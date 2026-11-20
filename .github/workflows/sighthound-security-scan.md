@@ -154,6 +154,7 @@ mcp-scripts:
     run: cat /tmp/gh-aw/agent/sighthound/summary.md
 safe-outputs:
   create-issue:
+    expires: 2d
     max: 1
     labels: [security, sighthound, cookie]
     close-older-issues: true

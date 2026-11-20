@@ -823,6 +823,7 @@ jobs:
             core.setOutput("issue_body", issueBody);
 safe-outputs:
   create-issue:
+    expires: 2d
     max: 1
     labels: [security, bot-detection]
   update-issue:

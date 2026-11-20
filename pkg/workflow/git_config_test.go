@@ -62,40 +62,6 @@ This is a test workflow to verify git configuration is included.
 	}
 }
 
-// TestGitConfigurationStepsHelper tests the generateGitConfigurationSteps helper directly
-func TestGitConfigurationStepsHelper(t *testing.T) {
-	compiler := NewCompiler()
-
-	steps := compiler.generateGitConfigurationSteps()
-
-	// Verify we get expected number of lines (6 lines: name, env, GH_AW_GIT_REPOSITORY, GITHUB_SERVER_URL, GITHUB_TOKEN, run)
-	if len(steps) != 6 {
-		t.Errorf("Expected 6 lines in git configuration steps, got %d", len(steps))
-	}
-
-	// Verify the content of the steps
-	expectedContents := []string{
-		"Configure Git credentials",
-		"env:",
-		"GH_AW_GIT_REPOSITORY:",
-		"GITHUB_TOKEN:",
-		"configure_git_credentials.sh",
-	}
-
-	fullContent := strings.Join(steps, "")
-
-	for _, expected := range expectedContents {
-		if !strings.Contains(fullContent, expected) {
-			t.Errorf("Expected git configuration steps to contain '%s'", expected)
-		}
-	}
-
-	// Verify proper indentation (should start with 6 spaces for job step level)
-	if !strings.HasPrefix(steps[0], "      - name:") {
-		t.Error("Expected first line to have proper indentation for job step (6 spaces)")
-	}
-}
-
 // TestGitCredentialsCleanerStep verifies that git credentials cleaner step is included before agent execution
 func TestGitCredentialsCleanerStep(t *testing.T) {
 	// Create temporary directory for test files

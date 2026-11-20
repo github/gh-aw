@@ -85,8 +85,8 @@
   body.light .dots button { background: #1f232833; }
   body.light .dots button.hd { background: transparent; box-shadow: inset 0 0 0 2px #1f232859; }
   body.light .dots button.on { background: #1f2328; box-shadow: none; }
-  body.light .snd, body.light .fzb, body.light .smb, body.light .ntb, body.light .ksb, body.light .arrows button { border-color: #9ea7b3; background: #e6eaefcc; color: #424a53; }
-  body.light .snd:hover, body.light .fzb:hover, body.light .smb:hover, body.light .ntb:hover, body.light .ksb:hover, body.light .arrows button:hover { color: #1f2328; border-color: #818b98; }
+  body.light .snd, body.light .fzb, body.light .smb, body.light .ntb, body.light .ksb, body.light .ccb, body.light .arrows button { border-color: #9ea7b3; background: #e6eaefcc; color: #424a53; }
+  body.light .snd:hover, body.light .fzb:hover, body.light .smb:hover, body.light .ntb:hover, body.light .ksb:hover, body.light .ccb:hover, body.light .arrows button:hover { color: #1f2328; border-color: #818b98; }
   /* research prototype badge on every gh cao slide (top right, clear of the chrome) */
   .proto { position: absolute; right: 110px; top: 76px; display: flex; align-items: center; gap: 14px; padding: 12px 22px; border: 2px dashed #e3b341; border-radius: 999px; background: #0d1117cc; font: 600 20px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: #e3b341; z-index: 5; }
   .proto i { width: 12px; height: 12px; border-radius: 50%; background: #e3b341; box-shadow: 0 0 12px #e3b341; animation: proto-blink 1.6s ease-in-out infinite; }
@@ -174,10 +174,10 @@
   body.compact-nav.nav-idle :is(.arrows, .vnb, .snd, .fzb, .smb, .ntb, .ksb, .tourp) { opacity: .4; }
   body.compact-nav.nav-idle :is(.arrows:has(:focus-visible), .vnb:focus-visible, .snd:focus-visible, .fzb:focus-visible, .smb:focus-visible, .ntb:focus-visible, .ksb:focus-visible, .tourp:has(:focus-visible)) { opacity: 1; }
   @media (prefers-reduced-motion: reduce) { body.compact-nav :is(.arrows, .vnb, .snd, .fzb, .smb, .ntb, .ksb, .tourp) { transition: none; } }
-  .snd, .fzb, .smb, .ntb, .ksb { position: fixed; right: calc(24px + var(--sr)); bottom: calc(10px + var(--sb)); width: 34px; height: 34px; padding: 6px; border: 1px solid #3d444d; border-radius: 8px;
+  .snd, .fzb, .smb, .ntb, .ksb, .ccb { position: fixed; right: calc(24px + var(--sr)); bottom: calc(10px + var(--sb)); width: 34px; height: 34px; padding: 6px; border: 1px solid #3d444d; border-radius: 8px;
     background: #151b23cc; color: #9198a1; cursor: pointer; z-index: 5; transition: color .2s, border-color .2s, background .2s; }
-  .snd:hover, .fzb:hover, .smb:hover, .ntb:hover, .ksb:hover { color: #f0f6fc; border-color: #9198a1; }
-  .snd svg, .fzb svg, .smb svg, .ntb svg, .ksb svg { width: 100%; height: 100%; display: block; }
+  .snd:hover, .fzb:hover, .smb:hover, .ntb:hover, .ksb:hover, .ccb:hover { color: #f0f6fc; border-color: #9198a1; }
+  .snd svg, .fzb svg, .smb svg, .ntb svg, .ksb svg, .ccb svg { width: 100%; height: 100%; display: block; }
   .fzb { right: calc(64px + var(--sr)); }
   .smb { right: calc(104px + var(--sr)); }
   .ntb { right: calc(144px + var(--sr)); }
@@ -192,6 +192,19 @@
   body.kiosk.nav-idle { cursor: none; }
   body.kiosk.nav-idle :is(.ksb, .snd):not(:focus-visible) { opacity: 0; }
   body.light.kiosk :is(.ksb, .snd) { color: #1f2328; border-color: #1f2328; }
+  /* closed captioning (CC): kiosk mode with the muted-TV captions of a bar or an airport gate. Two speakers talk each
+     slide through as roll-up speech-to-text, uppercase in black boxes over the bottom of the ${W}x${H} frame. */
+  .ccb { display: none; }
+  body.kiosk .ccb { display: block; right: calc(104px + var(--sr)); opacity: 1; color: #f0f6fc; border-color: #f0f6fc; transition: opacity .4s, color .2s, border-color .2s; }
+  body.kiosk.nav-idle .ccb:not(:focus-visible) { opacity: 0; }
+  body.light.kiosk .ccb { color: #1f2328; border-color: #1f2328; }
+  .ccb[aria-pressed="true"] { box-shadow: inset 0 -3px currentColor; }
+  .cc { position: fixed; inset: 0; z-index: 4; pointer-events: none; overflow: hidden; display: none; }
+  body.cc-on .cc { display: block; }
+  .cc-f { position: absolute; left: 50%; top: 50%; width: ${W}px; height: ${H}px; transform-origin: 0 0; }
+  .cc-box { position: absolute; left: 50%; bottom: 72px; transform: translateX(-50%); display: flex; flex-direction: column; align-items: flex-start; }
+  .cc-box div { padding: 4px 18px; background: #000000e0; color: #fff; font: 600 38px/1.3 var(--mono); letter-spacing: .02em; text-transform: uppercase; white-space: pre; }
+  .cc-box div:empty { display: none; }
   .snd .waves { transition: opacity .2s; }
   .snd .x { opacity: 0; transition: opacity .2s; }
   .snd.off .waves { opacity: 0; }
@@ -327,6 +340,60 @@
   body.light .smp-tb span { color: #59636e; }
   body.light .smp-d { background: #f6f8fa; border-color: #9ea7b3; }
   body.light .smp-dc { color: #1f2328; }
+  /* keyboard manual (bottom of the map): game-style controls screen, a full keyboard then a card per group; keycaps are inert kbd */
+  .smp-kg { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; align-items: start; }
+  .smp-kbd { grid-column: 1 / -1; padding: 14px 12px 10px; border: 1px solid #3d444d; border-radius: 8px;
+    background: radial-gradient(ellipse at 50% 55%, #4493f824, transparent 70%), #151b23; }
+  .smp-kbw { overflow-x: auto; }
+  .smp-kbd svg { display: block; width: 100%; min-width: 680px; height: auto; font-family: var(--mono); }
+  .kb-k .kb-sk { fill: #0d1117; stroke: #3d444d; }
+  .kb-k .kb-top { fill: #212830; stroke: #3d444d; }
+  .kb-l { font-size: 10px; font-weight: 600; fill: #9198a1; text-anchor: middle; dominant-baseline: middle; pointer-events: none; }
+  .kb-t { font-size: 7.5px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; fill: var(--c); text-anchor: middle; dominant-baseline: middle; pointer-events: none; }
+  .kb-k.on { cursor: help; }
+  .kb-k.on .kb-sk { fill: #0d419d; stroke: var(--c); }
+  .kb-k.on .kb-top { fill: #1b2a40; stroke: var(--c); }
+  .kb-k.on .kb-l { fill: #f0f6fc; font-size: 11px; }
+  .kb-k.mod .kb-top { stroke-dasharray: 4 3; }
+  .kb-k.hot .kb-top { fill: #4493f8; }
+  .kb-k.hot .kb-l, .kb-k.hot .kb-t { fill: #0d1117; }
+  .kb-arc { cursor: help; }
+  .kb-arc path { fill: none; stroke: var(--c); stroke-width: 2.5; stroke-linecap: round; opacity: .7; filter: drop-shadow(0 0 3px #0d1117); }
+  .kb-arc.seq path { stroke-dasharray: 2 6; }
+  .kb-arc circle { fill: var(--c); stroke: #0d1117; stroke-width: 2; }
+  .kb-arc.hot path { opacity: 1; stroke-width: 4; stroke: #cae8ff; }
+  .kb-arcs:has(.hot) .kb-arc:not(.hot) { opacity: .2; }
+  .smp-kcap { margin: 8px 0 0; min-height: 1.4em; text-align: center; font: 500 12px/1.4 "Mona Sans", sans-serif; color: #c9d1d9; }
+  .smp-kb { padding: 10px 12px; border: 1px solid #3d444d; border-top: 3px solid var(--c); border-radius: 8px; background: #151b23; }
+  .smp-kb h4 { margin: 0 0 8px; font: 600 12px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--c); }
+  .smp-kb dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 7px 12px; align-items: center; }
+  .smp-kb dl > div { display: contents; }
+  .smp-kb dt { display: flex; flex-wrap: wrap; gap: 4px; }
+  .smp-kb dd { margin: 0; font: 500 12px/1.35 "Mona Sans", sans-serif; color: #c9d1d9; }
+  .smp-kc { display: inline-flex; align-items: center; gap: 2px; }
+  .smp-kc i { font: 600 10px/1 var(--mono); font-style: normal; color: #9198a1; }
+  .smp-keys kbd { display: inline-flex; align-items: center; justify-content: center; min-width: 24px; height: 24px; padding: 0 6px; box-sizing: border-box;
+    font: 600 11px/1 var(--mono); color: #f0f6fc; background: linear-gradient(#2a313c, #1f2630); border: 1px solid #3d444d; border-bottom: 3px solid #0d1117;
+    border-radius: 5px; box-shadow: 0 1px 0 #ffffff14 inset; white-space: nowrap; }
+  @media (max-width: 640px) { .smp-kg { grid-template-columns: minmax(0, 1fr); } }
+  body.light .smp-kb { background: #ffffff; border-color: #9ea7b3; border-top-color: var(--c); }
+  body.light .smp-kbd { background: radial-gradient(ellipse at 50% 55%, #4493f81f, transparent 70%), #ffffff; border-color: #9ea7b3; }
+  body.light .kb-k .kb-sk { fill: #d1d9e0; stroke: #9ea7b3; }
+  body.light .kb-k .kb-top { fill: #f6f8fa; stroke: #9ea7b3; }
+  body.light .kb-l { fill: #59636e; }
+  body.light .kb-k.on .kb-sk { fill: #0969da; stroke: #0969da; }
+  body.light .kb-k.on .kb-top { fill: #ddf4ff; stroke: #0969da; }
+  body.light .kb-k.on .kb-l { fill: #1f2328; }
+  body.light .kb-t, body.light .kb-arc circle { fill: #0969da; }
+  body.light .kb-arc path { stroke: #0969da; filter: drop-shadow(0 0 2px #ffffff); }
+  body.light .kb-arc circle { stroke: #ffffff; }
+  body.light .kb-k.hot .kb-top { fill: #0969da; }
+  body.light .kb-k.hot .kb-l, body.light .kb-k.hot .kb-t { fill: #ffffff; }
+  body.light .kb-arc.hot path { stroke: #0550ae; }
+  body.light .smp-kcap { color: #1f2328; }
+  body.light .smp-kb dd { color: #1f2328; }
+  body.light .smp-kb h4 { color: #0969da; }
+  body.light .smp-keys kbd { color: #1f2328; background: linear-gradient(#ffffff, #eaeef2); border-color: #9ea7b3; border-bottom-color: #818b98; box-shadow: none; }
   body.light .smp-db, body.light .smp-d input { background: #ffffff; border-color: #9ea7b3; color: #1f2328; }
   body.light .smp-db.go { background: #0969da; border-color: #0969da; color: #ffffff; }
   body.light .smp.design .smp-t[aria-pressed="true"] { border-color: #0969da; background: #0969da14; }
@@ -550,11 +617,12 @@
       b._nav = fn;
       return b;
     };
+    const lineStartBtn = arrowBtn("First slide of the band", "Shift+Home", "Shift+Home", "M5 5v14M13 6l-6 6 6 6M20 6l-6 6 6 6", () => lineStart());
     const bandPrevBtn = arrowBtn("Previous band", "PgUp or Shift+↑", "PageUp Shift+ArrowUp", "M6 5v14M18 6l-7 6 7 6", () => band(-1));
     const prevBtn = arrowBtn("Previous slide", "←", "ArrowLeft Backspace", "M15 5l-7 7 7 7", () => prev());
     const nextBtn = arrowBtn("Next slide", "→", "ArrowRight Space Enter", "M9 5l7 7-7 7", () => next());
     const bandNextBtn = arrowBtn("Next band", "PgDn or Shift+↓", "PageDown Shift+ArrowDown", "M18 5v14M6 6l7 6-7 6", () => band(1));
-    const arrows = h("div", { class: "arrows" }, bandPrevBtn, prevBtn, nextBtn, bandNextBtn);
+    const arrows = h("div", { class: "arrows" }, lineStartBtn, bandPrevBtn, prevBtn, nextBtn, bandNextBtn);
     // Column button (dock): shown on a column's head and its examples. On the head it is lit with a bouncing
     // arrow and the example count, so the audience knows there is a line below; it steps down the column and,
     // on the last example, turns into an up arrow back to the pattern.
@@ -666,6 +734,18 @@
         setKiosk(!kiosk);
       },
     });
+    // closed captioning (C, CC): kiosk mode as a captioned news TV; its dock button shows only while kiosk mode runs
+    const ccb = h("button", {
+      class: "ccb",
+      "aria-pressed": "false",
+      "aria-keyshortcuts": "C",
+      onclick: e => {
+        e.stopPropagation();
+        toggleCap();
+      },
+    });
+    ccb.innerHTML =
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="3"/><path d="M10.5 10a2.5 2.5 0 1 0 0 4M17.5 10a2.5 2.5 0 1 0 0 4"/></svg>';
     // tour pill (top right, only during a tour): the tour title and position open the map; × shows every slide again
     const tourT = h("span", { class: "tourp-t" }),
       tourN = h("span", { class: "tourp-n" });
@@ -708,7 +788,14 @@
     for (const t of ["touchstart", "touchend"]) tourP.addEventListener(t, e => e.stopPropagation(), { passive: true });
     const wash = h("div", { class: "wash" });
     const gridc = h("canvas", { class: "gridc" });
-    document.body.append(canvas, wash, gridc, stage, progress, dots, arrows, vnb, ksb, notesBtn, smBtn, fzBtn, ...(config.sound ? [snd] : []), notes, tourP);
+    // closed-captioning overlay (see "closed captioning" below): three roll-up caption rows in a frame scaled like the stage
+    const ccRows = h("div", { class: "cc-box" }, h("div"), h("div"), h("div"));
+    const ccF = h("div", { class: "cc-f" }, ccRows);
+    const ccEl = h("div", { class: "cc", "aria-hidden": "true" }, ccF);
+    // kiosk mode starts captioned; turning CC off keeps it off for later kiosk runs until it is turned back on
+    let capOn = false,
+      capPref = true;
+    document.body.append(canvas, wash, gridc, stage, ccEl, progress, dots, arrows, vnb, ksb, ccb, notesBtn, smBtn, fzBtn, ...(config.sound ? [snd] : []), notes, tourP);
     // the pressed state (sound on) and the struck-out icon (.off) always follow the sound service
     const paintSound = () => {
       snd.classList.toggle("off", !!sfx.muted);
@@ -720,7 +807,7 @@
     const dotsWidth = 28 + Math.max(...rows.map(r => r.items.reduce((w, s) => w + (s.parent ? 7 : 13), r.header ? 13 : 0))) + 16 + 400;
     const fit = () => {
       const s = Math.min(innerWidth / W, innerHeight / H);
-      stage.style.transform = `scale(${s}) translate(-50%, -50%)`;
+      ccF.style.transform = stage.style.transform = `scale(${s}) translate(-50%, -50%)`;
       document.body.classList.toggle("compact-nav", dotsWidth > innerWidth - 230);
     };
     addEventListener("resize", fit);
@@ -783,12 +870,15 @@
     const kioskArm = () => {
       if (!kiosk) return;
       clearTimeout(kiosk.t);
-      kiosk.t = setTimeout(() => {
-        if (!kiosk) return;
-        // hold the slide while any dialog (search, map, a deck's own modal) is open
-        if (!document.querySelector("dialog[open], [aria-modal='true']")) go(kioskNext());
-        kioskArm();
-      }, KIOSK_MS);
+      kiosk.t = setTimeout(
+        () => {
+          if (!kiosk) return;
+          // hold the slide while any dialog (search, map, a deck's own modal) is open
+          if (!document.querySelector("dialog[open], [aria-modal='true']")) go(kioskNext());
+          kioskArm();
+        },
+        capOn ? Math.max(KIOSK_MS, capDwell(cur)) : KIOSK_MS
+      );
     };
     const paintKiosk = () => {
       const label = kiosk ? "Stop kiosk mode" : "Start kiosk mode: rotate slides in fullscreen",
@@ -824,10 +914,12 @@
           }
         }
         kioskArm();
+        if (capPref) setCap(true);
       } else {
         const k = kiosk;
         clearTimeout(k.t);
         kiosk = null;
+        if (capOn) setCap(false);
         // leave the fullscreen kiosk mode asked for, not one the presenter already had
         if (k.entered && fsEl()) exitFs();
       }
@@ -965,8 +1057,11 @@
       void el.offsetWidth; // restart CSS animations on re-entry
       el.classList.add("active");
       cur = n;
+      if (n !== goalKeep) goal = Math.max(0, posOf(n));
+      goalKeep = -1;
       slides[n].enter?.(dir);
       chrome(n);
+      if (capOn) capEnter();
       kioskArm();
     }
     // progress, dots, dock buttons, notes and hash for slide n (also refreshed when a tour starts or ends)
@@ -980,6 +1075,7 @@
       nextBtn.disabled = nextTop(n) == null;
       bandPrevBtn.disabled = bandTo(slides[n].band, -1) == null;
       bandNextBtn.disabled = bandTo(slides[n].band, 1) == null;
+      lineStartBtn.disabled = n === mainLine(slides[n].band)[0];
       paintColumn(n);
       renderNotes(slides[n].notes || "");
       notes.scrollTop = 0;
@@ -987,7 +1083,7 @@
       history.replaceState(null, "", hashFor(n));
     }
     // Left/right walk the main line of slides (column heads, never their examples) and wrap across bands;
-    // up/down walk a column, and past its ends (or off any column) jump to the header of the band above/below.
+    // up/down walk a column, and past its ends (or off any column) move to the band above/below, keeping the horizontal position.
     // In a tour only its slides count (an example is only ever in a tour together with its pattern).
     const pat = n => (slides[n].parent ? slides.indexOf(slides[n].parent) : -1);
     const onMain = i => vis(i) && pat(i) < 0;
@@ -1008,9 +1104,24 @@
       }
       return null;
     };
+    // the visible main line of band b (header first, then column heads and plain slides, never examples)
+    const mainLine = b => slides.reduce((a, s, i) => (s.band === b && onMain(i) && a.push(i), a), []);
+    const posOf = n => mainLine(slides[n].band).indexOf(top(n));
+    // Like a text cursor, up/down keep the horizontal position: `goal` is the main-line position of the last
+    // slide reached any other way, and a band move lands on that position, clamped to the band's length.
+    let goal = 0,
+      goalKeep = -1;
     const band = d => {
       const i = bandTo(slides[cur].band, d);
-      if (i != null) go(i);
+      if (i == null) return;
+      const line = mainLine(slides[i].band),
+        to = line.length ? line[Math.min(goal, line.length - 1)] : i;
+      goalKeep = to;
+      go(to);
+    };
+    const lineStart = () => {
+      const line = mainLine(slides[cur].band);
+      if (line.length) go(line[0]);
     };
     // the visible part of a slide's column, pattern first, or null when there is nothing to walk
     const colList = s => {
@@ -1110,10 +1221,12 @@
       } else if (e.key === "u" || e.key === "U") {
         const col = colOf(slides[cur]);
         if (col) go(slides.indexOf(col));
-      } else if (e.key === "Home") go(firstVis());
+      } else if (e.key === "Home" && e.shiftKey) lineStart();
+      else if (e.key === "Home") go(firstVis());
       else if (e.key === "End") go(lastVis());
       else if (e.key === "f" || e.key === "F") toggleFullscreen();
       else if ((e.key === "k" || e.key === "K") && !e.repeat && !target.closest?.("input, textarea, select, [contenteditable]")) setKiosk(!kiosk);
+      else if ((e.key === "c" || e.key === "C") && !e.repeat && !target.closest?.("input, textarea, select, [contenteditable]")) toggleCap();
       else if (e.key === "Escape" && kiosk && !e.defaultPrevented) {
         e.preventDefault();
         setKiosk(false);
@@ -1445,6 +1558,260 @@
       h("h3", { class: "smp-l", id: "smp-tours-h" }, "Tours", " ", h("small", {}, "filtered views of the deck, shareable by link")),
       smpTourList
     );
+    // Keyboard manual (below the tours): a game-style controls screen, a full keyboard plus one card per group of
+    // shortcuts. Each entry is [keys, action]; a key is a string whose "+" joins a chord ("Shift+Home").
+    /** @type {Array<[string[], string]>} */
+    const SOUND_KEYS = config.sound ? [[["M"], "Sound on or off"]] : [];
+    /** @type {Array<[string, Array<[string[], string]>]>} */
+    const KEYMAP = [
+      [
+        "Move",
+        [
+          [["→", "Space", "Enter"], "Next slide"],
+          [["←", "Backspace"], "Previous slide"],
+          [["↑", "↓"], "Up or down a column, or to the next band; keeps your place in the line"],
+          [["Shift+↑", "Shift+↓", "PgUp", "PgDn"], "Previous or next band"],
+          [["U"], "Back to the pattern of an example"],
+        ],
+      ],
+      [
+        "Jump",
+        [
+          [["Shift+Home"], "First slide of the band"],
+          [["Home", "End"], "First or last slide"],
+          [["1…9+Enter"], "Slide by number"],
+          [["/", "Ctrl+K", "⌘+K"], "Search slides"],
+          [["G"], "Slide map (this screen)"],
+        ],
+      ],
+      [
+        "Show",
+        [[["N"], "Speaker notes"], [["F"], "Fullscreen"], [["K"], "Kiosk: auto-advance (Esc stops)"], [["C"], "Closed captioning (CC) in kiosk mode"], ...SOUND_KEYS, [["X"], "Leave the tour or view"], [["Esc"], "Close notes or dialogs"]],
+      ],
+      [
+        "Slide map",
+        [
+          [["←", "→", "↑", "↓"], "Move between tiles"],
+          [["Home", "End"], "First or last tile"],
+          [["Enter"], "Open the slide"],
+          [["T"], "Tours"],
+          [["D"], "Design a view"],
+          [["Esc", "G"], "Close the map"],
+        ],
+      ],
+      [
+        "Design a view",
+        [
+          [["A"], "Select every slide"],
+          [["C"], "Clear the selection"],
+          [["L"], "Copy the link"],
+          [["Ctrl+Enter"], "Apply the view"],
+          [["Esc"], "Leave design mode"],
+        ],
+      ],
+    ];
+    const keycap = k =>
+      h(
+        "span",
+        { class: "smp-kc" },
+        k.split(/(?<=.)\+(?=.)/).flatMap((p, i) => (i ? [h("i", {}, "+"), h("kbd", {}, p)] : [h("kbd", {}, p)]))
+      );
+    // Full 102-key ISO keyboard (main block, F row, navigation cluster, numpad) drawn in SVG. Keys bound in KEYMAP light
+    // up with a short tag; arcs join each chord's modifier to its key ("1…9+Enter" is a dashed sequence). Each key is
+    // [label, x, y, w?, h?, k?] in key units; k names the KEYMAP key it stands for (default: the label).
+    const KB = (() => {
+      /** @type {any[][]} */
+      const keys = [["Esc", 0, 0]];
+      for (let i = 0; i < 12; i++) keys.push([`F${i + 1}`, 2 + i + Math.floor(i / 4) * 0.5, 0]);
+      ["PrtSc", "ScrLk", "Pause"].forEach((l, i) => keys.push([l, 15.5 + i, 0]));
+      const row = (y, x, labels) => labels.forEach(l => (Array.isArray(l) ? (keys.push([l[0], x, y, ...l.slice(1)]), (x += l[1] || 1)) : (keys.push([l, x, y]), x++)));
+      row(1.5, 0, ["`", ..."123456789".split("").map(d => [d, 1, 1, "1…9"]), "0", "-", "=", ["Backspace", 2]]);
+      row(2.5, 0, [["Tab", 1.5], ..."QWERTYUIOP[]"]);
+      row(3.5, 0, [["Caps", 1.75], ..."ASDFGHJKL;'#"]);
+      row(4.5, 0, [["Shift", 1.25], "\\", ..."ZXCVBNM,./", ["Shift", 2.75]]);
+      [
+        ["Ctrl", 0, 1.5],
+        ["Alt", 2.5, 1.5],
+        ["Space", 4, 7],
+        ["AltGr", 11, 1.5],
+        ["Ctrl", 13.5, 1.5],
+      ].forEach(([l, x, w]) => keys.push([l, x, 5.5, w]));
+      keys.push(["Enter", 13.5, 2.5, 1.5, 2, "Enter", "iso"]);
+      ["Ins", "Home", "PgUp"].forEach((l, i) => keys.push([l, 15.5 + i, 1.5]));
+      ["Del", "End", "PgDn"].forEach((l, i) => keys.push([l, 15.5 + i, 2.5]));
+      keys.push(["↑", 16.5, 4.5]);
+      ["←", "↓", "→"].forEach((l, i) => keys.push([l, 15.5 + i, 5.5]));
+      ["Num", "/", "*", "-"].forEach((l, i) => keys.push([l, 19 + i, 1.5]));
+      [
+        ["7", "8", "9"],
+        ["4", "5", "6"],
+        ["1", "2", "3"],
+      ].forEach((r, j) => r.forEach((d, i) => keys.push([d, 19 + i, 2.5 + j, 1, 1, "1…9"])));
+      keys.push(["+", 22, 2.5, 1, 2], ["Enter", 22, 4.5, 1, 2], ["0", 19, 5.5, 2], [".", 21, 5.5]);
+      return keys.map(([label, x, y, w = 1, hh = 1, k = label, shape]) => ({ label, x, y, w, h: hh, k, shape }));
+    })();
+    const KEYTAG = {
+      "→": "next",
+      "←": "prev",
+      "↑": "up",
+      "↓": "down",
+      Space: "next",
+      Enter: "next",
+      Backspace: "prev",
+      PgUp: "band",
+      PgDn: "band",
+      Home: "first",
+      End: "last",
+      U: "pattern",
+      G: "map",
+      "/": "search",
+      N: "notes",
+      F: "full",
+      K: "kiosk",
+      C: "CC",
+      M: "sound",
+      X: "leave",
+      Esc: "close",
+      T: "tours",
+      D: "design",
+      A: "all",
+      L: "link",
+      Shift: "mod",
+      Ctrl: "mod ⌘",
+      "1…9": "jump",
+    };
+    const KALIAS = { "⌘": "Ctrl" };
+    const chord = k => k.split(/(?<=.)\+(?=.)/).map(p => KALIAS[p] || p);
+    const smpKeyboard = (() => {
+      const U = 40,
+        NS = "http://www.w3.org/2000/svg";
+      const s = (tag, attrs = {}, ...kids) => {
+        const el = document.createElementNS(NS, tag);
+        for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v);
+        el.append(...kids.flat().filter(k => k != null));
+        return el;
+      };
+      const rows = KEYMAP.flatMap(([, r]) => r);
+      const bound = new Set(rows.flatMap(([keys]) => keys.flatMap(chord)));
+      const pts = key => {
+        const [x, y, w, hh, i] = [key.x * U, key.y * U, key.w * U, key.h * U, 3];
+        // ISO Enter: 1.5u wide on its top row, 1.25u on the row below
+        return key.shape === "iso"
+          ? [
+              [x + i, y + i],
+              [x + w - i, y + i],
+              [x + w - i, y + hh - i],
+              [x + 0.25 * U + i, y + hh - i],
+              [x + 0.25 * U + i, y + U - i],
+              [x + i, y + U - i],
+            ]
+          : [
+              [x + i, y + i],
+              [x + w - i, y + i],
+              [x + w - i, y + hh - i],
+              [x + i, y + hh - i],
+            ];
+      };
+      const centre = key => [(key.x + (key.shape ? 0.75 : key.w / 2)) * U, (key.y + (key.shape ? 0.5 : key.h / 2)) * U];
+      const anchor = key => [centre(key)[0], key.y * U + 5];
+      // a chord joins the nearest pair of its keys outside the numpad (right Shift to the arrows, 9 to Enter) so arcs stay short
+      const nearest = (a, b) => {
+        /** @type {[number, any, any] | undefined} */
+        let best;
+        for (const p of KB.filter(key => key.k === a && key.x < 19))
+          for (const q of KB.filter(key => key.k === b && key.x < 19)) {
+            const d = Math.hypot(p.x - q.x, p.y - q.y);
+            if (!best || d < best[0]) best = [d, p, q];
+          }
+        return best.slice(1);
+      };
+      const combos = new Map();
+      for (const [keys, act] of rows)
+        for (const key of keys) {
+          const parts = chord(key);
+          if (parts.length < 2) continue;
+          const id = parts.join("+");
+          if (!combos.has(id)) combos.set(id, { parts, acts: [], seq: parts[0] === "1…9" });
+          if (!combos.get(id).acts.includes(act)) combos.get(id).acts.push(act);
+        }
+      const arcs = [...combos.values()].map(c => {
+        const [[x1, y1], [x2, y2]] = nearest(c.parts[0], c.parts[1]).map(anchor);
+        const lift = 0.6 * U + Math.abs(x2 - x1) * 0.3;
+        return s(
+          "g",
+          { class: `kb-arc${c.seq ? " seq" : ""}`, "data-parts": c.parts.join(" ") },
+          s("path", { d: `M${x1} ${y1} Q${(x1 + x2) / 2} ${Math.min(y1, y2) - lift} ${x2} ${y2}` }),
+          s("circle", { cx: x1, cy: y1, r: 4 }),
+          s("circle", { cx: x2, cy: y2, r: 4 })
+        );
+      });
+      const keyEls = KB.map(key => {
+        const p = pts(key),
+          [cx, cy] = centre(key),
+          on = bound.has(key.k),
+          tag = on && KEYTAG[key.k];
+        const poly = dy => p.map(([x, y]) => `${x},${y + dy}`).join(" ");
+        return s(
+          "g",
+          { class: `kb-k${on ? " on" : ""}${key.k === "Shift" || key.k === "Ctrl" ? " mod" : ""}`, "data-k": key.k },
+          s("polygon", { class: "kb-sk", points: poly(0) }),
+          s("polygon", { class: "kb-top", points: poly(-3) }),
+          s("text", { x: cx, y: cy - (tag ? 6 : 2), class: "kb-l" }, key.label),
+          tag ? s("text", { x: cx, y: cy + 9, class: "kb-t" }, tag) : null
+        );
+      });
+      const svg = s(
+        "svg",
+        { viewBox: `-8 -12 ${23 * U + 16} ${6.5 * U + 20}`, role: "img", "aria-label": "Full keyboard: lit keys have shortcuts, arcs join a modifier or digits to their key; the cards below list every shortcut" },
+        s("g", {}, keyEls),
+        s("g", { class: "kb-arcs" }, arcs)
+      );
+      const HINT = "Point at a key or an arc to see what it does";
+      const cap = h("p", { class: "smp-kcap" }, HINT);
+      const actsFor = k => rows.filter(([keys]) => keys.some(key => chord(key).includes(k))).map(([keys, act]) => `${keys.filter(key => chord(key).includes(k)).join(", ")}: ${act}`);
+      const light = (keys, arcSel, text) => {
+        svg.querySelectorAll(".hot").forEach(el => el.classList.remove("hot"));
+        keys.forEach(k => svg.querySelectorAll(`.kb-k[data-k="${CSS.escape(k)}"]`).forEach(el => el.classList.add("hot")));
+        arcSel.forEach(el => el.classList.add("hot"));
+        cap.textContent = text;
+      };
+      svg.addEventListener("pointerover", e => {
+        const arc = e.target.closest(".kb-arc"),
+          key = e.target.closest(".kb-k.on");
+        if (arc) {
+          const parts = arc.dataset.parts.split(" ");
+          light(parts, [arc], `${parts.join(arc.classList.contains("seq") ? " then " : "+")}: ${combos.get(parts.join("+")).acts.join(" · ")}`);
+        } else if (key) {
+          const k = key.dataset.k,
+            linked = [...svg.querySelectorAll(".kb-arc")].filter(a => a.dataset.parts.split(" ").includes(k));
+          light([k, ...linked.flatMap(a => a.dataset.parts.split(" "))], linked, actsFor(k).join(" · "));
+        } else light([], [], HINT);
+      });
+      svg.addEventListener("pointerleave", () => light([], [], HINT));
+      return h("div", { class: "smp-kbd" }, h("div", { class: "smp-kbw" }, svg), cap);
+    })();
+    const smpKeys = h(
+      "section",
+      { class: "smp-row smp-keys", "--c": "#4493f8", "aria-labelledby": "smp-keys-h" },
+      h("h3", { class: "smp-l", id: "smp-keys-h" }, "Keyboard", " ", h("small", {}, "every shortcut; on touch screens, swipe left, right, up and down")),
+      h(
+        "div",
+        { class: "smp-kg" },
+        smpKeyboard,
+        KEYMAP.map(([title, rows]) =>
+          h(
+            "div",
+            { class: "smp-kb" },
+            h("h4", {}, title),
+            h(
+              "dl",
+              {},
+              rows.map(([keys, act]) => h("div", {}, h("dt", {}, keys.map(keycap)), h("dd", {}, act)))
+            )
+          )
+        )
+      )
+    );
     const smpCount = h("span", { class: "smp-dc", "aria-live": "polite" });
     const smpTitle = h("input", { type: "text", class: "smp-dt", placeholder: "View title (optional)", maxLength: 80, "aria-label": "View title", oninput: () => smpPaint() });
     const smpLink = h("input", { type: "text", class: "smp-dl", readOnly: true, "aria-label": "Link to this view", onfocus: e => e.target.select() });
@@ -1621,7 +1988,8 @@
             h("div", { class: "smp-tiles" }, tiles)
           );
         }),
-        smpTours
+        smpTours,
+        smpKeys
       );
     };
     // nearest tile on the next visual line above or below (tiles wrap, so bands can span several lines)
@@ -1718,6 +2086,109 @@
     });
     for (const t of ["touchstart", "touchend"]) smp.addEventListener(t, e => e.stopPropagation(), { passive: true });
 
+    // ---------- closed captioning ----------
+    // Kiosk mode starts captioned; C (or the CC dock button in kiosk mode) toggles it. Captions run kiosk mode like a muted TV in a bar or an airport gate: two
+    // speakers talk each slide through as roll-up speech-to-text, >> marking each change of speaker. Their lines are
+    // precomputed per slide id in config.captions.scripts (alternating speakers); a slide without one reads its heading
+    // and slides.md summary. Each slide stays up until its conversation ends (at least the kiosk interval). Captions
+    // advance from the runtime frame loop: no timers, three DOM rows.
+    const CAP = config.captions || {},
+      CAP_WPS = 3.2, // caption words per second, the pace of live speech-to-text
+      CAP_COLS = 40; // characters per caption row
+    const capLines = i => {
+      const s = slides[i],
+        lines = CAP.scripts?.[s.id];
+      if (Array.isArray(lines) && lines.length) return lines;
+      const summary = (fzIndex ??= fzBuild())[i]?.summary;
+      return [`Now showing: ${headingText(s) || label(s)}.`, summary || (s.notes || "").split("\n")[0].replace(/^[A-Z][A-Za-z]{0,15}:\s+/, "")].filter(Boolean);
+    };
+    // deterministic pseudo-random bursts of 1-3 words, so a slide's airtime is known before it airs
+    const capRnd = k => {
+      const x = Math.sin(k * 12.9898 + 78.233) * 43758.5453;
+      return x - Math.floor(x);
+    };
+    const capPlans = new Map();
+    const capPlan = i => {
+      if (capPlans.has(i)) return capPlans.get(i);
+      const ev = [];
+      let at = 1200,
+        k = i * 97;
+      capLines(i).forEach((line, turn) => {
+        if (turn) at += 900;
+        ev.push({ at, turn });
+        const words = String(line).toUpperCase().split(/\s+/).filter(Boolean);
+        for (let w = 0; w < words.length;) {
+          const n = 1 + Math.floor(capRnd(k++) * 3);
+          ev.push({ at, turn, text: words.slice(w, w + n).join(" ") });
+          at += (n / CAP_WPS) * 1000 * (0.7 + capRnd(k++) * 0.6);
+          w += n;
+        }
+      });
+      const plan = { ev, dur: at + 3000 };
+      capPlans.set(i, plan);
+      return plan;
+    };
+    const capDwell = i => capPlan(i).dur;
+    let cc = null;
+    const ccPaint = () => [...ccRows.children].forEach((d, k) => (d.textContent = cc ? (cc.rows[cc.rows.length - 3 + k] ?? "") : ""));
+    const ccWraps = text => {
+      const row = cc.rows[cc.rows.length - 1];
+      return row.length + 1 + text.length > CAP_COLS && row !== ">>";
+    };
+    const ccPut = text => {
+      const last = cc.rows.length - 1;
+      if (ccWraps(text)) cc.rows.push(text);
+      else cc.rows[last] += ` ${text}`;
+      if (cc.rows.length > 3) cc.rows.splice(0, cc.rows.length - 3);
+    };
+    function capEnter() {
+      cc = { t0: performance.now(), plan: capPlan(cur), i: 0, rows: [""] };
+      ccPaint();
+    }
+    function capFrame() {
+      if (!cc) return;
+      const now = performance.now(),
+        { plan, t0 } = cc;
+      let dirty = false;
+      for (; cc.i < plan.ev.length && t0 + plan.ev[cc.i].at <= now; cc.i++) {
+        const e = plan.ev[cc.i];
+        if (e.text == null) {
+          if (e.turn) cc.rows.push(">>");
+          else cc.rows[cc.rows.length - 1] = ">>";
+        } else if (REDUCED) {
+          // reduced motion: a whole row lands at once, on the plan's timing, so no row scrolls off unread
+          ccPut(e.text);
+          for (let n; (n = plan.ev[cc.i + 1]) && n.text != null && n.turn === e.turn && !ccWraps(n.text); cc.i++) ccPut(n.text);
+        } else ccPut(e.text);
+        dirty = true;
+      }
+      if (dirty) ccPaint();
+    }
+    const paintCap = () => {
+      const lbl = capOn ? "Turn off closed captions (CC)" : "Turn on closed captions (CC)";
+      ccb.setAttribute("aria-pressed", String(capOn));
+      ccb.setAttribute("aria-label", `${lbl} (C)`);
+      ccb.title = `${lbl} (C)`;
+      document.body.classList.toggle("cc-on", capOn);
+    };
+    function setCap(on) {
+      on = !!on;
+      if (on === capOn) return on;
+      capOn = on;
+      if (on) {
+        if (!kiosk) setKiosk(true);
+        capEnter();
+      } else {
+        cc = null;
+        ccPaint();
+      }
+      paintCap();
+      kioskArm();
+      return on;
+    }
+    const toggleCap = () => setCap((capPref = !capOn));
+    paintCap();
+
     // ---------- animated background ----------
     const ctx = canvas.getContext("2d");
     const hex = c => [1, 3, 5].map(i => parseInt(c.slice(i, i + 2), 16));
@@ -1812,6 +2283,7 @@
         }
       }
 
+      if (capOn) capFrame();
       slides[cur]?.tick?.(t);
       requestAnimationFrame(frame);
     }
@@ -1825,7 +2297,7 @@
       setView(v);
       if (v) go(firstVis());
     };
-    return { slides, rows, go, next, prev, band, current: () => cur, tour, tours: () => Object.keys(TOURS), kiosk: on => setKiosk(on ?? !kiosk) };
+    return { slides, rows, go, next, prev, band, current: () => cur, tour, tours: () => Object.keys(TOURS), kiosk: on => setKiosk(on ?? !kiosk), captions: on => setCap((capPref = on ?? !capOn)) };
   }
 
   window.CracktroDeck = { h, letters, resetIndex, create };

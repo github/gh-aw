@@ -66,6 +66,7 @@ The method names mentioned in analyzer descriptions (such as `Err`, `Flush`, `Re
 - `ossetenvlibrary` — reports `os.Setenv` calls in library packages (`pkg/*`) where side effects should be isolated.
 - `packagelevelmutableslicemap` — reports package-level (file/package-scope) `var` slice/map declarations mutated from inside a function body via `append()` re-assignment, index assignment, or `delete()`. Mutations inside a top-level `init()` are exempt.
 - `panic-in-library-code` — reports `panic()` calls in library packages (`pkg/*`) where errors should be returned instead.
+- `prefercutprefix` — reports `strings.HasPrefix`/`HasSuffix` guards followed by matching `strings.TrimPrefix`/`TrimSuffix` calls; use `strings.CutPrefix`/`CutSuffix` to combine the check and trim.
 - `rawloginlib` — reports direct usage of the standard `log` package in library packages, where `pkg/logger` should be used.
 - `readerstringconv` — reports `strings.NewReader(string(b))` where `b` is `[]byte` and `bytes.NewReader([]byte(s))` where `s` is a string; prefer `bytes.NewReader(b)` or `strings.NewReader(s)` to avoid copying data only to change reader type. No automatic fix is offered: review concrete reader types and any reliance on a defensive copy of `b`. Named string arguments still need a `string(s)` conversion.
 - `reflect-deepequal-usage` (Go package `reflectdeepequalusage`) — reports `reflect.DeepEqual()` calls, including calls through local function-value aliases, that should use typed equality operators or type-specific comparison functions. Alias resolution is conservative: aliases must have a declaration initializer and no reassignment or address escape; package-level aliases are not resolved.
@@ -247,6 +248,7 @@ environment variable and gates findings on the recorded execution hit count for 
 | `ossetenvlibrary` | Custom `go/analysis` analyzer that flags `os.Setenv` usage in library packages |
 | `packagelevelmutableslicemap` | Custom `go/analysis` analyzer that flags package-level slice/map `var` declarations mutated from inside a function body via `append()` re-assignment, index assignment, or `delete()` |
 | `panic-in-library-code` | Custom `go/analysis` analyzer that flags `panic()` usage in library packages |
+| `prefercutprefix` | Custom `go/analysis` analyzer that flags matching `strings.HasPrefix`/`HasSuffix` guards followed by `strings.TrimPrefix`/`TrimSuffix` calls and recommends `strings.CutPrefix`/`CutSuffix` |
 | `rawloginlib` | Custom `go/analysis` analyzer that flags standard-library `log` package calls in library packages |
 | `readerstringconv` | Custom `go/analysis` analyzer that flags `strings.NewReader(string(b))` and `bytes.NewReader([]byte(s))` conversions and recommends the reader matching the original data |
 | `reflect-deepequal-usage` (`reflectdeepequalusage`) | Custom `go/analysis` analyzer that flags `reflect.DeepEqual()` calls that should use typed equality operators or type-specific comparison functions |
@@ -320,6 +322,7 @@ import (
 	"github.com/github/gh-aw/pkg/linters/osgetenvlibrary"
 	"github.com/github/gh-aw/pkg/linters/osexitinlibrary"
 	panicinlibrarycode "github.com/github/gh-aw/pkg/linters/panic-in-library-code"
+	"github.com/github/gh-aw/pkg/linters/prefercutprefix"
 	"github.com/github/gh-aw/pkg/linters/rawloginlib"
 	"github.com/github/gh-aw/pkg/linters/regexpcompileinfunction"
 	"github.com/github/gh-aw/pkg/linters/regexpdynamicpattern"
@@ -356,6 +359,7 @@ _ = manualmutexunlock.Analyzer
 _ = osgetenvlibrary.Analyzer
 _ = osexitinlibrary.Analyzer
 _ = panicinlibrarycode.Analyzer
+_ = prefercutprefix.Analyzer
 _ = rawloginlib.Analyzer
 _ = regexpcompileinfunction.Analyzer
 _ = regexpdynamicpattern.Analyzer
@@ -418,6 +422,7 @@ _ = typeassertionnil.Analyzer
 - `github.com/github/gh-aw/pkg/linters/ossetenvlibrary` — os-setenv-library analyzer subpackage
 - `github.com/github/gh-aw/pkg/linters/packagelevelmutableslicemap` — package-level-mutable-slice-map analyzer subpackage
 - `github.com/github/gh-aw/pkg/linters/panic-in-library-code` — panic-in-library-code analyzer subpackage
+- `github.com/github/gh-aw/pkg/linters/prefercutprefix` — prefer-cut-prefix analyzer subpackage
 - `github.com/github/gh-aw/pkg/linters/rawloginlib` — raw-log-in-lib analyzer subpackage
 - `github.com/github/gh-aw/pkg/linters/readerstringconv` — reader-string-conversion analyzer subpackage
 - `github.com/github/gh-aw/pkg/linters/regexpcompileinfunction` — regexp-compile-in-function analyzer subpackage

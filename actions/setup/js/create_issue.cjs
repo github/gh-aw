@@ -47,7 +47,7 @@ const TITLE_DEDUP_MIN_SEARCH_RATE_LIMIT_FRACTION = 0.2;
  * @typedef {import("./types/safe-outputs").IssueArtifactBodyInput} IssueArtifactBodyInput
  * @typedef {import("./types/safe-outputs").IssueArtifact} IssueArtifact
  * @typedef {import("./types/safe-outputs").CreatedIssueArtifact} CreatedIssueArtifact
- * @typedef {Omit<IssueParameters, "owner" | "repo" | "title" | "body"> & {owner?: string, repo?: string, title: string, body: string, artifacts?: IssueArtifactBodyInput[]}} CreateIssueParameters
+ * @typedef {Omit<IssueParameters, "owner" | "repo" | "title" | "body"> & {owner?: string, repo?: string, title: string, body: string, expiresHours?: number, artifacts?: IssueArtifactBodyInput[]}} CreateIssueParameters
  * @typedef {{staged: false, issue: Issue, artifacts?: CreatedIssueArtifact[]} | {staged: true, preview: IssueParameters & {artifacts?: IssueArtifact[]}}} CreateIssueResult
  */
 
@@ -97,9 +97,12 @@ async function createIssue(parameters) {
   if (issueArrayLimitError) {
     throw new Error(`${ERR_VALIDATION}: ${issueArrayLimitError}`);
   }
-  const { artifacts: artifactInput, ...issueParameters } = parameters;
+  const { artifacts: artifactInput, expiresHours, ...issueParameters } = parameters;
+  if (expiresHours !== undefined && (!Number.isFinite(expiresHours) || expiresHours <= 0)) {
+    throw new Error(`${ERR_VALIDATION}: createIssue expiresHours must be a positive finite number`);
+  }
   const artifacts = normalizeIssueArtifacts(artifactInput);
-  const report = buildIssueBodyReport(parameters.title, parameters.body, { repo: { owner, repo } });
+  const report = buildIssueBodyReport(parameters.title, parameters.body, { repo: { owner, repo }, expiresHours });
   /** @type {IssueParameters & {title: string, body: string}} */
   const request = renderIssueParameters({ ...issueParameters, owner, repo }, report);
   if (labels) request.labels = labels;
@@ -310,7 +313,8 @@ function createParentIssueTemplate(groupId, titlePrefix, workflowName, workflowS
       },
     ],
   });
-  if (expiresHours > 0) children.push({ type: "quote", agentTainted: false, children: [{ type: "expiration", expiresAt: new Date(Date.now() + expiresHours * 60 * 60 * 1000).toISOString(), agentTainted: false }] });
+  if (Number.isFinite(expiresHours) && expiresHours > 0)
+    children.push({ type: "quote", agentTainted: false, children: [{ type: "expiration", expiresAt: new Date(Date.now() + expiresHours * 60 * 60 * 1000).toISOString(), agentTainted: false }] });
   return { type: "report", title, children };
 }
 
@@ -893,10 +897,9 @@ async function main(config = {}) {
   return async function handleCreateIssue(message, resolvedTemporaryIds) {
     // Merge external resolved temp IDs with our local map
     if (resolvedTemporaryIds) {
+      // The current invocation's resolutions replace cached entries from earlier invocations.
       for (const [tempId, resolved] of Object.entries(resolvedTemporaryIds)) {
-        if (!temporaryIdMap.has(tempId)) {
-          temporaryIdMap.set(tempId, resolved);
-        }
+        temporaryIdMap.set(tempId, resolved);
       }
     }
 

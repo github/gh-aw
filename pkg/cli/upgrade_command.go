@@ -306,7 +306,7 @@ func runUpgradeCommand(opts upgradeOptions) (runErr error) {
 		if upgraded {
 			upgradeLog.Print("Extension was upgraded; re-launching with new binary")
 			fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Continuing upgrade with newly installed version..."))
-			// Pass installPath so relaunchWithSameArgs uses the pre-rename path;
+			// Pass installPath so relaunchUpgradeWithContext uses the pre-rename path;
 			// on Linux os.Executable() returns a "(deleted)" suffix after the rename.
 			if err := relaunchUpgradeWithContext(opts.ctx, "--skip-extension-upgrade", installPath); err != nil {
 				return err
@@ -568,7 +568,7 @@ func upgradeUsesCopilot(opts upgradeOptions, workflowDir string) bool {
 	return false
 }
 
-// relaunchWithSameArgs re-executes the current binary with the original command-line
+// relaunchUpgradeWithContext re-executes the current binary with the original command-line
 // arguments plus the provided extraFlag. stdin/stdout/stderr are forwarded to the child
 // process. The function blocks until the child exits and returns its error.
 // It is used after a successful extension upgrade so that the freshly-installed binary
@@ -578,10 +578,6 @@ func upgradeUsesCopilot(opts upgradeOptions, workflowDir string) bool {
 // calling os.Executable(). On Linux the caller should pass the pre-rename install
 // path because os.Executable() returns a "(deleted)"-suffixed path after the binary
 // has been renamed out of the way during the upgrade.
-func relaunchWithSameArgs(extraFlag string, exeOverride string) error {
-	return relaunchUpgradeWithContext(context.Background(), extraFlag, exeOverride)
-}
-
 func relaunchUpgradeWithContext(ctx context.Context, extraFlag string, exeOverride string) error {
 	allowedExtraFlags := map[string]struct{}{
 		"--skip-extension-upgrade": {},

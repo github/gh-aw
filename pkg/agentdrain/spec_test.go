@@ -3,6 +3,7 @@
 package agentdrain_test
 
 import (
+	"math"
 	"strconv"
 	"sync"
 	"testing"
@@ -22,18 +23,93 @@ func TestSpec_PublicAPI_DefaultConfig(t *testing.T) {
 
 	assert.NotEmpty(t, cfg.MaskRules, "production defaults should include masking rules")
 	assert.NotEmpty(t, cfg.ExcludeFields, "production defaults should include excluded fields")
-	miner, err := agentdrain.NewMiner(cfg)
+	_, err := agentdrain.NewMiner(cfg)
 	require.NoError(t, err, "the documented default configuration should construct a miner")
-	require.NotNil(t, miner, "the default configuration should produce a usable miner")
 }
 
-// TestSpec_PublicAPI_NewMiner validates that NewMiner creates a usable miner.
-func TestSpec_PublicAPI_NewMiner(t *testing.T) {
+// TestSpec_PublicAPI_Constructors validates that public constructors accept valid inputs
+// and reject invalid anomaly thresholds.
+func TestSpec_PublicAPI_Constructors(t *testing.T) {
 	t.Parallel()
-	cfg := agentdrain.DefaultConfig()
-	miner, err := agentdrain.NewMiner(cfg)
-	require.NoError(t, err, "NewMiner with valid config should not error")
-	assert.NotNil(t, miner, "NewMiner should return non-nil miner")
+	tests := []struct {
+		name      string
+		construct func() (any, error)
+		wantError bool
+	}{
+		{
+			name: "NewMiner",
+			construct: func() (any, error) {
+				return agentdrain.NewMiner(agentdrain.DefaultConfig())
+			},
+		},
+		{
+			name: "NewCoordinator",
+			construct: func() (any, error) {
+				return agentdrain.NewCoordinator(agentdrain.DefaultConfig(), []string{"plan", "tool_call", "finish"})
+			},
+		},
+		{
+			name: "NewMasker",
+			construct: func() (any, error) {
+				return agentdrain.NewMasker([]agentdrain.MaskRule{{Name: "number", Pattern: `\d+`, Replacement: "<NUM>"}})
+			},
+		},
+		{
+			name: "NewAnomalyDetector",
+			construct: func() (any, error) {
+				return agentdrain.NewAnomalyDetector(0.4, 2)
+			},
+		},
+		{
+			name: "NewAnomalyDetector rejects similarity threshold above one",
+			construct: func() (any, error) {
+				return agentdrain.NewAnomalyDetector(1.1, 2)
+			},
+			wantError: true,
+		},
+		{
+			name: "NewAnomalyDetector rejects NaN similarity threshold",
+			construct: func() (any, error) {
+				return agentdrain.NewAnomalyDetector(math.NaN(), 2)
+			},
+			wantError: true,
+		},
+		{
+			name: "NewAnomalyDetector rejects negative rare cluster threshold",
+			construct: func() (any, error) {
+				return agentdrain.NewAnomalyDetector(0.4, -1)
+			},
+			wantError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			result, err := tt.construct()
+			if tt.wantError {
+				require.Error(t, err, "constructor should reject invalid input")
+				assert.Nil(t, result, "constructor should not return a value for invalid input")
+				return
+			}
+			require.NoError(t, err, "constructor should accept valid input")
+			require.NotNil(t, result, "constructor should return a usable value")
+		})
+	}
+}
+
+// TestSpec_PublicAPI_Masker_Mask validates that Mask applies configured substitutions.
+func TestSpec_PublicAPI_Masker_Mask(t *testing.T) {
+	t.Parallel()
+	masker, err := agentdrain.NewMasker([]agentdrain.MaskRule{
+		{Name: "number", Pattern: `\d+`, Replacement: "<NUM>"},
+	})
+	require.NoError(t, err, "NewMasker should accept valid rules")
+	require.NotNil(t, masker, "NewMasker should return a usable masker")
+
+	result := masker.Mask("step 42 completed")
+	assert.Contains(t, result, "<NUM>", "Mask should apply substitution rules")
+	assert.NotContains(t, result, "42", "Mask should replace matched content")
 }
 
 // TestSpec_PublicAPI_Miner_TrainEvent validates that TrainEvent processes known-good events.
@@ -49,7 +125,7 @@ func TestSpec_PublicAPI_Miner_TrainEvent(t *testing.T) {
 	}
 	result, err := miner.TrainEvent(evt)
 	require.NoError(t, err, "TrainEvent should not error on valid event")
-	assert.NotNil(t, result, "TrainEvent should return a MatchResult")
+	require.NotNil(t, result, "TrainEvent should return a MatchResult")
 	assert.Positive(t, result.ClusterID, "ClusterID should be positive after training")
 }
 
@@ -112,16 +188,6 @@ func TestSpec_PublicAPI_Miner_Persistence(t *testing.T) {
 	require.NoError(t, err, "the restored miner should accept further training")
 	require.NoError(t, restored.LoadJSON(data), "loading a snapshot should replace existing miner state")
 	assert.Equal(t, miner.Clusters(), restored.Clusters(), "loading should replace subsequent training with saved cluster state")
-}
-
-// TestSpec_PublicAPI_NewCoordinator validates that NewCoordinator creates a coordinator for given stages.
-func TestSpec_PublicAPI_NewCoordinator(t *testing.T) {
-	t.Parallel()
-	cfg := agentdrain.DefaultConfig()
-	stages := []string{"plan", "tool_call", "finish"}
-	coord, err := agentdrain.NewCoordinator(cfg, stages)
-	require.NoError(t, err, "NewCoordinator with valid config and stages should not error")
-	assert.NotNil(t, coord, "NewCoordinator should return non-nil Coordinator")
 }
 
 // TestSpec_PublicAPI_Coordinator_AllClusters validates that AllClusters returns a map keyed by stage.
@@ -195,7 +261,11 @@ func TestSpec_PublicAPI_Utility_Tokenize(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			result := agentdrain.Tokenize(tt.line)
-			assert.Equal(t, tt.expected, result, "Tokenize(%q) mismatch", tt.line)
+			if tt.line == "" {
+				assert.Empty(t, result, "Tokenize(%q) should return no tokens", tt.line)
+			} else {
+				assert.Equal(t, tt.expected, result, "Tokenize(%q) mismatch", tt.line)
+			}
 		})
 	}
 }
@@ -274,33 +344,6 @@ func TestSpec_PublicAPI_Utility_StageSequence(t *testing.T) {
 	}
 }
 
-// TestSpec_PublicAPI_NewMasker validates that NewMasker creates a masker and Mask applies substitutions.
-func TestSpec_PublicAPI_NewMasker(t *testing.T) {
-	t.Parallel()
-	rules := []agentdrain.MaskRule{
-		{
-			Name:        "number_test",
-			Pattern:     `\d+`,
-			Replacement: "<NUM>",
-		},
-	}
-	masker, err := agentdrain.NewMasker(rules)
-	require.NoError(t, err, "NewMasker should not error with valid rules")
-	assert.NotNil(t, masker, "NewMasker should return non-nil Masker")
-
-	result := masker.Mask("step 42 completed")
-	assert.Contains(t, result, "<NUM>", "Mask should apply substitution rules")
-	assert.NotContains(t, result, "42", "Mask should replace matched content")
-}
-
-// TestSpec_PublicAPI_NewAnomalyDetector validates AnomalyDetector construction.
-func TestSpec_PublicAPI_NewAnomalyDetector(t *testing.T) {
-	t.Parallel()
-	detector, err := agentdrain.NewAnomalyDetector(0.4, 2)
-	require.NoError(t, err, "NewAnomalyDetector should not error with valid thresholds")
-	assert.NotNil(t, detector, "NewAnomalyDetector should return non-nil detector")
-}
-
 // TestSpec_Types_AgentEvent validates the documented AgentEvent type structure.
 // Spec: Stage string, Fields map[string]string
 func TestSpec_Types_AgentEvent(t *testing.T) {
@@ -365,7 +408,7 @@ func TestSpec_PublicAPI_Coordinator_AnalyzeEvent(t *testing.T) {
 	}
 	result, report, err := coord.AnalyzeEvent(evt)
 	require.NoError(t, err, "AnalyzeEvent should not error for a registered stage")
-	assert.NotNil(t, result, "AnalyzeEvent should return a MatchResult")
+	require.NotNil(t, result, "AnalyzeEvent should return a MatchResult")
 	assert.NotNil(t, report, "AnalyzeEvent should return an AnomalyReport")
 	assert.Equal(t, "plan", result.Stage, "MatchResult.Stage should match the event stage")
 }
@@ -378,7 +421,6 @@ func TestSpec_PublicAPI_Coordinator_WeightsPersistence(t *testing.T) {
 	stages := []string{"plan", "finish"}
 	coord, err := agentdrain.NewCoordinator(cfg, stages)
 	require.NoError(t, err)
-
 	evt := agentdrain.AgentEvent{Stage: "plan", Fields: map[string]string{"step": "start"}}
 	_, err = coord.TrainEvent(evt)
 	require.NoError(t, err)
@@ -392,6 +434,60 @@ func TestSpec_PublicAPI_Coordinator_WeightsPersistence(t *testing.T) {
 	err = coord2.LoadWeightsJSON(data)
 	require.NoError(t, err, "LoadWeightsJSON should not error with valid data")
 	assert.Equal(t, coord.AllClusters(), coord2.AllClusters(), "combined weights should preserve all stages and cluster contents")
+}
+
+// TestSpec_PublicAPI_ErrorCases validates errors for malformed persisted state,
+// unknown coordinator stages, and events emptied by masking.
+func TestSpec_PublicAPI_ErrorCases(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name string
+		run  func(*testing.T) error
+	}{
+		{
+			name: "malformed miner JSON",
+			run: func(t *testing.T) error {
+				miner, err := agentdrain.NewMiner(agentdrain.DefaultConfig())
+				require.NoError(t, err)
+				return miner.LoadJSON([]byte("{"))
+			},
+		},
+		{
+			name: "malformed coordinator weights JSON",
+			run: func(t *testing.T) error {
+				coord, err := agentdrain.NewCoordinator(agentdrain.DefaultConfig(), []string{"plan"})
+				require.NoError(t, err)
+				return coord.LoadWeightsJSON([]byte("{"))
+			},
+		},
+		{
+			name: "unknown coordinator stage",
+			run: func(t *testing.T) error {
+				coord, err := agentdrain.NewCoordinator(agentdrain.DefaultConfig(), []string{"plan"})
+				require.NoError(t, err)
+				_, err = coord.TrainEvent(agentdrain.AgentEvent{Stage: "unknown"})
+				return err
+			},
+		},
+		{
+			name: "event emptied by masking",
+			run: func(t *testing.T) error {
+				cfg := agentdrain.DefaultConfig()
+				cfg.MaskRules = []agentdrain.MaskRule{{Name: "remove stage", Pattern: `stage=plan`, Replacement: ""}}
+				miner, err := agentdrain.NewMiner(cfg)
+				require.NoError(t, err)
+				_, err = miner.TrainEvent(agentdrain.AgentEvent{Stage: "plan"})
+				return err
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			require.Error(t, tt.run(t), "invalid input should return an error")
+		})
+	}
 }
 
 // TestSpec_PublicAPI_MaskerRuleOrder validates Public API / Functions: all
@@ -447,8 +543,8 @@ func TestSpec_DesignDecision_AnomalyFlags(t *testing.T) {
 	assert.Equal(t, event.Stage, clusters[0].Stage, "training should propagate the event stage into its cluster")
 }
 
-// TestSpec_PublicAPI_AnomalyDetector_Analyze validates that AnomalyDetector.Analyze
-// returns an AnomalyReport with AnomalyScore in the documented [0, 1] range.
+// TestSpec_PublicAPI_AnomalyDetector_Analyze validates that a first event's score
+// accounts for both its new template and rare cluster flags.
 func TestSpec_PublicAPI_AnomalyDetector_Analyze(t *testing.T) {
 	t.Parallel()
 	cfg := agentdrain.DefaultConfig()
@@ -459,9 +555,8 @@ func TestSpec_PublicAPI_AnomalyDetector_Analyze(t *testing.T) {
 	_, report, err := miner.AnalyzeEvent(evt)
 	require.NoError(t, err)
 
-	assert.NotNil(t, report, "AnomalyReport should not be nil")
-	assert.GreaterOrEqual(t, report.AnomalyScore, 0.0, "AnomalyScore should be >= 0 (documented range [0,1])")
-	assert.LessOrEqual(t, report.AnomalyScore, 1.0, "AnomalyScore should be <= 1 (documented range [0,1])")
+	require.NotNil(t, report, "AnomalyReport should not be nil")
+	assert.InDelta(t, 0.65, report.AnomalyScore, 0, "a first event is new and rare under the default configuration")
 }
 
 // TestSpec_Types_Cluster validates the documented Cluster type structure.
@@ -496,6 +591,7 @@ func TestSpec_Types_MatchResult(t *testing.T) {
 	evt := agentdrain.AgentEvent{Stage: "tool_call", Fields: map[string]string{"tool": "bash"}}
 	result, err := miner.TrainEvent(evt)
 	require.NoError(t, err)
+	require.NotNil(t, result, "TrainEvent should return a MatchResult")
 
 	assert.Positive(t, result.ClusterID, "MatchResult.ClusterID should be positive")
 	assert.NotEmpty(t, result.Template, "MatchResult.Template should be a space-joined template string")
@@ -516,13 +612,12 @@ func TestSpec_Types_AnomalyReport(t *testing.T) {
 	_, report, err := miner.AnalyzeEvent(evt)
 	require.NoError(t, err)
 
-	// Verify all documented fields are accessible
-	_ = report.IsNewTemplate
-	_ = report.LowSimilarity
-	_ = report.RareCluster
-	_ = report.Reason
-	assert.GreaterOrEqual(t, report.AnomalyScore, 0.0, "AnomalyReport.AnomalyScore should be in documented range [0, 1]")
-	assert.LessOrEqual(t, report.AnomalyScore, 1.0, "AnomalyReport.AnomalyScore should be in documented range [0, 1]")
+	require.NotNil(t, report, "AnalyzeEvent should return an AnomalyReport")
+	assert.True(t, report.IsNewTemplate, "the first event should create a new template")
+	assert.False(t, report.LowSimilarity, "a new template should not be flagged as low similarity")
+	assert.True(t, report.RareCluster, "a cluster of size one should be rare under this configuration")
+	assert.NotEmpty(t, report.Reason, "AnomalyReport.Reason should explain the detected anomaly")
+	assert.InDelta(t, 0.65, report.AnomalyScore, 0, "AnomalyReport.AnomalyScore should reflect new and rare flags")
 }
 
 // TestSpec_PublicAPI_Coordinator_TrainEvent validates Coordinator.TrainEvent routes known-good
@@ -541,7 +636,7 @@ func TestSpec_PublicAPI_Coordinator_TrainEvent(t *testing.T) {
 	}
 	result, err := coord.TrainEvent(evt)
 	require.NoError(t, err, "Coordinator.TrainEvent should not error for valid event in registered stage")
-	assert.NotNil(t, result, "Coordinator.TrainEvent should return a non-nil MatchResult")
+	require.NotNil(t, result, "Coordinator.TrainEvent should return a non-nil MatchResult")
 	assert.Equal(t, "plan", result.Stage, "MatchResult.Stage should match the trained event stage")
 }
 
@@ -582,7 +677,7 @@ func TestSpec_Types_Snapshot(t *testing.T) {
 	assert.Len(t, restored.Clusters(), 1, "restored miner should have the same cluster count as the original")
 }
 
-// TestSpec_Constants_AnomalyWeights validates the documented anomaly scoring constants.
+// TestSpec_Constants_AnomalyWeights validates implementation-detail anomaly scoring constants.
 func TestSpec_Constants_AnomalyWeights(t *testing.T) {
 	t.Parallel()
 	assert.InDelta(t, 1.0, agentdrain.AnomalyWeightNew, 0, "new-template anomaly weight should match the specification")
@@ -639,6 +734,11 @@ func TestSpec_ThreadSafety_Miner(t *testing.T) {
 	for operationErr := range errCh {
 		require.NoError(t, operationErr, "documented concurrent Miner operations should succeed")
 	}
+	var trainedEvents int
+	for _, cluster := range miner.Clusters() {
+		trainedEvents += cluster.Size
+	}
+	assert.Equal(t, workers, trainedEvents, "concurrent training should account for every event")
 }
 
 // TestSpec_ThreadSafety_Coordinator validates the documented guarantee that
@@ -676,5 +776,13 @@ func TestSpec_ThreadSafety_Coordinator(t *testing.T) {
 	close(errCh)
 	for operationErr := range errCh {
 		require.NoError(t, operationErr, "documented concurrent Coordinator operations should succeed")
+	}
+	allClusters := coordinator.AllClusters()
+	for _, stage := range []string{"plan", "tool_call"} {
+		var trainedEvents int
+		for _, cluster := range allClusters[stage] {
+			trainedEvents += cluster.Size
+		}
+		assert.Equal(t, workers/2, trainedEvents, "concurrent training should account for every %s event", stage)
 	}
 }

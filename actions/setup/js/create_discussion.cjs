@@ -415,10 +415,9 @@ async function main(config = {}) {
 
     // Merge resolved temp IDs
     if (resolvedTemporaryIds) {
+      // The current invocation's resolutions replace cached entries from earlier invocations.
       for (const [tempId, resolved] of Object.entries(resolvedTemporaryIds)) {
-        if (!temporaryIdMap.has(tempId)) {
-          temporaryIdMap.set(tempId, resolved);
-        }
+        temporaryIdMap.set(tempId, resolved);
       }
     }
 

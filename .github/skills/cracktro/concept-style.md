@@ -6,7 +6,7 @@ A concept slide states one idea of the talk as a manifesto: a light, quiet canva
 
 ## Ingredients
 
-1. **Own header-less row.** Give the slide its own `group`, add it to `SOLO` (`// ---------- bands ----------`) and to `slides.md` as a normal row (no band header row). No `BANDS` entry.
+1. **Own header-less row.** Give the slide its own `group`, add it to `SOLO` (`// ---------- bands ----------`) and to `slides.md` as a normal slide section (no band header section). No `BANDS` entry.
 2. **Light, gridless theme.** Add a `THEME` entry cloned from `mindset`/`trust`: `light: true`, `base: [200, 209, 218]` (`#c8d1da`), `pal` all `#000000` (no glows), `grid: [200, 209, 218, 0, 0]` (invisible), `cell: 32`, a small `ang` (-π/12, π/8) so the eased background still moves, `prog: [0]`. `light` sets `body.light`; `go()` stages the light/dark swap for you.
 3. **Copy stack.** `.kicker` (runtime style: Monaspace, uppercase, muted) naming the idea, then `h2` statements, never `letters()`, `.l-grad` or `slide-head`:
    - problem line: neutral, 76–80px, `line-height` 1.04–1.1;
@@ -15,7 +15,7 @@ A concept slide states one idea of the talk as a manifesto: a light, quiet canva
 4. **One live metaphor.** A single visual that animates in `tick(t)` and loops forever, built from the deck's own vocabulary (code glyphs, octicons such as `OCTI.merge`, pills, tiles); reset all state in `enter()`. Examples: the 7×7 tile grid flipping between code glyphs and green swatches (`fmm-grid`); the two-lane race of a slow and a fast pill filling while merge icons pop into a tray (`tp-vs`). Throttle work (`if (t - last < 110) return;`), use `setTimeout` only for short flip halves.
 5. **Horizontal split motion.** Elements fly in from the sides and leave the way they came; the slide itself does not take the vertical band push or fade (see CSS skeleton).
 6. **Own music.** One short `MUSIC` theme keyed by the `THEME`'s `music` that sonifies the metaphor (factory: metallic machinery ticks; trust: one heavy review `bell` against quick merge blips, then a resolving `pad`). Sync per-event `sfx` calls (`sfx.pop`, `sfx.step`) with visual events, sparingly (every 3rd blip).
-7. **Notes.** Read the slide aloud as a short manifesto. If the visual implies numbers (durations, counts), say it is illustrative and mark the `slides.md` row `illustrative`.
+7. **Notes.** Read the slide aloud as a short manifesto. If the visual implies numbers (durations, counts), say it is illustrative and mark the `slides.md` entry with Notes `illustrative`.
 
 ## Layouts
 
@@ -97,7 +97,7 @@ Optional and at most one per concept slide. Trust the process uses the only full
 ## Checklist
 
 - New, unused CSS prefix; base dark rules plus `body.light` overrides.
-- `SOLO`, `THEME` (light, gridless), `MUSIC` and `slides.md` row added together.
+- `SOLO`, `THEME` (light, gridless), `MUSIC` and `slides.md` section added together.
 - One accent (green); a second hue only for a labelled comparison.
 - Answer line is the largest text; no `letters()`, gradients or glows.
 - Enter and exit are horizontal; slide-level `up-in`/`down-in`/`leaving` animations disabled.

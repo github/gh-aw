@@ -46,6 +46,8 @@ If your workflow already pins a model under `engine`, remove that pin so the top
 
 These are levels, not model names. Two runs at the same level need not use the same model. `model: auto` is different: it leaves model selection to the engine or provider rather than the gh-aw router.
 
+The deprecated nested `engine.model-routing.goal: cost-speed` requires an AWF pin older than v0.29.17. With the default firewall, choose a cost-routing level explicitly; `cost-speed` is not an alias for `cost`.
+
 ## A shortlist of models
 
 To let the main agent choose between specific models, give it a shortlist alongside a literal router value:
@@ -82,7 +84,7 @@ For [Claude on Anthropic](/gh-aw/reference/engines/claude/) or [Codex on OpenAI]
 
 ## Which models does the router support?
 
-The [routing tables in Agent Workflow Firewall (AWF) v0.29.16](https://github.com/github/gh-aw-firewall/tree/v0.29.16/containers/router/routing), the version gh-aw uses by default, include these GitHub Copilot model IDs:
+The [routing tables in Agent Workflow Firewall (AWF) v0.29.17](https://github.com/github/gh-aw-firewall/tree/v0.29.17/containers/router/routing), the version gh-aw uses by default, include these GitHub Copilot model IDs:
 
 <!-- When DefaultFirewallVersion changes, check this list against the new AWF routing tables. -->
 

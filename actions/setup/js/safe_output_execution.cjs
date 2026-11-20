@@ -1,5 +1,6 @@
 // @ts-check
 
+const { ERR_PERMISSION } = require("./error_codes.cjs");
 const { classifySafeOutputResult, pickOutcomeField } = require("./safe_outputs_status.cjs");
 const { AsyncLocalStorage } = require("node:async_hooks");
 
@@ -22,7 +23,7 @@ async function authorizeSafeOutputInvocation(options) {
   const state = currentSafeOutputInvocation();
   if (!state?.requirement && !options.config?.authorization) return { state: "not_configured" };
   if (!state?.requirement || !state.invocation || typeof state.authorize !== "function") {
-    throw new Error("Protected safe-output handlers require their trusted prepared invocation context");
+    throw new Error(ERR_PERMISSION + ": Protected safe-output handlers require their trusted prepared invocation context");
   }
   return state.authorize(options);
 }

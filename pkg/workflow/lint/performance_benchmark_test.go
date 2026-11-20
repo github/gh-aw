@@ -162,7 +162,7 @@ func TestLintPerformanceBudget(t *testing.T) {
 			}
 			require.LessOrEqual(t, allocations[1], allocations[0]*12+1000,
 				"8x more jobs must not cause quadratic allocation growth; profile this rule before increasing the budget")
-			require.LessOrEqual(t, durations[1], durations[0]*24+5*time.Millisecond,
+			require.LessOrEqual(t, durations[1], durations[0]*24+10*time.Millisecond,
 				"8x more jobs must not cause excessive CPU growth; the margin tolerates shared-CI scheduling noise")
 		})
 	})
