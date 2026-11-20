@@ -34,7 +34,7 @@ function readTransactions(file = process.env.GH_AW_LEDGER_TRANSACTIONS) {
     if (!stat.isFile() || stat.size > MAX_TRANSACTION_BYTES) throw new TypeError(ERR_VALIDATION + ": Invalid ledger transaction artifact");
     artifact = JSON.parse(fs.readFileSync(fd, "utf8"));
   } catch (error) {
-    if (error instanceof TypeError && error.message === "Invalid ledger transaction artifact") throw error;
+    if (error instanceof TypeError && error.message === `${ERR_VALIDATION}: Invalid ledger transaction artifact`) throw error;
     if (error instanceof Error && "code" in error && error.code === "ENOENT") {
       const artifactName = process.env.GH_AW_LEDGER_TRANSACTIONS_ARTIFACT_NAME || "ledger transaction artifact";
       throw new Error(`${ERR_VALIDATION}: Missing validated ledger transaction artifact at ${resolved}; ensure safe_outputs uploads ${artifactName} before push_ledger_changes`, { cause: error });
@@ -253,7 +253,7 @@ async function persistLedgerAppends({ appends, config, githubClient, owner, repo
           }
         : undefined,
     });
-    if (pushed === false) throw new Error(`${ERR_VALIDATION}: Failed to persist records to ${branchName}`);
+    if (pushed === false) throw new Error(`${ERR_SYSTEM}: Failed to persist records to ${branchName}`);
     return { persisted, already_present: alreadyPresent, reconciled: alreadyPresent, persisted_ids: persistedIds };
   } finally {
     if (ledger) ledger.close();
@@ -383,7 +383,7 @@ async function main(options = {}) {
     try {
       fs.appendFileSync(output, `ledger_result=${JSON.stringify(result)}\n`);
     } catch (error) {
-      throw new Error(ERR_VALIDATION + ": Failed to write ledger persistence result", { cause: error });
+      throw new Error(ERR_SYSTEM + ": Failed to write ledger persistence result", { cause: error });
     }
   }
   return result;
@@ -391,7 +391,8 @@ async function main(options = {}) {
 
 if (require.main === module) {
   main().catch(error => {
-    core.setFailed(error instanceof Error ? error.message : `${ERR_SYSTEM}: Ledger persistence failed`);
+    const message = error instanceof Error ? error.message : "Ledger persistence failed";
+    core.setFailed(/^(?:ERR_[A-Z0-9_]+|E\d{3}):/.test(message) ? message : `${ERR_SYSTEM}: ${message}`);
   });
 }
 
