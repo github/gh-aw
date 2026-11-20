@@ -11,14 +11,6 @@ import (
 	"github.com/github/gh-aw/pkg/validationerror"
 )
 
-type specValidationError struct {
-	validationerror.Payload
-}
-
-func (e *specValidationError) Error() string {
-	return validationerror.Format("validation failed", e.Payload, false)
-}
-
 // TestSpec_Types_PayloadAndValidationError validates the documented Payload
 // fields, accessors, and ValidationError interface.
 func TestSpec_Types_PayloadAndValidationError(t *testing.T) {
@@ -43,7 +35,7 @@ func TestSpec_Types_PayloadAndValidationError(t *testing.T) {
 	}
 
 	var target validationerror.ValidationError
-	if !errors.As(error(&specValidationError{Payload: payload}), &target) {
+	if !errors.As(error(&exampleError{Payload: payload}), &target) {
 		t.Fatal("Payload embedded in an error should implement ValidationError")
 	}
 }
