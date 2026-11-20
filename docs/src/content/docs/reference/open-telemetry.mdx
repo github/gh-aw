@@ -104,7 +104,6 @@ When a workflow does not configure `observability.otlp` (in its own frontmatter 
 
 | Name | Kind | Purpose |
 | --- | --- | --- |
-| `GH_AW_DEFAULT_OTLP_CONFIG` | Secret | Atomic JSON pair containing the default endpoint URL and exporter headers |
 | `GH_AW_DEFAULT_OTLP_ENDPOINT` | Secret or variable | OTLP endpoint URL used when no endpoint is configured in frontmatter |
 | `GH_AW_DEFAULT_OTLP_HEADERS` | Secret | Exporter headers (`key=value` pairs, comma-separated) sent to that endpoint |
 
@@ -112,20 +111,17 @@ Because these values are resolved at run time, setting defaults at the repositor
 
 Behavior:
 
-- The atomic config secret takes precedence over the legacy endpoint and header settings as a whole. It keeps the endpoint and its headers from being independently selected across repository and organization scopes. Invalid or incomplete JSON does not fall back to legacy fields.
-- Without the atomic config secret, the endpoint secret takes precedence over the variable when both are set; clear both values to disable OTLP export.
+- The endpoint secret takes precedence over the variable when both are set, including when an organization secret and repository variable are configured. Clear both values to disable OTLP export.
 - When both endpoint values are unset, the endpoint resolves to an empty string and OTLP export is a no-op.
-- With legacy separate settings, an endpoint without `GH_AW_DEFAULT_OTLP_HEADERS` is treated as unconfigured rather than exported without credentials. The agent job additionally fails with an error so the misconfiguration is visible.
+- An endpoint without `GH_AW_DEFAULT_OTLP_HEADERS` is treated as unconfigured rather than exported without credentials. The agent job additionally fails with an error so the misconfiguration is visible.
 - Any `observability.otlp` configuration in frontmatter or an import overrides these defaults entirely.
 - If the workflow already defines any of the OTLP-related environment variables in its own `env:` block, the compiler skips injecting that specific variable instead of emitting a duplicate key.
-
-The compiler passes the complete JSON secret to the workflow environment without extracting its fields. In each job, setup parses the pair and registers the endpoint, headers, and derived authentication credentials with the runner's secret masker before exporting `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_EXPORTER_OTLP_HEADERS`, and `GH_AW_OTLP_ENDPOINTS` for the agent and conclusion/report steps. This avoids exposing unmasked JSON substrings in step environment logs. Explicit workflow `OTEL_EXPORTER_OTLP_ENDPOINT` or `GH_AW_OTLP_ENDPOINTS` settings bypass the default pair; an explicit endpoint uses only explicitly supplied headers, never credentials from a different default collector.
 
 Set variables with `gh aw env update` or `gh variable set`. Set either value as a secret with `gh secret set`.
 
 #### Configure defaults in one command
 
-`gh aw env otel` tests an OTLP endpoint and saves the endpoint and headers together in one encrypted `GH_AW_DEFAULT_OTLP_CONFIG` Actions secret, plus `OTEL_EXPORTER_OTLP_PROTOCOL` and `GH_AW_OTEL_METRICS` as Actions variables. The paired secret takes precedence over legacy endpoint/header settings at every scope, preventing partial overrides from sending one scope's credentials to another scope's collector. Recompile existing workflows once to add the paired-secret lookup.
+`gh aw env otel` tests an OTLP endpoint and configures the existing `GH_AW_DEFAULT_OTLP_ENDPOINT` and `GH_AW_DEFAULT_OTLP_HEADERS` Actions secrets, plus `OTEL_EXPORTER_OTLP_PROTOCOL` and `GH_AW_OTEL_METRICS` Actions variables. This is an operational command: it does not compile workflows, change generated files, or introduce a new configuration format.
 
 ```bash
 gh aw env otel
@@ -147,7 +143,7 @@ gh aw env otel --repo my-org/my-repo \
 | `--scope repo\|org\|ent` | Restrict the target type; contradictory target flags fail |
 | `--visibility all\|private\|selected` | Organization repository access; defaults to `private`. Invalid with repository targets |
 | `--selected owner/repo` | Required for organization `selected` visibility; repeat for repositories belonging to the target organization |
-| `--endpoint URL` | HTTPS base endpoint or complete `/v1/traces` URL; credentials, fragments, quotes, backslashes, and control characters are rejected. Plain HTTP is limited to literal loopback IP addresses |
+| `--endpoint URL` | HTTPS base endpoint or complete `/v1/traces` URL; userinfo credentials, fragments, raw quotes/backslashes, and control characters are rejected. Percent-encode quotes and backslashes. Plain HTTP is limited to literal loopback IP addresses |
 | `--protocol http/json\|http/protobuf` | Request encoding; defaults to `http/json` |
 | `--metrics=false` | Disable metrics; otherwise metrics are enabled |
 | `--headers-stdin` | Read the header secret from stdin, up to 48 KiB; requires `--endpoint` and `--yes` for noninteractive use |
@@ -157,7 +153,9 @@ Enterprise scope enumerates the enterprise organizations visible to the authenti
 
 Before any setting is saved, the command sends an authenticated **empty traces export** to `/v1/traces`, using the selected protocol. It checks HTTP 200 and the bounded OTLP response, rejecting malformed responses and partial success with rejected spans. Warning-only partial success is accepted without exposing collector messages. This verifies route and credential acceptance, **not actual span ingestion**, logs, metrics, or connectivity from GitHub runners. The test has a 10-second deadline and a 64 KiB response limit, never follows redirects, and withholds response bodies and raw network errors. Sentry endpoint headers are normalized to `x-sentry-auth` before testing and saving.
 
-The command preflights encryption keys, variable access, and selected memberships for all targets before writing. The endpoint and headers are updated in one encrypted secret, so reconfiguration cannot leave them paired with different collectors. GitHub updates are not transactional: a later variable-write failure can leave earlier settings saved, and the command reports the affected target. Repository-level paired secrets override organization paired secrets, and explicit workflow OTLP settings still override defaults. Recompile workflows once if their existing lock files do not contain the paired-secret lookup.
+The command preflights encryption keys, variable access, and selected memberships for all targets before writing. Organization setup also checks existing secret visibility and inspects every affected repository for partial endpoint/header secret overrides. It rejects a repository with only one of these secrets, including a repository endpoint variable paired with a repository header secret. Configure both repository secrets before retrying organization setup. Existing complete repository secret overrides remain in effect. Inspection requires access to the affected repositories' secret metadata; `all` and `private` visibility additionally require a complete organization repository inventory. Use `selected` visibility to restrict inspection to explicitly named repositories. Changing an existing organization secret's visibility or selected repositories requires a coordinated manual migration.
+
+GitHub settings updates are not transactional. The command first replaces the endpoint secret with a nonempty invalid URL to disable default export without falling back to an endpoint variable. It then writes the header secret and protocol/metrics variables, and restores the validated endpoint last. A failed write can leave export disabled; rerun the command to recover. Earlier targets may already be configured, and the error identifies the failing target. Avoid concurrent settings changes and workflow starts while configuring defaults. Explicit workflow OTLP settings remain unchanged.
 
 Multiple targets do not mean multiple default collectors: runtime defaults support one endpoint/header pair. Use the frontmatter endpoint list for [multiple exporters](/gh-aw/reference/frontmatter/#observability-observability).
 

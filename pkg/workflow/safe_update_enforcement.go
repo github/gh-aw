@@ -30,7 +30,6 @@ var ghAwInternalSecrets = map[string]bool{
 	"COPILOT_GITHUB_TOKEN":          true,
 	// Enterprise-wide OTLP exporter credentials injected by injectOTLPConfig when
 	// no observability.otlp endpoint is configured in frontmatter.
-	compilerenv.DefaultOTLPConfig:   true,
 	compilerenv.DefaultOTLPEndpoint: true,
 	compilerenv.DefaultOTLPHeaders:  true,
 }

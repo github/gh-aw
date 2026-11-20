@@ -298,7 +298,6 @@ func TestOTLPEnvExcludedFromAWFSandboxes(t *testing.T) {
 		want bool
 	}{
 		{name: "configured endpoint", env: "env:\n  OTEL_EXPORTER_OTLP_ENDPOINT: https://traces.example.com\n", want: true},
-		{name: "raw atomic defaults", env: "env:\n  GH_AW_DEFAULT_OTLP_CONFIG: ${{ secrets.GH_AW_DEFAULT_OTLP_CONFIG }}\n", want: true},
 		{name: "no endpoint", env: "env:\n  OTHER: value\n", want: false},
 	} {
 		t.Run(tt.name, func(t *testing.T) {

@@ -91,14 +91,7 @@ func TestEnforceSafeUpdate(t *testing.T) {
 		{
 			name:        "compiler-injected OTLP default secrets are always allowed",
 			manifest:    &GHAWManifest{Version: 1, Secrets: []string{}, Actions: []GHAWManifestAction{}},
-			secretNames: []string{"GH_AW_DEFAULT_OTLP_CONFIG", "GH_AW_DEFAULT_OTLP_ENDPOINT", "GH_AW_DEFAULT_OTLP_HEADERS"},
-			actionRefs:  []string{},
-			wantErr:     false,
-		},
-		{
-			name:        "compiler-injected atomic OTLP config secret alone is allowed",
-			manifest:    &GHAWManifest{Version: 1, Secrets: []string{}, Actions: []GHAWManifestAction{}},
-			secretNames: []string{"GH_AW_DEFAULT_OTLP_CONFIG"},
+			secretNames: []string{"GH_AW_DEFAULT_OTLP_ENDPOINT", "GH_AW_DEFAULT_OTLP_HEADERS"},
 			actionRefs:  []string{},
 			wantErr:     false,
 		},

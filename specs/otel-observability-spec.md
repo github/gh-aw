@@ -280,7 +280,7 @@ Expressions such as `${{ secrets.OTLP_ENDPOINT }}` MUST NOT produce a compile-ti
 
 ### 5.8 Default Fallback
 
-When a workflow declares no `observability.otlp` endpoint in its own frontmatter or in any imported workflow, the compiler MUST resolve the endpoint and headers from the single `GH_AW_DEFAULT_OTLP_CONFIG` secret as an atomic pair. If it is unset, implementations MUST retain compatibility with the legacy endpoint `${{ secrets.GH_AW_DEFAULT_OTLP_ENDPOINT || vars.GH_AW_DEFAULT_OTLP_ENDPOINT }}` and header `${{ secrets.GH_AW_DEFAULT_OTLP_HEADERS }}` settings. A paired setting MUST take precedence over the separate legacy settings so endpoint and credentials cannot be selected from different scopes.
+When a workflow declares no `observability.otlp` endpoint in its own frontmatter or in any imported workflow, the compiler MUST fall back to a repository- or organization-level default endpoint expressed as `${{ secrets.GH_AW_DEFAULT_OTLP_ENDPOINT || vars.GH_AW_DEFAULT_OTLP_ENDPOINT }}` with headers `${{ secrets.GH_AW_DEFAULT_OTLP_HEADERS }}`. The secret takes precedence when both endpoint values are configured; implementations MUST require clearing both endpoint values to disable export when both are present.
 
 An explicit `observability.otlp` endpoint from frontmatter or an import MUST take precedence over the default fallback; the fallback MUST only apply when no endpoint entry can be resolved from frontmatter or imports.
 
@@ -1325,7 +1325,7 @@ which has no release tag, and semantic-conventions v1.45.0.
 
 ### Version 0.5.0 (Working Draft, August 27, 2026)
 
-- **Added**: §5.8 Default Fallback — the compiler resolves default OTLP settings from an atomic endpoint/header secret, retains legacy fallback compatibility, and forces `if-missing: ignore` when no default is configured.
+- **Added**: §5.8 Default Fallback — the compiler falls back to `${{ secrets.GH_AW_DEFAULT_OTLP_ENDPOINT || vars.GH_AW_DEFAULT_OTLP_ENDPOINT }}` / `${{ secrets.GH_AW_DEFAULT_OTLP_HEADERS }}` when no `observability.otlp` endpoint is configured in frontmatter or an import, forcing `if-missing: ignore` so an unset default is a silent no-op.
 - **Added**: A normative requirement (§5.8, §6.4) that a default endpoint resolved with a URL but empty headers MUST be dropped by every span-emitting runtime path (job-setup, conclusion, outcome, MCP gateway), not only by whichever job performs credential validation, so no job ordering can allow unauthenticated export.
 - **Added**: A normative requirement (§5.8) that the compiler MUST NOT emit a duplicate env-block mapping key when the workflow already defines an OTLP-related key (`OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_SERVICE_NAME`, `OTEL_RESOURCE_ATTRIBUTES`, `OTEL_EXPORTER_OTLP_HEADERS`, `GH_AW_OTLP_ALL_HEADERS`, `GH_AW_OTLP_ENDPOINTS`, `GH_AW_OTLP_IF_MISSING`, `GH_AW_OTLP_ATTRIBUTES`).
 - **Clarified**: §6.1 table entry for `GH_AW_OTLP_IF_MISSING` now cross-references the default fallback.

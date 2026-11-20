@@ -157,10 +157,6 @@ func TestBuildDefaultOTLPEndpointExpression(t *testing.T) {
 		"${{ secrets.GH_AW_DEFAULT_OTLP_ENDPOINT || vars.GH_AW_DEFAULT_OTLP_ENDPOINT }}",
 		BuildDefaultOTLPEndpointExpression(),
 	)
-	assert.Equal(t,
-		"${{ secrets.GH_AW_DEFAULT_OTLP_HEADERS }}",
-		BuildDefaultOTLPHeadersExpression(),
-	)
 }
 
 func TestBuildTimeoutMinutesExpression(t *testing.T) {

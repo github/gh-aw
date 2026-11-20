@@ -14,6 +14,8 @@ Workflows read OTLP defaults from Actions variables and secrets (`OTEL_EXPORTER_
 
 We will add a dedicated `gh aw env otel` subcommand that configures one OTLP endpoint for repeated `--repo`, `--org`, and `--enterprise` targets. It sends an authenticated, empty traces export to `/v1/traces` before any write, with a 10-second deadline, a 64 KiB response limit, and no redirects. It stores the endpoint and headers as encrypted Actions secrets and the protocol and metrics flag as variables. Headers come from hidden interactive input or `--headers-stdin` (up to 48 KiB), never argv, and enterprise targets are expanded to their visible organizations through GraphQL. The primary driver is safe, repeatable bulk setup that fails early on bad credentials.
 
+This command uses the existing scalar settings without compiler, runtime, or generated-workflow changes. Updates temporarily disable the endpoint, save credentials and variables, then enable the validated endpoint last. Organization setup rejects partial repository secret overrides and changes to existing secret visibility before writing.
+
 ### Alternatives Considered
 
 #### Alternative 1: Keep using `gh aw env update` and `gh secret set`
@@ -36,13 +38,13 @@ A single enterprise-scope write would be simpler for users. It was not possible 
 - Header values stay out of argv and shell history, and raw collector bodies and network errors are not echoed.
 
 #### Negative
-- Writes across targets are nontransactional, so a mid-run failure can leave targets partially configured. [TODO: verify whether the command reports which targets were saved.]
+- Writes are nontransactional. A mid-run failure identifies the target and can leave export disabled there; rerunning completes the configuration. Earlier targets may already be saved.
 - The probe checks route and credential acceptance, not span ingestion or connectivity from GitHub runners, so it can give false confidence.
 - Enterprise expansion covers only the organizations visible to the caller. Organizations hidden from enumeration or added later are not configured.
-- This adds about 1,300 lines of security-sensitive CLI code (HTTP probe, secret encryption, GraphQL pagination) to maintain.
+- Organization setup requires access to inspect affected repository secrets and, outside selected visibility, verify the complete repository inventory.
 
 #### Neutral
-- All targets share a single default endpoint, and the endpoint secret takes precedence over an existing endpoint variable at the same scope.
+- All targets share a single default endpoint, and an endpoint secret takes precedence over an endpoint variable, including across scopes.
 - Sentry endpoint headers are normalized to `x-sentry-auth` before testing and saving.
 - The command changes only the four OTEL settings and preserves unrelated defaults.
 

@@ -120,7 +120,7 @@ Test workflow
 			}
 			compiled := string(result)
 			for _, name := range otlpSandboxExcludedEnvVarNames {
-				if !strings.HasPrefix(name, "GH_AW_DEFAULT_OTLP_") && !strings.Contains(compiled, name+":") {
+				if !strings.Contains(compiled, name+":") {
 					t.Errorf("host-side OTLP environment must retain %s", name)
 				}
 				for _, job := range []string{"agent", "detection"} {

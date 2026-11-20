@@ -98,8 +98,6 @@ const (
 	// exporter headers (comma-separated key=value pairs) that accompany
 	// DefaultOTLPEndpoint.
 	DefaultOTLPHeaders = "GH_AW_DEFAULT_OTLP_HEADERS"
-	// DefaultOTLPConfig stores an endpoint and its headers as one atomic pair.
-	DefaultOTLPConfig = "GH_AW_DEFAULT_OTLP_CONFIG"
 	// OTLPProtocol is the standard Actions variable used to select the trusted
 	// JavaScript exporter's wire encoding unless workflow env overrides it.
 	OTLPProtocol = "OTEL_EXPORTER_OTLP_PROTOCOL"
@@ -315,15 +313,18 @@ func BuildDefaultMaxTurnsExpression() string {
 	return fmt.Sprintf("${{ vars.%s || '' }}", DefaultMaxTurns)
 }
 
-// BuildDefaultOTLPEndpointExpression reads the legacy endpoint secret or variable.
-// Setup uses it only when the intact atomic configuration secret is absent.
+// BuildDefaultOTLPEndpointExpression builds an expression that resolves the OTLP
+// endpoint at runtime from the GH_AW_DEFAULT_OTLP_ENDPOINT GitHub secret, falling
+// back to the variable for compatibility. The expression evaluates to an empty
+// string when both are unset, which downstream runtime code treats as
+// "observability disabled".
 func BuildDefaultOTLPEndpointExpression() string {
 	return fmt.Sprintf("${{ secrets.%s || vars.%s }}", DefaultOTLPEndpoint, DefaultOTLPEndpoint)
 }
 
 // BuildDefaultOTLPHeadersExpression builds a secrets expression that resolves the
-// legacy OTLP exporter headers. Atomic defaults are passed intact and resolved
-// inside setup after registering their individual values as runner secrets.
+// OTLP exporter headers at runtime from the GH_AW_DEFAULT_OTLP_HEADERS GitHub
+// secret. The expression evaluates to an empty string when the secret is unset.
 func BuildDefaultOTLPHeadersExpression() string {
 	return fmt.Sprintf("${{ secrets.%s }}", DefaultOTLPHeaders)
 }

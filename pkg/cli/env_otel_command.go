@@ -67,10 +67,16 @@ Selected visibility requires --selected entries (owner/repo for org; org for ent
 Enterprise scope expands to its visible organizations, since GitHub has no enterprise
 Actions secrets API. Selected enterprises configure only the named organizations,
 with private repository visibility. Other enterprise visibility applies to each org.
-The endpoint and headers are stored together in one encrypted secret, so a resolved
-default always uses a matching pair. This paired secret takes precedence over legacy
-separate endpoint/header settings. Unrelated defaults are preserved. Explicit workflow
-OTLP settings win.`,
+The command configures the existing endpoint and header secrets, plus protocol and
+metrics variables. It never compiles or changes workflows. The endpoint secret wins
+over endpoint variables, including repository variables. Organization setup requires
+access to inspect every affected repository and rejects partial secret overrides or
+changes to existing secret visibility. Unrelated defaults are preserved.
+
+During updates, export is disabled with an invalid endpoint until all settings are
+saved. A failed write can leave export disabled; rerun the command to recover. Avoid
+concurrent settings changes or workflow starts during configuration. Explicit workflow
+OTLP settings still win.`,
 		Example: `  gh aw env otel
   gh aw env otel --repo myorg/one --repo myorg/two --endpoint https://collector.example --headers-stdin --yes < otlp-headers.txt
   gh aw env otel --org myorg --visibility selected --selected myorg/one --endpoint https://collector.example --headers-stdin --yes < otlp-headers.txt
@@ -110,7 +116,7 @@ func executeEnvOTELCommand(cmd *cobra.Command, o envOTELOptions) error {
 	if err := runEnvOTEL(cmd.Context(), targets, o, headers); err != nil {
 		return err
 	}
-	return envOTELPrint(cmd.OutOrStdout(), "OTLP traces check passed; configured %d target(s). Existing workflows must include default OTLP lookups (recompile if needed).\n", len(targets))
+	return envOTELPrint(cmd.OutOrStdout(), "OTLP traces check passed; configured %d target(s). No workflow files changed.\n", len(targets))
 }
 
 func envOTELPrint(output io.Writer, format string, args ...any) error {
@@ -233,18 +239,8 @@ func envOTELTargets(o envOTELOptions, visibilitySet bool) ([]defaultsTarget, err
 			return nil, errors.New("target flags contradict --scope")
 		}
 		for _, name := range group.names {
-			parts := strings.Split(name, "/")
-			if group.scope == defaultsScopeRepo && len(parts) != 2 || group.scope != defaultsScopeRepo && len(parts) != 1 {
+			if !envOTELValidTarget(group.scope, name) {
 				return nil, errors.New("invalid target: use owner/repo for repositories and a slug for organizations or enterprises")
-			}
-			for i, part := range parts {
-				valid := envOTELIdentifier.MatchString(part) && part != "." && part != ".."
-				if group.scope == defaultsScopeRepo && i == 1 {
-					valid = envOTELRepositoryName.MatchString(part) && part != "." && part != ".."
-				}
-				if !valid {
-					return nil, errors.New("invalid target identifier")
-				}
 			}
 			target, err := resolveDefaultsTarget(group.scope, name, name, name, o.visibility, false)
 			if err != nil {
@@ -276,6 +272,14 @@ func envOTELTargets(o envOTELOptions, visibilitySet bool) ([]defaultsTarget, err
 		return nil, errors.New("configure selected organization and enterprise targets in separate invocations")
 	}
 	return targets, nil
+}
+
+func envOTELValidTarget(scope, name string) bool {
+	if scope != defaultsScopeRepo {
+		return envOTELIdentifier.MatchString(name)
+	}
+	owner, repo, found := strings.Cut(name, "/")
+	return found && envOTELIdentifier.MatchString(owner) && envOTELRepositoryName.MatchString(repo) && repo != "." && repo != ".."
 }
 
 // Secret-bearing requests never use runDefaultsGH, argv values, or raw GH errors.
@@ -435,43 +439,31 @@ func envOTELPrepare(ctx context.Context, targets []defaultsTarget, selections ma
 				return nil, fmt.Errorf("preflight %s selected repositories: %w", target.displayName(), err)
 			}
 		}
+		if err := envOTELCheckOverrides(ctx, p, selections[strings.ToLower(target.org)]); err != nil {
+			return nil, fmt.Errorf("preflight %s: %w", target.displayName(), err)
+		}
 		plans = append(plans, p)
 	}
 	return plans, nil
 }
 
 func envOTELSave(ctx context.Context, p envOTELPlan, o envOTELOptions, headers string) error {
-	config, err := json.Marshal(struct {
-		Endpoint string `json:"endpoint"`
-		Headers  string `json:"headers"`
-	}{Endpoint: o.endpoint, Headers: headers})
-	if err != nil {
-		return errors.New("failed to encode encrypted OTLP configuration")
-	}
-	if len(config) > 48*1024 {
-		return errors.New("combined default OTLP configuration exceeds GitHub's 48 KiB secret limit")
-	}
-	encrypted, err := encryptWithPublicKey(p.key.Key, string(config))
-	if err != nil {
-		return errors.New("failed to encrypt OTLP configuration")
-	}
-	payload := map[string]any{"key_id": p.key.ID, "encrypted_value": encrypted}
-	envOTELAccess(payload, p.target, p.ids)
-	body, err := json.Marshal(payload)
-	if err != nil {
-		return errors.New("failed to encode encrypted OTLP configuration")
-	}
-	path := strings.TrimSuffix(p.target.variablesEndpoint(), "variables") + "secrets/" + compilerenv.DefaultOTLPConfig
-	if _, err := envOTELRunGH(ctx, body, "api", "-X", "PUT", path, "--input", "-"); err != nil {
+	if err := envOTELSecret(ctx, p, compilerenv.DefaultOTLPEndpoint, envOTELDisabledEndpoint); err != nil {
 		return err
+	}
+	if err := envOTELSecret(ctx, p, compilerenv.DefaultOTLPHeaders, headers); err != nil {
+		return fmt.Errorf("export may remain disabled; rerun to finish configuration: %w", err)
 	}
 	for _, setting := range []struct{ name, value string }{
 		{compilerenv.OTLPProtocol, o.protocol},
 		{compilerenv.OTLPMetrics, strconv.FormatBool(o.metrics)},
 	} {
 		if err := envOTELVariable(ctx, p.target, p.ids, setting.name, setting.value); err != nil {
-			return err
+			return fmt.Errorf("export may remain disabled; rerun to finish configuration: %w", err)
 		}
+	}
+	if err := envOTELSecret(ctx, p, compilerenv.DefaultOTLPEndpoint, o.endpoint); err != nil {
+		return fmt.Errorf("export may remain disabled; rerun to finish configuration: %w", err)
 	}
 	return nil
 }

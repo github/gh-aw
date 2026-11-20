@@ -16,9 +16,6 @@ import (
 func TestRemoveDryRunTelemetryEnv(t *testing.T) {
 	const source = `name: test
 env: &shared
-  GH_AW_DEFAULT_OTLP_CONFIG: '${{ secrets.GH_AW_DEFAULT_OTLP_CONFIG }}'
-  GH_AW_DEFAULT_OTLP_ENDPOINT: https://legacy.example.com
-  GH_AW_DEFAULT_OTLP_HEADERS: '${{ secrets.GH_AW_DEFAULT_OTLP_HEADERS }}'
   OTEL_EXPORTER_OTLP_HEADERS: |
     Authorization=private
     X-Tenant=private
@@ -278,7 +275,7 @@ func TestDryRunTelemetryConfiguration(t *testing.T) {
 	assert.Same(t, data, normal)
 	var fresh WorkflowData
 	compiler.injectOTLPConfig(&fresh)
-	assert.Contains(t, fresh.Env, "GH_AW_DEFAULT_OTLP_CONFIG:")
+	assert.Contains(t, fresh.Env, "OTEL_EXPORTER_OTLP_ENDPOINT:")
 }
 
 func TestPrepareDryRunWorkflowDataInvalidEnv(t *testing.T) {

@@ -75,7 +75,6 @@ function parseJobStartMs(raw) {
  * @returns {Promise<void>}
  */
 async function run() {
-  require("./otlp_default_config.cjs").resolveOTLPDefaultConfig();
   const endpoints = process.env.GH_AW_OTLP_ENDPOINTS;
   const jobName = getActionInput("JOB_NAME");
   const preUpload = process.env.GH_AW_OTEL_CONCLUSION_PREUPLOAD === "true";

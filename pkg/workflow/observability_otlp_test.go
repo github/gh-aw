@@ -395,13 +395,8 @@ func TestInjectOTLPConfig(t *testing.T) {
 		c.injectOTLPConfig(wd)
 		assert.Nil(t, wd.NetworkPermissions, "NetworkPermissions should remain nil for expression endpoints")
 		assert.True(t, wd.OTLPUsesEnterpriseDefaults, "enterprise defaults should be flagged")
-		assert.Contains(t, wd.Env, "GH_AW_DEFAULT_OTLP_CONFIG: ${{ secrets.GH_AW_DEFAULT_OTLP_CONFIG }}")
-		assert.Contains(t, wd.Env, "GH_AW_DEFAULT_OTLP_ENDPOINT: ${{ secrets.GH_AW_DEFAULT_OTLP_ENDPOINT || vars.GH_AW_DEFAULT_OTLP_ENDPOINT }}")
-		assert.Contains(t, wd.Env, "GH_AW_DEFAULT_OTLP_HEADERS: ${{ secrets.GH_AW_DEFAULT_OTLP_HEADERS }}")
-		assert.NotContains(t, wd.Env, "fromJSON(")
-		assert.NotContains(t, wd.Env, "OTEL_EXPORTER_OTLP_ENDPOINT:")
-		assert.NotContains(t, wd.Env, "OTEL_EXPORTER_OTLP_HEADERS:")
-		assert.NotContains(t, wd.Env, "GH_AW_OTLP_ENDPOINTS:")
+		assert.Contains(t, wd.Env, "OTEL_EXPORTER_OTLP_ENDPOINT: ${{ secrets.GH_AW_DEFAULT_OTLP_ENDPOINT || vars.GH_AW_DEFAULT_OTLP_ENDPOINT }}")
+		assert.Contains(t, wd.Env, "OTEL_EXPORTER_OTLP_HEADERS: ${{ secrets.GH_AW_DEFAULT_OTLP_HEADERS }}")
 		assert.Contains(t, wd.Env, "GH_AW_OTLP_IF_MISSING: ignore", "unset enterprise defaults must be a no-op")
 		assert.Contains(t, wd.Env, "GH_AW_OTLP_LOGS_ENABLED: ${{ vars.GH_AW_OTLP_LOGS_ENABLED }}")
 		assert.Contains(t, wd.Env, "GH_AW_OTLP_LOGS_MAX_BYTES: ${{ vars.GH_AW_OTLP_LOGS_MAX_BYTES }}")
@@ -423,7 +418,7 @@ func TestInjectOTLPConfig(t *testing.T) {
 		c.injectOTLPConfig(wd)
 		assert.Nil(t, wd.NetworkPermissions, "NetworkPermissions should remain nil for expression endpoints")
 		assert.True(t, wd.OTLPUsesEnterpriseDefaults, "enterprise defaults should be flagged")
-		assert.Contains(t, wd.Env, "GH_AW_DEFAULT_OTLP_CONFIG: ${{ secrets.GH_AW_DEFAULT_OTLP_CONFIG }}")
+		assert.Contains(t, wd.Env, "OTEL_EXPORTER_OTLP_ENDPOINT: ${{ secrets.GH_AW_DEFAULT_OTLP_ENDPOINT || vars.GH_AW_DEFAULT_OTLP_ENDPOINT }}")
 	})
 
 	t.Run("injects env vars when endpoint is a secret expression", func(t *testing.T) {
@@ -445,7 +440,6 @@ func TestInjectOTLPConfig(t *testing.T) {
 		// Env should contain the OTEL vars
 		require.NotEmpty(t, wd.Env, "Env should be set")
 		assert.Contains(t, wd.Env, "OTEL_EXPORTER_OTLP_ENDPOINT: ${{ secrets.OTLP_ENDPOINT }}", "should contain endpoint var")
-		assert.NotContains(t, wd.Env, "GH_AW_DEFAULT_OTLP_CONFIG", "frontmatter overrides defaults entirely")
 		assert.Contains(t, wd.Env, "OTEL_SERVICE_NAME: gh-aw", "should contain service name")
 	})
 
@@ -954,7 +948,7 @@ func TestInjectOTLPConfig_RawFrontmatterFallback(t *testing.T) {
 			RawFrontmatter:    map[string]any{"name": "my-workflow"},
 		}
 		c.injectOTLPConfig(wd)
-		assert.Contains(t, wd.Env, "GH_AW_DEFAULT_OTLP_CONFIG: ${{ secrets.GH_AW_DEFAULT_OTLP_CONFIG }}")
+		assert.Contains(t, wd.Env, "OTEL_EXPORTER_OTLP_ENDPOINT: ${{ secrets.GH_AW_DEFAULT_OTLP_ENDPOINT || vars.GH_AW_DEFAULT_OTLP_ENDPOINT }}")
 		assert.Nil(t, wd.NetworkPermissions, "NetworkPermissions should remain nil")
 	})
 }
@@ -1200,8 +1194,8 @@ func TestInjectOTLPConfig_OTLPEndpointField(t *testing.T) {
 			RawFrontmatter: map[string]any{"name": "no-otlp"},
 		}
 		c.injectOTLPConfig(wd)
-		assert.Equal(t, "${{ secrets.GH_AW_DEFAULT_OTLP_ENDPOINT || vars.GH_AW_DEFAULT_OTLP_ENDPOINT }}", wd.OTLPEndpoint, "legacy defaults remain available; the atomic pair is resolved inside setup")
-		assert.Equal(t, "${{ secrets.GH_AW_DEFAULT_OTLP_HEADERS }}", wd.OTLPHeaders, "legacy defaults remain available; the atomic pair is resolved inside setup")
+		assert.Equal(t, "${{ secrets.GH_AW_DEFAULT_OTLP_ENDPOINT || vars.GH_AW_DEFAULT_OTLP_ENDPOINT }}", wd.OTLPEndpoint, "OTLPEndpoint should prefer the enterprise default secret and fall back to the variable")
+		assert.Equal(t, "${{ secrets.GH_AW_DEFAULT_OTLP_HEADERS }}", wd.OTLPHeaders, "OTLPHeaders should fall back to the enterprise default secret")
 	})
 
 	t.Run("sets OTLPEndpoint from imported observability merged into RawFrontmatter", func(t *testing.T) {

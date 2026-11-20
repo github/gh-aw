@@ -78,9 +78,6 @@ describe("action_setup_otlp.cjs", () => {
       GH_AW_OTLP_ENDPOINTS: process.env.GH_AW_OTLP_ENDPOINTS,
       OTEL_EXPORTER_OTLP_HEADERS: process.env.OTEL_EXPORTER_OTLP_HEADERS,
       GH_AW_OTLP_ALL_HEADERS: process.env.GH_AW_OTLP_ALL_HEADERS,
-      GH_AW_DEFAULT_OTLP_CONFIG: process.env.GH_AW_DEFAULT_OTLP_CONFIG,
-      GH_AW_DEFAULT_OTLP_ENDPOINT: process.env.GH_AW_DEFAULT_OTLP_ENDPOINT,
-      GH_AW_DEFAULT_OTLP_HEADERS: process.env.GH_AW_DEFAULT_OTLP_HEADERS,
     };
 
     delete process.env.GH_AW_OTLP_ENDPOINTS;
@@ -95,9 +92,6 @@ describe("action_setup_otlp.cjs", () => {
     delete process.env["INPUT_OTLP_OIDC_TOKEN"];
     delete process.env.OTEL_EXPORTER_OTLP_HEADERS;
     delete process.env.GH_AW_OTLP_ALL_HEADERS;
-    delete process.env.GH_AW_DEFAULT_OTLP_CONFIG;
-    delete process.env.GH_AW_DEFAULT_OTLP_ENDPOINT;
-    delete process.env.GH_AW_DEFAULT_OTLP_HEADERS;
     process.env.GITHUB_OUTPUT = outputFile;
     process.env.GITHUB_ENV = envFile;
   });
@@ -118,31 +112,6 @@ describe("action_setup_otlp.cjs", () => {
 
   it("should export run as a function", () => {
     expect(typeof run).toBe("function");
-  });
-
-  it("exports masked atomic defaults for both the agent and subsequent conclusion/report steps", async () => {
-    delete process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
-    const endpoint = "https://atomic.example.com";
-    const headers = "Authorization=Bearer atomic-only-private-token";
-    process.env.GH_AW_DEFAULT_OTLP_CONFIG = JSON.stringify({ endpoint, headers });
-    process.env.GH_AW_DEFAULT_OTLP_ENDPOINT = "https://legacy.example.com";
-    process.env.GH_AW_DEFAULT_OTLP_HEADERS = "Authorization=Bearer legacy-private-token";
-    mockSendJobSetupSpan.mockImplementationOnce(async () => {
-      expect(mockCore.setSecret).toHaveBeenCalledWith(endpoint);
-      expect(mockCore.setSecret).toHaveBeenCalledWith("atomic-only-private-token");
-      expect(process.env.OTEL_EXPORTER_OTLP_ENDPOINT).toBe(endpoint);
-      expect(process.env.OTEL_EXPORTER_OTLP_HEADERS).toBe(headers);
-      return { traceId: VALID_TRACE_ID, spanId: VALID_SPAN_ID };
-    });
-
-    await run();
-
-    expect(mockSendJobSetupSpan).toHaveBeenCalledOnce();
-    const persisted = readFileSync(envFile, "utf8");
-    expect(persisted).toContain(`OTEL_EXPORTER_OTLP_ENDPOINT=${endpoint}\n`);
-    expect(persisted).toContain(`OTEL_EXPORTER_OTLP_HEADERS=${headers}\n`);
-    expect(persisted).toContain(`GH_AW_OTLP_ENDPOINTS=${JSON.stringify([{ url: endpoint, headers }])}\n`);
-    expect(persisted).not.toContain("legacy-private-token");
   });
 
   describe("writeEnvLine", () => {

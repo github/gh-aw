@@ -122,7 +122,6 @@ function getPrimaryOTLPEndpoint(endpointsRaw) {
  * @returns {Promise<void>}
  */
 async function run() {
-  require("./otlp_default_config.cjs").resolveOTLPDefaultConfig((key, value) => writeEnvLine(process.env.GITHUB_ENV, key, value, key, "GITHUB_ENV"));
   const { sendJobSetupSpan, isValidTraceId, isValidSpanId, parseOTLPEndpoints } = require("./send_otlp_span.cjs");
 
   const rawStartMs = process.env.SETUP_START_MS;
