@@ -338,6 +338,11 @@
 ## 2026-11-20 (workflow-health-manager, run 44674692240)
 - **Correction:** #78066, #77641, #77062, #78921, #78922 and #78923 were closed by the create-issue `expires: 1d` setting, not by a human not_planned decision. Treat these trackers as expired, not as declined.
 - **Root cause of recurring closures:** workflow-health-manager.md sets `safe-outputs.create-issue.expires: 1d`. A new maintenance issue is filed to fix this.
-- **Auditor:** still failing 11 of 12 hourly runs since 2026-11-19 17:27Z; latest success 03:30Z. Root cause unverified (logs 403 DIFC). New P1 tracker filed.
-- **Handle agent failure (conclusion job):** dependabot-burner failed 6 of 6 recent runs (last 2026-11-18); visual-regression-checker failed 5 of 6 (success 2026-11-19 18:12Z). New P1 tracker filed. #77984 remains closed and is not a pending fix.
-- Trend: 7d/30d unavailable (partial snapshots 11-16, 11-18, 11-19, 11-20).
+- **Auditor (2026-11-21T04:30Z):** still failing. 6 of 23 completed 24h runs failed; latest failure 2026-11-21T03:29Z. P1 #79418 open, root cause unverified (logs 403 DIFC).
+- **Handle agent failure (conclusion job), 2026-11-21:** daily-go-test-parallelizer 8 of 11 completed 24h runs failed (untracked before this run; new P1 tracker filed). visual-regression-checker 2 of 8 failed 24h (11-20 17:46-18:30Z); dependabot-burner last run 11-20 succeeded, so the earlier 6-of-6 failure note is stale. Root cause unverified (logs 403 DIFC).
+- Trend: 7d/30d unavailable (partial snapshots 11-18, 11-19, 11-20; complete 11-17 is the latest scored snapshot).
+
+
+## Update — 2026-11-21T04:30Z (Workflow Health Manager)
+- Re-verified P0 #20315 (cited in alerts-coordination.md): CLOSED 2026-03-11. Stale; do not cite as pending.
+- Scored snapshot is metrics/daily/2026-11-17.json (complete). Tiers unchanged: Healthy 14, Warning 4, Critical 5, Low-sample 186, Inactive 159.

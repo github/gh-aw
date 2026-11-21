@@ -1,6 +1,6 @@
 # Alerts - 2026-03-16T17:41Z | Q:83 E:82 H:70
 
-P0: #20315 GH_AW_GITHUB_TOKEN missing → Issue Monster+Triage+WeeklyIssue+PRTriage+DailyIssues+OrgHealth
+RESOLVED (stale, verified 2026-11-21): #20315 GH_AW_GITHUB_TOKEN was closed 2026-03-11. Do not cite as a pending P0. Re-diagnose Issue Monster+Triage+WeeklyIssue+PRTriage+DailyIssues+OrgHealth from current run logs.
 P1: Smoke Copilot context mismatch (PR tools in schedule) → issue #aw_smkctx1
 P1: CI Optimization Coach create_pr failed (3.4M tokens, 18.8m wasted)
 P2: Contribution Check bad labels (lgtm/needs-work don't exist)
