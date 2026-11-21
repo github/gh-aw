@@ -542,6 +542,52 @@ test.describe("compact navigation on touch screens", () => {
     await expect(page.locator(".arrows")).toHaveCSS("touch-action", "manipulation");
   });
 
+  test("never moves on a click, swipes between slides, opens band-header tiles on tap and pinches to the map", async ({ page }) => {
+    const count = page.locator(CURRENT);
+    await page.goto(`/gh-aw/cracktro/#${SECURITY + 1}`);
+    await expect(count).toHaveAttribute("aria-label", at(SECURITY + 1));
+    // a click anywhere on the slide (either side) keeps the slide
+    await page.mouse.click(300, 300);
+    await page.mouse.click(20, 300);
+    await expect(count).toHaveAttribute("aria-label", at(SECURITY + 1));
+
+    const swipe = (dx: number, dy: number, fingers = 1) =>
+      page.evaluate(
+        ([dx, dy, fingers]) => {
+          const el = document.querySelector(".slide.active")!;
+          const touches = (x: number, y: number) => Array.from({ length: fingers }, (_, i) => new Touch({ identifier: i, target: el, clientX: x + i * 40, clientY: y }));
+          el.dispatchEvent(new TouchEvent("touchstart", { bubbles: true, cancelable: true, touches: touches(160, 300), changedTouches: touches(160, 300) }));
+          el.dispatchEvent(new TouchEvent("touchend", { bubbles: true, cancelable: true, touches: [], changedTouches: touches(160 + dx, 300 + dy) }));
+        },
+        [dx, dy, fingers]
+      );
+    await swipe(-120, 0);
+    await expect(count).toHaveAttribute("aria-label", at(SECURITY + 2));
+    await swipe(120, 0);
+    await expect(count).toHaveAttribute("aria-label", at(SECURITY + 1));
+    // a two-finger gesture (pinch) is not a swipe
+    await swipe(-120, 0, 2);
+    await expect(count).toHaveAttribute("aria-label", at(SECURITY + 1));
+    await swipe(120, 0);
+    await expect(count).toHaveAttribute("aria-label", at(SECURITY));
+
+    // tapping a band-header tile opens its slide exactly once and cancels the synthetic click
+    const tile = page.locator(".slide.active .bh-row li[data-go]").nth(1);
+    const target = Number(await tile.getAttribute("data-go")) + 1;
+    await tile.tap();
+    await expect(count).toHaveAttribute("aria-label", at(target));
+
+    // pinching in (two fingers closing) zooms out to the slide map
+    await page.evaluate(() => {
+      const el = document.querySelector(".slide.active")!;
+      const two = (gap: number) => [0, 1].map(i => new Touch({ identifier: i, target: el, clientX: 160 + (i ? gap : -gap), clientY: 300 }));
+      el.dispatchEvent(new TouchEvent("touchstart", { bubbles: true, touches: two(100), changedTouches: two(100) }));
+      el.dispatchEvent(new TouchEvent("touchmove", { bubbles: true, touches: two(40), changedTouches: two(40) }));
+      el.dispatchEvent(new TouchEvent("touchend", { bubbles: true, touches: [], changedTouches: two(40) }));
+    });
+    await expect(page.locator("dialog.smp")).toBeVisible();
+  });
+
   test("dims the idle toolbar without swallowing the first tap or hiding keyboard focus", async ({ page }) => {
     const count = page.locator(CURRENT);
     const arrows = page.locator(".arrows");

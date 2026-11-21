@@ -66,9 +66,10 @@ It is a standalone slide deck, separate from the homepage slideshow, linked
 from the site footer. The deck is laid out as a table of horizontal bands: the
 title, the factory mindset, trust the process and the finale are rows of their own, and every other band (Workflows,
 Security, Human agent processes, Cost Optimization, Agentic Engineering, Enterprise, Central Agentic Ops, AW factory) starts with a header
-slide that lists the band's slides (click a tile to jump) and a map of all bands.
+slide that lists the band's slides (click or tap a tile to jump) and a map of all bands.
 The Central Agentic Ops (CAO, `gh cao`) band covers a research prototype, so each of its
 slides carries a "Research prototype" badge.
+Clicking a slide never changes it; on touch screens, swipe left/right to step, up/down to walk a column or switch bands, and pinch in to zoom out to the slide map.
 Left/Right (or Space) step through the slides of the main line in reading
 order and wrap between bands, and Page Up/Page Down (or Shift+Up/Down) move to the band above or
 below like a text cursor: they keep the horizontal position (clamped to the band's length) until

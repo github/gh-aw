@@ -145,7 +145,7 @@
   .bh-mrow.on i { background: var(--bh); box-shadow: 0 0 14px var(--bh); }
   .bh-mrow.on i.hd { background: transparent; box-shadow: inset 0 0 0 2px var(--bh2); }
   .bh-row { position: absolute; left: 140px; right: 140px; bottom: 190px; margin: 0; padding: 0; list-style: none; display: flex; gap: 22px; }
-  .bh-row li { cursor: pointer; flex: 1; min-width: 0; height: 170px; padding: 26px 28px; border: 1px solid #3d444d; border-top: 4px solid var(--bh); border-radius: 14px;
+  .bh-row li { cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; flex: 1; min-width: 0; height: 170px; padding: 26px 28px; border: 1px solid #3d444d; border-top: 4px solid var(--bh); border-radius: 14px;
     background: #151b23cc; display: flex; flex-direction: column; justify-content: space-between; }
   .bh-row li:hover { border-color: var(--bh2); background: #1f2630cc; }
   .active .bh-row li { animation: rowin .8s cubic-bezier(.2,.9,.2,1) both calc(var(--i) * 90ms + .5s); }
@@ -1236,25 +1236,67 @@
       else if (e.key === "g" || e.key === "G") openMap();
       else if ((e.key === "x" || e.key === "X") && view) setView(null);
     });
-    addEventListener("click", e => {
+    // Clicks never move between slides (only keys, the dock, swipes and jump targets do); a click on a
+    // jump target (band-header tile) opens its slide. The listener sits on the stage so iOS Safari dispatches it.
+    stage.addEventListener("click", e => {
       /** @type {any} */
-      const target = e.target;
-      if (fz.open || smp.open || target.closest(".fz, .smp, .notes, a, button")) return;
-      const tile = target.closest("[data-go]");
-      if (tile) return go(+tile.dataset.go);
-      e.clientX < innerWidth / 3 ? prev() : next();
+      const tile = e.target.closest?.("[data-go]");
+      if (tile && !fz.open && !smp.open) go(+tile.dataset.go);
     });
+    // Touch: a horizontal swipe steps along the main line, a vertical one walks the column or switches bands, and a
+    // tap on a jump target opens it on touchend (cancelling the synthetic click), so taps work even when the browser
+    // withholds the click. A two-finger pinch in zooms out to the slide map (unless the page itself is zoomed in, so the
+    // browser's own zoom still works); touches in the notes, dialogs or form fields are ignored.
     let tx = null,
-      ty = null;
-    addEventListener("touchstart", e => (fz.open || smp.open ? (tx = ty = null) : ((tx = e.touches[0].clientX), (ty = e.touches[0].clientY))), { passive: true });
-    addEventListener("touchend", e => {
-      if (tx == null || fz.open || smp.open) return;
-      const dx = e.changedTouches[0].clientX - tx,
-        dy = e.changedTouches[0].clientY - ty;
-      tx = ty = null;
-      if (Math.abs(dy) > Math.abs(dx)) Math.abs(dy) > 50 && vstep(dy < 0 ? 1 : -1);
-      else if (Math.abs(dx) > 50) dx < 0 ? next() : prev();
-    });
+      ty = null,
+      pinch0 = null;
+    const touchIgnored = t => fz.open || smp.open || !!t.closest?.(".notes, .fz, .smp, input, textarea, select, [contenteditable]");
+    const spread = ts => Math.hypot(ts[0].clientX - ts[1].clientX, ts[0].clientY - ts[1].clientY);
+    addEventListener(
+      "touchstart",
+      e => {
+        tx = ty = pinch0 = null;
+        if (touchIgnored(e.target)) return;
+        if (e.touches.length === 2) pinch0 = spread(e.touches);
+        if (e.touches.length !== 1) return;
+        tx = e.touches[0].clientX;
+        ty = e.touches[0].clientY;
+      },
+      { passive: true }
+    );
+    addEventListener(
+      "touchmove",
+      e => {
+        if (e.touches.length > 1) tx = ty = null;
+        if (pinch0 == null || e.touches.length !== 2 || (visualViewport?.scale ?? 1) > 1.01) return;
+        if (spread(e.touches) < pinch0 * 0.7) {
+          pinch0 = null;
+          openMap();
+        }
+      },
+      { passive: true }
+    );
+    addEventListener("touchcancel", () => (tx = ty = pinch0 = null));
+    addEventListener(
+      "touchend",
+      e => {
+        if (tx == null || e.touches.length || fz.open || smp.open) return (tx = ty = null);
+        const t = e.changedTouches[0],
+          dx = t.clientX - tx,
+          dy = t.clientY - ty;
+        tx = ty = null;
+        if (Math.abs(dx) < 10 && Math.abs(dy) < 10) {
+          /** @type {any} */
+          const tile = e.target.closest?.("[data-go]");
+          if (tile && stage.contains(tile)) {
+            if (e.cancelable) e.preventDefault();
+            go(+tile.dataset.go);
+          }
+        } else if (Math.abs(dy) > Math.abs(dx)) Math.abs(dy) > 50 && vstep(dy < 0 ? 1 : -1);
+        else if (Math.abs(dx) > 50) dx < 0 ? next() : prev();
+      },
+      { passive: false }
+    );
     // #id selects a slide; a legacy numeric #N still opens the Nth slide and is rewritten to its #id.
     // &tour=<name> or &view=<payload> after it starts (or keeps) a tour; a slide outside the tour opens its first slide.
     const parseHash = () => {
