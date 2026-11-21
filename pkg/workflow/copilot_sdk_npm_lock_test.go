@@ -6,6 +6,7 @@ import (
 	"crypto/sha512"
 	"encoding/base64"
 	"encoding/json"
+	"maps"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -71,9 +72,7 @@ func TestCopilotSDKCompilesWithFrozenNPMGraph(t *testing.T) {
 				}
 				require.NoError(t, json.Unmarshal(project.Manifest, &manifest))
 				want := map[string]string{"@github/copilot-sdk": string(constants.DefaultCopilotSDKVersion), "undici": "6.28.0"}
-				for pkg, version := range tt.extra {
-					want[pkg] = version
-				}
+				maps.Copy(want, tt.extra)
 				require.Equal(t, want, manifest.Dependencies)
 
 				var lock struct {
