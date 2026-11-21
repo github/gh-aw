@@ -22,6 +22,18 @@ type ExpressionError struct {
 	Line int
 }
 
+func (a *analyzer) executableText(text, path string, bindings scope) error {
+	site := Site{Kind: ExecutableInterpolation, Path: path}
+	if !a.rule.IsSink(site) {
+		return nil
+	}
+	return VisitInterpolations(context.Background(), text, path, func(_, _, line int, node actionlint.ExprNode) error {
+		site.Line = line
+		a.emit(site, a.expression(node, path, bindings))
+		return nil
+	})
+}
+
 func (e *ExpressionError) Error() string {
 	return fmt.Sprintf("invalid Actions expression at %s:%d", e.Path, e.Line)
 }

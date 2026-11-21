@@ -16,7 +16,8 @@ import (
 
 // Analyze resolves a copy of the AST and visits jobs in dependency order.
 // Environment scopes and step execution order are preserved. Shell-local
-// assignments are conservative unions across control-flow paths.
+// assignments are conservative unions across control-flow paths. Findings
+// collected before an analysis failure are returned alongside the error.
 func Analyze(input *actions.Workflow, rule Rule) (Result, error) {
 	return analyze(input, rule, nil)
 }
@@ -55,20 +56,20 @@ func analyze(input *actions.Workflow, rule Rule, document *aw.Document) (Result,
 	}
 	for _, job := range resolved.Jobs {
 		if err := visit(job); err != nil {
-			return Result{}, err
+			return a.result, err
 		}
 	}
 	for path, text := range map[string]string{"name": resolved.Name, "run-name": resolved.RunName} {
 		sources, err := a.text(text, path, nil)
 		if err != nil {
-			return Result{}, err
+			return a.result, err
 		}
 		a.emit(Site{Kind: Display, Path: path}, sources)
 	}
 	if document != nil {
 		sources, err := a.text(document.Markdown, "markdown", a.promptScope)
 		if err != nil {
-			return Result{}, err
+			return a.result, err
 		}
 		a.emit(Site{Kind: Prompt, Path: "markdown"}, sources)
 	}
@@ -221,9 +222,21 @@ func (a *analyzer) jobSteps(job *actions.Job, workflow *actions.Workflow, path s
 	workflowRunDefaults := runDefaults(workflow.Defaults)
 	jobRunDefaults := runDefaults(job.Defaults)
 	for i, step := range job.Steps {
+		// Analysis inspects typed interpolation without changing declarations
+		// or bypassing the emitter's guard on the caller's graph.
+		run, typed := step.(actions.RunStep)
+		typed = typed && strings.Contains(run.Run, "${{")
+		if typed {
+			placeholder := run
+			placeholder.Run = "true"
+			step = placeholder
+		}
 		fields, err := actions.LowerStep(step, job.ID, workflow)
 		if err != nil {
 			return err
+		}
+		if typed {
+			fields["run"] = run.Run
 		}
 		stepPath := fmt.Sprintf("%s.steps[%d]", path, i)
 		if _, exists := fields["shell"]; !exists {
@@ -348,7 +361,9 @@ func (a *analyzer) inputs(inputs map[string]actions.Expression, site Site, job a
 
 func (a *analyzer) step(fields map[string]any, path string, env, persisted, files scope) error {
 	// Runner command files belong to one step, unlike ordinary workspace files.
-	delete(files, "$GITHUB_OUTPUT")
+	for _, name := range []string{"$GITHUB_OUTPUT", "$GITHUB_ENV", "$GITHUB_PATH", "$GITHUB_STEP_SUMMARY"} {
+		delete(files, name)
+	}
 	parent := maps.Clone(env)
 	maps.Copy(parent, persisted)
 	bindings := maps.Clone(parent)
@@ -415,14 +430,20 @@ func (a *analyzer) action(fields map[string]any, path string, bindings, files sc
 		}
 	}
 	for _, key := range slices.Sorted(maps.Keys(inputs)) {
-		sources, err := a.text(fmt.Sprint(inputs[key]), path+".with."+key, bindings)
+		inputPath := path + ".with." + key
+		if a.rule.IsExecutableInput != nil && a.rule.IsExecutableInput(Site{Uses: uses, Input: key}) {
+			if err := a.executableText(fmt.Sprint(inputs[key]), inputPath, bindings); err != nil {
+				return err
+			}
+		}
+		sources, err := a.text(fmt.Sprint(inputs[key]), inputPath, bindings)
 		if err != nil {
 			return err
 		}
 		a.emit(Site{Kind: ActionInput, Path: path + ".with." + key, Uses: uses, Input: key}, sources)
 		if actionName(uses) == "actions/upload-artifact" && key == "path" {
 			var contents value
-			patterns := strings.Split(fmt.Sprint(inputs[key]), "\n")
+			patterns := strings.FieldsFunc(fmt.Sprint(inputs[key]), func(r rune) bool { return r == '\n' || r == '\r' })
 			for file, sources := range files {
 				if artifactIncludes(patterns, file) {
 					contents = union(contents, sources)

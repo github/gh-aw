@@ -46,6 +46,9 @@ func actionName(uses string) string {
 }
 
 func secretSink(site Site) bool {
+	if site.Kind == ExecutableInterpolation || site.Kind == EnvironmentFile {
+		return false
+	}
 	if site.Kind != ActionInput {
 		return true
 	}
