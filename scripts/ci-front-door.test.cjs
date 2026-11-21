@@ -344,6 +344,7 @@ test("invalid inputs and policy changes force all suites without inference", asy
     { diff: { ...diff, unavailable: true } },
     { diff: { ...diff, truncated: true } },
     { diff: { ...diff, files: [".github/ci/suite-catalog.json"] } },
+    { diff: { ...diff, files: ["scripts/go-unit-suite.cjs"] } },
     { diff: { ...diff, files: ["scripts/ci-front-door.cjs"] } },
     { diff: { ...diff, files: [".github/workflows/cgo.yml"] } },
     { diff: { ...diff, files: ["actions/setup/js/decisions_client.cjs"] } },
@@ -428,7 +429,9 @@ test("catalog jobs are all selectable and historical savings reflect selected jo
 });
 
 test("selected jobs retain direct and transitive prerequisites without making them unconditional", () => {
-  assert.deepEqual(selectSuites({ suite_ids: ["canary-go"], confidence: 1 }, catalog, diff), ["verify-integration-build", "test", "canary-go"]);
+  assert.deepEqual(selectSuites({ suite_ids: ["canary-go"], confidence: 1 }, catalog, diff), ["verify-integration-build", "test", "test-slow", "canary-go"]);
+  assert.deepEqual(selectSuites({ suite_ids: ["test"], confidence: 1 }, catalog, diff), ["verify-integration-build", "test"]);
+  assert.deepEqual(selectSuites({ suite_ids: ["test-slow"], confidence: 1 }, catalog, diff), ["verify-integration-build", "test-slow"]);
   for (const [id, dependencies] of Object.entries(JOB_DEPENDENCIES)) {
     const selected = selectSuites({ suite_ids: [id], confidence: 1 }, catalog, diff);
     for (const dependency of dependencies) assert.ok(selected.includes(dependency), `${id}: ${dependency}`);
