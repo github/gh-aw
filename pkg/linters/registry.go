@@ -53,6 +53,7 @@ import (
 	"github.com/github/gh-aw/pkg/linters/mapclearloop"
 	"github.com/github/gh-aw/pkg/linters/mapdeletecheck"
 	"github.com/github/gh-aw/pkg/linters/nilctxpassed"
+	"github.com/github/gh-aw/pkg/linters/os-stat-ignored-error-deref"
 	"github.com/github/gh-aw/pkg/linters/osexitinlibrary"
 	"github.com/github/gh-aw/pkg/linters/osgetenvlibrary"
 	"github.com/github/gh-aw/pkg/linters/osisnotexist"
@@ -164,6 +165,7 @@ var allAnalyzers = []*analysis.Analyzer{
 	osisnotexist.Analyzer,
 	osopenreadallpreferreadfile.Analyzer,
 	osremoveuncheckedcleanup.Analyzer,
+	osstatignorederrorderef.Analyzer,
 	ossetenvlibrary.Analyzer,
 	packagelevelmutableslicemap.Analyzer,
 	panicinlibrarycode.Analyzer,

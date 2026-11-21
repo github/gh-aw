@@ -49,6 +49,7 @@ var notYetEnforced = map[string]string{
 	"osisnotexist":                     "existing os error predicates need case-by-case review before CI enforcement",
 	"osopenreadallpreferreadfile":      "os.Open/ReadAll simplifications need an enforcement-readiness audit before CI enables it",
 	"osremoveuncheckedcleanup":         "existing cleanup error findings need remediation before CI enforcement",
+	"osstatignorederrorderef":          "new nil-dereference analyzer needs an enforcement-readiness audit before CI enables it",
 	"packagelevelmutableslicemap":      "existing production violations need remediation",
 	"prefercutprefix":                  "existing HasPrefix/TrimPrefix and HasSuffix/TrimSuffix findings need remediation before CI enforcement",
 	"readerstringconv":                 "existing reader conversions need an enforcement-readiness audit before CI enables it",
@@ -304,6 +305,8 @@ func docSlugToAnalyzerName(slug string) string {
 		return "panicinlibrarycode"
 	case "splitlines-on-newline":
 		return "splitlinesonnewline"
+	case "os-stat-ignored-error-deref":
+		return "osstatignorederrorderef"
 	default:
 		return slug
 	}
