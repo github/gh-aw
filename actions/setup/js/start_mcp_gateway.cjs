@@ -1646,7 +1646,12 @@ function applyBuiltinMCPRunnerIdentity(config, uid = process.geteuid?.(), gid = 
     Object.assign(server, {
       args: [...args, "--user", `${uid}:${gid}`],
       // /tmp is private to this backend container; /root is not writable as the runner.
-      env: { HOME: "/tmp", ...env },
+      env: {
+        HOME: "/tmp",
+        ...env,
+        // Use the same bind mount as the agent for the logs file_path handoff.
+        ...(name === "agenticworkflows" ? { GH_AW_MCP_LOGS_REPORT_DIR: "/tmp/gh-aw" } : {}),
+      },
     });
   }
 }

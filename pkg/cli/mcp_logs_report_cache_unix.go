@@ -70,17 +70,25 @@ func (cache *mcpLogsReportCache) prepare() error {
 		return nil
 	}
 	base := cache.tempDir
+	shared := false
+	if base == "" {
+		base = os.Getenv("GH_AW_MCP_LOGS_REPORT_DIR")
+		shared = base != ""
+	}
 	if base == "" {
 		base = os.TempDir()
 	}
 	if !filepath.IsAbs(base) {
 		return errors.New("logs cache requires an absolute temporary directory")
 	}
-	// Resolve system aliases (such as /var on macOS) once. Validate and use only
-	// the resolved path, never the shared legacy cache or artifact directories.
-	base, err := filepath.EvalSymlinks(base)
-	if err != nil {
-		return fmt.Errorf("resolve logs cache temporary directory: %w", err)
+	// Resolve system aliases (such as /var on macOS), but do not redirect an
+	// explicit shared mount: its path must be the same in both containers.
+	if !shared {
+		resolved, err := filepath.EvalSymlinks(base)
+		if err != nil {
+			return fmt.Errorf("resolve logs cache temporary directory: %w", err)
+		}
+		base = resolved
 	}
 	if err := validateMCPLogsTempDirectory(base); err != nil {
 		return err

@@ -5,6 +5,7 @@ package cli
 import (
 	"encoding/json"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -82,6 +83,22 @@ func TestBuildLogsFileResponse_SetsOwnerOnlyPermissions(t *testing.T) {
 	if filePerm != 0o600 {
 		t.Errorf("Cache file should be owner-only (0600), got mode %o", filePerm)
 	}
+}
+
+func TestBuildLogsFileResponse_AgentCanReadSharedReport(t *testing.T) {
+	output := `{"summary":{"total_runs":1}}`
+	sharedDir, err := filepath.EvalSymlinks(t.TempDir())
+	require.NoError(t, err)
+	t.Setenv("GH_AW_MCP_LOGS_REPORT_DIR", sharedDir)
+	var cache mcpLogsReportCache
+	var response MCPLogsGuardrailResponse
+	require.NoError(t, json.Unmarshal([]byte(buildLogsFileResponseWithCache(output, cache.store)), &response))
+	require.NotEmpty(t, response.FilePath, response.Message)
+	require.Equal(t, sharedDir, filepath.Dir(filepath.Dir(response.FilePath)))
+
+	data, err := exec.CommandContext(t.Context(), "cat", response.FilePath).Output()
+	require.NoError(t, err)
+	require.Equal(t, output, string(data))
 }
 
 func TestBuildLogsFileResponse_RefusesUnsafeCache(t *testing.T) {
