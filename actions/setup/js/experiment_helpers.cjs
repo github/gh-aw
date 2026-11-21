@@ -42,7 +42,7 @@ function readExperimentAssignments() {
   /** @type {Record<string, string>} */
   const fromEnv = {};
   for (const [key, value] of Object.entries(process.env)) {
-    if (!key.startsWith("GH_AW_EXPERIMENTS_") || key === "GH_AW_EXPERIMENTS_BROKER_URL") {
+    if (!key.startsWith("GH_AW_EXPERIMENTS_")) {
       continue;
     }
     const name = key.substring("GH_AW_EXPERIMENTS_".length).toLowerCase();

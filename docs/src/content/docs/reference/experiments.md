@@ -284,12 +284,14 @@ gh-aw does not ship the server.
 
 Activation obtains assignments and required cumulative counts. A separate,
 isolated job after conclusion (and graders when needed) submits allowlisted
-numeric/status observations from `activity/summary.json` in the `usage` artifact.
+numeric/status observations from a compact `activity/experiment-results.json` in the `usage` artifact.
 Reporting is best effort: failures, cancellation, or missing artifacts can leave assignments
 without results. Reported values are untrusted observations, not authorization
 or verified human adoption. Eval answers, custom grader values, and adoption
 results are not currently reported. Authored steps and workflow-level environment
 hooks cannot customize the isolated broker report job.
+The report job uses the configured framework runner (`runs-on-slim` or
+`safe-outputs.runs-on`), which must satisfy the deployment's runner policy.
 Friction costs are reported only for available measurement dimensions;
 unavailable or unsupported values are omitted rather than recorded as zero.
 New attempts require fresh activation/conclusion artifacts; rerunning only a

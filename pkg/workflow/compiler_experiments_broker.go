@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"path"
+	"slices"
 	"strings"
 
 	"github.com/github/gh-aw/pkg/constants"
@@ -25,10 +26,11 @@ func experimentBrokerEnv(data *WorkflowData, names []string, invocationID string
 		"        env:\n",
 		fmt.Sprintf("          GH_AW_EXPERIMENT_SPEC: '%s'\n", strings.ReplaceAll(spec, "'", "''")),
 		fmt.Sprintf("          GH_AW_WORKFLOW_ID: %q\n", data.WorkflowID),
-		"          GH_AW_WORKFLOW_REF: ${{ job.workflow_ref }}\n",
+		"          GH_AW_WORKFLOW_REF: ${{ job.workflow_ref || github.workflow_ref }}\n",
 		fmt.Sprintf("          GH_AW_EXPERIMENT_INVOCATION_ID: %s\n", invocationID),
 		fmt.Sprintf("          GH_AW_EXPERIMENT_STATE_DIR: %s\n", experimentsCacheDir),
-		"          GH_AW_EXPERIMENTS_BROKER_URL: ${{ secrets.GH_AW_EXPERIMENTS_BROKER_URL }}\n",
+		fmt.Sprintf("          GH_AW_EXPERIMENT_STATE_FILE: %s\n", experimentStateFile),
+		"          GH_AW_BROKER_EXPERIMENTS_URL: ${{ secrets.GH_AW_EXPERIMENTS_BROKER_URL }}\n",
 	}
 }
 
@@ -80,7 +82,7 @@ func (c *Compiler) addReportExperimentsJob(data *WorkflowData) error {
 	perms.Set(PermissionIdToken, PermissionWrite)
 	job := &Job{
 		Name:           string(constants.ReportExperimentsJobName),
-		RunsOn:         "runs-on: ubuntu-latest",
+		RunsOn:         c.formatFrameworkJobRunsOn(data),
 		Needs:          needs,
 		If:             "always() && !cancelled() && needs.activation.outputs.experiments != '' && needs.activation.outputs.experiments != '{}'",
 		Permissions:    perms.RenderToYAML(),
@@ -98,7 +100,7 @@ func (c *Compiler) buildReportExperimentsSteps(data *WorkflowData) []string {
 	steps = append(steps, c.generateSetupStepForJob(string(constants.ReportExperimentsJobName), &WorkflowData{Name: data.Name}, setupRef, SetupActionDestination, false, "", "", "")...)
 	steps = append(steps, initializeBrokerExperimentStateStep(),
 		"      - name: Initialize experiment usage files\n",
-		"        run: rm -f /tmp/gh-aw/usage/activity/summary.json /tmp/gh-aw/usage/aw_info.json\n",
+		"        run: rm -f /tmp/gh-aw/usage/activity/experiment-results.json /tmp/gh-aw/usage/aw_info.json\n",
 	)
 	steps = append(steps, buildArtifactDownloadSteps(ArtifactDownloadConfig{
 		ArtifactName:    experimentArtifactDownloadName(data),
@@ -112,7 +114,41 @@ func (c *Compiler) buildReportExperimentsSteps(data *WorkflowData) []string {
 		StepName:        "Download experiment usage results",
 		ContinueOnError: new(false),
 	}, c.getActionPin)...)
-	return append(steps, c.buildReportExperimentsScriptStep(data)...)
+	steps = append(steps, c.buildReportExperimentsScriptStep(data)...)
+	return isolateBrokerReportStepTemp(steps)
+}
+
+// Step contexts can use runner.temp; job-level env cannot.
+func isolateBrokerReportStepTemp(steps []string) []string {
+	lines := strings.SplitAfter(strings.Join(steps, ""), "\n")
+	var result []string
+	var step []string
+	flush := func() {
+		if len(step) == 0 {
+			return
+		}
+		hasEnv := slices.Contains(step, "        env:\n")
+		for i, line := range step {
+			result = append(result, line)
+			if i == 0 && !hasEnv {
+				result = append(result, "        env:\n")
+			} else if line != "        env:\n" {
+				continue
+			}
+			for _, name := range []string{"HOME", "TMPDIR", "TMP", "TEMP"} {
+				result = append(result, "          "+name+": ${{ runner.temp }}\n")
+			}
+		}
+		step = nil
+	}
+	for _, line := range lines {
+		if strings.HasPrefix(line, "      - ") {
+			flush()
+		}
+		step = append(step, line)
+	}
+	flush()
+	return result
 }
 
 func (c *Compiler) buildReportExperimentsScriptStep(data *WorkflowData) []string {
@@ -122,7 +158,7 @@ func (c *Compiler) buildReportExperimentsScriptStep(data *WorkflowData) []string
 	}
 	steps = append(steps, experimentBrokerEnv(data, sortedExperimentNames(data.Experiments), artifactPrefixExprForDownstreamJob(data))...)
 	return append(steps,
-		"          GH_AW_EXPERIMENT_RESULTS_FILE: /tmp/gh-aw/usage/activity/summary.json\n",
+		"          GH_AW_EXPERIMENT_RESULTS_FILE: /tmp/gh-aw/usage/activity/experiment-results.json\n",
 		"          GH_AW_EXPERIMENT_METADATA_FILE: /tmp/gh-aw/usage/aw_info.json\n",
 		"          GH_AW_EXPERIMENT_AGENT_RESULT: ${{ needs.agent.result }}\n",
 		"        with:\n",
@@ -151,7 +187,7 @@ func brokerReportJobEnv(data *WorkflowData) (map[string]string, error) {
 	}
 	for _, name := range []string{"HOME", "TMPDIR", "TMP", "TEMP"} {
 		if _, exists := env[name]; exists {
-			env[name] = "${{ runner.temp }}"
+			env[name] = "/tmp"
 		}
 	}
 	if _, exists := env["PATH"]; exists {

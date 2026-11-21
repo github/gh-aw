@@ -78,9 +78,10 @@ describe("readExperimentAssignments", () => {
   });
 
   it("never treats the secret broker endpoint as an experiment assignment", () => {
-    vi.stubEnv("GH_AW_EXPERIMENTS_BROKER_URL", "https://synthetic-broker.example.test/secret");
+    vi.stubEnv("GH_AW_BROKER_EXPERIMENTS_URL", "https://synthetic-broker.example.test/secret");
     expect(readExperimentAssignments()).toBeNull();
+    vi.stubEnv("GH_AW_EXPERIMENTS_BROKER_URL", "candidate");
     process.env.GH_AW_EXPERIMENTS_PROMPT_STYLE = "concise";
-    expect(readExperimentAssignments()).toEqual({ prompt_style: "concise" });
+    expect(readExperimentAssignments()).toEqual({ broker_url: "candidate", prompt_style: "concise" });
   });
 });

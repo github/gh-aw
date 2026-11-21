@@ -390,7 +390,8 @@ func buildUsageArtifactUploadStep(prefix string, pinAction func(string) string) 
 		"            /tmp/gh-aw/usage/experiment/state.jsonl\n",
 		"            /tmp/gh-aw/usage/experiment/state.json\n",
 		"            /tmp/gh-aw/usage/experiment/assignments.json\n",
-		"            /tmp/gh-aw/usage/activity/summary.json\n",
+		"            /tmp/gh-aw/usage/activity/summary.json\n" +
+			"            /tmp/gh-aw/usage/activity/experiment-results.json\n",
 		"          if-no-files-found: ignore\n",
 	}
 	retryUsageArtifactUploadWithLines := append([]string{}, usageArtifactUploadWithLines...)

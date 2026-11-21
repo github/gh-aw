@@ -101,10 +101,11 @@ func TestExperimentsBrokerCompiledWorkflow(t *testing.T) {
 				assert.Contains(t, pickScript, "experiments_broker.cjs")
 				assert.Contains(t, pickScript, "await assign({core})")
 				assert.NotContains(t, pickScript, "pick_experiment.cjs")
-				assert.Equal(t, "${{ secrets.GH_AW_EXPERIMENTS_BROKER_URL }}", pickEnv["GH_AW_EXPERIMENTS_BROKER_URL"])
+				assert.Equal(t, "${{ secrets.GH_AW_EXPERIMENTS_BROKER_URL }}", pickEnv["GH_AW_BROKER_EXPERIMENTS_URL"])
 				assert.Equal(t, "broker-test", pickEnv["GH_AW_WORKFLOW_ID"])
-				assert.Equal(t, "${{ job.workflow_ref }}", pickEnv["GH_AW_WORKFLOW_REF"])
+				assert.Equal(t, "${{ job.workflow_ref || github.workflow_ref }}", pickEnv["GH_AW_WORKFLOW_REF"])
 				assert.Equal(t, experimentsCacheDir, pickEnv["GH_AW_EXPERIMENT_STATE_DIR"])
+				assert.Equal(t, experimentStateFile, pickEnv["GH_AW_EXPERIMENT_STATE_FILE"])
 				assert.Equal(t, "write", activation.Permissions["id-token"])
 				assert.Equal(t, map[string]string{"contents": "read", "id-token": "write"}, report.Permissions)
 				if tc.noOIDC {
@@ -126,7 +127,7 @@ func TestExperimentsBrokerCompiledWorkflow(t *testing.T) {
 				}
 				assert.Contains(t, reportSection, "await report({core})")
 				assert.Contains(t, reportSection, "GH_AW_EXPERIMENT_SPEC:")
-				assert.Contains(t, reportSection, "GH_AW_EXPERIMENT_RESULTS_FILE: /tmp/gh-aw/usage/activity/summary.json")
+				assert.Contains(t, reportSection, "GH_AW_EXPERIMENT_RESULTS_FILE: /tmp/gh-aw/usage/activity/experiment-results.json")
 				assert.Contains(t, reportSection, "GH_AW_EXPERIMENT_METADATA_FILE: /tmp/gh-aw/usage/aw_info.json")
 				assert.Contains(t, reportSection, "GH_AW_EXPERIMENT_AGENT_RESULT: ${{ needs.agent.result }}")
 				assert.Contains(t, reportSection, "secrets.GH_AW_EXPERIMENTS_BROKER_URL")
@@ -143,6 +144,7 @@ func TestExperimentsBrokerCompiledWorkflow(t *testing.T) {
 				assert.Contains(t, reportSection, "GH_AW_EXPERIMENT_INVOCATION_ID: "+reportInvocation)
 				assert.Contains(t, reportSection, "name: "+artifact)
 				assert.Contains(t, reportSection, "name: "+artifactPrefixExprForDownstreamJob(data)+"usage")
+				assert.Contains(t, extractJobSection(generated, "conclusion"), "/tmp/gh-aw/usage/activity/experiment-results.json")
 			} else {
 				assert.Contains(t, pickScript, "pick_experiment.cjs")
 				assert.NotContains(t, generated, "/experiments_broker.cjs")
@@ -200,6 +202,52 @@ func TestExperimentsBrokerReportJobCannotBeCustomized(t *testing.T) {
 	}
 }
 
+func TestExperimentsReportNameAvailableWithoutLiveBroker(t *testing.T) {
+	for _, tc := range []struct {
+		storage string
+		dryRun  bool
+	}{{"repo", false}, {"cache", false}, {"broker", true}} {
+		t.Run(fmt.Sprintf("%s/dry-run=%t", tc.storage, tc.dryRun), func(t *testing.T) {
+			compiler := NewCompiler(WithNoEmit(true))
+			compiler.SetDryRun(tc.dryRun)
+			source := fmt.Sprintf("---\non: workflow_dispatch\nstrict: false\nexperiments:\n  storage: %s\n  prompt: [control, candidate]\njobs:\n  report_experiments:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo custom-report\n---\nTest.\n", tc.storage)
+			file := filepath.Join(t.TempDir(), "workflow.md")
+			data, err := compiler.ParseWorkflowString(source, file)
+			require.NoError(t, err)
+			generated, err := compiler.CompileToYAML(data, file)
+			require.NoError(t, err)
+			if tc.dryRun {
+				assert.Contains(t, extractJobSection(generated, "report_experiments"), "Custom job disabled in dry-run")
+			} else {
+				assert.Contains(t, extractJobSection(generated, "report_experiments"), "echo custom-report")
+			}
+			assert.Contains(t, extractJobSection(generated, "conclusion"), "report_experiments")
+		})
+	}
+}
+
+func TestExperimentsBrokerUsesFrameworkRunner(t *testing.T) {
+	for _, policy := range []string{"cli", "repo"} {
+		t.Run(policy, func(t *testing.T) {
+			compiler := NewCompiler(WithNoEmit(true))
+			if policy == "cli" {
+				compiler.SetRequireSelfHostedRunners(true)
+			} else {
+				compiler.repoConfig = &RepoConfig{RequireSelfHostedRunners: true}
+			}
+			source := "---\non: workflow_dispatch\nstrict: false\nruns-on: self-hosted\nruns-on-slim: [self-hosted, linux]\nexperiments:\n  storage: broker\n  prompt: [control, candidate]\n---\nTest.\n"
+			file := filepath.Join(t.TempDir(), "workflow.md")
+			data, err := compiler.ParseWorkflowString(source, file)
+			require.NoError(t, err)
+			generated, err := compiler.CompileToYAML(data, file)
+			require.NoError(t, err)
+			report := extractJobSection(generated, "report_experiments")
+			assert.Contains(t, report, "self-hosted")
+			assert.Contains(t, report, "linux")
+		})
+	}
+}
+
 func TestExperimentsBrokerReportEnvironmentIsolation(t *testing.T) {
 	for _, mode := range []ActionMode{ActionModeRelease, ActionModeDev, ActionModeScript} {
 		for _, imported := range []bool{false, true} {
@@ -209,7 +257,7 @@ func TestExperimentsBrokerReportEnvironmentIsolation(t *testing.T) {
 				var env strings.Builder
 				env.WriteString("env:\n")
 				hooks := []string{"BASH_ENV", "ENV", "NODE_OPTIONS", "NODE_PATH", "LD_PRELOAD", "LD_LIBRARY_PATH", "PYTHONPATH", "PYTHONSTARTUP", "ARBITRARY_FUTURE_HOOK"}
-				for _, name := range append(hooks, "PATH", "HOME", "TMPDIR") {
+				for _, name := range append(hooks, "PATH", "HOME", "TMPDIR", "TMP", "TEMP") {
 					env.WriteString("  " + name + ": /untrusted/startup\n")
 				}
 				source := "---\non: workflow_dispatch\nstrict: false\nexperiments:\n  storage: broker\n  prompt: [control, candidate]\n"
@@ -228,7 +276,11 @@ func TestExperimentsBrokerReportEnvironmentIsolation(t *testing.T) {
 				require.NoError(t, err)
 				var workflow struct {
 					Jobs map[string]struct {
-						Env map[string]string `yaml:"env"`
+						Env   map[string]string `yaml:"env"`
+						Steps []struct {
+							Name string            `yaml:"name"`
+							Env  map[string]string `yaml:"env"`
+						} `yaml:"steps"`
 					} `yaml:"jobs"`
 				}
 				require.NoError(t, yaml.Unmarshal([]byte(generated), &workflow))
@@ -239,8 +291,15 @@ func TestExperimentsBrokerReportEnvironmentIsolation(t *testing.T) {
 					assert.Empty(t, value)
 					assert.Contains(t, extractJobSection(generated, "report_experiments"), hook+`: ""`)
 				}
-				assert.Equal(t, "${{ runner.temp }}", reportEnv["HOME"])
-				assert.Equal(t, "${{ runner.temp }}", reportEnv["TMPDIR"])
+				assert.Equal(t, "/tmp", reportEnv["HOME"])
+				assert.Equal(t, "/tmp", reportEnv["TMPDIR"])
+				assert.Equal(t, "/tmp", reportEnv["TMP"])
+				assert.Equal(t, "/tmp", reportEnv["TEMP"])
+				for _, step := range workflow.Jobs["report_experiments"].Steps {
+					for _, name := range []string{"HOME", "TMPDIR", "TMP", "TEMP"} {
+						assert.Equal(t, "${{ runner.temp }}", step.Env[name], "step %s: %s", step.Name, name)
+					}
+				}
 				assert.Equal(t, "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin", reportEnv["PATH"])
 			})
 		}

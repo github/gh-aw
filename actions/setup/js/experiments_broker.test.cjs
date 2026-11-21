@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-const { assign, report } = require("./experiments_broker.cjs");
+const { assign, report, projectExperimentResults } = require("./experiments_broker.cjs");
 const { loadState } = require("./pick_experiment.cjs");
 const { buildFrictionSummary } = require("./generate_usage_activity_summary.cjs");
 const fs = require("fs");
@@ -15,7 +15,7 @@ const RESULTS_FILE = `${DIRECTORY}/summary.json`;
 const METADATA_FILE = `${DIRECTORY}/aw_info.json`;
 const json = value => new Response(JSON.stringify(value));
 const makeEnv = () => ({
-  GH_AW_EXPERIMENTS_BROKER_URL: "https://broker.example.test/experiments?route=synthetic",
+  GH_AW_BROKER_EXPERIMENTS_URL: "https://broker.example.test/experiments?route=synthetic",
   ACTIONS_ID_TOKEN_REQUEST_URL: "https://oidc.example.test/token?job=synthetic",
   ACTIONS_ID_TOKEN_REQUEST_TOKEN: "synthetic-bootstrap",
   GH_AW_EXPERIMENT_SPEC: JSON.stringify(SPEC),
@@ -51,11 +51,22 @@ function setup(overrides = {}) {
     ],
   ]);
   const core = { setSecret: vi.fn(), setOutput: vi.fn(), exportVariable: vi.fn(), info: vi.fn(), warning: vi.fn(), error: vi.fn() };
+  const positions = new Map();
   const fsImpl = {
-    statSync: vi.fn(file => {
+    openSync: vi.fn(file => {
       if (!files.has(file)) throw new Error("sensitive-detail");
-      return { size: Buffer.byteLength(files.get(file)) };
+      positions.set(file, 0);
+      return file;
     }),
+    fstatSync: vi.fn(file => ({ size: Buffer.byteLength(files.get(file)), isFile: () => true })),
+    readSync: vi.fn((file, buffer, offset, length) => {
+      const source = Buffer.from(files.get(file));
+      const start = positions.get(file);
+      const count = source.copy(buffer, offset, start, start + length);
+      positions.set(file, start + count);
+      return count;
+    }),
+    closeSync: vi.fn(),
     readFileSync: vi.fn(file => {
       if (!files.has(file)) throw new Error("sensitive-detail");
       return files.get(file);
@@ -97,13 +108,13 @@ describe("experiments broker assignment", () => {
     expect(await assign(fixture)).toEqual(DECISION);
     expect(fixture.fetchImpl).toHaveBeenCalledTimes(2);
     const [oidcUrl, oidcInit] = fixture.fetchImpl.mock.calls[0];
-    expect(oidcUrl.searchParams.get("audience")).toBe(fixture.env.GH_AW_EXPERIMENTS_BROKER_URL);
+    expect(oidcUrl.searchParams.get("audience")).toBe(fixture.env.GH_AW_BROKER_EXPERIMENTS_URL);
     expect(oidcUrl.searchParams.get("job")).toBe("synthetic");
     expect(oidcInit).toMatchObject({ redirect: "manual", headers: { authorization: "bearer synthetic-bootstrap" }, signal: expect.any(AbortSignal) });
     expect(oidcInit.headers).not.toHaveProperty("traceparent");
     expect(oidcInit.headers).not.toHaveProperty("baggage");
     const [endpoint, init] = fixture.fetchImpl.mock.calls[1];
-    expect(endpoint).toBe(fixture.env.GH_AW_EXPERIMENTS_BROKER_URL);
+    expect(endpoint).toBe(fixture.env.GH_AW_BROKER_EXPERIMENTS_URL);
     expect(init).toMatchObject({
       method: "POST",
       redirect: "manual",
@@ -259,6 +270,34 @@ describe("experiments broker assignment", () => {
 });
 
 describe("experiments broker reporting", () => {
+  it("projects and reports a large usage summary with bound assignments and allowlisted observations only", async () => {
+    const summary = {
+      schema: "usage-activity-summary/v1",
+      session: { turns: 2, transcript: "sensitive-detail".repeat(100000) },
+      gateway: { total_calls: 4, servers: { private: "sensitive-detail" }, calls: Array(16385).fill("sensitive-detail") },
+      experiments: { assignments: DECISION.assignments, runs: ["sensitive-detail"] },
+      memory_saves: ["sensitive-detail"],
+      friction: { total_run_aic: 5, total_run_aic_partial: true, friction_ratio: 0.1, dimension_states: { aic: "measured", private: "sensitive-detail" }, cost: { aic: 2, private: "sensitive-detail" } },
+    };
+    expect(Buffer.byteLength(JSON.stringify(summary))).toBeGreaterThan(1048576);
+    const projected = projectExperimentResults(summary);
+    expect(projected).toEqual({
+      schema: "usage-activity-summary/v1",
+      session: { turns: 2 },
+      gateway: { total_calls: 4 },
+      friction: { dimension_states: { aic: "measured" }, cost: { aic: 2 } },
+      experiments: { assignments: DECISION.assignments },
+    });
+    expect(JSON.stringify(projected)).not.toContain("sensitive-detail");
+    expect(summary.session.transcript).toHaveLength(1600000);
+    const fixture = setup();
+    fixture.files.set(RESULTS_FILE, JSON.stringify(projected));
+    await report(fixture);
+    const payload = JSON.parse(fixture.fetchImpl.mock.calls[1][1].body);
+    expect(payload.results).toEqual({ session: { turns: 2 }, gateway: { total_calls: 4 }, friction: { dimension_states: { aic: "measured" }, cost: { aic: 2 } }, agent_result: "success" });
+    expect(JSON.stringify(payload)).not.toContain("sensitive-detail");
+  });
+
   it("reports only fixed aggregate numeric/status observations, never raw logs, prompts, arbitrary strings, or items", async () => {
     const fixture = setup();
     fixture.env.GITHUB_JOB = "report_experiments";
@@ -464,6 +503,45 @@ describe("experiments broker reporting", () => {
     expect(fixture.fetchImpl).not.toHaveBeenCalled();
   });
 
+  it.each([ASSIGNMENTS_FILE, RESULTS_FILE, METADATA_FILE])("rejects malformed UTF-8 in artifact %s", async file => {
+    const fixture = setup();
+    const original = Buffer.from(fixture.files.get(file));
+    fixture.files.set(file, Buffer.concat([original.subarray(0, 1), Buffer.from([0x22, 0x78, 0x22, 0x3a, 0x22, 0xff, 0x22, 0x2c]), original.subarray(1)]));
+    await fails(report(fixture), "INPUT");
+    expect(fixture.fetchImpl).not.toHaveBeenCalled();
+    expect(fixture.fsImpl.closeSync).toHaveBeenCalled();
+  });
+
+  it("bounds reads even if a file grows after stat and closes it before rejecting", async () => {
+    const fixture = setup();
+    fixture.files.set(ASSIGNMENTS_FILE, " ".repeat(1048577));
+    fixture.fsImpl.fstatSync.mockReturnValue({ size: 1, isFile: () => true });
+    await fails(report(fixture), "INPUT");
+    expect(fixture.fsImpl.readSync.mock.calls[0][3]).toBe(1048577);
+    expect(fixture.fsImpl.closeSync).toHaveBeenCalledWith(ASSIGNMENTS_FILE);
+    expect(fixture.fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it("handles short reads and accepts a valid UTF-8 replacement character", async () => {
+    const fixture = setup();
+    const metadata = JSON.parse(fixture.files.get(METADATA_FILE));
+    metadata.model = "\uFFFD";
+    fixture.files.set(METADATA_FILE, JSON.stringify(metadata));
+    const read = fixture.fsImpl.readSync.getMockImplementation();
+    fixture.fsImpl.readSync.mockImplementation((fd, buffer, offset, length, position) => read(fd, buffer, offset, Math.min(length, 7), position));
+    await report(fixture);
+    expect(fixture.fsImpl.readSync.mock.calls.length).toBeGreaterThan(3);
+    expect(fixture.fsImpl.closeSync).toHaveBeenCalledTimes(3);
+  });
+
+  it("rejects non-regular input files before reading", async () => {
+    const fixture = setup();
+    fixture.fsImpl.fstatSync.mockReturnValue({ size: 0, isFile: () => false });
+    await fails(report(fixture), "INPUT");
+    expect(fixture.fsImpl.readSync).not.toHaveBeenCalled();
+    expect(fixture.fsImpl.closeSync).toHaveBeenCalled();
+  });
+
   it("requires a configured results file and bounds local inputs", async () => {
     const fixture = setup();
     delete fixture.env.GH_AW_EXPERIMENT_RESULTS_FILE;
@@ -472,7 +550,7 @@ describe("experiments broker reporting", () => {
     delete fixture.env.GH_AW_EXPERIMENT_METADATA_FILE;
     await fails(report(fixture), "INPUT");
     fixture.env.GH_AW_EXPERIMENT_METADATA_FILE = METADATA_FILE;
-    fixture.fsImpl.statSync.mockReturnValue({ size: 1048577 });
+    fixture.fsImpl.fstatSync.mockReturnValue({ size: 1048577, isFile: () => true });
     await fails(report(fixture), "INPUT");
     expect(fixture.fetchImpl).not.toHaveBeenCalled();
   });
@@ -493,12 +571,20 @@ describe.each([
     "https://broker.example.test/\nsecret",
   ])("rejects invalid endpoints %# without network access", async endpoint => {
     const fixture = setup();
-    fixture.env.GH_AW_EXPERIMENTS_BROKER_URL = endpoint;
+    fixture.env.GH_AW_BROKER_EXPERIMENTS_URL = endpoint;
     await fails(run(fixture), "CONFIGURATION");
     expect(fixture.fetchImpl).not.toHaveBeenCalled();
   });
 
-  it.each(["GH_AW_EXPERIMENTS_BROKER_URL", "GH_AW_WORKFLOW_ID", "GH_AW_WORKFLOW_REF", "GH_AW_EXPERIMENT_INVOCATION_ID", "GITHUB_JOB", "GITHUB_RUN_ID", "GITHUB_RUN_ATTEMPT", "GITHUB_REPOSITORY", "GITHUB_SERVER_URL"])(
+  it("does not interpret the broker_url experiment assignment as an endpoint", async () => {
+    const fixture = setup();
+    delete fixture.env.GH_AW_BROKER_EXPERIMENTS_URL;
+    fixture.env.GH_AW_EXPERIMENTS_BROKER_URL = "https://assignment.example.test";
+    await fails(run(fixture), "CONFIGURATION");
+    expect(fixture.fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it.each(["GH_AW_BROKER_EXPERIMENTS_URL", "GH_AW_WORKFLOW_ID", "GH_AW_WORKFLOW_REF", "GH_AW_EXPERIMENT_INVOCATION_ID", "GITHUB_JOB", "GITHUB_RUN_ID", "GITHUB_RUN_ATTEMPT", "GITHUB_REPOSITORY", "GITHUB_SERVER_URL"])(
     "requires identity input %s",
     async key => {
       const fixture = setup();

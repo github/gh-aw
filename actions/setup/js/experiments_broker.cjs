@@ -35,7 +35,7 @@ function discard(response) {
  */
 async function exchange(operation, payload, { core, env = process.env, fetchImpl = fetch, now = Date.now }) {
   const snapshot = { ...env };
-  const endpoint = snapshot.GH_AW_EXPERIMENTS_BROKER_URL || "";
+  const endpoint = snapshot.GH_AW_BROKER_EXPERIMENTS_URL || "";
   httpsUrl(endpoint, "CONFIGURATION");
   const hints = identity(snapshot);
   const oidcUrl = httpsUrl(snapshot.ACTIONS_ID_TOKEN_REQUEST_URL, "OIDC");
@@ -65,6 +65,7 @@ async function exchange(operation, payload, { core, env = process.env, fetchImpl
       token = result.value;
       await core.setSecret(token);
       if (!/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(token)) throw failure("OIDC");
+      // This is only an advisory expiry check; the broker must verify the JWT signature and claims.
       const claims = JSON.parse(Buffer.from(token.split(".")[1], "base64url").toString("utf8"));
       if (typeof claims?.exp !== "number" || !Number.isFinite(claims.exp) || claims.exp * 1000 <= now()) throw failure("OIDC");
     } catch {
@@ -113,13 +114,31 @@ async function exchange(operation, payload, { core, env = process.env, fetchImpl
  * @param {typeof fs} fsImpl
  */
 function readJSON(file, fsImpl) {
+  let fd;
   try {
-    if (fsImpl.statSync(file).size > 16 * LIMIT) throw failure("INPUT");
-    const raw = fsImpl.readFileSync(file, "utf8");
-    if (Buffer.byteLength(raw) > 16 * LIMIT) throw failure("INPUT");
-    return parseJSON(raw, 16 * LIMIT);
+    const max = 16 * LIMIT;
+    fd = fsImpl.openSync(file, fs.constants.O_RDONLY | fs.constants.O_NONBLOCK);
+    const stat = fsImpl.fstatSync(fd);
+    if (!stat.isFile() || stat.size > max) throw failure("INPUT");
+    const bytes = Buffer.alloc(max + 1);
+    let length = 0;
+    while (length < bytes.length) {
+      const read = fsImpl.readSync(fd, bytes, length, bytes.length - length, null);
+      if (read === 0) break;
+      length += read;
+    }
+    if (length > max) throw failure("INPUT");
+    return parseJSON(new TextDecoder("utf-8", { fatal: true }).decode(bytes.subarray(0, length)), max);
   } catch {
     throw failure("INPUT");
+  } finally {
+    if (fd !== undefined) {
+      try {
+        fsImpl.closeSync(fd);
+      } catch {
+        throw failure("INPUT");
+      }
+    }
   }
 }
 
@@ -219,6 +238,16 @@ function observationsCost(value, states) {
   return result;
 }
 
+/** @param {unknown} summary */
+function projectExperimentResults(summary) {
+  const result = observations(summary);
+  if (!object(summary) || !object(summary.experiments)) throw failure("INPUT");
+  const selected = assignments(summary.experiments.assignments, undefined, "INPUT");
+  const projected = { schema: "usage-activity-summary/v1", ...result, experiments: { assignments: selected } };
+  if (Buffer.byteLength(JSON.stringify(projected)) > 16 * LIMIT) throw failure("INPUT");
+  return projected;
+}
+
 /** @param {BrokerOptions} options */
 async function assign(options) {
   const { core, env = process.env, fsImpl = fs, now = Date.now } = options;
@@ -263,4 +292,4 @@ async function report(options) {
   await exchange("report", { assignments: selected, results }, options);
 }
 
-module.exports = { assign, report };
+module.exports = { assign, report, projectExperimentResults };

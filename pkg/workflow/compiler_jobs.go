@@ -416,7 +416,7 @@ func (c *Compiler) finalizeBuiltJobs(data *WorkflowData) error {
 		return fmt.Errorf("built-in job needs augmentations could not be applied: %w. Check that jobs referenced in needs actually exist in the workflow", err)
 	}
 
-	if err := c.ensureConclusionIsLastJob(); err != nil {
+	if err := c.ensureConclusionIsLastJob(usesExperimentsBroker(data)); err != nil {
 		return err
 	}
 
@@ -796,7 +796,7 @@ func (c *Compiler) updateConclusionJobDependencies(pushRepoMemoryJobName, pushLe
 //   - "conclusion" itself
 //   - "graders" – consumes conclusion's published session
 //   - "pre_activation" / "pre-activation" – runs at the very start, before activation
-func (c *Compiler) ensureConclusionIsLastJob() error {
+func (c *Compiler) ensureConclusionIsLastJob(hasBrokerReporter bool) error {
 	conclusionJob, exists := c.jobManager.GetJob("conclusion")
 	if !exists {
 		return nil
@@ -813,11 +813,13 @@ func (c *Compiler) ensureConclusionIsLastJob() error {
 	// Jobs that must never appear in conclusion's needs
 	exclude := map[string]struct {
 	}{
-		"conclusion":                               {},
-		string(constants.GradersJobName):           {},
-		string(constants.ReportExperimentsJobName): {},
-		string(constants.PreActivationJobName):     {},
-		"pre-activation":                           {},
+		"conclusion":                           {},
+		string(constants.GradersJobName):       {},
+		string(constants.PreActivationJobName): {},
+		"pre-activation":                       {},
+	}
+	if hasBrokerReporter {
+		exclude[string(constants.ReportExperimentsJobName)] = struct{}{}
 	}
 
 	// Iterate over all jobs in alphabetical order for deterministic output

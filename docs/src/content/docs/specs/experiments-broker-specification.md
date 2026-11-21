@@ -89,7 +89,7 @@ The compiler MUST recognize `broker` as a storage selector, not an experiment na
 The compiler MUST resolve the endpoint only at Actions runtime through:
 
 ```yaml
-GH_AW_EXPERIMENTS_BROKER_URL: ${{ secrets.GH_AW_EXPERIMENTS_BROKER_URL }}
+GH_AW_BROKER_EXPERIMENTS_URL: ${{ secrets.GH_AW_EXPERIMENTS_BROKER_URL }}
 ```
 
 The workflow author MUST NOT supply a broker URL or audience in experiment configuration. The compiler MUST NOT resolve a deployment endpoint from its own environment or embed a resolved secret in generated YAML. Actions variables MUST NOT be a fallback. Merely defining the secret MUST NOT enable broker storage.
@@ -102,9 +102,9 @@ The compiler MUST perform `assign` in activation, before consuming experiment ex
 
 The compiler MUST generate a separate, isolated report job after conclusion. The report job MAY also wait for the graders job when its completion is needed for the run summary. It MUST use a fresh OIDC identity and receive only the assignment metadata and summary artifacts needed for reporting; it MUST NOT execute agent output, authored steps, custom graders, or other untrusted executable content. Reporting MUST NOT be embedded as authored code in conclusion.
 
-Authored workflow-level environment hooks MUST NOT alter reporter executable loading, interpreter startup, credential acquisition, endpoint configuration, or artifact processing. Before any report-job setup action, the compiler MUST override every authored or imported workflow-level environment key with an empty value, except authored `HOME`, `TMPDIR`, `TMP`, and `TEMP`, which MUST resolve to `runner.temp`, and authored `PATH`, which MUST use the compiler's fixed Ubuntu system search path. Compiler-generated step environment values for the endpoint, configuration, and producer paths MUST remain controlled by the compiler.
+Authored workflow-level environment hooks MUST NOT alter reporter executable loading, interpreter startup, credential acquisition, endpoint configuration, or artifact processing. Before any report-job setup action, the compiler MUST override every authored or imported workflow-level environment key with an empty value, except authored `HOME`, `TMPDIR`, `TMP`, and `TEMP`, which MUST use a trusted literal at job scope, and authored `PATH`, which MUST use the compiler's fixed Ubuntu system search path. Compiler-controlled steps MUST override the temporary directory variables with `runner.temp` at step scope, where that context is available. Compiler-generated step environment values for the endpoint, configuration, and producer paths MUST remain controlled by the compiler.
 
-The `report_experiments` job MUST be entirely compiler-owned. Authored customization, including its `needs`, `env`, `runs-on`, `steps`, and `permissions`, MUST be rejected. Job isolation MUST NOT be inferred merely from a separate job name while inherited hooks or augmentation can execute authored code with that job's OIDC authority.
+When live broker reporting is enabled, the `report_experiments` job MUST be entirely compiler-owned. Authored customization, including its `needs`, `env`, `runs-on`, `steps`, and `permissions`, MUST be rejected. The compiler MUST select its runner using the framework runner configuration, subject to runner policies. Job isolation MUST NOT be inferred merely from a separate job name while inherited hooks or augmentation can execute authored code with that job's OIDC authority.
 
 Broker storage MUST be rejected when compilation does not generate an agent job whose result can be reported, including status-only workflows. The diagnostic MUST explain that an agent job is required and that status-only workflows are unsupported.
 
@@ -186,7 +186,7 @@ The reporter MUST validate producer metadata from `aw_info.json` in the same dow
 
 The client MUST bound each local JSON artifact read to 1,048,576 bytes. Its strict JSON parser MUST reject duplicate decoded member names and invalid Unicode scalar strings, and enforce maximum nesting depth 64 and maximum array length 16,384. Numeric parsing MAY accept finite fractional values; field-specific counter and producer-identity constraints still apply.
 
-Other `results` members MUST be projected from `activity/summary.json` in the `usage` artifact, whose source `schema` MUST equal `usage-activity-summary/v1`. The source's `experiments.assignments` MUST exactly match the downloaded assignment metadata before reporting. A mismatch or missing assignment binding MUST fail report construction, not be repaired from the reported observations. Producer metadata, the schema marker, and source assignment metadata MUST NOT be forwarded inside `results`. The client MUST include only the following optional nested numeric/status observations, preserving their source member names:
+Other `results` members MUST be projected from the compact `activity/experiment-results.json` in the `usage` artifact, whose source `schema` MUST equal `usage-activity-summary/v1`. The trusted summary producer MUST include only the allowlisted observations and assignment binding, rather than unbounded per-call lists. The source's `experiments.assignments` MUST exactly match the downloaded assignment metadata before reporting. A mismatch or missing assignment binding MUST fail report construction, not be repaired from the reported observations. Producer metadata, the schema marker, and source assignment metadata MUST NOT be forwarded inside `results`. The client MUST include only the following optional nested numeric/status observations, preserving their source member names:
 
 | Result object | Allowlisted members | Value contract |
 | --- | --- | --- |

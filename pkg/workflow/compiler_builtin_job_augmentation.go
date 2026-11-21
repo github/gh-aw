@@ -16,7 +16,7 @@ func (c *Compiler) applyBuiltinJobPreSteps(data *WorkflowData) error {
 	}
 
 	for jobName, jobConfig := range data.Jobs {
-		if err := validateCompilerOwnedJobCustomization(jobName); err != nil {
+		if err := validateCompilerOwnedJobCustomization(jobName, data); err != nil {
 			return err
 		}
 		configMap, ok := jobConfig.(map[string]any)
@@ -71,8 +71,8 @@ func (c *Compiler) applyBuiltinJobPreSteps(data *WorkflowData) error {
 	return nil
 }
 
-func validateCompilerOwnedJobCustomization(jobName string) error {
-	if jobName == string(constants.ReportExperimentsJobName) {
+func validateCompilerOwnedJobCustomization(jobName string, data *WorkflowData) error {
+	if jobName == string(constants.ReportExperimentsJobName) && usesExperimentsBroker(data) {
 		return errors.New("jobs.report_experiments is compiler-owned and cannot be customized; configure experiments.storage instead")
 	}
 	if jobName == string(constants.AdmissionJobName) || jobName == string(constants.ConclusionAdmissionJobName) {
@@ -267,7 +267,7 @@ func parseBuiltinJobAugmentation(jobName, targetJobName string, rawConfig any) (
 }
 
 func (c *Compiler) applyBuiltinJobAugmentation(jobName string, rawConfig any, data *WorkflowData, allJobs map[string]*Job) error {
-	if err := validateCompilerOwnedJobCustomization(jobName); err != nil {
+	if err := validateCompilerOwnedJobCustomization(jobName, data); err != nil {
 		return err
 	}
 	if jobName == string(constants.GradersJobName) {
