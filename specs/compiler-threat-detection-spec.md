@@ -7,7 +7,7 @@ sidebar:
 
 # GitHub Actions Compiler Threat Detection Specification
 
-**Version**: 1.0.105
+**Version**: 1.0.106
 **Status**: Candidate Recommendation  
 **Latest Version**: https://github.com/github/gh-aw/blob/main/specs/compiler-threat-detection-spec.md  
 **Editors**: GitHub Next (GitHub, Inc.)
@@ -32,7 +32,7 @@ Each version maps to the minimum compatible binary. A version change MUST update
 
 | Versions | Minimum gh-aw |
 |---|---:|
-| `1.0.60`–`1.0.105` | Unreleased |
+| `1.0.60`–`1.0.106` | Unreleased |
 | `1.0.44`–`1.0.59` | Unreleased |
 | `1.0.40`–`1.0.43` | `v0.87.9` |
 | `1.0.39` | `v0.87.9` |
@@ -882,6 +882,16 @@ Git operations on disposable source downloads MUST use the hardened command cont
 | Hardened source-download Git | `pkg/gitutil/source_command.go`: `SourceCommandContext`, `sourceCommandEnvironment` | `pkg/gitutil/source_command_test.go`: `TestSourceCommandContextClone`, `TestSourceCommandContextRejectsExecutableTransports`, `TestCreateSourceTempDirWithRelativeTMPDIR` |
 
 Exclusion prevents inheritance of the variable names only; it does not protect credentials held in another process's memory. No new `CTR-*` or compliance-test identifier is introduced.
+
+### 7.15 Activation Markdown Metadata Embedding
+
+Authored markdown metadata (for example agent `model` or `tools` values) is untrusted text that the compiler embeds in the activation job. Embedding MUST keep the catalog inert for Actions expression evaluation, YAML single quotes, and shell single quotes: `inertJSON` escapes `$` and `'` as JSON `\u` escapes and encodes non-ASCII characters as UTF-16 escapes, so the payload is ASCII-only and chunk boundaries never split a character. Payloads larger than `activationMetadataChunkSize` MUST be written through `printf '%s'` chunk steps rather than a step environment value, and the decoded catalog MUST round-trip the authored value exactly. Neither path may execute authored text or evaluate `${{ ... }}` within it.
+
+| Boundary | Implementation | Regression Evidence |
+|---|---|---|
+| Inert JSON encoding of embedded metadata | `pkg/workflow/compiler_yaml.go`: `inertJSON`, `activationMetadataChunkSize` | `TestInertJSON`, `TestCompilerActivationMarkdownMetadataQuoting` (environment and chunked-printf subtests) in `pkg/workflow/compiler_markdown_metadata_test.go` |
+
+This is a CTR-006 data-transport boundary. No new `CTR-*` rule or compliance-test identifier is introduced.
 
 ## 8. Compliance Testing
 

@@ -17,6 +17,15 @@ type workflowSource struct {
 	lowered string
 }
 
+// OriginalSource returns the parsed YAML, or an empty string for constructed
+// graphs. Use Emit instead when source must reflect subsequent AST edits.
+func (workflow *Workflow) OriginalSource() string {
+	if workflow.source == nil {
+		return ""
+	}
+	return workflow.source.text
+}
+
 func retainWorkflowSource(workflow *Workflow, content []byte) error {
 	lowered, err := serializedWorkflow(workflow)
 	if err != nil {

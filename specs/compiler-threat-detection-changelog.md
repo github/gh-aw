@@ -26,6 +26,7 @@ The unreleased 1.0.81 merge-policy mapping also covers ambiguous check producers
 
 | Version | Change |
 |---|---|
+| 1.0.106 | Mapping-only: adds Section 7.15 for inert embedding of authored activation markdown metadata (`inertJSON`, chunked `printf` transport) as a CTR-006 data-transport boundary. No new `CTR-*` rule or `T-CTR-*` test ID. |
 | 1.0.105 | Mapping-only: adds Sections 7.12–7.14 for the experimental token-broker credential boundary, protected safe-output authorization baseline verification (`validate --authorization-policy`), and host runtime temp-variable exclusion with hardened source-download Git. No new `CTR-*` rule or `T-CTR-*` test ID. |
 | 1.0.104 | Adds CTR-035 through CTR-038 for accidental misuse of safe-output write credentials by authored `safe-outputs.steps` (minted token reuse, `GITHUB_ENV`/`GITHUB_PATH` mutation, credential-persisting checkout, handler input tampering), enforced by the `safe-output-credentials` Actions/AW lint rule with per-finding threat IDs via `Rule.FindingThreatRuleIDs`, and conformance tests T-CTR-050 through T-CTR-053. |
 | 1.0.103 | Aligns the false-positive suppression SLA as MUST within 10 business days for non-strict rejection controls, clarifies that Section 6 `T-CTR-*` identifiers are test IDs rather than catalog rules, and assigns the open CTR-032 destination-filtering obligation to Safe Outputs maintainers under T-CTR-047. Destination-filtering evidence remains outstanding; no implementation behavior changed. |
@@ -112,6 +113,19 @@ The unreleased 1.0.81 merge-policy mapping also covers ambiguous check producers
 | 1.0.7–1.0.0 | Established CTR-001–015, conformance model, and daily reconciliation. |
 
 ## Mapping Audits
+
+### Mapping Audit (2026-11-21)
+
+Reviewed commits from the last two days (most recent: #79630, #79596, #79597, #79617, #79600, #79598, #79549, #79576, #79558, #79565, #79572, #79546, #79498, #79482) touching compiler, CLI, and runtime security boundaries.
+
+Findings and disposition:
+
+- Activation metadata quoting regressions (#79597): already implemented by `inertJSON` and the chunked `printf` transport in `pkg/workflow/compiler_yaml.go`, now with shell-breakout tests in `compiler_markdown_metadata_test.go`. Added Section 7.15 mapping as a CTR-006 data-transport boundary. No new `CTR-*` rule.
+- One-shot OTEL configuration (#79549): its compiler changes were restored before merge; CTR-017 OTLP exclusions and attribute lint are unchanged.
+- Repo-memory overlapping-run replay (#79558), per-attempt safe-output isolation and temporary-target authorization (#79546, #79498, #79482), and token-broker safe-output tests (#79572): runtime or test-only changes within existing safe-output and token-broker controls (Sections 7.9 and 7.12); no new compiler detection class.
+- Code Scanning work queue (#79600), alias wildcards (#79576), ledger verification (#79617), CLI help (#79596), Dependabot manifests (#79565), and validation coverage (#79598): no compiler-generated security construct changed.
+- No `threat-detection-suppress` annotations exist in workflow sources outside this optimizer prompt, so no suppression SLA action applies.
+- Go tests could not be executed (the required Go 1.27.4 toolchain is unavailable offline). Only specification, changelog, and changeset text changed; no implementation was modified. The GitHub integrity filter withheld pull-request file lists, so dispositions rely on commit messages and local source inspection.
 
 ### Mapping Audit (2026-11-20)
 
