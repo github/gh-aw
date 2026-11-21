@@ -187,10 +187,11 @@ The RL-057/RL-058/RL-059 post-`setLabels` checks are enforced by
 
 ## Normative MUST Evidence Index (§§5–8)
 
-Each MUST-level requirement is mapped to a test ID and its implementation test,
-or to a specific evidence gap. This index is complete when every requirement in
-§§5–8 of `specs/replace-label-spec.md` appears below with a test mapping or an
-explicit gap; completion does not depend on an owner or a review date.
+Each numbered MUST-level requirement is mapped to a test ID and its
+implementation test, or to a specific evidence gap. This index is complete when
+every requirement code in `specs/replace-label-spec.md` appears below with a test
+mapping or an explicit gap; completion does not depend on an owner or a review
+date.
 
 The remaining evidence gaps are **pipeline** (RL-033), **observability**
 (RL-027), **external guarantee** (RL-043), and **security** (RL-051, RL-054,
@@ -200,6 +201,13 @@ accepted gap below has a rationale.
 | Requirement | Test ID(s) or documented gap | Implementation evidence |
 |---|---|---|
 | §5 ordered processing pipeline | **Partial:** handler test verifies read → read → write order and one gate-skip cutoff; schema, count, target, label, staged, computation, and REST failure cutoffs remain untested. | “executes the label pipeline in order and stops before writes on a gate skip” does not establish early-stop behavior for all eight stages. **Owner:** replace-label maintainers. **Close when:** handler tests cover each stage's early-stop/no-write behavior and show the computed set is based on the live stage-5 REST response. |
+| RL-001 | `rl-001-glob-semantics.yaml` | `TestFormalGlobSemantics` |
+| RL-002 | `rl-002-allowlist-enforcement.yaml` | `TestFormalAllowlistEnforcement` |
+| RL-003 | `rl-003-blocklist-ordering.yaml` | `TestFormalBlocklistOrdering` |
+| RL-004 | T-RL-001, T-RL-003 | `TestFormalSchemaRequiredFields` |
+| RL-005 | T-RL-002, T-RL-004 | `TestFormalSchemaRequiredFields` |
+| RL-006 | T-RL-005 | `TestFormalRepoMaxLength` |
+| RL-007 | `TestFormalReplaceLabelP3_ValidationConfigFields` | Confirms `Sanitize: true` for both label fields. |
 | RL-008 | T-RL-001–006 | `TestFormalSchemaRequiredFields` |
 | RL-009 | T-RL-009 | `TestFormalReplaceLabelRL009_CommonValidationConfig` checks that the shared validation-config generator emits the configured `replace_label` entry and field rules. |
 | RL-010 | T-RL-010–011 | `TestFormalCountGate` |
@@ -245,9 +253,9 @@ accepted gap below has a rationale.
 | RL-049 | T-RL-020–025 | `TestFormalBlocklistOrdering`; JS allow/blocklist tests |
 | RL-049a | T-RL-026 | `T-RL-026 rechecks blocklist state before setLabels`; `TestFormalBlockedLabelAddedViaReplaceLabelMidBlocklistChange_NoWriteAPI` |
 | RL-050 | T-RL-070–072 | `TestFormalCrossRepoRestriction` |
-| RL-051 | **Accepted gap [Security]:** GitHub enforces token grants on the target repository at the write endpoint. Offline tests cannot inspect a live token's repository grant; a denied write is handled as a hard error, but no proactive scope check is performed. **Owner:** replace-label maintainers. **Close when:** workflow-level credential integration verifies the target-repository grant before the write, or preserve the documented server-side enforcement limitation. |
+| RL-051 | **Accepted gap [Security]:** GitHub enforces token grants on the target repository at the write endpoint. Offline tests cannot inspect a live token's repository grant; a denied write is handled as a hard error, but no proactive scope check is performed. **Owner:** replace-label maintainers. **Owner review (2026-11-21):** the grant remains unverified before the write. **Close when:** workflow-level credential integration verifies the target-repository grant before the write, or preserve the documented server-side enforcement limitation. |
 | RL-052 | T-RL-041 | JS nonexistent-label hard-error test |
 | RL-053 | T-RL-030–031 | JS required-label gate test uses the REST response; the agent message has no label-state field. |
 | RL-054 | **Accepted gap [Security]:** `TestFormalSec_P8_TokenScopeMinimum` checks a standalone predicate, not the credential path; no conformance test establishes that the token used by `replace-label` has `issues:write`. **Owner:** replace-label maintainers. **Close when:** workflow-level credential integration proves that the actual token used by `replace-label` has `issues:write`. |
-| RL-055 | **Accepted gap [Security]:** the SHOULD applies only when the default token is broader; confirming per-type token selection and its relative grants requires workflow-level credential integration. **Owner:** replace-label maintainers. **Close when:** workflow-level credential tests prove dedicated-token selection and its grants when the default token is broader. |
+| RL-055 | **Accepted gap [Security]:** the SHOULD applies only when the default token is broader; confirming per-type token selection and its relative grants requires workflow-level credential integration. **Owner:** replace-label maintainers. **Owner review (2026-11-21):** this condition and the gap remain current. **Close when:** workflow-level credential tests prove dedicated-token selection and its grants when the default token is broader. |
 | RL-056 | T-RL-060 | `T-RL-060 does not call setLabels in staged mode` |

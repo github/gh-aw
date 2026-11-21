@@ -4,7 +4,7 @@ description: Formal W3C-style specification for observability contract for GitHu
 version: 0.7.0
 status: Working Draft
 date: 2026-06-18
-last_updated: 2026-11-19
+last_updated: 2026-11-21
 editors:
   - GitHub gh-aw Team
 ---
@@ -22,7 +22,7 @@ editors:
 
 ## Abstract
 
-This specification defines the compatibility-first OpenTelemetry observability contract for GitHub Agentic Workflows (`gh-aw`). It specifies the existing `observability.otlp` configuration surface, OTLP export behavior, trace-context compatibility variables, resource identity, built-in span attributes, local telemetry mirrors, security controls, and conformance obligations. Version 0.4.0 preserves the contract already used by workflows, dashboards, and artifacts, and treats additional OpenTelemetry alignment as additive evolution rather than a replacement standard.
+This specification defines the compatibility-first OpenTelemetry observability contract for GitHub Agentic Workflows (`gh-aw`). It specifies the existing `observability.otlp` configuration surface, OTLP export behavior, trace-context compatibility variables, resource identity, built-in span attributes, local telemetry mirrors, security controls, and conformance obligations. Version 0.4.0 established the compatibility baseline used by workflows, dashboards, and artifacts; this version preserves that contract and treats additional OpenTelemetry alignment as additive evolution rather than a replacement standard.
 
 ## Status of This Document
 
@@ -264,7 +264,7 @@ The policy applies to required exporter setup values, not to ordinary telemetry 
 
 ### 5.6 Reserved Extension Fields
 
-`mode`, `signals`, and `capture-content` are reserved extension fields. They are not part of the Level 1 or Level 2 compatibility contract in version 0.4.0.
+`mode`, `signals`, and `capture-content` are reserved extension fields. They are not part of the Level 1 or Level 2 compatibility contract established by the version 0.4.0 baseline.
 
 If an implementation adds `mode`, it SHOULD accept `collector`, `direct`, and `auto`, and direct export MUST remain available for existing workflows.
 
@@ -427,7 +427,7 @@ Across GitHub Actions steps and jobs, the stable gh-aw carriers are `GITHUB_AW_O
 
 The implementation SHOULD emit `TRACEPARENT` where child tools can consume W3C Trace Context. It MAY also emit `TRACESTATE` when non-empty and `BAGGAGE` when non-empty.
 
-When both gh-aw carriers and W3C carriers are present, they MUST describe the same active trace context. New W3C carriers MUST NOT replace or suppress the gh-aw carriers in version 0.4.0.
+When both gh-aw carriers and W3C carriers are present, they MUST describe the same active trace context. New W3C carriers MUST NOT replace or suppress the gh-aw carriers in version 0.7.0.
 
 ### 7.3 Workflow Root Context
 
@@ -1222,7 +1222,7 @@ attribute-level checks mapped directly to Section 10 requirements:
 | **T-OT-008** | §10.2 `gh-aw.job.name` on built-in job spans | The setup span includes `gh-aw.job.name` equal to the GitHub Actions job name | Decode `/tmp/gh-aw/otel.jsonl` or captured OTLP payloads and assert the setup span attribute value exactly matches the workflow job name |
 | **T-OT-009** | §10.3 `gen_ai.provider.name` (and, without the opt-in, `gen_ai.system`) on built-in agent spans | A known engine emits the §10.3 provider value | Run a workflow with a built-in agent span, decode exported spans, and assert `gen_ai.provider.name` equals the mapped value and, without the opt-in, `gen_ai.system` is also present |
 | **T-OT-010** | §13.3 `gh-aw.adoption.type` on optional downstream outcome-evaluation spans | Exported outcome spans preserve the safe-output type being evaluated | Feed `.adoption[].items[]` from `gh aw logs --adoption --json` to the downstream exporter under test and assert `gh-aw.adoption.type` matches the evaluated manifest item type; not a built-in CLI export |
-| **T-OT-011** | §17 Backward-compatibility: v0.3.0 fields present in v0.4.0 export | All span attribute keys that were present in v0.3.0 (`gh-aw.*`, `github.*`, `gen_ai.system`, `gen_ai.usage.total_tokens`, `OTEL_EXPORTER_OTLP_ENDPOINT`, built-in setup/conclusion span names) **MUST** also be present in a v0.4.0 export at the same semantic positions | This test applies to exports without the §6.7 opt-in. Produce a v0.4.0 compliant export from the current implementation; compare the set of attribute keys against the v0.3.0 attribute inventory (defined in Version 0.3.0 change-log entry in Section 19); assert no v0.3.0 attribute has been removed or renamed; assert no built-in span name has changed |
+| **T-OT-011** | §17 Backward-compatibility: v0.3.0 fields present in v0.7.0 export | All span attribute keys that were present in v0.3.0 (`gh-aw.*`, `github.*`, `gen_ai.system`, `gen_ai.usage.total_tokens`, `OTEL_EXPORTER_OTLP_ENDPOINT`, built-in setup/conclusion span names) **MUST** also be present in a v0.7.0 export at the same semantic positions | This test applies to exports without the §6.7 opt-in. Produce a v0.7.0 compliant export from the current implementation; compare the set of attribute keys against the v0.3.0 attribute inventory (defined in Version 0.3.0 change-log entry in Section 19); assert no v0.3.0 attribute has been removed or renamed; assert no built-in span name has changed |
 | **T-OT-012** | §16.6 Exporter-failure test coverage | Non-2xx responses, exhausted network retries, mirror-write failures, and bounded-shutdown-flush failures preserve the completed workflow result and do not report failed delivery as successful | Existing tests cover non-2xx responses, exhausted retries, and mirror-write failures; add a bounded-shutdown-flush failure case to complete coverage |
 | **T-OT-013** | Proposed stricter §15.2 identifier redaction | If the contract changes to redact authorized §15.4 identifiers, those values are absent from remote payloads, mirrors, artifacts, and diagnostics; metric-dimension restrictions remain | Proposed only; current payload tests expect authorized actor identifiers, and mirror redaction is not guaranteed. Add payload and mirror tests before adopting this requirement |
 | **T-OT-014** | §9.5 agent identity | The built-in agent span has `gen_ai.agent.name` = workflow name and, on failure, `error.type` ∈ {`timeout`,`cancelled`,`agent_failed`} | `send_otlp_span.test.cjs` |
@@ -1242,7 +1242,7 @@ Level 3 extension tests MUST prove that the extension is additive. They MUST NOT
 
 ### 17.3 Implementation Map
 
-The following implementation areas are authoritative for version 0.4.0 compatibility:
+The following implementation areas are authoritative for version 0.7.0 compatibility:
 
 | Contract area | Implementation and tests |
 |---|---|
@@ -1302,6 +1302,10 @@ which has no release tag, and semantic-conventions v1.45.0.
 
 ## 19. Change Log
 
+### Version 0.7.0 (Working Draft, November 21, 2026)
+
+- **Added**: OTLP metrics emission, enabled by default when configured, and the `logMetric(name, value, options)` API for counters, gauges, and histograms, with a separate local metrics mirror.
+
 ### Unreleased
 
 - **Added**: Backend service correlation through W3C `traceparent`, header-safe job baggage using `cicd.pipeline.task.name`, and JSON `job_id` (§7.7.1), with endpoint coverage and trust-boundary requirements.
@@ -1314,7 +1318,7 @@ which has no release tag, and semantic-conventions v1.45.0.
   `gen_ai.workflow.name` and `gen_ai.client.token.usage` are compatibility names, still supported and on by default
   (not deprecated, §6.7); with the opt-in, the agent span
   is `invoke_agent` (`INTERNAL`) and `gen_ai.usage.input_tokens` includes cache tokens.
-- **Added**: Opt-in built-in job metrics and the `logMetric()` API (§11.5, §12.6), including a separate local metrics mirror.
+- **Added**: Opt-in built-in job metrics (§11.5), including a separate local metrics mirror.
 - **Added**: A normative requirement (§10.8) that completed BinEval records MUST produce `eval.result` events on `gh-aw.evals.conclusion`; when a not-evaluated status marker is present it takes precedence and answers are not emitted.
 - **Added**: Non-normative follow-ups for PII redaction and exporter-failure test coverage, with tracked IDs T-OT-012 and T-OT-013.
 

@@ -114,6 +114,9 @@ is distinct from the passing safety checks above.
 
 **Safeguards**
 
+- The configurations check finite bounds: two keys, two abstract JSON values,
+  and at most two durable records. TLC results apply only to those bounded
+  state spaces, not arbitrary production data sizes or executions.
 - A value MUST be understood as a canonical-JSON equality class; table rows,
   counters, notes, transaction IDs, and artifacts remain bounded abstractions.
 - The table model has a primary key and one non-key field per row; counter
@@ -124,10 +127,11 @@ is distinct from the passing safety checks above.
   and retry behavior is not modeled.
 - Claims about `Compact` MUST be limited to preserving modeled history and
   shard-ID coverage; physical compaction is not represented or verified.
-- The model MUST NOT be cited as evidence of liveness or
-  distributed-serializability. Production tests cover separate obligations.
+- These bounded safety checks are not a liveness proof. TLC results MUST NOT be
+  cited as evidence of liveness or distributed-serializability. Production tests
+  cover separate obligations.
 
-## Last synced with implementation (2026-11-17)
+## Last synced with implementation (2026-11-21)
 
 - **Go compiler wiring and tests:** `pkg/workflow/compiler_main_job_ledger.go`,
   `pkg/workflow/ledger.go`, `pkg/workflow/ledger_job.go`,
