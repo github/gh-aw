@@ -1,5 +1,5 @@
-# gh-aw-metadata: {"schema_version":"v4","frontmatter_hash":"63e898771a0579b65dfddd190da6033f34804bb23129e4cc91d68033c29dcfcd","body_hash":"010ec087955487b90eca421ee3eea0297bf2ccb3eb250f5e4dbf34870fb4dfa9","strict":true,"agent_id":"codex","engine_versions":{"codex":"0.169.0"}}
-# gh-aw-manifest: {"version":1,"secrets":["GH_AW_CI_TRIGGER_TOKEN","GH_AW_DEFAULT_OTLP_ENDPOINT","GH_AW_DEFAULT_OTLP_HEADERS","GH_AW_GITHUB_MCP_SERVER_TOKEN","GH_AW_GITHUB_TOKEN","GITHUB_TOKEN"],"actions":[{"repo":"actions/checkout","sha":"3d3c42e5aac5ba805825da76410c181273ba90b1","version":"v7.0.1"},{"repo":"actions/download-artifact","sha":"9000827ccba6bdab643e8b6fd33ac0654aef8333","version":"v8.0.2"},{"repo":"actions/github-script","sha":"3a2844b7e9c422d3c10d287c895573f7108da1b3","version":"v9.0.0"},{"repo":"actions/setup-node","sha":"949feb2413d6458794dcd2491c4babbbce0c15c1","version":"v7.1.0"},{"repo":"actions/upload-artifact","sha":"cf430e030ddbb5b0abf93d22962f4752f3646cd9","version":"v7.0.2"}],"containers":[{"image":"ghcr.io/github/gh-aw-firewall/agent:0.29.17@sha256:ba0b06fcf767f4e2c4f36ee44eabca94353b491f534bb99e52d043d116a692f2"},{"image":"ghcr.io/github/gh-aw-firewall/api-proxy:0.29.17@sha256:b2c7388738463dbbf7ae1856f32cf55433ee43f2aac3dc31bd9267aa9c53dab1"},{"image":"ghcr.io/github/gh-aw-firewall/cli-proxy:0.29.17@sha256:8ab755e943c71206ce09e447ba9a87d755300fce34e272ce5213568eafd7e719"},{"image":"ghcr.io/github/gh-aw-firewall/router:0.29.17@sha256:8220705eb9dca0e509529851a57a85e0e86aefd03211b15566b694dc73751214"},{"image":"ghcr.io/github/gh-aw-firewall/squid:0.29.17@sha256:ccf566a704ef09185a207794cdee9e2e396353cdf3d542353db5f756d3c8de02"},{"image":"ghcr.io/github/gh-aw-mcpg:v0.5.11","digest":"sha256:0d7e6b64b3d13b2afed8988be5bf961d0dc65eb74989939df1f2d612eac3f9e3","pinned_image":"ghcr.io/github/gh-aw-mcpg:v0.5.11@sha256:0d7e6b64b3d13b2afed8988be5bf961d0dc65eb74989939df1f2d612eac3f9e3"},{"image":"ghcr.io/github/gh-aw-node","digest":"sha256:8735428c2d4e602f90781ba0c571c400e8ff93c7ee1508a75d71f87e34e415cc","pinned_image":"ghcr.io/github/gh-aw-node@sha256:8735428c2d4e602f90781ba0c571c400e8ff93c7ee1508a75d71f87e34e415cc"},{"image":"ghcr.io/github/github-mcp-server:v2.2.0","digest":"sha256:040c4e99810076035eb1d9beb4b4a96fcf589c43cefed6ff51a46a553eb4e174","pinned_image":"ghcr.io/github/github-mcp-server:v2.2.0@sha256:040c4e99810076035eb1d9beb4b4a96fcf589c43cefed6ff51a46a553eb4e174"}],"mcp_servers":[{"name":"safeoutputs","tools":["create_pull_request","noop","report_incomplete","report_missing_data","report_missing_tool"]}],"threat_detection":{"mode":"enabled"},"admission":true,"agent_metadata":{"03cbf8931deff21d5116":{"name":"Agentic Workflows"},"4943cffeebb6706aa8bc":{"name":"Squad","tools":["*"]},"9ea639558df913e650e4":{"name":"technical-doc-writer"},"a17c6c62ffcd7401f40f":{"name":"adr-writer"},"ad6ff0fe9219fbfa5ccc":{"name":"grumpy-reviewer","tools":["read","search"]},"e0c35a96dedfb29cb9b1":{"name":"w3c-specification-writer"}}}
+# gh-aw-metadata: {"schema_version":"v4","frontmatter_hash":"6b1754dd4ea3d9219c51964f224928de6a92b2ab2c7992e00cfedf73a6461dc4","body_hash":"4e19313a85fa88f52893ceb76e7f4723e976ba9e6cb4f591518729028ca25e0f","strict":true,"agent_id":"codex","engine_versions":{"codex":"0.169.0"}}
+# gh-aw-manifest: {"version":1,"secrets":["GH_AW_DEFAULT_OTLP_ENDPOINT","GH_AW_DEFAULT_OTLP_HEADERS","GH_AW_GITHUB_MCP_SERVER_TOKEN","GH_AW_GITHUB_TOKEN","GITHUB_TOKEN"],"actions":[{"repo":"actions/checkout","sha":"3d3c42e5aac5ba805825da76410c181273ba90b1","version":"v7.0.1"},{"repo":"actions/download-artifact","sha":"9000827ccba6bdab643e8b6fd33ac0654aef8333","version":"v8.0.2"},{"repo":"actions/github-script","sha":"3a2844b7e9c422d3c10d287c895573f7108da1b3","version":"v9.0.0"},{"repo":"actions/setup-node","sha":"949feb2413d6458794dcd2491c4babbbce0c15c1","version":"v7.1.0"},{"repo":"actions/upload-artifact","sha":"cf430e030ddbb5b0abf93d22962f4752f3646cd9","version":"v7.0.2"}],"containers":[{"image":"ghcr.io/github/gh-aw-firewall/agent:0.29.17@sha256:ba0b06fcf767f4e2c4f36ee44eabca94353b491f534bb99e52d043d116a692f2"},{"image":"ghcr.io/github/gh-aw-firewall/api-proxy:0.29.17@sha256:b2c7388738463dbbf7ae1856f32cf55433ee43f2aac3dc31bd9267aa9c53dab1"},{"image":"ghcr.io/github/gh-aw-firewall/cli-proxy:0.29.17@sha256:8ab755e943c71206ce09e447ba9a87d755300fce34e272ce5213568eafd7e719"},{"image":"ghcr.io/github/gh-aw-firewall/router:0.29.17@sha256:8220705eb9dca0e509529851a57a85e0e86aefd03211b15566b694dc73751214"},{"image":"ghcr.io/github/gh-aw-firewall/squid:0.29.17@sha256:ccf566a704ef09185a207794cdee9e2e396353cdf3d542353db5f756d3c8de02"},{"image":"ghcr.io/github/gh-aw-mcpg:v0.5.11","digest":"sha256:0d7e6b64b3d13b2afed8988be5bf961d0dc65eb74989939df1f2d612eac3f9e3","pinned_image":"ghcr.io/github/gh-aw-mcpg:v0.5.11@sha256:0d7e6b64b3d13b2afed8988be5bf961d0dc65eb74989939df1f2d612eac3f9e3"},{"image":"ghcr.io/github/gh-aw-node","digest":"sha256:8735428c2d4e602f90781ba0c571c400e8ff93c7ee1508a75d71f87e34e415cc","pinned_image":"ghcr.io/github/gh-aw-node@sha256:8735428c2d4e602f90781ba0c571c400e8ff93c7ee1508a75d71f87e34e415cc"},{"image":"ghcr.io/github/github-mcp-server:v2.2.0","digest":"sha256:040c4e99810076035eb1d9beb4b4a96fcf589c43cefed6ff51a46a553eb4e174","pinned_image":"ghcr.io/github/github-mcp-server:v2.2.0@sha256:040c4e99810076035eb1d9beb4b4a96fcf589c43cefed6ff51a46a553eb4e174"}],"mcp_servers":[{"name":"safeoutputs","tools":["create_issue","noop","report_incomplete","report_missing_data","report_missing_tool"]}],"threat_detection":{"mode":"enabled"},"admission":true,"agent_metadata":{"03cbf8931deff21d5116":{"name":"Agentic Workflows"},"4943cffeebb6706aa8bc":{"name":"Squad","tools":["*"]},"9ea639558df913e650e4":{"name":"technical-doc-writer"},"a17c6c62ffcd7401f40f":{"name":"adr-writer"},"ad6ff0fe9219fbfa5ccc":{"name":"grumpy-reviewer","tools":["read","search"]},"e0c35a96dedfb29cb9b1":{"name":"w3c-specification-writer"}}}
 # This file was automatically generated by gh-aw. DO NOT EDIT. To debug this workflow, load the skill at https://github.com/github/gh-aw/blob/main/debug.md
 #
 #    ___                   _   _
@@ -23,10 +23,9 @@
 #
 # For more information: https://github.github.com/gh-aw/introduction/overview/
 #
-# Daily audit that repairs proven drift between aw reference docs and workflow designer guidance in one draft PR
+# Daily audit that detects drift between aw reference docs and the workflow designer skill/agent files
 #
 # Secrets used:
-#   - GH_AW_CI_TRIGGER_TOKEN
 #   - GH_AW_DEFAULT_OTLP_ENDPOINT
 #   - GH_AW_DEFAULT_OTLP_HEADERS
 #   - GH_AW_GITHUB_MCP_SERVER_TOKEN
@@ -54,7 +53,6 @@ name: "Designer Drift Audit"
 on:
   schedule:
     - cron: "38 3 * * 1-5"  # Friendly format: daily on weekdays (scattered)
-  # skip-if-match: "is:pr is:open \"gh-aw-workflow-id: designer-drift-audit\" in:body" # Skip-if-match processed as search check in pre-activation job
   workflow_dispatch:
     inputs:
       aw_context:
@@ -87,8 +85,6 @@ env:
 jobs:
   activation:
     name: activation
-    needs: pre_activation
-    if: needs.pre_activation.outputs.activated == 'true'
     runs-on: ubuntu-slim
     # Permissions for the activation job (workflow permissions default to none).
     permissions:
@@ -136,8 +132,6 @@ jobs:
         with:
           destination: ${{ runner.temp }}/gh-aw/actions
           job-name: ${{ github.job }}
-          trace-id: ${{ needs.pre_activation.outputs.setup-trace-id }}
-          parent-span-id: ${{ needs.pre_activation.outputs.setup-parent-span-id || needs.pre_activation.outputs.setup-span-id }}
           safe-output-artifact-client: ${{ env.GH_AW_MAX_DAILY_AI_CREDITS != '' }}
         env:
           GH_AW_SETUP_WORKFLOW_NAME: "Designer Drift Audit"
@@ -154,7 +148,7 @@ jobs:
           GH_AW_DEFAULT_ADMISSION_URL: ${{ vars.GH_AW_DEFAULT_ADMISSION_URL }}
           GH_AW_DEFAULT_ADMISSION_AUDIENCE: ${{ vars.GH_AW_DEFAULT_ADMISSION_AUDIENCE }}
           GH_AW_DEFAULT_ADMISSION_ON_OUTAGE: ${{ vars.GH_AW_DEFAULT_ADMISSION_ON_OUTAGE }}
-          GH_AW_ADMISSION_WORKFLOW_HASH: "63e898771a0579b65dfddd190da6033f34804bb23129e4cc91d68033c29dcfcd:010ec087955487b90eca421ee3eea0297bf2ccb3eb250f5e4dbf34870fb4dfa9"
+          GH_AW_ADMISSION_WORKFLOW_HASH: "6b1754dd4ea3d9219c51964f224928de6a92b2ab2c7992e00cfedf73a6461dc4:4e19313a85fa88f52893ceb76e7f4723e976ba9e6cb4f591518729028ca25e0f"
           GH_AW_INFO_WORKFLOW_ID: ${{ job.workflow_ref }}
           GITHUB_ACTOR: ${{ github.actor }}
           GITHUB_TRIGGERING_ACTOR: ${{ github.triggering_actor }}
@@ -315,12 +309,12 @@ jobs:
           GH_AW_OTLP_LOGS_ENABLED: ""
           GH_AW_OTLP_LOGS_MAX_BYTES: ""
           GH_AW_PROMPT: ${{ runner.temp }}/gh-aw/aw-prompts/prompt.txt
-          GH_AW_PROMPT_CONFIG: "{\"items\":[{\"content_env\":\"GH_AW_PROMPT_CONTENT_0000\"},{\"file\":\"xpia.md\"},{\"file\":\"temp_folder_prompt.md\"},{\"file\":\"markdown.md\"},{\"file\":\"safe_outputs_mcp_transport_prompt.md\"},{\"file\":\"safe_outputs_prompt.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0001\"},{\"file\":\"safe_outputs_create_pull_request.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0002\"},{\"file\":\"mcp_cli_tools_with_safeoutputs_prompt.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0003\"},{\"file\":\"cli_proxy_with_safeoutputs_prompt.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0004\"},{\"author_file\":\".github/workflows/designer-drift-audit.md\"}],\"system_item_count\":13}"
+          GH_AW_PROMPT_CONFIG: "{\"items\":[{\"content_env\":\"GH_AW_PROMPT_CONTENT_0000\"},{\"file\":\"xpia.md\"},{\"file\":\"temp_folder_prompt.md\"},{\"file\":\"markdown.md\"},{\"file\":\"safe_outputs_mcp_transport_prompt.md\"},{\"file\":\"safe_outputs_prompt.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0001\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0002\"},{\"file\":\"mcp_cli_tools_with_safeoutputs_prompt.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0003\"},{\"file\":\"cli_proxy_with_safeoutputs_prompt.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0004\"},{\"author_file\":\".github/workflows/designer-drift-audit.md\"}],\"system_item_count\":12}"
           GH_AW_PROMPT_CONTENT_0000: |
             <system>
           GH_AW_PROMPT_CONTENT_0001: |
             <safe-output-tools>
-            Tools: create_pull_request, report_missing_tool, report_missing_data, report_incomplete, noop(max:2)
+            Tools: create_issue, report_missing_tool, report_missing_data, report_incomplete, noop(max:2)
           GH_AW_PROMPT_CONTENT_0002: |
             </safe-output-tools>
           GH_AW_PROMPT_CONTENT_0003: "<github-context>\n{{#if __GH_AW_GITHUB_ACTOR__ }}\n- **actor**: __GH_AW_GITHUB_ACTOR__\n{{/if}}\n{{#if __GH_AW_GITHUB_REPOSITORY__ }}\n- **repository**: __GH_AW_GITHUB_REPOSITORY__\n{{/if}}\n{{#if __GH_AW_GITHUB_WORKSPACE__ }}\n- **workspace**: __GH_AW_GITHUB_WORKSPACE__\n{{/if}}\n{{#if __GH_AW_EXPR_7C248226__ }}\n- **issue-number**: #__GH_AW_EXPR_7C248226__\n{{/if}}\n{{#if __GH_AW_EXPR_C19C384F__ }}\n- **discussion-number**: #__GH_AW_EXPR_C19C384F__\n{{/if}}\n{{#if __GH_AW_EXPR_76DF9333__ }}\n- **pull-request-number**: #__GH_AW_EXPR_76DF9333__\n{{/if}}\n{{#if __GH_AW_EXPR_77C1A4D2__ }}\n- **comment-id**: __GH_AW_EXPR_77C1A4D2__\n{{/if}}\n{{#if __GH_AW_GITHUB_RUN_ID__ }}\n- **workflow-run-id**: __GH_AW_GITHUB_RUN_ID__\n{{/if}}\n</github-context>\n\n"
@@ -341,7 +335,7 @@ jobs:
             const { setupPromptGlobals } = require(process.env.GH_AW_ACTIONS_DIR + '/setup_prompt_globals.cjs');
             setupPromptGlobals(core, context);
             const { main } = require(process.env.GH_AW_ACTIONS_DIR + '/interpolate_prompt.cjs');
-            await main({ authorExpressions: {"needs.pre_activation.outputs.activated":"GH_AW_NEEDS_PRE_ACTIVATION_OUTPUTS_ACTIVATED"} });
+            await main();
         env:
           GH_AW_ACTIONS_DIR: ${{ runner.temp }}/gh-aw/actions
           GH_AW_ENGINE_ID: codex
@@ -354,14 +348,13 @@ jobs:
           GH_AW_GITHUB_RUN_ID: ${{ github.run_id }}
           GH_AW_GITHUB_WORKSPACE: ${{ github.workspace }}
           GH_AW_MCP_CLI_SERVERS_LIST: "- `safeoutputs` — run `safeoutputs --help` to see available tools"
-          GH_AW_NEEDS_PRE_ACTIVATION_OUTPUTS_ACTIVATED: ${{ needs.pre_activation.outputs.activated }}
           GH_AW_OTEL_METRICS: ""
           GH_AW_OTLP_ENDPOINTS: ""
           GH_AW_OTLP_IF_MISSING: ""
           GH_AW_OTLP_LOGS_ENABLED: ""
           GH_AW_OTLP_LOGS_MAX_BYTES: ""
           GH_AW_PROMPT: ${{ runner.temp }}/gh-aw/aw-prompts/prompt.txt
-          GH_AW_PROMPT_ENV: "[\"GH_AW_ENGINE_ID\",\"GH_AW_EXPR_76DF9333\",\"GH_AW_EXPR_77C1A4D2\",\"GH_AW_EXPR_7C248226\",\"GH_AW_EXPR_C19C384F\",\"GH_AW_GITHUB_ACTOR\",\"GH_AW_GITHUB_REPOSITORY\",\"GH_AW_GITHUB_RUN_ID\",\"GH_AW_GITHUB_WORKSPACE\",\"GH_AW_MCP_CLI_SERVERS_LIST\",\"GH_AW_NEEDS_PRE_ACTIVATION_OUTPUTS_ACTIVATED\",\"GH_AW_PROMPT\",\"GH_AW_SKILL_DIR\",\"GH_AW_SKILL_EXT\",\"GH_AW_SUB_AGENT_DIR\",\"GH_AW_SUB_AGENT_EXT\"]"
+          GH_AW_PROMPT_ENV: "[\"GH_AW_ENGINE_ID\",\"GH_AW_EXPR_76DF9333\",\"GH_AW_EXPR_77C1A4D2\",\"GH_AW_EXPR_7C248226\",\"GH_AW_EXPR_C19C384F\",\"GH_AW_GITHUB_ACTOR\",\"GH_AW_GITHUB_REPOSITORY\",\"GH_AW_GITHUB_RUN_ID\",\"GH_AW_GITHUB_WORKSPACE\",\"GH_AW_MCP_CLI_SERVERS_LIST\",\"GH_AW_PROMPT\",\"GH_AW_SKILL_DIR\",\"GH_AW_SKILL_EXT\",\"GH_AW_SUB_AGENT_DIR\",\"GH_AW_SUB_AGENT_EXT\"]"
           GH_AW_SKILL_DIR: .codex/skills
           GH_AW_SKILL_EXT: /SKILL.md
           GH_AW_SUB_AGENT_DIR: .codex/agents
@@ -393,8 +386,7 @@ jobs:
                 GH_AW_GITHUB_REPOSITORY: process.env.GH_AW_GITHUB_REPOSITORY,
                 GH_AW_GITHUB_RUN_ID: process.env.GH_AW_GITHUB_RUN_ID,
                 GH_AW_GITHUB_WORKSPACE: process.env.GH_AW_GITHUB_WORKSPACE,
-                GH_AW_MCP_CLI_SERVERS_LIST: process.env.GH_AW_MCP_CLI_SERVERS_LIST,
-                GH_AW_NEEDS_PRE_ACTIVATION_OUTPUTS_ACTIVATED: process.env.GH_AW_NEEDS_PRE_ACTIVATION_OUTPUTS_ACTIVATED
+                GH_AW_MCP_CLI_SERVERS_LIST: process.env.GH_AW_MCP_CLI_SERVERS_LIST
               }
             });
         env:
@@ -408,14 +400,13 @@ jobs:
           GH_AW_GITHUB_RUN_ID: ${{ github.run_id }}
           GH_AW_GITHUB_WORKSPACE: ${{ github.workspace }}
           GH_AW_MCP_CLI_SERVERS_LIST: "- `safeoutputs` — run `safeoutputs --help` to see available tools"
-          GH_AW_NEEDS_PRE_ACTIVATION_OUTPUTS_ACTIVATED: ${{ needs.pre_activation.outputs.activated }}
           GH_AW_OTEL_METRICS: ""
           GH_AW_OTLP_ENDPOINTS: ""
           GH_AW_OTLP_IF_MISSING: ""
           GH_AW_OTLP_LOGS_ENABLED: ""
           GH_AW_OTLP_LOGS_MAX_BYTES: ""
           GH_AW_PROMPT: ${{ runner.temp }}/gh-aw/aw-prompts/prompt.txt
-          GH_AW_PROMPT_ENV: "[\"GH_AW_EXPR_76DF9333\",\"GH_AW_EXPR_77C1A4D2\",\"GH_AW_EXPR_7C248226\",\"GH_AW_EXPR_C19C384F\",\"GH_AW_GITHUB_ACTOR\",\"GH_AW_GITHUB_REPOSITORY\",\"GH_AW_GITHUB_RUN_ID\",\"GH_AW_GITHUB_WORKSPACE\",\"GH_AW_MCP_CLI_SERVERS_LIST\",\"GH_AW_NEEDS_PRE_ACTIVATION_OUTPUTS_ACTIVATED\",\"GH_AW_PROMPT\"]"
+          GH_AW_PROMPT_ENV: "[\"GH_AW_EXPR_76DF9333\",\"GH_AW_EXPR_77C1A4D2\",\"GH_AW_EXPR_7C248226\",\"GH_AW_EXPR_C19C384F\",\"GH_AW_GITHUB_ACTOR\",\"GH_AW_GITHUB_REPOSITORY\",\"GH_AW_GITHUB_RUN_ID\",\"GH_AW_GITHUB_WORKSPACE\",\"GH_AW_MCP_CLI_SERVERS_LIST\",\"GH_AW_PROMPT\"]"
           OTEL_EXPORTER_OTLP_ENDPOINT: ""
           OTEL_EXPORTER_OTLP_HEADERS: ""
           OTEL_EXPORTER_OTLP_PROTOCOL: ""
@@ -626,6 +617,13 @@ jobs:
         with:
           name: activation
           path: /tmp/gh-aw
+      - name: Extract reference doc metadata
+        run: "mkdir -p /tmp/gh-aw/data\n\n# Core reference docs the designer depends on\nREFS=(\n  \".github/aw/syntax.md\"\n  \".github/aw/safe-outputs.md\"\n  \".github/aw/network.md\"\n  \".github/aw/patterns.md\"\n  \".github/aw/subagents.md\"\n  \".github/aw/token-optimization.md\"\n  \".github/aw/triggers.md\"\n  \".github/aw/create-agentic-workflow.md\"\n)\n\n# Extract key sections from each reference doc:\n# - H2/H3 headings (structural outline)\n# - YAML frontmatter field names\n# - Table rows containing mapping keywords\nfor ref in \"${REFS[@]}\"; do\n  if [ -f \"$ref\" ]; then\n    basename=$(basename \"$ref\" .md)\n    {\n      echo \"=== $ref ===\"\n      # Headings\n      grep -n '^##' \"$ref\" | head -50\n      echo \"---\"\n      # Frontmatter keys (between --- delimiters)\n      sed -n '/^---$/,/^---$/p' \"$ref\" | grep -E '^\\w+:' | head -30\n      echo \"---\"\n      # Table rows with config keywords\n      grep -E '^\\|.*\\|' \"$ref\" | grep -ivE '^\\|[\\s-]+\\|' | head -80\n      echo \"===\"\n    } > \"/tmp/gh-aw/data/ref-${basename}.txt\"\n  fi\ndone\n"
+      - name: Extract designer file metadata
+        run: "# Skill file\nSKILL=\".github/aw/designer.md\"\nif [ -f \"$SKILL\" ]; then\n  {\n    echo \"=== SKILL.md ===\"\n    grep -n '^##' \"$SKILL\" | head -50\n    echo \"---\"\n    # Decision heuristic tables\n    grep -E '^\\|.*\\|' \"$SKILL\" | grep -ivE '^\\|[\\s-]+\\|' | head -150\n    echo \"---\"\n    # Explicit references to .github/aw/ files\n    grep -n '\\.github/aw/' \"$SKILL\" || true\n    echo \"===\"\n  } > /tmp/gh-aw/data/designer-skill.txt\nfi\n\n# Agent file\nAGENT=\".github/agents/interactive-agent-designer.agent.md\"\nif [ -f \"$AGENT\" ]; then\n  {\n    echo \"=== interactive-agent-designer.agent.md ===\"\n    grep -n '^##' \"$AGENT\" | head -50\n    echo \"---\"\n    grep -E '^\\|.*\\|' \"$AGENT\" | grep -ivE '^\\|[\\s-]+\\|' | head -60\n    echo \"---\"\n    grep -n '\\.github/aw/' \"$AGENT\" || true\n    echo \"===\"\n  } > /tmp/gh-aw/data/designer-agent.txt\nfi\n"
+      - name: Collect recent changes to reference docs
+        run: "# Commits in the last 7 days that touched reference docs\ngit log --oneline --since=\"7 days ago\" -- \\\n  .github/aw/syntax.md \\\n  .github/aw/safe-outputs.md \\\n  .github/aw/network.md \\\n  .github/aw/patterns.md \\\n  .github/aw/subagents.md \\\n  .github/aw/token-optimization.md \\\n  .github/aw/triggers.md \\\n  .github/aw/create-agentic-workflow.md \\\n  > /tmp/gh-aw/data/recent-ref-commits.txt 2>/dev/null || true\n\n# Commits in the last 7 days that touched designer files\ngit log --oneline --since=\"7 days ago\" -- \\\n  .github/aw/designer.md \\\n  .github/agents/interactive-agent-designer.agent.md \\\n  > /tmp/gh-aw/data/recent-designer-commits.txt 2>/dev/null || true\n\n# New or changed safe output types (from validation config in Go)\ngrep -oP '\"(\\w+)\":\\s*\\{' pkg/workflow/safe_outputs_validation_config.go \\\n  | sed 's/\": {//' | tr -d '\"' | sort \\\n  > /tmp/gh-aw/data/all-safe-output-types.txt 2>/dev/null || true"
+
       - name: Configure Git credentials
         env:
           GH_AW_GIT_REPOSITORY: ${{ github.repository }}
@@ -707,7 +705,7 @@ jobs:
         env:
           GH_AW_FILE_ROOT: "${{ runner.temp }}/gh-aw"
           GH_AW_FILE_CONFIG: "{\"files\":[{\"path\":\"safeoutputs/config.json\",\"content_env\":\"GH_AW_SAFE_OUTPUTS_CONFIG\"}]}"
-          GH_AW_SAFE_OUTPUTS_CONFIG: "{\"create_pull_request\":{\"allow_empty\":false,\"allowed_files\":[\".github/aw/designer.md\",\".github/aw/designer-mappings.md\",\".github/agents/interactive-agent-designer.agent.md\"],\"draft\":true,\"expires\":168,\"fallback_as_issue\":false,\"labels\":[\"drift-audit\",\"automated\"],\"max\":1,\"max_patch_files\":3,\"max_patch_size\":4096,\"protect_top_level_dot_folders\":true,\"protected_files\":[\"package.json\",\"bun.lockb\",\"bunfig.toml\",\"deno.json\",\"deno.jsonc\",\"deno.lock\",\"global.json\",\"NuGet.Config\",\"Directory.Packages.props\",\"mix.exs\",\"mix.lock\",\"go.mod\",\"go.sum\",\"stack.yaml\",\"stack.yaml.lock\",\"pom.xml\",\"build.gradle\",\"build.gradle.kts\",\"settings.gradle\",\"settings.gradle.kts\",\"gradle.properties\",\"package-lock.json\",\"yarn.lock\",\"pnpm-lock.yaml\",\"npm-shrinkwrap.json\",\"requirements.txt\",\"Pipfile\",\"Pipfile.lock\",\"pyproject.toml\",\"setup.py\",\"setup.cfg\",\"Gemfile\",\"Gemfile.lock\",\"uv.lock\",\"CODEOWNERS\",\"DESIGN.md\",\"README.md\",\"CONTRIBUTING.md\",\"SECURITY.md\",\"CODE_OF_CONDUCT.md\",\"AGENTS.md\"],\"protected_files_path_exclude\":[\".changeset/*.md\"],\"protected_files_policy\":\"request-review\",\"title_prefix\":\"[designer-drift] \"},\"create_report_incomplete_issue\":{},\"noop\":{\"max\":2,\"report-as-issue\":\"false\"},\"report_incomplete\":{},\"report_missing_data\":{},\"report_missing_tool\":{}}"
+          GH_AW_SAFE_OUTPUTS_CONFIG: "{\"create_issue\":{\"close_older_issues\":true,\"expires\":168,\"labels\":[\"drift-audit\",\"automated\"],\"max\":1,\"max_issue_artifact_size\":1048576,\"max_issue_artifacts\":10,\"title_prefix\":\"Designer Drift Audit\"},\"create_report_incomplete_issue\":{},\"noop\":{\"max\":2,\"report-as-issue\":\"false\"},\"report_incomplete\":{},\"report_missing_data\":{},\"report_missing_tool\":{}}"
         with:
           script: |
             const path = require('path');
@@ -721,41 +719,29 @@ jobs:
           GH_AW_TOOLS_META_JSON: |
             {
               "description_suffixes": {
-                "create_pull_request": " CONSTRAINTS: Maximum 1 pull request(s) can be created. Title will be prefixed with \"[designer-drift] \". Labels [\"drift-audit\" \"automated\"] will be automatically added. PRs will be created as drafts."
+                "create_issue": " CONSTRAINTS: Maximum 1 issue(s) can be created. Title will be prefixed with \"Designer Drift Audit\". Labels [\"drift-audit\" \"automated\"] will be automatically added. Maximum 10 artifact(s) can be attached per issue. Maximum artifact body size: 1048576 UTF-8 bytes."
               },
               "repo_params": {},
               "dynamic_tools": []
             }
           GH_AW_VALIDATION_JSON: |
             {
-              "create_pull_request": {
+              "create_issue": {
                 "defaultMax": 1,
                 "fields": {
-                  "base": {
-                    "type": "string",
-                    "sanitize": true,
-                    "maxLength": 128
+                  "artifacts": {
+                    "type": "array"
                   },
+                  "blocked_by": {},
                   "body": {
                     "required": true,
                     "type": "string",
                     "sanitize": true,
-                    "maxLength": 65000
+                    "maxLength": 65000,
+                    "minLength": 20
                   },
-                  "branch": {
-                    "required": true,
-                    "type": "string",
-                    "sanitize": true,
-                    "maxLength": 256
-                  },
-                  "dependencies": {
-                    "type": "array",
-                    "itemType": "string",
-                    "itemSanitize": true,
-                    "itemMaxLength": 256
-                  },
-                  "draft": {
-                    "type": "boolean"
+                  "fields": {
+                    "type": "array"
                   },
                   "labels": {
                     "type": "array",
@@ -763,21 +749,15 @@ jobs:
                     "itemSanitize": true,
                     "itemMaxLength": 128
                   },
+                  "parent": {
+                    "issueOrPRNumber": true
+                  },
                   "repo": {
                     "type": "string",
                     "maxLength": 256
                   },
-                  "stack_position": {
-                    "optionalPositiveInteger": true
-                  },
-                  "stack_root": {
-                    "type": "string",
-                    "sanitize": true,
-                    "maxLength": 256
-                  },
                   "temporary_id": {
-                    "type": "string",
-                    "pattern": "^#?aw_[A-Za-z0-9_]{3,12}$"
+                    "type": "string"
                   },
                   "title": {
                     "required": true,
@@ -785,7 +765,8 @@ jobs:
                     "sanitize": true,
                     "maxLength": 128
                   }
-                }
+                },
+                "collapseData": true
               },
               "noop": {
                 "defaultMax": 2,
@@ -1404,18 +1385,17 @@ jobs:
     permissions:
       actions: read # Read workflow runs and artifacts for workflow context.
       checks: read # Read check runs for workflow context.
-      contents: write # Create or update repository contents.
       id-token: write # Request an OIDC token for authenticated services.
       issues: write # Create or update issues and comments.
-      pull-requests: write # Create or update pull requests and review comments.
+      pull-requests: read # Read pull requests and review comments for workflow context.
     concurrency:
       group: "gh-aw-conclusion-designer-drift-audit"
       cancel-in-progress: false
       queue: max
     env:
-      GH_AW_JOB_DISPLAY_NAMES: "{\"activation\":\"activation\",\"agent\":\"agent\",\"conclusion\":\"conclusion\",\"detection\":\"detection\",\"pre_activation\":\"pre_activation\",\"safe_outputs\":\"safe_outputs\"}"
+      GH_AW_JOB_DISPLAY_NAMES: "{\"activation\":\"activation\",\"agent\":\"agent\",\"conclusion\":\"conclusion\",\"detection\":\"detection\",\"safe_outputs\":\"safe_outputs\"}"
       GH_AW_JOB_RESULTS: "{\"activation\":{\"result\":\"${{ needs.activation.result }}\"},\"agent\":{\"result\":\"${{ needs.agent.result }}\"},\"detection\":{\"result\":\"${{ needs.detection.result }}\"},\"safe_outputs\":{\"result\":\"${{ needs.safe_outputs.result }}\"}}"
-      GH_AW_JOB_TIMING_ELIGIBLE: "{\"activation\":true,\"agent\":true,\"conclusion\":true,\"detection\":true,\"pre_activation\":true,\"safe_outputs\":true}"
+      GH_AW_JOB_TIMING_ELIGIBLE: "{\"activation\":true,\"agent\":true,\"conclusion\":true,\"detection\":true,\"safe_outputs\":true}"
       GH_AW_RUNTIME_FEATURES: ${{ vars.GH_AW_RUNTIME_FEATURES }}
     outputs:
       incomplete_count: ${{ steps.report_incomplete.outputs.incomplete_count }}
@@ -1631,8 +1611,6 @@ jobs:
           GH_AW_MISSING_MODEL_PRICING_MODEL_NAME: ${{ needs.agent.outputs.missing_model_pricing_model_name }}
           GH_AW_SHELL_EXPANSION_GUARD_REJECTED: ${{ needs.agent.outputs.shell_expansion_guard_rejected }}
           GH_AW_ENGINE_API_HOSTS: "api.enterprise.githubcopilot.com,api.githubcopilot.com,api.business.githubcopilot.com,api.individual.githubcopilot.com"
-          GH_AW_CODE_PUSH_FAILURE_ERRORS: ${{ needs.safe_outputs.outputs.code_push_failure_errors }}
-          GH_AW_CODE_PUSH_FAILURE_COUNT: ${{ needs.safe_outputs.outputs.code_push_failure_count }}
           GH_AW_LOCKDOWN_CHECK_FAILED: ${{ needs.activation.outputs.lockdown_check_failed }}
           GH_AW_OAUTH_TOKEN_CHECK_FAILED: ${{ needs.activation.outputs.oauth_token_check_failed }}
           GH_AW_STALE_LOCK_FILE_FAILED: ${{ needs.activation.outputs.stale_lock_file_failed }}
@@ -1794,7 +1772,7 @@ jobs:
           GH_AW_DEFAULT_ADMISSION_URL: ${{ vars.GH_AW_DEFAULT_ADMISSION_URL }}
           GH_AW_DEFAULT_ADMISSION_AUDIENCE: ${{ vars.GH_AW_DEFAULT_ADMISSION_AUDIENCE }}
           GH_AW_DEFAULT_ADMISSION_ON_OUTAGE: ${{ vars.GH_AW_DEFAULT_ADMISSION_ON_OUTAGE }}
-          GH_AW_ADMISSION_WORKFLOW_HASH: "63e898771a0579b65dfddd190da6033f34804bb23129e4cc91d68033c29dcfcd:010ec087955487b90eca421ee3eea0297bf2ccb3eb250f5e4dbf34870fb4dfa9"
+          GH_AW_ADMISSION_WORKFLOW_HASH: "6b1754dd4ea3d9219c51964f224928de6a92b2ab2c7992e00cfedf73a6461dc4:4e19313a85fa88f52893ceb76e7f4723e976ba9e6cb4f591518729028ca25e0f"
           GH_AW_INFO_WORKFLOW_ID: ${{ job.workflow_ref }}
           GITHUB_ACTOR: ${{ github.actor }}
           GITHUB_TRIGGERING_ACTOR: ${{ github.triggering_actor }}
@@ -1928,7 +1906,7 @@ jobs:
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           WORKFLOW_NAME: "Designer Drift Audit"
-          WORKFLOW_DESCRIPTION: "Daily audit that repairs proven drift between aw reference docs and workflow designer guidance in one draft PR"
+          WORKFLOW_DESCRIPTION: "Daily audit that detects drift between aw reference docs and the workflow designer skill/agent files"
           HAS_PATCH: ${{ needs.agent.outputs.has_patch }}
           GH_AW_DETECTION_CONTINUE_ON_ERROR: "true"
           GH_AW_DETECTION_SKIP_PROMPT_SUMMARY: "true"
@@ -2004,7 +1982,7 @@ jobs:
           S2STOKENS: true
           TRACEPARENT: ${{ env.GITHUB_AW_OTEL_TRACE_ID != '' && env.GITHUB_AW_OTEL_PARENT_SPAN_ID != '' && format('00-{0}-{1}-01', env.GITHUB_AW_OTEL_TRACE_ID, env.GITHUB_AW_OTEL_PARENT_SPAN_ID) || '' }}
           WORKFLOW_NAME: "Designer Drift Audit"
-          WORKFLOW_DESCRIPTION: "Daily audit that repairs proven drift between aw reference docs and workflow designer guidance in one draft PR"
+          WORKFLOW_DESCRIPTION: "Daily audit that detects drift between aw reference docs and the workflow designer skill/agent files"
           HAS_PATCH: ${{ needs.agent.outputs.has_patch }}
           GH_AW_DETECTION_CONTINUE_ON_ERROR: "true"
           GH_AW_DETECTION_INPUT_DIR: "/tmp/gh-aw/threat-detection-inputs"
@@ -2175,75 +2153,6 @@ jobs:
           if-no-files-found: ignore
           retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
 
-  pre_activation:
-    name: pre_activation
-    runs-on: ubuntu-slim
-    # Permissions for the pre_activation job (workflow permissions default to none).
-    permissions:
-      contents: read
-      issues: read # Read issues and comments for workflow context.
-      pull-requests: read # Read pull requests and review comments for workflow context.
-    env:
-      GH_AW_RUNTIME_FEATURES: ${{ vars.GH_AW_RUNTIME_FEATURES }}
-    outputs:
-      activated: ${{ steps.check_membership.outputs.is_team_member == 'true' && steps.check_skip_if_match.outputs.skip_check_ok == 'true' }}
-      matched_command: ''
-      setup-parent-span-id: ${{ steps.setup.outputs.parent-span-id || steps.setup.outputs.span-id }}
-      setup-span-id: ${{ steps.setup.outputs.span-id }}
-      setup-trace-id: ${{ steps.setup.outputs.trace-id }}
-    steps:
-      - name: Checkout actions folder
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          repository: github/gh-aw
-          sparse-checkout: |
-            actions
-          fetch-depth: 1
-          clean: false
-          persist-credentials: false
-      - name: Setup Scripts
-        id: setup
-        uses: ./actions/setup
-        with:
-          destination: ${{ runner.temp }}/gh-aw/actions
-          job-name: ${{ github.job }}
-        env:
-          GH_AW_SETUP_WORKFLOW_NAME: "Designer Drift Audit"
-          GH_AW_CURRENT_WORKFLOW_REF: ${{ github.repository }}/.github/workflows/designer-drift-audit.lock.yml@${{ github.ref }}
-          GH_AW_INFO_VERSION: "0.169.0"
-          GH_AW_INFO_AWF_VERSION: "v0.29.17"
-          GH_AW_INFO_ENGINE_ID: "codex"
-          GH_AW_SETUP_AW_CONTEXT: ${{ inputs.aw_context }}
-      - name: Check team membership for workflow
-        id: check_membership
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-        env:
-          GH_AW_REQUIRED_ROLES: "admin,maintainer,write"
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const path = require('path');
-            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
-            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
-            setupGlobals(core, github, context, exec, io, getOctokit);
-            const { main } = require(path.join(actionsDir, 'check_membership.cjs'));
-            await main();
-      - name: Check skip-if-match query
-        id: check_skip_if_match
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-        env:
-          GH_AW_SKIP_QUERY: "is:pr is:open \"gh-aw-workflow-id: designer-drift-audit\" in:body"
-          GH_AW_WORKFLOW_NAME: "Designer Drift Audit"
-          GH_AW_SKIP_MAX_MATCHES: "1"
-        with:
-          script: |
-            const path = require('path');
-            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
-            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
-            setupGlobals(core, github, context, exec, io, getOctokit);
-            const { main } = require(path.join(actionsDir, 'check_skip_if_match.cjs'));
-            await main();
-
   safe_outputs:
     name: safe_outputs
     needs:
@@ -2251,13 +2160,11 @@ jobs:
       - agent
       - detection
     if: (!cancelled()) && needs.agent.result != 'skipped' && needs.detection.result == 'success'
-    runs-on: ubuntu-latest # Safe-output code publication checks out repository files; ubuntu-slim is limited to 15 minutes.
+    runs-on: ubuntu-slim
     # Permissions for the safe_outputs job (workflow permissions default to none).
     permissions:
-      contents: write # Create or update repository contents.
       issues: write # Create or update issues and comments.
-      pull-requests: write # Create or update pull requests and review comments.
-    timeout-minutes: 45
+    timeout-minutes: 15
     env:
       GH_AW_AGENT_AIC: ${{ needs.agent.outputs.aic }}
       GH_AW_AIC: ${{ needs.agent.outputs.aic }}
@@ -2283,13 +2190,12 @@ jobs:
       GH_AW_WORKFLOW_NAME: "Designer Drift Audit"
       GH_AW_WORKFLOW_SOURCE_URL: "${{ github.server_url }}/${{ github.repository }}/blob/${{ github.ref_name }}/.github/workflows/designer-drift-audit.md"
     outputs:
-      activation_comment_links: ${{ steps.process_safe_outputs.outputs.activation_comment_links }}
       code_push_failure_count: ${{ steps.process_safe_outputs.outputs.code_push_failure_count }}
       code_push_failure_errors: ${{ steps.process_safe_outputs.outputs.code_push_failure_errors }}
       create_discussion_error_count: ${{ steps.process_safe_outputs.outputs.create_discussion_error_count }}
       create_discussion_errors: ${{ steps.process_safe_outputs.outputs.create_discussion_errors }}
-      created_pr_number: ${{ steps.process_safe_outputs.outputs.created_pr_number }}
-      created_pr_url: ${{ steps.process_safe_outputs.outputs.created_pr_url }}
+      created_issue_number: ${{ steps.process_safe_outputs.outputs.created_issue_number }}
+      created_issue_url: ${{ steps.process_safe_outputs.outputs.created_issue_url }}
       process_safe_outputs_items_applied: ${{ steps.process_safe_outputs.outputs.items_applied }}
       process_safe_outputs_items_cancelled: ${{ steps.process_safe_outputs.outputs.items_cancelled }}
       process_safe_outputs_items_deferred: ${{ steps.process_safe_outputs.outputs.items_deferred }}
@@ -2343,25 +2249,6 @@ jobs:
           if [ -f "/tmp/gh-aw/agent_output.json" ]; then
             echo "GH_AW_AGENT_OUTPUT=/tmp/gh-aw/agent_output.json" >> "$GITHUB_OUTPUT"
           fi
-      - name: Download patch artifact
-        continue-on-error: true
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          name: agent
-          path: /tmp/gh-aw/
-      - name: Checkout repository (gh-aw default)
-        if: (!cancelled()) && needs.agent.result != 'skipped' && contains(needs.agent.outputs.output_types, 'create_pull_request')
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: true
-          token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
-      - name: Configure Git credentials
-        if: (!cancelled()) && needs.agent.result != 'skipped' && contains(needs.agent.outputs.output_types, 'create_pull_request')
-        env:
-          GH_AW_GIT_REPOSITORY: ${{ github.repository }}
-          GITHUB_SERVER_URL: ${{ github.server_url }}
-          GIT_TOKEN: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
-        run: bash "${RUNNER_TEMP}/gh-aw/actions/configure_git_credentials.sh"
       - name: Configure GH_HOST for enterprise compatibility
         id: ghes-host-config
         shell: bash
@@ -2382,8 +2269,7 @@ jobs:
           GH_AW_ALLOWED_DOMAINS: "archive.ubuntu.com,azure.archive.ubuntu.com,crl.geotrust.com,crl.globalsign.com,crl.identrust.com,crl.sectigo.com,crl.thawte.com,crl.usertrust.com,crl.verisign.com,crl3.digicert.com,crl4.digicert.com,crls.ssl.com,json-schema.org,json.schemastore.org,keyserver.ubuntu.com,ocsp.digicert.com,ocsp.geotrust.com,ocsp.globalsign.com,ocsp.identrust.com,ocsp.sectigo.com,ocsp.ssl.com,ocsp.thawte.com,ocsp.usertrust.com,ocsp.verisign.com,s.symcb.com,s.symcd.com,security.ubuntu.com,ts-crl.ws.symantec.com,ts-ocsp.ws.symantec.com"
           GITHUB_SERVER_URL: ${{ github.server_url }}
           GITHUB_API_URL: ${{ github.api_url }}
-          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"create_pull_request\":{\"allow_empty\":false,\"allowed_files\":[\".github/aw/designer.md\",\".github/aw/designer-mappings.md\",\".github/agents/interactive-agent-designer.agent.md\"],\"draft\":true,\"expires\":168,\"fallback_as_issue\":false,\"labels\":[\"drift-audit\",\"automated\"],\"max\":1,\"max_patch_files\":3,\"max_patch_size\":4096,\"protect_top_level_dot_folders\":true,\"protected_files\":[\"package.json\",\"bun.lockb\",\"bunfig.toml\",\"deno.json\",\"deno.jsonc\",\"deno.lock\",\"global.json\",\"NuGet.Config\",\"Directory.Packages.props\",\"mix.exs\",\"mix.lock\",\"go.mod\",\"go.sum\",\"stack.yaml\",\"stack.yaml.lock\",\"pom.xml\",\"build.gradle\",\"build.gradle.kts\",\"settings.gradle\",\"settings.gradle.kts\",\"gradle.properties\",\"package-lock.json\",\"yarn.lock\",\"pnpm-lock.yaml\",\"npm-shrinkwrap.json\",\"requirements.txt\",\"Pipfile\",\"Pipfile.lock\",\"pyproject.toml\",\"setup.py\",\"setup.cfg\",\"Gemfile\",\"Gemfile.lock\",\"uv.lock\",\"CODEOWNERS\",\"DESIGN.md\",\"README.md\",\"CONTRIBUTING.md\",\"SECURITY.md\",\"CODE_OF_CONDUCT.md\",\"AGENTS.md\"],\"protected_files_path_exclude\":[\".changeset/*.md\"],\"protected_files_policy\":\"request-review\",\"title_prefix\":\"[designer-drift] \"},\"create_report_incomplete_issue\":{},\"noop\":{\"max\":2,\"report-as-issue\":\"false\"},\"report_incomplete\":{},\"report_missing_data\":{},\"report_missing_tool\":{}}"
-          GH_AW_CI_TRIGGER_TOKEN: ${{ secrets.GH_AW_CI_TRIGGER_TOKEN }}
+          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"create_issue\":{\"close_older_issues\":true,\"expires\":168,\"labels\":[\"drift-audit\",\"automated\"],\"max\":1,\"max_issue_artifact_size\":1048576,\"max_issue_artifacts\":10,\"title_prefix\":\"Designer Drift Audit\"},\"create_report_incomplete_issue\":{},\"noop\":{\"max\":2,\"report-as-issue\":\"false\"},\"report_incomplete\":{},\"report_missing_data\":{},\"report_missing_tool\":{}}"
           GH_AW_GITHUB_TOKEN_SOURCE: ${{ secrets.GH_AW_GITHUB_TOKEN != '' && 'pat' || 'github_actions' }}
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
@@ -2406,14 +2292,3 @@ jobs:
             /tmp/gh-aw/safe-output-errors.json
           if-no-files-found: ignore
           retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
-      - name: Restore actions folder
-        if: always()
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          repository: github/gh-aw
-          sparse-checkout: |
-            actions/setup
-          sparse-checkout-cone-mode: true
-          fetch-depth: 1
-          clean: false
-          persist-credentials: false
