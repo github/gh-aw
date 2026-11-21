@@ -2822,6 +2822,10 @@ jobs:
       - name: Write agent output placeholder if missing
         if: always()
         run: |
+          if [[ "${RUNNER_ENVIRONMENT:-}" == "self-hosted" ]] && ! "${GH_AW_NODE:-node}" "${RUNNER_TEMP}/gh-aw/actions/docker_lease.cjs" assert; then
+            echo "Skipping shared agent output finalization without a validated Docker lease."
+            exit 0
+          fi
           if [ ! -f /tmp/gh-aw/agent_output.json ]; then
             echo '{"items":[]}' > /tmp/gh-aw/agent_output.json
           fi
