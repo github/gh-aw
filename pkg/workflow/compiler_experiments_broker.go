@@ -3,11 +3,14 @@ package workflow
 import (
 	"errors"
 	"fmt"
+	"path"
 	"strings"
 
 	"github.com/github/gh-aw/pkg/constants"
 	"github.com/goccy/go-yaml"
 )
+
+const brokerReportSystemPath = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
 func usesExperimentsBroker(data *WorkflowData) bool {
 	return data != nil && len(data.Experiments) > 0 && data.ExperimentsStorage == ExperimentsStorageBroker && !data.DryRun
@@ -105,7 +108,7 @@ func (c *Compiler) buildReportExperimentsSteps(data *WorkflowData) []string {
 	}, c.getActionPin)...)
 	steps = append(steps, buildArtifactDownloadSteps(ArtifactDownloadConfig{
 		ArtifactName:    artifactPrefixExprForDownstreamJob(data) + constants.UsageArtifactName.String(),
-		DownloadPath:    "/tmp/gh-aw/usage",
+		DownloadPath:    path.Join(constants.TmpGhAwDir, constants.UsageArtifactName.String()),
 		StepName:        "Download experiment usage results",
 		ContinueOnError: new(false),
 	}, c.getActionPin)...)
@@ -152,7 +155,7 @@ func brokerReportJobEnv(data *WorkflowData) (map[string]string, error) {
 		}
 	}
 	if _, exists := env["PATH"]; exists {
-		env["PATH"] = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+		env["PATH"] = brokerReportSystemPath
 	}
 	return env, nil
 }

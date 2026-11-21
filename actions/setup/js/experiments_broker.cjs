@@ -376,8 +376,8 @@ async function assign(options) {
   } catch {
     throw failure("STORAGE");
   }
-  core.setOutput("experiments", JSON.stringify(result.assignments));
   for (const [name, variant] of Object.entries(result.assignments)) core.setOutput(name, variant);
+  core.setOutput("experiments", JSON.stringify(result.assignments));
   const attributes = Object.entries(result.assignments)
     .map(([name, variant]) => `experiment.${name}=${encodeURIComponent(variant)}`)
     .join(",");

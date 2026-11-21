@@ -196,17 +196,18 @@ func TestExperimentsBrokerReportEnvironmentIsolation(t *testing.T) {
 			t.Run(fmt.Sprintf("%s/imported=%t", mode, imported), func(t *testing.T) {
 				dir := t.TempDir()
 				file := filepath.Join(dir, "workflow.md")
-				env := "env:\n"
+				var env strings.Builder
+				env.WriteString("env:\n")
 				hooks := []string{"BASH_ENV", "ENV", "NODE_OPTIONS", "NODE_PATH", "LD_PRELOAD", "LD_LIBRARY_PATH", "PYTHONPATH", "PYTHONSTARTUP", "ARBITRARY_FUTURE_HOOK"}
 				for _, name := range append(hooks, "PATH", "HOME", "TMPDIR") {
-					env += "  " + name + ": /untrusted/startup\n"
+					env.WriteString("  " + name + ": /untrusted/startup\n")
 				}
 				source := "---\non: workflow_dispatch\nstrict: false\nexperiments:\n  storage: broker\n  prompt: [control, candidate]\n"
 				if imported {
-					require.NoError(t, os.WriteFile(filepath.Join(dir, "env.md"), []byte("---\n"+env+"---\n"), 0o600))
+					require.NoError(t, os.WriteFile(filepath.Join(dir, "env.md"), []byte("---\n"+env.String()+"---\n"), 0o600))
 					source += "imports: [env.md]\n"
 				} else {
-					source += env
+					source += env.String()
 				}
 				compiler := NewCompiler(WithNoEmit(true), WithVersion("v1.0.0"))
 				compiler.SetActionMode(mode)

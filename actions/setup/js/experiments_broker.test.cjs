@@ -131,9 +131,9 @@ describe("experiments broker assignment", () => {
     });
     expect(fixture.core.setSecret.mock.calls).toEqual([[OIDC]]);
     expect(fixture.core.setOutput.mock.calls).toEqual([
-      ["experiments", JSON.stringify(DECISION.assignments)],
       ["feature", "candidate"],
       ["style", "brief"],
+      ["experiments", JSON.stringify(DECISION.assignments)],
     ]);
     expect(fixture.core.exportVariable).toHaveBeenCalledWith("OTEL_RESOURCE_ATTRIBUTES", "existing=value,experiment.feature=candidate,experiment.style=brief");
     expect(JSON.parse(fixture.files.get(ASSIGNMENTS_FILE))).toEqual(DECISION.assignments);
@@ -191,6 +191,17 @@ describe("experiments broker assignment", () => {
     await assign(fixture);
     expect(fixture.core.setOutput).toHaveBeenCalledWith("feature", variant);
     expect(fixture.core.exportVariable).toHaveBeenCalledWith("OTEL_RESOURCE_ATTRIBUTES", `experiment.feature=${encodeURIComponent(variant)}`);
+  });
+
+  it("preserves the final aggregate output for a valid experiment named experiments", async () => {
+    const fixture = setup({ env: { ...makeEnv(), GH_AW_EXPERIMENT_SPEC: '{"experiments":["control","candidate"]}' } });
+    const selected = { experiments: "candidate" };
+    fixture.fetchImpl.mockImplementation(async (_url, init) => (init.method === "POST" ? json({ assignments: selected, counts: { experiments: { control: 0, candidate: 1 } } }) : json({ value: OIDC })));
+    await assign(fixture);
+    expect(fixture.core.setOutput.mock.calls).toEqual([
+      ["experiments", "candidate"],
+      ["experiments", JSON.stringify(selected)],
+    ]);
   });
 
   it("handles prototype-like declared names and variants as data", async () => {
