@@ -15,7 +15,7 @@ Copilot workflows that declare the built-in `lsp.typescript` entry get a compile
 
 Bundle TypeScript `6.0.3` and `typescript-language-server` `6.1.0`. This server wraps `tsserver` and [recommends TypeScript 6](https://github.com/typescript-language-server/typescript-language-server/tree/v6.1.0#installing); TypeScript 7 uses a different language server. The setup action stages `package.json`, the complete npm lockfile, and the installer. The compiler embeds the same npm files but emits only the helper invocation and the files' SHA-256 hashes. The helper checks both hashes before running `npm ci` in `${RUNNER_TEMP}/gh-aw/engine-cli/typescript-lsp`. npm checks the package tarballs against the lockfile's SHA-512 hashes using the runner's configured registry. A mismatch or install failure stops the step without an unlocked fallback.
 
-Users can omit `lsp.typescript.version` or explicitly select the bundled server version. For another version, configure the server under `lsp.typescript-custom`, install it from a checked-in npm project with `npm ci` in `pre-agent-steps`, and point `command` to the installed executable. This lets each workflow choose its own version without relaxing the built-in install's lockfile requirement.
+Users can omit `lsp.typescript.version` or explicitly select the bundled server version. For another version, use a key not used by a built-in server, omit `version`, install from a checked-in npm project with `npm ci` in `pre-agent-steps`, and set `command` to the workspace-relative path of the installed executable. This preserves the built-in install's lockfile requirement.
 
 ### Alternatives Considered
 

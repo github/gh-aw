@@ -151,35 +151,6 @@ lsp:
       ".py": python
 ```
 
-### Custom Server (no built-in install)
-
-To use a different TypeScript server version, commit a `package.json` that pins both `typescript` and `typescript-language-server`, and commit the matching `package-lock.json`. This example uses `.github/lsp/typescript` as the npm project directory. Change your `lsp` key from `typescript` to `typescript-custom`, remove `version`, and retain your file extension mappings:
-
-Use `pre-agent-steps:` so the install runs after the PR job restores the base branch's `.github` directory. The workspace-relative `command` lets Copilot find the server even when a fresh WSL shell does not inherit the Windows runner's PATH updates.
-
-```yaml
-engine:
-  id: copilot
-
-pre-agent-steps:
-  - name: Install custom TypeScript language server
-    working-directory: .github/lsp/typescript
-    run: |
-      npm ci --ignore-scripts --no-audit --no-fund
-      bin_dir="$PWD/node_modules/.bin"
-      if [[ "${RUNNER_OS:-}" == Windows ]]; then
-        bin_dir="$(wslpath -w "$bin_dir")"
-      fi
-      printf '%s\n' "$bin_dir" >> "$GITHUB_PATH"
-
-lsp:
-  typescript-custom:
-    command: ./.github/lsp/typescript/node_modules/.bin/typescript-language-server
-    args: ["--stdio"]
-    fileExtensions:
-      ".ts": typescript
-```
-
 ## Network Requirements
 
 Installing LSP servers requires network access to the appropriate package registry. Add the matching ecosystem to `network.allowed`:

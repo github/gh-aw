@@ -69,8 +69,9 @@ func TestValidateTypeScriptLSPLockedVersion(t *testing.T) {
 			if version == unsupported {
 				require.ErrorContains(t, err, "lsp.typescript.version")
 				require.ErrorContains(t, err, `version: "`+typescriptLSPVersion+`"`)
-				require.ErrorContains(t, err, "lsp.typescript-custom")
-				data.LSP = map[string]LSPServerConfig{"typescript-custom": config}
+				require.ErrorContains(t, err, "Omit the version")
+				config.Version = ""
+				data.LSP = map[string]LSPServerConfig{"custom-server": config}
 				require.NoError(t, NewCompiler().validateLSPSupport(data))
 				require.Empty(t, NewLSPManager(data.LSP).GenerateInstallSteps(data))
 				return

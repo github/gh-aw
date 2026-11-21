@@ -21,9 +21,10 @@ and mixed edits continue to require write-or-higher repository permission.
 The experimental built-in TypeScript LSP accepts only the bundled server
 version (`6.1.0`, paired with TypeScript `6.0.3`). Omit `lsp.typescript.version`
 to use the bundled lockfile. To retain the former server (`4.3.3`) and TypeScript
-(`5.8.3`) or use other versions, move the entry to `lsp.typescript-custom`, remove `version`,
-and install the desired packages from a checked-in npm project using `npm ci`
-in `pre-agent-steps`. Point `command` to the installed executable.
+(`5.8.3`) or use other versions, rename the `lsp.typescript` entry to a key
+not used by a built-in server and remove `version`. Install the desired
+packages from a checked-in npm project using `npm ci` in `pre-agent-steps`,
+and point `command` to the installed executable using a workspace-relative path.
 
 Safe-output lifecycle reporting now uses `logs --delivery` and `logs --adoption`,
 with the same evaluator available in single-run `audit` and episode retrieval.
