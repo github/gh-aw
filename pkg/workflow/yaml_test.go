@@ -7,7 +7,50 @@ import (
 	"testing"
 
 	"github.com/goccy/go-yaml"
+	yamlv3 "go.yaml.in/yaml/v3"
 )
+
+func TestExtractTopLevelYAMLSectionPreservesNullInScripts(t *testing.T) {
+	const script = `cat <<'EOF'
+{
+  "a": null,
+  "b": null
+}
+EOF`
+	const frontmatterYAML = `on:
+  workflow_dispatch: null
+steps:
+  - name: Write JSON with null values
+    run: |-
+      cat <<'EOF'
+      {
+        "a": null,
+        "b": null
+      }
+      EOF
+`
+	var frontmatter map[string]any
+	if err := yaml.Unmarshal([]byte(frontmatterYAML), &frontmatter); err != nil {
+		t.Fatal(err)
+	}
+	compiler := NewCompiler()
+	frontmatter["post-steps"] = frontmatter["steps"]
+	for _, key := range []string{"steps", "post-steps"} {
+		t.Run(key, func(t *testing.T) {
+			section := compiler.extractTopLevelYAMLSection(frontmatter, key)
+			var decoded map[string][]struct{ Run string }
+			if err := yamlv3.Unmarshal([]byte(section), &decoded); err != nil {
+				t.Fatalf("invalid YAML: %v\n%s", err, section)
+			}
+			if steps := decoded[key]; len(steps) != 1 || steps[0].Run != script {
+				t.Errorf("expected unchanged script %q, got:\n%s", script, section)
+			}
+		})
+	}
+	if got := compiler.extractTopLevelYAMLSection(frontmatter, "on"); !strings.HasSuffix(got, "\n  workflow_dispatch:") {
+		t.Errorf("expected an empty workflow_dispatch mapping value, got:\n%s", got)
+	}
+}
 
 func TestCleanYAMLNullValues(t *testing.T) {
 	tests := []struct {

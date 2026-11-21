@@ -77,7 +77,7 @@ func (c *Compiler) extractTopLevelYAMLSection(frontmatter map[string]any, key st
 			// custom `steps:` marshaling elsewhere is unaffected.
 			marshalOptions = append(append([]yaml.EncodeOption{}, DefaultMarshalOptions...), yaml.IndentSequence(true))
 		}
-		yamlBytes, err = marshalYAMLWithOptions(wrappedData, marshalOptions...)
+		yamlBytes, err = marshalYAML(wrappedData, true, marshalOptions...)
 		if err != nil {
 			return ""
 		}
@@ -87,7 +87,7 @@ func (c *Compiler) extractTopLevelYAMLSection(frontmatter map[string]any, key st
 		if key == "on" || key == "services" {
 			marshalOptions = append(append([]yaml.EncodeOption{}, DefaultMarshalOptions...), yaml.IndentSequence(true))
 		}
-		yamlBytes, err = marshalYAMLWithOptions(map[string]any{key: value}, marshalOptions...)
+		yamlBytes, err = marshalYAML(map[string]any{key: value}, true, marshalOptions...)
 		if err != nil {
 			return ""
 		}
@@ -107,10 +107,6 @@ func (c *Compiler) extractTopLevelYAMLSection(frontmatter map[string]any, key st
 	if key == "env" {
 		yamlStr = quoteEnvValuesContainingColonSpace(yamlStr)
 	}
-
-	// Clean up null values - replace `: null` with `:` for cleaner output
-	// GitHub Actions treats `workflow_dispatch:` and `workflow_dispatch: null` identically
-	yamlStr = CleanYAMLNullValues(yamlStr)
 
 	// Clean up quoted keys - replace "key": with key: at the start of a line
 	// Don't unquote "on" key as it's a YAML boolean keyword and must remain quoted

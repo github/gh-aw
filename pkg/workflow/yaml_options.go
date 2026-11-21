@@ -24,11 +24,26 @@ var DefaultMarshalOptions = []yaml.EncodeOption{
 // marshalYAMLWithOptions preserves multiline values that bare literal blocks
 // would misindent or normalize. Ordinary multiline strings retain literal style.
 func marshalYAMLWithOptions(value any, options ...yaml.EncodeOption) ([]byte, error) {
+	return marshalYAML(value, false, options...)
+}
+
+func marshalYAML(value any, implicitMappingNulls bool, options ...yaml.EncodeOption) ([]byte, error) {
 	node, err := yaml.NewEncoder(nil, options...).EncodeToNode(value)
 	if err != nil {
 		return nil, err
 	}
 	repaired := false
+	if implicitMappingNulls {
+		// Render only actual mapping nulls as empty values, never text inside
+		// a block scalar or null entries in a sequence.
+		for _, candidate := range ast.Filter(ast.MappingValueType, node) {
+			entry := candidate.(*ast.MappingValueNode)
+			if value, ok := entry.Value.(*ast.NullNode); ok && !entry.IsFlowStyle {
+				value.Token.Type = token.ImplicitNullType
+				repaired = true
+			}
+		}
+	}
 	for _, candidate := range ast.Filter(ast.StringType, node) {
 		text, ok := candidate.(*ast.StringNode)
 		if !ok {
