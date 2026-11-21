@@ -1,5 +1,6 @@
 ---
 title: Forecast Command Specification
+spec: true
 description: Formal W3C-style specification for the gh aw forecast command — Monte Carlo AI Credit projection, workflow discovery, and run-level output formats for GitHub Agentic Workflows
 sidebar:
   order: 1355

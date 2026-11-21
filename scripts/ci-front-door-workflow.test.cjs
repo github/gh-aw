@@ -64,7 +64,7 @@ function validatedSuites(raw, outcome = "success") {
   return output.slice("suite_ids=".length, -1);
 }
 
-test("every CGO check job is selectable; only checkout, selection and cleanup are infrastructure", () => {
+test("the selector catalog covers every CGO check job", () => {
   assert.deepEqual(
     Object.keys(jobs)
       .filter(id => !infrastructure.includes(id))
@@ -100,7 +100,12 @@ test("CGO unit tests use 12 disjoint shards with complete test-name coverage", (
   for (const name of ["BenchmarkA", "ExampleA", "NotTestA"]) {
     assert.equal(shards.filter(shard => shard.pattern.test(name)).length, 0, name);
   }
-  assert.match(jobs.test, /shard: n-r\n          # Includes a compile sweep of the repository workflows\.\n          timeout: 5m/);
+  assert.match(jobs.test, /UNIT_TEST_SUITE: fast/);
+  assert.match(jobs.test, /steps: &unit-test-steps/);
+  assert.match(jobs["test-slow"], /UNIT_TEST_SUITE: slow/);
+  assert.match(jobs["test-slow"], /steps: \*unit-test-steps/);
+  assert.match(jobs["test-slow"], /pattern: repository\n          shard: slow-repository/);
+  assert.match(jobs["test-slow"], /UNIT_TEST_TIMEOUT: 5m/);
 });
 
 test("inference credentials and executable policy stay isolated from PR code", () => {
@@ -139,7 +144,7 @@ test("inference credentials and executable policy stay isolated from PR code", (
   assert.deepEqual(dependencies(decision), []);
 });
 
-test("PR model decisions control every check job through the actual output validator and job expressions", async () => {
+test("PR decisions keep the fast baseline and control optional jobs through the validator", async () => {
   for (const wanted of [[], ...SUITE_IDS.map(id => [id]), [...SUITE_IDS]]) {
     const selection = await frontDoor({
       catalog,
@@ -159,7 +164,9 @@ test("invalid outputs and missing, failed or skipped decisions run every check j
   for (const raw of ["", "not-json", "null", "{}", '["unknown"]', JSON.stringify([...SUITE_IDS, "unknown"]), '["build","build"]', '["go-tests"]', ...Object.keys(JOB_DEPENDENCIES).map(id => JSON.stringify([id]))]) {
     assert.equal(validatedSuites(raw), "", raw);
   }
-  assert.equal(validatedSuites("[]"), "[]");
+  assert.equal(validatedSuites("[]"), "");
+  assert.equal(validatedSuites('["verify-integration-build","build"]'), "");
+  assert.equal(validatedSuites('["verify-integration-build","test"]'), '["verify-integration-build","test"]');
   assert.equal(validatedSuites(JSON.stringify(SUITE_IDS)), JSON.stringify(SUITE_IDS));
   for (const id of SUITE_IDS) {
     for (const result of ["failure", "skipped", "cancelled", ""]) assert.equal(evaluate(condition(jobs[id]), { result }), true, `${id}: ${result}`);

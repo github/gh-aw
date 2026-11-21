@@ -1,5 +1,6 @@
 ---
 title: Copilot SDK Driver Specification
+spec: true
 description: Formal W3C-style specification for Copilot SDK driver configuration, environment variables, permission checks, and logging requirements
 sidebar:
   order: 1365

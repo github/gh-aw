@@ -136,6 +136,15 @@ func (acc *importAccumulator) extractConfigFields(fm map[string]any, fullPath st
 	acc.extractPlugins(fm)
 	acc.appendJSONSliceField(fm, "safe-outputs", "{}", &acc.safeOutputs)
 	acc.appendJSONBuilderField(fm, "graders", "{}", &acc.gradersBuilder)
+	if experiments, ok := fm["experiments"].(map[string]any); ok {
+		settings := make(map[string]any)
+		for _, key := range []string{"storage", "broker-url"} {
+			if value, ok := experiments[key]; ok {
+				settings[key] = value
+			}
+		}
+		acc.appendJSONBuilderField(map[string]any{"experiments": settings}, "experiments", "{}", &acc.experimentsBuilder)
+	}
 	acc.appendJSONSliceField(fm, "mcp-scripts", "{}", &acc.mcpScripts)
 	acc.appendJSONBuilderField(fm, "runtimes", "{}", &acc.runtimesBuilder)
 	acc.appendYAMLBuilderField(fm, "services", &acc.servicesBuilder)

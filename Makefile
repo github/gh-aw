@@ -110,6 +110,15 @@ test: test-unit test-integration
 test-unit-all:
 	go test -v -parallel=4 -timeout=10m -run='^Test' ./... -short
 
+.PHONY: test-unit-fast test-unit-slow
+test-unit-fast:
+	@pattern=$$(node scripts/go-unit-suite.cjs) && \
+	go test -v -parallel=4 -timeout=10m -run='^Test' -skip="$$pattern" ./... -short
+
+test-unit-slow:
+	@pattern=$$(node scripts/go-unit-suite.cjs) && \
+	go test -v -parallel=4 -timeout=10m -run="$$pattern" ./... -short
+
 # Run concurrency-heavy package tests with the Go race detector
 .PHONY: test-race
 test-race:
@@ -1555,6 +1564,8 @@ help:
 	@echo "  test             - Run Go tests (unit + integration)"
 	@echo "  test-unit        - Run impacted Go unit tests first (~$(TEST_UNIT_MAX_SECONDS)s budget); set TEST_UNIT_RUN_FULL=1 for full suite"
 	@echo "  test-unit-all    - Run full Go unit test suite"
+	@echo "  test-unit-fast   - Run all unit tests except measured >=10s tests"
+	@echo "  test-unit-slow   - Run only measured >=10s unit tests"
 	@echo "  test-security    - Run security regression tests"
 	@echo "  check-agent-local-settings - Reject tracked Claude Code local permission settings"
 	@echo "  test-agent-local-settings - Test local settings secret-leak prevention"

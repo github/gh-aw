@@ -53,3 +53,21 @@ test("the landing page keeps its own wide layout", async ({ page }) => {
       .evaluate(hero => getComputedStyle(hero).maxWidth)
   ).toBe("1152px");
 });
+
+test("specification styling keeps section anchors and the reading measure", async ({ page }) => {
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await page.goto("/gh-aw/specs/unified-agent-session-specification/#abstract");
+
+  const title = page.getByRole("heading", { level: 1, name: "Unified Agent Session Specification" });
+  await expect(title).toBeVisible();
+  await expect(page.getByText("Specification", { exact: true })).toBeVisible();
+  const abstract = page.locator("#abstract");
+  await expect(abstract).toBeVisible();
+  const section = abstract.locator("..");
+  await expect(section).toHaveCSS("border-block-start-width", "1px");
+  expect((await section.boundingBox())?.width).toBeLessThanOrEqual(PROSE_WIDTH + 1);
+
+  await page.goto("/gh-aw/reference/work-queue/");
+  await expect(page.locator(".spec-label")).toHaveCount(0);
+  await expect(page.locator(".sl-markdown-content > .level-h2").first()).toHaveCSS("border-block-start-width", "0px");
+});

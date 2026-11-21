@@ -30,6 +30,23 @@ function sidebarGroup(page: Page, label: string) {
   });
 }
 
+test("specification links are marked in the desktop sidebar and mobile menu", async ({ page }) => {
+  const specRoute = "/gh-aw/specs/unified-agent-session-specification/";
+  await page.goto("/gh-aw/introduction/overview/");
+  const specs = sidebarGroup(page, "Specs");
+  await specs.locator("summary").click();
+  const specLink = specs.getByRole("link", { name: "Unified Agent Session Specification Spec", exact: true });
+  await expect(specLink).toHaveAttribute("href", specRoute);
+  await expect(specLink.getByText("Spec", { exact: true })).toBeVisible();
+  await expect(page.locator('#starlight__sidebar a[aria-current="page"] .spec-sidebar-badge')).toHaveCount(0);
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(specRoute);
+  await page.getByRole("button", { name: "Menu", exact: true }).click();
+  await expect(specLink).toHaveAttribute("aria-current", "page");
+  await expect(specLink.getByText("Spec", { exact: true })).toBeVisible();
+});
+
 for (const section of sections) {
   test(`${section.label} shows its preview and More outside its section`, async ({ page }) => {
     await page.goto("/gh-aw/introduction/overview/");

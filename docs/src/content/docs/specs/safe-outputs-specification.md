@@ -1,5 +1,6 @@
 ---
 title: Safe Outputs MCP Gateway Specification
+spec: true
 description: Formal W3C-style specification defining the Safe Outputs Model Context Protocol Gateway for secure AI-to-GitHub operation translation
 sidebar:
   order: 1360

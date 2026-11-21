@@ -1,5 +1,6 @@
 ---
 title: Safe Update Specification
+spec: true
 description: Formal specification of safe update enforcement and manifest baselines in gh-aw compilation
 sidebar:
   order: 1366

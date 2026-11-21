@@ -1,5 +1,6 @@
 ---
 title: MCP Scripts Specification
+spec: true
 description: Formal specification for MCP Scripts custom MCP tools following W3C conventions
 sidebar:
   order: 1360

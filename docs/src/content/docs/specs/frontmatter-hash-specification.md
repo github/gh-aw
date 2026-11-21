@@ -1,5 +1,6 @@
 ---
 title: Frontmatter Hash Specification
+spec: true
 description: Specification for computing deterministic hashes of agentic workflow frontmatter
 version: 1.0.0
 status: Draft

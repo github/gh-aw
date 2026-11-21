@@ -1,5 +1,6 @@
 ---
 title: Webhook Gateway Specification
+spec: true
 description: Experimental contract for supported webhook triggers, expected source data, normalized activities, and batched dispatch.
 sidebar:
   order: 1360

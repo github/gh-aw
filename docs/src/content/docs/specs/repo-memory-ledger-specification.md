@@ -1,5 +1,6 @@
 ---
 title: Git-backed Ledger Specification
+spec: true
 description: Specification for standalone Git-backed ledgers, built-in projections, trusted persistence, and lossless compaction
 sidebar:
   order: 1370

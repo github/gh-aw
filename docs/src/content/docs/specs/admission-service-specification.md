@@ -1,5 +1,6 @@
 ---
 title: AW Admission Service Specification
+spec: true
 description: OIDC-authenticated admission, conclusion session delivery, component allowances, and the independent opt-in token broker contract
 sidebar:
   order: 1362

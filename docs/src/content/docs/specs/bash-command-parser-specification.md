@@ -1,5 +1,6 @@
 ---
 title: Bash Command Parser Specification
+spec: true
 description: W3C-style specification for the Copilot SDK bash command parser and conformance test generation
 sidebar:
   order: 1370

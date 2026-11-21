@@ -46,6 +46,7 @@ describe("generate_usage_activity_summary.cjs", () => {
       }
       global.core = { info: vi.fn(), warning: vi.fn() };
       vi.spyOn(fs, "existsSync").mockReturnValue(false);
+      vi.spyOn(fs, "rmSync").mockImplementation(() => {});
       const writes = vi.spyOn(fs, "writeFileSync").mockImplementation(() => {});
       await main();
       const payload = JSON.parse(writes.mock.calls.find(([file]) => file === "/tmp/gh-aw/usage/activity/summary.json")[1]);
@@ -55,6 +56,37 @@ describe("generate_usage_activity_summary.cjs", () => {
       } else {
         expect(payload).not.toHaveProperty("memory_saves");
       }
+    } finally {
+      vi.restoreAllMocks();
+      process.env = originalEnv;
+      global.core = originalCore;
+    }
+  });
+
+  it("writes a separate compact experiment artifact without altering the usage summary", async () => {
+    const originalEnv = { ...process.env };
+    const originalCore = global.core;
+    const { projectExperimentResults } = req("./experiments_broker.cjs");
+    try {
+      delete process.env.GH_AW_DETECTION_JOB_RESULT;
+      delete process.env.GITHUB_STEP_SUMMARY;
+      process.env.GH_AW_EXPERIMENT_STATE_DIR = "synthetic-experiments";
+      global.core = { info: vi.fn(), warning: vi.fn() };
+      vi.spyOn(fs, "existsSync").mockReturnValue(false);
+      vi.spyOn(fs, "rmSync").mockImplementation(() => {});
+      vi.spyOn(fs, "readFileSync").mockImplementation(file => {
+        if (file === path.join("synthetic-experiments", "assignments.json")) return JSON.stringify({ feature: "candidate" });
+        throw new Error("not found");
+      });
+      const writes = vi.spyOn(fs, "writeFileSync").mockImplementation(() => {});
+      await main();
+      const summary = JSON.parse(writes.mock.calls.find(([file]) => file === "/tmp/gh-aw/usage/activity/summary.json")[1]);
+      expect(global.core.warning.mock.calls.filter(([message]) => message.startsWith("Experiment results unavailable"))).toEqual([]);
+      const result = JSON.parse(writes.mock.calls.find(([file]) => file === "/tmp/gh-aw/usage/activity/experiment-results.json")[1]);
+      expect(summary.experiments).toEqual({ assignments: { feature: "candidate" } });
+      expect(summary).toHaveProperty("working_set");
+      expect(result).toEqual(projectExperimentResults(summary));
+      expect(result).not.toHaveProperty("working_set");
     } finally {
       vi.restoreAllMocks();
       process.env = originalEnv;

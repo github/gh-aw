@@ -3574,13 +3574,17 @@
       }
     },
     "experiments": {
-      "description": "A/B testing experiments. Each key is an experiment name; the value is either an array of two or more variant strings (bare-array form) or an object with a 'variants' field plus optional metadata fields (description, metric, weight, issue, start_date, end_date, hypothesis, secondary_metrics, guardrail_metrics, min_samples, analysis_type, decision). The reserved 'storage' key controls how experiment state is persisted: 'repo' (default) commits state to a git branch named 'experiments/{sanitizedWorkflowID}' (workflow ID lowercased with hyphens removed) for durability; 'cache' uses GitHub Actions cache. At runtime the activation job picks a variant and persists the updated counters. Use ${{ experiments.<name> }} in the workflow prompt to reference the selected variant. When multiple experiments are declared, assignments are statistically balanced using a least-used counter that round-robins across variants (or weighted when 'weight' is provided); ties are broken randomly so no variant is systematically favoured on the first run.",
+      "description": "A/B testing experiments. Each key is an experiment name; the value is either an array of two or more variant strings (bare-array form) or an object with a 'variants' field plus optional metadata fields (description, metric, weight, issue, start_date, end_date, hypothesis, secondary_metrics, guardrail_metrics, min_samples, analysis_type, decision). The reserved 'storage' key controls persistence: 'repo' (default) commits state to 'experiments/{sanitizedWorkflowID}'; 'cache' uses GitHub Actions cache; opt-in 'broker' delegates variant selection and aggregate result reporting to an OIDC-authenticated API. The optional 'broker-url' configures its HTTPS endpoint. Broker dry-runs use local ephemeral selection without broker calls or broker OIDC grants. Use ${{ experiments.<name> }} in the workflow prompt to reference the selected variant. Repo and cache modes use local least-used counters (weighted when 'weight' is provided), with random tie-breaking; in broker mode the API owns selection and cumulative counts.",
       "type": "object",
       "propertyNames": {
         "anyOf": [
           {
             "const": "storage",
             "description": "Reserved key for storage mode configuration."
+          },
+          {
+            "const": "broker-url",
+            "description": "Reserved key for the experiments broker endpoint."
           },
           {
             "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
@@ -3819,9 +3823,15 @@
       "properties": {
         "storage": {
           "type": "string",
-          "enum": ["cache", "repo"],
+          "enum": ["cache", "repo", "broker"],
           "default": "repo",
-          "description": "Storage backend for experiment state. 'repo' (default) persists state to a git branch named 'experiments/{sanitizedWorkflowID}' (workflow ID lowercased with hyphens removed, e.g. 'my-workflow' -> 'experiments/myworkflow') for durability across cache evictions. 'cache' uses GitHub Actions cache (legacy behavior). Repo storage is recommended because experiment data is valuable and more durable than cache."
+          "description": "Storage backend for experiment state. 'repo' (default) persists state to a git branch named 'experiments/{sanitizedWorkflowID}' (workflow ID lowercased with hyphens removed, e.g. 'my-workflow' -> 'experiments/myworkflow') for durability across cache evictions. 'cache' uses GitHub Actions cache (legacy behavior). 'broker' delegates assignment and aggregate reporting to an OIDC-authenticated service without git or cache persistence. Broker dry-runs use local ephemeral assignments and never contact the broker."
+        },
+        "broker-url": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^https://[^$]*$",
+          "description": "Literal HTTPS broker endpoint without credentials or expressions. Defaults to the GH_AW_EXPERIMENTS_BROKER_URL secret."
         }
       }
     },

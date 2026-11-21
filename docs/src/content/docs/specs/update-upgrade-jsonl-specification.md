@@ -1,5 +1,6 @@
 ---
 title: Update and Upgrade JSONL Specification
+spec: true
 description: Machine-readable messages for workflow updates, repository upgrades, and pull request delivery
 sidebar:
   order: 1370
