@@ -378,14 +378,14 @@ describe.each(["agenticworkflows", "safeoutputs"])("%s backend ownership", name 
     expect(backend.args.filter(arg => arg === "--user")).toHaveLength(1);
   });
 
-  it.each([["--user", "42:43"], ["--user=42:43"], ["-u", "42:43"], ["-u42:43"], ["--user", "app:staff"], ["--user=app:staff"], ["-u", "app:staff"], ["-uroot"], ["-uapp:staff"], ["-u=app:staff"]])(
+  it.each([["--user", "1001:123"], ["--user", "42:43"], ["--user=42:43"], ["-u", "42:43"], ["-u42:43"], ["--user", "app:staff"], ["--user=app:staff"], ["-u", "app:staff"], ["-uroot"], ["-uapp:staff"], ["-u=app:staff"]])(
     "preserves an explicitly configured container user: %j",
     (...args) => {
       const backend = { container: "example/server", args, env: { HOME: "/custom" } };
       const original = structuredClone(backend);
       applyBuiltinMCPRunnerIdentity({ mcpServers: { [name]: backend } }, 1001, 123);
       applyBuiltinMCPRunnerIdentity({ mcpServers: { [name]: backend } }, 1001, 123);
-      expect(backend).toEqual(original);
+      expect(backend).toEqual({ ...original, env: { ...original.env, ...reportEnv } });
     }
   );
 
@@ -393,7 +393,7 @@ describe.each(["agenticworkflows", "safeoutputs"])("%s backend ownership", name 
     const backend = { container: "example/server", args: [arg], env: { HOME: "/custom" } };
     const original = structuredClone(backend);
     applyBuiltinMCPRunnerIdentity({ mcpServers: { [name]: backend } }, 1001, 123);
-    expect(backend).toEqual(original);
+    expect(backend).toEqual({ ...original, env: { ...original.env, ...reportEnv } });
   });
 
   it("does not confuse --userns with an explicit container user", () => {
@@ -635,7 +635,7 @@ readline.createInterface({ input: process.stdin }).on("line", line => {
     const agenticworkflows = { container: "alpine:3.24", args: ["--user", "42:43"] };
     const safeoutputs = { container: "ghcr.io/github/gh-aw-node@sha256:test", args: ["-w", "/workspace"] };
     applyBuiltinMCPRunnerIdentity({ mcpServers: { agenticworkflows, safeoutputs } }, 1001, 123);
-    expect(agenticworkflows.args).toEqual(["--user", "42:43"]);
+    expect(agenticworkflows).toEqual({ container: "alpine:3.24", args: ["--user", "42:43"], env: { GH_AW_MCP_LOGS_REPORT_DIR: "/tmp/gh-aw" } });
     expect(safeoutputs.args).toEqual(["-w", "/workspace", "--user", "1001:123"]);
     expect(safeoutputs.env).toEqual({ HOME: "/tmp" });
   });

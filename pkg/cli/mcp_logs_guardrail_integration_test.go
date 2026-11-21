@@ -1,4 +1,4 @@
-//go:build integration && unix
+//go:build integration && (linux || darwin)
 
 package cli
 

@@ -1655,8 +1655,9 @@ function applyBuiltinMCPRunnerIdentity(config, uid = process.geteuid?.(), gid = 
       throw codedError(`Invalid ${name} container arguments`, ERR_CONFIG);
     }
     // Docker parses any suffix after -u as a username or UID, including -uroot.
-    if (args.some(arg => arg === "--user" || arg === "-u" || arg.startsWith("--user=") || (arg.startsWith("-u") && !arg.startsWith("--")))) continue;
-    if (!Number.isSafeInteger(uid) || !Number.isSafeInteger(gid) || uid === undefined || gid === undefined || uid < 0 || gid < 0) {
+    const hasExplicitUser = args.some(arg => arg === "--user" || arg === "-u" || arg.startsWith("--user=") || (arg.startsWith("-u") && !arg.startsWith("--")));
+    if (hasExplicitUser && name !== "agenticworkflows") continue;
+    if (!hasExplicitUser && (!Number.isSafeInteger(uid) || !Number.isSafeInteger(gid) || uid === undefined || gid === undefined || uid < 0 || gid < 0)) {
       throw codedError(`Runner identity is required for the ${name} container`, ERR_CONFIG);
     }
     const env = "env" in server ? server.env : {};
@@ -1664,10 +1665,10 @@ function applyBuiltinMCPRunnerIdentity(config, uid = process.geteuid?.(), gid = 
       throw codedError(`Invalid ${name} container environment`, ERR_CONFIG);
     }
     Object.assign(server, {
-      args: [...args, "--user", `${uid}:${gid}`],
+      ...(hasExplicitUser ? {} : { args: [...args, "--user", `${uid}:${gid}`] }),
       // /tmp is private to this backend container; /root is not writable as the runner.
       env: {
-        HOME: "/tmp",
+        ...(hasExplicitUser ? {} : { HOME: "/tmp" }),
         ...env,
         // Use the same bind mount as the agent for the logs file_path handoff.
         ...(name === "agenticworkflows" ? { GH_AW_MCP_LOGS_REPORT_DIR: "/tmp/gh-aw" } : {}),

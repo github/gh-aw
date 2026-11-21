@@ -2,7 +2,7 @@
 
 **Date**: 2026-11-21
 **Status**: Draft
-**Deciders**: Peli de Halleux (PR author, @pelikhan); [TODO: verify other reviewers]
+**Deciders**: Peli de Halleux (PR author, @pelikhan)
 
 ---
 
@@ -12,17 +12,17 @@ The `logs` MCP tool summarizes workflow run data and returns a `file_path` so th
 
 ### Decision
 
-We will write each new report into a per-server-process directory created with `MkdirTemp` and mode `0700`, and create each report as an exclusive `0600` file through `os.Root`. Unsafe ancestors, non-private directories or files, and changed directories fail closed, and the legacy cache is neither read nor migrated. The primary driver is confidentiality of workflow log data; the `file_path` response and both continuation cursor formats stay unchanged, so no callers change. The containerized `agenticworkflows` backend receives `GH_AW_MCP_LOGS_REPORT_DIR=/tmp/gh-aw` so that its reports land on the shared mount, and non-Unix builds fail closed rather than relying on POSIX mode bits.
+On Linux and macOS, we write reports to a per-server-process directory created with `MkdirTemp` and mode `0700`, and create each report as an exclusive `0600` file through `os.Root`. Unsafe ancestors, non-private files or directories, and replaced cache directories fail closed. On macOS, extended ACLs or failure to verify their absence also cause an error; Linux POSIX ACL grants are constrained by the mode's group class. The legacy cache is neither read nor migrated. The response fields and both continuation cursor formats stay unchanged. The containerized `agenticworkflows` backend receives `GH_AW_MCP_LOGS_REPORT_DIR=/tmp/gh-aw` so its reports land on the shared mount.
 
 ### Alternatives Considered
 
 #### Alternative 1: Keep the fixed shared cache and tighten its permissions
 
-Keep `/tmp/gh-aw/logs-cache` and change its modes to `0700` and `0600`. This is the smallest diff and would stop other users from reading new reports. It was rejected because the fixed name in a shared temporary directory remains predictable, so safety would rest on path checks alone, and reports already written with `0644` would still need migration or deletion. A random per-process directory avoids both problems. This was not a close call.
+Keep `/tmp/gh-aw/logs-cache` and change its modes to `0700` and `0600`. This is the smallest diff, but it would reuse a predictable path and require a policy for pre-existing entries. A fresh per-process directory avoids trusting any pre-existing cache or touching legacy reports.
 
 #### Alternative 2: Return the report inline in the MCP response
 
-Return the summary JSON in the tool result and drop the filesystem handoff. This removes the file trust boundary entirely. It was rejected because the `file_path` handoff exists to keep tool responses small, and inline summaries would bring that size pressure back. [TODO: verify the response-size budget that motivated the `file_path` design.]
+Return the summary JSON in the tool result and drop the filesystem handoff. This removes the file trust boundary, but it would put the full report in the response instead of letting the agent read and filter only the fields it needs. The current `logs` handler writes the full report to disk regardless of size; this decision does not depend on a particular token limit.
 
 #### Alternative 3: Store reports in a per-user directory outside `/tmp`
 
@@ -36,17 +36,13 @@ Use the home directory or `XDG_RUNTIME_DIR`. This avoids shared temporary storag
 - The caller contract is unchanged: `file_path`, report bytes, and both cursor formats are identical, so no workflow callers need code changes.
 
 #### Negative
-- Reports under the legacy `/tmp/gh-aw/logs-cache/` are neither read nor migrated. Existing `file_path` references stop resolving, and affected reports must be regenerated.
-- Deduplication is now per server process. Identical reports produced by different server processes get different directories and different `file_path` values.
-- Non-Unix platforms, including Windows, fail to store reports, so the `logs` tool returns an error for the file handoff. [TODO: verify whether this tool is supported on Windows.]
+- The server neither reads nor migrates reports under the legacy `/tmp/gh-aw/logs-cache/`. Generate a new report to use the private cache; this change does not retroactively protect legacy files.
+- Deduplication is per cache directory and verifies the existing file's SHA-256 digest before returning its path. If the directory disappears while its ancestors remain safe, the next write creates a fresh private directory.
+- On platforms other than Linux and macOS, including Windows, the `logs` tool returns a file-handoff error rather than using storage whose permissions it cannot verify.
 - The shared-mount path requires the agent and the backend container to run as the same UID. A mismatch leaves the report unreadable by the agent.
-- A new environment-variable contract (`GH_AW_MCP_LOGS_REPORT_DIR`) skips symlink resolution for the explicit shared path, which is extra surface to maintain.
+- `GH_AW_MCP_LOGS_REPORT_DIR` adds a gateway-to-server configuration contract. The server validates an explicitly configured path as supplied, rejecting symlink components instead of following them.
 
 #### Neutral
-- The `ci-front-door-researcher`, `daily-cli-tools-tester`, and `daily-rendering-scripts-verifier` workflows, their lock files, and `.github/aw/agentic-workflows-mcp.md` now describe the new location. Lock file changes are limited to generated hashes.
-- The server does not remove per-process report directories. They persist until the OS clears temporary storage, as the legacy cache did.
-- The gateway sets `GH_AW_MCP_LOGS_REPORT_DIR` only for the `agenticworkflows` backend, not for `safeoutputs`.
-
----
-
-*ADR created by [adr-writer agent]. Review and finalize before changing status from Draft to Accepted.*
+- The `ci-front-door-researcher`, `daily-cli-tools-tester`, and `daily-rendering-scripts-verifier` workflows and `.github/aw/agentic-workflows-mcp.md` now describe the new location. Workflow locks are regenerated from their Markdown sources.
+- The server keeps reports available while it is running. On graceful shutdown it removes only the files it created and its own cache directory, without enumerating other directories. Forced termination or unsafe metadata can leave reports for host cleanup.
+- The gateway sets `GH_AW_MCP_LOGS_REPORT_DIR` only for the `agenticworkflows` backend, including when a container user is explicitly configured. It does not change the explicit identity or its `HOME` settings.

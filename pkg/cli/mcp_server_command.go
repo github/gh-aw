@@ -154,11 +154,17 @@ func runMCPServer(ctx context.Context, port int, cmdPath string, validateActor b
 	}
 
 	// Create the server configuration
-	server := createMCPServer(cmdPath, actor, validateActor, allowWriteTools, manifestCacheFile, mcpServerEnv)
+	logsCache := &mcpLogsReportCache{}
+	defer func() {
+		if err := logsCache.close(); err != nil {
+			mcpLog.Printf("Failed to clean up private logs cache: %v", err)
+		}
+	}()
+	server := createMCPServer(cmdPath, actor, validateActor, allowWriteTools, manifestCacheFile, mcpServerEnv, logsCache)
 
 	if port > 0 {
 		// Run HTTP server with SSE transport
-		return runHTTPServer(server, port)
+		return runHTTPServer(ctx, server, port)
 	}
 
 	// Run stdio transport
