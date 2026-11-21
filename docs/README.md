@@ -281,3 +281,18 @@ Root-level endpoints on `https://github.github.com/` (for example `/robots.txt`)
 ## Want to learn more?
 
 Check out [Starlight’s docs](https://starlight.astro.build/), read [the Astro documentation](https://docs.astro.build), or jump into the [Astro Discord server](https://astro.build/chat).
+
+## Web API specifications
+
+Every specification that defines a service-side web API must include a linked
+TypeSpec (`.tsp`) definition next to the Markdown source. Update both files
+when the wire contract changes. Model methods, routes, authentication, headers,
+and request and response shapes in TypeSpec. Keep requirements that schemas
+cannot express, such as duplicate-key rejection, identity binding, and
+idempotency, in the Markdown specification.
+
+From the repository root, run `npm ci --prefix specs/otel` to install the locked
+toolchain, then run `make spec-build`. The build discovers TypeSpec sources in
+the repository and compiles each independently. It
+emits OpenAPI for services and JSON Schema for data contracts under `dist/specs/`.
+Fixed wire objects are sealed in the emitted schemas.

@@ -1821,7 +1821,8 @@ run and attempt, logical invocation identity, implementation and input digests,
 binding level and relevant evidence references. Private bodies, patches, prompts,
 secret-valued inputs and tokens MUST NOT be transmitted or logged; bind digests
 and reviewed secret references instead. The authority independently verifies any
-evidence required by its policy.
+evidence required by its policy. The [companion TypeSpec definition](https://github.com/github/gh-aw/blob/main/docs/src/content/docs/specs/safe-output-authorization.tsp)
+describes the decision endpoint and its request and response bodies.
 
 The request object contains `version`, `request_digest`, and `invocation`, plus
 top-level `job_id` whenever nonempty `GITHUB_JOB` is available. `job_id` preserves
