@@ -9,7 +9,6 @@ on:
 max-daily-ai-credits: 10000
 permissions:
   contents: read
-  issues: read
   pull-requests: read
 
   copilot-requests: write
@@ -21,9 +20,9 @@ experiments:
   detail_level:
     variants: [brief, comprehensive]
     description: "Tests whether a leaner output format (diagram + brief change log only) delivers equivalent reader value vs. the full report with Package Reference table and verbose summaries."
-    hypothesis: "H0: no change in run success rate or issue engagement. H1: brief variant reduces token usage ≥20% and run duration ≥15% with no drop in success rate."
+    hypothesis: "H0: no change in run success rate. H1: brief variant reduces token usage ≥20% and run duration ≥15% with no drop in success rate."
     metric: run_duration_ms
-    secondary_metrics: [output_issue_body_length, run_success_rate]
+    secondary_metrics: [run_success_rate]
     guardrail_metrics:
       - name: run_success_rate
         threshold: ">=0.85"
@@ -45,27 +44,30 @@ tools:
   cache-memory: true
 
 safe-outputs:
-  create-issue:
-    title-prefix: "🏗️ Architecture Diagram:"
-    labels: [architecture, diagram]
-    close-older-issues: true
-    expires: 7d
-    max: 1
+  threat-detection:
+    report-as-issue: false
+  report-failure-as-issue: false
+  report-failed-jobs: false
+  report-missing-tool:
+    create-issue: false
+  report-missing-data:
+    create-issue: false
+  report-incomplete:
+    create-issue: false
   create-pull-request:
+    max: 1
     expires: 7d
     draft: true
+    fallback-as-issue: false
+    github-token-for-extra-empty-commit: none
+    allowed-files: [scratchpad/architecture.md]
     title-prefix: "[architecture] "
     labels: [architecture, diagram, documentation]
   noop:
+    report-as-issue: false
 
 imports:
-  - shared/pr-safe-output-defaults.md
-  - uses: shared/daily-audit-base.md
-    with:
-      title-prefix: "[architecture-diagram] "
-      expires: 3d
   - shared/reporting.md
-
   - shared/otlp.md
 timeout-minutes: 20
 strict: true
@@ -177,7 +179,10 @@ This is just an example skeleton. Your actual diagram should:
 
 #### Updating the Cache
 
-After generating the diagram, write an updated `architecture-state.json` to cache-memory with:
+Write an updated `architecture-state.json` only after verifying that the diagram
+already in the checkout matches the current structure. If the diagram is
+missing or materially changed, leave the checkpoint untouched: a queued draft
+PR may fail to publish, or may never merge.
 
 ```json
 {
@@ -191,13 +196,13 @@ After generating the diagram, write an updated `architecture-state.json` to cach
 
 Use a filesystem-safe filename: `architecture-state.json` (no colons or special characters).
 
-#### Output Format
+#### Pull Request Description
 
-Create an issue with this structure:
+If the diagram has materially changed or is missing, write the PR description using this structure. Include a link to the [workflow run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}).
 
 ### Architecture Diagram
 
-Wrap the ASCII diagram in a `<details><summary><b>View Diagram</b></summary>...</details>` block (with the diagram inside a code block, triple backticks, so it renders with monospace font) so the issue stays short by default.
+Wrap the ASCII diagram in a `<details><summary><b>View Diagram</b></summary>...</details>` block (with the diagram inside a code block, triple backticks, so it renders with monospace font) so the description stays short by default.
 
 {{#if experiments.detail_level == 'comprehensive' }}
 ### Summary
@@ -228,14 +233,14 @@ If this was an incremental update, list changed packages in a brief bullet list 
 
 #### Scratchpad File
 
-After creating the issue, update `scratchpad/architecture.md` with the latest diagram via `create_pull_request`.
+Update only `scratchpad/architecture.md` with the latest diagram before calling `create_pull_request`.
 
 The file should contain:
 
 ````markdown
 # Architecture Diagram
 
-> Last updated: <YYYY-MM-DD> · Source: [Issue #<number>](<issue_url>)
+> Last updated: <YYYY-MM-DD> · Source: [Workflow run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
 
 ## Overview
 
@@ -250,5 +255,5 @@ This diagram shows the package structure and dependencies of the `gh-aw` codebas
 <package table>
 ````
 
-- When the diagram **changes**: update `scratchpad/architecture.md` via `create_pull_request` with a PR titled `[architecture] Update architecture diagram - <date>`.
-- When the diagram is **unchanged** (noop path): skip the scratchpad update entirely.
+- When the diagram **materially changes or is missing**: update only `scratchpad/architecture.md`, stage and commit it locally, and submit that branch via `create_pull_request` once with title `Update architecture diagram - <date>` (the safe output adds the `[architecture] ` prefix).
+- When the diagram is **unchanged** after analysis: call `noop` and skip the scratchpad update entirely. A new date or run URL alone is not a material change.
