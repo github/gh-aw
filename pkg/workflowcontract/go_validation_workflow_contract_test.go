@@ -54,7 +54,7 @@ func TestGoTestParallelizerPreservesValidationAndCompletedCursor(t *testing.T) {
 		"Never write it or its directory; preserve the cursor unchanged on every outcome",
 		"For any partial, blocked, failed, or uncertain result, use `report_incomplete`, never `noop`",
 		"On failed, blocked, or out-of-scope validation, restore only your edits and report incomplete",
-		"Partition the rotated list into non-overlapping batches of at most 10 files",
+		"Partition the rotated list into non-overlapping batches of at most 3 files",
 		"(github.run_number - 1) % number_of_batches",
 		"${{ github.run_number }}",
 		"zero consecutive retries after a block",
@@ -109,7 +109,7 @@ func TestGoTestParallelizerDisablesCursorPersistence(t *testing.T) {
 	if !config.Tools.CacheMemory.RestoreOnly {
 		t.Fatal("cursor must remain restore-only until trusted validation can authorize persistence")
 	}
-	if config.MaxAICredits != 15 || config.MaxTurns != 40 {
+	if config.MaxAICredits != 25 || config.MaxTurns != 60 {
 		t.Fatal("parallelizer must retain its per-run credit and turn limits")
 	}
 }
