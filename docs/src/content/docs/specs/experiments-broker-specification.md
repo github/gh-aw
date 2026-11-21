@@ -118,6 +118,8 @@ For dry-run execution, the compiler/runtime MUST select variants locally using e
 
 ## 4. Assignment and Reporting Protocol
 
+The [companion TypeSpec definition](https://github.com/github/gh-aw/blob/main/docs/src/content/docs/specs/experiments-broker-specification.tsp) describes the service's shared POST endpoint, assignment and report messages, and response statuses. This section defines operation-specific success, strict validation, and cross-field requirements.
+
 ### 4.1. Transport and common request envelope
 
 Both operations MUST POST UTF-8 JSON to the same full HTTPS endpoint with `Content-Type: application/json` and `Accept: application/json`. The client MUST acquire a GitHub Actions OIDC JWT with the exact endpoint audience. Neither OIDC acquisition nor broker requests may follow redirects; the server MUST serve the endpoint directly.

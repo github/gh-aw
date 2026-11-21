@@ -103,6 +103,8 @@ Admission success, admission absence, and admission's `ignore` outage policy MUS
 
 ## 4. Exchange Protocol
 
+The [companion TypeSpec definition](https://github.com/github/gh-aw/blob/main/docs/src/content/docs/specs/token-broker-specification.tsp) describes the service's shared POST endpoint, exchange and invalidation messages, and response statuses. This section defines operation-specific success, strict validation, and credential lifecycle requirements.
+
 ### 4.1. Transport and request
 
 The configured URL is the complete exchange endpoint; no route suffix or discovery request is appended. The client MUST acquire a GitHub Actions OIDC JWT with that exact audience and send one HTTPS POST with `Content-Type: application/json` and `Accept: application/json`. Redirects MUST NOT be followed during OIDC acquisition or exchange. The broker MUST serve the configured endpoint directly without redirects.
@@ -336,7 +338,7 @@ This section is the authoritative list of checks a conforming broker MUST perfor
 
 Deployments MUST provide negative tests for SV-06 to SV-24, SV-28, SV-31, and SV-36 before claiming conformance (Section 7).
 
-An experimental, informative TLA+ model of these requirements and Appendix E is in `specs/token-broker/` in the gh-aw repository. It found the gaps that SV-16, SV-28, SV-31, SV-36, and SV-37 now close.
+The [experimental, informative TLA+ model](https://github.com/github/gh-aw/tree/main/specs/token-broker) covers the server validation requirements and Appendix E. It found the gaps that SV-16, SV-28, SV-31, SV-36, and SV-37 now close.
 
 ## 6. Credential Issuance and Lifecycle
 

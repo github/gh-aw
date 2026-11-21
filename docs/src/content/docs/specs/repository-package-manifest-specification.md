@@ -272,6 +272,10 @@ The remove lifecycle uninstalls a previously installed package by deleting its i
 
 > **Note**: Package-installed documentation files (for example `README.md`) are within the scope of R-PKG-R001 and follow modified-file protection in R-PKG-R002.
 
+### 5.4 Bounded Formal Model
+
+The [package lifecycle model](https://github.com/github/gh-aw/blob/main/specs/repository-package/PackageLifecycle.tla) and [TLC configuration](https://github.com/github/gh-aw/blob/main/specs/repository-package/PackageLifecycle.cfg) check install and update publication, stale-file preservation, rollback diagnostics, and removal ownership and confirmation. The model considers one package operation at a time and treats files and ownership records as jointly published. It models failures before publication and errors cleaning up staged files; it does not establish atomicity or crash recovery for a concrete filesystem implementation.
+
 ## 6. Documentation
 
 Package documentation is `README.md` in the package root.
@@ -412,7 +416,7 @@ This section provides a normative reference table for all MUST/SHALL requirement
 | — | §5 | If no installable workflow files are resolved, package validation MUST fail |
 | — | §5 | Raw `.yml` files MUST be direct children of `.github/workflows/`; nested `.yml` files are rejected |
 | R-PKG-U001 | §5.2 | Update MUST overwrite previously installed files with the new version |
-| R-PKG-U002 | §5.2 | Orphaned files (present in old version, absent in new) MUST be left in place with a warning |
+| R-PKG-U002 | §5.2 | Stale files may be removed only when unchanged, owned by the same package, and not replaced; preserved stale files SHOULD produce a warning when modified or ownership is unproven |
 | R-PKG-U003 | §5.2 | Failed overwrite MUST abort update; MUST NOT leave a mixed-version directory |
 | R-PKG-U004 | §5.2 | Failed update MUST leave previously installed files intact |
 | R-PKG-R001 | §5.3 | Removal MUST delete only package-installed files |

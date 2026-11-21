@@ -669,6 +669,8 @@ The workflow presents that value, not the runner's request credential, to the in
 
 #### Compiler continuation profile
 
+The [companion TypeSpec definition](https://github.com/github/gh-aw/blob/main/docs/src/content/docs/specs/webhook-gateway-specification.tsp) describes the gateway's `getToken` continuation endpoint. It does not define provider ingress or reproduce the GitHub REST API.
+
 The reserved `gateway_admission` job MUST follow successful `gateway_provenance`. Every other job, including custom, reusable, and `on.needs` jobs, directly requires both gates' successful results and `verified == 'true'` outputs. Custom conditions, activation outputs, or `strict: false` cannot bypass either gate. Customizing `jobs.gateway_admission` is rejected. Both control-plane jobs remain outside job environments, including when `--environment` is used, so environment-specific settings cannot replace central trust configuration. Their setup does not mint user-configured App or observability credentials.
 
 Trusted onboarding configures `GH_AW_GATEWAY_GET_TOKEN_URL` and `GH_AW_GATEWAY_OIDC_AUDIENCE` as organization/repository Actions secrets or variables; each nonempty secret takes precedence over its matching variable. Missing or malformed values fail closed. The first is an exact canonical HTTPS endpoint without credentials, query, or fragment; its path is deployment-selected. The second is the approved audience base without a trailing slash, query, or fragment. A host-only base such as `https://cao.example` is supported. Workflow-global environment values and dispatch fields do not supply either setting.

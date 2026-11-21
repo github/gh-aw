@@ -555,6 +555,15 @@ string `"no"` as falsy, in addition to the standard falsy values `""`, `"false"`
 
 ## 9. Activation Job Structure
 
+The [ExperimentPersistence TLA+ model](https://github.com/github/gh-aw/blob/main/specs/experiments/ExperimentPersistence.tla)
+and [TLC configuration](https://github.com/github/gh-aw/blob/main/specs/experiments/ExperimentPersistence.cfg)
+check the §7–9 repo/cache lifecycle with two interleaving runs: restore, selection,
+publication of a run-local snapshot, backend-specific persistence, and conclusion.
+The model uses one least-used experiment and a reduced history limit. It permits
+stale reads and does not guarantee lossless concurrent writes or cache durability.
+The [Experiments Broker Specification](/gh-aw/specs/experiments-broker-specification/#appendix-d-formal-model-informative)
+models broker mode separately.
+
 **R-JOB-001**: When the `experiments` field is present in the frontmatter, the compiled
 activation job **MUST** include the experiment steps defined in §9.1, §9.2, or §9.4 as appropriate.
 

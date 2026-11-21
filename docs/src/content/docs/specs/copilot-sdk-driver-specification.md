@@ -444,6 +444,10 @@ Nested-agent refusals do not independently establish main-session rejection.
 
 The implementation MUST perform best-effort cleanup of event streams, session handles, and client handles regardless of success or failure.
 
+### 7.4 Formal Model
+
+The [TLA+ driver model](https://github.com/github/gh-aw/blob/main/specs/copilot-sdk-driver/CopilotSDKDriver.tla) and [TLC configuration](https://github.com/github/gh-aw/blob/main/specs/copilot-sdk-driver/CopilotSDKDriver.cfg) check one SDK session with a denial limit of two. The model checks startup and dispatch order, result classification from SDK observations, and cleanup attempts for resources acquired before success or failure. It abstracts connection and permission configuration into classified inputs; it does not verify token handling, policy matching, log strings, or actual cleanup success.
+
 ---
 
 ## 8. Compliance Testing
