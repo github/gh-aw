@@ -86,13 +86,13 @@ Summarize in a **${{ experiments.prompt_style }}** style.
 
 The compiler MUST recognize `broker` as a storage selector, not an experiment name. Omitted storage MUST remain `repo`; `repo` and `cache` behavior MUST remain unchanged. Broker selection MUST NOT create, fetch, or update experiment git state, restore or save experiment caches, or add `contents: write`. An unrelated explicitly configured operation can still require repository permissions.
 
-The compiler MUST resolve the endpoint only at Actions runtime through:
+When `experiments.broker-url` is omitted, the compiler MUST resolve the endpoint at Actions runtime through:
 
 ```yaml
 GH_AW_BROKER_EXPERIMENTS_URL: ${{ secrets.GH_AW_EXPERIMENTS_BROKER_URL }}
 ```
 
-The workflow author MUST NOT supply a broker URL or audience in experiment configuration. The compiler MUST NOT resolve a deployment endpoint from its own environment or embed a resolved secret in generated YAML. Actions variables MUST NOT be a fallback. Merely defining the secret MUST NOT enable broker storage.
+The workflow author MAY supply `experiments.broker-url` as an HTTPS URL or a secrets expression. Shared imports MAY supply `storage: broker` and `broker-url`, with the importing workflow taking precedence. The compiler MUST use the same configured endpoint for both operations and MUST NOT resolve it from its own environment or embed a resolved secret in generated YAML. Actions variables MUST NOT be a fallback. Merely defining the secret MUST NOT enable broker storage.
 
 The endpoint MUST be an absolute HTTPS URL with a hostname and no user information, fragment, whitespace, or backslash. Its complete configured string, including path or query, is both the POST destination and the exact OIDC audience. The client MUST NOT append a route, discover another endpoint, or normalize the audience. Operators SHOULD avoid query parameters, aliases, and trailing-slash ambiguity. Missing, empty, or invalid configuration MUST fail closed.
 
@@ -303,7 +303,7 @@ Tests MUST use deterministic clocks, controlled OIDC/JWKS fixtures, isolated ten
 
 | Test ID | Class | Scenario and expected outcome |
 | --- | --- | --- |
-| T-EXB-001 | Client | Omitted storage stays `repo`; `cache` is unchanged. `broker` selects only the runtime secret endpoint, adds no experiment git/cache operations or `contents: write`, and is not parsed as an experiment. |
+| T-EXB-001 | Client | Omitted storage stays `repo`; `cache` is unchanged. `broker` selects the configured endpoint or runtime secret default, adds no experiment git/cache operations or `contents: write`, and is not parsed as an experiment. |
 | T-EXB-002 | Client | Activation assigns before consuming variants. A separate report job follows conclusion and applicable graders, uses fresh OIDC, and executes no authored or artifact-supplied code. Workflow-level environment keys are neutralized before setup; authored augmentation is rejected. Status-only/no-agent workflows fail compilation with actionable guidance. Unrelated jobs gain no broker OIDC permission. |
 | T-EXB-003 | Client | Dry-run clears stale local state, uses ephemeral local assignments, and makes zero experiments broker HTTP/OIDC calls, reports, git writes, or cache writes, including on reused self-hosted runners. |
 | T-EXB-004 | Both | Both operations POST the exact configured HTTPS URL; audience retains path/query bytes. Reject invalid/missing URLs, alternate audiences, route discovery, and all redirects. |

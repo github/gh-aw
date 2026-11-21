@@ -164,6 +164,90 @@ func TestExperimentsBrokerCompiledWorkflow(t *testing.T) {
 	}
 }
 
+func TestExperimentsBrokerURLAndImports(t *testing.T) {
+	for _, tc := range []struct {
+		name, shared, local, want string
+		broker                    bool
+	}{
+		{name: "local", local: "storage: broker\n  broker-url: https://broker.example/assign?x=1", want: "https://broker.example/assign?x=1", broker: true},
+		{name: "secret", local: "storage: broker\n  broker-url: '${{ secrets.CUSTOM_BROKER }}'", want: "${{ secrets.CUSTOM_BROKER }}", broker: true},
+		{name: "imported", shared: "storage: broker\n  broker-url: https://shared.example/assign", want: "https://shared.example/assign", broker: true},
+		{name: "local override", shared: "storage: broker\n  broker-url: https://shared.example/assign", local: "broker-url: https://local.example/assign", want: "https://local.example/assign", broker: true},
+		{name: "disabled locally", shared: "storage: broker\n  broker-url: https://shared.example/assign", local: "storage: cache"},
+		{name: "non-broker import", shared: "storage: cache"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			file := filepath.Join(dir, "workflow.md")
+			if tc.shared != "" {
+				require.NoError(t, os.WriteFile(filepath.Join(dir, "shared.md"), []byte("---\nexperiments:\n  "+tc.shared+"\n---\n"), 0600))
+			}
+			source := "---\non: workflow_dispatch\nstrict: false\n"
+			if tc.shared != "" {
+				source += "imports: [shared.md]\n"
+			}
+			source += "experiments:\n"
+			if tc.local != "" {
+				source += "  " + tc.local + "\n"
+			}
+			source += "  prompt: [control, candidate]\n---\nTest.\n"
+			compiler := NewCompiler(WithNoEmit(true))
+			compiler.gitRoot = dir
+			data, err := compiler.ParseWorkflowString(source, file)
+			require.NoError(t, err)
+			generated, err := compiler.CompileToYAML(data, file)
+			require.NoError(t, err)
+			require.Equal(t, tc.broker, usesExperimentsBroker(data))
+			if tc.broker {
+				for _, job := range []string{"activation", "report_experiments"} {
+					assert.Contains(t, extractJobSection(generated, job), "GH_AW_BROKER_EXPERIMENTS_URL: '"+tc.want+"'")
+				}
+			} else {
+				assert.NotContains(t, generated, "GH_AW_BROKER_EXPERIMENTS_URL")
+			}
+		})
+	}
+}
+
+func TestExperimentsBrokerURLValidation(t *testing.T) {
+	for _, value := range []string{"http://broker.example", "https://user@broker.example", "https://broker.example/#fragment", "https://broker.example/${{ github.event.issue.title }}", "${{ inputs.url }}", "${{\n secrets.BROKER_URL }}", "https://broker.example/\nmalicious: value"} {
+		t.Run(value, func(t *testing.T) {
+			require.Error(t, validateExperimentBrokerURL(value))
+		})
+	}
+	require.NoError(t, validateExperimentBrokerURL("https://broker.example/assign?x=1"))
+	require.NoError(t, validateExperimentBrokerURL("${{ secrets.BROKER_URL }}"))
+}
+
+func TestExperimentsBrokerNestedImportPrecedence(t *testing.T) {
+	for _, tc := range []struct {
+		name, parent string
+		broker       bool
+	}{
+		{name: "parent endpoint wins", parent: "storage: broker\n  broker-url: https://parent.example/assign", broker: true},
+		{name: "parent disables broker", parent: "storage: cache"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			require.NoError(t, os.WriteFile(filepath.Join(dir, "nested.md"), []byte("---\nexperiments:\n  storage: broker\n  broker-url: https://nested.example/assign\n---\n"), 0600))
+			require.NoError(t, os.WriteFile(filepath.Join(dir, "parent.md"), []byte("---\nimports: [nested.md]\nexperiments:\n  "+tc.parent+"\n---\n"), 0600))
+			source := "---\non: workflow_dispatch\nstrict: false\nimports: [parent.md]\nexperiments:\n  prompt: [control, candidate]\n---\nTest.\n"
+			file := filepath.Join(dir, "workflow.md")
+			compiler := NewCompiler(WithNoEmit(true))
+			compiler.gitRoot = dir
+			data, err := compiler.ParseWorkflowString(source, file)
+			require.NoError(t, err)
+			generated, err := compiler.CompileToYAML(data, file)
+			require.NoError(t, err)
+			require.Equal(t, tc.broker, usesExperimentsBroker(data))
+			assert.NotContains(t, generated, "https://nested.example/assign")
+			if tc.broker {
+				assert.Contains(t, generated, "https://parent.example/assign")
+			}
+		})
+	}
+}
+
 func TestExperimentsBrokerJobsWithoutAssignments(t *testing.T) {
 	compiler := NewCompiler()
 	data := &WorkflowData{ExperimentsStorage: ExperimentsStorageBroker}

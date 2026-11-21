@@ -270,17 +270,23 @@ activation job and commits the updated `state.json` to the experiments branch.
 ---
 experiments:
   storage: broker
+  broker-url: https://broker.example.com/experiments
   prompt_style: [concise, detailed]
 ---
 
 Summarize in a **${{ experiments.prompt_style }}** style.
 ```
 
-Set the repository or organization Actions secret
-`GH_AW_EXPERIMENTS_BROKER_URL` to the full HTTPS endpoint. The URL is resolved
-only at runtime; it is not authored in workflow frontmatter. Both assignment and
-reporting POST to this exact endpoint, which is also the exact OIDC audience.
-gh-aw does not ship the server.
+`broker-url` accepts a full HTTPS endpoint or a GitHub Actions secrets expression.
+When omitted, it defaults to the repository or organization Actions secret
+`GH_AW_EXPERIMENTS_BROKER_URL`. Both assignment and reporting POST to this exact
+endpoint, which is also the exact OIDC audience. Do not include credentials in
+the URL. `storage: broker` and `broker-url` can be provided by a shared workflow
+import; the importing workflow's values take precedence. Imported experiment
+variants and non-broker storage modes are not merged. An explicit non-broker
+storage mode in a shared workflow prevents a nested import from enabling broker
+storage. Treat imports as trusted configuration: the selected
+endpoint receives the workflow's OIDC identity. gh-aw does not ship the server.
 
 Activation obtains assignments and required cumulative counts. A separate,
 isolated job after conclusion (and graders when needed) submits allowlisted

@@ -508,8 +508,8 @@ counter updates occur on the server, preserving §§5–6 selection/date semanti
 **R-STORE-BROKER-002**: Broker storage **MUST NOT** read or write experiment git/cache
 state, add `contents: write`, or fall back to another backend after failure. Dry-run
 **MUST** use cleared, ephemeral local state without experiments broker HTTP/OIDC calls
-or reports. The endpoint **MUST** come only from the runtime Actions secret
-`GH_AW_EXPERIMENTS_BROKER_URL`, not authored frontmatter.
+or reports. The endpoint **MUST** come from `experiments.broker-url` or, when
+omitted, the runtime Actions secret `GH_AW_EXPERIMENTS_BROKER_URL`.
 
 The separate broker specification defines exact-audience authentication, counts,
 atomic idempotency, job isolation, observation allowlists, and conformance tests.

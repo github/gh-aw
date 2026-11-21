@@ -231,6 +231,7 @@ type WorkflowData struct {
 	Experiments                    map[string][]string             // A/B testing experiments: maps experiment name to variant list (from frontmatter)
 	ExperimentConfigs              map[string]*ExperimentConfig    // Full A/B experiment metadata (populated alongside Experiments)
 	ExperimentsStorage             ExperimentStorageMode           // "cache", "repo" (default), or opt-in "broker"; controls experiment persistence
+	ExperimentsBrokerURL           string                          // Optional broker endpoint or secret expression
 	CachedConcurrencyGroupExprSet  bool                            // true once CachedConcurrencyGroupExprErr has been populated; distinguishes "valid (nil)" from "not yet computed"
 	CachedParsedToolsets           []string                        // cached result of ParseGitHubToolsets for the GitHub tool (for performance optimization); populated by applyDefaults
 	CachedAllowedDomainsStr        string                          // cached agent firewall policy; sanitization-only domains must not be stored here

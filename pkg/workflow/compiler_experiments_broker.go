@@ -3,15 +3,67 @@ package workflow
 import (
 	"errors"
 	"fmt"
+	"maps"
+	"net/url"
 	"path"
+	"regexp"
 	"slices"
 	"strings"
 
 	"github.com/github/gh-aw/pkg/constants"
+	"github.com/github/gh-aw/pkg/jsonutil"
 	"github.com/goccy/go-yaml"
 )
 
 const brokerReportSystemPath = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+
+var brokerSecretExpression = regexp.MustCompile(`^\$\{\{ *secrets\.[a-zA-Z_][a-zA-Z0-9_]* *\}\}$`)
+
+func validateExperimentBrokerURL(value string) error {
+	if value == "" || brokerSecretExpression.MatchString(value) {
+		return nil
+	}
+	u, err := url.Parse(value)
+	if err != nil || u.Scheme != "https" || u.Hostname() == "" || u.User != nil || u.Fragment != "" || strings.ContainsAny(value, " \t\r\n\\#$") {
+		return errors.New("experiments.broker-url must be an HTTPS URL without credentials or a secrets expression")
+	}
+	return nil
+}
+
+func mergeImportedExperimentBrokerSettings(frontmatter map[string]any, imported string) (map[string]any, error) {
+	settings := map[string]any{}
+	storageSeen := false
+	for line := range strings.SplitSeq(imported, "\n") {
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+		var config map[string]any
+		if err := jsonutil.UnmarshalString(line, &config); err != nil {
+			return nil, fmt.Errorf("invalid imported experiments configuration: %w", err)
+		}
+		if storage, ok := config["storage"]; ok && !storageSeen {
+			storageSeen = true
+			if mode, ok := storage.(string); ok && mode == "broker" {
+				settings["storage"] = "broker"
+			}
+		}
+		if value, ok := config["broker-url"]; ok {
+			if _, seen := settings["broker-url"]; !seen {
+				settings["broker-url"] = value
+			}
+		}
+	}
+	if len(settings) == 0 {
+		return frontmatter, nil
+	}
+	if local, ok := frontmatter["experiments"].(map[string]any); ok {
+		maps.Copy(settings, local)
+	}
+	result := make(map[string]any, len(frontmatter))
+	maps.Copy(result, frontmatter)
+	result["experiments"] = settings
+	return result, nil
+}
 
 func usesExperimentsBroker(data *WorkflowData) bool {
 	return data != nil && len(data.Experiments) > 0 && data.ExperimentsStorage == ExperimentsStorageBroker && !data.DryRun
@@ -22,6 +74,10 @@ func experimentBrokerEnv(data *WorkflowData, names []string, invocationID string
 	if invocationID == "" {
 		invocationID = "default"
 	}
+	brokerURL := "${{ secrets.GH_AW_EXPERIMENTS_BROKER_URL }}"
+	if data.ExperimentsBrokerURL != "" {
+		brokerURL = "'" + strings.ReplaceAll(data.ExperimentsBrokerURL, "'", "''") + "'"
+	}
 	return []string{
 		"        env:\n",
 		fmt.Sprintf("          GH_AW_EXPERIMENT_SPEC: '%s'\n", strings.ReplaceAll(spec, "'", "''")),
@@ -30,7 +86,7 @@ func experimentBrokerEnv(data *WorkflowData, names []string, invocationID string
 		fmt.Sprintf("          GH_AW_EXPERIMENT_INVOCATION_ID: %s\n", invocationID),
 		fmt.Sprintf("          GH_AW_EXPERIMENT_STATE_DIR: %s\n", experimentsCacheDir),
 		fmt.Sprintf("          GH_AW_EXPERIMENT_STATE_FILE: %s\n", experimentStateFile),
-		"          GH_AW_BROKER_EXPERIMENTS_URL: ${{ secrets.GH_AW_EXPERIMENTS_BROKER_URL }}\n",
+		"          GH_AW_BROKER_EXPERIMENTS_URL: " + brokerURL + "\n",
 	}
 }
 
