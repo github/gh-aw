@@ -25,6 +25,10 @@
 #
 name: Agentic Continuation Relay
 run-name: Continuation relay ${{ inputs.parent_run_id }}/${{ inputs.parent_run_attempt }}
+concurrency:
+  group: continuation-relay-${{ github.repository_id }}-${{ inputs.parent_run_id }}-${{ inputs.parent_run_attempt }}
+  cancel-in-progress: false
+
 
 on:
   workflow_dispatch:
@@ -34,7 +38,11 @@ on:
         required: true
         type: string
       parent_run_attempt:
-        description: "Attempt of the workflow run that requested continuation"
+        description: "Attempt that produced the continuation request"
+        required: true
+        type: string
+      checkpoint_run_attempt:
+        description: "Attempt that produced the durable checkpoint"
         required: true
         type: string
 
@@ -74,6 +82,7 @@ jobs:
         env:
           GH_AW_PARENT_RUN_ID: ${{ inputs.parent_run_id }}
           GH_AW_PARENT_RUN_ATTEMPT: ${{ inputs.parent_run_attempt }}
+          GH_AW_PARENT_CHECKPOINT_ATTEMPT: ${{ inputs.checkpoint_run_attempt }}
           GH_AW_RELAY_TOKEN: ${{ github.token }}
         with:
           script: |
@@ -129,8 +138,10 @@ jobs:
         env:
           GH_AW_PARENT_RUN_ID: ${{ inputs.parent_run_id }}
           GH_AW_PARENT_RUN_ATTEMPT: ${{ inputs.parent_run_attempt }}
+          GH_AW_PARENT_CHECKPOINT_ATTEMPT: ${{ inputs.checkpoint_run_attempt }}
           GH_AW_RELAY_TOKEN: ${{ github.token }}
           GH_AW_APPROVAL_RESULT: ${{ needs.approve.result }}
+          GH_AW_APPROVAL_ENVIRONMENT: ${{ needs.resolve.outputs.approval_environment }}
         with:
           script: |
             const path = require('path');
@@ -147,4 +158,4 @@ jobs:
           name: continuation-dispatched
           path: ${{ runner.temp }}/gh-aw/continuation-relay/dispatched.json
           if-no-files-found: ignore
-          retention-days: 7
+          retention-days: 90
