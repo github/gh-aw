@@ -366,20 +366,20 @@ get_sha() {
 get_sha "$1" "$2"
 ```
 
-### Verify Action Creators
+### Assess Action Creators
 
-**Trust levels** for GitHub Actions:
+**Trust signals** for GitHub Actions:
 
 1. **GitHub-verified creators** (✅ Highest trust)
    - `actions/*` - GitHub official actions
    - `github/*` - GitHub official actions
    
-2. **Verified publishers** (✅ High trust)
+2. **Established publishers** (⚠️ Reputation signals only; review action provenance)
    - Cloud providers (AWS, Azure, Google Cloud)
    - Open-source projects with an active maintainer history and a public release record
    - Actions with many stars, recent updates, and active maintenance
 
-3. **Unverified third-party** (⚠️ Review carefully)
+3. **Other third-party actions** (⚠️ Review carefully)
    - New or unmaintained actions
    - Actions with few users
    - Actions without source code transparency
@@ -388,7 +388,7 @@ get_sha "$1" "$2"
 # ✅ TRUSTED: GitHub official action
 - uses: actions/checkout@sha
 
-# ✅ TRUSTED: Well-known verified publisher
+# ⚠️ REVIEW: Established publisher; verify action provenance
 - uses: docker/build-push-action@sha
 
 # ⚠️ REVIEW: Third-party action
