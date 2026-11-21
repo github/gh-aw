@@ -21,9 +21,8 @@ func TestDailyCLIToolsTesterCoverageContract(t *testing.T) {
 		"Never claim full coverage or repository-wide health",
 		"Record these three skipped edge cases as **not tested (expected exclusion)**",
 		"These exclusions alone do not require `report_incomplete`",
-		"even if a findings issue was already created",
-		"A later `noop` must not override that incomplete status or claim success",
-		"do not relabel a failed or blocked required check as an expected exclusion",
+		"Do not emit a PR. A later `noop` must not override that incomplete status or claim success",
+		"Do not relabel a failed or blocked required check as an expected exclusion",
 		"Coverage is partial by design",
 	} {
 		if !strings.Contains(text, token) {
