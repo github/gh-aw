@@ -1434,7 +1434,7 @@ Unlike `gh aw compile --fix`, `gh aw upgrade` runs codemods, action version upda
 
 #### `env`
 
-Manage compiler defaults as GitHub variables at repository, organization, or enterprise scope.
+Manage compiler defaults as GitHub variables at repository, organization, or enterprise scope, and configure default OpenTelemetry export with `env otel`.
 
 ##### `env get [file]`
 
@@ -1466,6 +1466,25 @@ gh aw env update defaults.yml --scope ent --enterprise my-enterprise --yes
 The `--visibility` flag sets access for newly created org or ent variables (`all`, `private`, or `selected`; default: `all`). Existing variables keep their current visibility. The flag is rejected with `--scope repo`.
 
 For repository scope, `--repo` currently accepts `owner/repo` only. To target GitHub Enterprise Server, select the host via `GH_HOST` rather than prefixing the repository with `[HOST/]`.
+
+##### `env otel`
+
+Test an authenticated empty OTLP traces export, then configure the `GH_AW_DEFAULT_OTLP_ENDPOINT` and `GH_AW_DEFAULT_OTLP_HEADERS` Actions secrets and the `OTEL_EXPORTER_OTLP_PROTOCOL` and `GH_AW_OTEL_METRICS` Actions variables. This command changes GitHub settings without editing or compiling workflows.
+
+```bash wrap
+gh aw env otel
+gh aw env otel --repo my-org/my-repo \
+  --endpoint https://collector.example.com \
+  --protocol http/protobuf --headers-stdin --yes < otlp-headers.txt
+```
+
+**Options:** `--scope`, `--repo/-r`, `--org`, `--enterprise`, `--endpoint`, `--protocol`, `--metrics`, `--headers-stdin`, `--yes/-y`, `--visibility`, `--selected`
+
+Without target flags, the command uses the current repository. Repeat `--repo`, `--org`, or `--enterprise` for multiple targets; enterprise targets expand to visible organizations. `--visibility` defaults to `private` and is invalid for repository targets. With `selected` visibility, repeat `--selected owner/repo` for an organization or `--selected org` for an enterprise.
+
+Interactive header input is hidden. Noninteractive use requires `--endpoint`, `--headers-stdin`, and `--yes`; keep header credentials out of command arguments. `--protocol` defaults to `http/json`, and metrics are enabled unless `--metrics=false` is set.
+
+The probe verifies route and credential acceptance, not span ingestion or connectivity from GitHub runners. Settings updates are not transactional: a failed write can leave export disabled until the command is rerun. See [Configure defaults in one command](/gh-aw/reference/open-telemetry/#configure-defaults-in-one-command) for endpoint constraints, access requirements, override checks, and recovery.
 
 ### Advanced
 
