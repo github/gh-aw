@@ -8,8 +8,14 @@ var CopilotSDKNodeManifest string
 //go:embed copilot-sdk/node/package-lock.json
 var CopilotSDKNodeLock string
 
+//go:embed copilot-sdk/node/cooldown.json
+var CopilotSDKNodeCooldown string
+
 //go:embed copilot-sdk/typescript/package.json
 var CopilotSDKTypeScriptManifest string
 
 //go:embed copilot-sdk/typescript/package-lock.json
 var CopilotSDKTypeScriptLock string
+
+//go:embed copilot-sdk/typescript/cooldown.json
+var CopilotSDKTypeScriptCooldown string

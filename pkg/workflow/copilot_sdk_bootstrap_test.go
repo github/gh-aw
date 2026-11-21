@@ -17,7 +17,6 @@ import (
 	"testing"
 
 	"github.com/github/gh-aw/actions/setup"
-	"github.com/github/gh-aw/pkg/constants"
 	"github.com/goccy/go-yaml"
 	"github.com/stretchr/testify/require"
 )
@@ -47,10 +46,12 @@ func TestCopilotSDKNodeBootstrapIsolatedFromRepository(t *testing.T) {
 	require.Contains(t, string(output), "RUNNER_TEMP must be set for Copilot SDK module resolution")
 
 	fixtures := t.TempDir()
-	dependencies := map[string]string{
-		"@github/copilot-sdk": string(constants.DefaultCopilotSDKVersion),
-		"undici":              "6.28.0",
+	var stagedManifest struct {
+		Dependencies map[string]string `json:"dependencies"`
 	}
+	manifest := []byte(setup.CopilotSDKNodeManifest)
+	require.NoError(t, json.Unmarshal(manifest, &stagedManifest))
+	dependencies := stagedManifest.Dependencies
 	packages := map[string]any{"": map[string]any{"dependencies": dependencies}}
 	for name, version := range dependencies {
 		archivePath := filepath.Join(fixtures, filepath.Base(name)+".tgz")
@@ -100,7 +101,6 @@ func TestCopilotSDKNodeBootstrapIsolatedFromRepository(t *testing.T) {
 			installer, err := os.ReadFile("../../actions/setup/sh/install_copilot_sdk.sh")
 			require.NoError(t, err)
 			require.NoError(t, os.WriteFile(filepath.Join(actionsDir, "install_copilot_sdk.sh"), installer, 0o600))
-			manifest := []byte(setup.CopilotSDKNodeManifest)
 			require.NoError(t, os.WriteFile(filepath.Join(stagedProject, "package.json"), manifest, 0o600))
 			require.NoError(t, os.WriteFile(filepath.Join(stagedProject, "package-lock.json"), fixtureLock, 0o600))
 			resolverPath := filepath.Join(actionsDir, "copilot_sdk_module_resolution.cjs")

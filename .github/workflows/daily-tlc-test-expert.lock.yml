@@ -732,7 +732,8 @@ jobs:
       - name: Install AWF binary
         run: bash "${RUNNER_TEMP}/gh-aw/actions/install_awf_binary.sh" v0.29.17 --rootless
       - name: Install GitHub Copilot SDK (Node.js)
-        run: bash "${RUNNER_TEMP}/gh-aw/actions/install_copilot_sdk.sh" node 9965c1dcda78dca721cdc6c30bd29e92ed5c3276bf4218453536f937c8f53e29 2026-09-30T21:58:46Z
+        shell: bash
+        run: bash "${RUNNER_TEMP}/gh-aw/actions/install_copilot_sdk.sh" node c90e9653d2d50970ae1e10adc236cc22109b26cf7bd23e7d9735afd50b4c6ff8 2026-10-15T14:19:28Z
         env:
           NPM_CONFIG_MIN_RELEASE_AGE: '3'
       - name: Determine automatic lockdown mode for GitHub MCP Server

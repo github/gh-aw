@@ -5,6 +5,11 @@
     "@github/copilot-sdk": "1.0.16",
     "ts-node": "10.9.2",
     "typescript": "5.8.3",
-    "undici": "6.28.0"
+    "undici": "6.29.1"
+  },
+  "overrides": {
+    "@github/copilot-sdk": {
+      "zod": "4.6.6"
+    }
   }
 }

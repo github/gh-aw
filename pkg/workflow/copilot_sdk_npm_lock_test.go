@@ -65,7 +65,7 @@ func TestCopilotSDKCompilesWithFrozenNPMGraph(t *testing.T) {
 					Dependencies map[string]string `json:"dependencies"`
 				}
 				require.NoError(t, json.Unmarshal([]byte(manifestJSON), &manifest))
-				want := map[string]string{"@github/copilot-sdk": string(constants.DefaultCopilotSDKVersion), "undici": "6.28.0"}
+				want := map[string]string{"@github/copilot-sdk": string(constants.DefaultCopilotSDKVersion), "undici": "6.29.1"}
 				maps.Copy(want, tt.extra)
 				require.Equal(t, want, manifest.Dependencies)
 
@@ -84,12 +84,16 @@ func TestCopilotSDKCompilesWithFrozenNPMGraph(t *testing.T) {
 				for pkg, version := range want {
 					require.Equal(t, version, lock.Packages["node_modules/"+pkg].Version, pkg)
 				}
+				require.Equal(t, "4.6.6", lock.Packages["node_modules/zod"].Version)
 				require.Contains(t, lock.Packages, "node_modules/@github/copilot-sdk-linux-x64")
 				require.Contains(t, lock.Packages, "node_modules/@github/copilot-sdk-darwin-arm64")
 				require.Contains(t, lock.Packages, "node_modules/koffi")
 				for path, pkg := range lock.Packages {
 					if path == "" {
 						continue
+					}
+					if strings.HasSuffix(path, "node_modules/zod") {
+						require.Equal(t, "4.6.6", pkg.Version, path)
 					}
 					require.True(t, strings.HasPrefix(pkg.Resolved, "https://registry.npmjs.org/"), path)
 					encoded, ok := strings.CutPrefix(pkg.Integrity, "sha512-")
@@ -98,9 +102,21 @@ func TestCopilotSDKCompilesWithFrozenNPMGraph(t *testing.T) {
 					require.NoError(t, err, path)
 					require.Len(t, digest, sha512.Size, path)
 				}
+
 				return
 			}
 			t.Fatal("compiled workflow is missing its SDK install step")
 		})
 	}
+}
+
+func TestCopilotSDKNPMProjectRejectsStaleCooldown(t *testing.T) {
+	manifest, lock, cooldown := setup.CopilotSDKNodeManifest, setup.CopilotSDKNodeLock, setup.CopilotSDKNodeCooldown
+	_, err := newCopilotSDKNPMProject("node", manifest, lock, cooldown)
+	require.NoError(t, err)
+
+	changedLock := strings.Replace(lock, `"version": "6.29.1"`, `"version": "6.29.2"`, 1)
+	require.NotEqual(t, lock, changedLock)
+	_, err = newCopilotSDKNPMProject("node", manifest, changedLock, cooldown)
+	require.ErrorContains(t, err, "stale node Copilot SDK cooldown metadata")
 }

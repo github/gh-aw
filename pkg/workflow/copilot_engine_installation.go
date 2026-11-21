@@ -223,6 +223,7 @@ func specToInstallStep(spec copilotSDKInstallSpec, cooldownDays int) GitHubActio
 	if spec.npm != nil {
 		return GitHubActionStep{
 			"      - name: " + spec.stepName,
+			"        shell: bash",
 			"        run: " + spec.npm.installCommand(),
 			"        env:",
 			fmt.Sprintf("          NPM_CONFIG_MIN_RELEASE_AGE: '%d'", cooldownDays),
