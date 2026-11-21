@@ -3,28 +3,16 @@
 
 /**
  * Conclusion-job step that hands a recorded continuation request to the generated
- * continuation relay workflow. Only the parent run identity is sent; the relay
- * revalidates the request artifact and the compiled continuation policy itself.
+ * continuation relay workflow. Producer attempts identify the exact request and
+ * checkpoint artifacts after reruns.
  */
 
 const { dispatchWorkflow } = require("./dispatch_workflow_transport.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { ERR_API } = require("./error_codes.cjs");
+const { getDefaultBranch } = require("./continuation_request.cjs");
 
 const DEFAULT_RELAY_WORKFLOW = "agentic-continuation-relay.yml";
-
-/**
- * Resolves the default branch, where the trusted relay workflow definition lives.
- * @param {any} github
- * @param {any} context
- * @returns {Promise<string>}
- */
-async function resolveDefaultBranch(github, context) {
-  const fromPayload = context.payload?.repository?.default_branch;
-  if (typeof fromPayload === "string" && fromPayload) return fromPayload;
-  const { data } = await github.rest.repos.get({ owner: context.repo.owner, repo: context.repo.repo });
-  return data.default_branch;
-}
 
 /**
  * @param {{github?: any, context?: any, core?: any}} [options]
@@ -32,11 +20,16 @@ async function resolveDefaultBranch(github, context) {
 async function main({ github = global.github, context = global.context, core = global.core } = {}) {
   const workflow = process.env.GH_AW_CONTINUATION_RELAY_WORKFLOW || DEFAULT_RELAY_WORKFLOW;
   const parentRunId = String(context.runId);
-  const parentRunAttempt = String(process.env.GITHUB_RUN_ATTEMPT || "1");
-  const inputs = { parent_run_id: parentRunId, parent_run_attempt: parentRunAttempt };
+  const parentRunAttempt = String(process.env.GH_AW_PARENT_REQUEST_ATTEMPT || "");
+  const checkpointRunAttempt = String(process.env.GH_AW_PARENT_CHECKPOINT_ATTEMPT || "");
+  if (!/^[1-9]\d*$/.test(parentRunAttempt) || !/^[1-9]\d*$/.test(checkpointRunAttempt)) {
+    core.setFailed(`${ERR_API}: Continuation request and checkpoint producer attempts are required`);
+    return;
+  }
+  const inputs = { parent_run_id: parentRunId, parent_run_attempt: parentRunAttempt, checkpoint_run_attempt: checkpointRunAttempt };
   const { owner, repo } = context.repo;
   try {
-    const branch = await resolveDefaultBranch(github, context);
+    const branch = await getDefaultBranch(github, context);
     core.info(`Dispatching continuation relay ${workflow} on ${branch} for run ${parentRunId} attempt ${parentRunAttempt}`);
     const response = await dispatchWorkflow(github, { owner, repo, workflow_id: workflow, ref: `refs/heads/${branch}`, inputs, return_run_details: true }, { allowLegacyFallback: true, coreApi: core });
     const relayRunId = response?.data?.workflow_run_id;
@@ -50,7 +43,7 @@ async function main({ github = global.github, context = global.context, core = g
     core.setFailed(
       `${ERR_API}: Failed to dispatch continuation relay ${workflow}: ${getErrorMessage(error)}. ` +
         `Ensure ${workflow} exists on the default branch (run \`gh aw compile\`), then retry with: ` +
-        `gh workflow run ${workflow} -f parent_run_id=${parentRunId} -f parent_run_attempt=${parentRunAttempt}`
+        `gh workflow run ${workflow} -f parent_run_id=${parentRunId} -f parent_run_attempt=${parentRunAttempt} -f checkpoint_run_attempt=${checkpointRunAttempt}`
     );
   }
 }

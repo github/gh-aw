@@ -227,6 +227,9 @@ func (c *Compiler) addMainJobEngineErrorOutputs(outputs map[string]string, data 
 // buildMainJobOutputs builds the complete outputs map for the main agent job.
 func (c *Compiler) buildMainJobOutputs(data *WorkflowData) map[string]string {
 	outputs := buildMainJobCoreOutputs(data)
+	if data.EngineConfig != nil && data.EngineConfig.Durable != nil {
+		outputs["durable_checkpoint_attempt"] = "${{ steps.durable_checkpoint.outputs.checkpoint-attempt }}"
+	}
 	if checkoutError := dynamicCheckoutFailureOutput(data.CheckoutConfigs); checkoutError != "" {
 		outputs["checkout_error"] = checkoutError
 	}

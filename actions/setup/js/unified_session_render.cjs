@@ -225,7 +225,7 @@ function eventDetail(event) {
       return fields(data, ["engine", "role", "configured_model", "resolved_model", "provider", "status", "cause"]);
     case "durable.restore":
     case "durable.session":
-      return fields(data, ["engine", "storage", "status", "runId", "runAttempt", "parentRunId", "artifactId", "sessionId"]);
+      return fields(data, ["engine", "storage", "status", "runId", "runAttempt", "parentRunId", "artifactId", "relayRunId", "sessionId"]);
     case "mcp.event":
       return fields(data, ["event", "serverName", "level", "status", "message", "reason"]);
     case "firewall.event":

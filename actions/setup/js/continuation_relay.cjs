@@ -19,11 +19,14 @@ const { ERR_VALIDATION } = require("./error_codes.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const {
   GITHUB_ACTIONS_BOT,
+  RELAY_DISPATCH_CLAIM_ARTIFACT,
+  RELAY_DISPATCH_MARKER_ARTIFACT,
   checkpointArtifactPrefix,
   downloadContinuationRequest,
   findCheckpointArtifact,
   findRequestArtifact,
   getDefaultBranch,
+  normalizeWorkflowRunPath,
   relayRunTitle,
   requestArtifactName,
   validateContinuationRequest,
@@ -35,8 +38,7 @@ const WORKFLOW_ID = /^[A-Za-z0-9_-]+$/;
 const ENVIRONMENT_NAME = /^[A-Za-z0-9_.-]{1,255}$/;
 const LOCK_FILE_PATH = /^\.github\/workflows\/[A-Za-z0-9_.-]+\.lock\.yml$/;
 const SUPPORTED_POLICIES = ["workflow-dispatch"];
-/** Artifact uploaded by the dispatch job after the child run was dispatched. */
-const DISPATCHED_MARKER_ARTIFACT = "continuation-dispatched";
+const DISPATCH_CLAIM_RETENTION_DAYS = 90;
 
 /** @param {string} message */
 function fail(message) {
@@ -45,14 +47,16 @@ function fail(message) {
 
 /**
  * @param {NodeJS.ProcessEnv} env
- * @returns {{parentRunId: string, parentRunAttempt: string}}
+ * @returns {{parentRunId: string, parentRunAttempt: string, checkpointRunAttempt: string}}
  */
 function readInputs(env = process.env) {
   const parentRunId = String(env.GH_AW_PARENT_RUN_ID ?? "").trim();
   const parentRunAttempt = String(env.GH_AW_PARENT_RUN_ATTEMPT ?? "").trim();
+  const checkpointRunAttempt = String(env.GH_AW_PARENT_CHECKPOINT_ATTEMPT ?? "").trim();
   if (!POSITIVE_INTEGER.test(parentRunId)) throw fail("parent_run_id must be a positive integer");
   if (!POSITIVE_INTEGER.test(parentRunAttempt)) throw fail("parent_run_attempt must be a positive integer");
-  return { parentRunId, parentRunAttempt };
+  if (!POSITIVE_INTEGER.test(checkpointRunAttempt)) throw fail("checkpoint_run_attempt must be a positive integer");
+  return { parentRunId, parentRunAttempt, checkpointRunAttempt };
 }
 
 /**
@@ -99,14 +103,14 @@ const DISPATCHER_PERMISSIONS = ["admin", "write"];
  * a modified copy from another branch), and every actor that started or reran it must be
  * GITHUB_TOKEN (the parent's conclusion job) or a human with write access. Other bots and
  * read-only users are rejected even though GitHub already requires write to dispatch.
- * @param {{github: any, context: any, core: any, relay: any, parentRunId: string, parentRunAttempt: string}} options
+ * @param {{github: any, context: any, core: any, relay: any, parentRunId: string, parentRunAttempt: string, defaultBranch: string}} options
  */
-async function assertTrustedDispatch({ github, context, core, relay, parentRunId, parentRunAttempt }) {
+async function assertTrustedDispatch({ github, context, core, relay, parentRunId, parentRunAttempt, defaultBranch }) {
   if (context.eventName !== "workflow_dispatch") throw fail(`the relay only runs on workflow_dispatch, not ${JSON.stringify(context.eventName)}`);
   const { owner, repo } = context.repo;
   if (relay?.repository?.full_name?.toLowerCase() !== `${owner}/${repo}`.toLowerCase()) throw fail("the relay run must belong to this repository");
   try {
-    validateRelayRun(relay, { repositoryId: relay.repository.id, defaultBranch: await getDefaultBranch(github, context), parentRunId, parentRunAttempt });
+    validateRelayRun(relay, { repositoryId: relay.repository.id, defaultBranch, parentRunId, parentRunAttempt });
   } catch (error) {
     throw fail(getErrorMessage(error));
   }
@@ -129,18 +133,43 @@ async function assertTrustedDispatch({ github, context, core, relay, parentRunId
 }
 
 /**
- * Rejects the relay when another relay for the same parent attempt is pending or
- * succeeded, or when this relay run already dispatched a child in an earlier attempt.
- * @param {{github: any, context: any, relay: any, parentRunId: string, parentRunAttempt: string, parentCreatedAt: string}} options
+ * Elects the lowest-ID eligible pending relay and rejects prior dispatch claims.
+ * @param {{github: any, context: any, relay: any, parentRunId: string, parentRunAttempt: string, parentCreatedAt: string, defaultBranch: string}} options
  */
-async function assertNotRelayed({ github, context, relay, parentRunId, parentRunAttempt, parentCreatedAt }) {
+async function assertNotRelayed({ github, context, relay, parentRunId, parentRunAttempt, parentCreatedAt, defaultBranch }) {
   const { owner, repo } = context.repo;
   const title = relayRunTitle(parentRunId, parentRunAttempt);
   const runs = await github.paginate(github.rest.actions.listWorkflowRuns, { owner, repo, workflow_id: relay.workflow_id, event: "workflow_dispatch", created: `>=${parentCreatedAt}`, per_page: 100 });
-  const duplicate = runs.find(run => String(run.id) !== String(context.runId) && run.display_title === title && (run.status !== "completed" || run.conclusion === "success"));
-  if (duplicate) throw fail(`continuation for run ${parentRunId} attempt ${parentRunAttempt} is already handled by relay run ${duplicate.id}`);
+  const eligible = runs.filter(
+    run =>
+      String(run.id) !== String(context.runId) &&
+      String(run.workflow_id) === String(relay.workflow_id) &&
+      run.display_title === title &&
+      run.event === "workflow_dispatch" &&
+      run.repository?.id === relay.repository?.id &&
+      run.head_repository?.id === relay.repository?.id &&
+      normalizeWorkflowRunPath(run.path) === normalizeWorkflowRunPath(relay.path) &&
+      run.head_branch === defaultBranch
+  );
+  const successful = eligible.find(run => run.status === "completed" && run.conclusion === "success");
+  if (successful) throw fail(`continuation for run ${parentRunId} attempt ${parentRunAttempt} is already handled by relay run ${successful.id}`);
+
+  const currentId = BigInt(context.runId);
+  const earlierPending = eligible.filter(run => run.status !== "completed" && BigInt(run.id) < currentId).sort((a, b) => (BigInt(a.id) < BigInt(b.id) ? -1 : 1))[0];
+  if (earlierPending) throw fail(`continuation for run ${parentRunId} attempt ${parentRunAttempt} is elected to relay run ${earlierPending.id}`);
+
+  const failedRelays = eligible.filter(run => run.status === "completed" && ["failure", "cancelled", "timed_out", "action_required"].includes(run.conclusion));
+  for (const failed of failedRelays) {
+    const artifacts = await github.paginate(github.rest.actions.listWorkflowRunArtifacts, { owner, repo, run_id: failed.id, per_page: 100 });
+    if (artifacts.some(artifact => [RELAY_DISPATCH_CLAIM_ARTIFACT, RELAY_DISPATCH_MARKER_ARTIFACT].includes(artifact.name))) {
+      throw fail(`continuation for run ${parentRunId} attempt ${parentRunAttempt} already has a dispatch claim from relay run ${failed.id}`);
+    }
+  }
+
   const own = await github.paginate(github.rest.actions.listWorkflowRunArtifacts, { owner, repo, run_id: context.runId, per_page: 100 });
-  if (own.some(artifact => artifact.name === DISPATCHED_MARKER_ARTIFACT)) throw fail(`relay run ${context.runId} already dispatched this continuation`);
+  if (own.some(artifact => [RELAY_DISPATCH_CLAIM_ARTIFACT, RELAY_DISPATCH_MARKER_ARTIFACT].includes(artifact.name))) {
+    throw fail(`relay run ${context.runId} already claimed this continuation`);
+  }
 }
 
 /**
@@ -148,26 +177,29 @@ async function assertNotRelayed({ github, context, relay, parentRunId, parentRun
  * @param {{github: any, context: any, core: any, token: string, artifactClient?: any, tempDir?: string, env?: NodeJS.ProcessEnv}} options
  */
 async function loadContinuation({ github, context, core, token, artifactClient = new DefaultArtifactClient(), tempDir = path.join(process.env.RUNNER_TEMP || "/tmp", "gh-aw", "continuation-relay"), env = process.env }) {
-  const { parentRunId, parentRunAttempt } = readInputs(env);
+  const { parentRunId, parentRunAttempt, checkpointRunAttempt } = readInputs(env);
   const { owner, repo } = context.repo;
   if (parentRunId === String(context.runId)) throw fail("the relay cannot continue itself");
   const { data: relay } = await github.rest.actions.getWorkflowRun({ owner, repo, run_id: context.runId });
-  await assertTrustedDispatch({ github, context, core, relay, parentRunId, parentRunAttempt });
+  const defaultBranch = await getDefaultBranch(github, context);
+  await assertTrustedDispatch({ github, context, core, relay, parentRunId, parentRunAttempt, defaultBranch });
   const { data: parent } = await github.rest.actions.getWorkflowRun({ owner, repo, run_id: parentRunId });
   if (!parent?.repository?.id || parent.repository.full_name?.toLowerCase() !== `${owner}/${repo}`.toLowerCase()) throw fail("the parent run must belong to this repository");
   if (parent.head_repository?.id !== parent.repository.id) throw fail("fork workflow runs cannot be continued");
   if (Number(parentRunAttempt) > Number(parent.run_attempt || 1)) throw fail(`run ${parentRunId} has no attempt ${parentRunAttempt}`);
+  if (Number(checkpointRunAttempt) > Number(parent.run_attempt || 1)) throw fail(`run ${parentRunId} has no checkpoint attempt ${checkpointRunAttempt}`);
   if (typeof parent.head_branch !== "string" || !parent.head_branch) throw fail("the parent run has no branch to continue on");
-  if (typeof parent.path !== "string" || !LOCK_FILE_PATH.test(parent.path)) throw fail("the parent run is not a compiled agentic workflow");
+  const parentPath = normalizeWorkflowRunPath(parent.path);
+  if (!LOCK_FILE_PATH.test(parentPath)) throw fail("the parent run is not a compiled agentic workflow");
   if (!/^[0-9a-f]{40,64}$/.test(String(parent.head_sha))) throw fail("the parent run has an invalid head SHA");
 
-  const lock = await readFileAtRef(github, { owner, repo, path: parent.path, ref: parent.head_sha });
+  const lock = await readFileAtRef(github, { owner, repo, path: parentPath, ref: parent.head_sha });
   const metadata = readContinuationMetadata(parseLockFileHeaders(lock.split("\n", 3)).metadata);
 
   const artifacts = await github.paginate(github.rest.actions.listWorkflowRunArtifacts, { owner, repo, run_id: parent.id, per_page: 100 });
   const found = findRequestArtifact(artifacts, parentRunAttempt);
   if (!found) throw fail(`run ${parentRunId} attempt ${parentRunAttempt} has no unexpired ${requestArtifactName(parentRunAttempt)} artifact; it did not request continuation or the request expired`);
-  const checkpoint = findCheckpointArtifact(artifacts, checkpointArtifactPrefix(metadata.workflow, parent), parent.id, parentRunAttempt);
+  const checkpoint = findCheckpointArtifact(artifacts, checkpointArtifactPrefix(metadata.workflow, parent), parent.id, checkpointRunAttempt);
   if (!checkpoint) throw fail(`run ${parentRunId} attempt ${parentRunAttempt} has no unexpired durable checkpoint; checkpoints are kept for a limited time, so start a new run instead`);
 
   const raw = await downloadContinuationRequest({ artifactClient, artifactId: found.artifact.id, token, owner, repo, directory: path.join(tempDir, "request") });
@@ -178,19 +210,19 @@ async function loadContinuation({ github, context, core, token, artifactClient =
   // dispatch into a workflow that no longer opts into continuation or has a lower limit.
   let targetLock;
   try {
-    targetLock = await readFileAtRef(github, { owner, repo, path: parent.path, ref: `refs/heads/${parent.head_branch}` });
+    targetLock = await readFileAtRef(github, { owner, repo, path: parentPath, ref: `refs/heads/${parent.head_branch}` });
   } catch (error) {
-    throw fail(`could not read ${parent.path} on branch ${parent.head_branch}: ${getErrorMessage(error)}`);
+    throw fail(`could not read ${parentPath} on branch ${parent.head_branch}: ${getErrorMessage(error)}`);
   }
   const target = readContinuationMetadata(parseLockFileHeaders(targetLock.split("\n", 3)).metadata);
-  if (target.workflow !== metadata.workflow) throw fail(`${parent.path} on branch ${parent.head_branch} is now workflow ${JSON.stringify(target.workflow)}, not ${JSON.stringify(metadata.workflow)}`);
+  if (target.workflow !== metadata.workflow) throw fail(`${parentPath} on branch ${parent.head_branch} is now workflow ${JSON.stringify(target.workflow)}, not ${JSON.stringify(metadata.workflow)}`);
   if (request.depth > target.max) throw fail(`continuation depth ${request.depth} exceeds the maximum of ${target.max} now compiled on branch ${parent.head_branch}`);
   const max = Math.min(metadata.max, target.max);
   if (metadata.approval && target.approval && metadata.approval !== target.approval) {
     throw fail(`the approval environment changed on branch ${parent.head_branch} from ${JSON.stringify(metadata.approval)} to ${JSON.stringify(target.approval)}; start a new run`);
   }
   const approval = metadata.approval || target.approval;
-  return { parentRunId, parentRunAttempt, parent, relay, metadata: { ...metadata, max, approval }, request, targetWorkflow: path.posix.basename(parent.path) };
+  return { parentRunId, parentRunAttempt, checkpointRunAttempt, parent, relay, defaultBranch, metadata: { ...metadata, max, approval }, request, targetWorkflow: path.posix.basename(parentPath) };
 }
 
 /**
@@ -248,7 +280,15 @@ async function writeSummary(core, heading, { parentRunId, parentRunAttempt, pare
  */
 async function resolve({ github = global.github, context = global.context, core = global.core, token = process.env.GH_AW_RELAY_TOKEN || "", artifactClient, env = process.env } = {}) {
   const continuation = await loadContinuation({ github, context, core, token, artifactClient, env });
-  await assertNotRelayed({ github, context, relay: continuation.relay, parentRunId: continuation.parentRunId, parentRunAttempt: continuation.parentRunAttempt, parentCreatedAt: continuation.parent.created_at });
+  await assertNotRelayed({
+    github,
+    context,
+    relay: continuation.relay,
+    parentRunId: continuation.parentRunId,
+    parentRunAttempt: continuation.parentRunAttempt,
+    parentCreatedAt: continuation.parent.created_at,
+    defaultBranch: continuation.defaultBranch,
+  });
   if (continuation.metadata.approval) await assertProtectedEnvironment(github, context.repo, continuation.metadata.approval);
   core.setOutput("target_workflow", continuation.targetWorkflow);
   core.setOutput("ref", continuation.parent.head_branch);
@@ -267,14 +307,19 @@ async function dispatch({
   context = global.context,
   core = global.core,
   token = process.env.GH_AW_RELAY_TOKEN || "",
-  artifactClient,
+  artifactClient = new DefaultArtifactClient(),
   env = process.env,
   markerFile = path.join(process.env.RUNNER_TEMP || "/tmp", "gh-aw", "continuation-relay", "dispatched.json"),
 } = {}) {
   const continuation = await loadContinuation({ github, context, core, token, artifactClient, env });
-  const { parentRunId, parentRunAttempt, parent, relay, metadata, request, targetWorkflow } = continuation;
-  if (metadata.approval && env.GH_AW_APPROVAL_RESULT !== "success") throw fail(`continuation requires approval in ${JSON.stringify(metadata.approval)}`);
-  await assertNotRelayed({ github, context, relay, parentRunId, parentRunAttempt, parentCreatedAt: parent.created_at });
+  const { parentRunId, parentRunAttempt, checkpointRunAttempt, parent, relay, defaultBranch, metadata, request, targetWorkflow } = continuation;
+  const approvedEnvironment = String(env.GH_AW_APPROVAL_ENVIRONMENT ?? "");
+  if (approvedEnvironment !== metadata.approval) throw fail("the approval environment changed after resolve; start a new relay run");
+  if (metadata.approval) {
+    if (env.GH_AW_APPROVAL_RESULT !== "success") throw fail(`continuation requires approval in ${JSON.stringify(metadata.approval)}`);
+    await assertProtectedEnvironment(github, context.repo, metadata.approval);
+  }
+  await assertNotRelayed({ github, context, relay, parentRunId, parentRunAttempt, parentCreatedAt: parent.created_at, defaultBranch });
   const { owner, repo } = context.repo;
   /** @type {any} */
   const inherited = request.aw_context.continuation && typeof request.aw_context.continuation === "object" ? request.aw_context.continuation : {};
@@ -284,16 +329,31 @@ async function dispatch({
     repo: `${owner}/${repo}`,
     run_id: parentRunId,
     run_attempt: parentRunAttempt,
+    checkpoint_attempt: checkpointRunAttempt,
     continuation: { ...requestContinuation, depth: request.depth, max: metadata.max },
     relay_run_id: String(context.runId),
   };
   const ref = `refs/heads/${parent.head_branch}`;
   core.info(`Dispatching continuation ${request.depth} of ${metadata.max}: ${targetWorkflow} (${ref})`);
+  const claimFile = path.join(path.dirname(markerFile), "claim.json");
+  try {
+    fs.mkdirSync(path.dirname(claimFile), { recursive: true });
+    fs.writeFileSync(claimFile, JSON.stringify({ parent_run_id: parentRunId, parent_run_attempt: parentRunAttempt, relay_run_id: String(context.runId) }) + "\n", { mode: 0o600 });
+  } catch (error) {
+    throw new Error(`${ERR_VALIDATION}: failed to write continuation dispatch claim ${claimFile}: ${getErrorMessage(error)}`, { cause: error });
+  }
+  if (typeof artifactClient?.uploadArtifact !== "function") throw fail("the relay cannot persist a dispatch claim before dispatching");
+  await artifactClient.uploadArtifact(RELAY_DISPATCH_CLAIM_ARTIFACT, [claimFile], path.dirname(claimFile), { retentionDays: DISPATCH_CLAIM_RETENTION_DAYS });
   const response = await dispatchWorkflow(github, { owner, repo, workflow_id: targetWorkflow, ref, inputs: { aw_context: JSON.stringify(awContext) }, return_run_details: true }, { allowLegacyFallback: true, coreApi: core });
   const childRunId = response?.data?.workflow_run_id;
+  if (!POSITIVE_INTEGER.test(String(childRunId ?? ""))) throw fail("the workflow dispatch API did not return the child run ID required for authenticated continuation");
   try {
     fs.mkdirSync(path.dirname(markerFile), { recursive: true });
-    fs.writeFileSync(markerFile, JSON.stringify({ parent_run_id: parentRunId, parent_run_attempt: parentRunAttempt, child_run_id: childRunId ? String(childRunId) : null }) + "\n", { mode: 0o600 });
+    fs.writeFileSync(
+      markerFile,
+      JSON.stringify({ parent_run_id: parentRunId, parent_run_attempt: parentRunAttempt, checkpoint_run_attempt: checkpointRunAttempt, relay_run_id: String(context.runId), child_run_id: String(childRunId) }) + "\n",
+      { mode: 0o600 }
+    );
   } catch (error) {
     throw new Error(`${ERR_VALIDATION}: failed to write continuation dispatch marker ${markerFile}: ${getErrorMessage(error)}`, { cause: error });
   }
@@ -302,4 +362,4 @@ async function dispatch({
   await writeSummary(core, childRunId ? `Continuation dispatched as run ${childRunId}` : "Continuation dispatched", continuation);
 }
 
-module.exports = { resolve, dispatch, relayRunTitle, readContinuationMetadata, DISPATCHED_MARKER_ARTIFACT };
+module.exports = { resolve, dispatch, relayRunTitle, readContinuationMetadata, RELAY_DISPATCH_MARKER_ARTIFACT, RELAY_DISPATCH_CLAIM_ARTIFACT };

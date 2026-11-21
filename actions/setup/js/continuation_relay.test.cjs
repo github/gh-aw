@@ -49,7 +49,7 @@ function fixture({ metadata = { workflow: "research", max: 3, policy: "workflow-
     { id: 12, name: "continuation-request-1", ...unexpired },
   ];
   const lock = `# gh-aw-metadata: ${JSON.stringify({ schema_version: "v4", continuation: metadata })}\nname: research\n`;
-  const state = { parentArtifacts, relayArtifacts: [], relayRuns: [], lock, targetLock: lock, permission: "write" };
+  const state = { parentArtifacts, relayArtifacts: [], relayRuns: [], otherRelayArtifacts: new Map(), lock, targetLock: lock, permission: "write" };
   const github = {
     rest: {
       actions: {
@@ -66,7 +66,8 @@ function fixture({ metadata = { workflow: "research", max: 3, policy: "workflow-
     },
     paginate: vi.fn(async (method, args) => {
       if (method === github.rest.actions.listWorkflowRuns) return state.relayRuns;
-      return String(args.run_id) === "300" ? state.relayArtifacts : state.parentArtifacts;
+      if (String(args.run_id) === "300") return state.relayArtifacts;
+      return state.otherRelayArtifacts.get(String(args.run_id)) || state.parentArtifacts;
     }),
   };
   const summary = { addHeading: vi.fn(() => summary), addTable: vi.fn(() => summary), addRaw: vi.fn(() => summary), write: vi.fn(async () => {}) };
@@ -77,12 +78,25 @@ function fixture({ metadata = { workflow: "research", max: 3, policy: "workflow-
       fs.mkdirSync(destination, { recursive: true });
       fs.writeFileSync(path.join(destination, "continuation-request.json"), JSON.stringify(request));
     }),
+    uploadArtifact: vi.fn(async () => ({ id: 501 })),
   };
-  const env = { GH_AW_PARENT_RUN_ID: "100", GH_AW_PARENT_RUN_ATTEMPT: "1", RUNNER_TEMP: tempDir };
+  const env = { GH_AW_PARENT_RUN_ID: "100", GH_AW_PARENT_RUN_ATTEMPT: "1", GH_AW_PARENT_CHECKPOINT_ATTEMPT: "1", RUNNER_TEMP: tempDir };
   return { github, context, core, artifactClient, env, token: "token", parent, relay, request, state, tempDir, markerFile: path.join(tempDir, "marker.json") };
 }
 
 const outputs = core => Object.fromEntries(core.setOutput.mock.calls);
+const otherRelay = (id, overrides = {}) => ({
+  id,
+  workflow_id: 77,
+  event: "workflow_dispatch",
+  path: ".github/workflows/agentic-continuation-relay.yml",
+  head_branch: "main",
+  display_title: "Continuation relay 100/1",
+  repository: { id: 1, full_name: "owner/repo" },
+  head_repository: { id: 1 },
+  status: "in_progress",
+  ...overrides,
+});
 
 describe("continuation relay resolve", () => {
   it("validates the parent and exposes only trusted routing outputs", async () => {
@@ -106,9 +120,9 @@ describe("continuation relay resolve", () => {
     ["expired checkpoint", options => (options.state.parentArtifacts[0].expired = true), "no unexpired durable checkpoint"],
     ["depth above compiled max", options => (options.request.depth = 4), "exceeds the configured maximum of 3"],
     ["mismatched request", options => (options.request.parent_run_attempt = "2"), "does not belong"],
-    ["duplicate relay", options => options.state.relayRuns.push({ id: 299, display_title: "Continuation relay 100/1", status: "in_progress" }), "already handled by relay run 299"],
-    ["completed relay", options => options.state.relayRuns.push({ id: 298, display_title: "Continuation relay 100/1", status: "completed", conclusion: "success" }), "already handled"],
-    ["relay rerun after dispatch", options => options.state.relayArtifacts.push({ name: "continuation-dispatched" }), "already dispatched"],
+    ["earlier pending relay", options => options.state.relayRuns.push(otherRelay(299)), "elected to relay run 299"],
+    ["completed relay", options => options.state.relayRuns.push(otherRelay(298, { status: "completed", conclusion: "success" })), "already handled"],
+    ["relay rerun after dispatch", options => options.state.relayArtifacts.push({ name: "continuation-dispatch-claim" }), "already claimed"],
     ["non-dispatch event", options => (options.context.eventName = "push"), "only runs on workflow_dispatch"],
     ["relay from another branch", options => (options.relay.head_branch = "attacker"), "must run from the default branch"],
     ["relay copy at another path", options => (options.relay.path = ".github/workflows/copy.yml"), "must come from .github/workflows/agentic-continuation-relay.yml"],
@@ -144,6 +158,14 @@ describe("continuation relay resolve", () => {
     expect(outputs(options.core).target_workflow).toBe("research.lock.yml");
   });
 
+  it("normalizes @ref suffixes on parent and relay workflow paths", async () => {
+    const options = fixture();
+    options.parent.path += "@refs/heads/feature";
+    options.relay.path += "@refs/heads/main";
+    await resolve(options);
+    expect(options.github.rest.repos.getContent).toHaveBeenCalledWith(expect.objectContaining({ path: ".github/workflows/research.lock.yml", ref: "a".repeat(40) }));
+  });
+
   it("enforces the stricter branch maximum and adopts a newly added approval gate", async () => {
     const options = fixture();
     options.state.targetLock = `# gh-aw-metadata: {"continuation":{"workflow":"research","max":2,"policy":"workflow-dispatch","approval":"continuation-review"}}\n`;
@@ -153,8 +175,21 @@ describe("continuation relay resolve", () => {
 
   it("ignores failed duplicate relays so a relay can be retried", async () => {
     const options = fixture();
-    options.state.relayRuns.push({ id: 299, display_title: "Continuation relay 100/1", status: "completed", conclusion: "failure" });
+    options.state.relayRuns.push(otherRelay(299, { status: "completed", conclusion: "failure" }));
     await expect(resolve(options)).resolves.toBeUndefined();
+  });
+
+  it("ignores same-title runs that cannot execute the trusted default-branch relay", async () => {
+    const options = fixture();
+    options.state.relayRuns.push(otherRelay(299, { head_branch: "feature" }));
+    await expect(resolve(options)).resolves.toBeUndefined();
+  });
+
+  it("rejects a failed relay with a durable dispatch claim", async () => {
+    const options = fixture();
+    options.state.relayRuns.push(otherRelay(299, { status: "completed", conclusion: "failure" }));
+    options.state.otherRelayArtifacts.set("299", [{ name: "continuation-dispatch-claim" }]);
+    await expect(resolve(options)).rejects.toThrow("already has a dispatch claim");
   });
 
   it("requests approval through a protected environment", async () => {
@@ -182,16 +217,24 @@ describe("continuation relay dispatch", () => {
     const call = options.github.rest.actions.createWorkflowDispatch.mock.calls[0][0];
     expect(call).toMatchObject({ owner: "owner", repo: "repo", workflow_id: "research.lock.yml", ref: "refs/heads/feature" });
     const awContext = JSON.parse(call.inputs.aw_context);
-    expect(awContext).toMatchObject({ repo: "owner/repo", run_id: "100", run_attempt: "1", relay_run_id: "300", episode_id: "ep", continuation: { depth: 1, max: 3 } });
+    expect(awContext).toMatchObject({ repo: "owner/repo", run_id: "100", run_attempt: "1", checkpoint_attempt: "1", relay_run_id: "300", episode_id: "ep", continuation: { depth: 1, max: 3 } });
     expect(call.inputs.aw_context).not.toContain("Resume");
     expect(call.inputs.aw_context).not.toContain("leak");
-    expect(JSON.parse(fs.readFileSync(options.markerFile, "utf8"))).toEqual({ parent_run_id: "100", parent_run_attempt: "1", child_run_id: "400" });
+    expect(JSON.parse(fs.readFileSync(options.markerFile, "utf8"))).toEqual({
+      parent_run_id: "100",
+      parent_run_attempt: "1",
+      checkpoint_run_attempt: "1",
+      relay_run_id: "300",
+      child_run_id: "400",
+    });
     expect(options.core.setOutput).toHaveBeenCalledWith("child_run_id", "400");
+    expect(options.artifactClient.uploadArtifact).toHaveBeenCalledWith("continuation-dispatch-claim", [expect.stringContaining("claim.json")], expect.any(String), { retentionDays: 90 });
   });
 
   it("refuses to dispatch an approval-gated continuation that was not approved", async () => {
     const options = fixture({ metadata: { workflow: "research", max: 3, policy: "workflow-dispatch", approval: "continuation-review" } });
     options.env.GH_AW_APPROVAL_RESULT = "skipped";
+    options.env.GH_AW_APPROVAL_ENVIRONMENT = "continuation-review";
     await expect(dispatch(options)).rejects.toThrow("requires approval");
     expect(options.github.rest.actions.createWorkflowDispatch).not.toHaveBeenCalled();
   });
@@ -199,8 +242,17 @@ describe("continuation relay dispatch", () => {
   it("dispatches an approved continuation", async () => {
     const options = fixture({ metadata: { workflow: "research", max: 3, policy: "workflow-dispatch", approval: "continuation-review" } });
     options.env.GH_AW_APPROVAL_RESULT = "success";
+    options.env.GH_AW_APPROVAL_ENVIRONMENT = "continuation-review";
     await dispatch(options);
     expect(options.github.rest.actions.createWorkflowDispatch).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects approval granted for a different environment after revalidation", async () => {
+    const options = fixture({ metadata: { workflow: "research", max: 3, policy: "workflow-dispatch", approval: "new-review" } });
+    options.env.GH_AW_APPROVAL_RESULT = "success";
+    options.env.GH_AW_APPROVAL_ENVIRONMENT = "old-review";
+    await expect(dispatch(options)).rejects.toThrow("approval environment changed after resolve");
+    expect(options.github.rest.actions.createWorkflowDispatch).not.toHaveBeenCalled();
   });
 
   it("re-checks checkpoint expiry after approval", async () => {

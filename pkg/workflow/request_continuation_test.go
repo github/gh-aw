@@ -128,8 +128,11 @@ func TestCompileRequestContinuation(t *testing.T) {
 	}
 	require.NoError(t, yaml.Unmarshal([]byte(lock), &workflow))
 	safeOutputs, conclusion := workflow.Jobs["safe_outputs"], workflow.Jobs["conclusion"]
+	agent := workflow.Jobs["agent"]
 	assert.NotEqual(t, "write", safeOutputs.Permissions["actions"], "the safe-outputs job only records the request")
 	assert.Equal(t, "${{ steps.process_safe_outputs.outputs.continuation_requested }}", safeOutputs.Outputs["continuation_requested"])
+	assert.Equal(t, "${{ steps.process_safe_outputs.outputs.continuation_requested == 'true' && github.run_attempt || '' }}", safeOutputs.Outputs["continuation_request_attempt"])
+	assert.Equal(t, "${{ steps.durable_checkpoint.outputs.checkpoint-attempt }}", agent.Outputs["durable_checkpoint_attempt"])
 	assert.Equal(t, "write", conclusion.Permissions["actions"], "the conclusion job dispatches the relay")
 
 	stepIndex := func(steps []struct {
@@ -153,6 +156,8 @@ func TestCompileRequestContinuation(t *testing.T) {
 	assert.Contains(t, conclusion.Steps[dispatch].If, "needs.safe_outputs.outputs.continuation_requested == 'true'")
 	assert.Contains(t, conclusion.Steps[dispatch].If, "needs.safe_outputs.result == 'success'")
 	assert.Equal(t, "${{ github.token }}", conclusion.Steps[dispatch].With["github-token"])
+	assert.Contains(t, lock, "GH_AW_PARENT_REQUEST_ATTEMPT: ${{ needs.safe_outputs.outputs.continuation_request_attempt }}")
+	assert.Contains(t, lock, "GH_AW_PARENT_CHECKPOINT_ATTEMPT: ${{ needs.agent.outputs.durable_checkpoint_attempt }}")
 
 	uploadGate := "contains(steps.collect_output.outputs.output_types, 'request_continuation')"
 	require.Contains(t, lock, uploadGate, "checkpoint upload must require a continuation request")

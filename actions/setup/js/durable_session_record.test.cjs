@@ -16,12 +16,13 @@ afterEach(() => {
 });
 
 it("appends only validated metadata, not transcript or credentials", () => {
-  recordDurableSessionEvent("durable.restore", { status: "restored", parentRunId: "100", artifactId: "99", transcript: "private history" }, options);
+  recordDurableSessionEvent("durable.restore", { status: "restored", parentRunId: "100", artifactId: "99", relayRunId: "300", transcript: "private history" }, options);
   recordDurableSessionEvent("durable.session", { status: "resumed", parentRunId: "100", sessionId: "native-session", token: "private token" }, options);
   const file = path.join(options.root, "durable-session.jsonl");
   const content = fs.readFileSync(file, "utf8");
   const records = content.trim().split("\n").map(JSON.parse);
   expect(records).toHaveLength(2);
+  expect(records[0].data).toMatchObject({ relayRunId: "300" });
   expect(records[1].data).toEqual({ engine: "copilot", storage: "artifact", runId: "200", runAttempt: "1", status: "resumed", parentRunId: "100", sessionId: "native-session" });
   expect(content).not.toContain("private");
   expect(fs.statSync(file).mode & 0o777).toBe(0o600);

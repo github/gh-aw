@@ -142,6 +142,13 @@ function removeDirectory(directory) {
 const RELAY_WORKFLOW_PATH = ".github/workflows/agentic-continuation-relay.yml";
 /** Identity of GITHUB_TOKEN; the conclusion job dispatches the relay and the relay dispatches the child with it. */
 const GITHUB_ACTIONS_BOT = "github-actions[bot]";
+const RELAY_DISPATCH_CLAIM_ARTIFACT = "continuation-dispatch-claim";
+const RELAY_DISPATCH_MARKER_ARTIFACT = "continuation-dispatched";
+
+/** GitHub workflow-run paths may include an @ref suffix. */
+function normalizeWorkflowRunPath(workflowPath) {
+  return typeof workflowPath === "string" ? workflowPath.split("@", 1)[0] : "";
+}
 
 /**
  * Builds the deterministic relay run name; the generated workflow uses the same format.
@@ -177,7 +184,7 @@ async function getDefaultBranch(github, context) {
 function validateRelayRun(relay, { repositoryId, defaultBranch, parentRunId, parentRunAttempt }) {
   if (!relay || relay.repository?.id !== repositoryId || relay.head_repository?.id !== repositoryId) throw new Error("The continuation relay run must belong to this repository and not a fork");
   if (relay.event !== "workflow_dispatch") throw new Error(`The continuation relay run must be a workflow_dispatch run, not ${JSON.stringify(relay.event)}`);
-  if (relay.path !== RELAY_WORKFLOW_PATH) throw new Error(`The continuation relay run must come from ${RELAY_WORKFLOW_PATH}`);
+  if (normalizeWorkflowRunPath(relay.path) !== RELAY_WORKFLOW_PATH) throw new Error(`The continuation relay run must come from ${RELAY_WORKFLOW_PATH}`);
   if (relay.head_branch !== defaultBranch) throw new Error(`The continuation relay must run from the default branch ${JSON.stringify(defaultBranch)}, not ${JSON.stringify(relay.head_branch)}`);
   if (relay.display_title !== relayRunTitle(parentRunId, parentRunAttempt)) throw new Error(`The continuation relay run is not bound to run ${parentRunId} attempt ${parentRunAttempt}`);
 }
@@ -185,6 +192,9 @@ function validateRelayRun(relay, { repositoryId, defaultBranch, parentRunId, par
 module.exports = {
   RELAY_WORKFLOW_PATH,
   GITHUB_ACTIONS_BOT,
+  RELAY_DISPATCH_CLAIM_ARTIFACT,
+  RELAY_DISPATCH_MARKER_ARTIFACT,
+  normalizeWorkflowRunPath,
   relayRunTitle,
   getDefaultBranch,
   validateRelayRun,

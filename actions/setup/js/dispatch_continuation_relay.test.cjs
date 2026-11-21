@@ -9,7 +9,8 @@ afterEach(() => {
 });
 
 function fixture() {
-  vi.stubEnv("GITHUB_RUN_ATTEMPT", "2");
+  vi.stubEnv("GH_AW_PARENT_REQUEST_ATTEMPT", "2");
+  vi.stubEnv("GH_AW_PARENT_CHECKPOINT_ATTEMPT", "1");
   const summary = { addHeading: vi.fn(() => summary), addRaw: vi.fn(() => summary), write: vi.fn(async () => {}) };
   const core = { info: vi.fn(), setOutput: vi.fn(), setFailed: vi.fn(), summary };
   const github = {
@@ -31,7 +32,7 @@ describe("dispatch_continuation_relay", () => {
       repo: "repo",
       workflow_id: "agentic-continuation-relay.yml",
       ref: "refs/heads/main",
-      inputs: { parent_run_id: "100", parent_run_attempt: "2" },
+      inputs: { parent_run_id: "100", parent_run_attempt: "2", checkpoint_run_attempt: "1" },
       return_run_details: true,
     });
     expect(options.core.setOutput).toHaveBeenCalledWith("relay_run_id", "300");

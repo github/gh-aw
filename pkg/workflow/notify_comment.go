@@ -160,8 +160,8 @@ func (c *Compiler) appendConclusionUsageSteps(steps []string, data *WorkflowData
 }
 
 // buildContinuationRelayDispatchStep dispatches the generated continuation relay after the
-// safe-outputs job recorded a continuation request. Only the parent run identity is passed;
-// the relay revalidates the request artifact and the workflow's compiled policy.
+// safe-outputs job recorded a continuation request. Producer attempts identify the exact
+// request and checkpoint artifacts even when conclusion or safe_outputs is rerun.
 func (c *Compiler) buildContinuationRelayDispatchStep(data *WorkflowData) []string {
 	if !isSafeOutputHandlerEnabledAndUnstaged(data.SafeOutputs, "RequestContinuation") {
 		return nil
@@ -174,6 +174,8 @@ func (c *Compiler) buildContinuationRelayDispatchStep(data *WorkflowData) []stri
 		fmt.Sprintf("        uses: %s\n", getCachedActionPin("actions/github-script", data)),
 		"        env:\n",
 		"          GH_AW_CONTINUATION_RELAY_WORKFLOW: " + ContinuationRelayWorkflowFile + "\n",
+		fmt.Sprintf("          GH_AW_PARENT_REQUEST_ATTEMPT: ${{ needs.%s.outputs.continuation_request_attempt }}\n", safeOutputsJob),
+		fmt.Sprintf("          GH_AW_PARENT_CHECKPOINT_ATTEMPT: ${{ needs.%s.outputs.durable_checkpoint_attempt }}\n", constants.AgentJobName),
 		"        with:\n",
 		"          github-token: ${{ github.token }}\n",
 		"          script: |\n",

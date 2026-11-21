@@ -620,6 +620,7 @@ func (c *Compiler) appendContinuationRequestArtifactUpload(data *WorkflowData, s
 		fmt.Sprintf("          retention-days: %d\n", retentionDays),
 	)
 	state.outputs["continuation_requested"] = "${{ steps.process_safe_outputs.outputs.continuation_requested }}"
+	state.outputs["continuation_request_attempt"] = "${{ steps.process_safe_outputs.outputs.continuation_requested == 'true' && github.run_attempt || '' }}"
 }
 
 // appendCustomScriptFilesStep appends the setup step(s) for writing custom safe-output scripts to

@@ -26,7 +26,7 @@ func TestGenerateContinuationRelayWorkflow(t *testing.T) {
 	require.NoError(t, yaml.Unmarshal(content, &parsed), "relay must be valid YAML")
 	jobs := parsed["jobs"].(map[string]any)
 	require.ElementsMatch(t, []string{"resolve", "approve", "dispatch"}, mapKeys(jobs))
-	require.NotContains(t, parsed, "concurrency", "continuations are serialized by relay lineage checks, not a concurrency group")
+	require.Contains(t, parsed, "concurrency", "relay runs for one parent attempt are serialized")
 	require.Equal(t, map[string]any{}, parsed["permissions"])
 	require.Equal(t, map[string]any{"actions": "read", "contents": "read"}, jobs["resolve"].(map[string]any)["permissions"])
 	require.Equal(t, map[string]any{}, jobs["approve"].(map[string]any)["permissions"])
@@ -34,12 +34,16 @@ func TestGenerateContinuationRelayWorkflow(t *testing.T) {
 	require.Equal(t, map[string]any{"actions": "write", "contents": "read"}, jobs["dispatch"].(map[string]any)["permissions"])
 
 	require.Contains(t, text, "run-name: Continuation relay ${{ inputs.parent_run_id }}/${{ inputs.parent_run_attempt }}")
+	require.Contains(t, text, "checkpoint_run_attempt:")
+	require.Contains(t, text, "GH_AW_PARENT_CHECKPOINT_ATTEMPT: ${{ inputs.checkpoint_run_attempt }}")
 	require.Contains(t, text, "GH_AW_PARENT_RUN_ID: ${{ inputs.parent_run_id }}", "untrusted inputs must only reach scripts through env")
 	require.Contains(t, text, "github.event_name == 'workflow_dispatch' && !github.event.repository.fork && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)", "the relay only runs as a default-branch workflow_dispatch")
 	require.Contains(t, text, "await resolve();")
 	require.Contains(t, text, "await dispatch();")
 	require.Contains(t, text, "GH_AW_APPROVAL_RESULT: ${{ needs.approve.result }}")
+	require.Contains(t, text, "GH_AW_APPROVAL_ENVIRONMENT: ${{ needs.resolve.outputs.approval_environment }}")
 	require.Contains(t, text, "name: continuation-dispatched")
+	require.Contains(t, text, "retention-days: 90")
 }
 
 func TestGenerateContinuationRelayWorkflowRemovesStaleRelay(t *testing.T) {
