@@ -338,7 +338,7 @@ This section is the authoritative list of checks a conforming broker MUST perfor
 
 Deployments MUST provide negative tests for SV-06 to SV-24, SV-28, SV-31, and SV-36 before claiming conformance (Section 7).
 
-An experimental, informative TLA+ model of these requirements and Appendix E is in `specs/token-broker/` in the gh-aw repository. It found the gaps that SV-16, SV-28, SV-31, SV-36, and SV-37 now close.
+The [experimental, informative TLA+ model](https://github.com/github/gh-aw/tree/main/specs/token-broker) covers the server validation requirements and Appendix E. It found the gaps that SV-16, SV-28, SV-31, SV-36, and SV-37 now close.
 
 ## 6. Credential Issuance and Lifecycle
 

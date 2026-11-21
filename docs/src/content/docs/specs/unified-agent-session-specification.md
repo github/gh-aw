@@ -2497,6 +2497,8 @@ for exceptionally large sessions remains future work.
 
 ## 11. References
 
+The [TLA+ session artifact model](https://github.com/github/gh-aw/blob/main/specs/unified-agent-session/UnifiedAgentSession.tla) and [TLC configuration](https://github.com/github/gh-aw/blob/main/specs/unified-agent-session/UnifiedAgentSession.cfg) cover the producer–collector–reader handoff in Section 3.5 and the observation rules in Section 5. For a trace of up to three records and two tool IDs, the model checks that collection preserves supported records in order without inventing completions, publication precedes cleanup, and the reader sees the published artifact. It abstracts payloads, JSONL framing, redaction, tool pairing, and artifact transport failures.
+
 ### 11.1 Normative references
 
 - **[RFC 2119]** S. Bradner, *Key words for use in RFCs to Indicate Requirement Levels*, March 1997. [RFC 2119](https://www.ietf.org/rfc/rfc2119.txt).
