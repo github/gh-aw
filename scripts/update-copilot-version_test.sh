@@ -7,9 +7,12 @@ cd "$repo_root"
 work=".copilot-version-test-$$-$RANDOM"
 (umask 077; mkdir "$work")
 trap 'rm -rf "$work"' EXIT
-mkdir -p "$work/scripts" "$work/actions/setup/sh" "$work/pkg/constants"
+mkdir -p "$work/scripts" "$work/actions/setup/sh" "$work/pkg/constants" "$work/.github/aw"
 cp scripts/update-copilot-version.sh "$work/scripts/"
+cp scripts/sync-compat.sh "$work/scripts/"
 cp actions/setup/sh/release_integrity.sh "$work/actions/setup/sh/"
+cp actions/setup/sh/install_copilot_cli.sh "$work/actions/setup/sh/"
+cp .github/aw/compat.json "$work/.github/aw/"
 cp pkg/constants/version_constants.go "$work/baseline"
 target="$work/pkg/constants/version_constants.go"
 updater="$work/scripts/update-copilot-version.sh"
@@ -43,6 +46,15 @@ grep -qx 'const DefaultCopilotChecksumsSHA256 = "26cd3e4b32cde498e4961fb4d48e7b8
 cp "$target" "$work/before"
 bash "$updater" v1.0.103
 cmp "$target" "$work/before"
+bash "$work/scripts/sync-compat.sh" --check
+sed -i 's/^const DefaultCopilotChecksumsSHA256 = .*/const DefaultCopilotChecksumsSHA256 = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"/' "$target"
+if bash "$work/scripts/sync-compat.sh" > "$work/output" 2>&1; then
+  echo "FAIL: sync accepted mismatched version and checksum" >&2
+  exit 1
+fi
+grep -q 'does not match the reviewed pin' "$work/output"
+bash "$updater" 1.0.103
+bash "$work/scripts/sync-compat.sh" --check
 
 for constant in DefaultCopilotVersion DefaultCopilotChecksumsSHA256; do
   sed "/^const $constant /d" "$work/baseline" > "$target"

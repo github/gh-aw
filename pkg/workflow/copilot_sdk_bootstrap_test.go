@@ -222,6 +222,18 @@ if (!sdk.bootstrapFixture || relative !== "relative helper") throw new Error("ES
 				require.Error(t, err)
 				require.Contains(t, string(output), "do not satisfy engine.cooldown")
 				require.NoDirExists(t, filepath.Join(runnerTemp, "gh-aw", "engine-cli", "copilot-sdk"))
+				outside := filepath.Join(root, "outside")
+				engineDir := filepath.Join(runnerTemp, "gh-aw", "engine-cli")
+				require.NoError(t, os.Mkdir(outside, 0o755))
+				require.NoError(t, os.Symlink(outside, engineDir))
+				linked := exec.CommandContext(t.Context(), "bash", "-c", command)
+				linked.Dir = workspace
+				linked.Env = env
+				output, err = linked.CombinedOutput()
+				require.Error(t, err)
+				require.Contains(t, string(output), "Unexpected symlink")
+				require.NoDirExists(t, filepath.Join(outside, "copilot-sdk"))
+				require.NoError(t, os.Remove(engineDir))
 			}
 			run(command)
 

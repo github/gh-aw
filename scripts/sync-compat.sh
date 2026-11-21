@@ -41,6 +41,18 @@ if [ -z "$COPILOT_VERSION" ]; then
   exit 1
 fi
 
+# shellcheck source=actions/setup/sh/release_integrity.sh
+source "$REPO_ROOT/actions/setup/sh/release_integrity.sh"
+COPILOT_SHA=$(sed -nE 's/^const DefaultCopilotChecksumsSHA256 = "([0-9a-f]{64})"$/\1/p' "$CONSTANTS_FILE")
+REVIEWED_SHA=$(release_artifact_sha256 github/copilot-cli "$COPILOT_VERSION" SHA256SUMS.txt) || {
+  echo "Error: no reviewed checksum for DefaultCopilotVersion=$COPILOT_VERSION" >&2
+  exit 1
+}
+if [ "$COPILOT_SHA" != "$REVIEWED_SHA" ]; then
+  echo "Error: DefaultCopilotChecksumsSHA256 does not match the reviewed pin for $COPILOT_VERSION; run scripts/update-copilot-version.sh" >&2
+  exit 1
+fi
+
 # Read the current max-agent of the latest interval (entry with "open": true)
 CURRENT_MAX_AGENT=$(jq -r '."agent-compat-v1".copilot[] | select(.open == true) | ."max-agent"' "$COMPAT_FILE")
 if [ -z "$CURRENT_MAX_AGENT" ] || [ "$CURRENT_MAX_AGENT" = "null" ]; then
