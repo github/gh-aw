@@ -73,6 +73,25 @@ describe("work queue MCP server", () => {
     expect(readWorkQueueState(test.snapshot, {})).toMatchObject({ total: 0, prediction: { work_id: null } });
   });
 
+  it("shows a worker its assigned Claims and defaults the read to their pool", () => {
+    const works = [h.work("smoke", { pool: "smoke", graph_id: "smoke-graph" }), h.work("other")];
+    const planned = h.dispatchNext(h.submit(h.submit([], [works[0]]), [works[1]]), { pool: "smoke" });
+    const dispatchId = planned.decision.dispatches[0];
+    const log = h.bind(h.launch(planned.log, dispatchId), dispatchId, h.workerActor("200", 1));
+    const directory = fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()), "gh-aw-queue-mcp-"));
+    directories.push(directory);
+    const snapshotPath = path.join(directory, "snapshot.json");
+    const worker = assignmentForDispatch(replayTransactions(log), dispatchId);
+    fs.writeFileSync(snapshotPath, JSON.stringify({ version: 4, sha: "head", transactionLog: h.ledgerText(log), origin: h.dispatcher, role: "worker", worker }));
+    const view = readWorkQueueState(loadWorkQueueSnapshot(snapshotPath), {});
+    expect(view).toMatchObject({ pool: "smoke", total: 1, counts: { claimed: 1 } });
+    expect(view.assignment).toEqual({
+      dispatch_id: dispatchId,
+      claims: [{ claim_handle: worker.claims[0].handle, claim_id: worker.claims[0].claim_id, work_id: works[0].work_id, work: works[0].payload, result_refs: [] }],
+    });
+    expect(readWorkQueueState(setup("dispatcher").snapshot, {})).not.toHaveProperty("assignment");
+  });
+
   it("validates the v4 envelope strictly", () => {
     const test = setup("worker");
     expect(parseSnapshotEnvelope(JSON.stringify(test.envelope))).toEqual(test.envelope);

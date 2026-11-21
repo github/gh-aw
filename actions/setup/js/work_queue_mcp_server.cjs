@@ -72,7 +72,19 @@ function sortValue(work, key) {
   return key === "id" ? work.work_id : key === "priority" ? work.priority : work.position.commit * 1024 + work.position.operation;
 }
 
-/** A bounded, read-only view of the activation snapshot for one pool. */
+/**
+ * A worker's Claims live only in its activation snapshot (the dispatch input
+ * carries just the Dispatch ID), so the read view is how the agent learns them.
+ */
+function assignmentView(snapshot) {
+  if (!snapshot.worker) return null;
+  return {
+    dispatch_id: snapshot.worker.dispatch_id,
+    claims: snapshot.worker.claims.map(claim => ({ claim_handle: claim.handle, claim_id: claim.claim_id, work_id: claim.work_id, work: claim.work, result_refs: claim.result_refs })),
+  };
+}
+
+/** A bounded, read-only view of the activation snapshot for one pool; a worker's pool defaults to its assigned Work's. */
 function readWorkQueueState(snapshot, args = {}) {
   closed(args, [], ["work", "pool", "limit", "offset", "sort"], "work_queue_read");
   if (args.work !== undefined) identity(args.work, "Work ID");
@@ -82,7 +94,8 @@ function readWorkQueueState(snapshot, args = {}) {
   integer(offset, 0, 1000000, "read offset");
   validateSort(args.sort);
   const state = snapshot.projection;
-  const pool = args.pool ?? "default";
+  const assignment = assignmentView(snapshot);
+  const pool = args.pool ?? (assignment ? state.works.get(assignment.claims[0].work_id)?.pool : undefined) ?? "default";
   identity(pool, "pool");
   const visibility = snapshot.visible_work_ids === undefined ? null : new Set(snapshot.visible_work_ids);
   const visible = work => !visibility || visibility.has(work.work_id);
@@ -107,6 +120,8 @@ function readWorkQueueState(snapshot, args = {}) {
     view: "activation_snapshot",
     snapshot_sha: snapshot.sha,
     queue_tip: state.tip,
+    pool,
+    ...(assignment ? { assignment } : {}),
     prediction: { work_id: next?.work_id ?? null, authoritative: false },
     counts,
     claim_counts: claimCounts,
