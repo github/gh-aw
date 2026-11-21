@@ -424,6 +424,18 @@ func TestSafeOutputsToolsJSONInSync(t *testing.T) {
 		"pkg/workflow/js/safe_outputs_tools.json and actions/setup/js/safe_outputs_tools.json must define identical tool objects in the same order; update both files together")
 }
 
+func TestRequestContinuationToolDescribesDurableRuns(t *testing.T) {
+	var tools []map[string]any
+	require.NoError(t, json.Unmarshal([]byte(safeOutputsToolsJSONContent), &tools))
+	for _, tool := range tools {
+		if tool["name"] == "request_continuation" {
+			require.Contains(t, tool["description"], "durable")
+			return
+		}
+	}
+	t.Fatal("request_continuation tool not found")
+}
+
 func TestPushToPullRequestBranchMessageGuidance(t *testing.T) {
 	var tools []map[string]any
 	require.NoError(t, json.Unmarshal([]byte(safeOutputsToolsJSONContent), &tools))

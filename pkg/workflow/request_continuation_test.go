@@ -167,6 +167,58 @@ func TestCompileRequestContinuation(t *testing.T) {
 	assert.Less(t, collect, validate, "output collection must precede the gated checkpoint upload")
 }
 
+func TestCompileLegacyDurableContinuation(t *testing.T) {
+	tests := []struct {
+		name        string
+		engine      string
+		safeOutputs string
+		max         string
+		retention   string
+	}{
+		{name: "defaults", engine: "engine:\n  id: copilot\n  durable: {}\n", max: "5", retention: "7"},
+		{name: "custom retention and other safe outputs", engine: "engine:\n  id: copilot\n  durable:\n    retention-days: 3\n", safeOutputs: "safe-outputs:\n  create-issue: {}\n", max: "5", retention: "3"},
+		{name: "explicit continuation configuration", engine: "engine:\n  id: copilot\n  durable:\n    retention-days: 3\n", safeOutputs: "safe-outputs:\n  request-continuation:\n    max: 2\n", max: "2", retention: "3"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			lock, err := compileRequestContinuationWorkflow(t, "on: workflow_dispatch\n"+tt.engine+tt.safeOutputs)
+			require.NoError(t, err)
+			for _, expected := range []string{
+				`"continuation":{"workflow":"continue","max":` + tt.max + `,"policy":"workflow-dispatch"}`,
+				`\"request_continuation\":{\"max\":1,\"max_continuations\":` + tt.max + `}`,
+				"Restore durable workflow state",
+				"Upload durable checkpoint artifact",
+				"Upload continuation request",
+				"Dispatch continuation relay",
+			} {
+				assert.Contains(t, lock, expected)
+			}
+			var compiled struct {
+				Jobs map[string]struct {
+					Steps []struct {
+						Name string            `yaml:"name"`
+						With map[string]string `yaml:"with"`
+					} `yaml:"steps"`
+				} `yaml:"jobs"`
+			}
+			require.NoError(t, yaml.Unmarshal([]byte(lock), &compiled))
+			for job, name := range map[string]string{"agent": "Upload durable checkpoint artifact", "safe_outputs": "Upload continuation request"} {
+				found := false
+				for _, step := range compiled.Jobs[job].Steps {
+					if step.Name == name {
+						assert.Equal(t, "${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '"+tt.retention+"' }}", step.With["retention-days"])
+						found = true
+					}
+				}
+				assert.True(t, found, "missing %s in %s", name, job)
+			}
+			if strings.Contains(tt.safeOutputs, "create-issue") {
+				assert.Contains(t, lock, `\"create_issue\":{`)
+			}
+		})
+	}
+}
+
 func TestCompileRequestContinuationWithOtherSafeOutputs(t *testing.T) {
 	lock, err := compileRequestContinuationWorkflow(t, "on: workflow_dispatch\nengine: copilot\nsafe-outputs:\n  create-issue: {}\n  add-comment: {}\n  request-continuation: {}\n")
 	require.NoError(t, err)
