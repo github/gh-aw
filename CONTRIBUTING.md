@@ -572,9 +572,13 @@ replay uses one iteration per size instead of three; all sizes are retained.
 Routine benchmarks exclude external Zizmor/Poutine scanner invocations, which
 can measure container startup or timeouts rather than Go performance; the
 separate CGO security scan is unchanged. `make bench` still runs the full set
-locally. Use `BENCH_PACKAGES`, `BENCH_TIME`, and `BENCH_SKIP` to narrow a run.
+locally. Use `BENCH_PACKAGES`, `BENCH_TIME`, `BENCH_COUNT`, and `BENCH_SKIP` to
+configure a run.
 Each shard publishes its own results and compares with its previous main-branch
 baseline; the first run establishes the new shard baseline.
+CI takes six samples per benchmark and fails on statistically significant
+increases above 10% in time, bytes allocated, or allocations per operation.
+Geomeans are reported but do not fail the gate.
 
 The selector uses GitHub Decisions at
 `https://api.githubcopilot.com/v1/decisions` with model `gpt-6-luna-decisions`.
