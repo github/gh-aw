@@ -119,7 +119,7 @@ When triggered by an issue event (opened/edited), scheduled run, or manual dispa
 
 ### Primary Backlog Label
 
-Use the taxonomy in `.github/backlog-labels.json`. Preserve a preexisting `backlog:` label, even if you would choose a different one. Otherwise, apply exactly one of the defined `backlog:` labels for the issue's primary purpose, independently of its existing type and component labels. Apply this rule before any early exit, including the aggregate-report and known-automation rules below. Routine workflow run failures go in run alerts; generated artifacts that exercise issue creation go in smoke tests; recurring summaries go in reports. An actionable engineering finding belongs in its engineering cluster, even if filed by a bot. Do not infer a report solely from its bracketed prefix. If the primary cluster is unclear, use `needs-triage` rather than guessing.
+Use the taxonomy in `.github/backlog-labels.json`. Preserve a preexisting `backlog:` label, even if you would choose a different one. For an issue without one, add exactly one defined `backlog:` label only when the evidence supports a primary cluster, independently of its existing type and component labels. If the cluster is unclear, leave the primary label unset for manual review and add `needs-triage` only if absent. If no other labels are justified and `needs-triage` is already present, make no label change. Apply this rule before any early exit, including the aggregate-report and known-automation rules below. Routine workflow run failures go in run alerts; generated artifacts that exercise issue creation go in smoke tests; recurring summaries go in reports. An actionable engineering finding belongs in its engineering cluster, even if filed by a bot. Do not infer a report solely from its bracketed prefix.
 
 Read `/tmp/gh-aw/agent/missing-backlog-label.json` on every trigger. When a candidate in that file has `primary_backlog_label`, use that label for the matching issue number. It is computed by repository triage code, not extracted from the issue text.
 
@@ -133,8 +133,7 @@ When an issue is opened or edited:
 2. **Check if the issue already has labels** — stop only if it has a primary `backlog:` label and appropriate type and component labels where applicable. Otherwise add the missing labels.
 3. **Check if the author is a community member** — if `author_association` is `NONE`, `FIRST_TIME_CONTRIBUTOR`, `FIRST_TIMER`, or `CONTRIBUTOR`, and the author is **not** a bot (`user.type != "Bot"` and login does not end with `[bot]`), include `community` in the labels to apply
 4. **Classify the issue** based on its title and body content
-5. **Apply all labels** (including `community` if applicable) in a single `add_labels` call
-6. If uncertain about classification, add the `needs-triage` label for human review
+5. **Apply only missing labels** (including `community` or `needs-triage` where applicable) in a single `add_labels` call; call `noop` if no label changes are justified.
 
 ### On Scheduled Runs (Every 6 Hours)
 
@@ -142,8 +141,8 @@ When running on schedule:
 
 1. **Read pre-fetched unlabeled issues** from `/tmp/gh-aw/agent/unlabeled-issues.json` (populated by the pre-agent step). If the file is missing or contains an empty JSON array (`[]`), fall back to `search_issues` with query `repo:github/gh-aw is:issue is:open no:label` — **do NOT use `list_issues`** as it returns an oversized payload.
 2. **Also read partially-labeled issues** from `/tmp/gh-aw/agent/partial-labeled-issues.json` — these are issues that have only generic type labels (`bug`, `enhancement`, `documentation`, `question`) but no component labels. Process these in the same pass to add missing component labels (e.g., `safe-outputs`, `mcp`, `copilot`). Skip this file if it's missing or empty.
-3. **Also read `/tmp/gh-aw/agent/missing-backlog-label.json`** for recent issues whose producers didn't set a primary label. If all three lists are empty, call `noop` and stop.
-4. **Process up to 10 distinct issues total**, prioritizing fully unlabeled issues, then missing backlog labels. Do not reapply existing labels or repeatedly add `needs-triage` when classification is still uncertain.
+3. **Also read `/tmp/gh-aw/agent/missing-backlog-label.json`** for issues without a primary label, including issues already marked `needs-triage`. If all three lists are empty, call `noop` and stop.
+4. **Process up to 10 distinct issues total.** Deduplicate by issue number across all sources, using any available `primary_backlog_label`. Prioritize fully unlabeled issues, then missing primary labels with a helper match or no `needs-triage`, then other first-time triage work. Revisit remaining `needs-triage` issues with spare capacity. Do not reapply existing labels.
 5. **Apply labels** to each issue based on classification; the pre-fetched data already includes `number`, `title`, `body`, and `labels` (for partial-labeled). Only call `issue_read` when you need additional metadata not present in those fields (e.g., comments, reactions, or author association details not available in the pre-fetch).
 6. **Create a summary report** as a discussion with statistics on processed issues
 
@@ -157,7 +156,7 @@ When triggered manually as a backfill pass:
 
 When issues needing triage exist:
 
-4. **Process up to 10 issues** in this run (respecting safe-output limits); if more exist, note the remainder in the report
+4. **Process up to 10 distinct issues** in this run using the scheduled-run deduplication and priority rules; if more exist, note the remainder in the report
 5. **Apply labels** to each issue based on classification rules below, using title/body heuristics and existing triage rules
 6. **Create a summary report** as a discussion listing every issue processed, the labels applied, and how many unlabeled issues (if any) still remain for the next pass
 
@@ -167,7 +166,7 @@ Apply labels based on the following rules. You can apply multiple labels when ap
 
 ### Classification Order
 
-1. Assign a primary backlog label as described above, then check whether the issue is a machine-generated aggregate report.
+1. Apply the primary backlog rule above, including the manual-review exception, then check whether the issue is a machine-generated aggregate report.
 2. Classify type and component for all other issues, including actionable machine-generated findings.
 3. For a human-authored issue that describes unexpected behavior, expected versus actual results, a reproducible failure, or an error, apply `bug` even if its title does not contain the word "bug". Add the relevant component label when clear; otherwise add `needs-triage`.
 
@@ -232,7 +231,7 @@ This label identifies issues opened by external community members and read-only 
 
 ### Machine-Generated Aggregate Reports (deterministic, apply immediately)
 
-An issue is a machine-generated aggregate report only when it has both a generated-report title and a generated-report marker or footer. Apply `report` alongside the primary backlog label and **do not** apply `needs-triage`:
+An issue is a machine-generated aggregate report only when it has both a generated-report title and a generated-report marker or footer. Apply `report` alongside the primary backlog label; no additional type or component labels are needed:
 
 - Its title indicates a generated aggregate report — for example starts with a workflow-prefix tag like `[daily-report]`, `[deep-report]`, `[agentic-token-audit]`, `[model-resolution]`, `[copilot-cli-research]`, or any other `[<workflow-id>]` prefix, OR contains `Daily Report`
 - Its body contains a tracker marker `gh-aw-workflow-call-id: github/gh-aw/<workflow-id>` (the specific workflow name after the final `/` varies; any value identifies a known automated workflow), OR its footer contains `> Generated by` or `> AI generated by`
@@ -241,7 +240,7 @@ When an issue meets both criteria above and is actually an aggregate report, app
 
 ### Known Automation Title Patterns (high-confidence, apply immediately)
 
-These title patterns identify machine-generated operational issues. Apply `automation` without further analysis and **do not** apply `needs-triage`:
+These title patterns identify machine-generated operational issues. After applying the primary backlog rule, apply `automation` without further type or component analysis:
 
 | Title prefix / pattern | Label(s) to apply |
 |---|---|
@@ -250,7 +249,7 @@ These title patterns identify machine-generated operational issues. Apply `autom
 | `[auto-triage]` (case-insensitive) | `automation` |
 | `[Parent]` | `automation` |
 
-When an issue title matches one of these patterns, apply the specified label(s) and skip all other classification rules for that issue.
+When an issue title matches one of these patterns, apply the specified label(s) and skip the remaining type and component rules.
 
 ### Uncertainty Handling
 
@@ -396,7 +395,7 @@ When running on schedule, create a discussion report following these formatting 
 **Before finishing, check whether you called any safe-output tool in this run.** If you did NOT call `add_labels` or `create_discussion`, you MUST call `noop`. Every run MUST end with at least one safe-output call — failing to do so causes the workflow to fail with a safe-output compliance error.
 
 Situations that require a `noop` call:
-- No unlabeled issues were found (all trigger types)
+- No issues needing triage were found across the applicable candidate sources
 - The triggering issue already had appropriate labels
 - All issues analyzed were already labeled or had been processed
 - You were uncertain and chose not to label rather than guess incorrectly

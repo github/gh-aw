@@ -90,7 +90,7 @@ jobs:
             - A forbidden domain was accessible (firewall escape vulnerability)
             - An allowed domain was blocked unexpectedly
             - File operations failed`,
-              labels: ['bug', 'firewall', 'automated', 'backlog:run-alerts']
+              labels: ['bug', 'firewall', 'automated', 'backlog:security']
             });
 ---
 

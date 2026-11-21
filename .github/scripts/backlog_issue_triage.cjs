@@ -5,7 +5,7 @@ const runAlertTitles = new Set(["[aw] agentic workflows out of sync", "[aw] Fail
 
 function backlogCandidate(issue) {
   const labels = issue.labels.map(label => label.name);
-  if (issue.pull_request || labels.some(label => label === "needs-triage" || label.startsWith("backlog:"))) return null;
+  if (issue.pull_request || labels.some(label => label.startsWith("backlog:"))) return null;
 
   const isRunAlert =
     issue.user?.login === "github-actions[bot]" &&
@@ -22,13 +22,20 @@ function backlogCandidate(issue) {
 }
 
 async function collectCandidates(input) {
+  const limit = 20;
   const candidates = [];
+  const deferred = [];
   for await (const line of createInterface({ input, crlfDelay: Infinity })) {
-    if (candidates.length >= 20) continue;
+    if (candidates.length >= limit) continue;
     const candidate = backlogCandidate(JSON.parse(line));
-    if (candidate) candidates.push(candidate);
+    if (!candidate) continue;
+    if (candidate.labels.includes("needs-triage") && !candidate.primary_backlog_label) {
+      if (deferred.length < limit) deferred.push(candidate);
+    } else {
+      candidates.push(candidate);
+    }
   }
-  return candidates;
+  return candidates.concat(deferred.slice(0, limit - candidates.length));
 }
 
 if (require.main === module) {
