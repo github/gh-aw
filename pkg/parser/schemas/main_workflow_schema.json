@@ -6567,7 +6567,7 @@
             "version": {
               "type": "string",
               "minLength": 1,
-              "description": "Package version to install for this language server (e.g. \"5.8.3\"). Overrides the built-in pinned default. Has no effect for custom servers not in the built-in install spec table."
+              "description": "Package version to install for built-in language servers that support overrides. The built-in TypeScript server accepts only its bundled lockfile version. Has no effect for custom servers."
             }
           },
           "required": ["command", "fileExtensions"],

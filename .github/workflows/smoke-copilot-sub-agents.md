@@ -41,7 +41,7 @@ safe-outputs:
     group: true
     close-older-issues: true
     close-older-key: "smoke-copilot-sub-agents"
-    labels: [automation, testing]
+    labels: [automation, testing, "backlog:smoke-tests"]
 timeout-minutes: 10
 features:
   gh-aw-detection: false

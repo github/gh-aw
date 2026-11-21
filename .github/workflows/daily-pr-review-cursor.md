@@ -38,7 +38,7 @@ safe-outputs:
   create-issue:
     expires: 1d
     title-prefix: "[pr-review] "
-    labels: [automation, code-review]
+    labels: [automation, code-review, "backlog:reports"]
     max: 1
     close-older-issues: true
     close-older-key: daily-pr-review-cursor

@@ -51,7 +51,7 @@ tools:
 safe-outputs:
   create-issue:
     title-prefix: "[harness-experiment-proposal] "
-    labels: [automation, experiment-proposal, harness, needs-manual-patch]
+    labels: [automation, experiment-proposal, harness, needs-manual-patch, "backlog:reports"]
     expires: 7d
     max: 1
   noop:

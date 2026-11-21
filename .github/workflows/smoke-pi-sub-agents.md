@@ -29,7 +29,7 @@ evals:
 safe-outputs:
   staged: true
   create-issue:
-    labels: [automation, testing]
+    labels: [automation, testing, "backlog:smoke-tests"]
 timeout-minutes: 5
 features:
   gh-aw-detection: false

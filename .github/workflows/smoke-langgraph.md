@@ -24,7 +24,7 @@ safe-outputs:
     expires: 2h
     close-older-issues: true
     close-older-key: smoke-langgraph
-    labels: [automation, testing]
+    labels: [automation, testing, "backlog:smoke-tests"]
 timeout-minutes: 10
 max-turns: 20
 sandbox:

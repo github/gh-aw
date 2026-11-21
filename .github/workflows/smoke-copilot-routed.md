@@ -39,7 +39,7 @@ safe-outputs:
     group: true
     close-older-issues: true
     close-older-key: "smoke-copilot-routed"
-    labels: [automation, testing]
+    labels: [automation, testing, "backlog:smoke-tests"]
   threat-detection:
     model: claude-haiku-5.5
     post-steps:
