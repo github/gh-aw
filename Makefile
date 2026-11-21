@@ -226,12 +226,13 @@ test-perf:
 # Run benchmarks for performance testing
 BENCH_PACKAGES ?= ./pkg/...
 BENCH_TIME ?= 3x
+BENCH_COUNT ?= 1
 BENCH_SKIP ?= ^$$
 .PHONY: bench
 bench: SHELL := /bin/bash -eu -o pipefail
 bench:
 	@echo "Running benchmarks..."
-	go test -bench=. -benchmem -benchtime=$(BENCH_TIME) -count=1 -skip='$(BENCH_SKIP)' -run=^$$ $(BENCH_PACKAGES) | tee bench_results.txt
+	go test -bench=. -benchmem -benchtime=$(BENCH_TIME) -count=$(BENCH_COUNT) -skip='$(BENCH_SKIP)' -run=^$$ $(BENCH_PACKAGES) | tee bench_results.txt
 
 # Run only critical performance benchmarks for daily monitoring
 # Uses time-based -benchtime (not a fixed low iteration count) so that results are

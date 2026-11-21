@@ -2012,7 +2012,7 @@ jobs:
           $environmentNames = $allowedEnvironmentVariables | Where-Object { $processEnvironment.Contains($_) }
           $wslEnvironment = (($environmentNames | ForEach-Object { $value = [string]$processEnvironment[$_]; if ($pathVariableSet.Contains($_) -or $value -match '^(?:[A-Za-z]:[\\/]|\\\\)') { "$_/p" } else { $_ } }) -join ':')
           if ($wslEnvironment.Length -gt 32767) { throw 'The Windows job environment exceeds the WSL forwarding limit.' }; $env:WSLENV = $wslEnvironment
-          $compressedScript = [System.Convert]::FromBase64String('ykxTiFZQVNBNU9AvyS3QT8/QTSzXT0xPzSuJzy8tKSgt0csqzs9TiLVWKMlIzeNSUEhNzshXUK9WyixJzS1WsoqOrVVXsMOrmSstkwswAA==')
+          $compressedScript = [System.Convert]::FromBase64String('fM/BTsJAEMbxO0/xsTFwWuoZg4kJjXpgMYh6IE2z6U7ZhbLbdKdiJH13U3rRiw8wv/83rsRuB3Fz2bwplW7yVL0/b9ZqlartXHYCiwVEpKqUNkQmI5BlmEww7k8en/KHj1ytl+lc+mCoE7+gbbp66ZK9lfosI3FbJ7pgF3xMTCiO1OQV6Uiz4hAFdIzU8B3Ykh8BVNgA8Xp0de38HtHqhgz0njwjtFy3jNJ5Xblv3Ys4O7ahZWh86soZzWSwvEYwRESPfjnG7ah0o/5ljCFLJHyqh4nJVc8HfXaIwSP7u2d6EY7pFMV8l3VT3P973Gd+BgA=')
           $compressedStream = [System.IO.MemoryStream]::new($compressedScript)
           $decompressor = [System.IO.Compression.DeflateStream]::new($compressedStream, [System.IO.Compression.CompressionMode]::Decompress)
           $reader = [System.IO.StreamReader]::new($decompressor, [System.Text.Encoding]::UTF8)

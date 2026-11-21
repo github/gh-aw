@@ -20,7 +20,15 @@ set -e
 
 # Capture start time immediately so the OTLP setup span reflects actual setup duration.
 # Falls back to 0 when node is unavailable.
-SETUP_START_MS=$(node -e "process.stdout.write(String(Date.now()))" 2>/dev/null || echo "0")
+GH_AW_NODE="${GH_AW_NODE:-$(command -v node 2>/dev/null || true)}"
+if [[ "${GH_AW_NODE}" == *$'\n'* || "${GH_AW_NODE}" == *$'\r'* ]]; then
+  echo "::error::Node.js executable path contains unsupported control characters."
+  exit 1
+fi
+if [[ -n "${GH_AW_NODE}" && -n "${GITHUB_ENV:-}" ]]; then
+  printf 'GH_AW_NODE=%s\n' "${GH_AW_NODE}" >> "${GITHUB_ENV}"
+fi
+SETUP_START_MS=$("${GH_AW_NODE:-node}" -e "process.stdout.write(String(Date.now()))" 2>/dev/null || echo "0")
 
 # Log a message only when GitHub Actions debug mode is active.
 # Handles both RUNNER_DEBUG=1 and RUNNER_DEBUG=true (GitHub Actions sets 'true').
@@ -85,6 +93,15 @@ if [ "${RESOLVED_RUNNER_TEMP%/}" = "/tmp" ]; then
 fi
 
 debug_log "Using RUNNER_TEMP: ${RUNNER_TEMP_BASH} (resolved: ${RESOLVED_RUNNER_TEMP}, writable: yes)"
+
+# Acquire before touching shared paths, containers, or listeners. Kept until always/post.
+if [[ "${RUNNER_ENVIRONMENT:-}" == "self-hosted" ]]; then
+  if [[ -z "${GH_AW_NODE}" || ! -x "${GH_AW_NODE}" ]]; then
+    echo "::error::Node.js is required before acquiring the shared-daemon lease."
+    exit 1
+  fi
+  "${GH_AW_NODE}" "$(dirname "${BASH_SOURCE[0]}")/js/docker_lease.cjs" acquire
+fi
 
 # Get destination from input or use default
 DESTINATION="${INPUT_DESTINATION:-${GH_AW_ROOT}/actions}"
