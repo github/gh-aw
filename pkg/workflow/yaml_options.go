@@ -27,6 +27,10 @@ func marshalYAMLWithOptions(value any, options ...yaml.EncodeOption) ([]byte, er
 	return marshalYAML(value, false, options...)
 }
 
+func marshalYAMLWithImplicitMappingNulls(value any, options ...yaml.EncodeOption) ([]byte, error) {
+	return marshalYAML(value, true, options...)
+}
+
 func marshalYAML(value any, implicitMappingNulls bool, options ...yaml.EncodeOption) ([]byte, error) {
 	node, err := yaml.NewEncoder(nil, options...).EncodeToNode(value)
 	if err != nil {
@@ -36,13 +40,21 @@ func marshalYAML(value any, implicitMappingNulls bool, options ...yaml.EncodeOpt
 	if implicitMappingNulls {
 		// Render only actual mapping nulls as empty values, never text inside
 		// a block scalar or null entries in a sequence.
+		flowEntries := make(map[*ast.MappingValueNode]bool)
+		for _, candidate := range ast.Filter(ast.MappingType, node) {
+			if mapping, ok := candidate.(*ast.MappingNode); ok && mapping.IsFlowStyle {
+				for _, entry := range mapping.Values {
+					flowEntries[entry] = true
+				}
+			}
+		}
 		for _, candidate := range ast.Filter(ast.MappingValueType, node) {
 			entry, ok := candidate.(*ast.MappingValueNode)
-			if !ok || entry.IsFlowStyle {
+			if !ok || entry.IsFlowStyle || flowEntries[entry] {
 				continue
 			}
-			if value, ok := entry.Value.(*ast.NullNode); ok {
-				value.Token.Type = token.ImplicitNullType
+			if nullNode, ok := entry.Value.(*ast.NullNode); ok {
+				nullNode.Token.Type = token.ImplicitNullType
 				repaired = true
 			}
 		}

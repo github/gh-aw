@@ -77,7 +77,7 @@ func (c *Compiler) extractTopLevelYAMLSection(frontmatter map[string]any, key st
 			// custom `steps:` marshaling elsewhere is unaffected.
 			marshalOptions = append(append([]yaml.EncodeOption{}, DefaultMarshalOptions...), yaml.IndentSequence(true))
 		}
-		yamlBytes, err = marshalYAML(wrappedData, true, marshalOptions...)
+		yamlBytes, err = marshalYAMLWithImplicitMappingNulls(wrappedData, marshalOptions...)
 		if err != nil {
 			return ""
 		}
@@ -87,7 +87,7 @@ func (c *Compiler) extractTopLevelYAMLSection(frontmatter map[string]any, key st
 		if key == "on" || key == "services" {
 			marshalOptions = append(append([]yaml.EncodeOption{}, DefaultMarshalOptions...), yaml.IndentSequence(true))
 		}
-		yamlBytes, err = marshalYAML(map[string]any{key: value}, true, marshalOptions...)
+		yamlBytes, err = marshalYAMLWithImplicitMappingNulls(map[string]any{key: value}, marshalOptions...)
 		if err != nil {
 			return ""
 		}

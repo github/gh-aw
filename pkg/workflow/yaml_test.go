@@ -52,87 +52,73 @@ steps:
 	}
 }
 
-func TestCleanYAMLNullValues(t *testing.T) {
-	tests := []struct {
-		name     string
-		input    string
-		expected string
-	}{
-		{
-			name: "workflow_dispatch with null",
-			input: `on:
-  schedule:
-  - cron: "0 0 * * *"
-  workflow_dispatch: null`,
-			expected: `on:
-  schedule:
-  - cron: "0 0 * * *"
-  workflow_dispatch:`,
-		},
-		{
-			name: "multiple null values",
-			input: `on:
-  workflow_dispatch: null
-  workflow_call: null
-  schedule:
-  - cron: "0 0 * * *"`,
-			expected: `on:
-  workflow_dispatch:
-  workflow_call:
-  schedule:
-  - cron: "0 0 * * *"`,
-		},
-		{
-			name: "null with extra whitespace",
-			input: `on:
-  workflow_dispatch:   null  
-  schedule:
-  - cron: "0 0 * * *"`,
-			expected: `on:
-  workflow_dispatch:
-  schedule:
-  - cron: "0 0 * * *"`,
-		},
-		{
-			name:     "string containing null should not be modified",
-			input:    `description: "This is a null value"`,
-			expected: `description: "This is a null value"`,
-		},
-		{
-			name: "null in the middle of line should not be modified",
-			input: `key: null is not good
-  workflow_dispatch: null`,
-			expected: `key: null is not good
-  workflow_dispatch:`,
-		},
-		{
-			name: "no null values",
-			input: `on:
-  workflow_dispatch:
-    inputs:
-      issue_url:
-        required: true`,
-			expected: `on:
-  workflow_dispatch:
-    inputs:
-      issue_url:
-        required: true`,
-		},
-		{
-			name:     "empty string",
-			input:    "",
-			expected: "",
-		},
+func TestExtractTopLevelYAMLSectionNullValues(t *testing.T) {
+	const input = `steps:
+  - env:
+      EMPTY: null
+    with:
+      optional: null
+      list:
+        - null
+        - value
+`
+	var frontmatter map[string]any
+	if err := yaml.Unmarshal([]byte(input), &frontmatter); err != nil {
+		t.Fatal(err)
 	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := CleanYAMLNullValues(tt.input)
-			if result != tt.expected {
-				t.Errorf("CleanYAMLNullValues() failed\nInput:\n%s\n\nExpected:\n%s\n\nGot:\n%s",
-					tt.input, tt.expected, result)
+	section := NewCompiler().extractTopLevelYAMLSection(frontmatter, "steps")
+	for _, want := range []string{"EMPTY:", "optional:", "- null"} {
+		found := false
+		for _, line := range strings.Split(section, "\n") {
+			if strings.TrimSpace(line) == want {
+				found = true
+				break
 			}
-		})
+		}
+		if !found {
+			t.Errorf("expected %q in:\n%s", want, section)
+		}
+	}
+	var decoded struct {
+		Steps []struct {
+			Env  map[string]any
+			With map[string]any
+		}
+	}
+	if err := yamlv3.Unmarshal([]byte(section), &decoded); err != nil {
+		t.Fatalf("invalid YAML: %v\n%s", err, section)
+	}
+	if len(decoded.Steps) != 1 {
+		t.Fatalf("expected one step, got %d", len(decoded.Steps))
+	}
+	step := decoded.Steps[0]
+	if value, ok := step.Env["EMPTY"]; !ok || value != nil {
+		t.Errorf("env null lost: %#v", step.Env)
+	}
+	if value, ok := step.With["optional"]; !ok || value != nil {
+		t.Errorf("with null lost: %#v", step.With)
+	}
+	list, ok := step.With["list"].([]any)
+	if !ok || len(list) != 2 || list[0] != nil || list[1] != "value" {
+		t.Errorf("sequence null lost: %#v", step.With["list"])
+	}
+}
+
+func TestMarshalYAMLWithImplicitMappingNullsFlowStyle(t *testing.T) {
+	input := map[string]any{"key": nil, "list": []any{nil}}
+	encoded, err := marshalYAMLWithImplicitMappingNulls(input, yaml.Flow(true))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(encoded), "key: null") || !strings.Contains(string(encoded), "[null]") {
+		t.Errorf("expected explicit flow-style nulls, got %s", encoded)
+	}
+	var decoded map[string]any
+	if err := yamlv3.Unmarshal(encoded, &decoded); err != nil {
+		t.Fatalf("invalid flow-style YAML: %v\n%s", err, encoded)
+	}
+	if value, ok := decoded["key"]; !ok || value != nil {
+		t.Errorf("flow mapping null lost: %#v", decoded)
 	}
 }
 
