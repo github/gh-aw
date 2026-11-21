@@ -1693,18 +1693,12 @@ function replayCheckpointSource(contents, priorGitSHA, root) {
   const state = replayTransactionLog(contents);
   const checkpoint = root.operations[0];
   const invalid = () => queueError("checkpoint_invalid", "checkpoint does not match its Git parent history");
-  if (
-    priorGitSHA !== checkpoint.prior_git_sha ||
-    state.tip !== checkpoint.prior_tip ||
-    createHash("sha256")
-      .update(state.transactions.map(transaction => canonical(transaction) + "\n").join(""), "utf8")
-      .digest("hex") !== checkpoint.history_sha256
-  )
-    throw invalid();
+  const lines = state.transactions.map(transaction => canonical(transaction) + "\n");
+  if (priorGitSHA !== checkpoint.prior_git_sha || state.tip !== checkpoint.prior_tip || createHash("sha256").update(lines.join(""), "utf8").digest("hex") !== checkpoint.history_sha256) throw invalid();
   for (const retainPolicyHistory of [true, false]) {
     for (const legacy of [false, true]) {
       try {
-        if (digest(checkpointState(state, priorGitSHA, root.actor, root.at, legacy, retainPolicyHistory)) === checkpoint.state_sha256) return state;
+        if (digest(checkpointState(state, priorGitSHA, root.actor, root.at, legacy, retainPolicyHistory)) === checkpoint.state_sha256) return { state, lines };
       } catch (error) {
         if (error?.code !== "checkpoint_invalid") throw error;
       }
