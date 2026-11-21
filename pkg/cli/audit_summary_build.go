@@ -20,6 +20,7 @@ func applyAuditMetrics(run WorkflowRun, results auditAnalysisResults) WorkflowRu
 	}
 	run.WarningCount = 0
 	run.SafeItemsCount = results.safeItemsCount
+	run.ContinuationRequestCount = len(results.continuationRequests)
 	return run
 }
 
@@ -32,6 +33,7 @@ func buildProcessedAuditRun(run WorkflowRun, results auditAnalysisResults) Proce
 		MissingTools:            results.missingTools,
 		MissingData:             results.missingData,
 		Noops:                   results.noops,
+		ContinuationRequests:    results.continuationRequests,
 		MCPFailures:             results.mcpFailures,
 		SkillActivations:        results.skillActivations,
 		GatewaySteeringEvents:   results.gatewaySteeringEvents,
@@ -78,6 +80,7 @@ func buildAuditRunSummary(run WorkflowRun, processedRun ProcessedRun, results au
 			MissingTools:            results.missingTools,
 			MissingData:             results.missingData,
 			Noops:                   results.noops,
+			ContinuationRequests:    results.continuationRequests,
 			MCPFailures:             results.mcpFailures,
 			SkillActivations:        results.skillActivations,
 			MCPToolUsage:            results.mcpToolUsage,

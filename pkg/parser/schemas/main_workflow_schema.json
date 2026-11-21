@@ -13671,6 +13671,27 @@
             }
           }
         },
+        "request-continuation": {
+          "description": "Opt-in metadata-only request for follow-up work. Does not resume work or dispatch a workflow.",
+          "oneOf": [
+            {
+              "type": "object",
+              "properties": {
+                "authorization": { "$ref": "#/$defs/safeOutputAuthorization" },
+                "max": {
+                  "description": "Maximum number of continuation requests (default: 1).",
+                  "oneOf": [
+                    { "type": "integer", "minimum": 1 },
+                    { "type": "string", "pattern": "^\\$\\{\\{.*\\}\\}$" }
+                  ]
+                }
+              },
+              "additionalProperties": false
+            },
+            { "type": "null" },
+            { "type": "boolean" }
+          ]
+        },
         "report-incomplete": {
           "oneOf": [
             {

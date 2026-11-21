@@ -341,7 +341,9 @@ async function main() {
     const workflowName = process.env.GH_AW_WORKFLOW_NAME || "unknown";
     const runUrl = process.env.GH_AW_RUN_URL || "";
     const agentConclusion = process.env.GH_AW_AGENT_CONCLUSION || "";
-    const hasIncompleteReport = result.items.some(/** @param {any} item */ item => item.type === "report_incomplete") && !shouldIgnoreTaskCompleteRegistrationReports(result.items);
+    const hasIncompleteReport =
+      result.items.some(/** @param {any} item */ item => item.type === "request_continuation") ||
+      (result.items.some(/** @param {any} item */ item => item.type === "report_incomplete") && !shouldIgnoreTaskCompleteRegistrationReports(result.items));
     const hasNonNoopOutput = nonNoopItems.length > 0;
     const reportAsIssue = process.env.GH_AW_NOOP_REPORT_AS_ISSUE !== "false"; // Default to true
 

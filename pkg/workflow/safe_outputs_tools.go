@@ -26,10 +26,11 @@ type SafeOutputToolOption struct {
 // internalSafeOutputs are tool names that are internal / system-level and should
 // not be presented to users as selectable safe outputs.
 var internalSafeOutputs = map[string]bool{
-	"report_missing_tool": true,
-	"noop":                true,
-	"report_missing_data": true,
-	"report_incomplete":   true,
+	"report_missing_tool":  true,
+	"noop":                 true,
+	"report_missing_data":  true,
+	"report_incomplete":    true,
+	"request_continuation": true,
 }
 
 // GetSafeOutputToolOptions parses safe_outputs_tools.json and returns all user-facing

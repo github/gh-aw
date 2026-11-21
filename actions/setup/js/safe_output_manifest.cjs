@@ -243,12 +243,13 @@ const CREATE_ITEM_TYPES = new Set([
  * - report_missing_tool: records a missing tool capability (metadata only)
  * - report_missing_data: records missing required data (metadata only)
  * - report_incomplete: signals that the task could not be completed (metadata only)
+ * - request_continuation: records requested follow-up, not resumed work (metadata only)
  *
  * All other types — built-in handler types, custom safe job types, and
  * any future types — are logged automatically without needing to update this list.
  * @type {Set<string>}
  */
-const NOT_LOGGED_TYPES = new Set(["noop", "report_missing_tool", "report_missing_data", "report_incomplete"]);
+const NOT_LOGGED_TYPES = new Set(["noop", "report_missing_tool", "report_missing_data", "report_incomplete", "request_continuation"]);
 
 /**
  * @typedef {Object} ManifestEntry

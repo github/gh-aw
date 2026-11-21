@@ -66,37 +66,38 @@ const (
 
 // WorkflowRun represents a GitHub Actions workflow run with metrics
 type WorkflowRun struct {
-	ObsoletePR          *ObsoletePREvidence `json:"obsolete_pr,omitempty"`
-	DatabaseID          int64               `json:"databaseId"`
-	Number              int                 `json:"number"`
-	URL                 string              `json:"url"`
-	Status              string              `json:"status"`
-	Conclusion          string              `json:"conclusion"`
-	WorkflowName        string              `json:"workflowName"`
-	WorkflowPath        string              `json:"workflowPath"` // Workflow file path (e.g., .github/workflows/copilot-swe-agent.yml)
-	CreatedAt           time.Time           `json:"createdAt"`
-	StartedAt           time.Time           `json:"startedAt"`
-	UpdatedAt           time.Time           `json:"updatedAt"`
-	Event               string              `json:"event"`
-	HeadBranch          string              `json:"headBranch"`
-	HeadSha             string              `json:"headSha"`
-	DisplayTitle        string              `json:"displayTitle"`
-	Attempt             int                 `json:"attempt,omitempty"`
-	Repository          string              `json:"repository,omitempty"`
-	Actor               string              `json:"actor,omitempty"`
-	Duration            time.Duration
-	ActionMinutes       float64 // Billable Actions minutes estimated from wall-clock time
-	TokenUsage          int
-	Turns               int
-	TurnsAvailable      bool // True when turn count was successfully read from artifact logs
-	ErrorCount          int
-	WarningCount        int
-	MissingToolCount    int
-	MissingDataCount    int
-	NoopCount           int
-	SafeItemsCount      int           `json:"safe_items_count,omitempty"` // Count of safe-output items actually written to GitHub
-	AvgTimeBetweenTurns time.Duration // Average time between consecutive LLM API calls (from per-turn timestamps when available)
-	LogsPath            string
+	ObsoletePR               *ObsoletePREvidence `json:"obsolete_pr,omitempty"`
+	DatabaseID               int64               `json:"databaseId"`
+	Number                   int                 `json:"number"`
+	URL                      string              `json:"url"`
+	Status                   string              `json:"status"`
+	Conclusion               string              `json:"conclusion"`
+	WorkflowName             string              `json:"workflowName"`
+	WorkflowPath             string              `json:"workflowPath"` // Workflow file path (e.g., .github/workflows/copilot-swe-agent.yml)
+	CreatedAt                time.Time           `json:"createdAt"`
+	StartedAt                time.Time           `json:"startedAt"`
+	UpdatedAt                time.Time           `json:"updatedAt"`
+	Event                    string              `json:"event"`
+	HeadBranch               string              `json:"headBranch"`
+	HeadSha                  string              `json:"headSha"`
+	DisplayTitle             string              `json:"displayTitle"`
+	Attempt                  int                 `json:"attempt,omitempty"`
+	Repository               string              `json:"repository,omitempty"`
+	Actor                    string              `json:"actor,omitempty"`
+	Duration                 time.Duration
+	ActionMinutes            float64 // Billable Actions minutes estimated from wall-clock time
+	TokenUsage               int
+	Turns                    int
+	TurnsAvailable           bool // True when turn count was successfully read from artifact logs
+	ErrorCount               int
+	WarningCount             int
+	MissingToolCount         int
+	MissingDataCount         int
+	NoopCount                int
+	ContinuationRequestCount int           `json:"continuation_request_count,omitempty"`
+	SafeItemsCount           int           `json:"safe_items_count,omitempty"` // Count of safe-output items actually written to GitHub
+	AvgTimeBetweenTurns      time.Duration // Average time between consecutive LLM API calls (from per-turn timestamps when available)
+	LogsPath                 string
 	// DownloadDuration is the wall-clock time spent downloading this run's artifacts
 	// from GitHub. It is zero for runs served from the on-disk cache (no download
 	// was performed).
@@ -130,6 +131,7 @@ type ProcessedRun struct {
 	MissingTools            []MissingToolReport
 	MissingData             []MissingDataReport
 	Noops                   []NoopReport
+	ContinuationRequests    []ContinuationRequestReport
 	MCPFailures             []MCPFailureReport
 	SkillActivations        []SkillActivation
 	GatewaySteeringEvents   []GatewaySteeringEvent
@@ -182,6 +184,12 @@ type MissingToolReport struct {
 // NoopReport represents a noop message reported by an agentic workflow
 type NoopReport struct {
 	Message string `json:"message"`
+	ReportProvenance
+}
+
+// ContinuationRequestReport records intent only, not a dispatch or successful continuation.
+type ContinuationRequestReport struct {
+	Message string `json:"message" console:"header:Message"`
 	ReportProvenance
 }
 
@@ -291,31 +299,32 @@ var ErrNoArtifacts = errors.New("no artifacts found for this run")
 // workflow run's logs and artifacts. It is embedded by both RunSummary and DownloadResult
 // so both carriers share a single definition of the analysis surface.
 type RunAnalysis struct {
-	Run                     WorkflowRun              `json:"run"`                               // Full workflow run metadata
-	Metrics                 LogMetrics               `json:"metrics"`                           // Extracted log metrics
-	AwContext               *AwContext               `json:"context,omitempty"`                 // aw_context data from aw_info.json
-	TaskDomain              *TaskDomainInfo          `json:"task_domain,omitempty"`             // Inferred workflow task domain
-	BehaviorFingerprint     *BehaviorFingerprint     `json:"behavior_fingerprint,omitempty"`    // Compact execution profile
-	AgenticAssessments      []AgenticAssessment      `json:"agentic_assessments,omitempty"`     // Derived agentic judgments
-	AccessAnalysis          *DomainAnalysis          `json:"access_analysis"`                   // Network access analysis
-	FirewallAnalysis        *FirewallAnalysis        `json:"firewall_analysis"`                 // Firewall log analysis
-	RedactedDomainsAnalysis *RedactedDomainsAnalysis `json:"redacted_domains_analysis"`         // Redacted URL domains analysis
-	MissingTools            []MissingToolReport      `json:"missing_tools"`                     // Missing tool reports
-	MissingData             []MissingDataReport      `json:"missing_data"`                      // Missing data reports
-	Noops                   []NoopReport             `json:"noops"`                             // Noop messages
-	MCPFailures             []MCPFailureReport       `json:"mcp_failures"`                      // MCP server failures
-	SkillActivations        []SkillActivation        `json:"skill_activations,omitempty"`       // Detected skill invocations
-	MCPToolUsage            *MCPToolUsageData        `json:"mcp_tool_usage,omitempty"`          // MCP tool usage data
-	TokenUsage              *TokenUsageSummary       `json:"token_usage_summary,omitempty"`     // Token usage from firewall proxy
-	ModelRouting            *ModelRoutingSummary     `json:"model_routing,omitempty"`           // AWF model routing decisions and cost attribution
-	GatewaySteeringEvents   []GatewaySteeringEvent   `json:"gateway_steering_events,omitempty"` // AI-credit and timeout steering events
-	WorkingSet              *WorkingSetMetrics       `json:"working_set,omitempty"`             // Working-set rebuild metric from usage summary
-	Ledger                  *LedgerActivity          `json:"ledger,omitempty"`                  // Recorded ledger append transactions
-	WorkQueue               *WorkQueueReport         `json:"work_queue,omitempty"`
-	Friction                *FrictionCostSummary     `json:"friction,omitempty"`                // Precomputed cost of wasted work from usage summary
-	GitHubRateLimitUsage    *GitHubRateLimitUsage    `json:"github_rate_limit_usage,omitempty"` // GitHub API quota consumption
-	JobDetails              []JobInfoWithDuration    `json:"job_details"`                       // Job execution details
-	SafeOutputs             []CreatedItemReport      `json:"safe_outputs,omitempty"`            // Entities affected by safe-output handlers
+	Run                     WorkflowRun                 `json:"run"`                            // Full workflow run metadata
+	Metrics                 LogMetrics                  `json:"metrics"`                        // Extracted log metrics
+	AwContext               *AwContext                  `json:"context,omitempty"`              // aw_context data from aw_info.json
+	TaskDomain              *TaskDomainInfo             `json:"task_domain,omitempty"`          // Inferred workflow task domain
+	BehaviorFingerprint     *BehaviorFingerprint        `json:"behavior_fingerprint,omitempty"` // Compact execution profile
+	AgenticAssessments      []AgenticAssessment         `json:"agentic_assessments,omitempty"`  // Derived agentic judgments
+	AccessAnalysis          *DomainAnalysis             `json:"access_analysis"`                // Network access analysis
+	FirewallAnalysis        *FirewallAnalysis           `json:"firewall_analysis"`              // Firewall log analysis
+	RedactedDomainsAnalysis *RedactedDomainsAnalysis    `json:"redacted_domains_analysis"`      // Redacted URL domains analysis
+	MissingTools            []MissingToolReport         `json:"missing_tools"`                  // Missing tool reports
+	MissingData             []MissingDataReport         `json:"missing_data"`                   // Missing data reports
+	Noops                   []NoopReport                `json:"noops"`                          // Noop messages
+	ContinuationRequests    []ContinuationRequestReport `json:"continuation_requests"`
+	MCPFailures             []MCPFailureReport          `json:"mcp_failures"`                      // MCP server failures
+	SkillActivations        []SkillActivation           `json:"skill_activations,omitempty"`       // Detected skill invocations
+	MCPToolUsage            *MCPToolUsageData           `json:"mcp_tool_usage,omitempty"`          // MCP tool usage data
+	TokenUsage              *TokenUsageSummary          `json:"token_usage_summary,omitempty"`     // Token usage from firewall proxy
+	ModelRouting            *ModelRoutingSummary        `json:"model_routing,omitempty"`           // AWF model routing decisions and cost attribution
+	GatewaySteeringEvents   []GatewaySteeringEvent      `json:"gateway_steering_events,omitempty"` // AI-credit and timeout steering events
+	WorkingSet              *WorkingSetMetrics          `json:"working_set,omitempty"`             // Working-set rebuild metric from usage summary
+	Ledger                  *LedgerActivity             `json:"ledger,omitempty"`                  // Recorded ledger append transactions
+	WorkQueue               *WorkQueueReport            `json:"work_queue,omitempty"`
+	Friction                *FrictionCostSummary        `json:"friction,omitempty"`                // Precomputed cost of wasted work from usage summary
+	GitHubRateLimitUsage    *GitHubRateLimitUsage       `json:"github_rate_limit_usage,omitempty"` // GitHub API quota consumption
+	JobDetails              []JobInfoWithDuration       `json:"job_details"`                       // Job execution details
+	SafeOutputs             []CreatedItemReport         `json:"safe_outputs,omitempty"`            // Entities affected by safe-output handlers
 }
 
 // RunSummary represents a complete summary of a workflow run's artifacts and metrics.

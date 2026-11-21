@@ -1675,6 +1675,24 @@
     }
   },
   {
+    "name": "request_continuation",
+    "description": "Record a request for follow-up work with the reason and task to continue in message. This is metadata only: it does not dispatch a workflow, resume work, or confirm that a continuation occurred. It does not mark the current task completed.",
+    "inputSchema": {
+      "type": "object",
+      "required": ["message"],
+      "properties": {
+        "message": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S",
+          "maxLength": 65536,
+          "description": "Nonempty reason for requesting follow-up and the task to continue."
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  {
     "name": "noop",
     "description": "Log a transparency message when no significant actions are needed. Use this to confirm workflow completion and provide visibility when analysis is complete but no changes or outputs are required (e.g., 'No issues found', 'All checks passed'). This ensures the workflow produces human-visible output even when no other actions are taken.",
     "inputSchema": {

@@ -51,11 +51,12 @@ func tryLoadCachedRunResult(
 	activitySummaryApplied := backfillCacheHitIfNeeded(&result, runOutputDir, params.verbose)
 	steeringBackfillApplied := backfillGatewaySteeringEventsIfNeeded(&result, runOutputDir, params.verbose)
 	workQueueBackfillApplied := backfillWorkQueueReport(&result.WorkQueue, runOutputDir)
+	continuationBackfillApplied := backfillContinuationRequests(&result.ContinuationRequests, result.Run, runOutputDir, params.verbose)
 	// If the backfill populated SafeItemsCount (i.e. it was 0 before and is now non-zero),
 	// persist the healed value back to run_summary.json so downstream readers (e.g.
 	// the api-consumption-report) see the correct count without having to fall back to
 	// usage/activity/summary.json.
-	if result.Run.SafeItemsCount != safeItemsBefore || activitySummaryApplied || steeringBackfillApplied || workQueueBackfillApplied || metadataRefresh.Applied {
+	if result.Run.SafeItemsCount != safeItemsBefore || activitySummaryApplied || steeringBackfillApplied || workQueueBackfillApplied || continuationBackfillApplied || metadataRefresh.Applied {
 		healed := *summary
 		healed.Run = result.Run
 		healed.Metrics = result.Metrics
@@ -66,6 +67,8 @@ func tryLoadCachedRunResult(
 		healed.SafeOutputs = result.SafeOutputs
 		healed.GatewaySteeringEvents = result.GatewaySteeringEvents
 		healed.WorkQueue = result.WorkQueue
+		healed.ContinuationRequests = result.ContinuationRequests
+		healed.Run.ContinuationRequestCount = len(result.ContinuationRequests)
 		if err := saveRunSummary(runOutputDir, &healed, params.verbose); err != nil {
 			logsOrchestratorLog.Printf("Warning: failed to persist healed run summary for run %d: %v", result.Run.DatabaseID, err)
 		}

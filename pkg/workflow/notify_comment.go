@@ -84,6 +84,7 @@ func (c *Compiler) buildConclusionJobSteps(data *WorkflowData, mainJobName strin
 		steps = append(steps, c.buildConclusionDetectionRunsStep(data, mainJobName)...)
 		return c.appendConclusionUsageSteps(steps, data)
 	}
+	steps = append(steps, c.buildConclusionRequestContinuationStep(data, mainJobName)...)
 	steps = append(steps, c.buildConclusionNoOpStep(data, mainJobName)...)
 	steps = append(steps, c.buildConclusionDetectionRunsStep(data, mainJobName)...)
 	steps = append(steps, c.buildConclusionMissingToolStep(data, mainJobName)...)

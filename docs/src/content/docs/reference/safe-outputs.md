@@ -212,6 +212,7 @@ approved resource arguments, staging, and migration limitations.
 | Output | Key | Description |
 |--------|-----|-------------|
 | [No-Op](#no-op-logging-noop) | `noop` | Log completion messages for transparency (max: 2, same-repo only) |
+| [Continuation Request](#continuation-requests-request-continuation) | `request-continuation` | Record remaining work for follow-up without dispatching a workflow (max: 1) |
 | [Missing Tool](#missing-tool-reporting-report-missing-tool) | `report-missing-tool` | Report missing tools (max: unlimited, same-repo only) |
 | [Missing Data](#missing-data-reporting-report-missing-data) | `report-missing-data` | Report missing data required to achieve goals (max: unlimited, same-repo only) |
 | [Create Issue](#issue-creation-create-issue) | `create-issue` | Auto-injected when no `safe-outputs:` section is present or when only system types (`noop`, `report-missing-tool`, `report-missing-data`) are configured (max: 1, labels and title-prefix set to workflow ID). |
@@ -1455,6 +1456,22 @@ Up to two `noop` calls are accepted by default (`max: 2`), since an agent's firs
 If no action is needed, you MUST call the `noop` tool with a message explaining why:
 {"noop": {"message": "No action needed: [brief explanation]"}}
 ```
+
+### Continuation Requests (`request-continuation:`)
+
+Opt-in diagnostic tool for recording useful work that remains beyond the current run's budget.
+
+```yaml wrap
+safe-outputs:
+  request-continuation:
+    max: 1
+```
+
+The `request_continuation` tool accepts a required nonempty `message` describing the remaining work and relevant context. Its default limit is one request per run. Requests appear in workflow logs and step summaries, but are excluded from GitHub mutation manifests and activity notifications, like `noop`.
+
+A request does not dispatch another workflow, resume an engine session, or prove task completion. It is separate from Copilot's `engine.max-continuations` autopilot setting and artifact-backed durable sessions. Use `noop` when no work remains and `report_incomplete` for blocking failures.
+
+`gh aw audit` and `gh aw logs` expose `continuation_requests` with run and experiment provenance. `gh aw logs --safe-output request-continuation` selects runs containing requests. `gh aw health` summarizes cached requests and affected runs separately from Actions conclusions; missing cached evidence is not evidence of zero requests. Include the `agent` artifact set when collecting evidence, for example `gh aw audit <run-id> --artifacts agent`.
 
 ### Missing Tool Reporting (`report-missing-tool:`)
 

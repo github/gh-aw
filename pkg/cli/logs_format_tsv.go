@@ -33,6 +33,7 @@ func renderLogsTSVToWriter(w io.Writer, data LogsData) {
 	logsTSVLog.Printf("Rendering %d runs as TSV", data.Summary.TotalRuns)
 
 	s := data.Summary
+	renderTSVContinuationRequestSummary(w, s)
 	// Summary line with key aggregates
 	fmt.Fprintf(w, "# %d runs | %s duration | %s tokens | %d turns | %d errors\n",
 		s.TotalRuns, s.TotalDuration, formatTSVSummaryTokens(s.TotalTokens), s.TotalTurns, s.TotalErrors)
@@ -122,6 +123,7 @@ func renderLogsTSVVerboseToWriter(w io.Writer, data LogsData) {
 	logsTSVLog.Printf("Rendering %d runs as verbose TSV", data.Summary.TotalRuns)
 
 	s := data.Summary
+	renderTSVContinuationRequestSummary(w, s)
 	fmt.Fprintf(w, "# %d runs | %s duration | %s tokens | %d turns | %d errors | %d missing_tools | %d github_api_calls\n",
 		s.TotalRuns, s.TotalDuration, formatTSVSummaryTokens(s.TotalTokens), s.TotalTurns, s.TotalErrors, s.TotalMissingTools, s.TotalGitHubAPICalls)
 

@@ -130,6 +130,7 @@ func updateLogsRunMessageCounts(run *ProcessedRun) {
 	run.Run.MissingToolCount = len(run.MissingTools)
 	run.Run.MissingDataCount = len(run.MissingData)
 	run.Run.NoopCount = len(run.Noops)
+	run.Run.ContinuationRequestCount = len(run.ContinuationRequests)
 }
 
 func logsCollectionMessage(opts renderLogsOutputOptions) string {

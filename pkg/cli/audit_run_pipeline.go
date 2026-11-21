@@ -353,6 +353,7 @@ func auditNeedsDetectionArtifact(cfg auditRunConfig, summary *RunSummary) bool {
 }
 
 func processedRunFromSummary(summary *RunSummary, runOutputDir string) ProcessedRun {
+	backfillContinuationRequests(&summary.ContinuationRequests, summary.Run, runOutputDir, false)
 	backfillWorkQueueReport(&summary.WorkQueue, runOutputDir)
 	if summary.Ledger == nil {
 		if activity, err := loadUsageActivitySummary(runOutputDir); err == nil && activity != nil {
@@ -378,6 +379,7 @@ func processedRunFromSummary(summary *RunSummary, runOutputDir string) Processed
 		MissingTools:            summary.MissingTools,
 		MissingData:             summary.MissingData,
 		Noops:                   summary.Noops,
+		ContinuationRequests:    summary.ContinuationRequests,
 		MCPFailures:             summary.MCPFailures,
 		SkillActivations:        summary.SkillActivations,
 		GatewaySteeringEvents:   gatewaySteeringEvents,

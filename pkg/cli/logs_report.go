@@ -41,6 +41,7 @@ type LogsData struct {
 	ErrorsAndWarnings    []ErrorSummary              `json:"errors_and_warnings,omitempty" console:"title:Errors and Warnings,omitempty"`
 	MissingTools         []MissingToolSummary        `json:"missing_tools,omitempty" console:"title:🛠️  Missing Tools Summary,omitempty"`
 	MissingData          []MissingDataSummary        `json:"missing_data,omitempty" console:"title:📊 Missing Data Summary,omitempty"`
+	ContinuationRequests []ContinuationRequestReport `json:"continuation_requests" console:"title:Continuation Requests,omitempty"`
 	MCPFailures          []MCPFailureSummary         `json:"mcp_failures,omitempty" console:"-"`
 	AccessLog            *AccessLogSummary           `json:"access_log,omitempty" console:"title:Access Log Analysis,omitempty"`
 	FirewallLog          *FirewallLogSummary         `json:"firewall_log,omitempty" console:"title:🔥 Firewall Log Analysis,omitempty"`
@@ -111,23 +112,26 @@ type WorkflowContinuation struct {
 
 // LogsSummary contains aggregate metrics across all runs
 type LogsSummary struct {
-	ObsoletePRRuns      int      `json:"obsolete_pr_runs,omitempty" console:"header:Obsolete PR Runs,omitempty"`
-	NonExecutionRuns    int      `json:"non_execution_runs,omitempty" console:"header:Jobless Runs,omitempty"`
-	ExecutedRuns        int      `json:"executed_runs" console:"-"`
-	ExecutedSuccessRuns int      `json:"executed_success_runs" console:"-"`
-	TotalRuns           int      `json:"total_runs" console:"header:Total Runs"`
-	TotalDuration       string   `json:"total_duration" console:"header:Total Duration"`
-	TotalAIC            *float64 `json:"total_aic"`
-	AICCoverage         string   `json:"aic_coverage" console:"-"`
-	TotalTokens         int      `json:"total_tokens,omitempty" console:"header:Total Tokens,format:number,omitempty"`
-	TotalActionMinutes  float64  `json:"total_action_minutes" console:"header:Total Action Minutes"`
-	TotalTurns          int      `json:"total_turns" console:"header:Total Turns"`
-	TotalSteeringEvents int      `json:"total_steering_events,omitempty" console:"header:Total Steering Events,format:number,omitempty"`
-	TotalErrors         int      `json:"total_errors" console:"header:Total Errors"`
-	TotalWarnings       int      `json:"total_warnings" console:"header:Total Warnings"`
-	TotalMissingTools   int      `json:"total_missing_tools" console:"header:Total Missing Tools"`
-	TotalMissingData    int      `json:"total_missing_data" console:"header:Total Missing Data"`
-	TotalSafeItems      int      `json:"total_safe_items" console:"header:Total Safe Items"`
+	ObsoletePRRuns                      int      `json:"obsolete_pr_runs,omitempty" console:"header:Obsolete PR Runs,omitempty"`
+	NonExecutionRuns                    int      `json:"non_execution_runs,omitempty" console:"header:Jobless Runs,omitempty"`
+	ExecutedRuns                        int      `json:"executed_runs" console:"-"`
+	ExecutedSuccessRuns                 int      `json:"executed_success_runs" console:"-"`
+	TotalRuns                           int      `json:"total_runs" console:"header:Total Runs"`
+	TotalDuration                       string   `json:"total_duration" console:"header:Total Duration"`
+	TotalAIC                            *float64 `json:"total_aic"`
+	AICCoverage                         string   `json:"aic_coverage" console:"-"`
+	TotalTokens                         int      `json:"total_tokens,omitempty" console:"header:Total Tokens,format:number,omitempty"`
+	TotalActionMinutes                  float64  `json:"total_action_minutes" console:"header:Total Action Minutes"`
+	TotalTurns                          int      `json:"total_turns" console:"header:Total Turns"`
+	TotalSteeringEvents                 int      `json:"total_steering_events,omitempty" console:"header:Total Steering Events,format:number,omitempty"`
+	TotalErrors                         int      `json:"total_errors" console:"header:Total Errors"`
+	TotalWarnings                       int      `json:"total_warnings" console:"header:Total Warnings"`
+	TotalMissingTools                   int      `json:"total_missing_tools" console:"header:Total Missing Tools"`
+	TotalMissingData                    int      `json:"total_missing_data" console:"header:Total Missing Data"`
+	TotalContinuationRequests           int      `json:"total_continuation_requests" console:"header:Total Continuation Requests"`
+	ContinuationRequestedRuns           int      `json:"continuation_requested_runs" console:"header:Continuation Requested Runs"`
+	ContinuationRequestsUnavailableRuns int      `json:"continuation_requests_unavailable_runs" console:"header:Continuation Requests Unavailable Runs"`
+	TotalSafeItems                      int      `json:"total_safe_items" console:"header:Total Safe Items"`
 	// TotalDriverExitFailures counts failed runs with zero agent turns — the CLI wrapper
 	// or a pre/post-agent infrastructure step exited non-zero before the agent ran.
 	// These are infra-flakiness signals, not agent-logic regressions.
@@ -208,63 +212,65 @@ type RunData struct {
 	ActionMinutes float64 `json:"action_minutes,omitempty" console:"header:Action Minutes,omitempty"`
 	// TokenUsage is always emitted (even when 0) so consumers of the run list can
 	// discover the field and distinguish "no tokens recorded" from "field absent".
-	TokenUsage                 int                    `json:"token_usage" console:"header:Tokens,format:number,omitempty"`
-	AIC                        *float64               `json:"aic"`
-	AICCoverage                string                 `json:"aic_coverage" console:"-"`
-	AmbientContext             *AmbientContextMetrics `json:"ambient_context,omitempty" console:"-"`
-	WorkingSet                 *WorkingSetMetrics     `json:"working_set,omitempty" console:"-"`
-	Ledger                     *LedgerActivity        `json:"ledger,omitempty" console:"-"`
-	WorkQueue                  *WorkQueueReport       `json:"work_queue,omitempty" console:"-"`
-	Friction                   *FrictionCostSummary   `json:"friction,omitempty" console:"-"`
-	WSRF                       string                 `json:"-" console:"header:WSRF,omitempty"`         // Working-Set Rebuild Factor, pre-formatted for table display
-	FrictionAIC                string                 `json:"-" console:"header:Friction AIC,omitempty"` // Precomputed friction cost in AI credits, pre-formatted for table display
-	Turns                      int                    `json:"turns,omitempty" console:"header:Turns,omitempty"`
-	ErrorCount                 int                    `json:"error_count,omitempty" console:"header:Errors"`
-	WarningCount               int                    `json:"warning_count,omitempty" console:"header:Warnings"`
-	MissingToolCount           int                    `json:"missing_tool_count,omitempty" console:"header:Missing Tools"`
-	MissingDataCount           int                    `json:"missing_data_count,omitempty" console:"header:Missing Data"`
-	SafeItemsCount             int                    `json:"safe_items_count,omitempty" console:"header:Safe Items,omitempty"`
-	ManifestEntryCount         int                    `json:"manifest_entry_count,omitempty" console:"-"`
-	TemporaryIDMapStatus       string                 `json:"temporary_id_map_status,omitempty" console:"-"`
-	TemporaryIDMappings        int                    `json:"temporary_id_mappings,omitempty" console:"-"`
-	ChainedTargetCount         int                    `json:"chained_target_count,omitempty" console:"-"`
-	ChainedFollowupActionCount int                    `json:"chained_followup_action_count,omitempty" console:"-"`
-	DelegatedTempTargetCount   int                    `json:"delegated_temp_target_count,omitempty" console:"-"`
-	ClosedTempTargetCount      int                    `json:"closed_temp_target_count,omitempty" console:"-"`
-	CreatedAt                  time.Time              `json:"created_at" console:"header:Created"`
-	StartedAt                  time.Time              `json:"started_at,omitzero" console:"-"`
-	UpdatedAt                  time.Time              `json:"updated_at,omitzero" console:"-"`
-	URL                        string                 `json:"url" console:"-"`
-	LogsPath                   string                 `json:"logs_path" console:"header:Logs Path"`
-	AuditPath                  string                 `json:"audit_path,omitempty" console:"-"`
-	Event                      string                 `json:"event" console:"-"`
-	Branch                     string                 `json:"branch" console:"-"`
-	HeadSHA                    string                 `json:"head_sha,omitempty" console:"-"`
-	DisplayTitle               string                 `json:"display_title,omitempty" console:"-"`
-	Repository                 string                 `json:"repository,omitempty" console:"-"`
-	Organization               string                 `json:"organization,omitempty" console:"-"`
-	Ref                        string                 `json:"ref,omitempty" console:"-"`
-	SHA                        string                 `json:"sha,omitempty" console:"-"`
-	Actor                      string                 `json:"actor,omitempty" console:"-"`
-	RunAttempt                 string                 `json:"run_attempt,omitempty" console:"-"`
-	TargetRepo                 string                 `json:"target_repo,omitempty" console:"-"`
-	EventName                  string                 `json:"event_name,omitempty" console:"-"`
-	Comparison                 *AuditComparisonData   `json:"comparison,omitempty" console:"-"`
-	TaskDomain                 *TaskDomainInfo        `json:"task_domain,omitempty" console:"-"`
-	BehaviorFingerprint        *BehaviorFingerprint   `json:"behavior_fingerprint,omitempty" console:"-"`
-	AgenticAssessments         []AgenticAssessment    `json:"agentic_assessments,omitempty" console:"-"`
-	AwContext                  *AwContext             `json:"context,omitempty" console:"-"` // aw_context data from aw_info.json
-	EpisodeHops                []EpisodeHop           `json:"episode_hops,omitempty" console:"-"`
-	TokenUsageSummary          *TokenUsageSummary     `json:"token_usage_summary,omitempty" console:"-"`                                            // Token usage from firewall proxy
-	SteeringNotices            []SteeringNotice       `json:"steering_notices,omitempty" console:"-"`                                               // AWF steering notices delivered on model requests
-	SteeringDeliveries         []SteeringDelivery     `json:"steering_deliveries,omitempty" console:"-"`                                            // Every AWF steering notice delivery, one per conversation per notice
-	SteeringNoticesUnavailable bool                   `json:"steering_notices_unavailable,omitempty" console:"-"`                                   // True when the unified session could not be read
-	ModelRouting               *ModelRoutingSummary   `json:"model_routing,omitempty" console:"-"`                                                  // AWF model routing and per-run cost attribution
-	GitHubAPICalls             int                    `json:"github_api_calls,omitempty" console:"header:GitHub API Calls,format:number,omitempty"` // GitHub API calls made during the run
-	AvgTimeBetweenTurns        string                 `json:"avg_time_between_turns,omitempty" console:"-"`                                         // Average time between consecutive LLM API calls (TBT)
-	Experiments                *ExperimentData        `json:"experiments,omitempty" console:"-"`                                                    // A/B experiment assignments for this run
-	Graders                    *GradersData           `json:"graders,omitempty" console:"-"`                                                        // Deterministic grader results for this run
-	SafeOutputs                []CreatedItemReport    `json:"safe_outputs,omitempty" console:"-"`                                                   // Entities affected by safe-output handlers
+	TokenUsage                 int                         `json:"token_usage" console:"header:Tokens,format:number,omitempty"`
+	AIC                        *float64                    `json:"aic"`
+	AICCoverage                string                      `json:"aic_coverage" console:"-"`
+	AmbientContext             *AmbientContextMetrics      `json:"ambient_context,omitempty" console:"-"`
+	WorkingSet                 *WorkingSetMetrics          `json:"working_set,omitempty" console:"-"`
+	Ledger                     *LedgerActivity             `json:"ledger,omitempty" console:"-"`
+	WorkQueue                  *WorkQueueReport            `json:"work_queue,omitempty" console:"-"`
+	Friction                   *FrictionCostSummary        `json:"friction,omitempty" console:"-"`
+	WSRF                       string                      `json:"-" console:"header:WSRF,omitempty"`         // Working-Set Rebuild Factor, pre-formatted for table display
+	FrictionAIC                string                      `json:"-" console:"header:Friction AIC,omitempty"` // Precomputed friction cost in AI credits, pre-formatted for table display
+	Turns                      int                         `json:"turns,omitempty" console:"header:Turns,omitempty"`
+	ErrorCount                 int                         `json:"error_count,omitempty" console:"header:Errors"`
+	WarningCount               int                         `json:"warning_count,omitempty" console:"header:Warnings"`
+	MissingToolCount           int                         `json:"missing_tool_count,omitempty" console:"header:Missing Tools"`
+	MissingDataCount           int                         `json:"missing_data_count,omitempty" console:"header:Missing Data"`
+	ContinuationRequestCount   *int                        `json:"continuation_request_count" console:"header:Continuation Requests,omitempty"`
+	ContinuationRequests       []ContinuationRequestReport `json:"continuation_requests" console:"-"`
+	SafeItemsCount             int                         `json:"safe_items_count,omitempty" console:"header:Safe Items,omitempty"`
+	ManifestEntryCount         int                         `json:"manifest_entry_count,omitempty" console:"-"`
+	TemporaryIDMapStatus       string                      `json:"temporary_id_map_status,omitempty" console:"-"`
+	TemporaryIDMappings        int                         `json:"temporary_id_mappings,omitempty" console:"-"`
+	ChainedTargetCount         int                         `json:"chained_target_count,omitempty" console:"-"`
+	ChainedFollowupActionCount int                         `json:"chained_followup_action_count,omitempty" console:"-"`
+	DelegatedTempTargetCount   int                         `json:"delegated_temp_target_count,omitempty" console:"-"`
+	ClosedTempTargetCount      int                         `json:"closed_temp_target_count,omitempty" console:"-"`
+	CreatedAt                  time.Time                   `json:"created_at" console:"header:Created"`
+	StartedAt                  time.Time                   `json:"started_at,omitzero" console:"-"`
+	UpdatedAt                  time.Time                   `json:"updated_at,omitzero" console:"-"`
+	URL                        string                      `json:"url" console:"-"`
+	LogsPath                   string                      `json:"logs_path" console:"header:Logs Path"`
+	AuditPath                  string                      `json:"audit_path,omitempty" console:"-"`
+	Event                      string                      `json:"event" console:"-"`
+	Branch                     string                      `json:"branch" console:"-"`
+	HeadSHA                    string                      `json:"head_sha,omitempty" console:"-"`
+	DisplayTitle               string                      `json:"display_title,omitempty" console:"-"`
+	Repository                 string                      `json:"repository,omitempty" console:"-"`
+	Organization               string                      `json:"organization,omitempty" console:"-"`
+	Ref                        string                      `json:"ref,omitempty" console:"-"`
+	SHA                        string                      `json:"sha,omitempty" console:"-"`
+	Actor                      string                      `json:"actor,omitempty" console:"-"`
+	RunAttempt                 string                      `json:"run_attempt,omitempty" console:"-"`
+	TargetRepo                 string                      `json:"target_repo,omitempty" console:"-"`
+	EventName                  string                      `json:"event_name,omitempty" console:"-"`
+	Comparison                 *AuditComparisonData        `json:"comparison,omitempty" console:"-"`
+	TaskDomain                 *TaskDomainInfo             `json:"task_domain,omitempty" console:"-"`
+	BehaviorFingerprint        *BehaviorFingerprint        `json:"behavior_fingerprint,omitempty" console:"-"`
+	AgenticAssessments         []AgenticAssessment         `json:"agentic_assessments,omitempty" console:"-"`
+	AwContext                  *AwContext                  `json:"context,omitempty" console:"-"` // aw_context data from aw_info.json
+	EpisodeHops                []EpisodeHop                `json:"episode_hops,omitempty" console:"-"`
+	TokenUsageSummary          *TokenUsageSummary          `json:"token_usage_summary,omitempty" console:"-"`                                            // Token usage from firewall proxy
+	SteeringNotices            []SteeringNotice            `json:"steering_notices,omitempty" console:"-"`                                               // AWF steering notices delivered on model requests
+	SteeringDeliveries         []SteeringDelivery          `json:"steering_deliveries,omitempty" console:"-"`                                            // Every AWF steering notice delivery, one per conversation per notice
+	SteeringNoticesUnavailable bool                        `json:"steering_notices_unavailable,omitempty" console:"-"`                                   // True when the unified session could not be read
+	ModelRouting               *ModelRoutingSummary        `json:"model_routing,omitempty" console:"-"`                                                  // AWF model routing and per-run cost attribution
+	GitHubAPICalls             int                         `json:"github_api_calls,omitempty" console:"header:GitHub API Calls,format:number,omitempty"` // GitHub API calls made during the run
+	AvgTimeBetweenTurns        string                      `json:"avg_time_between_turns,omitempty" console:"-"`                                         // Average time between consecutive LLM API calls (TBT)
+	Experiments                *ExperimentData             `json:"experiments,omitempty" console:"-"`                                                    // A/B experiment assignments for this run
+	Graders                    *GradersData                `json:"graders,omitempty" console:"-"`                                                        // Deterministic grader results for this run
+	SafeOutputs                []CreatedItemReport         `json:"safe_outputs,omitempty" console:"-"`                                                   // Entities affected by safe-output handlers
 	// DownloadDurationMS is the wall-clock time (milliseconds) spent by `gh aw logs`
 	// downloading this run's artifacts from GitHub. Zero means no download duration
 	// was recorded for this invocation (for example, an on-disk cache hit); when the
@@ -690,6 +696,8 @@ func newRunData(pr ProcessedRun, engineInfo runEngineInfo, chainMetrics SafeOutp
 		WarningCount:               run.WarningCount,
 		MissingToolCount:           run.MissingToolCount,
 		MissingDataCount:           run.MissingDataCount,
+		ContinuationRequestCount:   continuationRequestCount(pr.ContinuationRequests),
+		ContinuationRequests:       pr.ContinuationRequests,
 		SafeItemsCount:             run.SafeItemsCount,
 		ManifestEntryCount:         chainMetrics.ManifestEntryCount,
 		TemporaryIDMapStatus:       chainMetrics.TemporaryIDMapStatus,
@@ -790,6 +798,20 @@ func buildLogsDataWithCollectionCoverage(processedRuns []ProcessedRun, outputDir
 	data := buildLogsSections(processedRuns)
 	data.Summary = summary
 	data.Runs = runs
+	for _, run := range runs {
+		if run.ContinuationRequestCount == nil {
+			data.Summary.ContinuationRequestsUnavailableRuns++
+			continue
+		}
+		if data.ContinuationRequests == nil {
+			data.ContinuationRequests = []ContinuationRequestReport{}
+		}
+		data.ContinuationRequests = append(data.ContinuationRequests, run.ContinuationRequests...)
+		data.Summary.TotalContinuationRequests += *run.ContinuationRequestCount
+		if *run.ContinuationRequestCount > 0 {
+			data.Summary.ContinuationRequestedRuns++
+		}
+	}
 	data.FailureClusters = annotateFailureClusters(data.Runs)
 	data.FailureInvestigation = buildFailureInvestigation(data.Runs, data.FailureClusters)
 	data.Episodes = episodes

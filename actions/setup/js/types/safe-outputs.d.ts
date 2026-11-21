@@ -571,7 +571,14 @@ interface ResolvePullRequestReviewThreadItem extends BaseSafeOutputItem {
 /**
  * Union type of all possible safe output items
  */
+/** Metadata only; not a completed task or proof of resumed work. */
+interface RequestContinuationItem extends BaseSafeOutputItem {
+  type: "request_continuation";
+  message: string;
+}
+
 type SafeOutputItem =
+  | RequestContinuationItem
   | AddSecurityAdvisoryCommentItem
   | CreateSecurityAdvisoryItem
   | CreateIssueItem
@@ -624,6 +631,7 @@ export {
   CreateSecurityAdvisoryItem,
   // JSONL item types
   BaseSafeOutputItem,
+  RequestContinuationItem,
   IssueArtifactType,
   IssueArtifactInput,
   IssueArtifactBodyInput,

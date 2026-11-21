@@ -279,7 +279,7 @@ func ExtractLogMetricsFromRun(processedRun ProcessedRun) workflow.LogMetrics {
 // legacy directory and recursive layouts), decodes each entry of its "items" array into I,
 // and calls fn for every successfully decoded item. Read and parse problems are reported
 // only when verbose is set, and processing continues without the failing file or item.
-func forEachSafeOutputItem[I any](runDir string, run WorkflowRun, verbose bool, fn func(item I)) {
+func forEachSafeOutputItem[I any](runDir string, run WorkflowRun, verbose bool, fn func(item I)) bool {
 	resolvedAgentOutputFile := resolveAgentOutputFile(runDir, verbose)
 	if resolvedAgentOutputFile == "" {
 		logsMetricsLog.Print("No safe output artifact found")
@@ -287,7 +287,7 @@ func forEachSafeOutputItem[I any](runDir string, run WorkflowRun, verbose bool, 
 			agentOutputJSONPath := filepath.Join(runDir, constants.AgentOutputFilename.String())
 			fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("No safe output artifact found at %s for run %d", agentOutputJSONPath, run.DatabaseID)))
 		}
-		return
+		return false
 	}
 
 	// Sanitize the path to prevent path traversal attacks
@@ -299,7 +299,7 @@ func forEachSafeOutputItem[I any](runDir string, run WorkflowRun, verbose bool, 
 		if verbose {
 			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to read safe output file %s: %v", cleanPath, readErr)))
 		}
-		return // Continue processing without this file
+		return false // Continue processing without this file
 	}
 
 	// Parse the structured JSON output from the collect script
@@ -311,12 +311,21 @@ func forEachSafeOutputItem[I any](runDir string, run WorkflowRun, verbose bool, 
 		if verbose {
 			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to parse safe output JSON from %s: %v", cleanPath, err)))
 		}
-		return // Continue processing without this file
+		return false // Continue processing without this file
+	}
+	if safeOutput.Items == nil {
+		return false
 	}
 
+	validItems := len(safeOutput.Errors) == 0
 	for _, itemRaw := range safeOutput.Items {
+		if strings.TrimSpace(string(itemRaw)) == "null" {
+			validItems = false
+			continue
+		}
 		var item I
 		if err := json.Unmarshal(itemRaw, &item); err != nil {
+			validItems = false
 			if verbose {
 				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to parse item from safe output: %v", err)))
 			}
@@ -324,6 +333,43 @@ func forEachSafeOutputItem[I any](runDir string, run WorkflowRun, verbose bool, 
 		}
 		fn(item)
 	}
+	return validItems
+}
+
+func extractContinuationRequestsFromRun(runDir string, run WorkflowRun, verbose bool, experimentName, variant string) ([]ContinuationRequestReport, error) {
+	var requests []ContinuationRequestReport
+	invalidRequest := false
+	type requestItem struct {
+		Type      string `json:"type"`
+		Message   string `json:"message"`
+		Timestamp string `json:"timestamp"`
+	}
+	available := forEachSafeOutputItem(runDir, run, verbose, func(item requestItem) {
+		if item.Type == "" {
+			invalidRequest = true
+			return
+		}
+		if item.Type != "request_continuation" {
+			return
+		}
+		if strings.TrimSpace(item.Message) == "" {
+			invalidRequest = true
+			return
+		}
+		requests = append(requests, ContinuationRequestReport{
+			Message:          item.Message,
+			ReportProvenance: buildReportProvenance(run, item.Timestamp, experimentName, variant),
+		})
+	})
+	if !available || invalidRequest {
+		logsMetricsLog.Printf("Continuation request evidence unavailable reason=%s", "incomplete_or_invalid_safe_output")
+		return nil, nil
+	}
+	if requests == nil {
+		requests = []ContinuationRequestReport{}
+	}
+	logsMetricsLog.Printf("Extracted continuation requests count=%d", len(requests))
+	return requests, nil
 }
 
 // extractMissingToolsFromRun extracts missing tool reports from a workflow run's artifacts.

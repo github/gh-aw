@@ -787,6 +787,15 @@
             "total_missing_data": {
               "type": "integer"
             },
+            "total_continuation_requests": {
+              "type": "integer"
+            },
+            "continuation_requested_runs": {
+              "type": "integer"
+            },
+            "continuation_requests_unavailable_runs": {
+              "type": "integer"
+            },
             "total_safe_items": {
               "type": "integer"
             },
@@ -873,6 +882,9 @@
             "total_warnings",
             "total_missing_tools",
             "total_missing_data",
+            "total_continuation_requests",
+            "continuation_requested_runs",
+            "continuation_requests_unavailable_runs",
             "total_safe_items",
             "total_driver_exit_failures",
             "total_agent_logic_failures",
@@ -2527,6 +2539,46 @@
               },
               "missing_data_count": {
                 "type": "integer"
+              },
+              "continuation_request_count": {
+                "type": [
+                  "null",
+                  "integer"
+                ]
+              },
+              "continuation_requests": {
+                "type": [
+                  "null",
+                  "array"
+                ],
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "timestamp": {
+                      "type": "string"
+                    },
+                    "workflow_name": {
+                      "type": "string"
+                    },
+                    "run_id": {
+                      "type": "integer"
+                    },
+                    "experiment_name": {
+                      "type": "string"
+                    },
+                    "variant": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "message",
+                    "timestamp"
+                  ],
+                  "additionalProperties": false
+                }
               },
               "safe_items_count": {
                 "type": "integer"
@@ -4952,6 +5004,8 @@
               "token_usage",
               "aic",
               "aic_coverage",
+              "continuation_request_count",
+              "continuation_requests",
               "created_at",
               "url",
               "logs_path",
@@ -6952,6 +7006,40 @@
             "additionalProperties": false
           }
         },
+        "continuation_requests": {
+          "type": [
+            "null",
+            "array"
+          ],
+          "items": {
+            "type": "object",
+            "properties": {
+              "message": {
+                "type": "string"
+              },
+              "timestamp": {
+                "type": "string"
+              },
+              "workflow_name": {
+                "type": "string"
+              },
+              "run_id": {
+                "type": "integer"
+              },
+              "experiment_name": {
+                "type": "string"
+              },
+              "variant": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message",
+              "timestamp"
+            ],
+            "additionalProperties": false
+          }
+        },
         "mcp_failures": {
           "type": [
             "null",
@@ -7747,6 +7835,7 @@
         "runs",
         "episodes",
         "edges",
+        "continuation_requests",
         "logs_location"
       ],
       "additionalProperties": false
