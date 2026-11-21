@@ -747,6 +747,8 @@ function getCreatedTemporaryId(message) {
     return null;
   }
 
+  // Inline-review IDs are URLs scoped to a single review, not shared producers.
+  if (message.type === "create_pull_request_review_comment") return null;
   const tempId = message.temporary_id;
   if (tempId && isTemporaryId(String(tempId))) {
     return normalizeTemporaryId(String(tempId));

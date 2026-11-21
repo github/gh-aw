@@ -18,6 +18,9 @@ const mockGithub = {
     pulls: {
       get: vi.fn(),
       createReview: vi.fn(),
+      submitReview: vi.fn(),
+      updateReview: vi.fn(),
+      deletePendingReview: vi.fn(),
       listFiles: vi.fn(),
       listReviews: vi.fn(),
       listCommentsForReview: vi.fn(),
@@ -288,6 +291,101 @@ describe("pr_review_buffer (factory pattern)", () => {
   });
 
   describe("submitReview", () => {
+    describe("inline comment links", () => {
+      const target = { owner: "owner", repo: "repo", pull_number: 42 };
+      const review = { id: 808, html_url: "https://github.com/owner/repo/pull/42#pullrequestreview-808" };
+      const first = { path: "src/a.ts", line: 42, body: "First finding", temporaryId: "aw_find1" };
+      const firstUrl = "https://github.com/owner/repo/pull/42#discussion_r101";
+      const secondUrl = "https://github.com/owner/repo/pull/42#discussion_r102";
+      const reviewParams = { ...target, review_id: review.id };
+
+      beforeEach(() => {
+        buffer.setReviewContext({ repo: "owner/repo", repoParts: { owner: "owner", repo: "repo" }, pullRequestNumber: 42, pullRequest: { head: { sha: "abc" } } });
+        buffer.addComment(first);
+        buffer.setReviewMetadata("- [Unvalidated input](#aw_find1) `src/a.ts:42`", "COMMENT");
+        mockGithub.rest.pulls.createReview.mockResolvedValue({ data: review });
+        mockGithub.rest.pulls.submitReview.mockReset().mockResolvedValue({ data: review });
+        mockGithub.rest.pulls.listCommentsForReview.mockResolvedValue({ data: [{ ...first, id: 101, html_url: firstUrl }] });
+      });
+
+      it("publishes one review with the resolved summary and no later edit", async () => {
+        expect(await buffer.submitReview()).toMatchObject({ success: true, review_comments: [{ id: 101, url: firstUrl }] });
+        const pulls = mockGithub.rest.pulls;
+        expect(pulls.createReview).toHaveBeenCalledExactlyOnceWith({ ...target, commit_id: expect.any(String), comments: [{ path: first.path, line: first.line, body: first.body }] });
+        expect(pulls.listCommentsForReview).toHaveBeenCalledExactlyOnceWith({ ...reviewParams, per_page: 100, page: 1 });
+        expect(pulls.submitReview).toHaveBeenCalledExactlyOnceWith({ ...reviewParams, event: "COMMENT", body: `- [Unvalidated input](${firstUrl}) \`src/a.ts:42\`` });
+        expect(pulls.updateReview).not.toHaveBeenCalled();
+      });
+
+      it.each(["Summary with no references", "[Unknown finding](#aw_unknown)"])("uses the direct call for %s", async body => {
+        buffer.setReviewMetadata(body, "COMMENT");
+        expect(await buffer.submitReview()).toMatchObject({ success: true });
+        expect(mockGithub.rest.pulls.createReview).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ event: "COMMENT", body }));
+        expect(mockGithub.rest.pulls.submitReview).not.toHaveBeenCalled();
+        if (body.includes("#aw_unknown")) expect(mockCore.warning).toHaveBeenCalledWith(expect.stringContaining("#aw_unknown"));
+      });
+
+      it("matches reordered same-line comments by body", async () => {
+        const second = { ...first, body: "Second finding", temporaryId: "aw_find2" };
+        buffer.addComment(second);
+        buffer.setReviewMetadata("[First](#aw_find1) and [Second](#aw_find2)", "COMMENT");
+        mockGithub.rest.pulls.listCommentsForReview.mockResolvedValue({
+          data: [
+            { ...second, id: 102, html_url: secondUrl },
+            { ...first, id: 101, html_url: firstUrl },
+          ],
+        });
+        expect(await buffer.submitReview()).toMatchObject({ success: true, review_comments: [{ id: 101 }, { id: 102 }] });
+        expect(mockGithub.rest.pulls.submitReview).toHaveBeenCalledWith({ ...reviewParams, event: "COMMENT", body: `[First](${firstUrl}) and [Second](${secondUrl})` });
+      });
+
+      it.each(["listCommentsForReview", "submitReview"])("deletes only this pending review when %s fails", async method => {
+        mockGithub.rest.pulls[method].mockRejectedValueOnce(new Error("Line could not be resolved"));
+        expect(await buffer.submitReview()).toMatchObject({ success: false, error: expect.stringContaining("Line could not be resolved") });
+        expect(mockGithub.rest.pulls.deletePendingReview).toHaveBeenCalledExactlyOnceWith(reviewParams);
+        expect(mockGithub.rest.pulls.createReview).toHaveBeenCalledTimes(1);
+      });
+
+      it("retries submission with COMMENT on a self-authored PR", async () => {
+        buffer.setReviewMetadata("[First](#aw_find1)", "APPROVE");
+        mockGithub.rest.pulls.submitReview.mockRejectedValueOnce(new Error("Can not approve your own pull request"));
+        expect(await buffer.submitReview()).toMatchObject({ success: true, event: "COMMENT" });
+        expect(mockGithub.rest.pulls.createReview).toHaveBeenCalledTimes(1);
+        expect(mockGithub.rest.pulls.submitReview).toHaveBeenNthCalledWith(1, { ...reviewParams, event: "APPROVE", body: `[First](${firstUrl})` });
+        expect(mockGithub.rest.pulls.submitReview).toHaveBeenNthCalledWith(2, { ...reviewParams, event: "COMMENT", body: `[First](${firstUrl})` });
+        expect(mockGithub.rest.pulls.deletePendingReview).not.toHaveBeenCalled();
+      });
+
+      it("publishes directly then updates links when a pending review already exists", async () => {
+        mockGithub.rest.pulls.createReview.mockRejectedValueOnce(new Error("User can only have one pending review per pull request"));
+        expect(await buffer.submitReview()).toMatchObject({ success: true });
+        expect(mockGithub.rest.pulls.createReview).toHaveBeenCalledTimes(2);
+        expect(mockGithub.rest.pulls.createReview).toHaveBeenNthCalledWith(2, expect.objectContaining({ event: "COMMENT", body: expect.stringContaining("[Unvalidated input](#aw_find1)") }));
+        expect(mockGithub.rest.pulls.updateReview).toHaveBeenCalledExactlyOnceWith({ ...reviewParams, body: expect.stringContaining(firstUrl) });
+        expect(mockGithub.rest.pulls.submitReview).not.toHaveBeenCalled();
+        expect(mockGithub.rest.pulls.deletePendingReview).not.toHaveBeenCalled();
+      });
+
+      it("keeps an unmatched reference when the review comment listing is incomplete", async () => {
+        mockGithub.rest.pulls.listCommentsForReview.mockResolvedValue({ data: [] });
+        expect(await buffer.submitReview()).toMatchObject({ success: true });
+        expect(mockGithub.rest.pulls.submitReview).toHaveBeenCalledWith(expect.objectContaining({ body: expect.stringContaining("[Unvalidated input](#aw_find1)") }));
+        expect(mockCore.warning).toHaveBeenCalledWith(expect.stringContaining("#aw_find1"));
+      });
+
+      it("preserves unresolved links in a partial-anchor fallback", async () => {
+        buffer.addComment({ ...first, line: 43, body: "Could not anchor", temporaryId: "aw_find2" });
+        buffer.setReviewMetadata("[First](#aw_find1) and [Second](#aw_find2)", "COMMENT");
+        const error = new Error("Line could not be resolved");
+        error.response = { data: { errors: [{ field: "comments[1].line", message: "Line could not be resolved" }] } };
+        mockGithub.rest.pulls.createReview.mockRejectedValueOnce(error);
+        expect(await buffer.submitReview()).toMatchObject({ success: true, comment_count: 1 });
+        expect(mockGithub.rest.pulls.submitReview).toHaveBeenCalledWith(expect.objectContaining({ body: expect.stringContaining(`[First](${firstUrl}) and [Second](#aw_find2)`) }));
+        expect(mockGithub.rest.pulls.submitReview.mock.calls[0][0].body).toContain("Comments that could not be inline-anchored");
+        expect(mockCore.warning).toHaveBeenCalledWith(expect.stringContaining("#aw_find2"));
+      });
+    });
+
     it("should skip when no comments and no metadata are present", async () => {
       const result = await buffer.submitReview();
 

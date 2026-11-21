@@ -5,7 +5,7 @@
  * PR Review Buffer Factory
  *
  * Creates a buffer instance that collects PR review comments and review metadata
- * so they can be submitted as a single GitHub PR review via pulls.createReview().
+ * so they can be submitted as a single GitHub PR review.
  *
  * Cross-repository validation: The review buffer receives pre-validated repository
  * information from handlers like create_pr_review_comment.cjs which use
@@ -30,6 +30,7 @@ const { attachExecutionState, fetchPullRequestReviewState } = require("./safe_ou
 const { withRetry, RATE_LIMIT_RETRY_CONFIG, isTransientError, sleep } = require("./error_recovery.cjs");
 const { ERR_API } = require("./error_codes.cjs");
 const { renderSizedReport } = require("./report_size.cjs");
+const { normalizeTemporaryId, TEMPORARY_ID_PATTERN } = require("./temporary_id.cjs");
 
 const SUPERSEDE_REVIEW_MESSAGE = "Superseded by updated review from same workflow.";
 const MAX_SUPERSEDE_REVIEW_PAGES = 10;
@@ -67,10 +68,15 @@ const REVIEW_RATE_LIMIT_RETRY_CONFIG = {
  * @property {string} [bodyFooter] - Trusted suffix reserved intact during fallback size fitting
  * @property {import("./report_ast.cjs").ReportBlock[]} [bodyFooterBlocks] - Configured footer kept as nodes for fallback publication
  * @property {string} [rawBody] - Imported agent Markdown before the configured footer was rendered
+ * @property {string} [temporaryId] - Review-local identifier, never sent to GitHub
  * @property {number} [start_line] - Start line for multi-line comments
  * @property {string} [side] - LEFT or RIGHT
  * @property {string} [start_side] - start_side for multi-line comments
  */
+
+// A pending review was created successfully. Do not route subsequent failures
+// through createReview fallbacks, which could publish a second review.
+class PendingReviewPublicationError extends Error {}
 
 /**
  * @typedef {Object} ReviewMetadata
@@ -374,18 +380,23 @@ function createReviewBuffer() {
       bodySuffix.push({ type: "review_marker", workflowCallId: callerWorkflowId, agentTainted: false });
     }
     const agentBody = body;
-    const bodyNodes = parseReportMarkdown(agentBody, { minimumHeadingLevel: 2, allowMetadata: true, agentTainted: true });
-    body = renderSizedReport({ type: "report", title: "Pull request review", children: [...bodyPrefix, ...bodyNodes, ...bodySuffix] }, MAX_REVIEW_BODY_LENGTH).body;
+    const parseBody = text => parseReportMarkdown(text, { minimumHeadingLevel: 2, allowMetadata: true, allowTemporaryIdLinks: true, agentTainted: true });
+    const bodyNodes = parseBody(agentBody);
+    const renderBody = nodes => renderSizedReport({ type: "report", title: "Pull request review", children: [...bodyPrefix, ...nodes, ...bodySuffix] }, MAX_REVIEW_BODY_LENGTH).body;
+    body = renderBody(bodyNodes);
+    const referencedIds = new Set(Array.from(agentBody.matchAll(TEMPORARY_ID_PATTERN), match => normalizeTemporaryId(match[1])));
     /** @type {WeakMap<BufferedComment, string | undefined>} */
     const commentFooters = new WeakMap();
     /** @type {WeakMap<BufferedComment, import("./report_ast.cjs").ReportBlock[] | undefined>} */
     const commentFooterBlocks = new WeakMap();
     /** @type {WeakMap<BufferedComment, string | undefined>} */
     const commentBodies = new WeakMap();
+    /** @type {WeakMap<BufferedComment, string>} */
+    const commentTemporaryIds = new WeakMap();
     /** @param {BufferedComment[]} fallbackComments */
-    const appendFallbackComments = fallbackComments =>
+    const appendFallbackComments = (fallbackComments, nodes = bodyNodes) =>
       appendUnanchoredCommentsSection(
-        bodyNodes,
+        nodes,
         fallbackComments.map(comment => ({ ...comment, bodyFooter: commentFooters.get(comment), bodyFooterBlocks: commentFooterBlocks.get(comment), rawBody: commentBodies.get(comment) })),
         { prefix: bodyPrefix, suffix: bodySuffix }
       );
@@ -401,6 +412,7 @@ function createReviewBuffer() {
       commentFooters.set(apiComment, comment.bodyFooter);
       commentFooterBlocks.set(apiComment, comment.bodyFooterBlocks);
       commentBodies.set(apiComment, comment.rawBody);
+      if (comment.temporaryId) commentTemporaryIds.set(apiComment, comment.temporaryId);
 
       if (comment.start_line !== undefined) {
         apiComment.start_line = comment.start_line;
@@ -612,6 +624,87 @@ function createReviewBuffer() {
       return withRetry(() => github.rest.pulls.createReview(params), REVIEW_RATE_LIMIT_RETRY_CONFIG, `pulls.createReview ${repo}#${pullRequestNumber}`);
     }
 
+    const ownPrMessages = ["Can not request changes on your own pull request", "Can not approve your own pull request"];
+    /** @type {Map<BufferedComment, any> | undefined} */
+    let linkedComments;
+
+    async function resolveCommentLinks(reviewParams, submittedComments, fallbackComments) {
+      const listed = [];
+      for (let page = 1; listed.length < submittedComments.length; page++) {
+        const { data } = await github.rest.pulls.listCommentsForReview({ ...reviewParams, per_page: 100, page });
+        listed.push(...data);
+        if (data.length < 100) break;
+      }
+      linkedComments = matchReviewComments(submittedComments, listed);
+      const urls = new Map();
+      for (const [comment, match] of linkedComments) {
+        const id = commentTemporaryIds.get(comment);
+        if (id && match.html_url) urls.set(id, match.html_url);
+      }
+      warnUnresolvedLinks(urls);
+      const resolved = agentBody.replace(TEMPORARY_ID_PATTERN, (match, id) => urls.get(normalizeTemporaryId(id)) ?? match);
+      if (resolved === agentBody) return undefined;
+      const nodes = parseBody(resolved);
+      return fallbackComments.length ? appendFallbackComments(fallbackComments, nodes) : renderBody(nodes);
+    }
+
+    function warnUnresolvedLinks(urls = new Map()) {
+      for (const id of referencedIds) {
+        if (!urls.has(id)) core.warning(`Could not resolve review comment reference #${id} on ${repo}#${pullRequestNumber}; leaving it unchanged`);
+      }
+    }
+
+    async function publishReview(params, fallbackComments = []) {
+      const submittedComments = params.comments ?? [];
+      if (!submittedComments.some(comment => referencedIds.has(commentTemporaryIds.get(comment) ?? ""))) {
+        const response = await createReviewWithRetry(params);
+        warnUnresolvedLinks();
+        return response;
+      }
+
+      const { event: requestedEvent, body: unresolvedBody, ...pendingParams } = params;
+      const { owner, repo: repoName, pull_number } = params;
+      const target = { owner, repo: repoName, pull_number };
+      let pending;
+      try {
+        ({ data: pending } = await createReviewWithRetry(pendingParams));
+      } catch (error) {
+        if (!/(?:already (?:have|has) (?:a )?pending review|(?:only (?:have|one)|already exists).*pending review|pending review already exists)/i.test(getErrorMessage(error))) throw error;
+        core.warning(`A pending review already exists on ${repo}#${pullRequestNumber}; publishing directly and then updating the summary links`);
+        const response = await createReviewWithRetry(params);
+        try {
+          const reviewParams = { ...target, review_id: response.data.id };
+          const resolvedBody = await resolveCommentLinks(reviewParams, submittedComments, fallbackComments);
+          if (resolvedBody !== undefined) await github.rest.pulls.updateReview({ ...reviewParams, body: resolvedBody });
+        } catch (updateError) {
+          core.warning(`Review #${response.data.id} was published, but its summary links could not be updated: ${getErrorMessage(updateError)}`);
+        }
+        return response;
+      }
+
+      const reviewParams = { ...target, review_id: pending.id };
+      try {
+        const resolvedBody = (await resolveCommentLinks(reviewParams, submittedComments, fallbackComments)) ?? unresolvedBody;
+        const submitParams = { ...reviewParams, event: requestedEvent, body: resolvedBody };
+        try {
+          return await github.rest.pulls.submitReview(submitParams);
+        } catch (error) {
+          if (requestedEvent === "COMMENT" || !ownPrMessages.some(msg => getErrorMessage(error).includes(msg))) throw error;
+          core.warning(`Cannot submit ${requestedEvent} review on own PR. Retrying with event=COMMENT.`);
+          const response = await github.rest.pulls.submitReview({ ...submitParams, event: "COMMENT" });
+          event = "COMMENT";
+          return response;
+        }
+      } catch (error) {
+        try {
+          await github.rest.pulls.deletePendingReview(reviewParams);
+        } catch (cleanupError) {
+          core.warning(`Could not delete pending review #${pending.id}: ${getErrorMessage(cleanupError)}`);
+        }
+        throw new PendingReviewPublicationError(`${ERR_API}: ${getErrorMessage(error)}`, { cause: error });
+      }
+    }
+
     async function fetchAfterStateIfAvailable() {
       // Only fetch after-state when before-state capture succeeded; otherwise we are
       // already in degraded mode and avoid spending another API call on metadata.
@@ -642,7 +735,12 @@ function createReviewBuffer() {
           review_id: review.id,
         },
       }));
-      if (commentCount > 0 && typeof github.rest.pulls.listCommentsForReview === "function") {
+      if (linkedComments) {
+        reviewComments = reviewComments.map((submitted, index) => {
+          const comment = linkedComments?.get(/** @type {BufferedComment} */ submittedComments[index]);
+          return comment ? { ...submitted, id: comment.id, url: comment.html_url, metadata: { ...submitted.metadata, ...(comment.node_id ? { node_id: comment.node_id } : {}) } } : submitted;
+        });
+      } else if (commentCount > 0 && typeof github.rest.pulls.listCommentsForReview === "function") {
         try {
           const { data } = await github.rest.pulls.listCommentsForReview({
             owner: repoParts.owner,
@@ -700,7 +798,7 @@ function createReviewBuffer() {
     }
 
     try {
-      const { data: review } = await createReviewWithRetry(requestParams);
+      const { data: review } = await publishReview(requestParams);
       await maybeSupersedeOlderReviews(review.id);
       const afterState = await fetchAfterStateIfAvailable();
 
@@ -709,16 +807,19 @@ function createReviewBuffer() {
       return await buildReviewSuccessResult(review, event, comments, afterState);
     } catch (error) {
       const errorMessage = getErrorMessage(error);
+      if (error instanceof PendingReviewPublicationError) {
+        core.error(`Failed to publish pending PR review: ${errorMessage}`);
+        return { success: false, error: errorMessage };
+      }
 
       // Retry with COMMENT when the API rejects APPROVE/REQUEST_CHANGES on own PR.
       // This handles all token types (GITHUB_TOKEN lacks read:user scope for proactive checks).
       // These error message strings are returned verbatim by the GitHub API (Unprocessable Entity).
-      const ownPrMessages = ["Can not request changes on your own pull request", "Can not approve your own pull request"];
       if (event !== "COMMENT" && ownPrMessages.some(msg => errorMessage.includes(msg))) {
         core.warning(`Cannot submit ${event} review on own PR. Retrying with event=COMMENT.`);
         try {
           requestParams.event = "COMMENT";
-          const { data: review } = await createReviewWithRetry(requestParams);
+          const { data: review } = await publishReview(requestParams);
           await maybeSupersedeOlderReviews(review.id);
           const afterState = await fetchAfterStateIfAvailable();
           core.info(`Created PR review #${review.id}: ${review.html_url}`);
@@ -726,14 +827,14 @@ function createReviewBuffer() {
         } catch (retryError) {
           const retryErrorMsg = getErrorMessage(retryError);
           // If the COMMENT retry still fails due to unresolvable line(s), fall back to body-only COMMENT.
-          if (requiredComments.length === 0 && (retryErrorMsg.includes("Line could not be resolved") || retryErrorMsg.includes("Path could not be resolved"))) {
+          if (!(retryError instanceof PendingReviewPublicationError) && requiredComments.length === 0 && (retryErrorMsg.includes("Line could not be resolved") || retryErrorMsg.includes("Path could not be resolved"))) {
             core.warning(`COMMENT retry on own PR failed with unresolvable line(s): ${retryErrorMsg}. Falling back to body-only COMMENT.`);
             try {
               const ownPrBodyOnlyParams = { ...requestParams };
               delete ownPrBodyOnlyParams.comments;
               ownPrBodyOnlyParams.event = "COMMENT";
               ownPrBodyOnlyParams.body = appendFallbackComments(comments);
-              const { data: review } = await createReviewWithRetry(ownPrBodyOnlyParams);
+              const { data: review } = await publishReview(ownPrBodyOnlyParams);
               await maybeSupersedeOlderReviews(review.id);
               const afterState = await fetchAfterStateIfAvailable();
               core.info(`Created PR review #${review.id} (own-PR body-only COMMENT): ${review.html_url}`);
@@ -761,7 +862,7 @@ function createReviewBuffer() {
         for (let attempt = 1; attempt <= LOCKED_PR_RETRY_COUNT; attempt++) {
           await sleep(LOCKED_PR_RETRY_DELAY_MS);
           try {
-            const { data: review } = await createReviewWithRetry(requestParams);
+            const { data: review } = await publishReview(requestParams);
             await maybeSupersedeOlderReviews(review.id);
             const afterState = await fetchAfterStateIfAvailable();
             core.info(`Created PR review #${review.id} after lock retry (attempt ${attempt}/${LOCKED_PR_RETRY_COUNT}): ${review.html_url}`);
@@ -804,12 +905,16 @@ function createReviewBuffer() {
                 comments: resolvableComments,
                 body: appendFallbackComments(unresolvableComments),
               };
-              const { data: review } = await createReviewWithRetry(partialParams);
+              const { data: review } = await publishReview(partialParams, unresolvableComments);
               await maybeSupersedeOlderReviews(review.id);
               const afterState = await fetchAfterStateIfAvailable();
               core.info(`Created PR review #${review.id} (partial-anchor fallback): ${review.html_url}`);
               return await buildReviewSuccessResult(review, event, resolvableComments, afterState);
             } catch (partialRetryError) {
+              if (partialRetryError instanceof PendingReviewPublicationError) {
+                core.error(`Failed to publish pending PR review: ${getErrorMessage(partialRetryError)}`);
+                return { success: false, error: getErrorMessage(partialRetryError) };
+              }
               core.warning(`Failed to submit partially anchored PR review: ${getErrorMessage(partialRetryError)}. Falling back to body-only review.`);
             }
           }
@@ -821,7 +926,7 @@ function createReviewBuffer() {
         delete bodyOnlyParams.comments;
         bodyOnlyParams.body = appendFallbackComments(comments);
         try {
-          const { data: review } = await createReviewWithRetry(bodyOnlyParams);
+          const { data: review } = await publishReview(bodyOnlyParams);
           await maybeSupersedeOlderReviews(review.id);
           const afterState = await fetchAfterStateIfAvailable();
           core.info(`Created PR review #${review.id} (body-only fallback): ${review.html_url}`);
@@ -833,7 +938,7 @@ function createReviewBuffer() {
             core.warning(`Body-only ${bodyOnlyParams.event} review rejected on own PR. Retrying as body-only COMMENT.`);
             try {
               bodyOnlyParams.event = "COMMENT";
-              const { data: review } = await createReviewWithRetry(bodyOnlyParams);
+              const { data: review } = await publishReview(bodyOnlyParams);
               await maybeSupersedeOlderReviews(review.id);
               const afterState = await fetchAfterStateIfAvailable();
               core.info(`Created PR review #${review.id} (body-only COMMENT fallback): ${review.html_url}`);
@@ -1076,6 +1181,38 @@ function extractUnresolvableCommentIndices(error, totalComments) {
   }
 
   return Array.from(indices).sort((a, b) => a - b);
+}
+
+/**
+ * @param {BufferedComment[]} submitted
+ * @param {any[]} listed
+ */
+function matchReviewComments(submitted, listed) {
+  const matched = new Map();
+  const unmatched = new Set(listed);
+  for (const comment of submitted) {
+    const matches = [...unmatched].filter(
+      actual =>
+        actual.path === comment.path &&
+        (actual.line ?? actual.original_line) === comment.line &&
+        (actual.start_line ?? actual.original_start_line ?? undefined) === comment.start_line &&
+        (actual.side ?? "RIGHT") === (comment.side ?? "RIGHT") &&
+        actual.body === comment.body
+    );
+    if (matches.length === 1) {
+      matched.set(comment, matches[0]);
+      unmatched.delete(matches[0]);
+    }
+  }
+  // Use submission order only when the listing is complete; otherwise a missing
+  // comment could shift the remaining URLs onto the wrong findings.
+  if (listed.length === submitted.length) {
+    const remaining = [...unmatched];
+    for (const comment of submitted) {
+      if (!matched.has(comment)) matched.set(comment, remaining.shift());
+    }
+  }
+  return matched;
 }
 
 /**

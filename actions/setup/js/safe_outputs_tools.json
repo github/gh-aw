@@ -619,6 +619,12 @@
           "description": "Review comment content in Markdown. Provide specific, actionable feedback about the code at this location. Oversized agent content is automatically redacted to fit the published body without shortening footers or markers.",
           "maxLength": 524288
         },
+        "temporary_id": {
+          "type": "string",
+          "pattern": "^#?aw_[A-Za-z0-9_]{3,12}$",
+          "description": "Unique temporary identifier for this inline comment. Use #aw_ID as a Markdown link destination in the summary of the same review, e.g. [Finding](#aw_find1). The optional # prefix is accepted on the identifier.",
+          "x-synonyms": ["temporaryId"]
+        },
         "pull_request_number": {
           "type": ["number", "string"],
           "description": "Pull request number to add the review comment to. This is the numeric ID from the GitHub URL (e.g., 876 in github.com/owner/repo/pull/876). If omitted, adds the comment to the PR that triggered this workflow. Required when the workflow target is '*' (any PR) \u2014 omitting it will cause the comment to fail.",
