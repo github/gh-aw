@@ -48,7 +48,7 @@ describe("checkpoint and expiration internal-state regressions", () => {
     assert.notEqual(legacy[0].operations[0].state_sha256, current[0].operations[0].state_sha256);
     const recovered = reconstructCheckpoint(log, "a".repeat(40), administrator, 100, legacy[0].operations[0].state_sha256);
     assert.equal(canonical(recovered), canonical(legacy));
-    assert.equal(canonical(serializeProjection(replayCheckpointSource(serializeTransactionLog(log), "a".repeat(40), legacy[0]))), canonical(serializeProjection(replayTransactions(log))));
+    assert.equal(canonical(serializeProjection(replayCheckpointSource(serializeTransactionLog(log), "a".repeat(40), legacy[0]).state)), canonical(serializeProjection(replayTransactions(log))));
     const state = replayTransactions(recovered);
     const prior = state.requests.get(log[1].request.id);
     const original = { nodes: log[1].request.parameters.nodes.map(({ kind, batch_trust_domain, enqueued, ...node }) => node) };
@@ -63,7 +63,7 @@ describe("checkpoint and expiration internal-state regressions", () => {
     const contents = serializeTransactionLog(log);
     const root = compactTransactions(log, prior, administrator, 100)[0];
     const replayed = replayCheckpointSource(contents, prior, root);
-    assert.equal(canonical(serializeProjection(replayed)), canonical(serializeProjection(replayTransactions(log))));
+    assert.equal(canonical(serializeProjection(replayed.state)), canonical(serializeProjection(replayTransactions(log))));
     for (const field of ["prior_git_sha", "prior_tip", "history_sha256", "state_sha256"]) {
       const changed = structuredClone(root);
       changed.operations[0][field] = field === "prior_tip" ? "different-tip" : "b".repeat(field === "prior_git_sha" ? 40 : 64);
