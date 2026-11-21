@@ -112,7 +112,7 @@ Call the `upload_asset` tool for each chart image:
 { "path": "/tmp/gh-aw/python/charts/trend.png" }
 ```
 
-Do not include a `type` field; the `upload_asset` tool rejects it.
+Omit `type`; the schema accepts only `path`, plus optional `secrecy` and `integrity`.
 
 The tool returns a direct URL to the uploaded image.
 

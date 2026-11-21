@@ -16,7 +16,8 @@ describe("start_safe_outputs_server.sh", () => {
 
   it.each(["start_safe_outputs_server.sh", "start_mcp_scripts_server.sh"])("%s inherits DEBUG instead of forcing verbose logging", script => {
     const content = fs.readFileSync(path.join(__dirname, "../sh", script), "utf8");
-    assert.match(content, /^node mcp-server\.cjs >> /m);
+    const launchCommand = script === "start_mcp_scripts_server.sh" ? /^"\$GH_AW_NODE" mcp-server\.cjs >> /m : /^node mcp-server\.cjs >> /m;
+    assert.match(content, launchCommand);
     assert.doesNotMatch(content, /DEBUG=["']\*["']/);
   });
 

@@ -10,6 +10,8 @@ import (
 
 var compilerYamlStepGenerationLog = logger.New("workflow:compiler_yaml_step_generation")
 
+const scriptModeActionsSourcePathTemplate = "${{ runner.temp }}/gh-aw-actions-source-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.job }}-${{ strategy.job-index }}"
+
 // generateCheckoutActionsFolder generates the checkout step for the actions folder
 // when running in dev mode and not using the action-tag feature. This is used to
 // checkout the local actions before running the setup action.
@@ -37,26 +39,9 @@ func (c *Compiler) generateCheckoutActionsFolder(data *WorkflowData) []string {
 	// that were added after the latest tag.
 	ref := versionToGitRef(c.version)
 
-	// Script mode: checkout .github folder from github/gh-aw to /tmp/gh-aw/actions-source/
+	// Script mode: check out the actions folder to an invocation-private path outside /tmp/gh-aw.
 	if c.actionMode.IsScript() {
-		lines := []string{
-			"      - name: Checkout actions folder\n",
-			fmt.Sprintf("        uses: %s\n", getActionPin("actions/checkout")),
-			"        with:\n",
-			"          repository: github/gh-aw\n",
-		}
-		if ref != "" {
-			lines = append(lines, fmt.Sprintf("          ref: %s\n", ref))
-		}
-		lines = append(lines,
-			"          sparse-checkout: |\n",
-			"            actions\n",
-			"          path: /tmp/gh-aw/actions-source\n",
-			"          fetch-depth: 1\n",
-			"          clean: false\n",
-			"          persist-credentials: false\n",
-		)
-		return lines
+		return generateScriptModeActionsCheckout(ref)
 	}
 
 	// Dev mode: checkout actions folder from github/gh-aw so that cross-repo
@@ -82,6 +67,30 @@ func (c *Compiler) generateCheckoutActionsFolder(data *WorkflowData) []string {
 	return nil
 }
 
+func generateScriptModeActionsCheckout(ref string) []string {
+	lines := []string{
+		"      - name: Checkout actions folder\n",
+		fmt.Sprintf("        uses: %s\n", getActionPin("actions/checkout")),
+		"        with:\n",
+		"          repository: github/gh-aw\n",
+	}
+	if ref != "" {
+		lines = append(lines, fmt.Sprintf("          ref: %s\n", ref))
+	}
+	return append(lines,
+		"          sparse-checkout: |\n",
+		"            actions\n",
+		fmt.Sprintf("          path: %s\n", scriptModeActionsSourcePath()),
+		"          fetch-depth: 1\n",
+		"          clean: false\n",
+		"          persist-credentials: false\n",
+	)
+}
+
+func scriptModeActionsSourcePath() string {
+	return scriptModeActionsSourcePathTemplate
+}
+
 // generateRestoreActionsSetupStep generates a single "Restore actions folder" step that
 // re-checks out only the actions/setup subfolder from github/gh-aw. This is used in dev mode
 // after a job step has checked out a different repository (or a different git branch) and
@@ -98,7 +107,7 @@ func (c *Compiler) generateRestoreActionsSetupStep() string {
 	var step strings.Builder
 	step.WriteString("      - name: Restore actions folder\n")
 	step.WriteString("        if: always()\n")
-	fmt.Fprintf(&step, "        uses: %s\n", getActionPin("actions/checkout"))
+	step.WriteString("        uses: " + getActionPin("actions/checkout") + "\n")
 	step.WriteString("        with:\n")
 	step.WriteString("          repository: github/gh-aw\n")
 	step.WriteString("          sparse-checkout: |\n")
@@ -243,12 +252,20 @@ func (c *Compiler) generateSetupStepWithArtifactClientCondition(data *WorkflowDa
 
 	// Script mode: run the setup.sh script directly
 	if c.actionMode.IsScript() {
+		lines = append(lines,
+			"      - name: Setup Node.js for gh-aw setup\n",
+			"        if: runner.environment == 'self-hosted'\n",
+			fmt.Sprintf("        uses: %s\n", getActionPin("actions/setup-node")),
+			"        with:\n",
+			fmt.Sprintf("          node-version: %s\n", constants.DefaultNodeVersion),
+		)
 		setupLines := []string{
 			"      - name: Setup Scripts\n",
 			"        id: setup\n",
 			"        run: |\n",
-			"          bash /tmp/gh-aw/actions-source/actions/setup/setup.sh\n",
+			"          bash \"${GH_AW_ACTIONS_SOURCE_DIR}/actions/setup/setup.sh\"\n",
 			"        env:\n",
+			fmt.Sprintf("          GH_AW_ACTIONS_SOURCE_DIR: %s\n", scriptModeActionsSourcePath()),
 			fmt.Sprintf("          INPUT_DESTINATION: %s\n", destination),
 			"          INPUT_JOB_NAME: ${{ github.job }}\n",
 		}
@@ -380,9 +397,10 @@ func (c *Compiler) generateScriptModeCleanupStep() string {
 	step.WriteString("      - name: Clean Scripts\n")
 	step.WriteString("        if: always()\n")
 	step.WriteString("        run: |\n")
-	step.WriteString("          bash /tmp/gh-aw/actions-source/actions/setup/clean.sh\n")
+	step.WriteString("          bash \"${GH_AW_ACTIONS_SOURCE_DIR}/actions/setup/clean.sh\"\n")
 	step.WriteString("        env:\n")
-	fmt.Fprintf(&step, "          INPUT_DESTINATION: %s\n", SetupActionDestination)
+	step.WriteString("          GH_AW_ACTIONS_SOURCE_DIR: " + scriptModeActionsSourcePath() + "\n")
+	step.WriteString("          INPUT_DESTINATION: " + SetupActionDestination + "\n")
 	step.WriteString("          INPUT_JOB_NAME: ${{ github.job }}\n")
 	return step.String()
 }

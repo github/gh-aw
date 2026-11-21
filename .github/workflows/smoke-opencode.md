@@ -56,7 +56,7 @@ safe-outputs:
       expires: 2h
       close-older-issues: true
       close-older-key: "smoke-opencode"
-      labels: [automation, testing]
+      labels: [automation, testing, "backlog:smoke-tests"]
     add-labels:
       allowed: [smoke-opencode]
     messages:

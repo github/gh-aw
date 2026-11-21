@@ -149,6 +149,11 @@ func TestGatewayAdmissionSetupDoesNotMintOtherCredentials(t *testing.T) {
 			assert.NotContains(t, steps, "mint-otlp-oidc-token")
 			assert.NotContains(t, steps, "https://example.com/collector")
 			assert.NotContains(t, steps, "create-github-app-token")
+			if mode.IsScript() {
+				assert.Contains(t, steps, "if: always()\n        run: |\n          bash \"${GH_AW_ACTIONS_SOURCE_DIR}/actions/setup/clean.sh\"")
+			} else {
+				assert.NotContains(t, steps, "Clean Scripts")
+			}
 			assert.Contains(t, job.Permissions, "id-token: write")
 		})
 	}
