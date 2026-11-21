@@ -7,6 +7,8 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"maps"
+	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -105,6 +107,80 @@ func TestCopilotSDKCompilesWithFrozenNPMGraph(t *testing.T) {
 				return
 			}
 			t.Fatal("compiled workflow is missing its SDK install step")
+		})
+	}
+}
+
+func TestCopilotSDKFrontmatterPin(t *testing.T) {
+	digest := strings.Repeat("a", 64)
+	pin := "    version: '1.2.3'\n    sha256: '" + digest + "'\n"
+	for _, tc := range []struct {
+		name, fields, extra, topLevel, variant, wantError string
+	}{
+		{name: "Node", fields: pin, variant: "node"},
+		{name: "TypeScript", fields: pin, extra: "  command: ts-node driver.ts\n", variant: "typescript"},
+		{name: "missing digest", fields: "    version: '1.2.3'\n", wantError: "error:"},
+		{name: "invalid version", fields: strings.Replace(pin, "'1.2.3'", "latest", 1), wantError: "version"},
+		{name: "invalid digest", fields: strings.Replace(pin, digest, "invalid", 1), wantError: "error:"},
+		{name: "unsupported driver", fields: pin, extra: "  command: python3 driver.py\n", wantError: "npm-backed"},
+		{name: "checkout disabled", fields: pin, topLevel: "checkout: false\n", wantError: "require a checkout"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "sdk.md")
+			c := NewCompiler(WithSkipValidation(true))
+			source := "---\non: workflow_dispatch\n" + tc.topLevel + "engine:\n  id: copilot\n  version: '1.0.103'\n  copilot-sdk:\n" + tc.fields + tc.extra + "---\nInspect the repository.\n"
+			require.NoError(t, os.WriteFile(path, []byte(source), 0o600))
+			err := c.CompileWorkflow(path)
+			if tc.wantError != "" {
+				require.ErrorContains(t, err, tc.wantError)
+				return
+			}
+			require.NoError(t, err)
+			content, err := os.ReadFile(filepath.Join(filepath.Dir(path), "sdk.lock.yml"))
+			require.NoError(t, err)
+			require.Contains(t, string(content), copilotSDKNodeInstallCommand+" "+tc.variant+" "+digest+" 1.2.3")
+			metadata, legacy, err := ExtractMetadataFromLockFile(string(content))
+			require.NoError(t, err)
+			require.False(t, legacy)
+			require.NotNil(t, metadata)
+			require.Equal(t, "1.2.3", metadata.EngineVersions["copilot-sdk"])
+			require.Equal(t, "1.0.103", metadata.EngineVersions["copilot"])
+		})
+	}
+}
+
+func TestCopilotSDKInstallerVerifiesCustomPin(t *testing.T) {
+	for _, tool := range []string{"bash", "jq"} {
+		if _, err := exec.LookPath(tool); err != nil {
+			t.Skipf("%s is required", tool)
+		}
+	}
+	script, err := filepath.Abs("../../actions/setup/sh/install_copilot_sdk.sh")
+	require.NoError(t, err)
+	for _, tc := range []struct{ name, version, digest, wantError string }{
+		{name: "matching pin", version: string(constants.DefaultCopilotSDKVersion), digest: copilotSDKNodeProject.digest},
+		{name: "mismatched version", version: "0.0.0", digest: copilotSDKNodeProject.digest, wantError: "Expected a registry-only npm v3 lockfile"},
+		{name: "mismatched digest", version: string(constants.DefaultCopilotSDKVersion), digest: strings.Repeat("0", 64), wantError: "does not match the compiled workflow"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			root := t.TempDir()
+			project := filepath.Join(root, ".github", "aw", "copilot-sdk", tc.version, "node")
+			require.NoError(t, os.MkdirAll(project, 0o755))
+			require.NoError(t, os.WriteFile(filepath.Join(project, "package.json"), []byte(setup.CopilotSDKNodeManifest), 0o600))
+			require.NoError(t, os.WriteFile(filepath.Join(project, "package-lock.json"), []byte(setup.CopilotSDKNodeLock), 0o600))
+			require.NoError(t, os.WriteFile(filepath.Join(root, "npm"), []byte("#!/bin/bash\nprintf 'npm %s\\n' \"$*\"\n"), 0o700))
+			cmd := exec.CommandContext(t.Context(), "bash", script, "node", tc.digest, tc.version)
+			cmd.Env = append(os.Environ(), "GITHUB_WORKSPACE="+root, "RUNNER_TEMP="+root, "PATH="+root+string(os.PathListSeparator)+os.Getenv("PATH"))
+			output, err := cmd.CombinedOutput()
+			if tc.wantError != "" {
+				require.Error(t, err)
+				require.Contains(t, string(output), tc.wantError)
+				require.NotContains(t, string(output), "npm ci")
+				return
+			}
+			require.NoError(t, err, "%s", output)
+			require.Contains(t, string(output), "npm ci --prefix ")
+			require.Contains(t, string(output), "--ignore-scripts")
 		})
 	}
 }

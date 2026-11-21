@@ -203,6 +203,20 @@ func selectCopilotSDKInstallSpec(workflowData *WorkflowData) copilotSDKInstallSp
 	if workflowData == nil || workflowData.EngineConfig == nil || !workflowData.EngineConfig.CopilotSDK {
 		return copilotSDKInstallSpec{}
 	}
+	spec := selectDefaultCopilotSDKInstallSpec(workflowData)
+	if pin := workflowData.EngineConfig.CopilotSDKPin; pin != nil && spec.npm != nil {
+		if !pin.valid() {
+			return copilotSDKInstallSpec{
+				stepName: spec.stepName,
+				command:  `echo "::error::Invalid engine.copilot-sdk version or sha256" >&2; exit 1`,
+			}
+		}
+		spec.npm = &copilotSDKNPMProject{variant: spec.npm.variant, digest: pin.SHA256, version: pin.Version}
+	}
+	return spec
+}
+
+func selectDefaultCopilotSDKInstallSpec(workflowData *WorkflowData) copilotSDKInstallSpec {
 	if inlineRuntimeID := copilotSDKInlineDriverRuntimeID(workflowData); inlineRuntimeID != "" {
 		return getInlineCopilotSDKInstallSpec(inlineRuntimeID)
 	}

@@ -16091,8 +16091,27 @@
               "additionalProperties": false
             },
             "copilot-sdk": {
-              "type": "boolean",
-              "description": "Enables the experimental GitHub Copilot SDK integration (copilot engine only). When true, the harness starts a separate headless Copilot CLI sidecar on the configured localhost port and sets COPILOT_SDK_URI on child processes."
+              "description": "Enables Copilot SDK integration. An object pins a checked-in npm project for a Node.js or TypeScript driver.",
+              "oneOf": [
+                { "type": "boolean" },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["version", "sha256"],
+                  "properties": {
+                    "version": {
+                      "type": "string",
+                      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$",
+                      "description": "Exact stable version of @github/copilot-sdk, independent of engine.version."
+                    },
+                    "sha256": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{64}$",
+                      "description": "Lowercase SHA-256 of the checked-in manifest, a NUL byte, and the npm lockfile."
+                    }
+                  }
+                }
+              ]
             },
             "driver": {
               "description": "Custom driver script, command, or inline source for the engine. String values accept a workspace-relative path or bare name. Inline object values are supported for the Copilot engine and materialize runtime files before execution. Supported inline runtimes are node, python, go, and java.",
