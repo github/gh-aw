@@ -29,7 +29,7 @@ imports:
     with:
       title-prefix: "[spdd] "
       expires: 3d
-      labels: [spdd, specifications, planning, automation]
+      labels: [spdd, specifications, planning, automation, "backlog:reports"]
       assignees: [copilot]
 
   - shared/otlp.md
