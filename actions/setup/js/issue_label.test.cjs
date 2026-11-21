@@ -1,7 +1,7 @@
 // @ts-check
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-const { getIssueLabel, getIssueLabelQuery, getRunIssueLabels } = require("./issue_label.cjs");
+const { getIssueLabel, getIssueLabelQuery } = require("./issue_label.cjs");
 
 afterEach(() => vi.unstubAllEnvs());
 
@@ -21,11 +21,5 @@ describe("issue label", () => {
   it("escapes quotes and backslashes in search values", () => {
     vi.stubEnv("GH_AW_ISSUE_LABEL", 'area:"workflow\\issues"');
     expect(getIssueLabelQuery()).toBe('label:"area:\\"workflow\\\\issues\\""');
-  });
-
-  it("adds the gh-aw backlog label only to run reports targeting this repository", () => {
-    vi.stubEnv("GH_AW_ISSUE_LABEL", "custom-run-label");
-    expect(getRunIssueLabels("GitHub", "gh-aw")).toEqual(["custom-run-label", "backlog:run-alerts"]);
-    expect(getRunIssueLabels("another-owner", "gh-aw")).toEqual(["custom-run-label"]);
   });
 });

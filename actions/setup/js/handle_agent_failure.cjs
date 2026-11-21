@@ -1,7 +1,7 @@
 // @ts-check
 /// <reference types="@actions/github-script" />
 
-const { getIssueLabelQuery, getRunIssueLabels } = require("./issue_label.cjs");
+const { getIssueLabel, getIssueLabelQuery } = require("./issue_label.cjs");
 const { createReportIssue, renderIssueParameters } = require("./issue_report.cjs");
 
 const { iterateJsonl, readJsonlFileEvents, iterateLines } = require("./jsonl_helpers.cjs");
@@ -796,6 +796,7 @@ async function ensureParentIssue(previousParentNumber = null, ownerOverride, rep
   const owner = ownerOverride || contextOwner;
   const repo = repoOverride || contextRepo;
   const parentTitle = "[aw] Failed runs";
+  const parentLabel = getIssueLabel();
 
   core.info(`Searching for parent issue: "${parentTitle}"`);
 
@@ -969,7 +970,7 @@ gh aw audit <run-id>
         owner,
         repo,
         title: parentTitle,
-        labels: getRunIssueLabels(owner, repo),
+        labels: [parentLabel],
         headers: { "X-GitHub-Api-Version": GITHUB_API_VERSION },
       },
       { type: "report", title: parentTitle, children: parentNodes, agentTainted: false }
@@ -4052,7 +4053,7 @@ async function findOrCreateDailyCapRollupIssue(owner, repo) {
         owner,
         repo,
         title: DAILY_CAP_ROLLUP_TITLE,
-        labels: [...getRunIssueLabels(owner, repo), DAILY_CAP_ROLLUP_LABEL],
+        labels: [getIssueLabel(), DAILY_CAP_ROLLUP_LABEL],
         headers: { "X-GitHub-Api-Version": GITHUB_API_VERSION },
       },
       report
@@ -4176,7 +4177,7 @@ async function detectAndHandleFailureCascade(owner, repo, triggeringIssueNumber)
           owner,
           repo,
           title: CASCADE_ROLLUP_TITLE,
-          labels: [...getRunIssueLabels(owner, repo), CASCADE_ROLLUP_LABEL],
+          labels: [getIssueLabel(), CASCADE_ROLLUP_LABEL],
           headers: { "X-GitHub-Api-Version": GITHUB_API_VERSION },
         },
         rollupReport
@@ -5413,14 +5414,12 @@ async function main() {
         });
 
         report.preamble = getDetectionCautionBlocks(workflowName, runUrl);
-        const request = renderIssueParameters({ owner, repo, title: issueTitle, labels: getRunIssueLabels(owner, repo), headers: { "X-GitHub-Api-Version": GITHUB_API_VERSION } }, report);
+        const request = renderIssueParameters({ owner, repo, title: issueTitle, labels: [getIssueLabel()], headers: { "X-GitHub-Api-Version": GITHUB_API_VERSION } }, report);
         const { title: reportTitle, body: issueBody } = request;
 
         let newIssue;
         if (failureIssue) {
-          const existingLabels = (failureIssue.labels || []).map(label => (typeof label === "string" ? label : label.name || "")).filter(Boolean);
-          const reportLabels = getRunIssueLabels(owner, repo).filter(label => !label.startsWith("backlog:") || !existingLabels.some(existing => existing.startsWith("backlog:")));
-          const labels = [...new Set([...existingLabels, ...reportLabels])];
+          const labels = [...new Set([...(failureIssue.labels || []).map(label => (typeof label === "string" ? label : label.name || "")).filter(Boolean), getIssueLabel()])];
           newIssue = await github.rest.issues.update({
             owner,
             repo,

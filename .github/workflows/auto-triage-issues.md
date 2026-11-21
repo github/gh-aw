@@ -45,6 +45,7 @@ steps:
     env:
       GH_TOKEN: ${{ secrets.GH_AW_GITHUB_MCP_SERVER_TOKEN || secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
     run: |
+      set -o pipefail
       mkdir -p /tmp/gh-aw/agent
       # Fetch issues with no labels at all
       gh api "repos/github/gh-aw/issues?state=open&labels=&per_page=30" \
@@ -61,10 +62,16 @@ steps:
         ) | {number: .number, title: .title, body: .body, labels: [.labels[].name]}]' \
         > /tmp/gh-aw/agent/partial-labeled-issues.json
       echo "Partial-labeled issues (type-only, missing component): $(jq length /tmp/gh-aw/agent/partial-labeled-issues.json)"
-      # Token-authored issue creations may not emit a workflow-triggering event.
-      gh api --paginate "repos/github/gh-aw/issues?state=open&sort=created&direction=desc&per_page=100" \
-        --jq '.[] | select(.pull_request == null and (.labels | all(.name != "needs-triage" and (.name | startswith("backlog:") | not)))) | {number, title, body, labels: [.labels[].name]}' \
-        | jq -s '.[0:20]' > /tmp/gh-aw/agent/missing-backlog-label.json
+      if [[ "$GITHUB_EVENT_NAME" == "issues" ]]; then
+        issue_number=$(jq -er '.issue.number | numbers' "$GITHUB_EVENT_PATH")
+        gh api "repos/github/gh-aw/issues/$issue_number" \
+          | jq -c 'select(.state == "open")' \
+          | node .github/scripts/backlog_issue_triage.cjs > /tmp/gh-aw/agent/missing-backlog-label.json
+      else
+        # Token-authored issue creations may not emit a workflow-triggering event.
+        gh api --paginate "repos/github/gh-aw/issues?state=open&sort=created&direction=desc&per_page=100" --jq '.[]' \
+          | node .github/scripts/backlog_issue_triage.cjs > /tmp/gh-aw/agent/missing-backlog-label.json
+      fi
 safe-outputs:
   add-labels:
     max: 10
@@ -113,6 +120,8 @@ When triggered by an issue event (opened/edited), scheduled run, or manual dispa
 ### Primary Backlog Label
 
 Use the taxonomy in `.github/backlog-labels.json`. Preserve a preexisting `backlog:` label, even if you would choose a different one. Otherwise, apply exactly one of the defined `backlog:` labels for the issue's primary purpose, independently of its existing type and component labels. Apply this rule before any early exit, including the aggregate-report and known-automation rules below. Routine workflow run failures go in run alerts; generated artifacts that exercise issue creation go in smoke tests; recurring summaries go in reports. An actionable engineering finding belongs in its engineering cluster, even if filed by a bot. Do not infer a report solely from its bracketed prefix. If the primary cluster is unclear, use `needs-triage` rather than guessing.
+
+Read `/tmp/gh-aw/agent/missing-backlog-label.json` on every trigger. When a candidate in that file has `primary_backlog_label`, use that label for the matching issue number. It is computed by repository triage code, not extracted from the issue text.
 
 For upstream-managed producers, a Daily Team Status or Daily AIC Usage Audit is a recurring report; a finding proposing a concrete reduction in workflow AI-credit spend belongs in AI credits and cost controls.
 
