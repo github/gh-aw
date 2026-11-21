@@ -1,7 +1,7 @@
 ---
 title: Work Queue Specification
-spec: true
 description: A fair work-queue DAG with cross-repository Issue/PR dependencies, batched assignments, and independent Claim finalization.
+spec: true
 sidebar:
   order: 1380
 ---
