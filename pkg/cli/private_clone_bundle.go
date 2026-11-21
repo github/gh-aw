@@ -215,7 +215,7 @@ var (
 	// the clone's GITHUB_TOKEN: GitHub Apps, OIDC exchanges, and stored credentials.
 	privateCloneExternalCredentialKeys = map[string]struct{}{
 		"github-app": {}, "github-apps": {}, "head-github-app": {}, "safe-outputs-github-app": {},
-		"github-app-read": {}, "github-app-write": {}, "app-id": {}, "private-key": {},
+		"github-app-read": {}, "github-app-write": {}, "app-id": {}, "private-key": {}, "id-token": {},
 		"credentials": {}, "read-credentials": {}, "oidc-tokens": {},
 	}
 	// privateCloneRepositoryKeys select repositories for reads, writes, dispatches, or checkouts.
@@ -236,9 +236,6 @@ func validatePrivateCloneScope(value any) error {
 	switch typed := value.(type) {
 	case map[string]any:
 		for key, child := range typed {
-			if key == "permissions" {
-				continue
-			}
 			if err := validatePrivateCloneField(strings.ReplaceAll(key, "_", "-"), child); err != nil {
 				return err
 			}

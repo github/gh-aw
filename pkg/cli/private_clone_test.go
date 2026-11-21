@@ -743,6 +743,7 @@ func TestPrivateCloneWorkflowPolicyRejectsExternalCredentialsAndTargets(t *testi
 		"safe-outputs:\n  create-project:\n    target-owner: acme",
 		"tools:\n  github:\n    allowed-repos: [\"${{ github.repository }}\", acme/source]",
 		"tools:\n  github:\n    lockdown: true",
+		"permissions:\n  id-token: write",
 		"checkout:\n  token: ${{ secrets.UPSTREAM_TOKEN }}",
 		"observability:\n  otlp:\n    github-app:\n      app-id: \"1\"",
 	} {
@@ -751,7 +752,6 @@ func TestPrivateCloneWorkflowPolicyRejectsExternalCredentialsAndTargets(t *testi
 		require.Error(t, validatePrivateCloneScope(frontmatter.Frontmatter), field)
 	}
 	for _, field := range []string{
-		"permissions:\n  id-token: write",
 		"tools:\n  github:\n    lockdown: false\n    allowed-repos: [current]",
 		"safe-outputs:\n  github-token: ${{ secrets.GITHUB_TOKEN }}\n  create-pull-request:\n    github-token-for-extra-empty-commit: none",
 	} {
