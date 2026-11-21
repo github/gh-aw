@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { getErrorMessage, getErrorStatus, isHtmlContent, isLockedError, isRateLimitError, isConnectTimeoutError } from "./error_helpers.cjs";
+import { getErrorMessage, getErrorStatus, isHtmlContent, isLockedError, isCommentLimitError, isRateLimitError, isConnectTimeoutError } from "./error_helpers.cjs";
 
 describe("error_helpers", () => {
   describe("getErrorStatus", () => {
@@ -147,6 +147,19 @@ describe("error_helpers", () => {
 
     it("should return false for empty string", () => {
       expect(isHtmlContent("")).toBe(false);
+    });
+  });
+
+  describe("isCommentLimitError", () => {
+    it("detects the 403 comment-limit response", () => {
+      const error = Object.assign(new Error("Commenting is disabled on issues with more than 2500 comments"), { status: 403 });
+      expect(isCommentLimitError(error)).toBe(true);
+    });
+
+    it("rejects other statuses and other 403 messages", () => {
+      expect(isCommentLimitError(Object.assign(new Error("Commenting is disabled on issues with more than 2500 comments"), { status: 422 }))).toBe(false);
+      expect(isCommentLimitError(Object.assign(new Error("Resource not accessible by integration"), { status: 403 }))).toBe(false);
+      expect(isCommentLimitError(null)).toBe(false);
     });
   });
 
