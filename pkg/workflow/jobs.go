@@ -70,6 +70,7 @@ type Job struct {
 	Needs                      []string          // Job dependencies (needs clause)
 	Outputs                    map[string]string // YAML-ready scalar snippets, emitted verbatim by WriteJobsYAML
 	actionsCondition           bool
+	experimentsBrokerReporter  bool
 	// Actions contributes typed steps after Steps, and typed conditions,
 	// environment values, and output bindings. It is lowered after all job
 	// augmentation so output references can derive dependencies centrally.
@@ -216,7 +217,8 @@ func (jm *JobManager) WriteJobsYAML(b *strings.Builder) {
 	// jobOrder is kept sorted alphabetically by AddJob
 	for _, jobName := range jm.jobOrder {
 		job := jm.jobs[jobName]
-		if strings.TrimSpace(strings.TrimPrefix(job.RunsOn, "runs-on:")) == "windows-latest" {
+		if strings.TrimSpace(strings.TrimPrefix(job.RunsOn, "runs-on:")) == "windows-latest" &&
+			(job.Name != string(constants.ReportExperimentsJobName) || job.experimentsBrokerReporter) {
 			var jobYAML strings.Builder
 			jm.renderJobTo(&jobYAML, job)
 			b.WriteString(renderStepForRunner(jobYAML.String(), job.RunsOn, job.Name))
@@ -465,6 +467,9 @@ func buildRenderedJobEnv(job *Job) map[string]string {
 
 func shouldInjectRuntimeFeaturesEnv(job *Job) bool {
 	if job == nil || job.Uses != "" {
+		return false
+	}
+	if job.Name == string(constants.ReportExperimentsJobName) && !job.experimentsBrokerReporter {
 		return false
 	}
 	_, ok := runtimeFeaturesBuiltInJobNames[job.Name]

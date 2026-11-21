@@ -81,14 +81,15 @@ func (c *Compiler) addReportExperimentsJob(data *WorkflowData) error {
 	perms := NewPermissionsContentsRead()
 	perms.Set(PermissionIdToken, PermissionWrite)
 	job := &Job{
-		Name:           string(constants.ReportExperimentsJobName),
-		RunsOn:         c.formatFrameworkJobRunsOn(data),
-		Needs:          needs,
-		If:             "always() && !cancelled() && needs.activation.outputs.experiments != '' && needs.activation.outputs.experiments != '{}'",
-		Permissions:    perms.RenderToYAML(),
-		Env:            env,
-		TimeoutMinutes: 5,
-		Steps:          c.buildReportExperimentsSteps(data),
+		Name:                      string(constants.ReportExperimentsJobName),
+		RunsOn:                    c.formatFrameworkJobRunsOn(data),
+		Needs:                     needs,
+		If:                        "always() && !cancelled() && needs.activation.outputs.experiments != '' && needs.activation.outputs.experiments != '{}'",
+		Permissions:               perms.RenderToYAML(),
+		Env:                       env,
+		TimeoutMinutes:            5,
+		Steps:                     c.buildReportExperimentsSteps(data),
+		experimentsBrokerReporter: true,
 	}
 	return c.jobManager.AddJob(job)
 }

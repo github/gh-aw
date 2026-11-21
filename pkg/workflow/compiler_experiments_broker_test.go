@@ -221,6 +221,7 @@ func TestExperimentsReportNameAvailableWithoutLiveBroker(t *testing.T) {
 				assert.Contains(t, extractJobSection(generated, "report_experiments"), "Custom job disabled in dry-run")
 			} else {
 				assert.Contains(t, extractJobSection(generated, "report_experiments"), "echo custom-report")
+				assert.NotContains(t, extractJobSection(generated, "report_experiments"), "GH_AW_RUNTIME_FEATURES")
 			}
 			assert.Contains(t, extractJobSection(generated, "conclusion"), "report_experiments")
 		})
