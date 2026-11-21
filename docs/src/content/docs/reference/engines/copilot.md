@@ -126,8 +126,9 @@ SDK driver process instead of the default CLI-only flow.
 
 For Node.js drivers, generated workflows install the SDK and its dependencies
 from a compiler-pinned npm lockfile in runner temporary storage. The install
-verifies package integrity, disables npm lifecycle scripts, and enforces
-`engine.cooldown` without changing the application's package files.
+verifies package integrity and disables npm lifecycle scripts without changing
+the application's package files. The locked SDK dependencies are not subject
+to `engine.cooldown`.
 
 The built-in driver registers native MCP servers from converter-owned `RUNNER_TEMP/gh-aw/mcp-config/copilot-sdk.json`, not the user-managed CLI catalog. `tools.cli-proxy` servers remain CLI-only. A SHA-256 integrity value is bound to the run, attempt, and job; missing, malformed, changed, linked, or stale catalogs fail before inference. This does not protect against a compromised runner able to replace both catalog and trusted environment.
 
