@@ -1,6 +1,10 @@
 package cli
 
-import "io"
+import (
+	"cmp"
+	"io"
+	"slices"
+)
 
 type HealthContinuationRequestRun struct {
 	RunID        int64  `json:"run_id"`
@@ -43,6 +47,7 @@ func applyHealthContinuationRequests(health *WorkflowHealth, runs []WorkflowRun,
 		}
 		report.Runs = append(report.Runs, evidence)
 	}
+	slices.SortFunc(report.Runs, func(a, b HealthContinuationRequestRun) int { return cmp.Compare(b.RunID, a.RunID) })
 	health.ContinuationRequests = report
 }
 
