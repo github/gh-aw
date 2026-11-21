@@ -2,10 +2,12 @@
 private: true
 emoji: "🔧"
 name: Daily Go Function Namer
-description: Analyzes one entire Go package per day using Serena to extract function names and suggest renames that improve agent discoverability, using round-robin over package directories via cache-memory
+description: Analyzes one Go package per day with Serena and implements validated internal function renames in a bounded draft PR, rotating packages via cache-memory
+intent: Improve Go function discoverability for coding agents without changing behavior or duplicating existing work.
 on:
   schedule: daily
   workflow_dispatch:
+  skip-if-match: 'is:pr is:open in:title "[function-namer]"'
 
 max-daily-ai-credits: 10000
 permissions:
@@ -20,32 +22,46 @@ model: router/economy
 engine:
   id: pi
   model-provider: github
+  env:
+    GOCACHE: /tmp/gh-aw/agent/function-namer-go-build
+    GOMODCACHE: /tmp/gh-aw/agent/function-namer-go-mod
 imports:
-  - uses: shared/daily-audit-base.md
-    with:
-      title-prefix: "[function-namer] "
-      expires: 3d
   - shared/mcp/serena-go.md
-
   - shared/otlp.md
   - shared/reporting.md
 safe-outputs:
-  create-issue:
-    expires: 7d
+  create-pull-request:
     title-prefix: "[function-namer] "
     labels: [refactoring, code-quality, automated-analysis, cookie]
+    draft: true
     max: 1
-    close-older-issues: true
+    expires: 7d
+    if-no-changes: ignore
+    fallback-as-issue: false
+    protected-files: blocked
+    allowed-files:
+      - "pkg/**/*.go"
+    max-patch-files: 10
+    max-patch-size: 100
+  noop:
+    report-as-issue: false
+  report-incomplete:
+    create-issue: false
 
 sandbox:
   agent:
     id: awf
+runtimes:
+  go: {}
+network:
+  allowed: [defaults, go]
 tools:
   cli-proxy: true
   cache-memory: true
   github:
     mode: gh-proxy
-    toolsets: [default, issues]
+    toolsets: [default, issues, pull_requests]
+  edit:
   bash: true
 
 timeout-minutes: 30
@@ -54,82 +70,152 @@ features:
   gh-aw-detection: true
 evals:
   - id: package_analyzed
-    question: Did the agent analyze at least one Go package for function naming quality and discoverability?
-  - id: issue_created_or_noop
-    question: Was an issue created with function rename suggestions, or was noop used when no naming improvements were identified?
+    question: Did the agent analyze one real Go package's naming, or stop safely for duplicates or missing semantic evidence?
+  - id: pr_created_or_noop
+    question: Did the agent create at most one draft PR with validated internal Go renames, or call noop with a concrete reason when no safe novel change was available?
+  - id: rename_guardrails
+    question: Did the agent preserve behavior/APIs, avoid generated files/fixtures, and withhold unverified or out-of-scope changes?
 ---
 
 # Daily Go Function Namer
 
-You are an AI agent that analyzes Go functions daily to improve their names for better discoverability by AI coding agents. Your goal is to make function names more intuitive so that agents can reliably find the right functions when working on tasks.
+Analyze **one entire real Go package** per run in round-robin order under `pkg/`.
+Implement at most **three clearly justified internal function renames** and all
+their references in **one draft PR**, never an issue or discussion.
 
-## Mission
+## Mandatory guardrails
 
-Each day, analyze **one entire Go package** using round-robin rotation across all package directories in `pkg/`. For each package:
+- Make pure identifier renames only: no behavior, signatures, exported APIs,
+  dependency, workflow, configuration, or unrelated refactoring changes.
+- Rename only unexported functions, not methods, interface contracts,
+  constructors (`New*`, `Make*`), callbacks/closures, or descriptive names.
+- Analyze non-test Go files; update test references with bash/edit as needed
+  (the Serena import excludes test-file analysis). All edited files must be
+  tracked, non-generated `.go` files in the selected package: at most 10 files
+  and 100 KiB. Never edit `testdata/`, fixtures, vendor, or other packages.
+- Require Serena semantic evidence for the declaration and every reference.
+  Search repository-wide, including tests, for textual references, build tags,
+  reflection, string-based lookup, and generated callers. Skip uncertain
+  references/constraints, collisions, or out-of-scope callers.
+- Keep GitHub access read-only. Publish only through `create_pull_request`.
+  Do not merge, dispatch workflows, assign/close issues, or fall back to issues.
+- Before editing and again before publication, check open `[function-namer]`
+  PRs and open issues/PRs covering the package or proposed old/new names. If a
+  PR or assigned issue already covers the work, call `noop` with its URL.
+  For unassigned legacy plans, verify suggestions against current code and
+  check timelines for linked PRs. Implement only verified, uncovered candidates;
+  cite the issue with `Relates to #N`, never a closing keyword.
+- If analysis finds no meaningful rename, call `noop`. If semantic tools,
+  duplicate checks, scope, or validation fail, restore only your candidate
+  edits, call `noop` with the blocker, and stop. Never treat a failed command
+  as successful analysis, publish unvalidated edits, or bypass denials.
 
-1. Enumerate all functions in the package with a fast `grep` sweep
-2. Activate Serena for deeper semantic analysis of functions that need it
-3. Evaluate each name's clarity and intent
-4. Suggest renames that are clearer and more intuitive for agents
-5. Create a GitHub issue with a concrete agentic implementation plan
+## 1. Select the package
 
-## Context
+Repository: `${{ github.repository }}`. Workspace: `${{ github.workspace }}`.
+Date: `date +%Y-%m-%d`.
+Cache: `/tmp/gh-aw/cache-memory/function-namer-state.json`.
 
-- **Repository**: ${{ github.repository }}
-- **Date**: run `date +%Y-%m-%d` in bash to get the current date at runtime
-- **Workspace**: ${{ github.workspace }}
-- **Cache**: `/tmp/gh-aw/cache-memory/`
+Before selection, load and run the [Package selection script](#package-selection-script)
+below. Use its selected package, file list, counts, and next index directly;
+do not re-compute them manually.
 
-## Step 1: Compute Package Selection with Code
+Missing cache: accept random initialization, not missing data.
+Malformed cache: stop explicitly, never silently reset.
 
-Run this script to load the round-robin state, enumerate all Go package directories, and compute which package to analyze this run:
+## 2. Inventory and semantic analysis
+
+Run `grep -n "^func " "${PKG_FILES[@]}"` once for the package inventory.
+Activate Serena with `activate_project` and the workspace path.
+For each selected non-generated file, use `get_symbols_overview` and bounded
+`read_file` ranges. Avoid repeated searches.
+
+Ask: **Would a coding agent find this function from a task description?**
+Consider generic verbs, obscure abbreviations, implementation-focused names,
+and names mismatching behavior. Prefer clear verb+noun names.
+Reject minor stylistic substitutions such as `makeConfig` to `createConfig`.
+
+Use `find_referencing_symbols`; inspect declarations/callers and apply guardrails.
+
+## 3. Implement and validate
+
+Record the initial worktree state. Rename selected declarations, every caller,
+and directly related doc-comment identifiers; preserve test expectations and
+behavior. Do not add tests that merely check a name.
+
+Review `git diff --check`, `git diff --stat`, and the full candidate diff.
+Require only approved identifier/comment changes within the selected package.
+Search for old identifiers again and explain any unrelated same-name matches.
+Run `gofmt` on modified files, `go test "./$PKG_DIR" -count=1`,
+`make build`, `make test-unit`, and `make lint`. Require every command to pass;
+Record command results/failures. Use configured Go caches; never change
+dependencies or validation rules to make a rename pass.
+
+Restore out-of-scope generated changes from validation before final diff review.
+On failure restore candidate edits; never revert pre-existing work.
+
+## 4. Persist completed analysis
+
+After full analysis, including a genuine no-candidate result, save
+`last_package_index` as `new_last_package_index` from Step 1 and append
+`{"package":"<selected_package>","analyzed_at":"<YYYY-MM-DD>"}` to
+`analyzed_packages`. Keep only the most recent 30 entries. Preserve existing
+entries; initialize from scratch only on a cold cache.
+Do not advance state on incomplete analysis, duplicate blocking, or failed
+validation. Cache state is not a repository change and must not enter the PR.
+
+## 5. Publish or noop
+
+Recheck duplicates and the final diff. With a nonempty, fully validated patch,
+call `create_pull_request` once with title
+`Go function renames: <selected_package>`. Keep it draft.
+Include package/date/rotation/function counts, a concise old-name/new-name/
+rationale table, reference completeness, exact validation commands and results,
+skipped candidates, and any related legacy issue URL. Use `###` or lower
+headers; put long evidence in `<details><summary><b>...</b></summary>`.
+
+Otherwise call `noop` with the package and no-candidate, duplicate,
+uncertainty, or failure reason.
+
+<!-- instruction-prefix-end -->
+
+## Package selection script
 
 ```bash
-# Load last_package_index from cache (-1 sentinel means cache is absent/empty — pick randomly later)
 LAST_INDEX=$(python3 -c "
-import sys, json, os
+import json, os, sys
 p = '/tmp/gh-aw/cache-memory/function-namer-state.json'
-if os.path.exists(p):
+if not os.path.exists(p):
+    print(-1)
+else:
     try:
         d = json.load(open(p))
-        print(d.get('last_package_index', -1))
-    except Exception:
-        print(-1)
-else:
-    print(-1)
-")
+        i = d.get('last_package_index', -1)
+        if type(i) is not int or i < -1:
+            raise ValueError('invalid last_package_index')
+        print(i)
+    except (ValueError, TypeError) as e:
+        print('Invalid function-namer cache: ' + str(e), file=sys.stderr)
+        sys.exit(1)
+") || exit 1
 
-# Enumerate all unique package directories containing non-test Go files
-mapfile -t ALL_PKGS < <(find pkg -name '*.go' ! -name '*_test.go' -type f | xargs -I{} dirname {} | sort -u)
+mapfile -t ALL_PKGS < <(find pkg -type d \( -name testdata -o -name vendor \) -prune -o -name '*.go' ! -name '*_test.go' -type f -print | xargs -r -I{} dirname {} | sort -u)
 TOTAL=${#ALL_PKGS[@]}
-
 if [ "$TOTAL" -eq 0 ]; then
   echo "ERROR: no Go packages found in pkg/" >&2
   exit 1
 fi
-
-# On cache miss, start at a random position so repeated cold starts don't always hit the same package
 if [ "$LAST_INDEX" -eq -1 ]; then
   LAST_INDEX=$(( RANDOM % TOTAL ))
   echo "cache_miss=true (random start at index ${LAST_INDEX})"
 fi
-
-echo "total_packages=${TOTAL}"
-echo "last_package_index=${LAST_INDEX}"
-
-# Pick the next package in round-robin order
 PKG_DIR="${ALL_PKGS[$(( LAST_INDEX % TOTAL ))]}"
 NEW_INDEX=$(( (LAST_INDEX + 1) % TOTAL ))
-
-# Collect all non-test Go files in the selected package
 mapfile -t PKG_FILES < <(find "$PKG_DIR" -maxdepth 1 -name '*.go' ! -name '*_test.go' -type f | sort)
 FILE_COUNT=${#PKG_FILES[@]}
-if [ "$FILE_COUNT" -gt 0 ]; then
-  TOTAL_FNS=$(grep -hc "^func " "${PKG_FILES[@]}" 2>/dev/null | awk '{s+=$1} END {print s+0}')
-else
-  TOTAL_FNS=0
-fi
-
+TOTAL_FNS=$(grep -hc "^func " "${PKG_FILES[@]}" | awk '{s+=$1} END {print s+0}')
+echo "total_packages=${TOTAL}"
+echo "last_package_index=${LAST_INDEX}"
 echo "selected_package=${PKG_DIR}"
 echo "file_count=${FILE_COUNT}"
 echo "new_last_package_index=${NEW_INDEX}"
@@ -137,312 +223,3 @@ echo "total_functions_approx=${TOTAL_FNS}"
 echo "--- selected files ---"
 printf '%s\n' "${PKG_FILES[@]}"
 ```
-
-The script outputs:
-- `selected_package` — the package directory to analyze this run
-- `file_count` — number of Go files in the selected package
-- `new_last_package_index` — value to write back to cache after the run
-- `total_functions_approx` — total function count across the package files
-- The list of package file paths (one per line, after `--- selected files ---`)
-
-Use these values directly for the rest of the workflow. Do **not** re-derive or re-compute them manually.
-
-**On cold start** (`/tmp/gh-aw/cache-memory/function-namer-state.json` missing): treat this as expected initialization, not a failure. Do **not** call `report_missing_data` for a missing state file on first run or cold cache; run the Step 1 script as written, accept `LAST_INDEX=-1`, and continue.
-
-## Step 2: Enumerate All Functions in the Package
-
-Before invoking Serena, run a fast `grep` sweep across all files in the selected package to build a complete function inventory. This minimizes Serena tool calls by giving you the full picture upfront:
-
-```bash
-# Fast enumeration — one pass over all package files
-grep -n "^func " "${PKG_FILES[@]}" | awk -F: '{printf "%-50s line %-5s %s\n", $1, $2, $3}'
-```
-
-This produces a list of every function/method definition with its file and line number. Use this inventory to decide which functions need deeper Serena analysis.
-
-## Step 3: Activate Serena
-
-Activate the Serena project to enable Go semantic analysis:
-
-```
-Tool: activate_project
-Args: { "path": "${{ github.workspace }}" }
-```
-
-## Step 4: Analyze Each File in the Package with Serena
-
-For each of the files in the selected package (output by Step 1), perform a full function name analysis. Use the function inventory from Step 2 to guide which functions need deeper Serena investigation.
-
-### 4.1 Get All Symbols
-
-```
-Tool: get_symbols_overview
-Args: { "file_path": "<relative/path/to/file.go>" }
-```
-
-This returns all functions, methods, and types defined in the file.
-
-### 4.2 Read Function Implementations
-
-For each function identified in 4.1, read enough of the implementation to understand its behavior:
-
-```
-Tool: read_file
-Args: { "file_path": "<file.go>", "start_line": N, "end_line": M }
-```
-
-For small files you may read the entire file:
-
-```bash
-cat <path/to/file.go>
-```
-
-### 4.3 Evaluate Function Names
-
-For each function, assess its name against these criteria:
-
-**Rename candidates — names that hurt agent discoverability:**
-- Generic verbs without context: `process()`, `handle()`, `run()`, `execute()`, `generate()`
-- Implementation-focused names: `useGoroutine()`, `callHTTP()`, `doLoop()`
-- Abbreviations that obscure intent: `genSO()`, `mkCfg()`, `bldYAML()`, `chk()`
-- Names that mismatch actual behavior
-- Names that would cause an agent to overlook this function when searching for its capability
-
-**Names to keep — these are already discoverable:**
-- Verb + noun describing the exact action: `compileWorkflowMarkdown()`, `validateFrontmatterConfig()`
-- Standard Go interface methods: `String()`, `Error()`, `ServeHTTP()`, `MarshalJSON()`
-- Constructors following Go convention: `NewCompiler()`, `NewMCPConfig()`
-- Short unexported names used as closures or immediately-invoked helpers
-
-### 4.4 Propose Renames
-
-For each function that would benefit from a clearer name:
-
-1. Propose a new name in Go naming conventions (camelCase for unexported, PascalCase for exported)
-2. Explain why the new name is more discoverable for an agent
-3. Find all call sites using Serena:
-
-```
-Tool: find_referencing_symbols
-Args: { "symbol_name": "<currentName>", "file_path": "pkg/..." }
-```
-
-**Rename examples:**
-| Current | Suggested | Reason |
-|---|---|---|
-| `process()` | `compileWorkflowMarkdown()` | Specifies what is processed |
-| `generate()` | `generateGitHubActionsYAML()` | Describes the output |
-| `handle()` | `handleMCPToolRequest()` | Adds missing context |
-| `mkCfg()` | `buildMCPServerConfig()` | Readable and specific |
-| `run()` | `executeDockerContainer()` | Concrete action |
-
-**Only suggest renames where the improvement is clear and meaningful.** Quality over quantity — two well-justified suggestions are better than ten marginal ones.
-
-## Step 5: Update Cache State
-
-After completing the analysis, save the updated round-robin position. Use the `new_last_package_index` value from Step 1 and a filesystem-safe timestamp (`YYYY-MM-DD`):
-
-```bash
-cat > /tmp/gh-aw/cache-memory/function-namer-state.json << 'CACHE_EOF'
-{
-  "last_package_index": <new_package_index>,
-  "analyzed_packages": [
-    <previous entries, pruned to last 30>,
-    {"package": "pkg/workflow", "analyzed_at": "2026-03-13"}
-  ]
-}
-CACHE_EOF
-```
-
-Where `<new_package_index>` is the `new_last_package_index` value output by Step 1, and the `analyzed_packages` list contains one entry per package actually analyzed.
-
-Use relative paths (e.g., `pkg/workflow`) matching the output of the `find pkg` command.
-
-Prune `analyzed_packages` to the most recent 30 entries to prevent unbounded growth.
-
-If the state file was missing at the start of the run, initialize it from scratch here instead of reporting missing cache data.
-
-## Step 6: Create Issue with Agentic Plan
-
-If any rename suggestions were found across the analyzed package, create a GitHub issue.
-
-Use h3 (`###`) or lower for all headers in the issue body. Never use h1 (`#`) or h2 (`##`) — these are reserved for the issue title.
-
-If **no improvements were found**, emit `noop` and exit:
-
-```json
-{"noop": {"message": "No rename suggestions found for package <pkg>. All analyzed functions have clear, descriptive names."}}
-```
-
-Otherwise, create an issue with this structure:
-
----
-
-**Title**: `Go function rename plan: <package>` (e.g., `Go function rename plan: pkg/workflow`)
-
-**Body**:
-
-```markdown
-### 🏷️ Go Function Rename Plan
-
-**Package Analyzed**: `<package>`
-**Analysis Date**: <YYYY-MM-DD>
-**Round-Robin Position**: package <package_index> of <total> total packages
-**Functions Analyzed**: <total_functions_approx> functions across <file_count> files
-
-### Why This Matters
-
-When AI coding agents search for functions to complete a task, they rely on function
-names to understand what code does. Clear, descriptive names increase the likelihood
-that an agent will find the right function instead of reimplementing existing logic.
-Functions in the same package also call each other, so reviewing them together gives
-better context for rename decisions.
-
-### Rename Suggestions
-
-#### `<file1>`
-
-| Current Name | Suggested Name | Reason |
-|---|---|---|
-| `oldName()` | `newName()` | Describes the specific action rather than the generic verb |
-
-**All functions in this file** (for reference):
-- `functionA()` — ✅ Clear, no change needed
-- `oldName()` — ⚠️ Rename suggested (see table above)
-
-#### `<file2>`
-
-<!-- Same structure, or: "No renames needed for this file." -->
-
-#### `<fileN>`
-
-<!-- Repeat for each file in the package. -->
-
----
-
-<details>
-<summary>🤖 Agentic Implementation Plan</summary>
-
-### Agentic Implementation Plan
-
-This issue is designed to be assigned to a coding agent. The agent should implement
-all rename suggestions below in a single pull request.
-
-### Prerequisites
-
-- [ ] Read each rename suggestion and verify it is accurate by reviewing the function body
-- [ ] Check for any Go interface constraints that prevent renaming (e.g., must match interface method name)
-
-### Implementation Steps
-
-For **each** rename suggestion, follow this sequence:
-
-#### 1. Rename the function in `<file>`
-
-```go
-// Old
-func oldName(args) returnType {
-
-// New
-func newName(args) returnType {
-```
-
-#### 2. Update all call sites
-
-Use `grep` to find every caller and update the reference:
-
-```bash
-grep -rn "oldName" pkg/ --include="*.go"
-```
-
-Also check test files:
-
-```bash
-grep -rn "oldName" pkg/ --include="*_test.go"
-```
-
-#### 3. Verify compilation after each rename
-
-```bash
-make build
-```
-
-#### 4. Run tests after all renames are complete
-
-```bash
-make test-unit
-make lint
-```
-
-### Commit Convention
-
-Each rename should be a focused commit:
-
-```
-refactor: rename <oldName> to <newName> for clarity
-```
-
-### Validation Checklist
-
-- [ ] All renames implemented
-- [ ] All call sites updated (Go files and test files)
-- [ ] `make build` passes with no errors
-- [ ] `make test-unit` passes
-- [ ] `make lint` passes
-- [ ] PR description explains the agent-discoverability rationale
-
-### Notes for the Agent
-
-- This is a **pure rename refactor** — behavior must not change, only names
-- If a rename causes unexpected complexity (e.g., name conflicts, interface constraints),
-  skip it and leave a comment in the PR explaining why
-- Follow existing naming conventions documented in `AGENTS.md`
-- Unexported functions used only as closures or immediately-invoked can be skipped
-
-</details>
-
----
-
-*Generated by the Daily Go Function Namer workflow*
-*Run: ${{ github.run_id }}*
-```
-
----
-
-## Analysis Guidelines
-
-### Focus on Agent Discoverability
-
-The primary question is: **"Would an AI coding agent find this function when given a task description?"**
-
-Ask yourself:
-- If an agent is asked to "compile a workflow", would it find `compileWorkflowMarkdown()` faster than `process()`?
-- If an agent is asked to "validate frontmatter", would it find `validateFrontmatterConfig()` rather than `check()`?
-- If an agent is asked to "generate a YAML file", would it find `generateGitHubActionsWorkflow()` instead of `generate()`?
-
-### What to Skip
-
-Do NOT suggest renames for:
-- Functions that already have clear, specific names
-- Standard Go interface implementations (`String()`, `Error()`, `ServeHTTP()`, `MarshalJSON()`)
-- Constructor functions following Go convention (`New*`, `Make*`)
-- Functions where the rename would be minor or stylistic (e.g., `makeConfig` → `createConfig`)
-- Private single-letter functions used as immediate callbacks or closures
-
-### Quality Bar
-
-Only include a rename suggestion if you are confident it would measurably improve an agent's ability to find the function. When in doubt, leave the function as-is.
-
----
-
-**Important**: If no action is needed after completing your analysis, you **MUST** call the `noop` safe-output tool. Failing to call any safe-output tool is the most common cause of workflow failures.
-
-```json
-{"noop": {"message": "No rename suggestions found for package <pkg>. All analyzed functions already have clear, descriptive names that support agent discoverability."}}
-```
-
-### Output Format
-
-- Use `###` (h3) or lower for all report headers; never use `#` or `##` inside the report body.
-- Wrap long lists, tables, and detailed findings in `<details><summary><b>...</b></summary>...</details>` blocks to reduce scrolling.
-- Structure reports as: overview → key metrics/issues → collapsible detail → next actions.
