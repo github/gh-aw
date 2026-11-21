@@ -1,7 +1,7 @@
 // @ts-check
 /// <reference types="@actions/github-script" />
 
-const { getIssueLabel } = require("./issue_label.cjs");
+const { getRunIssueLabels } = require("./issue_label.cjs");
 const { createReportIssue } = require("./issue_report.cjs");
 
 const { getErrorMessage } = require("./error_helpers.cjs");
@@ -444,7 +444,7 @@ async function main() {
         owner,
         repo,
         title: RECOMPILE_ISSUE_TITLE,
-        labels: [getIssueLabel(), "maintenance"],
+        labels: [...getRunIssueLabels(owner, repo), "maintenance"],
       },
       report
     );

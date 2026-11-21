@@ -1,7 +1,7 @@
 // @ts-check
 /// <reference types="@actions/github-script" />
 
-const { getIssueLabel, getIssueLabelQuery } = require("./issue_label.cjs");
+const { getIssueLabel, getIssueLabelQuery, getRunIssueLabels } = require("./issue_label.cjs");
 const { createReportIssue } = require("./issue_report.cjs");
 
 const fs = require("fs");
@@ -126,7 +126,6 @@ async function findReplacementAgentRunsIssue(excludeNumber) {
 async function createAgentRunsIssue() {
   const { owner, repo } = context.repo;
   const parentTitle = NOOP_RUNS_ISSUE_TITLE;
-  const parentLabel = getIssueLabel();
 
   // Load template from file
   const templatePath = getPromptPath("noop_runs_issue.md");
@@ -143,7 +142,7 @@ async function createAgentRunsIssue() {
       owner,
       repo,
       title: parentTitle,
-      labels: [parentLabel],
+      labels: getRunIssueLabels(owner, repo),
     },
     {
       type: "report",

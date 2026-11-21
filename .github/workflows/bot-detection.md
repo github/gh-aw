@@ -825,7 +825,7 @@ safe-outputs:
   create-issue:
     expires: 2d
     max: 1
-    labels: [security, bot-detection]
+    labels: [security, bot-detection, "backlog:reports"]
   update-issue:
     max: 1
     target: "*"

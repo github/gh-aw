@@ -1,7 +1,7 @@
 // @ts-check
 /// <reference types="@actions/github-script" />
 
-const { getIssueLabel } = require("./issue_label.cjs");
+const { getRunIssueLabels } = require("./issue_label.cjs");
 const { createReportIssue } = require("./issue_report.cjs");
 
 const { SAFE_OUTPUT_E001 } = require("./error_codes.cjs");
@@ -291,7 +291,7 @@ async function main() {
           owner,
           repo,
           title: issueTitle,
-          labels: [getIssueLabel()],
+          labels: getRunIssueLabels(owner, repo),
           headers: { "X-GitHub-Api-Version": GITHUB_API_VERSION },
         },
         {

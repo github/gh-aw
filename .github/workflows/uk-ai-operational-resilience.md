@@ -46,7 +46,7 @@ safe-outputs:
   create-issue:
     expires: 2d
     max: 2
-    labels: [security, high-priority, ai-generated, cookie]
+    labels: [security, high-priority, ai-generated, cookie, "backlog:security"]
     title-prefix: "[uk-ai-resilience] "
 pre-agent-steps:
   - name: Pre-compute recent changes governance context

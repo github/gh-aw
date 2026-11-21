@@ -43,7 +43,7 @@ safe-outputs:
       expires: 2h
     create-issue:
       expires: 2h
-      labels: [ai-generated, automation, testing]
+      labels: [ai-generated, automation, testing, "backlog:smoke-tests"]
       group: true
       close-older-issues: true
     add-labels:

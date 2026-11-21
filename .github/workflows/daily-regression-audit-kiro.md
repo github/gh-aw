@@ -49,7 +49,7 @@ safe-outputs:
   create-issue:
     expires: 2d
     title-prefix: "[regression] "
-    labels: [automation, testing, reliability]
+    labels: [automation, testing, reliability, "backlog:reports"]
     max: 1
     close-older-issues: true
     close-older-key: daily-regression-audit-kiro

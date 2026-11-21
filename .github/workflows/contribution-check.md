@@ -40,6 +40,7 @@ safe-outputs:
     title-prefix: "[Contribution Check Report]"
     labels:
       - contribution-report
+      - "backlog:reports"
     close-older-issues: true
     group-by-day: true
     expires: 1d

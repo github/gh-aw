@@ -2,7 +2,7 @@
 /// <reference types="@actions/github-script" />
 
 const { createReportIssue } = require("./issue_report.cjs");
-const { getIssueLabel, getIssueLabelQuery } = require("./issue_label.cjs");
+const { getIssueLabelQuery, getRunIssueLabels } = require("./issue_label.cjs");
 
 const fs = require("fs");
 const { getErrorMessage } = require("./error_helpers.cjs");
@@ -59,7 +59,6 @@ function classifyDetectionOutcome(reason) {
 async function ensureDetectionRunsIssue() {
   const { owner, repo } = context.repo;
   const parentTitle = "[aw] Detection Runs";
-  const parentLabel = getIssueLabel();
 
   core.info(`Searching for detection runs issue: "${parentTitle}"`);
 
@@ -103,7 +102,7 @@ async function ensureDetectionRunsIssue() {
       owner,
       repo,
       title: parentTitle,
-      labels: [parentLabel],
+      labels: getRunIssueLabels(owner, repo),
     },
     {
       type: "report",
