@@ -66,38 +66,37 @@ const (
 
 // WorkflowRun represents a GitHub Actions workflow run with metrics
 type WorkflowRun struct {
-	ObsoletePR               *ObsoletePREvidence `json:"obsolete_pr,omitempty"`
-	DatabaseID               int64               `json:"databaseId"`
-	Number                   int                 `json:"number"`
-	URL                      string              `json:"url"`
-	Status                   string              `json:"status"`
-	Conclusion               string              `json:"conclusion"`
-	WorkflowName             string              `json:"workflowName"`
-	WorkflowPath             string              `json:"workflowPath"` // Workflow file path (e.g., .github/workflows/copilot-swe-agent.yml)
-	CreatedAt                time.Time           `json:"createdAt"`
-	StartedAt                time.Time           `json:"startedAt"`
-	UpdatedAt                time.Time           `json:"updatedAt"`
-	Event                    string              `json:"event"`
-	HeadBranch               string              `json:"headBranch"`
-	HeadSha                  string              `json:"headSha"`
-	DisplayTitle             string              `json:"displayTitle"`
-	Attempt                  int                 `json:"attempt,omitempty"`
-	Repository               string              `json:"repository,omitempty"`
-	Actor                    string              `json:"actor,omitempty"`
-	Duration                 time.Duration
-	ActionMinutes            float64 // Billable Actions minutes estimated from wall-clock time
-	TokenUsage               int
-	Turns                    int
-	TurnsAvailable           bool // True when turn count was successfully read from artifact logs
-	ErrorCount               int
-	WarningCount             int
-	MissingToolCount         int
-	MissingDataCount         int
-	NoopCount                int
-	ContinuationRequestCount int           `json:"continuation_request_count,omitempty"`
-	SafeItemsCount           int           `json:"safe_items_count,omitempty"` // Count of safe-output items actually written to GitHub
-	AvgTimeBetweenTurns      time.Duration // Average time between consecutive LLM API calls (from per-turn timestamps when available)
-	LogsPath                 string
+	ObsoletePR          *ObsoletePREvidence `json:"obsolete_pr,omitempty"`
+	DatabaseID          int64               `json:"databaseId"`
+	Number              int                 `json:"number"`
+	URL                 string              `json:"url"`
+	Status              string              `json:"status"`
+	Conclusion          string              `json:"conclusion"`
+	WorkflowName        string              `json:"workflowName"`
+	WorkflowPath        string              `json:"workflowPath"` // Workflow file path (e.g., .github/workflows/copilot-swe-agent.yml)
+	CreatedAt           time.Time           `json:"createdAt"`
+	StartedAt           time.Time           `json:"startedAt"`
+	UpdatedAt           time.Time           `json:"updatedAt"`
+	Event               string              `json:"event"`
+	HeadBranch          string              `json:"headBranch"`
+	HeadSha             string              `json:"headSha"`
+	DisplayTitle        string              `json:"displayTitle"`
+	Attempt             int                 `json:"attempt,omitempty"`
+	Repository          string              `json:"repository,omitempty"`
+	Actor               string              `json:"actor,omitempty"`
+	Duration            time.Duration
+	ActionMinutes       float64 // Billable Actions minutes estimated from wall-clock time
+	TokenUsage          int
+	Turns               int
+	TurnsAvailable      bool // True when turn count was successfully read from artifact logs
+	ErrorCount          int
+	WarningCount        int
+	MissingToolCount    int
+	MissingDataCount    int
+	NoopCount           int
+	SafeItemsCount      int           `json:"safe_items_count,omitempty"` // Count of safe-output items actually written to GitHub
+	AvgTimeBetweenTurns time.Duration // Average time between consecutive LLM API calls (from per-turn timestamps when available)
+	LogsPath            string
 	// DownloadDuration is the wall-clock time spent downloading this run's artifacts
 	// from GitHub. It is zero for runs served from the on-disk cache (no download
 	// was performed).

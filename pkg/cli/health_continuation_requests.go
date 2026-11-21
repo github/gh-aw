@@ -24,7 +24,24 @@ type HealthContinuationRequests struct {
 func applyHealthContinuationRequests(health *WorkflowHealth, runs []WorkflowRun, config HealthConfig) {
 	report := &HealthContinuationRequests{Runs: []HealthContinuationRequestRun{}}
 	seen := make(map[int64]bool)
-	for _, run := range runs {
+	orderedRuns := slices.Clone(runs)
+	slices.SortFunc(orderedRuns, func(a, b WorkflowRun) int {
+		if !a.CreatedAt.Equal(b.CreatedAt) {
+			if a.CreatedAt.After(b.CreatedAt) {
+				return -1
+			}
+			return 1
+		}
+		switch {
+		case a.DatabaseID > b.DatabaseID:
+			return -1
+		case a.DatabaseID < b.DatabaseID:
+			return 1
+		default:
+			return 0
+		}
+	})
+	for _, run := range orderedRuns {
 		if seen[run.DatabaseID] {
 			continue
 		}

@@ -68,7 +68,6 @@ func tryLoadCachedRunResult(
 		healed.GatewaySteeringEvents = result.GatewaySteeringEvents
 		healed.WorkQueue = result.WorkQueue
 		healed.ContinuationRequests = result.ContinuationRequests
-		healed.Run.ContinuationRequestCount = len(result.ContinuationRequests)
 		if err := saveRunSummary(runOutputDir, &healed, params.verbose); err != nil {
 			logsOrchestratorLog.Printf("Warning: failed to persist healed run summary for run %d: %v", result.Run.DatabaseID, err)
 		}

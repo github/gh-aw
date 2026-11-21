@@ -4548,7 +4548,7 @@ async function main() {
         if (nonNoopItems.length === 0) {
           hasOnlyNoopOutputs = true;
           core.info("Agent failed with exit code 1 but produced only noop outputs - treating as successful no-action (transient AI model error)");
-        } else if (!nonNoopItems.some(item => item.type === "request_continuation" || (item.type === "report_incomplete" && !isTaskCompleteRegistrationIssue(item)))) {
+        } else if (!nonNoopItems.some(item => item.type === "report_incomplete" && !isTaskCompleteRegistrationIssue(item))) {
           // The agent produced valid non-noop safe outputs (e.g. create_discussion) but the
           // job exit code is non-zero. If terminal_reason: completed is present in the log,
           // the failure was a transient error after the agent finished its task — do not report

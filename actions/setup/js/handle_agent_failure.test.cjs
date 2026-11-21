@@ -7630,7 +7630,15 @@ describe("handle_agent_failure", () => {
 
     it("skips failure issue creation when terminal_reason: completed and non-noop safe outputs present", async () => {
       // Agent produced a valid non-noop safe output
-      fs.writeFileSync(path.join(tmpDir, "agent_output.json"), JSON.stringify({ items: [{ type: "create_discussion", title: "Done", body: "All set." }] }));
+      fs.writeFileSync(
+        path.join(tmpDir, "agent_output.json"),
+        JSON.stringify({
+          items: [
+            { type: "create_discussion", title: "Done", body: "All set." },
+            { type: "request_continuation", message: "Follow-up work remains" },
+          ],
+        })
+      );
       // stdio log contains terminal_reason: completed
       fs.writeFileSync(path.join(tmpDir, "agent-stdio.log"), '{"type":"result","subtype":"success","terminal_reason":"completed","num_turns":10}\n');
 
@@ -7657,6 +7665,26 @@ describe("handle_agent_failure", () => {
 
       expect(createIssueMock).not.toHaveBeenCalled();
       expect(createCommentMock).not.toHaveBeenCalled();
+    });
+
+    it("reports failure when continuation was requested without terminal completion evidence", async () => {
+      fs.writeFileSync(path.join(tmpDir, "agent_output.json"), JSON.stringify({ items: [{ type: "request_continuation", message: "Follow-up work remains" }] }));
+      const createIssueMock = vi.fn(async () => ({ data: { number: 456, html_url: "https://github.com/owner/repo/issues/456" } }));
+      const createCommentMock = vi.fn();
+      global.github = {
+        rest: {
+          search: { issuesAndPullRequests: vi.fn(async () => ({ data: { total_count: 0, items: [] } })) },
+          issues: { create: createIssueMock, createComment: createCommentMock },
+          pulls: { get: vi.fn() },
+        },
+        graphql: vi.fn(),
+      };
+
+      vi.resetModules();
+      const { main: mainFn } = require("./handle_agent_failure.cjs");
+      await mainFn();
+
+      expect(createIssueMock).toHaveBeenCalled();
     });
 
     it.each(["missing_terminal_safe_output", "agent_startup_failure"])("skips cancelled agents with collector-reported %s", async reason => {

@@ -51,8 +51,15 @@ describe("request_continuation metadata handler", () => {
     expect((await handler({ message: "three" })).success).toBe(false);
   });
 
+  it("honors a resolved integer string max", async () => {
+    const handler = await main({ max: "2" });
+    expect((await handler({ message: "one" })).success).toBe(true);
+    expect((await handler({ message: "two" })).success).toBe(true);
+    expect(await handler({ message: "three" })).toEqual({ success: false, error: "Max count of 2 reached" });
+  });
+
   it("rejects invalid runtime maxima", async () => {
-    for (const max of [0, -1, -2, 1.5, "2"]) {
+    for (const max of [0, -1, -2, 1.5, "2.0", "2e0", "", "2x"]) {
       await expect(main({ max })).rejects.toThrow("max must be a positive integer");
     }
   });

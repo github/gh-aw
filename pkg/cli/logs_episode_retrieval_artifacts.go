@@ -361,6 +361,11 @@ func processEpisodeArtifacts(run WorkflowRun, runDir string, info *AwInfo) (Proc
 	result := DownloadResult{Run: run}
 	result.Run.LogsPath = runDir
 	metrics := extractRunMetricsAndMetadata(&result, runDir, false)
+	var err error
+	result.ContinuationRequests, err = extractEpisodeContinuationRequests(runDir, run)
+	if err != nil {
+		return ProcessedRun{}, err
+	}
 	usage, err := analyzeTokenUsage(runDir, false)
 	if err != nil {
 		return ProcessedRun{}, fmt.Errorf("read compact episode usage: %w", err)
@@ -384,4 +389,47 @@ func processEpisodeArtifacts(run WorkflowRun, runDir string, info *AwInfo) (Proc
 		Friction: result.Friction, GitHubRateLimitUsage: result.GitHubRateLimitUsage,
 		SafeOutputs: result.SafeOutputs,
 	}, nil
+}
+
+func extractEpisodeContinuationRequests(runDir string, run WorkflowRun) ([]ContinuationRequestReport, error) {
+	artifactDirs, foundInventory, err := readEpisodeAllArtifactDirs(runDir)
+	if err != nil {
+		return nil, err
+	}
+	dirs := append([]string{runDir}, artifactDirs...)
+	if !foundInventory {
+		dirs = dirs[:1]
+	}
+	var requests []ContinuationRequestReport
+	seen := make(map[ContinuationRequestReport]struct{})
+	foundOutput, invalidOutput := false, false
+	for _, dir := range dirs {
+		if resolveAgentOutputFile(dir, false) == "" {
+			continue
+		}
+		foundOutput = true
+		experiment, variant, _ := firstExperimentAssignment(extractExperimentData(dir))
+		extracted, err := extractContinuationRequestsFromRun(dir, run, false, experiment, variant)
+		if err != nil {
+			return nil, err
+		}
+		if extracted == nil {
+			invalidOutput = true
+			continue
+		}
+		if requests == nil {
+			requests = []ContinuationRequestReport{}
+		}
+		for _, request := range extracted {
+			if _, exists := seen[request]; exists {
+				continue
+			}
+			seen[request] = struct{}{}
+			requests = append(requests, request)
+		}
+	}
+	if invalidOutput || !foundOutput {
+		return nil, nil
+	}
+	return requests, nil
 }

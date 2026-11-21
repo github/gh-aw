@@ -57,6 +57,28 @@ func TestInvalidateCompleteArtifactDownloadMarker(t *testing.T) {
 	assert.NoFileExists(t, marker)
 }
 
+func TestCachedAuditBypassesWhenRequestedAgentOutputIsMissing(t *testing.T) {
+	runDir := t.TempDir()
+	markerDir := filepath.Join(runDir, downloadedArtifactsMarkerDir)
+	require.NoError(t, os.MkdirAll(markerDir, 0o700))
+	for _, marker := range []string{string(ArtifactSetAll), "agent", "agent-output-fallback"} {
+		require.NoError(t, os.WriteFile(filepath.Join(markerDir, marker), nil, 0o600))
+	}
+	summary := &RunSummary{CLIVersion: GetVersion(), RunID: 42,
+		RunAnalysis: RunAnalysis{Run: WorkflowRun{DatabaseID: 42}}}
+	require.NoError(t, saveRunSummary(runDir, summary, false))
+
+	done, skipped, err := renderCachedAuditIfAvailable(t.Context(), auditRunConfig{
+		runID: 42, outputDir: runDir, artifactFilter: []string{"agent"},
+	})
+	require.NoError(t, err)
+	assert.False(t, done)
+	assert.False(t, skipped)
+	for _, marker := range []string{string(ArtifactSetAll), "agent", "agent-output-fallback"} {
+		assert.NoFileExists(t, filepath.Join(markerDir, marker))
+	}
+}
+
 func TestAuditNeedsDetectionArtifactWithUnifiedSession(t *testing.T) {
 	t.Parallel()
 	runDir := writeUnifiedDetectionTestSession(t, unifiedDetectionTestHeader+unifiedDetectionTestEvent(`{"jobResult":"success","conclusion":"warning","reason":"parse_error"}`))

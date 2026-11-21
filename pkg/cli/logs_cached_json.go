@@ -860,41 +860,44 @@ func cachedJSONLCanSatisfy(artifactFilter []string, parse, train, toolGraph bool
 }
 
 func processedRunFromCachedData(data RunData, audit *AuditData, outputDir string) ProcessedRun {
-	run := WorkflowRun{DatabaseID: data.RunID, WorkflowName: data.WorkflowName}
+	attempt, _ := strconv.Atoi(data.RunAttempt)
+	run := WorkflowRun{
+		DatabaseID: data.RunID, WorkflowName: data.WorkflowName, Repository: data.Repository,
+		Attempt: attempt, UpdatedAt: data.UpdatedAt,
+	}
 	runDir := filepath.Join(outputDir, fmt.Sprintf("run-%d", data.RunID))
 	backfillContinuationRequests(&data.ContinuationRequests, run, runDir, false)
-	if data.ContinuationRequests != nil {
-		data.ContinuationRequestCount = continuationRequestCount(data.ContinuationRequests)
-	}
+	data.ContinuationRequestCount = continuationRequestCount(data.ContinuationRequests)
+	mergeContinuationRequestsIntoAudit(audit, data.ContinuationRequests)
 	return ProcessedRun{
 		Run: WorkflowRun{
-			DatabaseID:               data.RunID,
-			Number:                   data.Number,
-			URL:                      data.URL,
-			Status:                   data.Status,
-			Conclusion:               data.Conclusion,
-			WorkflowName:             data.WorkflowName,
-			WorkflowPath:             data.WorkflowPath,
-			CreatedAt:                data.CreatedAt,
-			StartedAt:                data.StartedAt,
-			UpdatedAt:                data.UpdatedAt,
-			Event:                    data.Event,
-			HeadBranch:               data.Branch,
-			HeadSha:                  data.HeadSHA,
-			DisplayTitle:             data.DisplayTitle,
-			Repository:               data.Repository,
-			Actor:                    data.Actor,
-			Duration:                 parseDurationString(data.Duration),
-			ActionMinutes:            data.ActionMinutes,
-			TokenUsage:               data.TokenUsage,
-			Turns:                    data.Turns,
-			ErrorCount:               data.ErrorCount,
-			WarningCount:             data.WarningCount,
-			MissingToolCount:         data.MissingToolCount,
-			MissingDataCount:         data.MissingDataCount,
-			ContinuationRequestCount: len(data.ContinuationRequests),
-			SafeItemsCount:           data.SafeItemsCount,
-			LogsPath:                 filepath.Join(outputDir, fmt.Sprintf("run-%d", data.RunID)),
+			DatabaseID:       data.RunID,
+			Number:           data.Number,
+			URL:              data.URL,
+			Status:           data.Status,
+			Conclusion:       data.Conclusion,
+			WorkflowName:     data.WorkflowName,
+			WorkflowPath:     data.WorkflowPath,
+			CreatedAt:        data.CreatedAt,
+			StartedAt:        data.StartedAt,
+			UpdatedAt:        data.UpdatedAt,
+			Event:            data.Event,
+			HeadBranch:       data.Branch,
+			HeadSha:          data.HeadSHA,
+			DisplayTitle:     data.DisplayTitle,
+			Repository:       data.Repository,
+			Attempt:          attempt,
+			Actor:            data.Actor,
+			Duration:         parseDurationString(data.Duration),
+			ActionMinutes:    data.ActionMinutes,
+			TokenUsage:       data.TokenUsage,
+			Turns:            data.Turns,
+			ErrorCount:       data.ErrorCount,
+			WarningCount:     data.WarningCount,
+			MissingToolCount: data.MissingToolCount,
+			MissingDataCount: data.MissingDataCount,
+			SafeItemsCount:   data.SafeItemsCount,
+			LogsPath:         filepath.Join(outputDir, fmt.Sprintf("run-%d", data.RunID)),
 		},
 		AwContext:            data.AwContext,
 		TaskDomain:           data.TaskDomain,

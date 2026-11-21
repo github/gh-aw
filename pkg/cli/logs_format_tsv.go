@@ -33,12 +33,12 @@ func renderLogsTSVToWriter(w io.Writer, data LogsData) {
 	logsTSVLog.Printf("Rendering %d runs as TSV", data.Summary.TotalRuns)
 
 	s := data.Summary
-	renderTSVContinuationRequestSummary(w, s)
 	// Summary line with key aggregates
 	fmt.Fprintf(w, "# %d runs | %s duration | %s tokens | %d turns | %d errors\n",
 		s.TotalRuns, s.TotalDuration, formatTSVSummaryTokens(s.TotalTokens), s.TotalTurns, s.TotalErrors)
 
 	if len(data.Runs) == 0 {
+		renderTSVContinuationRequestSummary(w, s)
 		return
 	}
 
@@ -111,6 +111,7 @@ func renderLogsTSVToWriter(w io.Writer, data LogsData) {
 		}
 		fmt.Fprintf(w, "# engines: %s\n", strings.Join(parts, " "))
 	}
+	renderTSVContinuationRequestSummary(w, s)
 }
 
 // renderLogsTSV outputs the logs data as tab-separated values to os.Stdout.
@@ -123,11 +124,11 @@ func renderLogsTSVVerboseToWriter(w io.Writer, data LogsData) {
 	logsTSVLog.Printf("Rendering %d runs as verbose TSV", data.Summary.TotalRuns)
 
 	s := data.Summary
-	renderTSVContinuationRequestSummary(w, s)
 	fmt.Fprintf(w, "# %d runs | %s duration | %s tokens | %d turns | %d errors | %d missing_tools | %d github_api_calls\n",
 		s.TotalRuns, s.TotalDuration, formatTSVSummaryTokens(s.TotalTokens), s.TotalTurns, s.TotalErrors, s.TotalMissingTools, s.TotalGitHubAPICalls)
 
 	if len(data.Runs) == 0 {
+		renderTSVContinuationRequestSummary(w, s)
 		return
 	}
 
@@ -192,6 +193,7 @@ func renderLogsTSVVerboseToWriter(w io.Writer, data LogsData) {
 			fmt.Fprintf(w, "# [%s] %s: %s\n", obs.Severity, obs.Title, obs.Summary)
 		}
 	}
+	renderTSVContinuationRequestSummary(w, s)
 }
 
 // renderLogsTSVVerbose outputs a more detailed TSV with additional columns to os.Stdout.

@@ -4,14 +4,15 @@
 /** @type {import('./types/handler-factory').HandlerFactoryFunction} */
 async function main(config = {}) {
   const { max: maxCount = 1 } = config;
-  if (!Number.isSafeInteger(maxCount) || maxCount < 1) {
+  const normalizedMax = typeof maxCount === "string" && /^\d+$/.test(maxCount) ? Number(maxCount) : maxCount;
+  if (!Number.isSafeInteger(normalizedMax) || normalizedMax < 1) {
     throw new Error("request_continuation max must be a positive integer");
   }
   let processedCount = 0;
 
   return async function handleRequestContinuation(message) {
-    if (maxCount > 0 && processedCount >= maxCount) {
-      return { success: false, error: `Max count of ${maxCount} reached` };
+    if (processedCount >= normalizedMax) {
+      return { success: false, error: `Max count of ${normalizedMax} reached` };
     }
     if (typeof message.message !== "string" || !message.message.trim()) {
       return { success: false, error: "Missing required field: message" };

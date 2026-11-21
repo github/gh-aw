@@ -9,7 +9,9 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/github/gh-aw/pkg/constants"
 	"github.com/stretchr/testify/assert"
@@ -49,7 +51,7 @@ func TestExtractContinuationRequestsFromRun(t *testing.T) {
 }
 
 func TestContinuationRequestsUnavailableVersusEmpty(t *testing.T) {
-	for _, content := range []string{"", "{", `{}`, `{"items":null}`, `{"items":[}`, `{"items":{}}`, `{"items":[null]}`, `{"items":[{}]}`, `{"items":[12]}`, `{"items":[{"type":"request_continuation","message":12}]}`, `{"items":[{"type":"request_continuation"}]}`, `{"items":[]}`} {
+	for _, content := range []string{"", "{", `{}`, `{"items":null}`, `{"items":[}`, `{"items":{}}`, `{"items":[null]}`, `{"items":[12]}`, `{"items":[{"type":"request_continuation","message":12}]}`, `{"items":[{"type":"request_continuation"}]}`, `{"items":[]}`} {
 		t.Run(content, func(t *testing.T) {
 			dir := t.TempDir()
 			if content != "" {
@@ -71,7 +73,6 @@ func TestContinuationRequestsMixedMalformedArtifactsAreUnavailable(t *testing.T)
 	valid := `{"type":"request_continuation","message":"More work remains"}`
 	for _, malformed := range []string{
 		`null`,
-		`{}`,
 		`12`,
 		`{"type":"request_continuation","message":""}`,
 		`{"type":"request_continuation"}`,
@@ -97,6 +98,21 @@ func TestContinuationRequestsMixedMalformedArtifactsAreUnavailable(t *testing.T)
 			})
 		}
 	}
+}
+
+func TestContinuationRequestsIgnoreUnrelatedItems(t *testing.T) {
+	dir := t.TempDir()
+	content := `{"items":[
+			{"type":"request_continuation","message":"More work"},
+			{},
+			{"type":"custom_job","message":42,"timestamp":true}
+		]}`
+	require.NoError(t, os.WriteFile(filepath.Join(dir, constants.AgentOutputArtifactName.String()), []byte(content), 0o600))
+
+	requests, err := extractContinuationRequestsFromRun(dir, WorkflowRun{}, false, "", "")
+	require.NoError(t, err)
+	require.Len(t, requests, 1)
+	assert.Equal(t, "More work", requests[0].Message)
 }
 
 func TestContinuationRequestsCollectionErrorsAreUnavailable(t *testing.T) {
@@ -127,7 +143,6 @@ func TestContinuationRequestsAuditAndLogs(t *testing.T) {
 	run = applyAuditMetrics(run, results)
 	processed := buildProcessedAuditRun(run, results)
 	assert.Equal(t, requests, processed.ContinuationRequests)
-	assert.Equal(t, 1, processed.Run.ContinuationRequestCount)
 	summary := buildAuditRunSummary(run, processed, results)
 	assert.Equal(t, requests, summary.ContinuationRequests)
 	session := buildSessionAnalysis(processed, LogMetrics{})
@@ -164,6 +179,8 @@ func TestContinuationRequestsAuditAndLogs(t *testing.T) {
 	output.Reset()
 	renderLogsTSVToWriter(&output, data)
 	assert.Contains(t, output.String(), "continuation_requests=1")
+	assert.Less(t, strings.Index(output.String(), "# 1 runs"), strings.Index(output.String(), "continuation_requests=1"))
+	assert.Greater(t, strings.Index(output.String(), "continuation_requests=1"), strings.Index(output.String(), "run_id\t"))
 
 	cached := data.Runs[0]
 	cachedData := buildLogsData([]ProcessedRun{{Run: run, cachedData: &cached}}, ".", nil)
@@ -174,7 +191,9 @@ func TestContinuationRequestsAuditAndLogs(t *testing.T) {
 func TestHealthContinuationRequestsCachedEvidence(t *testing.T) {
 	runs, config := healthSubagentFixture(t)
 	cachedRun := runs[9]
-	summary := &RunSummary{CLIVersion: GetVersion(), RunID: cachedRun.DatabaseID,
+	cachedRun.Repository = "org/repo"
+	cachedRun.Attempt = 1
+	summary := &RunSummary{CLIVersion: GetVersion(), RunID: cachedRun.DatabaseID, ProcessedAt: cachedRun.UpdatedAt.Add(time.Minute),
 		RunAnalysis: RunAnalysis{Run: cachedRun, ContinuationRequests: []ContinuationRequestReport{{Message: "More"}, {Message: "Later"}}}}
 	dir := filepath.Join(config.LogsDir, fmt.Sprintf("run-%d", cachedRun.DatabaseID))
 	require.NoError(t, os.MkdirAll(dir, 0o700))
@@ -211,7 +230,9 @@ func TestHealthContinuationRequestsRejectUnavailableCache(t *testing.T) {
 		t.Run(mode, func(t *testing.T) {
 			runs, config := healthSubagentFixture(t)
 			run := runs[9]
-			summary := &RunSummary{CLIVersion: GetVersion(), RunID: run.DatabaseID,
+			run.Repository = "org/repo"
+			run.Attempt = 1
+			summary := &RunSummary{CLIVersion: GetVersion(), RunID: run.DatabaseID, ProcessedAt: run.UpdatedAt.Add(time.Minute),
 				RunAnalysis: RunAnalysis{Run: run, ContinuationRequests: []ContinuationRequestReport{}}}
 			switch mode {
 			case "missing field":
@@ -247,27 +268,93 @@ func TestContinuationRequestsCacheBackfill(t *testing.T) {
 	require.NoError(t, os.MkdirAll(dir, 0o700))
 	require.NoError(t, os.WriteFile(filepath.Join(dir, constants.AgentOutputArtifactName.String()),
 		[]byte(`{"items":[{"type":"request_continuation","message":"Continue later"}]}`), 0o600))
-	run := WorkflowRun{DatabaseID: 42, WorkflowName: "Example"}
+	run := WorkflowRun{DatabaseID: 42, WorkflowName: "Example", Repository: "org/repo", Attempt: 1, UpdatedAt: time.Now().UTC()}
+	summary := &RunSummary{CLIVersion: GetVersion(), RunID: 42, ProcessedAt: run.UpdatedAt.Add(time.Minute),
+		RunAnalysis: RunAnalysis{Run: run}}
+	require.NoError(t, saveRunSummary(dir, summary, false))
 	var requests []ContinuationRequestReport
 	require.True(t, backfillContinuationRequests(&requests, run, dir, false))
 	require.Len(t, requests, 1)
 	assert.False(t, backfillContinuationRequests(&requests, run, dir, false))
-	summary := &RunSummary{RunID: 42, RunAnalysis: RunAnalysis{Run: run}}
 	processed := processedRunFromSummary(summary, dir)
 	assert.Equal(t, requests, processed.ContinuationRequests)
-	cached := processedRunFromCachedData(RunData{RunID: 42, WorkflowName: "Example"}, nil, root)
+	cached := processedRunFromCachedData(RunData{RunID: 42, WorkflowName: "Example", Repository: "org/repo",
+		RunAttempt: "1", UpdatedAt: run.UpdatedAt}, nil, root)
 	assert.Equal(t, requests, cached.ContinuationRequests)
+	require.NotNil(t, cached.cachedData.ContinuationRequestCount)
+	assert.Equal(t, 1, *cached.cachedData.ContinuationRequestCount)
 	data := buildLogsData([]ProcessedRun{cached}, root, nil)
 	assert.Equal(t, 1, data.Summary.TotalContinuationRequests)
 	assert.Equal(t, requests, data.ContinuationRequests)
 }
 
+func TestContinuationRequestsCacheBackfillRequiresCurrentRunMetadata(t *testing.T) {
+	for _, mismatch := range []string{"repository", "attempt", "updated_at", "freshness"} {
+		t.Run(mismatch, func(t *testing.T) {
+			dir := t.TempDir()
+			run := WorkflowRun{DatabaseID: 42, WorkflowName: "Example", Repository: "org/repo",
+				Attempt: 2, UpdatedAt: time.Now().UTC()}
+			summary := &RunSummary{CLIVersion: GetVersion(), RunID: run.DatabaseID,
+				ProcessedAt: run.UpdatedAt.Add(time.Minute), RunAnalysis: RunAnalysis{Run: run}}
+			switch mismatch {
+			case "repository":
+				summary.Run.Repository = "org/other"
+			case "attempt":
+				summary.Run.Attempt--
+			case "updated_at":
+				summary.Run.UpdatedAt = summary.Run.UpdatedAt.Add(-time.Minute)
+			case "freshness":
+				summary.ProcessedAt = summary.Run.UpdatedAt.Add(-time.Minute)
+			}
+			require.NoError(t, saveRunSummary(dir, summary, false))
+			require.NoError(t, os.WriteFile(filepath.Join(dir, constants.AgentOutputArtifactName.String()),
+				[]byte(`{"items":[{"type":"request_continuation","message":"Continue later"}]}`), 0o600))
+
+			var requests []ContinuationRequestReport
+			assert.False(t, backfillContinuationRequests(&requests, run, dir, false))
+			assert.Nil(t, requests)
+		})
+	}
+}
+
+func TestMergeContinuationRequestsIntoAuditRefreshesSessionCount(t *testing.T) {
+	audit := AuditData{ContinuationRequests: []ContinuationRequestReport{{Message: "Old"}},
+		SessionAnalysis: &SessionAnalysis{ContinuationRequestCount: continuationRequestCount([]ContinuationRequestReport{{Message: "Old"}})}}
+	requests := []ContinuationRequestReport{{Message: "Updated"}, {Message: "More"}}
+
+	require.True(t, mergeContinuationRequestsIntoAudit(&audit, requests))
+	assert.Equal(t, requests, audit.ContinuationRequests)
+	require.NotNil(t, audit.SessionAnalysis.ContinuationRequestCount)
+	assert.Equal(t, 2, *audit.SessionAnalysis.ContinuationRequestCount)
+	assert.False(t, mergeContinuationRequestsIntoAudit(&audit, requests))
+	assert.False(t, mergeContinuationRequestsIntoAudit(&audit, nil))
+}
+
+func TestProcessEpisodeArtifactsIncludesContinuationRequests(t *testing.T) {
+	root := t.TempDir()
+	dir := filepath.Join(root, "collection-1")
+	artifactDir := filepath.Join(root, "1-enrichment")
+	require.NoError(t, os.MkdirAll(dir, 0o700))
+	require.NoError(t, os.MkdirAll(artifactDir, 0o700))
+	require.NoError(t, os.WriteFile(filepath.Join(artifactDir, constants.AgentOutputArtifactName.String()),
+		[]byte(`{"items":[{"type":"request_continuation","message":"Continue later"}]}`), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(artifactDir, ".episode-complete"), []byte("v1\n"), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, ".episode-artifacts.json"), []byte(`["../1-enrichment"]`), 0o600))
+	run := WorkflowRun{DatabaseID: 42, WorkflowName: "Example"}
+	processed, err := processEpisodeArtifacts(run, dir, &AwInfo{Context: &AwContext{EpisodeID: "episode-1"}})
+	require.NoError(t, err)
+	require.Len(t, processed.ContinuationRequests, 1)
+	assert.Equal(t, "Continue later", processed.ContinuationRequests[0].Message)
+}
+
 func TestHealthContinuationRequestsBackfillCachedArtifacts(t *testing.T) {
 	runs, config := healthSubagentFixture(t)
 	run := runs[9]
+	run.Repository = "org/repo"
+	run.Attempt = 1
 	dir := filepath.Join(config.LogsDir, fmt.Sprintf("run-%d", run.DatabaseID))
 	require.NoError(t, os.MkdirAll(dir, 0o700))
-	summary := &RunSummary{CLIVersion: GetVersion(), RunID: run.DatabaseID, RunAnalysis: RunAnalysis{Run: run}}
+	summary := &RunSummary{CLIVersion: GetVersion(), RunID: run.DatabaseID, ProcessedAt: run.UpdatedAt.Add(time.Minute), RunAnalysis: RunAnalysis{Run: run}}
 	require.NoError(t, saveRunSummary(dir, summary, false))
 	require.NoError(t, os.WriteFile(filepath.Join(dir, constants.AgentOutputArtifactName.String()),
 		[]byte(`{"items":[{"type":"request_continuation","message":"Continue later"}]}`), 0o600))

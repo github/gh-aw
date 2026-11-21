@@ -280,6 +280,22 @@ func ExtractLogMetricsFromRun(processedRun ProcessedRun) workflow.LogMetrics {
 // and calls fn for every successfully decoded item. Read and parse problems are reported
 // only when verbose is set, and processing continues without the failing file or item.
 func forEachSafeOutputItem[I any](runDir string, run WorkflowRun, verbose bool, fn func(item I)) bool {
+	validItems := true
+	available := forEachSafeOutputRawItem(runDir, run, verbose, func(itemRaw json.RawMessage) {
+		var item I
+		if err := json.Unmarshal(itemRaw, &item); err != nil {
+			validItems = false
+			if verbose {
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to parse item from safe output: %v", err)))
+			}
+			return
+		}
+		fn(item)
+	})
+	return available && validItems
+}
+
+func forEachSafeOutputRawItem(runDir string, run WorkflowRun, verbose bool, fn func(item json.RawMessage)) bool {
 	resolvedAgentOutputFile := resolveAgentOutputFile(runDir, verbose)
 	if resolvedAgentOutputFile == "" {
 		logsMetricsLog.Print("No safe output artifact found")
@@ -323,15 +339,7 @@ func forEachSafeOutputItem[I any](runDir string, run WorkflowRun, verbose bool, 
 			validItems = false
 			continue
 		}
-		var item I
-		if err := json.Unmarshal(itemRaw, &item); err != nil {
-			validItems = false
-			if verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to parse item from safe output: %v", err)))
-			}
-			continue // Skip malformed items
-		}
-		fn(item)
+		fn(itemRaw)
 	}
 	return validItems
 }
@@ -344,12 +352,27 @@ func extractContinuationRequestsFromRun(runDir string, run WorkflowRun, verbose 
 		Message   string `json:"message"`
 		Timestamp string `json:"timestamp"`
 	}
-	available := forEachSafeOutputItem(runDir, run, verbose, func(item requestItem) {
-		if item.Type == "" {
+	available := forEachSafeOutputRawItem(runDir, run, verbose, func(itemRaw json.RawMessage) {
+		var fields map[string]json.RawMessage
+		if err := json.Unmarshal(itemRaw, &fields); err != nil {
 			invalidRequest = true
 			return
 		}
-		if item.Type != "request_continuation" {
+		typeRaw, hasType := fields["type"]
+		if !hasType {
+			return
+		}
+		var itemType string
+		if err := json.Unmarshal(typeRaw, &itemType); err != nil {
+			invalidRequest = true
+			return
+		}
+		if itemType != "request_continuation" {
+			return
+		}
+		var item requestItem
+		if err := json.Unmarshal(itemRaw, &item); err != nil {
+			invalidRequest = true
 			return
 		}
 		if strings.TrimSpace(item.Message) == "" {

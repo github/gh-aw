@@ -21,7 +21,7 @@ engine: copilot
 network: defaults
 safe-outputs:
   request-continuation:
-    max: 1
+    max: 2
   report-incomplete:
     create-issue: false
   noop:
@@ -39,12 +39,17 @@ Continue the analysis if more work remains.
 	require.NoError(t, err)
 	text := string(lock)
 	require.Contains(t, text, `"request_continuation"`)
+	toolsStart := strings.Index(text, "<safe-output-tools>")
+	require.NotEqual(t, -1, toolsStart)
+	toolsEnd := strings.Index(text[toolsStart:], "</safe-output-tools>")
+	require.GreaterOrEqual(t, toolsEnd, 0)
+	require.Contains(t, text[toolsStart:toolsStart+toolsEnd], "request_continuation(max:2)")
 	require.Contains(t, text, "record_request_continuation.cjs")
 	require.Contains(t, text, "GH_AW_REQUEST_CONTINUATION_MAX")
 	require.NotContains(t, text, "actions: write")
 	content, err := os.ReadFile(source)
 	require.NoError(t, err)
-	require.NoError(t, os.WriteFile(source, []byte(strings.Replace(string(content), "  request-continuation:\n    max: 1\n", "", 1)), 0600))
+	require.NoError(t, os.WriteFile(source, []byte(strings.Replace(string(content), "  request-continuation:\n    max: 2\n", "", 1)), 0600))
 	require.NoError(t, NewCompiler().CompileWorkflow(source))
 	baseline, err := os.ReadFile(filepath.Join(dir, "continuation.lock.yml"))
 	require.NoError(t, err)
@@ -81,6 +86,10 @@ func TestRequestContinuationConfig(t *testing.T) {
 		require.ErrorContains(t, err, "request-continuation")
 		require.NotContains(t, err.Error(), "unlimited")
 	}
+
+	requestContinuation := &RequestContinuationConfig{BaseSafeOutputConfig: BaseSafeOutputConfig{Authorization: &SafeOutputAuthorization{}}}
+	require.ErrorContains(t, validateRequestContinuationAuthorization(&SafeOutputsConfig{RequestContinuation: requestContinuation}), "request-continuation.authorization")
+	require.ErrorContains(t, validateRequestContinuationAuthorization(&SafeOutputsConfig{RequestContinuation: requestContinuation, Authorization: &SafeOutputAuthorization{}}), "request-continuation.authorization")
 }
 
 func TestRequestContinuationMetadataOnly(t *testing.T) {

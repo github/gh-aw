@@ -20,7 +20,6 @@ func applyAuditMetrics(run WorkflowRun, results auditAnalysisResults) WorkflowRu
 	}
 	run.WarningCount = 0
 	run.SafeItemsCount = results.safeItemsCount
-	run.ContinuationRequestCount = len(results.continuationRequests)
 	return run
 }
 

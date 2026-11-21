@@ -3,6 +3,8 @@ package cli
 import (
 	"fmt"
 	"io"
+	"slices"
+	"strings"
 )
 
 func continuationRequestCount(requests []ContinuationRequestReport) *int {
@@ -17,9 +19,47 @@ func backfillContinuationRequests(requests *[]ContinuationRequestReport, run Wor
 	if *requests != nil {
 		return false
 	}
+	if !continuationEvidenceMatchesRun(run, runDir, verbose) {
+		*requests = nil
+		return false
+	}
 	experiment, variant, _ := firstExperimentAssignment(extractExperimentData(runDir))
 	*requests, _ = extractContinuationRequestsFromRun(runDir, run, verbose, experiment, variant)
 	return *requests != nil
+}
+
+func continuationEvidenceMatchesRun(run WorkflowRun, runDir string, verbose bool) bool {
+	if run.DatabaseID <= 0 || run.Attempt <= 0 || run.Repository == "" || run.UpdatedAt.IsZero() {
+		return false
+	}
+	summary, ok := loadRunSummary(runDir, verbose)
+	if !ok || summary == nil || summary.RunID != run.DatabaseID ||
+		summary.Run.DatabaseID != run.DatabaseID ||
+		summary.Run.Attempt != run.Attempt ||
+		!strings.EqualFold(summary.Run.Repository, run.Repository) ||
+		!summary.Run.UpdatedAt.Equal(run.UpdatedAt) ||
+		summary.ProcessedAt.IsZero() || summary.ProcessedAt.Before(summary.Run.UpdatedAt) {
+		return false
+	}
+	return true
+}
+
+func mergeContinuationRequestsIntoAudit(auditData *AuditData, requests []ContinuationRequestReport) bool {
+	if auditData == nil || requests == nil {
+		return false
+	}
+	changed := auditData.ContinuationRequests == nil || !slices.Equal(auditData.ContinuationRequests, requests)
+	auditData.ContinuationRequests = requests
+	count := len(requests)
+	if auditData.SessionAnalysis == nil {
+		auditData.SessionAnalysis = &SessionAnalysis{}
+		changed = true
+	}
+	if auditData.SessionAnalysis.ContinuationRequestCount == nil || *auditData.SessionAnalysis.ContinuationRequestCount != count {
+		auditData.SessionAnalysis.ContinuationRequestCount = &count
+		changed = true
+	}
+	return changed
 }
 
 func renderTSVContinuationRequestSummary(w io.Writer, summary LogsSummary) {
