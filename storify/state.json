@@ -1,25 +1,24 @@
 {
-  "last_run_date": "2026-11-20",
+  "last_run_date": "2026-11-21",
   "last_window": {
-    "start": "2026-11-19T07:55:22Z",
-    "end": "2026-11-20T07:55:22Z"
+    "start": "2026-11-20T07:55:29Z",
+    "end": "2026-11-21T07:55:29Z"
   },
   "observed_window": {
-    "coverage": "394 cached records 2026-11-19T16:14:34Z through 2026-11-20T07:54:05Z; count-limited; no fleet refetch",
-    "missing_start": "2026-11-19T07:55:22Z",
-    "continuation_end": "2026-11-19T16:00:57Z",
-    "continuation_before_run_id": 44563846624
+    "coverage": "168 cached records 2026-11-21T02:47:51Z through 07:53:23Z; count-limited; no fleet refetch",
+    "missing_start": "2026-11-20T07:55:29Z",
+    "continuation_end": "2026-11-21T02:44:01Z",
+    "continuation_before_run_id": 44857809698
   },
   "key_themes": [
-    "Auditor had 12 failed and four successful collections in cached slice, with agent skipped on successful collections; a failure recurred after two successes.",
-    "Health Manager raised new tracker and tracker-expiry issue; Issue Monster requested assignment.",
-    "Three smoke dispatcher runs and ESLint dispatcher showed failed trusted control processing, with causes unverified.",
-    "Simulator memory preparation and repo-memory push failed again."
+    "Auditor: two collection failures, three collection successes, five agents skipped; tracker and tracker-expiry issue auto-closed before later failure.",
+    "Three dispatcher runs failed trusted control processing; common cause unknown.",
+    "Human-authored PR 79701 drew mixed reviewers, ADR draft, Sous Chef follow-up and bot revision; open at window end."
   ],
   "carry_forward_questions": [
-    "What actual error caused Auditor collection failures, and will the agent execute after collection?",
-    "Does tracker 79418 stay open through recovery, and is expiry issue 79421 fixed?",
-    "Why did dispatcher trusted control processing fail in each workflow?",
-    "Does simulator memory isolation and publication recover?"
+    "What caused Auditor collection failure and will agent execute after collection?",
+    "Will tracker expiry be fixed and a persistent Auditor tracker remain open?",
+    "What caused trusted work queue control failures and did dispatch occur?",
+    "Will PR 79701 review findings be resolved and validated?"
   ]
 }
