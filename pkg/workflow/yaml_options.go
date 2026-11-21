@@ -37,8 +37,11 @@ func marshalYAML(value any, implicitMappingNulls bool, options ...yaml.EncodeOpt
 		// Render only actual mapping nulls as empty values, never text inside
 		// a block scalar or null entries in a sequence.
 		for _, candidate := range ast.Filter(ast.MappingValueType, node) {
-			entry := candidate.(*ast.MappingValueNode)
-			if value, ok := entry.Value.(*ast.NullNode); ok && !entry.IsFlowStyle {
+			entry, ok := candidate.(*ast.MappingValueNode)
+			if !ok || entry.IsFlowStyle {
+				continue
+			}
+			if value, ok := entry.Value.(*ast.NullNode); ok {
 				value.Token.Type = token.ImplicitNullType
 				repaired = true
 			}
