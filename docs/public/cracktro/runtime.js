@@ -378,7 +378,7 @@
   /* touch gestures card: a phone loops each gesture in a 2 s slot (12 s cycle); pointing at a row plays only that gesture */
   .smp-ph { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 10px 32px; padding: 14px 16px;
     border: 1px solid #3d444d; border-radius: 8px; background: radial-gradient(ellipse at 30% 50%, #4493f824, transparent 60%), #151b23; }
-  .smp-ph svg { width: 150px; height: auto; flex: none; font-family: var(--mono); }
+  .smp-ph svg { width: 280px; max-width: 100%; height: auto; flex: none; font-family: var(--mono); }
   .ph-body { fill: #212830; stroke: #3d444d; stroke-width: 2; }
   .ph-scr { fill: #0d1117; }
   .ph-sl { fill: #151b23; stroke: var(--c); stroke-width: 1.5; }
@@ -390,14 +390,14 @@
   .ph-lb { font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; fill: var(--c); text-anchor: middle; }
   .ph-g { opacity: 0; animation: ph-slot 12s linear infinite both; animation-delay: calc(var(--i) * 2s); }
   @keyframes ph-slot { 0% { opacity: 0; } 1.5%, 15% { opacity: 1; } 16.6%, 100% { opacity: 0; } }
-  @keyframes ph-l { 0%, 15% { transform: translateX(0); } 75%, 100% { transform: translateX(-70px); } }
-  @keyframes ph-r { 0%, 15% { transform: translateX(0); } 75%, 100% { transform: translateX(70px); } }
-  @keyframes ph-u { 0%, 15% { transform: translateY(0); } 75%, 100% { transform: translateY(-150px); } }
-  @keyframes ph-d { 0%, 15% { transform: translateY(0); } 75%, 100% { transform: translateY(150px); } }
+  @keyframes ph-l { 0%, 15% { transform: translateX(0); } 75%, 100% { transform: translateX(-140px); } }
+  @keyframes ph-r { 0%, 15% { transform: translateX(0); } 75%, 100% { transform: translateX(140px); } }
+  @keyframes ph-u { 0%, 15% { transform: translateY(0); } 75%, 100% { transform: translateY(-88px); } }
+  @keyframes ph-d { 0%, 15% { transform: translateY(0); } 75%, 100% { transform: translateY(88px); } }
   @keyframes ph-tap { 0%, 30% { transform: scale(1); } 45% { transform: scale(.65); } 60%, 100% { transform: scale(1); } }
   @keyframes ph-ring { 0%, 40% { transform: scale(.7); opacity: 0; } 45% { opacity: .9; } 90%, 100% { transform: scale(2); opacity: 0; } }
-  @keyframes ph-p1 { 0%, 15% { transform: translate(0, 0); } 75%, 100% { transform: translate(24px, 26px); } }
-  @keyframes ph-p2 { 0%, 15% { transform: translate(0, 0); } 75%, 100% { transform: translate(-24px, -26px); } }
+  @keyframes ph-p1 { 0%, 15% { transform: translate(0, 0); } 75%, 100% { transform: translate(34px, 22px); } }
+  @keyframes ph-p2 { 0%, 15% { transform: translate(0, 0); } 75%, 100% { transform: translate(-34px, -22px); } }
   .ph-tapf, .ph-ring { transform-box: fill-box; transform-origin: center; }
   .ph-ring { fill: none; stroke: var(--c); stroke-width: 2; animation: ph-ring 2s ease-out infinite both; animation-delay: calc(var(--i) * 2s); }
   .smp-ph.solo .ph-g { animation: none; opacity: 0; }
@@ -1875,12 +1875,12 @@
     // Touch gestures: a phone shows the deck letterboxed and loops each gesture with its action on screen; pointing at
     // (or tapping) a row plays only that gesture. Rows mirror the window touch handlers (see navigation).
     const GESTURES = [
-      ["Swipe ←", "Next slide", "Next", "ph-l", [[115, 225]], "M115 225H45"],
-      ["Swipe →", "Previous slide", "Previous", "ph-r", [[45, 225]], "M45 225H115"],
-      ["Swipe ↑", "Down the column, else next band", "Down", "ph-u", [[80, 245]], "M80 245V95"],
-      ["Swipe ↓", "Up the column, else previous band", "Up", "ph-d", [[80, 85]], "M80 85V235"],
-      ["Tap a tile", "Jump to its slide", "Jump", "ph-tap", [[66, 167]], ""],
-      ["Pinch in", "Zoom out to the slide map", "Slide map", "", [[44, 98]], "M44 98L68 124M116 202L92 176"],
+      ["Swipe ←", "Next slide", "Next", "ph-l", [[220, 98]], "M220 98H80"],
+      ["Swipe →", "Previous slide", "Previous", "ph-r", [[80, 98]], "M80 98H220"],
+      ["Swipe ↑", "Down the column, else next band", "Down", "ph-u", [[214, 128]], "M214 128V40"],
+      ["Swipe ↓", "Up the column, else previous band", "Up", "ph-d", [[214, 40]], "M214 40V128"],
+      ["Tap a tile", "Jump to its slide", "Jump", "ph-tap", [[126, 120]], ""],
+      ["Pinch in", "Zoom out to the slide map", "Slide map", "", [[66, 36]], "M66 36L100 58M234 124L200 102"],
     ];
     const smpGestures = (() => {
       const NS = "http://www.w3.org/2000/svg";
@@ -1892,20 +1892,20 @@
       };
       const groups = GESTURES.map(([, , label, anim, [[x, y]], trail], i) => {
         const f = (cx, cy, name, cls = "ph-f") => s("circle", { class: cls, cx, cy, r: 11, style: `--i:${i};animation-name:${name}` });
-        const fingers = i === 5 ? [f(44, 98, "ph-p1"), f(116, 202, "ph-p2")] : anim === "ph-tap" ? [s("circle", { class: "ph-ring", cx: x, cy: y, r: 11, style: `--i:${i}` }), f(x, y, "ph-tap", "ph-f ph-tapf")] : [f(x, y, anim)];
-        return s("g", { class: "ph-g", "data-i": i, style: `--i:${i}` }, s("text", { class: "ph-lb", x: 80, y: 62 }, label), trail ? s("path", { class: "ph-tr", d: trail }) : null, fingers);
+        const fingers = i === 5 ? [f(66, 36, "ph-p1"), f(234, 124, "ph-p2")] : anim === "ph-tap" ? [s("circle", { class: "ph-ring", cx: x, cy: y, r: 11, style: `--i:${i}` }), f(x, y, "ph-tap", "ph-f ph-tapf")] : [f(x, y, anim)];
+        return s("g", { class: "ph-g", "data-i": i, style: `--i:${i}` }, s("text", { class: "ph-lb", x: 150, y: 76 }, label), trail ? s("path", { class: "ph-tr", d: trail }) : null, fingers);
       });
       const svg = s(
         "svg",
-        { viewBox: "0 0 160 300", role: "img", "aria-label": "Phone showing the touch gestures: swipes step through slides and bands, a tap on a tile jumps, a pinch in opens the slide map" },
-        s("rect", { class: "ph-body", x: 10, y: 4, width: 140, height: 292, rx: 24 }),
-        s("rect", { class: "ph-scr", x: 18, y: 16, width: 124, height: 268, rx: 14 }),
-        s("rect", { class: "ph-body", x: 62, y: 22, width: 36, height: 8, rx: 4 }),
-        s("rect", { class: "ph-sl", x: 22, y: 117, width: 116, height: 65, rx: 4 }),
-        s("rect", { class: "ph-tl", x: 30, y: 128, width: 54, height: 7, rx: 2 }),
-        s("rect", { class: "ph-tl", x: 30, y: 140, width: 34, height: 4, rx: 2, opacity: 0.5 }),
-        [26, 54, 82, 110].map(x => s("rect", { class: "ph-tile", x, y: 160, width: 24, height: 14, rx: 2 })),
-        [0, 1, 2, 3, 4].map(i => s("rect", { class: "ph-dock", x: 50 + i * 13, y: 264, width: 10, height: 10, rx: 2 })),
+        { viewBox: "0 0 300 160", role: "img", "aria-label": "Phone showing the touch gestures: swipes step through slides and bands, a tap on a tile jumps, a pinch in opens the slide map" },
+        s("rect", { class: "ph-body", x: 4, y: 10, width: 292, height: 140, rx: 24 }),
+        s("rect", { class: "ph-scr", x: 16, y: 18, width: 268, height: 124, rx: 14 }),
+        s("rect", { class: "ph-body", x: 22, y: 62, width: 8, height: 36, rx: 4 }),
+        s("rect", { class: "ph-sl", x: 52, y: 25, width: 196, height: 110, rx: 4 }),
+        s("rect", { class: "ph-tl", x: 62, y: 36, width: 80, height: 9, rx: 2 }),
+        s("rect", { class: "ph-tl", x: 62, y: 50, width: 50, height: 5, rx: 2, opacity: 0.5 }),
+        [60, 106, 152, 198].map(x => s("rect", { class: "ph-tile", x, y: 112, width: 40, height: 16, rx: 2 })),
+        [0, 1, 2, 3, 4].map(i => s("rect", { class: "ph-dock", x: 262, y: 48 + i * 13, width: 10, height: 10, rx: 2 })),
         groups
       );
       const card = h("div", { class: "smp-ph" });
