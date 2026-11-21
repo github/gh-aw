@@ -65,14 +65,6 @@ function digest(value) {
   return createHash("sha256").update(canonical(value), "utf8").digest("hex");
 }
 
-function fingerprint(actor, kind, parameters) {
-  if (kind === "finish" && parameters?.keep_open === false) {
-    parameters = { ...parameters };
-    delete parameters.keep_open;
-  }
-  return digest({ actor, kind, parameters });
-}
-
 // JSON.parse alone cannot detect duplicate (including escaped-equivalent) keys.
 /**
  * @param {string} text
@@ -202,9 +194,4 @@ function integer(value, min, max, name) {
   return value;
 }
 
-function validateReason(reason) {
-  if (typeof reason !== "string" || reason.length > 128 || !/^[A-Za-z0-9]/.test(reason) || /[^A-Za-z0-9_.:-]/.test(reason)) throw queueError("reason_invalid", "reason must be a bounded sanitized code");
-  return reason;
-}
-
-module.exports = { MAX_PARSE_BYTES, MAX_SNAPSHOT_PARSE_BYTES, canonical, canonicalBytes, closed, digest, fingerprint, identity, integer, parseStrictJSON, queueError, utf8Compare, validateReason, validString };
+module.exports = { MAX_PARSE_BYTES, MAX_SNAPSHOT_PARSE_BYTES, canonical, canonicalBytes, closed, digest, identity, integer, parseStrictJSON, queueError, utf8Compare, validString };

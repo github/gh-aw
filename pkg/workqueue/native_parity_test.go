@@ -5,167 +5,224 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
 	"os/exec"
-	"reflect"
-	"slices"
+	"sort"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
 )
 
-func TestNativeEnginesStrictEveryPrefixParity(t *testing.T) {
-	node, err := exec.LookPath("node")
-	if err != nil {
-		t.Skip("cross-engine test tooling requires Node; native production has no Node dependency")
-	}
-	data, err := os.ReadFile("../../specs/work-queue/fixtures/canonical-prefix.json")
-	if err != nil {
-		t.Fatal(err)
-	}
-	var fixture struct {
-		Commits []QueueCommit `json:"commits"`
-	}
-	if err := json.Unmarshal(data, &fixture); err != nil {
-		t.Fatal(err)
-	}
-	if len(fixture.Commits) < 4 {
-		t.Fatal("missing independent every-prefix fixture")
-	}
-	parameters := DispatchParameters{Pool: "default", MaxClaims: 16, MaxDispatches: 16, MaxBytes: 48 << 10}
-	check := func(t *testing.T, commits []QueueCommit, at int64) {
-		t.Helper()
-		state, err := Replay(commits)
-		if err != nil {
-			t.Fatal(err)
-		}
-		canonical, err := Serialize(commits)
-		if err != nil {
-			t.Fatal(err)
-		}
-		next, err := PlanNext(state, "default", at)
-		if err != nil {
-			t.Fatal(err)
-		}
-		decision, err := PlanDispatch(state, parameters, "parity-request", "parity-commit", at)
-		if err != nil {
-			t.Fatal(err)
-		}
-		input, err := canonicalValue(map[string]any{
-			"transactions": commits, "pool": "default", "at": at,
-			"parameters": parameters, "request_id": "parity-request", "commit_id": "parity-commit",
-		})
-		if err != nil {
-			t.Fatal(err)
-		}
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-		defer cancel()
-		command := exec.CommandContext(ctx, node, "../../actions/setup/js/work_queue_conformance_checks.cjs", "--replay")
-		command.Stdin = bytes.NewReader(input)
-		var stderr bytes.Buffer
-		command.Stderr = &stderr
-		output, err := command.Output()
-		if err != nil {
-			t.Fatalf("JavaScript parity adapter: %v\n%s", err, stderr.Bytes())
-		}
-		var actual struct {
-			State     json.RawMessage `json:"state"`
-			Canonical string          `json:"canonical"`
-			Next      json.RawMessage `json:"next"`
-			Decision  json.RawMessage `json:"decision"`
-		}
-		if err := json.Unmarshal(output, &actual); err != nil {
-			t.Fatal(err)
-		}
-		if actual.Canonical != string(canonical) {
-			t.Error("causal canonical ledger differs between native engines")
-		}
-		for _, pair := range []struct {
-			name   string
-			native any
-			js     json.RawMessage
-		}{
-			{"projection", state, actual.State},
-			{"next", next, actual.Next},
-			{"decision", decision, actual.Decision},
-		} {
-			expected, err := canonicalValue(pair.native)
-			if err != nil {
-				t.Fatal(err)
-			}
-			got, err := Canonical(pair.js)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if !bytes.Equal(expected, got) {
-				var native, js any
-				_ = json.Unmarshal(expected, &native)
-				_ = json.Unmarshal(got, &js)
-				t.Errorf("%s strict parity mismatch: %s", pair.name, firstParityDifference(native, js, pair.name))
-			}
-		}
-	}
-	for index := range fixture.Commits {
-		t.Run(fmt.Sprintf("prefix-%02d", index+1), func(t *testing.T) {
-			check(t, fixture.Commits[:index+1], fixture.Commits[index].At)
-		})
-	}
-	t.Run("physical-reorder-and-exact-duplicate", func(t *testing.T) {
-		commits := slices.Clone(fixture.Commits)
-		slices.Reverse(commits)
-		commits = append(commits, fixture.Commits[3])
-		check(t, commits, fixture.Commits[len(fixture.Commits)-1].At)
-	})
-	t.Run("bounded-observed-grant", func(t *testing.T) {
-		commits, observation := observedDispatchFixture(t)
-		actor := testActor("administrator")
-		request, err := NewRequest("observed-parity", "dispatch_next", actor, parameters)
-		if err != nil {
-			t.Fatal(err)
-		}
-		next, _, _, err := buildCandidateWithObservations(commits, actor, request, 3000, []Observation{observation})
-		if err != nil {
-			t.Fatal(err)
-		}
-		check(t, next, 3000)
-		commits = testOperations(t, commits, actor, "observe-parity", "observe", mustOp(t, observation))
-		check(t, commits, 4000)
-	})
+// Differential parity: the Go engine and the JS engine (work_queue_conformance_checks.cjs
+// replayCommand) must produce the same canonical projection, wire and decision, or
+// reject with the same code, for the shared lifecycle ledger and systematic
+// mutations of its commits.
+
+type parityInput struct {
+	Transactions []any               `json:"transactions"`
+	Parameters   *DispatchParameters `json:"parameters,omitempty"`
+	RequestID    string              `json:"request_id,omitempty"`
+	label        string
 }
 
-func firstParityDifference(native, js any, path string) string {
-	if reflect.DeepEqual(native, js) {
-		return ""
+func goReplayCommand(t *testing.T, input parityInput) string {
+	t.Helper()
+	records := make([]any, len(input.Transactions))
+	for index, record := range input.Transactions {
+		records[index] = deepCopy(record)
 	}
-	if left, ok := native.(map[string]any); ok {
-		if right, ok := js.(map[string]any); ok {
-			keys := make([]string, 0, len(left)+len(right))
-			for key := range left {
-				keys = append(keys, key)
-			}
-			for key := range right {
-				keys = append(keys, key)
-			}
-			slices.Sort(keys)
-			for _, key := range slices.Compact(keys) {
-				l, lok := left[key]
-				r, rok := right[key]
-				if !lok || !rok {
-					return fmt.Sprintf("%s.%s exists native=%t JS=%t", path, key, lok, rok)
+	state, err := replayValues(records)
+	if err != nil {
+		code := ErrorCode(err)
+		require.NotEmpty(t, code, "Go replay error without a protocol code: %v", err)
+		data, _ := canonicalGeneric(map[string]any{"error": code})
+		return string(data)
+	}
+	projection, err := SerializeProjection(state)
+	require.NoError(t, err)
+	wire, err := serializeTransactions(state.Transactions)
+	require.NoError(t, err)
+	output := map[string]any{"state": json.RawMessage(projection), "canonical": string(wire)}
+	if input.Parameters != nil {
+		decision, err := PlanDispatch(state, *input.Parameters, input.RequestID)
+		require.NoError(t, err)
+		output["decision"] = decision
+	}
+	data, err := CanonicalValue(output)
+	require.NoError(t, err)
+	return string(data)
+}
+
+const jsBatchHarness = `
+const { replayCommand } = require("./actions/setup/js/work_queue_conformance_checks.cjs");
+const { canonical, parseStrictJSON } = require("./actions/setup/js/work_queue_codec.cjs");
+const inputs = parseStrictJSON(require("node:fs").readFileSync(0, "utf8"), { maxBytes: 80 * 1024 * 1024 });
+process.stdout.write(inputs.map(input => canonical(replayCommand(input))).join("\n") + "\n");
+`
+
+func jsReplayCommands(t *testing.T, inputs []parityInput) []string {
+	t.Helper()
+	node, err := exec.LookPath("node")
+	if err != nil {
+		t.Skip("node is required for the differential parity test")
+	}
+	data, err := json.Marshal(inputs)
+	require.NoError(t, err)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+	command := exec.CommandContext(ctx, node, "-e", jsBatchHarness)
+	command.Dir = "../.."
+	command.Stdin = bytes.NewReader(data)
+	var stderr bytes.Buffer
+	command.Stderr = &stderr
+	output, err := command.Output()
+	require.NoError(t, err, stderr.String())
+	lines := bytes.Split(bytes.TrimSuffix(output, []byte{'\n'}), []byte{'\n'})
+	require.Len(t, lines, len(inputs))
+	results := make([]string, len(lines))
+	for index, line := range lines {
+		results[index] = string(line)
+	}
+	return results
+}
+
+func deepCopy(value any) any {
+	switch value := value.(type) {
+	case map[string]any:
+		copied := make(map[string]any, len(value))
+		for key, child := range value {
+			copied[key] = deepCopy(child)
+		}
+		return copied
+	case []any:
+		copied := make([]any, len(value))
+		for index, child := range value {
+			copied[index] = deepCopy(child)
+		}
+		return copied
+	default:
+		return value
+	}
+}
+
+type valuePath []any
+
+func collectPaths(value any, prefix valuePath, depth int, paths *[]valuePath) {
+	if depth > 5 {
+		return
+	}
+	switch value := value.(type) {
+	case map[string]any:
+		keys := make([]string, 0, len(value))
+		for key := range value {
+			keys = append(keys, key)
+		}
+		sort.Strings(keys)
+		for _, key := range keys {
+			path := append(append(valuePath{}, prefix...), key)
+			*paths = append(*paths, path)
+			collectPaths(value[key], path, depth+1, paths)
+		}
+	case []any:
+		for index, child := range value {
+			path := append(append(valuePath{}, prefix...), index)
+			*paths = append(*paths, path)
+			collectPaths(child, path, depth+1, paths)
+		}
+	}
+}
+
+// mutate replaces (or deletes, when replacement is the delete sentinel) the value at path.
+func mutate(root any, path valuePath, replacement any) any {
+	copied := deepCopy(root)
+	parent := copied
+	for _, step := range path[:len(path)-1] {
+		switch step := step.(type) {
+		case string:
+			parent = parent.(map[string]any)[step]
+		case int:
+			parent = parent.([]any)[step]
+		}
+	}
+	switch last := path[len(path)-1].(type) {
+	case string:
+		if replacement == deleteSentinel {
+			delete(parent.(map[string]any), last)
+		} else {
+			parent.(map[string]any)[last] = replacement
+		}
+	case int:
+		if replacement == deleteSentinel {
+			return nil
+		}
+		parent.([]any)[last] = replacement
+	}
+	return copied
+}
+
+type deleteMarker struct{}
+
+var deleteSentinel any = deleteMarker{}
+
+func TestNativeParityWithJavaScript(t *testing.T) {
+	var fixture prefixFixture
+	loadFixture(t, "canonical-prefix.json", &fixture)
+	commits := make([]any, len(fixture.Commits))
+	for index, record := range fixture.Commits {
+		value, err := decodeStrict(record)
+		require.NoError(t, err)
+		commits[index] = value
+	}
+	parameters := fixture.NextParameters
+	inputs := []parityInput{{Transactions: []any{}}}
+	for index := range commits {
+		inputs = append(inputs, parityInput{Transactions: commits[:index+1], Parameters: &parameters, RequestID: fixture.NextRequestID})
+	}
+	// Checkpoint restore followed by nothing, and the reversed (non-causal) ledger.
+	checkpoint, err := decodeStrict(fixture.Checkpoint.Commit)
+	require.NoError(t, err)
+	inputs = append(inputs, parityInput{Transactions: []any{checkpoint}, Parameters: &parameters, RequestID: fixture.NextRequestID})
+	reversed := make([]any, len(commits))
+	for index, commit := range commits {
+		reversed[len(commits)-1-index] = commit
+	}
+	inputs = append(inputs, parityInput{Transactions: reversed})
+	replacements := []any{deleteSentinel, nil, json.Number("1"), json.Number("0"), "", "x", true, []any{}, map[string]any{}}
+	for index, commit := range commits {
+		var paths []valuePath
+		collectPaths(commit, nil, 0, &paths)
+		for _, path := range paths {
+			for _, replacement := range replacements {
+				mutated := mutate(commit, path, replacement)
+				if mutated == nil {
+					continue
 				}
-				if difference := firstParityDifference(l, r, path+"."+key); difference != "" {
-					return difference
-				}
+				transactions := append(append([]any{}, commits[:index]...), mutated)
+				inputs = append(inputs, parityInput{Transactions: transactions, label: fmt.Sprintf("commit %d %v -> %#v", index, path, replacement)})
 			}
 		}
 	}
-	if left, ok := native.([]any); ok {
-		if right, ok := js.([]any); ok && len(left) == len(right) {
-			for index := range left {
-				if difference := firstParityDifference(left[index], right[index], fmt.Sprintf("%s[%d]", path, index)); difference != "" {
-					return difference
-				}
+	// Checkpoint-state mutations exercise restore validation.
+	var paths []valuePath
+	collectPaths(checkpoint, nil, 0, &paths)
+	for _, path := range paths {
+		for _, replacement := range replacements[:4] {
+			if mutated := mutate(checkpoint, path, replacement); mutated != nil {
+				inputs = append(inputs, parityInput{Transactions: []any{mutated}, label: fmt.Sprintf("checkpoint %v -> %#v", path, replacement)})
 			}
 		}
 	}
-	return fmt.Sprintf("%s native=%v JS=%v", path, native, js)
+	t.Logf("differential cases: %d", len(inputs))
+	expected := jsReplayCommands(t, inputs)
+	mismatches := 0
+	for index, input := range inputs {
+		actual := goReplayCommand(t, input)
+		if actual != expected[index] {
+			mismatches++
+			if mismatches <= 400 {
+				t.Errorf("case %d (%s)\n go: %.200s\n js: %.200s", index, input.label, actual, expected[index])
+			}
+		}
+	}
+	require.Zero(t, mismatches, "%d of %d differential cases differ", mismatches, len(inputs))
 }

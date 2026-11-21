@@ -10,17 +10,6 @@ import (
 
 var resourceHostPattern = regexp.MustCompile(`^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)*$`)
 
-func resourceHost(host string) (string, error) {
-	if host == "" {
-		return expectedResourceHost()
-	}
-	host = strings.ToLower(host)
-	if !resourceHostPattern.MatchString(host) {
-		return "", queueError("resource_invalid", "invalid resource host")
-	}
-	return host, nil
-}
-
 func expectedResourceHost() (string, error) {
 	serverURL := envutil.GetStringFromEnv("GITHUB_SERVER_URL", "", nil)
 	if serverURL == "" {

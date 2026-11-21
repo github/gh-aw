@@ -4,24 +4,17 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const { withClaimExecution } = require("./work_queue_claim_scope.cjs");
-const { createClaimAdapterHandler, preparedAdapterPath, verifyClaimAdapterOutput, createDeclaredAdapterVerifier } = require("./work_queue_claim_adapters.cjs");
-const { prepareAdapterContext, main: prepareAdapter } = require("./work_queue_prepare_claim_adapter.cjs");
-const { verifyClaimDelivery } = require("./work_queue_delivery.cjs");
+const { createClaimAdapterHandler, preparedAdapterPath } = require("./work_queue_claim_adapters.cjs");
+const { prepareAdapterContext } = require("./work_queue_prepare_claim_adapter.cjs");
 const { wrapClaimEffectClient } = require("./work_queue_effect_client.cjs");
 const { claimArtifactPath } = require("./work_queue_claim_scope.cjs");
 const { createHash } = require("node:crypto");
-const { main: createAssetHandler, verifyAssetDelivery } = require("./work_queue_upload_assets.cjs");
+const { main: createAssetHandler } = require("./work_queue_upload_assets.cjs");
 const { validateAdapter } = require("./work_queue_claim_adapters.cjs");
 
 function assignment() {
   return {
-    version: 3,
     dispatch_id: "dispatch",
-    request_id: "request",
-    commit_id: "commit",
-    policy_epoch: "epoch",
-    pool: "default",
-    worker_profile: "default",
     claims: ["h1", "h2"].map(handle => ({
       handle,
       claim_id: `claim:${handle}`,
@@ -94,7 +87,7 @@ function registerTests({ describe, it }) {
       }
     });
 
-    it("supports declared custom REST effects with complete independent native field verification, not job success", async () => {
+    it("executes custom REST effects once through the guarded client without readback", async () => {
       const root = require("./work_queue_effect_test_helpers.cjs").temporaryDirectory("claim-rest");
       const configured = {
         mode: "prepared",
@@ -103,40 +96,28 @@ function registerTests({ describe, it }) {
         "field-map": { name: "check_name", head_sha: "revision" },
         expected: { status: "completed", conclusion: "success" },
         request: { method: "POST", route: "/repos/{owner}/{repo}/check-runs", permission: "checks" },
-        verifier: { route: "/repos/{owner}/{repo}/check-runs/{receipt_id}", "resource-kind": "check_run", fields: { name: "name", head_sha: "head_sha", status: "status", conclusion: "conclusion" } },
       };
       const scoped = assignment();
-      const effects = [];
       const message = { type: "custom", claim_handle: "h1", check_name: "claimed-check", revision: "a".repeat(40) };
-      scoped.claims[0].work.effect_contract.outputs[0].verification = { verifier_id: "custom", expected: { name: message.check_name, head_sha: message.revision, status: "completed", conclusion: "success" } };
-      let observed;
       let writes = 0;
+      let reads = 0;
       let cancelled = false;
-      const trustedContext = { repo: { owner: "owner", repo: "repo" } };
-      const authorize = async request => {
-        if (request.message.type === "work_queue_resource_verification") {
-          assert.equal(request.context, trustedContext);
-          assert.equal(request.github, source);
-        }
-        return { claim_handle: request.claim_handle, authorized: !cancelled && (request.message.repo === undefined || request.message.repo === "owner/repo") };
-      };
+      const authorize = async request => ({ claim_handle: request.claim_handle, authorized: !cancelled && (request.message.repo === undefined || request.message.repo === "owner/repo") });
       const source = {
         rest: { repos: { get: async () => ({ data: { id: 7, full_name: "owner/repo" } }) } },
         request: async (route, fields) => {
-          if (route.startsWith("POST ")) {
-            writes++;
-            assert.equal(route, "POST /repos/owner/repo/check-runs");
-            assert.deepEqual(fields, { name: "claimed-check", head_sha: "a".repeat(40), status: "completed", conclusion: "success" });
-            observed = { id: 91, name: fields.name, head_sha: fields.head_sha, status: fields.status, conclusion: fields.conclusion };
-            return { data: structuredClone(observed) };
+          if (!route.startsWith("POST ")) {
+            reads++;
+            return { data: {} };
           }
-          assert.equal(route, "GET /repos/owner/repo/check-runs/91");
-          assert.equal(fields, undefined);
-          return { data: observed };
+          writes++;
+          assert.equal(route, "POST /repos/owner/repo/check-runs");
+          assert.deepEqual(fields, { name: "claimed-check", head_sha: "a".repeat(40), status: "completed", conclusion: "success" });
+          return { data: { id: 91 } };
         },
       };
       try {
-        await withClaimExecution({ assignment: scoped, claim_handle: "h1", authorize, effects }, async () => {
+        await withClaimExecution({ assignment: scoped, claim_handle: "h1", authorize, effects: [] }, async () => {
           const filename = preparedAdapterPath(root, "h1", "custom");
           fs.mkdirSync(path.dirname(filename), { recursive: true });
           fs.writeFileSync(filename, JSON.stringify({ version: 3, claim_handle: "h1", type: "custom", messages: [{ input: message, payload: { check_name: message.check_name, revision: message.revision } }] }));
@@ -145,34 +126,16 @@ function registerTests({ describe, it }) {
           configured.request.route = "/repos/{owner}/{repo}/issues";
           const result = await handler(message);
           configured.request.route = originalRoute;
-          const verification = {
-            assignment: scoped,
-            claim_handle: "h1",
-            authorize,
-            context: trustedContext,
-            effects,
-            messages: [message],
-            results: [{ messageIndex: 0, success: true, result }],
-            github: source,
-            verifyOutput: input => verifyClaimAdapterOutput({ ...input, adapter: configured }),
-            verifyDeclaredOutput: createDeclaredAdapterVerifier({ custom: configured }),
-          };
-          assert.equal((await verifyClaimDelivery(verification)).verification, "verified");
-          assert.equal((await verifyClaimAdapterOutput({ claim: scoped.claims[0], result: structuredClone(result), adapter: configured, github: source })).verified, false);
-          observed.conclusion = "failure";
-          assert.equal((await verifyClaimDelivery(verification)).verification, "unknown");
+          assert.deepEqual(result, { success: true, repo: "owner/repo", id: "91" });
           assert.equal(writes, 1);
+          assert.equal(reads, 0);
           cancelled = true;
-          await assert.rejects(handler(message), /same-Claim/);
+          await assert.rejects(handler(message), /not open/);
           assert.equal(writes, 1);
         });
       } finally {
         fs.rmSync(root, { recursive: true, force: true });
       }
-      /** @type {Record<string, any>} */
-      const incomplete = structuredClone(configured);
-      delete incomplete.verifier.fields.head_sha;
-      assert.throws(() => validateAdapter(incomplete), /Every declared REST effect field/);
       const override = structuredClone(configured);
       override["field-map"].headers = "credentials";
       assert.throws(() => validateAdapter(override), /reserved effect fields/);
@@ -182,8 +145,17 @@ function registerTests({ describe, it }) {
         assert.throws(() => validateAdapter(malformed), /reserved effect fields/);
       }
       const foreign = structuredClone(configured);
-      foreign.verifier.route = "https://foreign.example/91";
+      foreign.request.route = "https://foreign.example/91";
       assert.throws(() => validateAdapter(foreign), /repository-relative/);
+      const unbound = structuredClone(configured);
+      unbound.request.route = "/repos/{owner}/{repo}/check-runs/{check_id}";
+      assert.throws(() => validateAdapter(unbound), /unbound selector/);
+      const legacy = structuredClone(configured);
+      legacy.verifier = { anything: true };
+      legacy["verifier-id"] = "ignored";
+      assert.equal(validateAdapter(legacy), legacy);
+      delete legacy.verifier;
+      assert.equal(validateAdapter(legacy), legacy);
     });
 
     it("prepares only original scoped inputs without Completion or shrinking immutable assignment", async () => {
@@ -222,129 +194,12 @@ function registerTests({ describe, it }) {
       }
     });
 
-    it("resolves native adapter repository authority before Completion without permitting writes or terminal Claims", async () => {
-      const { queueFixture, REF, REPOSITORY, WORKFLOW } = require("./work_queue_lifecycle.test_helpers.cjs");
-      const { authorizeWorkerClaim } = require("./finish_work_queue_claim.cjs");
-      const { assertClaimAuthorized } = require("./work_queue_claim_scope.cjs");
-      const repository = { repository: REPOSITORY, host: "github.com", repository_id: "7" };
-      for (const resources of [undefined, [{ repository: REPOSITORY }], [{ ...repository, repository_id: "8" }], [repository]]) {
-        const root = require("./work_queue_effect_test_helpers.cjs").temporaryDirectory("claim-adapter-native");
-        const fixture = queueFixture({
-          bound: true,
-          count: 1,
-          configureWork(work) {
-            work.payload = { effect_contract: { version: 1, outputs: [{ type: "custom", min: 1, max: 1 }] }, ...(resources === undefined ? {} : { resource_scope: { version: 1, resources } }) };
-          },
-        });
-        const original = fixture.assignment;
-        assert.ok(original);
-        const member = original.claims[0];
-        const authorize = request => authorizeWorkerClaim({ ...request, context: fixture.workerContext, githubClient: fixture.githubClient, workflowRef: `${REPOSITORY}/${WORKFLOW}@${REF}`, readWorkQueueLog: fixture.readWorkQueueLog });
-        const options = { assignment: original, adapter, index: 0, type: "custom", messages: [{ type: "custom", claim_handle: member.handle }], authorize, github: fixture.githubClient, artifactRoot: root };
-        try {
-          if (resources?.[0]?.repository_id === "7") {
-            assert.equal((await prepareAdapterContext(options)).active, true);
-            await withClaimExecution({ assignment: original, claim_handle: member.handle, authorize }, async () => {
-              await assert.rejects(assertClaimAuthorized({ type: "custom", claim_handle: member.handle }, { effect: true, resource: repository }), /Completion/);
-            });
-          } else {
-            await assert.rejects(prepareAdapterContext(options), /positive immutable Work target binding/);
-            assert.deepEqual(fs.readdirSync(root), []);
-          }
-          fixture.append("finish", { dispatch_id: original.dispatch_id, claim_handle: member.handle, outcome: "cancelled" }, { ...fixture.workerActor, dispatch_id: original.dispatch_id, claim_handle: member.handle });
-          let reads = 0;
-          await assert.rejects(
-            prepareAdapterContext({
-              ...options,
-              github: {
-                rest: {
-                  repos: {
-                    get: async () => {
-                      reads++;
-                    },
-                  },
-                },
-              },
-            }),
-            /cancelled/
-          );
-          assert.equal(reads, 0);
-        } finally {
-          fs.rmSync(root, { recursive: true, force: true });
-        }
-      }
-    });
-
-    it("loads assignment-level adapter inputs at the compiled entrypoint before selecting an immutable Claim", async () => {
-      const root = require("./work_queue_effect_test_helpers.cjs").temporaryDirectory("claim-adapter-entrypoint");
-      const { queueFixture } = require("./work_queue_lifecycle.test_helpers.cjs");
-      const { serializeTransactionLog } = require("./work_queue_replay.cjs");
-      const fixture = queueFixture({ bound: true, count: 2 });
-      const originalAssignment = fixture.assignment;
-      assert.ok(originalAssignment);
-      const keys = ["GH_AW_WORK_QUEUE_ENABLED", "GH_AW_WORK_QUEUE_ROLE", "GH_AW_WORK_QUEUE_SNAPSHOT", "GH_AW_AGENT_OUTPUT", "GH_AW_CLAIM_ADAPTER_CONFIG", "GH_AW_CLAIM_ADAPTER_INDEX", "GH_AW_CLAIM_ADAPTER_TYPE"];
-      const previous = Object.fromEntries(keys.map(key => [key, process.env[key]]));
-      const previousCore = global.core;
-      const outputs = {};
-      const exported = {};
-      const core = {
-        ...previousCore,
-        info: () => {},
-        error: () => {},
-        setOutput: (name, value) => {
-          outputs[name] = value;
-        },
-        exportVariable: (name, value) => {
-          exported[name] = value;
-        },
-      };
-      try {
-        global.core = core;
-        process.env.GH_AW_WORK_QUEUE_ENABLED = "true";
-        process.env.GH_AW_WORK_QUEUE_ROLE = "worker";
-        process.env.GH_AW_WORK_QUEUE_SNAPSHOT = path.join(root, "snapshot.json");
-        process.env.GH_AW_AGENT_OUTPUT = path.join(root, "agent-output.json");
-        process.env.GH_AW_CLAIM_ADAPTER_CONFIG = JSON.stringify(adapter);
-        process.env.GH_AW_CLAIM_ADAPTER_INDEX = "0";
-        process.env.GH_AW_CLAIM_ADAPTER_TYPE = "custom";
-        fs.writeFileSync(
-          process.env.GH_AW_WORK_QUEUE_SNAPSHOT,
-          JSON.stringify({ version: 3, sha: "head", transactionLog: serializeTransactionLog(fixture.transactions), captured_at: fixture.at, origin: fixture.workerActor, worker: originalAssignment, role: "worker" })
-        );
-        const [first, sibling] = originalAssignment.claims;
-        const message = { type: "custom", claim_handle: first.handle, number: 42, content: "one" };
-        fs.writeFileSync(process.env.GH_AW_AGENT_OUTPUT, JSON.stringify({ items: [message, { ...message, claim_handle: sibling.handle, content: "sibling" }, { type: "custom", content: "ambiguous" }] }));
-        const authorize = async request => {
-          assert.equal(request.requireCompletion, false);
-          assert.equal(request.claim_handle, first.handle);
-          return { claim_handle: first.handle, authorized: true };
-        };
-        const result = await prepareAdapter({ core, authorize, artifactRoot: root });
-        assert.equal(result.active, true);
-        assert.deepEqual(result.messages, [message]);
-        assert.equal(outputs.active, "true");
-        assert.equal(outputs.claim_handle, first.handle);
-        assert.equal(exported.GH_AW_CLAIM_HANDLE, first.handle);
-        assert.equal(JSON.parse(fs.readFileSync(result.assignmentFile, "utf8")).claims.length, 2);
-        fs.writeFileSync(process.env.GH_AW_AGENT_OUTPUT, "{");
-        await assert.rejects(prepareAdapter({ core, authorize, artifactRoot: root }), /cannot load agent output/);
-        fs.writeFileSync(process.env.GH_AW_AGENT_OUTPUT, JSON.stringify({ items: [] }));
-        assert.equal((await prepareAdapter({ core, authorize, artifactRoot: root })).active, false);
-        assert.equal(outputs.active, "false");
-      } finally {
-        global.core = previousCore;
-        for (const [key, value] of Object.entries(previous)) value === undefined ? delete process.env[key] : (process.env[key] = value);
-        fs.rmSync(root, { recursive: true, force: true });
-      }
-    });
-
-    it("applies prepared data only through fresh guarded effects and never accepts job success or uploaded receipts", async () => {
+    it("applies prepared data only through fresh guarded effects", async () => {
       const root = require("./work_queue_effect_test_helpers.cjs").temporaryDirectory("claim-adapter");
       const scoped = assignment();
       const effects = [];
       const message = { type: "custom", claim_handle: "h1", number: 42, content: "original" };
       let writes = 0;
-      let observed = "prepared";
       const authorize = async request => ({ claim_handle: request.claim_handle, authorized: request.message.repo === undefined || request.message.repo === "owner/repo" });
       const source = {
         rest: {
@@ -354,7 +209,6 @@ function registerTests({ describe, it }) {
               writes++;
               return { data: { id: 7, number: args.issue_number } };
             },
-            get: async () => ({ data: { id: 7, number: 42, body: observed, html_url: "https://github.com/owner/repo/issues/42" } }),
           },
         },
       };
@@ -373,23 +227,10 @@ function registerTests({ describe, it }) {
               return { success: true, repo: "owner/repo", number: response.data.number };
             },
           });
-          const result = await handler(message);
+          await handler(message);
           assert.equal(writes, 1);
-          const verification = {
-            assignment: scoped,
-            claim_handle: "h1",
-            authorize,
-            effects,
-            messages: [message],
-            results: [{ messageIndex: 0, success: true, claim_handle: "h1", result }],
-            verifyOutput: input => verifyClaimAdapterOutput({ ...input, adapter, effects }),
-            github: source,
-          };
-          assert.equal((await verifyClaimDelivery(verification)).verification, "verified");
-          const forged = structuredClone(result);
-          assert.equal((await verifyClaimAdapterOutput({ claim: scoped.claims[0], message, result: forged, adapter, github: source, effects })).verified, false);
-          observed = "prepared with incorrect extra content";
-          assert.equal((await verifyClaimDelivery(verification)).verification, "unknown");
+          assert.ok(effects.length >= 1);
+          assert.ok(effects.every(effect => effect.claim_handle === "h1"));
         });
       } finally {
         fs.rmSync(root, { recursive: true, force: true });
@@ -426,17 +267,15 @@ function registerTests({ describe, it }) {
         fs.rmSync(root, { recursive: true, force: true });
       }
     });
-    it("publishes isolated assets with exact immutable git evidence and never trusts copied receipts", async () => {
+    it("publishes isolated assets through Claim-namespaced git effects", async () => {
       const root = require("./work_queue_effect_test_helpers.cjs").temporaryDirectory("claim-assets");
       const scoped = assignment();
       const namespace = path.basename(claimArtifactPath("", "h1", scoped));
       const sourcePath = "image.png";
       const content = Buffer.from("claim-only-asset");
       const sha = createHash("sha256").update(content).digest("hex");
-      const effects = [];
       const calls = [];
-      let ref, file, createdRef;
-      let incorrect = false;
+      let file, createdRef;
       const source = {
         rest: {
           repos: { get: async () => ({ data: { id: 7, full_name: "owner/repo" } }) },
@@ -444,7 +283,7 @@ function registerTests({ describe, it }) {
             getRef: async (...parameters) => {
               const requested = parameters[0]?.ref;
               if (requested === "heads/assets/trusted") return { data: { object: { sha: "legacy-sha" } } };
-              if (createdRef && requested === createdRef.replace(/^refs\//, "")) return { data: { object: { sha: ref } } };
+              if (createdRef && requested === createdRef.replace(/^refs\//, "")) return { data: { object: { sha: "commit-sha" } } };
               throw Object.assign(new Error("missing"), { status: 404 });
             },
             createBlob: async args => {
@@ -466,22 +305,13 @@ function registerTests({ describe, it }) {
               calls.push("ref");
               assert.equal(args.ref, `refs/heads/assets/trusted-claims/${namespace}`);
               createdRef = args.ref;
-              ref = args.sha;
-              return { data: { object: { sha: ref } } };
+              return { data: { object: { sha: args.sha } } };
             },
-            getCommit: async () => ({ data: { sha: "commit-sha", tree: { sha: "tree-sha" }, parents: [] } }),
-            getTree: async () => ({ data: { sha: "tree-sha", truncated: false, tree: [file] } }),
-            getBlob: async () => ({ data: { sha: "blob-sha", encoding: "base64", content: (incorrect ? Buffer.from("incorrect") : content).toString("base64") } }),
           },
         },
       };
-      const trustedContext = { repo: { owner: "owner", repo: "repo" } };
       const authorize = async request => {
         if (request.resource?.path) assert.match(request.resource.path, /^claims\//);
-        if (request.message.type === "work_queue_resource_verification") {
-          assert.equal(request.context, trustedContext);
-          assert.equal(request.github, source);
-        }
         return { claim_handle: request.claim_handle, authorized: request.message.repo === undefined || request.message.repo === "owner/repo" };
       };
       try {
@@ -489,7 +319,7 @@ function registerTests({ describe, it }) {
         fs.mkdirSync(directory, { recursive: true });
         fs.writeFileSync(path.join(directory, createHash("sha256").update(sourcePath).digest("hex") + ".png"), content);
         scoped.claims[0].work.effect_contract.outputs[0].type = "upload_asset";
-        await withClaimExecution({ assignment: scoped, claim_handle: "h1", authorize, effects }, async () => {
+        await withClaimExecution({ assignment: scoped, claim_handle: "h1", authorize, effects: [] }, async () => {
           const client = wrapClaimEffectClient(source, { claim_handle: "h1", authorize });
           const handler = await createAssetHandler({ "target-repo": "owner/repo", branch: "assets/trusted", "assets-dir": root }, client);
           assert.equal((await source.rest.git.getRef({ ref: "heads/assets/trusted" })).data.object.sha, "legacy-sha");
@@ -498,22 +328,7 @@ function registerTests({ describe, it }) {
           assert.equal(result.sha, sha);
           assert.deepEqual(calls, ["blob", "tree", "commit", "ref"]);
           assert.equal(createdRef, `refs/heads/assets/trusted-claims/${namespace}`);
-          assert.equal((await verifyAssetDelivery({ claim: scoped.claims[0], result, github: source, authorize, context: trustedContext })).verified, true);
-          assert.equal((await verifyAssetDelivery({ claim: scoped.claims[0], result: structuredClone(result), github: source })).verified, false);
-          const options = {
-            assignment: scoped,
-            claim_handle: "h1",
-            messages: [message],
-            results: [{ messageIndex: 0, success: true, result }],
-            effects,
-            github: source,
-            authorize,
-            context: trustedContext,
-            verifyOutput: verifyAssetDelivery,
-          };
-          assert.equal((await verifyClaimDelivery(options)).verification, "verified");
-          incorrect = true;
-          assert.equal((await verifyClaimDelivery(options)).verification, "unknown");
+          assert.equal(file.path, `claims/${namespace}/${sha}.png`);
           await assert.rejects(handler({ ...message, claim_handle: "h2" }), /cannot escape/);
         });
       } finally {

@@ -5,7 +5,11 @@ import os from "node:os";
 import path from "node:path";
 import { prepareMemorySnapshot, validateMemorySchema } from "./work_queue_memory.cjs";
 import Ajv from "ajv";
-import { queueFixture } from "./work_queue_lifecycle.test_helpers.cjs";
+
+/** A v4 snapshot assignment of `count` Claims. */
+function queueFixture({ count }) {
+  return { assignment: { dispatch_id: "d1", claims: Array.from({ length: count }, (_, index) => ({ handle: `h${index + 1}`, claim_id: `c${index + 1}`, work_id: `w${index + 1}`, work: { plan: `task ${index + 1}` }, result_refs: [] })) } };
+}
 
 const schema = {
   type: "object",
@@ -94,7 +98,7 @@ describe("declarative Claim memory", () => {
     fs.symlinkSync(filename, link);
     vi.stubEnv("GH_AW_CLAIM_ASSIGNMENT", link);
     expect(() => prepareMemorySnapshot({ memory: memory(assignment) }, config)).toThrow(/regular/);
-    fs.writeFileSync(filename, " ".repeat(48 * 1024 + 2));
+    fs.writeFileSync(filename, " ".repeat(64 * 1024 + 2));
     vi.stubEnv("GH_AW_CLAIM_ASSIGNMENT", filename);
     expect(() => prepareMemorySnapshot({ memory: memory(assignment) }, config)).toThrow(/bounded/);
     vi.stubEnv("GH_AW_CLAIM_ASSIGNMENT", "");

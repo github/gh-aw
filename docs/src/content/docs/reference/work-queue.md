@@ -3,50 +3,40 @@ title: Work queues
 description: Native work-queue configuration, Claim-scoped tools, lifecycle rules, and operator commands.
 ---
 
-`tools.work-queue` provides a native, Git-backed queue with fair scheduling and task dependencies. The version-3 transaction log, `work-queue.jsonl`, is authoritative. The default queue branch is `work-queue`; Issues can mirror tasks but cannot store the queue. There is no `storage` option.
+`tools.work-queue` provides a native, Git-backed queue with priority-then-FIFO scheduling and task dependencies. The protocol version 4 transaction log, `work-queue.jsonl` on the `work-queue` branch, is authoritative. Issues can mirror tasks but cannot store the queue. There is no `storage` option.
 
-For architecture, a [minimal deployment example](/gh-aw/patterns/workqueue-ops/#deploy-a-native-queue), and lightweight alternatives, see [WorkQueueOps](/gh-aw/patterns/workqueue-ops/). The [protocol specification](/gh-aw/specs/work-queue-specification/) and [executable models](https://github.com/github/gh-aw/blob/main/specs/work-queue/README.md) cover implementation contracts and verification.
+For architecture, a [minimal deployment example](/gh-aw/patterns/workqueue-ops/#deploy-a-native-queue), and lightweight alternatives, see [WorkQueueOps](/gh-aw/patterns/workqueue-ops/). The [protocol specification](/gh-aw/specs/work-queue-specification/) and the [formal model](https://github.com/github/gh-aw/blob/main/specs/work-queue/README.md) cover implementation contracts and verification.
 
-## Initialization and authorization
+## Queue model
 
-The first accepted producer submission atomically installs Policy and Work. Compilation, activation, reads, and dispatch-only requests do not initialize a queue. On an existing AW-managed queue, trusted submission and dispatch processing install missing configured pools and worker profiles on demand before deployment synchronization. Publish the worker Markdown and compiled lock to the default branch, add any pool to `aw.json`, and recompile the producer or dispatcher. No manual registration or drain is needed for these additions.
-
-Installation publishes a separate `PoolInstall` operation. New workers must be singleton, repository-scoped AW workflows with verified default-revision source, a matching compiled contract, and active native registration. `config_ref` records that immutable revision; it is provenance, not authorization. Existing profiles, deployments, pool limits, default selection, accepted Work, Claims, fairness debt and the Policy epoch are preserved. Workers, observers, dry-run previews, and accepted-request recovery do not install pools or profiles. Changes to installed authority or scheduling economics still require a quiescent queue and an explicit administrator `policy` update.
-
-Native `submit-work` and `submit-graph` resolve scheduling and approved AW worker routes from the verified repository revision, not an unrelated local checkout. Assignment-capable workers must already be published.
-
-AW supplies authenticated roles, worker routes, and credentials. Agents receive an immutable snapshot, not queue-write credentials. Workers must accept `work_queue_assignment` and be verifiable at an approved immutable revision. Queue Git access uses isolated storage and ephemeral authentication, independently of source-checkout credentials.
+The queue has no installed configuration. Every workflow that uses the queue receives the compiled pool configuration in `GH_AW_WORK_QUEUE_POLICY`, so a change to `aw.json` takes effect on the next run after recompilation. The first commit of any non-worker role creates the queue; an absent branch is an empty queue.
 
 | Record | Meaning |
 | --- | --- |
-| Work | Immutable task definition, optionally part of a dependency graph. |
-| Claim | Authorization for one attempt, identified by its original `claim_handle`. |
-| Policy | Scheduling limits and approved worker contracts. |
-| Deployment | Worker revision and availability for future execution. |
-| Reservation | Worker capacity retained until verified termination or nonlaunch. |
-| Completion | Durable task completion, recorded before delivering effects. |
-| Result | Independently verified delivery; satisfies Work dependencies. |
-| Release | Frees a reservation; does not establish Result. |
+| Work | Immutable task definition with pool, priority, fairness key, worker profile, payload, and dependencies. |
+| Claim | One attempt at one Work, identified inside its Dispatch by a `claim_handle`. |
+| Dispatch | One worker launch. States: `reserved` → `started` → `bound` → `closed`. |
+| Completion | The worker finished its Claim; records the effects the run applied. |
+| Release | Closes a Dispatch and returns its open Claims' Work to the pool. |
 
-An existing malformed, policyless, or unsupported ledger fails validation rather than being reset. Git access failures have no REST/GraphQL ledger fallback.
+Work states are `available`, `claimed`, `completed`, and `cancelled`. Every cancelled Claim adds one to the Work's `attempts`; when `attempts` reaches the pool's `max_attempts`, the same commit cancels the Work with reason `attempts_exhausted`. No decision reads a clock: there is no expiry, backoff, observation age, or deadline.
+
+Write access to the queue branch is the only authority. Each job writes as the role compiled into it (producer, dispatcher, worker, reconciler, or projector) and identifies itself with its own repository, workflow path, and run. Replay checks which role may publish each operation and that a worker settles only the Dispatch bound to its own run attempt. Agents receive a read-only snapshot, never queue-write credentials.
 
 > [!CAUTION]
-> Repository writers can alter or delete the queue branch. A deleted branch is treated as a fresh queue, losing active deduplication and settlement evidence. Checkpoints do not recover a deleted branch.
+> Repository writers can alter or delete the queue branch. A deleted branch is treated as a fresh queue, losing Work and request deduplication. Checkpoints do not recover a deleted branch.
 
 ## Repository scheduling settings
 
-Configure the optional `work_queue` object in `.github/workflows/aw.json`. A missing file, missing section, or `{}` uses defaults. Unknown properties, nulls, invalid types, and out-of-range values are errors. Identities, credentials, and worker routes are managed by AW, not this object.
+Configure the optional `work_queue` object in `.github/workflows/aw.json`. A missing file, missing section, or `{}` uses defaults. Unknown properties, nulls, invalid types, and out-of-range values are compile errors.
 
 | Field | Default | Accepted values |
 | --- | --- | --- |
-| `concurrency` | 16 | Integer 1–4,096; capacity per pool |
-| `pending_limit` | 4,096 | Integer 1–4,096; queue-wide pending Work |
-| `retry.max_attempts` | 3 | Integer 1–16 |
-| `retry.backoff_seconds` | 30 | Integer 1–3,600 |
-| `mode` | `weighted-priority` | `weighted-priority` or `strict-priority` |
-| `class_weights` | `[8,4,2,1,1]` | Five integer weights, each 1–1,000 |
-| `accounting_weights` | `{"":1}` | Named integer weights, each 1–1,000; the empty key retains weight 1 |
-| `pools` | One `default` pool | Up to 64 named objects overriding `concurrency`, `retry`, and `per_account_limit` (1–4,096); inherit AW worker routes |
+| `concurrency` | 16 | Integer 1–4,096; maximum non-closed Dispatches per pool |
+| `pending_limit` | 4,096 | Integer 1–4,096; maximum `available` plus `claimed` Work per pool |
+| `retry.max_attempts` | 3 | Integer 1–16; Claims per Work before `attempts_exhausted` |
+| `pools` | One `default` pool | Up to 64 named objects overriding `concurrency`, `retry.max_attempts`, and `per_account_limit` |
+| `pools.<name>.per_account_limit` | Unlimited | Integer 1–4,096; open Claims per `fairness_key` in the pool |
 | `issues` | Disabled | Boolean or settings object; see [Backing Issues](#backing-issues) |
 
 ```json title=".github/workflows/aw.json"
@@ -54,24 +44,14 @@ Configure the optional `work_queue` object in `.github/workflows/aw.json`. A mis
   "work_queue": {
     "concurrency": 3,
     "pending_limit": 30,
-    "retry": { "max_attempts": 3, "backoff_seconds": 30 }
+    "retry": { "max_attempts": 3 }
   }
 }
 ```
 
-Defaults use singleton assignments and FIFO ordering within one priority and accounting key. Weights allocate opportunities to receive durable Claims, not CPU time or successful completions. Lower priority numbers receive greater weight by default, not strict precedence.
+A `default` pool always exists. Every pool can route to every workflow declared with `tools.work-queue.worker: true`; the worker profile name is the workflow ID, and the pool's default profile is the first worker ID in sorted order. Each profile's effect scope is the current repository.
 
-Editing configuration does not replace an installed Policy. Apply economic changes with `policy --from-config --epoch EPOCH` only when no unfinished Work, reservations, or unresolved delivery barriers remain.
-
-### Worker evolution
-
-Compatible worker updates affect future execution without draining the queue. Contracts cover declared inputs, permissions, tools, and output/resource capabilities; prompt or engine changes alone do not change the contract. Existing assignments retain their original worker profile and run binding. Unavailable or incompatible workers block only affected Work and its successors.
-
-Protected producer/dispatcher processing synchronizes approved routes from the verified default-branch revision. Operators use `deploy --from-config`, optionally with `--pool` or `--worker-profile`. To pin Work, use `submit-work --execution-ref IMMUTABLE_SHA` or a submission node's `execution_ref`; changing the pin requires new Work.
-
-Worker dispatch uses verified tags named `gh-aw/work-queue/<SHA>`. The trusted dispatch credential needs `actions: write` and `contents: write` for tag creation. Tags are never overwritten or deleted by the queue; repository writers must not mutate tags in use. A launch sends at most one dispatch POST: an uncertain response does not authorize another launch.
-
-## Workflow roles and intent tools
+## Workflow roles and tools
 
 ```yaml title="Producer or dispatcher"
 tools:
@@ -85,67 +65,74 @@ tools:
     worker: true
 ```
 
-Dispatchers also declare approved workers in `safe-outputs.dispatch-workflow.workflows` and bound launches with `max`. The [deployment example](/gh-aw/patterns/workqueue-ops/#deploy-a-native-queue) combines these declarations.
+Dispatchers also declare the worker workflows in `safe-outputs.dispatch-workflow.workflows` and bound launches per run with `max`. The [deployment example](/gh-aw/patterns/workqueue-ops/#deploy-a-native-queue) combines these declarations. Standalone `tools.repo-memory` persistence is unsupported in native queue workers; memory-backed queues are separate [alternative patterns](/gh-aw/patterns/workqueue-ops/).
 
-Standalone `tools.repo-memory` persistence is unsupported in native queue workers; memory-backed queues are separate [alternative patterns](/gh-aw/patterns/workqueue-ops/).
-
-| Role | Authority |
+| Role | Agent tools |
 | --- | --- |
-| Observer | Read/explain the snapshot; no submit, dispatch, or finish authority. |
-| Producer/dispatcher | Stage task plans and assignment requests within approved pools, routes, and budgets. The scheduler selects Work. |
-| Worker | Process only its authenticated assignment's `claims` array. Missing required assignment input is an error. |
+| Observer | `work_queue_read` only. |
+| Dispatcher | `work_queue_read`, `work_queue_submit`, `work_queue_dispatch_next`. |
+| Worker | `work_queue_read`, `work_queue_submit` (child Work), `work_queue_claim_finish`. |
 
-| MCP tool | Purpose |
-| --- | --- |
-| `work_queue_read`, `work_queue_explain` | Inspect the immutable activation snapshot; predictions can be stale. |
-| `work_queue_submit` | Stage an immutable task or dependency graph. |
-| `work_queue_dispatch_next` | Request scheduler-selected assignments from a pool within a limit. |
-| `work_queue_claim_finish` | Stage a Claim's `completed` or `cancelled` finish intent. |
+| MCP tool | Input | Purpose |
+| --- | --- | --- |
+| `work_queue_read` | `work`, `pool`, `limit`, `offset`, `sort` | Read the activation snapshot: counts, open Dispatches, Work rows with `attempts` and readiness, and a non-authoritative prediction of the next Work. |
+| `work_queue_submit` | `nodes` (1–256), `claim_handle` | Stage Work nodes. Omitted `graph_id`/`node_key` default to the payload hash and `root`; a worker's children inherit its Work's graph, pool, priority, fairness key, and profile. |
+| `work_queue_dispatch_next` | `pool`, `max_claims`, `max_dispatches` | Stage a request for the scheduler to claim and launch the pool's next eligible Work. It accepts no Work selector. |
+| `work_queue_claim_finish` | `claim_handle`, `outcome` | Stage `completed` (default) or `failed` for one Claim. |
 
-When listed in `<mcp-clis>`, invoke tools as `work-queue work_queue_read '{}'`. These are agent tools, not `gh aw work-queue` operator subcommands. Staging an intent does not publish it.
+When listed in `<mcp-clis>`, invoke tools as `work-queue work_queue_read '{}'`. Staging writes an intent file; trusted steps after the agent publish it. These are agent tools, not `gh aw work-queue` operator subcommands.
 
-### Claim-scoped effects and delivery
+### Dispatch and launch
 
-- Every safe output and finish intent belongs to an original Claim. Multi-Claim assignments require `claim_handle` on every message, even if only one Claim remains open. Only originally single-Claim assignments may omit it.
-- Finish accepts `outcome: "completed"` or `"cancelled"`. `keep_open` defaults to false; `true` is valid only with `"completed"`. Retries must preserve both values.
-- Trusted processing records Completion before authorizing effects and Result only after independent delivery verification. Assignment input, a successful Actions run, or an output artifact alone cannot establish authority or Result.
-- `keep_open: true` makes Work eligible again only after verified delivery. It preserves fairness debt, resets failure-retry counters, leaves the backing Issue open, and does not satisfy successors.
-- Work dependencies require predecessor Results. External Issue dependencies require fresh completion evidence; pull request dependencies require merge evidence. External nodes consume no Claims.
-- Cancellation does not stop a native worker or release its reservation. Release requires verified worker quiescence, exact native termination, or definitive nonlaunch.
-- Uncertain delivery is not retried by rerunning effects. Bounded verification records Result or `DeliveryFailure`; unavailable evidence leaves the barrier pending.
+The trusted control step publishes one `dispatch_next` commit per staged request. The scheduler takes eligible Work of the pool in priority order (1 first), then submission order, while the pool has fewer non-closed Dispatches than `concurrency`, the Work's `fairness_key` is under `per_account_limit`, and fewer than `min(max_claims, max_dispatches)` Claims were taken. Each Dispatch carries one Claim. Work is eligible when every Work predecessor is `completed` and every Issue or pull request dependency has a `ready` observation; the dispatcher refreshes those observations in the same commit.
 
-The immutable Work payload declares its output contract in `effect_contract`. A read-only task can use `{"kind":"none"}`; a missing contract or successful `noop` alone does not prove no-write delivery. Write-capable contracts must bound the permitted outputs and resource scope.
+For each new Dispatch the step sends one `workflow_dispatch` of the worker at the dispatcher's `target-ref` with the input `work_queue_assignment: {"version":4,"dispatch_id":"d_…"}`. A successful request is recorded as `Dispatch{started}`. A failed request releases the Dispatch with reason `launch_failed`, returning its Work to the pool; it does not fail the step.
 
-Worker conclusion performs inline reservation cleanup. Scheduled `agentics-maintenance.yml` reconciliation handles stranded reservations and pending delivery before compaction. Maintenance never cancels active runs or manufactures Result; disabling it leaves dispatcher/operator reconciliation as the fallback.
+### Claim-scoped effects
 
-Maintenance also retires obsolete backlog in checked batches of at most 256 Work (further bounded by the installed operation limit). Available, unpinned Work with no delivery barrier is terminally cancelled using `WorkCancellation` with operation `version: 1` and reason `worker_contract_obsolete` when its admission contract differs from its approved active worker contract. Selection accounts for expiration at the current time, so elapsed Work is excluded. Missing or unavailable deployments are not proof of obsolescence. Exact `execution_ref` pins, owned Work, delivery barriers, Results, ledger history and fairness debt are preserved. Cancellation rechecks eligibility against the publication's current ledger; a concurrent Claim, expiration or compatible route change rejects the transaction. Retirement failures emit sanitized diagnostics and a warning without skipping reservation reconciliation, pending delivery, Issue synchronization or compaction. Operators can use `cancel-work --reason worker_contract_obsolete --work-id ID` for the same checked recovery without dispatching workers.
+- The worker's activation job binds the Dispatch to its run attempt. If the Dispatch has no open Claim (for example, maintenance already released it), the run writes a settled snapshot and skips the agent and safe-output jobs.
+- Every safe output belongs to one Claim. A one-Claim assignment may omit `claim_handle`.
+- A safe output is applied only when its Claim is open, its Dispatch is bound to this run attempt, the Claim's finish outcome is `completed`, and every target repository equals the profile's effect scope. Otherwise the handler rejects it with `E004`.
+- Each applied effect is appended to `/tmp/gh-aw/work-queue.effects.jsonl`. The **Finish work queue claim** step, after **Process Safe Outputs**, publishes one `finish` commit: a Completion with those effects (dropped with a warning above 4,096 bytes) for `completed` Claims, and a `worker_failed` Claim cancellation for `failed` or missing outcomes.
+- Effects are applied before the `finish` commit. If the job stops between the two, maintenance releases the Dispatch and the next attempt can repeat the effects. Write idempotent workers.
+- A Work predecessor is satisfied by its Completion. Its recorded effects are passed to successors as `result_refs[].descriptor`.
 
-The ledger remains version 3. Historical `WorkCancellation` operations without an operation `version` retain reason-only semantics, including cancellations of compatible or pinned Work with reason `worker_contract_obsolete`; replay and checkpoints do not retrofit an obsolescence check or rewrite those receipts. New maintenance and operator retirement requests explicitly use operation `version: 1`. Retrying an accepted legacy operator request recovers its original unchecked receipt rather than creating a new cancellation. Other explicit operation versions are rejected.
+Beyond built-in safe outputs, declare `safe-outputs.claim-adapters` for Claim-scoped effects with custom handlers; adapters use the same authorization.
 
 ### Claim-scoped memory
 
 `tools.work-queue.memory` generates a structured output tool and protected Git-tree publication adapter for a worker. It is not standalone `tools.repo-memory`. Configuration fields are `name` (default `persist_work_queue_memory`), `path`, `target-repo`, `base-revision`, `branch-prefix`, `schema`, and `max-bytes` (default and maximum `262144`, including the final newline).
 
-Each call supplies the original `claim_handle` and a `memory` object matching the schema. Preparation validates the selector and any `memory.work_id` without repository credentials. Publication requires the immutable Work/profile/ancestor resource scope and independently verifies the resulting commit, tree, blobs, and Claim ref.
+Each call supplies the Claim's `claim_handle` and a `memory` object matching the schema. Preparation validates the selector and any `memory.work_id` without repository credentials.
 
 Schemas are limited to 16 KiB and 16 nested levels. Supported keywords are `type`, `description`, `properties`, `required`, boolean `additionalProperties`, `items`, scalar `enum`, `minimum`, `maximum`, `minLength`, `maxLength`, `minItems`, and `maxItems`. Each nested schema declares one type; references, regexes, combinators, and executable validators are unsupported.
 
-Data is limited to 32 nested levels and 16384 members per array. Numbers must be safe integers; encode fractional or other exact quantities as strings. See the [Linter Factory example](/gh-aw/gallery/linter-factory/#refiner-memory) for its use.
+Data is limited to 32 nested levels and 16,384 members per array. Numbers must be safe integers; encode fractional or other exact quantities as strings. See the [Linter Factory example](/gh-aw/gallery/linter-factory/#refiner-memory) for its use.
 
-## Work expiration
+## Recovery
 
-`expires_at` is an immutable Unix-millisecond timestamp in `0..9007199254740991`, supplied per submission node or as `submit-work --expires-at`. Omission means no expiration.
+Recovery is driven by GitHub run state, never by elapsed time:
 
-At or after the deadline, unclaimed Work becomes cancelled with reason `work_expired`. Running Claims may still complete. Expiration does not release reservations, refund fairness charges, unblock dependencies, or bypass delivery barriers.
+| Situation | Who acts | Ledger result |
+| --- | --- | --- |
+| `workflow_dispatch` request fails | Dispatcher | `Release{launch_failed}` |
+| Worker run ends with an open Claim | Worker conclusion job **Terminate work queue worker** | `Release{worker_terminated}` |
+| Bound run completed or was deleted | Scheduled maintenance | `Release{run_terminal}` or `Release{run_missing}` |
+| Launched run never bound | Scheduled maintenance | `Release{run_missing}` when no queued or in-progress run of the worker has the `dispatch_id` in its title |
+| Operator decision | `gh aw work-queue release` or `cancel-work` | `Release{operator}` or `WorkCancellation{operator}` |
 
-Replay uses maximum committed time; live reads also evaluate current time, and activation snapshots use `captured_at`. A wall-clock-only expiration view is not durable until queue activity commits it. There is no background timer or Claim lease.
+Maintenance runs in `agentics-maintenance.yml`. It also converts a protocol version 3 ledger, writes a checkpoint when the log exceeds 512 lines, and runs the Issue projection. A run that starts after its Dispatch was released finds no open Claim and exits without effects.
+
+### Version 3 ledgers
+
+The first dispatcher, producer, administrator, or maintenance job that reads a version 3 head converts it. The converter keeps `available` Work whose pool and worker profile are still configured, in their original order, and writes it as administrator `migrate` commits into a new log whose Git parent is the version 3 head. Claimed, completed, and cancelled version 3 Work is not carried; the old log stays in Git history. Workers, observers, and projectors fail with `unsupported_protocol` until conversion has run.
 
 ## Backing Issues
 
 ```json title=".github/workflows/aw.json"
 {
   "work_queue": {
-    "issues": { "label": "work", "title_prefix": "[work queue]", "orphaned_after_days": 30 }
+    "issues": { "label": "work", "title_prefix": "[work queue]" }
   }
 }
 ```
@@ -153,25 +140,19 @@ Replay uses maximum committed time; live reads also evaluate current time, and a
 | Setting | Behavior |
 | --- | --- |
 | Absent or `false` | Disable projection. |
-| `true` or `{}` | Use tracking label `work`, status labels `work:<status>`, and title prefix `[work queue]`. |
-| `label` | Nonblank literal, at most 33 UTF-8 bytes; whitespace becomes hyphens in status labels. |
+| `true` or `{}` | Use label `work` and title prefix `[work queue]`. |
+| `label` | Nonblank literal, at most 33 UTF-8 bytes. |
 | `title_prefix` | Nonblank literal, at most 80 UTF-8 bytes. |
-| `orphaned_after_days` | Default `30`; integer 1–3,650. Flags tracked Issues with no matching ledger Work after this many days. |
+| `orphaned_after_days` | Accepted for compatibility (integer 1–3,650); the projection does not use it. |
 
-Unknown keys are errors. Labels are created as needed. Titles show the first 12 Work-ID characters; the body retains the full ID. Newly created Issues omit payload titles/descriptions because conclusion lacks the original runtime redaction context.
+The projection is best-effort and never fails a job. It runs after dispatcher controls, worker finish and termination, and maintenance, and handles at most 50 Work per run, oldest first:
 
-Admission and Claim hooks update their own Work; scheduled maintenance reconciles same-repository mirrors against the checked ledger. Immutable `IssueLink` records bind one Work to one Issue. Maintenance updates labels and summaries from ledger state, closes verified non-PR results only when the admission-time `close-on-result` policy allows it, and flags old tracked Issues with no ledger Work for maintainer review. It does not create mirrors, change ledger state, or close orphaned Issues. Human titles, bodies, discussion, and unrelated labels are preserved.
+- `available` or `claimed` Work without a backing Issue gets a new labelled Issue (or adopts a labelled Issue carrying its marker), bound by an immutable `IssueLink`.
+- A Claim whose Dispatch is bound gets one comment on the Work's Issue.
+- `completed` or `cancelled` Work gets a final comment and its Issue is closed.
+- A labelled open Issue whose marked Work is absent from the ledger is commented on and closed.
 
-| Queue outcome | Issue summary |
-| --- | --- |
-| Completion, delivery pending | Verifying |
-| Verified PR delivery | Needs review |
-| Verified non-PR delivery | Done |
-| Verified `keep_open` completion | Returns to the queue |
-
-Issues stay open by default. Pre-existing `backing_issue` targets, cross-repository projection, and `completion_policy: "close-on-result"` require explicit installed projector grants; ordinary `aw.json` does not grant them. Closure requires verified non-PR delivery and authority installed before admission. `keep_open: true` prevents closure.
-
-`backing_issue` uses string resource identities:
+Comments carry `<!-- gh-aw-work-queue:… -->` markers so a repeated projection does not duplicate them. Submitted Work can also name an existing Issue in `backing_issue`:
 
 ```json
 {
@@ -184,254 +165,114 @@ Issues stay open by default. Pre-existing `backing_issue` targets, cross-reposit
 }
 ```
 
-Resource hosts must match `GITHUB_SERVER_URL` (default `github.com`). A backing Issue is separate from a Work subject or dependency.
-
-The compiler generates `agentic-workqueue.yml` for Issue events. Closing an exactly bound Issue can cancel unfinished Work after fresh identity and label checks; it cannot revoke completed delivery, stop a worker, or establish Result.
-
-Projection hooks require `contents: write`, `issues: write`, and `actions: read`, with credentials kept outside agent execution. Issue updates and coordination-lock cleanup use the same projector token; custom tokens must grant those permissions for every projected repository. Scheduled maintenance bounds reconciliation to 256 bound mirrors and 1,000 tracked Issues per run. Failed projection emits a warning rather than failing worker conclusion or scheduled maintenance; it does not roll back queue admission or justify rerunning a worker. Claim delivery and Result verification failures remain fatal. Maintenance retries independent verification from authenticated `DeliveryEvidence` before expiring an unresolved delivery barrier, without repeating resource writes. The evidence operation is not proof by itself: changed or unavailable resources still fail verification. Ambiguous Issue/comment creation remains pending rather than blindly creating duplicates; automatic recovery of unreceipted creation is not implemented.
-
-### Projector grants
-
-Explicit Policy `projectors` entries are required for pre-existing Issues, cross-repository projection, or closure on Result. Historical non-AW Policies also use them for ordinary projection. Each entry contains:
-
-| Field | Contract |
-| --- | --- |
-| `principal` | Actual authenticated native principal. |
-| `workflow`, `ref` | Workflow path and immutable 40- or 64-hex commit SHA. |
-| `pools`, `repositories` | Authorized pool names and backing repositories. |
-| `backing_issues` | Exact resource identities for pre-existing Issues, using the shape above; omit for projector-created Issues only. |
-| `completion_policy` | `keep-open` or `close-on-result`; installed before admission. |
-
-Entries belong in the complete Policy, not `aw.json.work_queue`. Installation uses `policy --file POLICY.json --epoch EPOCH` on a quiescent queue. Each projecting workflow independently needs the relevant exact-target grant.
-
-Protected hooks need permission to create/delete their `gh-aw-issue-projection/*` coordination refs. With `safe-outputs.github-app`, each hook mints its own scoped projector token. A repository allowlist or Issue marker does not replace a grant or verified creation receipt.
-
-### Synchronization and recovery
-
-```bash
-gh aw work-queue --repo OWNER/REPO sync-issues --request-id REQUEST_ID
-```
-
-A repository maintainer or administrator can synchronize one committed terminal request identified with `trace`. This updates existing same-repository AW-created mirrors only; it does not create Issues, rebind receipts, repeat effects, or change queue state. Missing or ambiguous receipts remain pending. Scheduled maintenance separately reconciles bound mirrors and scans the configured tracking label to flag old orphaned mirrors.
+Resource hosts must match `GITHUB_SERVER_URL` (default `github.com`); one Issue backs at most one Work. The compiler generates `agentic-workqueue.yml` for Issue events: closing a backing Issue cancels its Work with reason `related_issue_closed` when the Work is `available`, and leaves claimed or terminal Work unchanged.
 
 ## Operator commands
 
 ```bash
-gh aw work-queue --repo OWNER/REPO [--branch QUEUE_BRANCH] COMMAND
+gh aw work-queue --repo OWNER/REPO [--branch QUEUE_BRANCH] [--json] COMMAND
 ```
 
-Repository selection is `--repo`, then `GH_REPO`, then local `origin`, then `gh repo view`. Invalid explicit environment selection fails rather than falling back. Local inference selects the fork, regardless of `gh repo set-default`; use an explicit canonical repository after a rename. Offline `replay --file` needs no repository inference.
-
-`--branch` selects a separate queue, not a migration. `--json` is available where supported. Reuse `--request-id` and immutable inputs to recover an uncertain accepted publication without repeating it. Use each subcommand's `--help` for its complete flags.
+`work` is an alias of `work-queue`. Repository selection is `--repo`, then `GH_REPO`, then local `origin`, then `gh repo view`. Offline `replay --file` needs no repository. `--branch` selects a separate queue. Commands that write publish as the repository `administrator` role and need push access to the queue branch.
 
 | Command | Purpose |
 | --- | --- |
-| `stats` | Metadata-only counts, delivery, reservations, eligibility, and activity. |
-| `state [--graph GRAPH] [--pool POOL] [--state STATE] [--search TEXT]` | Metadata-only ASCII tree. |
-| `inspect --work-id ID` or `--claim-id ID` | IDs, dependencies, ownership, delivery, and native-run barriers. |
-| `replay` | Full reconstructed live state, including payloads in JSON; `--run-id` or `--file` selects a captured snapshot. |
-| `explain --pool POOL [--work-id ID]` | Read-only scheduler/dependency evaluation. |
-| `explain --request-id ID` or `--claim-id ID` | Exact historical grant decision. |
-| `trace --request-id ID` or `--claim-id ID` | Bounded causal events without payloads or receipt contents. |
-| `tui` (alias `interactive`) | Keyboard browser with reviewed cancellation and priority actions. |
-| `submit-work --file work.json` | Admit Work; default priority 3 and accounting key `""`. |
-| `submit-graph` | Atomically admit a graph, including external Issue/PR dependencies. |
-| `dispatch-next --pool POOL --max-claims N --max-dispatches N` | Commit assignments and reservations; does not launch workflows. |
-| `dispatch DISPATCHER [--wait] [--dry-run]` | Activate a verified default-revision dispatcher, not a worker directly. |
-| `deploy --from-config` | Refresh compatible worker routes; optional `--pool`, `--worker-profile`. |
-| `policy --from-config --epoch EPOCH` | Update existing, quiescent Policy; `--file` is the mutually exclusive alternative. |
-| `control`, `cancel-work` | Apply authorized pause, cutover, or Work cancellation. |
-| `cancel-work --obsolete [--limit N] [--dry-run]` | Select one checked obsolete-contract batch. |
-| `cancel-claim --claim-id ID[,ID...] --reason CODE` | Cancel exact current Claims and their Work, not native runs. |
-| `reprioritize --work-id ID[,ID...] --priority 1..5 --reason CODE` | Administrator-only priority override for future grants of available Work. |
-| `clear --reason CODE [--dry-run] [--hard]` | Interactive local cancellation or settled-queue reset; see below. |
-| `evidence`, `reconcile --dispatch-id ID` | Inspect native evidence and reconcile reservations. |
-| `sync-issues --request-id ID` | Repair eligible existing mirrors for one terminal request. |
-| `compact` | Checkpoint the ledger while preserving replay state and request identities. |
+| `replay` (alias `read`) | Replay the live ledger and list Work states; JSON output is the full projection. |
+| `stats` | Count Work, Claims, and Dispatches per pool. |
+| `state [--graph ID] [--pool POOL] [--state STATE] [--search TEXT] [--offset N] [--limit N]` | Metadata-only ASCII Work/Claim forest, at most 256 rows and 64 KiB per page (default 80 rows). |
+| `inspect --work-id ID` or `--claim-id ID` | Metadata, dependencies, Dispatch, bound run, and effects of one Work or Claim. |
+| `tui` (alias `interactive`) | Keyboard-driven Work/Claim browser with checked operator actions. |
+| `submit-work --file PATH --worker-profile WORKER` | Submit one Work item. Optional `--graph-id` (default: payload hash), `--node-key` (default `root`), `--pool` (default `default`), `--priority` 1–5 (default 3), `--fairness-key`. |
+| `submit-graph --file PATH` | Atomically submit a JSON array of 1–256 complete Work operations, including Issue and pull request dependencies. |
+| `cancel-work --work-id ID[,ID...] [--reason REASON]` | Cancel `available` Work (default reason `operator`). Claimed Work must be released first. |
+| `release --dispatch-id ID [--reason REASON]` | Release a non-closed Dispatch (default reason `operator`); its Work returns to the pool or is cancelled with `attempts_exhausted`. |
+| `clear [--dry-run]` | Release every open Dispatch and cancel all `available` Work; see below. |
+| `compact [--min-lines N]` | Replace the log with one checkpoint commit when it has more than N lines (default 1). |
+| `dispatch DISPATCHER [--dry-run] [--wait]` | Run a dispatcher workflow on the default branch; `--wait` waits for the dispatcher only. |
 
-`state` and `trace` accept `--offset` and `--limit`; state output is bounded to 256 rows/64 KiB. `cancel-claim` and `reprioritize` require administrator authority, accept repeated or comma-separated IDs, and publish all-or-nothing checked transactions. Stale ownership or priority changes reject the action. Reprioritization preserves FIFO positions, retries, and fairness charges.
-
-### Structured diagnostics
-
-All timestamps are Unix milliseconds. Inspection reads do not refresh external dependencies, fetch live Actions status, reconcile reservations, or retry effects.
-
-| Output | Fields and interpretation |
-| --- | --- |
-| `stats --json` | Snapshot identity, `policy_mode`, pause controls, `claims_by_state`, cancellation/failure reasons, `delivery_by_state`, and 24-hour committed `activity`. |
-| Dispatch counters | `dispatches_total`/`dispatches_by_state` include history. `native_reservations`/`reservations_by_state` count retained reservations; legacy `dispatches` aliases the retained count. Neither proves live Actions status. |
-| `pools` | Per-pool counts, limits, eligibility, oldest admission age, and a one-Claim/one-dispatch prediction. Eligibility excludes native-capacity checks; prediction includes them. |
-| `state --json` | Typed tree rows and `next_offset`; pagination counts graph and Claim rows as well as Work. Keep filters unchanged between pages. |
-| `inspect --json` | `selection`, `details`, `work`, `scheduling`, `claim`, and `dispatch`; unavailable metadata is null. Use `--claim-id` for historical attempts. |
-| `explain --json` | Scheduler `decision` and compact `prediction`. |
-
-Metadata diagnostics exclude payloads, Result descriptors, request parameters, and receipt bodies. Retired pools remain visible with `policy_installed: false`; unknown admission ages are counted rather than inferred from client timestamps.
-
-### Cancel obsolete worker-contract Work
-
-```bash
-gh aw work --repo OWNER/REPO cancel-work --obsolete \
-  --limit 256 --request-id obsolete-batch-1 --dry-run --json
-```
-
-`cancel-work --obsolete` uses the JavaScript maintenance selection: only available, unclaimed, unpinned Work with barrier `none` and an admission contract incompatible with an available approved active Deployment is eligible. Expired Work, compatible Work, explicit execution pins, and missing/unavailable deployments are excluded. IDs are sorted in UTF-8 byte order; one batch contains at most `--limit` Work (default and maximum 256), further bounded by the installed Policy operation limit. It does not refresh routes or restore missing deployments.
-
-`--dry-run` reads and validates the ledger and reports the selection without checking administrator publication authority, recording a request, synchronizing Issues, or causing queue effects. Remove it to publish an administrator-authorized atomic `cancel_work` request with fixed reason `worker_contract_obsolete` and operation `version: 1`. Fresh publication checks reject the whole batch if a selected Work becomes owned, expired, compatible, or otherwise ineligible. Claims, Results, delivery barriers, reservations, policy/epoch/limits, fairness debt, history, and unselected Work are preserved; no native runs are stopped.
-
-`--work-id` and `--reason` cannot be combined with `--obsolete`; `--limit` and `--dry-run` require it. Use the same stable `--request-id` after an uncertain publication. An accepted request recovers only its original cancellation targets and fingerprint, including historical legacy receipts; it never sweeps newly obsolete Work. A caller limit that cannot hold the original receipt is rejected with the required numeric minimum. A subsequently lowered Policy operation limit does not block accepted receipt recovery, since it creates no new operations. Publication retains the original ledger snapshot and rejects replacement ledgers, including hard-clear/readmission of the same Work IDs; verified same-ledger appends and checkpoints remain supported. To select another batch, use a new request ID. No eligible Work returns `no_work` without recording a request.
-
-JSON output includes `status`, `request_id`, `snapshot_tip`, and metadata-only `work_ids`; authenticated publication additionally includes `publication`. Status is `dry_run`, `no_work`, `cancelled`, or `already_committed`. A preview does not guarantee later publication authority or eligibility. Inspect `explain --request-id ID` after an uncertain failure before retrying that same ID; a committed cancellation with pending Issue synchronization requires `sync-issues --request-id ID`, not another cancellation.
+Resubmitting an existing Work ID is a no-op, so retrying a submission is safe. `release` and `cancel-work` do not stop running workflow runs: a late worker finds its Claims closed and cannot complete them.
 
 ### Clear unfinished Work
 
 ```bash
-gh aw work-queue --repo OWNER/REPO clear \
-  --reason operator_clear --request-id incident-clear --dry-run --json
+gh aw work-queue --repo OWNER/REPO clear --dry-run
 ```
 
-Without `--hard`, `clear` cancels cancellable unfinished snapshot Work while preserving completed Work, delivery barriers, history, deduplication, and fairness debt. It neither pauses admission/grants nor stops workers/releases reservations. Work with pending retained delivery is excluded.
-
-Both modes require maintain/admin access, interactive confirmation for new mutations, and a reason of 1–128 ASCII letters, digits, `_`, `.`, `:`, or `-`, starting with a letter or digit. They refuse CI environments, including `COPILOT_AGENT_SESSION_ID`, before queue access. There is no `--yes`, force, or CI bypass.
-
-`--dry-run` validates without writing or reserving the request ID. Normal cancellation is atomic, limited by Policy to at most 256 Work; use bounded `cancel-work` batches for larger sets. Concurrent target changes reject the entire operation. Retrying an accepted request with the same reason recovers its original targets, not later admissions.
-
-#### Hard reset
-
-`clear --hard` additionally requires:
-
-- Admission and grants already paused.
-- All native reservations released and no open Claims.
-- No pending/failed delivery barriers or uncertain effects.
-- Confirmation and publication against the exact previewed Git revision.
-
-> [!CAUTION]
-> Hard reset forgets active Work, Claim, and request identities, retry history, and fairness debt. Previously settled effects can repeat if old identities are resubmitted. Prefer ordinary `clear` for cancellation or `compact` for ledger size.
-
-The reset retains current Policy, worker routes/availability, credential generation, and paused controls. Previous history remains at `prior_git_sha`; this is a fast-forward publication, not history erasure.
+`clear` releases every non-closed Dispatch with reason `operator`, then cancels every `available` Work with reason `operator` in batches of at most 256. Released Work that reaches its pool's `max_attempts` is cancelled with `attempts_exhausted`. Completed Work and ledger history are retained; Work admitted after the preview is not cancelled. Mutations show a preview and require interactive confirmation; non-TTY input and CI environments are refused. `--dry-run` previews without publishing.
 
 ### Replay an Actions snapshot
 
 ```bash
 gh aw work-queue --repo OWNER/REPO replay --run-id RUN_ID \
-  --pool default --max-claims 3 --max-dispatches 3 --json
+  --pool default --max-claims 3 --max-dispatches 3 --concurrency 3 --json
 ```
 
-`--run-id` selects the exact attempt's matching activation artifact; `--file PATH` reads a downloaded snapshot offline. Missing, ambiguous, expired-only, or invalid matches fail. Candidate downloads and snapshot reads each have an aggregate 162 MiB limit.
-
-Artifact JSON is metadata-only, unlike live replay JSON. Scheduler predictions use capture time. Replay never launches workers, repairs live state, or repeats effects.
-
-`dispatch --dry-run` previews a verified dispatcher route without creating tags or launching. A real dispatch requires the returned run identity to match the verified snapshot. Unknown outcomes must be inspected before retrying. `--wait` waits only for the dispatcher, not worker Results. Direct Work/Claim/ref selectors and alternate queue branches are unsupported for `dispatch`.
-
-### Keyboard browser and checked actions
-
-`tui` requires interactive input/output and at least 45 columns × 16 rows. At 100 columns it displays tree and details side by side. It rejects `--json` and `--request-id`.
-
-| Key | Action |
-| --- | --- |
-| Arrows, `j`/`k`, `PgUp`/`PgDn`, `g`/`G` | Navigate |
-| Left/right, `h`/`l` | Collapse/expand Claim history |
-| `Tab`/`Enter` | Switch tree/details focus |
-| `/`, then `Enter` | Search IDs/metadata |
-| `Space` | Toggle multi-selection |
-| `c`, `p` | Review administrator cancellation/priority changes; `y` publishes, `n`/`Esc` dismisses |
-| `r`, `?`, `q` | Refresh, help, quit |
-| `Esc` outside a dialog | Clear search and selection |
-
-Idle refresh is every 10 seconds; search and action review pause it. Failed reads retain the prior view with an explicit stale/error status. Uncertain publications retain their request ID for `explain --request-id`.
+`--run-id` downloads the activation snapshot of that run; `--file PATH` reads a downloaded `work-queue.snapshot.json` offline. `--pool`, `--max-claims`, `--max-dispatches`, and `--concurrency` (default 16) predict the next dispatch from the captured ledger. Snapshot replay is read-only: it never writes the ledger or launches workers.
 
 ## OpenTelemetry queue health
 
-Runtime queue operations emit `work_queue.read.run`, `work_queue.publish.run`, `work_queue.dispatch.run`, `work_queue.reconcile_dispatch.run`, `work_queue.reconcile.run`, and `work_queue.compact.run` spans. They reuse the workflow's trace and job parent, [OTLP configuration](/gh-aw/reference/open-telemetry/), exporter fan-out, and sanitized `otel.jsonl` mirror. No additional queue setting is required. Without valid workflow trace context, queue instrumentation is disabled.
+Ledger reads and publications emit `work_queue.read` and `work_queue.publish` spans. Nested reads and publications contribute to the outer span. They reuse the workflow's trace and job parent, [OTLP configuration](/gh-aw/reference/open-telemetry/), and sanitized `otel.jsonl` mirror. Without valid workflow trace context, queue instrumentation is disabled.
 
-Attributes use the `gh-aw.work_queue.` prefix. `queue.id` is a stable SHA-256 digest of the lowercased target repository coordinates and queue branch, allowing correlation across workflow runs without exporting queue identifiers or task content. Nested ledger reads and publications contribute to one outer operation span rather than separate export requests.
+Attributes use the `gh-aw.work_queue.` prefix. `queue.id` is a SHA-256 digest of the lowercased repository coordinates and queue branch, allowing correlation across runs without exporting queue identifiers or task content.
 
 | Attribute suffix | Meaning |
 | --- | --- |
-| `operation`, `request.kind`, `reason`, `outcome` | Operation, last checked request kind, bounded scheduling decision, and lifecycle outcome when applicable |
-| `snapshot.present`, `observed_at_unix_ms`, `initialized` | Whether verified state was observed, its observation time, and whether Policy is installed |
-| `work.total`, `work.available`, `work.claimed`, `work.completed`, `work.cancelled`, `work.expired` | Queue-wide Work counts; expired unclaimed Work is included in cancelled, not available |
-| `work.retry_delayed`, `work.oldest_available_age_ms` | Available Work in backoff and age of the oldest available Work, including dependency- or capacity-blocked Work |
-| `delivery.pending`, `delivery.failed` | Work delivery barriers plus independent `keep_open` Claim barriers; completion alone is not delivery |
-| `claims.open`, `reservations.active`, `reservations.unbound`, `reservations.uncertain`, `reservations.unresolved` | Logical ownership and unreleased native capacity; cancellation or expiration does not imply reservation release |
-| `capacity.logical_limit`, `capacity.native_limit` | Sums of installed pool limits |
-| `capacity.logical_saturated_pools`, `capacity.native_saturated_pools` | Number of pools at or above their respective limits |
-| `admission_paused`, `grants_paused` | Committed operator controls |
-| `publication.attempts`, `publication.conflict`, `publication.ambiguous`, `publication.commits`, `publication.recovered` | Attempts, CAS conflicts, ambiguous writes, acknowledged new commits, and stable-request recoveries during the operation |
-| `committed.<kind>` | Counts of newly acknowledged Work, Claim, Completion, cancellation, Dispatch, Release, Result, and DeliveryFailure operations; recovered requests do not count as new commits |
-| `reconciliation.checked`, `reconciliation.unresolved` | Reservations checked by a reconciliation batch and those returning unresolved launch or binding-conflict outcomes |
-| `error.type` | Allowlisted error category, never raw provider messages or request bodies |
+| `operation`, `request.kind`, `reason`, `outcome` | Operation, last committed request kind, scheduler plan reason, and launch or settlement outcome |
+| `snapshot.present` | Whether a replayed ledger was observed |
+| `work.total`, `work.available`, `work.claimed`, `work.completed`, `work.cancelled` | Work counts of the observed ledger |
+| `claims.open`, `dispatches.reserved`, `dispatches.started`, `dispatches.bound` | Open Claims and non-closed Dispatches by state |
+| `publication.attempts`, `publication.conflict`, `publication.ambiguous`, `publication.commits`, `publication.recovered` | Compare-and-swap attempts, ref conflicts, ambiguous writes, new commits, and requests found already committed |
+| `committed.<kind>` | Newly committed `Work`, `Claim`, `Dispatch`, `Bound`, `Completion`, `ClaimCancellation`, `WorkCancellation`, and `Release` operations |
+| `error.type` | Allowlisted error category, never raw provider messages |
 
-These are **span attributes**, not continuously sampled OTEL metrics. For a dashboard, group by `queue.id` and select the snapshot with the latest `observed_at_unix_ms`; never sum snapshots across spans or workflow runs. Missing snapshots mean unknown state, not an empty queue. A failed operation may retain the last verified snapshot from before the failure. No operations means no new observations, so alert on stale observations separately.
+These are span attributes, not sampled metrics. Group by `queue.id` and use the latest span; never sum counts across spans. Queue telemetry excludes payloads, effects, and Work, Claim, Dispatch, and request IDs.
 
-Monitor growing backlog age, failed delivery barriers, unresolved reservations, saturated pools, and repeated publication conflicts. Span status is ERROR for thrown failures and returned rejected/unresolved/conflicting launches, including unresolved reconciliation batches. An ordinary no-grant decision is not an error. Observability failures do not change publication, Claim accounting, or launch fencing. Queue-specific telemetry excludes Work payloads, result bodies, Work/Claim/dispatch/request IDs, fairness keys, and raw errors; the existing workflow resource attributes still identify the workflow run.
-
-## Runtime debug logging
+## Diagnostics
 
 | Setting | Scope |
 | --- | --- |
-| `DEBUG=work-queue:*` | JavaScript runtime queue events |
-| `DEBUG=work-queue:store,work-queue:dispatch` | Selected runtime components |
-| `DEBUG=work-queue:claims,work-queue:delivery,work-queue:native_delivery` | Runtime delivery verification |
-| `DEBUG=workqueue:delivery,workqueue:native_delivery` | Native operator delivery recovery |
+| `DEBUG=work-queue:*` | All JavaScript runtime queue events |
+| `DEBUG=work-queue:store,work-queue:dispatch` | Selected components (`claims`, `dispatch`, `effects`, `intents`, `mcp`, `memory`, `native`, `reconciler`, `replay`, `run`, `scheduler`, `store`, `workflow-dispatch`) |
+| `DEBUG=workqueue:*` | Go CLI ledger operations |
 | `ACTIONS_RUNNER_DEBUG=true` or `RUNNER_DEBUG=1` | All runtime queue events |
 
-Events go to stderr with elapsed timing and sanitized counts, flags, statuses, and error categories, not payloads, identities, or credentials. Blocked controls and exhausted delivery verification also emit always-visible diagnostics.
-
-Git ledger reads reuse one bounded local object stream instead of starting Git for every historical object. Issue projection shares the originating client's ledger and verified ancestry; repository access is still refreshed before cached history is reused. Cold reads still validate every checkpoint boundary.
-
-After GitHub accepts a dispatch with the required HTTP 200 native run receipt, the dispatcher reports `activation_pending` and does not poll worker metadata or publish a binding. The durable start marker fences every resend; the returned run ID and URL are preserved in the Actions `work_queue_requests` controls output, not as new durable ledger evidence. This status means dispatch acceptance, not Claim/effect authority or worker completion. Trusted worker activation still verifies the actual run ID, attempt one, repository, workflow, immutable SHA, initiating/triggering principal and original dispatch token, then publishes and rechecks a durable binding before allowing worker execution.
-
-An uncertain POST response triggers bounded reconciliation of the original reservation, never another launch POST or a worker cancellation. Recovery uses the installed discovery and identity checks below, including a fresh ledger read to observe concurrent worker activation. Verified binding or release is returned in the controls receipt; missing, conflicting, or unavailable evidence leaves the reservation fenced and the controls status `recovery_required`. Always-visible `launch.recovery.start`, `launch.recovery.complete`, and `launch.recovery.failed` diagnostics report recovery timing, marker persistence, binding/release/conflict flags, and disabled resends without exposing assignment identities or payloads. If the uncertain marker cannot be published, the durable start marker still prevents another launch.
-
-Stranded-launch recovery is bounded. Without an explicit run hint or an existing ledger evidence hint, scheduled or explicit reconciliation discovers at most two pages of 50 runs filtered by the worker workflow, `workflow_dispatch` event and immutable SHA, within the installed attempt/deadline limits. A full second page is an overflow conflict, not proof of a unique run. Even a successfully verified exact run hint must pass this bounded conflict scan and does not bypass the overflow fence or guarantee recovery outside the listing window. If a worker never activates and its run falls outside this window, automatic reconciliation cannot recover its binding from the controls output: the reservation remains fenced and unbound (`launch_unresolved` or `run_binding_conflict`). Preserve the controls receipt for operator investigation; losing it does not authorize another dispatch, release or effect replay. Recovery requires authenticated run evidence and all normal binding checks; reconciliation does not widen its scan.
-
-Native activation/reconciliation diagnostics preserve fixed identity failure codes such as `run_correlation_mismatch`, `run_ref_mismatch`, and `run_principal_mismatch` without printing run metadata. A correlation mismatch can reflect a pending run title; neither a mismatch nor missing discovery permits release or another POST. Unbound reconciliation authenticates repository identity once per operation and checks every subsequent attempt response against that identity, with no cross-operation or cross-client cache. Failed authentication is not cached. Reconciliation retains an exact run hint throughout its retry budget, including after transient API errors or a 404; these failures do not establish nonlaunch. For pending titles, it spaces reads with exponential delays of 1, 2, 4, 8 seconds and so on, capped at 30 seconds and the remaining installed deadline. Attempt limits and all identity checks remain unchanged; permanently mismatched runs remain fenced without binding/effect authority.
-
-Routing diagnostics distinguish installed Policy gaps from compiler approval failures:
+Events go to stderr with sanitized counts, flags, and error categories, not payloads or credentials.
 
 | Code | Meaning and recovery |
 | --- | --- |
-| `work_queue_pool_not_installed` | The requested pool could not be installed on demand. Declare it in `aw.json`, publish the worker source and lock to the default branch, and recompile the producer or dispatcher. Installed economics must remain unchanged. |
-| `work_queue_profile_not_approved` | The worker could not be registered on demand. Check its default-revision AW source, compiled contract, active registration and the caller's dispatch allowlist. |
-| `work_queue_worker_not_compiler_approved` | The caller's compiled configuration does not approve the worker route. Check `safe-outputs.dispatch-workflow.workflows` and the published worker's assignment support. |
-
-HTTP failure diagnostics include validated quota counters, `rate_limit_reset_unix` (Unix seconds), `retry_after_seconds`, fixed rate-limit/SSO flags, and the GitHub request ID when available. Explicit rate-limit evidence distinguishes throttled HTTP 403 responses from otherwise ambiguous access denials; quota headroom alone does not prove permission denial. Raw provider messages, arbitrary headers, and authorization URLs are never printed.
-
-`queue_control_github_transport_failed` with `transport_response_missing=true` identifies a client-side synthetic status 500 without an HTTP response, not a confirmed GitHub server error. Worker provisioning and native repository/run metadata GETs use a fresh 15-second fetch deadline per attempt, including response-body reads. Standalone metadata recovery makes at most three attempts with one-second delays; native polling callers retain their own retry budget without nested retries. Permission denials, rate limits, and invalid worker contents or run identities still fail closed; writes and worker launches are not retried by this read recovery. An exhausted read does not authorize releasing reservations or replaying effects.
-
-`delivery.effect.uncovered` means a recorded effect lacks independent coverage, even if its handler succeeded. For signed pull requests, verification checks the exact head branch and confirms that the REST ref mutation's recorded commit is the verified head or its ancestor. Missing ref selectors, unrelated commits, moved heads, and unavailable readback remain unverified. An older delivery failure is not repaired by upgrading the verifier; inspect the original Claim and its immutable receipts before considering recovery, without replaying successful writes.
-
-`attempts_exhausted` is a terminal Work cancellation, not a delivery-verification failure. Inspect its individual Claim cancellation reasons: repeated `worker_cancelled` outcomes can reflect intentional clean-scan decisions, while `definitive_nonlaunch`, `native_run_terminal`, or `worker_termination` require their own native-run evidence. A write-capable worker that needs no resource output must cancel rather than complete with `noop`; cancellation still consumes an attempt. Do not increase retry limits, resubmit terminal Work, or reinterpret cancellation as a verified Result merely to clear the backlog.
-
-Observer smoke failures are not necessarily queue failures. A sandbox host-preflight or engine-driver failure can prevent any queue tool from running. Diagnose that first boundary separately; do not disable isolation, manufacture a smoke success, or change queue policy to compensate. Dispatch and worker smoke checks additionally require a verified launch and Result, respectively, not just staged intents.
-
-Projection coordination failures emit `projection.locks.acquire.failed` and counts of requested versus acknowledged locks. `projection.locks.retained` indicates unacknowledged native writes whose locks remain held. These diagnostics do not authorize retries, worker reruns, receipt recreation, or lock deletion.
-
-GraphQL failures include a validated GitHub request ID even when no HTTP status is exposed. The failure summary retains the error count and allowlisted categories; individual `.graphql_error` records require runtime debug logging and are limited to five per failure. `graphql_error_details_omitted` counts errors without detailed records. Detailed records identify the error index, allowlisted type and operation, and zero-based lock (`l0`–`l49`), unlock (`u0`–`u49`), or Issue projection (`m0`–`m49`) aliases only when the request builder supplies that alias scheme. Unaliased label operations also require explicit request-builder context. Arbitrary Claim-handler aliases, including aliases named after GraphQL operations, remain unclassified. `graphql_result_present` means only that the alias returned non-null data, not that a native receipt was verified. `graphql_reference_already_exists` recognizes the exact reference-conflict message; it does not establish lock ownership or authorize deletion. Unknown paths/types remain unclassified. Collections larger than 50 are marked `graphql_errors_truncated=true` and `graphql_error_types_inspected=false`: summary category inspection is skipped, not a finding that categories are absent. Their debug details are marked `graphql_error_sample_only=true`; sampled types do not affect the summary's queue-control classification or authorize retries. Raw messages, paths, queries, variables, and response bodies are never printed.
+| `unsupported_protocol` | The ledger is version 3 and this job cannot convert it, or a line is not version 4. Run a dispatcher or maintenance first. |
+| `cas_exhausted` | The branch head changed on all 8 publication attempts. Rerun the job; publication is idempotent by request ID. |
+| `work_queue_pending_limit` | A submission would exceed the pool's `pending_limit`. |
+| `work_queue_profile_not_approved` | The Work names a worker profile that is not configured for its pool. Declare the worker with `tools.work-queue.worker: true` and recompile. |
+| `pool_invalid` | The pool is not in the compiled configuration. Add it to `aw.json` and recompile. |
+| `work_queue_assignment_unknown` | The worker's `dispatch_id` is not in the ledger. |
+| `claim_scope_invalid`, `run_binding_conflict` | A run tried to bind or settle a Dispatch bound to another run or workflow. |
+| `attempts_exhausted` | Terminal Work cancellation after `max_attempts` cancelled Claims. Inspect the Claims' cancellation reasons before resubmitting with a new `node_key`. |
 
 ### Diagnostic artifacts
 
-Claim audit exports contain operations, temporary-ID references, and structured errors, not raw handler output or proof of Result. Default retention is one day; failed worker `safe-outputs-items` are retained for seven days. Repository policy or `GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS` can override retention. Uploads fail if redaction fails.
+The `safe_outputs` job exposes `work_queue_outcome` (`completed` when every Claim completed, otherwise `failed`). When trusted queue controls run, `safe_outputs.outputs.work_queue_requests` contains their receipt:
 
-The `safe_outputs` job exposes `work_queue_outcome`. Unverified Claims retain delivery state, effects disposition, and reconciliation reason in scoped `claim-delivery-errors.json`.
+```json
+{
+  "version": 4,
+  "success": true,
+  "status": "committed",
+  "receipts": [
+    {
+      "intent_id": "intent:…",
+      "request_id": "request:…",
+      "commit_id": "q_…",
+      "status": "committed",
+      "dispatches": 1,
+      "launches": [{ "dispatch_id": "d_…", "state": "started" }]
+    }
+  ],
+  "remaining_dispatches": 0,
+  "summary": "## Work queue controls…"
+}
+```
 
-When trusted queue controls are configured, `safe_outputs.outputs.work_queue_requests` contains their version-3 JSON receipt. A successful controls job can report `no_grant` with no launches or `activation_pending` when GitHub accepted a launch but this observation has not verified its binding. A launch with `state: "activation_pending"` includes the accepted run ID and link, not binding authority; only `state: "bound"` identifies a verified native worker run. Pending activation alone does not fail controls, but it never masks a failed or uncertain sibling launch. The receipt is not automatically consumed by reconciliation and proves neither worker completion nor Result.
+A launch with `state: "launch_failed"` carries a `reason` and returned its Work to the pool. The controls step fails only when a receipt is `blocked` or a dispatcher staged no intents.
 
-Claim files live under `/tmp/gh-aw/claims/<original-identity-hash>/` with directory/file modes `0700`/`0600`:
-
-| File | Contents |
-| --- | --- |
-| `safe-output-items.jsonl` | Executed operations and original Claim attribution |
-| `temporary-id-map.json` | Audit references; runtime resolution uses the in-memory map |
-| `safe-output-errors.json` | Structured failures, not raw handler output |
-
-No `delivery-receipt.json` is written or uploaded; protected in-memory evidence and the ledger establish delivery.
-
-Writers redact configured secrets, gateway tokens, and built-in credential patterns from decoded JSON keys/values. After verification, redaction also uses worker-job secrets and recoverable agent-log runtime masks. Redaction does not anonymize repository names, IDs, URLs, personal data, or unknown secrets. Masks registered only in the safe-output job cannot be recovered from agent logs. Limit diagnostic content and artifact access accordingly.
-
-## Compatibility
-
-Upgrade all closed-schema readers and runtimes before using newer version-3 fields or evidence records, including Issue projection, expiration, worker contracts, and inline termination evidence.
-
-Historical Policy-only genesis and unmarked worker profiles remain readable. Unmarked workers retain exact-ref behavior until explicit quiescent migration. Workflow-level `work-queue-policy` and `tools.work-queue.issues` are deprecated and conflict with repository-level equivalents.
-
-Standalone seeding (`initializeWorkQueue`, `initializationContext`, or pre-submission `policy`), scalar assignments, direct agent-selected claiming, and arbitrary run-ID adoption are unsupported. First accepted submission replaces seeding; existing queues need no reset.
+The activation snapshot `/tmp/gh-aw/work-queue.snapshot.json` contains the ledger at activation and, for a worker, `worker.claims[]` with `handle`, `claim_id`, `work_id`, the Work payload as `work`, and predecessor `result_refs`. Claim audit files live under `/tmp/gh-aw/claims/<identity-hash>/` and contain executed operations and structured errors, not raw handler output. Writers redact configured secrets and built-in credential patterns; redaction does not anonymize repository names, IDs, URLs, or unknown secrets.

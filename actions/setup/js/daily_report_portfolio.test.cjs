@@ -1,37 +1,34 @@
 // @ts-check
 import { describe, expect, it } from "vitest";
 import fs from "node:fs";
+import { createRequire } from "node:module";
 import { DAILY_REPORTS, FIXED_DAILY_REPORTS, WEEKLY_REPORTS, REPORT_PROFILES, REPORTS_PER_DAY, REPORT_POOL, reportsForDay, buildDailyReportPlan, buildDailyReportPolicy } from "./daily_report_portfolio.cjs";
-import { normalizeDispatchParameters, normalizeSubmitParameters } from "./work_queue_intents.cjs";
-import { newState, newRequest, generateRequestOperations, replayTransactions } from "./work_queue_replay.cjs";
-import { validatePolicy } from "./work_queue_policy.cjs";
+import { normalizeSubmitParameters } from "./work_queue_intents.cjs";
+import { replayTransactions } from "./work_queue_replay.cjs";
+import { validatePolicyEnv } from "./work_queue_policy.cjs";
 import { frozenResourceScope } from "./work_queue_resource_scope.cjs";
-import { validateDeliveryContract } from "./work_queue_delivery.cjs";
 import { readDocumentMetadata } from "../../../scripts/markdown_metadata_test_adapter.cjs";
 
+const require = createRequire(import.meta.url);
+const h = require("./work_queue_test_helpers.cjs");
 const repository = "owner/repo";
 const settings = JSON.parse(fs.readFileSync(new URL("../../../.github/workflows/aw.json", import.meta.url), "utf8")).work_queue;
-const policyOptions = { repository, ref: "a".repeat(40), settings };
+const policyOptions = { repository, settings };
 const planOptions = { repository, repositoryId: "7", date: "2026-10-07" };
 const source = name => fs.readFileSync(new URL(`../../../.github/workflows/${name}.md`, import.meta.url), "utf8");
 
-function ledger() {
-  let state = newState();
-  const transactions = [];
-  let at = 1000;
-  const append = (kind, parameters, actor) => {
-    const request = newRequest(`portfolio:${transactions.length}:${++at}`, kind, actor, parameters);
-    const id = `commit:${at}`;
-    const decision = generateRequestOperations(state, request, actor, at, id);
-    if (decision.operations.length) {
-      transactions.push({ version: 3, id, previous: state.tip || null, request, actor, policy_epoch: "portfolio-v1", at, operations: decision.operations });
-      state = replayTransactions(transactions);
-    }
-    return state;
-  };
-  const policy = buildDailyReportPolicy(policyOptions);
-  append("policy", { operations: [{ kind: "Policy", epoch: "portfolio-v1", policy }] }, { role: "administrator", repository, principal: "11" });
-  return { append, policy, state: () => state, transactions };
+/** Admit the plan's new Work (existing Work IDs are idempotent no-ops). */
+function admit(log, plan, policy) {
+  const state = replayTransactions(log);
+  const fresh = normalizeSubmitParameters({ nodes: plan.nodes }, policy).filter(work => !state.works.has(work.work_id));
+  return fresh.length ? h.submit(log, fresh, { ...h.producer, run_id: String(10 + log.length) }) : log;
+}
+
+/** Commit the plan's dispatch_next with the compiled pool limits. */
+function dispatch(log, plan, policy, runId = "15") {
+  const pool = policy.pools[plan.dispatch.pool];
+  const profiles = Object.fromEntries(Object.entries(pool.profiles).map(([name, profile]) => [name, { workflow: profile.workflow }]));
+  return h.dispatchNext(log, { ...plan.dispatch, concurrency: pool.concurrency, per_account_limit: pool.per_account_limit, profiles }, { ...h.dispatcher, run_id: runId }).log;
 }
 
 describe("bounded daily and weekly discussion-report portfolio", () => {
@@ -79,7 +76,7 @@ describe("bounded daily and weekly discussion-report portfolio", () => {
       expect(node).toMatchObject({ graph_id: "daily-report-cohort:2026-10-07", pool: REPORT_POOL, priority: 3, fairness_key: node.worker_profile, node_key: node.worker_profile, depends_on: [] });
       expect(node.payload).toMatchObject({ report_date: plan.date, report_profile: node.worker_profile });
       expect(frozenResourceScope(node.payload)).toEqual({ version: 1, resources: [{ host: "github.com", repository, repository_id: "7" }] });
-      expect(validateDeliveryContract(node.payload.effect_contract).outputs).toContainEqual({ type: "create_discussion", min: 1, max: 1 });
+      expect(node.payload.effect_contract.outputs).toContainEqual({ type: "create_discussion", min: 1, max: 1 });
       expect(node.payload.effect_contract.outputs.some(output => output.type === "create_issue")).toBe(node.worker_profile === "deep-report");
     }
     expect(() => buildDailyReportPlan({ ...planOptions, repository: "not-a-repository" })).toThrow();
@@ -100,78 +97,55 @@ describe("bounded daily and weekly discussion-report portfolio", () => {
     expect(coveredProfiles).toEqual(new Set(REPORT_PROFILES));
   });
 
-  it("uses shared scheduling and all thirteen immutable AW routes without enrollment", () => {
+  it("uses shared scheduling and all thirteen AW worker routes without enrollment", () => {
     const policy = buildDailyReportPolicy(policyOptions);
-    expect(validatePolicy(policy)).toEqual(policy);
+    expect(validatePolicyEnv(policy)).toEqual(policy);
     const pool = policy.pools[REPORT_POOL];
-    expect(policy.authorization).toBe("aw");
-    expect(policy.producers).toEqual({});
-    expect(pool).toMatchObject({ logical_limit: 3, native_limit: 3, per_account_limit: 1, retry: { max_attempts: 3, backoff_ms: 30000 } });
+    expect(pool).toMatchObject({ concurrency: 3, per_account_limit: 1, max_attempts: 3 });
     expect(Object.keys(pool.profiles).sort()).toEqual([...REPORT_PROFILES].sort());
-    for (const profile of REPORT_PROFILES) {
-      expect(policy.accounting_weights[profile]).toBe(1);
-      expect(pool.profiles[profile]).toEqual({
-        workflow: `.github/workflows/${profile}.lock.yml`,
-        ref: policyOptions.ref,
-        trust_domain: "default",
-        credential_scope: "repository",
-        effect_scope: repository,
-        max_claims: 1,
-        share_keys: false,
-      });
-    }
-    expect(() => buildDailyReportPolicy({ ...policyOptions, ref: "main" })).toThrow();
+    for (const profile of REPORT_PROFILES) expect(pool.profiles[profile]).toEqual({ workflow: `.github/workflows/${profile}.lock.yml`, effect_scope: repository });
+    expect(() => buildDailyReportPolicy({ ...policyOptions, repository: "not-a-repository" })).toThrow();
   });
 
-  it("records idempotent daily Work and three singleton grants in the same QueueCommit history", () => {
-    const queue = ledger();
+  it("records idempotent daily Work and three singleton Claims in the ledger", () => {
+    const policy = buildDailyReportPolicy(policyOptions);
     const plan = buildDailyReportPlan(planOptions);
-    const producer = { role: "producer", repository, principal: "11" };
-    const dispatcher = { role: "dispatcher", repository, principal: "11", workflow: ".github/workflows/daily-report-dispatcher.lock.yml", run_id: "15", run_attempt: 1 };
-    queue.append("submit", normalizeSubmitParameters({ nodes: plan.nodes }, queue.policy, 2000, queue.state()), producer);
-    const originalWork = [...queue.state().works.values()];
-    queue.append("submit", normalizeSubmitParameters({ nodes: plan.nodes }, queue.policy, 3000, queue.state()), producer);
-    expect([...queue.state().works.values()]).toEqual(originalWork);
-    expect(queue.state().works.size).toBe(3);
-    queue.append("dispatch_next", normalizeDispatchParameters(plan.dispatch, queue.policy, 3), dispatcher);
-    expect(queue.state().claims.size).toBe(3);
-    expect(queue.state().dispatches.size).toBe(3);
-    for (const dispatch of queue.state().dispatches.values()) {
-      expect(dispatch.claims).toHaveLength(1);
-      expect(plan.selected).toContain(dispatch.profile.workflow.split("/").pop().replace(".lock.yml", ""));
+    let log = admit([], plan, policy);
+    const originalWork = [...replayTransactions(log).works.values()];
+    log = admit(log, plan, policy);
+    expect([...replayTransactions(log).works.values()]).toEqual(originalWork);
+    expect(originalWork).toHaveLength(3);
+    log = dispatch(log, plan, policy);
+    let state = replayTransactions(log);
+    expect(state.claims.size).toBe(3);
+    expect(state.dispatches.size).toBe(3);
+    for (const record of state.dispatches.values()) {
+      expect(record.claims).toHaveLength(1);
+      expect(plan.selected).toContain(record.workflow.split("/").pop().replace(".lock.yml", ""));
     }
-    queue.append("dispatch_next", normalizeDispatchParameters(plan.dispatch, queue.policy, 3), dispatcher);
-    expect(queue.state().claims.size).toBe(3);
+    log = dispatch(log, plan, policy, "16");
+    expect(replayTransactions(log).claims.size).toBe(3);
     const tomorrow = buildDailyReportPlan({ ...planOptions, date: "2026-10-08" });
-    queue.append("submit", normalizeSubmitParameters({ nodes: tomorrow.nodes }, queue.policy, 4000, queue.state()), producer);
-    expect(queue.state().works.size).toBe(6);
-    queue.append("dispatch_next", normalizeDispatchParameters(tomorrow.dispatch, queue.policy, 3), { ...dispatcher, run_id: "16" });
-    expect(queue.state().claims.size).toBe(3);
-    expect(queue.state().dispatches.size).toBe(3);
-    expect(replayTransactions(queue.transactions).claims.size).toBe(3);
+    log = admit(log, tomorrow, policy);
+    log = dispatch(log, tomorrow, policy, "17");
+    state = replayTransactions(log);
+    expect(state.works.size).toBe(6);
+    expect(state.claims.size).toBe(3);
+    expect(state.dispatches.size).toBe(3);
   });
 
   it.each(["2026-10-10", "2026-10-11"])("admits weekly reports idempotently with exactly one required discussion on %s", date => {
-    const queue = ledger();
+    const policy = buildDailyReportPolicy(policyOptions);
     const plan = buildDailyReportPlan({ ...planOptions, date });
-    const producer = { role: "producer", repository, principal: "11" };
-    queue.append("submit", normalizeSubmitParameters({ nodes: plan.nodes }, queue.policy, 2000, queue.state()), producer);
-    queue.append("submit", normalizeSubmitParameters({ nodes: plan.nodes }, queue.policy, 3000, queue.state()), producer);
-    expect(queue.state().works.size).toBe(3);
+    const log = admit(admit([], plan, policy), plan, policy);
+    expect(replayTransactions(log).works.size).toBe(3);
     const weekly = plan.nodes.find(node => WEEKLY_REPORTS.some(report => report.profile === node.worker_profile));
     expect(weekly).toBeDefined();
     expect(weekly.payload.report_date).toBe(date);
     expect(weekly.payload.effect_contract.outputs).toContainEqual({ type: "create_discussion", min: 1, max: 1 });
-    queue.append("dispatch_next", normalizeDispatchParameters(plan.dispatch, queue.policy, 3), {
-      role: "dispatcher",
-      repository,
-      principal: "11",
-      workflow: ".github/workflows/daily-report-dispatcher.lock.yml",
-      run_id: "15",
-      run_attempt: 1,
-    });
-    expect(queue.state().dispatches.size).toBe(3);
-    expect([...queue.state().dispatches.values()].some(dispatch => dispatch.profile.workflow === `.github/workflows/${weekly.worker_profile}.lock.yml`)).toBe(true);
+    const state = replayTransactions(dispatch(log, plan, policy));
+    expect(state.dispatches.size).toBe(3);
+    expect([...state.dispatches.values()].some(record => record.workflow === `.github/workflows/${weekly.worker_profile}.lock.yml`)).toBe(true);
   });
 
   it("keeps the dispatcher allowlist and thirteen dispatch-only Claim workers wired to actual compiled queue protocols", () => {
@@ -217,7 +191,7 @@ describe("bounded daily and weekly discussion-report portfolio", () => {
       const compiled = fs.readFileSync(new URL(`../../../.github/workflows/${profile}.lock.yml`, import.meta.url), "utf8");
       expect(compiled).toContain("work_queue_assignment:");
       expect(compiled).toContain('GH_AW_WORK_QUEUE_ROLE: "worker"');
-      expect(compiled).toContain("name: Reconcile work queue claim");
+      expect(compiled).toContain("name: Finish work queue claim");
       expect(compiled).toContain("work_queue_claim_finish");
       expect(compiled).toContain("create_discussion");
       if (["deep-report", "artifacts-summary", "repo-tree-map"].includes(profile)) expect(frontmatter).toContain("fallback-to-issue: false");

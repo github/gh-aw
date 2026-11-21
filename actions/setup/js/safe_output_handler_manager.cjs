@@ -53,7 +53,6 @@ const {
   writeSafeOutputExecutions,
   writeMergePullRequestDecision,
   SAFE_OUTPUT_ERRORS_FILE_PATH,
-  CLAIM_DELIVERY_ERRORS_FILE_NAME,
 } = require("./safe_output_manifest.cjs");
 const { loadCustomSafeOutputJobTypes, loadCustomSafeOutputScriptHandlers, loadCustomSafeOutputActionHandlers, isStagedMode, resolveTarget } = require("./safe_output_helpers.cjs");
 const { emitSafeOutputActionOutputs } = require("./safe_outputs_action_outputs.cjs");
@@ -69,18 +68,17 @@ const {
   normalizeRuntimeMessage,
   assertClaimAuthorized,
   withClaimExecution,
+  withClaimOutputType,
   currentClaimHandle,
   currentClaimAssignment,
   claimIdentity,
   assertClaimIdentity,
-  closeClaimEffectChannel,
 } = require("./work_queue_claim_scope.cjs");
-const { withClaimEffectClients, wrapClaimEffectClient } = require("./work_queue_effect_client.cjs");
-const { readClaimControlMessages } = require("./work_queue_control_delivery.cjs");
-const { readDeliveryControlInventory, inspectClaimDelivery, createClaimDeliveryVerifier, verifyBuiltinDeliveryOutput, validateDeliveryContract, NO_WRITE_TYPES } = require("./work_queue_delivery.cjs");
+const { appendClaimEffects, withClaimEffectClients } = require("./work_queue_effect_client.cjs");
 const { normalizeSafeOutputName } = require("./safe_output_names.cjs");
-const { collectDeliveryEvidence, publishDeliveryEvidence } = require("./work_queue_delivery_evidence.cjs");
-const { createClaimAdapterHandler, verifyClaimAdapterOutput, preparedAdapterPath, createDeclaredAdapterVerifier, wrapDeclaredBuiltinHandler } = require("./work_queue_claim_adapters.cjs");
+const { createClaimAdapterHandler, preparedAdapterPath } = require("./work_queue_claim_adapters.cjs");
+// Output types that never write resources; allowed for a Work whose effect_contract sets no_writes.
+const NO_WRITE_TYPES = new Set(["noop", "report_missing_tool", "report_missing_data", "missing_tool", "missing_data", "report_incomplete"]);
 const GITHUB_TOKEN_CONFIG_KEY = "github-token";
 
 /**
@@ -841,7 +839,6 @@ async function initializeHandlers(config, prReviewBufferRegistry, resolvedAllowe
           const executable = wrapWithClientRebinding(type, messageHandler, handlerGithubClient);
           const factoryClaim = currentClaimHandle();
           const factoryIdentity = factoryClaim ? claimIdentity(factoryClaim) : null;
-          const declaredExecutable = factoryClaim ? wrapDeclaredBuiltinHandler(type, executable) : executable;
           const assertFactoryScope = () => {
             if (currentClaimHandle() !== factoryClaim) throw new Error("Handler state cannot escape its trusted Claim factory context");
             if (factoryIdentity) assertClaimIdentity(factoryIdentity);
@@ -849,7 +846,7 @@ async function initializeHandlers(config, prReviewBufferRegistry, resolvedAllowe
           const authorizedHandler = async (message, ...args) => {
             assertFactoryScope();
             const scopedMessage = await assertClaimAuthorized({ ...message, repo: message.repo ?? getDefaultTargetRepo(handlerConfig) });
-            return declaredExecutable(scopedMessage, ...args);
+            return executable(scopedMessage, ...args);
           };
           if (factoryClaim) {
             for (const [name, value] of Object.entries(executable)) {
@@ -1370,7 +1367,13 @@ async function processMessages(messageHandlers, messages, onItemCreated = null, 
   const stagedFor = (type, message = null) => isStagedMode(trustedConfig) || isStagedMode(trustedDescriptor(trustedConfig, type, message));
   const previewOnly = (type, message) => !!effectiveAuthorization(trustedConfig, type, message) || scriptTypes.has(type) || actionTypes.has(type);
 
-  async function executeInvocation(type, index, message, resolvedTemporaryIds, temporaryIdMap, handler, phase = "primary") {
+  // Claim effects recorded during an invocation carry its safe-output type.
+  function executeInvocation(type, index, message, resolvedTemporaryIds, temporaryIdMap, handler, phase = "primary") {
+    const run = () => executeScopedInvocation(type, index, message, resolvedTemporaryIds, temporaryIdMap, handler, phase);
+    return currentClaimHandle() ? withClaimOutputType(type, run) : run();
+  }
+
+  async function executeScopedInvocation(type, index, message, resolvedTemporaryIds, temporaryIdMap, handler, phase) {
     if (type === "dispatch_repository" && trustedConfig[type]?.tools && !Object.hasOwn(trustedConfig[type].tools, message.tool_name)) {
       return { success: false, error: "Repository dispatch tool is not configured" };
     }
@@ -2687,11 +2690,10 @@ async function processSyntheticUpdates(github, context, trackedOutputs, temporar
  * report must never mask the original failure, so errors are swallowed.
  *
  * @param {{errorCode?: string, message?: string, failures?: Array<{type?: string, errorCode?: string, error?: string}>}} report
- * @param {string} [filePath]
  */
-function recordSafeOutputFailure(report, filePath) {
+function recordSafeOutputFailure(report) {
   try {
-    writeSafeOutputErrorReport({ status: "failure", ...report }, filePath);
+    writeSafeOutputErrorReport({ status: "failure", ...report });
   } catch (error) {
     core.warning(`Failed to write safe output error report: ${getErrorMessage(error)}`);
   }
@@ -2771,78 +2773,24 @@ function logSafeOutputReplayHint(results) {
 }
 
 /**
+ * Output types a Work's effect_contract does not declare (none when it declares no outputs list).
+ * @param {any} work
+ * @param {any[]} messages
+ * @returns {string[]}
+ */
+function undeclaredOutputTypes(work, messages) {
+  const contract = work?.effect_contract;
+  if (!contract || typeof contract !== "object" || !Array.isArray(contract.outputs)) return [];
+  const known = new Set(contract.outputs.map(output => normalizeSafeOutputName(String(output?.type))));
+  return [...new Set(messages.map(message => normalizeSafeOutputName(message.type)).filter(type => !known.has(type) && !(contract.no_writes === true && NO_WRITE_TYPES.has(type))))];
+}
+
+/**
  * Main entry point for the handler manager
  * This is called by the consolidated safe output step
  *
- * @returns {Promise<void>}
+ * @param {{claimPartition?: boolean, messages?: object[], queueClient?: object, authorize?: (request: Record<string, unknown>) => unknown, activationCommentLinks?: string[]}} [options]
  */
-/** @param {any} scope @param {any[]} messages @param {any[]} results @param {Record<string, any>} [options] */
-async function settleClaimDelivery(scope, messages, results, options = {}) {
-  const handle = currentClaimHandle();
-  const member = scope.assignment.claims.find(claim => claim.handle === handle);
-  if (!member) throw new Error("Claim delivery lost its immutable assignment member");
-  const verificationGithub = options.github || github;
-  const verificationContext = options.context || context;
-  for (const result of results) result.claim_handle = handle;
-  if (options.registerVerification) options.registerVerification(messages, results);
-  const controls = options.controlMessages || [];
-  if (options.registerVerification !== undefined && !isStagedMode()) {
-    try {
-      const evidence = collectDeliveryEvidence({ assignment: scope.assignment, claim_handle: handle, messages, results, effects: options.effects || [], controls, config: loadConfig(), context: verificationContext });
-      if (evidence.unsupported) core.info(`Claim ${handle}: durable delivery evidence not published (${evidence.unsupported})`);
-      else await publishDeliveryEvidence({ assignment: scope.assignment, claim_handle: handle, ...evidence, github: options.queueClient || github, context: verificationContext, core });
-    } catch (error) {
-      core.error(`Claim ${handle}: durable delivery evidence publication failed: ${getErrorMessage(error)}`);
-    }
-  }
-  const controlProofs = new Map();
-  const outcomes = [...results, ...controls.map((message, index) => ({ messageIndex: messages.length + index, success: true, claim_handle: handle, result: null }))];
-  const queueControls = require("./work_queue_control_receipts.cjs");
-  const delivery = await inspectClaimDelivery({
-    assignment: scope.assignment,
-    claim_handle: handle,
-    messages: [...messages, ...controls],
-    results: outcomes,
-    effects: options.effects || [],
-    effectChannel: closeClaimEffectChannel(),
-    authorize: options.authorize,
-    context: verificationContext,
-    github: verificationGithub,
-    signal: options.signal,
-    staged: isStagedMode(),
-    requireControlInventory: true,
-    readControlInventory: async () => {
-      const inventory = await (options.readControlInventory
-        ? options.readControlInventory()
-        : readDeliveryControlInventory({ assignment: scope.assignment, claim_handle: handle, github: verificationGithub, queueClient: options.queueClient, context: verificationContext, core, signal: options.signal }));
-      for (const message of controls) {
-        const proof = await queueControls.verifyClaimQueueControl({ assignment: scope.assignment, claim_handle: handle, message, inventory });
-        controlProofs.set(message.intent_id, proof);
-      }
-      return inventory;
-    },
-    verifyOutput:
-      options.verifyOutput ||
-      (input => {
-        if (["work_queue_submit", "work_queue_dispatch_next"].includes(input.message.type)) return controlProofs.get(input.message.intent_id);
-        const config = loadConfig();
-        const verification = { ...input, config: config[input.message.type], effects: options.effects || [] };
-        const adapter = config.claim_adapters?.[input.message.type];
-        if (input.message.type === "upload_asset") return require("./work_queue_upload_assets.cjs").verifyAssetDelivery(verification);
-        if (input.message.type === "upload_artifact") return require("./upload_artifact.cjs").verifyArtifactDelivery(verification);
-        if (input.message.type === "create_code_scanning_alert") return require("./work_queue_code_scanning.cjs").verifyCodeScanningDelivery(verification);
-        if (input.message.type === "upload_code_coverage") return require("./work_queue_code_coverage.cjs").verifyCodeCoverageDelivery(verification);
-        return adapter ? verifyClaimAdapterOutput({ ...verification, adapter }) : verifyBuiltinDeliveryOutput(verification);
-      }),
-    verifyDeclaredOutput: member.work.effect_contract?.outputs?.some(output => output.verification !== undefined)
-      ? options.verifyDeclaredOutput || createDeclaredAdapterVerifier(loadConfig().claim_adapters, loadConfig(), options.effects)
-      : undefined,
-  });
-  options.signal?.throwIfAborted();
-  return delivery;
-}
-
-/** @param {{claimPartition?: boolean, messages?: object[], verifyOutput?: Function, finalizeResults?: Function, controlIntentPath?: string, queueClient?: object, authorize?: (request: Record<string, unknown>) => unknown, activationCommentLinks?: string[]}} [options] */
 async function main(options = {}) {
   const activationCommentLinks = options.activationCommentLinks ?? [];
   const scope = readClaimScopeContext();
@@ -2858,8 +2806,6 @@ async function main(options = {}) {
     const sourceDigest = require("./safe_output_authorization.cjs").canonicalDigest(JSON.parse(JSON.stringify(messages)));
     for (const partition of partitions.values()) authorizationBatchContexts.set(partition, { digest: sourceDigest, indices: [] });
     const rejected = [];
-    const controls = readClaimControlMessages(scope.assignment, options.controlIntentPath);
-    rejected.push(...controls.errors.map(error => ({ ...error, success: false, errorCode: "claim_control_delivery_invalid" })));
     for (const [sourceIndex, message] of messages.entries()) {
       try {
         if (message._claimScopeError) throw new Error(message._claimScopeError);
@@ -2873,134 +2819,51 @@ async function main(options = {}) {
     }
     rejectCrossClaimTemporaryReferences(partitions, rejected);
     const settlements = [];
-    const verificationPasses = new Map();
     const queueClient = options.queueClient || github;
     for (const [handle, scopedMessages] of partitions) {
+      /** @type {Array<Record<string, any>>} */
+      const effects = [];
       try {
         const unscopedGithub = github;
-        const effects = [];
         const authorize = options.authorize || (request => require("./finish_work_queue_claim.cjs").authorizeWorkerClaim({ ...request, github: unscopedGithub, queueClient }));
-        const claimOptions = {
-          ...options,
-          queueClient,
-          authorize,
-          effects,
-          controlMessages: controls.messages.filter(message => message.claim_handle === handle),
-          registerVerification: (originalMessages, originalResults) => {
-            verificationPasses.set(handle, verification =>
-              withClaimExecution({ ...scope, claim_handle: handle, authorize, effects }, () => {
-                const readbackGithub = wrapClaimEffectClient(unscopedGithub, { claim_handle: handle, authorize, authorizeGithub: unscopedGithub, context, signal: verification?.signal });
-                return settleClaimDelivery(scope, originalMessages, originalResults, { ...claimOptions, github: readbackGithub, context, signal: verification?.signal, registerVerification: undefined });
-              })
-            );
-          },
-        };
-        try {
-          const contract = validateDeliveryContract(scope.assignment.claims.find(claim => claim.handle === handle).work.effect_contract);
-          const known = new Set(contract.outputs.map(output => normalizeSafeOutputName(output.type)));
-          const undeclared = [...new Set(scopedMessages.map(message => normalizeSafeOutputName(message.type)).filter(type => !known.has(type) && !(contract.no_writes === true && NO_WRITE_TYPES.has(type))))];
-          if (undeclared.length > 0 && !isStagedMode()) {
-            core.warning(`Claim ${handle}: refusing ${scopedMessages.length} scoped output(s); undeclared type(s): ${undeclared.join(", ")}`);
-            const delivery = await withClaimExecution({ ...scope, claim_handle: handle, authorize, effects }, () => settleClaimDelivery(scope, scopedMessages, [], claimOptions));
-            settlements.push({ claim_handle: handle, success: false, error: `Undeclared output type(s) in immutable effect_contract: ${undeclared.join(", ")}`, delivery });
-            continue;
-          }
-        } catch {
-          // Delivery settlement reports invalid immutable contracts.
+        const undeclared = undeclaredOutputTypes(scope.assignment.claims.find(claim => claim.handle === handle).work, scopedMessages);
+        if (undeclared.length > 0 && !isStagedMode()) {
+          core.warning(`Claim ${handle}: refusing ${scopedMessages.length} scoped output(s); undeclared type(s): ${undeclared.join(", ")}`);
+          settlements.push({ claim_handle: handle, success: false, error: `Undeclared output type(s) in Work effect_contract: ${undeclared.join(", ")}` });
+          continue;
         }
         const settlement = await withClaimExecution({ ...scope, claim_handle: handle, authorize, effects }, () =>
           withClaimEffectClients({ claim_handle: handle, authorize, authorizeGithub: unscopedGithub, context }, async () => {
             try {
               await assertClaimAuthorized({ type: "work_queue_effect_pass", claim_handle: handle }, { requireCompletion: !isStagedMode() });
             } catch (error) {
-              return { success: !!error.suppressed, delivery: await settleClaimDelivery(scope, scopedMessages, [], claimOptions) };
+              if (error.suppressed) {
+                core.info(`Claim ${handle}: ${scopedMessages.length} scoped output(s) suppressed (${error.state})`);
+                return { success: true, suppressed: true, state: error.state };
+              }
+              return { success: false, error: getErrorMessage(error) };
             }
             if (isStagedMode()) {
-              core.info(`Read-only preview for Claim ${handle}: ${scopedMessages.length} scoped output(s); no handlers or terminal facts`);
-              return { success: true, messages: scopedMessages, delivery: await settleClaimDelivery(scope, scopedMessages, [], claimOptions) };
+              core.info(`Read-only preview for Claim ${handle}: ${scopedMessages.length} scoped output(s); no handlers or queue writes`);
+              return { success: true, messages: scopedMessages };
             }
-            const result = await main({ ...claimOptions, claimPartition: true, messages: scopedMessages, activationCommentLinks });
-            if (result?.delivery) return result;
-            return { ...result, delivery: await settleClaimDelivery(scope, scopedMessages, [], claimOptions) };
+            return (await main({ ...options, queueClient, authorize, claimPartition: true, messages: scopedMessages, activationCommentLinks })) ?? { success: false };
           })
         );
         settlements.push({ claim_handle: handle, ...settlement });
       } catch (error) {
         settlements.push({ claim_handle: handle, success: false, error: getErrorMessage(error) });
+      } finally {
+        if (!isStagedMode()) appendClaimEffects(effects);
       }
     }
-    let finalized;
-    if (!isStagedMode()) {
-      const finalize = options.finalizeResults || require("./finish_work_queue_claim.cjs").finalizeWorkerResults;
-      if (typeof finalize !== "function") throw new Error("Trusted per-Claim Result reconciler is unavailable");
-      const disputed = new Set(rejected.map(failure => failure.claim_handle).filter(Boolean));
-      finalized = await finalize({
-        core,
-        github,
-        queueClient,
-        context,
-        assignment: scope.assignment,
-        verifyEffects: createClaimDeliveryVerifier({
-          assignment: scope.assignment,
-          recheck: async (member, verification) => {
-            const recheck = verificationPasses.get(member.handle);
-            if (disputed.has(member.handle) || !recheck) return null;
-            const delivery = await recheck(verification);
-            const settlement = settlements.find(settlement => settlement.claim_handle === member.handle);
-            if (settlement) settlement.delivery = delivery;
-            return delivery;
-          },
-        }),
-      });
-    }
-    core.setOutput("claim_results", JSON.stringify({ settlements, reconciliation: finalized }));
-    const states = settlements.map(settlement => finalized?.claims?.[settlement.claim_handle]?.state || settlement.delivery?.verification);
-    const settled = states.every(state => state === "result" || state === "cancelled");
-    const cancelled = states.filter(state => state === "cancelled").length;
-    const outcome = isStagedMode() ? "staged_preview" : !settled ? "delivery_pending" : cancelled === states.length ? "cancelled" : cancelled ? "completed_with_cancellations" : "completed";
-    core.setOutput("work_queue_outcome", outcome);
-    if (!isStagedMode()) {
-      for (const settlement of settlements) {
-        const result = finalized?.claims?.[settlement.claim_handle];
-        const delivery = settlement.delivery;
-        const attestationRefused = delivery?.verification === "verified" && delivery.attestation?.recorded === false;
-        if (["result", "cancelled"].includes(result?.state)) continue;
-        await withClaimExecution({ ...scope, claim_handle: settlement.claim_handle, authorize: options.authorize }, () =>
-          recordSafeOutputFailure(
-            {
-              errorCode: "claim_delivery_unverified",
-              message: `Claim delivery state: ${result?.state || "pending"}; effects: ${result?.effects || "unknown"}; attempts: ${result?.attempts ?? "unknown"}`,
-              failures: [
-                {
-                  type: "claim_delivery",
-                  errorCode: result?.reason || (result?.state === "delivery_failed" ? "delivery_failed" : "verification_unresolved"),
-                  error:
-                    delivery?.reason ||
-                    settlement.error ||
-                    (attestationRefused
-                      ? "Verified settlement receipt was not attested"
-                      : delivery?.verification === "verified"
-                        ? "Verified settlement was not re-verified by the trusted finalizer"
-                        : "Independent delivery verification is unavailable"),
-                  ...(delivery?.diagnostics ? { diagnostics: delivery.diagnostics } : attestationRefused ? { diagnostics: { event: "delivery.receipt.not_recorded", ...delivery.attestation } } : {}),
-                  ...(result?.verifier ? { verifier: result.verifier } : {}),
-                },
-              ],
-            },
-            nodePath.join(nodePath.dirname(SAFE_OUTPUT_ERRORS_FILE_PATH), CLAIM_DELIVERY_ERRORS_FILE_NAME)
-          )
-        );
-      }
-    }
+    core.setOutput("claim_results", JSON.stringify({ settlements }));
     if (rejected.length) {
       core.setOutput("claim_scope_errors", JSON.stringify(rejected));
       core.setFailed(`${rejected.length} safe-output message(s) have invalid Claim scope`);
     }
-    if (settlements.some(settlement => settlement.success === false && !["result", "cancelled"].includes(finalized?.claims?.[settlement.claim_handle]?.state))) {
-      core.setFailed("One or more Claim-scoped safe-output passes failed; independently valid siblings were reconciled");
-    }
-    if (!isStagedMode() && !settled) {
-      core.setFailed("One or more Claim deliveries remain unverified; inspect the safe-outputs-items Claim diagnostics and the queue ledger before retrying. Independently valid siblings were reconciled");
+    if (settlements.some(settlement => settlement.success === false)) {
+      core.setFailed("One or more Claim-scoped safe-output passes failed; independently valid siblings were processed");
     }
     return { settlements, rejected };
   }
@@ -3348,10 +3211,6 @@ async function main(options = {}) {
     // Emit named action outputs (e.g. created_issue_number, created_issue_url)
     // for the first successful result of each safe output type.
     emitSafeOutputActionOutputs(processingResult);
-    let delivery = null;
-    if (currentClaimHandle() && scope?.assignment) {
-      delivery = await settleClaimDelivery(scope, allMessages, processingResult.results, options);
-    }
 
     // Ensure the manifest file always exists for artifact upload (even if no items were created).
     // Skip in staged mode — no real items were created so no manifest should be emitted.
@@ -3362,10 +3221,10 @@ async function main(options = {}) {
     if (failedOutputsMessage !== null) {
       recordSafeOutputFailure({ errorCode: SAFE_OUTPUT_E099, message: failedOutputsMessage, failures: failureDetails });
       core.setFailed(failedOutputsMessage);
-      return { success: false, delivery };
+      return { success: false };
     }
     core.info("Safe Output Handler Manager completed");
-    return { success: true, delivery };
+    return { success: true };
   } catch (error) {
     const handlerError = `${ERR_VALIDATION}: Handler manager failed: ${getErrorMessage(error)}`;
     if (!statusOutputsSet) {
@@ -3419,5 +3278,4 @@ module.exports = {
   setSafeOutputsStatusOutputs,
   processSyntheticUpdates,
   rejectCrossClaimTemporaryReferences,
-  settleClaimDelivery,
 };

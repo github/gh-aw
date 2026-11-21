@@ -278,7 +278,7 @@ describe("toNanoString", () => {
 
 describe("buildAttr", () => {
   it("uses the generated attribute registry and preserves caller-defined keys", () => {
-    expect(buildAttr("gh-aw.work_queue.initialized", true).key).toBe("gh-aw.work_queue.initialized");
+    expect(buildAttr("gh-aw.work_queue.snapshot.present", true).key).toBe("gh-aw.work_queue.snapshot.present");
     expect(buildAttr("custom.attribute", true).key).toBe("custom.attribute");
   });
 

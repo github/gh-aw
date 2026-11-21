@@ -9,7 +9,6 @@ const require = createRequire(import.meta.url);
 const { withClaimExecution } = require("./work_queue_claim_scope.cjs");
 const { withSafeOutputInvocation } = require("./safe_output_execution.cjs");
 const { createClaimAdapterHandler, preparedAdapterPath } = require("./work_queue_claim_adapters.cjs");
-const { queueFixture } = require("./work_queue_lifecycle.test_helpers.cjs");
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -34,7 +33,7 @@ describe("prepared Claim adapter safe-output authorization", () => {
     vi.stubEnv("ACTIONS_ID_TOKEN_REQUEST_TOKEN", undefined);
     vi.stubEnv("ACTIONS_ID_TOKEN_REQUEST_URL", undefined);
     vi.stubGlobal("core", { info: vi.fn(), warning: vi.fn(), setSecret: vi.fn() });
-    const fixture = queueFixture({ count: 1 });
+    const fixture = { assignment: { dispatch_id: "d1", claims: [{ handle: "h1", claim_id: "c1", work_id: "w1", work: {}, result_refs: [] }] } };
     const message = { type: "custom", claim_handle: "h1", number: 42, content: "prepared body" };
     const adapter = { mode: "prepared", "effect-type": "update_issue", "target-repo": "owner/repo", "field-map": { body: "content", item_number: "number" } };
     const loadEffectHandler = vi.fn();

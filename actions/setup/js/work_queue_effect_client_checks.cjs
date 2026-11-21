@@ -3,19 +3,13 @@
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
-const { withClaimExecution, claimArtifactPath } = require("./work_queue_claim_scope.cjs");
-const { wrapClaimEffectClient, withClaimEffectClients } = require("./work_queue_effect_client.cjs");
+const { withClaimExecution, withClaimOutputType, claimArtifactPath } = require("./work_queue_claim_scope.cjs");
+const { appendClaimEffects, wrapClaimEffectClient, withClaimEffectClients } = require("./work_queue_effect_client.cjs");
 const { assertGitPushAuthorized, gitPushRepository } = require("./work_queue_git_effects.cjs");
-const { verifyClaimDelivery, verifyBuiltinDeliveryOutput } = require("./work_queue_delivery.cjs");
+const { readJsonlFile } = require("./jsonl_helpers.cjs");
 
 const assignment = {
-  version: 3,
   dispatch_id: "d",
-  request_id: "r",
-  commit_id: "commit",
-  policy_epoch: "epoch",
-  pool: "default",
-  worker_profile: "default",
   claims: ["h1", "h2"].map(handle => ({ handle, claim_id: `c:${handle}`, work_id: `w:${handle}`, work: {}, result_refs: [] })),
 };
 
@@ -272,9 +266,9 @@ function registerTests({ describe, it }) {
       });
     });
 
-    it("does not turn hidden auxiliary or ambiguous API effects into successful Results", async () => {
-      const scope = JSON.parse(JSON.stringify(assignment));
-      scope.claims[0].work.effect_contract = { version: 1, outputs: [{ type: "create_issue", min: 1, max: 1 }] };
+    it("appends succeeded visible effects with their safe-output type to the effects file", async () => {
+      const directory = require("./work_queue_effect_test_helpers.cjs").temporaryDirectory("claim-effects");
+      const filename = path.join(directory, "effects.jsonl");
       const effects = [];
       const authorize = async request => ({ claim_handle: request.claim_handle, authorized: true });
       const source = {
@@ -282,31 +276,25 @@ function registerTests({ describe, it }) {
           repos: { get: async () => ({ data: { id: 7, full_name: "owner/repo" } }) },
           issues: {
             create: async _parameters => ({ data: { id: 42, number: 10 } }),
-            update: async _parameters => ({ data: { id: 43, number: 11 } }),
-            get: async ({ issue_number }) => ({ data: { id: issue_number === 10 ? 42 : 43, number: issue_number, html_url: `https://github.com/owner/repo/issues/${issue_number}` } }),
+            update: async _parameters => {
+              throw new Error("rejected");
+            },
           },
+          git: { createBlob: async _parameters => ({ data: { sha: "b".repeat(40) } }) },
         },
       };
-      await withClaimExecution({ assignment: scope, claim_handle: "h1", authorize, effects }, async () => {
-        const client = wrapClaimEffectClient(source, { claim_handle: "h1", authorize });
-        await client.rest.issues.create({ owner: "owner", repo: "repo" });
-        const options = {
-          assignment: scope,
-          claim_handle: "h1",
-          authorize,
-          github: client,
-          effects,
-          messages: [{ type: "create_issue", claim_handle: "h1", repo: "owner/repo" }],
-          results: [{ messageIndex: 0, success: true, claim_handle: "h1", result: { number: 10 } }],
-          verifyOutput: verifyBuiltinDeliveryOutput,
-        };
-        assert.equal((await verifyClaimDelivery(options)).verification, "verified");
-        await client.rest.issues.update({ owner: "owner", repo: "repo", issue_number: 11 });
-        assert.equal((await verifyClaimDelivery(options)).verification, "unknown");
-        scope.claims[0].work.effect_contract = { kind: "none" };
-        await assert.rejects(verifyClaimDelivery({ assignment: scope, claim_handle: "h1", authorize, effects }), /immutable assignment/);
-      });
-      assert.equal((await verifyClaimDelivery({ assignment: scope, claim_handle: "h1", authorize, effects })).verification, "unknown");
+      try {
+        await withClaimExecution({ assignment, claim_handle: "h1", authorize, effects }, async () => {
+          const client = wrapClaimEffectClient(source, { claim_handle: "h1", authorize });
+          await withClaimOutputType("create_issue", () => client.rest.issues.create({ owner: "owner", repo: "repo", title: "t" }));
+          await assert.rejects(client.rest.issues.update({ owner: "owner", repo: "repo", issue_number: 10, title: "u" }), /rejected/);
+          await client.rest.git.createBlob({ owner: "owner", repo: "repo", content: "x" });
+        });
+        assert.equal(appendClaimEffects(effects, filename), 1);
+        assert.deepEqual([...readJsonlFile(filename, { strict: true })], [{ claim_handle: "h1", kind: "create_issue", resource: { repository: "owner/repo", number: 10, id: "42" } }]);
+      } finally {
+        fs.rmSync(directory, { recursive: true, force: true });
+      }
     });
 
     it("authorizes all actual git push destinations after native URL rewriting", async () => {
@@ -379,7 +367,7 @@ function registerTests({ describe, it }) {
       const modulePath = require.resolve("./upload_artifact.cjs");
       delete require.cache[modulePath];
       try {
-        const { main, verifyArtifactDelivery } = require(modulePath);
+        const { main } = require(modulePath);
         const effects = [];
         const authorize = async request => {
           assert.equal(request.requireCompletion, true);
@@ -396,32 +384,6 @@ function registerTests({ describe, it }) {
             if (handle === "h1") firstHandler = handler;
             const result = await handler({ type: "upload_artifact", claim_handle: handle, path: "same.txt", temporary_id: "aw_same" });
             assert.equal(result.success, true, result.error);
-            const client = {
-              rest: {
-                actions: {
-                  getArtifact: async () => ({
-                    data: {
-                      id: result.artifactId,
-                      name: result.artifactName,
-                      digest: `sha256:${"f".repeat(64)}`,
-                      size_in_bytes: 1,
-                      expired: false,
-                      workflow_run: { id: 123 },
-                    },
-                  }),
-                },
-              },
-            };
-            const member = assignment.claims.find(claim => claim.handle === handle);
-            assert.equal((await verifyArtifactDelivery({ claim: member, result, github: client })).verified, true);
-            assert.equal((await verifyArtifactDelivery({ claim: member, result: structuredClone(result), github: client })).verified, false);
-            assert.equal((await verifyArtifactDelivery({ claim: assignment.claims.find(claim => claim.handle !== handle), result, github: client })).verified, false);
-            const getArtifact = client.rest.actions.getArtifact;
-            client.rest.actions.getArtifact = async () => {
-              const metadata = await getArtifact();
-              return { ...metadata, data: { ...metadata.data, digest: `sha256:${"0".repeat(64)}` } };
-            };
-            assert.equal((await verifyArtifactDelivery({ claim: member, result, github: client })).verified, false);
           });
         }
         assert.deepEqual(
@@ -445,7 +407,7 @@ function registerTests({ describe, it }) {
         let checks = 0;
         const cancelling = async request => {
           const authorized = ++checks === 1;
-          return { claim_handle: request.claim_handle, authorized, state: authorized ? "completed" : "cancelled", ...(authorized ? {} : { suppressed: true }) };
+          return { claim_handle: request.claim_handle, authorized, state: authorized ? "open" : "cancelled", ...(authorized ? {} : { suppressed: true }) };
         };
         await withClaimExecution({ assignment, claim_handle: "h1", authorize: cancelling }, async () => {
           const handler = await main();

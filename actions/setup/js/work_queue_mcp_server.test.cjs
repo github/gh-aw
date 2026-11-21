@@ -3,268 +3,138 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import fs from "fs";
 import path from "path";
 import os from "node:os";
+import { createRequire } from "node:module";
 import {
   createWorkQueueDispatchTool,
-  createWorkQueueExplainTool,
   createWorkQueueFinishTool,
-  createWorkQueueSubmitTool,
   createWorkQueueStateTool,
+  createWorkQueueSubmitTool,
   createWorkQueueTools,
   loadWorkQueueSnapshot,
   parseSnapshotEnvelope,
   readWorkQueueState,
 } from "./work_queue_mcp_server.cjs";
-import { serializeTransactionLog } from "./work_queue_replay.cjs";
-import { readStagedIntents } from "./work_queue_intents.cjs";
+import { readFinishIntents, readStagedIntents } from "./work_queue_intents.cjs";
 import { createServer, handleMessage, registerTool } from "./mcp_server_core.cjs";
-import { queueFixture } from "./work_queue_lifecycle.test_helpers.cjs";
-import { MAX_PARSE_BYTES, MAX_SNAPSHOT_PARSE_BYTES, parseStrictJSON } from "./work_queue_codec.cjs";
+import { MAX_PARSE_BYTES, MAX_SNAPSHOT_PARSE_BYTES } from "./work_queue_codec.cjs";
+
+const require = createRequire(import.meta.url);
+const h = require("./work_queue_test_helpers.cjs");
+const { replayTransactions } = require("./work_queue_replay.cjs");
+const { assignmentForDispatch } = require("./work_queue_scheduler.cjs");
 
 const directories = [];
-function setup(options = {}) {
-  const fixture = queueFixture({ granted: false, ...options });
+
+/** Three Work in pool default; "a" is claimed by a dispatch bound to worker run 200. */
+function setup(role = "dispatcher", envelopeOverrides = {}) {
+  const works = ["a", "b", "c"].map((key, index) => h.work(key, { priority: [1, 3, 2][index] }));
+  const planned = h.dispatchNext(h.submit([], works), { max_claims: 1, max_dispatches: 1 });
+  const dispatchId = planned.decision.dispatches[0];
+  const log = h.bind(h.launch(planned.log, dispatchId), dispatchId, h.workerActor("200", 1));
+  const state = replayTransactions(log);
   const directory = fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()), "gh-aw-queue-mcp-"));
   directories.push(directory);
-  const envelope = { version: 3, sha: "activation-head", captured_at: fixture.at, origin: fixture.dispatcher, worker: fixture.assignment, transactionLog: serializeTransactionLog(fixture.transactions) };
+  const envelope = { version: 4, sha: "activation-head", transactionLog: h.ledgerText(log), origin: h.dispatcher, role, worker: role === "worker" ? assignmentForDispatch(state, dispatchId) : null, ...envelopeOverrides };
   const snapshotPath = path.join(directory, "snapshot.json");
   fs.writeFileSync(snapshotPath, JSON.stringify(envelope));
-  return { fixture, envelope, snapshot: loadWorkQueueSnapshot(snapshotPath), snapshotPath, intentPath: path.join(directory, "intents.jsonl"), finishIntentPath: path.join(directory, "finish.jsonl") };
+  return { works, state, envelope, snapshotPath, snapshot: loadWorkQueueSnapshot(snapshotPath), intentPath: path.join(directory, "intents.jsonl"), finishIntentPath: path.join(directory, "finish.jsonl") };
 }
 const response = value => JSON.parse(value.content[0].text);
+
 afterEach(() => {
   vi.unstubAllEnvs();
   for (const directory of directories.splice(0)) fs.rmSync(directory, { recursive: true, force: true });
 });
 
-describe("bounded credential-free work queue MCP", () => {
-  it("stages keep_open only for completed Claims and detects conflicting retry choices", () => {
-    const fixture = queueFixture({ granted: true, bound: true, count: 1 });
-    const directory = fs.mkdtempSync(path.join(fs.realpathSync(process.cwd()), ".gh-aw-queue-keep-open-"));
-    directories.push(directory);
-    const filename = path.join(directory, "finish.jsonl");
-    const tool = createWorkQueueFinishTool({ snapshot: { worker: fixture.assignment, role: "worker" }, finishIntentPath: filename });
-    for (const keep_open of [null, "true", 1]) expect(() => tool.handler({ keep_open })).toThrow(/boolean/);
-    expect(() => tool.handler({ outcome: "cancelled", keep_open: true })).toThrow(/requires outcome completed/);
-    expect(fs.existsSync(filename)).toBe(false);
-    const staged = response(tool.handler({ keep_open: true }));
-    expect(response(tool.handler({ outcome: "completed", keep_open: true })).intent_id).toBe(staged.intent_id);
-    expect(() => tool.handler({ outcome: "completed" })).toThrow(/finish_conflict/);
-    expect(readStagedIntents(filename)[0].parameters).toEqual({ outcome: "completed", keep_open: true });
-  });
-  it("supports the observer smoke read/explain protocol before queue initialization without any finish artifact", () => {
-    const test = setup();
-    fs.writeFileSync(test.snapshotPath, JSON.stringify({ ...test.envelope, sha: null, transactionLog: "", role: "observer" }));
-    const snapshot = loadWorkQueueSnapshot(test.snapshotPath);
-    const work = "__gh_aw_smoke__-15";
-    const result = response(createWorkQueueStateTool(snapshot).handler({ work }));
-    expect(result).toMatchObject({ view: "activation_snapshot", snapshot_sha: null, work: { id: work, state: "absent" }, queue_state: "uninitialized", prediction: { work_id: null, reason: "queue_uninitialized", authoritative: false } });
-    const explained = response(createWorkQueueExplainTool(snapshot).handler({ work, pool: "default" }));
-    expect(explained).toMatchObject({ view: "activation_snapshot", snapshot_sha: null, explanation: { work_id: work, state: "absent", ready: false, authoritative: false } });
-    expect(createWorkQueueTools(snapshot).map(tool => tool.name)).toEqual(["work_queue_read", "work_queue_explain"]);
-    expect(() => createWorkQueueFinishTool({ snapshot, finishIntentPath: test.finishIntentPath }).handler({ outcome: "completed" })).toThrow();
-    expect(fs.existsSync(test.finishIntentPath)).toBe(false);
-    fs.writeFileSync(test.snapshotPath, JSON.stringify({ ...test.envelope, sha: "existing", transactionLog: "", role: "observer" }));
-    expect(() => loadWorkQueueSnapshot(test.snapshotPath)).toThrow(/policy_missing/);
+describe("work queue MCP server", () => {
+  it("registers tools by snapshot role", () => {
+    expect(createWorkQueueTools(setup("observer").snapshot).map(tool => tool.name)).toEqual(["work_queue_read"]);
+    expect(createWorkQueueTools(setup("dispatcher").snapshot).map(tool => tool.name)).toEqual(["work_queue_read", "work_queue_submit", "work_queue_dispatch_next"]);
+    expect(createWorkQueueTools(setup("worker").snapshot).map(tool => tool.name)).toEqual(["work_queue_read", "work_queue_submit", "work_queue_claim_finish"]);
   });
 
-  it("reads an absent dispatcher queue as empty but rejects existing policyless and worker snapshots", () => {
+  it("reads one pool's states and predicts the next Work by priority then FIFO", () => {
     const test = setup();
-    fs.writeFileSync(test.snapshotPath, JSON.stringify({ ...test.envelope, sha: null, transactionLog: "", worker: null, role: "dispatcher" }));
-    const snapshot = loadWorkQueueSnapshot(test.snapshotPath);
-    expect(readWorkQueueState(snapshot)).toMatchObject({ queue_state: "uninitialized", total: 0, snapshot_sha: null });
-    expect(snapshot.projection.policy).toBeNull();
-    fs.writeFileSync(test.snapshotPath, JSON.stringify({ ...test.envelope, sha: "existing", transactionLog: "", worker: null, role: "dispatcher" }));
-    expect(() => loadWorkQueueSnapshot(test.snapshotPath)).toThrow(/policy_missing/);
-    fs.writeFileSync(test.snapshotPath, JSON.stringify({ ...test.envelope, sha: null, transactionLog: "", role: "worker" }));
-    expect(() => loadWorkQueueSnapshot(test.snapshotPath)).toThrow(/assignment_required|policy_missing/);
+    const view = readWorkQueueState(test.snapshot, {});
+    expect(view).toMatchObject({ view: "activation_snapshot", snapshot_sha: "activation-head", counts: { claimed: 1, available: 2 }, claim_counts: { open: 1 }, open_dispatches: { total: 1, unbound: 0 }, total: 3 });
+    expect(view.prediction).toEqual({ work_id: test.works[2].work_id, authoritative: false });
+    expect(view.works.map(work => work.id)).toEqual(test.works.map(work => work.work_id));
+    expect(view.works[1]).toMatchObject({ state: "available", attempts: 0, readiness: "ready", claim_id: null });
+    expect(view.works.every(work => !Object.hasOwn(work, "payload"))).toBe(true);
+    const sorted = readWorkQueueState(test.snapshot, { sort: [{ key: "priority", direction: "asc" }] });
+    expect(sorted.works.map(work => work.id)).toEqual([0, 2, 1].map(index => test.works[index].work_id));
+    expect(sorted.prediction).toEqual(view.prediction);
+    expect(readWorkQueueState(test.snapshot, { work: "absent" }).work).toEqual({ id: "absent", state: "absent" });
+    for (const args of [{ limit: 0 }, { sort: [{ key: "enqueued", direction: "asc" }] }, { unexpected: true }]) expect(() => readWorkQueueState(test.snapshot, args)).toThrow();
   });
 
-  it("reports independent Work/Claim states, pending delivery, native accounting and absent Work without payloads", () => {
-    const test = setup({ granted: true, bound: true });
-    test.fixture.append("finish", { dispatch_id: test.fixture.assignment.dispatch_id, claim_handle: "h1", outcome: "completed" }, { ...test.fixture.workerActor, dispatch_id: test.fixture.assignment.dispatch_id, claim_handle: "h1" });
-    test.fixture.append("finish", { dispatch_id: test.fixture.assignment.dispatch_id, claim_handle: "h2", outcome: "cancelled" }, { ...test.fixture.workerActor, dispatch_id: test.fixture.assignment.dispatch_id, claim_handle: "h2" });
-    const snapshot = { ...test.snapshot, role: "observer", worker: null, projection: test.fixture.state };
-    expect(readWorkQueueState(snapshot)).toMatchObject({
-      queue_state: "initialized",
-      policy_mode: "weighted-priority",
-      fairness_units: "durable_claims",
-      counts: { completed: 1, available: 1, claimed: 1 },
-      claim_counts: { completed: 1, cancelled: 1, open: 1 },
-      barrier_counts: { pending: 1, none: 2 },
-      native_reservations: { outstanding: 1, unbound: 0 },
-    });
-    expect(readWorkQueueState(snapshot, { work: "absent" }).work.state).toBe("absent");
-    expect(response(createWorkQueueExplainTool(snapshot).handler({ work: "absent" })).explanation).toMatchObject({ state: "absent", reason: "work_absent", authoritative: false });
-    expect(JSON.stringify(readWorkQueueState(snapshot))).not.toContain("stored task");
+  it("hides Work outside the snapshot's visible set", () => {
+    const test = setup("dispatcher", { visible_work_ids: [] });
+    expect(readWorkQueueState(test.snapshot, {})).toMatchObject({ total: 0, prediction: { work_id: null } });
   });
 
-  it("exposes only read/explain to explicit observers and never stages queue mutations", () => {
-    const test = setup();
-    const snapshot = { ...test.snapshot, role: "observer" };
-    expect(createWorkQueueTools(snapshot).map(tool => tool.name)).toEqual(["work_queue_read", "work_queue_explain"]);
-    expect(readWorkQueueState(snapshot).total).toBe(3);
-    const work = readWorkQueueState(snapshot).works[0].id;
-    expect(response(createWorkQueueExplainTool(snapshot).handler({ work })).view).toBe("activation_snapshot");
-    expect(() => createWorkQueueSubmitTool(snapshot, { intentPath: test.intentPath }).handler({ nodes: [{ graph_id: "g", node_key: "n", payload: {} }] })).toThrow(/observer_read_only/);
-    expect(() => createWorkQueueDispatchTool(snapshot, { intentPath: test.intentPath }).handler({ pool: "default", max_claims: 1, max_dispatches: 1 })).toThrow(/observer_read_only/);
-    expect(() => createWorkQueueFinishTool({ snapshot, finishIntentPath: test.finishIntentPath }).handler({})).toThrow();
-    expect(fs.existsSync(test.intentPath)).toBe(false);
-    expect(fs.existsSync(test.finishIntentPath)).toBe(false);
+  it("validates the v4 envelope strictly", () => {
+    const test = setup("worker");
+    expect(parseSnapshotEnvelope(JSON.stringify(test.envelope))).toEqual(test.envelope);
+    const settled = { ...test.envelope, worker: null };
+    expect(parseSnapshotEnvelope(JSON.stringify(settled)).worker).toBeNull();
+    for (const invalid of [
+      { ...test.envelope, version: 3 },
+      { ...test.envelope, captured_at: 1 },
+      { ...test.envelope, role: "administrator" },
+      { ...test.envelope, role: "dispatcher" },
+      { ...test.envelope, worker: { ...test.envelope.worker, version: 4 } },
+      { ...test.envelope, origin: null },
+    ])
+      expect(() => parseSnapshotEnvelope(JSON.stringify(invalid))).toThrow();
+    expect(() => parseSnapshotEnvelope('{"version":4,"version":4}')).toThrow(/duplicate/);
+    expect(() => parseSnapshotEnvelope(JSON.stringify({ ...test.envelope, transactionLog: "x".repeat(MAX_PARSE_BYTES + 1) }))).toThrow(/ledger exceeds/);
+    fs.truncateSync(test.snapshotPath, MAX_SNAPSHOT_PARSE_BYTES + 1);
+    expect(() => loadWorkQueueSnapshot(test.snapshotPath)).toThrow(/snapshot exceeds/);
   });
 
-  it("rejects forged observer snapshots when the compiled role declares a worker", () => {
-    const test = setup();
+  it("rejects a snapshot whose role conflicts with the compiled role", () => {
+    const test = setup("observer");
     vi.stubEnv("GH_AW_WORK_QUEUE_ROLE", "worker");
-    expect(() => createWorkQueueTools({ ...test.snapshot, role: "observer" })).toThrow(/role_conflict/);
-    expect(() => createWorkQueueTools({ ...test.snapshot, role: "worker" })).toThrow(/assignment_required/);
-    fs.writeFileSync(test.snapshotPath, JSON.stringify({ ...test.envelope, role: "observer" }));
     expect(() => loadWorkQueueSnapshot(test.snapshotPath)).toThrow(/role_conflict/);
   });
 
-  it("reads and explains only activation state with explicit stale prediction provenance", () => {
-    const { snapshot, fixture } = setup();
-    const result = readWorkQueueState(snapshot, { limit: 1 });
-    expect(result).toMatchObject({ view: "activation_snapshot", snapshot_sha: "activation-head", total: 3, next_offset: 1, prediction: { authoritative: false } });
-    expect(result.prediction.work_id).toBe([...fixture.state.works.keys()][0]);
-    expect(result.works).toHaveLength(1);
-    expect(result.works[0]).not.toHaveProperty("payload");
-    const explanation = response(createWorkQueueExplainTool(snapshot).handler({ work: result.works[0].id }));
-    expect(explanation.view).toBe("activation_snapshot");
-    expect(explanation.explanation).toMatchObject({ work_id: result.works[0].id, state: "available" });
+  it("stages dispatch_next and submit intents without Work selectors", () => {
+    const test = setup();
+    const dispatch = createWorkQueueDispatchTool(test.snapshot, { intentPath: test.intentPath, createIntentId: () => "intent1" });
+    expect(response(dispatch.handler({ pool: "default", max_claims: 3, max_dispatches: 1 }))).toEqual({ intent_id: "intent1", status: "staged" });
+    for (const extra of [{ work_id: "chosen" }, { ref: "main" }, { workflow: "worker" }, { claim_handle: "h1" }]) expect(() => dispatch.handler({ pool: "default", max_claims: 1, max_dispatches: 1, ...extra })).toThrow();
+    const submit = createWorkQueueSubmitTool(test.snapshot, { intentPath: test.intentPath, createIntentId: () => "intent2" });
+    expect(response(submit.handler({ nodes: [{ payload: { plan: "root" } }] })).status).toBe("staged");
+    expect(() => submit.handler({ nodes: [{ payload: {}, expires_at: 1 }] })).toThrow();
+    expect(() => submit.handler({ nodes: [{ payload: {}, graph_id: "" }] })).toThrow();
+    expect(readStagedIntents(test.intentPath)).toEqual([
+      { version: 4, intent_id: "intent1", kind: "dispatch_next", parameters: { pool: "default", max_claims: 3, max_dispatches: 1 } },
+      { version: 4, intent_id: "intent2", kind: "submit", parameters: { nodes: [{ payload: { plan: "root" } }] } },
+    ]);
   });
 
-  it("makes presentation sorting independent of the scheduler's next fair winner", () => {
+  it("stages one finish outcome per assigned Claim", () => {
+    const test = setup("worker");
+    const finish = createWorkQueueFinishTool(test.snapshot, { finishIntentPath: test.finishIntentPath });
+    for (const args of [{ claim_handle: "foreign" }, { outcome: "cancelled" }, { keep_open: true }]) expect(() => finish.handler(args)).toThrow();
+    expect(response(finish.handler({}))).toEqual({ claim_handle: "h1", outcome: "completed", status: "staged" });
+    expect(response(finish.handler({ claim_handle: "h1", outcome: "completed" })).status).toBe("staged");
+    expect(() => finish.handler({ outcome: "failed" })).toThrow(/conflict/);
+    expect(readFinishIntents(test.finishIntentPath)).toEqual(new Map([["h1", "completed"]]));
+    expect(() => createWorkQueueFinishTool(setup("worker", { worker: null }).snapshot).handler({})).toThrow(/assignment_required/);
+  });
+
+  it("attributes a worker's child submission to its Claim handle", () => {
+    const test = setup("worker");
+    const submit = createWorkQueueSubmitTool(test.snapshot, { intentPath: test.intentPath, createIntentId: () => "child" });
+    expect(response(submit.handler({ nodes: [{ node_key: "child", payload: {} }] }))).toEqual({ intent_id: "child", status: "staged", claim_handle: "h1" });
+    expect(() => submit.handler({ nodes: [{ payload: {} }], claim_handle: "h9" })).toThrow(/claim_scope/);
+  });
+
+  it("serves bounded read results through the MCP stdio transport", async () => {
     const { snapshot } = setup();
-    const baseline = readWorkQueueState(snapshot);
-    const sorted = readWorkQueueState(snapshot, { sort: [{ key: "id", direction: "desc" }] });
-    expect(sorted.works.map(work => work.id)).toEqual(
-      baseline.works
-        .map(work => work.id)
-        .sort()
-        .reverse()
-    );
-    expect(sorted.prediction).toEqual(baseline.prediction);
-    for (const args of [{ limit: 129 }, { offset: -1 }, { sort: [] }, { sort: [{ key: "state", direction: "asc" }] }, { actor: "forged" }]) expect(() => readWorkQueueState(snapshot, args)).toThrow();
-    expect(createWorkQueueStateTool(snapshot).inputSchema.properties.limit.maximum).toBe(128);
-  });
-
-  it("rejects old snapshots, unsupported logs and duplicate keys without any upgrade", () => {
-    const test = setup();
-    for (const envelope of [
-      { ...test.envelope, version: 2 },
-      { ...test.envelope, transactionLog: '{"version":2,"kind":"Work","work":"old"}\n' },
-    ]) {
-      fs.writeFileSync(test.snapshotPath, JSON.stringify(envelope));
-      expect(() => loadWorkQueueSnapshot(test.snapshotPath)).toThrow();
-    }
-    fs.writeFileSync(test.snapshotPath, '{"version":3,"version":2}');
-    expect(() => loadWorkQueueSnapshot(test.snapshotPath)).toThrow(/duplicate/);
-  });
-
-  it("uses shared strict outer framing without weakening metadata or ledger parsing", () => {
-    const test = setup();
-    const encoded = JSON.stringify(test.envelope).replace('"transactionLog":', '"transaction\\u004cog":');
-    expect(parseSnapshotEnvelope(encoded)).toEqual(test.envelope);
-    fs.writeFileSync(test.snapshotPath, encoded);
-    expect(loadWorkQueueSnapshot(test.snapshotPath).projection.tip).toBe(test.fixture.state.tip);
-    for (const invalid of [
-      '{"transactionLog":"x","transaction\\u004cog":"y"}',
-      '{"transactionLog":"x","metadata":{"a":1,"a":2}}',
-      '{"transactionLog":"x","metadata":1e2}',
-      '{"transactionLog":"x","metadata":-0}',
-      '{"transactionLog":"\\ud800"}',
-      '{"transactionLog":"\\x20"}',
-      '{"metadata":"transactionLog":"x"}',
-      '{"transactionLog":"unterminated}',
-      '{"transactionLog":"x","metadata":' + "[".repeat(65) + "0" + "]".repeat(65) + "}",
-      '{"transactionLog":"x","metadata":[' + Array.from({ length: 16385 }, () => "null").join(",") + "]}",
-    ])
-      expect(() => parseSnapshotEnvelope(invalid)).toThrow();
-    const nested = { transactionLog: '{"nested":"transactionLog: \\\\ end"}\n', worker: { transactionLog: "must stay strictly parsed" } };
-    expect(parseSnapshotEnvelope(JSON.stringify(nested))).toEqual(nested);
-    const corrupt = Buffer.from(JSON.stringify(test.envelope));
-    corrupt[corrupt.indexOf("activation-head")] = 0x80;
-    fs.writeFileSync(test.snapshotPath, corrupt);
-    expect(() => loadWorkQueueSnapshot(test.snapshotPath)).toThrow(/encoded data/);
-    fs.writeFileSync(test.snapshotPath, Buffer.concat([Buffer.from([0xef, 0xbb, 0xbf]), Buffer.from(JSON.stringify(test.envelope))]));
-    expect(() => loadWorkQueueSnapshot(test.snapshotPath)).toThrow();
-  });
-
-  it("accepts an exactly 80 MiB decoded ledger in escaped outer framing above 160 MiB", () => {
-    const ledger = "\\".repeat(MAX_PARSE_BYTES);
-    const encoded = JSON.stringify({ transactionLog: ledger, version: 3 });
-    expect(Buffer.byteLength(ledger)).toBe(MAX_PARSE_BYTES);
-    expect(Buffer.byteLength(encoded)).toBeGreaterThan(2 * MAX_PARSE_BYTES);
-    expect(Buffer.byteLength(encoded)).toBeLessThan(MAX_SNAPSHOT_PARSE_BYTES);
-    expect(() => parseStrictJSON(encoded)).toThrow(/parser limit/);
-    expect(parseSnapshotEnvelope(encoded).transactionLog).toBe(ledger);
-    expect(() => parseStrictJSON(encoded)).toThrow(/parser limit/);
-  });
-
-  it("rejects oversized decoded ledgers and outer files before authoritative replay", () => {
-    expect(() => parseSnapshotEnvelope('{"transactionLog":"' + "x".repeat(MAX_PARSE_BYTES + 1) + '"}')).toThrow(/ledger exceeds.*bounded/);
-    const test = setup();
-    fs.truncateSync(test.snapshotPath, MAX_SNAPSHOT_PARSE_BYTES + 1);
-    expect(() => loadWorkQueueSnapshot(test.snapshotPath)).toThrow(/snapshot exceeds.*bounded/);
-  });
-
-  it("stages submit/dispatch-next without Work selectors, authority or durable mutation", () => {
-    const test = setup();
-    const options = { intentPath: test.intentPath, createIntentId: () => "intent1" };
-    const dispatch = createWorkQueueDispatchTool(test.snapshot, options);
-    const result = response(dispatch.handler({ pool: "default", max_claims: 3, max_dispatches: 1 }));
-    expect(result).toEqual({ intent_id: "intent1", status: "staged" });
-    expect(result).not.toHaveProperty("claims");
-    expect(test.fixture.state.claims.size).toBe(0);
-    expect(readStagedIntents(test.intentPath)).toEqual([{ version: 3, intent_id: "intent1", kind: "dispatch_next", parameters: { pool: "default", max_claims: 3, max_dispatches: 1 } }]);
-    for (const extra of [{ work_id: "chosen" }, { ref: "main" }, { actor: "forged" }, { workflow: "worker" }, { claim_handle: "foreign" }])
-      expect(() => dispatch.handler({ pool: "default", max_claims: 1, max_dispatches: 1, ...extra })).toThrow();
-    const submit = createWorkQueueSubmitTool(test.snapshot, { ...options, createIntentId: () => "intent2" });
-    expect(response(submit.handler({ nodes: [{ graph_id: "g2", node_key: "n", payload: { plan: "stored task" }, worker_profile: "default" }] })).status).toBe("staged");
-    expect(() => submit.handler({ nodes: [{ graph_id: "g2", node_key: "n", payload: {}, batch_trust_domain: "forged" }] })).toThrow();
-  });
-
-  it("stages independent finishes and requires multi-Claim handles from the original assignment", () => {
-    const batch = setup({ granted: true, bound: true });
-    const finish = createWorkQueueFinishTool({ snapshot: batch.snapshot, finishIntentPath: batch.finishIntentPath, createIntentId: () => "finish1" });
-    for (const args of [{}, { claim_handle: null }, { claim_handle: "" }, { claim_handle: "foreign" }, { claim_handle: "h1", work_id: "forged" }]) expect(() => finish.handler(args)).toThrow();
-    const staged = response(finish.handler({ claim_handle: "h1", outcome: "completed" }));
-    expect(staged).toEqual({ intent_id: "finish1", status: "staged", claim_handle: "h1" });
-    expect(response(finish.handler({ claim_handle: "h1", outcome: "completed" }))).toEqual(staged);
-    expect(() => finish.handler({ claim_handle: "h1", outcome: "cancelled" })).toThrow(/conflict/);
-    expect(readStagedIntents(batch.finishIntentPath)).toHaveLength(1);
-    expect(fs.statSync(batch.finishIntentPath).mode & 0o777).toBe(0o644);
-    const single = setup({ granted: true, bound: true, count: 1 });
-    const singleton = createWorkQueueFinishTool({ snapshot: single.snapshot, finishIntentPath: single.finishIntentPath, createIntentId: () => "single" });
-    expect(response(singleton.handler({})).claim_handle).toBe("h1");
-    expect(() => singleton.handler({ outcome: null })).toThrow();
-    expect(() => createWorkQueueFinishTool({ snapshot: setup().snapshot }).handler({})).toThrow(/assignment_required/);
-  });
-
-  it("stages omitted root identities for trusted resolution without accepting explicit invalid identities", () => {
-    const test = setup();
-    const payload = { plan: "independent root", effect_contract: { kind: "none" } };
-    const submit = createWorkQueueSubmitTool(test.snapshot, { intentPath: test.intentPath, createIntentId: () => "default-root" });
-    expect(response(submit.handler({ nodes: [{ payload }] })).status).toBe("staged");
-    expect(readStagedIntents(test.intentPath)[0].parameters).toEqual({ nodes: [{ payload }] });
-    expect(test.fixture.state.works.size).toBe(3);
-    for (const field of ["graph_id", "node_key"]) {
-      for (const value of ["", null, undefined]) expect(() => submit.handler({ nodes: [{ payload, [field]: value }] })).toThrow();
-    }
-    expect(readStagedIntents(test.intentPath)).toHaveLength(1);
-  });
-
-  it("attributes worker-generated queue control to its Claim but never rewrites its ownership", () => {
-    const test = setup({ granted: true, bound: true });
-    const tool = createWorkQueueDispatchTool(test.snapshot, { intentPath: test.intentPath, createIntentId: () => "scoped" });
-    expect(() => tool.handler({ pool: "default", max_claims: 1, max_dispatches: 1 })).toThrow(/claim_handle/);
-    expect(response(tool.handler({ pool: "default", max_claims: 1, max_dispatches: 1, claim_handle: "h2" })).claim_handle).toBe("h2");
-    expect(test.fixture.state.claims.get(test.fixture.assignment.claims[1].claim_id).state).toBe("open");
-  });
-
-  it("serves bounded read results through the existing MCP stdio transport", async () => {
-    const { snapshot } = setup();
-    const server = createServer({ name: "work-queue", version: "3.0.0" });
+    const server = createServer({ name: "work-queue", version: "4.0.0" });
     server.debug = vi.fn();
     server.writeMessage = vi.fn();
     registerTool(server, createWorkQueueStateTool(snapshot));

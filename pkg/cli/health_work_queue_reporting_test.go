@@ -78,9 +78,9 @@ func TestHealthWorkQueueSanitizesQuotaCheckWarning(t *testing.T) {
 
 func TestHealthWorkQueueDetectionWarningDoesNotChangeLedgerStatus(t *testing.T) {
 	collection := healthWorkQueueFixture(t, "jobs: [", "env:\n  GH_AW_WORK_QUEUE_ENABLED: true")
-	_, commits, _ := workOperatorFixture(t, false)
-	healthReadWorkQueue = func(context.Context, workqueue.Branch) ([]workqueue.QueueCommit, error) {
-		return commits, nil
+	snapshot := healthWQSnapshot(func() *workQueueTestLog { log, _ := workQueueMixedFixture(t); return log }())
+	healthReadWorkQueue = func(context.Context, workqueue.Branch) (workqueue.Snapshot, error) {
+		return snapshot, nil
 	}
 	collectHealthWorkQueue(collection)
 	require.NotNil(t, collection.WorkQueue)
@@ -107,8 +107,8 @@ func TestHealthWorkQueueReadFailureGuidance(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			collection := healthWorkQueueFixture(t, "env:\n  GH_AW_WORK_QUEUE_ENABLED: true")
-			healthReadWorkQueue = func(context.Context, workqueue.Branch) ([]workqueue.QueueCommit, error) {
-				return nil, tc.err
+			healthReadWorkQueue = func(context.Context, workqueue.Branch) (workqueue.Snapshot, error) {
+				return workqueue.Snapshot{}, tc.err
 			}
 			collectHealthWorkQueue(collection)
 			require.NotNil(t, collection.WorkQueue)

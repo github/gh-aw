@@ -20,6 +20,13 @@ function readWorkflow(name, compiled = false) {
   return readWorkflowFile(`smoke-work-queue-${name}`, compiled);
 }
 
+/** The compiled GH_AW_WORK_QUEUE_POLICY JSON, joined from its chunked transport when needed. */
+function compiledPolicy(env) {
+  if (env.GH_AW_WORK_QUEUE_POLICY !== undefined) return JSON.parse(env.GH_AW_WORK_QUEUE_POLICY);
+  const parts = Number(env.GH_AW_WORK_QUEUE_POLICY_PARTS);
+  return JSON.parse(Array.from({ length: parts }, (_, index) => env[`GH_AW_WORK_QUEUE_POLICY_${index}`]).join(""));
+}
+
 function verification(name) {
   const workflow = readWorkflow(name);
   const job = workflow.jobs[`verify_smoke_${name === "worker" ? "completion" : "dispatch"}`];
@@ -28,64 +35,57 @@ function verification(name) {
   return { job, step, run: env => runInNewContext(script, { require: () => assert, process: { env } }) };
 }
 
-function prepareDispatcher(policy) {
-  const step = readWorkflow("dispatcher").steps[0];
-  const script = step.with.script;
-  const staged = [];
-  const fs = { mkdirSync() {}, writeFileSync() {} };
-  const path = { join: (...parts) => parts.join("/") };
-  const require = name => {
-    if (name === "node:fs") return fs;
-    if (name === "node:path") return path;
-    if (name.endsWith("work_queue_mcp_server.cjs")) return { loadWorkQueueSnapshot: () => ({ projection: { policy } }) };
-    if (name.endsWith("work_queue_intents.cjs")) return { stagePlanIntents: (_filename, plan) => staged.push(plan) };
-    throw new Error(`Unexpected module ${name}`);
-  };
-  const run = () =>
+const successfulJobs = { SMOKE_ACTIVATION_RESULT: "success", SMOKE_AGENT_RESULT: "success", SMOKE_SAFE_OUTPUTS_RESULT: "success" };
+const dispatchId = index => `d_${String(index).repeat(64)}_1`;
+const startedLaunches = [1, 2, 3].map(index => ({ dispatch_id: dispatchId(index), state: "started" }));
+// Shapes emitted by the trusted control step (`work_queue_requests`), not agent intents.
+const dispatchReceipt = (overrides = {}) => ({
+  version: 4,
+  success: true,
+  status: "committed",
+  receipts: [
+    { intent_id: "submit", request_id: "request:submit", commit_id: "q_submit", status: "committed" },
+    { intent_id: "dispatch", request_id: "request:dispatch", commit_id: "q_dispatch", status: "committed", dispatches: 3, launches: startedLaunches, ...overrides },
+  ],
+  remaining_dispatches: 0,
+  summary: "Committed 3 dispatches",
+});
+const dispatchEnv = receipt => ({ ...successfulJobs, SMOKE_DISPATCH_RECEIPT: JSON.stringify(receipt) });
+
+describe("native work queue smoke verification", () => {
+  it("stages three smoke Work and one bounded dispatch without reading an installed Policy", () => {
+    const script = readWorkflow("dispatcher").steps[0].with.script;
+    expect(script).not.toContain("work_queue_mcp_server.cjs");
+    expect(script).not.toMatch(/logical_limit|native_limit|Policy/);
+    const staged = [];
+    const require = name => {
+      if (name === "node:fs") return { mkdirSync() {}, writeFileSync() {} };
+      if (name === "node:path") return { join: (...parts) => parts.join("/") };
+      if (name.endsWith("work_queue_intents.cjs")) return { stagePlanIntents: (_filename, plan) => staged.push(plan) };
+      throw new Error(`Unexpected module ${name}`);
+    };
     runInNewContext(script, {
       require,
       process: { env: { RUNNER_TEMP: "/tmp" } },
       context: { runId: "123", repo: { owner: "owner", repo: "repo" }, payload: { repository: { id: 456 } } },
       core: { info() {} },
     });
-  return { run, staged };
-}
-
-const successfulJobs = { SMOKE_ACTIVATION_RESULT: "success", SMOKE_AGENT_RESULT: "success", SMOKE_SAFE_OUTPUTS_RESULT: "success" };
-const boundLaunch = { dispatch_id: "dispatch:smoke", state: "bound", released: false, dispatched: true, run_id: "42", html_url: "https://github.com/owner/repo/actions/runs/42" };
-const pendingLaunch = { ...boundLaunch, state: "activation_pending" };
-const boundLaunches = [boundLaunch, { ...boundLaunch, dispatch_id: "dispatch:smoke-2", run_id: "43" }, { ...boundLaunch, dispatch_id: "dispatch:smoke-3", run_id: "44" }];
-const pendingLaunches = boundLaunches.map(launch => ({ ...launch, state: "activation_pending" }));
-const launchesWith = launch => [launch, ...pendingLaunches.slice(1)];
-// Shapes emitted by dispatchQueueIntent and work_queue_dispatch.main, not agent intents.
-const dispatchReceipt = (overrides = {}) => ({
-  version: 3,
-  status: "activation_pending",
-  success: true,
-  receipts: [
-    { status: "durable", request_id: "request:submit" },
-    { status: "durable", success: true, request_id: "request:dispatch", dispatches: 3, launches: pendingLaunches, ...overrides },
-  ],
-  remaining_dispatches: 0,
-});
-const dispatchEnv = receipt => ({ ...successfulJobs, SMOKE_DISPATCH_RECEIPT: JSON.stringify(receipt) });
-
-describe("native work queue smoke verification", () => {
-  it("does not stage smoke Work until the installed pool allows three Claims", () => {
-    const oldPolicy = prepareDispatcher({ pools: { "smoke-work-queue": { logical_limit: 1, native_limit: 1 } } });
-    expect(() => oldPolicy.run()).toThrow("Installed smoke-work-queue Policy does not allow three Claims");
-    expect(oldPolicy.staged).toEqual([]);
-
-    const uninitialized = prepareDispatcher(null);
-    uninitialized.run();
-    expect(uninitialized.staged[0].nodes).toHaveLength(3);
-
-    const installed = prepareDispatcher({ pools: { "smoke-work-queue": { logical_limit: 3, native_limit: 3 } } });
-    installed.run();
-    expect(installed.staged[0].nodes).toHaveLength(3);
+    expect(staged).toHaveLength(1);
+    expect(staged[0].nodes.map(node => node.node_key)).toEqual(["smoke-1", "smoke-2", "smoke-3"]);
+    expect(staged[0].nodes.every(node => node.graph_id === "smoke-work-queue:123" && node.payload.smoke === "work-queue-v1")).toBe(true);
+    expect(staged[0].dispatch).toEqual({ pool: "smoke-work-queue", max_claims: 3, max_dispatches: 3 });
   });
 
-  it("uses isolated worker concurrency and a read-only bounded monitor snapshot", () => {
+  it("compiles the smoke pool concurrency from aw.json into the dispatcher policy", () => {
+    const lock = readWorkflow("dispatcher", true);
+    const controls = lock.jobs.safe_outputs.steps.find(step => step.id === "work_queue_controls");
+    const policy = compiledPolicy(controls.env);
+    expect(policy.version).toBe(4);
+    expect(policy.pools["smoke-work-queue"]).toMatchObject({ concurrency: 3, max_attempts: 3 });
+    expect(policy.pools["smoke-work-queue"].profiles["smoke-work-queue-worker"]).toEqual({ workflow: ".github/workflows/smoke-work-queue-worker.lock.yml", effect_scope: "${{ github.repository }}" });
+  });
+
+  it("uses isolated worker concurrency and a read-only, time-free monitor", () => {
     const worker = readWorkflow("worker");
     expect(worker.concurrency["job-discriminator"]).toBe("${{ github.run_id }}");
 
@@ -94,11 +94,16 @@ describe("native work queue smoke verification", () => {
     expect(monitor.tools["cli-proxy"]).toBe(true);
     expect(monitor.tools["work-queue"]).toBe(true);
     expect(monitor.tools.bash).toContain("work-queue:*");
-    expect(monitor.steps[0].with.script).toContain("work_queue_mcp_server.cjs");
+    const script = monitor.steps[0].with.script;
+    expect(script).toContain("work_queue_replay.cjs");
+    expect(script).toContain("per_page: 6");
+    for (const clock of ["Date.now", "Date.parse", "new Date", "created:", "BUDGET", "secs(", "over_budget", "timing("]) {
+      expect(script).not.toContain(clock);
+    }
 
     const monitorLock = readFileSync(new URL("../../../.github/workflows/smoke-work-queue-monitor.lock.yml", import.meta.url), "utf8");
     expect(monitorLock).toContain('GH_AW_WORK_QUEUE_ROLE: "observer"');
-    expect(monitorLock).toContain('"tools": ["work_queue_read", "work_queue_explain"]');
+    expect(monitorLock).toContain('"tools": ["work_queue_read"]');
     expect(monitorLock).not.toContain('"work_queue_submit"');
     expect(monitorLock).not.toContain('"work_queue_dispatch_next"');
     expect(monitorLock).not.toContain('"work_queue_claim_finish"');
@@ -118,23 +123,17 @@ describe("native work queue smoke verification", () => {
     }
   });
 
-  it("requires a trusted accepted dispatch receipt without waiting for worker activation", () => {
+  it("requires a committed dispatch receipt with three started launches", () => {
     const { step, run } = verification("dispatcher");
     expect(step.env.SMOKE_DISPATCH_RECEIPT).toBe("${{ needs.safe_outputs.outputs.work_queue_requests }}");
     expect(() => run(dispatchEnv(dispatchReceipt()))).not.toThrow();
-    expect(() => run(dispatchEnv({ ...dispatchReceipt({ launches: boundLaunches }), status: "ok" }))).not.toThrow();
     for (const invalid of [
-      dispatchReceipt({ status: "no_grant", dispatches: 0, launches: [] }),
-      dispatchReceipt({ status: "staged_preview", dispatches: 0, launches: [] }),
+      dispatchReceipt({ status: "blocked", reason: "work_queue_pending_limit", dispatches: 0, launches: [] }),
       dispatchReceipt({ launches: [] }),
-      dispatchReceipt({ dispatches: 2, launches: [boundLaunch, boundLaunch] }),
-      dispatchReceipt({ launches: launchesWith({ ...boundLaunch, state: "launch_unresolved" }) }),
-      dispatchReceipt({ launches: launchesWith({ ...boundLaunch, state: "released", released: true, dispatched: false }) }),
-      dispatchReceipt({ launches: launchesWith({ ...boundLaunch, state: "rejected" }) }),
-      dispatchReceipt({ launches: launchesWith({ ...pendingLaunch, dispatched: false }) }),
-      dispatchReceipt({ success: false }),
-      dispatchReceipt({ launches: launchesWith({ ...boundLaunch, run_id: undefined }) }),
-      dispatchReceipt({ acknowledgement_only: true, launches: [] }),
+      dispatchReceipt({ dispatches: 2, launches: startedLaunches.slice(0, 2) }),
+      dispatchReceipt({ launches: [{ dispatch_id: dispatchId(1), state: "launch_failed", reason: "http_5xx" }, ...startedLaunches.slice(1)] }),
+      dispatchReceipt({ launches: [{ dispatch_id: "dispatch:smoke", state: "started" }, ...startedLaunches.slice(1)] }),
+      { ...dispatchReceipt(), version: 3 },
       { ...dispatchReceipt(), success: false },
       { ...dispatchReceipt(), receipts: [] },
     ]) {
@@ -144,25 +143,36 @@ describe("native work queue smoke verification", () => {
     expect(() => run({ ...successfulJobs })).toThrow();
   });
 
-  it("requires a verified Result even if agent execution and safe outputs succeeded", () => {
+  it("requires a committed Completion even if agent execution and safe outputs succeeded", () => {
     const { step, run } = verification("worker");
     expect(step.env.SMOKE_QUEUE_OUTCOME).toBe("${{ needs.safe_outputs.outputs.work_queue_outcome }}");
     expect(() => run({ ...successfulJobs, SMOKE_QUEUE_OUTCOME: "completed" })).not.toThrow();
-    // Missing finish artifacts cancel the Claim despite successful trusted processing.
-    for (const outcome of ["cancelled", "completed_with_cancellations", "delivery_pending", "staged_preview", ""]) {
+    for (const outcome of ["failed", "staged_preview", ""]) {
       expect(() => run({ ...successfulJobs, SMOKE_QUEUE_OUTCOME: outcome })).toThrow();
     }
     expect(() => run(successfulJobs)).toThrow();
   });
 
-  it("requires trusted worker activation separately from a completed Result", () => {
+  it("requires trusted worker activation separately from a completed Claim", () => {
     const { step, run } = verification("worker");
     expect(step.env.SMOKE_ACTIVATION_RESULT).toBe("${{ needs.activation.result }}");
     const { SMOKE_ACTIVATION_RESULT, ...withoutActivation } = successfulJobs;
     expect(() => run({ ...withoutActivation, SMOKE_QUEUE_OUTCOME: "completed" })).toThrow();
   });
 
-  it("compiles always-running verifiers and exports only trusted receipt and outcome sources", () => {
+  it("validates the v4 assignment from the activation snapshot and a version-4 finish intent", () => {
+    const worker = readWorkflow("worker");
+    const pre = worker["pre-agent-steps"][0].run;
+    expect(pre).toContain("assert.equal(input.version, 4)");
+    expect(pre).toContain("/tmp/gh-aw/work-queue.snapshot.json");
+    expect(pre).toContain('assert.equal(work.smoke, "work-queue-v1")');
+    expect(pre).not.toContain("normalizeAssignment");
+    const post = worker["post-steps"][0].run;
+    expect(post).toContain('{ version: 4, claim_handle: handle, outcome: "completed" }');
+    expect(post).not.toContain("keep_open");
+  });
+
+  it("compiles always-running verifiers, the finish step after Process Safe Outputs, and trusted receipt sources", () => {
     for (const name of ["dispatcher", "worker"]) {
       const compiled = readWorkflow(name, true);
       const id = `verify_smoke_${name === "worker" ? "completion" : "dispatch"}`;
@@ -170,15 +180,31 @@ describe("native work queue smoke verification", () => {
       expect(compiled.jobs[id].needs).toEqual(expect.arrayContaining(["agent", "safe_outputs"]));
       expect(compiled.jobs[id].steps).toEqual(expect.arrayContaining(readWorkflow(name).jobs[id].steps));
       expect(compiled.jobs.safe_outputs.outputs.work_queue_requests).toBe("${{ steps.work_queue_controls.outputs.work_queue_requests }}");
-      const controls = compiled.jobs.safe_outputs.steps.find(step => step.id === "work_queue_controls");
+      const steps = compiled.jobs.safe_outputs.steps;
+      const controls = steps.find(step => step.id === "work_queue_controls");
       expect(controls.env.GH_AW_WORK_QUEUE_ROLE).toBe(name === "worker" ? "worker" : "dispatcher");
+      expect(compiledPolicy(controls.env).version).toBe(4);
       expect(controls.with.script).toContain("work_queue_control_adapter.cjs");
       expect(controls.with.script).toContain("await main({ core, github, context");
       if (name === "worker") {
         expect(compiled.jobs[id].needs).toContain("activation");
         const activation = compiled.jobs.activation.steps.find(step => step.id === "work_queue_snapshot");
         expect(activation.with.script).toContain("write_work_queue_snapshot.cjs");
-        expect(compiled.jobs.safe_outputs.outputs.work_queue_outcome).toBe("${{ steps.process_safe_outputs.outputs.work_queue_outcome }}");
+        expect(compiled.jobs.activation.outputs.work_queue_assignment_settled).toBe("${{ steps.work_queue_snapshot.outputs.work_queue_assignment_settled }}");
+        expect(compiled.jobs.agent.if).toContain("needs.activation.outputs.work_queue_assignment_settled != 'true'");
+        expect(compiled.jobs.safe_outputs.if).toContain("needs.activation.outputs.work_queue_assignment_settled != 'true'");
+        const handler = steps.findIndex(step => step.id === "process_safe_outputs");
+        const finish = steps.findIndex(step => step.name === "Finish work queue claim");
+        expect(handler).toBeGreaterThan(-1);
+        expect(finish).toBeGreaterThan(handler);
+        expect(steps[finish].id).toBe("work_queue_finish");
+        expect(steps[finish].env.GH_AW_WORK_QUEUE_EFFECTS).toBe("/tmp/gh-aw/work-queue.effects.jsonl");
+        expect(steps[handler].env.GH_AW_WORK_QUEUE_EFFECTS).toBe("/tmp/gh-aw/work-queue.effects.jsonl");
+        expect(compiled.jobs.safe_outputs.outputs.work_queue_outcome).toBe("${{ steps.work_queue_finish.outputs.work_queue_outcome }}");
+        const termination = compiled.jobs.conclusion.steps.find(step => step.id === "worker_termination");
+        expect(compiledPolicy(termination.env).version).toBe(4);
+      } else {
+        expect(steps.some(step => step.id === "work_queue_finish")).toBe(false);
       }
     }
   });
@@ -188,9 +214,10 @@ describe("native work queue smoke verification", () => {
 // bodies from its workflow sources against the real setup modules and replay engine, so queue or
 // compiler changes that break admission, dispatch, or worker projection fail here.
 describe("code scanning work queue regression", () => {
-  const { buildCodeScanningPolicy } = requireSetup("./code_scanning_portfolio.cjs");
-  const { normalizeDispatchParameters, normalizeSubmitParameters, readStagedIntents } = requireSetup("./work_queue_intents.cjs");
-  const { assignmentForDispatch, generateRequestOperations, newRequest, newState, replayTransactions } = requireSetup("./work_queue_replay.cjs");
+  const helpers = requireSetup("./work_queue_test_helpers.cjs");
+  const { readStagedIntents } = requireSetup("./work_queue_intents.cjs");
+  const { replayTransactions } = requireSetup("./work_queue_replay.cjs");
+  const { assignmentForDispatch } = requireSetup("./work_queue_scheduler.cjs");
   const repository = "owner/repo";
   const repo = { owner: "owner", repo: "repo" };
   const dispatchContext = { repo, payload: { repository: { full_name: repository, id: 7 } } };
@@ -199,6 +226,7 @@ describe("code scanning work queue regression", () => {
   const gate = dispatcher.on.steps[0].with.script;
   const prepare = dispatcher.steps[0].with.script;
   const select = worker["pre-agent-steps"][0].with.script;
+  const SNAPSHOT = "/tmp/gh-aw/work-queue.snapshot.json";
   const alert = (number, tool, rule, level, file) => ({
     number,
     tool: { name: tool },
@@ -232,13 +260,21 @@ describe("code scanning work queue regression", () => {
   // Runs one workflow github-script body the way actions/github-script does: an async function in
   // the same realm as the setup modules, whose canonical JSON codec rejects foreign-realm objects.
   // Agent files are captured in memory; staged intents land in a disposable RUNNER_TEMP.
-  async function runScript(script, { github, context = dispatchContext, env = {}, works = [] }) {
+  async function runScript(script, { github, context = dispatchContext, env = {}, works = [], assignment = null }) {
     const runnerTemp = mkdtempSync(path.join(os.tmpdir(), "code-scanning-smoke-"));
     const actions = `${runnerTemp}/gh-aw/actions/`;
     const written = new Map();
     const outputs = {};
+    const fs = {
+      mkdirSync() {},
+      writeFileSync: (file, data) => written.set(file, JSON.parse(data)),
+      readFileSync: file => {
+        if (file !== SNAPSHOT) throw new Error(`Unexpected read ${file}`);
+        return JSON.stringify({ version: 4, worker: assignment });
+      },
+    };
     const require = name => {
-      if (name === "node:fs") return { mkdirSync() {}, writeFileSync: (file, data) => written.set(file, JSON.parse(data)) };
+      if (name === "node:fs") return fs;
       if (name === "node:path") return path;
       if (name === `${actions}work_queue_mcp_server.cjs`) return { loadWorkQueueSnapshot: () => ({ projection: { works: new Map(works.map(work => [work.work_id, work])) } }) };
       if (name.startsWith(actions)) return requireSetup(`./${name.slice(actions.length)}`);
@@ -254,30 +290,22 @@ describe("code scanning work queue regression", () => {
     }
   }
 
-  // Applies staged dispatcher intents with the installed code-scanning Policy, as trusted processing would.
+  // Applies staged dispatcher intents to a v4 ledger, as trusted control processing would.
   function codeScanningQueue() {
-    const settings = JSON.parse(readFileSync(new URL("../../../.github/workflows/aw.json", import.meta.url), "utf8")).work_queue;
-    const policy = buildCodeScanningPolicy({ repository, ref: "a".repeat(40), settings });
-    const actor = role => ({ role, repository, principal: "11", ...(role === "dispatcher" ? { workflow: ".github/workflows/code-scanning-dispatcher.lock.yml", run_id: "15", run_attempt: 1 } : {}) });
-    const transactions = [];
-    let state = newState();
-    let at = 1000;
-    const append = (kind, parameters, actorRole) => {
-      const now = ++at;
-      const request = newRequest(`code-scanning-smoke:${now}`, kind, actor(actorRole), parameters);
-      const decision = generateRequestOperations(state, request, actor(actorRole), now, `commit:${now}`);
-      if (!decision.operations.length) return;
-      transactions.push({ version: 3, id: `commit:${now}`, previous: state.tip || null, request, actor: actor(actorRole), policy_epoch: "e1", at: now, operations: decision.operations });
-      state = replayTransactions(transactions);
-    };
-    append("policy", { operations: [{ kind: "Policy", epoch: "e1", policy }] }, "administrator");
+    let log = [];
+    const profiles = { "code-scanning-fixer-worker": { workflow: ".github/workflows/code-scanning-fixer-worker.lock.yml" } };
     return {
-      state: () => state,
-      works: () => [...state.works.values()],
+      state: () => replayTransactions(log),
+      works: () => [...replayTransactions(log).works.values()],
       apply: intents => {
         for (const { kind, parameters } of intents) {
-          if (kind === "submit") append("submit", normalizeSubmitParameters(parameters, policy, at, state), "producer");
-          else append("dispatch_next", normalizeDispatchParameters(parameters, policy, 3), "dispatcher");
+          if (kind === "submit") {
+            const known = replayTransactions(log).works;
+            const fresh = parameters.nodes.map(node => helpers.work(node.node_key, node)).filter(node => !known.has(node.work_id));
+            if (fresh.length) log = helpers.submit(log, fresh);
+          } else {
+            log = helpers.dispatchNext(log, { ...parameters, concurrency: 3, per_account_limit: 0, profiles }).log;
+          }
         }
       },
     };
@@ -308,7 +336,8 @@ describe("code scanning work queue regression", () => {
     const assignment = [...queue.state().dispatches.values()].map(dispatch => assignmentForDispatch(queue.state(), dispatch.dispatch_id)).find(candidate => candidate.claims[0].work.ai_scan);
     const workerRun = {
       github: fakeGithub({ pulls: [{ number: 302, title: "Tidy b.go", body: "" }], files: { 302: [{ filename: "pkg/x/b.go" }] } }),
-      context: { repo, payload: { inputs: { work_queue_assignment: JSON.stringify(assignment) } } },
+      context: { repo, payload: { inputs: { work_queue_assignment: JSON.stringify({ version: 4, dispatch_id: assignment.dispatch_id }) } } },
+      assignment,
     };
     const selected = await runScript(select, { ...workerRun, env: { GH_AW_WORK_QUEUE_ROLE: "worker" } });
     expect(selected.written.get("/tmp/gh-aw/agent/alert-selection.json")).toMatchObject({ claim_handle: assignment.claims[0].handle, ai_scan: true, alerts: [{ number: 10 }], covered_alerts: [{ number: 9, pull_numbers: [302] }] });
@@ -334,6 +363,7 @@ describe("code scanning work queue regression", () => {
     expect(controls(dispatcherLock).env.GH_AW_WORK_QUEUE_ROLE).toBe("dispatcher");
     const handlerConfig = JSON.parse(dispatcherLock.jobs.safe_outputs.steps.find(step => step.env?.GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG).env.GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG);
     expect(handlerConfig.dispatch_workflow).toMatchObject({ work_queue_enabled: true, work_queue_workflows: ["code-scanning-fixer-worker"], max: 3 });
+    expect(handlerConfig.dispatch_workflow).not.toHaveProperty("work_queue_dispatch_credential");
 
     const workerLock = readWorkflowFile("code-scanning-fixer-worker", true);
     expect(controls(workerLock).env.GH_AW_WORK_QUEUE_ROLE).toBe("worker");

@@ -1,204 +1,68 @@
 // @ts-check
 "use strict";
 
-const fs = require("node:fs");
-const { getPromptPath } = require("./messages_core.cjs");
-const { buildGeneratedFooterBlocks } = require("./markdown_body_helpers.cjs");
-const { parseReportMarkdown } = require("./report_markdown.cjs");
-const { renderSizedReport } = require("./report_size.cjs");
-const { normalizeReportText } = require("./report_ast.cjs");
 const { sanitizeContent } = require("./sanitize_content.cjs");
-const { buildAllowedDomains, sanitizeUrlDomains, sanitizeUrlProtocols } = require("./sanitize_content_core.cjs");
-const { redactDiagnosticText } = require("./diagnostic_sanitization.cjs");
-const { expectedGitHubHost } = require("./work_queue_host.cjs");
 
-function presentationText(value, limit, singleLine = false, maskedValues = [], literal = false) {
-  if (typeof value !== "string") return "";
-  let text = redactDiagnosticText(value, { maskedValues }).trim();
-  if (singleLine) text = text.replace(/\s+/g, " ");
-  if (literal) {
-    // Literal rendering escapes source code delimiters, so URL policy must cover those regions too.
-    text = sanitizeContent(sanitizeUrlDomains(sanitizeUrlProtocols(normalizeReportText(text).replace(/\s+/g, " ")), buildAllowedDomains()));
-  }
-  const render = candidate => {
-    if (literal) return renderSizedReport({ type: "report", title: "Work description", children: [{ type: "paragraph", children: [{ type: "text", value: candidate, agentTainted: true }] }] }).body;
-    let rendered = candidate;
-    for (;;) {
-      const sanitized = sanitizeContent(redactDiagnosticText(rendered, { maskedValues }));
-      if (sanitized === rendered) return sanitized;
-      rendered = sanitized;
-    }
-  };
-  const withinLimit = candidate => {
-    const rendered = render(candidate);
-    return [...rendered].length <= limit ? (literal ? candidate : rendered) : undefined;
-  };
-  const complete = render(text);
-  if ([...complete].length <= limit) return literal ? text : complete;
+const ISSUE_MARKER = /<!-- gh-aw-work-queue-issue:([^\s>]+) -->/;
 
-  // Redact the complete value before cutting, so a boundary cannot expose a
-  // credential prefix that no longer matches its exact value or token pattern.
-  const characters = [...(literal ? text : complete)];
-  let low = 0;
-  let high = characters.length;
-  let result = withinLimit("...");
-  while (low <= high) {
-    const middle = Math.floor((low + high) / 2);
-    const candidate = `${characters.slice(0, middle).join("").trimEnd()}...`;
-    const rendered = withinLimit(candidate);
-    if (rendered !== undefined) {
-      result = rendered;
-      low = middle + 1;
-    } else {
-      high = middle - 1;
-    }
-  }
-  return result;
-}
-
-function issueTitle(work, config, maskedValues = []) {
-  const base = `${config.title_prefix} ${work.work_id.slice(0, 12)}`;
-  const title = presentationText(work.payload?.title, 128, true, maskedValues);
-  return title ? `${base} — ${title}` : base;
-}
-
-const PROGRESS_NOTES = {
-  Queued: "Ready for its next fair slot.",
-  Blocked: "Waiting for dependencies or a retry window.",
-  Assigned: "An original Claim is reserved; its native run is not yet authenticated.",
-  Running: "An authenticated run is carrying this Work forward.",
-  Verifying: "The Claim has completed. Delivery is still being independently verified.",
-  "Needs review": "Verified PR delivery is ready for human review. A PR is not a merge.",
-  Done: "The recorded delivery has been independently verified.",
-  "Needs attention": "Delivery needs attention; inspect the diagnostics below.",
-  Cancelled: "Cancellation is recorded in Git. It does not terminate a native worker.",
-};
-
-function runLink(run) {
-  return `https://github.com/${run.repository}/actions/runs/${run.run_id}/attempts/${run.run_attempt}`;
-}
-
-function workQueueLedgerUrl(repository, branch) {
-  return `https://${expectedGitHubHost()}/${repository}/blob/${branch}/work-queue.jsonl`;
-}
-
-/** @returns {import("./report_ast.cjs").Report} */
-function orphanIssueReport(repository, branch, workId) {
-  return {
-    type: "report",
-    title: "Work queue orphan review",
-    children: [
-      {
-        type: "paragraph",
-        children: [
-          {
-            type: "text",
-            value: "This mirror is older than the configured orphan age and has no matching Work ID in the checked ledger. It has been flagged for maintainer review; this does not change or recreate queue work.",
-            agentTainted: false,
-          },
-        ],
-        agentTainted: false,
-      },
-      {
-        type: "paragraph",
-        children: [
-          {
-            type: "link",
-            url: workQueueLedgerUrl(repository, branch),
-            children: [{ type: "text", value: "View the checked ledger", agentTainted: false }],
-            agentTainted: false,
-          },
-        ],
-        agentTainted: false,
-      },
-      { type: "xml_marker", name: "gh-aw-work-queue-orphan", value: workId, compact: true, agentTainted: false },
-    ],
-    agentTainted: false,
-  };
-}
-
-function renderOrphanComment(repository, branch, workId) {
-  return renderSizedReport(orphanIssueReport(repository, branch, workId)).body;
-}
-
-/** @returns {import("./report_ast.cjs").Report} */
-function buildWorkQueueMessageReport(template, values, run) {
-  const workflowName =
-    process.env.GH_AW_WORKFLOW_NAME ||
-    run.workflow
-      .split("/")
-      .at(-1)
-      .replace(/\.lock\.yml$/, "");
-  const runUrl = runLink(run);
-  const footer = buildGeneratedFooterBlocks({ workflowName, runUrl });
-  const hasAttribution = footer.some(block => block.type === "quote" && block.children.some(child => child.type === "paragraph" && child.children.some(inline => inline.type === "text" && inline.value.startsWith("Generated by "))));
-  if (!hasAttribution) footer.unshift(...parseReportMarkdown(fs.readFileSync(getPromptPath("work_queue_generated_footer.md"), "utf8"), { context: { workflow_name: workflowName, run_url: runUrl }, agentTainted: false }));
-  const consumed = new Set();
-  const children = parseReportMarkdown(fs.readFileSync(getPromptPath(template), "utf8"), {
-    context: values,
-    blockSlots: { generated_footer: footer },
-    minimumHeadingLevel: 2,
-    allowMetadata: true,
-    agentTainted: false,
-    onBlockSlot: key => consumed.add(key),
-  });
-  if (!consumed.has("generated_footer")) children.push(...footer);
-  return { type: "report", title: "Work queue", children, agentTainted: false };
-}
-
-function issueBodyReport(state, work, origin, config, branch, maskedValues = []) {
-  const admission = state.workCreators?.get(work.work_id);
-  if (!admission) throw new Error("work_queue_admission_provenance_missing");
-  const ledgerUrl = workQueueLedgerUrl(state.repository, branch);
-  const description = presentationText(work.payload?.description, 4096, false, maskedValues, true);
-  return buildWorkQueueMessageReport(
-    "work_queue_issue_body.md",
-    {
-      work_id: work.work_id.slice(0, 12),
-      full_work_id: work.work_id,
-      admission_run_url: admission.run_id ? runLink(admission) : ledgerUrl,
-      admission_link_label: admission.run_id ? "View the admitting run" : "View the admission receipt",
-      ledger_url: ledgerUrl,
-      description_section: description
-        ? [
-            { type: "heading", level: 3, children: [{ type: "text", value: "Work description", agentTainted: false }], agentTainted: false },
-            { type: "paragraph", children: [{ type: "text", value: description, agentTainted: true }], agentTainted: true },
-          ]
-        : [],
-      tracking_label: config.label,
-      projection_note: "Progress is projected into a status label; the live summary links to the checked ledger.",
-    },
-    origin
+/** Single-line, sanitized, backtick-free inline text. @param {unknown} value */
+function inline(value) {
+  return sanitizeContent(
+    String(value)
+      .replace(/[`\r\n]+/g, " ")
+      .trim()
   );
 }
 
-function summaryReport(values, run, status) {
-  const statusSection = parseReportMarkdown(fs.readFileSync(getPromptPath("work_queue_issue_status.md"), "utf8"), { context: { status }, agentTainted: false });
-  return buildWorkQueueMessageReport(
-    "work_queue_issue_summary.md",
-    {
-      ...values,
-      status_section: statusSection,
-      progress_note: PROGRESS_NOTES[status],
-    },
-    run
-  );
+/** Marker identifying the Work an Issue tracks (Issue body). @param {string} workId */
+function issueMarker(workId) {
+  return `<!-- gh-aw-work-queue-issue:${workId} -->`;
 }
 
-function claimReport(values, run) {
-  return buildWorkQueueMessageReport("work_queue_issue_claim.md", values, run);
+/** Work id recorded in an Issue body, or undefined. @param {unknown} body */
+function markedWorkId(body) {
+  return typeof body === "string" ? body.match(ISSUE_MARKER)?.[1] : undefined;
 }
 
-function issueBody(state, work, origin, config, branch, maskedValues = []) {
-  return renderSizedReport(issueBodyReport(state, work, origin, config, branch, maskedValues)).body;
+/** Idempotence marker of a projection comment. @param {string} workId @param {string} state */
+function commentMarker(workId, state) {
+  return `<!-- gh-aw-work-queue:${workId}:${state} -->`;
 }
 
-function renderSummary(values, run, status) {
-  return renderSizedReport(summaryReport(values, run, status)).body;
+/** @param {any} subject */
+function subjectLabel(subject) {
+  if (!subject) return undefined;
+  return `${subject.repository}#${subject.number}`;
 }
 
-function renderClaim(values, run) {
-  return renderSizedReport(claimReport(values, run)).body;
+/** @param {any} work @param {{title_prefix: string}} config */
+function issueTitle(work, config) {
+  return `${config.title_prefix} ${inline(subjectLabel(work.subject) ?? work.node_key)}`.slice(0, 256);
 }
 
-module.exports = { issueBody, issueBodyReport, issueTitle, renderSummary, summaryReport, renderClaim, claimReport, runLink, workQueueLedgerUrl, orphanIssueReport, renderOrphanComment };
+/** @param {any} work @param {string} repository */
+function issueBody(work, repository) {
+  const lines = ["This Issue tracks work queue Work.", "", `- Pool: \`${inline(work.pool)}\``, `- Graph: \`${inline(work.graph_id)}\``, `- Node: \`${inline(work.node_key)}\``, `- Work: \`${work.work_id}\``];
+  if (work.subject) lines.push(`- Subject: ${work.subject.repository}#${work.subject.number}`);
+  lines.push("", `[View the work queue ledger](https://github.com/${repository}/blob/work-queue/work-queue.jsonl)`, "", issueMarker(work.work_id));
+  return lines.join("\n");
+}
+
+/** @param {any} work @param {any} claim @param {any} dispatch @param {string} repository */
+function claimComment(work, claim, dispatch, repository) {
+  const run = `https://github.com/${repository}/actions/runs/${dispatch.run.run_id}/attempts/${dispatch.run.run_attempt}`;
+  return [`Claimed by dispatch \`${dispatch.dispatch_id}\` (attempt ${work.attempts + 1}); worker [run ${dispatch.run.run_id}](${run}).`, "", commentMarker(work.work_id, `claim-${claim.claim_id}`)].join("\n");
+}
+
+/** @param {any} work */
+function terminalComment(work) {
+  const outcome = work.state === "completed" ? "Work completed." : `Work cancelled (\`${work.cancellation_reason}\`).`;
+  return [outcome, "", commentMarker(work.work_id, work.state)].join("\n");
+}
+
+/** @param {string} workId */
+function orphanComment(workId) {
+  return ["This Issue tracks Work that is no longer in the work queue ledger; closing it.", "", commentMarker(workId, "orphaned")].join("\n");
+}
+
+module.exports = { claimComment, commentMarker, issueBody, issueMarker, issueTitle, markedWorkId, orphanComment, terminalComment };

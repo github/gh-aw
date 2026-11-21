@@ -23,6 +23,11 @@
       },
       "action_description": "Add labels to an issue or a pull request."
     },
+    "actions/attest-build-provenance@v4.2.2": {
+      "repo": "actions/attest-build-provenance",
+      "version": "v4.2.2",
+      "sha": "4d101475d8b20a2381f78447822ac1eab6504dd8"
+    },
     "actions/cache/restore@v6.1.0": {
       "repo": "actions/cache/restore",
       "version": "v6.1.0",

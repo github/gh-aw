@@ -4,11 +4,11 @@
 
 ## Overview
 
-The `workqueue` package defines the version-3 transaction log used by gh-aw's native work queue. `work-queue.jsonl` on the `work-queue` branch is authoritative; Issues can be used as a projection, but are not queue storage. The package models submitted Work, immutable Policy, assignments and Claims, worker deployments, evidence, and lifecycle operations.
+The `workqueue` package implements protocol version 4 of gh-aw's native work queue in Go. `work-queue.jsonl` on the `work-queue` branch is the only authority: an append-only JSONL log with one `QueueCommit` per line. Every write is a Git commit whose parent is the observed head, published with a non-force ref update (compare-and-swap); a lost race re-reads the ledger and re-plans. Issues can be used as a projection, but are not queue storage.
 
-The core ledger API parses and validates commits, replays them into a `Projection`, and plans candidate transactions and scheduling decisions. Host and delivery types provide the boundaries for repository transport, dispatch, and independently verified output. Repository scheduling preferences can be parsed separately from authorization and approved worker routes.
+The package parses and validates commits, replays them into a `Projection`, plans `dispatch_next` selections, and publishes requests through `Branch`. Scheduling settings come from the `work_queue` section of `aw.json`, compiled into the `GH_AW_WORK_QUEUE_POLICY` environment (`PolicyEnv`); they are not stored in the ledger.
 
-For the full queue behavior and operator configuration, see the [work-queue reference](../../docs/src/content/docs/reference/work-queue.md) and [protocol models](../../specs/work-queue/README.md).
+For the full queue behavior and operator configuration, see the [work-queue reference](../../docs/src/content/docs/reference/work-queue.md), the [specification](../../docs/src/content/docs/specs/work-queue-specification.md), and [protocol models](../../specs/work-queue/README.md).
 
 ## Public API
 
@@ -16,179 +16,154 @@ For the full queue behavior and operator configuration, see the [work-queue refe
 
 | Type | Kind | Description |
 |------|------|-------------|
-| `Actor` | struct | Principal and repository identity attached to a ledger request. |
-| `Request` | struct | Idempotent request envelope with parameters and fingerprint. |
-| `QueueCommit` | struct | Versioned transaction-log record with actor, policy epoch, operations, and predecessor. |
-| `Operation` | alias | Raw JSON representation of a closed ledger operation variant. |
-| `Policy` | struct | Queue authorization, scheduling, pool, and resource limits. |
-| `WorkDefinition` | struct | Immutable task definition, payload, dependencies, scheduling attributes, and optional resource bindings. |
-| `Projection` | struct | State derived by replaying the ledger, including Work, Claims, Dispatches, Policy, and scheduling data. |
-| `WorkState` | struct | Current lifecycle state and immutable definition for one Work item. |
-| `ClaimState` | struct | Lifecycle and terminal evidence for one attempt. |
-| `DispatchState` | struct | Assignment and worker-run state for a dispatch. |
-| `Stats` | struct | Aggregate counts for Work lifecycle and availability, Claims, Dispatches, transactions, and replayed graph nodes. |
-| `Assignment` | struct | Worker input containing one dispatch and its Claims. |
-| `Evidence` | struct | Recorded evidence used to validate lifecycle and delivery transitions. |
-| `Selection` | struct | Scheduler selection or the reason no Work was selected. |
-| `Decision` | struct | Planned transaction operations, assignments, and next selection. |
-| `Settings` | struct | Parsed repository scheduling preferences; it does not grant authorization or routes. |
-| `SettingsRetry` | struct | Retry limits and backoff preferences for settings and pools. |
-| `PoolSettings` | struct | Per-pool concurrency, account limit, and retry preferences. |
-| `Branch` | struct | Git-backed queue ledger transport. |
-| `NativeDeliveryHost` | struct | Native host for verifying and publishing queue delivery outputs. |
-| `LedgerSession` | struct | Scoped set of ledger operations sharing one isolated Git object store. |
+| `Actor` | struct | Role, repository, and optional workflow/run identity of a request, taken from the job's own context. |
+| `Request` | struct | Request id, closed kind, and canonical parameters. |
+| `QueueCommit` | struct | One ledger line: version, id, previous id, request, actor, informational `At`, and 1–256 operations. |
+| `Operation` | alias | Canonical JSON of one closed ledger operation (`json.RawMessage`). |
+| `Resource` | struct | GitHub Issue or pull request reference used by dependencies, Observations, and Issue links. |
+| `Dependency` | struct | Work predecessor or external Issue/pull-request edge. |
+| `Replacement` | struct | Optional `replacement_of` reference on a Work definition. |
+| `WorkDefinition` | struct | Work operation: identity, pool, priority, fairness key, worker profile, payload, and dependencies. |
+| `ObservationOperation`, `ClaimOperation`, `DispatchOperation`, `BoundOperation`, `CompletionOperation`, `ClaimCancellationOperation`, `WorkCancellationOperation`, `ReleaseOperation`, `CheckpointOperation`, `IssueLinkOperation`, `IssueCommentOperation` | struct | Remaining closed operation variants. |
+| `WorkIDsParameters`, `DispatchParameters`, `DispatchProfile`, `DispatchIDParameters`, `ReleaseParameters`, `CancelWorkParameters`, `CheckpointParameters`, `IssueLinkParameters` | struct | Closed request parameters per request kind. |
+| `Position` | struct | FIFO position: commit ordinal and operation index. |
+| `Projection` | struct | State derived by replaying the ledger: Work, Claims, Dispatches, Observations, committed requests, and `Stats`. |
+| `WorkState` | struct | Work definition plus state, position, attempts, Completion effects, and cancellation data. |
+| `ClaimState` | struct | One Claim: ids, handle, state, terminal commit, cancellation reason, and effects. |
+| `DispatchState` | struct | One dispatch: pool, profile, workflow, state, run binding, and Claims. |
+| `RunBinding` | struct | Run id and attempt bound to a dispatch. |
+| `Stats` | struct | Aggregate counts of Work by state, Claims, Dispatches, transactions, and graph nodes. |
+| `Decision` | struct | Planned `dispatch_next` Claims, dispatch ids, and plan reason. |
+| `Assignment`, `AssignmentClaim`, `ResultReference` | struct | Worker view of one dispatch, its Claims, and predecessor effects. |
+| `Branch` | struct | Git-backed ledger transport for one repository and branch. |
+| `Snapshot` | struct | One read of the queue branch: head, tree, raw data, and replayed state. |
+| `Publication` | struct | Outcome of one request publication, including `Committed` and `Recovered`. |
+| `OperationsFor` | func type | Plans a request's operations against the current projection; re-run after each lost compare-and-swap. |
+| `CheckpointResult` | struct | Outcome of `Branch.Checkpoint`. |
+| `PolicyEnv`, `IssuesEnv`, `PoolEnv`, `ProfileEnv` | struct | Compiled `GH_AW_WORK_QUEUE_POLICY` environment. |
+| `Settings`, `SettingsRetry`, `PoolSettings`, `IssuesSettings` | struct | Parsed `aw.json` `work_queue` settings. |
+| `ProtocolError` | struct | Error carrying a stable protocol error code. |
 
-### Additional ledger and policy types
+### Constants and Variables
 
-| Area | Exported symbols | Description |
-|------|------------------|-------------|
-| Operation data | `CheckpointOperation`, `CheckpointParameters`, `ClaimOperation`, `Dependency`, `Resource`, `Replacement`, `ResultReference`, `OperationsParameters`, `SubmitParameters`, `Position` | Typed inputs and references used to validate checkpoint, claim, dependency, replacement, and submission transitions; `Resource` identifies a repository resource, and `Position` identifies a commit and operation index in the ledger. |
-| Issue projection | `IssueLinkOperation`, `IssueCommentOperation`, `IssueSynchronizationPending`, `IssuesSettings` | Optional issue projection operations and synchronization state; they do not make Issues the queue's source of truth. |
-| Scheduling and routing | `ProducerRule`, `ProjectorRule`, `PoolPolicy`, `PoolInstallOperation`, `WorkerProfile`, `WorkerRevision`, `WorkerDeployment`, `DeploymentOperation`, `RetryPolicy`, `ReconciliationPolicy`, `Limits` | Admission rules, installed pool configuration, worker routes and route-change requests, bounded retry/reconciliation behavior, and resource limits. |
-| Inspection and delivery | `Capacity`, `NativeRun`, `RunBinding`, `DeliveryVerification`, `RemediationVerifier`, `Clock`, `PoolClocks` | Bounded native-run evidence, host delivery verification, reconciliation inputs, capacity observations, and deterministic pool clocks. |
+| Name | Value | Description |
+|------|-------|-------------|
+| `FileName` | `work-queue.jsonl` | Ledger file name. |
+| `DefaultBranch` | `work-queue` | Default queue branch. |
+| `Version`, `PolicyEnvVersion` | `4` | Ledger and policy-environment protocol versions. |
+| `PayloadBytes` | 16 KiB | Maximum Work payload. |
+| `OperationsPerCommit` | 256 | Maximum operations per commit. |
+| `GraphNodes` | 4096 | Maximum replayed graph vertices. |
+| `Predecessors` | 64 | Maximum dependencies per Work. |
+| `AssignmentBytes` | 48 KiB | Maximum assignment size. |
+| `EffectsBytes` | 4096 | Maximum canonical Completion effects. |
+| `LedgerBytes` | 64 MiB | Maximum ledger size. |
+| `CheckpointAfterLines` | 512 | Maintenance checkpoint threshold. |
+| `MaxPendingWork` | 4096 | Maximum available plus claimed Work per pool. |
+| `CASAttempts` | 8 | Maximum compare-and-swap publication attempts. |
+| `Roles` | variable | Closed actor roles. |
+| `ClaimCancellationReasons`, `WorkCancellationReasons`, `ReleaseReasons` | variable | Closed reason sets. |
 
-These types are the payloads and supporting records for the public replay,
-planning, settings, inspection, and delivery APIs above. They do not independently
-grant actor, worker-route, or effect authority.
-
-### Inspection and Delivery Types
-
-| Type | Description |
-|------|-------------|
-| `Trace` | Optional trace/span correlation IDs and publisher-attempt number carried with a ledger request. |
-| `TraceOptions`, `TraceEvent`, `TraceEvidence`, `TracePage` | Bounded ledger provenance, including lifecycle events and evidence metadata without work payloads or request parameters. |
-| `Observation` | Resource-condition evidence, including observed state, read status, credential generation, timestamps, and optional merge metadata. |
-| `NativeDeliveryScope` | Binds approved host callbacks to an immutable assignment and authenticated Actions attempt. |
-| `NativeDeliveryOutput`, `NativeDeliveryInventory` | Closed effect-channel records supplied by an approved process callback; neither caller data nor receipts can create verifier authority. |
-| `NativeOutputVerifier` | Host-registered callback for independent readback of a native delivery output. |
-
-### Functions
+### Ledger Functions
 
 | Function | Signature | Description |
 |----------|-----------|-------------|
-| `Parse` | `func Parse(data []byte) ([]QueueCommit, error)` | Parses a JSONL ledger into commits. |
-| `Serialize` | `func Serialize(commits []QueueCommit) ([]byte, error)` | Encodes commits as the canonical ledger representation. |
-| `ValidateCommit` | `func ValidateCommit(commit QueueCommit) error` | Validates one commit against the queue contract. |
-| `Replay` | `func Replay(commits []QueueCommit) (Projection, error)` | Validates and replays commits into queue state. |
-| `ReplayForHost` | `func ReplayForHost(commits []QueueCommit, host string) (Projection, error)` | Replays commits while validating resource references against an explicit GitHub host. |
-| `BuildCandidate` | `func BuildCandidate(commits []QueueCommit, actor Actor, request Request, at int64) ([]QueueCommit, *QueueCommit, Decision, error)` | Builds a candidate ledger update and scheduling decision for a request. |
-| `PlanNext` | `func PlanNext(state Projection, pool string, at int64) (Selection, error)` | Plans the next eligible Work without changing scheduler state. |
-| `ObsoleteWorkIDs` | `func ObsoleteWorkIDs(state Projection, at int64, limit int) ([]string, error)` | Selects a bounded, byte-ordered batch of unclaimed available Work whose worker revision is incompatible; publication must still validate each cancellation. |
-| `PlanDispatch` | `func PlanDispatch(state Projection, params DispatchParameters, requestID, commitID string, at int64) (Decision, error)` | Plans scheduler-selected assignments within the supplied dispatch bounds. |
-| `ValidatePolicy` | `func ValidatePolicy(policy Policy) error` | Validates policy structure and semantic limits. |
-| `ParseSettings` | `func ParseSettings(data []byte) (Settings, error)` | Parses the `work_queue` settings object. |
-| `ParseRepositorySettings` | `func ParseRepositorySettings(data []byte) (Settings, error)` | Extracts and parses `work_queue` from repository configuration JSON. |
-| `Canonical` | `func Canonical(data []byte) ([]byte, error)` | Encodes JSON using the queue's integer-only canonical profile. |
-| `NewRequest` | `func NewRequest(id, kind string, actor Actor, parameters any) (Request, error)` | Constructs a request with its canonical fingerprint. |
-| `AuthorizeEffect` | `func AuthorizeEffect(state Projection, actor Actor, target EffectResource) error` | Checks whether a completed worker Claim authorizes the requested effect. |
-| `CanonicalValue` | `func CanonicalValue(value any) ([]byte, error)` | Encodes typed JSON without repairing strings or losing numeric values. |
-| `CompactCheckpoint` | `func CompactCheckpoint(commits []QueueCommit, priorGitSHA string, actor Actor, at int64) ([]QueueCommit, error)` | Builds a minimal state checkpoint from validated history, bound to the Git commit containing the prior ledger. |
-| `DefaultPolicy` | `func DefaultPolicy(principal, repository string) Policy` | Creates the default weighted-priority policy for a principal and repository. |
-| `DispatchPrincipal` | `func DispatchPrincipal(dispatch *DispatchState) string` | Returns the principal frozen at dispatch launch from the selected AW credential. |
-| `ExplainBeforeClaim` | `func ExplainBeforeClaim(commits []QueueCommit, claimID string) (ClaimExplanation, error)` | Validates ledger authority and explains the observations and Claims preceding a Claim. |
-| `ExplainRequest` | `func ExplainRequest(commits []QueueCommit, requestID string) (RequestExplanation, error)` | Replays the ledger and explains the commit associated with a request ID. |
-| `ExplainWork` | `func ExplainWork(state Projection, id string, at int64) (WorkExplanation, error)` | Explains a Work item's readiness and current state at the supplied time. |
-| `Fingerprint` | `func Fingerprint(actor Actor, kind string, parameters json.RawMessage) (string, error)` | Computes the canonical fingerprint for a request. |
-| `FuturePolicy` | `func FuturePolicy(state Projection) Policy` | Exposes current routes to trusted admission builders; it does not replace installed policy or affect existing assignments. |
-| `Genesis` | `func Genesis(actor Actor, policy Policy, requestID, epoch string, at int64) (QueueCommit, error)` | Creates the initial policy commit for a ledger. |
-| `IndependentGraphID` | `func IndependentGraphID(payload []byte) (string, error)` | Computes a graph ID from the canonical payload. |
-| `NewChildWork` | `func NewChildWork(state Projection, actor Actor, payload []byte, nodeKey string, at int64) (WorkDefinition, error)` | Constructs child Work after validating actor authority and the parent projection. |
-| `NewNativeDeliveryHost` | `func NewNativeDeliveryHost(options NativeDeliveryHostOptions) *NativeDeliveryHost` | Creates a native delivery host from the supplied options. |
-| `NewWork` | `func NewWork(payload []byte, graphID, nodeKey, pool string, policy Policy, at int64) (WorkDefinition, error)` | Constructs a Work definition from its payload, graph, node, pool, and policy. |
-| `NodeID` | `func NodeID(graphID, nodeKey string) string` | Derives a stable node ID from a graph ID and node key. |
-| `NormalizeClaimHandle` | `func NormalizeClaimHandle(assignment Assignment, selector *string) (string, error)` | Resolves an optional Claim selector to the canonical Claim handle in an assignment. |
-| `NormalizeFinishIntent` | `func NormalizeFinishIntent(assignment Assignment, data []byte) (FinishParameters, error)` | Validates finish-intent JSON while preserving the distinction between absent and null fields. |
-| `ObservationRefreshBudget` | `func ObservationRefreshBudget(state Projection, requested int) (int, error)` | Bounds an observation refresh while reserving a Claim slot and excluding optional recovery reads. |
-| `Op` | `func Op(value any) (Operation, error)` | Encodes a typed operation using the queue's canonical JSON representation. |
-| `ParseAssignment` | `func ParseAssignment(data []byte) (Assignment, error)` | Validates and decodes a worker assignment. |
-| `ProposedCommitID` | `func ProposedCommitID(state Projection, request Request) string` | Derives the proposed commit ID from the current tip and request ID. |
-| `RecoveryHeadroom` | `func RecoveryHeadroom(state Projection) int64` | Reports the outstanding closure reservation in a replayed projection. |
-| `ReplayAt` | `func ReplayAt(commits []QueueCommit, at int64) (Projection, error)` | Replays historical decisions at committed time and adds a disposable current-time view. |
-| `ReplayAtForHost` | `func ReplayAtForHost(commits []QueueCommit, at int64, host string) (Projection, error)` | Adds a disposable current-time view using the selected resource host. |
-| `TraceQueue` | `func TraceQueue(commits []QueueCommit, options TraceOptions, at int64) (TracePage, error)` | Returns bounded ledger provenance without payloads, descriptors, receipts, or request parameters. |
-| `ValidReason` | `func ValidReason(reason string) bool` | Reports whether a reason is a bounded, sanitized queue reason code. |
-| `ValidateAssignment` | `func ValidateAssignment(state Projection, assignment Assignment) error` | Verifies that an assignment matches the dispatch recorded in the projection. |
+| `Parse` | `func Parse(data []byte) ([]QueueCommit, error)` | Decodes ledger lines. |
+| `Serialize` | `func Serialize(commits []QueueCommit) ([]byte, error)` | Encodes commits as canonical JSONL. |
+| `Replay` | `func Replay(commits []QueueCommit) (Projection, error)` | Validates and replays commits. |
+| `ReplayLog` | `func ReplayLog(data []byte) (Projection, error)` | Parses and replays a ledger file. |
+| `ReplayRaw` | `func ReplayRaw(records []json.RawMessage) (Projection, error)` | Replays raw commit records. |
+| `NewProjection` | `func NewProjection() Projection` | Returns an empty projection. |
+| `AppendCommit` | `func AppendCommit(state Projection, commit QueueCommit) (Projection, error)` | Applies one commit to a cloned projection. |
+| `ValidateCommit` | `func ValidateCommit(commit QueueCommit) error` | Validates commit shape and identity. |
+| `LedgerProtocol` | `func LedgerProtocol(data []byte) int` | Reports the head line's protocol version. |
+| `SerializeProjection` | `func SerializeProjection(state Projection) ([]byte, error)` | Serializes a projection for a Checkpoint. |
+| `CheckpointCommit` | `func CheckpointCommit(state Projection, actor Actor, at int64) (QueueCommit, error)` | Builds a root Checkpoint commit. |
+| `Projection.Clone` | `func (state Projection) Clone() Projection` | Deep-copies a projection. |
+| `Projection.CommittedRequest` | `func (state Projection) CommittedRequest(requestID string) (*QueueCommit, bool)` | Finds the commit for a request id. |
+| `Projection.OpenClaims` | `func (state Projection) OpenClaims(dispatch *DispatchState) []*ClaimState` | Lists a dispatch's open Claims. |
+| `Projection.DispatchOrder` | `func (state Projection) DispatchOrder() []string` | Lists dispatch ids in commit order. |
+| `Projection.DependencyStatus` | `func (state Projection) DependencyStatus(work *WorkState) (bool, string)` | Reports whether a Work's dependencies are satisfied. |
 
-### Methods
+### Request and Identity Functions
 
-| Method | Signature | Description |
-|--------|-----------|-------------|
-| `Assignment.ToReceipt` | `func (assignment Assignment) ToReceipt() AssignmentReceipt` | Projects assignment identity without work payloads or result references; callers populate lifecycle facts separately from a validated projection. |
-| `AssignmentClaim.ToReceipt` | `func (claim AssignmentClaim) ToReceipt() ClaimReceipt` | Projects Claim identity without work payloads or result references. |
-| `Branch.Authenticate` | `func (b Branch) Authenticate(ctx context.Context, role string) (Actor, error)` | Derives operator identity from credentials rather than caller-supplied actor fields or flags. |
-| `Branch.AuthenticateClear` | `func (b Branch) AuthenticateClear(ctx context.Context) (Actor, error)` | Authorizes repository maintainers and administrators for clear operations. |
-| `Branch.CancelReserved` | `func (b Branch) CancelReserved(ctx context.Context, dispatchID, requestID string) (Reconciliation, error)` | Cancels a reservation before launch; a competing start marker wins the compare-and-swap. |
-| `Branch.Compact` | `func (b Branch) Compact(ctx context.Context) (Compaction, error)` | Replaces validated ledger history with a canonical checkpoint bound to the prior Git commit. |
-| `Branch.DeploymentOperationsFromConfig` | `func (b Branch) DeploymentOperationsFromConfig(ctx context.Context, state Projection, poolName, workerName string) ([]Operation, error)` | Proposes route-only changes for existing AW workers; unavailable registrations pause only affected targets. |
-| `Branch.DispatcherFromConfig` | `func (b Branch) DispatcherFromConfig(ctx context.Context, name string) (DispatcherRoute, error)` | Resolves a dispatcher at the verified default revision without granting or launching Claims. |
-| `Branch.HardClear` | `func (b Branch) HardClear(ctx context.Context, requestID, reason string, dryRun bool) (HardClearResult, error)` | Previews or resets only a settled, paused queue while retaining the prior ledger in Git history. |
-| `Branch.HardClearFromSnapshot` | `func (b Branch) HardClearFromSnapshot(ctx context.Context, requestID, reason, priorGitSHA string) (HardClearResult, error)` | Resets only the exact Git snapshot previewed by the operator. |
-| `Branch.InspectEvidence` | `func (b Branch) InspectEvidence(ctx context.Context, dispatchID string) (Reconciliation, error)` | Reads evidence for the specified dispatch and returns its reconciliation state. |
-| `Branch.OpenLedgerSession` | `func (b Branch) OpenLedgerSession(ctx context.Context) (*LedgerSession, error)` | Opens a scoped session with an isolated Git object store. |
-| `Branch.PolicyFromConfig` | `func (b Branch) PolicyFromConfig(ctx context.Context) (Policy, error)` | Resolves scheduling policy and worker approval from the target repository's verified immutable default ref. |
-| `Branch.PrepareDispatcherActivation` | `func (b Branch) PrepareDispatcherActivation(ctx context.Context, route DispatcherRoute) (string, error)` | Binds a verified dispatcher route to a named snapshot ref without moving or deleting tags. |
-| `Branch.Publish` | `func (b Branch) Publish(ctx context.Context, actor Actor, request Request) (Publication, error)` | Publishes authenticated intent, rebuilding selections and charges after compare-and-swap retries. |
-| `Branch.PublishFromSnapshot` | `func (b Branch) PublishFromSnapshot(ctx context.Context, actor Actor, request Request, selected []QueueCommit) (Publication, error)` | Publishes intent selected from a snapshot while rejecting replacement ledgers. |
-| `Branch.Read` | `func (b Branch) Read(ctx context.Context) ([]QueueCommit, error)` | Refreshes the queue head and reads its validated ledger. |
-| `Branch.Reconcile` | `func (b Branch) Reconcile(ctx context.Context, dispatchID, requestID string) (Reconciliation, error)` | Inspects the bound native attempt; missing or unbound runs retain reservations. |
-| `Branch.RecoverDelivery` | `func (b Branch) RecoverDelivery(ctx context.Context, workID, requestID string) (DeliveryRecovery, error)` | Recovers a delivery barrier independently of native capacity; missing proof remains unknown. |
-| `Branch.SynchronizeIssueTransition` | `func (b Branch) SynchronizeIssueTransition(ctx context.Context, requestID string) (result IssueSynchronization, err error)` | Synchronizes one checked terminal request as an explicit maintain/admin action. |
-| `Branch.SynchronizePublishedIssueTransition` | `func (b Branch) SynchronizePublishedIssueTransition(ctx context.Context, publication *Publication) (IssueSynchronization, error)` | Synchronizes the exact checked publication using its publisher's existing writer authority. |
-| `DispatchParameters.MarshalJSON` | `func (parameters DispatchParameters) MarshalJSON() ([]byte, error)` | Serializes dispatch bounds while preserving an explicitly empty worker-profile list. |
-| `LedgerSession.Close` | `func (s *LedgerSession) Close()` | Closes the session and removes its temporary Git object store. |
-| `LedgerSession.Compact` | `func (s *LedgerSession) Compact(ctx context.Context) (Compaction, error)` | Compacts the current queue using the session's object store. |
-| `LedgerSession.Publish` | `func (s *LedgerSession) Publish(ctx context.Context, actor Actor, request Request) (Publication, error)` | Publishes a checked request using the session's object store. |
-| `LedgerSession.Read` | `func (s *LedgerSession) Read(ctx context.Context) ([]QueueCommit, error)` | Refreshes the queue head and reads its validated ledger. |
-| `NativeDeliveryHost.Verifier` | `func (host *NativeDeliveryHost) Verifier(branch Branch) DeliveryVerifier` | Returns the native verifier used for recovery and fresh ledger prefixes. |
-| `ProtocolError.Error` | `func (e *ProtocolError) Error() string` | Formats the stable error code and rejection message as `<code>: <message>`. |
-| `Settings.Apply` | `func (settings Settings) Apply(policy Policy) (Policy, error)` | Applies scheduling preferences to host-approved policy routes without adding profile authority. |
-| `WorkState.SchedulingPriority` | `func (work *WorkState) SchedulingPriority() int` | Computes scheduling priority without changing the admitted definition or historical Claims. |
+| Function | Signature | Description |
+|----------|-----------|-------------|
+| `NewRequest` | `func NewRequest(kind string, actor Actor, parameters any) (Request, error)` | Builds a request with its canonical id. |
+| `RequestID` | `func RequestID(actor Actor, kind string, parameters any) (string, error)` | Computes `request:<sha256>`. |
+| `CommitID` | `func CommitID(previous *string, requestID string) string` | Computes `q_<sha256>`. |
+| `ProposedCommitID` | `func ProposedCommitID(state Projection, request Request) string` | Commit id for a request at the current tip. |
+| `BuildCommit` | `func BuildCommit(state Projection, actor Actor, request Request, operations []Operation, at int64) QueueCommit` | Builds the next commit. |
+| `Op` | `func Op(value any) (Operation, error)` | Canonically encodes an operation. |
+| `ValidateActor` | `func ValidateActor(actor Actor) error` | Validates actor fields. |
+| `Canonical`, `CanonicalValue` | `func Canonical(data []byte) ([]byte, error)`; `func CanonicalValue(value any) ([]byte, error)` | Canonical JSON encoding. |
+| `ErrorCode` | `func ErrorCode(err error) string` | Extracts a protocol error code. |
 
-### Constants
+### Graph and Scheduling Functions
 
-| Constant | Type | Value | Description |
-|----------|------|-------|-------------|
-| `FileName` | untyped string | `"work-queue.jsonl"` | Ledger filename. |
-| `DefaultBranch` | untyped string | `"work-queue"` | Default ledger branch. |
-| `Version` | untyped integer | `3` | Current queue-ledger version. |
-| `MaxTimestamp` | `int64` | `9007199254740991` | Largest timestamp representable as a safe JSON integer. |
-| `MaxEnqueued` | untyped integer | `MaxTimestamp` | Maximum accepted enqueue timestamp. |
-| `MaxClaimsPerDispatch` | untyped integer | `16` | Maximum Claims in a dispatch. |
+| Function | Signature | Description |
+|----------|-----------|-------------|
+| `NewWork` | `func NewWork(graphID, nodeKey, pool, profile, fairnessKey string, priority int, payload []byte, dependsOn []Dependency) (WorkDefinition, error)` | Builds and validates a Work definition. |
+| `ValidateWork` | `func ValidateWork(work WorkDefinition) error` | Validates a Work definition. |
+| `NodeID` | `func NodeID(graphID, nodeKey string) string` | Computes a Work id. |
+| `IndependentGraphID` | `func IndependentGraphID(payload []byte) (string, error)` | Default graph id from the canonical payload. |
+| `GateKey` | `func GateKey(resource Resource, condition string) string` | Observation key for an external edge. |
+| `FIFOCompare` | `func FIFOCompare(a, b Position) int` | Orders Work by FIFO position. |
+| `ClaimIdentity` | `func ClaimIdentity(requestID, workID string) (claimID, dispatchID, handle string)` | Derives Claim, dispatch, and handle ids. |
+| `PlanDispatch` | `func PlanDispatch(state Projection, parameters DispatchParameters, requestID string) (Decision, error)` | Plans a priority-FIFO `dispatch_next` selection. |
+| `Projection.EligibleWork` | `func (state Projection) EligibleWork(pool string, profiles map[string]DispatchProfile) []*WorkState` | Lists eligible Work in scheduling order. |
+| `Projection.PoolOccupancy` | `func (state Projection) PoolOccupancy(pool string) (int, map[string]int)` | Counts non-closed dispatches and open Claims per fairness key. |
+| `AssignmentForDispatch` | `func AssignmentForDispatch(state Projection, dispatchID string) (Assignment, error)` | Builds a worker assignment. |
+| `AssignmentsForRequest` | `func AssignmentsForRequest(state Projection, requestID string) ([]Assignment, error)` | Builds assignments for a committed request. |
+
+### Transport and Settings Functions
+
+| Function | Signature | Description |
+|----------|-----------|-------------|
+| `Branch.Read` | `func (b Branch) Read(ctx context.Context) (Snapshot, error)` | Reads and replays the queue branch. |
+| `Branch.Publish` | `func (b Branch) Publish(ctx context.Context, actor Actor, kind string, parameters any, operationsFor OperationsFor) (Publication, error)` | Publishes one request with compare-and-swap retries. |
+| `Branch.Checkpoint` | `func (b Branch) Checkpoint(ctx context.Context, actor Actor, minimumLines int) (CheckpointResult, error)` | Replaces the log with one Checkpoint commit. |
+| `ParseSettings` | `func ParseSettings(data []byte) (Settings, error)` | Parses a `work_queue` settings object. |
+| `ParseRepositorySettings` | `func ParseRepositorySettings(data []byte) (Settings, error)` | Parses `work_queue` from an `aw.json` document. |
+| `BuildPolicyEnv` | `func BuildPolicyEnv(settings Settings, repository string, workflows []string) (PolicyEnv, error)` | Compiles settings and worker workflows into the policy environment. |
+| `ParsePolicyEnv` | `func ParsePolicyEnv(data []byte) (PolicyEnv, error)` | Parses a policy environment. |
+| `ValidatePolicyEnv` | `func ValidatePolicyEnv(env PolicyEnv) error` | Validates a policy environment. |
+| `PolicyEnv.MarshalJSON` | `func (env PolicyEnv) MarshalJSON() ([]byte, error)` | Canonical policy-environment encoding. |
 
 ## Usage Example
 
 ```go
+branch := workqueue.Branch{Remote: "owner/repo", Name: workqueue.DefaultBranch}
+snapshot, err := branch.Read(ctx)
+if err != nil {
+	panic(err)
+}
+fmt.Println(snapshot.Head, snapshot.State.Stats.Work, snapshot.State.Stats.Available)
+
 data, err := os.ReadFile(workqueue.FileName)
 if err != nil {
 	panic(err)
 }
-
-commits, err := workqueue.Parse(data)
+state, err := workqueue.ReplayLog(data)
 if err != nil {
 	panic(err)
 }
-
-state, err := workqueue.Replay(commits)
-if err != nil {
-	panic(err)
-}
-
 fmt.Println(state.Repository, state.Stats.Work)
 ```
 
 ## Design Decisions
 
-The ledger is the durable source of truth; `Projection` is derived state, not an independently authoritative store. Queue writes are modeled as validated transactions, and replay rechecks commit and lifecycle invariants instead of trusting a supplied snapshot.
+The ledger is the durable source of truth; `Projection` is derived state. Replay revalidates every commit, role, and transition instead of trusting a supplied snapshot, and never reads the informational `At` field. Request ids are content hashes, so retrying the same intent is idempotent and a request found on re-read is reported as `Recovered`.
 
-Scheduling produces a plan without mutating the projection. A Claim authorizes one attempt, while verified delivery establishes a Result; completion, cancellation, and reservation release are distinct lifecycle facts. Repository settings describe scheduling preferences and are not an authorization source.
+Scheduling is priority then FIFO, bounded by pool concurrency and an optional per-account limit. `PlanDispatch` produces a plan without mutating the projection; replay does not re-plan selection. A Claim owns one attempt; a Completion records the applied effects, and a cancelled Claim returns its Work to the pool. Configuration lives in the compiled policy environment, so changing `aw.json` needs no ledger change. The protocol has no clocks: no deadlines, expiry, or backoff.
 
 ## Dependencies
 
-Core serialization and ledger logic use the Go standard library. Repository and host integrations use `go-gh`, `pkg/console`, `pkg/envutil`, `pkg/githubapi`, `pkg/logger`, and `pkg/parser`. JSON Schema validation uses `github.com/santhosh-tekuri/jsonschema/v6`.
+Core serialization and ledger logic use the Go standard library. Git transport uses the `git` executable and `github.com/cli/go-gh/v2/pkg/auth` for credentials. Logging and environment helpers use `pkg/logger` and `pkg/envutil`.
 
 ## Concurrency
 
-`Projection` and its nested maps are mutable caller-visible state. Callers should not mutate a projection concurrently with replay or planning operations; this package does not provide a package-wide synchronization guarantee.
+`Projection` and its nested maps are mutable caller-visible state. Callers should not mutate a projection concurrently with replay or planning operations; this package does not provide a package-wide synchronization guarantee. Concurrent writers coordinate only through compare-and-swap ref updates on the queue branch.
 
 ---
 

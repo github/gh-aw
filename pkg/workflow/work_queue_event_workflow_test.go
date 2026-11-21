@@ -15,7 +15,8 @@ func TestGenerateWorkQueueEventWorkflowWhenIssueMirroringIsEnabled(t *testing.T)
 	t.Setenv("GH_AW_ACTION_MODE", "dev")
 	dir := t.TempDir()
 	data := []*WorkflowData{{
-		Tools: map[string]any{"work-queue": map[string]any{"issues": true}},
+		Tools:           map[string]any{"work-queue": map[string]any{"issues": true}},
+		WorkQueuePolicy: &WorkQueuePolicyConfig{PolicyJSON: `{"version":4}`},
 	}}
 
 	require.NoError(t, GenerateWorkQueueEventWorkflow(context.Background(), data, dir, nil))
@@ -25,6 +26,7 @@ func TestGenerateWorkQueueEventWorkflowWhenIssueMirroringIsEnabled(t *testing.T)
 	require.Contains(t, string(content), "  issues:\n    types: [closed]")
 	require.Contains(t, string(content), "  issue_comment:\n    types: [created]")
 	require.Contains(t, string(content), "cancel_work_queue_closed_issue.cjs")
+	require.Contains(t, string(content), `GH_AW_WORK_QUEUE_POLICY: "{\"version\":4}"`)
 }
 
 func TestGenerateWorkQueueEventWorkflowRemovesWhenIssueMirroringIsUnused(t *testing.T) {
