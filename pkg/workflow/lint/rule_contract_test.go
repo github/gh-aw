@@ -34,6 +34,18 @@ const contractSafeSteps = "    steps:\n      - shell: bash\n        run: echo pu
 
 func builtInRuleContracts() map[string]ruleContract {
 	return map[string]ruleContract{
+		"unpinned-images": {
+			targets: ActionsAST | AWAST, severity: Warning,
+			unsafe: contractJob + "    container: node:latest\n" + contractSafeSteps,
+			safe:   contractJob + contractSafeSteps,
+			path:   "jobs.check.container",
+		},
+		"environment-file-injection": {
+			targets: ActionsAST | AWAST,
+			unsafe:  contractJob + "    steps:\n      - shell: bash\n        env: {BODY: '${{ github.event.comment.body }}'}\n        run: printf 'VALUE=%s\\n' \"$BODY\" >> \"$GITHUB_ENV\"\n",
+			safe:    contractJob + contractSafeSteps,
+			path:    "jobs.check.steps[0].run",
+		},
 		"privileged-checkout": {
 			targets: ActionsAST | AWAST, severity: Warning,
 			unsafe: "on: pull_request_target\n" + contractJob + "    steps:\n      - uses: actions/checkout@v7\n        with: {allow-unsafe-pr-checkout: true}\n",
@@ -379,7 +391,7 @@ func ruleContractInput(t *testing.T, source string, target ASTTargets, nonstrict
 func assertRuleContractDiagnostics(t *testing.T, id string, contract ruleContract, target ASTTargets, nonstrict, positive bool, diagnostics []Diagnostic) {
 	t.Helper()
 	want := make(map[string]Severity)
-	if id == "secret-leak" && target == AWAST {
+	if (id == "secret-leak" || id == "environment-file-injection") && target == AWAST {
 		// AW-only analysis must retain its generated-execution coverage gap,
 		// including in the negative case; it is not a secret disclosure.
 		want["workflow"] = Warning
@@ -412,7 +424,7 @@ func assertRuleContractDiagnostics(t *testing.T, id string, contract ruleContrac
 		assert.Equal(t, severity, diagnostic.Severity)
 		assert.NotEmpty(t, diagnostic.Message)
 		if diagnostic.Path == "workflow" {
-			assert.Equal(t, "Incomplete secret-leak analysis: only authored AW execution nodes are available; imports, generated steps, cross-job flows and compiler defaults require the compiled Actions AST", diagnostic.Message)
+			assert.Equal(t, "Incomplete "+id+" analysis: only authored AW execution nodes are available; imports, generated steps, cross-job flows and compiler defaults require the compiled Actions AST", diagnostic.Message)
 		}
 		delete(want, diagnostic.Path)
 	}

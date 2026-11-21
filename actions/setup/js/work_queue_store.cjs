@@ -4,7 +4,7 @@
 const { TextDecoder } = require("node:util");
 const { createHash } = require("node:crypto");
 const log = require("./work_queue_logging.cjs").createWorkQueueLogger("store");
-const { canonical, digest, identity, integer, queueError } = require("./work_queue_codec.cjs");
+const { canonical, identity, integer, queueError } = require("./work_queue_codec.cjs");
 const { actorFromContext, validatePolicy, validateRequestRole, validateTrustedContext } = require("./work_queue_policy.cjs");
 const { assignmentsForRequest } = require("./work_queue_scheduler.cjs");
 const { validateEffectResource } = require("./work_queue_resource_scope.cjs");
@@ -395,10 +395,11 @@ async function verifyCheckpointGitHistory(options, head, transactions) {
   const verified = cached && scope && cached.scope === scope ? cached.proofs : new Set();
   const pending = new Set();
   let root = transactions[0];
+  let lines = transactions.map(transaction => canonical(transaction) + "\n");
   verification: while (root?.operations?.[0]?.kind === "Checkpoint") {
     const checkpoint = root.operations[0];
-    const checkpointDigest = digest(root);
-    let lines = transactions.map(transaction => canonical(transaction) + "\n");
+    // lines[0] is canonical(root) + "\n", so this equals digest(root) without a second canonical pass.
+    const checkpointDigest = createHash("sha256").update(lines[0].slice(0, -1), "utf8").digest("hex");
     const rootBytes = Buffer.byteLength(lines[0], "utf8");
     let validatedPrefix = lines.join("");
     let prefixes = queueGitScope(githubClient) ? canonicalGitPrefixes(lines, head.length) : undefined;
@@ -427,10 +428,11 @@ async function verifyCheckpointGitHistory(options, head, transactions) {
       }
       if (parent === checkpoint.prior_git_sha) {
         try {
-          const state = replayCheckpointSource(contents, parent, root);
+          const source = replayCheckpointSource(contents, parent, root);
           head = parent;
-          transactions = state.transactions;
+          transactions = source.state.transactions;
           root = transactions[0];
+          lines = source.lines;
           break;
         } catch (error) {
           // Preserve the existing deployment-checkpoint recovery path.
@@ -440,25 +442,21 @@ async function verifyCheckpointGitHistory(options, head, transactions) {
       const { state } = await replayVerifiedQueueLog({ ...options, coreApi: undefined }, parent, contents, false);
       const previous = { transactions: state.transactions, state };
       if (previous.transactions[0]?.id === root.id) {
-        if (canonical(previous.transactions[0]) !== canonical(root)) throw invalid();
-        lines = previous.transactions.map(transaction => canonical(transaction) + "\n");
+        const previousLines = previous.transactions.map(transaction => canonical(transaction) + "\n");
+        if (previousLines[0] !== lines[0]) throw invalid();
+        lines = previousLines;
         validatedPrefix = lines.join("");
         prefixes = queueGitScope(githubClient) ? canonicalGitPrefixes(lines, head.length) : undefined;
         current = parent;
         continue;
       }
-      if (
-        parent !== checkpoint.prior_git_sha ||
-        !previous.transactions.length ||
-        createHash("sha256")
-          .update(previous.transactions.map(transaction => canonical(transaction) + "\n").join(""), "utf8")
-          .digest("hex") !== checkpoint.history_sha256
-      )
-        throw invalid();
+      const previousLines = previous.transactions.map(transaction => canonical(transaction) + "\n");
+      if (parent !== checkpoint.prior_git_sha || !previous.transactions.length || createHash("sha256").update(previousLines.join(""), "utf8").digest("hex") !== checkpoint.history_sha256) throw invalid();
       if (previous.state.tip !== checkpoint.prior_tip || reconstructCheckpoint(previous.transactions, parent, root.actor, root.at, checkpoint.state_sha256)[0].operations[0].state_sha256 !== checkpoint.state_sha256) throw invalid();
       head = parent;
       transactions = previous.transactions;
       root = previous.transactions[0];
+      lines = previousLines;
       break;
     }
   }
