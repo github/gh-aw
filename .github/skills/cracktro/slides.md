@@ -506,11 +506,11 @@ red team, firewall escape, pentest, adversarial, security testing
 
 #### Summary
 
-GitHub Agentic Workflows applies Microsoft's six Responsible AI principles (fairness, reliability and safety, privacy and security, inclusiveness, transparency and accountability) through reviewable instructions, a sandboxed agent, gated writes and traceable outputs, as safeguards rather than guarantees.
+GitHub Agentic Workflows supports responsible AI principles (fairness, reliability and safety, privacy and security, inclusiveness, transparency and accountability) through reviewable instructions, a sandboxed agent, gated writes and traceable outputs, as safeguards rather than guarantees.
 
 #### Keywords
 
-Microsoft Responsible AI Standard, RAI, responsible AI principles, fairness, reliability and safety, privacy and security, inclusiveness, transparency, accountability, AI-generated footer, staged mode, safe outputs, manual-approval, roles, human in the loop, read-only token, min-integrity, threat detection, transparency note
+RAI, responsible AI principles, fairness, reliability and safety, privacy and security, inclusiveness, transparency, accountability, AI-generated footer, staged mode, safe outputs, manual-approval, roles, human in the loop, read-only token, min-integrity, threat detection, transparency note
 
 #### Captions
 

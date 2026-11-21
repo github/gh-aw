@@ -15813,7 +15813,7 @@
     });
   }
 
-  // Responsible AI: Microsoft's six Responsible AI principles, each mapped to the gh-aw controls that apply it; arrows step through them
+  // Responsible AI: six principles, each mapped to the gh-aw controls that support it; arrows step through them
   {
     resetIndex();
     const ICON = {
@@ -15834,9 +15834,7 @@
         "M15.5 12a3.5 3.5 0 1 1-7 0 3.5 3.5 0 0 1 7 0Z",
         "M12 3.5c3.432 0 6.124 1.534 8.054 3.241 1.926 1.703 3.132 3.61 3.616 4.46a1.6 1.6 0 0 1 0 1.598c-.484.85-1.69 2.757-3.616 4.461-1.929 1.706-4.622 3.24-8.054 3.24-3.432 0-6.124-1.534-8.054-3.24C2.02 15.558.814 13.65.33 12.8a1.6 1.6 0 0 1 0-1.598c.484-.85 1.69-2.757 3.616-4.462C5.875 5.034 8.568 3.5 12 3.5ZM1.633 11.945a.115.115 0 0 0-.017.055c.001.02.006.039.017.056.441.774 1.551 2.527 3.307 4.08C6.691 17.685 9.045 19 12 19c2.955 0 5.31-1.315 7.06-2.864 1.756-1.553 2.866-3.306 3.307-4.08a.111.111 0 0 0 .017-.056.111.111 0 0 0-.017-.056c-.441-.773-1.551-2.527-3.307-4.08C17.309 6.315 14.955 5 12 5 9.045 5 6.69 6.314 4.94 7.865c-1.756 1.552-2.866 3.306-3.307 4.08Z",
       ],
-      person: [
-        "M12 2.5a5.5 5.5 0 0 1 3.096 10.047 9.005 9.005 0 0 1 5.9 8.181.75.75 0 1 1-1.499.044 7.5 7.5 0 0 0-14.993 0 .75.75 0 0 1-1.5-.045 9.005 9.005 0 0 1 5.9-8.18A5.5 5.5 0 0 1 12 2.5ZM8 8a4 4 0 1 0 8 0 4 4 0 0 0-8 0Z",
-      ],
+      person: ["M12 2.5a5.5 5.5 0 0 1 3.096 10.047 9.005 9.005 0 0 1 5.9 8.181.75.75 0 1 1-1.499.044 7.5 7.5 0 0 0-14.993 0 .75.75 0 0 1-1.5-.045 9.005 9.005 0 0 1 5.9-8.18A5.5 5.5 0 0 1 12 2.5ZM8 8a4 4 0 1 0 8 0 4 4 0 0 0-8 0Z"],
     };
     // [principle, icon, how gh-aw applies it, controls]
     const RAI = [
@@ -15865,7 +15863,7 @@
     const el = h(
       "section",
       { class: "slide rai" },
-      h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Microsoft's six principles, applied by gh-aw"), h("h2", {}, letters("Responsible "), letters("AI", "l-grad"))),
+      h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Responsible AI principles in gh-aw"), h("h2", {}, letters("Responsible "), letters("AI", "l-grad"))),
       h("div", { class: "rai-grid" }, cards),
       h("div", { class: "rai-foot" }, h("b", {}, "Safeguards, not guarantees"), " · owners still define, trial and monitor each workflow")
     );
@@ -15880,7 +15878,7 @@
     slides.push({
       group: "security",
       notes:
-        "What: Microsoft's six Responsible AI principles, each paired with the gh-aw controls that apply it; the arrow keys step through them. Reliability, privacy and accountability come from the sandbox, read-only token, safe outputs and approval gates; transparency from AI-generated footers, reviewable lock files and audits.\nWhy: Principles help only when they become defaults you can inspect. These are safeguards, not guarantees: nothing here certifies that an output is accurate or fair.\nWhen: Before rollout, name who a workflow affects, trial it in staged mode on representative, multilingual and adversarial inputs, and keep a person on impactful writes.",
+        "What: Six responsible AI principles, each paired with gh-aw controls that support them; the arrow keys step through them. Reliability, privacy and accountability come from the sandbox, read-only token, safe outputs and approval gates; transparency from AI-generated footers, reviewable lock files and audits.\nWhy: Principles help only when they become defaults you can inspect. These are safeguards, not guarantees: nothing here certifies that an output is accurate or fair.\nWhen: Before rollout, name who a workflow affects, trial it in staged mode on representative, multilingual and adversarial inputs, and keep a person on impactful writes.",
       enter(dir) {
         focus(dir < 0 ? RAI.length - 1 : -1);
       },
