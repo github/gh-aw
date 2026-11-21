@@ -20,12 +20,17 @@ func (c *Compiler) validateLSPSupport(workflowData *WorkflowData) error {
 	if err := manager.Validate(); err != nil {
 		return err
 	}
-	if config, ok := manager.servers["typescript"]; ok && config.Version != "" && strings.TrimPrefix(config.Version, "v") != typescriptLSPVersion {
-		return NewValidationError(
-			"lsp.typescript.version", config.Version,
-			"the built-in TypeScript language server only supports locked version "+typescriptLSPVersion,
-			fmt.Sprintf("Omit the version or set version: %q. To use another version, install a checked-in npm project with npm ci in pre-agent-steps: and configure the server under lsp.typescript-custom.", typescriptLSPVersion),
-		)
+	if config, ok := manager.servers["typescript"]; ok {
+		if typescriptLSPPinsErr != nil {
+			return fmt.Errorf("load bundled TypeScript LSP pins: %w", typescriptLSPPinsErr)
+		}
+		if config.Version != "" && strings.TrimPrefix(config.Version, "v") != typescriptLSPVersion {
+			return NewValidationError(
+				"lsp.typescript.version", config.Version,
+				"the built-in TypeScript language server only supports locked version "+typescriptLSPVersion,
+				fmt.Sprintf("Omit the version or set version: %q. To use another version, install a checked-in npm project with npm ci in pre-agent-steps: and configure the server under lsp.typescript-custom.", typescriptLSPVersion),
+			)
+		}
 	}
 
 	engineID := ResolveEngineID(workflowData)

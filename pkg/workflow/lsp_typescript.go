@@ -1,55 +1,51 @@
 package workflow
 
 import (
-	_ "embed"
-	"strings"
+	"crypto/sha256"
+	"encoding/json"
+	"errors"
+	"fmt"
 
+	"github.com/github/gh-aw/actions/setup"
 	"github.com/github/gh-aw/pkg/constants"
 )
 
 const (
-	typescriptLSPVersion = "4.3.3"
-	typescriptLSPDir     = constants.GhAwRootDirShell + "/engine-cli/typescript-lsp"
-	typescriptLSPBinDir  = typescriptLSPDir + "/node_modules/.bin"
+	typescriptLSPDir    = constants.GhAwRootDirShell + "/engine-cli/typescript-lsp"
+	typescriptLSPBinDir = typescriptLSPDir + "/node_modules/.bin"
 )
 
-//go:embed lsp/typescript/package.json
-var typescriptLSPManifest string
+var typescriptLSPVersion, typescriptLSPManifestSHA256, typescriptLSPLockSHA256, typescriptLSPPinsErr = loadTypeScriptLSPPins()
 
-//go:embed lsp/typescript/package-lock.json
-var typescriptLSPLock string
+func loadTypeScriptLSPPins() (version, manifestSHA256, lockSHA256 string, err error) {
+	manifest, err := setup.TypeScriptLSPProject.ReadFile("typescript-lsp/package.json")
+	if err != nil {
+		return "", "", "", err
+	}
+	lock, err := setup.TypeScriptLSPProject.ReadFile("typescript-lsp/package-lock.json")
+	if err != nil {
+		return "", "", "", err
+	}
+	var project struct {
+		Dependencies map[string]string `json:"dependencies"`
+	}
+	if err := json.Unmarshal(manifest, &project); err != nil {
+		return "", "", "", err
+	}
+	version = project.Dependencies["typescript-language-server"]
+	if version == "" {
+		return "", "", "", errors.New("embedded TypeScript LSP manifest is missing the typescript-language-server version")
+	}
+	return version, fmt.Sprintf("%x", sha256.Sum256(manifest)), fmt.Sprintf("%x", sha256.Sum256(lock)), nil
+}
 
 func generateTypeScriptLSPInstallStep() GitHubActionStep {
-	step := GitHubActionStep{
+	return GitHubActionStep{
 		"      - name: Install TypeScript LSP dependencies",
 		"        shell: bash",
 		"        run: |",
-		"          set -euo pipefail",
-		`          install_dir="` + typescriptLSPDir + `"`,
-		`          mkdir -p "$install_dir"`,
+		fmt.Sprintf(`          bash "%s/install_typescript_lsp.sh" %s %s`, SetupActionDestinationShell, typescriptLSPManifestSHA256, typescriptLSPLockSHA256),
 	}
-	for _, file := range []struct{ name, contents string }{
-		{"package.json", typescriptLSPManifest},
-		{"package-lock.json", typescriptLSPLock},
-	} {
-		script := `printf '%s\n' ` + shellEscapeArg(strings.TrimSuffix(file.contents, "\n")) + ` > "$install_dir/` + file.name + `"`
-		for line := range strings.SplitSeq(script, "\n") {
-			step = append(step, "          "+line)
-		}
-	}
-	return append(step,
-		// Keep the runner's registry and credentials; npm maps the canonical npmjs lock URLs to that registry.
-		`          npm ci --prefix "$install_dir" --replace-registry-host=npmjs --no-audit --no-fund`,
-		`          bin_dir="$install_dir/node_modules/.bin"`,
-		`          if [[ "${RUNNER_OS:-}" == Windows ]]; then`,
-		`            if command -v wslpath >/dev/null 2>&1; then`,
-		`              bin_dir="$(wslpath -w "$bin_dir")"`,
-		`            else`,
-		`              bin_dir="$(cygpath -w "$bin_dir")"`,
-		`            fi`,
-		`          fi`,
-		`          printf '%s\n' "$bin_dir" >> "$GITHUB_PATH"`,
-	)
 }
 
 func prependTypeScriptLSPPath(data *WorkflowData, command string) string {

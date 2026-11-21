@@ -445,25 +445,64 @@ func TestTypeScriptLSPInstallPath(t *testing.T) {
 		{"Linux", "Linux", ""},
 		{"WSL", "Windows", "wslpath"},
 		{"Git Bash", "Windows", "cygpath"},
+		{"Mismatched lock", "Linux", ""},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			temp := t.TempDir()
 			binDir := filepath.Join(temp, "gh-aw", "engine-cli", "typescript-lsp", "node_modules", ".bin")
-			if err := os.MkdirAll(binDir, 0700); err != nil {
+			bin := filepath.Join(temp, "mock-bin")
+			actionDir := filepath.Join(temp, "gh-aw", "actions")
+			if err := os.MkdirAll(filepath.Join(actionDir, "typescript-lsp"), 0700); err != nil {
 				t.Fatal(err)
 			}
+			if err := os.Mkdir(bin, 0700); err != nil {
+				t.Fatal(err)
+			}
+			for _, file := range []string{"sh/install_typescript_lsp.sh", "sh/release_integrity.sh", "typescript-lsp/package.json", "typescript-lsp/package-lock.json"} {
+				contents, err := os.ReadFile(filepath.Join("..", "..", "actions", "setup", file))
+				if err != nil {
+					t.Fatal(err)
+				}
+				if tc.name == "Mismatched lock" && strings.HasSuffix(file, "package-lock.json") {
+					contents = append(contents, ' ')
+				}
+				if err := os.WriteFile(filepath.Join(actionDir, strings.TrimPrefix(file, "sh/")), contents, 0600); err != nil {
+					t.Fatal(err)
+				}
+			}
 			pathFile := filepath.Join(temp, "github-path")
-			// Exercise the generated script without a live registry or Windows tools.
-			setup := "PATH=/nonexistent\nmkdir() { :; }\nnpm() { :; }\n"
+			npmCall := filepath.Join(temp, "npm-called")
+			const mockNpm = `#!/bin/bash
+[[ "$#" == 4 && "$1" == ci && "$PWD/node_modules/.bin" == "$EXPECTED_BIN_DIR" &&
+   "$2" == --replace-registry-host=npmjs && "$3" == --no-audit && "$4" == --no-fund ]] || exit 1
+printf 'called\n' > "$NPM_CALL"
+`
+			if err := os.WriteFile(filepath.Join(bin, "npm"), []byte(mockNpm), 0700); err != nil {
+				t.Fatal(err)
+			}
 			want := binDir
 			if tc.converter != "" {
 				want = `C:\runner temp\gh-aw\engine-cli\typescript-lsp\node_modules\.bin`
-				setup += tc.converter + `() { [[ "$1" == -w && "$2" == "$EXPECTED_BIN_DIR" ]] || return 1; printf '%s\n' "$WINDOWS_BIN_DIR"; }` + "\n"
+				const mockConverter = "#!/bin/bash\n" + `[[ "$1" == -w && "$2" == "$EXPECTED_BIN_DIR" ]] || exit 1; printf '%s\n' "$WINDOWS_BIN_DIR"` + "\n"
+				if err := os.WriteFile(filepath.Join(bin, tc.converter), []byte(mockConverter), 0700); err != nil {
+					t.Fatal(err)
+				}
 			}
-			cmd := exec.CommandContext(t.Context(), bash, "--noprofile", "--norc", "-c", setup+fields["run"].(string))
+			cmd := exec.CommandContext(t.Context(), bash, "--noprofile", "--norc", "-c", fields["run"].(string))
 			cmd.Env = []string{"RUNNER_OS=" + tc.runnerOS, "RUNNER_TEMP=" + temp, "GITHUB_PATH=" + pathFile,
-				"EXPECTED_BIN_DIR=" + binDir, "WINDOWS_BIN_DIR=" + want}
-			if output, err := cmd.CombinedOutput(); err != nil {
+				"EXPECTED_BIN_DIR=" + binDir, "WINDOWS_BIN_DIR=" + want, "NPM_CALL=" + npmCall,
+				"PATH=" + bin + ":/usr/bin:/bin"}
+			output, err := cmd.CombinedOutput()
+			if tc.name == "Mismatched lock" {
+				if err == nil || !strings.Contains(string(output), "SHA256 verification failed for package-lock.json") {
+					t.Fatalf("installer did not reject the mismatched lock: %v\n%s", err, output)
+				}
+				if _, err := os.Stat(npmCall); !os.IsNotExist(err) {
+					t.Fatalf("mismatched lock should fail before npm, stat err = %v", err)
+				}
+				return
+			}
+			if err != nil {
 				t.Fatalf("run installer: %v\n%s", err, output)
 			}
 			if got, err := os.ReadFile(pathFile); err != nil || string(got) != want+"\n" {
@@ -510,12 +549,13 @@ Inspect the TypeScript code.
 	}
 	const installerHeader = "      - name: Install TypeScript LSP dependencies\n"
 	before, remainder, ok := strings.Cut(string(lock), installerHeader)
-	if !ok || !strings.Contains(before, "'NPM_CONFIG_REGISTRY=https://mirror.example.com/'") {
-		t.Fatal("expected the npm mirror step before the installer")
+	if !ok || !strings.Contains(before, "'NPM_CONFIG_REGISTRY=https://mirror.example.com/'") ||
+		!strings.Contains(before, "- name: Setup Scripts") {
+		t.Fatal("expected setup action assets and the npm mirror step before the installer")
 	}
 	installer, after, _ := strings.Cut(remainder, "\n      - ")
 	if !strings.Contains(installer, "shell: pwsh") ||
-		!strings.Contains(decodeWindowsWSLRunScript(t, installer), `npm ci --prefix "$install_dir" --replace-registry-host=npmjs`) {
+		!strings.Contains(decodeWindowsWSLRunScript(t, installer), `/install_typescript_lsp.sh" `+typescriptLSPManifestSHA256+` `+typescriptLSPLockSHA256) {
 		t.Fatal("expected the locked TypeScript installer to run inside WSL")
 	}
 	lookalike := renderWindowsPOSIXRunStep(strings.Join(generateTypeScriptLSPInstallStep(), "\n")+"\n", nil)

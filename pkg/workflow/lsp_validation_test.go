@@ -56,7 +56,8 @@ func TestValidateLSPSupport(t *testing.T) {
 }
 
 func TestValidateTypeScriptLSPLockedVersion(t *testing.T) {
-	for _, version := range []string{"", "4.3.3", "v4.3.3", "5.0.0"} {
+	const unsupported = "0.0.0"
+	for _, version := range []string{"", typescriptLSPVersion, "v" + typescriptLSPVersion, unsupported} {
 		t.Run(version, func(t *testing.T) {
 			config := LSPServerConfig{
 				Command:        "typescript-language-server",
@@ -65,9 +66,9 @@ func TestValidateTypeScriptLSPLockedVersion(t *testing.T) {
 			}
 			data := &WorkflowData{LSP: map[string]LSPServerConfig{"TypeScript": config}}
 			err := NewCompiler().validateLSPSupport(data)
-			if version == "5.0.0" {
+			if version == unsupported {
 				require.ErrorContains(t, err, "lsp.typescript.version")
-				require.ErrorContains(t, err, `version: "4.3.3"`)
+				require.ErrorContains(t, err, `version: "`+typescriptLSPVersion+`"`)
 				require.ErrorContains(t, err, "lsp.typescript-custom")
 				data.LSP = map[string]LSPServerConfig{"typescript-custom": config}
 				require.NoError(t, NewCompiler().validateLSPSupport(data))
