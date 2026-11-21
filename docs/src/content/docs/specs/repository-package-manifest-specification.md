@@ -271,6 +271,10 @@ The remove lifecycle uninstalls a previously installed package by deleting its i
 
 > **Note**: Package-installed documentation files (for example `README.md`) are within the scope of R-PKG-R001 and follow modified-file protection in R-PKG-R002.
 
+### 5.4 Bounded Formal Model
+
+The [package lifecycle model](https://github.com/github/gh-aw/blob/main/specs/repository-package/PackageLifecycle.tla) and [TLC configuration](https://github.com/github/gh-aw/blob/main/specs/repository-package/PackageLifecycle.cfg) check install and update publication, stale-file preservation, rollback diagnostics, and removal ownership and confirmation. The model considers one package operation at a time and treats files and ownership records as jointly published. It models failures before publication and errors cleaning up staged files; it does not establish atomicity or crash recovery for a concrete filesystem implementation.
+
 ## 6. Documentation
 
 Package documentation is `README.md` in the package root.

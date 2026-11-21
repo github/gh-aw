@@ -7048,6 +7048,8 @@ The YAML configuration key is `report-missing-data`. The legacy tool/output type
 
 ## 8. Protocol Exchange Patterns
 
+The bounded [compiled workflow model](https://github.com/github/gh-aw/blob/main/specs/workflow-security/CompiledWorkflow.tla) abstracts the handoff from agent requests through artifact provenance, detection, authorization, and privileged effects. It does not model JSON-RPC framing or the NDJSON encoding.
+
 ### 8.1 Stdio Container Transport Layer
 
 **Transport**: stdio (JSON-RPC 2.0 over stdin/stdout)  
