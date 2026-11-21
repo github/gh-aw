@@ -1,10 +1,16 @@
 package cli
 
 import (
+	"errors"
 	"fmt"
 	"io"
+	"io/fs"
+	"os"
+	"path/filepath"
 	"slices"
 	"strings"
+
+	"github.com/github/gh-aw/pkg/constants"
 )
 
 func continuationRequestCount(requests []ContinuationRequestReport) *int {
@@ -16,16 +22,62 @@ func continuationRequestCount(requests []ContinuationRequestReport) *int {
 }
 
 func backfillContinuationRequests(requests *[]ContinuationRequestReport, run WorkflowRun, runDir string, verbose bool) bool {
-	if *requests != nil {
-		return false
-	}
 	if !continuationEvidenceMatchesRun(run, runDir, verbose) {
 		*requests = nil
+		return false
+	}
+	if *requests != nil {
 		return false
 	}
 	experiment, variant, _ := firstExperimentAssignment(extractExperimentData(runDir))
 	*requests, _ = extractContinuationRequestsFromRun(runDir, run, verbose, experiment, variant)
 	return *requests != nil
+}
+
+func continuationEvidenceIdentityChanged(cachedRun, currentRun WorkflowRun) bool {
+	if cachedRun.DatabaseID <= 0 || currentRun.DatabaseID <= 0 ||
+		cachedRun.Attempt <= 0 || currentRun.Attempt <= 0 ||
+		cachedRun.Repository == "" || currentRun.Repository == "" ||
+		cachedRun.UpdatedAt.IsZero() || currentRun.UpdatedAt.IsZero() {
+		return false
+	}
+	return cachedRun.DatabaseID != currentRun.DatabaseID ||
+		cachedRun.Attempt != currentRun.Attempt ||
+		!strings.EqualFold(cachedRun.Repository, currentRun.Repository) ||
+		!cachedRun.UpdatedAt.Equal(currentRun.UpdatedAt)
+}
+
+func invalidateContinuationArtifactEvidence(runDir string) error {
+	if err := invalidateAgentOutputDownloadMarkers(runDir); err != nil {
+		return err
+	}
+	markerDir := filepath.Join(runDir, downloadedArtifactsMarkerDir)
+	return filepath.WalkDir(runDir, func(path string, entry fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() && path == markerDir {
+			return fs.SkipDir
+		}
+		if entry.IsDir() {
+			if path == runDir ||
+				(!artifactNameMatchesBase(entry.Name(), constants.AgentArtifactName.String()) &&
+					!artifactNameMatchesBase(entry.Name(), constants.AgentOutputFallbackArtifactName.String())) {
+				return nil
+			}
+			if err := os.RemoveAll(path); err != nil {
+				return fmt.Errorf("failed to remove stale continuation artifact directory %s: %w", path, err)
+			}
+			return fs.SkipDir
+		}
+		if entry.Name() != constants.AgentOutputFilename.String() {
+			return nil
+		}
+		if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
+			return fmt.Errorf("failed to remove stale continuation evidence %s: %w", path, err)
+		}
+		return nil
+	})
 }
 
 func continuationEvidenceMatchesRun(run WorkflowRun, runDir string, verbose bool) bool {

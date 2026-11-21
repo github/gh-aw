@@ -401,14 +401,22 @@ func extractEpisodeContinuationRequests(runDir string, run WorkflowRun) ([]Conti
 		dirs = dirs[:1]
 	}
 	var requests []ContinuationRequestReport
-	seen := make(map[ContinuationRequestReport]struct{})
+	type continuationRequestIdentity struct {
+		message   string
+		timestamp string
+	}
+	seenOccurrences := make(map[continuationRequestIdentity]int)
+	collectionExperiment, collectionVariant, _ := firstExperimentAssignment(extractExperimentData(runDir))
 	foundOutput, invalidOutput := false, false
 	for _, dir := range dirs {
 		if resolveAgentOutputFile(dir, false) == "" {
 			continue
 		}
 		foundOutput = true
-		experiment, variant, _ := firstExperimentAssignment(extractExperimentData(dir))
+		experiment, variant, ok := firstExperimentAssignment(extractExperimentData(dir))
+		if !ok {
+			experiment, variant = collectionExperiment, collectionVariant
+		}
 		extracted, err := extractContinuationRequestsFromRun(dir, run, false, experiment, variant)
 		if err != nil {
 			return nil, err
@@ -420,11 +428,14 @@ func extractEpisodeContinuationRequests(runDir string, run WorkflowRun) ([]Conti
 		if requests == nil {
 			requests = []ContinuationRequestReport{}
 		}
+		currentOccurrences := make(map[continuationRequestIdentity]int)
 		for _, request := range extracted {
-			if _, exists := seen[request]; exists {
+			identity := continuationRequestIdentity{message: request.Message, timestamp: request.Timestamp}
+			currentOccurrences[identity]++
+			if currentOccurrences[identity] <= seenOccurrences[identity] {
 				continue
 			}
-			seen[request] = struct{}{}
+			seenOccurrences[identity] = currentOccurrences[identity]
 			requests = append(requests, request)
 		}
 	}

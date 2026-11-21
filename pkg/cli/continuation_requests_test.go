@@ -60,13 +60,19 @@ func TestContinuationRequestsUnavailableVersusEmpty(t *testing.T) {
 			requests, err := extractContinuationRequestsFromRun(dir, WorkflowRun{}, false, "", "")
 			require.NoError(t, err)
 			if content == `{"items":[]}` {
-				assert.NotNil(t, requests)
-				assert.Empty(t, requests)
+				assert.Nil(t, requests, "an empty placeholder has no collection-completion evidence")
 			} else {
 				assert.Nil(t, requests)
 			}
 		})
 	}
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, constants.AgentOutputArtifactName.String()),
+		[]byte(`{"items":[{"type":"noop","message":"No action needed"}]}`), 0o600))
+	requests, err := extractContinuationRequestsFromRun(dir, WorkflowRun{}, false, "", "")
+	require.NoError(t, err)
+	require.NotNil(t, requests)
+	assert.Empty(t, requests)
 }
 
 func TestContinuationRequestsMixedMalformedArtifactsAreUnavailable(t *testing.T) {
@@ -310,11 +316,39 @@ func TestContinuationRequestsCacheBackfillRequiresCurrentRunMetadata(t *testing.
 			require.NoError(t, os.WriteFile(filepath.Join(dir, constants.AgentOutputArtifactName.String()),
 				[]byte(`{"items":[{"type":"request_continuation","message":"Continue later"}]}`), 0o600))
 
-			var requests []ContinuationRequestReport
+			requests := []ContinuationRequestReport{{Message: "Stale request"}}
 			assert.False(t, backfillContinuationRequests(&requests, run, dir, false))
 			assert.Nil(t, requests)
 		})
 	}
+}
+
+func TestCachedJSONLContinuationRequestsRequireMatchingArtifactAttempt(t *testing.T) {
+	root := t.TempDir()
+	runDir := filepath.Join(root, "run-42")
+	require.NoError(t, os.MkdirAll(runDir, 0o700))
+	oldUpdatedAt := time.Now().UTC().Add(-time.Hour)
+	summary := &RunSummary{
+		CLIVersion:  GetVersion(),
+		RunID:       42,
+		ProcessedAt: oldUpdatedAt.Add(time.Minute),
+		RunAnalysis: RunAnalysis{Run: WorkflowRun{
+			DatabaseID: 42, Repository: "org/repo", Attempt: 1, UpdatedAt: oldUpdatedAt,
+		}},
+	}
+	require.NoError(t, saveRunSummary(runDir, summary, false))
+	require.NoError(t, os.WriteFile(filepath.Join(runDir, constants.AgentOutputArtifactName.String()),
+		[]byte(`{"items":[{"type":"request_continuation","message":"Prior attempt"}]}`), 0o600))
+
+	processed := processedRunFromCachedData(RunData{
+		RunID: 42, WorkflowName: "Example", Repository: "org/repo", RunAttempt: "2",
+		UpdatedAt: oldUpdatedAt.Add(time.Minute), ContinuationRequests: []ContinuationRequestReport{{Message: "Prior attempt"}},
+	}, nil, root)
+
+	assert.Nil(t, processed.ContinuationRequests)
+	require.NotNil(t, processed.cachedData)
+	assert.Nil(t, processed.cachedData.ContinuationRequests)
+	assert.Nil(t, processed.cachedData.ContinuationRequestCount)
 }
 
 func TestMergeContinuationRequestsIntoAuditRefreshesSessionCount(t *testing.T) {
@@ -345,6 +379,39 @@ func TestProcessEpisodeArtifactsIncludesContinuationRequests(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, processed.ContinuationRequests, 1)
 	assert.Equal(t, "Continue later", processed.ContinuationRequests[0].Message)
+}
+
+func TestEpisodeContinuationRequestsPreserveRepeatedSubmissionsAndCollectionExperiment(t *testing.T) {
+	root := t.TempDir()
+	dir := filepath.Join(root, "collection-1")
+	agentDir := filepath.Join(root, "1-enrichment")
+	fallbackDir := filepath.Join(root, "2-enrichment")
+	for _, artifactDir := range []string{dir, agentDir, fallbackDir} {
+		require.NoError(t, os.MkdirAll(artifactDir, 0o700))
+	}
+	output := `{"items":[
+		{"type":"request_continuation","message":"Continue later"},
+		{"type":"request_continuation","message":"Continue later"}
+	]}`
+	for _, artifactDir := range []string{agentDir, fallbackDir} {
+		require.NoError(t, os.WriteFile(filepath.Join(artifactDir, constants.AgentOutputArtifactName.String()), []byte(output), 0o600))
+		require.NoError(t, os.WriteFile(filepath.Join(artifactDir, ".episode-complete"), []byte("v1\n"), 0o600))
+	}
+	require.NoError(t, os.MkdirAll(filepath.Join(dir, constants.ExperimentArtifactName.String()), 0o700))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, constants.ExperimentArtifactName.String(), "state.jsonl"),
+		[]byte(`{"run_id":"42","timestamp":"2026-11-21T00:00:00Z","assignments":{"theme":"variant-b"}}`), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, ".episode-artifacts.json"),
+		[]byte(`["../1-enrichment","../2-enrichment"]`), 0o600))
+
+	requests, err := extractEpisodeContinuationRequests(dir, WorkflowRun{DatabaseID: 42, WorkflowName: "Example"})
+
+	require.NoError(t, err)
+	require.Len(t, requests, 2)
+	for _, request := range requests {
+		assert.Equal(t, "Continue later", request.Message)
+		assert.Equal(t, "theme", request.ExperimentName)
+		assert.Equal(t, "variant-b", request.Variant)
+	}
 }
 
 func TestHealthContinuationRequestsBackfillCachedArtifacts(t *testing.T) {

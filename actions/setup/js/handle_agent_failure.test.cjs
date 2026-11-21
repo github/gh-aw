@@ -7667,8 +7667,11 @@ describe("handle_agent_failure", () => {
       expect(createCommentMock).not.toHaveBeenCalled();
     });
 
-    it("reports failure when continuation was requested without terminal completion evidence", async () => {
+    it.each([false, true])("reports failure when continuation was requested without task output (terminal completion evidence: %s)", async completed => {
       fs.writeFileSync(path.join(tmpDir, "agent_output.json"), JSON.stringify({ items: [{ type: "request_continuation", message: "Follow-up work remains" }] }));
+      if (completed) {
+        fs.writeFileSync(path.join(tmpDir, "agent-stdio.log"), '{"type":"result","subtype":"success","terminal_reason":"completed","num_turns":10}\n');
+      }
       const createIssueMock = vi.fn(async () => ({ data: { number: 456, html_url: "https://github.com/owner/repo/issues/456" } }));
       const createCommentMock = vi.fn();
       global.github = {

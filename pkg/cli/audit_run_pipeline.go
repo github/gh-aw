@@ -362,7 +362,8 @@ func auditNeedsContinuationAgentOutput(cfg auditRunConfig) bool {
 	if len(cfg.artifactFilter) == 0 || !artifactMatchesFilter(constants.AgentOutputFallbackArtifactName.String(), cfg.artifactFilter) {
 		return false
 	}
-	return resolveAgentOutputFile(cfg.outputDir, false) == ""
+	return resolveAgentOutputFile(cfg.outputDir, false) == "" &&
+		len(findMissingFilterEntries(cfg.artifactFilter, cfg.outputDir)) > 0
 }
 
 func auditNeedsDetectionArtifact(cfg auditRunConfig, summary *RunSummary) bool {

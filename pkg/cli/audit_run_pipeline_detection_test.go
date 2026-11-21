@@ -57,7 +57,7 @@ func TestInvalidateCompleteArtifactDownloadMarker(t *testing.T) {
 	assert.NoFileExists(t, marker)
 }
 
-func TestCachedAuditBypassesWhenRequestedAgentOutputIsMissing(t *testing.T) {
+func TestCachedAuditKeepsCompletedMissingAgentOutputLookup(t *testing.T) {
 	runDir := t.TempDir()
 	markerDir := filepath.Join(runDir, downloadedArtifactsMarkerDir)
 	require.NoError(t, os.MkdirAll(markerDir, 0o700))
@@ -72,11 +72,29 @@ func TestCachedAuditBypassesWhenRequestedAgentOutputIsMissing(t *testing.T) {
 		runID: 42, outputDir: runDir, artifactFilter: ResolveArtifactFilter([]string{"agent"}),
 	})
 	require.NoError(t, err)
-	assert.False(t, done)
+	assert.True(t, done)
 	assert.False(t, skipped)
 	for _, marker := range []string{string(ArtifactSetAll), "agent", "agent-output-fallback"} {
-		assert.NoFileExists(t, filepath.Join(markerDir, marker))
+		assert.FileExists(t, filepath.Join(markerDir, marker))
 	}
+}
+
+func TestCachedAuditFetchesAgentOutputAfterUsageOnlyLookup(t *testing.T) {
+	runDir := t.TempDir()
+	markerDir := filepath.Join(runDir, downloadedArtifactsMarkerDir)
+	require.NoError(t, os.MkdirAll(markerDir, 0o700))
+	require.NoError(t, os.WriteFile(filepath.Join(markerDir, "usage"), nil, 0o600))
+	summary := &RunSummary{CLIVersion: GetVersion(), RunID: 43,
+		RunAnalysis: RunAnalysis{Run: WorkflowRun{DatabaseID: 43}}}
+	require.NoError(t, saveRunSummary(runDir, summary, false))
+
+	done, skipped, err := renderCachedAuditIfAvailable(t.Context(), auditRunConfig{
+		runID: 43, outputDir: runDir, artifactFilter: ResolveArtifactFilter([]string{"agent"}),
+	})
+	require.NoError(t, err)
+	assert.False(t, done)
+	assert.False(t, skipped)
+	assert.FileExists(t, filepath.Join(markerDir, "usage"))
 }
 
 func TestAuditNeedsDetectionArtifactWithUnifiedSession(t *testing.T) {

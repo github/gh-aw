@@ -16,6 +16,13 @@ func tryLoadCachedRunResult(
 	if !ok || workQueueLogsMissing(params.includeWorkQueue, runOutputDir) {
 		return nil, false
 	}
+	if continuationEvidenceIdentityChanged(summary.Run, run) {
+		logsOrchestratorLog.Printf("Cache bypass for run %d: continuation evidence belongs to a different attempt or run revision", run.DatabaseID)
+		if err := invalidateContinuationArtifactEvidence(runOutputDir); err != nil {
+			logsOrchestratorLog.Printf("Failed to invalidate stale continuation evidence for run %d: %v", run.DatabaseID, err)
+		}
+		return nil, false
+	}
 	if len(params.artifactFilter) == 0 {
 		if missing := findMissingFilterEntries([]string{string(ArtifactSetAll)}, runOutputDir); len(missing) > 0 {
 			logsOrchestratorLog.Printf("Cache bypass for run %d: complete artifact marker missing", run.DatabaseID)

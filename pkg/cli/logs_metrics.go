@@ -346,6 +346,7 @@ func forEachSafeOutputRawItem(runDir string, run WorkflowRun, verbose bool, fn f
 
 func extractContinuationRequestsFromRun(runDir string, run WorkflowRun, verbose bool, experimentName, variant string) ([]ContinuationRequestReport, error) {
 	var requests []ContinuationRequestReport
+	itemCount := 0
 	invalidRequest := false
 	type requestItem struct {
 		Type      string `json:"type"`
@@ -353,6 +354,7 @@ func extractContinuationRequestsFromRun(runDir string, run WorkflowRun, verbose 
 		Timestamp string `json:"timestamp"`
 	}
 	available := forEachSafeOutputRawItem(runDir, run, verbose, func(itemRaw json.RawMessage) {
+		itemCount++
 		var fields map[string]json.RawMessage
 		if err := json.Unmarshal(itemRaw, &fields); err != nil {
 			invalidRequest = true
@@ -384,7 +386,7 @@ func extractContinuationRequestsFromRun(runDir string, run WorkflowRun, verbose 
 			ReportProvenance: buildReportProvenance(run, item.Timestamp, experimentName, variant),
 		})
 	})
-	if !available || invalidRequest {
+	if !available || invalidRequest || itemCount == 0 {
 		logsMetricsLog.Printf("Continuation request evidence unavailable reason=%s", "incomplete_or_invalid_safe_output")
 		return nil, nil
 	}
