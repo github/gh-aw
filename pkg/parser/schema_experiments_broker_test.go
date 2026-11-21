@@ -38,4 +38,15 @@ func TestExperimentsBrokerStorageSchema(t *testing.T) {
 			"broker_url": []string{"control", "candidate"},
 		},
 	}, "workflow.md"))
+	for _, value := range []string{"${{ secrets.BROKER_URL }}", "https://broker.example/${{ secrets.BROKER_URL }}"} {
+		t.Run(value, func(t *testing.T) {
+			require.Error(t, ValidateMainWorkflowFrontmatterWithSchemaAndLocation(map[string]any{
+				"on": "workflow_dispatch",
+				"experiments": map[string]any{
+					"storage":    "broker",
+					"broker-url": value,
+				},
+			}, "workflow.md"))
+		})
+	}
 }

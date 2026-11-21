@@ -277,7 +277,7 @@ experiments:
 Summarize in a **${{ experiments.prompt_style }}** style.
 ```
 
-`broker-url` accepts a full HTTPS endpoint or a GitHub Actions secrets expression.
+`broker-url` accepts a literal HTTPS endpoint, not a GitHub Actions expression.
 When omitted, it defaults to the repository or organization Actions secret
 `GH_AW_EXPERIMENTS_BROKER_URL`. Both assignment and reporting POST to this exact
 endpoint, which is also the exact OIDC audience. Do not include credentials in

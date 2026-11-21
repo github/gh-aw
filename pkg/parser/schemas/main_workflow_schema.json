@@ -3830,7 +3830,8 @@
         "broker-url": {
           "type": "string",
           "minLength": 1,
-          "description": "HTTPS broker endpoint or GitHub Actions secrets expression. Defaults to the GH_AW_EXPERIMENTS_BROKER_URL secret."
+          "pattern": "^https://[^$]*$",
+          "description": "Literal HTTPS broker endpoint without credentials or expressions. Defaults to the GH_AW_EXPERIMENTS_BROKER_URL secret."
         }
       }
     },

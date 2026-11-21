@@ -92,7 +92,7 @@ When `experiments.broker-url` is omitted, the compiler MUST resolve the endpoint
 GH_AW_BROKER_EXPERIMENTS_URL: ${{ secrets.GH_AW_EXPERIMENTS_BROKER_URL }}
 ```
 
-The workflow author MAY supply `experiments.broker-url` as an HTTPS URL or a secrets expression. Shared imports MAY supply `storage: broker` and `broker-url`, with the importing workflow taking precedence. The compiler MUST use the same configured endpoint for both operations and MUST NOT resolve it from its own environment or embed a resolved secret in generated YAML. Actions variables MUST NOT be a fallback. Merely defining the secret MUST NOT enable broker storage.
+The workflow author MAY supply `experiments.broker-url` as a literal HTTPS URL without credentials or GitHub Actions expressions. Shared imports MAY supply `storage: broker` and `broker-url`, with the importing workflow taking precedence. The compiler MUST reject expressions in the selected `broker-url`. The compiler MUST use the same configured endpoint for both operations and MUST NOT resolve it from its own environment or embed a resolved secret in generated YAML. Actions variables MUST NOT be a fallback. Merely defining the secret MUST NOT enable broker storage.
 
 The endpoint MUST be an absolute HTTPS URL with a hostname and no user information, fragment, whitespace, or backslash. Its complete configured string, including path or query, is both the POST destination and the exact OIDC audience. The client MUST NOT append a route, discover another endpoint, or normalize the audience. Operators SHOULD avoid query parameters, aliases, and trailing-slash ambiguity. Missing, empty, or invalid configuration MUST fail closed.
 

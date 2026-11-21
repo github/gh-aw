@@ -170,7 +170,6 @@ func TestExperimentsBrokerURLAndImports(t *testing.T) {
 		broker                    bool
 	}{
 		{name: "local", local: "storage: broker\n  broker-url: https://broker.example/assign?x=1", want: "https://broker.example/assign?x=1", broker: true},
-		{name: "secret", local: "storage: broker\n  broker-url: '${{ secrets.CUSTOM_BROKER }}'", want: "${{ secrets.CUSTOM_BROKER }}", broker: true},
 		{name: "imported", shared: "storage: broker\n  broker-url: https://shared.example/assign", want: "https://shared.example/assign", broker: true},
 		{name: "local override", shared: "storage: broker\n  broker-url: https://shared.example/assign", local: "broker-url: https://local.example/assign", want: "https://local.example/assign", broker: true},
 		{name: "disabled locally", shared: "storage: broker\n  broker-url: https://shared.example/assign", local: "storage: cache"},
@@ -210,13 +209,34 @@ func TestExperimentsBrokerURLAndImports(t *testing.T) {
 }
 
 func TestExperimentsBrokerURLValidation(t *testing.T) {
-	for _, value := range []string{"http://broker.example", "https://user@broker.example", "https://broker.example/#fragment", "https://broker.example/${{ github.event.issue.title }}", "${{ inputs.url }}", "${{\n secrets.BROKER_URL }}", "https://broker.example/\nmalicious: value"} {
+	for _, value := range []string{"http://broker.example", "https://user@broker.example", "https://broker.example/#fragment", "https://broker.example/${{ github.event.issue.title }}", "https://broker.example/${{ secrets.BROKER_URL }}", "${{ secrets.BROKER_URL }}", "${{ inputs.url }}", "${{\n secrets.BROKER_URL }}", "https://broker.example/\nmalicious: value"} {
 		t.Run(value, func(t *testing.T) {
 			require.Error(t, validateExperimentBrokerURL(value))
 		})
 	}
 	require.NoError(t, validateExperimentBrokerURL("https://broker.example/assign?x=1"))
-	require.NoError(t, validateExperimentBrokerURL("${{ secrets.BROKER_URL }}"))
+}
+
+func TestExperimentsBrokerURLRejectsSecretExpressions(t *testing.T) {
+	for _, imported := range []bool{false, true} {
+		t.Run(fmt.Sprintf("imported=%t", imported), func(t *testing.T) {
+			dir := t.TempDir()
+			file := filepath.Join(dir, "workflow.md")
+			config := "storage: broker\n  broker-url: '${{ secrets.CUSTOM_BROKER }}'\n"
+			source := "---\non: workflow_dispatch\nstrict: false\n"
+			if imported {
+				require.NoError(t, os.WriteFile(filepath.Join(dir, "shared.md"), []byte("---\nexperiments:\n  "+config+"---\n"), 0600))
+				source += "imports: [shared.md]\nexperiments:\n"
+			} else {
+				source += "experiments:\n  " + config
+			}
+			source += "  prompt: [control, candidate]\n---\nTest.\n"
+			compiler := NewCompiler(WithNoEmit(true))
+			compiler.gitRoot = dir
+			_, err := compiler.ParseWorkflowString(source, file)
+			require.ErrorContains(t, err, "broker-url")
+		})
+	}
 }
 
 func TestExperimentsBrokerNestedImportPrecedence(t *testing.T) {

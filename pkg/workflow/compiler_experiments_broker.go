@@ -6,7 +6,6 @@ import (
 	"maps"
 	"net/url"
 	"path"
-	"regexp"
 	"slices"
 	"strings"
 
@@ -17,15 +16,13 @@ import (
 
 const brokerReportSystemPath = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
-var brokerSecretExpression = regexp.MustCompile(`^\$\{\{ *secrets\.[a-zA-Z_][a-zA-Z0-9_]* *\}\}$`)
-
 func validateExperimentBrokerURL(value string) error {
-	if value == "" || brokerSecretExpression.MatchString(value) {
+	if value == "" {
 		return nil
 	}
 	u, err := url.Parse(value)
 	if err != nil || u.Scheme != "https" || u.Hostname() == "" || u.User != nil || u.Fragment != "" || strings.ContainsAny(value, " \t\r\n\\#$") {
-		return errors.New("experiments.broker-url must be an HTTPS URL without credentials or a secrets expression")
+		return errors.New("experiments.broker-url must be a literal HTTPS URL without credentials or expressions")
 	}
 	return nil
 }
