@@ -13,14 +13,12 @@ See [DeterministicOps](/gh-aw/patterns/deterministic-ops/) for patterns combinin
 
 Use these top-level step hooks in this order:
 
-1. `pre-steps:` — runs before checkout and all later built-in agent-job setup; only compiler-injected OTLP masking steps may run earlier. Use this for short-lived token minting or anything that must happen before repository checkout.
-2. `steps:` — runs after checkout and the normal runtime/bootstrap steps, but before the final pre-agent phase. Use this for deterministic preprocessing that needs the checked-out repository.
-3. `pre-agent-steps:` — runs after framework-owned initialization such as checkout cleanup and base-branch restoration, and before MCP startup and engine execution. Use this for last-moment environment preparation immediately before the agent starts.
-4. `post-steps:` — runs after the engine finishes. Use this for cleanup, summaries, uploads, or follow-up automation.
+1. `pre-steps:` — runs before checkout and all later built-in agent-job setup (only compiler-injected OTLP masking steps may run earlier). Use it for short-lived token minting or anything that must precede checkout.
+2. `steps:` — runs after checkout and runtime/bootstrap steps, before the final pre-agent phase. Use it for deterministic preprocessing that needs the checked-out repository.
+3. `pre-agent-steps:` — runs after framework initialization (checkout cleanup, base-branch restoration) and before MCP startup and engine execution. Use it for last-moment environment preparation.
+4. `post-steps:` — runs after the engine finishes. Use it for cleanup, summaries, uploads, or follow-up automation.
 
 ## Custom Pre-Checkout Steps (`pre-steps:`)
-
-Add custom steps before checkout and the later pre-checkout agent-job setup. Compiler-injected OTLP masking steps may still run earlier.
 
 ```yaml wrap
 pre-steps:
@@ -34,18 +32,11 @@ pre-steps:
       permission-contents: read
 ```
 
-Set an explicit `repositories` input and `permission-*` inputs for every `actions/create-github-app-token` step; otherwise the installation token can inherit access across the App installation. To scope a token to the current repository, use `repositories: ${{ github.repository }}`. The action accepts the fully qualified `owner/repository` value from this trusted context. If you set `owner` to a different installation owner, explicitly list repositories belonging to that owner instead. The compiler warns when either is missing and rejects the workflow in strict mode. Job-level `permissions:` does not scope the App token.
+Every `actions/create-github-app-token` step needs explicit `repositories` and `permission-*` inputs; otherwise the token can inherit access across the App installation. `repositories: ${{ github.repository }}` scopes the token to the current repository. If you set `owner` to a different installation owner, list that owner's repositories explicitly. The compiler warns when either input is missing and rejects the workflow in strict mode. Job-level `permissions:` does not scope the App token.
 
 Use pre-steps when later checkout or setup must consume outputs from a step in the same job.
 
-For compiler-managed token wiring, give the official
-`actions/create-github-app-token` action the reserved `id: create-token`. The compiler
-recognizes only that action with this ID; third-party and similarly named actions do not
-trigger token wiring or automatic OIDC permissions. It prefers the step's output for
-compiler-owned default GitHub token bindings that run later in the same generated job.
-Authored step environments and explicitly configured credentials are left unchanged. The
-compiler also adds `id-token: write` to the minting job unless `id-token: none` is explicitly
-configured or `safe-outputs.id-token: none` disables automatic grants.
+For compiler-managed token wiring, give the official `actions/create-github-app-token` action the reserved `id: create-token`. Only that action with that ID triggers token wiring and automatic OIDC permissions; similarly named third-party actions do not. The compiler prefers this step's output for compiler-owned default GitHub token bindings later in the same job. Authored step environments and explicit credentials are left unchanged. It also adds `id-token: write` to the minting job unless `id-token: none` is set or `safe-outputs.id-token: none` disables automatic grants.
 
 ```yaml wrap
 permissions:
@@ -74,7 +65,7 @@ steps:
     run: npm ci
 ```
 
-Use custom steps to precompute data, filter triggers, or prepare context for AI agents. Steps can also short-circuit the agent by writing a `noop` entry to `$GH_AW_SAFE_OUTPUTS` — the harness detects this at startup and exits cleanly without incurring any AI inference cost. See [Skip the Agent When It Is Not Needed](/gh-aw/reference/cost-management/#skip-the-agent-when-it-is-not-needed) for details.
+Steps can also short-circuit the agent by writing a `noop` entry to `$GH_AW_SAFE_OUTPUTS` — the harness detects this at startup and exits cleanly without incurring any AI inference cost. See [Skip the Agent When It Is Not Needed](/gh-aw/reference/cost-management/#skip-the-agent-when-it-is-not-needed) for details.
 
 See [Checkout and Host Step Order](/gh-aw/reference/checkout/#checkout-and-host-step-order) for checkout ordering, untrusted-ref warnings, and safe handling of fetched refs.
 
@@ -87,8 +78,6 @@ pre-agent-steps:
   - name: Finalize Context
     run: ./scripts/prepare-agent-context.sh
 ```
-
-Use pre-agent steps when work must happen right before the engine runs (for example, final context preparation or last-moment validations).
 
 ## Custom Post-Execution Steps (`post-steps:`)
 
@@ -105,7 +94,6 @@ post-steps:
       retention-days: 7
 ```
 
-Useful for artifact uploads, summaries, cleanup, or triggering downstream workflows.
 Post-steps must not create issues directly, read safe-output files, or expose secrets through a step-level `env` section. Avoid uploading the entire `/tmp/gh-aw/` directory, which can contain protected safe-output files.
 Use [`safe-outputs.create-issue`](/gh-aw/reference/safe-outputs/) to publish agent-generated issues instead.
 
@@ -113,7 +101,7 @@ Use [`safe-outputs.create-issue`](/gh-aw/reference/safe-outputs/) to publish age
 
 Define custom jobs that run before agentic execution. The agentic execution job waits for all custom jobs to complete. Custom jobs can share data with the agent through artifacts or job outputs.
 
-To run a custom job after agentic execution, add `needs: [agent, detection]` (or `needs: detection` if agent outputs are not referenced directly). The compiler also recognizes transitive post-agent dependencies. When detection is enabled, every downstream custom job receives a direct detection dependency and a non-overridable success guard. Failed, cancelled, skipped, missing, or warn-mode flagged detection results block the custom job, including reusable workflow calls and jobs using `if: always()`. Custom jobs cannot run between agent and detection. Explicitly disabling detection removes this gate.
+To run a custom job after agentic execution, add `needs: [agent, detection]` (or `needs: detection` if agent outputs are not referenced directly). The compiler also recognizes transitive post-agent dependencies. When detection is enabled, every downstream custom job gets a direct detection dependency and a non-overridable success guard. Failed, cancelled, skipped, missing, or warn-mode flagged results block it, including reusable workflow calls and `if: always()` jobs. Custom jobs cannot run between agent and detection. Disabling detection removes this gate.
 
 For notifications that must run even when detection fails or flags warn-mode findings, mark a leaf custom job `detection-gate: status-only`:
 
@@ -128,7 +116,7 @@ jobs:
       - run: echo "${{ needs.agent.result }} ${{ needs.detection.result }} ${{ needs.safe_outputs.outputs.created_issue_number }}"
 ```
 
-The compiler adds `detection` to `needs` if needed and preserves the authored `if`. The job may read outputs from detection-gated compiler-owned jobs (such as `safe_outputs`) and authored custom jobs that the dependency graph proves run before `agent`, with no direct or transitive dependency on `agent` or `detection`. This allows a reporter to use pre-agent metadata, such as a validated PR number and head SHA, even when detection fails. Declare each metadata job as a direct dependency in the reporter's `needs`, then pass its outputs through `env`; do not interpolate custom outputs directly into `run` or `actions/github-script` code.
+The compiler adds `detection` to `needs` if needed and keeps the authored `if`. The job may read outputs from detection-gated compiler-owned jobs (such as `safe_outputs`) and from custom jobs that run before `agent` with no direct or transitive dependency on `agent` or `detection`. For example, a reporter can use a validated PR number and head SHA from pre-agent metadata even when detection fails. Declare each metadata job in `needs` and pass its outputs through `env`; never interpolate custom outputs directly into `run` or `actions/github-script` code.
 
 The compiler rejects the opt-out if the job downloads artifacts, calls an opaque reusable workflow, reads other job outputs, or references `GH_AW_AGENT_OUTPUT` or agent/safe-output files in `env` or `run`. Other custom jobs cannot depend on a job using this option. The `detection-gate` key is compiler-only and is not emitted in the Actions workflow. See [Custom job detection gates](/gh-aw/reference/workflow-linters/#custom-job-detection-gates).
 
@@ -198,9 +186,9 @@ Use this map to see where compiler-inserted steps land for each job type.
 4. `jobs.<job-id>.pre-steps`
 5. `jobs.<job-id>.steps`
 
-Set `jobs.<job-id>.restore-memory: true` to restore any configured `cache-memory`, `repo-memory`, and `comment-memory` stores before deterministic job steps run. This surface is read-only: gh-aw injects restore/clone/prepare steps, but never emits cache save, repo push, or safe-output write-back steps for custom jobs.
+Set `jobs.<job-id>.restore-memory: true` to restore configured `cache-memory`, `repo-memory`, and `comment-memory` stores before deterministic job steps run. This is read-only: gh-aw never emits cache save, repo push, or safe-output write-back steps for custom jobs.
 
-Custom jobs can depend on generated post-agent maintenance jobs when the corresponding feature is enabled. For example, with `tools.repo-memory` configured, `needs: [push_repo_memory]` runs a custom job after the agent and the repo-memory push, without listing `agent` explicitly. Other post-agent maintenance job IDs are `update_cache_memory`, `update_drive_memory`, `push_ledger_changes`, and `push_evals_state`. Experiment persistence (`push_experiments_state`) runs after activation rather than after the agent.
+Custom jobs can also depend on enabled post-agent maintenance jobs. For example, with `tools.repo-memory` configured, `needs: [push_repo_memory]` runs after the agent and the repo-memory push without listing `agent`. Other post-agent maintenance job IDs are `update_cache_memory`, `update_drive_memory`, `push_ledger_changes`, and `push_evals_state`. Experiment persistence (`push_experiments_state`) runs after activation rather than after the agent.
 
 ### Built-in jobs
 
@@ -215,7 +203,7 @@ Custom jobs can depend on generated post-agent maintenance jobs when the corresp
 | `detection` | `jobs.detection.setup-steps` → compiler setup checkout/setup → `jobs.detection.pre-steps` → built-in detection steps |
 | `unlock` | `jobs.unlock.setup-steps` → compiler setup checkout/setup → `jobs.unlock.pre-steps` → built-in unlock steps |
 
-Built-in job sections also support additive `needs` and `if` overrides. For example, use `jobs.agent.needs` and `jobs.agent.if` to gate the generated agent job on a custom setup job without relying on `on.needs` plus a top-level workflow `if`:
+Built-in job sections support additive `needs` and `if` overrides, for example to gate the generated agent job on a custom setup job:
 
 ```yaml wrap
 jobs:
@@ -276,9 +264,7 @@ jobs:
     timeout-minutes: 30
 ```
 
-When a job reaches its timeout, GitHub Actions cancels all remaining steps in
-that job; the workflow conclusion reports the job as `timed_out`. A job-level
-timeout therefore covers setup steps as well as the agentic execution step.
+On timeout, GitHub Actions cancels the job's remaining steps and reports the job as `timed_out`. The budget covers setup steps as well as the agentic execution step.
 
 ### Job Outputs
 
@@ -310,10 +296,8 @@ outputs:
   empty: ''
 ```
 
-The compiler preserves these string values in the generated workflow for custom
-jobs, `pre_activation` (also spelled `pre-activation`), and custom safe-output
-jobs. Expressions such as `${{ steps.get_release.outputs.version }}` retain
-their expression syntax.
+The compiler preserves these string values for custom jobs, `pre_activation`
+(also spelled `pre-activation`), and custom safe-output jobs. Expressions keep their syntax.
 
 ## Learn More
 
