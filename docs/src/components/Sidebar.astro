@@ -160,7 +160,7 @@ Astro.locals.starlightRoute.sidebar = Astro.locals.starlightRoute.sidebar.map((e
 <Default />
 {Array.from(catalogs, ([id, entries]) => (
 	<template id={`sidebar-catalog-${id}`}>
-		<SidebarSublist sublist={markSpecLinks(entries)} nested />
+		<SidebarSublist sublist={entries} nested />
 	</template>
 ))}
 
