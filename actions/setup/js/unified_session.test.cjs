@@ -83,7 +83,7 @@ describe("Unified conclusion session", () => {
   });
 
   it("collects and exports only run-scoped durable metadata without historical top-level content", async () => {
-    const metadata = { engine: "codex", storage: "artifact", runId: "123", runAttempt: "2", parentRunId: "122" };
+    const metadata = { engine: "codex", storage: "artifact", runId: "123", runAttempt: "2", parentRunId: "122", relayRunId: "456" };
     write("agent/durable-session.jsonl", [
       {
         type: "durable.restore",
@@ -101,6 +101,7 @@ describe("Unified conclusion session", () => {
     const events = writeUnifiedSession({ rootDir: root, outputPath: output });
     const durable = events.filter(event => event.type.startsWith("durable."));
     expect(durable).toHaveLength(2);
+    expect(durable[0].data).toMatchObject({ relayRunId: "456" });
     expect(durable[1].data).toMatchObject({ status: "resumed", parentRunId: "122", sessionId: "native-id" });
     expect(durable[0].provenance).toMatchObject({ component: "durable", phase: "agent", path: "agent/durable-session.jsonl" });
     expect(durable[0].timestamp).toBe("2026-11-08T14:00:00.000Z");

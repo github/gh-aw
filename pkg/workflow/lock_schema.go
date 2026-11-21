@@ -41,9 +41,21 @@ type LockMetadata struct {
 	Docs            string            `json:"docs,omitempty"`
 	Strict          bool              `json:"strict,omitempty"`
 	DryRun          bool              `json:"dry_run,omitempty"`
+	// Continuation is the trusted request-continuation policy read by the
+	// generated continuation relay from the lock file at the parent run's head SHA.
+	Continuation *ContinuationLockMetadata `json:"continuation,omitempty"`
 	// AgentMetadataInfo is embedded so agent fields are declared once and
 	// serialized inline in the lock metadata JSON.
 	AgentMetadataInfo
+}
+
+// ContinuationLockMetadata records the request-continuation policy of a workflow.
+type ContinuationLockMetadata struct {
+	// Workflow is the durable workflow identifier used in checkpoint artifact names.
+	Workflow string `json:"workflow"`
+	Max      int    `json:"max"`
+	Policy   string `json:"policy"`
+	Approval string `json:"approval,omitempty"`
 }
 
 // AgentMetadataInfo holds agent and detection agent information for embedding in lock file metadata

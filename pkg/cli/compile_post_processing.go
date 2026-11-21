@@ -137,6 +137,32 @@ func generateWorkQueueEventWorkflowWrapper(ctx context.Context, workflowDataList
 	return nil
 }
 
+// generateContinuationRelayWorkflowWrapper generates the generic continuation relay
+// (agentic-continuation-relay.yml) when any workflow enables safe-outputs.request-continuation,
+// and removes a stale relay otherwise.
+func generateContinuationRelayWorkflowWrapper(ctx context.Context, workflowDataList []*workflow.WorkflowData, workflowsDir string, gitRoot string, strict bool, noLogo bool) error {
+	compilePostProcessingLog.Print("Generating continuation relay workflow")
+	if !workflow.ContinuationRelayEnabled(workflowDataList) {
+		return workflow.GenerateContinuationRelayWorkflow(ctx, workflowDataList, workflowsDir, nil)
+	}
+
+	repoConfig, err := workflow.LoadRepoConfig(gitRoot)
+	if err != nil {
+		if strict {
+			return fmt.Errorf("failed to load repo config for continuation relay workflow: %w", err)
+		}
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to load repo config for continuation relay workflow: %v", err)))
+		repoConfig = nil
+	}
+	if err := workflow.GenerateContinuationRelayWorkflow(ctx, workflowDataList, workflowsDir, repoConfig, noLogo); err != nil {
+		if strict {
+			return fmt.Errorf("failed to generate continuation relay workflow: %w", err)
+		}
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to generate continuation relay workflow: %v", err)))
+	}
+	return nil
+}
+
 // generateCentralSlashCommandWorkflowWrapper generates a single centralized
 // slash-command trigger workflow for all participating workflows.
 func generateCentralSlashCommandWorkflowWrapper(

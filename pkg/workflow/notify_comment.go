@@ -151,11 +151,39 @@ func (c *Compiler) appendConclusionUsageSteps(steps []string, data *WorkflowData
 		}
 		steps = append(steps, c.buildConclusionAdmissionStep(data)...)
 	}
+	steps = append(steps, c.buildContinuationRelayDispatchStep(data)...)
 	if c.actionMode.IsScript() {
 		steps = append(steps, c.generateScriptModeCleanupStep())
 	}
 	steps = append(steps, c.buildReactionCleanupSteps(data)...)
 	return steps, nil
+}
+
+// buildContinuationRelayDispatchStep dispatches the generated continuation relay after the
+// safe-outputs job recorded a continuation request. Producer attempts identify the exact
+// request and checkpoint artifacts even when conclusion or safe_outputs is rerun.
+func (c *Compiler) buildContinuationRelayDispatchStep(data *WorkflowData) []string {
+	if !isSafeOutputHandlerEnabledAndUnstaged(data.SafeOutputs, "RequestContinuation") {
+		return nil
+	}
+	safeOutputsJob := string(constants.SafeOutputsJobName)
+	return []string{
+		"      - name: Dispatch continuation relay\n",
+		"        id: continuation_relay\n",
+		fmt.Sprintf("        if: (!cancelled()) && needs.%s.result == 'success' && needs.%s.outputs.continuation_requested == 'true'\n", safeOutputsJob, safeOutputsJob),
+		fmt.Sprintf("        uses: %s\n", getCachedActionPin("actions/github-script", data)),
+		"        env:\n",
+		"          GH_AW_CONTINUATION_RELAY_WORKFLOW: " + ContinuationRelayWorkflowFile + "\n",
+		fmt.Sprintf("          GH_AW_PARENT_REQUEST_ATTEMPT: ${{ needs.%s.outputs.continuation_request_attempt }}\n", safeOutputsJob),
+		fmt.Sprintf("          GH_AW_PARENT_CHECKPOINT_ATTEMPT: ${{ needs.%s.outputs.durable_checkpoint_attempt }}\n", constants.AgentJobName),
+		"        with:\n",
+		"          github-token: ${{ github.token }}\n",
+		"          script: |\n",
+		"            const { setupGlobals } = require('" + SetupActionDestination + "/setup_globals.cjs');\n",
+		"            setupGlobals(core, github, context, exec, io, getOctokit);\n",
+		"            const { main } = require('" + SetupActionDestination + "/dispatch_continuation_relay.cjs');\n",
+		"            await main();\n",
+	}
 }
 
 func configuredUsageSafeJobNames(data *WorkflowData) []string {
@@ -200,6 +228,10 @@ func computeConclusionJobPermissions(data *WorkflowData) *Permissions {
 		return conclusionPerms
 	}
 	conclusionPerms.Set(PermissionIdToken, PermissionWrite)
+	// The conclusion job dispatches the continuation relay with the workflow token.
+	if isSafeOutputHandlerEnabledAndUnstaged(data.SafeOutputs, "RequestContinuation") {
+		conclusionPerms.Set(PermissionActions, PermissionWrite)
+	}
 	if isWorkQueueEnabled(data) {
 		if level, ok := conclusionPerms.Get(PermissionContents); !ok || level == PermissionNone {
 			conclusionPerms.Set(PermissionContents, PermissionRead)

@@ -518,6 +518,7 @@ func (c *Compiler) buildSafeOutputsHandlerOutputsAndActionSteps(data *WorkflowDa
 		return nil, nil, nil, err
 	}
 	c.appendLedgerTransactionsArtifactUpload(data, &state)
+	c.appendContinuationRequestArtifactUpload(data, &state)
 	c.appendSarifArtifactUploadStep(data, agentArtifactPrefix, &state)
 	if err := c.appendCustomActionSteps(data, markdownPath, &state); err != nil {
 		return nil, nil, nil, err
@@ -595,6 +596,31 @@ func (c *Compiler) appendLedgerTransactionsArtifactUpload(data *WorkflowData, st
 		"          if-no-files-found: error\n",
 		"          retention-days: 1\n",
 	)
+}
+
+// appendContinuationRequestArtifactUpload publishes the request recorded by the
+// request_continuation handler. The conclusion job reads the job output to dispatch the
+// continuation relay, which validates this artifact before dispatching the next run.
+func (c *Compiler) appendContinuationRequestArtifactUpload(data *WorkflowData, state *safeOutputsHandlerOutputsAndActionState) {
+	if !isSafeOutputHandlerEnabledAndUnstaged(data.SafeOutputs, "RequestContinuation") {
+		return
+	}
+	retentionDays := defaultDurableRetentionDays
+	if data.EngineConfig != nil && data.EngineConfig.Durable != nil {
+		retentionDays = data.EngineConfig.Durable.RetentionDays
+	}
+	state.steps = append(state.steps,
+		"      - name: Upload continuation request\n",
+		"        if: steps.process_safe_outputs.outputs.continuation_requested == 'true'\n",
+		fmt.Sprintf("        uses: %s\n", c.getActionPin("actions/upload-artifact")),
+		"        with:\n",
+		"          name: "+continuationRequestArtifactPrefix+"${{ github.run_attempt }}\n",
+		"          path: "+continuationRequestFilePath+"\n",
+		"          if-no-files-found: error\n",
+		fmt.Sprintf("          retention-days: %d\n", retentionDays),
+	)
+	state.outputs["continuation_requested"] = "${{ steps.process_safe_outputs.outputs.continuation_requested }}"
+	state.outputs["continuation_request_attempt"] = "${{ steps.process_safe_outputs.outputs.continuation_requested == 'true' && github.run_attempt || '' }}"
 }
 
 // appendCustomScriptFilesStep appends the setup step(s) for writing custom safe-output scripts to

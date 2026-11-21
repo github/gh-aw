@@ -13662,7 +13662,7 @@
           }
         },
         "request-continuation": {
-          "description": "Experimental. Enables durable continuation. The agent must call request_continuation with self-contained hints to dispatch the next run of this workflow; it may emit other safe outputs in the same run. The next run restores the previous native session checkpoint when available and receives the hints, but must reconstruct workspace and tool context itself. When the agent does not request continuation, no checkpoint is uploaded and the chain stops. Requires a workflow_dispatch trigger.",
+          "description": "Experimental. Enables durable continuation. The agent must call request_continuation with self-contained hints to request the next run of this workflow, which the generated agentic-continuation-relay.yml relay dispatches; it may emit other safe outputs in the same run. The next run restores the previous native session checkpoint when available and receives the hints, but must reconstruct workspace and tool context itself. When the agent does not request continuation, no checkpoint is uploaded and the chain stops. Requires a workflow_dispatch trigger.",
           "oneOf": [
             {
               "type": "null",
@@ -13682,6 +13682,34 @@
                   "maximum": 100,
                   "default": 5,
                   "description": "Maximum number of chained continuation runs (default: 5). Requests beyond this depth are skipped."
+                },
+                "continuation-policy": {
+                  "description": "How the next run is triggered and gated. The parent never dispatches itself: its conclusion job dispatches the generated agentic-continuation-relay.yml relay, which validates the request and dispatches the next run. Default: workflow-dispatch.",
+                  "oneOf": [
+                    {
+                      "type": "string",
+                      "enum": ["workflow-dispatch"],
+                      "description": "Shorthand for { type: <value> }."
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "enum": ["workflow-dispatch"],
+                          "default": "workflow-dispatch",
+                          "description": "Continuation trigger. workflow-dispatch: the relay dispatches the next run with workflow_dispatch."
+                        },
+                        "approval": {
+                          "type": "string",
+                          "pattern": "^[A-Za-z0-9_.-]+$",
+                          "maxLength": 255,
+                          "description": "Optional GitHub environment with required reviewers. The relay waits for approval in this environment before dispatching the next run and fails closed when the environment is missing or has no required reviewers."
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  ]
                 }
               },
               "additionalProperties": false

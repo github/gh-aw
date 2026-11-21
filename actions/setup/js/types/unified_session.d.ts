@@ -128,6 +128,7 @@ export interface DurableSessionMetadata {
 export interface DurableRestoreData extends DurableSessionMetadata {
   status: "restored" | "fresh" | "failed";
   artifactId?: string;
+  relayRunId?: string;
 }
 
 export interface DurableStartupData extends DurableSessionMetadata {

@@ -14,7 +14,7 @@ const MAX_SOURCE_SCAN_BYTES = 64 * 1024 * 1024;
 
 /** @type {Record<string, readonly string[]>} */
 const EVENT_FIELDS = {
-  "durable.restore": ["engine", "storage", "runId", "runAttempt", "status", "parentRunId", "artifactId"],
+  "durable.restore": ["engine", "storage", "runId", "runAttempt", "status", "parentRunId", "artifactId", "relayRunId"],
   "durable.session": ["engine", "storage", "runId", "runAttempt", "status", "parentRunId", "sessionId"],
   "session.format": ["version"],
   "workflow.info": ["engineId", "agentVersion", "cliVersion", "awfVersion", "mcpgVersion", "model", "requestedModel", "triggerType", "dryRun", "workflowId", "workflowCallId", "repository", "runId", "runAttempt", "ref", "sha"],
