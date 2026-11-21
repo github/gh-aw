@@ -153,6 +153,35 @@ const harnessChildEnv = {
   GH_AW_SKIP_REFLECT: "true",
 };
 
+describe("native Copilot model effort suffix", () => {
+  it.each([
+    ["gpt-6-luna?effort=high", ["--prompt", "test"], "gpt-6-luna", ["--prompt", "test", "--reasoning-effort", "high"]],
+    ["gpt-6-luna?effort=low", ["--prompt", "--reasoning-effort=high", "--", "positional"], "gpt-6-luna", ["--prompt", "--reasoning-effort=high", "--reasoning-effort", "low", "--", "positional"]],
+    ["gpt-6-luna?effort=high", ["--reasoning-effort=low"], "gpt-6-luna", ["--reasoning-effort=low"]],
+    ["gpt-6-luna?effort=high", ["--reasoning-effort", "low"], "gpt-6-luna", ["--reasoning-effort", "low"]],
+    ["gpt-6-luna", ["--model=gpt-6-luna?effort=medium"], "gpt-6-luna", ["--model=gpt-6-luna", "--reasoning-effort", "medium"]],
+    ["gpt-6-luna", [], "gpt-6-luna", []],
+  ])("launches with the bare model ID and native effort arguments (%s, %j)", (model, cliArgs, expectedModel, expectedArgs) => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), "copilot-model-effort-"));
+    try {
+      const stubPath = path.join(directory, "copilot.cjs");
+      const invocationPath = path.join(directory, "invocation.json");
+      fs.writeFileSync(stubPath, `require("fs").writeFileSync(${JSON.stringify(invocationPath)}, JSON.stringify({ model: process.env.COPILOT_MODEL, args: process.argv.slice(2) }));`);
+      const harnessPath = require.resolve("./copilot_harness.cjs");
+      const result = spawnProcessSync(process.execPath, [harnessPath, process.execPath, stubPath, ...cliArgs], {
+        cwd: directory,
+        env: { ...harnessChildEnv, GITHUB_WORKSPACE: directory, GH_AW_TMP_DIR: directory, GH_AW_PHASE: "detection", COPILOT_MODEL: model },
+        encoding: "utf8",
+        timeout: 10000,
+      });
+      expect(result.status, result.stderr).toBe(0);
+      expect(JSON.parse(fs.readFileSync(invocationPath, "utf8"))).toEqual({ model: expectedModel, args: expectedArgs });
+    } finally {
+      fs.rmSync(directory, { recursive: true, force: true });
+    }
+  });
+});
+
 // Child processes restore compiler provenance from aw_info.json, not this worker's in-memory fixture records.
 function spawnSync(command, args, options) {
   const env = { ...(options.env || process.env) };
