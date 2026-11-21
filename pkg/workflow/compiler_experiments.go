@@ -866,7 +866,10 @@ func rewriteDeclaredExperimentNames(s string, experiments map[string][]string, p
 func rewriteExpressionReferences(s string, prefix []string, replace func(string) (string, bool)) string {
 	var b strings.Builder
 	last := 0
-	spans, _ := actionslanguageservice.ExtractExpressions(s)
+	spans, err := actionslanguageservice.ExtractExpressions(s)
+	if err != nil {
+		return s
+	}
 	for _, span := range spans {
 		expression, err := actionslanguageservice.ParseSyntax(span.Content)
 		if err != nil {
@@ -877,7 +880,7 @@ func rewriteExpressionReferences(s string, prefix []string, replace func(string)
 			if !ok {
 				return true
 			}
-			if len(path) == len(prefix)+1 && referenceHasPrefix(path, prefix) {
+			if len(prefix) < len(path) && len(path) == len(prefix)+1 && referenceHasPrefix(path, prefix) {
 				if replacement, changed := replace(path[len(prefix)]); changed {
 					start, end := span.Start+3+node.Start, span.Start+3+node.End
 					b.WriteString(s[last:start])

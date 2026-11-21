@@ -3,7 +3,7 @@ package workflow
 import (
 	"fmt"
 	"path/filepath"
-	"sort"
+	"slices"
 	"strings"
 
 	"github.com/github/gh-aw/pkg/setutil"
@@ -150,7 +150,7 @@ func (c *Compiler) getCustomJobsDependingOnPreActivation(customJobs map[string]a
 		}
 		return false
 	})
-	sort.Strings(deps)
+	slices.Sort(deps)
 	compilerJobsLog.Printf("Found %d custom jobs depending on pre_activation: %v", len(deps), deps)
 	return deps
 }
@@ -169,7 +169,7 @@ func (c *Compiler) getReferencedCustomJobs(content string, customJobs map[string
 	refs := sliceutil.FilterMapKeys(customJobs, func(jobName string, _ any) bool {
 		return strings.Contains(content, fmt.Sprintf("needs.%s.", jobName))
 	})
-	sort.Strings(refs)
+	slices.Sort(refs)
 	if len(refs) > 0 {
 		compilerJobsLog.Printf("Found %d custom job references: %v", len(refs), refs)
 	}
@@ -254,7 +254,7 @@ func (c *Compiler) getEngineEnvReferencedCustomJobsWithNoExplicitNeeds(data *Wor
 		result = append(result, jobName)
 		compilerJobsLog.Printf("Found custom job '%s' referenced in engine.env with no explicit needs: will run before activation", jobName)
 	}
-	sort.Strings(result)
+	slices.Sort(result)
 	return result
 }
 
@@ -280,7 +280,7 @@ func (c *Compiler) getActivationRenderedEngineEnvValues(data *WorkflowData) []st
 	for key := range envKeys {
 		keyList = append(keyList, key)
 	}
-	sort.Strings(keyList)
+	slices.Sort(keyList)
 
 	values := make([]string, 0, len(keyList))
 	for _, key := range keyList {
