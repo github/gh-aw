@@ -558,10 +558,10 @@ Quick reference:
 
 ### CI Front Door
 
-CGO filters every check job on PRs through `scripts/ci-front-door.cjs`, including
-Go tests, security checks, linters, conformance, builds, fuzzing, and
-both macOS and Windows. Only checkout, selection, and timing/cache cleanup are
-unconditional infrastructure. Main-branch pushes,
+CGO uses `scripts/ci-front-door.cjs` on PRs to filter optional check jobs,
+including slow Go tests, security checks, linters, conformance, builds, fuzzing,
+and both macOS and Windows. The fast Go unit suite and its integration compilation
+prerequisite always run. Main-branch pushes,
 manual runs, and the weekly scheduled control run all applicable suites without
 calling the Decision API. CJS and Windows CI are unchanged.
 
@@ -619,8 +619,8 @@ first parent against the event on every page before filtering locks. A raw
 deadline still fails open. Local `CI_DIFF_WORKSPACE` evidence never fetches.
 
 GitHub returns a named safe-to-omit predicate for each check job.
-Probabilities at least 0.9 permit omission; probabilities at most 0.1 retain the
-suite. Any intermediate probability, refusal, missing/duplicate/unknown answer,
+Probabilities at least 0.9 permit omission of optional suites; lower probabilities
+retain the suite. A refusal, missing/duplicate/unknown answer,
 malformed JSON, non-200 status, 10-second deadline, or more than 16 KiB of response
 data forces all suites. The adapter preserves normalized replay responses such
 as `{"suite_ids":["build-wasm"],"confidence":0.95}`. Selected jobs retain
@@ -635,17 +635,23 @@ selection enables or omits both macOS and Windows together.
 Pushes and other non-PR events skip the decision job without suppressing
 any suite.
 
+The decision step summary shows retained and omitted suite counts at a glance.
+Expand **Suite selection and diagnostics** to see the suite IDs, fallback reason
+when applicable, and metrics. The selector still emits JSON to stdout and keeps
+its workflow outputs machine-readable.
+
 The same model-driven selection and prerequisite closure apply during
 recorded-response replay. Source, test-only, dependency, configuration, and
 unknown paths all reach the model; no path category automatically forces all
 jobs to run or skip. This is a relevance decision, not a guarantee of safety:
-uncertain answers still run every job, and independent full runs remain the
+uncertain answers retain the associated suite, and independent full runs remain the
 control for missed regressions.
 
 `.github/ci/suite-catalog.json` has schema version 1 and entries with a stable
 `id`, short `description`, `mandatory` flag, and
 `historical_duration_seconds` (nonnegative seconds, or `null` for unknown).
-All `mandatory` flags are false. IDs match the 25 selectable CGO check jobs.
+The `test` suite is mandatory; its prerequisite is included by the runtime.
+IDs match CGO check jobs.
 Adding a suite requires updating both the catalog and the runtime's fixed ID
 list, plus job wiring and tests. Never invent historical durations.
 
@@ -685,9 +691,12 @@ failure artifacts under unique shard names. New tests default to fast; refresh
 the manifest from complete CGO artifacts when timings change. Move a whole
 top-level test, including all subtests, and keep its shard unique.
 
-The front door assesses both suites independently; selecting the coverage
-canary retains both. Main pushes, scheduled controls, and invalid/missing
-decisions still run both. Their new runner durations remain `null` in the
+The front door retains the fast suite (including new or unmeasured tests).
+It can omit the slow suite only when its coverage is unaffected. Selecting the
+coverage canary retains both. Main pushes, scheduled controls, and invalid/missing
+decisions still run both. The researcher mines cached test and job timing to
+identify candidates with critical-path savings rather than treating every slow
+test as skippable. Split-suite runner durations remain `null` in the
 catalog until measured: per-test times and old shard times cannot establish
 split-suite runner-minutes or a guaranteed fast-suite wall-clock budget.
 Local `test-unit-fast` and `test-unit-slow` retain the full suite's `-short`
