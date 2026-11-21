@@ -8,6 +8,7 @@ import (
 	"encoding/base64"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -427,6 +428,153 @@ func TestRenderStepForRunnerPreservesWorkingDirectoryAndExplicitEnvironment(t *t
 	for _, excluded := range []string{"'GITHUB_TOKEN'", "UNRELATED_SECRET"} {
 		if strings.Contains(got, excluded) {
 			t.Errorf("Windows WSL wrapper unexpectedly forwards %q:\n%s", excluded, got)
+		}
+	}
+}
+
+func TestTypeScriptLSPInstallPath(t *testing.T) {
+	bash, err := exec.LookPath("bash")
+	if err != nil {
+		t.Skip("bash is required to run the generated installer")
+	}
+	fields, ok := parseWindowsStep(strings.Join(generateTypeScriptLSPInstallStep(), "\n") + "\n")
+	if !ok {
+		t.Fatal("could not parse the TypeScript LSP install step")
+	}
+	for _, tc := range []struct{ name, runnerOS, converter string }{
+		{"Linux", "Linux", ""},
+		{"WSL", "Windows", "wslpath"},
+		{"Git Bash", "Windows", "cygpath"},
+		{"Mismatched lock", "Linux", ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			temp := t.TempDir()
+			binDir := filepath.Join(temp, "gh-aw", "engine-cli", "typescript-lsp", "node_modules", ".bin")
+			bin := filepath.Join(temp, "mock-bin")
+			actionDir := filepath.Join(temp, "gh-aw", "actions")
+			if err := os.MkdirAll(filepath.Join(actionDir, "typescript-lsp"), 0700); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.Mkdir(bin, 0700); err != nil {
+				t.Fatal(err)
+			}
+			for _, file := range []string{"sh/install_typescript_lsp.sh", "sh/release_integrity.sh", "typescript-lsp/package.json", "typescript-lsp/package-lock.json"} {
+				contents, err := os.ReadFile(filepath.Join("..", "..", "actions", "setup", file))
+				if err != nil {
+					t.Fatal(err)
+				}
+				if tc.name == "Mismatched lock" && strings.HasSuffix(file, "package-lock.json") {
+					contents = append(contents, ' ')
+				}
+				if err := os.WriteFile(filepath.Join(actionDir, strings.TrimPrefix(file, "sh/")), contents, 0600); err != nil {
+					t.Fatal(err)
+				}
+			}
+			pathFile := filepath.Join(temp, "github-path")
+			npmCall := filepath.Join(temp, "npm-called")
+			const mockNpm = `#!/bin/bash
+[[ "$#" == 4 && "$1" == ci && "$PWD/node_modules/.bin" == "$EXPECTED_BIN_DIR" &&
+   "$2" == --replace-registry-host=npmjs && "$3" == --no-audit && "$4" == --no-fund ]] || exit 1
+printf 'called\n' > "$NPM_CALL"
+`
+			if err := os.WriteFile(filepath.Join(bin, "npm"), []byte(mockNpm), 0700); err != nil {
+				t.Fatal(err)
+			}
+			want := binDir
+			if tc.converter != "" {
+				want = `C:\runner temp\gh-aw\engine-cli\typescript-lsp\node_modules\.bin`
+				const mockConverter = "#!/bin/bash\n" + `[[ "$1" == -w && "$2" == "$EXPECTED_BIN_DIR" ]] || exit 1; printf '%s\n' "$WINDOWS_BIN_DIR"` + "\n"
+				if err := os.WriteFile(filepath.Join(bin, tc.converter), []byte(mockConverter), 0700); err != nil {
+					t.Fatal(err)
+				}
+			}
+			cmd := exec.CommandContext(t.Context(), bash, "--noprofile", "--norc", "-c", fields["run"].(string))
+			cmd.Env = []string{"RUNNER_OS=" + tc.runnerOS, "RUNNER_TEMP=" + temp, "GITHUB_PATH=" + pathFile,
+				"EXPECTED_BIN_DIR=" + binDir, "WINDOWS_BIN_DIR=" + want, "NPM_CALL=" + npmCall,
+				"PATH=" + bin + ":/usr/bin:/bin"}
+			output, err := cmd.CombinedOutput()
+			if tc.name == "Mismatched lock" {
+				if err == nil || !strings.Contains(string(output), "SHA256 verification failed for package-lock.json") {
+					t.Fatalf("installer did not reject the mismatched lock: %v\n%s", err, output)
+				}
+				if _, err := os.Stat(npmCall); !os.IsNotExist(err) {
+					t.Fatalf("mismatched lock should fail before npm, stat err = %v", err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("run installer: %v\n%s", err, output)
+			}
+			if got, err := os.ReadFile(pathFile); err != nil || string(got) != want+"\n" {
+				t.Fatalf("GITHUB_PATH = %q, err = %v; want %q", got, err, want+"\n")
+			}
+		})
+	}
+}
+
+func TestCompileWindowsTypeScriptLSPForwardsEarlierNpmSettingsOnlyToInstaller(t *testing.T) {
+	dir := t.TempDir()
+	workflowFile := filepath.Join(dir, "windows-typescript.md")
+	const workflow = `---
+on: workflow_dispatch
+permissions:
+  contents: read
+runs-on: windows-latest
+engine: copilot
+strict: false
+steps:
+  - name: Configure npm mirror
+    shell: pwsh
+    run: |
+      Add-Content -Path $env:GITHUB_ENV -Value 'NPM_CONFIG_REGISTRY=https://mirror.example.com/'
+      Add-Content -Path $env:GITHUB_ENV -Value "NPM_CONFIG_USERCONFIG=$env:RUNNER_TEMP\mirror.npmrc"
+lsp:
+  typescript:
+    command: typescript-language-server
+    args: ["--stdio"]
+    fileExtensions:
+      ".ts": typescript
+---
+Inspect the TypeScript code.
+`
+	if err := os.WriteFile(workflowFile, []byte(workflow), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := NewCompiler().CompileWorkflow(workflowFile); err != nil {
+		t.Fatal(err)
+	}
+	lock, err := os.ReadFile(filepath.Join(dir, "windows-typescript.lock.yml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	const installerHeader = "      - name: Install TypeScript LSP dependencies\n"
+	before, remainder, ok := strings.Cut(string(lock), installerHeader)
+	if !ok || !strings.Contains(before, "'NPM_CONFIG_REGISTRY=https://mirror.example.com/'") ||
+		!strings.Contains(before, "- name: Setup Scripts") {
+		t.Fatal("expected setup action assets and the npm mirror step before the installer")
+	}
+	installer, after, _ := strings.Cut(remainder, "\n      - ")
+	if !strings.Contains(installer, "shell: pwsh") ||
+		!strings.Contains(decodeWindowsWSLRunScript(t, installer), `/install_typescript_lsp.sh" `+typescriptLSPManifestSHA256+` `+typescriptLSPLockSHA256) {
+		t.Fatal("expected the locked TypeScript installer to run inside WSL")
+	}
+	lookalike := renderWindowsPOSIXRunStep(strings.Join(generateTypeScriptLSPInstallStep(), "\n")+"\n", nil)
+	wslArray := func(step, name string) string {
+		_, value, _ := strings.Cut(step, "$"+name+" = @(")
+		value, _, _ = strings.Cut(value, "\n")
+		return value
+	}
+	if !strings.Contains(wslArray(installer, "pathVariables"), "'NPM_CONFIG_USERCONFIG'") {
+		t.Error("expected the WSL wrapper to mark the npm user config as a path")
+	}
+	for _, name := range []string{"'NPM_CONFIG_REGISTRY'", "'NPM_CONFIG_USERCONFIG'", "'NODE_AUTH_TOKEN'"} {
+		if !strings.Contains(wslArray(installer, "allowedEnvironmentVariables"), name) {
+			t.Errorf("installer does not forward %s from earlier steps", name)
+		}
+		for line := range strings.SplitSeq(before+lookalike+after, "\n") {
+			if strings.Contains(wslArray(line, "allowedEnvironmentVariables"), name) {
+				t.Errorf("found %s in another step's WSL allowlist", name)
+			}
 		}
 	}
 }

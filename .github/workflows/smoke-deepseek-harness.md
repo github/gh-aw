@@ -60,7 +60,7 @@ safe-outputs:
     expires: 2h
     close-older-issues: true
     close-older-key: "smoke-deepseek-harness"
-    labels: [automation, testing]
+    labels: [automation, testing, "backlog:smoke-tests"]
   add-labels:
     allowed: [smoke-deepseek-harness]
   messages:

@@ -34,7 +34,7 @@ safe-outputs:
     report-as-issue: false
   create-issue:
     title-prefix: "[enterprise-docs] "
-    labels: [cookie]
+    labels: [cookie, "backlog:docs"]
     allowed-labels: [cookie]
     max: 3
     expires: 2d

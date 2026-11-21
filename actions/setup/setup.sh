@@ -228,6 +228,13 @@ else
   debug_log "No shell scripts directory found at ${SH_SOURCE_DIR}"
 fi
 
+# Stage only the locked npm project, not the maintainer's registry settings.
+create_dir "${DESTINATION}/typescript-lsp"
+for filename in package.json package-lock.json; do
+  cp "${SCRIPT_DIR}/typescript-lsp/${filename}" "${DESTINATION}/typescript-lsp/${filename}"
+  FILE_COUNT=$((FILE_COUNT + 1))
+done
+
 echo "Successfully copied ${FILE_COUNT} files to ${DESTINATION}"
 
 # Keep the locked SDK projects beside their installer; runner npm configuration
