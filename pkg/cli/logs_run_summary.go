@@ -65,7 +65,6 @@ func newRunSummary(result *DownloadResult, metrics LogMetrics, jobDetails []JobI
 		CLIVersion:  GetVersion(),
 		RunID:       result.Run.DatabaseID,
 		ProcessedAt: time.Now(),
-		AICFound:    result.TokenUsage != nil && result.TokenUsage.AICFound,
 		RunAnalysis: RunAnalysis{
 			Run:                     result.Run,
 			Metrics:                 metrics,

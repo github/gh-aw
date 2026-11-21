@@ -1460,10 +1460,9 @@ func TestDownloadWorkflowLogsFromStdinReportsCollectionStatsForJSONLAndDiskCache
 		CLIVersion:  GetVersion(),
 		RunID:       diskCachedRunID,
 		ProcessedAt: time.Now(),
-		AICFound:    true,
 		RunAnalysis: RunAnalysis{
 			Run:        WorkflowRun{DatabaseID: diskCachedRunID, WorkflowName: "Disk Cached", WorkflowPath: ".github/workflows/disk-cached.lock.yml", Status: "completed", Conclusion: "success"},
-			TokenUsage: &TokenUsageSummary{},
+			TokenUsage: &TokenUsageSummary{AICFound: true},
 		},
 	}, false))
 	require.NoError(t, markArtifactDownloaded(diskRunDir, constants.UsageArtifactName.String()))

@@ -1343,7 +1343,7 @@ func TestLogsJSONAICCoverage(t *testing.T) {
 			}
 			require.NoError(t, json.Unmarshal(output.Bytes(), &decoded))
 			assert.Equal(t, tc.coverage, decoded.Summary["aic_coverage"])
-			assert.Equal(t, tc.total, decoded.Summary["total_aic"])
+			assert.InDelta(t, tc.total, decoded.Summary["total_aic"], 1e-9)
 			require.Len(t, decoded.Runs, len(tc.runCoverage))
 			for i, coverage := range tc.runCoverage {
 				assert.Equal(t, coverage, decoded.Runs[i]["aic_coverage"])

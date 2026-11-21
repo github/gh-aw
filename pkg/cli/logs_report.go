@@ -566,21 +566,33 @@ func applyRunDataSteering(runData *RunData, summary *TokenUsageSummary) {
 	runData.SteeringNoticesUnavailable = tokenUsageSteeringNoticesUnavailable(summary)
 }
 
+func (agg *logsAggregate) recordCachedRun(runData RunData) RunData {
+	// Older cache records cannot distinguish a recorded zero from missing cost.
+	if runData.AICCoverage == "" {
+		runData.AICCoverage = logsAICUnavailable
+		if runData.AIC > 0 {
+			runData.AICCoverage = logsAICAvailable
+		}
+	}
+	agg.accumulateCachedRunTotals(runData)
+	agg.accumulateRunAIC(runData)
+	return runData
+}
+
+func (agg *logsAggregate) recordRunAIC(runData *RunData, usage *TokenUsageSummary) {
+	runData.AICCoverage = logsAICUnavailable
+	if usage != nil && (usage.AICFound || usage.TotalAIC > 0) {
+		runData.AIC = usage.TotalAIC
+		runData.AICCoverage = logsAICAvailable
+	}
+	agg.accumulateRunAIC(*runData)
+}
+
 // buildRunData converts a processed run into RunData while accumulating rollup totals.
 // localRepo guards against cross-repo misclassification of intentional-failure workflows.
 func buildRunData(pr ProcessedRun, processedRuns []ProcessedRun, localRepo string, agg *logsAggregate, classifyLocal bool) RunData {
 	if pr.cachedData != nil {
-		runData := *pr.cachedData
-		// Older cache records cannot distinguish a recorded zero from missing cost.
-		if runData.AICCoverage == "" {
-			runData.AICCoverage = logsAICUnavailable
-			if runData.AIC > 0 {
-				runData.AICCoverage = logsAICAvailable
-			}
-		}
-		agg.accumulateCachedRunTotals(runData)
-		agg.accumulateRunAIC(runData)
-		return runData
+		return agg.recordCachedRun(*pr.cachedData)
 	}
 	run := pr.Run
 
@@ -627,12 +639,7 @@ func buildRunData(pr ProcessedRun, processedRuns []ProcessedRun, localRepo strin
 	if run.Duration > 0 {
 		runData.Duration = timeutil.FormatDuration(run.Duration)
 	}
-	runData.AICCoverage = logsAICUnavailable
-	if pr.TokenUsage != nil && (pr.TokenUsage.AICFound || pr.TokenUsage.TotalAIC > 0) {
-		runData.AIC = pr.TokenUsage.TotalAIC
-		runData.AICCoverage = logsAICAvailable
-	}
-	agg.accumulateRunAIC(runData)
+	agg.recordRunAIC(&runData, pr.TokenUsage)
 	// Compute average TBT from metrics when available; fall back to wall-time / (turns - 1).
 	if run.AvgTimeBetweenTurns > 0 {
 		runData.AvgTimeBetweenTurns = timeutil.FormatDuration(run.AvgTimeBetweenTurns)
