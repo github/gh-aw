@@ -15,6 +15,7 @@ describe("readExperimentAssignments", () => {
   });
 
   afterEach(() => {
+    vi.unstubAllEnvs();
     readFileSpy.mockRestore();
     delete process.env.GH_AW_EXPERIMENTS_PROMPT_STYLE;
     delete process.env.GH_AW_EXPERIMENTS_REASONING_DEPTH;
@@ -74,5 +75,13 @@ describe("readExperimentAssignments", () => {
     process.env.GH_AW_EXPERIMENTS_PROMPT_STYLE = "concise";
     process.env.GH_AW_EXPERIMENTS_REASONING_DEPTH = "deep";
     expect(readExperimentAssignments()).toEqual({ prompt_style: "concise", reasoning_depth: "deep" });
+  });
+
+  it("never treats the secret broker endpoint as an experiment assignment", () => {
+    vi.stubEnv("GH_AW_BROKER_EXPERIMENTS_URL", "https://synthetic-broker.example.test/secret");
+    expect(readExperimentAssignments()).toBeNull();
+    vi.stubEnv("GH_AW_EXPERIMENTS_BROKER_URL", "candidate");
+    process.env.GH_AW_EXPERIMENTS_PROMPT_STYLE = "concise";
+    expect(readExperimentAssignments()).toEqual({ broker_url: "candidate", prompt_style: "concise" });
   });
 });

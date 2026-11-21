@@ -757,10 +757,26 @@ func (c *Compiler) extractAdditionalConfigurations( //nolint:largefunc // Existi
 	workflowData.TokenBrokerEnabled = workflowData.TokenBrokerEnabled ||
 		usesTokenBrokerGitHubTool(workflowData) || usesTokenBrokerSafeOutputs(workflowData)
 
+	frontmatter, err = mergeImportedExperimentBrokerSettings(frontmatter, importsResult.MergedExperiments)
+	if err != nil {
+		return err
+	}
 	// Extract experiments configuration once; derive the simple variants map from the configs.
 	workflowData.ExperimentConfigs = extractExperimentConfigsFromFrontmatter(frontmatter)
 	workflowData.Experiments = experimentVariantsFromConfigs(workflowData.ExperimentConfigs)
 	workflowData.ExperimentsStorage = extractExperimentsStorageFromFrontmatter(frontmatter)
+	if experiments, ok := frontmatter["experiments"].(map[string]any); ok {
+		if raw, exists := experiments["broker-url"]; exists {
+			var valid bool
+			workflowData.ExperimentsBrokerURL, valid = raw.(string)
+			if !valid || workflowData.ExperimentsBrokerURL == "" {
+				return errors.New("experiments.broker-url must be a non-empty string")
+			}
+		}
+	}
+	if err := validateExperimentBrokerURL(workflowData.ExperimentsBrokerURL); err != nil {
+		return err
+	}
 
 	// Rewrite ${{ experiments.<name> }} references that ended up in engine.model (e.g.
 	// `engine: { model: ${{ experiments.model }} }`) so the compiled workflow reads the
