@@ -10,6 +10,11 @@ set +o histexpand
 
 set -e
 
+if [[ "${RUNNER_ENVIRONMENT:-}" == "self-hosted" ]]; then
+  # shellcheck source=assert_docker_lease.sh
+  source "$(dirname "${BASH_SOURCE[0]}")/assert_docker_lease.sh" awmg-mcpg
+fi
+
 # Restrict default file creation mode to owner-only (rw-------) for all new files.
 # This prevents the race window between file creation via output redirection and
 # a subsequent chmod, which would leave credential-bearing files world-readable
@@ -95,6 +100,10 @@ if ! echo "$MCP_GATEWAY_DOCKER_COMMAND" | grep -qE '^docker run'; then
   echo "ERROR: MCP_GATEWAY_DOCKER_COMMAND has incorrect syntax"
   echo "Expected: docker run command with image and arguments"
   exit 1
+fi
+
+if [[ "${RUNNER_ENVIRONMENT:-}" == "self-hosted" ]]; then
+  MCP_GATEWAY_DOCKER_COMMAND="docker run --label io.github.gh-aw.invocation=${GH_AW_DOCKER_OWNER} ${MCP_GATEWAY_DOCKER_COMMAND#docker run}"
 fi
 
 # Validate container command includes required flags

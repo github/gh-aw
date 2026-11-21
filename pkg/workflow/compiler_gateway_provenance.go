@@ -43,6 +43,9 @@ func (c *Compiler) addGatewayProvenanceJob(data *WorkflowData) error {
 		"          script: |\n",
 		generateGitHubScriptWithRequire("check_gateway_provenance.cjs"),
 	)
+	if c.actionMode.IsScript() {
+		steps = append(steps, c.generateScriptModeCleanupStep())
+	}
 	return c.jobManager.AddJob(&Job{
 		Name:           gatewayProvenanceJobName,
 		DisplayName:    "Verify CAO App provenance",

@@ -6,20 +6,33 @@ set +o histexpand
 
 set -e
 
-cd ${RUNNER_TEMP}/gh-aw/mcp-scripts || exit 1
+umask 077
+MCP_SCRIPTS_DIR="${RUNNER_TEMP}/gh-aw/mcp-scripts"
+MCP_SCRIPTS_PID_FILE="${RUNNER_TEMP}/gh-aw/actions/mcp-scripts-server.pid"
+
+if [[ "${RUNNER_ENVIRONMENT:-}" == "self-hosted" ]]; then
+  # shellcheck source=assert_docker_lease.sh
+  source "$(dirname "${BASH_SOURCE[0]}")/assert_docker_lease.sh"
+fi
+
+if [[ -e "$MCP_SCRIPTS_PID_FILE" || -L "$MCP_SCRIPTS_PID_FILE" ]]; then
+  bash "$(dirname "${BASH_SOURCE[0]}")/stop_mcp_scripts_server.sh"
+fi
+
+cd "${MCP_SCRIPTS_DIR}" || exit 1
 
 # Verify required files exist
 echo "Verifying mcp-scripts setup..."
 
 # Check core configuration files
 if [ ! -f mcp-server.cjs ]; then
-  echo "ERROR: mcp-server.cjs not found in ${RUNNER_TEMP}/gh-aw/mcp-scripts"
-  ls -la ${RUNNER_TEMP}/gh-aw/mcp-scripts/
+  echo "ERROR: mcp-server.cjs not found in ${MCP_SCRIPTS_DIR}"
+  ls -la "${MCP_SCRIPTS_DIR}/"
   exit 1
 fi
 if [ ! -f tools.json ]; then
-  echo "ERROR: tools.json not found in ${RUNNER_TEMP}/gh-aw/mcp-scripts"
-  ls -la ${RUNNER_TEMP}/gh-aw/mcp-scripts/
+  echo "ERROR: tools.json not found in ${MCP_SCRIPTS_DIR}"
+  ls -la "${MCP_SCRIPTS_DIR}/"
   exit 1
 fi
 
@@ -51,13 +64,13 @@ for dep in "${REQUIRED_DEPS[@]}"; do
 done
 
 if [ ${#MISSING_FILES[@]} -gt 0 ]; then
-  echo "ERROR: Missing required dependency files in ${RUNNER_TEMP}/gh-aw/mcp-scripts/"
+  echo "ERROR: Missing required dependency files in ${MCP_SCRIPTS_DIR}/"
   for file in "${MISSING_FILES[@]}"; do
     echo "  - $file"
   done
   echo
   echo "Current directory contents:"
-  ls -la ${RUNNER_TEMP}/gh-aw/mcp-scripts/
+  ls -la "${MCP_SCRIPTS_DIR}/"
   echo
   echo "These files should have been copied by the Setup Scripts action."
   echo "This usually indicates a problem with the actions/setup step."
@@ -85,8 +98,25 @@ mkdir -p /tmp/gh-aw/mcp-scripts/logs
 
 # Start the HTTP server in the background
 echo "Starting mcp-scripts MCP HTTP server..."
-node mcp-server.cjs >> /tmp/gh-aw/mcp-scripts/logs/server.log 2>&1 &
+GH_AW_NODE="${GH_AW_NODE:-${GH_AW_NODE_BIN:-$(command -v node 2>/dev/null || true)}}"
+if [[ -z "$GH_AW_NODE" || ! -x "$GH_AW_NODE" ]]; then
+  echo "::error::Node.js is required to start the MCP Scripts server."
+  exit 1
+fi
+"$GH_AW_NODE" mcp-server.cjs >> /tmp/gh-aw/mcp-scripts/logs/server.log 2>&1 &
 SERVER_PID=$!
+if [[ "${RUNNER_ENVIRONMENT:-}" == "self-hosted" ]]; then
+  if [[ -L "${RUNNER_TEMP}/gh-aw/actions" || -L "$MCP_SCRIPTS_PID_FILE" || -e "$MCP_SCRIPTS_PID_FILE" ]]; then
+    echo "::error::Refusing to overwrite an existing or unsafe MCP Scripts server PID file."
+    kill "$SERVER_PID" 2>/dev/null || true
+    exit 1
+  fi
+  if ! (set -o noclobber; printf '%s\t%s\n' "${GH_AW_DOCKER_OWNER}" "$SERVER_PID" > "$MCP_SCRIPTS_PID_FILE"); then
+    echo "::error::Unable to record the MCP Scripts server PID."
+    kill "$SERVER_PID" 2>/dev/null || true
+    exit 1
+  fi
+fi
 echo "Started mcp-scripts MCP server with PID $SERVER_PID"
 
 # Wait for server to be ready (max 10 seconds)
