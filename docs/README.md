@@ -66,9 +66,10 @@ It is a standalone slide deck, separate from the homepage slideshow, linked
 from the site footer. The deck is laid out as a table of horizontal bands: the
 title, the factory mindset, trust the process and the finale are rows of their own, and every other band (Workflows,
 Security, Human agent processes, Cost Optimization, Agentic Engineering, Enterprise, Central Agentic Ops, AW factory) starts with a header
-slide that lists the band's slides (click a tile to jump) and a map of all bands.
+slide that lists the band's slides (click or tap a tile to jump) and a map of all bands.
 The Central Agentic Ops (CAO, `gh cao`) band covers a research prototype, so each of its
 slides carries a "Research prototype" badge.
+Clicking a slide never changes it; on touch screens, swipe left/right to step, up/down to walk a column or switch bands, and pinch in to zoom out to the slide map.
 Left/Right (or Space) step through the slides of the main line in reading
 order and wrap between bands, and Page Up/Page Down (or Shift+Up/Down) move to the band above or
 below like a text cursor: they keep the horizontal position (clamped to the band's length) until
@@ -79,7 +80,8 @@ Up/Down walk down the column and back (past either end they switch bands, as
 they do on slides without a column), U goes back to the pattern, and Left/Right from an example return to
 the main line. Typing a slide number then Enter jumps to that slide, like clicking its dot. Home/End jump to the first/last slide, F for fullscreen, the notes toolbar button (or N) toggles speaker notes,
 and M to toggle sound. G opens the slide map, whose bottom section is a keyboard manual: a full
-keyboard with the shortcut keys lit and combos joined by arcs, then a list of every shortcut. Notes explain what the slide shows, why the feature exists,
+keyboard with the shortcut keys lit and combos joined by arcs, a phone that loops every touch gesture
+(point at one to play it alone), then a list of every shortcut. Notes explain what the slide shows, why the feature exists,
 and when to use it for technical audiences new to AW; notes written as `Label: text` lines
 show each labelled cue as its own block, and other notes stay plain text. They stay open as you navigate;
 Escape hides them, and long notes scroll without advancing the slide.
@@ -114,9 +116,9 @@ the slide map: picking one adds `&tour=<name>` to the hash, a pill shows the tou
 and position, navigation skips the other slides, and × (or X) leaves the tour. Examples
 in a pattern's column only appear together with their pattern. "Design a view"
 in the slide map lets you tick slides or whole bands and copy a link that
-encodes the selection as `&view=<base64url>`. Clicking the left third
-goes back; clicking elsewhere advances. On touch screens, swipe left or right
-within a band and up or down between bands. On phones the toolbar dims after a
+encodes the selection as `&view=<base64url>`. Clicks never change slides.
+On touch screens, swipe left or right within a band, up or down between bands,
+and pinch in for the slide map. On phones the toolbar dims after a
 few idle seconds and brightens on any touch, key or focus. iPhone Safari offers no
 page fullscreen; to present without the browser bars, use
 Share → Add to Home Screen and open the talk from that icon. Slides within a band push left, and
