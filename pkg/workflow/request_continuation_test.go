@@ -110,6 +110,17 @@ func TestCompileRequestContinuation(t *testing.T) {
 	assert.Less(t, collect, validate, "output collection must precede the gated checkpoint upload")
 }
 
+func TestCompileRequestContinuationWithOtherSafeOutputs(t *testing.T) {
+	lock, err := compileRequestContinuationWorkflow(t, "on: workflow_dispatch\nengine: copilot\nsafe-outputs:\n  create-issue: {}\n  add-comment: {}\n  request-continuation: {}\n")
+	require.NoError(t, err)
+
+	for _, handler := range []string{`\"create_issue\":{`, `\"add_comment\":{`, `\"request_continuation\":{`} {
+		assert.Contains(t, lock, handler, "every configured safe output must remain enabled alongside request-continuation")
+	}
+	assert.Contains(t, lock, "contains(steps.collect_output.outputs.output_types, 'request_continuation')",
+		"the gate must match request_continuation within a mixed output type list")
+}
+
 func TestCompileRequestContinuationRequiresWorkflowDispatch(t *testing.T) {
 	_, err := compileRequestContinuationWorkflow(t, "on: push\nengine: copilot\nsafe-outputs:\n  request-continuation: {}\n")
 	require.Error(t, err)

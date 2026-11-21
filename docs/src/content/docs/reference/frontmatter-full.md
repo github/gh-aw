@@ -24057,10 +24057,11 @@ safe-outputs:
 
   # Experimental. Enables durable continuation. The agent must call
   # request_continuation with self-contained hints to dispatch the next run of this
-  # workflow. The next run restores the previous native session checkpoint when
-  # available and receives the hints, but must reconstruct workspace and tool
-  # context itself. When the agent does not request continuation, no checkpoint is
-  # uploaded and the chain stops. Requires a workflow_dispatch trigger.
+  # workflow; it may emit other safe outputs in the same run. The next run restores
+  # the previous native session checkpoint when available and receives the hints,
+  # but must reconstruct workspace and tool context itself. When the agent does not
+  # request continuation, no checkpoint is uploaded and the chain stops. Requires a
+  # workflow_dispatch trigger.
   # (optional)
   # Accepted formats:
 

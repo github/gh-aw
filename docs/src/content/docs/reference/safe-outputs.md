@@ -1762,7 +1762,7 @@ safe-outputs:
 > Request continuation is experimental. Enabling it emits a compile-time
 > warning. Configuration and behavior may change without deprecation.
 
-Lets an agent continue long-running work in a new run of the same workflow. The agent must call `request_continuation` with self-contained `hints`; without that call, no checkpoint is published and the chain stops.
+Lets an agent continue long-running work in a new run of the same workflow. The agent must call `request_continuation` with self-contained `hints`; without that call, no checkpoint is published and the chain stops. The call does not replace other safe outputs: the agent can create issues, comments, pull requests, and so on in the same run, and they are applied normally alongside the continuation.
 
 ```yaml wrap
 on: workflow_dispatch

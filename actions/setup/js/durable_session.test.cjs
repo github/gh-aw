@@ -127,6 +127,7 @@ describe("request_continuation prompt", () => {
     expect(prompt).toContain("NOT restored. Reconstruct");
     expect(prompt).toContain("````\n" + hints + "\n````");
     expect(prompt).toContain("call request_continuation");
+    expect(prompt).toContain("Emit this run's safe outputs as usual");
     expect(prompt).not.toContain("untrusted historical data");
     expect(prompt.endsWith("Current task")).toBe(true);
     preparePrompt({ env: {}, promptFile, continuation: { depth: 2, max: 5, hints } });
