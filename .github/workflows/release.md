@@ -623,6 +623,40 @@ jobs:
           name: release-binaries-${{ needs.config.outputs.release_tag }}
           path: dist/
 
+      - name: Verify release asset checksums
+        working-directory: dist
+        shell: bash
+        run: |
+          if [[ ! -f checksums.txt || -L checksums.txt ]]; then
+            echo "::error::Missing or invalid release checksum manifest"
+            exit 1
+          fi
+          assets=()
+          for asset in *; do
+            [[ "$asset" == checksums.txt ]] && continue
+            if [[ ! -f "$asset" || -L "$asset" ]]; then
+              echo "::error::Unexpected entry in release assets: $asset"
+              exit 1
+            fi
+            assets+=("$asset")
+          done
+          if [[ ${#assets[@]} -eq 0 ]]; then
+            echo "::error::No release assets to verify"
+            exit 1
+          fi
+          # Check both the digests and the complete set of files about to be published.
+          actual=$(sha256sum -- "${assets[@]}" | LC_ALL=C sort)
+          expected=$(LC_ALL=C sort checksums.txt)
+          if [[ "$actual" != "$expected" ]]; then
+            echo "::error::Release asset checksums do not match checksums.txt"
+            exit 1
+          fi
+
+      - name: Attest release assets
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: dist/*
+
       - name: Create GitHub release
         id: get_release
         env:

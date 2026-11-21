@@ -246,7 +246,7 @@ Do not replace the auto-generated notes — prepend only.
 |---|---|---|
 | Security/virus scan | After build, before release | Use `runs-on: windows-latest` with Microsoft Defender for binaries |
 | SBOM generation | Inside the `release` job | Use `anchore/sbom-action`; upload as artifact, not as release asset |
-| Attestation | Inside the `release` job | Use `actions/attest-build-provenance`; requires `id-token: write` + `attestations: write` |
+| Attestation | Inside the `release` job, before publishing | Verify that `checksums.txt` covers every payload file and attest the files being uploaded using `actions/attest-build-provenance`; requires `id-token: write` + `attestations: write`. Keep asset names and checksum format unchanged for existing installers. |
 | Gate / environment approval | Between jobs | Use `environment:` on a gate job; useful for manual sign-off before releasing |
 | Comment on merged PRs | After agent job | Separate classic job using `actions/github-script` to notify PR authors; requires `pull-requests: write` + `issues: write` |
 | Community attribution | Agent prefetch step | Fetch community-labeled issues closed in the release window for attribution in highlights |

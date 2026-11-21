@@ -23,7 +23,7 @@ func TestDailyCLIToolsTesterCompileEdgeCasePolicy(t *testing.T) {
 	assert.Contains(t, phase, "Malformed YAML frontmatter, invalid tool configurations, and missing imports")
 	assert.Contains(t, phase, "**out of scope**")
 	assert.Contains(t, phase, "Do not create fixtures, modify selected workflows to induce errors, or compile downloaded content.")
-	assert.Contains(t, phase, "Record these three skipped edge cases as **not tested (expected exclusion)** with the trusted-target restriction in the findings issue or final `noop`.")
+	assert.Contains(t, phase, "Record these three skipped edge cases as **not tested (expected exclusion)** with the trusted-target restriction in the final output.")
 	assert.Contains(t, phase, "These exclusions alone do not require `report_incomplete`.")
 	assert.NotContains(t, phase, "Use `report_incomplete` to record these three skipped edge cases")
 	assert.Contains(t, phase, "Do not count them as passing tests or claim complete compile error-handling coverage.")
