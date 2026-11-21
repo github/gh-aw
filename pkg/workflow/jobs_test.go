@@ -277,6 +277,28 @@ func TestJobManager_WriteJobsYAML(t *testing.T) {
 	}
 }
 
+func TestReportExperimentsJobRendering(t *testing.T) {
+	for _, reporter := range []bool{false, true} {
+		job := &Job{
+			Name:                      "report_experiments",
+			RunsOn:                    "runs-on: windows-latest",
+			Steps:                     []string{"      - run: echo \"${RUNNER_TEMP}/gh-aw/actions/setup.sh\"\n"},
+			experimentsBrokerReporter: reporter,
+		}
+		manager := NewJobManager()
+		if err := manager.AddJob(job); err != nil {
+			t.Fatal(err)
+		}
+		var output strings.Builder
+		manager.WriteJobsYAML(&output)
+		for _, marker := range []string{"GH_AW_RUNTIME_FEATURES", "Initialize WSL runtime"} {
+			if strings.Contains(output.String(), marker) != reporter {
+				t.Errorf("reporter=%t: unexpected %q in job:\n%s", reporter, marker, output.String())
+			}
+		}
+	}
+}
+
 func TestRenderStepForRunner(t *testing.T) {
 	windowsStep := "    steps:\n      - name: Run script\n        run: echo \"${RUNNER_TEMP}/gh-aw/actions/setup.sh\" --verbose\n"
 	got := renderStepForRunner(windowsStep, "runs-on: windows-latest", "agent")

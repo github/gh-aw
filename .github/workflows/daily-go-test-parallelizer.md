@@ -71,16 +71,16 @@ features:
 
 # Daily Go Test Parallelizer
 
-Analyze up to ten Go test files per run and add `t.Parallel()` only where parallel execution is demonstrably safe. Ten files keeps analysis and package validation inside the 25-credit, 60-minute budget.
+Analyze up to three Go test files per run and add `t.Parallel()` only where parallel execution is demonstrably safe. Three files keeps analysis and package validation inside the 25-credit, 60-minute budget.
 
 ## Select a file
 
 1. Use `grep` to list tracked `*_test.go` files containing top-level `Test` functions. Exclude `vendor/` and generated files, then sort paths lexicographically.
 2. Read `/tmp/gh-aw/cache-memory/go-test-parallelizer/state.json` when it exists. It has this shape:
    `{"last_file":"path/to/file_test.go"}`.
-3. Rotate the sorted list to start after `last_file`, wrapping to the first path. If the cache is absent, malformed, or names a removed file, start from the first path. Partition the rotated list into non-overlapping batches of at most 10 files; do not wrap within a batch.
+3. Rotate the sorted list to start after `last_file`, wrapping to the first path. If the cache is absent, malformed, or names a removed file, start from the first path. Partition the rotated list into non-overlapping batches of at most 3 files; do not wrap within a batch.
 4. Select batch `(github.run_number - 1) % number_of_batches`, using run number `${{ github.run_number }}`. This attempted-batch rotation permits zero consecutive retries after a block: the next run selects the next batch regardless of outcome, without changing the completed-analysis cursor. If there are no files, report a completed no-candidate analysis; if there is only one batch, report that rotation cannot select a different batch.
-5. Analyze and modify only this selected batch (maximum 10 files). Keep the previous cursor unchanged; selection alone is not completed analysis.
+5. Analyze and modify only this selected batch (maximum 3 files). Keep the previous cursor unchanged; selection alone is not completed analysis.
 6. Minimize token usage: first `grep -n` the batch for the exclusion patterns below, then read only the remaining candidate test functions (bounded line ranges, never whole files or long `-A` context dumps). Do not re-read analyzed code, load unrelated skills or Makefiles, or paste file contents into notes or outputs.
 
 ## Analyze safety

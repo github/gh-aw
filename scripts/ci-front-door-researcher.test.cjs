@@ -78,12 +78,20 @@ test("catalog and runtime safety contracts are explicit", () => {
   assert.match(prompt, /Preserve schema version 1/);
   assert.match(prompt, /finite nonnegative seconds/);
   assert.match(prompt, /every CGO check job by its actual job ID/);
-  assert.match(prompt, /All checks are\s+eligible for PR filtering/);
-  assert.match(prompt, /Every `mandatory` flag is false/);
+  assert.match(prompt, /fast unit suite\s+\(`test`\) is mandatory and retains `verify-integration-build`/);
   assert.match(prompt, /at\s+least \*\*0\.9\*\*/);
   assert.match(prompt, /all-suite fallback/);
   assert.match(prompt, /Reasoning is ignored/);
   assert.match(prompt, /diff_summary:\{\.\.\.\},suite_catalog:catalog,prompt:string/);
+});
+
+test("researcher ranks slow tests by critical path using cached timing and retains unmeasured tests", () => {
+  assert.match(prompt, /10-second threshold/);
+  assert.match(prompt, /cached `test-result-cgo-unit-\*`/);
+  assert.match(prompt, /exclude subtests to avoid double counting/);
+  assert.match(prompt, /Retain fast, unmeasured, and borderline tests/);
+  assert.match(prompt, /critical-path impact, accounting for parallel shards/);
+  assert.match(prompt, /omitting `test-slow` requires evidence for every test/);
 });
 
 test("GitHub authentication never authorizes research calls or weaker fallback", () => {

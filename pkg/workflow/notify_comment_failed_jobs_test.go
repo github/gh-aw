@@ -75,7 +75,7 @@ func TestConclusionJobResultsEnvironmentExcludesOutputs(t *testing.T) {
 		require.NoError(t, compiler.jobManager.AddJob(&Job{Name: id}))
 	}
 	require.NoError(t, compiler.jobManager.AddJob(&Job{Name: "pre_activation"}))
-	require.NoError(t, compiler.ensureConclusionIsLastJob())
+	require.NoError(t, compiler.ensureConclusionIsLastJob(false))
 
 	var rendered strings.Builder
 	compiler.jobManager.WriteJobsYAML(&rendered)

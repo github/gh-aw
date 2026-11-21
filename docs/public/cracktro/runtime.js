@@ -145,7 +145,7 @@
   .bh-mrow.on i { background: var(--bh); box-shadow: 0 0 14px var(--bh); }
   .bh-mrow.on i.hd { background: transparent; box-shadow: inset 0 0 0 2px var(--bh2); }
   .bh-row { position: absolute; left: 140px; right: 140px; bottom: 190px; margin: 0; padding: 0; list-style: none; display: flex; gap: 22px; }
-  .bh-row li { cursor: pointer; flex: 1; min-width: 0; height: 170px; padding: 26px 28px; border: 1px solid #3d444d; border-top: 4px solid var(--bh); border-radius: 14px;
+  .bh-row li { cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; flex: 1; min-width: 0; height: 170px; padding: 26px 28px; border: 1px solid #3d444d; border-top: 4px solid var(--bh); border-radius: 14px;
     background: #151b23cc; display: flex; flex-direction: column; justify-content: space-between; }
   .bh-row li:hover { border-color: var(--bh2); background: #1f2630cc; }
   .active .bh-row li { animation: rowin .8s cubic-bezier(.2,.9,.2,1) both calc(var(--i) * 90ms + .5s); }
@@ -375,6 +375,46 @@
   .smp-keys kbd { display: inline-flex; align-items: center; justify-content: center; min-width: 24px; height: 24px; padding: 0 6px; box-sizing: border-box;
     font: 600 11px/1 var(--mono); color: #f0f6fc; background: linear-gradient(#2a313c, #1f2630); border: 1px solid #3d444d; border-bottom: 3px solid #0d1117;
     border-radius: 5px; box-shadow: 0 1px 0 #ffffff14 inset; white-space: nowrap; }
+  /* touch gestures card: a phone loops each gesture in a 2 s slot (12 s cycle); pointing at a row plays only that gesture */
+  .smp-ph { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 10px 32px; padding: 14px 16px;
+    border: 1px solid #3d444d; border-radius: 8px; background: radial-gradient(ellipse at 30% 50%, #4493f824, transparent 60%), #151b23; }
+  .smp-ph svg { width: 280px; max-width: 100%; height: auto; flex: none; font-family: var(--mono); }
+  .ph-body { fill: #212830; stroke: #3d444d; stroke-width: 2; }
+  .ph-scr { fill: #0d1117; }
+  .ph-sl { fill: #151b23; stroke: var(--c); stroke-width: 1.5; }
+  .ph-tl { fill: #f0f6fc; }
+  .ph-tile { fill: #212830; stroke: #3d444d; }
+  .ph-dock { fill: #212830; }
+  .ph-tr { fill: none; stroke: var(--c); stroke-width: 2; stroke-dasharray: 3 4; stroke-linecap: round; opacity: .7; }
+  .ph-f { fill: #f0f6fcd9; stroke: var(--c); stroke-width: 2; animation: 2s ease-in-out infinite both; animation-delay: calc(var(--i) * 2s); }
+  .ph-lb { font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; fill: var(--c); text-anchor: middle; }
+  .ph-g { opacity: 0; animation: ph-slot 12s linear infinite both; animation-delay: calc(var(--i) * 2s); }
+  @keyframes ph-slot { 0% { opacity: 0; } 1.5%, 15% { opacity: 1; } 16.6%, 100% { opacity: 0; } }
+  @keyframes ph-l { 0%, 15% { transform: translateX(0); } 75%, 100% { transform: translateX(-140px); } }
+  @keyframes ph-r { 0%, 15% { transform: translateX(0); } 75%, 100% { transform: translateX(140px); } }
+  @keyframes ph-u { 0%, 15% { transform: translateY(0); } 75%, 100% { transform: translateY(-88px); } }
+  @keyframes ph-d { 0%, 15% { transform: translateY(0); } 75%, 100% { transform: translateY(88px); } }
+  @keyframes ph-tap { 0%, 30% { transform: scale(1); } 45% { transform: scale(.65); } 60%, 100% { transform: scale(1); } }
+  @keyframes ph-ring { 0%, 40% { transform: scale(.7); opacity: 0; } 45% { opacity: .9; } 90%, 100% { transform: scale(2); opacity: 0; } }
+  @keyframes ph-p1 { 0%, 15% { transform: translate(0, 0); } 75%, 100% { transform: translate(34px, 22px); } }
+  @keyframes ph-p2 { 0%, 15% { transform: translate(0, 0); } 75%, 100% { transform: translate(-34px, -22px); } }
+  .ph-tapf, .ph-ring { transform-box: fill-box; transform-origin: center; }
+  .ph-ring { fill: none; stroke: var(--c); stroke-width: 2; animation: ph-ring 2s ease-out infinite both; animation-delay: calc(var(--i) * 2s); }
+  .smp-ph.solo .ph-g { animation: none; opacity: 0; }
+  .smp-ph.solo .ph-g.on { opacity: 1; }
+  .smp-ph.solo .ph-g.on :is(.ph-f, .ph-ring) { animation-delay: 0s; }
+  .smp-ph dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 7px 12px; align-items: center; min-width: 240px; }
+  .smp-ph dl > div { display: contents; cursor: help; }
+  .smp-ph dt { font: 600 11px/1 var(--mono); color: #f0f6fc; padding: 6px 8px; border: 1px solid #3d444d; border-radius: 999px; background: #212830; white-space: nowrap; }
+  .smp-ph dd { margin: 0; font: 500 12px/1.35 "Mona Sans", sans-serif; color: #c9d1d9; }
+  .smp-ph dl > div.on dt { color: #0d1117; background: var(--c); border-color: var(--c); }
+  @media (prefers-reduced-motion: reduce) { .ph-g, .ph-f, .ph-ring { animation: none !important; } .smp-ph:not(.solo) .ph-g[data-i="0"] { opacity: 1; } }
+  body.light .smp-ph { background: radial-gradient(ellipse at 30% 50%, #4493f81f, transparent 60%), #ffffff; border-color: #9ea7b3; }
+  body.light .ph-body { fill: #d1d9e0; stroke: #9ea7b3; }
+  body.light .ph-dock, body.light .ph-tile { fill: #30363d; }
+  body.light .smp-ph dt { color: #1f2328; background: #f6f8fa; border-color: #9ea7b3; }
+  body.light .smp-ph dd { color: #1f2328; }
+  body.light .smp-ph dl > div.on dt { color: #ffffff; background: #0969da; border-color: #0969da; }
   @media (max-width: 640px) { .smp-kg { grid-template-columns: minmax(0, 1fr); } }
   body.light .smp-kb { background: #ffffff; border-color: #9ea7b3; border-top-color: var(--c); }
   body.light .smp-kbd { background: radial-gradient(ellipse at 50% 55%, #4493f81f, transparent 70%), #ffffff; border-color: #9ea7b3; }
@@ -1236,25 +1276,67 @@
       else if (e.key === "g" || e.key === "G") openMap();
       else if ((e.key === "x" || e.key === "X") && view) setView(null);
     });
-    addEventListener("click", e => {
+    // Clicks never move between slides (only keys, the dock, swipes and jump targets do); a click on a
+    // jump target (band-header tile) opens its slide. The listener sits on the stage so iOS Safari dispatches it.
+    stage.addEventListener("click", e => {
       /** @type {any} */
-      const target = e.target;
-      if (fz.open || smp.open || target.closest(".fz, .smp, .notes, a, button")) return;
-      const tile = target.closest("[data-go]");
-      if (tile) return go(+tile.dataset.go);
-      e.clientX < innerWidth / 3 ? prev() : next();
+      const tile = e.target.closest?.("[data-go]");
+      if (tile && !fz.open && !smp.open) go(+tile.dataset.go);
     });
+    // Touch: a horizontal swipe steps along the main line, a vertical one walks the column or switches bands, and a
+    // tap on a jump target opens it on touchend (cancelling the synthetic click), so taps work even when the browser
+    // withholds the click. A two-finger pinch in zooms out to the slide map (unless the page itself is zoomed in, so the
+    // browser's own zoom still works); touches in the notes, dialogs or form fields are ignored.
     let tx = null,
-      ty = null;
-    addEventListener("touchstart", e => (fz.open || smp.open ? (tx = ty = null) : ((tx = e.touches[0].clientX), (ty = e.touches[0].clientY))), { passive: true });
-    addEventListener("touchend", e => {
-      if (tx == null || fz.open || smp.open) return;
-      const dx = e.changedTouches[0].clientX - tx,
-        dy = e.changedTouches[0].clientY - ty;
-      tx = ty = null;
-      if (Math.abs(dy) > Math.abs(dx)) Math.abs(dy) > 50 && vstep(dy < 0 ? 1 : -1);
-      else if (Math.abs(dx) > 50) dx < 0 ? next() : prev();
-    });
+      ty = null,
+      pinch0 = null;
+    const touchIgnored = t => fz.open || smp.open || !!t.closest?.(".notes, .fz, .smp, input, textarea, select, [contenteditable]");
+    const spread = ts => Math.hypot(ts[0].clientX - ts[1].clientX, ts[0].clientY - ts[1].clientY);
+    addEventListener(
+      "touchstart",
+      e => {
+        tx = ty = pinch0 = null;
+        if (touchIgnored(e.target)) return;
+        if (e.touches.length === 2) pinch0 = spread(e.touches);
+        if (e.touches.length !== 1) return;
+        tx = e.touches[0].clientX;
+        ty = e.touches[0].clientY;
+      },
+      { passive: true }
+    );
+    addEventListener(
+      "touchmove",
+      e => {
+        if (e.touches.length > 1) tx = ty = null;
+        if (pinch0 == null || e.touches.length !== 2 || (visualViewport?.scale ?? 1) > 1.01) return;
+        if (spread(e.touches) < pinch0 * 0.7) {
+          pinch0 = null;
+          openMap();
+        }
+      },
+      { passive: true }
+    );
+    addEventListener("touchcancel", () => (tx = ty = pinch0 = null));
+    addEventListener(
+      "touchend",
+      e => {
+        if (tx == null || e.touches.length || fz.open || smp.open) return (tx = ty = null);
+        const t = e.changedTouches[0],
+          dx = t.clientX - tx,
+          dy = t.clientY - ty;
+        tx = ty = null;
+        if (Math.abs(dx) < 10 && Math.abs(dy) < 10) {
+          /** @type {any} */
+          const tile = e.target.closest?.("[data-go]");
+          if (tile && stage.contains(tile)) {
+            if (e.cancelable) e.preventDefault();
+            go(+tile.dataset.go);
+          }
+        } else if (Math.abs(dy) > Math.abs(dx)) Math.abs(dy) > 50 && vstep(dy < 0 ? 1 : -1);
+        else if (Math.abs(dx) > 50) dx < 0 ? next() : prev();
+      },
+      { passive: false }
+    );
     // #id selects a slide; a legacy numeric #N still opens the Nth slide and is rewritten to its #id.
     // &tour=<name> or &view=<payload> after it starts (or keeps) a tour; a slide outside the tour opens its first slide.
     const parseHash = () => {
@@ -1790,14 +1872,67 @@
       svg.addEventListener("pointerleave", () => light([], [], HINT));
       return h("div", { class: "smp-kbd" }, h("div", { class: "smp-kbw" }, svg), cap);
     })();
+    // Touch gestures: a phone shows the deck letterboxed and loops each gesture with its action on screen; pointing at
+    // (or tapping) a row plays only that gesture. Rows mirror the window touch handlers (see navigation).
+    const GESTURES = [
+      ["Swipe ←", "Next slide", "Next", "ph-l", [[220, 98]], "M220 98H80"],
+      ["Swipe →", "Previous slide", "Previous", "ph-r", [[80, 98]], "M80 98H220"],
+      ["Swipe ↑", "Down the column, else next band", "Down", "ph-u", [[214, 128]], "M214 128V40"],
+      ["Swipe ↓", "Up the column, else previous band", "Up", "ph-d", [[214, 40]], "M214 40V128"],
+      ["Tap a tile", "Jump to its slide", "Jump", "ph-tap", [[126, 120]], ""],
+      ["Pinch in", "Zoom out to the slide map", "Slide map", "", [[66, 36]], "M66 36L100 58M234 124L200 102"],
+    ];
+    const smpGestures = (() => {
+      const NS = "http://www.w3.org/2000/svg";
+      const s = (tag, attrs = {}, ...kids) => {
+        const el = document.createElementNS(NS, tag);
+        for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v);
+        el.append(...kids.flat().filter(k => k != null));
+        return el;
+      };
+      const groups = GESTURES.map(([, , label, anim, [[x, y]], trail], i) => {
+        const f = (cx, cy, name, cls = "ph-f") => s("circle", { class: cls, cx, cy, r: 11, style: `--i:${i};animation-name:${name}` });
+        const fingers = i === 5 ? [f(66, 36, "ph-p1"), f(234, 124, "ph-p2")] : anim === "ph-tap" ? [s("circle", { class: "ph-ring", cx: x, cy: y, r: 11, style: `--i:${i}` }), f(x, y, "ph-tap", "ph-f ph-tapf")] : [f(x, y, anim)];
+        return s("g", { class: "ph-g", "data-i": i, style: `--i:${i}` }, s("text", { class: "ph-lb", x: 150, y: 76 }, label), trail ? s("path", { class: "ph-tr", d: trail }) : null, fingers);
+      });
+      const svg = s(
+        "svg",
+        { viewBox: "0 0 300 160", role: "img", "aria-label": "Phone showing the touch gestures: swipes step through slides and bands, a tap on a tile jumps, a pinch in opens the slide map" },
+        s("rect", { class: "ph-body", x: 4, y: 10, width: 292, height: 140, rx: 24 }),
+        s("rect", { class: "ph-scr", x: 16, y: 18, width: 268, height: 124, rx: 14 }),
+        s("rect", { class: "ph-body", x: 22, y: 62, width: 8, height: 36, rx: 4 }),
+        s("rect", { class: "ph-sl", x: 52, y: 25, width: 196, height: 110, rx: 4 }),
+        s("rect", { class: "ph-tl", x: 62, y: 36, width: 80, height: 9, rx: 2 }),
+        s("rect", { class: "ph-tl", x: 62, y: 50, width: 50, height: 5, rx: 2, opacity: 0.5 }),
+        [60, 106, 152, 198].map(x => s("rect", { class: "ph-tile", x, y: 112, width: 40, height: 16, rx: 2 })),
+        [0, 1, 2, 3, 4].map(i => s("rect", { class: "ph-dock", x: 262, y: 48 + i * 13, width: 10, height: 10, rx: 2 })),
+        groups
+      );
+      const card = h("div", { class: "smp-ph" });
+      const rows = GESTURES.map(([g, act], i) => h("div", { "data-i": i }, h("dt", {}, g), h("dd", {}, act)));
+      const solo = i => {
+        card.classList.toggle("solo", i != null);
+        groups.forEach((g, j) => g.classList.toggle("on", j === i));
+        rows.forEach((r, j) => r.classList.toggle("on", j === i));
+      };
+      const dl = h("dl", {}, rows);
+      dl.addEventListener("pointerover", e => {
+        const r = e.target.closest("[data-i]");
+        if (r) solo(+r.dataset.i);
+      });
+      dl.addEventListener("pointerleave", () => solo(null));
+      card.append(svg, dl);
+      return card;
+    })();
     const smpKeys = h(
       "section",
       { class: "smp-row smp-keys", "--c": "#4493f8", "aria-labelledby": "smp-keys-h" },
-      h("h3", { class: "smp-l", id: "smp-keys-h" }, "Keyboard", " ", h("small", {}, "every shortcut; on touch screens, swipe left, right, up and down")),
+      h("h3", { class: "smp-l", id: "smp-keys-h" }, "Keyboard and touch", " ", h("small", {}, "every shortcut and touch gesture")),
       h(
         "div",
         { class: "smp-kg" },
         smpKeyboard,
+        smpGestures,
         KEYMAP.map(([title, rows]) =>
           h(
             "div",

@@ -296,7 +296,10 @@ The project has several test targets optimized for different scenarios:
 
 | Target | Speed | What It Tests | Use When |
 |--------|-------|---------------|----------|
-| `test-unit` | ~25s | Unit tests only (excludes integration) | **Recommended** for rapid iteration during development |
+| `test-unit` | ~30s selected runtime, plus compilation | Impacted unit tests, not full coverage | **Recommended** for rapid iteration during development |
+| `test-unit-fast` | Varies | Full fast partition; excludes measured >=10s tests | Broad fast feedback |
+| `test-unit-slow` | Varies | Measured >=10s top-level tests | Repository sweeps and slow runtime regressions |
+| `test-unit-all` | Varies | Both unit partitions | Full Go unit coverage |
 | `test` | ~30s | Unit + all integration tests | Before committing, comprehensive validation |
 | `test-integration-compile` | Varies | Workflow compilation integration tests | Testing compiler changes specifically |
 | `test-integration-mcp-playwright` | Varies | MCP Playwright integration | Testing Playwright MCP functionality |
@@ -530,7 +533,7 @@ The CI workflow generates JSON test result artifacts with timing information tha
 
 #### Available Artifacts
 
-- **test-result-unit.json**: Unit test results with timing data
+- **test-result-cgo-unit-***: CGO fast and slow shard artifacts, each containing `test-result-unit-SHARD.json`
 - **test-result-integration-*.json**: Integration test results for each test group
 
 #### JSON Format
@@ -555,14 +558,17 @@ To extract timing information from artifacts:
 
 ```bash
 # Download artifacts from a workflow run
-gh run download <run-id>
+gh run download <run-id> --pattern 'test-result-cgo-unit-*' --dir "$TMPDIR/cgo-results"
 
 # Extract slowest tests
-cat test-result-unit.json | jq -r 'select(.Action == "pass" and .Test != null) | "\(.Elapsed)s \(.Test)"' | sort -rn | head -20
+find "$TMPDIR/cgo-results" -name '*.json' -exec cat {} + | jq -r 'select((.Action == "pass" or .Action == "fail") and .Test != null and (.Test | contains("/") | not)) | "\(.Elapsed)s \(.Package) \(.Test)"' | sort -rn | head -20
 
 # Get package-level timing
-cat test-result-unit.json | jq -r 'select(.Action == "pass" and .Test == null) | "\(.Elapsed)s \(.Package)"' | sort -rn
+find "$TMPDIR/cgo-results" -name '*.json' -exec cat {} + | jq -r 'select((.Action == "pass" or .Action == "fail") and .Test == null) | "\(.Elapsed)s \(.Package)"' | sort -rn
 ```
+
+See [CGO unit-test timing](CONTRIBUTING.md#cgo-unit-test-timing) for the measured
+slowest tests, failure timing, and fast/slow front-door selection contract.
 
 #### Mining Test Data
 

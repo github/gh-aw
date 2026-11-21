@@ -1097,6 +1097,14 @@ function writeDetectionUsageResult(detectionDir = DETECTION_DIR, outputPath = DE
 }
 
 async function main() {
+  const experimentResultsPath = "/tmp/gh-aw/usage/activity/experiment-results.json";
+  let experimentResultsClean = false;
+  try {
+    fs.rmSync(experimentResultsPath, { force: true });
+    experimentResultsClean = true;
+  } catch (err) {
+    core.warning(`Experiment results unavailable: ${getErrorMessage(err)}`);
+  }
   writeDetectionUsageResult();
   const summary = { schema: "usage-activity-summary/v1" };
   const memorySaves = require("./memory_save_results.cjs").readMemorySaveResults();
@@ -1203,6 +1211,15 @@ async function main() {
     throw new Error(`Failed to write file ${outputPath}: ${getErrorMessage(err)}`, { cause: err });
   }
   core.info(outputPath);
+
+  if (experiments && experimentResultsClean) {
+    try {
+      const { projectExperimentResults } = require("./experiments_broker.cjs");
+      fs.writeFileSync(experimentResultsPath, JSON.stringify(projectExperimentResults(summary)), "utf8");
+    } catch (err) {
+      core.warning(`Experiment results unavailable: ${getErrorMessage(err)}`);
+    }
+  }
 
   if (summary.friction) {
     await writeFrictionStepSummary(buildFrictionStepSummary(summary.friction));
