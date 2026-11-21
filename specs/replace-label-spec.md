@@ -673,16 +673,24 @@ Error-category fixture: `specs/replace-label-compliance/rl-004-error-categories.
 | RL-049a Recheck blocklist before write | T-RL-026 | 1 | Required |
 | RL-033 Use current REST response for label state | T-RL-045 | 1 | Required |
 
-### 9.4 Normative MUST Coverage Index (§§5–8)
+### 9.4 Normative MUST Coverage Index
 
-Each MUST-level requirement is mapped to a compliance test ID or an explicit
-evidence gap. Test IDs identify the expected conformance case; the evidence table
-in [`specs/replace-label-compliance/README.md`](replace-label-compliance/README.md)
+Each numbered MUST-level requirement is mapped to a compliance test ID or an
+explicit evidence gap. Test IDs identify the expected conformance case; the
+evidence table in
+[`specs/replace-label-compliance/README.md`](replace-label-compliance/README.md)
 records the implementation test or remaining gap.
 
 | Requirement | Test ID(s) or documented gap |
 |---|---|
 | §5 ordered processing pipeline | `replace_label.test.cjs`: “executes the label pipeline in order and stops before writes on a gate skip.” |
+| RL-001 | `rl-001-glob-semantics.yaml`; `TestFormalGlobSemantics` |
+| RL-002 | `rl-002-allowlist-enforcement.yaml`; `TestFormalAllowlistEnforcement` |
+| RL-003 | `rl-003-blocklist-ordering.yaml`; `TestFormalBlocklistOrdering` |
+| RL-004 | T-RL-001, T-RL-003; `TestFormalSchemaRequiredFields` |
+| RL-005 | T-RL-002, T-RL-004; `TestFormalSchemaRequiredFields` |
+| RL-006 | T-RL-005; `TestFormalRepoMaxLength` |
+| RL-007 | `TestFormalReplaceLabelP3_ValidationConfigFields` verifies sanitization is enabled for both label fields. |
 | RL-008 | T-RL-001–006; `TestFormalSchemaRequiredFields` |
 | RL-009 | T-RL-009; `TestFormalReplaceLabelRL009_CommonValidationConfig` verifies that the shared validation-config generator emits the `replace_label` entry. |
 | RL-010 | T-RL-010–011; `TestFormalCountGate` |
@@ -728,11 +736,11 @@ records the implementation test or remaining gap.
 | RL-049 | T-RL-020–025; `TestFormalBlocklistOrdering` |
 | RL-049a | `TestFormalBlockedLabelAddedViaReplaceLabelMidBlocklistChange_NoWriteAPI` |
 | RL-050 | T-RL-070–072; `TestFormalCrossRepoRestriction` |
-| RL-051 | **Accepted gap:** target-repository token grants are enforced by GitHub when `issues.setLabels` runs; the offline suite cannot verify an issued token's target-repository grant. A denied API call is a hard error, but there is no preflight permission check. |
+| RL-051 | **Accepted gap:** target-repository token grants are enforced by GitHub when `issues.setLabels` runs; the offline suite cannot verify an issued token's target-repository grant. A denied API call is a hard error, but there is no preflight permission check. **Owner review — replace-label maintainers (2026-11-21):** the grant remains unverified before the write; close when workflow-level credential integration verifies the target-repository grant, or retain the documented server-side enforcement limitation. |
 | RL-052 | T-RL-041; handler test for nonexistent `label_to_add` |
 | RL-053 | T-RL-030–031; **gap:** no test substitutes agent-provided label state for the REST response. |
 | RL-054 | **Accepted gap [Security]:** `TestFormalSec_P8_TokenScopeMinimum` checks a standalone predicate, not the credential path; no conformance test establishes that the token used by `replace-label` has `issues:write`. |
-| RL-055 | **Accepted gap:** the SHOULD is conditional on the workflow token carrying broader grants; verifying token selection and relative scope requires workflow-level credential integration, not the offline handler suite. |
+| RL-055 | **Accepted gap:** the SHOULD is conditional on the workflow token carrying broader grants; verifying token selection and relative scope requires workflow-level credential integration, not the offline handler suite. **Owner review — replace-label maintainers (2026-11-21):** this condition and the gap remain current; close when workflow-level credential tests prove dedicated-token selection and its grants when the default token is broader. |
 | RL-056 | T-RL-060; `replace_label.test.cjs` asserts staged mode never calls `setLabels`. |
 
 ---
