@@ -1294,6 +1294,64 @@ func TestBuildLogsDataAggregatesAIC(t *testing.T) {
 	}
 }
 
+func TestLogsJSONAICCoverage(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		inputs      []ProcessedRun
+		runCoverage []string
+		coverage    string
+		total       float64
+	}{
+		{
+			name: "no cost evidence",
+			inputs: []ProcessedRun{
+				{Run: WorkflowRun{DatabaseID: 1}},
+				{Run: WorkflowRun{DatabaseID: 2}, TokenUsage: &TokenUsageSummary{TotalInputTokens: 100}},
+				{cachedData: &RunData{RunID: 3}},
+			},
+			runCoverage: []string{"unavailable", "unavailable", "unavailable"},
+			coverage:    "unavailable",
+		},
+		{
+			name: "recorded zero",
+			inputs: []ProcessedRun{
+				{Run: WorkflowRun{DatabaseID: 1}, TokenUsage: &TokenUsageSummary{AICFound: true}},
+				{cachedData: &RunData{RunID: 2, AICCoverage: "available"}},
+			},
+			runCoverage: []string{"available", "available"},
+			coverage:    "available",
+		},
+		{
+			name: "mixed cost evidence",
+			inputs: []ProcessedRun{
+				{Run: WorkflowRun{DatabaseID: 1}, TokenUsage: &TokenUsageSummary{AICFound: true, TotalAIC: 1}},
+				{cachedData: &RunData{RunID: 2, AIC: 2}},
+				{Run: WorkflowRun{DatabaseID: 3}},
+			},
+			runCoverage: []string{"available", "available", "unavailable"},
+			coverage:    "partial",
+			total:       3,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			data := buildLogsData(tc.inputs, t.TempDir(), nil)
+			var output bytes.Buffer
+			require.NoError(t, renderLogsJSONToWriter(&output, data, false))
+			var decoded struct {
+				Summary map[string]any
+				Runs    []map[string]any
+			}
+			require.NoError(t, json.Unmarshal(output.Bytes(), &decoded))
+			assert.Equal(t, tc.coverage, decoded.Summary["aic_coverage"])
+			assert.Equal(t, tc.total, decoded.Summary["total_aic"])
+			require.Len(t, decoded.Runs, len(tc.runCoverage))
+			for i, coverage := range tc.runCoverage {
+				assert.Equal(t, coverage, decoded.Runs[i]["aic_coverage"])
+			}
+		})
+	}
+}
+
 // TestBuildLogsDataAggregatesTokensFromRunTokenUsage verifies that TotalTokens is
 // populated from Run.TokenUsage. For AWF-based engines (Claude, Codex, Gemini) the
 // run processor backfills Run.TokenUsage from the firewall proxy

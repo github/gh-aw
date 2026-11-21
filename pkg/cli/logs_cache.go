@@ -60,6 +60,9 @@ func loadRunSummary(outputDir string, verbose bool) (*RunSummary, bool) {
 		return nil, false
 	}
 
+	if summary.AICFound && summary.TokenUsage != nil {
+		summary.TokenUsage.AICFound = true
+	}
 	logsCacheLog.Printf("Successfully loaded cached run summary: run_id=%d", summary.RunID)
 	if verbose {
 		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Loaded cached run summary for run %d (processed at %s)", summary.RunID, summary.ProcessedAt.Format(time.RFC3339))))

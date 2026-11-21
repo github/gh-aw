@@ -336,6 +336,7 @@ type RunSummary struct {
 	RunID       int64     `json:"run_id"`       // Workflow run database ID
 	ProcessedAt time.Time `json:"processed_at"` // When this summary was created
 	RunAnalysis
+	AICFound       bool            `json:"aic_found,omitempty"`       // Preserves recorded zero cost across cache loads
 	PolicyAnalysis *PolicyAnalysis `json:"policy_analysis,omitempty"` // Firewall policy rule attribution
 	ArtifactsList  []string        `json:"artifacts_list"`            // List of downloaded artifact files
 }

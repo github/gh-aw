@@ -720,6 +720,12 @@ artifact (token usage and run metadata) is downloaded. `--artifacts` replaces th
 firewall and network data. Use `--artifacts usage,agent` to download both compact usage
 and agent data. Results are cached for 10-100x speedup on subsequent runs.
 
+In `--json` output, `runs[].aic_coverage` is `available` when AI credit cost was
+recorded (including zero) and `unavailable` when it is unknown. Ignore the numeric
+`aic` value for unavailable runs. `summary.total_aic` sums only recorded costs.
+`summary.aic_coverage` is `available` when every returned run has a recorded cost,
+`partial` when only some do, and `unavailable` when none do.
+
 ```bash wrap
 gh aw logs workflow                        # Download logs for workflow
 gh aw logs workflow --artifacts agent     # Download only detailed agent data

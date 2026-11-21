@@ -4,6 +4,7 @@ package cli
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -1459,8 +1460,10 @@ func TestDownloadWorkflowLogsFromStdinReportsCollectionStatsForJSONLAndDiskCache
 		CLIVersion:  GetVersion(),
 		RunID:       diskCachedRunID,
 		ProcessedAt: time.Now(),
+		AICFound:    true,
 		RunAnalysis: RunAnalysis{
-			Run: WorkflowRun{DatabaseID: diskCachedRunID, WorkflowName: "Disk Cached", WorkflowPath: ".github/workflows/disk-cached.lock.yml", Status: "completed", Conclusion: "success"},
+			Run:        WorkflowRun{DatabaseID: diskCachedRunID, WorkflowName: "Disk Cached", WorkflowPath: ".github/workflows/disk-cached.lock.yml", Status: "completed", Conclusion: "success"},
+			TokenUsage: &TokenUsageSummary{},
 		},
 	}, false))
 	require.NoError(t, markArtifactDownloaded(diskRunDir, constants.UsageArtifactName.String()))
@@ -1473,15 +1476,25 @@ func TestDownloadWorkflowLogsFromStdinReportsCollectionStatsForJSONLAndDiskCache
 	)
 	require.NoError(t, os.WriteFile(cachedJSONLPath, []byte(cachedRecord), 0o600))
 
-	_, stderr := captureOutput(t, func() error {
+	stdout, stderr := captureOutput(t, func() error {
 		return DownloadWorkflowLogsFromStdin(context.Background(), StdinLogsOptions{
 			RunURLs:      []string{strconv.FormatInt(diskCachedRunID, 10), strconv.FormatInt(jsonlCachedRunID, 10)},
 			OutputDir:    outputDir,
 			RepoOverride: "owner/repo",
 			CachedJSONL:  cachedJSONLPath,
 			ArtifactSets: []string{"usage"},
+			JSONOutput:   true,
 		})
 	})
 
 	assert.Contains(t, stderr, "Runs: 2 discovered; reports: 0 downloaded, 2 skipped because cached analyses were reused")
+	var report LogsData
+	require.NoError(t, json.Unmarshal([]byte(stdout), &report))
+	assert.Equal(t, "partial", report.Summary.AICCoverage)
+	assert.Zero(t, report.Summary.TotalAIC)
+	coverageByRun := make(map[int64]string)
+	for _, run := range report.Runs {
+		coverageByRun[run.RunID] = run.AICCoverage
+	}
+	assert.Equal(t, map[int64]string{diskCachedRunID: "available", jsonlCachedRunID: "unavailable"}, coverageByRun)
 }
