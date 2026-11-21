@@ -35,4 +35,15 @@ describe("bundled connector pattern validation", () => {
     await expect(matchesConnectorPattern("^(a+)+$", `${"a".repeat(50000)}!`)).rejects.toThrow("budget");
     expect(await matchesConnectorPattern("^ok$", "ok")).toBe(true);
   });
+
+  it("does not charge a busy host's worker startup to the pattern budget", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    try {
+      const pending = matchesConnectorPattern("^ok$", "ok");
+      vi.advanceTimersByTime(1500);
+      expect(await pending).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
