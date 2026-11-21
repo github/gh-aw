@@ -392,7 +392,7 @@ func TestFormal_MergeOfEmptyMapsYieldsNil(t *testing.T) {
 // Pending: no production metric-cardinality filter exists in pkg/workflow yet.
 // Wire this predicate to the real filter once
 // https://github.com/github/gh-aw/issues is addressed.
-// See also specs/otel-observability-spec.md §metric-cardinality and ADR-49809.
+// See also docs/src/content/docs/reference/open-telemetry-specification.md §metric-cardinality and ADR-49809.
 func TestFormal_MetricResourceCardinalityBound(t *testing.T) {
 	t.Skip("pending: no production metricAttributeRegistry implementation in pkg/workflow; " +
 		"replace t.Skip with assertions against the real filter once it lands")
@@ -405,7 +405,7 @@ func TestFormal_MetricResourceCardinalityBound(t *testing.T) {
 //
 // Pending: no production instrumentation-scope resolver exists in pkg/workflow yet.
 // Wire this predicate to the real resolver once it is implemented.
-// See specs/otel-observability-spec.md §instrumentation-scope and ADR-49809.
+// See docs/src/content/docs/reference/open-telemetry-specification.md §instrumentation-scope and ADR-49809.
 func TestFormal_InstrumentationScopeNaming(t *testing.T) {
 	t.Skip("pending: no production instrumentationScopeResolver implementation in pkg/workflow; " +
 		"replace t.Skip with assertions against the real resolver once it lands")

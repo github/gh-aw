@@ -1,6 +1,6 @@
 package workflow
 
-// Formal predicates for specs/otel-observability-spec.md Sections 13-16:
+// Formal predicates for docs/src/content/docs/reference/open-telemetry-specification.md Sections 13-16:
 // Outcome Evaluation, Local Mirrors and Artifacts, Security and Privacy, and
 // Reliability and Failure Handling.
 //
@@ -27,7 +27,7 @@ import (
 
 // P4_MirrorPathStable
 // The local OTLP mirror default path MUST be exactly /tmp/gh-aw/otel.jsonl.
-// Specification reference: specs/otel-observability-spec.md §14.1.
+// Specification reference: docs/src/content/docs/reference/open-telemetry-specification.md §14.1.
 func TestFormal_MirrorPathIsStable(t *testing.T) {
 	assert.Equal(t, "/tmp/gh-aw/otel.jsonl", constants.TmpGhAwDirSlash+constants.OtelJsonlFilename.String())
 }
@@ -35,7 +35,7 @@ func TestFormal_MirrorPathIsStable(t *testing.T) {
 // P1_OutcomeSeparateTrace
 // An outcome-evaluation span emitted long after (e.g. >24h) the source
 // workflow completed MUST NOT extend the original workflow trace.
-// Specification reference: specs/otel-observability-spec.md §13.1.
+// Specification reference: docs/src/content/docs/reference/open-telemetry-specification.md §13.1.
 //
 // Pending: no outcome-evaluation span emitter exists in pkg/workflow yet.
 func TestFormal_OutcomeEvaluationUsesSeparateTrace(t *testing.T) {
@@ -48,7 +48,7 @@ func TestFormal_OutcomeEvaluationUsesSeparateTrace(t *testing.T) {
 // originating workflow root context, or the full attribute triple
 // (gh-aw.adoption.source_run_id, gh-aw.adoption.source_workflow,
 // gh-aw.adoption.repo) when a persisted span context is unavailable.
-// Specification reference: specs/otel-observability-spec.md §13.2.
+// Specification reference: docs/src/content/docs/reference/open-telemetry-specification.md §13.2.
 //
 // Pending: no outcome-evaluation span emitter exists in pkg/workflow yet.
 func TestFormal_OutcomeSourceCorrelation(t *testing.T) {
@@ -60,7 +60,7 @@ func TestFormal_OutcomeSourceCorrelation(t *testing.T) {
 // gh-aw.adoption.result MUST be restricted to the canonical outcome taxonomy
 // (accepted, rejected, ignored, pending, lifecycle, lifecycle_close) defined
 // in specs/safe-output-lifecycle.md.
-// Specification reference: specs/otel-observability-spec.md §13.3.
+// Specification reference: docs/src/content/docs/reference/open-telemetry-specification.md §13.3.
 //
 // Pending: the outcome-status taxonomy is implemented as pkg/cli.OutcomeStatus
 // (see pkg/cli/outcome_eval_formal_test.go), which pkg/workflow cannot import
@@ -74,7 +74,7 @@ func TestFormal_OutcomeResultTaxonomy(t *testing.T) {
 
 // P9_MetricDimensionBound
 // URLs, item identifiers, and run IDs MUST NOT be used as metric dimensions.
-// Specification reference: specs/otel-observability-spec.md §13.3, §15.4.
+// Specification reference: docs/src/content/docs/reference/open-telemetry-specification.md §13.3, §15.4.
 //
 // Pending: no production metric-cardinality filter exists in pkg/workflow yet
 // (tracked jointly with P20 TestFormal_MetricResourceCardinalityBound in
@@ -87,7 +87,7 @@ func TestFormal_MetricDimensionCardinalityBound(t *testing.T) {
 // P5_MirrorWriteBeforeExport
 // A mirror record MUST be written before any remote export attempt is
 // assumed successful.
-// Specification reference: specs/otel-observability-spec.md §14.3.
+// Specification reference: docs/src/content/docs/reference/open-telemetry-specification.md §14.3.
 //
 // Pending: the mirror writer is implemented in JavaScript
 // (actions/setup/js/send_otlp_span.cjs), not in pkg/workflow.
@@ -99,7 +99,7 @@ func TestFormal_MirrorWriteOccursBeforeExportSuccess(t *testing.T) {
 // P6_MirrorNotTruncatedOnFail
 // A remote export failure MUST NOT delete or truncate previously written
 // mirror records.
-// Specification reference: specs/otel-observability-spec.md §14.3.
+// Specification reference: docs/src/content/docs/reference/open-telemetry-specification.md §14.3.
 //
 // Pending: the mirror writer is implemented in JavaScript, not in pkg/workflow.
 func TestFormal_MirrorNotTruncatedOnExportFailure(t *testing.T) {
@@ -110,7 +110,7 @@ func TestFormal_MirrorNotTruncatedOnExportFailure(t *testing.T) {
 // P7_HeaderRedactionInMirror
 // Exporter header values MUST be masked before any diagnostic, mirror, or
 // artifact output, and raw credentials MUST NOT leak into redacted output.
-// Specification reference: specs/otel-observability-spec.md §15.1.
+// Specification reference: docs/src/content/docs/reference/open-telemetry-specification.md §15.1.
 //
 // Pending: header redaction for the local mirror is implemented in
 // JavaScript (actions/setup/js/send_otlp_span.cjs); the compile-time header
@@ -126,7 +126,7 @@ func TestFormal_HeaderRedactionBeforeMirrorOrDiagnostic(t *testing.T) {
 // P8_ContentDefaultNone
 // Raw prompts, model responses, and other sensitive content MUST NOT be
 // captured by default; full-content capture requires explicit opt-in.
-// Specification reference: specs/otel-observability-spec.md §15.2.
+// Specification reference: docs/src/content/docs/reference/open-telemetry-specification.md §15.2.
 //
 // Pending: no content-capture configuration or default exists in pkg/workflow yet.
 func TestFormal_ContentCaptureDefaultsToNone(t *testing.T) {
@@ -137,7 +137,7 @@ func TestFormal_ContentCaptureDefaultsToNone(t *testing.T) {
 // P11_PartialFanOutIndependent
 // For N configured endpoints, one endpoint's export failure MUST NOT
 // suppress attempts or successes at sibling endpoints.
-// Specification reference: specs/otel-observability-spec.md §16.3.
+// Specification reference: docs/src/content/docs/reference/open-telemetry-specification.md §16.3.
 //
 // Pending: fan-out export/retry orchestration is implemented in JavaScript
 // (actions/setup/js/send_otlp_span.cjs), not in pkg/workflow. pkg/workflow
@@ -152,7 +152,7 @@ func TestFormal_PartialFanOutFailureDoesNotSuppressOthers(t *testing.T) {
 // INV1_RetryBounded
 // Retry permission MUST be bounded by maximum attempts, maximum elapsed
 // time, and short-circuited on permanent failure.
-// Specification reference: specs/otel-observability-spec.md §16.2.
+// Specification reference: docs/src/content/docs/reference/open-telemetry-specification.md §16.2.
 //
 // Pending: retry/backoff orchestration is implemented in JavaScript
 // (actions/setup/js/send_otlp_span.cjs), not in pkg/workflow.
@@ -165,7 +165,7 @@ func TestFormal_RetryIsBoundedByAttemptsAndElapsedTime(t *testing.T) {
 // P10_NonFatalExportFailure
 // The reported workflow result MUST depend only on functional success, never
 // on telemetry export outcome.
-// Specification reference: specs/otel-observability-spec.md §16.1.
+// Specification reference: docs/src/content/docs/reference/open-telemetry-specification.md §16.1.
 //
 // Pending: no production code path in pkg/workflow couples workflow result
 // to telemetry export outcome, but there is also no explicit guard/emitter to
@@ -177,7 +177,7 @@ func TestFormal_TelemetryFailureNeverFlipsFunctionalSuccess(t *testing.T) {
 
 // SAFETY_FailClosedSecrets (edge case)
 // A shutdown flush timeout MUST NOT delete previously written mirror records.
-// Specification reference: specs/otel-observability-spec.md §16.5, Safeguards.
+// Specification reference: docs/src/content/docs/reference/open-telemetry-specification.md §16.5, Safeguards.
 //
 // Pending: shutdown/finalization ordering is implemented in JavaScript
 // (actions/setup/js/send_otlp_span.cjs and actions/setup/post.js), not in pkg/workflow.

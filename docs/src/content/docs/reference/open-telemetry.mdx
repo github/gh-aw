@@ -14,6 +14,8 @@ This guide covers the two ways gh-aw uses OpenTelemetry:
 
 Keep reusable telemetry setup in [shared workflow files](/gh-aw/reference/imports/) when multiple workflows use the same configuration.
 
+For the normative contract, see the [OpenTelemetry specification](/gh-aw/reference/open-telemetry-specification/).
+
 ## Write telemetry through OTLP
 
 Configure [`observability.otlp`](/gh-aw/reference/frontmatter/#observability-observability) in workflow frontmatter when the workflow should emit new spans. A typical Sentry setup looks like this:
@@ -250,7 +252,7 @@ By default, gh-aw keeps its existing GenAI names and span shape while adding cur
 
 `gen_ai_v1` identifies the gh-aw opt-in contract; it does not imply a stable upstream GenAI release.
 
-For deprecated and superseded notation, use the specification's [GenAI migration map](https://github.com/github/gh-aw/blob/main/specs/otel-observability-spec.md#671-deprecated-and-superseded-genai-notation-informative). It maps legacy span names, attributes, provider values and token metrics to their replacements, including changed input-token semantics and span parentage. Upstream deprecation does not remove gh-aw compatibility support; migrate queries before enabling the opt-in.
+For deprecated and superseded notation, use the specification's [GenAI migration map](/gh-aw/reference/open-telemetry-specification/#671-deprecated-and-superseded-genai-notation-informative). It maps legacy span names, attributes, provider values and token metrics to their replacements, including changed input-token semantics and span parentage. Upstream deprecation does not remove gh-aw compatibility support; migrate queries before enabling the opt-in.
 
 You usually do not need to configure or memorize these built-in attributes. They are mainly useful when building backend queries, dashboards, or deeper debugging workflows. For the exhaustive built-in inventory, see the [OpenTelemetry attribute reference](/gh-aw/reference/open-telemetry-attributes/).
 

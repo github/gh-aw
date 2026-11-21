@@ -1196,7 +1196,7 @@ validate-registry:
 	@echo "Validating model_multipliers.json (R-REG-007: no placeholder or null multipliers)..."
 	@go test ./pkg/cli/... -run TestModelMultipliersNoPlaceholders -count=1
 
-# Validate the gh-aw OpenTelemetry compatibility contract from specs/otel-observability-spec.md.
+# Validate the gh-aw OpenTelemetry compatibility contract from docs/src/content/docs/reference/open-telemetry-specification.md.
 # This is intentionally focused and isolated: schema/frontmatter acceptance, compiler env plumbing,
 # raw OTLP JSONL mirrors, and shipped GenAI compatibility attributes.
 .PHONY: validate-otel-contract

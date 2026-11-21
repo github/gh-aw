@@ -14,6 +14,7 @@ on:
       - 'scripts/**'
       - 'specs/**'
       - 'docs/src/content/docs/specs/**'
+      - 'docs/src/content/docs/reference/open-telemetry-specification.md'
       - 'docs/adr/**'
       - '.github/workflows/**'
       - '.github/aw/**'
@@ -187,7 +188,7 @@ references, and requirement IDs:
 | Compiler, parser, generated workflow security | `specs/compiler-threat-detection-spec.md`, `specs/compiler-threat-detection-changelog.md`, `specs/security-architecture-spec.md`, compiler threat compliance fixtures and tests |
 | Safe-output schemas, handlers, publication, sanitization, dependencies, limits | `docs/src/content/docs/specs/safe-outputs-specification.md`, `specs/safe-output-lifecycle.md`, `specs/security-architecture-spec.md`, handler tests and `scripts/check-safe-outputs-conformance.sh` |
 | Checkout, credentials, ref or artifact trust | `docs/src/content/docs/specs/checkout-behavior-specification.md`, security architecture and compiler threat contracts |
-| Session collection, graders, models, credits, OTEL | Relevant session, graders, model-alias, AI-credits, and `specs/otel-observability-spec.md` contracts |
+| Session collection, graders, models, credits, OTEL | Relevant session, graders, model-alias, AI-credits, and `docs/src/content/docs/reference/open-telemetry-specification.md` contracts |
 | Work queues, ledger/memory, scheduling, MCP scripts, admissions, manifests | Corresponding specifications in `docs/src/content/docs/specs/` and their referenced compliance fixtures |
 
 Do not treat scratchpad documents or generated spec summaries as authoritative.

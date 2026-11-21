@@ -1,6 +1,8 @@
 ---
 title: gh-aw OpenTelemetry Observability Specification
 description: Formal W3C-style specification for observability contract for GitHub Agentic Workflows using OpenTelemetry traces, metrics, logs, and OTLP export.
+sidebar:
+  order: 345
 version: 0.7.0
 status: Working Draft
 date: 2026-06-18
@@ -14,7 +16,7 @@ editors:
 **Version**: 0.7.0
 **Status**: Working Draft  
 **Publication Date**: June 18, 2026
-**Latest Version**: https://github.com/github/gh-aw/blob/main/specs/otel-observability-spec.md  
+**Latest Version**: [OpenTelemetry Specification](/gh-aw/reference/open-telemetry-specification/)  
 **Previous Version**: 0.6.0
 **Editors**: GitHub gh-aw Team
 
@@ -32,7 +34,7 @@ Version 0.7.0 adds OTLP metrics emission (enabled by default when configured) an
 
 Sections explicitly marked **Informative** are non-normative. All other sections are normative unless stated otherwise.
 
-Implementation mapping, validation requirements, and compatibility test expectations are defined in this specification so version 0.7.0 has one authoritative contract.
+Implementation mapping, validation requirements, and compatibility test expectations are defined in this specification so version 0.7.0 has one authoritative contract. For configuration and usage guidance, see the [OpenTelemetry reference](/gh-aw/reference/open-telemetry/).
 
 Implementations claiming conformance MUST identify the version and conformance classes they implement. A conformance claim for version 0.7.0 is a compatibility claim: it MUST preserve externally observable behavior documented by this specification unless a later specification explicitly defines a migration period and compatibility alias.
 

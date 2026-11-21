@@ -1,4 +1,4 @@
-# Typed extensions from specs/otel-observability-spec.md sections 8, 10 and 11.4.
+# Typed extensions from docs/src/content/docs/reference/open-telemetry-specification.md sections 8, 10 and 11.4.
 # Standard attributes and all GenAI definitions come from the pinned registries.
 file_format: definition/2
 attributes:
