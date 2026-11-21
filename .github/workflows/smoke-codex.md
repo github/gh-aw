@@ -71,7 +71,7 @@ safe-outputs:
       expires: 2h
       close-older-issues: true
       close-older-key: "smoke-codex"
-      labels: [automation, testing]
+      labels: [automation, testing, "backlog:smoke-tests"]
     set-issue-field:
       max: 1
       allowed-fields: ["*"]

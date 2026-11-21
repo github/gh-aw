@@ -306,4 +306,4 @@ jobs:
           EOF
           )
 
-          gh issue create --title "$TITLE" --body "$BODY" --label "bug"
+          gh issue create --title "$TITLE" --body "$BODY" --label "bug" --label "backlog:run-alerts"

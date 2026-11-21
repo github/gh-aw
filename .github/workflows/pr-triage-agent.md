@@ -47,7 +47,7 @@ safe-outputs:
   create-issue:
     max: 1
     title-prefix: "[PR Triage Report] "
-    labels: [automation, pr-triage-report]
+    labels: [automation, pr-triage-report, "backlog:reports"]
     expires: 1d
     close-older-issues: true
   messages:

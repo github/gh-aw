@@ -156,7 +156,7 @@ safe-outputs:
   create-issue:
     expires: 2d
     max: 1
-    labels: [security, sighthound, cookie]
+    labels: [security, sighthound, cookie, "backlog:security"]
     close-older-issues: true
     title-prefix: "[sighthound] "
   noop:
