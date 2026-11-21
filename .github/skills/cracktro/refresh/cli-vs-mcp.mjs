@@ -3,8 +3,10 @@
 // versus gh-proxy (`gh` CLI, no GitHub MCP tool schemas). Mines each run's `usage` artifact.
 // Run from the repo root (needs git history and `gh auth login`):
 //   node .github/skills/cracktro/refresh/cli-vs-mcp.mjs > out.json      (RAW=rows.json dumps per-run rows)
-// Env: CAP runs per side nearest the switch (15), DAYS max window per side (7), CONTROLS (15), CACHE dir.
+// Env: CAP runs per side nearest the switch (15), DAYS max window per side (7), CONTROLS (15),
+// CACHE trusted directory for reuse across invocations (default: private temporary directory).
 import { execFile } from "node:child_process";
+import { rmSync } from "node:fs";
 import { promisify } from "node:util";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -15,7 +17,12 @@ const REPO = process.env.REPO || "github/gh-aw";
 const CAP = +(process.env.CAP || 15);
 const DAYS = +(process.env.DAYS || 7);
 const NCTRL = +(process.env.CONTROLS || 15);
-const CACHE = process.env.CACHE || join(tmpdir(), "cvm-cache");
+const CACHE = process.env.CACHE || (await mkdtemp(join(tmpdir(), "cvm-cache-")));
+if (process.env.CACHE) {
+  await mkdir(CACHE, { recursive: true, mode: 0o700 });
+} else {
+  process.once("exit", () => rmSync(CACHE, { recursive: true, force: true }));
+}
 const MIN = 3; // runs per side for a workflow to count
 
 // Commits that flip tools.github.mode between local (MCP) and gh-proxy and change nothing else that
@@ -188,7 +195,6 @@ async function measure(c, runs, raw) {
   return res;
 }
 
-await mkdir(CACHE, { recursive: true });
 const raw = [];
 const flips = (await Promise.all(SWITCHES.map(casesFor))).flat();
 const ctrl = await controls();

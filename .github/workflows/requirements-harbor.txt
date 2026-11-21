@@ -188,6 +188,7 @@ anyio==4.16.0 \
     --hash=sha256:c66ae634e0b8228396b801741beb3294326d4b6102f7bba4041c0dfb58c29026
     # via
     #   httpx
+    #   litellm
     #   openai
     #   starlette
 attrs==26.1.0 \
@@ -659,9 +660,9 @@ fastuuid==0.14.0 \
     --hash=sha256:f54d5b36c56a2d5e1a31e73b950b28a0d83eb0c37b91d10408875a5a29494bad \
     --hash=sha256:f74631b8322d2780ebcf2d2d75d58045c3e9378625ec51865fe0b5620800c39d
     # via litellm
-filelock==3.32.7 \
-    --hash=sha256:37b8a3d9811b0f9aef7e5ec5c71bb320de52df51e6ca9bcd6f5ad81187660da7 \
-    --hash=sha256:65ff0d0190ea42038b32bda4b77834fb05be2cad4c5b9b01aa4dfb3614536e52
+filelock==4.2.1 \
+    --hash=sha256:7be2662e9e826b9bba28afc0f843a123280d799a2ea44bb5d35ccec67905ae44 \
+    --hash=sha256:c4c937ccac2a813cee448e662a56366cfb374c0f8702e75f295c412cc1c5d5a3
     # via
     #   harbor
     #   huggingface-hub
@@ -1023,15 +1024,15 @@ jsonschema-specifications==2025.9.1 \
     --hash=sha256:98802fee3a11ee76ecaca44429fda8a41bff98b00a0f2838151b113f210cc6fe \
     --hash=sha256:b540987f239e745613c7a9176f3edb72b832a4ac465cf02712288397832b5e8d
     # via jsonschema
-litellm==1.106.6 \
-    --hash=sha256:42ce43ffb0161c9a844e8b0cd02a8796d0423b11d84fe304bff925378ca55085 \
-    --hash=sha256:8bf6d33b5ca32a5fc6858784b64c82e7f3bfab462d571d7d0def5596c3e1acc3 \
-    --hash=sha256:a2876545a652de5070fa5905849b479cee977680b0616b603a6ab21fd5599524 \
-    --hash=sha256:a51f2a7317ab9cb1ef01a93c619f3c7ff69fe1fe13a59b409d0130748b5d8af9 \
-    --hash=sha256:ac74f9ff9faae1a424dc7be873b80ccf1cea1681a9f4dac03bac068ae3a8d8b0 \
-    --hash=sha256:af0b6f4a3df53194b74188a972f103f41ee5ed86afeefc7d9a1ea40156cc0f2e \
-    --hash=sha256:ec3cae6c87971657c9ae905b6d23aef456e979c8848f22bbc5096a31e1a1da4d \
-    --hash=sha256:f3398d8c21ac9fe851f1788a2d811af7f369fb485d775a25a9b3f517b0b3e88b
+litellm==1.109.1 \
+    --hash=sha256:1b2866219249186babe194d7e3f4af29095c0905a4c5712b62be662aa6a38fb7 \
+    --hash=sha256:1c8b4dd671fa0cd0850aa751678704ff77e595fb1e6085b2dc3be39ee19bdaaf \
+    --hash=sha256:1dcf31166d385e6eaaef7f5840ba88c4eac319d1aa2d3ec2787de981e07fcf11 \
+    --hash=sha256:1fdf789757fc71c9a9ac183cd326b978782dfa9ebd44087c6603b5b963956841 \
+    --hash=sha256:5b98ecccd93374b8ea1746ee98de16b505c0b5e6c0dfb7e8afec3d817d08d7c2 \
+    --hash=sha256:738fd2465e24460f03a8c5ff33dc57c3fdfad88ff489811d718ee6ba3c5ad900 \
+    --hash=sha256:b94080b0436c471e686735d10fd1069c151cf8b9816d823a1450419573f30e46 \
+    --hash=sha256:c84737897b6b459acd660fd7adb33e2d552c5d0b93c4a47b8cd4f5e299c93bac
     # via harbor
 markdown-it-py==4.2.0 \
     --hash=sha256:04a21681d6fbb623de53f6f364d352309d4094dd4194040a10fd51833e418d49 \

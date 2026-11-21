@@ -35,7 +35,7 @@ jobs:
         id: cache-key
         env:
           INDEX_REVISION: ${{ github.sha }}
-          INDEX_SOURCE_HASH: ${{ hashFiles('.github/workflows/shared/pageindex.md') }}
+          INDEX_SOURCE_HASH: ${{ hashFiles('.github/workflows/shared/pageindex.md', '.github/workflows/requirements-pageindex.txt') }}
         run: |
           set -euo pipefail
           corpus_hash=$(printf '%s' "$PAGEINDEX_PATTERNS" | sha256sum | cut -d ' ' -f 1)
@@ -57,7 +57,10 @@ jobs:
         run: |
           set -euo pipefail
           uv venv --python 3.12 /tmp/gh-aw/pageindex/venv
-          uv pip install --exclude-newer "$(date -u -d '3 days ago' +%Y-%m-%dT%H:%M:%SZ)" --only-binary=:all: --python /tmp/gh-aw/pageindex/venv/bin/python "pageindex==0.5.3"
+          uv pip sync --require-hashes --only-binary=:all: \
+            --python /tmp/gh-aw/pageindex/venv/bin/python \
+            .github/workflows/requirements-pageindex.txt
+          uv pip check --python /tmp/gh-aw/pageindex/venv/bin/python
 
       - name: Build local PageIndex
         if: steps.index-cache.outputs.cache-hit != 'true'

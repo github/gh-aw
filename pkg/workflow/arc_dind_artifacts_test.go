@@ -60,6 +60,8 @@ func TestArcDindPostAgentStepsUseRunnerTempPaths(t *testing.T) {
 	compiler.generateAgentOutputPlaceholderStep(&output, data)
 	assert.Contains(t, output.String(), "/tmp/gh-aw/agent_output.json")
 	assert.NotContains(t, output.String(), "${RUNNER_TEMP}/gh-aw/agent_output.json")
+	assert.Contains(t, output.String(), "docker_lease.cjs\" assert")
+	assert.Contains(t, output.String(), "Skipping shared agent output finalization without a validated Docker lease.")
 }
 
 func TestArcDindFailureHandlerUsesDownloadedArtifactPaths(t *testing.T) {

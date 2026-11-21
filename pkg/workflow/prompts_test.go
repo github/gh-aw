@@ -233,8 +233,8 @@ func TestDailyFunctionNamerColdStartHandling(t *testing.T) {
 		t.Fatalf("Failed to read workflow file: %v", err)
 	}
 
-	workflow := string(content)
-	coldStartGuidance := "**On cold start** (`/tmp/gh-aw/cache-memory/function-namer-state.json` missing): treat this as expected initialization, not a failure. Do **not** call `report_missing_data` for a missing state file on first run or cold cache; run the Step 1 script as written, accept `LAST_INDEX=-1`, and continue."
+	workflow := strings.Join(strings.Fields(string(content)), " ")
+	coldStartGuidance := "**On cold start** (the state file is missing), treat this as expected initialization. Do not call `report_missing_data`. Run the package selection script as written and accept its random starting package."
 	if !strings.Contains(workflow, coldStartGuidance) {
 		t.Fatal("Expected daily-function-namer workflow to include explicit cold-start guidance")
 	}

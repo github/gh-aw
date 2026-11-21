@@ -571,7 +571,8 @@ test-pageindex-workflow:
 	tmp_dir=$$(mktemp -d); \
 	trap 'rm -rf "$$tmp_dir"' EXIT; \
 	uv venv --python 3.12 "$$tmp_dir/venv"; \
-	uv pip install --exclude-newer "$$(date -u -d '3 days ago' +%Y-%m-%dT%H:%M:%SZ)" --only-binary=:all: --python "$$tmp_dir/venv/bin/python" "pageindex==0.5.3"; \
+	uv pip sync --require-hashes --only-binary=:all: --python "$$tmp_dir/venv/bin/python" .github/workflows/requirements-pageindex.txt; \
+	uv pip check --python "$$tmp_dir/venv/bin/python"; \
 	"$$tmp_dir/venv/bin/python" scripts/test_pageindex_workflow.py
 
 .PHONY: test-scripts

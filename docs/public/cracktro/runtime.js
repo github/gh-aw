@@ -1373,11 +1373,14 @@
       const [head, ...rest] = location.hash.slice(1).split("&"),
         q = {};
       for (const p of head.includes("=") ? [head, ...rest] : rest) {
-        const k = p.indexOf("=");
-        if (k > 0)
-          try {
-            q[p.slice(0, k)] = decodeURIComponent(p.slice(k + 1));
-          } catch {}
+        const k = p.indexOf("="),
+          key = p.slice(0, k);
+        if (k < 0 || (key !== "tour" && key !== "view")) continue;
+        try {
+          const value = decodeURIComponent(p.slice(k + 1));
+          if (key === "tour") q.tour = value;
+          else q.view = value;
+        } catch {}
       }
       let id = head.includes("=") ? "" : head;
       try {

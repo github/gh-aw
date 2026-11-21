@@ -4,7 +4,7 @@
 // #supply-chain-hardening is checked in the real deck and, without a browser, by running its slide code.
 // Chrome-driven tests need Chrome or Chromium (CHROME_PATH) and skip without one; the other tests do not.
 import assert from "node:assert/strict";
-import { chmodSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -182,15 +182,15 @@ test("invalid numeric flags are rejected before any server or browser starts", a
   }
 });
 
-test("a browser that never answers times out instead of hanging", { skip: process.platform === "win32" && "needs a POSIX shell" }, async () => {
-  const mute = join(tmpdir(), `cracktro-perf-mute-${process.pid}.sh`);
-  writeFileSync(mute, "#!/bin/sh\nexec sleep 30\n");
-  chmodSync(mute, 0o755);
+test("a browser that never answers times out instead of hanging", { skip: process.platform === "win32" && "needs a POSIX shell" }, async t => {
+  const dir = mkdtempSync(join(tmpdir(), "cracktro-perf-mute-"));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const mute = join(dir, "mute.sh");
+  writeFileSync(mute, "#!/bin/sh\nexec sleep 30\n", { mode: 0o700, flag: "wx" });
   const cdp = launch(mute, [], 50);
   try {
     await assert.rejects(cdp.send("Browser.getVersion"), /no reply from Chrome after 0.05s/);
   } finally {
     await cdp.close();
-    rmSync(mute, { force: true });
   }
 });

@@ -125,43 +125,41 @@ Repository: `${{ github.repository }}`. Workspace: `${{ github.workspace }}`.
 Date: `date +%Y-%m-%d`.
 Cache: `/tmp/gh-aw/cache-memory/function-namer-state.json`.
 
-Before selection, load and run the [Package selection script](#package-selection-script)
-below. Use its selected package, file list, counts, and next index directly;
-do not re-compute them manually.
+Run the [Package selection script](#package-selection-script). Use its outputs
+directly; do not recompute them.
 
-Missing cache: accept random initialization, not missing data.
+**On cold start** (the state file is missing), treat this as expected
+initialization. Do not call `report_missing_data`. Run the package selection
+script as written and accept its random starting package.
 Malformed cache: stop explicitly, never silently reset.
 
 ## 2. Inventory and semantic analysis
 
-Run `grep -n "^func "` once with the file paths printed by the selection script.
-Activate Serena with `activate_project` and the workspace path.
-For each selected non-generated file, use `get_symbols_overview` and bounded
-`read_file` ranges. Avoid repeated searches.
+Run `grep -n "^func "` once on the listed files. Use Serena `activate_project`
+with the workspace path, then `get_symbols_overview` and bounded `read_file`
+ranges on each selected non-generated file. Avoid repeated searches.
 
-Ask: **Would a coding agent find this function from a task description?**
-Consider generic verbs, obscure abbreviations, implementation-focused names,
-and names mismatching behavior. Prefer clear verb+noun names.
-Reject minor stylistic substitutions such as `makeConfig` to `createConfig`.
+Prefer clear verb+noun names discoverable from a task description. Look for
+generic verbs, obscure abbreviations, implementation details, or mismatched
+behavior. Reject stylistic swaps like `makeConfig` to `createConfig`.
 
 Use `find_referencing_symbols`; inspect declarations/callers and apply guardrails.
 
 ## 3. Implement and validate
 
-Record the initial worktree state. Rename selected declarations, every caller,
-and directly related doc-comment identifiers; preserve test expectations and
-behavior. Do not add tests that merely check a name.
+Record initial worktree state. Rename declarations, callers, and related
+doc-comment identifiers. Preserve behavior and tests; do not add name-only tests.
 
-Review `git diff --check`, `git diff --stat`, and the full candidate diff.
-Require only approved identifier/comment changes within the selected package.
-Search for old identifiers again and explain any unrelated same-name matches.
+Run `git diff --check` and `git diff --stat`. Review the full diff for only
+approved identifier/comment changes in the selected package. Search old names
+again and explain unrelated matches.
 Run `gofmt` on modified files, `go test "./$PKG_DIR" -count=1`,
 `make build`, `make test-unit`, and `make lint`. Require every command to pass.
-Record command results/failures. Use configured Go caches; never change
-dependencies or validation rules to make a rename pass.
+Record results. Use configured Go caches. Never change dependencies or
+validation rules to pass.
 
-Restore out-of-scope generated changes from validation before final diff review.
-On failure restore candidate edits; never revert pre-existing work.
+Restore out-of-scope validation outputs before final review. On failure revert
+only your edits, never pre-existing work.
 
 ## 4. Persist completed analysis
 
@@ -169,22 +167,20 @@ After full analysis, including a genuine no-candidate result, save
 `last_package_index` as `new_last_package_index` from Step 1 and append
 `{"package":"<selected_package>","analyzed_at":"<YYYY-MM-DD>"}` to
 `analyzed_packages`. Keep only the most recent 30 entries. Preserve existing
-entries; initialize from scratch only on a cold cache.
+entries. If the state file was missing at the start of the run, initialize it
+from scratch here instead of reporting missing cache data.
 Do not advance state on incomplete analysis, duplicate blocking, or failed
 validation. Cache state is not a repository change and must not enter the PR.
 
 ## 5. Publish or noop
 
-Recheck duplicates and the final diff. Stage only the verified paths and commit
-locally. Submit that branch via `create_pull_request` once with title
-`Go function renames: <selected_package>`. Keep it draft.
-Include package/date/rotation/function counts, a concise old-name/new-name/
-rationale table, reference completeness, exact validation commands and results,
-skipped candidates, and any related legacy issue URL. Use `###` or lower
-headers; put long evidence in `<details><summary><b>...</b></summary>`.
+Recheck duplicates and the diff. Stage only verified paths and commit locally.
+Call `create_pull_request` once for a draft titled `Go function renames: <selected_package>`.
+Include package/date/rotation/function counts, rename rationale table, reference
+completeness, validation commands and results, skips, and related legacy issue
+URL. Use `###` or lower headers and collapse long evidence with `<details>`.
 
-Otherwise call `noop` with the package and no-candidate, duplicate,
-uncertainty, or failure reason.
+Otherwise call `noop` with the package and reason.
 
 <!-- instruction-prefix-end -->
 
