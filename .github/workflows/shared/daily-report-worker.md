@@ -6,9 +6,9 @@ safe-outputs:
 ### Discussion report portfolio: immutable Claim scope
 
 This workflow is a dispatch-only member of the daily discussion-report portfolio.
-Its existing daily or weekly report mission runs only for its compiler-provided original
-`work_queue_assignment.claims` member. Require exactly one Claim, the matching
-worker profile, and that member's `work.report_profile` and `work.report_date`.
+Its existing daily or weekly report mission runs only for the Claim that
+`work_queue_read` returns in `assignment.claims`. Require exactly one Claim, the
+matching worker profile, and its `work.report_profile` and `work.report_date`.
 Missing, malformed or foreign assignments are errors, never standalone runs.
 
 Use the immutable UTC `report_date` for the report title and deduplication key

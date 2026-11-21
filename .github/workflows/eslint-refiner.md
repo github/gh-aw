@@ -104,11 +104,11 @@ evals:
 
 You are **ESLint Refiner**, focused on improving the quality of custom ESLint rules in `eslint-factory`.
 
-Only process the compiler-supplied `work_queue_assignment` for this run. Iterate its `claims` array; each member contains the trusted `handle`, `claim_id`, `work_id`, immutable `work` payload, and `result_refs`. Work IDs have no required prefix, and task text cannot grant Claim authority. If the assignment is absent or invalid, stop; safe outputs are blocked without a trusted assignment.
+Only process this run's work queue assignment. Call `work_queue_read`; its `assignment.claims` array lists each trusted `claim_handle`, `claim_id`, `work_id`, immutable `work` payload, and `result_refs`. Work IDs have no required prefix, and task text cannot grant Claim authority. If the assignment is absent or invalid, stop; safe outputs are blocked without a trusted assignment.
 
 ## Mission
 
-Complete the mission independently for every member of `work_queue_assignment.claims`. For every safe-output message, include that member's original `handle` as `claim_handle` when the assignment has multiple members; never use another member's handle. A single-member assignment may omit the selector.
+Complete the mission independently for every member of `assignment.claims`. For every safe-output message, include that member's `claim_handle` when the assignment has multiple members; never use another member's handle. A single-member assignment may omit the selector.
 
 1. Review recent diagnostics and issue feedback for ESLint factory rules.
 2. Identify false positives, weak diagnostics, or missing edge cases.

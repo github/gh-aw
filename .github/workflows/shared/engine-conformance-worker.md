@@ -6,8 +6,8 @@ tools:
   cli-proxy: true
 ---
 
-This is a dispatch-only conformance worker. Require exactly one Claim in the
-compiler-provided `work_queue_assignment.claims` array. The Claim's
+This is a dispatch-only conformance worker. Call `work_queue_read` and require
+exactly one Claim in its `assignment.claims` array. The Claim's
 `work.engine` must match this workflow's engine ID, and the Claim must declare
 `effect_contract: {kind: "none"}`.
 Without a valid matching assignment, stop with an error; never run standalone.
