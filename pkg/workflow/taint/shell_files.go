@@ -3,34 +3,115 @@ package taint
 import (
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 
 	"mvdan.cc/sh/v3/syntax"
 )
 
+// NUL cannot occur in a filesystem path. These symbols preserve the distinction
+// between an expanded runner variable and a literal filename such as '$GITHUB_ENV'.
+const (
+	runnerEnvTarget     = "\x00github-env"
+	runnerPathTarget    = "\x00github-path"
+	runnerOutputTarget  = "\x00github-output"
+	runnerSummaryTarget = "\x00github-step-summary"
+)
+
+type shellOutputRoute struct {
+	redirect  *syntax.Redirect
+	log       bool
+	discarded bool
+	unknown   bool
+}
+
+func (s *shell) outputRoute(stmt *syntax.Stmt) (shellOutputRoute, bool) {
+	routes := map[string]shellOutputRoute{"1": {}, "2": {log: true}}
+	incomplete := false
+	for _, redir := range stmt.Redirs {
+		fd := "1"
+		if redir.N != nil {
+			fd = redir.N.Value
+		}
+		switch redir.Op.String() {
+		case ">", ">>":
+			routes[fd] = shellOutputRoute{redirect: redir}
+		case "&>", "&>>":
+			routes["1"] = shellOutputRoute{redirect: redir}
+			routes["2"] = routes["1"]
+		case ">&":
+			texts, known := wordTexts(redir.Word, s.constants, s.constantValues, s.constantUnknown)
+			target, exists := sliceAt(texts, 0)
+			if !known || !exists || len(texts) != 1 {
+				routes[fd] = shellOutputRoute{unknown: true}
+				incomplete = true
+				continue
+			}
+			if target == "-" {
+				routes[fd] = shellOutputRoute{discarded: true}
+				continue
+			}
+			source := strings.TrimSuffix(target, "-")
+			if _, err := strconv.Atoi(source); err == nil {
+				route, exists := routes[source]
+				if !exists {
+					route = shellOutputRoute{unknown: true}
+					incomplete = true
+				}
+				routes[fd] = route
+				if source != target {
+					routes[source] = shellOutputRoute{discarded: true}
+				}
+			} else if redir.N == nil {
+				// Bash's unnumbered >&filename redirects both output streams.
+				routes["1"] = shellOutputRoute{redirect: redir}
+				routes["2"] = routes["1"]
+			} else {
+				routes[fd] = shellOutputRoute{unknown: true}
+				incomplete = true
+			}
+		}
+	}
+	incomplete = s.outputRoutingIncomplete(stmt, routes["2"]) || incomplete
+	return routes["1"], incomplete
+}
+
+func (s *shell) outputRoutingIncomplete(stmt *syntax.Stmt, stderr shellOutputRoute) bool {
+	incomplete := false
+	stderrRedirected := stderr.redirect != nil || stderr.discarded || stderr.unknown
+	if stderrRedirected {
+		incomplete = incomplete || s.trace
+		syntax.Walk(stmt.Cmd, func(node syntax.Node) bool {
+			if expansion, ok := node.(*syntax.ParamExp); ok && expansion.Exp != nil {
+				op := expansion.Exp.Op.String()
+				incomplete = incomplete || op == "?" || op == ":?"
+			}
+			return true
+		})
+	}
+	if call, ok := stmt.Cmd.(*syntax.CallExpr); ok {
+		if command, exists := sliceAt(call.Args, 0); exists && literalShellWord(command) == "exec" && len(stmt.Redirs) > 0 {
+			s.incompleteRouting = true
+		}
+	} else if stderrRedirected {
+		// Nested commands may write stderr independently of the compound stdout.
+		incomplete = true
+	}
+	return incomplete || s.incompleteRouting
+}
+
 func (s *shell) redirectOutput(stmt *syntax.Stmt, redir *syntax.Redirect, out value) {
-	switch redir.Op.String() {
-	case ">", ">>", "&>", "&>>":
-		if redir.N != nil && redir.N.Value != "1" && !strings.HasPrefix(redir.Op.String(), "&") {
-			return
-		}
-		target := wordText(redir.Word, s.constants)
-		if !specialTarget(target) {
-			targets, known := s.paths(redir.Word)
-			if !known && len(union(out, s.word(redir.Word))) > 0 {
-				s.a.gapAt(s.path, int(redir.Pos().Line()), "dynamic file targets are not modeled")
-			}
-			for _, target := range targets {
-				s.write(target, out, s.outputName(stmt.Cmd, target), int(stmt.Pos().Line()), stmt.Cmd)
-			}
-			return
-		}
-		payload := s.outputName(stmt.Cmd, target)
+	targets, known := s.paths(redir.Word)
+	if !known && len(union(out, s.word(redir.Word))) > 0 {
+		s.a.gapAt(s.path, int(redir.Pos().Line()), "dynamic file targets are not modeled")
+	}
+	for _, target := range targets {
+		payload := s.outputName(stmt.Cmd, runnerTargetName(target))
 		if payload == "" {
 			for _, source := range stmt.Redirs {
 				if source.Hdoc != nil {
 					payload = heredocOutputName(source.Hdoc, s.constants, s.markers)
-					if target == "$GITHUB_OUTPUT" {
+					if target == runnerOutputTarget {
 						payload = "" // A heredoc can contain several output records.
 					}
 					if payload != "" {
@@ -40,18 +121,44 @@ func (s *shell) redirectOutput(stmt *syntax.Stmt, redir *syntax.Redirect, out va
 			}
 		}
 		s.write(target, out, payload, int(stmt.Pos().Line()), stmt.Cmd)
-	case ">&":
-		if staticWord(redir.Word) == "2" {
-			s.a.emit(Site{Kind: Log, Path: s.path, Line: int(stmt.Pos().Line())}, out)
-		}
 	}
 }
 
 func (s *shell) pathFor(path string) string {
-	if specialTarget(path) || filepath.IsAbs(path) || s.workingDirectory == "" {
-		return filepath.Clean(path)
+	if specialTarget(path) {
+		return path
 	}
-	return filepath.Clean(filepath.Join(s.workingDirectory, path))
+	if filepath.IsAbs(path) || s.workingDirectory == "" {
+		path = filepath.Clean(path)
+	} else {
+		path = filepath.Clean(filepath.Join(s.workingDirectory, path))
+	}
+	// Keep ordinary reserved-looking filenames separate from the canonical
+	// runner file keys also used by JavaScript transport.
+	if runnerFileKey(path) {
+		return "./" + path
+	}
+	return path
+}
+
+func runnerFileKey(path string) bool {
+	return path == "$GITHUB_ENV" || path == "$GITHUB_PATH" ||
+		path == "$GITHUB_OUTPUT" || path == "$GITHUB_STEP_SUMMARY"
+}
+
+func runnerTargetName(target string) string {
+	switch target {
+	case runnerEnvTarget:
+		return "$GITHUB_ENV"
+	case runnerPathTarget:
+		return "$GITHUB_PATH"
+	case runnerOutputTarget:
+		return "$GITHUB_OUTPUT"
+	case runnerSummaryTarget:
+		return "$GITHUB_STEP_SUMMARY"
+	default:
+		return target
+	}
 }
 
 func (s *shell) paths(word *syntax.Word) ([]string, bool) {
@@ -73,12 +180,16 @@ func (s *shell) paths(word *syntax.Word) ([]string, bool) {
 }
 
 func (s *shell) readPaths(pattern string) ([]string, bool) {
+	pattern = runnerTargetName(pattern)
 	if !strings.ContainsAny(pattern, "*?[") {
 		return []string{pattern}, true
 	}
 	var matches []string
 	for file := range s.files {
-		matched, err := filepath.Match(filepath.ToSlash(pattern), filepath.ToSlash(file))
+		if runnerFileKey(file) {
+			continue
+		}
+		matched, err := filepath.Match(filepath.ToSlash(pattern), filepath.ToSlash(filepath.Clean(file)))
 		if err != nil {
 			return nil, false
 		}
@@ -111,12 +222,14 @@ func (s *shell) readFileWord(word *syntax.Word) value {
 }
 
 func (s *shell) write(target string, sources value, payload string, line int, command syntax.Command) {
+	target = s.environmentFileWrite(target, sources, line)
 	site := Site{Path: s.path, Line: line}
 	switch target {
 	case "$GITHUB_STEP_SUMMARY":
 		site.Kind = Summary
 		s.a.emit(site, sources)
 	case "$GITHUB_OUTPUT", "$GITHUB_ENV":
+		s.files[target] = union(s.files[target], sources)
 		name, _, found := strings.Cut(payload, "=")
 		if !found {
 			name, _, _ = strings.Cut(payload, "<<")
@@ -124,7 +237,6 @@ func (s *shell) write(target string, sources value, payload string, line int, co
 		name = strings.TrimSpace(name)
 		if target == "$GITHUB_OUTPUT" {
 			site.Kind = Output
-			s.files[target] = union(s.files[target], sources)
 			s.a.transportOutputRecord(site, name, sources, s.a.stepOutput, s.outputMayBeMultiline(command), s.outputRecordComplete(command))
 		} else if name != "" {
 			key := "env." + strings.ToLower(name)
@@ -139,7 +251,18 @@ func (s *shell) write(target string, sources value, payload string, line int, co
 	}
 }
 
+func (s *shell) environmentFileWrite(target string, sources value, line int) string {
+	switch target {
+	case runnerEnvTarget, runnerPathTarget:
+		s.a.emit(Site{Kind: EnvironmentFile, Path: s.path, Line: line}, sources)
+	}
+	return runnerTargetName(target)
+}
+
 func artifactIncludes(patterns []string, file string) bool {
+	if runnerFileKey(file) {
+		return false
+	}
 	included := false
 	for _, pattern := range patterns {
 		pattern = strings.TrimSpace(pattern)

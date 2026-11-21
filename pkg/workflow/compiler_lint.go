@@ -24,13 +24,6 @@ func (c *Compiler) lintCompiledWorkflow(data *WorkflowData, content, sourcePath 
 	if err != nil {
 		return formatCompilerError(sourcePath, "error", "cannot parse generated Actions AST for linting", nil)
 	}
-	generatedActionRefs := compilerGeneratedActionRefs(data)
-	// An explicit --action-tag is a caller-selected reference override. Do not
-	// let compiler ownership downgrade mutable fallback refs; callers must opt in
-	// with --allow-action-refs when the override cannot be resolved to a SHA.
-	if c.actionTag != "" {
-		generatedActionRefs = nil
-	}
 	rules := workflowlint.Default().Rules()
 	rules = slices.DeleteFunc(rules, func(rule workflowlint.Rule) bool {
 		return rule.ID == "safe-output-credentials"
@@ -39,10 +32,7 @@ func (c *Compiler) lintCompiledWorkflow(data *WorkflowData, content, sourcePath 
 	if err != nil {
 		return fmt.Errorf("configure compiler workflow linter: %w", err)
 	}
-	diagnostics, err := runner.Run(c.ctx, workflowlint.Input{
-		Workflow: graph, Document: c.lintPolicyDocument(data), AuthoredJobs: data.Jobs, SourcePath: sourcePath,
-		AllowActionRefs: c.allowActionRefs, SafeOutputJobs: safeOutputLintJobs(data), GeneratedActionRefs: generatedActionRefs,
-	})
+	diagnostics, err := runner.Run(c.ctx, c.compilerLintInput(data, graph, sourcePath))
 	var failures []error
 	if err != nil {
 		failures = append(failures, fmt.Errorf("workflow lint analysis failed: %w", err))
@@ -56,7 +46,9 @@ func (c *Compiler) lintCompiledWorkflow(data *WorkflowData, content, sourcePath 
 		if diagnostic.RuleID == "artipacked" && diagnostic.Severity == workflowlint.Warning && exemptCheckout {
 			continue
 		}
-		if (diagnostic.RuleID == "secret-leak" || diagnostic.RuleID == "grader-file-io") && diagnostic.Severity == workflowlint.Warning {
+		if diagnostic.Severity == workflowlint.Warning && (diagnostic.RuleID == "secret-leak" ||
+			diagnostic.RuleID == "grader-file-io" || diagnostic.RuleID == "environment-file-injection" ||
+			diagnostic.RuleID == "template-injection" && strings.HasPrefix(diagnostic.Message, "Incomplete template-injection output-flow analysis:")) {
 			continue
 		}
 		message := fmt.Sprintf("[%s] %s at %s (script line %d)",
@@ -84,6 +76,20 @@ func (c *Compiler) lintCompiledWorkflow(data *WorkflowData, content, sourcePath 
 		return formatCompilerError(sourcePath, "error", err.Error(), err)
 	}
 	return nil
+}
+
+func (c *Compiler) compilerLintInput(data *WorkflowData, graph *actions.Workflow, sourcePath string) workflowlint.Input {
+	generatedActionRefs := compilerGeneratedActionRefs(data)
+	// An explicit --action-tag is a caller-selected reference override. Do not
+	// let compiler ownership downgrade mutable fallback refs; callers must opt in
+	// with --allow-action-refs when the override cannot be resolved to a SHA.
+	if c.actionTag != "" {
+		generatedActionRefs = nil
+	}
+	return workflowlint.Input{
+		Workflow: graph, Document: c.lintPolicyDocument(data), AuthoredJobs: data.Jobs, SourcePath: sourcePath,
+		AllowActionRefs: c.allowActionRefs, SafeOutputJobs: safeOutputLintJobs(data), GeneratedActionRefs: generatedActionRefs,
+	}
 }
 
 func compilerGeneratedActionRefs(data *WorkflowData) map[string]struct{} {

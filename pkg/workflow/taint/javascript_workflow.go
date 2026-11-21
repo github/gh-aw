@@ -71,7 +71,7 @@ func (s *shell) javascriptCommand(cmd *syntax.CallExpr, captured bool, stdin val
 		return nil, false
 	}
 	if s.a.rule.JavaScript == nil || s.a.rule.JavaScript.Parser == nil {
-		if len(stdin) == 0 && len(s.javascriptArguments(cmd.Args[1:])) == 0 {
+		if len(stdin) == 0 && len(s.javascriptArguments(cmd.Args[1:])) == 0 && !s.vars.hasSources() {
 			return nil, true
 		}
 		s.a.gapAt(s.path, line, "JavaScript analysis unavailable; configure the pinned native TypeScript compiler module")
