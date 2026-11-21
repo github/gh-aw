@@ -38,7 +38,7 @@ safe-outputs:
     create-issue: true
   create-issue:
     title-prefix: "[aw-compat] "
-    labels: [automation, compatibility, gh-aw]
+    labels: [automation, compatibility, gh-aw, "backlog:reports"]
     close-older-issues: true
     max: 6
     expires: 7d

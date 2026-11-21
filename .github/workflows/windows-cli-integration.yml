@@ -856,7 +856,7 @@ jobs:
             gh issue comment "$EXISTING" --repo "${GITHUB_REPOSITORY}" --body "$BODY"
             echo "🔁 Updated existing tracking issue #${EXISTING}" >> "$GITHUB_STEP_SUMMARY"
           else
-            NEW_URL=$(gh issue create --repo "${GITHUB_REPOSITORY}" --title "$TITLE" --body "$BODY" --label "bug")
+            NEW_URL=$(gh issue create --repo "${GITHUB_REPOSITORY}" --title "$TITLE" --body "$BODY" --label "bug" --label "backlog:run-alerts")
             echo "🆕 Created tracking issue: ${NEW_URL}" >> "$GITHUB_STEP_SUMMARY"
           fi
 

@@ -23,7 +23,7 @@ safe-outputs:
   max-bot-mentions: 1
   create-issue:
     title-prefix: "[work-queues] "
-    labels: [automation]
+    labels: [automation, "backlog:reports"]
     close-older-issues: true
     expires: 7d
     max: 1

@@ -11,7 +11,7 @@
   "dependencies": {
     "@actions/expressions": "0.3.61",
     "@actions/workflow-parser": "0.3.61",
-    "yaml": "2.8.1"
+    "yaml": "2.8.3"
   },
   "devDependencies": {
     "esbuild": "0.28.2"

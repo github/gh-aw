@@ -28,7 +28,7 @@ safe-outputs:
   create-issue:
     expires: 2d
     title-prefix: "[container-image-scan] "
-    labels: [cookie, security]
+    labels: [cookie, security, "backlog:dependencies"]
     assignees: [pelikhan]
     max: 25
     deduplicate-by-title: true

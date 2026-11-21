@@ -25,7 +25,7 @@ safe-outputs:
   create-issue:
     max: 1
     title-prefix: "[smoke-work-queue] "
-    labels: [automation, testing]
+    labels: [automation, testing, "backlog:smoke-tests"]
     close-older-issues: true
     close-older-key: "smoke-work-queue"
   noop:

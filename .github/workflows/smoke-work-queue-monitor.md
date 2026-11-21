@@ -27,7 +27,7 @@ safe-outputs:
   max-bot-mentions: 1
   create-issue:
     title-prefix: "[WorkQueue Health] "
-    labels: [automation, testing]
+    labels: [automation, testing, "backlog:run-alerts"]
     close-older-issues: true
     expires: 2d
     max: 1

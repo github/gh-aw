@@ -35,7 +35,7 @@ safe-outputs:
     title-prefix: "[smoke-temporary-id] "
     max: 5
     group: true
-    labels: [ai-generated, automation, testing]
+    labels: [ai-generated, automation, testing, "backlog:smoke-tests"]
     close-older-issues: true
   link-sub-issue:
     max: 3
