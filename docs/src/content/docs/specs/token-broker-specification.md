@@ -1,5 +1,6 @@
 ---
 title: Token Broker Specification
+spec: true
 description: Normative OIDC exchange, authorization, issuance, and conformance requirements for a deployment-owned gh-aw token broker.
 sidebar:
   order: 1363
@@ -101,6 +102,8 @@ Credential-consuming jobs MUST have `id-token: write` within the caller's permis
 Admission success, admission absence, and admission's `ignore` outage policy MUST NOT authorize broker issuance or make broker failures fail open. Broker authentication MUST NOT replace credentials for unrelated GitHub operations.
 
 ## 4. Exchange Protocol
+
+The [companion TypeSpec definition](https://github.com/github/gh-aw/blob/main/docs/src/content/docs/specs/token-broker-specification.tsp) describes the service's shared POST endpoint, exchange and invalidation messages, and response statuses. This section defines operation-specific success, strict validation, and credential lifecycle requirements.
 
 ### 4.1. Transport and request
 
@@ -335,7 +338,7 @@ This section is the authoritative list of checks a conforming broker MUST perfor
 
 Deployments MUST provide negative tests for SV-06 to SV-24, SV-28, SV-31, and SV-36 before claiming conformance (Section 7).
 
-An experimental, informative TLA+ model of these requirements and Appendix E is in `specs/token-broker/` in the gh-aw repository. It found the gaps that SV-16, SV-28, SV-31, SV-36, and SV-37 now close.
+The [experimental, informative TLA+ model](https://github.com/github/gh-aw/tree/main/specs/token-broker) covers the server validation requirements and Appendix E. It found the gaps that SV-16, SV-28, SV-31, SV-36, and SV-37 now close.
 
 ## 6. Credential Issuance and Lifecycle
 

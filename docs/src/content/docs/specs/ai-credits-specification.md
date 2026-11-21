@@ -1,5 +1,6 @@
 ---
 title: AI Credits Specification
+spec: true
 description: Formal W3C-style specification for AI Credits (AIC) calculation, model pricing catalog format, and Copilot billing reference requirements.
 sidebar:
   order: 1361
@@ -588,6 +589,8 @@ The writer uses staged usage files and the permissive usage parser, appending ti
 ### 9.16 Native Contract Coverage and Validation Boundary
 
 Focused Vitest suites exercise the runtime behavior described in Sections 9.9–9.15, including history completeness, snapshot trust and reinspection, component accounting, fallback decisions, API retries and quota handling, and repo-memory ledger rules. The spec-derived fixed-output contract cases are in `actions/setup/js/daily_aic_spec_conformance.test.cjs`; quota-blocked cases verify empty totals, `exceeded: false`, and no activation failure, while compiler tests verify enforced startup gating and configured fail-open behavior. These tests are executable conformance examples, not a proof of provider billing or GitHub API behavior.
+
+The [bounded daily guardrail TLA+ model](https://github.com/github/gh-aw/tree/main/specs/daily-aic) checks history completeness, exact-match snapshot reuse, whole-run estimates, quota deferral, startup decisions, and repo-memory backend selection. A separate model checks the cancelled-rerun evidence rule in §9.11. Neither model verifies provider billing, GitHub API behavior, or the runtime implementation.
 
 ---
 

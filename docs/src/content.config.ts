@@ -11,6 +11,9 @@ export const collections = {
 			extend: (ctx) => {
 				const blogExtension = blogSchema(ctx);
 				return blogExtension.extend({
+					spec: z.boolean().optional().describe(
+						'Uses specification styling and marks the page in the sidebar'
+					),
 					metadata: z.object({
 						seoDescription: z.string().max(160).optional().describe(
 							'SEO-optimized description used for search and social snippets (validated at build time, max 160 chars)'

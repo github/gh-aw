@@ -1,5 +1,6 @@
 ---
 title: Safe Outputs MCP Gateway Specification
+spec: true
 description: Formal W3C-style specification defining the Safe Outputs Model Context Protocol Gateway for secure AI-to-GitHub operation translation
 sidebar:
   order: 1360
@@ -1821,7 +1822,8 @@ run and attempt, logical invocation identity, implementation and input digests,
 binding level and relevant evidence references. Private bodies, patches, prompts,
 secret-valued inputs and tokens MUST NOT be transmitted or logged; bind digests
 and reviewed secret references instead. The authority independently verifies any
-evidence required by its policy.
+evidence required by its policy. The [companion TypeSpec definition](https://github.com/github/gh-aw/blob/main/docs/src/content/docs/specs/safe-output-authorization.tsp)
+describes the decision endpoint and its request and response bodies.
 
 The request object contains `version`, `request_digest`, and `invocation`, plus
 top-level `job_id` whenever nonempty `GITHUB_JOB` is available. `job_id` preserves
@@ -7047,6 +7049,8 @@ The YAML configuration key is `report-missing-data`. The legacy tool/output type
 ---
 
 ## 8. Protocol Exchange Patterns
+
+The bounded [compiled workflow model](https://github.com/github/gh-aw/blob/main/specs/workflow-security/CompiledWorkflow.tla) abstracts the handoff from agent requests through artifact provenance, detection, authorization, and privileged effects. It does not model JSON-RPC framing or the NDJSON encoding.
 
 ### 8.1 Stdio Container Transport Layer
 

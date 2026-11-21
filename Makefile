@@ -1235,6 +1235,10 @@ check-otel-attributes:
 generate-otel-attributes:
 	npm run generate --prefix specs/otel
 
+.PHONY: spec-build
+spec-build:
+	node specs/otel/build_specs.mjs
+
 # Check file sizes and function counts
 .PHONY: check-file-sizes
 check-file-sizes:
@@ -1654,6 +1658,7 @@ help:
 	@echo "  generate-schema-docs - Generate frontmatter full reference documentation from JSON schema"
 	@echo "  session-schemas - Generate canonical and unified session JSON schemas from TypeScript declarations"
 	@echo "  check-session-schemas - Check generated session schemas for declaration drift"
+	@echo "  spec-build       - Compile TypeSpec contracts and emit schemas under dist/specs"
 	@echo "  generate-agent-factory     - Generate agent factory documentation page"
 	@echo "  generate-llms-txt  - Generate llms.txt at repository root from .github/aw/*.md"
 	@echo "  build-slides     - Build slides with Marp to docs/public/slides/gh-aw.html"

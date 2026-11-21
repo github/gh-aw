@@ -25,6 +25,11 @@ formatting, capitalization, and whitespace. Its anchor remains available for
 existing links. Distinct headings and headings after body content are preserved.
 Run `npm run test:titles` to check this behavior for Markdown and MDX pages.
 
+Set `spec: true` in a page's front matter to give it W3C-inspired specification
+styling and a **Spec** badge in the docs sidebar. Write status, version and
+section numbers in the document itself; this setting does not generate them
+or change existing heading links.
+
 Images can be added to `src/assets/` and embedded in Markdown with a relative link.
 
 Static assets, like favicons, can be placed in the `public/` directory.
@@ -281,3 +286,18 @@ Root-level endpoints on `https://github.github.com/` (for example `/robots.txt`)
 ## Want to learn more?
 
 Check out [Starlight’s docs](https://starlight.astro.build/), read [the Astro documentation](https://docs.astro.build), or jump into the [Astro Discord server](https://astro.build/chat).
+
+## Web API specifications
+
+Every specification that defines a service-side web API must include a linked
+TypeSpec (`.tsp`) definition next to the Markdown source. Update both files
+when the wire contract changes. Model methods, routes, authentication, headers,
+and request and response shapes in TypeSpec. Keep requirements that schemas
+cannot express, such as duplicate-key rejection, identity binding, and
+idempotency, in the Markdown specification.
+
+From the repository root, run `npm ci --prefix specs/otel` to install the locked
+toolchain, then run `make spec-build`. The build discovers TypeSpec sources in
+the repository and compiles each independently. It
+emits OpenAPI for services and JSON Schema for data contracts under `dist/specs/`.
+Fixed wire objects are sealed in the emitted schemas.

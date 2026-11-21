@@ -9,7 +9,7 @@
 import MobileMenuToggle from 'virtual:starlight/components/MobileMenuToggle';
 import SiteFooter from './SiteFooter.astro';
 
-const { hasSidebar } = Astro.locals.starlightRoute;
+const { hasSidebar, entry } = Astro.locals.starlightRoute;
 ---
 
 <div class="page sl-flex">
@@ -56,7 +56,7 @@ const { hasSidebar } = Astro.locals.starlightRoute;
 			</nav>
 		)
 	}
-	<div class="main-frame"><slot /></div>
+	<div class="main-frame" data-spec={entry.data.spec ? '' : undefined}><slot /></div>
 	<SiteFooter />
 </div>
 
@@ -141,6 +141,20 @@ const { hasSidebar } = Astro.locals.starlightRoute;
 	/* Site footer placement */
 	.main-frame {
 		flex-grow: 1; /* short pages: the footer still sits at the bottom of the viewport */
+	}
+
+	.main-frame[data-spec] :global(.content-panel h1#_top) {
+		font-size: var(--aw-step-5);
+		font-weight: 600;
+	}
+
+	.main-frame[data-spec] :global(.sl-markdown-content > .level-h2) {
+		border-block-start: 1px solid var(--aw-color-border-strong);
+		padding-block-start: 0.75rem;
+	}
+
+	.main-frame[data-spec] :global(.sl-markdown-content > .level-h2 > h2) {
+		font-weight: 600;
 	}
 
 	/* Landing: the CTA band meets the footer directly, as it did when the footer

@@ -1,5 +1,6 @@
 ---
 title: Frontmatter Hash Specification
+spec: true
 description: Specification for computing deterministic hashes of agentic workflow frontmatter
 version: 1.0.0
 status: Draft
@@ -414,12 +415,25 @@ The current Go implementation (`pkg/parser/frontmatter_hash.go`) uses a **text-b
 
 ### Hash Storage and Verification
 
-1. **Compilation**: The Go compiler computes the hash and writes it to the workflow log file
-2. **Execution**: The JavaScript custom action:
-   - Reads the hash from the log file
-   - Recomputes the hash from the workflow file
-   - Compares the two hashes
-   - Creates a GitHub issue if they differ (indicating frontmatter modification)
+1. **Compilation**: The Go compiler computes the hash and writes it to the workflow lock file metadata.
+2. **Activation**: When the freshness check runs, the JavaScript action reads the stored hash and
+   recomputes it from the workflow source. It reads through the GitHub API first and can fall back to
+   local files if the API read fails. A mismatch or an unverifiable hash fails the check and emits
+   `stale_lock_file_failed` for the conclusion job to report.
+
+The informative [TLA+ freshness model and TLC configuration](https://github.com/github/gh-aw/tree/main/specs/frontmatter-hash)
+check that activation proceeds past the freshness gate only after a matching comparison, and that
+a mismatch or missing comparison reaches the conclusion job as a failure signal. The bounds are
+one compilation, one checked run, two abstract digest values, and a stable source snapshot during
+the check. The model does not verify digest computation, body hashes, runs that skip the check,
+other activation gates, or issue delivery.
+
+From the repository root, run with the pinned [TLC v1.7.4 release](https://github.com/tlaplus/tlaplus/releases/tag/v1.7.4):
+
+```sh
+java -cp "$TLA2TOOLS_JAR" tlc2.TLC \
+  -config specs/frontmatter-hash/FrontmatterFreshness.cfg specs/frontmatter-hash/FrontmatterFreshness.tla
+```
 
 ## Safeguards
 
