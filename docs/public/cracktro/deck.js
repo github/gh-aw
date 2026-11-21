@@ -1636,6 +1636,26 @@
   .ge-mark.r text { fill: #ff7b72; } .ge-mark.r line { stroke: #f85149; }
   .ge-mark.g text { fill: #79c0ff; } .ge-mark.g path { stroke: #4493f8; filter: drop-shadow(0 0 8px #4493f855); }
   .ge-dot { opacity: 0; filter: drop-shadow(0 0 10px #f0f6fc55); }
+  .rai { --lg: #ff7b72; }
+  .rai-grid { position: absolute; left: 110px; top: 300px; width: 1700px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
+  .rai-card { position: relative; height: 280px; padding: 26px 30px 0; border-radius: 20px; background: #161b22d8; border: 2px solid #30363d; text-align: left; font: inherit; color: inherit; cursor: pointer;
+    transition: opacity .35s, border-color .35s, box-shadow .35s, transform .35s cubic-bezier(.2,.9,.2,1); }
+  .active .rai-card { animation: rise .55s cubic-bezier(.2,.9,.2,1) backwards calc(var(--i) * 110ms + 250ms); }
+  .rai-card:hover { border-color: #6e7681; }
+  .rai-card:focus-visible { outline: 3px solid #4493f8; outline-offset: 3px; }
+  .rai-card > span { display: block; }
+  .rai-card .rai-hd { display: flex; align-items: center; gap: 16px; }
+  .rai-card svg { width: 44px; height: 44px; flex: none; fill: #ff7b72; }
+  .rai-card .rai-nm { font-size: 36px; font-weight: 700; line-height: 1.1; color: #f0f6fc; }
+  .rai-card .rai-n { position: absolute; right: 26px; top: 24px; font: 600 16px/1 var(--mono); letter-spacing: .14em; color: #6e7681; }
+  .rai-card .rai-p { margin: 16px 0 0; font-size: 23px; line-height: 1.35; color: #c9d1d9; }
+  .rai-card .rai-ch { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
+  .rai-card code { padding: 4px 11px; border-radius: 8px; border: 1px solid #3d444d; background: #0d1117; font: 500 17px/1.3 var(--mono); color: #e6edf3; transition: border-color .35s, color .35s; }
+  .rai.focus .rai-card { opacity: .42; }
+  .rai.focus .rai-card.on { opacity: 1; border-color: #f85149; box-shadow: 0 0 50px -14px #f8514955; transform: translateY(-8px); }
+  .rai-card.on code { border-color: #f8514999; color: #ffa198; animation: rise .4s cubic-bezier(.2,.9,.2,1) both calc(var(--j) * 90ms + 120ms); }
+  .rai-foot { position: absolute; left: 110px; top: 934px; font: 500 19px var(--mono); color: #9198a1; }
+  .rai-foot b { color: #ff7b72; font-weight: 600; }
   .zs { --lg: #d2a8ff; }
   .ek { --lg: #79c0ff; }
   .ek-svg { position: absolute; left: 60px; top: 290px; width: 1800px; height: 600px; overflow: visible; font-family: "Mona Sans"; }
@@ -15790,6 +15810,97 @@
         stats,
         h("div", { class: "ct-src" }, "measured from The Great Escapi's repo memory · Feb–Sep 2026 · fixed in the AWF firewall")
       ),
+    });
+  }
+
+  // Responsible AI: Microsoft's six Responsible AI principles, each mapped to the gh-aw controls that apply it; arrows step through them
+  {
+    resetIndex();
+    const ICON = {
+      law: [
+        "M12.75 2.75V4.5h1.975c.351 0 .694.106.984.303l1.697 1.154c.041.028.09.043.14.043h4.102a.75.75 0 0 1 0 1.5H20.07l3.366 7.68a.749.749 0 0 1-.23.896c-.1.074-.203.143-.31.206a6.296 6.296 0 0 1-.79.399 7.349 7.349 0 0 1-2.856.569 7.343 7.343 0 0 1-2.855-.568 6.205 6.205 0 0 1-.79-.4 3.205 3.205 0 0 1-.307-.202l-.005-.004a.749.749 0 0 1-.23-.896l3.368-7.68h-.886c-.351 0-.694-.106-.984-.303l-1.697-1.154a.246.246 0 0 0-.14-.043H12.75v14.5h4.487a.75.75 0 0 1 0 1.5H6.763a.75.75 0 0 1 0-1.5h4.487V6H9.275a.249.249 0 0 0-.14.043L7.439 7.197c-.29.197-.633.303-.984.303h-.886l3.368 7.68a.75.75 0 0 1-.209.878c-.08.065-.16.126-.31.223a6.077 6.077 0 0 1-.792.433 6.924 6.924 0 0 1-2.876.62 6.913 6.913 0 0 1-2.876-.62 6.077 6.077 0 0 1-.792-.433 3.483 3.483 0 0 1-.309-.221.762.762 0 0 1-.21-.88L3.93 7.5H2.353a.75.75 0 0 1 0-1.5h4.102c.05 0 .099-.015.141-.043l1.695-1.154c.29-.198.634-.303.985-.303h1.974V2.75a.75.75 0 0 1 1.5 0ZM2.193 15.198a5.414 5.414 0 0 0 2.557.635 5.414 5.414 0 0 0 2.557-.635L4.75 9.368Zm14.51-.024c.082.04.174.083.275.126.53.223 1.305.45 2.272.45a5.847 5.847 0 0 0 2.547-.576L19.25 9.367Z",
+      ],
+      shield: [
+        "M16.53 9.78a.75.75 0 0 0-1.06-1.06L11 13.19l-1.97-1.97a.75.75 0 0 0-1.06 1.06l2.5 2.5a.75.75 0 0 0 1.06 0l5-5Z",
+        "m12.54.637 8.25 2.675A1.75 1.75 0 0 1 22 4.976V10c0 6.19-3.771 10.704-9.401 12.83a1.704 1.704 0 0 1-1.198 0C5.77 20.705 2 16.19 2 10V4.976c0-.758.489-1.43 1.21-1.664L11.46.637a1.748 1.748 0 0 1 1.08 0Zm-.617 1.426-8.25 2.676a.249.249 0 0 0-.173.237V10c0 5.46 3.28 9.483 8.43 11.426a.199.199 0 0 0 .14 0C17.22 19.483 20.5 15.461 20.5 10V4.976a.25.25 0 0 0-.173-.237l-8.25-2.676a.253.253 0 0 0-.154 0Z",
+      ],
+      lock: [
+        "M6 9V7.25C6 3.845 8.503 1 12 1s6 2.845 6 6.25V9h.5a2.5 2.5 0 0 1 2.5 2.5v8a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 19.5v-8A2.5 2.5 0 0 1 5.5 9Zm-1.5 2.5v8a1 1 0 0 0 1 1h13a1 1 0 0 0 1-1v-8a1 1 0 0 0-1-1h-13a1 1 0 0 0-1 1Zm3-4.25V9h9V7.25c0-2.67-1.922-4.75-4.5-4.75-2.578 0-4.5 2.08-4.5 4.75Z",
+      ],
+      people: [
+        "M3.5 8a5.5 5.5 0 1 1 8.596 4.547 9.005 9.005 0 0 1 5.9 8.18.751.751 0 0 1-1.5.045 7.5 7.5 0 0 0-14.993 0 .75.75 0 0 1-1.499-.044 9.005 9.005 0 0 1 5.9-8.181A5.496 5.496 0 0 1 3.5 8ZM9 4a4 4 0 1 0 0 8 4 4 0 0 0 0-8Zm8.29 4c-.148 0-.292.01-.434.03a.75.75 0 1 1-.212-1.484 4.53 4.53 0 0 1 3.38 8.097 6.69 6.69 0 0 1 3.956 6.107.75.75 0 0 1-1.5 0 5.193 5.193 0 0 0-3.696-4.972l-.534-.16v-1.676l.41-.209A3.03 3.03 0 0 0 17.29 8Z",
+      ],
+      eye: [
+        "M15.5 12a3.5 3.5 0 1 1-7 0 3.5 3.5 0 0 1 7 0Z",
+        "M12 3.5c3.432 0 6.124 1.534 8.054 3.241 1.926 1.703 3.132 3.61 3.616 4.46a1.6 1.6 0 0 1 0 1.598c-.484.85-1.69 2.757-3.616 4.461-1.929 1.706-4.622 3.24-8.054 3.24-3.432 0-6.124-1.534-8.054-3.24C2.02 15.558.814 13.65.33 12.8a1.6 1.6 0 0 1 0-1.598c.484-.85 1.69-2.757 3.616-4.462C5.875 5.034 8.568 3.5 12 3.5ZM1.633 11.945a.115.115 0 0 0-.017.055c.001.02.006.039.017.056.441.774 1.551 2.527 3.307 4.08C6.691 17.685 9.045 19 12 19c2.955 0 5.31-1.315 7.06-2.864 1.756-1.553 2.866-3.306 3.307-4.08a.111.111 0 0 0 .017-.056.111.111 0 0 0-.017-.056c-.441-.773-1.551-2.527-3.307-4.08C17.309 6.315 14.955 5 12 5 9.045 5 6.69 6.314 4.94 7.865c-1.756 1.552-2.866 3.306-3.307 4.08Z",
+      ],
+      person: [
+        "M12 2.5a5.5 5.5 0 0 1 3.096 10.047 9.005 9.005 0 0 1 5.9 8.181.75.75 0 1 1-1.499.044 7.5 7.5 0 0 0-14.993 0 .75.75 0 0 1-1.5-.045 9.005 9.005 0 0 1 5.9-8.18A5.5 5.5 0 0 1 12 2.5ZM8 8a4 4 0 1 0 8 0 4 4 0 0 0-8 0Z",
+      ],
+    };
+    // [principle, icon, how gh-aw applies it, controls]
+    const RAI = [
+      ["Fairness", "law", "Criteria live in reviewed Markdown; preview outputs across contributor groups first.", ["instructions in git", "staged: true"]],
+      ["Reliability & safety", "shield", "Sandboxed agent, scanned and bounded writes; red-teamed and model-checked.", ["AWF sandbox", "threat detection", "max: 1"]],
+      ["Privacy & security", "lock", "No secrets in the sandbox; untrusted input is filtered by author trust.", ["read-only token", "API proxy", "min-integrity"]],
+      ["Inclusiveness", "people", "Anyone who can describe a task can write a workflow, on the engine they choose.", ["plain Markdown", "engine: copilot · claude · codex"]],
+      ["Transparency", "eye", "Every AI post links back to its run; source and compiled lock file are reviewable.", ["AI-generated footer", ".lock.yml", "gh aw audit"]],
+      ["Accountability", "person", "The agent only proposes; people own the config and approve sensitive writes.", ["safe-outputs", "on.manual-approval", "on.roles"]],
+    ];
+    let f = -1;
+    const cards = RAI.map(([name, ic, how, ctl], i) =>
+      h(
+        "button",
+        { class: "rai-card", type: "button", "--i": i, "aria-pressed": "false", "aria-keyshortcuts": "ArrowLeft ArrowRight", title: `${name} (← → step through principles)`, onclick: () => (focus(f === i ? -1 : i), sfx.step()) },
+        h("span", { class: "rai-n" }, String(i + 1).padStart(2, "0")),
+        h("span", { class: "rai-hd" }, h("span", { innerHTML: `<svg viewBox="0 0 24 24" aria-hidden="true">${ICON[ic].map(d => `<path d="${d}"/>`).join("")}</svg>` }).firstChild, h("span", { class: "rai-nm" }, name)),
+        h("span", { class: "rai-p" }, how),
+        h(
+          "span",
+          { class: "rai-ch" },
+          ctl.map((c, j) => h("code", { "--j": j }, c))
+        )
+      )
+    );
+    const el = h(
+      "section",
+      { class: "slide rai" },
+      h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Microsoft's six principles, applied by gh-aw"), h("h2", {}, letters("Responsible "), letters("AI", "l-grad"))),
+      h("div", { class: "rai-grid" }, cards),
+      h("div", { class: "rai-foot" }, h("b", {}, "Safeguards, not guarantees"), " · owners still define, trial and monitor each workflow")
+    );
+    const focus = n => {
+      f = n;
+      el.classList.toggle("focus", n >= 0);
+      cards.forEach((c, i) => {
+        c.classList.toggle("on", i === n);
+        c.setAttribute("aria-pressed", String(i === n));
+      });
+    };
+    slides.push({
+      group: "security",
+      notes:
+        "What: Microsoft's six Responsible AI principles, each paired with the gh-aw controls that apply it; the arrow keys step through them. Reliability, privacy and accountability come from the sandbox, read-only token, safe outputs and approval gates; transparency from AI-generated footers, reviewable lock files and audits.\nWhy: Principles help only when they become defaults you can inspect. These are safeguards, not guarantees: nothing here certifies that an output is accurate or fair.\nWhen: Before rollout, name who a workflow affects, trial it in staged mode on representative, multilingual and adversarial inputs, and keep a person on impactful writes.",
+      enter(dir) {
+        focus(dir < 0 ? RAI.length - 1 : -1);
+      },
+      onNext() {
+        if (f < RAI.length - 1) {
+          focus(f + 1);
+          sfx.step();
+          return true;
+        }
+        return false;
+      },
+      onPrev() {
+        if (f >= 0) {
+          focus(f - 1);
+          sfx.step();
+          return true;
+        }
+        return false;
+      },
+      el,
     });
   }
 
