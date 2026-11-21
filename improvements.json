@@ -1,5 +1,5 @@
 {
-  "last_updated": "2026-11-20",
+  "last_updated": "2026-11-21",
   "pending_tasks": [
     {
       "file": "docs/src/content/docs/reference/workflow-linters.md",
@@ -108,6 +108,18 @@
       "created": "2026-09-16",
       "status": "pending",
       "issue": "Add Example fields to env get / env update subcommands"
+    },
+    {
+      "file": "pkg/parser/import_schema_validation.go",
+      "created": "2026-11-21",
+      "status": "pending",
+      "issue": "Line 212 choice error 'is not in the allowed options' does not list valid options; append them. Line 42 unknown-key error does not list declared inputs. Test asserts only the substring, so safe to change"
+    },
+    {
+      "file": "docs/src/content/docs/blog/2026-10-19-weekly-update.md",
+      "created": "2026-11-21",
+      "status": "pending",
+      "issue": "Lines 44-46 attribute 81 firewall requests to runs that failed at Start MCP Gateway; confirm source of the figure, then reword paragraph and joke. Confirm before editing"
     }
   ]
 }

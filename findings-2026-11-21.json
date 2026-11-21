@@ -1,0 +1,47 @@
+{
+  "date": "2026-11-21",
+  "files_analyzed": {
+    "documentation": [
+      "docs/src/content/docs/blog/2026-05-25-weekly-update.md",
+      "docs/src/content/docs/blog/2026-10-19-weekly-update.md"
+    ],
+    "cli": [
+      "gh aw (main help)",
+      "gh aw compile"
+    ],
+    "messages": [
+      ".github/workflows/craft.md",
+      ".github/workflows/smoke-cursor.md"
+    ],
+    "validation": [
+      "pkg/parser/import_schema_validation.go"
+    ]
+  },
+  "overall_quality": "needs-work",
+  "quality_highlights": [
+    "Weekly-update 2026-10-19 firewall run durations (10-27 min) match run createdAt/updatedAt for runs 37404641692, 37562780447, 37718535178",
+    "Import-schema error messages include importPath and parameter name consistently",
+    "smoke-cursor run-started/run-success messages are concise and use the same status tone"
+  ],
+  "single_file_improvements": [
+    {
+      "file": "pkg/parser/import_schema_validation.go",
+      "priority": "high",
+      "issue": "Choice error (line 212) says 'is not in the allowed options' without listing options; test asserts only that substring, so listing options is safe"
+    },
+    {
+      "file": "docs/src/content/docs/blog/2026-10-19-weekly-update.md",
+      "priority": "high",
+      "issue": "Lines 44-46 claim 81 firewall requests were gathered from the three Oct 6-8 runs (37404641692, 37562780447, 37718535178), but each failed at the agent job's Start MCP Gateway step. Source of the 81 figure is unclear unless the workflow reads logs from other runs; confirm before editing"
+    }
+  ],
+  "unverified": [
+    "2026-05-25 release-count and turns/tokens claims: git tag inspection was denied by workflow tool permissions",
+    "2026-10-19 'scheduled early-morning runs on the Copilot engine': engine not checked"
+  ],
+  "observations": [
+    "import_schema_validation.go line 42 unknown-key error does not list declared inputs (same pattern as choice error)",
+    "craft.md run-failure reuses the run-started emoji (🛠️), so failure is not visually distinct; already pending from 2026-09-09"
+  ],
+  "caveats": "git was denied by workflow tool permissions; release-tag checks were skipped and replaced with gh run inspection."
+}
