@@ -1,5 +1,6 @@
 ---
 title: A/B Experiments Specification
+spec: true
 description: Formal W3C-style specification for the GitHub Agentic Workflows A/B experiment system — frontmatter schema, variant selection, state persistence, expression integration, audit CLI, and statistical reporting.
 sidebar:
   order: 1360

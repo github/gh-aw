@@ -25,6 +25,11 @@ formatting, capitalization, and whitespace. Its anchor remains available for
 existing links. Distinct headings and headings after body content are preserved.
 Run `npm run test:titles` to check this behavior for Markdown and MDX pages.
 
+Set `spec: true` in a page's front matter to give it W3C-inspired specification
+styling and a **Spec** badge in the docs sidebar. Write status, version and
+section numbers in the document itself; this setting does not generate them
+or change existing heading links.
+
 Images can be added to `src/assets/` and embedded in Markdown with a relative link.
 
 Static assets, like favicons, can be placed in the `public/` directory.

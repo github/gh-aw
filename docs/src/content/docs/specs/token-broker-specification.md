@@ -1,5 +1,6 @@
 ---
 title: Token Broker Specification
+spec: true
 description: Normative OIDC exchange, authorization, issuance, and conformance requirements for a deployment-owned gh-aw token broker.
 sidebar:
   order: 1363
