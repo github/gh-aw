@@ -4,7 +4,6 @@
  * sheet, so it leads with the primary site links and a section heading, then
  * Starlight's own tree and MobileMenuFooter. Above 50rem only the tree shows.
  */
-import { getCollection } from 'astro:content';
 import Default from '@astrojs/starlight/components/Sidebar.astro';
 import SidebarSublist from '@astrojs/starlight/components/SidebarSublist.astro';
 import MobileNav from './MobileNav.astro';
@@ -66,28 +65,6 @@ Astro.locals.starlightRoute.sidebar = Astro.locals.starlightRoute.sidebar.map((e
 		],
 	};
 });
-
-const base = import.meta.env.BASE_URL.replace(/\/$/, '');
-const specs = await getCollection('docs', ({ data }) => data.spec === true);
-const specPaths = new Set(specs.map(({ id }) => {
-	const slug = id.replace(/(?:^|\/)index$/, '').normalize();
-	return new URL(`${base}/${slug}`, Astro.url).pathname.replace(/\/$/, '');
-}));
-
-function markSpecLinks(entries: Sidebar): Sidebar {
-	return entries.map((entry) => {
-		if (entry.type === 'group') return { ...entry, entries: markSpecLinks(entry.entries) };
-		if ('data-sidebar-more' in entry.attrs) return entry;
-		const url = new URL(entry.href, Astro.url);
-		if (url.origin !== Astro.url.origin || !specPaths.has(url.pathname.replace(/\/$/, ''))) return entry;
-		const badge = entry.badge
-			? { ...entry.badge, text: `Spec · ${entry.badge.text}` }
-			: { text: 'Spec', variant: 'default' as const, class: 'spec-sidebar-badge' };
-		return { ...entry, badge };
-	});
-}
-
-Astro.locals.starlightRoute.sidebar = markSpecLinks(Astro.locals.starlightRoute.sidebar);
 ---
 
 <div class="mobile-menu-top">
@@ -183,7 +160,7 @@ Astro.locals.starlightRoute.sidebar = markSpecLinks(Astro.locals.starlightRoute.
 <Default />
 {Array.from(catalogs, ([id, entries]) => (
 	<template id={`sidebar-catalog-${id}`}>
-		<SidebarSublist sublist={markSpecLinks(entries)} nested />
+		<SidebarSublist sublist={entries} nested />
 	</template>
 ))}
 
@@ -256,13 +233,6 @@ Astro.locals.starlightRoute.sidebar = markSpecLinks(Astro.locals.starlightRoute.
 </script>
 
 <style>
-	:global(.sidebar-content .spec-sidebar-badge) {
-		color: inherit;
-		background: transparent;
-		border-color: var(--aw-color-border-strong);
-		white-space: nowrap;
-	}
-
 	:global(.sidebar-more) {
 		display: block;
 		width: 100%;

@@ -22,7 +22,7 @@ func TestDefaultCLIMCPVersions(t *testing.T) {
 		{"Gemini CLI", DefaultGeminiVersion, "0.64.0"},
 		{"Agy CLI", DefaultAgyVersion, "1.3.6"},
 		{"Pi CLI", DefaultPiVersion, "1.5.2"},
-		{"GitHub MCP Server", DefaultGitHubMCPServerVersion, "v2.1.0"},
+		{"GitHub MCP Server", DefaultGitHubMCPServerVersion, "v2.2.0"},
 		{"Firewall", DefaultFirewallVersion, "v0.29.17"},
 		{"Cost-only model routing", AWFCostOnlyModelRoutingMinVersion, "v0.29.17"},
 		{"OpenAI WIF", AWFOpenAIWIFMinVersion, "v0.29.11"},

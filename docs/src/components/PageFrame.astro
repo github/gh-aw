@@ -10,9 +10,10 @@ import MobileMenuToggle from 'virtual:starlight/components/MobileMenuToggle';
 import SiteFooter from './SiteFooter.astro';
 
 const { hasSidebar, entry } = Astro.locals.starlightRoute;
+const isSpec = entry.id.startsWith('specs/');
 ---
 
-<div class="page sl-flex">
+<div class="page sl-flex" data-zen={isSpec ? '' : undefined}>
 	<header class="header"><slot name="header" /></header>
 	{
 		hasSidebar && (
@@ -56,9 +57,28 @@ const { hasSidebar, entry } = Astro.locals.starlightRoute;
 			</nav>
 		)
 	}
-	<div class="main-frame" data-spec={entry.data.spec ? '' : undefined}><slot /></div>
+	<div class="main-frame" data-spec={entry.data.spec ? '' : undefined}>
+		{isSpec && (
+			<button type="button" class="zen-toggle print:hidden" aria-pressed="true" hidden>
+				Zen mode
+			</button>
+		)}
+		<slot />
+	</div>
 	<SiteFooter />
 </div>
+
+<script>
+	const toggle = document.querySelector<HTMLButtonElement>('.zen-toggle');
+	const frame = toggle?.closest('.page');
+	if (toggle && frame) {
+		toggle.addEventListener('click', () => {
+			const enabled = frame.toggleAttribute('data-zen');
+			toggle.setAttribute('aria-pressed', String(enabled));
+		});
+		toggle.hidden = false;
+	}
+</script>
 
 <style>
 	/* Starlight's own frame styles, copied unchanged */
@@ -143,6 +163,29 @@ const { hasSidebar, entry } = Astro.locals.starlightRoute;
 		flex-grow: 1; /* short pages: the footer still sits at the bottom of the viewport */
 	}
 
+	.zen-toggle {
+		margin-block-start: 0.5rem;
+		margin-inline-start: var(--sl-nav-pad-x);
+		padding: 0.375rem 0.625rem;
+		min-height: 2rem;
+		border: 1px solid var(--aw-color-divider);
+		border-radius: var(--aw-radius-xs);
+		background: var(--aw-color-bg);
+		color: var(--aw-color-text-muted);
+		font: inherit;
+		font-size: var(--aw-text-ui);
+		cursor: pointer;
+	}
+
+	.zen-toggle:is(:hover, :focus-visible) {
+		color: var(--aw-color-text-strong);
+	}
+
+	.zen-toggle:focus-visible {
+		outline: var(--aw-focus-ring);
+		outline-offset: 2px;
+	}
+
 	.main-frame[data-spec] :global(.content-panel h1#_top) {
 		font-size: var(--aw-step-5);
 		font-weight: 600;
@@ -164,7 +207,7 @@ const { hasSidebar, entry } = Astro.locals.starlightRoute;
 	}
 
 	@media (min-width: 50rem) {
-		:global([data-has-sidebar]) .page {
+		:global([data-has-sidebar]) .page:not([data-zen]) {
 			display: grid;
 			grid-template-columns: var(--sl-sidebar-width) minmax(0, 1fr);
 			grid-template-rows: 1fr auto;
