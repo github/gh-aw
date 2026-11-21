@@ -35,10 +35,12 @@ func run(pass *analysis.Pass) (any, error) {
 			if !ok || pkgPath != "os" || (funcName != "Stat" && funcName != "Lstat") {
 				return true
 			}
-			if len(assign.Lhs) == 0 {
-				return true
+			var resultExpr ast.Expr
+			for _, lhs := range assign.Lhs {
+				resultExpr = lhs
+				break
 			}
-			result, ok := astutil.UnwrapParenExpr(assign.Lhs[0]).(*ast.Ident)
+			result, ok := astutil.UnwrapParenExpr(resultExpr).(*ast.Ident)
 			if !ok {
 				return true
 			}
