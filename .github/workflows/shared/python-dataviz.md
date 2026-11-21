@@ -90,7 +90,7 @@ Dirs: `/tmp/gh-aw/python/` (scripts), `/tmp/gh-aw/python/data/` (inputs), `/tmp/
 
 **Upload**:
 1. `plt.savefig('/tmp/gh-aw/python/charts/my_chart.png', dpi=300, bbox_inches='tight')`
-2. `{ "type": "upload_asset", "path": "/tmp/gh-aw/python/charts/my_chart.png" }`
+2. `{ "path": "/tmp/gh-aw/python/charts/my_chart.png" }` — do not include a `type` field; the tool rejects it.
 3. `![Description](ASSET_URL_FROM_UPLOAD)` in report
 
 Up to 5 uploads per run; PNG, JPG, JPEG, SVG allowed.
