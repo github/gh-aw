@@ -334,6 +334,10 @@ func (c *Compiler) buildJobs(data *WorkflowData, markdownPath string) error {
 		return err
 	}
 
+	if err := c.addReportExperimentsJob(data); err != nil {
+		return err
+	}
+
 	if err := c.finalizeBuiltJobs(data); err != nil {
 		return err
 	}
@@ -809,10 +813,11 @@ func (c *Compiler) ensureConclusionIsLastJob() error {
 	// Jobs that must never appear in conclusion's needs
 	exclude := map[string]struct {
 	}{
-		"conclusion":                           {},
-		string(constants.GradersJobName):       {},
-		string(constants.PreActivationJobName): {},
-		"pre-activation":                       {},
+		"conclusion":                               {},
+		string(constants.GradersJobName):           {},
+		string(constants.ReportExperimentsJobName): {},
+		string(constants.PreActivationJobName):     {},
+		"pre-activation":                           {},
 	}
 
 	// Iterate over all jobs in alphabetical order for deterministic output

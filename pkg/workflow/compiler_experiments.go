@@ -34,6 +34,9 @@ const (
 	// ExperimentsStorageRepo uses a git branch (repo-memory) to persist experiment state.
 	// This is the default because experiment data is valuable and repo storage is more durable.
 	ExperimentsStorageRepo ExperimentStorageMode = "repo"
+
+	// ExperimentsStorageBroker delegates assignment and reporting to an OIDC-authenticated broker.
+	ExperimentsStorageBroker ExperimentStorageMode = "broker"
 )
 
 // experimentsBranchPrefix is the git branch prefix used when storage: repo is selected.
@@ -111,7 +114,7 @@ func extractExperimentsStorageFromFrontmatter(frontmatter map[string]any) Experi
 		if s, ok := storageRaw.(string); ok {
 			storage := ExperimentStorageMode(s)
 			switch storage {
-			case ExperimentsStorageCache, ExperimentsStorageRepo:
+			case ExperimentsStorageCache, ExperimentsStorageRepo, ExperimentsStorageBroker:
 				return storage
 			default:
 				experimentsLog.Printf("Unknown experiments storage %q; falling back to %q", s, ExperimentsStorageRepo)
@@ -624,6 +627,14 @@ func (c *Compiler) generateExperimentSteps(data *WorkflowData) []string {
 	experimentNames := sortedExperimentNames(data.Experiments)
 	experimentsLog.Printf("Generating experiment steps for %d experiment(s): %v (storage=%s)", len(experimentNames), experimentNames, data.ExperimentsStorage)
 
+	if data.ExperimentsStorage == ExperimentsStorageBroker {
+		if data.DryRun {
+			steps := []string{initializeBrokerExperimentStateStep()}
+			steps = append(steps, c.generatePickExperimentStep(data, experimentNames)...)
+			return append(steps, c.generateExperimentArtifactUploadStep(data, SanitizeWorkflowIDForCacheKey(data.WorkflowID))...)
+		}
+		return c.generateBrokerExperimentSteps(data, experimentNames)
+	}
 	if data.ExperimentsStorage == ExperimentsStorageCache {
 		return c.generateExperimentCacheSteps(data, experimentNames)
 	}

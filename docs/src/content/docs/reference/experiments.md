@@ -251,7 +251,7 @@ is persisted:
 
 ```yaml
 experiments:
-  storage: repo   # or: cache (default: repo)
+  storage: repo   # or: cache, broker (default: repo)
   prompt_style: [concise, detailed]
 ```
 
@@ -259,9 +259,57 @@ experiments:
 |---|---|
 | `repo` (**default**) | Commits state to a git branch named `experiments/{sanitizedWorkflowID}` (workflow ID lowercased with hyphens removed, e.g. `my-workflow` → `experiments/myworkflow`). Durable — survives cache evictions. Requires `contents: write` permission (added automatically by the compiler). |
 | `cache` | Uses GitHub Actions cache (legacy). State may be evicted after 7 days of inactivity. |
+| `broker` | Uses a deployment-owned OIDC-authenticated HTTPS service for assignments, cumulative counts, and run-result observations. No experiment git/cache state or added `contents: write` permission. |
 
 When `storage: repo`, the compiler adds a `push_experiments_state` job after the
 activation job and commits the updated `state.json` to the experiments branch.
+
+### Broker storage
+
+```aw wrap
+---
+experiments:
+  storage: broker
+  prompt_style: [concise, detailed]
+---
+
+Summarize in a **${{ experiments.prompt_style }}** style.
+```
+
+Set the repository or organization Actions secret
+`GH_AW_EXPERIMENTS_BROKER_URL` to the full HTTPS endpoint. The URL is resolved
+only at runtime; it is not authored in workflow frontmatter. Both assignment and
+reporting POST to this exact endpoint, which is also the exact OIDC audience.
+gh-aw does not ship the server.
+
+Activation obtains assignments and required cumulative counts. A separate,
+isolated job after conclusion (and graders when needed) submits allowlisted
+numeric/status observations from `activity/summary.json` in the `usage` artifact.
+Reporting is best effort: failures, cancellation, or missing artifacts can leave assignments
+without results. Reported values are untrusted observations, not authorization
+or verified human adoption. Eval answers, custom grader values, and adoption
+results are not currently reported. Authored steps and workflow-level environment
+hooks cannot customize the isolated broker report job.
+Friction costs are reported only for available measurement dimensions;
+unavailable or unsupported values are omitted rather than recorded as zero.
+New attempts require fresh activation/conclusion artifacts; rerunning only a
+failed reporter rejects prior-attempt data instead of attributing it to the new attempt.
+
+Broker storage requires a generated agent job and does not support status-only
+workflows. Define an agent job or use `repo`/`cache` storage instead.
+Repeated reusable-workflow calls with identical inputs in the same attempt are
+also unsupported because they share the artifact/invocation prefix. The broker
+must bind supported invocation hints to trusted job evidence, not trust the hash alone.
+
+The calling jobs require `id-token: write` within the caller's permission
+envelope. Broker errors do not retry or fall back to git/cache. Dry-run uses an
+ephemeral local picker and makes no experiments broker HTTP or OIDC calls.
+Existing `repo` and `cache` behavior is unchanged.
+
+`gh aw experiments` commands, including `gh aw experiments analyze`, currently
+use only the git backend; there is no broker analysis client. See the
+[Experiments Broker Specification](/gh-aw/specs/experiments-broker-specification/)
+for the wire protocol, server authorization, and deployment requirements.
 
 ## Accessing assignments downstream
 
@@ -276,7 +324,10 @@ Use these expressions in downstream jobs defined in the `jobs:` frontmatter sect
 
 ## Analyzing results
 
-The activation job uploads the counter state as an `experiment` artifact. Download and inspect it with the `gh aw` CLI:
+The activation job uploads the counter state as an `experiment` artifact. This
+per-run artifact can show broker assignments and count snapshots, but does not
+provide access to the broker's result dataset. Download and inspect it with the
+`gh aw` CLI:
 
 ```bash
 # Download the experiment artifact for a specific run
@@ -704,6 +755,7 @@ Tracking issue: [#1234](https://github.com/owner/repo/issues/1234)
 | Field | Type | Description |
 |---|---|---|
 | `experiments` | `object` | Map of experiment name → variant array or config object |
+| `experiments.storage` | `string` | Persistence backend: `repo` (default), `cache`, or `broker`; reserved, not an experiment name |
 | `experiments.<name>` | `string[]` | Array of two or more variant strings for one experiment |
 
 ### Object form fields
@@ -747,9 +799,10 @@ experiments:
 
 Assignment happens in the activation job before agent execution. A SHA-256 hash of
 the seed, experiment name, repository, workflow, and run ID selects the variant.
-The activation job advances the ramp after each `min_samples` candidate assignments
-and stores the current stage on the experiment branch, leaving the workflow source
-immutable. The logs show the stage, assignment counts, weights, and selected variant.
+The assignment backend advances the ramp after each `min_samples` candidate
+assignments and persists the current stage in the configured storage backend
+(the experiment branch for `repo`), leaving the workflow source immutable.
+The logs show the stage, assignment counts, weights, and selected variant.
 
 The ramp does not evaluate adopted outputs or promote a winner. Use the existing experiment
 analysis commands and configured metrics to decide whether to stop the experiment

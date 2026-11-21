@@ -230,7 +230,7 @@ type WorkflowData struct {
 	CachedConcurrencyGroupExprErr  error                           // cached result of validateConcurrencyGroupExpression(ConcurrencyGroupExpr); nil = valid; populated by applyDefaults
 	Experiments                    map[string][]string             // A/B testing experiments: maps experiment name to variant list (from frontmatter)
 	ExperimentConfigs              map[string]*ExperimentConfig    // Full A/B experiment metadata (populated alongside Experiments)
-	ExperimentsStorage             ExperimentStorageMode           // "cache" or "repo" (default "repo"); controls how experiment state is persisted across runs
+	ExperimentsStorage             ExperimentStorageMode           // "cache", "repo" (default), or opt-in "broker"; controls experiment persistence
 	CachedConcurrencyGroupExprSet  bool                            // true once CachedConcurrencyGroupExprErr has been populated; distinguishes "valid (nil)" from "not yet computed"
 	CachedParsedToolsets           []string                        // cached result of ParseGitHubToolsets for the GitHub tool (for performance optimization); populated by applyDefaults
 	CachedAllowedDomainsStr        string                          // cached agent firewall policy; sanitization-only domains must not be stored here

@@ -39,6 +39,7 @@ var runtimeFeaturesBuiltInJobNames = map[string]struct{}{
 	string(constants.GradersJobName):             {},
 	string(constants.UnlockJobName):              {},
 	pushExperimentsStateJobName:                  {},
+	string(constants.ReportExperimentsJobName):   {},
 	pushEvalsStateJobName:                        {},
 	pushRepoMemoryJobName:                        {},
 	pushLedgerChangesJobName:                     {},

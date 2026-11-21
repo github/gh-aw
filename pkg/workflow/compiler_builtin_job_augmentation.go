@@ -16,6 +16,9 @@ func (c *Compiler) applyBuiltinJobPreSteps(data *WorkflowData) error {
 	}
 
 	for jobName, jobConfig := range data.Jobs {
+		if jobName == string(constants.ReportExperimentsJobName) {
+			return errors.New("jobs.report_experiments is compiler-owned and cannot be customized; configure experiments.storage instead")
+		}
 		if jobName == string(constants.AdmissionJobName) || jobName == string(constants.ConclusionAdmissionJobName) {
 			return fmt.Errorf("jobs.%s is compiler-owned and cannot be customized; configure admission with managed Actions variables", jobName)
 		}
@@ -257,6 +260,9 @@ func parseBuiltinJobAugmentation(jobName, targetJobName string, rawConfig any) (
 }
 
 func (c *Compiler) applyBuiltinJobAugmentation(jobName string, rawConfig any, data *WorkflowData, allJobs map[string]*Job) error {
+	if jobName == string(constants.ReportExperimentsJobName) {
+		return errors.New("jobs.report_experiments is compiler-owned and cannot be customized; configure experiments.storage instead")
+	}
 	if jobName == string(constants.AdmissionJobName) || jobName == string(constants.ConclusionAdmissionJobName) {
 		return fmt.Errorf("jobs.%s is compiler-owned and cannot be customized; configure admission with managed Actions variables", jobName)
 	}
