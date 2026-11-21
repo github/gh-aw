@@ -124,6 +124,11 @@ Set `engine.copilot-sdk: true` to run a local Copilot sidecar and SDK driver.
 In this mode, the harness starts a local sidecar and runs the
 SDK driver process instead of the default CLI-only flow.
 
+For Node.js drivers, generated workflows install the SDK and its dependencies
+from a compiler-pinned npm lockfile in runner temporary storage. The install
+verifies package integrity, disables npm lifecycle scripts, and enforces
+`engine.cooldown` without changing the application's package files.
+
 The built-in driver registers native MCP servers from converter-owned `RUNNER_TEMP/gh-aw/mcp-config/copilot-sdk.json`, not the user-managed CLI catalog. `tools.cli-proxy` servers remain CLI-only. A SHA-256 integrity value is bound to the run, attempt, and job; missing, malformed, changed, linked, or stale catalogs fail before inference. This does not protect against a compromised runner able to replace both catalog and trusted environment.
 
 The built-in SDK driver loads inline sub-agents and repository

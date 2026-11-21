@@ -135,34 +135,24 @@ func enginePackageForManifest(install *EngineInstallationDefinition, config *Eng
 func extractCopilotSDKPackages(data *WorkflowData, ecosystem string) []string {
 	// Reuse SDK installation selection (including inline/language drivers).
 	// engine.version controls the CLI, not the independently pinned SDK.
-	command := strings.Join(buildCopilotSDKInstallStep(data), "\n")
+	spec := selectCopilotSDKInstallSpec(data)
 	switch ecosystem {
 	case "npm":
-		var installCommands []string
-		for line := range strings.SplitSeq(command, "\n") {
-			if strings.Contains(line, "npm install ") {
-				installCommands = append(installCommands, line)
-			}
+		if spec.npm != nil {
+			return []string{spec.npm.sdkSpec}
 		}
-		extractor := PackageExtractor{
-			CommandNames:        []string{"npm"},
-			RequiredSubcommands: []string{"install"},
-			FlagsWithValues:     []string{"--prefix"},
-			TrimSuffixes:        "&|;",
-		}
-		return extractor.ExtractPackages(strings.Join(installCommands, "\n"))
 	case "pip":
 		// The SDK command has a --target argument, which the general
 		// pip extractor does not distinguish from a package.
 		var packages []string
-		for token := range strings.FieldsSeq(command) {
+		for token := range strings.FieldsSeq(spec.command) {
 			if strings.HasPrefix(token, "github-copilot-sdk==") {
 				packages = append(packages, token)
 			}
 		}
 		return packages
 	case "go":
-		return extractGoFromCommands(command)
+		return extractGoFromCommands(spec.command)
 	}
 	return nil
 }

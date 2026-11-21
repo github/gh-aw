@@ -5,6 +5,8 @@ package workflow
 import (
 	"archive/tar"
 	"compress/gzip"
+	"crypto/sha512"
+	"encoding/base64"
 	"encoding/json"
 	"os"
 	"os/exec"
@@ -42,11 +44,12 @@ func TestCopilotSDKNodeBootstrapIsolatedFromRepository(t *testing.T) {
 	require.Contains(t, string(output), "RUNNER_TEMP must be set for Copilot SDK module resolution")
 
 	fixtures := t.TempDir()
-	packages := map[string]string{}
-	for name, version := range map[string]string{
+	dependencies := map[string]string{
 		"@github/copilot-sdk": string(constants.DefaultCopilotSDKVersion),
-		"undici":              strings.TrimPrefix(copilotSDKWebFetchDependency, "undici@"),
-	} {
+		"undici":              "6.28.0",
+	}
+	packages := map[string]any{"": map[string]any{"dependencies": dependencies}}
+	for name, version := range dependencies {
 		archivePath := filepath.Join(fixtures, filepath.Base(name)+".tgz")
 		archive, err := os.Create(archivePath)
 		require.NoError(t, err)
@@ -55,6 +58,7 @@ func TestCopilotSDKNodeBootstrapIsolatedFromRepository(t *testing.T) {
 		manifest, err := json.Marshal(map[string]any{
 			"name": name, "version": version,
 			"exports": map[string]string{"import": "./index.mjs", "require": "./index.cjs"},
+			"scripts": map[string]string{"install": "exit 99"},
 		})
 		require.NoError(t, err)
 		for path, content := range map[string]string{
@@ -69,8 +73,16 @@ func TestCopilotSDKNodeBootstrapIsolatedFromRepository(t *testing.T) {
 		require.NoError(t, tw.Close())
 		require.NoError(t, gz.Close())
 		require.NoError(t, archive.Close())
-		packages[name+"@"+version] = archivePath
+		tarball, err := os.ReadFile(archivePath)
+		require.NoError(t, err)
+		digest := sha512.Sum512(tarball)
+		packages["node_modules/"+name] = map[string]any{
+			"version": version, "resolved": "file:" + archivePath,
+			"integrity": "sha512-" + base64.StdEncoding.EncodeToString(digest[:]), "hasInstallScript": true,
+		}
 	}
+	fixtureLock, err := json.Marshal(map[string]any{"lockfileVersion": 3, "packages": packages})
+	require.NoError(t, err)
 
 	for _, name := range []string{"normal", "esm", "inline", "legacy-node"} {
 		t.Run(name, func(t *testing.T) {
@@ -116,7 +128,7 @@ func TestCopilotSDKNodeBootstrapIsolatedFromRepository(t *testing.T) {
 			globalRootCommand.Env = env
 			globalRoot, err := globalRootCommand.Output()
 			require.NoError(t, err)
-			for name := range packages {
+			for name := range dependencies {
 				globalPackage := filepath.Join(strings.TrimSpace(string(globalRoot)), filepath.FromSlash(name))
 				require.NoError(t, os.MkdirAll(globalPackage, 0o755))
 				manifest, err := json.Marshal(map[string]string{"name": name, "version": "0.0.0-conflict", "main": "index.cjs"})
@@ -171,15 +183,27 @@ if (!sdk.bootstrapFixture || relative !== "relative helper") throw new Error("ES
 			}
 			data := &WorkflowData{EngineConfig: config}
 			var install []struct {
-				Run string `yaml:"run"`
+				Run string            `yaml:"run"`
+				Env map[string]string `yaml:"env"`
 			}
 			require.NoError(t, yaml.Unmarshal([]byte(strings.Join(buildCopilotSDKInstallStep(data), "\n")), &install))
 			require.Len(t, install, 1)
-			require.Contains(t, install[0].Run, `npm install --prefix "${RUNNER_TEMP}/gh-aw/engine-cli/copilot-sdk"`)
-			// Substitute local tarballs, leaving the generated npm invocation and repository policy intact.
-			command := install[0].Run
-			for dependency, archive := range packages {
-				command = strings.ReplaceAll(command, dependency, shellEscapeArg(archive))
+			require.Contains(t, install[0].Run, copilotSDKNodeInstallCommand)
+			for key, value := range install[0].Env {
+				env = append(env, key+"="+value)
+			}
+			// Use equivalent lockfile inputs with local tarballs so npm ci runs offline.
+			command := strings.Replace(install[0].Run, copilotSDKNodeProject.lock, string(fixtureLock), 1)
+			require.NotEqual(t, install[0].Run, command)
+			if name == "normal" {
+				// Exercise a positive cooldown that an already locked graph would otherwise bypass.
+				blocked := exec.CommandContext(t.Context(), "bash", "-c", command)
+				blocked.Dir = workspace
+				blocked.Env = append(env, "NPM_CONFIG_MIN_RELEASE_AGE=1000000")
+				output, err := blocked.CombinedOutput()
+				require.Error(t, err)
+				require.Contains(t, string(output), "do not satisfy engine.cooldown")
+				require.NoDirExists(t, filepath.Join(runnerTemp, "gh-aw", "engine-cli", "copilot-sdk"))
 			}
 			run(command)
 
