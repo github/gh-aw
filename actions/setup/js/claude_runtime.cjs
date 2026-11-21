@@ -1,6 +1,10 @@
 // @ts-check
 "use strict";
 
+// @safe-outputs-exempt USE-001 — this is the Claude engine runtime harness, not a safe-output handler; it only
+// reads the safe-outputs byte offset to resume a session and never records or applies safe-output operations,
+// so the E001-E010 handler error codes do not apply to its internal errors.
+
 const { iterateJsonl, iterateJsonlEvents } = require("./jsonl_helpers.cjs");
 const fs = require("fs");
 const path = require("path");
