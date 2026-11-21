@@ -192,11 +192,15 @@ func TestSpec_PublicAPI_Receipts(t *testing.T) {
 	assert.Equal(t, assignment.DispatchID, receipt.DispatchID, "receipt should retain dispatch identity")
 	assert.Equal(t, assignment.RequestID, receipt.RequestID, "receipt should retain request identity")
 	assert.Equal(t, assignment.CommitID, receipt.CommitID, "receipt should retain commit identity")
+	assert.Empty(t, receipt.State, "assignment identity alone must not assert a lifecycle state")
+	assert.False(t, receipt.Released, "reservation release must be populated separately from a validated projection")
 	require.Len(t, receipt.Claims, 1, "assignment receipt should project its claim identity")
 	for _, projected := range []workqueue.ClaimReceipt{claim.ToReceipt(), receipt.Claims[0]} {
 		assert.Equal(t, claim.Handle, projected.Handle, "claim receipt should retain its handle")
 		assert.Equal(t, claim.ClaimID, projected.ClaimID, "claim receipt should retain claim identity")
 		assert.Equal(t, claim.WorkID, projected.WorkID, "claim receipt should retain work identity")
+		assert.Empty(t, projected.State, "claim identity alone must not assert a lifecycle state")
+		assert.Empty(t, projected.Barrier, "delivery facts must be populated separately from a validated projection")
 	}
 	for _, tt := range []struct {
 		name  string
@@ -462,3 +466,12 @@ func TestSpec_PublicAPI_NodeID(t *testing.T) {
 		})
 	}
 }
+
+// SPEC_AMBIGUITY: DefaultPolicy principal encoding and valid policy input
+// combinations are not documented; validating generated policies requires a
+// specification-provided valid fixture.
+// SPEC_AMBIGUITY: The README does not provide a valid ledger fixture, actor-role
+// values, operation schemas, scheduler eligibility encodings, or concrete
+// finish-intent fields whose absent/null handling differs. Replay, planning,
+// and lifecycle scenarios require those contracts before deriving more tests.
+// Host and transport APIs have no documented local fixtures.

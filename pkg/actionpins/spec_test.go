@@ -6,6 +6,7 @@ package actionpins_test
 import (
 	"context"
 	"errors"
+	"reflect"
 	"strings"
 	"sync"
 	"testing"
@@ -402,3 +403,51 @@ func TestSpec_ThreadSafety_EmbeddedReads(t *testing.T) {
 // SPEC_AMBIGUITY: GetContainerPin and ResolveGHESActionPin do not document
 // concrete bundled images or repositories requiring GHES-compatible pins.
 // Avoid deriving those fixture guarantees from implementation data.
+
+// TestSpec_Types_PublicContracts validates the type kinds documented in
+// README.md / Public API / Types without assuming additional field semantics.
+func TestSpec_Types_PublicContracts(t *testing.T) {
+	t.Parallel()
+	for _, tt := range []struct {
+		name   string
+		typeOf reflect.Type
+		kind   reflect.Kind
+	}{
+		{name: "ActionYAMLInput", typeOf: reflect.TypeFor[actionpins.ActionYAMLInput](), kind: reflect.Struct},
+		{name: "ActionPin", typeOf: reflect.TypeFor[actionpins.ActionPin](), kind: reflect.Struct},
+		{name: "ContainerPin", typeOf: reflect.TypeFor[actionpins.ContainerPin](), kind: reflect.Struct},
+		{name: "ActionPinsData", typeOf: reflect.TypeFor[actionpins.ActionPinsData](), kind: reflect.Struct},
+		{name: "SHAResolver", typeOf: reflect.TypeFor[actionpins.SHAResolver](), kind: reflect.Interface},
+		{name: "ResolutionErrorType", typeOf: reflect.TypeFor[actionpins.ResolutionErrorType](), kind: reflect.String},
+		{name: "ResolutionFailure", typeOf: reflect.TypeFor[actionpins.ResolutionFailure](), kind: reflect.Struct},
+		{name: "PinContext", typeOf: reflect.TypeFor[actionpins.PinContext](), kind: reflect.Struct},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tt.kind, tt.typeOf.Kind(), "%s must retain its documented public type kind", tt.name)
+		})
+	}
+}
+
+// TestSpec_PublicAPI_WarningDeduplication validates README.md / PinContext
+// fields: unresolved-reference warnings share a repo@version deduplication map.
+// SPEC_AMBIGUITY: Mapping diagnostics do not document their warning-map keys;
+// this test checks unresolved references, whose repo@version keys are specified.
+func TestSpec_PublicAPI_WarningDeduplication(t *testing.T) {
+	t.Parallel()
+	for _, version := range []string{"v1", "v2"} {
+		t.Run(version, func(t *testing.T) {
+			t.Parallel()
+			const repo = "unknown/action"
+			ctx := &actionpins.PinContext{
+				EnforcePinned: true, AllowActionRefs: true, Warnings: make(map[string]bool),
+			}
+			for attempt := range 2 {
+				_, err := actionpins.ResolveActionPin(repo, version, ctx)
+				require.NoError(t, err, "allowed unresolved refs should remain warnings on attempt %d", attempt+1)
+				assert.True(t, ctx.Warnings[repo+"@"+version], "the shared map should mark the documented repo@version warning key")
+				assert.Len(t, ctx.Warnings, 1, "repeated resolution should deduplicate the same unresolved reference")
+			}
+		})
+	}
+}
