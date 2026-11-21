@@ -86,6 +86,11 @@ fi
 
 debug_log "Using RUNNER_TEMP: ${RUNNER_TEMP_BASH} (resolved: ${RESOLVED_RUNNER_TEMP}, writable: yes)"
 
+# Acquire before touching shared paths, containers, or listeners. Kept until always/post.
+if [[ "${RUNNER_ENVIRONMENT:-}" == "self-hosted" ]]; then
+  node "$(dirname "${BASH_SOURCE[0]}")/js/docker_lease.cjs" acquire
+fi
+
 # Get destination from input or use default
 DESTINATION="${INPUT_DESTINATION:-${GH_AW_ROOT}/actions}"
 if [[ "$(uname -o 2>/dev/null)" == "Msys" ]] && command -v cygpath >/dev/null 2>&1; then

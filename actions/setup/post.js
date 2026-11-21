@@ -108,4 +108,11 @@ function listTmpGhAwFiles(tmpDir, maxDepth, maxFiles) {
   }
 
   cleanupRuntimeTmp();
+  if (process.env.RUNNER_ENVIRONMENT === "self-hosted") {
+    const result = spawnSync(process.execPath, [path.join(__dirname, "js", "docker_lease.cjs"), "release"], { stdio: "inherit" });
+    if (result.error || result.status !== 0) {
+      console.warn("Warning: shared-daemon AWF lease retained; inspect remaining resources before reusing this daemon.");
+      process.exitCode = 1;
+    }
+  }
 })();

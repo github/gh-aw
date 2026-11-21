@@ -38,3 +38,7 @@ fi
 if [[ -n "${GH_AW_RUNTIME_TMP_DIR:-}" && -f "${DESTINATION}/cleanup_runtime_tmp.sh" ]]; then
   bash "${DESTINATION}/cleanup_runtime_tmp.sh"
 fi
+
+if [[ "${RUNNER_ENVIRONMENT:-}" == "self-hosted" ]]; then
+  node "$(dirname "${BASH_SOURCE[0]}")/js/docker_lease.cjs" release
+fi
