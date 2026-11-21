@@ -18,6 +18,7 @@ function recordDurableSessionEvent(type, data, { env = process.env, root = path.
       status: data.status,
       ...(data.parentRunId ? { parentRunId: String(data.parentRunId) } : {}),
       ...(data.artifactId ? { artifactId: String(data.artifactId) } : {}),
+      ...(data.relayRunId ? { relayRunId: String(data.relayRunId) } : {}),
       ...(data.sessionId ? { sessionId: data.sessionId } : {}),
     },
   };
@@ -46,7 +47,7 @@ function isDurableSessionRecord(record) {
     typeof data.runAttempt === "string" &&
     /^[1-9]\d*$/.test(data.runAttempt) &&
     (record.type === "durable.restore" ? ["restored", "fresh", "failed"] : ["resumed", "fresh"]).includes(data.status) &&
-    ["parentRunId", "artifactId"].every(key => data[key] === undefined || (typeof data[key] === "string" && /^[1-9]\d*$/.test(data[key]))) &&
+    ["parentRunId", "artifactId", "relayRunId"].every(key => data[key] === undefined || (typeof data[key] === "string" && /^[1-9]\d*$/.test(data[key]))) &&
     (record.type !== "durable.session" ||
       (typeof data.sessionId === "string" &&
         (data.engine === "pi"

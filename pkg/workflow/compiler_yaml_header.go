@@ -76,6 +76,7 @@ func (c *Compiler) generateLockMetadataHeader(yaml *strings.Builder, data *Workf
 		metadata := GenerateLockMetadata(LockHashInfo{FrontmatterHash: frontmatterHash, BodyHash: bodyHash}, data.StopTime, c.effectiveStrictMode(data.RawFrontmatter), agentInfo)
 		metadata.Docs = data.Docs
 		metadata.DryRun = data.DryRun
+		metadata.Continuation = continuationLockMetadata(data)
 		if metadata.CompilerVersion == "" && c.GetActionTag() != "" {
 			metadata.CompilerVersion = c.GetVersion()
 		}

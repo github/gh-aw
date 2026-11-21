@@ -1,14 +1,19 @@
 // @ts-check
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { main, resolveCurrentWorkflowFile, readContinuationDepth } from "./request_continuation.cjs";
+import { main, readContinuationDepth } from "./request_continuation.cjs";
 
-const createWorkflowDispatch = vi.fn();
+let tmpDir;
+let requestFile;
 
 beforeEach(() => {
   vi.clearAllMocks();
-  createWorkflowDispatch.mockResolvedValue({ data: { workflow_run_id: 4242 } });
-  global.core = { info: vi.fn(), warning: vi.fn(), error: vi.fn(), summary: { addRaw: vi.fn().mockReturnThis(), write: vi.fn() } };
-  global.github = { rest: { actions: { createWorkflowDispatch } } };
+  tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "request-continuation-"));
+  requestFile = path.join(tmpDir, "continuation", "continuation-request.json");
+  global.core = { info: vi.fn(), warning: vi.fn(), error: vi.fn(), setOutput: vi.fn(), summary: { addRaw: vi.fn().mockReturnThis(), write: vi.fn() } };
+  global.github = { rest: { actions: { createWorkflowDispatch: vi.fn() } } };
   global.context = {
     repo: { owner: "octo", repo: "app" },
     runId: 100,
@@ -20,54 +25,45 @@ beforeEach(() => {
     payload: {},
   };
   vi.stubEnv("GITHUB_WORKFLOW_REF", "octo/app/.github/workflows/continue.lock.yml@refs/heads/feature");
-  vi.stubEnv("GITHUB_REF", "refs/heads/feature");
-  vi.stubEnv("GITHUB_HEAD_REF", "");
+  vi.stubEnv("GITHUB_RUN_ATTEMPT", "2");
   vi.stubEnv("GH_AW_SAFE_OUTPUTS_STAGED", "");
+  vi.stubEnv("GH_AW_CONTINUATION_REQUEST_FILE", requestFile);
 });
 
 afterEach(() => {
   vi.unstubAllEnvs();
+  fs.rmSync(tmpDir, { recursive: true, force: true });
 });
 
-function dispatchedContext() {
-  expect(createWorkflowDispatch).toHaveBeenCalledTimes(1);
-  const request = createWorkflowDispatch.mock.calls[0][0];
-  return { request, awContext: JSON.parse(request.inputs.aw_context) };
+function recordedRequest() {
+  return JSON.parse(fs.readFileSync(requestFile, "utf8"));
 }
 
 describe("request_continuation handler", () => {
-  it("dispatches the current workflow on the same ref with continuation lineage", async () => {
+  it("records a continuation request for the relay instead of dispatching", async () => {
     const handler = await main({ max_continuations: 3 });
     const result = await handler({ type: "request_continuation", hints: "  Finished step 1; next open the PR.  " });
-    expect(result).toMatchObject({ success: true, workflow_name: "continue.lock.yml", depth: 1, run_id: 4242 });
-    const { request, awContext } = dispatchedContext();
-    expect(request).toMatchObject({ owner: "octo", repo: "app", workflow_id: "continue.lock.yml", ref: "refs/heads/feature" });
-    expect(String(awContext.run_id)).toBe("100");
-    expect(awContext.continuation).toEqual({ depth: 1, max: 3, hints: "Finished step 1; next open the PR." });
+    expect(result).toMatchObject({ success: true, depth: 1 });
+    expect(global.github.rest.actions.createWorkflowDispatch).not.toHaveBeenCalled();
+    expect(global.core.setOutput).toHaveBeenCalledWith("continuation_requested", "true");
+    const request = recordedRequest();
+    expect(request).toMatchObject({ version: 1, hints: "Finished step 1; next open the PR.", depth: 1, max: 3, parent_run_id: "100", parent_run_attempt: "2" });
+    expect(request.aw_context).toMatchObject({ run_id: "100", repo: "octo/app" });
   });
 
   it("increments the inbound continuation depth", async () => {
-    global.context.payload = { inputs: { aw_context: JSON.stringify({ run_id: "50", continuation: { depth: 2, max: 5, hints: "old" } }) } };
+    global.context.payload = { inputs: { aw_context: JSON.stringify({ run_id: "50", continuation: { depth: 2, max: 5 } }) } };
     const handler = await main({});
-    const result = await handler({ hints: "keep going" });
-    expect(result).toMatchObject({ success: true, depth: 3 });
-    expect(dispatchedContext().awContext.continuation).toEqual({ depth: 3, max: 5, hints: "keep going" });
+    expect(await handler({ hints: "keep going" })).toMatchObject({ success: true, depth: 3 });
+    expect(recordedRequest()).toMatchObject({ depth: 3, max: 5, hints: "keep going" });
   });
 
-  it("skips dispatch once the chain reaches the configured maximum", async () => {
-    global.context.payload = { inputs: { aw_context: JSON.stringify({ run_id: "50", continuation: { depth: 2, max: 2, hints: "old" } }) } };
+  it("does not record a request once the chain reaches the configured maximum", async () => {
+    global.context.payload = { inputs: { aw_context: JSON.stringify({ run_id: "50", continuation: { depth: 2, max: 2 } }) } };
     const handler = await main({ max_continuations: 2 });
-    const result = await handler({ hints: "more" });
-    expect(result).toMatchObject({ success: true, skipped: true });
-    expect(createWorkflowDispatch).not.toHaveBeenCalled();
-  });
-
-  it("uses the pull request head branch for pull_request runs", async () => {
-    vi.stubEnv("GITHUB_HEAD_REF", "topic");
-    vi.stubEnv("GITHUB_REF", "refs/pull/7/merge");
-    const handler = await main({});
-    await handler({ hints: "next" });
-    expect(dispatchedContext().request.ref).toBe("refs/heads/topic");
+    expect(await handler({ hints: "more" })).toMatchObject({ success: true, skipped: true });
+    expect(fs.existsSync(requestFile)).toBe(false);
+    expect(global.core.setOutput).not.toHaveBeenCalled();
   });
 
   it("accepts only one request per run and rejects empty or oversized hints", async () => {
@@ -76,31 +72,18 @@ describe("request_continuation handler", () => {
     const handler = await main({});
     expect(await handler({ hints: "first" })).toMatchObject({ success: true });
     expect(await handler({ hints: "second" })).toMatchObject({ success: false });
-    expect(createWorkflowDispatch).toHaveBeenCalledTimes(1);
+    expect(recordedRequest().hints).toBe("first");
   });
 
-  it("previews without dispatching in staged mode", async () => {
+  it("previews without recording a request in staged mode", async () => {
     const handler = await main({ staged: true });
-    const result = await handler({ hints: "next" });
-    expect(result).toMatchObject({ success: true, staged: true, depth: 1 });
-    expect(createWorkflowDispatch).not.toHaveBeenCalled();
-  });
-
-  it("reports dispatch failures", async () => {
-    createWorkflowDispatch.mockRejectedValue(new Error("403 Resource not accessible"));
-    const handler = await main({});
-    const result = await handler({ hints: "next" });
-    expect(result.success).toBe(false);
-    expect(result.error).toContain("403");
+    expect(await handler({ hints: "next" })).toMatchObject({ success: true, staged: true, depth: 1 });
+    expect(fs.existsSync(requestFile)).toBe(false);
+    expect(global.core.setOutput).not.toHaveBeenCalled();
   });
 });
 
 describe("request_continuation helpers", () => {
-  it("resolves the workflow file from GITHUB_WORKFLOW_REF", () => {
-    expect(resolveCurrentWorkflowFile("o/r/.github/workflows/a.b.lock.yml@refs/heads/main")).toBe("a.b.lock.yml");
-    expect(() => resolveCurrentWorkflowFile("")).toThrow("GITHUB_WORKFLOW_REF");
-  });
-
   it("validates continuation depth", () => {
     expect(readContinuationDepth(null)).toBe(0);
     expect(readContinuationDepth({ continuation: { depth: 4 } })).toBe(4);

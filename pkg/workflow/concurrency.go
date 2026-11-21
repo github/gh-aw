@@ -40,11 +40,10 @@ func generateSafeOutputsConcurrencyConfig(data *WorkflowData) (string, error) {
 func GenerateConcurrencyConfig(workflowData *WorkflowData, isCommandTrigger bool) string {
 	concurrencyLog.Printf("Generating concurrency config: isCommandTrigger=%v", isCommandTrigger)
 	if workflowData.EngineConfig != nil && workflowData.EngineConfig.Durable != nil {
-		concurrencyConfig := fmt.Sprintf("concurrency:\n  group: \"gh-aw-durable-%s\"\n  cancel-in-progress: false", durableWorkflowID(workflowData))
-		if isGroupConcurrencyQueueEnabled(workflowData) {
-			concurrencyConfig += "\n  queue: max"
-		}
-		return concurrencyConfig
+		// Continuation runs are serialized by the relay's lineage checks, not by a group;
+		// a pending-run group could silently replace a dispatched continuation.
+		concurrencyLog.Print("Durable workflow: emitting only author-defined concurrency")
+		return workflowData.Concurrency
 	}
 
 	// Don't override if already set

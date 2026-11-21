@@ -84,9 +84,6 @@ func (c *Compiler) validateEngineDurable(data *WorkflowData) error {
 	if data.EngineConfig.Durable.RetentionDays < 1 || data.EngineConfig.Durable.RetentionDays > 90 {
 		return errors.New("engine.durable.retention-days must be an integer from 1 to 90")
 	}
-	if data.Concurrency != "" || data.EngineConfig.Concurrency != "" {
-		return errors.New("safe-outputs.request-continuation manages workflow concurrency; remove explicit concurrency settings to serialize checkpoint publication")
-	}
 	if hasWorkflowCallTrigger(data.On) || data.WorkQueuePolicy != nil {
 		return errors.New("safe-outputs.request-continuation does not support workflow_call or work-queue workers; use a single workflow invocation")
 	}

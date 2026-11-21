@@ -911,7 +911,7 @@ func (c *Compiler) processOnSectionAndFilters( //nolint:largefunc // Existing or
 		return err
 	}
 
-	// Validate durable continuation before defaults add its concurrency group.
+	// Validate durable continuation before defaults are applied.
 	if err := c.validateRequestContinuation(workflowData); err != nil {
 		return formatCompilerError(cleanPath, "error", err.Error(), err)
 	}

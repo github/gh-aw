@@ -10840,6 +10840,9 @@
                     "artifact_id": {
                       "type": "string"
                     },
+                    "relay_run_id": {
+                      "type": "string"
+                    },
                     "session_id": {
                       "type": "string"
                     },

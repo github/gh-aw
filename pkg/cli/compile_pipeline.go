@@ -1079,21 +1079,8 @@ func runPostProcessingForDirectory(
 	// Skip maintenance workflow generation when using custom --dir option.
 	// Keep invoking generators for empty workflowDataList so stale generated files are cleaned up.
 	if !config.NoEmit && config.usesDefaultWorkflowDir() {
-		absWorkflowDir := getAbsoluteWorkflowDir(workflowsDir, gitRoot)
-		if err := generateMaintenanceWorkflowWrapper(ctx, compiler, workflowDataList, absWorkflowDir, gitRoot, config.Verbose, config.Strict, config.NoLogo); err != nil {
-			if config.Strict {
-				return err
-			}
-		}
-		if err := generateWorkQueueEventWorkflowWrapper(ctx, workflowDataList, absWorkflowDir, gitRoot, config.Strict, config.NoLogo); err != nil {
-			if config.Strict {
-				return err
-			}
-		}
-		if err := generateCentralSlashCommandWorkflowWrapper(ctx, workflowDataList, absWorkflowDir, gitRoot, config.Strict, config.NoLogo); err != nil {
-			if config.Strict {
-				return err
-			}
+		if err := generateDirectoryCompanionWorkflows(ctx, compiler, workflowDataList, config, getAbsoluteWorkflowDir(workflowsDir, gitRoot), gitRoot); err != nil {
+			return err
 		}
 	}
 
@@ -1108,6 +1095,39 @@ func runPostProcessingForDirectory(
 	// Save action cache (errors are logged but non-fatal)
 	_ = saveActionCache(actionCache, config.Verbose)
 
+	return nil
+}
+
+// generateDirectoryCompanionWorkflows generates the compiler-managed companion workflows
+// (maintenance, work-queue events, continuation relay, central slash commands).
+// Generator errors are fatal only in strict mode.
+func generateDirectoryCompanionWorkflows(
+	ctx context.Context,
+	compiler *workflow.Compiler,
+	workflowDataList []*workflow.WorkflowData,
+	config CompileConfig,
+	absWorkflowDir string,
+	gitRoot string,
+) error {
+	generators := []func() error{
+		func() error {
+			return generateMaintenanceWorkflowWrapper(ctx, compiler, workflowDataList, absWorkflowDir, gitRoot, config.Verbose, config.Strict, config.NoLogo)
+		},
+		func() error {
+			return generateWorkQueueEventWorkflowWrapper(ctx, workflowDataList, absWorkflowDir, gitRoot, config.Strict, config.NoLogo)
+		},
+		func() error {
+			return generateContinuationRelayWorkflowWrapper(ctx, workflowDataList, absWorkflowDir, gitRoot, config.Strict, config.NoLogo)
+		},
+		func() error {
+			return generateCentralSlashCommandWorkflowWrapper(ctx, workflowDataList, absWorkflowDir, gitRoot, config.Strict, config.NoLogo)
+		},
+	}
+	for _, generate := range generators {
+		if err := generate(); err != nil && config.Strict {
+			return err
+		}
+	}
 	return nil
 }
 
