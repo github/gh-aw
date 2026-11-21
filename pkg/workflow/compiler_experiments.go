@@ -880,8 +880,9 @@ func rewriteExpressionReferences(s string, prefix []string, replace func(string)
 			if !ok {
 				return true
 			}
-			if len(prefix) < len(path) && len(path) == len(prefix)+1 && referenceHasPrefix(path, prefix) {
-				if replacement, changed := replace(path[len(prefix)]); changed {
+			index := len(prefix)
+			if index >= 0 && index < len(path) && len(path) == index+1 && referenceHasPrefix(path, prefix) {
+				if replacement, changed := replace(path[index]); changed {
 					start, end := span.Start+3+node.Start, span.Start+3+node.End
 					b.WriteString(s[last:start])
 					b.WriteString(replacement)
