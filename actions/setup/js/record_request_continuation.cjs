@@ -14,6 +14,7 @@ async function main() {
   if (!output.success) return;
   const handler = await createHandler({ max });
   const outputPath = process.env.GH_AW_AGENT_OUTPUT;
+  if (!outputPath) return;
   const sourceOutput = JSON.parse(fs.readFileSync(outputPath, "utf8"));
   let changed = false;
   for (const [index, item] of output.items.entries()) {

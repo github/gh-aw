@@ -354,9 +354,12 @@ func invalidateAgentOutputDownloadMarkers(runOutputDir string) error {
 	return nil
 }
 
+// auditNeedsContinuationAgentOutput reports whether explicitly requested agent output
+// is absent locally. Only sets that request agent output (agent, outcomes, graders)
+// include the fallback artifact; sets that use the agent artifact for logs
+// (work-queue, mcp, firewall) and default all-artifact audits keep the cache.
 func auditNeedsContinuationAgentOutput(cfg auditRunConfig) bool {
-	if !artifactMatchesFilter(constants.AgentArtifactName.String(), cfg.artifactFilter) &&
-		!artifactMatchesFilter(constants.AgentOutputFallbackArtifactName.String(), cfg.artifactFilter) {
+	if len(cfg.artifactFilter) == 0 || !artifactMatchesFilter(constants.AgentOutputFallbackArtifactName.String(), cfg.artifactFilter) {
 		return false
 	}
 	return resolveAgentOutputFile(cfg.outputDir, false) == ""

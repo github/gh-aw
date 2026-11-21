@@ -69,7 +69,7 @@ func TestCachedAuditBypassesWhenRequestedAgentOutputIsMissing(t *testing.T) {
 	require.NoError(t, saveRunSummary(runDir, summary, false))
 
 	done, skipped, err := renderCachedAuditIfAvailable(t.Context(), auditRunConfig{
-		runID: 42, outputDir: runDir, artifactFilter: []string{"agent"},
+		runID: 42, outputDir: runDir, artifactFilter: ResolveArtifactFilter([]string{"agent"}),
 	})
 	require.NoError(t, err)
 	assert.False(t, done)

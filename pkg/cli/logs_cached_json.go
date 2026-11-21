@@ -860,7 +860,11 @@ func cachedJSONLCanSatisfy(artifactFilter []string, parse, train, toolGraph bool
 }
 
 func processedRunFromCachedData(data RunData, audit *AuditData, outputDir string) ProcessedRun {
-	attempt, _ := strconv.Atoi(data.RunAttempt)
+	attempt, err := strconv.Atoi(data.RunAttempt)
+	if err != nil {
+		// Unknown attempt: cached continuation evidence cannot be matched to the run.
+		attempt = 0
+	}
 	run := WorkflowRun{
 		DatabaseID: data.RunID, WorkflowName: data.WorkflowName, Repository: data.Repository,
 		Attempt: attempt, UpdatedAt: data.UpdatedAt,
