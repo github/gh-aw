@@ -57,8 +57,12 @@ func renderStepForRunner(jobYAML, runsOn, jobName string) string {
 	return renderStepForRunnerWithEnvironment(jobYAML, runsOn, jobName, windowsJobEnvironmentVariableNames(jobYAML))
 }
 
+func isWindowsWSLRunner(runsOn string) bool {
+	return strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(runsOn), "runs-on:")) == "windows-latest"
+}
+
 func renderStepForRunnerWithEnvironment(jobYAML, runsOn, jobName string, jobEnvironmentVariables []string) string {
-	if strings.TrimSpace(strings.TrimPrefix(runsOn, "runs-on:")) != "windows-latest" {
+	if !isWindowsWSLRunner(runsOn) {
 		return jobYAML
 	}
 	if _, isFrameworkJob := runtimeFeaturesBuiltInJobNames[jobName]; !isFrameworkJob {
@@ -342,7 +346,20 @@ func rewriteWindowsArtifactPathLine(line string) string {
 	return indent + constants.GhAwRootDir + strings.TrimPrefix(path, constants.TmpGhAwDir) + newline
 }
 
-func renderWindowsPOSIXRunStep(step string, jobEnvironmentVariables []string) string {
+// Render before the installer is combined with workflow-authored steps, which
+// must not opt in to forwarding credentials through a YAML marker or step name.
+func renderWindowsTypeScriptLSPInstallStep(step GitHubActionStep) GitHubActionStep {
+	rendered := renderWindowsPOSIXRunStep(strings.Join(step, "\n")+"\n", []string{
+		"NPM_CONFIG_REGISTRY", "NPM_CONFIG_USERCONFIG", "NODE_AUTH_TOKEN",
+	})
+	var lines GitHubActionStep
+	for line := range strings.Lines(rendered) {
+		lines = append(lines, strings.TrimRight(line, "\r\n"))
+	}
+	return lines
+}
+
+func renderWindowsPOSIXRunStep(step string, additionalEnvironmentVariables []string) string {
 	fields, ok := parseWindowsStep(step)
 	if !ok {
 		return step
@@ -370,7 +387,7 @@ func renderWindowsPOSIXRunStep(step string, jobEnvironmentVariables []string) st
 		return step
 	}
 
-	environmentVariables := append(jobEnvironmentVariables, windowsStepEnvironmentVariableNames(fields)...)
+	environmentVariables := append(windowsStepEnvironmentVariableNames(fields), additionalEnvironmentVariables...)
 	wrapper := windowsWSLRunWrapper(script, environmentVariables)
 	var rendered strings.Builder
 	for i, line := range lines {
@@ -558,7 +575,7 @@ func windowsWSLEnvironmentSetup(environmentVariables []string) []string {
 	}
 	return []string{
 		"$ErrorActionPreference = 'Stop'",
-		"$pathVariables = @('GITHUB_WORKSPACE', 'RUNNER_TEMP', 'RUNNER_TOOL_CACHE', 'GITHUB_ENV', 'GITHUB_OUTPUT', 'GITHUB_PATH', 'GITHUB_STEP_SUMMARY', 'GITHUB_EVENT_PATH', 'GH_AW_AGENT_OUTPUT', 'GH_AW_SAFE_OUTPUTS', 'GH_AW_SAFE_OUTPUTS_CONFIG_PATH', 'GH_AW_SAFE_OUTPUTS_TOOLS_PATH', 'GH_AW_WSL_WORKING_DIRECTORY', 'HOME', 'TEMP', 'TMP', 'TMPDIR')",
+		"$pathVariables = @('GITHUB_WORKSPACE', 'RUNNER_TEMP', 'RUNNER_TOOL_CACHE', 'GITHUB_ENV', 'GITHUB_OUTPUT', 'GITHUB_PATH', 'GITHUB_STEP_SUMMARY', 'GITHUB_EVENT_PATH', 'GH_AW_AGENT_OUTPUT', 'GH_AW_SAFE_OUTPUTS', 'GH_AW_SAFE_OUTPUTS_CONFIG_PATH', 'GH_AW_SAFE_OUTPUTS_TOOLS_PATH', 'GH_AW_WSL_WORKING_DIRECTORY', 'HOME', 'NPM_CONFIG_USERCONFIG', 'TEMP', 'TMP', 'TMPDIR')",
 		"$pathVariableSet = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)",
 		"foreach ($name in $pathVariables) { [void]$pathVariableSet.Add($name) }",
 		"$allowedEnvironmentVariables = @(" + strings.Join(powerShellAllowedVariables, ", ") + ")",
