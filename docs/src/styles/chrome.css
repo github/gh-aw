@@ -145,6 +145,28 @@ main > .content-panel:has(h1#_top) + .content-panel {
   }
 }
 
+/* Zen mode gives the document the full frame without widening running text. */
+html:has(.page[data-zen]) {
+  scroll-padding-top: 1.5rem;
+}
+
+.page[data-zen] > :is(.header, .sidebar, .site-footer),
+.page[data-zen] :is(.right-sidebar-container, .recruitment-banner, .sl-banner, .content-panel footer.sl-flex) {
+  display: none;
+}
+
+.page[data-zen] .main-frame {
+  padding: 0;
+}
+
+.page[data-zen] .main-pane {
+  width: 100%;
+}
+
+.page[data-zen] .content-panel:has(h1#_top) .sl-container {
+  margin-inline: auto;
+}
+
 /* ==========================================================================
    Header (SiteHeader.astro): solid page background, hairline rule
    ========================================================================== */
