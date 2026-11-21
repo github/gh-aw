@@ -106,12 +106,11 @@ describe("cleanup_stale_steering_issues", () => {
     });
   });
 
-  it("does not touch active, failed, malformed, or unrelated issues", async () => {
+  it("does not touch active, malformed, or unrelated issues", async () => {
     const issues = [
       { number: 2, title: "Unrelated issue", createdAt: oldCreatedAt },
       { number: 3, title: "[WIP] Missing link", createdAt: oldCreatedAt },
       { number: 4, title: "[WIP] Invalid link", createdAt: oldCreatedAt },
-      { number: 5, title: "[WIP] Failed run", createdAt: oldCreatedAt },
       { number: 6, title: "[WIP] Active run", createdAt: oldCreatedAt },
       { number: 1, title: "[WIP] Active example", createdAt: new Date().toISOString() },
     ];
@@ -121,16 +120,32 @@ describe("cleanup_stale_steering_issues", () => {
     mockGithub.rest.issues.get
       .mockResolvedValueOnce({ data: { body: "No workflow run link" } })
       .mockResolvedValueOnce({ data: { body: "https://example.com/owner/repo/actions/runs/12345" } })
-      .mockResolvedValueOnce({ data: { body: makeIssue().body } })
       .mockResolvedValueOnce({ data: { body: makeIssue().body } });
-    mockGithub.rest.actions.getWorkflowRun.mockResolvedValueOnce({ data: { status: "completed", conclusion: "failure" } }).mockResolvedValueOnce({ data: { status: "in_progress", conclusion: null } });
+    mockGithub.rest.actions.getWorkflowRun.mockResolvedValueOnce({ data: { status: "in_progress", conclusion: null } });
 
     const { main } = await import("./cleanup_stale_steering_issues.cjs");
     await main();
 
-    expect(mockGithub.rest.actions.getWorkflowRun).toHaveBeenCalledTimes(2);
+    expect(mockGithub.rest.actions.getWorkflowRun).toHaveBeenCalledTimes(1);
     expect(mockGithub.rest.issues.createComment).not.toHaveBeenCalled();
     expect(mockGithub.rest.issues.update).not.toHaveBeenCalled();
+  });
+
+  it.each(["failure", "cancelled"])("closes stale steering issues orphaned by a %s run as not planned", async conclusion => {
+    mockGithub.graphql.mockResolvedValueOnce({
+      repository: { issues: { nodes: [{ number: 5, title: "[WIP] Orphaned run", createdAt: oldCreatedAt }], pageInfo: { hasNextPage: false, endCursor: null } } },
+    });
+    mockGithub.rest.issues.get.mockResolvedValueOnce({ data: { body: makeIssue().body } });
+    mockGithub.paginate.mockResolvedValueOnce([]);
+    mockGithub.rest.actions.getWorkflowRun.mockResolvedValueOnce({ data: { status: "completed", conclusion } });
+
+    const { main, UNSUCCESSFUL_RUN_CLEANUP_COMMENT, CLEANUP_COMMENT_MARKER } = await import("./cleanup_stale_steering_issues.cjs");
+    await main();
+
+    expect(UNSUCCESSFUL_RUN_CLEANUP_COMMENT).toContain(CLEANUP_COMMENT_MARKER);
+    expect(mockGithub.rest.issues.createComment).toHaveBeenCalledWith({ owner: "testowner", repo: "testrepo", issue_number: 5, body: UNSUCCESSFUL_RUN_CLEANUP_COMMENT });
+    expect(mockGithub.rest.issues.update).toHaveBeenCalledWith({ owner: "testowner", repo: "testrepo", issue_number: 5, state: "closed", state_reason: "not_planned" });
+    expect(mockCore.setFailed).not.toHaveBeenCalled();
   });
 
   it("does not duplicate the cleanup comment when closure needs another attempt", async () => {

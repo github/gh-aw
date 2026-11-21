@@ -386,11 +386,11 @@ describe("ephemerals", () => {
       expect(EXPIRATION_PATTERN).toBeInstanceOf(RegExp);
     });
 
-    it("should NOT match standard expiration line without blockquote", async () => {
+    it("should match report-body expiration line without blockquote", async () => {
       const { EXPIRATION_PATTERN } = await import("./ephemerals.cjs");
       const line = "- [x] expires <!-- gh-aw-expires: 2026-01-25T15:54:08.894Z --> on Jan 25, 2026";
-      // This should NOT match because the pattern requires blockquote prefix
-      expect(EXPIRATION_PATTERN.test(line)).toBe(false);
+      expect(EXPIRATION_PATTERN.test(line)).toBe(true);
+      expect(EXPIRATION_PATTERN.test(line.replace("[x]", "[ ]"))).toBe(false);
     });
 
     it("should match expiration line with blockquote prefix", async () => {

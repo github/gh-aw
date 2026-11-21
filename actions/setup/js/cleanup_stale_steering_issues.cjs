@@ -8,14 +8,22 @@ const { renderSizedReport } = require("./report_size.cjs");
 const STEERING_ISSUE_TITLE_PREFIX = "[WIP] ";
 const STEERING_ISSUE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 const CLEANUP_COMMENT_MARKER = "<!-- gh-aw:stale-steering-issue-cleanup -->";
-const CLEANUP_COMMENT = renderSizedReport({
-  type: "report",
-  title: "Stale steering issue closed",
-  children: [
-    { type: "paragraph", children: [{ type: "text", value: "This steering issue was left open after its linked workflow run completed successfully. Closing it during scheduled agentic maintenance.", agentTainted: false }] },
-    { type: "xml_marker", name: "gh-aw", value: "stale-steering-issue-cleanup", compact: true, agentTainted: false },
-  ],
-}).body;
+/** @param {string} reason */
+function renderCleanupComment(reason) {
+  return renderSizedReport({
+    type: "report",
+    title: "Stale steering issue closed",
+    children: [
+      { type: "paragraph", children: [{ type: "text", value: `This steering issue was left open after its linked workflow run ${reason}. Closing it during scheduled agentic maintenance.`, agentTainted: false }] },
+      { type: "xml_marker", name: "gh-aw", value: "stale-steering-issue-cleanup", compact: true, agentTainted: false },
+    ],
+  }).body;
+}
+
+const CLEANUP_COMMENT = renderCleanupComment("completed successfully");
+// Failed runs normally retitle the steering issue into the failure report; a [WIP] issue left
+// behind by a completed unsuccessful run is an orphan with no remaining owner.
+const UNSUCCESSFUL_RUN_CLEANUP_COMMENT = renderCleanupComment("completed without success");
 
 const OPEN_ISSUES_QUERY = `
   query($owner: String!, $repo: String!, $cursor: String) {
@@ -120,9 +128,10 @@ async function main() {
         }
         throw error;
       }
-      if (run.status !== "completed" || run.conclusion !== "success") {
+      if (run.status !== "completed") {
         continue;
       }
+      const succeeded = run.conclusion === "success";
 
       try {
         const comments = await github.paginate(github.rest.issues.listComments, {
@@ -138,7 +147,7 @@ async function main() {
                 owner,
                 repo,
                 issue_number: candidate.number,
-                body: CLEANUP_COMMENT,
+                body: succeeded ? CLEANUP_COMMENT : UNSUCCESSFUL_RUN_CLEANUP_COMMENT,
               }),
             RATE_LIMIT_RETRY_CONFIG,
             `comment on stale steering issue #${candidate.number}`
@@ -156,12 +165,12 @@ async function main() {
             repo,
             issue_number: candidate.number,
             state: "closed",
-            state_reason: "completed",
+            state_reason: succeeded ? "completed" : "not_planned",
           }),
         RATE_LIMIT_RETRY_CONFIG,
         `close stale steering issue #${candidate.number}`
       );
-      core.info(`Closed stale steering issue #${candidate.number} for successful workflow run ${runID}`);
+      core.info(`Closed stale steering issue #${candidate.number} for ${succeeded ? "successful" : run.conclusion || "unsuccessful"} workflow run ${runID}`);
     } catch (error) {
       const message = `Failed to clean up stale steering issue #${candidate.number}: ${getErrorMessage(error)}`;
       core.warning(message);
@@ -173,4 +182,4 @@ async function main() {
   }
 }
 
-module.exports = { main, getWorkflowRunId, getStaleSteeringIssues, CLEANUP_COMMENT, CLEANUP_COMMENT_MARKER, STEERING_ISSUE_MAX_AGE_MS };
+module.exports = { main, getWorkflowRunId, getStaleSteeringIssues, CLEANUP_COMMENT, UNSUCCESSFUL_RUN_CLEANUP_COMMENT, CLEANUP_COMMENT_MARKER, STEERING_ISSUE_MAX_AGE_MS };

@@ -5,10 +5,10 @@ const { formatDateInProjectTimeZone, resolveProjectTimeZone } = require("./proje
 
 /**
  * Regex pattern to match expiration marker with checked checkbox and HTML comment (new format)
- * Format: > - [x] expires <!-- gh-aw-expires: ISO_DATE --> on HUMAN_DATE UTC
- * Allows flexible whitespace and supports blockquote prefix
+ * Format: [> ]- [x] expires <!-- gh-aw-expires: ISO_DATE --> on HUMAN_DATE UTC
+ * Allows flexible whitespace and an optional blockquote prefix (report bodies render the line unquoted)
  */
-const EXPIRATION_PATTERN = /^>\s*-\s*\[x\]\s+expires\s*<!--\s*gh-aw-expires:\s*([^>]+)\s*-->/m;
+const EXPIRATION_PATTERN = /^(?:>\s*)?-\s*\[x\]\s+expires\s*<!--\s*gh-aw-expires:\s*([^>]+)\s*-->/m;
 
 /**
  * Regex pattern to match legacy expiration marker without HTML comment (old format)
