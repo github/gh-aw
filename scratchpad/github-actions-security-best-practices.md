@@ -246,7 +246,7 @@ When building GraphQL queries in shell scripts, use proper quoting:
 - ✅ Use `shellcheck` to catch common issues
 
 ```yaml
-# ✅ SECURE: Well-structured bash script
+# ✅ SECURE: Bash script with strict mode and input validation
 steps:
   - name: Secure script
     env:
@@ -312,7 +312,7 @@ steps:
 
 There are several ways to find the SHA commit for a specific action version:
 
-**Method 1: Using git ls-remote (Recommended)**
+**Method 1: Using git ls-remote (no API authentication required)**
 ```bash
 # Get SHA for a specific tag
 git ls-remote https://github.com/actions/checkout v4.1.1
@@ -366,20 +366,20 @@ get_sha() {
 get_sha "$1" "$2"
 ```
 
-### Verify Action Creators
+### Assess Action Creators
 
-**Trust levels** for GitHub Actions:
+**Trust signals** for GitHub Actions:
 
 1. **GitHub-verified creators** (✅ Highest trust)
    - `actions/*` - GitHub official actions
    - `github/*` - GitHub official actions
    
-2. **Well-known verified publishers** (✅ High trust)
-   - Major cloud providers (AWS, Azure, Google Cloud)
-   - Popular open-source projects with established reputation
+2. **Established publishers** (⚠️ Reputation signals only; review action provenance)
+   - Cloud providers (AWS, Azure, Google Cloud)
+   - Open-source projects with an active maintainer history and a public release record
    - Actions with many stars, recent updates, and active maintenance
 
-3. **Unverified third-party** (⚠️ Review carefully)
+3. **Other third-party actions** (⚠️ Review carefully)
    - New or unmaintained actions
    - Actions with few users
    - Actions without source code transparency
@@ -388,7 +388,7 @@ get_sha "$1" "$2"
 # ✅ TRUSTED: GitHub official action
 - uses: actions/checkout@sha
 
-# ✅ TRUSTED: Well-known verified publisher
+# ⚠️ REVIEW: Established publisher; verify action provenance
 - uses: docker/build-push-action@sha
 
 # ⚠️ REVIEW: Third-party action
@@ -469,7 +469,7 @@ Once actions are pinned to SHA commits, they need to be updated periodically to 
 
 #### Automated Update Tools
 
-**Dependabot** (Recommended for GitHub repositories):
+**Dependabot** (built-in option for GitHub repositories):
 ```yaml
 # .github/dependabot.yml
 version: 2

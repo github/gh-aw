@@ -619,7 +619,7 @@ GitHub Actions runner images used across compiled workflows:
 ## Patterns and Conventions
 
 ### Temporary File Structure
-```
+```text
 /tmp/gh-aw/
 ├── .claude/agents/             # Claude custom agent definitions
 ├── .codex/agents/              # Codex custom agent definitions
@@ -711,7 +711,7 @@ GitHub Actions runner images used across compiled workflows:
 ```
 
 ### GitHub Workflow Directory Structure
-```
+```text
 .github/
 ├── agents/                     # Custom agent definitions
 │   └── test-agent.md
