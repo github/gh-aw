@@ -1189,7 +1189,7 @@ test("opens every hard-coded tour from the hash with all its slides found", asyn
   expect(warnings.filter(w => w.includes("CracktroDeck"))).toEqual([]);
 });
 
-test("ends the slide map with a keyboard manual of every shortcut", async ({ page }) => {
+test("ends the slide map with a keyboard manual of every shortcut and touch gesture", async ({ page }) => {
   await page.goto("/gh-aw/cracktro/");
   await page.keyboard.press("g");
   const keys = page.getByRole("region", { name: "Keyboard" });
@@ -1204,6 +1204,12 @@ test("ends the slide map with a keyboard manual of every shortcut", async ({ pag
   await keys.locator('.kb-k[data-k="G"]').hover();
   await expect(keys.locator(".smp-kcap")).toContainText("Slide map");
   await expect(keys.getByRole("button")).toHaveCount(0);
+  const touch = keys.locator(".smp-ph");
+  await expect(touch.getByRole("img", { name: /touch gestures/ })).toBeVisible();
+  for (const g of ["Swipe ←", "Swipe →", "Swipe ↑", "Swipe ↓", "Tap a tile", "Pinch in"]) await expect(touch.locator("dt", { hasText: g })).toHaveCount(1);
+  await touch.locator("dt", { hasText: "Pinch in" }).hover();
+  await expect(touch).toHaveClass(/solo/);
+  await expect(touch.locator(".ph-g.on .ph-lb")).toHaveText("Slide map");
 });
 
 test("keeps an example in a view only together with its pattern slide", async ({ page }) => {

@@ -375,6 +375,46 @@
   .smp-keys kbd { display: inline-flex; align-items: center; justify-content: center; min-width: 24px; height: 24px; padding: 0 6px; box-sizing: border-box;
     font: 600 11px/1 var(--mono); color: #f0f6fc; background: linear-gradient(#2a313c, #1f2630); border: 1px solid #3d444d; border-bottom: 3px solid #0d1117;
     border-radius: 5px; box-shadow: 0 1px 0 #ffffff14 inset; white-space: nowrap; }
+  /* touch gestures card: a phone loops each gesture in a 2 s slot (12 s cycle); pointing at a row plays only that gesture */
+  .smp-ph { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 10px 32px; padding: 14px 16px;
+    border: 1px solid #3d444d; border-radius: 8px; background: radial-gradient(ellipse at 30% 50%, #4493f824, transparent 60%), #151b23; }
+  .smp-ph svg { width: 150px; height: auto; flex: none; font-family: var(--mono); }
+  .ph-body { fill: #212830; stroke: #3d444d; stroke-width: 2; }
+  .ph-scr { fill: #0d1117; }
+  .ph-sl { fill: #151b23; stroke: var(--c); stroke-width: 1.5; }
+  .ph-tl { fill: #f0f6fc; }
+  .ph-tile { fill: #212830; stroke: #3d444d; }
+  .ph-dock { fill: #212830; }
+  .ph-tr { fill: none; stroke: var(--c); stroke-width: 2; stroke-dasharray: 3 4; stroke-linecap: round; opacity: .7; }
+  .ph-f { fill: #f0f6fcd9; stroke: var(--c); stroke-width: 2; animation: 2s ease-in-out infinite both; animation-delay: calc(var(--i) * 2s); }
+  .ph-lb { font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; fill: var(--c); text-anchor: middle; }
+  .ph-g { opacity: 0; animation: ph-slot 12s linear infinite both; animation-delay: calc(var(--i) * 2s); }
+  @keyframes ph-slot { 0% { opacity: 0; } 1.5%, 15% { opacity: 1; } 16.6%, 100% { opacity: 0; } }
+  @keyframes ph-l { 0%, 15% { transform: translateX(0); } 75%, 100% { transform: translateX(-70px); } }
+  @keyframes ph-r { 0%, 15% { transform: translateX(0); } 75%, 100% { transform: translateX(70px); } }
+  @keyframes ph-u { 0%, 15% { transform: translateY(0); } 75%, 100% { transform: translateY(-150px); } }
+  @keyframes ph-d { 0%, 15% { transform: translateY(0); } 75%, 100% { transform: translateY(150px); } }
+  @keyframes ph-tap { 0%, 30% { transform: scale(1); } 45% { transform: scale(.65); } 60%, 100% { transform: scale(1); } }
+  @keyframes ph-ring { 0%, 40% { transform: scale(.7); opacity: 0; } 45% { opacity: .9; } 90%, 100% { transform: scale(2); opacity: 0; } }
+  @keyframes ph-p1 { 0%, 15% { transform: translate(0, 0); } 75%, 100% { transform: translate(24px, 26px); } }
+  @keyframes ph-p2 { 0%, 15% { transform: translate(0, 0); } 75%, 100% { transform: translate(-24px, -26px); } }
+  .ph-tapf, .ph-ring { transform-box: fill-box; transform-origin: center; }
+  .ph-ring { fill: none; stroke: var(--c); stroke-width: 2; animation: ph-ring 2s ease-out infinite both; animation-delay: calc(var(--i) * 2s); }
+  .smp-ph.solo .ph-g { animation: none; opacity: 0; }
+  .smp-ph.solo .ph-g.on { opacity: 1; }
+  .smp-ph.solo .ph-g.on :is(.ph-f, .ph-ring) { animation-delay: 0s; }
+  .smp-ph dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 7px 12px; align-items: center; min-width: 240px; }
+  .smp-ph dl > div { display: contents; cursor: help; }
+  .smp-ph dt { font: 600 11px/1 var(--mono); color: #f0f6fc; padding: 6px 8px; border: 1px solid #3d444d; border-radius: 999px; background: #212830; white-space: nowrap; }
+  .smp-ph dd { margin: 0; font: 500 12px/1.35 "Mona Sans", sans-serif; color: #c9d1d9; }
+  .smp-ph dl > div.on dt { color: #0d1117; background: var(--c); border-color: var(--c); }
+  @media (prefers-reduced-motion: reduce) { .ph-g, .ph-f, .ph-ring { animation: none !important; } .smp-ph:not(.solo) .ph-g[data-i="0"] { opacity: 1; } }
+  body.light .smp-ph { background: radial-gradient(ellipse at 30% 50%, #4493f81f, transparent 60%), #ffffff; border-color: #9ea7b3; }
+  body.light .ph-body { fill: #d1d9e0; stroke: #9ea7b3; }
+  body.light .ph-dock, body.light .ph-tile { fill: #30363d; }
+  body.light .smp-ph dt { color: #1f2328; background: #f6f8fa; border-color: #9ea7b3; }
+  body.light .smp-ph dd { color: #1f2328; }
+  body.light .smp-ph dl > div.on dt { color: #ffffff; background: #0969da; border-color: #0969da; }
   @media (max-width: 640px) { .smp-kg { grid-template-columns: minmax(0, 1fr); } }
   body.light .smp-kb { background: #ffffff; border-color: #9ea7b3; border-top-color: var(--c); }
   body.light .smp-kbd { background: radial-gradient(ellipse at 50% 55%, #4493f81f, transparent 70%), #ffffff; border-color: #9ea7b3; }
@@ -1832,14 +1872,67 @@
       svg.addEventListener("pointerleave", () => light([], [], HINT));
       return h("div", { class: "smp-kbd" }, h("div", { class: "smp-kbw" }, svg), cap);
     })();
+    // Touch gestures: a phone shows the deck letterboxed and loops each gesture with its action on screen; pointing at
+    // (or tapping) a row plays only that gesture. Rows mirror the window touch handlers (see navigation).
+    const GESTURES = [
+      ["Swipe ←", "Next slide", "Next", "ph-l", [[115, 225]], "M115 225H45"],
+      ["Swipe →", "Previous slide", "Previous", "ph-r", [[45, 225]], "M45 225H115"],
+      ["Swipe ↑", "Down the column, else next band", "Down", "ph-u", [[80, 245]], "M80 245V95"],
+      ["Swipe ↓", "Up the column, else previous band", "Up", "ph-d", [[80, 85]], "M80 85V235"],
+      ["Tap a tile", "Jump to its slide", "Jump", "ph-tap", [[66, 167]], ""],
+      ["Pinch in", "Zoom out to the slide map", "Slide map", "", [[44, 98]], "M44 98L68 124M116 202L92 176"],
+    ];
+    const smpGestures = (() => {
+      const NS = "http://www.w3.org/2000/svg";
+      const s = (tag, attrs = {}, ...kids) => {
+        const el = document.createElementNS(NS, tag);
+        for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v);
+        el.append(...kids.flat().filter(k => k != null));
+        return el;
+      };
+      const groups = GESTURES.map(([, , label, anim, [[x, y]], trail], i) => {
+        const f = (cx, cy, name, cls = "ph-f") => s("circle", { class: cls, cx, cy, r: 11, style: `--i:${i};animation-name:${name}` });
+        const fingers = i === 5 ? [f(44, 98, "ph-p1"), f(116, 202, "ph-p2")] : anim === "ph-tap" ? [s("circle", { class: "ph-ring", cx: x, cy: y, r: 11, style: `--i:${i}` }), f(x, y, "ph-tap", "ph-f ph-tapf")] : [f(x, y, anim)];
+        return s("g", { class: "ph-g", "data-i": i, style: `--i:${i}` }, s("text", { class: "ph-lb", x: 80, y: 62 }, label), trail ? s("path", { class: "ph-tr", d: trail }) : null, fingers);
+      });
+      const svg = s(
+        "svg",
+        { viewBox: "0 0 160 300", role: "img", "aria-label": "Phone showing the touch gestures: swipes step through slides and bands, a tap on a tile jumps, a pinch in opens the slide map" },
+        s("rect", { class: "ph-body", x: 10, y: 4, width: 140, height: 292, rx: 24 }),
+        s("rect", { class: "ph-scr", x: 18, y: 16, width: 124, height: 268, rx: 14 }),
+        s("rect", { class: "ph-body", x: 62, y: 22, width: 36, height: 8, rx: 4 }),
+        s("rect", { class: "ph-sl", x: 22, y: 117, width: 116, height: 65, rx: 4 }),
+        s("rect", { class: "ph-tl", x: 30, y: 128, width: 54, height: 7, rx: 2 }),
+        s("rect", { class: "ph-tl", x: 30, y: 140, width: 34, height: 4, rx: 2, opacity: 0.5 }),
+        [26, 54, 82, 110].map(x => s("rect", { class: "ph-tile", x, y: 160, width: 24, height: 14, rx: 2 })),
+        [0, 1, 2, 3, 4].map(i => s("rect", { class: "ph-dock", x: 50 + i * 13, y: 264, width: 10, height: 10, rx: 2 })),
+        groups
+      );
+      const card = h("div", { class: "smp-ph" });
+      const rows = GESTURES.map(([g, act], i) => h("div", { "data-i": i }, h("dt", {}, g), h("dd", {}, act)));
+      const solo = i => {
+        card.classList.toggle("solo", i != null);
+        groups.forEach((g, j) => g.classList.toggle("on", j === i));
+        rows.forEach((r, j) => r.classList.toggle("on", j === i));
+      };
+      const dl = h("dl", {}, rows);
+      dl.addEventListener("pointerover", e => {
+        const r = e.target.closest("[data-i]");
+        if (r) solo(+r.dataset.i);
+      });
+      dl.addEventListener("pointerleave", () => solo(null));
+      card.append(svg, dl);
+      return card;
+    })();
     const smpKeys = h(
       "section",
       { class: "smp-row smp-keys", "--c": "#4493f8", "aria-labelledby": "smp-keys-h" },
-      h("h3", { class: "smp-l", id: "smp-keys-h" }, "Keyboard", " ", h("small", {}, "every shortcut; on touch screens, swipe left, right, up and down")),
+      h("h3", { class: "smp-l", id: "smp-keys-h" }, "Keyboard and touch", " ", h("small", {}, "every shortcut and touch gesture")),
       h(
         "div",
         { class: "smp-kg" },
         smpKeyboard,
+        smpGestures,
         KEYMAP.map(([title, rows]) =>
           h(
             "div",
