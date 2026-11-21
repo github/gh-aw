@@ -9,7 +9,7 @@
  * processing. The body content is used only for pattern matching, not for writing.
  */
 
-const { EXPIRATION_PATTERN, LEGACY_EXPIRATION_PATTERN } = require("./ephemerals.cjs");
+const { EXPIRATION_PATTERN, LEGACY_EXPIRATION_PATTERN, stripFencedCode } = require("./ephemerals.cjs");
 // SEC-004: No sanitize needed - entity.body is read-only (marker detection)
 
 /**
@@ -125,9 +125,11 @@ async function searchEntitiesWithExpiration(github, owner, repo, config) {
         continue;
       }
 
-      // Check if has expiration marker with checked checkbox (try both new and legacy formats)
-      const match = entity.body ? entity.body.match(EXPIRATION_PATTERN) : null;
-      const legacyMatch = !match && entity.body ? entity.body.match(LEGACY_EXPIRATION_PATTERN) : null;
+      // Check if has expiration marker with checked checkbox (try both new and legacy formats),
+      // ignoring example markers inside fenced code blocks
+      const markerText = entity.body ? stripFencedCode(entity.body) : "";
+      const match = markerText.match(EXPIRATION_PATTERN);
+      const legacyMatch = !match ? markerText.match(LEGACY_EXPIRATION_PATTERN) : null;
 
       if (match || legacyMatch) {
         withExpirationCount++;
