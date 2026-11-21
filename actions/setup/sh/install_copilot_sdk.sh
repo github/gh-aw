@@ -12,21 +12,27 @@ script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 project="${script_dir}/copilot-sdk/${variant}"
 target="${RUNNER_TEMP:?RUNNER_TEMP must be set}"
 
-node - "$project" "$expected_digest" <<'NODE'
-const { createHash } = require("node:crypto");
-const { readFileSync } = require("node:fs");
-const { join } = require("node:path");
-const [project, expectedDigest] = process.argv.slice(2);
-const actual = createHash("sha256")
-  .update(readFileSync(join(project, "package.json")))
-  .update("\0")
-  .update(readFileSync(join(project, "package-lock.json")))
-  .digest("hex");
-if (actual !== expectedDigest) {
-  console.error("::error::Copilot SDK npm project does not match the compiled workflow");
-  process.exit(1);
-}
-NODE
+if command -v sha256sum >/dev/null 2>&1; then
+  hash_command=(sha256sum -b)
+elif command -v shasum >/dev/null 2>&1; then
+  hash_command=(shasum -a 256 -b)
+else
+  echo "::error::Neither sha256sum nor shasum is available to verify the Copilot SDK npm project" >&2
+  exit 1
+fi
+
+# Match the compiler's manifest + NUL + lockfile byte stream.
+if ! digest_output=$(
+  { cat "$project/package.json" && printf '\0' && cat "$project/package-lock.json"; } |
+    "${hash_command[@]}"
+); then
+  echo "::error::Could not hash the Copilot SDK npm project" >&2
+  exit 1
+fi
+if [[ "${digest_output%% *}" != "$expected_digest" ]]; then
+  echo "::error::Copilot SDK npm project does not match the compiled workflow" >&2
+  exit 1
+fi
 
 for component in gh-aw engine-cli copilot-sdk; do
   target="$target/$component"
