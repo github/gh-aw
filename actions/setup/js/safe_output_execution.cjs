@@ -41,6 +41,11 @@ function assertSafeOutputAuthorizationFresh() {
   }
 }
 
+function assertSafeOutputAuthorizationFreshForClaimEffect() {
+  const state = currentSafeOutputInvocation();
+  state?.assertAuthorizationFreshForClaimEffect?.();
+}
+
 /** @returns {import("./types/handler-factory").SafeOutputAuthorizationEvidence | undefined} */
 function projectAuthorization(source) {
   if (!source || typeof source !== "object") return undefined;
@@ -218,5 +223,6 @@ module.exports = {
   currentSafeOutputInvocation,
   authorizeSafeOutputInvocation,
   assertSafeOutputAuthorizationFresh,
+  assertSafeOutputAuthorizationFreshForClaimEffect,
   projectAuthorization,
 };

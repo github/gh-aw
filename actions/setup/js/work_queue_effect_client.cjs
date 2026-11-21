@@ -6,6 +6,7 @@ const { assertClaimAuthorized, currentClaimHandle, recordClaimEffect, claimIdent
 const { canonical, digest, parseStrictJSON } = require("./work_queue_codec.cjs");
 const { canonicalResourceTarget, nativeDecimalIdentity, resolveRepositoryTarget, resolveParentResourceTarget } = require("./work_queue_effect_resource.cjs");
 const { expectedGitHubHost, isTrustedGitHubApiUrl } = require("./work_queue_host.cjs");
+const { assertSafeOutputAuthorizationFreshForClaimEffect } = require("./safe_output_execution.cjs");
 
 const READ_METHODS = new Set(["get", "list", "getSarif", "getAnalysis", "getComment", "getCommit", "getRef", "getTree", "getBlob", "getArtifact", "getBranch", "getByUsername", "getWorkflowRun", "getWorkflowRunAttempt", "compareCommits"]);
 /** @type {WeakMap<object, {identity: ReturnType<typeof claimIdentity>, options: Record<string, unknown>}>} */
@@ -672,6 +673,7 @@ function wrapClaimEffectClient(client, options) {
                   for (const target of targets) await authorize(repository, number, { ...target, path: entry.path });
                 }
               }
+              assertSafeOutputAuthorizationFreshForClaimEffect();
               return mutate(target, receiver, snapshot.forwarded, repository, number, kind, snapshot.body, resource);
             });
           }

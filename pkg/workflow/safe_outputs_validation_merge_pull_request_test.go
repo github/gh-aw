@@ -170,6 +170,7 @@ func TestMergePullRequestProofEvidence(t *testing.T) {
 	encoded, err := json.Marshal(handler["proof_evidence"])
 	require.NoError(t, err)
 	assert.JSONEq(t, `{"check":"verify","verifier_version":"1.2.3","configuration_sha256":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"}`, string(encoded))
+	assert.Equal(t, true, handler["deferred_authorization"])
 	for _, tc := range []struct {
 		name   string
 		change func(*MergePullRequestConfig)

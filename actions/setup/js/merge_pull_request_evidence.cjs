@@ -5,6 +5,8 @@ const { resolveTargetRepoConfig } = require("./repo_helpers.cjs");
 const { parseStrictJSON } = require("./work_queue_codec.cjs");
 const { SAFE_OUTPUT_E007 } = require("./error_codes.cjs");
 
+const MERGE_PROOF_EVIDENCE_ERROR = `${SAFE_OUTPUT_E007}: Missing, unsupported, failed or mismatched merge proof evidence; obtain a passed result from the configured deterministic verifier for this exact head and configuration`;
+
 /**
  * Only the selected, producer-pinned GitHub check supplies proof, never the
  * agent message. The verifier owns the semantics of its configuration digest.
@@ -17,7 +19,7 @@ const { SAFE_OUTPUT_E007 } = require("./error_codes.cjs");
 function readMergeProofEvidence(run, policy, repository, pullNumber, headSha) {
   /** @returns {never} */
   const reject = () => {
-    throw new Error(`${SAFE_OUTPUT_E007}: Missing, unsupported, failed or mismatched merge proof evidence; obtain a passed result from the configured deterministic verifier for this exact head and configuration`);
+    throw new Error(MERGE_PROOF_EVIDENCE_ERROR);
   };
   if (!run || !Number.isSafeInteger(run.id) || run.id <= 0 || run.head_sha !== headSha || run.status !== "completed" || run.conclusion !== "success") reject();
   let proof;
@@ -74,8 +76,9 @@ function mergeProofScope(proof) {
 function mergeAuthorizationEvidence(config, requiredChecks) {
   const { defaultTargetRepo, allowedRepos } = resolveTargetRepoConfig(config);
   const sorted = values => [...(values || [])].sort();
+  const policyVersion = config.proof_evidence ? 2 : 1;
   const policy = {
-    version: 1,
+    version: policyVersion,
     target: config.target || "triggering",
     target_repo: defaultTargetRepo,
     allowed_repos: sorted([...allowedRepos]),
@@ -98,7 +101,7 @@ function mergeAuthorizationEvidence(config, requiredChecks) {
     detection_required: String(process.env.GH_AW_RUN_DETECTION || "").trim() === "true",
   };
   return {
-    policy_version: 1,
+    policy_version: policyVersion,
     policy_sha256: createHash("sha256").update(JSON.stringify(policy)).digest("hex"),
     required_checks: "not_evaluated",
     independent_approval: policy.required_approvers.length > 0 ? "not_evaluated" : "not_required",
@@ -130,4 +133,4 @@ async function reconcileMerge(client, owner, repo, pullNumber, headSha) {
   return null;
 }
 
-module.exports = { mergeAuthorizationEvidence, reconcileMerge, readMergeProofEvidence, mergeProofScope };
+module.exports = { MERGE_PROOF_EVIDENCE_ERROR, mergeAuthorizationEvidence, reconcileMerge, readMergeProofEvidence, mergeProofScope };

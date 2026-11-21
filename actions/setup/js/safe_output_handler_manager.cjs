@@ -14,6 +14,7 @@ const { normalizeSafeOutputConfig } = require("./safe_output_names.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { getStalePullRequestReason } = require("./pr_lifecycle.cjs");
 const { ERR_CONFIG, ERR_PARSE, ERR_SYSTEM, ERR_VALIDATION, SAFE_OUTPUT_E007, SAFE_OUTPUT_E099 } = require("./error_codes.cjs");
+const { MERGE_PROOF_EVIDENCE_ERROR } = require("./merge_pull_request_evidence.cjs");
 const { classifySafeOutputResult, computeSafeOutputsStatus, isFailedProcessingResult } = require("./safe_outputs_status.cjs");
 const { buildSafeOutputDependencyPlan, checkSafeOutputDependencies } = require("./safe_output_dependencies.cjs");
 const { projectSafeOutputData, finalizeBufferedReviewExecutions, withSafeOutputInvocation, currentSafeOutputInvocation, projectAuthorization } = require("./safe_output_execution.cjs");
@@ -631,9 +632,13 @@ async function loadHandlers(config, prReviewBufferRegistry, resolvedAllowedMenti
         const deferred =
           actions.has(type) ||
           ["upload_artifact", "call_workflow", "upload_code_coverage"].includes(type) ||
-          (type === "merge_pull_request" && !!config[type]?.proof_evidence) ||
+          config[type]?.deferred_authorization === true ||
           (!!currentClaimHandle() && (type === "upload_asset" || ["prepared", "script"].includes(config.claim_adapters?.[type]?.mode)));
-        if (!state || state.requirement !== requirement || state.invocation?.output.type !== type || (state.authorization?.state !== "allowed" && !(deferred && state.authorization?.state === "not_requested"))) {
+        const stagedDeferred = config[type]?.deferred_authorization === true && isStagedMode(config[type]);
+        if (
+          (!state && !stagedDeferred) ||
+          (state && (state.requirement !== requirement || state.invocation?.output.type !== type || (state.authorization?.state !== "allowed" && !(deferred && state.authorization?.state === "not_requested"))))
+        ) {
           throw new Error("Protected safe-output handlers require their trusted prepared invocation context");
         }
       }
@@ -1270,6 +1275,7 @@ function mergeProcessingError(result) {
   // Only preserve exact fixed diagnostics; other handler errors can contain private API data.
   switch (result?.error) {
     case "merge_pull_request gate checks failed":
+    case MERGE_PROOF_EVIDENCE_ERROR:
     case `${SAFE_OUTPUT_E007}: Missing check producer evidence for required check`:
     case `${SAFE_OUTPUT_E007}: Unexpected check producer for required check`:
     case `${SAFE_OUTPUT_E007}: Ambiguous check producers for required check`:
@@ -1343,7 +1349,7 @@ async function processMessages(messageHandlers, messages, onItemCreated = null, 
   const sourceBatch = authorizationBatchContexts.get(messages);
   const batchDigest = authorizationConfigured ? sourceBatch?.digest || protocol.canonicalDigest(originalMessages) : null;
   const stagedFor = (type, message = null) => isStagedMode(trustedConfig) || isStagedMode(trustedDescriptor(trustedConfig, type, message));
-  const previewOnly = (type, message) => !!effectiveAuthorization(trustedConfig, type, message) || scriptTypes.has(type) || actionTypes.has(type);
+  const previewOnly = (type, message) => (!!effectiveAuthorization(trustedConfig, type, message) || scriptTypes.has(type) || actionTypes.has(type)) && trustedDescriptor(trustedConfig, type, message).deferred_authorization !== true;
 
   async function executeInvocation(type, index, message, resolvedTemporaryIds, temporaryIdMap, handler, phase = "primary") {
     if (type === "dispatch_repository" && trustedConfig[type]?.tools && !Object.hasOwn(trustedConfig[type].tools, message.tool_name)) {
@@ -1455,13 +1461,12 @@ async function processMessages(messageHandlers, messages, onItemCreated = null, 
     const invocationState = { invocation, requirement, config: descriptor, batchDigest: invocationBatchDigest, recordIndex: sourceBatch?.indices[index] ?? index, authorization: undefined };
     invocationState.authorize = options => require("./safe_output_authorization_gate.cjs").authorizeHandlerInvocation(options);
     invocationState.assertAuthorizationFresh = () => protocol.assertAuthorizationFresh({ authorization: invocationState.authorization });
+    if (descriptor.deferred_authorization === true) {
+      invocationState.assertAuthorizationFreshForClaimEffect = () => protocol.assertAuthorizationFresh({ authorization: invocationState.authorization });
+    }
     const deferredGate =
       phase === "primary" &&
-      (preparedAdapter ||
-        actionTypes.has(type) ||
-        ["upload_artifact", "call_workflow", "upload_code_coverage"].includes(type) ||
-        (type === "merge_pull_request" && !!descriptor.proof_evidence) ||
-        (type === "upload_asset" && !!currentClaimHandle()));
+      (preparedAdapter || actionTypes.has(type) || ["upload_artifact", "call_workflow", "upload_code_coverage"].includes(type) || descriptor.deferred_authorization === true || (type === "upload_asset" && !!currentClaimHandle()));
     const evidencePath = protocol.authorizationEvidencePath();
     let authorization;
     try {

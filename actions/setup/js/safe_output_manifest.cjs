@@ -62,10 +62,10 @@ function isAuditTimestamp(value) {
 /** @param {any} value */
 function projectMergeAuthorization(value) {
   if (value === undefined) return undefined;
-  if (!value || typeof value !== "object" || Array.isArray(value) || value.policy_version !== 1 || typeof value.policy_sha256 !== "string" || !/^[a-f0-9]{64}$/.test(value.policy_sha256)) {
+  if (!value || typeof value !== "object" || Array.isArray(value) || ![1, 2].includes(value.policy_version) || typeof value.policy_sha256 !== "string" || !/^[a-f0-9]{64}$/.test(value.policy_sha256)) {
     throw new Error(`${ERR_SYSTEM}: Invalid merge authorization evidence`);
   }
-  const result = { policy_version: 1, policy_sha256: value.policy_sha256 };
+  const result = { policy_version: value.policy_version, policy_sha256: value.policy_sha256 };
   for (const gate of ["required_checks", "independent_approval", "protected_files", "final_revalidation"]) {
     if (!["passed", "failed", "not_required", "not_evaluated"].includes(value[gate])) throw new Error(`${ERR_SYSTEM}: Invalid merge authorization gate`);
     result[gate] = value[gate];

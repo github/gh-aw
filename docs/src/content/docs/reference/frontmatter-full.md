@@ -17334,6 +17334,18 @@ safe-outputs:
     required-check-apps:
       {}
 
+    # Opt-in deterministic verifier evidence from a required check pinned in
+    # required-check-apps. Requires external authorization. The check output summary
+    # must bind the repository, PR number, exact head, verifier version, configuration
+    # digest and passed result using gh-aw.merge-proof.v1.
+    # (optional)
+    proof-evidence:
+      check: "example-value"
+
+      verifier-version: "example-value"
+
+      configuration-sha256: "example-value"
+
     # Human GitHub logins. At least one must have a current, non-dismissed approval
     # for the evaluated head SHA, independent of the PR author and authenticated merge
     # identity. Empty or omitted requires no affirmative approval.

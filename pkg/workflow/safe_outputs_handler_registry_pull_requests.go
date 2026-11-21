@@ -106,6 +106,7 @@ var pullRequestHandlerRegistry = map[string]handlerBuilder{
 		}
 		if c.ProofEvidence != nil {
 			handler["proof_evidence"] = c.ProofEvidence
+			handler["deferred_authorization"] = true
 		}
 		return handler
 	},

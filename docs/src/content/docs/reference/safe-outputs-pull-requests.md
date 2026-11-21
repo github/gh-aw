@@ -302,7 +302,9 @@ safe-outputs:
 safe-outputs:
   merge-pull-request:
     allowed-base-branches: ["agent-work/*"]
-    authorization: true # existing external authority; configure its endpoint and audience
+    authorization:
+      endpoint: https://authority.example/authorize
+      audience: merge-proof
     required-checks: ["invariant-verifier"]
     required-check-apps:
       invariant-verifier: 12345 # independent verifier's GitHub App ID

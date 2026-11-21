@@ -5,6 +5,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { withClaimExecution, claimArtifactPath } = require("./work_queue_claim_scope.cjs");
 const { wrapClaimEffectClient, withClaimEffectClients } = require("./work_queue_effect_client.cjs");
+const { withSafeOutputInvocation } = require("./safe_output_execution.cjs");
 const { assertGitPushAuthorized, gitPushRepository } = require("./work_queue_git_effects.cjs");
 const { verifyClaimDelivery, verifyBuiltinDeliveryOutput } = require("./work_queue_delivery.cjs");
 
@@ -85,6 +86,30 @@ function registerTests({ describe, it }) {
         assert.equal(writes, 2);
         assert.equal(checks, 5);
       });
+    });
+
+    it("rechecks deferred authorization after Claim preflight and immediately before the native effect", async () => {
+      const events = [];
+      const authorize = async request => {
+        events.push("claim-preflight-start");
+        await Promise.resolve();
+        events.push("claim-preflight-complete");
+        return { claim_handle: request.claim_handle, authorized: request.message.repo === "owner/repo" };
+      };
+      const source = {
+        rest: {
+          issues: {
+            create: async _parameters => {
+              events.push("native-effect");
+            },
+          },
+        },
+      };
+      await withClaimExecution({ assignment, claim_handle: "h1", authorize }, async () => {
+        const client = wrapClaimEffectClient(source, { claim_handle: "h1", authorize });
+        await withSafeOutputInvocation({ assertAuthorizationFreshForClaimEffect: () => events.push("authorization-freshness") }, () => client.rest.issues.create({ owner: "owner", repo: "repo" }));
+      });
+      assert.deepEqual(events, ["claim-preflight-start", "claim-preflight-complete", "authorization-freshness", "native-effect"]);
     });
 
     it("cannot bypass targets with call/apply/bind and supports immutable SDK namespaces", async () => {

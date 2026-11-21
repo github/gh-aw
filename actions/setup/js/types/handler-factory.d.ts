@@ -46,6 +46,8 @@ interface HandlerConfig {
     verifier_version: string;
     configuration_sha256: string;
   };
+  /** Internal marker: authorization is resolved against handler evidence at execution time. */
+  deferred_authorization?: boolean;
   /** Maximum issue artifacts per issue (default: 10); non-positive values disable artifacts. */
   max_issue_artifacts?: number;
   /** Compiled maximum UTF-8 bytes per issue artifact body (default: 1048576). */

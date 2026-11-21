@@ -402,6 +402,7 @@ describe("merge_pull_request policy hardening", () => {
     checkResults.mockResolvedValue([verifierRun()]);
     const { result, state } = await runProof({ merge_method: "squash", commit_title: "Verified change" });
     expect(result.success).toBe(true);
+    expect(result.decision_evidence.authorization.policy_version).toBe(2);
     expect(state.authorize).toHaveBeenCalledOnce();
     const request = state.authorize.mock.calls[0][0];
     expect(request.inputs).toEqual({
@@ -463,6 +464,7 @@ describe("merge_pull_request policy hardening", () => {
     const { result, state } = await runProof();
     expect(result.success).toBe(false);
     expect(result.error).toContain("merge proof evidence");
+    expect(result.decision_evidence.authorization.required_checks).toBe("failed");
     expect(state.authorize).not.toHaveBeenCalled();
     expect(client.rest.pulls.merge).not.toHaveBeenCalled();
   });
@@ -507,9 +509,10 @@ describe("merge_pull_request policy hardening", () => {
     expect(client.rest.pulls.merge).not.toHaveBeenCalled();
   });
 
-  it.each(["allow", "deny", "changed head", "Unknown"])("enforces proof through the real manager and external authorization protocol: %s", async mode => {
+  it.each(["allow", "deny", "changed head", "Unknown", "staged preview"])("enforces proof through the real manager and external authorization protocol: %s", async mode => {
     checkResults.mockResolvedValue([verifierRun(mode === "Unknown" ? { result: "Unknown" } : {})]);
     const directory = path.resolve(`.test-merge-proof-authorization-${Math.random().toString(36).slice(2)}`);
+    if (mode === "staged preview") pr.base.sha = "b".repeat(40);
     for (const [key, value] of Object.entries({
       RUNNER_TEMP: directory,
       GITHUB_SERVER_URL: "https://github.com",
@@ -519,7 +522,7 @@ describe("merge_pull_request policy hardening", () => {
       GH_AW_AUTHORIZATION_WORKFLOW_HASH: "b".repeat(64),
       GITHUB_RUN_ID: "456",
       GITHUB_RUN_ATTEMPT: "1",
-      GH_AW_SAFE_OUTPUTS_STAGED: "false",
+      GH_AW_SAFE_OUTPUTS_STAGED: mode === "staged preview" ? "true" : "false",
       ACTIONS_ID_TOKEN_REQUEST_URL: "https://oidc.example/token",
       ACTIONS_ID_TOKEN_REQUEST_TOKEN: "fixture-bootstrap",
     }))
@@ -551,12 +554,20 @@ describe("merge_pull_request policy hardening", () => {
     );
     try {
       const { loadHandlers, processMessages } = require("./safe_output_handler_manager.cjs");
-      const handlers = await loadHandlers({ merge_pull_request: { allowed_base_branches: ["integration"], ...proofConfig } });
+      const handlers = await loadHandlers({ merge_pull_request: { allowed_base_branches: ["integration"], deferred_authorization: true, ...proofConfig } });
       const { results } = await processMessages(handlers, [{ type: "merge_pull_request", merge_method: "squash", proof_evidence: { result: "passed" } }]);
-      expect(results[0].success).toBe(mode === "allow");
+      expect(results[0].success).toBe(mode === "allow" || mode === "staged preview");
       expect(client.rest.pulls.merge).toHaveBeenCalledTimes(mode === "allow" ? 1 : 0);
-      expect(global.fetch).toHaveBeenCalledTimes(mode === "Unknown" ? 0 : 2);
-      if (mode !== "Unknown") {
+      expect(global.fetch).toHaveBeenCalledTimes(mode === "Unknown" || mode === "staged preview" ? 0 : 2);
+      if (mode === "staged preview") {
+        expect(results[0].result).toMatchObject({
+          staged: true,
+          merged: false,
+          audit_recorded: true,
+          decision_evidence: { authorization: { policy_version: 2, required_checks: "passed", final_revalidation: "passed" } },
+        });
+        expect(checkResults).toHaveBeenCalledTimes(2);
+      } else if (mode !== "Unknown") {
         expect(envelope.invocation.scope).toMatchObject({
           binding: "resolved_effect",
           refs: expect.arrayContaining([`head-sha:${"a".repeat(40)}`, "verification-result:passed", "check-run:github/gh-aw/17"]),
@@ -1330,6 +1341,8 @@ describe("merge_pull_request policy hardening", () => {
     const required = persistDecision(await run({ required_checks: ["ci"], required_check_apps: { ci: 5 }, required_approvers: ["reviewer"] })).decision_evidence.authorization;
     expect(required).toMatchObject({ required_checks: "passed", independent_approval: "passed", final_revalidation: "passed" });
     expect(required.policy_sha256).not.toBe(optional.policy_sha256);
+    const { mergeAuthorizationEvidence } = await import("./merge_pull_request_evidence.cjs");
+    expect(mergeAuthorizationEvidence({ proof_evidence: proofPolicy }, []).policy_version).toBe(2);
   });
 
   it("does not claim that undiscovered branch checks were optional", async () => {

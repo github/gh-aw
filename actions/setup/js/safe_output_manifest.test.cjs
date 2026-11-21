@@ -111,9 +111,9 @@ describe("safe_output_manifest", () => {
         expect(JSON.parse(content)).not.toHaveProperty("evidence_truncated");
       });
 
-      it("persists only versioned authorization fingerprints and fixed gate outcomes", () => {
+      it.each([1, 2])("persists policy version %s fingerprints and fixed gate outcomes", policyVersion => {
         const authorization = {
-          policy_version: 1,
+          policy_version: policyVersion,
           policy_sha256: "d".repeat(64),
           required_checks: "passed",
           independent_approval: "not_required",
@@ -129,7 +129,7 @@ describe("safe_output_manifest", () => {
       it.each([
         null,
         [],
-        { policy_version: 2 },
+        { policy_version: 3 },
         { policy_version: 1, policy_sha256: "private-config" },
         { policy_version: 1, policy_sha256: "d".repeat(64), required_checks: "private-check" },
         { policy_version: 1, policy_sha256: "d".repeat(64), required_checks: "passed", independent_approval: "passed", protected_files: "passed", final_revalidation: "private-context" },

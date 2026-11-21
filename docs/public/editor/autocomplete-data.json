@@ -3096,6 +3096,10 @@
               "type": "object",
               "desc": "Expected GitHub App ID for each named check."
             },
+            "proof-evidence": {
+              "type": "object",
+              "desc": "Opt-in deterministic verifier evidence from a required check pinned in required-check-apps."
+            },
             "required-approvers": {
               "type": "array",
               "desc": "Human GitHub logins.",
