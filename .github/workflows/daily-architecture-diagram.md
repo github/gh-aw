@@ -59,6 +59,7 @@ safe-outputs:
     expires: 7d
     draft: true
     fallback-as-issue: false
+    github-token-for-extra-empty-commit: none
     allowed-files: [scratchpad/architecture.md]
     title-prefix: "[architecture] "
     labels: [architecture, diagram, documentation]
@@ -178,7 +179,10 @@ This is just an example skeleton. Your actual diagram should:
 
 #### Updating the Cache
 
-After generating the diagram, write an updated `architecture-state.json` to cache-memory with:
+Write an updated `architecture-state.json` only after verifying that the diagram
+already in the checkout matches the current structure. If the diagram is
+missing or materially changed, leave the checkpoint untouched: a queued draft
+PR may fail to publish, or may never merge.
 
 ```json
 {
@@ -251,5 +255,5 @@ This diagram shows the package structure and dependencies of the `gh-aw` codebas
 <package table>
 ````
 
-- When the diagram **materially changes or is missing**: update `scratchpad/architecture.md` and call `create_pull_request` once with title `Update architecture diagram - <date>` (the safe output adds the `[architecture] ` prefix).
+- When the diagram **materially changes or is missing**: update only `scratchpad/architecture.md`, stage and commit it locally, and submit that branch via `create_pull_request` once with title `Update architecture diagram - <date>` (the safe output adds the `[architecture] ` prefix).
 - When the diagram is **unchanged** after analysis: call `noop` and skip the scratchpad update entirely. A new date or run URL alone is not a material change.

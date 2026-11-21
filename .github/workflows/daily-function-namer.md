@@ -30,6 +30,14 @@ imports:
   - shared/otlp.md
   - shared/reporting.md
 safe-outputs:
+  threat-detection:
+    report-as-issue: false
+  report-failure-as-issue: false
+  report-failed-jobs: false
+  report-missing-tool:
+    create-issue: false
+  report-missing-data:
+    create-issue: false
   create-pull-request:
     title-prefix: "[function-namer] "
     labels: [refactoring, code-quality, automated-analysis, cookie]
@@ -38,6 +46,7 @@ safe-outputs:
     expires: 7d
     if-no-changes: ignore
     fallback-as-issue: false
+    github-token-for-extra-empty-commit: none
     protected-files: blocked
     allowed-files:
       - "pkg/**/*.go"

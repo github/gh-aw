@@ -46,6 +46,14 @@ tools:
     - "*.txt"
     max-file-size: 51200
 safe-outputs:
+  threat-detection:
+    report-as-issue: false
+  report-failure-as-issue: false
+  report-failed-jobs: false
+  report-missing-tool:
+    create-issue: false
+  report-missing-data:
+    create-issue: false
   create-pull-request:
     title-prefix: "[testify-expert] "
     labels: [testing, code-quality, automated-analysis, cookie]
@@ -53,6 +61,7 @@ safe-outputs:
     max: 1
     expires: 2d
     fallback-as-issue: false
+    github-token-for-extra-empty-commit: none
     if-no-changes: error
     protected-files: blocked
     allowed-files:

@@ -21,6 +21,16 @@ tools:
   bash: ["*"]
   edit:
 safe-outputs:
+  threat-detection:
+    report-as-issue: false
+  report-failure-as-issue: false
+  report-failed-jobs: false
+  report-missing-tool:
+    create-issue: false
+  report-missing-data:
+    create-issue: false
+  report-incomplete:
+    create-issue: false
   create-pull-request:
     expires: 7d
     title-prefix: "[cli-tools-test] "
@@ -28,6 +38,7 @@ safe-outputs:
     max: 1
     draft: true
     fallback-as-issue: false
+    github-token-for-extra-empty-commit: none
     protected-files: blocked
     stacked: false
     max-patch-files: 5
@@ -37,6 +48,7 @@ safe-outputs:
       - "pkg/cli/**/*.go"
       - "pkg/workflow/**/*.go"
   noop:
+    report-as-issue: false
 timeout-minutes: 60
 model: router/economy
 engine:
