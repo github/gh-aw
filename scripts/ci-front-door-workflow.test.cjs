@@ -100,7 +100,12 @@ test("CGO unit tests use 12 disjoint shards with complete test-name coverage", (
   for (const name of ["BenchmarkA", "ExampleA", "NotTestA"]) {
     assert.equal(shards.filter(shard => shard.pattern.test(name)).length, 0, name);
   }
-  assert.match(jobs.test, /shard: n-r\n          # Includes a compile sweep of the repository workflows\.\n          timeout: 5m/);
+  assert.match(jobs.test, /UNIT_TEST_SUITE: fast/);
+  assert.match(jobs.test, /steps: &unit-test-steps/);
+  assert.match(jobs["test-slow"], /UNIT_TEST_SUITE: slow/);
+  assert.match(jobs["test-slow"], /steps: \*unit-test-steps/);
+  assert.match(jobs["test-slow"], /pattern: repository\n          shard: slow-repository/);
+  assert.match(jobs["test-slow"], /UNIT_TEST_TIMEOUT: 5m/);
 });
 
 test("inference credentials and executable policy stay isolated from PR code", () => {

@@ -10,6 +10,7 @@ const SUITE_IDS = Object.freeze([
   "front-door-conformance",
   "verify-integration-build",
   "test",
+  "test-slow",
   "canary-go",
   "impacted-go-tests",
   "native-javascript-tests",
@@ -33,7 +34,8 @@ const SUITE_IDS = Object.freeze([
 ]);
 const JOB_DEPENDENCIES = Object.freeze({
   test: Object.freeze(["verify-integration-build"]),
-  "canary-go": Object.freeze(["test"]),
+  "test-slow": Object.freeze(["verify-integration-build"]),
+  "canary-go": Object.freeze(["test", "test-slow"]),
   security: Object.freeze(["build"]),
   "security-scan": Object.freeze(["build"]),
   "cross-platform-build": Object.freeze(["build"]),
@@ -174,7 +176,11 @@ async function frontDoor({ catalog, diff, prompt, token, fullRun = false, decide
   let decisionCalls = 0;
   let response;
   let reason = fullRun ? "full-run" : !validCatalog ? "invalid-catalog" : !validDiffSummary(diff) ? "invalid-diff-summary" : diff.unavailable ? "diff-unavailable" : diff.truncated ? "diff-truncated" : null;
-  if (!reason && diff.files.some(file => file.startsWith(".github/ci/") || file.startsWith("scripts/ci-front-door") || file === ".github/workflows/cgo.yml" || file === "actions/setup/js/decisions_client.cjs")) reason = "policy-changed";
+  if (
+    !reason &&
+    diff.files.some(file => file.startsWith(".github/ci/") || file.startsWith("scripts/ci-front-door") || file.startsWith("scripts/go-unit-suite") || file === ".github/workflows/cgo.yml" || file === "actions/setup/js/decisions_client.cjs")
+  )
+    reason = "policy-changed";
   if (!reason && !diff.files.length) reason = "empty-diff";
   if (!reason) {
     try {
