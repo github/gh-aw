@@ -339,6 +339,27 @@ describe("pr_review_buffer (factory pattern)", () => {
         expect(mockGithub.rest.pulls.submitReview).toHaveBeenCalledWith({ ...reviewParams, event: "COMMENT", body: `[First](${firstUrl}) and [Second](${secondUrl})` });
       });
 
+      it("uses submission order when a complete listing lacks usable anchors", async () => {
+        buffer.addComment({ ...first, line: 43, body: "Second finding", temporaryId: "aw_find2" });
+        buffer.setReviewMetadata("[First](#aw_find1) and [Second](#aw_find2)", "COMMENT");
+        mockGithub.rest.pulls.listCommentsForReview.mockResolvedValue({
+          data: [
+            { id: 101, html_url: firstUrl },
+            { id: 102, html_url: secondUrl },
+          ],
+        });
+        expect(await buffer.submitReview()).toMatchObject({ success: true });
+        expect(mockGithub.rest.pulls.submitReview).toHaveBeenCalledWith({ ...reviewParams, event: "COMMENT", body: `[First](${firstUrl}) and [Second](${secondUrl})` });
+      });
+
+      it("fits the resolved summary within the review body limit", async () => {
+        buffer.setReviewMetadata(`[First](#aw_find1)\n\n\`\`\`text\n${"x".repeat(64955)}\n\`\`\``, "COMMENT");
+        expect(await buffer.submitReview()).toMatchObject({ success: true });
+        const { body } = mockGithub.rest.pulls.submitReview.mock.calls[0][0];
+        expect(body).toContain(`[First](${firstUrl})`);
+        expect(body.length).toBeLessThanOrEqual(65000);
+      });
+
       it.each(["listCommentsForReview", "submitReview"])("deletes only this pending review when %s fails", async method => {
         mockGithub.rest.pulls[method].mockRejectedValueOnce(new Error("Line could not be resolved"));
         expect(await buffer.submitReview()).toMatchObject({ success: false, error: expect.stringContaining("Line could not be resolved") });

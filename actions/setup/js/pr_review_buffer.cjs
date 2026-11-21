@@ -718,7 +718,7 @@ function createReviewBuffer() {
      *
      * @param {{ id: number, html_url: string, state?: string }} review - Created review object
      * @param {string} resolvedEvent - The review event actually used (may differ from the requested event)
-     * @param {Array<Record<string, any>>} submittedComments - The inline comments actually included in the submitted review
+     * @param {BufferedComment[]} submittedComments - The inline comments actually included in the submitted review
      * @param {import("./safe_output_execution_metadata.cjs").ReviewState|null} afterState - Post-submit review state
      */
     async function buildReviewSuccessResult(review, resolvedEvent, submittedComments, afterState) {
@@ -737,7 +737,7 @@ function createReviewBuffer() {
       }));
       if (linkedComments) {
         reviewComments = reviewComments.map((submitted, index) => {
-          const comment = linkedComments?.get(/** @type {BufferedComment} */ submittedComments[index]);
+          const comment = linkedComments?.get(submittedComments[index]);
           return comment ? { ...submitted, id: comment.id, url: comment.html_url, metadata: { ...submitted.metadata, ...(comment.node_id ? { node_id: comment.node_id } : {}) } } : submitted;
         });
       } else if (commentCount > 0 && typeof github.rest.pulls.listCommentsForReview === "function") {
