@@ -16,7 +16,7 @@ No required parameters.
 
 ### `logs`
 
-Download workflow run logs to private server storage at `/tmp/gh-aw/aw-mcp/logs/`. The normal response exposes a JSON summary through `file_path` under `/tmp/gh-aw/logs-cache/`; read only that explicitly returned file if session policy permits. Do not enumerate private raw artifacts or change their permissions. If the summary is inaccessible, report incomplete coverage rather than assuming the download or filters were validated.
+Download workflow run logs to private server storage at `/tmp/gh-aw/aw-mcp/logs/`. The normal response exposes a JSON summary through `file_path` in a separate owner-only temporary directory. Read only that explicitly returned file if session policy permits; do not look in the legacy cache, enumerate private raw artifacts, or change permissions. If the summary is inaccessible, report incomplete coverage rather than assuming the download or filters were validated.
 
 | Parameter | Description |
 |---|---|

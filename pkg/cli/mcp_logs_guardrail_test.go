@@ -1,10 +1,11 @@
-//go:build !integration
+//go:build !integration && unix
 
 package cli
 
 import (
 	"encoding/json"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -35,9 +36,8 @@ func TestBuildLogsFileResponse_WritesFile(t *testing.T) {
 	}
 
 	// Verify the file is in the cache directory (not the artifact directory)
-	if !strings.HasPrefix(response.FilePath, mcpLogsCacheDir) {
-		t.Errorf("File should be in cache dir %q, got %q", mcpLogsCacheDir, response.FilePath)
-	}
+	require.True(t, filepath.IsAbs(response.FilePath))
+	require.Equal(t, defaultMCPLogsCache.dir, filepath.Dir(response.FilePath))
 
 	// Verify the file was actually created and contains the output
 	data, err := os.ReadFile(response.FilePath)
@@ -52,9 +52,10 @@ func TestBuildLogsFileResponse_WritesFile(t *testing.T) {
 	_ = os.Remove(response.FilePath)
 }
 
-func TestBuildLogsFileResponse_SetsReadablePermissions(t *testing.T) {
+func TestBuildLogsFileResponse_SetsOwnerOnlyPermissions(t *testing.T) {
+	cache := mcpLogsReportCache{tempDir: t.TempDir()}
 	output := `{"summary":{"total_runs":1}}`
-	result := buildLogsFileResponse(output)
+	result := buildLogsFileResponseWithCache(output, cache.store)
 
 	var response MCPLogsGuardrailResponse
 	if err := json.Unmarshal([]byte(result), &response); err != nil {
@@ -64,13 +65,13 @@ func TestBuildLogsFileResponse_SetsReadablePermissions(t *testing.T) {
 		t.Fatal("Response should include file_path")
 	}
 
-	cacheInfo, err := os.Stat(mcpLogsCacheDir)
+	cacheInfo, err := os.Stat(filepath.Dir(response.FilePath))
 	if err != nil {
 		t.Fatalf("Cache directory should exist: %v", err)
 	}
 	cachePerm := cacheInfo.Mode().Perm()
-	if cachePerm&0o005 != 0o005 {
-		t.Errorf("Cache directory should be accessible to other users (expected other r-x bits set), got mode %o", cachePerm)
+	if cachePerm != 0o700 {
+		t.Errorf("Cache directory should be owner-only (0700), got mode %o", cachePerm)
 	}
 
 	fileInfo, err := os.Stat(response.FilePath)
@@ -78,11 +79,40 @@ func TestBuildLogsFileResponse_SetsReadablePermissions(t *testing.T) {
 		t.Fatalf("Cache file should exist: %v", err)
 	}
 	filePerm := fileInfo.Mode().Perm()
-	if filePerm&0o004 != 0o004 {
-		t.Errorf("Cache file should be world-readable (expected other read bit set), got mode %o", filePerm)
+	if filePerm != 0o600 {
+		t.Errorf("Cache file should be owner-only (0600), got mode %o", filePerm)
 	}
+}
 
-	_ = os.Remove(response.FilePath)
+func TestBuildLogsFileResponse_RefusesUnsafeCache(t *testing.T) {
+	const output = `{"summary":{"total_runs":1},"continuation":{"before_run_id":42}}`
+	for _, scenario := range []string{"writable ancestor", "nonprivate directory", "nonprivate report", "nonregular report"} {
+		t.Run(scenario, func(t *testing.T) {
+			base := t.TempDir()
+			cache := mcpLogsReportCache{tempDir: base}
+			if scenario == "writable ancestor" {
+				require.NoError(t, os.Chmod(base, 0o777))
+				t.Cleanup(func() { assert.NoError(t, os.Chmod(base, 0o700)) })
+			} else {
+				path, err := cache.store(output)
+				require.NoError(t, err)
+				switch scenario {
+				case "nonprivate directory":
+					require.NoError(t, os.Chmod(filepath.Dir(path), 0o750))
+				case "nonprivate report":
+					require.NoError(t, os.Chmod(path, 0o640))
+				case "nonregular report":
+					require.NoError(t, os.Remove(path))
+					require.NoError(t, os.Mkdir(path, 0o700))
+				}
+			}
+			var response MCPLogsGuardrailResponse
+			require.NoError(t, json.Unmarshal([]byte(buildLogsFileResponseWithCache(output, cache.store)), &response))
+			assert.Empty(t, response.FilePath)
+			assert.NotContains(t, response.Message, output)
+			assert.Contains(t, response.Message, "could not be saved")
+		})
+	}
 }
 
 func TestBuildLogsFileResponse_ContentDeduplication(t *testing.T) {
@@ -103,6 +133,7 @@ func TestBuildLogsFileResponse_ContentDeduplication(t *testing.T) {
 	if r1.FilePath != r2.FilePath {
 		t.Errorf("Identical content should produce the same file path: got %q and %q", r1.FilePath, r2.FilePath)
 	}
+	require.NotEmpty(t, r1.FilePath)
 
 	// Verify the file exists only once (not duplicated)
 	if _, err := os.Stat(r1.FilePath); os.IsNotExist(err) {
