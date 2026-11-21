@@ -134,10 +134,10 @@ func startPrivateCloneInvestigation(ctx context.Context, destination, starterWor
 		return fmt.Errorf("verify Actions is enabled in %s: %w", destination, err)
 	}
 	if permissions.Enabled == nil || !*permissions.Enabled {
-		return fmt.Errorf("Actions is not enabled in %s; starter workflow was not dispatched", destination)
+		return fmt.Errorf("actions is not enabled in %s; starter workflow was not dispatched", destination)
 	}
 	if _, err := privateCloneGH(ctx, "workflow", "run", starterWorkflow, "--repo", destination, "--ref", "main"); err != nil {
-		return fmt.Errorf("Actions is enabled in %s, but starter workflow %s could not be dispatched: %w", destination, starterWorkflow, err)
+		return fmt.Errorf("actions is enabled in %s, but starter workflow %s could not be dispatched: %w", destination, starterWorkflow, err)
 	}
 	return nil
 }
