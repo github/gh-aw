@@ -68,9 +68,11 @@ jobs:
 
 Use comma-separated IDs for multiple rules: `# gh-aw: ignore[template-injection, environment-file-injection] -- Reason`. A nonempty reason and exact registered rule IDs are required. Wildcards, empty lists, unknown IDs, and malformed or misplaced directives fail linting.
 
+Ordinary notes containing `gh-aw:` are not directives. Suppression recognition is restricted to the `ignore` syntax; malformed suppression attempts still fail linting.
+
 Place the comment at the field's indentation, with no blank line before the field. Other YAML comments may intervene. Before `- run:`, match the list marker's indentation; only that first field is targeted, not the whole step. A mapping or sequence field includes its authored child fields. Sibling fields and steps, other rules, and analysis failures remain visible. There is no file-wide or disable/enable directive. Comments inside strings, scripts, or the Markdown prompt do not suppress anything.
 
-Directives work in Actions YAML and AW frontmatter. AW comments are not copied into compiled execution graphs: when linting a compiled workflow and its companion AW document, execution diagnostics use comments in the Actions YAML, while AW-only rules use the frontmatter. Suppressions on YAML anchors do not implicitly carry over to alias uses; an alias field needs its own directive.
+Directives work in Actions YAML and AW frontmatter. AW comments are not copied into compiled execution graphs: when linting a compiled workflow and its companion AW document, execution diagnostics use comments in the Actions YAML, while findings from authored AW fields use the frontmatter, including AW-owned findings from mixed-target rules. Suppressions on YAML anchors do not implicitly carry over to alias uses; an alias field needs its own directive, scoped to its actual descendants rather than similarly prefixed sibling keys.
 
 Suppression acknowledges a diagnostic; it does not establish safety. These comments do not disable independent compiler validation, strict-mode security controls, runtime protections, or external tools such as actionlint and shellcheck.
 
@@ -92,11 +94,15 @@ Compilation stays offline and deterministic. These rules neither resolve action 
 
 ### Executable inputs and runner environment files
 
-`template-injection` recognizes `actions/github-script.script`, `amadevus/pwsh-script.script`, `jannekem/run-python-script-action.script`, `cardinalby/js-eval-action.expression`, and `addnab/docker-run-action.run`. Action names match exactly, independently of their version or SHA. Other inputs are not assumed to be executable.
+`template-injection` recognizes `actions/github-script.script`, `amadevus/pwsh-script.script`, `jannekem/run-python-script-action.script`, `cardinalby/js-eval-action.expression`, and `addnab/docker-run-action.run`. Action names match exactly, independently of their version or SHA; reviewed input names match case-insensitively, while diagnostics retain authored key casing. Other inputs are not assumed to be executable.
 
 Output-flow analysis reuses the symbolic shell model, preserving known event/input origins through `GITHUB_OUTPUT`, environment aliases, and declared dependency outputs. Unknown action outputs are not automatically trusted or classified as attacker-controlled. AW-only analysis tracks explicit steps within each execution block; cross-job propagation requires the Actions AST. Unsupported interpreters, unresolved output names, and malformed modeled scripts produce coverage warnings. JavaScript-produced output propagation and arbitrary external-script behavior are outside this shell model.
 
+Analysis does not mutate typed steps or remove their output declarations and emission-time interpolation safeguards. Findings collected before an analysis failure are preserved; malformed Actions expressions remain explicit failures, not warning-only success.
+
 `environment-file-injection` is an error in strict and non-strict mode. An attacker-controlled multiline value can append extra environment records even when passed through a quoted shell variable or a fixed heredoc delimiter. An attacker-controlled path can change later executable lookup. The check is conservative: arbitrary shell validation is not treated as sanitization. PowerShell, other unsupported shells, and unavailable generated AW execution produce incomplete-analysis warnings rather than a clean bill of health. This rule does not replace the stricter prohibition on environment-file writes in authored safe-output steps.
+
+Shell stdout follows ordered descriptor redirects and duplication, including routing through fd 2 into runner command files. Unmodeled persistent, dynamic, compound, or independently produced stderr flows remain coverage gaps. Unsupported Node commands with tainted inherited environment values also produce coverage warnings when JavaScript analysis is unavailable.
 
 As with secret-flow coverage, the compiler omits environment-file and output-flow coverage warnings from its warning count. `gh aw lint` retains them. Confirmed findings still fail compilation.
 
@@ -104,11 +110,11 @@ As with secret-flow coverage, the compiler omits environment-file and output-flo
 
 | Check | Safe cases and conservative limits |
 |---|---|
-| Artifact preloads | Only explicit relative paths, absolute paths, and local file URLs for ESM imports/loaders are resolved as local preload files. CommonJS `--require` does not accept file URLs. Bare package specifiers are not workspace-relative paths; package resolution is not modeled. `--version`, `-v`, and `--v8-options` do not execute preloads. `--help` and `--check` can still load preloads and are not blanket exemptions. |
+| Artifact preloads | Only explicit relative paths, absolute paths, and local file URLs for ESM imports/loaders are resolved as local preload files. CommonJS `--require` does not accept file URLs. Bare package specifiers are not workspace-relative paths; unresolved package resolution produces an incomplete-analysis warning, while known Node builtins are exempt. Options after eval/print payloads are inspected. `--version`, `-v`, and `--v8-options` do not execute preloads, including when supplied later. `--help` and `--check` can still load preloads and are not blanket exemptions. |
 | Executable action inputs | Only the reviewed action/input pairs above are code sinks. Lookalike action names and unrelated data inputs are not sinks. Runtime environment access and expressions returning booleans do not trigger executable interpolation findings. |
 | Output interpolation | Quoted runtime environment access, boolean comparisons, and boolean predicate results remain data. Taint is conservatively unioned across shell branches and assignments; overwrites and arbitrary sanitizers do not prove a value safe. Unknown outputs do not become attacker-controlled solely because another output is tainted, except where unresolved or multiline records require wildcard tracking. |
-| Environment files | Literal filenames such as `'$GITHUB_ENV'` and `'$GITHUB_PATH'` are ordinary files, not runner command files. Expanded runner variables and their modeled aliases are checked. Constants and boolean-filtered values are allowed; quoting untrusted multiline data or using a fixed heredoc delimiter is not sanitization. |
-| Image pins | An explicitly empty service `image` disables that service and is allowed; an empty job-container image is not. A matrix `exclude` entry naming only the image axis removes that alternative, but a later `include` can restore it. Partial multi-axis exclusions remain conservative; unresolved expressions produce coverage warnings, not proof of mutable images. |
+| Environment files | Literal filenames such as `'$GITHUB_ENV'`, `'$GITHUB_PATH'`, and `'$GITHUB_OUTPUT'` are ordinary working-directory-relative files, not runner command files. They retain ordinary file taint without publishing runner environment records or outputs. Expanded runner variables and their modeled aliases are checked. Constants and boolean-filtered values are allowed; quoting untrusted multiline data or using a fixed heredoc delimiter is not sanitization. |
+| Image pins | An explicitly empty service `image`, including an empty fully substituted matrix alternative, disables that service and is allowed; an empty job-container image is not. Matrix values are substituted into the full image template before validation. A matrix `exclude` entry naming only the image axis removes that alternative, but a later `include` can restore it. Partial multi-axis exclusions remain conservative; unresolved expressions produce coverage warnings, not proof of mutable images. |
 
 ### Historical zizmor regressions
 

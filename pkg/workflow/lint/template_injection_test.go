@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/github/gh-aw/pkg/workflow/actions"
+	"github.com/github/gh-aw/pkg/workflow/taint"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -312,6 +313,127 @@ func TestTemplateInjectionDeterministicReadOnlyAndLines(t *testing.T) {
 	}
 	assert.Same(t, original, workflow.Jobs[0])
 	assert.Equal(t, script, workflow.Jobs[0].Steps[0].(actions.RawStep).Fields["run"])
+}
+
+func TestTemplateInjectionTypedRunRemainsReadOnly(t *testing.T) {
+	for _, transport := range []bool{false, true} {
+		workflow := templateInjectionWorkflow("echo '${{ inputs.body }}'", true)
+		if transport {
+			workflow.Jobs[0].Steps = append(workflow.Jobs[0].Steps, actions.RunStep{Run: `echo 'value=fixed' >> "$GITHUB_OUTPUT"`})
+		}
+		originalJob := workflow.Jobs[0]
+		originalStep := originalJob.Steps[0]
+		_, err := actions.Emit(workflow)
+		require.ErrorContains(t, err, "typed run steps")
+		diagnostics := runTemplateInjection(t, workflow)
+		require.NotEmpty(t, diagnostics)
+		assert.Same(t, originalJob, workflow.Jobs[0])
+		assert.Equal(t, originalStep, workflow.Jobs[0].Steps[0])
+		assert.IsType(t, actions.RunStep{}, workflow.Jobs[0].Steps[0])
+		_, err = actions.Emit(workflow)
+		require.ErrorContains(t, err, "typed run steps")
+		assert.Equal(t, diagnostics, runTemplateInjection(t, workflow))
+	}
+}
+
+func TestTemplateInjectionTypedOutputReferences(t *testing.T) {
+	for _, interpolatingProducer := range []bool{false, true} {
+		script := `printf 'value=%s\n' "$BODY" >> "$GITHUB_OUTPUT"`
+		if interpolatingProducer {
+			script = `printf 'value=%s\n' '${{ github.event.issue.body }}' >> "$GITHUB_OUTPUT"`
+		}
+		ref := actions.OutputRef{Job: "producer", Step: "capture", Name: "value"}
+		workflow := &actions.Workflow{Jobs: []*actions.Job{
+			{
+				ID: "producer", RunsOn: "ubuntu-latest",
+				Outputs: map[actions.OutputName]actions.Expression{"public": ref},
+				Steps: []actions.Step{
+					actions.RunStep{
+						StepOptions: actions.StepOptions{
+							ID: "capture", Outputs: []actions.OutputDecl{{Name: "value"}},
+							Env: map[string]actions.Expression{"BODY": actions.Context("github.event.issue.body")},
+						},
+						Run: script,
+					},
+					actions.ActionStep{Uses: "actions/github-script@v8", With: map[string]actions.Expression{"SCRIPT": ref}},
+					actions.RunStep{
+						StepOptions: actions.StepOptions{Env: map[string]actions.Expression{"VALUE": ref}},
+						Run:         `printf '%s\n' "$VALUE"`,
+					},
+				},
+			},
+			{
+				ID: "consumer", RunsOn: "ubuntu-latest",
+				Env: map[string]actions.Expression{"VALUE": ref},
+				Steps: []actions.Step{
+					actions.ActionStep{Uses: "actions/github-script@v8", With: map[string]actions.Expression{"script": ref}},
+					actions.ActionStep{Uses: "actions/github-script@v8", With: map[string]actions.Expression{
+						"script": actions.OutputRef{Job: "producer", Name: "public"},
+					}},
+				},
+			},
+		}}
+		before, err := actions.Resolve(workflow)
+		require.NoError(t, err)
+		diagnostics := runTemplateInjection(t, workflow)
+		var flowPaths []string
+		for _, diagnostic := range diagnostics {
+			if diagnostic.Path != "jobs.producer.steps[0].run" {
+				assert.Equal(t, Error, diagnostic.Severity)
+				flowPaths = append(flowPaths, diagnostic.Path)
+			}
+		}
+		assert.Equal(t, []string{
+			"jobs.consumer.steps[0].with.script", "jobs.consumer.steps[1].with.script",
+			"jobs.producer.steps[1].with.SCRIPT",
+		}, flowPaths)
+		after, err := actions.Resolve(workflow)
+		require.NoError(t, err)
+		assert.Equal(t, before, after)
+		assert.Equal(t, ref, workflow.Jobs[0].Outputs["public"])
+		assert.Len(t, workflow.Jobs[0].Steps[0].(actions.RunStep).Outputs, 1)
+		assert.Empty(t, workflow.Jobs[1].Needs)
+		assert.Equal(t, ref, workflow.Jobs[1].Env["VALUE"])
+	}
+}
+
+func TestTemplateInjectionOutputFlowPartialFailure(t *testing.T) {
+	for _, failure := range []string{"run", "env", "name"} {
+		t.Run(failure, func(t *testing.T) {
+			workflow := templateInjectionWorkflow("", false)
+			workflow.Jobs[0].Steps = []actions.Step{
+				actions.RawStep{Fields: map[string]any{
+					"id": "capture", "env": map[string]any{"BODY": "${{ github.event.issue.body }}"},
+					"run": `printf 'value=%s\n' "$BODY" >> "$GITHUB_OUTPUT"`,
+				}},
+				actions.RawStep{Fields: map[string]any{"run": `echo "${{ steps.capture.outputs.value }}"`}},
+			}
+			path := "jobs.test.steps[2]." + failure
+			malformed := "${{ inputs.PRIVATE_VALUE + }}"
+			switch failure {
+			case "run":
+				workflow.Jobs[0].Steps = append(workflow.Jobs[0].Steps, actions.RawStep{Fields: map[string]any{"run": "echo " + malformed}})
+			case "env":
+				path += ".BODY"
+				workflow.Jobs[0].Steps = append(workflow.Jobs[0].Steps, actions.RawStep{Fields: map[string]any{
+					"env": map[string]any{"BODY": malformed}, "run": "echo safe",
+				}})
+			case "name":
+				path = "name"
+				workflow.Name = malformed
+			}
+			runner, err := New(TemplateInjectionRule())
+			require.NoError(t, err)
+			diagnostics, err := runner.Run(context.Background(), Input{Workflow: workflow})
+			var expressionError *taint.ExpressionError
+			require.ErrorAs(t, err, &expressionError)
+			assert.Equal(t, path, expressionError.Path)
+			require.Len(t, diagnostics, 2)
+			assert.True(t, diagnosticAt(diagnostics, "jobs.test.steps[1].run", 1, Error), "%+v", diagnostics)
+			assert.True(t, diagnosticAt(diagnostics, path, 1, Warning), "%+v", diagnostics)
+			assert.NotContains(t, fmt.Sprint(diagnostics, err), "PRIVATE_VALUE")
+		})
+	}
 }
 
 func TestTemplateInjectionFailuresAndCancellation(t *testing.T) {

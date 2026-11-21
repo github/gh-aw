@@ -30,6 +30,7 @@ type shell struct {
 	constantValues        map[string]map[string]struct{}
 	constantUnknown       map[string]bool
 	javascriptExecutables map[string]struct{}
+	incompleteRouting     bool
 }
 
 type constantState struct {
@@ -75,11 +76,10 @@ func (a *analyzer) parseShell(text string, fields map[string]any, path string, b
 		constants:    make(map[string]string), constantValues: make(map[string]map[string]struct{}),
 		constantUnknown: make(map[string]bool),
 	}
-	s.setConstants("GITHUB_OUTPUT", []string{"$GITHUB_OUTPUT"}, false)
-	if a.rule.IsSink(Site{Kind: EnvironmentFile}) {
-		s.setConstants("GITHUB_ENV", []string{runnerEnvTarget}, false)
-		s.setConstants("GITHUB_PATH", []string{runnerPathTarget}, false)
-	}
+	s.setConstants("GITHUB_OUTPUT", []string{runnerOutputTarget}, false)
+	s.setConstants("GITHUB_ENV", []string{runnerEnvTarget}, false)
+	s.setConstants("GITHUB_PATH", []string{runnerPathTarget}, false)
+	s.setConstants("GITHUB_STEP_SUMMARY", []string{runnerSummaryTarget}, false)
 	for key, sources := range bindings {
 		if name, ok := strings.CutPrefix(key, "shell."); ok {
 			s.vars[name] = sources
@@ -206,20 +206,24 @@ func (s *shell) stmts(stmts []*syntax.Stmt, captured bool, stdin value) value {
 }
 
 func (s *shell) stmt(stmt *syntax.Stmt, captured bool, stdin value) value {
-	redirected := false
 	for _, redir := range stmt.Redirs {
 		switch redir.Op.String() {
-		case ">", ">>", ">&", "&>", "&>>":
-			redirected = redirected || redir.N == nil || redir.N.Value == "1" || strings.HasPrefix(redir.Op.String(), "&")
 		case "<":
 			stdin = union(stdin, s.readFileWord(redir.Word))
 		case "<<", "<<-", "<<<": //nolint:generatedyamlheredoc // This analyzes authored heredocs; it does not generate shell.
 			stdin = union(stdin, s.word(redir.Hdoc), s.word(redir.Word))
 		}
 	}
+	route, incomplete := s.outputRoute(stmt)
+	redirected := route.redirect != nil || route.log || route.discarded || route.unknown
 	out := s.command(stmt.Cmd, captured || redirected, stdin)
-	for _, redir := range stmt.Redirs {
-		s.redirectOutput(stmt, redir, out)
+	if incomplete && (len(out) > 0 || s.vars.hasSources() || s.files.hasSources() || s.markers.hasSources()) {
+		s.a.gapAt(s.path, int(stmt.Pos().Line()), "shell descriptor routing is not fully modeled")
+	}
+	if route.redirect != nil {
+		s.redirectOutput(stmt, route.redirect, out)
+	} else if route.log {
+		s.a.emit(Site{Kind: Log, Path: s.path, Line: int(stmt.Pos().Line())}, out)
 	}
 	if redirected {
 		return nil

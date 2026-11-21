@@ -23,7 +23,7 @@ func templateInjectionOutputFlows(ctx context.Context, input Input, diagnostics 
 		IsSink: func(site taint.Site) bool { return site.Kind == taint.ExecutableInterpolation },
 		IsExecutableInput: func(site taint.Site) bool {
 			key, _ := executableActionInput(site.Uses)
-			return key != "" && key == site.Input
+			return key != "" && strings.EqualFold(key, site.Input)
 		},
 	}
 	result, err := analyzeUntrustedFlow(ctx, input, rule)
@@ -61,7 +61,7 @@ func outputFlowInput(ctx context.Context, input Input) (Input, bool, error) {
 		input.Workflow = workflow
 		for _, job := range input.Workflow.Jobs {
 			hasTransport = hasTransport || len(job.Outputs) > 0
-			for index, step := range job.Steps {
+			for _, step := range job.Steps {
 				// Lint must inspect typed run interpolation even though the
 				// emitter rejects it. Lower options without emitting that text.
 				run, typed := step.(actions.RunStep)
@@ -76,7 +76,6 @@ func outputFlowInput(ctx context.Context, input Input) (Input, bool, error) {
 				}
 				if typed {
 					fields["run"] = run.Run
-					job.Steps[index] = actions.RawStep{Fields: fields}
 				}
 				hasTransport = hasTransport || hasOutputTransport(fields)
 			}
@@ -97,27 +96,26 @@ func outputFlowInput(ctx context.Context, input Input) (Input, bool, error) {
 }
 
 func templateInjectionFlowError(diagnostics []Diagnostic, err error) ([]Diagnostic, error) {
+	return templateInjectionFlowWarnings(diagnostics, err), err
+}
+
+func templateInjectionFlowWarnings(diagnostics []Diagnostic, err error) []Diagnostic {
 	if joined, ok := err.(interface{ Unwrap() []error }); ok {
-		var failures []error
 		for _, child := range joined.Unwrap() {
-			var failure error
-			diagnostics, failure = templateInjectionFlowError(diagnostics, child)
-			failures = append(failures, failure)
+			diagnostics = templateInjectionFlowWarnings(diagnostics, child)
 		}
-		return diagnostics, errors.Join(failures...)
-	}
-	if child := errors.Unwrap(err); child != nil {
-		return templateInjectionFlowError(diagnostics, child)
-	}
-	var expressionError *taint.ExpressionError
-	if errors.As(err, &expressionError) {
-		if !diagnosticAt(diagnostics, expressionError.Path, expressionError.Line, Warning) {
-			diagnostics = append(diagnostics, Diagnostic{Severity: Warning, Path: expressionError.Path, Line: expressionError.Line,
-				Message: "Incomplete template-injection output-flow analysis: invalid Actions expression; fix the expression and rerun the check"})
+	} else if child := errors.Unwrap(err); child != nil {
+		diagnostics = templateInjectionFlowWarnings(diagnostics, child)
+	} else {
+		var expressionError *taint.ExpressionError
+		if errors.As(err, &expressionError) {
+			if !diagnosticAt(diagnostics, expressionError.Path, expressionError.Line, Warning) {
+				diagnostics = append(diagnostics, Diagnostic{Severity: Warning, Path: expressionError.Path, Line: expressionError.Line,
+					Message: "Incomplete template-injection output-flow analysis: invalid Actions expression; fix the expression and rerun the check"})
+			}
 		}
-		return diagnostics, nil
 	}
-	return diagnostics, err
+	return diagnostics
 }
 
 func hasOutputTransport(raw any) bool {

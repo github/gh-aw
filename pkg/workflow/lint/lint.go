@@ -66,6 +66,9 @@ type Input struct {
 }
 
 type Diagnostic struct {
+	// Source identifies the AST owning this finding. Zero uses the rule's
+	// primary available AST; mixed-source checks set it for individual findings.
+	Source       ASTTargets        `json:"-"`
 	RuleID       string            `json:"rule_id"`
 	ThreatRuleID string            `json:"threat_rule_id,omitempty"`
 	Severity     Severity          `json:"severity"`
@@ -217,7 +220,13 @@ func (r *Runner) Run(ctx context.Context, input Input) ([]Diagnostic, error) {
 			failures = append(failures, fmt.Errorf("lint rule %s: %w", rule.ID, err))
 		}
 		for _, diagnostic := range findings {
-			if suppressions.contains(input, rule, diagnostic.Path) {
+			if diagnostic.Source == 0 {
+				diagnostic.Source = AWAST
+				if input.Workflow != nil && targets&ActionsAST != 0 {
+					diagnostic.Source = ActionsAST
+				}
+			}
+			if suppressions.contains(rule.ID, diagnostic) {
 				continue
 			}
 			diagnostic.RuleID = rule.ID

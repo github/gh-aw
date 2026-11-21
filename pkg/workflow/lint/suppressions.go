@@ -16,12 +16,13 @@ import (
 	"github.com/goccy/go-yaml/token"
 )
 
+var suppressionCommentMarker = regexp.MustCompile(`#[ \t]*gh-aw:`)
+var suppressionDirective = regexp.MustCompile(`^gh-aw:\s*ignore\b`)
 var suppressionPattern = regexp.MustCompile(`^gh-aw:\s*ignore\[([^\]]*)\]\s+--\s+(\S.*)$`)
 
 type lintSuppression struct {
-	rules   map[string]struct{}
-	paths   map[string]struct{}
-	aliases []string
+	rules map[string]struct{}
+	paths map[string]struct{}
 }
 
 type lintSuppressions struct {
@@ -30,9 +31,8 @@ type lintSuppressions struct {
 }
 
 type suppressionField struct {
-	column  int
-	paths   map[string]struct{}
-	aliases []string
+	column int
+	paths  map[string]struct{}
 }
 
 func (r *Runner) suppressionRuleIDs() map[string]struct{} {
@@ -54,8 +54,8 @@ func (r *Runner) commentSuppressions(input Input) (lintSuppressions, error) {
 	}
 	var result lintSuppressions
 	var failures []error
-	if input.Workflow != nil && strings.Contains(input.Workflow.OriginalSource(), "gh-aw:") {
-		source, err := actions.Emit(input.Workflow)
+	if input.Workflow != nil && hasSuppressionComments(input.Workflow.OriginalSource()) {
+		source, err := actions.SourceForInspection(input.Workflow)
 		if err != nil {
 			failures = append(failures, errors.New("cannot render Actions source for lint suppressions"))
 		} else {
@@ -72,23 +72,33 @@ func (r *Runner) commentSuppressions(input Input) (lintSuppressions, error) {
 	return result, errors.Join(failures...)
 }
 
-func (s lintSuppressions) contains(input Input, rule Rule, path string) bool {
+func (s lintSuppressions) contains(ruleID string, diagnostic Diagnostic) bool {
 	scopes := s.aw
-	if input.Workflow != nil && rule.Targets != AWAST {
+	if diagnostic.Source == ActionsAST {
 		scopes = s.actions
 	}
 	return slices.ContainsFunc(scopes, func(scope lintSuppression) bool {
-		_, ruleMatches := scope.rules[rule.ID]
-		_, pathMatches := scope.paths[path]
-		pathMatches = pathMatches || slices.ContainsFunc(scope.aliases, func(alias string) bool {
-			return strings.HasPrefix(path, alias+".") || strings.HasPrefix(path, alias+"[")
-		})
+		_, ruleMatches := scope.rules[ruleID]
+		_, pathMatches := scope.paths[diagnostic.Path]
 		return ruleMatches && pathMatches
 	})
 }
 
+func hasSuppressionComments(source string) bool {
+	if !suppressionCommentMarker.MatchString(source) {
+		return false
+	}
+	return slices.ContainsFunc(lexer.Tokenize(source), func(item *token.Token) bool {
+		return item.Type == token.CommentType && suppressionDirective.MatchString(suppressionCommentText(item))
+	})
+}
+
+func suppressionCommentText(item *token.Token) string {
+	return strings.TrimSpace(strings.TrimPrefix(item.Value, "#"))
+}
+
 func parseLintSuppressions(source string, known map[string]struct{}) ([]lintSuppression, error) {
-	if !strings.Contains(source, "gh-aw:") {
+	if !hasSuppressionComments(source) {
 		return nil, nil
 	}
 	source = strings.ReplaceAll(source, "\r\n", "\n")
@@ -99,7 +109,15 @@ func parseLintSuppressions(source string, known map[string]struct{}) ([]lintSupp
 	}
 	fields := make(map[int][]suppressionField)
 	for _, document := range file.Docs {
-		collectSuppressionFields(document.Body, "", fields)
+		anchors := make(map[string]ast.Node)
+		for _, node := range ast.Filter(ast.AnchorType, document.Body) {
+			anchor, ok := node.(*ast.AnchorNode)
+			if !ok {
+				return nil, errors.New("cannot inspect YAML anchor for lint suppressions; correct the YAML before linting")
+			}
+			anchors[anchor.Name.GetToken().Value] = anchor.Value
+		}
+		collectSuppressionFields(document.Body, "", fields, anchors)
 	}
 	var lines []string
 	for line := range strings.Lines(source) {
@@ -110,8 +128,8 @@ func parseLintSuppressions(source string, known map[string]struct{}) ([]lintSupp
 		if item.Type != token.CommentType {
 			continue
 		}
-		text := strings.TrimSpace(strings.TrimPrefix(item.Value, "#"))
-		if !strings.HasPrefix(text, "gh-aw:") {
+		text := suppressionCommentText(item)
+		if !suppressionDirective.MatchString(text) {
 			continue
 		}
 		scope, err := suppressionComment(item.Position.Line, text, lines, fields, known)
@@ -158,7 +176,7 @@ func suppressionComment(line int, text string, lines []string, fields map[int][]
 			return lintSuppression{}, invalid
 		}
 		field := slices.MinFunc(candidates, func(a, b suppressionField) int { return a.column - b.column })
-		return lintSuppression{paths: field.paths, aliases: field.aliases, rules: rules}, nil
+		return lintSuppression{paths: field.paths, rules: rules}, nil
 	}
 	return lintSuppression{}, invalid
 }
@@ -167,12 +185,25 @@ func suppressionIndent(line string) int {
 	return len(line) - len(strings.TrimLeft(line, " \t"))
 }
 
-func collectSuppressionFields(node ast.Node, path string, fields map[int][]suppressionField) suppressionField {
+func collectSuppressionFields(node ast.Node, path string, fields map[int][]suppressionField, anchors map[string]ast.Node) suppressionField {
 	result := suppressionField{paths: map[string]struct{}{path: {}}}
+	if fields == nil {
+		switch node.(type) {
+		case *ast.MappingNode, *ast.MappingValueNode:
+			for key, value := range suppressionMapping(node, anchors) {
+				child := key
+				if path != "" {
+					child = path + "." + key
+				}
+				result.add(collectSuppressionFields(value, child, nil, anchors))
+			}
+			return result
+		}
+	}
 	switch value := node.(type) {
 	case *ast.MappingNode:
 		for _, field := range value.Values {
-			result.add(collectSuppressionFields(field, path, fields))
+			result.add(collectSuppressionFields(field, path, fields, anchors))
 		}
 	case *ast.MappingValueNode:
 		key := value.Key.GetToken()
@@ -180,25 +211,78 @@ func collectSuppressionFields(node ast.Node, path string, fields map[int][]suppr
 		if path != "" {
 			child = path + "." + child
 		}
-		descendants := collectSuppressionFields(value.Value, child, fields)
+		descendants := collectSuppressionFields(value.Value, child, fields, anchors)
 		descendants.column = key.Position.Column
-		fields[key.Position.Line] = append(fields[key.Position.Line], descendants)
+		if fields != nil {
+			fields[key.Position.Line] = append(fields[key.Position.Line], descendants)
+		}
 		result.add(descendants)
 	case *ast.SequenceNode:
 		for index, item := range value.Values {
-			result.add(collectSuppressionFields(item, path+"["+strconv.Itoa(index)+"]", fields))
+			result.add(collectSuppressionFields(item, path+"["+strconv.Itoa(index)+"]", fields, anchors))
 		}
 	case *ast.AnchorNode:
-		result.add(collectSuppressionFields(value.Value, path, fields))
+		result.add(collectSuppressionFields(value.Value, path, fields, anchors))
 	case *ast.TagNode:
-		result.add(collectSuppressionFields(value.Value, path, fields))
+		result.add(collectSuppressionFields(value.Value, path, fields, anchors))
 	case *ast.AliasNode:
-		result.aliases = append(result.aliases, path)
+		name := value.Value.GetToken().Value
+		if anchor, ok := anchors[name]; ok {
+			remaining := maps.Clone(anchors)
+			delete(remaining, name)
+			// Resolve at the alias path without registering the anchor's
+			// source lines as fields belonging to this separate occurrence.
+			result.add(collectSuppressionFields(anchor, path, nil, remaining))
+		}
+	}
+	return result
+}
+
+func suppressionMapping(node ast.Node, anchors map[string]ast.Node) map[string]ast.Node {
+	var fields []*ast.MappingValueNode
+	switch value := node.(type) {
+	case *ast.MappingNode:
+		fields = value.Values
+	case *ast.MappingValueNode:
+		fields = []*ast.MappingValueNode{value}
+	case *ast.AnchorNode:
+		return suppressionMapping(value.Value, anchors)
+	case *ast.TagNode:
+		return suppressionMapping(value.Value, anchors)
+	case *ast.AliasNode:
+		name := value.Value.GetToken().Value
+		remaining := maps.Clone(anchors)
+		delete(remaining, name)
+		return suppressionMapping(anchors[name], remaining)
+	case *ast.SequenceNode:
+		result := make(map[string]ast.Node)
+		for _, item := range value.Values {
+			for key, child := range suppressionMapping(item, anchors) {
+				if _, exists := result[key]; !exists {
+					result[key] = child
+				}
+			}
+		}
+		return result
+	}
+	result := make(map[string]ast.Node)
+	for _, field := range fields {
+		if !field.Key.IsMergeKey() {
+			result[field.Key.GetToken().Value] = field.Value
+		}
+	}
+	for _, field := range fields {
+		if field.Key.IsMergeKey() {
+			for key, child := range suppressionMapping(field.Value, anchors) {
+				if _, exists := result[key]; !exists {
+					result[key] = child
+				}
+			}
+		}
 	}
 	return result
 }
 
 func (field *suppressionField) add(child suppressionField) {
 	maps.Copy(field.paths, child.paths)
-	field.aliases = append(field.aliases, child.aliases...)
 }

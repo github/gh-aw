@@ -1,18 +1,20 @@
 # ADR-79624: Field-Scoped Lint Suppression Comments and Bounded Static Flow Analysis for Security Lint Gaps
 
 **Date**: 2026-11-21
-**Status**: Draft
-**Deciders**: [TODO: verify] PR #79624 author (pelikhan); `pkg/workflow/lint` maintainers to confirm
+**Status**: Proposed
+**Deciders**: Not recorded; maintainer review and approval are pending
 
 ---
 
 ### Context
 
-The Actions/AW workflow linter in `pkg/workflow/lint` had verified gaps: cross-run artifact execution through Node preloads/imports/loaders, executable inputs of reviewed third-party actions, attacker-controlled data transported through shell step and job outputs, writes to `GITHUB_ENV`/`GITHUB_PATH`, and unpinned container/service images. Closing them adds conservative taint propagation, which also adds false positives (Node metadata commands, literal `'$GITHUB_ENV'` filenames, disabled services, excluded matrix images). Operators had no narrow, auditable way to acknowledge an incorrect diagnostic, and the compiler must stay offline and deterministic and must still reject confirmed errors.
+The Actions/AW workflow linter in `pkg/workflow/lint` had verified gaps: cross-run artifact execution through Node preloads/imports/loaders, executable inputs of reviewed third-party actions, attacker-controlled data transported through shell step and job outputs, writes to `GITHUB_ENV`/`GITHUB_PATH`, and unpinned container/service images. Closing them adds conservative taint propagation and requires distinguishing false positives such as Node metadata commands, literal `'$GITHUB_ENV'` filenames, disabled services, and excluded matrix images. Operators had no narrow, auditable way to acknowledge an incorrect diagnostic. Lint analysis must remain offline and deterministic, and unsuppressed error diagnostics must still fail compilation.
 
 ### Decision
 
-We will extend the existing symbolic shell/taint model (`pkg/workflow/taint`) with new rules (`environment-file-injection`, `unpinned-images`) and wider `template-injection` and `artifact-execution` coverage, rather than adding a new analysis engine. We will add field-scoped `# gh-aw: ignore[rule-id, ...] -- reason` YAML comments that require exact registered rule IDs and a nonempty reason, reject malformed or misplaced directives, and keep sibling diagnostics, analysis errors, strict-mode checks, and runtime protections independent of them. Unsupported shells and unresolved flows produce coverage warnings that the compiler omits from its warning count while still failing on confirmed errors. The primary driver is closing real gaps while keeping false positives correctable without weakening security controls.
+The proposal extends the existing symbolic shell/taint model (`pkg/workflow/taint`) with new rules (`environment-file-injection`, `unpinned-images`) and wider `template-injection` and `artifact-execution` coverage, rather than adding a new analysis engine. It adds standalone `# gh-aw: ignore[rule-id, ...] -- reason` YAML comments immediately before a field at matching indentation. Directives require exact registered rule IDs and a nonempty reason; malformed or misplaced directives fail linting. Suppression applies to the named rules at that field and its descendants, not sibling fields, and does not suppress analysis errors, independent strict-mode checks, or runtime protections.
+
+Analysis remains bounded to supported syntax and modeled flows, without fetching or executing action internals. Known gaps receive rule-specific diagnostics; selected environment-file and output-flow coverage warnings remain visible in `gh aw lint` but are omitted from the compiler warning count. This is not a blanket downgrade of unresolved inputs. Unsuppressed errors still fail compilation. Suppressions make false positives reviewable, but their reasons are acknowledgements, not proof that a finding is safe.
 
 ### Alternatives Considered
 
@@ -26,27 +28,28 @@ Tuning rules until no false positives remain avoids a new user-facing syntax. It
 
 #### Alternative 3: Full interprocedural or interpreter-aware data-flow analysis
 
-Modeling JavaScript, PowerShell, action internals, and cross-job artifact flows would reduce the unsupported cases. It was rejected because it needs network access or code execution to resolve actions, and conflicts with the offline, deterministic compiler. Bounded checks with explicit coverage warnings were chosen instead.
+Richer JavaScript, PowerShell, action-internal, and cross-job models could reduce unsupported cases. Static analysis can remain offline, but deeper models require additional semantics, action source inputs, and maintenance beyond the current lint contract. Fetching or executing action internals during linting is outside that contract. Extending the existing bounded model with explicit gap diagnostics keeps this change scoped without claiming complete flow analysis.
 
 ### Consequences
 
 #### Positive
-- Cross-run artifact execution, executable action inputs, output-transported injection, runner environment-file injection, and unpinned images are now detected.
+- Supported cross-run artifact execution, executable action inputs, output-transported injection, runner environment-file injection, and unpinned images are diagnosed.
 - Known false positives are corrected, and the remaining ones can be acknowledged per field with an auditable reason.
-- Suppressions do not disable compiler validation, strict-mode controls, or runtime protections, so a comment cannot silently weaken security.
-- The compiler stays offline and deterministic, and confirmed errors still fail compilation.
+- Suppressions do not disable independent compiler validation, strict-mode controls, or runtime protections.
+- Lint analysis stays offline and deterministic, and unsuppressed errors still fail compilation.
 
 #### Negative
 - A new comment syntax must be documented, parsed, and maintained, and malformed directives now fail linting.
-- Conservative taint propagation can still produce false positives and misses, since unsupported interpreters and unresolved flows are only warned about.
+- Conservative taint propagation can still produce false positives and misses. Gap diagnostics do not prove that an unsupported interpreter or unresolved flow is safe.
+- A suppression can hide a real finding for its named rules, including findings under a mapping field; reviewers must assess the reason and prefer the narrowest field.
 - AW comments are not copied into generated Actions graphs, so compiled execution diagnostics need directives in the Actions YAML and AW-only rules need them in frontmatter; anchors do not carry suppressions to aliases.
 - Omitting flow-coverage warnings from the compiler warning count lowers their visibility there; `gh aw lint` retains them.
 
 #### Neutral
 - Rule IDs become a public contract for suppression directives, so renaming a rule is a breaking change.
 - New rules are registered in the default registry and documented in `docs/src/content/docs/reference/workflow-linters.md`.
-- Two new skills (`retrieve-public-aw-workflows`, `top-public-aw-repositories`) ride along in this PR and are unrelated to this decision.
+- The `retrieve-public-aw-workflows` and `top-public-aw-repositories` skills support the requested public-workflow discovery follow-up. They are separate operational guidance, not part of this lint architecture.
 
 ---
 
-*ADR created by [adr-writer agent]. Review and finalize before changing status from Draft to Accepted.*
+*Proposed for maintainer review in [PR #79624](https://github.com/github/gh-aw/pull/79624). No maintainer approval is recorded here; change to Accepted only after approval and record the deciders then.*

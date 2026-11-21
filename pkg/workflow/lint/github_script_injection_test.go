@@ -3,6 +3,7 @@ package lint
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/github/gh-aw/pkg/workflow/actions"
@@ -77,20 +78,29 @@ func TestExecutableActionInputs(t *testing.T) {
 		{"addnab/docker-run-action", "run"},
 	} {
 		t.Run(tt.uses, func(t *testing.T) {
-			for _, typed := range []bool{false, true} {
+			for _, variant := range []struct {
+				key   string
+				typed bool
+			}{
+				{tt.key, false}, {tt.key, true},
+				{strings.ToUpper(tt.key), false}, {strings.ToUpper(tt.key), true},
+				{strings.ToUpper(tt.key[:1]) + tt.key[1:], false},
+				{strings.ToUpper(tt.key[:1]) + tt.key[1:], true},
+			} {
+				key, typed := variant.key, variant.typed
 				workflow := templateInjectionWorkflow("", typed)
 				uses := tt.uses + "@0123456789abcdef0123456789abcdef01234567"
 				workflow.Env = map[string]actions.Expression{"BODY": actions.Context("github.event.comment.body")}
 				var step actions.Step = actions.RawStep{Fields: map[string]any{
-					"uses": uses, "with": map[string]any{tt.key: "code\n${{ env.BODY }}"},
+					"uses": uses, "with": map[string]any{key: "code\n${{ env.BODY }}"},
 				}}
 				if typed {
-					step = actions.ActionStep{Uses: uses, With: map[string]actions.Expression{tt.key: actions.Literal("code\n${{ env.BODY }}")}}
+					step = actions.ActionStep{Uses: uses, With: map[string]actions.Expression{key: actions.Literal("code\n${{ env.BODY }}")}}
 				}
 				workflow.Jobs[0].Steps = []actions.Step{step}
 				diagnostics := runTemplateInjection(t, workflow)
 				require.Len(t, diagnostics, 1)
-				assert.Equal(t, "jobs.test.steps[0].with."+tt.key, diagnostics[0].Path)
+				assert.Equal(t, "jobs.test.steps[0].with."+key, diagnostics[0].Path)
 				assert.Equal(t, 2, diagnostics[0].Line)
 			}
 			workflow := templateInjectionWorkflow("", false)
@@ -104,5 +114,60 @@ func TestExecutableActionInputs(t *testing.T) {
 			}}}
 			assert.Empty(t, runTemplateInjection(t, workflow), "boolean code inputs and unrelated data inputs are not injection")
 		})
+	}
+}
+
+func TestExecutableActionInputOutputFlows(t *testing.T) {
+	for _, test := range []struct{ uses, key string }{
+		{"actions/github-script@v8", "SCRIPT"},
+		{"amadevus/pwsh-script@v2", "Script"},
+		{"jannekem/run-python-script-action@v1", "sCrIpT"},
+		{"cardinalby/js-eval-action@v1", "EXPRESSION"},
+		{"addnab/docker-run-action@v3", "RUN"},
+	} {
+		t.Run(test.uses, func(t *testing.T) {
+			for _, typed := range []bool{false, true} {
+				var consumer actions.Step = actions.RawStep{Fields: map[string]any{
+					"uses": test.uses, "with": map[string]any{test.key: "${{ steps.capture.outputs.value }}"},
+				}}
+				if typed {
+					consumer = actions.ActionStep{Uses: test.uses, With: map[string]actions.Expression{
+						test.key: actions.Literal("${{ steps.capture.outputs.value }}"),
+					}}
+				}
+				workflow := templateInjectionWorkflow("", false)
+				workflow.Jobs[0].Steps = []actions.Step{
+					actions.RawStep{Fields: map[string]any{
+						"id": "capture", "env": map[string]any{"BODY": "${{ github.event.issue.body }}"},
+						"run": `printf 'value=%s\n' "$BODY" >> "$GITHUB_OUTPUT"`,
+					}},
+					consumer,
+				}
+				diagnostics := runTemplateInjection(t, workflow)
+				require.Len(t, diagnostics, 1)
+				assert.Equal(t, Error, diagnostics[0].Severity)
+				assert.Equal(t, "jobs.test.steps[1].with."+test.key, diagnostics[0].Path)
+			}
+		})
+	}
+}
+
+func TestExecutableActionInputCaseCollisions(t *testing.T) {
+	for _, typed := range []bool{false, true} {
+		workflow := templateInjectionWorkflow("", false)
+		var step actions.Step = actions.RawStep{Fields: map[string]any{
+			"uses": "actions/github-script@v8",
+			"with": map[string]any{"SCRIPT": "console.log('${{ inputs.body }}')", "script": "console.log('safe')"},
+		}}
+		if typed {
+			step = actions.ActionStep{Uses: "actions/github-script@v8", With: map[string]actions.Expression{
+				"SCRIPT": actions.Literal("console.log('${{ inputs.body }}')"),
+				"script": actions.Literal("console.log('safe')"),
+			}}
+		}
+		workflow.Jobs[0].Steps[0] = step
+		diagnostics := runTemplateInjection(t, workflow)
+		require.Len(t, diagnostics, 1)
+		assert.Equal(t, "jobs.test.steps[0].with.SCRIPT", diagnostics[0].Path)
 	}
 }

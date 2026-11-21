@@ -34,3 +34,29 @@ func TestCompilerLintCommentsDoNotBypassStrictPermissions(t *testing.T) {
 	compiler.SetSkipValidation(true)
 	require.ErrorContains(t, compiler.CompileWorkflow(file), "strict mode: write permission")
 }
+
+func TestCompilerLintOrdinaryGHAWDescription(t *testing.T) {
+	source := "---\ndescription: 'gh-aw: daily triage'\non: workflow_dispatch\nstrict: false\n" +
+		"tools: {github: false}\n---\nPrompt.\n"
+	file := filepath.Join(t.TempDir(), "workflow.md")
+	require.NoError(t, os.WriteFile(file, []byte(source), 0o600))
+	compiler := NewCompiler(WithLint(true))
+	compiler.SetSkipValidation(true)
+	require.NoError(t, compiler.CompileWorkflow(file))
+	content, err := os.ReadFile(strings.TrimSuffix(file, ".md") + ".lock.yml")
+	require.NoError(t, err)
+	require.Contains(t, string(content), "# gh-aw: daily triage")
+}
+
+func TestCompilerLintSuppressedMCPImageArgument(t *testing.T) {
+	const source = "---\nmcp-servers:\n  fixture:\n" +
+		"    # gh-aw: ignore[image-argument] -- Reviewed MCP image\n    container: '-fixture'\n---\nPrompt.\n"
+	document, err := aw.Parse(source)
+	require.NoError(t, err)
+	const actions = "jobs:\n  check:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo public\n"
+	compiler := NewCompiler(WithLint(true))
+	require.NoError(t, compiler.lintCompiledWorkflow(&WorkflowData{SourceDocument: document}, actions, "test.md"))
+	document, err = aw.Parse(strings.ReplaceAll(source, "    # gh-aw: ignore[image-argument] -- Reviewed MCP image\n", ""))
+	require.NoError(t, err)
+	require.ErrorContains(t, compiler.lintCompiledWorkflow(&WorkflowData{SourceDocument: document}, actions, "test.md"), "[image-argument]")
+}

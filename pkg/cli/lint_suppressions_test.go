@@ -51,3 +51,37 @@ func TestLintSuppressionCLI(t *testing.T) {
 		}
 	}
 }
+
+func TestLintSuppressionCompanionMCPCLI(t *testing.T) {
+	for _, suppressed := range []bool{false, true} {
+		t.Run(strconv.FormatBool(suppressed), func(t *testing.T) {
+			source := "---\nmcp-servers:\n  fixture:\n"
+			if suppressed {
+				source += "    # gh-aw: ignore[image-argument] -- Reviewed MCP image\n"
+			}
+			source += "    container: '-fixture'\n---\nPrompt.\n"
+			directory := t.TempDir()
+			file := filepath.Join(directory, "workflow.lock.yml")
+			require.NoError(t, os.WriteFile(filepath.Join(directory, "workflow.md"), []byte(source), 0o600))
+			require.NoError(t, os.WriteFile(file, []byte("jobs:\n  check:\n    runs-on: ubuntu-latest\n"+
+				"    container: '-fixture'\n    steps:\n      - run: echo public\n"), 0o600))
+			command := NewLintCommand()
+			var output bytes.Buffer
+			command.SetOut(&output)
+			command.SetErr(&output)
+			command.SetArgs([]string{"--rules=image-argument", "--json", file})
+			require.ErrorContains(t, command.Execute(), "workflow lint found")
+			var diagnostics []workflowLintDiagnostic
+			require.NoError(t, json.NewDecoder(&output).Decode(&diagnostics))
+			count := 2
+			if suppressed {
+				count = 1
+			}
+			require.Len(t, diagnostics, count)
+			assert.Equal(t, "jobs.check.container", diagnostics[0].Path)
+			if !suppressed {
+				assert.Equal(t, "mcp-servers.fixture.container", diagnostics[1].Path)
+			}
+		})
+	}
+}
