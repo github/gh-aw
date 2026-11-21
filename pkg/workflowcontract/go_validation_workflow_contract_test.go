@@ -109,7 +109,7 @@ func TestGoTestParallelizerDisablesCursorPersistence(t *testing.T) {
 	if !config.Tools.CacheMemory.RestoreOnly {
 		t.Fatal("cursor must remain restore-only until trusted validation can authorize persistence")
 	}
-	if config.MaxAICredits != 15 || config.MaxTurns != 40 {
+	if config.MaxAICredits != 25 || config.MaxTurns != 60 {
 		t.Fatal("parallelizer must retain its per-run credit and turn limits")
 	}
 }
