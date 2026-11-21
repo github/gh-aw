@@ -96,6 +96,33 @@ func compileAuthorizationTestSource(t *testing.T, file string) {
 	require.NoError(t, compiler.CompileWorkflow(file))
 }
 
+func TestAuthorizationCandidateDirectoryUsesExplicitSnapshotRoot(t *testing.T) {
+	snapshot := t.TempDir()
+	source := filepath.Join(snapshot, ".github/workflows/triage.md")
+	writeAuthorizationTestFile(t, source, authorizationSourceFixture)
+	_, generated, err := workflow.NewAuthorizationVerificationCompiler(snapshot).CompileAuthorizationSnapshot(source)
+	require.NoError(t, err)
+	writeAuthorizationTestFile(t, filepath.Join(snapshot, ".github/workflows/triage.lock.yml"), generated)
+
+	callerDir := t.TempDir()
+	t.Chdir(callerDir)
+	before, err := os.Getwd()
+	require.NoError(t, err)
+
+	cmd := NewValidateCommand(func(string) error {
+		t.Fatal("ordinary validation ran")
+		return nil
+	})
+	result := &AuthorizationPolicyResult{}
+	verifyAuthorizationCandidateDirectory(cmd, snapshot, mustParseAuthorizationPolicy(t), result)
+
+	after, err := os.Getwd()
+	require.NoError(t, err)
+	require.Equal(t, before, after)
+	require.Empty(t, result.Findings)
+	require.Len(t, result.Workflows, 1)
+}
+
 func TestAuthorizationGitEnvironmentIsolated(t *testing.T) {
 	root, other := t.TempDir(), t.TempDir()
 	for _, repo := range []string{root, other} {
