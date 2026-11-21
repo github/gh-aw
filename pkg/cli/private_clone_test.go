@@ -8,9 +8,11 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
+	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/parser"
 	"github.com/stretchr/testify/require"
 )
@@ -69,11 +71,11 @@ func TestPrivateCloneWorkflowBundle(t *testing.T) {
 		dir := t.TempDir()
 		require.NoError(t, os.WriteFile(filepath.Join(dir, "fix.md"),
 			[]byte(strings.Replace(privateCloneTestWorkflow, "engine: copilot", "imports: [shared/context.md]\nengine: copilot", 1)), 0o600))
-		_, err := readPrivateCloneWorkflows(dir)
+		_, _, err := readPrivateCloneWorkflows(dir)
 		require.ErrorContains(t, err, "not bundled")
 		require.NoError(t, os.Mkdir(filepath.Join(dir, "shared"), 0o700))
 		require.NoError(t, os.WriteFile(filepath.Join(dir, "shared/context.md"), []byte("Local context"), 0o600))
-		_, err = readPrivateCloneWorkflows(dir)
+		_, _, err = readPrivateCloneWorkflows(dir)
 		require.NoError(t, err)
 	})
 	t.Run("requires a dispatchable starter workflow", func(t *testing.T) {
@@ -96,7 +98,7 @@ func TestPrivateCloneWorkflowBundle(t *testing.T) {
 			} else {
 				require.NoError(t, os.WriteFile(filepath.Join(dir, name), []byte("name: unexpected"), 0o600))
 			}
-			_, err := readPrivateCloneWorkflows(dir)
+			_, _, err := readPrivateCloneWorkflows(dir)
 			require.Error(t, err)
 		}
 	})
@@ -111,7 +113,7 @@ func TestPrivateCloneWorkflowBundle(t *testing.T) {
 		} {
 			dir := t.TempDir()
 			require.NoError(t, os.WriteFile(filepath.Join(dir, "fix.md"), []byte("---\non: workflow_dispatch\n"+field+"\n---\nFix\n"), 0o600))
-			_, err := readPrivateCloneWorkflows(dir)
+			_, _, err := readPrivateCloneWorkflows(dir)
 			require.Error(t, err, field)
 		}
 	})
@@ -214,7 +216,7 @@ func TestPrivateCloneDocsStarterCompiles(t *testing.T) {
 	files := map[string][]byte{"investigate.md": []byte(privateCloneDocsStarter)}
 	starter, err := resolvePrivateCloneStarter(files, "")
 	require.NoError(t, err)
-	require.NoError(t, installPrivateCloneBundle(dir, files, snapshot))
+	require.NoError(t, installPrivateCloneBundle(dir, files, nil, snapshot))
 	require.NoError(t, withWorkingDir(dir, func() error {
 		_, err := CompileWorkflows(context.Background(), CompileConfig{WorkflowDir: ".github/workflows", Strict: true, Validate: true, Approve: true})
 		return err
@@ -261,7 +263,7 @@ func TestPrivateCloneBootstrap(t *testing.T) {
 		"shared/setup.md":  []byte("${{ secrets.BUILD_TOKEN }}"),
 		"shared/github.md": []byte("---\ntools:\n  github:\n    toolsets: [repos]\n---\n"),
 	}
-	require.NoError(t, installPrivateCloneBundle(dir, files, snapshot))
+	require.NoError(t, installPrivateCloneBundle(dir, files, nil, snapshot))
 	require.NoFileExists(t, filepath.Join(dir, ".github/workflows/upstream.yml"))
 	data, err := os.ReadFile(filepath.Join(dir, ".github/workflows/fix.md"))
 	require.NoError(t, err)
@@ -303,7 +305,7 @@ func TestPrivateCloneRejectsUpstreamSymlink(t *testing.T) {
 	dir := t.TempDir()
 	outside := t.TempDir()
 	require.NoError(t, os.Symlink(outside, filepath.Join(dir, ".github")))
-	err := installPrivateCloneBundle(dir, nil, &privateCloneSnapshot{})
+	err := installPrivateCloneBundle(dir, nil, nil, &privateCloneSnapshot{})
 	require.ErrorContains(t, err, ".github must be a real directory")
 }
 
@@ -315,7 +317,7 @@ func TestPrivateCloneCompilation(t *testing.T) {
 		privateCloneManifest: privateCloneManifest{Version: 1, SourceSHA: strings.Repeat("a", 40)},
 		Data:                 map[string][]byte{},
 	}
-	require.NoError(t, installPrivateCloneBundle(dir, map[string][]byte{"fix.md": []byte(privateCloneTestWorkflow)}, snapshot))
+	require.NoError(t, installPrivateCloneBundle(dir, map[string][]byte{"fix.md": []byte(privateCloneTestWorkflow)}, nil, snapshot))
 	require.NoError(t, withWorkingDir(dir, func() error {
 		_, err := CompileWorkflows(context.Background(), CompileConfig{
 			WorkflowDir: ".github/workflows",
@@ -376,13 +378,14 @@ func TestPrivateCloneDestinationPolicy(t *testing.T) {
 		permissions string
 		ok          bool
 	}{
-		{"private standalone disabled", `{"private":true,"fork":false,"full_name":"security/fix"}`, `{"enabled":false}`, true},
+		{"private standalone disabled", `{"private":true,"visibility":"private","fork":false,"full_name":"security/fix"}`, `{"enabled":false}`, true},
 		{"public", `{"private":false,"fork":false,"full_name":"security/fix"}`, `{"enabled":false}`, false},
-		{"fork", `{"private":true,"fork":true,"full_name":"security/fix"}`, `{"enabled":false}`, false},
-		{"wrong repository", `{"private":true,"fork":false,"full_name":"security/other"}`, `{"enabled":false}`, false},
-		{"missing fork classification", `{"private":true,"full_name":"security/fix"}`, `{"enabled":false}`, false},
-		{"Actions enabled", `{"private":true,"fork":false,"full_name":"security/fix"}`, `{"enabled":true}`, false},
-		{"missing policy", `{"private":true,"fork":false,"full_name":"security/fix"}`, `{}`, false},
+		{"internal", `{"private":true,"visibility":"internal","fork":false,"full_name":"security/fix"}`, `{"enabled":false}`, false},
+		{"fork", `{"private":true,"visibility":"private","fork":true,"full_name":"security/fix"}`, `{"enabled":false}`, false},
+		{"wrong repository", `{"private":true,"visibility":"private","fork":false,"full_name":"security/other"}`, `{"enabled":false}`, false},
+		{"missing fork classification", `{"private":true,"visibility":"private","full_name":"security/fix"}`, `{"enabled":false}`, false},
+		{"Actions enabled", `{"private":true,"visibility":"private","fork":false,"full_name":"security/fix"}`, `{"enabled":true}`, false},
+		{"missing policy", `{"private":true,"visibility":"private","fork":false,"full_name":"security/fix"}`, `{}`, false},
 	} {
 		t.Run(scenario.name, func(t *testing.T) {
 			t.Setenv("PRIVATE_CLONE_TEST_REPO", scenario.repo)
@@ -411,7 +414,7 @@ case "$*" in
   "repo create "*) exit 0 ;;
   *"--method PUT"*) exit 0 ;;
   *actions/permissions*) printf '%s\n' '{"enabled":false}' ;;
-  "api repos/security/fix") printf '%s\n' '{"private":true,"fork":false,"full_name":"security/fix"}' ;;
+  "api repos/security/fix") printf '%s\n' '{"private":true,"visibility":"private","fork":false,"full_name":"security/fix"}' ;;
   *) exit 1 ;;
 esac`)
 	gitBin := t.TempDir()
@@ -431,6 +434,7 @@ printf 'git %s\n' "$*" >> "$PRIVATE_CLONE_TEST_LOG"
 	require.Less(t, strings.Index(record, "api repos/security/fix/actions/permissions\n"), strings.Index(record, "push origin"))
 	require.Contains(t, record, "HEAD:refs/heads/main refs/tags/private-clone/bootstrap")
 	require.NotContains(t, record, "--mirror")
+	require.NotContains(t, record, "--disable-issues")
 	require.NotContains(t, record, "workflow run")
 }
 
@@ -482,7 +486,7 @@ func TestPrivateCloneCopilotRequestsPermission(t *testing.T) {
 		"---\non: workflow_dispatch\nengine:\n  id: codex\n---\nFix\n":                   nil,
 		"---\non: workflow_dispatch\npermissions:\n  copilot-requests: none\n---\nFix\n": "none",
 	} {
-		data, err := configurePrivateCloneWorkflow("fix.md", []byte(workflow))
+		data, err := configurePrivateCloneWorkflow("fix.md", []byte(workflow), nil)
 		require.NoError(t, err, workflow)
 		parsed, err := parser.ExtractFrontmatterFromContent(string(data))
 		require.NoError(t, err, workflow)
@@ -519,4 +523,293 @@ esac`)
 		Source: "acme/source", Destination: "security/fix", Ref: "main", Alerts: []int{42},
 	})
 	require.ErrorContains(t, err, "invalid JSON")
+}
+
+func TestPrivateCloneBundleImportsRejectUnvalidatedDependencies(t *testing.T) {
+	root := func(imports string) []byte {
+		return []byte("---\non: workflow_dispatch\nimports: [" + imports + "]\n---\nFix\n")
+	}
+	shared := []byte("---\ntools:\n  bash: true\n---\nContext\n")
+	for _, imports := range []string{
+		"../config.md", "shared/../../config.md", ".github/workflows/shared/a.md", "/.github/workflows/shared/a.md",
+		"shared/a.md@main", "https://example.com/a.md", "nested/dir/a.md", "shared/context.txt",
+	} {
+		files := map[string][]byte{
+			"fix.md": root(imports), "shared/a.md": shared, "nested/dir/a.md": shared, "shared/context.txt": shared,
+		}
+		require.Error(t, validatePrivateCloneWorkflowFiles(files), imports)
+	}
+	files := map[string][]byte{"fix.md": root("shared/a.md"), "shared/a.md": []byte("---\nimports: [./b.yml]\n---\n"), "shared/b.yml": []byte("tools:\n  bash: true\n")}
+	require.NoError(t, validatePrivateCloneWorkflowFiles(files))
+	files["shared/b.yml"] = []byte("imports: [../../config.md]\n")
+	require.Error(t, validatePrivateCloneWorkflowFiles(files))
+}
+
+func TestPrivateCloneBundleImportsRejectBodyDirectives(t *testing.T) {
+	for _, directive := range []string{
+		"@include shared/a.md", "@import? acme/repo/a.md", "{{#import shared/a.md}}", "See {{#runtime-import shared/a.md}} here",
+	} {
+		files := map[string][]byte{"fix.md": []byte("---\non: workflow_dispatch\n---\n" + directive + "\n"), "shared/a.md": []byte("x")}
+		require.ErrorContains(t, validatePrivateCloneWorkflowFiles(files), "fix.md", directive)
+	}
+}
+
+func TestPrivateCloneBundleImportsRejectRootConfiguration(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "fix.md"), []byte(privateCloneTestWorkflow), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "aw.json"),
+		[]byte(`{"maintenance":{"compile":{"create_pull_request_github_token":"UPSTREAM_TOKEN"}}}`), 0o600))
+	_, _, err := readPrivateCloneWorkflows(dir)
+	require.ErrorContains(t, err, "aw.json")
+}
+
+func TestPrivateClonePublicationGitIgnoresInheritedRepositoryEnv(t *testing.T) {
+	outer := t.TempDir()
+	clone := t.TempDir()
+	t.Setenv("GIT_DIR", filepath.Join(outer, ".git"))
+	t.Setenv("GIT_WORK_TREE", outer)
+	t.Setenv("GIT_INDEX_FILE", filepath.Join(outer, "index"))
+	_, err := privateCloneGit(context.Background(), clone, "init", "--initial-branch=main", "--template=")
+	require.NoError(t, err)
+	require.DirExists(t, filepath.Join(clone, ".git"))
+	require.NoDirExists(t, filepath.Join(outer, ".git"))
+	for _, entry := range privateCloneGitEnvironment(clone) {
+		require.False(t, strings.HasPrefix(entry, "GIT_DIR=") || strings.HasPrefix(entry, "GIT_WORK_TREE=") || strings.HasPrefix(entry, "GIT_INDEX_FILE="), entry)
+	}
+}
+
+func TestPrivateClonePublicationPinsOneHost(t *testing.T) {
+	t.Setenv("GITHUB_SERVER_URL", "https://ghe.example.com")
+	t.Setenv("GH_HOST", "github.com")
+	privateCloneMockGH(t, `printf '%s' "$GH_HOST"`)
+	host, err := privateCloneGH(context.Background(), "api", "repos/security/fix")
+	require.NoError(t, err)
+	require.Equal(t, "ghe.example.com", string(host))
+	require.Equal(t, "https://ghe.example.com/security/fix.git", trialRepositoryGitURL("security/fix"))
+}
+
+func TestPrivateClonePublicationRejectsRequiredStarterInputs(t *testing.T) {
+	starter := func(inputs string) map[string][]byte {
+		return map[string][]byte{"investigate.md": []byte("---\non:\n  workflow_dispatch:\n    inputs:\n" + inputs + "---\nInvestigate\n")}
+	}
+	_, err := resolvePrivateCloneStarter(starter("      target:\n        required: true\n"), "")
+	require.ErrorContains(t, err, "inputs without defaults (target)")
+	require.ErrorContains(t, err, "--no-start")
+	lock, err := resolvePrivateCloneStarter(starter("      target:\n        required: true\n        default: main\n      note:\n        required: false\n"), "")
+	require.NoError(t, err)
+	require.Equal(t, "investigate.lock.yml", lock)
+}
+
+func TestPrivateClonePublicationPreservesExecutableBundleFiles(t *testing.T) {
+	bundleDir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(bundleDir, "fix.md"), []byte(privateCloneTestWorkflow), 0o600))
+	require.NoError(t, os.MkdirAll(filepath.Join(bundleDir, "scripts"), 0o700))
+	require.NoError(t, os.WriteFile(filepath.Join(bundleDir, "scripts", "run.sh"), []byte("#!/bin/sh\n"), 0o700))
+	require.NoError(t, os.WriteFile(filepath.Join(bundleDir, "scripts", "notes.txt"), []byte("notes"), 0o600))
+	files, executables, err := readPrivateCloneWorkflows(bundleDir)
+	require.NoError(t, err)
+	require.Equal(t, map[string]struct{}{"scripts/run.sh": {}}, executables)
+	dir := t.TempDir()
+	snapshot := &privateCloneSnapshot{Data: map[string][]byte{privateCloneContextDir + "/code-scanning/42.json": []byte("{}")}}
+	require.NoError(t, installPrivateCloneBundle(dir, files, executables, snapshot))
+	for name, executable := range map[string]bool{
+		".github/workflows/scripts/run.sh":                true,
+		".github/workflows/scripts/notes.txt":             false,
+		privateCloneContextDir + "/code-scanning/42.json": false,
+	} {
+		info, err := os.Stat(filepath.Join(dir, filepath.FromSlash(name)))
+		require.NoError(t, err)
+		require.Equal(t, executable, info.Mode().Perm()&0o111 != 0, name)
+	}
+}
+
+func privateCloneSnapshotGit(t *testing.T, dir string, args ...string) string {
+	t.Helper()
+	cmd := exec.Command("git", append([]string{"-c", "user.name=Test", "-c", "user.email=test@example.com", "-c", "commit.gpgsign=false"}, args...)...)
+	cmd.Dir = dir
+	cmd.Env = append(os.Environ(), "GIT_CONFIG_GLOBAL="+os.DevNull, "GIT_CONFIG_NOSYSTEM=1")
+	out, err := cmd.CombinedOutput()
+	require.NoError(t, err, "%s", out)
+	return strings.TrimSpace(string(out))
+}
+
+func privateCloneSnapshotUpstream(t *testing.T, files map[string]string) (string, string) {
+	t.Helper()
+	upstream := t.TempDir()
+	privateCloneSnapshotGit(t, upstream, "init", "--initial-branch=main", "--template=")
+	require.NoError(t, os.WriteFile(filepath.Join(upstream, "secret.txt"), []byte("deleted secret"), 0o600))
+	privateCloneSnapshotGit(t, upstream, "add", "--all")
+	privateCloneSnapshotGit(t, upstream, "commit", "-m", "Old history")
+	require.NoError(t, os.Remove(filepath.Join(upstream, "secret.txt")))
+	for name, content := range files {
+		require.NoError(t, os.MkdirAll(filepath.Dir(filepath.Join(upstream, name)), 0o700))
+		require.NoError(t, os.WriteFile(filepath.Join(upstream, name), []byte(content), 0o600))
+	}
+	privateCloneSnapshotGit(t, upstream, "add", "--all")
+	privateCloneSnapshotGit(t, upstream, "commit", "-m", "Selected")
+	sha := privateCloneSnapshotGit(t, upstream, "rev-parse", "HEAD")
+	dir := t.TempDir()
+	privateCloneSnapshotGit(t, dir, "init", "--initial-branch=main", "--template=")
+	privateCloneSnapshotGit(t, dir, "fetch", "--no-tags", upstream, sha)
+	return dir, sha
+}
+
+func TestPrivateCloneSnapshotPublishesIndependentForceStagedBootstrap(t *testing.T) {
+	dir, sha := privateCloneSnapshotUpstream(t, map[string]string{".gitignore": "*.json\n*.lock.yml\n", "main.go": "package main\n"})
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "ignored.json"), []byte("{}"), 0o600))
+	require.NoError(t, snapshotPrivateCloneSource(context.Background(), dir, sha))
+	snapshot := &privateCloneSnapshot{
+		privateCloneManifest: privateCloneManifest{Version: 1, SourceSHA: sha},
+		Data:                 map[string][]byte{privateCloneContextDir + "/code-scanning/42.json": []byte("{}")},
+	}
+	require.NoError(t, installPrivateCloneBundle(dir, map[string][]byte{"fix.md": []byte(privateCloneTestWorkflow)}, nil, snapshot))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, ".github/workflows/fix.lock.yml"), []byte("name: fix\n"), 0o600))
+	_, err := commitPrivateCloneBootstrap(context.Background(), dir)
+	require.NoError(t, err)
+
+	require.Equal(t, "2", privateCloneSnapshotGit(t, dir, "rev-list", "--count", "--all"))
+	require.Empty(t, privateCloneSnapshotGit(t, dir, "log", "--all", "--format=%H", "--", "secret.txt"))
+	tracked := privateCloneSnapshotGit(t, dir, "ls-files")
+	for _, name := range []string{".github/workflows/fix.lock.yml", ".github/workflows/fix.md", privateCloneContextDir + "/manifest.json", privateCloneContextDir + "/code-scanning/42.json", "main.go"} {
+		require.Contains(t, strings.Split(tracked, "\n"), name)
+	}
+	require.NotContains(t, tracked, "ignored.json")
+}
+
+func TestPrivateCloneSnapshotRejectsSubmodulesAndLFS(t *testing.T) {
+	dir, sha := privateCloneSnapshotUpstream(t, map[string]string{".gitattributes": "# *.zip filter=lfs\n*.bin filter=lfs diff=lfs merge=lfs -text\n"})
+	require.ErrorContains(t, snapshotPrivateCloneSource(context.Background(), dir, sha), "uses Git LFS (.gitattributes)")
+
+	dir, sha = privateCloneSnapshotUpstream(t, map[string]string{"main.go": "package main\n"})
+	privateCloneSnapshotGit(t, dir, "checkout", "--detach", sha)
+	privateCloneSnapshotGit(t, dir, "update-index", "--add", "--cacheinfo", "160000,"+sha+",vendor/dep")
+	privateCloneSnapshotGit(t, dir, "commit", "-m", "Add submodule")
+	err := snapshotPrivateCloneSource(context.Background(), dir, privateCloneSnapshotGit(t, dir, "rev-parse", "HEAD"))
+	require.ErrorContains(t, err, "Git submodule (vendor/dep)")
+}
+
+func TestPrivateCloneSnapshotRejectsCompilerPathSymlinks(t *testing.T) {
+	for _, name := range []string{".gitattributes", ".github/aw"} {
+		t.Run(name, func(t *testing.T) {
+			dir := t.TempDir()
+			outside := filepath.Join(t.TempDir(), "outside")
+			require.NoError(t, os.MkdirAll(outside, 0o700))
+			require.NoError(t, os.WriteFile(filepath.Join(outside, "actions-lock.json"), []byte("operator"), 0o600))
+			require.NoError(t, os.MkdirAll(filepath.Join(dir, ".github"), 0o700))
+			target := outside
+			if name == ".gitattributes" {
+				target = filepath.Join(outside, "actions-lock.json")
+			}
+			require.NoError(t, os.Symlink(target, filepath.Join(dir, name)))
+			err := installPrivateCloneBundle(dir, map[string][]byte{"fix.md": []byte(privateCloneTestWorkflow)}, nil, &privateCloneSnapshot{})
+			require.ErrorContains(t, err, "upstream "+name+" must be")
+			data, readErr := os.ReadFile(filepath.Join(outside, "actions-lock.json"))
+			require.NoError(t, readErr)
+			require.Equal(t, "operator", string(data))
+		})
+	}
+}
+
+func TestPrivateCloneSnapshotRemovesInheritedAgentConfiguration(t *testing.T) {
+	dir := t.TempDir()
+	inherited := []string{
+		"AGENTS.md", "src/CLAUDE.md", "docs/GEMINI.md", ".github/copilot-instructions.md",
+		".github/instructions/go.instructions.md", ".github/agents/fix.agent.md", ".github/skills/x/SKILL.md",
+		".github/hooks/hooks.json", ".claude/settings.json", ".agents/skills/x/SKILL.md", ".mcp.json",
+		".github/aw/actions-lock.json", ".github/workflows/upstream.yml",
+	}
+	for _, name := range append(slices.Clone(inherited), "src/main.go", ".github/dependabot.yml") {
+		require.NoError(t, os.MkdirAll(filepath.Dir(filepath.Join(dir, name)), 0o700))
+		require.NoError(t, os.WriteFile(filepath.Join(dir, name), []byte("upstream"), 0o600))
+	}
+	require.NoError(t, installPrivateCloneBundle(dir, map[string][]byte{"fix.md": []byte(privateCloneTestWorkflow)}, nil, &privateCloneSnapshot{}))
+	for _, name := range inherited {
+		require.NoFileExists(t, filepath.Join(dir, name))
+	}
+	require.FileExists(t, filepath.Join(dir, "src/main.go"))
+	require.FileExists(t, filepath.Join(dir, ".github/dependabot.yml"))
+}
+
+func TestPrivateCloneWorkflowPolicyRejectsExternalCredentialsAndTargets(t *testing.T) {
+	for _, field := range []string{
+		"tools:\n  repo-memory:\n    github-app-write:\n      app-id: ${{ vars.APP_ID }}\n      private-key: ${{ secrets.APP_KEY }}",
+		"safe-outputs:\n  create-pull-request:\n    github-token-for-extra-empty-commit: ${{ secrets.CI_TOKEN }}",
+		"safe-outputs:\n  create-pull-request:\n    github-token-for-extra-empty-commit: app",
+		"safe-outputs:\n  assign-to-agent:\n    pull-request-repo: acme/source",
+		"safe-outputs:\n  dispatch-workflow:\n    workflows: [fix]\n    target-repo: acme/source",
+		"safe-outputs:\n  dispatch_repository:\n    ci:\n      event_type: ci\n      allowed_repositories: [acme/source]",
+		"safe-outputs:\n  failure-issue-repo: acme/source",
+		"safe-outputs:\n  token-broker: true",
+		"safe-outputs:\n  create-project:\n    target-owner: acme",
+		"tools:\n  github:\n    allowed-repos: [\"${{ github.repository }}\", acme/source]",
+		"tools:\n  github:\n    lockdown: true",
+		"checkout:\n  token: ${{ secrets.UPSTREAM_TOKEN }}",
+		"observability:\n  otlp:\n    github-app:\n      app-id: \"1\"",
+	} {
+		frontmatter, err := parser.ExtractFrontmatterFromContent("---\non: workflow_dispatch\n" + field + "\n---\nFix\n")
+		require.NoError(t, err, field)
+		require.Error(t, validatePrivateCloneScope(frontmatter.Frontmatter), field)
+	}
+	for _, field := range []string{
+		"permissions:\n  id-token: write",
+		"tools:\n  github:\n    lockdown: false\n    allowed-repos: [current]",
+		"safe-outputs:\n  github-token: ${{ secrets.GITHUB_TOKEN }}\n  create-pull-request:\n    github-token-for-extra-empty-commit: none",
+	} {
+		frontmatter, err := parser.ExtractFrontmatterFromContent("---\non: workflow_dispatch\n" + field + "\n---\nFix\n")
+		require.NoError(t, err, field)
+		require.NoError(t, validatePrivateCloneScope(frontmatter.Frontmatter), field)
+	}
+}
+
+func TestPrivateCloneWorkflowPolicyConfiguresEffectiveDefaults(t *testing.T) {
+	configure := func(t *testing.T, name, workflow string, files map[string][]byte) map[string]any {
+		t.Helper()
+		data, err := configurePrivateCloneWorkflow(name, []byte(workflow), files)
+		require.NoError(t, err)
+		parsed, err := parser.ExtractFrontmatterFromContent(string(data))
+		require.NoError(t, err)
+		return parsed.Frontmatter
+	}
+	t.Run("injects clone-only GitHub tool and default permissions", func(t *testing.T) {
+		frontmatter := configure(t, "fix.md", "---\non: workflow_dispatch\nengine: copilot\nsafe-outputs:\n  create-pull-request:\n---\nFix\n", nil)
+		require.Equal(t, map[string]any{"contents": "read", "copilot-requests": "write"}, frontmatter["permissions"])
+		github, ok := frontmatter["tools"].(map[string]any)["github"].(map[string]any)
+		require.True(t, ok)
+		require.Equal(t, "${{ github.repository }}", github["allowed-repos"])
+		require.Equal(t, "approved", github["min-integrity"])
+		require.Equal(t, "${{ secrets.GITHUB_TOKEN }}", github["github-token"])
+		outputs, ok := frontmatter["safe-outputs"].(map[string]any)
+		require.True(t, ok)
+		require.Equal(t, "${{ secrets.GITHUB_TOKEN }}", outputs["github-token"])
+		require.Equal(t, map[string]any{"github-token-for-extra-empty-commit": "none"}, outputs["create-pull-request"])
+	})
+	t.Run("preserves explicit permissions and disablement", func(t *testing.T) {
+		frontmatter := configure(t, "fix.md", "---\non: workflow_dispatch\nengine: claude\npermissions:\n  issues: read\ntools:\n  github: false\n---\nFix\n", nil)
+		require.Equal(t, map[string]any{"issues": "read"}, frontmatter["permissions"])
+		require.Equal(t, false, frontmatter["tools"].(map[string]any)["github"])
+	})
+	t.Run("leaves imported GitHub configuration effective", func(t *testing.T) {
+		files := map[string][]byte{"shared/github.md": []byte("---\ntools:\n  github: false\n---\n")}
+		frontmatter := configure(t, "fix.md", "---\non: workflow_dispatch\nimports: [shared/github.md]\n---\nFix\n", files)
+		require.Nil(t, frontmatter["tools"])
+	})
+}
+
+func TestPrivateCloneWorkflowPolicyCompiledLock(t *testing.T) {
+	dir := t.TempDir()
+	_, err := privateCloneGit(context.Background(), dir, "init", "--initial-branch=main", "--template=")
+	require.NoError(t, err)
+	workflow := "---\non: workflow_dispatch\nengine: copilot\nsafe-outputs:\n  create-pull-request:\n    draft: true\n---\nFix\n"
+	snapshot := &privateCloneSnapshot{privateCloneManifest: privateCloneManifest{Version: 1}, Data: map[string][]byte{}}
+	require.NoError(t, installPrivateCloneBundle(dir, map[string][]byte{"fix.md": []byte(workflow)}, nil, snapshot))
+	require.NoError(t, withWorkingDir(dir, func() error {
+		_, err := CompileWorkflows(context.Background(), CompileConfig{WorkflowDir: constants.WorkflowsDir, Strict: true, Validate: true, Approve: true})
+		return err
+	}))
+	lock, err := os.ReadFile(filepath.Join(dir, constants.WorkflowsDir, "fix.lock.yml"))
+	require.NoError(t, err)
+	require.Contains(t, string(lock), `"allow-only"`)
+	require.NotContains(t, string(lock), "GH_AW_GITHUB_MCP_SERVER_TOKEN ||")
+	require.NotContains(t, string(lock), "secrets.GH_AW_GITHUB_TOKEN ||")
+	require.NotContains(t, string(lock), "GH_AW_CI_TRIGGER_TOKEN")
 }

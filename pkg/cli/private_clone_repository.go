@@ -8,8 +8,12 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
+
+	"github.com/github/gh-aw/pkg/constants"
 )
 
 var privateCloneSHAPattern = regexp.MustCompile(`^[0-9a-f]{40}$`)
@@ -24,10 +28,7 @@ func privateCloneGit(ctx context.Context, dir string, args ...string) ([]byte, e
 	}
 	cmd := exec.CommandContext(ctx, "git", append(base, args...)...)
 	cmd.Dir = dir
-	cmd.Env = append(os.Environ(),
-		"GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL="+os.DevNull,
-		"GIT_TERMINAL_PROMPT=0", "GIT_LFS_SKIP_SMUDGE=1",
-	)
+	cmd.Env = privateCloneGitEnvironment(dir)
 	data, err := cmd.Output()
 	if err != nil {
 		return nil, fmt.Errorf("private-clone git operation failed: %w", err)
@@ -35,11 +36,47 @@ func privateCloneGit(ctx context.Context, dir string, args ...string) ([]byte, e
 	return data, nil
 }
 
+// privateCloneGitEnvironment drops inherited GIT_* overrides (GIT_DIR, GIT_WORK_TREE,
+// GIT_INDEX_FILE, GIT_CONFIG_*) so every operation targets the disposable clone.
+func privateCloneGitEnvironment(dir string) []string {
+	env := make([]string, 0, len(os.Environ())+6)
+	for _, value := range os.Environ() {
+		key, _, _ := strings.Cut(value, "=")
+		if !strings.HasPrefix(strings.ToUpper(key), "GIT_") && !strings.EqualFold(key, "SSH_ASKPASS") {
+			env = append(env, value)
+		}
+	}
+	return append(env, "GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL="+os.DevNull,
+		"GIT_CEILING_DIRECTORIES="+filepath.Dir(dir), "GIT_TERMINAL_PROMPT=0",
+		"GIT_NO_REPLACE_OBJECTS=1", "GIT_LFS_SKIP_SMUDGE=1")
+}
+
+var privateCloneCommitIdentity = []string{
+	"-c", "user.name=GitHub Agentic Workflows", "-c", "user.email=actions@users.noreply.github.com", "-c", "commit.gpgsign=false",
+}
+
+// preparePrivateCloneSource checks out the selected source tree as an
+// independent root commit, so publication transfers no upstream history.
 func preparePrivateCloneSource(ctx context.Context, dir, source, sha string) error {
 	for _, args := range [][]string{
 		{"init", "--initial-branch=main", "--template="},
-		{"fetch", "--no-tags", trialRepositoryGitURL(source), sha},
-		{"checkout", "-B", "main", sha},
+		{"fetch", "--no-tags", "--depth=1", trialRepositoryGitURL(source), sha},
+	} {
+		if _, err := privateCloneGit(ctx, dir, args...); err != nil {
+			return fmt.Errorf("prepare upstream snapshot: %w", err)
+		}
+	}
+	return snapshotPrivateCloneSource(ctx, dir, sha)
+}
+
+func snapshotPrivateCloneSource(ctx context.Context, dir, sha string) error {
+	if err := validatePrivateCloneSourceTree(ctx, dir, sha); err != nil {
+		return err
+	}
+	for _, args := range [][]string{
+		{"checkout", "--detach", sha},
+		{"checkout", "--orphan", "main"},
+		append(slices.Clone(privateCloneCommitIdentity), "commit", "--allow-empty", "-m", "Source snapshot "+sha),
 	} {
 		if _, err := privateCloneGit(ctx, dir, args...); err != nil {
 			return fmt.Errorf("prepare upstream snapshot: %w", err)
@@ -51,8 +88,8 @@ func preparePrivateCloneSource(ctx context.Context, dir, source, sha string) err
 func commitPrivateCloneBootstrap(ctx context.Context, dir string) ([]byte, error) {
 	for _, args := range [][]string{
 		{"add", "--all"},
-		{"-c", "user.name=GitHub Agentic Workflows", "-c", "user.email=actions@users.noreply.github.com",
-			"-c", "commit.gpgsign=false", "commit", "-m", "Configure private remediation workspace"},
+		{"add", "--force", "--", constants.WorkflowsDir, privateCloneContextDir},
+		append(slices.Clone(privateCloneCommitIdentity), "commit", "--allow-empty", "-m", "Configure private remediation workspace"),
 		{"tag", "private-clone/bootstrap"},
 	} {
 		if _, err := privateCloneGit(ctx, dir, args...); err != nil {
@@ -63,7 +100,7 @@ func commitPrivateCloneBootstrap(ctx context.Context, dir string) ([]byte, error
 }
 
 func publishPrivateClone(ctx context.Context, dir, destination string) error {
-	if _, err := privateCloneGH(ctx, "repo", "create", destination, "--private", "--disable-issues", "--disable-wiki"); err != nil {
+	if _, err := privateCloneGH(ctx, "repo", "create", destination, "--private", "--disable-wiki"); err != nil {
 		return fmt.Errorf("create a new private repository (existing repositories are not reused): %w", err)
 	}
 	if _, err := privateCloneGH(ctx, "api", "--method", "PUT", path.Join("repos", destination, "actions/permissions"), "-F", "enabled=false"); err != nil {
@@ -93,14 +130,16 @@ func verifyPrivateCloneDestination(ctx context.Context, destination string) erro
 		return err
 	}
 	var repo struct {
-		Private  *bool  `json:"private"`
-		Fork     *bool  `json:"fork"`
-		FullName string `json:"full_name"`
+		Private    *bool  `json:"private"`
+		Visibility string `json:"visibility"`
+		Fork       *bool  `json:"fork"`
+		FullName   string `json:"full_name"`
 	}
 	if err := json.Unmarshal(data, &repo); err != nil {
 		return fmt.Errorf("verify private-clone destination: %w", err)
 	}
-	if repo.Private == nil || !*repo.Private || repo.Fork == nil || *repo.Fork || !strings.EqualFold(repo.FullName, destination) {
+	// private is also true for internal repositories, which enterprise members can read.
+	if repo.Private == nil || !*repo.Private || repo.Visibility != "private" || repo.Fork == nil || *repo.Fork || !strings.EqualFold(repo.FullName, destination) {
 		return errors.New("private-clone destination must be the requested standalone private repository; no source was pushed")
 	}
 	data, err = privateCloneGH(ctx, "api", path.Join("repos", destination, "actions/permissions"))

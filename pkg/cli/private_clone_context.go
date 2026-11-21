@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/url"
+	"os/exec"
 	"path"
 	"slices"
 	"strconv"
@@ -33,9 +34,25 @@ type privateCloneSnapshot struct {
 	Data map[string][]byte
 }
 
-func privateCloneGH(ctx context.Context, args ...string) ([]byte, error) {
+// privateCloneHost returns the single host used for every private-clone API call,
+// git URL, and gh command, so verification and publication cannot target different hosts.
+func privateCloneHost() string {
+	host := getGitHubHost()
+	if parsed, err := url.Parse(host); err == nil && parsed.Host != "" {
+		return parsed.Host
+	}
+	return host
+}
+
+// privateCloneGHCommand pins GH_HOST to the same host used for git URLs.
+func privateCloneGHCommand(ctx context.Context, args ...string) *exec.Cmd {
 	cmd := workflow.ExecGHContext(ctx, args...)
-	data, err := cmd.Output()
+	workflow.ForceGHHostEnv(cmd, privateCloneHost())
+	return cmd
+}
+
+func privateCloneGH(ctx context.Context, args ...string) ([]byte, error) {
+	data, err := privateCloneGHCommand(ctx, args...).Output()
 	if err != nil {
 		// gh errors can contain confidential API response bodies.
 		return nil, fmt.Errorf("private-clone GitHub operation failed: %w; verify repository access and required permissions", err)

@@ -10,7 +10,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/github/gh-aw/pkg/workflow"
+	"github.com/github/gh-aw/pkg/parser"
 )
 
 var privateCloneSecretNamePattern = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
@@ -59,7 +59,48 @@ func resolvePrivateCloneStarter(files map[string][]byte, name string) (string, e
 	} else if path.Ext(name) == "" {
 		name += ".md"
 	}
-	return validatePrivateCloneStarterWorkflow(files, name)
+	lock, err := validatePrivateCloneStarterWorkflow(files, name)
+	if err != nil {
+		return "", err
+	}
+	if required := privateCloneRequiredDispatchInputs(files[name]); len(required) > 0 {
+		return "", fmt.Errorf("starter workflow %q requires workflow_dispatch inputs without defaults (%s), but private-clone dispatches it without inputs; add defaults or pass --no-start", name, strings.Join(required, ", "))
+	}
+	return lock, nil
+}
+
+// privateCloneRequiredDispatchInputs lists workflow_dispatch inputs that are
+// required and have no default, so dispatch would fail after publication.
+func privateCloneRequiredDispatchInputs(content []byte) []string {
+	parsed, err := parser.ExtractFrontmatterFromContent(string(content))
+	if err != nil {
+		return nil
+	}
+	on, ok := parsed.Frontmatter["on"].(map[string]any)
+	if !ok {
+		return nil
+	}
+	dispatch, ok := on["workflow_dispatch"].(map[string]any)
+	if !ok {
+		return nil
+	}
+	inputs, ok := dispatch["inputs"].(map[string]any)
+	if !ok {
+		return nil
+	}
+	var required []string
+	for name, value := range inputs {
+		input, ok := value.(map[string]any)
+		if !ok {
+			continue
+		}
+		isRequired, isBool := input["required"].(bool)
+		if def, hasDefault := input["default"]; isBool && isRequired && (!hasDefault || def == nil) {
+			required = append(required, name)
+		}
+	}
+	slices.Sort(required)
+	return required
 }
 
 // readPrivateCloneSecretValues reads each --secret value from the operator's
@@ -103,7 +144,7 @@ func setPrivateCloneSecrets(ctx context.Context, destination string, secrets map
 	}
 	slices.Sort(names)
 	for _, name := range names {
-		cmd := workflow.ExecGHContext(ctx, "secret", "set", name, "--repo", destination)
+		cmd := privateCloneGHCommand(ctx, "secret", "set", name, "--repo", destination)
 		cmd.Stdin = bytes.NewBufferString(secrets[name])
 		if _, err := cmd.Output(); err != nil {
 			return fmt.Errorf("source was pushed to %s, but secret %s could not be set (Actions remains disabled): %w", destination, name, err)

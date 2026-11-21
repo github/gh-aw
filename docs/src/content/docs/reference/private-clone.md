@@ -19,13 +19,14 @@ gh aw private-clone acme/project security/project-fix-42 \
 
 ## Arguments and options
 
-Both positional arguments are explicit `owner/repo` slugs on the selected GitHub
-host. The destination must be new; existing repositories are never reused.
+Both positional arguments are explicit `owner/repo` slugs on the same GitHub
+host, which is used for every API and git operation. The destination must be
+new; existing repositories are never reused.
 
 | Option | Meaning |
 |---|---|
 | `--workflows DIR` | Required local directory of operator-authored workflow Markdown and supporting local imports |
-| `--starter-workflow NAME` | Top-level workflow (`investigate` or `investigate.md`) to dispatch after activating Actions; it must declare `workflow_dispatch`. Defaults to the only top-level workflow; required when the bundle has several |
+| `--starter-workflow NAME` | Top-level workflow (`investigate` or `investigate.md`) to dispatch after activating Actions; it must declare `workflow_dispatch`, and every required input needs a default. Defaults to the only top-level workflow; required when the bundle has several |
 | `--secret NAME` | Repository secret to set from the operator's same-named environment variable; repeatable. Every secret referenced by the bundle must be supplied unless `--no-start` is used |
 | `--no-start` | Leave Actions disabled and dispatch nothing so the repository can be reviewed first |
 | `--ref REF` | Source branch, tag, or commit; defaults to `HEAD` and resolves to an immutable SHA |
@@ -53,21 +54,24 @@ fix-workflows/
     conventions.md
 ```
 
-Top-level Markdown files are compiled as workflows. Imports must resolve inside
-the supplied directory; remote imports, symlinks, precompiled locks, and top-level
-native Actions YAML are rejected. Keep supporting Markdown in subdirectories.
-The command supplies no fix-generation workflow or prompt template.
+Top-level Markdown files are compiled as workflows. Frontmatter imports must
+resolve inside the supplied directory; remote imports, Markdown body import
+directives, `aw.json`, symlinks, precompiled locks, and top-level native Actions
+YAML are rejected. Keep supporting Markdown in subdirectories. Executable bundle
+files keep their executable bit. The command supplies no fix-generation workflow
+or prompt template.
 
 Each root workflow receives a short pointer to the local context index. Root
 workflows whose own frontmatter selects the Copilot engine (including the
 default) also receive `permissions.copilot-requests: write` unless they declare
 `copilot-requests` explicitly. Downloaded alert and advisory files are
-re-encoded JSON with API links and dismissal comments removed. GitHub tools, including local imports, are
-restricted to `allowed-repos: "${{ github.repository }}"`. Explicit external
-checkout/output targets and external GitHub token/App configurations are
-rejected. The starter workflow must declare `workflow_dispatch`;
-`gh aw private-clone` dispatches its compiled workflow on `main` after enabling
-Actions. Supply any required supporting scripts within the bundle and invoke
+re-encoded JSON with API links and dismissal comments removed. GitHub tools are
+restricted to `allowed-repos: "${{ github.repository }}"`, including when a
+workflow omits `tools.github`, and use the clone's `GITHUB_TOKEN`; `lockdown`,
+explicit external checkout/output targets, and external GitHub token/App
+configurations are rejected. The starter workflow must declare
+`workflow_dispatch`, and required inputs need defaults; `gh aw private-clone` dispatches
+its compiled workflow on `main` after enabling Actions. Supply any required supporting scripts within the bundle and invoke
 them through their installed paths under `.github/workflows/`.
 
 When GitHub tools have no explicit `min-integrity`, setup supplies `approved`.
@@ -104,13 +108,16 @@ instructions.
 
 ## Isolation and activation
 
-Setup fetches source locally, removes inherited workflows, installs and compiles
-the supplied bundle, and creates a bootstrap commit. The destination is verified
-private, standalone, and Actions-disabled before any source or confidential
-context is pushed. Only the `main` branch and bootstrap tag are pushed, not an
-upstream mirror. Original secrets, integrations, and git remotes are not copied.
-The clone's default workflow token remains read-only; clone-local PR creation is
-enabled, subject to organization policy.
+Setup fetches source locally and rejects sources that use Git submodules or Git
+LFS. It removes inherited workflows, quarantines inherited agent instruction
+files and compiler caches, installs and compiles the supplied bundle, and
+commits the selected tree as an independent root commit (`Source snapshot
+<sha>`) followed by the bootstrap commit; no upstream history is pushed. The destination is verified to be exactly `private`
+(`internal` is rejected), not a fork, and Actions-disabled before any source or
+confidential context is pushed. Only `main` and the bootstrap tag are pushed.
+Original secrets, integrations, and git remotes are not copied; issues stay
+enabled. The clone's default workflow token remains read-only; clone-local PR
+creation is enabled, subject to organization policy.
 
 After the source and context are pushed, the command sets the `--secret` values
 on the new repository, enables Actions, and dispatches the starter workflow to
@@ -119,6 +126,13 @@ and passed to `gh secret set` on stdin, never as arguments. Copilot inference us
 the clone's Actions token via `copilot-requests: write`; no upstream PAT or
 Copilot PAT is provisioned. With `--no-start`, Actions stays disabled and no
 workflow is dispatched; enable Actions and run the starter after review.
+
+Starting the investigation is the default because invoking the command is the
+operator's authorization to run the bundle. The review boundary is therefore
+before invocation: the bundle is operator-authored, and the starter, secret, and
+strict compilation checks complete locally before any remote side effect. Use
+`--no-start` when someone other than the invoking operator must review the
+pushed repository, its secrets, or ambient organization access first.
 
 > [!CAUTION]
 > This command activates Actions and immediately runs trusted, operator-supplied
@@ -179,15 +193,18 @@ Then run the end-to-end flow:
 5. Export only the reviewed delta after `private-clone/bootstrap`, as described
    below.
 
-Use `--no-start` to inspect the pushed repository first; then set secrets,
-enable Actions, and run `gh workflow run investigate.lock.yml --repo DEST`.
+Use `--no-start` to inspect the pushed repository first; then set secrets with
+`gh secret set NAME --repo DEST`, enable Actions with
+`gh api -X PUT repos/DEST/actions/permissions -F enabled=true`, and run
+`gh workflow run investigate.lock.yml --repo DEST`.
 
 ## Export boundary
 
 `refs/tags/private-clone/bootstrap` identifies the commit containing the supplied
 automation and downloaded context. Export only the reviewed delta from this
-commit to the approved fix SHA. Do not export bootstrap changes or the confidential
-context directory, including later context edits. Avoid blanket `.github/`
+commit to the approved fix SHA as a patch; the bootstrap history shares no
+history with upstream, so do not merge or push its branches upstream. Do not
+export bootstrap changes or the confidential context directory, including later context edits. Avoid blanket `.github/`
 exclusions: a legitimate fix may modify an upstream workflow.
 
 Upstream publication and repository deletion are separate, operator-authorized

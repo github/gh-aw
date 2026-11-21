@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -131,7 +132,7 @@ func configurePrivateClone(ctx context.Context, opts privateCloneOptions) error 
 	if err := validatePrivateCloneOptions(opts); err != nil {
 		return err
 	}
-	bundle, err := readPrivateCloneWorkflows(opts.Workflows)
+	bundle, executables, err := readPrivateCloneWorkflows(opts.Workflows)
 	if err != nil {
 		return err
 	}
@@ -156,7 +157,7 @@ func configurePrivateClone(ctx context.Context, opts privateCloneOptions) error 
 	if err := preparePrivateCloneSource(ctx, dir, opts.Source, snapshot.SourceSHA); err != nil {
 		return err
 	}
-	if err := installPrivateCloneBundle(dir, bundle, snapshot); err != nil {
+	if err := installPrivateCloneBundle(dir, bundle, executables, snapshot); err != nil {
 		return err
 	}
 	if err := withWorkingDir(dir, func() error {
@@ -191,9 +192,27 @@ func configurePrivateClone(ctx context.Context, opts privateCloneOptions) error 
 const privateCloneContextDir = ".github/private-clone"
 
 func writePrivateCloneFile(root, name string, data []byte) error {
-	path := filepath.Join(root, filepath.FromSlash(name))
-	if err := os.MkdirAll(filepath.Dir(path), constants.DirPermOwnerOnly); err != nil {
+	return writePrivateCloneFileMode(root, name, data, constants.FilePermSensitive)
+}
+
+// writePrivateCloneBundleFile installs an operator bundle file under the workflows
+// directory, preserving the executable bit so git records scripts as executable.
+func writePrivateCloneBundleFile(root, name string, data []byte, executables map[string]struct{}) error {
+	perm := constants.FilePermSensitive
+	if _, ok := executables[name]; ok {
+		perm = constants.FilePermExecutable
+	}
+	return writePrivateCloneFileMode(root, path.Join(constants.WorkflowsDir, name), data, perm)
+}
+
+func writePrivateCloneFileMode(root, name string, data []byte, perm os.FileMode) error {
+	target := filepath.Join(root, filepath.FromSlash(name))
+	if err := os.MkdirAll(filepath.Dir(target), constants.DirPermOwnerOnly); err != nil {
 		return err
 	}
-	return os.WriteFile(path, data, constants.FilePermSensitive)
+	if err := os.WriteFile(target, data, perm); err != nil {
+		return err
+	}
+	// WriteFile does not change the mode of an existing file.
+	return os.Chmod(target, perm)
 }
