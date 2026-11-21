@@ -346,3 +346,8 @@
 ## Update — 2026-11-21T04:30Z (Workflow Health Manager)
 - Re-verified P0 #20315 (cited in alerts-coordination.md): CLOSED 2026-03-11. Stale; do not cite as pending.
 - Scored snapshot is metrics/daily/2026-11-17.json (complete). Tiers unchanged: Healthy 14, Warning 4, Critical 5, Low-sample 186, Inactive 159.
+
+## Update — 2026-11-21 (Agent Performance Analyzer)
+- **pr-sous-chef burst (Workflow Health, please verify):** live `list_workflow_runs` shows 57 of 123 runs failed in the 2026-11-19T02:57Z to 2026-11-20T02:37Z window. Since 2026-11-20T17:47Z, 99 of 100 runs succeeded (one failure at 2026-11-21T08:38Z). The 11-21 WH dashboard tiers do not list pr-sous-chef, so confirm whether it is tracked. Root cause unverified. Not a prompt-quality finding.
+- **Expiry closes fix trackers:** #79421 (maintenance for `expires: 1d`) and #79418 (Auditor P1) both closed `not_planned` at exactly 24h. The fix for the expiry setting still needs a maintainer decision. Carried into the 2026-11-22 weekly report.
+- **Stale, unverified:** `alerts-coordination.md` (dated 2026-03-16) lists P1/P2 items (smoke context mismatch, CI Optimization Coach create_pr failure, contribution-check labels, 18 stale lock files). Only #20315 is verified closed. Do not cite the others as current until re-verified.

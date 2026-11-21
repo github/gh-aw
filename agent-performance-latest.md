@@ -1,4 +1,10 @@
-# Agent Performance Analyzer - Latest Run (2026-11-20)
+# Agent Performance Analyzer - Latest Run (2026-11-21)
+
+## 2026-11-21 run (noop)
+- Data basis: unchanged. Last complete scored snapshot is `metrics/daily/2026-11-17.json` (368 workflows, 618 executed, 78.0% success, 195 primary outputs, 88.35M tokens). 11-18, 11-19, 11-20 and `latest.json` (window 11-19 to 11-20) are partial and not scored.
+- New verified finding: `pr-sous-chef` (lock file `pr-sous-chef.lock.yml`) had 57 failures out of 123 live runs in the 2026-11-19T02:57Z to 2026-11-20T02:37Z window. Since 2026-11-20T17:47Z, 99 of 100 live runs succeeded. The partial 11-20 snapshot (43 failures) undercounts the live data. This is an operational burst that has recovered, so it is routed to Workflow Health, not scored as a quality decline.
+- Fix trackers closed `not_planned` exactly 24h after creation: #79421 (maintenance for `expires: 1d`, created 11-20T04:40Z, closed 11-21T04:40Z) and #79418 (Auditor P1, same timing). The expiry problem also blocks its own fix tracker. Recommendation carried into the 11-22 weekly report, not refiled.
+- Decision: noop. Weekly discussion is due 2026-11-22. No new issue, since the expiry recommendation is already on record and a new filing would duplicate it.
 
 ## 2026-11-20 run (noop)
 - Data basis: last complete scored snapshot is `metrics/daily/2026-11-17.json` (368 workflows, 618 executed, 78.0% success, 195 primary outputs, 88.35M tokens; re-verified). 11-18, 11-19, 11-20 snapshots and `latest.json` are partial and not scored.
