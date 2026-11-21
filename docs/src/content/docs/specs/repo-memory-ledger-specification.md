@@ -20,6 +20,10 @@ concurrent reconstruction, compaction, retirement, configuration limits, the
 validated transactions consumed by trusted persistence, and the adversarial
 review of the feature.
 
+The [bounded TLA+ ledger models](https://github.com/github/gh-aw/tree/main/specs/ledger)
+cover Git-backed replay and persistence, and separately check comment-backed
+batch publication and retry reconciliation.
+
 ## 1. Conformance and terminology
 
 The key words **MUST**, **MUST NOT**, **REQUIRED**, **SHALL**, **SHALL NOT**,
