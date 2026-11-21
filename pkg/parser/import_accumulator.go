@@ -36,6 +36,7 @@ type importAccumulator struct {
 	pluginObjects            []map[string]any
 	safeOutputs              []string
 	gradersBuilder           strings.Builder
+	experimentsBuilder       strings.Builder
 	mcpScripts               []string
 	bots                     []string
 	botsSet                  map[string]bool
@@ -143,6 +144,7 @@ func (acc *importAccumulator) buildImportsResult() *ImportsResult {
 		MergedPluginObjects:           acc.pluginObjects,
 		MergedSafeOutputs:             acc.safeOutputs,
 		MergedGraders:                 acc.gradersBuilder.String(),
+		MergedExperiments:             acc.experimentsBuilder.String(),
 		MergedMCPScripts:              acc.mcpScripts,
 		MergedMarkdown:                acc.markdownBuilder.String(),
 		ImportPaths:                   acc.importPaths,

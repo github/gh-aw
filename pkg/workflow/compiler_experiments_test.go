@@ -803,6 +803,11 @@ func TestExtractExperimentsStorageFromFrontmatter(t *testing.T) {
 			want:        ExperimentsStorageCache,
 		},
 		{
+			name:        "storage: broker returns broker",
+			frontmatter: map[string]any{"experiments": map[string]any{"storage": "broker"}},
+			want:        ExperimentsStorageBroker,
+		},
+		{
 			name:        "unknown storage value returns repo default",
 			frontmatter: map[string]any{"experiments": map[string]any{"storage": "unknown"}},
 			want:        ExperimentsStorageRepo,
