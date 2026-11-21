@@ -115,29 +115,15 @@ func TestCompileDurableRejectsUnsupportedEngineOrDriver(t *testing.T) {
 }
 
 func TestDurableWorkflowConcurrency(t *testing.T) {
-	for _, test := range []struct {
-		name     string
-		features map[string]any
-		queue    bool
-	}{
-		{name: "default", queue: true},
-		{name: "enabled", features: map[string]any{"group-concurrency-queue": true}, queue: true},
-		{name: "disabled", features: map[string]any{"group-concurrency-queue": false}},
-	} {
-		t.Run(test.name, func(t *testing.T) {
-			data := &WorkflowData{
-				WorkflowID:   "continuable",
-				On:           "on:\n  issues:\n  workflow_dispatch:\n",
-				EngineConfig: &EngineConfig{ID: "pi", Durable: &DurableConfig{RetentionDays: 7}},
-				Features:     test.features,
-			}
-			concurrency := GenerateConcurrencyConfig(data, false)
-			require.Contains(t, concurrency, `group: "gh-aw-durable-continuable"`)
-			require.Contains(t, concurrency, "cancel-in-progress: false")
-			require.NotContains(t, concurrency, "github.event.issue.number")
-			require.Equal(t, test.queue, strings.Contains(concurrency, "queue: max"))
-		})
+	data := &WorkflowData{
+		WorkflowID:   "continuable",
+		On:           "on:\n  issues:\n  workflow_dispatch:\n",
+		EngineConfig: &EngineConfig{ID: "pi", Durable: &DurableConfig{RetentionDays: 7}},
 	}
+	require.Empty(t, GenerateConcurrencyConfig(data, false), "continuation runs must not share a pending-run concurrency group")
+
+	data.Concurrency = "concurrency:\n  group: \"author\""
+	require.Equal(t, data.Concurrency, GenerateConcurrencyConfig(data, false), "author concurrency is preserved")
 }
 
 func TestDurableWorkflowID(t *testing.T) {
@@ -172,7 +158,8 @@ Continue the workflow task.
 	lock, err := os.ReadFile(filepath.Join(dir, "workflow.test.lock.yml"))
 	require.NoError(t, err)
 	text := string(lock)
-	require.Contains(t, text, `group: "gh-aw-durable-workflow-test"`)
+	require.NotContains(t, text, "gh-aw-durable-")
+	require.Contains(t, text, `"continuation":{"workflow":"workflow-test","max":5,"policy":"workflow-dispatch"}`)
 	require.Contains(t, text, "pi-durable-workflow-test.json")
 	require.NotContains(t, text, "pi-durable-workflow.test.json")
 }

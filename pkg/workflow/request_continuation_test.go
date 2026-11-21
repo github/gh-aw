@@ -8,17 +8,20 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/goccy/go-yaml"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestParseRequestContinuationConfig(t *testing.T) {
 	tests := []struct {
-		name      string
-		raw       any
-		wantNil   bool
-		wantMax   int
-		wantError string
+		name         string
+		raw          any
+		wantNil      bool
+		wantMax      int
+		wantPolicy   string
+		wantApproval string
+		wantError    string
 	}{
 		{name: "null enables defaults", raw: nil, wantMax: 5},
 		{name: "true enables defaults", raw: true, wantMax: 5},
@@ -30,6 +33,12 @@ func TestParseRequestContinuationConfig(t *testing.T) {
 		{name: "max zero", raw: map[string]any{"max": 0}, wantError: "from 1 to 100"},
 		{name: "unknown field", raw: map[string]any{"retention-days": 3}, wantError: "supports only max"},
 		{name: "string", raw: "yes", wantError: "must be an object"},
+		{name: "policy shorthand", raw: map[string]any{"continuation-policy": "workflow-dispatch"}, wantMax: 5, wantPolicy: "workflow-dispatch"},
+		{name: "policy object with approval", raw: map[string]any{"continuation-policy": map[string]any{"type": "workflow-dispatch", "approval": "continuation-review"}}, wantMax: 5, wantPolicy: "workflow-dispatch", wantApproval: "continuation-review"},
+		{name: "policy object defaults type", raw: map[string]any{"continuation-policy": map[string]any{"approval": "review"}}, wantMax: 5, wantPolicy: "workflow-dispatch", wantApproval: "review"},
+		{name: "unknown policy type", raw: map[string]any{"continuation-policy": "schedule"}, wantError: "supported values: workflow-dispatch"},
+		{name: "approval expression rejected", raw: map[string]any{"continuation-policy": map[string]any{"approval": "${{ vars.ENV }}"}}, wantError: "literal GitHub environment name"},
+		{name: "unknown policy field", raw: map[string]any{"continuation-policy": map[string]any{"cron": "daily"}}, wantError: "supports only type and approval"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -46,6 +55,10 @@ func TestParseRequestContinuationConfig(t *testing.T) {
 			}
 			require.NoError(t, config.parseError)
 			assert.Equal(t, tt.wantMax, config.EffectiveMax())
+			if tt.wantPolicy != "" {
+				assert.Equal(t, tt.wantPolicy, config.EffectivePolicy())
+			}
+			assert.Equal(t, tt.wantApproval, config.Approval)
 		})
 	}
 }
@@ -95,12 +108,56 @@ func TestCompileRequestContinuation(t *testing.T) {
 	for _, expected := range []string{
 		"Restore durable workflow state",
 		"Upload durable checkpoint artifact",
-		"group: \"gh-aw-durable-continue\"",
 		`\"request_continuation\":{\"max\":1,\"max_continuations\":3}`,
-		"actions: write",
+		`"continuation":{"workflow":"continue","max":3,"policy":"workflow-dispatch"}`,
 	} {
 		assert.Contains(t, lock, expected)
 	}
+	assert.NotContains(t, lock, "gh-aw-durable-", "continuation runs must not share a workflow concurrency group")
+
+	var workflow struct {
+		Jobs map[string]struct {
+			Permissions map[string]string `yaml:"permissions"`
+			Outputs     map[string]string `yaml:"outputs"`
+			Steps       []struct {
+				Name string            `yaml:"name"`
+				If   string            `yaml:"if"`
+				With map[string]string `yaml:"with"`
+			} `yaml:"steps"`
+		} `yaml:"jobs"`
+	}
+	require.NoError(t, yaml.Unmarshal([]byte(lock), &workflow))
+	safeOutputs, conclusion := workflow.Jobs["safe_outputs"], workflow.Jobs["conclusion"]
+	agent := workflow.Jobs["agent"]
+	assert.NotEqual(t, "write", safeOutputs.Permissions["actions"], "the safe-outputs job only records the request")
+	assert.Equal(t, "${{ steps.process_safe_outputs.outputs.continuation_requested }}", safeOutputs.Outputs["continuation_requested"])
+	assert.Equal(t, "${{ steps.process_safe_outputs.outputs.continuation_requested == 'true' && github.run_attempt || '' }}", safeOutputs.Outputs["continuation_request_attempt"])
+	assert.Equal(t, "${{ steps.durable_checkpoint.outputs.checkpoint-attempt }}", agent.Outputs["durable_checkpoint_attempt"])
+	assert.Equal(t, "write", conclusion.Permissions["actions"], "the conclusion job dispatches the relay")
+
+	stepIndex := func(steps []struct {
+		Name string            `yaml:"name"`
+		If   string            `yaml:"if"`
+		With map[string]string `yaml:"with"`
+	}, name string) int {
+		for i, step := range steps {
+			if step.Name == name {
+				return i
+			}
+		}
+		return -1
+	}
+	upload := stepIndex(safeOutputs.Steps, "Upload continuation request")
+	require.GreaterOrEqual(t, upload, 0)
+	assert.Equal(t, "continuation-request-${{ github.run_attempt }}", safeOutputs.Steps[upload].With["name"])
+	assert.Contains(t, safeOutputs.Steps[upload].With["retention-days"], "7")
+	dispatch := stepIndex(conclusion.Steps, "Dispatch continuation relay")
+	require.GreaterOrEqual(t, dispatch, 0)
+	assert.Contains(t, conclusion.Steps[dispatch].If, "needs.safe_outputs.outputs.continuation_requested == 'true'")
+	assert.Contains(t, conclusion.Steps[dispatch].If, "needs.safe_outputs.result == 'success'")
+	assert.Equal(t, "${{ github.token }}", conclusion.Steps[dispatch].With["github-token"])
+	assert.Contains(t, lock, "GH_AW_PARENT_REQUEST_ATTEMPT: ${{ needs.safe_outputs.outputs.continuation_request_attempt }}")
+	assert.Contains(t, lock, "GH_AW_PARENT_CHECKPOINT_ATTEMPT: ${{ needs.agent.outputs.durable_checkpoint_attempt }}")
 
 	uploadGate := "contains(steps.collect_output.outputs.output_types, 'request_continuation')"
 	require.Contains(t, lock, uploadGate, "checkpoint upload must require a continuation request")
@@ -119,6 +176,20 @@ func TestCompileRequestContinuationWithOtherSafeOutputs(t *testing.T) {
 	}
 	assert.Contains(t, lock, "contains(steps.collect_output.outputs.output_types, 'request_continuation')",
 		"the gate must match request_continuation within a mixed output type list")
+}
+
+func TestCompileRequestContinuationPolicy(t *testing.T) {
+	lock, err := compileRequestContinuationWorkflow(t, "on: workflow_dispatch\nengine: copilot\nconcurrency:\n  group: author-group\nsafe-outputs:\n  request-continuation:\n    continuation-policy:\n      type: workflow-dispatch\n      approval: continuation-review\n")
+	require.NoError(t, err, "explicit concurrency is allowed with request-continuation")
+	assert.Contains(t, lock, `"continuation":{"workflow":"continue","max":5,"policy":"workflow-dispatch","approval":"continuation-review"}`)
+	assert.Contains(t, lock, "group: author-group")
+}
+
+func TestCompileRequestContinuationStagedDoesNotDispatch(t *testing.T) {
+	lock, err := compileRequestContinuationWorkflow(t, "on: workflow_dispatch\nengine: copilot\nsafe-outputs:\n  staged: true\n  request-continuation: {}\n")
+	require.NoError(t, err)
+	assert.NotContains(t, lock, "Upload continuation request")
+	assert.NotContains(t, lock, "Dispatch continuation relay")
 }
 
 func TestCompileRequestContinuationRequiresWorkflowDispatch(t *testing.T) {

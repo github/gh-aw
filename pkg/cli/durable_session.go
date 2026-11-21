@@ -22,6 +22,7 @@ type DurableSessionReport struct {
 	Storage     string `json:"storage,omitempty"`
 	ParentRunID string `json:"parent_run_id,omitempty"`
 	ArtifactID  string `json:"artifact_id,omitempty"`
+	RelayRunID  string `json:"relay_run_id,omitempty"`
 	SessionID   string `json:"session_id,omitempty"`
 	Started     bool   `json:"started"`
 	Evidence    string `json:"evidence,omitempty"`
@@ -36,6 +37,7 @@ type durableSessionRecord struct {
 	Status      string `json:"status"`
 	ParentRunID string `json:"parentRunId"`
 	ArtifactID  string `json:"artifactId"`
+	RelayRunID  string `json:"relayRunId"`
 	SessionID   string `json:"sessionId"`
 }
 
@@ -164,7 +166,7 @@ func durableSessionReportFromRecords(restore, startup *durableSessionRecord) (*D
 		return nil, nil
 	}
 	report := &DurableSessionReport{Status: restore.Status, Engine: restore.Engine, Storage: restore.Storage,
-		ParentRunID: restore.ParentRunID, ArtifactID: restore.ArtifactID}
+		ParentRunID: restore.ParentRunID, ArtifactID: restore.ArtifactID, RelayRunID: restore.RelayRunID}
 	if restore.Status == "failed" {
 		report.Status = "restore_failed"
 	}
@@ -185,7 +187,7 @@ func validDurableSessionRecord(record durableSessionRecord, eventType string) bo
 		!durableNumericIDPattern.MatchString(record.RunID) || !durableNumericIDPattern.MatchString(record.RunAttempt) {
 		return false
 	}
-	for _, id := range []string{record.ParentRunID, record.ArtifactID} {
+	for _, id := range []string{record.ParentRunID, record.ArtifactID, record.RelayRunID} {
 		if id != "" && !durableNumericIDPattern.MatchString(id) {
 			return false
 		}
@@ -208,7 +210,11 @@ func renderDurableSession(w io.Writer, report *DurableSessionReport) error {
 	if report == nil {
 		return nil
 	}
-	_, err := fmt.Fprintf(w, "[durable_session] status=%s started=%t engine=%q parent_run_id=%q artifact_id=%q session_id=%q evidence=%q reason=%q\n",
-		report.Status, report.Started, report.Engine, report.ParentRunID, report.ArtifactID, report.SessionID, report.Evidence, report.Reason)
+	relay := ""
+	if report.RelayRunID != "" {
+		relay = fmt.Sprintf(" relay_run_id=%q", report.RelayRunID)
+	}
+	_, err := fmt.Fprintf(w, "[durable_session] status=%s started=%t engine=%q parent_run_id=%q artifact_id=%q%s session_id=%q evidence=%q reason=%q\n",
+		report.Status, report.Started, report.Engine, report.ParentRunID, report.ArtifactID, relay, report.SessionID, report.Evidence, report.Reason)
 	return err
 }

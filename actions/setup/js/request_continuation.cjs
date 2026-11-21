@@ -8,16 +8,17 @@
 /** @type {string} Safe output type handled by this module */
 const HANDLER_TYPE = "request_continuation";
 
+const fs = require("node:fs");
+const path = require("node:path");
 const { getErrorMessage } = require("./error_helpers.cjs");
-const { ERR_CONFIG, ERR_VALIDATION } = require("./error_codes.cjs");
-const { createAuthenticatedGitHubClient } = require("./handler_auth.cjs");
+const { ERR_VALIDATION } = require("./error_codes.cjs");
 const { logStagedPreviewInfo } = require("./staged_preview.cjs");
 const { isStagedMode } = require("./safe_output_helpers.cjs");
 const { buildAwContext, readInboundAwContext } = require("./aw_context.cjs");
-const { dispatchWorkflow } = require("./dispatch_workflow_transport.cjs");
+const { CONTINUATION_REQUEST_FILE_NAME, CONTINUATION_REQUEST_VERSION, MAX_CONTINUATION_HINTS_LENGTH: MAX_HINTS_LENGTH } = require("./continuation_request.cjs");
 
 const DEFAULT_MAX_CONTINUATIONS = 5;
-const MAX_HINTS_LENGTH = 4000;
+const DEFAULT_CONTINUATION_REQUEST_FILE = `/tmp/gh-aw/continuation/${CONTINUATION_REQUEST_FILE_NAME}`;
 
 /**
  * Returns the continuation depth of the current run (0 for the first run).
@@ -33,37 +34,17 @@ function readContinuationDepth(awContext) {
 }
 
 /**
- * Resolves the workflow file of the current run from GITHUB_WORKFLOW_REF.
- * @param {string | undefined} workflowRef
- * @returns {string}
- */
-function resolveCurrentWorkflowFile(workflowRef) {
-  const match = /\.github\/workflows\/([^/@]+\.ya?ml)@/.exec(workflowRef || "");
-  if (!match) throw new Error(`${ERR_CONFIG}: Cannot resolve the current workflow file from GITHUB_WORKFLOW_REF`);
-  return match[1];
-}
-
-/**
- * Resolves the branch ref for the next run so it shares the checkpoint scope of this run.
- * @returns {string}
- */
-function resolveContinuationRef() {
-  if (process.env.GITHUB_HEAD_REF) return `refs/heads/${process.env.GITHUB_HEAD_REF}`;
-  const ref = process.env.GITHUB_REF || context.ref;
-  if (!ref) throw new Error(`${ERR_CONFIG}: Cannot resolve the ref for the continuation run`);
-  return ref;
-}
-
-/**
  * Main handler factory for request_continuation.
- * The agent checkpoint is uploaded only when this output exists; this handler
- * dispatches the same workflow so the next run restores that checkpoint.
+ * The agent checkpoint is uploaded only when this output exists. This handler
+ * never dispatches: it records a continuation request that the safe-outputs job
+ * uploads as an artifact, and the conclusion job hands the run to the generated
+ * continuation relay, which validates the request and dispatches the next run.
  * @type {HandlerFactoryFunction}
  */
 async function main(config = {}) {
   const maxContinuations = Number.isInteger(config.max_continuations) && config.max_continuations > 0 ? config.max_continuations : DEFAULT_MAX_CONTINUATIONS;
   const isStaged = isStagedMode(config);
-  const githubClient = await createAuthenticatedGitHubClient(config);
+  const requestFile = process.env.GH_AW_CONTINUATION_REQUEST_FILE || DEFAULT_CONTINUATION_REQUEST_FILE;
   let handled = false;
 
   core.info(`Request continuation configuration: max continuations=${maxContinuations}`);
@@ -86,26 +67,30 @@ async function main(config = {}) {
     try {
       const depth = readContinuationDepth(readInboundAwContext(context.payload));
       if (depth >= maxContinuations) {
-        core.warning(`Continuation limit reached (${depth} of ${maxContinuations}); not dispatching another run`);
+        core.warning(`Continuation limit reached (${depth} of ${maxContinuations}); not requesting another run`);
         return { success: true, skipped: true, skipReason: `Continuation limit of ${maxContinuations} reached`, depth };
       }
 
-      const workflowFile = resolveCurrentWorkflowFile(process.env.GITHUB_WORKFLOW_REF);
-      const ref = resolveContinuationRef();
       const nextDepth = depth + 1;
-      const awContext = { ...buildAwContext(), continuation: { depth: nextDepth, max: maxContinuations, hints } };
-      const inputs = { aw_context: JSON.stringify(awContext) };
-
       if (isStaged) {
-        logStagedPreviewInfo(`Would dispatch continuation ${nextDepth} of ${maxContinuations}: ${workflowFile} with ref: ${ref}`);
-        return { success: true, staged: true, workflow_name: workflowFile, depth: nextDepth };
+        logStagedPreviewInfo(`Would request continuation ${nextDepth} of ${maxContinuations} through the continuation relay`);
+        return { success: true, staged: true, depth: nextDepth };
       }
 
-      core.info(`Dispatching continuation ${nextDepth} of ${maxContinuations}: ${workflowFile} (${ref})`);
-      const response = await dispatchWorkflow(githubClient, { owner: context.repo.owner, repo: context.repo.repo, workflow_id: workflowFile, ref, inputs, return_run_details: true }, { allowLegacyFallback: true, coreApi: core });
-      const runId = response?.data?.workflow_run_id;
-      core.info(runId ? `✓ Dispatched continuation run ${runId}` : "✓ Dispatched continuation run");
-      return { success: true, workflow_name: workflowFile, depth: nextDepth, run_id: runId };
+      const request = {
+        version: CONTINUATION_REQUEST_VERSION,
+        hints,
+        depth: nextDepth,
+        max: maxContinuations,
+        parent_run_id: String(context.runId),
+        parent_run_attempt: String(process.env.GITHUB_RUN_ATTEMPT || "1"),
+        aw_context: buildAwContext(),
+      };
+      fs.mkdirSync(path.dirname(requestFile), { recursive: true });
+      fs.writeFileSync(requestFile, JSON.stringify(request), { mode: 0o600 });
+      core.setOutput("continuation_requested", "true");
+      core.info(`✓ Recorded continuation request ${nextDepth} of ${maxContinuations}; the conclusion job hands it to the continuation relay`);
+      return { success: true, depth: nextDepth };
     } catch (error) {
       const errorMessage = getErrorMessage(error);
       core.error(`Failed to request continuation: ${errorMessage}`);
@@ -114,4 +99,4 @@ async function main(config = {}) {
   };
 }
 
-module.exports = { main, HANDLER_TYPE, readContinuationDepth, resolveCurrentWorkflowFile };
+module.exports = { main, HANDLER_TYPE, readContinuationDepth, DEFAULT_CONTINUATION_REQUEST_FILE };

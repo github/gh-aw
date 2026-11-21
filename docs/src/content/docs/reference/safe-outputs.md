@@ -186,7 +186,7 @@ replace the former built-in work-item handlers.
 |--------|-----|-------------|
 | [Dispatch Workflow](#workflow-dispatch-dispatch-workflow) | `dispatch-workflow` | Trigger other workflows with inputs (max: 3, same-repo only) |
 | [Call Workflow](#workflow-call-call-workflow) | `call-workflow` | Call reusable workflows via compile-time fan-out (max: 1, same-repo only) |
-| [Request Continuation](#request-continuation-request-continuation) | `request-continuation` | Experimental. Checkpoint the agent session and dispatch the next run of this workflow (max chain: 5) |
+| [Request Continuation](#request-continuation-request-continuation) | `request-continuation` | Experimental. Checkpoint the agent session and request the next run of this workflow through a continuation relay (max chain: 5) |
 | [Dispatch Repository Event](#repository-dispatch-dispatch-repository) | `dispatch-repository` | Trigger `repository_dispatch` events in external repositories (cross-repo) |
 | [Code Scanning Alerts](#code-scanning-alerts-create-code-scanning-alert) | `create-code-scanning-alert` | Generate SARIF security advisories (max: unlimited, same-repo only) |
 | [Autofix Code Scanning Alerts](#autofix-code-scanning-alerts-autofix-code-scanning-alert) | `autofix-code-scanning-alert` | Create automated fixes for code scanning alerts (max: 10, same-repo only) |
@@ -1769,17 +1769,37 @@ on: workflow_dispatch
 safe-outputs:
   request-continuation:
     max: 5 # optional, 1-100 chained continuation runs (default: 5)
+    continuation-policy: # optional (default: workflow-dispatch)
+      type: workflow-dispatch
+      approval: continuation-review # optional environment with required reviewers
 ```
+
+`continuation-policy` accepts the shorthand `continuation-policy: workflow-dispatch` or an object. `type` selects how the next run is triggered; `workflow-dispatch` is the only type. `approval` names a [deployment environment](https://docs.github.com/en/actions/managing-workflow-runs-and-deployments/managing-deployments/managing-environments-for-deployment) that must have required reviewers. When it is set, each continuation waits for a reviewer before the next run starts.
 
 When the agent requests continuation:
 
 1. After secret redaction and integrity validation, the agent job uploads the native session checkpoint.
-2. The safe-outputs job dispatches the same workflow on the same branch, recording the parent run, continuation depth, and hints in `aw_context`.
-3. The next run restores the checkpoint and resumes the native session when the engine supports it. It then receives the hints and the current workflow prompt.
+2. After threat detection passes, the safe-outputs job records the request, including depth and hints, in a `continuation-request-<attempt>` artifact. It does not dispatch anything.
+3. The conclusion job dispatches the generated `agentic-continuation-relay.yml` relay with the parent run ID and attempt.
+4. The relay reads the parent's compiled lock file at the parent commit. It then validates the run, the request, the checkpoint and the depth limit, waits on the `approval` environment when one is configured, and dispatches the same workflow on the parent's branch. Its `aw_context` carries the lineage (parent run, depth, and relay run ID) but not the hints.
+5. The next run reads the hints from the parent's request artifact, restores the checkpoint, and resumes the native session when the engine supports it. It then receives the hints and the current workflow prompt.
 
 The next run starts on a fresh runner. Workspace edits, files, credentials, and tool state are not restored. The agent must use the hints to reconstruct its working context before acting. Hints and restored history are untrusted, advisory data; current workflow instructions take precedence. Only one continuation can be requested per run. When the chain reaches `max`, the request is skipped.
 
-Requires a `workflow_dispatch` trigger and grants `actions: write` to the safe-outputs job. Supports `authorization` like other safe outputs. The compiler adds workflow-level concurrency so that runs in a chain execute one at a time; explicit `concurrency`, `workflow_call`, and work-queue workers are not supported. See [durable runs](/gh-aw/reference/engines/#durable-runs) for per-engine session behavior.
+The relay fails closed. It stops when:
+
+- the relay itself is not a `workflow_dispatch` run of `agentic-continuation-relay.yml` on the default branch, or its run name does not match the inputs;
+- the relay was dispatched or rerun by anyone other than `github-actions[bot]` or a user with write access (other bots are rejected);
+- the parent is a fork run, comes from another repository, or is not a compiled agentic workflow;
+- the workflow on the parent's branch no longer enables `request-continuation`, lowers `max` below the depth, or changes the approval environment;
+- the request or checkpoint artifact is missing or expired;
+- the depth exceeds the compiled `max`;
+- the approval environment is missing, has no required reviewers, or is rejected;
+- the same parent attempt has already been relayed.
+
+Recover a failed dispatch by rerunning the relay, or with `gh workflow run agentic-continuation-relay.yml -f parent_run_id=<id> -f parent_run_attempt=<attempt>`. The continued run accepts continuation lineage only from a `workflow_dispatch` by `github-actions[bot]` that names an authentic relay run bound to the same parent attempt, so a hand-crafted `aw_context` cannot restore a checkpoint or inject hints.
+
+Requires a `workflow_dispatch` trigger. Only the conclusion job (to dispatch the relay) and the relay's dispatch job get `actions: write`; the safe-outputs job gets no additional permissions. The compiler generates `agentic-continuation-relay.yml` only when at least one workflow enables `request-continuation`, and removes it when none do; commit it with your lock files. The relay runs from the default branch, so merge it there before continuations can run. No concurrency group is added, and explicit `concurrency` is allowed; `workflow_call` and work-queue workers are not supported. Staged mode records nothing and dispatches nothing. Supports `authorization` like other safe outputs. See [durable runs](/gh-aw/reference/engines/#durable-runs) for per-engine session behavior.
 
 ### Agent Session Creation (`create-agent-session:`)
 

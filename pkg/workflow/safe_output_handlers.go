@@ -573,13 +573,8 @@ var safeOutputHandlers = []safeOutputHandlerDescriptor{
 		Key:         requestContinuationKey,
 		StructField: "RequestContinuation",
 		ToolName:    requestContinuationToolName,
-		NewConfig:   func() any { return &RequestContinuationConfig{} },
-		PermissionBuilder: func(safeOutputs *SafeOutputsConfig) *Permissions {
-			if !isSafeOutputHandlerEnabledAndUnstaged(safeOutputs, "RequestContinuation") {
-				return nil
-			}
-			return NewPermissionsActionsWrite()
-		},
+		// The handler only records a request artifact; the conclusion job dispatches the relay.
+		NewConfig: func() any { return &RequestContinuationConfig{} },
 	},
 	{
 		Key:         "dispatch_repository",

@@ -520,7 +520,8 @@
         "runAttempt": { "type": "string" },
         "parentRunId": { "type": "string" },
         "status": { "type": "string", "enum": ["restored", "fresh", "failed"] },
-        "artifactId": { "type": "string" }
+        "artifactId": { "type": "string" },
+        "relayRunId": { "type": "string" }
       },
       "required": ["engine", "runAttempt", "runId", "status", "storage"],
       "additionalProperties": false
