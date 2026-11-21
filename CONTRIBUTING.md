@@ -635,6 +635,11 @@ selection enables or omits both macOS and Windows together.
 Pushes and other non-PR events skip the decision job without suppressing
 any suite.
 
+The decision step summary shows retained and omitted suite counts at a glance.
+Expand **Suite selection and diagnostics** to see the suite IDs, fallback reason
+when applicable, and metrics. The selector still emits JSON to stdout and keeps
+its workflow outputs machine-readable.
+
 The same model-driven selection and prerequisite closure apply during
 recorded-response replay. Source, test-only, dependency, configuration, and
 unknown paths all reach the model; no path category automatically forces all

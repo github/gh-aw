@@ -225,6 +225,41 @@ async function frontDoor({ catalog, diff, prompt, token, fullRun = false, decide
   };
 }
 
+function renderSummary({ suite_ids: suiteIds, fallback, reason, metrics }) {
+  const selected = new Set(suiteIds);
+  const omitted = SUITE_IDS.filter(id => !selected.has(id));
+  const status = fallback ? "Fallback: keeping every suite." : reason === "full-run" ? "Full run: suite selection was not applied." : omitted.length ? "Selection applied." : "Decision kept every suite.";
+  const suiteList = ids => (ids.length ? ids.map(id => `- \`${id}\``).join("\n") : "_None._");
+  const minutes = metrics.estimated_test_minutes_saved;
+  return [
+    "### CI Front Door",
+    "",
+    `${status} **${selected.size} of ${SUITE_IDS.length} suites retained**, **${omitted.length} omitted**.`,
+    "",
+    "<details>",
+    "<summary>Suite selection and diagnostics</summary>",
+    "",
+    `**Retained suites (${selected.size})**`,
+    "",
+    suiteList(suiteIds),
+    "",
+    `**Omitted suites (${omitted.length})**`,
+    "",
+    suiteList(omitted),
+    "",
+    "| Diagnostic | Value |",
+    "| --- | --- |",
+    `| Outcome | \`${reason}\` |`,
+    `| Estimated test minutes saved | ${minutes === null ? "Unavailable" : Number(minutes.toFixed(2))} |`,
+    `| Missed regressions | ${metrics.missed_regressions ?? "Not measured"} |`,
+    `| Decisions API requests | ${metrics.decision_api_requests} |`,
+    `| Other GitHub API requests | ${metrics.other_github_api_requests} |`,
+    "",
+    "</details>",
+    "",
+  ].join("\n");
+}
+
 async function main() {
   const cwd = path.resolve(__dirname, "..");
   const diffCwd = path.resolve(process.env.CI_DIFF_WORKSPACE || cwd);
@@ -260,7 +295,7 @@ async function main() {
   result.metrics.other_github_api_requests = githubApiRequests;
   const json = JSON.stringify(result);
   if (process.env.GITHUB_OUTPUT) fs.appendFileSync(process.env.GITHUB_OUTPUT, `suite_ids=${JSON.stringify(result.suite_ids)}\nfallback=${result.fallback}\nmetrics=${JSON.stringify(result.metrics)}\n`);
-  if (process.env.GITHUB_STEP_SUMMARY) fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, `### CI Front Door\n\n${json}\n`);
+  if (process.env.GITHUB_STEP_SUMMARY) fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, renderSummary(result));
   process.stdout.write(json + "\n");
 }
 

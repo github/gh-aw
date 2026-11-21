@@ -892,7 +892,7 @@ global.fetch = async (url, options) => {
   if (process.env.MOCK_COMPARE_STATUS === "403") assert.equal(input.diff_summary.unavailable, true);
   else assert.deepEqual(input.diff_summary.files, ["README.md"]);
   assert.deepEqual(input.suite_catalog, ${JSON.stringify(catalog)});
-  return new Response(${JSON.stringify(JSON.stringify(decisionResponse({ suite_ids: [], confidence: 1 })))}, { status: 200 });
+  return new Response(${JSON.stringify(JSON.stringify(decisionResponse({ suite_ids: ["build-wasm"], confidence: 1 })))}, { status: 200 });
 };
 `
   );
@@ -901,6 +901,7 @@ global.fetch = async (url, options) => {
     ["pull_request", "403"],
     ["push", "200"],
   ]) {
+    const summaryPath = path.join(cwd, `${event}-${status}-summary.md`);
     const stdout = execFileSync(process.execPath, ["--require", preload, path.join(cwd, "scripts/ci-front-door.cjs")], {
       cwd,
       env: {
@@ -913,16 +914,35 @@ global.fetch = async (url, options) => {
         GITHUB_EVENT_NAME: event,
         MOCK_COMPARE_STATUS: status,
         GITHUB_OUTPUT: "",
-        GITHUB_STEP_SUMMARY: "",
+        GITHUB_STEP_SUMMARY: summaryPath,
       },
       encoding: "utf8",
       stdio: ["ignore", "pipe", "pipe"],
     });
     const result = JSON.parse(stdout);
-    assert.deepEqual(result.suite_ids, event === "pull_request" && status === "200" ? [] : SUITE_IDS);
+    const selective = event === "pull_request" && status === "200";
+    assert.deepEqual(result.suite_ids, selective ? ["build-wasm"] : SUITE_IDS);
     assert.equal(result.fallback, status === "403");
     assert.equal(result.metrics.decision_api_requests, event === "pull_request" && status === "200" ? 1 : 0);
     assert.equal(result.metrics.other_github_api_requests, event === "pull_request" ? 1 : 0);
+    const summary = fs.readFileSync(summaryPath, "utf8");
+    const [headline, details] = summary.split("<details>\n");
+    const expectedStatus = selective ? "Selection applied." : status === "403" ? "Fallback: keeping every suite." : "Full run: suite selection was not applied.";
+    assert.ok(headline.startsWith(`### CI Front Door\n\n${expectedStatus}`));
+    assert.ok(headline.includes(`**${result.suite_ids.length} of ${SUITE_IDS.length} suites retained**`));
+    assert.match(details, /^<summary>Suite selection and diagnostics<\/summary>\n\n/);
+    if (selective) {
+      assert.match(details, /\*\*Retained suites \(1\)\*\*\n\n- `build-wasm`\n\n\*\*Omitted suites \(\d+\)\*\*\n\n- `front-door-conformance`/);
+      assert.match(details, /\| Estimated test minutes saved \| Unavailable \|/);
+    } else {
+      assert.match(details, /\*\*Omitted suites \(0\)\*\*\n\n_None\._/);
+      assert.match(details, /\| Estimated test minutes saved \| 0 \|/);
+    }
+    assert.ok(details.includes(`| Outcome | \`${result.reason}\` |`));
+    assert.ok(details.includes(`| Decisions API requests | ${result.metrics.decision_api_requests} |`));
+    assert.ok(details.includes(`| Other GitHub API requests | ${result.metrics.other_github_api_requests} |`));
+    assert.ok(details.endsWith("</details>\n"));
+    assert.doesNotMatch(summary, /"suite_ids"/);
   }
 });
 
