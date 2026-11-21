@@ -16,6 +16,7 @@ const {
   ModelAliasResolutionError,
   normalizeForCopilotCLI,
   resolveConfiguredCopilotModel,
+  resolveConfiguredModel,
   resolveEngineModel,
   resolveModelAlias,
   selectLatestGlobMatch,
@@ -506,5 +507,54 @@ describe("built-in detection alias selection", () => {
 
   it("keeps an explicit GH_AW_MODEL_DETECTION_COPILOT override", async () => {
     expect(await resolveDetection(CLI_CLI_CATALOG, { GH_AW_MODEL_DETECTION_COPILOT: "gpt-5.3-codex" })).toBe("gpt-5.3-codex");
+  });
+});
+
+// Copilot catalogue from github/gh-aw#76961, where `auto` chose a Decisions-only model.
+describe("alias wildcards and automatic selection eligibility", () => {
+  const ROUTING_MODELS = [
+    { model_id: "claude-haiku-4.5", automatic_selection_eligible: true },
+    { model_id: "gpt-5.3-codex", automatic_selection_eligible: true },
+    { model_id: "gpt-5.6-luna-utility", automatic_selection_eligible: false, automatic_selection_reason: "model_picker_disabled" },
+    { model_id: "gpt-6-luna-decisions", automatic_selection_eligible: false, automatic_selection_reason: "no_agent_endpoint" },
+    { model_id: "text-embedding-3-small", automatic_selection_eligible: false, automatic_selection_reason: "no_agent_endpoint" },
+  ];
+  const reflect = (routingModels = ROUTING_MODELS) => ({
+    models_fetch_complete: true,
+    endpoints: [{ configured: true, provider: "copilot", models: ROUTING_MODELS.map(model => model.model_id), ...(routingModels ? { routing_models: routingModels } : {}) }],
+  });
+  const resolve = (configuredModel, options = {}) => resolveConfiguredModel({ configuredModel, aliasMap: ALIAS_MAP, reflectData: reflect(), ...options }).modelId;
+
+  it.each(["auto", "large", "gpt-5"])("resolves %s past models that cannot serve an agent", configuredModel => {
+    expect(resolve(configuredModel)).toBe("gpt-5.3-codex");
+    expect(resolve(configuredModel, { provider: "copilot" })).toBe("gpt-5.3-codex");
+  });
+
+  it("filters a caller-supplied catalogue with the /reflect eligibility", () => {
+    const ids = ROUTING_MODELS.map(model => model.model_id);
+    expect(resolve("auto", { catalog: ids.map(id => `copilot/${id}`) })).toBe("gpt-5.3-codex");
+    expect(resolve("auto", { catalog: ids, provider: "copilot" })).toBe("gpt-5.3-codex");
+  });
+
+  it("fails an alias whose only wildcard matches are not automatically selectable", () => {
+    expect(() => resolve("gpt-6")).toThrow(expect.objectContaining({ reason: "model_unavailable" }));
+  });
+
+  it("logs the wildcard matches it skipped", () => {
+    const messages = [];
+    resolve("auto", { logger: message => messages.push(message) });
+    expect(messages).toContain("model alias resolution: 'copilot/gpt-6*' skipped copilot/gpt-6-luna-decisions: AWF marks them as not automatically selectable");
+    expect(messages).toContain("model alias resolution: 'copilot/gpt-5*' skipped copilot/gpt-5.6-luna-utility: AWF marks them as not automatically selectable");
+  });
+
+  it.each(["evals", "copilot/gpt-6-luna-decisions"])("keeps the explicit choice %s", configuredModel => {
+    expect(resolve(configuredModel)).toBe("gpt-6-luna-decisions");
+  });
+
+  it.each([
+    ["without routing_models", null],
+    ["without the eligibility field", ROUTING_MODELS.map(({ model_id }) => ({ model_id }))],
+  ])("leaves resolution unchanged when /reflect is %s", (_, routingModels) => {
+    expect(resolveConfiguredModel({ configuredModel: "auto", aliasMap: ALIAS_MAP, reflectData: reflect(routingModels) }).modelId).toBe("gpt-6-luna-decisions");
   });
 });
