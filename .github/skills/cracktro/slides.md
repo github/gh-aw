@@ -439,6 +439,28 @@ writes, threat detection, safe-outputs, scoped jobs, permissions, proposals, YAM
 - So who actually presses the button once a proposal is cleared?
 - A separate, scoped job applies only the declared outputs, adding the configured prefix and labels. The agent itself never writes.
 
+### Extend safe outputs {#extend-safe-outputs}
+
+#### Notes
+
+illustrative
+
+#### Summary
+
+Every agent write is a typed tool: built-in handlers cover common GitHub writes such as issues, pull requests, comments and labels, safe scripts add inline JavaScript run once per call without secrets, and safe jobs add a custom Actions job with its own steps and secrets, all behind threat detection and outside the sandbox.
+
+#### Keywords
+
+extensibility, custom safe outputs, safe-outputs.scripts, safe-outputs.jobs, safe-outputs.actions, inline script handlers, custom jobs, MCP tools, GH_AW_AGENT_OUTPUT, create-issue, create-pull-request, add-comment, create-discussion, add-labels, update-issue, push-to-pull-request-branch, chat notification, webhooks, secrets, built-in handlers
+
+#### Captions
+
+- Safe outputs are not a closed list. Tonight: how teams extend what an agent may change.
+- Built-in handlers cover the common GitHub writes, such as issues, pull requests, comments and labels.
+- And when a team needs something gh-aw does not ship, like a chat notification?
+- A safe script adds a little JavaScript that runs once per call, with no secrets.
+- A safe job is a full Actions job with its own steps and secrets. All three stay typed tools, behind threat detection, outside the sandbox.
+
 ### Model-checked {#model-checked}
 
 #### Notes

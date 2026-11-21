@@ -2126,6 +2126,44 @@
   .so-note { margin-top: 18px; font-size: 22px; line-height: 1.35; color: #9198a1; }
   .so-note code { font: 600 19px var(--mono); color: #79c0ff; }
 
+  /* --- extend safe outputs: agent calls → built-in handlers, safe scripts, safe jobs --- */
+  .sx { --lg: #79c0ff; }
+  .slide-head h2.sx-h { font-size: 100px; }
+  .sx-ag { position: absolute; left: 1250px; top: 96px; width: 560px; height: 170px; padding: 20px 24px; border-radius: 18px; border: 2px dashed #4493f8; background: #010409ee; }
+  .active .sx-ag { animation: sec-in .9s cubic-bezier(.2,.9,.2,1) both 200ms; }
+  .sx-ag i { display: flex; align-items: center; justify-content: space-between; font: 600 17px/1 var(--mono); letter-spacing: .14em; color: #79c0ff; font-style: normal; }
+  .sx-ag i span { letter-spacing: 0; padding: 7px 12px; border-radius: 99px; border: 1px solid #4493f8; background: #4493f81f; }
+  .sx-term { margin-top: 20px; font: 500 22px/1.3 var(--mono); color: #f0f6fc; white-space: nowrap; overflow: hidden; }
+  .sx-term .p { color: #79c0ff; }
+  .sx-term .cur::after { content: "▍"; color: #f0f6fc; animation: blink 1s steps(1) infinite; }
+  .sx-ag .sub { margin-top: 12px; font: 500 17px/1 var(--mono); color: #9198a1; }
+  .sx-col { position: absolute; top: 320px; width: 540px; height: 600px; padding: 26px 22px; border-radius: 20px; border: 2px solid #30363d; background: #0d1117e6; transition: border-color .4s, box-shadow .4s; }
+  .active .sx-col { animation: sec-in .9s cubic-bezier(.2,.9,.2,1) both calc(var(--i) * 300ms + 500ms); }
+  .sx-col.hot { border-color: #4493f8; box-shadow: 0 0 80px -16px #4493f855, inset 0 0 80px -40px #4493f855; }
+  .sx-col > i { font: 600 17px/1 var(--mono); letter-spacing: .18em; color: #79c0ff; font-style: normal; }
+  .sx-col h3 { margin: 14px 0 8px; font-size: 40px; line-height: 1; color: #f0f6fc; font-variation-settings: "wght" 700, "wdth" 100; }
+  .sx-col .sub { font-size: 21px; line-height: 1.3; color: #9198a1; }
+  .sx-list { margin: 18px 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; }
+  .sx-list li { display: flex; align-items: center; gap: 12px; height: 38px; padding: 0 12px; border-radius: 10px; border: 1px solid #30363d; background: #161b22; font: 500 18px/1 var(--mono); color: #d1d7e0; transition: background .4s, border-color .4s, color .4s; }
+  .sx-list li svg { width: 20px; height: 20px; flex: none; }
+  .sx-code { margin-top: 18px; padding: 12px 14px; border-radius: 12px; border: 1px solid #30363d; background: #010409; font: 500 17px/1.5 var(--mono); color: #d1d7e0; }
+  .sx-code div { white-space: pre; padding: 0 6px; margin: 0 -6px; border-radius: 4px; transition: background .4s, color .4s; }
+  .sx-code b { font-weight: 600; color: #79c0ff; }
+  .sx-code .s { color: #9198a1; }
+  .sx-list li.hl, .sx-code div.hl { background: #4493f826; border-color: #4493f8; color: #f0f6fc; }
+  .sx-tags { position: absolute; left: 22px; right: 22px; bottom: 82px; display: flex; flex-wrap: wrap; gap: 8px; }
+  .sx-tags span { font: 600 15px/1 var(--mono); padding: 7px 11px; border-radius: 99px; border: 1px solid #3d444d; color: #c9d1d9; background: #ffffff0a; }
+  .sx-res { position: absolute; left: 22px; right: 22px; bottom: 22px; height: 44px; display: flex; align-items: center; padding: 0 14px; border-radius: 10px; font: 600 18px/1 var(--mono); color: #0d1117; background: #4493f8; white-space: nowrap; overflow: hidden; opacity: 0; transform: translateY(8px); transition: opacity .4s, transform .4s; }
+  .sx-col.done .sx-res { opacity: 1; transform: none; }
+  .sx-pill { position: absolute; left: 0; top: 0; z-index: 3; display: flex; align-items: center; gap: 10px; padding: 9px 14px; border-radius: 99px; border: 2px dashed #4493f8; background: #161b22; font: 600 18px/1 var(--mono); color: #f0f6fc; white-space: nowrap; opacity: 0; transition: transform .8s cubic-bezier(.5,0,.2,1), opacity .3s; }
+  .sx-pill.on { opacity: 1; }
+  .sx-pill span { display: none; color: #79c0ff; }
+  .sx-pill.ok { border-style: solid; }
+  .sx-pill.ok span { display: inline; }
+  .sx-foot { position: absolute; left: 110px; top: 950px; width: 1700px; font: 500 24px/1.3 "Mona Sans"; color: #9198a1; opacity: .55; transition: opacity .5s, color .5s; }
+  .sx-foot b { font-weight: 600; color: #79c0ff; }
+  .sx.p-end .sx-foot { opacity: 1; color: #e6edf3; }
+
   /* --- agentic attacks: attack cards → sandboxed agent terminal → defense layers, OWASP chips below --- */
   .atk { --lg: #ff7b72; }
   .atk-cards { position: absolute; left: 110px; top: 300px; width: 470px; display: flex; flex-direction: column; gap: 9px; }
@@ -6383,6 +6421,187 @@
             status.textContent = "● open · #42";
             sfx.notify(false);
           });
+      },
+      el,
+    });
+  }
+
+  // Extend safe outputs: the agent calls three tools; a built-in handler, an inline safe script and a custom safe job each apply one write
+  {
+    resetIndex();
+    const CX = [110, 690, 1270];
+    // [octicon, built-in safe output type]: a selection of commonly used built-in types
+    const BUILTIN = [
+      ["issue", "create-issue"],
+      ["pr", "create-pull-request"],
+      ["comment", "add-comment"],
+      ["discussion", "create-discussion"],
+      ["tag", "add-labels"],
+      ["issue", "update-issue"],
+      ["merge", "push-to-pull-request-branch"],
+    ];
+    const SCRIPT = [
+      "safe-outputs:",
+      "  scripts:",
+      "    post-status:",
+      "      description: Log a build status",
+      "      inputs:",
+      "        state: { type: string }",
+      "      script: |",
+      "        core.info(`status ${item.state}`);",
+      "        return { success: true };",
+    ];
+    const JOB = [
+      "safe-outputs:",
+      "  jobs:",
+      "    notify-chat:",
+      "      description: Post to team chat",
+      "      runs-on: ubuntu-latest",
+      "      inputs:",
+      "        message: { type: string }",
+      "      env:",
+      "        HOOK: ${{ secrets.CHAT_HOOK }}",
+      "      steps:",
+      '        - run: notify "$GH_AW_AGENT_OUTPUT"',
+    ];
+    const yl = line => {
+      const m = /^(\s*(?:- )?)([A-Za-z_-]+):(.*)$/.exec(line);
+      return m ? h("div", {}, m[1], h("b", {}, m[2]), ":", m[3]) : h("div", { class: "s" }, line);
+    };
+    const chips = BUILTIN.map(([ico, k]) => h("li", {}, h("span", { class: "sx-ico", "data-ico": ico }), k));
+    const sLines = SCRIPT.map(yl);
+    const jLines = JOB.map(yl);
+    const res = [h("div", { class: "sx-res" }), h("div", { class: "sx-res" }), h("div", { class: "sx-res" })];
+    const COLS = [
+      ["01 · BUILT IN", "Built-in handlers", "Typed writes gh-aw maintains", h("ul", { class: "sx-list" }, chips), ["no code", "max · target · labels"]],
+      ["02 · SCRIPTS", "Safe scripts", "Inline JavaScript, once per call", h("div", { class: "sx-code" }, sLines), ["in-process", "no secrets"]],
+      ["03 · JOBS", "Safe jobs", "Your own Actions job, with secrets", h("div", { class: "sx-code" }, jLines), ["own runner", "secrets", "any steps"]],
+    ];
+    const cols = COLS.map(([k, t, sub, body, tags], i) =>
+      h("div", { class: "sx-col", "--i": i, style: { left: `${CX[i]}px` } }, h("i", {}, k), h("h3", {}, t), h("div", { class: "sub" }, sub), body, h("div", { class: "sx-tags" }, tags.map(x => h("span", {}, x))), res[i])
+    );
+    // [tool call typed by the agent, highlighted rows, result line]
+    const STEPS = [
+      ['create_issue({ title: "Flaky test" })', [chips[0]], "✓ issue #42 opened"],
+      ['post_status({ state: "green" })', sLines.slice(6), "✓ { success: true }"],
+      ['notify_chat({ message: "Fixed" })', jLines.slice(7), "✓ notify-chat job · success"],
+    ];
+    const typed = h("span", { class: "cur" });
+    const pillName = h("b", {});
+    const pill = h("div", { class: "sx-pill" }, pillName, h("span", {}, "✓ detection"));
+    const el = h(
+      "section",
+      { class: "slide sx" },
+      h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Built in · scripts · jobs"), h("h2", { class: "sx-h" }, letters("Extend "), letters("safe outputs", "l-grad"))),
+      h(
+        "div",
+        { class: "sx-ag" },
+        h("i", {}, "AGENT · SANDBOXED", h("span", {}, "🔒 read-only")),
+        h("div", { class: "sx-term" }, h("span", { class: "p" }, "› "), typed),
+        h("div", { class: "sub" }, "one typed MCP tool per declared write")
+      ),
+      cols,
+      pill,
+      h(
+        "div",
+        { class: "sx-foot" },
+        "One contract for all three: a ",
+        h("b", {}, "typed tool"),
+        " the agent calls, ",
+        h("b", {}, "threat detection"),
+        " on every proposal, and the write applied ",
+        h("b", {}, "outside the sandbox"),
+        "."
+      )
+    );
+    const S0 = 500,
+      DT = 4400,
+      TYPE = 1300,
+      FLY = 1500,
+      OK = 2000,
+      LAND = 2400,
+      END = S0 + STEPS.length * DT,
+      CYC = END + 4200,
+      HOME = [1270, 200];
+    const dest = i => [CX[i] + 120, 296];
+    let t0 = 0,
+      cyc = -1,
+      state = "",
+      nTyped = -1,
+      seen = new Set(),
+      iconsDrawn = false;
+    const move = ([x, y], instant) => {
+      if (instant) pill.style.transition = "none";
+      pill.style.transform = `translate(${x}px, ${y}px)`;
+      if (instant) {
+        void pill.offsetWidth;
+        pill.style.transition = "";
+      }
+    };
+    const fire = (name, fn) => {
+      if (seen.has(name)) return;
+      seen.add(name);
+      fn();
+    };
+    slides.push({
+      under: "safe-outputs",
+      id: "extend-safe-outputs",
+      group: "security",
+      notes:
+        "What: An illustrative run with synthetic calls. The sandboxed agent writes nothing itself; every declared write is a typed MCP tool. Built-in handlers cover common GitHub writes such as create-issue, create-pull-request, add-comment, create-discussion, add-labels, update-issue and push-to-pull-request-branch, configured with options like max, target and labels. safe-outputs.scripts adds inline JavaScript that runs in-process in the consolidated safe-outputs job, once per tool call, without repository secrets. safe-outputs.jobs adds a full Actions job with its own runner, steps and secrets; it runs once per workflow run and reads every call from $GH_AW_AGENT_OUTPUT. safe-outputs.actions, not shown, wraps a public GitHub Action as a tool.\nWhy: Teams can extend what agents may change, such as chat notifications or external systems, without giving the agent a token; extensions keep threat detection and the job boundary.\nWhen: Prefer a built-in type; use a script for light per-call logic without secrets, and a job when the write needs secrets or a custom runner.",
+      enter() {
+        if (!iconsDrawn) {
+          iconsDrawn = true;
+          el.querySelectorAll(".sx-ico").forEach(s => {
+            s.innerHTML = `<svg viewBox="0 0 24 24" fill="#79c0ff">${OCTI[s.dataset.ico].map(d => `<path d="${d}"/>`).join("")}</svg>`;
+          });
+        }
+        t0 = 0;
+        cyc = -1;
+      },
+      tick(t) {
+        if (!t0) t0 = t;
+        const e = t - t0,
+          c = Math.floor(e / CYC),
+          u = e % CYC;
+        if (c !== cyc) {
+          cyc = c;
+          seen = new Set();
+          state = "";
+          nTyped = -1;
+          move(HOME, true);
+        }
+        const k = Math.min(STEPS.length - 1, Math.max(0, Math.floor((u - S0) / DT))),
+          v = u - S0 - k * DT,
+          [call] = STEPS[k];
+        const phase = u < S0 ? "idle" : u >= END ? "end" : v < FLY ? "type" : v < OK ? "fly" : v < LAND ? "ok" : "land";
+        const key = `${k}:${phase}`;
+        if (key !== state) {
+          state = key;
+          el.classList.toggle("p-end", phase === "end");
+          pillName.textContent = call.replace(/\(.*$/, "");
+          pill.classList.toggle("on", phase === "fly" || phase === "ok");
+          pill.classList.toggle("ok", phase === "ok");
+          if (phase === "type") move(HOME, true);
+          if (phase === "fly") move(dest(k));
+          cols.forEach((col, i) => {
+            const landed = phase === "end" ? true : i < k || (i === k && phase === "land");
+            col.classList.toggle("done", landed && u >= S0);
+            col.classList.toggle("hot", i === k && phase === "land");
+            if (landed && u >= S0) res[i].textContent = STEPS[i][2];
+          });
+          STEPS.forEach(([, rs], i) => rs.forEach(r => r.classList.toggle("hl", i === k && phase === "land")));
+        }
+        const n = u < S0 ? 0 : u >= END ? call.length : Math.max(0, Math.min(call.length, Math.floor((v / TYPE) * call.length)));
+        if (n !== nTyped) {
+          if (n > nTyped && nTyped >= 0 && phase === "type") sfx.key(0.7);
+          nTyped = n;
+          typed.textContent = call.slice(0, n);
+        }
+        if (phase === "fly") fire("fly" + k, () => sfx.pop(3 + k));
+        if (phase === "ok") fire("ok" + k, () => sfx.pop(6));
+        if (phase === "land") fire("land" + k, () => (k === 2 ? sfx.compile() : sfx.notify(false)));
+        if (phase === "end") fire("end", () => sfx.review());
       },
       el,
     });
