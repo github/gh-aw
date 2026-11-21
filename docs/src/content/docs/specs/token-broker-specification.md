@@ -103,6 +103,8 @@ Admission success, admission absence, and admission's `ignore` outage policy MUS
 
 ## 4. Exchange Protocol
 
+The [companion TypeSpec definition](https://github.com/github/gh-aw/blob/main/docs/src/content/docs/specs/token-broker-specification.tsp) describes the service's shared POST endpoint, exchange and invalidation messages, and response statuses. This section defines operation-specific success, strict validation, and credential lifecycle requirements.
+
 ### 4.1. Transport and request
 
 The configured URL is the complete exchange endpoint; no route suffix or discovery request is appended. The client MUST acquire a GitHub Actions OIDC JWT with that exact audience and send one HTTPS POST with `Content-Type: application/json` and `Accept: application/json`. Redirects MUST NOT be followed during OIDC acquisition or exchange. The broker MUST serve the configured endpoint directly without redirects.
