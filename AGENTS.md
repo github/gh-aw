@@ -43,14 +43,9 @@ Workflows that declare a `source:` frontmatter entry (for example `source: githu
 
 ## Lazy Skill Loading Policy
 
-Use skills only when the task requires specialized guidance. Do not pre-load every skill.
-
-All skills are local to this repository under `.github/skills/`. **NEVER** use GitHub Agent Finder (`agentfinder.github.com`) or any other remote skill discovery service to look for skills.
-
-When the relevant skill is not obvious, first discover candidates locally and then load only the minimal guidance needed:
-
-- Discover skills by listing or searching `.github/skills/*/SKILL.md` in this repository.
-- Use **skill fusion** after discovery: read only the specific skill sections or fragments needed instead of loading full skills broadly.
+Load only the skill guidance the task requires. If the route is unclear,
+search `.github/skills/*/SKILL.md` locally, then read only relevant sections.
+Never use GitHub Agent Finder (`agentfinder.github.com`) or other remote skill discovery.
 
 ### Skill routes
 
@@ -68,6 +63,7 @@ Paths below are relative to `.github/skills/`; load only the matching `SKILL.md`
 | Error handling/recovery | `error-recovery-patterns` |
 | GitHub MCP usage | `github-mcp-server` |
 | Issue/PR/workflow/discussion/label queries | matching `github-*-query` |
+| Verify or merge Dependabot npm updates through 1ES | `dependabot-1es` |
 | Workflow review: compile/scans/audit/optimization | `review-agentic-workflows` |
 | Documentation | `documentation` |
 | Issue/comment/review Markdown | `issue-markdown` |
