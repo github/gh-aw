@@ -249,8 +249,39 @@ test("benchmark shards cover every benchmark package once and bound expensive re
         .split(" ")
     );
     assert.ok(args.includes(`BENCH_TIME=${shard === "workqueue" ? "1x" : "3x"}`));
+    assert.ok(args.includes("BENCH_COUNT=6"));
   }
   assert.deepEqual(selected.sort(), expected);
+});
+
+test("benchmark gate ignores noisy geomeans and fails significant regressions over 10%", t => {
+  const benchmarks = fs.readFileSync(path.join(__dirname, "../.github/workflows/benchmarks.yml"), "utf8");
+  const script = benchmarks
+    .split("    - name: Run benchstat regression check\n")[1]
+    .split("      run: |\n")[1]
+    .split("\n    - name:")[0]
+    .replace(/^        /gm, "");
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "benchmark-gate-"));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  fs.writeFileSync(path.join(directory, "benchstat"), '#!/bin/bash\nprintf "%s\\n" "$BENCHSTAT_OUTPUT"\n', { mode: 0o755 });
+  const output = [
+    "        │ sec/op │ sec/op vs base │",
+    "Parse-4   57.57µ   64.40µ ~ (p=1.000 n=1)",
+    "geomean   57.57µ   64.40µ +11.87%",
+    "Boundary-4 10n 11n +10.00% (p=0.002 n=6)",
+    "        │ B/s │ B/s vs base │",
+    "Replay-4 10M 12M +20.00% (p=0.002 n=6)",
+  ].join("\n");
+  const run = data =>
+    spawnSync("bash", ["-c", script], {
+      cwd: directory,
+      env: { ...process.env, PATH: `${directory}:${process.env.PATH}`, BENCHSTAT_OUTPUT: data, SHARD: "other", GITHUB_STEP_SUMMARY: path.join(directory, "summary") },
+      encoding: "utf8",
+    });
+  assert.equal(run(output).status, 0);
+  const regression = run(`${output}\n        │ B/op │ B/op vs base │\nParse-4  100  112  +12.00% (p=0.002 n=6)`);
+  assert.equal(regression.status, 1);
+  assert.match(regression.stdout, /::error::Performance regression >10%: Parse-4/);
 });
 
 test("make bench preserves Go failures through tee", t => {
