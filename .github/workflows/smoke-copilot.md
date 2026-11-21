@@ -25,8 +25,6 @@ permissions:
 name: Smoke Copilot
 engine:
   id: copilot
-  durable:
-    retention-days: 7
   fallback-models:
     - copilot/gpt-5.6-luna
     - copilot/claude-sonnet-5
@@ -90,6 +88,7 @@ models:
             cache_read: "3e-07"
             cache_write: "3.75e-06"
 safe-outputs:
+    request-continuation: {}
     allowed-domains: [default-safe-outputs]
     upload-artifact:
       max-uploads: 1

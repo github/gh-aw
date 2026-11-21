@@ -868,7 +868,6 @@ func (c *Compiler) generateAgentRunSteps(yaml *strings.Builder, data *WorkflowDa
 	// This ensures all artifacts are scanned for secrets before being uploaded
 	c.generateDurableFileStage(yaml, data)
 	c.generateTrackedSecretRedactionStep(yaml, yaml.String(), data, true)
-	c.generateDurableArtifactUpload(yaml, data)
 
 	// Append the agent step summary to the real $GITHUB_STEP_SUMMARY after secrets are redacted.
 	// The agent writes its GITHUB_STEP_SUMMARY content to AgentStepSummaryPath (a file inside
@@ -884,6 +883,9 @@ func (c *Compiler) generateAgentRunSteps(yaml *strings.Builder, data *WorkflowDa
 			return nil, "", err
 		}
 	}
+	// The checkpoint is published only when the agent requested continuation,
+	// so the collected output types must be known first.
+	c.generateDurableArtifactUpload(yaml, data)
 
 	return artifactPaths, logFileFull, nil
 }

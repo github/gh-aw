@@ -41,7 +41,7 @@ The engine, inference provider, and enabled tools determine where repository con
 | Per-command bash allowlist | Yes | Yes | No | Yes | Yes | No |
 | Native MCP | Yes | Yes | Yes | Yes | Yes | Production-conformance gated |
 | Agent Plugins (`plugins`) | Yes | Yes | Yes | No | No | No |
-| Artifact-backed `engine.durable` | Session (CLI/SDK) | Session | Session | Session | Session (CLI/SDK/RPC) | Session |
+| Durable continuation (`request-continuation`) | Session (CLI/SDK) | Session | Session | Session | Session (CLI/SDK/RPC) | Session |
 
 Codex can disable shell execution but cannot enforce a command allowlist. Agy rejects unsupported tool restrictions rather than ignoring them. See individual references for provider-specific web access, bare-mode behavior, and dynamic workflows.
 
@@ -70,7 +70,7 @@ engine:
 | <span id="custom-engine-command">`command`</span> | Replacement executable that skips the engine installer, not AWF installation. Provision it in setup steps; Agy checks the verified version, and Copilot checksum pins cannot be combined with it. |
 | `api-target` | Endpoint hostname, where supported; see below. |
 | `harness` | Replacement wrapper or retry settings for Copilot, Claude, and Codex. |
-| `durable` | Artifact-backed session continuation with optional `retention-days` (1–90, default `7`). |
+| `durable` | Deprecated. Use [`safe-outputs.request-continuation`](/gh-aw/reference/safe-outputs/#request-continuation-request-continuation); `gh aw fix` migrates it. |
 
 Engine-specific options such as `agent`, `copilot-sdk`, `driver`, `dynamic-workflows`, `permission-mode`, `config`, and `extensions` are documented in each engine reference. Agy rejects most overrides.
 
@@ -78,19 +78,22 @@ Engine-specific options such as `agent`, `copilot-sdk`, `driver`, `dynamic-workf
 
 > [!WARNING]
 > Durable mode is experimental for all engines, including Pi. Enabling
-> `engine.durable` emits a compile-time warning. Configuration and behavior may
-> change without deprecation.
+> `safe-outputs.request-continuation` emits a compile-time warning. Configuration
+> and behavior may change without deprecation.
 
-All built-in engines support artifact-backed continuation:
+All built-in engines support artifact-backed continuation, enabled by the [`request-continuation`](/gh-aw/reference/safe-outputs/#request-continuation-request-continuation) safe output:
 
 ```aw
-engine:
-  id: copilot
-  durable:
-    retention-days: 7
+on: workflow_dispatch
+engine: copilot
+safe-outputs:
+  request-continuation:
+    max: 5 # optional (default: 5)
 ```
 
-The compiler restores an explicit parent from `aw_context`, or otherwise the last successful run of the same workflow on the same branch. Reruns prefer a checkpoint from an earlier attempt of the same run. Retention follows repository and organization policy. Durable mode needs no memory tool and never dispatches another run.
+To continue, the agent must call `request_continuation` with self-contained hints. Only then does the agent job publish its session checkpoint, and the safe-outputs job dispatch the next run of the same workflow on the same branch. If the agent does not call it, nothing is uploaded and the chain stops. The next run restores the parent's checkpoint, which is identified by `aw_context`, and receives the hints. Runs without continuation lineage start fresh, and reruns prefer a checkpoint from an earlier attempt of the same run. Checkpoints are kept for seven days, subject to repository and organization policy. Durable mode needs no memory tool.
+
+`engine.durable` is deprecated and is treated as `safe-outputs.request-continuation`. Run `gh aw fix` to migrate it.
 
 | Engine | Persisted state | Continuation |
 | --- | --- | --- |
@@ -105,7 +108,7 @@ Copilot, Claude, Codex, and Pi resume the exact recorded session with the curren
 
 Durable mode reuses potentially attacker-influenced history across runs. The untrusted-data guidance is advisory, not enforced isolation, and does not eliminate cross-run prompt injection.
 
-Only session files are restored, not workspace edits, credentials, pending task phases, or exactly-once tool execution. Restored Copilot events are excluded from current-run capture and model verification. With no prior run or checkpoint, the first run starts a new session. Missing explicit-parent artifacts, corrupt sessions, and authorization failures remain errors; they never silently start an unrelated conversation.
+Only session files are restored, not workspace edits, credentials, pending task phases, or exactly-once tool execution. The continued agent must reconstruct its working context from the hints and trusted sources. Restored Copilot events are excluded from current-run capture and model verification. If the parent published no checkpoint, the continued run starts a new session that still receives the hints. Corrupt sessions and authorization failures remain errors; they never silently start an unrelated conversation.
 
 The unified session records `durable.restore` (`restored`, `fresh`, or `failed`) and, for Copilot, Claude, Codex, and Pi, `durable.session` (`resumed` or `fresh`). These records hold metadata only, and restoration alone does not prove native continuation for Gemini, Agy, or imported engines. Recording is best effort; missing records mean evidence is unavailable, not a fresh start or a failed restore. `gh aw audit RUN --artifacts info,usage --json` and `gh aw health WORKFLOW --json --logs-dir DIRECTORY` report this evidence; see the [audit reference](/gh-aw/reference/audit/). Spans and durable session logs carry the checkpoint parent as `gh-aw.durable.parent_run_id`; fresh runs omit it.
 

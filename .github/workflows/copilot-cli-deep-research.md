@@ -20,6 +20,7 @@ imports:
 - shared/otlp.md
 - shared/graphify.md
 safe-outputs:
+  request-continuation: {}
   create-issue:
     close-older-issues: true
     expires: 1d
@@ -30,8 +31,6 @@ emoji: 🔬
 engine:
   id: copilot
   copilot-sdk: true
-  durable:
-    retention-days: 7
 max-tool-denials: 3
 strict: true
 timeout-minutes: 20

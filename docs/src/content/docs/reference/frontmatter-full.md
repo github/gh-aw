@@ -3618,19 +3618,6 @@ engine:
     # (optional)
     java: "example-value"
 
-  # Experimental. Persist engine-declared session files in GitHub Actions artifacts.
-  # Using this field emits a compile-time warning. Configuration and behavior may
-  # change without deprecation. Copilot, Claude, Codex, and Pi resume the exact
-  # native session with the current workflow prompt; other session-based engines
-  # receive a continuation prompt. Starts fresh when no prior history exists. No
-  # memory tool is required.
-  # (optional)
-  durable:
-    # Number of days to retain durable checkpoint artifacts, subject to repository and
-    # organization artifact retention policy.
-    # (optional)
-    retention-days: 1
-
   # Engine-specific plugin names to install before launching the engine. Currently
   # used by the Pi engine: each entry is passed to `pi install <extension>`.
   # (optional)
@@ -3768,19 +3755,6 @@ engine:
   # gh-proxy and cli-proxy and rejects attempts to disable either proxy.
   # (optional)
   mcp: true
-
-  # Experimental. Persist engine-declared session files in GitHub Actions artifacts.
-  # Using this field emits a compile-time warning. Configuration and behavior may
-  # change without deprecation. Copilot, Claude, Codex, and Pi resume the exact
-  # native session with the current workflow prompt; other session-based engines
-  # receive a continuation prompt. Starts fresh when no prior history exists. No
-  # memory tool is required.
-  # (optional)
-  durable:
-    # Number of days to retain durable checkpoint artifacts, subject to repository and
-    # organization artifact retention policy.
-    # (optional)
-    retention-days: 1
 
   # Runtime adapter identifier. Maps to the CodingAgentEngine registered in the
   # engine registry. Defaults to id when omitted.
@@ -4218,19 +4192,6 @@ engine:
 # Format 7: Pi engine options, including optional durable execution.
 engine:
   pi:
-    # Experimental. Persist engine-declared session files in GitHub Actions artifacts.
-    # Using this field emits a compile-time warning. Configuration and behavior may
-    # change without deprecation. Copilot, Claude, Codex, and Pi resume the exact
-    # native session with the current workflow prompt; other session-based engines
-    # receive a continuation prompt. Starts fresh when no prior history exists. No
-    # memory tool is required.
-    # (optional)
-    durable:
-      # Number of days to retain durable checkpoint artifacts, subject to repository and
-      # organization artifact retention policy.
-      # (optional)
-      retention-days: 1
-
     # Model for this engine, overriding the top-level model. Has sensible defaults and
     # can typically be omitted. Supports full model IDs (e.g.,
     # 'claude-3-5-sonnet-20241022', 'gpt-4'), which is useful when a nested engine
@@ -22636,19 +22597,6 @@ safe-outputs:
         # (optional)
         java: "example-value"
 
-      # Experimental. Persist engine-declared session files in GitHub Actions artifacts.
-      # Using this field emits a compile-time warning. Configuration and behavior may
-      # change without deprecation. Copilot, Claude, Codex, and Pi resume the exact
-      # native session with the current workflow prompt; other session-based engines
-      # receive a continuation prompt. Starts fresh when no prior history exists. No
-      # memory tool is required.
-      # (optional)
-      durable:
-        # Number of days to retain durable checkpoint artifacts, subject to repository and
-        # organization artifact retention policy.
-        # (optional)
-        retention-days: 1
-
       # Engine-specific plugin names to install before launching the engine. Currently
       # used by the Pi engine: each entry is passed to `pi install <extension>`.
       # (optional)
@@ -22786,19 +22734,6 @@ safe-outputs:
       # gh-proxy and cli-proxy and rejects attempts to disable either proxy.
       # (optional)
       mcp: true
-
-      # Experimental. Persist engine-declared session files in GitHub Actions artifacts.
-      # Using this field emits a compile-time warning. Configuration and behavior may
-      # change without deprecation. Copilot, Claude, Codex, and Pi resume the exact
-      # native session with the current workflow prompt; other session-based engines
-      # receive a continuation prompt. Starts fresh when no prior history exists. No
-      # memory tool is required.
-      # (optional)
-      durable:
-        # Number of days to retain durable checkpoint artifacts, subject to repository and
-        # organization artifact retention policy.
-        # (optional)
-        retention-days: 1
 
       # Runtime adapter identifier. Maps to the CodingAgentEngine registered in the
       # engine registry. Defaults to id when omitted.
@@ -23236,19 +23171,6 @@ safe-outputs:
     # Format 7: Pi engine options, including optional durable execution.
     engine-config:
       pi:
-        # Experimental. Persist engine-declared session files in GitHub Actions artifacts.
-        # Using this field emits a compile-time warning. Configuration and behavior may
-        # change without deprecation. Copilot, Claude, Codex, and Pi resume the exact
-        # native session with the current workflow prompt; other session-based engines
-        # receive a continuation prompt. Starts fresh when no prior history exists. No
-        # memory tool is required.
-        # (optional)
-        durable:
-          # Number of days to retain durable checkpoint artifacts, subject to repository and
-          # organization artifact retention policy.
-          # (optional)
-          retention-days: 1
-
         # Model for this engine, overriding the top-level model. Has sensible defaults and
         # can typically be omitted. Supports full model IDs (e.g.,
         # 'claude-3-5-sonnet-20241022', 'gpt-4'), which is useful when a nested engine
@@ -24132,6 +24054,34 @@ safe-outputs:
   # (optional)
   actions:
     {}
+
+  # Experimental. Enables durable continuation. The agent must call
+  # request_continuation with self-contained hints to dispatch the next run of this
+  # workflow. The next run restores the previous native session checkpoint when
+  # available and receives the hints, but must reconstruct workspace and tool
+  # context itself. When the agent does not request continuation, no checkpoint is
+  # uploaded and the chain stops. Requires a workflow_dispatch trigger.
+  # (optional)
+  # Accepted formats:
+
+  # Format 1: Enable request-continuation with default settings (max: 5)
+  request-continuation: null
+
+  # Format 2: true enables request-continuation with defaults; false disables it
+  request-continuation: true
+
+  # Format 3: object
+  request-continuation:
+    # (optional)
+    authorization:
+      endpoint: "example-value"
+
+      audience: "example-value"
+
+    # Maximum number of chained continuation runs (default: 5). Requests beyond this
+    # depth are skipped.
+    # (optional)
+    max: 1
 
   # Enable AI agents to signal that a task could not be completed due to
   # infrastructure or tool failures (e.g., MCP crash, missing auth, inaccessible

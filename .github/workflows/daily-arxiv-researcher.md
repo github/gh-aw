@@ -14,8 +14,6 @@ model: router/economy
 engine:
   id: codex
   model-provider: github
-  durable:
-    retention-days: 7
 
 timeout-minutes: 20
 max-ai-credits: 300
@@ -72,6 +70,7 @@ imports:
   - shared/reporting.md
 
 safe-outputs:
+  request-continuation: {}
   allowed-domains: ["arxiv.org", "export.arxiv.org"]
   create-discussion:
     category: "research"

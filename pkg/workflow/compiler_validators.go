@@ -595,7 +595,7 @@ var experimentalFeatureChecks = []struct {
 	{"rate-limit", func(w *WorkflowData) bool { return w.RateLimit != nil }},
 	{"skip-if-decision", isSkipIfDecisionEnabled},
 	{"token-broker", func(w *WorkflowData) bool { return w.TokenBrokerEnabled }},
-	{"engine-durable", func(w *WorkflowData) bool { return w.EngineConfig != nil && w.EngineConfig.Durable != nil }},
+	{"request-continuation", hasRequestContinuation},
 	{"gateway-dispatch", func(w *WorkflowData) bool { return len(w.WebhookSubscriptions) > 0 }},
 	{"gateway-dispatch-projects-items", func(w *WorkflowData) bool { return hasWebhookSubscriptionEvent(w, "projects_v2_item") }},
 	{"gateway-dispatch-code-scanning-alert", func(w *WorkflowData) bool { return hasWebhookSubscriptionEvent(w, "code_scanning_alert") }},

@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestExperimentalFeatureNoticeClassification(t *testing.T) {
@@ -96,11 +97,13 @@ func TestDurableExperimentalNoticeClassification(t *testing.T) {
 			assert.Zero(t, compiler.GetExperimentalWarningCount())
 			assert.Empty(t, compiler.GetExperimentalFeatureUsage())
 
-			data.EngineConfig.Durable = &DurableConfig{RetentionDays: 7}
+			data.SafeOutputs = &SafeOutputsConfig{RequestContinuation: &RequestContinuationConfig{}}
+			applyRequestContinuationDurable(data)
+			require.NotNil(t, data.EngineConfig.Durable, "request-continuation enables durable checkpoints")
 			compiler.emitExperimentalFeatureWarningsTo(data, &output)
 			assert.Equal(t, 1, compiler.GetWarningCount(), "engine: %s, batch: %t", engine, batch)
 			assert.Equal(t, 1, compiler.GetExperimentalWarningCount())
-			const warning = "Using experimental feature: engine.durable"
+			const warning = "Using experimental feature: safe-outputs.request-continuation"
 			if batch {
 				assert.Empty(t, output.String())
 				assert.Equal(t, map[string]int{warning: 1}, compiler.GetExperimentalFeatureUsage())

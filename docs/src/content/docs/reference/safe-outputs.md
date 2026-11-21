@@ -186,6 +186,7 @@ replace the former built-in work-item handlers.
 |--------|-----|-------------|
 | [Dispatch Workflow](#workflow-dispatch-dispatch-workflow) | `dispatch-workflow` | Trigger other workflows with inputs (max: 3, same-repo only) |
 | [Call Workflow](#workflow-call-call-workflow) | `call-workflow` | Call reusable workflows via compile-time fan-out (max: 1, same-repo only) |
+| [Request Continuation](#request-continuation-request-continuation) | `request-continuation` | Experimental. Checkpoint the agent session and dispatch the next run of this workflow (max chain: 5) |
 | [Dispatch Repository Event](#repository-dispatch-dispatch-repository) | `dispatch-repository` | Trigger `repository_dispatch` events in external repositories (cross-repo) |
 | [Code Scanning Alerts](#code-scanning-alerts-create-code-scanning-alert) | `create-code-scanning-alert` | Generate SARIF security advisories (max: unlimited, same-repo only) |
 | [Autofix Code Scanning Alerts](#autofix-code-scanning-alerts-autofix-code-scanning-alert) | `autofix-code-scanning-alert` | Create automated fixes for code scanning alerts (max: 10, same-repo only) |
@@ -1754,6 +1755,31 @@ safe-outputs:
 
 - **Cross-repo allowlist** — At runtime the handler validates the target repository against the configured `repository` or `allowed_repositories` before calling the API (SEC-005).
 - **Staged mode** — Supports `staged: true` for preview without dispatching.
+
+### Request Continuation (`request-continuation:`)
+
+> [!WARNING]
+> Request continuation is experimental. Enabling it emits a compile-time
+> warning. Configuration and behavior may change without deprecation.
+
+Lets an agent continue long-running work in a new run of the same workflow. The agent must call `request_continuation` with self-contained `hints`; without that call, no checkpoint is published and the chain stops.
+
+```yaml wrap
+on: workflow_dispatch
+safe-outputs:
+  request-continuation:
+    max: 5 # optional, 1-100 chained continuation runs (default: 5)
+```
+
+When the agent requests continuation:
+
+1. After secret redaction and integrity validation, the agent job uploads the native session checkpoint.
+2. The safe-outputs job dispatches the same workflow on the same branch, recording the parent run, continuation depth, and hints in `aw_context`.
+3. The next run restores the checkpoint and resumes the native session when the engine supports it. It then receives the hints and the current workflow prompt.
+
+The next run starts on a fresh runner. Workspace edits, files, credentials, and tool state are not restored. The agent must use the hints to reconstruct its working context before acting. Hints and restored history are untrusted, advisory data; current workflow instructions take precedence. Only one continuation can be requested per run. When the chain reaches `max`, the request is skipped.
+
+Requires a `workflow_dispatch` trigger and grants `actions: write` to the safe-outputs job. Supports `authorization` like other safe outputs. The compiler adds workflow-level concurrency so that runs in a chain execute one at a time; explicit `concurrency`, `workflow_call`, and work-queue workers are not supported. See [durable runs](/gh-aw/reference/engines/#durable-runs) for per-engine session behavior.
 
 ### Agent Session Creation (`create-agent-session:`)
 

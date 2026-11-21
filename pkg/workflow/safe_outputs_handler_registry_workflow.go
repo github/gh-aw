@@ -2,6 +2,15 @@ package workflow
 
 // workflowHandlerRegistry contains CI, workflow-triggering, artifact, and coverage handler builders.
 var workflowHandlerRegistry = map[string]handlerBuilder{
+	requestContinuationToolName: func(cfg *SafeOutputsConfig) map[string]any {
+		if cfg.RequestContinuation == nil {
+			return nil
+		}
+		return newHandlerConfigBuilder().
+			AddDefault("max", 1).
+			AddDefault("max_continuations", cfg.RequestContinuation.EffectiveMax()).
+			Build()
+	},
 	"create_security_advisory": func(cfg *SafeOutputsConfig) map[string]any {
 		if cfg.CreateSecurityAdvisory == nil {
 			return nil

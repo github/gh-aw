@@ -75,7 +75,8 @@ func (c *Compiler) generateDurableArtifactUpload(yaml *strings.Builder, data *Wo
 	}
 	bundle := durableStateDirectory + "/bundle/"
 	c.stepOrderTracker.RecordArtifactUpload("Upload durable checkpoint artifact", []string{bundle})
-	condition := "always() && steps.stage_durable_files.outcome == 'success' && steps.stage_durable_files.outputs.present == 'true' && " + secretRedactionSuccessCondition(data)
+	condition := "always() && contains(steps.collect_output.outputs.output_types, '" + requestContinuationToolName + "') && " +
+		"steps.stage_durable_files.outcome == 'success' && steps.stage_durable_files.outputs.present == 'true' && " + secretRedactionSuccessCondition(data)
 	if data.EngineConfig != nil && data.EngineConfig.ID == "copilot" {
 		condition += " && steps.redact_secrets.outputs.durable_checkpoint_safe != 'false'"
 	}

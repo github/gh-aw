@@ -213,7 +213,6 @@ func (c *Compiler) validateWorkflowEngineSettings(cleanPath string, workflowData
 	checks := []func(*WorkflowData) error{
 		c.validateRunInstallScripts,
 		c.validateEngineVersion,
-		c.validateEngineDurable,
 		c.validatePlaywrightMode,
 		c.validateLSPSupport,
 		c.validateEngineHarnessScript,
@@ -306,6 +305,10 @@ func (c *Compiler) populateWorkflowBuildContext(ctx *workflowBuildContext) error
 	ctx.workflowData.AmbientFolders = ambientFolders
 	if err := c.processOnSectionAndFilters(ctx.frontmatter.Frontmatter, ctx.workflowData, ctx.cleanPath); err != nil {
 		return err
+	}
+	// Durable continuation dispatches the next run through workflow_dispatch.
+	if err := validateRequestContinuationTrigger(ctx.workflowData); err != nil {
+		return formatCompilerError(ctx.cleanPath, "error", err.Error(), err)
 	}
 	if err := validateRouterModelValuePlacement(ctx.workflowData); err != nil {
 		return formatCompilerError(ctx.cleanPath, "error", err.Error(), err)
@@ -711,6 +714,7 @@ func (c *Compiler) extractAdditionalConfigurations( //nolint:largefunc // Existi
 		return fmt.Errorf("failed to merge safe-outputs from imports: %w", err)
 	}
 	workflowData.SafeOutputs = mergedSafeOutputs
+	applyRequestContinuationDurable(workflowData)
 	if err := c.attachConnectorInputSchemas(workflowData); err != nil {
 		return err
 	}
@@ -905,6 +909,11 @@ func (c *Compiler) processOnSectionAndFilters( //nolint:largefunc // Existing or
 	// Parse the "on" section for command triggers, reactions, and other events
 	if err := c.parseOnSection(frontmatter, workflowData, cleanPath); err != nil {
 		return err
+	}
+
+	// Validate durable continuation before defaults add its concurrency group.
+	if err := c.validateRequestContinuation(workflowData); err != nil {
+		return formatCompilerError(cleanPath, "error", err.Error(), err)
 	}
 
 	// Apply defaults

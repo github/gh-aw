@@ -85,10 +85,10 @@ func (c *Compiler) validateEngineDurable(data *WorkflowData) error {
 		return errors.New("engine.durable.retention-days must be an integer from 1 to 90")
 	}
 	if data.Concurrency != "" || data.EngineConfig.Concurrency != "" {
-		return errors.New("engine.durable manages workflow concurrency; remove explicit concurrency settings to serialize checkpoint publication")
+		return errors.New("safe-outputs.request-continuation manages workflow concurrency; remove explicit concurrency settings to serialize checkpoint publication")
 	}
 	if hasWorkflowCallTrigger(data.On) || data.WorkQueuePolicy != nil {
-		return errors.New("engine.durable does not support workflow_call or work-queue workers; use a single workflow invocation")
+		return errors.New("safe-outputs.request-continuation does not support workflow_call or work-queue workers; use a single workflow invocation")
 	}
 	engine, err := c.getAgenticEngine(data.AI)
 	if err != nil {
@@ -125,7 +125,7 @@ func validateDurableFiles(files []string) error {
 
 func durableExecutionEnv(data *WorkflowData) (map[string]string, error) {
 	if data.EngineConfig == nil || data.EngineConfig.Durable == nil {
-		return nil, errors.New("engine.durable is required for durable execution")
+		return nil, errors.New("safe-outputs.request-continuation is required for durable execution")
 	}
 
 	return map[string]string{

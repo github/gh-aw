@@ -2560,6 +2560,20 @@ jobs:
                   }
                 }
               },
+              "request_continuation": {
+                "defaultMax": 1,
+                "fields": {
+                  "hints": {
+                    "required": true,
+                    "type": "string",
+                    "sanitize": true,
+                    "maxLength": 4000,
+                    "minLength": 1,
+                    "pattern": ".*\\S.*",
+                    "patternError": "must not be empty"
+                  }
+                }
+              },
               "resolve_pull_request_review_thread": {
                 "defaultMax": 10,
                 "fields": {

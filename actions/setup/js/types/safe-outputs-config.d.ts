@@ -310,6 +310,14 @@ interface SetIssueTypeConfig extends SafeOutputConfig {
 }
 
 /**
+ * Configuration for requesting durable continuation runs
+ */
+interface RequestContinuationConfig extends SafeOutputConfig {
+  /** Maximum continuation runs in one chain */
+  max_continuations?: number;
+}
+
+/**
  * Configuration for assigning agents to issues
  */
 interface AssignToAgentConfig extends SafeOutputConfig {
@@ -423,6 +431,7 @@ type SpecificSafeOutputConfig =
   | UploadAssetConfig
   | AssignMilestoneConfig
   | SetIssueTypeConfig
+  | RequestContinuationConfig
   | AssignToAgentConfig
   | UpdateReleaseConfig
   | NoOpConfig
@@ -464,6 +473,7 @@ export {
   UploadAssetConfig,
   AssignMilestoneConfig,
   SetIssueTypeConfig,
+  RequestContinuationConfig,
   AssignToAgentConfig,
   UpdateReleaseConfig,
   NoOpConfig,

@@ -136,12 +136,14 @@ for the restrictions on top-level `env`.
 
 > [!WARNING]
 > Durable execution is experimental, including for imported engines. Enabling
-> `engine.durable` emits a compile-time warning. Configuration and behavior may
-> change without deprecation.
+> `safe-outputs.request-continuation` emits a compile-time warning. Configuration
+> and behavior may change without deprecation.
 
-A workflow can opt into artifact-backed continuation using `engine.durable:
-{ retention-days: 7 }` alongside its custom `engine.id`. Compilation fails unless
-the definition declares `behaviors.durable`. Engines that implement the Go
+A workflow can opt into artifact-backed continuation with the
+[`request-continuation`](/gh-aw/reference/safe-outputs/#request-continuation-request-continuation)
+safe output alongside its custom `engine.id`. Compilation fails unless the
+definition declares `behaviors.durable`. The deprecated `engine.durable` field is
+treated as `request-continuation`. Engines that implement the Go
 interface provide `GetDurableExecutionPlan` with the files to persist and the
 continuation execution steps.
 

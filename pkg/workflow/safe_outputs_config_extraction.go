@@ -314,6 +314,9 @@ func (c *Compiler) extractSafeOutputsConfig(frontmatter map[string]any) *SafeOut
 				config.HideComment = hideCommentConfig
 			}
 
+			// Handle request-continuation
+			config.RequestContinuation = c.parseRequestContinuationConfig(outputMap)
+
 			// Handle set-issue-type
 			setIssueTypeConfig := c.parseSetIssueTypeConfig(outputMap)
 			if setIssueTypeConfig != nil {

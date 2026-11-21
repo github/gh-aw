@@ -42,11 +42,11 @@
       "docs": ["/reference/enterprise-configuration/"]
     },
     {
-      "id": "engine-durable",
-      "name": "Durable execution",
-      "compiler_warning": "engine.durable",
-      "docs": ["/reference/engines/"],
-      "cracktro": [{ "slide": "Durable execution", "badge": "engine.durable" }]
+      "id": "request-continuation",
+      "name": "Durable continuation",
+      "compiler_warning": "safe-outputs.request-continuation",
+      "docs": ["/reference/safe-outputs/"],
+      "cracktro": [{ "slide": "Durable execution", "badge": "request-continuation" }]
     },
     {
       "id": "gateway-dispatch",

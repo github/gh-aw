@@ -257,6 +257,11 @@ func validateSafeOutputsMax(config *SafeOutputsConfig) error {
 			return err
 		}
 	}
+	if config.RequestContinuation != nil {
+		if err := checkMaxField(requestContinuationToolName, config.RequestContinuation.Max); err != nil {
+			return err
+		}
+	}
 	if config.ResolvePullRequestReviewThread != nil {
 		if err := checkMaxField("resolve_pull_request_review_thread", config.ResolvePullRequestReviewThread.Max); err != nil {
 			return err

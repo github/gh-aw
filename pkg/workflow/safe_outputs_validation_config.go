@@ -368,6 +368,12 @@ var ValidationConfig = map[string]TypeValidationConfig{
 			"ref":           {Type: "string", MinLength: 1, MaxLength: 256, Pattern: "^[^\\x00-\\x20\\x7f~^:?*\\[\\\\]+$", PatternError: "must be a valid git ref"},
 		},
 	},
+	"request_continuation": {
+		DefaultMax: 1,
+		Fields: map[string]FieldValidation{
+			"hints": {Required: true, Type: "string", Sanitize: true, MinLength: 1, MaxLength: 4000, Pattern: ".*\\S.*", PatternError: "must not be empty"},
+		},
+	},
 	"call_workflow": {
 		DefaultMax: 1,
 		Fields: map[string]FieldValidation{

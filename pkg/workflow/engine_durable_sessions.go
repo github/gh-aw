@@ -39,7 +39,7 @@ func sessionDurableFiles(engine string) []string {
 func sessionDurableExecutionPlan(engine CodingAgentEngine, data *WorkflowData, logFile string) (*DurableExecutionPlan, error) {
 	config := data.EngineConfig
 	if config == nil || config.Durable == nil {
-		return nil, fmt.Errorf("engine %q durable execution requires engine.durable", engine.GetID())
+		return nil, fmt.Errorf("engine %q durable execution requires safe-outputs.request-continuation", engine.GetID())
 	}
 	builtinPiDriver := engine.GetID() == "pi" && (config.Driver == "pi_agent_core_driver.cjs" || config.Driver == "pi_rpc_driver.cjs")
 	if config.Command != "" || (config.Driver != "" && !builtinPiDriver) || config.HarnessScript != "" {

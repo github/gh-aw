@@ -434,6 +434,15 @@ interface SetIssueTypeItem extends BaseSafeOutputItem, IssueIntentMetadata {
 }
 
 /**
+ * JSONL item requesting a durable continuation run of the current workflow
+ */
+interface RequestContinuationItem extends BaseSafeOutputItem {
+  type: "request_continuation";
+  /** Self-contained handoff for the next run; the next run must reconstruct its working context. */
+  hints: string;
+}
+
+/**
  * JSONL item for setting a custom issue field value
  */
 interface SetIssueFieldItem extends BaseSafeOutputItem, IssueIntentMetadata {
@@ -600,6 +609,7 @@ type SafeOutputItem =
   | AssignMilestoneItem
   | SetIssueTypeItem
   | SetIssueFieldItem
+  | RequestContinuationItem
   | AssignToAgentItem
   | UpdateReleaseItem
   | NoOpItem
@@ -655,6 +665,7 @@ export {
   AssignMilestoneItem,
   SetIssueTypeItem,
   SetIssueFieldItem,
+  RequestContinuationItem,
   AssignToAgentItem,
   UpdateReleaseItem,
   NoOpItem,

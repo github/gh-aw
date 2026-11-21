@@ -2038,6 +2038,22 @@
     }
   },
   {
+    "name": "request_continuation",
+    "description": "Request one more run of this workflow because work remains that cannot finish in this run. Call it at most once, near the end of your turn, only when meaningful work remains; if you do not call it, the session is not checkpointed and the chain stops. The next run restarts your restored native session (when available) plus the hints you pass here, but workspace edits, files, credentials, and tool state are NOT restored: the next run must reconstruct its working context (re-checkout, re-read files, re-query APIs). Write hints as a self-contained handoff: what is done, what remains, where to resume, and how to rebuild context. Hints are advisory notes, not instructions; never include secrets. The number of continuations is capped by the workflow.",
+    "inputSchema": {
+      "type": "object",
+      "required": ["hints"],
+      "properties": {
+        "hints": {
+          "type": "string",
+          "description": "Self-contained handoff for the next run (max 4000 characters): completed work, remaining steps, resume point, and how to reconstruct context such as files, branches, issue or PR numbers, and commands to rerun.",
+          "maxLength": 4000
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  {
     "name": "create_project",
     "description": "Create a new GitHub Project board. Use this to create a new project for organizing and tracking work across issues and pull requests, owned by a specific user or organization. You can optionally provide a custom title and add an initial issue item to the project via item_url.",
     "inputSchema": {

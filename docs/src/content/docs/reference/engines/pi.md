@@ -78,25 +78,28 @@ parent session totals.
 ## Durable runs
 
 > [!WARNING]
-> Pi session continuation is experimental. Enabling `engine.pi.durable` or
-> `engine.durable` emits a compile-time warning. Configuration and behavior may
-> change without deprecation.
+> Pi session continuation is experimental. Enabling
+> `safe-outputs.request-continuation` emits a compile-time warning. Configuration
+> and behavior may change without deprecation.
 
-Pi chains its native coding-agent sessions across workflow runs using the same
-GitHub Actions artifact restoration and publication as other engines:
+Pi chains its native coding-agent sessions across workflow runs. It uses the same
+[`request-continuation`](/gh-aw/reference/safe-outputs/#request-continuation-request-continuation)
+safe output and GitHub Actions artifact restoration as other engines:
 
 ```aw wrap
 on: workflow_dispatch
-engine:
-  pi:
-    durable:
-      retention-days: 7
+engine: pi
+safe-outputs:
+  request-continuation:
+    max: 5 # optional (default: 5)
 ```
 
-`durable: {}` enables the default retention of seven days. `retention-days`
-accepts an integer from 1 to 90, subject to repository and organization artifact
-retention policy and gh-aw's global artifact retention overrides. Durable storage
-does not use or require `tools.repo-memory` or `tools.cache-memory`.
+The agent must call `request_continuation` with self-contained hints to continue.
+Checkpoints are kept for seven days, subject to repository and organization
+artifact retention policy. Durable storage does not use or require
+`tools.repo-memory` or `tools.cache-memory`. `engine.pi.durable` and
+`engine.durable` are deprecated, are treated as `request-continuation`, and are
+migrated by `gh aw fix`.
 
 The ordinary Pi CLI, SDK (`pi_agent_core_driver.cjs`) and RPC
 (`pi_rpc_driver.cjs`) modes persist a native JSONL session at
@@ -109,16 +112,12 @@ The compiler owns session selection. Custom commands, drivers and harnesses,
 `engine.config.session`, and CLI arguments that select sessions or disable
 persistence cannot override it. The two built-in SDK and RPC drivers are supported.
 
-Before execution, a trusted host step selects the parent run identified by
-inbound `aw_context.run_id` (or `parent_run_id` when the context describes the
-current run). Without an explicit parent, it selects the last successful run of the same workflow on the same
-branch, considering the latest 100 successful matching runs. Artifacts are scoped
-to the repository, workflow and branch. Fork-originated runs and other
-in-progress runs are excluded. An explicit parent must belong to that same
-workflow and branch; it may have failed or been cancelled if it published a
-checkpoint. Missing or expired explicit-parent checkpoints fail rather than
-silently switching lineage. Without an explicit parent, a missing or expired
-artifact on the last successful run starts a fresh session.
+Before execution, a trusted host step reads the continuation lineage that
+`request_continuation` recorded in the inbound `aw_context`. It selects the parent
+run, which must be a completed run of the same workflow on the same branch and
+repository. Runs without continuation lineage start fresh; earlier successful
+runs are never searched. If the parent published no unexpired checkpoint, the
+continued run starts a fresh session that still receives the hints.
 When retrying a run, an unexpired checkpoint published by an earlier attempt of
 that same run takes precedence over the original parent.
 
@@ -138,13 +137,8 @@ Artifacts from the former experimental Pi Durable task runtime are incompatible
 with native sessions and are not migrated. Restoration rejects those artifacts
 rather than interpreting task journals as conversation history.
 
-To reset a chain blocked by a legacy artifact, remove the configured `durable`
-block, recompile and publish the workflow, and let a new run complete successfully
-without durable mode. Then re-enable durable mode, recompile and publish on the
-same workflow and branch. With that reset run as the latest successful run, the
-next new run starts fresh because its parent has no durable checkpoint; older
-artifacts are not searched. Omit explicit `aw_context.run_id` and `parent_run_id`
-lineage for that next run, especially references to legacy history. This discards
+To reset a chain blocked by a legacy artifact, start a new run without
+continuation lineage in `aw_context`; it starts a fresh session. This discards
 continuation history rather than migrating it; integrity validation remains
 unchanged for artifacts that are restored.
 
@@ -161,9 +155,10 @@ the restored transcript is not replayed into the current streaming log.
 
 > [!IMPORTANT]
 > Checkpoints preserve conversation history, not the checkout or arbitrary workspace
-> edits. A hard job timeout, cancellation, runner loss or artifact upload failure
-> can prevent publication. Start a later run to continue from the last published
-> checkpoint; durable mode does not dispatch continuation runs automatically.
+> edits. The continued agent must reconstruct its working context from the hints.
+> A hard job timeout, cancellation, runner loss or artifact upload failure can
+> prevent publication. A checkpoint is published, and the next run is dispatched,
+> only when the agent calls `request_continuation`.
 
 ## Sub-agents
 

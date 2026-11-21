@@ -566,6 +566,7 @@ func hasHandlerManagerTypes(data *WorkflowData) bool {
 		data.SafeOutputs.SetIssueType != nil ||
 		data.SafeOutputs.SetIssueField != nil ||
 		data.SafeOutputs.DispatchWorkflow != nil ||
+		data.SafeOutputs.RequestContinuation != nil ||
 		data.SafeOutputs.CallWorkflow != nil ||
 		data.SafeOutputs.CreateCodeScanningAlerts != nil ||
 		data.SafeOutputs.AutofixCodeScanningAlert != nil ||

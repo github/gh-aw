@@ -453,7 +453,7 @@ func (e *BaseEngine) GetCapabilities() EngineCapabilities {
 }
 
 func (e *BaseEngine) GetDurableExecutionPlan(_ *WorkflowData, _ string) (*DurableExecutionPlan, error) {
-	return nil, fmt.Errorf("engine %q does not support durable execution; remove engine.durable or select an engine with durable behavior", e.id)
+	return nil, fmt.Errorf("engine %q does not support durable execution; remove safe-outputs.request-continuation or select an engine with durable behavior", e.id)
 }
 
 func (e *BaseEngine) getDedicatedLLMGatewayPort() int {

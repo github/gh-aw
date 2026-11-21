@@ -570,6 +570,18 @@ var safeOutputHandlers = []safeOutputHandlerDescriptor{
 		},
 	},
 	{
+		Key:         requestContinuationKey,
+		StructField: "RequestContinuation",
+		ToolName:    requestContinuationToolName,
+		NewConfig:   func() any { return &RequestContinuationConfig{} },
+		PermissionBuilder: func(safeOutputs *SafeOutputsConfig) *Permissions {
+			if !isSafeOutputHandlerEnabledAndUnstaged(safeOutputs, "RequestContinuation") {
+				return nil
+			}
+			return NewPermissionsActionsWrite()
+		},
+	},
+	{
 		Key:         "dispatch_repository",
 		StructField: "DispatchRepository",
 		ToolName:    "dispatch_repository",

@@ -18,8 +18,6 @@ permissions:
 
 engine:
   id: pi
-  durable:
-    retention-days: 7
 model: copilot/gpt-6-sol
 
 network:
@@ -36,6 +34,7 @@ imports:
 
   - shared/otlp.md
 safe-outputs:
+  request-continuation: {}
   create-discussion:
     expires: 1d
     category: "research"

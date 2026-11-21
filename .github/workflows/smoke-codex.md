@@ -23,8 +23,6 @@ permissions:
 name: Smoke Codex
 engine:
   id: codex
-  durable:
-    retention-days: 7
   fallback-models:
     - openai/gpt-5.4
     - openai/gpt-5.4-mini
@@ -63,6 +61,7 @@ runtimes:
   go:
     version: "1.27.4"
 safe-outputs:
+    request-continuation: {}
     allowed-domains: [default-safe-outputs]
     add-comment:
       hide-older-comments: true

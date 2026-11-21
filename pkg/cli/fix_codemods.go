@@ -139,6 +139,7 @@ func getLaterCodemods() []Codemod {
 		getRunInstallScriptsToRuntimesNodeCodemod(),       // Move top-level run-install-scripts under runtimes.node
 		getMentionsAllowTeamMembersCodemod(),              // Rename allow-team-members to allowed-collaborators in safe-outputs.mentions
 		getEngineCopilotSDKDriverToDriverCodemod(),        // Rename deprecated engine.copilot-sdk-driver to engine.driver
+		getEngineDurableToRequestContinuationCodemod(),    // Migrate deprecated engine.durable to safe-outputs.request-continuation
 		getRequestReviewPolicyCodemod(),                   // Normalize legacy request_review protected-file policies
 		getPostStepsSafeOutputsGuidedErrorCodemod(),       // Detect direct safe-outputs file access in post-steps and emit guided error
 		getPullRequestTargetGuidedErrorCodemod(),          // Report remaining risky trigger configurations after automatic fixes
