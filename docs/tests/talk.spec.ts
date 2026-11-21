@@ -1189,7 +1189,19 @@ test("serves the slide list in the talk page head without running the deck", asy
   expect(docs[0].url).toBe(PAGE_URL);
   expect(docs[0].hasPart).toEqual(slideParts(SLIDES, PAGE_URL));
   expect(docs[0].hasPart.every((part: { description: string }) => !part.description.startsWith("Band header ("))).toBe(true);
-  expect(head.match(/https:\/\/[^"\s]+/g)!.every(url => url.startsWith("https://schema.org") || url.startsWith("https://github.github.com/gh-aw/"))).toBe(true);
+  const { origin, pathname } = new URL(PAGE_URL);
+  const paths = [new URL("..", PAGE_URL).pathname, pathname, `${pathname}og-image.png`];
+  const urls = head.match(/https:\/\/[^"\s]+/g) ?? [];
+  expect(urls.length).toBeGreaterThan(0);
+  for (const raw of urls) {
+    const url = new URL(raw);
+    if (url.origin === "https://schema.org") {
+      expect(url.pathname, raw).toBe("/");
+    } else {
+      expect(url.origin, raw).toBe(origin);
+      expect(paths, raw).toContain(url.pathname);
+    }
+  }
 });
 
 test("opens every slide from its metadata #id link", async ({ page, request }) => {
