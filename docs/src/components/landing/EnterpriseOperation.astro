@@ -20,7 +20,7 @@ const sections = {
     title: 'OpenTelemetry',
     lede: 'Traces and opt-in logs go to your OTLP backend.',
     paragraphs: [
-      'Set <code>observability.otlp</code> endpoints with headers from secrets, or organization defaults through <code>GH_AW_DEFAULT_OTLP_ENDPOINT</code> and the secret <code>GH_AW_DEFAULT_OTLP_HEADERS</code>.',
+      'Set <code>observability.otlp</code> endpoints with headers from secrets, or validate and configure organization defaults with <code>gh aw env otel --org ORG</code>.',
       'The hosted MCP gateway exports one trace span per tool call. Compact session logs are opt-in with <code>GH_AW_OTLP_LOGS_ENABLED=true</code>. Delivery failures never fail the workflow, but a default endpoint without headers fails the agent job. You own the collector and its retention.',
     ],
     link: { href: '/reference/open-telemetry/', text: 'Configure OpenTelemetry' },

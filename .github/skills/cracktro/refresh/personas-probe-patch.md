@@ -84,6 +84,7 @@ If the new numbers are lower than the baseline, suspect the query, not the data:
 3. **Caption:** update the snapshot date, the window end and its day count. Keep "MEASURED ·" and "loop illustrative", and keep the caption ending left of the sound button.
 4. **Notes:** update the snapshot date, the window, the persona count, the agent-file size and every number in the measured sentence. Keep "…illustrative, simplified example…" so the notes still match `/illustrative|synthetic|simulated/i`.
 5. **`.github/skills/cracktro/content-rules.md`:** update the numbers and dates in the "Personas · Probe · Patch slide" Exception bullet. Do not change other bullets.
+6. **Guide row slide `persona-optimization`** (`gdp-` classes): update its KPI values, the prefix bar (`17,035 B`, percentage), the caption snapshot/window and the notes, plus its "Personas test the guide" Exception bullet in `content-rules.md`.
 
 ## 6. Validation
 

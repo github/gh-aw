@@ -268,26 +268,44 @@ jobs:
       fail-fast: false
       matrix:
         include:
-        - name: A-B
-          pattern: ^Test[A-B]
-          shard: a-b
+        - name: A
+          pattern: ^TestA
+          shard: a
+        - name: B
+          pattern: ^TestB
+          shard: b
         - name: C
           pattern: ^TestC
           shard: c
-        - name: D-G
-          pattern: ^Test[D-G]
-          shard: d-g
-        - name: H-M
-          pattern: ^Test[H-M]
-          shard: h-m
+        - name: D
+          pattern: ^TestD
+          shard: d
+        - name: E-G
+          pattern: ^Test[E-G]
+          shard: e-g
+        - name: H-J
+          pattern: ^Test[H-J]
+          shard: h-j
+        - name: K-M
+          pattern: ^Test[K-M]
+          shard: k-m
         - name: N-R
           pattern: ^Test[N-R]
           shard: n-r
           # Includes a compile sweep of the repository workflows.
           timeout: 5m
-        - name: S-Z and other
-          pattern: ^Test([S-Z]|[^A-R])
-          shard: s-z
+        - name: S
+          pattern: ^TestS
+          shard: s
+        - name: T
+          pattern: ^TestT
+          shard: t
+        - name: U-V
+          pattern: ^Test[U-V]
+          shard: u-v
+        - name: W-Z and other
+          pattern: ^Test([W-Z]|[^A-V])
+          shard: w-z
     concurrency:
       group: ci-${{ github.ref }}-test-${{ matrix.shard }}
       cancel-in-progress: true

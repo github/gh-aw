@@ -122,6 +122,23 @@ class PushSignedCommitsPolicyViolation extends Error {
 }
 
 /**
+ * Sentinel error class for a remote branch that moved away from `baseRef` when
+ * `requireBaseRefMatch` is set. The caller must rebuild the commit on the new
+ * head, so neither the replay rebase nor the unsigned `git push` fallback runs.
+ */
+class PushSignedCommitsBaseMoved extends Error {
+  /**
+   * @param {string} branch
+   * @param {string | undefined} baseRefOid
+   * @param {string | undefined} remoteHeadOid
+   */
+  constructor(branch, baseRefOid, remoteHeadOid) {
+    super(`${ERR_API}: branch ${branch} moved from ${baseRefOid || "an unresolved base"} to ${remoteHeadOid || "no readable head"} after this commit was prepared`);
+    this.name = "PushSignedCommitsBaseMoved";
+  }
+}
+
+/**
  * Unescape a C-quoted path returned by `git diff-tree --raw`.
  *
  * git wraps paths that contain special characters (spaces, non-ASCII bytes,
@@ -306,12 +323,15 @@ async function lsRemoteHeadOid(branch, cwd, gitAuthEnv, pushRemoteUrl, pushToken
  * @param {string} [opts.pushToken]
  * @param {() => void} [opts.assertTransportUnchanged]
  * @param {boolean} [opts.requireExistingBranch]
+ * @param {string} [opts.expectedRemoteHead] - Push only while the remote branch is exactly this commit
  * @returns {Promise<string>}
  */
-async function pushBranchAndResolveHead({ branch, cwd, gitAuthEnv, pushRemoteUrl, pushToken, assertTransportUnchanged, requireExistingBranch }) {
+async function pushBranchAndResolveHead({ branch, cwd, gitAuthEnv, pushRemoteUrl, pushToken, assertTransportUnchanged, requireExistingBranch, expectedRemoteHead }) {
   const pushOnce = async () => {
     const pushArgs = ["push"];
-    if (requireExistingBranch) {
+    if (expectedRemoteHead) {
+      pushArgs.push(`--force-with-lease=refs/heads/${branch}:${expectedRemoteHead}`);
+    } else if (requireExistingBranch) {
       const expectedHead = await lsRemoteHeadOid(branch, cwd, gitAuthEnv, pushRemoteUrl, pushToken);
       if (!expectedHead) throw new Error(`${ERR_API}: Branch ${branch} no longer exists; refusing to recreate it`);
       const ancestor = await getGitExecOutput(["merge-base", "--is-ancestor", expectedHead, "HEAD"], { cwd, ignoreReturnCode: true });
@@ -422,7 +442,7 @@ async function resolveLocalHeadSha(cwd) {
  * @param {string} [opts.pushToken] - Optional token used when pushing to pushRemoteUrl
  * @param {boolean} [opts.signedCommits=true] - When false, skip GraphQL signed commits and use git push directly
  * @param {boolean} [opts.allowGitPushFallback=true] - When false, refuse any fallback path that would use direct git push
- * @param {boolean} [opts.requireBaseRefMatch=false] - Refuse a signed commit against a remote head other than baseRef
+ * @param {boolean} [opts.requireBaseRefMatch=false] - Commit only while the remote head is still baseRef; a moved head is reported without rebasing or falling back to git push
  * @param {boolean} [opts.requireExistingBranch=false] - Never recreate a deleted target branch
  * @param {Record<string, any>} [opts.resolvedTemporaryIds] - Resolved temporary IDs map
  * @param {string} [opts.currentRepo] - Repository slug used for same-repo temporary ID resolution
@@ -545,6 +565,9 @@ async function pushSignedCommits({
     remoteHeadOid = await lsRemoteHeadOid(branch, cwd, gitAuthEnv, pushRemoteUrl, pushToken);
   } catch {
     // Non-fatal. The existing branch-creation logic handles missing remote refs.
+  }
+  if (requireBaseRefMatch && remoteHeadOid !== baseRefOid) {
+    throw new PushSignedCommitsBaseMoved(branch, baseRefOid, remoteHeadOid);
   }
   const firstReplayParentOid = revListEntries[0] && revListEntries[0].fields.length > 1 ? revListEntries[0].fields[1] : undefined;
   const firstGraphqlParentOid = remoteHeadOid || baseRefOid;
@@ -844,6 +867,7 @@ async function pushSignedCommits({
         expectedHeadOid = oidResult || "";
         if (!expectedHeadOid) {
           if (requireExistingBranch) throw new Error(`${ERR_API}: Branch ${branch} no longer exists; refusing to recreate it`);
+          if (requireBaseRefMatch) throw new PushSignedCommitsBaseMoved(branch, baseRefOid, undefined);
           // Branch does not exist on the remote yet.
           // createCommitOnBranch requires the branch to already exist – it does NOT auto-create branches.
           // Create the first commit before publishing the ref, so branch-push CI
@@ -951,7 +975,7 @@ async function pushSignedCommits({
           core.info(`pushSignedCommits: using remote HEAD OID from ls-remote: ${expectedHeadOid}`);
         }
         if (requireBaseRefMatch && expectedHeadOid !== baseRefOid) {
-          throw new Error(`${ERR_API}: ledger branch moved after transition validation`);
+          throw new PushSignedCommitsBaseMoved(branch, baseRefOid, expectedHeadOid);
         }
       }
 
@@ -999,12 +1023,25 @@ async function pushSignedCommits({
     if (err instanceof PushSignedCommitsPolicyViolation) {
       throw new Error(`${ERR_VALIDATION}: pushSignedCommits: refusing unsigned push for branch '${branch}': ${stripLeadingErrorCode(getErrorMessage(err))}`, { cause: err });
     }
+    if (err instanceof PushSignedCommitsBaseMoved) {
+      throw err;
+    }
     if (allowGitPushFallback === false) {
       const detail = getErrorMessage(err);
       throw new Error(`${ERR_API}: pushSignedCommits: signed commit push failed for branch '${branch}' and git push fallback is disabled: ${detail}${getWorkflowPermissionHint(detail)}`, { cause: err });
     }
     core.warning(`pushSignedCommits: GraphQL signed push failed, falling back to git push: ${getErrorMessage(err)}`);
-    const fallbackSha = await pushBranchAndResolveHead({ branch, cwd, gitAuthEnv, pushRemoteUrl, pushToken, assertTransportUnchanged, requireExistingBranch });
+    const fallbackSha = await pushBranchAndResolveHead({
+      branch,
+      cwd,
+      gitAuthEnv,
+      pushRemoteUrl,
+      pushToken,
+      assertTransportUnchanged,
+      requireExistingBranch,
+      // The unsigned fallback may only replace the head this commit was prepared on.
+      expectedRemoteHead: requireBaseRefMatch ? baseRefOid : undefined,
+    });
     core.info(`pushSignedCommits: git push fallback completed, using pushed SHA ${fallbackSha}`);
     return fallbackSha;
   }

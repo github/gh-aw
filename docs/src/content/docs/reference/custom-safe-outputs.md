@@ -254,7 +254,9 @@ The helper adds the generated-by footer, run and history links, and workflow, ca
 
 `parameters.artifacts` accepts up to 10 [issue artifacts](/gh-aw/reference/safe-outputs/#issue-artifacts) per issue, each with inline `body` up to 1 MB. The helper does not accept `path`, so the custom job must sanitize artifact names and content. Live results include `artifacts: [{ number, url }]`. If an attachment fails, the error names the already-created issue.
 
-The helper does not perform grouping, deduplication, expiration, agent assignment, or manifest artifact upload. The custom job remains responsible for validating agent-controlled content, enforcing output counts and allowed repositories, and supplying a token with appropriate permissions.
+`parameters.expiresHours` accepts a positive finite number of hours and adds an expiration marker to the generated footer. Omit it for no expiry. Configure the value in the custom job's workflow YAML and pass it to the helper; cleanup requires an enabled Agentic Maintenance workflow.
+
+The helper does not perform grouping, deduplication, agent assignment, or manifest artifact upload. The custom job remains responsible for validating agent-controlled content, enforcing output counts and allowed repositories, and supplying a token with appropriate permissions.
 
 #### Attaching a Text File as an Issue Artifact
 

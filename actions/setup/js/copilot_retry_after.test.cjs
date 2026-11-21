@@ -82,6 +82,42 @@ describe("Copilot Retry-After parsing", () => {
 });
 
 describe("Copilot Retry-After harness integration", () => {
+  it("does not report a retry for an acceptable wait when retries are exhausted", () => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), "copilot-retry-after-exhausted-"));
+    const stubPath = path.join(directory, "stub.cjs");
+    fs.writeFileSync(stubPath, 'console.error("HTTP 429\\nRetry-After: 1"); process.exitCode = 1;');
+    try {
+      const result = spawnSync(process.execPath, [harnessPath, process.execPath, stubPath, "--prompt", "test"], {
+        cwd: directory,
+        env: {
+          ...process.env,
+          GITHUB_WORKSPACE: directory,
+          GH_AW_TMP_DIR: directory,
+          GH_AW_HARNESS_TELEMETRY_DIR: directory,
+          GH_AW_HARNESS_MAX_RETRIES: "0",
+          GH_AW_HARNESS_MAX_DELAY_MS: "2000",
+          GH_AW_SAFE_OUTPUTS: "",
+          GH_AW_SKIP_REFLECT: "true",
+          AWF_REFLECT_ENABLED: "",
+          COPILOT_MODEL: "",
+          GH_AW_COPILOT_SDK: "",
+          GH_AW_LLM_PROVIDER: "github",
+          GH_AW_SKIP_IF_DECISION: "",
+        },
+        encoding: "utf8",
+        timeout: 10000,
+      });
+      expect(result.status, result.stderr).toBe(1);
+      expect(result.stderr).toContain("all 0 retries exhausted after HTTP 429");
+      expect(result.stderr).not.toContain("requires 1000ms before next attempt");
+      const telemetry = JSON.parse(fs.readFileSync(path.join(directory, "harness_retry.json"), "utf8"));
+      expect(telemetry.attempt_results).toHaveLength(1);
+      expect(telemetry.attempt_results[0].failure_classes).not.toContain("rate_limit_error");
+    } finally {
+      fs.rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
   it.each([
     ["stderr", "1", "2000", "", 0, 2, "rate_limit_error"],
     ["session.error", "1", "2000", "", 0, 2, "rate_limit_error"],

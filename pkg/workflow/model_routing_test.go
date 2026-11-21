@@ -496,6 +496,53 @@ func TestValidateModelRoutingRequiresMinimumAWFVersion(t *testing.T) {
 	require.ErrorContains(t, err, "requires AWF v0.28.29 or newer")
 }
 
+func TestValidateModelRoutingCostOnlyVersion(t *testing.T) {
+	for _, tc := range []struct {
+		name            string
+		goal            string
+		firewallVersion string
+		agentVersion    string
+		wantError       bool
+	}{
+		{name: "default rejects cost-speed", goal: "cost-speed", wantError: true},
+		{name: "previous release accepts cost-speed", goal: "cost-speed", firewallVersion: "v0.29.16"},
+		{name: "boundary rejects cost-speed", goal: "cost-speed", firewallVersion: "v0.29.17", wantError: true},
+		{name: "unprefixed boundary rejects cost-speed", goal: "cost-speed", firewallVersion: "0.29.17", wantError: true},
+		{name: "newer release rejects cost-speed", goal: "cost-speed", firewallVersion: "v0.30.0", wantError: true},
+		{name: "latest rejects cost-speed", goal: "cost-speed", firewallVersion: "latest", wantError: true},
+		{name: "older agent override accepts cost-speed", goal: "cost-speed", firewallVersion: "v0.29.17", agentVersion: "v0.29.16"},
+		{name: "newer agent override rejects cost-speed", goal: "cost-speed", firewallVersion: "v0.29.16", agentVersion: "v0.29.17", wantError: true},
+		{name: "default accepts cost", goal: "cost"},
+		{name: "previous release accepts cost", goal: "cost", firewallVersion: "v0.29.16"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			data := &WorkflowData{
+				EngineConfig: &EngineConfig{
+					ID: "copilot",
+					ModelRouting: &CopilotModelRoutingConfig{
+						Goal: tc.goal, Mode: "balanced", AllowedModels: []string{"gpt-5.4-mini"},
+					},
+				},
+				NetworkPermissions: &NetworkPermissions{
+					Firewall: &FirewallConfig{Enabled: true, Version: tc.firewallVersion},
+				},
+				SandboxConfig: &SandboxConfig{
+					Agent: &AgentSandboxConfig{Type: SandboxTypeAWF, Version: tc.agentVersion},
+				},
+			}
+			err := validateModelRouting(data, "copilot")
+			if tc.wantError {
+				require.ErrorContains(t, err, "engine.model-routing.goal")
+				require.ErrorContains(t, err, "AWF v0.29.17 and newer support only cost routing")
+				require.ErrorContains(t, err, "Set engine.model-routing.goal to cost")
+				require.ErrorContains(t, err, "not an alias")
+				return
+			}
+			require.NoError(t, err)
+		})
+	}
+}
+
 func TestValidateModelRoutingEngineCompatibility(t *testing.T) {
 	for _, tc := range []struct {
 		name      string

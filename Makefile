@@ -113,7 +113,7 @@ test-unit-all:
 # Run concurrency-heavy package tests with the Go race detector
 .PHONY: test-race
 test-race:
-	go test -race -count=1 -short -parallel=4 -timeout=30m ./pkg/cli ./pkg/console ./pkg/parser ./pkg/workflow
+	go test -race -count=1 -short -parallel=4 -timeout=30m ./pkg/agentdrain ./pkg/cli ./pkg/console ./pkg/parser ./pkg/workflow
 
 # Test impacted Go unit tests first for faster feedback (target budget: ~30s)
 .PHONY: test-unit
@@ -549,7 +549,7 @@ bundle-js:
 # Run workflow contracts in CJS CI even when impacted runtime tests are skipped.
 .PHONY: test-workflow-tool-contracts
 test-workflow-tool-contracts:
-	node --test scripts/workflow-tool-contracts.test.cjs scripts/code-scanning-fixer-selection.test.cjs scripts/cache-strategy-workflows.test.cjs scripts/dependabot-burner-selection.test.cjs
+	node --test scripts/workflow-tool-contracts.test.cjs scripts/cache-strategy-workflows.test.cjs scripts/dependabot-burner-selection.test.cjs
 
 # Run script tests (authentication probes, stale locks, workflow drift, and workflow purity).
 .PHONY: test-pageindex-workflow

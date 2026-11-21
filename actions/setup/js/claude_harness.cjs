@@ -64,6 +64,7 @@ const {
 } = require("./harness_retry_runner.cjs");
 const { resolveRetryConfig: resolveSharedRetryConfig } = require("./harness_retry_config.cjs");
 const { stopForPermissionDenied } = require("./harness_failure_handling.cjs");
+const { hasAttemptTerminalSafeOutput } = require("./harness_safe_outputs.cjs");
 const { resolveHarnessPromptFileArgs } = require("./harness_prompt_input.cjs");
 const {
   AWF_API_PROXY_REFLECT_URL,
@@ -78,12 +79,12 @@ const {
   REFLECT_PROVIDER_ALIASES,
   resolveProviderEndpointFromReflect,
 } = require("./awf_reflect.cjs");
-const { emitMissingToolPermissionIssue, emitInfrastructureIncomplete, hasExpectedSafeOutputs, hasNoopInSafeOutputs, hasTerminalSafeOutput } = require("./safeoutputs_cli.cjs");
+const { emitMissingToolPermissionIssue, emitInfrastructureIncomplete, hasExpectedSafeOutputs, hasNoopInSafeOutputs } = require("./safeoutputs_cli.cjs");
 const { countPermissionDeniedIssues, hasNumerousPermissionDeniedIssues, extractDeniedCommands, buildMissingToolPermissionIssuePayload } = require("./permission_denied_helpers.cjs");
 const {
   createOutputPatternMatcher,
   detectNonRetryableHarnessGuard,
-  detectExhaustedAWFInvocationBudget,
+  observeInvocationBudget,
   buildSoftTimeoutGuard,
   emitSoftTimeoutSignal,
   isAuthenticationFailedError,
@@ -683,7 +684,7 @@ async function main() {
         stdin: attempt > 0 && useContinueOnRetry ? CLAUDE_RESUME_PROMPT : (prompt ?? undefined),
         postResultWatchdog: safeOutputsPath
           ? {
-              shouldArm: () => hasTerminalSafeOutput(safeOutputsPath, { byteOffset: safeOutputsByteOffset, logger: log }),
+              shouldArm: () => hasAttemptTerminalSafeOutput(safeOutputsPath, safeOutputsByteOffset, { logger: log }),
               inactivityTimeoutMs: resolvePostResultWatchdogIdleTimeoutMs(),
             }
           : undefined,
@@ -696,7 +697,6 @@ async function main() {
       sessionId = claudeSessionId(result.output) || sessionId;
       return {
         ...result,
-        exitCode: result.runtimeGuardFired && result.exitCode === 0 ? 1 : result.exitCode,
         safeOutputsByteOffset,
         strategy,
         nativeTerminalRateLimitError,
@@ -708,7 +708,7 @@ async function main() {
         emitSoftTimeoutSignal(softTimeoutGuard, "during execution", "Claude harness", log);
         return { action: "stop" };
       }
-      if (result.watchdogFired && hasTerminalSafeOutput(safeOutputsPath, { byteOffset: result.safeOutputsByteOffset, logger: log })) {
+      if (result.watchdogFired === true && hasAttemptTerminalSafeOutput(safeOutputsPath, result.safeOutputsByteOffset ?? 0, { logger: log })) {
         log("post-result watchdog stopped an idle process after terminal safe-output — treating as success");
         return { action: "stop", exitCode: 0 };
       }
@@ -776,14 +776,7 @@ async function main() {
       }
 
       const nonRetryableGuard = detectNonRetryableHarnessGuard(classifierOutput);
-      if (!nonRetryableGuard.maxRunsExceeded) {
-        const budget = await detectExhaustedAWFInvocationBudget({ nativeTerminalRateLimitError: result.nativeTerminalRateLimitError === true, logger: log });
-        if (budget) {
-          nonRetryableGuard.maxRunsExceeded = true;
-          result.failureClasses.push("invocation_cap_exceeded");
-          log(`attempt ${attempt + 1}: AWF shared invocation budget exhausted (${budget.invocationCount}/${budget.maxRuns}) — confirmed by fresh reflection`);
-        }
-      }
+      await observeInvocationBudget({ guard: nonRetryableGuard, nativeTerminalRateLimitError: result.nativeTerminalRateLimitError === true, attempt, log, result });
       if (nonRetryableGuard.apiProxyGuardRejection) {
         const reason = `AWF API proxy guardrail rejected the request: ${nonRetryableGuard.apiProxyGuardRejection.guard}`;
         log(`${reason} — not retrying`);

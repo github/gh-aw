@@ -49,7 +49,7 @@ safe-outputs:
     labels: ["agent-research", "cookie"]
     max: 1
     close-older-issues: true
-    expires: false
+    expires: 2d
   threat-detection:
     engine: copilot
 timeout-minutes: 180

@@ -22,6 +22,7 @@ tools:
   bash: ["*"]
 safe-outputs:
   create-issue:
+    expires: 2d
     title-prefix: "[domains-audit] "
     labels: [cookie, security]
     close-older-issues: false

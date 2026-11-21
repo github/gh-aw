@@ -291,32 +291,32 @@ func TestUpgradeCommandRepoDispatchWithPR(t *testing.T) {
 	assert.True(t, capturedCreatePR, "--repo --create-pull-request must request PR creation")
 }
 
-func TestRelaunchWithSameArgsRejectsRelativeExecutableOverride(t *testing.T) {
-	err := relaunchWithSameArgs("--skip-extension-upgrade", "relative/gh-aw")
+func TestRelaunchUpgradeWithContextRejectsRelativeExecutableOverride(t *testing.T) {
+	err := relaunchUpgradeWithContext(context.Background(), "--skip-extension-upgrade", "relative/gh-aw")
 	require.Error(t, err)
 	require.ErrorContains(t, err, "invalid executable path")
 }
 
-func TestRelaunchWithSameArgsRejectsNullByteArgument(t *testing.T) {
+func TestRelaunchUpgradeWithContextRejectsNullByteArgument(t *testing.T) {
 	origArgs := os.Args
 	t.Cleanup(func() { os.Args = origArgs })
 	os.Args = []string{"gh-aw", "compile", "bad\x00arg"}
 
-	err := relaunchWithSameArgs("--skip-extension-upgrade", "/bin/echo")
+	err := relaunchUpgradeWithContext(context.Background(), "--skip-extension-upgrade", "/bin/echo")
 	require.Error(t, err)
 	require.ErrorContains(t, err, "argument contains invalid control characters")
 }
 
-func TestRelaunchWithSameArgsAllowsEmptyForwardedArgument(t *testing.T) {
+func TestRelaunchUpgradeWithContextAllowsEmptyForwardedArgument(t *testing.T) {
 	origArgs := os.Args
 	t.Cleanup(func() { os.Args = origArgs })
 	os.Args = []string{"gh-aw", "compile", ""}
 
-	err := relaunchWithSameArgs("--skip-extension-upgrade", "/bin/echo")
+	err := relaunchUpgradeWithContext(context.Background(), "--skip-extension-upgrade", "/bin/echo")
 	require.NoError(t, err)
 }
 
-func TestRelaunchWithSameArgsPassesShellMetacharactersLiterally(t *testing.T) {
+func TestRelaunchUpgradeWithContextPassesShellMetacharactersLiterally(t *testing.T) {
 	origArgs := os.Args
 	origStdout := os.Stdout
 	t.Cleanup(func() {
@@ -336,7 +336,7 @@ func TestRelaunchWithSameArgsPassesShellMetacharactersLiterally(t *testing.T) {
 	})
 	os.Stdout = writeOutput
 
-	require.NoError(t, relaunchWithSameArgs("--skip-extension-upgrade", "/bin/echo"))
+	require.NoError(t, relaunchUpgradeWithContext(context.Background(), "--skip-extension-upgrade", "/bin/echo"))
 	require.NoError(t, writeOutput.Close())
 	writeOutputClosed = true
 	output, err := io.ReadAll(readOutput)
@@ -344,8 +344,8 @@ func TestRelaunchWithSameArgsPassesShellMetacharactersLiterally(t *testing.T) {
 	require.Equal(t, "upgrade ; $(whoami) --skip-extension-upgrade\n", string(output))
 }
 
-func TestRelaunchWithSameArgsRejectsUnknownExtraFlag(t *testing.T) {
-	err := relaunchWithSameArgs("--unknown-flag", "/bin/echo")
+func TestRelaunchUpgradeWithContextRejectsUnknownExtraFlag(t *testing.T) {
+	err := relaunchUpgradeWithContext(context.Background(), "--unknown-flag", "/bin/echo")
 	require.Error(t, err)
 	require.ErrorContains(t, err, "invalid relaunch flag")
 }

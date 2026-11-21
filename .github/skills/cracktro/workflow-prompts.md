@@ -33,6 +33,7 @@ Slides built on a gh-aw agentic workflow show, at `top: 30px`, the first user me
 | Merge fast, unslop daily | jsweep | #6854 | PR body |
 | Issue Monster | issue-monster | #4684 | PR body "Original prompt" |
 | Query · Ask · Grow | daily-otel-instrumentation-advisor | #24655 | task `4f75f9b3-462c-4143-ae1d-0dae11684d5a`, session `2b0febeb-53b8-4f19-83d4-471aed9ce7d9` |
+| Instrument · Debug · Repeat | go-logger | #2084 | PR body "Original prompt" (Copilot PR, merged 2025-10-21) |
 | Mine · Refine · Apply | linter-miner | #32263 | task `414cf3c4-ff06-4015-92ec-2c9eec136b3e`, session `3e5e3881-fdf1-4f74-8c10-674d786224d3` |
 | Explore · Reuse · Lint | sergo | #10063 | PR body |
 | Semantic clustering | semantic-function-refactor | #2109 | PR body (commit subject lacks PR number) |

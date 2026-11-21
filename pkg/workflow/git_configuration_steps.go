@@ -10,11 +10,6 @@ import (
 
 var gitConfigStepsLog = logger.New("workflow:git_configuration_steps")
 
-// generateGitConfigurationSteps generates standardized git credential setup as string steps
-func (c *Compiler) generateGitConfigurationSteps() []string {
-	return c.generateGitConfigurationStepsWithToken("${{ github.token }}", "")
-}
-
 // generateGitConfigurationStepsForData generates git credential setup with awareness of the
 // workflow's checkout configuration. When a checkout is marked current: true and is located
 // in a subdirectory, the generated step targets that subdirectory via working-directory so
@@ -128,7 +123,7 @@ func (c *Compiler) generateGitConfigurationStepsWithToken(token string, targetRe
 }
 
 // getGitIdentityEnvVars returns a map of git identity environment variables.
-// These mirror the values set by generateGitConfigurationSteps so that git commits
+// These mirror the values set by generateGitConfigurationStepsForData so that git commits
 // work correctly inside the AWF sandbox container, which cannot read the host-side
 // ~/.gitconfig written by "Configure Git credentials".
 //

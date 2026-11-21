@@ -26,6 +26,7 @@ tools:
   bash: []
 safe-outputs:
   create-issue:
+    expires: 2d
     title-prefix: "[container-image-scan] "
     labels: [cookie, security]
     assignees: [pelikhan]

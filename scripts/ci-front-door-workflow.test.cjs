@@ -83,6 +83,26 @@ test("every CGO check job is selectable; only checkout, selection and cleanup ar
   assert.equal(condition(jobs["summarize-timing"]), "always()");
 });
 
+test("CGO unit tests use 12 disjoint shards with complete test-name coverage", () => {
+  const shards = [...jobs.test.matchAll(/^        - name: (.+)\n          pattern: (.+)\n          shard: (.+)$/gm)].map(([, name, pattern, shard]) => ({
+    name,
+    pattern: new RegExp(pattern),
+    shard,
+  }));
+  assert.equal(shards.length, 12);
+  assert.equal(new Set(shards.map(shard => shard.name)).size, 12);
+  assert.equal(new Set(shards.map(shard => shard.shard)).size, 12);
+  const suffixes = [...Array.from({ length: 128 }, (_, code) => String.fromCharCode(code)), "É", "Ω", "中"];
+  for (const suffix of suffixes) {
+    const name = `Test${suffix}Example`;
+    assert.equal(shards.filter(shard => shard.pattern.test(name)).length, 1, JSON.stringify(name));
+  }
+  for (const name of ["BenchmarkA", "ExampleA", "NotTestA"]) {
+    assert.equal(shards.filter(shard => shard.pattern.test(name)).length, 0, name);
+  }
+  assert.match(jobs.test, /shard: n-r\n          # Includes a compile sweep of the repository workflows\.\n          timeout: 5m/);
+});
+
 test("inference credentials and executable policy stay isolated from PR code", () => {
   assert.equal((workflow.match(/copilot-requests: write/g) || []).length, 1);
   assert.equal((workflow.match(/CI_DECISION_TOKEN:/g) || []).length, 1);
