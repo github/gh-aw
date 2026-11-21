@@ -160,7 +160,7 @@ This project **intentionally avoids** mocking frameworks and test suites:
 - **Explicitness**: Setup is visible in each test
 - **Compatibility**: Compatible with standard `go test` tooling
 
-This approach keeps tests focused, fast, and maintainable. Tests verify real component interactions rather than mocked behavior.
+This approach keeps each test focused on one behavior and avoids mock setup code. Tests verify real component interactions rather than mocked behavior.
 
 ### Running Tests
 
@@ -441,14 +441,14 @@ Security tests are integrated into:
 
 ### Current Implementation Status
 The tests are designed to work with the current implementation state:
-- **Completed functionality**: Tested with high coverage
+- **Completed functionality**: Covered by tests; run `make test-coverage` for current coverage figures
 - **Stub implementations**: Interface stability testing to ensure future compatibility
 - **Missing functionality**: Framework prepared for when implementation is complete
 
 ### Future Expansion
 As the Go implementation develops:
 1. **Stub tests** will be expanded to include full behavioral validation
-3. **Edge case tests** will be expanded based on real usage patterns
+2. **Edge case tests** will be expanded based on real usage patterns
 
 ## Test Coverage Areas
 
@@ -476,10 +476,10 @@ As the Go implementation develops:
 
 This testing framework ensures:
 
-1. **Regression Prevention**: Any changes that break existing functionality will be caught
+1. **Regression Prevention**: Changes that break behavior covered by the test suite cause test failures
 2. **Interface Stability**: CLI and API interfaces remain consistent
-3. **Behavioral Compatibility**: Go implementation will match bash behavior exactly
-4. **Code Quality**: High test coverage and validation
+3. **Behavioral Compatibility**: The Go implementation is intended to match bash behavior; bash-Go output comparison is still pending (see Ready for Enhancement)
+4. **Code Quality**: Measured test coverage (`make test-coverage`) and validation in CI
 5. **Future Readiness**: Testing infrastructure scales with implementation progress
 6. **Security Assurance**: Security fixes remain effective over time
 
@@ -489,7 +489,7 @@ The testing framework is designed to be:
 - **Self-checking**: The validation script checks that tests run and pass
 - **Coverage-tracked**: Covers the functionality and interface areas listed in this document
 - **Maintainable**: Structure and documentation are kept current for future updates
-- **Scalable**: Tests can be added incrementally as functionality is implemented
+- **Incremental**: Tests are added per feature as functionality is implemented
 - **Security-focused**: Security regression tests prevent reintroduction of vulnerabilities
 
 ## Conclusion

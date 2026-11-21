@@ -524,6 +524,23 @@ red team, firewall escape, pentest, adversarial, security testing
 - And when it actually succeeds? That sounds like bad news for someone.
 - It is good news, really. Each escape it finds gets turned into a fix for the firewall.
 
+### Responsible AI {#responsible-ai}
+
+#### Summary
+
+GitHub Agentic Workflows supports responsible AI principles (fairness, reliability and safety, privacy and security, inclusiveness, transparency and accountability) through reviewable instructions, a sandboxed agent, gated writes and traceable outputs, as safeguards rather than guarantees.
+
+#### Keywords
+
+RAI, responsible AI principles, fairness, reliability and safety, privacy and security, inclusiveness, transparency, accountability, AI-generated footer, staged mode, safe outputs, manual-approval, roles, human in the loop, read-only token, min-integrity, threat detection, transparency note
+
+#### Captions
+
+- Responsible AI has six principles on paper. How do they show up in an agent that runs in your repository?
+- Each one maps to a control. Reliability and privacy come from the sandbox, the read-only token and filtered input.
+- And who answers for what the agent posts?
+- People do. The agent only proposes, every post links back to its run, and owners still trial each workflow.
+
 ### Stop manually translating intent into code. {#stop-manually-translating-intent-into-code}
 
 #### Summary
