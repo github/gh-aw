@@ -2,7 +2,7 @@
   "name": "gh-aw-typescript-lsp",
   "private": true,
   "dependencies": {
-    "typescript": "5.8.3",
-    "typescript-language-server": "4.3.3"
+    "typescript": "6.0.3",
+    "typescript-language-server": "6.1.0"
   }
 }

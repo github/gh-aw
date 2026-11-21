@@ -13,7 +13,7 @@ Copilot workflows that declare the built-in `lsp.typescript` entry get a compile
 
 ### Decision
 
-Keep TypeScript `5.8.3` and `typescript-language-server` `4.3.3` so the default toolchain does not change. The setup action stages `package.json`, the complete npm lockfile, and the installer. The compiler embeds the same npm files but emits only the helper invocation and the files' SHA-256 hashes. The helper checks both hashes before running `npm ci` in `${RUNNER_TEMP}/gh-aw/engine-cli/typescript-lsp`. npm checks the package tarballs against the lockfile's SHA-512 hashes using the runner's configured registry. A mismatch or install failure stops the step without an unlocked fallback.
+Bundle TypeScript `6.0.3` and `typescript-language-server` `6.1.0`. This server wraps `tsserver` and [recommends TypeScript 6](https://github.com/typescript-language-server/typescript-language-server/tree/v6.1.0#installing); TypeScript 7 uses a different language server. The setup action stages `package.json`, the complete npm lockfile, and the installer. The compiler embeds the same npm files but emits only the helper invocation and the files' SHA-256 hashes. The helper checks both hashes before running `npm ci` in `${RUNNER_TEMP}/gh-aw/engine-cli/typescript-lsp`. npm checks the package tarballs against the lockfile's SHA-512 hashes using the runner's configured registry. A mismatch or install failure stops the step without an unlocked fallback.
 
 Users can omit `lsp.typescript.version` or explicitly select the bundled server version. For another version, configure the server under `lsp.typescript-custom`, install it from a checked-in npm project with `npm ci` in `pre-agent-steps`, and point `command` to the installed executable. This lets each workflow choose its own version without relaxing the built-in install's lockfile requirement.
 
@@ -39,7 +39,7 @@ Removing the built-in entry would eliminate the compiler's bundled-lockfile main
 - The default `lsp.typescript` configuration keeps working without workflow changes, and the fix addresses code-scanning alerts 1082–1084 on the compiler side.
 
 #### Negative
-- Breaking change: requests for a server version other than `4.3.3` fail validation at compile time and require the custom migration described above. The changeset is marked `major`.
+- Breaking change: explicit server versions other than `6.1.0`, including the former `4.3.3`, fail validation at compile time. Omit `version` to adopt the bundled versions or use the custom migration described above to retain old pins. The changeset is marked `major`.
 - Refresh the version pins and lockfile together with `bash scripts/update-typescript-lsp.sh TYPESCRIPT_VERSION LANGUAGE_SERVER_VERSION`. Pass both exact versions, including the current version of any package that should stay pinned. The script verifies the refreshed lock with `npm ci` before copying it back. Review the npm file changes, then release the matching compiler and setup action and recompile affected workflows. The compiler derives the default server version and both file digests from the npm files; no Go constant needs editing.
 - The PR defers regeneration of the compiled workflows for `eslint-miner`, `jsweep`, and `smoke-copilot` until after SDK integration.
 

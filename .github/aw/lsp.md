@@ -33,7 +33,7 @@ Each key under `lsp` is a language identifier (lowercase, alphanumeric, hyphens,
 | `command` | **yes** | Executable name or path for the language server |
 | `args` | no | Command-line arguments passed to the server on startup |
 | `fileExtensions` | **yes** | Map of file extension (with leading `.`) to LSP language ID |
-| `version` | no | Package version to install for a built-in server that supports overrides. For TypeScript, omit it or specify the bundled server version (`"4.3.3"`). |
+| `version` | no | Package version to install for a built-in server that supports overrides. For TypeScript, omit it or specify the bundled server version (`"6.1.0"`). |
 
 ## Built-in Servers
 
@@ -47,7 +47,7 @@ For the languages below, the compiler injects the install step automatically —
 | `python` | `1.1.399` | `npm install -g --ignore-scripts pyright@1.1.399` | `pyright-langserver` |
 | `ruby` | `0.50.0` | `gem install solargraph -v 0.50.0` | `solargraph` |
 | `rust` | n/a | `rustup component add rust-analyzer` | `rust-analyzer` |
-| `typescript` | `5.8.3` / `4.3.3` | `npm ci` with the compiler's bundled lockfile | `typescript-language-server` |
+| `typescript` | `6.0.3` / `6.1.0` | `npm ci` with the compiler's bundled lockfile | `typescript-language-server` |
 | `yaml` | `1.15.0` | `npm install -g --ignore-scripts yaml-language-server@1.15.0` | `yaml-language-server` |
 
 The built-in TypeScript server does not resolve versions at runtime. To use a different version, configure a custom server and install it from your own lockfile.
