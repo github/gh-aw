@@ -37,12 +37,12 @@ describe("Issue Monster scheduling contract", () => {
 
   it("receives domains-audit findings as cookie-approved queue items", () => {
     const { frontmatter } = readWorkflow("weekly-network-domains-audit");
-    expect(frontmatter).toContain("labels: [cookie, security]");
+    expect(frontmatter).toContain('labels: [cookie, security, "backlog:security"]');
 
     const lock = readFileSync(resolve(import.meta.dirname, "../../../.github/workflows/weekly-network-domains-audit.lock.yml"), "utf8");
     const configLine = lock.match(/^\s+GH_AW_SAFE_OUTPUTS_CONFIG:\s+("(?:\\.|[^"])*")$/m);
     expect(configLine).not.toBeNull();
     const safeOutputs = JSON.parse(JSON.parse(configLine[1]));
-    expect(safeOutputs.create_issue.labels).toEqual(["cookie", "security"]);
+    expect(safeOutputs.create_issue.labels).toEqual(["cookie", "security", "backlog:security"]);
   });
 });
