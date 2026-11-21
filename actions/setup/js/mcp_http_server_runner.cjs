@@ -128,7 +128,7 @@ async function runHttpServer(options) {
 
     // The default gateway configuration and runner health checks do not set Origin.
     if (req.headers.origin !== undefined) {
-      rejectRequest(403, "Origin not allowed");
+      rejectRequest(403, "Origin header not permitted on this endpoint");
       return;
     }
 

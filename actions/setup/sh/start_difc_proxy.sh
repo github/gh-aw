@@ -59,7 +59,7 @@ docker rm -f awmg-proxy 2>/dev/null || true
 DOCKER_NETWORK_ARGS=(--network host)
 PROXY_LISTEN=127.0.0.1:18443
 if [ "${GH_AW_NETWORK_ISOLATION:-false}" = "true" ]; then
-  # Docker forwards the loopback-only host publication to the container's bridge IP.
+  # Docker forwards the loopback-only host port to the container's bridge IP, not its loopback.
   DOCKER_NETWORK_ARGS=(--network bridge -p 127.0.0.1:18443:18443)
   PROXY_LISTEN=0.0.0.0:18443
 fi

@@ -126,6 +126,7 @@ describe("mcp_http_server_runner.cjs - runHttpServer", () => {
 
     const res = await request(currentServer, { method, path, headers: { Origin: "https://example.test" } });
     expect(res.statusCode).toBe(403);
+    expect(JSON.parse(res.body)).toEqual({ error: "Origin header not permitted on this endpoint" });
     expect(res.headers).not.toHaveProperty("access-control-allow-origin");
     expect(transport.calls).toHaveLength(0);
   });
