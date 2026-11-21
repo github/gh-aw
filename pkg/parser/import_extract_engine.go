@@ -12,7 +12,7 @@ import (
 // Side effects: acc.engines, acc.mergedEngineMCPToolTimeout,
 // acc.mergedEngineMCPSessionTimeout, acc.mergedEngineModel.
 func (acc *importAccumulator) extractEngineConfig(fm map[string]any, fullPath string) {
-	acc.extractRouterShortlist(fm)
+	acc.extractTopLevelRouting(fm)
 	if _, ok := fm["model"]; ok {
 		acc.engineModelChoiceDeclared = true
 	}
@@ -73,8 +73,14 @@ func (acc *importAccumulator) extractEngineConfig(fm map[string]any, fullPath st
 	}
 }
 
-func (acc *importAccumulator) extractRouterShortlist(fm map[string]any) {
-	if routing, ok := fm["model-routing"].(map[string]any); ok {
+func (acc *importAccumulator) extractTopLevelRouting(fm map[string]any) {
+	switch routing := fm["model-routing"].(type) {
+	case bool:
+		if !routing {
+			acc.routerDisabled = true
+			acc.engineModelChoiceDeclared = true
+		}
+	case map[string]any:
 		acc.routerShortlists = append(acc.routerShortlists, parseStringSliceField(routing["allowed-models"], true))
 	}
 }
@@ -130,6 +136,15 @@ func (acc *importAccumulator) extractConfigFields(fm map[string]any, fullPath st
 	acc.extractPlugins(fm)
 	acc.appendJSONSliceField(fm, "safe-outputs", "{}", &acc.safeOutputs)
 	acc.appendJSONBuilderField(fm, "graders", "{}", &acc.gradersBuilder)
+	if experiments, ok := fm["experiments"].(map[string]any); ok {
+		settings := make(map[string]any)
+		for _, key := range []string{"storage", "broker-url"} {
+			if value, ok := experiments[key]; ok {
+				settings[key] = value
+			}
+		}
+		acc.appendJSONBuilderField(map[string]any{"experiments": settings}, "experiments", "{}", &acc.experimentsBuilder)
+	}
 	acc.appendJSONSliceField(fm, "mcp-scripts", "{}", &acc.mcpScripts)
 	acc.appendJSONBuilderField(fm, "runtimes", "{}", &acc.runtimesBuilder)
 	acc.appendYAMLBuilderField(fm, "services", &acc.servicesBuilder)

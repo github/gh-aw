@@ -493,7 +493,9 @@ func TestSummarizeMetricEvalResults(t *testing.T) {
 {"id":"quality","answer":"MAYBE","runid":"103"}
 {"id":"coverage","answer":"YES","runid":"200"}
 `)
-	result := summarizeMetricEvalResults(parseEvalResultRecords(data))
+	records, err := parseEvalResultRecords(data)
+	require.NoError(t, err)
+	result := summarizeMetricEvalResults(records)
 	require.NotNil(t, result)
 
 	quality, ok := result["quality"]

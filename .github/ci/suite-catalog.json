@@ -1,7 +1,12 @@
 {
   "version": 1,
   "suites": [
-    { "id": "front-door-conformance", "description": "Node tests for scripts/ci-front-door*.cjs and the CGO selection and researcher workflow contracts.", "historical_duration_seconds": null, "mandatory": false },
+    {
+      "id": "front-door-conformance",
+      "description": "Node tests for scripts/ci-front-door*.cjs, scripts/go-unit-suite*.cjs and the CGO selection, unit partition and researcher workflow contracts.",
+      "historical_duration_seconds": null,
+      "mandatory": false
+    },
     {
       "id": "verify-integration-build",
       "description": "Compile every Go package and integration-tagged test binary with go test -run='^$' -exec=true -tags=integration ./...; executes no tests.",
@@ -10,13 +15,19 @@
     },
     {
       "id": "test",
-      "description": "Full Go unit tests with coverage across six test-name shards, including package CLI/workflow tests, fixtures, and their runtime inputs. Requires verify-integration-build.",
+      "description": "Required fast Go unit tests with coverage across 12 test-name shards. Excludes only the measured >=10s tests listed in .github/ci/go-unit-slow-tests.json, keeping unmeasured tests by default. Requires verify-integration-build.",
+      "historical_duration_seconds": null,
+      "mandatory": true
+    },
+    {
+      "id": "test-slow",
+      "description": "Measured >=10s Go unit tests from .github/ci/go-unit-slow-tests.json in four shards: repository workflow lint/compile sweeps, Azure bundled-Node connectors, workflow reader/checkout/npm runtime parity, and CLI/parser/workqueue closure tests. Top observed tests: repository lint 130.67s, repository compile 57.81s, reserved-closure workqueue 50.39s. Requires verify-integration-build; select independently of fast test. New suite runner duration is not yet measured.",
       "historical_duration_seconds": null,
       "mandatory": false
     },
     {
       "id": "canary-go",
-      "description": "Check full Go unit-test coverage using artifacts from test; compare discovered test names with executed tests. Requires test and its integration compilation prerequisite.",
+      "description": "Check full Go unit-test coverage using combined artifacts from test and test-slow; compare discovered test names with executed tests. Requires both unit suites and their integration compilation prerequisite.",
       "historical_duration_seconds": null,
       "mandatory": false
     },
@@ -45,7 +56,6 @@
       "historical_duration_seconds": null,
       "mandatory": false
     },
-    { "id": "bench", "description": "Run Go benchmarks and compare with historical baselines using benchstat for runtime performance regressions.", "historical_duration_seconds": null, "mandatory": false },
     { "id": "check-validator-sizes", "description": "Run the validator source file-size checker; report oversized validation Go files.", "historical_duration_seconds": null, "mandatory": false },
     { "id": "lint-go-format", "description": "Check formatting of Go source and test files with repository Go formatting commands.", "historical_duration_seconds": null, "mandatory": false },
     { "id": "lint-go-golangci", "description": "Run golangci-lint on Go packages in three shards, including compiler, CLI, internal tools, test files, and lint configuration.", "historical_duration_seconds": null, "mandatory": false },

@@ -22,7 +22,7 @@ In single-run mode, a job URL without a step anchor extracts the first failing s
 | `-o, --output <dir>` | `./logs` | Directory to write downloaded artifacts and report files |
 | `--json` | off | Output report as JSON to stdout |
 | `--parse` | off | Run JavaScript parsers on agent and firewall logs, writing `log.md` and `firewall.md` (single-run only) |
-| `--repo <owner/repo>` | auto | Specify repository when the run ID is not from a URL |
+| `--repo <owner/repo>` | current repository | Specify repository when the run ID is not from a URL |
 | `--stdin` | off | Read run IDs or URLs from stdin (one per line) instead of positional arguments |
 | `--verbose` | off | Print detailed progress information |
 | `--format <fmt>` | `pretty` | Diff output format: `pretty` or `markdown` (multi-run only) |
@@ -175,13 +175,13 @@ gh aw audit 1234567890 -o ./audit-reports --repo owner/repo
 
 **Stdin mode:**
 
-Use `--stdin` to pass run IDs or URLs from a file or pipeline (mutually exclusive with positional arguments). Blank lines and `#` lines are ignored. Bare numeric IDs require `--repo owner/repo`.
+Use `--stdin` to pass run IDs or URLs from a file or pipeline (mutually exclusive with positional arguments). Blank lines and `#` lines are ignored. Bare numeric IDs use the current repository unless `--repo owner/repo` is provided. If the current repository cannot be detected, provide `--repo` or a run URL.
 
 ```bash
 echo "1234567890" | gh aw audit --stdin
 echo -e "1234567890\n9876543210" | gh aw audit --stdin   # diff mode: first is base
 cat run-ids.txt | gh aw audit --stdin
-cat run-ids.txt | gh aw audit --stdin --repo owner/repo  # required for bare numeric IDs
+cat run-ids.txt | gh aw audit --stdin  # uses the current repository for bare numeric IDs
 ```
 
 **Multi-run diff examples:**
@@ -299,7 +299,7 @@ Parent workflow success does not imply successful delegation. `metrics.error_cou
 | `agentic_overkill_for_agentic` | The task may not require an agentic workflow |
 | `agentic_poor_agentic_control` | Agentic control signals were weak |
 | `agentic_partially_reducible` | Part of the task could use deterministic steps |
-| `agentic_model_downgrade_available` | A routine task may not need a high-capability model: use per-task [model routing](/gh-aw/reference/model-routing/) by changing `engine.model` (if set) or the top-level `model` to `router`, or setting `mode: auto` in an existing `engine.model-routing` block; use `router/economy` to cap routing at the lowest level. Also emitted for runs routed at a fixed `balanced` or `robust` mode. Runs routed at economy, or routed by `auto` to a higher level, emit no finding |
+| `agentic_model_downgrade_available` | A routine task may not need a high-capability model. Consider [per-task routing](/gh-aw/reference/model-routing/) with `model: router`, or use `model: router/economy` for a fixed economy level. The finding can also appear on runs using a fixed balanced or robust level. It does not appear for economy runs or when the router chose a higher level for the task. |
 | `agentic_delegated_context_present` | Delegated workflow context was preserved |
 
 The `agentic_poor_agentic_control` assessment uses the larger of reported control signals and counted friction occurrences. This avoids summing potentially overlapping sources, but can undercount distinct signals. Counted friction includes integrity-filtered responses: these indicate friction, not that the gateway control failed. A derived count covers only the available log sources.

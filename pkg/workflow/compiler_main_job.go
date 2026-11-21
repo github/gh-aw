@@ -65,6 +65,12 @@ func (c *Compiler) buildMainJob(data *WorkflowData, activationJobCreated bool) (
 	if err != nil {
 		return nil, err
 	}
+	if usesTokenBrokerGitHubTool(data) {
+		perms := NewPermissionsParser(permissions).ToPermissions()
+		perms.Set(PermissionIdToken, PermissionWrite)
+		permissions = perms.RenderToYAML()
+		steps = append(steps, c.buildBrokerInvalidationStep(data)...)
+	}
 
 	if c.actionMode.IsScript() {
 		compilerMainJobLog.Print("Adding script-mode cleanup step")

@@ -41,7 +41,9 @@ below ten requires a reason, rather than padded or unrelated assignments.
 Assign a summary to freeze its scope. Unassign it to allow daily refreshes.
 Stable keys retain issue identity while members overlap; merges/splits retire only
 unassigned summaries. Operator text outside the generated island, labels,
-assignees, and comments are preserved. Summaries do not auto-expire.
+assignees, and comments are preserved. New summaries auto-expire after 48 hours,
+configured by `GH_AW_ISSUE_EXPIRES_HOURS` in the publisher's workflow YAML.
+Daily refreshes preserve the original expiry; assignment freezes scope, not expiry.
 At publication, provenance-verified sources closed after run start are removed
 from unassigned candidates; empty candidates retire with an explicit shortfall.
 Assigned scopes remain frozen. Summaries assigned or edited after run start use

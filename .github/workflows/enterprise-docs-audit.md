@@ -37,7 +37,7 @@ safe-outputs:
     labels: [cookie]
     allowed-labels: [cookie]
     max: 3
-    expires: false
+    expires: 2d
     deduplicate-by-title: true
   noop:
     report-as-issue: false

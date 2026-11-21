@@ -235,6 +235,7 @@ func TestBuiltInSourcePolicyRulesCLI(t *testing.T) {
 		{"push-target", "safe-outputs:\n  push-to-pull-request-branch:\n    target: '*'", "safe-outputs.push-to-pull-request-branch.target", workflowlint.Warning},
 		{"pull-request-target-roles", "on: {pull_request_target: null, roles: read}", "on.roles", workflowlint.Error},
 		{"safe-output-shell-expansion", "safe-outputs: {steps: [{run: '$(PRIVATE_VALUE)'}]}", "safe-outputs.steps[0].run", workflowlint.Error},
+		{"safe-output-credentials", "safe-outputs: {steps: [{run: 'echo A=1 >> $GITHUB_ENV'}]}", "safe-outputs.steps[0].run", workflowlint.Error},
 		{"firewall-ssl-bump", "strict: false\nsandbox: {agent: {args: [--allow-urls, 'https://example.com/path']}}", "sandbox.agent.args", workflowlint.Error},
 		{"firewall-ssl-bump", "network: {firewall: {allow-urls: ['https://example.com/path'], ssl-bump: true}}", "network.firewall", workflowlint.Error},
 		{"pull-request-target-checkout", "on: pull_request_target\ncheckout: {ref: '${{ github.event.pull_request.head.sha }}'}", "checkout", workflowlint.Error},

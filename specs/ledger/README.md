@@ -1,5 +1,47 @@
 # Ledger protocol: bounded TLA+ model-checking results
 
+## Comment-backed publication
+
+[`CommentLedgerPublication.tla`](CommentLedgerPublication.tla) models the
+[comment-backed storage contract](../../docs/src/content/docs/specs/repo-memory-ledger-specification.md#comment-backed-storage)
+separately from Git-backed transactions. It represents one target with
+serialized persistence, two batch identities with three rotated shards each,
+and at most two attempts per batch. Publication can fail without acceptance,
+succeed with a response, or be accepted with a lost response. Every retry
+starts by scanning durable history; an already present batch does not post
+another comment. Staged runs and invalid history cannot publish.
+
+`CommentLedgerPublication.cfg` checks complete batches, unique publication,
+durability before success, and the staged/invalid-history gates.
+`CommentLedgerLostResponseWitness.cfg` additionally negates reachability of
+successful reconciliation after a lost response. The expected witness verdict
+is an invariant violation of `NoLostResponseRecovery` (exit 12), not a safety
+failure. TLC 2.19 on Java 21 exhausted 279 distinct safety states at depth 13.
+The witness reached reconciliation in six states. The finite model has no
+fairness or progress claim.
+
+From `specs/ledger`, run each configuration with the repository's
+[pinned Java and TLC tooling](../../.github/aw/formal-methods.md), using a
+fresh `-metadir` for each run:
+
+```sh
+"$JAVA_BIN" -cp "$TLA2TOOLS_JAR" tlc2.TLC -workers 2 \
+  -config CommentLedgerPublication.cfg -metadir "$TMPDIR/comment-ledger-safety" \
+  CommentLedgerPublication.tla
+"$JAVA_BIN" -cp "$TLA2TOOLS_JAR" tlc2.TLC -workers 2 \
+  -config CommentLedgerLostResponseWitness.cfg -metadir "$TMPDIR/comment-ledger-witness" \
+  CommentLedgerPublication.tla
+```
+
+This models `persistCommentLedgerAppends` after resolution of the target and
+publisher. It assumes serialized writers and a complete read that sees prior
+accepted comments; delayed visibility and simultaneous cross-repository
+writers are not checked. Batch identities and prepared shard contents abstract
+deterministic IDs, rendering, and size validation. Authentication, pagination,
+partially overlapping batches, and SQLite replay are implementation obligations.
+
+## Git-backed transactions
+
 `LedgerProtocol.tla` models the generic raw-record ledger and all six declared
 types (`log`, `set`, `map`, `table`, `counter`, `notes`). Its actions represent the
 agent's queued intent, validation in `safe_outputs`, the versioned transaction

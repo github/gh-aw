@@ -832,7 +832,7 @@ func (c *Compiler) buildSafeOutputsJobFromParts(
 	}
 	safeOutputStepNames := opts.safeOutputStepNames
 	permissions := opts.permissions
-	if usesTokenBrokerTasks(data) {
+	if usesTokenBrokerTasks(data) || usesTokenBrokerSafeOutputs(data) {
 		permissions.Set(PermissionIdToken, PermissionWrite)
 	}
 	threatDetectionEnabled := opts.threatDetectionEnabled
@@ -885,6 +885,9 @@ func (c *Compiler) buildSafeOutputsJobFromParts(
 // checkout and safe-output handler steps. It also mutates outputs to track minting failures.
 func (c *Compiler) buildPreambleTokenSteps(data *WorkflowData, outputs map[string]string) []string {
 	var preambleTokenSteps []string
+	if usesTokenBrokerSafeOutputs(data) {
+		preambleTokenSteps = append(preambleTokenSteps, c.buildGitHubBrokerTokenStep(data, "safe-outputs-app-token")...)
+	}
 	if data.SafeOutputs.GitHubApp != nil {
 		appPermissions := computePermissionsForSafeOutputs(data.SafeOutputs, true)
 		if !globalAppTokenNeededForPermissions(appPermissions) {
@@ -1004,12 +1007,16 @@ func (c *Compiler) appendFinalSafeOutputSteps(data *WorkflowData, steps []string
 		claimArtifacts := isWorkQueueWorker(data)
 		if claimArtifacts || hasMergeDecisions {
 			var redaction strings.Builder
-			c.generateTrackedSecretRedactionStep(&redaction, strings.Join(steps, ""), data)
+			c.generateTrackedSecretRedactionStep(&redaction, strings.Join(steps, ""), data, false)
 			steps = append(steps, redaction.String())
 		}
 		steps = append(steps, buildSafeOutputManifestUploadStep(agentArtifactPrefix, c.getActionPin, claimArtifacts, data, !isStaged)...)
 	}
-	steps = append(steps, c.buildTokenBrokerInvalidationStep(data)...)
+	if usesTokenBrokerSafeOutputs(data) {
+		steps = append(steps, c.buildBrokerInvalidationStep(data)...)
+	} else {
+		steps = append(steps, c.buildTokenBrokerInvalidationStep(data)...)
+	}
 	if c.actionMode.IsDev() && usesPatchesAndCheckouts(data.SafeOutputs) {
 		steps = append(steps, c.generateRestoreActionsSetupStep())
 		consolidatedSafeOutputsJobLog.Print("Added restore actions folder step to safe_outputs job (dev mode with checkout)")

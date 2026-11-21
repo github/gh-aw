@@ -59,7 +59,7 @@ func TestSortGroupedAuditEntries(t *testing.T) {
 
 func TestResolveGroupedAuditRunRequests(t *testing.T) {
 	t.Parallel()
-	requests, err := resolveGroupedAuditRunRequests([]string{
+	requests, err := resolveGroupedAuditRunRequests(t.Context(), []string{
 		"https://github.com/owner/repo/actions/runs/100",
 		"101",
 	}, "")
@@ -74,7 +74,7 @@ func TestResolveGroupedAuditRunRequests(t *testing.T) {
 
 func TestResolveGroupedAuditRunRequestsRejectsDuplicateRuns(t *testing.T) {
 	t.Parallel()
-	_, err := resolveGroupedAuditRunRequests([]string{"100", "100"}, "owner/repo")
+	_, err := resolveGroupedAuditRunRequests(t.Context(), []string{"100", "100"}, "owner/repo")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "duplicate run ID 100")
 }

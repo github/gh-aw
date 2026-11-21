@@ -1,9 +1,9 @@
 ---
 name: Smoke Work Queue Dispatcher
-description: Submit one synthetic task daily and request one native smoke worker Claim
+description: Submit three synthetic tasks every six hours and request three native smoke worker Claims
 intent: Detect failures in native work queue admission, dispatch, and worker completion without changing source content, allowing framework queue tracking mutations.
 on:
-  schedule: daily around 14:00
+  schedule: every 6 hours
 if: github.run_attempt == 1
 imports:
   - shared/work-queue-staged-plan.md
@@ -24,7 +24,7 @@ safe-outputs:
   dispatch-workflow:
     workflows: [smoke-work-queue-worker]
     target-ref: ${{ github.event.repository.default_branch }}
-    max: 1
+    max: 3
 jobs:
   verify_smoke_dispatch:
     needs: [agent, safe_outputs]
@@ -52,12 +52,13 @@ jobs:
           const receipt = dispatches[0];
           assert.equal(receipt.status, "durable", "Smoke is incomplete when capacity grants no worker");
           assert.equal(receipt.success, true);
-          assert.equal(receipt.dispatches, 1, "Smoke requires exactly one worker dispatch");
-          assert.equal(receipt.launches.length, 1);
-          const launch = receipt.launches[0];
-          assert.ok(["activation_pending", "bound"].includes(launch.state), "Smoke requires an accepted dispatch; trusted worker activation verifies binding separately");
-          assert.equal(launch.dispatched, true);
-          assert.match(String(launch.run_id), /^[1-9][0-9]*$/);
+          assert.equal(receipt.dispatches, 3, "Smoke requires exactly three worker dispatches");
+          assert.equal(receipt.launches.length, 3);
+          for (const launch of receipt.launches) {
+            assert.ok(["activation_pending", "bound"].includes(launch.state), "Smoke requires an accepted dispatch; trusted worker activation verifies binding separately");
+            assert.equal(launch.dispatched, true);
+            assert.match(String(launch.run_id), /^[1-9][0-9]*$/);
+          }
           JS
 steps:
   - name: Prepare synthetic work and bounded dispatch
@@ -67,34 +68,41 @@ steps:
         const fs = require("node:fs");
         const path = require("node:path");
         const { stagePlanIntents } = require(path.join(process.env.RUNNER_TEMP, "gh-aw/actions/work_queue_intents.cjs"));
+        const { loadWorkQueueSnapshot } = require(path.join(process.env.RUNNER_TEMP, "gh-aw/actions/work_queue_mcp_server.cjs"));
+        const queue = loadWorkQueueSnapshot();
+        const activePool = queue.projection.policy?.pools?.["smoke-work-queue"];
+        if (queue.projection.policy && (!activePool || !Number.isInteger(activePool.logical_limit) || activePool.logical_limit < 3 || !Number.isInteger(activePool.native_limit) || activePool.native_limit < 3)) {
+          throw new Error("Installed smoke-work-queue Policy does not allow three Claims; no Work was staged");
+        }
+        const node = node_key => ({
+          graph_id: `smoke-work-queue:${context.runId}`,
+          node_key,
+          pool: "smoke-work-queue",
+          worker_profile: "smoke-work-queue-worker",
+          payload: {
+            task: "Complete the synthetic work queue smoke task.",
+            smoke: "work-queue-v1",
+            resource_scope: {
+              version: 1,
+              resources: [{
+                host: "github.com",
+                repository: `${context.repo.owner}/${context.repo.repo}`,
+                repository_id: String(context.payload.repository.id),
+              }],
+            },
+            effect_contract: { kind: "none" },
+          },
+          depends_on: [],
+        });
         const plan = {
           version: 1,
-          nodes: [{
-            graph_id: `smoke-work-queue:${context.runId}`,
-            node_key: "smoke",
-            pool: "smoke-work-queue",
-            worker_profile: "smoke-work-queue-worker",
-            payload: {
-              task: "Complete the synthetic work queue smoke task.",
-              smoke: "work-queue-v1",
-              resource_scope: {
-                version: 1,
-                resources: [{
-                  host: "github.com",
-                  repository: `${context.repo.owner}/${context.repo.repo}`,
-                  repository_id: String(context.payload.repository.id),
-                }],
-              },
-              effect_contract: { kind: "none" },
-            },
-            depends_on: [],
-          }],
-          dispatch: { pool: "smoke-work-queue", max_claims: 1, max_dispatches: 1 },
+          nodes: ["smoke-1", "smoke-2", "smoke-3"].map(node),
+          dispatch: { pool: "smoke-work-queue", max_claims: 3, max_dispatches: 3 },
         };
         fs.mkdirSync("/tmp/gh-aw/agent", { recursive: true });
         fs.writeFileSync("/tmp/gh-aw/agent/smoke-work-queue-plan.json", JSON.stringify(plan));
         stagePlanIntents(path.join(process.env.RUNNER_TEMP, "gh-aw/safeoutputs/work-queue/work-queue.intents.jsonl"), plan);
-        core.info("Staged one synthetic Work and one bounded smoke dispatch request");
+        core.info("Staged three synthetic Work and one bounded smoke dispatch request for three Claims");
 timeout-minutes: 10
 strict: true
 ---
@@ -106,10 +114,11 @@ with `{"pool":"smoke-work-queue","limit":8}`. An absent queue is empty; the
 trusted submission installs Policy and Work together. An existing policyless
 ledger or a tool error is a failure, not an empty backlog.
 
-The trusted preparation step stages exactly one synthetic Work followed by
-`{"pool":"smoke-work-queue","max_claims":1,"max_dispatches":1}`. Explain the
+The trusted preparation step stages exactly three synthetic Work (`node_key`
+`smoke-1`, `smoke-2`, `smoke-3`, identical payloads) followed by
+`{"pool":"smoke-work-queue","max_claims":3,"max_dispatches":3}`. Explain the
 staged plan; do not submit again, choose a winner, dispatch directly, or emit
-`noop`. Work identity is stable for this daily activation, and whole-run reruns
+`noop`. Work identity is stable for this activation, and whole-run reruns
 are disabled. The scheduler may select an older smoke task when recovering a
 backlog; never force-release capacity or modify other pools.
 
@@ -119,7 +128,9 @@ a staged finish is not a verified Result. Check the authoritative queue Result
 and worker run when diagnosing failures; do not wait for workers in this run.
 
 Publish both smoke workflows and their lock files together with `aw.json`.
-The dedicated pool has concurrency one and still shares repository-wide limits.
+The dedicated pool has concurrency three and still shares repository-wide limits.
+Fewer than three grants is a smoke failure; the companion `smoke-work-queue-monitor`
+workflow reports stuck or failed Work.
 Trusted dispatch verification rejects `no_grant`, missing receipts, and unresolved
 launches; an always-running downstream check also rejects skipped or failed jobs.
 An accepted dispatch may still be `activation_pending`: the worker separately
@@ -136,3 +147,12 @@ Trusted processing installs the configured pool and verifies the published
 default-revision smoke worker on first use, without draining existing work.
 Only changes to installed authority or scheduling limits require a quiescent
 administrator Policy update; never reset or reseed an existing queue.
+
+Before staging any Work, the trusted preparation step checks the active pool
+limits. If an installed Policy still allows fewer than three logical or native
+Claims, the run fails before admission and leaves the queue quiescent for the
+Policy update. An uninitialized queue may still be initialized from the published
+configuration. If an earlier smoke version left unfinished Work or reservations,
+pause the dispatcher, resolve or cancel those items using the supported queue
+recovery operations, and wait until the queue is quiescent before installing the
+Policy. Do not clear or reseed the ledger.

@@ -18,6 +18,7 @@ func TestAddHandlerManagerConfigEnvVar(t *testing.T) {
 		safeOutputs              *SafeOutputsConfig
 		commentMemory            *CommentMemoryConfig
 		tools                    map[string]any
+		tokenBrokerCopilotTask   bool
 		checkContains            []string
 		checkJSON                bool
 		expectedKeys             []string
@@ -28,6 +29,20 @@ func TestAddHandlerManagerConfigEnvVar(t *testing.T) {
 		expectedEnvironment      string
 		checkRequireAgentSuccess bool
 	}{
+		{
+			name: "authorization config",
+			safeOutputs: &SafeOutputsConfig{
+				Authorization: &SafeOutputAuthorization{
+					Endpoint: "https://authority.example/a",
+					Audience: "https://authority.example/gh-aw",
+				},
+			},
+			checkContains: []string{
+				"GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG",
+			},
+			checkJSON:    true,
+			expectedKeys: []string{"authorization"},
+		},
 		{
 			name: "create issue config",
 			safeOutputs: &SafeOutputsConfig{
@@ -1087,6 +1102,23 @@ func TestAddHandlerManagerConfigEnvVar(t *testing.T) {
 			expectedKeys: []string{"claim_adapters"},
 		},
 		{
+			name: "token broker config",
+			safeOutputs: &SafeOutputsConfig{
+				TokenBroker: true,
+				AssignToAgent: &AssignToAgentConfig{
+					BaseSafeOutputConfig: BaseSafeOutputConfig{
+						Max: strPtr("1"),
+					},
+				},
+			},
+			tokenBrokerCopilotTask: true,
+			checkContains: []string{
+				"GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG",
+			},
+			checkJSON:    true,
+			expectedKeys: []string{"_token_broker", "assign_to_agent"},
+		},
+		{
 			name: "require agent success config",
 			safeOutputs: &SafeOutputsConfig{
 				RequireAgentSuccess: true,
@@ -1162,10 +1194,11 @@ func TestAddHandlerManagerConfigEnvVar(t *testing.T) {
 			compiler := NewCompiler()
 
 			workflowData := &WorkflowData{
-				Name:                "Test Workflow",
-				SafeOutputs:         tt.safeOutputs,
-				CommentMemoryConfig: tt.commentMemory,
-				Tools:               tt.tools,
+				Name:                   "Test Workflow",
+				SafeOutputs:            tt.safeOutputs,
+				CommentMemoryConfig:    tt.commentMemory,
+				Tools:                  tt.tools,
+				TokenBrokerCopilotTask: tt.tokenBrokerCopilotTask,
 			}
 
 			var steps []string

@@ -1,5 +1,6 @@
 ---
 title: Webhook Gateway Specification
+spec: true
 description: Experimental contract for supported webhook triggers, expected source data, normalized activities, and batched dispatch.
 sidebar:
   order: 1360
@@ -19,10 +20,56 @@ sidebar:
 
 This specification defines the compiler-to-receiver and receiver-to-runner contract for `on.gateway-dispatch`. It covers GitHub issues, pull requests, discussions, every comment family, reviews/threads, Projects, security alerts, imported connector triggers, and commands. Arbitrary undeclared custom webhook identifiers are unsupported. It does not register webhook sources and is unrelated to the MCP gateway.
 
+The [bounded TLA+ model and TLC-backed security threat model](https://github.com/github/gh-aw/tree/main/specs/webhook-gateway)
+exercise admission, replay/recovery, discovery fencing and destination trust
+boundaries. They distinguish shipped destination checks from external receiver
+requirements; bounded model checking does not prove implementation conformance
+or hosted readiness.
+
 The terms **MUST**, **MUST NOT**, and **MAY** describe requirements for conforming integrations. Receiver requirements are not claims that gh-aw ships a receiver: provider onboarding, signature verification, source authorization, durable admission, and dispatch remain integration responsibilities. This contract does not establish compatibility with the proposed hosted CAO RFC-033 interchange.
 
 > [!IMPORTANT]
 > The compiler generates the mandatory App-token provenance and hash-bound admission gates described below, replacing generic role/bot authorization for gateway ingress. This destination implementation does not verify a CAO deployment or establish hosted readiness. An integration MUST remain nonactivating until both the receiver token flow and the approved destination revision satisfy this contract.
+
+The receiver MUST accept the optional string `job_id` and echo its exact value in the admission response whenever the client supplies it. Deploy and verify this receiver support before publishing or activating a workflow revision that sends `job_id`; the client rejects an omitted or changed echo.
+
+## Bounded security findings
+
+The [TLC-backed threat model](https://github.com/github/gh-aw/blob/main/specs/webhook-gateway/threat-model.md)
+records an exhausted secure baseline of **23,620 distinct states**, with all
+18 invariant checks satisfied. Each of 18 deliberately weakened controls
+produces its expected counterexample. Six reachability witnesses establish that
+valid activation, uncertain outcomes, known-nonacceptance retries, duplicate and
+conflicting receipts, and restart are reachable with security invariants enabled.
+These counterexamples demonstrate why the controls are necessary in the model;
+they are not discovered vulnerabilities in the current implementation.
+
+Threat identifiers are stable references for these grouped findings. New findings
+receive new identifiers; existing identifiers are not renumbered or reused.
+
+| Threat ID | Finding from weakened controls | Consequence for this contract |
+| --- | --- | --- |
+| `WGT-001` | Retrying an uncertain dispatch can produce a second GitHub acceptance; forgetting an accepted outcome across restart has the same effect. | [Durability and recovery](#receiver-durability-and-recovery) requires quarantine of uncertain outcomes and durable receipt/outcome retention. Only known nonacceptance permits an automatic bounded retry; `204` proves acceptance, not workflow completion. |
+| `WGT-002` | An older refresh can resurrect a revoked route, and queued work can outlive its approval. | [Discovery publication](#table-shape-matching-and-publication) requires generation fencing; [pre-dispatch checks](#backend-owned-refresh-policy) must revalidate current bindings on every attempt. Revocation cannot recall an already authorized/transmitted request or an issued continuation. |
+| `WGT-003` | A stale worker or a conflicting duplicate can violate the original admission binding. | [Durable worker fencing and immutable content bindings](#receiver-durability-and-recovery) are required; process-local locks and batch-local resource deduplication do not establish cross-dispatch replay safety. |
+| `WGT-004` | A valid signature, enrolled source, matching predicate, or approved App alone does not establish the other trust boundaries; forwarding native content can leak data before destination validation. | [Source admission and minimal projection](#supported-triggers-and-source-data), [App provenance](#github-app-token-provenance), and [workflow admission](#workflow-hash-bound-gettoken-admission) remain independent gates. Destination rejection cannot undo receiver-side disclosure. |
+| `WGT-005` | A familiar configuration hash can coexist with an unapproved compiled artifact; a valid server decision can be misapplied without response correlation or envelope validation. | [Server verification](#server-verification-and-on-demand-refresh) must independently bind the actual artifact at the signed revision. The [continuation profile](#compiler-continuation-profile) and [dispatch envelope](#dispatch-envelope) checks remain mandatory after admission. |
+
+The finite model covers 13 request profiles, one scoped receipt key, two workers,
+at most two dispatch attempts, one approval revocation, and one restart. Signature,
+hash, artifact, projection, and response validity are abstract predicates, not
+proofs of their implementations. There is no fairness, liveness, exactly-once
+delivery, or hosted-readiness guarantee.
+
+Receiver and admission-server controls remain external integration requirements;
+the shipped destination checks do not establish their deployment or conformance.
+Real cryptographic and URL parsing, source-isolation keys, replay-retention
+horizons, exact size/evaluation budgets, resource exhaustion, provider-read
+authorization, prompt injection, and runtime-token cleanup require separate
+implementation review and integration evidence. The generated threat model
+records the full assumptions, residual risks, counterexamples, and reproduction
+commands. These findings clarify existing requirements; they add no wire-schema
+or runtime behavior change.
 
 ## Configuration and experimental status
 
@@ -75,6 +122,14 @@ The receiver MUST reject unknown evaluation versions/operators before enrollment
 Its internal event name is `connector_` followed by the first 24 lowercase hex
 digits of SHA-256 over alias, NUL, trigger name, NUL, and the frozen plan digest.
 The public selector remains the connector ID and declared trigger name.
+
+The [Connector Specification](/gh-aw/specs/connector-specification/) defines the
+separately selected reader, exact resource grant, request endpoint, network
+approval, and credential authority required for provider access. This subscription
+metadata carries trigger rules and resource constraints, but grants none of those
+reader permissions. This gateway contract governs source authentication, predicate
+evaluation, projection, and dispatch. A matched subscription or canonical URL MUST
+NOT be treated as a connector reader selection or provider-access grant.
 
 Compiler conditions encode every original fixed match predicate and exact
 resource grant as equality checks on decoded JSON Pointer paths. Integer grants
@@ -614,6 +669,8 @@ The workflow presents that value, not the runner's request credential, to the in
 
 #### Compiler continuation profile
 
+The [companion TypeSpec definition](https://github.com/github/gh-aw/blob/main/docs/src/content/docs/specs/webhook-gateway-specification.tsp) describes the gateway's `getToken` continuation endpoint. It does not define provider ingress or reproduce the GitHub REST API.
+
 The reserved `gateway_admission` job MUST follow successful `gateway_provenance`. Every other job, including custom, reusable, and `on.needs` jobs, directly requires both gates' successful results and `verified == 'true'` outputs. Custom conditions, activation outputs, or `strict: false` cannot bypass either gate. Customizing `jobs.gateway_admission` is rejected. Both control-plane jobs remain outside job environments, including when `--environment` is used, so environment-specific settings cannot replace central trust configuration. Their setup does not mint user-configured App or observability credentials.
 
 Trusted onboarding configures `GH_AW_GATEWAY_GET_TOKEN_URL` and `GH_AW_GATEWAY_OIDC_AUDIENCE` as organization/repository Actions secrets or variables; each nonempty secret takes precedence over its matching variable. Missing or malformed values fail closed. The first is an exact canonical HTTPS endpoint without credentials, query, or fragment; its path is deployment-selected. The second is the approved audience base without a trailing slash, query, or fragment. A host-only base such as `https://cao.example` is supported. Workflow-global environment values and dispatch fields do not supply either setting.
@@ -635,11 +692,16 @@ The client sends one `POST` to the configured endpoint, with `Authorization: Bea
 | `workflow_hash` | Existing compiler `frontmatter_hash` from the metadata header; identical to the compiler-owned step literal and audience suffix. |
 | `run_id`, `run_attempt` | Canonical positive decimal strings from GitHub's run context. |
 | `check_run_id` | Canonical positive decimal string from the issued JWT identifying the owning job. |
+| `job_id` | Runner `GITHUB_JOB` string when available, omitted without job context. Diagnostic logical job ID only; it MUST NOT replace verification of the signed `check_run_id`. |
 | `ref` | The GitHub-owned `refs/heads/...` execution ref. |
 | `event_name` | Literal `repository_dispatch`. |
 | `event_type` | The compiler-defined route for this workflow ID, already checked by App provenance. It is not a signed OIDC claim; the server independently binds it to the approved artifact/admission. |
 
+When the current `GITHUB_AW_OTEL_TRACE_ID` and `GITHUB_AW_OTEL_PARENT_SPAN_ID` are both valid, the POST MUST carry their W3C `traceparent`; invalid or incomplete context is omitted. Nonempty `GITHUB_JOB` MUST also produce a single W3C `baggage` member, `cicd.pipeline.task.name=<encoded-job-id>`. Header sanitization uses UTF-8 percent-encoding (`encodeURIComponent`), including whitespace, CR/LF, Unicode, baggage delimiters and literal percent signs; JSON `job_id` remains unchanged. This OpenTelemetry CI/CD task name is diagnostic only. The client snapshots it before acquiring OIDC and MUST NOT forward arbitrary inherited propagation headers, baggage or exporter credentials, send correlation headers to the OIDC issuer, or enable telemetry export merely to propagate context.
+
 Success is **only** `200 OK` with a UTF-8 JSON object containing exactly every request field unchanged plus boolean `allowed: true`. Missing, different, additional, or credential-bearing fields reject continuation. The endpoint returns an authorization decision, not CAO's dispatch token or a new runtime credential. Only the boolean `verified` is published as a job output; the OIDC and job tokens are never outputs or agent inputs.
+
+Backends MUST allow `job_id` in their closed request schema and echo it unchanged when present; omission or alteration in the response rejects continuation. Callers without job context omit it from both schemas. This metadata extension does not change subscription/dispatch schema version `2` or the admission audience format and numeric schema version `1`.
 
 The backend MUST enforce a bounded closed request schema and validate all copies against the signed identity and independently verified artifact. It MUST authorize the signed `check_run_id` as the expected admission job for this run/attempt, using trusted GitHub job metadata as needed; a caller-provided logical job name is not proof. It MUST correlate the decision with the current backend admission and route. Duplicate requests for the same issuer/repository/workflow revision/hash/run/attempt/check-run/route binding MUST be idempotent and recheck current token validity and approval; conflicting reuse of a signed token identity MUST reject. A stored decision MUST NOT bypass a later revocation.
 
@@ -707,6 +769,7 @@ Receiver and compiler/runtime acceptance tests MUST cover the following cases be
 | Invalid batch from the approved App | Reject under existing route, projection, selector, size, and batch rules. |
 | Valid hash-bearing OIDC audience and independently verified compiled artifact at the signed workflow revision | Grant `getToken` access only after current enrollment/admission checks; the App gate remains independently required. |
 | Missing/malformed hash, unsigned hash only, wrong audience base/path, digest mismatch, or conflicting request-body hash | Reject before credential issuance or continuation, even if the requested hash matches a cached older row. |
+| Current/missing trace or job context, reserved characters in job names, or a missing/changed response `job_id` | Send valid current `traceparent`, HTTP-safe job baggage and original JSON `job_id` when available; omit unavailable context; accept and echo `job_id` exactly before client rollout, and reject an omitted/changed echo without using diagnostic metadata instead of signed `check_run_id`. |
 | Server table is behind the verified executing workflow | Fetch the exact revision, validate approved configuration, and refresh with atomic fencing before granting access; an explicit retryable result is permitted while refresh is pending. |
 | Refresh failure, unsupported/unapproved source, or revoked approval | Fail closed without automatic approval, fallback credentials, or success-shaped continuation. |
 | Repeated OIDC request or asynchronous refresh completion | Require valid authentication and current grants; reuse only the explicitly authorized idempotent outcome under the documented run/attempt/replay policy, never a fresh duplicate credential grant. |
@@ -933,5 +996,9 @@ The compiler implements hash-bound `getToken` calls and fail-closed client conti
 ## References
 
 The [GitHub webhook trigger reference](/gh-aw/reference/webhook-triggers/) defines the detailed GitHub filter catalog and dispatch authorization. The [provider issue reference](/gh-aw/reference/provider-issue-triggers/) explains migration from the removed native integrations to imported connector declarations.
+
+The [Connector Specification](/gh-aw/specs/connector-specification/) defines
+declaration-side connector authority and the nonactivation boundary for imported
+subscriptions.
 
 See the [GitHub repository dispatch API](https://docs.github.com/en/rest/repos/repos#create-a-repository-dispatch-event), [App installation-token generation](https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/generating-an-installation-access-token-for-a-github-app), [GitHub actor contexts](https://docs.github.com/en/actions/reference/workflows-and-actions/contexts#github-context), [GitHub webhook payloads](https://docs.github.com/en/webhooks/webhook-events-and-payloads), [Jira webhooks](https://developer.atlassian.com/cloud/jira/platform/webhooks/), [Linear webhooks](https://linear.app/developers/webhooks).

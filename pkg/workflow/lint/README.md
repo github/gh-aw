@@ -31,7 +31,7 @@ constructors:
 | Actions and workflow integrity | `ActionPinRule`, `VersionCheckRule`, `JobTimeoutRule`, `NeedsConsistencyRule`, `StepReferenceRule`, `WorkflowRunScopeRule`, `ConditionalImportRule`, `PrivateToPublicRule`, `InstallScriptsRule`, `GatewayDispatchLiteralsRule`, `BashCasePatternRule`, `ObfuscationRule` |
 | Permissions, jobs, and checkout | `PermissionScopeRule`, `ExcessivePermissionsRule`, `CustomJobDetectionRule`, `PrivilegedCheckoutRule`, `CheckoutModeRule`, `ForkAssociationRule`, `PullRequestTargetRolesRule`, `UntrustedRolesDetectionRule`, `PullRequestTargetCheckoutRule` |
 | Network, tools, images, and sandbox | `NetworkScopeRule`, `PushTargetRule`, `AllowedLabelsRule`, `ToolScopeRule`, `ImageArgumentRule`, `SandboxConfigRule`, `FirewallSSLBumpRule` |
-| Outputs, artifacts, and cache | `SafeOutputShellExpansionRule`, `ArtifactExecutionRule`, `ArtipackedRule`, `CachePoisoningRule` |
+| Outputs, artifacts, and cache | `SafeOutputShellExpansionRule`, `SafeOutputCredentialsRule`, `ArtifactExecutionRule`, `ArtipackedRule`, `CachePoisoningRule` |
 | Grader I/O | `GraderFileIORule` |
 
 `ASTTargets` selects the authored AW AST (`AWAST`), native Actions AST

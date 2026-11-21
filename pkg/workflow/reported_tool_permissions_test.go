@@ -20,7 +20,7 @@ func TestReportedWorkflowToolPermissions(t *testing.T) {
 		{"daily-schema-audit-cursor", []string{"shell(find)", "shell(jq)", "shell(sort)", "shell(echo)"}},
 		{"daily-regression-audit-kiro", []string{"shell(cd)", "shell(cut)", "shell(jq)"}},
 		{"daily-compiler-quality", []string{"shell(cd)", "shell(test)", "shell([)", "shell(awk)"}},
-		{"code-scanning-fixer", []string{"shell(cut)", "shell(github:*)", "shell(safeoutputs:*)"}},
+		{"code-scanning-fixer-worker", []string{"shell(cut)", "shell(github:*)", "shell(safeoutputs:*)", "shell(work-queue:*)"}},
 		{"tidy", []string{"shell(make:*)", "shell(git status)", "shell(safeoutputs:*)"}},
 		{"smoke-copilot-aoai-apikey", []string{"shell", "safeoutputs"}},
 		{"smoke-workflow-call", []string{"Bash(git status:*)", "Bash(git branch:*)", "Bash(git remote:*)", "Bash(git log:*)"}},
@@ -51,7 +51,7 @@ func TestReportedWorkflowToolPermissions(t *testing.T) {
 					assert.NotContains(t, args, "shell(graft:*)")
 					assert.NotContains(t, data.Tools, "graft")
 				}
-				if tt.workflow == "code-scanning-fixer" {
+				if tt.workflow == "code-scanning-fixer-worker" {
 					assert.NotContains(t, args, "shell")
 					assert.NotContains(t, args, "shell(node:*)")
 					assert.NotContains(t, args, "shell(make:*)")
@@ -64,7 +64,7 @@ func TestReportedWorkflowToolPermissions(t *testing.T) {
 					}
 					assert.Contains(t, data.MarkdownContent, "Tests not run: test execution is not available in this workflow")
 					assert.Contains(t, data.MarkdownContent, "DIFC/policy-filtered result")
-					assert.Contains(t, data.MarkdownContent, "only after the tool accepts the intent")
+					assert.Contains(t, data.MarkdownContent, "work_queue_claim_finish")
 					github, ok := data.Tools["github"].(map[string]any)
 					require.True(t, ok)
 					assert.Contains(t, github["toolsets"], "repos")

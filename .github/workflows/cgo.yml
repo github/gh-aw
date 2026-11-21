@@ -130,13 +130,13 @@ jobs:
       run: |
         node <<'NODE'
         const fs = require('node:fs');
-        const known = ['front-door-conformance', 'verify-integration-build', 'test', 'canary-go', 'impacted-go-tests', 'native-javascript-tests', 'build', 'build-wasm', 'validate-yaml', 'bench', 'check-validator-sizes', 'lint-go-format', 'lint-go-golangci', 'lint-go-govulncheck', 'lint-go-custom', 'lint-error-messages', 'actions-build', 'fuzz', 'security', 'security-scan', 'mcp-server-compile-test', 'cross-platform-build', 'alpine-container-test', 'safe-outputs-conformance'];
-        const dependencies = {test: ['verify-integration-build'], 'canary-go': ['test'], security: ['build'], 'security-scan': ['build'], 'cross-platform-build': ['build']};
+        const known = ['front-door-conformance', 'verify-integration-build', 'test', 'test-slow', 'canary-go', 'impacted-go-tests', 'native-javascript-tests', 'build', 'build-wasm', 'validate-yaml', 'check-validator-sizes', 'lint-go-format', 'lint-go-golangci', 'lint-go-govulncheck', 'lint-go-custom', 'lint-error-messages', 'actions-build', 'fuzz', 'security', 'security-scan', 'mcp-server-compile-test', 'cross-platform-build', 'alpine-container-test', 'safe-outputs-conformance'];
+        const dependencies = {test: ['verify-integration-build'], 'test-slow': ['verify-integration-build'], 'canary-go': ['test', 'test-slow'], security: ['build'], 'security-scan': ['build'], 'cross-platform-build': ['build']};
         let suiteIds = '';
         try {
           const ids = JSON.parse(process.env.RAW_SUITE_IDS);
           if (process.env.SELECTOR_OUTCOME === 'success' && Array.isArray(ids) &&
-              ids.length <= known.length && new Set(ids).size === ids.length &&
+              ids.includes('test') && ids.length <= known.length && new Set(ids).size === ids.length &&
               ids.every(id => known.includes(id) && (dependencies[id] || []).every(dependency => ids.includes(dependency)))) {
             suiteIds = JSON.stringify(ids);
           }
@@ -165,6 +165,7 @@ jobs:
         node --test scripts/ci-front-door.test.cjs
         node --test scripts/ci-front-door-researcher.test.cjs
         node --test scripts/ci-front-door-workflow.test.cjs
+        node --test scripts/go-unit-suite.test.cjs
 
   verify-integration-build:
     needs: [checkout-cache, front-door-decision]
@@ -254,7 +255,7 @@ jobs:
         go test -run='^$' -exec=true -tags=integration ./...
 
   test:
-    name: Unit tests (${{ matrix.name }})
+    name: Fast unit tests (${{ matrix.name }})
     if: always() && !cancelled() && needs.checkout-cache.result == 'success' && needs.verify-integration-build.result == 'success' && (github.event_name != 'pull_request' || needs.front-door-decision.result != 'success' || !needs.front-door-decision.outputs.suite_ids || contains(fromJSON(needs.front-door-decision.outputs.suite_ids), 'test'))
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -264,32 +265,53 @@ jobs:
     - front-door-decision
     permissions:
       contents: read
+    env:
+      UNIT_TEST_SUITE: fast
+      UNIT_TEST_TIMEOUT: 3m
     strategy:
       fail-fast: false
       matrix:
         include:
-        - name: A-B
-          pattern: ^Test[A-B]
-          shard: a-b
+        - name: A
+          pattern: ^TestA
+          shard: a
+        - name: B
+          pattern: ^TestB
+          shard: b
         - name: C
           pattern: ^TestC
           shard: c
-        - name: D-G
-          pattern: ^Test[D-G]
-          shard: d-g
-        - name: H-M
-          pattern: ^Test[H-M]
-          shard: h-m
+        - name: D
+          pattern: ^TestD
+          shard: d
+        - name: E-G
+          pattern: ^Test[E-G]
+          shard: e-g
+        - name: H-J
+          pattern: ^Test[H-J]
+          shard: h-j
+        - name: K-M
+          pattern: ^Test[K-M]
+          shard: k-m
         - name: N-R
           pattern: ^Test[N-R]
           shard: n-r
-        - name: S-Z and other
-          pattern: ^Test([S-Z]|[^A-R])
-          shard: s-z
+        - name: S
+          pattern: ^TestS
+          shard: s
+        - name: T
+          pattern: ^TestT
+          shard: t
+        - name: U-V
+          pattern: ^Test[U-V]
+          shard: u-v
+        - name: W-Z and other
+          pattern: ^Test([W-Z]|[^A-V])
+          shard: w-z
     concurrency:
       group: ci-${{ github.ref }}-test-${{ matrix.shard }}
       cancel-in-progress: true
-    steps:
+    steps: &unit-test-steps
     - name: Restore checkout
       id: restore-checkout
       uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9   # v6.1.0
@@ -393,10 +415,22 @@ jobs:
 
     - name: Run unit tests with coverage
       id: run-unit-tests
+      env:
+        TEST_PATTERN: ${{ matrix.pattern }}
       run: |
         set -o pipefail
+        if [ "$UNIT_TEST_SUITE" = "fast" ]; then
+          slow_pattern=$(node scripts/go-unit-suite.cjs)
+          selection=(-run "$TEST_PATTERN" -skip "$slow_pattern")
+        elif [ "$UNIT_TEST_SUITE" = "slow" ]; then
+          slow_pattern=$(node scripts/go-unit-suite.cjs "$TEST_PATTERN")
+          selection=(-run "$slow_pattern")
+        else
+          echo "Unknown unit-test suite: $UNIT_TEST_SUITE" >&2
+          exit 1
+        fi
         # Run tests with JSON output for artifacts, but also show failures
-        if ! go test -v -parallel=8 -timeout=3m -run='${{ matrix.pattern }}' -tags '!integration' -coverprofile=coverage-${{ matrix.shard }}.out -json ./... > test-result-unit-${{ matrix.shard }}.json; then
+        if ! go test -v -parallel=8 -timeout="$UNIT_TEST_TIMEOUT" "${selection[@]}" -tags '!integration' -coverprofile=coverage-${{ matrix.shard }}.out -json ./... > test-result-unit-${{ matrix.shard }}.json; then
           cat test-result-unit-${{ matrix.shard }}.json
           exit 1
         fi
@@ -439,14 +473,50 @@ jobs:
         path: test-result-unit-${{ matrix.shard }}.json
         retention-days: 7
 
+  test-slow:
+    name: Slow unit tests (${{ matrix.name }})
+    if: always() && !cancelled() && needs.checkout-cache.result == 'success' && needs.verify-integration-build.result == 'success' && (github.event_name != 'pull_request' || needs.front-door-decision.result != 'success' || !needs.front-door-decision.outputs.suite_ids || contains(fromJSON(needs.front-door-decision.outputs.suite_ids), 'test-slow'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs:
+    - checkout-cache
+    - verify-integration-build
+    - front-door-decision
+    permissions:
+      contents: read
+    env:
+      UNIT_TEST_SUITE: slow
+      UNIT_TEST_TIMEOUT: 5m
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        - name: Repository sweeps
+          pattern: repository
+          shard: slow-repository
+        - name: Azure runtime
+          pattern: workflow-azure
+          shard: slow-workflow-azure
+        - name: Workflow readers
+          pattern: workflow-readers
+          shard: slow-workflow-readers
+        - name: CLI, parser and workqueue
+          pattern: cli-parser-workqueue
+          shard: slow-cli-parser-workqueue
+    concurrency:
+      group: ci-${{ github.ref }}-test-${{ matrix.shard }}
+      cancel-in-progress: true
+    steps: *unit-test-steps
+
   canary-go:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     needs:
     - checkout-cache
     - test
+    - test-slow
     - front-door-decision
-    if: always() && !cancelled() && needs.checkout-cache.result == 'success' && needs.test.result == 'success' && (github.event_name != 'pull_request' || needs.front-door-decision.result != 'success' || !needs.front-door-decision.outputs.suite_ids || contains(fromJSON(needs.front-door-decision.outputs.suite_ids), 'canary-go'))
+    if: always() && !cancelled() && needs.checkout-cache.result == 'success' && needs.test.result == 'success' && needs.test-slow.result == 'success' && (github.event_name != 'pull_request' || needs.front-door-decision.result != 'success' || !needs.front-door-decision.outputs.suite_ids || contains(fromJSON(needs.front-door-decision.outputs.suite_ids), 'canary-go'))
     permissions:
       contents: read
     steps:
@@ -1275,182 +1345,6 @@ jobs:
           }
 
           core.info(`✅ ${CONFIG_FILE} passes all structural and cross-row invariant checks`);
-
-  bench:
-    # PR relevance comes from frontdoor; retain main-only performance tracking otherwise.
-    if: always() && !cancelled() && needs.checkout-cache.result == 'success' && (github.event_name == 'pull_request' || github.ref == 'refs/heads/main') && (github.event_name != 'pull_request' || needs.front-door-decision.result != 'success' || !needs.front-door-decision.outputs.suite_ids || contains(fromJSON(needs.front-door-decision.outputs.suite_ids), 'bench'))
-    needs: [checkout-cache, front-door-decision]
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    permissions:
-      contents: read
-      actions: read
-    concurrency:
-      group: ci-${{ github.ref }}-bench
-      cancel-in-progress: true
-    steps:
-    - name: Restore checkout
-      id: restore-checkout
-      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9   # v6.1.0
-      with:
-        path: .
-        key: checkout-cgo-${{ github.run_id }}-${{ github.sha }}
-    - name: Checkout on cache miss
-      if: steps.restore-checkout.outputs.cache-hit != 'true'
-      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
-      with:
-        ref: ${{ github.sha }}
-        fetch-depth: 2
-        persist-credentials: false
-
-    - name: Set up Go
-      id: setup-go
-      uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e   # v6
-      with:
-        go-version-file: go.mod
-        cache: true
-
-    - name: Report Go cache status
-      run: |
-        if [ "${{ steps.setup-go.outputs.cache-hit }}" == "true" ]; then
-          echo "✅ Go cache hit" >> $GITHUB_STEP_SUMMARY
-        else
-          echo "⚠️ Go cache miss" >> $GITHUB_STEP_SUMMARY
-        fi
-
-    - name: Download dependencies with retry
-      if: steps.setup-go.outputs.cache-hit != 'true'
-      run: |
-        set -e
-        MAX_RETRIES=3
-        RETRY_DELAY=5
-
-        for i in $(seq 1 $MAX_RETRIES); do
-          echo "Attempt $i of $MAX_RETRIES: Downloading Go modules..."
-          if go mod download; then
-            echo "✅ Successfully downloaded Go modules"
-            break
-          else
-            if [ $i -eq $MAX_RETRIES ]; then
-              echo "❌ Failed to download Go modules after $MAX_RETRIES attempts"
-              echo "This may indicate that proxy.golang.org is unreachable"
-              echo "Please check network connectivity or consider vendoring dependencies"
-              exit 1
-            fi
-            echo "⚠️ Download failed, retrying in ${RETRY_DELAY}s..."
-            sleep $RETRY_DELAY
-          fi
-        done
-
-    - name: Verify dependencies
-      run: go mod verify
-
-    - name: Install benchstat
-      run: go install golang.org/x/perf/cmd/benchstat@v0.0.0-20260615155930-9e4b9ddef5b6
-
-    - name: Download previous benchmark baseline
-      id: baseline
-      env:
-        GH_TOKEN: ${{ github.token }}
-      run: |
-        set +e
-        echo "Looking for previous benchmark-results artifact..."
-        # The bench job only runs on main, so any benchmark-results artifact is from main.
-        # The artifacts API includes workflow_run.head_branch; filter for main as an extra safeguard.
-        artifact_id=$(gh api \
-          "repos/$GITHUB_REPOSITORY/actions/artifacts?name=benchmark-results&per_page=10" \
-          --jq '[.artifacts[] | select(.workflow_run.head_branch? == "main")] | .[0].id // empty' 2>/dev/null)
-
-        if [ -n "$artifact_id" ]; then
-          echo "Found artifact ID: $artifact_id"
-          mkdir -p baseline
-          if gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/$artifact_id/zip" \
-            --output baseline.zip 2>/dev/null; then
-            if unzip -q baseline.zip -d baseline 2>/dev/null && [ -f baseline/bench_results.txt ]; then
-              echo "✅ Downloaded baseline benchmark results"
-              echo "has_baseline=true" >> "$GITHUB_OUTPUT"
-            else
-              echo "⚠️ Failed to extract baseline artifact or bench_results.txt not found"
-              echo "has_baseline=false" >> "$GITHUB_OUTPUT"
-            fi
-          else
-            echo "⚠️ Failed to download baseline artifact"
-            echo "has_baseline=false" >> "$GITHUB_OUTPUT"
-          fi
-        else
-          echo "ℹ️ No previous benchmark results found — skipping regression check on first run"
-          echo "has_baseline=false" >> "$GITHUB_OUTPUT"
-        fi
-
-    - name: Run benchmarks
-      run: make bench
-
-    - name: Run benchstat regression check
-      if: steps.baseline.outputs.has_baseline == 'true'
-      run: |
-        echo "## 📈 Benchmark Regression Check" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-
-        if ! benchstat_out=$(benchstat baseline/bench_results.txt bench_results.txt 2>&1); then
-          echo "$benchstat_out"
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          echo "$benchstat_out" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "❌ **benchstat failed to compare benchmark results.** Check the output above." >> $GITHUB_STEP_SUMMARY
-          echo "::error::benchstat failed to compare benchmark results"
-          exit 1
-        fi
-
-        echo "$benchstat_out"
-
-        echo '```' >> $GITHUB_STEP_SUMMARY
-        echo "$benchstat_out" >> $GITHUB_STEP_SUMMARY
-        echo '```' >> $GITHUB_STEP_SUMMARY
-
-        # Fail if any benchmark regresses by more than 10%.
-        # benchstat uses + for slower time (regression) and - for faster time (improvement).
-        REGRESSION=false
-        while IFS= read -r line; do
-          if [[ "$line" =~ \+([0-9]+(\.[0-9]+)?)% ]]; then
-            pct="${BASH_REMATCH[1]}"
-            if awk -v p="$pct" 'BEGIN {exit !(p > 10)}'; then
-              echo "❌ Regression: $line"
-              REGRESSION=true
-            fi
-          fi
-        done <<< "$benchstat_out"
-
-        if [ "$REGRESSION" = "true" ]; then
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "❌ **Performance regression >10% detected.** See comparison above." >> $GITHUB_STEP_SUMMARY
-          echo "::error::Performance regression >10% detected — see benchstat output above"
-          exit 1
-        else
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "✅ No significant performance regressions detected." >> $GITHUB_STEP_SUMMARY
-          echo "✅ No regressions detected"
-        fi
-
-    - name: Display benchmark summary
-      run: |
-        echo "## 📊 Benchmark Results" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-        # Show compiler benchmarks from the results
-        grep "BenchmarkCompile" bench_results.txt | head -20 >> $GITHUB_STEP_SUMMARY || echo "No benchmark results found" >> $GITHUB_STEP_SUMMARY
-        echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "📁 Full results saved to artifact: benchmark-results" >> $GITHUB_STEP_SUMMARY
-
-      # Benchmark results for performance trend analysis - 14 days allows comparison across multiple runs
-    - name: Save benchmark results
-      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9   # v7.0.2
-      with:
-        name: benchmark-results
-        path: bench_results.txt
-        if-no-files-found: ignore
-        retention-days: 14
 
   check-validator-sizes:
     name: Check validator file sizes
@@ -3023,13 +2917,13 @@ jobs:
     - checkout-cache
     - verify-integration-build
     - test
+    - test-slow
     - canary-go
     - impacted-go-tests
     - native-javascript-tests
     - build
     - build-wasm
     - validate-yaml
-    - bench
     - check-validator-sizes
     - lint-go-format
     - lint-go-golangci

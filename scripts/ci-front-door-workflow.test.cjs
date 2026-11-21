@@ -4,6 +4,8 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const vm = require("node:vm");
+const os = require("node:os");
+const { execFileSync, spawnSync } = require("node:child_process");
 const { test } = require("node:test");
 const { frontDoor, SUITE_IDS, JOB_DEPENDENCIES } = require("./ci-front-door.cjs");
 const catalog = require("../.github/ci/suite-catalog.json");
@@ -62,7 +64,7 @@ function validatedSuites(raw, outcome = "success") {
   return output.slice("suite_ids=".length, -1);
 }
 
-test("every CGO check job is selectable; only checkout, selection and cleanup are infrastructure", () => {
+test("the selector catalog covers every CGO check job", () => {
   assert.deepEqual(
     Object.keys(jobs)
       .filter(id => !infrastructure.includes(id))
@@ -79,6 +81,31 @@ test("every CGO check job is selectable; only checkout, selection and cleanup ar
   assert.doesNotMatch(jobs["cross-platform-build"], /matrix:[\s\S]*outputs\.suite_ids/);
   assert.equal(condition(decision), "github.event_name == 'pull_request'");
   assert.equal(condition(jobs["summarize-timing"]), "always()");
+});
+
+test("CGO unit tests use 12 disjoint shards with complete test-name coverage", () => {
+  const shards = [...jobs.test.matchAll(/^        - name: (.+)\n          pattern: (.+)\n          shard: (.+)$/gm)].map(([, name, pattern, shard]) => ({
+    name,
+    pattern: new RegExp(pattern),
+    shard,
+  }));
+  assert.equal(shards.length, 12);
+  assert.equal(new Set(shards.map(shard => shard.name)).size, 12);
+  assert.equal(new Set(shards.map(shard => shard.shard)).size, 12);
+  const suffixes = [...Array.from({ length: 128 }, (_, code) => String.fromCharCode(code)), "É", "Ω", "中"];
+  for (const suffix of suffixes) {
+    const name = `Test${suffix}Example`;
+    assert.equal(shards.filter(shard => shard.pattern.test(name)).length, 1, JSON.stringify(name));
+  }
+  for (const name of ["BenchmarkA", "ExampleA", "NotTestA"]) {
+    assert.equal(shards.filter(shard => shard.pattern.test(name)).length, 0, name);
+  }
+  assert.match(jobs.test, /UNIT_TEST_SUITE: fast/);
+  assert.match(jobs.test, /steps: &unit-test-steps/);
+  assert.match(jobs["test-slow"], /UNIT_TEST_SUITE: slow/);
+  assert.match(jobs["test-slow"], /steps: \*unit-test-steps/);
+  assert.match(jobs["test-slow"], /pattern: repository\n          shard: slow-repository/);
+  assert.match(jobs["test-slow"], /UNIT_TEST_TIMEOUT: 5m/);
 });
 
 test("inference credentials and executable policy stay isolated from PR code", () => {
@@ -117,7 +144,7 @@ test("inference credentials and executable policy stay isolated from PR code", (
   assert.deepEqual(dependencies(decision), []);
 });
 
-test("PR model decisions control every check job through the actual output validator and job expressions", async () => {
+test("PR decisions keep the fast baseline and control optional jobs through the validator", async () => {
   for (const wanted of [[], ...SUITE_IDS.map(id => [id]), [...SUITE_IDS]]) {
     const selection = await frontDoor({
       catalog,
@@ -137,7 +164,9 @@ test("invalid outputs and missing, failed or skipped decisions run every check j
   for (const raw of ["", "not-json", "null", "{}", '["unknown"]', JSON.stringify([...SUITE_IDS, "unknown"]), '["build","build"]', '["go-tests"]', ...Object.keys(JOB_DEPENDENCIES).map(id => JSON.stringify([id]))]) {
     assert.equal(validatedSuites(raw), "", raw);
   }
-  assert.equal(validatedSuites("[]"), "[]");
+  assert.equal(validatedSuites("[]"), "");
+  assert.equal(validatedSuites('["verify-integration-build","build"]'), "");
+  assert.equal(validatedSuites('["verify-integration-build","test"]'), '["verify-integration-build","test"]');
   assert.equal(validatedSuites(JSON.stringify(SUITE_IDS)), JSON.stringify(SUITE_IDS));
   for (const id of SUITE_IDS) {
     for (const result of ["failure", "skipped", "cancelled", ""]) assert.equal(evaluate(condition(jobs[id]), { result }), true, `${id}: ${result}`);
@@ -169,10 +198,72 @@ test("non-PR main controls retain all checks and never require a successful deci
       assert.equal(evaluate(condition(jobs[id]), { event, ref: "refs/heads/main", result: "skipped" }), true, `${event}: ${id}`);
     }
   }
-  for (const id of ["bench", "fuzz", "security-scan"]) {
+  for (const id of ["fuzz", "security-scan"]) {
     assert.equal(evaluate(condition(jobs[id]), { event: "workflow_dispatch", ref: "refs/heads/feature", result: "skipped" }), false, id);
   }
   assert.match(workflow, /schedule:\n[\s\S]*cron:/);
+});
+
+test("benchmarks are isolated from PR checks, including selector fallback", () => {
+  assert.ok(!jobs.bench);
+  assert.ok(!SUITE_IDS.includes("bench"));
+  assert.equal(validatedSuites('["bench"]'), "");
+  const benchmarks = fs.readFileSync(path.join(__dirname, "../.github/workflows/benchmarks.yml"), "utf8");
+  const triggers = benchmarks.split("\njobs:\n")[0];
+  assert.doesNotMatch(triggers, /\bpull_request(?:_target)?:/);
+  const expression = condition(benchmarks.split("\n  bench:\n")[1]);
+  for (const event of ["pull_request", "pull_request_target", "push", "schedule", "workflow_dispatch"]) {
+    for (const ref of ["refs/heads/main", "refs/heads/feature", "refs/pull/1/merge"]) {
+      assert.equal(evaluate(expression, { event, ref }), ref === "refs/heads/main" && ["push", "schedule", "workflow_dispatch"].includes(event), `${event}: ${ref}`);
+    }
+  }
+});
+
+test("benchmark shards cover every benchmark package once and bound expensive replay iterations", t => {
+  const benchmarks = fs.readFileSync(path.join(__dirname, "../.github/workflows/benchmarks.yml"), "utf8");
+  const script = benchmarks
+    .split("    - name: Run benchmarks\n")[1]
+    .split("      run: |\n")[1]
+    .split("\n    - name:")[0]
+    .replace(/^        /gm, "");
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "benchmark-shards-"));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  const root = path.join(__dirname, "..");
+  fs.writeFileSync(path.join(directory, "make"), '#!/bin/bash\nprintf "%s\\n" "$@" > "$CAPTURE_ARGS"\nprintf "BenchmarkSmoke-1 1 1 ns/op\\n" > bench_results.txt\n', { mode: 0o755 });
+  fs.writeFileSync(path.join(directory, "git"), '#!/bin/bash\nexec "$REAL_GIT" -C "$BENCH_ROOT" "$@"\n', { mode: 0o755 });
+  const realGit = execFileSync("which", ["git"], { encoding: "utf8" }).trim();
+  const files = execFileSync(realGit, ["grep", "-l", "^func Benchmark", "--", "pkg/*_test.go"], { cwd: root, encoding: "utf8" }).trim().split("\n");
+  const expected = [...new Set(files.map(file => `./${path.dirname(file)}`))].sort();
+  const selected = [];
+  for (const shard of ["cli", "workflow", "workqueue", "other"]) {
+    const capture = path.join(directory, `${shard}.args`);
+    execFileSync("bash", ["-c", script], {
+      cwd: directory,
+      env: { ...process.env, PATH: `${directory}:${process.env.PATH}`, REAL_GIT: realGit, BENCH_ROOT: root, SHARD: shard, CAPTURE_ARGS: capture, GITHUB_STEP_SUMMARY: path.join(directory, "summary") },
+    });
+    const args = fs.readFileSync(capture, "utf8").trim().split("\n");
+    selected.push(
+      ...args
+        .find(arg => arg.startsWith("BENCH_PACKAGES="))
+        .slice("BENCH_PACKAGES=".length)
+        .split(" ")
+    );
+    assert.ok(args.includes(`BENCH_TIME=${shard === "workqueue" ? "1x" : "3x"}`));
+  }
+  assert.deepEqual(selected.sort(), expected);
+});
+
+test("make bench preserves Go failures through tee", t => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "benchmark-failure-"));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  fs.writeFileSync(path.join(directory, "go"), '#!/bin/bash\nprintf "FAIL benchmark\\n"\nexit 17\n', { mode: 0o755 });
+  const result = spawnSync("make", ["-f", path.join(__dirname, "../Makefile"), "bench", "VERSION=test"], {
+    cwd: directory,
+    env: { ...process.env, PATH: `${directory}:${process.env.PATH}` },
+    encoding: "utf8",
+  });
+  assert.notEqual(result.status, 0);
+  assert.match(fs.readFileSync(path.join(directory, "bench_results.txt"), "utf8"), /FAIL benchmark/);
 });
 
 test("the entire needs graph is acyclic and timing/cache cleanup waits for all checks", () => {

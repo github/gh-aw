@@ -40,6 +40,9 @@ func validateGitHubToolConfig(tools *Tools, workflowName string) error {
 		toolsValidationLog.Printf("Invalid GitHub tool configuration in workflow: %s", workflowName)
 		return errors.New("'tools.github.github-app' and 'tools.github.github-token' cannot both be set. Use one authentication method: either 'github-app' (GitHub App) or 'github-token' (personal access token). Example:\ntools:\n  github:\n    github-token: \"${{ secrets.GITHUB_TOKEN }}\"")
 	}
+	if tools.GitHub.TokenBroker && (tools.GitHub.GitHubApp != nil || tools.GitHub.GitHubToken != "") {
+		return errors.New("tools.github.token-broker: true is mutually exclusive with github-app and github-token; choose one credential source")
+	}
 
 	return nil
 }

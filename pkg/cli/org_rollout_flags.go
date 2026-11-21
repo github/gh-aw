@@ -103,7 +103,7 @@ func configureOrgRollout(cmd *cobra.Command, org, repo string, createPR, createI
 
 func orgRolloutWorkerArgs(cmd *cobra.Command) []string {
 	excluded := []string{"org", "enterprise", "repo", "repos", "interactive", "dry-run", "concurrency",
-		"replace-existing", "rollout-worker", "rollout-cache-dir", "create-pull-request", "pr", "create-issue", "yes"}
+		"replace-existing", "rollout-worker", "rollout-cache-dir", "create-pull-request", "pr", "create-issue", "yes", "jsonl-continuation"}
 	args := []string{cmd.Name(), "--rollout-worker", "--yes"}
 	cmd.Flags().Visit(func(flag *pflag.Flag) {
 		if slices.Contains(excluded, flag.Name) {

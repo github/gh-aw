@@ -110,10 +110,19 @@ test: test-unit test-integration
 test-unit-all:
 	go test -v -parallel=4 -timeout=10m -run='^Test' ./... -short
 
+.PHONY: test-unit-fast test-unit-slow
+test-unit-fast:
+	@pattern=$$(node scripts/go-unit-suite.cjs) && \
+	go test -v -parallel=4 -timeout=10m -run='^Test' -skip="$$pattern" ./... -short
+
+test-unit-slow:
+	@pattern=$$(node scripts/go-unit-suite.cjs) && \
+	go test -v -parallel=4 -timeout=10m -run="$$pattern" ./... -short
+
 # Run concurrency-heavy package tests with the Go race detector
 .PHONY: test-race
 test-race:
-	go test -race -count=1 -short -parallel=4 -timeout=30m ./pkg/cli ./pkg/console ./pkg/parser ./pkg/workflow
+	go test -race -count=1 -short -parallel=4 -timeout=30m ./pkg/agentdrain ./pkg/cli ./pkg/console ./pkg/parser ./pkg/workflow
 
 # Test impacted Go unit tests first for faster feedback (target budget: ~30s)
 .PHONY: test-unit
@@ -215,10 +224,14 @@ test-perf:
 	exit $$EXIT_CODE
 
 # Run benchmarks for performance testing
+BENCH_PACKAGES ?= ./pkg/...
+BENCH_TIME ?= 3x
+BENCH_SKIP ?= ^$$
 .PHONY: bench
+bench: SHELL := /bin/bash -eu -o pipefail
 bench:
 	@echo "Running benchmarks..."
-	go test -bench=. -benchmem -benchtime=3x -run=^$$ ./pkg/... | tee bench_results.txt
+	go test -bench=. -benchmem -benchtime=$(BENCH_TIME) -count=1 -skip='$(BENCH_SKIP)' -run=^$$ $(BENCH_PACKAGES) | tee bench_results.txt
 
 # Run only critical performance benchmarks for daily monitoring
 # Uses time-based -benchtime (not a fixed low iteration count) so that results are
@@ -545,7 +558,7 @@ bundle-js:
 # Run workflow contracts in CJS CI even when impacted runtime tests are skipped.
 .PHONY: test-workflow-tool-contracts
 test-workflow-tool-contracts:
-	node --test scripts/workflow-tool-contracts.test.cjs scripts/code-scanning-fixer-selection.test.cjs scripts/cache-strategy-workflows.test.cjs scripts/dependabot-burner-selection.test.cjs
+	node --test scripts/workflow-tool-contracts.test.cjs scripts/cache-strategy-workflows.test.cjs scripts/dependabot-burner-selection.test.cjs
 
 # Run script tests (authentication probes, stale locks, workflow drift, and workflow purity).
 .PHONY: test-pageindex-workflow
@@ -1203,6 +1216,17 @@ validate-otel-contract:
 	@cd actions/setup/js && npm run test:js -- otel_contract.test.cjs send_otlp_span.test.cjs --no-file-parallelism >/dev/null
 	@echo "✓ OpenTelemetry compatibility contract validated"
 
+OTEL_CONFORMANCE_REPORT_DIR ?= $(if $(TMPDIR),$(TMPDIR),/tmp)/gh-aw-otel-conformance-reports
+.PHONY: validate-otel-conformance
+validate-otel-conformance:
+	@command -v otel-conformance >/dev/null || { echo "otel-conformance is required; install the pinned conformance runner packages"; exit 1; }
+	@command -v weaver >/dev/null || { echo "Weaver v0.28.0 is required; install it before running conformance"; exit 1; }
+	@mkdir -p "$(OTEL_CONFORMANCE_REPORT_DIR)"
+	@python actions/setup/js/fixtures/genai/prepare_registry.py "$(OTEL_CONFORMANCE_REPORT_DIR)/registry"
+	@python actions/setup/js/scripts/genai_registry.test.py "$(OTEL_CONFORMANCE_REPORT_DIR)/registry"
+	@otel-conformance actions/setup/js/fixtures/genai --report-dir "$(OTEL_CONFORMANCE_REPORT_DIR)" --data-file "$(OTEL_CONFORMANCE_REPORT_DIR)/data.json" --var "GH_AW_GENAI_REGISTRY=$(abspath $(OTEL_CONFORMANCE_REPORT_DIR))/registry"
+	@node actions/setup/js/fixtures/genai/check_genai_conformance.mjs "$(OTEL_CONFORMANCE_REPORT_DIR)"
+
 .PHONY: check-otel-attributes
 check-otel-attributes:
 	@npm run check --prefix specs/otel
@@ -1210,6 +1234,10 @@ check-otel-attributes:
 .PHONY: generate-otel-attributes
 generate-otel-attributes:
 	npm run generate --prefix specs/otel
+
+.PHONY: spec-build
+spec-build:
+	node specs/otel/build_specs.mjs
 
 # Check file sizes and function counts
 .PHONY: check-file-sizes
@@ -1540,6 +1568,8 @@ help:
 	@echo "  test             - Run Go tests (unit + integration)"
 	@echo "  test-unit        - Run impacted Go unit tests first (~$(TEST_UNIT_MAX_SECONDS)s budget); set TEST_UNIT_RUN_FULL=1 for full suite"
 	@echo "  test-unit-all    - Run full Go unit test suite"
+	@echo "  test-unit-fast   - Run all unit tests except measured >=10s tests"
+	@echo "  test-unit-slow   - Run only measured >=10s unit tests"
 	@echo "  test-security    - Run security regression tests"
 	@echo "  check-agent-local-settings - Reject tracked Claude Code local permission settings"
 	@echo "  test-agent-local-settings - Test local settings secret-leak prevention"
@@ -1628,6 +1658,7 @@ help:
 	@echo "  generate-schema-docs - Generate frontmatter full reference documentation from JSON schema"
 	@echo "  session-schemas - Generate canonical and unified session JSON schemas from TypeScript declarations"
 	@echo "  check-session-schemas - Check generated session schemas for declaration drift"
+	@echo "  spec-build       - Compile TypeSpec contracts and emit schemas under dist/specs"
 	@echo "  generate-agent-factory     - Generate agent factory documentation page"
 	@echo "  generate-llms-txt  - Generate llms.txt at repository root from .github/aw/*.md"
 	@echo "  build-slides     - Build slides with Marp to docs/public/slides/gh-aw.html"

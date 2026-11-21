@@ -4127,6 +4127,21 @@
                   "acceptance_kind": {
                     "type": "string"
                   },
+                  "actor": {
+                    "type": "object",
+                    "properties": {
+                      "login": {
+                        "type": "string"
+                      },
+                      "type": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "login"
+                    ],
+                    "additionalProperties": false
+                  },
                   "human_verified": {
                     "type": "boolean"
                   },
@@ -4274,6 +4289,9 @@
             "accepted_human": {
               "type": "integer"
             },
+            "accepted_automation": {
+              "type": "integer"
+            },
             "accepted_delivery_fallback": {
               "type": "integer"
             },
@@ -4387,6 +4405,7 @@
             "total",
             "accepted",
             "accepted_human",
+            "accepted_automation",
             "accepted_delivery_fallback",
             "rejected",
             "not_applicable",

@@ -494,6 +494,13 @@ func TestParseAndDisplayZizmorOutput(t *testing.T) {
 	}
 }
 
+func TestParseAndDisplayZizmorOutputReturnsScannerErrors(t *testing.T) {
+	_, _, err := parseAndDisplayZizmorOutputWithOptions("", strings.Repeat("x", 64*1024+1), false, zizmorResultOptions{})
+	if err == nil || !strings.Contains(err.Error(), "failed to scan zizmor stderr") {
+		t.Fatalf("expected scanner error, got %v", err)
+	}
+}
+
 func TestBuildZizmorContainerScanPath(t *testing.T) {
 	t.Parallel()
 	tests := []struct {

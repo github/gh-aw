@@ -308,7 +308,7 @@ func validateSafeOutputsAllowWorkflows(safeOutputs *SafeOutputsConfig) error {
 	safeOutputsAllowWorkflowsValidationLog.Printf("allow-workflows: true found on: %s", strings.Join(handlers, ", "))
 
 	// Check if GitHub App is configured with required fields
-	if safeOutputs.GitHubApp == nil || safeOutputs.GitHubApp.AppID == "" || safeOutputs.GitHubApp.PrivateKey == "" {
+	if !safeOutputs.TokenBroker && (safeOutputs.GitHubApp == nil || safeOutputs.GitHubApp.AppID == "" || safeOutputs.GitHubApp.PrivateKey == "") {
 		safeOutputsAllowWorkflowsValidationLog.Print("allow-workflows requires github-app but none configured")
 		return fmt.Errorf(
 			"safe-outputs.%s.allow-workflows: requires a GitHub App to be configured.\n"+
@@ -358,7 +358,7 @@ func validateSafeOutputsApproveWorkflowRun(safeOutputs *SafeOutputsConfig) error
 	if templatableBoolIsTrue(safeOutputs.Staged) || templatableBoolIsTrue(config.Staged) {
 		return nil
 	}
-	if config.GitHubToken != "" || config.GitHubApp != nil || safeOutputs.GitHubToken != "" || safeOutputs.GitHubApp != nil {
+	if config.GitHubToken != "" || config.GitHubApp != nil || safeOutputs.GitHubToken != "" || safeOutputs.GitHubApp != nil || safeOutputs.TokenBroker {
 		return nil
 	}
 

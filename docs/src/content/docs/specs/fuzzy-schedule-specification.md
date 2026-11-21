@@ -1,5 +1,6 @@
 ---
 title: Fuzzy Schedule Time Syntax Specification
+spec: true
 description: Formal specification for the fuzzy schedule time syntax following W3C conventions
 sidebar:
   order: 1360

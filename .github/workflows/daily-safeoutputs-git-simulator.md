@@ -134,6 +134,7 @@ imports:
   - shared/reporting.md
 safe-outputs:
   create-issue:
+    expires: 2d
     title-prefix: "[git-sim] "
     labels: ["git-simulator", "safe-outputs", "automated"]
     max: 10

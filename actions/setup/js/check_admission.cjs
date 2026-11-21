@@ -67,12 +67,13 @@ async function requestAuthority({ config, body, parseResponse, acceptedStatuses 
   if (oidcUrl.protocol !== "https:" || oidcUrl.username || oidcUrl.password || oidcUrl.hash) throw new AdmissionError();
   oidcUrl.searchParams.set("audience", config.audience);
 
-  const { generateTraceId, generateSpanId, isValidTraceId, isValidSpanId, parseOTLPEndpoints, buildTraceparent } = require("./send_otlp_span.cjs");
+  const { generateTraceId, generateSpanId, isValidTraceId, isValidSpanId, parseOTLPEndpoints, buildServiceRequestHeaders } = require("./send_otlp_span.cjs");
   const endpoints = parseOTLPEndpoints();
   const existingTraceId = env.GITHUB_AW_OTEL_TRACE_ID || "";
   const traceId = isValidTraceId(existingTraceId) ? existingTraceId : generateTraceId();
   const parentSpanId = isValidTraceId(env.GITHUB_AW_OTEL_TRACE_ID || "") && isValidSpanId(env.GITHUB_AW_OTEL_PARENT_SPAN_ID || "") ? env.GITHUB_AW_OTEL_PARENT_SPAN_ID : undefined;
   const operationSpanId = generateSpanId();
+  const correlationEnv = { ...env };
   const startMs = Date.now();
   const deadline = now() + 60000;
   let token = "";
@@ -131,8 +132,7 @@ async function requestAuthority({ config, body, parseResponse, acceptedStatuses 
             return await withAdmissionTimeout(
               async signal => {
                 /** @type {Record<string, string>} */
-                const headers = { authorization: `bearer ${token}`, "content-type": "application/json", "cache-control": "no-store" };
-                headers.traceparent = buildTraceparent(traceId, spanId);
+                const headers = { ...buildServiceRequestHeaders(correlationEnv, traceId, spanId), authorization: `bearer ${token}`, "content-type": "application/json", "cache-control": "no-store" };
                 const response = await fetchImpl(config.endpoint, { method: "POST", headers, body, redirect: "manual", signal });
                 if (!acceptedStatuses.includes(response.status)) {
                   discard(response);
@@ -257,7 +257,7 @@ async function main(core) {
       core.setOutput("trace-id", decision.traceId);
       if (decision.endpoints.length) {
         const { buildOTLPPayload, buildGitHubActionsResourceAttributes, sendOTLPToAllEndpoints } = require("./send_otlp_span.cjs");
-        const resourceAttributes = buildGitHubActionsResourceAttributes({ repository: process.env.GITHUB_REPOSITORY || "", runId: process.env.GITHUB_RUN_ID || "", staged: false });
+        const resourceAttributes = buildGitHubActionsResourceAttributes({ repository: process.env.GITHUB_REPOSITORY || "", runId: process.env.GITHUB_RUN_ID || "", workflowName: process.env.GITHUB_WORKFLOW || "", staged: false });
         for (const attempt of decision.attempts) {
           const payload = buildOTLPPayload({
             ...attempt,

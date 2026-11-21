@@ -117,6 +117,21 @@
                       "acceptance_kind": {
                         "type": "string"
                       },
+                      "actor": {
+                        "type": "object",
+                        "properties": {
+                          "login": {
+                            "type": "string"
+                          },
+                          "type": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "login"
+                        ],
+                        "additionalProperties": false
+                      },
                       "human_verified": {
                         "type": "boolean"
                       },
@@ -5591,6 +5606,21 @@
                         "acceptance_kind": {
                           "type": "string"
                         },
+                        "actor": {
+                          "type": "object",
+                          "properties": {
+                            "login": {
+                              "type": "string"
+                            },
+                            "type": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "login"
+                          ],
+                          "additionalProperties": false
+                        },
                         "human_verified": {
                           "type": "boolean"
                         },
@@ -5735,6 +5765,9 @@
                   "accepted_human": {
                     "type": "integer"
                   },
+                  "accepted_automation": {
+                    "type": "integer"
+                  },
                   "accepted_delivery_fallback": {
                     "type": "integer"
                   },
@@ -5848,6 +5881,7 @@
                   "total",
                   "accepted",
                   "accepted_human",
+                  "accepted_automation",
                   "accepted_delivery_fallback",
                   "rejected",
                   "not_applicable",
@@ -5874,6 +5908,32 @@
               "items",
               "summary",
               "coverage"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "adoption_errors": {
+          "type": [
+            "null",
+            "array"
+          ],
+          "items": {
+            "type": "object",
+            "properties": {
+              "run_id": {
+                "type": "integer"
+              },
+              "reason": {
+                "type": "string"
+              },
+              "error": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "run_id",
+              "reason",
+              "error"
             ],
             "additionalProperties": false
           }
@@ -5989,6 +6049,21 @@
                             },
                             "acceptance_kind": {
                               "type": "string"
+                            },
+                            "actor": {
+                              "type": "object",
+                              "properties": {
+                                "login": {
+                                  "type": "string"
+                                },
+                                "type": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "login"
+                              ],
+                              "additionalProperties": false
                             },
                             "human_verified": {
                               "type": "boolean"
@@ -6135,6 +6210,9 @@
                       "accepted_human": {
                         "type": "integer"
                       },
+                      "accepted_automation": {
+                        "type": "integer"
+                      },
                       "accepted_delivery_fallback": {
                         "type": "integer"
                       },
@@ -6248,6 +6326,7 @@
                       "total",
                       "accepted",
                       "accepted_human",
+                      "accepted_automation",
                       "accepted_delivery_fallback",
                       "rejected",
                       "not_applicable",
@@ -9504,6 +9583,21 @@
                         "acceptance_kind": {
                           "type": "string"
                         },
+                        "actor": {
+                          "type": "object",
+                          "properties": {
+                            "login": {
+                              "type": "string"
+                            },
+                            "type": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "login"
+                          ],
+                          "additionalProperties": false
+                        },
                         "human_verified": {
                           "type": "boolean"
                         },
@@ -9648,6 +9742,9 @@
                   "accepted_human": {
                     "type": "integer"
                   },
+                  "accepted_automation": {
+                    "type": "integer"
+                  },
                   "accepted_delivery_fallback": {
                     "type": "integer"
                   },
@@ -9761,6 +9858,7 @@
                   "total",
                   "accepted",
                   "accepted_human",
+                  "accepted_automation",
                   "accepted_delivery_fallback",
                   "rejected",
                   "not_applicable",
@@ -9787,6 +9885,32 @@
               "items",
               "summary",
               "coverage"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "adoption_errors": {
+          "type": [
+            "null",
+            "array"
+          ],
+          "items": {
+            "type": "object",
+            "properties": {
+              "run_id": {
+                "type": "integer"
+              },
+              "reason": {
+                "type": "string"
+              },
+              "error": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "run_id",
+              "reason",
+              "error"
             ],
             "additionalProperties": false
           }
@@ -9902,6 +10026,21 @@
                             },
                             "acceptance_kind": {
                               "type": "string"
+                            },
+                            "actor": {
+                              "type": "object",
+                              "properties": {
+                                "login": {
+                                  "type": "string"
+                                },
+                                "type": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "login"
+                              ],
+                              "additionalProperties": false
                             },
                             "human_verified": {
                               "type": "boolean"
@@ -10048,6 +10187,9 @@
                       "accepted_human": {
                         "type": "integer"
                       },
+                      "accepted_automation": {
+                        "type": "integer"
+                      },
                       "accepted_delivery_fallback": {
                         "type": "integer"
                       },
@@ -10161,6 +10303,7 @@
                       "total",
                       "accepted",
                       "accepted_human",
+                      "accepted_automation",
                       "accepted_delivery_fallback",
                       "rejected",
                       "not_applicable",

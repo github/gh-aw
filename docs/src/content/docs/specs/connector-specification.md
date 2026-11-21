@@ -1,5 +1,6 @@
 ---
 title: Connector Specification
+spec: true
 description: Declaration, selection, execution, and conformance requirements for third-party connectors.
 sidebar:
   order: 1365
@@ -7,10 +8,45 @@ sidebar:
 
 # Connector Specification
 
-**Version**: 1.1.0<br>
+**Version**: 1.1.1<br>
 **Status**: Experimental Working Draft<br>
 **Publication Date**: 2026-11-18<br>
 **Editor**: GitHub Agentic Workflows Team
+
+## Abstract
+
+This specification defines declaration-only third-party connectors for GitHub
+Agentic Workflows: explicit capability selection, phase-separated credentials,
+typed fixed requests, bounded response evidence, staged effects, and protected
+event subscriptions. It specifies compiler and trusted-host obligations,
+offline compliance evidence, and an informative bounded TLA+ model of selected
+authority boundaries.
+
+## Status of This Document
+
+This Experimental Working Draft is maintained by the GitHub Agentic Workflows
+project through repository review. It is not a W3C Recommendation or evidence
+of provider certification. Version 1.1.1 clarifies existing requirements and
+adds identifiable compliance checks and informative formal models; it does not
+add runtime capabilities or change accepted declarations. Publication does not
+establish provider authorization or operational trigger ingress.
+
+## Table of Contents
+
+1. [Scope and conformance](#1-scope-and-conformance)
+2. [Public authoring and imports](#2-public-authoring-and-imports)
+3. [Explicit selection and phase pruning](#3-explicit-selection-and-phase-pruning)
+4. [Authentication and authority](#4-authentication-and-authority)
+5. [Typed operations and fixed requests](#5-typed-operations-and-fixed-requests)
+6. [Response evidence and bounds](#6-response-evidence-and-bounds)
+7. [Safe-output execution](#7-safe-output-execution)
+8. [Triggers and context boundary](#8-triggers-and-context-boundary)
+9. [Minimal declaration and consumer](#9-minimal-declaration-and-consumer)
+10. [Author documentation and conformance evidence](#10-author-documentation-and-conformance-evidence)
+11. [Implementation references](#11-implementation-references)
+12. [References](#12-references)
+13. [Appendices](#13-appendices)
+14. [Change Log](#14-change-log)
 
 ## 1. Scope and conformance
 
@@ -20,8 +56,14 @@ definitions, explicitly selected reads, safe outputs, and protected event
 subscriptions. It does not define a provider catalog, token acquisition service,
 webhook receiver deployment, or arbitrary API/script execution interface.
 
-The key words MUST, MUST NOT, SHOULD, SHOULD NOT, and MAY are normative when
-capitalized. A conforming declaration satisfies both the workflow JSON Schema
+The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD",
+"SHOULD NOT", "RECOMMENDED", "NOT RECOMMENDED", "MAY", and "OPTIONAL" in this
+document are to be interpreted as described in
+[RFC 2119](https://www.ietf.org/rfc/rfc2119.txt).
+Following [RFC 8174](https://www.rfc-editor.org/rfc/rfc8174), these meanings
+apply only when the words appear in all capitals.
+
+A conforming declaration satisfies both the workflow JSON Schema
 and semantic connector validation. A conforming compiler freezes the selected
 contract without resolving credential values. A conforming execution host
 enforces phase, resource, endpoint, input, and response constraints.
@@ -31,6 +73,30 @@ provider examples and their limitations. The
 [connector creation skill](https://github.com/github/gh-aw/blob/main/.github/skills/create-connector/SKILL.md)
 provides an authoring procedure. Those examples are not live-readiness
 certifications.
+
+### 1.1 Conformance classes and document conventions
+
+Conformance claims MUST identify their class: **declaration**, **compiler**, or
+**execution host**. A declaration conforms to the authoring constraints for
+its declared capabilities. A compiler conforms to validation, selection,
+freezing, and distribution requirements. An execution host conforms to the
+authorization, transport, evidence, and publication requirements for the
+capabilities it executes, including the trusted outer host's network and write
+authorization controls. An embedded transport alone is not that entire host.
+
+Each class MUST satisfy all applicable mandatory requirements; absence of an
+optional capability does not constitute partial conformance. This document
+defines no reduced-security conformance levels. A claim MUST identify the
+specification version, supported capability kinds, tested implementation
+revision, test results, and any untested or inapplicable capabilities.
+
+Sections 1–8 and 10 define requirements. Section 9 is an informative synthetic
+example, section 11 is an informative implementation index, section 12 classifies
+references, and sections 13–14 are informative. Example code and formal models
+do not override normative prose. A **grant** is an exact authored resource
+allowlist; a **phase plan** is the selected frozen contract delivered to one
+execution phase; a **staged intent** is validated proposed work, not delivery
+evidence or an authenticated resource receipt.
 
 ## 2. Public authoring and imports
 
@@ -375,6 +441,29 @@ receiver enrollment, replay protection deployment, webhook installation, or live
 operability. Until an approved receiver supports the exact profile and mapping,
 the subscription is nonactivating. Event references are not hydrated bodies.
 
+### Connector-to-gateway contract
+
+The [Webhook Gateway Specification's imported connector contract](/gh-aw/specs/webhook-gateway-specification/#imported-connector-subscriptions)
+defines how this declaration is represented and enforced at ingress:
+
+| Connector declaration | Gateway representation and enforcement |
+| --- | --- |
+| `verificationProfile`, `nativeEvents` | Frozen `verification_profile` and `native_events`; the receiver authenticates the enrolled source and original event before projection. Declaration alone is not source authentication. |
+| `match`, `resources` | Encoded equality conditions and projected matched literals; the receiver checks original evidence, while the destination validates the projection. A canonical URL or its origin does not prove resource membership. |
+| `types` | Frozen `connector.types` map of JSON Pointers to required primitive types; `ProjectEvent` validates the corresponding native event fields before projection. This is not an activity selection. |
+| `normalize`, URL constraints, `resourceOrigins` | Canonical projected resource URL and approved origins; these constrain normalization and identity, not connector request endpoints, network approval, or provider authorization. |
+| `when`, `filters`, `variants` | Versioned bounded source predicates evaluated by the receiver before projection; missing or ambiguous evidence is a nonmatch. |
+
+Gateway deliveries contain minimal references, not provider bodies, connector
+reader results, or credentials. A trigger MUST NOT select a reader or grant
+resource, credential, endpoint, or network authority. To resolve a delivered
+reference, a workflow MUST separately select an authorized reader, grant the
+exact resource, and satisfy that reader's endpoint/network and credential-phase
+requirements. Gateway source authentication, enrollment, replay handling, and
+dispatch admission remain additional controls; connector reader controls do not
+replace them. See the gateway's [derived-context and responsibility boundary](/gh-aw/specs/webhook-gateway-specification/#derived-context-and-responsibility-boundary)
+for the receiver, runner, and workflow responsibilities.
+
 ## 9. Minimal declaration and consumer
 
 The following is a synthetic contract, not a claim about a real provider API.
@@ -542,6 +631,45 @@ provider authorization, ingress readiness, live delivery, and operational value.
 Live tests require separately authorized scope and the
 [debugging execution gates](https://github.com/github/gh-aw/blob/main/.github/aw/debug-agentic-workflow.md).
 
+### 10.1 Identifiable authority-boundary requirements
+
+The following identifiers restate existing obligations in sections 2–8 for
+compliance reporting. They do not replace the other requirements of this
+specification. Each listed test is required for the applicable conformance
+class; it is not sufficient by itself to certify a complete implementation.
+
+| Requirement | Class | Test ID | Procedure and expected outcome |
+| --- | --- | --- | --- |
+| **C-SEL-001**: The compiler MUST deliver only explicitly selected capabilities and their phase-required dependencies (section 3). | Compiler | **T-CON-001** | Compile import-only, reader-only, writer-only, and combined consumers. Import-only emits no connector execution; other plans contain only selected phase capabilities, needed grants, endpoints, and credential references. |
+| **C-GRT-001**: The execution host MUST validate typed inputs and every resource-constrained item against its exact grant before credential access (sections 4–5). | Execution host | **T-CON-002** | Instrument secret resolution and HTTP calls; submit unknown, missing, wrong-type, ungranted, and mixed granted/ungranted array arguments. All reject with zero accesses and requests. |
+| **C-ISO-001**: The compiler and execution host MUST keep writer credentials outside the agent boundary (sections 3–4, 7). | Compiler, execution host | **T-CON-003** | Inspect reader plans and agent environments; attempt a wrong-phase operation. No writer credential is distributed or resolved by the agent. |
+| **C-STG-001**: A staged effect MUST resolve no writer credential, perform no HTTP request or policy read, and produce no creation receipt (section 7). | Execution host | **T-CON-004** | Stage a valid selected effect using the bundled publication host with instrumented secret and network access. Counts remain zero; output describes an intent, not delivered work. Verify selected readers remain independent. |
+| **C-NET-001**: Live requests MUST remain within the selected fixed destination and host network approval; redirects MUST NOT forward credentials (sections 3–5). | Compiler, execution host | **T-CON-005** | Exercise unapproved origins, redirects, and changed hosted MCP paths. Reject before credential forwarding to the disallowed destination; import metadata grants no approval. |
+| **C-RSP-001**: The execution host MUST enforce every declared response check before exposing successful evidence (section 6). | Execution host | **T-CON-006** | Supply wrong types, malformed or oversized responses, missing required evidence, and a different granted ID where request correlation is declared. All reject; an allowed ID alone does not establish requested identity. |
+| **C-AUT-001**: Live writes MUST require explicit host write authorization; authorization denial MUST NOT cause retry or credential fallback (sections 4, 7). | Execution host | **T-CON-007** | Attempt an unauthorized write; observe zero secret accesses/requests. Return 401/403 for an authorized attempt; observe no subsequent request or alternate credential resolution. |
+| **C-TRG-001**: Trigger fixture projection MUST NOT establish operational ingress; missing/ambiguous required evidence MUST NOT authorize a match (section 8). | Compiler, execution host | **T-CON-008** | Project matching, nonmatching, incomplete, and ambiguous fixtures with Go/Node predicate parity. Only complete matching evidence projects; fixture results remain `operational: false`. |
+
+### 10.2 Compliance testing procedure
+
+Test reports MUST distinguish schema/semantic validation, compilation,
+instrumented runtime tests, bounded model checking, and authorized live tests.
+For each applicable test ID, the report MUST record the implementation revision,
+fixture or input, command/tool version, expected result, observed result, and
+pass/fail status. An unexecuted test is untested, not passed. A trigger test is
+inapplicable only when no trigger support is claimed.
+
+Run negative cases alongside a valid authorized read, an authorized write in a
+mock host, and a staged effect. A suite that rejects everything does not
+demonstrate successful conformance. Validate the documented consumer by compiling
+the actual fenced examples, not only parsing their YAML. Repeat publication and
+staging checks with the matching bundled Node runtime; Go-only evidence does not
+establish deployment parity. No offline procedure authorizes a live write.
+
+The optional formal procedure in [Appendix A](#appendix-a-bounded-formal-model)
+checks an abstraction of selected requirements. Formal results MUST NOT be
+reported as proof of provider authorization, cryptographic correctness, or
+unmodeled runtime behavior.
+
 ## 11. Implementation references
 
 The public shape is `ConnectorDeclaration` in
@@ -555,7 +683,171 @@ The shared publication runtime is
 [`connector_runtime.cjs`](https://github.com/github/gh-aw/blob/main/actions/setup/js/connector_runtime.cjs).
 Structural internal schemas alone MUST NOT be treated as executable authority.
 
-## 12. Change Log
+## 12. References
+
+### 12.1 Normative references
+
+- **[RFC 2119]** [Key words for use in RFCs to Indicate Requirement Levels](https://www.ietf.org/rfc/rfc2119.txt).
+- **[RFC 8174]** [Ambiguity of Uppercase vs Lowercase in RFC 2119 Key Words](https://www.rfc-editor.org/rfc/rfc8174).
+- **[JSON Pointer]** [RFC 6901: JavaScript Object Notation (JSON) Pointer](https://www.rfc-editor.org/rfc/rfc6901).
+- **[Webhook Gateway]** [Webhook Gateway Specification](/gh-aw/specs/webhook-gateway-specification/), for gateway-selected subscriptions.
+
+### 12.2 Informative references
+
+- **[Connector Reference]** [Connector configuration and provider guidance](/gh-aw/reference/connectors/).
+- **[TLA+]** [TLA+ and TLC documentation](https://lamport.azurewebsites.net/tla/tla.html).
+- **[Connector Model]** [Bounded model and configurations](https://github.com/github/gh-aw/tree/main/specs/connectors); reproduction and interpretation are in [Appendix A](#appendix-a-bounded-formal-model).
+
+## 13. Appendices
+
+### Appendix A: Bounded formal model
+
+This appendix is informative. The executable
+[`ConnectorBoundary.tla`](https://github.com/github/gh-aw/blob/main/specs/connectors/ConnectorBoundary.tla)
+models one invocation with two reader capabilities, one writer, two phases,
+all eight capability-selection subsets, and three resource IDs. Two IDs are
+independently granted for one reader, enabling a wrong-but-granted response
+identity case. Input validity, network approval, host write authorization, and
+staging vary independently. Compilation precedes validation, secret resolution,
+transport, and response validation; staging terminates before live execution.
+
+| Requirement | Model predicate | Implementation boundary |
+| --- | --- | --- |
+| C-SEL-001 | `ExactPhasePlan` | Compiler selection and `Plan.ForPhase`; exact capabilities and dependency pruning. |
+| C-GRT-001 | `GrantBeforeSecret` | `authorizeOperation`, `authorizeMCP`, and argument validation before authentication. |
+| C-ISO-001 | `WriterIsolation` | Phase-restricted plans and host-owned phase-specific secret resolver. |
+| C-STG-001 | `StagedIsolation` | `PrepareSafeOutput` and Node `stageIntent`/staged return; model counts secret and HTTP accesses. |
+| C-NET-001 | `NetworkBoundary` | Host network policy, Go origin checks, redirect rejection, and fixed MCP endpoint transport. |
+| C-RSP-001 | `ResponseIdentity` | Declared response bindings and evidence checks before result projection. |
+| C-AUT-001 | `HostWriteAuthorization`, `FailClosed` | Outer host write authorization, `Runtime.AllowWrites`, and nonretryable authorization failures. |
+
+The model assumes a trusted compiler/host and immutable reviewed declarations,
+correct primitive validation, a phase-confined resolver, and faithful transport
+observations. `evidenceOK` abstracts parsing, types, size limits, and other
+declared response checks. Identity correlation is modeled for an operation
+that declares it; not every response field is implicitly identity-bound.
+Host network approval represents composition with the trusted outer host,
+not a claim that every low-level Node entry point implements a firewall.
+
+The model does not cover token minting, secret values or leakage through text,
+cryptography, concurrent invocations, transient retry schedules, publication
+formatting, lookups, receipts, binary files, hosted MCP session sequencing,
+trigger admission/replay, or provider persistence. It makes no liveness or live
+delivery claim. A rejected response after a write does not prove that the
+provider made no mutation.
+
+`ConnectorBoundary.cfg` checks the combined safety invariant.
+`Control*.cfg` deliberately remove individual protections and are expected to
+produce the named invariant violation. `Witness*.cfg` retain all safety checks
+and deliberately falsify `ProbeAbsent` to establish reachable authorized reads,
+writes, zero-access staging, terminal authorization denial, and rejection of a
+wrong-but-granted response identity. These are existential counterexample
+witnesses, not universal eventual-success properties.
+
+#### Reproduction and expected outcomes
+
+Use the existing checksum-verifying installer from a trusted checkout; no new
+model runner or dependency is required. Run the following from the repository
+root. The installer requires a nonexistent destination and verifies both the
+JRE and TLA+ Tools; stop on installation or verification failure.
+
+```bash
+set -eu
+repo="$PWD"
+tools="$(mktemp -d "${TMPDIR:-/tmp}/connector-tla.XXXXXX")/runtime"
+bash "$repo/.github/scripts/install_tla_runtime.sh" "$tools"
+export JAVA_BIN="$tools/jre/bin/java"
+export TLA2TOOLS_JAR="$tools/tla2tools.jar"
+cd "$repo/specs/connectors"
+"$JAVA_BIN" -cp "$TLA2TOOLS_JAR" tla2sany.SANY ConnectorBoundary.tla
+for config in ConnectorBoundary.cfg Control*.cfg Witness*.cfg; do
+  expected=""
+  case "$config" in
+    Control*) expected="$(awk '$1 == "INVARIANT" {print $2}' "$config")" ;;
+    Witness*) expected="ProbeAbsent" ;;
+  esac
+  status=0
+  output="$("$JAVA_BIN" -XX:+UseParallelGC -Xmx1g -cp "$TLA2TOOLS_JAR" \
+    tlc2.TLC -workers 1 -seed 1 \
+    -metadir "$(mktemp -d "${TMPDIR:-/tmp}/connector-states.XXXXXX")" \
+    -config "$config" ConnectorBoundary.tla 2>&1)" || status=$?
+  printf '%s\n' "$output"
+  if [ -z "$expected" ]; then
+    test "$status" -eq 0
+    printf '%s\n' "$output" | grep -F 'No error has been found.'
+  else
+    test "$status" -eq 12
+    printf '%s\n' "$output" | grep -F "Error: Invariant $expected is violated."
+  fi
+done
+```
+
+TLA+ Tools v1.7.4 (TLC 2.19) is pinned by SHA-256
+`936a262061c914694dfd669a543be24573c45d5aa0ff20a8b96b23d01e050e88`
+in the existing installer. On 2026-11-18, the verified Temurin 21.0.12.1
+runtime, one worker, and seed 1 produced the following results. The secure run
+exhausted its queue, starting from 2,304 initial states, with search depth 6.
+Control/witness runs stop at the first expected violation; their counts are
+partial exploration counts, not full state-space sizes or coverage percentages.
+
+| Configuration | Expected invariant result | Generated states | Distinct states |
+| --- | --- | --- | --- |
+| `ConnectorBoundary.cfg` | `Safety` holds | 11,208 | 7,708 |
+| `ControlPhasePruning.cfg` | `ExactPhasePlan` violated | 2,305 | 2,305 |
+| `ControlGrant.cfg` | `GrantBeforeSecret` violated | 7,220 | 6,917 |
+| `ControlWriterIsolation.cfg` | `WriterIsolation` violated | 7,204 | 6,913 |
+| `ControlStagedSecret.cfg` | `StagedIsolation` violated | 8,043 | 6,926 |
+| `ControlStagedNetwork.cfg` | `StagedIsolation` violated | 8,043 | 6,926 |
+| `ControlNetworkApproval.cfg` | `NetworkBoundary` violated | 7,203 | 6,913 |
+| `ControlEndpoint.cfg` | `NetworkBoundary` violated | 9,218 | 6,982 |
+| `ControlWriteAuthorization.cfg` | `HostWriteAuthorization` violated | 8,020 | 6,925 |
+| `ControlResponseIdentity.cfg` | `ResponseIdentity` violated | 9,301 | 7,042 |
+| `ControlAuthorizationRetry.cfg` | `FailClosed` violated | 9,286 | 7,034 |
+| `WitnessRead.cfg` | `ProbeAbsent` violated; authorized read reached | 9,297 | 7,039 |
+| `WitnessWrite.cfg` | `ProbeAbsent` violated; authorized write reached | 9,297 | 7,039 |
+| `WitnessStaged.cfg` | `ProbeAbsent` violated; staging reached with zero accesses | 8,043 | 6,926 |
+| `WitnessAuthorizationDenied.cfg` | `ProbeAbsent` violated; denial terminal after one request | 9,286 | 7,034 |
+| `WitnessWrongGrantedIdentity.cfg` | `ProbeAbsent` violated; wrong granted ID rejected | 9,301 | 7,042 |
+
+Witness configurations check `Safety` before `ProbeAbsent`. A parser error,
+timeout, unexpected invariant failure, or missing expected counterexample is a
+failed verification, not evidence that the negative control worked. Witnesses
+establish that safety does not hold merely because no operation can run.
+Generated traces are not normative and need not be committed.
+
+Existing implementation tests complement, rather than follow from, this model:
+`TestConnectorPhaseSnapshots` and `TestConnectorHTTPMCPPhaseSnapshot` in
+[`compiled_test.go`](https://github.com/github/gh-aw/blob/main/pkg/connectors/compiled_test.go);
+`TestRuntimeDenyBeforeCredentials` and `TestRedirectAndWriteFailuresNeverRetry` in
+[`runtime_test.go`](https://github.com/github/gh-aw/blob/main/pkg/connectors/runtime_test.go);
+`TestConnectorResponseResourceIdentity` in
+[`request_metadata_test.go`](https://github.com/github/gh-aw/blob/main/pkg/connectors/request_metadata_test.go);
+the executable examples in
+[`connector_specification_test.go`](https://github.com/github/gh-aw/blob/main/pkg/workflow/connector_specification_test.go);
+and bundled Node staging in
+[`connector_staging_parity_test.go`](https://github.com/github/gh-aw/blob/main/pkg/workflow/connector_staging_parity_test.go).
+
+### Appendix B: Security and privacy considerations
+
+Provider responses, event fixtures, and author documentation remain untrusted.
+Exact grants bound individual identifiers, not tenant relationships or provider
+ACLs. Independent reader/writer credentials and trusted-host checks limit
+authority but do not validate consent or token provisioning. A digest identifies
+a frozen plan; it is not a signature authenticating an untrusted author.
+
+Staging prevents the selected effect's credential/network accesses, not other
+selected reads or arbitrary authored scripts. Model traces use symbolic
+identifiers, never credential values. Production evidence collection needs
+separate redaction and privacy controls. Errors are described semantically in
+sections 4–8; this specification defines no new public error-code registry.
+
+## 14. Change Log
+
+### Version 1.1.1 (Experimental Working Draft) — 2026-11-18
+
+- Clarified conformance classes, normative notation, status, and evidence-reporting requirements.
+- Identified existing authority-boundary obligations and corresponding T-CON compliance procedures in section 10.
+- Added informative bounded TLA+ mappings, reproducible safety/negative-control/reachability checks, and explicit proof limitations.
 
 ### Version 1.1.0 (Experimental Working Draft) — 2026-11-18
 

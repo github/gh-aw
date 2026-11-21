@@ -116,7 +116,7 @@ function readState(filename, repository) {
 
 /** @returns {Record<string, number>} */
 function emptyCounts() {
-  return { delivered: 0, accepted_human: 0, accepted_delivery_fallback: 0, rejected: 0, pending: 0, lifecycle: 0, not_applicable: 0, unknown: 0, survival_observed: 0, survival_reversed: 0, survival_unknown: 0 };
+  return { delivered: 0, accepted_human: 0, accepted_automation: 0, accepted_delivery_fallback: 0, rejected: 0, pending: 0, lifecycle: 0, not_applicable: 0, unknown: 0, survival_observed: 0, survival_reversed: 0, survival_unknown: 0 };
 }
 
 /** @param {Record<string, number>} counts @param {Record<string, any>} record */
@@ -126,6 +126,7 @@ function countRecord(counts, record) {
   if (adoption.coverage !== "available") counts.unknown++;
   else if (adoption.state === "accepted") {
     if (adoption.acceptance_kind === "explicit_human" && adoption.human_verified) counts.accepted_human++;
+    else if (adoption.acceptance_kind === "automation" && !adoption.human_verified) counts.accepted_automation++;
     else if (adoption.acceptance_kind === "fallback_delivery" && !adoption.human_verified) counts.accepted_delivery_fallback++;
     else throw new Error(`${ERR_VALIDATION}: Invalid retained adoption acceptance`);
   } else if (["rejected", "pending", "lifecycle", "not_applicable", "unknown"].includes(adoption.state)) counts[adoption.state]++;

@@ -65,9 +65,9 @@ func (c *Compiler) generateUnifiedArtifactUpload(yaml *strings.Builder, paths []
 	compilerYamlArtifactsLog.Printf("Generated unified artifact upload step with %d paths", len(paths))
 }
 
-func (c *Compiler) generateTrackedSecretRedactionStep(yaml *strings.Builder, yamlContent string, data *WorkflowData) {
+func (c *Compiler) generateTrackedSecretRedactionStep(yaml *strings.Builder, yamlContent string, data *WorkflowData, stagedDurableFiles bool) {
 	var step strings.Builder
-	c.generateSecretRedactionStep(&step, yamlContent, data)
+	c.generateSecretRedactionStep(&step, yamlContent, data, stagedDurableFiles)
 	yaml.WriteString(strings.Replace(step.String(),
 		"      - name: Redact secrets in logs\n",
 		"      - name: Redact secrets in logs\n        id: redact_secrets\n",

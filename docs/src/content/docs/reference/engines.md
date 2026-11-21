@@ -111,7 +111,7 @@ The unified session records `durable.restore` (`restored`, `fresh`, or `failed`)
 
 Built-in durable mode rejects replacement commands, custom drivers, and harnesses. Pi's SDK and RPC drivers remain supported. Ordinary CLI arguments work, but session selectors and persistence-disabling flags cannot override compiler-managed continuation. Copilot cannot override `COPILOT_HOME`. Pi has [additional restrictions](/gh-aw/reference/engines/pi/#durable-runs), and [imported engines](/gh-aw/reference/third-party-agent/#durable-execution) must declare their own durable files. Threat detection uses a separate fresh session.
 
-Checkpoints are published after secret redaction and integrity validation. Cancellation or hard runner loss can prevent publication. Artifacts contain restorable session content that may expose sensitive history to anyone with artifact access, and redaction is heuristic. Enable durable mode only where that suits the repository's artifact access and retention policies.
+Checkpoints are published after secret redaction and integrity validation. Copilot event payloads can be redacted before publication while preserving the session ID and event structure. The checkpoint is rejected if redaction changes other session files or cannot preserve the event structure. Cancellation or hard runner loss can prevent publication. Artifacts contain restorable session content that may expose sensitive history to anyone with artifact access, and redaction is heuristic. Enable durable mode only where that suits the repository's artifact access and retention policies.
 
 ### Pinning a Specific Engine Version
 
@@ -212,7 +212,7 @@ Threat detection defaults to zero retries; configure its engine explicitly to ch
 
 Copilot, Claude, Codex, Pi, and Agy resolve aliases against the configured provider's live AWF `/reflect` catalog before execution:
 
-- Built-in aliases (such as `opus`/`small`), workflow-defined `models:`, and their globs select the newest live match.
+- Built-in aliases (such as `opus`/`small`), workflow-defined `models:`, and their globs select the newest live match. Globs skip models AWF marks as not automatically selectable, such as a Decisions-only evaluation model; alias entries without `*`, such as `evals`, are unaffected.
 - A `provider/` prefix restricts the lookup; otherwise the engine's configured provider applies.
 - Exact live IDs take precedence over same-named aliases, and unrecognized IDs are not rewritten. Pi checks exact IDs before launch; Copilot, Claude, and Codex fail on the first unavailable-model request.
 - `?effort=` parameters are retained; `auto` keeps its engine-specific meaning.
@@ -224,7 +224,7 @@ Resolution produces `model.resolution` evidence in `usage/aw_session.jsonl`. See
 
 ### Default model routing
 
-On GitHub Copilot inference, `copilot`, `claude`, `codex`, and `pi` workflows that set no model or routing use `goal: cost` and `mode: auto`, the same as `model: router` (Claude and Codex also require `model-provider: github`). Any explicit `model` (including a router value), `engine.model`, `engine.model-routing`, `engine.fallback-models`, or model `engine.env` variable, including from imports, keeps existing behavior, as do unsupported or uncertain configurations. A nonempty `GH_AW_MODEL_AGENT_<ENGINE>` or `GH_AW_DEFAULT_MODEL_<ENGINE>` variable overrides the default at run time for Copilot, Claude, and Codex. Opt out with `engine.model-routing: false`; see [default routing](/gh-aw/reference/model-routing/#default-routing-for-workflows-without-a-model).
+On GitHub Copilot inference, `copilot`, `claude`, `codex`, and `pi` workflows that set no model or routing use `goal: cost` and `mode: auto`, the same as `model: router` (Claude and Codex also require `model-provider: github`). Any explicit `model` (including a router value), `engine.model`, `engine.model-routing`, `engine.fallback-models`, or model `engine.env` variable, including from imports, keeps existing behavior, as do unsupported or uncertain configurations. A nonempty `GH_AW_MODEL_AGENT_<ENGINE>` or `GH_AW_DEFAULT_MODEL_<ENGINE>` variable overrides the default at run time for Copilot, Claude, and Codex. Opt out with top-level `model-routing: false`; see [default routing](/gh-aw/reference/model-routing/#default-routing-for-workflows-without-a-model).
 
 ### Ordered model fallback (`fallback-models`)
 

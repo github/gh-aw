@@ -65,7 +65,10 @@ func TestJavaScriptFastSummaryEffects(t *testing.T) {
 		{"git callback mutation", `let captured; require("./actions/setup/js/git_auth_env.cjs").buildGitAuthEnv(process.env.TOKEN, token => {captured=token}); console.log(captured)`, true, false, true},
 		{"git mask callback", `require("./actions/setup/js/git_auth_env.cjs").buildGitAuthEnv(process.env.TOKEN, core.setSecret)`, false, false, false},
 		{"error retains source", `console.log(require("./actions/setup/js/error_helpers.cjs").getErrorMessage({message:process.env.TOKEN}))`, true, false, true},
+		{"error request id retains source", `console.log(require("./actions/setup/js/error_helpers.cjs").getErrorMessage({message:"",response:{headers:{"x-github-request-id":process.env.TOKEN}}}))`, true, false, true},
+		{"error status retains source", `console.log(require("./actions/setup/js/error_helpers.cjs").getErrorStatus({response:{status:process.env.TOKEN}}))`, true, false, true},
 		{"error predicate", `console.log(require("./actions/setup/js/error_helpers.cjs").isLockedError({message:process.env.TOKEN,status:403}))`, false, false, false},
+		{"comment limit predicate", `console.log(require("./actions/setup/js/error_helpers.cjs").isCommentLimitError({message:process.env.TOKEN,status:403}))`, false, false, false},
 		{"OTLP returns credentials", `console.log(require("./actions/setup/js/otlp_header_helpers.cjs").getOTLPSecretValues())`, true, false, true},
 		{"OTLP runner masks retain credentials", `console.log(require("./actions/setup/js/otlp_header_helpers.cjs").getOTLPRunnerMaskValues())`, true, false, true},
 		{"OTLP reexported runner masks retain credentials", `console.log(require("./actions/setup/js/actions_secret_masking.cjs").getOTLPRunnerMaskValues())`, true, false, true},
@@ -172,6 +175,9 @@ func TestJavaScriptSummaryUnresolvedCallbacks(t *testing.T) {
 		});`,
 		"nested rate limit predicate coercion": `require("./actions/setup/js/error_helpers.cjs").isRateLimitError({
 			message: {toString() {console.error(process.env.TOKEN); return "rate limit exceeded"}}
+		});`,
+		"nested comment limit predicate coercion": `require("./actions/setup/js/error_helpers.cjs").isCommentLimitError({
+			status: 403, message: {toString() {console.error(process.env.TOKEN); return "comment limit"}}
 		});`,
 	} {
 		t.Run(name, func(t *testing.T) {

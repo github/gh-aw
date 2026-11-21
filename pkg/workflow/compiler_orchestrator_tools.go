@@ -485,7 +485,10 @@ func (c *Compiler) resolveMarkdownArtifacts(
 	if len(importPaths) > 0 {
 		orchestratorToolsLog.Printf("Found %d import paths for runtime-import macros", len(importPaths))
 	}
-	bodyImports := parser.ExtractBodyLevelImportPaths(effectiveMarkdown, markdownDir)
+	bodyImports, err := parser.ExtractBodyLevelImportPaths(effectiveMarkdown, markdownDir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to scan body-level runtime imports: %w", err)
+	}
 	if len(bodyImports) > 0 {
 		orchestratorToolsLog.Printf("Found %d body-level {{#runtime-import}} directive(s) to promote to lock-file macros", len(bodyImports))
 		for _, bodyImport := range bodyImports {
@@ -657,6 +660,10 @@ func (c *Compiler) hasContentContext(frontmatter map[string]any) bool {
 // The schema's x-deprecation-message (falling back to description) is used as
 // the warning text so deprecations self-document without per-field plumbing.
 func (c *Compiler) warnDeprecatedFrontmatterFields(frontmatter map[string]any) {
+	if warning := parser.LegacyModelRoutingWarning(frontmatter); warning != "" {
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(warning))
+		c.IncrementWarningCount()
+	}
 	deprecatedFields, err := parser.GetMainWorkflowDeprecatedFieldsDeep()
 	if err != nil {
 		orchestratorToolsLog.Printf("Failed to load deprecated fields from schema: %v", err)

@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -15,6 +16,12 @@ func TestValidateImportInputType_String(t *testing.T) {
 	err = validateImportInputType("name", 42, "string", nil, "owner/repo/import.md")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "must be a string")
+
+	bounded := map[string]any{"maxLength": 150}
+	require.NoError(t, validateImportInputType("name", strings.Repeat("é", 150), "string", bounded, "import.md"))
+	err = validateImportInputType("name", strings.Repeat("é", 151), "string", bounded, "import.md")
+	require.ErrorContains(t, err, "at most 150 Unicode characters")
+	require.Error(t, validateImportInputType("name", "a", "string", map[string]any{"maxLength": -1}, "import.md"))
 }
 
 // TestValidateImportInputType_NumberAllTypes covers all numeric Go types accepted

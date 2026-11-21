@@ -242,6 +242,18 @@ describe("model_costs.cjs", () => {
     expect(aic).toBeCloseTo(0.336, 6);
   });
 
+  it("keeps inclusive input at least as large as cache reads when provider defaults apply", async () => {
+    const { computeInclusiveInputTokens } = await import("./model_costs.cjs");
+    expect(
+      computeInclusiveInputTokens({
+        provider: "anthropic",
+        inputTokens: 38719,
+        cacheReadTokens: 112640,
+        cacheWriteTokens: 0,
+      })
+    ).toBe(112640);
+  });
+
   it("uses explicit inclusive cache semantics when present", async () => {
     writeModelsFixture({
       "github-copilot": {

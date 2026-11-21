@@ -14,11 +14,12 @@ The `lifecycle` package models verified delivery separately from later adoption 
 |------|------|-------------|
 | `Identity` | struct | Identifies the host, source repository and workflow, run and attempt, invocation, evidence item, output type, and optional target resource. |
 | `Delivery` | struct | Records delivery state and signal, event and observation clocks, and evidence source. |
-| `Adoption` | struct | Records adoption state and signal, decision and observation clocks, source, rule version, acceptance kind, human verification, coverage, and any error. |
+| `Actor` | struct | Identifies the login and type of the account that decided an adoption outcome. |
+| `Adoption` | struct | Records adoption state and signal, decision and observation clocks, source, rule version, acceptance kind, deciding actor, human verification, coverage, and any error. |
 | `Survival` | struct | Records whether an adopted effect remains observed or was reversed, with observation time, coverage, and any error. |
 | `Record` | struct | Combines an ID and `Identity` with `Delivery`, `Adoption`, `Survival`, optional reversal details, and optional retained `Execution` evidence. |
 | `Execution` | struct | Retains a resource number, labels before and added, metadata, and before/after state for rechecking an effect after artifacts expire. |
-| `Observation` | struct | Supplies an adoption state and signal, optional decision clock, observation clock, acceptance kind, human-verification status, or an error. |
+| `Observation` | struct | Supplies an adoption state and signal, optional decision clock, observation clock, acceptance kind, deciding actor, human-verification status, or an error. |
 | `Rule` | struct | Describes an output type's effect class, delivery fallback and value eligibility, survival requirement, parent resource, and human-decision, rejection, and reversal signals. |
 
 ### Functions
@@ -26,7 +27,7 @@ The `lifecycle` package models verified delivery separately from later adoption 
 | Function | Signature | Description |
 |----------|-----------|-------------|
 | `Delivered` | `func Delivered(identity Identity, at, observedAt time.Time, source string) (Record, error)` | Validates execution identity and event clocks, derives a stable record ID from the identity, and initializes delivery and rule-based adoption state. A target URL, when present, must be an HTTPS resource on the execution host without user information or a query. |
-| `Observe` | `func Observe(record Record, observation Observation) (Record, error)` | Applies a provider adoption observation. Accepted decisions require a valid value-eligible output rule and either verified human acceptance or an allowed delivery fallback. |
+| `Observe` | `func Observe(record Record, observation Observation) (Record, error)` | Applies a provider adoption observation. Accepted decisions require a valid value-eligible output rule and verified human acceptance, an automation decision with its actor, or an allowed delivery fallback. Automation decisions cannot claim human verification. |
 | `Merge` | `func Merge(previous, incoming Record) (Record, error)` | Validates and combines records for the same effect, preserving execution evidence and preventing replayed delivery from replacing later or more authoritative observations. |
 | `IsHuman` | `func IsHuman(actorType, login string, publishers []string) bool` | Reports whether an actor is a non-bot GitHub user who is not in the supplied publisher list. |
 | `RuleFor` | `func RuleFor(outputType string) (Rule, bool)` | Returns a copy of the registered rule for an output type and whether that type is registered. |

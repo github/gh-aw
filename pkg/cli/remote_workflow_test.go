@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -666,6 +667,108 @@ imports:
 	}
 }
 
+func TestRunRemoteDependencyStepsPolicies(t *testing.T) {
+	tests := []struct {
+		name        string
+		label       string
+		fatalAlways bool
+		warnAlways  bool
+	}{
+		{name: "includes", label: "include dependencies"},
+		{name: "frontmatter imports", label: "frontmatter import dependencies"},
+		{name: "runtime imports", label: "runtime-import dependencies", warnAlways: true},
+		{name: "dispatch workflows", label: "dispatch workflow dependencies", fatalAlways: true},
+		{name: "call workflows", label: "call-workflow worker dependencies", fatalAlways: true},
+		{name: "resources", label: "resource dependencies", fatalAlways: true},
+	}
+
+	stepNames := []string{"includes", "frontmatter imports", "runtime imports", "dispatch workflows", "call workflows", "resources"}
+	for failureIndex, tc := range tests {
+		for _, strict := range []bool{false, true} {
+			for _, verbose := range []bool{false, true} {
+				t.Run(fmt.Sprintf("%s/strict=%t/verbose=%t", tc.name, strict, verbose), func(t *testing.T) {
+					var executed []string
+					fetchFailure := errors.New("fetch failed")
+					fetch := func(name string, index int) func() error {
+						return func() error {
+							executed = append(executed, name)
+							if index == failureIndex {
+								return fetchFailure
+							}
+							return nil
+						}
+					}
+					fetchers := remoteDependencyFetchers{
+						includes:       fetch(stepNames[0], 0),
+						frontmatter:    fetch(stepNames[1], 1),
+						runtimeImports: fetch(stepNames[2], 2),
+						dispatch:       fetch(stepNames[3], 3),
+						callWorkflow:   fetch(stepNames[4], 4),
+						resources:      fetch(stepNames[5], 5),
+					}
+					steps := remoteDependencySteps(fetchers)
+					warningCount := 0
+					for i := range steps {
+						warn := steps[i].warn
+						steps[i].warn = func(err error, verbose bool) {
+							warningCount++
+							warn(err, verbose)
+						}
+					}
+
+					reader, writer, err := os.Pipe()
+					require.NoError(t, err)
+					originalStderr := os.Stderr
+					os.Stderr = writer
+					err = runRemoteDependencySteps(steps, strict, verbose)
+					os.Stderr = originalStderr
+					require.NoError(t, writer.Close())
+					output, readErr := io.ReadAll(reader)
+					require.NoError(t, reader.Close())
+					require.NoError(t, readErr)
+
+					fatal := tc.fatalAlways || strict
+					wantExecuted := stepNames
+					if fatal {
+						wantExecuted = stepNames[:failureIndex+1]
+					}
+					assert.Equal(t, wantExecuted, executed, "steps run after the failing dependency")
+					if fatal {
+						require.EqualError(t, err, "failed to fetch "+tc.label+": fetch failed")
+						require.ErrorIs(t, err, fetchFailure)
+					} else {
+						require.NoError(t, err)
+					}
+					wantWarnings := 0
+					if fatal {
+						if tc.fatalAlways && verbose {
+							wantWarnings = 1
+						}
+					} else if tc.warnAlways || verbose {
+						wantWarnings = 1
+					}
+					assert.Equal(t, wantWarnings, warningCount, "warning policy for failing dependency")
+					if tc.name == "runtime imports" {
+						outputText := string(output)
+						if strict {
+							assert.Empty(t, outputText)
+						} else {
+							activationWarning := "Failed to fetch runtime-import dependencies; activation may fail"
+							assert.Contains(t, outputText, activationWarning)
+							if verbose {
+								assert.Contains(t, outputText, "fetch failed")
+								assert.Less(t, strings.Index(outputText, activationWarning), strings.Index(outputText, "fetch failed"))
+							} else {
+								assert.NotContains(t, outputText, "fetch failed")
+							}
+						}
+					}
+				})
+			}
+		}
+	}
+}
+
 func TestFetchAndSaveRemoteIncludes_PathTraversalRejected(t *testing.T) {
 	mockFetch := func(_ context.Context, _ string, _ *WorkflowSpec, _ bool) ([]byte, string, error) {
 		return []byte("# include body\n"), "", nil
@@ -728,6 +831,12 @@ func TestFetchAndSaveRemoteIncludes_SharedIncludeStaysUnderSharedDir(t *testing.
 	})
 	require.NoError(t, err)
 	assert.FileExists(t, filepath.Join(tmpDir, ".github", "shared", "helper.md"))
+}
+
+func TestFetchAndSaveRemoteIncludes_ReturnsScannerErrors(t *testing.T) {
+	spec := &WorkflowSpec{RepoSpec: RepoSpec{RepoSlug: "github/gh-aw"}}
+	err := fetchAndSaveRemoteIncludesWithOptions(t.Context(), strings.Repeat("x", 64*1024+1), includesFetchOptions{spec: spec})
+	require.ErrorContains(t, err, "failed to scan workflow content for includes")
 }
 
 // TestFetchAndSaveRemoteFrontmatterImports_InvalidRepoSlug verifies that an invalid

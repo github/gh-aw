@@ -45,7 +45,8 @@
     },
     "pools": {
       "default": {},
-      "smoke-work-queue": { "concurrency": 1 },
+      "smoke-work-queue": { "concurrency": 3 },
+      "code-scanning": { "concurrency": 3 },
       "daily-reports": { "concurrency": 3, "per_account_limit": 1 },
       "engine-conformance": { "concurrency": 3, "per_account_limit": 1 }
     }

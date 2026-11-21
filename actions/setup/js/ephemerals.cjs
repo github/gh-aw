@@ -2,13 +2,14 @@
 /// <reference types="@actions/github-script" />
 
 const { formatDateInProjectTimeZone, resolveProjectTimeZone } = require("./project_timezone.cjs");
+const { getFencedCodeRanges } = require("./sanitize_content_core.cjs");
 
 /**
  * Regex pattern to match expiration marker with checked checkbox and HTML comment (new format)
- * Format: > - [x] expires <!-- gh-aw-expires: ISO_DATE --> on HUMAN_DATE UTC
- * Allows flexible whitespace and supports blockquote prefix
+ * Format: [> ]- [x] expires <!-- gh-aw-expires: ISO_DATE --> on HUMAN_DATE UTC
+ * Allows flexible whitespace and an optional blockquote prefix (report bodies render the line unquoted)
  */
-const EXPIRATION_PATTERN = /^>\s*-\s*\[x\]\s+expires\s*<!--\s*gh-aw-expires:\s*([^>]+)\s*-->/m;
+const EXPIRATION_PATTERN = /^(?:>\s*)?-\s*\[x\]\s+expires\s*<!--\s*gh-aw-expires:\s*([^>]+)\s*-->/m;
 
 /**
  * Regex pattern to match legacy expiration marker without HTML comment (old format)
@@ -51,7 +52,28 @@ function createExpirationLine(expirationDate) {
 }
 
 /**
+ * Remove fenced code blocks so example expiration markers inside code are never matched.
+ * Unclosed fences run to the end of the body (CommonMark).
+ * @param {string} body - Markdown body
+ * @returns {string} Body without fenced code blocks
+ */
+function stripFencedCode(body) {
+  const ranges = getFencedCodeRanges(body);
+  if (ranges.length === 0) {
+    return body;
+  }
+  let result = "";
+  let pos = 0;
+  for (const [start, end] of ranges) {
+    result += body.slice(pos, start);
+    pos = end;
+  }
+  return result + body.slice(pos);
+}
+
+/**
  * Extract expiration date from text body
+ * Markers inside fenced code blocks are ignored.
  * Supports two formats:
  * 1. New format with HTML comment: > - [x] expires <!-- gh-aw-expires: ISO_DATE --> on HUMAN_DATE UTC
  * 2. Legacy format without HTML comment: > - [x] expires  on HUMAN_DATE UTC
@@ -59,8 +81,10 @@ function createExpirationLine(expirationDate) {
  * @returns {Date|null} Expiration date or null if not found/invalid
  */
 function extractExpirationDate(body) {
+  const text = stripFencedCode(body);
+
   // Try new format with HTML comment first (preferred)
-  const match = body.match(EXPIRATION_PATTERN);
+  const match = text.match(EXPIRATION_PATTERN);
 
   if (match) {
     const expirationISO = match[1].trim();
@@ -73,7 +97,7 @@ function extractExpirationDate(body) {
   }
 
   // Fall back to legacy format without HTML comment
-  const legacyMatch = body.match(LEGACY_EXPIRATION_PATTERN);
+  const legacyMatch = text.match(LEGACY_EXPIRATION_PATTERN);
 
   if (legacyMatch) {
     const humanReadableDate = legacyMatch[1].trim();
@@ -105,9 +129,8 @@ function generateFooterWithExpiration(options) {
   let footer = footerText;
 
   // Add expiration line inside the quoted section if configured
-  if (expiresHours && expiresHours > 0) {
-    const expirationDate = new Date();
-    expirationDate.setHours(expirationDate.getHours() + expiresHours);
+  if (typeof expiresHours === "number" && Number.isFinite(expiresHours) && expiresHours > 0) {
+    const expirationDate = new Date(Date.now() + expiresHours * 60 * 60 * 1000);
     const expirationLine = createExpirationLine(expirationDate);
     footer = `${footer.trimEnd()}\n> ${expirationLine}`;
 
@@ -133,12 +156,11 @@ function generateFooterWithExpiration(options) {
  * @returns {string} Footer with expiration inserted before XML marker
  */
 function addExpirationToFooter(footer, expiresHours, entityType) {
-  if (!expiresHours || expiresHours <= 0) {
+  if (typeof expiresHours !== "number" || !Number.isFinite(expiresHours) || expiresHours <= 0) {
     return footer;
   }
 
-  const expirationDate = new Date();
-  expirationDate.setHours(expirationDate.getHours() + expiresHours);
+  const expirationDate = new Date(Date.now() + expiresHours * 60 * 60 * 1000);
   const expirationLine = createExpirationLine(expirationDate);
 
   // Look for XML marker at the end of footer
@@ -163,6 +185,7 @@ function addExpirationToFooter(footer, expiresHours, entityType) {
 module.exports = {
   EXPIRATION_PATTERN,
   LEGACY_EXPIRATION_PATTERN,
+  stripFencedCode,
   formatExpirationDate,
   createExpirationLine,
   extractExpirationDate,

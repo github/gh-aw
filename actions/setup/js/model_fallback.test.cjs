@@ -71,6 +71,15 @@ describe("Claude model arguments", () => {
     expect(() => normalizeClaudeModelArgs(["--model", model], "github", {})).toThrow("requires an advertised Claude");
   });
 
+  it("skips Claude models AWF marks as not automatically selectable", () => {
+    const models = ["claude-sonnet-5", "claude-opus-5.5"];
+    const routing_models = [
+      { model_id: "claude-sonnet-5", automatic_selection_eligible: false, automatic_selection_reason: "model_picker_disabled" },
+      { model_id: "claude-opus-5.5", automatic_selection_eligible: true },
+    ];
+    expect(normalizeClaudeModelArgs(["--model", "auto"], "github", {}, { reflectData: { endpoints: [{ provider: "copilot", configured: true, models, routing_models }] } })).toEqual(["--model", "claude-opus-5.5"]);
+  });
+
   it.each(["github", "copilot", "github-copilot", "github_models", " COPILOT "])("normalizes repository-variable models for provider %s", provider => {
     const env = { GH_AW_MODEL_AGENT_CLAUDE: "copilot/claude-haiku-4.5" };
     const args = ["--print", "--model", env.GH_AW_MODEL_AGENT_CLAUDE];

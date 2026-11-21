@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"maps"
 	"math/big"
+	"unicode/utf8"
 )
 
 // validateWithImportSchema validates the provided 'with'/'inputs' values against
@@ -128,8 +129,18 @@ func validateObjectInput(name string, value any, paramDef map[string]any, import
 func validateImportInputType(name string, value any, declaredType string, paramDef map[string]any, importPath string) error {
 	switch declaredType {
 	case "string":
-		if _, ok := value.(string); !ok {
+		text, ok := value.(string)
+		if !ok {
 			return fmt.Errorf("import '%s': 'with' input %q must be a string (got %T)", importPath, name, value)
+		}
+		if raw, exists := paramDef["maxLength"]; exists {
+			bound, valid := importInputNumber(raw)
+			if !valid || !bound.IsInt() || bound.Sign() < 0 {
+				return fmt.Errorf("import '%s': import-schema %q maxLength must be a nonnegative integer", importPath, name)
+			}
+			if new(big.Rat).SetInt64(int64(utf8.RuneCountInString(text))).Cmp(bound) > 0 {
+				return fmt.Errorf("import '%s': 'with' input %q is too long. Expected at most %s Unicode characters. Example: use a shorter value", importPath, name, bound.RatString())
+			}
 		}
 	case "number":
 		// Accept all numeric types that YAML parsers may produce

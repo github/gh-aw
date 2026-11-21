@@ -68,7 +68,7 @@ const AgyDefaultModel = "gemini-3.8-flash-medium"
 const DefaultPiVersion Version = "1.5.2"
 
 // DefaultGitHubMCPServerVersion is the default version of the GitHub MCP server Docker image
-const DefaultGitHubMCPServerVersion Version = "v2.1.0"
+const DefaultGitHubMCPServerVersion Version = "v2.2.0"
 
 // DefaultFirewallVersion is the default version of the gh-aw-firewall (AWF) binary
 //
@@ -78,7 +78,7 @@ const DefaultGitHubMCPServerVersion Version = "v2.1.0"
 //
 // The first recompile regenerates all lock files using the new version; the second recompile
 // refreshes the container SHA pins that were resolved during the first pass.
-const DefaultFirewallVersion Version = "v0.29.16"
+const DefaultFirewallVersion Version = "v0.29.17"
 
 // AWFOpenAIWIFMinVersion is the first AWF release whose API proxy supports
 // OpenAI Workload Identity Federation.
@@ -101,6 +101,9 @@ const DefaultRouterVersion Version = "0.1.3"
 // AWFModelRoutingMinVersion is the first AWF version that exposes task routing
 // selections through /reflect and accepts apiProxy.routing.
 const AWFModelRoutingMinVersion Version = "v0.28.29"
+
+// AWFCostOnlyModelRoutingMinVersion is the first AWF release that rejects cost-speed routing goals.
+const AWFCostOnlyModelRoutingMinVersion Version = "v0.29.17"
 
 // AWFCloudHypervisorModelRoutingMinVersion is the first AWF release whose
 // primary-agent model routing supports the cloud-hypervisor runtime.
@@ -278,7 +281,7 @@ const CopilotNoAskUserMinVersion Version = "1.0.19"
 //
 // The first recompile regenerates all lock files using the new version; the second recompile
 // refreshes the container SHA pins that were resolved during the first pass.
-const DefaultMCPGatewayVersion Version = "v0.5.10"
+const DefaultMCPGatewayVersion Version = "v0.5.11"
 
 // MCPGIntegrityReactionsMinVersion is the minimum MCPG version that supports
 // endorsement-reactions and disapproval-reactions in the allow-only policy.

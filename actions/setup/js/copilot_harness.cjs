@@ -102,10 +102,12 @@ const {
   REFLECT_PROVIDER_ALIASES,
 } = require("./awf_reflect.cjs");
 const { runSafeOutputsCLI, buildMissingToolAlternatives, emitMissingToolPermissionIssue, emitInfrastructureIncomplete, hasExpectedSafeOutputs, hasTerminalSafeOutput, hasNoopInSafeOutputs } = require("./safeoutputs_cli.cjs");
+const { getSafeOutputsByteOffset, hasAttemptTerminalSafeOutput } = require("./harness_safe_outputs.cjs");
 const { countPermissionDeniedIssues, hasNumerousPermissionDeniedIssues, hasWorkflowToolPermissionDenial, extractDeniedCommands, buildMissingToolPermissionIssuePayload } = require("./permission_denied_helpers.cjs");
 const {
   detectNonRetryableHarnessGuard,
-  detectExhaustedAWFInvocationBudget,
+  observeInvocationBudget,
+  resolveRetryAfterDecision,
   buildSoftTimeoutGuard,
   emitSoftTimeoutSignal,
   isAuthenticationFailedError: isCommonAuthenticationFailedError,
@@ -2106,6 +2108,7 @@ async function main() {
           // Redact --prompt / -p value from logs to avoid leaking prompt content
           const strategy = copilotSDKMode ? "restart" : attempt > 0 && useContinueOnRetry ? "resume" : selectedHarnessStrategy(currentArgs, "copilot");
           observeStrategy(strategy);
+          const safeOutputsByteOffset = getSafeOutputsByteOffset(safeOutputsPath);
           const safeArgs = currentArgs.map((arg, i) => (currentArgs[i - 1] === "--prompt" || currentArgs[i - 1] === "-p" ? "<redacted>" : arg));
           const modelObserver = !verifyModel ? { check: () => "" } : createCopilotModelObserver({ configuredModel: selectionConfiguredModel, resolvedModel: process.env.COPILOT_MODEL || "", sessionId, logger: log });
           let nativeTerminalRateLimitError = false;
@@ -2179,7 +2182,7 @@ async function main() {
             runtimeGuard: { shouldTerminate: () => ({ terminate: Boolean(modelObserver.check()), reason: "copilot_model_verification" }) },
             postResultWatchdog: safeOutputsPath
               ? {
-                  shouldArm: () => hasTerminalSafeOutput(safeOutputsPath),
+                  shouldArm: () => hasAttemptTerminalSafeOutput(safeOutputsPath, safeOutputsByteOffset, { logger: log }),
                   inactivityTimeoutMs: POST_RESULT_WATCHDOG_IDLE_TIMEOUT_MS,
                 }
               : undefined,
@@ -2199,32 +2202,14 @@ async function main() {
           detectedCopilotErrors.agenticEngineTimeout ||= attemptDetections.agenticEngineTimeout;
           detectedCopilotErrors.modelNotSupportedError ||= attemptDetections.modelNotSupportedError;
           detectedCopilotErrors.http400ResponseError ||= attemptDetections.http400ResponseError;
-          return { ...result, strategy, nativeTerminalRateLimitError, retryAfterMs };
+          return { ...result, safeOutputsByteOffset, strategy, nativeTerminalRateLimitError, retryAfterMs };
         },
         handleFailure: async ({ attempt, result }) => {
-          /** @returns {import("./harness_retry_runner.cjs").HarnessFailureDecision | null} */
-          const retryAfterDecision = () => {
-            if (result.retryAfterMs == null) return null;
-            const exceedsDelayCap = result.retryAfterMs > Math.min(maxDelayMs, 2147483647);
-            const exceedsTimeout = softTimeoutGuard && Date.now() + result.retryAfterMs >= softTimeoutGuard.softDeadlineMs;
-            if (exceedsDelayCap || exceedsTimeout) {
-              result.failureClasses = ["rate_limit_wait_exceeded"];
-              const reason = exceedsDelayCap ? `max-delay-ms=${maxDelayMs}` : "remaining job timeout budget";
-              log(`attempt ${attempt + 1}: failureClass=rate_limit_wait_exceeded — HTTP 429 Retry-After=${result.retryAfterMs}ms exceeds ${reason}; not retrying`);
-              emitInfrastructureIncomplete(`Copilot HTTP 429 Retry-After wait exceeds ${reason}. Stopping rather than retrying inside the rate-limit window.`);
-              return { action: "stop" };
-            }
-            result.failureClasses = ["rate_limit_error"];
-            log(`attempt ${attempt + 1}: failureClass=rate_limit_error — HTTP 429 Retry-After requires ${result.retryAfterMs}ms before next attempt`);
-            return { action: "retry", nextDelayMs: result.retryAfterMs };
-          };
           /**
            * @param {number} [nextDelayMs]
            * @returns {import("./harness_retry_runner.cjs").HarnessFailureDecision}
            */
           const retryDecision = nextDelayMs => {
-            const rateLimitDecision = retryAfterDecision();
-            if (rateLimitDecision) return rateLimitDecision;
             return { action: "retry", ...(nextDelayMs === undefined ? {} : { nextDelayMs }) };
           };
           if (result.runtimeGuardReason === "copilot_model_verification") {
@@ -2266,15 +2251,8 @@ async function main() {
           const isWorkflowToolPermissionDenied = hasWorkflowToolPermissionDenial(result.exitCode);
           const nonRetryableGuard = detectNonRetryableHarnessGuard(result.output);
           const isContentFiltered = isCopilotContentFilterError(result.output, copilotSDKMode ? primaryProviderName : process.env.GH_AW_LLM_PROVIDER || "github");
-          let isInvocationCapExceeded = nonRetryableGuard.maxRunsExceeded;
-          if (!isInvocationCapExceeded) {
-            const budget = await detectExhaustedAWFInvocationBudget({ nativeTerminalRateLimitError: result.nativeTerminalRateLimitError === true, logger: log });
-            if (budget) {
-              nonRetryableGuard.maxRunsExceeded = true;
-              isInvocationCapExceeded = true;
-              log(`attempt ${attempt + 1}: AWF shared invocation budget exhausted (${budget.invocationCount}/${budget.maxRuns}) — confirmed by fresh reflection`);
-            }
-          }
+          await observeInvocationBudget({ guard: nonRetryableGuard, nativeTerminalRateLimitError: result.nativeTerminalRateLimitError === true, attempt, log });
+          const isInvocationCapExceeded = nonRetryableGuard.maxRunsExceeded;
           const tokenCount = extractTokenCountFromOutput(result.output);
           const attemptDurationMs = result.durationMs ?? 0;
           const proxyAICreditsRejection = parseAICreditsExceededProxyRejection(result.output);
@@ -2398,9 +2376,9 @@ async function main() {
           // run means the agent completed its task (wrote safe-output) but produced no console
           // output before the watchdog terminated the idle process.
           const isExpectedLateExit = failureClass === "partial_execution" || failureClass === "long_run_exit" || (failureClass === "no_output" && result.watchdogFired) || (failureClass === "authentication_failed" && result.watchdogFired);
-          if (isExpectedLateExit && safeOutputsPath && hasTerminalSafeOutput(safeOutputsPath)) {
-            const reason = result.watchdogFired ? "post-result watchdog fired after terminal safe-output was emitted" : "partial execution after terminal safe-output was already produced";
-            log(`attempt ${attempt + 1}: ${reason} — treating as success (late-activity exit suppressed)`);
+          if (isExpectedLateExit && hasAttemptTerminalSafeOutput(safeOutputsPath, result.safeOutputsByteOffset ?? 0, { logger: log })) {
+            const lateExitReason = result.watchdogFired ? "post-result watchdog fired after terminal safe-output was emitted" : "partial execution after terminal safe-output was already produced";
+            log(`attempt ${attempt + 1}: ${lateExitReason} — treating as success (late-activity exit suppressed)`);
             return { action: "stop", exitCode: 0 };
           }
 
@@ -2486,6 +2464,12 @@ async function main() {
 
           if (isWorkflowToolPermissionDenied) {
             return stopForPermissionDenied({ attempt, output: result.output, safeOutputsPath, log, deniedCommands: extractDeniedCommands(result.output), workflowToolPermissionDenied: isWorkflowToolPermissionDenied });
+          }
+
+          if (safeOutputsPath && hasExpectedSafeOutputs(safeOutputsPath, { logger: log })) {
+            emitInfrastructureIncomplete("Copilot failed after staging task output. Preserving existing outputs and stopping to avoid replaying completed work.", { logger: log });
+            log(`attempt ${attempt + 1}: task output already staged — preserving output and not retrying`);
+            return { action: "stop" };
           }
 
           if (isMCPPolicy) {
@@ -2583,9 +2567,10 @@ async function main() {
           }
 
           if (result.retryAfterMs != null) {
-            const decision = retryAfterDecision();
-            if (decision?.action === "stop") return decision;
             if (attempt >= maxRetries) {
+              // No runner retry decision remains: retain the terminal wait-cap diagnostic here.
+              const decision = resolveRetryAfterDecision({ attempt, result, maxDelayMs, softTimeoutGuard, harnessName: "Copilot harness", log, terminal: true });
+              if (decision?.action === "stop") return decision;
               log(`all ${maxRetries} retries exhausted after HTTP 429 — not retrying`);
               return { action: "stop" };
             }
@@ -2595,7 +2580,7 @@ async function main() {
               hasOutput: result.hasOutput,
               hasCAPIServerError,
             });
-            return decision ?? { action: "retry", nextDelayMs: result.retryAfterMs };
+            return retryDecision();
           }
 
           if (shouldRetryFailedExecution({ ...result, isModelRoutingFailure, attempt, maxRetries })) {

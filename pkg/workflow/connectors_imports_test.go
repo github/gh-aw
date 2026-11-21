@@ -243,10 +243,11 @@ func TestConnectorImportAllProviderWrappers(t *testing.T) {
 	t.Parallel()
 	doc, err := os.ReadFile("../../docs/src/content/docs/reference/connectors.md")
 	require.NoError(t, err)
-	_, snippet, found := strings.Cut(string(doc), "```aw wrap\n")
-	require.True(t, found)
-	snippet, _, found = strings.Cut(snippet, "```")
-	require.True(t, found)
+	const linearFence = "```aw wrap title=\".github/workflows/linear-review.md\"\n"
+	require.Equal(t, 1, strings.Count(string(doc), linearFence), "expected exactly one Linear review example")
+	_, snippet, _ := strings.Cut(string(doc), linearFence)
+	snippet, _, found := strings.Cut(snippet, "\n```")
+	require.True(t, found, "Linear review example must have a closing fence")
 	for _, provider := range []string{"linear", "jira", "azure-devops", "slack", "teams", "confluence", "sentry", "servicenow"} {
 		t.Run(provider, func(t *testing.T) {
 			root := t.TempDir()
@@ -273,7 +274,7 @@ func TestConnectorImportAllProviderWrappers(t *testing.T) {
 				sources = append(sources, struct {
 					name, content string
 					reject        bool
-				}{"documentation", snippet, false})
+				}{"documentation", snippet + "\n", false})
 			}
 			for _, source := range sources {
 				t.Run(source.name, func(t *testing.T) {

@@ -66,6 +66,7 @@ type WorkflowData struct {
 	MaxDailyAICreditsGitHubApp     *GitHubAppConfig  // optional GitHub App for minting the token used by the daily AIC guardrail
 	MaxDailyAICContinueOnError     bool              // when true, unknown/unverifiable daily AIC accounting is a warning instead of failing closed
 	ImportedFiles                  []string          // list of files imported via imports field (rendered as comment in lock file)
+	ResolvedDependencyFiles        []string          // canonical local dependency paths captured during protected verification
 	ImportedMetadataDocuments      map[string]string // compiler-resolved raw imports for JSON metadata generation
 	Skills                         []string          // skill specs from frontmatter (owner/repo@sha or owner/repo/skill/path@sha)
 	SkillReferences                []SkillReference
@@ -229,7 +230,8 @@ type WorkflowData struct {
 	CachedConcurrencyGroupExprErr  error                           // cached result of validateConcurrencyGroupExpression(ConcurrencyGroupExpr); nil = valid; populated by applyDefaults
 	Experiments                    map[string][]string             // A/B testing experiments: maps experiment name to variant list (from frontmatter)
 	ExperimentConfigs              map[string]*ExperimentConfig    // Full A/B experiment metadata (populated alongside Experiments)
-	ExperimentsStorage             ExperimentStorageMode           // "cache" or "repo" (default "repo"); controls how experiment state is persisted across runs
+	ExperimentsStorage             ExperimentStorageMode           // "cache", "repo" (default), or opt-in "broker"; controls experiment persistence
+	ExperimentsBrokerURL           string                          // Optional literal broker endpoint
 	CachedConcurrencyGroupExprSet  bool                            // true once CachedConcurrencyGroupExprErr has been populated; distinguishes "valid (nil)" from "not yet computed"
 	CachedParsedToolsets           []string                        // cached result of ParseGitHubToolsets for the GitHub tool (for performance optimization); populated by applyDefaults
 	CachedAllowedDomainsStr        string                          // cached agent firewall policy; sanitization-only domains must not be stored here

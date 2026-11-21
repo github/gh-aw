@@ -92,6 +92,7 @@ safe-outputs:
         actions: read
       env:
         GH_AW_SAFE_OUTPUTS_STAGED: ${{ github.event_name == 'workflow_dispatch' && inputs.staged }}
+        GH_AW_ISSUE_EXPIRES_HOURS: "48"
       inputs:
         plan_path:
           type: string

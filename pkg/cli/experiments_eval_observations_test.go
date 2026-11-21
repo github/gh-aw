@@ -4,6 +4,7 @@ package cli
 
 import (
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/github/gh-aw/pkg/workflow"
@@ -150,7 +151,8 @@ func TestNotEvaluatedEvalsRunExcludedAsMissingRecord(t *testing.T) {
 	require.NoError(t, err)
 	// Successful judge rows from the state branch plus a synthetic genuine UNKNOWN judgment.
 	data = append(data, []byte(`{"id":"docs_reviewed","question":"Did the agent review the project documentation from the perspective of a Claude Code user?","answer":"UNKNOWN","model":"evals","timestamp":"2026-10-30T09:00:00.000Z","runid":"41100000001"}`+"\n")...)
-	records := parseEvalResultRecords(data)
+	records, err := parseEvalResultRecords(data)
+	require.NoError(t, err)
 
 	summary := summarizeMetricEvalResults(records)
 	assert.Equal(t, MetricEvalResults{Total: 4, Yes: 3, Unknown: 1, LatestAnswer: "UNKNOWN", LatestRunID: "41100000001"}, summary["docs_reviewed"], "the not-evaluated run must not enter answer totals")
@@ -177,4 +179,10 @@ func TestNotEvaluatedEvalsRunExcludedAsMissingRecord(t *testing.T) {
 	assert.Zero(t, controlExclusions[exclusionInvalidValue].Count)
 	candidateExclusions := exclusionsByReason(set.Exclusions["candidate"])
 	assert.Equal(t, []string{"41100000001"}, candidateExclusions[exclusionInvalidValue].RunIDs, "a genuine UNKNOWN judgment keeps the invalid-value path")
+}
+
+func TestParseEvalResultRecordsReturnsScannerErrors(t *testing.T) {
+	data := []byte(strings.Repeat("x", 64*1024+1))
+	_, err := parseEvalResultRecords(data)
+	require.ErrorContains(t, err, "failed to scan eval result records")
 }

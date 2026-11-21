@@ -147,7 +147,7 @@ sandbox:
 8. **Discussion Interaction Testing**:
    - Use the `github-discussion-query` mcp-script tool with params: `limit=1, jq=".[0]"` to get the latest discussion from ${{ github.repository }}
    - Extract the discussion number from the result (e.g., if the result is `{"number": 123, "title": "...", ...}`, extract 123)
-   - Use the `add_comment` tool with `discussion_number: <extracted_number>` to add a fun, playful comment stating that the ARM64 smoke test agent was here
+   - Use the `add_comment` tool with `item_number: <extracted_number>` to add a fun, playful comment stating that the ARM64 smoke test agent was here
 9. **Build gh-aw**: Run `GOCACHE=/tmp/gh-aw/agent/go-cache GOMODCACHE=/tmp/gh-aw/agent/go-mod make build` to verify the agent can successfully build the gh-aw project on ARM64 (both caches must be set under `/tmp/gh-aw/agent` because the default cache locations are not writable). If the command fails, mark this test as ❌ and report the failure.
 10. **Discussion Creation Testing**: Use the `create_discussion` safe-output tool to create a discussion in the announcements category titled "copilot-arm64 was here" with the label "ai-generated" and `temporary_id: "aw_discuss"` so you can reference it in the Output section.
 11. **Workflow Dispatch Testing**: Use the `dispatch_workflow` safe output tool to trigger the `haiku-printer` workflow with a haiku as the message input. Create an original, creative haiku about ARM64 or multi-architecture computing.

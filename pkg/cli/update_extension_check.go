@@ -46,7 +46,15 @@ const backupCleanupRetryDelay = 300 * time.Millisecond
 // baked in. The caller should re-launch the freshly-installed binary (at
 // installPath) so that subsequent work (e.g. lock-file compilation) uses the
 // correct new version string.
-func upgradeExtensionIfOutdated(ctx context.Context, verbose bool, includePrereleases bool) (bool, string, error) {
+func upgradeExtensionIfOutdated(ctx context.Context, verbose bool, includePrereleases bool) (upgraded bool, installPath string, runErr error) {
+	var targetVersion string
+	currentVersionBefore := GetVersion()
+	defer func() {
+		if upgraded && runErr == nil {
+			runErr = emitUpdateEvent(ctx, updateJSONLEvent{Event: "change", Kind: "extension",
+				Operation: "modified", Before: currentVersionBefore, After: targetVersion})
+		}
+	}()
 	currentVersion := GetVersion()
 	updateExtensionCheckLog.Printf("Checking if extension needs upgrade (current: %s)", currentVersion)
 
@@ -61,6 +69,7 @@ func upgradeExtensionIfOutdated(ctx context.Context, verbose bool, includePrerel
 
 	// Query GitHub API for latest release
 	latestVersion, err := getLatestRelease(ctx, includePrereleases)
+	targetVersion = latestVersion
 	if err != nil {
 		// Fail silently - don't block the upgrade command if we can't reach GitHub
 		updateExtensionCheckLog.Printf("Failed to check for latest release (silently ignoring): %v", err)
@@ -192,7 +201,6 @@ func upgradeExtensionIfOutdated(ctx context.Context, verbose bool, includePrerel
 
 	// Resolve the current executable path before renaming; after the rename
 	// os.Executable() returns a "(deleted)"-suffixed path on Linux.
-	var installPath string
 	var backupPath string
 	if exe, exeErr := os.Executable(); exeErr == nil {
 		if resolved, resolveErr := filepath.EvalSymlinks(exe); resolveErr == nil {

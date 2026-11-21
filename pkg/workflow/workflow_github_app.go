@@ -101,7 +101,7 @@ func applyTopLevelGitHubAppFallbacks(data *WorkflowData) {
 	}
 
 	// Fallback for safe-outputs (safe-outputs.github-app / safe-outputs.github-token)
-	if data.SafeOutputs != nil && topLevelFallbackNeeded(data.SafeOutputs.GitHubApp, data.SafeOutputs.GitHubToken) {
+	if data.SafeOutputs != nil && !data.SafeOutputs.TokenBroker && topLevelFallbackNeeded(data.SafeOutputs.GitHubApp, data.SafeOutputs.GitHubToken) {
 		workflowGitHubAppLog.Print("Applying top-level github-app fallback for safe-outputs")
 		data.SafeOutputs.GitHubApp = fallback
 	}
@@ -117,6 +117,7 @@ func applyTopLevelGitHubAppFallbacks(data *WorkflowData) {
 	// Fallback for tools.github (tools.github.github-app / tools.github.github-token).
 	// Also skipped when tools.github is explicitly disabled (github: false) — do not re-enable it.
 	if data.ParsedTools != nil && data.ParsedTools.GitHub != nil &&
+		!data.ParsedTools.GitHub.TokenBroker &&
 		topLevelFallbackNeeded(data.ParsedTools.GitHub.GitHubApp, data.ParsedTools.GitHub.GitHubToken) &&
 		data.Tools["github"] != false {
 		workflowGitHubAppLog.Print("Applying top-level github-app fallback for tools.github")

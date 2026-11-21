@@ -1,6 +1,8 @@
 package workflow
 
 import (
+	"fmt"
+
 	"github.com/github/gh-aw/pkg/logger"
 )
 
@@ -38,6 +40,7 @@ type SafeOutputJobConfig struct {
 	PreSteps                   []string          // Optional steps to run before the GitHub Script step
 	PostSteps                  []string          // Optional steps to run after the GitHub Script step
 	Token                      string            // GitHub token for this output type
+	GitHubApp                  *GitHubAppConfig  // Optional per-handler installation credential
 	UseCopilotRequestsToken    bool              // Whether to use Copilot token preference chain
 	UseCopilotCodingAgentToken bool              // Whether to use agent token preference chain (config token > GH_AW_AGENT_TOKEN)
 	TargetRepoSlug             string            // Target repository for cross-repo operations
@@ -65,7 +68,20 @@ func (c *Compiler) buildSafeOutputJob(data *WorkflowData, config SafeOutputJobCo
 
 	// Add GitHub App token minting step if app is configured.
 	// This must run after setup/pre-steps so dynamic credentials can be prepared first.
-	if data.SafeOutputs != nil && data.SafeOutputs.GitHubApp != nil {
+	var app *GitHubAppConfig
+	if data.SafeOutputs != nil {
+		app = data.SafeOutputs.GitHubApp
+	}
+	if (usesTokenBrokerSafeOutputs(data) || config.JobName == "upload_assets") && config.GitHubApp != nil {
+		app = config.GitHubApp
+		config.Token = "${{ steps.safe-outputs-app-token.outputs.token }}"
+		if config.JobName == "upload_assets" && app.shouldIgnoreMissingKey() && !usesTokenBrokerSafeOutputs(data) {
+			config.Token = combineTokenExpressions(config.Token, resolveSafeOutputGitHubToken(data.SafeOutputs.GitHubToken))
+		}
+	} else if config.JobName == "upload_assets" && config.Token != "" {
+		app = nil
+	}
+	if app != nil {
 		safeOutputsJobsLog.Print("Adding GitHub App token minting step with auto-computed permissions")
 		// For workflow_call relay workflows, scope the token to the platform repo name only
 		// (not the full slug) because actions/create-github-app-token expects repo names
@@ -76,11 +92,75 @@ func (c *Compiler) buildSafeOutputJob(data *WorkflowData, config SafeOutputJobCo
 		}
 		steps = append(steps, c.buildGitHubAppTokenMintStepForRepository(
 			config.JobName,
-			data.SafeOutputs.GitHubApp,
+			app,
 			config.Permissions,
 			appTokenFallbackRepo,
 			inferSingleCheckoutRepositoryForGitHubAppOwner(data),
 		)...)
+	}
+
+	brokeredGitHub := usesTokenBrokerSafeOutputs(data) && config.Token == "" && !config.UseCopilotCodingAgentToken
+	if brokeredGitHub {
+		config.Permissions.Set(PermissionIdToken, PermissionWrite)
+		if level, _ := config.Permissions.Get(PermissionContents); level == PermissionWrite {
+			config.Permissions.Set(PermissionContents, PermissionRead)
+		}
+		steps = append(steps, c.buildGitHubBrokerTokenStep(data, "safe-outputs-app-token")...)
+	}
+
+	scriptData := data
+	if config.JobName == "upload_assets" {
+		// Verify both effective remote URLs and configure identity without storing
+		// a credential. The publisher supplies its selected token to git only.
+		gitSteps := c.generateGitConfigurationStepsWithToken("''", "")
+		steps = append(steps, gitSteps[:len(gitSteps)-1]...)
+		steps = append(steps, "          GIT_TOKEN: ''\n", gitSteps[len(gitSteps)-1])
+		token := config.Token
+		if token == "" && app != nil {
+			token = "${{ steps.safe-outputs-app-token.outputs.token }}"
+			if app.shouldIgnoreMissingKey() {
+				token = combineTokenExpressions(token, resolveSafeOutputGitHubToken(data.SafeOutputs.GitHubToken))
+			}
+		}
+		if token == "" {
+			token = resolveSafeOutputGitHubTokenForConfig(data, "", resolveSafeOutputGitHubToken, true)
+		}
+		config.Token = token
+		dataCopy := *data
+		safeOutputsCopy := *data.SafeOutputs
+		safeOutputsCopy.GitHubApp = nil
+		dataCopy.SafeOutputs = &safeOutputsCopy
+		scriptData = &dataCopy
+		helper := `!f() { protocol= host=; while IFS= read -r line && [ -n "$line" ]; do case "$line" in protocol=*) protocol=${line#protocol=} ;; host=*) host=${line#host=} ;; esac; done; server=${GITHUB_SERVER_URL#https://}; if [ "$server" != "$GITHUB_SERVER_URL" ] && [ "$protocol" = https ] && [ "$host" = "$server" ] && [ -n "$GH_AW_ASSET_GIT_TOKEN" ]; then printf 'username=x-access-token\npassword=%s\n' "$GH_AW_ASSET_GIT_TOKEN"; else printf 'quit=true\n'; fi; }; f`
+		config.CustomEnvVars = append(config.CustomEnvVars,
+			"          GH_AW_ASSET_GIT_AUTH_REQUIRED: 'true'\n",
+			"          GH_AW_ASSET_GIT_TOKEN: "+token+"\n",
+			"          GIT_CONFIG_COUNT: '7'\n",
+			"          GIT_CONFIG_KEY_0: credential.helper\n",
+			"          GIT_CONFIG_VALUE_0: ''\n",
+			"          GIT_CONFIG_KEY_1: credential.helper\n",
+			fmt.Sprintf("          GIT_CONFIG_VALUE_1: %q\n", helper),
+			"          GIT_CONFIG_KEY_2: http.extraheader\n",
+			"          GIT_CONFIG_VALUE_2: ''\n",
+			"          GIT_CONFIG_KEY_3: http.${{ github.server_url }}/.extraheader\n",
+			"          GIT_CONFIG_VALUE_3: ''\n",
+			"          GIT_CONFIG_KEY_4: http.followRedirects\n",
+			"          GIT_CONFIG_VALUE_4: 'false'\n",
+			"          GIT_CONFIG_KEY_5: http.${{ github.server_url }}/${{ github.repository }}.extraheader\n",
+			"          GIT_CONFIG_VALUE_5: ''\n",
+			"          GIT_CONFIG_KEY_6: http.${{ github.server_url }}/${{ github.repository }}.git.extraheader\n",
+			"          GIT_CONFIG_VALUE_6: ''\n",
+			"          GIT_TERMINAL_PROMPT: '0'\n",
+			"          GIT_ASKPASS: 'false'\n",
+			"          GIT_SSH_COMMAND: 'false'\n",
+			"          GIT_TRACE: '0'\n",
+			"          GIT_TRACE_CURL: '0'\n",
+			"          GIT_TRACE_PACKET: '0'\n",
+			"          GIT_TRACE2: '0'\n",
+			"          GIT_TRACE2_EVENT: '0'\n",
+			"          GIT_TRACE2_PERF: '0'\n",
+			"          GIT_CURL_VERBOSE: '0'\n",
+		)
 	}
 
 	// Build the step based on action mode
@@ -88,7 +168,7 @@ func (c *Compiler) buildSafeOutputJob(data *WorkflowData, config SafeOutputJobCo
 	if c.actionMode.UsesExternalActions() && config.ScriptName != "" {
 		// Use custom action mode (dev or release) if enabled and script name is provided
 		safeOutputsJobsLog.Printf("Using custom action mode (%s) for script: %s", c.actionMode, config.ScriptName)
-		scriptSteps = c.buildCustomActionStep(data, GitHubScriptStepConfig{
+		scriptSteps = c.buildCustomActionStep(scriptData, GitHubScriptStepConfig{
 			StepName:                   config.StepName,
 			StepID:                     config.StepID,
 			MainJobName:                config.MainJobName,
@@ -108,7 +188,7 @@ func (c *Compiler) buildSafeOutputJob(data *WorkflowData, config SafeOutputJobCo
 		} else {
 			safeOutputsJobsLog.Printf("Using inline mode (actions/github-script)")
 		}
-		scriptSteps = c.buildGitHubScriptStep(data, GitHubScriptStepConfig{
+		scriptSteps = c.buildGitHubScriptStep(scriptData, GitHubScriptStepConfig{
 			StepName:                   config.StepName,
 			StepID:                     config.StepID,
 			MainJobName:                config.MainJobName,
@@ -125,6 +205,9 @@ func (c *Compiler) buildSafeOutputJob(data *WorkflowData, config SafeOutputJobCo
 	// Add post-steps if provided (e.g., assignees, reviewers)
 	if len(config.PostSteps) > 0 {
 		steps = append(steps, config.PostSteps...)
+	}
+	if brokeredGitHub {
+		steps = append(steps, c.buildBrokerInvalidationStep(data)...)
 	}
 	var jobEnv map[string]string
 	if safeOutputAuthorizationEnabled(data.SafeOutputs) {

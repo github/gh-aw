@@ -1,5 +1,6 @@
 ---
 title: MCP Scripts Specification
+spec: true
 description: Formal specification for MCP Scripts custom MCP tools following W3C conventions
 sidebar:
   order: 1360
@@ -1213,6 +1214,10 @@ Implementations SHOULD provide:
 3. Test fixtures for common scenarios
 4. Integration test environment setup
 5. Conformance report generation
+
+### 12.4 Bounded Formal Model
+
+The [MCP Scripts invocation model](https://github.com/github/gh-aw/blob/main/specs/workflow-security/MCPScriptInvocation.tla) and [TLC configuration](https://github.com/github/gh-aw/blob/main/specs/workflow-security/MCPScriptInvocation.cfg) check the ordering in §5.1.1, default caller-controlled retries in §5.7, and attempt-local output provenance in §8. The model bounds a single invocation to three attempts. It abstracts JSON-RPC encoding, sanitization itself, process isolation, timeout and backoff timing, and cleanup of published files at workflow shutdown.
 
 ---
 

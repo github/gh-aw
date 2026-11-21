@@ -12,19 +12,21 @@ import (
 )
 
 type ruleContract struct {
-	targets       ASTTargets
-	threatRuleID  string
-	unsafe        string
-	safe          string
-	path          string
-	severity      Severity
-	strictPolicy  bool
-	javaScript    bool
-	unsafePrompt  string
-	safePrompt    string
-	actionsUnsafe string
-	actionsSafe   string
-	actionsPath   string
+	targets      ASTTargets
+	threatRuleID string
+	unsafe       string
+	safe         string
+	path         string
+	severity     Severity
+	strictPolicy bool
+	// findingThreatRuleID overrides threatRuleID for rules that map findings individually.
+	findingThreatRuleID string
+	javaScript          bool
+	unsafePrompt        string
+	safePrompt          string
+	actionsUnsafe       string
+	actionsSafe         string
+	actionsPath         string
 }
 
 const contractJob = "jobs:\n  check:\n    runs-on: ubuntu-latest\n"
@@ -32,6 +34,18 @@ const contractSafeSteps = "    steps:\n      - shell: bash\n        run: echo pu
 
 func builtInRuleContracts() map[string]ruleContract {
 	return map[string]ruleContract{
+		"unpinned-images": {
+			targets: ActionsAST | AWAST, severity: Warning,
+			unsafe: contractJob + "    container: node:latest\n" + contractSafeSteps,
+			safe:   contractJob + contractSafeSteps,
+			path:   "jobs.check.container",
+		},
+		"environment-file-injection": {
+			targets: ActionsAST | AWAST,
+			unsafe:  contractJob + "    steps:\n      - shell: bash\n        env: {BODY: '${{ github.event.comment.body }}'}\n        run: printf 'VALUE=%s\\n' \"$BODY\" >> \"$GITHUB_ENV\"\n",
+			safe:    contractJob + contractSafeSteps,
+			path:    "jobs.check.steps[0].run",
+		},
 		"privileged-checkout": {
 			targets: ActionsAST | AWAST, severity: Warning,
 			unsafe: "on: pull_request_target\n" + contractJob + "    steps:\n      - uses: actions/checkout@v7\n        with: {allow-unsafe-pr-checkout: true}\n",
@@ -266,6 +280,12 @@ func builtInRuleContracts() map[string]ruleContract {
 			safe:         "safe-outputs:\n  steps:\n    - run: cat /tmp/value\n",
 			path:         "safe-outputs.steps[0].run",
 		},
+		"safe-output-credentials": {
+			targets: AWAST, strictPolicy: true, findingThreatRuleID: "CTR-036",
+			unsafe: "safe-outputs:\n  steps:\n    - run: echo X=1 >> \"$GITHUB_ENV\"\n",
+			safe:   "safe-outputs:\n  steps:\n    - run: echo x=1 >> \"$GITHUB_OUTPUT\"\n",
+			path:   "safe-outputs.steps[0].run",
+		},
 		"firewall-ssl-bump": {
 			threatRuleID: "CTR-011",
 			targets:      AWAST,
@@ -371,7 +391,7 @@ func ruleContractInput(t *testing.T, source string, target ASTTargets, nonstrict
 func assertRuleContractDiagnostics(t *testing.T, id string, contract ruleContract, target ASTTargets, nonstrict, positive bool, diagnostics []Diagnostic) {
 	t.Helper()
 	want := make(map[string]Severity)
-	if id == "secret-leak" && target == AWAST {
+	if (id == "secret-leak" || id == "environment-file-injection") && target == AWAST {
 		// AW-only analysis must retain its generated-execution coverage gap,
 		// including in the negative case; it is not a secret disclosure.
 		want["workflow"] = Warning
@@ -396,11 +416,15 @@ func assertRuleContractDiagnostics(t *testing.T, id string, contract ruleContrac
 		severity, expected := want[diagnostic.Path]
 		require.True(t, expected, "unexpected diagnostic at %s", diagnostic.Path)
 		assert.Equal(t, id, diagnostic.RuleID)
-		assert.Equal(t, contract.threatRuleID, diagnostic.ThreatRuleID)
+		wantThreat := contract.threatRuleID
+		if contract.findingThreatRuleID != "" {
+			wantThreat = contract.findingThreatRuleID
+		}
+		assert.Equal(t, wantThreat, diagnostic.ThreatRuleID)
 		assert.Equal(t, severity, diagnostic.Severity)
 		assert.NotEmpty(t, diagnostic.Message)
 		if diagnostic.Path == "workflow" {
-			assert.Equal(t, "Incomplete secret-leak analysis: only authored AW execution nodes are available; imports, generated steps, cross-job flows and compiler defaults require the compiled Actions AST", diagnostic.Message)
+			assert.Equal(t, "Incomplete "+id+" analysis: only authored AW execution nodes are available; imports, generated steps, cross-job flows and compiler defaults require the compiled Actions AST", diagnostic.Message)
 		}
 		delete(want, diagnostic.Path)
 	}

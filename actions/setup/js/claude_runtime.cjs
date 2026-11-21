@@ -1,11 +1,16 @@
 // @ts-check
 "use strict";
 
+// @safe-outputs-exempt USE-001 — this is the Claude engine runtime harness, not a safe-output handler; it only
+// reads the safe-outputs byte offset to resume a session and never records or applies safe-output operations,
+// so the E001-E010 handler error codes do not apply to its internal errors.
+
 const { iterateJsonl, iterateJsonlEvents } = require("./jsonl_helpers.cjs");
 const fs = require("fs");
 const path = require("path");
 const { countPermissionDeniedIssues, extractDeniedCommands } = require("./permission_denied_helpers.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
+const { getSafeOutputsByteOffset } = require("./harness_safe_outputs.cjs");
 
 const CLAUDE_RESUME_PROMPT = "Continue the interrupted task using the existing session. Preserve completed work and staged safe outputs; do not repeat them. Complete only unfinished work.";
 
@@ -128,13 +133,7 @@ function claudeRepositoryEditPolicy(args, env) {
 
 /** @param {string} outputPath @returns {number} */
 function claudeSafeOutputsOffset(outputPath) {
-  if (!outputPath) return 0;
-  try {
-    return fs.statSync(outputPath).size;
-  } catch (error) {
-    if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") return 0;
-    throw new Error(`Failed to inspect Claude safe-outputs file: ${getErrorMessage(error)}`, { cause: error });
-  }
+  return getSafeOutputsByteOffset(outputPath, { strict: true, errorLabel: "Claude safe-outputs file" });
 }
 
 /** @param {string | undefined} pluginDir */

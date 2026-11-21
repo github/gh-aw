@@ -1,17 +1,20 @@
 ---
 title: AW Admission Service Specification
+spec: true
 description: OIDC-authenticated admission, conclusion session delivery, component allowances, and the independent opt-in token broker contract
 sidebar:
   order: 1362
 ---
 
-**Version**: 1.4 draft<br />
+**Version**: 1.5 draft<br />
 **Status**: gh-aw client implemented; admission authority deployed separately<br />
-**Date**: 2026-10-20
+**Date**: 2026-11-19
 
 The terms MUST, MUST NOT, SHOULD, and MAY indicate normative requirements. This repository implements the gh-aw client and compiler integration. The admission authority, trusted accounting ingestion, provisioning, and backend claim verification remain deployment-owned services; the contracts below apply to both sides.
 
 ## 1. Scope and Ownership
+
+The [companion TypeSpec definition](https://github.com/github/gh-aw/blob/main/docs/src/content/docs/specs/admission-service-specification.tsp) describes both service operations: activation admission and conclusion notification. This specification also defines strict wire validation, identity binding, and delivery behavior.
 
 The compiler MUST omit admission code by default. Set `"admission": true` in `.github/workflows/aw.json` to generate the admission check in `activation` and callback in `conclusion` for all workflows. An explicit repository `admission` boolean takes precedence over workflow frontmatter `on.admission`; absent either setting, the default is `false`. When the effective setting is `false`, the compiler MUST omit both steps and admission outputs without changing either job's permissions. Changing these settings requires recompilation. The check runs after activation setup and before author pre-steps, daily validation and agent execution. Only validated results and component allowances propagate to downstream jobs; credentials, request identity and service diagnostics remain client-local. Without a configured endpoint, an explicit step `if` skips admission, and activation continues through its existing fallback checks. A deployment-selected **admission authority server** (the authority) MUST implement the HTTPS admission service, trusted usage ingestion, policy evaluation, and protected operator diagnostics. It MAY use a server-side GitHub App for backend verification and configuration provisioning.
 
@@ -172,6 +175,7 @@ authorization: bearer <OIDC_JWT>
 content-type: application/json
 cache-control: no-store
 traceparent: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01
+baggage: cicd.pipeline.task.name=activation
 
 {
   "repo": "acme/project",
@@ -180,6 +184,7 @@ traceparent: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01
   "workflow_call_id": "1234-2:acme/project/.github/workflows/triage.lock.yml@refs/heads/main",
   "run_id": "1234",
   "run_attempt": "2",
+  "job_id": "activation",
   "ref": "refs/heads/main",
   "event_type": "workflow_dispatch",
   "actor": "octocat",
@@ -193,15 +198,15 @@ This POST targets the configured authority, not `api.github.com`. It is the prop
 
 ### Proxy-Friendly Header Conventions
 
-Emit lowercase application-controlled protocol field names and accept all HTTP field names case-insensitively, following [HTTP field-name semantics](https://www.rfc-editor.org/rfc/rfc9110.html#section-5.1). Transport-generated HTTP/1.1 fields such as `Date` or `Content-Length` MAY use conventional casing; HTTP/2 field names MUST follow its lowercase transport requirement. Use the standard W3C `traceparent` field, not `trace-parent`, `otel-traceparent`, or `x-trace-id`. The required standard request fields are `authorization`, `content-type`, `cache-control`, and `traceparent`.
+Emit lowercase application-controlled protocol field names and accept all HTTP field names case-insensitively, following [HTTP field-name semantics](https://www.rfc-editor.org/rfc/rfc9110.html#section-5.1). Transport-generated HTTP/1.1 fields such as `Date` or `Content-Length` MAY use conventional casing; HTTP/2 field names MUST follow its lowercase transport requirement. Use the standard W3C `traceparent` field, not `trace-parent`, `otel-traceparent`, or `x-trace-id`. The required standard request fields are `authorization`, `content-type`, `cache-control`, and `traceparent`; when job context is available, the client also sends one locally generated `baggage` member as defined in [OpenTelemetry Correlation](#opentelemetry-correlation).
 
 Any future custom header MUST use the lowercase `gh-aw-` namespace followed by ASCII alphanumeric, hyphen-separated words: `gh-aw-[a-z0-9]+(?:-[a-z0-9]+)*`. Do not use underscores, spaces, dotted OTel attribute names, or an `x-` prefix. This protocol defines no custom headers and no response trace or correlation identifier.
 
-Proxies and API gateways MUST allow and preserve the standard fields, without appending or comma-joining `traceparent` values, rewriting trace IDs, or caching admission responses. They MUST NOT forward arbitrary caller headers or use forwarded-host headers to select an issuer, audience, or tenant. Document transport limits that accommodate valid GitHub OIDC tokens and trace context. Infrastructure header/body limits still apply before protocol processing.
+Proxies and API gateways MUST allow and preserve `traceparent` and, when present, the single locally generated `cicd.pipeline.task.name` baggage member described in [OpenTelemetry Correlation](#opentelemetry-correlation). They MUST NOT append or comma-join trace or baggage values, rewrite trace IDs, cache admission responses, or forward arbitrary inherited baggage or other caller headers. They MUST NOT use forwarded-host headers to select an issuer, audience, or tenant. Document transport limits that accommodate valid GitHub OIDC tokens and correlation headers. Infrastructure header/body limits still apply before protocol processing.
 
 ### JSON Request Fields
 
-All ten fields are required exactly once in a UTF-8 JSON object. Every value is a string, including run IDs and attempt numbers. Standard runner sources below are defined in GitHub's [default environment variables](https://docs.github.com/en/actions/reference/workflows-and-actions/variables#default-environment-variables); the executing workflow reference uses gh-aw's existing metadata wiring:
+The ten identity fields are required exactly once in a UTF-8 JSON object. The client MUST also include `job_id` whenever `GITHUB_JOB` is available; callers without a job context omit it. Every value is a string, including run IDs and attempt numbers. Standard runner sources below are defined in GitHub's [default environment variables](https://docs.github.com/en/actions/reference/workflows-and-actions/variables#default-environment-variables); the executing workflow reference uses gh-aw's existing metadata wiring:
 
 | Field | Meaning and validation |
 |-------|------------------------|
@@ -211,6 +216,7 @@ All ten fields are required exactly once in a UTF-8 JSON object. Every value is 
 | `workflow_call_id` | Derive exactly `<run_id>-<run_attempt>:<workflow_id>`, matching `aw_info.workflow_call_id`; not a separate GitHub claim |
 | `run_id` | `GITHUB_RUN_ID`: canonical ASCII decimal run ID; preserve as a string and compare with signed `run_id` |
 | `run_attempt` | `GITHUB_RUN_ATTEMPT`: canonical ASCII decimal attempt number; MUST match signed `run_attempt` |
+| `job_id` | `GITHUB_JOB`: logical job ID for diagnostics, preserved using JSON string encoding. Not a signed job-execution identity or proof of authorization. |
 | `ref` | `GITHUB_REF`: current GitHub Actions ref; MUST match signed `ref` |
 | `event_type` | `GITHUB_EVENT_NAME`: current event name; MUST match supported signed `event_name` |
 | `actor` | `GITHUB_ACTOR` / `github.actor`: original run actor login; MUST match signed `actor` |
@@ -226,7 +232,7 @@ The client MUST pass both values from the current [GitHub Actions context](https
 
 The client derives fields from the current runner context and executing workflow reference, not caller-supplied `aw_context`. Existing gh-aw populates `GH_AW_INFO_WORKFLOW_ID` from `job.workflow_ref` and builds `aw_info.workflow_call_id` with `buildWorkflowCallId`; admission MUST preserve those semantics. For reusable workflows, `github.workflow_ref` and `GITHUB_WORKFLOW_REF` identify the caller and MUST NOT replace the executing reference. Missing executing identity or run attempt MUST block admission rather than use the metadata helper's empty-reference or default-attempt fallback. The request sends no full event payload, arbitrary inbound context, usage, balances, or policy values. Original triggering-event lineage is not part of this protocol.
 
-The service MUST reject missing, duplicate, unknown, malformed, empty, or oversized fields, non-object bodies, non-string values, unsupported content types, and request query parameters. It MUST impose documented body/header limits and SHOULD support an 8 KiB JSON body. Invalid UTF-8, control characters, invalid repository slugs, non-positive run numbers, or inconsistent invocation IDs receive the uniform denial. Body values MUST NOT be interpreted as executable expressions, outbound URLs, or credential selectors.
+The service MUST reject missing required fields, duplicate, unknown, malformed, empty, or oversized fields, non-object bodies, non-string values, unsupported content types, and request query parameters. It MUST impose documented body/header limits and SHOULD support an 8 KiB JSON body. Invalid UTF-8, control characters, invalid repository slugs, non-positive run numbers, or inconsistent invocation IDs receive the uniform denial. Body values MUST NOT be interpreted as executable expressions, outbound URLs, or credential selectors.
 
 JSON member names and string values in requests and success responses MUST decode to Unicode scalar-value sequences. Unpaired surrogate escapes MUST be rejected, not replaced; valid surrogate pairs remain supported. Decode JSON escapes exactly once and compare decoded identifiers exactly, without case folding or Unicode normalization. Invalid request strings receive the uniform denial; invalid success strings are blocking protocol failures.
 
@@ -248,9 +254,9 @@ Creating and sending request trace context MUST NOT enable client telemetry expo
 
 Trace IDs MUST NOT be used as metric datapoint dimensions, public metric labels, or authorization to access another tenant's telemetry.
 
-Trace context is untrusted observability data, not an authorization claim. Within overall HTTP transport limits, missing, malformed, oversized, or duplicate trace context MUST NOT change admission or outage decisions: the authority discards it and starts a fresh context without echoing or logging raw invalid values. Export failures MUST NOT change the decision, disable the check, or cause another admission request.
+Trace context and baggage are untrusted observability data, not authorization claims. Within overall HTTP transport limits, missing, malformed, oversized, or duplicate `traceparent` or `baggage` MUST NOT change admission or outage decisions: the authority starts a fresh trace only when `traceparent` is unusable and ignores invalid baggage, without echoing or logging raw invalid values. Export failures MUST NOT change the decision, disable the check, or cause another admission request.
 
-Only `traceparent` is propagated across this boundary. Arbitrary `tracestate` and `baggage` MUST NOT be forwarded or reflected; received values are ignored. Sampling is locally controlled and independent of spend, actor privileges, or an attacker-supplied sampled flag. Credentials, policy reasons, usage, balances, and personal metadata MUST NOT be encoded in trace identifiers or propagation headers.
+Alongside `traceparent`, the client MUST construct a single W3C `baggage` member, `cicd.pipeline.task.name=<encoded-job-id>`, from nonempty, well-formed `GITHUB_JOB` when available. Header sanitization percent-encodes UTF-8 using `encodeURIComponent`, including whitespace, CR/LF, Unicode, baggage delimiters and literal percent signs; JSON `job_id` retains the original value. The authority MAY extract this OpenTelemetry CI/CD task name for diagnostics, but MUST NOT treat it or unsigned `job_id` as proof of the signed job execution. Baggage is not automatically a span attribute. Arbitrary inherited `tracestate` and baggage MUST NOT be forwarded or reflected, and unknown baggage members MUST be ignored. These correlation headers MUST NOT be sent to the GitHub OIDC issuer. Sampling is locally controlled and independent of spend, actor privileges, or an attacker-supplied sampled flag. Credentials, policy reasons, usage, balances, and personal metadata MUST NOT be encoded in trace identifiers or propagation headers.
 
 Responses do not echo trace headers or disclose internal reason identifiers. The successful JSON response carries only the Section 5 policy allowances. Detailed service reasons remain in protected, tenant-scoped telemetry and MUST NOT appear in workflow-visible span attributes or events. Denied, skipped, and fail-open executions preserve existing OTel configuration; no response identifier is required or fabricated.
 
@@ -264,17 +270,17 @@ Existing agent, threat-detection and evals engine execution steps select only th
 
 The helper then succeeds, and activation finishes its remaining checks. GitHub Actions schedules the already-dependent agent job only if the existing [job dependency and success conditions](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#jobsjob_idneeds) permit it. The authority makes no callback or additional GitHub API call to resume the workflow. The workflow's normal engine credentials remain separate and MUST NOT be sent to the authority.
 
-The agent and its continuations consume the same effective invocation budget; they do not acquire another entitlement by repeating admission. All subsequent supported OTLP records retain the returned resource attribute as described above. If the endpoint is absent or an outage is ignored, there are no service decision values to transport; existing local/default controls remain. A denial, invalid success, or failed budget propagation blocks the agent instead of taking this continuation path.
+The agent and its continuations consume the same effective invocation budget; they do not acquire another entitlement by repeating admission. Subsequent supported OTLP records retain the workflow's existing trace context; no authority-issued resource attribute is returned. If the endpoint is absent or an outage is ignored, there are no service decision values to transport; existing local/default controls remain. A denial, invalid success, or failed budget propagation blocks the agent instead of taking this continuation path.
 
 ### Conclusion Notification
 
 The compiler MUST generate the unified session in conclusion, attempt usage-artifact upload, complete any configured upload retry, and only then run the trusted conclusion-admission callback step in the same job, including for work-queue participants. The callback MUST NOT acquire credentials or send a request before artifact publication attempts finish. It MUST use an endpoint-gated `always()` condition, `continue-on-error: true`, and a two-minute step timeout. Existing conclusion eligibility is unchanged: a skipped conclusion job cannot deliver a callback. An unsuccessful agent can still produce a useful session. If both artifact-upload attempts fail, the callback still attempts compact metadata delivery: ordering requires completed upload attempts, not guaranteed artifact availability. Failure or cancellation that prevents the conclusion job from running cannot guarantee a notification; consumers MUST NOT interpret absence as zero usage or successful completion.
 
-The callback reconstructs the same ten identity fields from compiler metadata and the current Actions context; it MUST NOT transport admission's identity or credentials through job outputs. It MUST read `/tmp/gh-aw/usage/aw_session.jsonl` from the runtime tree, not the separate `RUNNER_TEMP/gh-aw` setup tree, and apply the shared bounded compact projection before OIDC acquisition. Artifact IDs come directly from upload step outputs. The callback obtains a fresh OIDC JWT using conclusion's bootstrap credentials and the same effective audience. Admission tokens MUST NOT be persisted or reused across jobs. The authority MUST apply Section 4's issuer, audience, tenant, invocation and executing-workflow verification to conclusion requests independently of admission. A client-side `admitted` result is not required: executions allowed by the ignored-outage fallback also need session delivery.
+The callback reconstructs the same ten identity fields from compiler metadata and the current Actions context, and supplies conclusion's own `GITHUB_JOB` as `job_id` and encoded job baggage when available; it MUST NOT copy activation's job ID or transport admission's identity or credentials through job outputs. It MUST read `/tmp/gh-aw/usage/aw_session.jsonl` from the runtime tree, not the separate `RUNNER_TEMP/gh-aw` setup tree, and apply the shared bounded compact projection before OIDC acquisition. Artifact IDs come directly from upload step outputs. The callback obtains a fresh OIDC JWT using conclusion's bootstrap credentials and the same effective audience. Admission tokens MUST NOT be persisted or reused across jobs. The authority MUST apply Section 4's issuer, audience, tenant, invocation and executing-workflow verification to conclusion requests independently of admission. A client-side `admitted` result is not required: executions allowed by the ignored-outage fallback also need session delivery.
 
 The removed `jobs.admission` and `jobs.conclusion_admission` names remain reserved and MUST reject author configuration. The existing conclusion job continues to reject author-provided setup/pre/regular hooks. Its OIDC permission remains unchanged when the admission callback is omitted, including for work-queue participants.
 
-The complete request is a JSON object containing exactly Section 3's ten admission identity strings plus `session`, `session_compaction`, and `usage_artifact_ids`. `session` contains compact profile version 1 JSONL as defined by the [compact unified session specification](/gh-aw/specs/unified-agent-session-specification/#38-compact-unified-session-normative): at most 128 allowlisted metadata records and 16 KiB of UTF-8 JSONL. Agent conversation, reasoning, prompts, tool input/output and other unbounded payloads MUST NOT be sent. The client MUST derive this projection from the existing generated, redacted unified session using the shared helper, without modifying the full artifact or reparsing raw engine logs.
+The complete request is a JSON object containing Section 3's ten admission identity strings, `job_id` when available, and exactly `session`, `session_compaction`, and `usage_artifact_ids`. `session` contains compact profile version 1 JSONL as defined by the [compact unified session specification](/gh-aw/specs/unified-agent-session-specification/#38-compact-unified-session-normative): at most 128 allowlisted metadata records and 16 KiB of UTF-8 JSONL. Agent conversation, reasoning, prompts, tool input/output and other unbounded payloads MUST NOT be sent. The client MUST derive this projection from the existing generated, redacted unified session using the shared helper, without modifying the full artifact or reparsing raw engine logs.
 
 `session_compaction` MUST contain exactly `version`, `included_events`, `omitted_events`, `oversized_lines`, `scan_truncated`, and `truncated`, mapping the shared helper's corresponding version and coverage fields. The compact profile is intentionally lossy; false truncation flags MUST NOT be interpreted as a complete session or complete usage accounting.
 
@@ -287,6 +293,7 @@ authorization: bearer <FRESH_CONCLUSION_OIDC_JWT>
 content-type: application/json
 cache-control: no-store
 traceparent: 00-4bf92f3577b34da6a3ce929d0e0e4736-a3ce929d0e0e4736-01
+baggage: cicd.pipeline.task.name=conclusion
 
 {
   "repo": "acme/project",
@@ -295,6 +302,7 @@ traceparent: 00-4bf92f3577b34da6a3ce929d0e0e4736-a3ce929d0e0e4736-01
   "workflow_call_id": "1234-2:acme/project/.github/workflows/triage.lock.yml@refs/heads/main",
   "run_id": "1234",
   "run_attempt": "2",
+  "job_id": "conclusion",
   "ref": "refs/heads/main",
   "event_type": "workflow_dispatch",
   "actor": "octocat",
@@ -692,7 +700,7 @@ Both implementations MUST provide automated coverage before rollout. Each ID def
 | ADM-001 | `POST /api/admission` with valid OIDC identity, audience, enrollment, permitted invocation, and caller `traceparent` | `200` JSON containing required `max_ai_credits` and independently optional component allowances, with `cache-control: no-store`; no trace or correlation ID returned |
 | ADM-002 | Missing token, GitHub API token, App credential, bad signature/algorithm, wrong issuer/audience, missing/wrong-type `aud`, undeclared singleton array, additional audience recipients, expired or premature token | Same empty `403`; no credential fallback or implicit audience-profile expansion |
 | ADM-003 | Different hidden spend bands and durable denial reasons | No reason/amount differences in status, body, headers, size, or intentional timing |
-| ADM-004 | Missing/duplicate/unknown/malformed JSON field, non-string value, query parameter, invalid content type, noncanonical decimal run/attempt string, or inconsistent invocation ID | Uniform `403`, including signed/body-matching leading-zero, signed, whitespace, exponent, or non-ASCII digit forms; no normalization or unsafe downstream calls |
+| ADM-004 | Missing required field, duplicate/unknown/malformed JSON field, non-string value, query parameter, invalid content type, noncanonical decimal run/attempt string, or inconsistent invocation ID | Uniform `403`, including signed/body-matching leading-zero, signed, whitespace, exponent, or non-ASCII digit forms; no normalization or unsafe downstream calls |
 | ADM-005 | JSON slashes, Unicode/reserved characters, escapes, surrogate pairs, unpaired surrogate escapes in names/values, and large decimal ID strings | Valid scalar sequences parse once without injection, normalization, truncation, or precision loss; unpaired surrogates receive uniform request denial or a blocking success-response protocol error, never replacement |
 | ADM-006 | Forged repo/run/attempt, ref, event, either actor, executing reference/call ID, or logical policy selector | Signed execution bindings and authorized policy mapping enforced; caller reference cannot replace reusable executing identity; unverified rerun metadata never authorizes or attributes spend |
 | ADM-007 | OIDC/JWKS, GitHub, usage, policy, or storage outage; slow token acquisition/renewal, internal retries, or response-body reads | Each token/HTTP operation bounded by ten seconds and remaining overall time; the entire sequence, including backoff, ends within 60 seconds; no fabricated policy results |
@@ -740,6 +748,7 @@ Both implementations MUST provide automated coverage before rollout. Each ID def
 | ADM-049 | Session ingestion access logs, tracing, diagnostics and storage | No raw session/token capture; redacted source file only; tenant-scoped access and bounded retention; no assumption that session content is trusted or secret-free |
 | ADM-050 | Initial/retry upload IDs, both uploads failing, superseded IDs, large decimal IDs, invalid IDs, or mutation during retry | Wire upload outputs; send at most two unique canonical decimal strings, retry first; preserve precision; empty array when unavailable; reject malformed IDs; freeze IDs and compact payload before retry |
 | ADM-051 | Cross-repository/run/attempt or reusable-invocation artifact substitution; expired, missing or oversized artifact | Authenticate server-side reads independently, verify artifact/invocation binding and full-session schema, bound retrieval resources, and never relabel compact metadata as a complete session |
+| ADM-052 | Available/missing job context, reserved characters in job names, admission retries and conclusion delivery | JSON `job_id` preserves the current job name, baggage is percent-encoded and HTTP-safe, and retries retain both values; conclusion uses its own job; unavailable context omits both; neither field authorizes execution or reaches the OIDC issuer |
 
 Tests MUST use synthetic credentials and accounting fixtures, not production secrets or real spend. Supported GitHub deployments, triggers, and reusable-workflow paths MUST have an explicit verified claim matrix, including audience shape/cardinality, required claim types, subject policy, and caller/executing identity mappings. Each supported audience profile MUST have matching positive and negative fixtures; a declared singleton-array profile accepts only its one configured recipient.
 

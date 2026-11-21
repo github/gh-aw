@@ -36,6 +36,7 @@ type importAccumulator struct {
 	pluginObjects            []map[string]any
 	safeOutputs              []string
 	gradersBuilder           strings.Builder
+	experimentsBuilder       strings.Builder
 	mcpScripts               []string
 	bots                     []string
 	botsSet                  map[string]bool
@@ -77,6 +78,7 @@ type importAccumulator struct {
 	// These express a model preference without selecting a specific engine.
 	mergedEngineModel string
 	routerShortlists  [][]string
+	routerDisabled    bool
 	// engineModelChoiceDeclared records that an import declares a top-level model
 	// or a preference-only engine model choice, including empty values.
 	engineModelChoiceDeclared bool
@@ -142,6 +144,7 @@ func (acc *importAccumulator) buildImportsResult() *ImportsResult {
 		MergedPluginObjects:           acc.pluginObjects,
 		MergedSafeOutputs:             acc.safeOutputs,
 		MergedGraders:                 acc.gradersBuilder.String(),
+		MergedExperiments:             acc.experimentsBuilder.String(),
 		MergedMCPScripts:              acc.mcpScripts,
 		MergedMarkdown:                acc.markdownBuilder.String(),
 		ImportPaths:                   acc.importPaths,
@@ -197,6 +200,7 @@ func (acc *importAccumulator) populateImportsResultScalars(result *ImportsResult
 	result.MergedEngineMCPSessionTimeout = acc.mergedEngineMCPSessionTimeout
 	result.MergedEngineModel = acc.mergedEngineModel
 	result.RouterShortlists = acc.routerShortlists
+	result.RouterDisabled = acc.routerDisabled
 	result.EngineModelChoiceDeclared = acc.engineModelChoiceDeclared
 	result.MergedMaxTurns = acc.mergedMaxTurns
 	result.MergedMaxToolDenials = acc.mergedMaxToolDenials

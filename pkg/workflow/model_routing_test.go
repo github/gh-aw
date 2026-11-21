@@ -496,6 +496,53 @@ func TestValidateModelRoutingRequiresMinimumAWFVersion(t *testing.T) {
 	require.ErrorContains(t, err, "requires AWF v0.28.29 or newer")
 }
 
+func TestValidateModelRoutingCostOnlyVersion(t *testing.T) {
+	for _, tc := range []struct {
+		name            string
+		goal            string
+		firewallVersion string
+		agentVersion    string
+		wantError       bool
+	}{
+		{name: "default rejects cost-speed", goal: "cost-speed", wantError: true},
+		{name: "previous release accepts cost-speed", goal: "cost-speed", firewallVersion: "v0.29.16"},
+		{name: "boundary rejects cost-speed", goal: "cost-speed", firewallVersion: "v0.29.17", wantError: true},
+		{name: "unprefixed boundary rejects cost-speed", goal: "cost-speed", firewallVersion: "0.29.17", wantError: true},
+		{name: "newer release rejects cost-speed", goal: "cost-speed", firewallVersion: "v0.30.0", wantError: true},
+		{name: "latest rejects cost-speed", goal: "cost-speed", firewallVersion: "latest", wantError: true},
+		{name: "older agent override accepts cost-speed", goal: "cost-speed", firewallVersion: "v0.29.17", agentVersion: "v0.29.16"},
+		{name: "newer agent override rejects cost-speed", goal: "cost-speed", firewallVersion: "v0.29.16", agentVersion: "v0.29.17", wantError: true},
+		{name: "default accepts cost", goal: "cost"},
+		{name: "previous release accepts cost", goal: "cost", firewallVersion: "v0.29.16"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			data := &WorkflowData{
+				EngineConfig: &EngineConfig{
+					ID: "copilot",
+					ModelRouting: &CopilotModelRoutingConfig{
+						Goal: tc.goal, Mode: "balanced", AllowedModels: []string{"gpt-5.4-mini"},
+					},
+				},
+				NetworkPermissions: &NetworkPermissions{
+					Firewall: &FirewallConfig{Enabled: true, Version: tc.firewallVersion},
+				},
+				SandboxConfig: &SandboxConfig{
+					Agent: &AgentSandboxConfig{Type: SandboxTypeAWF, Version: tc.agentVersion},
+				},
+			}
+			err := validateModelRouting(data, "copilot")
+			if tc.wantError {
+				require.ErrorContains(t, err, "engine.model-routing.goal")
+				require.ErrorContains(t, err, "AWF v0.29.17 and newer support only cost routing")
+				require.ErrorContains(t, err, "Set engine.model-routing.goal to cost")
+				require.ErrorContains(t, err, "not an alias")
+				return
+			}
+			require.NoError(t, err)
+		})
+	}
+}
+
 func TestValidateModelRoutingEngineCompatibility(t *testing.T) {
 	for _, tc := range []struct {
 		name      string
@@ -933,7 +980,7 @@ func (c defaultRoutingCompilation) awfConfigs(t *testing.T) []map[string]any {
 	return configs
 }
 
-const defaultRoutingNoticeMarker = "Set engine.model-routing: false to opt out"
+const defaultRoutingNoticeMarker = "Set model-routing: false to opt out"
 
 // requireNoDefaultRouting asserts the compiled lock keeps today's non-routed
 // behavior: no routing config, router image, decision step, conversation step,
@@ -947,9 +994,13 @@ func requireNoDefaultRouting(t *testing.T, c defaultRoutingCompilation) {
 	require.NotContains(t, c.lock, `\"routing\":{`)
 	require.NotContains(t, c.lock, "GH_AW_MODEL_ROUTING: ")
 	require.NotContains(t, c.stderr, defaultRoutingNoticeMarker)
-	stderr := strings.ToLower(c.stderr)
-	require.NotContains(t, stderr, "model routing", "no routing diagnostics for a workflow without the default")
-	require.NotContains(t, stderr, "model-routing", "no routing diagnostics for a workflow without the default")
+	for line := range strings.SplitSeq(strings.ToLower(c.stderr), "\n") {
+		if strings.Contains(line, "engine.model-routing is deprecated.") || strings.Contains(line, "engine.pi.model-routing is deprecated.") {
+			continue
+		}
+		require.NotContains(t, line, "model routing", "no routing diagnostics except legacy migration warnings")
+		require.NotContains(t, line, "model-routing", "no routing diagnostics except legacy migration warnings")
+	}
 	if c.data != nil && c.data.EngineConfig != nil {
 		require.Nil(t, c.data.EngineConfig.ModelRouting)
 	}

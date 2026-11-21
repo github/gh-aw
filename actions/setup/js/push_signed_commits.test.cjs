@@ -471,8 +471,46 @@ describe("push_signed_commits integration tests", () => {
           allowGitPushFallback: false,
           requireBaseRefMatch: true,
         })
-      ).rejects.toThrow(/ledger branch moved/);
+      ).rejects.toThrow(/branch ledger-branch moved from [0-9a-f]{40} to [0-9a-f]{40}/);
       expect(githubClient.graphql).not.toHaveBeenCalled();
+    });
+
+    it("refuses to recreate a deleted branch when the base must match", async () => {
+      execGit(["checkout", "-b", "deleted-branch"], { cwd: workDir });
+      fs.writeFileSync(path.join(workDir, "memory.jsonl"), "{}\n");
+      execGit(["add", "memory.jsonl"], { cwd: workDir });
+      execGit(["commit", "-m", "Save"], { cwd: workDir });
+      global.exec = makeRealExec(workDir);
+      const githubClient = makeMockGithubClient();
+
+      await expect(pushSignedCommits({ githubClient, owner: "test-owner", repo: "test-repo", branch: "deleted-branch", baseRef: "origin/main", cwd: workDir, requireBaseRefMatch: true })).rejects.toThrow(
+        /branch deleted-branch moved from [0-9a-f]{40} to no readable head/
+      );
+      expect(githubClient.graphql).not.toHaveBeenCalled();
+      expect(githubClient.rest.git.createRef).not.toHaveBeenCalled();
+      expect(execGit(["ls-remote", bareDir, "refs/heads/deleted-branch"], { cwd: workDir }).stdout.trim()).toBe("");
+    });
+
+    it("keeps the unsigned fallback from undoing a reset made during the signed push", async () => {
+      const resetTarget = execGit(["rev-parse", "HEAD"], { cwd: workDir }).stdout.trim();
+      execGit(["checkout", "-b", "memory-branch"], { cwd: workDir });
+      fs.writeFileSync(path.join(workDir, "base.txt"), "base\n");
+      execGit(["add", "base.txt"], { cwd: workDir });
+      execGit(["commit", "-m", "Base"], { cwd: workDir });
+      execGit(["push", "-u", "origin", "memory-branch"], { cwd: workDir });
+      const baseRef = execGit(["rev-parse", "HEAD"], { cwd: workDir }).stdout.trim();
+      fs.writeFileSync(path.join(workDir, "memory.jsonl"), "{}\n");
+      execGit(["add", "memory.jsonl"], { cwd: workDir });
+      execGit(["commit", "-m", "Save"], { cwd: workDir });
+      global.exec = makeRealExec(workDir);
+      const githubClient = makeMockGithubClient();
+      githubClient.graphql = vi.fn(async () => {
+        execGit(["push", "--force", "origin", `${resetTarget}:refs/heads/memory-branch`], { cwd: workDir });
+        throw new Error("GraphQL unavailable");
+      });
+
+      await expect(pushSignedCommits({ githubClient, owner: "test-owner", repo: "test-repo", branch: "memory-branch", baseRef, cwd: workDir, requireBaseRefMatch: true })).rejects.toThrow(/git push failed/);
+      expect(execGit(["ls-remote", bareDir, "refs/heads/memory-branch"], { cwd: workDir }).stdout.split(/\s+/)[0]).toBe(resetTarget);
     });
 
     it("should call GraphQL for a single new commit", async () => {

@@ -284,7 +284,7 @@ func (c *Compiler) renderWorkQueuePreparedCustomSteps(data *WorkflowData, name s
 
 func (c *Compiler) finishWorkQueuePreparedAdapterSteps(data *WorkflowData, name string, index int, steps []string) []string {
 	var redaction strings.Builder
-	c.generateTrackedSecretRedactionStep(&redaction, strings.Join(steps, ""), data)
+	c.generateTrackedSecretRedactionStep(&redaction, strings.Join(steps, ""), data, false)
 	steps = append(steps, redaction.String())
 	steps = append(steps,
 		"      - name: Upload isolated Claim adapter preparation\n",

@@ -1,14 +1,24 @@
 ---
-description: Instructions for agents using TLA+/TLC or Koka to collect reproducible formal-methods evidence.
+description: Instructions for specifying APIs with TypeSpec and collecting reproducible formal-methods evidence with TLA+/TLC or Koka.
 ---
 
-# Formal methods with TLA+/TLC or Koka
+# API contracts and formal methods
 
 Use TLA+ and TLC for state-space exploration and temporal properties, or
 [Koka](https://koka-lang.github.io/koka/doc/index.html) for typed functional
 models with explicit algebraic effects and effect handlers. Choose the approach
 that fits the property being investigated; Koka's type and effect checks are not
 a substitute for TLC's model checking.
+
+## Specify APIs with TypeSpec
+
+- Define API operations, inputs, outputs, and errors in [TypeSpec](https://typespec.io/)
+  `.tsp` files as the single source of truth.
+- Generate the formats consumers need from the same definitions using TypeSpec
+  emitters, such as OpenAPI for HTTP APIs and JSON Schema for payload validation.
+- Compile the TypeSpec definitions and regenerate the configured outputs when
+  the contract changes. Fix drift in the `.tsp` source or emitter configuration,
+  not in generated files. Compilation checks the contract, not implementation behavior.
 
 ## Tooling
 

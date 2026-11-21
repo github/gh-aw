@@ -107,17 +107,57 @@ When a workflow does not configure `observability.otlp` (in its own frontmatter 
 | `GH_AW_DEFAULT_OTLP_ENDPOINT` | Secret or variable | OTLP endpoint URL used when no endpoint is configured in frontmatter |
 | `GH_AW_DEFAULT_OTLP_HEADERS` | Secret | Exporter headers (`key=value` pairs, comma-separated) sent to that endpoint |
 
-Because both are resolved at run time, setting them at the repository or organization level enables telemetry for every agentic workflow without editing any workflow file.
+Because these values are resolved at run time, setting defaults at the repository or organization level enables telemetry for every agentic workflow without editing each workflow file.
 
 Behavior:
 
-- The endpoint secret takes precedence over the variable when both are set; clear both values to disable OTLP export.
+- The endpoint secret takes precedence over the variable when both are set, including when an organization secret and repository variable are configured. Clear both values to disable OTLP export.
 - When both endpoint values are unset, the endpoint resolves to an empty string and OTLP export is a no-op.
-- When an endpoint is set but `GH_AW_DEFAULT_OTLP_HEADERS` is empty, no span is exported to that endpoint from any job (setup, conclusion, outcome, or MCP gateway) — the runtime treats an endpoint without matching credentials as unconfigured rather than exporting unauthenticated telemetry. The agent job additionally fails with an error so the misconfiguration is visible instead of silently degrading to no telemetry.
+- An endpoint without `GH_AW_DEFAULT_OTLP_HEADERS` is treated as unconfigured rather than exported without credentials. The agent job additionally fails with an error so the misconfiguration is visible.
 - Any `observability.otlp` configuration in frontmatter or an import overrides these defaults entirely.
 - If the workflow already defines any of the OTLP-related environment variables in its own `env:` block, the compiler skips injecting that specific variable instead of emitting a duplicate key.
 
 Set variables with `gh aw env update` or `gh variable set`. Set either value as a secret with `gh secret set`.
+
+#### Configure defaults in one command
+
+`gh aw env otel` tests an OTLP endpoint and configures the existing `GH_AW_DEFAULT_OTLP_ENDPOINT` and `GH_AW_DEFAULT_OTLP_HEADERS` Actions secrets, plus `OTEL_EXPORTER_OTLP_PROTOCOL` and `GH_AW_OTEL_METRICS` Actions variables. This is an operational command: it does not compile workflows, change generated files, or introduce a new configuration format.
+
+```bash
+gh aw env otel
+```
+
+The interactive command uses the current repository, prompts for the endpoint, displays the targets for confirmation, and reads comma-separated `key=value` headers with input hidden. Supply a complete authentication header value, and percent-encode commas inside values. Do not put header credentials in command arguments or shell history.
+
+For noninteractive setup, read headers from a protected file or a secret manager's stdout:
+
+```bash wrap
+gh aw env otel --repo my-org/my-repo \
+  --endpoint https://collector.example.com \
+  --protocol http/protobuf --headers-stdin --yes < otlp-headers.txt
+```
+
+| Option | Behavior |
+| --- | --- |
+| `--repo owner/repo`, `--org slug`, `--enterprise slug` | Repeat target flags to configure multiple targets with the same endpoint and credentials; without target flags, use the current repository |
+| `--scope repo\|org\|ent` | Restrict the target type; contradictory target flags fail |
+| `--visibility all\|private\|selected` | Organization repository access; defaults to `private`. Invalid with repository targets |
+| `--selected owner/repo` | Required for organization `selected` visibility; repeat for repositories belonging to the target organization |
+| `--endpoint URL` | HTTPS base endpoint or complete `/v1/traces` URL; userinfo credentials, fragments, raw quotes/backslashes, and control characters are rejected. Percent-encode quotes and backslashes. Plain HTTP is limited to literal loopback IP addresses |
+| `--protocol http/json\|http/protobuf` | Request encoding; defaults to `http/json` |
+| `--metrics=false` | Disable metrics; otherwise metrics are enabled |
+| `--headers-stdin` | Read the header secret from stdin, up to 48 KiB; requires `--endpoint` and `--yes` for noninteractive use |
+| `--yes` | Approve the displayed targets without prompting |
+
+Enterprise scope enumerates the enterprise organizations visible to the authenticated user through GitHub GraphQL and configures organization-level secrets and variables in each one. GitHub does not provide an enterprise-level Actions secrets API. Enterprise `--visibility all` or `private` applies that repository visibility to each organization. With enterprise `--visibility selected --selected my-org`, only named member organizations are configured, with private repository visibility. Enumeration requires enterprise read access; preflight fails if Actions secret/variable access is unavailable in an enumerated organization. The displayed targets are the configuration boundary: organizations hidden from enumeration or added later are not configured automatically.
+
+Before any setting is saved, the command sends an authenticated **empty traces export** to `/v1/traces`, using the selected protocol. It checks HTTP 200 and the bounded OTLP response, rejecting malformed responses and partial success with rejected spans. Warning-only partial success is accepted without exposing collector messages. This verifies route and credential acceptance, **not actual span ingestion**, logs, metrics, or connectivity from GitHub runners. The test has a 10-second deadline and a 64 KiB response limit, never follows redirects, and withholds response bodies and raw network errors. Sentry endpoint headers are normalized to `x-sentry-auth` before testing and saving.
+
+The command preflights encryption keys, variable access, and selected memberships for all targets before writing. Organization setup also checks existing secret visibility and inspects every affected repository for partial endpoint/header secret overrides. It rejects a repository with only one of these secrets, including a repository endpoint variable paired with a repository header secret. Configure both repository secrets before retrying organization setup. Existing complete repository secret overrides remain in effect. Inspection requires access to the affected repositories' secret metadata; `all` and `private` visibility additionally require a complete organization repository inventory. Use `selected` visibility to restrict inspection to explicitly named repositories. Changing an existing organization secret's visibility or selected repositories requires a coordinated manual migration.
+
+GitHub settings updates are not transactional. The command first replaces the endpoint secret with a nonempty invalid URL to disable default export without falling back to an endpoint variable. It then writes the header secret and protocol/metrics variables, and restores the validated endpoint last. A failed write can leave export disabled; rerun the command to recover. Earlier targets may already be configured, and the error identifies the failing target. Avoid concurrent settings changes and workflow starts while configuring defaults. Explicit workflow OTLP settings remain unchanged.
+
+Multiple targets do not mean multiple default collectors: runtime defaults support one endpoint/header pair. Use the frontmatter endpoint list for [multiple exporters](/gh-aw/reference/frontmatter/#observability-observability).
 
 ### Google Workload Identity Federation
 
@@ -205,6 +245,12 @@ gh-aw emits a small set of built-in spans and trace artifacts once OTLP is confi
 These fields are a compatibility contract. gh-aw may add OpenTelemetry-standard aliases over time, but existing span names, environment variables, JSONL shape, and documented attributes remain available for dashboards and customer backends.
 
 The built-in agent span uses OpenTelemetry [GenAI semantic conventions](https://opentelemetry.io/docs/specs/semconv/gen-ai/) for standard model, token, and finish-reason fields. gh-aw also adds a small number of gh-aw-specific fields.
+
+By default, gh-aw keeps its existing GenAI names and span shape while adding current standard aliases. Set `OTEL_SEMCONV_STABILITY_OPT_IN` to `gen_ai_v1` in workflow `env:` to use the current experimental GenAI span names and meanings; compatibility-only GenAI names are then omitted. The opt-in does not rename or remove `gh-aw.*` attributes or `gh_aw.*` metrics. The compatibility output remains the default during the staged migration.
+
+`gen_ai_v1` identifies the gh-aw opt-in contract; it does not imply a stable upstream GenAI release.
+
+For deprecated and superseded notation, use the specification's [GenAI migration map](https://github.com/github/gh-aw/blob/main/specs/otel-observability-spec.md#671-deprecated-and-superseded-genai-notation-informative). It maps legacy span names, attributes, provider values and token metrics to their replacements, including changed input-token semantics and span parentage. Upstream deprecation does not remove gh-aw compatibility support; migrate queries before enabling the opt-in.
 
 You usually do not need to configure or memorize these built-in attributes. They are mainly useful when building backend queries, dashboards, or deeper debugging workflows. For the exhaustive built-in inventory, see the [OpenTelemetry attribute reference](/gh-aw/reference/open-telemetry-attributes/).
 
@@ -394,6 +440,10 @@ env:
 
 The compiler injects `${{ vars.GH_AW_OTEL_METRICS || 'true' }}` unless the workflow defines `GH_AW_OTEL_METRICS` itself. To manage the Actions variable by repository, organization, or enterprise scope, use `gh aw env get` and `gh aw env update` with `default_otel_metrics: false`; deleting the variable restores the default-on behavior. Only the literal value `true` enables metrics. When enabled, metrics are sent to `/v1/metrics` as OTLP/HTTP JSON by default, or as protobuf when `OTEL_EXPORTER_OTLP_METRICS_PROTOCOL` or `OTEL_EXPORTER_OTLP_PROTOCOL` selects `http/protobuf` (see [Protobuf encoding](#protobuf-encoding-and-azure-monitor)), using the configured OTLP endpoints and their per-endpoint headers, and are mirrored to `/tmp/gh-aw/otel-metrics.jsonl` before export. The unified artifact includes the metrics mirror only when the effective runtime value is `true`. It contains metrics recorded in the agent job before artifact upload, including that job's built-in metrics; built-in metrics from other jobs are exported at post-job time and are not included in an artifact.
 
+The GenAI input counter includes cache-read and cache-write tokens exactly once when the source's cache semantics are known. Data points include `gen_ai.operation.name`, `gen_ai.provider.name`, and `gen_ai.token.modality` (`unknown` when modality is unavailable); zero or unavailable token values are omitted. `gen_ai.invoke_agent.duration` identifies the in-process agent invocation.
+
+Without the GenAI opt-in, `gen_ai.client.token.usage` with `gen_ai.token.type` is retained alongside the standard inference counters. OpenTelemetry removed this compatibility metric from its GenAI conventions; gh-aw does not deprecate it in this version. With the opt-in, that compatibility metric is omitted and its `gh_aw.tokens.*` aliases remain without `gen_ai.token.type`.
+
 Built-in metrics are emitted at job completion. Counters and histograms use delta temporality; durations and counts are job-level measurements.
 Unless noted, built-in metrics include `gh-aw.job.name` and `gh-aw.workflow.name` when available. Run metrics use the run conclusion for `cicd.pipeline.task.run.result`. The `gh_aw.job.errors` unit is `{job}`, while the `gh_aw.run.errors` compatibility metric uses `{run}`.
 
@@ -401,7 +451,9 @@ Unless noted, built-in metrics include `gh-aw.job.name` and `gh-aw.workflow.name
 | --- | --- | --- |
 | `gh_aw.job.duration` | Histogram, `s` | `cicd.pipeline.task.run.result` (job result), `gh-aw.job.name`, `gh-aw.workflow.name`, and (when known) `gh-aw.engine.id` and `gen_ai.request.model`; emitted for each completed job. |
 | `gh_aw.job.errors` | Counter, `{job}` | `cicd.pipeline.task.run.result` (job result), `gh-aw.job.name`, and `gh-aw.workflow.name`; emitted for `failure`, `timed_out`, or `cancelled` jobs. |
-| `gen_ai.client.token.usage` | Counter, `{token}` | `gen_ai.token.type` is `input`, `output`, `input_cache_read`, or `input_cache_write`; model and engine when known. Emitted for available, non-negative token counts when token usage is enabled. |
+| `gen_ai.client.inference.usage.input_tokens`, `gen_ai.client.inference.usage.output_tokens`, `gen_ai.client.inference.usage.cache_read.input_tokens`, `gen_ai.client.inference.usage.cache_write.input_tokens` | Counter, `{token}` | `gen_ai.operation.name`, `gen_ai.provider.name`, and `gen_ai.token.modality` (`unknown` when unavailable); emitted for available, positive token counts. The input count includes cache-read and cache-write tokens once when cache semantics are known. |
+| `gen_ai.client.token.usage` | Compatibility counter, `{token}` | Emitted by default with `gen_ai.token.type` set to `input`, `output`, `input_cache_read`, or `input_cache_write`; omitted with the GenAI opt-in. This superseded metric is not deprecated by this version. |
+| `gen_ai.invoke_agent.duration` | Histogram, `s` | `gen_ai.operation.name=invoke_agent`; emitted for the in-process agent invocation. |
 | `gh_aw.agent.turns` | Histogram, `{turn}` | Job and workflow names; emitted when a non-negative agent turn count is available. |
 | `gh_aw.tool_calls` | Counter, `{call}` | `gh-aw.tool.status` is `ok` or `error`; emitted for nonzero tool-call counts. |
 | `gh_aw.ai.credits.limit_exceeded` | Counter, `{event}` | Job and workflow names; emitted when an AI-credit limit is exceeded. |
@@ -414,10 +466,10 @@ The exporter also emits these compatibility names:
 | --- | --- |
 | `gh_aw.run.duration` | `gh_aw.job.duration` (uses the run conclusion for `cicd.pipeline.task.run.result`) |
 | `gh_aw.run.errors` | `gh_aw.job.errors` (unit `{run}`; emitted according to the run conclusion for `cicd.pipeline.task.run.result`) |
-| `gh_aw.tokens.input` | `gen_ai.client.token.usage` with `gen_ai.token.type=input` |
-| `gh_aw.tokens.output` | `gen_ai.client.token.usage` with `gen_ai.token.type=output` |
-| `gh_aw.tokens.cache_read` | `gen_ai.client.token.usage` with `gen_ai.token.type=input_cache_read` |
-| `gh_aw.tokens.cache_write` | `gen_ai.client.token.usage` with `gen_ai.token.type=input_cache_write` |
+| `gh_aw.tokens.input` | Input token count |
+| `gh_aw.tokens.output` | Output token count |
+| `gh_aw.tokens.cache_read` | Cache-read token count |
+| `gh_aw.tokens.cache_write` | Cache-write token count |
 | `gh_aw.safe_outputs` | `gh_aw.workflow.output.items` |
 
 The `gh_aw.run.*` names remain job-level measurements, not workflow-wide aggregates. Query a canonical metric or its compatibility name, not both, to avoid double counting.

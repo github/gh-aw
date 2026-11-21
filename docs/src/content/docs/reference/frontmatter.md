@@ -132,7 +132,7 @@ if: github.event_name == 'push'
 ### Token Broker (`token-broker:`)
 
 > [!WARNING]
-> Token broker authentication is experimental. Configuration and behavior may change without deprecation. Compiling a workflow that enables either capability emits a warning.
+> Token broker authentication is experimental. Configuration and behavior may change without deprecation. Compiling a workflow that enables a broker capability emits a warning.
 
 An optional object that independently enables OIDC-authenticated Copilot credential exchange.
 
@@ -141,7 +141,25 @@ token-broker:
   copilot-task: true
 ```
 
-Select `copilot-request`, `copilot-task`, or both independently. Brokered request authentication is supported in threat-detection and evals jobs; main agent inference remains blocked pending renewable AWF credential support. Request exchanges include the selected LLM inference provider ID. Jobs using brokered credentials run an unconditional post-step to invalidate credentials for that job. `copilot-request` cannot be combined with `permissions.copilot-requests: write`. The endpoint comes from the `GH_AW_TOKEN_BROKER_URL` Actions variable or secret at runtime, not from workflow source or the compiler environment. Missing configuration or failed credential exchange blocks the affected operation instead of falling back to existing credentials. See [enterprise token broker configuration](/gh-aw/reference/enterprise-configuration/#oidc-token-broker).
+Select `copilot-request`, `copilot-task`, or both independently. Brokered request authentication is supported in threat-detection and evals jobs; main agent inference remains blocked pending renewable AWF credential support. Request exchanges include the selected LLM inference provider ID. Jobs using brokered credentials run an unconditional post-step to invalidate credentials for that job. `copilot-request` cannot be combined with `permissions.copilot-requests: write`. The endpoint comes from the `GH_AW_TOKEN_BROKER_URL` Actions secret at runtime, not from workflow source or the compiler environment. Missing configuration or failed credential exchange blocks the affected operation instead of falling back to existing credentials. See [enterprise token broker configuration](/gh-aw/reference/enterprise-configuration/#oidc-token-broker).
+
+For GitHub API authentication, add `token-broker:` under `tools.github`, `safe-outputs`, or both. An empty value means `true`; explicit `false` disables the broker for that section.
+
+```aw
+tools:
+  github:
+    token-broker:
+safe-outputs:
+  token-broker:
+  add-comment:
+```
+
+These settings independently request the `github-app` broker capability; neither requires a top-level `token-broker` setting. Do not combine a section's enabled `token-broker` with its `github-app` or `github-token`. A top-level `github-app` does not override the section's broker selection. GitHub tool authentication requires an enabled agent sandbox with AWF environment-exclusion support to keep OIDC bootstrap credentials out of the agent. The broker controls installation, repository scope, permissions, and lifetime through deployment policy, not caller-supplied scopes; GitHub tool credentials must be read-only. Each consuming job exchanges its own credential and invalidates it during cleanup. GitHub consumers receive a fixed token for that job; this does not provide automatic renewal for long-running operations.
+
+> [!CAUTION]
+> Custom steps, jobs, and actions in a brokered job run with that job's full credential authority. This includes `pre-steps`, `steps`, `pre-agent-steps`, `post-steps`, `jobs`, and `safe-outputs.steps`. `safe-outputs.jobs` do not inherit broker authentication; they use their own configured credentials. These steps can read the brokered token. They can also use the job-wide `id-token: write` permission to request their own credentials from the broker. Cleanup only limits use after the job ends. Review this code whenever it changes. Pin third-party actions to full commit SHAs. Never let agent output or untrusted input choose code, actions, refs, or target repositories. Keep code that does not need credentials in separate jobs without `id-token: write`. See [security considerations](/gh-aw/specs/token-broker-specification/#appendix-c-security-and-privacy-considerations-normative).
+
+Work queue dispatch cannot use a brokered installation token because the broker response does not provide a verified App identity binding. Configure `safe-outputs.dispatch-workflow.github-app` or `safe-outputs.dispatch-workflow.github-token` explicitly. Dispatches without a verifiable binding are blocked before queue publication or launch.
 
 ### Imports (`imports:`)
 
@@ -277,15 +295,17 @@ engine:
 
 See [Harness Retry and Post-result Watchdog Policy](/gh-aw/reference/engines/#harness-retry-and-post-result-watchdog-policy) for defaults, units, and the equivalent `GH_AW_HARNESS_*` environment variables.
 
-### Model Routing (`model: router`, `engine.model-routing:`)
+<span id="model-routing-model-router-enginemodel-routing"></span>
 
-Set `model` (or `engine.model`) to a router value to route the main agent: `router` (the router judges each task), `router/economy`, `router/balanced`, or `router/robust`. Each is the same as `engine.model-routing` with `goal: cost` and the matching mode (`auto` for `router`). A workflow with no model already behaves like `model: router` when it is eligible.
+### Model Routing
 
-```yaml wrap
+Set the top-level `model` to `router` to let each task determine the routing level, or choose `router/economy`, `router/balanced`, or `router/robust` for a fixed level:
+
+```aw wrap
 model: router/economy
 ```
 
-To narrow the main agent's router choices, set top-level [`model-routing.allowed-models`](/gh-aw/reference/model-routing/#a-shortlist-of-models) alongside a literal router value. This does not restrict sub-agents. The nested `engine.model-routing` form is still supported.
+To narrow the main agent's choices without restricting sub-agents, add a [shortlist](/gh-aw/reference/model-routing/#a-shortlist-of-models) alongside a literal router value. To opt out of [default routing](/gh-aw/reference/model-routing/#default-routing-for-workflows-without-a-model) without pinning a model, omit `model` and set top-level `model-routing: false`.
 
 ### Engine Driver (`engine.driver:`)
 

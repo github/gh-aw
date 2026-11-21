@@ -3574,13 +3574,17 @@
       }
     },
     "experiments": {
-      "description": "A/B testing experiments. Each key is an experiment name; the value is either an array of two or more variant strings (bare-array form) or an object with a 'variants' field plus optional metadata fields (description, metric, weight, issue, start_date, end_date, hypothesis, secondary_metrics, guardrail_metrics, min_samples, analysis_type, decision). The reserved 'storage' key controls how experiment state is persisted: 'repo' (default) commits state to a git branch named 'experiments/{sanitizedWorkflowID}' (workflow ID lowercased with hyphens removed) for durability; 'cache' uses GitHub Actions cache. At runtime the activation job picks a variant and persists the updated counters. Use ${{ experiments.<name> }} in the workflow prompt to reference the selected variant. When multiple experiments are declared, assignments are statistically balanced using a least-used counter that round-robins across variants (or weighted when 'weight' is provided); ties are broken randomly so no variant is systematically favoured on the first run.",
+      "description": "A/B testing experiments. Each key is an experiment name; the value is either an array of two or more variant strings (bare-array form) or an object with a 'variants' field plus optional metadata fields (description, metric, weight, issue, start_date, end_date, hypothesis, secondary_metrics, guardrail_metrics, min_samples, analysis_type, decision). The reserved 'storage' key controls persistence: 'repo' (default) commits state to 'experiments/{sanitizedWorkflowID}'; 'cache' uses GitHub Actions cache; opt-in 'broker' delegates variant selection and aggregate result reporting to an OIDC-authenticated API. The optional 'broker-url' configures its HTTPS endpoint. Broker dry-runs use local ephemeral selection without broker calls or broker OIDC grants. Use ${{ experiments.<name> }} in the workflow prompt to reference the selected variant. Repo and cache modes use local least-used counters (weighted when 'weight' is provided), with random tie-breaking; in broker mode the API owns selection and cumulative counts.",
       "type": "object",
       "propertyNames": {
         "anyOf": [
           {
             "const": "storage",
             "description": "Reserved key for storage mode configuration."
+          },
+          {
+            "const": "broker-url",
+            "description": "Reserved key for the experiments broker endpoint."
           },
           {
             "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
@@ -3819,9 +3823,15 @@
       "properties": {
         "storage": {
           "type": "string",
-          "enum": ["cache", "repo"],
+          "enum": ["cache", "repo", "broker"],
           "default": "repo",
-          "description": "Storage backend for experiment state. 'repo' (default) persists state to a git branch named 'experiments/{sanitizedWorkflowID}' (workflow ID lowercased with hyphens removed, e.g. 'my-workflow' -> 'experiments/myworkflow') for durability across cache evictions. 'cache' uses GitHub Actions cache (legacy behavior). Repo storage is recommended because experiment data is valuable and more durable than cache."
+          "description": "Storage backend for experiment state. 'repo' (default) persists state to a git branch named 'experiments/{sanitizedWorkflowID}' (workflow ID lowercased with hyphens removed, e.g. 'my-workflow' -> 'experiments/myworkflow') for durability across cache evictions. 'cache' uses GitHub Actions cache (legacy behavior). 'broker' delegates assignment and aggregate reporting to an OIDC-authenticated service without git or cache persistence. Broker dry-runs use local ephemeral assignments and never contact the broker."
+        },
+        "broker-url": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^https://[^$]*$",
+          "description": "Literal HTTPS broker endpoint without credentials or expressions. Defaults to the GH_AW_EXPERIMENTS_BROKER_URL secret."
         }
       }
     },
@@ -5184,6 +5194,10 @@
                 "github-token": {
                   "$ref": "#/$defs/github_token_same_job",
                   "description": "Optional custom GitHub token (e.g., '${{ secrets.CUSTOM_PAT }}'). For 'remote' type, defaults to GH_AW_GITHUB_TOKEN if not specified."
+                },
+                "token-broker": {
+                  "type": ["boolean", "null"],
+                  "description": "Exchange GitHub Actions OIDC for a broker-policy-scoped GitHub App token. Mutually exclusive with github-app and github-token when true."
                 },
                 "toolsets": {
                   "description": "GitHub MCP server toolset name(s) to enable. Accepts a single toolset name (string) or an array of toolset names.",
@@ -12658,6 +12672,10 @@
           "description": "GitHub token to use for safe output jobs. Typically a secret reference like ${{ secrets.GITHUB_TOKEN }} or ${{ secrets.CUSTOM_PAT }}",
           "examples": ["${{ secrets.GITHUB_TOKEN }}", "${{ secrets.CUSTOM_PAT }}", "${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}"]
         },
+        "token-broker": {
+          "type": ["boolean", "null"],
+          "description": "Exchange GitHub Actions OIDC for a broker-policy-scoped GitHub App token. Mutually exclusive with github-app and github-token when true."
+        },
         "github-app": {
           "$ref": "#/$defs/github_app",
           "description": "GitHub App credentials for minting installation access tokens. When configured, a token will be generated using the app credentials and used for all safe output operations."
@@ -14475,6 +14493,11 @@
                     "type": "string",
                     "enum": ["string", "number", "boolean"],
                     "description": "Type of each array item."
+                  },
+                  "maxLength": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "Maximum Unicode code points in a string item."
                   }
                 },
                 "additionalProperties": false
@@ -14577,16 +14600,25 @@
       "examples": ["gpt-5.4", "claude-3-5-sonnet-20241022", "gpt-4"]
     },
     "model-routing": {
-      "description": "Optional shortlist for an explicit router model value. Applies only to the main agent's router choices, not to other model requests. Declare this block once, in the main workflow or a shared import.",
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["allowed-models"],
-      "properties": {
-        "allowed-models": {
-          "$ref": "#/$defs/engine_config/oneOf/1/properties/model-routing/oneOf/0/properties/allowed-models",
-          "description": "Specify at least one exact model name or gh-aw alias. The engine's capabilities and models.allowed/blocked still apply; the shortlist changes no request policy."
+      "description": "Set false to disable implicit main-agent routing without pinning a model, or give a shortlist for an explicit router model value. The shortlist changes no other model requests.",
+      "oneOf": [
+        {
+          "type": "boolean",
+          "const": false,
+          "description": "Keep the normal model overrides and engine default without using the router."
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["allowed-models"],
+          "properties": {
+            "allowed-models": {
+              "$ref": "#/$defs/engine_config/oneOf/1/properties/model-routing/oneOf/0/properties/allowed-models",
+              "description": "Specify at least one exact model name or gh-aw alias. Declare one list across the workflow and its imports. The engine's capabilities and models.allowed/blocked still apply."
+            }
+          }
         }
-      }
+      ]
     },
     "graders": {
       "description": "Graders over the unified session, including reserved operational-value JavaScript. Fast built-ins run in conclusion; executable custom graders run only in the separate graders job.",
@@ -15738,7 +15770,7 @@
               "description": "Ordered alternative models after model-specific failures, supported by engines with a built-in retry harness. Each model receives its own harness retry budget. Cannot be combined with model-routing or a custom driver or harness."
             },
             "model-routing": {
-              "description": "Experimental per-run model and reasoning-effort selection from the task text for Copilot, Claude, Codex, and pi engines, on GitHub Copilot or, for Claude and Codex, natively on Anthropic or OpenAI; requires the AWF firewall and ignores fixed model and effort settings. Eligible workflows that choose no model or routing on GitHub Copilot inference default to goal cost and mode auto; set false to opt out. See https://github.github.com/gh-aw/reference/model-routing/.",
+              "description": "Deprecated. Use a router model value for cost routing, or top-level model-routing: false to opt out. The cost-speed objective requires an AWF pin older than v0.29.17 and has no equivalent cost selector. See https://github.github.com/gh-aw/reference/model-routing/.",
               "oneOf": [
                 {
                   "type": "object",
@@ -15748,7 +15780,7 @@
                     "goal": {
                       "type": "string",
                       "enum": ["cost", "cost-speed"],
-                      "description": "Routing objective: cost prefers the cheapest model and effort that meet the mode's target; cost-speed prefers the fastest model and effort that meet it."
+                      "description": "Routing objective: cost prefers the cheapest model and effort that meet the mode's target; cost-speed prefers the fastest model and effort that meet it, but requires an AWF pin older than v0.29.17."
                     },
                     "mode": {
                       "type": "string",
@@ -16526,13 +16558,38 @@
                   "type": "object",
                   "properties": {
                     "package-manager": {
-                      "type": "string"
+                      "type": "string",
+                      "description": "Package manager used to install the engine: 'npm' installs 'package-name' globally; 'pip' installs the hash-locked 'requirements', when declared, before the agent sandbox starts."
                     },
                     "package-name": {
                       "type": "string"
                     },
                     "version": {
                       "type": "string"
+                    },
+                    "requirements": {
+                      "type": "array",
+                      "description": "pip only. Complete hash-locked dependency list, including 'package-name' at the engine version. The runtime installs binary wheels with pip --require-hashes into /tmp/gh-aw/agent/<engine-id>-python/site-packages, verifies the installed version, and exposes the directory to execution as GH_AW_PYTHON_PACKAGES.",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string",
+                            "description": "Python distribution name."
+                          },
+                          "version": {
+                            "type": "string",
+                            "description": "Exact distribution version. Quote it so YAML keeps it a string."
+                          },
+                          "sha256": {
+                            "type": "string",
+                            "pattern": "^[0-9a-f]{64}$",
+                            "description": "SHA-256 of the wheel to install."
+                          }
+                        },
+                        "required": ["name", "version", "sha256"],
+                        "additionalProperties": false
+                      }
                     },
                     "step-name": {
                       "type": "string"

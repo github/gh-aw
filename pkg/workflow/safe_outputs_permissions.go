@@ -151,6 +151,17 @@ func computePermissionsForSafeOutputs(safeOutputs *SafeOutputsConfig, excludePer
 		if handler.PermissionBuilder == nil {
 			continue
 		}
+		// Broker policy, not GITHUB_TOKEN job permissions, authorizes GitHub effects.
+		// Copilot task endpoints still use their independent credential source.
+		if !excludePerHandlerApps && safeOutputs.TokenBroker &&
+			handler.Key != "assign-to-agent" && handler.Key != "create-agent-session" {
+			// Explicit handler tokens can still be GITHUB_TOKEN, including expressions
+			// that fall back to it. Preserve their existing permission requirements.
+			if getHandlerGitHubApp(safeOutputs, handler.StructField) != nil ||
+				getHandlerGitHubToken(safeOutputs, handler.StructField) == "" {
+				continue
+			}
+		}
 		if excludePerHandlerApps && handler.StructField != "" {
 			if getHandlerGitHubApp(safeOutputs, handler.StructField) != nil ||
 				getHandlerGitHubToken(safeOutputs, handler.StructField) != "" {
@@ -319,6 +330,9 @@ func computeDispatchRepositoryPermissions(safeOutputs *SafeOutputsConfig, exclud
 		// which calls createAuthenticatedGitHubClient(toolConfig)), so it must not also
 		// contribute contents: write to the global safe-outputs App mint (GP5b rule 1).
 		if excludePerToolApps && (tool.GitHubApp != nil || tool.GitHubToken != "") {
+			continue
+		}
+		if !excludePerToolApps && safeOutputs.TokenBroker && (tool.GitHubApp != nil || tool.GitHubToken == "") {
 			continue
 		}
 		if permissions == nil {

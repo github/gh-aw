@@ -367,7 +367,7 @@ func TestSecretRedactionRunsWithoutWorkflowSecrets(t *testing.T) {
 	var builder strings.Builder
 	compiler := NewCompiler()
 
-	compiler.generateSecretRedactionStep(&builder, "", &WorkflowData{})
+	compiler.generateSecretRedactionStep(&builder, "", &WorkflowData{}, false)
 
 	output := builder.String()
 	if !strings.Contains(output, "const { main } = require('${{ runner.temp }}/gh-aw/actions/redact_secrets.cjs');") {
@@ -392,7 +392,7 @@ func TestSecretRedactionEmitsEnvMappingWithWorkflowSecrets(t *testing.T) {
 	var builder strings.Builder
 	compiler := NewCompiler()
 
-	compiler.generateSecretRedactionStep(&builder, "${{ secrets.MY_TOKEN }}", &WorkflowData{})
+	compiler.generateSecretRedactionStep(&builder, "${{ secrets.MY_TOKEN }}", &WorkflowData{}, false)
 
 	steps := parseGeneratedSteps(t, builder.String())
 	if len(steps) != 1 {
@@ -428,7 +428,7 @@ func TestSecretRedactionPreparesFilesOnlyForCustomMasking(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			var builder strings.Builder
 			compiler := NewCompiler()
-			compiler.generateSecretRedactionStep(&builder, "", &WorkflowData{SecretMasking: tt.masking})
+			compiler.generateSecretRedactionStep(&builder, "", &WorkflowData{SecretMasking: tt.masking}, false)
 			steps := parseGeneratedSteps(t, builder.String())
 			with := steps[0]["with"].(map[string]any)
 			script := with["script"].(string)

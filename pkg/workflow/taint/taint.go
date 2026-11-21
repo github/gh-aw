@@ -13,16 +13,18 @@ import (
 type Kind string
 
 const (
-	Log           Kind = "log"
-	Summary       Kind = "summary"
-	Output        Kind = "output"
-	Display       Kind = "display"
-	ActionInput   Kind = "action-input"
-	WorkflowInput Kind = "workflow-input"
-	Artifact      Kind = "artifact"
-	Network       Kind = "network"
-	OTLPAttribute Kind = "otlp-attribute"
-	Prompt        Kind = "prompt"
+	Log                     Kind = "log"
+	Summary                 Kind = "summary"
+	Output                  Kind = "output"
+	Display                 Kind = "display"
+	ActionInput             Kind = "action-input"
+	WorkflowInput           Kind = "workflow-input"
+	Artifact                Kind = "artifact"
+	Network                 Kind = "network"
+	OTLPAttribute           Kind = "otlp-attribute"
+	Prompt                  Kind = "prompt"
+	ExecutableInterpolation Kind = "executable-interpolation"
+	EnvironmentFile         Kind = "environment-file"
 )
 
 // Site identifies a sink without including its potentially sensitive contents.
@@ -70,6 +72,8 @@ type Rule struct {
 	ActionSources      func(uses string) []string
 	JavaScript         *JavaScriptOptions
 	IsJavaScriptFilter func(*JavaScriptNode) bool
+	// IsExecutableInput identifies action inputs containing executable code.
+	IsExecutableInput func(Site) bool
 	// SafeOutputJobs identifies compiled third-party integration jobs from
 	// compiler provenance, not job-name heuristics.
 	SafeOutputJobs []string

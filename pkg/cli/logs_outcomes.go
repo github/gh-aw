@@ -24,15 +24,51 @@ import (
 
 // OutcomesData records live outcome observations for one selected workflow run.
 type OutcomesData struct {
-	RunID     int64              `json:"run_id"`
-	Workflow  string             `json:"workflow,omitempty"`
-	Items     []OutcomeReport    `json:"items"`
-	Summary   OutcomeSummary     `json:"summary"`
-	EvalError string             `json:"eval_error,omitempty"`
-	Coverage  string             `json:"coverage"`
-	Delivery  *DeliveryData      `json:"-"`
-	Live      bool               `json:"-"`
-	Records   []lifecycle.Record `json:"-"`
+	RunID         int64              `json:"run_id"`
+	Workflow      string             `json:"workflow,omitempty"`
+	Items         []OutcomeReport    `json:"items"`
+	Summary       OutcomeSummary     `json:"summary"`
+	EvalError     string             `json:"eval_error,omitempty"`
+	Coverage      string             `json:"coverage"`
+	Delivery      *DeliveryData      `json:"-"`
+	Live          bool               `json:"-"`
+	Records       []lifecycle.Record `json:"-"`
+	AdoptionError *AdoptionErrorData `json:"-"`
+}
+
+// AdoptionErrorData identifies a selected run whose lifecycle evidence could not
+// be evaluated. The run stays in the report with unavailable coverage.
+type AdoptionErrorData struct {
+	RunID  int64  `json:"run_id"`
+	Reason string `json:"reason"`
+	Error  string `json:"error"`
+}
+
+const (
+	adoptionErrorLifecycleIdentityMissing = "lifecycle_identity_missing"
+	adoptionErrorLifecycleEvidenceInvalid = "lifecycle_evidence_invalid"
+)
+
+// lifecycleEvidenceError marks a failure confined to one run's lifecycle
+// evidence, so batch collection can record it and evaluate the other runs.
+type lifecycleEvidenceError struct {
+	reason string
+	err    error
+}
+
+func (e *lifecycleEvidenceError) Error() string { return e.err.Error() }
+
+func (e *lifecycleEvidenceError) Unwrap() error { return e.err }
+
+func newLifecycleEvidenceError(err error) error {
+	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		return err
+	}
+	reason := adoptionErrorLifecycleEvidenceInvalid
+	if errors.Is(err, errLifecycleIdentityMissing) {
+		reason = adoptionErrorLifecycleIdentityMissing
+	}
+	return &lifecycleEvidenceError{reason: reason, err: err}
 }
 
 type DeliveredItem struct {
@@ -80,6 +116,16 @@ func collectLogsLifecycles(ctx context.Context, runs []ProcessedRun, dir string,
 			return nil, err
 		}
 		report, err := collectRunLifecycle(ctx, run, mapping, verbose, live)
+		var evidenceErr *lifecycleEvidenceError
+		if errors.As(err, &evidenceErr) {
+			// One run's unusable evidence must not discard the rest of the batch.
+			report.EvalError, report.Coverage = err.Error(), "unavailable"
+			report.Delivery.Coverage, report.Delivery.Error = "unavailable", report.EvalError
+			report.AdoptionError = &AdoptionErrorData{RunID: report.RunID, Reason: evidenceErr.reason, Error: report.EvalError}
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Run %d: %s", report.RunID, report.EvalError)))
+			reports = append(reports, report)
+			continue
+		}
 		if err != nil {
 			return nil, fmt.Errorf("evaluate adoption for run %d: %w", run.Run.DatabaseID, err)
 		}
@@ -111,7 +157,7 @@ func collectRunLifecycle(ctx context.Context, run ProcessedRun, mapping *github.
 		report.Coverage, report.Delivery.Coverage = "partial", "partial"
 		report.EvalError, report.Delivery.Error = err.Error(), err.Error()
 	} else if err != nil {
-		return report, err
+		return report, newLifecycleEvidenceError(err)
 	}
 	if run.Run.LogsPath == "" {
 		report.EvalError = "safe-output artifact directory unavailable"
@@ -341,6 +387,9 @@ func attachLogsOutcomes(data *LogsData, reports []OutcomesData) error {
 		if report.Live || report.Delivery == nil {
 			data.Outcomes = append(data.Outcomes, report)
 		}
+		if report.AdoptionError != nil {
+			data.AdoptionErrors = append(data.AdoptionErrors, *report.AdoptionError)
+		}
 	}
 	if len(data.Outcomes) == 0 || len(data.Episodes) == 0 {
 		return nil
@@ -398,8 +447,8 @@ func renderLogsOutcomes(w io.Writer, data LogsData) error {
 		}
 	}
 	for _, run := range data.Outcomes {
-		if _, err := fmt.Fprintf(w, "\nAdoption for %s (run %d): %d accepted, %d rejected, %d not applicable, %d lifecycle, %d pending, %d unknown, %d errors (%d total; human: %d, delivery fallback: %d)\n",
-			run.Workflow, run.RunID, run.Summary.Accepted, run.Summary.Rejected, run.Summary.NotApplicable, run.Summary.Lifecycle, run.Summary.Pending, run.Summary.Unknown, run.Summary.Errors, run.Summary.Total, run.Summary.AcceptedHuman, run.Summary.AcceptedFallback); err != nil {
+		if _, err := fmt.Fprintf(w, "\nAdoption for %s (run %d): %d accepted, %d rejected, %d not applicable, %d lifecycle, %d pending, %d unknown, %d errors (%d total; human: %d, automation: %d, delivery fallback: %d)\n",
+			run.Workflow, run.RunID, run.Summary.Accepted, run.Summary.Rejected, run.Summary.NotApplicable, run.Summary.Lifecycle, run.Summary.Pending, run.Summary.Unknown, run.Summary.Errors, run.Summary.Total, run.Summary.AcceptedHuman, run.Summary.AcceptedAutomation, run.Summary.AcceptedFallback); err != nil {
 			return err
 		}
 		if run.EvalError != "" {

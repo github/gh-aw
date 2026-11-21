@@ -109,6 +109,21 @@ function providerIncludesCacheReadsInInput(provider) {
 }
 
 /**
+ * Resolve input-token totals using the same cache semantics as AI-credit pricing.
+ * @param {{provider: string, inputTokens: number, cacheReadTokens: number, cacheWriteTokens: number, inputTokensIncludeCache?: boolean}} usage
+ * @returns {number | undefined}
+ */
+function computeInclusiveInputTokens({ provider, inputTokens, cacheReadTokens, cacheWriteTokens, inputTokensIncludeCache }) {
+  if ([inputTokens, cacheReadTokens, cacheWriteTokens].some(value => typeof value !== "number" || !Number.isFinite(value) || value < 0)) {
+    return undefined;
+  }
+  if (inputTokensIncludeCache === true) return inputTokens;
+  if (inputTokensIncludeCache === false) return inputTokens + cacheReadTokens + cacheWriteTokens;
+  if (providerIncludesCacheReadsInInput(provider)) return Math.max(inputTokens - cacheReadTokens, 0) + cacheReadTokens + cacheWriteTokens;
+  return inputTokens + cacheReadTokens + cacheWriteTokens;
+}
+
+/**
  * @param {string} provider
  * @param {string} model
  * @returns {Record<string, number> | null}
@@ -317,6 +332,7 @@ function _resetModelCostsCache() {
 }
 
 module.exports = {
+  computeInclusiveInputTokens,
   computeInferenceAIC,
   computeInferenceCostUSD,
   findModelPricing,

@@ -23,6 +23,7 @@ describe("cleanup_stale_steering_issues", () => {
     created_at: oldCreatedAt,
     ...overrides,
   });
+  const openIssueData = () => ({ data: { body: makeIssue().body, title: makeIssue().title, state: "open" } });
   const mockCandidates = () => {
     mockGithub.graphql.mockResolvedValueOnce({
       repository: {
@@ -32,7 +33,7 @@ describe("cleanup_stale_steering_issues", () => {
         },
       },
     });
-    mockGithub.rest.issues.get.mockResolvedValue({ data: { body: makeIssue().body } });
+    mockGithub.rest.issues.get.mockResolvedValue(openIssueData());
     mockGithub.rest.actions.getWorkflowRun.mockResolvedValue({ data: { status: "completed", conclusion: "success" } });
     mockGithub.paginate.mockResolvedValue([]);
   };
@@ -73,7 +74,7 @@ describe("cleanup_stale_steering_issues", () => {
         },
       },
     });
-    mockGithub.rest.issues.get.mockResolvedValueOnce({ data: { body: makeIssue().body } });
+    mockGithub.rest.issues.get.mockResolvedValue(openIssueData());
     mockGithub.paginate.mockResolvedValueOnce([]);
     mockGithub.rest.actions.getWorkflowRun.mockResolvedValue({ data: { status: "completed", conclusion: "success" } });
 
@@ -106,12 +107,34 @@ describe("cleanup_stale_steering_issues", () => {
     });
   });
 
-  it("does not touch active, failed, malformed, or unrelated issues", async () => {
+  it("stops after the per-run closure limit and leaves the remainder for the next run", async () => {
+    const { DEFAULT_MAX_UPDATES_PER_RUN } = await import("./expired_entity_cleanup_helpers.cjs");
+    mockGithub.graphql.mockResolvedValueOnce({
+      repository: {
+        issues: {
+          nodes: Array.from({ length: DEFAULT_MAX_UPDATES_PER_RUN + 1 }, (_, i) => ({ number: i + 1, title: "[WIP] Stale", createdAt: oldCreatedAt })),
+          pageInfo: { hasNextPage: false, endCursor: null },
+        },
+      },
+    });
+    mockGithub.rest.issues.get.mockResolvedValue(openIssueData());
+    mockGithub.rest.actions.getWorkflowRun.mockResolvedValue({ data: { status: "completed", conclusion: "success" } });
+    mockGithub.paginate.mockResolvedValue([]);
+
+    const { main } = await import("./cleanup_stale_steering_issues.cjs");
+    await main();
+
+    expect(mockGithub.rest.issues.update).toHaveBeenCalledTimes(DEFAULT_MAX_UPDATES_PER_RUN);
+    expect(mockGithub.rest.issues.update).not.toHaveBeenCalledWith(expect.objectContaining({ issue_number: DEFAULT_MAX_UPDATES_PER_RUN + 1 }));
+    expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("1 remaining candidate(s) will be checked in the next scheduled run"));
+    expect(mockCore.setFailed).not.toHaveBeenCalled();
+  });
+
+  it("does not touch active, malformed, or unrelated issues", async () => {
     const issues = [
       { number: 2, title: "Unrelated issue", createdAt: oldCreatedAt },
       { number: 3, title: "[WIP] Missing link", createdAt: oldCreatedAt },
       { number: 4, title: "[WIP] Invalid link", createdAt: oldCreatedAt },
-      { number: 5, title: "[WIP] Failed run", createdAt: oldCreatedAt },
       { number: 6, title: "[WIP] Active run", createdAt: oldCreatedAt },
       { number: 1, title: "[WIP] Active example", createdAt: new Date().toISOString() },
     ];
@@ -121,16 +144,59 @@ describe("cleanup_stale_steering_issues", () => {
     mockGithub.rest.issues.get
       .mockResolvedValueOnce({ data: { body: "No workflow run link" } })
       .mockResolvedValueOnce({ data: { body: "https://example.com/owner/repo/actions/runs/12345" } })
-      .mockResolvedValueOnce({ data: { body: makeIssue().body } })
       .mockResolvedValueOnce({ data: { body: makeIssue().body } });
-    mockGithub.rest.actions.getWorkflowRun.mockResolvedValueOnce({ data: { status: "completed", conclusion: "failure" } }).mockResolvedValueOnce({ data: { status: "in_progress", conclusion: null } });
+    mockGithub.rest.actions.getWorkflowRun.mockResolvedValueOnce({ data: { status: "in_progress", conclusion: null } });
 
     const { main } = await import("./cleanup_stale_steering_issues.cjs");
     await main();
 
-    expect(mockGithub.rest.actions.getWorkflowRun).toHaveBeenCalledTimes(2);
+    expect(mockGithub.rest.actions.getWorkflowRun).toHaveBeenCalledTimes(1);
     expect(mockGithub.rest.issues.createComment).not.toHaveBeenCalled();
     expect(mockGithub.rest.issues.update).not.toHaveBeenCalled();
+  });
+
+  it.each(["failure", "cancelled"])("closes stale steering issues orphaned by a %s run as not planned", async conclusion => {
+    mockGithub.graphql.mockResolvedValueOnce({
+      repository: { issues: { nodes: [{ number: 5, title: "[WIP] Orphaned run", createdAt: oldCreatedAt }], pageInfo: { hasNextPage: false, endCursor: null } } },
+    });
+    mockGithub.rest.issues.get.mockResolvedValue(openIssueData());
+    mockGithub.paginate.mockResolvedValueOnce([]);
+    mockGithub.rest.actions.getWorkflowRun.mockResolvedValueOnce({ data: { status: "completed", conclusion } });
+
+    const { main, UNSUCCESSFUL_RUN_CLEANUP_COMMENT, CLEANUP_COMMENT_MARKER } = await import("./cleanup_stale_steering_issues.cjs");
+    await main();
+
+    expect(UNSUCCESSFUL_RUN_CLEANUP_COMMENT).toContain(CLEANUP_COMMENT_MARKER);
+    expect(mockGithub.rest.issues.createComment).toHaveBeenCalledWith({ owner: "testowner", repo: "testrepo", issue_number: 5, body: UNSUCCESSFUL_RUN_CLEANUP_COMMENT });
+    expect(mockGithub.rest.issues.update).toHaveBeenCalledWith({ owner: "testowner", repo: "testrepo", issue_number: 5, state: "closed", state_reason: "not_planned" });
+    expect(mockCore.setFailed).not.toHaveBeenCalled();
+  });
+
+  it.each(["timed_out", "action_required", "neutral", "skipped"])("leaves stale steering issues open for a %s run", async conclusion => {
+    mockCandidates();
+    mockGithub.rest.actions.getWorkflowRun.mockResolvedValue({ data: { status: "completed", conclusion } });
+    const { main } = await import("./cleanup_stale_steering_issues.cjs");
+    await main();
+
+    expect(mockGithub.rest.issues.get).toHaveBeenCalledTimes(2);
+    expect(mockGithub.rest.issues.createComment).not.toHaveBeenCalled();
+    expect(mockGithub.rest.issues.update).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { title: "[aw] Example failed", state: "open" },
+    { title: makeIssue().title, state: "closed" },
+  ])("skips an issue that stopped being an open steering issue after its run completed (%j)", async refetched => {
+    mockCandidates();
+    mockGithub.rest.actions.getWorkflowRun.mockResolvedValue({ data: { status: "completed", conclusion: "failure" } });
+    mockGithub.rest.issues.get.mockResolvedValueOnce(openIssueData()).mockResolvedValueOnce({ data: { body: makeIssue().body, ...refetched } });
+    const { main } = await import("./cleanup_stale_steering_issues.cjs");
+    await main();
+
+    expect(mockGithub.rest.issues.createComment).not.toHaveBeenCalledWith(expect.objectContaining({ issue_number: 101 }));
+    expect(mockGithub.rest.issues.update).not.toHaveBeenCalledWith(expect.objectContaining({ issue_number: 101 }));
+    expect(mockGithub.rest.issues.update).toHaveBeenCalledWith(expect.objectContaining({ issue_number: 102, state_reason: "not_planned" }));
+    expect(mockCore.setFailed).not.toHaveBeenCalled();
   });
 
   it("does not duplicate the cleanup comment when closure needs another attempt", async () => {
@@ -142,7 +208,7 @@ describe("cleanup_stale_steering_issues", () => {
         },
       },
     });
-    mockGithub.rest.issues.get.mockResolvedValueOnce({ data: { body: makeIssue().body } });
+    mockGithub.rest.issues.get.mockResolvedValue(openIssueData());
     mockGithub.paginate.mockResolvedValueOnce([{ body: "Already handled <!-- gh-aw:stale-steering-issue-cleanup -->" }]);
     mockGithub.rest.actions.getWorkflowRun.mockResolvedValue({ data: { status: "completed", conclusion: "success" } });
 
@@ -179,7 +245,7 @@ describe("cleanup_stale_steering_issues", () => {
     }
     expect(mockCore.warning).toHaveBeenCalledWith(expect.stringMatching(/#101:[\s\S]*Resource not accessible by integration/));
     expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringMatching(/#101:[\s\S]*Resource not accessible by integration/));
-    expect(failedOperation).toHaveBeenCalledTimes(2);
+    expect(failedOperation).toHaveBeenCalledTimes(operation === "get" ? 3 : 2);
   });
 
   it("does not treat a missing issue as a missing workflow run", async () => {

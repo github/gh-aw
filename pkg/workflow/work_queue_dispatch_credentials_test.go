@@ -25,6 +25,9 @@ func TestWorkQueueDispatchCredentialConfiguration(t *testing.T) {
 		{"global-app", &SafeOutputsConfig{GitHubApp: globalApp}, "${{ steps.work-queue-dispatch-app-token.outputs.token }}", "github_app", globalApp},
 		{"handler-app", &SafeOutputsConfig{GitHubApp: globalApp, DispatchWorkflow: &DispatchWorkflowConfig{BaseSafeOutputConfig: BaseSafeOutputConfig{GitHubApp: dispatchApp}}}, "${{ steps.work-queue-dispatch-app-token.outputs.token }}", "github_app", dispatchApp},
 		{"handler-pat-over-global-app", &SafeOutputsConfig{GitHubApp: globalApp, DispatchWorkflow: &DispatchWorkflowConfig{BaseSafeOutputConfig: BaseSafeOutputConfig{GitHubToken: "${{ secrets.WORKER_PAT }}"}}}, "${{ secrets.WORKER_PAT }}", "authenticated", nil},
+		{"broker", &SafeOutputsConfig{TokenBroker: true}, "${{ steps.safe-outputs-app-token.outputs.token }}", "broker_unverified", nil},
+		{"handler-pat-over-broker", &SafeOutputsConfig{TokenBroker: true, DispatchWorkflow: &DispatchWorkflowConfig{BaseSafeOutputConfig: BaseSafeOutputConfig{GitHubToken: "${{ secrets.WORKER_PAT }}"}}}, "${{ secrets.WORKER_PAT }}", "authenticated", nil},
+		{"handler-app-over-broker", &SafeOutputsConfig{TokenBroker: true, DispatchWorkflow: &DispatchWorkflowConfig{BaseSafeOutputConfig: BaseSafeOutputConfig{GitHubApp: dispatchApp}}}, "${{ steps.work-queue-dispatch-app-token.outputs.token }}", "github_app", dispatchApp},
 	} {
 		t.Run(entry.name, func(t *testing.T) {
 			config := map[string]any{}
@@ -60,6 +63,22 @@ func TestWorkQueueDispatchCredentialConfiguration(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestWorkQueueBrokerDispatchRequiresExplicitIdentity(t *testing.T) {
+	data := &WorkflowData{
+		Tools: map[string]any{"work-queue": true},
+		SafeOutputs: &SafeOutputsConfig{TokenBroker: true, DispatchWorkflow: &DispatchWorkflowConfig{
+			Workflows: []string{"worker"},
+		}},
+	}
+	require.ErrorContains(t, validateWorkQueueConfiguration(data), "brokered dispatch cannot verify the installation token's App identity")
+	require.ErrorContains(t, validateWorkQueueConfiguration(data), "configure safe-outputs.dispatch-workflow.github-app or github-token explicitly")
+	data.SafeOutputs.DispatchWorkflow.GitHubToken = "${{ secrets.WORKER_PAT }}"
+	require.NoError(t, validateWorkQueueConfiguration(data))
+	data.SafeOutputs.DispatchWorkflow.GitHubToken = ""
+	data.SafeOutputs.DispatchWorkflow.GitHubApp = &GitHubAppConfig{AppID: "${{ vars.APP_ID }}", PrivateKey: "${{ secrets.APP_KEY }}"}
+	require.NoError(t, validateWorkQueueConfiguration(data))
 }
 
 func TestWorkQueueControlStepPassesGitHubTokenProvenance(t *testing.T) {

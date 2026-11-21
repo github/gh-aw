@@ -38,6 +38,7 @@ type ImportsResult struct {
 	MergedPluginObjects           []map[string]any      // Object-form Agent Plugin references from all imports
 	MergedSafeOutputs             []string              // Merged safe-outputs configurations from all imports
 	MergedGraders                 string                // Merged graders configuration from all imports (JSON objects, one per line)
+	MergedExperiments             string                // Experiment configuration from imports (JSON objects, one per line)
 	MergedMCPScripts              []string              // Merged mcp-scripts configurations from all imports
 	MergedMarkdown                string                // Only contains imports WITH inputs (for compile-time substitution)
 	ImportPaths                   []string              // List of import file paths for runtime-import macro generation (replaces MergedMarkdown)
@@ -81,6 +82,7 @@ type ImportsResult struct {
 	MergedEngineMCPSessionTimeout string                // First engine.mcp.session-timeout found across all imports (Go duration string, e.g. "4h")
 	MergedEngineModel             string                // First engine.model found in imports that have no engine.id (model preference without engine selection)
 	RouterShortlists              [][]string            // Top-level main-agent shortlists, kept separate to detect conflicting declarations.
+	RouterDisabled                bool                  // An import opts out of default routing without selecting an engine or model.
 	EngineModelChoiceDeclared     bool                  // An import declares a top-level model, or a preference-only engine object declares model, model-routing, or fallback-models (including empty values)
 	MergedMaxTurns                string                // First max-turns value found across all imports (JSON-encoded, first-wins)
 	MergedMaxToolDenials          string                // First max-tool-denials value found across all imports (JSON-encoded, first-wins)

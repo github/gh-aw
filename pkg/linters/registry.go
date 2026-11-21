@@ -61,6 +61,7 @@ import (
 	"github.com/github/gh-aw/pkg/linters/ossetenvlibrary"
 	"github.com/github/gh-aw/pkg/linters/packagelevelmutableslicemap"
 	panicinlibrarycode "github.com/github/gh-aw/pkg/linters/panic-in-library-code"
+	"github.com/github/gh-aw/pkg/linters/prefercutprefix"
 	"github.com/github/gh-aw/pkg/linters/rawloginlib"
 	"github.com/github/gh-aw/pkg/linters/readerstringconv"
 	reflectdeepequalusage "github.com/github/gh-aw/pkg/linters/reflect-deepequal-usage"
@@ -166,6 +167,7 @@ var allAnalyzers = []*analysis.Analyzer{
 	ossetenvlibrary.Analyzer,
 	packagelevelmutableslicemap.Analyzer,
 	panicinlibrarycode.Analyzer,
+	prefercutprefix.Analyzer,
 	rawloginlib.Analyzer,
 	readerstringconv.Analyzer,
 	reflectdeepequalusage.Analyzer,

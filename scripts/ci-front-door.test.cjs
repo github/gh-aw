@@ -8,6 +8,7 @@ const os = require("node:os");
 const path = require("node:path");
 const { execFileSync } = require("node:child_process");
 const { SUITE_IDS, JOB_DEPENDENCIES, LIMITS, DECISIONS_BASE_URL, DECISIONS_MODEL, validateCatalog, summarizeDiff, summarizeGitHubDiff, postDecision, selectSuites, frontDoor } = require("./ci-front-door.cjs");
+const fastBaseline = ["verify-integration-build", "test"];
 const { evaluate } = require("./ci-front-door-evaluate.cjs");
 const catalog = require("../.github/ci/suite-catalog.json");
 const diff = { files: ["README.md"], patch: "+change", truncated: false, unavailable: false };
@@ -72,7 +73,7 @@ test("GitHub selection asks about every CGO check job in one authenticated Decis
     calls[0].body.questions.map(question => question.name),
     SUITE_IDS
   );
-  assert.deepEqual(result.suite_ids, ["build-wasm"]);
+  assert.deepEqual(result.suite_ids, [...fastBaseline, "build-wasm"]);
   assert.equal(result.fallback, false);
   assert.equal(result.metrics.decision_api_requests, 1);
   assert.equal(result.metrics.other_github_api_requests, 0);
@@ -108,7 +109,7 @@ test("source, test, build, security and unknown paths reach the model without a 
   ]) {
     const { result, calls } = await exercise({ diff: { ...diff, files } }, { value: decisionResponse({ suite_ids: [], confidence: 1 }) });
     assert.equal(calls.length, 1, files.join(","));
-    assert.deepEqual(result.suite_ids, [], files.join(","));
+    assert.deepEqual(result.suite_ids, fastBaseline, files.join(","));
     assert.equal(result.metrics.decision_api_requests, 1);
   }
 });
@@ -118,7 +119,7 @@ test("model decisions can retain or omit WASM checks and replay records observed
     const summary = { ...diff, files: [file, "scripts/workflow-timing.test.cjs", "README.md"] };
     const { result, calls } = await exercise({ diff: summary }, { value: decisionResponse({ suite_ids: [], confidence: 1 }) });
     assert.equal(calls.length, 1, file);
-    assert.deepEqual(result.suite_ids, [], file);
+    assert.deepEqual(result.suite_ids, fastBaseline, file);
     assert.equal(result.fallback, false, file);
     const replay = await evaluate(catalog, {
       records: [
@@ -154,32 +155,55 @@ test("real git inventories for CGO script and WASM test changes permit useful, s
   const timing = summarizeDiff({ cwd });
   assert.deepEqual(timing.files, ["scripts/workflow-timing.test.cjs"]);
   const omitted = await exercise({ diff: timing }, { value: decisionResponse({ suite_ids: [], confidence: 1 }) });
-  assert.deepEqual(omitted.result.suite_ids, []);
+  assert.deepEqual(omitted.result.suite_ids, fastBaseline);
   assert.equal(omitted.result.fallback, false);
   const retained = await exercise({ diff: timing }, { value: decisionResponse({ suite_ids: ["alpine-container-test"], confidence: 1 }) });
-  assert.deepEqual(retained.result.suite_ids, ["alpine-container-test"]);
+  assert.deepEqual(retained.result.suite_ids, [...fastBaseline, "alpine-container-test"]);
   fs.appendFileSync(path.join(cwd, "cmd/gh-aw-wasm/compile_recovery_test.go"), "func TestAnotherRecovery(t *testing.T) {}\n");
   git(["add", "."]);
   git(["commit", "-m", "WASM recovery test change"]);
   const wasm = summarizeDiff({ cwd });
   assert.deepEqual(wasm.files, ["cmd/gh-aw-wasm/compile_recovery_test.go"]);
   const selected = await exercise({ diff: wasm }, { value: decisionResponse({ suite_ids: [], confidence: 1 }) });
-  assert.deepEqual(selected.result.suite_ids, []);
+  assert.deepEqual(selected.result.suite_ids, fastBaseline);
   assert.equal(selected.result.fallback, false);
   const modelRetained = await exercise({ diff: wasm }, { value: decisionResponse({ suite_ids: ["actions-build"], confidence: 1 }) });
-  assert.deepEqual(modelRetained.result.suite_ids, ["actions-build"]);
+  assert.deepEqual(modelRetained.result.suite_ids, [...fastBaseline, "actions-build"]);
 });
 
 test("known-safe documentation omissions require model approval at the unchanged safe-to-omit threshold", async () => {
   const documentation = { ...diff, files: ["README.md", "CONTRIBUTING.md", "docs/src/content/docs/reference/tools.md", "docs/src/content/docs/example.mdx"] };
   const { result } = await exercise({ diff: documentation }, { value: decisionResponse({ suite_ids: ["build-wasm"], confidence: 1 }) });
-  assert.deepEqual(result.suite_ids, ["build-wasm"]);
+  assert.deepEqual(result.suite_ids, [...fastBaseline, "build-wasm"]);
   const threshold = await exercise({ diff: documentation }, { value: decisionResponse({ suite_ids: [], confidence: 0.9 }) });
-  assert.deepEqual(threshold.result.suite_ids, []);
+  assert.deepEqual(threshold.result.suite_ids, fastBaseline);
   assert.equal(threshold.result.fallback, false);
-  assert.deepEqual(selectSuites({ suite_ids: [], confidence: 1 }, catalog, { ...diff, files: ["go.mod"] }), []);
+  assert.deepEqual(selectSuites({ suite_ids: [], confidence: 1 }, catalog, { ...diff, files: ["go.mod"] }), fastBaseline);
   assert.throws(() => selectSuites({ suite_ids: [], confidence: 1 }, catalog), /invalid-diff/);
   assert.throws(() => selectSuites({ suite_ids: [], confidence: 1 }, catalog, { ...diff, files: [] }), /invalid-diff/);
+});
+
+test("uncertain answers retain only their suites and prerequisites without discarding confident omissions", async () => {
+  for (const probability of [0.1, 0.11, 0.5, 0.89, 0.9]) {
+    const value = decisionResponse();
+    value.answers.find(answer => answer.name === "security").probability = probability;
+    const { result, calls } = await exercise({}, { value });
+    assert.deepEqual(result.suite_ids, probability < 0.9 ? [...fastBaseline, "build", "build-wasm", "security"] : [...fastBaseline, "build-wasm"]);
+    assert.equal(result.fallback, false);
+    assert.equal(result.reason, "selected");
+    assert.equal(calls.length, 1);
+    assert.equal(result.metrics.decision_api_requests, 1);
+  }
+});
+
+test("an entirely uncertain batch retains every suite without a validation fallback", async () => {
+  for (const confidence of [0.5, 0.89]) {
+    const { result, calls } = await exercise({}, { value: decisionResponse({ confidence }) });
+    assert.deepEqual(result.suite_ids, SUITE_IDS);
+    assert.equal(result.fallback, false);
+    assert.equal(result.reason, "selected");
+    assert.equal(calls.length, 1);
+  }
 });
 
 test("malformed and incomplete flat or grouped inventories cannot authorize omissions", async () => {
@@ -241,7 +265,7 @@ test("complete large grouped documentation inventories remain eligible even when
     },
   };
   const { result } = await exercise({ diff: documentation }, { value: decisionResponse({ suite_ids: [], confidence: 1 }) });
-  assert.deepEqual(result.suite_ids, []);
+  assert.deepEqual(result.suite_ids, fastBaseline);
   assert.equal(result.fallback, false);
 });
 
@@ -257,8 +281,6 @@ test("invalid responses fail open after one request, without retrying", async ()
     { answers: decisionResponse().answers.map(answer => ({ type: "refusal", name: answer.name })) },
     { answers: decisionResponse().answers.map(answer => ({ ...answer, probability: null })) },
     { answers: decisionResponse().answers.map(answer => ({ ...answer, probability: 1.01 })) },
-    decisionResponse({ confidence: 0.89 }),
-    decisionResponse({ confidence: 0.5 }),
   ]) {
     const { result, calls } = await exercise({}, { value });
     assert.equal(calls.length, 1);
@@ -323,6 +345,7 @@ test("invalid inputs and policy changes force all suites without inference", asy
     { diff: { ...diff, unavailable: true } },
     { diff: { ...diff, truncated: true } },
     { diff: { ...diff, files: [".github/ci/suite-catalog.json"] } },
+    { diff: { ...diff, files: ["scripts/go-unit-suite.cjs"] } },
     { diff: { ...diff, files: ["scripts/ci-front-door.cjs"] } },
     { diff: { ...diff, files: [".github/workflows/cgo.yml"] } },
     { diff: { ...diff, files: ["actions/setup/js/decisions_client.cjs"] } },
@@ -345,7 +368,7 @@ test("only empty evidence bypasses inference; nonempty lock-only and mixed diffs
     assert.equal(calls.length, 1);
     assert.equal(result.reason, "selected");
     assert.equal(result.fallback, false);
-    assert.deepEqual(result.suite_ids, ["build-wasm"]);
+    assert.deepEqual(result.suite_ids, [...fastBaseline, "build-wasm"]);
   }
   const allMandatory = structuredClone(catalog);
   allMandatory.suites.forEach(suite => {
@@ -356,7 +379,7 @@ test("only empty evidence bypasses inference; nonempty lock-only and mixed diffs
   assert.equal(bypass.result.reason, "invalid-catalog");
   const eligible = await exercise({ diff: { ...diff, files: ["README.md", ".github/workflows/test.lock.yml"] } }, { value: decisionResponse({ suite_ids: [], confidence: 1 }) });
   assert.equal(eligible.calls.length, 1);
-  assert.deepEqual(eligible.result.suite_ids, []);
+  assert.deepEqual(eligible.result.suite_ids, fastBaseline);
 });
 
 test("missing credentials and oversized requests fail open without contacting GitHub", async () => {
@@ -377,9 +400,12 @@ test("full runs are local, deterministic, and never invoke the decision transpor
   assert.deepEqual(result.suite_ids, SUITE_IDS);
 });
 
-test("catalog jobs are all selectable and historical savings reflect selected job dependencies", async () => {
+test("catalog pins the fast suite and savings exclude required checks", async () => {
   validateCatalog(catalog);
   for (const mutate of [
+    copy => {
+      copy.suites.find(suite => suite.id === "test").mandatory = false;
+    },
     copy => {
       copy.suites[0].mandatory = true;
     },
@@ -402,17 +428,19 @@ test("catalog jobs are all selectable and historical savings reflect selected jo
     suite.historical_duration_seconds = 60;
   });
   const { result } = await exercise({ catalog: copy }, { value: decisionResponse({ suite_ids: ["security"], confidence: 0.9 }) });
-  assert.deepEqual(result.suite_ids, ["build", "security"]);
-  assert.equal(result.metrics.estimated_test_minutes_saved, SUITE_IDS.length - 2);
+  assert.deepEqual(result.suite_ids, [...fastBaseline, "build", "security"]);
+  assert.equal(result.metrics.estimated_test_minutes_saved, SUITE_IDS.length - 4);
 });
 
-test("selected jobs retain direct and transitive prerequisites without making them unconditional", () => {
-  assert.deepEqual(selectSuites({ suite_ids: ["canary-go"], confidence: 1 }, catalog, diff), ["verify-integration-build", "test", "canary-go"]);
+test("fast checks are retained even when the model would omit every suite", () => {
+  assert.deepEqual(selectSuites({ suite_ids: ["canary-go"], confidence: 1 }, catalog, diff), ["verify-integration-build", "test", "test-slow", "canary-go"]);
+  assert.deepEqual(selectSuites({ suite_ids: ["test"], confidence: 1 }, catalog, diff), ["verify-integration-build", "test"]);
+  assert.deepEqual(selectSuites({ suite_ids: ["test-slow"], confidence: 1 }, catalog, diff), [...fastBaseline, "test-slow"]);
   for (const [id, dependencies] of Object.entries(JOB_DEPENDENCIES)) {
     const selected = selectSuites({ suite_ids: [id], confidence: 1 }, catalog, diff);
     for (const dependency of dependencies) assert.ok(selected.includes(dependency), `${id}: ${dependency}`);
   }
-  assert.deepEqual(selectSuites({ suite_ids: [], confidence: 1 }, catalog, diff), []);
+  assert.deepEqual(selectSuites({ suite_ids: [], confidence: 1 }, catalog, diff), fastBaseline);
   for (const suite_ids of [["unknown"], ["build", "build"], [null], "build"]) {
     assert.throws(() => selectSuites({ suite_ids, confidence: 1 }, catalog, diff), /invalid/);
   }
@@ -446,7 +474,7 @@ test("GitHub diff uses one authenticated, SHA-pinned comparison without a checko
   assert.match(summary.groups.other.patch, /-before\n\+after/);
   assert.equal(summary.unavailable, false);
   assert.equal(summary.truncated, false);
-  assert.deepEqual((await exercise({ diff: summary }, { value: decisionResponse({ suite_ids: [], confidence: 1 }) })).result.suite_ids, []);
+  assert.deepEqual((await exercise({ diff: summary }, { value: decisionResponse({ suite_ids: [], confidence: 1 }) })).result.suite_ids, fastBaseline);
 });
 
 test("API evidence retains renamed source paths and language groups with only the first sorted lock", async () => {
@@ -468,7 +496,7 @@ test("API evidence retains renamed source paths and language groups with only th
   assert.match(summary.groups.go.patch, /a\/pkg\/runtime\.go/);
   assert.match(summary.groups.other.patch, /b\/README\.md/);
   const { result } = await exercise({ diff: summary }, { value: decisionResponse({ suite_ids: [], confidence: 1 }) });
-  assert.deepEqual(result.suite_ids, []);
+  assert.deepEqual(result.suite_ids, fastBaseline);
 });
 
 test("complete bounded API patches retain filenames", async () => {
@@ -562,12 +590,12 @@ test("lock-heavy capped comparisons paginate immutable evidence before filtering
   }
   const { result, calls } = await exercise({ diff: summary }, { value: decisionResponse({ suite_ids: [], confidence: 1 }) });
   assert.equal(calls.length, 1);
-  assert.deepEqual(result.suite_ids, []);
+  assert.deepEqual(result.suite_ids, fastBaseline);
   const unsafe = paginatedDiff([...locks, { ...source, filename: "go.mod" }]);
   const unsafeDiff = await githubDiff({}, { fetchImpl: unsafe.fetchImpl });
   const retained = await exercise({ diff: unsafeDiff.summary });
   assert.equal(retained.calls.length, 1);
-  assert.deepEqual(retained.result.suite_ids, ["build-wasm"]);
+  assert.deepEqual(retained.result.suite_ids, [...fastBaseline, "build-wasm"]);
 });
 
 test("commit pagination rejects wrong SHAs, parents, duplicates, malformed pages and its raw file ceiling", async t => {
@@ -752,7 +780,7 @@ test("large diffs retain separate language inventories and one sorted lock sampl
   assert.ok(Buffer.byteLength(JSON.stringify(summary)) <= LIMITS.summary);
   const { result } = await exercise({ diff: summary });
   assert.equal(result.fallback, false);
-  assert.deepEqual(result.suite_ids, ["build-wasm"]);
+  assert.deepEqual(result.suite_ids, [...fastBaseline, "build-wasm"]);
 });
 
 test("incomplete file inventories and genuine Git failures remain fail-open", async () => {
@@ -837,7 +865,7 @@ global.fetch = async (url, options) => {
     encoding: "utf8",
   });
   const result = JSON.parse(stdout);
-  assert.deepEqual(result.suite_ids, []);
+  assert.deepEqual(result.suite_ids, fastBaseline);
   assert.equal(result.fallback, false);
   assert.equal(result.metrics.decision_api_requests, 1);
 });
@@ -868,7 +896,7 @@ global.fetch = async (url, options) => {
   if (process.env.MOCK_COMPARE_STATUS === "403") assert.equal(input.diff_summary.unavailable, true);
   else assert.deepEqual(input.diff_summary.files, ["README.md"]);
   assert.deepEqual(input.suite_catalog, ${JSON.stringify(catalog)});
-  return new Response(${JSON.stringify(JSON.stringify(decisionResponse({ suite_ids: [], confidence: 1 })))}, { status: 200 });
+  return new Response(${JSON.stringify(JSON.stringify(decisionResponse({ suite_ids: ["build-wasm"], confidence: 1 })))}, { status: 200 });
 };
 `
   );
@@ -877,6 +905,7 @@ global.fetch = async (url, options) => {
     ["pull_request", "403"],
     ["push", "200"],
   ]) {
+    const summaryPath = path.join(cwd, `${event}-${status}-summary.md`);
     const stdout = execFileSync(process.execPath, ["--require", preload, path.join(cwd, "scripts/ci-front-door.cjs")], {
       cwd,
       env: {
@@ -889,16 +918,35 @@ global.fetch = async (url, options) => {
         GITHUB_EVENT_NAME: event,
         MOCK_COMPARE_STATUS: status,
         GITHUB_OUTPUT: "",
-        GITHUB_STEP_SUMMARY: "",
+        GITHUB_STEP_SUMMARY: summaryPath,
       },
       encoding: "utf8",
       stdio: ["ignore", "pipe", "pipe"],
     });
     const result = JSON.parse(stdout);
-    assert.deepEqual(result.suite_ids, event === "pull_request" && status === "200" ? [] : SUITE_IDS);
+    const selective = event === "pull_request" && status === "200";
+    assert.deepEqual(result.suite_ids, selective ? [...fastBaseline, "build-wasm"] : SUITE_IDS);
     assert.equal(result.fallback, status === "403");
     assert.equal(result.metrics.decision_api_requests, event === "pull_request" && status === "200" ? 1 : 0);
     assert.equal(result.metrics.other_github_api_requests, event === "pull_request" ? 1 : 0);
+    const summary = fs.readFileSync(summaryPath, "utf8");
+    const [headline, details] = summary.split("<details>\n");
+    const expectedStatus = selective ? "Selection applied." : status === "403" ? "Fallback: keeping every suite." : "Full run: suite selection was not applied.";
+    assert.ok(headline.startsWith(`### CI Front Door\n\n${expectedStatus}`));
+    assert.ok(headline.includes(`**${result.suite_ids.length} of ${SUITE_IDS.length} suites retained**`));
+    assert.match(details, /^<summary>Suite selection and diagnostics<\/summary>\n\n/);
+    if (selective) {
+      assert.match(details, /\*\*Retained suites \(3\)\*\*\n\n- `verify-integration-build`\n- `test`\n- `build-wasm`\n\n\*\*Omitted suites \(\d+\)\*\*\n\n- `front-door-conformance`/);
+      assert.match(details, /\| Estimated test minutes saved \| Unavailable \|/);
+    } else {
+      assert.match(details, /\*\*Omitted suites \(0\)\*\*\n\n_None\._/);
+      assert.match(details, /\| Estimated test minutes saved \| 0 \|/);
+    }
+    assert.ok(details.includes(`| Outcome | \`${result.reason}\` |`));
+    assert.ok(details.includes(`| Decisions API requests | ${result.metrics.decision_api_requests} |`));
+    assert.ok(details.includes(`| Other GitHub API requests | ${result.metrics.other_github_api_requests} |`));
+    assert.ok(details.endsWith("</details>\n"));
+    assert.doesNotMatch(summary, /"suite_ids"/);
   }
 });
 
@@ -913,9 +961,9 @@ test("offline replay measures misses against full controls, not missing or selec
     api_requests: { decision: 1, github: 0 },
   };
   const report = await evaluate(catalog, { records: [record] });
-  assert.equal(report.estimated_test_minutes_saved, SUITE_IDS.length);
+  assert.equal(report.estimated_test_minutes_saved, SUITE_IDS.length - fastBaseline.length);
   assert.equal(report.missed_regressions, 2);
-  assert.equal(report.selected_suite_count, 0);
+  assert.equal(report.selected_suite_count, fastBaseline.length);
   assert.equal(report.decision_api_requests, 1);
   assert.equal(report.other_github_api_requests, 0);
   assert.equal(report.evaluation_api_requests, 0);
@@ -948,8 +996,8 @@ test("recorded-response replay uses model relevance rather than the removed path
         },
       ],
     });
-    assert.deepEqual(report.results[0].suite_ids, []);
-    assert.equal(report.selected_suite_count, 0);
+    assert.deepEqual(report.results[0].suite_ids, fastBaseline);
+    assert.equal(report.selected_suite_count, fastBaseline.length);
     assert.equal(report.estimated_test_minutes_saved, null);
     assert.equal(report.missed_regressions, 2);
     assert.equal(report.evaluation_api_requests, 0);

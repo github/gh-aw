@@ -87,6 +87,13 @@ describe("visual regression workflow contract", () => {
     expect(workflow).toContain("On the first tool denial");
   });
 
+  it("reports incomplete only when a denied capability blocks a required step", () => {
+    const prompt = workflow.replace(/\s+/g, " ");
+    expect(prompt).toContain(
+      "On the first tool denial, stop using that capability; do not retry variants or suggest credential changes. If the denial blocks a required step, call `report_incomplete` with the exact command and missing evidence. If it blocks only optional verification, skip it, note the limitation in the summary, and do not call `report_incomplete`; continue the remaining required work."
+    );
+  });
+
   it("does not mistake missing baselines for failed capture or clean comparisons", () => {
     expect(workflow).toContain("Its absence must not block screenshots or accessibility inspection");
     expect(workflow).toContain("Record visual comparison as **unavailable**, never **unchanged**");

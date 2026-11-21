@@ -129,6 +129,75 @@ jobs:
         run: |
           node --test actions/setup/js/scripts/test_otlp_protobuf.mjs
 
+  genai-semconv-conformance:
+    name: GenAI semantic-convention conformance
+    needs: [checkout-cache]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    concurrency:
+      group: ci-${{ github.ref }}-genai-semconv-conformance
+      cancel-in-progress: true
+    steps:
+      - name: Restore checkout
+        id: restore-checkout
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .
+          key: checkout-cjs-${{ github.run_id }}-${{ github.sha }}
+      - name: Checkout on cache miss
+        if: steps.restore-checkout.outputs.cache-hit != 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 2
+          persist-credentials: false
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v6
+        with:
+          node-version: "24"
+      - name: Set up Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+      - name: Checkout semantic-conventions-conformance
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: open-telemetry/semantic-conventions-conformance
+          ref: a4321907b3768c468966538a459130ac6b095bdc
+          path: semantic-conventions-conformance
+          persist-credentials: false
+      - name: Move conformance checkout to runner temp
+        run: mv "$GITHUB_WORKSPACE/semantic-conventions-conformance" "$RUNNER_TEMP/semantic-conventions-conformance"
+      - name: Install pinned Weaver
+        run: |
+          mkdir -p "$RUNNER_TEMP/weaver"
+          asset=weaver-x86_64-unknown-linux-gnu.tar.xz
+          # runner-guard:ignore RGS-018 -- SHA-256 checked before extraction.
+          curl --fail --location --proto '=https' --tlsv1.2 \
+            "https://github.com/open-telemetry/weaver/releases/download/v0.28.0/$asset" \
+            --output "$RUNNER_TEMP/$asset"
+          printf '%s  %s\n' '9878e2d56ad82ae441b0b527377a4f6001ae19f4af362fb0a4d951884f59ab61' "$RUNNER_TEMP/$asset" | sha256sum --check --strict
+          tar -xJf "$RUNNER_TEMP/$asset" -C "$RUNNER_TEMP/weaver"
+          weaver_binary="$(find "$RUNNER_TEMP/weaver" -type f -name weaver -print -quit)"
+          test -n "$weaver_binary"
+          chmod +x "$weaver_binary"
+          echo "$(dirname "$weaver_binary")" >> "$GITHUB_PATH"
+      - name: Install isolated conformance runner
+        run: |
+          python -m venv "$RUNNER_TEMP/otel-conformance-venv"
+          "$RUNNER_TEMP/otel-conformance-venv/bin/pip" install \
+            -e "$RUNNER_TEMP/semantic-conventions-conformance/tools/runner" \
+            -e "$RUNNER_TEMP/semantic-conventions-conformance/tools/gen-ai/mock-server" \
+            -e "$RUNNER_TEMP/semantic-conventions-conformance/tools/gen-ai/runner"
+          echo "$RUNNER_TEMP/otel-conformance-venv/bin" >> "$GITHUB_PATH"
+      - name: Validate GenAI semantic conventions
+        env:
+          SEMCONV_CACHE: ${{ runner.temp }}/semconv-cache
+          OTEL_CONFORMANCE_REPORT_DIR: ${{ runner.temp }}/gh-aw-genai-conformance
+        run: make validate-otel-conformance
+
   js-tests:
     name: JS Tests (shard ${{ matrix.shard }}/8)
     needs: [checkout-cache]
