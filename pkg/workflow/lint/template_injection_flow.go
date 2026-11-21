@@ -14,6 +14,10 @@ import (
 // The lexical pass also covers unsupported interpreters and malformed
 // expressions. Supplement it with the shared shell/output transport model.
 func templateInjectionOutputFlows(ctx context.Context, input Input, diagnostics []Diagnostic) ([]Diagnostic, error) {
+	owner := AWAST
+	if input.Workflow != nil {
+		owner = ActionsAST
+	}
 	input, hasTransport, err := outputFlowInput(ctx, input)
 	if err != nil || !hasTransport {
 		return diagnostics, err
@@ -23,7 +27,7 @@ func templateInjectionOutputFlows(ctx context.Context, input Input, diagnostics 
 		IsSink: func(site taint.Site) bool { return site.Kind == taint.ExecutableInterpolation },
 		IsExecutableInput: func(site taint.Site) bool {
 			key, _ := executableActionInput(site.Uses)
-			return key != "" && key == site.Input
+			return key != "" && strings.EqualFold(key, site.Input)
 		},
 	}
 	result, err := analyzeUntrustedFlow(ctx, input, rule)
@@ -36,13 +40,13 @@ func templateInjectionOutputFlows(ctx context.Context, input Input, diagnostics 
 			related = append(related, RelatedLocation{Path: source.Path})
 		}
 		diagnostics = append(diagnostics, Diagnostic{
-			Path: finding.Site.Path, Line: finding.Site.Line, Related: related,
+			Source: owner, Path: finding.Site.Path, Line: finding.Site.Line, Related: related,
 			Message: "Attacker-controlled Actions value flows through an output into executable script text; bind it through env and read it as data instead",
 		})
 	}
 	diagnostics, err = templateInjectionFlowError(diagnostics, err)
 	for _, gap := range result.Gaps {
-		diagnostics = append(diagnostics, Diagnostic{Severity: Warning, Path: gap.Path, Line: gap.Line,
+		diagnostics = append(diagnostics, Diagnostic{Source: owner, Severity: Warning, Path: gap.Path, Line: gap.Line,
 			Message: "Incomplete template-injection output-flow analysis: " + gap.Reason})
 	}
 	return diagnostics, err
@@ -60,6 +64,7 @@ func outputFlowInput(ctx context.Context, input Input) (Input, bool, error) {
 		}
 		input.Workflow = workflow
 		for _, job := range input.Workflow.Jobs {
+			job.Steps = slices.Clone(job.Steps)
 			hasTransport = hasTransport || len(job.Outputs) > 0
 			for index, step := range job.Steps {
 				// Lint must inspect typed run interpolation even though the
@@ -112,7 +117,11 @@ func templateInjectionFlowError(diagnostics []Diagnostic, err error) ([]Diagnost
 	var expressionError *taint.ExpressionError
 	if errors.As(err, &expressionError) {
 		if !diagnosticAt(diagnostics, expressionError.Path, expressionError.Line, Warning) {
-			diagnostics = append(diagnostics, Diagnostic{Severity: Warning, Path: expressionError.Path, Line: expressionError.Line,
+			owner := ActionsAST
+			if len(diagnostics) > 0 && diagnostics[0].Source != 0 {
+				owner = diagnostics[0].Source
+			}
+			diagnostics = append(diagnostics, Diagnostic{Source: owner, Severity: Warning, Path: expressionError.Path, Line: expressionError.Line,
 				Message: "Incomplete template-injection output-flow analysis: invalid Actions expression; fix the expression and rerun the check"})
 		}
 		return diagnostics, nil

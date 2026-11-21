@@ -40,7 +40,7 @@ func checkTemplateInjection(ctx context.Context, input Input) ([]Diagnostic, err
 	if err != nil {
 		return nil, err
 	}
-	checker := templateInjectionChecker{rule: taint.Rule{
+	checker := templateInjectionChecker{source: ActionsAST, rule: taint.Rule{
 		ID: "template-injection", IsSource: templateInjectionSource,
 		IsFilter: templateInjectionFilter,
 	}}
@@ -69,6 +69,7 @@ func checkTemplateInjection(ctx context.Context, input Input) ([]Diagnostic, err
 }
 
 type templateInjectionChecker struct {
+	source      ASTTargets
 	rule        taint.Rule
 	diagnostics []Diagnostic
 }
@@ -93,12 +94,20 @@ func (c *templateInjectionChecker) step(ctx context.Context, step actions.Step, 
 		if key == "" {
 			return nil
 		}
-		expression, exists := value.With[key]
-		if !exists {
+		authoredKey := ""
+		var expression actions.Expression
+		for authored, candidate := range value.With {
+			if strings.EqualFold(authored, key) {
+				authoredKey = authored
+				expression = candidate
+				break
+			}
+		}
+		if authoredKey == "" {
 			return nil
 		}
 		javascript = js
-		scriptPath = path + ".with." + key
+		scriptPath = path + ".with." + authoredKey
 		script, err = actions.RenderExpression(expression, job, workflow, true)
 		if err != nil {
 			return fmt.Errorf("cannot render executable script at %s; correct the action input before linting", scriptPath)
@@ -125,11 +134,12 @@ func (c *templateInjectionChecker) rawStep(ctx context.Context, fields map[strin
 		if err != nil {
 			return err
 		}
-		raw, exists = with[key]
+		authoredKey, value, exists := executableInputKey(with, key)
 		if !exists {
 			return nil
 		}
-		scriptPath, javascript, kind = path+".with."+key, js, "executable action input"
+		raw = value
+		scriptPath, javascript, kind = path+".with."+authoredKey, js, "executable action input"
 	}
 	script, ok := raw.(string)
 	if !ok {
@@ -159,7 +169,7 @@ func (c *templateInjectionChecker) checkScript(ctx context.Context, script, scri
 			remediation = "bind it through env and read process.env instead"
 		}
 		c.diagnostics = append(c.diagnostics, Diagnostic{
-			Path: scriptPath, Line: expression.Line, Related: slices.Compact(related),
+			Source: c.source, Path: scriptPath, Line: expression.Line, Related: slices.Compact(related),
 			Message: "Attacker-controlled Actions value is interpolated into executable script text; " +
 				remediation,
 		})
@@ -172,7 +182,7 @@ func (c *templateInjectionChecker) text(ctx context.Context, text, path string, 
 	var parseError *taint.ExpressionError
 	if errors.As(err, &parseError) {
 		c.diagnostics = append(c.diagnostics, Diagnostic{
-			Severity: Warning, Path: path, Line: parseError.Line,
+			Source: c.source, Severity: Warning, Path: path, Line: parseError.Line,
 			Message: "Incomplete template-injection analysis: invalid Actions expression; " +
 				"fix the expression and rerun the check",
 		})
@@ -228,6 +238,7 @@ func (c *templateInjectionChecker) rawEnvironment(ctx context.Context, raw any, 
 			sources = append(sources, expression.Sources...)
 		}
 		bindings["env."+strings.ToLower(key)] = sources
+		bindings["shell."+key] = sources
 	}
 	return bindings, nil
 }

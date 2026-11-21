@@ -31,12 +31,15 @@ func checkImages(ctx context.Context, input Input, mcp bool, inspect func(any, s
 	}
 	var diagnostics []Diagnostic
 	var failures []error
-	check := func(raw any, path string, strategy map[string]any) {
+	check := func(raw any, path string, strategy map[string]any, owner ASTTargets) {
 		found, err := inspect(raw, path, strategy)
+		for index := range found {
+			found[index].Source = owner
+		}
 		diagnostics = append(diagnostics, found...)
 		failures = append(failures, err)
 	}
-	checkServices := func(services map[string]any, path string, strategy map[string]any) error {
+	checkServices := func(services map[string]any, path string, strategy map[string]any, owner ASTTargets) error {
 		for _, name := range slices.Sorted(maps.Keys(services)) {
 			if err := ctx.Err(); err != nil {
 				return err
@@ -44,7 +47,7 @@ func checkImages(ctx context.Context, input Input, mcp bool, inspect func(any, s
 			if disabledServiceImage(services[name]) {
 				continue
 			}
-			check(services[name], path+"."+name, strategy)
+			check(services[name], path+"."+name, strategy, owner)
 		}
 		return nil
 	}
@@ -54,8 +57,8 @@ func checkImages(ctx context.Context, input Input, mcp bool, inspect func(any, s
 				return diagnostics, errors.Join(append(failures, err)...)
 			}
 			path := "jobs." + string(job.ID)
-			check(job.Container, path+".container", job.Strategy)
-			failures = append(failures, checkServices(job.Services, path+".services", job.Strategy))
+			check(job.Container, path+".container", job.Strategy, ActionsAST)
+			failures = append(failures, checkServices(job.Services, path+".services", job.Strategy, ActionsAST))
 		}
 	} else {
 		blocks, err := aw.ExecutionBlocks(ctx, input.Document)
@@ -66,10 +69,10 @@ func checkImages(ctx context.Context, input Input, mcp bool, inspect func(any, s
 			}
 			strategy, strategyErr := policyMapping(block.Fields["strategy"], block.FieldPath("strategy"))
 			failures = append(failures, strategyErr)
-			check(block.Fields["container"], block.FieldPath("container"), strategy)
+			check(block.Fields["container"], block.FieldPath("container"), strategy, AWAST)
 			services, err := policyMapping(block.Fields["services"], block.FieldPath("services"))
 			failures = append(failures, err)
-			failures = append(failures, checkServices(services, block.FieldPath("services"), strategy))
+			failures = append(failures, checkServices(services, block.FieldPath("services"), strategy, AWAST))
 		}
 	}
 	if mcp && input.Document != nil {
@@ -81,7 +84,7 @@ func checkImages(ctx context.Context, input Input, mcp bool, inspect func(any, s
 			}
 			server, err := policyMapping(servers[name], "mcp-servers."+name)
 			failures = append(failures, err)
-			check(server["container"], "mcp-servers."+name+".container", nil)
+			check(server["container"], "mcp-servers."+name+".container", nil, AWAST)
 		}
 	}
 	return diagnostics, errors.Join(failures...)

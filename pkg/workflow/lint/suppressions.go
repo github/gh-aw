@@ -17,6 +17,7 @@ import (
 )
 
 var suppressionPattern = regexp.MustCompile(`^gh-aw:\s*ignore\[([^\]]*)\]\s+--\s+(\S.*)$`)
+var suppressionMarkerPattern = regexp.MustCompile(`#\s*gh-aw:`)
 
 type lintSuppression struct {
 	rules   map[string]struct{}
@@ -33,6 +34,11 @@ type suppressionField struct {
 	column  int
 	paths   map[string]struct{}
 	aliases []string
+}
+
+type suppressionAnchor struct {
+	base  string
+	paths map[string]struct{}
 }
 
 func (r *Runner) suppressionRuleIDs() map[string]struct{} {
@@ -54,7 +60,7 @@ func (r *Runner) commentSuppressions(input Input) (lintSuppressions, error) {
 	}
 	var result lintSuppressions
 	var failures []error
-	if input.Workflow != nil && strings.Contains(input.Workflow.OriginalSource(), "gh-aw:") {
+	if input.Workflow != nil && suppressionMarkerPattern.MatchString(input.Workflow.OriginalSource()) {
 		source, err := actions.Emit(input.Workflow)
 		if err != nil {
 			failures = append(failures, errors.New("cannot render Actions source for lint suppressions"))
@@ -72,23 +78,30 @@ func (r *Runner) commentSuppressions(input Input) (lintSuppressions, error) {
 	return result, errors.Join(failures...)
 }
 
-func (s lintSuppressions) contains(input Input, rule Rule, path string) bool {
+func (s lintSuppressions) contains(input Input, rule Rule, diagnostic Diagnostic) bool {
 	scopes := s.aw
-	if input.Workflow != nil && rule.Targets != AWAST {
+	owner := diagnostic.Source
+	if owner == 0 {
+		owner = rule.Targets
+		if owner == 0 {
+			owner = ActionsAST
+		}
+		if input.Workflow == nil {
+			owner = AWAST
+		}
+	}
+	if owner&ActionsAST != 0 {
 		scopes = s.actions
 	}
 	return slices.ContainsFunc(scopes, func(scope lintSuppression) bool {
 		_, ruleMatches := scope.rules[rule.ID]
-		_, pathMatches := scope.paths[path]
-		pathMatches = pathMatches || slices.ContainsFunc(scope.aliases, func(alias string) bool {
-			return strings.HasPrefix(path, alias+".") || strings.HasPrefix(path, alias+"[")
-		})
+		_, pathMatches := scope.paths[diagnostic.Path]
 		return ruleMatches && pathMatches
 	})
 }
 
 func parseLintSuppressions(source string, known map[string]struct{}) ([]lintSuppression, error) {
-	if !strings.Contains(source, "gh-aw:") {
+	if !suppressionMarkerPattern.MatchString(source) {
 		return nil, nil
 	}
 	source = strings.ReplaceAll(source, "\r\n", "\n")
@@ -98,8 +111,9 @@ func parseLintSuppressions(source string, known map[string]struct{}) ([]lintSupp
 		return nil, errors.New("cannot parse YAML comments for lint suppressions")
 	}
 	fields := make(map[int][]suppressionField)
+	anchors := make(map[string]suppressionAnchor)
 	for _, document := range file.Docs {
-		collectSuppressionFields(document.Body, "", fields)
+		collectSuppressionFields(document.Body, "", fields, anchors)
 	}
 	var lines []string
 	for line := range strings.Lines(source) {
@@ -112,6 +126,10 @@ func parseLintSuppressions(source string, known map[string]struct{}) ([]lintSupp
 		}
 		text := strings.TrimSpace(strings.TrimPrefix(item.Value, "#"))
 		if !strings.HasPrefix(text, "gh-aw:") {
+			continue
+		}
+		directive := strings.TrimSpace(strings.TrimPrefix(text, "gh-aw:"))
+		if !strings.HasPrefix(directive, "ignore") {
 			continue
 		}
 		scope, err := suppressionComment(item.Position.Line, text, lines, fields, known)
@@ -167,12 +185,12 @@ func suppressionIndent(line string) int {
 	return len(line) - len(strings.TrimLeft(line, " \t"))
 }
 
-func collectSuppressionFields(node ast.Node, path string, fields map[int][]suppressionField) suppressionField {
+func collectSuppressionFields(node ast.Node, path string, fields map[int][]suppressionField, anchors map[string]suppressionAnchor) suppressionField {
 	result := suppressionField{paths: map[string]struct{}{path: {}}}
 	switch value := node.(type) {
 	case *ast.MappingNode:
 		for _, field := range value.Values {
-			result.add(collectSuppressionFields(field, path, fields))
+			result.add(collectSuppressionFields(field, path, fields, anchors))
 		}
 	case *ast.MappingValueNode:
 		key := value.Key.GetToken()
@@ -180,20 +198,41 @@ func collectSuppressionFields(node ast.Node, path string, fields map[int][]suppr
 		if path != "" {
 			child = path + "." + child
 		}
-		descendants := collectSuppressionFields(value.Value, child, fields)
+		descendants := collectSuppressionFields(value.Value, child, fields, anchors)
 		descendants.column = key.Position.Column
 		fields[key.Position.Line] = append(fields[key.Position.Line], descendants)
 		result.add(descendants)
 	case *ast.SequenceNode:
 		for index, item := range value.Values {
-			result.add(collectSuppressionFields(item, path+"["+strconv.Itoa(index)+"]", fields))
+			result.add(collectSuppressionFields(item, path+"["+strconv.Itoa(index)+"]", fields, anchors))
 		}
 	case *ast.AnchorNode:
-		result.add(collectSuppressionFields(value.Value, path, fields))
+		descendants := collectSuppressionFields(value.Value, path, fields, anchors)
+		result.add(descendants)
+		if value.Name != nil && value.Name.GetToken() != nil {
+			anchors[strings.Trim(value.Name.GetToken().Value, "& ")] = suppressionAnchor{base: path, paths: descendants.paths}
+		}
 	case *ast.TagNode:
-		result.add(collectSuppressionFields(value.Value, path, fields))
+		result.add(collectSuppressionFields(value.Value, path, fields, anchors))
 	case *ast.AliasNode:
-		result.aliases = append(result.aliases, path)
+		name := ""
+		if value.GetToken() != nil {
+			name = strings.Trim(value.GetToken().Value, "* ")
+		}
+		if target, ok := anchors[name]; ok {
+			for targetPath := range target.paths {
+				if targetPath == target.base {
+					result.paths[path] = struct{}{}
+				} else if strings.HasPrefix(targetPath, target.base+".") {
+					result.paths[path+strings.TrimPrefix(targetPath, target.base)] = struct{}{}
+				} else if strings.HasPrefix(targetPath, target.base+"[") {
+					result.paths[path+strings.TrimPrefix(targetPath, target.base)] = struct{}{}
+				}
+			}
+		} else {
+			result.paths[path] = struct{}{}
+			result.paths[path+".image"] = struct{}{}
+		}
 	}
 	return result
 }

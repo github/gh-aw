@@ -11,14 +11,19 @@ import (
 // NUL cannot occur in a filesystem path. These symbols preserve the distinction
 // between an expanded runner variable and a literal filename such as '$GITHUB_ENV'.
 const (
-	runnerEnvTarget  = "\x00github-env"
-	runnerPathTarget = "\x00github-path"
+	runnerOutputTarget = "\x00github-output"
+	runnerEnvTarget    = "\x00github-env"
+	runnerPathTarget   = "\x00github-path"
 )
 
 func (s *shell) redirectOutput(stmt *syntax.Stmt, redir *syntax.Redirect, out value) {
 	switch redir.Op.String() {
 	case ">", ">>", "&>", "&>>":
-		if redir.N != nil && redir.N.Value != "1" && !strings.HasPrefix(redir.Op.String(), "&") {
+		if redir.N != nil && redir.N.Value != "1" && redir.N.Value != "2" && !strings.HasPrefix(redir.Op.String(), "&") {
+			return
+		}
+		if redir.N != nil && redir.N.Value == "2" && staticWord(redir.Word) == "/dev/null" {
+			s.a.emit(Site{Kind: Log, Path: s.path, Line: int(stmt.Pos().Line())}, out)
 			return
 		}
 		target := wordText(redir.Word, s.constants)
@@ -49,6 +54,15 @@ func (s *shell) redirectOutput(stmt *syntax.Stmt, redir *syntax.Redirect, out va
 		s.write(target, out, payload, int(stmt.Pos().Line()), stmt.Cmd)
 	case ">&":
 		if staticWord(redir.Word) == "2" {
+			for _, descriptorRedirect := range stmt.Redirs {
+				if descriptorRedirect.N == nil || descriptorRedirect.N.Value != "2" {
+					continue
+				}
+				target := wordText(descriptorRedirect.Word, s.constants)
+				if target != "" {
+					s.write(target, out, s.outputName(stmt.Cmd, target), int(stmt.Pos().Line()), stmt.Cmd)
+				}
+			}
 			s.a.emit(Site{Kind: Log, Path: s.path, Line: int(stmt.Pos().Line())}, out)
 		}
 	}
@@ -127,17 +141,41 @@ func (s *shell) write(target string, sources value, payload string, line int, co
 	case "$GITHUB_STEP_SUMMARY":
 		site.Kind = Summary
 		s.a.emit(site, sources)
-	case "$GITHUB_OUTPUT", "$GITHUB_ENV":
+	case runnerOutputTarget:
+		site.Kind = Output
+		s.files["$GITHUB_OUTPUT"] = union(s.files["$GITHUB_OUTPUT"], sources)
+		name := s.outputName(command, "$GITHUB_OUTPUT")
+		name, _, _ = strings.Cut(name, "=")
+		s.a.transportOutputRecord(site, name, sources, s.a.stepOutput, s.outputMayBeMultiline(command), s.outputRecordComplete(command))
+	case runnerEnvTarget:
 		name, _, found := strings.Cut(payload, "=")
 		if !found {
 			name, _, _ = strings.Cut(payload, "<<")
 		}
 		name = strings.TrimSpace(name)
-		if target == "$GITHUB_OUTPUT" {
-			site.Kind = Output
-			s.files[target] = union(s.files[target], sources)
-			s.a.transportOutputRecord(site, name, sources, s.a.stepOutput, s.outputMayBeMultiline(command), s.outputRecordComplete(command))
-		} else if name != "" {
+		if name != "" {
+			key := "env." + strings.ToLower(name)
+			s.persisted[key] = union(s.persisted[key], sources)
+			s.persisted["shell."+name] = union(s.persisted["shell."+name], sources)
+		} else if len(sources) > 0 {
+			s.a.gap(s.path, "dynamic GITHUB_ENV names are not modeled")
+		}
+	case "$GITHUB_OUTPUT":
+		name, _, found := strings.Cut(payload, "=")
+		if !found {
+			name, _, _ = strings.Cut(payload, "<<")
+		}
+		name = strings.TrimSpace(name)
+		site.Kind = Output
+		s.files[target] = union(s.files[target], sources)
+		s.a.transportOutputRecord(site, name, sources, s.a.stepOutput, s.outputMayBeMultiline(command), s.outputRecordComplete(command))
+	case "$GITHUB_ENV":
+		name, _, found := strings.Cut(payload, "=")
+		if !found {
+			name, _, _ = strings.Cut(payload, "<<")
+		}
+		name = strings.TrimSpace(name)
+		if name != "" {
 			key := "env." + strings.ToLower(name)
 			s.persisted[key] = union(s.persisted[key], sources)
 			s.persisted["shell."+name] = union(s.persisted["shell."+name], sources)
@@ -145,6 +183,7 @@ func (s *shell) write(target string, sources value, payload string, line int, co
 			s.a.gap(s.path, "dynamic GITHUB_ENV names are not modeled")
 		}
 	case "$GITHUB_PATH":
+		s.files[target] = union(s.files[target], sources)
 	case "", "/dev/null":
 	default:
 		s.files[target] = union(s.files[target], sources)

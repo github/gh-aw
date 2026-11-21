@@ -55,20 +55,20 @@ func analyze(input *actions.Workflow, rule Rule, document *aw.Document) (Result,
 	}
 	for _, job := range resolved.Jobs {
 		if err := visit(job); err != nil {
-			return Result{}, err
+			return a.result, err
 		}
 	}
 	for path, text := range map[string]string{"name": resolved.Name, "run-name": resolved.RunName} {
 		sources, err := a.text(text, path, nil)
 		if err != nil {
-			return Result{}, err
+			return a.result, err
 		}
 		a.emit(Site{Kind: Display, Path: path}, sources)
 	}
 	if document != nil {
 		sources, err := a.text(document.Markdown, "markdown", a.promptScope)
 		if err != nil {
-			return Result{}, err
+			return a.result, err
 		}
 		a.emit(Site{Kind: Prompt, Path: "markdown"}, sources)
 	}
@@ -408,7 +408,14 @@ func (a *analyzer) action(fields map[string]any, path string, bindings, files sc
 		return err
 	}
 	if actionName(uses) == "actions/github-script" && a.rule.JavaScript != nil {
-		if script, ok := inputs["script"].(string); ok {
+		var script string
+		for key, value := range inputs {
+			if strings.EqualFold(key, "script") {
+				script, _ = value.(string)
+				break
+			}
+		}
+		if script != "" {
 			if err := a.javascriptInline(script, path+".with.script", bindings, files, false); err != nil {
 				return err
 			}

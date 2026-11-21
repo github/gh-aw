@@ -271,7 +271,14 @@ func artifactNodePreloads(count int, argument func(int) string) ([]string, bool)
 		switch option {
 		case "-v", "--version", "--v8-options":
 			return nil, true
-		case "-h", "--help", "-c", "--check":
+		case "-h", "--help":
+			continue
+		case "-c", "--check":
+			continue
+		case "-e", "--eval", "-p", "--print", "-pe", "-ep", "--run":
+			if !attached {
+				index++
+			}
 			continue
 		case "-r", "--require", "--import", "--loader", "--experimental-loader":
 			if !attached {

@@ -71,7 +71,7 @@ func (s *shell) javascriptCommand(cmd *syntax.CallExpr, captured bool, stdin val
 		return nil, false
 	}
 	if s.a.rule.JavaScript == nil || s.a.rule.JavaScript.Parser == nil {
-		if len(stdin) == 0 && len(s.javascriptArguments(cmd.Args[1:])) == 0 {
+		if len(stdin) == 0 && len(s.javascriptArguments(cmd.Args[1:])) == 0 && !shellScopeHasSources(s.vars) && !shellScopeHasSources(s.persisted) {
 			return nil, true
 		}
 		s.a.gapAt(s.path, line, "JavaScript analysis unavailable; configure the pinned native TypeScript compiler module")
@@ -178,6 +178,15 @@ func (s *shell) javascriptFiles(files map[string][]Source) {
 	for name, sources := range files {
 		s.files[name] = union(s.files[name], sources)
 	}
+}
+
+func shellScopeHasSources(scope scope) bool {
+	for _, sources := range scope {
+		if len(sources) > 0 {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *shell) javascriptArguments(words []*syntax.Word) value {

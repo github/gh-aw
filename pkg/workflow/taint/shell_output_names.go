@@ -54,7 +54,7 @@ func commandOutputName(command syntax.Command, markers scope) string {
 }
 
 func (s *shell) outputName(command syntax.Command, target string) string {
-	if target != "$GITHUB_OUTPUT" {
+	if target != "$GITHUB_OUTPUT" && target != runnerOutputTarget {
 		return commandOutputName(command, s.markers)
 	}
 	// Compound output may contain several distinct records. Track the union

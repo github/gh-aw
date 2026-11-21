@@ -98,5 +98,5 @@ func applyTraceOptions(current bool, args []*syntax.Word) bool {
 
 func specialTarget(target string) bool {
 	return target == "$GITHUB_STEP_SUMMARY" || target == "$GITHUB_OUTPUT" || target == "$GITHUB_ENV" || target == "$GITHUB_PATH" ||
-		target == runnerEnvTarget || target == runnerPathTarget
+		target == runnerOutputTarget || target == runnerEnvTarget || target == runnerPathTarget
 }

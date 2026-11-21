@@ -90,7 +90,7 @@ func checkAuthoredPermissions(ctx context.Context, input Input, severity Severit
 }
 
 func checkAuthoredTemplateInjection(ctx context.Context, input Input) ([]Diagnostic, error) {
-	checker := templateInjectionChecker{rule: taint.Rule{
+	checker := templateInjectionChecker{source: AWAST, rule: taint.Rule{
 		ID: "template-injection", IsSource: templateInjectionSource, IsFilter: templateInjectionFilter,
 	}}
 	parent, err := checker.rawEnvironment(ctx, input.Document.Frontmatter["env"], "env", nil)

@@ -75,7 +75,11 @@ func (a *analyzer) parseShell(text string, fields map[string]any, path string, b
 		constants:    make(map[string]string), constantValues: make(map[string]map[string]struct{}),
 		constantUnknown: make(map[string]bool),
 	}
-	s.setConstants("GITHUB_OUTPUT", []string{"$GITHUB_OUTPUT"}, false)
+	if a.rule.ID == "template-injection" {
+		s.setConstants("GITHUB_OUTPUT", []string{runnerOutputTarget}, false)
+	} else {
+		s.setConstants("GITHUB_OUTPUT", []string{"$GITHUB_OUTPUT"}, false)
+	}
 	if a.rule.IsSink(Site{Kind: EnvironmentFile}) {
 		s.setConstants("GITHUB_ENV", []string{runnerEnvTarget}, false)
 		s.setConstants("GITHUB_PATH", []string{runnerPathTarget}, false)
@@ -210,7 +214,7 @@ func (s *shell) stmt(stmt *syntax.Stmt, captured bool, stdin value) value {
 	for _, redir := range stmt.Redirs {
 		switch redir.Op.String() {
 		case ">", ">>", ">&", "&>", "&>>":
-			redirected = redirected || redir.N == nil || redir.N.Value == "1" || strings.HasPrefix(redir.Op.String(), "&")
+			redirected = redirected || redir.N == nil || redir.N.Value == "1" || redir.N.Value == "2" || strings.HasPrefix(redir.Op.String(), "&")
 		case "<":
 			stdin = union(stdin, s.readFileWord(redir.Word))
 		case "<<", "<<-", "<<<": //nolint:generatedyamlheredoc // This analyzes authored heredocs; it does not generate shell.

@@ -34,6 +34,9 @@ func unpinnedImage(raw any, path string, strategy map[string]any) ([]Diagnostic,
 	if strings.Contains(image, "${{") {
 		if alternatives, known := matrixImageAlternatives(image, strategy); known {
 			for _, alternative := range alternatives {
+				if text, ok := alternative.(string); ok && text == "" && strings.Contains(path, ".services.") {
+					continue
+				}
 				if _, ok := alternative.(string); !ok {
 					return []Diagnostic{{Path: path, Message: "Incomplete image pin analysis: matrix image alternatives must be literal image strings pinned to immutable digests"}}, nil
 				}
@@ -100,7 +103,7 @@ func matrixImageAlternatives(image string, strategy map[string]any) ([]any, bool
 				alternatives = append(alternatives, value)
 			}
 		}
-		return alternatives, len(alternatives) > 0
+		return alternatives, true
 	}
 	return nil, false
 }

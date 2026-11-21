@@ -1,5 +1,7 @@
 package lint
 
+import "strings"
+
 // executableActionInput lists reviewed code inputs, not arbitrary fields named
 // "script". The boolean selects JavaScript-specific remediation.
 func executableActionInput(uses any) (string, bool) {
@@ -15,4 +17,13 @@ func executableActionInput(uses any) (string, bool) {
 	default:
 		return "", false
 	}
+}
+
+func executableInputKey(fields map[string]any, key string) (string, any, bool) {
+	for authored, value := range fields {
+		if strings.EqualFold(authored, key) {
+			return authored, value, true
+		}
+	}
+	return "", nil, false
 }

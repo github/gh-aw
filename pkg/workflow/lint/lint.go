@@ -73,6 +73,7 @@ type Diagnostic struct {
 	Line         int               `json:"script_line,omitempty"`
 	Message      string            `json:"message"`
 	Related      []RelatedLocation `json:"related,omitempty"`
+	Source       ASTTargets        `json:"-"`
 }
 
 type RelatedLocation struct {
@@ -217,7 +218,7 @@ func (r *Runner) Run(ctx context.Context, input Input) ([]Diagnostic, error) {
 			failures = append(failures, fmt.Errorf("lint rule %s: %w", rule.ID, err))
 		}
 		for _, diagnostic := range findings {
-			if suppressions.contains(input, rule, diagnostic.Path) {
+			if suppressions.contains(input, rule, diagnostic) {
 				continue
 			}
 			diagnostic.RuleID = rule.ID
