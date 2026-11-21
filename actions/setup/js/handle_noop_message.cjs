@@ -95,6 +95,31 @@ async function ensureAgentRunsIssue() {
 }
 
 /**
+ * Find another open no-op runs issue (for example one created by a concurrent rotation).
+ * Uses the issues list API rather than search to avoid search index lag.
+ * @param {number} excludeNumber - Issue number of the full tracker to skip
+ * @returns {Promise<{number: number, node_id: string} | null>} Newest matching open issue, or null
+ */
+async function findReplacementAgentRunsIssue(excludeNumber) {
+  const { owner, repo } = context.repo;
+  const { data } = await github.rest.issues.listForRepo({
+    owner,
+    repo,
+    labels: getIssueLabel(),
+    state: "open",
+    sort: "created",
+    direction: "desc",
+    per_page: 100,
+  });
+  const existing = data.find(issue => !issue.pull_request && issue.number !== excludeNumber && issue.title === NOOP_RUNS_ISSUE_TITLE);
+  if (!existing) {
+    return null;
+  }
+  core.info(`Found replacement no-op runs issue #${existing.number}: ${existing.html_url}`);
+  return { number: existing.number, node_id: existing.node_id };
+}
+
+/**
  * Create a new parent issue for agentic workflow no-op runs
  * @returns {Promise<{number: number, node_id: string}>} Parent issue number and node ID
  */
@@ -396,21 +421,27 @@ async function main() {
           throw error;
         }
         // The tracking issue is full; GitHub rejects every further comment, so roll over to a fresh issue.
-        core.info(`No-op runs issue #${noopRunsIssue.number} reached the comment limit, rotating to a new issue`);
-        await github.rest.issues.update({
-          owner,
-          repo,
-          issue_number: noopRunsIssue.number,
-          state: "closed",
-          state_reason: "completed",
-        });
-        noopRunsIssue = await createAgentRunsIssue();
+        // Record the comment on the replacement before closing the full issue so a failed rollover is retried next run.
+        const fullIssueNumber = noopRunsIssue.number;
+        core.info(`No-op runs issue #${fullIssueNumber} reached the comment limit, rotating to a new issue`);
+        noopRunsIssue = (await findReplacementAgentRunsIssue(fullIssueNumber)) || (await createAgentRunsIssue());
         await github.rest.issues.createComment({
           owner,
           repo,
           issue_number: noopRunsIssue.number,
           body: issueBody,
         });
+        try {
+          await github.rest.issues.update({
+            owner,
+            repo,
+            issue_number: fullIssueNumber,
+            state: "closed",
+            state_reason: "completed",
+          });
+        } catch (closeError) {
+          core.warning(`Failed to close full no-op runs issue #${fullIssueNumber}: ${getErrorMessage(closeError)}`);
+        }
       }
 
       core.info(`✓ Posted no-op message to no-op runs issue #${noopRunsIssue.number}`);
