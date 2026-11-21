@@ -196,7 +196,7 @@ func buildCopilotSDKInstallStep(workflowData *WorkflowData) GitHubActionStep {
 		return nil
 	}
 	copilotInstallLog.Printf("copilot-sdk enabled; runtime=%s", spec.runtimeID)
-	return specToInstallStep(spec, resolveEngineCooldownDays(workflowData))
+	return specToInstallStep(spec)
 }
 
 func selectCopilotSDKInstallSpec(workflowData *WorkflowData) copilotSDKInstallSpec {
@@ -219,14 +219,12 @@ func selectCopilotSDKInstallSpec(workflowData *WorkflowData) copilotSDKInstallSp
 // specToInstallStep converts a copilotSDKInstallSpec into a GitHubActionStep.
 // When the spec has runLines set it emits a "run: |" multi-line block; otherwise
 // it emits a single "run: <command>" line.
-func specToInstallStep(spec copilotSDKInstallSpec, cooldownDays int) GitHubActionStep {
+func specToInstallStep(spec copilotSDKInstallSpec) GitHubActionStep {
 	if spec.npm != nil {
 		return GitHubActionStep{
 			"      - name: " + spec.stepName,
 			"        shell: bash",
 			"        run: " + spec.npm.installCommand(),
-			"        env:",
-			fmt.Sprintf("          NPM_CONFIG_MIN_RELEASE_AGE: '%d'", cooldownDays),
 		}
 	}
 	if len(spec.runLines) > 0 {

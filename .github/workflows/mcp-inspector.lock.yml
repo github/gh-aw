@@ -813,9 +813,7 @@ jobs:
         run: bash "${RUNNER_TEMP}/gh-aw/actions/install_awf_binary.sh" v0.29.17 --rootless
       - name: Install GitHub Copilot SDK (Node.js)
         shell: bash
-        run: bash "${RUNNER_TEMP}/gh-aw/actions/install_copilot_sdk.sh" node c90e9653d2d50970ae1e10adc236cc22109b26cf7bd23e7d9735afd50b4c6ff8 2026-10-15T14:19:28Z
-        env:
-          NPM_CONFIG_MIN_RELEASE_AGE: '3'
+        run: bash "${RUNNER_TEMP}/gh-aw/actions/install_copilot_sdk.sh" node c90e9653d2d50970ae1e10adc236cc22109b26cf7bd23e7d9735afd50b4c6ff8
       - name: Determine automatic lockdown mode for GitHub MCP Server
         id: determine-automatic-lockdown
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0

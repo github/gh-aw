@@ -54,9 +54,6 @@ func (c *Compiler) generateCopilotSDKNpmInventories(workflows []*WorkflowData, c
 		if !selected[graph.project] {
 			continue
 		}
-		if graph.project.err != nil {
-			return nil, graph.project.err
-		}
 		relativeDir := filepath.Join(copilotSDKInventoryDir, graph.project.variant)
 		dir := filepath.Join(configDir, relativeDir)
 		if err := c.writeFrozenNpmInventory(dir, graph.manifest, graph.lock); err != nil {

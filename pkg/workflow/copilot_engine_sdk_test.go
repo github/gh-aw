@@ -16,19 +16,9 @@ func containsEnvValue(stepContent, key, value string) bool {
 		strings.Contains(stepContent, key+`: "`+value+`"`)
 }
 
-func TestCopilotSDKNpmInstallCooldown(t *testing.T) {
-	spec := getCopilotSDKInstallSpec("node driver.js")
-	for _, days := range []int{0, 3, 7} {
-		step := strings.Join(specToInstallStep(spec, days), "\n")
-		if !strings.Contains(step, "NPM_CONFIG_MIN_RELEASE_AGE: '"+strconv.Itoa(days)+"'") {
-			t.Fatalf("Expected locked SDK install to use the configured cooldown, got:\n%s", step)
-		}
-	}
-}
-
 func TestCopilotSDKJavaInstallUsesMavenNotNpm(t *testing.T) {
 	spec := getInlineCopilotSDKInstallSpec("java")
-	step := strings.Join(specToInstallStep(spec, 7), "\n")
+	step := strings.Join(specToInstallStep(spec), "\n")
 	if !strings.Contains(step, "mvn -q dependency:build-classpath") {
 		t.Fatalf("Expected Java SDK installation to use Maven, got:\n%s", step)
 	}

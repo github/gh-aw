@@ -21,12 +21,11 @@ func TestCopilotSDKCompilesWithFrozenNPMGraph(t *testing.T) {
 	for _, tt := range []struct {
 		name, engine string
 		extra        map[string]string
-		cooldown     string
 	}{
-		{name: "built-in", cooldown: "3"},
-		{name: "inline", engine: "\n  driver:\n    node: console.log('driver')", cooldown: "3"},
+		{name: "built-in"},
+		{name: "inline", engine: "\n  driver:\n    node: console.log('driver')"},
 		{
-			name: "typescript command", engine: "\n  command: ts-node driver.ts\n  cooldown: 7", cooldown: "7",
+			name: "typescript command", engine: "\n  command: ts-node driver.ts\n  cooldown: 7",
 			extra: map[string]string{"ts-node": "10.9.2", "typescript": "5.8.3"},
 		},
 	} {
@@ -52,7 +51,7 @@ func TestCopilotSDKCompilesWithFrozenNPMGraph(t *testing.T) {
 				if !strings.HasPrefix(step.Name, "Install GitHub Copilot SDK (") {
 					continue
 				}
-				require.Equal(t, tt.cooldown, step.Env["NPM_CONFIG_MIN_RELEASE_AGE"])
+				require.NotContains(t, step.Env, "NPM_CONFIG_MIN_RELEASE_AGE")
 				require.NotContains(t, step.Run, "npm install")
 				project := copilotSDKNodeProject
 				manifestJSON, lockJSON := setup.CopilotSDKNodeManifest, setup.CopilotSDKNodeLock
@@ -108,15 +107,4 @@ func TestCopilotSDKCompilesWithFrozenNPMGraph(t *testing.T) {
 			t.Fatal("compiled workflow is missing its SDK install step")
 		})
 	}
-}
-
-func TestCopilotSDKNPMProjectRejectsStaleCooldown(t *testing.T) {
-	manifest, lock, cooldown := setup.CopilotSDKNodeManifest, setup.CopilotSDKNodeLock, setup.CopilotSDKNodeCooldown
-	_, err := newCopilotSDKNPMProject("node", manifest, lock, cooldown)
-	require.NoError(t, err)
-
-	changedLock := strings.Replace(lock, `"version": "6.29.1"`, `"version": "6.29.2"`, 1)
-	require.NotEqual(t, lock, changedLock)
-	_, err = newCopilotSDKNPMProject("node", manifest, changedLock, cooldown)
-	require.ErrorContains(t, err, "stale node Copilot SDK cooldown metadata")
 }

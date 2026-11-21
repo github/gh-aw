@@ -222,7 +222,6 @@ func (c *Compiler) validateWorkflowEngineSettings(cleanPath string, workflowData
 		c.validateEngineMCPSessionTimeout,
 		c.validateEngineMCPToolTimeout,
 		validateCopilotSDKEngineArgs,
-		validateCopilotSDKCooldownMetadata,
 		validatePiSubagents,
 	}
 	for _, check := range checks {

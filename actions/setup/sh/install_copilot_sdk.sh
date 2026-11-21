@@ -3,7 +3,6 @@ set -euo pipefail
 
 variant="${1:-}"
 expected_digest="${2:-}"
-newest="${3:-}"
 case "$variant" in
   node|typescript) ;;
   *) echo "::error::Unknown Copilot SDK npm project" >&2; exit 1 ;;
@@ -13,19 +12,11 @@ script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 project="${script_dir}/copilot-sdk/${variant}"
 target="${RUNNER_TEMP:?RUNNER_TEMP must be set}"
 
-# npm ci does not apply the release-age filter to a complete lockfile.
-node - "$project" "$expected_digest" "$newest" <<'NODE'
+node - "$project" "$expected_digest" <<'NODE'
 const { createHash } = require("node:crypto");
 const { readFileSync } = require("node:fs");
 const { join } = require("node:path");
-const [project, expectedDigest, newest] = process.argv.slice(2);
-const days = Number(process.env.NPM_CONFIG_MIN_RELEASE_AGE);
-const published = Date.parse(newest);
-if (!Number.isInteger(days) || days < 0 || !Number.isFinite(published) ||
-    (days > 0 && Date.now() - published < days * 86400000)) {
-  console.error("::error::Locked Copilot SDK dependencies do not satisfy engine.cooldown");
-  process.exit(1);
-}
+const [project, expectedDigest] = process.argv.slice(2);
 const actual = createHash("sha256")
   .update(readFileSync(join(project, "package.json")))
   .update("\0")

@@ -194,15 +194,11 @@ if (!sdk.bootstrapFixture || relative !== "relative helper") throw new Error("ES
 			}
 			data := &WorkflowData{EngineConfig: config}
 			var install []struct {
-				Run string            `yaml:"run"`
-				Env map[string]string `yaml:"env"`
+				Run string `yaml:"run"`
 			}
 			require.NoError(t, yaml.Unmarshal([]byte(strings.Join(buildCopilotSDKInstallStep(data), "\n")), &install))
 			require.Len(t, install, 1)
 			require.Contains(t, install[0].Run, copilotSDKNodeInstallCommand)
-			for key, value := range install[0].Env {
-				env = append(env, key+"="+value)
-			}
 			// Bind the fixture lock with local tarballs so npm ci runs offline.
 			digest := sha256.Sum256(append(append(manifest, 0), fixtureLock...))
 			command := strings.Replace(install[0].Run, copilotSDKNodeProject.digest, hex.EncodeToString(digest[:]), 1)
@@ -214,13 +210,6 @@ if (!sdk.bootstrapFixture || relative !== "relative helper") throw new Error("ES
 				output, err := mismatch.CombinedOutput()
 				require.Error(t, err)
 				require.Contains(t, string(output), "does not match the compiled workflow")
-				// Exercise a positive cooldown that an already locked graph would otherwise bypass.
-				blocked := exec.CommandContext(t.Context(), "bash", "-c", command)
-				blocked.Dir = workspace
-				blocked.Env = append(env, "NPM_CONFIG_MIN_RELEASE_AGE=1000000")
-				output, err = blocked.CombinedOutput()
-				require.Error(t, err)
-				require.Contains(t, string(output), "do not satisfy engine.cooldown")
 				require.NoDirExists(t, filepath.Join(runnerTemp, "gh-aw", "engine-cli", "copilot-sdk"))
 				outside := filepath.Join(root, "outside")
 				engineDir := filepath.Join(runnerTemp, "gh-aw", "engine-cli")
