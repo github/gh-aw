@@ -106,7 +106,12 @@ func TestLSPManagerGenerateInstallSteps(t *testing.T) {
 	require.Len(t, steps, 1)
 	content := strings.Join(steps[0], "\n")
 	assert.Contains(t, content, "Install TypeScript LSP dependencies")
-	assert.Contains(t, content, "npm install -g typescript@5.8.3 typescript-language-server@4.3.3")
+	assert.Contains(t, content, `npm ci --prefix "$install_dir" --replace-registry-host=npmjs`)
+	assert.Contains(t, content, `"$install_dir/package.json"`)
+	assert.Contains(t, content, `"$install_dir/package-lock.json"`)
+	assert.Contains(t, content, `printf '%s\n' "$bin_dir" >> "$GITHUB_PATH"`)
+	assert.NotContains(t, content, "npm install")
+	assert.NotContains(t, content, "NPM_CONFIG_REGISTRY")
 	assert.NotContains(t, content, "--ignore-scripts")
 	assert.Contains(t, content, fmt.Sprintf("        env:\n          NPM_CONFIG_IGNORE_SCRIPTS: 'true'\n          NPM_CONFIG_MIN_RELEASE_AGE: '%d'", npmDefaultCooldownDays))
 }
@@ -127,7 +132,7 @@ func TestLSPManagerGenerateInstallSteps_RunInstallScripts(t *testing.T) {
 	steps := manager.GenerateInstallSteps(workflowData)
 	require.Len(t, steps, 1)
 	content := strings.Join(steps[0], "\n")
-	assert.Contains(t, content, "npm install -g typescript@5.8.3 typescript-language-server@4.3.3")
+	assert.Contains(t, content, "npm ci")
 	assert.NotContains(t, content, "--ignore-scripts")
 	assert.NotContains(t, content, "NPM_CONFIG_IGNORE_SCRIPTS")
 	assert.Contains(t, content, fmt.Sprintf("        env:\n          NPM_CONFIG_MIN_RELEASE_AGE: '%d'", npmDefaultCooldownDays))
@@ -178,7 +183,7 @@ func TestLSPManagerGenerateInstallSteps_RunInstallScriptsAndCooldownDisabled(t *
 	steps := manager.GenerateInstallSteps(workflowData)
 	require.Len(t, steps, 1)
 	content := strings.Join(steps[0], "\n")
-	assert.Contains(t, content, "npm install -g typescript@5.8.3 typescript-language-server@4.3.3")
+	assert.Contains(t, content, "npm ci")
 	assert.NotContains(t, content, "--ignore-scripts")
 	assert.NotContains(t, content, "NPM_CONFIG_IGNORE_SCRIPTS")
 	assert.NotContains(t, content, "NPM_CONFIG_MIN_RELEASE_AGE")
@@ -202,19 +207,16 @@ func TestLSPManagerGenerateInstallSteps_DefaultVersionPinning(t *testing.T) {
 func TestLSPManagerGenerateInstallSteps_VersionOverride(t *testing.T) {
 	// A Version field in the frontmatter overrides the pinned default for the primary package.
 	manager := NewLSPManager(map[string]LSPServerConfig{
-		"typescript": {
-			Command:        "typescript-language-server",
-			Version:        "5.0.0",
-			FileExtensions: map[string]string{".ts": "typescript"},
+		"yaml": {
+			Command:        "yaml-language-server",
+			Version:        "1.16.0",
+			FileExtensions: map[string]string{".yaml": "yaml"},
 		},
 	})
 	steps := manager.GenerateInstallSteps(nil)
 	require.Len(t, steps, 1)
 	content := strings.Join(steps[0], "\n")
-	// typescript-language-server is the primary (last) package; its version is overridden.
-	assert.Contains(t, content, "typescript-language-server@5.0.0")
-	// typescript (secondary package) retains its default version.
-	assert.Contains(t, content, "typescript@5.8.3")
+	assert.Contains(t, content, "yaml-language-server@1.16.0")
 }
 
 func TestLSPManagerGenerateInstallSteps_GoDefaultVersion(t *testing.T) {

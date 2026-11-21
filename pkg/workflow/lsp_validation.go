@@ -2,6 +2,7 @@ package workflow
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/github/gh-aw/pkg/logger"
 )
@@ -18,6 +19,13 @@ func (c *Compiler) validateLSPSupport(workflowData *WorkflowData) error {
 	manager := NewLSPManager(workflowData.LSP)
 	if err := manager.Validate(); err != nil {
 		return err
+	}
+	if config, ok := manager.servers["typescript"]; ok && config.Version != "" && strings.TrimPrefix(config.Version, "v") != typescriptLSPVersion {
+		return NewValidationError(
+			"lsp.typescript.version", config.Version,
+			"the built-in TypeScript language server only supports locked version "+typescriptLSPVersion,
+			fmt.Sprintf("Omit the version or set version: %q. To use another version, install a checked-in npm project with npm ci in steps: and configure the server under lsp.typescript-custom.", typescriptLSPVersion),
+		)
 	}
 
 	engineID := ResolveEngineID(workflowData)

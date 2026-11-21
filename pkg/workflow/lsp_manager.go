@@ -3,7 +3,7 @@ package workflow
 import (
 	"fmt"
 	"maps"
-	"sort"
+	"slices"
 	"strings"
 
 	"github.com/github/gh-aw/pkg/logger"
@@ -19,7 +19,7 @@ type LSPServerConfig struct {
 	// Version pins the package version for the language server. When set, it overrides the
 	// built-in default version for known LSP servers. Accepts standard semver version strings
 	// (e.g. "5.3.0") without a leading "v". Has no effect for custom servers not in the
-	// built-in install spec table.
+	// built-in install spec table. TypeScript only supports the bundled lockfile version.
 	Version string `json:"version,omitempty"`
 }
 
@@ -37,7 +37,7 @@ func NewLSPManager(servers map[string]LSPServerConfig) *LSPManager {
 	for k := range servers {
 		keys = append(keys, k)
 	}
-	sort.Strings(keys)
+	slices.Sort(keys)
 
 	normalized := make(map[string]LSPServerConfig, len(servers))
 	for _, key := range keys {
@@ -116,7 +116,7 @@ func (m *LSPManager) GenerateInstallSteps(workflowData *WorkflowData) []GitHubAc
 	for language := range m.servers {
 		langs = append(langs, language)
 	}
-	sort.Strings(langs)
+	slices.Sort(langs)
 
 	var steps []GitHubActionStep
 	for _, language := range langs {
@@ -132,9 +132,12 @@ func (m *LSPManager) GenerateInstallSteps(workflowData *WorkflowData) []GitHubAc
 		effectiveVersion := strings.TrimPrefix(config.Version, "v")
 
 		var step GitHubActionStep
-		if len(spec.NpmPackages) > 0 {
+		switch {
+		case language == "typescript":
+			step = appendNpmLSPInstallPolicy(generateTypeScriptLSPInstallStep(), runInstallScripts, cooldownEnabled)
+		case len(spec.NpmPackages) > 0:
 			step = generateNpmLSPInstallStep(spec, effectiveVersion, runInstallScripts, cooldownEnabled)
-		} else {
+		default:
 			step = generateNonNpmLSPInstallStep(language, spec, effectiveVersion)
 		}
 		steps = append(steps, step)
@@ -161,10 +164,13 @@ func generateNpmLSPInstallStep(spec lspInstallSpec, effectiveVersion string, run
 			args = append(args, pkg)
 		}
 	}
-	step := GitHubActionStep{
+	return appendNpmLSPInstallPolicy(GitHubActionStep{
 		"      - name: " + spec.StepName,
 		"        run: " + strings.Join(args, " "),
-	}
+	}, runInstallScripts, cooldownEnabled)
+}
+
+func appendNpmLSPInstallPolicy(step GitHubActionStep, runInstallScripts, cooldownEnabled bool) GitHubActionStep {
 	if !runInstallScripts || cooldownEnabled {
 		step = append(step, "        env:")
 	}
@@ -234,7 +240,7 @@ func (m *LSPManager) RuntimeRequirements() []RuntimeRequirement {
 	for language := range m.servers {
 		langs = append(langs, language)
 	}
-	sort.Strings(langs)
+	slices.Sort(langs)
 
 	for _, language := range langs {
 		spec, ok := lspInstallSpecs[language]
@@ -301,12 +307,6 @@ var lspInstallSpecs = map[string]lspInstallSpec{
 		RuntimeID: "", // Rust is not in knownRuntimes; runtime setup is done via rustup
 	},
 	"typescript": {
-		StepName:    "Install TypeScript LSP dependencies",
-		NpmPackages: []string{"typescript", "typescript-language-server"},
-		NpmPackageVersions: map[string]string{
-			"typescript":                 "5.8.3",
-			"typescript-language-server": "4.3.3",
-		},
 		RuntimeID: "node",
 	},
 	"yaml": {

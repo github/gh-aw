@@ -54,3 +54,27 @@ func TestValidateLSPSupport(t *testing.T) {
 		require.ErrorContains(t, err, "lsp.python.command is required")
 	})
 }
+
+func TestValidateTypeScriptLSPLockedVersion(t *testing.T) {
+	for _, version := range []string{"", "4.3.3", "v4.3.3", "5.0.0"} {
+		t.Run(version, func(t *testing.T) {
+			config := LSPServerConfig{
+				Command:        "typescript-language-server",
+				FileExtensions: map[string]string{".ts": "typescript"},
+				Version:        version,
+			}
+			data := &WorkflowData{LSP: map[string]LSPServerConfig{"TypeScript": config}}
+			err := NewCompiler().validateLSPSupport(data)
+			if version == "5.0.0" {
+				require.ErrorContains(t, err, "lsp.typescript.version")
+				require.ErrorContains(t, err, `version: "4.3.3"`)
+				require.ErrorContains(t, err, "lsp.typescript-custom")
+				data.LSP = map[string]LSPServerConfig{"typescript-custom": config}
+				require.NoError(t, NewCompiler().validateLSPSupport(data))
+				require.Empty(t, NewLSPManager(data.LSP).GenerateInstallSteps(data))
+				return
+			}
+			require.NoError(t, err)
+		})
+	}
+}

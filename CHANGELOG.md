@@ -18,6 +18,12 @@ and mixed edits continue to require write-or-higher repository permission.
 
 ### Breaking changes
 
+The experimental built-in TypeScript LSP accepts only the bundled server
+version (`4.3.3`). Omit `lsp.typescript.version` to use the bundled lockfile.
+For other versions, move the entry to `lsp.typescript-custom`, remove `version`,
+and install the desired packages from a checked-in npm project using `npm ci`
+in `steps`, adding its `node_modules/.bin` to `$GITHUB_PATH`.
+
 Safe-output lifecycle reporting now uses `logs --delivery` and `logs --adoption`,
 with the same evaluator available in single-run `audit` and episode retrieval.
 Replace `--outcomes`, `--outcomes-dir`, and `GH_AW_OUTCOMES_DIR` with `--adoption`,
