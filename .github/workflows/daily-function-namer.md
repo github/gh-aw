@@ -125,7 +125,7 @@ Malformed cache: stop explicitly, never silently reset.
 
 ## 2. Inventory and semantic analysis
 
-Run `grep -n "^func " "${PKG_FILES[@]}"` once for the package inventory.
+Run `grep -n "^func "` once with the file paths printed by the selection script.
 Activate Serena with `activate_project` and the workspace path.
 For each selected non-generated file, use `get_symbols_overview` and bounded
 `read_file` ranges. Avoid repeated searches.
@@ -147,7 +147,7 @@ Review `git diff --check`, `git diff --stat`, and the full candidate diff.
 Require only approved identifier/comment changes within the selected package.
 Search for old identifiers again and explain any unrelated same-name matches.
 Run `gofmt` on modified files, `go test "./$PKG_DIR" -count=1`,
-`make build`, `make test-unit`, and `make lint`. Require every command to pass;
+`make build`, `make test-unit`, and `make lint`. Require every command to pass.
 Record command results/failures. Use configured Go caches; never change
 dependencies or validation rules to make a rename pass.
 
@@ -166,8 +166,8 @@ validation. Cache state is not a repository change and must not enter the PR.
 
 ## 5. Publish or noop
 
-Recheck duplicates and the final diff. With a nonempty, fully validated patch,
-call `create_pull_request` once with title
+Recheck duplicates and the final diff. Stage only the verified paths and commit
+locally. Submit that branch via `create_pull_request` once with title
 `Go function renames: <selected_package>`. Keep it draft.
 Include package/date/rotation/function counts, a concise old-name/new-name/
 rationale table, reference completeness, exact validation commands and results,
