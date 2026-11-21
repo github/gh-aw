@@ -125,7 +125,7 @@ func TestRunSessionGraderDecisionIntegrityReplay(t *testing.T) {
 		} `json:"diagnostics"`
 	}
 	require.NoError(t, json.Unmarshal(first.Bytes(), &result))
-	assert.Equal(t, 1.0, result.Value)
+	assert.InDelta(t, 1.0, result.Value, 1e-9)
 	assert.Equal(t, "decision-integrity", result.Diagnostics.Mode)
 	assert.Equal(t, "producer-asserted", result.Diagnostics.EvidenceBasis)
 	assert.Equal(t, 1, result.Diagnostics.Counts.Valid)
