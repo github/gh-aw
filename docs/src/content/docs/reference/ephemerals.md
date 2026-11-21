@@ -59,7 +59,7 @@ Supported formats are an integer day count (for example, `7`) or a relative dura
 
 **Maintenance workflow generation is lazy**: `agentics-maintenance.yml` is only generated when at least one workflow explicitly opts in — by setting `expires` on `create-issue`, `create-discussion`, or `create-pull-request`, or by explicitly configuring `safe-outputs.noop`. The implicit `noop` fallback that is added automatically when `safe-outputs` is present defaults `report-as-issue` to `false`, so it does not create issues and does not generate a maintenance workflow.
 
-Enabled steering (`safe-outputs.steer`) also generates maintenance for stale steering issue cleanup, even without expiring safe outputs. The `cleanup-stale-steering-issues` job is included only when steering is enabled and runs on the maintenance schedule, daily when no expiration sets a shorter interval.
+Enabled steering (`safe-outputs.steer`) also generates maintenance for stale steering issue cleanup, even without expiring safe outputs. The `cleanup-stale-steering-issues` job is included only when steering is enabled and runs on the maintenance schedule, daily when no expiration sets a shorter interval. It closes `[WIP]` steering issues older than 24 hours whose linked run has completed: as completed after a successful run, or as not planned when a failed or cancelled run left the issue behind instead of reusing it for the failure report. Issues whose run ended with any other conclusion are left open, and each issue is re-checked just before closing so one already retitled into a failure report is not closed. Each run closes at most 100 stale steering issues; any remainder is handled by later scheduled runs.
 
 **Maintenance workflow frequency**: The generated `agentics-maintenance.yml` workflow runs at the minimum required frequency based on the shortest expiration time across all workflows:
 
@@ -75,7 +75,7 @@ Enabled steering (`safe-outputs.steer`) also generates maintenance for stale ste
 - [x] expires <!-- gh-aw-expires: 2026-01-14T15:30:00.000Z --> on Jan 14, 2026, 3:30 PM UTC
 ```
 
-The maintenance workflow searches for items with this expiration format (checked checkbox with the XML comment) and automatically closes them with appropriate comments and resolution reasons. Users can uncheck the checkbox to prevent automatic expiration.
+The maintenance workflow searches for items with this expiration format (checked checkbox with the XML comment, with or without a `> ` blockquote prefix; markers inside fenced code blocks are ignored) and automatically closes them with appropriate comments and resolution reasons. Users can uncheck the checkbox to prevent automatic expiration.
 
 See [Safe Outputs Reference](/gh-aw/reference/safe-outputs/) for complete documentation.
 
