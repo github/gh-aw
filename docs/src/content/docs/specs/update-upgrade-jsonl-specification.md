@@ -105,6 +105,10 @@ The public invocation emits one `command_started` and one `command_completed` me
 
 Consumers MUST check the process exit status as well as messages. A broken pipe, process termination, or startup failure can leave an incomplete stream. Missing messages MUST NOT be interpreted as proof that no side effects occurred.
 
+## Formal model
+
+The [TLA+ reporting model](https://github.com/github/gh-aw/blob/main/specs/update-upgrade-jsonl/UpdateUpgradeJSONL.tla) and [TLC configuration](https://github.com/github/gh-aw/blob/main/specs/update-upgrade-jsonl/UpdateUpgradeJSONL.cfg) check one invocation with two repositories and at most one relaunch. The model separates remote PR creation from its report, checks start and completion ordering, and treats missing reports as unknown even when the command fails. It covers PR evidence and previews, not JSON encoding, snapshots, other side effects, or authorization policy.
+
 ## Examples
 
 ```bash

@@ -250,6 +250,8 @@ Manifest content used by safe update comparisons SHOULD reflect secrets and acti
 
 ## 9. References
 
+The [TLA+ baseline lifecycle model](https://github.com/github/gh-aw/blob/main/specs/safe-update/SafeUpdate.tla) and [TLC configuration](https://github.com/github/gh-aw/blob/main/specs/safe-update/SafeUpdate.cfg) cover two compilations in one compiler instance. The model checks baseline precedence, retention of the first trusted manifest, legacy-lock handling, and warning-only publication under effective strict mode and explicit approval. It uses symbolic manifests and one representative restricted change; it does not verify policy matching, manifest parsing, Git or filesystem trust, or who supplies `--approve`.
+
 ### Normative References
 
 - [RFC 2119](https://www.ietf.org/rfc/rfc2119.txt)
