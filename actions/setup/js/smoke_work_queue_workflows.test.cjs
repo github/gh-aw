@@ -85,7 +85,7 @@ describe("native work queue smoke verification", () => {
     expect(policy.pools["smoke-work-queue"].profiles["smoke-work-queue-worker"]).toEqual({ workflow: ".github/workflows/smoke-work-queue-worker.lock.yml", effect_scope: "${{ github.repository }}" });
   });
 
-  it("uses isolated worker concurrency and a read-only, time-free monitor", () => {
+  it("uses isolated worker concurrency and a read-only monitor", () => {
     const worker = readWorkflow("worker");
     expect(worker.concurrency["job-discriminator"]).toBe("${{ github.run_id }}");
 
@@ -94,12 +94,6 @@ describe("native work queue smoke verification", () => {
     expect(monitor.tools["cli-proxy"]).toBe(true);
     expect(monitor.tools["work-queue"]).toBe(true);
     expect(monitor.tools.bash).toContain("work-queue:*");
-    const script = monitor.steps[0].with.script;
-    expect(script).toContain("work_queue_replay.cjs");
-    expect(script).toContain("per_page: 6");
-    for (const clock of ["Date.now", "Date.parse", "new Date", "created:", "BUDGET", "secs(", "over_budget", "timing("]) {
-      expect(script).not.toContain(clock);
-    }
 
     const monitorLock = readFileSync(new URL("../../../.github/workflows/smoke-work-queue-monitor.lock.yml", import.meta.url), "utf8");
     expect(monitorLock).toContain('GH_AW_WORK_QUEUE_ROLE: "observer"');
@@ -207,6 +201,302 @@ describe("native work queue smoke verification", () => {
         expect(steps.some(step => step.id === "work_queue_finish")).toBe(false);
       }
     }
+  });
+});
+
+// The monitor's trusted collector runs against real replayed ledgers built with the queue's own
+// helpers; only GitHub reads and the snapshot file are doubled.
+describe("smoke work queue monitor collector", () => {
+  const helpers = requireSetup("./work_queue_test_helpers.cjs");
+  const { checkpointCommit, replayTransactionLog, replayTransactions } = requireSetup("./work_queue_replay.cjs");
+  const { readQueueContentsAtSHA } = requireSetup("./work_queue_store.cjs");
+  const { collectSmokeCycle } = requireSetup("../../../.github/scripts/smoke_work_queue_monitor.cjs");
+  const POOL = "smoke-work-queue";
+  const PROFILE = "smoke-work-queue-worker";
+  const SMOKE_WORKER = ".github/workflows/smoke-work-queue-worker.lock.yml";
+  const SMOKE_DISPATCHER = ".github/workflows/smoke-work-queue-dispatcher.lock.yml";
+  const repo = { owner: "owner", repo: "repo" };
+  const ATTEMPT_ROUTE = "GET /repos/{owner}/{repo}/actions/runs/{run_id}/attempts/{attempt_number}";
+  const dispatcherActor = (runId, attempt = 1, workflow = SMOKE_DISPATCHER) => ({ role: "dispatcher", repository: helpers.repository, workflow, run_id: runId, run_attempt: attempt });
+  const runRow = (id, conclusion = "success", status = "completed", run_attempt = 1) => ({ id: Number(id), run_attempt, html_url: `https://github.com/owner/repo/actions/runs/${id}`, status, conclusion });
+  const attemptRow = (id, attempt, conclusion = "success", status = "completed") => ({ id: Number(id), run_attempt: attempt, html_url: `https://github.com/owner/repo/actions/runs/${id}/attempts/${attempt}`, status, conclusion });
+  const denied = () => Object.assign(new Error("Bad credentials ghp_secret"), { status: 403, response: { status: 403, headers: { "x-github-request-id": "ABCD-1234" } } });
+  const prefixes = claims => claims.map(claim => claim.claim_id.slice(0, 12)).sort();
+
+  /**
+   * A smoke ledger published one Git commit per append, as the store does. The text is the
+   * source of truth: replay adopts a restored checkpoint's records and mutates them, so every
+   * step re-parses the text and replays it once.
+   */
+  function smokeLedger() {
+    const git = helpers.fakeQueueGitHub();
+    let text = "";
+    const parsed = () =>
+      text
+        ? text
+            .trimEnd()
+            .split("\n")
+            .map(line => JSON.parse(line))
+        : [];
+    const publish = contents => {
+      text = contents;
+      git.install(text);
+    };
+    const append = step => {
+      const before = parsed();
+      const next = step(before);
+      if (next.length > before.length) publish(text + helpers.ledgerText([next.at(-1)]));
+    };
+    return {
+      git,
+      withoutLastLine: () => text.trimEnd().split("\n").slice(0, -1).join("\n") + "\n",
+      submit(runId) {
+        const works = [1, 2, 3].map(index => helpers.work(`smoke-${index}`, { graph_id: `${POOL}:${runId}`, pool: POOL, worker_profile: PROFILE }));
+        append(log => helpers.submit(log, works, dispatcherActor(runId)));
+        return works.map(node => node.work_id);
+      },
+      grant(actor, max = 3) {
+        let claims = [];
+        append(log => {
+          const { log: next, decision } = helpers.dispatchNext(log, { pool: POOL, max_claims: max, max_dispatches: max, concurrency: 3, profiles: { [PROFILE]: { workflow: SMOKE_WORKER } } }, actor);
+          claims = decision.operations;
+          return next;
+        });
+        for (const claim of claims) append(log => helpers.launch(log, claim.dispatch_id, true, actor));
+        return claims;
+      },
+      bind: (dispatchId, runId, attempt = 1) => append(log => helpers.bind(log, dispatchId, helpers.workerActor(runId, attempt, SMOKE_WORKER))),
+      finish: (dispatchId, runId, attempt = 1) => {
+        const state = replayTransactions(parsed());
+        const open = state.dispatches
+          .get(dispatchId)
+          .claims.map(id => state.claims.get(id))
+          .filter(claim => claim.state === "open");
+        const operations = open.map(claim => ({ kind: "Completion", work_id: claim.work_id, claim_id: claim.claim_id, dispatch_id: dispatchId, claim_handle: claim.handle, effects: [] }));
+        append(log => helpers.commit(log, helpers.workerActor(runId, attempt, SMOKE_WORKER), "finish", { dispatch_id: dispatchId }, operations));
+      },
+      release: (dispatchId, reason) => append(log => helpers.release(log, dispatchId, reason)),
+      checkpoint: () => publish(helpers.ledgerText([checkpointCommit(replayTransactions(parsed()), helpers.reconciler, 1)])),
+    };
+  }
+
+  // Dispatcher A's workers are terminated and its Claims released; dispatcher B then submits three
+  // fresh items but, FIFO, claims and completes A's. Mirrors monitor run 44936660441.
+  function fifoIncident({ checkpoint = false, tamper = false } = {}) {
+    const ledger = smokeLedger();
+    const aWork = ledger.submit("1001");
+    const a = ledger.grant(dispatcherActor("1001"));
+    a.forEach((claim, index) => {
+      ledger.bind(claim.dispatch_id, `500${index + 1}`);
+      ledger.release(claim.dispatch_id, "worker_terminated");
+    });
+    const bWork = ledger.submit("1002");
+    const b = ledger.grant(dispatcherActor("1002"));
+    if (tamper) ledger.git.install(ledger.withoutLastLine());
+    if (checkpoint) ledger.checkpoint();
+    b.forEach((claim, index) => {
+      ledger.bind(claim.dispatch_id, `600${index + 1}`);
+      ledger.finish(claim.dispatch_id, `600${index + 1}`);
+    });
+    const attempts = new Map([...[5001, 5002, 5003].map(id => [`${id}/1`, attemptRow(id, 1, "failure")]), ...[6001, 6002, 6003].map(id => [`${id}/1`, attemptRow(id, 1)])]);
+    return { ledger, aWork, bWork, a, b, attempts };
+  }
+
+  async function monitor({ ledger, runs, attempts, latestRuns = {}, git = {}, loadSnapshot = undefined }) {
+    const calls = [];
+    const warnings = [];
+    const github = {
+      rest: {
+        actions: {
+          listWorkflowRuns: async params => {
+            calls.push({ op: "listWorkflowRuns", ...params });
+            return { data: { workflow_runs: runs } };
+          },
+          // Only a wrong lookup would read the run's latest attempt.
+          getWorkflowRun: async ({ run_id }) => ({ data: latestRuns[run_id] }),
+        },
+        repos: {
+          listCommits: async ({ owner, repo: name, sha, path, per_page, page }) => {
+            calls.push({ op: "listCommits", owner, repo: name, sha, path, per_page, page });
+            let current = sha;
+            for (let index = 1; index < page && current; index++) current = ledger.git.commits.get(current)?.parents[0];
+            const entry = current ? ledger.git.commits.get(current) : undefined;
+            return { data: entry ? [{ sha: current, parents: entry.parents.map(parent => ({ sha: parent })) }] : [] };
+          },
+        },
+        git: { ...ledger.git.githubClient.rest.git, ...git },
+      },
+      request: async (route, params) => {
+        calls.push({ op: "request", route, ...params });
+        const row = attempts.get(`${params.run_id}/${params.attempt_number}`);
+        if (row instanceof Error) throw row;
+        if (!row) throw Object.assign(new Error("Not Found"), { status: 404 });
+        return { data: row };
+      },
+    };
+    const head = ledger.git.refs.get("work-queue");
+    const report = await collectSmokeCycle({
+      github,
+      context: { repo },
+      core: { warning: message => warnings.push(message) },
+      loadSnapshot: loadSnapshot ?? (() => ({ sha: head, projection: replayTransactionLog(ledger.git.contents()) })),
+      readStateAtSHA: async sha => replayTransactionLog((await readQueueContentsAtSHA({ githubClient: github, ...repo }, sha)).contents),
+    });
+    return { report, calls, warnings };
+  }
+
+  it("judges a FIFO dispatcher by the Claims it granted, not the Work it submitted", async () => {
+    const { ledger, aWork, bWork, a, b, attempts } = fifoIncident();
+    const { report, calls } = await monitor({ ledger, runs: [runRow(1002)], attempts });
+    expect(report.healthy).toBe(true);
+    expect(report.errors).toEqual([]);
+    expect(report.dispatcher).toEqual({ id: 1002, run_attempt: 1, url: "https://github.com/owner/repo/actions/runs/1002", conclusion: "success" });
+    expect(report.queue.claims.map(claim => claim.claim_id_prefix).sort()).toEqual(prefixes(b));
+    expect(report.queue.claims.map(claim => claim.work_id_prefix).sort()).toEqual(aWork.map(id => id.slice(0, 12)).sort());
+    expect(report.queue.claims.every(claim => claim.state === "completed" && claim.dispatch_state === "closed" && claim.cancellation_reason === null)).toBe(true);
+    expect(report.workers.map(worker => [worker.id, worker.run_attempt, worker.conclusion]).sort()).toEqual([
+      ["6001", 1, "success"],
+      ["6002", 1, "success"],
+      ["6003", 1, "success"],
+    ]);
+    const projection = replayTransactionLog(ledger.git.contents());
+    expect(bWork.map(id => projection.works.get(id).state)).toEqual(["available", "available", "available"]);
+    expect(calls.find(call => call.op === "listWorkflowRuns")).toMatchObject({ workflow_id: "smoke-work-queue-dispatcher.lock.yml", per_page: 6 });
+    expect(calls.filter(call => call.op === "request").every(call => call.route === ATTEMPT_ROUTE)).toBe(true);
+    expect(calls.some(call => call.op === "listCommits")).toBe(false);
+
+    // A's original Claims stay cancelled even though B later completed the same Work.
+    const earlier = (await monitor({ ledger, runs: [runRow(1001)], attempts })).report;
+    expect(earlier.healthy).toBe(false);
+    expect(earlier.errors).toEqual([]);
+    expect(earlier.queue.claims.map(claim => claim.claim_id_prefix).sort()).toEqual(prefixes(a));
+    expect(earlier.queue.claims.map(claim => [claim.state, claim.cancellation_reason, claim.dispatch_state])).toEqual(Array(3).fill(["cancelled", "worker_terminated", "closed"]));
+    expect(aWork.map(id => projection.works.get(id).state)).toEqual(["completed", "completed", "completed"]);
+  });
+
+  it("ignores other actors' grants and requires the bound attempt itself to succeed", async () => {
+    const { ledger, attempts } = fifoIncident();
+    ledger.grant(dispatcherActor("1002", 2), 1);
+    ledger.grant(dispatcherActor("1002", 1, ".github/workflows/other-dispatcher.lock.yml"), 1);
+    const healthy = (await monitor({ ledger, runs: [runRow(1002)], attempts })).report;
+    expect(healthy.healthy).toBe(true);
+    expect(healthy.queue.claims).toHaveLength(3);
+
+    attempts.set("6001/1", attemptRow(6001, 1, "failure"));
+    attempts.set("6001/2", attemptRow(6001, 2));
+    const rerun = (await monitor({ ledger, runs: [runRow(1002)], attempts, latestRuns: { 6001: attemptRow(6001, 2) } })).report;
+    expect(rerun.healthy).toBe(false);
+    expect(rerun.workers.find(worker => worker.id === "6001")).toMatchObject({ run_attempt: 1, conclusion: "failure" });
+  });
+
+  it.each([
+    ["an unbound open Claim", () => {}],
+    ["an active bound attempt", (ledger, claims, attempts) => claims.forEach((claim, index) => (ledger.bind(claim.dispatch_id, `700${index + 1}`), attempts.set(`700${index + 1}/1`, attemptRow(7000 + index + 1, 1, null, "in_progress"))))],
+    [
+      "a completed Claim whose worker job is still running",
+      (ledger, claims, attempts) =>
+        claims.forEach((claim, index) => {
+          ledger.bind(claim.dispatch_id, `700${index + 1}`);
+          ledger.finish(claim.dispatch_id, `700${index + 1}`);
+          attempts.set(`700${index + 1}/1`, attemptRow(7000 + index + 1, 1, index === 0 ? null : "success", index === 0 ? "in_progress" : "completed"));
+        }),
+    ],
+  ])("skips a newer dispatcher with %s for the latest settled one", async (_name, advance) => {
+    const { ledger, b, attempts } = fifoIncident();
+    ledger.submit("1003");
+    advance(ledger, ledger.grant(dispatcherActor("1003")), attempts);
+    const { report } = await monitor({ ledger, runs: [runRow(1004, null, "in_progress"), runRow(1003), runRow(1002)], attempts });
+    expect(report.dispatcher.id).toBe(1002);
+    expect(report.healthy).toBe(true);
+    expect(report.queue.claims.map(claim => claim.claim_id_prefix).sort()).toEqual(prefixes(b));
+    expect(report.dispatcher_runs.map(run => run.id)).toEqual([1004, 1003, 1002]);
+  });
+
+  it("reports a failed dispatcher instead of an older green one, even without grants", async () => {
+    const { ledger, attempts } = fifoIncident();
+    const { report } = await monitor({ ledger, runs: [runRow(1003, "failure"), runRow(1002)], attempts });
+    expect(report.dispatcher).toMatchObject({ id: 1003, conclusion: "failure" });
+    expect(report.healthy).toBe(false);
+    expect(report.queue.claims).toEqual([]);
+  });
+
+  it("reports a short grant set instead of treating it as in flight", async () => {
+    const { ledger, attempts } = fifoIncident();
+    ledger.submit("1003");
+    ledger.grant(dispatcherActor("1003"), 2).forEach((claim, index) => {
+      ledger.bind(claim.dispatch_id, `700${index + 1}`);
+      ledger.finish(claim.dispatch_id, `700${index + 1}`);
+      attempts.set(`700${index + 1}/1`, attemptRow(7000 + index + 1, 1));
+    });
+    const { report } = await monitor({ ledger, runs: [runRow(1003), runRow(1002)], attempts });
+    expect(report.dispatcher.id).toBe(1003);
+    expect(report.queue.claims.map(claim => claim.state)).toEqual(["completed", "completed"]);
+    expect(report.healthy).toBe(false);
+  });
+
+  it("reports an open Claim whose bound worker already terminated", async () => {
+    const { ledger, attempts } = fifoIncident();
+    ledger.submit("1003");
+    ledger.grant(dispatcherActor("1003")).forEach((claim, index) => {
+      ledger.bind(claim.dispatch_id, `700${index + 1}`);
+      if (index < 2) ledger.finish(claim.dispatch_id, `700${index + 1}`);
+      attempts.set(`700${index + 1}/1`, attemptRow(7000 + index + 1, 1, index < 2 ? "success" : "failure"));
+    });
+    const { report } = await monitor({ ledger, runs: [runRow(1003), runRow(1002)], attempts });
+    expect(report.dispatcher.id).toBe(1003);
+    expect(report.queue.claims.map(claim => claim.state).sort()).toEqual(["completed", "completed", "open"]);
+    expect(report.healthy).toBe(false);
+  });
+
+  it("reports an unreadable bound attempt with a sanitized error", async () => {
+    const { ledger, attempts } = fifoIncident();
+    attempts.set("6002/1", denied());
+    const { report, warnings } = await monitor({ ledger, runs: [runRow(1002)], attempts });
+    expect(report.healthy).toBe(false);
+    expect(report.errors).toEqual([{ operation: "read_bound_worker_run", status: 403, code: null, category: "http_4xx", short_message: "Read failed; response details withheld.", correlation_id: "ABCD-1234" }]);
+    expect(report.workers.find(worker => worker.id === "6002")).toMatchObject({ status: "unavailable", conclusion: null });
+    expect(JSON.stringify({ report, warnings })).not.toContain("ghp_secret");
+  });
+
+  it("reports an unreadable activation snapshot rather than a healthy queue", async () => {
+    const { ledger, attempts } = fifoIncident();
+    const { report } = await monitor({
+      ledger,
+      runs: [runRow(1002)],
+      attempts,
+      loadSnapshot: () => {
+        throw denied();
+      },
+    });
+    expect(report.queue.available).toBe(false);
+    expect(report.errors.map(error => error.operation)).toEqual(["work_queue_snapshot"]);
+    expect(report.healthy).toBe(false);
+  });
+
+  it("recovers grants folded into a checkpoint from the captured Git history", async () => {
+    const plain = await monitor({ ...fifoIncident(), runs: [runRow(1002)] });
+    const incident = fifoIncident({ checkpoint: true });
+    const { report, calls } = await monitor({ ...incident, runs: [runRow(1002)] });
+    expect(report.errors).toEqual([]);
+    expect(report.healthy).toBe(true);
+    expect(report.queue.claims).toEqual(plain.report.queue.claims);
+    expect(report.workers).toEqual(plain.report.workers);
+    const head = incident.ledger.git.refs.get("work-queue");
+    const segment = replayTransactionLog(incident.ledger.git.contents()).transactions.length;
+    expect(calls.filter(call => call.op === "listCommits")).toEqual([{ op: "listCommits", owner: "owner", repo: "repo", sha: head, path: "work-queue.jsonl", per_page: 1, page: segment }]);
+  });
+
+  it.each([
+    ["a checkpoint whose parent is not its prior tip", { tamper: true }, {}, { status: null, code: "HISTORY_UNANCHORED", category: "evidence" }],
+    ["a denied history read", {}, { getCommit: async () => Promise.reject(denied()) }, { status: 403, category: "http_4xx", correlation_id: "ABCD-1234" }],
+  ])("reports %s instead of falling back to submitted Work", async (_name, options, git, error) => {
+    const incident = fifoIncident({ checkpoint: true, ...options });
+    const { report, warnings } = await monitor({ ...incident, runs: [runRow(1002)], git });
+    expect(report.healthy).toBe(false);
+    expect(report.queue.claims).toEqual([]);
+    expect(report.errors).toHaveLength(1);
+    expect(report.errors[0]).toMatchObject({ operation: "read_claim_history", ...error });
+    expect(JSON.stringify({ report, warnings })).not.toContain("ghp_secret");
   });
 });
 
