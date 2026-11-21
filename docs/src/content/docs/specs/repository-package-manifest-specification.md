@@ -415,7 +415,7 @@ This section provides a normative reference table for all MUST/SHALL requirement
 | — | §5 | If no installable workflow files are resolved, package validation MUST fail |
 | — | §5 | Raw `.yml` files MUST be direct children of `.github/workflows/`; nested `.yml` files are rejected |
 | R-PKG-U001 | §5.2 | Update MUST overwrite previously installed files with the new version |
-| R-PKG-U002 | §5.2 | Orphaned files (present in old version, absent in new) MUST be left in place with a warning |
+| R-PKG-U002 | §5.2 | Stale files may be removed only when unchanged, owned by the same package, and not replaced; preserved stale files SHOULD produce a warning when modified or ownership is unproven |
 | R-PKG-U003 | §5.2 | Failed overwrite MUST abort update; MUST NOT leave a mixed-version directory |
 | R-PKG-U004 | §5.2 | Failed update MUST leave previously installed files intact |
 | R-PKG-R001 | §5.3 | Removal MUST delete only package-installed files |
