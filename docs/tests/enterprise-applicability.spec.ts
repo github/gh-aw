@@ -67,7 +67,11 @@ test("GHES action requirements are scoped and ARC paths remain daemon-visible", 
   await page.goto("/gh-aw/reference/arc-dind-copilot-agent/");
   await expect(content).toContainText("not the separate GitHub Copilot coding-agent service");
   await expect(content).toContainText("historical component-specific fix floors");
-  await expect(content.locator("pre").filter({ hasText: "RUNNER_TOOL_CACHE" })).toContainText("/home/runner/_work/_toolcache");
+  await expect(content).toContainText("${RUNNER_TEMP}/gh-aw/tool-cache");
+  await expect(content).toContainText("overriding any value set in the pod template");
+  await expect(content).toContainText("runner and daemon see at the same absolute path");
+  await expect(content).toContainText("The redirect does not emit a tool-cache warning");
+  await expect(content).not.toContainText("RUNNER_TOOL_CACHE is under /opt");
   await expect(content).toContainText("a symlink alone does not expose a daemon-private socket");
 });
 

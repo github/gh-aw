@@ -92,7 +92,7 @@ runner:
 `runner.topology: arc-dind` is required so compiled workflows enable ARC DinD split-filesystem handling (a shared runner/daemon workspace root, Docker-daemon-visible mount paths, and ARC-specific sandbox setup). The compiler handles its staging and default network isolation, but the operator must provide shared volumes, Docker socket access for the MCP gateway, and deployment-specific connectivity and policy configuration.
 
 > [!TIP]
-> `runner.topology: arc-dind` enables sysroot staging and tool-cache warnings at compile time. Other ARC-specific behaviors (network isolation, chroot identity, `--docker-host` passthrough) are activated at **runtime** when the compiled workflow detects a `tcp://` value in `DOCKER_HOST`. You do not need to configure these separately.
+> `runner.topology: arc-dind` enables sysroot staging and tool-cache redirection in the compiled workflow. Other ARC-specific behaviors (network isolation, chroot identity, `--docker-host` passthrough) are activated at **runtime** when the compiled workflow detects a `tcp://` value in `DOCKER_HOST`. You do not need to configure these separately.
 
 After editing the frontmatter, recompile the lock file:
 
@@ -174,16 +174,9 @@ gh aw compile
 
 If your runner image uses the default `RUNNER_TOOL_CACHE` location (`/opt/hostedtoolcache`), tools installed by `setup-*` actions (for example `setup-node`, `setup-python`) will be invisible to the DinD daemon because `/opt` is not on a shared volume.
 
-Redirect the tool cache to a shared path by setting `RUNNER_TOOL_CACHE` in your pod template:
+For `runner.topology: arc-dind`, the compiled workflow adds a **Redirect tool cache and install paths for ARC/DinD** step before runtime setup. It sets `RUNNER_TOOL_CACHE` to `${RUNNER_TEMP}/gh-aw/tool-cache` for subsequent steps, overriding any value set in the pod template. It also sets `DOTNET_INSTALL_DIR` and `GOPATH` under that cache. The redirect does not emit a tool-cache warning.
 
-```yaml
-# In your runner container spec
-env:
-  - name: RUNNER_TOOL_CACHE
-    value: /home/runner/_work/_toolcache
-```
-
-Use the actual shared work root if your pod changes `/home/runner/_work`; the runner and daemon must see the tool cache at the same absolute path. A private runner `/tmp` path is not sufficient. The compiled workflow emits a warning at runtime if it detects `RUNNER_TOOL_CACHE` under `/opt`. If you see this warning, apply the redirect and re-run.
+Ensure `RUNNER_TEMP` is on a shared volume that the runner and daemon see at the same absolute path. It is typically `/home/runner/_work/_temp`; a private runner `/tmp` path is not sufficient.
 
 ## Finding AWF logs
 
@@ -267,10 +260,6 @@ The AWF firewall's CLI proxy cannot reach the DIFC proxy at startup. Check the c
 **If the log shows `getaddrinfo EAI_AGAIN <hostname>`:** The proxy hostname is a Kubernetes service name (for example `awmg-cli-proxy`) that DinD-spawned containers cannot resolve. Docker containers created by the DinD daemon run on Docker's internal network, which does not have access to Kubernetes cluster DNS. To fix this, ensure the proxy is reachable by IP address or configure DNS forwarding from the DinD Docker network to the Kubernetes DNS resolver.
 
 **If the log shows connection timeouts:** The DinD daemon may not be ready when AWF starts. AWF retries probes up to 10 times with 2-second delays. If this is insufficient, check that the DinD sidecar starts before the runner job begins and that no network policies block communication between the runner container and the DinD sidecar.
-
-### `RUNNER_TOOL_CACHE is under /opt` warning
-
-The compiled workflow detected `RUNNER_TOOL_CACHE` at `/opt/hostedtoolcache`, which is not on a volume shared with the DinD daemon. See [Tool cache redirection](#tool-cache-redirection) to fix this.
 
 ### `Docker daemon is not accessible` in MCP gateway
 
