@@ -1326,9 +1326,8 @@
           dy = t.clientY - ty;
         tx = ty = null;
         if (Math.abs(dx) < 10 && Math.abs(dy) < 10) {
-          /** @type {any} */
-          const tile = e.target.closest?.("[data-go]");
-          if (tile && stage.contains(tile)) {
+          const tile = e.target instanceof Element ? e.target.closest("[data-go]") : null;
+          if (tile instanceof HTMLElement && stage.contains(tile)) {
             if (e.cancelable) e.preventDefault();
             go(+tile.dataset.go);
           }
