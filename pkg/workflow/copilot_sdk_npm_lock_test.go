@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"maps"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -55,22 +56,20 @@ func TestCopilotSDKCompilesWithFrozenNPMGraph(t *testing.T) {
 				require.NotContains(t, step.Run, "npm install")
 				require.Contains(t, step.Run, copilotSDKNodeInstallCommand)
 				require.Less(t, len(step.Run), MaxExpressionSize)
-				payload := func(delimiter string) []byte {
-					_, rest, ok := strings.Cut(step.Run, "<<'"+delimiter+"'\n")
-					require.True(t, ok)
-					value, _, ok := strings.Cut(rest, "\n"+delimiter+"\n")
-					require.True(t, ok)
-					return []byte(value)
+				project := copilotSDKNodeProject
+				if len(tt.extra) > 0 {
+					project = copilotSDKTypeScriptProject
 				}
-				var project struct {
-					Manifest json.RawMessage `json:"manifest"`
-					Lock     json.RawMessage `json:"lock"`
+				require.Contains(t, step.Run, project.installLines()[0])
+				for name, expected := range map[string]string{"package.json": project.manifest, "package-lock.json": project.lock} {
+					asset, err := os.ReadFile(filepath.Join("../../actions/setup/js", "copilot-sdk-"+project.variant+"-"+name))
+					require.NoError(t, err)
+					require.Equal(t, expected, string(asset))
 				}
-				require.NoError(t, json.Unmarshal(payload("GH_AW_SDK_PROJECT"), &project))
 				var manifest struct {
 					Dependencies map[string]string `json:"dependencies"`
 				}
-				require.NoError(t, json.Unmarshal(project.Manifest, &manifest))
+				require.NoError(t, json.Unmarshal([]byte(project.manifest), &manifest))
 				want := map[string]string{"@github/copilot-sdk": string(constants.DefaultCopilotSDKVersion), "undici": "6.28.0"}
 				maps.Copy(want, tt.extra)
 				require.Equal(t, want, manifest.Dependencies)
@@ -84,7 +83,7 @@ func TestCopilotSDKCompilesWithFrozenNPMGraph(t *testing.T) {
 						Integrity    string            `json:"integrity"`
 					} `json:"packages"`
 				}
-				require.NoError(t, json.Unmarshal(project.Lock, &lock))
+				require.NoError(t, json.Unmarshal([]byte(project.lock), &lock))
 				require.Equal(t, 3, lock.LockfileVersion)
 				require.Equal(t, want, lock.Packages[""].Dependencies)
 				for pkg, version := range want {

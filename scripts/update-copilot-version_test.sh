@@ -47,12 +47,20 @@ cp "$target" "$work/before"
 bash "$updater" v1.0.103
 cmp "$target" "$work/before"
 bash "$work/scripts/sync-compat.sh" --check
-sed -i 's/^const DefaultCopilotChecksumsSHA256 = .*/const DefaultCopilotChecksumsSHA256 = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"/' "$target"
+sed -i 's/^const DefaultCopilotVersion Version = "1.0.103"/const DefaultCopilotVersion Version = "1.0.98"/' "$target"
+cp "$work/.github/aw/compat.json" "$work/compat-before"
 if bash "$work/scripts/sync-compat.sh" > "$work/output" 2>&1; then
-  echo "FAIL: sync accepted mismatched version and checksum" >&2
+  echo "FAIL: sync-compat accepted a mismatched version and checksum" >&2
   exit 1
 fi
-grep -q 'does not match the reviewed pin' "$work/output"
+grep -q 'version and checksum do not match' "$work/output"
+cmp "$work/.github/aw/compat.json" "$work/compat-before"
+cp "$work/baseline" "$target"
+sed -i 's/^const DefaultCopilotChecksumsSHA256 = .*/const DefaultCopilotChecksumsSHA256 = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"/' "$target"
+if bash "$work/scripts/sync-compat.sh" > "$work/output" 2>&1; then
+  echo "FAIL: sync-compat accepted a mismatched checksum" >&2
+  exit 1
+fi
 bash "$updater" 1.0.103
 bash "$work/scripts/sync-compat.sh" --check
 

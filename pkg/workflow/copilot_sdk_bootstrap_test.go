@@ -5,9 +5,11 @@ package workflow
 import (
 	"archive/tar"
 	"compress/gzip"
+	"crypto/sha256"
 	"crypto/sha512"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -92,9 +94,9 @@ func TestCopilotSDKNodeBootstrapIsolatedFromRepository(t *testing.T) {
 			require.NoError(t, os.MkdirAll(workspace, 0o755))
 			actionsDir := filepath.Join(runnerTemp, "gh-aw", "actions")
 			require.NoError(t, os.MkdirAll(actionsDir, 0o755))
-			installer, err := os.ReadFile("../../actions/setup/sh/install_copilot_sdk.sh")
+			script, err := os.ReadFile("../../actions/setup/sh/install_copilot_sdk.sh")
 			require.NoError(t, err)
-			require.NoError(t, os.WriteFile(filepath.Join(actionsDir, "install_copilot_sdk.sh"), installer, 0o600))
+			require.NoError(t, os.WriteFile(filepath.Join(actionsDir, "install_copilot_sdk.sh"), script, 0o600))
 			resolverPath := filepath.Join(actionsDir, "copilot_sdk_module_resolution.cjs")
 			for _, name := range []string{"copilot_sdk_module_resolution.cjs", "copilot_sdk_module_resolution_hooks.cjs"} {
 				resolver, err := os.ReadFile(filepath.Join("../../actions/setup/js", name))
@@ -196,7 +198,11 @@ if (!sdk.bootstrapFixture || relative !== "relative helper") throw new Error("ES
 				env = append(env, key+"="+value)
 			}
 			// Use equivalent lockfile inputs with local tarballs so npm ci runs offline.
-			command := strings.Replace(install[0].Run, copilotSDKNodeProject.lock, string(fixtureLock), 1)
+			require.NoError(t, os.WriteFile(filepath.Join(actionsDir, "copilot-sdk-node-package.json"), []byte(copilotSDKNodeProject.manifest), 0o600))
+			require.NoError(t, os.WriteFile(filepath.Join(actionsDir, "copilot-sdk-node-package-lock.json"), fixtureLock, 0o600))
+			originalHash := fmt.Sprintf("%x", sha256.Sum256([]byte(copilotSDKNodeProject.lock)))
+			fixtureHash := fmt.Sprintf("%x", sha256.Sum256(fixtureLock))
+			command := strings.Replace(install[0].Run, originalHash, fixtureHash, 1)
 			require.NotEqual(t, install[0].Run, command)
 			if name == "normal" {
 				// Exercise a positive cooldown that an already locked graph would otherwise bypass.
@@ -207,16 +213,31 @@ if (!sdk.bootstrapFixture || relative !== "relative helper") throw new Error("ES
 				require.Error(t, err)
 				require.Contains(t, string(output), "do not satisfy engine.cooldown")
 				require.NoDirExists(t, filepath.Join(runnerTemp, "gh-aw", "engine-cli", "copilot-sdk"))
-				outside := filepath.Join(root, "outside")
-				require.NoError(t, os.Mkdir(outside, 0o755))
-				require.NoError(t, os.Symlink(outside, filepath.Join(runnerTemp, "gh-aw", "engine-cli")))
-				blocked = exec.CommandContext(t.Context(), "bash", "-c", command)
-				blocked.Dir = workspace
-				blocked.Env = env
-				output, err = blocked.CombinedOutput()
+				tampered := exec.CommandContext(t.Context(), "bash", "-c", install[0].Run)
+				tampered.Dir = workspace
+				tampered.Env = env
+				output, err = tampered.CombinedOutput()
+				require.Error(t, err)
+				require.Contains(t, string(output), "Copilot SDK asset hash mismatch")
+				require.NoFileExists(t, filepath.Join(runnerTemp, "gh-aw", "engine-cli", "copilot-sdk", "package.json"))
+				require.NoError(t, os.Remove(filepath.Join(runnerTemp, "gh-aw", "engine-cli", "copilot-sdk")))
+				require.NoError(t, os.Symlink(workspace, filepath.Join(runnerTemp, "gh-aw", "engine-cli", "copilot-sdk")))
+				symlinked := exec.CommandContext(t.Context(), "bash", "-c", command)
+				symlinked.Dir = workspace
+				symlinked.Env = env
+				output, err = symlinked.CombinedOutput()
 				require.Error(t, err)
 				require.Contains(t, string(output), "Unexpected symlink")
-				require.NoFileExists(t, filepath.Join(outside, "copilot-sdk", "package.json"))
+				require.NoError(t, os.Remove(filepath.Join(runnerTemp, "gh-aw", "engine-cli", "copilot-sdk")))
+				require.NoError(t, os.Remove(filepath.Join(runnerTemp, "gh-aw", "engine-cli")))
+				require.NoError(t, os.Symlink(workspace, filepath.Join(runnerTemp, "gh-aw", "engine-cli")))
+				symlinked = exec.CommandContext(t.Context(), "bash", "-c", command)
+				symlinked.Dir = workspace
+				symlinked.Env = env
+				output, err = symlinked.CombinedOutput()
+				require.Error(t, err)
+				require.Contains(t, string(output), "Unexpected symlink")
+				require.NoDirExists(t, filepath.Join(workspace, "copilot-sdk"))
 				require.NoError(t, os.Remove(filepath.Join(runnerTemp, "gh-aw", "engine-cli")))
 			}
 			run(command)
