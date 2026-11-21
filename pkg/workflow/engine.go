@@ -103,7 +103,8 @@ type EngineConfig struct {
 	// CopilotSDK enables the GitHub Copilot SDK integration.
 	// When true the compiler enables a harness-managed Copilot CLI headless sidecar
 	// and sets COPILOT_SDK_URI on child processes so the SDK can connect to it.
-	CopilotSDK bool
+	CopilotSDK    bool
+	CopilotSDKPin *copilotSDKNPMProjectPin
 
 	// Cwd is a templatable string that overrides the working directory for the engine's
 	// spawned process. When set, it is passed as GH_AW_ENGINE_CWD to the execution
@@ -791,6 +792,17 @@ func applyEngineBooleanFields(config *EngineConfig, engineObj map[string]any) {
 	if sdkVal, ok := engineObj["copilot-sdk"].(bool); ok {
 		config.CopilotSDK = sdkVal
 		engineLog.Printf("Extracted copilot-sdk: %v", config.CopilotSDK)
+	}
+	if sdk, ok := engineObj["copilot-sdk"].(map[string]any); ok {
+		config.CopilotSDK = true
+		pin := &copilotSDKNPMProjectPin{}
+		if version, ok := sdk["version"].(string); ok {
+			pin.Version = version
+		}
+		if digest, ok := sdk["sha256"].(string); ok {
+			pin.SHA256 = digest
+		}
+		config.CopilotSDKPin = pin
 	}
 	if config.Driver != "" && config.ID == "copilot" && !config.CopilotSDK {
 		config.CopilotSDK = true
