@@ -92,6 +92,9 @@ func TestCopilotSDKNodeBootstrapIsolatedFromRepository(t *testing.T) {
 			require.NoError(t, os.MkdirAll(workspace, 0o755))
 			actionsDir := filepath.Join(runnerTemp, "gh-aw", "actions")
 			require.NoError(t, os.MkdirAll(actionsDir, 0o755))
+			installer, err := os.ReadFile("../../actions/setup/sh/install_copilot_sdk.sh")
+			require.NoError(t, err)
+			require.NoError(t, os.WriteFile(filepath.Join(actionsDir, "install_copilot_sdk.sh"), installer, 0o600))
 			resolverPath := filepath.Join(actionsDir, "copilot_sdk_module_resolution.cjs")
 			for _, name := range []string{"copilot_sdk_module_resolution.cjs", "copilot_sdk_module_resolution_hooks.cjs"} {
 				resolver, err := os.ReadFile(filepath.Join("../../actions/setup/js", name))
@@ -204,6 +207,17 @@ if (!sdk.bootstrapFixture || relative !== "relative helper") throw new Error("ES
 				require.Error(t, err)
 				require.Contains(t, string(output), "do not satisfy engine.cooldown")
 				require.NoDirExists(t, filepath.Join(runnerTemp, "gh-aw", "engine-cli", "copilot-sdk"))
+				outside := filepath.Join(root, "outside")
+				require.NoError(t, os.Mkdir(outside, 0o755))
+				require.NoError(t, os.Symlink(outside, filepath.Join(runnerTemp, "gh-aw", "engine-cli")))
+				blocked = exec.CommandContext(t.Context(), "bash", "-c", command)
+				blocked.Dir = workspace
+				blocked.Env = env
+				output, err = blocked.CombinedOutput()
+				require.Error(t, err)
+				require.Contains(t, string(output), "Unexpected symlink")
+				require.NoFileExists(t, filepath.Join(outside, "copilot-sdk", "package.json"))
+				require.NoError(t, os.Remove(filepath.Join(runnerTemp, "gh-aw", "engine-cli")))
 			}
 			run(command)
 

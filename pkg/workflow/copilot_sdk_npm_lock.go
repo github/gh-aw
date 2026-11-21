@@ -12,7 +12,7 @@ import (
 var copilotSDKNPMLocks embed.FS
 
 const copilotSDKNodeTargetDir = constants.GhAwRootDirShell + "/engine-cli/copilot-sdk"
-const copilotSDKNodeInstallCommand = `npm ci --prefix "` + copilotSDKNodeTargetDir + `" --ignore-scripts --no-audit --no-fund`
+const copilotSDKNodeInstallCommand = `bash "` + constants.GhAwRootDirShell + `/actions/install_copilot_sdk.sh"`
 
 type copilotSDKNPMProject struct {
 	manifest string
@@ -59,18 +59,8 @@ func loadCopilotSDKNPMProject(variant, newest string) *copilotSDKNPMProject {
 
 func (project *copilotSDKNPMProject) installLines() []string {
 	return []string{
-		`set -euo pipefail`,
-		`node -e 'const days = Number(process.env.NPM_CONFIG_MIN_RELEASE_AGE); const published = Date.parse(process.argv[1]); if (!Number.isInteger(days) || days < 0 || !Number.isFinite(published) || (days > 0 && Date.now() - published < days * 86400000)) { console.error("Locked Copilot SDK dependencies do not satisfy engine.cooldown"); process.exit(1); }' '` + project.newest + `'`,
-		`mkdir -p "` + copilotSDKNodeTargetDir + `"`,
-		`cd "` + copilotSDKNodeTargetDir + `"`,
-		`if [[ -e npm-shrinkwrap.json || -L npm-shrinkwrap.json ]]; then echo "Unexpected npm-shrinkwrap.json in the Copilot SDK install directory" >&2; exit 1; fi`,
-		`if [[ -L package.json || -L package-lock.json ]]; then echo "Unexpected symlink in the Copilot SDK install directory" >&2; exit 1; fi`,
-		`cat > package.json <<'GH_AW_SDK_PACKAGE'`,
-		project.manifest,
-		`GH_AW_SDK_PACKAGE`,
-		`cat > package-lock.json <<'GH_AW_SDK_LOCK'`,
-		project.lock,
-		`GH_AW_SDK_LOCK`,
-		copilotSDKNodeInstallCommand,
+		copilotSDKNodeInstallCommand + ` '` + project.newest + `' <<'GH_AW_SDK_PROJECT'`,
+		`{"manifest":` + project.manifest + `,"lock":` + project.lock + `}`,
+		`GH_AW_SDK_PROJECT`,
 	}
 }

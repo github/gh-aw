@@ -52,7 +52,7 @@ func TestCopilotSDKCompilesWithFrozenNPMGraph(t *testing.T) {
 				}
 				require.Equal(t, tt.cooldown, step.Env["NPM_CONFIG_MIN_RELEASE_AGE"])
 				require.NotContains(t, step.Run, "npm install")
-				require.Contains(t, step.Run, `npm ci --prefix "${RUNNER_TEMP}/gh-aw/engine-cli/copilot-sdk" --ignore-scripts`)
+				require.Contains(t, step.Run, copilotSDKNodeInstallCommand)
 				require.Less(t, len(step.Run), MaxExpressionSize)
 				payload := func(delimiter string) []byte {
 					_, rest, ok := strings.Cut(step.Run, "<<'"+delimiter+"'\n")
@@ -61,10 +61,15 @@ func TestCopilotSDKCompilesWithFrozenNPMGraph(t *testing.T) {
 					require.True(t, ok)
 					return []byte(value)
 				}
+				var project struct {
+					Manifest json.RawMessage `json:"manifest"`
+					Lock     json.RawMessage `json:"lock"`
+				}
+				require.NoError(t, json.Unmarshal(payload("GH_AW_SDK_PROJECT"), &project))
 				var manifest struct {
 					Dependencies map[string]string `json:"dependencies"`
 				}
-				require.NoError(t, json.Unmarshal(payload("GH_AW_SDK_PACKAGE"), &manifest))
+				require.NoError(t, json.Unmarshal(project.Manifest, &manifest))
 				want := map[string]string{"@github/copilot-sdk": string(constants.DefaultCopilotSDKVersion), "undici": "6.28.0"}
 				for pkg, version := range tt.extra {
 					want[pkg] = version
@@ -80,7 +85,7 @@ func TestCopilotSDKCompilesWithFrozenNPMGraph(t *testing.T) {
 						Integrity    string            `json:"integrity"`
 					} `json:"packages"`
 				}
-				require.NoError(t, json.Unmarshal(payload("GH_AW_SDK_LOCK"), &lock))
+				require.NoError(t, json.Unmarshal(project.Lock, &lock))
 				require.Equal(t, 3, lock.LockfileVersion)
 				require.Equal(t, want, lock.Packages[""].Dependencies)
 				for pkg, version := range want {

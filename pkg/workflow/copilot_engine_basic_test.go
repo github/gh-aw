@@ -108,7 +108,7 @@ func TestCopilotEngineInstallationSteps(t *testing.T) {
 	if !strings.Contains(sdkInstallStep, "name: Install GitHub Copilot SDK (Node.js)") {
 		t.Fatalf("Expected SDK install step name, got:\n%s", sdkInstallStep)
 	}
-	expectedSDKInstall := `npm ci --prefix "${RUNNER_TEMP}/gh-aw/engine-cli/copilot-sdk" --ignore-scripts`
+	expectedSDKInstall := copilotSDKNodeInstallCommand
 	if !strings.Contains(sdkInstallStep, expectedSDKInstall) {
 		t.Fatalf("Expected SDK install command %q, got:\n%s", expectedSDKInstall, sdkInstallStep)
 	}
