@@ -1,5 +1,6 @@
 ---
 title: Model Alias Format Specification
+spec: true
 description: Formal W3C-style specification defining the model alias format, naming conventions, URL-style parameter encoding, and fallback resolution strategies for GitHub Agentic Workflows
 sidebar:
   order: 1360

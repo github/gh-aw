@@ -1,5 +1,6 @@
 ---
 title: Checkout Behavior Specification
+spec: true
 description: Formal specification of checkout behavior across activation, agent, and safe_outputs jobs in gh-aw workflows
 sidebar:
   order: 1365

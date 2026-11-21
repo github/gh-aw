@@ -1,5 +1,6 @@
 ---
 title: Graders Specification
+spec: true
 description: Pure deterministic metrics over the in-memory unified agent session
 sidebar:
   order: 1360

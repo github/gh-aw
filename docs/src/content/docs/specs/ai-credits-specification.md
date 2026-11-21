@@ -1,5 +1,6 @@
 ---
 title: AI Credits Specification
+spec: true
 description: Formal W3C-style specification for AI Credits (AIC) calculation, model pricing catalog format, and Copilot billing reference requirements.
 sidebar:
   order: 1361

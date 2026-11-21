@@ -1,5 +1,6 @@
 ---
 title: Unified Agent Session Specification
+spec: true
 description: Draft contract for canonical traces, full unified artifacts, and bounded compact unified sessions.
 sidebar:
   order: 1365

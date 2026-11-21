@@ -1,5 +1,6 @@
 ---
 title: Operational Value Report Specification
+spec: true
 description: Evidence, clocks, and attribution rules for a reproducible workflow value report.
 sidebar:
   order: 1371
