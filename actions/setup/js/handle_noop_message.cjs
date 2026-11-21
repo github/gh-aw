@@ -5,7 +5,7 @@ const { getIssueLabel, getIssueLabelQuery } = require("./issue_label.cjs");
 const { createReportIssue } = require("./issue_report.cjs");
 
 const fs = require("fs");
-const { getErrorMessage } = require("./error_helpers.cjs");
+const { getErrorMessage, isCommentLimitError } = require("./error_helpers.cjs");
 const { ERR_API, ERR_SYSTEM } = require("./error_codes.cjs");
 const { parseReportMarkdown } = require("./report_markdown.cjs");
 const { renderSizedReport } = require("./report_size.cjs");
@@ -53,14 +53,16 @@ function classifyNoopOutcome(agentConclusion, hasIncompleteReport = false, hasNo
     description: "The agent emitted a no-op output, but successful task completion is unconfirmed.",
   };
 }
+
+const NOOP_RUNS_ISSUE_TITLE = "[aw] No-Op Runs";
+
 /**
  * Search for or create the parent issue for all agentic workflow no-op runs
  * @returns {Promise<{number: number, node_id: string}>} Parent issue number and node ID
  */
 async function ensureAgentRunsIssue() {
   const { owner, repo } = context.repo;
-  const parentTitle = "[aw] No-Op Runs";
-  const parentLabel = getIssueLabel();
+  const parentTitle = NOOP_RUNS_ISSUE_TITLE;
 
   core.info(`Searching for no-op runs issue: "${parentTitle}"`);
 
@@ -70,6 +72,8 @@ async function ensureAgentRunsIssue() {
   try {
     const { data } = await github.rest.search.issuesAndPullRequests({
       q: searchQuery,
+      sort: "created",
+      order: "desc",
       per_page: 1,
     });
 
@@ -86,8 +90,18 @@ async function ensureAgentRunsIssue() {
     throw new Error(`${ERR_API}: Failed to search for existing no-op runs issue: ${getErrorMessage(error)}`, { cause: error });
   }
 
-  // Create no-op runs issue if it doesn't exist
   core.info(`No no-op runs issue found, creating one`);
+  return createAgentRunsIssue();
+}
+
+/**
+ * Create a new parent issue for agentic workflow no-op runs
+ * @returns {Promise<{number: number, node_id: string}>} Parent issue number and node ID
+ */
+async function createAgentRunsIssue() {
+  const { owner, repo } = context.repo;
+  const parentTitle = NOOP_RUNS_ISSUE_TITLE;
+  const parentLabel = getIssueLabel();
 
   // Load template from file
   const templatePath = getPromptPath("noop_runs_issue.md");
@@ -370,12 +384,34 @@ async function main() {
     if (!issueBody) return;
 
     try {
-      await github.rest.issues.createComment({
-        owner,
-        repo,
-        issue_number: noopRunsIssue.number,
-        body: issueBody,
-      });
+      try {
+        await github.rest.issues.createComment({
+          owner,
+          repo,
+          issue_number: noopRunsIssue.number,
+          body: issueBody,
+        });
+      } catch (error) {
+        if (!isCommentLimitError(error)) {
+          throw error;
+        }
+        // The tracking issue is full; GitHub rejects every further comment, so roll over to a fresh issue.
+        core.info(`No-op runs issue #${noopRunsIssue.number} reached the comment limit, rotating to a new issue`);
+        await github.rest.issues.update({
+          owner,
+          repo,
+          issue_number: noopRunsIssue.number,
+          state: "closed",
+          state_reason: "completed",
+        });
+        noopRunsIssue = await createAgentRunsIssue();
+        await github.rest.issues.createComment({
+          owner,
+          repo,
+          issue_number: noopRunsIssue.number,
+          body: issueBody,
+        });
+      }
 
       core.info(`✓ Posted no-op message to no-op runs issue #${noopRunsIssue.number}`);
     } catch (error) {
@@ -388,4 +424,4 @@ async function main() {
   }
 }
 
-module.exports = { main, ensureAgentRunsIssue, classifyNoopOutcome };
+module.exports = { main, ensureAgentRunsIssue, createAgentRunsIssue, classifyNoopOutcome };
