@@ -153,7 +153,11 @@ describe("mcp_http_server_runner.cjs - runHttpServer", () => {
     expect(payload.tools).toBe(42);
   });
 
-  it("responds 405 for non-POST methods other than GET /health", async () => {
+  it.each([
+    { method: "PUT", headers: {} },
+    // No Origin header, and remove the request helper's default Authorization.
+    { method: "OPTIONS", headers: { Authorization: undefined } },
+  ])("responds 405 for $method / without an Origin header", async ({ method, headers }) => {
     const transport = makeMockTransport();
     const logger = makeMockLogger();
     currentServer = await runHttpServer({
@@ -166,7 +170,7 @@ describe("mcp_http_server_runner.cjs - runHttpServer", () => {
     });
     await new Promise(r => currentServer.once("listening", r));
 
-    const res = await request(currentServer, { method: "PUT", path: "/" });
+    const res = await request(currentServer, { method, path: "/", headers });
     expect(res.statusCode).toBe(405);
     const body = JSON.parse(res.body);
     expect(body.error).toBe("Method not allowed");
