@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"testing"
 
 	"github.com/github/gh-aw/pkg/constants"
@@ -18,7 +19,7 @@ import (
 func TestExtractContinuationRequestsFromRun(t *testing.T) {
 	run := WorkflowRun{DatabaseID: 42, WorkflowName: "Example"}
 	for _, flattened := range []bool{false, true} {
-		t.Run(fmt.Sprint(flattened), func(t *testing.T) {
+		t.Run(strconv.FormatBool(flattened), func(t *testing.T) {
 			dir := t.TempDir()
 			target := dir
 			if !flattened {
@@ -299,7 +300,7 @@ func TestContinuationRequestsDrainEventsAreNotOutcomes(t *testing.T) {
 
 func TestContinuationRequestsSerializationDistinguishesUnavailableAndEmpty(t *testing.T) {
 	for _, available := range []bool{false, true} {
-		t.Run(fmt.Sprint(available), func(t *testing.T) {
+		t.Run(strconv.FormatBool(available), func(t *testing.T) {
 			var requests []ContinuationRequestReport
 			if available {
 				requests = []ContinuationRequestReport{}

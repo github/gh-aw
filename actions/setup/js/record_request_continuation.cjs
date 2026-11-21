@@ -14,7 +14,7 @@ async function main() {
   const handler = await createHandler({ max });
   for (const item of output.items) {
     if (item.type === "request_continuation") {
-      const result = await handler(item);
+      const result = await handler(item, {});
       if (!result.success) core.warning(`request_continuation: ${result.error}`);
     }
   }
