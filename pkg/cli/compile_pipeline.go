@@ -20,6 +20,12 @@ import (
 
 var compileOrchestrationLog = logger.New("cli:compile_pipeline")
 
+func logNonFatalCompileError(operation string, err error) {
+	if err != nil {
+		compileOrchestrationLog.Printf("Non-fatal %s error: %v", operation, err)
+	}
+}
+
 const fallbackCompilationErrorMessage = "compilation failed (no detailed error message available)"
 
 // compileSpecificFiles compiles a specific list of workflow files

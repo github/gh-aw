@@ -54,7 +54,7 @@ func runPostProcessing(
 	actionCache := compiler.GetSharedActionCache()
 
 	// Update .gitattributes (errors are non-fatal)
-	_ = updateGitAttributes(successCount, actionCache, config.Verbose)
+	logNonFatalCompileError("Git attributes update", updateGitAttributes(successCount, actionCache, config.Verbose))
 
 	// Generate Dependabot manifests and reconcile compiler-managed ignore entries if requested.
 	if config.Dependabot && !config.NoEmit {
@@ -96,7 +96,7 @@ func runPostProcessing(
 	pruneStaleActionCacheEntries(compiler, actionCache)
 
 	// Save action cache (errors are logged but non-fatal)
-	_ = saveActionCache(actionCache, config.Verbose)
+	logNonFatalCompileError("Action cache save", saveActionCache(actionCache, config.Verbose))
 
 	return nil
 }
@@ -116,7 +116,7 @@ func runPostProcessingForDirectory(
 	actionCache := compiler.GetSharedActionCache()
 
 	// Update .gitattributes (errors are non-fatal)
-	_ = updateGitAttributes(successCount, actionCache, config.Verbose)
+	logNonFatalCompileError("Git attributes update", updateGitAttributes(successCount, actionCache, config.Verbose))
 
 	// Generate Dependabot manifests if requested
 	if config.Dependabot && !config.NoEmit {
@@ -169,7 +169,7 @@ func runPostProcessingForDirectory(
 	pruneOrphanedActionCacheEntries(compiler, actionCache, errorCount)
 
 	// Save action cache (errors are logged but non-fatal)
-	_ = saveActionCache(actionCache, config.Verbose)
+	logNonFatalCompileError("Action cache save", saveActionCache(actionCache, config.Verbose))
 
 	return nil
 }

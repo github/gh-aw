@@ -58,6 +58,6 @@ func collectPurgeDataWithPatterns(workflowsDir string, mdFiles []string, verbose
 // runPurgeOperations runs all purge operations
 func runPurgeOperations(workflowsDir string, data *purgeTrackingData, verbose bool) {
 	// Errors from purge operations are logged but don't stop compilation
-	_ = purgeOrphanedLockFiles(workflowsDir, data.expectedLockFiles, verbose)
-	_ = purgeInvalidFiles(workflowsDir, verbose)
+	logNonFatalCompileError("Orphaned lock file purge", purgeOrphanedLockFiles(workflowsDir, data.expectedLockFiles, verbose))
+	logNonFatalCompileError("Invalid workflow file purge", purgeInvalidFiles(workflowsDir, verbose))
 }
