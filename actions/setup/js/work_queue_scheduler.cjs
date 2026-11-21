@@ -3,351 +3,130 @@
 const log = require("./work_queue_logging.cjs").createWorkQueueLogger("scheduler");
 
 const { createHash } = require("node:crypto");
-const { canonical, canonicalBytes, closed, identity, integer, utf8Compare, queueError } = require("./work_queue_codec.cjs");
-const { indexesFor, schedulingState, updateIndexes } = require("./work_queue_indexes.cjs");
-const { executionProfile } = require("./work_queue_deployment.cjs");
-const { workExpired } = require("./work_queue_expiration.cjs");
+const { closed, identity, integer, queueError } = require("./work_queue_codec.cjs");
+const { OPERATIONS_PER_COMMIT } = require("./work_queue_limits.cjs");
+const { dependencyStatus, resultReferences } = require("./work_queue_graph.cjs");
 
-function gcd(a, b) {
-  while (b !== 0n) [a, b] = [b, a % b];
-  return a;
-}
-
-function tickScale(weights) {
-  let q = 1n;
-  for (const weight of weights) {
-    if (!Number.isSafeInteger(weight) || weight < 1 || weight > 1000) throw queueError("policy_invalid", "weights must be integers between 1 and 1000");
-    const w = BigInt(weight);
-    q = (q / gcd(q, w)) * w;
-  }
-  return q;
-}
-
-function clock() {
-  return { virtual: 0n, passes: new Map(), active: new Set() };
-}
-
-function copyClock(parent) {
-  return { virtual: parent.virtual, passes: new Map(parent.passes), active: new Set(parent.active) };
-}
-
-function pick(parent, eligible, weights, scale, compare = utf8Compare) {
-  const next = copyClock(parent);
-  for (const key of eligible) {
-    const weight = weights.get(key);
-    if (weight === undefined) throw queueError("policy_invalid", "unregistered accounting key");
-    const stride = scale / BigInt(weight);
-    if (!parent.active.has(key)) {
-      const old = next.passes.get(key) ?? 0n;
-      const baseline = parent.virtual + stride;
-      next.passes.set(key, old > baseline ? old : baseline);
-    }
-  }
-  next.active = new Set(eligible);
-  if (!eligible.length) return { key: null, clock: next };
-  const key = [...eligible].sort((a, b) => {
-    const delta = next.passes.get(a) - next.passes.get(b);
-    return delta < 0n ? -1 : delta > 0n ? 1 : compare(a, b);
-  })[0];
-  const pass = next.passes.get(key);
-  next.virtual = pass;
-  next.passes.set(key, pass + scale / BigInt(weights.get(key)));
-  return { key, clock: next };
-}
+const DISPATCH_PARAMETERS = ["pool", "max_claims", "max_dispatches", "concurrency", "per_account_limit", "profiles"];
 
 function fifoCompare(a, b) {
   return a.position.commit - b.position.commit || a.position.operation - b.position.operation;
 }
 
-function copySchedule(schedule) {
-  return { classes: copyClock(schedule.classes), keys: new Map([...schedule.keys].map(([priority, parent]) => [priority, copyClock(parent)])) };
+function validateDispatchParameters(parameters) {
+  closed(parameters, DISPATCH_PARAMETERS, [], "dispatch_next parameters", "request_invalid");
+  identity(parameters.pool, "pool");
+  integer(parameters.max_claims, 1, OPERATIONS_PER_COMMIT, "max_claims");
+  integer(parameters.max_dispatches, 1, OPERATIONS_PER_COMMIT, "max_dispatches");
+  integer(parameters.concurrency, 1, 4096, "concurrency");
+  integer(parameters.per_account_limit, 0, 4096, "per_account_limit");
+  if (!parameters.profiles || typeof parameters.profiles !== "object" || Array.isArray(parameters.profiles)) throw queueError("request_invalid", "dispatch_next requires worker profiles");
 }
 
-function diagnostics(schedule) {
-  const render = parent => ({
-    v: parent.virtual.toString(),
-    pass: Object.fromEntries([...parent.passes].sort(([a], [b]) => utf8Compare(String(a), String(b))).map(([key, pass]) => [key, pass.toString()])),
-    active: Object.fromEntries([...parent.active].sort((a, b) => (typeof a === "number" ? a - b : utf8Compare(a, b))).map(key => [key, true])),
-  });
-  return { classes: render(schedule.classes), keys: Object.fromEntries([...schedule.keys].sort(([a], [b]) => a - b).map(([priority, parent]) => [priority, render(parent)])) };
+/** Deterministic Claim/Dispatch identities: one Claim per Dispatch. */
+function claimIdentity(requestId, workId) {
+  const seed = createHash("sha256").update(`${requestId}\n${workId}`, "utf8").digest("hex");
+  return { claim_id: `c_${seed}_1`, dispatch_id: `d_${seed}_1`, handle: "h1" };
 }
 
-function reservationSnapshot(state, pool, indexes = indexesFor(state)) {
-  let logical = 0;
-  let native = 0;
+/**
+ * Eligible Work of a pool in dispatch order: priority ascending, then causal FIFO.
+ * @param {any} state
+ * @param {string} pool
+ * @param {Record<string, unknown>} [profiles] only Work routed to one of these profiles
+ */
+function eligibleWork(state, pool, profiles = undefined) {
+  const eligible = [];
+  for (const work of state.works.values()) {
+    if (work.pool !== pool || work.state !== "available") continue;
+    if (profiles && !Object.hasOwn(profiles, work.worker_profile)) continue;
+    if (!dependencyStatus(state, work).ready) continue;
+    eligible.push(work);
+  }
+  return eligible.sort((a, b) => a.priority - b.priority || fifoCompare(a, b));
+}
+
+/** Non-closed Dispatches and open Claims per fairness key of one pool. */
+function poolOccupancy(state, pool) {
+  let dispatches = 0;
   const accounts = new Map();
-  for (const id of indexes.openClaims) {
-    const claim = state.claims.get(id);
+  for (const dispatch of state.dispatches.values()) if (dispatch.pool === pool && dispatch.state !== "closed") dispatches++;
+  for (const claim of state.claims.values()) {
+    if (claim.state !== "open") continue;
     const work = state.works.get(claim.work_id);
-    if (work.pool !== pool) continue;
-    logical++;
-    accounts.set(work.fairness_key, (accounts.get(work.fairness_key) || 0) + 1);
+    if (work.pool === pool) accounts.set(work.fairness_key, (accounts.get(work.fairness_key) ?? 0) + 1);
   }
-  for (const id of indexes.reservations) if (state.dispatches.get(id).pool === pool) native++;
-  return { logical, accounts, native };
+  return { dispatches, accounts };
 }
 
-function reservationCounts(state, pool, key) {
-  const { logical, accounts, native } = reservationSnapshot(state, pool);
-  return { logical, account: accounts.get(key) || 0, native };
-}
-
-function eligibility(state, work, at, capacitySnapshot) {
-  const { poolPolicy } = require("./work_queue_policy.cjs");
-  const { dependencyStatus } = require("./work_queue_graph.cjs");
-  if (workExpired(work, Math.max(at, state.time_watermark ?? 0)) || work.cancellation_reason === "work_expired") return { ready: false, reason: "work_expired", observations: [] };
-  if (work.state !== "available") return { ready: false, reason: `ownership_${work.state}`, observations: [] };
-  if (["pending", "failed"].includes(work.barrier)) return { ready: false, reason: `delivery_${work.barrier}`, observations: [] };
-  const policy = poolPolicy(state, work.pool);
-  if (state.grants_paused) return { ready: false, reason: "grants_paused", observations: [] };
-  if (state.scheduling_profiles && !state.scheduling_profiles.includes(work.worker_profile)) return { ready: false, reason: "worker_not_approved", observations: [] };
-  const route = executionProfile(state, work);
-  if (route.reason !== "ready") return { ready: false, reason: route.reason, observations: [] };
-  if (work.retry_not_before > at) return { ready: false, reason: "retry_delayed", observations: [] };
-  if (work.attempts >= policy.retry.max_attempts) return { ready: false, reason: "retry_exhausted", observations: [] };
-  const capacity = capacitySnapshot || reservationCounts(state, work.pool, work.fairness_key);
-  if (capacity.logical >= policy.logical_limit) return { ready: false, reason: "capacity_blocked", observations: [] };
-  if (policy.per_account_limit && capacity.account >= policy.per_account_limit) return { ready: false, reason: "account_capacity_blocked", observations: [] };
-  return dependencyStatus(state, work, at);
-}
-
-function planNext(state, pool, at) {
-  const { poolPolicy, policyScales } = require("./work_queue_policy.cjs");
-  const policy = poolPolicy(state, pool);
-  integer(at, 0, Number.MAX_SAFE_INTEGER, "decision timestamp");
-  if (state.grants_paused) {
-    log.debug("selection.grants_paused");
-    return { reason: "grants_paused", observations: [] };
-  }
-  const indexes = indexesFor(state);
-  const capacity = reservationSnapshot(state, pool, indexes);
-  if (capacity.logical >= policy.logical_limit) {
-    log.debug("selection.capacity_blocked", { reservations: capacity.logical });
-    return { reason: "capacity_blocked", observations: [] };
-  }
-  const buckets = new Map();
-  let pending = 0;
-  for (const id of indexes.available.get(pool) || []) {
-    const work = state.works.get(id);
-    if (workExpired(work, Math.max(at, state.time_watermark ?? 0))) continue;
-    pending++;
-    const dependency = eligibility(state, work, at, { logical: capacity.logical, account: capacity.accounts.get(work.fairness_key) || 0 });
-    if (!dependency.ready) continue;
-    const priority = work.effective_priority ?? work.priority;
-    const keys = buckets.get(priority) ?? new Map();
-    const oldest = keys.get(work.fairness_key);
-    if (!oldest || fifoCompare(work, oldest.work) < 0) keys.set(work.fairness_key, { work, dependency });
-    buckets.set(priority, keys);
-  }
-  if (!buckets.size) {
-    log.debug("selection.no_grant", { pending, ineligible: pending > 0 });
-    return { reason: pending ? "no_eligible_work" : "no_work", observations: [] };
-  }
-  const schedule = copySchedule(state.clocks.get(pool) ?? { classes: clock(), keys: new Map() });
-  const scales = policyScales(state.policy);
-  const classWeights = new Map(state.policy.class_weights.map((weight, index) => [index + 1, weight]));
-  let priority;
-  if (state.policy.mode === "strict-priority") priority = Math.min(...buckets.keys());
-  else {
-    const selected = pick(schedule.classes, [...buckets.keys()], classWeights, scales.classes, (a, b) => a - b);
-    priority = selected.key;
-    schedule.classes = selected.clock;
-  }
-  const keys = buckets.get(priority);
-  const selected = pick(schedule.keys.get(priority) ?? clock(), [...keys.keys()], new Map(Object.entries(state.policy.accounting_weights)), scales.keys);
-  schedule.keys.set(priority, selected.clock);
-  const winner = keys.get(selected.key);
-  return {
-    work_id: winner.work.work_id,
-    reason: "selected",
-    observations: [...winner.dependency.observations],
-    class_pass: schedule.classes.virtual.toString(),
-    key_pass: selected.clock.virtual.toString(),
-    nextClock: schedule,
-  };
-}
-
-function validateDispatchParameters(parameters, state) {
-  closed(parameters, ["pool", "max_claims", "max_dispatches", "max_bytes"], ["worker_profiles"], "dispatch_next parameters");
-  if (parameters.worker_profiles !== undefined) {
-    if (!Array.isArray(parameters.worker_profiles) || parameters.worker_profiles.length > 256 || new Set(parameters.worker_profiles).size !== parameters.worker_profiles.length)
-      throw queueError("request_invalid", "dispatch requires a bounded unique worker allowlist");
-    for (const name of parameters.worker_profiles) identity(name, "worker profile");
-  }
-  const { poolPolicy } = require("./work_queue_policy.cjs");
-  poolPolicy(state, parameters.pool);
-  integer(parameters.max_claims, 1, 256, "max_claims");
-  integer(parameters.max_dispatches, 1, 256, "max_dispatches");
-  integer(parameters.max_bytes, 1, 48 * 1024, "max_bytes");
-}
-
-function assignmentClaim(state, work, claim) {
-  const { resultReferences } = require("./work_queue_graph.cjs");
-  return { handle: claim.handle, claim_id: claim.claim_id, work_id: work.work_id, work: work.payload, result_refs: resultReferences(state, work) };
-}
-
-function groupCompatible(state, dispatch, work) {
-  if (dispatch.worker_profile !== work.worker_profile || dispatch.pool !== work.pool) return false;
-  const { profile, reason } = executionProfile(state, work);
-  if (reason !== "ready") return false;
-  if (profile.trust_domain !== work.batch_trust_domain) return false;
-  const first = state.works.get(dispatch.claims[0].work_id);
-  const firstProfile = dispatch.profile ?? executionProfile(state, first).profile;
-  if (canonical(firstProfile) !== canonical(profile)) return false;
-  return first.batch_trust_domain === work.batch_trust_domain && (profile.share_keys || first.fairness_key === work.fairness_key);
-}
-
-function applyScheduledClaim(state, operation, selection, commit) {
-  if (operation.work_id !== selection.work_id) throw queueError("selection_invalid", "Claim is not the next fair winner");
-  const work = state.works.get(operation.work_id);
-  if (state.claims.has(operation.claim_id)) throw queueError("claim_conflict", "Claim identity already exists");
-  let dispatch = state.dispatches.get(operation.dispatch_id);
-  if (dispatch && (dispatch.commit_id !== commit.id || dispatch.request_id !== commit.request.id || !groupCompatible(state, dispatch, work))) throw queueError("packing_invalid", "membership is immutable and group must be compatible");
-  if (!dispatch) {
-    dispatch = {
-      version: 3,
-      dispatch_id: operation.dispatch_id,
-      request_id: commit.request.id,
-      commit_id: commit.id,
-      policy_epoch: state.policy_epoch,
-      pool: work.pool,
-      worker_profile: work.worker_profile,
-      claims: [],
-      profile: structuredClone(executionProfile(state, work).profile),
-      state: "reserved",
-      released: false,
-      lifecycle_writes: 0,
-    };
-    state.dispatches.set(dispatch.dispatch_id, dispatch);
-  }
-  dispatch.claims.push(assignmentClaim(state, work, operation));
-  state.claims.set(operation.claim_id, { ...operation, state: "open", commit_id: commit.id, request_id: commit.request.id });
-  work.state = "claimed";
-  work.claim_id = operation.claim_id;
-  work.attempts++;
-  state.clocks.set(work.pool, selection.nextClock);
-  updateIndexes(state, operation);
-}
-
-function planDispatch(state, parameters, { requestId, commitId, at, precedingOperations = 0 }) {
-  log.debug("dispatch.plan.start", { works: state.works.size, preceding_operations: precedingOperations });
-  validateDispatchParameters(parameters, state);
-  integer(precedingOperations, 0, state.policy.limits.operations, "preceding operation count");
-  const working = schedulingState(state);
-  working.scheduling_profiles = parameters.worker_profiles;
+/**
+ * Plan the Claims of one dispatch_next request. Pure: the projection is never mutated.
+ * @param {any} state
+ * @param {{pool: string, max_claims: number, max_dispatches: number, concurrency: number, per_account_limit: number, profiles: Record<string, {workflow: string}>}} parameters
+ * @param {string} requestId
+ * @returns {{operations: Array<{kind: "Claim", work_id: string, claim_id: string, dispatch_id: string, handle: string}>, dispatches: string[], reason: string}}
+ */
+function planDispatch(state, parameters, requestId) {
+  validateDispatchParameters(parameters);
+  identity(requestId, "request ID");
+  const { pool, concurrency, per_account_limit: perAccountLimit } = parameters;
+  const limit = Math.min(parameters.max_claims, parameters.max_dispatches);
+  const occupancy = poolOccupancy(state, pool);
+  const eligible = eligibleWork(state, pool, parameters.profiles);
+  /** @type {Array<{kind: "Claim", work_id: string, claim_id: string, dispatch_id: string, handle: string}>} */
   const operations = [];
-  const groups = [];
-  const policy = state.policy.pools[parameters.pool];
-  const commit = { id: commitId, request: { id: requestId } };
-  const prefix = createHash("sha256").update(requestId, "utf8").digest("hex");
-  const limit = Math.min(parameters.max_claims, state.policy.limits.operations - precedingOperations);
-  let next = planNext(working, parameters.pool, at);
-  let lastSelection = next;
-  let reason = next.reason;
-  while (operations.length < limit && next.work_id) {
-    const work = working.works.get(next.work_id);
-    const profile = executionProfile(working, work).profile;
-    let group;
-    let claim;
-    const claimId = `c_${prefix}_${operations.length + 1}`;
-    for (const candidate of groups) {
-      if (!groupCompatible(working, candidate, work) || candidate.claims.length >= profile.max_claims) continue;
-      const proposed = { kind: "Claim", work_id: work.work_id, claim_id: claimId, dispatch_id: candidate.dispatch_id, handle: `h${candidate.claims.length + 1}`, observations: next.observations };
-      const claims = [...candidate.claims, assignmentClaim(working, work, proposed)];
-      if (canonicalBytes({ ...assignmentOnly(candidate), claims }) <= Math.min(parameters.max_bytes, state.policy.limits.assignment_bytes)) {
-        group = candidate;
-        claim = proposed;
-        break;
-      }
+  let reason = eligible.length ? "prefix_complete" : [...state.works.values()].some(work => work.pool === pool && work.state === "available") ? "no_eligible_work" : "no_work";
+  for (const work of eligible) {
+    if (occupancy.dispatches >= concurrency) {
+      reason = "capacity_blocked";
+      break;
     }
-    if (!group) {
-      if (groups.length >= parameters.max_dispatches) {
-        log.debug("dispatch.plan.dispatch_budget_blocked", { assignments: groups.length });
-        reason = "dispatch_budget_blocked";
-        break;
-      }
-      if (reservationCounts(working, parameters.pool, "").native >= policy.native_limit) {
-        log.debug("dispatch.plan.native_capacity_blocked");
-        reason = "native_capacity_blocked";
-        break;
-      }
-      const dispatchId = `d_${prefix}_${groups.length + 1}`;
-      claim = { kind: "Claim", work_id: work.work_id, claim_id: claimId, dispatch_id: dispatchId, handle: "h1", observations: next.observations };
-      group = { version: 3, dispatch_id: dispatchId, request_id: requestId, commit_id: commitId, policy_epoch: state.policy_epoch, pool: work.pool, worker_profile: work.worker_profile, claims: [assignmentClaim(working, work, claim)] };
-      if (canonicalBytes(group) > Math.min(parameters.max_bytes, state.policy.limits.assignment_bytes)) {
-        log.debug("dispatch.plan.assignment_bytes_blocked");
-        reason = "assignment_bytes_blocked";
-        break;
-      }
-      applyScheduledClaim(working, claim, next, commit);
-      groups.push(working.dispatches.get(dispatchId));
-    } else {
-      if (!claim) throw queueError("packing_invalid", "compatible packing group has no proposed Claim");
-      applyScheduledClaim(working, claim, next, commit);
+    if (operations.length >= limit) {
+      reason = "claim_budget_reached";
+      break;
     }
-    operations.push(claim);
-    log.debug("dispatch.plan.claim_selected", { claims: operations.length, assignments: groups.length });
-    lastSelection = next;
-    next = planNext(working, parameters.pool, at);
-    reason = next.reason;
+    const held = occupancy.accounts.get(work.fairness_key) ?? 0;
+    if (perAccountLimit > 0 && held >= perAccountLimit) {
+      reason = "account_capacity_blocked";
+      continue;
+    }
+    operations.push({ kind: "Claim", work_id: work.work_id, ...claimIdentity(requestId, work.work_id) });
+    occupancy.dispatches++;
+    occupancy.accounts.set(work.fairness_key, held + 1);
+    if (reason === "account_capacity_blocked") reason = "prefix_complete";
   }
-  if (operations.length === limit) {
-    reason = limit ? (limit === parameters.max_claims ? "claim_budget_reached" : "operation_budget_reached") : "operation_budget_blocked";
-    next = lastSelection;
-  } else if (operations.length && reason === "no_work") reason = "prefix_complete";
-  log.debug("dispatch.plan.complete", { claims: operations.length, assignments: groups.length, no_grant: operations.length === 0, budget_reached: operations.length === limit });
-  return { tip: state.tip, operations, assignments: groups.map(group => structuredClone(assignmentOnly(group))), reason, next: selectionOnly(next) };
+  log.debug("dispatch.plan.complete", { claims: operations.length, eligible: eligible.length, reason });
+  return { operations, dispatches: operations.map(operation => operation.dispatch_id), reason };
 }
 
-function assignmentOnly(dispatch) {
-  const fields = ["version", "dispatch_id", "request_id", "commit_id", "policy_epoch", "pool", "worker_profile", "claims"];
-  return Object.fromEntries(fields.map(field => [field, dispatch[field]]));
-}
-
+/**
+ * The worker's view of a Dispatch: its open Claims with payloads and predecessor effects.
+ * @returns {{dispatch_id: string, claims: Array<{handle: string, claim_id: string, work_id: string, work: object, result_refs: Array<{work_id: string, result_commit_id: string, descriptor: unknown}>}>}}
+ */
 function assignmentForDispatch(state, dispatchId) {
   const dispatch = state.dispatches.get(dispatchId);
   if (!dispatch) throw queueError("dispatch_missing", "requested Dispatch does not exist");
-  const assignment = structuredClone(assignmentOnly(dispatch));
-  function freeze(value) {
-    if (value && typeof value === "object") {
-      for (const child of Object.values(value)) freeze(child);
-      Object.freeze(value);
-    }
-    return value;
-  }
-  return freeze(assignment);
+  return assignmentOnly(state, dispatch);
+}
+
+function assignmentOnly(state, dispatch) {
+  const claims = dispatch.claims
+    .map(id => state.claims.get(id))
+    .filter(claim => claim.state === "open")
+    .map(claim => {
+      const work = state.works.get(claim.work_id);
+      return { handle: claim.handle, claim_id: claim.claim_id, work_id: work.work_id, work: structuredClone(work.payload), result_refs: structuredClone(resultReferences(state, work)) };
+    });
+  return { dispatch_id: dispatch.dispatch_id, claims };
 }
 
 function assignmentsForRequest(state, requestId) {
-  return [...state.dispatches.values()].filter(dispatch => dispatch.request_id === requestId).map(dispatch => structuredClone(assignmentOnly(dispatch)));
+  return [...state.dispatches.values()].filter(dispatch => dispatch.request_id === requestId).map(dispatch => assignmentOnly(state, dispatch));
 }
 
-function selectionOnly(selection) {
-  const { nextClock, ...view } = selection;
-  return view;
+/** A read-only summary of what dispatch_next would select now. */
+function selectionOnly(decision) {
+  return { reason: decision.reason, work_ids: decision.operations.map(operation => operation.work_id) };
 }
 
-function dispatchNext(state, parameters, context) {
-  return planDispatch(state, parameters, context);
-}
-
-module.exports = {
-  applyScheduledClaim,
-  assignmentForDispatch,
-  assignmentOnly,
-  assignmentsForRequest,
-  clock,
-  copySchedule,
-  diagnostics,
-  dispatchNext,
-  eligibility,
-  fifoCompare,
-  groupCompatible,
-  pick,
-  planDispatch,
-  planNext,
-  reservationCounts,
-  selectionOnly,
-  tickScale,
-  validateDispatchParameters,
-};
+module.exports = { assignmentForDispatch, assignmentOnly, assignmentsForRequest, claimIdentity, eligibleWork, fifoCompare, planDispatch, poolOccupancy, selectionOnly, validateDispatchParameters };

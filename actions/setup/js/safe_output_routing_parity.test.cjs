@@ -26,10 +26,7 @@ const { main: actionFactory } = require("./safe_output_action_handler.cjs");
 const { withClaimEffectClients } = require("./work_queue_effect_client.cjs");
 const { createRestEffectHandler } = require("./work_queue_rest_adapter.cjs");
 const { createGraphqlEffectHandler } = require("./work_queue_graphql_adapter.cjs");
-const { validateStoredAssignment } = require("./work_queue_binding.cjs");
-const { queueFixture } = require("./work_queue_lifecycle.test_helpers.cjs");
-const { readDeliveryControlInventory } = require("./work_queue_delivery.cjs");
-const { serializeTransactionLog } = require("./work_queue_replay.cjs");
+const { workerPolicy, workerQueue } = require("./work_queue_worker.test_helpers.cjs");
 
 const processorConfig = { itemType: "noop", configKey: "noop", displayName: "Noop", itemTypeName: "noop", supportsIssue: true, envVars: {} };
 const preview = { title: "Preview", description: "Preview", renderItem: item => item.message };
@@ -38,16 +35,7 @@ let oldEnv;
 let oldGlobals;
 
 function assignment(count = 1) {
-  return {
-    version: 3,
-    dispatch_id: "dispatch",
-    request_id: "request",
-    commit_id: "commit",
-    policy_epoch: "policy",
-    pool: "default",
-    worker_profile: "default",
-    claims: Array.from({ length: count }, (_, index) => ({ handle: `h${index + 1}`, claim_id: `c${index + 1}`, work_id: `w${index + 1}`, work: {}, result_refs: [] })),
-  };
+  return { dispatch_id: "dispatch", claims: Array.from({ length: count }, (_, index) => ({ handle: `h${index + 1}`, claim_id: `c${index + 1}`, work_id: `w${index + 1}`, work: {}, result_refs: [] })) };
 }
 
 function writeOutput(items) {
@@ -56,29 +44,19 @@ function writeOutput(items) {
 }
 
 function activate(count, items, options = {}) {
-  const fixture = queueFixture({ count, bound: true, ...options });
+  const value = assignment(count);
+  for (const member of value.claims) Object.assign(member.work, options.work);
   process.env.GH_AW_WORK_QUEUE_ENABLED = "true";
   process.env.GH_AW_WORK_QUEUE_ROLE = "worker";
   process.env.GH_AW_WORK_QUEUE_SNAPSHOT = path.join(root, "snapshot.json");
-  fs.writeFileSync(
-    process.env.GH_AW_WORK_QUEUE_SNAPSHOT,
-    JSON.stringify({ version: 3, sha: "head", transactionLog: serializeTransactionLog(fixture.transactions), captured_at: fixture.at, origin: fixture.workerActor, worker: fixture.assignment, role: "worker" })
-  );
-  global.context = fixture.workerContext;
-  writeOutput(items(fixture.assignment.claims));
-  return fixture;
+  fs.writeFileSync(process.env.GH_AW_WORK_QUEUE_SNAPSHOT, JSON.stringify({ version: 4, sha: "head", transactionLog: "", origin: { role: "worker", repository: "owner/repo" }, worker: value, role: "worker" }));
+  global.context = { repo: { owner: "owner", repo: "repo" }, runId: 42, runAttempt: 1, payload: { inputs: { work_queue_assignment: JSON.stringify({ version: 4, dispatch_id: value.dispatch_id }) } } };
+  writeOutput(items(value.claims));
+  return { assignment: value };
 }
 
 function managerOptions(overrides = {}) {
-  return {
-    authorize: vi.fn(authorize),
-    controlIntentPath: path.join(root, "missing-intents.jsonl"),
-    deliveryArtifactRoot: path.join(root, "delivery"),
-    // An untrusted inventory cannot manufacture a verified delivery or Result.
-    readControlInventory: async () => ({ controls: [] }),
-    finalizeResults: vi.fn(async () => ({ claims: {} })),
-    ...overrides,
-  };
+  return { authorize: vi.fn(authorize), ...overrides };
 }
 
 beforeEach(() => {
@@ -206,167 +184,44 @@ describe("disabled safe-output behavioral parity", () => {
 });
 
 describe("real immutable Claim routing", () => {
-  it.each([false, true])("reuses the selected queue transport for initial and bounded delivery readback with explicit client=%s", async explicitClient => {
-    const fixture = activate(2, () => []);
-    for (const member of fixture.assignment.claims) {
-      fixture.append("finish", { dispatch_id: fixture.assignment.dispatch_id, claim_handle: member.handle, outcome: "completed" }, { ...fixture.workerActor, dispatch_id: fixture.assignment.dispatch_id, claim_handle: member.handle });
-    }
-    global.github = fixture.githubClient;
-    const queueClient = explicitClient ? { ...fixture.githubClient } : fixture.githubClient;
-    const store = require("./work_queue_store.cjs");
-    const reads = vi.spyOn(store, "readWorkQueueLog").mockImplementation(async parameters => {
-      expect(parameters.githubClient).toBe(queueClient);
-      return fixture.readWorkQueueLog();
-    });
-    process.env.GITHUB_WORKFLOW_REF = `owner/repo/.github/workflows/worker.lock.yml@${"a".repeat(40)}`;
-    const { finalizeWorkerResults } = require("./finish_work_queue_claim.cjs");
-    const result = await manager.main({
-      ...(explicitClient ? { queueClient } : {}),
-      controlIntentPath: path.join(root, "missing-intents.jsonl"),
-      finalizeResults: options => finalizeWorkerResults({ ...options, publishWorkQueueRequest: fixture.publishWorkQueueRequest, now: fixture.at }),
-    });
-    expect(result.settlements.map(settlement => settlement.delivery.verification)).toEqual(["verified", "verified"]);
-    expect(fixture.assignment.claims.map(member => fixture.state.works.get(member.work_id).barrier)).toEqual(["verified", "verified"]);
-    expect(reads).toHaveBeenCalled();
+  it("applies a completed Claim's effects through the real authorizer and records them for the finish step", async () => {
+    const queue = workerQueue();
+    process.env.GH_AW_WORK_QUEUE_ENABLED = "true";
+    process.env.GH_AW_WORK_QUEUE_ROLE = "worker";
+    process.env.GH_AW_WORK_QUEUE_POLICY = JSON.stringify(workerPolicy());
+    process.env.GH_AW_WORK_QUEUE_SNAPSHOT = path.join(root, "bound-snapshot.json");
+    process.env.GH_AW_WORK_QUEUE_FINISH_INTENT = path.join(root, "bound-finish.jsonl");
+    process.env.GH_AW_WORK_QUEUE_EFFECTS = path.join(root, "bound-effects.jsonl");
+    fs.rmSync(process.env.GH_AW_WORK_QUEUE_EFFECTS, { force: true });
+    fs.writeFileSync(process.env.GH_AW_WORK_QUEUE_SNAPSHOT, JSON.stringify({ version: 4, sha: "head", transactionLog: "", origin: { role: "worker", repository: "owner/repo" }, role: "worker", worker: queue.assignment }));
+    process.env.GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG = JSON.stringify({ create_issue: { max: 1, footer: false } });
+    global.context = { ...queue.context, eventName: "workflow_dispatch" };
+    global.github.rest.repos = { get: vi.fn(async () => ({ data: { full_name: "owner/repo", id: 7 } })) };
+    global.github.rest.issues = { create: vi.fn(async args => ({ data: { ...args, id: 19, number: 19, html_url: "https://github.com/owner/repo/issues/19" } })) };
+    writeOutput([{ type: "create_issue", title: "Scoped", body: "Body" }]);
+
+    let result = await manager.main({ queueClient: queue.githubClient });
+    expect(result.settlements[0]).toMatchObject({ success: true, suppressed: true, state: "failed" });
+    expect(global.github.rest.issues.create).not.toHaveBeenCalled();
+
+    fs.writeFileSync(process.env.GH_AW_WORK_QUEUE_FINISH_INTENT, `${JSON.stringify({ version: 4, claim_handle: "h1", outcome: "completed" })}\n`);
+    result = await manager.main({ queueClient: queue.githubClient });
+    expect(result.settlements[0], JSON.stringify(global.core.setFailed.mock.calls)).toMatchObject({ claim_handle: "h1", success: true });
+    expect(global.github.rest.issues.create).toHaveBeenCalledTimes(1);
+    const lines = fs
+      .readFileSync(process.env.GH_AW_WORK_QUEUE_EFFECTS, "utf8")
+      .trim()
+      .split("\n")
+      .map(line => JSON.parse(line));
+    expect(lines).toEqual([{ claim_handle: "h1", kind: "create_issue", resource: { repository: "owner/repo", number: 19, id: "19" } }]);
     expect(global.core.setFailed).not.toHaveBeenCalled();
   });
-
-  it.each([...["create_discussion", "create_pull_request"].flatMap(type => [false, true].map(tampered => [type, tampered, false])), ["create_discussion", false, true]])(
-    "independently verifies the real %s handler and manager without masking tampered=%s or labelFailure=%s",
-    async (type, tampered, labelFailure) => {
-      const pending = tampered || labelFailure;
-      const labelNames = type === "create_discussion" ? ["report", "x".repeat(64)] : ["report"];
-      const fixture = activate(1, () => [{ type, title: "Required report", body: "Report body", labels: ["report"] }], {
-        workDefaults: {
-          payload: {
-            effect_contract: { version: 1, outputs: [{ type, min: 1, max: 1 }] },
-            resource_scope: { version: 1, resources: [{ host: "github.com", repository: "owner/repo", repository_id: "7" }] },
-          },
-        },
-      });
-      const member = fixture.assignment.claims[0];
-      fixture.append("finish", { dispatch_id: fixture.assignment.dispatch_id, claim_handle: member.handle, outcome: "completed" }, { ...fixture.workerActor, dispatch_id: fixture.assignment.dispatch_id, claim_handle: member.handle });
-      const snapshot = JSON.parse(fs.readFileSync(process.env.GH_AW_WORK_QUEUE_SNAPSHOT, "utf8"));
-      snapshot.transactionLog = serializeTransactionLog(fixture.transactions);
-      fs.writeFileSync(process.env.GH_AW_WORK_QUEUE_SNAPSHOT, JSON.stringify(snapshot));
-      global.github = fixture.githubClient;
-      global.github.rest.rateLimit = { get: vi.fn(async () => ({ data: { resources: { core: { remaining: 5000, limit: 5000 } } } })) };
-      const tree = "b".repeat(40);
-      const commit = "c".repeat(40);
-      const base = "d".repeat(40);
-      global.exec = {
-        exec: vi.fn(async () => 0),
-        getExecOutput: vi.fn(async (_command, args) => ({ exitCode: 0, stdout: args.at(-1) === "HEAD^{tree}" ? tree : args.at(-1) === "refs/remotes/origin/main^{commit}" ? base : "", stderr: "" })),
-      };
-      global.core.startGroup = vi.fn();
-      global.core.endGroup = vi.fn();
-      Object.assign(global.github.rest.git, {
-        getRef: vi.fn(async ({ ref }) => ({ data: { ref: `refs/${ref}`, object: { type: "commit", sha: commit } } })),
-        getCommit: vi.fn(async () => ({ data: { sha: commit, tree: { sha: tree }, parents: [{ sha: base }] } })),
-        getTree: vi.fn(async () => ({ data: { sha: tree, tree: [], truncated: false } })),
-      });
-      global.github.rest.repos.compareCommits = vi.fn(async () => ({ data: { base_commit: { sha: base }, merge_base_commit: { sha: base }, status: "ahead", ahead_by: 1, behind_by: 0 } }));
-      let native;
-      global.github.rest.pulls = {
-        create: vi.fn(async parameters => {
-          native = {
-            ...parameters,
-            id: 190,
-            node_id: "PR_19",
-            number: 19,
-            html_url: "https://github.com/owner/repo/pull/19",
-            state: "open",
-            labels: [],
-            assignees: [],
-            head: { sha: commit, ref: parameters.head, repo: { full_name: "owner/repo", id: 7 } },
-            base: { sha: base, ref: "main", repo: { full_name: "owner/repo", id: 7 } },
-          };
-          return { data: native };
-        }),
-        get: vi.fn(async () => ({ data: { ...native, body: tampered ? "Changed after publication" : native.body } })),
-      };
-      global.github.rest.issues = {
-        get: vi.fn(async () => ({ data: { id: 191, number: 19, labels: native.labels, assignees: [], pull_request: { url: "https://api.github.com/repos/owner/repo/pulls/19" } } })),
-        addLabels: vi.fn(async () => {
-          native.labels = labelNames.map(name => ({ name }));
-          return { data: native.labels };
-        }),
-      };
-      global.github.graphql = vi.fn(async (query, variables) => {
-        if (query.includes("WorkQueueEffectTargets")) {
-          return {
-            nodes: variables.ids.map(id =>
-              id === "R_7"
-                ? { __typename: "Repository", id, databaseId: 7, nameWithOwner: "owner/repo" }
-                : { __typename: id === "D_19" ? "Discussion" : id.startsWith("L_") ? "Label" : "DiscussionCategory", id, ...(id === "D_19" ? { number: 19 } : {}), repository: { nameWithOwner: "owner/repo", databaseId: 7 } }
-            ),
-          };
-        }
-        if (query.includes("discussionCategories")) return { repository: { id: "R_7", discussionCategories: { nodes: [{ id: "C_1", name: "Reports", slug: "reports" }] } } };
-        if (query.includes("after: $cursor")) return { repository: { labels: { nodes: labelNames.map((name, index) => ({ id: `L_${index + 1}`, name })), pageInfo: { hasNextPage: false } } } };
-        if (query.includes("addLabelsToLabelable")) {
-          if (labelFailure) throw new Error("Injected native label API unavailable");
-          native.labels.nodes = labelNames.map(name => ({ name }));
-          return { addLabelsToLabelable: { labelable: { id: native.id, labels: native.labels } } };
-        }
-        if (query.includes("mutation")) {
-          native = {
-            __typename: "Discussion",
-            id: "D_19",
-            number: 19,
-            url: "https://github.com/owner/repo/discussions/19",
-            title: variables.title,
-            body: variables.body,
-            repository: { id: "R_7", databaseId: 7, nameWithOwner: "owner/repo" },
-            category: { id: "C_1" },
-            labels: { nodes: [], pageInfo: { hasNextPage: false } },
-          };
-          return { createDiscussion: { discussion: native } };
-        }
-        return { node: { ...native, body: tampered ? "Changed after publication" : native.body } };
-      });
-      process.env.GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG = JSON.stringify({
-        [type]: { category: "Reports", footer: false, fallback_to_issue: false, allow_empty: true, base_branch: "main", labels: type === "create_discussion" ? [" report ", "x".repeat(70)] : [" report "] },
-      });
-      const runtime = {
-        assignment: fixture.assignment,
-        context: fixture.workerContext,
-        githubClient: fixture.githubClient,
-        workflowRef: `owner/repo/.github/workflows/worker.lock.yml@${"a".repeat(40)}`,
-        readWorkQueueLog: fixture.readWorkQueueLog,
-      };
-      const { authorizeWorkerClaim, finalizeWorkerResults } = require("./finish_work_queue_claim.cjs");
-      const { readDeliveryControlInventory } = require("./work_queue_delivery.cjs");
-      const result = await manager.main(
-        managerOptions({
-          authorize: request => authorizeWorkerClaim({ ...runtime, ...request }),
-          readControlInventory: () => readDeliveryControlInventory({ ...runtime, claim_handle: member.handle }),
-          finalizeResults: options => finalizeWorkerResults({ ...options, ...runtime, publishWorkQueueRequest: fixture.publishWorkQueueRequest, now: fixture.at }),
-        })
-      );
-      expect(result.settlements[0].success, JSON.stringify(global.core.setFailed.mock.calls)).toBe(true);
-      if (type === "create_discussion") expect(native.labels.nodes, JSON.stringify(global.core.warning.mock.calls)).toHaveLength(labelFailure ? 0 : labelNames.length);
-      expect(result.settlements[0].delivery.verification, result.settlements[0].delivery.reason).toBe(pending ? "unknown" : "verified");
-      expect(global.core.setOutput).toHaveBeenCalledWith("work_queue_outcome", pending ? "delivery_pending" : "completed");
-      if (pending) expect(global.core.setFailed).toHaveBeenCalledWith(expect.stringContaining("Claim deliveries remain unverified"));
-      else expect(global.core.setFailed).not.toHaveBeenCalled();
-      expect(fixture.state.works.get(member.work_id).barrier).toBe(pending ? "pending" : "verified");
-    }
-  );
 
   it("allows only noop safe outputs for a genuinely absent dispatcher queue", () => {
     process.env.GH_AW_WORK_QUEUE_ENABLED = "true";
     process.env.GH_AW_WORK_QUEUE_ROLE = "dispatcher";
     process.env.GH_AW_WORK_QUEUE_SNAPSHOT = path.join(root, "absent-dispatcher-snapshot.json");
-    const snapshot = {
-      version: 3,
-      sha: null,
-      transactionLog: "",
-      captured_at: 0,
-      origin: {},
-      worker: null,
-      role: "dispatcher",
-    };
+    const snapshot = { version: 4, sha: null, transactionLog: "", origin: { role: "dispatcher", repository: "owner/repo" }, worker: null, role: "dispatcher" };
     fs.writeFileSync(process.env.GH_AW_WORK_QUEUE_SNAPSHOT, JSON.stringify(snapshot));
     const outputFile = path.join(root, "absent-dispatcher-output.jsonl");
     fs.writeFileSync(outputFile, "");
@@ -378,7 +233,7 @@ describe("real immutable Claim routing", () => {
       expect(() => append({ type })).toThrow(/unassigned dispatcher/);
     }
     fs.writeFileSync(process.env.GH_AW_WORK_QUEUE_SNAPSHOT, JSON.stringify({ ...snapshot, sha: "existing" }));
-    expect(() => append({ type: "noop", message: "Policyless ledger" })).toThrow(/policy_missing/);
+    expect(() => append({ type: "noop", message: "Existing queue" })).toThrow(/unassigned dispatcher/);
     expect(fs.readFileSync(outputFile, "utf8").trim().split("\n")).toHaveLength(1);
   });
 
@@ -399,7 +254,7 @@ describe("real immutable Claim routing", () => {
         process.env.GH_AW_WORK_QUEUE_ROLE = role;
         if (enabled === "false") expect(scope.readClaimScopeContext()).toBeNull();
         expect(scope.currentClaimHandle()).toBe(handle);
-        await expect(scope.assertClaimAuthorized({ type: "noop", ...(count === 1 ? {} : { claim_handle: handle }) })).rejects.toThrow(/not available/);
+        await expect(scope.assertClaimAuthorized({ type: "noop", ...(count === 1 ? {} : { claim_handle: handle }) })).rejects.toThrow(/not authorized/);
         expect(() => scope.normalizeRuntimeMessage({ type: "noop", claim_handle: otherHandle })).toThrow(/foreign|escape/);
         expect(() => put({ claim_handle: otherHandle, key: "foreign", value: "rejected" })).toThrow(/foreign|escape/);
         expect(put({ ...(count === 1 ? {} : { claim_handle: handle }), key: role, value: "selected" }).isError).not.toBe(true);
@@ -411,7 +266,7 @@ describe("real immutable Claim routing", () => {
     expect(global.getOctokit).not.toHaveBeenCalled();
   });
 
-  it.each([1, 2])("runs the manager's original %i-Claim assignment with independently scoped noops and artifacts", async count => {
+  it.each([1, 2])("runs the manager's %i-Claim assignment with independently scoped noops", async count => {
     const fixture = activate(count, members => members.map(member => ({ type: "noop", message: member.handle, ...(count === 1 ? {} : { claim_handle: member.handle }) })));
     const options = managerOptions();
     const result = await manager.main(options);
@@ -419,13 +274,8 @@ describe("real immutable Claim routing", () => {
     expect(result.settlements).toHaveLength(count);
     for (const [index, settlement] of result.settlements.entries()) {
       expect(settlement).toMatchObject({ claim_handle: fixture.assignment.claims[index].handle, success: true });
-      expect(settlement.delivery.verification).toBe("unknown");
-      const directory = scope.claimArtifactPath(options.deliveryArtifactRoot, settlement.claim_handle, fixture.assignment);
-      expect(fs.existsSync(path.join(directory, "delivery-receipt.json"))).toBe(false);
     }
-    expect(options.finalizeResults).toHaveBeenCalledTimes(1);
-    expect(global.core.setOutput).toHaveBeenCalledWith("work_queue_outcome", "delivery_pending");
-    expect(global.core.setFailed).toHaveBeenCalledWith(expect.stringContaining("Claim deliveries remain unverified"));
+    expect(global.core.setFailed).not.toHaveBeenCalled();
     expect(global.getOctokit).not.toHaveBeenCalled();
   });
 
@@ -434,79 +284,16 @@ describe("real immutable Claim routing", () => {
     const createIssue = require("./create_issue.cjs");
     const createIssueHandler = vi.fn();
     const createIssueFactory = vi.spyOn(createIssue, "main").mockResolvedValue(createIssueHandler);
-    const fixture = activate(1, () => [{ type: "create_issue", title: "Undeclared", body: "Must not be created" }], { configureWork: work => (work.payload.effect_contract = { version: 1, outputs: [{ type: "noop", min: 0, max: 1 }] }) });
-    const member = fixture.assignment.claims[0];
-    fixture.append("finish", { dispatch_id: fixture.assignment.dispatch_id, claim_handle: member.handle, outcome: "completed" }, { ...fixture.workerActor, dispatch_id: fixture.assignment.dispatch_id, claim_handle: member.handle });
-    global.github = fixture.githubClient;
-    const options = managerOptions({
-      queueClient: fixture.githubClient,
-      readControlInventory: () =>
-        readDeliveryControlInventory({
-          assignment: fixture.assignment,
-          claim_handle: "h1",
-          githubClient: fixture.githubClient,
-          queueClient: fixture.githubClient,
-          context: fixture.workerContext,
-          core: global.core,
-          workflowRef: `owner/repo/.github/workflows/worker.lock.yml@${"a".repeat(40)}`,
-          readWorkQueueLog: fixture.readWorkQueueLog,
-        }),
-      finalizeResults: vi.fn(async () => ({ claims: { h1: { state: "pending", reason: "terminal_evidence_required" } } })),
-    });
+    activate(1, () => [{ type: "create_issue", title: "Undeclared", body: "Must not be created" }], { work: { effect_contract: { version: 1, outputs: [{ type: "noop", min: 0, max: 1 }] } } });
+    const options = managerOptions();
 
     const result = await manager.main(options);
 
     expect(createIssueFactory).not.toHaveBeenCalled();
     expect(createIssueHandler).not.toHaveBeenCalled();
+    expect(options.authorize).not.toHaveBeenCalled();
     expect(result.settlements[0]).toMatchObject({ success: false, error: expect.stringMatching(/Undeclared output type\(s\).*create_issue/) });
-    const worker = scope.readClaimScopeContext().assignment;
-    const directory = scope.claimArtifactPath(root, "h1", worker);
-    const report = JSON.parse(fs.readFileSync(path.join(directory, manifest.CLAIM_DELIVERY_ERRORS_FILE_NAME), "utf8"));
-    expect(report.failures[0].error).toBe("Undeclared output type in immutable effect_contract");
-    expect(global.core.setOutput).toHaveBeenCalledWith("work_queue_outcome", "delivery_pending");
-  });
-  it.each(["pending", "delivery_failed"])("fails an otherwise successful output pass with a %s delivery without suppressing its verified sibling", async state => {
-    const fixture = activate(2, members => members.map(member => ({ type: "noop", message: member.handle, claim_handle: member.handle })));
-    await scope.withClaimExecution({ assignment: fixture.assignment, claim_handle: "h1", authorize }, () => manifest.writeSafeOutputErrorReport({ message: "Original handler failure" }));
-    const options = managerOptions({
-      finalizeResults: vi.fn(async () => ({ claims: { h1: { state, attempts: 0 }, h2: { state: "result" } } })),
-    });
-    const result = await manager.main(options);
-    expect(result.settlements).toHaveLength(2);
-    expect(result.settlements.every(settlement => settlement.success)).toBe(true);
-    expect(global.core.setOutput).toHaveBeenCalledWith("work_queue_outcome", "delivery_pending");
-    expect(global.core.setFailed).toHaveBeenCalledWith(expect.stringContaining("Claim deliveries remain unverified"));
-    const worker = scope.readClaimScopeContext().assignment;
-    const directory = scope.claimArtifactPath(root, "h1", worker);
-    const report = JSON.parse(fs.readFileSync(path.join(directory, manifest.CLAIM_DELIVERY_ERRORS_FILE_NAME), "utf8"));
-    expect(report).toMatchObject({
-      claim_handle: "h1",
-      errorCode: "claim_delivery_unverified",
-      message: `Claim delivery state: ${state}; effects: unknown; attempts: 0`,
-      failures: [{ type: "claim_delivery", errorCode: state === "delivery_failed" ? "delivery_failed" : "verification_unresolved" }],
-    });
-    expect(fs.statSync(path.join(directory, manifest.CLAIM_DELIVERY_ERRORS_FILE_NAME)).mode & 0o777).toBe(0o600);
-    expect(JSON.parse(fs.readFileSync(path.join(directory, "safe-output-errors.json"), "utf8")).message).toBe("Original handler failure");
-  });
-
-  it("preserves the trusted finalizer's verifier reason in Claim diagnostics", async () => {
-    activate(1, () => [{ type: "noop", message: "h1" }]);
-    await manager.main(
-      managerOptions({
-        finalizeResults: vi.fn(async () => ({ claims: { h1: { state: "pending", reason: "terminal_evidence_required", verifier: "recheck_receipt_rejected" } } })),
-      })
-    );
-    const worker = scope.readClaimScopeContext().assignment;
-    const directory = scope.claimArtifactPath(root, "h1", worker);
-    const report = JSON.parse(fs.readFileSync(path.join(directory, manifest.CLAIM_DELIVERY_ERRORS_FILE_NAME), "utf8"));
-    expect(report.failures[0]).toMatchObject({ errorCode: "terminal_evidence_required", verifier: "recheck_receipt_rejected" });
-  });
-
-  it.each(["result", "cancelled"])("does not fail independently settled %s Claims", async state => {
-    activate(2, members => members.map(member => ({ type: "noop", message: member.handle, claim_handle: member.handle })));
-    await manager.main(managerOptions({ finalizeResults: vi.fn(async () => ({ claims: { h1: { state }, h2: { state: "result" } } })) }));
-    expect(global.core.setFailed).not.toHaveBeenCalled();
-    expect(global.core.setOutput).toHaveBeenCalledWith("work_queue_outcome", state === "result" ? "completed" : "completed_with_cancellations");
+    expect(global.core.setFailed).toHaveBeenCalledWith(expect.stringContaining("Claim-scoped safe-output passes failed"));
   });
 
   it("redacts every persisted Claim diagnostic before JSON encoding and keeps files private", async () => {
@@ -604,29 +391,33 @@ describe("real immutable Claim routing", () => {
     expect(global.core.setFailed).toHaveBeenCalledWith("4 safe-output message(s) have invalid Claim scope");
   });
 
-  it.each(["cancelled", "result", "not-completed"])("does not provision credentials or handlers for a %s Claim and still processes its sibling", async state => {
+  it.each([
+    ["cancelled", true],
+    ["completed", true],
+    ["failed", true],
+    ["unbound", false],
+  ])("does not provision credentials or handlers for a %s Claim and still processes its sibling", async (state, suppressed) => {
     const fixture = activate(2, members => members.map(member => ({ type: "noop", message: member.handle, claim_handle: member.handle })));
     process.env.GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG = JSON.stringify({ noop: { "github-token": "private-test-token" } });
     const rejected = fixture.assignment.claims[0].handle;
     const options = managerOptions({
-      authorize: vi.fn(request => ({ claim_handle: request.claim_handle, authorized: request.claim_handle !== rejected, ...(request.claim_handle === rejected ? { state, suppressed: state !== "not-completed" } : {}) })),
+      authorize: vi.fn(request => ({ claim_handle: request.claim_handle, authorized: request.claim_handle !== rejected, ...(request.claim_handle === rejected ? { state, ...(suppressed ? { suppressed } : {}) } : {}) })),
     });
     const result = await manager.main(options);
-    expect(result.settlements[0].success).toBe(state !== "not-completed");
+    expect(result.settlements[0]).toMatchObject({ success: suppressed, ...(suppressed ? { suppressed: true, state } : {}) });
     expect(result.settlements[1].success).toBe(true);
     expect(global.getOctokit).toHaveBeenCalledTimes(1);
     expect(options.authorize.mock.calls.findIndex(([request]) => request.claim_handle === rejected)).toBe(0);
   });
 
-  it("keeps staged Claims read-only, permits pre-Completion preview, and never invokes terminal reconciliation", async () => {
+  it("keeps staged Claims read-only and authorizes their preview before finish", async () => {
     activate(2, members => members.map(member => ({ type: "noop", message: member.handle, claim_handle: member.handle })));
     process.env.GH_AW_SAFE_OUTPUTS_STAGED = "true";
     process.env.GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG = "invalid configuration must not be loaded";
     const options = managerOptions();
     const result = await manager.main(options);
-    expect(result.settlements.every(settlement => settlement.delivery.verification === "staged_preview")).toBe(true);
+    expect(result.settlements.every(settlement => settlement.success && settlement.messages.length === 1)).toBe(true);
     expect(options.authorize.mock.calls.every(([request]) => request.requireCompletion === false)).toBe(true);
-    expect(options.finalizeResults).not.toHaveBeenCalled();
     expect(global.getOctokit).not.toHaveBeenCalled();
     expect(global.core.setFailed).not.toHaveBeenCalled();
   });
@@ -737,7 +528,7 @@ describe("real immutable Claim routing", () => {
       const handlers = await manager.loadHandlers(config, undefined, []);
       expect(handlers.has("create_issue")).toBe(true);
       expect(global.getOctokit).not.toHaveBeenCalled();
-      await expect(handlers.get("create_issue")({ type: "create_issue", title: "Rejected" })).rejects.toThrow(/not available/);
+      await expect(handlers.get("create_issue")({ type: "create_issue", title: "Rejected" })).rejects.toThrow(/not authorized/);
       expect(global.getOctokit).not.toHaveBeenCalled();
     });
   });
@@ -788,7 +579,7 @@ describe("real immutable Claim routing", () => {
 
   it("contains a failed native API effect to its Claim while the actual manager executes a sibling", async () => {
     const fixture = activate(2, members => members.map((member, index) => ({ type: "create_issue", claim_handle: member.handle, title: index === 0 ? "First" : "Second", body: "Body" })), {
-      configureWork: work => (work.payload.effect_contract = { version: 1, outputs: [{ type: "create_issue", min: 1, max: 1 }] }),
+      work: { effect_contract: { version: 1, outputs: [{ type: "create_issue", min: 1, max: 1 }] } },
     });
     process.env.GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG = JSON.stringify({ create_issue: { max: 1, footer: false } });
     global.github.rest.repos = { get: vi.fn(async () => ({ data: { full_name: "owner/repo", id: 7 } })) };
@@ -803,8 +594,7 @@ describe("real immutable Claim routing", () => {
     expect(create).toHaveBeenCalledTimes(2);
     expect(result.settlements[0]).toMatchObject({ claim_handle: fixture.assignment.claims[0].handle, success: false });
     expect(result.settlements[1]).toMatchObject({ claim_handle: fixture.assignment.claims[1].handle, success: true });
-    expect(result.settlements.every(settlement => settlement.delivery.verification === "unknown")).toBe(true);
-    expect(global.core.setFailed).toHaveBeenCalledWith("One or more Claim-scoped safe-output passes failed; independently valid siblings were reconciled");
+    expect(global.core.setFailed).toHaveBeenCalledWith("One or more Claim-scoped safe-output passes failed; independently valid siblings were processed");
   });
 
   it("never allows manifest filename spelling or retained logger state to escape its original Claim", async () => {
@@ -823,17 +613,6 @@ describe("real immutable Claim routing", () => {
     await scope.withClaimExecution({ assignment: original, claim_handle: "h2" }, () => {
       expect(() => logger({ type: "create_issue", number: 2 })).toThrow(/original immutable Claim identity/);
     });
-  });
-
-  it("rejects mutated stored membership before native worker binding can be borrowed", () => {
-    const fixture = queueFixture({ count: 2, bound: true });
-    const state = fixture.readWorkQueueLog;
-    expect(typeof state).toBe("function");
-    const projection = require("./work_queue_replay.cjs").replayTransactions(fixture.transactions);
-    expect(validateStoredAssignment(projection, fixture.assignment).assignment).toEqual(fixture.assignment);
-    const narrowed = structuredClone(fixture.assignment);
-    narrowed.claims.pop();
-    expect(() => validateStoredAssignment(projection, narrowed)).toThrow(/assignment_mismatch/);
   });
 });
 

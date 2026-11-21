@@ -2211,11 +2211,11 @@ synthetic_claim_history
 ## Template: work_queue_reconciliation_summary.md
 
 <details>
-<summary>Work queue reconciliation</summary>
+<summary>Work queue finish</summary>
 
-### Independent Claim reconciliation
+### Claim outcomes
 
-synthetic_authorized_claims Claims may process scoped effects; synthetic_unauthorized_claims Claims are cancelled, settled or blocked. Completion is not a verified Result. Shared native capacity remains reserved until exact terminal/nonlaunch evidence.
+synthetic_completed_claims Claims completed with their recorded effects; synthetic_failed_claims Claims failed and returned to the queue, or were cancelled after their last attempt.
 
 </details>
 

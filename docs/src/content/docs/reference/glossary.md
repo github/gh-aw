@@ -1828,15 +1828,15 @@ A catalog of built-in configuration fragments under `.github/workflows/shared/gr
 
 ### Work Queue (`tools.work-queue`)
 
-A native, Git-backed queue for fair scheduling of [Work](#claim-work-queue) with immutable task dependency graphs. Its only source of authority is the `work-queue.jsonl` transaction log. The first accepted producer or dispatcher submission initializes the queue with a Policy and Work; Issues and pull requests can be dependency nodes but cannot store the queue. Distinct from the lightweight issue-checklist approach in [WorkQueueOps](#workqueueops). See [Work Queues](/gh-aw/reference/work-queue/) and the [specification](/gh-aw/specs/work-queue-specification/).
+A native, Git-backed queue for priority-FIFO scheduling of [Work](#claim-work-queue) with immutable task dependency graphs. Its only source of authority is the append-only `work-queue.jsonl` log on the `work-queue` branch; each line is one commit published by compare-and-swap. Scheduling settings come from the `work_queue` section of `aw.json`, not from the ledger. Issues and pull requests can be dependency nodes but cannot store the queue. Distinct from the lightweight issue-checklist approach in [WorkQueueOps](#workqueueops). See [Work Queues](/gh-aw/reference/work-queue/) and the [specification](/gh-aw/specs/work-queue-specification/).
 
 ### Claim (Work Queue)
 
-Authorization for one attempt at a Work item in a native [work queue](#work-queue-toolswork-queue), identified by its original `claim_handle`. Worker effects are scoped to the Claim, and a Result is recorded only after independently verified delivery of those effects. See [Work Queues](/gh-aw/reference/work-queue/).
+Ownership of one attempt at a Work item in a native [work queue](#work-queue-toolswork-queue), granted by a dispatcher together with a Dispatch and addressed by the worker through its `claim_handle`. Worker effects are authorized only while the Claim is open and its Dispatch is bound to the worker's run. A completed Claim records the applied effects; a cancelled Claim returns its Work to the pool until `max_attempts` is reached. See [Work Queues](/gh-aw/reference/work-queue/).
 
-### Delivery Evidence (Work Queue)
+### Dispatch (Work Queue)
 
-A ledger record of delivery observations for a [Claim](#claim-work-queue)'s effects, persisted in the `work-queue.jsonl` transaction log so verification survives restarts and checkpoints. Delivery Evidence alone does not establish a Result: maintenance must perform fresh, independent native readback, and changed or unavailable resources remain unverified. Pending Delivery Evidence keeps the delivery barrier in place until bounded verification records a Result or a `DeliveryFailure`; uncertain delivery is never retried by rerunning effects. See [Work Queues](/gh-aw/reference/work-queue/).
+One worker launch reserved by a dispatcher for a [Claim](#claim-work-queue). A Dispatch moves from `reserved` to `started` after `workflow_dispatch` succeeds, to `bound` when the worker run binds to it, and to `closed` once its Claims are terminal or it is released. See [Work Queues](/gh-aw/reference/work-queue/).
 
 ## Operational Patterns
 

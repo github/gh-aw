@@ -258,13 +258,7 @@ describe("offline object-pack recovery", () => {
 
   it("preserves Claim-scoped artifact paths during isolated regeneration", async () => {
     const assignment = {
-      version: 3,
       dispatch_id: crypto.randomUUID(),
-      request_id: "r",
-      commit_id: "q",
-      policy_epoch: "p",
-      pool: "default",
-      worker_profile: "default",
       claims: [{ handle: "h1", claim_id: "c1", work_id: "w1", work: {}, result_refs: [] }],
     };
     await withClaimExecution({ assignment, claim_handle: "h1" }, async () => {

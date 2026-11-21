@@ -2,72 +2,150 @@ import { describe, expect, it } from "vitest";
 
 const fs = require("node:fs");
 const path = require("node:path");
-const { DEFAULT_LIMITS } = require("./work_queue_limits.cjs");
-const { validatePolicy } = require("./work_queue_policy.cjs");
-const { buildAWPolicy } = require("./work_queue_settings.cjs");
+const limits = require("./work_queue_limits.cjs");
+const { ROLES, validatePolicyEnv } = require("./work_queue_policy.cjs");
+const { buildPolicyEnv } = require("./work_queue_settings.cjs");
+const { CLAIM_CANCELLATION_REASONS, OP_FIELDS, OP_ROLES, PROTOCOL_VERSION, RELEASE_REASONS, REQUEST_KINDS, WORK_CANCELLATION_REASONS } = require("./work_queue_replay.cjs");
 const repositoryRoot = path.resolve(__dirname, "../../..");
 const deploymentPath = "docs/src/content/docs/patterns/workqueue-ops.md";
 const referencePath = "docs/src/content/docs/reference/work-queue.md";
 const specificationPath = "docs/src/content/docs/specs/work-queue-specification.md";
 const instructionsPath = ".github/aw/work-queue.md";
+const queueDocs = [deploymentPath, referencePath, specificationPath, instructionsPath];
+
+// Protocol v3 concepts that v4 removed; current docs must not describe them.
+const REMOVED_V3 =
+  /policy epoch|policy_epoch|PoolInstall|DeliveryEvidence|DeliveryFailure|delivery barrier|keep_open|expires_at|retry_not_before|admission_paused|grants_paused|logical_limit|native_limit|class_weights|accounting_weights|backoff_seconds|work_queue_explain|sync-issues|transactions\.tsp|activation_pending|recovery_required|installed Policy/i;
 
 function readRepositoryFile(file) {
   return fs.readFileSync(path.join(repositoryRoot, file), "utf8");
 }
 
-describe("work-queue deployment documentation", () => {
-  it("omits removed storage selectors from the generated frontmatter reference", () => {
+/** Cells of the Markdown table row whose first cell is `name` in backticks. */
+function tableRow(source, name) {
+  const line = source.split("\n").find(row => row.startsWith(`| \`${name}\` |`));
+  expect(line, `table row for ${name}`).toBeDefined();
+  return line.split("|").slice(1, -1);
+}
+
+function backticked(cell) {
+  return [...cell.matchAll(/`([^`]+)`/g)].map(([, value]) => value);
+}
+
+describe("work-queue v4 documentation", () => {
+  it("documents the version-4 work-queue tool in the generated frontmatter reference", () => {
     const source = readRepositoryFile("docs/src/content/docs/reference/frontmatter-full.md");
-    const queue = source.slice(source.indexOf("  # Read the immutable version-3 activation snapshot."), source.indexOf("  # Cache memory MCP configuration"));
+    const start = source.indexOf("  # Read the version-4 activation snapshot");
+    expect(start).toBeGreaterThan(-1);
+    const queue = source.slice(start, source.indexOf("  # Cache memory MCP configuration", start));
     expect(queue).toMatch(/^  work-queue:\s*$/m);
     expect(queue).toContain("work-queue: null");
     expect(queue).toContain("worker: true");
     expect(queue).not.toMatch(/\bstorage:/);
+    expect(queue).not.toMatch(/version-3|installed/i);
   });
 
-  it("resolves documented scheduling without identity placeholders", () => {
-    const source = readRepositoryFile(deploymentPath);
-    const example = source.match(/```json title="\.github\/workflows\/aw\.json"\n([\s\S]*?)\n```/);
-    expect(example).not.toBeNull();
-    const config = JSON.parse(example[1]);
-    const policy = buildAWPolicy({ repository: "github/gh-aw", ref: "a".repeat(40), workflows: ["queue-worker"], settings: config.work_queue });
+  it("compiles the documented aw.json examples into valid v4 policy environments", () => {
+    const example = file => {
+      const match = readRepositoryFile(file).match(/```json title="\.github\/workflows\/aw\.json"\n([\s\S]*?)\n```/);
+      expect(match, file).not.toBeNull();
+      return JSON.parse(match[1]).work_queue;
+    };
 
-    expect(validatePolicy(policy)).toBe(policy);
-    expect(policy.accounting_weights).toEqual({ "": 1 });
-    expect(policy.producers).toEqual({});
-    expect(policy.authorization).toBe("aw");
-    expect(policy.limits).toEqual(DEFAULT_LIMITS);
-    expect(policy.pools.default).toMatchObject({ logical_limit: 1, native_limit: 1, retry: { max_attempts: 3, backoff_ms: 30000 } });
-    expect(policy.pools.default.profiles["queue-worker"]).not.toHaveProperty("principal");
+    const minimal = buildPolicyEnv({ repository: "github/gh-aw", workflows: ["queue-worker"], settings: example(deploymentPath) });
+    expect(validatePolicyEnv(minimal)).toBe(minimal);
+    expect(minimal.pools.default).toEqual({
+      concurrency: 1,
+      per_account_limit: 0,
+      max_attempts: 3,
+      default_profile: "queue-worker",
+      profiles: { "queue-worker": { workflow: ".github/workflows/queue-worker.lock.yml", effect_scope: "github/gh-aw" } },
+    });
 
+    const scheduling = buildPolicyEnv({ repository: "github/gh-aw", workflows: ["eslint-refiner"], settings: example(referencePath) });
+    expect(validatePolicyEnv(scheduling)).toBe(scheduling);
+    expect(scheduling).toMatchObject({ version: 4, pending_limit: 30, issues: false });
+    expect(scheduling.pools.default).toMatchObject({ concurrency: 3, per_account_limit: 0, max_attempts: 3 });
+  });
+
+  it("keeps the specification tables in sync with the v4 replay contract", () => {
+    const spec = readRepositoryFile(specificationPath);
+    expect(PROTOCOL_VERSION).toBe(4);
+    expect(spec).toContain('{"version":4,');
+
+    for (const [kind, [required, optional]] of Object.entries(OP_FIELDS)) {
+      const [, requiredCell, optionalCell] = tableRow(spec, kind);
+      expect(backticked(requiredCell).sort(), `${kind} required fields`).toEqual([...required].sort());
+      expect(backticked(optionalCell).sort(), `${kind} optional fields`).toEqual([...optional].sort());
+    }
+    expect(Object.keys(OP_FIELDS)).not.toEqual(expect.arrayContaining(["Policy", "PoolInstall", "Deployment", "Control", "Result", "DeliveryFailure"]));
+
+    for (const [kind, { operations, parameters }] of Object.entries(REQUEST_KINDS)) {
+      const [, parameterCell, operationCell] = tableRow(spec, kind);
+      expect(backticked(operationCell).sort(), `${kind} operations`).toEqual([...operations].sort());
+      expect(backticked(parameterCell), `${kind} parameters`).toEqual(expect.arrayContaining(parameters));
+    }
+
+    const reasons = { ClaimCancellation: CLAIM_CANCELLATION_REASONS, WorkCancellation: WORK_CANCELLATION_REASONS, Release: RELEASE_REASONS };
+    const reasonSection = spec.slice(spec.indexOf("### 6.2 Reasons"), spec.indexOf("### 6.3 Roles"));
+    for (const [kind, allowed] of Object.entries(reasons)) {
+      expect(backticked(tableRow(reasonSection, kind)[1]).sort(), `${kind} reasons`).toEqual([...allowed].sort());
+    }
+
+    const roleSection = spec.slice(spec.indexOf("### 6.3 Roles"), spec.indexOf("## 7. Projection"));
+    for (const [kind, roles] of Object.entries(OP_ROLES)) {
+      const row = roleSection.split("\n").find(line => line.startsWith("| ") && backticked(line.split("|")[1]).includes(kind));
+      expect(row, `role row for ${kind}`).toBeDefined();
+      expect(
+        backticked(row.split("|")[2])
+          .filter(value => ROLES.includes(value))
+          .sort(),
+        `${kind} roles`
+      ).toEqual([...roles].sort());
+    }
+
+    for (const name of ["PAYLOAD_BYTES", "OPERATIONS_PER_COMMIT", "GRAPH_NODES", "PREDECESSORS", "ASSIGNMENT_BYTES", "EFFECTS_BYTES", "LEDGER_BYTES", "CHECKPOINT_AFTER_LINES", "MAX_PENDING_WORK"]) {
+      expect(tableRow(spec, name)[1].trim(), name).toBe(String(limits[name]));
+    }
+  });
+
+  it("describes only the v4 time-free protocol", () => {
+    for (const file of queueDocs) {
+      const source = readRepositoryFile(file);
+      const stale = source.split("\n").filter(line => REMOVED_V3.test(line));
+      expect(stale, file).toEqual([]);
+    }
     const reference = readRepositoryFile(referencePath);
-    const scheduling = reference.match(/```json title="\.github\/workflows\/aw\.json"\n([\s\S]*?)\n```/);
-    expect(scheduling).not.toBeNull();
-    const factoryPolicy = buildAWPolicy({ repository: "github/gh-aw", ref: "a".repeat(40), workflows: ["eslint-refiner"], settings: JSON.parse(scheduling[1]).work_queue });
-    expect(validatePolicy(factoryPolicy)).toBe(factoryPolicy);
-    expect(factoryPolicy.limits).toEqual({ ...DEFAULT_LIMITS, pending_nodes: 30 });
-    expect(factoryPolicy.pools.default).toMatchObject({ logical_limit: 3, native_limit: 3, retry: { max_attempts: 3, backoff_ms: 30000 } });
+    expect(reference).toContain("Git-backed");
+    expect(reference).toContain("No decision reads a clock");
+    expect(readRepositoryFile(specificationPath)).toContain("replay MUST NOT read it");
   });
 
   it("separates published docs and specifications from bounded agent instructions", () => {
     for (const file of [deploymentPath, referencePath, specificationPath]) {
       expect(readRepositoryFile(file)).toMatch(/^---\ntitle: [^\n]+\ndescription: [^\n]+\n/);
     }
-    expect(fs.existsSync(path.join(repositoryRoot, "specs/work-queue/priority-and-fairness.md"))).toBe(false);
-    expect(fs.existsSync(path.join(repositoryRoot, "specs/work-queue/transactions.tsp"))).toBe(true);
+    expect(fs.existsSync(path.join(repositoryRoot, "specs/work-queue/WorkQueueV4.tla"))).toBe(true);
+    expect(fs.existsSync(path.join(repositoryRoot, "specs/work-queue/transactions.tsp"))).toBe(false);
 
     const instructions = readRepositoryFile(instructionsPath);
     expect(instructions.trim().split(/\s+/).length).toBeLessThanOrEqual(800);
     expect(instructions).not.toContain("```json");
-    expect(instructions).toContain("issue-backed WorkQueueOps");
-    expect(instructions).toContain("Absent branches are empty");
-    expect(instructions).toContain("reject malformed/unsupported logs");
-    expect(readRepositoryFile(referencePath)).toContain("Git-backed");
     for (const file of [deploymentPath, referencePath, specificationPath]) {
       const linked = [...instructions.matchAll(/\[[^\]\n]*\]\(([^)#]+)(?:#[^)]*)?\)/g)].map(([, link]) => path.resolve(repositoryRoot, path.dirname(instructionsPath), link));
       expect(linked).toContain(path.join(repositoryRoot, file));
     }
-    for (const invariant of ["originally single-Claim", "max_claims", "max_dispatches", "Standalone seeding is unsupported", "Repository access rules are GitHub's responsibility", "Result only after independently verified delivery"]) {
+    for (const invariant of [
+      "issue-backed WorkQueueOps",
+      "Absent branches are empty",
+      "reject malformed/unsupported logs",
+      "max_claims",
+      "max_dispatches",
+      "Standalone seeding is unsupported",
+      "Repository access rules are GitHub's responsibility",
+      "`max_attempts`",
+      "No clocks",
+    ]) {
       expect(instructions).toContain(invariant);
     }
   });
@@ -91,14 +169,12 @@ describe("work-queue deployment documentation", () => {
     expect(automation).not.toContain('pass `work_queue: {work_id: "<id>"}`');
   });
 
-  it("treats genuine factory queue absence as empty without bypassing Policy", () => {
+  it("treats genuine factory queue absence as an empty backlog", () => {
     const dispatcher = readRepositoryFile(".github/workflows/eslint-factory-dispatcher.md");
     expect(dispatcher).toContain('work-queue work_queue_read \'{"pool":"default","limit":32}\'');
-    expect(dispatcher).toContain("Check `queue_state`, not just `total`");
     expect(dispatcher).toContain("Treat it as an empty backlog; the first trusted producer submission");
     expect(dispatcher).toContain("shared/work-queue-staged-plan.md");
     expect(readRepositoryFile(".github/workflows/shared/work-queue-staged-plan.md")).toContain("Trusted processing verifies the exact batch");
-    expect(dispatcher).toContain("existing policyless ledger");
     expect(dispatcher).toContain('{"pool":"default","max_claims":3,"max_dispatches":3}');
     expect(dispatcher).toContain('`status: "staged"`');
     expect(dispatcher).toContain("an empty snapshot or a prediction of no eligible Work can be stale");
@@ -106,25 +182,11 @@ describe("work-queue deployment documentation", () => {
 
     const factory = readRepositoryFile("docs/src/content/docs/gallery/linter-factory.md");
     expect(factory).toContain("gh aw work-queue --repo OWNER/REPO stats --json");
-    expect(factory).toContain("--no-baseline --json");
-    expect(factory).toContain("The first authorized submission atomically creates Policy and Work");
-    expect(factory).toContain("dispatch alone cannot bootstrap an absent queue");
-    expect(factory).toContain("A denied Git read is an error, not an empty queue");
-    expect(factory).toContain("Check the staged plan and authoritative ledger");
-    expect(factory).toContain("Result is recorded only after independent verification");
+    expect(factory.split("\n").filter(line => REMOVED_V3.test(line))).toEqual([]);
   });
 
   it("resolves queue documentation links after relocation", () => {
-    const files = [
-      deploymentPath,
-      referencePath,
-      specificationPath,
-      instructionsPath,
-      "specs/work-queue/README.md",
-      "docs/adr/64955-git-backed-work-queue-coordination.md",
-      "docs/src/content/docs/gallery/daily-report-portfolio.md",
-      "docs/src/content/docs/gallery/linter-factory.md",
-    ];
+    const files = [...queueDocs, "specs/work-queue/README.md", "docs/src/content/docs/gallery/daily-report-portfolio.md", "docs/src/content/docs/gallery/linter-factory.md"];
     for (const file of files) {
       const source = readRepositoryFile(file);
       for (const [, link] of source.matchAll(/\[[^\]\n]*\]\(([^)\s]+)\)/g)) {

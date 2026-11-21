@@ -47,27 +47,20 @@ import "embed"
 //go:embed js/github_notification_webhook.cjs js/github_notification_webhooks.json
 //go:embed js/messages_core.cjs
 //go:embed js/work_queue_mcp_server.cjs js/work_queue_replay.cjs js/work_queue_intents.cjs
-//go:embed js/work_queue_issue_contract.cjs
-//go:embed js/work_queue_binding.cjs js/work_queue_policy.cjs js/work_queue_store.cjs
-//go:embed js/work_queue_auth_cache.cjs
+//go:embed js/work_queue_binding.cjs js/work_queue_policy.cjs js/work_queue_store.cjs js/work_queue_convert_v3.cjs
 //go:embed js/work_queue_git_transport.cjs js/work_queue_git_objects.cjs js/git_auth_env.cjs
 //go:embed js/work_queue_policy_config.cjs
-//go:embed js/work_queue_pool_install.cjs
-//go:embed js/work_queue_checked_transport.cjs
 //go:embed js/work_queue_summary_renderer.cjs
 //go:embed js/work_queue_memory.cjs js/work_queue_logging.cjs
-//go:embed js/work_queue_native.cjs js/work_queue_control_receipts.cjs js/work_queue_delivery.cjs
-//go:embed js/work_queue_native_creation_delivery.cjs
+//go:embed js/work_queue_native.cjs js/work_queue_control_receipts.cjs
 //go:embed js/dispatch_workflow_transport.cjs
 //go:embed js/work_queue_effect_resource.cjs js/work_queue_effect_client.cjs js/work_queue_claim_adapters.cjs
-//go:embed js/work_queue_declared_verification.cjs js/work_queue_dependency_resolver.cjs js/work_queue_dispatch.cjs
-//go:embed js/work_queue_dispatch_credential.cjs js/work_queue_provisioning.cjs js/work_queue_reconciler.cjs
-//go:embed js/work_queue_read_retry.cjs
-//go:embed js/work_queue_expiration.cjs
-//go:embed js/work_queue_deployment.cjs js/work_queue_deployment_control.cjs
+//go:embed js/work_queue_dependency_resolver.cjs js/work_queue_dispatch.cjs
+//go:embed js/work_queue_reconciler.cjs
 //go:embed js/work_queue_git_tree_adapter.cjs js/work_queue_graphql_adapter.cjs js/work_queue_rest_adapter.cjs
-//go:embed js/work_queue_graph.cjs js/work_queue_limits.cjs js/work_queue_scheduler.cjs js/work_queue_expiration.cjs
-//go:embed js/work_queue_indexes.cjs
+//go:embed js/work_queue_graph.cjs js/work_queue_limits.cjs js/work_queue_scheduler.cjs
+//go:embed js/work_queue_issues.cjs js/work_queue_issue_api.cjs js/work_queue_issue_messages.cjs
+//go:embed js/issue_report.cjs js/report_redaction.cjs js/report_markdown.cjs js/report_size.cjs
 //go:embed js/mcp_server_core.cjs js/mcp_dependencies_manager.cjs js/mcp_enhanced_errors.cjs js/mcp_logger.cjs
 //go:embed js/levenshtein_distance.cjs
 //go:embed js/safe_output_names.cjs

@@ -344,7 +344,7 @@ func TestLogsJSONLWorkQueueArtifactScope(t *testing.T) {
 		processConcurrentRunDownload, buildLogsProcessedRun = originalProcess, originalBuild
 	})
 	run := WorkflowRun{DatabaseID: 42, Repository: "owner/repo", WorkflowPath: ".github/workflows/test.lock.yml"}
-	queue := &WorkQueueReport{FinishIntent: "cached queue evidence"}
+	queue := &WorkQueueReport{FinishIntents: []WorkQueueFinishReceipt{{Handle: "cached queue evidence", Outcome: "completed"}}}
 	logsFetchWorkflowRunBatch = func(context.Context, LogsDownloadOptions, string, int, bool) (workflowRunBatch, error) {
 		return workflowRunBatch{runs: []WorkflowRun{run}, totalFetched: 1, batchSize: 1}, nil
 	}
@@ -400,7 +400,7 @@ func TestLogsJSONLWorkQueueArtifactScope(t *testing.T) {
 						require.NotNil(t, summary)
 						assert.Equal(t, tt.include, streamed.WorkQueue != nil)
 						assert.Equal(t, summary.WorkQueue, streamed.WorkQueue)
-						assert.Equal(t, "cached queue evidence", queue.FinishIntent, "projection must not mutate cached evidence")
+						assert.Equal(t, "cached queue evidence", queue.FinishIntents[0].Handle, "projection must not mutate cached evidence")
 					})
 				}
 			}

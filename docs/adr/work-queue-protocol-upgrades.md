@@ -1,5 +1,8 @@
 # Extension to ADR-64955: Current-Only Work Queue Commits
 
+> [!NOTE]
+> Superseded by work queue protocol v4 ([specification](../src/content/docs/specs/work-queue-specification.md)): v4 replaces in-place upgrades with a one-time v3-to-v4 conversion and accepts only version 4 commits.
+
 **Date**: 2026-10-02
 **Status**: Draft
 **Deciders**: gh-aw maintainers (review pending)

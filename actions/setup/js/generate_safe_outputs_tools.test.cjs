@@ -200,13 +200,7 @@ describe("generate_safe_outputs_tools", () => {
     runScript();
     const tools = JSON.parse(fs.readFileSync(outputPath, "utf8"));
     const assignment = count => ({
-      version: 3,
       dispatch_id: "dispatch",
-      request_id: "request",
-      commit_id: "commit",
-      policy_epoch: "policy",
-      pool: "pool",
-      worker_profile: "worker",
       claims: Array.from({ length: count }, (_, index) => ({ handle: `h${index + 1}`, claim_id: `c${index + 1}`, work_id: `w${index + 1}`, work: {}, result_refs: [] })),
     });
     expect(tools.map(tool => tool.name)).toEqual(["create_issue", "custom_job"]);
@@ -230,7 +224,7 @@ describe("generate_safe_outputs_tools", () => {
       }
       const omitted = normalizeSafeOutputToolArguments(tool.name, {}, undefined, tool.inputSchema);
       expect(normalizeClaimScope(omitted, assignment(1)).claim_handle).toBe("h1");
-      expect(() => normalizeClaimScope(omitted, assignment(2))).toThrow(/original multi-Claim/);
+      expect(() => normalizeClaimScope(omitted, assignment(2))).toThrow(/claim_handle is required for a multi-Claim assignment/);
     }
     const custom = tools.find(tool => tool.name === "custom_job");
     expect(normalizeSafeOutputToolArguments(custom.name, { count: "", claim_handle: "h1" }, undefined, custom.inputSchema)).toEqual({ claim_handle: "h1" });

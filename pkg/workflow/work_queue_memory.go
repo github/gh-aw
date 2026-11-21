@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"path"
 	"slices"
 	"strings"
@@ -43,7 +44,7 @@ func configureWorkQueueMemory(data *WorkflowData) error {
 		data.SafeOutputs = &SafeOutputsConfig{WorkQueueEnabled: true}
 	}
 	outputs := data.SafeOutputs
-	for _, name := range []string{"noop", "constructor", "prototype", "work_queue_read", "work_queue_explain", "work_queue_submit", "work_queue_dispatch_next", "work_queue_claim_finish"} {
+	for _, name := range []string{"noop", "constructor", "prototype", "work_queue_read", "work_queue_submit", "work_queue_dispatch_next", "work_queue_claim_finish"} {
 		if config.Name == name {
 			return fmt.Errorf("tools.work-queue.memory.name: %q is reserved", name)
 		}
@@ -160,6 +161,9 @@ func parseWorkQueueMemory(raw any) (*WorkQueueMemoryConfig, error) {
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(config); err != nil {
 		return nil, fmt.Errorf("tools.work-queue.memory: %w", err)
+	}
+	if err := decoder.Decode(new(any)); !errors.Is(err, io.EOF) {
+		return nil, errors.New("tools.work-queue.memory must be a single JSON object")
 	}
 	for _, field := range []string{"name", "max-bytes"} {
 		if value, exists := fields[field]; exists && value == nil {

@@ -70,17 +70,11 @@ function directory() {
 
 function assignment(count = 2) {
   return {
-    version: 3,
     dispatch_id: "original-dispatch",
-    request_id: "original-request",
-    commit_id: "original-commit",
-    policy_epoch: "original-policy",
-    pool: "original-pool",
-    worker_profile: "original-profile",
     claims: Array.from({ length: count }, (_, index) => ({
       handle: `h${index + 1}`,
-      claim_id: `claim:${index + 1}`,
-      work_id: `work:${index + 1}`,
+      claim_id: `claim-${index + 1}`,
+      work_id: `work-${index + 1}`,
       work: { checkout: `checkout-${index + 1}`, input: `input-${index + 1}` },
       result_refs: [],
     })),
@@ -203,9 +197,9 @@ describe("prepared adapter rejection ordering", () => {
       expect(authorize).not.toHaveBeenCalled();
       await expect(handler({ type: "custom", claim_handle: "h1" })).rejects.toThrow();
     });
-    await scope.withClaimExecution({ assignment: original, claim_handle: "h1", authorize: async request => ({ claim_handle: request.claim_handle, authorized: false, state: "result", suppressed: true }) }, async () => {
+    await scope.withClaimExecution({ assignment: original, claim_handle: "h1", authorize: async request => ({ claim_handle: request.claim_handle, authorized: false, state: "completed", suppressed: true }) }, async () => {
       const handler = await createClaimAdapterHandler({ adapter, filename: "unreadable", loadEffectHandler });
-      await expect(handler({ type: "custom", claim_handle: "h1" })).rejects.toThrow(/already settled/);
+      await expect(handler({ type: "custom", claim_handle: "h1" })).rejects.toThrow(/already completed/);
     });
     expect(loadEffectHandler).not.toHaveBeenCalled();
   });
@@ -223,14 +217,14 @@ describe("prepared adapter rejection ordering", () => {
 });
 
 describe("git authorization before credentialed repository readback", () => {
-  it.each(["open", "cancelled", "result"])("rejects a %s Claim without accessing its repository client", async state => {
+  it.each(["unbound", "cancelled", "completed"])("rejects a %s Claim without accessing its repository client", async state => {
     const repositoryRead = vi.fn(async () => {
       throw new Error("unauthorized native read");
     });
-    const authorize = async request => ({ claim_handle: request.claim_handle, authorized: false, state, ...(state === "open" ? {} : { suppressed: true }) });
+    const authorize = async request => ({ claim_handle: request.claim_handle, authorized: false, state, ...(state === "unbound" ? {} : { suppressed: true }) });
     await scope.withClaimExecution({ assignment: assignment(), claim_handle: "h1", authorize }, async () => {
       await expect(assertGitPushAuthorized({ remote: "origin", branch: "work", execGitSync: () => "https://github.com/owner/repo.git\n", github: { rest: { repos: { get: repositoryRead } } } })).rejects.toThrow(
-        /Completion|cancelled|settled/
+        /not open|cancelled|completed/
       );
     });
     expect(repositoryRead).not.toHaveBeenCalled();
@@ -273,7 +267,7 @@ describe("git authorization before credentialed repository readback", () => {
     await scope.withClaimExecution({ assignment: assignment(), claim_handle: "h1", authorize: async request => ({ claim_handle: request.claim_handle, authorized: false }) }, async () => {
       await expect(
         pushSignedCommits({ owner: "owner", repo: "repo", branch: "work", baseRef: "main", cwd: root, signedCommits: false, pushRemoteUrl: "https://github.com/owner/repo.git", pushToken: "checkout-specific-token" })
-      ).rejects.toThrow(/Completion/);
+      ).rejects.toThrow(/not open/);
     });
     expect(global.exec.exec).not.toHaveBeenCalled();
     expect(global.exec.getExecOutput).not.toHaveBeenCalled();
@@ -289,7 +283,7 @@ describe("git authorization before credentialed repository readback", () => {
       await expect(assertGitPushAuthorized({ remote: "https://github.com/owner/repo.git", branch: "work", cwd: root, github: { rest: { repos: { get: read } } } })).resolves.toBeUndefined();
       expect(read).toHaveBeenCalledTimes(1);
       execFileSync("git", ["-C", root, "config", "--local", "url.https://github.com/foreign/.pushInsteadOf", "https://github.com/owner/"]);
-      await expect(assertGitPushAuthorized({ remote: "https://github.com/owner/repo.git", branch: "work", cwd: root, github: { rest: { repos: { get: read } } } })).rejects.toThrow(/Completion/);
+      await expect(assertGitPushAuthorized({ remote: "https://github.com/owner/repo.git", branch: "work", cwd: root, github: { rest: { repos: { get: read } } } })).rejects.toThrow(/not open/);
       expect(read).toHaveBeenCalledTimes(1);
     });
     expect(execFileSync("git", ["-C", root, "remote"], { encoding: "utf8" }).trim()).toBe("unrelated");
@@ -315,9 +309,11 @@ describe.each([1, 2])("native standalone adapters with %i original Claims", coun
             categories.push(JSON.parse(zlib.gunzipSync(Buffer.from(input.sarif, "base64"))).runs[0].automationDetails.id);
             return { data: { id: `sarif-${categories.length}` } };
           }),
+          getSarif: async () => ({ data: { processing_status: "complete" } }),
         },
       },
       request: vi.fn(async (route, input) => {
+        if (route.startsWith("GET ")) return { data: { processing_status: "succeeded" } };
         expect(route).toBe("PUT /repos/{owner}/{repo}/code-coverage/report");
         uploadedLabels.push(input.label);
         expect(zlib.gunzipSync(Buffer.from(input.coverage_report, "base64")).toString()).toBe(original.claims[uploadedLabels.length - 1].work.input);
@@ -346,7 +342,7 @@ describe.each([1, 2])("native standalone adapters with %i original Claims", coun
     expect(new Set(uploadedLabels).size).toBe(count);
   });
 
-  it.skipIf(process.platform === "win32")("publishes independently namespaced assets and verifies only the original private Claim receipt", async () => {
+  it.skipIf(process.platform === "win32")("publishes independently namespaced assets per original Claim", async () => {
     simulateLinuxAssetDescriptors();
     const original = assignment(count);
     const root = directory();
@@ -399,9 +395,7 @@ describe.each([1, 2])("native standalone adapters with %i original Claims", coun
         const result = await handler(message);
         results.push(result);
         expect(result.sha).toBe(digest(member.work.input));
-        expect((await assets.verifyAssetDelivery({ claim: member, result, github, authorize: allow })).verified).toBe(true);
-        expect((await assets.verifyAssetDelivery({ claim: member, result: structuredClone(result), github })).verified).toBe(false);
-        if (results.length > 1) expect((await assets.verifyAssetDelivery({ claim: member, result: results[0], github })).verified).toBe(false);
+        expect(result.path).toContain(scope.claimArtifactPath("", member.handle, original).split("/").pop());
       });
     }
     expect(refs.size).toBe(count);
@@ -432,7 +426,7 @@ describe("standalone adapter rejection before file or native effect access", () 
     expect(fs.readFileSync(sentinel, "utf8")).toBe("harmless external sentinel");
   });
 
-  it.each(["cancelled", "result"])("rejects terminal %s selectors before accessing any standalone upload endpoint", async state => {
+  it.each(["cancelled", "completed"])("rejects terminal %s selectors before accessing any standalone upload endpoint", async state => {
     const access = vi.fn(() => {
       throw new Error("terminal Claim cannot access native credentials or endpoints");
     });
@@ -441,7 +435,7 @@ describe("standalone adapter rejection before file or native effect access", () 
     await scope.withClaimExecution({ assignment: assignment(), claim_handle: "h1", authorize }, async () => {
       for (const module of [scanning, coverage, assets]) {
         const handler = await module.main({ "target-ref": "refs/heads/main", "target-repo": "owner/repo" }, github);
-        await expect(handler({ type: "upload", claim_handle: "h1" })).rejects.toThrow(/cancelled|already settled/);
+        await expect(handler({ type: "upload", claim_handle: "h1" })).rejects.toThrow(/cancelled|already completed/);
       }
     });
     expect(access).not.toHaveBeenCalled();

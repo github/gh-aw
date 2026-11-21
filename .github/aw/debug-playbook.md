@@ -218,46 +218,28 @@ Check current PR head/base/checks/reviews/guards; diagnosis isn't merge authoriz
 ## Work-queue codes
 
 Read-only: [queue playbook](work-queue.md).
-Check repo/branch/tip, epoch/fingerprint, Work/Claim/Delivery IDs, run binding/receipts.
-Never rewrite history, fabricate evidence, reuse cross-work credentials/request IDs,
-or bypass profiles/effect-scopes.
+Check repo/branch/tip, request ID, Work/Claim/dispatch IDs, run binding, receipts.
+Never rewrite history, fabricate commits, reuse request IDs for different intent,
+or bypass profiles/effect scope.
 
 | Codes | Check | Remedy |
 | --- | --- | --- |
-| `ERR_WORK_QUEUE_DELIVERY_READBACK_REQUIRED` | Missing trusted readback. | Independent verifier required; otherwise block delivery. |
-| `unsupported_protocol`, `codec_invalid`, `invalid_json`, `invalid_utf8`, `invalid_unicode`, `duplicate_key`, `noncanonical_number` | Version/canonical bytes/keys/Unicode/numbers. | Align producer/reader; regenerate input, not history. |
-| `ledger_invalid`, `ledger_foreign`, `ledger_nonextending` | Queue identity, DAG, ancestry. | Stop publication; recover trusted queue/tip via protocol. |
-| `queue_missing`, `policy_missing`, `work_queue_pool_not_installed` | Queue/pool; compiled/installed policy. | Bootstrap queue/policy; absent pool: quiesce, admin-authorized Policy addition. |
-| `repository_unavailable`, `repository_scope_invalid`, `branch_invalid`, `git_transport_failed` | Repo/branch, credentials, Git failure. | Restore authorized transport; reread uncertain tip. |
-| `actor_unauthorized`, `admission_unauthorized`, `unauthorized_operation`, `ownership_unauthorized`, `work_unauthorized`, `dependency_unauthorized`, `projection_unauthorized`, `resource_unauthorized` | Principal/role/profile/effect scope. | Authorized actor/path only; no impersonation. |
-| `policy_invalid`, `policy_epoch_invalid`, `policy_proposal_mismatch`, `work_queue_policy_proposal_mismatch`, `profile_invalid`, `pool_invalid`, `dispatcher_invalid` | Schema/revision/epoch/pools/dispatcher. | Fix trusted config via supported update. |
-| `work_queue_profile_not_approved`, `work_queue_worker_not_compiler_approved`, `work_queue_dispatch_credential_identity_unavailable` | Installed profiles/dispatch allowlist. | Quiesce; update Policy/allowlist/credentials; reject unverified. |
-| `deployment_invalid`, `deployment_conflict` | Schema, revision, expected tip. | Fix trusted deployment; reconcile before CAS retry. |
-| `policy_not_quiescent`, `admission_paused`, `grants_paused` | Claims/dispatches; pause controls. | Respect pause; reconcile before authorized Policy change. |
-| `work_expired` | Deadline/queue time. | Refresh fair prefix; never revive expired Work. |
-| `hard_clear_snapshot_invalid`, `hard_clear_conflict` | Preview revision; current tip/receipt. | Reconcile; preview/authorize afresh; don't reset newer snapshots. |
-| `hard_clear_not_paused` | Admission/grant controls. | Pause both before authorized hard clear. |
-| `hard_clear_unresolved`, `hard_clear_uncertain` | Reservations/Claims/barriers/effects/receipt. | Reconcile trusted evidence before retry; preserve unresolved effects. |
-| `graph_invalid`, `graph_pool_conflict`, `node_conflict`, `replacement_invalid`, `work_conflict`, `work_identity_invalid`, `work_invalid`, `identity_invalid` | Graph/node/pool/payload/fingerprint/replacement. | Fix submission; retain accepted identity. |
-| `dependency_cycle`, `dependency_duplicate`, `dependency_invalid`, `dependency_missing`, `dependency_result_unavailable`, `dependency_credentials_missing` | DAG, dependency, receipt, scoped credentials. | Fix graph/result/access; never fabricate completion. |
-| `dependency_verifier_required`, `delivery_verifier_required`, `nonlaunch_verifier_required`, `remediation_verifier_required` | Verifier/evidence type. | Approved verifier required; otherwise block effects. Never disable verification. |
-| `ERR_WORK_QUEUE_CLAIM_SCOPE`, `assignment_invalid`, `assignment_immutable`, `claim_invalid`, `claim_missing`, `claim_conflict`, `claim_ineffective` | Immutable 1-16 Claims; owner/epoch/deadline. | Fix producer/reconcile; keep effective Claim identities/scopes. |
-| `claim_scope_invalid`, `claim_scope_required`, `claim_effects_unauthorized`, `claim_control_delivery_invalid` | Claim handle/factory, scope, control delivery. | Retain original write scope and validated control intent. |
-| `child_entitlement`, `run_binding_conflict`, `run_invalid` | Parent/child entitlement; workflow/run/attempt identity. | Correct authorized binding; reject reused/mismatched authority. |
-| `condition_invalid`, `control_invalid`, `packing_invalid`, `selection_invalid`, `priority_conflict` | Policy/control/scheduler inputs. | Recompute authoritative state; allowed transitions only. |
-| `request_invalid`, `request_missing`, `request_fingerprint`, `request_reuse`, `request_reused`, `reason_invalid`, `timestamp_invalid` | Identity/fingerprint, schema, reason/timestamp. | Exact retry only for identical intent; otherwise fresh ID. |
-| `publication_conflict`, `publication_invalid`, `publication_unresolved` | Git tip, CAS, published commit. | Reread/reconcile before retry; publication may have succeeded. |
-| `checkpoint_invalid`, `credential_generation_reused` | Checkpoint proof/ancestry; unique credential generation. | Recover verified checkpoint/authorized new generation; no stale authority. |
-| `dispatch_invalid`, `dispatch_missing`, `launch_started`, `launch_unresolved` | Reservation, receipt, possibly started child. | Reconcile immutable identity; no duplicate launch. |
-| `claim_delivery_unverified`, `delivery_failed`, `verification_unresolved`, `delivery_conflict`, `delivery_barrier_conflict`, `delivery_contract_required`, `delivery_evidence_required`, `evidence_invalid`, `evidence_required`, `terminal_evidence_required`, `nonlaunch_evidence_required` | Claim state/effects, independent receipts, barrier/contract. | Reconcile before retry; no forced terminal state. |
-| `result_invalid`, `completion_conflict`, `cancellation_conflict`, `ownership_terminal`, `work_terminal`, `work_missing` | Work/ownership; finish/result intent. | Respect terminal transitions; reconcile duplicate/conflicting completion/cancellation. |
-| `retry_invalid`, `retry_exhausted`, `release_invalid`, `release_open_claims`, `remediation_invalid` | Retry/release policy, attempts, open claims. | Stop exhausted retries; reconcile claims; authorized recovery only. |
-| `ERR_WORK_QUEUE_RECONCILIATION`, `observation_invalid`, `observation_conflict`, `reconciliation_invalid`, `reconciliation_pending`, `inspection_invalid`, `resource_unverified` | Reason/binding/provenance/freshness. | Bounded trusted reconciliation; unverified stays blocked; no forced release. |
-| `resource_invalid`, `resource_limit`, `assignment_limit`, `evidence_limit`, `graph_limit`, `work_queue_graph_limit`, `ledger_limit`, `observation_limit`, `operation_limit`, `payload_limit`, `pending_limit`, `projection_limit`, `reconciliation_limit`, `obsolete_limit` | Named limit; count. | Bound/batch/compact; keep limits. |
-| `issue_binding_invalid`, `issue_binding_conflict` | Queue-issue binding/ownership. | Correct authorized binding; never adopt another Work's issue. |
-| `projection_invalid`, `projection_journal_invalid`, `projection_journal_conflict`, `projection_scope_changed`, `projection_write_ambiguous` | Journal/acknowledgement/target/CAS. | Reconcile receipts; preserve uncertain writes/locks/history; no duplicates. |
-| `projection_target_unavailable`, `projection_unavailable` | Failure; safe status/request ID. | Diagnose; preserve mirrors and locks. |
-| `projection_receipt_pending`, `projection_comment_pending`, `projection_label_pending`, `projection_coordination_pending`, `projection_pagination_pending`, `projection_rate_pending` | Checkpoint/pacing/mirrors/receipts. | Reconcile exact request; never recreate mirrors or mistake pending for terminal failure. |
+| `unsupported_protocol` | Ledger head version. | v3 head: dispatcher/producer/maintenance converts it; workers wait. |
+| `codec_invalid`, `invalid_json`, `invalid_utf8`, `invalid_unicode`, `duplicate_key`, `noncanonical_number` | Canonical bytes/keys/Unicode/numbers. | Fix producer input; never edit history. |
+| `ledger_invalid`, `checkpoint_invalid`, `ledger_limit` | Commit chain, checkpoint position, 64 MiB cap. | Stop publication; `compact` for size; restore from Git ancestry. |
+| `queue_missing`, `policy_missing`, `policy_invalid`, `pool_invalid` | Branch exists; compiled `GH_AW_WORK_QUEUE_POLICY`; pool in `aw.json`. | First producer submit creates branch; fix `aw.json`, recompile. |
+| `repository_unavailable`, `repository_scope_invalid`, `branch_invalid`, `git_transport_failed` | Repo/branch, credentials, Git failure. | Restore transport; reread tip. |
+| `actor_unauthorized`, `unauthorized_operation`, `resource_unauthorized` | Actor repository, role vs operation, effect scope. | Use the role that owns the operation. |
+| `cas_exhausted`, `publication_conflict`, `publication_invalid` | 8 CAS attempts lost to writers. | Rerun; reread first, publication may have committed. |
+| `request_invalid`, `request_reused`, `reason_invalid` | Kind/parameters/operations, request ID, reason enum. | Fix request; same intent retries are idempotent. |
+| `graph_invalid`, `work_identity_invalid`, `work_invalid`, `resource_invalid` | Graph/node identity, Work fields, resource refs. | Fix submission; keep admitted identity. |
+| `dependency_cycle`, `dependency_invalid`, `dependency_pending`, `observation_invalid` | DAG edges, predecessor state, Observation fields. | Fix graph; never fabricate completion. |
+| `resource_limit`, `assignment_limit`, `work_queue_pending_limit` | GRAPH_NODES/MAX_PENDING_WORK, 48 KiB assignment, `pending_limit`. | Wait for drain or batch; keep limits. |
+| `ownership_conflict`, `claim_conflict`, `claim_missing`, `work_missing`, `work_terminal` | Work state/owner, Claim ID reuse. | Release before cancel; respect terminal Work. |
+| `ERR_WORK_QUEUE_CLAIM_SCOPE`, `claim_scope_invalid`, `claim_ineffective`, `work_queue_claim_handle_required` | Claim open, handle, dispatch bound to this run+attempt. | Use original `claim_handle`; no effects after Claim closes. |
+| `dispatch_missing`, `dispatch_state_conflict`, `run_binding_conflict`, `work_queue_assignment_unknown` | Dispatch state; bound workflow/run/attempt. | Rerun only the bound run; else `release`. |
+| `work_queue_effect_scope_denied` (E004) | Target repo vs profile `effect_scope`. | Target the worker's repository. |
+| `issue_binding_conflict` | One Work per Issue; immutable link. | Never adopt another Work's Issue. |
 
 ## Unmapped codes
 

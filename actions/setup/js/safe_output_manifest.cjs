@@ -10,7 +10,6 @@ const { MANIFEST_FILE_PATH, TEMPORARY_ID_MAP_FILE_PATH, SAFE_OUTPUT_ERRORS_FILE_
 const { redactBuiltInPatterns, redactSecrets, extractMCPGatewayTokens, MCP_GATEWAY_CONFIG_PATHS } = require("./redact_secrets.cjs");
 const { currentClaimHandle, claimArtifactPath, claimIdentity, assertClaimIdentity, assertClaimArtifactDirectory, assertClaimArtifactFile } = require("./work_queue_claim_scope.cjs");
 
-const CLAIM_DELIVERY_ERRORS_FILE_NAME = "claim-delivery-errors.json";
 const SAFE_OUTPUT_EXECUTIONS_FILE_NAME = "safe-output-executions.jsonl";
 const MERGE_DECISIONS_FILE_NAME = "merge-pull-request-decisions.jsonl";
 const MERGE_PRODUCER_FAILURE_CODES = new Set(["required_check_producer_missing", "required_check_producer_mismatch", "required_check_producer_ambiguous"]);
@@ -571,7 +570,6 @@ module.exports = {
   MANIFEST_FILE_PATH,
   TEMPORARY_ID_MAP_FILE_PATH,
   SAFE_OUTPUT_ERRORS_FILE_PATH,
-  CLAIM_DELIVERY_ERRORS_FILE_NAME,
   CREATE_ITEM_TYPES,
   NOT_LOGGED_TYPES,
   createManifestLogger,

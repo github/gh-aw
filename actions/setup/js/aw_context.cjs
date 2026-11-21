@@ -192,10 +192,23 @@ function readInboundAwContext(payload) {
   return parseInboundAwContext(payload?.inputs?.aw_context) || parseInboundAwContext(payload?.client_payload?.aw_context);
 }
 
+/**
+ * The dispatched worker input `work_queue_assignment` is exactly `{"version":4,"dispatch_id":"d_…"}`;
+ * the worker loads its Claims from the ledger by `dispatch_id`.
+ * @returns {{version: 4, dispatch_id: string}}
+ */
 function parseWorkQueueAssignment(raw) {
-  const { parseStrictJSON } = require("./work_queue_codec.cjs");
-  const { normalizeAssignment } = require("./work_queue_claim_scope.cjs");
-  return normalizeAssignment(typeof raw === "string" ? parseStrictJSON(raw) : raw);
+  const { identity, parseStrictJSON } = require("./work_queue_codec.cjs");
+  let value;
+  try {
+    value = typeof raw === "string" ? parseStrictJSON(raw) : raw;
+    if (!isRecord(value) || Object.keys(value).length !== 2 || value.version !== 4 || !Object.hasOwn(value, "dispatch_id")) throw new Error("shape");
+    identity(value.dispatch_id, "dispatch_id");
+  } catch {
+    throw new TypeError("work_queue_assignment_invalid");
+  }
+  // prettier-ignore
+  return Object.freeze({ version: /** @type {const} */ (4), dispatch_id: /** @type {string} */ (value.dispatch_id) });
 }
 
 function readInboundWorkQueueAssignment(payload) {

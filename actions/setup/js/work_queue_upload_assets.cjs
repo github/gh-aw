@@ -5,28 +5,13 @@ const { SAFE_OUTPUT_E001 } = require("./error_codes.cjs");
 
 const path = require("path");
 const crypto = require("crypto");
-const {
-  assertClaimAuthorized,
-  currentClaimHandle,
-  claimArtifactPath,
-  assertClaimArtifactFile,
-  claimIdentity,
-  assertClaimIdentity,
-  receiptMatchesClaim,
-  withClaimResourceEffects,
-  createClaimResourceVerification,
-  withClaimResourceVerification,
-  claimDeliveryReceipt,
-  durableReceipt,
-} = require("./work_queue_claim_scope.cjs");
+const { assertClaimAuthorized, currentClaimHandle, claimArtifactPath, assertClaimArtifactFile, claimIdentity, assertClaimIdentity, withClaimResourceEffects } = require("./work_queue_claim_scope.cjs");
 const { resolveRepositoryTarget } = require("./work_queue_effect_resource.cjs");
 const { wrapClaimEffectClient } = require("./work_queue_effect_client.cjs");
 const { normalizeBranchName } = require("./normalize_branch_name.cjs");
 const { isStagedMode } = require("./safe_output_helpers.cjs");
 const { readGuardedFile } = require("./symlink_guard.cjs");
 const { authorizeHandlerInvocation } = require("./safe_output_authorization_gate.cjs");
-
-const receipts = new WeakMap();
 
 /** @param {{ "target-repo"?: string, "assets-dir"?: string, "allowed-exts"?: string[], "max-size"?: number, max?: number, branch?: string, staged?: boolean }} [config] @param {import("./types/work-queue-native-client").ClaimNativeClient} [suppliedClient] */
 async function main(config = {}, suppliedClient) {
@@ -95,73 +80,16 @@ async function main(config = {}, suppliedClient) {
       inputs: { repository, branch, path: assetPath, sha256, size: content.length, parent: head },
       scope: { binding: "invocation", refs: [`sha256:${sha256}`] },
     });
-    const { blob, tree, commit } = await withClaimResourceEffects([authorityResource], ["rest.git.createBlob", "rest.git.createTree", "rest.git.createCommit", "rest.git.updateRef", "rest.git.createRef"], async () => {
+    const commit = await withClaimResourceEffects([authorityResource], ["rest.git.createBlob", "rest.git.createTree", "rest.git.createCommit", "rest.git.updateRef", "rest.git.createRef"], async () => {
       const blob = await createBlob({ owner, repo, content: content.toString("base64"), encoding: "base64" });
       const tree = await createTree({ owner, repo, ...(baseTree ? { base_tree: baseTree } : {}), tree: [{ path: assetPath, mode: "100644", type: "blob", sha: blob.data.sha }] });
       const commit = await createCommit({ owner, repo, message: `Publish Claim ${factoryClaim} asset ${sha256}`, tree: tree.data.sha, parents: head ? [head] : [] });
       await mutateRef({ owner, repo, ref: head ? `heads/${branch}` : `refs/heads/${branch}`, sha: commit.data.sha, ...(head ? { force: false } : {}) });
-      return { blob, tree, commit };
+      return commit;
     });
     const server = process.env.GITHUB_SERVER_URL || "https://github.com";
-    const result = { success: true, repo: repository, branch, path: assetPath, sha: sha256, commit: commit.data.sha, url: `${server}/${repository}/blob/${branch}/${assetPath}?raw=true` };
-    receipts.set(result, { ...factoryIdentity, repository, branch, path: assetPath, sha256, blob: blob.data.sha, tree: tree.data.sha, commit: commit.data.sha, parent: head, authorityResource, url: result.url });
-    return result;
+    return { success: true, repo: repository, branch, path: assetPath, sha: sha256, commit: commit.data.sha, url: `${server}/${repository}/blob/${branch}/${assetPath}?raw=true` };
   };
 }
 
-async function verifyAssetDelivery(options) {
-  const receipt = claimDeliveryReceipt(options, "asset", receipts);
-  return verifyAssetReceipt(options, receipt);
-}
-
-function validAssetReceipt(receipt, claim) {
-  return (
-    receiptMatchesClaim(receipt, claim) &&
-    ["repository", "branch", "path", "blob", "tree", "commit", "url"].every(key => typeof receipt[key] === "string" && receipt[key].length > 0) &&
-    /^[A-Za-z0-9_-]+\/[A-Za-z0-9._-]+$/.test(receipt.repository) &&
-    /^[a-f0-9]{64}$/.test(receipt.sha256) &&
-    (receipt.parent === null || (typeof receipt.parent === "string" && receipt.parent.length > 0)) &&
-    receipt.authorityResource?.repository === receipt.repository &&
-    receipt.authorityResource.ref === `refs/heads/${receipt.branch}` &&
-    receipt.authorityResource.path === receipt.path
-  );
-}
-
-function durableAssetReceipt(result, claim) {
-  const receipt = result && receipts.get(result);
-  if (!validAssetReceipt(receipt, claim)) return null;
-  return durableReceipt(receipt);
-}
-
-async function verifyAssetReceipt(options, receipt) {
-  const { claim, github } = options;
-  if (!validAssetReceipt(receipt, claim)) return { verified: false, diagnostics: { event: "asset.receipt_missing" } };
-  const [owner, repo] = receipt.repository.split("/");
-  const ref = await github.rest.git.getRef({ owner, repo, ref: `heads/${receipt.branch}` });
-  if (ref.data.object.sha !== receipt.commit) return { verified: false, diagnostics: { event: "asset.ref_mismatch" } };
-  const commit = await github.rest.git.getCommit({ owner, repo, commit_sha: receipt.commit });
-  if (commit.data.sha !== receipt.commit || commit.data.tree.sha !== receipt.tree) return { verified: false, diagnostics: { event: "asset.commit_mismatch" } };
-  if (receipt.parent ? commit.data.parents?.length !== 1 || commit.data.parents[0].sha !== receipt.parent : commit.data.parents?.length !== 0) return { verified: false, diagnostics: { event: "asset.parent_mismatch" } };
-  const tree = await github.rest.git.getTree({ owner, repo, tree_sha: receipt.tree, recursive: "true" });
-  if (tree.data.truncated || tree.data.sha !== receipt.tree || !tree.data.tree?.some(entry => entry.path === receipt.path && entry.type === "blob" && entry.mode === "100644" && entry.sha === receipt.blob))
-    return { verified: false, diagnostics: { event: "asset.tree_mismatch" } };
-  const blob = await github.rest.git.getBlob({ owner, repo, file_sha: receipt.blob });
-  if (blob.data.sha !== receipt.blob || blob.data.encoding !== "base64" || crypto.createHash("sha256").update(Buffer.from(blob.data.content, "base64")).digest("hex") !== receipt.sha256)
-    return { verified: false, diagnostics: { event: "asset.blob_mismatch" } };
-  const proof = createClaimResourceVerification({
-    verified: true,
-    claim_handle: claim.handle,
-    resource: { kind: "asset", repository: receipt.repository, id: receipt.commit, ref: `heads/${receipt.branch}`, path: receipt.path, sha256: receipt.sha256, url: receipt.url },
-    authority_resource: await resolveRepositoryTarget(github, receipt.authorityResource),
-    effect_resources: [
-      { kind: "git_blob", repository: receipt.repository, id: receipt.blob },
-      { kind: "git_tree", repository: receipt.repository, id: receipt.tree },
-      { kind: "git_commit", repository: receipt.repository, id: receipt.commit },
-      { kind: "git_ref", repository: receipt.repository, id: receipt.commit },
-    ],
-    evidence: { source: "github_git_api", commit: receipt.commit, tree: receipt.tree, blob: receipt.blob, sha256: receipt.sha256 },
-  });
-  return withClaimResourceVerification(proof, () => proof, { authorize: options.authorize, context: options.context, github });
-}
-
-module.exports = { main, verifyAssetDelivery, durableAssetReceipt };
+module.exports = { main };

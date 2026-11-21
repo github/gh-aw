@@ -69,11 +69,28 @@ func healthWorkQueueFixture(t *testing.T, definitions ...string) *HealthCollecti
 		t.Fatalf("unexpected health API request: %v", args)
 		return nil, errors.New("unexpected request")
 	}
-	healthReadWorkQueue = func(context.Context, workqueue.Branch) ([]workqueue.QueueCommit, error) {
+	healthReadWorkQueue = func(context.Context, workqueue.Branch) (workqueue.Snapshot, error) {
 		t.Fatal("queue must not be read")
-		return nil, errors.New("unexpected queue read")
+		return workqueue.Snapshot{}, errors.New("unexpected queue read")
 	}
 	return collection
+}
+
+func healthWQSnapshot(log *workQueueTestLog) workqueue.Snapshot {
+	return workqueue.Snapshot{Head: "abc", State: log.state()}
+}
+
+// healthWQExhaustedFixture releases the running dispatch of the mixed fixture and
+// cancels its Work for exhausted attempts in the same release commit.
+func healthWQExhaustedFixture(t *testing.T) *workQueueTestLog {
+	t.Helper()
+	log, ids := workQueueMixedFixture(t)
+	dispatchID := ids["running_dispatch"]
+	claimID := log.state().Dispatches[dispatchID].Claims[0]
+	log.append(workQueueTestAdmin, "release", workqueue.ReleaseParameters{DispatchID: dispatchID, Reason: "worker_terminated"},
+		workqueue.ReleaseOperation{Kind: "Release", DispatchID: dispatchID, Reason: "worker_terminated"},
+		workqueue.WorkCancellationOperation{Kind: "WorkCancellation", WorkID: ids["running"], ClaimID: claimID, Reason: "attempts_exhausted"})
+	return log
 }
 
 func TestHealthWorkQueueConditionalCollection(t *testing.T) {
@@ -91,16 +108,16 @@ func TestHealthWorkQueueConditionalCollection(t *testing.T) {
 	})
 	t.Run("queue shared by workflows without runs", func(t *testing.T) {
 		collection := healthWorkQueueFixture(t, "env:\n  GH_AW_WORK_QUEUE_ENABLED: 'true'", "jobs: {}", "env:\n  GH_AW_WORK_QUEUE_ENABLED: true")
-		_, commits, _ := workDiagnosticsFixture(t)
+		snapshot := healthWQSnapshot(healthWQExhaustedFixture(t))
 		reads := 0
-		healthReadWorkQueue = func(ctx context.Context, branch workqueue.Branch) ([]workqueue.QueueCommit, error) {
+		healthReadWorkQueue = func(ctx context.Context, branch workqueue.Branch) (workqueue.Snapshot, error) {
 			reads++
 			assert.Equal(t, "owner/repo", branch.Remote)
 			assert.Equal(t, workqueue.DefaultBranch, branch.Name)
 			assert.Equal(t, collection.Host, branch.Host)
 			_, bounded := ctx.Deadline()
 			assert.True(t, bounded)
-			return commits, nil
+			return snapshot, nil
 		}
 		collectHealthWorkQueue(collection)
 		require.NotNil(t, collection.WorkQueue)
@@ -108,25 +125,27 @@ func TestHealthWorkQueueConditionalCollection(t *testing.T) {
 		assert.Equal(t, []string{collection.workflows[0].Path, collection.workflows[2].Path}, collection.WorkQueue.Workflows)
 		assert.Equal(t, "attention_required", collection.WorkQueue.Status)
 		require.NotNil(t, collection.WorkQueue.Stats)
-		assert.Equal(t, 1, collection.WorkQueue.Stats.DeliveryByState["failed"])
-		assert.Equal(t, 1, collection.WorkQueue.Stats.DeliveryByState["verified"])
-		assertWorkDiagnosticsPrivate(t, collection.WorkQueue)
+		assert.Equal(t, 1, collection.WorkQueue.Stats.WorkCancellationReasons["attempts_exhausted"])
+		assert.Equal(t, 1, collection.WorkQueue.Stats.ClaimCancellationReasons["worker_terminated"])
+		assert.Equal(t, []string{"work-queue cancelled 1 Work after exhausting worker attempts"}, collection.WorkQueue.Warnings)
 
 		var output bytes.Buffer
 		require.NoError(t, renderHealthCollection(&output, collection))
-		assert.Contains(t, output.String(), "[health_work_queue] status=attention_required")
-		assert.Contains(t, output.String(), "delivery: pending=0 verified=1 failed=1")
-		assert.Contains(t, output.String(), "ledger evidence, not live Actions status")
-		assert.Contains(t, output.String(), "verification_exhausted")
+		text := output.String()
+		assert.Contains(t, text, "[health_work_queue] status=attention_required")
+		assert.Contains(t, text, "Work cancellations: ")
+		assert.Contains(t, text, "attempts_exhausted")
+		assert.Contains(t, text, "ledger records, not live Actions status")
+		assert.Less(t, strings.Index(text, "Work cancellations: "), strings.Index(text, "Warning: work-queue cancelled 1 Work"))
 		data, err := json.Marshal(collection)
 		require.NoError(t, err)
 		assert.Contains(t, string(data), `"work_queue":`)
-		assert.Contains(t, string(data), `"delivery_by_state":{"failed":1,"pending":0,"verified":1}`)
+		assert.Contains(t, string(data), `"work_cancellation_reasons":{"attempts_exhausted":1,"operator":1}`)
 	})
 }
 
 func TestHealthWorkQueueUnavailableEvidence(t *testing.T) {
-	for _, tc := range []string{"invalid workflow", "API error", "stopped", "missing ledger", "invalid ledger", "missing policy", "wrong repository"} {
+	for _, tc := range []string{"invalid workflow", "API error", "stopped", "missing ledger", "invalid ledger", "empty ledger", "wrong repository"} {
 		t.Run(tc, func(t *testing.T) {
 			collection := healthWorkQueueFixture(t, "env:\n  GH_AW_WORK_QUEUE_ENABLED: true")
 			switch tc {
@@ -139,17 +158,17 @@ func TestHealthWorkQueueUnavailableEvidence(t *testing.T) {
 			case "stopped":
 				collection.stopped = true
 			default:
-				_, commits, _ := workDiagnosticsFixture(t)
-				healthReadWorkQueue = func(context.Context, workqueue.Branch) ([]workqueue.QueueCommit, error) {
+				log, _ := workQueueMixedFixture(t)
+				healthReadWorkQueue = func(context.Context, workqueue.Branch) (workqueue.Snapshot, error) {
 					switch tc {
 					case "missing ledger":
-						return nil, errors.New("queue_missing: private detail")
+						return workqueue.Snapshot{}, errors.New("queue_missing: private detail")
 					case "invalid ledger":
-						return []workqueue.QueueCommit{{ID: "PAYLOAD-MUST-STAY-PRIVATE"}}, nil
-					case "missing policy":
-						return nil, nil
+						return workqueue.Snapshot{}, &workqueue.ProtocolError{Code: "request_invalid", Message: "private detail"}
+					case "empty ledger":
+						return workqueue.Snapshot{}, nil
 					}
-					return commits, nil
+					return healthWQSnapshot(log), nil
 				}
 				if tc == "wrong repository" {
 					originalGH := healthRunGH
@@ -164,7 +183,6 @@ func TestHealthWorkQueueUnavailableEvidence(t *testing.T) {
 			assert.Equal(t, "unavailable", collection.WorkQueue.Status)
 			assert.Nil(t, collection.WorkQueue.Stats)
 			require.NotEmpty(t, collection.WorkQueue.Warnings)
-			assertWorkDiagnosticsPrivate(t, collection.WorkQueue)
 			assert.NotContains(t, strings.Join(collection.WorkQueue.Warnings, " "), "private detail")
 		})
 	}
@@ -192,9 +210,9 @@ func TestRunHealthWorkQueueWithoutRuns(t *testing.T) {
 				}
 				return originalGH(ctx, message, args...)
 			}
-			_, commits, _ := workDiagnosticsFixture(t)
-			healthReadWorkQueue = func(context.Context, workqueue.Branch) ([]workqueue.QueueCommit, error) {
-				return commits, nil
+			snapshot := healthWQSnapshot(healthWQExhaustedFixture(t))
+			healthReadWorkQueue = func(context.Context, workqueue.Branch) (workqueue.Snapshot, error) {
+				return snapshot, nil
 			}
 			output := captureAuditGroupStdout(t, func() {
 				require.NoError(t, runHealth(context.Background(), HealthConfig{
@@ -213,45 +231,28 @@ func TestRunHealthWorkQueueWithoutRuns(t *testing.T) {
 	}
 }
 
-func TestHealthWorkQueueControlsAndBacklog(t *testing.T) {
-	for _, control := range []string{"", "admission_paused", "grants_paused"} {
-		t.Run("control="+control, func(t *testing.T) {
-			collection := healthWorkQueueFixture(t, "env:\n  GH_AW_WORK_QUEUE_ENABLED: true")
-			_, commits, _ := workOperatorFixture(t, false)
-			if control != "" {
-				actor := workqueue.Actor{Role: "administrator", Principal: "1001", Repository: "owner/repo"}
-				request, err := workqueue.NewRequest("pause", "control", actor, workqueue.OperationsParameters{
-					Operations: []workqueue.Operation{mustWorkQueueOperation(t, map[string]any{
-						"kind": "Control", "control": control, "value": true, "reason": "operator",
-					})},
-				})
-				require.NoError(t, err)
-				commits, _, _, err = workqueue.BuildCandidate(commits, actor, request, 3000)
-				require.NoError(t, err)
-			}
-			healthReadWorkQueue = func(context.Context, workqueue.Branch) ([]workqueue.QueueCommit, error) {
-				return commits, nil
-			}
-			collectHealthWorkQueue(collection)
-			require.NotNil(t, collection.WorkQueue)
-			require.NotNil(t, collection.WorkQueue.Stats)
-			assert.Equal(t, 3, collection.WorkQueue.Stats.Available)
-			require.Len(t, collection.WorkQueue.Stats.Pools, 1)
-			assert.NotNil(t, collection.WorkQueue.Stats.Pools[0].OldestAvailable)
-			if control == "" {
-				assert.Equal(t, "observed", collection.WorkQueue.Status)
-				assert.Empty(t, collection.WorkQueue.Warnings)
-				assert.Equal(t, 3, collection.WorkQueue.Stats.Pools[0].SchedulingEligible)
-			} else {
-				assert.Equal(t, "attention_required", collection.WorkQueue.Status)
-				assert.NotEmpty(t, collection.WorkQueue.Warnings)
-			}
-			var output bytes.Buffer
-			require.NoError(t, renderHealthWorkQueue(&output, collection.WorkQueue))
-			assert.Contains(t, output.String(), "oldest_work=")
-			assertWorkDiagnosticsPrivate(t, collection.WorkQueue)
-		})
+func TestHealthWorkQueueBacklogObserved(t *testing.T) {
+	collection := healthWorkQueueFixture(t, "env:\n  GH_AW_WORK_QUEUE_ENABLED: true")
+	log, ids := workQueueMixedFixture(t)
+	snapshot := healthWQSnapshot(log)
+	healthReadWorkQueue = func(context.Context, workqueue.Branch) (workqueue.Snapshot, error) {
+		return snapshot, nil
 	}
+	collectHealthWorkQueue(collection)
+	require.NotNil(t, collection.WorkQueue)
+	require.NotNil(t, collection.WorkQueue.Stats)
+	assert.Equal(t, "observed", collection.WorkQueue.Status, "operator cancellations alone do not require attention")
+	assert.Empty(t, collection.WorkQueue.Warnings)
+	stats := collection.WorkQueue.Stats
+	assert.Equal(t, 1, stats.Available)
+	assert.Equal(t, 1, stats.DispatchesByState["bound"])
+	require.Len(t, stats.Pools, 1)
+	assert.Equal(t, []string{ids["waiting"]}, stats.Pools[0].NextEligible)
+	var output bytes.Buffer
+	require.NoError(t, renderHealthWorkQueue(&output, collection.WorkQueue))
+	assert.Contains(t, output.String(), "[health_work_queue] status=observed workflows=1")
+	assert.Contains(t, output.String(), "pool: default available=1")
+	assert.NotContains(t, output.String(), "Warning:")
 }
 
 func TestHealthWorkQueueDetectionSharesAPIBudget(t *testing.T) {

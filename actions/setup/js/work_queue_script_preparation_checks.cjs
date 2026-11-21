@@ -13,13 +13,7 @@ function registerTests({ describe, it }) {
       const keys = ["RUNNER_TEMP", "GH_AW_CLAIM_INPUT", "GH_AW_CLAIM_OUTPUT", "GH_AW_CLAIM_SCRIPT_FILENAME"];
       const previous = keys.map(key => process.env[key]);
       const assignment = {
-        version: 3,
         dispatch_id: "d",
-        request_id: "r",
-        commit_id: "c",
-        policy_epoch: "e",
-        pool: "p",
-        worker_profile: "w",
         claims: ["one", "two"].map(handle => ({ handle, claim_id: `c:${handle}`, work_id: `w:${handle}`, work: {}, result_refs: [] })),
       };
       const message = { type: "custom", claim_handle: "one", number: 42, content: "original" };

@@ -5,7 +5,10 @@ import path from "node:path";
 import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
-const { queueFixture } = require("./work_queue_lifecycle.test_helpers.cjs");
+/** A v4 snapshot assignment of `count` Claims. */
+function queueFixture({ count }) {
+  return { assignment: { dispatch_id: "d1", claims: Array.from({ length: count }, (_, index) => ({ handle: `h${index + 1}`, claim_id: `c${index + 1}`, work_id: `w${index + 1}`, work: {}, result_refs: [] })) } };
+}
 const { temporaryDirectory } = require("./work_queue_effect_test_helpers.cjs");
 const claimScope = require("./work_queue_claim_scope.cjs");
 const constants = require("./constants.cjs");

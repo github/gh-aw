@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"slices"
 	"strings"
@@ -13,30 +14,35 @@ import (
 	"github.com/github/gh-aw/pkg/workqueue"
 )
 
-// Receipts deliberately omit payloads, actor credentials, and raw evidence.
-// They describe validated snapshot facts, not a live branch or API recheck.
+// WorkQueueCurrentSnapshot describes validated activation-time snapshot facts,
+// not a live branch read. Receipts omit payloads and effect resources.
 type WorkQueueCurrentSnapshot struct {
-	Role            string                      `json:"role"`
-	PolicyInstalled bool                        `json:"policy_installed"`
-	Tip             string                      `json:"tip"`
-	PolicyEpoch     string                      `json:"policy_epoch"`
-	CapturedAt      int64                       `json:"captured_at"`
-	CommitCount     int                         `json:"commit_count"`
-	Paused          bool                        `json:"admission_paused"`
-	GrantsPaused    bool                        `json:"grants_paused"`
-	Assignment      *WorkQueueAssignmentReceipt `json:"assignment,omitempty"`
-	Diagnostics     *WorkQueueDiagnostics       `json:"diagnostics,omitempty"`
+	Role        string                      `json:"role"`
+	Tip         string                      `json:"tip"`
+	CommitCount int                         `json:"commit_count"`
+	Assignment  *WorkQueueAssignmentReceipt `json:"assignment,omitempty"`
+	Diagnostics *WorkQueueDiagnostics       `json:"diagnostics,omitempty"`
 }
 
-type WorkQueueAssignmentReceipt = workqueue.AssignmentReceipt
+// WorkQueueAssignmentReceipt is the worker's Dispatch as captured after binding.
+type WorkQueueAssignmentReceipt struct {
+	DispatchID string                  `json:"dispatch_id"`
+	State      string                  `json:"state"`
+	Run        *workqueue.RunBinding   `json:"run"`
+	Claims     []WorkQueueClaimReceipt `json:"claims"`
+}
 
-type WorkQueueClaimReceipt = workqueue.ClaimReceipt
+type WorkQueueClaimReceipt struct {
+	Handle  string `json:"claim_handle"`
+	ClaimID string `json:"claim_id"`
+	WorkID  string `json:"work_id"`
+	State   string `json:"state"`
+}
 
+// WorkQueueFinishReceipt is one staged finish intent: "completed" or "failed".
 type WorkQueueFinishReceipt struct {
-	IntentID string `json:"intent_id"`
-	Handle   string `json:"claim_handle"`
-	Outcome  string `json:"outcome"`
-	KeepOpen bool   `json:"keep_open,omitempty"`
+	Handle  string `json:"claim_handle"`
+	Outcome string `json:"outcome"`
 }
 
 func readBoundedWorkQueueArtifact(path string, limit int64) (data []byte, err error) {
@@ -90,6 +96,9 @@ func decodeClosedWorkQueueObject(data []byte, required, optional []string, targe
 	if err := decoder.Decode(target); err != nil {
 		return errors.New("invalid typed work queue artifact")
 	}
+	if err := decoder.Decode(new(any)); !errors.Is(err, io.EOF) {
+		return errors.New("invalid typed work queue artifact")
+	}
 	return nil
 }
 
@@ -106,258 +115,127 @@ func currentWorkQueueDiagnosticError(stage string, err error) error {
 
 type currentWorkQueueEnvelope struct {
 	Version        int                   `json:"version"`
-	Role           json.RawMessage       `json:"role"`
 	SHA            *string               `json:"sha"`
+	TransactionLog string                `json:"transactionLog"`
+	Origin         workqueue.Actor       `json:"origin"`
+	Role           string                `json:"role"`
 	Worker         *workqueue.Assignment `json:"worker"`
-	TransactionLog *string               `json:"transactionLog"`
-	CapturedAt     *int64                `json:"captured_at"`
-	Origin         *workqueue.Actor      `json:"origin"`
-	VisibleWorkIDs json.RawMessage       `json:"visible_work_ids"`
+	VisibleWorkIDs []string              `json:"visible_work_ids,omitempty"`
 }
 
 func parseCurrentWorkQueueSnapshot(data []byte) (*WorkQueueSnapshot, error) {
-	envelope, state, role, err := replayCurrentWorkQueueSnapshot(data)
+	envelope, state, err := replayCurrentWorkQueueSnapshot(data)
 	if err != nil {
 		return nil, err
 	}
-	current := &WorkQueueCurrentSnapshot{
-		Role: role, PolicyInstalled: state.Policy != nil,
-		Tip: state.Tip, PolicyEpoch: state.PolicyEpoch, CapturedAt: *envelope.CapturedAt,
-		CommitCount: state.Stats.Transactions, Paused: state.AdmissionPaused, GrantsPaused: state.GrantsPaused,
-	}
+	current := &WorkQueueCurrentSnapshot{Role: envelope.Role, Tip: state.Tip, CommitCount: state.Stats.Transactions}
 	if envelope.Worker != nil {
-		current.Assignment, err = currentWorkQueueAssignmentReceipt(state, *envelope.Worker, *envelope.Origin)
-		if err != nil {
+		if current.Assignment, err = currentWorkQueueAssignmentReceipt(state, *envelope.Worker, envelope.Origin); err != nil {
 			return nil, err
 		}
 	}
-	current.Diagnostics, err = capturedWorkQueueDiagnostics(state, envelope)
-	if err != nil {
-		return nil, currentWorkQueueDiagnosticError("diagnostics", err)
-	}
-	return &WorkQueueSnapshot{Version: 3, SHA: envelope.SHA, Current: current}, nil
+	current.Diagnostics = capturedWorkQueueDiagnostics(state, envelope)
+	return &WorkQueueSnapshot{Version: workqueue.Version, SHA: envelope.SHA, Current: current}, nil
 }
 
-func replayCurrentWorkQueueSnapshot(data []byte) (currentWorkQueueEnvelope, workqueue.Projection, string, error) {
+// replayCurrentWorkQueueSnapshot validates a v4 activation snapshot and replays its captured ledger.
+func replayCurrentWorkQueueSnapshot(data []byte) (currentWorkQueueEnvelope, workqueue.Projection, error) {
 	var envelope currentWorkQueueEnvelope
-	var state workqueue.Projection
+	state := workqueue.NewProjection()
 	if err := decodeClosedWorkQueueObject(data,
-		[]string{"version", "sha", "worker", "transactionLog", "captured_at", "origin"},
-		[]string{"visible_work_ids", "role"}, &envelope); err != nil {
-		return envelope, state, "", err
+		[]string{"version", "sha", "transactionLog", "origin", "role", "worker"},
+		[]string{"visible_work_ids"}, &envelope); err != nil {
+		return envelope, state, err
 	}
-	if err := validateCurrentWorkQueueEnvelope(envelope); err != nil {
-		return envelope, state, "", err
+	if envelope.Version != workqueue.Version || envelope.SHA != nil && !validWorkQueueReceiptID(*envelope.SHA) {
+		return envelope, state, errors.New("invalid current work queue snapshot")
 	}
-	role, err := currentWorkQueueSnapshotRole(envelope)
+	if !slices.Contains([]string{"observer", "dispatcher", "worker"}, envelope.Role) ||
+		envelope.Origin.Role != envelope.Role || workqueue.ValidateActor(envelope.Origin) != nil {
+		return envelope, state, errors.New("invalid current work queue snapshot origin")
+	}
+	if envelope.Worker != nil && envelope.Role != "worker" {
+		return envelope, state, errors.New("current snapshot role conflicts with its assignment")
+	}
+	if envelope.TransactionLog == "" {
+		state.Repository = envelope.Origin.Repository
+		return envelope, state, nil
+	}
+	state, err := workqueue.ReplayLog([]byte(envelope.TransactionLog))
 	if err != nil {
-		return envelope, state, "", err
+		return envelope, state, currentWorkQueueDiagnosticError("ledger", err)
 	}
-	if role == "observer" && envelope.SHA == nil && *envelope.TransactionLog == "" {
-		return envelope, state, role, nil
+	if !strings.EqualFold(state.Repository, envelope.Origin.Repository) {
+		return envelope, state, errors.New("current snapshot origin repository differs from its captured queue")
 	}
-	commits, err := workqueue.Parse([]byte(*envelope.TransactionLog))
-	if err != nil {
-		return envelope, state, role, currentWorkQueueDiagnosticError("ledger", err)
-	}
-	state, err = workqueue.ReplayAt(commits, *envelope.CapturedAt)
-	if err != nil {
-		return envelope, state, role, currentWorkQueueDiagnosticError("chain", err)
-	}
-	if state.Policy == nil {
-		return envelope, state, role, errors.New("current snapshot requires an installed policy")
-	}
-	if role == "observer" && envelope.Origin.Repository != state.Repository {
-		return envelope, state, role, errors.New("current observer snapshot repository differs from captured queue")
-	}
-	return envelope, state, role, nil
+	return envelope, state, nil
 }
 
-func validateCurrentWorkQueueEnvelope(envelope currentWorkQueueEnvelope) error {
-	if envelope.Version != 3 || envelope.TransactionLog == nil || envelope.CapturedAt == nil ||
-		*envelope.CapturedAt < 0 || *envelope.CapturedAt > workqueue.MaxTimestamp ||
-		(envelope.SHA != nil && !validWorkQueueReceiptID(*envelope.SHA)) || envelope.Origin == nil ||
-		!validWorkQueueNativeID(envelope.Origin.Principal) {
-		return errors.New("invalid current work queue snapshot")
-	}
-	if len(envelope.VisibleWorkIDs) != 0 {
-		var ids []*string
-		if err := json.Unmarshal(envelope.VisibleWorkIDs, &ids); err != nil ||
-			ids == nil || slices.Contains(ids, nil) {
-			return errors.New("invalid current work queue snapshot visibility")
-		}
-	}
-	return nil
-}
-
-func currentWorkQueueSnapshotRole(envelope currentWorkQueueEnvelope) (string, error) {
-	role := "dispatcher"
-	if envelope.Worker != nil {
-		role = "worker"
-	}
-	if len(envelope.Role) != 0 {
-		var declaredRole string
-		if err := json.Unmarshal(envelope.Role, &declaredRole); err != nil ||
-			!slices.Contains([]string{"observer", "dispatcher", "worker"}, declaredRole) {
-			return "", errors.New("invalid current work queue snapshot role")
-		}
-		role = declaredRole
-	}
-	if (role == "worker") != (envelope.Worker != nil) {
-		return "", errors.New("current snapshot role conflicts with immutable assignment")
-	}
-	unassignedOriginRole := "dispatcher"
-	if role == "observer" {
-		unassignedOriginRole = "producer"
-		if !validWorkQueueReceiptID(envelope.Origin.Repository) ||
-			envelope.Origin.DispatchID != "" || envelope.Origin.ClaimHandle != "" {
-			return "", errors.New("current observer snapshot requires bounded producer provenance")
-		}
-	}
-	if envelope.Worker == nil && (envelope.Origin.Role != unassignedOriginRole ||
-		envelope.Origin.RunAttempt < 1 || envelope.Origin.RunAttempt > 4096 ||
-		!validWorkQueueNativeID(envelope.Origin.RunID) || !validWorkQueueReceiptID(envelope.Origin.Workflow)) {
-		return "", errors.New("current snapshot requires bounded native run and workflow provenance")
-	}
-	return role, nil
-}
-
+// currentWorkQueueAssignmentReceipt checks a worker snapshot against its captured
+// ledger: the Dispatch exists and is bound to the snapshot's own run.
 func currentWorkQueueAssignmentReceipt(state workqueue.Projection, assignment workqueue.Assignment, origin workqueue.Actor) (*WorkQueueAssignmentReceipt, error) {
-	if err := workqueue.ValidateAssignment(state, assignment); err != nil {
-		return nil, currentWorkQueueDiagnosticError("assignment", err)
-	}
 	dispatch := state.Dispatches[assignment.DispatchID]
-	if dispatch.Run == nil || dispatch.Run.RunID != origin.RunID ||
-		dispatch.Run.RunAttempt != 1 || origin.RunAttempt != 1 ||
-		origin.Role != "worker" || origin.DispatchID != dispatch.DispatchID ||
-		dispatch.Run.Repository != origin.Repository || dispatch.Run.Workflow != origin.Workflow ||
-		dispatch.Run.Principal != origin.Principal {
-		return nil, errors.New("current snapshot origin differs from durable assignment binding")
+	if dispatch == nil {
+		return nil, errors.New("current snapshot assignment is not in its captured ledger")
 	}
-	// The embedded Assignment.ToReceipt projects identity; enrich lifecycle facts from the captured state.
-	receipt := dispatch.ToReceipt()
-	receipt.State, receipt.Released = dispatch.State, dispatch.Released
-	for i, member := range receipt.Claims {
-		claim, work := state.Claims[member.ClaimID], state.Works[member.WorkID]
-		receipt.Claims[i].State, receipt.Claims[i].Barrier = claim.State, work.Barrier
-		if claim.KeepOpen {
-			receipt.Claims[i].Barrier = claim.Barrier
+	if dispatch.Run == nil || dispatch.Run.RunID != origin.RunID || dispatch.Run.RunAttempt != origin.RunAttempt {
+		return nil, errors.New("current snapshot origin differs from the Dispatch's bound run")
+	}
+	receipt := &WorkQueueAssignmentReceipt{DispatchID: dispatch.DispatchID, State: dispatch.State, Run: dispatch.Run, Claims: []WorkQueueClaimReceipt{}}
+	for _, member := range assignment.Claims {
+		claim := state.Claims[member.ClaimID]
+		if claim == nil || claim.DispatchID != dispatch.DispatchID || claim.WorkID != member.WorkID || claim.Handle != member.Handle {
+			return nil, errors.New("current snapshot assignment differs from its captured ledger")
 		}
+		receipt.Claims = append(receipt.Claims, WorkQueueClaimReceipt{Handle: claim.Handle, ClaimID: claim.ClaimID, WorkID: claim.WorkID, State: claim.State})
 	}
-	return &receipt, nil
+	return receipt, nil
 }
 
+// readCurrentWorkQueueFinishIntents reads staged `{"version":4,"claim_handle","outcome"}` lines.
 func readCurrentWorkQueueFinishIntents(path string, snapshot *WorkQueueCurrentSnapshot) ([]WorkQueueFinishReceipt, error) {
 	data, err := readBoundedWorkQueueArtifact(path, 4<<20)
-	if os.IsNotExist(err) {
+	if errors.Is(err, fs.ErrNotExist) {
 		return nil, nil
 	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to read current work queue intents: %w", err)
 	}
 	var receipts []WorkQueueFinishReceipt
-	ids, outcomes := map[string]string{}, map[string]string{}
+	outcomes := map[string]string{}
 	lines := 0
 	for index, line := range bytes.Split(data, []byte{'\n'}) {
 		if len(bytes.TrimSpace(line)) == 0 {
 			continue
 		}
-		lines++
-		if lines > 256 {
+		if lines++; lines > 256 {
 			return nil, errors.New("work queue finish intent exceeds 256 entries")
 		}
-		intent, canonical, err := decodeCurrentWorkQueueFinishIntent(line, snapshot, index+1)
-		if err != nil {
-			return nil, err
+		var intent struct {
+			Version int    `json:"version"`
+			Handle  string `json:"claim_handle"`
+			Outcome string `json:"outcome"`
 		}
-		if previous, ok := ids[intent.IntentID]; ok {
-			if previous != string(canonical) {
-				return nil, errors.New("conflicting work queue intent identity")
+		if err := decodeClosedWorkQueueObject(line, []string{"version", "claim_handle", "outcome"}, nil, &intent); err != nil {
+			return nil, fmt.Errorf("finish intent line %d: %w", index+1, err)
+		}
+		if intent.Version != workqueue.Version || !validWorkQueueReceiptID(intent.Handle) || !slices.Contains([]string{"completed", "failed"}, intent.Outcome) {
+			return nil, fmt.Errorf("invalid current finish intent at line %d", index+1)
+		}
+		if snapshot == nil || snapshot.Assignment == nil ||
+			!slices.ContainsFunc(snapshot.Assignment.Claims, func(c WorkQueueClaimReceipt) bool { return c.Handle == intent.Handle }) {
+			return nil, errors.New("finish intent is foreign to the captured assignment")
+		}
+		if previous, ok := outcomes[intent.Handle]; ok {
+			if previous != intent.Outcome {
+				return nil, errors.New("conflicting per-Claim work queue finish intents")
 			}
 			continue
 		}
-		choice := fmt.Sprintf("%s:%t", intent.Outcome, intent.KeepOpen)
-		if previous, ok := outcomes[intent.Handle]; ok && previous != choice {
-			return nil, errors.New("conflicting per-Claim work queue finish intents")
-		}
-		ids[intent.IntentID], outcomes[intent.Handle] = string(canonical), choice
-		receipts = append(receipts, intent)
+		outcomes[intent.Handle] = intent.Outcome
+		receipts = append(receipts, WorkQueueFinishReceipt{Handle: intent.Handle, Outcome: intent.Outcome})
 	}
 	return receipts, nil
-}
-
-func decodeCurrentWorkQueueFinishIntent(line []byte, snapshot *WorkQueueCurrentSnapshot, lineNumber int) (WorkQueueFinishReceipt, []byte, error) {
-	var intent struct {
-		Version    int    `json:"version"`
-		IntentID   string `json:"intent_id"`
-		Kind       string `json:"kind"`
-		Handle     string `json:"claim_handle"`
-		Parameters struct {
-			Outcome  string `json:"outcome"`
-			KeepOpen bool   `json:"keep_open"`
-		} `json:"parameters"`
-	}
-	if err := decodeClosedWorkQueueObject(line, []string{"version", "intent_id", "kind", "parameters"}, []string{"claim_handle"}, &intent); err != nil {
-		return WorkQueueFinishReceipt{}, nil, fmt.Errorf("finish intent line %d: %w", lineNumber, err)
-	}
-	var fields map[string]json.RawMessage
-	if err := json.Unmarshal(line, &fields); err != nil {
-		return WorkQueueFinishReceipt{}, nil, fmt.Errorf("finish intent fields line %d: %w", lineNumber, err)
-	}
-	if _, supplied := fields["claim_handle"]; !supplied {
-		if snapshot == nil || snapshot.Assignment == nil || len(snapshot.Assignment.Claims) != 1 {
-			return WorkQueueFinishReceipt{}, nil, errors.New("finish intent requires a selector for the original multi-Claim assignment")
-		}
-		for _, claim := range snapshot.Assignment.Claims {
-			intent.Handle = claim.Handle
-		}
-	}
-	if err := decodeClosedWorkQueueObject(fields["parameters"], []string{"outcome"}, []string{"keep_open"}, &intent.Parameters); err != nil {
-		return WorkQueueFinishReceipt{}, nil, fmt.Errorf("finish parameters line %d: %w", lineNumber, err)
-	}
-	var parameters map[string]json.RawMessage
-	if err := json.Unmarshal(fields["parameters"], &parameters); err != nil {
-		return WorkQueueFinishReceipt{}, nil, err
-	}
-	if keepOpen, present := parameters["keep_open"]; present && string(keepOpen) != "true" && string(keepOpen) != "false" {
-		return WorkQueueFinishReceipt{}, nil, errors.New("keep_open requires a boolean")
-	}
-	if intent.Version != 3 || intent.Kind != "finish" || !validWorkQueueReceiptID(intent.IntentID) ||
-		!validWorkQueueReceiptID(intent.Handle) || !slices.Contains([]string{"completed", "cancelled"}, intent.Parameters.Outcome) ||
-		intent.Parameters.KeepOpen && intent.Parameters.Outcome != "completed" {
-		return WorkQueueFinishReceipt{}, nil, fmt.Errorf("invalid current finish intent at line %d", lineNumber)
-	}
-	if snapshot == nil || snapshot.Assignment == nil ||
-		!slices.ContainsFunc(snapshot.Assignment.Claims, func(c WorkQueueClaimReceipt) bool { return c.Handle == intent.Handle }) {
-		return WorkQueueFinishReceipt{}, nil, errors.New("finish intent is foreign to original immutable assignment")
-	}
-	if !intent.Parameters.KeepOpen {
-		normalized, err := normalizeCurrentWorkQueueFinishIntent(fields, parameters)
-		if err != nil {
-			return WorkQueueFinishReceipt{}, nil, fmt.Errorf("finish intent line %d: %w", lineNumber, err)
-		}
-		line = normalized
-	}
-	canonical, err := workqueue.Canonical(line)
-	if err != nil {
-		return WorkQueueFinishReceipt{}, nil, fmt.Errorf("finish intent line %d: %w", lineNumber, err)
-	}
-	return WorkQueueFinishReceipt{IntentID: intent.IntentID, Handle: intent.Handle, Outcome: intent.Parameters.Outcome, KeepOpen: intent.Parameters.KeepOpen}, canonical, nil
-}
-
-func normalizeCurrentWorkQueueFinishIntent(fields, parameters map[string]json.RawMessage) ([]byte, error) {
-	delete(parameters, "keep_open")
-	normalized, err := json.Marshal(parameters)
-	if err != nil {
-		return nil, err
-	}
-	fields["parameters"] = normalized
-	return json.Marshal(fields)
-}
-
-func validWorkQueueNativeID(value string) bool {
-	return value != "" && len(value) <= 256 && !strings.HasPrefix(value, "0") &&
-		!strings.ContainsFunc(value, func(r rune) bool { return r < '0' || r > '9' })
 }
 
 func validWorkQueueReceiptID(value string) bool {

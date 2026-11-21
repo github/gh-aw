@@ -1,10 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 
-const { fakeGitHub, options } = require("./work_queue_store_checks.cjs");
 const { publishWorkQueueRequest } = require("./work_queue_store.cjs");
-const { defaultPolicy } = require("./work_queue_policy.cjs");
-const { newRequest, replayTransactions } = require("./work_queue_replay.cjs");
-const { administrator, dispatcher, genesis, operationCommit, producer, submission } = require("./work_queue_test_helpers.cjs");
+const { replayTransactionLog } = require("./work_queue_replay.cjs");
+const { planDispatch } = require("./work_queue_scheduler.cjs");
+const { dispatchNext, dispatchParameters, dispatcher, fakeQueueGitHub, ledgerText, producer, submit, work } = require("./work_queue_test_helpers.cjs");
 
 function summaryCore() {
   const summary = { addRaw: vi.fn(), write: vi.fn().mockResolvedValue(undefined) };
@@ -12,101 +11,91 @@ function summaryCore() {
   return { info: vi.fn(), warning: vi.fn(), summary };
 }
 
-function dispatchRequest(id) {
-  return newRequest(id, "dispatch_next", dispatcher, { pool: "default", max_claims: 1, max_dispatches: 1, max_bytes: 49152 });
+function publishOptions(fake, actor, request, operationsFor, extra = {}) {
+  return { githubClient: fake.githubClient, owner: "owner", repo: "repo", actor, request, operationsFor, ...extra };
 }
 
+/** A dispatch_next publication that re-plans against every CAS re-read. */
+function dispatchOptions(fake, core, actor = dispatcher, extra = {}) {
+  const parameters = dispatchParameters({ max_claims: 1, max_dispatches: 1 });
+  return publishOptions(fake, actor, { kind: "dispatch_next", parameters }, (state, request) => planDispatch(state, parameters, request.id).operations, { core, ...extra });
+}
+
+const ledger = fake => replayTransactionLog(fake.contents());
+
 describe("queue publication step summaries", () => {
-  it("renders Policy installation, Work admission and later control updates only after persistence", async () => {
-    const fake = fakeGitHub();
+  it("renders Work admission and later updates only after persistence", async () => {
+    const fake = fakeQueueGitHub(ledgerText(submit([], [work("seed")])));
     const core = summaryCore();
     core.summary.addRaw.mockImplementation(markdown => {
-      expect(fake.log().length).toBeGreaterThan(0);
-      expect(markdown).toContain(replayTransactions(fake.log()).tip.slice(0, 24));
+      expect(markdown).toContain(ledger(fake).tip.slice(0, 24));
       return core.summary;
     });
-    const policy = defaultPolicy({ repository: "owner/repo", principal: "1001", ref: fake.state.defaultRevision });
-    const nodes = submission([genesis(policy)], ["admitted-node"]).operations;
-    const admitted = await publishWorkQueueRequest(options(fake, newRequest("admit-summary", "submit", producer, { nodes }), producer, { core, policyProposal: policy }));
-    expect(admitted.publishedNow).toBe(true);
+    const node = work("admitted-node");
+    const admitted = await publishWorkQueueRequest(publishOptions(fake, producer, { kind: "submit", parameters: { work_ids: [node.work_id] } }, () => [node], { core }));
+    expect(admitted).toMatchObject({ committed: true, recovered: false });
     expect(core.summary.addRaw.mock.calls[0][0]).toMatch(/^<details>\n<summary>Work queue admission<\/summary>\n\n/);
     expect(core.summary.addRaw.mock.calls[0][0]).toContain("<code>admitted-node</code>");
-    const control = newRequest("control-summary", "control", administrator, { operations: [{ kind: "Control", control: "grants_paused", value: true, reason: "maintenance" }] });
-    const updated = await publishWorkQueueRequest(options(fake, control, administrator, { core }));
-    expect(updated.publishedNow).toBe(true);
-    expect(core.summary.addRaw.mock.calls[1][0]).toContain("<code>control</code>");
+    const granted = await publishWorkQueueRequest(dispatchOptions(fake, core));
+    expect(granted.committed).toBe(true);
+    expect(core.summary.addRaw.mock.calls[1][0]).toContain("<code>dispatch_next</code>");
     expect(core.summary.write).toHaveBeenCalledTimes(2);
     expect(core.warning).not.toHaveBeenCalled();
   });
 
-  it("summarizes a durable Claim grant once, not idempotent recovery or zero-operation requests", async () => {
-    const initial = [genesis()];
-    initial.push(submission(initial, ["claimed"]));
-    const fake = fakeGitHub(initial);
+  it("summarizes a durable Claim once, not idempotent recovery or zero-operation requests", async () => {
+    const fake = fakeQueueGitHub(ledgerText(submit([], [work("claimed")])));
     const core = summaryCore();
-    const request = dispatchRequest("grant-summary");
-    const result = await publishWorkQueueRequest(options(fake, request, dispatcher, { core }));
-    expect(result.publishedNow).toBe(true);
+    const result = await publishWorkQueueRequest(dispatchOptions(fake, core));
+    expect(result).toMatchObject({ committed: true, recovered: false });
     expect(core.summary.addRaw).toHaveBeenCalledTimes(1);
-    expect(core.summary.addRaw.mock.calls[0][0]).toContain("1 open Claims");
-    expect(core.summary.addRaw.mock.calls[0][0]).toContain("1 native reservations (1 unbound)");
-    const replay = await publishWorkQueueRequest(options(fake, request, dispatcher, { core }));
-    expect(replay.reused).toBe(true);
-    const empty = await publishWorkQueueRequest(options(fake, dispatchRequest("no-more-work"), dispatcher, { core }));
-    expect(empty.operations).toEqual([]);
+    expect(core.summary.addRaw.mock.calls[0][0]).toContain("1 open Claims; 1 active Dispatches (1 not yet bound to a run)");
+    const replay = await publishWorkQueueRequest(dispatchOptions(fake, core));
+    expect(replay).toMatchObject({ committed: true, recovered: true });
+    const empty = await publishWorkQueueRequest(dispatchOptions(fake, core, { ...dispatcher, run_id: "101" }));
+    expect(empty).toMatchObject({ committed: false, commit: null });
     expect(core.summary.addRaw).toHaveBeenCalledTimes(1);
-    expect(replayTransactions(fake.log()).claims.size).toBe(1);
+    expect(ledger(fake).claims.size).toBe(1);
   });
 
   it("never renders a candidate that loses CAS and becomes ineligible", async () => {
-    const initial = [genesis()];
-    initial.push(submission(initial, ["losing-candidate"]));
-    const fake = fakeGitHub(initial);
+    const log = submit([], [work("losing-candidate")]);
+    const fake = fakeQueueGitHub(ledgerText(log));
     const core = summaryCore();
-    fake.state.beforeUpdate = async ({ log, install }) => {
-      install([...log, operationCommit(log, "pause-before-grant", "control", [{ kind: "Control", control: "grants_paused", value: true, reason: "paused" }], administrator, 100)]);
-    };
-    const result = await publishWorkQueueRequest(options(fake, dispatchRequest("lost-cas-summary"), dispatcher, { core }));
-    expect(result.publishedNow).toBe(false);
-    expect(result.state.claims.size).toBe(0);
+    fake.state.beforeUpdate = () => fake.install(ledgerText(dispatchNext(log, { max_claims: 1, max_dispatches: 1 }, { ...dispatcher, run_id: "999" }).log));
+    const result = await publishWorkQueueRequest(dispatchOptions(fake, core));
+    expect(result.committed).toBe(false);
+    expect(result.state.claims.size).toBe(1);
     expect(core.summary.addRaw).not.toHaveBeenCalled();
   });
 
-  it("renders a recovered ambiguous committed write without selecting or charging again", async () => {
-    const initial = [genesis()];
-    initial.push(submission(initial, ["ambiguous-grant"]));
-    const fake = fakeGitHub(initial);
+  it("recovers an ambiguous committed write without selecting again or rendering a second view", async () => {
+    const fake = fakeQueueGitHub(ledgerText(submit([], [work("ambiguous-grant")])));
     fake.state.ambiguousOnce = true;
     const core = summaryCore();
-    const request = dispatchRequest("ambiguous-summary");
-    const result = await publishWorkQueueRequest(options(fake, request, dispatcher, { core }));
-    expect(result.recovered).toBe(true);
-    expect(result.publishedNow).toBe(false);
-    expect(core.summary.addRaw).toHaveBeenCalledTimes(1);
-    expect(core.summary.addRaw.mock.calls[0][0]).toContain("1 open Claims");
-    await publishWorkQueueRequest(options(fake, request, dispatcher, { core }));
-    expect(core.summary.addRaw).toHaveBeenCalledTimes(1);
+    const result = await publishWorkQueueRequest(dispatchOptions(fake, core));
+    expect(result).toMatchObject({ committed: true, recovered: true });
+    await publishWorkQueueRequest(dispatchOptions(fake, core));
+    expect(core.summary.addRaw).not.toHaveBeenCalled();
     expect(fake.state.updates).toBe(1);
-    expect(replayTransactions(fake.log()).claims.size).toBe(1);
+    expect(ledger(fake).claims.size).toBe(1);
   });
 
-  it("does not reinterpret a summary write failure as an ambiguous CAS or revoke the winning sender", async () => {
-    const initial = [genesis()];
-    initial.push(submission(initial, ["summary-io-failure"]));
-    const fake = fakeGitHub(initial);
+  it("does not reinterpret a summary write failure as an ambiguous CAS", async () => {
+    const fake = fakeQueueGitHub(ledgerText(submit([], [work("summary-io-failure")])));
     const core = summaryCore();
     core.summary.write.mockRejectedValue(new Error("summary filesystem unavailable"));
-    const result = await publishWorkQueueRequest(options(fake, dispatchRequest("summary-write-failed"), dispatcher, { core }));
-    expect(result).toMatchObject({ publishedNow: true, persisted: true, reused: false, recovered: false });
+    const result = await publishWorkQueueRequest(dispatchOptions(fake, core));
+    expect(result).toMatchObject({ committed: true, recovered: false });
     expect(fake.state.updates).toBe(1);
     expect(core.warning).toHaveBeenCalledWith(expect.stringContaining("Publication and Claim accounting are unchanged"));
-    expect(replayTransactions(fake.log()).claims.size).toBe(1);
+    expect(ledger(fake).claims.size).toBe(1);
   });
 
   it("keeps rejected queue updates out of summaries", async () => {
     const core = summaryCore();
-    const fake = fakeGitHub([genesis()]);
-    await expect(publishWorkQueueRequest(options(fake, dispatchRequest("invalid-branch-summary"), dispatcher, { core, branch: "../queue" }))).rejects.toThrow(/branch_invalid/);
+    const fake = fakeQueueGitHub(ledgerText(submit([], [work("seed")])));
+    await expect(publishWorkQueueRequest(dispatchOptions(fake, core, dispatcher, { branch: "../queue" }))).rejects.toThrow(/branch_invalid/);
     expect(core.summary.addRaw).not.toHaveBeenCalled();
     expect(fake.state.updates).toBe(0);
   });

@@ -179,7 +179,7 @@ The `work-queue` tool requires `operation` and `repo` (`owner/repo`), matching t
 | Operation | Options | Returns |
 | --- | --- | --- |
 | `state` | `graph`, `pool`, `state`, `search`, `offset`, `limit` | Bounded metadata-only Work/Claim forest with counts, queue tip, and `next_offset` when more rows remain. |
-| `inspect` | Exactly one of `work_id` or `claim_id` | Metadata, dependencies, assignment membership, and delivery barriers. |
+| `inspect` | Exactly one of `work_id` or `claim_id` | Metadata, dependencies, dispatch, run binding, and recorded effects. |
 
 Options belonging to another operation are rejected. For `state`, the `state` filter accepts `available`, `claimed`, `completed`, or `cancelled`. Pagination uses a nonnegative `offset` and a `limit` of 1–256 (default 80).
 
@@ -195,7 +195,7 @@ Options belonging to another operation are rejected. For `state`, the `state` fi
 }
 ```
 
-Only `state` and `inspect` are exposed through MCP. Other read-only operations (`replay`, `stats`, `explain`, `trace`, and `evidence`) remain CLI-only, as do all mutating operations.
+Only `state` and `inspect` are exposed through MCP. Other read-only operations (`replay` and `stats`) remain CLI-only, as do all mutating operations.
 
 ## Using GH-AW as an MCP from an Agentic Workflow
 

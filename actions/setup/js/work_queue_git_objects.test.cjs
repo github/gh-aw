@@ -8,10 +8,9 @@ const readers = [];
 afterEach(() => {
   for (const reader of readers.splice(0)) reader.close();
   vi.restoreAllMocks();
-  vi.useRealTimers();
 });
 
-function fixture(reply) {
+function fixture(reply, options = {}) {
   const child = new EventEmitter();
   child.stdout = new PassThrough();
   child.stdin = new Writable({
@@ -23,7 +22,7 @@ function fixture(reply) {
   child.unref = vi.fn();
   child.kill = vi.fn();
   const spawn = vi.spyOn(childProcess, "spawn").mockReturnValue(child);
-  const reader = createQueueGitObjectReader(["--git-dir", "/offline/queue"], { GIT_NO_LAZY_FETCH: "1" });
+  const reader = createQueueGitObjectReader(["--git-dir", "/offline/queue"], { GIT_NO_LAZY_FETCH: "1" }, options);
   readers.push(reader);
   return { reader, child, spawn };
 }
@@ -65,19 +64,18 @@ describe("bounded queue Git object stream", () => {
   });
 
   it.each(["error", "exit", "stdin", "close", "timeout"])("rejects pending and queued reads on %s without exposing process data", async cause => {
-    vi.useFakeTimers();
-    const { reader, child } = fixture(() => {});
+    const { reader, child } = fixture(() => {}, { timeoutMs: cause === "timeout" ? 5 : 60000 });
     const first = reader.object(oid, "blob");
     const second = reader.object(oid, "blob");
     const checked = Promise.all([expect(first).rejects.toMatchObject({ code: "git_transport_failed" }), expect(second).rejects.toMatchObject({ code: "git_transport_failed" })]);
     await Promise.resolve();
-    if (cause === "timeout") await vi.advanceTimersByTimeAsync(120000);
-    else if (cause === "stdin") child.stdin.emit("error", new Error("private credentials"));
+    if (cause === "timeout") {
+      // The read watchdog fires on its own.
+    } else if (cause === "stdin") child.stdin.emit("error", new Error("private credentials"));
     else if (cause === "close") reader.close();
     else child.emit(cause, new Error("private credentials"));
     await checked;
     expect(child.stdout.listenerCount("data")).toBe(0);
-    expect(vi.getTimerCount()).toBe(0);
   });
 
   it("rejects untrusted object selectors before starting Git", async () => {

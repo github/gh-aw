@@ -167,20 +167,6 @@ describe("setup.sh bundled connector execution", () => {
   });
 });
 
-describe("work queue pool-install packaging", () => {
-  it.each([
-    ["MCP_SCRIPTS_FILES", mcpScriptsFiles],
-    ["SAFE_OUTPUTS_FILES", safeOutputsFiles],
-  ])("deploys the pool-install module in %s", (_name, files) => {
-    expect(files).toContain("work_queue_pool_install.cjs");
-  });
-
-  it("embeds the pool-install module for standalone bundles", () => {
-    const sources = readFileSync(resolve(__dirname, "../session_parsers.go"), "utf8");
-    expect(sources).toMatch(/^\/\/go:embed .*js\/work_queue_pool_install\.cjs(?:\s|$)/m);
-  });
-});
-
 describe("setup.sh isolated redaction dependencies", () => {
   it.each([
     ["MCP_SCRIPTS_FILES", mcpScriptsFiles],
@@ -217,16 +203,14 @@ describe("setup.sh MCP_SCRIPTS_FILES", () => {
             const manifest = require("./safe_output_manifest.cjs");
             const summary = require("./work_queue_summary_renderer.cjs");
             const native = require("./work_queue_native.cjs");
-            const delivery = require("./work_queue_native_creation_delivery.cjs");
-            const provisioning = require("./work_queue_provisioning.cjs");
+            const issues = require("./work_queue_issues.cjs");
             const { normalizeWebhookContext } = require("./webhook_context.cjs");
             const payload = { url: "https://api.github.com/orgs/org/projectsV2/1/items/123", type: ["edited"] };
             assert.equal(normalizeWebhookContext({ webhook: { event: "projects_v2_item", deliveries: [{ delivery_id: "d", payload }] } }).items[0].item_number, "123");
             assert.throws(() => normalizeWebhookContext({ webhook: { event: "projects_v2_item", deliveries: [{ delivery_id: "d", payload: { ...payload, body: "private" } }] } }), /accepts only/);
             assert.equal(typeof summary.renderWorkQueue, "function");
-            assert.equal(typeof native.authenticatePublisher, "function");
-            assert.equal(typeof delivery.captureDiscussionDelivery, "function");
-            assert.equal(typeof provisioning.verifiedDefaultReference, "function");
+            assert.equal(typeof native.postQueueDispatch, "function");
+            assert.equal(typeof issues.projectIssues, "function");
             const token = "ghp_" + "a".repeat(36);
             assert.equal(
               manifest.redactManifestValue(token + " fixture-custom-secret", ["fixture-custom-secret"]),
@@ -304,18 +288,15 @@ describe("setup.sh SAFE_OUTPUTS_FILES", () => {
             assert.ok(formatted.text.includes("gh-aw-agentic-workflow"));
             const { withClaimExecution } = require("./work_queue_claim_scope.cjs");
             const native = require("./work_queue_native.cjs");
-            const delivery = require("./work_queue_native_creation_delivery.cjs");
-            const provisioning = require("./work_queue_provisioning.cjs");
+            const issues = require("./work_queue_issues.cjs");
             const { normalizeWebhookContext } = require("./webhook_context.cjs");
             const payload = { url: "https://api.github.com/orgs/org/projectsV2/1/items/123", type: ["edited"] };
             assert.equal(normalizeWebhookContext({ webhook: { event: "projects_v2_item", deliveries: [{ delivery_id: "d", payload }] } }).items[0].item_number, "123");
             assert.throws(() => normalizeWebhookContext({ webhook: { event: "projects_v2_item", deliveries: [{ delivery_id: "d", payload: { ...payload, body: "private" } }] } }), /accepts only/);
-            assert.equal(typeof native.authenticatePublisher, "function");
-            assert.equal(typeof delivery.captureDiscussionDelivery, "function");
-            assert.equal(typeof provisioning.verifiedDefaultReference, "function");
+            assert.equal(typeof native.postQueueDispatch, "function");
+            assert.equal(typeof issues.projectIssues, "function");
             const assignment = {
-              version: 3, dispatch_id: "dispatch", request_id: "request", commit_id: "commit",
-              policy_epoch: "policy", pool: "default", worker_profile: "default",
+              dispatch_id: "dispatch",
               claims: [{ handle: "h1", claim_id: "claim-one", work_id: "work-one", work: {}, result_refs: [] }],
             };
             const context = { workflowName: "Worker", runUrl: "https://github.com/owner/repo/actions/runs/123" };
@@ -345,16 +326,14 @@ describe("setup.sh SAFE_OUTPUTS_FILES", () => {
     expect(safeOutputsFiles).toContain("work_queue_logging.cjs");
   });
 
-  it("deploys checked transport and Issue binding dependencies with the queue runtime", () => {
-    expect(getDirectLocalRequires("work_queue_store.cjs")).toContain("work_queue_checked_transport.cjs");
-    expect(getDirectLocalRequires("work_queue_replay.cjs")).toContain("work_queue_issue_contract.cjs");
-    expect(safeOutputsFiles).toContain("work_queue_checked_transport.cjs");
-    expect(safeOutputsFiles).toContain("work_queue_issue_contract.cjs");
+  it("deploys Issue projection dependencies with the queue runtime", () => {
+    for (const file of ["work_queue_issues.cjs", "work_queue_issue_api.cjs", "work_queue_issue_messages.cjs"]) {
+      expect(safeOutputsFiles).toContain(file);
+    }
   });
 
-  it("deploys Claim authority and worker route provisioning dependencies", () => {
+  it("deploys Claim authority dependencies", () => {
     expect(getDirectLocalRequires("safe_outputs_handlers.cjs")).toContain("work_queue_claim_scope.cjs");
-    expect(readFileSync(resolve(__dirname, "work_queue_provisioning.cjs"), "utf8")).not.toContain("readDocumentMetadata");
     for (const file of ["work_queue_claim_scope.cjs", "finish_work_queue_claim.cjs", "work_queue_resource_scope.cjs", "work_queue_effect_client.cjs"]) {
       expect(safeOutputsFiles).toContain(file);
     }

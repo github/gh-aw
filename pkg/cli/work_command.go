@@ -1,10 +1,6 @@
 package cli
 
 import (
-	"bytes"
-	"context"
-	"crypto/rand"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -12,42 +8,29 @@ import (
 	"os"
 	"slices"
 	"strings"
-	"time"
 
+	"github.com/github/gh-aw/pkg/gitutil"
+	"github.com/github/gh-aw/pkg/workflow"
 	"github.com/github/gh-aw/pkg/workqueue"
 	"github.com/spf13/cobra"
 )
 
-const workQueueBranchDescription = "Queue branch (an explicit branch is a separate authority)"
+const workQueueBranchDescription = "Queue branch holding work-queue.jsonl"
+
+// defaultWorkQueueMaxAttempts applies when no compiled pool configuration is available.
+const defaultWorkQueueMaxAttempts = 3
 
 func NewWorkCommand() *cobra.Command {
-	return NewWorkCommandWithNativeDeliveryHost(nil)
-}
-
-type nativeDeliveryHostKey struct{}
-
-// NewWorkCommandWithNativeDeliveryHost is the protected native-process entry
-// point. An embedding host supplies approved callbacks, never a CLI receipt
-// filename, verifier executable, digest, or actor/source assertion.
-func NewWorkCommandWithNativeDeliveryHost(host *workqueue.NativeDeliveryHost) *cobra.Command {
 	var root *cobra.Command
 	root = &cobra.Command{
-		Use: "work-queue", Aliases: []string{"work"}, Short: "Inspect and publish the current fair Git-backed DAG work queue",
-		Long: "Inspect and publish the current fair Git-backed DAG work queue.\n\n" +
-			"Direct claim and operator finish are unsupported. Use dispatch-next for mandatory\n" +
-			"scheduler grants, or dispatch to run a trusted dispatcher and launch assignments.\n" +
-			"Only the originally bound worker may stage work_queue_claim_finish.\n" +
-			"Use trace and historical explain for read-only provenance. compact normalizes\n" +
-			"representation without dropping history, resetting debt, or adopting legacy queues.",
+		Use: "work-queue", Aliases: []string{"work"}, Short: "Inspect and operate the Git-backed priority-FIFO work queue",
+		Long: "Inspect and operate the Git-backed work queue (protocol v4).\n\n" +
+			"Dispatchers claim and launch Work; workers bind and finish their own Claims;\n" +
+			"agentics-maintenance releases dispatches whose runs ended. Operator commands\n" +
+			"publish as the administrator of the target repository: cancel-work, release,\n" +
+			"clear, and compact (checkpoint).",
 		Args: cobra.NoArgs,
 		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
-			if host != nil {
-				cmd.SetContext(context.WithValue(cmd.Context(), nativeDeliveryHostKey{}, host))
-			}
-			storage, _ := cmd.Flags().GetString("storage")
-			if storage != "git" {
-				return errors.New("unsupported_backend: work queues require Git storage; Issues storage is not supported")
-			}
 			repo, _ := cmd.Flags().GetString("repo")
 			fileReplay := cmd.Name() == "replay" && cmd.Flags().Changed("file")
 			if repo == "" && cmd.Parent() == root && !fileReplay {
@@ -63,27 +46,24 @@ func NewWorkCommandWithNativeDeliveryHost(host *workqueue.NativeDeliveryHost) *c
 	}
 	root.PersistentFlags().StringP("repo", "r", "", "Target repository (owner/repo format)")
 	root.PersistentFlags().String("branch", workqueue.DefaultBranch, workQueueBranchDescription)
-	root.PersistentFlags().String("storage", "git", "Queue storage (git only)")
-	root.PersistentFlags().String("request-id", "", "Stable publication handle, or committed request to inspect with explain/trace")
 	root.PersistentFlags().BoolP("json", "j", false, "Output results in JSON format")
-	root.AddCommand(workReplayCommand(), workStatsCommand(), workExplainCommand(),
-		workSubmitCommand(), workSubmitGraphCommand(), workDispatchNextCommand(), workDispatchCommand(),
-		workPolicyCommand(), workDeployCommand(), workControlCommand(), workCancelCommand(), workClearCommand(),
-		workReconcileCommand(), workEvidenceCommand(), workCompactCommand(), workTraceCommand(),
-		workStateCommand(), workInspectCommand(), workCancelClaimCommand(), workPriorityCommand(), workSyncIssuesCommand(), workTUICommand())
+	root.AddCommand(workReplayCommand(), workStatsCommand(), workStateCommand(), workInspectCommand(), workTUICommand(),
+		workSubmitCommand(), workSubmitGraphCommand(), workCancelCommand(), workReleaseCommand(), workClearCommand(),
+		workCompactCommand(), workDispatchCommand())
 	return root
 }
 
 func workBranch(cmd *cobra.Command) workqueue.Branch {
 	repo, _ := cmd.Flags().GetString("repo")
 	branch, _ := cmd.Flags().GetString("branch")
-	result := workqueue.Branch{Remote: repo, Name: branch}
-	var host *workqueue.NativeDeliveryHost
-	if provided, ok := cmd.Context().Value(nativeDeliveryHostKey{}).(*workqueue.NativeDeliveryHost); ok {
-		host = provided
-	}
-	result.DeliveryVerifier = host.Verifier(result)
-	return result
+	return workqueue.Branch{Remote: repo, Name: branch}
+}
+
+// workActor is the operator actor: write access to the queue branch is the only
+// authority v4 relies on, so no API self-authentication is performed.
+func workActor(cmd *cobra.Command) workqueue.Actor {
+	repo, _ := cmd.Flags().GetString("repo")
+	return workqueue.Actor{Role: "administrator", Repository: repo}
 }
 
 func workPrint(cmd *cobra.Command, value any, human string) error {
@@ -98,221 +78,38 @@ func workPrint(cmd *cobra.Command, value any, human string) error {
 }
 
 func workRead(cmd *cobra.Command) (workqueue.Projection, error) {
-	commits, err := workBranch(cmd).Read(cmd.Context())
+	snapshot, err := workBranch(cmd).Read(cmd.Context())
 	if err != nil {
 		return workqueue.Projection{}, err
 	}
-	projection, err := workqueue.ReplayAt(commits, time.Now().UnixMilli())
-	if err != nil {
-		return projection, err
+	state := snapshot.State
+	if state.Repository == "" {
+		state.Repository, _ = cmd.Flags().GetString("repo")
 	}
-	if projection.Repository == "" {
-		projection.Repository, _ = cmd.Flags().GetString("repo")
-	}
-	return projection, nil
+	return state, nil
 }
 
-func workReplayCommand() *cobra.Command {
-	cmd := &cobra.Command{
-		Use: "replay", Aliases: []string{"read"}, Short: "Validate the full causal queue and display ownership and barriers",
-		Long: "Replay the live ledger, or use --run-id to download an exact Actions activation\n" +
-			"snapshot (--file accepts an already downloaded snapshot). Artifact replay is\n" +
-			"read-only; --pool predicts scheduling at capture time without launching workers.",
-		Args: cobra.NoArgs,
-		RunE: func(cmd *cobra.Command, _ []string) error {
-			runID, _ := cmd.Flags().GetInt64("run-id")
-			file, _ := cmd.Flags().GetString("file")
-			if cmd.Flags().Changed("run-id") || cmd.Flags().Changed("file") {
-				return workReplayArtifact(cmd, runID, file)
+// workMaxAttempts resolves each pool's compiled max_attempts from the checkout's
+// .github/workflows/aw.json (the source of the compiled policy environment).
+func workMaxAttempts() func(string) int {
+	settings := workqueue.Settings{}
+	loaded := false
+	if root, err := gitutil.FindGitRoot(); err == nil {
+		if config, err := workflow.LoadRepoConfig(root); err == nil && config != nil {
+			if parsed, err := workqueue.ParseSettings(config.WorkQueue); err == nil {
+				settings, loaded = parsed, true
 			}
-			for _, flag := range []string{"pool", "max-claims", "max-dispatches"} {
-				if cmd.Flags().Changed(flag) {
-					return errors.New("artifact_replay_invalid: scheduling predictions require --run-id or --file")
-				}
-			}
-			projection, err := workRead(cmd)
-			if err != nil {
-				return err
-			}
-			ids := make([]string, 0, len(projection.Works))
-			for id := range projection.Works {
-				ids = append(ids, id)
-			}
-			slices.Sort(ids)
-			lines := []string{}
-			for _, id := range ids {
-				item := projection.Works[id]
-				lines = append(lines, fmt.Sprintf("%s  %s  delivery=%s", id, item.State, item.Barrier))
-			}
-			if len(lines) == 0 {
-				lines = []string{"No Work; policy " + projection.PolicyEpoch}
-			}
-			return workPrint(cmd, projection, strings.Join(lines, "\n"))
-		},
-	}
-	cmd.Flags().Int64("run-id", 0, "Replay the activation snapshot from this exact Actions run (read only)")
-	cmd.Flags().String("file", "", "Replay a downloaded work-queue.snapshot.json (read only)")
-	cmd.Flags().String("pool", "", "Predict a fair dispatch from the captured ledger without writes or launches")
-	cmd.Flags().Int("max-claims", 1, "Predicted logical Claim budget, bounded by captured Policy")
-	cmd.Flags().Int("max-dispatches", 1, "Predicted native dispatch budget, bounded by captured Policy")
-	return cmd
-}
-
-func workStatsCommand() *cobra.Command {
-	return &cobra.Command{
-		Use: "stats", Short: "Count ownership, typed graph nodes, and native reservations separately",
-		Args: cobra.NoArgs,
-		RunE: func(cmd *cobra.Command, _ []string) error {
-			projection, err := workRead(cmd)
-			if err != nil {
-				return err
-			}
-			branch, _ := cmd.Flags().GetString("branch")
-			report, err := workQueueStatsAt(projection, branch, time.Now().UnixMilli())
-			if err != nil {
-				return err
-			}
-			return workPrint(cmd, report, workQueueStatsText(report))
-		},
-	}
-}
-
-func workExplainCommand() *cobra.Command {
-	cmd := &cobra.Command{
-		Use: "explain", Short: "Explain live eligibility or an exact committed request/Claim using the authoritative scheduler",
-		Args: cobra.NoArgs,
-		RunE: func(cmd *cobra.Command, _ []string) error {
-			id, _ := cmd.Flags().GetString("work-id")
-			beforeClaim, _ := cmd.Flags().GetString("before-claim")
-			requestID, _ := cmd.Flags().GetString("request-id")
-			selectors := 0
-			for _, value := range []string{id, beforeClaim, requestID} {
-				if value != "" {
-					selectors++
-				}
-			}
-			if selectors > 1 || (beforeClaim != "" || requestID != "") && cmd.Flags().Changed("pool") {
-				return errors.New("inspection_invalid: explain selectors are mutually exclusive; historical requests determine their pool")
-			}
-			commits, err := workBranch(cmd).Read(cmd.Context())
-			if err != nil {
-				return err
-			}
-			if beforeClaim != "" || requestID != "" {
-				return workExplainCommitted(cmd, commits, beforeClaim, requestID)
-			}
-			at := time.Now().UnixMilli()
-			state, err := workqueue.ReplayAt(commits, at)
-			if err != nil {
-				return err
-			}
-			if id != "" {
-				explanation, err := workqueue.ExplainWork(state, id, at)
-				if err != nil {
-					return err
-				}
-				return workPrint(cmd, struct {
-					workqueue.WorkExplanation
-					Tip    string `json:"tip"`
-					At     int64  `json:"at"`
-					Status string `json:"status"`
-				}{explanation, state.Tip, at, "operator_live_read"},
-					explanation.Reason+": "+strings.Join(explanation.Path, " -> "))
-			}
-			pool, _ := cmd.Flags().GetString("pool")
-			selection, err := workqueue.PlanNext(state, pool, at)
-			if err != nil {
-				return err
-			}
-			decision, err := workqueue.PlanDispatch(state, workqueue.DispatchParameters{
-				Pool: pool, MaxClaims: 1, MaxDispatches: 1, MaxBytes: state.Policy.Limits.AssignmentBytes,
-			}, "snapshot_prediction", "snapshot_commit", at)
-			if err != nil {
-				return err
-			}
-			return workPrint(cmd, map[string]any{"tip": state.Tip, "at": at, "status": "snapshot_prediction", "selection": selection, "decision": decision, "prediction": workQueueCompactPrediction(decision)},
-				"Snapshot prediction: "+decision.Reason+" "+selection.WorkID+" (not a grant)")
-		},
-	}
-	cmd.Flags().String("pool", "default", "Approved scheduling pool")
-	cmd.Flags().String("work-id", "", "Inspect this Work's dependency path (read only)")
-	cmd.Flags().String("before-claim", "", "Replay the exact predecessor and earlier operations before this committed Claim")
-	return cmd
-}
-
-func workExplainCommitted(cmd *cobra.Command, commits []workqueue.QueueCommit, beforeClaim, requestID string) error {
-	if beforeClaim != "" {
-		explanation, err := workqueue.ExplainBeforeClaim(commits, beforeClaim)
-		if err != nil {
-			return err
 		}
-		return workPrint(cmd, explanation, fmt.Sprintf("Committed Claim %s: selected %s before %s operation %d; tip %s",
-			explanation.ClaimID, explanation.Selection.WorkID, explanation.CommitID, explanation.Position.Operation, explanation.Tip))
 	}
-	explanation, err := workqueue.ExplainRequest(commits, requestID)
-	if err != nil {
-		return err
+	return func(pool string) int {
+		if !loaded {
+			return defaultWorkQueueMaxAttempts
+		}
+		if configured, ok := settings.Pools[pool]; ok {
+			return configured.Retry.MaxAttempts
+		}
+		return settings.Retry.MaxAttempts
 	}
-	return workPrint(cmd, explanation, fmt.Sprintf("Committed request %s (%s): %d Claims in %s; tip %s",
-		explanation.RequestID, explanation.Kind, len(explanation.Claims), explanation.CommitID, explanation.Tip))
-}
-
-func workCompactCommand() *cobra.Command {
-	return &cobra.Command{
-		Use: "compact", Short: "Canonicalize and deduplicate an existing queue without dropping history or resetting debt",
-		Args: cobra.NoArgs,
-		RunE: func(cmd *cobra.Command, _ []string) error {
-			result, err := workBranch(cmd).Compact(cmd.Context())
-			if err != nil {
-				return err
-			}
-			status := "Already canonical"
-			if result.Changed {
-				status = "Canonicalized"
-			} else if result.AcknowledgmentRecovered {
-				status = "Confirmed canonical after uncertain publication"
-			}
-			return workPrint(cmd, result, fmt.Sprintf("%s: retained %d commits; removed %d duplicate records; tip %s",
-				status, result.Commits, result.DuplicatesRemoved, result.Tip))
-		},
-	}
-}
-
-func workTraceCommand() *cobra.Command {
-	cmd := &cobra.Command{
-		Use: "trace", Short: "Trace exact committed request/Claim grants, bindings and delivery without exposing payloads or receipts",
-		Args: cobra.NoArgs,
-		RunE: func(cmd *cobra.Command, _ []string) error {
-			requestID, _ := cmd.Flags().GetString("request-id")
-			claimID, _ := cmd.Flags().GetString("claim-id")
-			offset, _ := cmd.Flags().GetInt("offset")
-			limit, _ := cmd.Flags().GetInt("limit")
-			if (requestID == "") == (claimID == "") || offset < 0 || limit < 1 || limit > 256 {
-				return errors.New("inspection_invalid: trace requires exactly one --request-id/--claim-id and --offset >= 0, --limit 1..256")
-			}
-			commits, err := workBranch(cmd).Read(cmd.Context())
-			if err != nil {
-				return err
-			}
-			page, err := workqueue.TraceQueue(commits, workqueue.TraceOptions{
-				RequestID: requestID, ClaimID: claimID, Offset: offset, Limit: limit,
-			}, time.Now().UnixMilli())
-			if err != nil {
-				return err
-			}
-			lines := []string{fmt.Sprintf("Read-only trace: tip %s; events %d..%d of %d; %s",
-				page.Tip, page.Offset, page.Offset+len(page.Events), page.TotalEvents, page.TraceAvailability)}
-			for _, event := range page.Events {
-				lines = append(lines, fmt.Sprintf("%s[%d] %s request=%s claim=%s dispatch=%s %s",
-					event.CommitID, event.Position.Operation, event.Kind, event.RequestID, event.ClaimID, event.DispatchID, event.State))
-			}
-			return workPrint(cmd, page, strings.Join(lines, "\n"))
-		},
-	}
-	cmd.Flags().String("claim-id", "", "Exact original Claim to trace (mutually exclusive with --request-id)")
-	cmd.Flags().Int("offset", 0, "Matching event offset")
-	cmd.Flags().Int("limit", 100, "Maximum events on this page (1..256)")
-	return cmd
 }
 
 func workReadJSON(cmd *cobra.Command) (data []byte, retErr error) {
@@ -321,12 +118,10 @@ func workReadJSON(cmd *cobra.Command) (data []byte, retErr error) {
 		return nil, errors.New("--file is required")
 	}
 	var reader io.Reader
-	var file *os.File
 	if path == "-" {
 		reader = cmd.InOrStdin()
 	} else {
-		var err error
-		file, err = os.Open(path)
+		file, err := os.Open(path)
 		if err != nil {
 			return nil, err
 		}
@@ -347,441 +142,98 @@ func workReadJSON(cmd *cobra.Command) (data []byte, retErr error) {
 	return workqueue.Canonical(data)
 }
 
-func workRequestID(cmd *cobra.Command) (string, error) {
-	id, _ := cmd.Flags().GetString("request-id")
-	if id != "" {
-		return id, nil
-	}
-	var bytes [16]byte
-	if _, err := rand.Read(bytes[:]); err != nil {
-		return "", err
-	}
-	return hex.EncodeToString(bytes[:]), nil
-}
-
-func workPublish(cmd *cobra.Command, role, kind string, params any) (workqueue.Publication, error) {
-	branch := workBranch(cmd)
-	actor, err := branch.Authenticate(cmd.Context(), role)
-	if err != nil {
-		return workqueue.Publication{}, err
-	}
-	id, err := workRequestID(cmd)
-	if err != nil {
-		return workqueue.Publication{}, err
-	}
-	request, err := workqueue.NewRequest(id, kind, actor, params)
-	if err != nil {
-		return workqueue.Publication{}, err
-	}
-	return branch.Publish(cmd.Context(), actor, request)
-}
-
-func workSubmitCommand() *cobra.Command {
+func workReplayCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use: "submit-work", Short: "Admit immutable Work with queue-like defaults and trusted policy entitlements",
-		Args: cobra.NoArgs,
-		RunE: workRunSubmitCommand,
-	}
-	cmd.Flags().String("file", "", "JSON work object path (- for stdin)")
-	cmd.Flags().String("graph-id", "", "Nonempty graph namespace (when omitted: canonical payload SHA256)")
-	cmd.Flags().String("node-key", "root", "Nonempty node identity inside its graph (when omitted: root)")
-	cmd.Flags().String("pool", "default", "Approved scheduling pool")
-	cmd.Flags().Int("priority", 3, "Entitled priority 1..5")
-	cmd.Flags().String("fairness-key", "", "Entitled accounting key (default: one shared bucket)")
-	cmd.Flags().String("worker-profile", "", "Approved profile (default: pool default)")
-	cmd.Flags().String("execution-ref", "", "Pin this Work to an approved immutable worker SHA instead of following future compatible deployments")
-	cmd.Flags().Int64("expires-at", 0, "Immutable Unix-millisecond deadline for unclaimed Work (omitted: no expiration)")
-	return cmd
-}
-
-func workRunSubmitCommand(cmd *cobra.Command, _ []string) error {
-	graph, _ := cmd.Flags().GetString("graph-id")
-	key, _ := cmd.Flags().GetString("node-key")
-	if cmd.Flags().Changed("graph-id") && graph == "" || cmd.Flags().Changed("node-key") && key == "" {
-		return errors.New("work_invalid: explicitly supplied graph/node identities are empty. Use nonempty values, for example --graph-id review --node-key root, or omit the flags for payload-hash/root defaults")
-	}
-	payload, err := workReadJSON(cmd)
-	if err != nil {
-		return err
-	}
-	branch := workBranch(cmd)
-	actor, err := branch.Authenticate(cmd.Context(), "producer")
-	if err != nil {
-		return err
-	}
-	state, policy, err := workReadSubmissionPolicy(cmd, actor.Principal, actor.Repository)
-	if err != nil {
-		return err
-	}
-	pool, _ := cmd.Flags().GetString("pool")
-	if !cmd.Flags().Changed("graph-id") {
-		graph, err = workqueue.IndependentGraphID(payload)
-		if err != nil {
-			return err
-		}
-	}
-	work, err := workqueue.NewWork(payload, graph, key, pool, policy, time.Now().UnixMilli())
-	if err != nil {
-		return err
-	}
-	work, err = workConfigureSubmission(cmd, state, policy, work)
-	if err != nil {
-		return err
-	}
-	work, err = workReuseSubmission(state, work)
-	if err != nil {
-		return err
-	}
-	if state.Policy == nil {
-		branch.PolicyProposal = &policy
-	}
-	published, err := workPublishSubmission(cmd, branch, actor, work)
-	if err != nil {
-		return err
-	}
-	if !published.Changed {
-		return workPrint(cmd, map[string]any{
-			"work_id": work.WorkID, "created": false, "status": "already_admitted", "publication": published,
-		}, "Work "+work.WorkID+" already admitted")
-	}
-	return workPrint(cmd, map[string]any{"work_id": work.WorkID, "created": published.Changed, "publication": published},
-		"Admitted Work "+work.WorkID)
-}
-
-func workConfigureSubmission(cmd *cobra.Command, state workqueue.Projection, policy workqueue.Policy, work workqueue.WorkDefinition) (workqueue.WorkDefinition, error) {
-	work, err := workConfigureExpiration(cmd, state, work)
-	if err != nil {
-		return workqueue.WorkDefinition{}, err
-	}
-	pool := work.Pool
-	work.Priority, _ = cmd.Flags().GetInt("priority")
-	work.FairnessKey, _ = cmd.Flags().GetString("fairness-key")
-	profile, _ := cmd.Flags().GetString("worker-profile")
-	if profile != "" {
-		approved, ok := policy.Pools[pool].Profiles[profile]
-		if !ok {
-			return workqueue.WorkDefinition{}, errors.New("profile_invalid: worker profile is not approved")
-		}
-		work.WorkerProfile, work.BatchTrustDomain = profile, approved.TrustDomain
-		work.LogicalContract = approved.LogicalContract
-	}
-	pin, _ := cmd.Flags().GetString("execution-ref")
-	if cmd.Flags().Changed("execution-ref") && pin == "" {
-		return workqueue.WorkDefinition{}, errors.New("work_invalid: execution-ref must be a nonempty approved immutable worker SHA")
-	}
-	if existing := state.Works[work.WorkID]; existing != nil && cmd.Flags().Changed("execution-ref") && existing.ExecutionRef != pin {
-		return workqueue.WorkDefinition{}, errors.New("work_conflict: an existing Work execution pin is immutable; use its original pin or a new node identity")
-	}
-	if pin != "" {
-		approved := policy.Pools[pool].Profiles[work.WorkerProfile]
-		if pin != approved.Ref {
-			deployment := state.Deployments[pool][work.WorkerProfile]
-			if deployment == nil {
-				return workqueue.WorkDefinition{}, errors.New("work_invalid: execution-ref must name the exact installed worker SHA or a registered immutable revision")
-			}
-			revision, exists := deployment.Revisions[pin]
-			if !exists {
-				return workqueue.WorkDefinition{}, errors.New("work_invalid: execution-ref is not a registered immutable worker revision")
-			}
-			approved = revision.Profile
-		}
-		work.ExecutionRef, work.LogicalContract = pin, approved.LogicalContract
-	}
-	return work, nil
-}
-
-func workConfigureExpiration(cmd *cobra.Command, state workqueue.Projection, work workqueue.WorkDefinition) (workqueue.WorkDefinition, error) {
-	if cmd.Flags().Changed("expires-at") {
-		deadline, _ := cmd.Flags().GetInt64("expires-at")
-		if deadline < 0 || deadline > workqueue.MaxTimestamp {
-			return workqueue.WorkDefinition{}, errors.New("work_invalid: expires-at must be a nonnegative safe-integer Unix-millisecond timestamp")
-		}
-		work.ExpiresAt = &deadline
-		if existing := state.Works[work.WorkID]; existing != nil && (existing.ExpiresAt == nil || *existing.ExpiresAt != deadline) {
-			return workqueue.WorkDefinition{}, errors.New("work_conflict: an existing Work expiration is immutable; use its original deadline or a new node identity")
-		}
-	} else if existing := state.Works[work.WorkID]; existing != nil {
-		work.ExpiresAt = existing.ExpiresAt
-	}
-	return work, nil
-}
-
-func workPublishSubmission(cmd *cobra.Command, branch workqueue.Branch, actor workqueue.Actor, work workqueue.WorkDefinition) (workqueue.Publication, error) {
-	requestID, err := workRequestID(cmd)
-	if err != nil {
-		return workqueue.Publication{}, err
-	}
-	request, err := workqueue.NewRequest(requestID, "submit", actor, workqueue.SubmitParameters{Nodes: []workqueue.WorkDefinition{work}})
-	if err != nil {
-		return workqueue.Publication{}, err
-	}
-	return branch.Publish(cmd.Context(), actor, request)
-}
-
-func workReadSubmissionPolicy(cmd *cobra.Command, _, _ string) (workqueue.Projection, workqueue.Policy, error) {
-	state, err := workRead(cmd)
-	if err == nil {
-		return state, workqueue.FuturePolicy(state), nil
-	}
-	var protocolError *workqueue.ProtocolError
-	if errors.As(err, &protocolError) && protocolError.Code == "queue_missing" {
-		policy, err := workBranch(cmd).PolicyFromConfig(cmd.Context())
-		return state, policy, err
-	}
-	return workqueue.Projection{}, workqueue.Policy{}, err
-}
-
-func workReuseSubmission(state workqueue.Projection, work workqueue.WorkDefinition) (workqueue.WorkDefinition, error) {
-	existing := state.Works[work.WorkID]
-	if existing == nil {
-		return work, nil
-	}
-	work.Enqueued = existing.Enqueued
-	work.LogicalContract, work.ExecutionRef = existing.LogicalContract, existing.ExecutionRef
-	left, err := workqueue.CanonicalValue(existing.WorkDefinition)
-	if err != nil {
-		return workqueue.WorkDefinition{}, err
-	}
-	right, err := workqueue.CanonicalValue(work)
-	if err != nil {
-		return workqueue.WorkDefinition{}, err
-	}
-	if !bytes.Equal(left, right) {
-		return workqueue.WorkDefinition{}, errors.New("work_conflict: idempotent submission changes immutable metadata")
-	}
-	return work, nil
-}
-
-func workSubmitGraphCommand() *cobra.Command {
-	cmd := &cobra.Command{
-		Use: "submit-graph", Short: "Atomically admit a bounded array of normalized current-protocol graph nodes",
+		Use: "replay", Aliases: []string{"read"}, Short: "Validate the queue ledger and list Work states",
+		Long: "Replay the live ledger, or use --run-id to download an exact Actions activation\n" +
+			"snapshot (--file accepts an already downloaded snapshot). Artifact replay is\n" +
+			"read-only; --pool predicts the next dispatch from the captured ledger.",
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			data, err := workReadJSON(cmd)
-			if err != nil {
-				return err
+			runID, _ := cmd.Flags().GetInt64("run-id")
+			file, _ := cmd.Flags().GetString("file")
+			if cmd.Flags().Changed("run-id") || cmd.Flags().Changed("file") {
+				return workReplayArtifact(cmd, runID, file)
 			}
-			var nodes []json.RawMessage
-			if err := json.Unmarshal(data, &nodes); err != nil || len(nodes) == 0 || len(nodes) > 256 {
-				return errors.New("graph_invalid: expected 1..256 complete normalized Work nodes")
-			}
-			published, err := workPublish(cmd, "producer", "submit", struct {
-				Nodes []json.RawMessage `json:"nodes"`
-			}{Nodes: nodes})
-			if err != nil {
-				return err
-			}
-			return workPrint(cmd, published, fmt.Sprintf("Admitted %d graph nodes atomically", len(nodes)))
-		},
-	}
-	cmd.Flags().String("file", "", "Normalized current-protocol Work array (- for stdin)")
-	return cmd
-}
-
-func workDispatchNextCommand() *cobra.Command {
-	cmd := &cobra.Command{
-		Use: "dispatch-next", Short: "Grant a deterministic fair prefix; launch and binding remain trusted lifecycle steps",
-		Args: cobra.NoArgs,
-		RunE: func(cmd *cobra.Command, _ []string) error {
-			pool, _ := cmd.Flags().GetString("pool")
-			claims, _ := cmd.Flags().GetInt("max-claims")
-			dispatches, _ := cmd.Flags().GetInt("max-dispatches")
-			bytes, _ := cmd.Flags().GetInt64("max-bytes")
-			published, err := workPublish(cmd, "administrator", "dispatch_next", workqueue.DispatchParameters{
-				Pool: pool, MaxClaims: claims, MaxDispatches: dispatches, MaxBytes: bytes,
-			})
-			if err != nil {
-				return err
-			}
-			claimsGranted := 0
-			for _, assignment := range published.Decision.Assignments {
-				claimsGranted += len(assignment.Claims)
-			}
-			return workPrint(cmd, published, fmt.Sprintf("Fair prefix: %d Claims, %d reserved assignments; %s",
-				claimsGranted, len(published.Decision.Assignments), published.Decision.Reason))
-		},
-	}
-	cmd.Flags().String("pool", "default", "Complete approved scheduling pool")
-	cmd.Flags().Int("max-claims", 1, "Logical Claim budget for this request")
-	cmd.Flags().Int("max-dispatches", 1, "Native dispatch budget for this request")
-	cmd.Flags().Int64("max-bytes", 48<<10, "Assignment byte budget, bounded by policy and host")
-	return cmd
-}
-
-func workPolicyCommand() *cobra.Command {
-	cmd := &cobra.Command{
-		Use: "policy", Short: "Update an existing quiescent queue's authenticated policy; never seed a queue",
-		Args: cobra.NoArgs,
-		RunE: func(cmd *cobra.Command, _ []string) error {
-			epoch, _ := cmd.Flags().GetString("epoch")
-			if epoch == "" {
-				return errors.New("--epoch is required")
-			}
-			fromConfig, _ := cmd.Flags().GetBool("from-config")
-			if fromConfig {
-				if cmd.Flags().Changed("file") {
-					return errors.New("policy: --from-config and --file are mutually exclusive")
+			for _, flag := range []string{"pool", "max-claims", "max-dispatches", "concurrency"} {
+				if cmd.Flags().Changed(flag) {
+					return errors.New("artifact_replay_invalid: scheduling predictions require --run-id or --file")
 				}
-				return workPolicyFromConfig(cmd, epoch)
 			}
-			data, err := workReadJSON(cmd)
+			projection, err := workRead(cmd)
 			if err != nil {
 				return err
 			}
-			var policy map[string]any
-			if err := json.Unmarshal(data, &policy); err != nil {
-				return err
+			ids := make([]string, 0, len(projection.Works))
+			for id := range projection.Works {
+				ids = append(ids, id)
 			}
-			operation, err := workqueue.Op(map[string]any{"kind": "Policy", "epoch": epoch, "policy": json.RawMessage(data)})
-			if err != nil {
-				return err
+			slices.Sort(ids)
+			lines := []string{}
+			for _, id := range ids {
+				item := projection.Works[id]
+				lines = append(lines, fmt.Sprintf("%s  %s  attempts=%d", id, item.State, item.Attempts))
 			}
-			published, err := workPublish(cmd, "administrator", "policy", workqueue.OperationsParameters{Operations: []workqueue.Operation{operation}})
-			if err != nil {
-				return err
+			if len(lines) == 0 {
+				lines = []string{"No Work"}
 			}
-			return workPrint(cmd, published, "Installed prospective policy epoch "+epoch)
+			return workPrint(cmd, workQueueProjectionJSON(projection), strings.Join(lines, "\n"))
 		},
 	}
-	cmd.Flags().String("file", "", "Complete QueuePolicy JSON (- for stdin)")
-	cmd.Flags().Bool("from-config", false, "Resolve current scheduling and approved AW workers from the target repository's immutable default ref")
-	cmd.Flags().String("epoch", "", "New unique policy epoch")
+	cmd.Flags().Int64("run-id", 0, "Replay the activation snapshot from this exact Actions run (read only)")
+	cmd.Flags().String("file", "", "Replay a downloaded work-queue.snapshot.json (read only)")
+	cmd.Flags().String("pool", "", "Predict the next dispatch from the captured ledger without writes or launches")
+	cmd.Flags().Int("max-claims", 1, "Predicted Claim budget")
+	cmd.Flags().Int("max-dispatches", 1, "Predicted dispatch budget")
+	cmd.Flags().Int("concurrency", 16, "Predicted pool concurrency (non-closed dispatches)")
 	return cmd
 }
 
-func workPolicyFromConfig(cmd *cobra.Command, epoch string) error {
-	branch := workBranch(cmd)
-	actor, err := branch.Authenticate(cmd.Context(), "administrator")
+// workQueueProjectionJSON is the canonical projection (the checkpoint state format) plus stats.
+func workQueueProjectionJSON(state workqueue.Projection) any {
+	data, err := workqueue.SerializeProjection(state)
 	if err != nil {
-		return err
+		return map[string]any{"error": err.Error()}
 	}
-	commits, err := branch.Read(cmd.Context())
-	if err != nil {
-		return err
-	}
-	if len(commits) == 0 {
-		return errors.New("queue_missing: --from-config updates an existing quiescent queue; submit Work for first-use initialization")
-	}
-	policy, err := branch.PolicyFromConfig(cmd.Context())
-	if err != nil {
-		return err
-	}
-	operation, err := workqueue.Op(map[string]any{"kind": "Policy", "epoch": epoch, "policy": policy})
-	if err != nil {
-		return err
-	}
-	requestID, err := workRequestID(cmd)
-	if err != nil {
-		return err
-	}
-	request, err := workqueue.NewRequest(requestID, "policy", actor, workqueue.OperationsParameters{Operations: []workqueue.Operation{operation}})
-	if err != nil {
-		return err
-	}
-	published, err := branch.Publish(cmd.Context(), actor, request)
-	if err != nil {
-		return err
-	}
-	return workPrint(cmd, published, "Installed prospective AW policy epoch "+epoch)
+	return map[string]any{"projection": json.RawMessage(data), "stats": state.Stats}
 }
 
-func workControlCommand() *cobra.Command {
-	cmd := &cobra.Command{
-		Use: "control", Short: "Pause/resume admission or grants, or rotate equivalent credential generation; never reset debt",
+func workStatsCommand() *cobra.Command {
+	return &cobra.Command{
+		Use: "stats", Short: "Count Work, Claims and dispatches per pool",
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			control, _ := cmd.Flags().GetString("name")
-			reason, _ := cmd.Flags().GetString("reason")
-			if reason == "" || !slices.Contains([]string{"admission_paused", "grants_paused", "credential_generation"}, control) {
-				return errors.New("--name must be admission_paused, grants_paused, or credential_generation; --reason is required")
-			}
-			var value any
-			if control == "credential_generation" {
-				generation, _ := cmd.Flags().GetString("generation")
-				if generation == "" {
-					return errors.New("--generation is required for credential_generation")
-				}
-				value = generation
-			} else {
-				if !cmd.Flags().Changed("paused") {
-					return errors.New("--paused=true or --paused=false is required")
-				}
-				value, _ = cmd.Flags().GetBool("paused")
-			}
-			operation, err := workqueue.Op(map[string]any{"kind": "Control", "control": control, "value": value, "reason": reason})
+			projection, err := workRead(cmd)
 			if err != nil {
 				return err
 			}
-			published, err := workPublish(cmd, "administrator", "control", workqueue.OperationsParameters{Operations: []workqueue.Operation{operation}})
-			if err != nil {
-				return err
-			}
-			return workPrint(cmd, published, "Published "+control+"; ownership and fairness debt unchanged")
+			branch, _ := cmd.Flags().GetString("branch")
+			report := workQueueStats(projection, branch)
+			return workPrint(cmd, report, workQueueStatsText(report))
 		},
 	}
-	cmd.Flags().String("name", "", "Closed operational control name")
-	cmd.Flags().Bool("paused", false, "Explicit pause/resume value")
-	cmd.Flags().String("generation", "", "Opaque equivalent-scope credential generation, never a secret")
-	cmd.Flags().String("reason", "", "Sanitized operational reason code")
-	return cmd
 }
 
-func workReconcileCommand() *cobra.Command {
+func workCompactCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use: "reconcile", Short: "Reconcile exact native termination; retain uncertain reservations and independent delivery barriers",
+		Use: "compact", Short: "Replace the ledger with one Checkpoint commit (Git history keeps the prior log)",
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			id, _ := cmd.Flags().GetString("dispatch-id")
-			workID, _ := cmd.Flags().GetString("work-id")
-			cancelReserved, _ := cmd.Flags().GetBool("cancel-reserved")
-			if (id == "") == (workID == "") || workID != "" && cancelReserved {
-				return errors.New("provide exactly one of --dispatch-id or --work-id; --cancel-reserved requires --dispatch-id")
+			minimum, _ := cmd.Flags().GetInt("min-lines")
+			if minimum < 1 {
+				return errors.New("--min-lines must be at least 1")
 			}
-			request, err := workRequestID(cmd)
+			result, err := workBranch(cmd).Checkpoint(cmd.Context(), workActor(cmd), minimum)
 			if err != nil {
 				return err
 			}
-			if workID != "" {
-				result, err := workBranch(cmd).RecoverDelivery(cmd.Context(), workID, request)
-				if err != nil {
-					return err
-				}
-				return workPrintTerminalPublication(cmd, result.Publication, result, result.Reason+"; Work "+workID)
+			summary := map[string]any{"checkpointed": result.Checkpointed, "head": result.Head, "lines": result.Lines, "tip": result.State.Tip}
+			if !result.Checkpointed {
+				return workPrint(cmd, summary, fmt.Sprintf("No checkpoint: the ledger has %d lines (threshold %d)", result.Lines, minimum))
 			}
-			var result workqueue.Reconciliation
-			if cancelReserved {
-				result, err = workBranch(cmd).CancelReserved(cmd.Context(), id, request)
-			} else {
-				result, err = workBranch(cmd).Reconcile(cmd.Context(), id, request)
-			}
-			if err != nil {
-				return err
-			}
-			return workPrintTerminalPublication(cmd, result.Publication, result, result.Reason+"; dispatch "+id)
+			return workPrint(cmd, summary, fmt.Sprintf("Checkpointed %d lines into one commit; prior log retained at Git parent of %s", result.Lines, result.Head))
 		},
 	}
-	cmd.Flags().String("dispatch-id", "", "Immutable native reservation identity")
-	cmd.Flags().String("work-id", "", "Reconcile delivery independently with protected native host callbacks; missing proof remains unknown")
-	cmd.Flags().Bool("cancel-reserved", false, "Cancel only if CAS proves no launch start marker exists (not a force release)")
-	return cmd
-}
-
-func workEvidenceCommand() *cobra.Command {
-	cmd := &cobra.Command{
-		Use: "evidence", Short: "Read authenticated native-run evidence (diagnostic, not an authorization or force release)",
-		Args: cobra.NoArgs,
-		RunE: func(cmd *cobra.Command, _ []string) error {
-			id, _ := cmd.Flags().GetString("dispatch-id")
-			if id == "" {
-				return errors.New("--dispatch-id is required")
-			}
-			result, err := workBranch(cmd).InspectEvidence(cmd.Context(), id)
-			if err != nil {
-				return err
-			}
-			return workPrint(cmd, result, result.Reason+"; dispatch "+id)
-		},
-	}
-	cmd.Flags().String("dispatch-id", "", "Immutable native reservation identity")
+	cmd.Flags().Int("min-lines", 1, "Checkpoint only when the ledger has more than this many lines")
 	return cmd
 }

@@ -9,7 +9,6 @@ import (
 	"io"
 	"regexp"
 	"slices"
-	"sort"
 	"strings"
 
 	"github.com/github/gh-aw/pkg/logger"
@@ -73,8 +72,7 @@ type GHAWManifestDetectionPolicy struct {
 
 // GHAWManifestWorkQueue records compiler-derived work-queue worker metadata.
 type GHAWManifestWorkQueue struct {
-	Worker          bool   `json:"worker"`
-	LogicalContract string `json:"logical_contract,omitempty"`
+	Worker bool `json:"worker"`
 }
 
 // GHAWManifest is the single-line JSON payload embedded as a "# gh-aw-manifest: ..."
@@ -133,7 +131,7 @@ func NewGHAWManifest(secretNames []string, actionRefs []string, failures []GHAWM
 			secrets = append(secrets, full)
 		}
 	}
-	sort.Strings(secrets)
+	slices.Sort(secrets)
 
 	actions := parseActionRefs(actionRefs)
 	resolutionFailures := normalizeResolutionFailures(failures)
@@ -172,7 +170,7 @@ func normalizeManifestSpecs(specs []string) []string {
 			sorted = append(sorted, spec)
 		}
 	}
-	sort.Strings(sorted)
+	slices.Sort(sorted)
 	return sorted
 }
 

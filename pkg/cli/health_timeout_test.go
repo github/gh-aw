@@ -141,9 +141,9 @@ func TestHealthTimeBudgetReturnsPartialJSON(t *testing.T) {
 func TestHealthTimeBudgetPropagatesToWorkQueueAndGit(t *testing.T) {
 	original := healthReadWorkQueue
 	t.Cleanup(func() { healthReadWorkQueue = original })
-	healthReadWorkQueue = func(ctx context.Context, _ workqueue.Branch) ([]workqueue.QueueCommit, error) {
+	healthReadWorkQueue = func(ctx context.Context, _ workqueue.Branch) (workqueue.Snapshot, error) {
 		<-ctx.Done()
-		return nil, ctx.Err()
+		return workqueue.Snapshot{}, ctx.Err()
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Millisecond)
 	defer cancel()
