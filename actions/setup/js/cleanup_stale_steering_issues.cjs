@@ -3,6 +3,7 @@
 
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { withRetry, RATE_LIMIT_RETRY_CONFIG } = require("./error_recovery.cjs");
+const { DEFAULT_MAX_UPDATES_PER_RUN } = require("./expired_entity_cleanup_helpers.cjs");
 const { renderSizedReport } = require("./report_size.cjs");
 
 const STEERING_ISSUE_TITLE_PREFIX = "[WIP] ";
@@ -110,8 +111,13 @@ async function main() {
   const cutoff = Date.now() - STEERING_ISSUE_MAX_AGE_MS;
   const candidates = await getStaleSteeringIssues(owner, repo, cutoff);
   const failures = [];
+  let closedCount = 0;
 
-  for (const candidate of candidates) {
+  for (const [index, candidate] of candidates.entries()) {
+    if (closedCount >= DEFAULT_MAX_UPDATES_PER_RUN) {
+      core.info(`Reached the limit of ${DEFAULT_MAX_UPDATES_PER_RUN} closed stale steering issues for this run; ${candidates.length - index} remaining candidate(s) will be checked in the next scheduled run`);
+      break;
+    }
     try {
       const { data: issue } = await github.rest.issues.get({ owner, repo, issue_number: candidate.number });
       const runID = getWorkflowRunId(issue.body || "", owner, repo);
@@ -183,6 +189,7 @@ async function main() {
         RATE_LIMIT_RETRY_CONFIG,
         `close stale steering issue #${candidate.number}`
       );
+      closedCount++;
       core.info(`Closed stale steering issue #${candidate.number} for ${succeeded ? "successful" : run.conclusion} workflow run ${runID}`);
     } catch (error) {
       const message = `Failed to clean up stale steering issue #${candidate.number}: ${getErrorMessage(error)}`;

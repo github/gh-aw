@@ -107,6 +107,29 @@ describe("cleanup_stale_steering_issues", () => {
     });
   });
 
+  it("stops after the per-run closure limit and leaves the remainder for the next run", async () => {
+    const { DEFAULT_MAX_UPDATES_PER_RUN } = await import("./expired_entity_cleanup_helpers.cjs");
+    mockGithub.graphql.mockResolvedValueOnce({
+      repository: {
+        issues: {
+          nodes: Array.from({ length: DEFAULT_MAX_UPDATES_PER_RUN + 1 }, (_, i) => ({ number: i + 1, title: "[WIP] Stale", createdAt: oldCreatedAt })),
+          pageInfo: { hasNextPage: false, endCursor: null },
+        },
+      },
+    });
+    mockGithub.rest.issues.get.mockResolvedValue(openIssueData());
+    mockGithub.rest.actions.getWorkflowRun.mockResolvedValue({ data: { status: "completed", conclusion: "success" } });
+    mockGithub.paginate.mockResolvedValue([]);
+
+    const { main } = await import("./cleanup_stale_steering_issues.cjs");
+    await main();
+
+    expect(mockGithub.rest.issues.update).toHaveBeenCalledTimes(DEFAULT_MAX_UPDATES_PER_RUN);
+    expect(mockGithub.rest.issues.update).not.toHaveBeenCalledWith(expect.objectContaining({ issue_number: DEFAULT_MAX_UPDATES_PER_RUN + 1 }));
+    expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("1 remaining candidate(s) will be checked in the next scheduled run"));
+    expect(mockCore.setFailed).not.toHaveBeenCalled();
+  });
+
   it("does not touch active, malformed, or unrelated issues", async () => {
     const issues = [
       { number: 2, title: "Unrelated issue", createdAt: oldCreatedAt },
