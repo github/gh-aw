@@ -119,6 +119,7 @@ Before requesting a PR:
   within the first 7,500 UTF-8 bytes of each edited instruction entry point.
 - Review `git diff --name-only` and the complete patch: only the three permitted
   files may change, and at least one substantive verified repair must remain.
+- Stage only the repaired files and commit locally before requesting the PR.
 
 If evidence is insufficient, required verification fails or is unavailable,
 or no substantive patch remains, do not request a PR. Report the specific

@@ -117,7 +117,7 @@ For the selected test file:
 
 ### 4) Submit one draft PR
 
-Recheck open PRs for the prefix and selected path immediately before submission; if competing work appeared, restore only your edits and use `noop`. Otherwise call `create_pull_request` with a title `Improve Test Quality: <FILE_PATH>` and the validated patch. Include the selected path, concise rationale, assertion/coverage changes, and exact validation commands and results. Use `###`/`####` headers only; put long evidence in `<details>`.
+Recheck open PRs for the prefix and selected path immediately before submission; if competing work appeared, restore only your edits and use `noop`. Otherwise stage only the selected test file, commit locally, and submit that branch with `create_pull_request` and the title `Improve Test Quality: <FILE_PATH>`. Include the selected path, concise rationale, assertion/coverage changes, and exact validation commands and results. Use `###`/`####` headers only; put long evidence in `<details>`.
 
 Do not push branches, create PRs with `gh` or raw APIs, request auto-merge, assign an agent, or create fallback issues. The safe output is the only publication path.
 
