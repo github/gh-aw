@@ -69,7 +69,7 @@ func TestExtractTopLevelYAMLSectionNullValues(t *testing.T) {
 	section := NewCompiler().extractTopLevelYAMLSection(frontmatter, "steps")
 	for _, want := range []string{"EMPTY:", "optional:", "- null"} {
 		found := false
-		for _, line := range strings.Split(section, "\n") {
+		for line := range strings.SplitSeq(section, "\n") {
 			if strings.TrimSpace(line) == want {
 				found = true
 				break
