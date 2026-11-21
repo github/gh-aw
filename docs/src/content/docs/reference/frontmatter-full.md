@@ -5272,10 +5272,10 @@ tools:
     # (optional)
     allow-write-tools: true
 
-  # Read the immutable version-3 activation snapshot. Nonworkers without approved
-  # dispatch targets are read-only observers; workers and approved dispatchers may
-  # stage scoped queue intents. The installed ledger Policy is authoritative. Only
-  # Git storage is supported.
+  # Read the version-4 activation snapshot of the Git-backed work queue. Workflows
+  # without approved dispatch targets are read-only observers; workers and approved
+  # dispatchers may stage queue intents that trusted steps publish. Pool limits come
+  # from aw.json work_queue at compile time. Only Git storage is supported.
   # (optional)
   # Accepted formats:
 
@@ -5293,13 +5293,14 @@ tools:
     # (optional)
     require-assignment: true
 
-    # Declare this workflow as a work-queue worker eligible to receive trusted queue
-    # claims.
+    # Declare this workflow as a work-queue worker. Every pool may route Claims to it;
+    # it receives work_queue_assignment {version: 4, dispatch_id} when dispatched.
     # (optional)
     worker: true
 
-    # Mirror only this run's admitted Work and original authenticated Claims to GitHub
-    # Issues. Git remains authoritative; requires installed projector rules.
+    # Workflow-level Issue projection setting; conflicts with aw.json
+    # work_queue.issues, which is preferred. Git remains authoritative; projection is
+    # best-effort.
     # (optional)
     # Accepted formats:
 
@@ -5308,9 +5309,7 @@ tools:
 
     # Format 2: object
     issues:
-      # Repository label prefix; GitHub labels are limited to 50 characters, leaving at
-      # most 33 bytes for the prefix before the longest status suffix, ': Needs
-      # attention'.
+      # Label applied to projected Issues; at most 33 bytes.
       # (optional)
       label: "example-value"
 
@@ -5324,7 +5323,8 @@ tools:
       # Fixed relative JSON file path in the snapshot tree.
       path: "example-value"
 
-      # Fixed repository also authorized by the installed immutable Work scope.
+      # Fixed repository that receives the memory snapshot; it must equal the worker
+      # profile's effect scope.
       target-repo: "example-value"
 
       base-revision: "example-value"

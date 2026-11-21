@@ -184,8 +184,8 @@ func (c *Compiler) buildHandlerManagerStep(data *WorkflowData) ([]string, error)
 	steps = append(steps, "        env:\n")
 	// The job context is available at step scope, including reusable and matrix jobs.
 	steps = append(steps, "          GH_AW_JOB_CHECK_RUN_ID: ${{ job.check_run_id }}\n")
-	if isWorkQueueParticipant(data) {
-		steps = append(steps, "          GH_AW_CLAIM_FOOTER_LINKS: ${{ steps.work_queue_claim_reconciliation.outputs.claim_footer_links }}\n")
+	if workQueueRequiresAssignment(data) {
+		steps = append(steps, "          GH_AW_WORK_QUEUE_EFFECTS: "+constants.WorkQueueEffectsPath+"\n")
 	}
 	if err := c.addSafeOutputCoreEnvVars(&steps, data); err != nil {
 		return nil, err
@@ -325,22 +325,10 @@ func buildSafeOutputManifestUploadStep(prefix string, pinAction func(string) str
 	if claimArtifacts || includeMergeDecisions {
 		condition += " && " + secretRedactionSuccessCondition(data)
 	}
+	includeAuthorization := data != nil && data.SafeOutputs != nil && safeOutputAuthorizationEnabled(data.SafeOutputs)
 	var steps []string
-	if data != nil && data.SafeOutputs != nil && safeOutputAuthorizationEnabled(data.SafeOutputs) {
-		steps = append(steps,
-			"      - name: Collect safe-output authorization evidence\n",
-			"        if: always()\n",
-			fmt.Sprintf("        uses: %s\n", pinAction("actions/github-script")),
-			"        with:\n",
-			"          script: |\n",
-			"            const fs = require('fs');\n",
-			"            const { authorizationEvidencePath } = require(`${process.env.RUNNER_TEMP}/gh-aw/actions/safe_output_authorization.cjs`);\n",
-			"            const source = authorizationEvidencePath();\n",
-			"            if (fs.existsSync(source)) {\n",
-			"              fs.mkdirSync('/tmp/gh-aw', { recursive: true });\n",
-			"              fs.copyFileSync(source, '/tmp/gh-aw/safe-output-authorization.jsonl');\n",
-			"            }\n",
-		)
+	if includeAuthorization {
+		steps = append(steps, buildSafeOutputAuthorizationEvidenceStep(pinAction)...)
 	}
 	steps = append(steps,
 		"      - name: Upload Safe Outputs Items\n",
@@ -350,28 +338,58 @@ func buildSafeOutputManifestUploadStep(prefix string, pinAction func(string) str
 		fmt.Sprintf("          name: %s%s\n", prefix, constants.SafeOutputItemsArtifactName),
 		"          path: |\n",
 	)
+	steps = append(steps, safeOutputManifestUploadPaths(claimArtifacts, includeItems, includeAuthorization, includeMergeDecisions)...)
+	steps = append(steps, "          if-no-files-found: ignore\n")
+	if claimArtifacts {
+		steps = append(steps, "          retention-days: ${{ job.status == 'failure' && 7 || 1 }}\n")
+	}
+	return steps
+}
+
+// buildSafeOutputAuthorizationEvidenceStep copies the authorization evidence file
+// to the fixed path the safe-outputs items upload collects.
+func buildSafeOutputAuthorizationEvidenceStep(pinAction func(string) string) []string {
+	return []string{
+		"      - name: Collect safe-output authorization evidence\n",
+		"        if: always()\n",
+		fmt.Sprintf("        uses: %s\n", pinAction("actions/github-script")),
+		"        with:\n",
+		"          script: |\n",
+		"            const fs = require('fs');\n",
+		"            const { authorizationEvidencePath } = require(`${process.env.RUNNER_TEMP}/gh-aw/actions/safe_output_authorization.cjs`);\n",
+		"            const source = authorizationEvidencePath();\n",
+		"            if (fs.existsSync(source)) {\n",
+		"              fs.mkdirSync('/tmp/gh-aw', { recursive: true });\n",
+		"              fs.copyFileSync(source, '/tmp/gh-aw/safe-output-authorization.jsonl');\n",
+		"            }\n",
+	}
+}
+
+// safeOutputManifestUploadPaths lists the `path:` entries of the safe-outputs items upload.
+func safeOutputManifestUploadPaths(claimArtifacts, includeItems, includeAuthorization, includeMergeDecisions bool) []string {
+	var paths []string
 	if includeItems {
-		steps = append(steps,
+		paths = append(paths,
 			"            /tmp/gh-aw/safe-output-items.jsonl\n",
 			"            /tmp/gh-aw/safe-output-executions.jsonl\n",
 			fmt.Sprintf("            /tmp/gh-aw/%s\n", constants.TemporaryIdMapFilename),
 			fmt.Sprintf("            /tmp/gh-aw/%s\n", constants.SafeOutputErrorsFilename),
 		)
 	}
-	if data != nil && data.SafeOutputs != nil && safeOutputAuthorizationEnabled(data.SafeOutputs) {
-		steps = append(steps, "            /tmp/gh-aw/safe-output-authorization.jsonl\n")
+	if includeAuthorization {
+		paths = append(paths, "            /tmp/gh-aw/safe-output-authorization.jsonl\n")
 		if claimArtifacts {
-			steps = append(steps, "            /tmp/gh-aw/claims/*/safe-output-authorization.jsonl\n")
+			paths = append(paths, "            /tmp/gh-aw/claims/*/safe-output-authorization.jsonl\n")
 		}
 	}
 	if includeMergeDecisions {
-		steps = append(steps, "            /tmp/gh-aw/merge-pull-request-decisions.jsonl\n")
+		paths = append(paths, "            /tmp/gh-aw/merge-pull-request-decisions.jsonl\n")
 		if claimArtifacts {
-			steps = append(steps, "            /tmp/gh-aw/claims/*/merge-pull-request-decisions.jsonl\n")
+			paths = append(paths, "            /tmp/gh-aw/claims/*/merge-pull-request-decisions.jsonl\n")
 		}
 	}
 	if claimArtifacts && includeItems {
-		steps = append(steps,
+		paths = append(paths,
 			"            /tmp/gh-aw/claims/*/safe-output-items.jsonl\n",
 			"            /tmp/gh-aw/claims/*/safe-output-executions.jsonl\n",
 			"            /tmp/gh-aw/claims/*/temporary-id-map.json\n",
@@ -379,11 +397,7 @@ func buildSafeOutputManifestUploadStep(prefix string, pinAction func(string) str
 			"            /tmp/gh-aw/claims/*/claim-delivery-errors.json\n",
 		)
 	}
-	steps = append(steps, "          if-no-files-found: ignore\n")
-	if claimArtifacts {
-		steps = append(steps, "          retention-days: ${{ job.status == 'failure' && 7 || 1 }}\n")
-	}
-	return steps
+	return paths
 }
 
 // buildSarifArtifactUploadStep builds the step that uploads the SARIF file generated by

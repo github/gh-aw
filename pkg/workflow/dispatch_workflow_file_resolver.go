@@ -169,7 +169,7 @@ func mdHasWorkQueueWorker(mdPath string) (bool, error) {
 	return ok && worker, nil
 }
 
-// lockHasWorkQueueProtocol reports whether a compiled workflow includes both queue admission and reconciliation.
+// lockHasWorkQueueProtocol reports whether a compiled workflow includes both the queue snapshot and the worker finish step.
 func lockHasWorkQueueProtocol(lockPath string) (bool, error) {
 	content, err := os.ReadFile(lockPath) // #nosec G304 -- lockPath is validated via isPathWithinDir in findWorkflowFile
 	if err != nil {
@@ -199,7 +199,7 @@ func lockHasWorkQueueProtocol(lockPath string) (bool, error) {
 		return false
 	}
 	return hasStep(string(constants.ActivationJobName), "Snapshot work queue state", "") &&
-		hasStep(string(constants.SafeOutputsJobName), "Reconcile work queue claim", "work_queue_claim_reconciliation"), nil
+		hasStep(string(constants.SafeOutputsJobName), "Finish work queue claim", "work_queue_finish"), nil
 }
 
 // extractMDWorkflowDispatchInputs reads a .md workflow file's frontmatter and extracts

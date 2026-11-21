@@ -31,10 +31,10 @@ update. Only configured safe outputs can produce effects.
 After staging the discussion and any declared auxiliary outputs, call
 `work_queue_claim_finish` with
 `{"claim_handle":"<original handle>","outcome":"completed"}`. Completion is an
-intent, not proof that the discussion was published: trusted processing verifies
-delivery before recording Result. If there is no qualifying data, prerequisites
-are unavailable, or no discussion can be prepared, stage a scoped `noop` or
-`report_incomplete` and finish with `outcome: "cancelled"` instead. Do not claim
-successful reporting without a discussion. A cancelled Claim may be retried
-under the installed pool policy; it is not a terminal cancellation of Work until
-the configured attempt budget is exhausted.
+intent, not proof that the discussion was published: trusted processing applies
+the staged outputs and then records the Completion. If there is no qualifying
+data, prerequisites are unavailable, or no discussion can be prepared, stage a
+scoped `noop` or `report_incomplete` and finish with `outcome: "failed"`
+instead. Do not claim successful reporting without a discussion. A failed Claim
+returns its Work to the pool for another attempt until the configured attempt
+budget is exhausted.

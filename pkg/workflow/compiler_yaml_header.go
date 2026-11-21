@@ -103,9 +103,6 @@ func (c *Compiler) generateManifestHeader(yaml *strings.Builder, data *WorkflowD
 	manifest.MarkdownMetadata = &GHAWMarkdownMetadata{Version: metadata.Version, Records: slices.Clone(metadata.Records)}
 	if isWorkQueueWorker(data) {
 		manifest.WorkQueue = &GHAWManifestWorkQueue{Worker: true}
-		if data.WorkQueuePolicy != nil {
-			manifest.WorkQueue.LogicalContract = data.WorkQueuePolicy.WorkerContract
-		}
 	}
 	if data.ParsedFrontmatter != nil {
 		manifest.ThreatDetectionSuppressions = data.ParsedFrontmatter.ThreatDetectionSuppressions

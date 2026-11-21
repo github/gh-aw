@@ -5,7 +5,7 @@ import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "n
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Readable } from "node:stream";
-import { readLockFileHeaders } from "./work_queue_provisioning.cjs";
+import { readLockFileHeaders } from "./lock_file_headers.cjs";
 
 const require = createRequire(import.meta.url);
 const { buildCopilotSDKPermissionHandler } = require("./copilot_sdk_permissions.cjs");

@@ -1,22 +1,11 @@
 // @ts-check
 "use strict";
 const { SAFE_OUTPUT_E001 } = require("./error_codes.cjs");
-// @safe-outputs-exempt SEC-005 — work_queue_claim_adapters.cjs:119 validates the fixed adapter repository; assertClaimAuthorized and the guarded effect client authorize resolved GraphQL targets before mutations.
+// @safe-outputs-exempt SEC-005 — work_queue_claim_adapters.cjs validates the fixed adapter repository; assertClaimAuthorized and the guarded effect client authorize resolved GraphQL targets before mutations.
 
-const { canonical, canonicalBytes, closed, digest, utf8Compare } = require("./work_queue_codec.cjs");
-const {
-  assertClaimAuthorized,
-  currentClaimHandle,
-  claimIdentity,
-  assertClaimIdentity,
-  receiptMatchesClaim,
-  claimDeliveryReceipt,
-  durableReceipt,
-  createClaimResourceVerification,
-  withClaimResourceVerification,
-} = require("./work_queue_claim_scope.cjs");
-const { resolveRepositoryTarget } = require("./work_queue_effect_resource.cjs");
-const { wrapClaimEffectClient, graphEffectIdentity } = require("./work_queue_effect_client.cjs");
+const { canonicalBytes, closed, utf8Compare } = require("./work_queue_codec.cjs");
+const { assertClaimAuthorized, currentClaimHandle, claimIdentity, assertClaimIdentity } = require("./work_queue_claim_scope.cjs");
+const { wrapClaimEffectClient } = require("./work_queue_effect_client.cjs");
 const { isStagedMode } = require("./safe_output_helpers.cjs");
 
 const NAME = /^[A-Za-z][A-Za-z_0-9]*$/;
@@ -45,32 +34,23 @@ const RESERVED = new Set([
   "dispatch_id",
   "receipt_id",
 ]);
-const receipts = new WeakMap();
 
+// `fields`, `number-field` and `resource-kind` are accepted for compiled-config
+// compatibility but unused: v4 records effects without delivery readback.
 function validateGraphqlAdapter(adapter) {
   const config = adapter.graphql;
-  closed(config, ["mutation", "input-type", "response-field", "resource-type", "resource-kind", "repository-field", "repository-input", "permission", "fields"], ["number-field"], "trusted GraphQL adapter");
+  closed(config, ["mutation", "input-type", "response-field", "resource-type", "repository-field", "repository-input", "permission"], ["fields", "number-field", "resource-kind"], "trusted GraphQL adapter");
   for (const field of ["mutation", "input-type", "response-field", "resource-type"]) {
     if (typeof config[field] !== "string" || config[field].length > 128 || !NAME.test(config[field]) || RESERVED.has(config[field])) throw new Error(`${SAFE_OUTPUT_E001}: Trusted GraphQL adapter requires fixed native operation names`);
   }
   if (!["none", "repositoryId", "repositoryNameWithOwner"].includes(config["repository-input"])) throw new Error("Trusted GraphQL adapter requires explicit repository input binding");
   if (!["checks", "contents", "issues", "pull-requests", "deployments", "discussions"].includes(config.permission)) throw new Error("Trusted GraphQL adapter requires an explicit native write permission");
-  if (!["unknown", "issue", "pull_request", "comment", "discussion", "repository"].includes(config["resource-kind"])) throw new Error("Unsupported trusted GraphQL resource kind");
   const declarations = Object.assign(Object.create(null), adapter.expected || {});
   for (const field of Object.keys(adapter["field-map"] || {})) declarations[field] = true;
   if (!Object.keys(declarations).length || Object.keys(declarations).length > 64 || Object.keys(declarations).some(field => !NAME.test(field) || RESERVED.has(field)))
     throw new Error("Trusted GraphQL adapter has invalid or reserved effect fields");
-  if (!config.fields || typeof config.fields !== "object" || Array.isArray(config.fields) || Object.keys(config.fields).length !== Object.keys(declarations).length)
-    throw new Error("Every declared GraphQL effect field requires independent readback");
-  const paths = [config["repository-field"], ...(config["number-field"] === undefined ? [] : [config["number-field"]])];
-  for (const [desired, observed] of Object.entries(config.fields)) {
-    if (!Object.hasOwn(declarations, desired)) throw new Error("Trusted GraphQL verifier has an undeclared effect field");
-    paths.push(observed);
-  }
-  for (const field of paths) {
-    if (typeof field !== "string" || field.length > 256 || !PATH.test(field) || field.split(".").some(component => RESERVED.has(component))) throw new Error("Trusted GraphQL verifier requires bounded native field paths");
-  }
-  selection(paths);
+  const field = config["repository-field"];
+  if (typeof field !== "string" || field.length > 256 || !PATH.test(field) || field.split(".").some(component => RESERVED.has(component))) throw new Error("Trusted GraphQL adapter requires a bounded native repository field path");
   return adapter;
 }
 
@@ -82,11 +62,11 @@ function selection(paths) {
     for (let index = 0; index < components.length; index++) {
       const component = components[index];
       if (node[component] === true) {
-        if (index !== components.length - 1) throw new Error("GraphQL verifier contains conflicting scalar and object projections");
+        if (index !== components.length - 1) throw new Error("GraphQL selection contains conflicting scalar and object projections");
         break;
       }
       if (index === components.length - 1) {
-        if (node[component] !== undefined) throw new Error("GraphQL verifier contains conflicting scalar and object projections");
+        if (node[component] !== undefined) throw new Error("GraphQL selection contains conflicting scalar and object projections");
         node[component] = true;
       } else {
         node[component] ||= Object.create(null);
@@ -104,7 +84,7 @@ function selection(paths) {
 
 function observedField(node, field) {
   for (const component of field.split(".")) {
-    if (!node || typeof node !== "object" || Array.isArray(node) || !Object.hasOwn(node, component)) throw new Error("Independent GraphQL readback is missing a declared field");
+    if (!node || typeof node !== "object" || Array.isArray(node) || !Object.hasOwn(node, component)) throw new Error("GraphQL mutation response is missing a declared field");
     node = node[component];
   }
   return node;
@@ -113,10 +93,6 @@ function observedField(node, field) {
 function nodeIdentity(id) {
   if (typeof id !== "string" || !id || Buffer.byteLength(id) > 256 || /[\x00-\x1f\x7f]/.test(id)) throw new Error("Trusted GraphQL response has no exact native node identity");
   return id;
-}
-
-function readbackSelection(config) {
-  return selection([config["repository-field"], ...Object.values(config.fields), ...(config["number-field"] === undefined ? [] : [config["number-field"]])]);
 }
 
 function createGraphqlEffectHandler(adapter, github) {
@@ -143,71 +119,13 @@ function createGraphqlEffectHandler(adapter, github) {
       if (response?.repository?.nameWithOwner !== adapter["target-repo"]) throw new Error("Trusted GraphQL repository identity mismatch");
       input.repositoryId = nodeIdentity(response.repository.id);
     } else if (config["repository-input"] === "repositoryNameWithOwner") input.repositoryNameWithOwner = adapter["target-repo"];
-    const query = `mutation ClaimAdapterEffect($input:${config["input-type"]}!) { ${config.mutation}(input:$input) { ${config["response-field"]} { ${readbackSelection(config)} } } }`;
-    const variables = { input };
-    const response = await client.graphql(query, variables);
+    const query = `mutation ClaimAdapterEffect($input:${config["input-type"]}!) { ${config.mutation}(input:$input) { ${config["response-field"]} { ${selection([config["repository-field"]])} } } }`;
+    const response = await client.graphql(query, { input });
     const node = response?.[config.mutation]?.[config["response-field"]];
     const id = nodeIdentity(node?.id);
     if (node.__typename !== config["resource-type"] || observedField(node, config["repository-field"]) !== adapter["target-repo"]) throw new Error("GraphQL mutation returned a foreign native resource");
-    const result = { success: true, repo: adapter["target-repo"], id };
-    receipts.set(result, { ...identity, adapter: canonical(adapter), fields: structuredClone(fields), id, effect_id: graphEffectIdentity(query, variables, response) });
-    return result;
+    return { success: true, repo: adapter["target-repo"], id };
   };
 }
 
-function durableGraphqlReceipt(result, claim) {
-  const receipt = result && receipts.get(result);
-  if (!receiptMatchesClaim(receipt, claim) || canonicalBytes(receipt.fields) > 8192) return null;
-  return durableReceipt(receipt, ["adapter"]);
-}
-
-async function verifyGraphqlAdapterDelivery(options) {
-  const receipt = claimDeliveryReceipt(options, "graphql_adapter", receipts);
-  return verifyGraphqlReceipt(options, receipt);
-}
-
-async function verifyGraphqlReceipt(options, receipt) {
-  const { adapter, claim, github } = options;
-  const unverified = field_index => ({ verified: false, diagnostics: { event: "graphql.readback.mismatch", field_index } });
-  validateGraphqlAdapter(adapter);
-  if (!receiptMatchesClaim(receipt, claim) || (options.durable === true ? options.result?.entry?.adapter : receipt.adapter) !== canonical(adapter)) return unverified(-1);
-  try {
-    nodeIdentity(receipt.id);
-    if (typeof receipt.effect_id !== "string" || !/^[a-f0-9]{64}$/.test(receipt.effect_id)) return unverified(-1);
-    closed(receipt.fields, [...new Set([...Object.keys(adapter.expected || {}), ...Object.keys(adapter["field-map"] || {})])], [], "GraphQL receipt fields");
-    canonical(receipt.fields);
-  } catch {
-    return unverified(-1);
-  }
-  if (!require("./work_queue_declared_verification.cjs").matchesDeclaredAdapterExpected(adapter, receipt.fields, options.verification)) return unverified(-1);
-  const config = adapter.graphql;
-  const typed = ["Issue", "PullRequest"].includes(config["resource-type"]);
-  const nativeSelection = config["resource-type"] === "Repository" ? "databaseId" : `${typed ? "databaseId number " : ""}repository { databaseId }`;
-  const query = `query ClaimAdapterReadback($id:ID!) { node(id:$id) { id __typename ... on ${config["resource-type"]} { ${readbackSelection(config)} ${nativeSelection} } } }`;
-  const response = await github.graphql(query, { id: receipt.id });
-  const node = response?.node;
-  if (!node || nodeIdentity(node.id) !== receipt.id || node.__typename !== config["resource-type"] || observedField(node, config["repository-field"]) !== adapter["target-repo"]) return unverified(-1);
-  const verifiedFields = Object.entries(config.fields);
-  for (const [index, [desired, observed]] of verifiedFields.entries()) {
-    if (canonical(observedField(node, observed)) !== canonical(receipt.fields[desired])) return unverified(index);
-  }
-  const number = config["number-field"] === undefined ? undefined : observedField(node, config["number-field"]);
-  if (number !== undefined && (!Number.isSafeInteger(number) || number < 1)) return unverified(verifiedFields.length);
-  const authorityResource = await resolveRepositoryTarget(github, {
-    repository: adapter["target-repo"],
-    ...(typed ? { kind: config["resource-type"] === "Issue" ? "issue" : "pull_request", resource_id: node.databaseId } : {}),
-    ...((typed ? node.number : number) === undefined ? {} : { number: typed ? node.number : number }),
-    repository_id: config["resource-type"] === "Repository" ? node.databaseId : node.repository?.databaseId,
-  });
-  const proof = createClaimResourceVerification({
-    verified: true,
-    claim_handle: claim.handle,
-    resource: { kind: config["resource-kind"], repository: adapter["target-repo"], id: receipt.id, ...(number === undefined ? {} : { number }) },
-    authority_resource: authorityResource,
-    effect_resources: [{ kind: "graphql", repository: adapter["target-repo"], id: receipt.effect_id }],
-    evidence: { source: "independent_native_readback", id: receipt.id, fields_digest: digest(receipt.fields) },
-  });
-  return withClaimResourceVerification(proof, () => proof, { authorize: options.authorize, context: options.context, github });
-}
-
-module.exports = { validateGraphqlAdapter, createGraphqlEffectHandler, verifyGraphqlAdapterDelivery, durableGraphqlReceipt };
+module.exports = { validateGraphqlAdapter, createGraphqlEffectHandler };

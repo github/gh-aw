@@ -2,269 +2,267 @@ package cli
 
 import (
 	"bytes"
-	"cmp"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"slices"
 
 	"github.com/github/gh-aw/pkg/workqueue"
 	"github.com/spf13/cobra"
 )
 
-type workOperatorTarget struct{ WorkID, ClaimID string }
+// workCancelOperations cancels exact available Work. Work already cancelled with
+// the same reason is skipped; claimed Work must be released first.
+func workCancelOperations(state workqueue.Projection, ids []string, reason string) ([]workqueue.Operation, error) {
+	operations := []workqueue.Operation{}
+	for _, id := range ids {
+		work := state.Works[id]
+		switch {
+		case work == nil:
+			return nil, fmt.Errorf("work_missing: unknown Work %s", workQueueText(id))
+		case work.State == "cancelled" && work.CancellationReason == reason:
+			continue
+		case work.State == "claimed":
+			return nil, fmt.Errorf("ownership_conflict: Work %s is claimed; release dispatch %s first", workQueueText(id), workQueueText(workQueueClaimDispatch(state, work)))
+		case work.State != "available":
+			return nil, fmt.Errorf("work_terminal: Work %s is %s", workQueueText(id), work.State)
+		}
+		operation, err := workqueue.Op(workqueue.WorkCancellationOperation{Kind: "WorkCancellation", WorkID: id, Reason: reason})
+		if err != nil {
+			return nil, err
+		}
+		operations = append(operations, operation)
+	}
+	return operations, nil
+}
+
+func workQueueClaimDispatch(state workqueue.Projection, work *workqueue.WorkState) string {
+	if claim := state.Claims[work.ClaimID]; claim != nil {
+		return claim.DispatchID
+	}
+	return ""
+}
+
+// workReleaseOperations releases a non-closed dispatch: Release cancels every open
+// Claim, and Work whose next attempt would exceed its pool's max_attempts is cancelled.
+func workReleaseOperations(state workqueue.Projection, dispatchID, reason string, maxAttempts func(string) int) ([]workqueue.Operation, error) {
+	dispatch := state.Dispatches[dispatchID]
+	if dispatch == nil {
+		return nil, fmt.Errorf("dispatch_missing: unknown dispatch %s", workQueueText(dispatchID))
+	}
+	if dispatch.State == "closed" {
+		return []workqueue.Operation{}, nil
+	}
+	values := []any{workqueue.ReleaseOperation{Kind: "Release", DispatchID: dispatchID, Reason: reason}}
+	for _, claim := range state.OpenClaims(dispatch) {
+		work := state.Works[claim.WorkID]
+		if work.Attempts+1 >= maxAttempts(work.Pool) {
+			values = append(values, workqueue.WorkCancellationOperation{Kind: "WorkCancellation", WorkID: work.WorkID, Reason: "attempts_exhausted", ClaimID: claim.ClaimID})
+		}
+	}
+	operations := make([]workqueue.Operation, 0, len(values))
+	for _, value := range values {
+		operation, err := workqueue.Op(value)
+		if err != nil {
+			return nil, err
+		}
+		operations = append(operations, operation)
+	}
+	return operations, nil
+}
+
+func workPublicationSummary(published workqueue.Publication) map[string]any {
+	summary := map[string]any{"committed": published.Committed, "recovered": published.Recovered, "request_id": published.Request.ID, "head": published.Head}
+	if published.Commit != nil {
+		summary["commit_id"] = published.Commit.ID
+		summary["operations"] = len(published.Commit.Operations)
+	}
+	return summary
+}
 
 func workCancelCommand() *cobra.Command {
-	cmd := workOperatorCommand("cancel-work", false, false)
-	cmd.Long = "Terminally cancel exact Work IDs with --work-id and --reason, or use\n" +
-		"--obsolete to retire one bounded batch using the JavaScript maintenance semantics.\n\n" +
-		"--obsolete selects available, unclaimed, unpinned Work without delivery barriers\n" +
-		"whose admission contract differs from an available approved active deployment.\n" +
-		"Elapsed Work and missing/unavailable deployments are excluded. IDs are sorted\n" +
-		"in UTF-8 byte order, then bounded by --limit and the installed operation limit.\n" +
-		"The fixed reason is worker_contract_obsolete with operation version 1.\n\n" +
-		"--dry-run is a read-only obsolete selection preview; it neither authenticates\n" +
-		"operator authority nor reserves the request ID. Publication requires the same\n" +
-		"repository administrator permission as cancel-work and rechecks the current\n" +
-		"ledger at committed time; any stale target rejects the entire batch.\n" +
-		"Use a stable --request-id: retries recover only the original accepted targets,\n" +
-		"never newly obsolete Work. No eligible Work is a no-op without a receipt.\n" +
-		"Claims, Results, barriers, native reservations, policy, debt and history are\n" +
-		"retained; native runs are not stopped and worker routes are not changed."
-	cmd.Flags().Bool("obsolete", false, "Select one checked batch of obsolete worker-contract Work; excludes --work-id and --reason")
-	cmd.Flags().Int("limit", 256, "Maximum obsolete Work per batch (1..256, further bounded by Policy)")
-	cmd.Flags().Bool("dry-run", false, "Preview --obsolete selection without publishing or synchronizing Issues")
+	cmd := &cobra.Command{
+		Use: "cancel-work", Short: "Cancel exact available Work (claimed Work must be released first)",
+		Args: cobra.NoArgs,
+	}
+	cmd.Flags().StringSlice("work-id", nil, "Exact Work IDs, comma-separated or repeated (maximum 256)")
+	cmd.Flags().String("reason", "operator", "Cancellation reason: "+workQueueReasonList(workqueue.WorkCancellationReasons))
 	cmd.RunE = func(cmd *cobra.Command, _ []string) error {
-		obsolete, _ := cmd.Flags().GetBool("obsolete")
-		if obsolete {
-			if cmd.Flags().Changed("work-id") || cmd.Flags().Changed("reason") {
-				return errors.New("obsolete_selector_invalid: --obsolete cannot be combined with --work-id or --reason")
-			}
-			return workRunObsoleteCancellation(cmd)
+		ids, _ := cmd.Flags().GetStringSlice("work-id")
+		reason, _ := cmd.Flags().GetString("reason")
+		if !slices.Contains(workqueue.WorkCancellationReasons, reason) {
+			return fmt.Errorf("reason_invalid: --reason must be one of %s", workQueueReasonList(workqueue.WorkCancellationReasons))
 		}
-		if cmd.Flags().Changed("limit") || cmd.Flags().Changed("dry-run") {
-			return errors.New("obsolete_selector_invalid: --limit and --dry-run require --obsolete")
+		ids = slices.Compact(slices.Sorted(slices.Values(ids)))
+		if len(ids) < 1 || len(ids) > workqueue.OperationsPerCommit || slices.Contains(ids, "") {
+			return errors.New("--work-id requires 1..256 nonempty Work IDs")
 		}
-		return workRunOperator(cmd, "work-id", false, false)
+		published, err := workBranch(cmd).Publish(cmd.Context(), workActor(cmd), "cancel_work", workqueue.CancelWorkParameters{WorkIDs: ids, Reason: reason},
+			func(state workqueue.Projection, _ workqueue.Request) ([]workqueue.Operation, error) {
+				return workCancelOperations(state, ids, reason)
+			})
+		if err != nil {
+			return err
+		}
+		if !published.Committed {
+			return workPrint(cmd, workPublicationSummary(published), "Selected Work is already cancelled; nothing published")
+		}
+		return workPrint(cmd, workPublicationSummary(published), fmt.Sprintf("Cancelled %d Work (%s); request=%s", len(published.Commit.Operations), reason, published.Request.ID))
 	}
 	return cmd
 }
 
-func workCancelClaimCommand() *cobra.Command { return workOperatorCommand("cancel-claim", true, false) }
-func workPriorityCommand() *cobra.Command    { return workOperatorCommand("reprioritize", false, true) }
-
-func workOperatorCommand(name string, claims, priority bool) *cobra.Command {
-	selector := "work-id"
-	short := "Terminally cancel selected Work atomically; retain native reservations"
-	if claims {
-		selector, short = "claim-id", "Fence selected current Claims and terminally cancel their Work atomically"
+func workReleaseCommand() *cobra.Command {
+	cmd := &cobra.Command{
+		Use: "release", Short: "Release a dispatch: return its open Claims' Work to the pool (or cancel it after max attempts)",
+		Long: "Release a non-closed dispatch. Every open Claim is cancelled with the given\n" +
+			"reason and its Work becomes available again with one more attempt; Work that\n" +
+			"reaches its pool's max_attempts (from .github/workflows/aw.json, default 3) is\n" +
+			"cancelled with attempts_exhausted. Running workflow runs are not stopped: a\n" +
+			"late worker finds its Claims closed and cannot complete them.",
+		Args: cobra.NoArgs,
 	}
-	if priority {
-		short = "Change available Work's future scheduling priority without resetting age or debt"
+	cmd.Flags().String("dispatch-id", "", "Exact dispatch ID")
+	cmd.Flags().String("reason", "operator", "Release reason: "+workQueueReasonList(workqueue.ReleaseReasons))
+	cmd.RunE = func(cmd *cobra.Command, _ []string) error {
+		dispatchID, _ := cmd.Flags().GetString("dispatch-id")
+		reason, _ := cmd.Flags().GetString("reason")
+		if dispatchID == "" {
+			return errors.New("--dispatch-id is required")
+		}
+		if !slices.Contains(workqueue.ReleaseReasons, reason) {
+			return fmt.Errorf("reason_invalid: --reason must be one of %s", workQueueReasonList(workqueue.ReleaseReasons))
+		}
+		maxAttempts := workMaxAttempts()
+		published, err := workBranch(cmd).Publish(cmd.Context(), workActor(cmd), "release", workqueue.ReleaseParameters{DispatchID: dispatchID, Reason: reason},
+			func(state workqueue.Projection, _ workqueue.Request) ([]workqueue.Operation, error) {
+				return workReleaseOperations(state, dispatchID, reason, maxAttempts)
+			})
+		if err != nil {
+			return err
+		}
+		if !published.Committed {
+			return workPrint(cmd, workPublicationSummary(published), "Dispatch is already closed; nothing published")
+		}
+		return workPrint(cmd, workPublicationSummary(published), fmt.Sprintf("Released dispatch %s (%s); request=%s", workQueueText(dispatchID), reason, published.Request.ID))
 	}
-	cmd := &cobra.Command{Use: name, Short: short, Args: cobra.NoArgs}
-	cmd.Flags().StringSlice(selector, nil, "Exact IDs, comma-separated or repeated; all-or-nothing (maximum 256)")
-	cmd.Flags().String("reason", "", "Required sanitized reason code, for example operator_cancelled")
-	if priority {
-		cmd.Flags().Int("priority", 0, "New class 1..5 (configured weighted shares, not strict priority)")
-	}
-	cmd.RunE = func(cmd *cobra.Command, _ []string) error { return workRunOperator(cmd, selector, claims, priority) }
 	return cmd
 }
 
-func workOperatorSelectors(cmd *cobra.Command, selector string, priority bool) ([]string, string, int, error) {
-	ids, _ := cmd.Flags().GetStringSlice(selector)
-	reason, _ := cmd.Flags().GetString("reason")
-	value := 0
-	extra := ""
-	if priority {
-		value, _ = cmd.Flags().GetInt("priority")
-		extra = " and --priority 1..5"
-	}
-	if len(ids) < 1 || len(ids) > 256 || reason == "" || priority && (value < 1 || value > 5) {
-		return nil, "", 0, fmt.Errorf("--%s (1..256 IDs), --reason%s are required", selector, extra)
-	}
-	slices.Sort(ids)
-	if slices.Contains(ids, "") || len(slices.Compact(slices.Clone(ids))) != len(ids) {
-		return nil, "", 0, errors.New("selectors must be nonempty, distinct exact IDs")
-	}
-	return ids, reason, value, nil
+func workQueueReasonList(reasons []string) string {
+	return fmt.Sprintf("%v", reasons)
 }
 
-func workRunOperator(cmd *cobra.Command, selector string, claims, priority bool) error {
-	ids, reason, value, err := workOperatorSelectors(cmd, selector, priority)
-	if err != nil {
-		return err
+func workSubmitCommand() *cobra.Command {
+	cmd := &cobra.Command{
+		Use: "submit-work", Short: "Submit one Work item as the repository administrator",
+		Args: cobra.NoArgs,
+		RunE: workRunSubmitCommand,
 	}
-	state, err := workRead(cmd)
-	if err != nil {
-		return err
-	}
-	targets, err := workOperatorTargets(state, ids, claims)
-	if err != nil {
-		return err
-	}
-	id, err := workRequestID(cmd)
-	if err != nil {
-		return err
-	}
-	params, kind, err := workOperatorIntent(state, targets, reason, value, id)
-	if err != nil {
-		return err
-	}
-	published, err := workPublishOperator(cmd, id, kind, params)
-	if err != nil {
-		return err
-	}
-	message := fmt.Sprintf("Cancelled %d selected Work; native reservations retained until definitive evidence", len(targets))
-	if priority {
-		message = fmt.Sprintf("Priority %d recorded for %d available Work; age and debt preserved", value, len(targets))
-	} else {
-		sync, err := workBranch(cmd).SynchronizeIssueTransition(cmd.Context(), id)
-		if err != nil {
-			return fmt.Errorf("queue cancellation committed; Issue synchronization pending; retry sync-issues --request-id %s: %w", id, err)
-		}
-		if !sync.Disabled {
-			message += fmt.Sprintf("; %d existing Issue mirrors synchronized", sync.Synchronized)
-		}
-	}
-	return workPrint(cmd, published, message+"; request="+id)
+	cmd.Flags().String("file", "", "JSON payload object path (- for stdin)")
+	cmd.Flags().String("graph-id", "", "Nonempty graph namespace (when omitted: canonical payload SHA256)")
+	cmd.Flags().String("node-key", "root", "Nonempty node identity inside its graph")
+	cmd.Flags().String("pool", "default", "Scheduling pool")
+	cmd.Flags().Int("priority", 3, "Priority 1..5 (1 is dispatched first)")
+	cmd.Flags().String("fairness-key", "", "Account key for per_account_limit (default: one shared bucket)")
+	cmd.Flags().String("worker-profile", "", "Worker profile: the worker workflow ID (required)")
+	return cmd
 }
 
-func workOperatorTargets(state workqueue.Projection, ids []string, claims bool) ([]workOperatorTarget, error) {
-	targets := make([]workOperatorTarget, 0, len(ids))
-	for _, id := range ids {
-		target := workOperatorTarget{WorkID: id}
-		if claims {
-			claim := state.Claims[id]
-			if claim == nil {
-				return nil, fmt.Errorf("claim_missing: unknown Claim %s", workQueueText(id))
+func workRunSubmitCommand(cmd *cobra.Command, _ []string) error {
+	graph, _ := cmd.Flags().GetString("graph-id")
+	key, _ := cmd.Flags().GetString("node-key")
+	pool, _ := cmd.Flags().GetString("pool")
+	priority, _ := cmd.Flags().GetInt("priority")
+	fairness, _ := cmd.Flags().GetString("fairness-key")
+	profile, _ := cmd.Flags().GetString("worker-profile")
+	if cmd.Flags().Changed("graph-id") && graph == "" || key == "" {
+		return errors.New("work_invalid: graph and node identities must be nonempty; omit --graph-id for the payload-hash default")
+	}
+	if profile == "" {
+		return errors.New("work_invalid: --worker-profile is required (the worker workflow ID)")
+	}
+	payload, err := workReadJSON(cmd)
+	if err != nil {
+		return err
+	}
+	if !cmd.Flags().Changed("graph-id") {
+		if graph, err = workqueue.IndependentGraphID(payload); err != nil {
+			return err
+		}
+	}
+	work, err := workqueue.NewWork(graph, key, pool, profile, fairness, priority, payload, nil)
+	if err != nil {
+		return err
+	}
+	published, err := workPublishWork(cmd, []workqueue.WorkDefinition{work})
+	if err != nil {
+		return err
+	}
+	if !published.Committed {
+		return workPrint(cmd, map[string]any{"work_id": work.WorkID, "created": false}, "Work "+work.WorkID+" already admitted")
+	}
+	return workPrint(cmd, map[string]any{"work_id": work.WorkID, "created": !published.Recovered, "publication": workPublicationSummary(published)}, "Admitted Work "+work.WorkID)
+}
+
+// workPublishWork submits Work; already admitted identities are skipped (replay
+// treats an existing Work ID as a no-op).
+func workPublishWork(cmd *cobra.Command, works []workqueue.WorkDefinition) (workqueue.Publication, error) {
+	ids := make([]string, 0, len(works))
+	for _, work := range works {
+		ids = append(ids, work.WorkID)
+	}
+	return workBranch(cmd).Publish(cmd.Context(), workActor(cmd), "submit", workqueue.WorkIDsParameters{WorkIDs: ids},
+		func(state workqueue.Projection, _ workqueue.Request) ([]workqueue.Operation, error) {
+			operations := []workqueue.Operation{}
+			for _, work := range works {
+				if _, exists := state.Works[work.WorkID]; exists {
+					continue
+				}
+				operation, err := workqueue.Op(work)
+				if err != nil {
+					return nil, err
+				}
+				operations = append(operations, operation)
 			}
-			target.WorkID, target.ClaimID = claim.WorkID, id
-		}
-		targets = append(targets, target)
-	}
-	return targets, nil
+			return operations, nil
+		})
 }
 
-func workPublishOperator(cmd *cobra.Command, id, kind string, params workqueue.OperationsParameters) (workqueue.Publication, error) {
-	branch := workBranch(cmd)
-	actor, err := branch.Authenticate(cmd.Context(), "administrator")
-	if err != nil {
-		return workqueue.Publication{}, err
+func workSubmitGraphCommand() *cobra.Command {
+	cmd := &cobra.Command{
+		Use: "submit-graph", Short: "Atomically submit 1..256 complete v4 Work operations",
+		Args: cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			data, err := workReadJSON(cmd)
+			if err != nil {
+				return err
+			}
+			var nodes []workqueue.WorkDefinition
+			decoder := json.NewDecoder(bytes.NewReader(data))
+			decoder.DisallowUnknownFields()
+			if err := decoder.Decode(&nodes); err != nil || len(nodes) == 0 || len(nodes) > workqueue.OperationsPerCommit {
+				return errors.New("graph_invalid: expected a JSON array of 1..256 complete Work operations")
+			}
+			if err := decoder.Decode(new(any)); !errors.Is(err, io.EOF) {
+				return errors.New("graph_invalid: expected a JSON array of 1..256 complete Work operations")
+			}
+			for _, node := range nodes {
+				if err := workqueue.ValidateWork(node); err != nil {
+					return err
+				}
+			}
+			published, err := workPublishWork(cmd, nodes)
+			if err != nil {
+				return err
+			}
+			if !published.Committed {
+				return workPrint(cmd, workPublicationSummary(published), "Every graph node is already admitted")
+			}
+			return workPrint(cmd, workPublicationSummary(published), fmt.Sprintf("Admitted %d graph nodes atomically", len(published.Commit.Operations)))
+		},
 	}
-	request, err := workqueue.NewRequest(id, kind, actor, params)
-	if err != nil {
-		return workqueue.Publication{}, err
-	}
-	return branch.Publish(cmd.Context(), actor, request)
-}
-
-func workOperatorIntent(state workqueue.Projection, targets []workOperatorTarget, reason string, priority int, requestID string) (workqueue.OperationsParameters, string, error) {
-	kind := "cancel_work"
-	if priority != 0 {
-		kind = "control"
-	}
-	slices.SortFunc(targets, func(a, b workOperatorTarget) int { return cmp.Compare(a.WorkID, b.WorkID) })
-	params := workqueue.OperationsParameters{Operations: []workqueue.Operation{}}
-	previous := ""
-	for _, target := range targets {
-		work := state.Works[target.WorkID]
-		if work == nil {
-			return params, kind, fmt.Errorf("work_missing: unknown Work %s", workQueueText(target.WorkID))
-		}
-		if previous == target.WorkID {
-			return params, kind, errors.New("selectors must identify distinct Work")
-		}
-		previous = target.WorkID
-		fields := map[string]any{"kind": "WorkCancellation", "work_id": target.WorkID, "reason": reason}
-		if reason == "worker_contract_obsolete" && priority == 0 {
-			fields["version"] = 1
-		}
-		if target.ClaimID != "" {
-			fields["claim_id"] = target.ClaimID
-		}
-		if priority != 0 {
-			fields["kind"], fields["priority"], fields["expected_priority"] = "WorkPriority", priority, work.SchedulingPriority()
-		}
-		operation, err := workqueue.Op(fields)
-		if err != nil {
-			return params, kind, err
-		}
-		params.Operations = append(params.Operations, operation)
-	}
-	recovered, err := recoverWorkOperatorIntent(state, params, kind, requestID)
-	return recovered, kind, err
-}
-
-// Recover original compare-and-set values, not a new fingerprint derived from
-// the state an accepted action already changed.
-func recoverWorkOperatorIntent(state workqueue.Projection, wanted workqueue.OperationsParameters, kind, requestID string) (workqueue.OperationsParameters, error) {
-	accepted, ok := state.Requests[requestID]
-	if !ok {
-		return wanted, nil
-	}
-	var old workqueue.OperationsParameters
-	var err error
-	if kind == "cancel_work" && len(wanted.Operations) > 0 {
-		var desired struct {
-			Reason string `json:"reason"`
-		}
-		if err := json.Unmarshal(wanted.Operations[0], &desired); err != nil {
-			return wanted, err
-		}
-		old, err = workRecoverClearIntent(accepted, desired.Reason)
-	} else {
-		err = json.Unmarshal(accepted.Request.Parameters, &old)
-	}
-	if err != nil {
-		return wanted, err
-	}
-	if accepted.Request.Kind != kind || len(old.Operations) != len(wanted.Operations) {
-		return wanted, errors.New("request_reuse: accepted request has different intent")
-	}
-	for index, operation := range old.Operations {
-		if index < 0 || index >= len(wanted.Operations) {
-			return wanted, errors.New("request_reuse: accepted request has different operation count")
-		}
-		left, err := workOperatorComparison(operation)
-		if err != nil {
-			return wanted, err
-		}
-		right, err := workOperatorRetryComparison(operation, wanted.Operations[index])
-		if err != nil {
-			return wanted, err
-		}
-		if !bytes.Equal(left, right) {
-			return wanted, errors.New("request_reuse: accepted request has different selectors, reason or priority")
-		}
-	}
-	return old, nil
-}
-
-func workOperatorComparison(operation workqueue.Operation) ([]byte, error) {
-	var fields map[string]json.RawMessage
-	if err := json.Unmarshal(operation, &fields); err != nil {
-		return nil, err
-	}
-	delete(fields, "expected_priority")
-	return json.Marshal(fields)
-}
-
-func workOperatorRetryComparison(original, wanted workqueue.Operation) ([]byte, error) {
-	var old, next map[string]json.RawMessage
-	if err := json.Unmarshal(original, &old); err != nil {
-		return nil, err
-	}
-	if err := json.Unmarshal(wanted, &next); err != nil {
-		return nil, err
-	}
-	// Acknowledging an accepted legacy request must recover its original bytes,
-	// not turn its reason-only cancellation into a new checked publication.
-	if old["version"] == nil && string(old["kind"]) == `"WorkCancellation"` &&
-		string(old["reason"]) == `"worker_contract_obsolete"` && string(next["version"]) == "1" {
-		delete(next, "version")
-	}
-	delete(next, "expected_priority")
-	return json.Marshal(next)
+	cmd.Flags().String("file", "", "JSON array of v4 Work operations (- for stdin)")
+	return cmd
 }

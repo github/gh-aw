@@ -1,5 +1,8 @@
 # ADR-71495: Additive First-Use Pool Installation for AW-Managed Work Queues
 
+> [!NOTE]
+> Superseded by work queue protocol v4 ([specification](../src/content/docs/specs/work-queue-specification.md)): v4 removed pool installation and Policy epochs; pools come from compiled `aw.json` settings on each run.
+
 **Date**: 2026-10-24
 **Status**: Draft
 **Deciders**: [TODO: verify] pelikhan, Copilot coding agent

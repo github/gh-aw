@@ -1,7 +1,7 @@
 "use strict";
 
 const assert = require("node:assert/strict");
-const { MAX_PARSE_BYTES, MAX_SNAPSHOT_PARSE_BYTES, canonical, canonicalBytes, fingerprint, parseStrictJSON, utf8Compare, validateReason } = require("./work_queue_codec.cjs");
+const { MAX_PARSE_BYTES, MAX_SNAPSHOT_PARSE_BYTES, canonical, canonicalBytes, parseStrictJSON, utf8Compare } = require("./work_queue_codec.cjs");
 
 function registerTests({ describe, it }) {
   describe("work queue canonical codec", () => {
@@ -71,14 +71,6 @@ function registerTests({ describe, it }) {
       }
       for (const value of [undefined, 1n, new Date(), [undefined]]) assert.throws(() => canonical(value), { code: "codec_invalid" });
     });
-    it("binds fingerprints to stable actor, kind, and semantic parameters, never branch state", () => {
-      const actor = { role: "dispatcher", principal: "approved" };
-      const parameters = { pool: "default", max_claims: 1, max_dispatches: 1 };
-      const hash = fingerprint(actor, "dispatch_next", parameters);
-      assert.match(hash, /^[a-f0-9]{64}$/);
-      assert.equal(hash, fingerprint({ principal: "approved", role: "dispatcher" }, "dispatch_next", { max_dispatches: 1, max_claims: 1, pool: "default" }));
-      assert.notEqual(hash, fingerprint(actor, "dispatch_next", { ...parameters, max_claims: 2 }));
-    });
     it("bounds JSON nesting before unbounded recursion", () => {
       assert.throws(() => parseStrictJSON("[".repeat(66) + "0" + "]".repeat(66)), /resource_limit/);
     });
@@ -113,11 +105,6 @@ function registerTests({ describe, it }) {
       assert.throws(() => parseStrictJSON("[".repeat(66) + "0" + "]".repeat(66), options), { code: "resource_limit" });
       assert.throws(() => parseStrictJSON(`[${"0,".repeat(16384)}0]`, options), { code: "resource_limit" });
       assert.equal(canonical(parseStrictJSON('{"__proto__":{},"value":0}', options)), '{"__proto__":{},"value":0}');
-    });
-    it("accepts only bounded sanitized reason codes without trailing newline anchor loopholes", () => {
-      for (const reason of ["A", "0", "code_with.punctuation:and-hyphens", "x".repeat(128)]) assert.equal(validateReason(reason), reason);
-      for (const reason of ["", "x".repeat(129), "retained-control-" + "x".repeat(220), "leading space", ".leading", "_leading", ":leading", "-leading", "é", "code\n", "code\r", "code\t", "code\u0000", undefined, 1])
-        assert.throws(() => validateReason(reason), /reason_invalid/);
     });
   });
 }

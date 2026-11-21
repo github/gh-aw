@@ -206,8 +206,8 @@ Run the worker.
       - name: Snapshot work queue state
   safe_outputs:
     steps:
-      - name: Reconcile work queue claim
-        id: work_queue_claim_reconciliation
+      - name: Finish work queue claim
+        id: work_queue_finish
 `,
 		"stale-worker": "",
 	} {

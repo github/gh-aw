@@ -26,20 +26,6 @@ function registerQueueLedgerClient(client, ledgerClient) {
   overrides.set(client, ledgerClient);
 }
 
-function inheritQueueLedgerClient(source, target) {
-  if (overrides.has(source)) {
-    const ledger = overrides.get(source);
-    registerQueueLedgerClient(target, ledger === source ? target : ledger);
-  }
-  let repositories = clients.get(source);
-  if (!repositories) clients.set(source, (repositories = new Map()));
-  clients.set(target, repositories);
-}
-
-function queueGitScope(client) {
-  return gitClients.has(client) ? client : undefined;
-}
-
 function queueLedgerClient(githubClient, owner, repo, branch = "work-queue") {
   const override = overrides.get(githubClient);
   const scope = gitClients.get(override || githubClient);
@@ -275,32 +261,6 @@ function createGitLedgerClient({ githubClient, owner, repo, branch, remote }) {
         createRef: async ({ ref, sha }) => push(ref, sha, ""),
       },
     },
-    async readFiles(head, paths) {
-      await fetchObjects();
-      const result = new Map();
-      for (const file of paths) {
-        const entry = git(["ls-tree", "-z", head, "--", file]).toString("utf8");
-        if (!entry) continue;
-        const [mode, type, oid] = entry.slice(0, entry.indexOf("\t")).split(" ");
-        if (mode !== "100644" || type !== "blob") throw queueError("projection_journal_conflict", "projection journal must be a regular blob");
-        result.set(file, new TextDecoder("utf-8", { fatal: true }).decode(await object(oid, "blob")));
-      }
-      return result;
-    },
-    async writeFiles(head, files) {
-      await fetchObjects();
-      const index = path.join(directory, "publication-index");
-      const env = { ...baseEnv, GIT_INDEX_FILE: index };
-      git(["read-tree", head], undefined, env);
-      for (const file of files) {
-        const oid = git(["hash-object", "-w", "--stdin"], file.content).toString("utf8").trim();
-        git(["update-index", "--add", "--cacheinfo", `100644,${oid},${file.path}`], undefined, env);
-      }
-      const tree = git(["write-tree"], undefined, env).toString("utf8").trim();
-      const commit = await client.rest.git.createCommit({ tree, parents: [head], message: "Publish checked work queue projection" });
-      await client.rest.git.updateRef({ ref: `heads/${branch}`, sha: commit.data.sha, force: false });
-      return commit.data.sha;
-    },
     close() {
       objectReader.close();
       objectReaders.delete(objectReader);
@@ -313,4 +273,4 @@ function createGitLedgerClient({ githubClient, owner, repo, branch, remote }) {
   return client;
 }
 
-module.exports = { createGitLedgerClient, queueLedgerClient, registerQueueLedgerClient, inheritQueueLedgerClient, queueGitScope, gitEnvironment };
+module.exports = { createGitLedgerClient, queueLedgerClient, registerQueueLedgerClient, gitEnvironment };

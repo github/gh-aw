@@ -1,140 +1,83 @@
 // @ts-check
 "use strict";
-const { SAFE_OUTPUT_E002 } = require("./error_codes.cjs");
-const queue = require("./work_queue_replay.cjs");
-const store = require("./work_queue_store.cjs");
-const { canonical, digest, parseStrictJSON } = require("./work_queue_codec.cjs");
-const { normalizeAssignment } = require("./work_queue_claim_scope.cjs");
-const { actorFromContext, dispatchPrincipal, validatePolicy } = require("./work_queue_policy.cjs");
-const { readWorkQueuePolicyConfig } = require("./work_queue_policy_config.cjs");
-const { requestForIntent } = require("./work_queue_intents.cjs");
-const { authenticatePublisher, validateNativeRun } = require("./work_queue_native.cjs");
 
-function policyProposalFor(options) {
-  const raw = Object.hasOwn(options, "policyProposal") ? options.policyProposal : readWorkQueuePolicyConfig() || undefined;
-  if (raw === undefined) return;
-  if (typeof raw === "string" && Buffer.byteLength(raw, "utf8") > 4 * 1024 * 1024) throw new Error(`${SAFE_OUTPUT_E002}: work_queue_policy_proposal_limit`);
-  const proposal = typeof raw === "string" ? parseStrictJSON(raw) : raw;
-  validatePolicy(proposal);
-  return proposal;
+const { queueError } = require("./work_queue_codec.cjs");
+const { actorFromContext, readWorkQueuePolicyEnv } = require("./work_queue_policy.cjs");
+const { openClaims } = require("./work_queue_replay.cjs");
+const { publishWorkQueueRequest, readWorkQueueLog } = require("./work_queue_store.cjs");
+
+// Roles whose jobs may write the ledger convert a v3 head before reading it.
+const CONVERTING_ROLES = ["dispatcher", "producer", "administrator", "reconciler"];
+const DEFAULT_MAX_ATTEMPTS = 3;
+
+/**
+ * @typedef {{githubClient: any, context: {repo: {owner: string, repo: string}, runId?: unknown, runAttempt?: unknown}, role: string, branch?: string, core?: any, policy?: import("./work_queue_policy.cjs").PolicyEnv | null}} QueueJobOptions
+ */
+
+/**
+ * Load the replayed ledger for a job. A v3 head is converted first when the job's
+ * role may write the ledger; workers, observers and projectors get unsupported_protocol.
+ * @param {QueueJobOptions} options
+ */
+async function loadQueue({ githubClient, context, role, branch = undefined, core: coreApi = undefined, policy = undefined }) {
+  const target = { githubClient, owner: context.repo.owner, repo: context.repo.repo, ...(branch === undefined ? {} : { branch }), core: coreApi };
+  let current = await readWorkQueueLog({ ...target, allowLegacy: true });
+  if (current.protocol === 3) {
+    if (!CONVERTING_ROLES.includes(role)) throw queueError("unsupported_protocol", "work queue protocol v4 required; run the v3 converter");
+    const resolved = policy ?? readWorkQueuePolicyEnv();
+    if (!resolved) throw queueError("policy_missing", "v3 conversion requires the compiled work queue policy");
+    const { convertV3Ledger } = require("./work_queue_convert_v3.cjs");
+    await convertV3Ledger({ ...target, actor: actorFromContext(context, "administrator"), policy: resolved });
+    current = await readWorkQueueLog(target);
+  }
+  return current;
 }
 
-function assertPolicyProposal(state, options) {
-  const proposal = policyProposalFor(options);
-  if (proposal === undefined) return;
-  if (!state.policy) throw new Error("work_queue_policy_missing");
-  if (proposal.authorization === "aw") return;
-  if (canonical(proposal) !== canonical(state.policy)) throw new Error("work_queue_policy_proposal_mismatch");
-}
-
-async function loadQueue(options) {
-  if (options.initializationContext !== undefined) throw new Error(`${SAFE_OUTPUT_E002}: work_queue_standalone_seeding_unsupported: submit Work to bootstrap the queue`);
-  const context = options.context;
-  const readLog = options.readWorkQueueLog || store.readWorkQueueLog;
-  const parameters = {
-    githubClient: options.queueClient || options.githubClient,
+/**
+ * Publish one request as this job's actor. `operationsFor(state, request)` is
+ * re-planned on every compare-and-swap retry; returning [] commits nothing.
+ * @param {QueueJobOptions & {kind: string, parameters: Record<string, any>, operationsFor: (state: any, request: {id: string, kind: string, parameters: any}) => Array<any> | Promise<Array<any>>}} options
+ */
+function publishRequest({ githubClient, context, role, branch = undefined, core: coreApi = undefined, kind, parameters, operationsFor }) {
+  return publishWorkQueueRequest({
+    githubClient,
     owner: context.repo.owner,
     repo: context.repo.repo,
-    ...(options.branch === undefined ? {} : { branch: options.branch }),
-    ...(options.eventIds === undefined ? {} : { eventIds: options.eventIds }),
-    core: options.core,
-  };
-  const readBoundLog = async () => {
-    const log = await readLog(parameters);
-    const repository = `${context.repo.owner}/${context.repo.repo}`.toLowerCase();
-    if (!Array.isArray(log.transactions) || log.transactions.some(commit => typeof commit?.actor?.repository !== "string" || commit.actor.repository.toLowerCase() !== repository)) throw new Error("work_queue_ledger_repository_mismatch");
-    return log;
-  };
-  const log = await readBoundLog();
-  const projection = log.state || queue.replayTransactions(log.transactions);
-  if (!projection.policy && log.sha === null && log.transactions.length === 0) {
-    // Validate the proposal, but defer installing it to the first checked commit.
-    policyProposalFor(options);
-  } else {
-    assertPolicyProposal(projection, options);
-  }
-  return { ...log, projection };
-}
-
-async function publishOperations(options, trustedContext, purpose, kind, operations, validatePrefix) {
-  const request = requestForIntent(trustedContext, `intent:${digest(purpose)}`, kind, { operations });
-  return (options.publishWorkQueueRequest || store.publishWorkQueueRequest)({
-    githubClient: options.queueClient || options.githubClient,
-    owner: options.context.repo.owner,
-    repo: options.context.repo.repo,
-    ...(options.branch === undefined ? {} : { branch: options.branch }),
-    context: trustedContext,
-    actor: actorFromContext(trustedContext),
-    request,
-    ...(validatePrefix === undefined
-      ? {}
-      : {
-          generateOperations: (state, stable, actor, at, id, observations) => {
-            validatePrefix(state);
-            return queue.generateRequestOperations(state, stable, actor, at, id, observations);
-          },
-        }),
-    core: options.core,
+    ...(branch === undefined ? {} : { branch }),
+    actor: actorFromContext(context, role),
+    request: { kind, parameters },
+    operationsFor,
+    core: coreApi,
   });
 }
 
-function validateStoredAssignment(state, supplied, { allowReleased = false } = {}) {
-  const assignment = normalizeAssignment(supplied);
-  const dispatch = state.dispatches.get(assignment.dispatch_id);
-  const stored = dispatch && queue.assignmentForDispatch(state, assignment.dispatch_id);
-  if (!stored || canonical(stored) !== canonical(assignment)) throw new Error("work_queue_assignment_mismatch");
-  const retired = state.policy_epoch !== assignment.policy_epoch;
-  if (retired && !(allowReleased && dispatch.released)) throw new Error("work_queue_assignment_policy_mismatch");
-  if (!dispatch || (dispatch.released && !allowReleased)) throw new Error("work_queue_dispatch_not_active");
-  const profile = dispatch.profile;
-  if (!profile) throw new Error("work_queue_assignment_profile_missing");
-  return { assignment: stored, dispatch, profile };
+/** @param {import("./work_queue_policy.cjs").PolicyEnv | null | undefined} policy @param {string} pool */
+function maxAttempts(policy, pool) {
+  return policy?.pools?.[pool]?.max_attempts ?? DEFAULT_MAX_ATTEMPTS;
 }
 
-function expectedWorkerRun(assignment, profile, context, canonicalRepository = `${context.repo.owner}/${context.repo.repo}`, principal = profile.principal) {
-  return {
-    repository: canonicalRepository,
-    ...(context.payload?.repository?.id === undefined ? {} : { repository_id: context.payload.repository.id }),
-    workflow: profile.workflow,
-    ref: profile.ref,
-    principal_id: principal,
-    dispatch_id: assignment.dispatch_id,
-  };
+/**
+ * WorkCancellation{attempts_exhausted} for a cancelled Claim whose Work has used its
+ * last attempt (the cancellation itself increments attempts).
+ * @returns {Array<{kind: "WorkCancellation", work_id: string, reason: "attempts_exhausted", claim_id: string}>}
+ */
+function exhaustedCancellation(state, claim, policy) {
+  const work = state.works.get(claim.work_id);
+  return work.attempts + 1 >= maxAttempts(policy, work.pool) ? [{ kind: "WorkCancellation", work_id: work.work_id, reason: "attempts_exhausted", claim_id: claim.claim_id }] : [];
 }
 
-function bindingForRun(proof, expected) {
-  if (proof.principal !== expected.principal_id) throw new Error("run_principal_mismatch");
-  return { run_id: proof.run_id, run_attempt: 1, repository: proof.repository, workflow: expected.workflow, ref: expected.ref, principal: expected.principal_id, event: "workflow_dispatch" };
+/**
+ * Operations releasing a non-closed Dispatch: Release (replay cancels every open Claim)
+ * plus the attempts rule for each affected Work. [] when there is nothing to release.
+ * @param {any} state
+ * @param {string} dispatchId
+ * @param {string} reason
+ * @param {import("./work_queue_policy.cjs").PolicyEnv | null | undefined} policy
+ */
+function releaseOperations(state, dispatchId, reason, policy) {
+  const dispatch = state.dispatches.get(dispatchId);
+  if (!dispatch || dispatch.state === "closed") return [];
+  return [{ kind: "Release", dispatch_id: dispatchId, reason }, ...openClaims(state, dispatch).flatMap(claim => exhaustedCancellation(state, claim, policy))];
 }
 
-async function bindWorkerAssignment(options) {
-  const initial = await loadQueue(options);
-  const { assignment, dispatch, profile } = validateStoredAssignment(initial.projection, options.assignment);
-  if (profile.logical_contract && (options.logicalContract ?? process.env.GH_AW_WORK_QUEUE_CONTRACT) !== profile.logical_contract) throw new Error("work_queue_worker_contract_mismatch");
-  if (!["started", "uncertain", "unresolved", "bound"].includes(dispatch.state)) throw new Error("work_queue_launch_marker_required");
-  const trustedContext = await authenticatePublisher({ ...options, role: "worker", dispatch_id: assignment.dispatch_id });
-  const expected = expectedWorkerRun(assignment, profile, options.context, trustedContext.repository, dispatchPrincipal(dispatch));
-  const proof = validateNativeRun(trustedContext.native_run, { ...expected, run_id: trustedContext.run_id });
-  const binding = bindingForRun(proof, expected);
-  if (dispatch.run && canonical(dispatch.run) !== canonical(binding)) throw new Error("run_binding_conflict");
-  if (!dispatch.run) {
-    const evidence = {
-      kind: "reconciliation",
-      source: "trusted_activation",
-      repository: binding.repository,
-      workflow: binding.workflow,
-      ref: binding.ref,
-      principal: binding.principal,
-      checked_at: options.now ?? Date.now(),
-      run_id: binding.run_id,
-      run_attempt: 1,
-    };
-    await publishOperations(options, trustedContext, ["bind", assignment.dispatch_id, proof.run_id], "dispatch", [{ kind: "Dispatch", dispatch_id: assignment.dispatch_id, state: "bound", run: binding, evidence }]);
-  }
-  const latest = await loadQueue(options);
-  const validated = validateStoredAssignment(latest.projection, assignment);
-  if (!validated.dispatch.run || canonical(validated.dispatch.run) !== canonical(binding)) throw new Error("work_queue_binding_not_durable");
-  return { assignment, binding, trustedContext, projection: latest.projection };
-}
-
-module.exports = { policyProposalFor, assertPolicyProposal, loadQueue, publishOperations, validateStoredAssignment, expectedWorkerRun, bindingForRun, bindWorkerAssignment };
+module.exports = { CONVERTING_ROLES, exhaustedCancellation, loadQueue, maxAttempts, publishRequest, releaseOperations };

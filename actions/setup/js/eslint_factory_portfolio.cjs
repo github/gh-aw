@@ -1,8 +1,7 @@
 // @ts-check
 "use strict";
 
-const { buildAWPolicy } = require("./work_queue_settings.cjs");
-const { validateDeliveryContract } = require("./work_queue_delivery.cjs");
+const { buildPolicyEnv } = require("./work_queue_settings.cjs");
 
 const ESLINT_WORKERS = Object.freeze(["eslint-miner", "eslint-refiner", "eslint-monster"]);
 
@@ -15,7 +14,7 @@ function factoryContract(profile) {
   } else if (profile === "eslint-monster") {
     outputs.push({ type: "create_issue", min: 0, max: 3 }, { type: "close_issue", min: 0, max: 10 }, { type: "update_issue", min: 0, max: 10 }, { type: "assign_to_agent", min: 0, max: 3 }, { type: "create_discussion", min: 0, max: 1 });
   } else throw new Error("ESLint worker profile is not approved");
-  return validateDeliveryContract({ version: 1, outputs });
+  return { version: 1, outputs };
 }
 
 /** @param {string} repository */
@@ -40,7 +39,7 @@ function buildESLintFactoryPlan({ date, repository, repositoryId }) {
       fairness_key: "",
       worker_profile: profile,
       payload: {
-        plan: "Run this workflow's existing ESLint mission for the immutable factory date. Stay within the assigned resource scope and effect contract; do not dispatch or admit other work. If no resource-writing output is needed, cancel the Claim instead of completing this write-capable Work with only noop.",
+        plan: "Run this workflow's existing ESLint mission for the immutable factory date. Stay within the assigned resource scope and effect contract; do not dispatch or admit other work. If no resource-writing output is needed, finish the Claim as failed instead of completing this write-capable Work with only noop.",
         factory_date: date,
         factory_profile: profile,
         resource_scope: { version: 1, resources: [{ host: "github.com", repository, repository_id: repositoryId }] },
@@ -52,17 +51,17 @@ function buildESLintFactoryPlan({ date, repository, repositoryId }) {
   };
 }
 
-/** @param {{repository: string, ref: string, settings?: object}} options */
-function buildESLintFactoryPolicy({ repository, ref, settings }) {
+/** @param {{repository: string, settings?: object}} options */
+function buildESLintFactoryPolicy({ repository, settings }) {
   assertRepository(repository);
-  return buildAWPolicy({ repository, ref, workflows: [...ESLINT_WORKERS], settings });
+  return buildPolicyEnv({ repository, workflows: [...ESLINT_WORKERS], settings });
 }
 
 module.exports = { ESLINT_WORKERS, buildESLintFactoryPlan, buildESLintFactoryPolicy };
 
 if (require.main === module) {
-  const [command, repository, ref, ...extra] = process.argv.slice(2);
-  if (command !== "policy" || extra.length || !repository || !ref) throw new Error("Usage: node eslint_factory_portfolio.cjs policy OWNER/REPO IMMUTABLE_SHA");
+  const [command, repository, ...extra] = process.argv.slice(2);
+  if (command !== "policy" || extra.length || !repository) throw new Error("Usage: node eslint_factory_portfolio.cjs policy OWNER/REPO");
   const { readPortfolioSettings } = require("./work_queue_portfolio_config.cjs");
-  process.stdout.write(JSON.stringify(buildESLintFactoryPolicy({ repository, ref, settings: readPortfolioSettings() }), null, 2) + "\n");
+  process.stdout.write(JSON.stringify(buildESLintFactoryPolicy({ repository, settings: readPortfolioSettings() }), null, 2) + "\n");
 }

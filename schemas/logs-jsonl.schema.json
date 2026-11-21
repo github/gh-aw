@@ -288,71 +288,6 @@
                         "string"
                       ]
                     },
-                    "worker": {
-                      "type": [
-                        "null",
-                        "object"
-                      ],
-                      "properties": {
-                        "work_id": {
-                          "type": "string"
-                        },
-                        "claim_id": {
-                          "type": "string"
-                        }
-                      },
-                      "required": [
-                        "work_id",
-                        "claim_id"
-                      ],
-                      "additionalProperties": false
-                    },
-                    "transactions": {
-                      "type": [
-                        "null",
-                        "array"
-                      ],
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "version": {
-                            "type": "integer"
-                          },
-                          "kind": {
-                            "type": "string"
-                          },
-                          "work": {
-                            "type": "string"
-                          },
-                          "claim": {
-                            "type": [
-                              "null",
-                              "string"
-                            ]
-                          },
-                          "attempt": {
-                            "type": [
-                              "null",
-                              "string"
-                            ]
-                          },
-                          "enqueued": {
-                            "type": [
-                              "null",
-                              "integer"
-                            ]
-                          }
-                        },
-                        "required": [
-                          "version",
-                          "kind",
-                          "work",
-                          "claim",
-                          "attempt"
-                        ],
-                        "additionalProperties": false
-                      }
-                    },
                     "current": {
                       "type": [
                         "null",
@@ -362,26 +297,11 @@
                         "role": {
                           "type": "string"
                         },
-                        "policy_installed": {
-                          "type": "boolean"
-                        },
                         "tip": {
                           "type": "string"
                         },
-                        "policy_epoch": {
-                          "type": "string"
-                        },
-                        "captured_at": {
-                          "type": "integer"
-                        },
                         "commit_count": {
                           "type": "integer"
-                        },
-                        "admission_paused": {
-                          "type": "boolean"
-                        },
-                        "grants_paused": {
-                          "type": "boolean"
                         },
                         "assignment": {
                           "type": [
@@ -392,17 +312,27 @@
                             "dispatch_id": {
                               "type": "string"
                             },
-                            "request_id": {
-                              "type": "string"
-                            },
-                            "commit_id": {
-                              "type": "string"
-                            },
                             "state": {
                               "type": "string"
                             },
-                            "released": {
-                              "type": "boolean"
+                            "run": {
+                              "type": [
+                                "null",
+                                "object"
+                              ],
+                              "properties": {
+                                "run_id": {
+                                  "type": "string"
+                                },
+                                "run_attempt": {
+                                  "type": "integer"
+                                }
+                              },
+                              "required": [
+                                "run_id",
+                                "run_attempt"
+                              ],
+                              "additionalProperties": false
                             },
                             "claims": {
                               "type": [
@@ -423,17 +353,13 @@
                                   },
                                   "state": {
                                     "type": "string"
-                                  },
-                                  "delivery_barrier": {
-                                    "type": "string"
                                   }
                                 },
                                 "required": [
                                   "claim_handle",
                                   "claim_id",
                                   "work_id",
-                                  "state",
-                                  "delivery_barrier"
+                                  "state"
                                 ],
                                 "additionalProperties": false
                               }
@@ -441,10 +367,8 @@
                           },
                           "required": [
                             "dispatch_id",
-                            "request_id",
-                            "commit_id",
                             "state",
-                            "released",
+                            "run",
                             "claims"
                           ],
                           "additionalProperties": false
@@ -482,31 +406,16 @@
                             "nodes": {
                               "type": "integer"
                             },
-                            "evaluated_at": {
-                              "type": "integer"
-                            },
                             "status": {
                               "type": "string"
                             },
                             "tip": {
                               "type": "string"
                             },
-                            "policy_epoch": {
-                              "type": "string"
-                            },
                             "repository": {
                               "type": "string"
                             },
                             "branch": {
-                              "type": "string"
-                            },
-                            "admission_paused": {
-                              "type": "boolean"
-                            },
-                            "grants_paused": {
-                              "type": "boolean"
-                            },
-                            "policy_mode": {
                               "type": "string"
                             },
                             "claims_by_state": {
@@ -521,31 +430,13 @@
                                 "type": "integer"
                               }
                             },
-                            "delivery_by_state": {
+                            "work_cancellation_reasons": {
                               "type": "object",
                               "additionalProperties": {
                                 "type": "integer"
                               }
-                            },
-                            "delivery_failure_reasons": {
-                              "type": "object",
-                              "additionalProperties": {
-                                "type": "integer"
-                              }
-                            },
-                            "native_reservations": {
-                              "type": "integer"
-                            },
-                            "dispatches_total": {
-                              "type": "integer"
                             },
                             "dispatches_by_state": {
-                              "type": "object",
-                              "additionalProperties": {
-                                "type": "integer"
-                              }
-                            },
-                            "reservations_by_state": {
                               "type": "object",
                               "additionalProperties": {
                                 "type": "integer"
@@ -562,9 +453,6 @@
                                   "pool": {
                                     "type": "string"
                                   },
-                                  "policy_installed": {
-                                    "type": "boolean"
-                                  },
                                   "work_by_state": {
                                     "type": "object",
                                     "additionalProperties": {
@@ -577,156 +465,39 @@
                                       "type": "integer"
                                     }
                                   },
-                                  "delivery_by_state": {
+                                  "open_dispatches": {
+                                    "type": "integer"
+                                  },
+                                  "eligible": {
+                                    "type": "integer"
+                                  },
+                                  "blocked": {
                                     "type": "object",
                                     "additionalProperties": {
                                       "type": "integer"
                                     }
                                   },
-                                  "native_reservations": {
-                                    "type": "integer"
-                                  },
-                                  "logical_limit": {
-                                    "type": "integer"
-                                  },
-                                  "native_limit": {
-                                    "type": "integer"
-                                  },
-                                  "max_attempts": {
-                                    "type": "integer"
-                                  },
-                                  "scheduling_eligible": {
-                                    "type": "integer"
-                                  },
-                                  "ineligible_reasons": {
-                                    "type": "object",
-                                    "additionalProperties": {
-                                      "type": "integer"
-                                    }
-                                  },
-                                  "oldest_available": {
+                                  "next_eligible": {
                                     "type": [
                                       "null",
-                                      "object"
+                                      "array"
                                     ],
-                                    "properties": {
-                                      "work_id": {
-                                        "type": "string"
-                                      },
-                                      "admitted_at": {
-                                        "type": "integer"
-                                      },
-                                      "age_ms": {
-                                        "type": "integer"
-                                      }
-                                    },
-                                    "required": [
-                                      "work_id",
-                                      "admitted_at",
-                                      "age_ms"
-                                    ],
-                                    "additionalProperties": false
-                                  },
-                                  "available_age_unknown": {
-                                    "type": "integer"
-                                  },
-                                  "prediction": {
-                                    "type": "object",
-                                    "properties": {
-                                      "reason": {
-                                        "type": "string"
-                                      },
-                                      "assignments": {
-                                        "type": [
-                                          "null",
-                                          "array"
-                                        ],
-                                        "items": {
-                                          "type": "object",
-                                          "properties": {
-                                            "worker_profile": {
-                                              "type": "string"
-                                            },
-                                            "work_ids": {
-                                              "type": [
-                                                "null",
-                                                "array"
-                                              ],
-                                              "items": {
-                                                "type": "string"
-                                              }
-                                            }
-                                          },
-                                          "required": [
-                                            "worker_profile",
-                                            "work_ids"
-                                          ],
-                                          "additionalProperties": false
-                                        }
-                                      }
-                                    },
-                                    "required": [
-                                      "reason",
-                                      "assignments"
-                                    ],
-                                    "additionalProperties": false
+                                    "items": {
+                                      "type": "string"
+                                    }
                                   }
                                 },
                                 "required": [
                                   "pool",
-                                  "policy_installed",
                                   "work_by_state",
                                   "claims_by_state",
-                                  "delivery_by_state",
-                                  "native_reservations",
-                                  "logical_limit",
-                                  "native_limit",
-                                  "max_attempts",
-                                  "scheduling_eligible",
-                                  "ineligible_reasons",
-                                  "oldest_available",
-                                  "available_age_unknown",
-                                  "prediction"
+                                  "open_dispatches",
+                                  "eligible",
+                                  "blocked",
+                                  "next_eligible"
                                 ],
                                 "additionalProperties": false
                               }
-                            },
-                            "activity": {
-                              "type": "object",
-                              "properties": {
-                                "since": {
-                                  "type": "integer"
-                                },
-                                "until": {
-                                  "type": "integer"
-                                },
-                                "transactions": {
-                                  "type": "integer"
-                                },
-                                "operations": {
-                                  "type": "object",
-                                  "additionalProperties": {
-                                    "type": "integer"
-                                  }
-                                },
-                                "last_commit_id": {
-                                  "type": "string"
-                                },
-                                "last_at": {
-                                  "type": [
-                                    "null",
-                                    "integer"
-                                  ]
-                                }
-                              },
-                              "required": [
-                                "since",
-                                "until",
-                                "transactions",
-                                "operations",
-                                "last_at"
-                              ],
-                              "additionalProperties": false
                             },
                             "assigned_claims": {
                               "type": [
@@ -760,9 +531,6 @@
                                       "priority": {
                                         "type": "integer"
                                       },
-                                      "admitted_priority": {
-                                        "type": "integer"
-                                      },
                                       "fairness_key": {
                                         "type": "string"
                                       },
@@ -782,43 +550,30 @@
                                         ],
                                         "additionalProperties": false
                                       },
-                                      "enqueued_at": {
-                                        "type": "integer"
-                                      },
-                                      "admitted_at": {
-                                        "type": [
-                                          "null",
-                                          "integer"
-                                        ]
-                                      },
                                       "attempts": {
-                                        "type": "integer"
-                                      },
-                                      "max_attempts": {
-                                        "type": [
-                                          "null",
-                                          "integer"
-                                        ]
-                                      },
-                                      "retry_not_before": {
                                         "type": "integer"
                                       },
                                       "claim_id": {
                                         "type": "string"
                                       },
-                                      "delivery": {
-                                        "type": "string"
-                                      },
                                       "completion_id": {
                                         "type": "string"
                                       },
-                                      "result_commit_id": {
-                                        "type": "string"
-                                      },
-                                      "disposition": {
-                                        "type": "string"
+                                      "effects": {
+                                        "type": [
+                                          "null",
+                                          "array"
+                                        ],
+                                        "items": {
+                                          "type": "integer",
+                                          "minimum": 0,
+                                          "maximum": 255
+                                        }
                                       },
                                       "cancellation_reason": {
+                                        "type": "string"
+                                      },
+                                      "cancellation_commit_id": {
                                         "type": "string"
                                       },
                                       "depends_on": {
@@ -880,7 +635,7 @@
                                           "additionalProperties": false
                                         }
                                       },
-                                      "issue": {
+                                      "subject": {
                                         "type": [
                                           "null",
                                           "object"
@@ -914,6 +669,50 @@
                                           "number"
                                         ],
                                         "additionalProperties": false
+                                      },
+                                      "backing_issue": {
+                                        "type": [
+                                          "null",
+                                          "object"
+                                        ],
+                                        "properties": {
+                                          "kind": {
+                                            "type": "string"
+                                          },
+                                          "host": {
+                                            "type": "string"
+                                          },
+                                          "repository": {
+                                            "type": "string"
+                                          },
+                                          "repository_id": {
+                                            "type": "string"
+                                          },
+                                          "resource_id": {
+                                            "type": "string"
+                                          },
+                                          "number": {
+                                            "type": "string"
+                                          }
+                                        },
+                                        "required": [
+                                          "kind",
+                                          "host",
+                                          "repository",
+                                          "repository_id",
+                                          "resource_id",
+                                          "number"
+                                        ],
+                                        "additionalProperties": false
+                                      },
+                                      "issue_comment": {
+                                        "type": "string"
+                                      },
+                                      "ready": {
+                                        "type": "boolean"
+                                      },
+                                      "reason": {
+                                        "type": "string"
                                       }
                                     },
                                     "required": [
@@ -924,16 +723,12 @@
                                       "worker_profile",
                                       "state",
                                       "priority",
-                                      "admitted_priority",
                                       "fairness_key",
                                       "position",
-                                      "enqueued_at",
-                                      "admitted_at",
                                       "attempts",
-                                      "max_attempts",
-                                      "retry_not_before",
-                                      "delivery",
-                                      "depends_on"
+                                      "depends_on",
+                                      "ready",
+                                      "reason"
                                     ],
                                     "additionalProperties": false
                                   },
@@ -967,35 +762,19 @@
                                       "terminal_commit_id": {
                                         "type": "string"
                                       },
-                                      "granted_at": {
-                                        "type": [
-                                          "null",
-                                          "integer"
-                                        ]
-                                      },
-                                      "terminal_at": {
-                                        "type": [
-                                          "null",
-                                          "integer"
-                                        ]
-                                      },
                                       "cancellation_reason": {
                                         "type": "string"
                                       },
-                                      "retry_not_before": {
-                                        "type": "integer"
-                                      },
-                                      "keep_open": {
-                                        "type": "boolean"
-                                      },
-                                      "delivery": {
-                                        "type": "string"
-                                      },
-                                      "delivery_failure_reason": {
-                                        "type": "string"
-                                      },
-                                      "disposition": {
-                                        "type": "string"
+                                      "effects": {
+                                        "type": [
+                                          "null",
+                                          "array"
+                                        ],
+                                        "items": {
+                                          "type": "integer",
+                                          "minimum": 0,
+                                          "maximum": 255
+                                        }
                                       }
                                     },
                                     "required": [
@@ -1006,12 +785,7 @@
                                       "state",
                                       "current",
                                       "request_id",
-                                      "commit_id",
-                                      "granted_at",
-                                      "terminal_at",
-                                      "retry_not_before",
-                                      "keep_open",
-                                      "delivery"
+                                      "commit_id"
                                     ],
                                     "additionalProperties": false
                                   }
@@ -1034,52 +808,32 @@
                             "dispatches",
                             "transactions",
                             "nodes",
-                            "evaluated_at",
                             "status",
                             "tip",
-                            "policy_epoch",
                             "repository",
                             "branch",
-                            "admission_paused",
-                            "grants_paused",
-                            "policy_mode",
                             "claims_by_state",
                             "claim_cancellation_reasons",
-                            "delivery_by_state",
-                            "delivery_failure_reasons",
-                            "native_reservations",
-                            "dispatches_total",
+                            "work_cancellation_reasons",
                             "dispatches_by_state",
-                            "reservations_by_state",
-                            "pools",
-                            "activity"
+                            "pools"
                           ],
                           "additionalProperties": false
                         }
                       },
                       "required": [
                         "role",
-                        "policy_installed",
                         "tip",
-                        "policy_epoch",
-                        "captured_at",
-                        "commit_count",
-                        "admission_paused",
-                        "grants_paused"
+                        "commit_count"
                       ],
                       "additionalProperties": false
                     }
                   },
                   "required": [
                     "version",
-                    "sha",
-                    "worker",
-                    "transactions"
+                    "sha"
                   ],
                   "additionalProperties": false
-                },
-                "finish_intent": {
-                  "type": "string"
                 },
                 "finish_intents": {
                   "type": [
@@ -1089,21 +843,14 @@
                   "items": {
                     "type": "object",
                     "properties": {
-                      "intent_id": {
-                        "type": "string"
-                      },
                       "claim_handle": {
                         "type": "string"
                       },
                       "outcome": {
                         "type": "string"
-                      },
-                      "keep_open": {
-                        "type": "boolean"
                       }
                     },
                     "required": [
-                      "intent_id",
                       "claim_handle",
                       "outcome"
                     ],
@@ -8910,71 +8657,6 @@
                             "string"
                           ]
                         },
-                        "worker": {
-                          "type": [
-                            "null",
-                            "object"
-                          ],
-                          "properties": {
-                            "work_id": {
-                              "type": "string"
-                            },
-                            "claim_id": {
-                              "type": "string"
-                            }
-                          },
-                          "required": [
-                            "work_id",
-                            "claim_id"
-                          ],
-                          "additionalProperties": false
-                        },
-                        "transactions": {
-                          "type": [
-                            "null",
-                            "array"
-                          ],
-                          "items": {
-                            "type": "object",
-                            "properties": {
-                              "version": {
-                                "type": "integer"
-                              },
-                              "kind": {
-                                "type": "string"
-                              },
-                              "work": {
-                                "type": "string"
-                              },
-                              "claim": {
-                                "type": [
-                                  "null",
-                                  "string"
-                                ]
-                              },
-                              "attempt": {
-                                "type": [
-                                  "null",
-                                  "string"
-                                ]
-                              },
-                              "enqueued": {
-                                "type": [
-                                  "null",
-                                  "integer"
-                                ]
-                              }
-                            },
-                            "required": [
-                              "version",
-                              "kind",
-                              "work",
-                              "claim",
-                              "attempt"
-                            ],
-                            "additionalProperties": false
-                          }
-                        },
                         "current": {
                           "type": [
                             "null",
@@ -8984,26 +8666,11 @@
                             "role": {
                               "type": "string"
                             },
-                            "policy_installed": {
-                              "type": "boolean"
-                            },
                             "tip": {
                               "type": "string"
                             },
-                            "policy_epoch": {
-                              "type": "string"
-                            },
-                            "captured_at": {
-                              "type": "integer"
-                            },
                             "commit_count": {
                               "type": "integer"
-                            },
-                            "admission_paused": {
-                              "type": "boolean"
-                            },
-                            "grants_paused": {
-                              "type": "boolean"
                             },
                             "assignment": {
                               "type": [
@@ -9014,17 +8681,27 @@
                                 "dispatch_id": {
                                   "type": "string"
                                 },
-                                "request_id": {
-                                  "type": "string"
-                                },
-                                "commit_id": {
-                                  "type": "string"
-                                },
                                 "state": {
                                   "type": "string"
                                 },
-                                "released": {
-                                  "type": "boolean"
+                                "run": {
+                                  "type": [
+                                    "null",
+                                    "object"
+                                  ],
+                                  "properties": {
+                                    "run_id": {
+                                      "type": "string"
+                                    },
+                                    "run_attempt": {
+                                      "type": "integer"
+                                    }
+                                  },
+                                  "required": [
+                                    "run_id",
+                                    "run_attempt"
+                                  ],
+                                  "additionalProperties": false
                                 },
                                 "claims": {
                                   "type": [
@@ -9045,17 +8722,13 @@
                                       },
                                       "state": {
                                         "type": "string"
-                                      },
-                                      "delivery_barrier": {
-                                        "type": "string"
                                       }
                                     },
                                     "required": [
                                       "claim_handle",
                                       "claim_id",
                                       "work_id",
-                                      "state",
-                                      "delivery_barrier"
+                                      "state"
                                     ],
                                     "additionalProperties": false
                                   }
@@ -9063,10 +8736,8 @@
                               },
                               "required": [
                                 "dispatch_id",
-                                "request_id",
-                                "commit_id",
                                 "state",
-                                "released",
+                                "run",
                                 "claims"
                               ],
                               "additionalProperties": false
@@ -9104,31 +8775,16 @@
                                 "nodes": {
                                   "type": "integer"
                                 },
-                                "evaluated_at": {
-                                  "type": "integer"
-                                },
                                 "status": {
                                   "type": "string"
                                 },
                                 "tip": {
                                   "type": "string"
                                 },
-                                "policy_epoch": {
-                                  "type": "string"
-                                },
                                 "repository": {
                                   "type": "string"
                                 },
                                 "branch": {
-                                  "type": "string"
-                                },
-                                "admission_paused": {
-                                  "type": "boolean"
-                                },
-                                "grants_paused": {
-                                  "type": "boolean"
-                                },
-                                "policy_mode": {
                                   "type": "string"
                                 },
                                 "claims_by_state": {
@@ -9143,31 +8799,13 @@
                                     "type": "integer"
                                   }
                                 },
-                                "delivery_by_state": {
+                                "work_cancellation_reasons": {
                                   "type": "object",
                                   "additionalProperties": {
                                     "type": "integer"
                                   }
-                                },
-                                "delivery_failure_reasons": {
-                                  "type": "object",
-                                  "additionalProperties": {
-                                    "type": "integer"
-                                  }
-                                },
-                                "native_reservations": {
-                                  "type": "integer"
-                                },
-                                "dispatches_total": {
-                                  "type": "integer"
                                 },
                                 "dispatches_by_state": {
-                                  "type": "object",
-                                  "additionalProperties": {
-                                    "type": "integer"
-                                  }
-                                },
-                                "reservations_by_state": {
                                   "type": "object",
                                   "additionalProperties": {
                                     "type": "integer"
@@ -9184,9 +8822,6 @@
                                       "pool": {
                                         "type": "string"
                                       },
-                                      "policy_installed": {
-                                        "type": "boolean"
-                                      },
                                       "work_by_state": {
                                         "type": "object",
                                         "additionalProperties": {
@@ -9199,156 +8834,39 @@
                                           "type": "integer"
                                         }
                                       },
-                                      "delivery_by_state": {
+                                      "open_dispatches": {
+                                        "type": "integer"
+                                      },
+                                      "eligible": {
+                                        "type": "integer"
+                                      },
+                                      "blocked": {
                                         "type": "object",
                                         "additionalProperties": {
                                           "type": "integer"
                                         }
                                       },
-                                      "native_reservations": {
-                                        "type": "integer"
-                                      },
-                                      "logical_limit": {
-                                        "type": "integer"
-                                      },
-                                      "native_limit": {
-                                        "type": "integer"
-                                      },
-                                      "max_attempts": {
-                                        "type": "integer"
-                                      },
-                                      "scheduling_eligible": {
-                                        "type": "integer"
-                                      },
-                                      "ineligible_reasons": {
-                                        "type": "object",
-                                        "additionalProperties": {
-                                          "type": "integer"
-                                        }
-                                      },
-                                      "oldest_available": {
+                                      "next_eligible": {
                                         "type": [
                                           "null",
-                                          "object"
+                                          "array"
                                         ],
-                                        "properties": {
-                                          "work_id": {
-                                            "type": "string"
-                                          },
-                                          "admitted_at": {
-                                            "type": "integer"
-                                          },
-                                          "age_ms": {
-                                            "type": "integer"
-                                          }
-                                        },
-                                        "required": [
-                                          "work_id",
-                                          "admitted_at",
-                                          "age_ms"
-                                        ],
-                                        "additionalProperties": false
-                                      },
-                                      "available_age_unknown": {
-                                        "type": "integer"
-                                      },
-                                      "prediction": {
-                                        "type": "object",
-                                        "properties": {
-                                          "reason": {
-                                            "type": "string"
-                                          },
-                                          "assignments": {
-                                            "type": [
-                                              "null",
-                                              "array"
-                                            ],
-                                            "items": {
-                                              "type": "object",
-                                              "properties": {
-                                                "worker_profile": {
-                                                  "type": "string"
-                                                },
-                                                "work_ids": {
-                                                  "type": [
-                                                    "null",
-                                                    "array"
-                                                  ],
-                                                  "items": {
-                                                    "type": "string"
-                                                  }
-                                                }
-                                              },
-                                              "required": [
-                                                "worker_profile",
-                                                "work_ids"
-                                              ],
-                                              "additionalProperties": false
-                                            }
-                                          }
-                                        },
-                                        "required": [
-                                          "reason",
-                                          "assignments"
-                                        ],
-                                        "additionalProperties": false
+                                        "items": {
+                                          "type": "string"
+                                        }
                                       }
                                     },
                                     "required": [
                                       "pool",
-                                      "policy_installed",
                                       "work_by_state",
                                       "claims_by_state",
-                                      "delivery_by_state",
-                                      "native_reservations",
-                                      "logical_limit",
-                                      "native_limit",
-                                      "max_attempts",
-                                      "scheduling_eligible",
-                                      "ineligible_reasons",
-                                      "oldest_available",
-                                      "available_age_unknown",
-                                      "prediction"
+                                      "open_dispatches",
+                                      "eligible",
+                                      "blocked",
+                                      "next_eligible"
                                     ],
                                     "additionalProperties": false
                                   }
-                                },
-                                "activity": {
-                                  "type": "object",
-                                  "properties": {
-                                    "since": {
-                                      "type": "integer"
-                                    },
-                                    "until": {
-                                      "type": "integer"
-                                    },
-                                    "transactions": {
-                                      "type": "integer"
-                                    },
-                                    "operations": {
-                                      "type": "object",
-                                      "additionalProperties": {
-                                        "type": "integer"
-                                      }
-                                    },
-                                    "last_commit_id": {
-                                      "type": "string"
-                                    },
-                                    "last_at": {
-                                      "type": [
-                                        "null",
-                                        "integer"
-                                      ]
-                                    }
-                                  },
-                                  "required": [
-                                    "since",
-                                    "until",
-                                    "transactions",
-                                    "operations",
-                                    "last_at"
-                                  ],
-                                  "additionalProperties": false
                                 },
                                 "assigned_claims": {
                                   "type": [
@@ -9382,9 +8900,6 @@
                                           "priority": {
                                             "type": "integer"
                                           },
-                                          "admitted_priority": {
-                                            "type": "integer"
-                                          },
                                           "fairness_key": {
                                             "type": "string"
                                           },
@@ -9404,43 +8919,30 @@
                                             ],
                                             "additionalProperties": false
                                           },
-                                          "enqueued_at": {
-                                            "type": "integer"
-                                          },
-                                          "admitted_at": {
-                                            "type": [
-                                              "null",
-                                              "integer"
-                                            ]
-                                          },
                                           "attempts": {
-                                            "type": "integer"
-                                          },
-                                          "max_attempts": {
-                                            "type": [
-                                              "null",
-                                              "integer"
-                                            ]
-                                          },
-                                          "retry_not_before": {
                                             "type": "integer"
                                           },
                                           "claim_id": {
                                             "type": "string"
                                           },
-                                          "delivery": {
-                                            "type": "string"
-                                          },
                                           "completion_id": {
                                             "type": "string"
                                           },
-                                          "result_commit_id": {
-                                            "type": "string"
-                                          },
-                                          "disposition": {
-                                            "type": "string"
+                                          "effects": {
+                                            "type": [
+                                              "null",
+                                              "array"
+                                            ],
+                                            "items": {
+                                              "type": "integer",
+                                              "minimum": 0,
+                                              "maximum": 255
+                                            }
                                           },
                                           "cancellation_reason": {
+                                            "type": "string"
+                                          },
+                                          "cancellation_commit_id": {
                                             "type": "string"
                                           },
                                           "depends_on": {
@@ -9502,7 +9004,7 @@
                                               "additionalProperties": false
                                             }
                                           },
-                                          "issue": {
+                                          "subject": {
                                             "type": [
                                               "null",
                                               "object"
@@ -9536,6 +9038,50 @@
                                               "number"
                                             ],
                                             "additionalProperties": false
+                                          },
+                                          "backing_issue": {
+                                            "type": [
+                                              "null",
+                                              "object"
+                                            ],
+                                            "properties": {
+                                              "kind": {
+                                                "type": "string"
+                                              },
+                                              "host": {
+                                                "type": "string"
+                                              },
+                                              "repository": {
+                                                "type": "string"
+                                              },
+                                              "repository_id": {
+                                                "type": "string"
+                                              },
+                                              "resource_id": {
+                                                "type": "string"
+                                              },
+                                              "number": {
+                                                "type": "string"
+                                              }
+                                            },
+                                            "required": [
+                                              "kind",
+                                              "host",
+                                              "repository",
+                                              "repository_id",
+                                              "resource_id",
+                                              "number"
+                                            ],
+                                            "additionalProperties": false
+                                          },
+                                          "issue_comment": {
+                                            "type": "string"
+                                          },
+                                          "ready": {
+                                            "type": "boolean"
+                                          },
+                                          "reason": {
+                                            "type": "string"
                                           }
                                         },
                                         "required": [
@@ -9546,16 +9092,12 @@
                                           "worker_profile",
                                           "state",
                                           "priority",
-                                          "admitted_priority",
                                           "fairness_key",
                                           "position",
-                                          "enqueued_at",
-                                          "admitted_at",
                                           "attempts",
-                                          "max_attempts",
-                                          "retry_not_before",
-                                          "delivery",
-                                          "depends_on"
+                                          "depends_on",
+                                          "ready",
+                                          "reason"
                                         ],
                                         "additionalProperties": false
                                       },
@@ -9589,35 +9131,19 @@
                                           "terminal_commit_id": {
                                             "type": "string"
                                           },
-                                          "granted_at": {
-                                            "type": [
-                                              "null",
-                                              "integer"
-                                            ]
-                                          },
-                                          "terminal_at": {
-                                            "type": [
-                                              "null",
-                                              "integer"
-                                            ]
-                                          },
                                           "cancellation_reason": {
                                             "type": "string"
                                           },
-                                          "retry_not_before": {
-                                            "type": "integer"
-                                          },
-                                          "keep_open": {
-                                            "type": "boolean"
-                                          },
-                                          "delivery": {
-                                            "type": "string"
-                                          },
-                                          "delivery_failure_reason": {
-                                            "type": "string"
-                                          },
-                                          "disposition": {
-                                            "type": "string"
+                                          "effects": {
+                                            "type": [
+                                              "null",
+                                              "array"
+                                            ],
+                                            "items": {
+                                              "type": "integer",
+                                              "minimum": 0,
+                                              "maximum": 255
+                                            }
                                           }
                                         },
                                         "required": [
@@ -9628,12 +9154,7 @@
                                           "state",
                                           "current",
                                           "request_id",
-                                          "commit_id",
-                                          "granted_at",
-                                          "terminal_at",
-                                          "retry_not_before",
-                                          "keep_open",
-                                          "delivery"
+                                          "commit_id"
                                         ],
                                         "additionalProperties": false
                                       }
@@ -9656,52 +9177,32 @@
                                 "dispatches",
                                 "transactions",
                                 "nodes",
-                                "evaluated_at",
                                 "status",
                                 "tip",
-                                "policy_epoch",
                                 "repository",
                                 "branch",
-                                "admission_paused",
-                                "grants_paused",
-                                "policy_mode",
                                 "claims_by_state",
                                 "claim_cancellation_reasons",
-                                "delivery_by_state",
-                                "delivery_failure_reasons",
-                                "native_reservations",
-                                "dispatches_total",
+                                "work_cancellation_reasons",
                                 "dispatches_by_state",
-                                "reservations_by_state",
-                                "pools",
-                                "activity"
+                                "pools"
                               ],
                               "additionalProperties": false
                             }
                           },
                           "required": [
                             "role",
-                            "policy_installed",
                             "tip",
-                            "policy_epoch",
-                            "captured_at",
-                            "commit_count",
-                            "admission_paused",
-                            "grants_paused"
+                            "commit_count"
                           ],
                           "additionalProperties": false
                         }
                       },
                       "required": [
                         "version",
-                        "sha",
-                        "worker",
-                        "transactions"
+                        "sha"
                       ],
                       "additionalProperties": false
-                    },
-                    "finish_intent": {
-                      "type": "string"
                     },
                     "finish_intents": {
                       "type": [
@@ -9711,21 +9212,14 @@
                       "items": {
                         "type": "object",
                         "properties": {
-                          "intent_id": {
-                            "type": "string"
-                          },
                           "claim_handle": {
                             "type": "string"
                           },
                           "outcome": {
                             "type": "string"
-                          },
-                          "keep_open": {
-                            "type": "boolean"
                           }
                         },
                         "required": [
-                          "intent_id",
                           "claim_handle",
                           "outcome"
                         ],

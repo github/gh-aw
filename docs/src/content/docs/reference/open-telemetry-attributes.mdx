@@ -351,7 +351,33 @@ Gate attributes exclude endpoints, audiences, tokens, invocation and decision ID
 
 ## Work queue attributes
 
-Runtime queue spans use `gh-aw.work_queue.*` for verified queue-state snapshots, backlog age, delivery barriers, logical/native capacity, publication retries, and reconciliation outcomes. See the [queue health attribute inventory](/gh-aw/reference/work-queue/#opentelemetry-queue-health) for field meanings and snapshot freshness rules. These measurements are span attributes, not continuously sampled metrics.
+Queue runtime helpers emit one span per outer ledger operation: `work_queue.read` or `work_queue.publish`. Nested reads and publications fold into the outer span. Attributes describe only committed results; candidate operations are never recorded. See [OpenTelemetry queue health](/gh-aw/reference/work-queue/#opentelemetry-queue-health) for usage.
+
+<table>
+  <thead>
+    <tr><th>Attribute</th><th>Type</th><th>Description</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><code>gh-aw.work_queue.operation</code></td><td>string</td><td>Outer operation: <code>read</code> or <code>publish</code>.</td></tr>
+    <tr><td><code>gh-aw.work_queue.publication.attempts</code></td><td>int</td><td>Compare-and-swap publication attempts.</td></tr>
+    <tr><td><code>gh-aw.work_queue.publication.conflict</code></td><td>int</td><td>Attempts that lost a ref-update race and re-planned.</td></tr>
+    <tr><td><code>gh-aw.work_queue.publication.ambiguous</code></td><td>int</td><td>Attempts whose write outcome was unknown and was re-read.</td></tr>
+    <tr><td><code>gh-aw.work_queue.publication.commits</code></td><td>int</td><td>Commits this operation appended.</td></tr>
+    <tr><td><code>gh-aw.work_queue.publication.recovered</code></td><td>int</td><td>Publications found already committed on re-read.</td></tr>
+    <tr><td><code>gh-aw.work_queue.request.kind</code></td><td>string</td><td>Committed request kind: <code>submit</code>, <code>dispatch_next</code>, <code>launch</code>, <code>bind</code>, <code>finish</code>, <code>release</code>, <code>cancel_work</code>, <code>checkpoint</code>, <code>issue_link</code>, or <code>migrate</code>.</td></tr>
+    <tr><td><code>gh-aw.work_queue.reason</code></td><td>string</td><td>Scheduler plan reason: <code>no_work</code>, <code>no_eligible_work</code>, <code>capacity_blocked</code>, <code>account_capacity_blocked</code>, <code>claim_budget_reached</code>, or <code>prefix_complete</code>.</td></tr>
+    <tr><td><code>gh-aw.work_queue.outcome</code></td><td>string</td><td><code>started</code>, <code>launch_failed</code>, <code>bound</code>, <code>released</code>, <code>settled</code>, or <code>blocked</code>. <code>blocked</code> marks the span as an error.</td></tr>
+    <tr><td><code>gh-aw.work_queue.error.type</code></td><td>string</td><td>Stable error code when the operation throws, such as <code>ledger_invalid</code>, <code>unsupported_protocol</code>, or <code>cas_exhausted</code>.</td></tr>
+    <tr><td><code>gh-aw.work_queue.queue.id</code></td><td>string</td><td>SHA-256 of the lowercased owner, repository, and queue branch.</td></tr>
+    <tr><td><code>gh-aw.work_queue.snapshot.present</code></td><td>boolean</td><td>Whether a replayed projection was observed.</td></tr>
+    <tr><td><code>gh-aw.work_queue.work.{total,available,claimed,completed,cancelled}</code></td><td>int</td><td>Work counts by state in the observed projection.</td></tr>
+    <tr><td><code>gh-aw.work_queue.claims.open</code></td><td>int</td><td>Open Claims in the observed projection.</td></tr>
+    <tr><td><code>gh-aw.work_queue.dispatches.{reserved,started,bound}</code></td><td>int</td><td>Non-closed dispatches by state.</td></tr>
+    <tr><td><code>gh-aw.work_queue.committed.{Work,Claim,Dispatch,Bound,Completion,ClaimCancellation,WorkCancellation,Release}</code></td><td>int</td><td>Committed operations of each kind.</td></tr>
+  </tbody>
+</table>
+
+Projection counts are present only when <code>snapshot.present</code> is true. These measurements are span attributes, not continuously sampled metrics, and are never scheduling inputs.
 
 ## Trace files and artifacts
 

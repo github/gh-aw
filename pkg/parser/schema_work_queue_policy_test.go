@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestWorkQueuePolicySchema(t *testing.T) {
+func TestWorkQueueToolSchema(t *testing.T) {
 	for _, tool := range []any{true, nil, map[string]any{}, map[string]any{"worker": true}} {
 		require.NoError(t, ValidateMainWorkflowFrontmatterWithSchemaAndLocation(map[string]any{
 			"on": "workflow_dispatch", "tools": map[string]any{"work-queue": tool},
@@ -20,17 +20,11 @@ func TestWorkQueuePolicySchema(t *testing.T) {
 			"on": "workflow_dispatch", "tools": map[string]any{"work-queue": tool},
 		}, "worker.md"))
 	}
-	for _, policy := range []any{false, map[string]any{"mode": "disabled"}, map[string]any{"class-weights": []any{1}}, map[string]any{"outstanding": map[string]any{"claims": 0}}} {
-		require.Error(t, ValidateMainWorkflowFrontmatterWithSchemaAndLocation(map[string]any{
-			"on": "workflow_dispatch", "work-queue-policy": policy,
-		}, "worker.md"))
-	}
-	require.NoError(t, ValidateMainWorkflowFrontmatterWithSchemaAndLocation(map[string]any{
-		"on": "workflow_dispatch", "work-queue-policy": map[string]any{
-			"mode": "weighted-priority", "class-weights": []any{8, 4, 2, 1, 1},
-			"accounting-weights": map[string]any{"project-a": 2},
-			"outstanding":        map[string]any{"claims": 8, "dispatches": 4},
-		},
+}
+
+func TestWorkQueuePolicyFrontmatterRemoved(t *testing.T) {
+	require.Error(t, ValidateMainWorkflowFrontmatterWithSchemaAndLocation(map[string]any{
+		"on": "workflow_dispatch", "work-queue-policy": map[string]any{"outstanding": map[string]any{"claims": 8}},
 	}, "worker.md"))
 }
 
@@ -41,35 +35,6 @@ func TestWorkQueueSchemaRejectsAllowedTools(t *testing.T) {
 				"work-queue": map[string]any{"allowed": allowed},
 			},
 		}, "worker.md"))
-	}
-}
-
-func TestWorkQueuePolicyRepositorySchema(t *testing.T) {
-	for _, repository := range []string{"owner/repo", "${{ github.repository }}", "${{ inputs.repository }}", "${{ github.event.repository.full_name }}", "not-a-repository"} {
-		t.Run(repository, func(t *testing.T) {
-			err := ValidateMainWorkflowFrontmatterWithSchemaAndLocation(map[string]any{
-				"on": "workflow_dispatch",
-				"work-queue-policy": map[string]any{
-					"pools": map[string]any{
-						"default": map[string]any{
-							"default-profile": "worker",
-							"profiles": map[string]any{
-								"worker": map[string]any{
-									"workflow": ".github/workflows/worker.lock.yml", "ref": strings.Repeat("a", 40),
-									"principal": "12345", "trust-domain": "worker", "credential-scope": "repository", "effect-scope": "${{ github.repository }}",
-								},
-							},
-							"logical-limit": 3, "native-limit": 3, "allowed-repositories": []any{repository},
-						},
-					},
-				},
-			}, "dispatcher.md")
-			if repository == "owner/repo" || repository == "${{ github.repository }}" {
-				require.NoError(t, err)
-			} else {
-				require.Error(t, err)
-			}
-		})
 	}
 }
 

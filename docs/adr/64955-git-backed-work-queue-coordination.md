@@ -1,5 +1,8 @@
 # ADR-64955: Git-Backed Work Queue Coordination
 
+> [!NOTE]
+> Superseded by work queue protocol v4 ([specification](../src/content/docs/specs/work-queue-specification.md)): the Git-backed ledger remains, but v4 removed installed Policy, epochs, delivery barriers, Results, and time-based state.
+
 **Date**: 2026-10-02
 **Status**: Draft
 **Deciders**: gh-aw maintainers (review pending)
@@ -69,7 +72,7 @@ The conclusion job writes a work queue activity step summary for workflows using
 The [formal evidence](../../specs/work-queue/README.md) distinguishes bounded
 models, witnesses, independent service properties and runtime conformance.
 Unfinished searches are not passes. The
-[implementation coverage table](../src/content/docs/specs/work-queue-specification.md#91-implementation-coverage-and-remaining-requirements)
+[implementation coverage table](../src/content/docs/specs/work-queue-specification.md)
 tracks deferred writer-restriction enforcement and other unverified obligations.
 
 ### Alternatives Considered

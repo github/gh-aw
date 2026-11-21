@@ -16,26 +16,19 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestWorkQueueDispatchCredentialActualCompilation(t *testing.T) {
+func TestWorkQueueDispatchTokenActualCompilation(t *testing.T) {
 	for _, entry := range []struct {
 		name     string
 		global   string
 		dispatch string
-		kind     string
 		token    string
-		app      bool
 	}{
-		{"default", "", "", "${{ secrets.GH_AW_GITHUB_TOKEN != '' && 'authenticated' || 'github_token' }}", "${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}", false},
-		{"default-explicit", "", "    github-token: ${{ secrets.GITHUB_TOKEN }}\n", "github_token", "${{ secrets.GITHUB_TOKEN }}", false},
-		{"pat", "  github-token: ${{ secrets.PUBLISHER_PAT }}\n", "    github-token: ${{ secrets.WORKER_PAT }}\n", "authenticated", "${{ secrets.WORKER_PAT }}", false},
-		{"app", "", "    github-app:\n      app-id: ${{ vars.WORKER_APP_ID }}\n      private-key: ${{ secrets.WORKER_APP_KEY }}\n", "github_app", "${{ steps.work-queue-dispatch-app-token.outputs.token }}", true},
-		{"global-app", "  github-app:\n    app-id: ${{ vars.WORKER_APP_ID }}\n    private-key: ${{ secrets.WORKER_APP_KEY }}\n", "", "github_app", "${{ steps.work-queue-dispatch-app-token.outputs.token }}", true},
-		{"broker", "  token-broker: true\n", "", "broker_unverified", "${{ steps.safe-outputs-app-token.outputs.token }}", false},
-		{"broker-handler-pat", "  token-broker: true\n", "    github-token: ${{ secrets.WORKER_PAT }}\n", "authenticated", "${{ secrets.WORKER_PAT }}", false},
-		{"broker-handler-app", "  token-broker: true\n", "    github-app:\n      app-id: ${{ vars.WORKER_APP_ID }}\n      private-key: ${{ secrets.WORKER_APP_KEY }}\n", "github_app", "${{ steps.work-queue-dispatch-app-token.outputs.token }}", true},
+		{"default", "", "", "${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}"},
+		{"default-explicit", "", "    github-token: ${{ secrets.GITHUB_TOKEN }}\n", "${{ secrets.GITHUB_TOKEN }}"},
+		{"pat", "  github-token: ${{ secrets.PUBLISHER_PAT }}\n", "    github-token: ${{ secrets.WORKER_PAT }}\n", "${{ secrets.WORKER_PAT }}"},
 	} {
 		t.Run(entry.name, func(t *testing.T) {
-			dir := testutil.TempDir(t, "work-queue-dispatch-credential-")
+			dir := testutil.TempDir(t, "work-queue-dispatch-token-")
 			dir = filepath.Join(dir, ".github", "workflows")
 			require.NoError(t, os.MkdirAll(dir, 0o700))
 			require.NoError(t, os.WriteFile(filepath.Join(dir, "worker.md"), []byte("---\non: workflow_dispatch\ntools:\n  work-queue:\n    worker: true\n---\nProcess queue work.\n"), 0o600))
@@ -45,12 +38,7 @@ func TestWorkQueueDispatchCredentialActualCompilation(t *testing.T) {
 			require.NoError(t, os.WriteFile(filename, []byte(source), 0o600))
 			compiler := NewCompiler(WithVersion("integration"))
 			compiler.SetApprove(true)
-			err := compiler.CompileWorkflow(filename)
-			if entry.name == "broker" {
-				require.ErrorContains(t, err, "brokered dispatch cannot verify the installation token's App identity")
-				return
-			}
-			require.NoError(t, err)
+			require.NoError(t, compiler.CompileWorkflow(filename))
 			content, err := os.ReadFile(filepath.Join(dir, "dispatcher.lock.yml"))
 			require.NoError(t, err)
 			var compiled struct {
@@ -63,25 +51,22 @@ func TestWorkQueueDispatchCredentialActualCompilation(t *testing.T) {
 				} `yaml:"jobs"`
 			}
 			require.NoError(t, yaml.Unmarshal(content, &compiled))
-			mint, controls, handlers := -1, -1, -1
+			controls, handlers := -1, -1
 			for index, step := range compiled.Jobs["safe_outputs"].Steps {
 				switch step.ID {
-				case workQueueDispatchAppTokenStepID:
-					mint = index
-					require.Equal(t, "write", step.With["permission-actions"])
-					require.NotContains(t, step.With, "permission-contents")
 				case "work_queue_controls":
 					controls = index
 					var config map[string]any
 					require.NoError(t, json.Unmarshal([]byte(step.Env["GH_AW_WORK_QUEUE_CONTROL_CONFIG"]), &config))
 					require.Equal(t, entry.token, config["github-token"])
-					credential := config["work_queue_dispatch_credential"].(map[string]any)
-					require.Equal(t, entry.kind, credential["kind"])
-					require.NotContains(t, credential, "principal")
+					require.NotContains(t, config, "work_queue_dispatch_credential")
 					require.NotEmpty(t, step.With["github-token"])
 					if entry.name == "pat" {
 						require.Equal(t, "${{ secrets.PUBLISHER_PAT }}", step.With["github-token"])
 					}
+					var policy map[string]any
+					require.NoError(t, json.Unmarshal([]byte(step.Env["GH_AW_WORK_QUEUE_POLICY"]), &policy))
+					require.EqualValues(t, 4, policy["version"])
 					assertWorkQueueScriptSyntax(t, step.With["script"])
 				case "process_safe_outputs":
 					handlers = index
@@ -89,19 +74,12 @@ func TestWorkQueueDispatchCredentialActualCompilation(t *testing.T) {
 					require.NoError(t, json.Unmarshal([]byte(step.Env["GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG"]), &config))
 					dispatch := config["dispatch_workflow"].(map[string]any)
 					require.Equal(t, entry.token, dispatch["github-token"])
-					require.Equal(t, entry.kind, dispatch["work_queue_dispatch_credential"].(map[string]any)["kind"])
+					require.NotContains(t, dispatch, "work_queue_dispatch_credential")
 				}
 			}
 			require.GreaterOrEqual(t, controls, 0)
 			require.Greater(t, handlers, controls)
-			if entry.app {
-				require.GreaterOrEqual(t, mint, 0)
-				require.Less(t, mint, controls)
-			} else {
-				require.Equal(t, -1, mint)
-			}
-			require.Contains(t, string(content), "GH_AW_WORK_QUEUE_POLICY:")
-			require.Contains(t, string(content), `\"authorization\":\"aw\"`)
+			require.NotContains(t, string(content), "work-queue-dispatch-app-token")
 		})
 	}
 }
@@ -137,13 +115,12 @@ Compile each work-queue workflow phase.
 	lockPath := filepath.Join(dir, "work-queue-worker.lock.yml")
 	lockContent, err := os.ReadFile(lockPath)
 	require.NoError(t, err)
-	assertWorkQueueProtectedOriginTransport(t, lockContent)
 	compiled := string(lockContent)
 	require.NotContains(t, compiled, "GH_AW_WORK_QUEUE_STORAGE")
 	require.NotContains(t, compiled, "WORK_QUEUE_HMAC_SECRET")
 	require.NotContains(t, compiled, "GH_AW_WORK_QUEUE_ISSUES:")
 	require.Contains(t, compiled, `GH_AW_WORK_QUEUE_ROLE: "worker"`)
-	require.NotContains(t, compiled, "GH_AW_WORK_QUEUE_POLICY:")
+	require.Contains(t, compiled, "GH_AW_WORK_QUEUE_POLICY:")
 	require.Contains(t, compiled, "work_queue_assignment:")
 	require.Contains(t, compiled, workQueueWorkerRunName)
 	require.NotContains(t, compiled, "work_queue_claim:")
@@ -170,30 +147,21 @@ Compile each work-queue workflow phase.
 	require.Contains(t, safeOutputs, constants.WorkQueueFinishIntentPath)
 	require.Contains(t, safeOutputs, constants.WorkQueueIntentPath)
 	require.Contains(t, safeOutputs, "Download activation artifact for work queue")
-	require.Contains(t, safeOutputs, "Reconcile work queue claim")
+	require.Contains(t, safeOutputs, "Finish work queue claim")
 	require.Contains(t, safeOutputs, "requireAssignment: true")
-	gate := "steps.work_queue_claim_reconciliation.outputs.authorized == 'true'"
-	require.NotContains(t, safeOutputs, gate)
 	require.Contains(t, safeOutputs, "GH_AW_WORK_QUEUE_ENABLED")
-	require.Contains(t, safeOutputs, "GH_AW_CLAIM_FOOTER_LINKS: ${{ steps.work_queue_claim_reconciliation.outputs.claim_footer_links }}")
+	require.Contains(t, safeOutputs, "GH_AW_WORK_QUEUE_EFFECTS: "+constants.WorkQueueEffectsPath)
+	require.NotContains(t, safeOutputs, "GH_AW_CLAIM_FOOTER_LINKS")
 	require.Contains(t, compiled, "work_queue_scoped")
 	require.Contains(t, safeOutputs, "id: process_safe_outputs")
 	require.Less(t,
-		strings.Index(safeOutputs, "Reconcile work queue claim"),
 		strings.Index(safeOutputs, "id: process_safe_outputs"),
-		"claim reconciliation must precede ordinary safe-output handlers",
+		strings.Index(safeOutputs, "Finish work queue claim"),
+		"the finish commit records the effects applied by ordinary safe-output handlers",
 	)
-	handlerID := strings.Index(safeOutputs, "id: process_safe_outputs")
-	handlerStart := strings.LastIndex(safeOutputs[:handlerID], "      - name:")
-	require.GreaterOrEqual(t, handlerStart, 0)
-	handlerEnd := strings.Index(safeOutputs[handlerStart+len("      - name:"):], "      - name:")
-	if handlerEnd < 0 {
-		handlerEnd = len(safeOutputs) - handlerStart
-	} else {
-		handlerEnd += len("      - name:")
-	}
-
-	require.NotContains(t, safeOutputs[handlerStart:handlerStart+handlerEnd], gate)
+	require.Contains(t, safeOutputs, "needs.activation.outputs.work_queue_assignment_settled != 'true'")
+	require.Contains(t, agent, "needs.activation.outputs.work_queue_assignment_settled != 'true'")
+	require.Contains(t, activation, "work_queue_assignment_settled: ${{ steps.work_queue_snapshot.outputs.work_queue_assignment_settled }}")
 
 	conclusion := extractJobSection(compiled, "conclusion")
 	require.Contains(t, conclusion, "contents: write")
@@ -203,49 +171,6 @@ Compile each work-queue workflow phase.
 	require.Contains(t, conclusion, "Summarize work queue activity\n        if: always()")
 	require.Contains(t, conclusion, "work_queue_summary.cjs")
 	require.Contains(t, conclusion, "snapshotPath: '${{ runner.temp }}/gh-aw-activation/work-queue.snapshot.json'")
-}
-
-func TestWorkQueueNamedProfileCompilation(t *testing.T) {
-	dir := testutil.TempDir(t, "work-queue-named-profile-")
-	path := filepath.Join(dir, "worker.md")
-	// Keep coverage of legacy explicit profiles without repository-level scheduling.
-	require.NoError(t, os.WriteFile(path, []byte(`---
-strict: false
-on: workflow_dispatch
-engine: claude
-tools:
-  work-queue:
-    worker: true
-work-queue-policy:
-  producers:
-    '777':
-      pools: [default]
-      priorities: [1, 2, 3, 4, 5]
-      fairness-keys: ['']
-  worker-profiles:
-    approved:
-      workflow: .github/workflows/worker.lock.yml
-      ref: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-      principal: '888'
-      trust-domain: trusted
-      credential-scope: repository
-      effect-scope: owner/repo
-safe-outputs:
-  noop:
----
-Use the explicitly approved profile without an implicit fallback worker.
-`), 0o600))
-	compiler := NewCompiler(WithVersion("integration"))
-	compiler.gitRoot = dir
-	compiler.SetApprove(true)
-	require.NoError(t, compiler.CompileWorkflow(path))
-	content, err := os.ReadFile(filepath.Join(dir, "worker.lock.yml"))
-	require.NoError(t, err)
-	compiled := string(content)
-	require.Contains(t, compiled, `\"default_profile\":\"approved\"`)
-	require.Contains(t, compiled, `\"principal\":\"888\"`)
-	require.NotContains(t, compiled, `\"default_profile\":\"default\"`)
-	require.NotContains(t, compiled, `\"profiles\":{\"default\":`)
 }
 
 func TestWorkQueueGlobalPreviewCompilation(t *testing.T) {
@@ -279,9 +204,9 @@ Preview the original Claim assignment without publishing facts or effects.
 	}
 	require.NoError(t, yaml.Unmarshal(content, &compiled))
 	want := map[string]bool{
-		"work_queue_claim_reconciliation": false,
-		"work_queue_controls":             false,
-		"process_safe_outputs":            false,
+		"work_queue_finish":    false,
+		"work_queue_controls":  false,
+		"process_safe_outputs": false,
 	}
 	for _, step := range compiled.Jobs[string(constants.SafeOutputsJobName)].Steps {
 		if _, required := want[step.ID]; required {
@@ -318,12 +243,11 @@ Read the queue and publish an ordinary report.
 	require.NoError(t, err)
 	compiled := string(content)
 	require.Contains(t, compiled, `GH_AW_WORK_QUEUE_ROLE: "observer"`)
-	require.Contains(t, compiled, "work_queue_origin: ${{ steps.work_queue_snapshot.outputs.work_queue_origin }}")
+	require.NotContains(t, compiled, "work_queue_origin")
 	require.NotContains(t, compiled, "GH_AW_WORK_QUEUE_POLICY:")
-	require.NotContains(t, compiled, "work_queue_claim_reconciliation")
+	require.NotContains(t, compiled, "work_queue_finish")
 	require.NotContains(t, compiled, "work_queue_controls")
-	require.NotContains(t, compiled, "GH_AW_WORK_QUEUE_INTENT_ORIGIN:")
-	require.Contains(t, compiled, `"tools": ["work_queue_read", "work_queue_explain"]`)
+	require.Contains(t, compiled, `"tools": ["work_queue_read"]`)
 	require.NotContains(t, compiled, constants.WorkQueueFinishIntentMount)
 	require.Contains(t, extractJobSection(compiled, "safe_outputs"), "Process Safe Outputs")
 	require.Contains(t, extractJobSection(compiled, "safe_outputs"), "issues: write")
@@ -346,7 +270,7 @@ func TestWorkQueueRepositoryObserverCompilation(t *testing.T) {
 			require.False(t, workQueueRequiresAssignment(data))
 			require.NotNil(t, data.SafeOutputs.CreateIssues)
 			require.NotContains(t, strings.Join(workQueuePolicyEnvironment(data), ""), "GH_AW_WORK_QUEUE_POLICY:")
-			require.Empty(t, compiler.buildWorkQueueClaimReconciliationStep(data))
+			require.Empty(t, compiler.buildWorkQueueFinishStep(data))
 			controls, err := compiler.buildWorkQueueControlProcessingStep(data)
 			require.NoError(t, err)
 			require.Empty(t, controls)
@@ -544,7 +468,7 @@ Process original immutable Claims.
 	require.Contains(t, trusted, "artifact-ids: ${{ needs.work_queue_prepare_discussion_15.outputs.artifact_id }}")
 	require.NotContains(t, trusted, "node prepare-discussion.cjs")
 	require.Contains(t, trusted, "work_queue_control_adapter.cjs")
-	require.Less(t, strings.Index(trusted, "finish_work_queue_claim.cjs"), strings.Index(trusted, "work_queue_control_adapter.cjs"))
+	require.Less(t, strings.Index(trusted, "work_queue_control_adapter.cjs"), strings.Index(trusted, "finish_work_queue_claim.cjs"))
 	require.Contains(t, trusted, "receipt_id")
 	require.Contains(t, trusted, "artifact-ids: ${{ needs.work_queue_prepare_checks_15.outputs.artifact_id }}")
 	require.NotContains(t, trusted, "node raw.cjs")
@@ -588,73 +512,16 @@ Read the queue and dispatch an available Work identity.
 	require.NoError(t, compiler.CompileWorkflow(dispatcherPath))
 	compiled, err := os.ReadFile(filepath.Join(workflowsDir, "dispatcher.lock.yml"))
 	require.NoError(t, err)
-	assertWorkQueueProtectedOriginTransport(t, compiled)
 	require.Contains(t, string(compiled), `work_queue_enabled`)
 	require.Contains(t, string(compiled), `work_queue_workflows`)
-	require.Contains(t, string(compiled), `work_queue`)
 	require.NotContains(t, string(compiled), "WORK_QUEUE_HMAC_SECRET")
+	require.NotContains(t, string(compiled), "capture_work_queue_intent_origin.cjs")
+	require.NotContains(t, string(compiled), "GH_AW_WORK_QUEUE_INTENT_ORIGIN")
 	require.Contains(t, string(compiled), "GH_AW_WORK_QUEUE_POLICY:")
-	require.Contains(t, string(compiled), `\"authorization\":\"aw\"`)
+	require.Contains(t, string(compiled), `\"version\":4`)
 	inputs, err := extractWorkflowDispatchInputs(filepath.Join(workflowsDir, "dispatcher.lock.yml"))
 	require.NoError(t, err)
 	require.NotContains(t, inputs, WorkQueueClaimInputName)
-}
-
-func assertWorkQueueProtectedOriginTransport(t *testing.T, content []byte) {
-	t.Helper()
-	var compiled struct {
-		Jobs map[string]struct {
-			Env     map[string]string `yaml:"env"`
-			Outputs map[string]string `yaml:"outputs"`
-			Steps   []struct {
-				ID   string            `yaml:"id"`
-				Name string            `yaml:"name"`
-				Env  map[string]string `yaml:"env"`
-				With map[string]any    `yaml:"with"`
-			} `yaml:"steps"`
-		} `yaml:"jobs"`
-	}
-	require.NoError(t, yaml.Unmarshal(content, &compiled))
-	activation := compiled.Jobs[string(constants.ActivationJobName)]
-	require.Equal(t, "${{ steps.work_queue_snapshot.outputs.work_queue_origin }}", activation.Outputs["work_queue_origin"])
-	agent := compiled.Jobs[string(constants.AgentJobName)]
-	require.Equal(t, "${{ steps.work_queue_intent_origin.outputs.work_queue_origin }}", agent.Outputs["work_queue_origin"])
-	downloadIndex, originIndex, executionIndex := -1, -1, -1
-	for index, step := range agent.Steps {
-		if step.Name == "Download activation artifact" {
-			downloadIndex = index
-		}
-		if step.ID == "work_queue_intent_origin" {
-			originIndex = index
-			script, ok := step.With["script"].(string)
-			require.True(t, ok)
-			require.Contains(t, script, "capture_work_queue_intent_origin.cjs")
-			require.Equal(t, 1, strings.Count(script, "const { setupGlobals }"))
-			require.Equal(t, 1, strings.Count(script, "setupGlobals(core, github, context, exec, io, getOctokit);"))
-			assertWorkQueueScriptSyntax(t, script)
-		}
-		if step.ID == "agentic_execution" {
-			executionIndex = index
-			require.NotEqual(t, -1, originIndex, "trusted origin capture must precede engine execution")
-		}
-		if step.Name == "User origin ordering marker" {
-			require.NotEqual(t, -1, originIndex, "trusted origin capture must precede user steps")
-		}
-	}
-	require.GreaterOrEqual(t, downloadIndex, 0)
-	require.Greater(t, originIndex, downloadIndex)
-	require.Greater(t, executionIndex, originIndex)
-	for _, name := range []constants.JobName{constants.AgentJobName, constants.SafeOutputsJobName} {
-		job := compiled.Jobs[string(name)]
-		expected := "${{ needs.activation.outputs.work_queue_origin }}"
-		if name == constants.SafeOutputsJobName {
-			expected = "${{ needs.agent.outputs.work_queue_origin }}"
-		}
-		require.Equal(t, expected, job.Env["GH_AW_WORK_QUEUE_INTENT_ORIGIN"], name)
-		for _, step := range job.Steps {
-			require.NotContains(t, step.Env, "GH_AW_WORK_QUEUE_INTENT_ORIGIN", "step %s must inherit its protected job-level origin rather than replacing it", step.ID)
-		}
-	}
 }
 
 func assertWorkQueueScriptSyntax(t *testing.T, script string) {
@@ -704,7 +571,7 @@ func TestWorkQueueRepositoryObserversUseOrdinaryOutputs(t *testing.T) {
 			require.False(t, workQueueRequiresAssignment(data))
 			require.NotNil(t, data.SafeOutputs)
 			require.NotNil(t, data.SafeOutputs.CreateIssues)
-			require.Empty(t, compiler.buildWorkQueueClaimReconciliationStep(data))
+			require.Empty(t, compiler.buildWorkQueueFinishStep(data))
 			controlSteps, err := compiler.buildWorkQueueControlProcessingStep(data)
 			require.NoError(t, err)
 			require.Empty(t, controlSteps)
@@ -712,7 +579,7 @@ func TestWorkQueueRepositoryObserversUseOrdinaryOutputs(t *testing.T) {
 			require.Contains(t, permissions.RenderToYAML(), "issues: write")
 			require.NotContains(t, permissions.RenderToYAML(), "contents: write")
 			require.NotContains(t, permissions.RenderToYAML(), "actions: write")
-			require.Equal(t, []string{"work_queue_read", "work_queue_explain"}, workQueueMCPToolNames(data))
+			require.Equal(t, []string{"work_queue_read"}, workQueueMCPToolNames(data))
 			require.NoError(t, compiler.CompileWorkflow(filepath.Join("../../.github/workflows", name+".md")))
 		})
 	}
@@ -741,10 +608,10 @@ func TestWorkQueueRepositoryObserversEmitProtectedOrdinaryOutputs(t *testing.T) 
 			require.Contains(t, compiled, `GH_AW_WORK_QUEUE_ROLE: "observer"`)
 			require.NotContains(t, compiled, "GH_AW_WORK_QUEUE_POLICY:")
 			require.NotContains(t, compiled, "GH_AW_WORK_QUEUE_INTENT_ORIGIN:")
-			require.NotContains(t, compiled, "work_queue_claim_reconciliation")
+			require.NotContains(t, compiled, "work_queue_finish")
 			require.NotContains(t, compiled, "work_queue_controls")
 			require.NotContains(t, compiled, constants.WorkQueueFinishIntentMount)
-			require.Contains(t, compiled, `"tools": ["work_queue_read", "work_queue_explain"]`)
+			require.Contains(t, compiled, `"tools": ["work_queue_read"]`)
 			safeOutputs := extractJobSection(compiled, string(constants.SafeOutputsJobName))
 			require.Contains(t, safeOutputs, "issues: write")
 			require.NotContains(t, safeOutputs, "contents: write")

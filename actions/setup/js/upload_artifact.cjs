@@ -56,12 +56,8 @@ const {
   recordClaimEffect,
   claimIdentity,
   assertClaimIdentity,
-  receiptMatchesClaim,
-  claimDeliveryReceipt,
-  durableReceipt,
 } = require("./work_queue_claim_scope.cjs");
 const { expectedGitHubHost } = require("./work_queue_host.cjs");
-const privateDeliveryReceipts = new WeakMap();
 
 /**
  * Staging directory where the model places files to be uploaded.
@@ -647,7 +643,7 @@ async function main(config = {}) {
    * @param {Object} message - The upload_artifact message from the model
    * @param {Object} resolvedTemporaryIds - Map of already-resolved temporary IDs (unused here)
    * @param {Map<string, any>} temporaryIdMap - Shared temp-ID map; the handler does not modify it
-   * @returns {Promise<{success: boolean, error?: string, skipped?: boolean, tmpId?: string, temporaryId?: string, artifactName?: string, artifactId?: number, artifactUrl?: string, slotIndex?: number}>}
+   * @returns {Promise<{success: boolean, error?: string, skipped?: boolean, staged?: boolean, tmpId?: string, temporaryId?: string, artifactName?: string, artifactId?: number, artifactUrl?: string, slotIndex?: number}>}
    */
   return async function handleUploadArtifact(message, resolvedTemporaryIds, temporaryIdMap) {
     if (currentClaimHandle() !== factoryClaim) throw new Error(`${ERR_VALIDATION}: upload_artifact factory cannot escape its original Claim; create a handler for the current Claim`);
@@ -710,8 +706,6 @@ async function main(config = {}) {
     let artifactId;
     /** @type {string} */
     let artifactUrl = "";
-    let trustedDigest;
-    let trustedSize;
 
     if (!isStaged) {
       // Upload files directly via the internal artifact client.
@@ -749,8 +743,6 @@ async function main(config = {}) {
           effect.id = String(uploadResult.id || "");
         }
         artifactId = uploadResult.id;
-        trustedDigest = uploadResult.digest;
-        trustedSize = uploadResult.size;
         core.info(`Uploaded artifact "${artifactName}" (id=${artifactId ?? "n/a"}, size=${uploadResult.size ?? totalSize}B)`);
 
         // Construct the artifact URL from the artifact ID and GitHub context.
@@ -816,7 +808,7 @@ async function main(config = {}) {
       core.warning(`Failed to write artifact resolver file: ${getErrorMessage(err)}`);
     }
 
-    const result = {
+    return {
       success: true,
       staged: isStaged,
       tmpId,
@@ -826,65 +818,7 @@ async function main(config = {}) {
       artifactUrl,
       slotIndex: i,
     };
-    if (factoryClaim && !isStaged && artifactId && typeof trustedDigest === "string" && /^(?:sha256:)?[a-f0-9]{64}$/.test(trustedDigest)) {
-      privateDeliveryReceipts.set(result, {
-        ...factoryIdentity,
-        repository: process.env.GITHUB_REPOSITORY,
-        run_id: process.env.GITHUB_RUN_ID,
-        name: artifactName,
-        id: artifactId,
-        digest: trustedDigest.replace(/^sha256:/, ""),
-        size: trustedSize,
-        url: artifactUrl,
-      });
-    }
-    return result;
   };
 }
 
-async function verifyArtifactDelivery(options) {
-  const receipt = claimDeliveryReceipt(options, "artifact", privateDeliveryReceipts);
-  return verifyArtifactReceipt(options, receipt);
-}
-
-function validArtifactReceipt(receipt, claim) {
-  return (
-    receiptMatchesClaim(receipt, claim) &&
-    ["repository", "run_id", "name", "url"].every(key => typeof receipt[key] === "string" && receipt[key].length > 0) &&
-    /^[A-Za-z0-9_-]+\/[A-Za-z0-9._-]+$/.test(receipt.repository) &&
-    /^[1-9][0-9]*$/.test(receipt.run_id) &&
-    Number.isSafeInteger(receipt.id) &&
-    receipt.id > 0 &&
-    /^[a-f0-9]{64}$/.test(receipt.digest) &&
-    (receipt.size === undefined || (Number.isSafeInteger(receipt.size) && receipt.size >= 0))
-  );
-}
-
-function durableArtifactReceipt(result, claim) {
-  const receipt = result && privateDeliveryReceipts.get(result);
-  if (!validArtifactReceipt(receipt, claim)) return null;
-  return durableReceipt(receipt);
-}
-
-async function verifyArtifactReceipt({ claim, github }, receipt) {
-  if (!validArtifactReceipt(receipt, claim)) return { verified: false };
-  const [owner, repo] = receipt.repository.split("/");
-  const { data } = await github.rest.actions.getArtifact({ owner, repo, artifact_id: receipt.id });
-  if (
-    data.id !== receipt.id ||
-    data.name !== receipt.name ||
-    data.expired !== false ||
-    String(data.workflow_run?.id) !== receipt.run_id ||
-    data.digest !== `sha256:${receipt.digest}` ||
-    (receipt.size !== undefined && data.size_in_bytes !== receipt.size)
-  )
-    return { verified: false };
-  return {
-    verified: true,
-    claim_handle: claim.handle,
-    resource: { kind: "artifact", repository: receipt.repository, id: String(receipt.id), target_run_id: receipt.run_id, name: receipt.name, digest: data.digest, url: receipt.url },
-    evidence: { source: "github_artifact_api", digest: data.digest, run_id: receipt.run_id, size: data.size_in_bytes },
-  };
-}
-
-module.exports = { main, verifyArtifactDelivery, durableArtifactReceipt };
+module.exports = { main };

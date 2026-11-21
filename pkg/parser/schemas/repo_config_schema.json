@@ -11,8 +11,7 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "max_attempts": { "type": "integer", "minimum": 1, "maximum": 16 },
-        "backoff_seconds": { "type": "integer", "minimum": 1, "maximum": 3600 }
+        "max_attempts": { "type": "integer", "minimum": 1, "maximum": 16 }
       }
     }
   },
@@ -69,7 +68,7 @@
       "description": "Experimental. Enable nested on.gateway-dispatch triggers delivered through repository_dispatch by an approved gateway server. Disabled unless explicitly true. This setting does not deploy a server or grant dispatch authority."
     },
     "work_queue": {
-      "description": "Global scheduling and backing Issue/label overrides. AW supplies authorization and approved worker routes. Missing settings use one pool, concurrency 16, pending limit 4096 and three attempts with 30-second backoff.",
+      "description": "Global scheduling and backing Issue/label overrides. AW supplies authorization and approved worker routes. Missing settings use one pool, concurrency 16, pending limit 4096 and three attempts. Pool limits take effect on the next run after recompilation.",
       "type": "object",
       "additionalProperties": false,
       "properties": {
@@ -77,7 +76,7 @@
         "pending_limit": { "type": "integer", "minimum": 1, "maximum": 4096 },
         "retry": { "$ref": "#/definitions/workQueueRetry" },
         "issues": {
-          "description": "Global backing Issue projection, label prefix, and age threshold for flagging tracked Issues without matching Work. Omitted or false disables projection; true uses work and work:<status> labels.",
+          "description": "Best-effort backing Issue projection: one labelled Issue per pending Work, closed when the Work completes or is cancelled. Omitted or false disables projection; true uses label work and title prefix [work queue]. orphaned_after_days is accepted but unused.",
           "oneOf": [
             { "type": "boolean" },
             {
@@ -91,9 +90,6 @@
             }
           ]
         },
-        "mode": { "type": "string", "enum": ["weighted-priority", "strict-priority"] },
-        "class_weights": { "type": "array", "minItems": 5, "maxItems": 5, "items": { "type": "integer", "minimum": 1, "maximum": 1000 } },
-        "accounting_weights": { "type": "object", "additionalProperties": { "type": "integer", "minimum": 1, "maximum": 1000 } },
         "pools": {
           "type": "object",
           "maxProperties": 64,

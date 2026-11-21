@@ -1,46 +1,40 @@
 // @ts-check
 import { describe, expect, it } from "vitest";
 import fs from "node:fs";
-import { randomUUID } from "node:crypto";
-import path from "node:path";
+import { createRequire } from "node:module";
 import { ESLINT_WORKERS, buildESLintFactoryPlan, buildESLintFactoryPolicy } from "./eslint_factory_portfolio.cjs";
-import { normalizeDispatchParameters, normalizeSubmitParameters, stagePlanIntents } from "./work_queue_intents.cjs";
-import { newState, newRequest, generateRequestOperations, replayTransactions } from "./work_queue_replay.cjs";
+import { normalizeSubmitParameters } from "./work_queue_intents.cjs";
+import { replayTransactions } from "./work_queue_replay.cjs";
 import { frozenResourceScope } from "./work_queue_resource_scope.cjs";
-import { validateDeliveryContract } from "./work_queue_delivery.cjs";
-import { main as processControls } from "./work_queue_control_adapter.cjs";
-import { main as snapshotQueue } from "./write_work_queue_snapshot.cjs";
-import { fakeGitHub } from "./work_queue_store_checks.cjs";
-import { queueFixture, DISPATCHER, REF, REPOSITORY } from "./work_queue_lifecycle.test_helpers.cjs";
-import { readWorkQueuePolicyConfig } from "./work_queue_policy_config.cjs";
-import { bindWorkerAssignment } from "./work_queue_binding.cjs";
-import { authorizeWorkerClaim, reconcileWorkerClaim } from "./finish_work_queue_claim.cjs";
-import { reconcileDispatch } from "./work_queue_reconciler.cjs";
-import { compiledFactoryPolicyEnvironments, installFactoryNativeAPI } from "./eslint_factory_native.test_helpers.cjs";
+import { readWorkQueuePolicyEnv, validatePolicyEnv } from "./work_queue_policy.cjs";
 import { checkFileProtection, checkFileProtectionPostApply } from "./manifest_file_helpers.cjs";
 
+const require = createRequire(import.meta.url);
+const h = require("./work_queue_test_helpers.cjs");
 const repository = "owner/repo";
 const planOptions = { date: "2026-10-08", repository, repositoryId: "7" };
 const settings = JSON.parse(fs.readFileSync(new URL("../../../.github/workflows/aw.json", import.meta.url), "utf8")).work_queue;
-const policyOptions = { repository, ref: "a".repeat(40), settings };
+const policyOptions = { repository, settings };
 
-function ledger() {
-  let state = newState();
-  const transactions = [];
-  let at = 1000;
-  const append = (kind, parameters, actor) => {
-    const request = newRequest(`factory:${transactions.length}:${++at}`, kind, actor, parameters);
-    const id = `commit:${at}`;
-    const decision = generateRequestOperations(state, request, actor, at, id);
-    if (decision.operations.length) {
-      transactions.push({ version: 3, id, previous: state.tip || null, request, actor, policy_epoch: "factory-v1", at, operations: decision.operations });
-      state = replayTransactions(transactions);
-    }
-    return state;
-  };
-  const policy = buildESLintFactoryPolicy(policyOptions);
-  append("policy", { operations: [{ kind: "Policy", epoch: "factory-v1", policy }] }, { role: "administrator", repository, principal: "11" });
-  return { append, policy, state: () => state };
+/** Admit the plan's new Work (existing Work IDs are idempotent no-ops). */
+function admit(log, plan, policy) {
+  const state = replayTransactions(log);
+  const fresh = normalizeSubmitParameters({ nodes: plan.nodes }, policy).filter(work => !state.works.has(work.work_id));
+  return fresh.length ? h.submit(log, fresh, { ...h.producer, run_id: String(10 + log.length) }) : log;
+}
+
+/** Commit the plan's dispatch_next with the compiled pool limits. */
+function dispatch(log, plan, policy, runId = "15") {
+  const pool = policy.pools[plan.dispatch.pool];
+  const profiles = Object.fromEntries(Object.entries(pool.profiles).map(([name, profile]) => [name, { workflow: profile.workflow }]));
+  return h.dispatchNext(log, { ...plan.dispatch, concurrency: pool.concurrency, per_account_limit: pool.per_account_limit, profiles }, { ...h.dispatcher, run_id: runId }).log;
+}
+
+/** Decoded GH_AW_WORK_QUEUE_POLICY environments (chunked or not) of a compiled lock file. */
+function compiledPolicyEnvironments(compiled) {
+  return [...compiled.matchAll(/(?:^ +GH_AW_WORK_QUEUE_POLICY(?:_PARTS|_[0-9]+)?: "[^\n]+"\n)+/gm)].map(([block]) =>
+    Object.fromEntries([...block.matchAll(/(GH_AW_WORK_QUEUE_POLICY(?:_PARTS|_[0-9]+)?): ("[^\n]+")/g)].map(([, name, value]) => [name, JSON.parse(value)]))
+  );
 }
 
 describe("ESLint factory producer and dispatcher", () => {
@@ -53,10 +47,10 @@ describe("ESLint factory producer and dispatcher", () => {
     for (const node of plan.nodes) {
       expect(node).toMatchObject({ graph_id: "eslint-factory-cohort:2026-10-08", node_key: node.worker_profile, priority: 3, fairness_key: "", pool: "default", depends_on: [] });
       expect(frozenResourceScope(node.payload)).toEqual({ version: 1, resources: [{ host: "github.com", repository, repository_id: "7" }] });
-      expect(validateDeliveryContract(node.payload.effect_contract)).toEqual(node.payload.effect_contract);
+      expect(node.payload.effect_contract.version).toBe(1);
     }
     expect(plan.nodes[0].payload.effect_contract.outputs).toContainEqual({ type: "create_pull_request", min: 0, max: 1 });
-    expect(plan.nodes.every(node => node.payload.plan.includes("cancel the Claim"))).toBe(true);
+    expect(plan.nodes.every(node => node.payload.plan.includes("finish the Claim as failed"))).toBe(true);
     expect(plan.nodes[1].payload.effect_contract.outputs).toContainEqual({ type: "persist_eslint_memory", min: 1, max: 1 });
     expect(plan.nodes[2].payload.effect_contract.outputs).toContainEqual({ type: "assign_to_agent", min: 0, max: 3 });
   });
@@ -89,49 +83,36 @@ describe("ESLint factory producer and dispatcher", () => {
     expect(() => buildESLintFactoryPlan({ ...planOptions, date })).toThrow(/date/);
   });
 
-  it("requires canonical repository identity and immutable AW routes without enrollment", () => {
+  it("requires canonical repository identity and routes every worker through the default pool", () => {
     for (const repositoryId of ["0", "007", "github-actions[bot]"]) expect(() => buildESLintFactoryPlan({ ...planOptions, repositoryId })).toThrow(/identity/);
     expect(() => buildESLintFactoryPlan({ ...planOptions, repository: "not-a-repo" })).toThrow();
-    expect(() => buildESLintFactoryPolicy({ ...policyOptions, ref: "main" })).toThrow();
+    expect(() => buildESLintFactoryPolicy({ ...policyOptions, repository: "not-a-repo" })).toThrow();
     const policy = buildESLintFactoryPolicy(policyOptions);
-    expect(policy.authorization).toBe("aw");
-    expect(policy.producers).toEqual({});
-    expect(policy.pools.default).toMatchObject({ logical_limit: 3, native_limit: 3, retry: { max_attempts: 3, backoff_ms: 30000 } });
-    for (const profile of ESLINT_WORKERS) {
-      expect(policy.pools.default.profiles[profile]).toMatchObject({ ref: policyOptions.ref, max_claims: 1, share_keys: false });
-      expect(policy.pools.default.profiles[profile]).not.toHaveProperty("principal");
-    }
+    expect(validatePolicyEnv(policy)).toEqual(policy);
+    expect(policy.pools.default).toMatchObject({ concurrency: settings.concurrency, max_attempts: 3 });
+    for (const profile of ESLINT_WORKERS) expect(policy.pools.default.profiles[profile]).toEqual({ workflow: `.github/workflows/${profile}.lock.yml`, effect_scope: repository });
   });
 
-  it("admits three tasks once per UTC day, then grants three singleton worker assignments", () => {
-    const queue = ledger();
+  it("admits three tasks once per UTC day, then claims three singleton dispatches", () => {
+    const policy = buildESLintFactoryPolicy(policyOptions);
     const plan = buildESLintFactoryPlan(planOptions);
-    const producer = { role: "producer", repository, principal: "11" };
-    const dispatcher = { role: "dispatcher", repository, principal: "11", workflow: ".github/workflows/eslint-factory-dispatcher.lock.yml", run_id: "15", run_attempt: 1 };
-    queue.append("submit", normalizeSubmitParameters({ nodes: plan.nodes }, queue.policy, 2000, queue.state()), producer);
-    const original = [...queue.state().works.values()];
-    queue.append("submit", normalizeSubmitParameters({ nodes: plan.nodes }, queue.policy, 3000, queue.state()), producer);
-    expect([...queue.state().works.values()]).toEqual(original);
-    expect(queue.state().works.size).toBe(3);
-    queue.append("dispatch_next", normalizeDispatchParameters(plan.dispatch, queue.policy, 3), dispatcher);
-    expect(queue.state().claims.size).toBe(3);
-    expect(queue.state().dispatches.size).toBe(3);
-    for (const dispatch of queue.state().dispatches.values()) expect(dispatch.claims).toHaveLength(1);
-    queue.append("submit", normalizeSubmitParameters({ nodes: plan.nodes }, queue.policy, 4000, queue.state()), producer);
-    queue.append("dispatch_next", normalizeDispatchParameters(plan.dispatch, queue.policy, 3), dispatcher);
-    expect(queue.state().claims.size).toBe(3);
+    let log = admit([], plan, policy);
+    const original = [...replayTransactions(log).works.values()];
+    log = admit(log, plan, policy);
+    expect([...replayTransactions(log).works.values()]).toEqual(original);
+    expect(original).toHaveLength(3);
+    log = dispatch(log, plan, policy);
+    let state = replayTransactions(log);
+    expect(state.claims.size).toBe(3);
+    expect(state.dispatches.size).toBe(3);
+    for (const record of state.dispatches.values()) expect(record.claims).toHaveLength(1);
+    log = dispatch(admit(log, plan, policy), plan, policy, "16");
+    expect(replayTransactions(log).claims.size).toBe(3);
     const tomorrow = buildESLintFactoryPlan({ ...planOptions, date: "2026-10-09" });
-    queue.append("submit", normalizeSubmitParameters({ nodes: tomorrow.nodes }, queue.policy, 5000, queue.state()), producer);
-    expect(queue.state().works.size).toBe(6);
-    queue.append("dispatch_next", normalizeDispatchParameters(tomorrow.dispatch, queue.policy, 3), { ...dispatcher, run_id: "16" });
-    expect(queue.state().claims.size).toBe(3);
-  });
-
-  it("admits another trusted AW identity without producer enrollment", () => {
-    const queue = ledger();
-    const plan = buildESLintFactoryPlan(planOptions);
-    queue.append("submit", normalizeSubmitParameters({ nodes: plan.nodes }, queue.policy, 2000, queue.state()), { role: "producer", repository, principal: "13" });
-    expect(queue.state().works.size).toBe(3);
+    log = dispatch(admit(log, tomorrow, policy), tomorrow, policy, "17");
+    state = replayTransactions(log);
+    expect(state.works.size).toBe(6);
+    expect(state.claims.size).toBe(3);
   });
 
   it("wires trusted plan preparation, submission before dispatch, and immutable run dates", () => {
@@ -142,34 +123,19 @@ describe("ESLint factory producer and dispatcher", () => {
     expect(source).toContain("cat /tmp/gh-aw/agent/eslint-factory-plan.json");
     expect(source).toContain("stagePlanIntents(");
     expect(source).toContain("shared/work-queue-staged-plan.md");
-    expect(source).toContain("will atomically bootstrap the branch with its compiler-approved Policy and Work.");
-    expect(source).toContain("Safe-output processing uses only the compiler-approved Policy proposal; never");
-    expect(source).toContain("no administrator seed is required.");
-    expect(source).not.toContain("producers:");
     expect(source).not.toContain("work-queue-policy:");
-    expect(source).not.toMatch(/branch protection|queue-branch protections/i);
   });
 
-  it("embeds the complete factory bootstrap Policy in activation and trusted control processing", () => {
+  it("compiles the v4 policy environment and the built-in token into the dispatcher controls", () => {
     const source = fs.readFileSync(new URL("../../../.github/workflows/eslint-factory-dispatcher.md", import.meta.url), "utf8");
     const compiled = fs.readFileSync(new URL("../../../.github/workflows/eslint-factory-dispatcher.lock.yml", import.meta.url), "utf8");
-    const environments = compiledFactoryPolicyEnvironments(compiled);
-    const proposals = environments.map(environment => JSON.parse(readWorkQueuePolicyConfig(environment).replaceAll("${{ github.repository }}", "github/gh-aw").replaceAll("${{ github.sha }}", policyOptions.ref)));
-    expect(proposals.length).toBeGreaterThanOrEqual(2);
+    const environments = compiledPolicyEnvironments(compiled).map(environment => Object.fromEntries(Object.entries(environment).map(([name, value]) => [name, value.replaceAll("${{ github.repository }}", repository)])));
+    expect(environments.length).toBeGreaterThanOrEqual(1);
     for (const environment of environments) {
-      expect(Object.values(environment).every(value => Buffer.byteLength(value) < 21 * 1024)).toBe(true);
-    }
-    for (const proposal of proposals) {
-      expect(proposal).toEqual(proposals[0]);
-      expect(proposal.authorization).toBe("aw");
-      expect(proposal.producers).toEqual({});
-      expect(proposal.limits.pending_nodes).toBe(settings.pending_limit);
-      expect(proposal.pools.default.logical_limit).toBe(settings.concurrency);
-      for (const worker of ESLINT_WORKERS) {
-        expect(proposal.pools.default.profiles[worker]).toMatchObject({ workflow: `.github/workflows/${worker}.lock.yml`, ref: policyOptions.ref, max_claims: 1 });
-        expect(proposal.pools.default.profiles[worker]).not.toHaveProperty("principal");
-        expect(proposal.pools.default.profiles[worker].logical_contract).toMatch(/^[a-f0-9]{64}$/);
-      }
+      const policy = readWorkQueuePolicyEnv(environment);
+      expect(policy).toMatchObject({ version: 4, pending_limit: settings.pending_limit });
+      expect(policy.pools.default.concurrency).toBe(settings.concurrency);
+      for (const worker of ESLINT_WORKERS) expect(policy.pools.default.profiles[worker]).toEqual({ workflow: `.github/workflows/${worker}.lock.yml`, effect_scope: repository });
     }
     expect(source).toContain("github-token: ${{ secrets.GITHUB_TOKEN }}");
     expect(source).not.toMatch(/secrets\.(?!GITHUB_TOKEN\b)/);
@@ -179,156 +145,13 @@ describe("ESLint factory producer and dispatcher", () => {
     });
     expect(configs.length).toBeGreaterThan(1);
     for (const config of configs) {
-      expect(config["github-token"]).toBe("${{ secrets.GITHUB_TOKEN }}");
-      expect(config.work_queue_dispatch_credential).toEqual({ kind: "github_token" });
+      // Dispatch reuses the control step's built-in token; no separate launch credential is compiled.
+      expect(config).not.toHaveProperty("github-token");
+      expect(config).not.toHaveProperty("work_queue_dispatch_credential");
       expect([...config.work_queue_workflows].sort()).toEqual([...ESLINT_WORKERS].sort());
     }
-    const controls = compiled.match(/      - name: Process trusted work queue controls\n([\s\S]*?)(?=      - name:)/);
-    expect(controls).not.toBeNull();
-    expect(controls[1]).toContain("github-token: ${{ secrets.GITHUB_TOKEN }}");
-    expect(controls[1]).not.toContain("secrets.GH_AW_GITHUB_TOKEN");
-  });
-
-  it.each(["completed", "cancelled"])("bootstraps, launches, executes and finishes all three workers (%s) without duplicate launches", async outcome => {
-    const directory = path.resolve(`.gh-aw-eslint-dispatch-${randomUUID()}`);
-    fs.mkdirSync(directory);
-    const fixture = queueFixture({ granted: false, workerPrincipal: "12" });
-    const fake = fakeGitHub();
-    const { runs, tagCreations, posts, fileReads, workerFiles } = installFactoryNativeAPI(fake, fixture);
-    const failures = [];
-    const compiled = fs.readFileSync(new URL("../../../.github/workflows/eslint-factory-dispatcher.lock.yml", import.meta.url), "utf8");
-    const configMatch = compiled.match(/GH_AW_WORK_QUEUE_CONTROL_CONFIG: ("[^\n]+")/);
-    expect(configMatch).not.toBeNull();
-    const dispatchConfig = JSON.parse(JSON.parse(configMatch[1]));
-    const [environment] = compiledFactoryPolicyEnvironments(compiled);
-    expect(environment).toBeDefined();
-    const policy = JSON.parse(readWorkQueuePolicyConfig(environment).replaceAll("${{ github.repository }}", REPOSITORY).replaceAll("${{ github.sha }}", REF));
-    const core = { setOutput: () => {}, info: () => {}, setFailed: message => failures.push(message) };
-    const options = {
-      githubClient: fake.githubClient,
-      context: fixture.dispatcherContext,
-      workflowRef: `${REPOSITORY}/${DISPATCHER}@${REF}`,
-      role: "dispatcher",
-      policyProposal: policy,
-      core,
-      env: {},
-      sleepFn: async () => {},
-    };
-    try {
-      const snapshot = await snapshotQueue({ ...options, snapshotPath: path.join(directory, "snapshot.json") });
-      expect(snapshot.sha).toBeNull();
-      expect(fake.refs.has("work-queue")).toBe(false);
-      const plan = buildESLintFactoryPlan(planOptions);
-      const intentPath = path.join(directory, "intents.jsonl");
-      stagePlanIntents(intentPath, plan);
-      const controls = {
-        ...options,
-        intentOrigin: snapshot.origin,
-        intentPath,
-        getOctokit: token => {
-          expect(token).toBe("fixture-token");
-          return fake.githubClient;
-        },
-        config: {
-          ...dispatchConfig,
-          "github-token": "fixture-token",
-        },
-      };
-      const result = await processControls(controls);
-      expect(result.success, JSON.stringify({ result, failures })).toBe(true);
-      expect(result.receipts.map(receipt => receipt.status)).toEqual(["durable", "durable"]);
-      expect(result.status).toBe("activation_pending");
-      expect(result.receipts[1].launches).toMatchObject([
-        { state: "activation_pending", run_id: "42", dispatched: true, released: false },
-        { state: "activation_pending", run_id: "43", dispatched: true, released: false },
-        { state: "activation_pending", run_id: "44", dispatched: true, released: false },
-      ]);
-      expect(posts).toHaveLength(3);
-      expect(tagCreations).toHaveLength(1);
-      expect(new Set(posts.map(post => post.workflow_id))).toEqual(new Set(ESLINT_WORKERS.map(profile => `${profile}.lock.yml`)));
-      const state = replayTransactions(fake.log());
-      expect(new Set(fileReads)).toEqual(new Set(workerFiles));
-      expect(fake.log()[0].operations.map(operation => operation.kind)).toEqual(["Policy", "Work", "Work", "Work"]);
-      expect(state.policy).toEqual(policy);
-      expect(state.works.size).toBe(3);
-      expect(state.claims.size).toBe(3);
-      expect(state.dispatches.size).toBe(3);
-      for (const dispatch of state.dispatches.values()) {
-        expect(dispatch.state).toBe("started");
-        expect(dispatch.run).toBeUndefined();
-      }
-      const workers = posts.map((post, index) => {
-        const assignment = JSON.parse(post.inputs.work_queue_assignment);
-        const runId = String(42 + index);
-        const workerContext = {
-          ...fixture.workerContext,
-          runId,
-          payload: { repository: { id: 7 }, inputs: post.inputs },
-        };
-        const finishIntentPath = path.join(directory, `${assignment.worker_profile}.finish.jsonl`);
-        return {
-          ...options,
-          context: workerContext,
-          workflowRef: `${REPOSITORY}/.github/workflows/${assignment.worker_profile}.lock.yml@${REF}`,
-          assignment,
-          logicalContract: policy.pools.default.profiles[assignment.worker_profile].logical_contract,
-          role: "worker",
-          requireAssignment: true,
-          finishIntentPath,
-        };
-      });
-      for (const worker of workers) {
-        const { assignment, context } = worker;
-        const runId = context.runId;
-        const activated = await bindWorkerAssignment(worker);
-        expect(activated.binding).toEqual({
-          run_id: runId,
-          run_attempt: 1,
-          repository: REPOSITORY,
-          workflow: `.github/workflows/${assignment.worker_profile}.lock.yml`,
-          ref: REF,
-          principal: "12",
-          event: "workflow_dispatch",
-        });
-        expect(replayTransactions(fake.log()).dispatches.get(assignment.dispatch_id)).toMatchObject({ state: "bound", run: activated.binding });
-      }
-      expect([...replayTransactions(fake.log()).dispatches.values()].every(dispatch => dispatch.state === "bound")).toBe(true);
-      const readsBeforeReplay = [...fileReads];
-      expect((await processControls(controls)).success).toBe(true);
-      expect(fileReads).toEqual(readsBeforeReplay);
-      expect(posts).toHaveLength(3);
-      expect(tagCreations).toHaveLength(1);
-      expect(replayTransactions(fake.log()).works.size).toBe(3);
-      for (const worker of workers) {
-        const { assignment, finishIntentPath, context } = worker;
-        const member = assignment.claims[0];
-        const runId = context.runId;
-        expect(await authorizeWorkerClaim({ ...worker, claim_handle: member.handle, requireCompletion: false })).toMatchObject({ authorized: true, state: "open", work_id: member.work_id });
-        expect(await authorizeWorkerClaim({ ...worker, claim_handle: member.handle })).toMatchObject({ authorized: false, state: "open" });
-        fs.writeFileSync(finishIntentPath, JSON.stringify({ version: 3, kind: "finish", intent_id: `factory-finish:${assignment.worker_profile}`, claim_handle: member.handle, parameters: { outcome } }) + "\n");
-        const finished = await reconcileWorkerClaim(worker);
-        expect(finished.claims[member.handle]).toMatchObject({ state: outcome, authorized: outcome === "completed" });
-        expect(await authorizeWorkerClaim({ ...worker, claim_handle: member.handle })).toMatchObject({ authorized: outcome === "completed", state: outcome });
-        const updates = fake.state.updates;
-        expect((await reconcileWorkerClaim(worker)).claims[member.handle].state).toBe(outcome);
-        expect(fake.state.updates).toBe(updates);
-        expect(posts).toHaveLength(3);
-        const work = replayTransactions(fake.log()).works.get(member.work_id);
-        expect(work.barrier).toBe(outcome === "completed" ? "pending" : "none");
-        expect(
-          fake
-            .log()
-            .flatMap(transaction => transaction.operations)
-            .some(operation => operation.kind === "Result")
-        ).toBe(false);
-        runs.set(runId, { ...runs.get(runId), status: "completed", conclusion: "success" });
-        expect(await reconcileDispatch({ ...options, assignment })).toMatchObject({ released: true });
-      }
-      expect([...replayTransactions(fake.log()).dispatches.values()].every(dispatch => dispatch.released)).toBe(true);
-      expect(failures).toEqual([]);
-    } finally {
-      fs.rmSync(directory, { recursive: true, force: true });
-    }
+    const controls = compiled.slice(compiled.indexOf("- name: Process trusted work queue controls"));
+    expect(controls).toContain("GH_AW_WORK_QUEUE_TOKEN: ${{ secrets.GITHUB_TOKEN }}");
   });
 
   it("executes the actual preparation step with only two metadata reads and no ambient filesystem or credentials", async () => {
@@ -380,14 +203,5 @@ describe("ESLint factory producer and dispatcher", () => {
     expect(files.size).toBe(1);
     expect(JSON.parse(files.get("/tmp/gh-aw/agent/eslint-factory-plan.json"))).toEqual(buildESLintFactoryPlan(planOptions));
     expect(intents).toEqual([buildESLintFactoryPlan(planOptions)]);
-  });
-
-  it("keeps clean scans and absent rule ideas from claiming write-capable no-write Results", () => {
-    for (const name of ["eslint-miner", "eslint-monster"]) {
-      const source = fs.readFileSync(new URL(`../../../.github/workflows/${name}.md`, import.meta.url), "utf8");
-      expect(source).toContain('`kind: "none"` or `no_writes: true`');
-      expect(source).toContain("cancel");
-      expect(source).toContain("cannot settle Result from `noop` alone");
-    }
   });
 });
