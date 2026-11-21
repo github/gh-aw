@@ -2,4 +2,4 @@
 "gh-aw": minor
 ---
 
-Add `gh aw private-clone` to configure a disposable private remediation repository with operator-supplied workflows and offline code scanning/advisory context. The command enables Actions and dispatches a selected `workflow_dispatch` starter to begin the investigation.
+Add `gh aw private-clone` to configure a disposable private remediation repository with operator-supplied workflows and offline code scanning/advisory context. After publishing, the command sets operator-supplied `--secret` values, enables Actions, and dispatches a `workflow_dispatch` starter workflow to begin the investigation; `--no-start` leaves Actions disabled for review.

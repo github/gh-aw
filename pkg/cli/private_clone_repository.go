@@ -121,7 +121,7 @@ func verifyPrivateCloneDestination(ctx context.Context, destination string) erro
 
 func startPrivateCloneInvestigation(ctx context.Context, destination, starterWorkflow string) error {
 	if _, err := privateCloneGH(ctx, "api", "--method", "PUT", path.Join("repos", destination, "actions/permissions"), "-F", "enabled=true"); err != nil {
-		return fmt.Errorf("enable Actions in %s: %w", destination, err)
+		return fmt.Errorf("source and secrets were pushed to %s, but Actions could not be enabled; no workflow was dispatched: %w", destination, err)
 	}
 	data, err := privateCloneGH(ctx, "api", path.Join("repos", destination, "actions/permissions"))
 	if err != nil {

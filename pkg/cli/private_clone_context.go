@@ -1,10 +1,12 @@
 package cli
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/url"
 	"path"
 	"slices"
@@ -97,25 +99,65 @@ func (s *privateCloneSnapshot) download(ctx context.Context, name, endpoint stri
 	if err != nil {
 		return fmt.Errorf("download %s: %w", name, err)
 	}
-	if !json.Valid(data) {
+	value, err := decodePrivateCloneJSON(data)
+	if err != nil {
 		return fmt.Errorf("download %s: GitHub returned invalid JSON", name)
 	}
 	if paginate {
-		var pages [][]json.RawMessage
-		if err := json.Unmarshal(data, &pages); err != nil || pages == nil {
+		pages, ok := value.([]any)
+		if !ok {
 			return fmt.Errorf("download %s: expected paginated JSON arrays", name)
 		}
-		items := make([]json.RawMessage, 0)
+		items := make([]any, 0)
 		for _, page := range pages {
-			items = append(items, page...)
+			entries, ok := page.([]any)
+			if !ok {
+				return fmt.Errorf("download %s: expected paginated JSON arrays", name)
+			}
+			items = append(items, entries...)
 		}
-		data, err = json.MarshalIndent(items, "", "  ")
-		if err != nil {
-			return err
-		}
+		value = items
+	}
+	// Store re-encoded JSON only so snapshot text always remains quoted data.
+	data, err = json.MarshalIndent(sanitizePrivateCloneJSON(value), "", "  ")
+	if err != nil {
+		return err
 	}
 	name = path.Join(privateCloneContextDir, name)
 	s.Data[name] = data
 	s.Files = append(s.Files, name)
 	return nil
+}
+
+func decodePrivateCloneJSON(data []byte) (any, error) {
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.UseNumber()
+	var value any
+	if err := decoder.Decode(&value); err != nil {
+		return nil, err
+	}
+	if _, err := decoder.Token(); !errors.Is(err, io.EOF) {
+		return nil, errors.New("unexpected data after JSON value")
+	}
+	return value, nil
+}
+
+// sanitizePrivateCloneJSON drops API links and dismissal comments, which are
+// not remediation evidence and only widen the untrusted text and link surface.
+func sanitizePrivateCloneJSON(value any) any {
+	switch typed := value.(type) {
+	case map[string]any:
+		for key, child := range typed {
+			if key == "url" || strings.HasSuffix(key, "_url") || key == "dismissed_comment" {
+				delete(typed, key)
+				continue
+			}
+			typed[key] = sanitizePrivateCloneJSON(child)
+		}
+	case []any:
+		for i, child := range typed {
+			typed[i] = sanitizePrivateCloneJSON(child)
+		}
+	}
+	return value
 }

@@ -26,6 +26,8 @@ type privateCloneOptions struct {
 	Ref         string
 	Workflows   string
 	Starter     string
+	NoStart     bool
+	Secrets     []string
 	Alerts      []int
 	Advisories  []string
 }
@@ -45,12 +47,14 @@ this offline context instead of querying the original repository.
 
 Inherited workflows are removed before your workflows are compiled and installed.
 No upstream secrets, integrations, or git remote are transferred. After publishing,
-Actions is enabled and the selected workflow is dispatched on main to start the
-investigation. Before running this command, review the workflow bundle and ambient
-organization secrets, Apps, and credentials. Use only a reviewed, operator-supplied
-starter workflow.`,
-		Example: `  gh aw private-clone acme/project security/project-fix-42 --workflows ./fix-workflows --starter-workflow investigate.md --alert 42
-  gh aw private-clone acme/project security/project-advisory --workflows ./fix-workflows --starter-workflow investigate.md --advisory GHSA-2345-6789-cfgh --ref main`,
+secrets named with --secret are set from the operator's environment, Actions is
+enabled, and the starter workflow is dispatched on main to start the investigation.
+The starter defaults to the only root workflow in the bundle. Use --no-start to
+leave Actions disabled for review instead. Before running this command, review the
+workflow bundle and ambient organization secrets, Apps, and credentials.`,
+		Example: `  gh aw private-clone acme/project security/project-fix-42 --workflows ./fix-workflows --alert 42
+  BUILD_TOKEN=... gh aw private-clone acme/project security/project-advisory --workflows ./fix-workflows --starter-workflow investigate --secret BUILD_TOKEN --advisory GHSA-2345-6789-cfgh --ref main
+  gh aw private-clone acme/project security/project-review --workflows ./fix-workflows --alert 42 --no-start`,
 		Args: cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Source, opts.Destination = args[0], args[1] //nolint:uncheckedsliceindex // Cobra ExactArgs(2) validates both positions before RunE.
@@ -60,17 +64,23 @@ starter workflow.`,
 			if _, err := fmt.Fprintln(cmd.ErrOrStderr(), console.FormatSuccessMessage("Configured private remediation repository: "+trialRepositoryURL(opts.Destination))); err != nil {
 				return err
 			}
-			_, err := fmt.Fprintln(cmd.ErrOrStderr(), console.FormatInfoMessage("Actions is enabled and the starter investigation workflow was dispatched. Review organization access and use only clone-scoped secrets."))
+			next := "Actions is enabled and the starter investigation workflow was dispatched. Watch it with: gh run list --repo " + opts.Destination
+			if opts.NoStart {
+				next = "Actions remains disabled and no workflow was dispatched (--no-start). Review the repository, then enable Actions and run the starter workflow."
+			}
+			_, err := fmt.Fprintln(cmd.ErrOrStderr(), console.FormatInfoMessage(next))
 			return err
 		},
 	}
 	cmd.Flags().StringVar(&opts.Workflows, "workflows", "", "Required local directory of workflow Markdown files and self-contained local imports")
-	cmd.Flags().StringVar(&opts.Starter, "starter-workflow", "", "Required root workflow .md file to dispatch after enabling Actions")
+	cmd.Flags().StringVar(&opts.Starter, "starter-workflow", "", "Root workflow to dispatch after enabling Actions (defaults to the only root workflow)")
+	cmd.Flags().BoolVar(&opts.NoStart, "no-start", false, "Leave Actions disabled and dispatch nothing so the repository can be reviewed first")
+	cmd.Flags().StringSliceVar(&opts.Secrets, "secret", nil, "Repository secret to set from the same-named environment variable (repeatable)")
 	cmd.Flags().StringVar(&opts.Ref, "ref", "HEAD", "Upstream branch, tag, or commit to snapshot")
 	cmd.Flags().IntSliceVar(&opts.Alerts, "alert", nil, "Code scanning alert number to download (repeatable or comma-separated)")
 	cmd.Flags().StringSliceVar(&opts.Advisories, "advisory", nil, "Repository security advisory GHSA ID to download (repeatable or comma-separated)")
 	_ = cmd.MarkFlagRequired("workflows")
-	_ = cmd.MarkFlagRequired("starter-workflow")
+	cmd.MarkFlagsMutuallyExclusive("starter-workflow", "no-start")
 	return cmd
 }
 
@@ -110,10 +120,11 @@ func validatePrivateCloneOptions(opts privateCloneOptions) error {
 	if opts.Workflows == "" {
 		return errors.New("private-clone requires --workflows with an operator-provided local workflow directory")
 	}
-	if opts.Starter == "" || strings.Contains(opts.Starter, "/") || strings.HasPrefix(opts.Starter, "-") || filepath.Ext(opts.Starter) != ".md" {
-		return errors.New("private-clone requires --starter-workflow with a root workflow .md filename")
+	if opts.Starter != "" && (strings.ContainsAny(opts.Starter, `/\`) || strings.HasPrefix(opts.Starter, "-") || strings.HasPrefix(opts.Starter, ".") ||
+		(filepath.Ext(opts.Starter) != ".md" && filepath.Ext(opts.Starter) != "")) {
+		return errors.New("--starter-workflow must name a root workflow, for example investigate or investigate.md")
 	}
-	return nil
+	return validatePrivateCloneSecretNames(opts.Secrets)
 }
 
 func configurePrivateClone(ctx context.Context, opts privateCloneOptions) error {
@@ -124,7 +135,7 @@ func configurePrivateClone(ctx context.Context, opts privateCloneOptions) error 
 	if err != nil {
 		return err
 	}
-	starter, err := validatePrivateCloneStarterWorkflow(bundle, opts.Starter)
+	starter, secrets, err := preparePrivateCloneActivation(bundle, opts)
 	if err != nil {
 		return err
 	}
@@ -159,6 +170,9 @@ func configurePrivateClone(ctx context.Context, opts privateCloneOptions) error 
 	}); err != nil {
 		return fmt.Errorf("compile private-clone workflows: %w", err)
 	}
+	if err := checkPrivateCloneSecretCoverage(snapshot.Secrets, secrets, !opts.NoStart); err != nil {
+		return err
+	}
 	bootstrapSHA, err := commitPrivateCloneBootstrap(ctx, dir)
 	if err != nil {
 		return err
@@ -166,11 +180,11 @@ func configurePrivateClone(ctx context.Context, opts privateCloneOptions) error 
 	if err := publishPrivateClone(ctx, dir, opts.Destination); err != nil {
 		return err
 	}
-	if err := startPrivateCloneInvestigation(ctx, opts.Destination, starter); err != nil {
+	if err := activatePrivateClone(ctx, opts.Destination, starter, secrets); err != nil {
 		return err
 	}
-	privateCloneLog.Printf("Configured workspace: repository=%s", opts.Destination)
-	fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Bootstrap SHA: "+strings.TrimSpace(string(bootstrapSHA))+". Investigation started; export only reviewed changes after this commit, never the bootstrap or confidential context."))
+	privateCloneLog.Printf("Configured workspace: repository=%s, starter=%s", opts.Destination, starter)
+	fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Bootstrap SHA: "+strings.TrimSpace(string(bootstrapSHA))+". Export only reviewed changes after this commit, never the bootstrap or confidential context."))
 	return nil
 }
 
@@ -178,8 +192,8 @@ const privateCloneContextDir = ".github/private-clone"
 
 func writePrivateCloneFile(root, name string, data []byte) error {
 	path := filepath.Join(root, filepath.FromSlash(name))
-	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+	if err := os.MkdirAll(filepath.Dir(path), constants.DirPermOwnerOnly); err != nil {
 		return err
 	}
-	return os.WriteFile(path, data, 0o600)
+	return os.WriteFile(path, data, constants.FilePermSensitive)
 }
