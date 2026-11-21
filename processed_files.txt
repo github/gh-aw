@@ -38,3 +38,4 @@
 ./pkg/workflow/time_delta_test.go|2026-05-10
 ./pkg/workflow/unquote_uses_test.go|2026-10-04
 ./pkg/workflow/workflow_run_validation_test.go|2026-11-08
+./pkg/stringutil/pat_validation_test.go|2026-11-21
