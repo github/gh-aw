@@ -68,7 +68,7 @@ const AgyDefaultModel = "gemini-3.8-flash-medium"
 const DefaultPiVersion Version = "1.5.2"
 
 // DefaultGitHubMCPServerVersion is the default version of the GitHub MCP server Docker image
-const DefaultGitHubMCPServerVersion Version = "v2.1.0"
+const DefaultGitHubMCPServerVersion Version = "v2.2.0"
 
 // DefaultFirewallVersion is the default version of the gh-aw-firewall (AWF) binary
 //
