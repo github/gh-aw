@@ -768,7 +768,7 @@ This section covers common errors users encounter, their causes, and step-by-ste
 #### Scenario: Missing Required Fields
 
 **Error:**
-```
+```text
 ✗ tool 'my-server' has invalid MCP configuration: tool 'my-server' mcp configuration must specify either 'command' or 'container'
 ```
 
@@ -789,7 +789,7 @@ tools:
 #### Scenario: HTTP MCP with Container Field
 
 **Error:**
-```
+```text
 ✗ tool 'http-server' validation failed: http MCP servers cannot use 'container' field
 ```
 
@@ -810,7 +810,7 @@ tools:
 #### Scenario: MCP Type Inference Confusion
 
 **Error:**
-```
+```text
 ✗ tool 'my-server' validation failed: missing required field 'url' for http type
 ```
 
@@ -843,7 +843,7 @@ tools:
 #### Scenario: Write Permissions in Strict Mode
 
 **Error:**
-```
+```text
 ✗ strict mode: write permission 'contents: write' is not allowed for security reasons
 ```
 
@@ -875,7 +875,7 @@ safe-outputs:
 #### Scenario: Missing Permissions for GitHub Toolset
 
 **Error:**
-```
+```text
 ✗ validation failed: GitHub tool requires additional permissions: issues: write, pull-requests: write
 ```
 
@@ -907,7 +907,7 @@ tools:
 #### Scenario: Wildcard Network Access in Strict Mode
 
 **Error:**
-```
+```text
 ✗ strict mode: wildcard '*' is not allowed in network.allowed domains to prevent unrestricted internet access
 ```
 
@@ -936,7 +936,7 @@ network:
 #### Scenario: Network Access Required but Not Configured
 
 **Error:**
-```
+```text
 ✗ MCP server 'my-server' requires network access but network configuration is missing
 ```
 
@@ -964,7 +964,7 @@ tools:
 #### Scenario: Invalid YAML Syntax in Frontmatter
 
 **Error:**
-```
+```text
 ✗ failed to parse workflow frontmatter: invalid YAML syntax
 ```
 
@@ -1012,7 +1012,7 @@ tools:
 #### Scenario: YAML 1.1 vs 1.2 Issues
 
 **Error:**
-```
+```text
 ✗ unexpected value for 'on' field: true (boolean)
 ```
 
@@ -1043,7 +1043,7 @@ See `scratchpad/yaml-version-gotchas.md` for complete guide.
 #### Scenario: Expression Size Limit Exceeded
 
 **Error:**
-```
+```text
 ✗ GitHub Actions expression exceeds size limit: 21000/20000 bytes
 ```
 
@@ -1077,7 +1077,7 @@ See `scratchpad/yaml-version-gotchas.md` for complete guide.
 #### Scenario: Invalid Engine Specified
 
 **Error:**
-```
+```text
 ✗ invalid engine: 'chatgpt'. Valid engines are: copilot, claude, codex, custom
 ```
 
@@ -1466,7 +1466,7 @@ Errors in gh-aw fall into four main categories, each requiring different handlin
 - Wrong field types
 
 **Error message pattern:**
-```
+```text
 ✗ [what's wrong]. [what's expected]. [example of correct usage]
 ```
 
@@ -1498,7 +1498,7 @@ return fmt.Errorf(
 - Expression size limit exceeded
 
 **Error message pattern:**
-```
+```text
 ✗ [what's wrong]. [why it matters]. [how to fix with configuration change]
 ```
 
@@ -1529,7 +1529,7 @@ return fmt.Errorf(
 - Permission denied (file system)
 
 **Error message pattern:**
-```
+```text
 ✗ [operation failed]: [system error]. Check that [environment requirement]
 ```
 
@@ -1561,7 +1561,7 @@ return fmt.Errorf(
 - Panic in production code path
 
 **Error message pattern:**
-```
+```text
 ✗ internal error: [brief description]. Please report this issue at https://github.com/github/gh-aw/issues
 ```
 
