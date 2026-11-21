@@ -10,6 +10,10 @@ Azure OpenAI resource's OpenAI v1 endpoint, put provider credentials in
 `engine.env`, and choose the wire model deliberately when Azure deployment names
 do not match Azure model IDs.
 
+For the separate Azure AI Gateway service at `ai.gateway.azure.com`, see
+[Azure AI Gateway](/gh-aw/reference/azure-ai-gateway/). Its token scope and
+gateway-key header conventions differ from Azure OpenAI.
+
 ## Use the Azure OpenAI v1 endpoint
 
 Set `COPILOT_PROVIDER_BASE_URL` to the Azure resource endpoint with the

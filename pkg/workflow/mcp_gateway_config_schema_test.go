@@ -9,7 +9,34 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
+
+func TestMCPGatewayAzureAuthSchema(t *testing.T) {
+	for _, path := range []string{"schemas/mcp-gateway-config.schema.json", "../../docs/public/schemas/mcp-gateway-config.schema.json"} {
+		t.Run(path, func(t *testing.T) {
+			raw, err := os.ReadFile(path)
+			require.NoError(t, err)
+			var doc map[string]any
+			require.NoError(t, json.Unmarshal(raw, &doc))
+			http := requireObject(t, requireObject(t, doc, "definitions"), "httpServerConfig")
+			authSchema, err := json.Marshal(requireObject(t, requireObject(t, http, "properties"), "auth"))
+			require.NoError(t, err)
+			schema, err := compileSchema(string(authSchema), "auth.json")
+			require.NoError(t, err)
+			auth := map[string]any{
+				"type": "github-oidc", "provider": "azure",
+				"azureTenantId": "tenant", "azureClientId": "client",
+				"azureScope": "https://ai.gateway.azure.com/.default", "azureCloud": "public",
+			}
+			require.NoError(t, schema.Validate(auth))
+			delete(auth, "azureClientId")
+			require.Error(t, schema.Validate(auth))
+			require.NoError(t, schema.Validate(map[string]any{"type": "github-oidc"}))
+		})
+	}
+}
 
 func TestMCPGatewayConfigSchemaContainerImages(t *testing.T) {
 	digest := strings.Repeat("aB012345", 8)

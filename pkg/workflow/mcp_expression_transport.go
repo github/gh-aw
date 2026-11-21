@@ -68,6 +68,9 @@ func replaceMCPExpressions(value string, preserveLegacy bool) (string, map[strin
 func collectMCPConfigExpressionBindings(config *parser.RegistryMCPServerConfig) map[string]string {
 	bindings := make(map[string]string)
 	values := []string{config.URL, config.Container, config.Entrypoint, config.Command, config.Registry}
+	if auth := config.Auth; auth != nil {
+		values = append(values, auth.Audience, auth.AzureTenantID, auth.AzureClientID, auth.AzureScope)
+	}
 	values = append(values, config.Args...)
 	values = append(values, config.EntrypointArgs...)
 	values = append(values, config.Mounts...)

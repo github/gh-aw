@@ -11,11 +11,22 @@ type ConnectorSpec struct {
 	ID          string                `json:"id"`
 	Endpoints   map[string]string     `json:"endpoints"`
 	Credentials map[string]Credential `json:"credentials"`
+	Inference   map[string]Inference  `json:"inference,omitempty"`
 	Triggers    map[string]Trigger    `json:"triggers,omitempty"`
 	MCP         map[string]ReadTool   `json:"mcp,omitempty"`
 	HTTPMCP     map[string]HTTPMCP    `json:"httpMcp,omitempty"`
 	SafeOutputs map[string]Operation  `json:"safeOutputs,omitempty"`
 	Context     map[string]Operation  `json:"context,omitempty"`
+}
+
+// Inference describes a fixed model provider, not an agent-callable operation.
+// The compiler lowers an explicit selection to the existing engine transport.
+type Inference struct {
+	Endpoint   string `json:"endpoint"`
+	Path       string `json:"path"`
+	Protocol   string `json:"protocol"`
+	Credential string `json:"credential"`
+	Models     string `json:"models"`
 }
 
 type Credential struct {
