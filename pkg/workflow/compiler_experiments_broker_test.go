@@ -24,10 +24,13 @@ func TestExperimentsBrokerCompiledWorkflow(t *testing.T) {
 		dryRun   bool
 		graders  bool
 		strict   bool
+		noOIDC   bool
 		mode     ActionMode
 	}{
 		{name: "broker", storage: "broker"},
 		{name: "broker-reusable", storage: "broker", reusable: true},
+		{name: "broker-oidc-none", storage: "broker", noOIDC: true},
+		{name: "broker-reusable-oidc-none", storage: "broker", reusable: true, noOIDC: true},
 		{name: "broker-custom-graders", storage: "broker", graders: true},
 		{name: "broker-strict", storage: "broker", strict: true},
 		{name: "broker-script-reusable", storage: "broker", reusable: true, mode: ActionModeScript},
@@ -46,7 +49,11 @@ func TestExperimentsBrokerCompiledWorkflow(t *testing.T) {
 			if tc.graders {
 				extra = "graders:\n  custom-count:\n    script: return 1\n"
 			}
-			source := fmt.Sprintf("---\non: %s\nengine: copilot\nstrict: %t\npermissions: {contents: read}\nexperiments:\n  storage: %s\n  prompt:\n    variants: [control, candidate]\n    weight: [70, 30]\n%s---\nTest.\n", trigger, tc.strict, tc.storage, extra)
+			permissions := "contents: read"
+			if tc.noOIDC {
+				permissions += ", id-token: none"
+			}
+			source := fmt.Sprintf("---\non: %s\nengine: copilot\nstrict: %t\npermissions: {%s}\nexperiments:\n  storage: %s\n  prompt:\n    variants: [control, candidate]\n    weight: [70, 30]\n%s---\nTest.\n", trigger, tc.strict, permissions, tc.storage, extra)
 			compiler := NewCompiler(WithVersion("v1.0.0"), WithNoEmit(true))
 			if tc.mode != "" {
 				compiler.actionMode = tc.mode
@@ -100,6 +107,9 @@ func TestExperimentsBrokerCompiledWorkflow(t *testing.T) {
 				assert.Equal(t, experimentsCacheDir, pickEnv["GH_AW_EXPERIMENT_STATE_DIR"])
 				assert.Equal(t, "write", activation.Permissions["id-token"])
 				assert.Equal(t, map[string]string{"contents": "read", "id-token": "write"}, report.Permissions)
+				if tc.noOIDC {
+					assert.NotEqual(t, "write", workflow.Jobs["agent"].Permissions["id-token"])
+				}
 				reportNeeds := parseNeedsField(report.Needs)
 				assert.Contains(t, reportNeeds, "activation")
 				assert.Contains(t, reportNeeds, "agent")
