@@ -4,12 +4,74 @@ package workflow
 
 import (
 	"maps"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/goccy/go-yaml"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestCompileOTLPOptOut(t *testing.T) {
+	const source = `---
+on:
+  schedule:
+    - cron: "0 12 * * *"
+  workflow_dispatch:
+engine: claude
+permissions:
+  contents: read
+network:
+  allowed: [defaults]
+env:
+  KEEP: preserved
+`
+	for _, tc := range []struct {
+		name, config string
+		disabled     bool
+	}{
+		{name: "defaults"},
+		{name: "disabled", config: "observability: { otlp: false }\n", disabled: true},
+		{name: "disabled with import", config: "observability: { otlp: false }\nimports: [shared.md]\n", disabled: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			require.NoError(t, os.WriteFile(filepath.Join(dir, "shared.md"), []byte(`---
+observability:
+  otlp:
+    endpoint: https://imported.example.com
+    headers: ${{ secrets.IMPORTED_OTLP_HEADERS }}
+---
+`), 0600))
+			path := filepath.Join(dir, "telemetry.md")
+			require.NoError(t, os.WriteFile(path, []byte(source+tc.config+"---\nSay hello.\n"), 0600))
+			require.NoError(t, NewCompiler().CompileWorkflow(path))
+			lock, err := os.ReadFile(filepath.Join(dir, "telemetry.lock.yml"))
+			require.NoError(t, err)
+
+			var workflow struct {
+				Env map[string]string `yaml:"env"`
+			}
+			require.NoError(t, yaml.Unmarshal(lock, &workflow))
+			assert.Equal(t, "preserved", workflow.Env["KEEP"])
+			for _, key := range []string{"OTEL_EXPORTER_OTLP_ENDPOINT", "OTEL_EXPORTER_OTLP_HEADERS", "GH_AW_OTLP_ENDPOINTS", "GH_AW_OTLP_IF_MISSING"} {
+				if tc.disabled {
+					assert.NotContains(t, workflow.Env, key)
+				} else {
+					assert.Contains(t, workflow.Env, key)
+				}
+			}
+			if tc.disabled {
+				assert.NotContains(t, string(lock), "secrets.GH_AW_DEFAULT_OTLP_")
+				assert.NotContains(t, string(lock), "secrets.IMPORTED_OTLP_HEADERS")
+				assert.NotContains(t, string(lock), "imported.example.com")
+				assert.NotContains(t, string(lock), "Check OTLP telemetry configuration")
+			}
+		})
+	}
+}
 
 // TestExtractOTLPEndpointDomain verifies hostname extraction from OTLP endpoint URLs.
 func TestExtractOTLPEndpointDomain(t *testing.T) {

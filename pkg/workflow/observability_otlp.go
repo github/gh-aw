@@ -924,7 +924,15 @@ func buildOTLPPayloadEnvLines(workflowData *WorkflowData, entries []otlpEndpoint
 	return lines
 }
 
+func isOTLPDisabled(frontmatter map[string]any) bool {
+	enabled, ok := extractRawObservabilityMap(frontmatter)["otlp"].(bool)
+	return ok && !enabled
+}
+
 func (c *Compiler) injectOTLPConfig(workflowData *WorkflowData) {
+	if isOTLPDisabled(workflowData.RawFrontmatter) {
+		return
+	}
 	entries, usesEnterpriseDefaults := resolveOTLPEndpointEntries(workflowData)
 	workflowData.OTLPUsesEnterpriseDefaults = usesEnterpriseDefaults
 

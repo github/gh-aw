@@ -388,7 +388,7 @@ func (c *Compiler) mergeImportedWorkflowConfiguration(ctx *workflowBuildContext)
 
 // mergeImportedObservability merges imported OTLP config into raw frontmatter with main precedence.
 func (c *Compiler) mergeImportedObservability(workflowData *WorkflowData, mergedObservability string) {
-	if mergedObservability == "" {
+	if mergedObservability == "" || isOTLPDisabled(workflowData.RawFrontmatter) {
 		return
 	}
 	var importedObs map[string]any

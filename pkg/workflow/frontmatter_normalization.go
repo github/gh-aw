@@ -11,6 +11,11 @@ func normalizeFrontmatterConfig(frontmatter map[string]any) (map[string]any, err
 	normalizePermissionsShorthand(normalized)
 	normalizeStringObjectShorthands(normalized)
 	normalizeSandboxShorthands(normalized)
+	if isOTLPDisabled(frontmatter) {
+		obs := maps.Clone(extractRawObservabilityMap(frontmatter))
+		delete(obs, "otlp")
+		normalized["observability"] = obs
+	}
 	if err := normalizeSafeOutputShorthands(normalized); err != nil {
 		return nil, err
 	}
