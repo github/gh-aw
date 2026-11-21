@@ -235,6 +235,36 @@ describe("searchEntitiesWithExpiration", () => {
     expect(result.stats.totalScanned).toBe(2);
   });
 
+  it("should ignore expiration markers inside fenced code blocks", async () => {
+    const fencedOnly = {
+      id: "issue-1",
+      number: 1,
+      title: "Issue with fenced example marker",
+      url: "https://github.com/test-owner/test-repo/issues/1",
+      body: "Example:\n\n```markdown\n- [x] expires <!-- gh-aw-expires: 2020-01-01T00:00:00.000Z --> on Jan 1, 2020 UTC\n```\n\n> - [ ] expires <!-- gh-aw-expires: 2020-01-01T00:00:00.000Z --> on Jan 1, 2020 UTC\n\n<!-- gh-aw-workflow-id: test-workflow -->",
+      createdAt: "2026-01-01T00:00:00Z",
+    };
+
+    mockGithub = {
+      graphql: vi.fn().mockResolvedValue({
+        repository: {
+          issues: {
+            pageInfo: { hasNextPage: false, endCursor: null },
+            nodes: [fencedOnly],
+          },
+        },
+      }),
+    };
+
+    const result = await searchEntitiesWithExpiration(mockGithub, owner, repo, {
+      entityType: "issues",
+      graphqlField: "issues",
+      resultKey: "issues",
+    });
+
+    expect(result.items).toHaveLength(0);
+  });
+
   it("should find issues with legacy expiration format (without HTML comment)", async () => {
     const legacyFormatIssue = {
       id: "issue-legacy",

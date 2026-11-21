@@ -23,6 +23,7 @@ describe("cleanup_stale_steering_issues", () => {
     created_at: oldCreatedAt,
     ...overrides,
   });
+  const openIssueData = () => ({ data: { body: makeIssue().body, title: makeIssue().title, state: "open" } });
   const mockCandidates = () => {
     mockGithub.graphql.mockResolvedValueOnce({
       repository: {
@@ -32,7 +33,7 @@ describe("cleanup_stale_steering_issues", () => {
         },
       },
     });
-    mockGithub.rest.issues.get.mockResolvedValue({ data: { body: makeIssue().body } });
+    mockGithub.rest.issues.get.mockResolvedValue(openIssueData());
     mockGithub.rest.actions.getWorkflowRun.mockResolvedValue({ data: { status: "completed", conclusion: "success" } });
     mockGithub.paginate.mockResolvedValue([]);
   };
@@ -73,7 +74,7 @@ describe("cleanup_stale_steering_issues", () => {
         },
       },
     });
-    mockGithub.rest.issues.get.mockResolvedValueOnce({ data: { body: makeIssue().body } });
+    mockGithub.rest.issues.get.mockResolvedValue(openIssueData());
     mockGithub.paginate.mockResolvedValueOnce([]);
     mockGithub.rest.actions.getWorkflowRun.mockResolvedValue({ data: { status: "completed", conclusion: "success" } });
 
@@ -135,7 +136,7 @@ describe("cleanup_stale_steering_issues", () => {
     mockGithub.graphql.mockResolvedValueOnce({
       repository: { issues: { nodes: [{ number: 5, title: "[WIP] Orphaned run", createdAt: oldCreatedAt }], pageInfo: { hasNextPage: false, endCursor: null } } },
     });
-    mockGithub.rest.issues.get.mockResolvedValueOnce({ data: { body: makeIssue().body } });
+    mockGithub.rest.issues.get.mockResolvedValue(openIssueData());
     mockGithub.paginate.mockResolvedValueOnce([]);
     mockGithub.rest.actions.getWorkflowRun.mockResolvedValueOnce({ data: { status: "completed", conclusion } });
 
@@ -148,6 +149,33 @@ describe("cleanup_stale_steering_issues", () => {
     expect(mockCore.setFailed).not.toHaveBeenCalled();
   });
 
+  it.each(["timed_out", "action_required", "neutral", "skipped"])("leaves stale steering issues open for a %s run", async conclusion => {
+    mockCandidates();
+    mockGithub.rest.actions.getWorkflowRun.mockResolvedValue({ data: { status: "completed", conclusion } });
+    const { main } = await import("./cleanup_stale_steering_issues.cjs");
+    await main();
+
+    expect(mockGithub.rest.issues.get).toHaveBeenCalledTimes(2);
+    expect(mockGithub.rest.issues.createComment).not.toHaveBeenCalled();
+    expect(mockGithub.rest.issues.update).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { title: "[aw] Example failed", state: "open" },
+    { title: makeIssue().title, state: "closed" },
+  ])("skips an issue that stopped being an open steering issue after its run completed (%j)", async refetched => {
+    mockCandidates();
+    mockGithub.rest.actions.getWorkflowRun.mockResolvedValue({ data: { status: "completed", conclusion: "failure" } });
+    mockGithub.rest.issues.get.mockResolvedValueOnce(openIssueData()).mockResolvedValueOnce({ data: { body: makeIssue().body, ...refetched } });
+    const { main } = await import("./cleanup_stale_steering_issues.cjs");
+    await main();
+
+    expect(mockGithub.rest.issues.createComment).not.toHaveBeenCalledWith(expect.objectContaining({ issue_number: 101 }));
+    expect(mockGithub.rest.issues.update).not.toHaveBeenCalledWith(expect.objectContaining({ issue_number: 101 }));
+    expect(mockGithub.rest.issues.update).toHaveBeenCalledWith(expect.objectContaining({ issue_number: 102, state_reason: "not_planned" }));
+    expect(mockCore.setFailed).not.toHaveBeenCalled();
+  });
+
   it("does not duplicate the cleanup comment when closure needs another attempt", async () => {
     mockGithub.graphql.mockResolvedValueOnce({
       repository: {
@@ -157,7 +185,7 @@ describe("cleanup_stale_steering_issues", () => {
         },
       },
     });
-    mockGithub.rest.issues.get.mockResolvedValueOnce({ data: { body: makeIssue().body } });
+    mockGithub.rest.issues.get.mockResolvedValue(openIssueData());
     mockGithub.paginate.mockResolvedValueOnce([{ body: "Already handled <!-- gh-aw:stale-steering-issue-cleanup -->" }]);
     mockGithub.rest.actions.getWorkflowRun.mockResolvedValue({ data: { status: "completed", conclusion: "success" } });
 
@@ -194,7 +222,7 @@ describe("cleanup_stale_steering_issues", () => {
     }
     expect(mockCore.warning).toHaveBeenCalledWith(expect.stringMatching(/#101:[\s\S]*Resource not accessible by integration/));
     expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringMatching(/#101:[\s\S]*Resource not accessible by integration/));
-    expect(failedOperation).toHaveBeenCalledTimes(2);
+    expect(failedOperation).toHaveBeenCalledTimes(operation === "get" ? 3 : 2);
   });
 
   it("does not treat a missing issue as a missing workflow run", async () => {

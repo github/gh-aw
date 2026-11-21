@@ -24,6 +24,8 @@ const CLEANUP_COMMENT = renderCleanupComment("completed successfully");
 // Failed runs normally retitle the steering issue into the failure report; a [WIP] issue left
 // behind by a completed unsuccessful run is an orphan with no remaining owner.
 const UNSUCCESSFUL_RUN_CLEANUP_COMMENT = renderCleanupComment("completed without success");
+// Other conclusions (timed_out, action_required, neutral, skipped, stale, ...) may still need follow-up.
+const ORPHANING_RUN_CONCLUSIONS = new Set(["failure", "cancelled"]);
 
 const OPEN_ISSUES_QUERY = `
   query($owner: String!, $repo: String!, $cursor: String) {
@@ -132,6 +134,17 @@ async function main() {
         continue;
       }
       const succeeded = run.conclusion === "success";
+      if (!succeeded && !ORPHANING_RUN_CONCLUSIONS.has(run.conclusion)) {
+        core.info(`Skipping stale steering issue #${candidate.number}: workflow run ${runID} concluded with ${run.conclusion || "no conclusion"}`);
+        continue;
+      }
+
+      // handle_agent_failure may have retitled this issue into a failure report since it was listed.
+      const { data: current } = await github.rest.issues.get({ owner, repo, issue_number: candidate.number });
+      if (current.state !== "open" || !current.title?.startsWith(STEERING_ISSUE_TITLE_PREFIX)) {
+        core.info(`Skipping stale steering issue #${candidate.number}: no longer an open steering issue`);
+        continue;
+      }
 
       try {
         const comments = await github.paginate(github.rest.issues.listComments, {
@@ -170,7 +183,7 @@ async function main() {
         RATE_LIMIT_RETRY_CONFIG,
         `close stale steering issue #${candidate.number}`
       );
-      core.info(`Closed stale steering issue #${candidate.number} for ${succeeded ? "successful" : run.conclusion || "unsuccessful"} workflow run ${runID}`);
+      core.info(`Closed stale steering issue #${candidate.number} for ${succeeded ? "successful" : run.conclusion} workflow run ${runID}`);
     } catch (error) {
       const message = `Failed to clean up stale steering issue #${candidate.number}: ${getErrorMessage(error)}`;
       core.warning(message);

@@ -169,6 +169,14 @@ describe("ephemerals", () => {
       expect(result?.toISOString()).toBe("2026-01-25T15:54:08.894Z");
     });
 
+    it("should ignore expiration markers inside fenced code blocks", async () => {
+      const { extractExpirationDate } = await import("./ephemerals.cjs");
+      const example = "```markdown\n- [x] expires <!-- gh-aw-expires: 2020-01-01T00:00:00.000Z --> on Jan 1, 2020 UTC\n```";
+
+      expect(extractExpirationDate(`${example}\n\n> - [ ] expires <!-- gh-aw-expires: 2020-01-01T00:00:00.000Z --> on Jan 1, 2020 UTC`)).toBeNull();
+      expect(extractExpirationDate(`${example}\n\n> - [x] expires <!-- gh-aw-expires: 2099-01-01T00:00:00.000Z --> on Jan 1, 2099 UTC`)?.toISOString()).toBe("2099-01-01T00:00:00.000Z");
+    });
+
     it("should parse a generated expiration line when project utc is configured", async () => {
       process.env.GH_AW_PROJECT_UTC = "-08:00";
 

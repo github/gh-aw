@@ -2,6 +2,7 @@
 /// <reference types="@actions/github-script" />
 
 const { formatDateInProjectTimeZone, resolveProjectTimeZone } = require("./project_timezone.cjs");
+const { getFencedCodeRanges } = require("./sanitize_content_core.cjs");
 
 /**
  * Regex pattern to match expiration marker with checked checkbox and HTML comment (new format)
@@ -51,7 +52,28 @@ function createExpirationLine(expirationDate) {
 }
 
 /**
+ * Remove fenced code blocks so example expiration markers inside code are never matched.
+ * Unclosed fences run to the end of the body (CommonMark).
+ * @param {string} body - Markdown body
+ * @returns {string} Body without fenced code blocks
+ */
+function stripFencedCode(body) {
+  const ranges = getFencedCodeRanges(body);
+  if (ranges.length === 0) {
+    return body;
+  }
+  let result = "";
+  let pos = 0;
+  for (const [start, end] of ranges) {
+    result += body.slice(pos, start);
+    pos = end;
+  }
+  return result + body.slice(pos);
+}
+
+/**
  * Extract expiration date from text body
+ * Markers inside fenced code blocks are ignored.
  * Supports two formats:
  * 1. New format with HTML comment: > - [x] expires <!-- gh-aw-expires: ISO_DATE --> on HUMAN_DATE UTC
  * 2. Legacy format without HTML comment: > - [x] expires  on HUMAN_DATE UTC
@@ -59,8 +81,10 @@ function createExpirationLine(expirationDate) {
  * @returns {Date|null} Expiration date or null if not found/invalid
  */
 function extractExpirationDate(body) {
+  const text = stripFencedCode(body);
+
   // Try new format with HTML comment first (preferred)
-  const match = body.match(EXPIRATION_PATTERN);
+  const match = text.match(EXPIRATION_PATTERN);
 
   if (match) {
     const expirationISO = match[1].trim();
@@ -73,7 +97,7 @@ function extractExpirationDate(body) {
   }
 
   // Fall back to legacy format without HTML comment
-  const legacyMatch = body.match(LEGACY_EXPIRATION_PATTERN);
+  const legacyMatch = text.match(LEGACY_EXPIRATION_PATTERN);
 
   if (legacyMatch) {
     const humanReadableDate = legacyMatch[1].trim();
@@ -161,6 +185,7 @@ function addExpirationToFooter(footer, expiresHours, entityType) {
 module.exports = {
   EXPIRATION_PATTERN,
   LEGACY_EXPIRATION_PATTERN,
+  stripFencedCode,
   formatExpirationDate,
   createExpirationLine,
   extractExpirationDate,
