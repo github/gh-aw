@@ -8,6 +8,7 @@ import (
 	"encoding/base64"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -427,6 +428,113 @@ func TestRenderStepForRunnerPreservesWorkingDirectoryAndExplicitEnvironment(t *t
 	for _, excluded := range []string{"'GITHUB_TOKEN'", "UNRELATED_SECRET"} {
 		if strings.Contains(got, excluded) {
 			t.Errorf("Windows WSL wrapper unexpectedly forwards %q:\n%s", excluded, got)
+		}
+	}
+}
+
+func TestTypeScriptLSPInstallPath(t *testing.T) {
+	bash, err := exec.LookPath("bash")
+	if err != nil {
+		t.Skip("bash is required to run the generated installer")
+	}
+	fields, ok := parseWindowsStep(strings.Join(generateTypeScriptLSPInstallStep(), "\n") + "\n")
+	if !ok {
+		t.Fatal("could not parse the TypeScript LSP install step")
+	}
+	for _, tc := range []struct{ name, runnerOS, converter string }{
+		{"Linux", "Linux", ""},
+		{"WSL", "Windows", "wslpath"},
+		{"Git Bash", "Windows", "cygpath"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			temp := t.TempDir()
+			binDir := filepath.Join(temp, "gh-aw", "engine-cli", "typescript-lsp", "node_modules", ".bin")
+			if err := os.MkdirAll(binDir, 0700); err != nil {
+				t.Fatal(err)
+			}
+			pathFile := filepath.Join(temp, "github-path")
+			// Exercise the generated script without a live registry or Windows tools.
+			setup := "PATH=/nonexistent\nmkdir() { :; }\nnpm() { :; }\n"
+			want := binDir
+			if tc.converter != "" {
+				want = `C:\runner temp\gh-aw\engine-cli\typescript-lsp\node_modules\.bin`
+				setup += tc.converter + `() { [[ "$1" == -w && "$2" == "$EXPECTED_BIN_DIR" ]] || return 1; printf '%s\n' "$WINDOWS_BIN_DIR"; }` + "\n"
+			}
+			cmd := exec.CommandContext(t.Context(), bash, "--noprofile", "--norc", "-c", setup+fields["run"].(string))
+			cmd.Env = []string{"RUNNER_OS=" + tc.runnerOS, "RUNNER_TEMP=" + temp, "GITHUB_PATH=" + pathFile,
+				"EXPECTED_BIN_DIR=" + binDir, "WINDOWS_BIN_DIR=" + want}
+			if output, err := cmd.CombinedOutput(); err != nil {
+				t.Fatalf("run installer: %v\n%s", err, output)
+			}
+			if got, err := os.ReadFile(pathFile); err != nil || string(got) != want+"\n" {
+				t.Fatalf("GITHUB_PATH = %q, err = %v; want %q", got, err, want+"\n")
+			}
+		})
+	}
+}
+
+func TestCompileWindowsTypeScriptLSPForwardsEarlierNpmSettingsOnlyToInstaller(t *testing.T) {
+	dir := t.TempDir()
+	workflowFile := filepath.Join(dir, "windows-typescript.md")
+	const workflow = `---
+on: workflow_dispatch
+permissions:
+  contents: read
+runs-on: windows-latest
+engine: copilot
+strict: false
+steps:
+  - name: Configure npm mirror
+    shell: pwsh
+    run: |
+      Add-Content -Path $env:GITHUB_ENV -Value 'NPM_CONFIG_REGISTRY=https://mirror.example.com/'
+      Add-Content -Path $env:GITHUB_ENV -Value "NPM_CONFIG_USERCONFIG=$env:RUNNER_TEMP\mirror.npmrc"
+lsp:
+  typescript:
+    command: typescript-language-server
+    args: ["--stdio"]
+    fileExtensions:
+      ".ts": typescript
+---
+Inspect the TypeScript code.
+`
+	if err := os.WriteFile(workflowFile, []byte(workflow), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := NewCompiler().CompileWorkflow(workflowFile); err != nil {
+		t.Fatal(err)
+	}
+	lock, err := os.ReadFile(filepath.Join(dir, "windows-typescript.lock.yml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	const installerHeader = "      - name: Install TypeScript LSP dependencies\n"
+	before, remainder, ok := strings.Cut(string(lock), installerHeader)
+	if !ok || !strings.Contains(before, "'NPM_CONFIG_REGISTRY=https://mirror.example.com/'") {
+		t.Fatal("expected the npm mirror step before the installer")
+	}
+	installer, after, _ := strings.Cut(remainder, "\n      - ")
+	if !strings.Contains(installer, "shell: pwsh") ||
+		!strings.Contains(decodeWindowsWSLRunScript(t, installer), `npm ci --prefix "$install_dir" --replace-registry-host=npmjs`) {
+		t.Fatal("expected the locked TypeScript installer to run inside WSL")
+	}
+	lookalike := renderWindowsPOSIXRunStep(strings.Join(generateTypeScriptLSPInstallStep(), "\n")+"\n", nil)
+	wslArray := func(step, name string) string {
+		_, value, _ := strings.Cut(step, "$"+name+" = @(")
+		value, _, _ = strings.Cut(value, "\n")
+		return value
+	}
+	if !strings.Contains(wslArray(installer, "pathVariables"), "'NPM_CONFIG_USERCONFIG'") {
+		t.Error("expected the WSL wrapper to mark the npm user config as a path")
+	}
+	for _, name := range []string{"'NPM_CONFIG_REGISTRY'", "'NPM_CONFIG_USERCONFIG'", "'NODE_AUTH_TOKEN'"} {
+		if !strings.Contains(wslArray(installer, "allowedEnvironmentVariables"), name) {
+			t.Errorf("installer does not forward %s from earlier steps", name)
+		}
+		for line := range strings.SplitSeq(before+lookalike+after, "\n") {
+			if strings.Contains(wslArray(line, "allowedEnvironmentVariables"), name) {
+				t.Errorf("found %s in another step's WSL allowlist", name)
+			}
 		}
 	}
 }

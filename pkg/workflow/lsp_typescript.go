@@ -41,7 +41,13 @@ func generateTypeScriptLSPInstallStep() GitHubActionStep {
 		// Keep the runner's registry and credentials; npm maps the canonical npmjs lock URLs to that registry.
 		`          npm ci --prefix "$install_dir" --replace-registry-host=npmjs --no-audit --no-fund`,
 		`          bin_dir="$install_dir/node_modules/.bin"`,
-		`          if [[ "${RUNNER_OS:-}" == Windows ]]; then bin_dir="$(wslpath -w "$bin_dir")"; fi`,
+		`          if [[ "${RUNNER_OS:-}" == Windows ]]; then`,
+		`            if command -v wslpath >/dev/null 2>&1; then`,
+		`              bin_dir="$(wslpath -w "$bin_dir")"`,
+		`            else`,
+		`              bin_dir="$(cygpath -w "$bin_dir")"`,
+		`            fi`,
+		`          fi`,
 		`          printf '%s\n' "$bin_dir" >> "$GITHUB_PATH"`,
 	)
 }

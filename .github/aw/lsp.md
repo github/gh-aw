@@ -52,7 +52,7 @@ For the languages below, the compiler injects the install step automatically —
 
 The built-in TypeScript server does not resolve versions at runtime. To use a different version, configure a custom server and install it from your own lockfile.
 
-Language keys not in this table still work — the compiler simply skips the auto-install step. Add a manual `steps:` entry to install the server yourself.
+Language keys not in this table still work — the compiler skips the auto-install step. Use `pre-agent-steps:` to install the server yourself.
 
 ## LSP-enabled Tools (Copilot Engine)
 
@@ -155,20 +155,26 @@ lsp:
 
 To use a different TypeScript server version, commit a `package.json` that pins both `typescript` and `typescript-language-server`, and commit the matching `package-lock.json`. This example uses `.github/lsp/typescript` as the npm project directory. Change your `lsp` key from `typescript` to `typescript-custom`, remove `version`, and retain your file extension mappings:
 
+Use `pre-agent-steps:` so the install runs after the PR job restores the base branch's `.github` directory. The workspace-relative `command` lets Copilot find the server even when a fresh WSL shell does not inherit the Windows runner's PATH updates.
+
 ```yaml
 engine:
   id: copilot
 
-steps:
+pre-agent-steps:
   - name: Install custom TypeScript language server
     working-directory: .github/lsp/typescript
     run: |
       npm ci --ignore-scripts --no-audit --no-fund
-      printf '%s\n' "$PWD/node_modules/.bin" >> "$GITHUB_PATH"
+      bin_dir="$PWD/node_modules/.bin"
+      if [[ "${RUNNER_OS:-}" == Windows ]]; then
+        bin_dir="$(wslpath -w "$bin_dir")"
+      fi
+      printf '%s\n' "$bin_dir" >> "$GITHUB_PATH"
 
 lsp:
   typescript-custom:
-    command: typescript-language-server
+    command: ./.github/lsp/typescript/node_modules/.bin/typescript-language-server
     args: ["--stdio"]
     fileExtensions:
       ".ts": typescript

@@ -135,6 +135,9 @@ func (m *LSPManager) GenerateInstallSteps(workflowData *WorkflowData) []GitHubAc
 		switch {
 		case language == "typescript":
 			step = appendNpmLSPInstallPolicy(generateTypeScriptLSPInstallStep(), runInstallScripts, cooldownEnabled)
+			if workflowData != nil && isWindowsWSLRunner(workflowData.RunsOn) {
+				step = renderWindowsTypeScriptLSPInstallStep(step)
+			}
 		case len(spec.NpmPackages) > 0:
 			step = generateNpmLSPInstallStep(spec, effectiveVersion, runInstallScripts, cooldownEnabled)
 		default:
