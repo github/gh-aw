@@ -15,9 +15,9 @@
     },
     {
       "id": "test",
-      "description": "Fast Go unit tests with coverage across 12 test-name shards, excluding the measured >=10s tests in .github/ci/go-unit-slow-tests.json. Covers all other Go tests, fixtures and runtime inputs, including fast failure TestJavaScriptSummaryCatalogSourceIdentity. Requires verify-integration-build. Test execution is faster, but package compilation/setup remains additional.",
+      "description": "Required fast Go unit tests with coverage across 12 test-name shards. Excludes only the measured >=10s tests listed in .github/ci/go-unit-slow-tests.json, keeping unmeasured tests by default. Requires verify-integration-build.",
       "historical_duration_seconds": null,
-      "mandatory": false
+      "mandatory": true
     },
     {
       "id": "test-slow",

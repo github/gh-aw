@@ -136,7 +136,7 @@ jobs:
         try {
           const ids = JSON.parse(process.env.RAW_SUITE_IDS);
           if (process.env.SELECTOR_OUTCOME === 'success' && Array.isArray(ids) &&
-              ids.length <= known.length && new Set(ids).size === ids.length &&
+              ids.includes('test') && ids.length <= known.length && new Set(ids).size === ids.length &&
               ids.every(id => known.includes(id) && (dependencies[id] || []).every(dependency => ids.includes(dependency)))) {
             suiteIds = JSON.stringify(ids);
           }

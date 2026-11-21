@@ -40,6 +40,7 @@ const JOB_DEPENDENCIES = Object.freeze({
   "security-scan": Object.freeze(["build"]),
   "cross-platform-build": Object.freeze(["build"]),
 });
+const REQUIRED_SUITES = Object.freeze(["test"]);
 const LIMITS = Object.freeze({ ...DIFF_LIMITS, response: 16384, request: 262144 });
 const DECISIONS_BASE_URL = "https://api.githubcopilot.com/v1";
 const DECISIONS_MODEL = "gpt-6-luna-decisions";
@@ -83,7 +84,8 @@ function validateCatalog(catalog) {
   if (catalog?.version !== 1 || !Array.isArray(catalog.suites) || catalog.suites.length !== SUITE_IDS.length) throw new Error("invalid-catalog");
   const seen = new Set();
   for (const suite of catalog.suites) {
-    if (!SUITE_IDS.includes(suite.id) || seen.has(suite.id) || typeof suite.description !== "string" || !suite.description || suite.description.length > 500 || suite.mandatory !== false) throw new Error("invalid-catalog");
+    if (!SUITE_IDS.includes(suite.id) || seen.has(suite.id) || typeof suite.description !== "string" || !suite.description || suite.description.length > 500 || suite.mandatory !== REQUIRED_SUITES.includes(suite.id))
+      throw new Error("invalid-catalog");
     if (suite.historical_duration_seconds !== null && (!Number.isFinite(suite.historical_duration_seconds) || suite.historical_duration_seconds < 0)) throw new Error("invalid-catalog");
     seen.add(suite.id);
   }
@@ -154,7 +156,7 @@ function selectSuites(response, catalog, diff) {
   if (!validDiffSummary(diff) || diff.truncated || diff.unavailable || !diff.files.length) throw new Error("invalid-diff-summary");
   if (!response || !Array.isArray(response.suite_ids) || !Number.isFinite(response.confidence) || response.confidence < 0.9 || response.confidence > 1) throw new Error("invalid-or-low-confidence");
   if (response.suite_ids.length > SUITE_IDS.length || new Set(response.suite_ids).size !== response.suite_ids.length || response.suite_ids.some(id => typeof id !== "string" || !SUITE_IDS.includes(id))) throw new Error("invalid-suite-ids");
-  const selected = new Set(response.suite_ids);
+  const selected = new Set([...REQUIRED_SUITES, ...response.suite_ids]);
   const include = id => {
     for (const dependency of JOB_DEPENDENCIES[id] || []) {
       if (selected.has(dependency)) continue;
@@ -162,7 +164,7 @@ function selectSuites(response, catalog, diff) {
       include(dependency);
     }
   };
-  for (const id of response.suite_ids) include(id);
+  for (const id of selected) include(id);
   return SUITE_IDS.filter(id => selected.has(id));
 }
 
