@@ -72,7 +72,7 @@ Rootless installation cannot repair root-owned state from previous privileged AW
 
 Self-hosted jobs using the same Docker daemon are **serialized**, not run concurrently inside AWF. Setup acquires the daemon-visible `gh-aw-daemon-lease` container before modifying shared runtime state and holds it through the action's always/post cleanup. Another job waits up to ten minutes, then fails without starting AWF or stopping the lease owner's services. Startup retries retain the lease. Separate runs, reruns, and matrix copies receive distinct SHA-256 invocation identities incorporating run metadata and a random UUID.
 
-The lease and its private, non-executable image carry the `io.github.gh-aw.invocation` label. The container also records repository, run ID, attempt, and job labels. Acquisition uses Docker's atomic container-name reservation, not a local lock file, so separate runner processes targeting the same daemon coordinate. Cleanup verifies the invocation label and removes the lease by immutable container ID. No lock image is downloaded or started.
+The lease and its private image carry the `io.github.gh-aw.invocation` label. The image is imported locally from a minimal archive containing a static pause executable for the Docker daemon's architecture; the network-isolated lease container runs that executable with an `unless-stopped` restart policy so ordinary Docker prune operations do not remove an active lease. No lock image or executable is downloaded. The container also records repository, run ID, attempt, and job labels. Acquisition uses Docker's atomic container-name reservation, not a local lock file, so separate runner processes targeting the same daemon coordinate. Cleanup verifies the invocation label and removes the lease by immutable container ID.
 
 ### Compatibility resource inventory
 
@@ -83,8 +83,8 @@ The current AWF compatibility boundary includes these shared resources:
 | gh-aw containers | `awmg-mcpg`, `awmg-cli-proxy`, `awmg-proxy` | Startup and stop scripts require a validated lease; replacement and cleanup also verify the container's invocation label. |
 | AWF containers | `awf-agent`, `awf-squid`, `awf-iptables-init`, `awf-api-proxy`, `awf-router`, `awf-doh-proxy`, `awf-cli-proxy`, `awf-enclave-mcp-server`, `awf-enclave-agent-api-proxy` | Upstream fixed names remain inside the exclusive lease. |
 | Networks and addresses | `awf-net`, `awf-ext`, enclave networks; default subnet `172.30.0.0/24` and fixed sidecar addresses | Serialized with AWF's setup and teardown. Changing a subnet alone does not isolate resource names. |
-| Host listeners | MCP gateway `8080` by default, delegation control at gateway port + 10, DIFC/CLI proxy `18443` | The entire listener lifecycle is serialized, including custom gateway ports. |
-| Sandbox listeners | MCP scripts `3000`, inspector `3001`, Copilot SDK `3002`; Squid `3128`, CLI proxy `11000`, provider proxies `10000`–`10005`, DNS `53` | Private to the sandbox topology, whose fixed names and addresses are serialized. |
+| Host listeners | MCP gateway `8080` by default, delegation control at gateway port + 10, MCP scripts `3000`, DIFC/CLI proxy `18443` | The entire listener lifecycle is serialized, including custom gateway ports. The MCP Scripts host PID is tracked and must exit before lease release. |
+| Sandbox listeners | Inspector `3001`, Copilot SDK `3002`; Squid `3128`, CLI proxy `11000`, provider proxies `10000`–`10005`, DNS `53` | Private to the sandbox topology, whose fixed names and addresses are serialized. |
 | Volumes and storage | Runtime bind mounts, Compose-managed state, shared `/tmp/gh-aw`, caches and image tags | No new shared named data volume is introduced. Residual `awf-*`/`awmg-*` containers, networks, volumes, and resources labelled with an `awf-*` Compose project block reuse. Image pulls retain normal content-addressed Docker behavior. |
 
 The pinned AWF release has no general resource-namespace option. gh-aw therefore cannot independently rename all upstream containers, networks, and listeners. Per-job runtime paths do **not** imply unrestricted same-host concurrency. Full parallelism requires separate hosts/VMs and Docker daemons, including isolated writable state and host listener namespaces.
@@ -93,7 +93,7 @@ All jobs sharing this boundary must use this setup/cleanup implementation and th
 
 ### Failed or interrupted jobs
 
-Normal failure cleanup runs before lease release. If an AWF container, network, or volume remains, cleanup fails closed and retains the lease instead of guessing that the resource is stale. A hard interruption that prevents post cleanup also leaves the lease in place. There is no age-based expiry or automatic lock stealing: an old job can still have live listeners or containers.
+Normal failure cleanup stops invocation-owned host listeners before lease release. If an MCP Scripts process, AWF container, network, or volume remains, cleanup fails closed and retains the lease instead of guessing that the resource is stale. A hard interruption that prevents post cleanup also leaves the running lease in place. There is no age-based expiry or automatic lock stealing: an old job can still have live listeners or containers.
 
 For recovery, first drain the affected runners and confirm that the recorded workflow invocation and all its processes have stopped. Inspect the lease metadata:
 

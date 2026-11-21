@@ -82,33 +82,61 @@ function listTmpGhAwFiles(tmpDir, maxDepth, maxFiles) {
   }
 }
 
+function validateDockerLease() {
+  const leaseScript = path.join(__dirname, "js", "docker_lease.cjs");
+  const result = spawnSync(process.execPath, [leaseScript, "assert"], { stdio: "inherit" });
+  return !result.error && result.status === 0;
+}
+
+function stopMcpScriptsServer() {
+  const stopScript = path.join(__dirname, "sh", "stop_mcp_scripts_server.sh");
+  const result = spawnSync("bash", [stopScript], { stdio: "inherit" });
+  return !result.error && result.status === 0;
+}
+
 // Wait for the OTLP span before completing the post step.
 (async () => {
+  const selfHosted = process.env.RUNNER_ENVIRONMENT === "self-hosted";
+  const leaseValidated = !selfHosted || validateDockerLease();
+  let canReleaseLease = true;
+
+  if (selfHosted && !leaseValidated) {
+    console.warn("Warning: shared runtime finalization skipped because this invocation does not own a validated lease.");
+  }
+
   // Send a gh-aw.<jobName>.conclusion span to the configured OTLP endpoint, if any.
   // Delegates to action_conclusion_otlp.cjs so that script mode (clean.sh) and
   // dev/release mode share the same implementation.  Non-fatal: errors are
   // handled inside sendJobConclusionSpan via console.warn.
-  try {
-    const { run } = require(path.join(__dirname, "js", "action_conclusion_otlp.cjs"));
-    await run();
-  } catch {
-    // Non-fatal: silently ignore any OTLP export errors in the post step.
+  if (leaseValidated) {
+    try {
+      const { run } = require(path.join(__dirname, "js", "action_conclusion_otlp.cjs"));
+      await run();
+    } catch {
+      // Non-fatal: silently ignore any OTLP export errors in the post step.
+    }
   }
 
   const tmpDir = "/tmp/gh-aw";
   const maxDebugDepth = 4;
   const maxDebugFiles = 200;
 
-  if (isDebugModeEnabled()) {
+  if (leaseValidated && isDebugModeEnabled()) {
     listTmpGhAwFiles(tmpDir, maxDebugDepth, maxDebugFiles);
   }
 
-  if (fs.existsSync(tmpDir)) {
+  if (leaseValidated && fs.existsSync(tmpDir)) {
     console.warn(`Warning: leaving shared ${tmpDir} untouched; per-invocation ownership cannot be established.`);
   }
 
+  if (selfHosted && leaseValidated && !stopMcpScriptsServer()) {
+    console.warn("Warning: MCP Scripts server did not stop; shared-daemon lease retained.");
+    canReleaseLease = false;
+    process.exitCode = 1;
+  }
+
   cleanupRuntimeTmp();
-  if (process.env.RUNNER_ENVIRONMENT === "self-hosted") {
+  if (selfHosted && canReleaseLease) {
     const result = spawnSync(process.execPath, [path.join(__dirname, "js", "docker_lease.cjs"), "release"], { stdio: "inherit" });
     if (result.error || result.status !== 0) {
       console.warn("Warning: shared-daemon AWF lease retained; inspect remaining resources before reusing this daemon.");

@@ -1,8 +1,10 @@
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const { spawnSync } = require("node:child_process");
-const { LEASE_NAME, OWNER_LABEL, invocationOwner, acquire, release, assertOwner, assertServiceOwner, inspectLease, main } = require("./docker_lease.cjs");
+const { LEASE_NAME, OWNER_LABEL, invocationOwner, acquire, release, assertOwner, assertServiceOwner, inspectLease, sharedResources, main } = require("./docker_lease.cjs");
 
 describe("shared Docker daemon lease", () => {
   let root, env, lease, calls, resources, run;
@@ -14,8 +16,10 @@ describe("shared Docker daemon lease", () => {
     resources = { container: "", network: "", volume: "" };
     run = (args, options) => {
       calls.push(args);
+      if (args[0] === "info") return "x86_64";
       if (args[0] === "image" && args[1] === "import") {
-        expect(options.input).toEqual(Buffer.alloc(1024));
+        expect(options.input.subarray(257, 262).toString()).toBe("ustar");
+        expect(options.input.subarray(512, 516).toString("hex")).toBe("7f454c46");
         return "sha256:test";
       }
       if (args[0] === "image") return "";
@@ -27,11 +31,15 @@ describe("shared Docker daemon lease", () => {
       if (args[1] === "create") {
         if (lease) throw new Error("name conflict");
         const owner = args[args.indexOf("--label") + 1].split("=")[1];
-        lease = { Id: "container-id", Image: "sha256:test", Config: { Labels: { [OWNER_LABEL]: owner } } };
+        lease = { Id: "container-id", Image: "sha256:test", State: { Running: false }, Config: { Labels: { [OWNER_LABEL]: owner } } };
         return lease.Id;
       }
+      if (args[1] === "start") {
+        lease.State.Running = true;
+        return "";
+      }
       if (args[1] === "rm") {
-        expect(args[2]).toBe(lease.Id);
+        expect(args.at(-1)).toBe(lease.Id);
         lease = null;
         return "";
       }
@@ -43,13 +51,15 @@ describe("shared Docker daemon lease", () => {
   it("persists unique invocation ownership before acquisition and removes only immutable owned IDs", async () => {
     const owner = await acquire({ env, run });
     expect(fs.readFileSync(env.GITHUB_ENV, "utf8")).toBe(`GH_AW_DOCKER_OWNER=${owner}\nGH_AW_DOCKER_READY=${owner}\n`);
-    expect(fs.readFileSync(env.GITHUB_STATE, "utf8")).toBe(`GH_AW_DOCKER_OWNER=${owner}\n`);
+    expect(fs.readFileSync(env.GITHUB_STATE, "utf8")).toBe(`GH_AW_DOCKER_OWNER=${owner}\nGH_AW_DOCKER_READY=${owner}\n`);
     expect(assertOwner(owner, run).Id).toBe("container-id");
     release(owner, run);
     expect(lease).toBeNull();
-    expect(calls).toContainEqual(["container", "rm", "container-id"]);
+    expect(calls).toContainEqual(["container", "rm", "--force", "container-id"]);
+    expect(calls.some(args => args[1] === "create" && args.includes("--restart") && args.includes("unless-stopped") && args.at(-1) === "/gh-aw-lease")).toBe(true);
+    expect(calls).toContainEqual(["container", "start", LEASE_NAME]);
     expect(calls).toContainEqual(["image", "rm", "sha256:test"]);
-    expect(calls.some(args => args.includes("--force") || args.includes("start"))).toBe(false);
+    expect(calls.some(args => args.includes("/never-executed"))).toBe(false);
   });
 
   it("distinguishes simultaneous matrix copies, retries, and separate runs", () => {
@@ -85,6 +95,13 @@ describe("shared Docker daemon lease", () => {
     expect(calls.filter(args => args[0] === "container" && args[1] === "rm")).toEqual([]);
   });
 
+  it("can remove its own stopped lease after startup failed", async () => {
+    const owner = await acquire({ env, run });
+    lease.State.Running = false;
+    release(owner, run);
+    expect(lease).toBeNull();
+  });
+
   it.each(["container", "network", "volume"])("refuses unowned stale %s resources and retains the lease", async kind => {
     resources[kind] = JSON.stringify({ Names: "awf-stale", Name: "awf-stale" });
     await expect(acquire({ env, run })).rejects.toThrow("resources remain");
@@ -103,6 +120,12 @@ describe("shared Docker daemon lease", () => {
     resources.container = "";
     release(owner, run);
     expect(lease).toBeNull();
+  });
+
+  it("classifies an active MCP Scripts host listener as a shared resource", () => {
+    const pidFile = path.join(root, "server.pid");
+    fs.writeFileSync(pidFile, `${"a".repeat(64)}\t${process.pid}\n`, { mode: 0o600 });
+    expect(sharedResources(() => "", pidFile)).toContain(`host-listener:mcp-scripts-server:${process.pid}`);
   });
 
   it("propagates daemon and creation failures rather than treating them as contention", async () => {
@@ -124,6 +147,17 @@ describe("shared Docker daemon lease", () => {
         throw new Error("No such container");
       })
     ).toBeNull();
+  });
+
+  it("builds a valid no-network pause executable for supported daemon architectures", () => {
+    for (const architecture of ["x86_64", "aarch64"]) {
+      const executable = require("./docker_lease.cjs").pauseExecutable(architecture);
+      expect(executable.subarray(0, 4).toString("hex")).toBe("7f454c46");
+      const archive = require("./docker_lease.cjs").tarArchive("gh-aw-lease", executable, 0o755);
+      expect(archive.subarray(257, 262).toString()).toBe("ustar");
+      expect(archive.subarray(512, 516)).toEqual(executable.subarray(0, 4));
+    }
+    expect(() => require("./docker_lease.cjs").pauseExecutable("riscv64")).toThrow("Unsupported Docker daemon architecture");
   });
 
   it("adopts only its own container after an ambiguous create timeout", async () => {
@@ -164,9 +198,29 @@ describe("shared Docker daemon lease", () => {
 
   it("acquires before setup's first shared filesystem deletion and releases last", () => {
     const setup = fs.readFileSync(path.resolve(__dirname, "../setup.sh"), "utf8");
-    expect(setup.indexOf('docker_lease.cjs" acquire')).toBeLessThan(setup.indexOf("sudo -n rm -rf /tmp/gh-aw"));
+    const acquireIndex = setup.indexOf('docker_lease.cjs" acquire');
+    const cleanupIndex = setup.indexOf("sudo -n rm -rf /tmp/gh-aw");
+    expect(acquireIndex).toBeGreaterThanOrEqual(0);
+    expect(cleanupIndex).toBeGreaterThanOrEqual(0);
+    expect(acquireIndex).toBeLessThan(cleanupIndex);
     const clean = fs.readFileSync(path.resolve(__dirname, "../clean.sh"), "utf8");
-    expect(clean.indexOf('docker_lease.cjs" release')).toBeGreaterThan(clean.indexOf('bash "${DESTINATION}/cleanup_runtime_tmp.sh"'));
+    const stopListenerIndex = clean.indexOf("stop_mcp_scripts_server.sh");
+    const cleanupRuntimeIndex = clean.indexOf('bash "${DESTINATION}/cleanup_runtime_tmp.sh"');
+    const releaseIndex = clean.indexOf('docker_lease.cjs" release');
+    expect(stopListenerIndex).toBeGreaterThanOrEqual(0);
+    expect(cleanupRuntimeIndex).toBeGreaterThanOrEqual(0);
+    expect(releaseIndex).toBeGreaterThanOrEqual(0);
+    expect(stopListenerIndex).toBeLessThan(cleanupRuntimeIndex);
+    expect(releaseIndex).toBeGreaterThan(cleanupRuntimeIndex);
+    const post = fs.readFileSync(path.resolve(__dirname, "../post.js"), "utf8");
+    const validateCallIndex = post.indexOf("const leaseValidated = !selfHosted || validateDockerLease();");
+    const conclusionIndex = post.indexOf('require(path.join(__dirname, "js", "action_conclusion_otlp.cjs"))');
+    const stopListenerCallIndex = post.indexOf("!stopMcpScriptsServer()");
+    const releaseCallIndex = post.indexOf('[path.join(__dirname, "js", "docker_lease.cjs"), "release"]');
+    expect(validateCallIndex).toBeGreaterThanOrEqual(0);
+    expect(validateCallIndex).toBeLessThan(conclusionIndex);
+    expect(stopListenerCallIndex).toBeGreaterThanOrEqual(0);
+    expect(stopListenerCallIndex).toBeLessThan(releaseCallIndex);
     expect(setup).toContain('RUNNER_ENVIRONMENT:-}" == "self-hosted"');
     expect(LEASE_NAME).toBe("gh-aw-daemon-lease");
   });
