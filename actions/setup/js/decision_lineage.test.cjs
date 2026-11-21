@@ -19,7 +19,10 @@ function fixture() {
     actions: [{ id: "accept", eventIndex: 33, consequential: true }],
     toolCalls: [{ id: "call", eventIndex: 11, name: "bash", outputRef: "result", success: true }],
     observations: [{ id: "result", eventIndex: 22, sourceToolCallId: "call" }],
-    provenanceEdges: [{ from: "result", to: "accept", relation: "informed" }],
+    provenanceEdges: [
+      { from: "call", to: "accept", relation: "informed" },
+      { from: "result", to: "accept", relation: "informed" },
+    ],
     decisionLineage: {
       version: 1,
       complete: true,
@@ -108,6 +111,24 @@ describe("experimental decision integrity over optional trajectory IR", () => {
     expect(grade(ir)).toMatchObject({
       value: 0,
       diagnostics: { violations: { "stale-validation": 1, "unsupported-acceptance": 1 } },
+    });
+  });
+
+  it.each([
+    ["revision", { revisionId: "r0" }],
+    ["outcome", { outcome: "failed" }],
+  ])("leaves contradictory assertions about one validation %s unknown", (_label, conflictingFields) => {
+    const ir = fixture();
+    ir.decisionLineage.validations.push({ ...ir.decisionLineage.validations[0], id: "v2", ...conflictingFields });
+    ir.decisionLineage.decisions[0].validationIds.push("v2");
+    const result = grade(ir);
+    expect(result).toMatchObject({
+      value: null,
+      diagnostics: {
+        counts: { valid: 0, invalid: 0, unknown: 1 },
+        violations: { "missing-required-validation": 0, "stale-validation": 0, "unsupported-acceptance": 0 },
+        decisions: [{ status: "unknown", reasons: ["conflicting-validation"] }],
+      },
     });
   });
 
@@ -357,6 +378,31 @@ describe("experimental decision integrity over optional trajectory IR", () => {
     });
   });
 
+  it.each([{ error: { message: "recorded result error" } }, { status: "failed" }, { is_error: true }, { isError: true }, { success: false }, { completed: false }, { exitCode: 1 }])(
+    "leaves a passed assertion conflicting with result failure %j unknown",
+    failure => {
+      const ir = fixture();
+      Object.assign(ir.observations[0], failure);
+      expect(grade(ir)).toMatchObject({
+        value: null,
+        diagnostics: { counts: { valid: 0, invalid: 0, unknown: 1 }, decisions: [{ status: "unknown", reasons: ["conflicting-validation"] }] },
+      });
+    }
+  );
+
+  it.each(["call-only", "result-only"])("requires both validation occurrences on the provenance path (%s)", path => {
+    const ir = fixture();
+    ir.provenanceEdges = [{ from: path === "call-only" ? "call" : "result", to: "accept", relation: "informed" }];
+    expect(grade(ir)).toMatchObject({
+      value: 0,
+      diagnostics: {
+        counts: { valid: 0, invalid: 1, unknown: 0 },
+        violations: { "unsupported-acceptance": 1 },
+        decisions: [{ status: "invalid", reasons: ["unsupported-acceptance"] }],
+      },
+    });
+  });
+
   it.each([
     [0, "message"],
     [1, "message"],
@@ -430,7 +476,7 @@ describe("experimental decision integrity over optional trajectory IR", () => {
     expect(JSON.stringify(result)).not.toContain("PRIVATE_");
   });
 
-  it("bounds annotation collections, reference expansion, and graph work", () => {
+  it("bounds annotation collections and preserves independent graph evaluations", () => {
     const ir = fixture();
     ir.decisionLineage.decisions = Array(5001).fill(ir.decisionLineage.decisions[0]);
     expect(grade(ir)).toMatchObject({ value: null, message: "unavailable: malformed-annotations" });
@@ -438,13 +484,21 @@ describe("experimental decision integrity over optional trajectory IR", () => {
     many.decisionLineage.decisions = Array.from({ length: 5 }, (_, i) => ({ ...many.decisionLineage.decisions[0], id: `d${i}`, requiredValidations: Array.from({ length: 5000 }, (_, j) => `check${j}`) }));
     expect(grade(many)).toMatchObject({ value: null, message: "unavailable: reference-limit" });
     const graph = fixture();
-    graph.states = Array.from({ length: 500 }, (_, i) => ({ id: `s${i}` }));
+    graph.states = Array.from({ length: 4996 }, (_, i) => ({ id: `s${i}` }));
     graph.provenanceEdges.push({ from: "s0", to: "accept", relation: "informed" });
-    for (let i = 1; i < 500; i++) graph.provenanceEdges.push({ from: `s${i}`, to: `s${i - 1}`, relation: "derived-from" });
-    graph.decisionLineage.decisions = Array.from({ length: 150 }, (_, i) => ({ ...graph.decisionLineage.decisions[0], id: `d${i}` }));
+    for (let i = 1; i < 4996; i++) graph.provenanceEdges.push({ from: `s${i}`, to: `s${i - 1}`, relation: "derived-from" });
+    graph.decisionLineage.decisions = Array.from({ length: 11 }, (_, i) => ({ ...graph.decisionLineage.decisions[0], id: `d${i}` }));
+    graph.events.push({ index: 44, kind: "safe_output", ref: "accept-simple" }, { index: 45, kind: "tool_call", ref: "call-simple" }, { index: 46, kind: "observation", ref: "result-simple" });
+    graph.actions.push({ id: "accept-simple", eventIndex: 44, consequential: true });
+    graph.toolCalls.push({ id: "call-simple", eventIndex: 45, name: "bash", outputRef: "result-simple", success: true });
+    graph.observations.push({ id: "result-simple", eventIndex: 46, sourceToolCallId: "call-simple" });
+    graph.provenanceEdges.push({ from: "call-simple", to: "accept-simple", relation: "informed" }, { from: "result-simple", to: "accept-simple", relation: "informed" });
+    graph.decisionLineage.validations.push({ id: "v-simple", toolCallId: "call-simple", resultObservationId: "result-simple", revisionId: "r1", requirement: "unit", outcome: "passed" });
+    graph.decisionLineage.decisions.push({ ...graph.decisionLineage.decisions[0], id: "d-simple", actionId: "accept-simple", eventIndex: 44, validationIds: ["v-simple"] });
     const result = grade(graph);
-    expect(result.diagnostics.counts.unknown).toBeGreaterThan(0);
-    expect(result.diagnostics.counts.valid).toBeGreaterThan(0);
+    expect(result.diagnostics.counts.unknown).toBe(0);
+    expect(result.diagnostics.counts.valid).toBe(12);
+    expect(result.diagnostics.decisions.at(-1)).toMatchObject({ decisionIndex: 11, status: "valid" });
   });
 
   it("is deterministic, immutable, and pure within the production compute boundary", () => {

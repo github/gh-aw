@@ -15,6 +15,7 @@ const id = value => typeof value === "string" && value.length > 0 && value.lengt
 const index = value => Number.isSafeInteger(value) && value >= 0;
 const list = value => Array.isArray(value) && value.length <= MAX_ITEMS;
 const ids = value => list(value) && value.every(id) && new Set(value).size === value.length;
+const hasExplicitFailure = item => isToolFailure(item) || item.status === "failed" || item.is_error === true || (item.exitCode !== undefined && item.exitCode !== 0);
 
 /** @param {any} trace @returns {any} */
 function gradeDecisionIntegrity(trace) {
@@ -99,6 +100,23 @@ function gradeDecisionIntegrity(trace) {
     if (!isRecord(validation) || !id(validation.id) || validations.has(validation.id)) return unavailable("ambiguous-validation-id");
     validations.set(validation.id, { item: validation, index: i });
   }
+  const assertions = new Map();
+  for (const { item: validation } of validations.values()) {
+    if (!id(validation.toolCallId) || !id(validation.resultObservationId) || !id(validation.requirement) || !id(validation.revisionId) || !["passed", "failed"].includes(validation.outcome)) continue;
+    const key = JSON.stringify([validation.toolCallId, validation.resultObservationId, validation.requirement]);
+    const assertion = JSON.stringify([validation.revisionId, validation.outcome]);
+    const group = assertions.get(key);
+    if (group) {
+      if (group.assertion !== assertion) group.conflicted = true;
+      group.validationIds.push(validation.id);
+    } else {
+      assertions.set(key, { assertion, validationIds: [validation.id], conflicted: false });
+    }
+  }
+  const conflictingValidationIds = new Set();
+  for (const group of assertions.values()) {
+    if (group.conflicted) for (const validationId of group.validationIds) conflictingValidationIds.add(validationId);
+  }
   const decisionIds = new Set();
   for (const decision of decisions) {
     if (!isRecord(decision) || !id(decision.id) || decisionIds.has(decision.id)) return unavailable("ambiguous-decision-id");
@@ -118,13 +136,13 @@ function gradeDecisionIntegrity(trace) {
     references += decision.requiredValidations.length + decision.validationIds.length;
     if (references > MAX_REFERENCES) return unavailable("reference-limit");
   }
-  let visits = 0;
   // Iterative DFS detects cycles even when another branch reaches a root.
   const evidenceGraph = start => {
     const active = new Set();
     const seen = new Set();
     const roots = new Set();
     const pending = [{ key: start, exit: false }];
+    let visits = 0;
     while (pending.length) {
       if (++visits > MAX_GRAPH_VISITS) return { reason: "graph-limit", roots };
       const next = pending.pop();
@@ -206,13 +224,16 @@ function gradeDecisionIntegrity(trace) {
           { collection: "events", index: callEvent.index },
           { collection: "events", index: resultEvent.index }
         );
+      if (conflictingValidationIds.has(validationId)) {
+        unknown.add("conflicting-validation");
+        continue;
+      }
       if (validation.revisionId !== decision.revisionId) violations.add("stale-validation");
       if (validation.outcome === "failed") violations.add("unsupported-acceptance");
       // An execution failure cannot establish a passing validation. Conversely,
       // a successful execution alone never establishes a passing validation.
-      if (validation.outcome === "passed" && (isToolFailure(call.item) || call.item.status === "failed" || call.item.is_error === true || (call.item.exitCode !== undefined && call.item.exitCode !== 0)))
-        unknown.add("conflicting-validation");
-      if (!graph.roots.has(validation.toolCallId) && !graph.roots.has(validation.resultObservationId)) {
+      if (validation.outcome === "passed" && (hasExplicitFailure(call.item) || hasExplicitFailure(result.item))) unknown.add("conflicting-validation");
+      if (!graph.roots.has(validation.toolCallId) || !graph.roots.has(validation.resultObservationId)) {
         if (annotation.complete === true) violations.add("unsupported-acceptance");
         else unknown.add("incomplete-provenance");
       }
