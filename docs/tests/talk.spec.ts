@@ -588,6 +588,49 @@ test.describe("compact navigation on touch screens", () => {
     await expect(page.locator("dialog.smp")).toBeVisible();
   });
 
+  test("claims WebKit's two-finger pinch before the map opens, without blocking native zoom elsewhere", async ({ page }) => {
+    await page.addInitScript(() => {
+      // Enable the WebKit path in the Chromium test project.
+      if (!("GestureEvent" in window)) Object.defineProperty(window, "GestureEvent", { value: Event });
+    });
+    await page.goto("/gh-aw/cracktro/#security");
+    const canceled = await page.evaluate(() => {
+      const slide = document.querySelector(".slide.active")!;
+      const input = document.createElement("input");
+      slide.append(input);
+      const touch = (id: number, x: number, target = slide) => new Touch({ identifier: id, target, clientX: x, clientY: 300 });
+      const send = (type: string, touches: Touch[], target = slide) =>
+        !target.dispatchEvent(new TouchEvent(type, { bubbles: true, cancelable: true, touches }));
+      const gesture = (type: string) => !slide.dispatchEvent(new Event(type, { bubbles: true, cancelable: true }));
+      const pair = [touch(0, 60), touch(1, 260)];
+      const first = send("touchstart", pair.slice(0, 1));
+      const second = send("touchstart", pair);
+      const start = gesture("gesturestart");
+      const beforeThreshold = send("touchmove", [touch(0, 70), touch(1, 250)]);
+      const change = gesture("gesturechange");
+      const openedEarly = document.querySelector<HTMLDialogElement>("dialog.smp")!.open;
+      send("touchcancel", []);
+      const afterCancel = gesture("gesturechange");
+      const mixed = send("touchstart", [touch(0, 60, input), pair[1]]);
+      send("touchcancel", []);
+      Object.defineProperty(window.visualViewport, "scale", { configurable: true, value: 2 });
+      const zoomed = send("touchstart", pair);
+      send("touchcancel", []);
+      Reflect.deleteProperty(window.visualViewport, "scale");
+      send("touchstart", pair);
+      const inward = send("touchmove", [touch(0, 120), touch(1, 200)]);
+      const afterOpen = send("touchmove", [touch(0, 130), touch(1, 190)]);
+      send("touchend", [], document.querySelector("dialog.smp")!);
+      const afterEnd = gesture("gesturechange");
+      return { first, second, start, beforeThreshold, change, openedEarly, afterCancel, mixed, zoomed, inward, afterOpen, afterEnd };
+    });
+    expect(canceled).toEqual({
+      first: false, second: true, start: true, beforeThreshold: true, change: true, openedEarly: false,
+      afterCancel: false, mixed: false, zoomed: false, inward: true, afterOpen: true, afterEnd: false,
+    });
+    await expect(page.locator("dialog.smp")).toBeVisible();
+  });
+
   test("dims the idle toolbar without swallowing the first tap or hiding keyboard focus", async ({ page }) => {
     const count = page.locator(CURRENT);
     const arrows = page.locator(".arrows");
