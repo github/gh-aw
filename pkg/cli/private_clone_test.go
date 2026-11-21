@@ -34,7 +34,7 @@ Fix the selected findings using the local security context.
 func TestPrivateCloneOptions(t *testing.T) {
 	valid := privateCloneOptions{
 		Source: "acme/source", Destination: "security/fix", Ref: "main",
-		Workflows: "workflows", Alerts: []int{42},
+		Workflows: "workflows", Starter: "investigate.md", Alerts: []int{42},
 	}
 	require.NoError(t, validatePrivateCloneOptions(valid))
 	for _, change := range []func(*privateCloneOptions){
@@ -46,6 +46,10 @@ func TestPrivateCloneOptions(t *testing.T) {
 		func(o *privateCloneOptions) { o.Advisories = []string{"../../outside"} },
 		func(o *privateCloneOptions) { o.Workflows = "" },
 		func(o *privateCloneOptions) { o.Ref = "--upload-pack=bad" },
+		func(o *privateCloneOptions) { o.Starter = "" },
+		func(o *privateCloneOptions) { o.Starter = "../investigate.md" },
+		func(o *privateCloneOptions) { o.Starter = "-investigate.md" },
+		func(o *privateCloneOptions) { o.Starter = "investigate.yml" },
 	} {
 		opts := valid
 		change(&opts)
@@ -70,6 +74,17 @@ func TestPrivateCloneWorkflowBundle(t *testing.T) {
 		require.NoError(t, os.WriteFile(filepath.Join(dir, "shared/context.md"), []byte("Local context"), 0o600))
 		_, err = readPrivateCloneWorkflows(dir)
 		require.NoError(t, err)
+	})
+	t.Run("requires a dispatchable starter workflow", func(t *testing.T) {
+		files := map[string][]byte{"investigate.md": []byte(privateCloneTestWorkflow)}
+		starter, err := validatePrivateCloneStarterWorkflow(files, "investigate.md")
+		require.NoError(t, err)
+		require.Equal(t, "investigate.lock.yml", starter)
+		_, err = validatePrivateCloneStarterWorkflow(files, "missing.md")
+		require.ErrorContains(t, err, "not a top-level workflow")
+		files["investigate.md"] = []byte("---\non: push\n---\nInvestigate\n")
+		_, err = validatePrivateCloneStarterWorkflow(files, "investigate.md")
+		require.ErrorContains(t, err, "must declare workflow_dispatch")
 	})
 	t.Run("rejects links and precompiled workflows", func(t *testing.T) {
 		for _, name := range []string{"fix.lock.yml", "other.yml", "linked.md"} {
@@ -286,4 +301,44 @@ printf 'git %s\n' "$*" >> "$PRIVATE_CLONE_TEST_LOG"
 	require.Contains(t, record, "HEAD:refs/heads/main refs/tags/private-clone/bootstrap")
 	require.NotContains(t, record, "--mirror")
 	require.NotContains(t, record, "workflow run")
+}
+
+func TestPrivateCloneStartsInvestigationAfterEnablingActions(t *testing.T) {
+	log := filepath.Join(t.TempDir(), "calls")
+	t.Setenv("PRIVATE_CLONE_TEST_LOG", log)
+	privateCloneMockGH(t, `
+printf '%s\n' "$*" >> "$PRIVATE_CLONE_TEST_LOG"
+case "$*" in
+  *actions/permissions*)
+    if [ "$1" = "api" ] && [ "$2" = "--method" ]; then exit 0; fi
+    printf '%s\n' '{"enabled":true}' ;;
+  "workflow run investigate.lock.yml --repo security/fix --ref main") exit 0 ;;
+  *) exit 1 ;;
+esac`)
+	require.NoError(t, startPrivateCloneInvestigation(context.Background(), "security/fix", "investigate.lock.yml"))
+	calls, err := os.ReadFile(log)
+	require.NoError(t, err)
+	lines := strings.Split(strings.TrimSpace(string(calls)), "\n")
+	require.Len(t, lines, 3)
+	require.Equal(t, "api --method PUT repos/security/fix/actions/permissions -F enabled=true", lines[0])
+	require.Equal(t, "api repos/security/fix/actions/permissions", lines[1])
+	require.Equal(t, "workflow run investigate.lock.yml --repo security/fix --ref main", lines[2])
+}
+
+func TestPrivateCloneDoesNotDispatchWhenActionsRemainDisabled(t *testing.T) {
+	log := filepath.Join(t.TempDir(), "calls")
+	t.Setenv("PRIVATE_CLONE_TEST_LOG", log)
+	privateCloneMockGH(t, `
+printf '%s\n' "$*" >> "$PRIVATE_CLONE_TEST_LOG"
+case "$*" in
+  *actions/permissions*)
+    if [ "$1" = "api" ] && [ "$2" = "--method" ]; then exit 0; fi
+    printf '%s\n' '{"enabled":false}' ;;
+  *) exit 1 ;;
+esac`)
+	err := startPrivateCloneInvestigation(context.Background(), "security/fix", "investigate.lock.yml")
+	require.ErrorContains(t, err, "starter workflow was not dispatched")
+	calls, err := os.ReadFile(log)
+	require.NoError(t, err)
+	require.NotContains(t, string(calls), "workflow run")
 }

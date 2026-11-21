@@ -104,6 +104,17 @@ func validatePrivateCloneWorkflowFiles(files map[string][]byte) error {
 	return nil
 }
 
+func validatePrivateCloneStarterWorkflow(files map[string][]byte, name string) (string, error) {
+	content, exists := files[name]
+	if !exists {
+		return "", fmt.Errorf("starter workflow %q is not a top-level workflow in the supplied bundle", name)
+	}
+	if !checkWorkflowHasDispatchFromContent(string(content)) {
+		return "", fmt.Errorf("starter workflow %q must declare workflow_dispatch", name)
+	}
+	return strings.TrimSuffix(name, ".md") + ".lock.yml", nil
+}
+
 func validatePrivateCloneImports(name string, imports any, files map[string][]byte) error {
 	if imports == nil {
 		return nil
@@ -303,11 +314,12 @@ Work only in this private repository. Do not publish, dispatch workflows in, or
 write to the original repository. A proposed fix does not resolve an upstream
 alert. Keep diagnostic output, patches, PRs, and validation evidence private.
 
-Actions is disabled at creation. The operator must provision any required
-clone-scoped secrets, inspect organization-wide secret and App access, review the
-compiled workflows, and enable Actions separately. Never install upstream tokens.
-Public upstream content remains anonymously accessible on the internet; absence
-of credentials is not a network-denial guarantee.
+Actions is disabled while the private source and context are published, then
+enabled before the selected starter workflow is dispatched. The operator must
+review the workflow bundle and any organization-wide secret or App access before
+running setup. Never install upstream tokens. Public upstream content remains
+anonymously accessible on the internet; absence of credentials is not a
+network-denial guarantee.
 
 For export, use the diff from refs/tags/private-clone/bootstrap to the approved
 fix commit. Never export bootstrap changes or this confidential context directory.

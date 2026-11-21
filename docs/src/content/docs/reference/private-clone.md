@@ -11,6 +11,7 @@ It is not a GitHub fork or an advisory-linked temporary fork.
 ```bash
 gh aw private-clone acme/project security/project-fix-42 \
   --workflows ./fix-workflows \
+  --starter-workflow investigate.md \
   --alert 42 \
   --advisory GHSA-2345-6789-cfgh \
   --ref main
@@ -24,14 +25,16 @@ host. The destination must be new; existing repositories are never reused.
 | Option | Meaning |
 |---|---|
 | `--workflows DIR` | Required local directory of operator-authored workflow Markdown and supporting local imports |
+| `--starter-workflow FILE.md` | Required top-level workflow to dispatch after activating Actions; it must declare `workflow_dispatch` |
 | `--ref REF` | Source branch, tag, or commit; defaults to `HEAD` and resolves to an immutable SHA |
 | `--alert NUMBER` | Selected code scanning alert; repeatable or comma-separated |
 | `--advisory GHSA-ID` | Selected repository advisory; repeatable or comma-separated |
 
 At least one alert or advisory is required. The local operator needs source
 contents access, code scanning/advisory read access for the selected resources,
-and permission to create and configure the destination repository and push its
-workflow files. Download failures stop setup rather than omitting context.
+and permission to create and configure the destination repository, push its
+workflow files, enable Actions, and dispatch the starter. Download failures stop
+setup rather than omitting context.
 Run setup locally or in a trusted private execution environment: local compiler
 diagnostics can include operator workflow content.
 
@@ -56,7 +59,9 @@ Each root workflow receives `permissions.copilot-requests: write` and a short
 pointer to the local context index. GitHub tools, including local imports, are
 restricted to `allowed-repos: "${{ github.repository }}"`. Explicit external
 checkout/output targets and external GitHub token/App configurations are
-rejected. Supply any required supporting scripts within the bundle and invoke
+rejected. The selected starter workflow must declare `workflow_dispatch`;
+`gh aw private-clone` dispatches its compiled workflow on `main` after enabling
+Actions. Supply any required supporting scripts within the bundle and invoke
 them through their installed paths under `.github/workflows/`.
 
 When GitHub tools have no explicit `min-integrity`, setup supplies `approved`.
@@ -101,21 +106,26 @@ upstream mirror. Original secrets, integrations, and git remotes are not copied.
 The clone's default workflow token remains read-only; clone-local PR creation is
 enabled, subject to organization policy.
 
-**Actions remains disabled after setup.** The operator must review the compiled
-workflows, provision additional clone-scoped secrets listed in the manifest, and
-enable Actions separately. Copilot inference uses the clone's Actions token via
-`copilot-requests: write`; no upstream PAT or Copilot PAT is provisioned.
+After the source and context are pushed, the command enables Actions and
+dispatches the selected starter workflow to begin investigation. Copilot
+inference uses the clone's Actions token via `copilot-requests: write`; no
+upstream PAT or Copilot PAT is provisioned. Any required secrets must already be
+available to the new repository through an approved organization or enterprise
+configuration.
 
 > [!CAUTION]
-> Do not grant the clone upstream repository access. Check organization-wide
-> secrets, installed Apps, shared runner credentials, private dependency
-> credentials, and operator-provided scripts before enabling workflows. Repository
-> creation does not revoke ambient organization grants. Use an isolated owner
-> when the upstream organization cannot provide an appropriate security boundary.
+> This command activates Actions and immediately runs trusted, operator-supplied
+> workflow code; other enabled triggers in the bundle may also run. Review the
+> bundle and check organization-wide secrets, installed Apps, shared runner
+> credentials, and private dependency credentials before invoking it. Do not
+> grant the clone upstream repository access. Repository creation does not revoke
+> ambient organization grants; use an isolated owner when the upstream
+> organization cannot provide an appropriate security boundary.
 
 Failed publication may leave an empty or partially configured private repository.
-The command does not delete repositories automatically. No workflows are
-dispatched, and no upstream objects are changed.
+The command does not delete repositories automatically. It dispatches only the
+selected starter workflow; it does not publish changes or mark an upstream alert
+fixed.
 
 ## Export boundary
 

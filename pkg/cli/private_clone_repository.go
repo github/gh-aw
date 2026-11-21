@@ -118,3 +118,26 @@ func verifyPrivateCloneDestination(ctx context.Context, destination string) erro
 	}
 	return nil
 }
+
+func startPrivateCloneInvestigation(ctx context.Context, destination, starterWorkflow string) error {
+	if _, err := privateCloneGH(ctx, "api", "--method", "PUT", path.Join("repos", destination, "actions/permissions"), "-F", "enabled=true"); err != nil {
+		return fmt.Errorf("enable Actions in %s: %w", destination, err)
+	}
+	data, err := privateCloneGH(ctx, "api", path.Join("repos", destination, "actions/permissions"))
+	if err != nil {
+		return fmt.Errorf("verify Actions is enabled in %s: %w", destination, err)
+	}
+	var permissions struct {
+		Enabled *bool `json:"enabled"`
+	}
+	if err := json.Unmarshal(data, &permissions); err != nil {
+		return fmt.Errorf("verify Actions is enabled in %s: %w", destination, err)
+	}
+	if permissions.Enabled == nil || !*permissions.Enabled {
+		return fmt.Errorf("Actions is not enabled in %s; starter workflow was not dispatched", destination)
+	}
+	if _, err := privateCloneGH(ctx, "workflow", "run", starterWorkflow, "--repo", destination, "--ref", "main"); err != nil {
+		return fmt.Errorf("Actions is enabled in %s, but starter workflow %s could not be dispatched: %w", destination, starterWorkflow, err)
+	}
+	return nil
+}
