@@ -8,6 +8,7 @@ import vm from "node:vm";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   applyBuiltinMCPRunnerIdentity,
+  addInvocationLabel,
   applyOTLPIgnoreIfMissing,
   clearGatewayStartupMarker,
   createGatewayStderrPath,
@@ -41,6 +42,15 @@ import {
 } from "./start_mcp_gateway.cjs";
 import { writeMcpConfiguration } from "./mcp_configuration.cjs";
 import { applyGatewayRuntimeTimeouts } from "./tool_timeouts.cjs";
+
+describe("MCP gateway Docker ownership", () => {
+  it("adds the current lease label only for self-hosted runs", () => {
+    const args = ["run", "--name", "awmg-mcpg", "image"];
+    expect(addInvocationLabel(args, { RUNNER_ENVIRONMENT: "self-hosted", GH_AW_DOCKER_OWNER: "a".repeat(64) })).toEqual(["run", "--label", `io.github.gh-aw.invocation=${"a".repeat(64)}`, "--name", "awmg-mcpg", "image"]);
+    expect(addInvocationLabel(args, {})).toBe(args);
+    expect(() => addInvocationLabel(args, { RUNNER_ENVIRONMENT: "self-hosted" })).toThrow("validated shared-daemon lease");
+  });
+});
 
 describe("MCP gateway container startup retry", () => {
   afterEach(() => {
@@ -615,7 +625,7 @@ readline.createInterface({ input: process.stdin }).on("line", line => {
       env: { HOME: "/tmp", RUNNER_TEMP: "${RUNNER_TEMP}" },
     });
     expect(core.info).toHaveBeenCalledWith(`Detected engine type: ${engine}`);
-    expect(mocks.child_process.execFileSync).toHaveBeenCalledWith("node", [expect.stringContaining(`convert_gateway_config_${engine}.cjs`)], expect.any(Object));
+    expect(mocks.child_process.execFileSync).toHaveBeenCalledWith(expect.any(String), [expect.stringContaining(`convert_gateway_config_${engine}.cjs`)], expect.any(Object));
     expect(core.setFailed).toHaveBeenCalledExactlyOnceWith(expect.stringContaining("converter reached"));
     expect(spawn).not.toHaveBeenCalled();
   });

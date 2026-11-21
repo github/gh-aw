@@ -39,7 +39,7 @@ Same-workflow before/after natural experiments: commits that flip `tools.github.
 
 ## 4. Queries
 
-Run from the repo root (needs full git history and `gh auth login`); downloads are cached in `CACHE`:
+Run from the repo root (needs full git history and `gh auth login`). Download results are cached in a private temporary directory for the run. To reuse them across invocations, set `CACHE` to a directory you control that other users cannot write to:
 
 ```bash
 RAW=$TMPDIR/cvm-raw.json node .github/skills/cracktro/refresh/cli-vs-mcp.mjs > $TMPDIR/cvm-out.json

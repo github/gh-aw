@@ -3480,6 +3480,7 @@
 
   // Agentic workflow nodes show a coding agent drawn from a seeded PRNG at load, one per slide, to show engine diversity.
   // Nodes for the Copilot coding agent itself (assignee, PR author) keep ico("copilot").
+  // Bare pickAgent() calls preserve the seeded sequence for later slides.
   const AGENTS = ["codex", "claude", "copilot", "pi", "agy"];
   const pickAgent = (() => {
     let a = 0x6a77;
@@ -8135,7 +8136,7 @@
         HOLD = 1800,
         T = [];
       let END = START;
-      for (const s of SEQ) {
+      for (let i = 0; i < SEQ.length; i++) {
         T.push(END);
         END += STEP;
       }
@@ -9024,7 +9025,7 @@
 
   // Trust the process: deep human review on every PR means the process is not trusted
   {
-    const AG = pickAgent();
+    pickAgent();
     resetIndex();
     const MERGE = `<svg viewBox="0 0 16 16"><path d="${OCTI.merge[0]}"/></svg>`;
     const lane = (cls, label) => {
@@ -9093,7 +9094,7 @@
 
   // Cost management: guard, measure, optimize (+ model routing)
   {
-    const AG = pickAgent();
+    pickAgent();
     resetIndex();
     const STEPS = [
       { id: "on", n: 1, label: "Scheduling", c: "#d29922", aic: 700, bar: "weekly" },
@@ -9443,7 +9444,7 @@
   // daily check at activation, spends AI credits, gets budget notices and hard-stops at max-ai-credits; queued run B is then blocked at
   // activation by the rolling 24 h max-daily-ai-credits budget; finally an admission authority approves run D with an allowance and denies run E
   {
-    const AG = pickAgent();
+    pickAgent();
     resetIndex();
     const RUNW = 804,
       RUNMAX = 600,
@@ -11923,7 +11924,6 @@
       V = "#a5d6ff";
     const vId = h("span", { class: "ae-val" });
     const vPv = h("span", { class: "ae-val" });
-    const caret = h("i", { class: "ae-caret" });
     const LINES = [
       [["---", D]],
       [
@@ -17057,7 +17057,7 @@
         per.textContent = `1 square ≈ ${fmt(perSq)} repositories`;
         ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
         ctx.clearRect(0, 0, CW, CH);
-        const sz = Math.max(2, cell - (cell > 8 ? 4 : 1.5)),
+        const sz = cell - 4,
           off = (cell - sz) / 2;
         // the CAO control repository sits in the middle of the fleet
         // the CAO control repository fills a 2x2 block in the middle of the fleet
@@ -18353,7 +18353,6 @@
   {
     resetIndex();
     const svgIco = (n, sz = 24) => `<svg viewBox="0 0 ${sz} ${sz}" aria-hidden="true">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</svg>`;
-    const ico = (n, x, y, sz, fill) => `<g transform="translate(${x - sz / 2},${y - sz / 2}) scale(${sz / 24})" fill="${fill}">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</g>`;
     // [initial, role, what it does on this task, colour, ring position, label dy]
     const SQUAD = [
       ["D", "Designer", "picks tokens and contrast", "#d2a8ff", [170, 70], -46],
@@ -21129,7 +21128,7 @@
   }
   // Mine → Refine → Apply: Linter Miner turns recurring patterns into analyzers, review refines them, LintMonster applies them across the repo. Feed events and counts are mined from gh-aw's history
   {
-    const AG = pickAgent();
+    pickAgent();
     resetIndex();
     const RX = 460,
       VW = 1700 + RX,
@@ -21692,7 +21691,7 @@
 
   // Semantic clustering: gh-aw's Semantic Function Refactoring report of 7 May 2026 found no copies, but grouping functions by intent exposed code filed in the wrong place; Copilot moved it the same day
   {
-    const AG = pickAgent();
+    pickAgent();
     resetIndex();
     const VW = 1800,
       VH = 680,
@@ -21840,7 +21839,7 @@
 
   // Spec → Model → Test: spec requirements become TLA+ invariants; TLC explores every state, a broken mutant must fail, a witness trace becomes a conformance test, and a surprise changes the spec first
   {
-    const AG = pickAgent();
+    pickAgent();
     resetIndex();
     const VW = 1800,
       VH = 680;
@@ -22355,7 +22354,7 @@
 
   // Go Fan: a daily agent picks the next Go dependency, studies its README, releases and changelog, compares them with how the repo uses it and files a review; Copilot ships the fix. Counts and pull request titles are mined from gh-aw's history
   {
-    const AG = pickAgent();
+    pickAgent();
     resetIndex();
     const VW = 1800,
       VH = 600;
@@ -22765,7 +22764,7 @@
 
   // Spec-driven testing: a human states intent, the W3C spec writer formalizes it with RFC 2119 keywords, an agent extracts the spec from each code change, a librarian keeps specs consistent, and an enforcer turns the spec into tests that guard the next change
   {
-    const AG = pickAgent();
+    pickAgent();
     resetIndex();
     const VW = 2160,
       VH = 680,
@@ -23301,7 +23300,7 @@
 
   // Multi-device tester: a daily agent opens the docs on phone, tablet and desktop viewports, files what breaks as one severity report, Copilot fixes it and the next run re-tests
   {
-    const AG = pickAgent();
+    pickAgent();
     resetIndex();
     const VW = 2160,
       VH = 680,
@@ -23721,7 +23720,7 @@
   }
   // Personas · Probe · Patch: a daily agent role-plays personas asking the agentic-workflows agent for workflows, scores the answers, re-runs one on the first 8,000 bytes of guidance to find rules the cut hides, and Copilot moves them up
   {
-    const AG = pickAgent();
+    pickAgent();
     resetIndex();
     const VW = 2160,
       VH = 680,
@@ -24008,7 +24007,7 @@
 
   // Speech To Agent (speak → map → grep): a DICTATION.md glossary turns misheard speech-to-text into the exact identifiers agents can grep; a namer agent renames APIs to be findable and a dictation agent adds the new names to the glossary
   {
-    const AG = pickAgent();
+    pickAgent();
     resetIndex();
     const VW = 1800,
       VH = 620;
@@ -24190,7 +24189,7 @@
 
   // Scan → Fix → Learn: the .NET runtime team's CI health loop; a scanner files Known Build Errors, a fixer attempts fixes, a feedback agent tunes both prompts
   {
-    const AG = pickAgent();
+    pickAgent();
     resetIndex();
     const VW = 1700,
       VH = 680;
@@ -24538,7 +24537,7 @@
 
   // PR Sous Chef: every five minutes it finds pull requests that sit idle with work waiting (review comments, failing CI) and nudges Copilot to pick them back up; humans still review and merge
   {
-    const AG = pickAgent();
+    pickAgent();
     resetIndex();
     const VW = 2160,
       VH = 680,
@@ -25245,7 +25244,6 @@
       muted = localStorage.getItem("aw-mute") === "1",
       tr = 0; // semitone shift for tone/bell/pad while a band's music is scheduled
     const SCALE = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21];
-    const ROOTS = [57, 60, 62, 55, 64, 59, 61, 56, 58, 63, 53, 65];
     const hz = m => 440 * 2 ** ((m - 69) / 12);
     const init = () => {
       if (ac) {

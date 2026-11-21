@@ -18,8 +18,13 @@ set +o histexpand
 #   GITHUB_REPOSITORY   - Repository name (owner/repo) for git remote
 
 set -e
+umask 077
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ "${RUNNER_ENVIRONMENT:-}" == "self-hosted" ]]; then
+  # shellcheck source=assert_docker_lease.sh
+  source "${SCRIPT_DIR}/assert_docker_lease.sh" awmg-proxy
+fi
 # shellcheck source=proxy_env_lib.sh
 source "${SCRIPT_DIR}/proxy_env_lib.sh"
 
@@ -38,6 +43,8 @@ fi
 
 PROXY_LOG_DIR=/tmp/gh-aw/proxy-logs
 MCP_LOG_DIR=/tmp/gh-aw/mcp-logs
+HOST_STATE_FILE="${RUNNER_TEMP}/gh-aw/actions/proxy-host-state"
+CA_CERT="/usr/local/share/ca-certificates/awmg-proxy-difc.crt"
 
 mkdir -p "$PROXY_LOG_DIR" "$MCP_LOG_DIR"
 
@@ -55,6 +62,7 @@ if [ "${GH_AW_NETWORK_ISOLATION:-false}" = "true" ]; then
 fi
 
 docker run -d --name awmg-proxy "${DOCKER_NETWORK_ARGS[@]}" \
+  --label "io.github.gh-aw.invocation=${GH_AW_DOCKER_OWNER:-}" \
   --user "$(id -u):$(id -g)" \
   -e GH_TOKEN \
   -e GH_HOST \
@@ -77,14 +85,51 @@ docker run -d --name awmg-proxy "${DOCKER_NETWORK_ARGS[@]}" \
 
 # Wait for TLS cert + health check (up to 30s)
 CA_INSTALLED=false
+CA_HASH=""
+REMOTE_ADDED=false
 PROXY_READY=false
+persist_host_state() {
+  if [[ "${RUNNER_ENVIRONMENT:-}" == "self-hosted" && ( "$CA_INSTALLED" == "true" || "$REMOTE_ADDED" == "true" ) ]]; then
+    local existing_owner tmp_file
+    if [[ -L "${RUNNER_TEMP}/gh-aw/actions" || -L "$HOST_STATE_FILE" || ( -e "$HOST_STATE_FILE" && ! -f "$HOST_STATE_FILE" ) ]]; then
+      echo "::error::Refusing to write an unsafe DIFC proxy host-state file." >&2
+      return 1
+    fi
+    if [[ -f "$HOST_STATE_FILE" ]]; then
+      IFS=$'\t' read -r existing_owner _ < "$HOST_STATE_FILE"
+      if [[ "$existing_owner" != "$GH_AW_DOCKER_OWNER" ]]; then
+        echo "::error::Existing DIFC proxy host-state belongs to another invocation." >&2
+        return 1
+      fi
+    fi
+    tmp_file="${HOST_STATE_FILE}.${GH_AW_DOCKER_OWNER}.tmp"
+    if [[ -e "$tmp_file" || -L "$tmp_file" ]] || ! (set -o noclobber; printf '%s\t%s\t%s\n' "${GH_AW_DOCKER_OWNER}" "${CA_HASH}" "$REMOTE_ADDED" > "$tmp_file"); then
+      echo "::error::Unable to stage DIFC proxy host-state." >&2
+      return 1
+    fi
+    chmod 600 "$tmp_file"
+    mv -f "$tmp_file" "$HOST_STATE_FILE"
+  fi
+}
 for i in $(seq 1 30); do
   if [ -f "$PROXY_LOG_DIR/proxy-tls/ca.crt" ]; then
     if [ "$CA_INSTALLED" = "false" ]; then
       if command -v sudo >/dev/null 2>&1 && command -v update-ca-certificates >/dev/null 2>&1; then
-        if sudo cp "$PROXY_LOG_DIR/proxy-tls/ca.crt" /usr/local/share/ca-certificates/awmg-proxy-difc.crt && \
-           sudo update-ca-certificates; then
+        if [ -e "$CA_CERT" ]; then
+          echo "::warning::Existing DIFC proxy CA was not replaced; preserving runner trust state"
+        elif [[ ! -e "$CA_CERT" ]]; then
           CA_INSTALLED=true
+          if command -v sha256sum >/dev/null 2>&1; then
+            CA_HASH="$(sha256sum "$PROXY_LOG_DIR/proxy-tls/ca.crt" | awk '{print $1}')"
+          else
+            CA_HASH="$(shasum -a 256 "$PROXY_LOG_DIR/proxy-tls/ca.crt" | awk '{print $1}')"
+          fi
+          persist_host_state
+          if sudo cp "$PROXY_LOG_DIR/proxy-tls/ca.crt" "$CA_CERT"; then
+            sudo update-ca-certificates || echo "::warning::Failed to refresh the system trust store"
+          else
+            echo "::warning::Failed to install DIFC proxy CA into system trust store; continuing without system CA update"
+          fi
         else
           echo "::warning::Failed to install DIFC proxy CA into system trust store; continuing without system CA update"
         fi
@@ -94,13 +139,18 @@ for i in $(seq 1 30); do
     fi
     if curl -sf "https://localhost:18443/api/v3/health" -o /dev/null 2>/dev/null; then
       echo "DIFC proxy ready on port 18443"
-      git remote add proxy "https://localhost:18443/${GITHUB_REPOSITORY}.git" || true
+      if ! git remote get-url proxy >/dev/null 2>&1 && git remote add proxy "https://localhost:18443/${GITHUB_REPOSITORY}.git"; then
+        REMOTE_ADDED=true
+        persist_host_state
+      fi
       PROXY_READY=true
       break
     fi
   fi
   sleep 1
 done
+
+persist_host_state
 
 if [ "$PROXY_READY" = "false" ]; then
   echo "::warning::DIFC proxy failed to start, falling back to direct API access"
