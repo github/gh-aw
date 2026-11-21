@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/github/gh-aw/pkg/workflow"
 	"github.com/stretchr/testify/require"
@@ -28,6 +29,7 @@ func TestLinearDevelopmentShorthandStaging(t *testing.T) {
 	declaration, err := workflow.LoadDevelopmentConnector(root, "linear", "", map[string]any{"writer-secret": "OVERRIDDEN_WRITER"}, grants)
 	require.NoError(t, err)
 	options := developmentOptions("safe-output", "add-comment", `{"issue-id":"ENG-123","body":"A staged shorthand comment"}`)
+	options.timeout = 20 * time.Second
 	options.nodeRuntime = "../../actions/setup/js/connector_runtime.cjs"
 	noSecrets := func(string) string {
 		t.Fatal("shorthand staging must not inspect credentials")
