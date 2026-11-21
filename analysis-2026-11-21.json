@@ -1,0 +1,39 @@
+{
+ "date": "2026-11-21",
+ "window": "2026-10-22..2026-11-21",
+ "total_prs": 695,
+ "merged": 579,
+ "closed": 111,
+ "open": 5,
+ "merge_rate": 0.839,
+ "merge_rate_basis": "completed (merged/(merged+closed))",
+ "categories": {
+  "other": {"total": 387, "merged": 317, "closed": 66, "open": 4, "rate": 0.828},
+  "feature": {"total": 78, "merged": 68, "closed": 10, "open": 0, "rate": 0.872},
+  "testing": {"total": 59, "merged": 57, "closed": 2, "open": 0, "rate": 0.966},
+  "bug_fix": {"total": 45, "merged": 39, "closed": 6, "open": 0, "rate": 0.867},
+  "documentation": {"total": 43, "merged": 39, "closed": 4, "open": 0, "rate": 0.907},
+  "security": {"total": 39, "merged": 28, "closed": 10, "open": 1, "rate": 0.737},
+  "dependency": {"total": 27, "merged": 24, "closed": 3, "open": 0, "rate": 0.889},
+  "refactor": {"total": 17, "merged": 7, "closed": 10, "open": 0, "rate": 0.412}
+ },
+ "negative_titles": {
+  "triage_verify_investigate": {"total": 20, "merged": 3, "closed": 17, "rate": 0.15},
+  "wip_draft": {"total": 2, "merged": 0, "closed": 2, "rate": 0.0}
+ },
+ "length_buckets_completed": {
+  "0-100": {"total": 391, "merged": 316, "closed": 75, "rate": 0.808},
+  "100-150": {"total": 182, "merged": 157, "closed": 25, "rate": 0.863},
+  "150-250": {"total": 36, "merged": 30, "closed": 6, "rate": 0.833},
+  "250+": {"total": 81, "merged": 76, "closed": 5, "rate": 0.938}
+ },
+ "structural": {
+  "avg_words_merged": 138.7, "avg_words_closed": 102.3,
+  "code_block_merged_pct": 59.8, "code_block_closed_pct": 37.8,
+  "bullet_merged_pct": 98.8, "bullet_closed_pct": 98.2
+ },
+ "weekly_completed_rate": {"2026-10-19": 0.823, "2026-10-26": 0.785, "2026-11-02": 0.914, "2026-11-09": 0.856, "2026-11-16": 0.724},
+ "last_7_days": {"total": 184, "merged": 137, "closed": 42, "open": 5, "rate": 0.765},
+ "category_rules": "v6-title-regex (same rules as 2026-11-17; first-match wins, leading [tag] stripped); category counts comparable to 2026-11-17 rules",
+ "caveat": "PR body used as prompt proxy; 499 of 695 PRs (71.8%) from app/copilot-swe-agent with agent-written bodies, so bodies measure the agent write-up, not the human prompt. Keyword lift confounded by single-author batches; not causal. Triage/verify/investigate and refactor closures may reflect no-change outcomes."
+}
