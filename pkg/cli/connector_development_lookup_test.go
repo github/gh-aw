@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"io"
 	"net/http"
+	"os/exec"
 	"path/filepath"
 	"testing"
 
@@ -14,6 +15,9 @@ import (
 )
 
 func TestLinearDevelopmentShorthandStaging(t *testing.T) {
+	if _, err := exec.LookPath("node"); err != nil {
+		t.Skip("Node.js is required for shared publication conformance")
+	}
 	root, err := filepath.Abs("../..")
 	require.NoError(t, err)
 	grants := map[string][]string{

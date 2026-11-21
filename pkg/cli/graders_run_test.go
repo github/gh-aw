@@ -100,7 +100,10 @@ func TestRunSessionGraderDecisionIntegrityReplay(t *testing.T) {
 			"actions":[{"id":"accept","eventIndex":33}],
 			"toolCalls":[{"id":"call","eventIndex":11,"outputRef":"result","success":true}],
 			"observations":[{"id":"result","eventIndex":22,"sourceToolCallId":"call"}],
-			"provenanceEdges":[{"from":"result","to":"accept","relation":"informed"}],
+			"provenanceEdges":[
+				{"from":"call","to":"accept","relation":"informed"},
+				{"from":"result","to":"accept","relation":"informed"}
+			],
 			"decisionLineage":{
 				"version":1,"complete":true,
 				"decisions":[{"id":"d","actionId":"accept","eventIndex":33,"revisionId":"r1","requiredValidations":["unit"],"validationIds":["v"]}],
