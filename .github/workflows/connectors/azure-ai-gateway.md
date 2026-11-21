@@ -118,5 +118,10 @@ access. Do not request secrets, call other models, or perform live probes.
 State that the issue is staged, not delivered.
 ]]></prompt>
   </consumer>
+  <sources>
+    <source href="https://ai.gateway.azure.com/docs/model-access" />
+    <source href="https://ai.gateway.azure.com/docs/security-identity" />
+    <source href="https://ai.gateway.azure.com/docs/models/api-formats-and-providers" />
+  </sources>
 </connector-documentation>
 -->

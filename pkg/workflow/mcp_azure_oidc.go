@@ -16,7 +16,7 @@ func validateHTTPMCPAzureOIDCGateway(data *WorkflowData) error {
 		if !ok {
 			continue
 		}
-		if hasMCP, _ := hasMCPConfig(tool); !hasMCP {
+		if hasMCP, mcpType := hasMCPConfig(tool); !hasMCP || mcpType != "http" {
 			continue
 		}
 		config, err := getMCPConfig(tool, name)
