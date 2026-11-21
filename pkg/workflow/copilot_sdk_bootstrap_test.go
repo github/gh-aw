@@ -5,8 +5,10 @@ package workflow
 import (
 	"archive/tar"
 	"compress/gzip"
+	"crypto/sha256"
 	"crypto/sha512"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"os"
 	"os/exec"
@@ -14,6 +16,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/github/gh-aw/actions/setup"
 	"github.com/github/gh-aw/pkg/constants"
 	"github.com/goccy/go-yaml"
 	"github.com/stretchr/testify/require"
@@ -92,6 +95,14 @@ func TestCopilotSDKNodeBootstrapIsolatedFromRepository(t *testing.T) {
 			require.NoError(t, os.MkdirAll(workspace, 0o755))
 			actionsDir := filepath.Join(runnerTemp, "gh-aw", "actions")
 			require.NoError(t, os.MkdirAll(actionsDir, 0o755))
+			stagedProject := filepath.Join(actionsDir, "copilot-sdk", "node")
+			require.NoError(t, os.MkdirAll(stagedProject, 0o755))
+			installer, err := os.ReadFile("../../actions/setup/sh/install_copilot_sdk.sh")
+			require.NoError(t, err)
+			require.NoError(t, os.WriteFile(filepath.Join(actionsDir, "install_copilot_sdk.sh"), installer, 0o600))
+			manifest := []byte(setup.CopilotSDKNodeManifest)
+			require.NoError(t, os.WriteFile(filepath.Join(stagedProject, "package.json"), manifest, 0o600))
+			require.NoError(t, os.WriteFile(filepath.Join(stagedProject, "package-lock.json"), fixtureLock, 0o600))
 			resolverPath := filepath.Join(actionsDir, "copilot_sdk_module_resolution.cjs")
 			for _, name := range []string{"copilot_sdk_module_resolution.cjs", "copilot_sdk_module_resolution_hooks.cjs"} {
 				resolver, err := os.ReadFile(filepath.Join("../../actions/setup/js", name))
@@ -192,15 +203,22 @@ if (!sdk.bootstrapFixture || relative !== "relative helper") throw new Error("ES
 			for key, value := range install[0].Env {
 				env = append(env, key+"="+value)
 			}
-			// Use equivalent lockfile inputs with local tarballs so npm ci runs offline.
-			command := strings.Replace(install[0].Run, copilotSDKNodeProject.lock, string(fixtureLock), 1)
+			// Bind the fixture lock with local tarballs so npm ci runs offline.
+			digest := sha256.Sum256(append(append(manifest, 0), fixtureLock...))
+			command := strings.Replace(install[0].Run, copilotSDKNodeProject.digest, hex.EncodeToString(digest[:]), 1)
 			require.NotEqual(t, install[0].Run, command)
 			if name == "normal" {
+				mismatch := exec.CommandContext(t.Context(), "bash", "-c", install[0].Run)
+				mismatch.Dir = workspace
+				mismatch.Env = env
+				output, err := mismatch.CombinedOutput()
+				require.Error(t, err)
+				require.Contains(t, string(output), "does not match the compiled workflow")
 				// Exercise a positive cooldown that an already locked graph would otherwise bypass.
 				blocked := exec.CommandContext(t.Context(), "bash", "-c", command)
 				blocked.Dir = workspace
 				blocked.Env = append(env, "NPM_CONFIG_MIN_RELEASE_AGE=1000000")
-				output, err := blocked.CombinedOutput()
+				output, err = blocked.CombinedOutput()
 				require.Error(t, err)
 				require.Contains(t, string(output), "do not satisfy engine.cooldown")
 				require.NoDirExists(t, filepath.Join(runnerTemp, "gh-aw", "engine-cli", "copilot-sdk"))

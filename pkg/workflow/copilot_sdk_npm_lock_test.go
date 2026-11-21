@@ -6,10 +6,12 @@ import (
 	"crypto/sha512"
 	"encoding/base64"
 	"encoding/json"
+	"maps"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/github/gh-aw/actions/setup"
 	"github.com/github/gh-aw/pkg/constants"
 	"github.com/goccy/go-yaml"
 	"github.com/stretchr/testify/require"
@@ -52,23 +54,19 @@ func TestCopilotSDKCompilesWithFrozenNPMGraph(t *testing.T) {
 				}
 				require.Equal(t, tt.cooldown, step.Env["NPM_CONFIG_MIN_RELEASE_AGE"])
 				require.NotContains(t, step.Run, "npm install")
-				require.Contains(t, step.Run, `npm ci --prefix "${RUNNER_TEMP}/gh-aw/engine-cli/copilot-sdk" --ignore-scripts`)
-				require.Less(t, len(step.Run), MaxExpressionSize)
-				payload := func(delimiter string) []byte {
-					_, rest, ok := strings.Cut(step.Run, "<<'"+delimiter+"'\n")
-					require.True(t, ok)
-					value, _, ok := strings.Cut(rest, "\n"+delimiter+"\n")
-					require.True(t, ok)
-					return []byte(value)
+				project := copilotSDKNodeProject
+				manifestJSON, lockJSON := setup.CopilotSDKNodeManifest, setup.CopilotSDKNodeLock
+				if tt.extra != nil {
+					project = copilotSDKTypeScriptProject
+					manifestJSON, lockJSON = setup.CopilotSDKTypeScriptManifest, setup.CopilotSDKTypeScriptLock
 				}
+				require.Equal(t, project.installCommand(), step.Run)
 				var manifest struct {
 					Dependencies map[string]string `json:"dependencies"`
 				}
-				require.NoError(t, json.Unmarshal(payload("GH_AW_SDK_PACKAGE"), &manifest))
+				require.NoError(t, json.Unmarshal([]byte(manifestJSON), &manifest))
 				want := map[string]string{"@github/copilot-sdk": string(constants.DefaultCopilotSDKVersion), "undici": "6.28.0"}
-				for pkg, version := range tt.extra {
-					want[pkg] = version
-				}
+				maps.Copy(want, tt.extra)
 				require.Equal(t, want, manifest.Dependencies)
 
 				var lock struct {
@@ -80,7 +78,7 @@ func TestCopilotSDKCompilesWithFrozenNPMGraph(t *testing.T) {
 						Integrity    string            `json:"integrity"`
 					} `json:"packages"`
 				}
-				require.NoError(t, json.Unmarshal(payload("GH_AW_SDK_LOCK"), &lock))
+				require.NoError(t, json.Unmarshal([]byte(lockJSON), &lock))
 				require.Equal(t, 3, lock.LockfileVersion)
 				require.Equal(t, want, lock.Packages[""].Dependencies)
 				for pkg, version := range want {

@@ -221,7 +221,12 @@ func selectCopilotSDKInstallSpec(workflowData *WorkflowData) copilotSDKInstallSp
 // it emits a single "run: <command>" line.
 func specToInstallStep(spec copilotSDKInstallSpec, cooldownDays int) GitHubActionStep {
 	if spec.npm != nil {
-		spec.runLines = spec.npm.installLines()
+		return GitHubActionStep{
+			"      - name: " + spec.stepName,
+			"        run: " + spec.npm.installCommand(),
+			"        env:",
+			fmt.Sprintf("          NPM_CONFIG_MIN_RELEASE_AGE: '%d'", cooldownDays),
+		}
 	}
 	if len(spec.runLines) > 0 {
 		step := GitHubActionStep{
@@ -230,12 +235,6 @@ func specToInstallStep(spec copilotSDKInstallSpec, cooldownDays int) GitHubActio
 		}
 		for _, line := range spec.runLines {
 			step = append(step, "          "+line)
-		}
-		if spec.npm != nil {
-			step = append(step,
-				"        env:",
-				fmt.Sprintf("          NPM_CONFIG_MIN_RELEASE_AGE: '%d'", cooldownDays),
-			)
 		}
 		return step
 	}

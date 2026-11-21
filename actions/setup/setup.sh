@@ -230,6 +230,15 @@ fi
 
 echo "Successfully copied ${FILE_COUNT} files to ${DESTINATION}"
 
+# Keep the locked SDK projects beside their installer; runner npm configuration
+# still controls the registry, not the development projects' .npmrc files.
+for variant in node typescript; do
+  sdk_project="${DESTINATION}/copilot-sdk/${variant}"
+  mkdir -p "$sdk_project"
+  cp "${SCRIPT_DIR}/copilot-sdk/${variant}/package.json" \
+    "${SCRIPT_DIR}/copilot-sdk/${variant}/package-lock.json" "$sdk_project/"
+done
+
 if ! bash "${DESTINATION}/runtime_trust_inventory.sh"; then
   echo "::warning::Runtime TLS inventory inspection failed; trust status unknown. Continuing setup; artifact-integrity checks remain required."
 fi

@@ -139,7 +139,7 @@ func extractCopilotSDKPackages(data *WorkflowData, ecosystem string) []string {
 	switch ecosystem {
 	case "npm":
 		if spec.npm != nil {
-			return []string{spec.npm.sdkSpec}
+			return []string{"@github/copilot-sdk@" + string(constants.DefaultCopilotSDKVersion)}
 		}
 	case "pip":
 		// The SDK command has a --target argument, which the general
