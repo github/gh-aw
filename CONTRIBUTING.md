@@ -551,6 +551,8 @@ For comprehensive testing guidelines including assert vs require usage, table-dr
 Quick reference:
 - `make test-unit` - Impacted Go tests (30-second selected-runtime budget; compilation is additional)
 - `make test-unit-all` - Full Go unit test suite
+- `make test-unit-fast` - All unit tests except measured >=10s tests
+- `make test-unit-slow` - Only measured >=10s unit tests
 - `make agent-report-progress` - Final branch-scoped validation before pushing
 - `make agent-finish` - Explicit repository-wide maintenance sweep; not an inner-loop command
 
@@ -622,8 +624,8 @@ suite. Any intermediate probability, refusal, missing/duplicate/unknown answer,
 malformed JSON, non-200 status, 10-second deadline, or more than 16 KiB of response
 data forces all suites. The adapter preserves normalized replay responses such
 as `{"suite_ids":["build-wasm"],"confidence":0.95}`. Selected jobs retain
-their direct and transitive prerequisites: `test` requires
-`verify-integration-build`, `canary-go` requires `test`, and `security`,
+their direct and transitive prerequisites: `test` and `test-slow` require
+`verify-integration-build`, `canary-go` requires both unit suites, and `security`,
 `security-scan`, and `cross-platform-build` require `build`.
 Invalid IDs or missing prerequisites are rejected before reaching downstream job
 conditions. A skipped or failed decision job, step failure, or missing outputs
@@ -643,9 +645,62 @@ control for missed regressions.
 `.github/ci/suite-catalog.json` has schema version 1 and entries with a stable
 `id`, short `description`, `mandatory` flag, and
 `historical_duration_seconds` (nonnegative seconds, or `null` for unknown).
-All `mandatory` flags are false. IDs match the 24 selectable CGO check jobs.
+All `mandatory` flags are false. IDs match the 25 selectable CGO check jobs.
 Adding a suite requires updating both the catalog and the runtime's fixed ID
 list, plus job wiring and tests. Never invent historical durations.
+
+### CGO unit-test timing
+
+The split uses completed top-level `pass`/`fail` events (not subtests) from
+[failed run 44921173289](https://github.com/github/gh-aw/actions/runs/44921173289)
+and [successful run 44880152498](https://github.com/github/gh-aw/actions/runs/44880152498),
+both on 2026-11-21. The ten slowest tests by maximum observed elapsed time:
+
+| Test | Package | Failed-run seconds | Successful-run seconds |
+|------|---------|-------------------:|-----------------------:|
+| `TestRepositoryAgenticWorkflows` | `pkg/workflow/lint` | 103.57 | 130.67 |
+| `TestRepositoryWorkflowsCompileWithoutEmitting` | `pkg/workflow` | 45.80 | 57.81 |
+| `TestLastAttemptCompletionCanSpendReservedClosureBytes` | `pkg/workqueue` | 50.39 | 44.70 |
+| `TestLinearAutomaticLookupFrozenHosts` | `pkg/workflow` | 35.79 | 33.71 |
+| `TestAzureBoundedReadersBundledNode` | `pkg/workflow` | 25.72 | 23.42 |
+| `TestCompileJSONOptionalScannerFindings` | `pkg/cli` | 15.05 | 22.00 |
+| `TestLintCacheModeLiteralsCLI` | `pkg/cli` | 19.12 | 20.29 |
+| `TestAzureDevOpsConnectorBundledNodeResponseIdentity` | `pkg/workflow` | 19.77 | 18.42 |
+| `TestNestedImportHashGoJavaScriptParity` | `pkg/parser` | 13.39 | 18.76 |
+| `TestUpdateUpgradeAutoMergeOrgDispatchErrors` | `pkg/cli` | 16.01 | 16.01 |
+
+The failed H-J shard's test step lasted 212 seconds, but its failure,
+`TestJavaScriptSummaryCatalogSourceIdentity`, took 0.00 seconds. Its reviewed
+runtime source hash no longer matched the source. This is an assertion failure,
+not a timeout or a slow-test failure; it remains in the fast suite. Compilation,
+setup and preceding tests delay feedback even for instantaneous failures.
+The A and N-R shards' longest package durations were 153.56 and 166.35 seconds.
+
+`.github/ci/go-unit-slow-tests.json` records the 20 tests taking at least
+10 seconds in either run, their packages, maxima, and four slow shards.
+The `test` job retains 12 alphabetical fast shards and excludes exactly those
+top-level names with `-skip`. `test-slow` runs those names with anchored `-run`
+patterns and five-minute package timeouts. Shared steps preserve coverage and
+failure artifacts under unique shard names. New tests default to fast; refresh
+the manifest from complete CGO artifacts when timings change. Move a whole
+top-level test, including all subtests, and keep its shard unique.
+
+The front door assesses both suites independently; selecting the coverage
+canary retains both. Main pushes, scheduled controls, and invalid/missing
+decisions still run both. Their new runner durations remain `null` in the
+catalog until measured: per-test times and old shard times cannot establish
+split-suite runner-minutes or a guaranteed fast-suite wall-clock budget.
+Local `test-unit-fast` and `test-unit-slow` retain the full suite's `-short`
+behavior; CI retains its existing non-short behavior.
+
+Download existing artifacts and rank tests without double-counting subtests:
+
+```bash
+gh run download RUN_ID --pattern 'test-result-cgo-unit-*' --dir "$TMPDIR/cgo-results"
+find "$TMPDIR/cgo-results" -name '*.json' -exec cat {} + |
+  jq -r 'select((.Action == "pass" or .Action == "fail") and .Test != null and (.Test | contains("/") | not)) | [.Elapsed, .Package, .Test, .Action] | @tsv' |
+  sort -rn | head -20
+```
 
 Run `node --test scripts/ci-front-door.test.cjs scripts/ci-front-door-workflow.test.cjs`
 for selector and workflow trust-boundary conformance checks.
