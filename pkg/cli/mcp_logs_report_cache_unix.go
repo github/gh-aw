@@ -11,6 +11,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strconv"
 	"sync"
 	"syscall"
 
@@ -206,7 +207,7 @@ func validateMCPLogsTempDirectory(dir string) error {
 	mode := info.Mode()
 	owner := "unknown"
 	if ok {
-		owner = fmt.Sprint(stat.Uid)
+		owner = strconv.FormatUint(uint64(stat.Uid), 10)
 	}
 	euid := uint32(os.Geteuid())
 	if !ok || !info.IsDir() || (stat.Uid != 0 && stat.Uid != euid) ||

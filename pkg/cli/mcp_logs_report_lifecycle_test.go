@@ -48,7 +48,9 @@ func TestMCPLogsReportLifecycle(t *testing.T) {
 	require.ErrorIs(t, err, fs.ErrNotExist)
 	data, err := os.ReadFile(other)
 	require.NoError(t, err)
-	require.Equal(t, report, string(data))
+	if string(data) != report {
+		t.Fatalf("report bytes changed after closing another cache: got %q, want %q", data, report)
+	}
 	_, err = first.store(report)
 	require.ErrorContains(t, err, "cache is closed")
 }
