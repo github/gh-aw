@@ -67,6 +67,8 @@ Wrap each custom step's `run:` block in a shell preamble that sets and unsets th
 3. `stop_difc_proxy.sh` **MUST** be responsible only for stopping the proxy container and removing the CA certificate.
 4. `stop_difc_proxy.sh` **MUST NOT** read from or write to `$GITHUB_ENV` for the purpose of restoring or clearing proxy routing vars.
 
+The pre-agent proxy serves runner-side clients. It listens on `127.0.0.1` in host-network mode. In bridge mode Docker publishes the port on host loopback and forwards requests to the container's bridge address.
+
 ### Conformance
 
 An implementation is considered conformant with this ADR if it satisfies all **MUST** and **MUST NOT** requirements above. Specifically: proxy routing vars appear only as step-level `env:` blocks on custom steps (never in `$GITHUB_ENV` writes within the proxy scripts); proxy routing vars (`GH_HOST`, `GH_REPO`, `GITHUB_API_URL`, `GITHUB_GRAPHQL_URL`, `NODE_EXTRA_CA_CERTS`) take precedence and overwrite any user-defined values for those keys; and all other step env vars are preserved. Failure to meet any **MUST** or **MUST NOT** requirement constitutes non-conformance.

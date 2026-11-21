@@ -7,6 +7,8 @@ sidebar:
 
 The [`mcp-scripts:`](/gh-aw/reference/glossary/#mcp-scripts) element allows you to define custom [MCP](/gh-aw/reference/glossary/#mcp-model-context-protocol) (Model Context Protocol) tools directly in your workflow [frontmatter](/gh-aw/reference/glossary/#frontmatter) using JavaScript, shell scripts, or Python. These tools are generated at runtime and run as an HTTP MCP server **on the GitHub Actions runner, outside the agent container**. The agent reaches the server via `host.docker.internal`, keeping tool execution isolated from the AI sandbox while still providing controlled secret access.
 
+The server rejects requests that include an `Origin` header. Gateway and CLI clients omit this header; MCP requests still require the API key in `Authorization`.
+
 > [!WARNING]
 > **MCP Scripts run outside the agent sandbox and must only implement READ-ONLY operations.**
 >

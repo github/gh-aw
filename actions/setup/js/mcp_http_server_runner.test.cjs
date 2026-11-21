@@ -87,7 +87,7 @@ describe("mcp_http_server_runner.cjs - runHttpServer", () => {
     }
   });
 
-  it("sets CORS headers on every response", async () => {
+  it("does not advertise browser access on an authenticated MCP response", async () => {
     const transport = makeMockTransport();
     const logger = makeMockLogger();
     currentServer = await runHttpServer({
@@ -103,12 +103,15 @@ describe("mcp_http_server_runner.cjs - runHttpServer", () => {
     await new Promise(r => currentServer.once("listening", r));
 
     const res = await request(currentServer, { method: "POST", path: "/", body: '{"jsonrpc":"2.0","id":1,"method":"ping"}' });
-    expect(res.headers["access-control-allow-origin"]).toBe("*");
-    expect(res.headers["access-control-allow-methods"]).toContain("POST");
-    expect(res.headers["access-control-allow-headers"]).toContain("Authorization");
+    expect(res.statusCode).toBe(200);
+    expect(res.headers).not.toHaveProperty("access-control-allow-origin");
   });
 
-  it("responds 200 to OPTIONS preflight without calling transport", async () => {
+  it.each([
+    ["OPTIONS", "/"],
+    ["POST", "/"],
+    ["GET", "/health"],
+  ])("rejects an Origin header on %s %s before routing", async (method, path) => {
     const transport = makeMockTransport();
     const logger = makeMockLogger();
     currentServer = await runHttpServer({
@@ -121,8 +124,9 @@ describe("mcp_http_server_runner.cjs - runHttpServer", () => {
     });
     await new Promise(r => currentServer.once("listening", r));
 
-    const res = await request(currentServer, { method: "OPTIONS", path: "/", headers: { Authorization: "" } });
-    expect(res.statusCode).toBe(200);
+    const res = await request(currentServer, { method, path, headers: { Origin: "https://example.test" } });
+    expect(res.statusCode).toBe(403);
+    expect(res.headers).not.toHaveProperty("access-control-allow-origin");
     expect(transport.calls).toHaveLength(0);
   });
 
@@ -148,7 +152,7 @@ describe("mcp_http_server_runner.cjs - runHttpServer", () => {
     expect(payload.tools).toBe(42);
   });
 
-  it("responds 405 for non-POST methods other than GET /health and OPTIONS", async () => {
+  it("responds 405 for non-POST methods other than GET /health", async () => {
     const transport = makeMockTransport();
     const logger = makeMockLogger();
     currentServer = await runHttpServer({

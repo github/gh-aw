@@ -91,6 +91,7 @@ describe("mcp_scripts_mcp_server_http.cjs integration", () => {
     it("should initialize with proper MCP protocol response", async () => {
       const response = await makeRequest({ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2024-11-05", clientInfo: { name: "test-client", version: "1.0.0" }, capabilities: {} } });
       (expect(response.status).toBe(200),
+        expect(response.headers).not.toHaveProperty("access-control-allow-origin"),
         expect(response.data.jsonrpc).toBe("2.0"),
         expect(response.data.id).toBe(1),
         expect(response.data.result).toBeDefined(),
@@ -142,17 +143,6 @@ describe("mcp_scripts_mcp_server_http.cjs integration", () => {
       expect(serverOutput).not.toContain("second-line");
       expect(serverOutput).toContain("[REDACTED]");
     }),
-    it("should handle CORS preflight requests", async () =>
-      new Promise((resolve, reject) => {
-        const req = http.request({ hostname: "localhost", port: 4100, path: "/", method: "OPTIONS" }, res => {
-          (expect(res.statusCode).toBe(200),
-            expect(res.headers["access-control-allow-origin"]).toBe("*"),
-            expect(res.headers["access-control-allow-methods"]).toContain("POST"),
-            expect(res.headers["access-control-allow-headers"]).toContain("Content-Type"),
-            resolve());
-        });
-        (req.on("error", reject), req.end());
-      })),
     it("should reject invalid HTTP methods", async () =>
       new Promise((resolve, reject) => {
         const req = http.request({ hostname: "localhost", port: 4100, path: "/", method: "PUT" }, res => {
