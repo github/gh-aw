@@ -126,7 +126,7 @@ async function runHttpServer(options) {
       res.end(JSON.stringify({ error: message }));
     }
 
-    // The gateway, agent CLI, and runner health checks do not send Origin.
+    // The default gateway configuration and runner health checks do not set Origin.
     if (req.headers.origin !== undefined) {
       rejectRequest(403, "Origin not allowed");
       return;

@@ -3,6 +3,7 @@
 **Date**: 2026-04-15
 **Status**: Accepted
 **Deciders**: lpcox, Copilot
+**Amended**: 2026-11-21 (PR #79924): restrict the pre-agent proxy's host listener to loopback in both Docker network modes.
 
 ---
 

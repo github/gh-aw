@@ -7,7 +7,7 @@ sidebar:
 
 The [`mcp-scripts:`](/gh-aw/reference/glossary/#mcp-scripts) element allows you to define custom [MCP](/gh-aw/reference/glossary/#mcp-model-context-protocol) (Model Context Protocol) tools directly in your workflow [frontmatter](/gh-aw/reference/glossary/#frontmatter) using JavaScript, shell scripts, or Python. These tools are generated at runtime and run as an HTTP MCP server **on the GitHub Actions runner, outside the agent container**. The agent reaches the server via `host.docker.internal`, keeping tool execution isolated from the AI sandbox while still providing controlled secret access.
 
-The server rejects requests that include an `Origin` header. Gateway and CLI clients omit this header; MCP requests still require the API key in `Authorization`.
+The server rejects requests that include an `Origin` header. See [HTTP Transport Limits](#http-transport-limits) for authentication and method requirements.
 
 > [!WARNING]
 > **MCP Scripts run outside the agent sandbox and must only implement READ-ONLY operations.**
@@ -37,7 +37,9 @@ The agent can now call `greet-user` with a `name` parameter.
 
 ## HTTP Transport Limits
 
-Generated workflows create a per-run API key and configure the MCP gateway to send it verbatim in the `Authorization` header. The HTTP server requires `GH_AW_MCP_SCRIPTS_API_KEY` at startup and rejects missing or incorrect request credentials with HTTP 401. `GET /health` and `OPTIONS` preflight requests remain unauthenticated.
+Generated workflows create a per-run API key and configure the MCP gateway to send it verbatim in the `Authorization` header. The HTTP server requires `GH_AW_MCP_SCRIPTS_API_KEY` at startup and rejects MCP requests with missing or incorrect credentials with HTTP 401.
+
+Requests with an `Origin` header return HTTP 403 before method or authentication checks. Without an `Origin` header, `GET /health` does not require authentication, and `OPTIONS` returns HTTP 405.
 
 Request bodies are limited to 1 MiB, including chunked uploads. Oversized requests return HTTP 413; malformed JSON returns HTTP 400. Headers and body uploads each have a 30-second timeout. The upload deadline does not limit tool execution time.
 
