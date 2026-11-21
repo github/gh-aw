@@ -35,7 +35,11 @@ func (cache *mcpLogsReportCache) store(report string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("open private logs cache: %w", err)
 	}
-	defer root.Close()
+	defer func() {
+		if err := root.Close(); err != nil {
+			mcpLogsGuardrailLog.Printf("Failed to close private logs cache: %v", err)
+		}
+	}()
 	info, err := root.Stat(".")
 	if err != nil || !os.SameFile(cache.info, info) || !isPrivateMCPLogsDirectory(info) {
 		return "", errors.New("logs cache directory changed or is not owner-private")
@@ -72,7 +76,7 @@ func (cache *mcpLogsReportCache) prepare() error {
 	base := cache.tempDir
 	shared := false
 	if base == "" {
-		base = os.Getenv("GH_AW_MCP_LOGS_REPORT_DIR")
+		base = os.Getenv("GH_AW_MCP_LOGS_REPORT_DIR") //nolint:osgetenvlibrary // Set by the MCP gateway for this server process.
 		shared = base != ""
 	}
 	if base == "" {
@@ -99,7 +103,9 @@ func (cache *mcpLogsReportCache) prepare() error {
 	}
 	info, err := os.Lstat(dir)
 	if err != nil || !isPrivateMCPLogsDirectory(info) {
-		_ = os.Remove(dir) // The new directory is still empty.
+		if err := os.Remove(dir); err != nil {
+			return fmt.Errorf("new logs cache directory is not owner-private; cleanup failed: %w", err)
+		}
 		return errors.New("new logs cache directory is not owner-private")
 	}
 	cache.dir, cache.info = dir, info

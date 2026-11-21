@@ -1726,7 +1726,7 @@ describe("start_mcp_gateway normalizeSinkVisibilityEncoding", () => {
 
 describe("start_mcp_gateway extractOptionalServerNames", () => {
   it("writes explicit required settings before extracting them for gateway startup", () => {
-    const directory = fs.mkdtempSync(path.join(os.tmpdir(), "gh-aw-mcp-required-"));
+    const directory = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "gh-aw-mcp-required-")));
     try {
       const configObj = { mcpServers: { optional: { type: "http", required: false } } };
       writeMcpConfiguration(directory, configObj);
