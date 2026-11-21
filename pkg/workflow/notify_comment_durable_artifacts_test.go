@@ -13,7 +13,7 @@ import (
 )
 
 func TestUsageArtifactUploadIncludesDurableSessionMetadata(t *testing.T) {
-	steps := strings.Join(buildUsageArtifactUploadStep("", func(action string) string { return action }), "")
+	steps := strings.Join(buildUsageArtifactUploadStep("", false, func(action string) string { return action }), "")
 	require.Equal(t, 2, strings.Count(steps, "            /tmp/gh-aw/usage/agent/durable-session.jsonl\n"),
 		"both the initial upload and retry must preserve raw durable metadata")
 }

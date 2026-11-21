@@ -144,7 +144,7 @@ func (c *Compiler) appendConclusionUsageSteps(steps []string, data *WorkflowData
 	// Admission still runs in dry-run mode; record its decision without applying
 	// its budget to agent, detection, or evals execution.
 	steps = append(steps, buildUsageActivityGenerationStep(data.AdmissionEnabled, hasMaxDailyAICGuardrail(data), !isWorkQueueParticipant(data) && conclusionReportFailedJobsEnabled(data), c.getActionPin, usageEnv...)...)
-	steps = append(steps, buildUsageArtifactUploadStep(artifactPrefixExprForDownstreamJob(data), c.getActionPin)...)
+	steps = append(steps, buildUsageArtifactUploadStep(artifactPrefixExprForDownstreamJob(data), usesExperimentsBroker(data), c.getActionPin)...)
 	if data.AdmissionEnabled {
 		if err := validateAdmissionWorkflowHashes(data); err != nil {
 			return nil, err
@@ -355,10 +355,10 @@ func buildUsageArtifactUploadSteps(prefix string, hasEvals bool, experimentArtif
 func buildUsageArtifactPublishSteps(prefix string, hasDetection, hasDailyAICGuardrail, reuseJobDurations bool, pinAction func(string) string, gradersEnv ...string) []string {
 	steps := buildUsageArtifactCollectionStep(hasDetection)
 	steps = append(steps, buildUsageActivityGenerationStep(false, hasDailyAICGuardrail, reuseJobDurations, pinAction, gradersEnv...)...)
-	return append(steps, buildUsageArtifactUploadStep(prefix, pinAction)...)
+	return append(steps, buildUsageArtifactUploadStep(prefix, false, pinAction)...)
 }
 
-func buildUsageArtifactUploadStep(prefix string, pinAction func(string) string) []string {
+func buildUsageArtifactUploadStep(prefix string, broker bool, pinAction func(string) string) []string {
 	var steps []string
 	usageArtifactUploadAction := pinAction("actions/upload-artifact")
 	usageArtifactUploadWithLines := []string{
@@ -390,9 +390,12 @@ func buildUsageArtifactUploadStep(prefix string, pinAction func(string) string) 
 		"            /tmp/gh-aw/usage/experiment/state.jsonl\n",
 		"            /tmp/gh-aw/usage/experiment/state.json\n",
 		"            /tmp/gh-aw/usage/experiment/assignments.json\n",
-		"            /tmp/gh-aw/usage/activity/summary.json\n            /tmp/gh-aw/usage/activity/experiment-results.json\n",
-		"          if-no-files-found: ignore\n",
+		"            /tmp/gh-aw/usage/activity/summary.json\n",
 	}
+	if broker {
+		usageArtifactUploadWithLines = append(usageArtifactUploadWithLines, "            /tmp/gh-aw/usage/activity/experiment-results.json\n")
+	}
+	usageArtifactUploadWithLines = append(usageArtifactUploadWithLines, "          if-no-files-found: ignore\n")
 	retryUsageArtifactUploadWithLines := append([]string{}, usageArtifactUploadWithLines...)
 	retryUsageArtifactUploadWithLines = append(retryUsageArtifactUploadWithLines, "          overwrite: true\n")
 	steps = append(steps,

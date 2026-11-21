@@ -144,11 +144,12 @@ func TestExperimentsBrokerCompiledWorkflow(t *testing.T) {
 				assert.Contains(t, reportSection, "GH_AW_EXPERIMENT_INVOCATION_ID: "+reportInvocation)
 				assert.Contains(t, reportSection, "name: "+artifact)
 				assert.Contains(t, reportSection, "name: "+artifactPrefixExprForDownstreamJob(data)+"usage")
-				assert.Contains(t, extractJobSection(generated, "conclusion"), "/tmp/gh-aw/usage/activity/experiment-results.json")
+				assert.Equal(t, 2, strings.Count(extractJobSection(generated, "conclusion"), "/tmp/gh-aw/usage/activity/experiment-results.json"))
 			} else {
 				assert.Contains(t, pickScript, "pick_experiment.cjs")
 				assert.NotContains(t, generated, "/experiments_broker.cjs")
 				assert.NotContains(t, generated, "GH_AW_EXPERIMENTS_BROKER_URL")
+				assert.NotContains(t, extractJobSection(generated, "conclusion"), "/tmp/gh-aw/usage/activity/experiment-results.json")
 				if tc.storage == "broker" {
 					assert.NotContains(t, activation.Permissions, "id-token", "admission=%v dryRun=%v safeOutputBroker=%v", data.AdmissionEnabled, data.DryRun, usesTokenBrokerSafeOutputs(data))
 				}
