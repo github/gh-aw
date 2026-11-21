@@ -159,6 +159,8 @@ Compile each work-queue workflow phase.
 		strings.Index(safeOutputs, "Finish work queue claim"),
 		"the finish commit records the effects applied by ordinary safe-output handlers",
 	)
+	processSafeOutputs := safeOutputs[strings.Index(safeOutputs, "id: process_safe_outputs"):strings.Index(safeOutputs, "Finish work queue claim")]
+	require.Contains(t, processSafeOutputs, "GH_AW_WORK_QUEUE_POLICY", "worker effect authorization resolves effect_scope from the compiled policy")
 	require.Contains(t, safeOutputs, "needs.activation.outputs.work_queue_assignment_settled != 'true'")
 	require.Contains(t, agent, "needs.activation.outputs.work_queue_assignment_settled != 'true'")
 	require.Contains(t, activation, "work_queue_assignment_settled: ${{ steps.work_queue_snapshot.outputs.work_queue_assignment_settled }}")

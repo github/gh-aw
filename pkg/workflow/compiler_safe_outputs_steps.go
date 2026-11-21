@@ -186,6 +186,10 @@ func (c *Compiler) buildHandlerManagerStep(data *WorkflowData) ([]string, error)
 	steps = append(steps, "          GH_AW_JOB_CHECK_RUN_ID: ${{ job.check_run_id }}\n")
 	if workQueueRequiresAssignment(data) {
 		steps = append(steps, "          GH_AW_WORK_QUEUE_EFFECTS: "+constants.WorkQueueEffectsPath+"\n")
+		// Effect authorization resolves the Claim's effect_scope from the compiled policy.
+		if data.WorkQueuePolicy != nil && data.WorkQueuePolicy.PolicyJSON != "" {
+			steps = append(steps, workQueuePolicyJSONEnvironment(data.WorkQueuePolicy.PolicyJSON)...)
+		}
 	}
 	if err := c.addSafeOutputCoreEnvVars(&steps, data); err != nil {
 		return nil, err
