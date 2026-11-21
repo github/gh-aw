@@ -196,6 +196,34 @@ describe("shared Docker daemon lease", () => {
     }
   });
 
+  it("cleans owned DIFC host state even when Docker teardown inspection fails", () => {
+    const bin = path.join(root, "host-cleanup-bin");
+    const actions = path.join(root, "runner-temp", "gh-aw", "actions");
+    const owner = "a".repeat(64);
+    const stateFile = path.join(actions, "proxy-host-state");
+    fs.mkdirSync(bin);
+    fs.mkdirSync(actions, { recursive: true });
+    fs.writeFileSync(path.join(bin, "node"), "#!/bin/sh\nexit 0\n", { mode: 0o700 });
+    fs.writeFileSync(path.join(bin, "docker"), "#!/bin/sh\nexit 1\n", { mode: 0o700 });
+    fs.writeFileSync(stateFile, `${owner}\t\tfalse\n`, { mode: 0o600 });
+
+    const result = spawnSync("bash", [path.resolve(__dirname, "../sh/stop_difc_proxy.sh")], {
+      env: {
+        ...process.env,
+        RUNNER_ENVIRONMENT: "self-hosted",
+        RUNNER_TEMP: path.join(root, "runner-temp"),
+        GH_AW_DOCKER_OWNER: owner,
+        GH_AW_NODE: path.join(bin, "node"),
+        PATH: `${bin}:${process.env.PATH}`,
+      },
+      encoding: "utf8",
+    });
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain("DIFC proxy teardown was incomplete");
+    expect(fs.existsSync(stateFile)).toBe(false);
+  });
+
   it("acquires before setup's first shared filesystem deletion and releases last", () => {
     const setup = fs.readFileSync(path.resolve(__dirname, "../setup.sh"), "utf8");
     const acquireIndex = setup.indexOf('docker_lease.cjs" acquire');

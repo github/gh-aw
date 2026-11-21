@@ -18,6 +18,7 @@ DIFC_PROXY_CA_CERT="/usr/local/share/ca-certificates/awmg-proxy-difc.crt"
 OWNER="${GH_AW_DOCKER_OWNER:-}"
 LEASE_VALIDATED=true
 TEARDOWN_FAILED=false
+HOST_CLEANUP_FAILED=false
 
 if [[ "${RUNNER_ENVIRONMENT:-}" == "self-hosted" ]]; then
   GH_AW_NODE="${GH_AW_NODE:-${GH_AW_NODE_BIN:-$(command -v node 2>/dev/null || true)}}"
@@ -63,6 +64,7 @@ if [[ -e "$HOST_STATE_FILE" || -L "$HOST_STATE_FILE" ]]; then
   if [[ -L "${RUNNER_TEMP}/gh-aw/actions" || -L "$HOST_STATE_FILE" || ! -f "$HOST_STATE_FILE" ]]; then
     echo "::error::Refusing to read an unsafe DIFC proxy host-state file." >&2
     TEARDOWN_FAILED=true
+    HOST_CLEANUP_FAILED=true
   else
     IFS=$'\t' read -r state_owner ca_hash remote_added < "$HOST_STATE_FILE"
     if [[ "${RUNNER_ENVIRONMENT:-}" != "self-hosted" || "$state_owner" == "$OWNER" ]]; then
@@ -70,6 +72,7 @@ if [[ -e "$HOST_STATE_FILE" || -L "$HOST_STATE_FILE" ]]; then
     else
       echo "::error::DIFC proxy host-state belongs to another invocation; leaving it untouched." >&2
       TEARDOWN_FAILED=true
+      HOST_CLEANUP_FAILED=true
     fi
   fi
 fi
@@ -78,7 +81,10 @@ if [[ "$HOST_STATE_OWNED" == "true" ]]; then
   if [[ "$remote_added" == "true" ]]; then
     expected_remote="https://localhost:18443/${GITHUB_REPOSITORY}.git"
     if [[ "$(git remote get-url proxy 2>/dev/null || true)" == "$expected_remote" ]]; then
-      git remote remove proxy || TEARDOWN_FAILED=true
+      if ! git remote remove proxy; then
+        HOST_CLEANUP_FAILED=true
+        TEARDOWN_FAILED=true
+      fi
     fi
   fi
 
@@ -91,20 +97,25 @@ if [[ "$HOST_STATE_OWNED" == "true" ]]; then
           current_hash="$(shasum -a 256 "$DIFC_PROXY_CA_CERT" | awk '{print $1}')"
         fi
         if [[ "$current_hash" == "$ca_hash" ]]; then
-          sudo rm -f "$DIFC_PROXY_CA_CERT" || CA_STATE_SAFE=false
+          if ! sudo rm -f "$DIFC_PROXY_CA_CERT"; then
+            CA_STATE_SAFE=false
+            HOST_CLEANUP_FAILED=true
+          fi
         else
           echo "::error::DIFC proxy CA changed after installation; leaving the replacement certificate untouched." >&2
           CA_STATE_SAFE=false
         fi
       fi
       if [[ "$CA_STATE_SAFE" == "true" ]] && ! sudo update-ca-certificates; then
+        HOST_CLEANUP_FAILED=true
         TEARDOWN_FAILED=true
       elif [[ "$CA_STATE_SAFE" == "false" ]]; then
+        HOST_CLEANUP_FAILED=true
         TEARDOWN_FAILED=true
       fi
     fi
 
-  if [[ "$TEARDOWN_FAILED" == "false" ]]; then
+  if [[ "$HOST_CLEANUP_FAILED" == "false" ]]; then
     rm -f "$HOST_STATE_FILE"
   fi
 fi
