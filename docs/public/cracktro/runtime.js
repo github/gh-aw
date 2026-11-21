@@ -1285,38 +1285,69 @@
     });
     // Touch: a horizontal swipe steps along the main line, a vertical one walks the column or switches bands, and a
     // tap on a jump target opens it on touchend (cancelling the synthetic click), so taps work even when the browser
-    // withholds the click. A two-finger pinch in zooms out to the slide map (unless the page itself is zoomed in, so the
-    // browser's own zoom still works); touches in the notes, dialogs or form fields are ignored.
+    // withholds the click. A two-finger pinch in opens the map at normal page scale.
     let tx = null,
       ty = null,
-      pinch0 = null;
-    const touchIgnored = t => fz.open || smp.open || !!t.closest?.(".notes, .fz, .smp, input, textarea, select, [contenteditable]");
+      pinch0 = null,
+      ownsPinch = false;
+    const touchIgnored = t => fz.open || smp.open || !!t.closest?.(".notes, dialog, input, textarea, select, [contenteditable]");
+    const pageZoomed = () => (window.visualViewport?.scale ?? 1) > 1.01;
     const spread = ts => Math.hypot(ts[0].clientX - ts[1].clientX, ts[0].clientY - ts[1].clientY);
+    const webkitGestures = "GestureEvent" in window;
+    const cancelGesture = e => {
+      if (ownsPinch && e.cancelable) e.preventDefault();
+    };
     addEventListener(
       "touchstart",
       e => {
         tx = ty = pinch0 = null;
+        if (ownsPinch) cancelGesture(e);
         if (touchIgnored(e.target)) return;
-        if (e.touches.length === 2) pinch0 = spread(e.touches);
+        if (e.touches.length === 2 && !pageZoomed() && !Array.from(e.touches).some(t => touchIgnored(t.target))) {
+          pinch0 = spread(e.touches);
+          // Claim the sequence on the second finger, before Safari can start its tab overview gesture.
+          ownsPinch = webkitGestures;
+          cancelGesture(e);
+        }
         if (e.touches.length !== 1) return;
         tx = e.touches[0].clientX;
         ty = e.touches[0].clientY;
       },
-      { passive: true }
+      { passive: !webkitGestures }
     );
     addEventListener(
       "touchmove",
       e => {
+        cancelGesture(e);
         if (e.touches.length > 1) tx = ty = null;
-        if (pinch0 == null || e.touches.length !== 2 || (visualViewport?.scale ?? 1) > 1.01) return;
+        if (pinch0 == null || e.touches.length !== 2 || pageZoomed() || touchIgnored(e.target)) return;
         if (spread(e.touches) < pinch0 * 0.7) {
           pinch0 = null;
           openMap();
         }
       },
-      { passive: true }
+      { passive: !webkitGestures }
     );
-    addEventListener("touchcancel", () => (tx = ty = pinch0 = null));
+    // WebKit can also deliver proprietary gesture events for the same touches.
+    if (webkitGestures) {
+      for (const type of ["gesturestart", "gesturechange", "gestureend"]) addEventListener(type, cancelGesture, { passive: false, capture: true });
+    }
+    const endPinch = e => {
+      if (e.touches.length < 2) {
+        pinch0 = null;
+        ownsPinch = false;
+      }
+    };
+    // Reset even if the map opened mid-gesture and stopped the bubbling touchend.
+    addEventListener("touchend", endPinch, { capture: true, passive: true });
+    addEventListener(
+      "touchcancel",
+      () => {
+        ownsPinch = false;
+        tx = ty = pinch0 = null;
+      },
+      { capture: true, passive: true }
+    );
     addEventListener(
       "touchend",
       e => {
