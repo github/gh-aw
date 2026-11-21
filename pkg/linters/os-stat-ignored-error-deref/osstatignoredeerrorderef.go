@@ -35,6 +35,9 @@ func run(pass *analysis.Pass) (any, error) {
 			if !ok || pkgPath != "os" || (funcName != "Stat" && funcName != "Lstat") {
 				return true
 			}
+			if len(assign.Lhs) == 0 {
+				return true
+			}
 			result, ok := astutil.UnwrapParenExpr(assign.Lhs[0]).(*ast.Ident)
 			if !ok {
 				return true
@@ -109,15 +112,11 @@ func guardedByNilCheck(pass *analysis.Pass, file *ast.File, object types.Object,
 				guarded = true
 			}
 		case *ast.BlockStmt:
-			useIndex := -1
-			for i, stmt := range node.List {
+			for _, stmt := range node.List {
 				if nodeContains(stmt, use) {
-					useIndex = i
 					break
 				}
-			}
-			for i := 0; i >= 0 && i < useIndex; i++ {
-				guard, ok := node.List[i].(*ast.IfStmt)
+				guard, ok := stmt.(*ast.IfStmt)
 				if !ok {
 					continue
 				}
@@ -157,7 +156,11 @@ func terminatesBlock(block *ast.BlockStmt) bool {
 	if block == nil || len(block.List) == 0 {
 		return false
 	}
-	return terminatesStatement(block.List[len(block.List)-1])
+	var last ast.Stmt
+	for _, stmt := range block.List {
+		last = stmt
+	}
+	return terminatesStatement(last)
 }
 
 func terminatesStatement(stmt ast.Stmt) bool {
