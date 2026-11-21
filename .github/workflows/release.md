@@ -623,6 +623,15 @@ jobs:
           name: release-binaries-${{ needs.config.outputs.release_tag }}
           path: dist/
 
+      - name: Verify release asset checksums
+        working-directory: dist
+        run: sha256sum --check checksums.txt
+
+      - name: Attest release assets
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: dist/*
+
       - name: Create GitHub release
         id: get_release
         env:
