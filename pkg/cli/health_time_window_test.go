@@ -116,6 +116,8 @@ func TestHealthTimeWindowReachesSamplingAndJSON(t *testing.T) {
 			args := []string{"--repo", "org/repo", "--json", "--start-date", start, "--end-date", end}
 			if detailed {
 				args = append(args, "example")
+			} else {
+				args = append(args, "--all-branches")
 			}
 			output := captureAuditGroupStdout(t, func() {
 				cmd := NewHealthCommand()
@@ -180,7 +182,7 @@ func TestHealthDaysOnlyPeriodThroughCommand(t *testing.T) {
 
 	output := captureAuditGroupStdout(t, func() {
 		cmd := NewHealthCommand()
-		cmd.SetArgs([]string{"--repo", "org/repo", "--json", "--days", "7"})
+		cmd.SetArgs([]string{"--all-branches", "--repo", "org/repo", "--json", "--days", "7"})
 		require.NoError(t, cmd.Execute())
 	})
 	var report struct {

@@ -1171,37 +1171,39 @@ Observed models are aggregated from `summary.json` token usage, per-run token us
 Display workflow health metrics and success rates.
 
 ```bash wrap
-gh aw health                       # Summary of all workflows (last 7 days)
+gh aw health                       # Default-branch fleet report (last 7 days)
 gh aw health issue-monster         # Detailed metrics for specific workflow
 gh aw health --days 30             # Summary for last 30 days
 gh aw health --threshold 90        # Warn if below 90% success rate
 gh aw health --json                # Output in JSON format
 gh aw health --start-date -24h      # Evidence from the last 24 hours
 gh aw health --timeout 30s --json   # Return available evidence within a 30-second collection budget
-gh aw health --fleet --start-date=-24h --timeout 30s --checkpoint ./health-checkpoint.json --json
-gh aw health --fleet --checkpoint ./health-checkpoint.json --timeout 2m --json
+gh aw health --start-date=-24h --timeout 30s --checkpoint ./health-checkpoint.json --json
+gh aw health --checkpoint ./health-checkpoint.json --timeout 2m --json
 gh aw health --start-date 2026-10-14T04:49:11Z  # Evidence since a release timestamp
 gh aw health --start-date 2026-10-14 --end-date 2026-10-15  # Bounded window
 gh aw health issue-monster --days 90  # 90-day metrics for workflow
 ```
 
-**Options:** `--days`, `--start-date`, `--end-date`, `--logs-dir`, `--timeout`, `--threshold`, `--repo/-r`, `--json/-j`, `--fleet`, `--checkpoint`, `--full`
+**Options:** `--days`, `--start-date`, `--end-date`, `--logs-dir`, `--timeout`, `--threshold`, `--repo/-r`, `--json/-j`, `--checkpoint`, `--full`, `--all-branches`
 
-`--fleet` selects a compact report for active agentic workflows on the default branch, excluding pull request events. It inventories historical Actions conclusions first, including skipped runs, then checks sampled runs against the pinned workflow revision. Historical outcomes and current-revision verdicts are separate. Coverage reports which phases finished, what remains, and why collection stopped. `not_collected` means verification did not finish; it does not imply the workflow is healthy or that no matching run exists. If GitHub's search cap cannot be resolved even for a one-second window, coverage remains partial.
+Without a workflow name, `health` returns a compact report for active agentic workflows on the default branch, excluding pull request events. It inventories historical Actions conclusions first, including skipped runs, then checks sampled runs against the pinned workflow revision. Historical outcomes and current-revision verdicts are separate. Coverage reports which phases finished, what remains, and why collection stopped. `not_collected` means verification did not finish; it does not imply the workflow is healthy or that no matching run exists. If GitHub's search cap cannot be resolved even for a one-second window, coverage remains partial.
 
 `--checkpoint` creates a private local file or resumes from an existing one. Use the same path and repository on resume and omit date flags: the checkpoint preserves the original UTC window, default-branch commit, completed inventory pages, and verification evidence. Use a new path to start a fresh scan. Keep checkpoint files private; they contain run evidence. Run conclusions can change while a scan is in progress, so its inventory reflects the results observed as pages were collected.
 
-Fleet JSON returns coverage, outcome counts, top failures and clusters, and a typed next action when available. `--full` adds per-workflow and complete cluster details. The MCP `health` tool accepts `fleet: true` and `full: true`; pass a returned `next_action.checkpoint` as `resume` in the same MCP session. MCP checkpoints expire 30 minutes after creation and do not survive server restarts.
+Fleet JSON returns `scope`, `coverage`, `status_counts`, historical outcomes, top failures and clusters, and a typed `next_action` when available. `--full` adds per-workflow and complete cluster details. The MCP `health` tool returns structured fleet results when `workflow_name` is omitted. Pass `full: true` for details or a returned `next_action.checkpoint` as `resume` in the same session. MCP checkpoints expire 30 minutes after creation and do not survive server restarts.
+
+Drop `--fleet` from CLI calls and `fleet` from MCP arguments. For scripts that need the previous all-branches summary and JSON schema, use `gh aw health --all-branches`. `--checkpoint` and `--full` apply only to the default fleet report, not to named checks or `--all-branches`.
 
 The `--days` flag accepts only 7, 30, or 90 (default: 7). Other values produce an error.
 
-`--timeout` bounds evidence collection (default: `2m`; `0` disables the deadline). The shared deadline cancels API quota checks, requests, local Git revision reads, and work-queue ledger reads. Expiry skips further cache reads and returns available evidence with `collection.partial: true`, `reason: "time_budget"`, and a warning, rather than discarding the report. JSON includes `timeout_seconds` when bounded and `elapsed_seconds`, measured after cache enrichment. An in-progress local cache read and report rendering may finish after the deadline. Partial results do not establish fleet health; increase the budget or narrow the workflow/time window to collect more evidence. `DEBUG=cli:health` logs request progress and elapsed times to stderr without logging response bodies.
+`--timeout` bounds evidence collection (default: `2m`; `0` disables the deadline). On expiry, fleet reports mark `coverage.partial` and named or all-branches reports mark `collection.partial`, with reason `time_budget`. Partial results do not establish fleet health. Resume from a checkpoint, increase the budget, or narrow the scope. `DEBUG=cli:health` logs request progress and elapsed times to stderr without logging response bodies.
 
 `--start-date` and `--end-date` filter run creation times inclusively. Both accept `YYYY-MM-DD` dates, RFC3339 timestamps with time zones, and relative times such as `-24h`, `-1d`, or `-1w`. Dates use UTC; an end date includes that entire day. The end defaults to the current time. Without an explicit start, `--days` counts backward from the end. An explicit start replaces the default seven-day horizon and cannot be combined with an explicit `--days`.
 
-For release-scoped evidence, pass the release's publication timestamp as `--start-date`; this filters by time, not compiler version. Text output and JSON `collection.start_date` / `collection.end_date` show the resolved UTC window. Health still samples current workflow revisions toward five completed first-attempt runs per scope, subject to API limits; it does not enumerate every run or reconstruct historical branch heads. A narrow window can leave insufficient evidence.
+For release-scoped evidence, pass the release's publication timestamp as `--start-date`; this filters by time, not compiler version. Fleet JSON shows the resolved UTC window under `scope`; named and all-branches JSON shows it under `collection`. Current-revision verification samples completed first-attempt runs per scope, subject to API limits. A narrow window can leave insufficient evidence.
 
-Runs with `skipped` or `action_required` conclusions are excluded from health metrics, revision evidence, and failure clusters. Waiting and failed runs without jobs are also excluded when the Jobs API confirms their run attempt has no jobs, including runs whose approval expired. Job-backed waiting runs remain pending revision evidence. Successful job-presence lookups are reused per run ID and attempt within the collection, including across overlapping search windows. Collection continues past ignored runs to find executed runs within the requested window and API limits. An unavailable or malformed Jobs API response is reported as an error, not treated as evidence that no jobs ran.
+For named and all-branches reports, runs with `skipped` or `action_required` conclusions are excluded from health metrics, revision evidence, and failure clusters. Waiting and failed runs without jobs are also excluded when the Jobs API confirms their run attempt has no jobs, including runs whose approval expired. Job-backed waiting runs remain pending revision evidence. Successful job-presence lookups are reused per run ID and attempt within the collection, including across overlapping search windows. Collection continues past ignored runs to find executed runs within the requested window and API limits. An unavailable or malformed Jobs API response is reported as an error, not treated as evidence that no jobs ran.
 
 For confirmed jobless failures, health checks the attempt-specific GitHub run page for the annotation `This workflow run required approval but was not approved before it expired.` Confirmed approval expiries are also removed from `failure_candidates` and `potential_issues`, without counting as successes. JSON `collection.approval_expiry_evidence` and text `[health_approval_expiry]` entries retain the run URL, attempt, classification, and reason; JSON also retains the matched message and update time. Missing annotations, inaccessible pages, or unrecognized messages never establish approval expiry. These optional page requests use the configured host and repository, share the collection's request budget, and are capped at 20 per collection (`approval_requests`). Results are reused only for the same run attempt and update time. Other jobless failures remain approximate potential issues.
 

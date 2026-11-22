@@ -51,9 +51,6 @@ type healthFleetState struct {
 }
 
 func runHealthFleet(ctx context.Context, config HealthConfig, start, end, started time.Time) error {
-	if config.WorkflowName != "" {
-		return errors.New("--fleet cannot be combined with a workflow name")
-	}
 	repo, host := repoutil.NormalizeRepoForAPI(config.RepoOverride)
 	if config.RepoOverride != "" && !validHealthFleetRepository(host, repo) {
 		return errors.New("--repo must be [HOST/]OWNER/REPO")

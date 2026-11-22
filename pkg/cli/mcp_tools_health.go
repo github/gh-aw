@@ -16,7 +16,7 @@ import (
 )
 
 type healthArgs struct {
-	WorkflowName string   `json:"workflow_name,omitempty" jsonschema:"Workflow name or path (empty for all workflows)"`
+	WorkflowName string   `json:"workflow_name,omitempty" jsonschema:"Workflow name or path (omit for the default-branch fleet report)"`
 	Days         *int     `json:"days,omitempty" jsonschema:"Maximum evidence horizon: 7, 30, or 90 days (default 7); mutually exclusive with start_date"`
 	StartDate    string   `json:"start_date,omitempty" jsonschema:"Include runs created at or after this UTC date, RFC3339 timestamp, or relative time such as -24h"`
 	EndDate      string   `json:"end_date,omitempty" jsonschema:"Include runs created at or before this UTC date, RFC3339 timestamp, or relative time (default now)"`
@@ -24,8 +24,7 @@ type healthArgs struct {
 	Repo         string   `json:"repo,omitempty" jsonschema:"GitHub repository owner/repo (defaults to the current repository)"`
 	LogsDir      string   `json:"logs_dir,omitempty" jsonschema:"Existing logs cache for failure clustering and sub-agent failures; does not download artifacts"`
 	Timeout      string   `json:"timeout,omitempty" jsonschema:"Maximum collection duration such as 30s or 5m (default 2m); 0 disables the deadline. Expiry returns explicitly partial results"`
-	Fleet        bool     `json:"fleet,omitempty" jsonschema:"Collect a compact resumable default-branch fleet snapshot"`
-	Full         bool     `json:"full,omitempty" jsonschema:"Include full per-workflow evidence in fleet mode"`
+	Full         bool     `json:"full,omitempty" jsonschema:"Include full per-workflow evidence; omit workflow_name"`
 	Resume       string   `json:"resume,omitempty" jsonschema:"Opaque checkpoint from this server's fleet response; omit date flags on resume"`
 }
 
@@ -42,9 +41,9 @@ func registerHealthTool(server *mcp.Server, execCmd execCmdFunc) {
 		Icons: mcpToolIcons("📊"),
 		Description: `Read workflow health metrics, success rates, execution trends, and revision-aware recovery evidence.
 
-Use fleet=true for a compact structured default-branch report. If next_action.type is resume, pass its checkpoint as resume in the same session within 30 minutes. Fleet mode may save a private temporary checkpoint.
+Omit workflow_name for a compact structured default-branch fleet report. If next_action.type is resume, pass its checkpoint as resume in the same session within 30 minutes. Fleet collection may save a private temporary checkpoint.
 
-Returns the health command's JSON summary for all workflows, or a detailed JSON report when workflow_name is supplied.
+Supply workflow_name for a detailed JSON report for one workflow.
 Reports use a bounded current-revision sample, not exhaustive history. Failure clusters reuse typed Jobs API observations and compatible cached evidence; sub-agent failures require current-version cached usage. Cache compatibility and job-evidence completeness are explicit; no artifacts are downloaded.
 Continuation requests are metadata-only intent, not successful continuations. Per-run cached request counts and requested runs are separate from unavailable evidence (not zero); Actions status is unchanged. Uses the server's existing GitHub credentials and does not modify workflows or cached logs.`,
 	}, func(ctx context.Context, req *mcp.CallToolRequest, args healthArgs) (*mcp.CallToolResult, any, error) {
@@ -63,14 +62,14 @@ Continuation requests are metadata-only intent, not successful continuations. Pe
 				return nil, nil, newMCPError(jsonrpc.CodeInvalidParams, "timeout must be a non-negative duration such as 30s or 5m", nil)
 			}
 		}
-		if (args.Resume != "" || args.Full) && !args.Fleet || args.Fleet && args.WorkflowName != "" {
-			return nil, nil, newMCPError(jsonrpc.CodeInvalidParams, "fleet options require fleet mode without a workflow name", nil)
+		if args.WorkflowName != "" && (args.Resume != "" || args.Full) {
+			return nil, nil, newMCPError(jsonrpc.CodeInvalidParams, "resume and full require omitting workflow_name", nil)
 		}
 
 		cmd := healthMCPCommand(args)
 		var checkpoint *healthMCPCheckpoint
 		var token string
-		if args.Fleet {
+		if args.WorkflowName == "" {
 			var err error
 			checkpoint, token, err = openHealthMCPCheckpoint(&checkpoints, req.Session, args.Resume)
 			if err != nil {
@@ -186,9 +185,6 @@ func healthMCPProgress(partial bool) string {
 
 func healthMCPCommand(args healthArgs) []string {
 	cmdArgs := []string{"health", "--json"}
-	if args.Fleet {
-		cmdArgs = append(cmdArgs, "--fleet")
-	}
 	if args.Full {
 		cmdArgs = append(cmdArgs, "--full")
 	}

@@ -249,7 +249,7 @@ jobs:
             let health;
             try {
               health = JSON.parse(execFileSync('gh', ['aw', 'health',
-                '--repo', repository, '--start-date', retentionStart, '--end-date', end,
+                '--all-branches', '--repo', repository, '--start-date', retentionStart, '--end-date', end,
                 '--logs-dir', path.join(cache, 'health'), '--timeout', `${healthTimeoutSeconds}s`, '--json'], {
                 encoding: 'utf8', timeout: (healthTimeoutSeconds + 30) * 1000, // 30s slack beyond the CLI deadline
                 maxBuffer: 16 * 1024 * 1024

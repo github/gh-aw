@@ -111,7 +111,7 @@ func TestHealthTimeBudgetReturnsPartialJSON(t *testing.T) {
 			start := time.Now()
 			output := captureAuditGroupStdout(t, func() {
 				require.NoError(t, runHealth(context.Background(), HealthConfig{
-					Days: 7, Threshold: 80, RepoOverride: "org/repo",
+					AllBranches: true, Days: 7, Threshold: 80, RepoOverride: "org/repo",
 					JSONOutput: true, LogsDir: t.TempDir(), Timeout: 30 * time.Millisecond,
 				}))
 			})

@@ -44,7 +44,9 @@ description: Complete reference for gh aw CLI commands and their MCP tool equiva
 | `gh aw fix` | `fix` |
 | `gh aw upgrade` | `upgrade` |
 
-Local only (no MCP tool): `skill`, `init`, `doctor`, `health`, `experiments`, `format`, `deploy`, `env`, `json-schema`. `gh aw run` has no MCP tool and no API/MCP/manual-dispatch substitution.
+Local only (no MCP tool): `skill`, `init`, `doctor`, `experiments`, `format`, `deploy`, `env`, `json-schema`. `gh aw run` has no MCP tool and no API/MCP/manual-dispatch substitution.
+
+For read-only health and checkpoint guidance, see [Check Current Workflow Health](debug-workflow-health.md). Discover the MCP `health` schema before use.
 `init` updates use the `upgrade` tool. `audit` covers single runs; BM25
 `audit --search` is CLI-only. Inside a workflow step, install
 `github/gh-aw/actions/setup-cli` to run local-only commands such as `deploy`.
@@ -223,8 +225,12 @@ gh aw checks <run-id>
 
 Display workflow health metrics, success rates, and revision-aware failure clusters.
 
+Omit the workflow name for a compact default-branch fleet report. In MCP `health`,
+omit `workflow_name` for the same scope; pass `next_action.checkpoint` as `resume`
+in the same session when `next_action.type` is `resume`.
+
 ```bash
-gh aw health                                 # Current status of all workflows
+gh aw health                                 # Default-branch fleet report
 gh aw health <workflow-name>                 # Detailed metrics for a specific workflow
 gh aw health --days 30 --threshold 90        # Bound lookback; warn below 90% success
 gh aw health --json                          # JSON output for programmatic use

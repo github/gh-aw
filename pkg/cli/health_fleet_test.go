@@ -91,7 +91,18 @@ func TestHealthFleetResumesLargeInventoryAndVerification(t *testing.T) {
 			return nil, nil
 		}
 	}
-	config := HealthConfig{Fleet: true, Full: true, Threshold: 80, RepoOverride: "org/repo", Checkpoint: filepath.Join(t.TempDir(), "health.json")}
+	config := HealthConfig{Full: true, Threshold: 80, RepoOverride: "org/repo", Checkpoint: filepath.Join(t.TempDir(), "health.json")}
+	output := captureAuditGroupStdout(t, func() {
+		cmd := NewHealthCommand()
+		cmd.SetArgs([]string{"--repo", "org/repo", "--json", "--start-date", start.Format(time.RFC3339), "--end-date", end.Format(time.RFC3339)})
+		require.NoError(t, cmd.Execute())
+	})
+	var compact healthFleetReport
+	require.NoError(t, json.Unmarshal([]byte(output), &compact))
+	require.Equal(t, 1, compact.SchemaVersion)
+	require.False(t, compact.Coverage.Partial)
+	require.Nil(t, compact.Details)
+	clear(calls)
 	run := func(blockEndpoint string) healthFleetReport {
 		t.Helper()
 		block = blockEndpoint

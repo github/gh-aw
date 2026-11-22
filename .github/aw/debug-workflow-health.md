@@ -13,7 +13,7 @@ verification, not authorization to dispatch or rerun a workflow.
 
 ## Collect Revision-Aware Health
 
-Use `gh aw health --fleet --json` against the identified repository. For fleet triage,
+Use `gh aw health --json` against the identified repository. For fleet triage,
 start with the last 24 hours unless the user supplied another window. Save the
 full report privately and project a compact summary before reading individual
 workflows. For a named workflow, pass its name or path and retain that scope.
@@ -22,7 +22,7 @@ the [bootstrap](debug-bootstrap.md#2-check-the-cli-and-run-identity).
 
 ```bash
 health_dir=$(mktemp -d "$TMPDIR/gh-aw-health.XXXXXX") &&
-  gh aw health --fleet --repo HOST/OWNER/REPO --start-date=-24h --timeout 2m \
+  gh aw health --repo HOST/OWNER/REPO --start-date=-24h --timeout 2m \
     --checkpoint "$health_dir/checkpoint.json" --json
 ```
 
@@ -34,7 +34,7 @@ Fleet mode reports historical default-branch outcomes separately from sampled
 current-revision statuses. On `coverage.partial=true`, report `coverage.reason`
 and the uncovered scope. `not_collected` means unassessed;
 `no_current_revision_runs` means no matching run was found, not that it passed.
-If `next_action.type` is `resume`, reuse `--fleet --checkpoint PATH` and the same
+If `next_action.type` is `resume`, reuse `--checkpoint PATH` and the same
 repository without date flags. A resume preserves the original time window and
 branch revision. Use `--full` only when per-workflow evidence is needed.
 Report other collection limits rather than blindly retrying. Use
@@ -43,11 +43,10 @@ Report other collection limits rather than blindly retrying. Use
 Use available health evidence when the CLI is unavailable; do not assume that
 an MCP equivalent exists without discovering its actual schema.
 
-Without `--fleet`, health scans the default branch before PR and other branches.
-Check `collection.default_branch` and `default_branch_pass_complete`; PR failures
-may reflect unmerged code rather than a default-branch regression. Fleet
-`status_counts` without `--fleet` are not default-branch-only; check the representative run's
-branch before attributing a failure to the default branch. Within each
+Named checks and `--all-branches` scan the default branch before PR and other
+branches. Check `collection.default_branch` and `default_branch_pass_complete`;
+verify the representative run's branch before attributing failures to the default
+branch. Within each
 branch pass, health inventories registered AW `failure` conclusions from run-list payloads before
 any job or revision lookups, then verifies one job-backed representative per
 branch/event. `collection.potential_issues` are approximate, list-only signals;
@@ -68,7 +67,7 @@ It samples backward per AW toward five completed first-attempt runs, bounded by
 ## Match the Source Actually Exercised
 
 Read `scope` and `details.workflows[].revisions` in full fleet output, or
-`collection` and `workflows[].revisions` in the legacy report: compare
+`collection` and revision evidence in the named or all-branches report: compare
 `gh-aw-metadata` frontmatter/body hashes, not repository commits alone.
 Health also compares the workflow Markdown source's blob SHA at each supported run
 with the pushed branch source, even when the lock file has not been recompiled.

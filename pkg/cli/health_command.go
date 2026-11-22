@@ -35,7 +35,7 @@ type HealthConfig struct {
 	RepoOverride       string
 	LogsDir            string
 	Timeout            time.Duration
-	Fleet              bool
+	AllBranches        bool
 	Full               bool
 	Checkpoint         string
 	collection         *HealthCollection
@@ -46,7 +46,12 @@ type HealthConfig struct {
 
 const healthCommandDescription = `Display workflow health metrics, success rates, and execution trends.
 
-Shows health metrics for workflows including:
+Without a workflow name, returns a compact, resumable fleet report for active
+agentic workflows on the default branch, excluding pull request events. Historical
+run outcomes and current-revision verdicts are reported separately. Use --full
+for per-workflow evidence and --checkpoint to save or resume collection.
+
+With a workflow name, shows detailed metrics including:
 - Current-revision success/failure rates from recent runs
 - Revision-aware recovery evidence, shared job/step failure clusters, and cached sub-agent failures
 - Trend indicators (↑ improving, → stable, ↓ degrading)
@@ -54,7 +59,7 @@ Shows health metrics for workflows including:
 - Warnings when success rate drops below threshold
 - Work-queue diagnostics when a selected published workflow uses work-queue
 
-Scans non-PR runs on the repository's default branch before reviewing PR and other
+Named checks and --all-branches scan non-PR runs on the repository's default branch before reviewing PR and other
 branch runs, even when a PR's source branch has the default branch's name.
 Their failures may reflect unmerged code rather than a default-branch regression.
 Within each pass, inventories failure signals from run-list payloads, verifies one
@@ -62,8 +67,6 @@ representative per branch/event, then samples successful and pending runs.
 The later pass reuses default-branch evidence for stopping, but still samples known
 other-branch failure scopes independently. Reuses local Git objects when the
 checkout matches the target, with GitHub API fallback.
-When called without a workflow name, displays summary for all workflows.
-When called with a specific workflow name, displays detailed metrics for that workflow.
 
 Use --start-date and --end-date to bound run creation times. Accepts UTC dates,
 RFC3339 timestamps, or relative times such as -24h and -1w. An explicit start
@@ -87,8 +90,8 @@ enrichment is best-effort: incomplete inventories warn and remain metadata-only
 unless compatible cached evidence is available. API quota and request limits
 still stop collection; primary inventory and presence errors remain errors.
 Collection has a two-minute time budget by default. Use --timeout to change it
-(0 disables the deadline). Expiry returns available evidence with
-collection.partial=true and reason=time_budget, not a healthy verdict.
+(0 disables the deadline). Expiry returns explicitly partial evidence, not a
+healthy verdict. In fleet reports, check coverage and next_action.
 
 `
 
@@ -98,7 +101,7 @@ func NewHealthCommand() *cobra.Command {
 		Use:   "health [workflow]",
 		Short: "Display workflow health metrics and success rates",
 		Long:  healthCommandDescription + WorkflowIDExplanation,
-		Example: `  ` + string(constants.CLIExtensionPrefix) + ` health                       # Current status of all workflows
+		Example: `  ` + string(constants.CLIExtensionPrefix) + ` health                       # Default-branch fleet report
   ` + string(constants.CLIExtensionPrefix) + ` health issue-monster         # Detailed metrics for specific workflow
   ` + string(constants.CLIExtensionPrefix) + ` health --days 30             # Look back at most 30 days
   ` + string(constants.CLIExtensionPrefix) + ` health --threshold 90        # Warn if below 90% success rate
@@ -117,12 +120,6 @@ func NewHealthCommand() *cobra.Command {
 			}
 
 			timeout, _ := cmd.Flags().GetDuration("timeout")
-			if cmd.Flags().Changed("checkpoint") && !getBoolFlag(cmd, "fleet") {
-				return errors.New("--checkpoint requires --fleet")
-			}
-			if getBoolFlag(cmd, "full") && !getBoolFlag(cmd, "fleet") {
-				return errors.New("--full requires --fleet")
-			}
 			return runHealth(cmd.Context(), HealthConfig{
 				WorkflowName: workflowName,
 				Days:         getIntFlag(cmd, "days"),
@@ -134,7 +131,7 @@ func NewHealthCommand() *cobra.Command {
 				RepoOverride: getStringFlag(cmd, "repo"),
 				LogsDir:      getStringFlag(cmd, "logs-dir"),
 				Timeout:      timeout,
-				Fleet:        getBoolFlag(cmd, "fleet"),
+				AllBranches:  getBoolFlag(cmd, "all-branches"),
 				Full:         getBoolFlag(cmd, "full"),
 				Checkpoint:   getStringFlag(cmd, "checkpoint"),
 			})
@@ -157,7 +154,7 @@ func addHealthFlags(cmd *cobra.Command) {
 	cmd.Flags().Float64("threshold", 80.0, "Success rate threshold for warnings (percentage)")
 	cmd.Flags().String("logs-dir", defaultLogsOutputDir, "Existing logs cache for failure clustering and sub-agent failures (reports cache compatibility; no artifact downloads)")
 	cmd.Flags().Duration("timeout", 2*time.Minute, "Maximum collection duration (e.g., 30s or 5m; 0 disables the deadline). Returns explicitly partial results when exhausted")
-	cmd.Flags().Bool("fleet", false, "Inventory default-branch run outcomes before verifying current revisions; return a compact report")
+	cmd.Flags().Bool("all-branches", false, "Include PR and other branches in the legacy summary (omit the workflow name)")
 	cmd.Flags().Bool("full", false, "Include per-workflow and full failure evidence in the fleet report")
 	cmd.Flags().String("checkpoint", "", "Create or resume a private fleet checkpoint at this path")
 	addRepoFlag(cmd)
@@ -166,6 +163,13 @@ func addHealthFlags(cmd *cobra.Command) {
 
 func runHealth(ctx context.Context, config HealthConfig) error {
 	healthLog.Printf("Running health check: workflow=%s, days=%d, threshold=%.1f", config.WorkflowName, config.Days, config.Threshold)
+	if config.AllBranches && config.WorkflowName != "" {
+		return errors.New("--all-branches requires omitting the workflow name")
+	}
+	fleet := config.WorkflowName == "" && !config.AllBranches
+	if !fleet && (config.Checkpoint != "" || config.Full) {
+		return errors.New("--checkpoint and --full require omitting the workflow name and --all-branches")
+	}
 	if config.Timeout < 0 {
 		return errors.New("--timeout must not be negative")
 	}
@@ -183,7 +187,7 @@ func runHealth(ctx context.Context, config HealthConfig) error {
 		return err
 	}
 	config.StartDate, config.EndDate = start.Format(time.RFC3339Nano), end.Format(time.RFC3339Nano)
-	if config.Fleet {
+	if fleet {
 		return runHealthFleet(ctx, config, start, end, started)
 	}
 	return runLegacyHealth(ctx, config, start, end, started)
