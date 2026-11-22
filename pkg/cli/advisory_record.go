@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/github/gh-aw/pkg/constants"
 	"github.com/spf13/cobra"
 )
 
@@ -92,7 +93,7 @@ func saveAdvisoryHandoff(cmd *cobra.Command, id string, record advisoryRecord, c
 	if err != nil {
 		return fmt.Errorf("encode advisory record: %w", err)
 	}
-	if err := os.MkdirAll(filepath.Dir(filename), 0o700); err != nil {
+	if err := os.MkdirAll(filepath.Dir(filename), constants.DirPermOwnerOnly); err != nil {
 		return fmt.Errorf("create private advisory record directory: %w", err)
 	}
 	requestPath := filename + ".fork-request"
@@ -120,7 +121,7 @@ func (o advisoryHandoff) createAndWaitForFork(ctx context.Context, requestPath s
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
 	defer cancel()
 	// Claim before POST so retries after interruption or a lost response only poll.
-	err := os.Mkdir(requestPath, 0o700)
+	err := os.Mkdir(requestPath, constants.DirPermOwnerOnly)
 	switch {
 	case err == nil:
 		// The fork may have appeared while the artifact was being verified.
