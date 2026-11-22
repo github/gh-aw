@@ -20,6 +20,7 @@
  */
 
 const http = require("http");
+const { isIPv4 } = require("node:net");
 const { timingSafeEqual } = require("crypto");
 const { createLogger } = require("./mcp_logger.cjs");
 const { ERR_CONFIG } = require("./error_codes.cjs");
@@ -104,7 +105,7 @@ function readRequestBody(req) {
  * @param {Object} options - Runner options
  * @param {any} options.transport - Connected MCPHTTPTransport instance
  * @param {number} options.port - Port to listen on
- * @param {string} [options.host] - Local interface to bind; omitted for Docker host-gateway clients
+ * @param {string} [options.host] - Specific local IPv4 address (defaults to loopback)
  * @param {Function} options.getHealthPayload - Zero-argument function that returns the JSON object for GET /health responses
  * @param {Object} options.logger - Logger instance (from mcp_logger.cjs createLogger)
  * @param {string} options.serverLabel - Human-readable label used in log messages (e.g. "MCP Scripts")
@@ -113,8 +114,11 @@ function readRequestBody(req) {
  * @returns {Promise<http.Server>} The started HTTP server
  */
 async function runHttpServer(options) {
-  const { transport, port, host, getHealthPayload, logger, serverLabel, configureServer } = options;
+  const { transport, port, host = "127.0.0.1", getHealthPayload, logger, serverLabel, configureServer } = options;
   const expectedKey = Buffer.from(requireHttpApiKey(options.apiKey, `${serverLabel} API key`));
+  if (!isIPv4(host) || host === "0.0.0.0") {
+    throw new Error(`${ERR_CONFIG}: ${serverLabel} requires a specific IPv4 bind address`);
+  }
 
   const httpServer = http.createServer(async (req, res) => {
     req.on("error", error => logger.debugError("HTTP request stream error: ", error));
@@ -224,8 +228,10 @@ async function runHttpServer(options) {
   logger.debug(`Attempting to bind to port ${port}...`);
   httpServer.listen({ port, host }, () => {
     logger.debug(`=== ${serverLabel} HTTP Server Started Successfully ===`);
-    logger.debug(`HTTP server listening on http://localhost:${port}`);
-    logger.debug(`MCP endpoint: POST http://localhost:${port}/`);
+    const address = httpServer.address();
+    const boundPort = address && typeof address === "object" ? address.port : port;
+    logger.debug(`HTTP server listening on http://${host}:${boundPort}`);
+    logger.debug(`MCP endpoint: POST http://${host}:${boundPort}/`);
     logger.debug(`Server is ready to accept requests`);
   });
 

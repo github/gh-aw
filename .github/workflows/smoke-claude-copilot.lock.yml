@@ -805,6 +805,7 @@ jobs:
           DEBUG: ${{ env.DEBUG || runner.debug == '1' && '*' || '' }}
           GH_AW_MCP_SCRIPTS_PORT: ${{ steps.mcp-scripts-config.outputs.mcp_scripts_port }}
           GH_AW_MCP_SCRIPTS_API_KEY: ${{ steps.mcp-scripts-config.outputs.mcp_scripts_api_key }}
+          GH_AW_MCP_SCRIPTS_BRIDGED_GATEWAY: 'true'
           GH_AW_MCP_SCRIPTS_ENV_10_CAPI_PROBE_SMOKE_RECEIPT: ${{ runner.temp }}/gh-aw/safeoutputs/claude-copilot-receipt.json
         run: |
           # Environment variables are set above to prevent template injection

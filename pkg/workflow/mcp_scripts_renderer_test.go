@@ -32,6 +32,9 @@ func TestMCPScriptsPerToolEnvironmentBindings(t *testing.T) {
 		t.Fatal(err)
 	}
 	startup := strings.Split(setup.String(), "      - name: Start MCP Scripts HTTP Server\n")[1]
+	if !strings.Contains(startup, "GH_AW_MCP_SCRIPTS_BRIDGED_GATEWAY: 'false'") {
+		t.Fatal("MCP Scripts should use loopback with the host-network gateway")
+	}
 	for _, tool := range manifest.Tools {
 		for name, source := range tool.Env {
 			expected := config.Tools[tool.Name].Env[name]

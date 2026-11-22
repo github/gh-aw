@@ -3,6 +3,7 @@ package workflow
 import (
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/github/gh-aw/pkg/constants"
@@ -84,6 +85,7 @@ func generateMCPScriptsSetup(yaml *strings.Builder, workflowData *WorkflowData) 
 	yaml.WriteString("          DEBUG: " + mcpDebugEnv + "\n")
 	yaml.WriteString("          GH_AW_MCP_SCRIPTS_PORT: ${{ steps.mcp-scripts-config.outputs.mcp_scripts_port }}\n")
 	yaml.WriteString("          GH_AW_MCP_SCRIPTS_API_KEY: ${{ steps.mcp-scripts-config.outputs.mcp_scripts_api_key }}\n")
+	yaml.WriteString("          GH_AW_MCP_SCRIPTS_BRIDGED_GATEWAY: '" + strconv.FormatBool(isAWFNetworkIsolationEnabled(workflowData)) + "'\n")
 	mcpScriptsSecrets := collectMCPScriptsSecrets(workflowData.MCPScripts)
 	if len(mcpScriptsSecrets) > 0 {
 		envVarNames := sliceutil.MapKeys(mcpScriptsSecrets)

@@ -1076,6 +1076,7 @@ jobs:
           DEBUG: ${{ env.DEBUG || runner.debug == '1' && '*' || '' }}
           GH_AW_MCP_SCRIPTS_PORT: ${{ steps.mcp-scripts-config.outputs.mcp_scripts_port }}
           GH_AW_MCP_SCRIPTS_API_KEY: ${{ steps.mcp-scripts-config.outputs.mcp_scripts_api_key }}
+          GH_AW_MCP_SCRIPTS_BRIDGED_GATEWAY: 'true'
           GH_AW_MCP_SCRIPTS_ENV_16_NATIVE_CHALLENGE_CONFORMANCE_STATE: ${{ runner.temp }}/engine-conformance
           GH_AW_MCP_SCRIPTS_ENV_21_CONFORMANCE_CHALLENGE_CONFORMANCE_STATE: ${{ runner.temp }}/engine-conformance
           GH_AW_MCP_SCRIPTS_ENV_31_NATIVE_INFRASTRUCTURE_CHALLENGE_CONFORMANCE_STATE: ${{ runner.temp }}/engine-conformance

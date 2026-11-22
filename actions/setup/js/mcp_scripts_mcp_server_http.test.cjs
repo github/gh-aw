@@ -25,7 +25,7 @@ describe("mcp_scripts_mcp_server_http.cjs integration", () => {
     return new Promise((resolve, reject) => {
       const data = JSON.stringify(payload),
         headers = { "Content-Type": "application/json", Accept: "application/json, text/event-stream", Authorization: "http-integration-test-key", "Content-Length": Buffer.byteLength(data), ...additionalHeaders },
-        req = http.request({ hostname: "localhost", port: 4100, path: "/", method: "POST", headers }, res => {
+        req = http.request({ hostname: "127.0.0.1", port: 4100, path: "/", method: "POST", headers }, res => {
           let responseData = "";
           (res.on("data", chunk => {
             responseData += chunk;
@@ -82,7 +82,7 @@ describe("mcp_scripts_mcp_server_http.cjs integration", () => {
         }
         return !1;
       })();
-      (expect(ready).toBe(!0), expect(serverOutput).toContain("HTTP server listening"));
+      (expect(ready).toBe(!0), expect(serverOutput).toContain("HTTP server listening on http://127.0.0.1:4100"));
     }),
     it.each(["", "incorrect-key"])("rejects unauthenticated MCP requests (%s)", async authorization => {
       const response = await makeRequest({ jsonrpc: "2.0", id: 1, method: "tools/list" }, { Authorization: authorization });
@@ -104,7 +104,7 @@ describe("mcp_scripts_mcp_server_http.cjs integration", () => {
     }),
     it("should respond to GET /health endpoint", async () =>
       new Promise((resolve, reject) => {
-        const req = http.request({ hostname: "localhost", port: 4100, path: "/health", method: "GET" }, res => {
+        const req = http.request({ hostname: "127.0.0.1", port: 4100, path: "/health", method: "GET" }, res => {
           let responseData = "";
           (res.on("data", chunk => {
             responseData += chunk;
@@ -145,7 +145,7 @@ describe("mcp_scripts_mcp_server_http.cjs integration", () => {
     }),
     it("should reject invalid HTTP methods", async () =>
       new Promise((resolve, reject) => {
-        const req = http.request({ hostname: "localhost", port: 4100, path: "/", method: "PUT" }, res => {
+        const req = http.request({ hostname: "127.0.0.1", port: 4100, path: "/", method: "PUT" }, res => {
           let data = "";
           (res.on("data", chunk => {
             data += chunk;

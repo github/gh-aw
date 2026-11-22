@@ -804,6 +804,7 @@ mcp-scripts:
 		"Docker command should use bridge networking in network isolation mode")
 	require.Contains(t, yamlStr, `--add-host host.docker.internal:host-gateway`,
 		"Docker command must add host-gateway mapping in bridge mode when mcp-scripts are present so the gateway can reach the mcp-scripts server on the host")
+	require.Contains(t, yamlStr, `GH_AW_MCP_SCRIPTS_BRIDGED_GATEWAY: 'true'`)
 	require.NotContains(t, yamlStr, `--add-host host.docker.internal:127.0.0.1`,
 		"Docker command should not inject the host loopback mapping in bridge mode")
 }

@@ -317,6 +317,8 @@ Analyze provided text using the `analyze-text` tool and create a discussion with
 
 MCP Scripts tools run on the GitHub Actions **runner host** — outside the agent container — so they can access the runner's file system and environment but are isolated from the AI's own execution environment. Tools also provide secret isolation (only specified env vars are forwarded), process isolation (separate execution), and output sanitization (large outputs saved to files). Only predefined tools are available to agents.
 
+The MCP Scripts HTTP server listens on runner loopback when the gateway uses host networking, or on the default Docker bridge's IPv4 address when the gateway uses bridged networking. Bridged mode requires Docker's `host-gateway` mapping to point to that bridge address. MCP requests still require the per-run API key.
+
 MCP script arguments are withheld from server logs, step summaries, and recent-tool-call diagnostics. Output payloads and error details are also withheld from server logs because they may echo arguments. Handlers receive the original inputs, and tool responses remain unchanged. Do not return secrets to the agent.
 
 ## Troubleshooting
