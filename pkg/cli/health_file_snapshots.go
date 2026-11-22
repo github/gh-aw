@@ -37,8 +37,15 @@ func healthWorkflowFiles(ref string, collection *HealthCollection) healthFileSna
 		return snapshot
 	}
 	snapshotRef := ref
+	if ref == collection.scanBranch && collection.pinnedBranchSHA != "" {
+		snapshotRef = collection.pinnedBranchSHA
+	}
+	if snapshot, checked := collection.fileSnapshots[snapshotRef]; checked {
+		collection.fileSnapshots[ref] = snapshot
+		return snapshot
+	}
 	if collection.localGit != nil {
-		sha := ref
+		sha := snapshotRef
 		if !validHealthBlobSHA(sha) {
 			endpoint := path.Join(healthRepositoryEndpoint(collection.repoOverride), "git/ref/heads", url.PathEscape(ref))
 			out, err := healthAPI(collection, endpoint, "--jq", ".object.sha")
@@ -175,7 +182,7 @@ func readHealthLockContent(endpoint, blobSHA string, collection *HealthCollectio
 		healthLog.Printf("Local lock blob unavailable: %v; using GitHub API", err)
 	}
 	filter := `.content | @base64d | split("\n") | .[0]`
-	if blobSHA != "" {
+	if blobSHA != "" && collection.pinnedBranchSHA == "" {
 		filter = ".content | @base64d"
 	}
 	out, err := healthAPI(collection, endpoint, "--jq", filter)

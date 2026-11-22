@@ -35,8 +35,13 @@ type HealthConfig struct {
 	RepoOverride       string
 	LogsDir            string
 	Timeout            time.Duration
+	Fleet              bool
+	Full               bool
+	Checkpoint         string
 	collection         *HealthCollection
 	explicitTimeWindow bool
+	inputStartDate     bool
+	inputEndDate       bool
 }
 
 const healthCommandDescription = `Display workflow health metrics, success rates, and execution trends.
@@ -112,6 +117,12 @@ func NewHealthCommand() *cobra.Command {
 			}
 
 			timeout, _ := cmd.Flags().GetDuration("timeout")
+			if cmd.Flags().Changed("checkpoint") && !getBoolFlag(cmd, "fleet") {
+				return errors.New("--checkpoint requires --fleet")
+			}
+			if getBoolFlag(cmd, "full") && !getBoolFlag(cmd, "fleet") {
+				return errors.New("--full requires --fleet")
+			}
 			return runHealth(cmd.Context(), HealthConfig{
 				WorkflowName: workflowName,
 				Days:         getIntFlag(cmd, "days"),
@@ -123,6 +134,9 @@ func NewHealthCommand() *cobra.Command {
 				RepoOverride: getStringFlag(cmd, "repo"),
 				LogsDir:      getStringFlag(cmd, "logs-dir"),
 				Timeout:      timeout,
+				Fleet:        getBoolFlag(cmd, "fleet"),
+				Full:         getBoolFlag(cmd, "full"),
+				Checkpoint:   getStringFlag(cmd, "checkpoint"),
 			})
 		},
 	}
@@ -143,6 +157,9 @@ func addHealthFlags(cmd *cobra.Command) {
 	cmd.Flags().Float64("threshold", 80.0, "Success rate threshold for warnings (percentage)")
 	cmd.Flags().String("logs-dir", defaultLogsOutputDir, "Existing logs cache for failure clustering and sub-agent failures (reports cache compatibility; no artifact downloads)")
 	cmd.Flags().Duration("timeout", 2*time.Minute, "Maximum collection duration (e.g., 30s or 5m; 0 disables the deadline). Returns explicitly partial results when exhausted")
+	cmd.Flags().Bool("fleet", false, "Inventory default-branch run outcomes before verifying current revisions; return a compact report")
+	cmd.Flags().Bool("full", false, "Include per-workflow and full failure evidence in the fleet report")
+	cmd.Flags().String("checkpoint", "", "Create or resume a private fleet checkpoint at this path")
 	addRepoFlag(cmd)
 	addJSONFlag(cmd)
 }
@@ -160,12 +177,19 @@ func runHealth(ctx context.Context, config HealthConfig) error {
 	}
 
 	config.explicitTimeWindow = config.StartDate != "" || config.EndDate != ""
+	config.inputStartDate, config.inputEndDate = config.StartDate != "", config.EndDate != ""
 	start, end, err := resolveHealthTimeWindow(config, time.Now())
 	if err != nil {
 		return err
 	}
 	config.StartDate, config.EndDate = start.Format(time.RFC3339Nano), end.Format(time.RFC3339Nano)
+	if config.Fleet {
+		return runHealthFleet(ctx, config, start, end, started)
+	}
+	return runLegacyHealth(ctx, config, start, end, started)
+}
 
+func runLegacyHealth(ctx context.Context, config HealthConfig, start, end, started time.Time) error {
 	if config.Verbose {
 		fmt.Fprintln(os.Stderr, console.FormatVerboseMessage("Fetching workflow runs created from "+config.StartDate+" to "+config.EndDate))
 	}
@@ -181,7 +205,9 @@ func runHealth(ctx context.Context, config HealthConfig) error {
 		return fmt.Errorf("failed to fetch workflow runs: %w", err)
 	}
 	collectHealthWorkQueue(config.collection)
-	checkHealthTimeBudget(config.collection)
+	if err := checkHealthTimeBudget(config.collection); err != nil {
+		healthLog.Printf("Collection budget expired after work-queue checks: %v", err)
+	}
 
 	if len(runs) == 0 && len(config.collection.workflows) == 0 && !config.collection.Partial {
 		if config.WorkflowName != "" {

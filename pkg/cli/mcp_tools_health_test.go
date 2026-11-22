@@ -8,6 +8,7 @@ import (
 	"maps"
 	"os/exec"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/modelcontextprotocol/go-sdk/jsonrpc"
@@ -15,6 +16,50 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestHealthToolFleetResume(t *testing.T) {
+	t.Parallel()
+	var checkpoint string
+	calls := 0
+	mockExec := func(ctx context.Context, args ...string) *exec.Cmd {
+		calls++
+		var path string
+		for _, arg := range args {
+			if value, ok := strings.CutPrefix(arg, "--checkpoint="); ok {
+				path = value
+			}
+		}
+		output := `{"schema_version":1,"coverage":{"partial":false}}`
+		if calls == 1 {
+			checkpoint = path
+			output = `{"schema_version":1,"coverage":{"partial":true},"next_action":{"type":"resume","checkpoint":"/server/private"}}`
+		}
+		assert.NotEmpty(t, path)
+		assert.Equal(t, checkpoint, path)
+		return mockCommandWithOutput(output, "")(ctx, args...)
+	}
+	server := mcp.NewServer(&mcp.Implementation{Name: "test"}, nil)
+	registerHealthTool(server, mockExec)
+	client := connectInMemory(t, server)
+	result, err := client.CallTool(t.Context(), &mcp.CallToolParams{Name: "health", Arguments: map[string]any{"fleet": true}})
+	require.NoError(t, err)
+	data, err := json.Marshal(result.StructuredContent)
+	require.NoError(t, err)
+	var report healthFleetReport
+	require.NoError(t, json.Unmarshal(data, &report))
+	require.True(t, report.Coverage.Partial)
+	require.NotNil(t, report.NextAction)
+	require.NotContains(t, report.NextAction.Checkpoint, "/")
+	require.NotEmpty(t, report.NextAction.Checkpoint)
+	args := map[string]any{"fleet": true, "resume": report.NextAction.Checkpoint}
+	other := connectInMemory(t, server)
+	_, err = other.CallTool(t.Context(), &mcp.CallToolParams{Name: "health", Arguments: args})
+	require.Error(t, err)
+	result, err = client.CallTool(t.Context(), &mcp.CallToolParams{Name: "health", Arguments: args})
+	require.NoError(t, err)
+	require.NotNil(t, result.StructuredContent)
+	require.Equal(t, 2, calls)
+}
 
 func TestHealthToolArguments(t *testing.T) {
 	t.Parallel()

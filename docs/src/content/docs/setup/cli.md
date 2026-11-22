@@ -1178,12 +1178,20 @@ gh aw health --threshold 90        # Warn if below 90% success rate
 gh aw health --json                # Output in JSON format
 gh aw health --start-date -24h      # Evidence from the last 24 hours
 gh aw health --timeout 30s --json   # Return available evidence within a 30-second collection budget
+gh aw health --fleet --start-date=-24h --timeout 30s --checkpoint ./health-checkpoint.json --json
+gh aw health --fleet --checkpoint ./health-checkpoint.json --timeout 2m --json
 gh aw health --start-date 2026-10-14T04:49:11Z  # Evidence since a release timestamp
 gh aw health --start-date 2026-10-14 --end-date 2026-10-15  # Bounded window
 gh aw health issue-monster --days 90  # 90-day metrics for workflow
 ```
 
-**Options:** `--days`, `--start-date`, `--end-date`, `--logs-dir`, `--timeout`, `--threshold`, `--repo/-r`, `--json/-j`
+**Options:** `--days`, `--start-date`, `--end-date`, `--logs-dir`, `--timeout`, `--threshold`, `--repo/-r`, `--json/-j`, `--fleet`, `--checkpoint`, `--full`
+
+`--fleet` selects a compact report for active agentic workflows on the default branch, excluding pull request events. It inventories historical Actions conclusions first, including skipped runs, then checks sampled runs against the pinned workflow revision. Historical outcomes and current-revision verdicts are separate. Coverage reports which phases finished, what remains, and why collection stopped. `not_collected` means verification did not finish; it does not imply the workflow is healthy or that no matching run exists. If GitHub's search cap cannot be resolved even for a one-second window, coverage remains partial.
+
+`--checkpoint` creates a private local file or resumes from an existing one. Use the same path and repository on resume and omit date flags: the checkpoint preserves the original UTC window, default-branch commit, completed inventory pages, and verification evidence. Use a new path to start a fresh scan. Keep checkpoint files private; they contain run evidence. Run conclusions can change while a scan is in progress, so its inventory reflects the results observed as pages were collected.
+
+Fleet JSON returns coverage, outcome counts, top failures and clusters, and a typed next action when available. `--full` adds per-workflow and complete cluster details. The MCP `health` tool accepts `fleet: true` and `full: true`; pass a returned `next_action.checkpoint` as `resume` in the same MCP session. MCP checkpoints expire 30 minutes after creation and do not survive server restarts.
 
 The `--days` flag accepts only 7, 30, or 90 (default: 7). Other values produce an error.
 

@@ -210,6 +210,8 @@ func fetchWorkflowRuns(workflowName, startDate, repoOverride string, verbose boo
 		defer func() { collection.scanBranch = "" }()
 		runs, err := fetchHealthRunSample(targets, startDate, repoOverride, verbose, collection)
 		allRuns = runs
+		collection.DefaultFailureListingDone = collection.FailureListingComplete
+		collection.DefaultFailurePassDone = collection.FailurePassComplete
 		if err != nil || collection.stopped {
 			collection.FailurePassComplete = false
 			collection.FailureListingComplete = false
@@ -284,10 +286,6 @@ func sampleHealthWorkflow(target GitHubWorkflow, startDate, repoOverride string,
 	sourceBoundaries := make(map[string]struct{})
 	for page := 1; ; page++ {
 		batch, total, listErr := healthListWorkflowRuns(opts, page, collection)
-		if collection.visited == nil {
-			collection.visited = make(map[string]struct{})
-		}
-		collection.visited[target.Path] = struct{}{}
 		for _, run := range batch {
 			if _, duplicate := seen[run.DatabaseID]; duplicate {
 				continue
@@ -322,6 +320,10 @@ func sampleHealthWorkflow(target GitHubWorkflow, startDate, repoOverride string,
 			return sample, errHealthAPIBudget
 		}
 		if total < opts.Limit || healthWorkflowSampleEnough(sample, target.Path, collection, priorSamples) {
+			if collection.visited == nil {
+				collection.visited = make(map[string]struct{})
+			}
+			collection.visited[target.Path] = struct{}{}
 			return sample, nil
 		}
 		if page*opts.Limit >= healthMaximumRunSearchResults {

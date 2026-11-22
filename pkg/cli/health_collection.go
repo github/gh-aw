@@ -30,6 +30,8 @@ type HealthCollection struct {
 	Host                      string                              `json:"host"`
 	DefaultBranch             string                              `json:"default_branch,omitempty"`
 	DefaultBranchPassComplete bool                                `json:"default_branch_pass_complete"`
+	DefaultFailureListingDone bool                                `json:"default_branch_failure_listing_complete"`
+	DefaultFailurePassDone    bool                                `json:"default_branch_failure_pass_complete"`
 	APIRateLimit              *GitHubAPIRateLimitState            `json:"api_rate_limit,omitempty"`
 	RevisionLookups           int                                 `json:"revision_lookups"`
 	APIRequests               int                                 `json:"api_requests"`
@@ -64,6 +66,8 @@ type HealthCollection struct {
 	checkedRequests           int
 	repoOverride              string
 	scanBranch                string
+	pinnedBranchSHA           string
+	fleetResponses            map[string][]byte
 	sampleIncomplete          bool
 	stopped                   bool
 	visited                   map[string]struct{}
@@ -100,7 +104,9 @@ func finishHealthCollection(collection *HealthCollection) {
 	if collection == nil || collection.startedAt.IsZero() {
 		return
 	}
-	checkHealthTimeBudget(collection)
+	if err := checkHealthTimeBudget(collection); err != nil {
+		healthLog.Printf("Collection budget expired before rendering: %v", err)
+	}
 	elapsed := time.Since(collection.startedAt)
 	collection.ElapsedSeconds = elapsed.Seconds()
 	healthLog.Printf("Health collection finished: elapsed=%s api_requests=%d partial=%t reason=%s",
@@ -160,6 +166,16 @@ func stopHealthCollection(collection *HealthCollection, err error) {
 }
 
 func healthAPI(collection *HealthCollection, endpoint string, extra ...string) ([]byte, error) {
+	if err := checkHealthTimeBudget(collection); err != nil {
+		return nil, err
+	}
+	var cacheKey string
+	if collection.fleetResponses != nil {
+		cacheKey = strings.Join(append([]string{endpoint}, extra...), "\x00")
+		if cached, ok := collection.fleetResponses[cacheKey]; ok {
+			return cached, nil
+		}
+	}
 	if err := checkHealthAPIBudget(collection); err != nil {
 		stopHealthCollection(collection, err)
 		return nil, err
@@ -175,6 +191,9 @@ func healthAPI(collection *HealthCollection, endpoint string, extra ...string) (
 	healthLog.Printf("Health API request %d started: %s", collection.APIRequests, endpointPath)
 	out, err := healthRunGH(ctx, "Fetching health evidence...", args...)
 	healthLog.Printf("Health API request %d finished: elapsed=%s failed=%t", collection.APIRequests, time.Since(started).Round(time.Millisecond), err != nil)
+	if err == nil && cacheKey != "" {
+		collection.fleetResponses[cacheKey] = out
+	}
 	if budgetErr := checkHealthTimeBudget(collection); budgetErr != nil {
 		return nil, budgetErr
 	}

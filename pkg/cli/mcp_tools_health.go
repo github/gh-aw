@@ -3,8 +3,12 @@ package cli
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/jsonrpc"
@@ -20,9 +24,13 @@ type healthArgs struct {
 	Repo         string   `json:"repo,omitempty" jsonschema:"GitHub repository owner/repo (defaults to the current repository)"`
 	LogsDir      string   `json:"logs_dir,omitempty" jsonschema:"Existing logs cache for failure clustering and sub-agent failures; does not download artifacts"`
 	Timeout      string   `json:"timeout,omitempty" jsonschema:"Maximum collection duration such as 30s or 5m (default 2m); 0 disables the deadline. Expiry returns explicitly partial results"`
+	Fleet        bool     `json:"fleet,omitempty" jsonschema:"Collect a compact resumable default-branch fleet snapshot"`
+	Full         bool     `json:"full,omitempty" jsonschema:"Include full per-workflow evidence in fleet mode"`
+	Resume       string   `json:"resume,omitempty" jsonschema:"Opaque checkpoint from this server's fleet response; omit date flags on resume"`
 }
 
 func registerHealthTool(server *mcp.Server, execCmd execCmdFunc) {
+	var checkpoints sync.Map
 	mcp.AddTool(server, &mcp.Tool{
 		Name: "health",
 		Annotations: &mcp.ToolAnnotations{
@@ -33,6 +41,8 @@ func registerHealthTool(server *mcp.Server, execCmd execCmdFunc) {
 		},
 		Icons: mcpToolIcons("📊"),
 		Description: `Read workflow health metrics, success rates, execution trends, and revision-aware recovery evidence.
+
+Use fleet=true for a compact structured default-branch report. If next_action.type is resume, pass its checkpoint as resume in the same session within 30 minutes. Fleet mode may save a private temporary checkpoint.
 
 Returns the health command's JSON summary for all workflows, or a detailed JSON report when workflow_name is supplied.
 Reports use a bounded current-revision sample, not exhaustive history. Failure clusters reuse typed Jobs API observations and compatible cached evidence; sub-agent failures require current-version cached usage. Cache compatibility and job-evidence completeness are explicit; no artifacts are downloaded.
@@ -53,27 +63,135 @@ Continuation requests are metadata-only intent, not successful continuations. Pe
 				return nil, nil, newMCPError(jsonrpc.CodeInvalidParams, "timeout must be a non-negative duration such as 30s or 5m", nil)
 			}
 		}
+		if (args.Resume != "" || args.Full) && !args.Fleet || args.Fleet && args.WorkflowName != "" {
+			return nil, nil, newMCPError(jsonrpc.CodeInvalidParams, "fleet options require fleet mode without a workflow name", nil)
+		}
 
-		mcpLog.Print("Executing health tool")
-		notifyProgress(ctx, req, 0, 100, "Reading workflow health...")
-		stdout, stderr, err := runMCPExecOutputWithStderr(ctx, execCmd, healthMCPCommand(args)...)
-		if err != nil {
-			detail := strings.TrimSpace(string(stderr))
-			if detail == "" {
-				detail = err.Error()
+		cmd := healthMCPCommand(args)
+		var checkpoint *healthMCPCheckpoint
+		var token string
+		if args.Fleet {
+			var err error
+			checkpoint, token, err = openHealthMCPCheckpoint(&checkpoints, req.Session, args.Resume)
+			if err != nil {
+				return nil, nil, newMCPError(jsonrpc.CodeInvalidParams, "could not open fleet checkpoint", err.Error())
 			}
-			return nil, nil, newMCPError(jsonrpc.CodeInternalError, "health command failed: "+detail, nil)
+			defer checkpoint.mu.Unlock()
+			keep := args.Resume != ""
+			defer func() {
+				if !keep {
+					checkpoint.expiry.Stop()
+					removeHealthMCPCheckpoint(&checkpoints, token, checkpoint)
+				}
+			}()
+			cmd = append(cmd, "--checkpoint="+filepath.Join(checkpoint.dir, "health.json"))
+			return runHealthMCPFleet(ctx, req, execCmd, cmd, token, &keep)
 		}
-		if !json.Valid(stdout) {
-			return nil, nil, newMCPError(jsonrpc.CodeInternalError, "health command returned invalid JSON", nil)
-		}
-		notifyProgress(ctx, req, 100, 100, "Workflow health read complete")
-		return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: string(stdout)}}}, nil, nil
+		return runLegacyHealthMCP(ctx, req, execCmd, cmd)
 	})
+}
+
+func runLegacyHealthMCP(ctx context.Context, req *mcp.CallToolRequest, execCmd execCmdFunc, cmd []string) (*mcp.CallToolResult, any, error) {
+	notifyProgress(ctx, req, 0, 100, "Reading workflow health...")
+	stdout, stderr, err := runMCPExecOutputWithStderr(ctx, execCmd, cmd...)
+	if err != nil {
+		detail := strings.TrimSpace(string(stderr))
+		if detail == "" {
+			detail = err.Error()
+		}
+		return nil, nil, newMCPError(jsonrpc.CodeInternalError, "health command failed: "+detail, nil)
+	}
+	var report struct {
+		Collection struct{ Partial bool }
+	}
+	if err := json.Unmarshal(stdout, &report); err != nil {
+		return nil, nil, newMCPError(jsonrpc.CodeInternalError, "health command returned invalid JSON", nil)
+	}
+	notifyProgress(ctx, req, 100, 100, healthMCPProgress(report.Collection.Partial))
+	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: string(stdout)}}}, nil, nil
+}
+
+func runHealthMCPFleet(ctx context.Context, req *mcp.CallToolRequest, execCmd execCmdFunc, cmd []string, token string, keep *bool) (*mcp.CallToolResult, any, error) {
+	notifyProgress(ctx, req, 0, 100, "Reading workflow health...")
+	stdout, stderr, err := runMCPExecOutputWithStderr(ctx, execCmd, cmd...)
+	if err != nil {
+		return nil, nil, newMCPError(jsonrpc.CodeInternalError, "health command failed", strings.TrimSpace(string(stderr)))
+	}
+	var report healthFleetReport
+	if err := json.Unmarshal(stdout, &report); err != nil || report.SchemaVersion != 1 {
+		return nil, nil, newMCPError(jsonrpc.CodeInternalError, "invalid health fleet report", nil)
+	}
+	*keep = report.NextAction != nil && report.NextAction.Type == "resume"
+	if *keep {
+		report.NextAction.Checkpoint = token
+	}
+	notifyProgress(ctx, req, 100, 100, healthMCPProgress(report.Coverage.Partial))
+	return nil, report, nil
+}
+
+type healthMCPCheckpoint struct {
+	dir     string
+	session *mcp.ServerSession
+	mu      sync.Mutex
+	expiry  *time.Timer
+}
+
+func removeHealthMCPCheckpoint(checkpoints *sync.Map, token string, checkpoint *healthMCPCheckpoint) {
+	checkpoints.Delete(token)
+	for _, path := range []string{filepath.Join(checkpoint.dir, "health.json"), checkpoint.dir} {
+		if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
+			mcpLog.Printf("Remove health checkpoint: %v", err)
+		}
+	}
+}
+
+func openHealthMCPCheckpoint(checkpoints *sync.Map, session *mcp.ServerSession, resume string) (*healthMCPCheckpoint, string, error) {
+	if resume != "" {
+		value, _ := checkpoints.Load(resume)
+		checkpoint, ok := value.(*healthMCPCheckpoint)
+		if !ok || checkpoint.session != session {
+			return nil, "", os.ErrNotExist
+		}
+		if !checkpoint.mu.TryLock() {
+			return nil, "", os.ErrExist
+		}
+		if _, live := checkpoints.Load(resume); !live {
+			checkpoint.mu.Unlock()
+			return nil, "", os.ErrNotExist
+		}
+		return checkpoint, resume, nil
+	}
+	dir, err := os.MkdirTemp("", "gh-aw-health-*")
+	if err != nil {
+		return nil, "", err
+	}
+	token := filepath.Base(dir)
+	checkpoint := &healthMCPCheckpoint{dir: dir, session: session}
+	checkpoint.mu.Lock()
+	checkpoints.Store(token, checkpoint)
+	checkpoint.expiry = time.AfterFunc(30*time.Minute, func() {
+		checkpoint.mu.Lock()
+		defer checkpoint.mu.Unlock()
+		removeHealthMCPCheckpoint(checkpoints, token, checkpoint)
+	})
+	return checkpoint, token, nil
+}
+
+func healthMCPProgress(partial bool) string {
+	if partial {
+		return "Workflow health returned partial evidence"
+	}
+	return "Workflow health read complete"
 }
 
 func healthMCPCommand(args healthArgs) []string {
 	cmdArgs := []string{"health", "--json"}
+	if args.Fleet {
+		cmdArgs = append(cmdArgs, "--fleet")
+	}
+	if args.Full {
+		cmdArgs = append(cmdArgs, "--full")
+	}
 	if args.Days != nil {
 		cmdArgs = append(cmdArgs, "--days="+strconv.Itoa(*args.Days))
 	}

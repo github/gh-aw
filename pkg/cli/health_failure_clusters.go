@@ -9,7 +9,12 @@ import (
 
 // Reuse logs clustering without downloading artifacts or retaining full cached analyses.
 func buildHealthFailureClusters(runs []WorkflowRun, config HealthConfig) ([]FailureCluster, *FailureInvestigation) {
-	runs = currentHealthRuns(runs, healthRevisionStatuses(runs, config.collection))
+	failures := healthFailureRecords(currentHealthRuns(runs, healthRevisionStatuses(runs, config.collection)), config)
+	clusters := annotateFailureClusters(failures)
+	return clusters, buildFailureInvestigation(failures, clusters)
+}
+
+func healthFailureRecords(runs []WorkflowRun, config HealthConfig) []RunData {
 	var failures []RunData
 	intentional := make(map[string]bool)
 	for _, run := range runs {
@@ -40,8 +45,7 @@ func buildHealthFailureClusters(runs []WorkflowRun, config HealthConfig) ([]Fail
 		}
 		failures = append(failures, data)
 	}
-	clusters := annotateFailureClusters(failures)
-	return clusters, buildFailureInvestigation(failures, clusters)
+	return failures
 }
 
 func enrichHealthFailureFromCache(data *RunData, run WorkflowRun, config HealthConfig) {
