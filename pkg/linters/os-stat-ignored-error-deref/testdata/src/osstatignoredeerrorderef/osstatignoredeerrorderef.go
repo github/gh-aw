@@ -138,6 +138,16 @@ func retainedError(path string) int64 {
 	return info.Size()
 }
 
+func expressionlessSwitch(path string) int64 {
+	info, _ := os.Stat(path)
+	switch {
+	case info == nil:
+		return 0
+	default:
+		return info.Size() // want "result of os.Stat is dereferenced"
+	}
+}
+
 func unrelatedStat(path string) int64 {
 	info, _ := Stat(path)
 	return info.Size()

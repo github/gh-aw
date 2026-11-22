@@ -175,6 +175,11 @@ function normalizeReportTitle(value) {
 }
 
 /** @param {string} value */
+function isTemporaryIdLink(value) {
+  return /^#aw_[A-Za-z0-9_]{3,12}$/i.test(value);
+}
+
+/** @param {string} value */
 function normalizeReportURL(value) {
   const normalized = normalizeReportText(value);
   if (normalized !== value || /[\s\\]/.test(value)) throw new TypeError("Report links must contain a canonical HTTPS URL");
@@ -338,7 +343,7 @@ function normalizeInlines(nodes, depth, inLink = false, deferRedaction = false) 
         if (node.type === "link" && inLink) throw new TypeError("Report links cannot contain other links");
         const children = normalizeInlines(node.children, depth + 1, inLink || node.type === "link", true);
         if (!children.length) break;
-        result.push(node.type === "link" ? { type: "link", url: normalizeReportURL(node.url), children } : { type: node.type, children });
+        result.push(node.type === "link" ? { type: "link", url: isTemporaryIdLink(node.url) ? node.url : normalizeReportURL(node.url), children } : { type: node.type, children });
         break;
       }
       default:
@@ -856,4 +861,16 @@ function renderReport(report) {
   return result;
 }
 
-module.exports = { normalizeReport, normalizeReportText, normalizeReportTitle, normalizeReportURL, normalizeReportAllowedURL, normalizeReportImage, isReportReferenceDefinition, redactReportForRendering, assertRedactedReport, renderReport };
+module.exports = {
+  normalizeReport,
+  normalizeReportText,
+  normalizeReportTitle,
+  normalizeReportURL,
+  normalizeReportAllowedURL,
+  normalizeReportImage,
+  isTemporaryIdLink,
+  isReportReferenceDefinition,
+  redactReportForRendering,
+  assertRedactedReport,
+  renderReport,
+};

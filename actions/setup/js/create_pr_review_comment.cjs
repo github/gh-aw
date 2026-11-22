@@ -18,6 +18,7 @@ const { resolveInvocationContext } = require("./invocation_context_helpers.cjs")
 const { ERR_VALIDATION } = require("./error_codes.cjs");
 const { fitMarkdownBody } = require("./report_size.cjs");
 const { parseReportMarkdown } = require("./report_markdown.cjs");
+const { isTemporaryId, normalizeTemporaryId } = require("./temporary_id.cjs");
 
 /** @type {string} Safe output type handled by this module */
 const HANDLER_TYPE = "create_pull_request_review_comment";
@@ -392,6 +393,7 @@ async function main(config = {}) {
       line: line,
       body,
       rawBody,
+      ...(isTemporaryId(commentItem.temporary_id) ? { temporaryId: normalizeTemporaryId(commentItem.temporary_id) } : {}),
       ...(bodyFooterBlocks.length ? { bodyFooterBlocks } : {}),
       side: side,
     };
@@ -400,7 +402,11 @@ async function main(config = {}) {
       bufferedComment.start_line = startLine;
     }
 
-    buffer.addComment(bufferedComment);
+    if (!buffer.addComment(bufferedComment)) {
+      const error = `Duplicate review-local temporary_id '${bufferedComment.temporaryId}' in this PR review`;
+      core.warning(error);
+      return { success: false, error };
+    }
 
     core.info(`Buffered review comment on PR #${pullRequestNumber} in ${itemRepo} at ${commentItem.path}:${line}${startLine ? ` (lines ${startLine}-${line})` : ""} [${side}]`);
 
