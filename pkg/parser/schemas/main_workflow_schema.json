@@ -13921,6 +13921,18 @@
       "description": "Optional observability output settings for workflow runs.",
       "properties": {
         "otlp": {
+          "oneOf": [
+            { "$ref": "#/properties/observability/$defs/otlp_config" },
+            {
+              "type": "boolean",
+              "const": false,
+              "description": "Disable compiler-managed OTLP configuration, including defaults and imported settings, when set in the main workflow."
+            }
+          ]
+        }
+      },
+      "$defs": {
+        "otlp_config": {
           "type": "object",
           "description": "OTLP (OpenTelemetry Protocol) trace export configuration.",
           "properties": {

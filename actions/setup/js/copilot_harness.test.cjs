@@ -153,6 +153,57 @@ const harnessChildEnv = {
   GH_AW_SKIP_REFLECT: "true",
 };
 
+describe("native Copilot model effort suffix", () => {
+  it.each([
+    ["gpt-6-luna?effort=high", ["--prompt", "test"], "gpt-6-luna", ["--prompt", "test", "--reasoning-effort", "high"]],
+    ["gpt-6-luna?effort=low", ["--prompt", "--reasoning-effort=high", "--", "positional"], "gpt-6-luna", ["--prompt", "--reasoning-effort=high", "--reasoning-effort", "low", "--", "positional"]],
+    ["gpt-6-luna?effort=high", ["--reasoning-effort=low"], "gpt-6-luna", ["--reasoning-effort=low"]],
+    ["gpt-6-luna?effort=high", ["--reasoning-effort", "low"], "gpt-6-luna", ["--reasoning-effort", "low"]],
+    ["gpt-6-luna", ["--model=gpt-6-luna?effort=medium"], "gpt-6-luna", ["--model=gpt-6-luna", "--reasoning-effort", "medium"]],
+    ["gpt-6-luna?effort=auto", ["--prompt", "test"], "gpt-6-luna?effort=auto", ["--prompt", "test"]],
+    ["gpt-6-luna", [], "gpt-6-luna", []],
+  ])("launches with the bare model ID and native effort arguments (%s, %j)", (model, cliArgs, expectedModel, expectedArgs) => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), "copilot-model-effort-"));
+    try {
+      const stubPath = path.join(directory, "copilot.cjs");
+      const invocationPath = path.join(directory, "invocation.json");
+      fs.writeFileSync(stubPath, `require("fs").writeFileSync(${JSON.stringify(invocationPath)}, JSON.stringify({ model: process.env.COPILOT_MODEL, args: process.argv.slice(2) }));`);
+      const harnessPath = require.resolve("./copilot_harness.cjs");
+      const result = spawnProcessSync(process.execPath, [harnessPath, process.execPath, stubPath, ...cliArgs], {
+        cwd: directory,
+        env: { ...harnessChildEnv, GITHUB_WORKSPACE: directory, GH_AW_TMP_DIR: directory, GH_AW_PHASE: "detection", COPILOT_MODEL: model },
+        encoding: "utf8",
+        timeout: 10000,
+      });
+      expect(result.status, result.stderr).toBe(0);
+      expect(JSON.parse(fs.readFileSync(invocationPath, "utf8"))).toEqual({ model: expectedModel, args: expectedArgs });
+    } finally {
+      fs.rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects CLI effort values that have no native flag before launching Copilot", () => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), "copilot-model-effort-"));
+    try {
+      const stubPath = path.join(directory, "copilot.cjs");
+      const invocationPath = path.join(directory, "invocation.json");
+      fs.writeFileSync(stubPath, `require("fs").writeFileSync(${JSON.stringify(invocationPath)}, "started");`);
+      const harnessPath = require.resolve("./copilot_harness.cjs");
+      const result = spawnProcessSync(process.execPath, [harnessPath, process.execPath, stubPath, "--prompt", "test"], {
+        cwd: directory,
+        env: { ...harnessChildEnv, GITHUB_WORKSPACE: directory, GH_AW_TMP_DIR: directory, GH_AW_PHASE: "detection", COPILOT_MODEL: "gpt-6-luna?effort=xhigh" },
+        encoding: "utf8",
+        timeout: 10000,
+      });
+      expect(result.status).not.toBe(0);
+      expect(result.stderr).toContain("Copilot model suffix ?effort= expects low, medium, or high");
+      expect(fs.existsSync(invocationPath)).toBe(false);
+    } finally {
+      fs.rmSync(directory, { recursive: true, force: true });
+    }
+  });
+});
+
 // Child processes restore compiler provenance from aw_info.json, not this worker's in-memory fixture records.
 function spawnSync(command, args, options) {
   const env = { ...(options.env || process.env) };
@@ -4710,14 +4761,14 @@ describe("Copilot CLI model-selection evidence through harness startup", () => {
     for (const dir of tempDirs.splice(0)) fs.rmSync(dir, { recursive: true, force: true });
   });
 
-  function runHarness(envOverrides, { routed, providerPort = 0, sdk = false }) {
+  function runHarness(envOverrides, { routed, providerPort = 0, sdk = false, modelAliases, cliArgs = ["--prompt", "Hello"] }) {
     const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "copilot-selection-startup-"));
     tempDirs.push(tmpDir);
     const preloadPath = path.join(tmpDir, "reflect-preload.cjs");
     const stubPath = path.join(tmpDir, "copilot-stub.cjs");
     const argsPath = path.join(tmpDir, "stub-args.json");
     const configPath = path.join(tmpDir, "awf-config.json");
-    fs.writeFileSync(configPath, JSON.stringify({ network: { allowDomains: [] } }));
+    fs.writeFileSync(configPath, JSON.stringify({ network: { allowDomains: [] }, ...(modelAliases ? { apiProxy: { models: modelAliases } } : {}) }));
     const reflect = JSON.parse(fs.readFileSync(path.join(fixtureDir, "awf-reflect.json"), "utf8"));
     if (!routed) delete reflect.routing;
     if (providerPort) Object.assign(reflect.endpoints[0], { base_url: `http://127.0.0.1:${providerPort}`, models_url: `http://127.0.0.1:${providerPort}/models` });
@@ -4774,7 +4825,7 @@ process.stdout.write("done\\n");`
     ])
       delete env[key];
     Object.assign(env, envOverrides);
-    const result = spawnSync(process.execPath, ["copilot_harness.cjs", process.execPath, ...(sdk ? [stubPath, sidecarPath] : [stubPath, "--prompt", "Hello"])], {
+    const result = spawnSync(process.execPath, ["copilot_harness.cjs", process.execPath, ...(sdk ? [stubPath, sidecarPath] : [stubPath, ...cliArgs])], {
       cwd: path.dirname(require.resolve("./copilot_harness.cjs")),
       env,
       encoding: "utf8",
@@ -4832,6 +4883,35 @@ process.stdout.write("done\\n");`
 
     expect(result.status, result.stderr).toBe(0);
     expect(selection).toEqual({ status: "observed", configured_model: "gpt-5.6-luna", resolved_model: "gpt-5.6-luna", effective_model: "gpt-5.6-luna" });
+  });
+
+  it.each([
+    ["inherits alias effort", [], "high"],
+    ["lets caller effort override alias effort", ["--reasoning-effort", "low", "--prompt", "Hello"], "low"],
+  ])("translates effort inherited from an alias after resolution (%s)", (caseName, cliArgs, expectedEffort) => {
+    const { result, args, selection } = runHarness(
+      { AWF_REFLECT_ENABLED: "1", COPILOT_MODEL: "effort-high" },
+      {
+        routed: false,
+        modelAliases: { "effort-high": ["copilot/gpt-6-luna?effort=high"] },
+        cliArgs: cliArgs.length ? cliArgs : ["--prompt", "Hello"],
+      }
+    );
+
+    expect(result.status, result.stderr).toBe(0);
+    expect(args).toContain("--reasoning-effort");
+    expect(args[args.indexOf("--reasoning-effort") + 1]).toBe(expectedEffort);
+    expect(args).not.toContain("gpt-6-luna?effort=high");
+    expect(selection).toMatchObject({ status: "observed", resolved_model: "gpt-6-luna", effective_model: "gpt-6-luna" });
+  });
+
+  it("leaves effort suffixes to existing SDK handling rather than applying CLI translation", () => {
+    const { result, sidecarArgs } = runHarness({ AWF_REFLECT_ENABLED: "1", COPILOT_MODEL: "gpt-6-luna?effort=high", COPILOT_SDK_URI: "http://127.0.0.1:1" }, { routed: false, sdk: true });
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("configured model 'gpt-6-luna?effort=high'");
+    expect(result.stderr).not.toContain("copilot-sdk driver mode: starting sidecar");
+    expect(sidecarArgs).toBeNull();
   });
 
   it.each([true, false])("does not create a CLI selection record in SDK mode (routed=%s)", async routed => {

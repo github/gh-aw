@@ -215,7 +215,7 @@ Copilot, Claude, Codex, Pi, and Agy resolve aliases against the configured provi
 - Built-in aliases (such as `opus`/`small`), workflow-defined `models:`, and their globs select the newest live match. Globs skip models AWF marks as not automatically selectable, such as a Decisions-only evaluation model; alias entries without `*`, such as `evals`, are unaffected.
 - A `provider/` prefix restricts the lookup; otherwise the engine's configured provider applies.
 - Exact live IDs take precedence over same-named aliases, and unrecognized IDs are not rewritten. Pi checks exact IDs before launch; Copilot, Claude, and Codex fail on the first unavailable-model request.
-- `?effort=` parameters are retained; `auto` keeps its engine-specific meaning.
+- `auto` keeps its engine-specific meaning. In Copilot CLI mode, `?effort=low`, `?effort=medium`, and `?effort=high` on a model ID or alias become `--reasoning-effort` after alias resolution. The CLI receives the model ID without the suffix. An explicit `--reasoning-effort` in `engine.args` takes precedence.
 - Missing matches fail with `model_unavailable`; incomplete discovery fails with `catalog_unavailable`.
 
 Gemini and declarative engines pass model names through unchanged and warn about gh-aw aliases. AWF can independently rewrite unrecognized models on non-Copilot providers; disable [`sandbox.agent.model-fallback`](/gh-aw/reference/sandbox/#model-fallback-sandboxagentmodel-fallback) when exact routing is required.
