@@ -111,22 +111,23 @@ type WorkflowContinuation struct {
 
 // LogsSummary contains aggregate metrics across all runs
 type LogsSummary struct {
-	ObsoletePRRuns      int     `json:"obsolete_pr_runs,omitempty" console:"header:Obsolete PR Runs,omitempty"`
-	NonExecutionRuns    int     `json:"non_execution_runs,omitempty" console:"header:Jobless Runs,omitempty"`
-	ExecutedRuns        int     `json:"executed_runs" console:"-"`
-	ExecutedSuccessRuns int     `json:"executed_success_runs" console:"-"`
-	TotalRuns           int     `json:"total_runs" console:"header:Total Runs"`
-	TotalDuration       string  `json:"total_duration" console:"header:Total Duration"`
-	TotalAIC            float64 `json:"total_aic,omitempty"`
-	TotalTokens         int     `json:"total_tokens,omitempty" console:"header:Total Tokens,format:number,omitempty"`
-	TotalActionMinutes  float64 `json:"total_action_minutes" console:"header:Total Action Minutes"`
-	TotalTurns          int     `json:"total_turns" console:"header:Total Turns"`
-	TotalSteeringEvents int     `json:"total_steering_events,omitempty" console:"header:Total Steering Events,format:number,omitempty"`
-	TotalErrors         int     `json:"total_errors" console:"header:Total Errors"`
-	TotalWarnings       int     `json:"total_warnings" console:"header:Total Warnings"`
-	TotalMissingTools   int     `json:"total_missing_tools" console:"header:Total Missing Tools"`
-	TotalMissingData    int     `json:"total_missing_data" console:"header:Total Missing Data"`
-	TotalSafeItems      int     `json:"total_safe_items" console:"header:Total Safe Items"`
+	ObsoletePRRuns      int      `json:"obsolete_pr_runs,omitempty" console:"header:Obsolete PR Runs,omitempty"`
+	NonExecutionRuns    int      `json:"non_execution_runs,omitempty" console:"header:Jobless Runs,omitempty"`
+	ExecutedRuns        int      `json:"executed_runs" console:"-"`
+	ExecutedSuccessRuns int      `json:"executed_success_runs" console:"-"`
+	TotalRuns           int      `json:"total_runs" console:"header:Total Runs"`
+	TotalDuration       string   `json:"total_duration" console:"header:Total Duration"`
+	TotalAIC            *float64 `json:"total_aic"`
+	AICCoverage         string   `json:"aic_coverage" console:"-"`
+	TotalTokens         int      `json:"total_tokens,omitempty" console:"header:Total Tokens,format:number,omitempty"`
+	TotalActionMinutes  float64  `json:"total_action_minutes" console:"header:Total Action Minutes"`
+	TotalTurns          int      `json:"total_turns" console:"header:Total Turns"`
+	TotalSteeringEvents int      `json:"total_steering_events,omitempty" console:"header:Total Steering Events,format:number,omitempty"`
+	TotalErrors         int      `json:"total_errors" console:"header:Total Errors"`
+	TotalWarnings       int      `json:"total_warnings" console:"header:Total Warnings"`
+	TotalMissingTools   int      `json:"total_missing_tools" console:"header:Total Missing Tools"`
+	TotalMissingData    int      `json:"total_missing_data" console:"header:Total Missing Data"`
+	TotalSafeItems      int      `json:"total_safe_items" console:"header:Total Safe Items"`
 	// TotalDriverExitFailures counts failed runs with zero agent turns — the CLI wrapper
 	// or a pre/post-agent infrastructure step exited non-zero before the agent ran.
 	// These are infra-flakiness signals, not agent-logic regressions.
@@ -208,7 +209,8 @@ type RunData struct {
 	// TokenUsage is always emitted (even when 0) so consumers of the run list can
 	// discover the field and distinguish "no tokens recorded" from "field absent".
 	TokenUsage                 int                    `json:"token_usage" console:"header:Tokens,format:number,omitempty"`
-	AIC                        float64                `json:"aic"`
+	AIC                        *float64               `json:"aic"`
+	AICCoverage                string                 `json:"aic_coverage" console:"-"`
 	AmbientContext             *AmbientContextMetrics `json:"ambient_context,omitempty" console:"-"`
 	WorkingSet                 *WorkingSetMetrics     `json:"working_set,omitempty" console:"-"`
 	Ledger                     *LedgerActivity        `json:"ledger,omitempty" console:"-"`
@@ -277,10 +279,17 @@ type RunData struct {
 	awInfo            *AwInfo
 }
 
+const (
+	logsAICAvailable   = "available"
+	logsAICUnavailable = "unavailable"
+	logsAICPartial     = "partial"
+)
+
 // logsAggregate accumulates cross-run totals while runs are converted to RunData.
 type logsAggregate struct {
 	totalDuration                 time.Duration
 	totalAIC                      float64
+	runsWithAIC                   int
 	totalTokens                   int
 	totalActionMinutes            float64
 	totalTurns                    int
@@ -316,7 +325,6 @@ func (agg *logsAggregate) accumulateRunTotals(pr ProcessedRun) {
 		agg.totalDuration += run.Duration
 	}
 	if pr.TokenUsage != nil {
-		agg.totalAIC += pr.TokenUsage.TotalAIC
 		agg.totalSteeringEvents += pr.TokenUsage.TotalSteeringEvents
 	}
 	agg.totalTokens += run.TokenUsage
@@ -331,7 +339,6 @@ func (agg *logsAggregate) accumulateRunTotals(pr ProcessedRun) {
 
 func (agg *logsAggregate) accumulateCachedRunTotals(run RunData) {
 	agg.totalDuration += parseDurationString(run.Duration)
-	agg.totalAIC += run.AIC
 	if run.TokenUsageSummary != nil {
 		agg.totalSteeringEvents += run.TokenUsageSummary.TotalSteeringEvents
 	}
@@ -363,6 +370,13 @@ func (agg *logsAggregate) accumulateCachedRunTotals(run RunData) {
 	}
 	if run.IntentionalFailure {
 		agg.intentionalFailureRuns++
+	}
+}
+
+func (agg *logsAggregate) accumulateRunAIC(run RunData) {
+	if run.AICCoverage == logsAICAvailable && run.AIC != nil {
+		agg.runsWithAIC++
+		agg.totalAIC += *run.AIC
 	}
 }
 
@@ -413,10 +427,17 @@ func (agg *logsAggregate) classifyRunFailure(pr ProcessedRun) string {
 
 // summary converts the accumulated totals into a LogsSummary.
 func (agg *logsAggregate) summary(totalRuns int) LogsSummary {
+	coverage := logsAICUnavailable
+	if agg.runsWithAIC > 0 {
+		coverage = logsAICPartial
+		if agg.runsWithAIC == totalRuns {
+			coverage = logsAICAvailable
+		}
+	}
 	summary := LogsSummary{
 		TotalRuns:                     totalRuns,
 		TotalDuration:                 timeutil.FormatDuration(agg.totalDuration),
-		TotalAIC:                      agg.totalAIC,
+		AICCoverage:                   coverage,
 		TotalTokens:                   agg.totalTokens,
 		TotalActionMinutes:            agg.totalActionMinutes,
 		TotalTurns:                    agg.totalTurns,
@@ -437,6 +458,9 @@ func (agg *logsAggregate) summary(totalRuns int) LogsSummary {
 		TotalChainedFollowupActions:   agg.totalChainedFollowupActions,
 		TotalClosedTempTargets:        agg.totalClosedTempTargets,
 		TotalGitHubAPICalls:           agg.totalGitHubAPICalls,
+	}
+	if coverage == logsAICAvailable {
+		summary.TotalAIC = new(agg.totalAIC)
 	}
 	if len(agg.engineCounts) > 0 {
 		summary.EngineCounts = agg.engineCounts
@@ -544,12 +568,45 @@ func applyRunDataSteering(runData *RunData, summary *TokenUsageSummary) {
 	runData.SteeringNoticesUnavailable = tokenUsageSteeringNoticesUnavailable(summary)
 }
 
+func (agg *logsAggregate) recordCachedRun(runData RunData) RunData {
+	// Older cache records cannot distinguish a recorded zero from missing cost.
+	if runData.AICCoverage == "" {
+		runData.AICCoverage = logsAICUnavailable
+		if runData.AIC != nil && *runData.AIC > 0 {
+			runData.AICCoverage = logsAICAvailable
+		}
+	}
+	if runData.AICCoverage != logsAICAvailable || runData.AIC == nil {
+		runData.AIC = nil
+		runData.AICCoverage = logsAICUnavailable
+	}
+	agg.accumulateCachedRunTotals(runData)
+	agg.accumulateRunAIC(runData)
+	return runData
+}
+
+func (agg *logsAggregate) recordRunAIC(runData *RunData, usage *TokenUsageSummary) {
+	runData.AICCoverage = logsAICUnavailable
+	if usage != nil && (usage.AICFound || usage.TotalAIC > 0) {
+		runData.AIC = new(usage.TotalAIC)
+		runData.AICCoverage = logsAICAvailable
+	}
+
+	agg.accumulateRunAIC(*runData)
+}
+
+func runAICValue(run RunData) float64 {
+	if run.AIC != nil {
+		return *run.AIC
+	}
+	return 0
+}
+
 // buildRunData converts a processed run into RunData while accumulating rollup totals.
 // localRepo guards against cross-repo misclassification of intentional-failure workflows.
 func buildRunData(pr ProcessedRun, processedRuns []ProcessedRun, localRepo string, agg *logsAggregate, classifyLocal bool) RunData {
 	if pr.cachedData != nil {
-		agg.accumulateCachedRunTotals(*pr.cachedData)
-		return *pr.cachedData
+		return agg.recordCachedRun(*pr.cachedData)
 	}
 	run := pr.Run
 
@@ -596,9 +653,7 @@ func buildRunData(pr ProcessedRun, processedRuns []ProcessedRun, localRepo strin
 	if run.Duration > 0 {
 		runData.Duration = timeutil.FormatDuration(run.Duration)
 	}
-	if pr.TokenUsage != nil && pr.TokenUsage.TotalAIC > 0 {
-		runData.AIC = pr.TokenUsage.TotalAIC
-	}
+	agg.recordRunAIC(&runData, pr.TokenUsage)
 	// Compute average TBT from metrics when available; fall back to wall-time / (turns - 1).
 	if run.AvgTimeBetweenTurns > 0 {
 		runData.AvgTimeBetweenTurns = timeutil.FormatDuration(run.AvgTimeBetweenTurns)
@@ -624,7 +679,6 @@ func newRunData(pr ProcessedRun, engineInfo runEngineInfo, chainMetrics SafeOutp
 		Classification:             deriveRunClassification(comparison),
 		FailureKind:                failureKind,
 		TokenUsage:                 run.TokenUsage,
-		AIC:                        0,
 		AmbientContext:             runAmbientContext(pr),
 		WorkingSet:                 pr.WorkingSet,
 		WSRF:                       wsrfDisplayValue(pr.WorkingSet),

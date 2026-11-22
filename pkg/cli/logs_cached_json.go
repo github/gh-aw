@@ -22,7 +22,14 @@ import (
 
 type cachedLogsRuns map[int64]cachedLogsJSONLRunData
 
-const cachedLogsJSONLSchemaVersion = 7
+const (
+	legacyCachedLogsJSONLSchemaVersion = 7
+	cachedLogsJSONLSchemaVersion       = 8
+)
+
+func supportedCachedLogsJSONLSchemaVersion(version int) bool {
+	return version == legacyCachedLogsJSONLSchemaVersion || version == cachedLogsJSONLSchemaVersion
+}
 
 const (
 	cachedLogsJSONLKindRun          = "run"
@@ -391,7 +398,7 @@ func cachedLogsJSONLFileDateRangeStatus(path string, dateRange cachedLogsJSONLDa
 	hasPreservedRecord := false
 	_, err := visitCachedLogsJSONLRecords(path, func(record cachedLogsJSONLRecord, _ int) error {
 		if record.Kind != cachedLogsJSONLKindRun ||
-			record.SchemaVersion != cachedLogsJSONLSchemaVersion ||
+			!supportedCachedLogsJSONLSchemaVersion(record.SchemaVersion) ||
 			record.Run == nil ||
 			record.Run.CreatedAt.IsZero() {
 			hasPreservedRecord = true
@@ -410,7 +417,7 @@ func cachedLogsJSONLFileDateRangeStatus(path string, dateRange cachedLogsJSONLDa
 }
 
 func (cache *cachedLogsJSONLCache) addRecord(record cachedLogsJSONLRecord, recordNumber int) error {
-	if record.SchemaVersion != cachedLogsJSONLSchemaVersion {
+	if !supportedCachedLogsJSONLSchemaVersion(record.SchemaVersion) {
 		logsCacheLog.Printf("Ignoring incompatible cached logs JSONL record: record=%d, schema_version=%d", recordNumber, record.SchemaVersion)
 		return nil
 	}
@@ -717,7 +724,7 @@ func (w *cachedLogsJSONLWriter) filterDateRange(startDate, endDate string) error
 		var record cachedLogsJSONLRecord
 		if err := json.Unmarshal(trimmed, &record); err != nil ||
 			record.Kind != cachedLogsJSONLKindRun ||
-			record.SchemaVersion != cachedLogsJSONLSchemaVersion ||
+			!supportedCachedLogsJSONLSchemaVersion(record.SchemaVersion) ||
 			record.Run == nil ||
 			record.Run.CreatedAt.IsZero() {
 			filtered = append(filtered, line...)

@@ -6,7 +6,7 @@
         "schema_version": {
           "type": "integer",
           "enum": [
-            7
+            8
           ]
         },
         "kind": {
@@ -142,7 +142,17 @@
               "type": "integer"
             },
             "aic": {
-              "type": "number"
+              "type": [
+                "null",
+                "number"
+              ]
+            },
+            "aic_coverage": {
+              "type": "string",
+              "enum": [
+                "available",
+                "unavailable"
+              ]
             },
             "ambient_context": {
               "type": [
@@ -2744,6 +2754,9 @@
                 },
                 "total_aic": {
                   "type": "number"
+                },
+                "aic_found": {
+                  "type": "boolean"
                 },
                 "ambient_context": {
                   "type": [
@@ -6182,6 +6195,9 @@
                     },
                     "total_aic": {
                       "type": "number"
+                    },
+                    "aic_found": {
+                      "type": "boolean"
                     },
                     "ambient_context": {
                       "type": [
@@ -11200,6 +11216,7 @@
             "classification",
             "token_usage",
             "aic",
+            "aic_coverage",
             "created_at",
             "url",
             "logs_path",
@@ -11222,7 +11239,7 @@
         "schema_version": {
           "type": "integer",
           "enum": [
-            7
+            8
           ]
         },
         "kind": {
@@ -11339,7 +11356,7 @@
         "schema_version": {
           "type": "integer",
           "enum": [
-            7
+            8
           ]
         },
         "kind": {
@@ -11428,7 +11445,7 @@
         "schema_version": {
           "type": "integer",
           "enum": [
-            7
+            8
           ]
         },
         "kind": {

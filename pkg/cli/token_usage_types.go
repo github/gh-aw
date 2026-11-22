@@ -282,7 +282,7 @@ type TokenUsageSummary struct {
 	TotalResponseBytes     int                         `json:"total_response_bytes"`
 	CacheEfficiency        float64                     `json:"cache_efficiency"`
 	TotalAIC               float64                     `json:"total_aic,omitempty"`
-	AICFound               bool                        `json:"-"`
+	AICFound               bool                        `json:"aic_found,omitempty"` // Preserves recorded zero cost across cache loads.
 	AmbientContext         *AmbientContextMetrics      `json:"ambient_context,omitempty"`
 	ByModel                map[string]*ModelTokenUsage `json:"by_model"`
 	SubagentModelRequests  []SubagentModelRequest      `json:"subagent_model_requests,omitempty"`
