@@ -35,6 +35,7 @@ type advisorySourceRun struct {
 	ID             int64              `json:"id"`
 	Event          string             `json:"event"`
 	Conclusion     string             `json:"conclusion"`
+	Attempt        int                `json:"run_attempt"`
 	Repository     struct{ ID int64 } `json:"repository"`
 	HeadRepository struct{ ID int64 } `json:"head_repository"`
 }
@@ -58,19 +59,20 @@ func (o advisoryHandoff) loadPatch(ctx context.Context) ([]byte, error) {
 	if repo.ID <= 0 || repo.Visibility != "private" || !strings.EqualFold(repo.FullName, o.sideRepo) {
 		return nil, errors.New("the artifact source must be the specified private repository")
 	}
-	var run advisorySourceRun
-	if err := readAdvisoryAPI(ctx, fmt.Sprintf("%s/actions/runs/%d", repoPath, o.runID), &run); err != nil {
-		return nil, err
-	}
-	if err := run.verify(o.runID, repo.ID); err != nil {
-		return nil, err
-	}
 	artifactPath := fmt.Sprintf("%s/actions/artifacts/%d", repoPath, o.artifactID)
 	var artifact advisoryArtifact
 	if err := readAdvisoryAPI(ctx, artifactPath, &artifact); err != nil {
 		return nil, err
 	}
 	if err := artifact.verify(o, repo.ID); err != nil {
+		return nil, err
+	}
+	// Check the attempt after fetching metadata so a concurrent rerun cannot supply a new artifact after the check.
+	var run advisorySourceRun
+	if err := readAdvisoryAPI(ctx, fmt.Sprintf("%s/actions/runs/%d", repoPath, o.runID), &run); err != nil {
+		return nil, err
+	}
+	if err := run.verify(o.runID, repo.ID); err != nil {
 		return nil, err
 	}
 	cmd := workflow.ExecGHContext(ctx, "api", "--hostname", "github.com", path.Join(artifactPath, "zip"))
@@ -97,6 +99,9 @@ func (r advisorySourceRun) verify(runID, repoID int64) error {
 	}
 	if r.Event != "workflow_dispatch" || r.Conclusion != "success" {
 		return errors.New("the source run must be a successful manual dispatch; select a completed advisory workflow run")
+	}
+	if r.Attempt != 1 {
+		return errors.New("the artifact source must be a successful first attempt; start a fresh manual dispatch instead of rerunning and use its new run and artifact IDs")
 	}
 	return nil
 }

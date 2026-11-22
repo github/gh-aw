@@ -58,6 +58,8 @@ Use a dedicated private side repository to prepare and test a fix for an unpubli
 
 For an opt-in starting point, add `"maintenance": false` to the private side repository's `.github/aw.json` and adapt this workflow. Replace the repository, base SHA, and sparse paths with values reviewed by the maintainers. Use the full SHA, not a dispatch input or a branch that can move.
 
+Before dispatching, create a fine-grained token scoped to the upstream repository with **Contents: Read-only**, and store it as the `UPSTREAM_READ_TOKEN` Actions secret in the private side repository. The default `GITHUB_TOKEN` is scoped to the side repository and cannot read a private upstream. Set `github-token` on the upstream checkout, not in the agent environment. The checkout does not persist the token in Git configuration. Do not use an advisory fork credential.
+
 ```aw wrap
 ---
 on: workflow_dispatch
@@ -67,6 +69,7 @@ permissions:
   copilot-requests: write
 checkout:
   - repository: my-org/upstream
+    github-token: ${{ secrets.UPSTREAM_READ_TOKEN }}
     ref: "0123456789abcdef0123456789abcdef01234567"
     path: target
     fetch-depth: 1
@@ -116,7 +119,7 @@ that passed. Ask the maintainer to review both files before transfer.
 Use `upload_artifact` to upload the `handoff` directory only.
 ```
 
-Use the artifact link in the run summary to identify the artifact ID and review the test notes. The patch and test notes are agent output, not a test attestation. Review them and independently verify the fix as needed. The approval digest binds the source identity, patch bytes, and fork destination at handoff; it does not replace that review.
+Use the artifact link in the run summary to identify the artifact ID and review the test notes. Artifact handoff requires a successful first attempt; start a fresh manual dispatch instead of rerunning an earlier attempt. The patch and test notes are agent output, not a test attestation. Review them and independently verify the fix as needed. The approval digest binds the source identity, patch bytes, and fork destination at handoff; it does not replace that review.
 
 The generic PR transfer command is not an advisory handoff command: it can create a normal fork and open a PR. Likewise, the [security advisory safe outputs](/gh-aw/reference/safe-outputs/#security-advisory-drafts-create-security-advisory) target the workflow repository, not the upstream repository or its temporary private fork.
 

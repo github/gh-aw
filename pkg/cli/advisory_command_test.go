@@ -69,6 +69,9 @@ func TestAdvisoryPatchReviewRejectsHiddenContent(t *testing.T) {
 	file := filepath.Join(t.TempDir(), "fix.patch")
 	for _, tc := range []struct{ contents, wantError string }{
 		{"diff --git a/file b/file\n+line\n", ""},
+		{"diff --git a/file b/file\n--- a/file\n+++ b/file\n@@ -1 +1 @@\n-café\r\n+thé\r\n", ""},
+		{"diff --git a/file b/file\n+text\roverwrite\r\n", "control characters"},
+		{"diff --git a/file b/file\n+text\r", "control characters"},
 		{"diff --git a/file b/file\nGIT binary patch\n", "binary patches"},
 		{"diff --git a/file b/file\n+text\x1b[2J\n", "control characters"},
 		{"diff --git a/file b/file\n+text\u202e\n", "control characters"},

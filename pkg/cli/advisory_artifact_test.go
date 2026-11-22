@@ -29,7 +29,7 @@ func TestAdvisoryInspectDownloadsExactArtifact(t *testing.T) {
 [ "$1" = api ] && [ "$2" = --hostname ] && [ "$3" = github.com ] || exit 1
 case "$4" in
 repos/owner/side) printf '%%s' '{"id":30,"full_name":"owner/side","visibility":"private"}' ;;
-repos/owner/side/actions/runs/10) printf '%%s' '{"id":10,"event":"workflow_dispatch","conclusion":"success","repository":{"id":30},"head_repository":{"id":30}}' ;;
+repos/owner/side/actions/runs/10) printf '{"id":10,"event":"workflow_dispatch","conclusion":"success","repository":{"id":30},"head_repository":{"id":30}%%s}' "$ADVISORY_TEST_ATTEMPT" ;;
 repos/owner/side/actions/artifacts/20) printf '%%s' '{"id":20,"size_in_bytes":%d,"digest":"sha256:%x","workflow_run":{"id":10,"repository_id":30}}' ;;
 repos/owner/side/actions/artifacts/20/zip) cat "$ADVISORY_TEST_ZIP" ;;
 repos/owner/upstream/security-advisories/GHSA-2345-6789-cfgh) printf '%%s' '{"ghsa_id":"GHSA-2345-6789-cfgh","state":"draft","private_fork":{"id":40,"full_name":"owner/fork","private":true}}' ;;
@@ -38,16 +38,35 @@ esac
 `, archive.Len(), sha256.Sum256(archive.Bytes()))
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "gh"), []byte(script), 0o700))
 	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
-	cmd := NewAdvisoryCommand()
-	var output bytes.Buffer
-	cmd.SetOut(&output)
-	cmd.SetErr(&output)
-	cmd.SetArgs([]string{"inspect", advisoryTestID, "--repo", "owner/upstream", "--base", strings.Repeat("a", 40),
-		"--base-branch", "main", "--branch", "fix", "--side-repo", "owner/side", "--run", "10", "--artifact", "20"})
-	require.NoError(t, cmd.ExecuteContext(t.Context()))
-	require.Contains(t, output.String(), "Verified source: owner/side, run 10, artifact 20")
-	require.Contains(t, output.String(), "+reviewed change")
-	require.Regexp(t, `Approval digest: [a-f0-9]{64}`, output.String())
+	for _, tc := range []struct {
+		name    string
+		attempt string
+		wantErr bool
+	}{
+		{name: "first attempt", attempt: `,"run_attempt":1`},
+		{name: "rerun", attempt: `,"run_attempt":2`, wantErr: true},
+		{name: "missing attempt", wantErr: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("ADVISORY_TEST_ATTEMPT", tc.attempt)
+			cmd := NewAdvisoryCommand()
+			var output bytes.Buffer
+			cmd.SetOut(&output)
+			cmd.SetErr(&output)
+			cmd.SetArgs([]string{"inspect", advisoryTestID, "--repo", "owner/upstream", "--base", strings.Repeat("a", 40),
+				"--base-branch", "main", "--branch", "fix", "--side-repo", "owner/side", "--run", "10", "--artifact", "20"})
+			err := cmd.ExecuteContext(t.Context())
+			if tc.wantErr {
+				require.ErrorContains(t, err, "successful first attempt")
+				require.NotContains(t, output.String(), "Verified source:")
+				return
+			}
+			require.NoError(t, err)
+			require.Contains(t, output.String(), "Verified source: owner/side, run 10, artifact 20")
+			require.Contains(t, output.String(), "+reviewed change")
+			require.Regexp(t, `Approval digest: [a-f0-9]{64}`, output.String())
+		})
+	}
 }
 
 func TestAdvisoryArtifactProvenance(t *testing.T) {
@@ -64,7 +83,7 @@ func TestAdvisoryArtifactProvenance(t *testing.T) {
 }
 
 func TestAdvisorySourceRunRejectsUntrustedTriggers(t *testing.T) {
-	run := advisorySourceRun{ID: 10, Event: "workflow_dispatch", Conclusion: "success"}
+	run := advisorySourceRun{ID: 10, Event: "workflow_dispatch", Conclusion: "success", Attempt: 1}
 	run.Repository.ID, run.HeadRepository.ID = 30, 30
 	require.NoError(t, run.verify(10, 30))
 	run.HeadRepository.ID++

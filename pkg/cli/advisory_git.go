@@ -8,8 +8,6 @@ import (
 	"os"
 	"os/exec"
 	"strings"
-
-	"github.com/github/gh-aw/pkg/constants"
 )
 
 func (o advisoryHandoff) pushPatch(ctx context.Context, fork advisoryFork, patch []byte) error {
@@ -72,6 +70,10 @@ func (o advisoryHandoff) applyAndPush(ctx context.Context, dir, remote string, p
 			return errors.New("could not create the private fix branch; verify Git access and choose an unused branch if it already exists")
 		}
 	}
+	tip, err = git.run(nil, "ls-remote", "--refs", remote, baseRef)
+	if err != nil || tip != base+"\t"+baseRef {
+		return errors.New("the advisory fork base moved or could not be reconfirmed after transfer; the private fix branch may already exist, so check it before rebasing, retesting, and running inspect again")
+	}
 	return nil
 }
 
@@ -112,7 +114,6 @@ func (g advisoryGit) patchTree(base string, patch []byte) (string, error) {
 	if changes == "" {
 		return "", errors.New("patch produced no supported changes")
 	}
-	const actionsDir = ".github/actions"
 	for changes != "" {
 		status, rest, statusOK := strings.Cut(changes, "\x00")
 		filename, remaining, pathOK := strings.Cut(rest, "\x00")
@@ -122,10 +123,11 @@ func (g advisoryGit) patchTree(base string, patch []byte) (string, error) {
 			return "", errors.New("could not verify paths in the staged patch")
 		}
 		lower := strings.ToLower(filename)
-		if !advisoryFileMode(oldMode) || !advisoryFileMode(newMode) ||
-			strings.EqualFold(filename, constants.WorkflowsDir) || strings.HasPrefix(lower, constants.WorkflowsDir+"/") ||
-			strings.EqualFold(filename, actionsDir) || strings.HasPrefix(lower, actionsDir+"/") {
-			return "", errors.New("patch changes a workflow or a non-regular file; use a manual handoff for this patch")
+		if lower == ".github" || strings.HasPrefix(lower, ".github/") {
+			return "", errors.New("patch changes a workflow or another path under .github; use a manual handoff for this patch")
+		}
+		if !advisoryFileMode(oldMode) || !advisoryFileMode(newMode) {
+			return "", errors.New("patch changes a non-regular file; use a manual handoff for this patch")
 		}
 		changes = remaining
 	}

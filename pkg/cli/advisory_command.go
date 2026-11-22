@@ -188,7 +188,10 @@ func validateAdvisoryPatch(patch []byte) ([]byte, error) {
 	if len(patch) > maxAdvisoryPatchBytes || !bytes.HasPrefix(patch, []byte("diff --git ")) || !utf8.Valid(patch) {
 		return nil, errors.New("provide a bounded, UTF-8 git diff")
 	}
-	for _, char := range string(patch) {
+	for i, char := range string(patch) {
+		if char == '\r' && i+1 < len(patch) && patch[i+1] == '\n' {
+			continue
+		}
 		if char != '\n' && char != '\t' && (unicode.IsControl(char) || unicode.Is(unicode.Cf, char)) {
 			return nil, errors.New("patch contains control characters that cannot be safely reviewed")
 		}

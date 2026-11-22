@@ -1,51 +1,32 @@
 # ADR-80115: Use Verified Artifact Handoff for Advisory Fixes
 
 **Date**: 2026-11-22
+
 **Status**: Draft
-**Deciders**: pelikhan (PR author); [TODO: verify other reviewers]
 
----
+**Deciders**: [TODO: verify]
 
-### Context
+## Context
 
-Maintainers sometimes need to fix an unpublished security advisory. GitHub hosts that work in a temporary private fork, but it does not run GitHub Actions or PR status checks there, so the fix cannot be built or tested by the usual CI path. The fix therefore has to be prepared and tested in a separate private side repository that the maintainer controls. The advisory details must stay confidential, the side repository must not be able to write to the upstream repository, and the patch that reaches the advisory fork must be exactly the reviewed patch, applied to the exact tested base commit.
+GitHub does not run Actions or PR status checks in temporary private advisory forks. A dedicated private side repository can prepare and test an unpublished advisory fix without giving Actions write access to the upstream repository or access to advisory fork credentials. The handoff must preserve confidentiality and let the maintainer approve the exact patch, tested base, and destination.
 
-### Decision
+## Decision
 
-We will hand off advisory fixes as a bounded text patch, not as a live branch or an automatic pull request. A manually dispatched workflow in the private side repository produces a short-retention artifact containing `handoff/fix.patch` and review notes. A new `gh aw advisory inspect` command verifies the source run, repository, artifact, and GitHub SHA-256 digest, then shows the patch and an approval digest. `gh aw advisory transfer` requires that digest, checks the base commit and fork identity, and pushes only a new branch to the existing temporary private fork. The primary driver is confidentiality with maintainer control: the command never creates a fork, merges changes, opens a PR, or publishes the advisory.
+Use a bounded text patch rather than a live branch or an automatically opened PR. A trusted manual workflow in the private side repository checks out the pinned upstream commit with read-only access and produces a short-retention artifact containing `handoff/fix.patch` and review notes.
 
-### Alternatives Considered
+The experimental `gh aw advisory inspect` command verifies that the artifact belongs to the successful first attempt of a manual run in the specified private repository and that the downloaded archive matches GitHub's SHA-256 digest. It resolves the existing temporary private fork from the unpublished advisory and displays the patch and an approval digest. That digest binds the patch bytes, source identifiers, base, fork identity, and destination branch.
 
-#### Alternative 1: Run the fix workflow inside the advisory fork
+`gh aw advisory transfer` repeats those checks, requires the matching digest, checks the fork's base branch against the tested commit, and applies the patch in an isolated Git index. It uses the maintainer's Git credentials to create a branch without overwriting an existing one. It does not create a fork, open a PR, merge changes, or publish the advisory. The maintainer opens the PR from the advisory in GitHub.
 
-Run the build, tests, and any agent work directly in the temporary private advisory fork. This was considered because it would keep the fix in the same place as the advisory. It was rejected because GitHub does not run Actions or PR status checks in these forks, and running agent workflows there would also put workflow permissions inside the advisory boundary.
+## Alternatives Considered
 
-#### Alternative 2: Reuse the generic `gh aw pr transfer` command
+- **Run the workflow in the advisory fork.** This would keep the fix and CI in the same repository, but Actions and PR status checks are unavailable there.
+- **Reuse `gh aw pr transfer`.** The general-purpose command can create a normal fork and open a PR. Those behaviors do not fit a handoff restricted to an existing temporary private advisory fork.
+- **Copy a patch manually.** This needs no artifact verification machinery but leaves the maintainer to check the patch's origin, base, and destination. The CLI retains `--patch` for a separately verified local diff. That mode skips artifact provenance checks but still requires approval and validates the fork, base, and branch.
 
-Move a pull request's changes to another repository with the existing transfer command. This was considered because the command already exists and handles PR-based handoffs. It was rejected because it can create a normal fork and open a public-facing PR, which would leave the private advisory scope.
+## Consequences
 
-#### Alternative 3: Copy the patch and notes manually
-
-Have the maintainer download the artifact or copy the diff and test notes by hand into the advisory fork. This was the closest alternative because it needs no new CLI code, and the new `--patch` mode keeps a local, separately verified diff path for that case. It was not chosen as the default because it provides no binding between the run, artifact digest, base commit, and destination. It also gives no check against base drift, workflow file changes, or overwriting an existing branch, and it depends on manual copying of confidential content.
-
-### Consequences
-
-#### Positive
-- Fix validation runs in the private side repository, where Actions can run, and the maintainer receives a reviewed patch rather than an unverified branch.
-- Transfer checks the artifact's source run, digest, base commit, and fork identity before any write. It refuses changes under `.github/workflows/` or `.github/actions/`, and it refuses to overwrite an existing branch.
-- Confidential patch content leaves the private boundary only after explicit maintainer approval, and no public PR is opened automatically.
-
-#### Negative
-- The change adds roughly 500 lines of Go in `pkg/cli` that shell out to `git` and `gh`. It depends on GitHub API behavior for advisory `private_fork` metadata and artifact digests, and the code has a special case for `fork:false` on temporary advisory forks.
-- The maintainer still has several manual steps: inspect, record the digest, run transfer, and open the PR in the GitHub UI. This is slower than full automation.
-- The approval digest shows that the patch and destination did not change after review. It does not show that the fix is correct, and the test notes are agent output rather than an independent attestation.
-- Live authentication and a push against a disposable advisory fork have not been verified, according to the PR's validation notes.
-
-#### Neutral
-- The command is registered as a top-level `gh aw advisory` subcommand in the utilities group, with `inspect` and `transfer` subcommands.
-- Documentation adds a side-repository workflow example to `docs/src/content/docs/patterns/multi-repo-ops.md` and command reference to `docs/src/content/docs/setup/cli.md`. The example is opt-in through `"maintenance": false` in the side repository's `.github/aw.json`.
-- Patches are capped at 4 MiB and artifacts at 8 MiB. Binary patches are rejected, so fixes that depend on binary files must be handled outside this command.
-
----
-
-*ADR created by [adr-writer agent]. Review and finalize before changing status from Draft to Accepted.*
+- Actions can prepare and test the fix without write access to either upstream or the advisory fork. The maintainer must restrict side-repository access, including access to logs and artifacts.
+- Transfer checks for base drift before and after pushing, blocks changes under `.github` regardless of case, and refuses to overwrite a destination branch. A post-push check can fail after branch creation, so the maintainer must check for the branch before retrying. The patch is limited to 4 MiB and cannot contain binary changes; the artifact archive is limited to 8 MiB.
+- Maintainers must review the diff and test notes, approve the digest, run the transfer, and open the PR. The digest binds the handoff to what was inspected; it does not attest that the fix is correct or that tests passed.
+- Artifact handoff depends on the GitHub API for run provenance, artifact digests, and the advisory's `private_fork` association. Live collaborator authentication and push to a disposable GitHub advisory fork remain unverified.

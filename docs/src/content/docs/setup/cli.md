@@ -1566,11 +1566,11 @@ gh aw advisory inspect GHSA-2345-6789-cfgh --repo owner/repo --base "$BASE_SHA" 
 gh aw advisory transfer GHSA-2345-6789-cfgh --repo owner/repo --base "$BASE_SHA" --base-branch main --branch advisory-fix --side-repo owner/private-side --run "$RUN_ID" --artifact "$ARTIFACT_ID" --approve "$APPROVAL_DIGEST"
 ```
 
-Both commands require `--repo` (upstream), `--base` (exact tested commit), `--base-branch` (branch in the fork), and `--branch` (new fix branch). Supply `--side-repo`, `--run`, and `--artifact` together to verify that the ZIP belongs to a successful manual run whose head is in the specified private repository, check its GitHub SHA-256 digest, and read `handoff/fix.patch`. A successful run is not proof that the patch passed its tests. Alternatively, use `--patch` with a local text Git diff if you verified its origin separately. The patch limit is 4 MiB in either mode.
+Both commands require `--repo` (upstream), `--base` (exact tested commit), `--base-branch` (branch in the fork), and `--branch` (new fix branch). Supply `--side-repo`, `--run`, and `--artifact` together to verify that the ZIP belongs to a successful first attempt of a manual run whose head is in the specified private repository, check its GitHub SHA-256 digest, and read `handoff/fix.patch`. Start a fresh manual dispatch rather than rerunning an earlier attempt. A successful run is not proof that the patch passed its tests. Alternatively, use `--patch` with a local text Git diff if you verified its origin separately. The patch limit is 4 MiB in either mode.
 
 `inspect` uses the signed-in GitHub CLI identity to resolve the fork and shows the patch without writing to GitHub. `transfer` also requires `--approve`, the digest printed by `inspect` after review. Run the commands in a private terminal; `inspect` prints the full diff.
 
-`transfer` applies the patch without checking out a working tree. It refuses base drift, changes under `.github/workflows/` or `.github/actions/`, and conflicting destination branches. It does not create a fork or open a PR. Open the PR from the advisory in GitHub once the branch is ready.
+`transfer` applies the patch without checking out a working tree. It refuses changes to `.github` or anything under it, regardless of case, and refuses to overwrite an existing branch. It checks the base before and after pushing. If the base moves or cannot be checked after the push, check for an existing fix branch before retrying. It does not create a fork or open a PR. Open the PR from the advisory in GitHub once the branch is ready.
 
 #### `mcp-server`
 
