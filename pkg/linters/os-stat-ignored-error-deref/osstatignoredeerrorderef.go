@@ -172,7 +172,9 @@ func (a *flowAnalyzer) switchStatement(statement *ast.SwitchStmt, state flowStat
 			return state, true
 		}
 	}
-	a.expression(statement.Tag, state)
+	if statement.Tag != nil {
+		a.expression(statement.Tag, state)
+	}
 	result := make(flowState)
 	hasDefault := false
 	for _, clause := range statement.Body.List {
