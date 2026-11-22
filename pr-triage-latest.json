@@ -1,6 +1,6 @@
 {
-  "generated_at": "2026-11-22T06:25:37Z",
-  "run_id": "pr-triage-2026-11-22T06:24:10Z",
+  "generated_at": "2026-11-22T12:21:31Z",
+  "run_id": "pr-triage-2026-11-22T12:21:31Z",
   "source": "pr-triage",
   "open_copilot_prs": 0,
   "scanned_open_prs": 14,
@@ -92,7 +92,7 @@
     {
       "number": 79896,
       "title": "Fix daily AI Credits budget accounting bug",
-      "updated_at": "2026-11-22T00:09:56Z",
+      "updated_at": "2026-11-22T00:09:54Z",
       "author": "pelikhan"
     },
     {
