@@ -65,7 +65,6 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           EVENT_NAME: ${{ github.event_name }}
         run: |
-          # Get the last CI workflow run on main branch, excluding pending and cancelled runs
           LAST_RUN=$(gh run list --workflow=ci.yml --branch=main --limit 50 --json conclusion,status,databaseId \
             | jq -r '[.[] | select(.status == "completed" and (.conclusion == "success" or .conclusion == "failure"))] | .[0]')
 
@@ -86,9 +85,6 @@ jobs:
             exit 0
           fi
 
-          # One proposal per red streak: skip while an open Avenger PR or fallback
-          # review issue created since the last green CI run is still pending.
-          # Manual dispatch bypasses this check.
           if [ "$EVENT_NAME" != "workflow_dispatch" ]; then
             LAST_GREEN_AT=$(gh run list --workflow=ci.yml --branch=main --status success --limit 1 \
               --json updatedAt -q '.[0].updatedAt // ""' || echo "")
@@ -138,7 +134,6 @@ steps:
         RAW="$RUNNER_TEMP/ci-job-$JOB_ID.log"
         gh run view --repo "$GITHUB_REPOSITORY" --job "$JOB_ID" --log-failed 2>/dev/null \
           | cut -f3- | sed -E 's/^[0-9T:.-]+Z //; s/\x1b\[[0-9;]*m//g' > "$RAW" || true
-        # Keep only the failure signal with context; fall back to the log tail.
         grep -n -E -B3 -A12 -e '##\[error\]|--- FAIL|^FAIL[[:space:]]|panic:|make: \*\*\*|DATA RACE|Error Trace:' "$RAW" \
           | head -c 40000 > "$OUT/$JOB_ID.log" || true
         [ -s "$OUT/$JOB_ID.log" ] || tail -n 300 "$RAW" | head -c 40000 > "$OUT/$JOB_ID.log"
@@ -194,7 +189,9 @@ evals:
 
 # Avenger — Hourly CI Fixer
 
-You are **Avenger**, an automated hourly CI repair agent. Your mission is to keep the `github/gh-aw` repository buildable by fixing common mechanical issues and creating a pull request with all fixes.
+If CI passes, call `noop`. On failure, merge `origin/main`; inspect extracted logs first and stop with `noop` for conflicts, infrastructure failures, or missing evidence. Load only the matching `avenger-repair-steps` section, make a targeted fix, recompile only if workflow Markdown changed, and validate. Respect the file-count guard; create a PR only for an actionable fix. Never run broad tests.
+
+<!-- instruction-prefix-end -->
 
 ## Context
 
@@ -263,40 +260,6 @@ Then extract the concrete failure category (formatting, lint, tests, wasm golden
 - If actionable, apply the smallest fix that maps directly to the failure signal.
 - If neither the extracted logs nor the MCP tools yield the failure, call `noop` saying the pre-extracted CI logs were missing and quote any tool denial text verbatim. Do not suggest toolset changes; `actions` is already enabled.
 
-## Step 4: Format sources (only when relevant)
-
-```bash
-make fmt
-```
-
-Run this only when the failing CI signal points to formatting (or when your code edits require formatting).
-
-## Step 5: Update wasm golden files (only for wasm-golden failures)
-
-```bash
-make update-wasm-golden
-```
-
-Run this only when the failing CI signal indicates wasm golden drift.
-
-## Step 6: Fix lint issues (only for lint failures)
-
-```bash
-make lint
-```
-
-Analyze lint errors and fix them. Re-run `make lint` once to confirm.
-
-**Important — `golangci-lint` sandbox limitation**: `golangci-lint` is not preinstalled in this sandbox and network egress to fetch it is blocked by the firewall. If `make lint` (or `make golint`) reports `golangci-lint is not installed`, this is a known environment limitation — **do not** attempt to install it via `go install`, `curl`, or any other network call. Skip the `golangci-lint`-specific portion of linting, note it in the PR body, and move on immediately to the next step. Do not retry the install more than once.
-
-## Step 7: Fix test failures (only for test failures)
-
-```bash
-make test-unit
-```
-
-Analyze test failures and fix them. Run `make test-unit` at most once for verification after your fix. If it cannot complete quickly within the runtime budget, call `noop` with what blocked progress.
-
 ## File-Count Guard Before PR Creation
 
 Before committing and calling `create_pull_request`, check how many files you are about to include:
@@ -340,3 +303,28 @@ Your pull request should:
 **Do NOT commit or include any files under `.github/workflows/`** — that directory is protected and excluded by the safe-outputs configuration.
 
 **Important**: If no action is needed (CI already passing, no fixable failures found, or no meaningful changes), you **MUST** call the `noop` safe-output tool with a brief explanation.
+
+## skill: `avenger-repair-steps`
+---
+description: Conditional formatting, wasm golden, lint, and test repair steps for Avenger.
+---
+
+Load only the section matching the failure category from Step 3.
+
+### Formatting failures
+
+Run `make fmt` only when the CI signal points to formatting or the targeted fix requires it.
+
+### wasm-golden failures
+
+Run `make update-wasm-golden` only when the CI signal indicates wasm golden drift.
+
+### Lint failures
+
+Run `make lint`, inspect the lint errors, and rerun it once to confirm the fix.
+
+If it reports that `golangci-lint` is not installed, do not install it or retry. Skip that portion, note the limitation in the PR body, and continue.
+
+### Test failures
+
+Run `make test-unit` once to verify the targeted fix. If it cannot finish within the runtime budget, call `noop` with the blocker.
