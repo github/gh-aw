@@ -3,10 +3,13 @@ package cli
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
 	"strings"
+
+	"github.com/github/gh-aw/pkg/constants"
 )
 
 func (o advisoryHandoff) pushPatch(ctx context.Context, fork advisoryFork, patch []byte) error {
@@ -22,7 +25,7 @@ func (o advisoryHandoff) pushPatch(ctx context.Context, fork advisoryFork, patch
 			return err
 		}
 		if current != fork {
-			return fmt.Errorf("the advisory fork changed; run advisory inspect again")
+			return errors.New("the advisory fork changed; run advisory inspect again")
 		}
 		return nil
 	}
@@ -34,7 +37,7 @@ func (o advisoryHandoff) applyAndPush(ctx context.Context, dir, remote string, p
 	baseRef, destRef := "refs/heads/"+o.baseBranch, "refs/heads/"+o.branch
 	for _, ref := range []string{baseRef, destRef} {
 		if _, err := git.run(nil, "check-ref-format", ref); err != nil {
-			return fmt.Errorf("invalid advisory branch name")
+			return errors.New("invalid advisory branch name; use a Git branch name such as advisory-fix")
 		}
 	}
 	if _, err := git.run(nil, "init", "--quiet", "--template="); err != nil {
@@ -42,10 +45,10 @@ func (o advisoryHandoff) applyAndPush(ctx context.Context, dir, remote string, p
 	}
 	base, err := git.fetch(baseRef)
 	if err != nil {
-		return fmt.Errorf("could not fetch the base branch from the advisory fork; verify maintainer Git access and the branch name")
+		return errors.New("could not fetch the base branch from the advisory fork; verify maintainer Git access and the branch name")
 	}
 	if base != o.base {
-		return fmt.Errorf("the advisory fork base moved; rebase and retest the fix before transferring")
+		return errors.New("the advisory fork base moved; rebase and retest the fix before transferring")
 	}
 	tree, err := git.patchTree(base, patch)
 	if err != nil {
@@ -60,13 +63,13 @@ func (o advisoryHandoff) applyAndPush(ctx context.Context, dir, remote string, p
 	}
 	tip, err := git.run(nil, "ls-remote", "--refs", remote, baseRef)
 	if err != nil || tip != base+"\t"+baseRef {
-		return fmt.Errorf("the fork base could not be reconfirmed; verify access and rerun inspect against the current base")
+		return errors.New("the fork base could not be reconfirmed; verify access and rerun inspect against the current base")
 	}
 	// An empty lease means the destination must not exist, even if a concurrent
 	// creator's branch could otherwise be updated with a fast-forward push.
 	if _, err := git.run(nil, "push", "--quiet", "--force-with-lease="+destRef+":", remote, head+":"+destRef); err != nil {
 		if !git.alreadyTransferred(destRef, base, tree) {
-			return fmt.Errorf("could not create the private fix branch; verify Git access and choose an unused branch if it already exists")
+			return errors.New("could not create the private fix branch; verify Git access and choose an unused branch if it already exists")
 		}
 	}
 	return nil
@@ -92,10 +95,7 @@ func (g advisoryGit) alreadyTransferred(ref, base, tree string) bool {
 		return false
 	}
 	commit, err := g.run(nil, "cat-file", "commit", head)
-	header, _, _ := strings.Cut(commit, "\n\n")
-	lines := strings.Split(header, "\n")
-	return err == nil && len(lines) >= 3 && lines[0] == "tree "+tree &&
-		lines[1] == "parent "+base && strings.HasPrefix(lines[2], "author ")
+	return err == nil && strings.HasPrefix(commit, "tree "+tree+"\nparent "+base+"\nauthor ")
 }
 
 func (g advisoryGit) patchTree(base string, patch []byte) (string, error) {
@@ -103,24 +103,31 @@ func (g advisoryGit) patchTree(base string, patch []byte) (string, error) {
 		return "", fmt.Errorf("could not load the advisory fork base: %w", err)
 	}
 	if _, err := g.run(patch, "apply", "--cached", "--whitespace=nowarn", "-"); err != nil {
-		return "", fmt.Errorf("patch does not apply cleanly to the exact tested base; regenerate it without rebasing implicitly")
+		return "", errors.New("patch does not apply cleanly to the exact tested base; regenerate it without rebasing implicitly")
 	}
 	changes, err := g.run(nil, "diff", "--cached", "--raw", "-z", "--no-renames", base)
 	if err != nil {
 		return "", fmt.Errorf("could not verify the staged patch: %w", err)
 	}
-	entries := strings.Split(changes, "\x00")
-	if changes == "" || len(entries)%2 != 1 {
-		return "", fmt.Errorf("patch produced no supported changes")
+	if changes == "" {
+		return "", errors.New("patch produced no supported changes")
 	}
-	for i := 0; i < len(entries)-1; i += 2 {
-		fields := strings.Fields(entries[i])
-		path := strings.ToLower(entries[i+1])
-		if len(fields) != 5 || !advisoryFileMode(strings.TrimPrefix(fields[0], ":")) ||
-			!advisoryFileMode(fields[1]) || path == ".github/workflows" || strings.HasPrefix(path, ".github/workflows/") ||
-			path == ".github/actions" || strings.HasPrefix(path, ".github/actions/") {
-			return "", fmt.Errorf("patch changes a workflow or a non-regular file; use a manual handoff for this patch")
+	const actionsDir = ".github/actions"
+	for changes != "" {
+		status, rest, statusOK := strings.Cut(changes, "\x00")
+		filename, remaining, pathOK := strings.Cut(rest, "\x00")
+		oldMode, modes, _ := strings.Cut(strings.TrimPrefix(status, ":"), " ")
+		newMode, _, _ := strings.Cut(modes, " ")
+		if !statusOK || !pathOK || filename == "" {
+			return "", errors.New("could not verify paths in the staged patch")
 		}
+		lower := strings.ToLower(filename)
+		if !advisoryFileMode(oldMode) || !advisoryFileMode(newMode) ||
+			strings.EqualFold(filename, constants.WorkflowsDir) || strings.HasPrefix(lower, constants.WorkflowsDir+"/") ||
+			strings.EqualFold(filename, actionsDir) || strings.HasPrefix(lower, actionsDir+"/") {
+			return "", errors.New("patch changes a workflow or a non-regular file; use a manual handoff for this patch")
+		}
+		changes = remaining
 	}
 	return g.run(nil, "write-tree")
 }
@@ -140,7 +147,8 @@ func (g advisoryGit) run(input []byte, args ...string) (string, error) {
 	for _, entry := range os.Environ() {
 		key, _, _ := strings.Cut(entry, "=")
 		upper := strings.ToUpper(key)
-		if !strings.HasPrefix(upper, "GIT_") && upper != "GH_HOST" && upper != "GH_PROMPT_DISABLED" && upper != "GH_DEBUG" {
+		if !strings.HasPrefix(upper, "GIT_") && !strings.EqualFold(key, "GH_HOST") &&
+			!strings.EqualFold(key, "GH_PROMPT_DISABLED") && !strings.EqualFold(key, "GH_DEBUG") {
 			cmd.Env = append(cmd.Env, entry)
 		}
 	}

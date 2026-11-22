@@ -6,8 +6,10 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"path"
 	"regexp"
 	"strings"
 
@@ -42,7 +44,7 @@ func (o advisoryHandoff) loadPatch(ctx context.Context) ([]byte, error) {
 		return readAdvisoryPatch(o.filename)
 	}
 	if !validAdvisoryRepo(o.sideRepo) || o.runID <= 0 || o.artifactID <= 0 {
-		return nil, fmt.Errorf("provide a private --side-repo and positive --run and --artifact IDs")
+		return nil, errors.New("provide a private --side-repo and positive --run and --artifact IDs")
 	}
 	repoPath := "repos/" + o.sideRepo
 	var repo struct {
@@ -54,7 +56,7 @@ func (o advisoryHandoff) loadPatch(ctx context.Context) ([]byte, error) {
 		return nil, err
 	}
 	if repo.ID <= 0 || repo.Visibility != "private" || !strings.EqualFold(repo.FullName, o.sideRepo) {
-		return nil, fmt.Errorf("the artifact source must be the specified private repository")
+		return nil, errors.New("the artifact source must be the specified private repository")
 	}
 	var run advisorySourceRun
 	if err := readAdvisoryAPI(ctx, fmt.Sprintf("%s/actions/runs/%d", repoPath, o.runID), &run); err != nil {
@@ -71,7 +73,7 @@ func (o advisoryHandoff) loadPatch(ctx context.Context) ([]byte, error) {
 	if err := artifact.verify(o, repo.ID); err != nil {
 		return nil, err
 	}
-	cmd := workflow.ExecGHContext(ctx, "api", "--hostname", "github.com", artifactPath+"/zip")
+	cmd := workflow.ExecGHContext(ctx, "api", "--hostname", "github.com", path.Join(artifactPath, "zip"))
 	pipe, err := cmd.StdoutPipe()
 	if err != nil {
 		return nil, fmt.Errorf("prepare advisory artifact download: %w", err)
@@ -81,20 +83,20 @@ func (o advisoryHandoff) loadPatch(ctx context.Context) ([]byte, error) {
 	}
 	body, readErr := io.ReadAll(io.LimitReader(pipe, maxAdvisoryArchiveBytes+1))
 	// Close before waiting so an oversized response cannot block the producer.
-	_ = pipe.Close()
+	closeErr := pipe.Close()
 	waitErr := cmd.Wait()
-	if readErr != nil || waitErr != nil || len(body) > maxAdvisoryArchiveBytes {
-		return nil, fmt.Errorf("could not download the bounded advisory artifact; verify Actions read access and artifact size")
+	if readErr != nil || closeErr != nil || waitErr != nil || len(body) > maxAdvisoryArchiveBytes {
+		return nil, errors.New("could not download the bounded advisory artifact; verify Actions read access and artifact size")
 	}
 	return extractAdvisoryPatch(body, artifact.Digest)
 }
 
 func (r advisorySourceRun) verify(runID, repoID int64) error {
 	if r.ID != runID || r.Repository.ID != repoID || r.HeadRepository.ID != repoID {
-		return fmt.Errorf("the source run and its head must belong to the specified private repository")
+		return errors.New("the source run and its head must belong to the specified private repository")
 	}
 	if r.Event != "workflow_dispatch" || r.Conclusion != "success" {
-		return fmt.Errorf("the source run must be a successful manual dispatch; select a completed advisory workflow run")
+		return errors.New("the source run must be a successful manual dispatch; select a completed advisory workflow run")
 	}
 	return nil
 }
@@ -102,31 +104,31 @@ func (r advisorySourceRun) verify(runID, repoID int64) error {
 func readAdvisoryAPI(ctx context.Context, path string, dst any) error {
 	body, err := workflow.RunGHContextWithHost(ctx, "Verifying advisory artifact source", "github.com", "api", "--hostname", "github.com", path)
 	if err != nil {
-		return fmt.Errorf("could not verify advisory artifact source on GitHub; check repository and Actions read access")
+		return errors.New("could not verify advisory artifact source on GitHub; check repository and Actions read access")
 	}
 	if err := json.Unmarshal(body, dst); err != nil {
-		return fmt.Errorf("GitHub returned invalid advisory artifact metadata")
+		return errors.New("GitHub returned invalid advisory artifact metadata")
 	}
 	return nil
 }
 
 func (a advisoryArtifact) verify(o advisoryHandoff, repoID int64) error {
 	if a.ID != o.artifactID || a.Run.ID != o.runID || a.Run.RepositoryID != repoID {
-		return fmt.Errorf("artifact does not belong to the specified repository and run")
+		return errors.New("artifact does not belong to the specified repository and run")
 	}
 	if a.Expired || a.Size <= 0 || a.Size > maxAdvisoryArchiveBytes || !advisoryArchiveDigest.MatchString(a.Digest) {
-		return fmt.Errorf("artifact is expired, oversized, or missing its GitHub SHA-256 digest")
+		return errors.New("artifact is expired, oversized, or missing its GitHub SHA-256 digest")
 	}
 	return nil
 }
 
 func extractAdvisoryPatch(body []byte, digest string) ([]byte, error) {
 	if fmt.Sprintf("sha256:%x", sha256.Sum256(body)) != digest {
-		return nil, fmt.Errorf("downloaded advisory artifact does not match its GitHub digest")
+		return nil, errors.New("downloaded advisory artifact does not match its GitHub digest")
 	}
 	reader, err := zip.NewReader(bytes.NewReader(body), int64(len(body)))
 	if err != nil {
-		return nil, fmt.Errorf("advisory artifact is not a valid ZIP")
+		return nil, errors.New("advisory artifact is not a valid ZIP")
 	}
 	var patch *zip.File
 	for _, file := range reader.File {
@@ -134,20 +136,19 @@ func extractAdvisoryPatch(body []byte, digest string) ([]byte, error) {
 			continue
 		}
 		if patch != nil || !file.Mode().IsRegular() || file.UncompressedSize64 > maxAdvisoryPatchBytes {
-			return nil, fmt.Errorf("artifact must contain one bounded regular handoff/fix.patch")
+			return nil, errors.New("artifact must contain one bounded regular handoff/fix.patch")
 		}
 		patch = file
 	}
 	if patch == nil {
-		return nil, fmt.Errorf("artifact is missing handoff/fix.patch")
+		return nil, errors.New("artifact is missing handoff/fix.patch")
 	}
 	src, err := patch.Open()
 	if err != nil {
 		return nil, fmt.Errorf("open patch in advisory artifact: %w", err)
 	}
-	defer src.Close()
 	data, err := io.ReadAll(io.LimitReader(src, maxAdvisoryPatchBytes+1))
-	if err != nil {
+	if err := errors.Join(err, src.Close()); err != nil {
 		return nil, fmt.Errorf("read patch in advisory artifact: %w", err)
 	}
 	return validateAdvisoryPatch(data)

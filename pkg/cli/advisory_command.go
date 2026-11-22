@@ -4,10 +4,13 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
+	"path"
 	"regexp"
 	"strings"
 	"unicode"
@@ -52,10 +55,9 @@ func newAdvisoryHandoffCommand(transfer bool) *cobra.Command {
 		Short: "Review a patch and get its transfer approval digest",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if prefix, suffix, ok := strings.Cut(args[0], "-"); ok && strings.EqualFold(prefix, "GHSA") {
+			opts.id = strings.Join(args, "")
+			if prefix, suffix, ok := strings.Cut(opts.id, "-"); ok && strings.EqualFold(prefix, "GHSA") {
 				opts.id = "GHSA-" + strings.ToLower(suffix)
-			} else {
-				opts.id = args[0]
 			}
 			return opts.run(cmd, transfer)
 		},
@@ -85,10 +87,10 @@ func newAdvisoryHandoffCommand(transfer bool) *cobra.Command {
 
 func (o advisoryHandoff) run(cmd *cobra.Command, transfer bool) error {
 	if !advisoryIDPattern.MatchString(o.id) || !validAdvisoryRepo(o.upstream) || !advisorySHA.MatchString(o.base) {
-		return fmt.Errorf("provide a GHSA ID, a GitHub OWNER/REPO, and an exact 40-character base SHA")
+		return errors.New("provide a GHSA ID, a GitHub OWNER/REPO, and an exact 40-character base SHA")
 	}
 	if !advisoryRefPattern.MatchString(o.baseBranch) || !advisoryRefPattern.MatchString(o.branch) || o.baseBranch == o.branch {
-		return fmt.Errorf("provide distinct branch names for --base-branch and --branch")
+		return errors.New("provide distinct branch names for --base-branch and --branch")
 	}
 	patch, err := o.loadPatch(cmd.Context())
 	if err != nil {
@@ -116,7 +118,7 @@ func (o advisoryHandoff) run(cmd *cobra.Command, transfer bool) error {
 		return err
 	}
 	if approval != o.approval {
-		return fmt.Errorf("approval digest does not match this patch and destination; run advisory inspect again")
+		return errors.New("approval digest does not match this patch and destination; run advisory inspect again")
 	}
 	if err := o.pushPatch(cmd.Context(), fork, patch); err != nil {
 		return err
@@ -132,9 +134,9 @@ func validAdvisoryRepo(repo string) bool {
 
 func (o advisoryHandoff) resolveFork(ctx context.Context) (advisoryFork, error) {
 	out, err := workflow.RunGHContextWithHost(ctx, "Verifying the private advisory fork", "github.com", "api", "--hostname", "github.com",
-		"repos/"+o.upstream+"/security-advisories/"+o.id)
+		path.Join("repos", o.upstream, "security-advisories", o.id))
 	if err != nil {
-		return advisoryFork{}, fmt.Errorf("could not read the advisory on github.com; verify the repository, advisory ID, and collaborator access")
+		return advisoryFork{}, errors.New("could not read the advisory on github.com; verify the repository, advisory ID, and collaborator access")
 	}
 	return o.parseFork(out)
 }
@@ -146,25 +148,24 @@ func (o advisoryHandoff) parseFork(out []byte) (advisoryFork, error) {
 		PrivateFork advisoryFork `json:"private_fork"`
 	}
 	if err := json.Unmarshal(out, &advisory); err != nil || advisory.ID != o.id {
-		return advisoryFork{}, fmt.Errorf("GitHub did not return the requested advisory")
+		return advisoryFork{}, errors.New("GitHub did not return the requested advisory")
 	}
 	if advisory.State != "draft" && advisory.State != "triage" {
-		return advisoryFork{}, fmt.Errorf("only unpublished draft or triage advisories are supported")
+		return advisoryFork{}, errors.New("only unpublished draft or triage advisories are supported")
 	}
 	fork := advisory.PrivateFork
 	// GitHub may report fork:false for a temporary advisory fork. The advisory's
 	// private_fork association, not the generic repository fork flag, identifies it.
 	if fork.ID <= 0 || !fork.Private || !validAdvisoryRepo(fork.FullName) || strings.EqualFold(fork.FullName, o.upstream) {
-		return advisoryFork{}, fmt.Errorf("the advisory has no verified temporary private fork; create or check it in GitHub before transferring")
+		return advisoryFork{}, errors.New("the advisory has no verified temporary private fork; create or check it in GitHub before transferring")
 	}
 	return fork, nil
 }
 
 func (o advisoryHandoff) approvalDigest(fork advisoryFork, patch []byte) string {
-	h := sha256.New()
-	fmt.Fprintf(h, "gh-aw-advisory-v2\n%s\n%s\n%d\n%s\n%s\n%s\n%s\n%s\n%d\n%d\n", o.upstream, o.id, fork.ID, fork.FullName, o.base, o.baseBranch, o.branch, o.sideRepo, o.runID, o.artifactID)
-	_, _ = h.Write(patch)
-	return fmt.Sprintf("%x", h.Sum(nil))
+	header := fmt.Appendf(nil, "gh-aw-advisory-v2\n%s\n%s\n%d\n%s\n%s\n%s\n%s\n%s\n%d\n%d\n", o.upstream, o.id, fork.ID, fork.FullName, o.base, o.baseBranch, o.branch, o.sideRepo, o.runID, o.artifactID)
+	digest := sha256.Sum256(append(header, patch...))
+	return hex.EncodeToString(digest[:])
 }
 
 func readAdvisoryPatch(filename string) ([]byte, error) {
@@ -176,9 +177,8 @@ func readAdvisoryPatch(filename string) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("open patch: %w", err)
 	}
-	defer file.Close()
 	patch, err := io.ReadAll(io.LimitReader(file, maxAdvisoryPatchBytes+1))
-	if err != nil {
+	if err := errors.Join(err, file.Close()); err != nil {
 		return nil, fmt.Errorf("read patch: %w", err)
 	}
 	return validateAdvisoryPatch(patch)
@@ -186,16 +186,16 @@ func readAdvisoryPatch(filename string) ([]byte, error) {
 
 func validateAdvisoryPatch(patch []byte) ([]byte, error) {
 	if len(patch) > maxAdvisoryPatchBytes || !bytes.HasPrefix(patch, []byte("diff --git ")) || !utf8.Valid(patch) {
-		return nil, fmt.Errorf("provide a bounded, UTF-8 git diff")
+		return nil, errors.New("provide a bounded, UTF-8 git diff")
 	}
 	for _, char := range string(patch) {
 		if char != '\n' && char != '\t' && (unicode.IsControl(char) || unicode.Is(unicode.Cf, char)) {
-			return nil, fmt.Errorf("patch contains control characters that cannot be safely reviewed")
+			return nil, errors.New("patch contains control characters that cannot be safely reviewed")
 		}
 	}
-	for _, line := range bytes.Split(patch, []byte("\n")) {
+	for line := range bytes.SplitSeq(patch, []byte("\n")) {
 		if bytes.HasPrefix(line, []byte("GIT binary patch")) || bytes.HasPrefix(line, []byte("Binary files ")) {
-			return nil, fmt.Errorf("binary patches are not supported")
+			return nil, errors.New("binary patches are not supported")
 		}
 	}
 	return patch, nil

@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -99,7 +100,7 @@ func TestAdvisoryTransfer(t *testing.T) {
 	require.Equal(t, tip, git("rev-parse", "advisory-fix"))
 	o.branch = "unverified"
 	require.ErrorContains(t, o.applyAndPush(t.Context(), t.TempDir(), remote, patch, func() error {
-		return fmt.Errorf("fork identity changed")
+		return errors.New("fork identity changed")
 	}), "fork identity changed")
 	require.Empty(t, git("branch", "--list", o.branch))
 	require.ErrorContains(t, transfer(o, []byte(strings.ReplaceAll(string(patch), "-before", "-unexpected"))), "does not apply cleanly")
