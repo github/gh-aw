@@ -29,6 +29,8 @@ Findings identify source paths and sink sites, not values. A `CoverageGap` must 
 
 The source and sink constants are `ActionInput`, `Artifact`, `Display`, `Log`,
 `Network`, `OTLPAttribute`, `Output`, `Prompt`, `Summary`, and `WorkflowInput`.
+`EnvironmentFile` and `ExecutableInterpolation` identify writes to runner
+environment files and interpolations in executable scripts.
 `ExpressionError` exposes a value-safe `Error` method, and `TextExpression`
 represents one parsed expression with source information. `AnalyzeText` analyzes
 expressions in authored text using the supplied rule and source bindings;
