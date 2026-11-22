@@ -107,7 +107,16 @@ When a workflow does not configure `observability.otlp` (in its own frontmatter 
 | `GH_AW_DEFAULT_OTLP_ENDPOINT` | Secret or variable | OTLP endpoint URL used when no endpoint is configured in frontmatter |
 | `GH_AW_DEFAULT_OTLP_HEADERS` | Secret | Exporter headers (`key=value` pairs, comma-separated) sent to that endpoint |
 
-Because these values are resolved at run time, setting defaults at the repository or organization level enables telemetry for every agentic workflow without editing each workflow file.
+Because these values are resolved at run time, setting defaults at the repository or organization level enables telemetry for agentic workflows that have not opted out.
+
+To opt out, set `observability.otlp: false` in the main workflow's frontmatter and recompile:
+
+```aw wrap
+observability:
+  otlp: false
+```
+
+The compiler omits its OTLP endpoint and credential environment variables, even if an import configures OTLP. This does not change variables you define explicitly in `env:`, trace-context propagation, or local telemetry artifacts. The opt-out applies only in the main workflow; `observability.otlp: false` in an imported workflow has no effect.
 
 Behavior:
 
