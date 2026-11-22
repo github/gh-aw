@@ -47,6 +47,31 @@ func TestAdvisoryGitPatchScope(t *testing.T) {
 	})
 }
 
+func TestAdvisoryGitStripsAmbientTokens(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("the fake Git executable uses a POSIX shell")
+	}
+	bin := t.TempDir()
+	script := `#!/bin/sh
+[ "${GH_TOKEN+x}${GITHUB_TOKEN+x}${GH_ENTERPRISE_TOKEN+x}${GITHUB_ENTERPRISE_TOKEN+x}" = "" ] || exit 1
+[ "$ADVISORY_TEST_ENV" = "dummy=retained" ] || exit 2
+for arg do
+    [ "$arg" != 'credential.helper=!gh auth git-credential' ] || exit 0
+done
+exit 3
+`
+	require.NoError(t, os.WriteFile(filepath.Join(bin, "git"), []byte(script), 0700))
+	for _, key := range []string{"GH_TOKEN", "GITHUB_TOKEN", "GH_ENTERPRISE_TOKEN", "GITHUB_ENTERPRISE_TOKEN"} {
+		t.Setenv(key, "dummy-token")
+	}
+	t.Setenv("ADVISORY_TEST_ENV", "dummy=retained")
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	g := advisoryGit{ctx: t.Context(), dir: t.TempDir()}
+	_, err := g.run(nil, "--version")
+	require.NoError(t, err)
+}
+
 func TestAdvisoryGitTransferRechecksBase(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("the local Git fixture uses a POSIX shell")

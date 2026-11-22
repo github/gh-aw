@@ -1578,7 +1578,7 @@ Artifact mode verifies that the ZIP belongs to a successful first attempt of a m
 
 `inspect` uses the signed-in GitHub CLI identity to resolve the fork and shows the patch without writing to GitHub. `transfer` also requires `--approve`, the digest printed by `inspect` after review. Run the commands in a private terminal; `inspect` prints the full diff.
 
-`transfer` applies the patch without checking out a working tree. It refuses changes to `.github` or anything under it, regardless of case, and refuses to overwrite an existing branch. It checks the base before and after pushing. If the base moves or cannot be checked after the push, check for an existing fix branch before retrying. It does not create a fork or open a PR. Open the PR from the advisory in GitHub once the branch is ready.
+`transfer` applies the patch without checking out a working tree. Git operations use the locally configured `gh` sign-in, not GitHub token environment variables. Sign in with `gh auth login --hostname github.com` using the account authorized for the advisory fork. Transfer refuses changes to `.github` or anything under it, regardless of case, and refuses to overwrite an existing branch. It checks the base before and after pushing. If the base moves or cannot be checked after the push, check for an existing fix branch before retrying. It does not create a fork or open a PR. Open the PR from the advisory in GitHub once the branch is ready.
 
 #### `mcp-server`
 

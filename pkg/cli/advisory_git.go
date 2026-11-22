@@ -151,10 +151,15 @@ func (g advisoryGit) run(input []byte, args ...string) (string, error) {
 	for _, entry := range os.Environ() {
 		key, _, _ := strings.Cut(entry, "=")
 		upper := strings.ToUpper(key)
-		if !strings.HasPrefix(upper, "GIT_") && !strings.EqualFold(key, "GH_HOST") &&
-			!strings.EqualFold(key, "GH_PROMPT_DISABLED") && !strings.EqualFold(key, "GH_DEBUG") {
-			cmd.Env = append(cmd.Env, entry)
+		if strings.HasPrefix(upper, "GIT_") {
+			continue
 		}
+		switch upper {
+		case "GH_HOST", "GH_PROMPT_DISABLED", "GH_DEBUG",
+			"GH_TOKEN", "GITHUB_TOKEN", "GH_ENTERPRISE_TOKEN", "GITHUB_ENTERPRISE_TOKEN":
+			continue
+		}
+		cmd.Env = append(cmd.Env, entry)
 	}
 	cmd.Env = append(cmd.Env, "GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL="+os.DevNull, "GIT_TERMINAL_PROMPT=0",
 		"GH_HOST=github.com", "GH_PROMPT_DISABLED=1")
