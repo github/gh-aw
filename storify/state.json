@@ -1,24 +1,24 @@
 {
-  "last_run_date": "2026-11-21",
+  "last_run_date": "2026-11-22",
   "last_window": {
-    "start": "2026-11-20T07:55:29Z",
-    "end": "2026-11-21T07:55:29Z"
+    "start": "2026-11-21T07:53:03Z",
+    "end": "2026-11-22T07:53:03Z"
   },
   "observed_window": {
-    "coverage": "168 cached records 2026-11-21T02:47:51Z through 07:53:23Z; count-limited; no fleet refetch",
-    "missing_start": "2026-11-20T07:55:29Z",
-    "continuation_end": "2026-11-21T02:44:01Z",
-    "continuation_before_run_id": 44857809698
+    "coverage": "267 cached records 2026-11-21T22:43:58Z through 2026-11-22T07:53:03Z, count-limited; no fleet refetch",
+    "missing_start": "2026-11-21T07:53:03Z",
+    "continuation_end": "2026-11-21T22:43:55Z",
+    "continuation_before_run_id": 44958251788
   },
   "key_themes": [
-    "Auditor: two collection failures, three collection successes, five agents skipped; tracker and tracker-expiry issue auto-closed before later failure.",
-    "Three dispatcher runs failed trusted control processing; common cause unknown.",
-    "Human-authored PR 79701 drew mixed reviewers, ADR draft, Sous Chef follow-up and bot revision; open at window end."
+    "PR 79924 smoke fan-out: 10 succeeded, four failed on original head; human addressed review and merged; shared cause unknown.",
+    "Nine Auditor collection successes but all agents skipped; dashboard and Issue Monster raised tracker expiry and assignment.",
+    "Five trusted-control failures across smoke, code scanning, and ESLint dispatchers; P1 tracker opened."
   ],
   "carry_forward_questions": [
-    "What caused Auditor collection failure and will agent execute after collection?",
-    "Will tracker expiry be fixed and a persistent Auditor tracker remain open?",
-    "What caused trusted work queue control failures and did dispatch occur?",
-    "Will PR 79701 review findings be resolved and validated?"
+    "Why did Auditor agents skip despite successful collection?",
+    "Will expired Auditor trackers be replaced or expiry adjusted?",
+    "What caused dispatcher trusted-control failures and were dispatches accepted?",
+    "Were PR 79924 smoke failures independently resolved on the final revision?"
   ]
 }
