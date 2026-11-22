@@ -1,5 +1,5 @@
 {
-  "last_updated": "2026-11-21",
+  "last_updated": "2026-11-22",
   "pending_tasks": [
     {
       "file": "docs/src/content/docs/reference/workflow-linters.md",
@@ -120,6 +120,18 @@
       "created": "2026-11-21",
       "status": "pending",
       "issue": "Lines 44-46 attribute 81 firewall requests to runs that failed at Start MCP Gateway; confirm source of the figure, then reword paragraph and joke. Confirm before editing"
+    },
+    {
+      "file": "docs/src/content/docs/blog/2026-06-02-agent-of-the-day.md",
+      "created": "2026-11-22",
+      "status": "pending",
+      "issue": "Line 32 headline 'daily token consumption ... nearly doubled over two months' conflicts with its own table (April ~80.1M to late May ~101.8M, about +27%). Reword headline to state the measured change and window. The description's '65% spike' matches early May to late May (~62.1M to ~101.8M) and should name that window."
+    },
+    {
+      "file": ".github/workflows/smoke-update-cross-repo-pr.md",
+      "created": "2026-11-22",
+      "status": "pending",
+      "issue": "Owner mismatch: frontmatter and safe-output target use github/gh-aw-side-repo (lines 31, 55, 61) while prompt body uses githubnext/gh-aw-side-repo (lines 76, 98, 100). Canonical owner unverified (gh repo view failed for both). Confirm before editing. Sibling smoke-create-cross-repo-pr.md has the same mix."
     }
   ]
 }

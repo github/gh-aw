@@ -1,0 +1,47 @@
+{
+  "date": "2026-11-22",
+  "files_analyzed": {
+    "documentation": [
+      "docs/src/content/docs/blog/2026-06-02-agent-of-the-day.md",
+      "docs/src/content/docs/blog/2026-01-13-meet-the-workflows-metrics-analytics.md (sampled; not reviewed in depth this run)"
+    ],
+    "cli": [
+      "gh aw (main help)",
+      "gh aw compile"
+    ],
+    "messages": [
+      ".github/workflows/smoke-update-cross-repo-pr.md",
+      ".github/workflows/smoke-workflow-call.md (sampled; not reviewed in depth this run)"
+    ],
+    "validation": [
+      "pkg/parser/sub_agent_validation_test.go"
+    ]
+  },
+  "overall_quality": "needs-work",
+  "quality_highlights": [
+    "Agent-of-the-day table values (April ~80.1M, early May ~62.1M, late May ~101.8M) support a ~65% early-to-late May rise, which matches the description's '65% spike'",
+    "smoke-create-cross-repo-pr run-started/run-success messages are concise and name the target repository"
+  ],
+  "single_file_improvements": [
+    {
+      "file": "docs/src/content/docs/blog/2026-06-02-agent-of-the-day.md",
+      "priority": "high",
+      "issue": "Line 32 headline 'nearly doubled over two months' conflicts with the table (April ~80.1M to late May ~101.8M is about +27%). The ~65% figure matches early May to late May instead. Reword the headline to name the window."
+    },
+    {
+      "file": ".github/workflows/smoke-update-cross-repo-pr.md",
+      "priority": "medium",
+      "issue": "Owner mismatch: frontmatter and safe-output target use github/gh-aw-side-repo (lines 31, 55, 61) while the prompt body uses githubnext/gh-aw-side-repo (lines 76, 98, 100). Owner is unverified; confirm with maintainers before editing. Sibling smoke-create-cross-repo-pr.md has the same mix."
+    }
+  ],
+  "unverified": [
+    "Canonical owner of gh-aw-side-repo: gh repo view failed for both github/ and githubnext/",
+    "2026-01-13 metrics-analytics blog post: sampled, not reviewed in depth",
+    "smoke-workflow-call.md: sampled, not reviewed in depth"
+  ],
+  "observations": [
+    "cmd/gh-aw/main.go compile help line 265 'Unlike gh aw upgrade...' sentence sits in the action-mode section; already tracked since 2026-11-12",
+    "pkg/parser/import_schema_validation.go line 212 and line 42 do not list valid options or declared inputs; already tracked since 2026-11-21 (not this run's sampled file)"
+  ],
+  "caveats": "Shell pipelines were denied by workflow tool permissions, so checks used view and grep. The reporting skill was not present in the environment."
+}
