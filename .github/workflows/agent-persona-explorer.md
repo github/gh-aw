@@ -212,6 +212,13 @@ Invoke the inline `persona-evaluator` Claude Code sub-agent once per selected sc
 
 The `persona-evaluator` is dynamically materialized as a Claude Code sub-agent from this workflow. It follows the repository's `agentic-workflows` custom-agent guidance; do not try to invoke the `agentic-workflows` CLI or MCP server with a freeform scenario because that interface only manages workflows and does not accept prompts.
 
+For every evaluator call, pass only its scenario, guidance mode and required
+response format. Do not pass parent analysis, prior responses, scores, ambient
+`AGENTS.md` content or skill inventories. The evaluator must use only the
+guidance files allowed by its mode; if the runtime injects ambient instructions
+that cannot be excluded, mark the invocation contaminated/unavailable and do
+not score it.
+
 **Important**: 
 - You are ONLY testing the agent's responses, NOT creating actual workflows
 - **Keep responses focused and concise** - summarize findings instead of verbose descriptions
@@ -223,8 +230,9 @@ The `persona-evaluator` is dynamically materialized as a Claude Code sub-agent f
 Use one successfully evaluated scenario as the full-guidance baseline; request
 one additional, fresh isolated `persona-evaluator` invocation with
 `guidance_mode: prefix_8000` and the identical scenario. Pass no full-response
-rationale or shared conversation history. Do not add a scenario or alter the four initial
-baseline tasks. If none succeeded, report the probe unavailable without scores.
+rationale, ambient `AGENTS.md` content, skill inventories or shared conversation
+history. Do not add a scenario or alter the four initial baseline tasks. If none
+succeeded, report the probe unavailable without scores.
 
 For each guidance file used, measure UTF-8 bytes from the file's start, including
 metadata. Use the repository checker for structural measurements:
@@ -396,14 +404,18 @@ name: persona-evaluator
 description: Evaluates workflow scenarios using the repository's agentic-workflows authoring guidance
 model: inherit
 ---
-Act as the `agentic-workflows` custom agent. By default use full guidance:
+Act as a clean-room `agentic-workflows` evaluator. Use only the requested
+guidance mode and the files it allows; do not use ambient `AGENTS.md`, injected
+skill inventories or prior parent context. By default use full guidance:
 read `.github/agents/agentic-workflows.md` and follow ad hoc evaluation in
 `.github/aw/create-agentic-workflow.md`. If `guidance_mode: prefix_8000`, use
 only the first 8,000 UTF-8 bytes of each guidance file, including metadata;
 follow only routes visible there and apply the same bound to linked guidance.
 Never read hidden tails or reconstruct them from other full-guidance results.
-Return guidance paths, byte counts and unavailable routes with the recommendation.
-Do not create/edit workflows or score your own response.
+If ambient instructions are injected and cannot be excluded, report the
+invocation as contaminated without a recommendation or score. Return guidance
+paths, byte counts and unavailable routes with the recommendation. Do not
+create/edit workflows or score your own response.
 
 Return one concise recommendation per scenario containing the trigger, tools, permissions, network access, safe outputs, and a prompt summary. If given multiple scenarios, keep their results separate and include each scenario identifier. Do not score your own recommendations; the parent evaluator will score completed responses. If you cannot evaluate a scenario, return its identifier and a concise invocation error without inventing a recommendation.
 
