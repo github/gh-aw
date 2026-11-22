@@ -179,8 +179,8 @@ func TestCopilotEngineExecutionStepsWithSDKWebFetchAndWildcardBashScopesTools(t 
 	if strings.Contains(stepContent, "--allow-all-tools") {
 		t.Fatalf("Expected wildcard bash with web-fetch to avoid authorizing unrelated built-in tools, got:\n%s", stepContent)
 	}
-	if !strings.Contains(stepContent, "--allow-tool shell") || !strings.Contains(stepContent, "--allow-tool web_fetch") {
-		t.Fatalf("Expected wildcard bash with web-fetch to authorize only shell and web_fetch, got:\n%s", stepContent)
+	if !strings.Contains(stepContent, "--allow-tool shell") || !strings.Contains(stepContent, "--allow-tool web-fetch") {
+		t.Fatalf("Expected wildcard bash with web-fetch to authorize shell and the web-fetch MCP server, got:\n%s", stepContent)
 	}
 }
 

@@ -122,6 +122,11 @@ func (c *Compiler) setupWorkflowBuildContext(ctx *workflowBuildContext) error {
 	if err := c.validateCopilotWebToolsSupport(engineSetup.agenticEngine, ctx.workflowData); err != nil {
 		return c.formatToolsProcessingError(ctx.cleanPath, err)
 	}
+	if usesWebFetchMCP(ctx.workflowData) && !isFirewallEnabled(ctx.workflowData) {
+		return c.formatToolsProcessingError(ctx.cleanPath, NewValidationError(
+			"tools.web-fetch", "web-fetch", "The built-in web fetch MCP server requires the AWF agent sandbox",
+			"Enable the AWF sandbox:\n\nsandbox:\n  agent:\n    id: awf"))
+	}
 	if err := c.validateResolvedEngineEnvSecrets(ctx); err != nil {
 		return c.formatEngineSetupError(ctx, err)
 	}

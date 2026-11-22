@@ -138,14 +138,14 @@ func TestFixRecursivelyProcessesNestedWorkflowFiles(t *testing.T) {
 		"root.md": `---
 engine: copilot
 tools:
-  web-fetch: true # unavailable in offline mode
+  web-search: true # unavailable in offline mode
   bash: ["git"]
 ---
 Keep this body.
 `,
 		filepath.Join("shared", "nested", "shared.md"): `---
 engine: copilot
-tools: {web-fetch: true, bash: ["git"]} # keep mapping comment
+tools: {web-search: true, bash: ["git"]} # keep mapping comment
 ---
 Keep this body.
 `,
@@ -164,7 +164,7 @@ Keep this body.
 		relativePath, err := filepath.Rel(dir, path)
 		require.NoError(t, err)
 		discoveredPaths[relativePath] = true
-		fixed, _, err := processWorkflowFileWithInfo(path, []Codemod{getCopilotWebFetchRemovalCodemod()}, false, false)
+		fixed, _, err := processWorkflowFileWithInfo(path, []Codemod{getCopilotWebSearchRemovalCodemod()}, false, false)
 		require.NoError(t, err)
 		assert.True(t, fixed, path)
 	}

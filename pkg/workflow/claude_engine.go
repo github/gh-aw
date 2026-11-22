@@ -262,6 +262,15 @@ func (e *ClaudeEngine) buildClaudeCliArgs(workflowData *WorkflowData, toolsWithM
 	// Note: we use --allowed-tools (not the simpler --tools from v2.0.31+) because it provides
 	// fine-grained control: Bash(git:*), MCP tool prefixes, path-specific tools, etc.
 	allowedTools = e.computeAllowedClaudeToolsStringWithDynamicWorkflows(toolsWithMountedCLIs, workflowData.SafeOutputs, workflowData.CacheMemoryConfig, workflowData.DriveMemoryConfig, workflowData.MCPScripts, workflowData.SandboxConfig, dynamicWorkflowsEnabled(e, workflowData.EngineConfig))
+	if usesWebFetchMCPForEngine("claude", workflowData) {
+		tools := strings.Split(allowedTools, ",")
+		for i, tool := range tools {
+			if tool == "WebFetch" {
+				tools[i] = "mcp__web-fetch__web_fetch"
+			}
+		}
+		allowedTools = strings.Join(tools, ",")
+	}
 	if allowedTools != "" {
 		claudeArgs = append(claudeArgs, "--allowed-tools", allowedTools)
 	}

@@ -72,7 +72,7 @@ engine:
     mcp:
       config-path: /tmp/gh-aw/opencode-mcp.json
       config-adapter: |
-        const { loadGatewayContext, filterAndTransformServers, rewriteUrl, writeSecureOutput } = require("./convert_gateway_config_shared.cjs");
+        const { loadGatewayContext, filterAndTransformServers, rewriteUrl, writeSecureOutput, addWebFetchMCPServer } = require("./convert_gateway_config_shared.cjs");
         const context = loadGatewayContext();
         const servers = filterAndTransformServers(context.servers, context.cliServers, (name, entry) => {
           if (typeof entry.url !== "string") {
@@ -87,6 +87,7 @@ engine:
             ...(entry.headers ? { headers: entry.headers } : {}),
           };
         });
+        addWebFetchMCPServer(servers, config => ({ type: "local", command: [config.command, ...config.args], disabled: false, codemode: false }));
         writeSecureOutput("/tmp/gh-aw/opencode-mcp.json", JSON.stringify({ mcp: { servers } }, null, 2));
     harness-script: |
       const { readFileSync, existsSync } = require("fs");

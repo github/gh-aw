@@ -46,7 +46,7 @@ engine:
       config-path: .goose/mcp.json
       config-adapter: |
         const path = require("path");
-        const { loadGatewayContext, filterAndTransformServers, normalizeGatewayEntry, writeSecureOutput } = require("./convert_gateway_config_shared.cjs");
+        const { loadGatewayContext, filterAndTransformServers, normalizeGatewayEntry, writeSecureOutput, addWebFetchMCPServer } = require("./convert_gateway_config_shared.cjs");
         const context = loadGatewayContext({ extraRequiredEnv: ["GITHUB_WORKSPACE"] });
         // The harness executes inside AWF, so use the container-facing gateway domain.
         const servers = filterAndTransformServers(context.servers, context.cliServers, (name, entry) => {
@@ -57,6 +57,7 @@ engine:
             transformed.type = typeof entry.url === "string" ? "streamable_http" : "stdio";
           });
         });
+        addWebFetchMCPServer(servers, config => ({ ...config, type: "stdio" }));
         writeSecureOutput(path.join(context.extraEnv.GITHUB_WORKSPACE, ".goose", "mcp.json"), JSON.stringify({ mcpServers: servers }, null, 2));
     harness-script: |
       const { createHash } = require("crypto");
@@ -205,6 +206,5 @@ Configuration and session state are isolated in a temporary `GOOSE_PATH_ROOT`,
 and keyring access is disabled for unattended execution. Goose's CLI HTTP
 extension flag cannot carry headers, so the harness writes an owner-only native
 config overlay instead. Native JSONL events provide tool calls and token usage.
-Goose has no gh-aw-native `web-fetch` tool; workflows must supply an MCP tool
-or explicitly use their shell capability for web access.
+Declare `tools.web-fetch` to use the built-in fetch MCP server inside AWF.
 -->

@@ -101,21 +101,18 @@ Review and commit the changed workflow `.md` and generated `.lock.yml` files. Fi
 
 ### Copilot Web Tools in Offline BYOK Mode
 
-Copilot runs with `COPILOT_OFFLINE=true` in offline BYOK mode. Compilation rejects `tools.web-search` in both CLI and SDK modes, and `tools.web-fetch` in CLI mode.
+Copilot runs with `COPILOT_OFFLINE=true` in both CLI and SDK modes. Compilation rejects native `tools.web-search`; `gh aw fix --write` removes that declaration. See [web search configuration](/gh-aw/reference/web-search/) for alternatives.
 
-`gh aw fix --write` removes these unsupported declarations. If the workflow still needs web access, configure an [MCP server](/gh-aw/reference/tools/#custom-mcp-servers-mcp-servers) instead, or switch to an engine that supports the required tools, such as `engine: codex`. See [web search configuration](/gh-aw/reference/web-search/).
-
-For fetching only, enable Copilot SDK mode to retain `tools.web-fetch`:
+For fetching only, enable `tools.web-fetch`:
 
 ```aw
 engine:
   id: copilot
-  copilot-sdk: true
 tools:
   web-fetch:
 ```
 
-SDK mode provides a custom proxy-aware fetch tool that follows `network.allowed`; it does **not** enable native web search.
+Both CLI and SDK use the built-in MCP server inside AWF. Fetching follows `network.allowed` and does not enable native web search.
 
 ### Explicit Bash Configuration with `min-integrity: none`
 
