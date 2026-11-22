@@ -7,7 +7,23 @@ const { createHash } = require("node:crypto");
 const { canonical, closed, digest, identity, integer, parseStrictJSON, queueError, utf8Compare } = require("./work_queue_codec.cjs");
 const { EFFECTS_BYTES, LEDGER_BYTES, OPERATIONS_PER_COMMIT, boundedBytes } = require("./work_queue_limits.cjs");
 const { PROFILE_WORKFLOW, decimal, validateActor } = require("./work_queue_policy.cjs");
-const { WORK_OPTIONAL, WORK_REQUIRED, backingIssueOwner, gateKey, issueKey, trackAdmittedWork, trackBackingIssue, trackWorkState, validateGraphAdmission, validateResource, validateWork, workDefinition } = require("./work_queue_graph.cjs");
+const {
+  ISSUE_CONDITIONS,
+  WORK_OPTIONAL,
+  WORK_REQUIRED,
+  approvalGate,
+  backingIssueOwner,
+  continuationChild,
+  gateKey,
+  issueKey,
+  trackAdmittedWork,
+  trackBackingIssue,
+  trackWorkState,
+  validateGraphAdmission,
+  validateResource,
+  validateWork,
+  workDefinition,
+} = require("./work_queue_graph.cjs");
 
 /** @type {4} */
 const PROTOCOL_VERSION = 4;
@@ -20,7 +36,7 @@ const OP_FIELDS = {
   Work: [WORK_REQUIRED, WORK_OPTIONAL],
   Observation: [
     ["kind", "observation_id", "resource", "condition", "state"],
-    ["state_reason", "merged", "merge_commit"],
+    ["state_reason", "merged", "merge_commit", "approved_by"],
   ],
   Claim: [["kind", "work_id", "claim_id", "dispatch_id", "handle"], []],
   Dispatch: [["kind", "dispatch_id", "state"], []],
@@ -40,7 +56,8 @@ const REQUEST_KINDS = {
   dispatch_next: { operations: ["Observation", "Claim"], parameters: ["pool", "max_claims", "max_dispatches", "concurrency", "per_account_limit", "profiles"] },
   launch: { operations: ["Dispatch", "Release", "WorkCancellation"], parameters: ["dispatch_id"] },
   bind: { operations: ["Bound"], parameters: ["dispatch_id"] },
-  finish: { operations: ["Completion", "ClaimCancellation", "WorkCancellation"], parameters: ["dispatch_id"] },
+  // A finish may admit one continuation Work right after each paired Completion.
+  finish: { operations: ["Completion", "ClaimCancellation", "WorkCancellation", "Work"], parameters: ["dispatch_id"] },
   release: { operations: ["Release", "WorkCancellation"], parameters: ["dispatch_id", "reason"] },
   cancel_work: { operations: ["WorkCancellation"], parameters: ["work_ids", "reason"] },
   checkpoint: { operations: ["Checkpoint"], parameters: ["prior_tip"] },
@@ -109,15 +126,19 @@ function workIds(value) {
 
 function validateObservation(operation) {
   validateResource(operation.resource);
-  const conditions = operation.resource.kind === "issue" ? ["completed", "closed"] : ["merged"];
+  const conditions = operation.resource.kind === "issue" ? ISSUE_CONDITIONS : ["merged"];
   if (!conditions.includes(operation.condition) || !["ready", "waiting", "failed", "unknown"].includes(operation.state)) throw queueError("observation_invalid", "typed condition/state is invalid");
   if (Object.hasOwn(operation, "state_reason") && !["completed", "not_planned", "reopened"].includes(operation.state_reason)) throw queueError("observation_invalid", "invalid Issue state_reason");
   if (Object.hasOwn(operation, "merged") && typeof operation.merged !== "boolean") throw queueError("observation_invalid", "merged must be boolean");
   if (Object.hasOwn(operation, "merge_commit")) identity(operation.merge_commit, "merge commit");
   if (operation.resource.kind === "issue" && (Object.hasOwn(operation, "merged") || Object.hasOwn(operation, "merge_commit"))) throw queueError("observation_invalid", "an Issue cannot carry pull request merge evidence");
+  // A ready approval names the writer who closed the Issue as completed; nothing else carries a closer.
+  const approval = operation.condition === "approved" && operation.state === "ready";
+  if (approval !== Object.hasOwn(operation, "approved_by")) throw queueError("observation_invalid", "approved_by belongs exactly to a ready approved Issue gate");
+  if (approval) decimal(operation.approved_by, "approved_by", "observation_invalid");
   if (operation.state === "ready") {
     if (operation.resource.kind === "pull_request" && (operation.merged !== true || !operation.merge_commit)) throw queueError("observation_invalid", "a ready pull request gate requires its merge commit");
-    if (operation.condition === "completed" && operation.state_reason !== "completed") throw queueError("observation_invalid", "a ready completed Issue gate requires state_reason completed");
+    if ((operation.condition === "completed" || approval) && operation.state_reason !== "completed") throw queueError("observation_invalid", "a ready completed Issue gate requires state_reason completed");
   }
 }
 
@@ -237,6 +258,8 @@ function authorizeOperation(commit, operation) {
   if (operation.kind === "WorkCancellation" && ((role === "worker" && kind !== "finish") || (role === "dispatcher" && kind !== "launch"))) throw unauthorized();
   if (operation.kind === "Release" && role === "dispatcher" && operation.reason !== "launch_failed") throw unauthorized();
   if (kind === "migrate" && role !== "administrator") throw unauthorized();
+  // Only a finish hands off: submit and migrate cannot mint a continuation (or, structurally, its approval gate).
+  if (operation.kind === "Work" && kind !== "finish" && Object.hasOwn(operation, "continuation")) throw queueError("request_invalid", `${kind} cannot carry a continuation`);
 }
 
 /** @returns {QueueCommit} */
@@ -351,6 +374,8 @@ function applyClaim(state, operation, commit) {
   if (state.claims.has(operation.claim_id)) throw queueError("claim_conflict", "Claim identity already exists");
   const profiles = commit.request.parameters.profiles;
   if (!Object.hasOwn(profiles, work.worker_profile)) throw queueError("request_invalid", "dispatch_next parameters omit the Work's worker profile");
+  const approval = approvalGate(work);
+  if (approval && state.observations.get(gateKey(approval.resource, approval.condition))?.state !== "ready") throw queueError("approval_required", "an issue-routed continuation needs its ready approval");
   let dispatch = state.dispatches.get(operation.dispatch_id);
   if (dispatch) {
     if (dispatch.commit_id !== commit.id || dispatch.pool !== work.pool || dispatch.worker_profile !== work.worker_profile) throw queueError("dispatch_state_conflict", "a Dispatch groups compatible Claims of one commit");
@@ -471,9 +496,31 @@ function applyIssueComment(state, operation) {
   target.issue_comment = operation.comment_id;
 }
 
+/**
+ * A finish-carried Work is the continuation of the Completion immediately before
+ * it: fresh, exactly `continuationChild` of that parent, and admitted against the
+ * projection that already counts the parent as completed.
+ */
+function admitContinuation(state, commit, index) {
+  const operation = commit.operations[index];
+  const invalid = message => queueError("request_invalid", message);
+  const paired = commit.operations[index - 1];
+  if (paired?.kind !== "Completion" || paired.dispatch_id !== commit.request.parameters.dispatch_id) throw invalid("a finish-carried Work must immediately follow its parent's Completion of the request's Dispatch");
+  if (state.works.has(operation.work_id)) throw invalid("a continuation must be fresh Work");
+  const parent = state.works.get(paired.work_id);
+  const continuation = operation.continuation;
+  if (!continuation || parent?.completion_id !== commit.id) throw invalid("a finish-carried Work must be the continuation of a Completion in this commit");
+  const approval = operation.depends_on.find(edge => edge.kind === "issue" && edge.condition === "approved")?.resource;
+  if (canonical(operation) !== canonical(continuationChild(parent, continuation, approval))) throw invalid("a continuation must inherit exactly from its parent");
+  // An automatic hop spends one unit of its parent's budget; a zero balance cannot hand off.
+  if (continuation.route === "workqueue" && parent.continuation && continuation.remaining >= parent.continuation.remaining) throw invalid("an automatic continuation must decrease its remaining budget");
+  validateGraphAdmission(state, [operation]);
+}
+
 function applyOperation(state, operation, commit, ordinal, index) {
   switch (operation.kind) {
     case "Work":
+      if (commit.request.kind === "finish") admitContinuation(state, commit, index);
       if (!state.works.has(operation.work_id)) {
         const work = { ...operation, state: "available", position: { commit: ordinal, operation: index }, attempts: 0 };
         state.works.set(work.work_id, work);
@@ -526,9 +573,13 @@ function applyCommit(state, commit) {
   } else if (commit.actor.repository !== state.repository) throw queueError("actor_unauthorized", "foreign queue repository");
   if (state.requests.has(commit.request.id)) throw queueError("request_reused", "request is already committed");
   if (commit.request.kind === "migrate" && !state.transactions.every(prior => prior.request.kind === "migrate")) throw queueError("request_invalid", "migrate commits must form the log genesis");
-  const fresh = new Map();
-  for (const operation of commit.operations) if (operation.kind === "Work" && !state.works.has(operation.work_id)) fresh.set(operation.work_id, [...(fresh.get(operation.work_id) ?? []), operation]);
-  if (fresh.size) validateGraphAdmission(state, [...fresh.values()].flat());
+  // submit/migrate admit their batch up front (forward references); a finish admits
+  // each continuation right after its paired Completion.
+  if (commit.request.kind !== "finish") {
+    const fresh = new Map();
+    for (const operation of commit.operations) if (operation.kind === "Work" && !state.works.has(operation.work_id)) fresh.set(operation.work_id, [...(fresh.get(operation.work_id) ?? []), operation]);
+    if (fresh.size) validateGraphAdmission(state, [...fresh.values()].flat());
+  }
   const ordinal = state.commits;
   commit.operations.forEach((operation, index) => applyOperation(state, operation, commit, ordinal, index));
   state.requests.add(commit.request.id);

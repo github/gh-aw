@@ -123,6 +123,11 @@ func (state *Projection) applyClaim(operation ClaimOperation, commit QueueCommit
 	if !routed {
 		return queueError("request_invalid", "dispatch_next parameters omit the Work's worker profile")
 	}
+	if approval := approvalGate(work.WorkDefinition); approval != nil {
+		if observation, ok := state.Observations[GateKey(*approval.Resource, approval.Condition)]; !ok || observation.State != "ready" {
+			return queueError("approval_required", "an issue-routed continuation needs its ready approval")
+		}
+	}
 	dispatch := state.Dispatches[operation.DispatchID]
 	if dispatch != nil {
 		if dispatch.CommitID != commit.ID || dispatch.Pool != work.Pool || dispatch.WorkerProfile != work.WorkerProfile {

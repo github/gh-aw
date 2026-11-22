@@ -3951,5 +3951,2825 @@
       },
       "code": "request_invalid"
     }
+  },
+  "continuation": {
+    "commits": [
+      {
+        "version": 4,
+        "id": "q_692ec79f0943173be3ebb3b2a6040592fd7bb841e5188160170aa8acef3b8741",
+        "previous": null,
+        "request": {
+          "id": "request:016fa5c1fa0f1e2539494dfff13dbbfd0c138e0d4f82fa0802c260000d4b5499",
+          "kind": "submit",
+          "parameters": {
+            "work_ids": ["3d459bf6097a00c7a08c46dc585b70179444c35b9fa37bd97e4ecbb4eeccd306"]
+          }
+        },
+        "actor": {
+          "role": "producer",
+          "repository": "owner/repo",
+          "workflow": ".github/workflows/producer.lock.yml",
+          "run_id": "10",
+          "run_attempt": 1
+        },
+        "at": 1,
+        "operations": [
+          {
+            "kind": "Work",
+            "work_id": "3d459bf6097a00c7a08c46dc585b70179444c35b9fa37bd97e4ecbb4eeccd306",
+            "graph_id": "graph",
+            "node_key": "p",
+            "pool": "default",
+            "priority": 3,
+            "fairness_key": "",
+            "worker_profile": "worker",
+            "payload": {
+              "task": "audit pages",
+              "effect_contract": {
+                "kind": "none"
+              }
+            },
+            "depends_on": [],
+            "subject": {
+              "kind": "issue",
+              "host": "github.com",
+              "repository": "owner/repo",
+              "repository_id": "1",
+              "resource_id": "9007199254740993",
+              "number": "7"
+            }
+          }
+        ]
+      },
+      {
+        "version": 4,
+        "id": "q_1b59d59e5738d29bd715652dfa61860d6d0dc16d610e60c8a4f7676f5e7b0312",
+        "previous": "q_692ec79f0943173be3ebb3b2a6040592fd7bb841e5188160170aa8acef3b8741",
+        "request": {
+          "id": "request:37c48289ad81720cf71ed85f074e1882808cee536c0923875887a6a467680684",
+          "kind": "dispatch_next",
+          "parameters": {
+            "concurrency": 2,
+            "max_claims": 16,
+            "max_dispatches": 16,
+            "per_account_limit": 0,
+            "pool": "default",
+            "profiles": {
+              "worker": {
+                "workflow": ".github/workflows/worker.lock.yml"
+              }
+            }
+          }
+        },
+        "actor": {
+          "role": "dispatcher",
+          "repository": "owner/repo",
+          "workflow": ".github/workflows/dispatcher.lock.yml",
+          "run_id": "201",
+          "run_attempt": 1
+        },
+        "at": 1,
+        "operations": [
+          {
+            "kind": "Claim",
+            "work_id": "3d459bf6097a00c7a08c46dc585b70179444c35b9fa37bd97e4ecbb4eeccd306",
+            "claim_id": "c_3ac298b078167e4c1eff6439c134ba4fea5b17ee3a21b8ffa8399dd9969e189b_1",
+            "dispatch_id": "d_3ac298b078167e4c1eff6439c134ba4fea5b17ee3a21b8ffa8399dd9969e189b_1",
+            "handle": "h1"
+          }
+        ]
+      },
+      {
+        "version": 4,
+        "id": "q_d94f13a93f7dc6fcbf9ce2f8f3431483b3bc85abcecc78fd951c105a5b285fe2",
+        "previous": "q_1b59d59e5738d29bd715652dfa61860d6d0dc16d610e60c8a4f7676f5e7b0312",
+        "request": {
+          "id": "request:3adf0671621a5c7fae207ae41de0ef866b97e5b8ca8eacec5a30ed306ad23b57",
+          "kind": "launch",
+          "parameters": {
+            "dispatch_id": "d_3ac298b078167e4c1eff6439c134ba4fea5b17ee3a21b8ffa8399dd9969e189b_1"
+          }
+        },
+        "actor": {
+          "role": "dispatcher",
+          "repository": "owner/repo",
+          "workflow": ".github/workflows/dispatcher.lock.yml",
+          "run_id": "201",
+          "run_attempt": 1
+        },
+        "at": 1,
+        "operations": [
+          {
+            "kind": "Dispatch",
+            "dispatch_id": "d_3ac298b078167e4c1eff6439c134ba4fea5b17ee3a21b8ffa8399dd9969e189b_1",
+            "state": "started"
+          }
+        ]
+      },
+      {
+        "version": 4,
+        "id": "q_3570b4dc99bfaeca5e7e1ec65deedcf944731186090d0baf6d7c9e07eeff03c1",
+        "previous": "q_d94f13a93f7dc6fcbf9ce2f8f3431483b3bc85abcecc78fd951c105a5b285fe2",
+        "request": {
+          "id": "request:1ea99ba9b9d426ff0368a5ded934ed628721f9d18f750a7af9589b2a638412e7",
+          "kind": "bind",
+          "parameters": {
+            "dispatch_id": "d_3ac298b078167e4c1eff6439c134ba4fea5b17ee3a21b8ffa8399dd9969e189b_1"
+          }
+        },
+        "actor": {
+          "role": "worker",
+          "repository": "owner/repo",
+          "workflow": ".github/workflows/worker.lock.yml",
+          "run_id": "21",
+          "run_attempt": 1
+        },
+        "at": 1,
+        "operations": [
+          {
+            "kind": "Bound",
+            "dispatch_id": "d_3ac298b078167e4c1eff6439c134ba4fea5b17ee3a21b8ffa8399dd9969e189b_1",
+            "run_id": "21",
+            "run_attempt": 1
+          }
+        ]
+      },
+      {
+        "version": 4,
+        "id": "q_886152e1f6423c4ec7529243c38d4d3b848e710751a6d2aad0aeeea68692a501",
+        "previous": "q_3570b4dc99bfaeca5e7e1ec65deedcf944731186090d0baf6d7c9e07eeff03c1",
+        "request": {
+          "id": "request:52db46c8dba364b1511f26a0cd8fba58d60c5a54b300dcf272e8f2ffc154b309",
+          "kind": "finish",
+          "parameters": {
+            "dispatch_id": "d_3ac298b078167e4c1eff6439c134ba4fea5b17ee3a21b8ffa8399dd9969e189b_1"
+          }
+        },
+        "actor": {
+          "role": "worker",
+          "repository": "owner/repo",
+          "workflow": ".github/workflows/worker.lock.yml",
+          "run_id": "21",
+          "run_attempt": 1
+        },
+        "at": 1,
+        "operations": [
+          {
+            "kind": "Completion",
+            "work_id": "3d459bf6097a00c7a08c46dc585b70179444c35b9fa37bd97e4ecbb4eeccd306",
+            "claim_id": "c_3ac298b078167e4c1eff6439c134ba4fea5b17ee3a21b8ffa8399dd9969e189b_1",
+            "dispatch_id": "d_3ac298b078167e4c1eff6439c134ba4fea5b17ee3a21b8ffa8399dd9969e189b_1",
+            "claim_handle": "h1",
+            "effects": []
+          },
+          {
+            "kind": "Work",
+            "work_id": "865269593bfe9cf30d99c4b9e6912ed3e89fcdb71e6d9946c6fe74bbbdb230cf",
+            "graph_id": "graph",
+            "node_key": "continuation:3d459bf6097a00c7a08c46dc585b70179444c35b9fa37bd97e4ecbb4eeccd306",
+            "pool": "default",
+            "priority": 3,
+            "fairness_key": "",
+            "worker_profile": "worker",
+            "payload": {
+              "task": "audit pages",
+              "effect_contract": {
+                "kind": "none"
+              }
+            },
+            "depends_on": [
+              {
+                "kind": "work",
+                "work_id": "3d459bf6097a00c7a08c46dc585b70179444c35b9fa37bd97e4ecbb4eeccd306"
+              }
+            ],
+            "continuation": {
+              "route": "workqueue",
+              "message": "Audit page 2",
+              "remaining": 1
+            },
+            "subject": {
+              "kind": "issue",
+              "host": "github.com",
+              "repository": "owner/repo",
+              "repository_id": "1",
+              "resource_id": "9007199254740993",
+              "number": "7"
+            }
+          }
+        ]
+      },
+      {
+        "version": 4,
+        "id": "q_f2ba1a88f58309413dca2b266d6d5c2565f7c7c0b85918f2c34178904a38831d",
+        "previous": "q_886152e1f6423c4ec7529243c38d4d3b848e710751a6d2aad0aeeea68692a501",
+        "request": {
+          "id": "request:24cb88532cbcb12bda6da082d34308b8fcc94243d32c9647d53650565c38eb57",
+          "kind": "dispatch_next",
+          "parameters": {
+            "concurrency": 2,
+            "max_claims": 16,
+            "max_dispatches": 16,
+            "per_account_limit": 0,
+            "pool": "default",
+            "profiles": {
+              "worker": {
+                "workflow": ".github/workflows/worker.lock.yml"
+              }
+            }
+          }
+        },
+        "actor": {
+          "role": "dispatcher",
+          "repository": "owner/repo",
+          "workflow": ".github/workflows/dispatcher.lock.yml",
+          "run_id": "202",
+          "run_attempt": 1
+        },
+        "at": 1,
+        "operations": [
+          {
+            "kind": "Claim",
+            "work_id": "865269593bfe9cf30d99c4b9e6912ed3e89fcdb71e6d9946c6fe74bbbdb230cf",
+            "claim_id": "c_df88ad74c699ff0f3a1498f3227a5758d0e72fbe676e29a6a7a0aa100e06d656_1",
+            "dispatch_id": "d_df88ad74c699ff0f3a1498f3227a5758d0e72fbe676e29a6a7a0aa100e06d656_1",
+            "handle": "h1"
+          }
+        ]
+      },
+      {
+        "version": 4,
+        "id": "q_6a145f268f3cb90d58ba948c32901b7d6ba52734d626f92ed132ac76d3aba3a5",
+        "previous": "q_f2ba1a88f58309413dca2b266d6d5c2565f7c7c0b85918f2c34178904a38831d",
+        "request": {
+          "id": "request:32fd4a2965e3140dda5e1066dda0486e619b5e24d2b842f34b9adbb6373587df",
+          "kind": "launch",
+          "parameters": {
+            "dispatch_id": "d_df88ad74c699ff0f3a1498f3227a5758d0e72fbe676e29a6a7a0aa100e06d656_1"
+          }
+        },
+        "actor": {
+          "role": "dispatcher",
+          "repository": "owner/repo",
+          "workflow": ".github/workflows/dispatcher.lock.yml",
+          "run_id": "202",
+          "run_attempt": 1
+        },
+        "at": 1,
+        "operations": [
+          {
+            "kind": "Dispatch",
+            "dispatch_id": "d_df88ad74c699ff0f3a1498f3227a5758d0e72fbe676e29a6a7a0aa100e06d656_1",
+            "state": "started"
+          }
+        ]
+      },
+      {
+        "version": 4,
+        "id": "q_509fec990f17e6ec26cfa76d6b59417b7f49d22a4a8871e6fc35ff5cbe2a16f4",
+        "previous": "q_6a145f268f3cb90d58ba948c32901b7d6ba52734d626f92ed132ac76d3aba3a5",
+        "request": {
+          "id": "request:d2b30d73e5fe29640afb9db1b684bfd2154a733362b8e183ebd5f1eb05302b47",
+          "kind": "bind",
+          "parameters": {
+            "dispatch_id": "d_df88ad74c699ff0f3a1498f3227a5758d0e72fbe676e29a6a7a0aa100e06d656_1"
+          }
+        },
+        "actor": {
+          "role": "worker",
+          "repository": "owner/repo",
+          "workflow": ".github/workflows/worker.lock.yml",
+          "run_id": "22",
+          "run_attempt": 1
+        },
+        "at": 1,
+        "operations": [
+          {
+            "kind": "Bound",
+            "dispatch_id": "d_df88ad74c699ff0f3a1498f3227a5758d0e72fbe676e29a6a7a0aa100e06d656_1",
+            "run_id": "22",
+            "run_attempt": 1
+          }
+        ]
+      },
+      {
+        "version": 4,
+        "id": "q_9c7434c17ec9d7b9ff86fed2ae566cea09e72417d7a187ccf21f74ed6a32402d",
+        "previous": "q_509fec990f17e6ec26cfa76d6b59417b7f49d22a4a8871e6fc35ff5cbe2a16f4",
+        "request": {
+          "id": "request:ea08b73004ab046cf7bf2fc635e6eb05713163e5ca873cde55bfa759203c2278",
+          "kind": "finish",
+          "parameters": {
+            "dispatch_id": "d_df88ad74c699ff0f3a1498f3227a5758d0e72fbe676e29a6a7a0aa100e06d656_1"
+          }
+        },
+        "actor": {
+          "role": "worker",
+          "repository": "owner/repo",
+          "workflow": ".github/workflows/worker.lock.yml",
+          "run_id": "22",
+          "run_attempt": 1
+        },
+        "at": 1,
+        "operations": [
+          {
+            "kind": "Completion",
+            "work_id": "865269593bfe9cf30d99c4b9e6912ed3e89fcdb71e6d9946c6fe74bbbdb230cf",
+            "claim_id": "c_df88ad74c699ff0f3a1498f3227a5758d0e72fbe676e29a6a7a0aa100e06d656_1",
+            "dispatch_id": "d_df88ad74c699ff0f3a1498f3227a5758d0e72fbe676e29a6a7a0aa100e06d656_1",
+            "claim_handle": "h1",
+            "effects": []
+          },
+          {
+            "kind": "Work",
+            "work_id": "8687a391f089495f34a86578e4c515c9d758c7354fe66f033fe646e7d019b96b",
+            "graph_id": "graph",
+            "node_key": "continuation:865269593bfe9cf30d99c4b9e6912ed3e89fcdb71e6d9946c6fe74bbbdb230cf",
+            "pool": "default",
+            "priority": 3,
+            "fairness_key": "",
+            "worker_profile": "worker",
+            "payload": {
+              "task": "audit pages",
+              "effect_contract": {
+                "kind": "none"
+              }
+            },
+            "depends_on": [
+              {
+                "kind": "work",
+                "work_id": "865269593bfe9cf30d99c4b9e6912ed3e89fcdb71e6d9946c6fe74bbbdb230cf"
+              },
+              {
+                "kind": "issue",
+                "resource": {
+                  "kind": "issue",
+                  "host": "github.com",
+                  "repository": "owner/repo",
+                  "repository_id": "1",
+                  "resource_id": "55",
+                  "number": "5"
+                },
+                "condition": "approved"
+              }
+            ],
+            "continuation": {
+              "route": "issue",
+              "message": "Audit page 3",
+              "remaining": 0
+            },
+            "subject": {
+              "kind": "issue",
+              "host": "github.com",
+              "repository": "owner/repo",
+              "repository_id": "1",
+              "resource_id": "9007199254740993",
+              "number": "7"
+            }
+          }
+        ]
+      },
+      {
+        "version": 4,
+        "id": "q_bca824821fcb13bb1097e9284297e1a0daa3dd7912228b398529759e8b1720ea",
+        "previous": "q_9c7434c17ec9d7b9ff86fed2ae566cea09e72417d7a187ccf21f74ed6a32402d",
+        "request": {
+          "id": "request:00fff950622fca607aaf75baff7d1e2baa73021b1767f7e5359828359d3fc824",
+          "kind": "dispatch_next",
+          "parameters": {
+            "concurrency": 2,
+            "max_claims": 16,
+            "max_dispatches": 16,
+            "per_account_limit": 0,
+            "pool": "default",
+            "profiles": {
+              "worker": {
+                "workflow": ".github/workflows/worker.lock.yml"
+              }
+            }
+          }
+        },
+        "actor": {
+          "role": "dispatcher",
+          "repository": "owner/repo",
+          "workflow": ".github/workflows/dispatcher.lock.yml",
+          "run_id": "203",
+          "run_attempt": 1
+        },
+        "at": 1,
+        "operations": [
+          {
+            "kind": "Observation",
+            "observation_id": "o-approval-waiting",
+            "resource": {
+              "kind": "issue",
+              "host": "github.com",
+              "repository": "owner/repo",
+              "repository_id": "1",
+              "resource_id": "55",
+              "number": "5"
+            },
+            "condition": "approved",
+            "state": "waiting"
+          }
+        ]
+      },
+      {
+        "version": 4,
+        "id": "q_1adcf17b77f3bbba7f07ec08df7969eeb11467279959964a4f6ecae36c9b2cce",
+        "previous": "q_bca824821fcb13bb1097e9284297e1a0daa3dd7912228b398529759e8b1720ea",
+        "request": {
+          "id": "request:cc84926a04c88a79d00231c6ef4a7e5a0cab72fb6e8da7f407406f4a4c920bff",
+          "kind": "dispatch_next",
+          "parameters": {
+            "concurrency": 2,
+            "max_claims": 16,
+            "max_dispatches": 16,
+            "per_account_limit": 0,
+            "pool": "default",
+            "profiles": {
+              "worker": {
+                "workflow": ".github/workflows/worker.lock.yml"
+              }
+            }
+          }
+        },
+        "actor": {
+          "role": "dispatcher",
+          "repository": "owner/repo",
+          "workflow": ".github/workflows/dispatcher.lock.yml",
+          "run_id": "204",
+          "run_attempt": 1
+        },
+        "at": 1,
+        "operations": [
+          {
+            "kind": "Observation",
+            "observation_id": "o-approval-ready",
+            "resource": {
+              "kind": "issue",
+              "host": "github.com",
+              "repository": "owner/repo",
+              "repository_id": "1",
+              "resource_id": "55",
+              "number": "5"
+            },
+            "condition": "approved",
+            "state": "ready",
+            "state_reason": "completed",
+            "approved_by": "583231"
+          },
+          {
+            "kind": "Claim",
+            "work_id": "8687a391f089495f34a86578e4c515c9d758c7354fe66f033fe646e7d019b96b",
+            "claim_id": "c_952c7b14793a92d3e50c004a26b07a1d573434effdcf8016fa837b58073d7769_1",
+            "dispatch_id": "d_952c7b14793a92d3e50c004a26b07a1d573434effdcf8016fa837b58073d7769_1",
+            "handle": "h1"
+          }
+        ]
+      }
+    ],
+    "canonical": "{\"actor\":{\"repository\":\"owner/repo\",\"role\":\"producer\",\"run_attempt\":1,\"run_id\":\"10\",\"workflow\":\".github/workflows/producer.lock.yml\"},\"at\":1,\"id\":\"q_692ec79f0943173be3ebb3b2a6040592fd7bb841e5188160170aa8acef3b8741\",\"operations\":[{\"depends_on\":[],\"fairness_key\":\"\",\"graph_id\":\"graph\",\"kind\":\"Work\",\"node_key\":\"p\",\"payload\":{\"effect_contract\":{\"kind\":\"none\"},\"task\":\"audit pages\"},\"pool\":\"default\",\"priority\":3,\"subject\":{\"host\":\"github.com\",\"kind\":\"issue\",\"number\":\"7\",\"repository\":\"owner/repo\",\"repository_id\":\"1\",\"resource_id\":\"9007199254740993\"},\"work_id\":\"3d459bf6097a00c7a08c46dc585b70179444c35b9fa37bd97e4ecbb4eeccd306\",\"worker_profile\":\"worker\"}],\"previous\":null,\"request\":{\"id\":\"request:016fa5c1fa0f1e2539494dfff13dbbfd0c138e0d4f82fa0802c260000d4b5499\",\"kind\":\"submit\",\"parameters\":{\"work_ids\":[\"3d459bf6097a00c7a08c46dc585b70179444c35b9fa37bd97e4ecbb4eeccd306\"]}},\"version\":4}\n{\"actor\":{\"repository\":\"owner/repo\",\"role\":\"dispatcher\",\"run_attempt\":1,\"run_id\":\"201\",\"workflow\":\".github/workflows/dispatcher.lock.yml\"},\"at\":1,\"id\":\"q_1b59d59e5738d29bd715652dfa61860d6d0dc16d610e60c8a4f7676f5e7b0312\",\"operations\":[{\"claim_id\":\"c_3ac298b078167e4c1eff6439c134ba4fea5b17ee3a21b8ffa8399dd9969e189b_1\",\"dispatch_id\":\"d_3ac298b078167e4c1eff6439c134ba4fea5b17ee3a21b8ffa8399dd9969e189b_1\",\"handle\":\"h1\",\"kind\":\"Claim\",\"work_id\":\"3d459bf6097a00c7a08c46dc585b70179444c35b9fa37bd97e4ecbb4eeccd306\"}],\"previous\":\"q_692ec79f0943173be3ebb3b2a6040592fd7bb841e5188160170aa8acef3b8741\",\"request\":{\"id\":\"request:37c48289ad81720cf71ed85f074e1882808cee536c0923875887a6a467680684\",\"kind\":\"dispatch_next\",\"parameters\":{\"concurrency\":2,\"max_claims\":16,\"max_dispatches\":16,\"per_account_limit\":0,\"pool\":\"default\",\"profiles\":{\"worker\":{\"workflow\":\".github/workflows/worker.lock.yml\"}}}},\"version\":4}\n{\"actor\":{\"repository\":\"owner/repo\",\"role\":\"dispatcher\",\"run_attempt\":1,\"run_id\":\"201\",\"workflow\":\".github/workflows/dispatcher.lock.yml\"},\"at\":1,\"id\":\"q_d94f13a93f7dc6fcbf9ce2f8f3431483b3bc85abcecc78fd951c105a5b285fe2\",\"operations\":[{\"dispatch_id\":\"d_3ac298b078167e4c1eff6439c134ba4fea5b17ee3a21b8ffa8399dd9969e189b_1\",\"kind\":\"Dispatch\",\"state\":\"started\"}],\"previous\":\"q_1b59d59e5738d29bd715652dfa61860d6d0dc16d610e60c8a4f7676f5e7b0312\",\"request\":{\"id\":\"request:3adf0671621a5c7fae207ae41de0ef866b97e5b8ca8eacec5a30ed306ad23b57\",\"kind\":\"launch\",\"parameters\":{\"dispatch_id\":\"d_3ac298b078167e4c1eff6439c134ba4fea5b17ee3a21b8ffa8399dd9969e189b_1\"}},\"version\":4}\n{\"actor\":{\"repository\":\"owner/repo\",\"role\":\"worker\",\"run_attempt\":1,\"run_id\":\"21\",\"workflow\":\".github/workflows/worker.lock.yml\"},\"at\":1,\"id\":\"q_3570b4dc99bfaeca5e7e1ec65deedcf944731186090d0baf6d7c9e07eeff03c1\",\"operations\":[{\"dispatch_id\":\"d_3ac298b078167e4c1eff6439c134ba4fea5b17ee3a21b8ffa8399dd9969e189b_1\",\"kind\":\"Bound\",\"run_attempt\":1,\"run_id\":\"21\"}],\"previous\":\"q_d94f13a93f7dc6fcbf9ce2f8f3431483b3bc85abcecc78fd951c105a5b285fe2\",\"request\":{\"id\":\"request:1ea99ba9b9d426ff0368a5ded934ed628721f9d18f750a7af9589b2a638412e7\",\"kind\":\"bind\",\"parameters\":{\"dispatch_id\":\"d_3ac298b078167e4c1eff6439c134ba4fea5b17ee3a21b8ffa8399dd9969e189b_1\"}},\"version\":4}\n{\"actor\":{\"repository\":\"owner/repo\",\"role\":\"worker\",\"run_attempt\":1,\"run_id\":\"21\",\"workflow\":\".github/workflows/worker.lock.yml\"},\"at\":1,\"id\":\"q_886152e1f6423c4ec7529243c38d4d3b848e710751a6d2aad0aeeea68692a501\",\"operations\":[{\"claim_handle\":\"h1\",\"claim_id\":\"c_3ac298b078167e4c1eff6439c134ba4fea5b17ee3a21b8ffa8399dd9969e189b_1\",\"dispatch_id\":\"d_3ac298b078167e4c1eff6439c134ba4fea5b17ee3a21b8ffa8399dd9969e189b_1\",\"effects\":[],\"kind\":\"Completion\",\"work_id\":\"3d459bf6097a00c7a08c46dc585b70179444c35b9fa37bd97e4ecbb4eeccd306\"},{\"continuation\":{\"message\":\"Audit page 2\",\"remaining\":1,\"route\":\"workqueue\"},\"depends_on\":[{\"kind\":\"work\",\"work_id\":\"3d459bf6097a00c7a08c46dc585b70179444c35b9fa37bd97e4ecbb4eeccd306\"}],\"fairness_key\":\"\",\"graph_id\":\"graph\",\"kind\":\"Work\",\"node_key\":\"continuation:3d459bf6097a00c7a08c46dc585b70179444c35b9fa37bd97e4ecbb4eeccd306\",\"payload\":{\"effect_contract\":{\"kind\":\"none\"},\"task\":\"audit pages\"},\"pool\":\"default\",\"priority\":3,\"subject\":{\"host\":\"github.com\",\"kind\":\"issue\",\"number\":\"7\",\"repository\":\"owner/repo\",\"repository_id\":\"1\",\"resource_id\":\"9007199254740993\"},\"work_id\":\"865269593bfe9cf30d99c4b9e6912ed3e89fcdb71e6d9946c6fe74bbbdb230cf\",\"worker_profile\":\"worker\"}],\"previous\":\"q_3570b4dc99bfaeca5e7e1ec65deedcf944731186090d0baf6d7c9e07eeff03c1\",\"request\":{\"id\":\"request:52db46c8dba364b1511f26a0cd8fba58d60c5a54b300dcf272e8f2ffc154b309\",\"kind\":\"finish\",\"parameters\":{\"dispatch_id\":\"d_3ac298b078167e4c1eff6439c134ba4fea5b17ee3a21b8ffa8399dd9969e189b_1\"}},\"version\":4}\n{\"actor\":{\"repository\":\"owner/repo\",\"role\":\"dispatcher\",\"run_attempt\":1,\"run_id\":\"202\",\"workflow\":\".github/workflows/dispatcher.lock.yml\"},\"at\":1,\"id\":\"q_f2ba1a88f58309413dca2b266d6d5c2565f7c7c0b85918f2c34178904a38831d\",\"operations\":[{\"claim_id\":\"c_df88ad74c699ff0f3a1498f3227a5758d0e72fbe676e29a6a7a0aa100e06d656_1\",\"dispatch_id\":\"d_df88ad74c699ff0f3a1498f3227a5758d0e72fbe676e29a6a7a0aa100e06d656_1\",\"handle\":\"h1\",\"kind\":\"Claim\",\"work_id\":\"865269593bfe9cf30d99c4b9e6912ed3e89fcdb71e6d9946c6fe74bbbdb230cf\"}],\"previous\":\"q_886152e1f6423c4ec7529243c38d4d3b848e710751a6d2aad0aeeea68692a501\",\"request\":{\"id\":\"request:24cb88532cbcb12bda6da082d34308b8fcc94243d32c9647d53650565c38eb57\",\"kind\":\"dispatch_next\",\"parameters\":{\"concurrency\":2,\"max_claims\":16,\"max_dispatches\":16,\"per_account_limit\":0,\"pool\":\"default\",\"profiles\":{\"worker\":{\"workflow\":\".github/workflows/worker.lock.yml\"}}}},\"version\":4}\n{\"actor\":{\"repository\":\"owner/repo\",\"role\":\"dispatcher\",\"run_attempt\":1,\"run_id\":\"202\",\"workflow\":\".github/workflows/dispatcher.lock.yml\"},\"at\":1,\"id\":\"q_6a145f268f3cb90d58ba948c32901b7d6ba52734d626f92ed132ac76d3aba3a5\",\"operations\":[{\"dispatch_id\":\"d_df88ad74c699ff0f3a1498f3227a5758d0e72fbe676e29a6a7a0aa100e06d656_1\",\"kind\":\"Dispatch\",\"state\":\"started\"}],\"previous\":\"q_f2ba1a88f58309413dca2b266d6d5c2565f7c7c0b85918f2c34178904a38831d\",\"request\":{\"id\":\"request:32fd4a2965e3140dda5e1066dda0486e619b5e24d2b842f34b9adbb6373587df\",\"kind\":\"launch\",\"parameters\":{\"dispatch_id\":\"d_df88ad74c699ff0f3a1498f3227a5758d0e72fbe676e29a6a7a0aa100e06d656_1\"}},\"version\":4}\n{\"actor\":{\"repository\":\"owner/repo\",\"role\":\"worker\",\"run_attempt\":1,\"run_id\":\"22\",\"workflow\":\".github/workflows/worker.lock.yml\"},\"at\":1,\"id\":\"q_509fec990f17e6ec26cfa76d6b59417b7f49d22a4a8871e6fc35ff5cbe2a16f4\",\"operations\":[{\"dispatch_id\":\"d_df88ad74c699ff0f3a1498f3227a5758d0e72fbe676e29a6a7a0aa100e06d656_1\",\"kind\":\"Bound\",\"run_attempt\":1,\"run_id\":\"22\"}],\"previous\":\"q_6a145f268f3cb90d58ba948c32901b7d6ba52734d626f92ed132ac76d3aba3a5\",\"request\":{\"id\":\"request:d2b30d73e5fe29640afb9db1b684bfd2154a733362b8e183ebd5f1eb05302b47\",\"kind\":\"bind\",\"parameters\":{\"dispatch_id\":\"d_df88ad74c699ff0f3a1498f3227a5758d0e72fbe676e29a6a7a0aa100e06d656_1\"}},\"version\":4}\n{\"actor\":{\"repository\":\"owner/repo\",\"role\":\"worker\",\"run_attempt\":1,\"run_id\":\"22\",\"workflow\":\".github/workflows/worker.lock.yml\"},\"at\":1,\"id\":\"q_9c7434c17ec9d7b9ff86fed2ae566cea09e72417d7a187ccf21f74ed6a32402d\",\"operations\":[{\"claim_handle\":\"h1\",\"claim_id\":\"c_df88ad74c699ff0f3a1498f3227a5758d0e72fbe676e29a6a7a0aa100e06d656_1\",\"dispatch_id\":\"d_df88ad74c699ff0f3a1498f3227a5758d0e72fbe676e29a6a7a0aa100e06d656_1\",\"effects\":[],\"kind\":\"Completion\",\"work_id\":\"865269593bfe9cf30d99c4b9e6912ed3e89fcdb71e6d9946c6fe74bbbdb230cf\"},{\"continuation\":{\"message\":\"Audit page 3\",\"remaining\":0,\"route\":\"issue\"},\"depends_on\":[{\"kind\":\"work\",\"work_id\":\"865269593bfe9cf30d99c4b9e6912ed3e89fcdb71e6d9946c6fe74bbbdb230cf\"},{\"condition\":\"approved\",\"kind\":\"issue\",\"resource\":{\"host\":\"github.com\",\"kind\":\"issue\",\"number\":\"5\",\"repository\":\"owner/repo\",\"repository_id\":\"1\",\"resource_id\":\"55\"}}],\"fairness_key\":\"\",\"graph_id\":\"graph\",\"kind\":\"Work\",\"node_key\":\"continuation:865269593bfe9cf30d99c4b9e6912ed3e89fcdb71e6d9946c6fe74bbbdb230cf\",\"payload\":{\"effect_contract\":{\"kind\":\"none\"},\"task\":\"audit pages\"},\"pool\":\"default\",\"priority\":3,\"subject\":{\"host\":\"github.com\",\"kind\":\"issue\",\"number\":\"7\",\"repository\":\"owner/repo\",\"repository_id\":\"1\",\"resource_id\":\"9007199254740993\"},\"work_id\":\"8687a391f089495f34a86578e4c515c9d758c7354fe66f033fe646e7d019b96b\",\"worker_profile\":\"worker\"}],\"previous\":\"q_509fec990f17e6ec26cfa76d6b59417b7f49d22a4a8871e6fc35ff5cbe2a16f4\",\"request\":{\"id\":\"request:ea08b73004ab046cf7bf2fc635e6eb05713163e5ca873cde55bfa759203c2278\",\"kind\":\"finish\",\"parameters\":{\"dispatch_id\":\"d_df88ad74c699ff0f3a1498f3227a5758d0e72fbe676e29a6a7a0aa100e06d656_1\"}},\"version\":4}\n{\"actor\":{\"repository\":\"owner/repo\",\"role\":\"dispatcher\",\"run_attempt\":1,\"run_id\":\"203\",\"workflow\":\".github/workflows/dispatcher.lock.yml\"},\"at\":1,\"id\":\"q_bca824821fcb13bb1097e9284297e1a0daa3dd7912228b398529759e8b1720ea\",\"operations\":[{\"condition\":\"approved\",\"kind\":\"Observation\",\"observation_id\":\"o-approval-waiting\",\"resource\":{\"host\":\"github.com\",\"kind\":\"issue\",\"number\":\"5\",\"repository\":\"owner/repo\",\"repository_id\":\"1\",\"resource_id\":\"55\"},\"state\":\"waiting\"}],\"previous\":\"q_9c7434c17ec9d7b9ff86fed2ae566cea09e72417d7a187ccf21f74ed6a32402d\",\"request\":{\"id\":\"request:00fff950622fca607aaf75baff7d1e2baa73021b1767f7e5359828359d3fc824\",\"kind\":\"dispatch_next\",\"parameters\":{\"concurrency\":2,\"max_claims\":16,\"max_dispatches\":16,\"per_account_limit\":0,\"pool\":\"default\",\"profiles\":{\"worker\":{\"workflow\":\".github/workflows/worker.lock.yml\"}}}},\"version\":4}\n{\"actor\":{\"repository\":\"owner/repo\",\"role\":\"dispatcher\",\"run_attempt\":1,\"run_id\":\"204\",\"workflow\":\".github/workflows/dispatcher.lock.yml\"},\"at\":1,\"id\":\"q_1adcf17b77f3bbba7f07ec08df7969eeb11467279959964a4f6ecae36c9b2cce\",\"operations\":[{\"approved_by\":\"583231\",\"condition\":\"approved\",\"kind\":\"Observation\",\"observation_id\":\"o-approval-ready\",\"resource\":{\"host\":\"github.com\",\"kind\":\"issue\",\"number\":\"5\",\"repository\":\"owner/repo\",\"repository_id\":\"1\",\"resource_id\":\"55\"},\"state\":\"ready\",\"state_reason\":\"completed\"},{\"claim_id\":\"c_952c7b14793a92d3e50c004a26b07a1d573434effdcf8016fa837b58073d7769_1\",\"dispatch_id\":\"d_952c7b14793a92d3e50c004a26b07a1d573434effdcf8016fa837b58073d7769_1\",\"handle\":\"h1\",\"kind\":\"Claim\",\"work_id\":\"8687a391f089495f34a86578e4c515c9d758c7354fe66f033fe646e7d019b96b\"}],\"previous\":\"q_bca824821fcb13bb1097e9284297e1a0daa3dd7912228b398529759e8b1720ea\",\"request\":{\"id\":\"request:cc84926a04c88a79d00231c6ef4a7e5a0cab72fb6e8da7f407406f4a4c920bff\",\"kind\":\"dispatch_next\",\"parameters\":{\"concurrency\":2,\"max_claims\":16,\"max_dispatches\":16,\"per_account_limit\":0,\"pool\":\"default\",\"profiles\":{\"worker\":{\"workflow\":\".github/workflows/worker.lock.yml\"}}}},\"version\":4}\n",
+    "prefixes": [
+      {
+        "tip": "q_692ec79f0943173be3ebb3b2a6040592fd7bb841e5188160170aa8acef3b8741",
+        "commits": 1,
+        "stats": {
+          "work": 1,
+          "available": 1,
+          "claimed": 0,
+          "completed": 0,
+          "cancelled": 0,
+          "claims": 0,
+          "dispatches": 0,
+          "transactions": 1,
+          "nodes": 1
+        },
+        "works": {
+          "p": {
+            "state": "available",
+            "attempts": 0
+          }
+        },
+        "dispatches": {},
+        "next": {
+          "keys": ["p"],
+          "reason": "prefix_complete"
+        }
+      },
+      {
+        "tip": "q_1b59d59e5738d29bd715652dfa61860d6d0dc16d610e60c8a4f7676f5e7b0312",
+        "commits": 2,
+        "stats": {
+          "work": 1,
+          "available": 0,
+          "claimed": 1,
+          "completed": 0,
+          "cancelled": 0,
+          "claims": 1,
+          "dispatches": 1,
+          "transactions": 2,
+          "nodes": 1
+        },
+        "works": {
+          "p": {
+            "state": "claimed",
+            "attempts": 0
+          }
+        },
+        "dispatches": {
+          "d_3ac298b078167e4c1eff6439c134ba4fea5b17ee3a21b8ffa8399dd9969e189b_1": "reserved"
+        },
+        "next": {
+          "keys": [],
+          "reason": "no_work"
+        }
+      },
+      {
+        "tip": "q_d94f13a93f7dc6fcbf9ce2f8f3431483b3bc85abcecc78fd951c105a5b285fe2",
+        "commits": 3,
+        "stats": {
+          "work": 1,
+          "available": 0,
+          "claimed": 1,
+          "completed": 0,
+          "cancelled": 0,
+          "claims": 1,
+          "dispatches": 1,
+          "transactions": 3,
+          "nodes": 1
+        },
+        "works": {
+          "p": {
+            "state": "claimed",
+            "attempts": 0
+          }
+        },
+        "dispatches": {
+          "d_3ac298b078167e4c1eff6439c134ba4fea5b17ee3a21b8ffa8399dd9969e189b_1": "started"
+        },
+        "next": {
+          "keys": [],
+          "reason": "no_work"
+        }
+      },
+      {
+        "tip": "q_3570b4dc99bfaeca5e7e1ec65deedcf944731186090d0baf6d7c9e07eeff03c1",
+        "commits": 4,
+        "stats": {
+          "work": 1,
+          "available": 0,
+          "claimed": 1,
+          "completed": 0,
+          "cancelled": 0,
+          "claims": 1,
+          "dispatches": 1,
+          "transactions": 4,
+          "nodes": 1
+        },
+        "works": {
+          "p": {
+            "state": "claimed",
+            "attempts": 0
+          }
+        },
+        "dispatches": {
+          "d_3ac298b078167e4c1eff6439c134ba4fea5b17ee3a21b8ffa8399dd9969e189b_1": "bound"
+        },
+        "next": {
+          "keys": [],
+          "reason": "no_work"
+        }
+      },
+      {
+        "tip": "q_886152e1f6423c4ec7529243c38d4d3b848e710751a6d2aad0aeeea68692a501",
+        "commits": 5,
+        "stats": {
+          "work": 2,
+          "available": 1,
+          "claimed": 0,
+          "completed": 1,
+          "cancelled": 0,
+          "claims": 1,
+          "dispatches": 0,
+          "transactions": 5,
+          "nodes": 2
+        },
+        "works": {
+          "p": {
+            "state": "completed",
+            "attempts": 0
+          },
+          "continuation:3d459bf6097a00c7a08c46dc585b70179444c35b9fa37bd97e4ecbb4eeccd306": {
+            "state": "available",
+            "attempts": 0
+          }
+        },
+        "dispatches": {
+          "d_3ac298b078167e4c1eff6439c134ba4fea5b17ee3a21b8ffa8399dd9969e189b_1": "closed"
+        },
+        "next": {
+          "keys": ["continuation:3d459bf6097a00c7a08c46dc585b70179444c35b9fa37bd97e4ecbb4eeccd306"],
+          "reason": "prefix_complete"
+        }
+      },
+      {
+        "tip": "q_f2ba1a88f58309413dca2b266d6d5c2565f7c7c0b85918f2c34178904a38831d",
+        "commits": 6,
+        "stats": {
+          "work": 2,
+          "available": 0,
+          "claimed": 1,
+          "completed": 1,
+          "cancelled": 0,
+          "claims": 2,
+          "dispatches": 1,
+          "transactions": 6,
+          "nodes": 2
+        },
+        "works": {
+          "p": {
+            "state": "completed",
+            "attempts": 0
+          },
+          "continuation:3d459bf6097a00c7a08c46dc585b70179444c35b9fa37bd97e4ecbb4eeccd306": {
+            "state": "claimed",
+            "attempts": 0
+          }
+        },
+        "dispatches": {
+          "d_3ac298b078167e4c1eff6439c134ba4fea5b17ee3a21b8ffa8399dd9969e189b_1": "closed",
+          "d_df88ad74c699ff0f3a1498f3227a5758d0e72fbe676e29a6a7a0aa100e06d656_1": "reserved"
+        },
+        "next": {
+          "keys": [],
+          "reason": "no_work"
+        }
+      },
+      {
+        "tip": "q_6a145f268f3cb90d58ba948c32901b7d6ba52734d626f92ed132ac76d3aba3a5",
+        "commits": 7,
+        "stats": {
+          "work": 2,
+          "available": 0,
+          "claimed": 1,
+          "completed": 1,
+          "cancelled": 0,
+          "claims": 2,
+          "dispatches": 1,
+          "transactions": 7,
+          "nodes": 2
+        },
+        "works": {
+          "p": {
+            "state": "completed",
+            "attempts": 0
+          },
+          "continuation:3d459bf6097a00c7a08c46dc585b70179444c35b9fa37bd97e4ecbb4eeccd306": {
+            "state": "claimed",
+            "attempts": 0
+          }
+        },
+        "dispatches": {
+          "d_3ac298b078167e4c1eff6439c134ba4fea5b17ee3a21b8ffa8399dd9969e189b_1": "closed",
+          "d_df88ad74c699ff0f3a1498f3227a5758d0e72fbe676e29a6a7a0aa100e06d656_1": "started"
+        },
+        "next": {
+          "keys": [],
+          "reason": "no_work"
+        }
+      },
+      {
+        "tip": "q_509fec990f17e6ec26cfa76d6b59417b7f49d22a4a8871e6fc35ff5cbe2a16f4",
+        "commits": 8,
+        "stats": {
+          "work": 2,
+          "available": 0,
+          "claimed": 1,
+          "completed": 1,
+          "cancelled": 0,
+          "claims": 2,
+          "dispatches": 1,
+          "transactions": 8,
+          "nodes": 2
+        },
+        "works": {
+          "p": {
+            "state": "completed",
+            "attempts": 0
+          },
+          "continuation:3d459bf6097a00c7a08c46dc585b70179444c35b9fa37bd97e4ecbb4eeccd306": {
+            "state": "claimed",
+            "attempts": 0
+          }
+        },
+        "dispatches": {
+          "d_3ac298b078167e4c1eff6439c134ba4fea5b17ee3a21b8ffa8399dd9969e189b_1": "closed",
+          "d_df88ad74c699ff0f3a1498f3227a5758d0e72fbe676e29a6a7a0aa100e06d656_1": "bound"
+        },
+        "next": {
+          "keys": [],
+          "reason": "no_work"
+        }
+      },
+      {
+        "tip": "q_9c7434c17ec9d7b9ff86fed2ae566cea09e72417d7a187ccf21f74ed6a32402d",
+        "commits": 9,
+        "stats": {
+          "work": 3,
+          "available": 1,
+          "claimed": 0,
+          "completed": 2,
+          "cancelled": 0,
+          "claims": 2,
+          "dispatches": 0,
+          "transactions": 9,
+          "nodes": 4
+        },
+        "works": {
+          "p": {
+            "state": "completed",
+            "attempts": 0
+          },
+          "continuation:3d459bf6097a00c7a08c46dc585b70179444c35b9fa37bd97e4ecbb4eeccd306": {
+            "state": "completed",
+            "attempts": 0
+          },
+          "continuation:865269593bfe9cf30d99c4b9e6912ed3e89fcdb71e6d9946c6fe74bbbdb230cf": {
+            "state": "available",
+            "attempts": 0
+          }
+        },
+        "dispatches": {
+          "d_3ac298b078167e4c1eff6439c134ba4fea5b17ee3a21b8ffa8399dd9969e189b_1": "closed",
+          "d_df88ad74c699ff0f3a1498f3227a5758d0e72fbe676e29a6a7a0aa100e06d656_1": "closed"
+        },
+        "next": {
+          "keys": [],
+          "reason": "no_eligible_work"
+        }
+      },
+      {
+        "tip": "q_bca824821fcb13bb1097e9284297e1a0daa3dd7912228b398529759e8b1720ea",
+        "commits": 10,
+        "stats": {
+          "work": 3,
+          "available": 1,
+          "claimed": 0,
+          "completed": 2,
+          "cancelled": 0,
+          "claims": 2,
+          "dispatches": 0,
+          "transactions": 10,
+          "nodes": 4
+        },
+        "works": {
+          "p": {
+            "state": "completed",
+            "attempts": 0
+          },
+          "continuation:3d459bf6097a00c7a08c46dc585b70179444c35b9fa37bd97e4ecbb4eeccd306": {
+            "state": "completed",
+            "attempts": 0
+          },
+          "continuation:865269593bfe9cf30d99c4b9e6912ed3e89fcdb71e6d9946c6fe74bbbdb230cf": {
+            "state": "available",
+            "attempts": 0
+          }
+        },
+        "dispatches": {
+          "d_3ac298b078167e4c1eff6439c134ba4fea5b17ee3a21b8ffa8399dd9969e189b_1": "closed",
+          "d_df88ad74c699ff0f3a1498f3227a5758d0e72fbe676e29a6a7a0aa100e06d656_1": "closed"
+        },
+        "next": {
+          "keys": [],
+          "reason": "no_eligible_work"
+        }
+      },
+      {
+        "tip": "q_1adcf17b77f3bbba7f07ec08df7969eeb11467279959964a4f6ecae36c9b2cce",
+        "commits": 11,
+        "stats": {
+          "work": 3,
+          "available": 0,
+          "claimed": 1,
+          "completed": 2,
+          "cancelled": 0,
+          "claims": 3,
+          "dispatches": 1,
+          "transactions": 11,
+          "nodes": 4
+        },
+        "works": {
+          "p": {
+            "state": "completed",
+            "attempts": 0
+          },
+          "continuation:3d459bf6097a00c7a08c46dc585b70179444c35b9fa37bd97e4ecbb4eeccd306": {
+            "state": "completed",
+            "attempts": 0
+          },
+          "continuation:865269593bfe9cf30d99c4b9e6912ed3e89fcdb71e6d9946c6fe74bbbdb230cf": {
+            "state": "claimed",
+            "attempts": 0
+          }
+        },
+        "dispatches": {
+          "d_3ac298b078167e4c1eff6439c134ba4fea5b17ee3a21b8ffa8399dd9969e189b_1": "closed",
+          "d_df88ad74c699ff0f3a1498f3227a5758d0e72fbe676e29a6a7a0aa100e06d656_1": "closed",
+          "d_952c7b14793a92d3e50c004a26b07a1d573434effdcf8016fa837b58073d7769_1": "reserved"
+        },
+        "next": {
+          "keys": [],
+          "reason": "no_work"
+        }
+      }
+    ],
+    "projection": {
+      "repository": "owner/repo",
+      "tip": "q_1adcf17b77f3bbba7f07ec08df7969eeb11467279959964a4f6ecae36c9b2cce",
+      "commits": 11,
+      "works": {
+        "3d459bf6097a00c7a08c46dc585b70179444c35b9fa37bd97e4ecbb4eeccd306": {
+          "kind": "Work",
+          "work_id": "3d459bf6097a00c7a08c46dc585b70179444c35b9fa37bd97e4ecbb4eeccd306",
+          "graph_id": "graph",
+          "node_key": "p",
+          "pool": "default",
+          "priority": 3,
+          "fairness_key": "",
+          "worker_profile": "worker",
+          "payload": {
+            "task": "audit pages",
+            "effect_contract": {
+              "kind": "none"
+            }
+          },
+          "depends_on": [],
+          "subject": {
+            "kind": "issue",
+            "host": "github.com",
+            "repository": "owner/repo",
+            "repository_id": "1",
+            "resource_id": "9007199254740993",
+            "number": "7"
+          },
+          "state": "completed",
+          "position": {
+            "commit": 0,
+            "operation": 0
+          },
+          "attempts": 0,
+          "claim_id": "c_3ac298b078167e4c1eff6439c134ba4fea5b17ee3a21b8ffa8399dd9969e189b_1",
+          "effects": [],
+          "completion_id": "q_886152e1f6423c4ec7529243c38d4d3b848e710751a6d2aad0aeeea68692a501"
+        },
+        "865269593bfe9cf30d99c4b9e6912ed3e89fcdb71e6d9946c6fe74bbbdb230cf": {
+          "kind": "Work",
+          "work_id": "865269593bfe9cf30d99c4b9e6912ed3e89fcdb71e6d9946c6fe74bbbdb230cf",
+          "graph_id": "graph",
+          "node_key": "continuation:3d459bf6097a00c7a08c46dc585b70179444c35b9fa37bd97e4ecbb4eeccd306",
+          "pool": "default",
+          "priority": 3,
+          "fairness_key": "",
+          "worker_profile": "worker",
+          "payload": {
+            "task": "audit pages",
+            "effect_contract": {
+              "kind": "none"
+            }
+          },
+          "depends_on": [
+            {
+              "kind": "work",
+              "work_id": "3d459bf6097a00c7a08c46dc585b70179444c35b9fa37bd97e4ecbb4eeccd306"
+            }
+          ],
+          "continuation": {
+            "route": "workqueue",
+            "message": "Audit page 2",
+            "remaining": 1
+          },
+          "subject": {
+            "kind": "issue",
+            "host": "github.com",
+            "repository": "owner/repo",
+            "repository_id": "1",
+            "resource_id": "9007199254740993",
+            "number": "7"
+          },
+          "state": "completed",
+          "position": {
+            "commit": 4,
+            "operation": 1
+          },
+          "attempts": 0,
+          "claim_id": "c_df88ad74c699ff0f3a1498f3227a5758d0e72fbe676e29a6a7a0aa100e06d656_1",
+          "effects": [],
+          "completion_id": "q_9c7434c17ec9d7b9ff86fed2ae566cea09e72417d7a187ccf21f74ed6a32402d"
+        },
+        "8687a391f089495f34a86578e4c515c9d758c7354fe66f033fe646e7d019b96b": {
+          "kind": "Work",
+          "work_id": "8687a391f089495f34a86578e4c515c9d758c7354fe66f033fe646e7d019b96b",
+          "graph_id": "graph",
+          "node_key": "continuation:865269593bfe9cf30d99c4b9e6912ed3e89fcdb71e6d9946c6fe74bbbdb230cf",
+          "pool": "default",
+          "priority": 3,
+          "fairness_key": "",
+          "worker_profile": "worker",
+          "payload": {
+            "task": "audit pages",
+            "effect_contract": {
+              "kind": "none"
+            }
+          },
+          "depends_on": [
+            {
+              "kind": "work",
+              "work_id": "865269593bfe9cf30d99c4b9e6912ed3e89fcdb71e6d9946c6fe74bbbdb230cf"
+            },
+            {
+              "kind": "issue",
+              "resource": {
+                "kind": "issue",
+                "host": "github.com",
+                "repository": "owner/repo",
+                "repository_id": "1",
+                "resource_id": "55",
+                "number": "5"
+              },
+              "condition": "approved"
+            }
+          ],
+          "continuation": {
+            "route": "issue",
+            "message": "Audit page 3",
+            "remaining": 0
+          },
+          "subject": {
+            "kind": "issue",
+            "host": "github.com",
+            "repository": "owner/repo",
+            "repository_id": "1",
+            "resource_id": "9007199254740993",
+            "number": "7"
+          },
+          "state": "claimed",
+          "position": {
+            "commit": 8,
+            "operation": 1
+          },
+          "attempts": 0,
+          "claim_id": "c_952c7b14793a92d3e50c004a26b07a1d573434effdcf8016fa837b58073d7769_1"
+        }
+      },
+      "claims": {
+        "c_3ac298b078167e4c1eff6439c134ba4fea5b17ee3a21b8ffa8399dd9969e189b_1": {
+          "claim_id": "c_3ac298b078167e4c1eff6439c134ba4fea5b17ee3a21b8ffa8399dd9969e189b_1",
+          "work_id": "3d459bf6097a00c7a08c46dc585b70179444c35b9fa37bd97e4ecbb4eeccd306",
+          "dispatch_id": "d_3ac298b078167e4c1eff6439c134ba4fea5b17ee3a21b8ffa8399dd9969e189b_1",
+          "handle": "h1",
+          "state": "completed",
+          "commit_id": "q_1b59d59e5738d29bd715652dfa61860d6d0dc16d610e60c8a4f7676f5e7b0312",
+          "request_id": "request:37c48289ad81720cf71ed85f074e1882808cee536c0923875887a6a467680684",
+          "terminal_commit_id": "q_886152e1f6423c4ec7529243c38d4d3b848e710751a6d2aad0aeeea68692a501",
+          "effects": []
+        },
+        "c_df88ad74c699ff0f3a1498f3227a5758d0e72fbe676e29a6a7a0aa100e06d656_1": {
+          "claim_id": "c_df88ad74c699ff0f3a1498f3227a5758d0e72fbe676e29a6a7a0aa100e06d656_1",
+          "work_id": "865269593bfe9cf30d99c4b9e6912ed3e89fcdb71e6d9946c6fe74bbbdb230cf",
+          "dispatch_id": "d_df88ad74c699ff0f3a1498f3227a5758d0e72fbe676e29a6a7a0aa100e06d656_1",
+          "handle": "h1",
+          "state": "completed",
+          "commit_id": "q_f2ba1a88f58309413dca2b266d6d5c2565f7c7c0b85918f2c34178904a38831d",
+          "request_id": "request:24cb88532cbcb12bda6da082d34308b8fcc94243d32c9647d53650565c38eb57",
+          "terminal_commit_id": "q_9c7434c17ec9d7b9ff86fed2ae566cea09e72417d7a187ccf21f74ed6a32402d",
+          "effects": []
+        },
+        "c_952c7b14793a92d3e50c004a26b07a1d573434effdcf8016fa837b58073d7769_1": {
+          "claim_id": "c_952c7b14793a92d3e50c004a26b07a1d573434effdcf8016fa837b58073d7769_1",
+          "work_id": "8687a391f089495f34a86578e4c515c9d758c7354fe66f033fe646e7d019b96b",
+          "dispatch_id": "d_952c7b14793a92d3e50c004a26b07a1d573434effdcf8016fa837b58073d7769_1",
+          "handle": "h1",
+          "state": "open",
+          "commit_id": "q_1adcf17b77f3bbba7f07ec08df7969eeb11467279959964a4f6ecae36c9b2cce",
+          "request_id": "request:cc84926a04c88a79d00231c6ef4a7e5a0cab72fb6e8da7f407406f4a4c920bff"
+        }
+      },
+      "dispatches": {
+        "d_3ac298b078167e4c1eff6439c134ba4fea5b17ee3a21b8ffa8399dd9969e189b_1": {
+          "dispatch_id": "d_3ac298b078167e4c1eff6439c134ba4fea5b17ee3a21b8ffa8399dd9969e189b_1",
+          "request_id": "request:37c48289ad81720cf71ed85f074e1882808cee536c0923875887a6a467680684",
+          "commit_id": "q_1b59d59e5738d29bd715652dfa61860d6d0dc16d610e60c8a4f7676f5e7b0312",
+          "pool": "default",
+          "worker_profile": "worker",
+          "workflow": ".github/workflows/worker.lock.yml",
+          "state": "closed",
+          "run": {
+            "run_id": "21",
+            "run_attempt": 1
+          },
+          "claims": ["c_3ac298b078167e4c1eff6439c134ba4fea5b17ee3a21b8ffa8399dd9969e189b_1"]
+        },
+        "d_df88ad74c699ff0f3a1498f3227a5758d0e72fbe676e29a6a7a0aa100e06d656_1": {
+          "dispatch_id": "d_df88ad74c699ff0f3a1498f3227a5758d0e72fbe676e29a6a7a0aa100e06d656_1",
+          "request_id": "request:24cb88532cbcb12bda6da082d34308b8fcc94243d32c9647d53650565c38eb57",
+          "commit_id": "q_f2ba1a88f58309413dca2b266d6d5c2565f7c7c0b85918f2c34178904a38831d",
+          "pool": "default",
+          "worker_profile": "worker",
+          "workflow": ".github/workflows/worker.lock.yml",
+          "state": "closed",
+          "run": {
+            "run_id": "22",
+            "run_attempt": 1
+          },
+          "claims": ["c_df88ad74c699ff0f3a1498f3227a5758d0e72fbe676e29a6a7a0aa100e06d656_1"]
+        },
+        "d_952c7b14793a92d3e50c004a26b07a1d573434effdcf8016fa837b58073d7769_1": {
+          "dispatch_id": "d_952c7b14793a92d3e50c004a26b07a1d573434effdcf8016fa837b58073d7769_1",
+          "request_id": "request:cc84926a04c88a79d00231c6ef4a7e5a0cab72fb6e8da7f407406f4a4c920bff",
+          "commit_id": "q_1adcf17b77f3bbba7f07ec08df7969eeb11467279959964a4f6ecae36c9b2cce",
+          "pool": "default",
+          "worker_profile": "worker",
+          "workflow": ".github/workflows/worker.lock.yml",
+          "state": "reserved",
+          "run": null,
+          "claims": ["c_952c7b14793a92d3e50c004a26b07a1d573434effdcf8016fa837b58073d7769_1"]
+        }
+      },
+      "observations": {
+        "{\"condition\":\"approved\",\"host\":\"github.com\",\"kind\":\"issue\",\"repository_id\":\"1\",\"resource_id\":\"55\"}": {
+          "kind": "Observation",
+          "observation_id": "o-approval-ready",
+          "resource": {
+            "kind": "issue",
+            "host": "github.com",
+            "repository": "owner/repo",
+            "repository_id": "1",
+            "resource_id": "55",
+            "number": "5"
+          },
+          "condition": "approved",
+          "state": "ready",
+          "state_reason": "completed",
+          "approved_by": "583231"
+        }
+      },
+      "requests": [
+        "request:00fff950622fca607aaf75baff7d1e2baa73021b1767f7e5359828359d3fc824",
+        "request:016fa5c1fa0f1e2539494dfff13dbbfd0c138e0d4f82fa0802c260000d4b5499",
+        "request:1ea99ba9b9d426ff0368a5ded934ed628721f9d18f750a7af9589b2a638412e7",
+        "request:24cb88532cbcb12bda6da082d34308b8fcc94243d32c9647d53650565c38eb57",
+        "request:32fd4a2965e3140dda5e1066dda0486e619b5e24d2b842f34b9adbb6373587df",
+        "request:37c48289ad81720cf71ed85f074e1882808cee536c0923875887a6a467680684",
+        "request:3adf0671621a5c7fae207ae41de0ef866b97e5b8ca8eacec5a30ed306ad23b57",
+        "request:52db46c8dba364b1511f26a0cd8fba58d60c5a54b300dcf272e8f2ffc154b309",
+        "request:cc84926a04c88a79d00231c6ef4a7e5a0cab72fb6e8da7f407406f4a4c920bff",
+        "request:d2b30d73e5fe29640afb9db1b684bfd2154a733362b8e183ebd5f1eb05302b47",
+        "request:ea08b73004ab046cf7bf2fc635e6eb05713163e5ca873cde55bfa759203c2278"
+      ],
+      "work_creators": {
+        "3d459bf6097a00c7a08c46dc585b70179444c35b9fa37bd97e4ecbb4eeccd306": {
+          "role": "producer",
+          "repository": "owner/repo",
+          "workflow": ".github/workflows/producer.lock.yml",
+          "run_id": "10",
+          "run_attempt": 1
+        },
+        "865269593bfe9cf30d99c4b9e6912ed3e89fcdb71e6d9946c6fe74bbbdb230cf": {
+          "role": "worker",
+          "repository": "owner/repo",
+          "workflow": ".github/workflows/worker.lock.yml",
+          "run_id": "21",
+          "run_attempt": 1
+        },
+        "8687a391f089495f34a86578e4c515c9d758c7354fe66f033fe646e7d019b96b": {
+          "role": "worker",
+          "repository": "owner/repo",
+          "workflow": ".github/workflows/worker.lock.yml",
+          "run_id": "22",
+          "run_attempt": 1
+        }
+      }
+    },
+    "assignment": {
+      "dispatch_id": "d_952c7b14793a92d3e50c004a26b07a1d573434effdcf8016fa837b58073d7769_1",
+      "claims": [
+        {
+          "handle": "h1",
+          "claim_id": "c_952c7b14793a92d3e50c004a26b07a1d573434effdcf8016fa837b58073d7769_1",
+          "work_id": "8687a391f089495f34a86578e4c515c9d758c7354fe66f033fe646e7d019b96b",
+          "work": {
+            "task": "audit pages",
+            "effect_contract": {
+              "kind": "none"
+            }
+          },
+          "result_refs": [
+            {
+              "work_id": "865269593bfe9cf30d99c4b9e6912ed3e89fcdb71e6d9946c6fe74bbbdb230cf",
+              "result_commit_id": "q_9c7434c17ec9d7b9ff86fed2ae566cea09e72417d7a187ccf21f74ed6a32402d",
+              "descriptor": []
+            }
+          ],
+          "continuation": {
+            "route": "issue",
+            "message": "Audit page 3",
+            "remaining": 0
+          }
+        }
+      ]
+    },
+    "checkpoint": {
+      "commit": {
+        "version": 4,
+        "id": "q_0df4fea8898f463f2edaa30df35ea6d051ba495c4d3b208db442a1a939c1bfdf",
+        "previous": null,
+        "request": {
+          "id": "request:a2813d78864d8602434d6c6c678ff5a25b9283a2e3710e4cfdf5b6f1b1045271",
+          "kind": "checkpoint",
+          "parameters": {
+            "prior_tip": "q_1adcf17b77f3bbba7f07ec08df7969eeb11467279959964a4f6ecae36c9b2cce"
+          }
+        },
+        "actor": {
+          "role": "reconciler",
+          "repository": "owner/repo",
+          "workflow": ".github/workflows/agentics-maintenance.yml",
+          "run_id": "300",
+          "run_attempt": 1
+        },
+        "at": 1,
+        "operations": [
+          {
+            "kind": "Checkpoint",
+            "prior_tip": "q_1adcf17b77f3bbba7f07ec08df7969eeb11467279959964a4f6ecae36c9b2cce",
+            "state": {
+              "repository": "owner/repo",
+              "tip": "q_1adcf17b77f3bbba7f07ec08df7969eeb11467279959964a4f6ecae36c9b2cce",
+              "commits": 11,
+              "works": {
+                "3d459bf6097a00c7a08c46dc585b70179444c35b9fa37bd97e4ecbb4eeccd306": {
+                  "kind": "Work",
+                  "work_id": "3d459bf6097a00c7a08c46dc585b70179444c35b9fa37bd97e4ecbb4eeccd306",
+                  "graph_id": "graph",
+                  "node_key": "p",
+                  "pool": "default",
+                  "priority": 3,
+                  "fairness_key": "",
+                  "worker_profile": "worker",
+                  "payload": {
+                    "task": "audit pages",
+                    "effect_contract": {
+                      "kind": "none"
+                    }
+                  },
+                  "depends_on": [],
+                  "subject": {
+                    "kind": "issue",
+                    "host": "github.com",
+                    "repository": "owner/repo",
+                    "repository_id": "1",
+                    "resource_id": "9007199254740993",
+                    "number": "7"
+                  },
+                  "state": "completed",
+                  "position": {
+                    "commit": 0,
+                    "operation": 0
+                  },
+                  "attempts": 0,
+                  "claim_id": "c_3ac298b078167e4c1eff6439c134ba4fea5b17ee3a21b8ffa8399dd9969e189b_1",
+                  "effects": [],
+                  "completion_id": "q_886152e1f6423c4ec7529243c38d4d3b848e710751a6d2aad0aeeea68692a501"
+                },
+                "865269593bfe9cf30d99c4b9e6912ed3e89fcdb71e6d9946c6fe74bbbdb230cf": {
+                  "kind": "Work",
+                  "work_id": "865269593bfe9cf30d99c4b9e6912ed3e89fcdb71e6d9946c6fe74bbbdb230cf",
+                  "graph_id": "graph",
+                  "node_key": "continuation:3d459bf6097a00c7a08c46dc585b70179444c35b9fa37bd97e4ecbb4eeccd306",
+                  "pool": "default",
+                  "priority": 3,
+                  "fairness_key": "",
+                  "worker_profile": "worker",
+                  "payload": {
+                    "task": "audit pages",
+                    "effect_contract": {
+                      "kind": "none"
+                    }
+                  },
+                  "depends_on": [
+                    {
+                      "kind": "work",
+                      "work_id": "3d459bf6097a00c7a08c46dc585b70179444c35b9fa37bd97e4ecbb4eeccd306"
+                    }
+                  ],
+                  "continuation": {
+                    "route": "workqueue",
+                    "message": "Audit page 2",
+                    "remaining": 1
+                  },
+                  "subject": {
+                    "kind": "issue",
+                    "host": "github.com",
+                    "repository": "owner/repo",
+                    "repository_id": "1",
+                    "resource_id": "9007199254740993",
+                    "number": "7"
+                  },
+                  "state": "completed",
+                  "position": {
+                    "commit": 4,
+                    "operation": 1
+                  },
+                  "attempts": 0,
+                  "claim_id": "c_df88ad74c699ff0f3a1498f3227a5758d0e72fbe676e29a6a7a0aa100e06d656_1",
+                  "effects": [],
+                  "completion_id": "q_9c7434c17ec9d7b9ff86fed2ae566cea09e72417d7a187ccf21f74ed6a32402d"
+                },
+                "8687a391f089495f34a86578e4c515c9d758c7354fe66f033fe646e7d019b96b": {
+                  "kind": "Work",
+                  "work_id": "8687a391f089495f34a86578e4c515c9d758c7354fe66f033fe646e7d019b96b",
+                  "graph_id": "graph",
+                  "node_key": "continuation:865269593bfe9cf30d99c4b9e6912ed3e89fcdb71e6d9946c6fe74bbbdb230cf",
+                  "pool": "default",
+                  "priority": 3,
+                  "fairness_key": "",
+                  "worker_profile": "worker",
+                  "payload": {
+                    "task": "audit pages",
+                    "effect_contract": {
+                      "kind": "none"
+                    }
+                  },
+                  "depends_on": [
+                    {
+                      "kind": "work",
+                      "work_id": "865269593bfe9cf30d99c4b9e6912ed3e89fcdb71e6d9946c6fe74bbbdb230cf"
+                    },
+                    {
+                      "kind": "issue",
+                      "resource": {
+                        "kind": "issue",
+                        "host": "github.com",
+                        "repository": "owner/repo",
+                        "repository_id": "1",
+                        "resource_id": "55",
+                        "number": "5"
+                      },
+                      "condition": "approved"
+                    }
+                  ],
+                  "continuation": {
+                    "route": "issue",
+                    "message": "Audit page 3",
+                    "remaining": 0
+                  },
+                  "subject": {
+                    "kind": "issue",
+                    "host": "github.com",
+                    "repository": "owner/repo",
+                    "repository_id": "1",
+                    "resource_id": "9007199254740993",
+                    "number": "7"
+                  },
+                  "state": "claimed",
+                  "position": {
+                    "commit": 8,
+                    "operation": 1
+                  },
+                  "attempts": 0,
+                  "claim_id": "c_952c7b14793a92d3e50c004a26b07a1d573434effdcf8016fa837b58073d7769_1"
+                }
+              },
+              "claims": {
+                "c_3ac298b078167e4c1eff6439c134ba4fea5b17ee3a21b8ffa8399dd9969e189b_1": {
+                  "claim_id": "c_3ac298b078167e4c1eff6439c134ba4fea5b17ee3a21b8ffa8399dd9969e189b_1",
+                  "work_id": "3d459bf6097a00c7a08c46dc585b70179444c35b9fa37bd97e4ecbb4eeccd306",
+                  "dispatch_id": "d_3ac298b078167e4c1eff6439c134ba4fea5b17ee3a21b8ffa8399dd9969e189b_1",
+                  "handle": "h1",
+                  "state": "completed",
+                  "commit_id": "q_1b59d59e5738d29bd715652dfa61860d6d0dc16d610e60c8a4f7676f5e7b0312",
+                  "request_id": "request:37c48289ad81720cf71ed85f074e1882808cee536c0923875887a6a467680684",
+                  "terminal_commit_id": "q_886152e1f6423c4ec7529243c38d4d3b848e710751a6d2aad0aeeea68692a501",
+                  "effects": []
+                },
+                "c_df88ad74c699ff0f3a1498f3227a5758d0e72fbe676e29a6a7a0aa100e06d656_1": {
+                  "claim_id": "c_df88ad74c699ff0f3a1498f3227a5758d0e72fbe676e29a6a7a0aa100e06d656_1",
+                  "work_id": "865269593bfe9cf30d99c4b9e6912ed3e89fcdb71e6d9946c6fe74bbbdb230cf",
+                  "dispatch_id": "d_df88ad74c699ff0f3a1498f3227a5758d0e72fbe676e29a6a7a0aa100e06d656_1",
+                  "handle": "h1",
+                  "state": "completed",
+                  "commit_id": "q_f2ba1a88f58309413dca2b266d6d5c2565f7c7c0b85918f2c34178904a38831d",
+                  "request_id": "request:24cb88532cbcb12bda6da082d34308b8fcc94243d32c9647d53650565c38eb57",
+                  "terminal_commit_id": "q_9c7434c17ec9d7b9ff86fed2ae566cea09e72417d7a187ccf21f74ed6a32402d",
+                  "effects": []
+                },
+                "c_952c7b14793a92d3e50c004a26b07a1d573434effdcf8016fa837b58073d7769_1": {
+                  "claim_id": "c_952c7b14793a92d3e50c004a26b07a1d573434effdcf8016fa837b58073d7769_1",
+                  "work_id": "8687a391f089495f34a86578e4c515c9d758c7354fe66f033fe646e7d019b96b",
+                  "dispatch_id": "d_952c7b14793a92d3e50c004a26b07a1d573434effdcf8016fa837b58073d7769_1",
+                  "handle": "h1",
+                  "state": "open",
+                  "commit_id": "q_1adcf17b77f3bbba7f07ec08df7969eeb11467279959964a4f6ecae36c9b2cce",
+                  "request_id": "request:cc84926a04c88a79d00231c6ef4a7e5a0cab72fb6e8da7f407406f4a4c920bff"
+                }
+              },
+              "dispatches": {
+                "d_3ac298b078167e4c1eff6439c134ba4fea5b17ee3a21b8ffa8399dd9969e189b_1": {
+                  "dispatch_id": "d_3ac298b078167e4c1eff6439c134ba4fea5b17ee3a21b8ffa8399dd9969e189b_1",
+                  "request_id": "request:37c48289ad81720cf71ed85f074e1882808cee536c0923875887a6a467680684",
+                  "commit_id": "q_1b59d59e5738d29bd715652dfa61860d6d0dc16d610e60c8a4f7676f5e7b0312",
+                  "pool": "default",
+                  "worker_profile": "worker",
+                  "workflow": ".github/workflows/worker.lock.yml",
+                  "state": "closed",
+                  "run": {
+                    "run_id": "21",
+                    "run_attempt": 1
+                  },
+                  "claims": ["c_3ac298b078167e4c1eff6439c134ba4fea5b17ee3a21b8ffa8399dd9969e189b_1"]
+                },
+                "d_df88ad74c699ff0f3a1498f3227a5758d0e72fbe676e29a6a7a0aa100e06d656_1": {
+                  "dispatch_id": "d_df88ad74c699ff0f3a1498f3227a5758d0e72fbe676e29a6a7a0aa100e06d656_1",
+                  "request_id": "request:24cb88532cbcb12bda6da082d34308b8fcc94243d32c9647d53650565c38eb57",
+                  "commit_id": "q_f2ba1a88f58309413dca2b266d6d5c2565f7c7c0b85918f2c34178904a38831d",
+                  "pool": "default",
+                  "worker_profile": "worker",
+                  "workflow": ".github/workflows/worker.lock.yml",
+                  "state": "closed",
+                  "run": {
+                    "run_id": "22",
+                    "run_attempt": 1
+                  },
+                  "claims": ["c_df88ad74c699ff0f3a1498f3227a5758d0e72fbe676e29a6a7a0aa100e06d656_1"]
+                },
+                "d_952c7b14793a92d3e50c004a26b07a1d573434effdcf8016fa837b58073d7769_1": {
+                  "dispatch_id": "d_952c7b14793a92d3e50c004a26b07a1d573434effdcf8016fa837b58073d7769_1",
+                  "request_id": "request:cc84926a04c88a79d00231c6ef4a7e5a0cab72fb6e8da7f407406f4a4c920bff",
+                  "commit_id": "q_1adcf17b77f3bbba7f07ec08df7969eeb11467279959964a4f6ecae36c9b2cce",
+                  "pool": "default",
+                  "worker_profile": "worker",
+                  "workflow": ".github/workflows/worker.lock.yml",
+                  "state": "reserved",
+                  "run": null,
+                  "claims": ["c_952c7b14793a92d3e50c004a26b07a1d573434effdcf8016fa837b58073d7769_1"]
+                }
+              },
+              "observations": {
+                "{\"condition\":\"approved\",\"host\":\"github.com\",\"kind\":\"issue\",\"repository_id\":\"1\",\"resource_id\":\"55\"}": {
+                  "kind": "Observation",
+                  "observation_id": "o-approval-ready",
+                  "resource": {
+                    "kind": "issue",
+                    "host": "github.com",
+                    "repository": "owner/repo",
+                    "repository_id": "1",
+                    "resource_id": "55",
+                    "number": "5"
+                  },
+                  "condition": "approved",
+                  "state": "ready",
+                  "state_reason": "completed",
+                  "approved_by": "583231"
+                }
+              },
+              "requests": [
+                "request:00fff950622fca607aaf75baff7d1e2baa73021b1767f7e5359828359d3fc824",
+                "request:016fa5c1fa0f1e2539494dfff13dbbfd0c138e0d4f82fa0802c260000d4b5499",
+                "request:1ea99ba9b9d426ff0368a5ded934ed628721f9d18f750a7af9589b2a638412e7",
+                "request:24cb88532cbcb12bda6da082d34308b8fcc94243d32c9647d53650565c38eb57",
+                "request:32fd4a2965e3140dda5e1066dda0486e619b5e24d2b842f34b9adbb6373587df",
+                "request:37c48289ad81720cf71ed85f074e1882808cee536c0923875887a6a467680684",
+                "request:3adf0671621a5c7fae207ae41de0ef866b97e5b8ca8eacec5a30ed306ad23b57",
+                "request:52db46c8dba364b1511f26a0cd8fba58d60c5a54b300dcf272e8f2ffc154b309",
+                "request:cc84926a04c88a79d00231c6ef4a7e5a0cab72fb6e8da7f407406f4a4c920bff",
+                "request:d2b30d73e5fe29640afb9db1b684bfd2154a733362b8e183ebd5f1eb05302b47",
+                "request:ea08b73004ab046cf7bf2fc635e6eb05713163e5ca873cde55bfa759203c2278"
+              ],
+              "work_creators": {
+                "3d459bf6097a00c7a08c46dc585b70179444c35b9fa37bd97e4ecbb4eeccd306": {
+                  "role": "producer",
+                  "repository": "owner/repo",
+                  "workflow": ".github/workflows/producer.lock.yml",
+                  "run_id": "10",
+                  "run_attempt": 1
+                },
+                "865269593bfe9cf30d99c4b9e6912ed3e89fcdb71e6d9946c6fe74bbbdb230cf": {
+                  "role": "worker",
+                  "repository": "owner/repo",
+                  "workflow": ".github/workflows/worker.lock.yml",
+                  "run_id": "21",
+                  "run_attempt": 1
+                },
+                "8687a391f089495f34a86578e4c515c9d758c7354fe66f033fe646e7d019b96b": {
+                  "role": "worker",
+                  "repository": "owner/repo",
+                  "workflow": ".github/workflows/worker.lock.yml",
+                  "run_id": "22",
+                  "run_attempt": 1
+                }
+              }
+            }
+          }
+        ]
+      },
+      "projection": {
+        "repository": "owner/repo",
+        "tip": "q_0df4fea8898f463f2edaa30df35ea6d051ba495c4d3b208db442a1a939c1bfdf",
+        "commits": 12,
+        "works": {
+          "3d459bf6097a00c7a08c46dc585b70179444c35b9fa37bd97e4ecbb4eeccd306": {
+            "kind": "Work",
+            "work_id": "3d459bf6097a00c7a08c46dc585b70179444c35b9fa37bd97e4ecbb4eeccd306",
+            "graph_id": "graph",
+            "node_key": "p",
+            "pool": "default",
+            "priority": 3,
+            "fairness_key": "",
+            "worker_profile": "worker",
+            "payload": {
+              "task": "audit pages",
+              "effect_contract": {
+                "kind": "none"
+              }
+            },
+            "depends_on": [],
+            "subject": {
+              "kind": "issue",
+              "host": "github.com",
+              "repository": "owner/repo",
+              "repository_id": "1",
+              "resource_id": "9007199254740993",
+              "number": "7"
+            },
+            "state": "completed",
+            "position": {
+              "commit": 0,
+              "operation": 0
+            },
+            "attempts": 0,
+            "claim_id": "c_3ac298b078167e4c1eff6439c134ba4fea5b17ee3a21b8ffa8399dd9969e189b_1",
+            "effects": [],
+            "completion_id": "q_886152e1f6423c4ec7529243c38d4d3b848e710751a6d2aad0aeeea68692a501"
+          },
+          "865269593bfe9cf30d99c4b9e6912ed3e89fcdb71e6d9946c6fe74bbbdb230cf": {
+            "kind": "Work",
+            "work_id": "865269593bfe9cf30d99c4b9e6912ed3e89fcdb71e6d9946c6fe74bbbdb230cf",
+            "graph_id": "graph",
+            "node_key": "continuation:3d459bf6097a00c7a08c46dc585b70179444c35b9fa37bd97e4ecbb4eeccd306",
+            "pool": "default",
+            "priority": 3,
+            "fairness_key": "",
+            "worker_profile": "worker",
+            "payload": {
+              "task": "audit pages",
+              "effect_contract": {
+                "kind": "none"
+              }
+            },
+            "depends_on": [
+              {
+                "kind": "work",
+                "work_id": "3d459bf6097a00c7a08c46dc585b70179444c35b9fa37bd97e4ecbb4eeccd306"
+              }
+            ],
+            "continuation": {
+              "route": "workqueue",
+              "message": "Audit page 2",
+              "remaining": 1
+            },
+            "subject": {
+              "kind": "issue",
+              "host": "github.com",
+              "repository": "owner/repo",
+              "repository_id": "1",
+              "resource_id": "9007199254740993",
+              "number": "7"
+            },
+            "state": "completed",
+            "position": {
+              "commit": 4,
+              "operation": 1
+            },
+            "attempts": 0,
+            "claim_id": "c_df88ad74c699ff0f3a1498f3227a5758d0e72fbe676e29a6a7a0aa100e06d656_1",
+            "effects": [],
+            "completion_id": "q_9c7434c17ec9d7b9ff86fed2ae566cea09e72417d7a187ccf21f74ed6a32402d"
+          },
+          "8687a391f089495f34a86578e4c515c9d758c7354fe66f033fe646e7d019b96b": {
+            "kind": "Work",
+            "work_id": "8687a391f089495f34a86578e4c515c9d758c7354fe66f033fe646e7d019b96b",
+            "graph_id": "graph",
+            "node_key": "continuation:865269593bfe9cf30d99c4b9e6912ed3e89fcdb71e6d9946c6fe74bbbdb230cf",
+            "pool": "default",
+            "priority": 3,
+            "fairness_key": "",
+            "worker_profile": "worker",
+            "payload": {
+              "task": "audit pages",
+              "effect_contract": {
+                "kind": "none"
+              }
+            },
+            "depends_on": [
+              {
+                "kind": "work",
+                "work_id": "865269593bfe9cf30d99c4b9e6912ed3e89fcdb71e6d9946c6fe74bbbdb230cf"
+              },
+              {
+                "kind": "issue",
+                "resource": {
+                  "kind": "issue",
+                  "host": "github.com",
+                  "repository": "owner/repo",
+                  "repository_id": "1",
+                  "resource_id": "55",
+                  "number": "5"
+                },
+                "condition": "approved"
+              }
+            ],
+            "continuation": {
+              "route": "issue",
+              "message": "Audit page 3",
+              "remaining": 0
+            },
+            "subject": {
+              "kind": "issue",
+              "host": "github.com",
+              "repository": "owner/repo",
+              "repository_id": "1",
+              "resource_id": "9007199254740993",
+              "number": "7"
+            },
+            "state": "claimed",
+            "position": {
+              "commit": 8,
+              "operation": 1
+            },
+            "attempts": 0,
+            "claim_id": "c_952c7b14793a92d3e50c004a26b07a1d573434effdcf8016fa837b58073d7769_1"
+          }
+        },
+        "claims": {
+          "c_3ac298b078167e4c1eff6439c134ba4fea5b17ee3a21b8ffa8399dd9969e189b_1": {
+            "claim_id": "c_3ac298b078167e4c1eff6439c134ba4fea5b17ee3a21b8ffa8399dd9969e189b_1",
+            "work_id": "3d459bf6097a00c7a08c46dc585b70179444c35b9fa37bd97e4ecbb4eeccd306",
+            "dispatch_id": "d_3ac298b078167e4c1eff6439c134ba4fea5b17ee3a21b8ffa8399dd9969e189b_1",
+            "handle": "h1",
+            "state": "completed",
+            "commit_id": "q_1b59d59e5738d29bd715652dfa61860d6d0dc16d610e60c8a4f7676f5e7b0312",
+            "request_id": "request:37c48289ad81720cf71ed85f074e1882808cee536c0923875887a6a467680684",
+            "terminal_commit_id": "q_886152e1f6423c4ec7529243c38d4d3b848e710751a6d2aad0aeeea68692a501",
+            "effects": []
+          },
+          "c_df88ad74c699ff0f3a1498f3227a5758d0e72fbe676e29a6a7a0aa100e06d656_1": {
+            "claim_id": "c_df88ad74c699ff0f3a1498f3227a5758d0e72fbe676e29a6a7a0aa100e06d656_1",
+            "work_id": "865269593bfe9cf30d99c4b9e6912ed3e89fcdb71e6d9946c6fe74bbbdb230cf",
+            "dispatch_id": "d_df88ad74c699ff0f3a1498f3227a5758d0e72fbe676e29a6a7a0aa100e06d656_1",
+            "handle": "h1",
+            "state": "completed",
+            "commit_id": "q_f2ba1a88f58309413dca2b266d6d5c2565f7c7c0b85918f2c34178904a38831d",
+            "request_id": "request:24cb88532cbcb12bda6da082d34308b8fcc94243d32c9647d53650565c38eb57",
+            "terminal_commit_id": "q_9c7434c17ec9d7b9ff86fed2ae566cea09e72417d7a187ccf21f74ed6a32402d",
+            "effects": []
+          },
+          "c_952c7b14793a92d3e50c004a26b07a1d573434effdcf8016fa837b58073d7769_1": {
+            "claim_id": "c_952c7b14793a92d3e50c004a26b07a1d573434effdcf8016fa837b58073d7769_1",
+            "work_id": "8687a391f089495f34a86578e4c515c9d758c7354fe66f033fe646e7d019b96b",
+            "dispatch_id": "d_952c7b14793a92d3e50c004a26b07a1d573434effdcf8016fa837b58073d7769_1",
+            "handle": "h1",
+            "state": "open",
+            "commit_id": "q_1adcf17b77f3bbba7f07ec08df7969eeb11467279959964a4f6ecae36c9b2cce",
+            "request_id": "request:cc84926a04c88a79d00231c6ef4a7e5a0cab72fb6e8da7f407406f4a4c920bff"
+          }
+        },
+        "dispatches": {
+          "d_3ac298b078167e4c1eff6439c134ba4fea5b17ee3a21b8ffa8399dd9969e189b_1": {
+            "dispatch_id": "d_3ac298b078167e4c1eff6439c134ba4fea5b17ee3a21b8ffa8399dd9969e189b_1",
+            "request_id": "request:37c48289ad81720cf71ed85f074e1882808cee536c0923875887a6a467680684",
+            "commit_id": "q_1b59d59e5738d29bd715652dfa61860d6d0dc16d610e60c8a4f7676f5e7b0312",
+            "pool": "default",
+            "worker_profile": "worker",
+            "workflow": ".github/workflows/worker.lock.yml",
+            "state": "closed",
+            "run": {
+              "run_id": "21",
+              "run_attempt": 1
+            },
+            "claims": ["c_3ac298b078167e4c1eff6439c134ba4fea5b17ee3a21b8ffa8399dd9969e189b_1"]
+          },
+          "d_df88ad74c699ff0f3a1498f3227a5758d0e72fbe676e29a6a7a0aa100e06d656_1": {
+            "dispatch_id": "d_df88ad74c699ff0f3a1498f3227a5758d0e72fbe676e29a6a7a0aa100e06d656_1",
+            "request_id": "request:24cb88532cbcb12bda6da082d34308b8fcc94243d32c9647d53650565c38eb57",
+            "commit_id": "q_f2ba1a88f58309413dca2b266d6d5c2565f7c7c0b85918f2c34178904a38831d",
+            "pool": "default",
+            "worker_profile": "worker",
+            "workflow": ".github/workflows/worker.lock.yml",
+            "state": "closed",
+            "run": {
+              "run_id": "22",
+              "run_attempt": 1
+            },
+            "claims": ["c_df88ad74c699ff0f3a1498f3227a5758d0e72fbe676e29a6a7a0aa100e06d656_1"]
+          },
+          "d_952c7b14793a92d3e50c004a26b07a1d573434effdcf8016fa837b58073d7769_1": {
+            "dispatch_id": "d_952c7b14793a92d3e50c004a26b07a1d573434effdcf8016fa837b58073d7769_1",
+            "request_id": "request:cc84926a04c88a79d00231c6ef4a7e5a0cab72fb6e8da7f407406f4a4c920bff",
+            "commit_id": "q_1adcf17b77f3bbba7f07ec08df7969eeb11467279959964a4f6ecae36c9b2cce",
+            "pool": "default",
+            "worker_profile": "worker",
+            "workflow": ".github/workflows/worker.lock.yml",
+            "state": "reserved",
+            "run": null,
+            "claims": ["c_952c7b14793a92d3e50c004a26b07a1d573434effdcf8016fa837b58073d7769_1"]
+          }
+        },
+        "observations": {
+          "{\"condition\":\"approved\",\"host\":\"github.com\",\"kind\":\"issue\",\"repository_id\":\"1\",\"resource_id\":\"55\"}": {
+            "kind": "Observation",
+            "observation_id": "o-approval-ready",
+            "resource": {
+              "kind": "issue",
+              "host": "github.com",
+              "repository": "owner/repo",
+              "repository_id": "1",
+              "resource_id": "55",
+              "number": "5"
+            },
+            "condition": "approved",
+            "state": "ready",
+            "state_reason": "completed",
+            "approved_by": "583231"
+          }
+        },
+        "requests": [
+          "request:00fff950622fca607aaf75baff7d1e2baa73021b1767f7e5359828359d3fc824",
+          "request:016fa5c1fa0f1e2539494dfff13dbbfd0c138e0d4f82fa0802c260000d4b5499",
+          "request:1ea99ba9b9d426ff0368a5ded934ed628721f9d18f750a7af9589b2a638412e7",
+          "request:24cb88532cbcb12bda6da082d34308b8fcc94243d32c9647d53650565c38eb57",
+          "request:32fd4a2965e3140dda5e1066dda0486e619b5e24d2b842f34b9adbb6373587df",
+          "request:37c48289ad81720cf71ed85f074e1882808cee536c0923875887a6a467680684",
+          "request:3adf0671621a5c7fae207ae41de0ef866b97e5b8ca8eacec5a30ed306ad23b57",
+          "request:52db46c8dba364b1511f26a0cd8fba58d60c5a54b300dcf272e8f2ffc154b309",
+          "request:a2813d78864d8602434d6c6c678ff5a25b9283a2e3710e4cfdf5b6f1b1045271",
+          "request:cc84926a04c88a79d00231c6ef4a7e5a0cab72fb6e8da7f407406f4a4c920bff",
+          "request:d2b30d73e5fe29640afb9db1b684bfd2154a733362b8e183ebd5f1eb05302b47",
+          "request:ea08b73004ab046cf7bf2fc635e6eb05713163e5ca873cde55bfa759203c2278"
+        ],
+        "work_creators": {
+          "3d459bf6097a00c7a08c46dc585b70179444c35b9fa37bd97e4ecbb4eeccd306": {
+            "role": "producer",
+            "repository": "owner/repo",
+            "workflow": ".github/workflows/producer.lock.yml",
+            "run_id": "10",
+            "run_attempt": 1
+          },
+          "865269593bfe9cf30d99c4b9e6912ed3e89fcdb71e6d9946c6fe74bbbdb230cf": {
+            "role": "worker",
+            "repository": "owner/repo",
+            "workflow": ".github/workflows/worker.lock.yml",
+            "run_id": "21",
+            "run_attempt": 1
+          },
+          "8687a391f089495f34a86578e4c515c9d758c7354fe66f033fe646e7d019b96b": {
+            "role": "worker",
+            "repository": "owner/repo",
+            "workflow": ".github/workflows/worker.lock.yml",
+            "run_id": "22",
+            "run_attempt": 1
+          }
+        }
+      }
+    },
+    "rejections": [
+      {
+        "name": "continuation with a different worker profile",
+        "base": 4,
+        "extra": [],
+        "commit": {
+          "version": 4,
+          "id": "q_886152e1f6423c4ec7529243c38d4d3b848e710751a6d2aad0aeeea68692a501",
+          "previous": "q_3570b4dc99bfaeca5e7e1ec65deedcf944731186090d0baf6d7c9e07eeff03c1",
+          "request": {
+            "id": "request:52db46c8dba364b1511f26a0cd8fba58d60c5a54b300dcf272e8f2ffc154b309",
+            "kind": "finish",
+            "parameters": {
+              "dispatch_id": "d_3ac298b078167e4c1eff6439c134ba4fea5b17ee3a21b8ffa8399dd9969e189b_1"
+            }
+          },
+          "actor": {
+            "role": "worker",
+            "repository": "owner/repo",
+            "workflow": ".github/workflows/worker.lock.yml",
+            "run_id": "21",
+            "run_attempt": 1
+          },
+          "at": 1,
+          "operations": [
+            {
+              "kind": "Completion",
+              "work_id": "3d459bf6097a00c7a08c46dc585b70179444c35b9fa37bd97e4ecbb4eeccd306",
+              "claim_id": "c_3ac298b078167e4c1eff6439c134ba4fea5b17ee3a21b8ffa8399dd9969e189b_1",
+              "dispatch_id": "d_3ac298b078167e4c1eff6439c134ba4fea5b17ee3a21b8ffa8399dd9969e189b_1",
+              "claim_handle": "h1",
+              "effects": []
+            },
+            {
+              "kind": "Work",
+              "work_id": "865269593bfe9cf30d99c4b9e6912ed3e89fcdb71e6d9946c6fe74bbbdb230cf",
+              "graph_id": "graph",
+              "node_key": "continuation:3d459bf6097a00c7a08c46dc585b70179444c35b9fa37bd97e4ecbb4eeccd306",
+              "pool": "default",
+              "priority": 3,
+              "fairness_key": "",
+              "worker_profile": "other",
+              "payload": {
+                "task": "audit pages",
+                "effect_contract": {
+                  "kind": "none"
+                }
+              },
+              "depends_on": [
+                {
+                  "kind": "work",
+                  "work_id": "3d459bf6097a00c7a08c46dc585b70179444c35b9fa37bd97e4ecbb4eeccd306"
+                }
+              ],
+              "continuation": {
+                "route": "workqueue",
+                "message": "Audit page 2",
+                "remaining": 1
+              },
+              "subject": {
+                "kind": "issue",
+                "host": "github.com",
+                "repository": "owner/repo",
+                "repository_id": "1",
+                "resource_id": "9007199254740993",
+                "number": "7"
+              }
+            }
+          ]
+        },
+        "code": "request_invalid"
+      },
+      {
+        "name": "continuation without its parent edge",
+        "base": 4,
+        "extra": [],
+        "commit": {
+          "version": 4,
+          "id": "q_886152e1f6423c4ec7529243c38d4d3b848e710751a6d2aad0aeeea68692a501",
+          "previous": "q_3570b4dc99bfaeca5e7e1ec65deedcf944731186090d0baf6d7c9e07eeff03c1",
+          "request": {
+            "id": "request:52db46c8dba364b1511f26a0cd8fba58d60c5a54b300dcf272e8f2ffc154b309",
+            "kind": "finish",
+            "parameters": {
+              "dispatch_id": "d_3ac298b078167e4c1eff6439c134ba4fea5b17ee3a21b8ffa8399dd9969e189b_1"
+            }
+          },
+          "actor": {
+            "role": "worker",
+            "repository": "owner/repo",
+            "workflow": ".github/workflows/worker.lock.yml",
+            "run_id": "21",
+            "run_attempt": 1
+          },
+          "at": 1,
+          "operations": [
+            {
+              "kind": "Completion",
+              "work_id": "3d459bf6097a00c7a08c46dc585b70179444c35b9fa37bd97e4ecbb4eeccd306",
+              "claim_id": "c_3ac298b078167e4c1eff6439c134ba4fea5b17ee3a21b8ffa8399dd9969e189b_1",
+              "dispatch_id": "d_3ac298b078167e4c1eff6439c134ba4fea5b17ee3a21b8ffa8399dd9969e189b_1",
+              "claim_handle": "h1",
+              "effects": []
+            },
+            {
+              "kind": "Work",
+              "work_id": "865269593bfe9cf30d99c4b9e6912ed3e89fcdb71e6d9946c6fe74bbbdb230cf",
+              "graph_id": "graph",
+              "node_key": "continuation:3d459bf6097a00c7a08c46dc585b70179444c35b9fa37bd97e4ecbb4eeccd306",
+              "pool": "default",
+              "priority": 3,
+              "fairness_key": "",
+              "worker_profile": "worker",
+              "payload": {
+                "task": "audit pages",
+                "effect_contract": {
+                  "kind": "none"
+                }
+              },
+              "depends_on": [],
+              "continuation": {
+                "route": "workqueue",
+                "message": "Audit page 2",
+                "remaining": 1
+              },
+              "subject": {
+                "kind": "issue",
+                "host": "github.com",
+                "repository": "owner/repo",
+                "repository_id": "1",
+                "resource_id": "9007199254740993",
+                "number": "7"
+              }
+            }
+          ]
+        },
+        "code": "request_invalid"
+      },
+      {
+        "name": "unpaired continuation",
+        "base": 4,
+        "extra": [],
+        "commit": {
+          "version": 4,
+          "id": "q_886152e1f6423c4ec7529243c38d4d3b848e710751a6d2aad0aeeea68692a501",
+          "previous": "q_3570b4dc99bfaeca5e7e1ec65deedcf944731186090d0baf6d7c9e07eeff03c1",
+          "request": {
+            "id": "request:52db46c8dba364b1511f26a0cd8fba58d60c5a54b300dcf272e8f2ffc154b309",
+            "kind": "finish",
+            "parameters": {
+              "dispatch_id": "d_3ac298b078167e4c1eff6439c134ba4fea5b17ee3a21b8ffa8399dd9969e189b_1"
+            }
+          },
+          "actor": {
+            "role": "worker",
+            "repository": "owner/repo",
+            "workflow": ".github/workflows/worker.lock.yml",
+            "run_id": "21",
+            "run_attempt": 1
+          },
+          "at": 1,
+          "operations": [
+            {
+              "kind": "Work",
+              "work_id": "865269593bfe9cf30d99c4b9e6912ed3e89fcdb71e6d9946c6fe74bbbdb230cf",
+              "graph_id": "graph",
+              "node_key": "continuation:3d459bf6097a00c7a08c46dc585b70179444c35b9fa37bd97e4ecbb4eeccd306",
+              "pool": "default",
+              "priority": 3,
+              "fairness_key": "",
+              "worker_profile": "worker",
+              "payload": {
+                "task": "audit pages",
+                "effect_contract": {
+                  "kind": "none"
+                }
+              },
+              "depends_on": [
+                {
+                  "kind": "work",
+                  "work_id": "3d459bf6097a00c7a08c46dc585b70179444c35b9fa37bd97e4ecbb4eeccd306"
+                }
+              ],
+              "continuation": {
+                "route": "workqueue",
+                "message": "Audit page 2",
+                "remaining": 1
+              },
+              "subject": {
+                "kind": "issue",
+                "host": "github.com",
+                "repository": "owner/repo",
+                "repository_id": "1",
+                "resource_id": "9007199254740993",
+                "number": "7"
+              }
+            },
+            {
+              "kind": "Completion",
+              "work_id": "3d459bf6097a00c7a08c46dc585b70179444c35b9fa37bd97e4ecbb4eeccd306",
+              "claim_id": "c_3ac298b078167e4c1eff6439c134ba4fea5b17ee3a21b8ffa8399dd9969e189b_1",
+              "dispatch_id": "d_3ac298b078167e4c1eff6439c134ba4fea5b17ee3a21b8ffa8399dd9969e189b_1",
+              "claim_handle": "h1",
+              "effects": []
+            }
+          ]
+        },
+        "code": "request_invalid"
+      },
+      {
+        "name": "two continuations for one Completion",
+        "base": 4,
+        "extra": [],
+        "commit": {
+          "version": 4,
+          "id": "q_886152e1f6423c4ec7529243c38d4d3b848e710751a6d2aad0aeeea68692a501",
+          "previous": "q_3570b4dc99bfaeca5e7e1ec65deedcf944731186090d0baf6d7c9e07eeff03c1",
+          "request": {
+            "id": "request:52db46c8dba364b1511f26a0cd8fba58d60c5a54b300dcf272e8f2ffc154b309",
+            "kind": "finish",
+            "parameters": {
+              "dispatch_id": "d_3ac298b078167e4c1eff6439c134ba4fea5b17ee3a21b8ffa8399dd9969e189b_1"
+            }
+          },
+          "actor": {
+            "role": "worker",
+            "repository": "owner/repo",
+            "workflow": ".github/workflows/worker.lock.yml",
+            "run_id": "21",
+            "run_attempt": 1
+          },
+          "at": 1,
+          "operations": [
+            {
+              "kind": "Completion",
+              "work_id": "3d459bf6097a00c7a08c46dc585b70179444c35b9fa37bd97e4ecbb4eeccd306",
+              "claim_id": "c_3ac298b078167e4c1eff6439c134ba4fea5b17ee3a21b8ffa8399dd9969e189b_1",
+              "dispatch_id": "d_3ac298b078167e4c1eff6439c134ba4fea5b17ee3a21b8ffa8399dd9969e189b_1",
+              "claim_handle": "h1",
+              "effects": []
+            },
+            {
+              "kind": "Work",
+              "work_id": "865269593bfe9cf30d99c4b9e6912ed3e89fcdb71e6d9946c6fe74bbbdb230cf",
+              "graph_id": "graph",
+              "node_key": "continuation:3d459bf6097a00c7a08c46dc585b70179444c35b9fa37bd97e4ecbb4eeccd306",
+              "pool": "default",
+              "priority": 3,
+              "fairness_key": "",
+              "worker_profile": "worker",
+              "payload": {
+                "task": "audit pages",
+                "effect_contract": {
+                  "kind": "none"
+                }
+              },
+              "depends_on": [
+                {
+                  "kind": "work",
+                  "work_id": "3d459bf6097a00c7a08c46dc585b70179444c35b9fa37bd97e4ecbb4eeccd306"
+                }
+              ],
+              "continuation": {
+                "route": "workqueue",
+                "message": "Audit page 2",
+                "remaining": 1
+              },
+              "subject": {
+                "kind": "issue",
+                "host": "github.com",
+                "repository": "owner/repo",
+                "repository_id": "1",
+                "resource_id": "9007199254740993",
+                "number": "7"
+              }
+            },
+            {
+              "kind": "Work",
+              "work_id": "865269593bfe9cf30d99c4b9e6912ed3e89fcdb71e6d9946c6fe74bbbdb230cf",
+              "graph_id": "graph",
+              "node_key": "continuation:3d459bf6097a00c7a08c46dc585b70179444c35b9fa37bd97e4ecbb4eeccd306",
+              "pool": "default",
+              "priority": 3,
+              "fairness_key": "",
+              "worker_profile": "worker",
+              "payload": {
+                "task": "audit pages",
+                "effect_contract": {
+                  "kind": "none"
+                }
+              },
+              "depends_on": [
+                {
+                  "kind": "work",
+                  "work_id": "3d459bf6097a00c7a08c46dc585b70179444c35b9fa37bd97e4ecbb4eeccd306"
+                }
+              ],
+              "continuation": {
+                "route": "workqueue",
+                "message": "Audit page 2",
+                "remaining": 1
+              },
+              "subject": {
+                "kind": "issue",
+                "host": "github.com",
+                "repository": "owner/repo",
+                "repository_id": "1",
+                "resource_id": "9007199254740993",
+                "number": "7"
+              }
+            }
+          ]
+        },
+        "code": "request_invalid"
+      },
+      {
+        "name": "pre-existing deterministic continuation ID",
+        "base": 4,
+        "extra": [
+          {
+            "version": 4,
+            "id": "q_cb3755ee931dcf1437d0af680306e81bf7a830a4ea5bf3dc64772df275966719",
+            "previous": "q_3570b4dc99bfaeca5e7e1ec65deedcf944731186090d0baf6d7c9e07eeff03c1",
+            "request": {
+              "id": "request:6484f83b7312b6786e48ccd1c5286c8b6663212a883e478d9be107eb8f1bc800",
+              "kind": "submit",
+              "parameters": {
+                "work_ids": ["865269593bfe9cf30d99c4b9e6912ed3e89fcdb71e6d9946c6fe74bbbdb230cf"]
+              }
+            },
+            "actor": {
+              "role": "producer",
+              "repository": "owner/repo",
+              "workflow": ".github/workflows/producer.lock.yml",
+              "run_id": "10",
+              "run_attempt": 1
+            },
+            "at": 1,
+            "operations": [
+              {
+                "kind": "Work",
+                "work_id": "865269593bfe9cf30d99c4b9e6912ed3e89fcdb71e6d9946c6fe74bbbdb230cf",
+                "graph_id": "graph",
+                "node_key": "continuation:3d459bf6097a00c7a08c46dc585b70179444c35b9fa37bd97e4ecbb4eeccd306",
+                "pool": "default",
+                "priority": 3,
+                "fairness_key": "",
+                "worker_profile": "worker",
+                "payload": {
+                  "task": "continuation:3d459bf6097a00c7a08c46dc585b70179444c35b9fa37bd97e4ecbb4eeccd306"
+                },
+                "depends_on": []
+              }
+            ]
+          }
+        ],
+        "commit": {
+          "version": 4,
+          "id": "q_0dafb165b49894be9a835791cfeaa5868baea59dce54a6fb38e115b2a4a4f104",
+          "previous": "q_cb3755ee931dcf1437d0af680306e81bf7a830a4ea5bf3dc64772df275966719",
+          "request": {
+            "id": "request:52db46c8dba364b1511f26a0cd8fba58d60c5a54b300dcf272e8f2ffc154b309",
+            "kind": "finish",
+            "parameters": {
+              "dispatch_id": "d_3ac298b078167e4c1eff6439c134ba4fea5b17ee3a21b8ffa8399dd9969e189b_1"
+            }
+          },
+          "actor": {
+            "role": "worker",
+            "repository": "owner/repo",
+            "workflow": ".github/workflows/worker.lock.yml",
+            "run_id": "21",
+            "run_attempt": 1
+          },
+          "at": 1,
+          "operations": [
+            {
+              "kind": "Completion",
+              "work_id": "3d459bf6097a00c7a08c46dc585b70179444c35b9fa37bd97e4ecbb4eeccd306",
+              "claim_id": "c_3ac298b078167e4c1eff6439c134ba4fea5b17ee3a21b8ffa8399dd9969e189b_1",
+              "dispatch_id": "d_3ac298b078167e4c1eff6439c134ba4fea5b17ee3a21b8ffa8399dd9969e189b_1",
+              "claim_handle": "h1",
+              "effects": []
+            },
+            {
+              "kind": "Work",
+              "work_id": "865269593bfe9cf30d99c4b9e6912ed3e89fcdb71e6d9946c6fe74bbbdb230cf",
+              "graph_id": "graph",
+              "node_key": "continuation:3d459bf6097a00c7a08c46dc585b70179444c35b9fa37bd97e4ecbb4eeccd306",
+              "pool": "default",
+              "priority": 3,
+              "fairness_key": "",
+              "worker_profile": "worker",
+              "payload": {
+                "task": "audit pages",
+                "effect_contract": {
+                  "kind": "none"
+                }
+              },
+              "depends_on": [
+                {
+                  "kind": "work",
+                  "work_id": "3d459bf6097a00c7a08c46dc585b70179444c35b9fa37bd97e4ecbb4eeccd306"
+                }
+              ],
+              "continuation": {
+                "route": "workqueue",
+                "message": "Audit page 2",
+                "remaining": 1
+              },
+              "subject": {
+                "kind": "issue",
+                "host": "github.com",
+                "repository": "owner/repo",
+                "repository_id": "1",
+                "resource_id": "9007199254740993",
+                "number": "7"
+              }
+            }
+          ]
+        },
+        "code": "request_invalid"
+      },
+      {
+        "name": "issue continuation gated on completed",
+        "base": 4,
+        "extra": [],
+        "commit": {
+          "version": 4,
+          "id": "q_886152e1f6423c4ec7529243c38d4d3b848e710751a6d2aad0aeeea68692a501",
+          "previous": "q_3570b4dc99bfaeca5e7e1ec65deedcf944731186090d0baf6d7c9e07eeff03c1",
+          "request": {
+            "id": "request:52db46c8dba364b1511f26a0cd8fba58d60c5a54b300dcf272e8f2ffc154b309",
+            "kind": "finish",
+            "parameters": {
+              "dispatch_id": "d_3ac298b078167e4c1eff6439c134ba4fea5b17ee3a21b8ffa8399dd9969e189b_1"
+            }
+          },
+          "actor": {
+            "role": "worker",
+            "repository": "owner/repo",
+            "workflow": ".github/workflows/worker.lock.yml",
+            "run_id": "21",
+            "run_attempt": 1
+          },
+          "at": 1,
+          "operations": [
+            {
+              "kind": "Completion",
+              "work_id": "3d459bf6097a00c7a08c46dc585b70179444c35b9fa37bd97e4ecbb4eeccd306",
+              "claim_id": "c_3ac298b078167e4c1eff6439c134ba4fea5b17ee3a21b8ffa8399dd9969e189b_1",
+              "dispatch_id": "d_3ac298b078167e4c1eff6439c134ba4fea5b17ee3a21b8ffa8399dd9969e189b_1",
+              "claim_handle": "h1",
+              "effects": []
+            },
+            {
+              "kind": "Work",
+              "work_id": "865269593bfe9cf30d99c4b9e6912ed3e89fcdb71e6d9946c6fe74bbbdb230cf",
+              "graph_id": "graph",
+              "node_key": "continuation:3d459bf6097a00c7a08c46dc585b70179444c35b9fa37bd97e4ecbb4eeccd306",
+              "pool": "default",
+              "priority": 3,
+              "fairness_key": "",
+              "worker_profile": "worker",
+              "payload": {
+                "task": "audit pages",
+                "effect_contract": {
+                  "kind": "none"
+                }
+              },
+              "depends_on": [
+                {
+                  "kind": "work",
+                  "work_id": "3d459bf6097a00c7a08c46dc585b70179444c35b9fa37bd97e4ecbb4eeccd306"
+                },
+                {
+                  "kind": "issue",
+                  "resource": {
+                    "kind": "issue",
+                    "host": "github.com",
+                    "repository": "owner/repo",
+                    "repository_id": "1",
+                    "resource_id": "55",
+                    "number": "5"
+                  },
+                  "condition": "completed"
+                }
+              ],
+              "continuation": {
+                "route": "issue",
+                "message": "Audit page 2",
+                "remaining": 0
+              },
+              "subject": {
+                "kind": "issue",
+                "host": "github.com",
+                "repository": "owner/repo",
+                "repository_id": "1",
+                "resource_id": "9007199254740993",
+                "number": "7"
+              }
+            }
+          ]
+        },
+        "code": "request_invalid"
+      },
+      {
+        "name": "oversized Unicode continuation message",
+        "base": 4,
+        "extra": [],
+        "commit": {
+          "version": 4,
+          "id": "q_886152e1f6423c4ec7529243c38d4d3b848e710751a6d2aad0aeeea68692a501",
+          "previous": "q_3570b4dc99bfaeca5e7e1ec65deedcf944731186090d0baf6d7c9e07eeff03c1",
+          "request": {
+            "id": "request:52db46c8dba364b1511f26a0cd8fba58d60c5a54b300dcf272e8f2ffc154b309",
+            "kind": "finish",
+            "parameters": {
+              "dispatch_id": "d_3ac298b078167e4c1eff6439c134ba4fea5b17ee3a21b8ffa8399dd9969e189b_1"
+            }
+          },
+          "actor": {
+            "role": "worker",
+            "repository": "owner/repo",
+            "workflow": ".github/workflows/worker.lock.yml",
+            "run_id": "21",
+            "run_attempt": 1
+          },
+          "at": 1,
+          "operations": [
+            {
+              "kind": "Completion",
+              "work_id": "3d459bf6097a00c7a08c46dc585b70179444c35b9fa37bd97e4ecbb4eeccd306",
+              "claim_id": "c_3ac298b078167e4c1eff6439c134ba4fea5b17ee3a21b8ffa8399dd9969e189b_1",
+              "dispatch_id": "d_3ac298b078167e4c1eff6439c134ba4fea5b17ee3a21b8ffa8399dd9969e189b_1",
+              "claim_handle": "h1",
+              "effects": []
+            },
+            {
+              "kind": "Work",
+              "work_id": "865269593bfe9cf30d99c4b9e6912ed3e89fcdb71e6d9946c6fe74bbbdb230cf",
+              "graph_id": "graph",
+              "node_key": "continuation:3d459bf6097a00c7a08c46dc585b70179444c35b9fa37bd97e4ecbb4eeccd306",
+              "pool": "default",
+              "priority": 3,
+              "fairness_key": "",
+              "worker_profile": "worker",
+              "payload": {
+                "task": "audit pages",
+                "effect_contract": {
+                  "kind": "none"
+                }
+              },
+              "depends_on": [
+                {
+                  "kind": "work",
+                  "work_id": "3d459bf6097a00c7a08c46dc585b70179444c35b9fa37bd97e4ecbb4eeccd306"
+                }
+              ],
+              "continuation": {
+                "route": "workqueue",
+                "message": "ééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé",
+                "remaining": 1
+              },
+              "subject": {
+                "kind": "issue",
+                "host": "github.com",
+                "repository": "owner/repo",
+                "repository_id": "1",
+                "resource_id": "9007199254740993",
+                "number": "7"
+              }
+            }
+          ]
+        },
+        "code": "resource_limit"
+      },
+      {
+        "name": "automatic continuation without a smaller budget",
+        "base": 8,
+        "extra": [],
+        "commit": {
+          "version": 4,
+          "id": "q_9c7434c17ec9d7b9ff86fed2ae566cea09e72417d7a187ccf21f74ed6a32402d",
+          "previous": "q_509fec990f17e6ec26cfa76d6b59417b7f49d22a4a8871e6fc35ff5cbe2a16f4",
+          "request": {
+            "id": "request:ea08b73004ab046cf7bf2fc635e6eb05713163e5ca873cde55bfa759203c2278",
+            "kind": "finish",
+            "parameters": {
+              "dispatch_id": "d_df88ad74c699ff0f3a1498f3227a5758d0e72fbe676e29a6a7a0aa100e06d656_1"
+            }
+          },
+          "actor": {
+            "role": "worker",
+            "repository": "owner/repo",
+            "workflow": ".github/workflows/worker.lock.yml",
+            "run_id": "22",
+            "run_attempt": 1
+          },
+          "at": 1,
+          "operations": [
+            {
+              "kind": "Completion",
+              "work_id": "865269593bfe9cf30d99c4b9e6912ed3e89fcdb71e6d9946c6fe74bbbdb230cf",
+              "claim_id": "c_df88ad74c699ff0f3a1498f3227a5758d0e72fbe676e29a6a7a0aa100e06d656_1",
+              "dispatch_id": "d_df88ad74c699ff0f3a1498f3227a5758d0e72fbe676e29a6a7a0aa100e06d656_1",
+              "claim_handle": "h1",
+              "effects": []
+            },
+            {
+              "kind": "Work",
+              "work_id": "8687a391f089495f34a86578e4c515c9d758c7354fe66f033fe646e7d019b96b",
+              "graph_id": "graph",
+              "node_key": "continuation:865269593bfe9cf30d99c4b9e6912ed3e89fcdb71e6d9946c6fe74bbbdb230cf",
+              "pool": "default",
+              "priority": 3,
+              "fairness_key": "",
+              "worker_profile": "worker",
+              "payload": {
+                "task": "audit pages",
+                "effect_contract": {
+                  "kind": "none"
+                }
+              },
+              "depends_on": [
+                {
+                  "kind": "work",
+                  "work_id": "865269593bfe9cf30d99c4b9e6912ed3e89fcdb71e6d9946c6fe74bbbdb230cf"
+                }
+              ],
+              "continuation": {
+                "route": "workqueue",
+                "message": "Audit page 3",
+                "remaining": 1
+              },
+              "subject": {
+                "kind": "issue",
+                "host": "github.com",
+                "repository": "owner/repo",
+                "repository_id": "1",
+                "resource_id": "9007199254740993",
+                "number": "7"
+              }
+            }
+          ]
+        },
+        "code": "request_invalid"
+      },
+      {
+        "name": "submit minting a continuation",
+        "base": 11,
+        "extra": [],
+        "commit": {
+          "version": 4,
+          "id": "q_3105dd93f7328bc051939c4dde0cb02950a93bbced4a0f698b9f26b8b74fdc38",
+          "previous": "q_1adcf17b77f3bbba7f07ec08df7969eeb11467279959964a4f6ecae36c9b2cce",
+          "request": {
+            "id": "request:0fdf5d73569acba3eecc024634bdd2167a49450a4b76e0db793ce2350dc859ff",
+            "kind": "submit",
+            "parameters": {
+              "work_ids": ["04eec817a6db53096176146bb6c5d7835f019f8d592f6895839111821c709b64"]
+            }
+          },
+          "actor": {
+            "role": "producer",
+            "repository": "owner/repo",
+            "workflow": ".github/workflows/producer.lock.yml",
+            "run_id": "10",
+            "run_attempt": 1
+          },
+          "at": 1,
+          "operations": [
+            {
+              "kind": "Work",
+              "work_id": "04eec817a6db53096176146bb6c5d7835f019f8d592f6895839111821c709b64",
+              "graph_id": "forged",
+              "node_key": "continuation:3d459bf6097a00c7a08c46dc585b70179444c35b9fa37bd97e4ecbb4eeccd306",
+              "pool": "default",
+              "priority": 3,
+              "fairness_key": "",
+              "worker_profile": "worker",
+              "payload": {
+                "task": "audit pages",
+                "effect_contract": {
+                  "kind": "none"
+                }
+              },
+              "depends_on": [],
+              "continuation": {
+                "route": "workqueue",
+                "message": "Audit page 2",
+                "remaining": 1
+              },
+              "subject": {
+                "kind": "issue",
+                "host": "github.com",
+                "repository": "owner/repo",
+                "repository_id": "1",
+                "resource_id": "9007199254740993",
+                "number": "7"
+              }
+            }
+          ]
+        },
+        "code": "request_invalid"
+      },
+      {
+        "name": "Claim before approval",
+        "base": 9,
+        "extra": [],
+        "commit": {
+          "version": 4,
+          "id": "q_f9e56a11efbced4b666ca7574f9b28b2c4f0c949fe4a18e32153e68c1c9bd44e",
+          "previous": "q_9c7434c17ec9d7b9ff86fed2ae566cea09e72417d7a187ccf21f74ed6a32402d",
+          "request": {
+            "id": "request:5b8f4126b6071a9f8f5e12cc262a2e74bd0a003ca39d82e61141ac583e8e1714",
+            "kind": "dispatch_next",
+            "parameters": {
+              "concurrency": 2,
+              "max_claims": 16,
+              "max_dispatches": 16,
+              "per_account_limit": 0,
+              "pool": "default",
+              "profiles": {
+                "worker": {
+                  "workflow": ".github/workflows/worker.lock.yml"
+                }
+              }
+            }
+          },
+          "actor": {
+            "role": "dispatcher",
+            "repository": "owner/repo",
+            "workflow": ".github/workflows/dispatcher.lock.yml",
+            "run_id": "205",
+            "run_attempt": 1
+          },
+          "at": 1,
+          "operations": [
+            {
+              "kind": "Claim",
+              "work_id": "8687a391f089495f34a86578e4c515c9d758c7354fe66f033fe646e7d019b96b",
+              "claim_id": "c_205",
+              "dispatch_id": "d_205",
+              "handle": "h1"
+            }
+          ]
+        },
+        "code": "approval_required"
+      },
+      {
+        "name": "Claim on a completed observation of the approval Issue",
+        "base": 9,
+        "extra": [],
+        "commit": {
+          "version": 4,
+          "id": "q_851543cbd98a898bd65f345c7d662c7d12904e60bab82dc60a2523ad46f35e1c",
+          "previous": "q_9c7434c17ec9d7b9ff86fed2ae566cea09e72417d7a187ccf21f74ed6a32402d",
+          "request": {
+            "id": "request:fc77e2ccbf0045d9344f2ece80e6b10e638509fdad3004ae805b563652d97baa",
+            "kind": "dispatch_next",
+            "parameters": {
+              "concurrency": 2,
+              "max_claims": 16,
+              "max_dispatches": 16,
+              "per_account_limit": 0,
+              "pool": "default",
+              "profiles": {
+                "worker": {
+                  "workflow": ".github/workflows/worker.lock.yml"
+                }
+              }
+            }
+          },
+          "actor": {
+            "role": "dispatcher",
+            "repository": "owner/repo",
+            "workflow": ".github/workflows/dispatcher.lock.yml",
+            "run_id": "206",
+            "run_attempt": 1
+          },
+          "at": 1,
+          "operations": [
+            {
+              "kind": "Observation",
+              "observation_id": "o-completed",
+              "resource": {
+                "kind": "issue",
+                "host": "github.com",
+                "repository": "owner/repo",
+                "repository_id": "1",
+                "resource_id": "55",
+                "number": "5"
+              },
+              "condition": "completed",
+              "state": "ready",
+              "state_reason": "completed"
+            },
+            {
+              "kind": "Claim",
+              "work_id": "8687a391f089495f34a86578e4c515c9d758c7354fe66f033fe646e7d019b96b",
+              "claim_id": "c_206",
+              "dispatch_id": "d_206",
+              "handle": "h1"
+            }
+          ]
+        },
+        "code": "approval_required"
+      },
+      {
+        "name": "approved_by on a completed gate",
+        "base": 9,
+        "extra": [],
+        "commit": {
+          "version": 4,
+          "id": "q_20ae2c6b1b4e7601c94a0ba03c767fd75c496f5d65ff27a9a5c6a8b11201e03d",
+          "previous": "q_9c7434c17ec9d7b9ff86fed2ae566cea09e72417d7a187ccf21f74ed6a32402d",
+          "request": {
+            "id": "request:c6f806cab4ba3f456e5150ef320b0629b921c0a4f73aaf6badf4fb31add31372",
+            "kind": "dispatch_next",
+            "parameters": {
+              "concurrency": 2,
+              "max_claims": 16,
+              "max_dispatches": 16,
+              "per_account_limit": 0,
+              "pool": "default",
+              "profiles": {
+                "worker": {
+                  "workflow": ".github/workflows/worker.lock.yml"
+                }
+              }
+            }
+          },
+          "actor": {
+            "role": "dispatcher",
+            "repository": "owner/repo",
+            "workflow": ".github/workflows/dispatcher.lock.yml",
+            "run_id": "207",
+            "run_attempt": 1
+          },
+          "at": 1,
+          "operations": [
+            {
+              "kind": "Observation",
+              "observation_id": "o-closer",
+              "resource": {
+                "kind": "issue",
+                "host": "github.com",
+                "repository": "owner/repo",
+                "repository_id": "1",
+                "resource_id": "55",
+                "number": "5"
+              },
+              "condition": "completed",
+              "state": "ready",
+              "state_reason": "completed",
+              "approved_by": "583231"
+            },
+            {
+              "kind": "Claim",
+              "work_id": "8687a391f089495f34a86578e4c515c9d758c7354fe66f033fe646e7d019b96b",
+              "claim_id": "c_207",
+              "dispatch_id": "d_207",
+              "handle": "h1"
+            }
+          ]
+        },
+        "code": "observation_invalid"
+      },
+      {
+        "name": "ready approval without its approver",
+        "base": 9,
+        "extra": [],
+        "commit": {
+          "version": 4,
+          "id": "q_b3be174f40dc1a4ce001f10f4248c6b20d8bf5302e283f4e914323b9dc44b934",
+          "previous": "q_9c7434c17ec9d7b9ff86fed2ae566cea09e72417d7a187ccf21f74ed6a32402d",
+          "request": {
+            "id": "request:318c586b5564e29d059833bb339c0aee89ce236dc86a98e6b0a786fecd58a50f",
+            "kind": "dispatch_next",
+            "parameters": {
+              "concurrency": 2,
+              "max_claims": 16,
+              "max_dispatches": 16,
+              "per_account_limit": 0,
+              "pool": "default",
+              "profiles": {
+                "worker": {
+                  "workflow": ".github/workflows/worker.lock.yml"
+                }
+              }
+            }
+          },
+          "actor": {
+            "role": "dispatcher",
+            "repository": "owner/repo",
+            "workflow": ".github/workflows/dispatcher.lock.yml",
+            "run_id": "208",
+            "run_attempt": 1
+          },
+          "at": 1,
+          "operations": [
+            {
+              "kind": "Observation",
+              "observation_id": "o-approval-ready",
+              "resource": {
+                "kind": "issue",
+                "host": "github.com",
+                "repository": "owner/repo",
+                "repository_id": "1",
+                "resource_id": "55",
+                "number": "5"
+              },
+              "condition": "approved",
+              "state": "ready",
+              "state_reason": "completed"
+            },
+            {
+              "kind": "Claim",
+              "work_id": "8687a391f089495f34a86578e4c515c9d758c7354fe66f033fe646e7d019b96b",
+              "claim_id": "c_208",
+              "dispatch_id": "d_208",
+              "handle": "h1"
+            }
+          ]
+        },
+        "code": "observation_invalid"
+      },
+      {
+        "name": "approval closed as not planned",
+        "base": 9,
+        "extra": [],
+        "commit": {
+          "version": 4,
+          "id": "q_69800779cc502e3fbfa037ac0f96fd4c0c40ae8fd577782df38046ee13134228",
+          "previous": "q_9c7434c17ec9d7b9ff86fed2ae566cea09e72417d7a187ccf21f74ed6a32402d",
+          "request": {
+            "id": "request:fb6dd080e9f47c58b7c6caa645dc099c0cf5e7af79545a615224265a0f9e6d80",
+            "kind": "dispatch_next",
+            "parameters": {
+              "concurrency": 2,
+              "max_claims": 16,
+              "max_dispatches": 16,
+              "per_account_limit": 0,
+              "pool": "default",
+              "profiles": {
+                "worker": {
+                  "workflow": ".github/workflows/worker.lock.yml"
+                }
+              }
+            }
+          },
+          "actor": {
+            "role": "dispatcher",
+            "repository": "owner/repo",
+            "workflow": ".github/workflows/dispatcher.lock.yml",
+            "run_id": "209",
+            "run_attempt": 1
+          },
+          "at": 1,
+          "operations": [
+            {
+              "kind": "Observation",
+              "observation_id": "o-approval-ready",
+              "resource": {
+                "kind": "issue",
+                "host": "github.com",
+                "repository": "owner/repo",
+                "repository_id": "1",
+                "resource_id": "55",
+                "number": "5"
+              },
+              "condition": "approved",
+              "state": "ready",
+              "state_reason": "not_planned",
+              "approved_by": "583231"
+            },
+            {
+              "kind": "Claim",
+              "work_id": "8687a391f089495f34a86578e4c515c9d758c7354fe66f033fe646e7d019b96b",
+              "claim_id": "c_209",
+              "dispatch_id": "d_209",
+              "handle": "h1"
+            }
+          ]
+        },
+        "code": "observation_invalid"
+      },
+      {
+        "name": "second successor pinned to one approval Issue",
+        "base": 11,
+        "extra": [
+          {
+            "version": 4,
+            "id": "q_d630dc58e8a0ebff56383592605de0cabca1a455145e237e1791c09603fd4c24",
+            "previous": "q_1adcf17b77f3bbba7f07ec08df7969eeb11467279959964a4f6ecae36c9b2cce",
+            "request": {
+              "id": "request:cb069b733716dd1a5386dfa572f1dd2df8942cc32982399de4b2319917adb241",
+              "kind": "launch",
+              "parameters": {
+                "dispatch_id": "d_952c7b14793a92d3e50c004a26b07a1d573434effdcf8016fa837b58073d7769_1"
+              }
+            },
+            "actor": {
+              "role": "dispatcher",
+              "repository": "owner/repo",
+              "workflow": ".github/workflows/dispatcher.lock.yml",
+              "run_id": "204",
+              "run_attempt": 1
+            },
+            "at": 1,
+            "operations": [
+              {
+                "kind": "Dispatch",
+                "dispatch_id": "d_952c7b14793a92d3e50c004a26b07a1d573434effdcf8016fa837b58073d7769_1",
+                "state": "started"
+              }
+            ]
+          },
+          {
+            "version": 4,
+            "id": "q_f7e3f92c0b4656d5f05f4ddb9fe08abd33b9007ad56cfe49ef4c72b3a9a863df",
+            "previous": "q_d630dc58e8a0ebff56383592605de0cabca1a455145e237e1791c09603fd4c24",
+            "request": {
+              "id": "request:1deb6df81518a29b9529b65112ad1a8b762c67ec321fe486f57685df3c0a33f2",
+              "kind": "bind",
+              "parameters": {
+                "dispatch_id": "d_952c7b14793a92d3e50c004a26b07a1d573434effdcf8016fa837b58073d7769_1"
+              }
+            },
+            "actor": {
+              "role": "worker",
+              "repository": "owner/repo",
+              "workflow": ".github/workflows/worker.lock.yml",
+              "run_id": "24",
+              "run_attempt": 1
+            },
+            "at": 1,
+            "operations": [
+              {
+                "kind": "Bound",
+                "dispatch_id": "d_952c7b14793a92d3e50c004a26b07a1d573434effdcf8016fa837b58073d7769_1",
+                "run_id": "24",
+                "run_attempt": 1
+              }
+            ]
+          }
+        ],
+        "commit": {
+          "version": 4,
+          "id": "q_4ea4dd629b0a0cfc24f956e265124ec73a2606c37f739eba4fc015a91e3d5c5a",
+          "previous": "q_f7e3f92c0b4656d5f05f4ddb9fe08abd33b9007ad56cfe49ef4c72b3a9a863df",
+          "request": {
+            "id": "request:6a833dd4c7d6446a86e3e4bc8d5e887e807256fe57ad0791e508d3214ffcab7c",
+            "kind": "finish",
+            "parameters": {
+              "dispatch_id": "d_952c7b14793a92d3e50c004a26b07a1d573434effdcf8016fa837b58073d7769_1"
+            }
+          },
+          "actor": {
+            "role": "worker",
+            "repository": "owner/repo",
+            "workflow": ".github/workflows/worker.lock.yml",
+            "run_id": "24",
+            "run_attempt": 1
+          },
+          "at": 1,
+          "operations": [
+            {
+              "kind": "Completion",
+              "work_id": "8687a391f089495f34a86578e4c515c9d758c7354fe66f033fe646e7d019b96b",
+              "claim_id": "c_952c7b14793a92d3e50c004a26b07a1d573434effdcf8016fa837b58073d7769_1",
+              "dispatch_id": "d_952c7b14793a92d3e50c004a26b07a1d573434effdcf8016fa837b58073d7769_1",
+              "claim_handle": "h1",
+              "effects": []
+            },
+            {
+              "kind": "Work",
+              "work_id": "8d68b75c6dbf6ae259ede21552cbb3d3d753e9ce91e884ff9e138f7151bee382",
+              "graph_id": "graph",
+              "node_key": "continuation:8687a391f089495f34a86578e4c515c9d758c7354fe66f033fe646e7d019b96b",
+              "pool": "default",
+              "priority": 3,
+              "fairness_key": "",
+              "worker_profile": "worker",
+              "payload": {
+                "task": "audit pages",
+                "effect_contract": {
+                  "kind": "none"
+                }
+              },
+              "depends_on": [
+                {
+                  "kind": "work",
+                  "work_id": "8687a391f089495f34a86578e4c515c9d758c7354fe66f033fe646e7d019b96b"
+                },
+                {
+                  "kind": "issue",
+                  "resource": {
+                    "kind": "issue",
+                    "host": "github.com",
+                    "repository": "owner/repo",
+                    "repository_id": "1",
+                    "resource_id": "55",
+                    "number": "5"
+                  },
+                  "condition": "approved"
+                }
+              ],
+              "continuation": {
+                "route": "issue",
+                "message": "Audit page 4",
+                "remaining": 0
+              },
+              "subject": {
+                "kind": "issue",
+                "host": "github.com",
+                "repository": "owner/repo",
+                "repository_id": "1",
+                "resource_id": "9007199254740993",
+                "number": "7"
+              }
+            }
+          ]
+        },
+        "code": "issue_binding_conflict"
+      }
+    ]
   }
 }

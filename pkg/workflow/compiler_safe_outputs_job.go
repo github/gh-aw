@@ -376,6 +376,9 @@ func (c *Compiler) buildWorkQueueFinishStep(data *WorkflowData) []string {
 			env = append(env, "          GH_AW_SAFE_OUTPUTS_STAGED: \"true\"\n")
 		}
 	}
+	if isQueueRoutedRequestContinuation(data.SafeOutputs) {
+		env = append(env, c.workQueueContinuationFinishEnv(data)...)
+	}
 	steps = append(steps, env...)
 	return append(steps,
 		"        with:\n",
@@ -550,6 +553,7 @@ func hasHandlerManagerTypes(data *WorkflowData) bool {
 		data.SafeOutputs.CreateCheckRun != nil ||
 		data.SafeOutputs.MissingTool != nil ||
 		data.SafeOutputs.MissingData != nil ||
+		isRoutedRequestContinuation(data.SafeOutputs) || // Process Safe Outputs is the only route consumer
 		data.SafeOutputs.AssignToAgent != nil || // assign_to_agent is now handled by the handler manager
 		data.SafeOutputs.CreateAgentSessions != nil || // create_agent_session is now handled by the handler manager
 		data.SafeOutputs.UploadArtifact != nil || // upload_artifact is handled inline in the handler loop

@@ -13,6 +13,7 @@ const { isProbingNoopMessage } = require("./intent_probe.cjs");
 const { buildEmptyOutputOutcome, collectOutcomeSession, hasFailedFinalResult } = require("./empty_output_outcome.cjs");
 const { normalizeSafeOutputName, normalizeSafeOutputConfig } = require("./safe_output_names.cjs");
 const { isDependencyUnsupportedType, validateSubmissionMetadata } = require("./safe_output_submission.cjs");
+const { routedRequestError } = require("./request_continuation_routes.cjs");
 
 const MENTION_AWARE_OUTPUT_TYPES = new Set(["add_comment", "close_discussion", "create_discussion", "create_issue", "create_pull_request", "create_pull_request_review_comment", "reply_to_pull_request_review_comment"]);
 
@@ -300,6 +301,16 @@ async function main() {
           rejectItem(`Line ${i + 1}: depends-on is not supported for ${itemType}, which executes outside the safe-output handler manager.`);
           continue;
         }
+        // A routed request is rejected, never truncated, before lossy sanitization; it
+        // carries only its message (route, destination and budget are compiled).
+        const routedContinuation = itemType === "request_continuation" && expectedOutputTypes[itemType]?.route !== undefined;
+        if (routedContinuation) {
+          const routedError = routedRequestError(item);
+          if (routedError) {
+            rejectItem(`Line ${i + 1}: ${routedError}`);
+            continue;
+          }
+        }
         if (!queueScope && itemType === "noop" && isProbingNoopMessage(item.message)) {
           core.info(`[INGESTION] Line ${i + 1}: Ignoring probing noop message (does not count against the noop budget): ${JSON.stringify(item.message)}`);
           continue;
@@ -348,6 +359,11 @@ async function main() {
           // Use the normalized item (with sanitized/validated fields) rather
           // than the raw input, so downstream consumers see the canonical form.
           core.info(`Line ${i + 1}: Valid ${itemType} item`);
+          const sanitizedRoutedError = routedContinuation ? routedRequestError(validationResult.normalizedItem) : null;
+          if (sanitizedRoutedError) {
+            rejectItem(`Line ${i + 1}: ${sanitizedRoutedError} after sanitization`);
+            continue;
+          }
           parsedItems.push(queueScope ? { ...validationResult.normalizedItem, ...(item.claim_handle ? { claim_handle: item.claim_handle } : {}) } : validationResult.normalizedItem);
         } else {
           // Fall back to validateItemWithSafeJobConfig for unknown types

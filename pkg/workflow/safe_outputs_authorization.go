@@ -291,7 +291,7 @@ func resolveNativeSafeOutputAuthorizations(config *SafeOutputsConfig) (map[strin
 		if handler.ToolName == "" || !hasSafeOutputFieldSet(config, handler.StructField) {
 			continue
 		}
-		requirement, err := effectiveSafeOutputAuthorization(config.Authorization, nativeSafeOutputAuthorization(config, handler), handler.Builtin)
+		requirement, err := effectiveSafeOutputAuthorization(config.Authorization, nativeSafeOutputAuthorization(config, handler), safeOutputHandlerBuiltin(config, handler))
 		if err != nil {
 			return nil, fmt.Errorf("safe-output %q: %w", handler.Key, err)
 		}
@@ -371,6 +371,14 @@ func resolveWorkflowSafeOutputAuthorizations(data *WorkflowData) error {
 			config.AuthorizationCoverage["call_workflow:launch:"+stringutil.NormalizeSafeOutputIdentifier(name)] = config.AuthorizationCoverage["call_workflow"]
 		}
 	}
+	if isQueueRoutedRequestContinuation(config) {
+		// Queue child admission is authorized independently by the worker finalizer.
+		coverage := config.AuthorizationCoverage["request_continuation"]
+		if coverage == "manager" {
+			coverage = "queue"
+		}
+		config.AuthorizationCoverage[requestContinuationAdmitAuthorization] = coverage
+	}
 	internal := map[string]bool{
 		commentMemoryHandlerKey:           buildCommentMemoryHandlerConfig(data.CommentMemoryConfig, config.Footer, config.BodyFooter) != nil,
 		ledgerMutationHandlerKey:          buildLedgerMutationHandlerConfig(data.RepoMemoryConfig) != nil,
@@ -423,7 +431,7 @@ func buildSafeOutputAuthorizationCoverage(config *SafeOutputsConfig) error {
 			continue
 		}
 		if field, ok := safeOutputPointerFieldValue(config, handler.StructField); ok && !field.IsNil() {
-			add(handler.ToolName, safeOutputAuthorizationExecutor(handler.ToolName), handler.Builtin, safeOutputHandlerStaged(field))
+			add(handler.ToolName, safeOutputAuthorizationExecutor(handler.ToolName), safeOutputHandlerBuiltin(config, handler), safeOutputHandlerStaged(field))
 		}
 	}
 	for name, script := range config.Scripts {
@@ -572,7 +580,7 @@ func addSafeOutputAuthorizationRuntimeConfig(target map[string]any, config *Safe
 	}
 	for _, handler := range safeOutputHandlers {
 		if entry, ok := target[handler.ToolName].(map[string]any); ok && safeOutputAuthorizationEnabled(config) {
-			entry["builtin"] = handler.Builtin
+			entry["builtin"] = safeOutputHandlerBuiltin(config, handler)
 			entry["authorization_executor"] = safeOutputAuthorizationExecutor(handler.ToolName)
 			if requirement := config.AuthorizationRequirements[handler.ToolName]; requirement != nil {
 				entry["authorization"] = requirement

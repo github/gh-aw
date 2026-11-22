@@ -19,7 +19,7 @@ type operationFields struct {
 
 var opFields = map[string]operationFields{
 	"Work":              {workRequired, workOptional},
-	"Observation":       {[]string{"kind", "observation_id", "resource", "condition", "state"}, []string{"state_reason", "merged", "merge_commit"}},
+	"Observation":       {[]string{"kind", "observation_id", "resource", "condition", "state"}, []string{"state_reason", "merged", "merge_commit", "approved_by"}},
 	"Claim":             {[]string{"kind", "work_id", "claim_id", "dispatch_id", "handle"}, nil},
 	"Dispatch":          {[]string{"kind", "dispatch_id", "state"}, nil},
 	"Bound":             {[]string{"kind", "dispatch_id", "run_id", "run_attempt"}, nil},
@@ -63,11 +63,21 @@ func validateObservationValue(operation object) error {
 	if kind == "issue" && (has(operation, "merged") || has(operation, "merge_commit")) {
 		return queueError("observation_invalid", "an Issue cannot carry pull request merge evidence")
 	}
+	// A ready approval names the writer who closed the Issue as completed; nothing else carries a closer.
+	approval := condition == "approved" && state == "ready"
+	if approval != has(operation, "approved_by") {
+		return queueError("observation_invalid", "approved_by belongs exactly to a ready approved Issue gate")
+	}
+	if approval {
+		if _, err := decimal(operation["approved_by"], "approved_by", "observation_invalid"); err != nil {
+			return err
+		}
+	}
 	if state == "ready" {
 		if kind == "pull_request" && (operation["merged"] != true || operation["merge_commit"] == nil || operation["merge_commit"] == "") {
 			return queueError("observation_invalid", "a ready pull request gate requires its merge commit")
 		}
-		if condition == "completed" && operation["state_reason"] != "completed" {
+		if (condition == "completed" || approval) && operation["state_reason"] != "completed" {
 			return queueError("observation_invalid", "a ready completed Issue gate requires state_reason completed")
 		}
 	}
@@ -168,6 +178,10 @@ func authorizeOperation(role, requestKind string, operation operationRecord) err
 	}
 	if requestKind == "migrate" && role != "administrator" {
 		return unauthorized
+	}
+	// Only a finish hands off: submit and migrate cannot mint a continuation (or, structurally, its approval gate).
+	if kind == "Work" && requestKind != "finish" && has(operation.value, "continuation") {
+		return queueError("request_invalid", "%s cannot carry a continuation", requestKind)
 	}
 	return nil
 }
@@ -323,20 +337,83 @@ func (state *Projection) applyCommitValue(value any) error {
 	if err := state.checkCommitLineage(commit); err != nil {
 		return err
 	}
-	if err := state.admitFreshWork(record.operations); err != nil {
-		return err
+	// submit/migrate admit their batch up front (forward references); a finish
+	// admits each continuation right after its paired Completion.
+	if commit.Request.Kind != "finish" {
+		if err := state.admitFreshWork(record.operations); err != nil {
+			return err
+		}
 	}
 	ordinal := state.Commits
+	var previous *operationRecord
 	for index, operation := range record.operations {
+		if operation.kind == "Work" && commit.Request.Kind == "finish" {
+			if err := state.admitContinuation(commit, operation, previous); err != nil {
+				return err
+			}
+		}
 		if err := state.applyOperation(operation.kind, operation.data, commit, ordinal, index); err != nil {
 			return err
 		}
+		previous = &record.operations[index]
 	}
 	state.Requests[commit.Request.ID] = struct{}{}
 	state.Tip = commit.ID
 	state.Commits++
 	state.Transactions = append(state.Transactions, commit)
 	return nil
+}
+
+// admitContinuation admits a finish-carried Work: fresh, immediately after its
+// parent's Completion (previous) of the request's Dispatch, exactly ContinuationChild
+// of that parent, and validated against the projection that already counts the
+// parent as completed.
+func (state *Projection) admitContinuation(commit QueueCommit, operation operationRecord, previous *operationRecord) error {
+	parameters, err := decodeParameters[DispatchIDParameters](commit.Request)
+	if err != nil {
+		return err
+	}
+	if previous == nil || previous.kind != "Completion" || previous.value["dispatch_id"] != parameters.DispatchID {
+		return queueError("request_invalid", "a finish-carried Work must immediately follow its parent's Completion of the request's Dispatch")
+	}
+	if _, exists := state.Works[operation.workID]; exists {
+		return queueError("request_invalid", "a continuation must be fresh Work")
+	}
+	parentID, ok := previous.value["work_id"].(string)
+	if !ok {
+		return queueError("request_invalid", "a finish-carried Work must be the continuation of a Completion in this commit")
+	}
+	parent := state.Works[parentID]
+	var work WorkDefinition
+	if err := decodeInto(operation.value, &work); err != nil {
+		return err
+	}
+	if work.Continuation == nil || parent == nil || parent.CompletionID != commit.ID {
+		return queueError("request_invalid", "a finish-carried Work must be the continuation of a Completion in this commit")
+	}
+	var approval *Resource
+	for _, edge := range work.DependsOn {
+		if edge.Kind == "issue" && edge.Condition == "approved" {
+			approval = edge.Resource
+			break
+		}
+	}
+	child, err := ContinuationChild(parent.WorkDefinition, *work.Continuation, approval)
+	if err != nil {
+		return err
+	}
+	expected, err := CanonicalValue(child)
+	if err != nil {
+		return err
+	}
+	if !bytes.Equal(expected, operation.data) {
+		return queueError("request_invalid", "a continuation must inherit exactly from its parent")
+	}
+	// An automatic hop spends one unit of its parent's budget; a zero balance cannot hand off.
+	if work.Continuation.Route == "workqueue" && parent.Continuation != nil && work.Continuation.Remaining >= parent.Continuation.Remaining {
+		return queueError("request_invalid", "an automatic continuation must decrease its remaining budget")
+	}
+	return state.validateGraphAdmission([]any{operation.value})
 }
 
 // checkCommitLineage requires a commit to extend the causal tip from the queue

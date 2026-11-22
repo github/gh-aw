@@ -5,11 +5,13 @@
 const h = require("./work_queue_test_helpers.cjs");
 const { buildCommit, checkpointCommit, newRequest, replayTransactions, serializeProjection } = require("./work_queue_replay.cjs");
 const { assignmentForDispatch, planDispatch } = require("./work_queue_scheduler.cjs");
+const { continuationChild } = require("./work_queue_graph.cjs");
 
 const NEXT_PARAMETERS = { pool: "default", max_claims: 16, max_dispatches: 16, concurrency: 2, per_account_limit: 0, profiles: h.PROFILES };
 const NEXT_REQUEST = "request:prefix-fixture";
 const RESOURCE = { kind: "issue", host: "github.com", repository: "owner/repo", repository_id: "1", resource_id: "9007199254740993", number: "7" };
 const BACKING = { kind: "issue", host: "github.com", repository: "owner/repo", repository_id: "1", resource_id: "8", number: "8" };
+const APPROVAL = { kind: "issue", host: "github.com", repository: "owner/repo", repository_id: "1", resource_id: "55", number: "5" };
 
 const dispatcherRun = runId => ({ ...h.dispatcher, run_id: runId });
 
@@ -158,6 +160,109 @@ function migration() {
   return { commits: log, canonical: h.ledgerText(log), projection: serializeProjection(replayTransactions(log)), late_migrate: { commit: late, code: "request_invalid" } };
 }
 
+function completion(state, dispatchId) {
+  const claim = state.claims.get(state.dispatches.get(dispatchId).claims[0]);
+  return { kind: "Completion", work_id: claim.work_id, claim_id: claim.claim_id, dispatch_id: dispatchId, claim_handle: claim.handle, effects: [] };
+}
+
+function approvalObservation(state, extra = {}) {
+  return { kind: "Observation", observation_id: `o-approval-${state}`, resource: APPROVAL, condition: "approved", state, ...extra };
+}
+
+/** Queue handoffs: a workqueue continuation, then an issue-gated one released by an approval. */
+function continuationLedger() {
+  const p = h.work("p", { payload: { task: "audit pages", effect_contract: { kind: "none" } }, subject: RESOURCE });
+  let log = h.submit([], [p]);
+  let step = h.dispatchNext(log, NEXT_PARAMETERS, dispatcherRun("201"));
+  log = h.launch(step.log, step.decision.dispatches[0], true, dispatcherRun("201"));
+  const dispatchP = step.decision.dispatches[0];
+  const run21 = h.workerActor("21");
+  log = h.bind(log, dispatchP, run21);
+  const boundP = log;
+  const c1 = continuationChild(p, { route: "workqueue", message: "Audit page 2", remaining: 1 });
+  log = h.commit(log, run21, "finish", { dispatch_id: dispatchP }, [completion(replayTransactions(log), dispatchP), c1]);
+  step = h.dispatchNext(log, NEXT_PARAMETERS, dispatcherRun("202"));
+  const dispatchC1 = step.decision.dispatches[0];
+  log = h.launch(step.log, dispatchC1, true, dispatcherRun("202"));
+  const run22 = h.workerActor("22");
+  log = h.bind(log, dispatchC1, run22);
+  const boundC1 = log;
+  const c2 = continuationChild(c1, { route: "issue", message: "Audit page 3", remaining: 0 }, APPROVAL);
+  log = h.commit(log, run22, "finish", { dispatch_id: dispatchC1 }, [completion(replayTransactions(log), dispatchC1), c2]);
+  const gated = log;
+  log = h.dispatchNext(log, NEXT_PARAMETERS, dispatcherRun("203"), [approvalObservation("waiting")]).log;
+  step = h.dispatchNext(log, NEXT_PARAMETERS, dispatcherRun("204"), [approvalObservation("ready", { state_reason: "completed", approved_by: "583231" })]);
+  log = step.log;
+  const dispatchC2 = step.decision.dispatches[0];
+  const state = replayTransactions(log);
+  const checkpoint = checkpointCommit(state, h.reconciler, 1);
+  const claimRequest = (prefix, run, observations) => {
+    const claim = { kind: "Claim", work_id: c2.work_id, claim_id: `c_${run}`, dispatch_id: `d_${run}`, handle: "h1" };
+    return raw(prefix, dispatcherRun(run), "dispatch_next", NEXT_PARAMETERS, [...observations, claim]);
+  };
+  const finishP = operations => raw(boundP, run21, "finish", { dispatch_id: dispatchP }, [completion(replayTransactions(boundP), dispatchP), ...operations]);
+  const preexisting = h.submit(boundP, [h.work(c1.node_key)]);
+  const boundC2 = h.bind(h.launch(log, dispatchC2, true, dispatcherRun("204")), dispatchC2, h.workerActor("24"));
+  // An ordinary producer cannot mint the continuation member, even for a fresh graph.
+  const forged = { ...c1, graph_id: "forged", work_id: h.work(c1.node_key, { graph_id: "forged" }).work_id, depends_on: [] };
+  const cases = [
+    { name: "continuation with a different worker profile", prefix: boundP, commit: finishP([{ ...c1, worker_profile: "other" }]), code: "request_invalid" },
+    { name: "continuation without its parent edge", prefix: boundP, commit: finishP([{ ...c1, depends_on: [] }]), code: "request_invalid" },
+    { name: "unpaired continuation", prefix: boundP, commit: raw(boundP, run21, "finish", { dispatch_id: dispatchP }, [c1, completion(replayTransactions(boundP), dispatchP)]), code: "request_invalid" },
+    { name: "two continuations for one Completion", prefix: boundP, commit: finishP([c1, c1]), code: "request_invalid" },
+    { name: "pre-existing deterministic continuation ID", prefix: preexisting, commit: raw(preexisting, run21, "finish", { dispatch_id: dispatchP }, [completion(replayTransactions(preexisting), dispatchP), c1]), code: "request_invalid" },
+    {
+      name: "issue continuation gated on completed",
+      prefix: boundP,
+      commit: finishP([{ ...c1, continuation: { ...c1.continuation, route: "issue", remaining: 0 }, depends_on: [...c1.depends_on, { kind: "issue", resource: APPROVAL, condition: "completed" }] }]),
+      code: "request_invalid",
+    },
+    { name: "oversized Unicode continuation message", prefix: boundP, commit: finishP([{ ...c1, continuation: { ...c1.continuation, message: "é".repeat(8193) } }]), code: "resource_limit" },
+    {
+      name: "automatic continuation without a smaller budget",
+      prefix: boundC1,
+      commit: raw(boundC1, run22, "finish", { dispatch_id: dispatchC1 }, [completion(replayTransactions(boundC1), dispatchC1), continuationChild(c1, { route: "workqueue", message: "Audit page 3", remaining: 1 })]),
+      code: "request_invalid",
+    },
+    { name: "submit minting a continuation", prefix: log, commit: raw(log, h.producer, "submit", { work_ids: [forged.work_id] }, [forged]), code: "request_invalid" },
+    { name: "Claim before approval", prefix: gated, commit: claimRequest(gated, "205", []), code: "approval_required" },
+    {
+      name: "Claim on a completed observation of the approval Issue",
+      prefix: gated,
+      commit: claimRequest(gated, "206", [{ kind: "Observation", observation_id: "o-completed", resource: APPROVAL, condition: "completed", state: "ready", state_reason: "completed" }]),
+      code: "approval_required",
+    },
+    {
+      name: "approved_by on a completed gate",
+      prefix: gated,
+      commit: claimRequest(gated, "207", [{ kind: "Observation", observation_id: "o-closer", resource: APPROVAL, condition: "completed", state: "ready", state_reason: "completed", approved_by: "583231" }]),
+      code: "observation_invalid",
+    },
+    { name: "ready approval without its approver", prefix: gated, commit: claimRequest(gated, "208", [approvalObservation("ready", { state_reason: "completed" })]), code: "observation_invalid" },
+    { name: "approval closed as not planned", prefix: gated, commit: claimRequest(gated, "209", [approvalObservation("ready", { state_reason: "not_planned", approved_by: "583231" })]), code: "observation_invalid" },
+    {
+      name: "second successor pinned to one approval Issue",
+      prefix: boundC2,
+      commit: raw(boundC2, h.workerActor("24"), "finish", { dispatch_id: dispatchC2 }, [completion(replayTransactions(boundC2), dispatchC2), continuationChild(c2, { route: "issue", message: "Audit page 4", remaining: 0 }, APPROVAL)]),
+      code: "issue_binding_conflict",
+    },
+  ];
+  return {
+    commits: log,
+    canonical: h.ledgerText(log),
+    prefixes: log.map((_, index) => summary(replayTransactions(log.slice(0, index + 1)))),
+    projection: serializeProjection(state),
+    assignment: assignmentForDispatch(state, dispatchC2),
+    checkpoint: { commit: checkpoint, projection: serializeProjection(replayTransactions([checkpoint])) },
+    // Each case replays continuation.commits[0:base], then `extra`, then `commit`.
+    rejections: cases.map(({ name, prefix, commit, code }) => {
+      const diverged = prefix.findIndex((entry, index) => entry !== log[index]);
+      const base = diverged === -1 ? Math.min(prefix.length, log.length) : diverged;
+      return { name, base, extra: prefix.slice(base), commit, code };
+    }),
+  };
+}
+
 function buildFixtures() {
   const scenario = lifecycle();
   const { log } = scenario;
@@ -176,6 +281,7 @@ function buildFixtures() {
     checkpoint: { commit: checkpoint, projection: serializeProjection(replayTransactions([checkpoint])) },
     rejections: rejections(log, scenario),
     migration: migration(),
+    continuation: continuationLedger(),
   };
 }
 

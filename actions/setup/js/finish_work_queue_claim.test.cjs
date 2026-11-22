@@ -3,7 +3,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import fs from "fs";
 import os from "os";
 import path from "path";
-import { authorizeWorkerClaim, main, readClaimEffects } from "./finish_work_queue_claim.cjs";
+import { authorizeWorkerClaim, finishOperations, main, readClaimEffects } from "./finish_work_queue_claim.cjs";
+import { replayTransactions } from "./work_queue_replay.cjs";
+import { continuationChild } from "./work_queue_graph.cjs";
+import { messageDigest } from "./request_continuation_routes.cjs";
 import { readWorkQueueLog } from "./work_queue_store.cjs";
 import { workerContext, workerPolicy, workerQueue } from "./work_queue_worker.test_helpers.cjs";
 import { ledgerText, release } from "./work_queue_test_helpers.cjs";
@@ -129,6 +132,51 @@ describe("finish step", () => {
       h2: [{ kind: "add_comment", resource: { repository: "owner/repo" } }],
     });
     expect(readClaimEffects(tempFile("missing.jsonl")).size).toBe(0);
+  });
+});
+
+describe("finishOperations with routed continuations", () => {
+  const message = "Audit page 2";
+  function plan(queue, { status = "ready", route = "workqueue", maxDepth = 1, outcome = "completed", entry = undefined, policy = queue.policy } = {}) {
+    const state = replayTransactions(queue.log);
+    const claim = queue.assignment.claims[0];
+    const receipt = { claim_handle: "h1", claim_id: claim.claim_id, message_sha256: messageDigest(message), status };
+    const entries = new Map([["h1", entry === undefined ? { message, message_sha256: receipt.message_sha256, index: 0, receipt } : entry]]);
+    return { state, claim, operations: () => finishOperations(state, queue.dispatchId, new Map([["h1", outcome]]), new Map(), policy, { config: { route, maxDepth }, entries }) };
+  }
+
+  it("places the successor immediately after its parent's Completion", () => {
+    const queue = workerQueue();
+    const { state, claim, operations } = plan(queue);
+    const parent = state.works.get(claim.work_id);
+    expect(operations()).toEqual([
+      { kind: "Completion", work_id: claim.work_id, claim_id: claim.claim_id, dispatch_id: queue.dispatchId, claim_handle: "h1", effects: [] },
+      continuationChild(parent, { route: "workqueue", message, remaining: 0 }, undefined),
+    ]);
+  });
+
+  it("derives the remaining budget from the ledger and rejects a disagreeing receipt", () => {
+    const queue = workerQueue();
+    expect(plan(queue, { status: "ready", maxDepth: 3 }).operations()[1].continuation.remaining).toBe(2);
+    expect(() => plan(queue, { status: "depth_limit" }).operations()).toThrow(/depth status/);
+  });
+
+  it("never falls back to a bare Completion for a request without a receipt", () => {
+    expect(() => plan(workerQueue(), { entry: null }).operations()).toThrow(/without an accepted receipt/);
+  });
+
+  it("emits only the cancellation for a failed finish", () => {
+    const queue = workerQueue();
+    expect(
+      plan(queue, { outcome: "failed" })
+        .operations()
+        .map(operation => operation.kind)
+    ).toEqual(["ClaimCancellation"]);
+  });
+
+  it("enforces pending_limit on the net transition", () => {
+    expect(plan(workerQueue(), { policy: { ...workerPolicy(), pending_limit: 1 } }).operations()).toHaveLength(2);
+    expect(() => plan(workerQueue({ count: 2 }), { policy: { ...workerPolicy(), pending_limit: 1 } }).operations()).toThrow(/pending_limit/);
   });
 });
 

@@ -13,13 +13,11 @@ import (
 // Shared Go/JS conformance fixtures; work_queue_conformance_checks.cjs asserts
 // the same fields against the JS engine.
 
-type prefixFixture struct {
-	Version        int                `json:"version"`
-	NextParameters DispatchParameters `json:"next_parameters"`
-	NextRequestID  string             `json:"next_request_id"`
-	Commits        []json.RawMessage  `json:"commits"`
-	Canonical      string             `json:"canonical"`
-	Prefixes       []struct {
+// ledgerFixture is one generated ledger with its expectations.
+type ledgerFixture struct {
+	Commits   []json.RawMessage `json:"commits"`
+	Canonical string            `json:"canonical"`
+	Prefixes  []struct {
 		Tip        string                    `json:"tip"`
 		Commits    int                       `json:"commits"`
 		Stats      Stats                     `json:"stats"`
@@ -37,11 +35,20 @@ type prefixFixture struct {
 		Projection json.RawMessage `json:"projection"`
 	} `json:"checkpoint"`
 	Rejections []struct {
-		Name   string            `json:"name"`
+		Name string `json:"name"`
+		// Base truncates Commits before Extra; absent means the whole ledger.
+		Base   *int              `json:"base"`
 		Extra  []json.RawMessage `json:"extra"`
 		Commit json.RawMessage   `json:"commit"`
 		Code   string            `json:"code"`
 	} `json:"rejections"`
+}
+
+type prefixFixture struct {
+	Version        int                `json:"version"`
+	NextParameters DispatchParameters `json:"next_parameters"`
+	NextRequestID  string             `json:"next_request_id"`
+	ledgerFixture
 	Migration struct {
 		Commits     []json.RawMessage `json:"commits"`
 		Canonical   string            `json:"canonical"`
@@ -51,6 +58,7 @@ type prefixFixture struct {
 			Code   string          `json:"code"`
 		} `json:"late_migrate"`
 	} `json:"migration"`
+	Continuation ledgerFixture `json:"continuation"`
 }
 
 func loadFixture(t *testing.T, name string, target any) {
@@ -95,78 +103,23 @@ func TestSharedNativeConformanceFixtures(t *testing.T) {
 	var fixture prefixFixture
 	loadFixture(t, "canonical-prefix.json", &fixture)
 	require.Equal(t, Version, fixture.Version)
+	require.NotEmpty(t, fixture.Continuation.Commits)
 
-	t.Run("canonical wire", func(t *testing.T) {
-		require.Equal(t, fixture.Canonical, serializeRaw(t, fixture.Commits))
-		commits, err := Parse([]byte(fixture.Canonical))
-		require.NoError(t, err)
-		require.Len(t, commits, len(fixture.Commits))
-		for index, commit := range commits {
-			data, err := CanonicalValue(commit)
-			require.NoError(t, err)
-			require.Equal(t, canonicalJSON(t, fixture.Commits[index]), string(data))
+	for name, ledger := range map[string]ledgerFixture{"lifecycle": fixture.ledgerFixture, "continuation": fixture.Continuation} {
+		t.Run(name+" canonical wire", func(t *testing.T) { checkCanonicalWire(t, ledger) })
+		t.Run(name+" every prefix", func(t *testing.T) { checkLedgerPrefixes(t, ledger, fixture.NextParameters, fixture.NextRequestID) })
+		t.Run(name+" checkpoint", func(t *testing.T) { checkLedgerCheckpoint(t, ledger) })
+		for _, rejection := range ledger.Rejections {
+			t.Run(name+" rejection "+rejection.Name, func(t *testing.T) {
+				base := len(ledger.Commits)
+				if rejection.Base != nil {
+					base = *rejection.Base
+				}
+				records := append(append(append([]json.RawMessage{}, ledger.Commits[:base]...), rejection.Extra...), rejection.Commit)
+				_, err := ReplayRaw(records)
+				requireCode(t, err, rejection.Code)
+			})
 		}
-	})
-
-	t.Run("every prefix", func(t *testing.T) {
-		require.Len(t, fixture.Prefixes, len(fixture.Commits))
-		for index, expected := range fixture.Prefixes {
-			state, err := ReplayRaw(fixture.Commits[:index+1])
-			require.NoError(t, err, "prefix %d", index)
-			require.Equal(t, expected.Tip, state.Tip)
-			require.Equal(t, expected.Commits, state.Commits)
-			require.Equal(t, expected.Stats, state.Stats, "prefix %d", index)
-			for _, work := range state.Works {
-				require.Equal(t, map[string]any{"state": work.State, "attempts": float64(work.Attempts)}, expected.Works[work.NodeKey], "prefix %d work %s", index, work.NodeKey)
-			}
-			for id, dispatch := range state.Dispatches {
-				require.Equal(t, expected.Dispatches[id], dispatch.State)
-			}
-			decision, err := PlanDispatch(state, fixture.NextParameters, fixture.NextRequestID)
-			require.NoError(t, err)
-			require.Equal(t, expected.Next.Keys, nodeKeys(state, decision), "prefix %d", index)
-			require.Equal(t, expected.Next.Reason, decision.Reason, "prefix %d", index)
-		}
-		state, err := ReplayRaw(fixture.Commits)
-		require.NoError(t, err)
-		require.Equal(t, canonicalJSON(t, fixture.Projection), serializedProjection(t, state))
-		var assignment Assignment
-		require.NoError(t, json.Unmarshal(fixture.Assignment, &assignment))
-		actual, err := AssignmentForDispatch(state, assignment.DispatchID)
-		require.NoError(t, err)
-		data, err := CanonicalValue(actual)
-		require.NoError(t, err)
-		require.Equal(t, canonicalJSON(t, fixture.Assignment), string(data))
-	})
-
-	t.Run("checkpoint", func(t *testing.T) {
-		restored, err := ReplayRaw([]json.RawMessage{fixture.Checkpoint.Commit})
-		require.NoError(t, err)
-		require.Equal(t, canonicalJSON(t, fixture.Checkpoint.Projection), serializedProjection(t, restored))
-		folded, err := ReplayRaw(fixture.Commits)
-		require.NoError(t, err)
-		var left, right map[string]json.RawMessage
-		require.NoError(t, json.Unmarshal(fixture.Checkpoint.Projection, &left))
-		require.NoError(t, json.Unmarshal([]byte(serializedProjection(t, folded)), &right))
-		for _, field := range []string{"repository", "works", "claims", "dispatches", "observations", "work_creators"} {
-			require.Equal(t, canonicalJSON(t, left[field]), canonicalJSON(t, right[field]), field)
-		}
-		// The Go checkpoint builder reproduces the shared checkpoint projection.
-		var commit QueueCommit
-		require.NoError(t, json.Unmarshal(fixture.Checkpoint.Commit, &commit))
-		built, err := CheckpointCommit(folded, commit.Actor, commit.At)
-		require.NoError(t, err)
-		data, err := CanonicalValue(built)
-		require.NoError(t, err)
-		require.Equal(t, canonicalJSON(t, fixture.Checkpoint.Commit), string(data))
-	})
-
-	for _, rejection := range fixture.Rejections {
-		t.Run("rejection "+rejection.Name, func(t *testing.T) {
-			records := append(append(append([]json.RawMessage{}, fixture.Commits...), rejection.Extra...), rejection.Commit)
-			_, err := ReplayRaw(records)
-			requireCode(t, err, rejection.Code)
-		})
 	}
 
 	t.Run("migration", func(t *testing.T) {
@@ -177,6 +130,74 @@ func TestSharedNativeConformanceFixtures(t *testing.T) {
 		_, err = ReplayRaw(append(append([]json.RawMessage{}, fixture.Migration.Commits...), fixture.Migration.LateMigrate.Commit))
 		requireCode(t, err, fixture.Migration.LateMigrate.Code)
 	})
+}
+
+func checkCanonicalWire(t *testing.T, ledger ledgerFixture) {
+	t.Helper()
+	require.Equal(t, ledger.Canonical, serializeRaw(t, ledger.Commits))
+	commits, err := Parse([]byte(ledger.Canonical))
+	require.NoError(t, err)
+	require.Len(t, commits, len(ledger.Commits))
+	for index, commit := range commits {
+		data, err := CanonicalValue(commit)
+		require.NoError(t, err)
+		require.Equal(t, canonicalJSON(t, ledger.Commits[index]), string(data))
+	}
+}
+
+func checkLedgerPrefixes(t *testing.T, ledger ledgerFixture, next DispatchParameters, nextRequestID string) {
+	t.Helper()
+	require.Len(t, ledger.Prefixes, len(ledger.Commits))
+	for index, expected := range ledger.Prefixes {
+		state, err := ReplayRaw(ledger.Commits[:index+1])
+		require.NoError(t, err, "prefix %d", index)
+		require.Equal(t, expected.Tip, state.Tip)
+		require.Equal(t, expected.Commits, state.Commits)
+		require.Equal(t, expected.Stats, state.Stats, "prefix %d", index)
+		for _, work := range state.Works {
+			require.Equal(t, map[string]any{"state": work.State, "attempts": float64(work.Attempts)}, expected.Works[work.NodeKey], "prefix %d work %s", index, work.NodeKey)
+		}
+		for id, dispatch := range state.Dispatches {
+			require.Equal(t, expected.Dispatches[id], dispatch.State)
+		}
+		decision, err := PlanDispatch(state, next, nextRequestID)
+		require.NoError(t, err)
+		require.Equal(t, expected.Next.Keys, nodeKeys(state, decision), "prefix %d", index)
+		require.Equal(t, expected.Next.Reason, decision.Reason, "prefix %d", index)
+	}
+	state, err := ReplayRaw(ledger.Commits)
+	require.NoError(t, err)
+	require.Equal(t, canonicalJSON(t, ledger.Projection), serializedProjection(t, state))
+	var assignment Assignment
+	require.NoError(t, json.Unmarshal(ledger.Assignment, &assignment))
+	actual, err := AssignmentForDispatch(state, assignment.DispatchID)
+	require.NoError(t, err)
+	data, err := CanonicalValue(actual)
+	require.NoError(t, err)
+	require.Equal(t, canonicalJSON(t, ledger.Assignment), string(data))
+}
+
+func checkLedgerCheckpoint(t *testing.T, ledger ledgerFixture) {
+	t.Helper()
+	restored, err := ReplayRaw([]json.RawMessage{ledger.Checkpoint.Commit})
+	require.NoError(t, err)
+	require.Equal(t, canonicalJSON(t, ledger.Checkpoint.Projection), serializedProjection(t, restored))
+	folded, err := ReplayRaw(ledger.Commits)
+	require.NoError(t, err)
+	var left, right map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(ledger.Checkpoint.Projection, &left))
+	require.NoError(t, json.Unmarshal([]byte(serializedProjection(t, folded)), &right))
+	for _, field := range []string{"repository", "works", "claims", "dispatches", "observations", "work_creators"} {
+		require.Equal(t, canonicalJSON(t, left[field]), canonicalJSON(t, right[field]), field)
+	}
+	// The Go checkpoint builder reproduces the shared checkpoint projection.
+	var commit QueueCommit
+	require.NoError(t, json.Unmarshal(ledger.Checkpoint.Commit, &commit))
+	built, err := CheckpointCommit(folded, commit.Actor, commit.At)
+	require.NoError(t, err)
+	data, err := CanonicalValue(built)
+	require.NoError(t, err)
+	require.Equal(t, canonicalJSON(t, ledger.Checkpoint.Commit), string(data))
 }
 
 type selectionFixture struct {

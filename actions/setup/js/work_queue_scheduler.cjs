@@ -101,7 +101,7 @@ function planDispatch(state, parameters, requestId) {
 
 /**
  * The worker's view of a Dispatch: its open Claims with payloads and predecessor effects.
- * @returns {{dispatch_id: string, claims: Array<{handle: string, claim_id: string, work_id: string, work: object, result_refs: Array<{work_id: string, result_commit_id: string, descriptor: unknown}>}>}}
+ * @returns {{dispatch_id: string, claims: Array<{handle: string, claim_id: string, work_id: string, work: object, result_refs: Array<{work_id: string, result_commit_id: string, descriptor: unknown}>, continuation?: {route: string, message: string, remaining: number}}>}}
  */
 function assignmentForDispatch(state, dispatchId) {
   const dispatch = state.dispatches.get(dispatchId);
@@ -115,7 +115,9 @@ function assignmentOnly(state, dispatch) {
     .filter(claim => claim.state === "open")
     .map(claim => {
       const work = state.works.get(claim.work_id);
-      return { handle: claim.handle, claim_id: claim.claim_id, work_id: work.work_id, work: structuredClone(work.payload), result_refs: structuredClone(resultReferences(state, work)) };
+      const member = { handle: claim.handle, claim_id: claim.claim_id, work_id: work.work_id, work: structuredClone(work.payload), result_refs: structuredClone(resultReferences(state, work)) };
+      // A continuation's remaining-work context travels beside, never inside, its payload.
+      return work.continuation ? { ...member, continuation: structuredClone(work.continuation) } : member;
     });
   return { dispatch_id: dispatch.dispatch_id, claims };
 }

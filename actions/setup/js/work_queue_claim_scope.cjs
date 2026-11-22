@@ -8,6 +8,7 @@ const { AsyncLocalStorage } = require("async_hooks");
 const { identity, canonical, canonicalBytes, closed } = require("./work_queue_codec.cjs");
 const { ASSIGNMENT_BYTES, PREDECESSORS } = require("./work_queue_limits.cjs");
 const { ERR_WORK_QUEUE_CLAIM_SCOPE } = require("./error_codes.cjs");
+const { validateContinuation } = require("./work_queue_graph.cjs");
 
 const MAX_ASSIGNMENT_CLAIMS = 16;
 // The snapshot assignment carries every Claim's payload plus predecessor effects.
@@ -42,7 +43,7 @@ function freeze(value) {
 }
 
 /**
- * Validate the snapshot assignment `{dispatch_id, claims:[{handle, claim_id, work_id, work, result_refs}]}`
+ * Validate the snapshot assignment `{dispatch_id, claims:[{handle, claim_id, work_id, work, result_refs, continuation?}]}`
  * produced by `assignmentForDispatch` (open Claims only).
  */
 function normalizeAssignment(value) {
@@ -57,7 +58,14 @@ function normalizeAssignment(value) {
   const works = new Set();
   for (const member of value.claims) {
     if (!object(member) || !object(member.work) || !Array.isArray(member.result_refs) || member.result_refs.length > PREDECESSORS) throw scopeError("each Claim must include its Work payload and bounded predecessor results");
-    if (Object.keys(member).some(field => !["handle", "claim_id", "work_id", "work", "result_refs"].includes(field))) throw scopeError("unknown assignment Claim field");
+    if (Object.keys(member).some(field => !["handle", "claim_id", "work_id", "work", "result_refs", "continuation"].includes(field))) throw scopeError("unknown assignment Claim field");
+    if (own(member, "continuation")) {
+      try {
+        validateContinuation(member.continuation);
+      } catch {
+        throw scopeError("invalid assignment continuation");
+      }
+    }
     identifier(member.handle, "handle");
     identifier(member.claim_id, "claim_id");
     identifier(member.work_id, "work_id");

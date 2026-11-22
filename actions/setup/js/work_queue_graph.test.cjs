@@ -4,7 +4,7 @@ import { createRequire } from "node:module";
 const require = createRequire(import.meta.url);
 const h = require("./work_queue_test_helpers.cjs");
 const { ASSIGNMENT_BYTES, EFFECTS_BYTES, GRAPH_NODES, PAYLOAD_BYTES, PREDECESSORS } = require("./work_queue_limits.cjs");
-const { dependencyStatus, gateKey, nodeId, resultReferences, validateGraphAdmission, validateResource, validateWork } = require("./work_queue_graph.cjs");
+const { continuationChild, dependencyStatus, gateKey, nodeId, resultReferences, validateContinuation, validateGraphAdmission, validateResource, validateWork } = require("./work_queue_graph.cjs");
 const { replayTransactions } = require("./work_queue_replay.cjs");
 
 const fails = (callback, code) => expect(callback).toThrow(expect.objectContaining({ code }));
@@ -108,5 +108,52 @@ describe("dependency readiness", () => {
     expect(resultReferences(state, state.works.get(b.work_id))).toEqual([{ work_id: a.work_id, result_commit_id: state.works.get(a.work_id).completion_id, descriptor: [{ kind: "create_issue" }] }]);
     const unobserved = replayTransactions(h.submit([], [h.work("g", { depends_on: [gate(6)] })]));
     expect(dependencyStatus(unobserved, unobserved.works.get(h.work("g").work_id)).reason).toBe("external_unobserved");
+  });
+});
+
+describe("continuation Work", () => {
+  const parent = h.work("p", { payload: { task: "audit pages" }, priority: 2, fairness_key: "account", subject: issue(7), backing_issue: issue(8), replacement_of: { work_id: "older" } });
+
+  it("inherits exactly the parent's scheduling and payload behind a deterministic key", () => {
+    const child = continuationChild(parent, { route: "workqueue", message: "Audit page 2", remaining: 1 });
+    expect(child).toEqual({
+      kind: "Work",
+      work_id: nodeId("graph", `continuation:${parent.work_id}`),
+      graph_id: "graph",
+      node_key: `continuation:${parent.work_id}`,
+      pool: "default",
+      priority: 2,
+      fairness_key: "account",
+      worker_profile: "worker",
+      payload: { task: "audit pages" },
+      subject: issue(7),
+      depends_on: [after(parent)],
+      continuation: { route: "workqueue", message: "Audit page 2", remaining: 1 },
+    });
+    expect(continuationChild(parent, { route: "issue", message: "Audit page 2", remaining: 0 }, issue(55)).depends_on).toEqual([after(parent), gate(55, "approved")]);
+  });
+
+  it("validates the continuation member and its shared budget", () => {
+    for (const [continuation, code] of [
+      [{ route: "dispatch", message: "x", remaining: 0 }, "request_invalid"],
+      [{ route: "workqueue", message: " \t\u00a0\ufeff", remaining: 0 }, "request_invalid"],
+      [{ route: "workqueue", message: "x", remaining: 16 }, "request_invalid"],
+      [{ route: "workqueue", message: "x", remaining: -1 }, "request_invalid"],
+      [{ route: "issue", message: "x", remaining: 1 }, "request_invalid"],
+      [{ route: "workqueue", message: "x", remaining: 0, extra: true }, "request_invalid"],
+      [{ route: "workqueue", message: "é".repeat(8193), remaining: 0 }, "resource_limit"],
+    ])
+      fails(() => validateContinuation(continuation), code);
+    expect(validateContinuation({ route: "workqueue", message: "\u0085", remaining: 0 }).message).toBe("\u0085");
+    fails(() => continuationChild(parent, { route: "issue", message: "x", remaining: 0 }), "request_invalid");
+    fails(() => continuationChild(parent, { route: "workqueue", message: "x", remaining: 0 }, issue(55)), "request_invalid");
+    const big = h.work("big", { payload: { task: "x".repeat(PAYLOAD_BYTES - 64) } });
+    expect(validateWork(big)).toBe(big);
+    fails(() => continuationChild(big, { route: "workqueue", message: "y".repeat(128), remaining: 0 }), "resource_limit");
+  });
+
+  it("keeps an approved gate distinct from a completed one", () => {
+    expect(gateKey(issue(55), "approved")).not.toBe(gateKey(issue(55), "completed"));
+    fails(() => validateWork(h.work("plain", { depends_on: [gate(55, "approved")] })), "request_invalid");
   });
 });

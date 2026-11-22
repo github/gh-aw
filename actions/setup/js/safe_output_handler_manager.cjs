@@ -324,6 +324,11 @@ function getThreatWarningPolicy(messageType, messageHandlers) {
   if (THREAT_WARNING_ABORT_TYPES.has(messageType) || handlerThreatWarningAbortTypes.get(messageHandlers)?.has(messageType)) {
     return { policy: "abort" };
   }
+  // A routed continuation authorizes future execution (dispatch, successor Work or
+  // an approval gate); it is never reviewable before it takes effect.
+  if (messageType === "request_continuation" && isRoutedContinuation(handlerConfigurations.get(messageHandlers))) {
+    return { policy: "abort" };
+  }
   const mappedType = THREAT_WARNING_CONVERTIBLE_TYPES.get(messageType);
   if (mappedType) {
     return { policy: "convertible", mappedType };
@@ -444,6 +449,21 @@ function effectiveAuthorization(config, type, /** @type {any} */ message = null)
 
 function hasAuthorization(config) {
   return !!config.authorization || Object.values(config).some(value => value && typeof value === "object" && (value.authorization || (value.tools && Object.values(value.tools).some(tool => tool?.authorization))));
+}
+
+/** Whether the trusted config routes request_continuation (advisory forms carry no route). */
+function isRoutedContinuation(config) {
+  return !!config && typeof config === "object" && config.request_continuation?.route !== undefined;
+}
+
+/** The trusted routed continuation descriptor for the Claim partitioner, read without failing the pass. */
+function routedContinuationConfig() {
+  try {
+    const config = normalizeSafeOutputConfig(JSON.parse(process.env.GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG || "{}"));
+    return isRoutedContinuation(config) ? config.request_continuation : null;
+  } catch {
+    return null;
+  }
 }
 
 function authorizationOperationStatus(result, fallback) {
@@ -654,7 +674,10 @@ async function loadHandlers(config, prReviewBufferRegistry, resolvedAllowedMenti
       if (requirement) {
         const state = currentSafeOutputInvocation();
         const deferred =
-          actions.has(type) || ["upload_artifact", "call_workflow", "upload_code_coverage"].includes(type) || (!!currentClaimHandle() && (type === "upload_asset" || ["prepared", "script"].includes(config.claim_adapters?.[type]?.mode)));
+          actions.has(type) ||
+          ["upload_artifact", "call_workflow", "upload_code_coverage"].includes(type) ||
+          (type === "request_continuation" && config.request_continuation?.route === "workqueue") ||
+          (!!currentClaimHandle() && (type === "upload_asset" || ["prepared", "script"].includes(config.claim_adapters?.[type]?.mode)));
         if (!state || state.requirement !== requirement || state.invocation?.output.type !== type || (state.authorization?.state !== "allowed" && !(deferred && state.authorization?.state === "not_requested"))) {
           throw new Error("Protected safe-output handlers require their trusted prepared invocation context");
         }
@@ -860,7 +883,7 @@ async function initializeHandlers(config, prReviewBufferRegistry, resolvedAllowe
             }
           }
           const loadedHandler = factoryClaim ? authorizedHandler : bindHandlerToFactoryScope(executable);
-          if (type === "report_incomplete" || type === "request_continuation") localDiagnosticHandlers.add(loadedHandler);
+          if (type === "report_incomplete" || (type === "request_continuation" && !isRoutedContinuation(config))) localDiagnosticHandlers.add(loadedHandler);
           messageHandlers.set(type, loadedHandler);
           core.info(`✓ Loaded and initialized handler for: ${type}`);
         } else {
@@ -1365,7 +1388,8 @@ async function processMessages(messageHandlers, messages, onItemCreated = null, 
   const sourceBatch = authorizationBatchContexts.get(messages);
   const batchDigest = authorizationConfigured ? sourceBatch?.digest || protocol.canonicalDigest(originalMessages) : null;
   const stagedFor = (type, message = null) => isStagedMode(trustedConfig) || isStagedMode(trustedDescriptor(trustedConfig, type, message));
-  const previewOnly = (type, message) => !!effectiveAuthorization(trustedConfig, type, message) || scriptTypes.has(type) || actionTypes.has(type);
+  // A staged routed continuation previews only; its handler never runs.
+  const previewOnly = (type, message) => !!effectiveAuthorization(trustedConfig, type, message) || scriptTypes.has(type) || actionTypes.has(type) || (type === "request_continuation" && isRoutedContinuation(trustedConfig));
 
   // Claim effects recorded during an invocation carry its safe-output type.
   function executeInvocation(type, index, message, resolvedTemporaryIds, temporaryIdMap, handler, phase = "primary") {
@@ -1490,7 +1514,15 @@ async function processMessages(messageHandlers, messages, onItemCreated = null, 
     /** @type {any} */
     const invocationState = { invocation, requirement, config: descriptor, batchDigest: invocationBatchDigest, recordIndex: sourceBatch?.indices[index] ?? index, authorization: undefined };
     invocationState.authorize = options => require("./safe_output_authorization_gate.cjs").authorizeHandlerInvocation(options);
-    const deferredGate = phase === "primary" && (preparedAdapter || actionTypes.has(type) || ["upload_artifact", "call_workflow", "upload_code_coverage"].includes(type) || (type === "upload_asset" && !!currentClaimHandle()));
+    // A workqueue continuation is admitted by the worker finalizer under its own
+    // `request_continuation:admit` authorization; this pass only validates it.
+    const deferredGate =
+      phase === "primary" &&
+      (preparedAdapter ||
+        actionTypes.has(type) ||
+        ["upload_artifact", "call_workflow", "upload_code_coverage"].includes(type) ||
+        (type === "request_continuation" && descriptor.route === "workqueue") ||
+        (type === "upload_asset" && !!currentClaimHandle()));
     const evidencePath = protocol.authorizationEvidencePath();
     let authorization;
     try {
@@ -1737,9 +1769,9 @@ async function processMessages(messageHandlers, messages, onItemCreated = null, 
       return;
     }
 
-    // Ordinary continuation requests are recorded once in conclusion; Claims
-    // retain their scoped diagnostic handler rather than an anonymous replay.
-    const messageHandler = messageType === "request_continuation" && !currentClaimHandle() ? undefined : messageHandlers.get(messageType);
+    // Advisory continuation requests are recorded once in conclusion; Claims retain
+    // their scoped diagnostic handler. A routed request is consumed only here.
+    const messageHandler = messageType === "request_continuation" && !currentClaimHandle() && !isRoutedContinuation(trustedConfig) ? undefined : messageHandlers.get(messageType);
 
     if (!messageHandler) {
       // Check if this message type is handled by a standalone step
@@ -2776,13 +2808,14 @@ function logSafeOutputReplayHint(results) {
  * Output types a Work's effect_contract does not declare (none when it declares no outputs list).
  * @param {any} work
  * @param {any[]} messages
+ * @param {ReadonlySet<string>} [noWriteTypes] output types that never write resources
  * @returns {string[]}
  */
-function undeclaredOutputTypes(work, messages) {
+function undeclaredOutputTypes(work, messages, noWriteTypes = NO_WRITE_TYPES) {
   const contract = work?.effect_contract;
   if (!contract || typeof contract !== "object" || !Array.isArray(contract.outputs)) return [];
   const known = new Set(contract.outputs.map(output => normalizeSafeOutputName(String(output?.type))));
-  return [...new Set(messages.map(message => normalizeSafeOutputName(message.type)).filter(type => !known.has(type) && !(contract.no_writes === true && NO_WRITE_TYPES.has(type))))];
+  return [...new Set(messages.map(message => normalizeSafeOutputName(message.type)).filter(type => !known.has(type) && !(contract.no_writes === true && noWriteTypes.has(type))))];
 }
 
 /**
@@ -2820,13 +2853,16 @@ async function main(options = {}) {
     rejectCrossClaimTemporaryReferences(partitions, rejected);
     const settlements = [];
     const queueClient = options.queueClient || github;
+    const continuation = routedContinuationConfig();
+    // A workqueue continuation is queue bookkeeping, not a resource write.
+    const noWriteTypes = continuation?.route === "workqueue" ? new Set([...NO_WRITE_TYPES, "request_continuation"]) : NO_WRITE_TYPES;
     for (const [handle, scopedMessages] of partitions) {
       /** @type {Array<Record<string, any>>} */
       const effects = [];
       try {
         const unscopedGithub = github;
         const authorize = options.authorize || (request => require("./finish_work_queue_claim.cjs").authorizeWorkerClaim({ ...request, github: unscopedGithub, queueClient }));
-        const undeclared = undeclaredOutputTypes(scope.assignment.claims.find(claim => claim.handle === handle).work, scopedMessages);
+        const undeclared = undeclaredOutputTypes(scope.assignment.claims.find(claim => claim.handle === handle).work, scopedMessages, noWriteTypes);
         if (undeclared.length > 0 && !isStagedMode()) {
           core.warning(`Claim ${handle}: refusing ${scopedMessages.length} scoped output(s); undeclared type(s): ${undeclared.join(", ")}`);
           settlements.push({ claim_handle: handle, success: false, error: `Undeclared output type(s) in Work effect_contract: ${undeclared.join(", ")}` });
@@ -2858,6 +2894,20 @@ async function main(options = {}) {
       }
     }
     core.setOutput("claim_results", JSON.stringify({ settlements }));
+    if (continuation && !isStagedMode()) {
+      // Accepted requests for the finalizer, in assignment order; only after the
+      // producing attempt's evidence and a clean collection were verified.
+      const bound = require("./request_continuation_routes.cjs").bindRoutedRequests({ assignment: scope.assignment });
+      if (bound.ok) {
+        const receipts = scope.assignment.claims.flatMap(member => {
+          const receipt = settlements.find(settlement => settlement.claim_handle === member.handle && settlement.success === true)?.continuation_receipt;
+          return receipt && receipt.message_sha256 === bound.requests.get(member.handle)?.message_sha256 ? [receipt] : [];
+        });
+        core.setOutput("work_queue_continuations", JSON.stringify(receipts));
+      } else {
+        core.warning(`request_continuation: no continuation receipts (${bound.reason})`);
+      }
+    }
     if (rejected.length) {
       core.setOutput("claim_scope_errors", JSON.stringify(rejected));
       core.setFailed(`${rejected.length} safe-output message(s) have invalid Claim scope`);
@@ -2914,7 +2964,7 @@ async function main(options = {}) {
       core.setOutput("processed_count", "0");
       setSafeOutputsStatusOutputs({ itemsSucceeded: 0, itemsFailed: 0, status: "success" });
       statusOutputsSet = true;
-      return undefined;
+      return currentClaimHandle() ? { success: true } : undefined;
     }
 
     // Create the PR review buffer registry (one per-PR buffer created on demand)
@@ -3059,6 +3109,8 @@ async function main(options = {}) {
 
     // Write step summaries for all processed safe-outputs
     await writeSafeOutputSummaries(processingResult.results, allMessages);
+    const continuationSummary = isRoutedContinuation(config) ? require("./request_continuation_routes.cjs").continuationSummary(processingResult.results) : "";
+    if (continuationSummary && typeof core.summary?.addRaw === "function") await core.summary.addRaw(continuationSummary).write();
 
     // Log summary
     const safeOutputsStatus = computeSafeOutputsStatus(processingResult.results);
@@ -3224,7 +3276,8 @@ async function main(options = {}) {
       return { success: false };
     }
     core.info("Safe Output Handler Manager completed");
-    return { success: true };
+    const continuationReceipt = currentClaimHandle() ? processingResult.results.find(record => record.type === "request_continuation" && record.success && record.result?.receipt)?.result.receipt : undefined;
+    return { success: true, ...(continuationReceipt ? { continuation_receipt: continuationReceipt } : {}) };
   } catch (error) {
     const handlerError = `${ERR_VALIDATION}: Handler manager failed: ${getErrorMessage(error)}`;
     if (!statusOutputsSet) {
