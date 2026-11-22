@@ -414,7 +414,7 @@ Synthetic fork_context.
 
 Synthetic runtime_alerts_context.
 
-Synthetic runtime_evidence_context.
+Synthetic runtime_diagnostics_context.
 
 
 

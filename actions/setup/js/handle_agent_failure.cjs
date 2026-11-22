@@ -4745,9 +4745,9 @@ async function main() {
       rootDir: path.dirname(getAgentStdioLogPath()),
       runId: context.runId,
     });
-    const reportIncompleteContext = [...incompleteSignal, ...incompleteReasons, ...incompleteEvidence];
     const approvedIncompleteReasons =
       agentOutputResult.success && !failureDiagnostics.secretRedactionFailed && process.env.GH_AW_DETECTION_ACCEPTED === "true" && process.env.GH_AW_DETECTION_CONCLUSION === "success" ? incompleteReasons : [];
+    const reportIncompleteContext = [...incompleteSignal, ...approvedIncompleteReasons, ...incompleteEvidence];
     if (hasReportedIncomplete && reportIncompleteContext.length > 0 && !failureDiagnostics.secretRedactionFailed) {
       try {
         const summary = renderSizedReport({ type: "report", title: "Incomplete result", children: reportIncompleteContext, agentTainted: false }).body;
@@ -5142,7 +5142,7 @@ async function main() {
               ? buildWarningAlertLine("Tool Denial Limit Exceeded", "The runtime recorded a tool-denial limit signal; agent text is excluded.")
               : ""
             : toolDenialsExceededContext,
-          report_incomplete_context: [...incompleteSignal, ...approvedIncompleteReasons, ...incompleteEvidence],
+          report_incomplete_context: reportIncompleteContext,
           failure_diagnostics_context: failureDiagnosticsContext,
           missing_safe_outputs_context: missingSafeOutputsContext,
           engine_failure_context: needsFailureDiagnostics ? "" : engineFailureContext,

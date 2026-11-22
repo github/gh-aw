@@ -2305,6 +2305,8 @@ describe("handle_agent_failure", () => {
       vi.stubEnv("GH_AW_AGENT_OUTPUT", outputPath);
       vi.stubEnv("GH_AW_AGENT_CONCLUSION", "success");
       vi.stubEnv("GH_AW_FAILURE_REPORT_AS_ISSUE", "false");
+      vi.stubEnv("GH_AW_DETECTION_ACCEPTED", undefined);
+      vi.stubEnv("GH_AW_DETECTION_CONCLUSION", undefined);
       global.context.runId = 123456;
       global.github = {
         rest: {
@@ -2327,7 +2329,8 @@ describe("handle_agent_failure", () => {
         expect(logs).not.toContain("build-resource permissions");
         expect(logs).not.toContain("private-build-diagnostics");
         const summary = JSON.stringify(global.core.summary.addRaw.mock.calls);
-        expect(summary).toContain("build-resource permissions");
+        expect(summary).toContain("Task Could Not Be Completed");
+        expect(summary).not.toContain("build-resource permissions");
         expect(summary).not.toContain("private-build-diagnostics");
         expect(global.core.summary.write).toHaveBeenCalled();
         expect(global.github.rest.issues.create).not.toHaveBeenCalled();
@@ -2413,7 +2416,7 @@ describe("handle_agent_failure", () => {
 
     it.each([false, true, "disabled"])("deduplicates missing-output notices by workflow and reports the cause (existing issue: %s)", async existingIssue => {
       const template = "{report_incomplete_context}{missing_data_context}{missing_tool_context}{permission_denied_context}{engine_failure_context}";
-      fs.writeFileSync(path.join(promptsDir, "agent_failure_issue.md"), "{agent_report_context}{runtime_evidence_context}" + template);
+      fs.writeFileSync(path.join(promptsDir, "agent_failure_issue.md"), "{agent_report_context}{runtime_diagnostics_context}" + template);
       fs.writeFileSync(path.join(promptsDir, "agent_failure_comment.md"), template);
       const outputPath = path.join(tmpDir, "agent_output.json");
       fs.writeFileSync(
@@ -2540,6 +2543,11 @@ describe("handle_agent_failure", () => {
       const reason = "Required data could not be read";
       expect(issueBody.includes(reason)).toBe(showReason);
       expect(commentBody.includes(reason)).toBe(showReason);
+      expect(global.core.summary.addRaw).toHaveBeenCalledTimes(2);
+      for (const [summary] of global.core.summary.addRaw.mock.calls) {
+        expect(summary).toContain("Task Could Not Be Completed");
+        expect(summary.includes(reason)).toBe(showReason);
+      }
       if (showReason) expect(issueBody.indexOf(reason)).toBeLessThan(issueBody.indexOf("### Next step"));
       expect(issueBody).toMatch(/> \[!WARNING\]\n> \*\*Task Could Not Be Completed/);
       expect(issueBody).toMatch(/<summary>Runtime evidence<\/summary>[\s\S]*Completion signal: agent reported incomplete/);
@@ -2677,7 +2685,7 @@ describe("handle_agent_failure", () => {
     ])("posts metadata-only generic diagnostics (missing job data: %s, existing issue: %s)", async (missingJobs, existingIssue) => {
       fs.copyFileSync(path.join(__dirname, "../md/engine_driver_failure.md"), path.join(promptsDir, "engine_driver_failure.md"));
       const template = "{failure_diagnostics_context}{report_incomplete_context}{engine_failure_context}";
-      fs.writeFileSync(path.join(promptsDir, "agent_failure_issue.md"), "{report_incomplete_context}{engine_failure_context}{runtime_alerts_context}{runtime_evidence_context}");
+      fs.writeFileSync(path.join(promptsDir, "agent_failure_issue.md"), "{report_incomplete_context}{engine_failure_context}{runtime_alerts_context}{runtime_diagnostics_context}");
       fs.writeFileSync(path.join(promptsDir, "agent_failure_comment.md"), template);
       const outputPath = path.join(tmpDir, "agent_output.json");
       fs.writeFileSync(outputPath, JSON.stringify({ items: [{ type: "report_incomplete", reason: "infrastructure_error", details: "agent-generated diagnostic" }] }));
