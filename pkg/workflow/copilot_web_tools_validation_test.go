@@ -27,24 +27,49 @@ Fetch a page.
 }
 
 func TestWebFetchMCPCompilation(t *testing.T) {
-	for _, engine := range []string{"copilot", "pi", "codex", "gemini", "claude"} {
-		t.Run(engine, func(t *testing.T) {
-			path := filepath.Join(t.TempDir(), "web-fetch.md")
+	for _, tc := range []struct {
+		name       string
+		engine     string
+		importFile string
+		model      string
+		fallback   bool
+	}{
+		{name: "copilot", engine: "copilot", fallback: true},
+		{name: "copilot-sdk", engine: "\n  id: copilot\n  copilot-sdk: true", fallback: true},
+		{name: "pi", engine: "pi", fallback: true},
+		{name: "claude-copilot", engine: "\n  id: claude\n  model-provider: github", fallback: true},
+		{name: "claude-anthropic", engine: "claude"},
+		{name: "codex", engine: "codex"},
+		{name: "gemini", engine: "gemini"},
+		{name: "agy", engine: "agy"},
+		{name: "goose", engine: "\n  id: goose", importFile: "goose.md", model: "copilot/auto", fallback: true},
+		{name: "opencode", engine: "\n  id: opencode", importFile: "opencode.md", model: "copilot/auto", fallback: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			imports := ""
+			if tc.importFile != "" {
+				source, err := os.ReadFile(filepath.Join("../../.github/workflows/shared", tc.importFile))
+				require.NoError(t, err)
+				require.NoError(t, os.WriteFile(filepath.Join(dir, tc.importFile), source, 0600))
+				imports = fmt.Sprintf("imports: [%s]\nmodel: %s\n", tc.importFile, tc.model)
+			}
+			path := filepath.Join(dir, "web-fetch.md")
 			require.NoError(t, os.WriteFile(path, []byte(fmt.Sprintf(`---
 on: workflow_dispatch
 engine: %s
+%s
 tools:
   github: false
   web-fetch:
 ---
 Fetch a page.
-`, engine)), 0600))
-			require.NoError(t, NewCompiler(WithSkipValidation(true)).CompileWorkflow(path))
-			lock, err := os.ReadFile(filepath.Join(filepath.Dir(path), "web-fetch.lock.yml"))
+`, tc.engine, imports)), 0600))
+			require.NoError(t, NewCompiler().CompileWorkflow(path))
+			lock, err := os.ReadFile(filepath.Join(dir, "web-fetch.lock.yml"))
 			require.NoError(t, err)
-			expected := engine == "copilot" || engine == "pi"
-			assert.Equal(t, expected, strings.Contains(string(lock), "export GH_AW_WEB_FETCH_MCP=1"))
-			assert.Equal(t, expected, strings.Contains(string(lock), `"name":"web-fetch","tools":["web_fetch"]`))
+			assert.Equal(t, tc.fallback, strings.Contains(string(lock), "export GH_AW_WEB_FETCH_MCP=1"))
+			assert.Equal(t, tc.fallback, strings.Contains(string(lock), `"name":"web-fetch","tools":["web_fetch"]`))
 			assert.NotContains(t, string(lock), "web_fetch_mcp_server.cjs", "the host gateway must not start the server")
 		})
 	}
