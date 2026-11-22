@@ -1381,13 +1381,12 @@ This allows combining OIDC auth with non-auth headers:
 - `auth.type` is required when `auth` is present. Empty type MUST be rejected.
 - Unsupported `auth.type` values MUST be rejected with a descriptive error.
 
-#### 7.6.4 Microsoft Entra Federation (Unreleased)
+#### 7.6.4 Microsoft Entra Federation
 
 Set workflow frontmatter `auth.provider: azure` to exchange the GitHub assertion
-for an Entra token instead of forwarding it directly. This requires an explicit
-custom MCP gateway build containing
-[github/gh-aw-mcpg#16956](https://github.com/github/gh-aw-mcpg/pull/16956);
-the default release is rejected at compile time.
+for an Entra token instead of forwarding it directly. This requires MCP gateway
+v0.5.12 or newer, or an explicitly configured custom build supporting Azure
+federation.
 
 | Frontmatter field | Gateway JSON field | Description |
 |---|---|---|

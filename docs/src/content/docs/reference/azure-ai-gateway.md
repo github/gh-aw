@@ -111,12 +111,10 @@ gh-aw's Azure OpenAI default. Confirm the scope against the deployed gateway.
 ## Connect an MCP server with Entra federation
 
 > [!IMPORTANT]
-> Azure federation for HTTP MCP depends on
-> [github/gh-aw-mcpg#16956](https://github.com/github/gh-aw-mcpg/pull/16956)
-> and is not in the default gateway release. Compilation requires an explicit
-> custom `sandbox.mcp.container` and `sandbox.mcp.version` containing that
-> change. Custom gateway images also require `strict: false`. The example below
-> is a configuration template, not a published image.
+> Azure federation for HTTP MCP requires MCP gateway v0.5.12 or newer.
+> For a custom gateway image, explicitly set `sandbox.mcp.container` and
+> `sandbox.mcp.version` to a reviewed build supporting federation; custom
+> gateway images also require `strict: false`.
 
 Configure an Entra application's federated credential to trust the workflow's
 GitHub issuer, repository/branch or environment subject, and
@@ -125,15 +123,10 @@ runtime access to the selected gateway MCP server. Backend credentials and
 backend access remain the gateway operator's responsibility.
 
 ```aw wrap
-strict: false
 permissions:
   contents: read
   id-token: write
 engine: copilot
-sandbox:
-  mcp:
-    container: ghcr.io/YOUR_ORG/gh-aw-mcpg-azure
-    version: YOUR_REVIEWED_BUILD_TAG
 mcp-servers:
   azure-search:
     type: http
@@ -170,8 +163,7 @@ GitHub OIDC authentication.
 
 ## Connect an MCP server with a gateway key
 
-Gateway-key authentication works with the existing HTTP MCP integration and
-does not require the unreleased Azure federation feature:
+Gateway-key authentication works with the existing HTTP MCP integration:
 
 ```aw wrap
 mcp-servers:
@@ -185,4 +177,4 @@ mcp-servers:
 ```
 
 Gateway keys grant broad runtime access. Prefer Entra federation with
-asset-specific access when the supporting MCP gateway release is available.
+asset-specific access.

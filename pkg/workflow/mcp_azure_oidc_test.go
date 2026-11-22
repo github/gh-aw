@@ -22,15 +22,10 @@ func TestMCPAzureOIDCCompilation(t *testing.T) {
 			file := filepath.Join(t.TempDir(), "azure-mcp.md")
 			require.NoError(t, os.WriteFile(file, []byte(fmt.Sprintf(`---
 on: workflow_dispatch
-strict: false
 permissions:
   contents: read
   id-token: write
 engine: %s
-sandbox:
-  mcp:
-    container: ghcr.io/example/gh-aw-mcpg-azure
-    version: reviewed-build
 tools:
   github: false
 mcp-servers:
@@ -157,8 +152,8 @@ process.stdout.write(JSON.stringify(resolveMCPConfigExpressions(JSON.parse(fs.re
 	require.Equal(t, tool["auth"].(map[string]any)["azure-scope"], auth["azureScope"])
 }
 
-func TestMCPAzureOIDCUnreleasedCompilation(t *testing.T) {
-	for _, sandbox := range []string{"", "sandbox:\n  mcp:\n    container: ghcr.io/example/mcpg\n"} {
+func TestMCPAzureOIDCUnsupportedCompilation(t *testing.T) {
+	for _, sandbox := range []string{"sandbox:\n  mcp:\n    version: v0.5.11\n", "sandbox:\n  mcp:\n    container: ghcr.io/example/mcpg\n"} {
 		file := filepath.Join(t.TempDir(), "azure-mcp.md")
 		require.NoError(t, os.WriteFile(file, []byte(`---
 on: workflow_dispatch
@@ -179,7 +174,7 @@ permissions:
 ---
 Use the gateway.
 `), 0600))
-		require.ErrorContains(t, NewCompiler().CompileWorkflow(file), "requires an unreleased MCP gateway feature")
+		require.ErrorContains(t, NewCompiler().CompileWorkflow(file), "mcp-servers.azure.auth.provider: azure requires")
 	}
 }
 
@@ -189,9 +184,11 @@ func TestMCPAzureOIDCGatewayGate(t *testing.T) {
 		gateway *MCPGatewayRuntimeConfig
 		wantErr bool
 	}{
-		{name: "default gateway", wantErr: true},
-		{name: "stock release", gateway: &MCPGatewayRuntimeConfig{Container: constants.DefaultMCPGatewayContainer, Version: string(constants.DefaultMCPGatewayVersion)}, wantErr: true},
-		{name: "unknown stock release", gateway: &MCPGatewayRuntimeConfig{Container: constants.DefaultMCPGatewayContainer, Version: "v999.0.0"}, wantErr: true},
+		{name: "default gateway"},
+		{name: "stock release", gateway: &MCPGatewayRuntimeConfig{Container: constants.DefaultMCPGatewayContainer, Version: string(constants.MCPGAzureOIDCMinVersion)}},
+		{name: "newer stock release", gateway: &MCPGatewayRuntimeConfig{Version: "v999.0.0"}},
+		{name: "older stock release", gateway: &MCPGatewayRuntimeConfig{Version: "v0.5.11"}, wantErr: true},
+		{name: "unverified stock tag", gateway: &MCPGatewayRuntimeConfig{Version: "latest"}, wantErr: true},
 		{name: "custom without version", gateway: &MCPGatewayRuntimeConfig{Container: "ghcr.io/example/mcpg"}, wantErr: true},
 		{name: "custom reviewed build", gateway: &MCPGatewayRuntimeConfig{Container: "ghcr.io/example/mcpg", Version: "reviewed-build"}},
 	} {
@@ -208,7 +205,7 @@ func TestMCPAzureOIDCGatewayGate(t *testing.T) {
 			}
 			err := validateHTTPMCPAzureOIDCGateway(data)
 			if test.wantErr {
-				require.ErrorContains(t, err, "github/gh-aw-mcpg#16956")
+				require.ErrorContains(t, err, "mcp-servers.azure.auth.provider: azure requires")
 			} else {
 				require.NoError(t, err)
 			}

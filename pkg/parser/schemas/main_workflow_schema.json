@@ -17105,7 +17105,7 @@
     },
     "http_mcp_auth": {
       "type": "object",
-      "description": "Upstream HTTP MCP authentication. The gateway acquires GitHub OIDC tokens directly or exchanges them for Microsoft Entra tokens. Azure federation requires a custom gateway build until released.",
+      "description": "Upstream HTTP MCP authentication. The gateway acquires GitHub OIDC tokens directly or exchanges them for Microsoft Entra tokens. Azure federation requires MCP gateway v0.5.12 or newer.",
       "properties": {
         "type": {
           "type": "string",

@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/github/gh-aw/pkg/constants"
+	"github.com/github/gh-aw/pkg/semverutil"
 	"github.com/github/gh-aw/pkg/sliceutil"
 )
 
@@ -26,13 +27,19 @@ func validateHTTPMCPAzureOIDCGateway(data *WorkflowData) error {
 		if config.Type != "http" || config.Auth == nil || config.Auth.Provider != "azure" {
 			continue
 		}
-		// No released MCPG version supports Azure federation yet. Do not invent a
-		// minimum version or send Azure configuration to the default gateway.
-		if data.SandboxConfig == nil || data.SandboxConfig.MCP == nil ||
-			data.SandboxConfig.MCP.Container == "" ||
-			data.SandboxConfig.MCP.Container == constants.DefaultMCPGatewayContainer ||
-			data.SandboxConfig.MCP.Version == "" {
-			return fmt.Errorf("mcp-servers.%s.auth.provider: azure requires an unreleased MCP gateway feature (github/gh-aw-mcpg#16956); set sandbox.mcp.container and sandbox.mcp.version to an explicit custom build containing that change", name)
+		if data.SandboxConfig != nil && data.SandboxConfig.MCP != nil {
+			gateway := data.SandboxConfig.MCP
+			if gateway.Container != "" && gateway.Container != constants.DefaultMCPGatewayContainer {
+				if gateway.Version == "" {
+					return fmt.Errorf("mcp-servers.%s.auth.provider: azure requires an explicit sandbox.mcp.version for a custom gateway build supporting Azure federation", name)
+				}
+				continue
+			}
+		}
+		version := effectiveMCPGatewayVersion(data)
+		minVersion := string(constants.MCPGAzureOIDCMinVersion)
+		if !isFullSemanticVersion(version) || semverutil.Compare(version, minVersion) < 0 {
+			return fmt.Errorf("mcp-servers.%s.auth.provider: azure requires MCP gateway %s or newer; effective version is %s", name, minVersion, version)
 		}
 	}
 	return nil
