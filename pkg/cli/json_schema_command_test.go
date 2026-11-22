@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/google/jsonschema-go/jsonschema"
+	"github.com/stretchr/testify/require"
 )
 
 func TestJSONSchemaCommand(t *testing.T) {
@@ -386,6 +387,40 @@ func TestLogsSchemaAICCoverage(t *testing.T) {
 					t.Errorf("invalid coverage %q accepted", coverage)
 				}
 			}
+		})
+	}
+}
+
+func TestLogsSchemaAICNullable(t *testing.T) {
+	tests := []struct {
+		name       string
+		schemaName string
+		output     any
+		target     func(map[string]any) map[string]any
+		field      string
+	}{
+		{"summary", "logs", LogsData{Summary: LogsSummary{AICCoverage: logsAICUnavailable}}, func(v map[string]any) map[string]any { return v["summary"].(map[string]any) }, "total_aic"},
+		{"run", "logs", LogsData{Summary: LogsSummary{AICCoverage: logsAICUnavailable}, Runs: []RunData{{AICCoverage: logsAICUnavailable}}}, func(v map[string]any) map[string]any { return v["runs"].([]any)[0].(map[string]any) }, "aic"},
+		{"cached run", "logs-jsonl", cachedLogsJSONLRunItemSchema{SchemaVersion: cachedLogsJSONLSchemaVersion, Kind: cachedLogsJSONLKindRun, Run: cachedLogsJSONLRunData{RunData: RunData{AICCoverage: logsAICUnavailable}}}, func(v map[string]any) map[string]any { return v["run"].(map[string]any) }, "aic"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			data, err := GenerateNamedOutputSchema(tt.schemaName)
+			require.NoError(t, err)
+			var schema jsonschema.Schema
+			require.NoError(t, json.Unmarshal(data, &schema))
+			resolved, err := schema.Resolve(nil)
+			require.NoError(t, err)
+			data, err = json.Marshal(tt.output)
+			require.NoError(t, err)
+			var value map[string]any
+			require.NoError(t, json.Unmarshal(data, &value))
+			for _, cost := range []any{nil, float64(0), float64(1.5)} {
+				tt.target(value)[tt.field] = cost
+				require.NoError(t, resolved.Validate(value))
+			}
+			tt.target(value)[tt.field] = "unknown"
+			require.Error(t, resolved.Validate(value))
 		})
 	}
 }

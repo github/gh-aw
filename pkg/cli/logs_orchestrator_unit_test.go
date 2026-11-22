@@ -1490,7 +1490,7 @@ func TestDownloadWorkflowLogsFromStdinReportsCollectionStatsForJSONLAndDiskCache
 	var report LogsData
 	require.NoError(t, json.Unmarshal([]byte(stdout), &report))
 	assert.Equal(t, "partial", report.Summary.AICCoverage)
-	assert.Zero(t, report.Summary.TotalAIC)
+	assert.Nil(t, report.Summary.TotalAIC)
 	coverageByRun := make(map[int64]string)
 	for _, run := range report.Runs {
 		coverageByRun[run.RunID] = run.AICCoverage

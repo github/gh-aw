@@ -6,7 +6,7 @@
         "schema_version": {
           "type": "integer",
           "enum": [
-            7
+            8
           ]
         },
         "kind": {
@@ -142,7 +142,10 @@
               "type": "integer"
             },
             "aic": {
-              "type": "number"
+              "type": [
+                "null",
+                "number"
+              ]
             },
             "aic_coverage": {
               "type": "string",
@@ -11236,7 +11239,7 @@
         "schema_version": {
           "type": "integer",
           "enum": [
-            7
+            8
           ]
         },
         "kind": {
@@ -11353,7 +11356,7 @@
         "schema_version": {
           "type": "integer",
           "enum": [
-            7
+            8
           ]
         },
         "kind": {
@@ -11442,7 +11445,7 @@
         "schema_version": {
           "type": "integer",
           "enum": [
-            7
+            8
           ]
         },
         "kind": {

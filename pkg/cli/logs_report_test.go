@@ -953,7 +953,7 @@ func TestRunDataJSONIncludesZeroTokenUsageAndAIC(t *testing.T) {
 		WorkflowPath: ".github/workflows/wf-1.md",
 		Status:       "completed",
 		TokenUsage:   0,
-		AIC:          0,
+		AIC:          new(float64(0)),
 	}
 
 	data, err := json.Marshal(run)
@@ -1286,10 +1286,10 @@ func TestBuildLogsDataAggregatesAIC(t *testing.T) {
 	}
 
 	data := buildLogsData(processedRuns, "/tmp/logs", nil)
-	if data.Summary.TotalAIC != 2.0 {
+	if data.Summary.TotalAIC == nil || *data.Summary.TotalAIC != 2.0 {
 		t.Fatalf("Expected TotalAIC = 2.0, got %v", data.Summary.TotalAIC)
 	}
-	if data.Runs[0].AIC != 1.25 {
+	if data.Runs[0].AIC == nil || *data.Runs[0].AIC != 1.25 {
 		t.Fatalf("Expected run AIC = 1.25, got %v", data.Runs[0].AIC)
 	}
 }
@@ -1299,9 +1299,14 @@ func TestLogsJSONAICCoverage(t *testing.T) {
 		name        string
 		inputs      []ProcessedRun
 		runCoverage []string
+		runCosts    []any
 		coverage    string
-		total       float64
+		total       any
 	}{
+		{
+			name:     "no runs",
+			coverage: "unavailable",
+		},
 		{
 			name: "no cost evidence",
 			inputs: []ProcessedRun{
@@ -1310,27 +1315,30 @@ func TestLogsJSONAICCoverage(t *testing.T) {
 				{cachedData: &RunData{RunID: 3}},
 			},
 			runCoverage: []string{"unavailable", "unavailable", "unavailable"},
+			runCosts:    []any{nil, nil, nil},
 			coverage:    "unavailable",
 		},
 		{
 			name: "recorded zero",
 			inputs: []ProcessedRun{
 				{Run: WorkflowRun{DatabaseID: 1}, TokenUsage: &TokenUsageSummary{AICFound: true}},
-				{cachedData: &RunData{RunID: 2, AICCoverage: "available"}},
+				{cachedData: &RunData{RunID: 2, AIC: new(float64(0)), AICCoverage: "available"}},
 			},
 			runCoverage: []string{"available", "available"},
+			runCosts:    []any{float64(0), float64(0)},
 			coverage:    "available",
+			total:       float64(0),
 		},
 		{
 			name: "mixed cost evidence",
 			inputs: []ProcessedRun{
 				{Run: WorkflowRun{DatabaseID: 1}, TokenUsage: &TokenUsageSummary{AICFound: true, TotalAIC: 1}},
-				{cachedData: &RunData{RunID: 2, AIC: 2}},
+				{cachedData: &RunData{RunID: 2, AIC: new(float64(2))}},
 				{Run: WorkflowRun{DatabaseID: 3}},
 			},
 			runCoverage: []string{"available", "available", "unavailable"},
+			runCosts:    []any{float64(1), float64(2), nil},
 			coverage:    "partial",
-			total:       3,
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -1343,11 +1351,43 @@ func TestLogsJSONAICCoverage(t *testing.T) {
 			}
 			require.NoError(t, json.Unmarshal(output.Bytes(), &decoded))
 			assert.Equal(t, tc.coverage, decoded.Summary["aic_coverage"])
-			assert.InDelta(t, tc.total, decoded.Summary["total_aic"], 1e-9)
+			assert.Contains(t, decoded.Summary, "total_aic")
+			assert.Equal(t, tc.total, decoded.Summary["total_aic"])
 			require.Len(t, decoded.Runs, len(tc.runCoverage))
 			for i, coverage := range tc.runCoverage {
 				assert.Equal(t, coverage, decoded.Runs[i]["aic_coverage"])
+				assert.Contains(t, decoded.Runs[i], "aic")
+				assert.Equal(t, tc.runCosts[i], decoded.Runs[i]["aic"])
 			}
+		})
+	}
+}
+
+func TestLogsAICCachedJSONRoundTrip(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		input    string
+		coverage string
+		cost     any
+	}{
+		{"legacy missing", `{"run_id":1}`, "unavailable", nil},
+		{"legacy zero", `{"run_id":1,"aic":0}`, "unavailable", nil},
+		{"legacy positive", `{"run_id":1,"aic":2}`, "available", float64(2)},
+		{"recorded zero", `{"run_id":1,"aic":0,"aic_coverage":"available"}`, "available", float64(0)},
+		{"unknown", `{"run_id":1,"aic":null,"aic_coverage":"unavailable"}`, "unavailable", nil},
+		{"inconsistent", `{"run_id":1,"aic":null,"aic_coverage":"available"}`, "unavailable", nil},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var cached RunData
+			require.NoError(t, json.Unmarshal([]byte(tc.input), &cached))
+			data := buildLogsData([]ProcessedRun{{cachedData: &cached}}, t.TempDir(), nil)
+			encoded, err := json.Marshal(data.Runs[0])
+			require.NoError(t, err)
+			var decoded map[string]any
+			require.NoError(t, json.Unmarshal(encoded, &decoded))
+			assert.Equal(t, tc.coverage, decoded["aic_coverage"])
+			assert.Contains(t, decoded, "aic")
+			assert.Equal(t, tc.cost, decoded["aic"])
 		})
 	}
 }

@@ -111,23 +111,23 @@ type WorkflowContinuation struct {
 
 // LogsSummary contains aggregate metrics across all runs
 type LogsSummary struct {
-	ObsoletePRRuns      int     `json:"obsolete_pr_runs,omitempty" console:"header:Obsolete PR Runs,omitempty"`
-	NonExecutionRuns    int     `json:"non_execution_runs,omitempty" console:"header:Jobless Runs,omitempty"`
-	ExecutedRuns        int     `json:"executed_runs" console:"-"`
-	ExecutedSuccessRuns int     `json:"executed_success_runs" console:"-"`
-	TotalRuns           int     `json:"total_runs" console:"header:Total Runs"`
-	TotalDuration       string  `json:"total_duration" console:"header:Total Duration"`
-	TotalAIC            float64 `json:"total_aic"`
-	AICCoverage         string  `json:"aic_coverage" console:"-"`
-	TotalTokens         int     `json:"total_tokens,omitempty" console:"header:Total Tokens,format:number,omitempty"`
-	TotalActionMinutes  float64 `json:"total_action_minutes" console:"header:Total Action Minutes"`
-	TotalTurns          int     `json:"total_turns" console:"header:Total Turns"`
-	TotalSteeringEvents int     `json:"total_steering_events,omitempty" console:"header:Total Steering Events,format:number,omitempty"`
-	TotalErrors         int     `json:"total_errors" console:"header:Total Errors"`
-	TotalWarnings       int     `json:"total_warnings" console:"header:Total Warnings"`
-	TotalMissingTools   int     `json:"total_missing_tools" console:"header:Total Missing Tools"`
-	TotalMissingData    int     `json:"total_missing_data" console:"header:Total Missing Data"`
-	TotalSafeItems      int     `json:"total_safe_items" console:"header:Total Safe Items"`
+	ObsoletePRRuns      int      `json:"obsolete_pr_runs,omitempty" console:"header:Obsolete PR Runs,omitempty"`
+	NonExecutionRuns    int      `json:"non_execution_runs,omitempty" console:"header:Jobless Runs,omitempty"`
+	ExecutedRuns        int      `json:"executed_runs" console:"-"`
+	ExecutedSuccessRuns int      `json:"executed_success_runs" console:"-"`
+	TotalRuns           int      `json:"total_runs" console:"header:Total Runs"`
+	TotalDuration       string   `json:"total_duration" console:"header:Total Duration"`
+	TotalAIC            *float64 `json:"total_aic"`
+	AICCoverage         string   `json:"aic_coverage" console:"-"`
+	TotalTokens         int      `json:"total_tokens,omitempty" console:"header:Total Tokens,format:number,omitempty"`
+	TotalActionMinutes  float64  `json:"total_action_minutes" console:"header:Total Action Minutes"`
+	TotalTurns          int      `json:"total_turns" console:"header:Total Turns"`
+	TotalSteeringEvents int      `json:"total_steering_events,omitempty" console:"header:Total Steering Events,format:number,omitempty"`
+	TotalErrors         int      `json:"total_errors" console:"header:Total Errors"`
+	TotalWarnings       int      `json:"total_warnings" console:"header:Total Warnings"`
+	TotalMissingTools   int      `json:"total_missing_tools" console:"header:Total Missing Tools"`
+	TotalMissingData    int      `json:"total_missing_data" console:"header:Total Missing Data"`
+	TotalSafeItems      int      `json:"total_safe_items" console:"header:Total Safe Items"`
 	// TotalDriverExitFailures counts failed runs with zero agent turns — the CLI wrapper
 	// or a pre/post-agent infrastructure step exited non-zero before the agent ran.
 	// These are infra-flakiness signals, not agent-logic regressions.
@@ -209,7 +209,7 @@ type RunData struct {
 	// TokenUsage is always emitted (even when 0) so consumers of the run list can
 	// discover the field and distinguish "no tokens recorded" from "field absent".
 	TokenUsage                 int                    `json:"token_usage" console:"header:Tokens,format:number,omitempty"`
-	AIC                        float64                `json:"aic"`
+	AIC                        *float64               `json:"aic"`
 	AICCoverage                string                 `json:"aic_coverage" console:"-"`
 	AmbientContext             *AmbientContextMetrics `json:"ambient_context,omitempty" console:"-"`
 	WorkingSet                 *WorkingSetMetrics     `json:"working_set,omitempty" console:"-"`
@@ -374,9 +374,9 @@ func (agg *logsAggregate) accumulateCachedRunTotals(run RunData) {
 }
 
 func (agg *logsAggregate) accumulateRunAIC(run RunData) {
-	if run.AICCoverage == logsAICAvailable {
+	if run.AICCoverage == logsAICAvailable && run.AIC != nil {
 		agg.runsWithAIC++
-		agg.totalAIC += run.AIC
+		agg.totalAIC += *run.AIC
 	}
 }
 
@@ -437,7 +437,6 @@ func (agg *logsAggregate) summary(totalRuns int) LogsSummary {
 	summary := LogsSummary{
 		TotalRuns:                     totalRuns,
 		TotalDuration:                 timeutil.FormatDuration(agg.totalDuration),
-		TotalAIC:                      agg.totalAIC,
 		AICCoverage:                   coverage,
 		TotalTokens:                   agg.totalTokens,
 		TotalActionMinutes:            agg.totalActionMinutes,
@@ -459,6 +458,9 @@ func (agg *logsAggregate) summary(totalRuns int) LogsSummary {
 		TotalChainedFollowupActions:   agg.totalChainedFollowupActions,
 		TotalClosedTempTargets:        agg.totalClosedTempTargets,
 		TotalGitHubAPICalls:           agg.totalGitHubAPICalls,
+	}
+	if coverage == logsAICAvailable {
+		summary.TotalAIC = new(agg.totalAIC)
 	}
 	if len(agg.engineCounts) > 0 {
 		summary.EngineCounts = agg.engineCounts
@@ -570,9 +572,13 @@ func (agg *logsAggregate) recordCachedRun(runData RunData) RunData {
 	// Older cache records cannot distinguish a recorded zero from missing cost.
 	if runData.AICCoverage == "" {
 		runData.AICCoverage = logsAICUnavailable
-		if runData.AIC > 0 {
+		if runData.AIC != nil && *runData.AIC > 0 {
 			runData.AICCoverage = logsAICAvailable
 		}
+	}
+	if runData.AICCoverage != logsAICAvailable || runData.AIC == nil {
+		runData.AIC = nil
+		runData.AICCoverage = logsAICUnavailable
 	}
 	agg.accumulateCachedRunTotals(runData)
 	agg.accumulateRunAIC(runData)
@@ -582,10 +588,18 @@ func (agg *logsAggregate) recordCachedRun(runData RunData) RunData {
 func (agg *logsAggregate) recordRunAIC(runData *RunData, usage *TokenUsageSummary) {
 	runData.AICCoverage = logsAICUnavailable
 	if usage != nil && (usage.AICFound || usage.TotalAIC > 0) {
-		runData.AIC = usage.TotalAIC
+		runData.AIC = new(usage.TotalAIC)
 		runData.AICCoverage = logsAICAvailable
 	}
+
 	agg.accumulateRunAIC(*runData)
+}
+
+func runAICValue(run RunData) float64 {
+	if run.AIC != nil {
+		return *run.AIC
+	}
+	return 0
 }
 
 // buildRunData converts a processed run into RunData while accumulating rollup totals.

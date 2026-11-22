@@ -750,7 +750,10 @@
               "type": "string"
             },
             "total_aic": {
-              "type": "number"
+              "type": [
+                "null",
+                "number"
+              ]
             },
             "aic_coverage": {
               "type": "string",
@@ -1013,7 +1016,10 @@
                 "type": "integer"
               },
               "aic": {
-                "type": "number"
+                "type": [
+                  "null",
+                  "number"
+                ]
               },
               "aic_coverage": {
                 "type": "string",

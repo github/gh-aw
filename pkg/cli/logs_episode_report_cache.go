@@ -98,6 +98,13 @@ func readEpisodeReportCache(path string, seedRunID int64) (LogsData, bool, error
 	if !valid {
 		return LogsData{}, false, errors.New("invalid episode cache: use --refresh to collect again")
 	}
+	agg := &logsAggregate{engineCounts: make(map[string]int)}
+	for i, run := range cache.Data.Runs {
+		cache.Data.Runs[i] = agg.recordCachedRun(run)
+	}
+	aicSummary := agg.summary(len(cache.Data.Runs))
+	cache.Data.Summary.TotalAIC = aicSummary.TotalAIC
+	cache.Data.Summary.AICCoverage = aicSummary.AICCoverage
 	cache.Data.EpisodeRetrieval.Cached = true
 	return cache.Data, true, nil
 }
