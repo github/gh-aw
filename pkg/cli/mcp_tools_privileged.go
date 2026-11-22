@@ -194,7 +194,7 @@ func effectiveMCPLogsToolSoftTimeoutSeconds(ctx context.Context, timeoutMinutes 
 
 // The logs tool requires write+ access and checks actor permissions.
 // Returns an error if schema generation fails.
-func registerLogsTool(server *mcp.Server, execCmd execCmdFunc, actor string, validateActor bool) error {
+func registerLogsTool(server *mcp.Server, execCmd execCmdFunc, actor string, validateActor bool, logsCache ...*mcpLogsReportCache) error {
 	// Generate schema with elicitation defaults
 	logsSchema, err := generateSchemaWithDefaults[logsArgs](map[string]any{
 		"count":      defaultMCPLogsToolCount,
@@ -221,7 +221,7 @@ func registerLogsTool(server *mcp.Server, execCmd execCmdFunc, actor string, val
 		Description: logsToolDescription,
 		InputSchema: logsSchema,
 		Icons:       mcpToolIcons("📝"),
-	}, newLogsToolHandler(execCmd, actor, validateActor))
+	}, newLogsToolHandler(execCmd, actor, validateActor, logsCache...))
 
 	return nil
 }
@@ -271,7 +271,11 @@ a run), hop/run edges, and missing evidence. Run costs are separate in run_costs
 never multiply or allocate a run's cost across its hops.`
 
 // newLogsToolHandler builds the handler for the logs tool.
-func newLogsToolHandler(execCmd execCmdFunc, actor string, validateActor bool) func(context.Context, *mcp.CallToolRequest, logsArgs) (*mcp.CallToolResult, any, error) { //nolint:largefunc // Existing MCP handler remains centralized.
+func newLogsToolHandler(execCmd execCmdFunc, actor string, validateActor bool, logsCache ...*mcpLogsReportCache) func(context.Context, *mcp.CallToolRequest, logsArgs) (*mcp.CallToolResult, any, error) { //nolint:largefunc // Existing MCP handler remains centralized.
+	cache := &defaultMCPLogsCache
+	if len(logsCache) > 0 {
+		cache = logsCache[0]
+	}
 	return func(ctx context.Context, req *mcp.CallToolRequest, args logsArgs) (*mcp.CallToolResult, any, error) {
 		if err := checkActorPermission(ctx, actor, validateActor, "logs"); err != nil {
 			return nil, nil, err
@@ -322,7 +326,7 @@ func newLogsToolHandler(execCmd execCmdFunc, actor string, validateActor bool) f
 		}
 
 		// Always write output to a file and return schema + file path
-		finalOutput := buildLogsFileResponse(outputStr)
+		finalOutput := buildLogsFileResponseWithCache(outputStr, cache.store)
 		notifyProgress(ctx, req, 100, 100, "Workflow logs downloaded")
 
 		return &mcp.CallToolResult{

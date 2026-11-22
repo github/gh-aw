@@ -33,11 +33,11 @@ Each key under `lsp` is a language identifier (lowercase, alphanumeric, hyphens,
 | `command` | **yes** | Executable name or path for the language server |
 | `args` | no | Command-line arguments passed to the server on startup |
 | `fileExtensions` | **yes** | Map of file extension (with leading `.`) to LSP language ID |
-| `version` | no | Package version to install (e.g. `"5.8.3"`). Overrides the built-in pinned default for known servers. |
+| `version` | no | Package version to install for a built-in server that supports overrides. For TypeScript, omit it or specify the bundled server version (`"6.1.0"`). |
 
 ## Built-in Servers
 
-For the languages below, the compiler injects the install step automatically — no manual `steps:` entry needed. Each is pinned to a known-good release; override with `version`.
+For the languages below, the compiler injects the install step automatically — no manual `steps:` entry needed.
 
 | Language key | Default version | Install command | Example `command` |
 |---|---|---|---|
@@ -47,12 +47,12 @@ For the languages below, the compiler injects the install step automatically —
 | `python` | `1.1.399` | `npm install -g --ignore-scripts pyright@1.1.399` | `pyright-langserver` |
 | `ruby` | `0.50.0` | `gem install solargraph -v 0.50.0` | `solargraph` |
 | `rust` | n/a | `rustup component add rust-analyzer` | `rust-analyzer` |
-| `typescript` | `5.8.3` / `4.3.3` | `npm install -g --ignore-scripts typescript@5.8.3 typescript-language-server@4.3.3` | `typescript-language-server` |
+| `typescript` | `6.0.3` / `6.1.0` | `npm ci` with the compiler's bundled lockfile | `typescript-language-server` |
 | `yaml` | `1.15.0` | `npm install -g --ignore-scripts yaml-language-server@1.15.0` | `yaml-language-server` |
 
-> The `version` field overrides the pinned version for the primary language server package (the last package in the install list). For `typescript`, it controls `typescript-language-server`; `typescript` itself stays at its hardcoded companion version (`5.8.3`).
+The built-in TypeScript server does not resolve versions at runtime. To use a different version, configure a custom server and install it from your own lockfile.
 
-Language keys not in this table still work — the compiler simply skips the auto-install step. Add a manual `steps:` entry to install the server yourself.
+Language keys not in this table still work — the compiler skips the auto-install step. Use `pre-agent-steps:` to install the server yourself.
 
 ## LSP-enabled Tools (Copilot Engine)
 
@@ -149,26 +149,6 @@ lsp:
     args: ["--stdio"]
     fileExtensions:
       ".py": python
-```
-
-### Custom Server (no built-in install)
-
-For servers without a built-in install spec, add a manual install step:
-
-```yaml
-engine:
-  id: copilot
-
-steps:
-  - name: Install custom language server
-    run: npm install -g my-custom-language-server
-
-lsp:
-  mylang:
-    command: my-custom-language-server
-    args: ["--stdio"]
-    fileExtensions:
-      ".ml": mylang
 ```
 
 ## Network Requirements

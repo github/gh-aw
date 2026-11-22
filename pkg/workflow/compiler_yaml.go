@@ -8,7 +8,6 @@ import (
 	"slices"
 	"strings"
 	"unicode/utf16"
-	"unicode/utf8"
 
 	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/logger"
@@ -70,16 +69,16 @@ func (c *Compiler) embedActivationMarkdownMetadata(metadata *GHAWMarkdownMetadat
 	return nil
 }
 
-// inertJSON escapes characters that Actions, YAML single quotes, or shell
-// single quotes would interpret, and keeps the payload ASCII so chunk
-// boundaries never split a character. These only occur inside JSON strings.
+// inertJSON takes compact JSON from json.Marshal and escapes dollar signs,
+// apostrophes, and non-printable or non-ASCII characters. Printable ASCII
+// keeps the YAML valid and lets shell chunks split at any byte boundary.
 func inertJSON(encoded []byte) string {
 	var out strings.Builder
 	for _, r := range string(encoded) {
 		switch {
-		case r == '$' || r == '\'':
+		case r == '$' || r == '\'' || r < ' ' || r == '\x7f':
 			fmt.Fprintf(&out, `\u%04x`, r) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
-		case r < utf8.RuneSelf:
+		case r <= '~':
 			out.WriteRune(r)
 		default:
 			for _, unit := range utf16.Encode([]rune{r}) {

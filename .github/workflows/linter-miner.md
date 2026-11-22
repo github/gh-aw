@@ -67,6 +67,7 @@ safe-outputs:
   create-pull-request:
     title-prefix: "[linter-miner] "
     labels: [automation, go-linters, cookie]
+    fallback-labels: ["backlog:engineering-quality", automation, go-linters, cookie]
     reviewers: [copilot]
     draft: true
     expires: 7d

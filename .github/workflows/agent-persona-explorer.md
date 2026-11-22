@@ -46,7 +46,7 @@ tools:
 safe-outputs:
   create-issue:
     title-prefix: "Agent Persona Exploration - "
-    labels: ["agent-research", "cookie"]
+    labels: ["agent-research", "cookie", "backlog:reports"]
     max: 1
     close-older-issues: true
     expires: 2d

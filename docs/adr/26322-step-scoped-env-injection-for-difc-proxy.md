@@ -3,6 +3,7 @@
 **Date**: 2026-04-15
 **Status**: Accepted
 **Deciders**: lpcox, Copilot
+**Amended**: 2026-11-21 (PR #79924): restrict the pre-agent proxy's host listener to loopback in both Docker network modes.
 
 ---
 
@@ -66,6 +67,8 @@ Wrap each custom step's `run:` block in a shell preamble that sets and unsets th
 2. `start_difc_proxy.sh` **MUST NOT** write any env vars to `$GITHUB_ENV`.
 3. `stop_difc_proxy.sh` **MUST** be responsible only for stopping the proxy container and removing the CA certificate.
 4. `stop_difc_proxy.sh` **MUST NOT** read from or write to `$GITHUB_ENV` for the purpose of restoring or clearing proxy routing vars.
+
+The pre-agent proxy serves runner-side clients. It listens on `127.0.0.1` in host-network mode. In bridge mode Docker publishes the port on host loopback and forwards requests to the container's bridge address.
 
 ### Conformance
 

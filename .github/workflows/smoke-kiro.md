@@ -53,7 +53,7 @@ safe-outputs:
     expires: 2h
     close-older-issues: true
     close-older-key: "smoke-kiro"
-    labels: [automation, testing]
+    labels: [automation, testing, "backlog:smoke-tests"]
   add-labels:
     allowed: [smoke-kiro]
   messages:

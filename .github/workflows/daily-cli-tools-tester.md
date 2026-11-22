@@ -240,7 +240,7 @@ Use the "logs" tool with count: 3 to limit results
 
 ### 2.3 Log Content Analysis
 
-Inspect only the JSON summary file explicitly exposed by the `logs` response's `file_path` under `/tmp/gh-aw/logs-cache/`, if session policy permits reading it. This tool-output handoff is distinct from private raw artifact storage at `/tmp/gh-aw/aw-mcp/logs/`; never list, search, or read that raw directory or change its permissions.
+Inspect only the JSON summary file explicitly exposed by the `logs` response's `file_path`, if session policy permits reading it. The owner-only report directory is distinct from private raw artifact storage at `/tmp/gh-aw/aw-mcp/logs/`; never list, search, or read that raw directory or change its permissions.
 
 Read bounded summary fields (run IDs, workflow names, status, timestamps, counts) rather than dumping the entire file. Validate metadata and filter consistency from those fields. A returned path alone does not prove raw logs are complete. Raw-content, directory-structure, and independent artifact-completeness checks are outside this session's scope.
 

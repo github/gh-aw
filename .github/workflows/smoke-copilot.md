@@ -106,7 +106,7 @@ safe-outputs:
       group: true
       close-older-issues: true
       close-older-key: "smoke-copilot"
-      labels: [automation, testing]
+      labels: [automation, testing, "backlog:smoke-tests"]
     create-discussion:
       category: announcements
       labels: [ai-generated]

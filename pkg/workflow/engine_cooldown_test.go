@@ -142,7 +142,8 @@ func TestEngineCooldownInstalls(t *testing.T) {
 		content := stepsToString(NewCopilotEngine().GetInstallationSteps(data))
 		assert.Contains(t, content, fmt.Sprintf("--cooldown-days %d", days))
 		assert.Contains(t, content, `"${ENGINE_VERSION}"`)
-		assert.Contains(t, content, fmt.Sprintf("NPM_CONFIG_MIN_RELEASE_AGE: '%d'", days), "SDK npm install also follows the engine policy")
+		assert.Contains(t, content, copilotSDKNodeProject.installCommand(), "the SDK uses the locked npm project")
+		assert.NotContains(t, content, "NPM_CONFIG_MIN_RELEASE_AGE", "the locked SDK install is independent of the CLI cooldown")
 	}
 }
 
