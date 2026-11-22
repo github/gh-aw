@@ -30,6 +30,7 @@ The method names mentioned in analyzer descriptions (such as `Err`, `Flush`, `Re
 - `errstringmatch` — reports `strings.Contains(err.Error(), "...")` patterns and recommends `errors.Is` / `errors.As`.
 - `fileclosenotdeferred` — reports non-deferred file `Close()` calls that can leak resources.
 - `filepathwalkpreferwalkdir` — reports `filepath.Walk` calls and recommends `filepath.WalkDir`.
+- `execcommandoutputerrdiscard` — reports `exec.Cmd` `Output()`/`CombinedOutput()` errors that are ignored or handled without preserving stderr from `*exec.ExitError`. The analyzer lives in `exec-command-output-err-discard`.
 - `execcommandwithoutcontext` — reports `exec.Command(...)` calls inside functions that already receive `context.Context` and should use `exec.CommandContext(...)`.
 - `fmterrorfnoverbs` — reports `fmt.Errorf` calls whose format string contains no verbs, recommending `errors.New` instead.
 - `formatintitoa` — reports `strconv.FormatInt(int64(x), 10)` for `int` arguments, recommending `strconv.Itoa(x)`. Supports constant decimal bases, parentheses, and import/type aliases; excludes defined integer types and non-decimal bases. Suggested fixes are limited to package-qualified calls without overlapping comments.
@@ -211,6 +212,7 @@ environment variable and gates findings on the recorded execution hit count for 
 | `errorsnewerrorstring` | Custom `go/analysis` analyzer that flags `errors.New(err.Error())` calls that discard the original error and break `errors.Is` / `errors.As` matching |
 | `errortypeassertion` | Custom `go/analysis` analyzer that flags type assertions from `error` to concrete types and recommends `errors.As` |
 | `errstringmatch` | Custom `go/analysis` analyzer that flags brittle `strings.Contains(err.Error(), "...")` checks |
+| `exec-command-output-err-discard` (`execcommandoutputerrdiscard`) | Custom `go/analysis` analyzer that flags `exec.Cmd` `Output()`/`CombinedOutput()` errors that are ignored or handled without preserving stderr |
 | `execcommandwithoutcontext` | Custom `go/analysis` analyzer that flags `exec.Command(...)` calls that should use `exec.CommandContext(...)` in context-receiving functions |
 | `fileclosenotdeferred` | Custom `go/analysis` analyzer that flags file `Close()` calls that are not deferred immediately |
 | `filepathwalkpreferwalkdir` | Custom `go/analysis` analyzer that flags `filepath.Walk` calls and recommends `filepath.WalkDir` |
