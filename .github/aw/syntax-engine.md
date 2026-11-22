@@ -62,7 +62,7 @@ See [syntax-agentic.md](syntax-agentic.md) for the full frontmatter field index.
       id: copilot
       driver:
         node: |
-          const sdk = require("@github/copilot-sdk");
+          const sdk = require("@microsoft/copilot-sdk");
           // ... driver implementation
     ```
 

@@ -119,12 +119,15 @@ func sortedUniqueStrings(values []string) []string {
 //
 // folders: the agent config directories to snapshot (e.g. ".agents", ".claude", ".github")
 // files:   the root instruction files to snapshot (e.g. "AGENTS.md", "CLAUDE.md")
-func generateSaveBaseGitHubFoldersStep(folders, files []string) []string {
+func generateSaveBaseGitHubFoldersStep(folders, files []string, stageCopilotSDKAgents bool) []string {
 	var lines []string
 	lines = append(lines, "      - name: Save agent config folders for base branch restoration\n")
 	lines = append(lines, "        env:\n")
 	lines = append(lines, fmt.Sprintf("          GH_AW_AGENT_FOLDERS: \"%s\"\n", strings.Join(folders, " ")))
 	lines = append(lines, fmt.Sprintf("          GH_AW_AGENT_FILES: \"%s\"\n", strings.Join(files, " ")))
+	if stageCopilotSDKAgents {
+		lines = append(lines, "          GH_AW_STAGE_COPILOT_SDK_AGENTS: \"true\"\n")
+	}
 	lines = append(lines, "        run: |\n")
 	lines = append(lines, "          bash \"${RUNNER_TEMP}/gh-aw/actions/save_base_github_folders.sh\"\n")
 	return lines

@@ -205,7 +205,7 @@ describe("compiler-owned Markdown metadata", () => {
       fs.writeFileSync(path.join(directory, "reader.agent.md"), "---\ndescription: Not compiled\nmodel: small\n---\nBody");
       expect(require("./copilot_harness.cjs").listCopilotAgentFiles(directory, vi.fn())).toEqual([{ name: "reader", path: path.join(directory, "reader.agent.md") }]);
       expect(require("./engine_subagent_models.cjs").listMarkdownAgentFiles(directory, vi.fn())).toEqual([{ fileName: "reader.agent.md", path: path.join(directory, "reader.agent.md"), name: null }]);
-      expect(require("./extract_inline_sub_agents.cjs").loadCopilotSDKCustomAgents(workspace, workspace, vi.fn())).toEqual([{ name: "reader", displayName: "reader", prompt: "Body" }]);
+      expect(require("./extract_inline_sub_agents.cjs").loadCopilotSDKCustomAgents(workspace, vi.fn())).toEqual([{ name: "reader", displayName: "reader", prompt: "Body" }]);
     } finally {
       fs.rmSync(workspace, { recursive: true, force: true });
     }
@@ -222,7 +222,7 @@ describe("compiler-owned Markdown metadata", () => {
       installMarkdownMetadata({ version: 2, records: [record(source, { model: "small", tools: ["Read"] })] });
       fs.writeFileSync(path.join(directory, "reader.agent.md"), `\uFEFF  ---\n${source}\n \t---\nBody`);
       const logger = vi.fn();
-      expect(require("./extract_inline_sub_agents.cjs").loadCopilotSDKCustomAgents(workspace, workspace, logger)).toMatchObject([{ name: "reader", model: "small", tools: ["Read"], prompt: "Body" }]);
+      expect(require("./extract_inline_sub_agents.cjs").loadCopilotSDKCustomAgents(workspace, logger)).toMatchObject([{ name: "reader", model: "small", tools: ["Read"], prompt: "Body" }]);
       fs.writeFileSync(path.join(directory, "invalid.agent.md"), "---\nmodel: small");
       const invalidFile = vi.fn();
       require("./engine_subagent_models.cjs").listMarkdownAgentFiles(directory, logger, { onInvalid: invalidFile });

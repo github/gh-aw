@@ -71,7 +71,7 @@ func (c *Compiler) generateLockMetadataHeader(yaml *strings.Builder, data *Workf
 			agentInfo.DetectionAgentID = data.SafeOutputs.ThreatDetection.EngineConfig.ID
 			agentInfo.DetectionAgentModel = data.SafeOutputs.ThreatDetection.Model
 		}
-		agentInfo.EngineVersions = collectEngineVersionsForMetadata(data, c.engineRegistry)
+		agentInfo.EngineVersions = c.collectEngineVersionsForMetadata(data)
 		agentInfo.AgentImageRunner = resolveAgentImageRunnerIdentifier(data.RawFrontmatter)
 		metadata := GenerateLockMetadata(LockHashInfo{FrontmatterHash: frontmatterHash, BodyHash: bodyHash}, data.StopTime, c.effectiveStrictMode(data.RawFrontmatter), agentInfo)
 		metadata.Docs = data.Docs

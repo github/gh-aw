@@ -363,7 +363,7 @@ describe("Copilot SDK evidence capture (synthetic)", () => {
         sessionStateBaseDir: directory,
         workingDirectory: directory,
         agentsBaseDir: directory,
-        sdkModule: { CopilotClient: Client, RuntimeConnection: { forUri: () => ({}) }, approveAll: () => "allow" },
+        sdkModule: { CopilotClient: Client, RuntimeConnection: { forTcp: () => ({}) }, approveAll: () => "allow" },
       });
       const saved = fs
         .readFileSync(path.join(directory, "sdk-audit", "events.jsonl"), "utf8")
