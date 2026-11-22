@@ -22,6 +22,7 @@ ENTRY_POINTS = (
     ".github/aw/instructions.md",
     ".github/aw/github-agentic-workflows.md",
     ".github/aw/create-agentic-workflow.md",
+    ".github/aw/factory.md",
     ".github/aw/create-agentic-workflow-design.md",
     ".github/aw/create-agentic-workflow-evaluation.md",
     ".github/aw/create-agentic-workflow-validation.md",
