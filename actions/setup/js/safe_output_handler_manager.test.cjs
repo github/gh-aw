@@ -11,6 +11,7 @@ import {
   main,
   loadConfig,
   loadHandlers,
+  normalizeInvocationInputs,
   processMessages,
   sortMessagesByTemporaryIdDependencies,
   sortMessageIndicesByTemporaryIdDependencies,
@@ -43,6 +44,20 @@ function renderedCommentMessage(message) {
 }
 
 describe("Safe Output Handler Manager", () => {
+  describe("normalizeInvocationInputs", () => {
+    it("preserves review-local IDs while resolving unrelated shared IDs", () => {
+      const temporaryIdMap = new Map([
+        ["aw_find1", { repo: "owner/repo", number: 10 }],
+        ["aw_issue1", { repo: "owner/repo", number: 11 }],
+      ]);
+      const message = { type: "submit_pull_request_review", body: "[Finding](#aw_find1) and #aw_issue1" };
+      expect(normalizeInvocationInputs(message, temporaryIdMap, "owner/repo", "", new Set(), new Map(), new Set(["aw_find1"]))).toEqual({
+        type: "submit_pull_request_review",
+        body: "[Finding](#aw_find1) and #11",
+      });
+    });
+  });
+
   beforeEach(() => {
     // Mock global core
     global.core = {
@@ -2049,6 +2064,28 @@ describe("Safe Output Handler Manager", () => {
       expect(calledMessage.body).not.toContain("#aw_chart1");
       // The issue does not need synthetic update since body was pre-resolved
       expect(result.outputsWithUnresolvedIds.length).toBe(0);
+    });
+
+    it("preserves review-local IDs during artifact URL substitution", async () => {
+      const messages = [
+        { type: "upload_artifact", temporary_id: "aw_find1", path: "chart.png" },
+        { type: "create_pull_request_review_comment", temporary_id: "aw_find1", path: "src/file.js", line: 10, body: "Finding" },
+        { type: "submit_pull_request_review", body: "[Finding](#aw_find1)" },
+      ];
+      const upload = vi.fn().mockResolvedValue({ tmpId: "aw_find1", artifactUrl: "https://github.com/owner/repo/actions/runs/1/artifacts/42" });
+      const comment = vi.fn().mockResolvedValue({ success: true });
+      const submit = vi.fn().mockResolvedValue({ success: true });
+      const result = await processMessages(
+        new Map([
+          ["upload_artifact", upload],
+          ["create_pull_request_review_comment", comment],
+          ["submit_pull_request_review", submit],
+        ]),
+        messages
+      );
+
+      expect(result.success).toBe(true);
+      expect(submit).toHaveBeenCalledWith(expect.objectContaining({ body: "[Finding](#aw_find1)" }), expect.anything(), expect.anything());
     });
 
     it("should silently skip message types handled by standalone steps", async () => {

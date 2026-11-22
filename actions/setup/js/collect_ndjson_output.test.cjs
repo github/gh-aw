@@ -119,6 +119,7 @@ describe("collect_ndjson_output.cjs", () => {
               body: { required: !0, type: "string", sanitize: !0, maxLength: 65e3 },
               start_line: { optionalPositiveInteger: !0 },
               side: { type: "string", enum: ["LEFT", "RIGHT"] },
+              temporary_id: { type: "string", pattern: "^#?aw_[A-Za-z0-9_]{3,12}$" },
             },
           },
           link_sub_issue: { defaultMax: 5, customValidation: "parentAndSubDifferent", fields: { parent_issue_number: { required: !0, issueNumberOrTemporaryId: !0 }, sub_issue_number: { required: !0, issueNumberOrTemporaryId: !0 } } },
@@ -751,7 +752,7 @@ describe("collect_ndjson_output.cjs", () => {
     it("should validate optional fields for create-pull-request-review-comment type", async () => {
       const testFile = "/tmp/gh-aw/test-ndjson-output.txt",
         ndjsonContent =
-          '{"type": "create_pull_request_review_comment", "path": "src/file.js", "line": 20, "start_line": 15, "side": "LEFT", "body": "Multi-line comment"}\n{"type": "create_pull_request_review_comment", "path": "src/file.js", "line": 25, "side": "INVALID", "body": "Invalid side"}';
+          '{"type": "create_pull_request_review_comment", "path": "src/file.js", "line": 20, "start_line": 15, "side": "LEFT", "body": "Multi-line comment", "temporary_id": "aw_find1"}\n{"type": "create_pull_request_review_comment", "path": "src/file.js", "line": 25, "side": "INVALID", "body": "Invalid side"}';
       (fs.writeFileSync(testFile, ndjsonContent), (process.env.GH_AW_SAFE_OUTPUTS = testFile));
       const __config = '{"create_pull_request_review_comment": {"max": 10}}',
         configPath = "/tmp/gh-aw/safeoutputs/config.json";
@@ -763,6 +764,7 @@ describe("collect_ndjson_output.cjs", () => {
       (expect(parsedOutput.items).toHaveLength(1),
         expect(parsedOutput.items[0].side).toBe("LEFT"),
         expect(parsedOutput.items[0].start_line).toBe(15),
+        expect(parsedOutput.items[0].temporary_id).toBe("aw_find1"),
         expect(parsedOutput.errors).toHaveLength(1),
         expect(parsedOutput.errors[0]).toContain("side' must be 'LEFT' or 'RIGHT'"));
     }),

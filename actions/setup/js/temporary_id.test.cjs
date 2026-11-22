@@ -745,6 +745,16 @@ describe("temporary_id.cjs", () => {
       expect(replaceArtifactUrlReferences(text, artifactUrlMap)).toBe("![before](https://github.com/owner/repo/actions/runs/1/artifacts/10) and ![after](https://github.com/owner/repo/actions/runs/1/artifacts/20)");
     });
 
+    it("should preserve review-local IDs while resolving other artifact references", async () => {
+      const { replaceArtifactUrlReferences } = await import("./temporary_id.cjs");
+      const artifactUrlMap = new Map([
+        ["aw_find1", "https://github.com/owner/repo/actions/runs/1/artifacts/10"],
+        ["aw_chart1", "https://github.com/owner/repo/actions/runs/1/artifacts/20"],
+      ]);
+      const text = "[Finding](#aw_find1) and ![chart](#aw_chart1)";
+      expect(replaceArtifactUrlReferences(text, artifactUrlMap, new Set(["aw_find1"]))).toBe("[Finding](#aw_find1) and ![chart](https://github.com/owner/repo/actions/runs/1/artifacts/20)");
+    });
+
     it("should return text unchanged when artifactUrlMap is empty", async () => {
       const { replaceArtifactUrlReferences } = await import("./temporary_id.cjs");
       const artifactUrlMap = new Map();
@@ -1142,6 +1152,11 @@ describe("temporary_id.cjs", () => {
   });
 
   describe("getCreatedTemporaryId", () => {
+    it("does not treat a PR review comment ID as a shared producer", async () => {
+      const { getCreatedTemporaryId } = await import("./temporary_id.cjs");
+      expect(getCreatedTemporaryId({ type: "create_pull_request_review_comment", temporary_id: "aw_find1" })).toBe(null);
+    });
+
     it("should return temporary_id when present and valid", async () => {
       const { getCreatedTemporaryId } = await import("./temporary_id.cjs");
 

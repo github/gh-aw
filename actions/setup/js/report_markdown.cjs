@@ -128,8 +128,72 @@ function markdownLink(source, offset, delimiters) {
     raw: source.slice(offset, destinationEnd + 1),
     label: source.slice(start + 1, labelEnd),
     destination: source.slice(labelEnd + 2, destinationEnd).replace(/\\([\\()])/g, "$1"),
+    destinationStart: labelEnd + 2,
+    destinationEnd,
+    end: destinationEnd + 1,
     image,
   };
+}
+
+/**
+ * Transform inline Markdown link destinations without touching code spans or fenced blocks.
+ * @param {string} markdown
+ * @param {(destination: string) => string} transform
+ * @returns {string}
+ */
+function transformMarkdownLinkDestinations(markdown, transform) {
+  let fence;
+  return markdown
+    .split("\n")
+    .map(line => {
+      if (fence) {
+        const closing = /^ {0,3}(`{3,}|~{3,})[ \t]*$/.exec(line);
+        if (closing && closing[1][0] === fence.character && closing[1].length >= fence.length) fence = undefined;
+        return line;
+      }
+      const opening = openingFence(line);
+      if (opening) {
+        fence = { character: opening[1][0], length: opening[1].length };
+        return line;
+      }
+
+      const delimiters = markdownDelimiters(line);
+      let output = "";
+      let copiedThrough = 0;
+      let changed = false;
+      for (let index = 0; index < line.length; index++) {
+        if (line[index] === "\\") {
+          index++;
+          continue;
+        }
+        if (line[index] === "`") {
+          const openingTicks = /^`+/.exec(line.slice(index))[0];
+          let closingIndex = line.indexOf("`", index + openingTicks.length);
+          while (closingIndex >= 0) {
+            const closingTicks = /^`+/.exec(line.slice(closingIndex))[0];
+            if (closingTicks.length === openingTicks.length) {
+              index = closingIndex + closingTicks.length - 1;
+              break;
+            }
+            closingIndex = line.indexOf("`", closingIndex + closingTicks.length);
+          }
+          continue;
+        }
+
+        const link = markdownLink(line, index, delimiters);
+        if (!link) continue;
+        const destination = line.slice(link.destinationStart, link.destinationEnd);
+        const replacement = transform(destination);
+        if (replacement !== destination) {
+          output += line.slice(copiedThrough, link.destinationStart) + replacement;
+          copiedThrough = link.destinationEnd;
+          changed = true;
+        }
+        index = link.end - 1;
+      }
+      return changed ? output + line.slice(copiedThrough) : line;
+    })
+    .join("\n");
 }
 
 /** @param {string} source */
@@ -584,4 +648,4 @@ function parseReportMarkdown(
   return blocks();
 }
 
-module.exports = { parseReportMarkdown };
+module.exports = { parseReportMarkdown, transformMarkdownLinkDestinations };

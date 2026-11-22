@@ -375,6 +375,11 @@
           "description": "Comment body content",
           "minLength": 1
         },
+        "temporary_id": {
+          "type": "string",
+          "pattern": "^#?aw_[A-Za-z0-9_]{3,12}$",
+          "description": "Optional review-local ID referenced from the review summary"
+        },
         "start_line": {
           "oneOf": [
             { "type": "number", "minimum": 1 },

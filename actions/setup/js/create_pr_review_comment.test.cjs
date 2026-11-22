@@ -135,6 +135,16 @@ describe("create_pr_review_comment.cjs", () => {
     expect(addComment).toHaveBeenCalledWith(expect.objectContaining({ temporaryId: "aw_find1" }));
   });
 
+  it("rejects duplicate review-local IDs without buffering the second comment", async () => {
+    const handler = await createHandler();
+    const first = await handler({ type: "create_pull_request_review_comment", path: "src/first.js", line: 10, body: "First", temporary_id: "aw_find1" }, {});
+    const duplicate = await handler({ type: "create_pull_request_review_comment", path: "src/second.js", line: 20, body: "Second", temporary_id: "#AW_FIND1" }, {});
+
+    expect(first.success).toBe(true);
+    expect(duplicate).toMatchObject({ success: false, error: expect.stringContaining("Duplicate review-local temporary_id") });
+    expect(buffer.getBufferedCount()).toBe(1);
+  });
+
   it("fits oversized inline comments before buffering and retains the full footer", async () => {
     const bodyFooter = "POLICY-START " + "f".repeat(1000) + " POLICY-END";
     const addComment = vi.spyOn(buffer, "addComment");

@@ -97,9 +97,10 @@ function normalizeTemporaryId(tempId) {
  * @param {string} text - The text to process
  * @param {Map<string, RepoIssuePair>} tempIdMap - Map of temporary_id to {repo, number}
  * @param {string} [currentRepo] - Current repository slug for same-repo references
+ * @param {Set<string>} [preservedIds] - Temporary IDs reserved for review-local links
  * @returns {string} Text with temporary IDs replaced with issue numbers
  */
-function replaceTemporaryIdReferences(text, tempIdMap, currentRepo) {
+function replaceTemporaryIdReferences(text, tempIdMap, currentRepo, preservedIds = new Set()) {
   // Detect and warn about malformed #aw_ references that won't be resolved
   let candidate;
   TEMPORARY_ID_CANDIDATE_PATTERN.lastIndex = 0;
@@ -111,7 +112,9 @@ function replaceTemporaryIdReferences(text, tempIdMap, currentRepo) {
   }
 
   return text.replace(TEMPORARY_ID_PATTERN, (match, tempId) => {
-    const resolved = tempIdMap.get(normalizeTemporaryId(tempId));
+    const normalizedId = normalizeTemporaryId(tempId);
+    if (preservedIds.has(normalizedId)) return match;
+    const resolved = tempIdMap.get(normalizedId);
     if (resolved !== undefined) {
       // If we have a currentRepo and the issue is in the same repo, use short format
       if (currentRepo && resolved.repo === currentRepo) {
@@ -562,9 +565,10 @@ function hasUnresolvedTemporaryIds(text, tempIdMap, artifactUrlMap) {
  *
  * @param {string} text - The text to process
  * @param {Map<string, string>|null|undefined} artifactUrlMap - Map of normalised temporary artifact ID to URL
+ * @param {Set<string>} [preservedIds] - Temporary IDs reserved for review-local links
  * @returns {string} Text with artifact ID references replaced by their URLs
  */
-function replaceArtifactUrlReferences(text, artifactUrlMap) {
+function replaceArtifactUrlReferences(text, artifactUrlMap, preservedIds = new Set()) {
   if (!artifactUrlMap || artifactUrlMap.size === 0) {
     return text;
   }
@@ -580,7 +584,9 @@ function replaceArtifactUrlReferences(text, artifactUrlMap) {
     }
   }
   return text.replace(TEMPORARY_ID_PATTERN, (match, tempId) => {
-    const url = artifactUrlMap.get(normalizeTemporaryId(tempId));
+    const normalizedId = normalizeTemporaryId(tempId);
+    if (preservedIds.has(normalizedId)) return match;
+    const url = artifactUrlMap.get(normalizedId);
     if (url !== undefined) {
       // Replace #aw_XXXX with the URL directly (no '#' prefix)
       return url;

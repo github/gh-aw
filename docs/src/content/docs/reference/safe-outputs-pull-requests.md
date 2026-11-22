@@ -349,6 +349,8 @@ An inline comment can include an optional `temporary_id`: `aw_` followed by 3 to
 
 The published summary links to the inline comment in the same review. Unresolved references stay unchanged and produce a warning. These IDs are not available in other outputs or inline comment bodies.
 
+If GitHub already has a pending review for the caller, gh-aw leaves it untouched, publishes the new review, then attempts one summary update after resolving comment URLs. The unresolved IDs may be briefly visible; if the update fails, they remain unchanged.
+
 ## Submit PR Review (`submit-pull-request-review:`)
 
 Submits a consolidated PR review. Inline comments buffered by `create-pull-request-review-comment` are included automatically.

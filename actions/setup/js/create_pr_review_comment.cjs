@@ -402,7 +402,11 @@ async function main(config = {}) {
       bufferedComment.start_line = startLine;
     }
 
-    buffer.addComment(bufferedComment);
+    if (!buffer.addComment(bufferedComment)) {
+      const error = `Duplicate review-local temporary_id '${bufferedComment.temporaryId}' in this PR review`;
+      core.warning(error);
+      return { success: false, error };
+    }
 
     core.info(`Buffered review comment on PR #${pullRequestNumber} in ${itemRepo} at ${commentItem.path}:${line}${startLine ? ` (lines ${startLine}-${line})` : ""} [${side}]`);
 
