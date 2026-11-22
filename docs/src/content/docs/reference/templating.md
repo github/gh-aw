@@ -112,7 +112,7 @@ These labels describe source capabilities, not the safety of every interpolated 
 
 ### Macro Syntax
 
-Use `{{#runtime-import filepath}}` to include file content at runtime. Use `{{#runtime-import? filepath}}` when the file is optional. All file paths resolve within `.github`, with or without the `.github/` prefix:
+Use `{{#runtime-import filepath}}` to include file content at runtime. Use `{{#runtime-import? filepath}}` when the file is optional. Unprefixed paths are relative to `.github/workflows`. Paths starting with `.github/` or `.agents/` are relative to the repository root.
 
 ```aw wrap
 ---
@@ -126,7 +126,7 @@ engine: copilot
 Follow these coding guidelines:
 
 {{#runtime-import coding-standards.md}}
-<!-- Same as: {{#runtime-import .github/coding-standards.md}} -->
+<!-- Same as: {{#runtime-import .github/workflows/coding-standards.md}} -->
 
 Review the code changes and provide feedback.
 ```
@@ -138,7 +138,7 @@ Review the code changes and provide feedback.
 
 The original buggy code was (from .github/docs/auth.go):
 
-{{#runtime-import docs/auth.go:45-52}}
+{{#runtime-import .github/docs/auth.go:45-52}}
 
 Verify the fix addresses the issue.
 ```
