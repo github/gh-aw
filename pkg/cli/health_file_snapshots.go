@@ -25,7 +25,7 @@ type healthLockSnapshot struct {
 }
 
 func useHealthFileSnapshots(collection *HealthCollection) bool {
-	return collection.localGit != nil || len(collection.workflows) > 1 || len(collection.fileSnapshots) > 0
+	return collection.pinnedBranchSHA != "" || collection.localGit != nil || len(collection.workflows) > 1 || len(collection.fileSnapshots) > 0
 }
 
 // A directory response supplies source and lock blob identities for every workflow.
@@ -79,6 +79,9 @@ func healthWorkflowFiles(ref string, collection *HealthCollection) healthFileSna
 	snapshot := healthFileSnapshot{err: err}
 	if err == nil {
 		snapshot.files, snapshot.err = parseHealthWorkflowFiles(out)
+		if snapshot.err != nil {
+			delete(collection.fleetResponses, endpoint+"\x00--jq\x00"+`map({path,sha,type})`)
+		}
 	}
 	collection.fileSnapshots[ref] = snapshot
 	collection.fileSnapshots[snapshotRef] = snapshot

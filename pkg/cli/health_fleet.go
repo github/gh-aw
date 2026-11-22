@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/url"
 	"path"
+	"path/filepath"
 	"regexp"
 	"slices"
 	"strings"
@@ -15,6 +16,7 @@ import (
 
 	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/repoutil"
+	"github.com/github/gh-aw/pkg/workflow"
 )
 
 type healthFleetScope struct {
@@ -32,16 +34,21 @@ type healthFleetWindow struct {
 }
 
 type healthFleetWorkflowEvidence struct {
-	Health         WorkflowHealth `json:"health"`
-	Failures       []RunData      `json:"failures,omitempty"`
-	IncompleteJobs bool           `json:"incomplete_jobs,omitempty"`
+	Health              WorkflowHealth                `json:"health"`
+	Failures            []RunData                     `json:"failures,omitempty"`
+	IncompleteJobs      bool                          `json:"incomplete_jobs,omitempty"`
+	IncompleteRevisions bool                          `json:"incomplete_revisions,omitempty"`
+	CacheEvidence       map[int64]HealthCacheEvidence `json:"cache_evidence,omitempty"`
 }
 
 type healthFleetState struct {
 	Version          int                                    `json:"version"`
 	Scope            healthFleetScope                       `json:"scope"`
 	Threshold        float64                                `json:"threshold"`
+	LogsDir          string                                 `json:"logs_dir,omitempty"`
 	RegistryPage     int                                    `json:"registry_page"`
+	RegistryDrift    bool                                   `json:"registry_drift,omitempty"`
+	RegistrySeen     map[string]bool                        `json:"registry_seen,omitempty"`
 	Workflows        []GitHubWorkflow                       `json:"workflows"`
 	Windows          []healthFleetWindow                    `json:"windows"`
 	UnresolvedSlices int                                    `json:"unresolved_slices"`
@@ -56,25 +63,49 @@ func runHealthFleet(ctx context.Context, config HealthConfig, start, end, starte
 		return errors.New("--repo must be [HOST/]OWNER/REPO")
 	}
 	host = normalizedGitHubAPIHost(host)
+	if config.LogsDir == "" {
+		config.LogsDir = defaultLogsOutputDir
+	}
+	logsDir, err := filepath.Abs(config.LogsDir)
+	if err != nil {
+		return fmt.Errorf("resolve health logs directory: %w", err)
+	}
+	config.LogsDir = logsDir
 	state, err := loadHealthFleetCheckpoint(config, host, repo, start, end)
 	if err != nil {
 		return err
 	}
 	config.StartDate, config.EndDate = state.Scope.Start.Format(time.RFC3339Nano), state.Scope.End.Format(time.RFC3339Nano)
 	config.Threshold = state.Threshold
+	if state.LogsDir != "" {
+		savedLogsDir, err := filepath.Abs(state.LogsDir)
+		if err != nil {
+			return fmt.Errorf("resolve checkpoint logs directory: %w", err)
+		}
+		if config.inputLogsDir && config.LogsDir != savedLogsDir {
+			return errors.New("health checkpoint logs directory does not match --logs-dir; omit the flag to resume")
+		}
+		config.LogsDir = savedLogsDir
+	}
+	if state.Scope.Repository != "" {
+		_, host = repoutil.NormalizeRepoForAPI(state.Scope.Repository)
+		host = normalizedGitHubAPIHost(host)
+	}
 	collection := newHealthCollection(ctx, config, state.Scope.Start, state.Scope.End)
 	config.collection = collection
 	collection.Host, collection.startedAt = host, started
 	collection.MinimumRuns = healthMinimumRuns
 	collection.fleetResponses = state.Responses
 	collection.repoOverride = config.RepoOverride
-	if err := collectHealthFleet(state, config); err != nil && !collection.stopped {
-		return err
-	}
+	collectErr := collectHealthFleet(state, config)
 	if config.Checkpoint != "" {
+		evictInvalidHealthFleetResponses(state.Responses)
 		if err := saveHealthFleetCheckpoint(config.Checkpoint, state); err != nil {
-			return err
+			return errors.Join(collectErr, err)
 		}
+	}
+	if collectErr != nil && !collection.stopped {
+		return collectErr
 	}
 	return renderHealthFleet(state, config)
 }
@@ -85,7 +116,7 @@ func validHealthFleetRepository(host, repo string) bool {
 		(host == "" || healthFleetHostPattern.MatchString(host))
 }
 
-var healthFleetHostPattern = regexp.MustCompile(`^[a-zA-Z0-9]+(?:[a-zA-Z0-9-]*[a-zA-Z0-9])?(?:\.[a-zA-Z0-9]+(?:[a-zA-Z0-9-]*[a-zA-Z0-9])?)+$`)
+var healthFleetHostPattern = regexp.MustCompile(`^[a-zA-Z0-9]+(?:[a-zA-Z0-9-]*[a-zA-Z0-9])?(?:\.[a-zA-Z0-9]+(?:[a-zA-Z0-9-]*[a-zA-Z0-9])?)*(?::[0-9]+)?$`)
 
 func validHealthFleetPath(file string) bool {
 	return path.Dir(file) == constants.WorkflowsDir && path.Clean(file) == file && strings.HasSuffix(file, ".lock.yml")
@@ -102,6 +133,7 @@ func collectHealthFleet(state *healthFleetState, config HealthConfig) error {
 			return err
 		}
 		if !validHealthFleetRepository(collection.Host, repo.FullName) || repo.DefaultBranch == "" {
+			delete(state.Responses, healthRepositoryEndpoint(collection.repoOverride)+"\x00--jq\x00{full_name,default_branch}")
 			return errors.New("health fleet repository response is missing its identity or default branch")
 		}
 		state.Scope.Branch = repo.DefaultBranch
@@ -109,7 +141,6 @@ func collectHealthFleet(state *healthFleetState, config HealthConfig) error {
 		clear(state.Responses)
 	}
 	collection.repoOverride = state.Scope.Repository
-	config.RepoOverride = state.Scope.Repository
 	collection.scanBranch, collection.DefaultBranch = state.Scope.Branch, state.Scope.Branch
 	if state.Scope.HeadSHA == "" {
 		endpoint := path.Join(healthRepositoryEndpoint(collection.repoOverride), "git/ref/heads", url.PathEscape(state.Scope.Branch))
@@ -120,6 +151,7 @@ func collectHealthFleet(state *healthFleetState, config HealthConfig) error {
 		if sha := strings.TrimSpace(string(out)); validHealthBlobSHA(sha) {
 			state.Scope.HeadSHA = sha
 		} else {
+			delete(state.Responses, endpoint+"\x00--jq\x00.object.sha")
 			return errors.New("health fleet default branch response is missing its commit SHA")
 		}
 	}
@@ -138,6 +170,24 @@ func collectHealthFleet(state *healthFleetState, config HealthConfig) error {
 }
 
 func collectHealthFleetRegistry(state *healthFleetState, collection *HealthCollection) error {
+	snapshot := healthWorkflowFiles(state.Scope.Branch, collection)
+	if snapshot.err != nil {
+		return snapshot.err
+	}
+	if state.RegistrySeen == nil {
+		state.RegistrySeen = make(map[string]bool)
+		for _, workflow := range state.Workflows {
+			state.RegistrySeen[workflow.Path] = true
+		}
+	}
+	state.Workflows = slices.DeleteFunc(state.Workflows, func(w GitHubWorkflow) bool {
+		if _, exists := snapshot.files[w.Path]; !exists {
+			state.RegistryDrift = true
+			delete(state.Verified, w.Path)
+			return true
+		}
+		return false
+	})
 	for state.RegistryPage > 0 {
 		endpoint := fmt.Sprintf("%s/actions/workflows?per_page=100&page=%d",
 			healthRepositoryEndpoint(collection.repoOverride), state.RegistryPage)
@@ -152,7 +202,14 @@ func collectHealthFleetRegistry(state *healthFleetState, collection *HealthColle
 			return errors.New("health fleet registry response did not contain workflows")
 		}
 		for _, workflow := range payload.Workflows {
+			if validHealthFleetPath(workflow.Path) {
+				state.RegistrySeen[workflow.Path] = true
+			}
 			if workflow.State == "active" && validHealthFleetPath(workflow.Path) {
+				if _, exists := snapshot.files[workflow.Path]; !exists {
+					state.RegistryDrift = true
+					continue
+				}
 				if !slices.ContainsFunc(state.Workflows, func(previous GitHubWorkflow) bool { return previous.Path == workflow.Path }) {
 					state.Workflows = append(state.Workflows, workflow)
 				}
@@ -163,6 +220,13 @@ func collectHealthFleetRegistry(state *healthFleetState, collection *HealthColle
 			break
 		}
 		state.RegistryPage++
+	}
+	if state.RegistryPage == 0 {
+		for file := range snapshot.files {
+			if validHealthFleetPath(file) && !state.RegistrySeen[file] {
+				state.RegistryDrift = true
+			}
+		}
 	}
 	collection.workflows = state.Workflows
 	return nil
@@ -185,6 +249,7 @@ func collectHealthFleetInventory(state *healthFleetState, collection *HealthColl
 		if err := healthFleetAPI(collection, endpoint, &payload, healthFleetRunProjection); err != nil {
 			return err
 		}
+		delete(state.Responses, endpoint+"\x00--jq\x00"+healthFleetRunProjection)
 		if payload.Total == nil || payload.Runs == nil {
 			return errors.New("health fleet run response did not contain total_count and workflow_runs")
 		}
@@ -203,7 +268,6 @@ func collectHealthFleetInventory(state *healthFleetState, collection *HealthColl
 			}
 		}
 		state.advanceWindow(window, *payload.Total, len(payload.Runs))
-		delete(state.Responses, endpoint+"\x00--jq\x00"+healthFleetRunProjection)
 	}
 	return nil
 }
@@ -236,9 +300,42 @@ func healthFleetAPI(collection *HealthCollection, endpoint string, dst any, proj
 		return err
 	}
 	if err := json.Unmarshal(out, dst); err != nil {
+		delete(collection.fleetResponses, endpoint+"\x00--jq\x00"+projection)
 		return fmt.Errorf("invalid health fleet API response: %w", err)
 	}
 	return nil
+}
+
+// Job responses are reused across resumptions, including optional failed reads.
+func evictInvalidHealthFleetResponses(responses map[string][]byte) {
+	for key, body := range responses {
+		endpoint, extra, _ := strings.Cut(key, "\x00")
+		switch {
+		case extra == "--jq\x00.object.sha" || extra == "--jq\x00.sha":
+			if !validHealthBlobSHA(strings.TrimSpace(string(body))) {
+				delete(responses, key)
+			}
+		case extra == "--jq\x00"+`map({path,sha,type})`:
+			if _, err := parseHealthWorkflowFiles(body); err != nil {
+				delete(responses, key)
+			}
+		case strings.Contains(endpoint, "/jobs?"):
+			var payload struct {
+				Jobs       []JobInfoWithDuration `json:"jobs"`
+				TotalCount *int                  `json:"total_count"`
+			}
+			if json.Unmarshal(body, &payload) != nil || payload.Jobs == nil {
+				delete(responses, key)
+			}
+		case (strings.Contains(endpoint, "/git/blobs/") || strings.Contains(endpoint, ".lock.yml?")) &&
+			strings.HasPrefix(extra, "--jq\x00.content | @base64d"):
+			header, _, _ := strings.Cut(string(body), "\n")
+			metadata, _, err := workflow.ExtractMetadataFromLockFile(header)
+			if err != nil || metadata == nil || metadata.FrontmatterHash == "" || metadata.BodyHash == "" {
+				delete(responses, key)
+			}
+		}
+	}
 }
 
 func (state *healthFleetState) groupedRuns() map[string][]WorkflowRun {
@@ -269,7 +366,7 @@ func verifyHealthFleet(state *healthFleetState, config HealthConfig) error {
 		return cmp.Or(cmp.Compare(failures[b.Path], failures[a.Path]), cmp.Compare(a.Path, b.Path))
 	})
 	for _, target := range registry {
-		if _, done := state.Verified[target.Path]; done {
+		if previous, done := state.Verified[target.Path]; done && !previous.IncompleteJobs {
 			continue
 		}
 		if err := checkHealthTimeBudget(config.collection); err != nil {

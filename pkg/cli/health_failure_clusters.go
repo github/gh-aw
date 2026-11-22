@@ -1,11 +1,47 @@
 package cli
 
 import (
+	"path"
 	"path/filepath"
 	"strconv"
+	"strings"
 
+	"github.com/github/gh-aw/pkg/parser"
 	"github.com/github/gh-aw/pkg/workflow"
 )
+
+func healthFleetIntentionalFailure(workflowPath string, collection *HealthCollection) bool {
+	if collection == nil || !validHealthFleetPath(workflowPath) || !validHealthBlobSHA(collection.pinnedBranchSHA) {
+		return false
+	}
+	enableHealthLocalGit(WorkflowRun{}, collection)
+	if collection.localGit == nil {
+		return false
+	}
+	snapshot := healthWorkflowFiles(collection.scanBranch, collection)
+	if snapshot.err != nil {
+		return false
+	}
+	source := strings.TrimSuffix(workflowPath, ".lock.yml") + ".md"
+	sha := snapshot.files[path.Clean(source)]
+	if sha == "" {
+		return false
+	}
+	content, err := collection.localGit.blob(sha)
+	if err != nil {
+		return false
+	}
+	result, err := parser.ExtractFrontmatterFromContent(string(content))
+	if err != nil || result == nil {
+		return false
+	}
+	features, ok := result.Frontmatter["features"].(map[string]any)
+	if !ok {
+		return false
+	}
+	value, ok := features["intentional-failure"].(bool)
+	return ok && value
+}
 
 // Reuse logs clustering without downloading artifacts or retaining full cached analyses.
 func buildHealthFailureClusters(runs []WorkflowRun, config HealthConfig) ([]FailureCluster, *FailureInvestigation) {

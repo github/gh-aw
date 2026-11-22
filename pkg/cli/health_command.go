@@ -39,6 +39,7 @@ type HealthConfig struct {
 	explicitTimeWindow bool
 	inputStartDate     bool
 	inputEndDate       bool
+	inputLogsDir       bool
 }
 
 const healthCommandDescription = `Display workflow health metrics, success rates, and execution trends.
@@ -130,6 +131,7 @@ func NewHealthCommand() *cobra.Command {
 				Timeout:      timeout,
 				Full:         getBoolFlag(cmd, "full"),
 				Checkpoint:   getStringFlag(cmd, "checkpoint"),
+				inputLogsDir: cmd.Flags().Changed("logs-dir"),
 			})
 		},
 	}

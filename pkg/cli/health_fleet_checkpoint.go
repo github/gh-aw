@@ -8,6 +8,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
@@ -28,7 +29,7 @@ func loadHealthFleetCheckpoint(config HealthConfig, host, repo string, start, en
 	if err != nil {
 		return nil, fmt.Errorf("inspect health checkpoint: %w", err)
 	}
-	if !info.Mode().IsRegular() || info.Mode().Perm()&0o077 != 0 || info.Size() > healthFleetCheckpointLimit {
+	if !info.Mode().IsRegular() || (runtime.GOOS != "windows" && info.Mode().Perm()&0o077 != 0) || info.Size() > healthFleetCheckpointLimit {
 		return nil, errors.New("health checkpoint must be a private regular file within the size limit")
 	}
 	file, err := os.Open(config.Checkpoint)
@@ -57,8 +58,8 @@ func loadHealthFleetCheckpoint(config HealthConfig, host, repo string, start, en
 	}
 	if state.Scope.Repository != "" {
 		savedRepo, savedHost := repoutil.NormalizeRepoForAPI(state.Scope.Repository)
-		if !validHealthFleetRepository(savedHost, savedRepo) || !strings.EqualFold(host, savedHost) ||
-			(repo != "" && !strings.EqualFold(repo, savedRepo)) {
+		if !validHealthFleetRepository(savedHost, savedRepo) ||
+			(repo != "" && (!strings.EqualFold(host, savedHost) || !strings.EqualFold(repo, savedRepo))) {
 			return nil, errors.New("health checkpoint repository does not match --repo")
 		}
 	} else if repo != "" || state.Scope.Branch != "" {
@@ -75,6 +76,7 @@ func newHealthFleetState(config HealthConfig, host, repo string, start, end time
 	state := &healthFleetState{
 		Version: healthFleetCheckpointVersion, Scope: healthFleetScope{Start: start, End: end},
 		Threshold: config.Threshold, RegistryPage: 1,
+		LogsDir:   config.LogsDir,
 		Windows:   []healthFleetWindow{{Start: start.Unix(), End: end.Unix(), Page: 1}},
 		Runs:      make(map[int64]WorkflowRun),
 		Verified:  make(map[string]healthFleetWorkflowEvidence),

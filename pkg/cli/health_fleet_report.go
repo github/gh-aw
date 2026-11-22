@@ -5,66 +5,146 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"slices"
 )
 
+const healthFleetMaximumBoundaryProbes = 32
+
 func verifyHealthFleetWorkflow(target GitHubWorkflow, history []WorkflowRun, config HealthConfig) (healthFleetWorkflowEvidence, error) {
 	collection := config.collection
-	var sample []WorkflowRun
-	incompleteJobs := false
-	boundaries := make(map[string]struct{})
-	representatives := make(map[string]struct{})
+	sampler := healthFleetSampler{
+		collection: collection, boundaries: make(map[string]struct{}),
+		representatives: make(map[string]struct{}), full: make(map[string]struct{}),
+		probedRefs: make(map[string]map[string]struct{}),
+	}
+	if err := sampler.collect(history); err != nil {
+		return healthFleetWorkflowEvidence{}, err
+	}
+	sample := sampler.sample
+	health := calculateCurrentWorkflowHealth(target.Name, sample, config)
+	health.WorkflowPath = target.Path
+	health.IntentionalFailure = healthFleetIntentionalFailure(target.Path, collection)
+	failures := healthFailureRecords(currentHealthRuns(sample, health.Revisions), config)
+	for i := range failures {
+		failures[i].IntentionalFailure = health.IntentionalFailure
+	}
+	if err := checkHealthTimeBudget(collection); err != nil {
+		return healthFleetWorkflowEvidence{}, err
+	}
+	cacheEvidence := make(map[int64]HealthCacheEvidence)
+	for _, run := range sample {
+		if evidence, ok := collection.CacheEvidence[run.DatabaseID]; ok {
+			cacheEvidence[run.DatabaseID] = evidence
+		}
+	}
+	return healthFleetWorkflowEvidence{Health: health, Failures: failures, IncompleteJobs: sampler.incompleteJobs,
+		IncompleteRevisions: sampler.incompleteRevisions, CacheEvidence: cacheEvidence}, nil
+}
+
+type healthFleetSampler struct {
+	collection          *HealthCollection
+	sample              []WorkflowRun
+	incompleteJobs      bool
+	incompleteRevisions bool
+	boundaries          map[string]struct{}
+	representatives     map[string]struct{}
+	full                map[string]struct{}
+	probedRefs          map[string]map[string]struct{}
+}
+
+func (sampler *healthFleetSampler) resolveRevision(run WorkflowRun) bool {
+	if _, full := sampler.full[run.Event]; !full {
+		resolveHealthRevision(run, sampler.collection)
+		return true
+	}
+	// A full current cohort needs only source probes to find an older
+	// boundary; do not enrich runs that cannot enter that cohort.
+	if !healthRunHasWorkflowRevision(run) {
+		return false
+	}
+	refs := sampler.probedRefs[run.Event]
+	if refs == nil {
+		refs = make(map[string]struct{})
+		sampler.probedRefs[run.Event] = refs
+	}
+	if _, seen := refs[run.HeadSha]; seen {
+		return false
+	}
+	if len(refs) >= healthFleetMaximumBoundaryProbes {
+		sampler.incompleteRevisions = true
+		sampler.boundaries[run.Event] = struct{}{}
+		return false
+	}
+	refs[run.HeadSha] = struct{}{}
+	resolveHealthSourceRevision(run, run.HeadSha, sampler.collection)
+	return true
+}
+
+func (sampler *healthFleetSampler) collect(history []WorkflowRun) error {
+	collection := sampler.collection
 	for _, run := range history {
-		if _, stopped := boundaries[run.Event]; stopped || isIgnoredHealthRun(run) {
+		if _, stopped := sampler.boundaries[run.Event]; stopped || isIgnoredHealthRun(run) {
 			continue
 		}
-		resolveHealthRevision(run, collection)
+		if !sampler.resolveRevision(run) {
+			continue
+		}
 		if err := checkHealthTimeBudget(collection); err != nil {
-			return healthFleetWorkflowEvidence{}, err
+			return err
 		}
 		if collection.stopped {
-			return healthFleetWorkflowEvidence{}, errors.New(collection.Warning)
+			return errors.New(collection.Warning)
 		}
-		if healthSourceChanged(run, collection) {
-			boundaries[run.Event] = struct{}{}
-			sample = append(sample, run)
-			// Examine other events too: a green schedule sample must not hide an
-			// older failure from a different trigger on the same revision.
+		changed := healthSourceChanged(run, collection)
+		if _, full := sampler.full[run.Event]; full && !changed {
 			continue
 		}
 		failed := isClusterFailureConclusion(run.Conclusion)
-		if _, sampled := representatives[run.Event]; failed && !sampled {
+		if _, sampled := sampler.representatives[run.Event]; failed && !sampled && !changed {
 			if err := collectHealthRepresentativeJobs(run, collection); err != nil && collection.stopped {
-				return healthFleetWorkflowEvidence{}, err
+				return err
 			}
-			incompleteJobs = incompleteJobs || !collection.JobEvidence[run.DatabaseID].Complete
+			sampler.incompleteJobs = sampler.incompleteJobs || !collection.JobEvidence[run.DatabaseID].Complete
 		}
 		if failed || run.Status == "waiting" {
 			hasJobs, err := healthRunHasJobs(run, collection)
 			if err != nil {
-				return healthFleetWorkflowEvidence{}, err
+				return err
 			}
 			if !hasJobs {
 				continue
 			}
 		}
+		if changed {
+			sampler.boundaries[run.Event] = struct{}{}
+			sampler.sample = append(sampler.sample, run)
+			continue
+		}
 		if failed {
-			representatives[run.Event] = struct{}{}
+			sampler.representatives[run.Event] = struct{}{}
 		}
 		if !run.StartedAt.IsZero() && !run.UpdatedAt.IsZero() {
 			run.Duration = run.UpdatedAt.Sub(run.StartedAt)
 		}
-		sample = append(sample, run)
+		sampler.sample = append(sampler.sample, run)
+		sampler.updateBoundary(run.Event)
+	}
+	return nil
+}
 
+func (sampler *healthFleetSampler) updateBoundary(event string) {
+	for _, revision := range healthRevisionStatuses(sampler.sample, sampler.collection) {
+		if revision.Event == event {
+			if revision.Previous != nil && revision.Previous.IndependentRuns >= healthMinimumRuns {
+				sampler.boundaries[event] = struct{}{}
+			} else if revision.Current.IndependentRuns >= healthMinimumRuns {
+				sampler.full[event] = struct{}{}
+			}
+			break
+		}
 	}
-	health := calculateCurrentWorkflowHealth(target.Name, sample, config)
-	health.WorkflowPath = target.Path
-	failures := healthFailureRecords(currentHealthRuns(sample, health.Revisions), config)
-	if err := checkHealthTimeBudget(collection); err != nil {
-		return healthFleetWorkflowEvidence{}, err
-	}
-	return healthFleetWorkflowEvidence{Health: health, Failures: failures, IncompleteJobs: incompleteJobs}, nil
 }
 
 type healthFleetFailure struct {
@@ -88,16 +168,17 @@ type healthFleetAction struct {
 }
 
 type healthFleetCoverage struct {
-	RegistryComplete   bool   `json:"registry_complete"`
-	InventoryComplete  bool   `json:"inventory_complete"`
-	VerificationDone   bool   `json:"verification_complete"`
-	WorkflowsVerified  int    `json:"workflows_verified"`
-	WorkflowsRemaining int    `json:"workflows_remaining"`
-	WindowsRemaining   int    `json:"windows_remaining"`
-	UnresolvedSlices   int    `json:"unresolved_slices"`
-	IncompleteJobs     int    `json:"workflows_with_incomplete_job_evidence"`
-	Partial            bool   `json:"partial"`
-	Reason             string `json:"reason,omitempty"`
+	RegistryComplete    bool   `json:"registry_complete"`
+	InventoryComplete   bool   `json:"inventory_complete"`
+	VerificationDone    bool   `json:"verification_complete"`
+	WorkflowsVerified   int    `json:"workflows_verified"`
+	WorkflowsRemaining  int    `json:"workflows_remaining"`
+	WindowsRemaining    int    `json:"windows_remaining"`
+	UnresolvedSlices    int    `json:"unresolved_slices"`
+	IncompleteJobs      int    `json:"workflows_with_incomplete_job_evidence"`
+	IncompleteRevisions int    `json:"workflows_with_incomplete_revision_evidence"`
+	Partial             bool   `json:"partial"`
+	Reason              string `json:"reason,omitempty"`
 }
 
 type healthFleetReport struct {
@@ -115,10 +196,11 @@ type healthFleetReport struct {
 }
 
 type healthFleetDetails struct {
-	Workflows              []WorkflowHealth      `json:"workflows"`
-	FailureRepresentatives []healthFleetRunRef   `json:"failure_representatives"`
-	FailureClusters        []FailureCluster      `json:"failure_clusters"`
-	FailureInvestigation   *FailureInvestigation `json:"failure_investigation,omitempty"`
+	Workflows              []WorkflowHealth              `json:"workflows"`
+	FailureRepresentatives []healthFleetRunRef           `json:"failure_representatives"`
+	FailureClusters        []FailureCluster              `json:"failure_clusters"`
+	FailureInvestigation   *FailureInvestigation         `json:"failure_investigation,omitempty"`
+	CacheEvidence          map[int64]HealthCacheEvidence `json:"cache_evidence,omitempty"`
 }
 
 type healthFleetRunRef struct {
@@ -178,11 +260,10 @@ func renderHealthFleet(state *healthFleetState, config HealthConfig) error {
 	return nil
 }
 
-func makeHealthFleetReport(state *healthFleetState, config HealthConfig) healthFleetReport {
-	collection := config.collection
+func makeHealthFleetCoverage(state *healthFleetState, collection *HealthCollection) healthFleetCoverage {
 	coverage := healthFleetCoverage{
-		RegistryComplete:  state.RegistryPage == 0,
-		InventoryComplete: state.RegistryPage == 0 && len(state.Windows) == 0 && state.UnresolvedSlices == 0,
+		RegistryComplete:  state.RegistryPage == 0 && !state.RegistryDrift,
+		InventoryComplete: state.RegistryPage == 0 && !state.RegistryDrift && len(state.Windows) == 0 && state.UnresolvedSlices == 0,
 		WorkflowsVerified: len(state.Verified), WorkflowsRemaining: len(state.Workflows) - len(state.Verified),
 		WindowsRemaining: len(state.Windows), UnresolvedSlices: state.UnresolvedSlices,
 		Reason: collection.Reason,
@@ -192,11 +273,26 @@ func makeHealthFleetReport(state *healthFleetState, config HealthConfig) healthF
 		if evidence.IncompleteJobs {
 			coverage.IncompleteJobs++
 		}
+		if evidence.IncompleteRevisions {
+			coverage.IncompleteRevisions++
+		}
 	}
-	if coverage.Reason == "" && coverage.IncompleteJobs > 0 {
-		coverage.Reason = "job_evidence_incomplete"
+	if state.RegistryDrift {
+		coverage.Reason = "registry_drift"
+	} else if coverage.Reason == "" {
+		if coverage.IncompleteRevisions > 0 {
+			coverage.Reason = "revision_boundary_incomplete"
+		} else if coverage.IncompleteJobs > 0 {
+			coverage.Reason = "job_evidence_incomplete"
+		}
 	}
-	coverage.Partial = collection.Partial || !coverage.VerificationDone || coverage.IncompleteJobs > 0
+	coverage.Partial = collection.Partial || !coverage.VerificationDone || coverage.IncompleteJobs > 0 || coverage.IncompleteRevisions > 0
+	return coverage
+}
+
+func makeHealthFleetReport(state *healthFleetState, config HealthConfig) healthFleetReport {
+	collection := config.collection
+	coverage := makeHealthFleetCoverage(state, collection)
 	report := healthFleetReport{SchemaVersion: 1, Scope: state.Scope, Coverage: coverage,
 		TotalWorkflows: len(state.Workflows), HistoricalRuns: len(state.Runs), Outcomes: make(map[string]int),
 		StatusCounts: make(map[string]int), TopFailures: []healthFleetFailure{}, Clusters: []healthFleetCluster{}}
@@ -204,6 +300,7 @@ func makeHealthFleetReport(state *healthFleetState, config HealthConfig) healthF
 	var failures []RunData
 	workflows := make([]WorkflowHealth, 0, len(state.Workflows))
 	representatives := []healthFleetRunRef{}
+	cacheEvidence := make(map[int64]HealthCacheEvidence)
 	for _, workflow := range state.Workflows {
 		health := WorkflowHealth{WorkflowName: workflow.Name, WorkflowPath: workflow.Path, Status: "not_collected"}
 		if evidence, done := state.Verified[workflow.Path]; done {
@@ -211,6 +308,7 @@ func makeHealthFleetReport(state *healthFleetState, config HealthConfig) healthF
 			failures = append(failures, evidence.Failures...)
 			if config.Full {
 				representatives = append(representatives, fleetFailureRepresentatives(evidence)...)
+				maps.Copy(cacheEvidence, evidence.CacheEvidence)
 			}
 		}
 		report.StatusCounts[health.Status]++
@@ -225,13 +323,14 @@ func makeHealthFleetReport(state *healthFleetState, config HealthConfig) healthF
 		}
 		report.Clusters = append(report.Clusters, row)
 	}
-	if config.Checkpoint != "" && !coverage.VerificationDone && collection.stopped {
+	hasResumableWork := state.RegistryPage != 0 || len(state.Windows) != 0 || coverage.WorkflowsRemaining > 0
+	if config.Checkpoint != "" && (coverage.IncompleteJobs > 0 || (hasResumableWork && collection.stopped)) {
 		report.NextAction = &healthFleetAction{Type: "resume", Checkpoint: config.Checkpoint}
 	} else if investigation != nil && len(investigation.SelectedRuns) > 0 {
 		report.NextAction = &healthFleetAction{Type: "audit", RunURL: investigation.SelectedRuns[0].URL}
 	}
 	if config.Full {
-		report.Details = &healthFleetDetails{Workflows: workflows, FailureRepresentatives: representatives, FailureClusters: clusters, FailureInvestigation: investigation}
+		report.Details = &healthFleetDetails{Workflows: workflows, FailureRepresentatives: representatives, FailureClusters: clusters, FailureInvestigation: investigation, CacheEvidence: cacheEvidence}
 	}
 	return report
 }
@@ -241,7 +340,7 @@ func (report *healthFleetReport) summarizeInventory(state *healthFleetState) {
 		var failure healthFleetFailure
 		for _, run := range history {
 			report.Outcomes[cmp.Or(run.Conclusion, run.Status, "unknown")]++
-			if run.Conclusion != "failure" {
+			if !isClusterFailureConclusion(run.Conclusion) {
 				continue
 			}
 			if failure.Failures == 0 {
