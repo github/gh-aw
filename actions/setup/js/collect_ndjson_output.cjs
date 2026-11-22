@@ -399,7 +399,7 @@ async function main() {
     let collectorDriverExitCode;
     let collectorRetryCount;
     let collectorEngineErrorType;
-    const hasTerminalOutput = parsedItems.some(item => !["report_missing_tool", "report_missing_data"].includes(item.type));
+    const hasTerminalOutput = parsedItems.some(item => !["report_missing_tool", "report_missing_data", "request_continuation"].includes(item.type));
     let failedFinalResult = false;
     let session = process.env.GH_AW_PROTECTED_SESSION_CAPTURE === "1" ? collectOutcomeSession(TMP_GH_AW_PATH) : undefined;
     if (!queueScope && hasTerminalOutput) {
@@ -418,6 +418,11 @@ async function main() {
       collectorDriverExitCode = incompleteOutcome.driverExitCode;
       collectorRetryCount = incompleteOutcome.retryCount;
       collectorEngineErrorType = incompleteOutcome.engineErrorType;
+    }
+    for (const item of parsedItems) {
+      if (item.type === "request_continuation") {
+        item.timestamp = new Date().toISOString();
+      }
     }
     const validatedOutput = {
       items: parsedItems,

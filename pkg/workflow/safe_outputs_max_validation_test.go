@@ -203,7 +203,12 @@ func TestValidateSafeOutputsMaxFieldCoverage(t *testing.T) {
 			err := validateSafeOutputsMax(cfg)
 			require.Errorf(t, err,
 				"validateSafeOutputsMax should detect invalid max for field %q (tool: %q); add a direct-access check", fieldName, toolName)
-			assert.Containsf(t, err.Error(), "max must be a positive integer or -1",
+			expected := "max must be a positive integer or -1"
+			if fieldName == "RequestContinuation" {
+				// Continuation requests are bounded: -1 (unlimited) is rejected.
+				expected = "max must be a positive integer,"
+			}
+			assert.Containsf(t, err.Error(), expected,
 				"error for field %q should explain valid values", fieldName)
 		})
 	}

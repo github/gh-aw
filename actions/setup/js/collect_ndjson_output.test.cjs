@@ -227,6 +227,22 @@ describe("collect_ndjson_output.cjs", () => {
         expect(mockCore.info).toHaveBeenCalledWith(`Output file does not exist: ${missingFile}`),
         expect(mockCore.exportVariable).toHaveBeenCalledWith("GH_AW_AGENT_OUTPUT", path.join(TMP_GH_AW_PATH, AGENT_OUTPUT_FILENAME)));
     }),
+    it("stamps continuation requests before upload without treating them as terminal output", async () => {
+      const testFile = "/tmp/gh-aw/test-ndjson-output.txt";
+      fs.writeFileSync(testFile, JSON.stringify({ type: "request_continuation", message: "Follow-up work remains", timestamp: "agent-supplied" }));
+      process.env.GH_AW_SAFE_OUTPUTS = testFile;
+      fs.writeFileSync(process.env.GH_AW_SAFE_OUTPUTS_CONFIG_PATH, JSON.stringify({ request_continuation: { max: 1 } }));
+      fs.writeFileSync(process.env.GH_AW_VALIDATION_CONFIG_PATH, JSON.stringify({ request_continuation: { defaultMax: 1, fields: { message: { required: true, type: "string", sanitize: true, maxLength: 1024 } } } }));
+
+      await eval(`(async () => { ${collectScript}; await main(); })()`);
+
+      const output = JSON.parse(fs.readFileSync(path.join(TMP_GH_AW_PATH, AGENT_OUTPUT_FILENAME), "utf8"));
+      const request = output.items.find(item => item.type === "request_continuation");
+      expect(request.timestamp).not.toBe("agent-supplied");
+      expect(Number.isNaN(Date.parse(request.timestamp))).toBe(false);
+      expect(output.collectorFailureCause).toBe("missing_terminal_safe_output");
+      expect(output.items.some(item => item.type === "report_incomplete")).toBe(true);
+    }),
     it("should fail with infra error when safeoutputs gateway-empty flag exists and outputs file is missing", async () => {
       const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "collect-gateway-empty-"));
       const missingFile = path.join(tempDir, "nonexistent-outputs.jsonl");

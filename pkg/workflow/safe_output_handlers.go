@@ -641,6 +641,12 @@ var safeOutputHandlers = []safeOutputHandlerDescriptor{
 		},
 	},
 	{
+		Key:         "request-continuation",
+		StructField: "RequestContinuation",
+		ToolName:    "request_continuation",
+		Builtin:     true,
+	},
+	{
 		Key:         "threat-detection",
 		StructField: "ThreatDetection",
 	},

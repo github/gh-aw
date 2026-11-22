@@ -138,7 +138,7 @@ func evaluateOutcomes(ctx context.Context, items []CreatedItemReport, repoOverri
 	occurrences := make(map[[sha256.Size]byte]int)
 	skipped := 0
 	for _, item := range items {
-		if item.Type == "noop" || item.Type == "report_missing_tool" || item.Type == "missing_tool" || item.Type == "report_missing_data" || item.Type == "missing_data" || item.Type == "report_incomplete" {
+		if item.Type == "noop" || item.Type == "request_continuation" || item.Type == "report_missing_tool" || item.Type == "missing_tool" || item.Type == "report_missing_data" || item.Type == "missing_data" || item.Type == "report_incomplete" {
 			skipped++
 			continue
 		}
@@ -444,7 +444,7 @@ func enrichOutcomeWithObjectiveValue(ctx context.Context, report *OutcomeReport,
 	}
 
 	// Skip types that don't have associated labels on issues/PRs
-	if report.Type == "noop" || report.Type == "report_missing_tool" || report.Type == "missing_tool" || report.Type == "report_missing_data" || report.Type == "missing_data" || report.Type == "report_incomplete" {
+	if report.Type == "noop" || report.Type == "request_continuation" || report.Type == "report_missing_tool" || report.Type == "missing_tool" || report.Type == "report_missing_data" || report.Type == "missing_data" || report.Type == "report_incomplete" {
 		return
 	}
 

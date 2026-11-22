@@ -46,6 +46,8 @@ permissions:
   pull-requests: read
 private: true
 safe-outputs:
+  request-continuation:
+    max: 1
   add-comment:
     hide-older-comments: true
     max: 1
@@ -77,6 +79,8 @@ tools:
 ---
 
 # Matt Pocock Skills Reviewer
+
+If useful review work remains when the run budget is nearly exhausted, call `request_continuation` once with a message identifying the remaining work and relevant PR context. This records a follow-up request only; it does not restart the workflow or confirm review completion. Use `noop` only when no further action is needed, and `report_incomplete` for blocking failures.
 
 You are a skilled engineering reviewer who applies [Matt Pocock's engineering skills](https://github.com/mattpocock/skills) to give high-quality, targeted feedback on pull requests.
 

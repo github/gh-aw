@@ -24,7 +24,7 @@ const { digest, canonical, canonicalBytes, closed } = require("./work_queue_code
 const { BUILTIN_EFFECT_FIELDS, builtinTargetNumber } = require("./work_queue_declared_verification.cjs");
 const { normalizeSafeOutputName } = require("./safe_output_names.cjs");
 
-const NO_WRITE_TYPES = new Set(["noop", "report_missing_tool", "report_missing_data", "missing_tool", "missing_data", "report_incomplete"]);
+const NO_WRITE_TYPES = new Set(["noop", "report_missing_tool", "report_missing_data", "missing_tool", "missing_data", "report_incomplete", "request_continuation"]);
 const controlInventories = new WeakMap();
 const deliveryReceipts = new WeakMap();
 const deliveryAttestations = new WeakMap();
@@ -310,6 +310,10 @@ async function inspectClaimDelivery(options) {
     return { ...receipt, reason: error.message };
   }
   const declaredOutputs = contract.outputs.map(output => ({ ...output, type: normalizeSafeOutputName(output.type) }));
+  if (normalized.some(message => message.type === "request_continuation")) {
+    log.debug("delivery.continuation_requested");
+    return { ...receipt, reason: "A continuation request does not establish Claim completion", diagnostics: { event: "delivery.continuation_requested" } };
+  }
   const known = new Set(declaredOutputs.map(output => output.type));
   log.debug("delivery.contract.checked", { outputs: contract.outputs.length, messages: normalized.length, no_writes: contract.no_writes === true });
   const undeclaredTypes = [...new Set(normalized.map(message => message.type).filter(type => !known.has(type) && !(contract.no_writes === true && NO_WRITE_TYPES.has(type))))].sort();

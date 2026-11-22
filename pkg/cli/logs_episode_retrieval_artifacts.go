@@ -361,6 +361,11 @@ func processEpisodeArtifacts(run WorkflowRun, runDir string, info *AwInfo) (Proc
 	result := DownloadResult{Run: run}
 	result.Run.LogsPath = runDir
 	metrics := extractRunMetricsAndMetadata(&result, runDir, false)
+	var err error
+	result.ContinuationRequests, err = extractEpisodeContinuationRequests(runDir, run)
+	if err != nil {
+		return ProcessedRun{}, err
+	}
 	usage, err := analyzeTokenUsage(runDir, false)
 	if err != nil {
 		return ProcessedRun{}, fmt.Errorf("read compact episode usage: %w", err)
@@ -376,11 +381,66 @@ func processEpisodeArtifacts(run WorkflowRun, runDir string, info *AwInfo) (Proc
 		Run: result.Run, AwContext: info.Context, AccessAnalysis: result.AccessAnalysis,
 		FirewallAnalysis: result.FirewallAnalysis, RedactedDomainsAnalysis: result.RedactedDomainsAnalysis,
 		MissingTools: result.MissingTools, MissingData: result.MissingData, Noops: result.Noops,
-		MCPFailures: result.MCPFailures, SkillActivations: result.SkillActivations,
+		ContinuationRequests: result.ContinuationRequests,
+		MCPFailures:          result.MCPFailures, SkillActivations: result.SkillActivations,
 		GatewaySteeringEvents: result.GatewaySteeringEvents, MCPToolUsage: result.MCPToolUsage,
 		TokenUsage: result.TokenUsage, ModelRouting: analyzeModelRouting(runDir),
 		WorkingSet: result.WorkingSet, Ledger: result.Ledger, WorkQueue: result.WorkQueue,
 		Friction: result.Friction, GitHubRateLimitUsage: result.GitHubRateLimitUsage,
 		SafeOutputs: result.SafeOutputs,
 	}, nil
+}
+
+func extractEpisodeContinuationRequests(runDir string, run WorkflowRun) ([]ContinuationRequestReport, error) {
+	artifactDirs, foundInventory, err := readEpisodeAllArtifactDirs(runDir)
+	if err != nil {
+		return nil, err
+	}
+	dirs := append([]string{runDir}, artifactDirs...)
+	if !foundInventory {
+		dirs = dirs[:1]
+	}
+	var requests []ContinuationRequestReport
+	type continuationRequestIdentity struct {
+		message   string
+		timestamp string
+	}
+	seenOccurrences := make(map[continuationRequestIdentity]int)
+	collectionExperiment, collectionVariant, _ := firstExperimentAssignment(extractExperimentData(runDir))
+	foundOutput, invalidOutput := false, false
+	for _, dir := range dirs {
+		if resolveAgentOutputFile(dir, false) == "" {
+			continue
+		}
+		foundOutput = true
+		experiment, variant, ok := firstExperimentAssignment(extractExperimentData(dir))
+		if !ok {
+			experiment, variant = collectionExperiment, collectionVariant
+		}
+		extracted, err := extractContinuationRequestsFromRun(dir, run, false, experiment, variant)
+		if err != nil {
+			return nil, err
+		}
+		if extracted == nil {
+			invalidOutput = true
+			continue
+		}
+		if requests == nil {
+			requests = []ContinuationRequestReport{}
+		}
+		currentOccurrences := make(map[continuationRequestIdentity]int)
+		for _, request := range extracted {
+			identity := continuationRequestIdentity{message: request.Message, timestamp: request.Timestamp}
+			currentOccurrences[identity]++
+			if currentOccurrences[identity] <= seenOccurrences[identity] {
+				continue
+			}
+			seenOccurrences[identity] = currentOccurrences[identity]
+			requests = append(requests, request)
+		}
+	}
+	if invalidOutput || !foundOutput {
+		return nil, nil
+	}
+	return requests, nil
 }

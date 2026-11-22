@@ -283,6 +283,20 @@ func (c *Compiler) buildConclusionReportIncompleteStep(data *WorkflowData, mainJ
 	})
 }
 
+func (c *Compiler) buildConclusionRequestContinuationStep(data *WorkflowData, mainJobName string) []string {
+	if data.SafeOutputs.RequestContinuation == nil {
+		return nil
+	}
+	return c.buildGitHubScriptStepWithoutDownload(data, GitHubScriptStepConfig{
+		StepName:      "Record continuation request",
+		StepID:        "request_continuation",
+		MainJobName:   mainJobName,
+		CustomEnvVars: buildTemplatableIntEnvVar("GH_AW_REQUEST_CONTINUATION_MAX", data.SafeOutputs.RequestContinuation.Max),
+		Script:        "const { main } = require('${{ runner.temp }}/gh-aw/actions/record_request_continuation.cjs'); await main();",
+		ScriptFile:    "record_request_continuation.cjs",
+	})
+}
+
 // serializeConclusionMessagesJSON serializes safe-output messages once for reuse.
 func serializeConclusionMessagesJSON(data *WorkflowData) string {
 	// Serialize messages config once for reuse in both handler steps below.
