@@ -8,7 +8,7 @@ sidebar:
 
 # MCP Scripts Specification
 
-**Version**: 1.1.0  
+**Version**: 1.2.0  
 **Status**: Draft Specification  
 **Latest Version**: [mcp-scripts-specification](/gh-aw/specs/mcp-scripts-specification/)  
 **JSON Schema**: [mcp-scripts-config.schema.json](/gh-aw/schemas/mcp-scripts-config.schema.json)  
@@ -167,10 +167,12 @@ MCP Scripts MUST use HTTP transport for MCP communication. The transport archite
 
 - **Client → Gateway**: HTTP with JSON-RPC payloads
 - **Gateway → MCP Scripts Server**: HTTP with JSON-RPC payloads
-- **MCP Scripts Server**: HTTP server on configurable port (default: 3000)
-- **Authentication**: API key-based authentication via Authorization header
+- **MCP Scripts Server**: HTTP server on the configurable port (default: 3000)
+- **Authentication**: API key-based authentication via the `Authorization` header
 
-Stdio transport is NOT supported for MCP Scripts.
+The MCP Scripts server MUST bind to one specific IPv4 address. It MUST NOT bind to an IPv4 wildcard address, an IPv6 address, or a hostname. When the gateway uses host networking, the server MUST bind to `127.0.0.1`. When the gateway uses bridged Docker networking, the server MUST discover the default Docker bridge's IPv4 gateway address and bind to that address. If the bridged gateway address cannot be discovered, server startup MUST fail. Readiness checks MUST use the same IPv4 address and port to which the server is bound.
+
+Stdio transport is NOT supported for MCP Scripts. API-key authentication and the existing Origin-rejection behavior remain unchanged.
 
 ---
 
@@ -1009,10 +1011,13 @@ MCP Scripts extends the MCP Gateway configuration format. During workflow compil
 
 MCP Scripts server MUST:
 
-1. Expose HTTP endpoint for MCP communication
-2. Accept JSON-RPC requests from gateway
-3. Require authentication via Authorization header
-4. Return JSON-RPC responses to gateway
+1. Expose an HTTP endpoint for MCP communication on the configured port.
+2. Bind that endpoint to the specific IPv4 address selected according to §3.3.
+3. Accept JSON-RPC requests from the gateway.
+4. Require authentication via the `Authorization` header.
+5. Apply the existing Origin-rejection behavior.
+6. Return JSON-RPC responses to the gateway.
+7. Perform readiness checks against the same address and port used by the endpoint.
 
 ### 9.3 Configuration Generation
 
@@ -1032,7 +1037,9 @@ At compilation time, MCP Scripts generates:
 }
 ```
 
-This configuration is merged with other MCP servers and passed to gateway.
+The URL MUST identify the server endpoint using an address reachable from the gateway. The `localhost` value above is illustrative for host networking; bridged Docker networking MAY use a gateway-resolvable host name such as `host.docker.internal` while the server itself binds to the specific IPv4 address selected according to §3.3. The URL MUST NOT require an IPv6 or wildcard listener.
+
+This configuration is merged with other MCP servers and passed to the gateway.
 
 ### 9.4 Server Lifecycle
 
@@ -1779,6 +1786,16 @@ _All open action items from the 2026-05-08 audit have been resolved. No outstand
 ---
 
 ## Change Log
+
+### Version 1.2.0 (Draft)
+
+- **Added**: Normative IPv4 bind-address requirements for the MCP Scripts HTTP server (Section 3.3)
+  - Host-network gateways use `127.0.0.1`
+  - Bridged gateways use the discovered default Docker bridge IPv4 gateway
+  - Startup fails when the bridged gateway address cannot be discovered
+  - Wildcard, IPv6, and hostname binds are prohibited
+- **Added**: Requirement that readiness checks use the server's selected bind address (Sections 3.3 and 9.2)
+- **Clarified**: Existing API-key authentication and Origin-rejection behavior are unchanged
 
 ### Version 1.1.0 (Draft)
 
