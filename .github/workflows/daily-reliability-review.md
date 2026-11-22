@@ -112,7 +112,7 @@ Order findings by:
 - Use the narrowest time window that still captures the last 24 hours.
 - Prefer current-run and current-day evidence over historical anecdotes.
 - Use `get_trace_details` to verify trace continuity before drawing conclusions.
-- If `search_events` is unavailable, fall back to `list_events` and filter client-side.
+- Without an embedded provider, call `search_traces` with direct Sentry query syntax, explicit fields, and sort. If Sentry is unavailable, report the gap and continue with the other backends.
 
 ## Output
 

@@ -82,21 +82,15 @@ You are an observability analyst. Generate a daily AI Credits (AIC) consumption 
 
 ### Step 2: Fetch Telemetry Events
 
-First, attempt to call `search_events` using:
-- `dataset: spans`
-- query constrained to the selected project
-- time range: last 24 hours
-- include enough results to cover the day (use pagination as needed)
-
-If `search_events` is **not available** (the tool is absent from the available tool list because no embedded LLM provider is configured), fall back to `list_events` with direct Sentry query syntax:
+Call `search_traces` for spans from the last 24 hours. Without an embedded LLM provider, use direct Sentry query syntax and explicit fields and sort:
 - `organizationSlug`: the org discovered in Step 1
-- `dataset: spans`
+- `projectSlug`: the project discovered in Step 1
 - Start with schema-valid span identity fields and inspect a representative raw gh-aw trace to discover custom fields. Do not restrict discovery to `span.op:ai*` or `span.op:gen_ai*`: gh-aw job spans carry cost, not individual model/tool spans.
 - `fields`: explicitly include `timestamp` (required for `sort: -timestamp`), `id`, and `trace` for Step 4 mirror deduplication; also request the confirmed numeric `gh-aw.aic` field and canonical workflow/run fields (`gh-aw.workflow.name`, `gh-aw.run.id`, `github.run_id`, `github.workflow_ref`) using the backend's discovered field syntax. An `Unknown attribute` error proves only that the requested field is not queryable in this schema; it does not prove the producer omitted it. Record the exact rejected field and inspect raw spans before recommending instrumentation changes.
 - `sort`: `-timestamp`
-- Use pagination to cover the last 24 hours
+- Split the query into smaller time windows if results hit the tool's limit.
 
-If `dataset: spans` returns no usable records with either tool, retry with `dataset: transactions`.
+If Sentry returns no usable span records, record the gap and continue with Grafana/Tempo.
 
 Treat "no usable records" as either:
 - zero events returned after pagination, or

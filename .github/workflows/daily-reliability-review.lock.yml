@@ -1,5 +1,5 @@
-# gh-aw-metadata: {"schema_version":"v4","frontmatter_hash":"fda4a3aef02c2f6397f270f1dfb9a9c170f14d7a8e44fad674dfbe9d89a09574","body_hash":"faf18e9d7f6f185b232135687bd19fb37241f26879d35d40388a0752a298681e","strict":true,"agent_id":"copilot","engine_versions":{"copilot":"1.0.103","copilot-sdk":"1.0.16"}}
-# gh-aw-manifest: {"version":1,"secrets":["COPILOT_GITHUB_TOKEN","GH_AW_GITHUB_MCP_SERVER_TOKEN","GH_AW_GITHUB_TOKEN","GH_AW_OTEL_SENTRY_AUTHORIZATION","GH_AW_OTEL_SENTRY_ENDPOINT","GITHUB_TOKEN","SENTRY_ACCESS_TOKEN","SENTRY_OPENAI_API_KEY"],"actions":[{"repo":"actions/checkout","sha":"3d3c42e5aac5ba805825da76410c181273ba90b1","version":"v7.0.1"},{"repo":"actions/download-artifact","sha":"9000827ccba6bdab643e8b6fd33ac0654aef8333","version":"v8.0.2"},{"repo":"actions/github-script","sha":"3a2844b7e9c422d3c10d287c895573f7108da1b3","version":"v9.0.0"},{"repo":"actions/setup-node","sha":"949feb2413d6458794dcd2491c4babbbce0c15c1","version":"v7.1.0"},{"repo":"actions/upload-artifact","sha":"cf430e030ddbb5b0abf93d22962f4752f3646cd9","version":"v7.0.2"}],"containers":[{"image":"ghcr.io/github/gh-aw-firewall/agent:0.29.18@sha256:271aa6f147ef9b4a29b479fd1077fec834bb60f6a998c0ac46ff666de5ca20f5"},{"image":"ghcr.io/github/gh-aw-firewall/api-proxy:0.29.18@sha256:04779d40ad81abcce125ceb3ef8cda5cd4a049fe760d3fe1f0e4c3a39307573e"},{"image":"ghcr.io/github/gh-aw-firewall/cli-proxy:0.29.18@sha256:61c7d5bd30033b759d29a44a4d898681b75c1826d40ea2df7959e11fdf9c1e34"},{"image":"ghcr.io/github/gh-aw-firewall/router:0.29.18@sha256:78fd3656385b37c1bc9bf1bc84d6b22f5229b508bbce8e32c569b1ad33b1b904"},{"image":"ghcr.io/github/gh-aw-firewall/squid:0.29.18@sha256:00fa6db859de828472056f4f74fdf36d03574c8b620eb9f8a2030891ca06802e"},{"image":"ghcr.io/github/gh-aw-mcpg:v0.5.12","digest":"sha256:3223d0c575227d859f18f390e70f17fcbef81db6ef2c7949a1fac4b04cd201dc","pinned_image":"ghcr.io/github/gh-aw-mcpg:v0.5.12@sha256:3223d0c575227d859f18f390e70f17fcbef81db6ef2c7949a1fac4b04cd201dc"},{"image":"ghcr.io/github/gh-aw-node","digest":"sha256:8735428c2d4e602f90781ba0c571c400e8ff93c7ee1508a75d71f87e34e415cc","pinned_image":"ghcr.io/github/gh-aw-node@sha256:8735428c2d4e602f90781ba0c571c400e8ff93c7ee1508a75d71f87e34e415cc"},{"image":"ghcr.io/github/github-mcp-server:v2.2.0","digest":"sha256:040c4e99810076035eb1d9beb4b4a96fcf589c43cefed6ff51a46a553eb4e174","pinned_image":"ghcr.io/github/github-mcp-server:v2.2.0@sha256:040c4e99810076035eb1d9beb4b4a96fcf589c43cefed6ff51a46a553eb4e174"},{"image":"node:lts-alpine","digest":"sha256:6bd9ab43c0ec0190ca7b2d193906cb8b7edf6e7f4afa43ddeccd6452710bffb5","pinned_image":"node:lts-alpine@sha256:6bd9ab43c0ec0190ca7b2d193906cb8b7edf6e7f4afa43ddeccd6452710bffb5"}],"mcp_servers":[{"name":"safeoutputs","tools":["create_issue","noop","report_incomplete","report_missing_data","report_missing_tool"]},{"name":"sentry","tools":["analyze_issue_with_seer","find_dsns","find_organizations","find_projects","find_releases","find_teams","get_doc","get_event_attachment","get_issue_details","get_trace_details","list_events","list_issue_events","search_docs","search_events","search_issues","whoami"]}],"threat_detection":{"mode":"enabled"},"admission":true,"agent_metadata":{"03cbf8931deff21d5116":{"name":"Agentic Workflows"},"4943cffeebb6706aa8bc":{"name":"Squad","tools":["*"]},"9ea639558df913e650e4":{"name":"technical-doc-writer"},"a17c6c62ffcd7401f40f":{"name":"adr-writer"},"ad6ff0fe9219fbfa5ccc":{"name":"grumpy-reviewer","tools":["read","search"]},"e0c35a96dedfb29cb9b1":{"name":"w3c-specification-writer"}}}
+# gh-aw-metadata: {"schema_version":"v4","frontmatter_hash":"bc0b6a0469c4efda1e27133985a84412b485cdb97b5e114407ca1ad772d97c4f","body_hash":"6f5b843761cae0a3d6afa5841ae1db2069d30e335f694c27aef0e357913dcd67","strict":true,"agent_id":"copilot","engine_versions":{"copilot":"1.0.103","copilot-sdk":"1.0.16"}}
+# gh-aw-manifest: {"version":1,"secrets":["COPILOT_GITHUB_TOKEN","GH_AW_GITHUB_MCP_SERVER_TOKEN","GH_AW_GITHUB_TOKEN","GH_AW_OTEL_SENTRY_AUTHORIZATION","GH_AW_OTEL_SENTRY_ENDPOINT","GITHUB_TOKEN","SENTRY_ACCESS_TOKEN","SENTRY_OPENAI_API_KEY"],"actions":[{"repo":"actions/checkout","sha":"3d3c42e5aac5ba805825da76410c181273ba90b1","version":"v7.0.1"},{"repo":"actions/download-artifact","sha":"9000827ccba6bdab643e8b6fd33ac0654aef8333","version":"v8.0.2"},{"repo":"actions/github-script","sha":"3a2844b7e9c422d3c10d287c895573f7108da1b3","version":"v9.0.0"},{"repo":"actions/setup-node","sha":"949feb2413d6458794dcd2491c4babbbce0c15c1","version":"v7.1.0"},{"repo":"actions/upload-artifact","sha":"cf430e030ddbb5b0abf93d22962f4752f3646cd9","version":"v7.0.2"}],"containers":[{"image":"ghcr.io/github/gh-aw-firewall/agent:0.29.18@sha256:271aa6f147ef9b4a29b479fd1077fec834bb60f6a998c0ac46ff666de5ca20f5"},{"image":"ghcr.io/github/gh-aw-firewall/api-proxy:0.29.18@sha256:04779d40ad81abcce125ceb3ef8cda5cd4a049fe760d3fe1f0e4c3a39307573e"},{"image":"ghcr.io/github/gh-aw-firewall/cli-proxy:0.29.18@sha256:61c7d5bd30033b759d29a44a4d898681b75c1826d40ea2df7959e11fdf9c1e34"},{"image":"ghcr.io/github/gh-aw-firewall/router:0.29.18@sha256:78fd3656385b37c1bc9bf1bc84d6b22f5229b508bbce8e32c569b1ad33b1b904"},{"image":"ghcr.io/github/gh-aw-firewall/squid:0.29.18@sha256:00fa6db859de828472056f4f74fdf36d03574c8b620eb9f8a2030891ca06802e"},{"image":"ghcr.io/github/gh-aw-mcpg:v0.5.12","digest":"sha256:3223d0c575227d859f18f390e70f17fcbef81db6ef2c7949a1fac4b04cd201dc","pinned_image":"ghcr.io/github/gh-aw-mcpg:v0.5.12@sha256:3223d0c575227d859f18f390e70f17fcbef81db6ef2c7949a1fac4b04cd201dc"},{"image":"ghcr.io/github/gh-aw-node","digest":"sha256:8735428c2d4e602f90781ba0c571c400e8ff93c7ee1508a75d71f87e34e415cc","pinned_image":"ghcr.io/github/gh-aw-node@sha256:8735428c2d4e602f90781ba0c571c400e8ff93c7ee1508a75d71f87e34e415cc"},{"image":"ghcr.io/github/github-mcp-server:v2.2.0","digest":"sha256:040c4e99810076035eb1d9beb4b4a96fcf589c43cefed6ff51a46a553eb4e174","pinned_image":"ghcr.io/github/github-mcp-server:v2.2.0@sha256:040c4e99810076035eb1d9beb4b4a96fcf589c43cefed6ff51a46a553eb4e174"},{"image":"node:lts-alpine","digest":"sha256:6bd9ab43c0ec0190ca7b2d193906cb8b7edf6e7f4afa43ddeccd6452710bffb5","pinned_image":"node:lts-alpine@sha256:6bd9ab43c0ec0190ca7b2d193906cb8b7edf6e7f4afa43ddeccd6452710bffb5"}],"mcp_servers":[{"name":"safeoutputs","tools":["create_issue","noop","report_incomplete","report_missing_data","report_missing_tool"]},{"name":"sentry","tools":["find_dsns","find_organizations","find_projects","find_releases","find_teams","get_doc","get_event_attachment","get_issue_details","get_trace_details","search_docs","search_errors","search_issues","search_logs","search_traces","whoami"]}],"threat_detection":{"mode":"enabled"},"admission":true,"agent_metadata":{"03cbf8931deff21d5116":{"name":"Agentic Workflows"},"4943cffeebb6706aa8bc":{"name":"Squad","tools":["*"]},"9ea639558df913e650e4":{"name":"technical-doc-writer"},"a17c6c62ffcd7401f40f":{"name":"adr-writer"},"ad6ff0fe9219fbfa5ccc":{"name":"grumpy-reviewer","tools":["read","search"]},"e0c35a96dedfb29cb9b1":{"name":"w3c-specification-writer"}}}
 # This file was automatically generated by gh-aw. DO NOT EDIT. To debug this workflow, load the skill at https://github.com/github/gh-aw/blob/main/debug.md
 #
 #    ___                   _   _
@@ -160,7 +160,7 @@ jobs:
           GH_AW_DEFAULT_ADMISSION_URL: ${{ vars.GH_AW_DEFAULT_ADMISSION_URL }}
           GH_AW_DEFAULT_ADMISSION_AUDIENCE: ${{ vars.GH_AW_DEFAULT_ADMISSION_AUDIENCE }}
           GH_AW_DEFAULT_ADMISSION_ON_OUTAGE: ${{ vars.GH_AW_DEFAULT_ADMISSION_ON_OUTAGE }}
-          GH_AW_ADMISSION_WORKFLOW_HASH: "fda4a3aef02c2f6397f270f1dfb9a9c170f14d7a8e44fad674dfbe9d89a09574:faf18e9d7f6f185b232135687bd19fb37241f26879d35d40388a0752a298681e"
+          GH_AW_ADMISSION_WORKFLOW_HASH: "bc0b6a0469c4efda1e27133985a84412b485cdb97b5e114407ca1ad772d97c4f:6f5b843761cae0a3d6afa5841ae1db2069d30e335f694c27aef0e357913dcd67"
           GH_AW_INFO_WORKFLOW_ID: ${{ job.workflow_ref }}
           GITHUB_ACTOR: ${{ github.actor }}
           GITHUB_TRIGGERING_ACTOR: ${{ github.triggering_actor }}
@@ -919,7 +919,7 @@ jobs:
 
           mkdir -p "$HOME/.copilot"
           GH_AW_NODE=$(which node 2>/dev/null || command -v node 2>/dev/null || echo node)
-          cat << GH_AW_MCP_CONFIG_afc9058d3b2e5703_EOF | "$GH_AW_NODE" "${RUNNER_TEMP}/gh-aw/actions/start_mcp_gateway.cjs"
+          cat << GH_AW_MCP_CONFIG_233d21344425b65a_EOF | "$GH_AW_NODE" "${RUNNER_TEMP}/gh-aw/actions/start_mcp_gateway.cjs"
           {
             "mcpServers": {
               "safeoutputs": {
@@ -973,7 +973,7 @@ jobs:
                 "container": "node:lts-alpine",
                 "entrypoint": "npx",
                 "entrypointArgs": [
-                  "@sentry/mcp-server@0.37.0"
+                  "@sentry/mcp-server@0.49.0"
                 ],
                 "tools": [
                   "whoami",
@@ -984,18 +984,17 @@ jobs:
                   "get_issue_details",
                   "get_trace_details",
                   "get_event_attachment",
-                  "search_events",
+                  "search_traces",
+                  "search_errors",
+                  "search_logs",
                   "search_issues",
-                  "list_events",
-                  "list_issue_events",
                   "find_dsns",
-                  "analyze_issue_with_seer",
                   "search_docs",
                   "get_doc"
                 ],
                 "env": {
                   "OPENAI_API_KEY": "\${SENTRY_OPENAI_API_KEY}",
-                  "SENTRY_ACCESS_TOKEN": "\${SENTRY_ACCESS_TOKEN}",
+                  "SENTRY_AUTH_TOKEN": "\${SENTRY_ACCESS_TOKEN}",
                   "SENTRY_HOST": "\${SENTRY_HOST}"
                 },
                 "guard-policies": {
@@ -1021,7 +1020,7 @@ jobs:
               }
             }
           }
-          GH_AW_MCP_CONFIG_afc9058d3b2e5703_EOF
+          GH_AW_MCP_CONFIG_233d21344425b65a_EOF
       - name: Mount MCP servers as CLIs
         id: mount-mcp-clis
         continue-on-error: true
@@ -1072,7 +1071,6 @@ jobs:
         # Copilot CLI tool arguments (sorted):
         # --allow-tool github
         # --allow-tool safeoutputs
-        # --allow-tool sentry(analyze_issue_with_seer)
         # --allow-tool sentry(find_dsns)
         # --allow-tool sentry(find_organizations)
         # --allow-tool sentry(find_projects)
@@ -1082,11 +1080,11 @@ jobs:
         # --allow-tool sentry(get_event_attachment)
         # --allow-tool sentry(get_issue_details)
         # --allow-tool sentry(get_trace_details)
-        # --allow-tool sentry(list_events)
-        # --allow-tool sentry(list_issue_events)
         # --allow-tool sentry(search_docs)
-        # --allow-tool sentry(search_events)
+        # --allow-tool sentry(search_errors)
         # --allow-tool sentry(search_issues)
+        # --allow-tool sentry(search_logs)
+        # --allow-tool sentry(search_traces)
         # --allow-tool sentry(whoami)
         # --allow-tool shell
         # --allow-tool write
@@ -1177,8 +1175,8 @@ jobs:
           GH_AW_ADMISSION_MAX_AI_CREDITS: ${{ needs.activation.outputs.admission-max-ai-credits }}
           GH_AW_ADMISSION_RESULT: ${{ needs.activation.outputs.admission-result }}
           GH_AW_COPILOT_SDK_DRIVER: 1
-          GH_AW_COPILOT_SDK_SERVER_ARGS: '["--headless","--no-auto-update","--port","3002","--add-dir","/tmp/gh-aw/","--log-level","all","--log-dir","/tmp/gh-aw/sandbox/agent/logs/","--disable-builtin-mcps","--no-ask-user","--allow-tool","github","--allow-tool","safeoutputs","--allow-tool","sentry(analyze_issue_with_seer)","--allow-tool","sentry(find_dsns)","--allow-tool","sentry(find_organizations)","--allow-tool","sentry(find_projects)","--allow-tool","sentry(find_releases)","--allow-tool","sentry(find_teams)","--allow-tool","sentry(get_doc)","--allow-tool","sentry(get_event_attachment)","--allow-tool","sentry(get_issue_details)","--allow-tool","sentry(get_trace_details)","--allow-tool","sentry(list_events)","--allow-tool","sentry(list_issue_events)","--allow-tool","sentry(search_docs)","--allow-tool","sentry(search_events)","--allow-tool","sentry(search_issues)","--allow-tool","sentry(whoami)","--allow-tool","shell","--allow-tool","write","--deny-tool","workflow","--allow-all-paths"]'
-          GH_AW_COPILOT_SDK_TOOL_CONFIG: '{"version":1,"capabilities":{"bash":true,"edit":true,"webFetch":false,"webSearch":false,"dynamicWorkflows":false,"mcp":true,"cliProxy":true},"permissions":{"allowedTools":["github","read","safeoutputs","sentry(analyze_issue_with_seer)","sentry(find_dsns)","sentry(find_organizations)","sentry(find_projects)","sentry(find_releases)","sentry(find_teams)","sentry(get_doc)","sentry(get_event_attachment)","sentry(get_issue_details)","sentry(get_trace_details)","sentry(list_events)","sentry(list_issue_events)","sentry(search_docs)","sentry(search_events)","sentry(search_issues)","sentry(whoami)","shell","write"]}}'
+          GH_AW_COPILOT_SDK_SERVER_ARGS: '["--headless","--no-auto-update","--port","3002","--add-dir","/tmp/gh-aw/","--log-level","all","--log-dir","/tmp/gh-aw/sandbox/agent/logs/","--disable-builtin-mcps","--no-ask-user","--allow-tool","github","--allow-tool","safeoutputs","--allow-tool","sentry(find_dsns)","--allow-tool","sentry(find_organizations)","--allow-tool","sentry(find_projects)","--allow-tool","sentry(find_releases)","--allow-tool","sentry(find_teams)","--allow-tool","sentry(get_doc)","--allow-tool","sentry(get_event_attachment)","--allow-tool","sentry(get_issue_details)","--allow-tool","sentry(get_trace_details)","--allow-tool","sentry(search_docs)","--allow-tool","sentry(search_errors)","--allow-tool","sentry(search_issues)","--allow-tool","sentry(search_logs)","--allow-tool","sentry(search_traces)","--allow-tool","sentry(whoami)","--allow-tool","shell","--allow-tool","write","--deny-tool","workflow","--allow-all-paths"]'
+          GH_AW_COPILOT_SDK_TOOL_CONFIG: '{"version":1,"capabilities":{"bash":true,"edit":true,"webFetch":false,"webSearch":false,"dynamicWorkflows":false,"mcp":true,"cliProxy":true},"permissions":{"allowedTools":["github","read","safeoutputs","sentry(find_dsns)","sentry(find_organizations)","sentry(find_projects)","sentry(find_releases)","sentry(find_teams)","sentry(get_doc)","sentry(get_event_attachment)","sentry(get_issue_details)","sentry(get_trace_details)","sentry(search_docs)","sentry(search_errors)","sentry(search_issues)","sentry(search_logs)","sentry(search_traces)","sentry(whoami)","shell","write"]}}'
           GH_AW_LLM_PROVIDER: github
           GH_AW_MAX_AI_CREDITS: ${{ vars.GH_AW_DEFAULT_MAX_AI_CREDITS || '1000' }}
           GH_AW_MAX_TOOL_DENIALS: 5
@@ -1909,7 +1907,7 @@ jobs:
           GH_AW_DEFAULT_ADMISSION_URL: ${{ vars.GH_AW_DEFAULT_ADMISSION_URL }}
           GH_AW_DEFAULT_ADMISSION_AUDIENCE: ${{ vars.GH_AW_DEFAULT_ADMISSION_AUDIENCE }}
           GH_AW_DEFAULT_ADMISSION_ON_OUTAGE: ${{ vars.GH_AW_DEFAULT_ADMISSION_ON_OUTAGE }}
-          GH_AW_ADMISSION_WORKFLOW_HASH: "fda4a3aef02c2f6397f270f1dfb9a9c170f14d7a8e44fad674dfbe9d89a09574:faf18e9d7f6f185b232135687bd19fb37241f26879d35d40388a0752a298681e"
+          GH_AW_ADMISSION_WORKFLOW_HASH: "bc0b6a0469c4efda1e27133985a84412b485cdb97b5e114407ca1ad772d97c4f:6f5b843761cae0a3d6afa5841ae1db2069d30e335f694c27aef0e357913dcd67"
           GH_AW_INFO_WORKFLOW_ID: ${{ job.workflow_ref }}
           GITHUB_ACTOR: ${{ github.actor }}
           GITHUB_TRIGGERING_ACTOR: ${{ github.triggering_actor }}
