@@ -34,12 +34,12 @@ func TestOutputSchemasValidateHistoricalOutcomeEvidence(t *testing.T) {
 		recordCount int
 	}{
 		{"audit", "audit", audit, 1},
-		{"logs", "logs", LogsData{Outcomes: outcomes, EpisodeOutcomes: episodes}, 2},
+		{"logs", "logs", LogsData{Summary: LogsSummary{AICCoverage: logsAICUnavailable}, Outcomes: outcomes, EpisodeOutcomes: episodes}, 2},
 		{"cross-run", "logs", CrossRunAuditReport{Outcomes: outcomes, EpisodeOutcomes: episodes}, 2},
 		{"cached-audit", "logs-jsonl", cachedLogsJSONLRecord{
 			SchemaVersion: cachedLogsJSONLSchemaVersion,
 			Kind:          cachedLogsJSONLKindRun,
-			Run:           &cachedLogsJSONLRunData{RunData: RunData{RunID: 42}, Audit: &audit},
+			Run:           &cachedLogsJSONLRunData{RunData: RunData{RunID: 42, AICCoverage: logsAICUnavailable}, Audit: &audit},
 		}, 1},
 	}
 
