@@ -200,8 +200,8 @@ const mockCore = {
           { verdict: "failure", accepted: "false", published: false },
           { verdict: "skipped", accepted: "true", published: false },
           { verdict: "", accepted: "false", published: false },
-          { published: false },
-        ])("requires a clean, accepted verdict: %j", async ({ verdict, accepted, published }) => {
+          { detectionDisabled: true, published: false },
+        ])("requires a clean, accepted verdict: %j", async ({ verdict, accepted, published, detectionDisabled }) => {
           const tempDir = fs.mkdtempSync(path.join(process.cwd(), "gh-aw-status-reports-"));
           const outputPath = path.join(tempDir, "agent-output.json");
           const items = [
@@ -217,7 +217,8 @@ const mockCore = {
             process.env.GH_AW_AGENT_OUTPUT = outputPath;
             process.env.GH_AW_COMMENT_ID = "123456";
             process.env.GH_AW_RUN_URL = "https://github.com/owner/repo/actions/runs/123";
-            process.env.GH_AW_AGENT_CONCLUSION = "failure";
+            process.env.GH_AW_AGENT_CONCLUSION = detectionDisabled ? "success" : "failure";
+            delete process.env.GH_AW_SAFE_OUTPUTS_RESULT;
             delete process.env.GH_AW_NOOP_COMMENT_BODY;
             delete process.env.GH_AW_SAFE_OUTPUT_MESSAGES;
             if (verdict === undefined) delete process.env.GH_AW_DETECTION_CONCLUSION;
@@ -232,6 +233,7 @@ const mockCore = {
               expect(body.includes(item.message || item.reason)).toBe(published);
             }
             expect(body.includes("<summary>Continuation requested</summary>")).toBe(published);
+            if (detectionDisabled) expect(body).toContain("completed successfully");
             expect(body).not.toContain("Unrequested details");
             expect(body).not.toContain("Unrelated safe output");
           } finally {

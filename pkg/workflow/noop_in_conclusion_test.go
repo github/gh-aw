@@ -52,6 +52,25 @@ func TestCompletionCommentFooterMetadata(t *testing.T) {
 	}
 }
 
+func TestCompletionCommentWithoutDetectionJob(t *testing.T) {
+	data := &WorkflowData{
+		EngineConfig:  &EngineConfig{ID: "copilot"},
+		StatusComment: new(true),
+		SafeOutputs: &SafeOutputsConfig{
+			NoOp:            &NoOpConfig{},
+			ThreatDetection: &ThreatDetectionConfig{EngineDisabled: true},
+		},
+	}
+	job, err := NewCompiler().buildConclusionJob(data, "agent", nil)
+	require.NoError(t, err)
+	require.NotNil(t, job)
+	require.NotContains(t, job.Needs, "detection")
+	steps := strings.Join(job.Steps, "")
+	require.Contains(t, steps, "Update reaction comment with completion status")
+	require.NotContains(t, steps, "needs.detection.")
+	require.NotContains(t, steps, "GH_AW_DETECTION_ACCEPTED:")
+}
+
 func TestCompletionCommentFooterMetadataUsesMainJobName(t *testing.T) {
 	tests := []struct {
 		name         string
