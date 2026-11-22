@@ -1,6 +1,6 @@
 // Package linters is a namespace for gh-aw's custom Go analysis linters.
 //
-// All 99 active analyzers:
+// All 100 active analyzers:
 //
 //   - appendbytestring — flags append(b, []byte(s)...) calls where s is a string that can be simplified to append(b, s...)
 //   - appendoneelement — flags append(s, []T{x}...) calls where a single-element slice literal is spread and can be simplified to append(s, x)
@@ -57,6 +57,7 @@
 //   - osisnotexist — flags legacy os error predicates that should use errors.Is or errors.As for wrapped errors
 //   - osopenreadallpreferreadfile — recommends os.ReadFile for files used only by deferred Close and a single ReadAll
 //   - osremoveuncheckedcleanup — flags os.Remove and os.RemoveAll expression and go statements where the error return is discarded
+//   - osstatignoredeerrorderef — flags os.Stat/os.Lstat results dereferenced after discarding their errors without a nil check
 //   - ossetenvlibrary — flags os.Setenv calls in library packages
 //   - packagelevelmutableslicemap — reports mutation of package-level slice/map variables from inside function bodies, which risks data races and cross-call state leaks
 //   - panic-in-library-code — flags panic() calls in library packages

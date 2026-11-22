@@ -23,6 +23,22 @@ func noEpisodeCacheRequest(t *testing.T) episodeAPIRequest {
 	}
 }
 
+func TestEpisodeReportCacheNormalizesLegacyAIC(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "report.json")
+	report := `{"version":1,"data":{"summary":{"total_aic":2,"total_tokens":42},"runs":[{"run_id":2,"aic":2},{"run_id":3,"aic":0}],"episodes":[{"episode_id":"canonical","run_ids":[2,3]}],"episode_retrieval":{"episode_id":"canonical","collected_at":"2026-01-01T00:00:00Z"}}}`
+	require.NoError(t, os.WriteFile(path, []byte(report), 0o600))
+	data, found, err := readEpisodeReportCache(path, 2)
+	require.NoError(t, err)
+	require.True(t, found)
+	require.Equal(t, logsAICPartial, data.Summary.AICCoverage)
+	require.Nil(t, data.Summary.TotalAIC)
+	require.Equal(t, 42, data.Summary.TotalTokens)
+	require.NotNil(t, data.Runs[0].AIC)
+	require.InDelta(t, 2, *data.Runs[0].AIC, 1e-9)
+	require.Nil(t, data.Runs[1].AIC)
+	require.Equal(t, logsAICUnavailable, data.Runs[1].AICCoverage)
+}
+
 func TestEpisodeReportCacheReusesSnapshotAcrossViews(t *testing.T) {
 	fixture := newEpisodeRetrievalFixture(t)
 	fixture.add("org/one", 2, "canonical", "org/one", 2)

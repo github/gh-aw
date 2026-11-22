@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"net/url"
 	"path"
 	"strings"
 
@@ -190,16 +191,27 @@ func artifactStepExecution(ctx context.Context, input Input, block aw.ExecutionB
 	directory := artifactWorkingDirectory(input, block, step)
 	return policyShellCalls(ctx, input, block, step, func(call *syntax.CallExpr, script string) ([]Diagnostic, error) {
 		var locations []RelatedLocation
-		for _, file := range artifactCommandFiles(call, directory, script) {
+		files, incomplete := artifactCommandFiles(call, directory, script)
+		for _, file := range files {
 			locations = append(locations, related(file)...)
 		}
-		return diagnostic(locations, step.Path+".run", int(call.Pos().Line())), nil
+		findings := diagnostic(locations, step.Path+".run", int(call.Pos().Line()))
+		if incomplete {
+			var downloadsRelated []RelatedLocation
+			for _, download := range downloads {
+				downloadsRelated = append(downloadsRelated, RelatedLocation{Path: download.path})
+			}
+			findings = append(findings, Diagnostic{Path: step.Path + ".run", Line: int(call.Pos().Line()), Related: downloadsRelated,
+				Message: "Incomplete artifact-execution analysis: bare Node preload module resolution is not modeled and may load artifact-provided packages; review module resolution and independent provenance or use a literal file path outside artifact directories",
+			})
+		}
+		return findings, nil
 	})
 }
 
-func artifactCommandFiles(call *syntax.CallExpr, directory, script string) []string {
-	if len(call.Args) == 0 || directory == "" {
-		return nil
+func artifactCommandFiles(call *syntax.CallExpr, directory, script string) ([]string, bool) {
+	if len(call.Args) == 0 {
+		return nil, false
 	}
 	argument := func(index int) string {
 		if index >= 0 && index < len(call.Args) {
@@ -208,6 +220,9 @@ func artifactCommandFiles(call *syntax.CallExpr, directory, script string) []str
 		return ""
 	}
 	command := argument(0)
+	if directory == "" && command != "node" {
+		return nil, false
+	}
 	hasOperand := func(start int) bool {
 		for index := start; index < len(call.Args); index++ {
 			value := argument(index)
@@ -218,31 +233,135 @@ func artifactCommandFiles(call *syntax.CallExpr, directory, script string) []str
 		return false
 	}
 	switch command {
-	case "bash", "sh", "python", "python3", "node", "source", ".":
+	case "node":
+		return artifactNodeCommandFiles(len(call.Args), argument, directory)
+	case "bash", "sh", "python", "python3", "source", ".":
 		if file := artifactInterpreterOperand(command, len(call.Args), argument); file != "" {
-			return []string{artifactResolvePath(directory, file)}
+			return []string{artifactResolvePath(directory, file)}, false
 		}
+		return nil, false
 	case "npm":
 		if len(call.Args) > 1 {
 			switch argument(1) {
 			case "run", "run-script":
 				if hasOperand(2) {
-					return []string{directory}
+					return []string{directory}, false
 				}
 			case "ci", "install", "i", "test", "start", "exec", "rebuild":
-				return []string{directory}
+				return []string{directory}, false
 			}
 		}
 	case "npx", "make":
 		if len(call.Args) == 1 || hasOperand(1) {
-			return []string{directory}
+			return []string{directory}, false
 		}
 	default:
 		if strings.Contains(command, "/") {
-			return []string{artifactResolvePath(directory, command)}
+			return []string{artifactResolvePath(directory, command)}, false
 		}
 	}
-	return nil
+	return nil, false
+}
+
+func artifactNodeCommandFiles(count int, argument func(int) string, directory string) ([]string, bool) {
+	preloads, metadataOnly, incomplete := artifactNodePreloads(count, argument)
+	if metadataOnly {
+		return nil, false
+	}
+	if directory == "" {
+		return nil, incomplete
+	}
+	var files []string
+	for _, file := range preloads {
+		files = append(files, artifactResolvePath(directory, file))
+	}
+	if file := artifactInterpreterOperand("node", count, argument); file != "" {
+		files = append(files, artifactResolvePath(directory, file))
+	}
+	return files, incomplete
+}
+
+func artifactNodePreloads(count int, argument func(int) string) ([]string, bool, bool) {
+	var files []string
+	var incomplete bool
+	for index := 1; index < count; index++ {
+		value := argument(index)
+		if value == "" || value == "--" || !strings.HasPrefix(value, "-") {
+			break
+		}
+		option, payload, attached := strings.Cut(value, "=")
+		if strings.HasPrefix(value, "-r") && value != "-r" {
+			option, payload, attached = "-r", strings.TrimPrefix(value, "-r"), true
+		}
+		switch option {
+		case "-v", "--version", "--v8-options":
+			return nil, true, false
+		case "-h", "--help", "-c", "--check":
+			continue
+		case "-e", "--eval", "-p", "--print", "-pe", "-ep":
+			if !attached && index+1 < count && !strings.HasPrefix(argument(index+1), "-") {
+				index++
+			}
+			continue
+		case "-r", "--require", "--import", "--loader", "--experimental-loader":
+			if !attached {
+				index++
+				payload = argument(index)
+			}
+			if file := artifactNodePreloadPath(option, payload); file != "" {
+				files = append(files, file)
+			} else if artifactNodeBarePreload(payload) {
+				incomplete = true
+			}
+		default:
+			takesValue, noScript := artifactInterpreterOption("node", value)
+			if noScript {
+				return files, false, incomplete
+			}
+			if takesValue {
+				index++
+			}
+		}
+	}
+	return files, false, incomplete
+}
+
+func artifactNodeBarePreload(payload string) bool {
+	if payload == "" || path.IsAbs(payload) || strings.HasPrefix(payload, "./") || strings.HasPrefix(payload, "../") {
+		return false
+	}
+	if location, err := url.Parse(payload); err == nil && location.Scheme != "" {
+		return false
+	}
+	// These builtins resolve without consulting artifact-provided node_modules.
+	switch payload {
+	case "assert", "assert/strict", "async_hooks", "buffer", "child_process", "cluster",
+		"console", "constants", "crypto", "dgram", "diagnostics_channel", "dns", "dns/promises",
+		"domain", "events", "fs", "fs/promises", "http", "http2", "https", "module", "net", "os",
+		"path", "path/posix", "path/win32", "perf_hooks", "process", "punycode", "querystring",
+		"readline", "readline/promises", "repl", "stream", "stream/consumers", "stream/promises",
+		"stream/web", "string_decoder", "sys", "timers", "timers/promises", "tls", "trace_events",
+		"tty", "url", "util", "util/types", "v8", "vm", "wasi", "worker_threads", "zlib":
+		return false
+	}
+	return true
+}
+
+func artifactNodePreloadPath(option, payload string) string {
+	if strings.HasPrefix(payload, "file:") {
+		if option == "-r" || option == "--require" {
+			return ""
+		}
+		location, err := url.Parse(payload)
+		if err != nil || location.Opaque != "" || (location.Host != "" && location.Host != "localhost") {
+			return ""
+		}
+		payload = location.Path
+	}
+	if path.IsAbs(payload) || strings.HasPrefix(payload, "./") || strings.HasPrefix(payload, "../") {
+		return payload
+	}
+	return ""
 }
 
 // Select only the script operand, not option payloads or arguments passed to it.
@@ -307,8 +426,11 @@ func artifactInterpreterOption(command, value string) (takesValue, noScript bool
 		}
 		return artifactInterpreterShortOption(value, "WX", "cmhV")
 	case "node":
+		if strings.HasPrefix(value, "-r") && value != "-r" {
+			return false, false
+		}
 		switch option {
-		case "-e", "--eval", "-p", "--print", "-pe", "-ep", "--run", "-h", "--help", "-v", "--version":
+		case "-e", "--eval", "-p", "--print", "-pe", "-ep", "--run", "-h", "--help", "-v", "--version", "--v8-options", "-c", "--check":
 			return false, true
 		case "-r", "--require", "--import", "--loader", "--experimental-loader",
 			"-C", "--conditions", "--log-file", "--input-type", "--inspect-port",

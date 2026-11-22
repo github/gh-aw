@@ -126,6 +126,25 @@ describe("create_pr_review_comment.cjs", () => {
     expect(mockGithub.rest.pulls.createReviewComment).not.toHaveBeenCalled();
   });
 
+  it("buffers a normalized temporary ID without registering a shared ID", async () => {
+    const addComment = vi.spyOn(buffer, "addComment");
+    const handler = await createHandler();
+    const result = await handler({ type: "create_pull_request_review_comment", path: "src/main.js", line: 10, body: "Finding", temporary_id: "#aw_Find1" }, {});
+    expect(result.success).toBe(true);
+    expect(result).not.toHaveProperty("temporaryId");
+    expect(addComment).toHaveBeenCalledWith(expect.objectContaining({ temporaryId: "aw_find1" }));
+  });
+
+  it("rejects duplicate review-local IDs without buffering the second comment", async () => {
+    const handler = await createHandler();
+    const first = await handler({ type: "create_pull_request_review_comment", path: "src/first.js", line: 10, body: "First", temporary_id: "aw_find1" }, {});
+    const duplicate = await handler({ type: "create_pull_request_review_comment", path: "src/second.js", line: 20, body: "Second", temporary_id: "#AW_FIND1" }, {});
+
+    expect(first.success).toBe(true);
+    expect(duplicate).toMatchObject({ success: false, error: expect.stringContaining("Duplicate review-local temporary_id") });
+    expect(buffer.getBufferedCount()).toBe(1);
+  });
+
   it("fits oversized inline comments before buffering and retains the full footer", async () => {
     const bodyFooter = "POLICY-START " + "f".repeat(1000) + " POLICY-END";
     const addComment = vi.spyOn(buffer, "addComment");

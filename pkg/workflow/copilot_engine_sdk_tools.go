@@ -106,7 +106,7 @@ func hasCopilotSDKMCPTools(workflowData *WorkflowData) bool {
 	if workflowData == nil {
 		return false
 	}
-	if HasSafeOutputsEnabled(workflowData.SafeOutputs) || IsMCPScriptsEnabled(workflowData.MCPScripts) {
+	if HasSafeOutputsEnabled(workflowData.SafeOutputs) || IsMCPScriptsEnabled(workflowData.MCPScripts) || usesWebFetchMCPForEngine(NewCopilotEngine(), workflowData) {
 		return true
 	}
 	for name, value := range workflowData.Tools {
@@ -178,7 +178,6 @@ func buildCopilotSDKToolConfig(workflowData *WorkflowData, toolArgs []string) co
 		Capabilities: copilotSDKToolCapabilities{
 			Bash:             isCopilotBashToolEnabled(workflowData),
 			Edit:             isCopilotEditToolEnabled(tools, workflowData),
-			WebFetch:         isCopilotToolValueEnabled(tools, "web-fetch"),
 			WebSearch:        false,
 			DynamicWorkflows: dynamicWorkflows,
 			MCP:              hasCopilotSDKMCPTools(workflowData),

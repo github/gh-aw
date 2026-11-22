@@ -998,6 +998,8 @@ A compact syntax for label-based triggers: `on: issue labeled bug` or `on: pull_
 
 An experimental frontmatter field that declares Language Server Protocol (LSP) servers for Copilot-engine workflows. At compile time, the compiler generates `~/.copilot/settings.json` with an `lspServers` block and injects install steps for known server ecosystems. When configured, Copilot gets semantic code-intelligence tools: symbol lookup, go-to-definition, find references, hover/type info, diagnostics, and rename/refactor — enabling symbol-aware navigation of large codebases.
 
+The built-in `typescript` entry installs TypeScript and its language server from a bundled npm lockfile. Omit `version` or specify the bundled server version (`6.1.0`).
+
 Only supported with `engine: copilot`; any other engine causes a compile-time error. Emits an experimental feature warning at compile time.
 
 ```aw wrap
@@ -1018,7 +1020,7 @@ Optional workflow metadata for categorization and organization. Enables filterin
 
 ### Model Alias
 
-A short human-friendly name (such as `sonnet` or `mini`) that gh-aw resolves at runtime, before the engine starts, to the newest matching model in the live model list. Aliases are defined as ordered lists of provider-scoped glob patterns; the first pattern that matches an available model wins. Meta-aliases reference other aliases and are resolved recursively. A provider prefix (`copilot/opus`) limits the lookup to that provider, and exact model ids are never rewritten. Built-in vendor aliases and meta-aliases are listed in the [Model Aliases & Multipliers Reference](/gh-aw/reference/model-tables/). Custom aliases are defined under `models:` in workflow frontmatter; see the [Model Alias Format Specification](/gh-aw/specs/model-alias-specification/).
+A short human-friendly name (such as `sonnet` or `mini`) that gh-aw resolves at runtime, before the engine starts, to the newest matching model in the live model list. Aliases are defined as ordered lists of provider-scoped glob patterns; the first pattern that matches an available model wins. A wildcard skips models the firewall marks as not automatically selectable, such as an evaluation model that only serves `/v1/decisions` or one disabled in the Copilot model picker; an alias entry without `*`, such as `evals`, still resolves as written. Meta-aliases reference other aliases and are resolved recursively. A provider prefix (`copilot/opus`) limits the lookup to that provider, and exact model ids are never rewritten. Built-in vendor aliases and meta-aliases are listed in the [Model Aliases & Multipliers Reference](/gh-aw/reference/model-tables/). Custom aliases are defined under `models:` in workflow frontmatter; see the [Model Alias Format Specification](/gh-aw/specs/model-alias-specification/).
 
 ### Model Policy (`models.allowed`, `models.blocked`)
 

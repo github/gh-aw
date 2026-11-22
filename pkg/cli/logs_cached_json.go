@@ -22,7 +22,14 @@ import (
 
 type cachedLogsRuns map[int64]cachedLogsJSONLRunData
 
-const cachedLogsJSONLSchemaVersion = 7
+const (
+	legacyCachedLogsJSONLSchemaVersion = 7
+	cachedLogsJSONLSchemaVersion       = 8
+)
+
+func supportedCachedLogsJSONLSchemaVersion(version int) bool {
+	return version == legacyCachedLogsJSONLSchemaVersion || version == cachedLogsJSONLSchemaVersion
+}
 
 const (
 	cachedLogsJSONLKindRun          = "run"
@@ -391,7 +398,7 @@ func cachedLogsJSONLFileDateRangeStatus(path string, dateRange cachedLogsJSONLDa
 	hasPreservedRecord := false
 	_, err := visitCachedLogsJSONLRecords(path, func(record cachedLogsJSONLRecord, _ int) error {
 		if record.Kind != cachedLogsJSONLKindRun ||
-			record.SchemaVersion != cachedLogsJSONLSchemaVersion ||
+			!supportedCachedLogsJSONLSchemaVersion(record.SchemaVersion) ||
 			record.Run == nil ||
 			record.Run.CreatedAt.IsZero() {
 			hasPreservedRecord = true
@@ -410,7 +417,7 @@ func cachedLogsJSONLFileDateRangeStatus(path string, dateRange cachedLogsJSONLDa
 }
 
 func (cache *cachedLogsJSONLCache) addRecord(record cachedLogsJSONLRecord, recordNumber int) error {
-	if record.SchemaVersion != cachedLogsJSONLSchemaVersion {
+	if !supportedCachedLogsJSONLSchemaVersion(record.SchemaVersion) {
 		logsCacheLog.Printf("Ignoring incompatible cached logs JSONL record: record=%d, schema_version=%d", recordNumber, record.SchemaVersion)
 		return nil
 	}
@@ -717,7 +724,7 @@ func (w *cachedLogsJSONLWriter) filterDateRange(startDate, endDate string) error
 		var record cachedLogsJSONLRecord
 		if err := json.Unmarshal(trimmed, &record); err != nil ||
 			record.Kind != cachedLogsJSONLKindRun ||
-			record.SchemaVersion != cachedLogsJSONLSchemaVersion ||
+			!supportedCachedLogsJSONLSchemaVersion(record.SchemaVersion) ||
 			record.Run == nil ||
 			record.Run.CreatedAt.IsZero() {
 			filtered = append(filtered, line...)
@@ -853,6 +860,19 @@ func cachedJSONLCanSatisfy(artifactFilter []string, parse, train, toolGraph bool
 }
 
 func processedRunFromCachedData(data RunData, audit *AuditData, outputDir string) ProcessedRun {
+	attempt, err := strconv.Atoi(data.RunAttempt)
+	if err != nil {
+		// Unknown attempt: cached continuation evidence cannot be matched to the run.
+		attempt = 0
+	}
+	run := WorkflowRun{
+		DatabaseID: data.RunID, WorkflowName: data.WorkflowName, Repository: data.Repository,
+		Attempt: attempt, UpdatedAt: data.UpdatedAt,
+	}
+	runDir := filepath.Join(outputDir, fmt.Sprintf("run-%d", data.RunID))
+	backfillContinuationRequests(&data.ContinuationRequests, run, runDir, false)
+	data.ContinuationRequestCount = continuationRequestCount(data.ContinuationRequests)
+	mergeContinuationRequestsIntoAudit(audit, data.ContinuationRequests)
 	return ProcessedRun{
 		Run: WorkflowRun{
 			DatabaseID:       data.RunID,
@@ -870,6 +890,7 @@ func processedRunFromCachedData(data RunData, audit *AuditData, outputDir string
 			HeadSha:          data.HeadSHA,
 			DisplayTitle:     data.DisplayTitle,
 			Repository:       data.Repository,
+			Attempt:          attempt,
 			Actor:            data.Actor,
 			Duration:         parseDurationString(data.Duration),
 			ActionMinutes:    data.ActionMinutes,
@@ -882,16 +903,17 @@ func processedRunFromCachedData(data RunData, audit *AuditData, outputDir string
 			SafeItemsCount:   data.SafeItemsCount,
 			LogsPath:         filepath.Join(outputDir, fmt.Sprintf("run-%d", data.RunID)),
 		},
-		AwContext:           data.AwContext,
-		TaskDomain:          data.TaskDomain,
-		BehaviorFingerprint: data.BehaviorFingerprint,
-		AgenticAssessments:  data.AgenticAssessments,
-		TokenUsage:          data.TokenUsageSummary,
-		WorkingSet:          data.WorkingSet,
-		Ledger:              data.Ledger,
-		WorkQueue:           data.WorkQueue,
-		Friction:            data.Friction,
-		cachedData:          &data,
-		cachedAudit:         audit,
+		AwContext:            data.AwContext,
+		TaskDomain:           data.TaskDomain,
+		BehaviorFingerprint:  data.BehaviorFingerprint,
+		AgenticAssessments:   data.AgenticAssessments,
+		TokenUsage:           data.TokenUsageSummary,
+		WorkingSet:           data.WorkingSet,
+		ContinuationRequests: data.ContinuationRequests,
+		Ledger:               data.Ledger,
+		WorkQueue:            data.WorkQueue,
+		Friction:             data.Friction,
+		cachedData:           &data,
+		cachedAudit:          audit,
 	}
 }

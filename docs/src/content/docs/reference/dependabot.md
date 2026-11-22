@@ -11,7 +11,7 @@ Engine entries use the effective installed version: `engine.version` when set, o
 
 ## Usage
 
-Run `gh aw compile --dependabot` to compile all workflows and generate manifests in `.github/workflows/`.
+Run `gh aw compile --dependabot` to compile all workflows and generate dependency manifests.
 
 **Prerequisites**: Node.js/npm required for `package-lock.json` generation. Pip and Go manifests generate without additional tools.
 
@@ -42,8 +42,11 @@ updates:
 | **npm** | `package.json` | `package-lock.json` (via `npm install --package-lock-only`) |
 | **pip** | `requirements.txt` | - |
 | **Go** | `go.mod` | - |
+| **Copilot SDK for Node.js or TypeScript** | `.github/gh-aw-dependencies/copilot-sdk/<variant>/package.json` | `package-lock.json` copied from the same frozen project the workflow installs |
 
-All ecosystems update `.github/dependabot.yml` with weekly update schedules. Existing configurations are preserved; only missing ecosystems are added.
+The aggregate manifests in `.github/workflows/` include a generated-file notice. The Copilot SDK inventory is separate: the compiler copies the manifest and lockfile for each selected variant without running npm, preserving all direct and transitive resolutions. Commit the generated inventory files for dependency alerts, but do not install from or edit these copies.
+
+All ecosystems update `.github/dependabot.yml` with weekly schedules. New Copilot SDK inventory entries disable version-update PRs; update the frozen graphs by upgrading gh-aw and recompiling instead.
 
 ## Handling Dependabot PRs
 

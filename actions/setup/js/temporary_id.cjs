@@ -111,7 +111,8 @@ function replaceTemporaryIdReferences(text, tempIdMap, currentRepo) {
   }
 
   return text.replace(TEMPORARY_ID_PATTERN, (match, tempId) => {
-    const resolved = tempIdMap.get(normalizeTemporaryId(tempId));
+    const normalizedId = normalizeTemporaryId(tempId);
+    const resolved = tempIdMap.get(normalizedId);
     if (resolved !== undefined) {
       // If we have a currentRepo and the issue is in the same repo, use short format
       if (currentRepo && resolved.repo === currentRepo) {
@@ -580,7 +581,8 @@ function replaceArtifactUrlReferences(text, artifactUrlMap) {
     }
   }
   return text.replace(TEMPORARY_ID_PATTERN, (match, tempId) => {
-    const url = artifactUrlMap.get(normalizeTemporaryId(tempId));
+    const normalizedId = normalizeTemporaryId(tempId);
+    const url = artifactUrlMap.get(normalizedId);
     if (url !== undefined) {
       // Replace #aw_XXXX with the URL directly (no '#' prefix)
       return url;
@@ -747,6 +749,8 @@ function getCreatedTemporaryId(message) {
     return null;
   }
 
+  // Inline-review IDs are URLs scoped to a single review, not shared producers.
+  if (message.type === "create_pull_request_review_comment") return null;
   const tempId = message.temporary_id;
   if (tempId && isTemporaryId(String(tempId))) {
     return normalizeTemporaryId(String(tempId));

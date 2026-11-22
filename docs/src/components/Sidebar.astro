@@ -12,7 +12,8 @@ import { getSection } from './site-nav';
 const section = getSection(Astro.locals.starlightRoute.id);
 const heading = section === 'blog' ? 'Blog posts' : 'Documentation';
 
-const catalogs = new Map<string, typeof Astro.locals.starlightRoute.sidebar>();
+type Sidebar = typeof Astro.locals.starlightRoute.sidebar;
+const catalogs = new Map<string, Sidebar>();
 
 // Keep full catalogs in inert templates so More can expand without navigation.
 Astro.locals.starlightRoute.sidebar = Astro.locals.starlightRoute.sidebar.map((entry) => {

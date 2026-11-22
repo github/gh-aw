@@ -12,7 +12,7 @@ Repo-memory provides persistent, git-backed storage for AI agents across workflo
 
 ### System Components
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────┐
 │                    Workflow Execution                        │
 │                                                              │
@@ -395,7 +395,7 @@ The total size of all changes (git diff) in a single repo-memory push MUST not e
 - If the patch exceeds the limit, the push is aborted with an error message indicating the actual vs. allowed size
 
 **Error message format**:
-```
+```text
 Patch size (N KB, X bytes) exceeds maximum allowed size (M KB, Y bytes). Reduce the number or size of changes, or increase max-patch-size.
 ```
 

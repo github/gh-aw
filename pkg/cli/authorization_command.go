@@ -176,22 +176,6 @@ func verifyAuthorizationCandidateDirectory(cmd *cobra.Command, snapshot string, 
 	if repo != nil && repo.SafeOutputAuthorization != nil {
 		verifyAuthorizationBinding(result, workflow.RepoConfigFileName, "safe_output_authorization", repo.SafeOutputAuthorization, policy)
 	}
-	// Some compiler lookups are repository-relative. The only working directory
-	// used for candidate parsing is the non-executable, private object snapshot.
-	cwd, err := os.Getwd()
-	if err != nil {
-		result.addFinding("verification_incomplete", "", "", "Cannot establish compiler working directory.", "")
-		return
-	}
-	if err := os.Chdir(snapshot); err != nil {
-		result.addFinding("verification_incomplete", "", "", "Cannot enter isolated candidate snapshot.", "")
-		return
-	}
-	defer func() {
-		if err := os.Chdir(cwd); err != nil {
-			result.addFinding("verification_incomplete", "", "", "Cannot restore compiler working directory.", "")
-		}
-	}()
 	approved, _ := cmd.Flags().GetStringArray("authorization-actions-workflow")
 	verifyAuthorizationSnapshot(cmd.Context(), snapshot, policy, result, approved)
 }

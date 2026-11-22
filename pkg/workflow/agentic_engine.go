@@ -41,7 +41,8 @@ type GitHubActionStep []string
 //   └── IsExperimental()
 //
 //   CapabilityProvider (feature detection - optional)
-//   └── GetCapabilities()
+//   ├── GetCapabilities()
+//   └── UsesWebFetchFallback()
 //
 //   WorkflowExecutor (compilation - required)
 //   ├── GetDeclaredOutputFiles()
@@ -126,6 +127,9 @@ type EngineCapabilities struct {
 	// WebSearch reports whether the engine has built-in support for the web-search tool.
 	WebSearch bool
 
+	// WebFetchFallback opts the engine into the built-in stdio web-fetch MCP server.
+	WebFetchFallback bool
+
 	// MaxContinuations reports whether the engine supports the max-continuations feature.
 	// When true, max-continuations > 1 enables autopilot/multi-run mode for the engine.
 	MaxContinuations bool
@@ -178,6 +182,10 @@ type PostConfigPluginInstallationProvider interface {
 // Engines can optionally implement this to indicate feature support.
 type CapabilityProvider interface {
 	GetCapabilities() EngineCapabilities
+
+	// UsesWebFetchFallback reports whether the engine needs the MCP fallback for this
+	// workflow configuration, independently of whether tools.web-fetch is enabled.
+	UsesWebFetchFallback(data *WorkflowData) bool
 }
 
 // HostedWebCapabilities describes hosted-web support that can depend on the
@@ -450,6 +458,10 @@ func (e *BaseEngine) GetGHSkillAgentName() string {
 
 func (e *BaseEngine) GetCapabilities() EngineCapabilities {
 	return e.capabilities
+}
+
+func (e *BaseEngine) UsesWebFetchFallback(_ *WorkflowData) bool {
+	return e.capabilities.WebFetchFallback
 }
 
 func (e *BaseEngine) GetDurableExecutionPlan(_ *WorkflowData, _ string) (*DurableExecutionPlan, error) {

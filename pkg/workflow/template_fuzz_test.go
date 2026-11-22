@@ -88,6 +88,8 @@ func FuzzWrapExpressionsInTemplateConditionals(f *testing.F) {
 	// Malformed nested braces that triggered CGO fuzz failure.
 	f.Add("{{#if{{elseif {}}")
 	f.Add("{{#if 0000000000000$$${{elseif 00000000000000000}}000")
+	// Literal elseif code example with an unparseable expression is preserved.
+	f.Add("{{#if`{{elseif `}}")
 
 	// Nested braces
 	f.Add("{{#if ${{ ${{ github.actor }} }} }}content{{/if}}")
@@ -196,6 +198,7 @@ func FuzzWrapExpressionsInTemplateConditionals(f *testing.F) {
 		// Ignore partial/malformed fragments produced by fuzzing (e.g. "{{elseif 0").
 		if strings.Contains(input, "{{#if") {
 			expressions, _ := actionslanguageservice.ExtractExpressions(result)
+			masked := maskTemplateCodeRegions(result)
 		patternLoop:
 			for _, pattern := range nonCanonicalElseifPatterns {
 				matches := pattern.FindAllStringSubmatchIndex(result, -1)
@@ -214,6 +217,13 @@ func FuzzWrapExpressionsInTemplateConditionals(f *testing.F) {
 						strings.Contains(expr, "{{") ||
 						strings.Contains(expr, "{") {
 						continue
+					}
+					// Literal code examples with unparseable expressions are
+					// intentionally preserved verbatim.
+					if masked[match[0]] == ' ' {
+						if _, err := actionslanguageservice.ParseSyntax(applyContentTransformers(expr, defaultContentTransformers)); err != nil {
+							continue
+						}
 					}
 					t.Errorf("Non-canonical elseif pattern %q still present in output, input: %q", pattern.String(), input)
 					break patternLoop

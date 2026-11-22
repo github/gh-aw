@@ -425,18 +425,41 @@ illustrative
 
 #### Summary
 
-Agents only propose writes; threat detection reviews each proposal and a separate, scoped job applies only the declared outputs.
+Front matter declares each allowed write under safe-outputs, with options such as max, labels, title-prefix and target; the agent only proposes, threat detection reviews each proposal, and a separate scoped job applies only those declared outputs.
 
 #### Keywords
 
-writes, threat detection, safe-outputs, scoped jobs, permissions, proposals
+writes, threat detection, safe-outputs, scoped jobs, permissions, proposals, YAML, front matter, create-issue, add-comment, max, title-prefix, labels, target, triggering, close-older-issues, hide-older-comments, limits
 
 #### Captions
 
 - Tonight we explain safe outputs, the system that decides what an agent is allowed to change.
+- It starts in the front matter: each allowed write is a typed entry, with limits like max, labels and target.
 - Agents only propose writes. Threat detection then reviews each proposal before anything happens.
 - So who actually presses the button once a proposal is cleared?
-- A separate, scoped job applies only the outputs that were declared. The agent itself never writes.
+- A separate, scoped job applies only the declared outputs, adding the configured prefix and labels. The agent itself never writes.
+
+### Extend safe outputs {#extend-safe-outputs}
+
+#### Notes
+
+illustrative
+
+#### Summary
+
+Every agent write is a typed tool: built-in handlers cover common GitHub writes such as issues, pull requests, comments and labels, safe scripts add inline JavaScript run once per call without secrets, and safe jobs add a custom Actions job with its own steps and secrets, all behind threat detection and outside the sandbox.
+
+#### Keywords
+
+extensibility, custom safe outputs, safe-outputs.scripts, safe-outputs.jobs, safe-outputs.actions, inline script handlers, custom jobs, MCP tools, GH_AW_AGENT_OUTPUT, create-issue, create-pull-request, add-comment, create-discussion, add-labels, update-issue, push-to-pull-request-branch, chat notification, webhooks, secrets, built-in handlers
+
+#### Captions
+
+- Safe outputs are not a closed list. Tonight: how teams extend what an agent may change.
+- Built-in handlers cover the common GitHub writes, such as issues, pull requests, comments and labels.
+- And when a team needs something gh-aw does not ship, like a chat notification?
+- A safe script adds a little JavaScript that runs once per call, with no secrets.
+- A safe job is a full Actions job with its own steps and secrets. All three stay typed tools, behind threat detection, outside the sandbox.
 
 ### Model-checked {#model-checked}
 
@@ -500,6 +523,23 @@ red team, firewall escape, pentest, adversarial, security testing
 - A daily red-team agent keeps trying new ways to escape the agent firewall.
 - And when it actually succeeds? That sounds like bad news for someone.
 - It is good news, really. Each escape it finds gets turned into a fix for the firewall.
+
+### Responsible AI {#responsible-ai}
+
+#### Summary
+
+GitHub Agentic Workflows supports responsible AI principles (fairness, reliability and safety, privacy and security, inclusiveness, transparency and accountability) through reviewable instructions, a sandboxed agent, gated writes and traceable outputs, as safeguards rather than guarantees.
+
+#### Keywords
+
+RAI, responsible AI principles, fairness, reliability and safety, privacy and security, inclusiveness, transparency, accountability, AI-generated footer, staged mode, safe outputs, manual-approval, roles, human in the loop, read-only token, min-integrity, threat detection, transparency note
+
+#### Captions
+
+- Responsible AI has six principles on paper. How do they show up in an agent that runs in your repository?
+- Each one maps to a control. Reliability and privacy come from the sandbox, the read-only token and filtered input.
+- And who answers for what the agent posts?
+- People do. The agent only proposes, every post links back to its run, and owners still trial each workflow.
 
 ### Stop manually translating intent into code. {#stop-manually-translating-intent-into-code}
 

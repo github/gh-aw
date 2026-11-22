@@ -64,7 +64,7 @@ function validatedSuites(raw, outcome = "success") {
   return output.slice("suite_ids=".length, -1);
 }
 
-test("every CGO check job is selectable; only checkout, selection and cleanup are infrastructure", () => {
+test("the selector catalog covers every CGO check job", () => {
   assert.deepEqual(
     Object.keys(jobs)
       .filter(id => !infrastructure.includes(id))
@@ -81,6 +81,31 @@ test("every CGO check job is selectable; only checkout, selection and cleanup ar
   assert.doesNotMatch(jobs["cross-platform-build"], /matrix:[\s\S]*outputs\.suite_ids/);
   assert.equal(condition(decision), "github.event_name == 'pull_request'");
   assert.equal(condition(jobs["summarize-timing"]), "always()");
+});
+
+test("CGO unit tests use 12 disjoint shards with complete test-name coverage", () => {
+  const shards = [...jobs.test.matchAll(/^        - name: (.+)\n          pattern: (.+)\n          shard: (.+)$/gm)].map(([, name, pattern, shard]) => ({
+    name,
+    pattern: new RegExp(pattern),
+    shard,
+  }));
+  assert.equal(shards.length, 12);
+  assert.equal(new Set(shards.map(shard => shard.name)).size, 12);
+  assert.equal(new Set(shards.map(shard => shard.shard)).size, 12);
+  const suffixes = [...Array.from({ length: 128 }, (_, code) => String.fromCharCode(code)), "É", "Ω", "中"];
+  for (const suffix of suffixes) {
+    const name = `Test${suffix}Example`;
+    assert.equal(shards.filter(shard => shard.pattern.test(name)).length, 1, JSON.stringify(name));
+  }
+  for (const name of ["BenchmarkA", "ExampleA", "NotTestA"]) {
+    assert.equal(shards.filter(shard => shard.pattern.test(name)).length, 0, name);
+  }
+  assert.match(jobs.test, /UNIT_TEST_SUITE: fast/);
+  assert.match(jobs.test, /steps: &unit-test-steps/);
+  assert.match(jobs["test-slow"], /UNIT_TEST_SUITE: slow/);
+  assert.match(jobs["test-slow"], /steps: \*unit-test-steps/);
+  assert.match(jobs["test-slow"], /pattern: repository\n          shard: slow-repository/);
+  assert.match(jobs["test-slow"], /UNIT_TEST_TIMEOUT: 5m/);
 });
 
 test("inference credentials and executable policy stay isolated from PR code", () => {
@@ -119,7 +144,7 @@ test("inference credentials and executable policy stay isolated from PR code", (
   assert.deepEqual(dependencies(decision), []);
 });
 
-test("PR model decisions control every check job through the actual output validator and job expressions", async () => {
+test("PR decisions keep the fast baseline and control optional jobs through the validator", async () => {
   for (const wanted of [[], ...SUITE_IDS.map(id => [id]), [...SUITE_IDS]]) {
     const selection = await frontDoor({
       catalog,
@@ -139,7 +164,9 @@ test("invalid outputs and missing, failed or skipped decisions run every check j
   for (const raw of ["", "not-json", "null", "{}", '["unknown"]', JSON.stringify([...SUITE_IDS, "unknown"]), '["build","build"]', '["go-tests"]', ...Object.keys(JOB_DEPENDENCIES).map(id => JSON.stringify([id]))]) {
     assert.equal(validatedSuites(raw), "", raw);
   }
-  assert.equal(validatedSuites("[]"), "[]");
+  assert.equal(validatedSuites("[]"), "");
+  assert.equal(validatedSuites('["verify-integration-build","build"]'), "");
+  assert.equal(validatedSuites('["verify-integration-build","test"]'), '["verify-integration-build","test"]');
   assert.equal(validatedSuites(JSON.stringify(SUITE_IDS)), JSON.stringify(SUITE_IDS));
   for (const id of SUITE_IDS) {
     for (const result of ["failure", "skipped", "cancelled", ""]) assert.equal(evaluate(condition(jobs[id]), { result }), true, `${id}: ${result}`);
@@ -221,9 +248,40 @@ test("benchmark shards cover every benchmark package once and bound expensive re
         .slice("BENCH_PACKAGES=".length)
         .split(" ")
     );
-    assert.ok(args.includes(`BENCH_TIME=${shard === "workqueue" ? "1x" : "3x"}`));
+    assert.ok(args.includes(`BENCH_TIME=${shard === "workqueue" ? "1x" : "100ms"}`));
+    assert.ok(args.includes("BENCH_COUNT=6"));
   }
   assert.deepEqual(selected.sort(), expected);
+});
+
+test("benchmark gate ignores noisy geomeans and fails significant regressions over 10%", t => {
+  const benchmarks = fs.readFileSync(path.join(__dirname, "../.github/workflows/benchmarks.yml"), "utf8");
+  const script = benchmarks
+    .split("    - name: Run benchstat regression check\n")[1]
+    .split("      run: |\n")[1]
+    .split("\n    - name:")[0]
+    .replace(/^        /gm, "");
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "benchmark-gate-"));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  fs.writeFileSync(path.join(directory, "benchstat"), '#!/bin/bash\nprintf "%s\\n" "$BENCHSTAT_OUTPUT"\n', { mode: 0o755 });
+  const output = [
+    "        │ sec/op │ sec/op vs base │",
+    "Parse-4   57.57µ   64.40µ ~ (p=1.000 n=1)",
+    "geomean   57.57µ   64.40µ +11.87%",
+    "Boundary-4 10n 11n +10.00% (p=0.002 n=6)",
+    "        │ B/s │ B/s vs base │",
+    "Replay-4 10M 12M +20.00% (p=0.002 n=6)",
+  ].join("\n");
+  const run = data =>
+    spawnSync("bash", ["-c", script], {
+      cwd: directory,
+      env: { ...process.env, PATH: `${directory}:${process.env.PATH}`, BENCHSTAT_OUTPUT: data, SHARD: "other", GITHUB_STEP_SUMMARY: path.join(directory, "summary") },
+      encoding: "utf8",
+    });
+  assert.equal(run(output).status, 0);
+  const regression = run(`${output}\n        │ B/op │ B/op vs base │\nParse-4  100  112  +12.00% (p=0.002 n=6)`);
+  assert.equal(regression.status, 1);
+  assert.match(regression.stdout, /::error::Performance regression >10%: Parse-4/);
 });
 
 test("make bench preserves Go failures through tee", t => {

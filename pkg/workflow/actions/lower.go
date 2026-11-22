@@ -12,6 +12,10 @@ import (
 
 // Lower resolves the graph and creates a deterministic YAML value tree.
 func Lower(input *Workflow) (yaml.MapSlice, error) {
+	return lowerWorkflow(input, LowerStep)
+}
+
+func lowerWorkflow(input *Workflow, lowerStep func(Step, JobID, *Workflow) (map[string]any, error)) (yaml.MapSlice, error) {
 	resolved, err := Resolve(input)
 	if err != nil {
 		return nil, err
@@ -48,7 +52,7 @@ func Lower(input *Workflow) (yaml.MapSlice, error) {
 	})
 	jobMap := make(yaml.MapSlice, 0, len(jobs))
 	for _, job := range jobs {
-		fields, err := lowerJob(job, resolved)
+		fields, err := lowerJobWithStep(job, resolved, lowerStep)
 		if err != nil {
 			return nil, fmt.Errorf("lowering workflow job %q: %w", job.ID, err)
 		}
@@ -58,6 +62,10 @@ func Lower(input *Workflow) (yaml.MapSlice, error) {
 }
 
 func lowerJob(job *Job, resolved *Workflow) (map[string]any, error) {
+	return lowerJobWithStep(job, resolved, LowerStep)
+}
+
+func lowerJobWithStep(job *Job, resolved *Workflow, lowerStep func(Step, JobID, *Workflow) (map[string]any, error)) (map[string]any, error) {
 	fields, err := nativeJobFields(job)
 	if err != nil {
 		return nil, err
@@ -106,7 +114,7 @@ func lowerJob(job *Job, resolved *Workflow) (map[string]any, error) {
 	if len(job.Steps) > 0 {
 		steps := make([]map[string]any, 0, len(job.Steps))
 		for _, step := range job.Steps {
-			value, err := LowerStep(step, job.ID, resolved)
+			value, err := lowerStep(step, job.ID, resolved)
 			if err != nil {
 				return nil, err
 			}
@@ -265,6 +273,10 @@ func Emit(input *Workflow) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	return emitLowered(input, value)
+}
+
+func emitLowered(input *Workflow, value yaml.MapSlice) (string, error) {
 	if input.source != nil {
 		content, err := snapshotYAMLValue(value)
 		if err != nil {

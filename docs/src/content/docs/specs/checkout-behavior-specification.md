@@ -1,5 +1,6 @@
 ---
 title: Checkout Behavior Specification
+spec: true
 description: Formal specification of checkout behavior across activation, agent, and safe_outputs jobs in gh-aw workflows
 sidebar:
   order: 1365
@@ -448,6 +449,8 @@ The following MUST-level norms govern credential and token safety during checkou
 
 ### Informative References
 
+- [Runtime repository-list checkout model](https://github.com/github/gh-aw/blob/main/specs/workflow-security/RuntimeRepositoryCheckout.tla) — bounded preflight, job-local finalization, manifest ordering, and credential-source selection.
+- [Compiled workflow model](https://github.com/github/gh-aw/blob/main/specs/workflow-security/CompiledWorkflow.tla) — bounded checkout and credential-cleanup lifecycle across trusted setup, agent execution, and privileged safe outputs.
 - `/gh-aw/reference/checkout/`
 - `/gh-aw/reference/safe-outputs-pull-requests/`
 - `/gh-aw/docs/sparseness.md`

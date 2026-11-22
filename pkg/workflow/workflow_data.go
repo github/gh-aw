@@ -122,6 +122,7 @@ type WorkflowData struct {
 	EngineConfig                   *EngineConfig // Extended engine configuration
 	durableExecutionPlan           *DurableExecutionPlan
 	engineDefinition               *EngineDefinition // Per-workflow metadata, retained across batch compiler registry resets
+	webFetchFallback               bool              // Resolved engine preference for MCP detection and manifest generation
 	AgentFile                      string            // Path to custom agent file (from imports)
 	AgentImportSpec                string            // Original import specification for agent file (e.g., "owner/repo/path@ref")
 	RepositoryImports              []string          // Repository-only imports (format: "owner/repo@ref") for .github folder merging
@@ -230,7 +231,8 @@ type WorkflowData struct {
 	CachedConcurrencyGroupExprErr  error                           // cached result of validateConcurrencyGroupExpression(ConcurrencyGroupExpr); nil = valid; populated by applyDefaults
 	Experiments                    map[string][]string             // A/B testing experiments: maps experiment name to variant list (from frontmatter)
 	ExperimentConfigs              map[string]*ExperimentConfig    // Full A/B experiment metadata (populated alongside Experiments)
-	ExperimentsStorage             ExperimentStorageMode           // "cache" or "repo" (default "repo"); controls how experiment state is persisted across runs
+	ExperimentsStorage             ExperimentStorageMode           // "cache", "repo" (default), or opt-in "broker"; controls experiment persistence
+	ExperimentsBrokerURL           string                          // Optional literal broker endpoint
 	CachedConcurrencyGroupExprSet  bool                            // true once CachedConcurrencyGroupExprErr has been populated; distinguishes "valid (nil)" from "not yet computed"
 	CachedParsedToolsets           []string                        // cached result of ParseGitHubToolsets for the GitHub tool (for performance optimization); populated by applyDefaults
 	CachedAllowedDomainsStr        string                          // cached agent firewall policy; sanitization-only domains must not be stored here

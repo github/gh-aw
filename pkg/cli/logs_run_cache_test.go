@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/github/gh-aw/pkg/constants"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -423,4 +424,47 @@ func TestTryLoadCachedRunResultPersistsSafeItemsCountAfterBackfill(t *testing.T)
 	reloaded, ok := loadRunSummary(runOutputDir, false)
 	require.True(t, ok)
 	assert.Equal(t, 5, reloaded.Run.SafeItemsCount, "on-disk run_summary.json SafeItemsCount should be persisted after backfill")
+}
+
+func TestTryLoadCachedRunResultInvalidatesContinuationEvidenceFromPriorAttempt(t *testing.T) {
+	t.Parallel()
+	runOutputDir := t.TempDir()
+	oldUpdatedAt := time.Now().UTC().Add(-time.Hour)
+	currentRun := WorkflowRun{
+		DatabaseID: 202,
+		Repository: "owner/repo",
+		Attempt:    2,
+		UpdatedAt:  oldUpdatedAt.Add(time.Minute),
+	}
+	summary := &RunSummary{
+		CLIVersion:  GetVersion(),
+		RunID:       currentRun.DatabaseID,
+		ProcessedAt: oldUpdatedAt.Add(time.Second),
+		RunAnalysis: RunAnalysis{
+			Run: WorkflowRun{
+				DatabaseID: currentRun.DatabaseID,
+				Repository: currentRun.Repository,
+				Attempt:    1,
+				UpdatedAt:  oldUpdatedAt,
+			},
+			ContinuationRequests: []ContinuationRequestReport{{Message: "Prior attempt"}},
+		},
+	}
+	require.NoError(t, saveRunSummary(runOutputDir, summary, false))
+	require.NoError(t, markArtifactDownloaded(runOutputDir, string(ArtifactSetAll)))
+	require.NoError(t, markArtifactDownloaded(runOutputDir, constants.AgentArtifactName.String()))
+	require.NoError(t, markArtifactDownloaded(runOutputDir, constants.AgentOutputFallbackArtifactName.String()))
+	staleOutput := filepath.Join(runOutputDir, constants.AgentArtifactName.String(), constants.AgentOutputFilename.String())
+	require.NoError(t, os.MkdirAll(filepath.Dir(staleOutput), 0o700))
+	require.NoError(t, os.WriteFile(staleOutput, []byte(`{"items":[{"type":"request_continuation","message":"Prior attempt"}]}`), 0o600))
+
+	result, ok := tryLoadCachedRunResult(context.Background(), currentRun, runOutputDir, concurrentRunDownloadParams{})
+
+	assert.False(t, ok)
+	assert.Nil(t, result)
+	assert.NoFileExists(t, staleOutput)
+	assert.NoDirExists(t, filepath.Join(runOutputDir, constants.AgentArtifactName.String()))
+	assert.NoFileExists(t, filepath.Join(runOutputDir, downloadedArtifactsMarkerDir, string(ArtifactSetAll)))
+	assert.NoFileExists(t, filepath.Join(runOutputDir, downloadedArtifactsMarkerDir, constants.AgentArtifactName.String()))
+	assert.NoFileExists(t, filepath.Join(runOutputDir, downloadedArtifactsMarkerDir, constants.AgentOutputFallbackArtifactName.String()))
 }

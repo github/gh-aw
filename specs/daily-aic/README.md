@@ -1,4 +1,31 @@
-# Cancelled daily AIC reruns: bounded TLA+ model
+# Daily AI Credits TLA+ models
+
+[`DailyAICGuardrail.tla`](DailyAICGuardrail.tla) models guardrail admission
+from §§9.8–9.15 of the [AI Credits specification](https://github.github.com/gh-aw/specs/ai-credits-specification/#9-daily-ai-credits-guardrail).
+It checks that artifact decisions use a complete fresh listing and one
+contribution per member, with separate whole-run estimates. Reuse requires
+trusted recorded evidence matching the current attempt identity. Quota deferral
+restarts the phase, discards partial results, and cannot itself admit a run.
+An explicit fail-open policy may allow startup without publishing a daily total
+or changing the outcome to `under_budget`. Repo-memory backend selection
+distinguishes trusted coverage, artifact bootstrap, clone failure, and the
+explicit insecure override; a permissive ledger total is not an artifact
+completeness claim.
+
+The model uses two historical run IDs, two pages, and one deferral per phase.
+It abstracts artifact validation, the timestamps in cache identities, retry
+deadline eligibility, and ledger shard contents. It does not model provider
+billing, concurrent budget reservations, or the ledger writer. Termination
+assumes weak fairness of the modeled progress actions.
+
+Run the guardrail checks from this directory:
+
+```sh
+java -cp "$TLA2TOOLS_JAR" tlc2.TLC \
+  -config DailyAICGuardrail.cfg DailyAICGuardrail.tla
+```
+
+## Cancelled rerun accounting
 
 `CancelledRerunAccounting.tla` checks that carried-forward usage is accepted
 only for a cancelled component attempt with no verified current producer, one

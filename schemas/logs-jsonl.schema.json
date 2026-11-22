@@ -6,7 +6,7 @@
         "schema_version": {
           "type": "integer",
           "enum": [
-            7
+            8
           ]
         },
         "kind": {
@@ -142,7 +142,17 @@
               "type": "integer"
             },
             "aic": {
-              "type": "number"
+              "type": [
+                "null",
+                "number"
+              ]
+            },
+            "aic_coverage": {
+              "type": "string",
+              "enum": [
+                "available",
+                "unavailable"
+              ]
             },
             "ambient_context": {
               "type": [
@@ -1644,6 +1654,46 @@
             "missing_data_count": {
               "type": "integer"
             },
+            "continuation_request_count": {
+              "type": [
+                "null",
+                "integer"
+              ]
+            },
+            "continuation_requests": {
+              "type": [
+                "null",
+                "array"
+              ],
+              "items": {
+                "type": "object",
+                "properties": {
+                  "message": {
+                    "type": "string"
+                  },
+                  "timestamp": {
+                    "type": "string"
+                  },
+                  "workflow_name": {
+                    "type": "string"
+                  },
+                  "run_id": {
+                    "type": "integer"
+                  },
+                  "experiment_name": {
+                    "type": "string"
+                  },
+                  "variant": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "message",
+                  "timestamp"
+                ],
+                "additionalProperties": false
+              }
+            },
             "safe_items_count": {
               "type": "integer"
             },
@@ -2744,6 +2794,9 @@
                 },
                 "total_aic": {
                   "type": "number"
+                },
+                "aic_found": {
+                  "type": "boolean"
                 },
                 "ambient_context": {
                   "type": [
@@ -5502,6 +5555,12 @@
                     "noop_count": {
                       "type": "integer"
                     },
+                    "continuation_request_count": {
+                      "type": [
+                        "null",
+                        "integer"
+                      ]
+                    },
                     "agent_active_ratio": {
                       "type": "number"
                     },
@@ -5510,7 +5569,8 @@
                     }
                   },
                   "required": [
-                    "timeout_detected"
+                    "timeout_detected",
+                    "continuation_request_count"
                   ],
                   "additionalProperties": false
                 },
@@ -5901,6 +5961,40 @@
                     "additionalProperties": false
                   }
                 },
+                "continuation_requests": {
+                  "type": [
+                    "null",
+                    "array"
+                  ],
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "message": {
+                        "type": "string"
+                      },
+                      "timestamp": {
+                        "type": "string"
+                      },
+                      "workflow_name": {
+                        "type": "string"
+                      },
+                      "run_id": {
+                        "type": "integer"
+                      },
+                      "experiment_name": {
+                        "type": "string"
+                      },
+                      "variant": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "message",
+                      "timestamp"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
                 "mcp_failures": {
                   "type": [
                     "null",
@@ -6182,6 +6276,9 @@
                     },
                     "total_aic": {
                       "type": "number"
+                    },
+                    "aic_found": {
+                      "type": "boolean"
                     },
                     "ambient_context": {
                       "type": [
@@ -10864,7 +10961,8 @@
                 "schema_version",
                 "overview",
                 "metrics",
-                "downloaded_files"
+                "downloaded_files",
+                "continuation_requests"
               ],
               "additionalProperties": false
             },
@@ -11200,6 +11298,9 @@
             "classification",
             "token_usage",
             "aic",
+            "aic_coverage",
+            "continuation_request_count",
+            "continuation_requests",
             "created_at",
             "url",
             "logs_path",
@@ -11222,7 +11323,7 @@
         "schema_version": {
           "type": "integer",
           "enum": [
-            7
+            8
           ]
         },
         "kind": {
@@ -11339,7 +11440,7 @@
         "schema_version": {
           "type": "integer",
           "enum": [
-            7
+            8
           ]
         },
         "kind": {
@@ -11428,7 +11529,7 @@
         "schema_version": {
           "type": "integer",
           "enum": [
-            7
+            8
           ]
         },
         "kind": {

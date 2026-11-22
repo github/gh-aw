@@ -1,5 +1,6 @@
 ---
 title: Forecast Command Specification
+spec: true
 description: Formal W3C-style specification for the gh aw forecast command — Monte Carlo AI Credit projection, workflow discovery, and run-level output formats for GitHub Agentic Workflows
 sidebar:
   order: 1355
@@ -773,6 +774,14 @@ When `--verbose` is specified, the implementation SHOULD emit the following addi
 - Timing information for API calls and simulation execution
 
 ### 10.6 Safeguards for API Rate-Limit During Sampling
+
+The [ForecastSampling TLA+ model](https://github.com/github/gh-aw/blob/main/specs/forecast/ForecastSampling.tla)
+and [TLC configuration](https://github.com/github/gh-aw/blob/main/specs/forecast/ForecastSampling.cfg)
+check the run-list and artifact request lifecycle for two discovered workflows.
+The model uses logical time and a three-retry budget per request. It checks
+warning and wait ordering, retry exhaustion, and completion of unaffected workflows.
+It distinguishes empty, sampled, and partial rows without modeling the numeric
+projection or the optional JSON flag.
 
 When the GitHub API returns HTTP 429 or HTTP 403 (with a `X-RateLimit-Remaining: 0` header)
 during `gh api` sampling calls (i.e., while fetching run lists or artifact data for individual

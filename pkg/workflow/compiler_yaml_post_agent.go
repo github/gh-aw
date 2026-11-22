@@ -85,8 +85,8 @@ func (c *Compiler) collectArtifactPaths(data *WorkflowData, engine CodingAgentEn
 
 	// Collect OTLP mirrors — enables post-hoc telemetry inspection without a live collector.
 	// Each line contains a full OTLP/HTTP JSON payload for its signal.
-	// Only included when OTLP is configured for this workflow.
-	if isOTLPEnabled(data) {
+	// Included when local telemetry is enabled, including with remote export disabled.
+	if isOTLPLocalTelemetryEnabled(data) {
 		paths = append(paths, constants.TmpGhAwDirSlash+constants.OtelJsonlFilename.String())
 		paths = append(paths, conditionalOTLPMetricsArtifactPath)
 		paths = append(paths, constants.TmpGhAwDirSlash+constants.OtlpExportErrorsFilename.String())
@@ -221,7 +221,7 @@ func (c *Compiler) generateSummarySteps(yaml *strings.Builder, data *WorkflowDat
 }
 
 func (c *Compiler) generateOTLPMetricsConclusionStep(yaml *strings.Builder, data *WorkflowData) {
-	if !isOTLPEnabled(data) {
+	if !isOTLPLocalTelemetryEnabled(data) {
 		return
 	}
 	yaml.WriteString("      - name: Emit OTLP job conclusion before artifacts\n")

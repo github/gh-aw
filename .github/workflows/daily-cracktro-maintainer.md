@@ -12,7 +12,7 @@ permissions:
   issues: read
   pull-requests: read
   actions: read
-engine: copilot
+engine: pi
 model: copilot/claude-opus-5.5
 strict: true
 timeout-minutes: 45
@@ -140,25 +140,25 @@ old data as current or invent numbers from incomplete queries.
 
 Run `node --check docs/public/cracktro/deck.js` and `git diff --check`; review
 the complete diff. Use provisioned Playwright; no build or installation.
-Run `node .github/scripts/cracktro_preview.cjs` as one standalone async Bash call.
+Run `node .github/scripts/cracktro_preview.cjs background` as a standalone Bash call.
 It serves `docs/public` on `127.0.0.1:4329` and creates
 `"$RUNNER_TEMP/gh-aw/safeoutputs/upload-artifacts/cracktro-review/"`.
-Keep its handle; no Python, `mkdir`, or shell loops. Check readiness separately:
+Keep the launcher PID printed by the command. Do not run Python directly, `mkdir`, or shell loops. Check readiness separately:
 `curl http://127.0.0.1:4329/cracktro/ --fail --silent --show-error --retry 15 --retry-connrefused --retry-delay 2 --retry-max-time 25 --connect-timeout 2 --max-time 5`.
 Then run `playwright-cli open --browser=chromium http://127.0.0.1:4329/cracktro/`.
-On first denial, stop that capability and report the exact command as incomplete;
+On the first tool denial, stop that capability and report the exact command as incomplete;
 do not probe variants or broaden permissions.
 
 Inspect changed slides and adjacent transitions at desktop and narrow widths:
 navigation, links, notes, sound controls, content rules, console/network errors.
 Run relevant tests only when dependencies exist; distinguish browser checks
 from passing suites.
-Check all changed paths against the allowlist; fix violations. Save screenshots under
-`"$RUNNER_TEMP/gh-aw/safeoutputs/upload-artifacts/cracktro-review/"`; publish
+Check all changed paths against the allowlist; fix violations. Save screenshots in
+the directory printed by the launcher, using its literal path; publish
 with `upload_artifact` using staging-relative `path: "cracktro-review"`.
 Never upload `/tmp` sources or the staging root.
-Close the browser; `stop_bash` the launcher handle and verify its result and
-`list_bash`, including on failure.
+Close the browser and run `kill <launcher-pid>` using only the PID printed by the
+launcher, including on failure. The preview also stops automatically after 10 minutes.
 
 Recheck overlapping PRs. Publish only via `create_pull_request`; never push,
 merge, enable auto-merge, dispatch, or use raw writes. Follow the PR template:

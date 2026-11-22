@@ -16,8 +16,8 @@ func (c *Compiler) applyBuiltinJobPreSteps(data *WorkflowData) error {
 	}
 
 	for jobName, jobConfig := range data.Jobs {
-		if jobName == string(constants.AdmissionJobName) || jobName == string(constants.ConclusionAdmissionJobName) {
-			return fmt.Errorf("jobs.%s is compiler-owned and cannot be customized; configure admission with managed Actions variables", jobName)
+		if err := validateCompilerOwnedJobCustomization(jobName, data); err != nil {
+			return err
 		}
 		configMap, ok := jobConfig.(map[string]any)
 		if !ok {
@@ -68,6 +68,16 @@ func (c *Compiler) applyBuiltinJobPreSteps(data *WorkflowData) error {
 		compilerJobsLog.Printf("Inserted %d setup-step(s), %d pre-step(s), and %d step(s) into built-in job '%s'", len(setupSteps), len(preSteps), len(regularSteps), targetJobName)
 	}
 
+	return nil
+}
+
+func validateCompilerOwnedJobCustomization(jobName string, data *WorkflowData) error {
+	if jobName == string(constants.ReportExperimentsJobName) && usesExperimentsBroker(data) {
+		return errors.New("jobs.report_experiments is compiler-owned and cannot be customized; configure experiments.storage instead")
+	}
+	if jobName == string(constants.AdmissionJobName) || jobName == string(constants.ConclusionAdmissionJobName) {
+		return fmt.Errorf("jobs.%s is compiler-owned and cannot be customized; configure admission with managed Actions variables", jobName)
+	}
 	return nil
 }
 
@@ -257,8 +267,8 @@ func parseBuiltinJobAugmentation(jobName, targetJobName string, rawConfig any) (
 }
 
 func (c *Compiler) applyBuiltinJobAugmentation(jobName string, rawConfig any, data *WorkflowData, allJobs map[string]*Job) error {
-	if jobName == string(constants.AdmissionJobName) || jobName == string(constants.ConclusionAdmissionJobName) {
-		return fmt.Errorf("jobs.%s is compiler-owned and cannot be customized; configure admission with managed Actions variables", jobName)
+	if err := validateCompilerOwnedJobCustomization(jobName, data); err != nil {
+		return err
 	}
 	if jobName == string(constants.GradersJobName) {
 		return errors.New("jobs.graders is compiler-owned and cannot be customized; configure custom JavaScript under graders instead")

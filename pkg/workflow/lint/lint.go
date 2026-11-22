@@ -66,6 +66,9 @@ type Input struct {
 }
 
 type Diagnostic struct {
+	// Source identifies the AST owning this finding. Zero uses the rule's
+	// primary available AST; mixed-source checks set it for individual findings.
+	Source       ASTTargets        `json:"-"`
 	RuleID       string            `json:"rule_id"`
 	ThreatRuleID string            `json:"threat_rule_id,omitempty"`
 	Severity     Severity          `json:"severity"`
@@ -100,7 +103,8 @@ type Rule struct {
 }
 
 type Runner struct {
-	rules []Rule
+	rules      []Rule
+	registered map[string]struct{}
 }
 
 var ruleIDPattern = regexp.MustCompile(`^[a-z][a-z0-9]*(-[a-z0-9]+)*$`)
@@ -131,7 +135,7 @@ func New(rules ...Rule) (*Runner, error) {
 		}
 		seen[rule.ID] = struct{}{}
 	}
-	return &Runner{rules: cloneRules(rules)}, nil
+	return &Runner{rules: cloneRules(rules), registered: seen}, nil
 }
 
 func (r *Runner) Rules() []Rule {
@@ -150,7 +154,9 @@ func cloneRules(rules []Rule) []Rule {
 // An empty selection runs every registered rule.
 func (r *Runner) Select(ids ...string) (*Runner, error) {
 	if len(ids) == 0 {
-		return New(r.rules...)
+		for _, rule := range r.rules {
+			ids = append(ids, rule.ID)
+		}
 	}
 	var selected []Rule
 	seen := make(map[string]struct{})
@@ -171,7 +177,11 @@ func (r *Runner) Select(ids ...string) (*Runner, error) {
 			return nil, fmt.Errorf("unknown workflow lint rule %q", id)
 		}
 	}
-	return New(selected...)
+	result, err := New(selected...)
+	if err == nil {
+		result.registered = r.suppressionRuleIDs()
+	}
+	return result, err
 }
 
 // Run returns diagnostics even when another rule fails. Tooling failures are
@@ -181,7 +191,8 @@ func (r *Runner) Run(ctx context.Context, input Input) ([]Diagnostic, error) {
 		return nil, errors.New("workflow lint requires an Actions or AW AST")
 	}
 	var diagnostics []Diagnostic
-	var failures []error
+	suppressions, suppressionErr := r.commentSuppressions(input)
+	failures := []error{suppressionErr}
 	region := trace.StartRegion(ctx, "workflow:lint")
 	defer region.End()
 	checked := 0
@@ -209,6 +220,15 @@ func (r *Runner) Run(ctx context.Context, input Input) ([]Diagnostic, error) {
 			failures = append(failures, fmt.Errorf("lint rule %s: %w", rule.ID, err))
 		}
 		for _, diagnostic := range findings {
+			if diagnostic.Source == 0 {
+				diagnostic.Source = AWAST
+				if input.Workflow != nil && targets&ActionsAST != 0 {
+					diagnostic.Source = ActionsAST
+				}
+			}
+			if suppressions.contains(rule.ID, diagnostic) {
+				continue
+			}
 			diagnostic.RuleID = rule.ID
 			if !slices.Contains(rule.FindingThreatRuleIDs, diagnostic.ThreatRuleID) {
 				diagnostic.ThreatRuleID = rule.ThreatRuleID
@@ -261,6 +281,8 @@ func Default() *Runner {
 		ToolScopeRule(),
 		SandboxConfigRule(),
 		ImageArgumentRule(),
+		UnpinnedImagesRule(),
+		EnvironmentFileInjectionRule(),
 		CheckoutModeRule(),
 		ForkAssociationRule(),
 		PullRequestTargetRolesRule(),

@@ -20,6 +20,7 @@ const dependabotConfigRelativePath = ".github/dependabot.yml"
 
 // PackageJSON represents the structure of a package.json file
 type PackageJSON struct {
+	Comment         string            `json:"_comment,omitempty"`
 	Name            string            `json:"name"`
 	Private         bool              `json:"private"`
 	License         string            `json:"license,omitempty"`
@@ -31,15 +32,19 @@ type PackageJSON struct {
 type DependabotConfig struct {
 	Version int                     `yaml:"version"`
 	Updates []DependabotUpdateEntry `yaml:"updates"`
+	Extra   map[string]any          `yaml:",inline"`
 }
 
 // DependabotUpdateEntry represents a single update configuration in dependabot.yml
 type DependabotUpdateEntry struct {
 	PackageEcosystem string `yaml:"package-ecosystem"`
 	Directory        string `yaml:"directory"`
+	PullRequestLimit *int   `yaml:"open-pull-requests-limit,omitempty"`
 	Schedule         struct {
-		Interval string `yaml:"interval"`
+		Interval string         `yaml:"interval"`
+		Extra    map[string]any `yaml:",inline"`
 	} `yaml:"schedule"`
+	Extra map[string]any `yaml:",inline"`
 }
 
 // NpmDependency represents a parsed npm package with version
@@ -86,8 +91,14 @@ func (c *Compiler) GenerateDependabotManifests(ctx context.Context, workflowData
 		ecosystems["gomod"] = struct{}{}
 	}
 
+	configDir := filepath.Dir(workflowDir)
+	sdkDirectories, err := c.generateCopilotSDKNpmInventories(workflowDataList, configDir)
+	if err != nil {
+		return err
+	}
+
 	// If no dependencies found at all, skip
-	if len(ecosystems) == 0 {
+	if len(ecosystems) == 0 && len(sdkDirectories) == 0 {
 		dependabotLog.Print("No dependencies found, skipping manifest generation")
 		if c.verbose {
 			fmt.Fprintln(os.Stderr, console.FormatInfoMessage("No dependencies detected in workflows, skipping Dependabot manifest generation"))
@@ -96,8 +107,8 @@ func (c *Compiler) GenerateDependabotManifests(ctx context.Context, workflowData
 	}
 
 	// Generate dependabot.yml with all detected ecosystems
-	dependabotPath := filepath.Join(filepath.Dir(workflowDir), "dependabot.yml")
-	if err := c.generateDependabotConfig(dependabotPath, ecosystems, forceOverwrite); err != nil {
+	dependabotPath := filepath.Join(configDir, "dependabot.yml")
+	if err := c.generateDependabotConfig(dependabotPath, ecosystems, forceOverwrite, sdkDirectories...); err != nil {
 		if err := c.handleManifestGenerationError("dependabot.yml", err); err != nil {
 			return err
 		}

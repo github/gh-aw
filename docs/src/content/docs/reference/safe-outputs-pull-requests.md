@@ -340,6 +340,17 @@ safe-outputs:
 
 With `target: "*"`, the agent must supply `pull_request_number` in each call, or the comment fails. For cross-repository use, the agent can also supply `repo` (`owner/repo` format), which must match `target-repo` or appear in `allowed-repos`.
 
+An inline comment can include an optional `temporary_id`: `aw_` followed by 3 to 12 letters, digits, or underscores, with an optional leading `#`. Use a unique ID within the review, and reference it as a Markdown link destination in the summary:
+
+```jsonl wrap
+{"type":"create_pull_request_review_comment","temporary_id":"aw_find1","path":"src/a.ts","line":42,"body":"Validate this input before using it."}
+{"type":"submit_pull_request_review","event":"COMMENT","body":"- [Unvalidated input](#aw_find1) `src/a.ts:42`"}
+```
+
+The published summary links to the inline comment in the same review. Unresolved references stay unchanged and produce a warning. These IDs are not available in other outputs or inline comment bodies.
+
+If GitHub already has a pending review for the caller, gh-aw leaves it untouched, publishes the new review, then attempts one summary update after resolving comment URLs. The unresolved IDs may be briefly visible; if the update fails, they remain unchanged.
+
 ## Submit PR Review (`submit-pull-request-review:`)
 
 Submits a consolidated PR review. Inline comments buffered by `create-pull-request-review-comment` are included automatically.

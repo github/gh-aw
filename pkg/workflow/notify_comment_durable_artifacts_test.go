@@ -13,9 +13,28 @@ import (
 )
 
 func TestUsageArtifactUploadIncludesDurableSessionMetadata(t *testing.T) {
-	steps := strings.Join(buildUsageArtifactUploadStep("", func(action string) string { return action }), "")
+	steps := strings.Join(buildUsageArtifactUploadStep("", false, func(action string) string { return action }), "")
 	require.Equal(t, 2, strings.Count(steps, "            /tmp/gh-aw/usage/agent/durable-session.jsonl\n"),
 		"both the initial upload and retry must preserve raw durable metadata")
+}
+
+func TestUsageArtifactUploadIncludesExperimentResultsOnlyForBroker(t *testing.T) {
+	for _, test := range []struct {
+		name   string
+		broker bool
+	}{
+		{name: "non-broker"},
+		{name: "broker", broker: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			steps := strings.Join(buildUsageArtifactUploadStep("", test.broker, func(action string) string { return action }), "")
+			if test.broker {
+				require.Equal(t, 2, strings.Count(steps, "            /tmp/gh-aw/usage/activity/experiment-results.json\n"))
+			} else {
+				require.NotContains(t, steps, "/tmp/gh-aw/usage/activity/experiment-results.json")
+			}
+		})
+	}
 }
 
 func TestUsageArtifactCollectionDurableSessionCopy(t *testing.T) {

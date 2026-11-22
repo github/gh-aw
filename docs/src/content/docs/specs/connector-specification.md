@@ -1,5 +1,6 @@
 ---
 title: Connector Specification
+spec: true
 description: Declaration, selection, execution, and conformance requirements for third-party connectors.
 sidebar:
   order: 1365

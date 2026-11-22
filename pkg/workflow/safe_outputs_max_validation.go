@@ -247,6 +247,14 @@ func validateSafeOutputsMax(config *SafeOutputsConfig) error {
 			return err
 		}
 	}
+	if config.RequestContinuation != nil {
+		max := config.RequestContinuation.Max
+		if max != nil && !isExpression(*max) {
+			if n, err := strconv.Atoi(*max); err == nil && n <= 0 {
+				return fmt.Errorf("safe-outputs.request-continuation: max must be a positive integer, got %d\n\nProvide a positive integer (e.g., max: 1 or max: 5)", n)
+			}
+		}
+	}
 	if config.ReplaceLabel != nil {
 		if err := checkMaxField("replace_label", config.ReplaceLabel.Max); err != nil {
 			return err

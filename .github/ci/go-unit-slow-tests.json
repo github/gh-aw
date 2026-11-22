@@ -1,0 +1,26 @@
+{
+  "threshold_seconds": 10,
+  "source_runs": [44921173289, 44880152498],
+  "tests": [
+    { "name": "TestRepositoryAgenticWorkflows", "package": "pkg/workflow/lint", "shard": "repository", "elapsed_seconds": 130.67 },
+    { "name": "TestRepositoryWorkflowsCompileWithoutEmitting", "package": "pkg/workflow", "shard": "repository", "elapsed_seconds": 57.81 },
+    { "name": "TestLastAttemptCompletionCanSpendReservedClosureBytes", "package": "pkg/workqueue", "shard": "cli-parser-workqueue", "elapsed_seconds": 50.39 },
+    { "name": "TestLinearAutomaticLookupFrozenHosts", "package": "pkg/workflow", "shard": "workflow-readers", "elapsed_seconds": 35.79 },
+    { "name": "TestAzureBoundedReadersBundledNode", "package": "pkg/workflow", "shard": "workflow-azure", "elapsed_seconds": 25.72 },
+    { "name": "TestCompileJSONOptionalScannerFindings", "package": "pkg/cli", "shard": "cli-parser-workqueue", "elapsed_seconds": 22 },
+    { "name": "TestLintCacheModeLiteralsCLI", "package": "pkg/cli", "shard": "cli-parser-workqueue", "elapsed_seconds": 20.29 },
+    { "name": "TestAzureDevOpsConnectorBundledNodeResponseIdentity", "package": "pkg/workflow", "shard": "workflow-azure", "elapsed_seconds": 19.77 },
+    { "name": "TestNestedImportHashGoJavaScriptParity", "package": "pkg/parser", "shard": "cli-parser-workqueue", "elapsed_seconds": 18.76 },
+    { "name": "TestUpdateUpgradeAutoMergeOrgDispatchErrors", "package": "pkg/cli", "shard": "cli-parser-workqueue", "elapsed_seconds": 16.01 },
+    { "name": "TestProviderReaderParityBundledNode", "package": "pkg/workflow", "shard": "workflow-readers", "elapsed_seconds": 15.58 },
+    { "name": "TestNpmEngineCooldownAtInstallationTime", "package": "pkg/workflow", "shard": "workflow-readers", "elapsed_seconds": 13.99 },
+    { "name": "TestRuntimeCheckoutRootCredentials", "package": "pkg/workflow", "shard": "workflow-readers", "elapsed_seconds": 12.4 },
+    { "name": "TestAuthorizationPolicySnapshot", "package": "pkg/cli", "shard": "cli-parser-workqueue", "elapsed_seconds": 12.16 },
+    { "name": "TestProviderDocumentationXMLConsumers", "package": "pkg/workflow", "shard": "workflow-readers", "elapsed_seconds": 11.81 },
+    { "name": "TestAzureFullWriteParityBranchRefMembership", "package": "pkg/workflow", "shard": "workflow-azure", "elapsed_seconds": 11.59 },
+    { "name": "TestNotionConnectorBundledNodeRuntime", "package": "pkg/workflow", "shard": "workflow-readers", "elapsed_seconds": 11.5 },
+    { "name": "TestRepoMemoryGitHubAppReadWriteCompilation", "package": "pkg/workflow", "shard": "workflow-readers", "elapsed_seconds": 11.12 },
+    { "name": "TestZendeskConnectorBundledNodeExecution", "package": "pkg/workflow", "shard": "workflow-readers", "elapsed_seconds": 10.55 },
+    { "name": "TestMCPAuditTimeoutReturnsStage", "package": "pkg/cli", "shard": "cli-parser-workqueue", "elapsed_seconds": 10.52 }
+  ]
+}

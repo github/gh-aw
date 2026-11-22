@@ -70,6 +70,7 @@ Monitor and update agentic CLI tools: Claude Code, GitHub Copilot CLI, OpenAI Co
 3. If no CLI version, Docker image version, or Docker image digest changes are detected, call `noop` as the terminal safe output and exit successfully
 
 **CRITICAL**: If version or digest changes are detected, implement and validate them and create a pull request using `create_pull_request`, including minor updates. Report concrete blockers with `report_incomplete`.
+For Copilot CLI and threat-detect, update versions and checksums together using `scripts/update-copilot-version.sh` and `scripts/update-threat-detect-pins.sh`; follow their verification requirements and report blockers rather than updating versions alone.
 
 For each CLI/MCP server and threat-detect:
 1. Resolve the newest stable version eligible under the global 3-day release cooldown below (use npm view commands for package metadata)
@@ -115,8 +116,8 @@ Apply this policy to **all release resolution**: every CLI, MCP server, threat-d
   - Constant: `DefaultPiVersion` in `pkg/constants/version_constants.go`
 - **Threat-detect**: Check `https://api.github.com/repos/github/gh-aw-threat-detection/releases?per_page=100` (apply the global cooldown)
   - Release notes: https://github.com/github/gh-aw-threat-detection/releases
-  - Constant: `DefaultThreatDetectVersion` in `pkg/constants/version_constants.go`
-  - Update the version with the `v` prefix used by GitHub release tags
+  - Update the version and complete digest matrix together with `bash scripts/update-threat-detect-pins.sh VERSION`, using the `v` prefix
+  - If verification fails, leave both unchanged and report the blocker with `report_incomplete`
 **Optimization**: Fetch all versions in parallel using multiple npm view or WebFetch calls in a single turn.
 
 ### Research & Analysis
@@ -176,7 +177,7 @@ Check cache-memory first (`/tmp/gh-aw/cache-memory/`). Only install and run `--h
 For each CLI tool update, install (`npm install -g <package>@<version>`), run `--help` on the main command and key subcommands (Copilot: `config`, `environment`), and compare with the cached output to identify new flags, removed features, or behavior changes.
 
 ### Update Process
-1. Edit the appropriate version constant in `./pkg/constants/` with cooldown-eligible CLI version(s). **Copilot CLI is special**: use the paired version/checksum refresh below instead of editing its constants by hand.
+1. Edit the appropriate version constant in `./pkg/constants/` with cooldown-eligible CLI version(s). For **Copilot CLI** and **threat-detect**, use their paired version/checksum updaters instead of editing constants by hand.
 2. Edit `./pkg/cli/docker_images.go` with new Docker image version(s) and digest(s), including digest-only changes where the tag is unchanged
 3. Run `make fmt` after editing any Go files
 4. **REQUIRED**: Run `make recompile` in the **foreground** — do NOT background it with `&` or follow it with `sleep`. Wait for it to finish completely before proceeding. Example: `make recompile && echo "done"`.

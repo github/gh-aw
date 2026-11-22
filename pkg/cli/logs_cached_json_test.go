@@ -45,6 +45,41 @@ func TestLoadCachedLogsJSON(t *testing.T) {
 	assert.Equal(t, "cached-workflow", runs.runs[42].WorkflowName)
 }
 
+func TestCachedLogsJSONLAICRoundTrip(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "logs.jsonl")
+	var lines []byte
+	for _, run := range []RunData{
+		{RunID: 1, AIC: new(float64(0)), AICCoverage: logsAICAvailable},
+		{RunID: 2, AICCoverage: logsAICUnavailable},
+	} {
+		record, err := json.Marshal(cachedLogsJSONLRecord{
+			SchemaVersion: cachedLogsJSONLSchemaVersion,
+			Kind:          cachedLogsJSONLKindRun,
+			Run:           &cachedLogsJSONLRunData{RunData: run, EngineVersion: "test"},
+		})
+		require.NoError(t, err)
+		lines = append(lines, record...)
+		lines = append(lines, '\n')
+	}
+	lines = append(lines, `{"schema_version":7,"kind":"run","run":{"run_id":3,"aic":0}}`...)
+	lines = append(lines, '\n')
+	require.NoError(t, os.WriteFile(path, lines, 0o600))
+	cache, err := loadCachedLogsJSONL(path)
+	require.NoError(t, err)
+	require.Len(t, cache.runs, 3)
+	zero := cache.runs[1]
+	missing := cache.runs[2]
+	legacy := cache.runs[3]
+	assert.Equal(t, "test", zero.EngineVersion)
+	data := buildLogsData([]ProcessedRun{{cachedData: &zero.RunData}, {cachedData: &missing.RunData}, {cachedData: &legacy.RunData}}, t.TempDir(), nil)
+	require.NotNil(t, data.Runs[0].AIC)
+	assert.Zero(t, *data.Runs[0].AIC)
+	assert.Nil(t, data.Runs[1].AIC)
+	assert.Nil(t, data.Runs[2].AIC)
+	assert.Equal(t, logsAICPartial, data.Summary.AICCoverage)
+	assert.Nil(t, data.Summary.TotalAIC)
+}
+
 func TestBuildCachedLogsJSONLRunDataUsesEffectiveRoutedModel(t *testing.T) {
 	routing := &ModelRoutingSummary{Status: "selected", SelectedModel: "gpt-5.6-luna", WireModel: "gpt-5.6-luna", SelectedEffort: "high"}
 	info := &AwInfo{Model: "auto", RequestedModel: "auto"}
@@ -589,7 +624,8 @@ func TestLoadCachedLogsJSONLIgnoresIncompatibleSchema(t *testing.T) {
 	runs, err := loadCachedLogsJSONL(path)
 
 	require.NoError(t, err)
-	require.Len(t, runs.runs, 1)
+	require.Len(t, runs.runs, 2)
+	assert.Contains(t, runs.runs, int64(legacyCachedLogsJSONLSchemaVersion+1))
 	assert.Contains(t, runs.runs, int64(cachedLogsJSONLSchemaVersion+1))
 }
 
@@ -982,7 +1018,9 @@ func TestBuildLogsDataPreservesCachedRunRecord(t *testing.T) {
 
 	data := buildLogsData([]ProcessedRun{processedRun}, outputDir, nil)
 
-	require.Equal(t, []RunData{cached}, data.Runs)
+	expected := cached
+	expected.AICCoverage = logsAICUnavailable
+	require.Equal(t, []RunData{expected}, data.Runs)
 	assert.Equal(t, 1, data.Summary.TotalRuns)
 	assert.Equal(t, "2.0m", data.Summary.TotalDuration)
 	assert.Equal(t, 2, data.Summary.TotalSteeringEvents)

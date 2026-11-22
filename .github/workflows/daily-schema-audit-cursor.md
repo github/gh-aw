@@ -39,7 +39,7 @@ safe-outputs:
   create-issue:
     expires: 1d
     title-prefix: "[schema-audit] "
-    labels: [automation, schema]
+    labels: [automation, schema, "backlog:reports"]
     max: 1
     close-older-issues: true
     close-older-key: daily-schema-audit-cursor

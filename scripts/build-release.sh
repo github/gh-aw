@@ -1,8 +1,8 @@
 #!/bin/bash
 set +o histexpand
 
-# Custom build script for gh-extension-precompile to set version correctly
-# This script is called during the release process to build binaries with proper version info
+# Build versioned release assets without publishing them. Native binary names
+# follow gh-extension-precompile's {os}-{arch}[.exe] convention for gh extension install.
 set -e
 
 VERSION="$1"

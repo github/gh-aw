@@ -30,15 +30,13 @@ type copilotSDKInstallSpec struct {
 	runtimeID string
 	stepName  string
 	command   string
+	npm       *copilotSDKNPMProject
 	// runLines, if non-empty, generates a "run: |" multiline step instead of "run: <command>".
 	runLines []string
 }
 
 const workspaceCommandPrefix = `cd "${GITHUB_WORKSPACE}" && `
-const copilotSDKNodeTargetDir = constants.GhAwRootDirShell + "/engine-cli/copilot-sdk"
-const copilotSDKNodeInstallCommand = `npm install --prefix "` + copilotSDKNodeTargetDir + `" --ignore-scripts --no-save `
 const copilotSDKPythonTargetDir = `${GITHUB_WORKSPACE}/.gh-aw/copilot-sdk/python`
-const copilotSDKWebFetchDependency = "undici@6.28.0"
 
 // inlineMavenVersion is the pinned Maven version used to bootstrap Maven for inline Java drivers
 // on runners that don't have it pre-installed (e.g. self-hosted). GitHub-hosted runners already
@@ -193,13 +191,34 @@ func appendCopilotLSPInstallSteps(steps []GitHubActionStep, workflowData *Workfl
 }
 
 func buildCopilotSDKInstallStep(workflowData *WorkflowData) GitHubActionStep {
-	if workflowData == nil || workflowData.EngineConfig == nil || !workflowData.EngineConfig.CopilotSDK {
-		return GitHubActionStep{}
+	spec := selectCopilotSDKInstallSpec(workflowData)
+	if spec.stepName == "" {
+		return nil
 	}
+	copilotInstallLog.Printf("copilot-sdk enabled; runtime=%s", spec.runtimeID)
+	return specToInstallStep(spec)
+}
+
+func selectCopilotSDKInstallSpec(workflowData *WorkflowData) copilotSDKInstallSpec {
+	if workflowData == nil || workflowData.EngineConfig == nil || !workflowData.EngineConfig.CopilotSDK {
+		return copilotSDKInstallSpec{}
+	}
+	spec := selectDefaultCopilotSDKInstallSpec(workflowData)
+	if pin := workflowData.EngineConfig.CopilotSDKPin; pin != nil && spec.npm != nil {
+		if !pin.valid() {
+			return copilotSDKInstallSpec{
+				stepName: spec.stepName,
+				command:  `echo "::error::Invalid engine.copilot-sdk version or sha256" >&2; exit 1`,
+			}
+		}
+		spec.npm = &copilotSDKNPMProject{variant: spec.npm.variant, digest: pin.SHA256, version: pin.Version}
+	}
+	return spec
+}
+
+func selectDefaultCopilotSDKInstallSpec(workflowData *WorkflowData) copilotSDKInstallSpec {
 	if inlineRuntimeID := copilotSDKInlineDriverRuntimeID(workflowData); inlineRuntimeID != "" {
-		spec := getInlineCopilotSDKInstallSpec(inlineRuntimeID)
-		copilotInstallLog.Printf("copilot-sdk enabled with inline driver; runtime=%s; install command=%s", spec.runtimeID, spec.command)
-		return specToInstallStep(spec, resolveEngineCooldownDays(workflowData))
+		return getInlineCopilotSDKInstallSpec(inlineRuntimeID)
 	}
 	// When a custom SDK driver is configured without a custom engine command, use the driver's
 	// file extension to determine which language SDK to install. This ensures the correct SDK
@@ -208,20 +227,20 @@ func buildCopilotSDKInstallStep(workflowData *WorkflowData) GitHubActionStep {
 	if command == "" && workflowData.EngineConfig.Driver != "" {
 		command = sdkDriverInstallCommand(workflowData.EngineConfig.Driver)
 	}
-	spec := getCopilotSDKInstallSpec(command)
-	copilotInstallLog.Printf("copilot-sdk enabled; runtime=%s; install command=%s", spec.runtimeID, spec.command)
-	return specToInstallStep(spec, resolveEngineCooldownDays(workflowData))
+	return getCopilotSDKInstallSpec(command)
 }
 
 // specToInstallStep converts a copilotSDKInstallSpec into a GitHubActionStep.
 // When the spec has runLines set it emits a "run: |" multi-line block; otherwise
 // it emits a single "run: <command>" line.
-func specToInstallStep(spec copilotSDKInstallSpec, cooldownDays int) GitHubActionStep {
-	installCommand := spec.command
-	if len(spec.runLines) > 0 {
-		installCommand = strings.Join(spec.runLines, "\n")
+func specToInstallStep(spec copilotSDKInstallSpec) GitHubActionStep {
+	if spec.npm != nil {
+		return GitHubActionStep{
+			"      - name: " + spec.stepName,
+			"        shell: bash",
+			"        run: " + spec.npm.installCommand(),
+		}
 	}
-	usesNpm := strings.Contains(installCommand, "npm install ")
 	if len(spec.runLines) > 0 {
 		step := GitHubActionStep{
 			"      - name: " + spec.stepName,
@@ -230,22 +249,12 @@ func specToInstallStep(spec copilotSDKInstallSpec, cooldownDays int) GitHubActio
 		for _, line := range spec.runLines {
 			step = append(step, "          "+line)
 		}
-		if usesNpm {
-			step = append(step,
-				"        env:",
-				fmt.Sprintf("          NPM_CONFIG_MIN_RELEASE_AGE: '%d'", cooldownDays),
-			)
-		}
 		return step
 	}
-	step := GitHubActionStep{
+	return GitHubActionStep{
 		"      - name: " + spec.stepName,
 		"        run: " + spec.command,
 	}
-	if usesNpm {
-		step = append(step, "        env:", fmt.Sprintf("          NPM_CONFIG_MIN_RELEASE_AGE: '%d'", cooldownDays))
-	}
-	return step
 }
 
 // sdkDriverInstallCommand returns a synthetic command string for the given driver filename
@@ -273,7 +282,6 @@ func getCopilotSDKInstallSpec(command string) copilotSDKInstallSpec {
 	spec := copilotSDKInstallSpec{
 		runtimeID: runtimeID,
 		stepName:  "Install GitHub Copilot SDK (Node.js)",
-		command:   copilotSDKNodeInstallCommand + "@github/copilot-sdk@" + version + " " + copilotSDKWebFetchDependency,
 	}
 
 	switch runtimeID {
@@ -286,7 +294,7 @@ func getCopilotSDKInstallSpec(command string) copilotSDKInstallSpec {
 		)
 	case "typescript":
 		spec.stepName = "Install GitHub Copilot SDK (TypeScript)"
-		spec.command = copilotSDKNodeInstallCommand + "@github/copilot-sdk@" + version + " " + copilotSDKWebFetchDependency + " ts-node@10.9.2 typescript@5.8.3"
+		spec.npm = copilotSDKTypeScriptProject
 	case "go":
 		spec.stepName = "Install GitHub Copilot SDK (Go)"
 		spec.command = workspaceCommandPrefix + "go get github.com/github/copilot-sdk/go@v" + version
@@ -299,6 +307,8 @@ func getCopilotSDKInstallSpec(command string) copilotSDKInstallSpec {
 	case "java":
 		spec.stepName = "Install GitHub Copilot SDK (Java)"
 		spec.command = workspaceCommandPrefix + "mvn -q org.apache.maven.plugins:maven-dependency-plugin:3.8.1:get -Dartifact=com.github:copilot-sdk-java:" + version
+	default:
+		spec.npm = copilotSDKNodeProject
 	}
 
 	return spec
@@ -310,7 +320,6 @@ func getInlineCopilotSDKInstallSpec(runtimeID string) copilotSDKInstallSpec {
 	spec := copilotSDKInstallSpec{
 		runtimeID: runtimeID,
 		stepName:  "Install GitHub Copilot SDK (Node.js)",
-		command:   copilotSDKNodeInstallCommand + "@github/copilot-sdk@" + version + " " + copilotSDKWebFetchDependency,
 	}
 
 	switch runtimeID {
@@ -354,6 +363,8 @@ func getInlineCopilotSDKInstallSpec(runtimeID string) copilotSDKInstallSpec {
 				classpathFile,
 			),
 		}
+	default:
+		spec.npm = copilotSDKNodeProject
 	}
 
 	return spec

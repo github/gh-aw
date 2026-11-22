@@ -17,7 +17,7 @@ Without a `model`, `engine.model`, or `engine.model-routing`, a Copilot workflow
 
 ## Capabilities and limitations
 
-Copilot supports `engine.agent`, custom harnesses, `max-continuations`, bare mode, and per-command bash allowlists. Compilation rejects native `tools.web-search` and CLI-mode `tools.web-fetch`; use MCP instead. SDK mode provides a proxy-aware `web-fetch` tool. Offline BYOK disables native web tools.
+Copilot supports `engine.agent`, custom harnesses, `max-continuations`, bare mode, and per-command bash allowlists. Both CLI and SDK always run in offline BYOK mode, where native web tools are unavailable. `tools.web-fetch` enables the built-in MCP fallback inside AWF; `tools.web-search` remains unsupported.
 
 Sandboxed CLI sessions derive URL approvals from finalized AWF network rules, including `network_allowed` additions. Domain rules cover apex/subdomains and HTTP/HTTPS unless restricted by protocol/port. These approvals do not grant shell access or bypass the firewall.
 
@@ -121,8 +121,35 @@ Use the resource's `/openai/v1` endpoint with API-key or GitHub OIDC authenticat
 ## Copilot SDK Support
 
 Set `engine.copilot-sdk: true` to run a local Copilot sidecar and SDK driver.
+
+For Node.js and TypeScript drivers, use the object form to pin a specific SDK version independently of `engine.version`, which still controls the CLI:
+
+```aw wrap
+engine:
+  id: copilot
+  copilot-sdk:
+    version: "1.0.16"
+    sha256: "<64 lowercase hex digits>"
+```
+
+Check in `package.json` and `package-lock.json` under `.github/aw/copilot-sdk/<version>/<variant>/`, where `<variant>` is `node` for the built-in or Node.js driver and `typescript` for an explicit `ts-node` command. Both files must pin `@github/copilot-sdk` to that exact version. Use an npm v3 lockfile with canonical npm registry URLs and SHA-512 integrity for every dependency. The SDK install step needs `jq` and a checkout that includes these files.
+
+From the project directory, calculate the frontmatter checksum over the manifest bytes, a NUL byte, and the lockfile bytes:
+
+```bash
+{ cat package.json && printf '\0' && cat package-lock.json; } | shasum -a 256 -b
+```
+
+Use the first field of the output. Keep both files byte-for-byte stable across checkouts (for example, enforce LF with `.gitattributes`). The installer verifies the digest before running `npm ci` with lifecycle scripts disabled. `copilot-sdk: true` still uses the bundled graph. Custom graphs are already checked into the repository, so `gh aw compile --dependabot` does not copy them into the generated inventory.
+
 In this mode, the harness starts a local sidecar and runs the
 SDK driver process instead of the default CLI-only flow.
+
+For Node.js drivers, generated workflows install the SDK and its dependencies
+from a compiler-pinned npm lockfile in runner temporary storage. The install
+verifies package integrity and disables npm lifecycle scripts without changing
+the application's package files. The locked SDK dependencies are not subject
+to `engine.cooldown`.
 
 The built-in driver registers native MCP servers from converter-owned `RUNNER_TEMP/gh-aw/mcp-config/copilot-sdk.json`, not the user-managed CLI catalog. `tools.cli-proxy` servers remain CLI-only. A SHA-256 integrity value is bound to the run, attempt, and job; missing, malformed, changed, linked, or stale catalogs fail before inference. This does not protect against a compromised runner able to replace both catalog and trusted environment.
 

@@ -720,6 +720,13 @@ artifact (token usage and run metadata) is downloaded. `--artifacts` replaces th
 firewall and network data. Use `--artifacts usage,agent` to download both compact usage
 and agent data. Results are cached for 10-100x speedup on subsequent runs.
 
+In `--json` output, `runs[].aic` is `null` when AI credit cost is unknown and a
+number when recorded, including zero. `runs[].aic_coverage` is `available` or
+`unavailable` accordingly. `summary.total_aic` is `null` unless every returned
+run has a recorded cost. `summary.aic_coverage` is `available` when all costs
+are recorded, `partial` when only some are recorded, and `unavailable` when none
+are recorded, including when there are no runs.
+
 ```bash wrap
 gh aw logs workflow                        # Download logs for workflow
 gh aw logs workflow --artifacts agent     # Download only detailed agent data
@@ -862,7 +869,7 @@ Events are written without output buffering. Concurrent targets can interleave e
 gh aw logs --format jsonl | jq --unbuffered 'select(.type == "run") | .run'
 ```
 
-`--cached-jsonl` is independent of streaming stdout: it reuses compatible, schema-versioned run records and workflow-run discovery responses. It writes exactly one JSON value per line, appending every complete `gh run list` payload before downloading artifacts and available GitHub API rate-limit reports after collection. Each enriched `run` record includes job execution data, sanitized MCP tool-call metadata, and available engine, model, runtime, and component versions for downstream dashboards. Raw tool errors, arguments, responses, and artifact bodies are excluded. Discovered runs therefore remain available when a timeout or API limit interrupts processing. Records from incompatible schema versions are ignored. Use `gh aw json-schema logs-jsonl` to generate the schema for each cached JSON Lines item (not the stdout event stream).
+`--cached-jsonl` is independent of streaming stdout: it reuses compatible, schema-versioned run records and workflow-run discovery responses. It writes exactly one JSON value per line, appending every complete `gh run list` payload before downloading artifacts and available GitHub API rate-limit reports after collection. Each enriched `run` record includes job execution data, sanitized MCP tool-call metadata, and available engine, model, runtime, and component versions for downstream dashboards. Raw tool errors, arguments, responses, and artifact bodies are excluded. Discovered runs therefore remain available when a timeout or API limit interrupts processing. Records from incompatible schema versions are ignored. Use `gh aw json-schema logs-jsonl` to generate the schema for newly written cached JSON Lines items (not the stdout event stream). Existing caches may also contain compatible older-version items.
 
 Each safe-output entity recorded for a run (the same provider-neutral records surfaced in `usage/activity/summary.json`) is also appended as its own `safe_output_item` line immediately after the `run` record, carrying a `run_id` correlating it back to the run plus the entity's type, provider, durable ID, human-readable identifier, URL, and target/state metadata. These per-entity lines are informational projections of the `run` record's `safe_outputs` array and are ignored by the in-memory run cache used to skip already-downloaded runs.
 
@@ -1434,7 +1441,7 @@ Unlike `gh aw compile --fix`, `gh aw upgrade` runs codemods, action version upda
 
 #### `env`
 
-Manage compiler defaults as GitHub variables at repository, organization, or enterprise scope.
+Manage compiler defaults as GitHub variables at repository, organization, or enterprise scope, and configure default OpenTelemetry export with `env otel`.
 
 ##### `env get [file]`
 
@@ -1466,6 +1473,25 @@ gh aw env update defaults.yml --scope ent --enterprise my-enterprise --yes
 The `--visibility` flag sets access for newly created org or ent variables (`all`, `private`, or `selected`; default: `all`). Existing variables keep their current visibility. The flag is rejected with `--scope repo`.
 
 For repository scope, `--repo` currently accepts `owner/repo` only. To target GitHub Enterprise Server, select the host via `GH_HOST` rather than prefixing the repository with `[HOST/]`.
+
+##### `env otel`
+
+Test an authenticated empty OTLP traces export, then configure the `GH_AW_DEFAULT_OTLP_ENDPOINT` and `GH_AW_DEFAULT_OTLP_HEADERS` Actions secrets and the `OTEL_EXPORTER_OTLP_PROTOCOL` and `GH_AW_OTEL_METRICS` Actions variables. This command changes GitHub settings without editing or compiling workflows.
+
+```bash wrap
+gh aw env otel
+gh aw env otel --repo my-org/my-repo \
+  --endpoint https://collector.example.com \
+  --protocol http/protobuf --headers-stdin --yes < otlp-headers.txt
+```
+
+**Options:** `--scope`, `--repo/-r`, `--org`, `--enterprise`, `--endpoint`, `--protocol`, `--metrics`, `--headers-stdin`, `--yes/-y`, `--visibility`, `--selected`
+
+Without target flags, the command uses the current repository. Repeat `--repo`, `--org`, or `--enterprise` for multiple targets; enterprise targets expand to visible organizations. `--visibility` defaults to `private` and is invalid for repository targets. With `selected` visibility, repeat `--selected owner/repo` for an organization or `--selected org` for an enterprise.
+
+Interactive header input is hidden. Noninteractive use requires `--endpoint`, `--headers-stdin`, and `--yes`; keep header credentials out of command arguments. `--protocol` defaults to `http/json`, and metrics are enabled unless `--metrics=false` is set.
+
+The probe verifies route and credential acceptance, not span ingestion or connectivity from GitHub runners. Settings updates are not transactional: a failed write can leave export disabled until the command is rerun. See [Configure defaults in one command](/gh-aw/reference/open-telemetry/#configure-defaults-in-one-command) for endpoint constraints, access requirements, override checks, and recovery.
 
 ### Advanced
 

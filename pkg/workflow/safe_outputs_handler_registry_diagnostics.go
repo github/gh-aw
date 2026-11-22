@@ -2,6 +2,14 @@ package workflow
 
 // diagnosticHandlerRegistry contains diagnostic, reporting, and no-op handler builders.
 var diagnosticHandlerRegistry = map[string]handlerBuilder{
+	"request_continuation": func(cfg *SafeOutputsConfig) map[string]any {
+		if cfg.RequestContinuation == nil {
+			return nil
+		}
+		return newHandlerConfigBuilder().
+			AddTemplatableInt("max", cfg.RequestContinuation.Max).
+			Build()
+	},
 	"report_missing_tool": func(cfg *SafeOutputsConfig) map[string]any {
 		if cfg.MissingTool == nil {
 			return nil

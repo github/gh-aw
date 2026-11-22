@@ -34,6 +34,9 @@ const (
 	// ExperimentsStorageRepo uses a git branch (repo-memory) to persist experiment state.
 	// This is the default because experiment data is valuable and repo storage is more durable.
 	ExperimentsStorageRepo ExperimentStorageMode = "repo"
+
+	// ExperimentsStorageBroker delegates assignment and reporting to an OIDC-authenticated broker.
+	ExperimentsStorageBroker ExperimentStorageMode = "broker"
 )
 
 // experimentsBranchPrefix is the git branch prefix used when storage: repo is selected.
@@ -111,7 +114,7 @@ func extractExperimentsStorageFromFrontmatter(frontmatter map[string]any) Experi
 		if s, ok := storageRaw.(string); ok {
 			storage := ExperimentStorageMode(s)
 			switch storage {
-			case ExperimentsStorageCache, ExperimentsStorageRepo:
+			case ExperimentsStorageCache, ExperimentsStorageRepo, ExperimentsStorageBroker:
 				return storage
 			default:
 				experimentsLog.Printf("Unknown experiments storage %q; falling back to %q", s, ExperimentsStorageRepo)
@@ -624,6 +627,14 @@ func (c *Compiler) generateExperimentSteps(data *WorkflowData) []string {
 	experimentNames := sortedExperimentNames(data.Experiments)
 	experimentsLog.Printf("Generating experiment steps for %d experiment(s): %v (storage=%s)", len(experimentNames), experimentNames, data.ExperimentsStorage)
 
+	if data.ExperimentsStorage == ExperimentsStorageBroker {
+		if data.DryRun {
+			steps := []string{initializeBrokerExperimentStateStep()}
+			steps = append(steps, c.generatePickExperimentStep(data, experimentNames)...)
+			return append(steps, c.generateExperimentArtifactUploadStep(data, SanitizeWorkflowIDForCacheKey(data.WorkflowID))...)
+		}
+		return c.generateBrokerExperimentSteps(data, experimentNames)
+	}
 	if data.ExperimentsStorage == ExperimentsStorageCache {
 		return c.generateExperimentCacheSteps(data, experimentNames)
 	}
@@ -855,7 +866,10 @@ func rewriteDeclaredExperimentNames(s string, experiments map[string][]string, p
 func rewriteExpressionReferences(s string, prefix []string, replace func(string) (string, bool)) string {
 	var b strings.Builder
 	last := 0
-	spans, _ := actionslanguageservice.ExtractExpressions(s)
+	spans, err := actionslanguageservice.ExtractExpressions(s)
+	if err != nil {
+		return s
+	}
 	for _, span := range spans {
 		expression, err := actionslanguageservice.ParseSyntax(span.Content)
 		if err != nil {
@@ -866,8 +880,9 @@ func rewriteExpressionReferences(s string, prefix []string, replace func(string)
 			if !ok {
 				return true
 			}
-			if len(path) == len(prefix)+1 && referenceHasPrefix(path, prefix) {
-				if replacement, changed := replace(path[len(prefix)]); changed {
+			index := len(prefix)
+			if index >= 0 && index < len(path) && len(path) == index+1 && referenceHasPrefix(path, prefix) {
+				if replacement, changed := replace(path[index]); changed {
 					start, end := span.Start+3+node.Start, span.Start+3+node.End
 					b.WriteString(s[last:start])
 					b.WriteString(replacement)

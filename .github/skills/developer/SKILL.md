@@ -85,6 +85,8 @@ defer package-wide Go linting and workflow drift to the final pass.
 
 > **Key rule:** Run `test-unit` only before the **final** `report_progress` call, not before intermediate saves. Intermediate saves defer full Go lint and workflow drift; they do not replace the final gate.
 
+Fast/slow suites: [timing and coverage contract](../../../CONTRIBUTING.md#cgo-unit-test-timing).
+
 > **Timeout budget:** Aim for warm-cache intermediate validation under 5 seconds. The 30-second `test-unit` budget covers selected test runtime, not compilation, linting, or full workflow drift; the final gate can take minutes. Set `TEST_UNIT_RUN_FULL=1` only when the full Go suite is required.
 
 ### Change-type command matrix

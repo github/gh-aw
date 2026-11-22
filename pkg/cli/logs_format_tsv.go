@@ -38,6 +38,7 @@ func renderLogsTSVToWriter(w io.Writer, data LogsData) {
 		s.TotalRuns, s.TotalDuration, formatTSVSummaryTokens(s.TotalTokens), s.TotalTurns, s.TotalErrors)
 
 	if len(data.Runs) == 0 {
+		renderTSVContinuationRequestSummary(w, s)
 		return
 	}
 
@@ -76,7 +77,7 @@ func renderLogsTSVToWriter(w io.Writer, data LogsData) {
 			conclusion,
 			duration,
 			strconv.Itoa(r.TokenUsage),
-			fmt.Sprintf("%.3f", r.AIC),
+			fmt.Sprintf("%.3f", runAICValue(r)),
 			strconv.Itoa(r.Turns),
 			strconv.Itoa(r.ErrorCount),
 			r.Event,
@@ -110,6 +111,7 @@ func renderLogsTSVToWriter(w io.Writer, data LogsData) {
 		}
 		fmt.Fprintf(w, "# engines: %s\n", strings.Join(parts, " "))
 	}
+	renderTSVContinuationRequestSummary(w, s)
 }
 
 // renderLogsTSV outputs the logs data as tab-separated values to os.Stdout.
@@ -126,6 +128,7 @@ func renderLogsTSVVerboseToWriter(w io.Writer, data LogsData) {
 		s.TotalRuns, s.TotalDuration, formatTSVSummaryTokens(s.TotalTokens), s.TotalTurns, s.TotalErrors, s.TotalMissingTools, s.TotalGitHubAPICalls)
 
 	if len(data.Runs) == 0 {
+		renderTSVContinuationRequestSummary(w, s)
 		return
 	}
 
@@ -164,7 +167,7 @@ func renderLogsTSVVerboseToWriter(w io.Writer, data LogsData) {
 			conclusion,
 			duration,
 			strconv.Itoa(r.TokenUsage),
-			fmt.Sprintf("%.3f", r.AIC),
+			fmt.Sprintf("%.3f", runAICValue(r)),
 			strconv.Itoa(r.Turns),
 			strconv.Itoa(r.ErrorCount),
 			strconv.Itoa(r.WarningCount),
@@ -190,6 +193,7 @@ func renderLogsTSVVerboseToWriter(w io.Writer, data LogsData) {
 			fmt.Fprintf(w, "# [%s] %s: %s\n", obs.Severity, obs.Title, obs.Summary)
 		}
 	}
+	renderTSVContinuationRequestSummary(w, s)
 }
 
 // renderLogsTSVVerbose outputs a more detailed TSV with additional columns to os.Stdout.

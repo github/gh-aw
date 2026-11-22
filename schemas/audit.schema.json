@@ -1334,6 +1334,12 @@
             "noop_count": {
               "type": "integer"
             },
+            "continuation_request_count": {
+              "type": [
+                "null",
+                "integer"
+              ]
+            },
             "agent_active_ratio": {
               "type": "number"
             },
@@ -1342,7 +1348,8 @@
             }
           },
           "required": [
-            "timeout_detected"
+            "timeout_detected",
+            "continuation_request_count"
           ],
           "additionalProperties": false
         },
@@ -1733,6 +1740,40 @@
             "additionalProperties": false
           }
         },
+        "continuation_requests": {
+          "type": [
+            "null",
+            "array"
+          ],
+          "items": {
+            "type": "object",
+            "properties": {
+              "message": {
+                "type": "string"
+              },
+              "timestamp": {
+                "type": "string"
+              },
+              "workflow_name": {
+                "type": "string"
+              },
+              "run_id": {
+                "type": "integer"
+              },
+              "experiment_name": {
+                "type": "string"
+              },
+              "variant": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message",
+              "timestamp"
+            ],
+            "additionalProperties": false
+          }
+        },
         "mcp_failures": {
           "type": [
             "null",
@@ -2014,6 +2055,9 @@
             },
             "total_aic": {
               "type": "number"
+            },
+            "aic_found": {
+              "type": "boolean"
             },
             "ambient_context": {
               "type": [
@@ -6696,7 +6740,8 @@
         "schema_version",
         "overview",
         "metrics",
-        "downloaded_files"
+        "downloaded_files",
+        "continuation_requests"
       ],
       "additionalProperties": false
     },

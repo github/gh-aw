@@ -542,6 +542,95 @@ test.describe("compact navigation on touch screens", () => {
     await expect(page.locator(".arrows")).toHaveCSS("touch-action", "manipulation");
   });
 
+  test("never moves on a click, swipes between slides, opens band-header tiles on tap and pinches to the map", async ({ page }) => {
+    const count = page.locator(CURRENT);
+    await page.goto(`/gh-aw/cracktro/#${SECURITY + 1}`);
+    await expect(count).toHaveAttribute("aria-label", at(SECURITY + 1));
+    // a click anywhere on the slide (either side) keeps the slide
+    await page.mouse.click(300, 300);
+    await page.mouse.click(20, 300);
+    await expect(count).toHaveAttribute("aria-label", at(SECURITY + 1));
+
+    const swipe = (dx: number, dy: number, fingers = 1) =>
+      page.evaluate(
+        ([dx, dy, fingers]) => {
+          const el = document.querySelector(".slide.active")!;
+          const touches = (x: number, y: number) => Array.from({ length: fingers }, (_, i) => new Touch({ identifier: i, target: el, clientX: x + i * 40, clientY: y }));
+          el.dispatchEvent(new TouchEvent("touchstart", { bubbles: true, cancelable: true, touches: touches(160, 300), changedTouches: touches(160, 300) }));
+          el.dispatchEvent(new TouchEvent("touchend", { bubbles: true, cancelable: true, touches: [], changedTouches: touches(160 + dx, 300 + dy) }));
+        },
+        [dx, dy, fingers]
+      );
+    await swipe(-120, 0);
+    await expect(count).toHaveAttribute("aria-label", at(SECURITY + 2));
+    await swipe(120, 0);
+    await expect(count).toHaveAttribute("aria-label", at(SECURITY + 1));
+    // a two-finger gesture (pinch) is not a swipe
+    await swipe(-120, 0, 2);
+    await expect(count).toHaveAttribute("aria-label", at(SECURITY + 1));
+    await swipe(120, 0);
+    await expect(count).toHaveAttribute("aria-label", at(SECURITY));
+
+    // tapping a band-header tile opens its slide exactly once and cancels the synthetic click
+    const tile = page.locator(".slide.active .bh-row li[data-go]").nth(1);
+    const target = Number(await tile.getAttribute("data-go")) + 1;
+    await tile.tap();
+    await expect(count).toHaveAttribute("aria-label", at(target));
+
+    // pinching in (two fingers closing) zooms out to the slide map
+    await page.evaluate(() => {
+      const el = document.querySelector(".slide.active")!;
+      const two = (gap: number) => [0, 1].map(i => new Touch({ identifier: i, target: el, clientX: 160 + (i ? gap : -gap), clientY: 300 }));
+      el.dispatchEvent(new TouchEvent("touchstart", { bubbles: true, touches: two(100), changedTouches: two(100) }));
+      el.dispatchEvent(new TouchEvent("touchmove", { bubbles: true, touches: two(40), changedTouches: two(40) }));
+      el.dispatchEvent(new TouchEvent("touchend", { bubbles: true, touches: [], changedTouches: two(40) }));
+    });
+    await expect(page.locator("dialog.smp")).toBeVisible();
+  });
+
+  test("claims WebKit's two-finger pinch before the map opens, without blocking native zoom elsewhere", async ({ page }) => {
+    await page.addInitScript(() => {
+      // Enable the WebKit path in the Chromium test project.
+      if (!("GestureEvent" in window)) Object.defineProperty(window, "GestureEvent", { value: Event });
+    });
+    await page.goto("/gh-aw/cracktro/#security");
+    const canceled = await page.evaluate(() => {
+      const slide = document.querySelector(".slide.active")!;
+      const input = document.createElement("input");
+      slide.append(input);
+      const touch = (id: number, x: number, target = slide) => new Touch({ identifier: id, target, clientX: x, clientY: 300 });
+      const send = (type: string, touches: Touch[], target = slide) =>
+        !target.dispatchEvent(new TouchEvent(type, { bubbles: true, cancelable: true, touches }));
+      const gesture = (type: string) => !slide.dispatchEvent(new Event(type, { bubbles: true, cancelable: true }));
+      const pair = [touch(0, 60), touch(1, 260)];
+      const first = send("touchstart", pair.slice(0, 1));
+      const second = send("touchstart", pair);
+      const start = gesture("gesturestart");
+      const beforeThreshold = send("touchmove", [touch(0, 70), touch(1, 250)]);
+      const change = gesture("gesturechange");
+      const openedEarly = document.querySelector<HTMLDialogElement>("dialog.smp")!.open;
+      send("touchcancel", []);
+      const afterCancel = gesture("gesturechange");
+      const mixed = send("touchstart", [touch(0, 60, input), pair[1]]);
+      send("touchcancel", []);
+      Object.defineProperty(window.visualViewport, "scale", { configurable: true, value: 2 });
+      const zoomed = send("touchstart", pair);
+      send("touchcancel", []);
+      Reflect.deleteProperty(window.visualViewport, "scale");
+      send("touchstart", pair);
+      const inward = send("touchmove", [touch(0, 120), touch(1, 200)]);
+      const afterOpen = send("touchmove", [touch(0, 130), touch(1, 190)]);
+      send("touchend", [], document.querySelector("dialog.smp")!);
+      const afterEnd = gesture("gesturechange");
+      return { first, second, start, beforeThreshold, change, openedEarly, afterCancel, mixed, zoomed, inward, afterOpen, afterEnd };
+    });
+    expect(canceled).toEqual({
+      first: false, second: true, start: true, beforeThreshold: true, change: true, openedEarly: false,
+      afterCancel: false, mixed: false, zoomed: false, inward: true, afterOpen: true, afterEnd: false,
+    });
+    await expect(page.locator("dialog.smp")).toBeVisible();
+  });
+
   test("dims the idle toolbar without swallowing the first tap or hiding keyboard focus", async ({ page }) => {
     const count = page.locator(CURRENT);
     const arrows = page.locator(".arrows");
@@ -1100,7 +1189,19 @@ test("serves the slide list in the talk page head without running the deck", asy
   expect(docs[0].url).toBe(PAGE_URL);
   expect(docs[0].hasPart).toEqual(slideParts(SLIDES, PAGE_URL));
   expect(docs[0].hasPart.every((part: { description: string }) => !part.description.startsWith("Band header ("))).toBe(true);
-  expect(head.match(/https:\/\/[^"\s]+/g)!.every(url => url.startsWith("https://schema.org") || url.startsWith("https://github.github.com/gh-aw/"))).toBe(true);
+  const { origin, pathname } = new URL(PAGE_URL);
+  const paths = [new URL("..", PAGE_URL).pathname, pathname, `${pathname}og-image.png`];
+  const urls = head.match(/https:\/\/[^"\s]+/g) ?? [];
+  expect(urls.length).toBeGreaterThan(0);
+  for (const raw of urls) {
+    const url = new URL(raw);
+    if (url.origin === "https://schema.org") {
+      expect(url.pathname, raw).toBe("/");
+    } else {
+      expect(url.origin, raw).toBe(origin);
+      expect(paths, raw).toContain(url.pathname);
+    }
+  }
 });
 
 test("opens every slide from its metadata #id link", async ({ page, request }) => {
@@ -1143,7 +1244,7 @@ test("opens every hard-coded tour from the hash with all its slides found", asyn
   expect(warnings.filter(w => w.includes("CracktroDeck"))).toEqual([]);
 });
 
-test("ends the slide map with a keyboard manual of every shortcut", async ({ page }) => {
+test("ends the slide map with a keyboard manual of every shortcut and touch gesture", async ({ page }) => {
   await page.goto("/gh-aw/cracktro/");
   await page.keyboard.press("g");
   const keys = page.getByRole("region", { name: "Keyboard" });
@@ -1158,6 +1259,12 @@ test("ends the slide map with a keyboard manual of every shortcut", async ({ pag
   await keys.locator('.kb-k[data-k="G"]').hover();
   await expect(keys.locator(".smp-kcap")).toContainText("Slide map");
   await expect(keys.getByRole("button")).toHaveCount(0);
+  const touch = keys.locator(".smp-ph");
+  await expect(touch.getByRole("img", { name: /touch gestures/ })).toBeVisible();
+  for (const g of ["Swipe ←", "Swipe →", "Swipe ↑", "Swipe ↓", "Tap a tile", "Pinch in"]) await expect(touch.locator("dt", { hasText: g })).toHaveCount(1);
+  await touch.locator("dt", { hasText: "Pinch in" }).hover();
+  await expect(touch).toHaveClass(/solo/);
+  await expect(touch.locator(".ph-g.on .ph-lb")).toHaveText("Slide map");
 });
 
 test("keeps an example in a view only together with its pattern slide", async ({ page }) => {

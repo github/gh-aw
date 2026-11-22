@@ -9,7 +9,7 @@ Playwright enables headless browser control for accessibility testing, visual re
 
 ## Configuration
 
-The built-in Playwright tool is CLI-only. It is token-efficient because it skips MCP tool schemas, avoids Docker overhead, and can reach local development servers through `localhost`. Older workflows may still set `mode: cli`, but omitting `mode` is preferred.
+The built-in Playwright tool is CLI-only. It skips MCP tool schemas and Docker overhead, and reaches local development servers through `localhost`. Older workflows may set `mode: cli`, but omitting `mode` is preferred.
 
 ```yaml wrap
 tools:
@@ -24,7 +24,7 @@ tools:
     browsers: [chrome, firefox]
 ```
 
-Supported values are `chrome`, `chrome-for-testing`, `chromium`, `firefox`, and `webkit`. `chromium` downloads the Chrome for Testing distribution, and `chrome` and `chrome-for-testing` are accepted aliases. Browser downloads happen before the agent starts, with retries; runtime package or browser installation is not allowed.
+Supported values are `chrome`, `chrome-for-testing`, `chromium`, `firefox`, and `webkit`. `chrome` and `chrome-for-testing` are aliases for `chromium`, which downloads the Chrome for Testing distribution. Browser downloads happen before the agent starts, with retries; runtime package or browser installation is not allowed.
 
 The agent runs Playwright through `playwright-cli <command>` from bash:
 
@@ -36,13 +36,11 @@ playwright-cli eval "() => document.title"
 playwright-cli run-code "async (page) => { await page.goto('https://example.com'); return await page.title(); }"
 ```
 
-With a restricted `tools.bash` allowlist, `playwright-cli:*` is added
-automatically. Explicit Bash entries are needed only for supporting lifecycle
-commands such as `npm`, `curl`, and `kill`.
+With a restricted `tools.bash` allowlist, `playwright-cli:*` is added automatically. Add only supporting commands such as `npm`, `curl`, and `kill`.
 
 ### Version
 
-The `version` field pins the `@playwright/cli` npm package. Omit it to use the compiler default.
+`version` pins the `@playwright/cli` npm package. Omit it to use the compiler default.
 
 ```yaml wrap
 tools:
@@ -52,7 +50,7 @@ tools:
 
 ### Network Access
 
-Domain access is controlled by the top-level [`network:`](/gh-aw/reference/network/) field. Playwright can always reach `localhost` and `127.0.0.1`, so a local server started in the same AWF sandbox does not require `network.allowed: local`. Combine ecosystem identifiers with explicit external domains as needed:
+Domain access is controlled by the top-level [`network:`](/gh-aw/reference/network/) field. Playwright always reaches `localhost` and `127.0.0.1`, so a local server in the same AWF sandbox does not need `network.allowed: local`:
 
 ```yaml wrap
 network:
@@ -63,22 +61,13 @@ network:
     - "*.staging.example.com"    # wildcard pattern
 ```
 
-Allowing `example.com` automatically allows its subdomains.
-
 ### AWF Sandbox Policy
 
-When the workflow runs inside the AWF sandbox (`sandbox.agent` enabled, or the
-firewall enabled by default for the configured engine), the compiler injects
-an additional policy prompt reinforcing the secure browser topology: bind
-local servers to `127.0.0.1` only, wait for a loopback readiness check before
-navigating, keep `localhost`/`127.0.0.1` on the proxy bypass list, and never
-install packages or browsers at runtime. This guidance takes precedence over
-generic Playwright CLI skill suggestions such as `npm install`/`npx` fallback
-installation or navigating to arbitrary example domains.
+Inside the AWF sandbox (`sandbox.agent` or the default firewall), the compiler adds a policy prompt that binds local servers to `127.0.0.1`, waits for a loopback readiness check before navigating, and keeps `localhost`/`127.0.0.1` on the proxy bypass list. It takes precedence over generic CLI skill advice, such as `npx` fallbacks.
 
 ### Browser Support and Sessions
 
-Chromium is the default. When Firefox or WebKit has been provisioned, select it with `--browser`:
+Chromium is the default. Select Firefox or WebKit (once provisioned) with `--browser`:
 
 ```bash wrap
 playwright-cli open "https://example.com"                  # Chromium
@@ -88,11 +77,11 @@ playwright-cli -s=firefox close
 playwright-cli -s=webkit close
 ```
 
-Named sessions (`-s=<name>`) isolate cookies and storage, which helps when comparing authenticated and anonymous flows.
+Named sessions (`-s=<name>`) isolate cookies and storage, such as for authenticated versus anonymous flows.
 
 ### Publishing Screenshots
 
-To let users retrieve a screenshot, save it in the workspace and publish it with an artifact safe output:
+To publish a screenshot, save it in the workspace and attach it with an artifact safe output:
 
 ```aw wrap
 ---
@@ -112,13 +101,11 @@ then call `upload_artifact` with `name: "home-screenshot"` and
 `path: "output/home.png"`.
 ```
 
-For an existing screenshot under `/tmp`, copy it into the workspace first. See [Artifact Uploads](/gh-aw/reference/safe-outputs/#artifact-uploads-upload-artifact) for source-path restrictions and staging behavior.
+To publish an existing `/tmp` screenshot, copy it into the workspace first. See [Artifact Uploads](/gh-aw/reference/safe-outputs/#artifact-uploads-upload-artifact) for path restrictions.
 
 ## Migrate from Playwright MCP
 
-Remove `mode: mcp`. The built-in integration is CLI-only, so no replacement `mode` field is needed, and the compiler now reports `mode: mcp` as an error.
-
-Replace MCP tool calls in prompts with equivalent `playwright-cli` commands run through bash:
+Remove `mode: mcp`; no replacement `mode` is needed, and the compiler reports `mode: mcp` as an error. Replace MCP tool calls in prompts with `playwright-cli` commands run through bash:
 
 | Playwright MCP tool | Playwright CLI command |
 | --- | --- |
@@ -128,11 +115,11 @@ Replace MCP tool calls in prompts with equivalent `playwright-cli` commands run 
 | `browser_click` | `playwright-cli click <ref>` |
 | `browser_evaluate` | `playwright-cli eval "() => document.title"` |
 
-Use `localhost` directly for development servers because Playwright CLI runs on the runner. Also remove Playwright MCP container arguments and MCP-specific tool names such as `mcp__playwright__browser_navigate` from prompts and engine allowlists.
+Use `localhost` for development servers, since the CLI runs on the runner. Also remove Playwright MCP container arguments and MCP tool names such as `mcp__playwright__browser_navigate` from prompts and engine allowlists.
 
 ## What if you still want MCP?
 
-The built-in tool no longer manages Playwright MCP. Configure it as a custom server under `mcp-servers` and pin the package version explicitly:
+Configure Playwright MCP as a custom `mcp-servers` entry with a pinned package version:
 
 ```aw wrap
 ---
@@ -156,13 +143,13 @@ network:
 ---
 ```
 
-Custom MCP servers are outside the built-in Playwright compatibility and version tracking. Pin and update the package deliberately, restrict `allowed` to the tools you need, and follow the [custom MCP server guidance](/gh-aw/guides/mcps/#manually-configuring-a-custom-mcp-server).
+Custom servers fall outside built-in version tracking, so pin and update the package deliberately, restrict `allowed` to required tools, and follow the [custom MCP server guidance](/gh-aw/guides/mcps/#manually-configuring-a-custom-mcp-server).
 
 ## Common Use Cases
 
 ### Accessibility Testing
 
-```aw wrap
+````aw wrap
 ---
 on:
   schedule: daily
@@ -195,16 +182,12 @@ playwright-cli open "https://docs.example.com"
 playwright-cli snapshot
 ```
 
-Use snapshots for structural and manual checks of headings, labels, alternative
-text, and keyboard flows. Comprehensive WCAG checks (such as axe-core and
-programmatic contrast analysis) require dependencies prepared before the agent
-runs; the AWF sandbox prohibits runtime installation. Create focused issues for
-actionable findings.
-```
+Snapshots cover headings, labels, alternative text, and keyboard flows. WCAG checks such as axe-core need dependencies prepared before the agent runs, since the AWF sandbox prohibits runtime installation. Create focused issues for actionable findings.
+````
 
 ### Visual Regression Testing
 
-Use `steps:` to start the dev server before the agent runs, and pin Playwright to prevent baseline drift from browser-engine upgrades:
+Use `steps:` to start the dev server before the agent runs, and pin Playwright to avoid baseline drift from browser upgrades:
 
 ```aw wrap
 ---
@@ -233,7 +216,7 @@ steps:
 
 tools:
   playwright:
-    version: "0.1.18"  # pins `@playwright/cli` npm package; see Configuration > Version
+    version: "0.1.18"  # pins `@playwright/cli`; see Configuration
   bash:
     - "npm *"
     - "curl http://localhost:*"
@@ -255,9 +238,9 @@ safe-outputs:
 
 # Visual Regression Check
 
-The dev server is running at http://localhost:4321/. Check the home, getting-started, and reference pages for visual regressions at three viewports: mobile (375×812), tablet (768×1024), and desktop (1440×900).
+The dev server runs at http://localhost:4321/. Check the home, getting-started, and reference pages at three viewports: mobile (375×812), tablet (768×1024), and desktop (1440×900).
 
-For each viewport, resize and capture a screenshot:
+Resize and capture a screenshot for each viewport:
 
 ```bash
 playwright-cli open "http://localhost:4321/"
@@ -269,35 +252,8 @@ Compare against baseline and report differences as a PR comment with screenshots
 If there are no regressions, call noop.
 ```
 
-### End-to-End Testing
-
-```aw wrap
----
-on:
-  workflow_dispatch:
-
-tools:
-  playwright:
-  bash: [":*"]
-
-network:
-  allowed:
-    - defaults
-    - playwright
-
-permissions:
-  contents: read
----
-
-# E2E Testing
-
-Start the dev server on localhost:3000, then drive a full user journey with `playwright-cli open "http://localhost:3000"`. Report failures with screenshots.
-```
-
 ## Learn More
 
 - [Tools Reference](/gh-aw/reference/tools/) — All tool configurations
 - [Network Permissions](/gh-aw/reference/network/) — Network access control
-- [Network Configuration Guide](/gh-aw/guides/network-configuration/) — Common patterns
 - [Safe Outputs Reference](/gh-aw/reference/safe-outputs/) — Configure output creation
-- [Frontmatter](/gh-aw/reference/frontmatter/) — All frontmatter options

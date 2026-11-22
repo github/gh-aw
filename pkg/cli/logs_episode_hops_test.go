@@ -28,11 +28,11 @@ func episodeHopTestReport(t *testing.T) LogsData {
 	hops := collectRunEpisodeHops(ProcessedRun{Run: run, EpisodeContexts: infos}, root)
 	require.Len(t, hops, 2, "mirrored metadata must not create additional hops")
 	runs := []RunData{
-		{RunID: 42, Repository: "org/repo", WorkflowName: "Root", AwContext: root, EpisodeHops: hops, TokenUsage: 100, AIC: 0.25},
-		{RunID: 43, Repository: "org/repo", WorkflowName: "Dispatched", AwContext: episodeHopTestContext("dispatched", "reusable", "42"), TokenUsage: 200, AIC: 0.75},
+		{RunID: 42, Repository: "org/repo", WorkflowName: "Root", AwContext: root, EpisodeHops: hops, TokenUsage: 100, AIC: new(float64(0.25)), AICCoverage: logsAICAvailable},
+		{RunID: 43, Repository: "org/repo", WorkflowName: "Dispatched", AwContext: episodeHopTestContext("dispatched", "reusable", "42"), TokenUsage: 200, AIC: new(float64(0.75)), AICCoverage: logsAICAvailable},
 	}
 	episodes, edges := buildEpisodeData(runs, nil)
-	return LogsData{Runs: runs, Episodes: episodes, Edges: edges}
+	return LogsData{Summary: LogsSummary{AICCoverage: logsAICAvailable}, Runs: runs, Episodes: episodes, Edges: edges}
 }
 
 func TestEpisodeHopsKeepSharedRunAccountingSeparate(t *testing.T) {

@@ -3,7 +3,23 @@ import Default from '@astrojs/starlight/components/PageTitle.astro';
 
 // The landing page (route id '') supplies its own h1, the hero headline,
 // so skip Starlight's page title there.
-const isLanding = Astro.locals.starlightRoute.id === '';
+const { id, entry } = Astro.locals.starlightRoute;
 ---
 
-{isLanding ? null : <Default {...Astro.props} />}
+{id !== '' && (
+	<>
+		{entry.data.spec && <p class="spec-label">Specification</p>}
+		<Default {...Astro.props} />
+	</>
+)}
+
+<style>
+	.spec-label {
+		margin-block: 0 0.5rem;
+		font-family: var(--aw-font-mono);
+		font-size: var(--aw-step--1);
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+		color: var(--aw-color-text-muted);
+	}
+</style>

@@ -30,6 +30,27 @@ function sidebarGroup(page: Page, label: string) {
   });
 }
 
+test("specification links show only their titles in the desktop sidebar and mobile menu", async ({ page }) => {
+  const specRoute = "/gh-aw/specs/unified-agent-session-specification/";
+  await page.goto("/gh-aw/introduction/overview/");
+  const specs = sidebarGroup(page, "Specs");
+  await specs.locator("summary").click();
+  const specLink = specs.getByRole("link", { name: "Unified Agent Session Specification", exact: true });
+  await expect(specLink).toHaveAttribute("href", specRoute);
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(specRoute);
+  const menu = page.getByRole("button", { name: "Menu", exact: true });
+  const toc = page.locator("mobile-starlight-toc nav");
+  await expect(menu).toBeHidden();
+  await expect(toc).toBeHidden();
+  await page.getByRole("button", { name: "Zen mode" }).click();
+  await expect(toc).toBeVisible();
+  await menu.click();
+  await expect(specLink).toHaveAttribute("aria-current", "page");
+  await expect(specLink).toBeVisible();
+});
+
 for (const section of sections) {
   test(`${section.label} shows its preview and More outside its section`, async ({ page }) => {
     await page.goto("/gh-aw/introduction/overview/");

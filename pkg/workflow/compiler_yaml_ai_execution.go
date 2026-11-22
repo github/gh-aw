@@ -342,9 +342,9 @@ func (c *Compiler) generateMCPGatewayLogParsing(yaml *strings.Builder, data *Wor
 
 // generateObservabilitySummary generates a step that synthesizes a compact
 // observability section for the GitHub Actions step summary from existing runtime files.
-// The step is only emitted when OTLP is configured in the workflow.
+// The step is emitted when local telemetry is enabled, including remote OTLP export.
 func (c *Compiler) generateObservabilitySummary(yaml *strings.Builder, data *WorkflowData) {
-	if !isOTLPEnabled(data) {
+	if !isOTLPLocalTelemetryEnabled(data) {
 		return
 	}
 
@@ -370,6 +370,10 @@ func isOTLPEnabled(data *WorkflowData) bool {
 		return false
 	}
 	return strings.Contains(data.Env, "OTEL_EXPORTER_OTLP_ENDPOINT") || strings.Contains(data.Env, "GH_AW_OTLP_ENDPOINTS")
+}
+
+func isOTLPLocalTelemetryEnabled(data *WorkflowData) bool {
+	return isOTLPEnabled(data) || (data != nil && !data.DryRun && isOTLPDisabled(data.RawFrontmatter))
 }
 
 // generateStopMCPGateway generates a step that stops the MCP gateway process using its PID from step output
@@ -408,6 +412,10 @@ func (c *Compiler) generateAgentOutputPlaceholderStep(yaml *strings.Builder, dat
 	yaml.WriteString("      - name: Write agent output placeholder if missing\n")
 	yaml.WriteString("        if: always()\n")
 	yaml.WriteString("        run: |\n")
+	yaml.WriteString("          if [[ \"${RUNNER_ENVIRONMENT:-}\" == \"self-hosted\" ]] && ! \"${GH_AW_NODE:-node}\" \"${RUNNER_TEMP}/gh-aw/actions/docker_lease.cjs\" assert; then\n")
+	yaml.WriteString("            echo \"Skipping shared agent output finalization without a validated Docker lease.\"\n")
+	yaml.WriteString("            exit 0\n")
+	yaml.WriteString("          fi\n")
 	yaml.WriteString("          if [ ! -f " + outputPath + " ]; then\n")
 	yaml.WriteString("            echo '{\"items\":[]}' > " + outputPath + "\n")
 	yaml.WriteString("          fi\n")

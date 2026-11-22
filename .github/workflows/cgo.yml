@@ -130,13 +130,13 @@ jobs:
       run: |
         node <<'NODE'
         const fs = require('node:fs');
-        const known = ['front-door-conformance', 'verify-integration-build', 'test', 'canary-go', 'impacted-go-tests', 'native-javascript-tests', 'build', 'build-wasm', 'validate-yaml', 'check-validator-sizes', 'lint-go-format', 'lint-go-golangci', 'lint-go-govulncheck', 'lint-go-custom', 'lint-error-messages', 'actions-build', 'fuzz', 'security', 'security-scan', 'mcp-server-compile-test', 'cross-platform-build', 'alpine-container-test', 'safe-outputs-conformance'];
-        const dependencies = {test: ['verify-integration-build'], 'canary-go': ['test'], security: ['build'], 'security-scan': ['build'], 'cross-platform-build': ['build']};
+        const known = ['front-door-conformance', 'verify-integration-build', 'test', 'test-slow', 'canary-go', 'impacted-go-tests', 'native-javascript-tests', 'build', 'build-wasm', 'validate-yaml', 'check-validator-sizes', 'lint-go-format', 'lint-go-golangci', 'lint-go-govulncheck', 'lint-go-custom', 'lint-error-messages', 'actions-build', 'fuzz', 'security', 'security-scan', 'mcp-server-compile-test', 'cross-platform-build', 'alpine-container-test', 'safe-outputs-conformance'];
+        const dependencies = {test: ['verify-integration-build'], 'test-slow': ['verify-integration-build'], 'canary-go': ['test', 'test-slow'], security: ['build'], 'security-scan': ['build'], 'cross-platform-build': ['build']};
         let suiteIds = '';
         try {
           const ids = JSON.parse(process.env.RAW_SUITE_IDS);
           if (process.env.SELECTOR_OUTCOME === 'success' && Array.isArray(ids) &&
-              ids.length <= known.length && new Set(ids).size === ids.length &&
+              ids.includes('test') && ids.length <= known.length && new Set(ids).size === ids.length &&
               ids.every(id => known.includes(id) && (dependencies[id] || []).every(dependency => ids.includes(dependency)))) {
             suiteIds = JSON.stringify(ids);
           }
@@ -165,6 +165,7 @@ jobs:
         node --test scripts/ci-front-door.test.cjs
         node --test scripts/ci-front-door-researcher.test.cjs
         node --test scripts/ci-front-door-workflow.test.cjs
+        node --test scripts/go-unit-suite.test.cjs
 
   verify-integration-build:
     needs: [checkout-cache, front-door-decision]
@@ -254,7 +255,7 @@ jobs:
         go test -run='^$' -exec=true -tags=integration ./...
 
   test:
-    name: Unit tests (${{ matrix.name }})
+    name: Fast unit tests (${{ matrix.name }})
     if: always() && !cancelled() && needs.checkout-cache.result == 'success' && needs.verify-integration-build.result == 'success' && (github.event_name != 'pull_request' || needs.front-door-decision.result != 'success' || !needs.front-door-decision.outputs.suite_ids || contains(fromJSON(needs.front-door-decision.outputs.suite_ids), 'test'))
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -264,34 +265,53 @@ jobs:
     - front-door-decision
     permissions:
       contents: read
+    env:
+      UNIT_TEST_SUITE: fast
+      UNIT_TEST_TIMEOUT: 3m
     strategy:
       fail-fast: false
       matrix:
         include:
-        - name: A-B
-          pattern: ^Test[A-B]
-          shard: a-b
+        - name: A
+          pattern: ^TestA
+          shard: a
+        - name: B
+          pattern: ^TestB
+          shard: b
         - name: C
           pattern: ^TestC
           shard: c
-        - name: D-G
-          pattern: ^Test[D-G]
-          shard: d-g
-        - name: H-M
-          pattern: ^Test[H-M]
-          shard: h-m
+        - name: D
+          pattern: ^TestD
+          shard: d
+        - name: E-G
+          pattern: ^Test[E-G]
+          shard: e-g
+        - name: H-J
+          pattern: ^Test[H-J]
+          shard: h-j
+        - name: K-M
+          pattern: ^Test[K-M]
+          shard: k-m
         - name: N-R
           pattern: ^Test[N-R]
           shard: n-r
-          # Includes a compile sweep of the repository workflows.
-          timeout: 5m
-        - name: S-Z and other
-          pattern: ^Test([S-Z]|[^A-R])
-          shard: s-z
+        - name: S
+          pattern: ^TestS
+          shard: s
+        - name: T
+          pattern: ^TestT
+          shard: t
+        - name: U-V
+          pattern: ^Test[U-V]
+          shard: u-v
+        - name: W-Z and other
+          pattern: ^Test([W-Z]|[^A-V])
+          shard: w-z
     concurrency:
       group: ci-${{ github.ref }}-test-${{ matrix.shard }}
       cancel-in-progress: true
-    steps:
+    steps: &unit-test-steps
     - name: Restore checkout
       id: restore-checkout
       uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9   # v6.1.0
@@ -395,10 +415,22 @@ jobs:
 
     - name: Run unit tests with coverage
       id: run-unit-tests
+      env:
+        TEST_PATTERN: ${{ matrix.pattern }}
       run: |
         set -o pipefail
+        if [ "$UNIT_TEST_SUITE" = "fast" ]; then
+          slow_pattern=$(node scripts/go-unit-suite.cjs)
+          selection=(-run "$TEST_PATTERN" -skip "$slow_pattern")
+        elif [ "$UNIT_TEST_SUITE" = "slow" ]; then
+          slow_pattern=$(node scripts/go-unit-suite.cjs "$TEST_PATTERN")
+          selection=(-run "$slow_pattern")
+        else
+          echo "Unknown unit-test suite: $UNIT_TEST_SUITE" >&2
+          exit 1
+        fi
         # Run tests with JSON output for artifacts, but also show failures
-        if ! go test -v -parallel=8 -timeout='${{ matrix.timeout || '3m' }}' -run='${{ matrix.pattern }}' -tags '!integration' -coverprofile=coverage-${{ matrix.shard }}.out -json ./... > test-result-unit-${{ matrix.shard }}.json; then
+        if ! go test -v -parallel=8 -timeout="$UNIT_TEST_TIMEOUT" "${selection[@]}" -tags '!integration' -coverprofile=coverage-${{ matrix.shard }}.out -json ./... > test-result-unit-${{ matrix.shard }}.json; then
           cat test-result-unit-${{ matrix.shard }}.json
           exit 1
         fi
@@ -441,14 +473,50 @@ jobs:
         path: test-result-unit-${{ matrix.shard }}.json
         retention-days: 7
 
+  test-slow:
+    name: Slow unit tests (${{ matrix.name }})
+    if: always() && !cancelled() && needs.checkout-cache.result == 'success' && needs.verify-integration-build.result == 'success' && (github.event_name != 'pull_request' || needs.front-door-decision.result != 'success' || !needs.front-door-decision.outputs.suite_ids || contains(fromJSON(needs.front-door-decision.outputs.suite_ids), 'test-slow'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs:
+    - checkout-cache
+    - verify-integration-build
+    - front-door-decision
+    permissions:
+      contents: read
+    env:
+      UNIT_TEST_SUITE: slow
+      UNIT_TEST_TIMEOUT: 5m
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        - name: Repository sweeps
+          pattern: repository
+          shard: slow-repository
+        - name: Azure runtime
+          pattern: workflow-azure
+          shard: slow-workflow-azure
+        - name: Workflow readers
+          pattern: workflow-readers
+          shard: slow-workflow-readers
+        - name: CLI, parser and workqueue
+          pattern: cli-parser-workqueue
+          shard: slow-cli-parser-workqueue
+    concurrency:
+      group: ci-${{ github.ref }}-test-${{ matrix.shard }}
+      cancel-in-progress: true
+    steps: *unit-test-steps
+
   canary-go:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     needs:
     - checkout-cache
     - test
+    - test-slow
     - front-door-decision
-    if: always() && !cancelled() && needs.checkout-cache.result == 'success' && needs.test.result == 'success' && (github.event_name != 'pull_request' || needs.front-door-decision.result != 'success' || !needs.front-door-decision.outputs.suite_ids || contains(fromJSON(needs.front-door-decision.outputs.suite_ids), 'canary-go'))
+    if: always() && !cancelled() && needs.checkout-cache.result == 'success' && needs.test.result == 'success' && needs.test-slow.result == 'success' && (github.event_name != 'pull_request' || needs.front-door-decision.result != 'success' || !needs.front-door-decision.outputs.suite_ids || contains(fromJSON(needs.front-door-decision.outputs.suite_ids), 'canary-go'))
     permissions:
       contents: read
     steps:
@@ -2849,6 +2917,7 @@ jobs:
     - checkout-cache
     - verify-integration-build
     - test
+    - test-slow
     - canary-go
     - impacted-go-tests
     - native-javascript-tests

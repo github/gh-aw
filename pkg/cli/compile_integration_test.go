@@ -2084,7 +2084,7 @@ safe-outputs:
           required: true
       env:
         GITHUB_TOKEN: ${{ github.token }}
-    close-issue:
+    close-bug-issue:
       uses: peter-evans/close-issue@05dff7ca07116e5707cfb3a3cd4af7bb5e43524c
       description: Close the issue
       inputs:
@@ -2094,7 +2094,7 @@ safe-outputs:
 
 # Test Multiple Safe Output Actions
 
-Call add_bug_label or close_issue as appropriate.
+Call add_bug_label or close_bug_issue as appropriate.
 `
 	testWorkflowPath := filepath.Join(setup.workflowsDir, "test-multi-safe-output-actions.md")
 	if err := os.WriteFile(testWorkflowPath, []byte(testWorkflow), 0644); err != nil {
@@ -2118,24 +2118,24 @@ Call add_bug_label or close_issue as appropriate.
 	if !strings.Contains(lockContentStr, "id: action_add_bug_label") {
 		t.Errorf("Lock file should contain step 'id: action_add_bug_label'\nLock file content:\n%s", lockContentStr)
 	}
-	if !strings.Contains(lockContentStr, "id: action_close_issue") {
-		t.Errorf("Lock file should contain step 'id: action_close_issue'\nLock file content:\n%s", lockContentStr)
+	if !strings.Contains(lockContentStr, "id: action_close_bug_issue") {
+		t.Errorf("Lock file should contain step 'id: action_close_bug_issue'\nLock file content:\n%s", lockContentStr)
 	}
 
 	// Both payloads must appear in if-conditions
 	if !strings.Contains(lockContentStr, "action_add_bug_label_payload") {
 		t.Errorf("Lock file should contain 'action_add_bug_label_payload'\nLock file content:\n%s", lockContentStr)
 	}
-	if !strings.Contains(lockContentStr, "action_close_issue_payload") {
-		t.Errorf("Lock file should contain 'action_close_issue_payload'\nLock file content:\n%s", lockContentStr)
+	if !strings.Contains(lockContentStr, "action_close_bug_issue_payload") {
+		t.Errorf("Lock file should contain 'action_close_bug_issue_payload'\nLock file content:\n%s", lockContentStr)
 	}
 
 	// GH_AW_SAFE_OUTPUT_ACTIONS must mention both tools
 	if !strings.Contains(lockContentStr, "add_bug_label") {
 		t.Errorf("Lock file should contain 'add_bug_label' in GH_AW_SAFE_OUTPUT_ACTIONS\nLock file content:\n%s", lockContentStr)
 	}
-	if !strings.Contains(lockContentStr, "close_issue") {
-		t.Errorf("Lock file should contain 'close_issue' in GH_AW_SAFE_OUTPUT_ACTIONS\nLock file content:\n%s", lockContentStr)
+	if !strings.Contains(lockContentStr, "close_bug_issue") {
+		t.Errorf("Lock file should contain 'close_bug_issue' in GH_AW_SAFE_OUTPUT_ACTIONS\nLock file content:\n%s", lockContentStr)
 	}
 }
 

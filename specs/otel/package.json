@@ -6,9 +6,15 @@
   },
   "devDependencies": {
     "@typespec/compiler": "1.17.0",
-    "@typespec/json-schema": "1.17.0"
+    "@typespec/http": "1.17.0",
+    "@typespec/json-schema": "1.17.0",
+    "@typespec/openapi": "1.17.0",
+    "@typespec/openapi3": "1.17.0"
   },
   "overrides": {
+    "@scalar/json-magic@0.13.5": {
+      "undici": "7.30.1"
+    },
     "@typespec/compiler": {
       "temporal-polyfill": "1.0.6",
       "semver": "7.8.5"

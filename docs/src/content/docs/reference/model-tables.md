@@ -11,7 +11,9 @@ Copilot catalogs can differ by organization and lag Copilot seats; an exact ID m
 
 ## Model Aliases
 
-Model aliases let you write `engine: copilot` with a human-friendly model name such as `sonnet` or `mini`, and gh-aw resolves it to the best available concrete model at compile time. Each alias holds an ordered list of patterns; the first pattern that matches an available model wins.
+Model aliases let you write `engine: copilot` with a human-friendly model name such as `sonnet` or `mini`, and gh-aw resolves it to the best available concrete model when the workflow runs, before the engine starts. Each alias holds an ordered list of patterns; the first pattern that matches an available model wins.
+
+Wildcard patterns only match models the firewall lets gh-aw choose automatically. They skip models the provider says can't run an agent, such as an evaluation model that only serves `/v1/decisions` or a model disabled in the Copilot model picker. Exact model names, and alias entries without `*` such as `evals`, still resolve as written.
 
 For details on the alias syntax, fallback resolution algorithm, and how to define your own aliases in workflow frontmatter, see the [Model Alias Format Specification](/gh-aw/specs/model-alias-specification/).
 

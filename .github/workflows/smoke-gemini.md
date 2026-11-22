@@ -72,7 +72,7 @@ safe-outputs:
       expires: 2h
       close-older-issues: true
       close-older-key: "smoke-gemini"
-      labels: [automation, testing]
+      labels: [automation, testing, "backlog:smoke-tests"]
     add-labels:
       allowed: [smoke-gemini]
     messages:

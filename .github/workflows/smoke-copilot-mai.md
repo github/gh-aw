@@ -53,7 +53,7 @@ safe-outputs:
     group: true
     close-older-issues: true
     close-older-key: "smoke-copilot-mai"
-    labels: [automation, testing]
+    labels: [automation, testing, "backlog:smoke-tests"]
   add-comment:
     hide-older-comments: true
     max: 1

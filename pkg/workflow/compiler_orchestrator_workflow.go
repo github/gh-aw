@@ -122,6 +122,12 @@ func (c *Compiler) setupWorkflowBuildContext(ctx *workflowBuildContext) error {
 	if err := c.validateCopilotWebToolsSupport(engineSetup.agenticEngine, ctx.workflowData); err != nil {
 		return c.formatToolsProcessingError(ctx.cleanPath, err)
 	}
+	ctx.workflowData.webFetchFallback = engineSetup.agenticEngine.UsesWebFetchFallback(ctx.workflowData)
+	if usesWebFetchMCP(ctx.workflowData) && !isFirewallEnabled(ctx.workflowData) {
+		return c.formatToolsProcessingError(ctx.cleanPath, NewValidationError(
+			"tools.web-fetch", "web-fetch", "The built-in web fetch MCP server requires the AWF agent sandbox",
+			"Enable the AWF sandbox:\n\nsandbox:\n  agent:\n    id: awf"))
+	}
 	if err := c.validateResolvedEngineEnvSecrets(ctx); err != nil {
 		return c.formatEngineSetupError(ctx, err)
 	}
@@ -225,6 +231,7 @@ func (c *Compiler) validateWorkflowEngineSettings(cleanPath string, workflowData
 		c.validateEngineMCPSessionTimeout,
 		c.validateEngineMCPToolTimeout,
 		validateCopilotSDKEngineArgs,
+		validateCopilotSDKPin,
 		validatePiSubagents,
 	}
 	for _, check := range checks {
@@ -391,7 +398,7 @@ func (c *Compiler) mergeImportedWorkflowConfiguration(ctx *workflowBuildContext)
 
 // mergeImportedObservability merges imported OTLP config into raw frontmatter with main precedence.
 func (c *Compiler) mergeImportedObservability(workflowData *WorkflowData, mergedObservability string) {
-	if mergedObservability == "" {
+	if mergedObservability == "" || isOTLPDisabled(workflowData.RawFrontmatter) {
 		return
 	}
 	var importedObs map[string]any
@@ -760,10 +767,26 @@ func (c *Compiler) extractAdditionalConfigurations( //nolint:largefunc // Existi
 	workflowData.TokenBrokerEnabled = workflowData.TokenBrokerEnabled ||
 		usesTokenBrokerGitHubTool(workflowData) || usesTokenBrokerSafeOutputs(workflowData)
 
+	frontmatter, err = mergeImportedExperimentBrokerSettings(frontmatter, importsResult.MergedExperiments)
+	if err != nil {
+		return err
+	}
 	// Extract experiments configuration once; derive the simple variants map from the configs.
 	workflowData.ExperimentConfigs = extractExperimentConfigsFromFrontmatter(frontmatter)
 	workflowData.Experiments = experimentVariantsFromConfigs(workflowData.ExperimentConfigs)
 	workflowData.ExperimentsStorage = extractExperimentsStorageFromFrontmatter(frontmatter)
+	if experiments, ok := frontmatter["experiments"].(map[string]any); ok {
+		if raw, exists := experiments["broker-url"]; exists {
+			var valid bool
+			workflowData.ExperimentsBrokerURL, valid = raw.(string)
+			if !valid || workflowData.ExperimentsBrokerURL == "" {
+				return errors.New("experiments.broker-url must be a non-empty string")
+			}
+		}
+	}
+	if err := validateExperimentBrokerURL(workflowData.ExperimentsBrokerURL); err != nil {
+		return err
+	}
 
 	// Rewrite ${{ experiments.<name> }} references that ended up in engine.model (e.g.
 	// `engine: { model: ${{ experiments.model }} }`) so the compiled workflow reads the

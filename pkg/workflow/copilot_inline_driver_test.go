@@ -97,7 +97,7 @@ func TestCopilotEngineInstallationWithInlineDriver(t *testing.T) {
 			runtime:    "node",
 			source:     "console.log('hello')",
 			expectPath: inlineCopilotSDKDriverNodePath,
-			expectRun:  `npm install --prefix "${RUNNER_TEMP}/gh-aw/engine-cli/copilot-sdk" --ignore-scripts --no-save @github/copilot-sdk@`,
+			expectRun:  copilotSDKNodeInstallCommand,
 		},
 		{
 			name:       "python",

@@ -7,7 +7,7 @@ sidebar:
 
 # GitHub Actions Compiler Threat Detection Specification
 
-**Version**: 1.0.105
+**Version**: 1.0.107
 **Status**: Candidate Recommendation  
 **Latest Version**: https://github.com/github/gh-aw/blob/main/specs/compiler-threat-detection-spec.md  
 **Editors**: GitHub Next (GitHub, Inc.)
@@ -32,7 +32,7 @@ Each version maps to the minimum compatible binary. A version change MUST update
 
 | Versions | Minimum gh-aw |
 |---|---:|
-| `1.0.60`–`1.0.105` | Unreleased |
+| `1.0.60`–`1.0.107` | Unreleased |
 | `1.0.44`–`1.0.59` | Unreleased |
 | `1.0.40`–`1.0.43` | `v0.87.9` |
 | `1.0.39` | `v0.87.9` |
@@ -882,6 +882,33 @@ Git operations on disposable source downloads MUST use the hardened command cont
 | Hardened source-download Git | `pkg/gitutil/source_command.go`: `SourceCommandContext`, `sourceCommandEnvironment` | `pkg/gitutil/source_command_test.go`: `TestSourceCommandContextClone`, `TestSourceCommandContextRejectsExecutableTransports`, `TestCreateSourceTempDirWithRelativeTMPDIR` |
 
 Exclusion prevents inheritance of the variable names only; it does not protect credentials held in another process's memory. No new `CTR-*` or compliance-test identifier is introduced.
+
+### 7.15 Activation Markdown Metadata Embedding
+
+Authored markdown metadata (for example agent `model` or `tools` values) is untrusted text that the compiler embeds in the activation job. Embedding MUST keep the catalog inert for Actions expression evaluation, YAML single quotes, and shell single quotes: `inertJSON` escapes `$` and `'` as JSON `\u` escapes and encodes non-ASCII characters as UTF-16 escapes, so the payload is ASCII-only and chunk boundaries never split a character. Payloads larger than `activationMetadataChunkSize` MUST be written through `printf '%s'` chunk steps rather than a step environment value, and the decoded catalog MUST round-trip the authored value exactly. Neither path may execute authored text or evaluate `${{ ... }}` within it.
+
+| Boundary | Implementation | Regression Evidence |
+|---|---|---|
+| Inert JSON encoding of embedded metadata | `pkg/workflow/compiler_yaml.go`: `inertJSON`, `activationMetadataChunkSize` | `TestInertJSON`, `TestCompilerActivationMarkdownMetadataQuoting` (environment and chunked-printf subtests) in `pkg/workflow/compiler_markdown_metadata_test.go` |
+
+This is a CTR-006 data-transport boundary. No new `CTR-*` rule or compliance-test identifier is introduced.
+
+### 7.16 Local-Only MCP and Pre-Agent Proxy Access
+
+The pre-agent DIFC proxy and the built-in HTTP MCP servers serve runner-local, non-browser clients. In host-network mode the DIFC proxy MUST listen on `127.0.0.1`; in bridge mode the listener stays container-internal and the host port MUST remain published on loopback only. The HTTP MCP server runner MUST reject any request carrying an `Origin` header with `403` before MCP routing and MUST NOT emit wildcard CORS headers. Originless health checks and API-key-authenticated MCP requests remain supported. The AWF CLI proxy and MCP Scripts listeners are unchanged because container clients still need to reach them; narrowing those binds requires a supported private route.
+
+Generated MCP logs reports can contain sensitive workflow data and MUST be stored in an owner-only cache (fresh `0700` directory, exclusively created `0600` files, fail closed on unsafe paths and unsupported platforms). The legacy cache is neither read nor migrated.
+
+`observability.otlp: false` is an authored opt-out that omits default OTLP settings and credential references from the generated workflow-level `env:` block, so they are not inherited by every job. Explicitly authored `env:` entries are unchanged, and the opt-out does not alter the CTR-017 `--exclude-env` sandbox exclusions.
+
+| Boundary | Implementation | Regression Evidence |
+|---|---|---|
+| Loopback-only host-network DIFC proxy | `actions/setup/sh/start_difc_proxy.sh`: `PROXY_LISTEN` | Static Docker-argument inspection in both network modes (no automated test) |
+| Origin rejection and no wildcard CORS | `actions/setup/js/mcp_http_server_runner.cjs` | `actions/setup/js/mcp_http_server_runner.test.cjs` |
+| Owner-private MCP logs report cache | `pkg/cli/mcp_logs_report_cache_unix.go`, `pkg/cli/mcp_logs_report_cache_other.go` | `pkg/cli/mcp_logs_guardrail_cache_test.go` |
+| OTLP default opt-out | `pkg/workflow/observability_otlp.go`: `isOTLPDisabled`, `injectOTLPConfig` | `TestCompileOTLPOptOut`, `TestNormalizeFrontmatterConfigOTLPDisabled` in `pkg/workflow/observability_otlp_test.go` |
+
+These are existing-behavior mappings within CTR-017 and the host-side MCP boundary. No new `CTR-*` rule or compliance-test identifier is introduced.
 
 ## 8. Compliance Testing
 

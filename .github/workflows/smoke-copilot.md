@@ -53,6 +53,7 @@ network:
     - playwright
 tools:
   agentic-workflows:
+  web-fetch:
   cache-memory: true
   comment-memory: true
   edit:
@@ -106,7 +107,7 @@ safe-outputs:
       group: true
       close-older-issues: true
       close-older-key: "smoke-copilot"
-      labels: [automation, testing]
+      labels: [automation, testing, "backlog:smoke-tests"]
     create-discussion:
       category: announcements
       labels: [ai-generated]
@@ -174,6 +175,8 @@ experiments:
 features:
   gh-aw-detection: false
 evals:
+  - id: sandboxed_web_fetch
+    question: Did the web-fetch MCP server return GitHub homepage content without using the shell or a browser?
   - id: smoke-passed
     question: Did all or most smoke tests pass? Look for an overall PASS status or the majority of tests showing ✅ in the agent output.
   - id: build-succeeded
@@ -203,6 +206,8 @@ post-steps:
 ---
 
 # Smoke Test: Copilot Engine Validation
+
+Use the `web_fetch` tool from the `web-fetch` MCP server to fetch `https://github.com/`. Confirm that the response contains "GitHub" and include the result in the smoke report. Do not substitute a shell or browser call.
 
 {{#if experiments.caveman }}
 Talk like a caveman in all your responses and outputs. Use short, broken sentences. Me test. You run.

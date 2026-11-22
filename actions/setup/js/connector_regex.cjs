@@ -4,6 +4,8 @@ const { Worker, isMainThread, parentPort, workerData } = require("node:worker_th
 const { ERR_VALIDATION } = require("./error_codes.cjs");
 
 const ABSOLUTE_END = "(?![\\s\\S])";
+const PATTERN_BUDGET_MS = 1000;
+const WORKER_STARTUP_BUDGET_MS = 10000;
 const ASCII_SPACE = "\\t\\n\\f\\r ";
 
 /**
@@ -83,9 +85,18 @@ async function matchesConnectorPattern(pattern, value) {
       if (failure) reject(failure);
       else resolve(result === true);
     };
-    const timer = setTimeout(() => {
-      void finish(undefined, new Error(`${ERR_VALIDATION}: Connector pattern exceeded its validation budget`));
-    }, 1000);
+    // The matching budget starts once the worker runs, so slow isolate startup
+    // on a loaded host is not mistaken for catastrophic backtracking.
+    let timer = setTimeout(() => {
+      void finish(undefined, new Error(`${ERR_VALIDATION}: Connector pattern worker did not start within its budget`));
+    }, WORKER_STARTUP_BUDGET_MS);
+    worker.once("online", () => {
+      if (settled) return;
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        void finish(undefined, new Error(`${ERR_VALIDATION}: Connector pattern exceeded its validation budget`));
+      }, PATTERN_BUDGET_MS);
+    });
     worker.once("message", message => {
       if (typeof message?.match === "boolean") void finish(message.match, undefined);
       else void finish(undefined, new Error(`${ERR_VALIDATION}: Unsupported connector pattern`));

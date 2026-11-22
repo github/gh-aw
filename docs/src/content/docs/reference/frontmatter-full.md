@@ -3592,11 +3592,21 @@ engine:
     # (optional)
     tool-timeout: "example-value"
 
-  # Enables the experimental GitHub Copilot SDK integration (copilot engine only).
-  # When true, the harness starts a separate headless Copilot CLI sidecar on the
-  # configured localhost port and sets COPILOT_SDK_URI on child processes.
+  # Enables Copilot SDK integration. An object pins a checked-in npm project for a
+  # Node.js or TypeScript driver.
   # (optional)
+  # Accepted formats:
+
+  # Format 1: boolean
   copilot-sdk: true
+
+  # Format 2: object
+  copilot-sdk:
+    # Exact stable version of @github/copilot-sdk, independent of engine.version.
+    version: "example-value"
+
+    # Lowercase SHA-256 of the checked-in manifest, a NUL byte, and the npm lockfile.
+    sha256: "example-value"
 
   # Custom driver script, command, or inline source for the engine. String values
   # accept a workspace-relative path or bare name. Inline object values are
@@ -3980,6 +3990,12 @@ engine:
 
       # (optional)
       web-search: true
+
+      # Use the built-in sandboxed web-fetch MCP server when the workflow enables
+      # tools.web-fetch. Requires MCP support and a config adapter that registers the
+      # stdio server.
+      # (optional)
+      web-fetch-fallback: true
 
       # (optional)
       max-continuations: true
@@ -22621,11 +22637,21 @@ safe-outputs:
         # (optional)
         tool-timeout: "example-value"
 
-      # Enables the experimental GitHub Copilot SDK integration (copilot engine only).
-      # When true, the harness starts a separate headless Copilot CLI sidecar on the
-      # configured localhost port and sets COPILOT_SDK_URI on child processes.
+      # Enables Copilot SDK integration. An object pins a checked-in npm project for a
+      # Node.js or TypeScript driver.
       # (optional)
+      # Accepted formats:
+
+      # Format 1: boolean
       copilot-sdk: true
+
+      # Format 2: object
+      copilot-sdk:
+        # Exact stable version of @github/copilot-sdk, independent of engine.version.
+        version: "example-value"
+
+        # Lowercase SHA-256 of the checked-in manifest, a NUL byte, and the npm lockfile.
+        sha256: "example-value"
 
       # Custom driver script, command, or inline source for the engine. String values
       # accept a workspace-relative path or bare name. Inline object values are
@@ -23009,6 +23035,12 @@ safe-outputs:
 
           # (optional)
           web-search: true
+
+          # Use the built-in sandboxed web-fetch MCP server when the workflow enables
+          # tools.web-fetch. Requires MCP support and a config adapter that registers the
+          # stdio server.
+          # (optional)
+          web-fetch-fallback: true
 
           # (optional)
           max-continuations: true
@@ -24782,8 +24814,10 @@ secret-masking:
 # Optional observability output settings for workflow runs.
 # (optional)
 observability:
-  # OTLP (OpenTelemetry Protocol) trace export configuration.
   # (optional)
+  # Accepted formats:
+
+  # Format 1: OTLP (OpenTelemetry Protocol) trace export configuration.
   otlp:
     # OTLP endpoint configuration. Accepts a plain URL string (backward-compat), a
     # single {url, headers} object, or an array of {url, headers} objects for
@@ -24914,6 +24948,10 @@ observability:
       # Optional Google service account email to impersonate after STS token exchange.
       # (optional)
       service-account: "example-value"
+
+  # Format 2: Disable compiler-managed OTLP configuration, including defaults and
+  # imported settings, when set in the main workflow.
+  otlp: false
 
 # Rate limiting configuration to restrict how frequently users can trigger the
 # workflow. Helps prevent abuse and resource exhaustion from programmatically
