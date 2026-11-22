@@ -1,10 +1,11 @@
 {
-  "generated_at": "2026-11-21T18:17:57Z",
-  "run_id": "pr-triage-2026-11-21T18:17:57Z",
+  "generated_at": "2026-11-22T00:42:19.261681Z",
+  "run_id": "pr-triage-2026-11-22T00:42:19Z",
   "source": "pr-triage",
   "open_copilot_prs": 0,
+  "scanned_open_prs": 14,
   "eligible_total": 0,
-  "cooldown_skipped": 0,
+  "cooldown_skipped": 8,
   "category_counts": {
     "docs": 0,
     "test": 0,
@@ -33,11 +34,60 @@
   },
   "selected_candidates": [],
   "batches": [],
-  "skipped_prs": [],
+  "skipped_prs": [
+    {
+      "number": 79964,
+      "title": "[WIP] Bump AWF to v0.29.18 and MCP gateway to v0.5.12",
+      "updated_at": "2026-11-22T00:32:04Z",
+      "author": "lpcox"
+    },
+    {
+      "number": 79961,
+      "title": "Fix CI assertions and reduce benchmark timing noise",
+      "updated_at": "2026-11-22T00:15:11Z",
+      "author": "pelikhan"
+    },
+    {
+      "number": 79909,
+      "title": "Allow workflows to opt out of default OTLP configuration",
+      "updated_at": "2026-11-22T00:20:22Z",
+      "author": "pelikhan"
+    },
+    {
+      "number": 79908,
+      "title": "Link PR review summaries to their inline comments",
+      "updated_at": "2026-11-22T00:21:14Z",
+      "author": "pelikhan"
+    },
+    {
+      "number": 79907,
+      "title": "Docs: Correct the default path base for `#runtime-import`",
+      "updated_at": "2026-11-22T00:04:54Z",
+      "author": "pelikhan"
+    },
+    {
+      "number": 79905,
+      "title": "Translate Copilot model effort suffixes into CLI flags",
+      "updated_at": "2026-11-22T00:22:34Z",
+      "author": "pelikhan"
+    },
+    {
+      "number": 79904,
+      "title": "Distinguish missing AI credit cost from zero in `logs --json`",
+      "updated_at": "2026-11-22T00:21:36Z",
+      "author": "pelikhan"
+    },
+    {
+      "number": 79898,
+      "title": "Add linter for unchecked os.Stat and os.Lstat results",
+      "updated_at": "2026-11-22T00:19:48Z",
+      "author": "gh-aw-bot"
+    }
+  ],
   "notes": [
-    "No open PRs are currently authored by app/github-copilot in github/gh-aw.",
-    "No eligible app/github-copilot PRs were found in the triage window.",
-    "The queue is empty; no labels, comments, or batch assignments were created."
+    "No open pull requests authored by app/github-copilot were found in github/gh-aw.",
+    "The current queue is composed of same-repo and bot-authored PRs, and none match the eligible author filter.",
+    "No labels, comments, or batch assignments were created because the eligible queue is empty."
   ],
   "review_status": "triaged"
 }

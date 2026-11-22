@@ -1,23 +1,37 @@
 ### Executive Summary
 
 - Eligible open `app/github-copilot` PRs: 0
-- Open `app/github-copilot` PRs scanned: 0
-- PRs skipped by 1h cooldown: 0
-- Recommended action: none; no app/github-copilot PRs are currently eligible for triage.
+- Open PRs scanned: 14
+- PRs skipped by 1h cooldown: 11
+- Recommended action: none; no eligible agent-authored PRs are currently in the queue.
 
 ### Distribution
 
 #### Category
-- None: 0
+- docs: 0
+- test: 0
+- formatting: 0
+- chore: 0
+- refactor: 0
+- bug: 0
+- feature: 0
 
 #### Risk
-- None: 0
+- low: 0
+- medium: 0
+- high: 0
 
 #### Priority
-- None: 0
+- low: 0
+- medium: 0
+- high: 0
 
 #### Action
-- None: 0
+- auto_merge: 0
+- fast_track: 0
+- batch_review: 0
+- defer: 0
+- close: 0
 
 ### Top-priority PRs
 
@@ -41,6 +55,6 @@
 
 ### Key trends and next actions
 
-- There are currently no open PRs authored by `app/github-copilot` in `github/gh-aw`.
-- No labels, comments, or batch assignments were created because the eligible queue is empty.
-- Re-run this triage when a new agent-authored PR becomes eligible.
+- No PR in the current open queue matches the eligible `app/github-copilot` author filter.
+- The current queue consists mainly of same-repo and bot-authored PRs (for example `pelikhan`, `lpcox`, and `gh-aw-bot`), which are outside the required author scope.
+- Re-run triage when a new `app/github-copilot` PR becomes eligible or when the repository is refreshed with agent-authored work.
