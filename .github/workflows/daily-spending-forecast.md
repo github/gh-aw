@@ -87,7 +87,7 @@ post-steps:
 safe-outputs:
   create-issue:
     title-prefix: "[spending-forecast] "
-    labels: [agentic-workflows]
+    labels: [agentic-workflows, "backlog:reports"]
     close-older-issues: true
     expires: 7d
     max: 1

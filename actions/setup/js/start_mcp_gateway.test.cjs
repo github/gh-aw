@@ -358,6 +358,7 @@ describe("MCP transported-data startup rejection", () => {
 });
 
 describe.each(["agenticworkflows", "safeoutputs"])("%s backend ownership", name => {
+  const reportEnv = name === "agenticworkflows" ? { GH_AW_MCP_LOGS_REPORT_DIR: "/tmp/gh-aw" } : {};
   it.each([0, 31, 123, 1001])("preserves the numeric primary GID %s and configured supplementary group access", gid => {
     const backend = { container: "example/server", args: ["--group-add", "1005"] };
     applyBuiltinMCPRunnerIdentity({ mcpServers: { [name]: backend } }, 2001, gid);
@@ -371,20 +372,20 @@ describe.each(["agenticworkflows", "safeoutputs"])("%s backend ownership", name 
     const config = { mcpServers: { [name]: backend, other } };
     applyBuiltinMCPRunnerIdentity(config, 1001, 123);
     expect(backend.args).toEqual(["--network", "host", "-w", "/workspace", "--user", "1001:123"]);
-    expect(backend.env).toEqual({ HOME: "/tmp", ...env });
+    expect(backend.env).toEqual({ HOME: "/tmp", ...env, ...reportEnv });
     expect(other).toEqual({ container: "example/server", args: [] });
     applyBuiltinMCPRunnerIdentity(config, 1001, 123);
     expect(backend.args.filter(arg => arg === "--user")).toHaveLength(1);
   });
 
-  it.each([["--user", "42:43"], ["--user=42:43"], ["-u", "42:43"], ["-u42:43"], ["--user", "app:staff"], ["--user=app:staff"], ["-u", "app:staff"], ["-uroot"], ["-uapp:staff"], ["-u=app:staff"]])(
+  it.each([["--user", "1001:123"], ["--user", "42:43"], ["--user=42:43"], ["-u", "42:43"], ["-u42:43"], ["--user", "app:staff"], ["--user=app:staff"], ["-u", "app:staff"], ["-uroot"], ["-uapp:staff"], ["-u=app:staff"]])(
     "preserves an explicitly configured container user: %j",
     (...args) => {
       const backend = { container: "example/server", args, env: { HOME: "/custom" } };
       const original = structuredClone(backend);
       applyBuiltinMCPRunnerIdentity({ mcpServers: { [name]: backend } }, 1001, 123);
       applyBuiltinMCPRunnerIdentity({ mcpServers: { [name]: backend } }, 1001, 123);
-      expect(backend).toEqual(original);
+      expect(backend).toEqual({ ...original, env: { ...original.env, ...reportEnv } });
     }
   );
 
@@ -392,19 +393,19 @@ describe.each(["agenticworkflows", "safeoutputs"])("%s backend ownership", name 
     const backend = { container: "example/server", args: [arg], env: { HOME: "/custom" } };
     const original = structuredClone(backend);
     applyBuiltinMCPRunnerIdentity({ mcpServers: { [name]: backend } }, 1001, 123);
-    expect(backend).toEqual(original);
+    expect(backend).toEqual({ ...original, env: { ...original.env, ...reportEnv } });
   });
 
   it("does not confuse --userns with an explicit container user", () => {
     const backend = { container: "example/server", args: ["--userns=host"], env: { HOME: "/custom" } };
     applyBuiltinMCPRunnerIdentity({ mcpServers: { [name]: backend } }, 1001, 123);
-    expect(backend).toEqual({ container: "example/server", args: ["--userns=host", "--user", "1001:123"], env: { HOME: "/custom" } });
+    expect(backend).toEqual({ container: "example/server", args: ["--userns=host", "--user", "1001:123"], env: { HOME: "/custom", ...reportEnv } });
   });
 
   it("preserves a configured HOME and supports default container arguments", () => {
     const backend = { container: "alpine:3.24", env: { HOME: "/custom" } };
     applyBuiltinMCPRunnerIdentity({ mcpServers: { [name]: backend } }, 1001, 123);
-    expect(backend).toEqual({ container: "alpine:3.24", args: ["--user", "1001:123"], env: { HOME: "/custom" } });
+    expect(backend).toEqual({ container: "alpine:3.24", args: ["--user", "1001:123"], env: { HOME: "/custom", ...reportEnv } });
   });
 
   it.each([{}, { mcpServers: {} }, { mcpServers: { [name]: { url: "https://example.com/mcp" } } }])("leaves absent and HTTP backends unchanged", config => {
@@ -634,7 +635,7 @@ readline.createInterface({ input: process.stdin }).on("line", line => {
     const agenticworkflows = { container: "alpine:3.24", args: ["--user", "42:43"] };
     const safeoutputs = { container: "ghcr.io/github/gh-aw-node@sha256:test", args: ["-w", "/workspace"] };
     applyBuiltinMCPRunnerIdentity({ mcpServers: { agenticworkflows, safeoutputs } }, 1001, 123);
-    expect(agenticworkflows.args).toEqual(["--user", "42:43"]);
+    expect(agenticworkflows).toEqual({ container: "alpine:3.24", args: ["--user", "42:43"], env: { GH_AW_MCP_LOGS_REPORT_DIR: "/tmp/gh-aw" } });
     expect(safeoutputs.args).toEqual(["-w", "/workspace", "--user", "1001:123"]);
     expect(safeoutputs.env).toEqual({ HOME: "/tmp" });
   });
@@ -1735,7 +1736,7 @@ describe("start_mcp_gateway normalizeSinkVisibilityEncoding", () => {
 
 describe("start_mcp_gateway extractOptionalServerNames", () => {
   it("writes explicit required settings before extracting them for gateway startup", () => {
-    const directory = fs.mkdtempSync(path.join(os.tmpdir(), "gh-aw-mcp-required-"));
+    const directory = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "gh-aw-mcp-required-")));
     try {
       const configObj = { mcpServers: { optional: { type: "http", required: false } } };
       writeMcpConfiguration(directory, configObj);

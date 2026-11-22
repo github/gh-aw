@@ -8,8 +8,12 @@ pkg/workflow/js/*.js linguist-generated=true
 pkg/workflow/js/*.cjs linguist-generated=true
 pkg/workflow/sh/*.sh linguist-generated=true
 actions/*/index.js linguist-generated=true
+# The compiler and runner hash these assets byte-for-byte.
+actions/setup/copilot-sdk/*/package*.json text eol=lf
 actions/setup-cli/install.sh linguist-generated=true
 actions/setup-cli/install.ps1 linguist-generated=true
+# The compiler pins the bytes copied by the setup action on every runner.
+actions/setup/typescript-lsp/*.json text eol=lf
 # Rendered snapshots preserve Markdown hard breaks and template whitespace.
 actions/setup/js/testdata/messages_preview.md whitespace=-blank-at-eol
 specs/artifacts.md linguist-generated=true merge=ours

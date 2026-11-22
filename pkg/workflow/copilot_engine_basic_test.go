@@ -4,39 +4,11 @@ package workflow
 
 import (
 	"fmt"
-	"regexp"
 	"strings"
 	"testing"
 
 	"github.com/github/gh-aw/pkg/constants"
 )
-
-func TestCopilotSDKInstallDependenciesArePinned(t *testing.T) {
-	t.Parallel()
-	exactVersion := regexp.MustCompile(`^(@[^/]+/)?[^@]+@[0-9]+\.[0-9]+\.[0-9]+([-+][0-9A-Za-z.-]+)?$`)
-	for name, spec := range map[string]copilotSDKInstallSpec{
-		"node":              getCopilotSDKInstallSpec("node driver.js"),
-		"typescript":        getCopilotSDKInstallSpec("ts-node driver.ts"),
-		"inline-node":       getInlineCopilotSDKInstallSpec("node"),
-		"inline-typescript": getInlineCopilotSDKInstallSpec("typescript"),
-	} {
-		t.Run(name, func(t *testing.T) {
-			_, dependencies, found := strings.Cut(spec.command, "--ignore-scripts --no-save ")
-			if !found {
-				t.Fatalf("expected SDK npm install command in %q", spec.command)
-			}
-			packages := strings.Fields(dependencies)
-			if len(packages) < 2 {
-				t.Fatalf("expected SDK and web-fetch dependencies in %q", spec.command)
-			}
-			for _, pkg := range packages {
-				if !exactVersion.MatchString(pkg) {
-					t.Errorf("generated SDK dependency must use an exact version: %q", pkg)
-				}
-			}
-		})
-	}
-}
 
 func TestCopilotEngine(t *testing.T) {
 	engine := NewCopilotEngine()
@@ -136,12 +108,12 @@ func TestCopilotEngineInstallationSteps(t *testing.T) {
 	if !strings.Contains(sdkInstallStep, "name: Install GitHub Copilot SDK (Node.js)") {
 		t.Fatalf("Expected SDK install step name, got:\n%s", sdkInstallStep)
 	}
-	expectedSDKInstall := `npm install --prefix "${RUNNER_TEMP}/gh-aw/engine-cli/copilot-sdk" --ignore-scripts --no-save @github/copilot-sdk@` + string(constants.DefaultCopilotSDKVersion)
+	if !strings.Contains(sdkInstallStep, "\n        shell: bash\n") {
+		t.Fatalf("Expected npm-backed SDK install step to declare Bash, got:\n%s", sdkInstallStep)
+	}
+	expectedSDKInstall := `bash "${RUNNER_TEMP}/gh-aw/actions/install_copilot_sdk.sh" node `
 	if !strings.Contains(sdkInstallStep, expectedSDKInstall) {
 		t.Fatalf("Expected SDK install command %q, got:\n%s", expectedSDKInstall, sdkInstallStep)
-	}
-	if !strings.Contains(sdkInstallStep, copilotSDKWebFetchDependency) {
-		t.Fatalf("Expected SDK install command to include %q, got:\n%s", copilotSDKWebFetchDependency, sdkInstallStep)
 	}
 }
 
@@ -242,7 +214,7 @@ func TestCopilotEngineInstallationWithCommandAndCopilotSDK(t *testing.T) {
 			name:          "node command uses npm sdk install",
 			command:       "node ./agent.js",
 			expectedName:  "name: Install GitHub Copilot SDK (Node.js)",
-			expectedRun:   copilotSDKNodeInstallCommand + "@github/copilot-sdk@" + string(constants.DefaultCopilotSDKVersion),
+			expectedRun:   copilotSDKNodeInstallCommand,
 			expectedSteps: 1,
 		},
 		{
@@ -291,14 +263,14 @@ func TestCopilotEngineInstallationWithCommandAndCopilotSDK(t *testing.T) {
 			name:          "unsupported runtime falls back to node sdk install",
 			command:       "bun run agent.ts",
 			expectedName:  "name: Install GitHub Copilot SDK (Node.js)",
-			expectedRun:   copilotSDKNodeInstallCommand + "@github/copilot-sdk@" + string(constants.DefaultCopilotSDKVersion),
+			expectedRun:   copilotSDKNodeInstallCommand,
 			expectedSteps: 1,
 		},
 		{
 			name:          "ts-node command installs ts-node and typescript alongside sdk",
 			command:       "ts-node driver.ts",
 			expectedName:  "name: Install GitHub Copilot SDK (TypeScript)",
-			expectedRun:   copilotSDKNodeInstallCommand + "@github/copilot-sdk@" + string(constants.DefaultCopilotSDKVersion) + " " + copilotSDKWebFetchDependency + " ts-node@10.9.2 typescript@5.8.3",
+			expectedRun:   copilotSDKNodeInstallCommand,
 			expectedSteps: 1,
 		},
 		{
@@ -370,7 +342,7 @@ func TestCopilotEngineInstallationWithCopilotSDKDriver(t *testing.T) {
 			name:         "js driver uses npm sdk install",
 			driver:       "my_driver.cjs",
 			expectedName: "name: Install GitHub Copilot SDK (Node.js)",
-			expectedRun:  copilotSDKNodeInstallCommand + "@github/copilot-sdk@" + string(constants.DefaultCopilotSDKVersion),
+			expectedRun:  copilotSDKNodeInstallCommand,
 		},
 		{
 			name:         "python driver uses pip sdk install",
@@ -382,19 +354,19 @@ func TestCopilotEngineInstallationWithCopilotSDKDriver(t *testing.T) {
 			name:         "typescript driver uses node sdk install (node 24 native ts support)",
 			driver:       "my_driver.ts",
 			expectedName: "name: Install GitHub Copilot SDK (Node.js)",
-			expectedRun:  copilotSDKNodeInstallCommand + "@github/copilot-sdk@" + string(constants.DefaultCopilotSDKVersion),
+			expectedRun:  copilotSDKNodeInstallCommand,
 		},
 		{
 			name:         "ruby driver uses npm sdk install fallback",
 			driver:       "my_driver.rb",
 			expectedName: "name: Install GitHub Copilot SDK (Node.js)",
-			expectedRun:  copilotSDKNodeInstallCommand + "@github/copilot-sdk@" + string(constants.DefaultCopilotSDKVersion),
+			expectedRun:  copilotSDKNodeInstallCommand,
 		},
 		{
 			name:         "arbitrary command driver uses npm sdk install fallback",
 			driver:       "my-copilot-driver",
 			expectedName: "name: Install GitHub Copilot SDK (Node.js)",
-			expectedRun:  copilotSDKNodeInstallCommand + "@github/copilot-sdk@" + string(constants.DefaultCopilotSDKVersion),
+			expectedRun:  copilotSDKNodeInstallCommand,
 		},
 	}
 

@@ -67,7 +67,7 @@ safe-outputs:
       expires: 2h
       close-older-issues: true
       close-older-key: "smoke-pi"
-      labels: [automation, testing]
+      labels: [automation, testing, "backlog:smoke-tests"]
     add-labels:
       allowed: [smoke-pi]
     messages:

@@ -567,14 +567,20 @@ calling the Decision API. CJS and Windows CI are unchanged.
 
 Benchmarks run separately in `.github/workflows/benchmarks.yml`, only on main
 pushes, weekly schedules, or manual main-branch runs, never on PRs. CLI,
-workflow, workqueue, and other benchmark packages run in parallel. Workqueue
-replay uses one iteration per size instead of three; all sizes are retained.
+workflow, workqueue, and other benchmark packages run in parallel. Most shards
+target 100 ms per sample to reduce timing noise. Workqueue replay uses one
+iteration per sample and retains every ledger size.
 Routine benchmarks exclude external Zizmor/Poutine scanner invocations, which
 can measure container startup or timeouts rather than Go performance; the
 separate CGO security scan is unchanged. `make bench` still runs the full set
-locally. Use `BENCH_PACKAGES`, `BENCH_TIME`, and `BENCH_SKIP` to narrow a run.
+locally. Use `BENCH_PACKAGES`, `BENCH_TIME`, `BENCH_COUNT`, and `BENCH_SKIP` to
+configure a run.
 Each shard publishes its own results and compares with its previous main-branch
-baseline; the first run establishes the new shard baseline.
+baseline. The time-based shards use separate artifacts from the old
+fixed-iteration runs, so their first run establishes a fresh baseline.
+CI takes six samples per benchmark and fails on statistically significant
+increases above 10% in time, bytes allocated, or allocations per operation.
+Geomeans are reported but do not fail the gate.
 
 The selector uses GitHub Decisions at
 `https://api.githubcopilot.com/v1/decisions` with model `gpt-6-luna-decisions`.

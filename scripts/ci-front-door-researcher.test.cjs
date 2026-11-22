@@ -95,7 +95,7 @@ test("researcher ranks slow tests by critical path using cached timing and retai
 });
 
 test("GitHub authentication never authorizes research calls or weaker fallback", () => {
-  assert.match(prompt, /https:\/\/api\.githubcopilot\.com\/v1\/decisions/);
+  assert.ok(prompt.includes("https://api.githubcopilot.com/v1/decisions"), "missing GitHub Decisions endpoint in prompt");
   assert.match(prompt, /built-in workflow token with job-scoped\s+`copilot-requests: write`/);
   assert.match(prompt, /pinned trusted base/);
   assert.match(prompt, /`CI_DIFF_WORKSPACE` only for local PR diff/);

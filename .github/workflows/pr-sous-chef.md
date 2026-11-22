@@ -168,7 +168,7 @@ safe-outputs:
     target: "*"
   create-issue:
     title-prefix: "[pr-sous-chef] "
-    labels: ["automation"]
+    labels: ["automation", "backlog:reports"]
     expires: 3d
     group-by-day: true
     close-older-issues: true

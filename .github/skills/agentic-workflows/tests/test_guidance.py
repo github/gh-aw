@@ -1408,7 +1408,9 @@ class GuidanceTests(unittest.TestCase):
         explorer = (ROOT / ".github/workflows/agent-persona-explorer.md").read_text()
         self.assertIn("If 1 or 2 remain, select those before resetting", explorer)
         self.assertIn("If the updated list now contains all 9 personas, reset to an empty list", explorer)
-        self.assertIn('labels: ["agent-research", "cookie"]', explorer)
+        labels = re.search(r"^    labels: (\[.*\])$", explorer.split("\n---", 1)[0], re.MULTILINE)
+        self.assertIsNotNone(labels)
+        self.assertTrue({"agent-research", "cookie"}.issubset(json.loads(labels.group(1))))
         self.assertNotIn("If fewer than 3 remain, reset", explorer)
 
     def test_security_reporting_omits_empty_findings_tables(self):
