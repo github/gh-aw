@@ -31,6 +31,7 @@ import (
 	"github.com/github/gh-aw/pkg/linters/errortypeassertion"
 	"github.com/github/gh-aw/pkg/linters/errstringmatch"
 	"github.com/github/gh-aw/pkg/linters/excessivefuncparams"
+	"github.com/github/gh-aw/pkg/linters/execcommandoutputerrdiscard"
 	"github.com/github/gh-aw/pkg/linters/execcommandwithoutcontext"
 	"github.com/github/gh-aw/pkg/linters/fileclosenotdeferred"
 	"github.com/github/gh-aw/pkg/linters/filepathwalkpreferwalkdir"
@@ -126,14 +127,14 @@ type docAnalyzer struct {
 }
 
 // documentedAnalyzers returns the analyzer subpackages documented in the README
-// "Public API > Subpackages" table. The README documents 99 analyzer
+// "Public API > Subpackages" table. The README documents 101 analyzer
 // subpackages (the non-analyzer `internal` helper subpackage is excluded because
 // it exposes no Analyzer).
 //
 // Spec (README "Public API > Subpackages"):
 //
 //	appendbytestring, appendoneelement, blankassigncomma, blankassignedcleanuperror, bufferresetbeforereuse, bufioscannererunchecked, bytesbufferstring, bytescomparestring, closeerrorunchecked, contextcancelnotdeferred, ctxbackground, deferinloop, deferrerrorunchecked, errorfwrapv, excessivefuncparams, errormessage, errorsnewerrorstring,
-//	errortypeassertion, errstringmatch, execcommandwithoutcontext, fileclosenotdeferred, filepathwalkpreferwalkdir, fmterrorfnoverbs, formatintitoa, fprintferrorunchecked, fprintlnsprintf,
+//	errortypeassertion, errstringmatch, execcommandoutputerrdiscard, execcommandwithoutcontext, fileclosenotdeferred, filepathwalkpreferwalkdir, fmterrorfnoverbs, formatintitoa, fprintferrorunchecked, fprintlnsprintf,
 //	generatedyamlheredoc, globwalkignorederror, goroutinemissingrecover, goroutineresourceleak, hardcodedfilepath, httpclientnotimeout, httpnoctx, httprespbodyclose, httpstatuscode, ignoredlocalerror, ioutildeprecated, jsondecodertrailingdataunchecked, jsonmarshalignoredeerror, jsonunmarshalbytesconversion, largefunc, lenstringsplit, lenstringzero,
 //	logfatallibrary, manualmutexunlock, manualpathconcat, mapclearloop, mapdeletecheck, nilctxpassed, osexitinlibrary, osgetenvlibrary, osisnotexist, osopenreadallpreferreadfile, osremoveuncheckedcleanup, osstatignoredeerrorderef, ossetenvlibrary, packagelevelmutableslicemap, panic-in-library-code, prefercutprefix, rawloginlib,
 //	readerstringconv, reflectdeepequalusage, regexpcompileinfunction, regexpdynamicpattern, seenmapbool, slicemakezerolength, sortbasicslices, sortslice, splitindexzero, splitlines-on-newline, sprintferrdot, sprintferrorsnew, sprintfbool, sprintfint, ssljson,
@@ -162,6 +163,7 @@ func documentedAnalyzers() []docAnalyzer {
 		{"errorsnewerrorstring", errorsnewerrorstring.Analyzer},
 		{"errortypeassertion", errortypeassertion.Analyzer},
 		{"errstringmatch", errstringmatch.Analyzer},
+		{"execcommandoutputerrdiscard", execcommandoutputerrdiscard.Analyzer},
 		{"execcommandwithoutcontext", execcommandwithoutcontext.Analyzer},
 		{"fileclosenotdeferred", fileclosenotdeferred.Analyzer},
 		{"filepathwalkpreferwalkdir", filepathwalkpreferwalkdir.Analyzer},

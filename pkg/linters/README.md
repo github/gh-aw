@@ -28,6 +28,7 @@ The method names mentioned in analyzer descriptions (such as `Err`, `Flush`, `Re
 - `errorsnewerrorstring` — reports `errors.New(err.Error())` calls that discard the original error and break error-chain matching.
 - `errortypeassertion` — reports type assertions from `error` to concrete types and recommends `errors.As`.
 - `errstringmatch` — reports `strings.Contains(err.Error(), "...")` patterns and recommends `errors.Is` / `errors.As`.
+- `execcommandoutputerrdiscard` — reports `exec.Cmd.Output()` failures that do not retain `*exec.ExitError.Stderr` and `CombinedOutput()` calls whose output is discarded.
 - `fileclosenotdeferred` — reports non-deferred file `Close()` calls that can leak resources.
 - `filepathwalkpreferwalkdir` — reports `filepath.Walk` calls and recommends `filepath.WalkDir`.
 - `execcommandwithoutcontext` — reports `exec.Command(...)` calls inside functions that already receive `context.Context` and should use `exec.CommandContext(...)`.
@@ -211,6 +212,7 @@ environment variable and gates findings on the recorded execution hit count for 
 | `errorsnewerrorstring` | Custom `go/analysis` analyzer that flags `errors.New(err.Error())` calls that discard the original error and break `errors.Is` / `errors.As` matching |
 | `errortypeassertion` | Custom `go/analysis` analyzer that flags type assertions from `error` to concrete types and recommends `errors.As` |
 | `errstringmatch` | Custom `go/analysis` analyzer that flags brittle `strings.Contains(err.Error(), "...")` checks |
+| `execcommandoutputerrdiscard` | Custom `go/analysis` analyzer that reports `exec.Cmd.Output()` failures that do not retain `*exec.ExitError.Stderr` and discarded `CombinedOutput()` results |
 | `execcommandwithoutcontext` | Custom `go/analysis` analyzer that flags `exec.Command(...)` calls that should use `exec.CommandContext(...)` in context-receiving functions |
 | `fileclosenotdeferred` | Custom `go/analysis` analyzer that flags file `Close()` calls that are not deferred immediately |
 | `filepathwalkpreferwalkdir` | Custom `go/analysis` analyzer that flags `filepath.Walk` calls and recommends `filepath.WalkDir` |
@@ -311,6 +313,7 @@ import (
 	"github.com/github/gh-aw/pkg/linters/errormessage"
 	"github.com/github/gh-aw/pkg/linters/errorsnewerrorstring"
 	"github.com/github/gh-aw/pkg/linters/errstringmatch"
+	"github.com/github/gh-aw/pkg/linters/execcommandoutputerrdiscard"
 	"github.com/github/gh-aw/pkg/linters/execcommandwithoutcontext"
 	"github.com/github/gh-aw/pkg/linters/fileclosenotdeferred"
 	"github.com/github/gh-aw/pkg/linters/hardcodedfilepath"
@@ -348,6 +351,7 @@ _ = excessivefuncparams.Analyzer
 _ = errormessage.Analyzer
 _ = errorsnewerrorstring.Analyzer
 _ = errstringmatch.Analyzer
+_ = execcommandoutputerrdiscard.Analyzer
 _ = execcommandwithoutcontext.Analyzer
 _ = fileclosenotdeferred.Analyzer
 _ = hardcodedfilepath.Analyzer
@@ -392,6 +396,7 @@ _ = typeassertionnil.Analyzer
 - `github.com/github/gh-aw/pkg/linters/errormessage` — error-message analyzer subpackage (also re-exported as `ErrorMessageAnalyzer`)
 - `github.com/github/gh-aw/pkg/linters/errortypeassertion` — error-type-assertion analyzer subpackage
 - `github.com/github/gh-aw/pkg/linters/errstringmatch` — err-string-match analyzer subpackage
+- `github.com/github/gh-aw/pkg/linters/execcommandoutputerrdiscard` — exec-command-output-error-discard analyzer subpackage
 - `github.com/github/gh-aw/pkg/linters/execcommandwithoutcontext` — exec-command-without-context analyzer subpackage
 - `github.com/github/gh-aw/pkg/linters/excessivefuncparams` — excessive-func-params analyzer subpackage
 - `github.com/github/gh-aw/pkg/linters/fileclosenotdeferred` — file-close-not-deferred analyzer subpackage
