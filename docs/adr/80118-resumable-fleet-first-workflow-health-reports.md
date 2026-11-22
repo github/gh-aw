@@ -12,7 +12,7 @@
 
 ### Decision
 
-We will make `gh aw health` with no workflow name a **fleet-first**, **resumable** report over active agentic workflows on the default branch (excluding pull-request events). The report inventories Actions outcomes first, records coverage, marks unfinished verification as `not_collected`, and returns a typed `resume` or `audit` next action. A checkpoint pins the repository, time window and branch revision so later calls continue without replaying completed work, and the MCP tool uses an opaque, session-bound resume token. The primary driver is **fleet coverage within a bounded run time**, which is also why the `--fleet` flag is removed.
+We will make `gh aw health` with no workflow name a **fleet-first**, **resumable** report over active agentic workflows on the default branch (excluding pull-request events). The report inventories Actions outcomes first, records coverage, marks unfinished verification as `not_collected`, and returns a typed `resume` or `audit` next action when available. A checkpoint pins the repository, time window and branch revision so later calls continue without replaying completed work, and the MCP tool uses an opaque, session-bound resume token.
 
 ### Alternatives Considered
 
@@ -20,9 +20,9 @@ We will make `gh aw health` with no workflow name a **fleet-first**, **resumable
 
 Keep the per-invocation scan and ask callers to rerun with a larger `--timeout` or to restart the scan when coverage is incomplete. This is the status quo and it is simple, with no new state. It was rejected because each restart repeats reads that already succeeded, so the fleet is never fully covered in bounded time, and callers still cannot tell a timeout from a healthy result without parsing free-text warnings.
 
-#### Alternative 2: Keep `--fleet` as an Opt-In Flag
+#### Alternative 2: Make the New Report Opt-In
 
-Retain the per-workflow default and expose the fleet report behind `--fleet`. This avoids a breaking change and keeps existing scripts unchanged. It was a close call. It was rejected because the fleet report is the form most callers need for a first look at repository health, and leaving the per-workflow report as the default keeps the coverage gap the PR set out to close. The changeset is marked `major`, and `--all-branches` is kept as the migration path for scripts that depend on the previous scope and JSON schema. [TODO: verify the migration window and whether a deprecation period was discussed.]
+Retain the previous repository-wide report by default and expose the resumable report as an opt-in. This keeps existing scripts unchanged but leaves the coverage gap for callers that use the default. The changeset is marked `major` because the unnamed command changes scope and JSON schema.
 
 #### Alternative 3: Remove the Deadline for Fleet Reports
 
@@ -37,16 +37,16 @@ Run fleet collection to completion with no time budget. This would give complete
 - `not_collected` separates "verification did not finish" from "healthy" and from "no runs exist".
 
 #### Negative
-- This is a breaking change for the CLI and MCP tool: `--fleet` and the MCP `fleet` argument are removed, and scripts that depended on the all-branches scope or the old JSON schema must move to `--all-branches`.
+- Unnamed CLI and MCP consumers must migrate to the new scope and schema. Read `coverage` for completeness and opt in to `details.workflows` when per-workflow evidence is needed.
 - Checkpoints store the full inventory and cached responses (capped at 128 MiB) on disk. They must be private regular files, and they need a clear retention story. [TODO: verify retention guidance for checkpoint files.]
 - MCP checkpoints live in temporary directories and expire after 30 minutes. They are bound to the originating MCP session, so a new session cannot resume them.
 - About 1,100 new lines in `pkg/cli` add state-machine complexity (inventory windows, registry paging, verification ordering) that future maintainers must understand.
 
 #### Neutral
-- Named-workflow reports keep their existing behavior and code path (`runLegacyHealth`).
+- Named-workflow reports keep their existing scope and JSON schema.
 - Checkpoints carry a version number. Incompatible or stale checkpoints are rejected, and the caller must start a new checkpoint path.
-- Default-branch fleet scope excludes pull-request events. Pull-request health still needs the per-workflow or `--all-branches` path.
-- The `auditor` workflow switches to `--all-branches` to keep its prior scope.
+- Use a named check for pull-request revision evidence, or `gh aw logs` for broader run history.
+- The Auditor adopts the default-branch, non-PR scope and uses `coverage` and `details.failure_representatives` before its downstream evidence checks.
 
 ---
 
