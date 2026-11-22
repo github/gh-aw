@@ -615,34 +615,7 @@ func (c *Compiler) buildConclusionScriptEnvVars(data *WorkflowData, mainJobName 
 	} else {
 		envVars = append(envVars, "          GH_AW_NOOP_COMMENT_BODY: \"\"\n")
 	}
-	staged := resolveSafeOutputsStagedValue(c.trialMode, data.SafeOutputs.Staged)
-	if staged == nil {
-		staged = new("false")
-	}
-	envVars = append(envVars, buildTemplatableBoolEnvVar("GH_AW_SAFE_OUTPUTS_STAGED", staged)...)
-	addStagedDiagnostic := func(name string, staged *TemplatableBool) {
-		envVars = append(envVars, buildTemplatableBoolEnvVar("GH_AW_COMPLETION_STAGED_"+name, templatableBoolEnvVarValue(staged))...)
-	}
-	if cfg := data.SafeOutputs.NoOp; cfg != nil {
-		addStagedDiagnostic("NOOP", cfg.Staged)
-	}
-	if cfg := data.SafeOutputs.ReportIncomplete; cfg != nil {
-		addStagedDiagnostic("REPORT_INCOMPLETE", cfg.Staged)
-	}
-	if cfg := data.SafeOutputs.MissingData; cfg != nil {
-		addStagedDiagnostic("REPORT_MISSING_DATA", cfg.Staged)
-	}
-	if cfg := data.SafeOutputs.MissingTool; cfg != nil {
-		addStagedDiagnostic("REPORT_MISSING_TOOL", cfg.Staged)
-	}
-	// Conclusion does not execute invocations or receive their trusted authorization decisions.
-	var protectedReports []string
-	for _, name := range []string{"noop", "report_incomplete", "report_missing_data", "report_missing_tool", "request_continuation"} {
-		if data.SafeOutputs.AuthorizationRequirements[name] != nil {
-			protectedReports = append(protectedReports, name)
-		}
-	}
-	envVars = append(envVars, fmt.Sprintf("          GH_AW_AUTHORIZATION_PROTECTED_REPORTS: %q\n", strings.Join(protectedReports, ",")))
+	envVars = append(envVars, c.buildConclusionSafeOutputPolicyEnvVars(data)...)
 	if slices.Contains(safeOutputJobNames, string(constants.SafeOutputsJobName)) {
 		envVars = append(envVars, fmt.Sprintf("          GH_AW_SAFE_OUTPUTS_RESULT: ${{ needs.%s.result }}\n", constants.SafeOutputsJobName))
 		notifyCommentLog.Print("Added safe_outputs job result environment variable to conclusion job")
@@ -675,6 +648,37 @@ func (c *Compiler) buildConclusionScriptEnvVars(data *WorkflowData, mainJobName 
 		}
 	}
 	return envVars
+}
+
+func (c *Compiler) buildConclusionSafeOutputPolicyEnvVars(data *WorkflowData) []string {
+	staged := resolveSafeOutputsStagedValue(c.trialMode, data.SafeOutputs.Staged)
+	if staged == nil {
+		staged = new("false")
+	}
+	envVars := buildTemplatableBoolEnvVar("GH_AW_SAFE_OUTPUTS_STAGED", staged)
+	addStagedDiagnostic := func(name string, staged *TemplatableBool) {
+		envVars = append(envVars, buildTemplatableBoolEnvVar("GH_AW_COMPLETION_STAGED_"+name, templatableBoolEnvVarValue(staged))...)
+	}
+	if cfg := data.SafeOutputs.NoOp; cfg != nil {
+		addStagedDiagnostic("NOOP", cfg.Staged)
+	}
+	if cfg := data.SafeOutputs.ReportIncomplete; cfg != nil {
+		addStagedDiagnostic("REPORT_INCOMPLETE", cfg.Staged)
+	}
+	if cfg := data.SafeOutputs.MissingData; cfg != nil {
+		addStagedDiagnostic("REPORT_MISSING_DATA", cfg.Staged)
+	}
+	if cfg := data.SafeOutputs.MissingTool; cfg != nil {
+		addStagedDiagnostic("REPORT_MISSING_TOOL", cfg.Staged)
+	}
+	// Conclusion does not execute invocations or receive their trusted authorization decisions.
+	var protectedReports []string
+	for _, name := range []string{"noop", "report_incomplete", "report_missing_data", "report_missing_tool", "request_continuation"} {
+		if data.SafeOutputs.AuthorizationRequirements[name] != nil {
+			protectedReports = append(protectedReports, name)
+		}
+	}
+	return append(envVars, fmt.Sprintf("          GH_AW_AUTHORIZATION_PROTECTED_REPORTS: %q\n", strings.Join(protectedReports, ",")))
 }
 
 // buildConclusionJobCondition builds the condition guarding the conclusion job.
