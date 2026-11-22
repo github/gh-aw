@@ -34,7 +34,7 @@ imports:
       gateway-host: example.ai.gateway.azure.com
       models: [deployment-checklist]
 network:
-  allowed: [defaults, example.ai.gateway.azure.com]
+  allowed: [defaults, example.ai.gateway.azure.com, login.microsoftonline.com]
 ```
 
 Replace the hostname, model metadata and wire alias with the reviewed Catalog
@@ -53,13 +53,16 @@ The tenant and client can instead be supplied with the `azure-tenant-id` and
 
 For a gateway key, select `responses-key` or `completions-key` and store it as
 `AZURE_AI_GATEWAY_KEY` (or bind `key-secret` to another secret **name**). Remove
-`id-token: write` when no selected feature needs it. Only the selected profile's
+`id-token: write` and `login.microsoftonline.com` when no other feature needs
+Entra federation. Only the selected profile's
 credential is used; there is no credential fallback.
 
 Use the protocol the deployed alias supports. `engine.model` supplies Copilot
 model metadata; `engine.inference.model` is the exact approved wire alias.
-Native provider/auth/env overrides, routing and fallbacks cannot be combined
-with connector inference. MCP configuration is separate.
+Native provider/auth/env overrides, routing, model fallback and Copilot SDK
+mode cannot be combined with connector inference. A threat detector that
+inherits the main engine cannot override its engine or model configuration.
+MCP configuration is separate.
 
 Run `gh aw connector azure-ai-gateway setup --phase inference` for offline
 provisioning guidance, then compile a consumer with `gh aw compile --strict

@@ -226,6 +226,24 @@ func TestActivationStepsAddCheckoutAndBaseRestoreStep(t *testing.T) {
 		assert.Contains(t, steps, "Checkout .github and .agents folders")
 		assert.Contains(t, steps, "Save agent config folders for base branch restoration")
 		assert.Contains(t, steps, "save_base_github_folders.sh")
+		assert.NotContains(t, steps, "GH_AW_STAGE_COPILOT_SDK_AGENTS")
+	})
+
+	t.Run("stages SDK agents even when the PR checkout is disabled", func(t *testing.T) {
+		prCheckout := false
+		ctx := newActivationStepsTestContext(&WorkflowData{
+			On:              "on:\n  pull_request:\n  workflow_call:\n",
+			InlinedImports:  true,
+			EngineConfig:    &EngineConfig{ID: "copilot", CopilotSDK: true},
+			CheckoutConfigs: []*CheckoutConfig{{PullRequest: &prCheckout}},
+		})
+
+		compiler.addActivationCheckoutAndBaseRestoreStep(ctx)
+
+		steps := strings.Join(ctx.steps, "")
+		assert.Contains(t, steps, "repository: ${{ steps.resolve-host-repo.outputs.target_repo }}")
+		assert.Contains(t, steps, "steps.resolve-host-repo.outputs.target_repo == github.repository && "+pullRequestBaseSHAExpression)
+		assert.Contains(t, steps, `GH_AW_STAGE_COPILOT_SDK_AGENTS: "true"`)
 	})
 
 	t.Run("skips when checkout is disabled by action tag", func(t *testing.T) {

@@ -2,7 +2,7 @@
 
 **Date**: 2026-11-22
 **Status**: Draft
-**Deciders**: Unknown (draft generated from PR #79595; PR author pelikhan to confirm)
+**Deciders**: Repository maintainers (approval pending)
 
 ---
 
@@ -39,12 +39,12 @@ This would support future providers and protocols without new compiler work, inc
 #### Negative
 - The feature is experimental and supports Copilot only. Other engines get no inference-profile support until they are designed separately.
 - It adds specification surface (connector specification 1.2.0 with C-INF-001 and C-INF-002 conformance procedures, plus new parser, compiler, and connector modules) that maintainers must keep in sync.
-- Compilation and the symbolic model do not establish Entra trust, provider authorization, protocol compatibility at runtime, pricing, or output quality. [TODO: verify] Azure Entra trust and asset RBAC have not been reviewed against a real deployment.
-- Azure HTTP MCP federation requires MCP gateway v0.5.12 or newer, `strict: false`, and a reviewed custom gateway build. It depends on upstream gh-aw-mcpg#16956.
+- Compilation and the symbolic model do not establish Entra trust, provider authorization, protocol compatibility at runtime, pricing, or output quality. Before deployment, verify the federated identity's issuer, exact repository subject and audience, and grant its service principal only the required gateway asset roles. No live deployment was verified in this PR.
+- Azure HTTP MCP federation uses stock MCP gateway v0.5.12 or newer, which includes gh-aw-mcpg#16956. A custom image requires an explicitly versioned, reviewed build.
 
 #### Neutral
 - Model grants bind the compiled wire alias, not the provider-side authority of the gateway key. A key with broader provider rights than the grant is still broader than the grant.
-- Entra federation for HTTP MCP servers is a separate, preparatory decision in the same PR. It keeps the existing direct GitHub OIDC behavior and can be revisited independently of the inference profile decision.
+- Entra federation for HTTP MCP servers is separate from inference. It keeps the existing direct GitHub OIDC behavior and can be revisited independently.
 - Validation is offline: setup guidance, a source-only golden fixture (`pkg/cli/workflows/azure-ai-gateway-golden.md`), and compile-time checks. Executing even a staged consumer sends prompts to the gateway and incurs model charges.
 
 ---

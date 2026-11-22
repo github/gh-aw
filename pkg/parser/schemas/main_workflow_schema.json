@@ -12725,12 +12725,14 @@
                       "description": "Disable AI engine for threat detection (only run custom steps)"
                     },
                     {
-                      "$ref": "#/$defs/engine_config"
+                      "$ref": "#/$defs/engine_config",
+                      "not": { "type": "object", "required": ["inference"] }
                     }
                   ]
                 },
                 "engine-config": {
                   "$ref": "#/$defs/engine_config",
+                  "not": { "type": "object", "required": ["inference"] },
                   "description": "Extended engine configuration for threat detection."
                 },
                 "model": {
@@ -16180,7 +16182,7 @@
                     "version": {
                       "type": "string",
                       "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$",
-                      "description": "Exact stable version of @github/copilot-sdk, independent of engine.version."
+                      "description": "Exact stable version of @microsoft/copilot-sdk, independent of engine.version."
                     },
                     "sha256": {
                       "type": "string",

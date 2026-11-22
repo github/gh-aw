@@ -34,6 +34,7 @@ var notYetEnforced = map[string]string{
 	"errormessage":                     "dedicated lint-error-messages CI job is intentionally advisory (continue-on-error per #54800)",
 	"errorsnewerrorstring":             "requires an enforcement-readiness audit before CI enables it",
 	"excessivefuncparams":              "existing production violations need remediation before enforcement; nolint suppression already works",
+	"execcommandoutputerrdiscard":      "existing exec output error handling needs review before CI enforcement",
 	"filepathwalkpreferwalkdir":        "existing filepath.Walk calls need remediation before CI enforcement",
 	"formatintitoa":                    "existing FormatInt conversions need remediation before CI enforcement",
 	"fprintferrorunchecked":            "existing production violations need remediation before enforcement; nolint suppression already works",

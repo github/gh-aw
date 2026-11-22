@@ -210,7 +210,7 @@ func versionToGitRef(version string) string {
 // collectEngineVersionsForMetadata returns engine version metadata for gh-aw lock files.
 // It includes only engines that are active in the current workflow, applies explicit version
 // overrides for those engines, and includes copilot-sdk only when enabled on an active copilot engine.
-func collectEngineVersionsForMetadata(data *WorkflowData, registry *EngineRegistry) map[string]string {
+func (c *Compiler) collectEngineVersionsForMetadata(data *WorkflowData) map[string]string {
 	if data == nil {
 		return map[string]string{}
 	}
@@ -245,20 +245,15 @@ func collectEngineVersionsForMetadata(data *WorkflowData, registry *EngineRegist
 		version := strings.TrimSpace(versions[engineID])
 		if version == "" {
 			// Behavior-defined engines declare their version in the engine definition.
-			version = strings.TrimSpace(behaviorEngineDefaultVersion(engineID, registry))
+			version = strings.TrimSpace(behaviorEngineDefaultVersion(engineID, c.engineRegistry))
 		}
 		if version != "" {
 			filteredVersions[engineID] = version
 		}
 	}
 
-	if isCopilotSDKEnabledForActiveEngine(data, mainEngineID) {
-		filteredVersions["copilot-sdk"] = string(constants.DefaultCopilotSDKVersion)
-		if data.EngineConfig != nil {
-			if pin := data.EngineConfig.CopilotSDKPin; pin != nil && pin.valid() {
-				filteredVersions["copilot-sdk"] = pin.Version
-			}
-		}
+	if version := c.copilotSDKVersionForMetadata(data, mainEngineID); version != "" {
+		filteredVersions["copilot-sdk"] = version
 	}
 
 	return filteredVersions
@@ -278,25 +273,35 @@ func applyMetadataEngineVersionOverrides(versions map[string]string, engineConfi
 	}
 }
 
-func isCopilotSDKEnabledForActiveEngine(data *WorkflowData, mainEngineID string) bool {
+func (c *Compiler) copilotSDKVersionForMetadata(data *WorkflowData, mainEngineID string) string {
 	if mainEngineID == string(constants.CopilotEngine) && data.EngineConfig != nil && data.EngineConfig.CopilotSDK {
-		return true
+		return copilotSDKInstallVersion(data)
 	}
 
-	if !IsDetectionJobEnabled(data.SafeOutputs) || data.SafeOutputs == nil || data.SafeOutputs.ThreatDetection == nil {
-		return false
+	// Inline detection resets CopilotSDK and does not install it.
+	if !IsDetectionJobEnabled(data.SafeOutputs) || !isFeatureEnabled(constants.GHAWDetectionFeatureFlag, data) {
+		return ""
 	}
 
-	detectionConfig := data.SafeOutputs.ThreatDetection.EngineConfig
-	if detectionConfig == nil {
-		return false
+	detectionEngineID := c.getExternalThreatDetectionEngineID(data)
+	if detectionEngineID != string(constants.CopilotEngine) {
+		return ""
 	}
+	detectionData := buildExternalDetectorWorkflowData(data, detectionEngineID)
+	if detectionData.EngineConfig.CopilotSDK {
+		return copilotSDKInstallVersion(detectionData)
+	}
+	return ""
+}
 
-	detectionEngineID := strings.TrimSpace(detectionConfig.ID)
-	if detectionEngineID == "" {
-		detectionEngineID = mainEngineID
+func copilotSDKInstallVersion(data *WorkflowData) string {
+	if selectDefaultCopilotSDKInstallSpec(data).npm == nil {
+		return string(constants.DefaultCopilotSDKVersion)
 	}
-	return detectionEngineID == string(constants.CopilotEngine) && detectionConfig.CopilotSDK
+	if pin := data.EngineConfig.CopilotSDKPin; pin != nil && pin.valid() {
+		return pin.Version
+	}
+	return string(constants.DefaultCopilotSDKNPMVersion)
 }
 
 // resolveAgentImageRunnerIdentifier returns a stable identifier for the configured runs-on value.

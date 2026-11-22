@@ -30,8 +30,8 @@ func validateHTTPMCPAzureOIDCGateway(data *WorkflowData) error {
 		if data.SandboxConfig != nil && data.SandboxConfig.MCP != nil {
 			gateway := data.SandboxConfig.MCP
 			if gateway.Container != "" && gateway.Container != constants.DefaultMCPGatewayContainer {
-				if gateway.Version == "" {
-					return fmt.Errorf("mcp-servers.%s.auth.provider: azure requires an explicit sandbox.mcp.version for a custom gateway build supporting Azure federation", name)
+				if !isFullSemanticVersion(gateway.Version) {
+					return fmt.Errorf("mcp-servers.%s.auth.provider: azure requires an explicit sandbox.mcp.version with a full semantic version for a custom gateway build supporting Azure federation", name)
 				}
 				continue
 			}

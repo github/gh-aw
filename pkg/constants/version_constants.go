@@ -51,8 +51,11 @@ const DefaultCopilotChecksumsSHA256 = "26cd3e4b32cde498e4961fb4d48e7b85d7859fc69
 // the exact session selector injected by the model-verification harness.
 const CopilotSessionIDMinVersion Version = "1.0.35"
 
-// DefaultCopilotSDKVersion is the default version of the @github/copilot-sdk package.
+// DefaultCopilotSDKVersion is the default version of the non-npm Copilot SDK packages.
 const DefaultCopilotSDKVersion Version = "1.0.16"
+
+// DefaultCopilotSDKNPMVersion is the default version of the @microsoft/copilot-sdk package.
+const DefaultCopilotSDKNPMVersion Version = "2.0.0"
 
 // DefaultCodexVersion is the default version of the OpenAI Codex CLI
 const DefaultCodexVersion Version = "0.169.0"

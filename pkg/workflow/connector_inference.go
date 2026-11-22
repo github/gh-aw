@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/github/gh-aw/pkg/connectors"
+	"github.com/github/gh-aw/pkg/sliceutil"
 )
 
 type ConnectorInferenceSelection struct {
@@ -26,6 +27,13 @@ type ResolvedConnectorInference struct {
 }
 
 func consumeConnectorInferenceSelection(frontmatter, registrations map[string]any) error {
+	for _, alias := range sliceutil.SortedKeys(registrations) {
+		if registration, ok := registrations[alias].(map[string]any); ok {
+			if _, authored := registration["selected-inference"]; authored {
+				return fmt.Errorf("connectors.%s.selected-inference is internal; select inference with the main workflow's engine.inference", alias)
+			}
+		}
+	}
 	engine, ok := frontmatter["engine"].(map[string]any)
 	if !ok {
 		return nil
@@ -56,6 +64,9 @@ func consumeConnectorInferenceSelection(frontmatter, registrations map[string]an
 
 func resolveConnectorInference(alias string, registration ConnectorRegistration, frontmatter map[string]any) (*ResolvedConnectorInference, error) {
 	if err := validateConnectorAzureOIDC(alias, registration); err != nil {
+		return nil, err
+	}
+	if err := validateConnectorInferenceProfiles(registration); err != nil {
 		return nil, err
 	}
 	selection := registration.Inference
@@ -112,6 +123,24 @@ func resolveConnectorInference(alias string, registration ConnectorRegistration,
 	return result, nil
 }
 
+func validateConnectorInferenceProfiles(registration ConnectorRegistration) error {
+	if registration.Spec == nil {
+		return nil
+	}
+	for _, name := range sliceutil.SortedKeys(registration.Spec.Inference) {
+		profile := registration.Spec.Inference[name]
+		if _, exists := registration.Resources[profile.Models]; !exists || len(registration.Resources[profile.Models]) == 0 {
+			return fmt.Errorf("inference %q requires a nonempty model resource collection %q", name, profile.Models)
+		}
+		credential := profile.Credential
+		if registration.GitHubApps[credential] != nil || registration.OIDCTokens[credential] != nil ||
+			(registration.AzureOIDC[credential] == nil && registration.Credentials[credential].Secret == "") {
+			return fmt.Errorf("inference %q requires a stored token or Azure OIDC credential", name)
+		}
+	}
+	return nil
+}
+
 func expandConnectorInference(frontmatter map[string]any, inference *ResolvedConnectorInference) error {
 	engine, ok := frontmatter["engine"].(map[string]any)
 	if !ok || (engine["id"] != nil && engine["id"] != "copilot") {
@@ -162,7 +191,46 @@ func expandConnectorInference(frontmatter map[string]any, inference *ResolvedCon
 
 func connectorInferenceEnvKey(key string) bool {
 	return strings.HasPrefix(key, "COPILOT_PROVIDER_") || strings.HasPrefix(key, "AWF_AUTH_") ||
-		strings.HasPrefix(key, "OPENAI_") || strings.HasPrefix(key, "ANTHROPIC_") || key == "GITHUB_COPILOT_BASE_URL"
+		strings.HasPrefix(key, "OPENAI_") || strings.HasPrefix(key, "ANTHROPIC_") ||
+		key == "GITHUB_COPILOT_BASE_URL" || key == "COPILOT_MODEL"
+}
+
+func usesConnectorInference(data *WorkflowData) bool {
+	if data != nil {
+		for _, connector := range data.Connectors {
+			if connector.Inference != nil {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func (c *Compiler) validateConnectorInferenceConsumers(data *WorkflowData) error {
+	if !usesConnectorInference(data) {
+		return nil
+	}
+	if agent := getAgentConfig(data); agent != nil {
+		if agent.ModelFallback != nil && *agent.ModelFallback != "false" {
+			return errors.New("sandbox.agent.model-fallback must be false for connector inference")
+		}
+		for _, key := range sliceutil.SortedKeys(agent.Env) {
+			if connectorInferenceEnvKey(key) {
+				return fmt.Errorf("sandbox.agent.env.%s conflicts with connector-owned inference", key)
+			}
+		}
+		if target := agent.Targets["copilot"]; target != nil && (target.AuthHeader != "" || len(target.ExtraBodyFields) != 0) {
+			return errors.New("sandbox.agent.targets.copilot auth-header and extra-body-fields overrides conflict with connector inference")
+		}
+	}
+	if data.SafeOutputs == nil || data.SafeOutputs.ThreatDetection == nil || c.getThreatDetectionEngineID(data) != data.AI {
+		return nil
+	}
+	detector := data.SafeOutputs.ThreatDetection
+	if detector.HasRunnableDetection() && (detector.Model != "" || detector.EngineConfig != nil) {
+		return errors.New("safe-outputs.threat-detection cannot override an engine that inherits connector inference; use a different detector engine")
+	}
+	return nil
 }
 
 func validateResolvedConnectorInference(data *WorkflowData, configs map[string]*WorkflowConnector, importedEnvSources map[string]string) error {
@@ -180,19 +248,22 @@ func validateResolvedConnectorInference(data *WorkflowData, configs map[string]*
 		if engine == nil || data.AI != "copilot" {
 			return errors.New("connector inference requires the copilot engine after import merging")
 		}
+		if engine.CopilotSDK {
+			return errors.New("engine.copilot-sdk cannot preserve the granted wire model for connector inference")
+		}
 		if engine.ModelRouting != nil || len(engine.FallbackModels) != 0 || engine.APITarget != "" || len(engine.Args) != 0 ||
 			engine.Config != "" || engine.IsInlineDefinition || engine.LLMProvider != "" || engine.Driver != "" ||
 			engine.InlineDriver != nil || engine.Command != "" || engine.HarnessScript != "" {
 			return errors.New("imported engine routing or provider overrides conflict with connector-owned inference")
 		}
-		if data.Model == "" || isExpression(data.Model) || isReservedRouterModelName(data.Model) {
+		if data.Model == "" || strings.Contains(data.Model, "${{") || isReservedRouterModelName(data.Model) {
 			return errors.New("connector inference requires explicit literal engine.model metadata, not a router or expression")
 		}
 		expected := &EngineConfig{Env: map[string]string{}, Auth: inference.Auth}
 		maps.Copy(expected.Env, inference.Env)
 		applyEngineAuthEnv(expected)
 		for key, value := range engine.Env {
-			if connectorInferenceEnvKey(key) && expected.Env[key] != value {
+			if want, allowed := expected.Env[key]; connectorInferenceEnvKey(key) && (!allowed || want != value) {
 				return fmt.Errorf("imported engine environment %s conflicts with connector-owned inference", key)
 			}
 		}

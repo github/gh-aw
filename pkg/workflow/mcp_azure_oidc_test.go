@@ -190,7 +190,8 @@ func TestMCPAzureOIDCGatewayGate(t *testing.T) {
 		{name: "older stock release", gateway: &MCPGatewayRuntimeConfig{Version: "v0.5.11"}, wantErr: true},
 		{name: "unverified stock tag", gateway: &MCPGatewayRuntimeConfig{Version: "latest"}, wantErr: true},
 		{name: "custom without version", gateway: &MCPGatewayRuntimeConfig{Container: "ghcr.io/example/mcpg"}, wantErr: true},
-		{name: "custom reviewed build", gateway: &MCPGatewayRuntimeConfig{Container: "ghcr.io/example/mcpg", Version: "reviewed-build"}},
+		{name: "custom mutable tag", gateway: &MCPGatewayRuntimeConfig{Container: "ghcr.io/example/mcpg", Version: "latest"}, wantErr: true},
+		{name: "custom reviewed build", gateway: &MCPGatewayRuntimeConfig{Container: "ghcr.io/example/mcpg", Version: "v0.5.12"}},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			data := &WorkflowData{

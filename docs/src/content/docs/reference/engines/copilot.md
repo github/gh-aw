@@ -132,7 +132,9 @@ engine:
     sha256: "<64 lowercase hex digits>"
 ```
 
-Check in `package.json` and `package-lock.json` under `.github/aw/copilot-sdk/<version>/<variant>/`, where `<variant>` is `node` for the built-in or Node.js driver and `typescript` for an explicit `ts-node` command. Both files must pin `@github/copilot-sdk` to that exact version. Use an npm v3 lockfile with canonical npm registry URLs and SHA-512 integrity for every dependency. The SDK install step needs `jq` and a checkout that includes these files.
+Check in `package.json` and `package-lock.json` under `.github/aw/copilot-sdk/<version>/<variant>/`, where `<variant>` is `node` for the built-in or Node.js driver and `typescript` for an explicit `ts-node` command. Both files must pin `@microsoft/copilot-sdk` to that exact version. Use an npm v3 lockfile with canonical npm registry URLs and SHA-512 integrity for every dependency. The SDK install step needs `jq` and a checkout that includes these files.
+
+When migrating an existing pin to the new npm package, regenerate the lockfile and update `sha256`. Custom JavaScript and TypeScript drivers must also use the new package name and v2 API; see the [Copilot SDK driver specification](/gh-aw/specs/copilot-sdk-driver-specification/).
 
 From the project directory, calculate the frontmatter checksum over the manifest bytes, a NUL byte, and the lockfile bytes:
 
@@ -154,7 +156,11 @@ to `engine.cooldown`.
 The built-in driver registers native MCP servers from converter-owned `RUNNER_TEMP/gh-aw/mcp-config/copilot-sdk.json`, not the user-managed CLI catalog. `tools.cli-proxy` servers remain CLI-only. A SHA-256 integrity value is bound to the run, attempt, and job; missing, malformed, changed, linked, or stale catalogs fail before inference. This does not protect against a compromised runner able to replace both catalog and trusted environment.
 
 The built-in SDK driver loads inline sub-agents and repository
-`.github/agents/*.agent.md` files as custom agents. It qualifies session and
+`.github/agents/*.agent.md` files staged by the activation job as custom agents.
+It does not discover agents from the execution checkout, including custom
+checkouts. If activation skips repository checkout, only staged inline agents
+are available. The standalone driver can load staged definitions but does not
+fall back to its current directory. The driver qualifies session and
 sub-agent models against the AWF model catalog. Copilot models use separate
 Responses and Chat Completions providers according to their supported endpoints,
 so GPT and Claude agents can use different wire APIs in the same session.

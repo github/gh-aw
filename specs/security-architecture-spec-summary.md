@@ -1,23 +1,29 @@
 # Security Architecture Specification - Summary
 
 **Document**: `security-architecture-spec.md`  
-**Architecture baseline**: 1.0.0
-**Current specification revision**: 1.1.9 / November 5, 2026
+**Architecture baseline**: 1.0.0 (baseline version)
+**Current specification revision**: 1.1.10 / November 11, 2026
 **Status**: Candidate Recommendation  
-**Date**: November 5, 2026
-**Last full validation**: v1.0.0 / 2026-07-15
-**Current targeted lock check**: 2026-11-03 (partial; see [validation report](security-architecture-spec-validation.md))
+**Date**: November 11, 2026
+**Last full validation of the 1.0.0 baseline**: 2026-07-15
+**Full requirement revalidation**: 2026-11-08 (see [validation report](security-architecture-spec-validation.md); unresolved mappings are not certified)
+**Current compiled-lock structure check**: 2026-11-08 (representative ten-job topology; see [validation report](security-architecture-spec-validation.md))
 
 ## Overview
 
 The GitHub Agentic Workflows Security Architecture Specification is a formal W3C-style document that defines the security architecture, guarantees, and implementation requirements for gh-aw. This specification enables organizations to replicate the security model in other CI/CD environments.
 
+### Go Toolchain Security Baseline (v1.1.10 / 2026-11-11)
+
+The full specification raises the TT-03 repository Go toolchain baseline to
+1.27.4 and retains release-build checks for embedded toolchain evidence. The
+versioned validation report tracks the release-artifact inspection separately.
+
 ### Appendix G Test Mapping (v1.1.9 / 2026-11-05)
 
 The full specification's v1.1.9 revision updates Appendix G.10 test-path mappings
-and clarifies partial-coverage limits. It was published November 5, 2026; this
-summary's current specification revision and date match that header and change
-log.
+and clarifies partial-coverage limits. It was published November 5, 2026; the
+subsequent v1.1.10 revision is summarized above.
 
 ### Floating-Head Opt-In (v1.1.8 / 2026-10-28)
 
@@ -359,11 +365,11 @@ Workflows are compiled to GitHub Actions with least-privilege job separation: th
 
 ### Structure
 
-The full specification's Sections 4–12 define the security layers, and the [validation report](security-architecture-spec-validation.md#current-compiled-job-structure-2026-11-03) maps them to the compiled job structure.
+The full specification's Sections 4–12 define the security layers, and the [validation report](security-architecture-spec-validation.md#current-compiled-job-structure-2026-11-08) maps them to the compiled job structure.
 
 ### Evidence
 
-The [validation report](security-architecture-spec-validation.md) records the historical full validation and the current targeted lock check. The 2026-11-03 check confirms the ten-job topology in `.github/workflows/security-review.lock.yml`; it is not a full revalidation.
+The [validation report](security-architecture-spec-validation.md) distinguishes the historical 2026-07-15 full validation of the 1.0.0 baseline from the 2026-11-08 requirement revalidation and compiled-lock check. The November 8 lock check confirms the representative ten-job topology, not uniform permissions across workflows or completion of unresolved requirement mappings.
 
 ### Assumptions
 
@@ -382,7 +388,7 @@ Compiled lock files are the evidence for generated job structure and permissions
 
 ### Operations
 
-The representative workflow orders its jobs as `pre_activation` → `admission` → `activation` → `agent` → `detection` → `evals` → `push_evals_state`, with `safe_outputs` also following `detection`, and `conclusion` → `conclusion_admission` terminal. The conclusion job is terminal reporting/cleanup, not a required security layer. See the current job table in the [validation report](security-architecture-spec-validation.md#current-compiled-job-structure-2026-11-03).
+The representative workflow orders its jobs as `pre_activation` → `admission` → `activation` → `agent` → `detection` → `evals` → `push_evals_state`, with `safe_outputs` also following `detection`, and `conclusion` → `conclusion_admission` terminal. The conclusion job is terminal reporting/cleanup, not a required security layer. See the current job table in the [validation report](security-architecture-spec-validation.md#current-compiled-job-structure-2026-11-08).
 
 ### Norms
 
@@ -390,7 +396,7 @@ The full specification defines normative MUST/SHOULD requirements. Summary statu
 
 ### Summary
 
-This canvas covers requirements, entities, approach, structure, operations, norms, and safeguards, with evidence, assumptions, and this summary as additional subsections. The latest targeted check leaves PM-08 fork protection UNVERIFIED for the representative lock and does not assign a new overall validation grade.
+This canvas covers requirements, entities, approach, structure, operations, norms, and safeguards, with evidence, assumptions, and this summary as additional subsections. The 2026-11-08 revalidation verified PM-08 for the default fork-deny policy and explicit allowlisting; unresolved TT-01–04, v1.1.9, and v1.1.10 mappings remain assigned in the validation report, and no new overall grade was assigned.
 
 ## Target Audience
 
@@ -420,7 +426,7 @@ This canvas covers requirements, entities, approach, structure, operations, norm
 
 ## Implementation Status
 
-This summary covers the **1.0.0 architecture baseline** and its reference implementation. The full validation grade is historical; the current targeted check is limited to the evidence stated in the validation report.
+This summary covers the **1.0.0 architecture baseline** and its reference implementation. The 2026-07-15 full-validation grade is historical. The 2026-11-08 requirement revalidation and compiled-lock check certify only the evidence and limits stated in the validation report.
 
 - **Reference Implementation**: GitHub Agentic Workflows (Go-based)
 - **Compiled Format**: GitHub Actions YAML (`.lock.yml` files)
@@ -450,7 +456,7 @@ The historical validation established the following minimum `.lock.yml` behavior
 - Runtime repository/fork validation, timestamp validation, and action pinning remain present in compiled output
 - Concurrency controls and threat-detection job placement are validated against current lock-file generation
 
-The **2026-11-03 targeted check** confirms the ten-job structure in `.github/workflows/security-review.lock.yml`, but also records workflow-specific write permissions and an UNVERIFIED PM-08 claim. It does not update the historical full-validation grade.
+The **2026-11-08 compiled-lock check** confirms the ten-job structure in `.github/workflows/security-review.lock.yml`. The related requirement revalidation verifies PM-08 default fork denial and explicit allowlisting, while retaining workflow-specific permission scope limits and the unresolved mappings recorded in the validation report. It does not update the historical full-validation grade.
 
 ## Next Steps
 
@@ -494,6 +500,7 @@ The **2026-11-03 targeted check** confirms the ten-job structure in `.github/wor
 | Sync §12 CS/RS coverage update from daily SPDD queue | ✅ Done (2026-07-28) | Added formal coverage map/test-suite entries for T-CS-001/002 and T-RS-003..008; synced to `specs/security-architecture-spec-validation.md` §12 matrix |
 | Add RS-05a for workflow_dispatch + aw_context PR checkout | ✅ Done (2026-08-01) | Security threat review cleared; added RS-05a to §11.3 (repository scope, actor trust, parse resilience, ref isolation); validation §7a added with 9-test unit evidence; §12 matrix updated; spec bumped to v1.0.1 |
 | Recheck compiled ten-job structure | ✅ Targeted check (2026-11-03) | `.github/workflows/security-review.lock.yml` confirms the ten jobs; full revalidation remains pending and PM-08 is UNVERIFIED in the validation report |
+| Revalidate compiled ten-job structure and PM-08 | ✅ Full requirement revalidation (2026-11-08) | Representative ten-job topology checked; PM-08 default fork denial and explicit allowlisting verified; unresolved TT/version mappings remain tracked in the validation report |
 
 ## Change Log
 
@@ -506,6 +513,11 @@ The **2026-11-03 targeted check** confirms the ten-job structure in `.github/wor
 
 - Synced the current revision marker and added links from every formal requirement group to its entry in the full specification.
 
+### 2026-11-11
+
+- Synced the revision marker and version summary to full specification v1.1.10.
+- Distinguished the 1.0.0 historical full-validation baseline from the 2026-11-08 requirement revalidation and compiled-lock structure check.
+
 ## Versioning
 
 The specification follows **semantic versioning**:
@@ -515,7 +527,7 @@ The specification follows **semantic versioning**:
 - **Patch**: Bug fixes, clarifications, editorial changes
 
 Historical summary revision: **1.0.1** (Candidate Recommendation). The architecture baseline is **1.0.0**; the later RS-05a updates, including v1.1.7, are recorded above.
-The current full specification revision is **1.1.9**, published **November 5, 2026**.
+The current full specification revision is **1.1.10**, published **November 11, 2026**.
 
 ## Feedback
 

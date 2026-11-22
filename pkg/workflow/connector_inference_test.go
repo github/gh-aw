@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/github/gh-aw/pkg/connectors"
 	"github.com/stretchr/testify/require"
 )
 
@@ -44,6 +45,8 @@ func TestAzureAIGatewayInferenceCompilation(t *testing.T) {
 			data, err := compiler.ParseWorkflowFile(path)
 			require.NoError(t, err)
 			assertConnectorScenarioAuthority(t, data, azureAIGatewayScenario)
+			require.Nil(t, data.Connectors[azureAIGatewayScenario.provider].Agent)
+			require.Nil(t, data.Connectors[azureAIGatewayScenario.provider].SafeOutputs)
 			env := data.EngineConfig.Env
 			require.Equal(t, "https://example.ai.gateway.azure.com/default/models/openai/v1", env["COPILOT_PROVIDER_BASE_URL"])
 			require.Equal(t, "openai", env["COPILOT_PROVIDER_TYPE"])
@@ -60,6 +63,12 @@ func TestAzureAIGatewayInferenceCompilation(t *testing.T) {
 			require.NotContains(t, output, "GH_AW_CONNECTOR_PLAN")
 			require.NotContains(t, effects, "AZURE_AI_GATEWAY_KEY")
 			require.NotContains(t, effects, "AWF_AUTH_AZURE_")
+			require.NotContains(t, effects, "COPILOT_PROVIDER_")
+			config, err := BuildAWFConfigJSON(AWFCommandConfig{
+				EngineName: "copilot", AllowedDomains: "example.ai.gateway.azure.com", WorkflowData: data,
+			})
+			require.NoError(t, err)
+			require.Contains(t, config, `"modelFallback":{"enabled":false}`)
 			if key {
 				require.Nil(t, data.EngineConfig.Auth)
 				require.Equal(t, "${{ secrets.AZURE_AI_GATEWAY_KEY }}", env["COPILOT_PROVIDER_API_KEY"])
@@ -69,7 +78,8 @@ func TestAzureAIGatewayInferenceCompilation(t *testing.T) {
 			} else {
 				require.Equal(t, "azure", data.EngineConfig.Auth.Provider)
 				require.Equal(t, "https://ai.gateway.azure.com/.default", data.EngineConfig.Auth.AzureScope)
-				require.Contains(t, output, "AWF_AUTH_AZURE_SCOPE")
+				require.Contains(t, agent, "AWF_AUTH_AZURE_SCOPE")
+				require.Contains(t, output, "login.microsoftonline.com")
 				require.Contains(t, output, "--exclude-env ACTIONS_ID_TOKEN_REQUEST_TOKEN")
 				require.NotContains(t, output, "secrets.AZURE_AI_GATEWAY_KEY")
 			}
@@ -100,6 +110,11 @@ func TestConnectorInferenceRejectsInvalidSelection(t *testing.T) {
 		{"routing", func(f map[string]any) { f["model-routing"] = map[string]any{"allowed-models": []any{"gpt-5.2"}} }, "conflicts"},
 		{"CLI override", func(f map[string]any) { f["engine"].(map[string]any)["args"] = []any{"--model", "other"} }, "conflicts"},
 		{"dynamic metadata", func(f map[string]any) { f["engine"].(map[string]any)["model"] = "${{ vars.INFERENCE_MODEL }}" }, "literal engine.model"},
+		{"interpolated metadata", func(f map[string]any) { f["engine"].(map[string]any)["model"] = "gpt-${{ vars.SUFFIX }}" }, "literal engine.model"},
+		{"native model env", func(f map[string]any) {
+			f["engine"].(map[string]any)["env"] = map[string]any{"COPILOT_MODEL": "other"}
+		}, "COPILOT_MODEL conflicts"},
+		{"SDK mode", func(f map[string]any) { f["engine"].(map[string]any)["copilot-sdk"] = true }, "cannot preserve the granted wire model"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -108,6 +123,82 @@ func TestConnectorInferenceRejectsInvalidSelection(t *testing.T) {
 			require.ErrorContains(t, err, tc.error)
 		})
 	}
+}
+
+func TestConnectorInferenceRejectsSandboxOverrides(t *testing.T) {
+	for _, tc := range []struct {
+		field string
+		value any
+		err   string
+	}{
+		{"model-fallback", true, "model-fallback must be false"},
+		{"model-fallback", "${{ vars.MODEL_FALLBACK }}", "model-fallback must be false"},
+		{"env", map[string]any{"COPILOT_PROVIDER_BASE_URL": "https://other.invalid"}, "sandbox.agent.env.COPILOT_PROVIDER_BASE_URL"},
+		{"targets", map[string]any{"copilot": map[string]any{"auth-header": "api-key"}}, "auth-header"},
+	} {
+		t.Run(tc.err+"/"+tc.field, func(t *testing.T) {
+			compiler, path := prepareConnectorScenario(t, azureAIGatewayScenario, false, func(f, _ map[string]any) {
+				f["strict"] = false
+				f["sandbox"] = map[string]any{"agent": map[string]any{tc.field: tc.value}}
+			})
+			_, err := compiler.ParseWorkflowFile(path)
+			require.ErrorContains(t, err, tc.err)
+		})
+	}
+}
+
+func TestConnectorInferenceRejectsDetectorOverrides(t *testing.T) {
+	for _, field := range []string{"engine", "engine-config"} {
+		t.Run(field, func(t *testing.T) {
+			compiler, path := prepareConnectorScenario(t, azureAIGatewayScenario, false, func(f, _ map[string]any) {
+				f["safe-outputs"].(map[string]any)["threat-detection"] = map[string]any{field: map[string]any{
+					"id": "copilot", "env": map[string]any{"COPILOT_PROVIDER_BASE_URL": "https://other.invalid"},
+				}}
+			})
+			_, err := compiler.ParseWorkflowFile(path)
+			require.ErrorContains(t, err, "cannot override an engine that inherits connector inference")
+
+			compiler, path = prepareConnectorScenario(t, azureAIGatewayScenario, false, func(f, _ map[string]any) {
+				f["safe-outputs"].(map[string]any)["threat-detection"] = map[string]any{field: map[string]any{
+					"id": "copilot", "inference": inferenceSelection(f),
+				}}
+			})
+			_, err = compiler.ParseWorkflowFile(path)
+			require.Error(t, err, "detector engine fields must not accept inference")
+		})
+	}
+}
+
+func TestConnectorInferenceRejectsInternalSelection(t *testing.T) {
+	err := consumeConnectorInferenceSelection(nil, map[string]any{
+		"prototype": map[string]any{"selected-inference": map[string]any{}},
+	})
+	require.ErrorContains(t, err, "selected-inference is internal")
+}
+
+func TestConnectorInferenceDeclarationRequiresGrantAndSupportedRoute(t *testing.T) {
+	registration := ConnectorRegistration{
+		Spec: &connectors.ConnectorSpec{Inference: map[string]connectors.Inference{
+			"responses": {Models: "models", Credential: "inference"},
+		}},
+		Credentials: map[string]connectors.SecretRef{"inference": {Secret: "GATEWAY_KEY"}},
+	}
+	require.ErrorContains(t, validateConnectorInferenceProfiles(registration), "nonempty model resource collection")
+	registration.Resources = map[string][]string{"models": {}}
+	require.ErrorContains(t, validateConnectorInferenceProfiles(registration), "nonempty model resource collection")
+	registration.Resources["models"] = []string{"approved"}
+	require.NoError(t, validateConnectorInferenceProfiles(registration))
+
+	registration.GitHubApps = map[string]*ConnectorGitHubApp{"inference": {}}
+	require.ErrorContains(t, validateConnectorInferenceProfiles(registration), "stored token or Azure OIDC")
+	registration.GitHubApps = nil
+	registration.OIDCTokens = map[string]*ConnectorGitHubOIDC{"inference": {}}
+	require.ErrorContains(t, validateConnectorInferenceProfiles(registration), "stored token or Azure OIDC")
+	registration.OIDCTokens = nil
+	registration.Credentials = nil
+	require.ErrorContains(t, validateConnectorInferenceProfiles(registration), "stored token or Azure OIDC")
+	registration.AzureOIDC = map[string]*ConnectorAzureOIDC{"inference": {}}
+	require.NoError(t, validateConnectorInferenceProfiles(registration))
 }
 
 func TestConnectorInferenceImportedOverrides(t *testing.T) {

@@ -14,7 +14,7 @@ permissions:
   contents: read
   id-token: write
 network:
-  allowed: [defaults, example.ai.gateway.azure.com]
+  allowed: [defaults, example.ai.gateway.azure.com, login.microsoftonline.com]
 imports:
   - uses: ".github/workflows/connectors/azure-ai-gateway.md"
     with:

@@ -64,6 +64,9 @@ func (c *Compiler) ParseWorkflowFile(markdownPath string) (*WorkflowData, error)
 	if err := c.populateWorkflowBuildContext(ctx); err != nil {
 		return nil, err
 	}
+	if err := c.validateConnectorInferenceConsumers(ctx.workflowData); err != nil {
+		return nil, c.formatEngineSetupError(ctx, err)
+	}
 	orchestratorWorkflowLog.Printf("Workflow file parsing completed successfully: %s", markdownPath)
 	return ctx.workflowData, nil
 }
@@ -101,6 +104,16 @@ func (c *Compiler) setupWorkflowBuildContext(ctx *workflowBuildContext) error {
 	engineSetup, err := c.resolveWorkflowEngine(ctx.frontmatter, ctx.cleanPath, ctx.content, ctx.markdownDir)
 	if err != nil {
 		return c.formatEngineSetupError(ctx, err)
+	}
+	if _, local := ctx.frontmatter.Frontmatter["runs-on"]; !local && engineSetup.importsResult.MergedRunsOn != nil {
+		runsOn := engineSetup.importsResult.MergedRunsOn
+		if err := validateRunsOnValue(runsOn); err != nil {
+			return c.formatToolsProcessingError(ctx.cleanPath, fmt.Errorf("imported runner configuration: %w", err))
+		}
+		if err := validateRunsOn(map[string]any{"runs-on": runsOn}, ctx.cleanPath); err != nil {
+			return err
+		}
+		ctx.frontmatter.Frontmatter["runs-on"] = runsOn
 	}
 	toolsResult, err := c.processToolsAndMarkdown(
 		ctx.frontmatter,
