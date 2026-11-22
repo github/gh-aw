@@ -28,7 +28,7 @@ The method names mentioned in analyzer descriptions (such as `Err`, `Flush`, `Re
 - `errorsnewerrorstring` — reports `errors.New(err.Error())` calls that discard the original error and break error-chain matching.
 - `errortypeassertion` — reports type assertions from `error` to concrete types and recommends `errors.As`.
 - `errstringmatch` — reports `strings.Contains(err.Error(), "...")` patterns and recommends `errors.Is` / `errors.As`.
-- `execcommandoutputerrdiscard` — reports `exec.Cmd.Output()` failures that do not retain `*exec.ExitError.Stderr` and `CombinedOutput()` calls whose output is discarded.
+- `execcommandoutputerrdiscard` — reports `exec.Cmd.Output()` failures that do not preserve stderr diagnostics and `CombinedOutput()` results that are discarded on failure.
 - `fileclosenotdeferred` — reports non-deferred file `Close()` calls that can leak resources.
 - `filepathwalkpreferwalkdir` — reports `filepath.Walk` calls and recommends `filepath.WalkDir`.
 - `execcommandwithoutcontext` — reports `exec.Command(...)` calls inside functions that already receive `context.Context` and should use `exec.CommandContext(...)`.
@@ -212,7 +212,7 @@ environment variable and gates findings on the recorded execution hit count for 
 | `errorsnewerrorstring` | Custom `go/analysis` analyzer that flags `errors.New(err.Error())` calls that discard the original error and break `errors.Is` / `errors.As` matching |
 | `errortypeassertion` | Custom `go/analysis` analyzer that flags type assertions from `error` to concrete types and recommends `errors.As` |
 | `errstringmatch` | Custom `go/analysis` analyzer that flags brittle `strings.Contains(err.Error(), "...")` checks |
-| `execcommandoutputerrdiscard` | Custom `go/analysis` analyzer that reports `exec.Cmd.Output()` failures that do not retain `*exec.ExitError.Stderr` and discarded `CombinedOutput()` results |
+| `execcommandoutputerrdiscard` | Custom `go/analysis` analyzer that reports `exec.Cmd.Output()` failures that do not preserve stderr diagnostics and `CombinedOutput()` results discarded on failure |
 | `execcommandwithoutcontext` | Custom `go/analysis` analyzer that flags `exec.Command(...)` calls that should use `exec.CommandContext(...)` in context-receiving functions |
 | `fileclosenotdeferred` | Custom `go/analysis` analyzer that flags file `Close()` calls that are not deferred immediately |
 | `filepathwalkpreferwalkdir` | Custom `go/analysis` analyzer that flags `filepath.Walk` calls and recommends `filepath.WalkDir` |

@@ -6,6 +6,7 @@ import (
 	"go/ast"
 	"go/token"
 	"go/types"
+	"strconv"
 
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/ast/inspector"
@@ -54,15 +55,16 @@ func run(pass *analysis.Pass) (any, error) {
 		binding := findCallResults(pass, body, call)
 		if method == "CombinedOutput" {
 			if binding.output == nil ||
-				(!hasObjectUse(pass, body, binding.output, call.End()) &&
-					!returnsNamedResultOnFailurePath(pass, body, functionType, binding.output, binding.err, call.End())) {
+				(!returnsObjectOnFailurePath(pass, body, binding.output, binding.err, call.End()) &&
+					!returnsOutputOnAllReturns(pass, body, functionType, binding.output, call.End()) &&
+					!hasRetainedObjectUseOnFailurePath(pass, body, binding.output, binding.err, call.End())) {
 				pass.ReportRangef(call, "exec.Cmd.CombinedOutput result should be retained to preserve stderr diagnostics")
 			}
 			continue
 		}
-		if binding.err == nil ||
-			(!hasExitErrorStderrUse(pass, body, binding.err, call.End()) &&
-				!returnsErrorOnFailurePath(pass, body, functionType, binding.err, call.End())) {
+		if !hasExitErrorStderrUse(pass, body, binding.err, call.End()) &&
+			!hasConfiguredStderrUse(pass, body, call, binding.err, call.End()) &&
+			!returnsErrorOnFailurePath(pass, body, functionType, binding.err, call.End()) {
 			pass.ReportRangef(call, "exec.Cmd.Output error handling should retain stderr from *exec.ExitError.Stderr")
 		}
 	}
@@ -115,27 +117,18 @@ func findCallResults(pass *analysis.Pass, body *ast.BlockStmt, call *ast.CallExp
 		}
 		switch stmt := node.(type) {
 		case *ast.AssignStmt:
-			if len(stmt.Rhs) == 1 {
-				for _, rhs := range stmt.Rhs {
-					if sameCall(rhs, call) {
-						binding = bindResults(pass, stmt.Lhs)
-						return false
-					}
-				}
+			if len(stmt.Rhs) == 1 && sameCall(stmt.Rhs[0], call) {
+				binding = bindResults(pass, stmt.Lhs)
+				return false
 			}
 		case *ast.ValueSpec:
-			if len(stmt.Values) == 1 {
-				for _, value := range stmt.Values {
-					if !sameCall(value, call) {
-						continue
-					}
-					lhs := make([]ast.Expr, 0, len(stmt.Names))
-					for _, name := range stmt.Names {
-						lhs = append(lhs, name)
-					}
-					binding = bindResults(pass, lhs)
-					return false
+			if len(stmt.Values) == 1 && sameCall(stmt.Values[0], call) {
+				lhs := make([]ast.Expr, 0, len(stmt.Names))
+				for _, name := range stmt.Names {
+					lhs = append(lhs, name)
 				}
+				binding = bindResults(pass, lhs)
+				return false
 			}
 		}
 		return true
@@ -152,16 +145,10 @@ func bindResults(pass *analysis.Pass, lhs []ast.Expr) resultBinding {
 	if len(lhs) != 2 {
 		return resultBinding{}
 	}
-	var binding resultBinding
-	for i, expr := range lhs {
-		switch i {
-		case 0:
-			binding.output = bindingObject(pass, expr)
-		case 1:
-			binding.err = bindingObject(pass, expr)
-		}
+	return resultBinding{
+		output: bindingObject(pass, lhs[0]),
+		err:    bindingObject(pass, lhs[1]),
 	}
-	return binding
 }
 
 func bindingObject(pass *analysis.Pass, expr ast.Expr) types.Object {
@@ -208,51 +195,126 @@ func returnsErrorOnFailurePath(pass *analysis.Pass, body *ast.BlockStmt, functio
 		return false
 	}
 	namedResult := hasNamedResult(pass, functionType, object)
-	returned := false
-	ast.Inspect(body, func(node ast.Node) bool {
-		if node != body {
-			if _, ok := node.(*ast.FuncLit); ok {
-				return false
-			}
-		}
-		ifStmt, ok := node.(*ast.IfStmt)
+	for _, stmt := range body.List {
+		ifStmt, ok := stmt.(*ast.IfStmt)
 		if !ok {
-			return true
+			continue
+		}
+		if ifStmt.Cond.Pos() <= after || hasReturnBefore(body, ifStmt, after) {
+			continue
 		}
 		branch := errorFailureBranch(pass, ifStmt, object)
-		if branch == nil {
+		if branch != nil && failureBranchReturnsObject(pass, body, branch, object, namedResult, after) {
 			return true
 		}
-		returned = failureBranchReturnsObject(pass, body, branch, object, namedResult, after)
-		return !returned
-	})
-	return returned
+	}
+	return false
 }
 
-func returnsNamedResultOnFailurePath(pass *analysis.Pass, body *ast.BlockStmt, functionType *ast.FuncType, resultObject, errObject types.Object, after token.Pos) bool {
-	if body == nil || resultObject == nil || errObject == nil ||
-		!hasNamedResult(pass, functionType, resultObject) {
+func returnsOutputOnAllReturns(pass *analysis.Pass, body *ast.BlockStmt, functionType *ast.FuncType, resultObject types.Object, after token.Pos) bool {
+	if body == nil || resultObject == nil {
 		return false
 	}
-	returned := false
+	foundReturn := false
+	allReturnsRetain := true
 	ast.Inspect(body, func(node ast.Node) bool {
 		if node != body {
 			if _, ok := node.(*ast.FuncLit); ok {
 				return false
 			}
 		}
-		ifStmt, ok := node.(*ast.IfStmt)
-		if !ok {
+		ret, ok := node.(*ast.ReturnStmt)
+		if !ok || ret.Pos() <= after {
 			return true
 		}
-		branch := errorFailureBranch(pass, ifStmt, errObject)
-		if branch == nil || objectReassignedBetween(pass, body, errObject, after, ifStmt.Cond.Pos()) {
-			return true
+		foundReturn = true
+		if !returnPropagatesObject(pass, body, ret, resultObject, hasNamedResult(pass, functionType, resultObject), after) {
+			allReturnsRetain = false
+			return false
 		}
-		returned = failureBranchReturnsObject(pass, body, branch, resultObject, true, after)
-		return !returned
+		return true
 	})
-	return returned
+	return foundReturn && allReturnsRetain
+}
+
+func returnsObjectOnFailurePath(pass *analysis.Pass, body *ast.BlockStmt, object, errObject types.Object, after token.Pos) bool {
+	if body == nil || object == nil || errObject == nil {
+		return false
+	}
+	for _, stmt := range body.List {
+		failureIf, ok := stmt.(*ast.IfStmt)
+		if !ok || failureIf.Cond.Pos() <= after || hasReturnBefore(body, failureIf, after) ||
+			objectReassignedBetween(pass, body, errObject, after, failureIf.Cond.Pos()) {
+			continue
+		}
+		branch := errorFailureBranch(pass, failureIf, errObject)
+		if branch != nil && failureBranchReturnsObject(pass, body, branch, object, false, after) {
+			return true
+		}
+	}
+	return false
+}
+
+func hasRetainedObjectUseOnFailurePath(pass *analysis.Pass, body *ast.BlockStmt, object, errObject types.Object, after token.Pos) bool {
+	if body == nil || object == nil || errObject == nil {
+		return false
+	}
+	for _, stmt := range body.List {
+		ifStmt, ok := stmt.(*ast.IfStmt)
+		if !ok || ifStmt.Cond.Pos() <= after || hasReturnBefore(body, ifStmt, after) ||
+			objectReassignedBetween(pass, body, errObject, after, ifStmt.Cond.Pos()) {
+			continue
+		}
+		branch, ok := errorFailureBranch(pass, ifStmt, errObject).(*ast.BlockStmt)
+		if !ok {
+			continue
+		}
+		for _, branchStmt := range branch.List {
+			switch branchStmt.(type) {
+			case *ast.IfStmt, *ast.ForStmt, *ast.RangeStmt, *ast.SwitchStmt, *ast.TypeSwitchStmt, *ast.SelectStmt:
+				continue
+			}
+			retained := false
+			ast.Inspect(branchStmt, func(node ast.Node) bool {
+				if node != branchStmt {
+					if _, ok := node.(*ast.FuncLit); ok {
+						return false
+					}
+				}
+				call, ok := node.(*ast.CallExpr)
+				if !ok || !isDiagnosticSinkCall(pass, call) {
+					return true
+				}
+				for _, arg := range call.Args {
+					if expressionUsesObject(pass, arg, object) &&
+						objectRetainedUntil(pass, body, object, after, call.Pos()) {
+						retained = true
+						return false
+					}
+				}
+				return !retained
+			})
+			if retained {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func isDiagnosticSinkCall(pass *analysis.Pass, call *ast.CallExpr) bool {
+	pkgPath, name, ok := astutil.PackageCall(pass, call)
+	if !ok {
+		return false
+	}
+	switch pkgPath {
+	case "log":
+		return name == "Print" || name == "Printf" || name == "Println"
+	case "log/slog":
+		return name == "Error" || name == "Warn" || name == "Info" || name == "Debug"
+	default:
+		return false
+	}
 }
 
 func failureBranchReturnsObject(pass *analysis.Pass, body *ast.BlockStmt, branch ast.Stmt, object types.Object, namedResult bool, after token.Pos) bool {
@@ -290,12 +352,484 @@ func failureBranchReturnsObject(pass *analysis.Pass, body *ast.BlockStmt, branch
 
 func returnPropagatesObject(pass *analysis.Pass, body *ast.BlockStmt, ret *ast.ReturnStmt, object types.Object, namedResult bool, after token.Pos) bool {
 	if len(ret.Results) == 0 {
-		return namedResult && !objectReassignedBetween(pass, body, object, after, ret.Pos())
+		if !namedResult {
+			return false
+		}
+		if isErrorObject(object) {
+			return !objectReassignedBetween(pass, body, object, after, ret.Pos())
+		}
+		return objectRetainedUntil(pass, body, object, after, ret.Pos())
 	}
 	for _, result := range ret.Results {
-		ident, ok := astutil.UnwrapParenExpr(result).(*ast.Ident)
-		if ok && ident.Pos() > after && pass.TypesInfo.ObjectOf(ident) == object &&
-			!objectReassignedBetween(pass, body, object, after, ident.Pos()) {
+		if isErrorObject(object) {
+			if expressionPropagatesError(pass, body, result, object, after, result.Pos()) {
+				return true
+			}
+			continue
+		}
+		if expressionRetainsObject(pass, body, result, object, after, result.Pos()) {
+			return true
+		}
+	}
+	return false
+}
+
+func isErrorObject(object types.Object) bool {
+	if object == nil {
+		return false
+	}
+	errorType := types.Universe.Lookup("error")
+	return errorType != nil && types.Identical(types.Unalias(object.Type()), types.Unalias(errorType.Type()))
+}
+
+func expressionPropagatesError(pass *analysis.Pass, body *ast.BlockStmt, expr ast.Expr, object types.Object, after, before token.Pos) bool {
+	if object == nil || before <= after || objectReassignedBetween(pass, body, object, after, before) {
+		return false
+	}
+	ident, ok := astutil.UnwrapParenExpr(expr).(*ast.Ident)
+	if ok {
+		return pass.TypesInfo.ObjectOf(ident) == object
+	}
+	call, ok := astutil.UnwrapParenExpr(expr).(*ast.CallExpr)
+	if !ok {
+		return false
+	}
+	pkgPath, name, ok := astutil.PackageCall(pass, call)
+	if !ok || len(call.Args) == 0 {
+		return false
+	}
+	if pkgPath == "errors" && name == "Join" {
+		for _, arg := range call.Args {
+			if expressionPropagatesError(pass, body, arg, object, after, before) {
+				return true
+			}
+		}
+	}
+	if pkgPath != "fmt" || name != "Errorf" || len(call.Args) != 2 {
+		return false
+	}
+	format, ok := astutil.UnwrapParenExpr(call.Args[0]).(*ast.BasicLit)
+	if !ok || format.Kind != token.STRING {
+		return false
+	}
+	formatString, err := strconv.Unquote(format.Value)
+	return err == nil && hasOnlyWrapVerb(formatString) &&
+		expressionPropagatesError(pass, body, call.Args[1], object, after, before)
+}
+
+func hasOnlyWrapVerb(format string) bool {
+	wrapCount := 0
+	for i := 0; i < len(format)-1; i++ {
+		if format[i] != '%' {
+			continue
+		}
+		if format[i+1] == '%' {
+			i++
+			continue
+		}
+		if format[i+1] == 'w' {
+			wrapCount++
+			i++
+			continue
+		}
+		if format[i+1] == '[' {
+			closeBracket := i + 2
+			for closeBracket < len(format) && format[closeBracket] >= '0' && format[closeBracket] <= '9' {
+				closeBracket++
+			}
+			if closeBracket > i+2 && format[i+2:closeBracket] == "1" &&
+				closeBracket+1 < len(format) && format[closeBracket] == ']' && format[closeBracket+1] == 'w' {
+				wrapCount++
+				i = closeBracket + 1
+				continue
+			}
+		}
+		return false
+	}
+	return wrapCount == 1
+}
+
+func expressionRetainsObject(pass *analysis.Pass, body *ast.BlockStmt, expr ast.Expr, object types.Object, after, before token.Pos) bool {
+	if object == nil || before <= after || !objectRetainedUntil(pass, body, object, after, before) {
+		return false
+	}
+	ident, ok := astutil.UnwrapParenExpr(expr).(*ast.Ident)
+	if ok {
+		return pass.TypesInfo.ObjectOf(ident) == object
+	}
+	call, ok := astutil.UnwrapParenExpr(expr).(*ast.CallExpr)
+	if !ok {
+		return false
+	}
+	if !isBuiltinCall(pass, call, "append") {
+		return false
+	}
+	for i, arg := range call.Args {
+		if i == 0 && isObjectIdent(pass, arg, object) {
+			return true
+		}
+		if call.Ellipsis.IsValid() && i == len(call.Args)-1 && isObjectIdent(pass, arg, object) {
+			return true
+		}
+	}
+	return false
+}
+
+func objectRetainedUntil(pass *analysis.Pass, body *ast.BlockStmt, object types.Object, after, before token.Pos) bool {
+	if body == nil || object == nil {
+		return false
+	}
+	aliases := findSliceAliases(pass, body, object, after, before)
+	retained := true
+	ast.Inspect(body, func(node ast.Node) bool {
+		if !retained {
+			return false
+		}
+		if node != body {
+			if _, ok := node.(*ast.FuncLit); ok {
+				return false
+			}
+		}
+		switch node := node.(type) {
+		case *ast.AssignStmt:
+			if node.Pos() <= after || node.Pos() >= before {
+				return true
+			}
+			writesObject := false
+			for _, lhs := range node.Lhs {
+				switch lhs := astutil.UnwrapParenExpr(lhs).(type) {
+				case *ast.Ident:
+					lhsObject := pass.TypesInfo.ObjectOf(lhs)
+					writesObject = lhsObject == object
+				case *ast.IndexExpr:
+					writesObject = expressionUsesObjectOrAliasAt(pass, body, lhs.X, object, aliases, after, node.Pos())
+				}
+				if writesObject {
+					break
+				}
+			}
+			if writesObject && (len(node.Rhs) != 1 || !isRetainingAppend(pass, node.Rhs[0], object)) {
+				retained = false
+				return false
+			}
+		case *ast.CallExpr:
+			if node.Pos() <= after || node.Pos() >= before || len(node.Args) == 0 {
+				return true
+			}
+			mutates := isBuiltinCall(pass, node, "clear") || isBuiltinCall(pass, node, "copy")
+			mutatesAlias := isBuiltinCall(pass, node, "append") &&
+				!isFullSliceAliasAt(pass, body, node.Args[0], object, aliases, after, node.Pos(), make(map[types.Object]bool)) &&
+				expressionUsesObjectOrAliasAt(pass, body, node.Args[0], object, aliases, after, node.Pos())
+			if (mutates || mutatesAlias) &&
+				expressionUsesObjectOrAliasAt(pass, body, node.Args[0], object, aliases, after, node.Pos()) {
+				retained = false
+				return false
+			}
+		}
+		return true
+	})
+	return retained
+}
+
+func findSliceAliases(pass *analysis.Pass, body *ast.BlockStmt, object types.Object, after, before token.Pos) map[types.Object]bool {
+	aliases := make(map[types.Object]bool)
+	addAlias := func(lhs ast.Expr) {
+		ident, ok := astutil.UnwrapParenExpr(lhs).(*ast.Ident)
+		if !ok {
+			return
+		}
+		alias := pass.TypesInfo.ObjectOf(ident)
+		if alias != nil && alias != object &&
+			types.Identical(types.Unalias(alias.Type()).Underlying(), types.Unalias(object.Type()).Underlying()) {
+			aliases[alias] = true
+		}
+	}
+	ast.Inspect(body, func(node ast.Node) bool {
+		if node != body {
+			if _, ok := node.(*ast.FuncLit); ok {
+				return false
+			}
+		}
+		switch node := node.(type) {
+		case *ast.AssignStmt:
+			if node.Pos() <= after || node.Pos() >= before {
+				return true
+			}
+			for _, lhs := range node.Lhs {
+				addAlias(lhs)
+			}
+		case *ast.ValueSpec:
+			if node.Pos() <= after || node.Pos() >= before {
+				return true
+			}
+			for _, name := range node.Names {
+				addAlias(name)
+			}
+		}
+		return true
+	})
+	return aliases
+}
+
+func expressionAliasesObjectAt(pass *analysis.Pass, body *ast.BlockStmt, expr ast.Expr, object types.Object, aliases map[types.Object]bool, after, before token.Pos) bool {
+	switch expr := astutil.UnwrapParenExpr(expr).(type) {
+	case *ast.Ident:
+		identObject := pass.TypesInfo.ObjectOf(expr)
+		return identObject == object ||
+			aliases[identObject] && sliceAliasMayAliasAt(pass, body, identObject, object, aliases, after, before)
+	case *ast.SliceExpr:
+		return expressionAliasesObjectAt(pass, body, expr.X, object, aliases, after, before)
+	case *ast.CallExpr:
+		if isBuiltinCall(pass, expr, "append") && len(expr.Args) > 0 {
+			return expressionAliasesObjectAt(pass, body, expr.Args[0], object, aliases, after, before)
+		}
+		return isSliceConversion(pass, expr) && len(expr.Args) == 1 &&
+			expressionAliasesObjectAt(pass, body, expr.Args[0], object, aliases, after, before)
+	default:
+		return false
+	}
+}
+
+func sliceAliasMayAliasAt(pass *analysis.Pass, body *ast.BlockStmt, alias, object types.Object, aliases map[types.Object]bool, after, before token.Pos) bool {
+	mayAlias := false
+	ast.Inspect(body, func(node ast.Node) bool {
+		if node != body {
+			if _, ok := node.(*ast.FuncLit); ok {
+				return false
+			}
+		}
+		var lhs []ast.Expr
+		var rhs []ast.Expr
+		switch node := node.(type) {
+		case *ast.AssignStmt:
+			lhs, rhs = node.Lhs, node.Rhs
+		case *ast.ValueSpec:
+			for _, name := range node.Names {
+				lhs = append(lhs, name)
+			}
+			rhs = node.Values
+		default:
+			return true
+		}
+		if node.Pos() <= after || node.End() >= before {
+			return true
+		}
+		for i, target := range lhs {
+			ident, ok := astutil.UnwrapParenExpr(target).(*ast.Ident)
+			if !ok || pass.TypesInfo.ObjectOf(ident) != alias {
+				continue
+			}
+			assignedMayAlias := i < len(rhs) && len(lhs) == len(rhs) &&
+				expressionAliasesObjectAt(pass, body, rhs[i], object, aliases, after, node.Pos())
+			if isDirectFunctionBodyAssignment(body, node) {
+				mayAlias = assignedMayAlias
+			} else {
+				mayAlias = mayAlias || assignedMayAlias
+			}
+		}
+		return true
+	})
+	return mayAlias
+}
+
+func isFullSliceAliasAt(pass *analysis.Pass, body *ast.BlockStmt, expr ast.Expr, object types.Object, aliases map[types.Object]bool, after, before token.Pos, visiting map[types.Object]bool) bool {
+	switch expr := astutil.UnwrapParenExpr(expr).(type) {
+	case *ast.Ident:
+		identObject := pass.TypesInfo.ObjectOf(expr)
+		if identObject == object {
+			return true
+		}
+		if !aliases[identObject] || visiting[identObject] {
+			return false
+		}
+		visiting[identObject] = true
+		var rhs ast.Expr
+		var latestPos token.Pos
+		found := false
+		latestDirect := false
+		ast.Inspect(body, func(node ast.Node) bool {
+			if node != body {
+				if _, ok := node.(*ast.FuncLit); ok {
+					return false
+				}
+			}
+			switch node := node.(type) {
+			case *ast.AssignStmt:
+				if node.Pos() <= after || node.End() > before || node.Pos() < latestPos {
+					return true
+				}
+				for i, lhs := range node.Lhs {
+					lhsIdent, ok := astutil.UnwrapParenExpr(lhs).(*ast.Ident)
+					if ok && pass.TypesInfo.ObjectOf(lhsIdent) == identObject {
+						latestPos = node.Pos()
+						found = true
+						latestDirect = isDirectFunctionBodyAssignment(body, node)
+						if i < len(node.Rhs) && len(node.Lhs) == len(node.Rhs) {
+							rhs = node.Rhs[i]
+						} else {
+							rhs = nil
+						}
+					}
+				}
+			case *ast.ValueSpec:
+				if node.Pos() <= after || node.End() > before || node.Pos() < latestPos {
+					return true
+				}
+				for i, name := range node.Names {
+					if pass.TypesInfo.ObjectOf(name) == identObject {
+						latestPos = node.Pos()
+						found = true
+						latestDirect = isDirectFunctionBodyAssignment(body, node)
+						if i < len(node.Values) && len(node.Names) == len(node.Values) {
+							rhs = node.Values[i]
+						} else {
+							rhs = nil
+						}
+					}
+				}
+			}
+			return true
+		})
+		if !found || rhs == nil || !latestDirect {
+			return false
+		}
+		return isFullSliceAliasAt(pass, body, rhs, object, aliases, after, latestPos, visiting)
+	case *ast.SliceExpr:
+		return expr.Low == nil && expr.High == nil && expr.Max == nil &&
+			isFullSliceAliasAt(pass, body, expr.X, object, aliases, after, before, visiting)
+	case *ast.CallExpr:
+		if isSliceConversion(pass, expr) && len(expr.Args) == 1 {
+			return isFullSliceAliasAt(pass, body, expr.Args[0], object, aliases, after, before, visiting)
+		}
+		if !isBuiltinCall(pass, expr, "append") || len(expr.Args) == 0 {
+			return false
+		}
+		if isFullSliceAliasAt(pass, body, expr.Args[0], object, aliases, after, before, visiting) {
+			return true
+		}
+		return expr.Ellipsis.IsValid() &&
+			isFullSliceAliasAt(pass, body, expr.Args[len(expr.Args)-1], object, aliases, after, before, visiting)
+	default:
+		return false
+	}
+}
+
+func isSliceConversion(pass *analysis.Pass, call *ast.CallExpr) bool {
+	if !pass.TypesInfo.Types[call.Fun].IsType() || len(call.Args) != 1 {
+		return false
+	}
+	target, targetOK := pass.TypesInfo.TypeOf(call).Underlying().(*types.Slice)
+	source, sourceOK := pass.TypesInfo.TypeOf(call.Args[0]).Underlying().(*types.Slice)
+	return targetOK && sourceOK && types.Identical(target, source)
+}
+
+func isDirectFunctionBodyAssignment(body *ast.BlockStmt, node ast.Node) bool {
+	for _, statement := range body.List {
+		if statement == node {
+			return true
+		}
+		declaration, ok := statement.(*ast.DeclStmt)
+		if !ok {
+			continue
+		}
+		general, ok := declaration.Decl.(*ast.GenDecl)
+		if !ok {
+			continue
+		}
+		for _, spec := range general.Specs {
+			if spec == node {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func expressionUsesObjectOrAliasAt(pass *analysis.Pass, body *ast.BlockStmt, expr ast.Expr, object types.Object, aliases map[types.Object]bool, after, before token.Pos) bool {
+	usesObject := false
+	ast.Inspect(expr, func(node ast.Node) bool {
+		ident, ok := node.(*ast.Ident)
+		if ok {
+			identObject := pass.TypesInfo.ObjectOf(ident)
+			if identObject == object ||
+				aliases[identObject] && sliceAliasMayAliasAt(pass, body, identObject, object, aliases, after, before) {
+				usesObject = true
+				return false
+			}
+		}
+		return !usesObject
+	})
+	return usesObject
+}
+
+func isBuiltinCall(pass *analysis.Pass, call *ast.CallExpr, name string) bool {
+	ident, ok := astutil.UnwrapParenExpr(call.Fun).(*ast.Ident)
+	if !ok || ident.Name != name {
+		return false
+	}
+	builtin, ok := pass.TypesInfo.Uses[ident].(*types.Builtin)
+	return ok && builtin.Name() == name
+}
+
+func isRetainingAppend(pass *analysis.Pass, expr ast.Expr, object types.Object) bool {
+	call, ok := astutil.UnwrapParenExpr(expr).(*ast.CallExpr)
+	if !ok {
+		return false
+	}
+	if !isBuiltinCall(pass, call, "append") {
+		return false
+	}
+	for i, arg := range call.Args {
+		if i == 0 && isObjectIdent(pass, arg, object) {
+			return true
+		}
+		if call.Ellipsis.IsValid() && i == len(call.Args)-1 && isObjectIdent(pass, arg, object) {
+			return true
+		}
+	}
+	return false
+}
+
+func isObjectIdent(pass *analysis.Pass, expr ast.Expr, object types.Object) bool {
+	ident, ok := astutil.UnwrapParenExpr(expr).(*ast.Ident)
+	return ok && pass.TypesInfo.ObjectOf(ident) == object
+}
+
+func expressionUsesObject(pass *analysis.Pass, expr ast.Expr, object types.Object) bool {
+	usesObject := false
+	ast.Inspect(expr, func(node ast.Node) bool {
+		ident, ok := node.(*ast.Ident)
+		if ok && pass.TypesInfo.ObjectOf(ident) == object {
+			usesObject = true
+			return false
+		}
+		return !usesObject
+	})
+	return usesObject
+}
+
+func hasReturnBefore(body *ast.BlockStmt, target *ast.IfStmt, after token.Pos) bool {
+	found := false
+	for _, stmt := range body.List {
+		if stmt.Pos() <= after {
+			continue
+		}
+		if stmt == target || stmt.Pos() >= target.Pos() {
+			break
+		}
+		ast.Inspect(stmt, func(node ast.Node) bool {
+			if node != stmt {
+				if _, ok := node.(*ast.FuncLit); ok {
+					return false
+				}
+			}
+			if _, ok := node.(*ast.ReturnStmt); ok {
+				found = true
+				return false
+			}
+			return true
+		})
+		if found {
 			return true
 		}
 	}
@@ -334,114 +868,174 @@ func errorFailureBranch(pass *analysis.Pass, ifStmt *ast.IfStmt, object types.Ob
 	return ifStmt.Else
 }
 
-func hasObjectUse(pass *analysis.Pass, body *ast.BlockStmt, object types.Object, after token.Pos) bool {
-	if object == nil || body == nil {
-		return false
-	}
-	index := indexObjectUses(pass, body, object, after)
-	used := false
-	ast.Inspect(body, func(node ast.Node) bool {
-		if used {
-			return false
-		}
-		if node != body {
-			if _, ok := node.(*ast.FuncLit); ok {
-				return false
-			}
-		}
-		ident, ok := node.(*ast.Ident)
-		if ok && ident.Pos() > after && pass.TypesInfo.ObjectOf(ident) == object &&
-			isRetainedObjectUse(ident, index) {
-			used = true
-			return false
-		}
-		return true
-	})
-	return used
-}
-
-type objectUseIndex struct {
-	writes        map[*ast.Ident]bool
-	discarded     map[*ast.Ident]bool
-	selfAssigned  map[*ast.Ident]bool
-	writePosition []token.Pos
-}
-
-func indexObjectUses(pass *analysis.Pass, body *ast.BlockStmt, object types.Object, after token.Pos) objectUseIndex {
-	index := objectUseIndex{
-		writes:       make(map[*ast.Ident]bool),
-		discarded:    make(map[*ast.Ident]bool),
-		selfAssigned: make(map[*ast.Ident]bool),
-	}
-	ast.Inspect(body, func(node ast.Node) bool {
-		if node != body {
-			if _, ok := node.(*ast.FuncLit); ok {
-				return false
-			}
-		}
-		switch stmt := node.(type) {
-		case *ast.AssignStmt:
-			writesOutput := false
-			for _, lhs := range stmt.Lhs {
-				if ident, ok := astutil.UnwrapParenExpr(lhs).(*ast.Ident); ok {
-					index.writes[ident] = true
-					if pass.TypesInfo.ObjectOf(ident) == object {
-						writesOutput = true
-					}
-					if ident.Name == "_" && len(stmt.Lhs) == 1 && len(stmt.Rhs) == 1 {
-						for _, rhsExpr := range stmt.Rhs {
-							if rhs, ok := astutil.UnwrapParenExpr(rhsExpr).(*ast.Ident); ok {
-								index.discarded[rhs] = true
-							}
-						}
-					}
-				}
-			}
-			if writesOutput && stmt.Pos() > after {
-				index.writePosition = append(index.writePosition, stmt.Pos())
-				for _, rhs := range stmt.Rhs {
-					ast.Inspect(rhs, func(expr ast.Node) bool {
-						ident, ok := expr.(*ast.Ident)
-						if ok && pass.TypesInfo.ObjectOf(ident) == object {
-							index.selfAssigned[ident] = true
-						}
-						return true
-					})
-				}
-			}
-		case *ast.ValueSpec:
-			for _, name := range stmt.Names {
-				index.writes[name] = true
-				if pass.TypesInfo.ObjectOf(name) == object && stmt.Pos() > after {
-					index.writePosition = append(index.writePosition, stmt.Pos())
-				}
-			}
-		}
-		return true
-	})
-	return index
-}
-
-func isRetainedObjectUse(ident *ast.Ident, index objectUseIndex) bool {
-	if index.writes[ident] || index.discarded[ident] || index.selfAssigned[ident] {
-		return false
-	}
-	for _, writePos := range index.writePosition {
-		if writePos < ident.Pos() {
-			return false
-		}
-	}
-	return true
-}
-
 func hasExitErrorStderrUse(pass *analysis.Pass, body *ast.BlockStmt, errObject types.Object, after token.Pos) bool {
 	if body == nil || errObject == nil {
 		return false
 	}
 	exitErrorObjects := findExitErrorObjects(pass, body, errObject, after)
-	found := false
-	ast.Inspect(body, func(node ast.Node) bool {
+	for _, stmt := range body.List {
+		ifStmt, ok := stmt.(*ast.IfStmt)
+		if !ok || ifStmt.Cond.Pos() <= after || hasReturnBefore(body, ifStmt, after) ||
+			objectReassignedBetween(pass, body, errObject, after, ifStmt.Cond.Pos()) {
+			continue
+		}
+		branch := errorFailureBranch(pass, ifStmt, errObject)
+		if branch == nil {
+			continue
+		}
+		found := false
+		ast.Inspect(branch, func(node ast.Node) bool {
+			if node != branch {
+				if _, ok := node.(*ast.FuncLit); ok {
+					return false
+				}
+			}
+			selector, ok := node.(*ast.SelectorExpr)
+			if !ok || selector.Sel.Name != "Stderr" || selector.Pos() <= after ||
+				!isExecExitErrorType(pass.TypesInfo.TypeOf(selector.X)) ||
+				isDiscardedValue(body, selector) || isAssignmentDestination(body, selector) ||
+				stderrFieldWrittenBetween(pass, body, selector.X, after, selector.Pos()) {
+				return true
+			}
+			switch receiver := astutil.UnwrapParenExpr(selector.X).(type) {
+			case *ast.TypeAssertExpr:
+				found = !objectReassignedBetween(pass, body, errObject, after, receiver.Pos()) &&
+					isExitErrorAssertion(pass, receiver, errObject)
+			case *ast.Ident:
+				object := pass.TypesInfo.ObjectOf(receiver)
+				derivedAt, ok := exitErrorObjects[object]
+				found = ok && derivedAt < selector.Pos() &&
+					!objectReassignedBetween(pass, body, object, derivedAt, selector.Pos())
+			}
+			return !found
+		})
 		if found {
+			return true
+		}
+	}
+	return false
+}
+
+func hasConfiguredStderrUse(pass *analysis.Pass, body *ast.BlockStmt, call *ast.CallExpr, errObject types.Object, after token.Pos) bool {
+	if body == nil {
+		return false
+	}
+	method, ok := astutil.UnwrapParenExpr(call.Fun).(*ast.SelectorExpr)
+	if !ok {
+		return false
+	}
+	receiver, ok := astutil.UnwrapParenExpr(method.X).(*ast.Ident)
+	if !ok {
+		return false
+	}
+	commandObject := pass.TypesInfo.ObjectOf(receiver)
+	var capturedObject types.Object
+	streamed := false
+	var sinkPosition token.Pos
+	for _, stmt := range body.List {
+		assign, ok := stmt.(*ast.AssignStmt)
+		if !ok || assign.Pos() >= after || len(assign.Lhs) != 1 || len(assign.Rhs) != 1 {
+			continue
+		}
+		if commandIdent, ok := astutil.UnwrapParenExpr(assign.Lhs[0]).(*ast.Ident); ok &&
+			pass.TypesInfo.ObjectOf(commandIdent) == commandObject {
+			streamed = false
+			capturedObject = nil
+			sinkPosition = token.NoPos
+			continue
+		}
+		stderrSelector, ok := astutil.UnwrapParenExpr(assign.Lhs[0]).(*ast.SelectorExpr)
+		if !ok || stderrSelector.Sel.Name != "Stderr" {
+			continue
+		}
+		commandIdent, ok := astutil.UnwrapParenExpr(stderrSelector.X).(*ast.Ident)
+		if !ok || pass.TypesInfo.ObjectOf(commandIdent) != commandObject {
+			continue
+		}
+		streamed = isOSStderr(pass, assign.Rhs[0])
+		capturedObject = stderrWriterObject(pass, assign.Rhs[0])
+		sinkPosition = assign.Pos()
+	}
+	if sinkPosition.IsValid() {
+		if objectReassignedBetween(pass, body, commandObject, sinkPosition, after) ||
+			stderrSinkReassignedBetween(pass, body, commandObject, sinkPosition, after) {
+			streamed = false
+			capturedObject = nil
+		} else if capturedObject != nil && objectReassignedBetween(pass, body, capturedObject, sinkPosition, after) {
+			capturedObject = nil
+		}
+	}
+	if streamed {
+		return true
+	}
+	if capturedObject == nil {
+		return false
+	}
+	if errObject == nil {
+		return false
+	}
+	for _, stmt := range body.List {
+		ifStmt, ok := stmt.(*ast.IfStmt)
+		if !ok || ifStmt.Cond.Pos() <= after || hasReturnBefore(body, ifStmt, after) ||
+			objectReassignedBetween(pass, body, errObject, after, ifStmt.Cond.Pos()) {
+			continue
+		}
+		branch := errorFailureBranch(pass, ifStmt, errObject)
+		if branch != nil && hasRetainedCapturedStderrUse(pass, body, branch, capturedObject, after) {
+			return true
+		}
+	}
+	return false
+}
+
+func isOSStderr(pass *analysis.Pass, expr ast.Expr) bool {
+	selector, ok := astutil.UnwrapParenExpr(expr).(*ast.SelectorExpr)
+	if !ok || selector.Sel.Name != "Stderr" {
+		return false
+	}
+	pkgIdent, ok := astutil.UnwrapParenExpr(selector.X).(*ast.Ident)
+	if !ok {
+		return false
+	}
+	pkgName, ok := pass.TypesInfo.Uses[pkgIdent].(*types.PkgName)
+	return ok && pkgName.Imported().Path() == "os"
+}
+
+func stderrWriterObject(pass *analysis.Pass, expr ast.Expr) types.Object {
+	if !isKnownCapturedStderrWriter(pass.TypesInfo.TypeOf(expr)) {
+		return nil
+	}
+	switch expr := astutil.UnwrapParenExpr(expr).(type) {
+	case *ast.UnaryExpr:
+		if expr.Op == token.AND {
+			return bindingObject(pass, expr.X)
+		}
+	case *ast.Ident:
+		return pass.TypesInfo.ObjectOf(expr)
+	}
+	return nil
+}
+
+func isKnownCapturedStderrWriter(t types.Type) bool {
+	if t == nil {
+		return false
+	}
+	t = types.Unalias(t)
+	if pointer, ok := t.(*types.Pointer); ok {
+		t = types.Unalias(pointer.Elem())
+	}
+	named, ok := t.(*types.Named)
+	if !ok || named.Obj().Pkg() == nil {
+		return false
+	}
+	return named.Obj().Pkg().Path() == "bytes" && named.Obj().Name() == "Buffer" ||
+		named.Obj().Pkg().Path() == "strings" && named.Obj().Name() == "Builder"
+}
+
+func stderrSinkReassignedBetween(pass *analysis.Pass, body *ast.BlockStmt, commandObject types.Object, after, before token.Pos) bool {
+	reassigned := false
+	ast.Inspect(body, func(node ast.Node) bool {
+		if reassigned {
 			return false
 		}
 		if node != body {
@@ -449,24 +1043,332 @@ func hasExitErrorStderrUse(pass *analysis.Pass, body *ast.BlockStmt, errObject t
 				return false
 			}
 		}
-		selector, ok := node.(*ast.SelectorExpr)
-		if !ok || selector.Sel.Name != "Stderr" || selector.Pos() <= after ||
-			!isExecExitErrorType(pass.TypesInfo.TypeOf(selector.X)) || isDiscardedValue(body, selector) {
+		assign, ok := node.(*ast.AssignStmt)
+		if !ok || assign.Pos() <= after || assign.Pos() >= before {
 			return true
 		}
-		switch receiver := astutil.UnwrapParenExpr(selector.X).(type) {
-		case *ast.TypeAssertExpr:
-			found = !objectReassignedBetween(pass, body, errObject, after, receiver.Pos()) &&
-				isExitErrorAssertion(pass, receiver, errObject)
-		case *ast.Ident:
-			object := pass.TypesInfo.ObjectOf(receiver)
-			derivedAt, ok := exitErrorObjects[object]
-			found = ok && derivedAt < selector.Pos() &&
-				!objectReassignedBetween(pass, body, object, derivedAt, selector.Pos())
+		for _, lhs := range assign.Lhs {
+			selector, ok := astutil.UnwrapParenExpr(lhs).(*ast.SelectorExpr)
+			if !ok || selector.Sel.Name != "Stderr" {
+				continue
+			}
+			receiver, ok := astutil.UnwrapParenExpr(selector.X).(*ast.Ident)
+			if ok && pass.TypesInfo.ObjectOf(receiver) == commandObject {
+				reassigned = true
+				return false
+			}
 		}
+		return true
+	})
+	return reassigned
+}
+
+func capturedStderrConsumedBetween(pass *analysis.Pass, body *ast.BlockStmt, object types.Object, after, before token.Pos) bool {
+	aliases := findCapturedBufferAliases(pass, body, object, after, before)
+	consumed := false
+	ast.Inspect(body, func(node ast.Node) bool {
+		if consumed {
+			return false
+		}
+		if node != body {
+			if _, ok := node.(*ast.FuncLit); ok {
+				return false
+			}
+		}
+		switch node := node.(type) {
+		case *ast.AssignStmt:
+			if node.Pos() <= after || node.Pos() >= before {
+				return true
+			}
+			if len(node.Lhs) == len(node.Rhs) {
+				for i, lhs := range node.Lhs {
+					if _, ok := astutil.UnwrapParenExpr(lhs).(*ast.Ident); ok &&
+						expressionUsesBufferBytes(pass, node.Rhs[i], object, aliases) {
+						consumed = true
+						return false
+					}
+				}
+			}
+			for _, lhs := range node.Lhs {
+				index, ok := astutil.UnwrapParenExpr(lhs).(*ast.IndexExpr)
+				if ok && expressionUsesBufferBytes(pass, index.X, object, aliases) {
+					consumed = true
+					return false
+				}
+			}
+		case *ast.CallExpr:
+			if node.Pos() <= after || node.Pos() >= before {
+				return true
+			}
+			if (isBuiltinCall(pass, node, "clear") || isBuiltinCall(pass, node, "copy") ||
+				isBuiltinCall(pass, node, "append")) &&
+				len(node.Args) > 0 && expressionUsesBufferBytes(pass, node.Args[0], object, aliases) {
+				consumed = true
+				return false
+			}
+			selector, ok := astutil.UnwrapParenExpr(node.Fun).(*ast.SelectorExpr)
+			if !ok {
+				return true
+			}
+			receiver, ok := astutil.UnwrapParenExpr(selector.X).(*ast.Ident)
+			if !ok {
+				return true
+			}
+			receiverObject := pass.TypesInfo.ObjectOf(receiver)
+			if receiverObject != object && !aliases[receiverObject] {
+				return true
+			}
+			switch selector.Sel.Name {
+			case "Reset", "Truncate", "Read", "ReadByte", "ReadBytes", "ReadRune", "Next", "WriteTo":
+				consumed = true
+				return false
+			}
+		}
+		return true
+	})
+	return consumed
+}
+
+func findCapturedBufferAliases(pass *analysis.Pass, body *ast.BlockStmt, object types.Object, after, before token.Pos) map[types.Object]bool {
+	aliases := make(map[types.Object]bool)
+	isAlias := func(expr ast.Expr) bool {
+		switch expr := astutil.UnwrapParenExpr(expr).(type) {
+		case *ast.Ident:
+			identObject := pass.TypesInfo.ObjectOf(expr)
+			return identObject == object || aliases[identObject]
+		case *ast.UnaryExpr:
+			if expr.Op != token.AND {
+				return false
+			}
+			ident, ok := astutil.UnwrapParenExpr(expr.X).(*ast.Ident)
+			if !ok {
+				return false
+			}
+			identObject := pass.TypesInfo.ObjectOf(ident)
+			return identObject == object || aliases[identObject]
+		default:
+			return false
+		}
+	}
+	addAlias := func(lhs, rhs ast.Expr) {
+		ident, ok := astutil.UnwrapParenExpr(lhs).(*ast.Ident)
+		if !ok {
+			return
+		}
+		alias := pass.TypesInfo.ObjectOf(ident)
+		if alias != nil && alias != object && isAlias(rhs) {
+			aliases[alias] = true
+		}
+	}
+	ast.Inspect(body, func(node ast.Node) bool {
+		if node != body {
+			if _, ok := node.(*ast.FuncLit); ok {
+				return false
+			}
+		}
+		switch node := node.(type) {
+		case *ast.AssignStmt:
+			if node.Pos() <= after || node.Pos() >= before || len(node.Lhs) != len(node.Rhs) {
+				return true
+			}
+			for i, lhs := range node.Lhs {
+				addAlias(lhs, node.Rhs[i])
+			}
+		case *ast.ValueSpec:
+			if node.Pos() <= after || node.Pos() >= before || len(node.Names) != len(node.Values) {
+				return true
+			}
+			for i, name := range node.Names {
+				addAlias(name, node.Values[i])
+			}
+		}
+		return true
+	})
+	return aliases
+}
+
+func expressionUsesBufferBytes(pass *analysis.Pass, expr ast.Expr, object types.Object, aliases map[types.Object]bool) bool {
+	usesBytes := false
+	ast.Inspect(expr, func(node ast.Node) bool {
+		if usesBytes {
+			return false
+		}
+		call, ok := node.(*ast.CallExpr)
+		if !ok {
+			return true
+		}
+		selector, ok := astutil.UnwrapParenExpr(call.Fun).(*ast.SelectorExpr)
+		if !ok || selector.Sel.Name != "Bytes" {
+			return true
+		}
+		receiver, ok := astutil.UnwrapParenExpr(selector.X).(*ast.Ident)
+		if ok {
+			receiverObject := pass.TypesInfo.ObjectOf(receiver)
+			if receiverObject == object || aliases[receiverObject] {
+				usesBytes = true
+				return false
+			}
+		}
+		return true
+	})
+	return usesBytes
+}
+
+func hasRetainedCapturedStderrUse(pass *analysis.Pass, body *ast.BlockStmt, branch ast.Stmt, object types.Object, after token.Pos) bool {
+	found := false
+	ast.Inspect(branch, func(node ast.Node) bool {
+		if found {
+			return false
+		}
+		if node != branch {
+			if _, ok := node.(*ast.FuncLit); ok {
+				return false
+			}
+		}
+		call, ok := node.(*ast.CallExpr)
+		if !ok || isDiscardedValue(body, call) {
+			return true
+		}
+		selector, ok := astutil.UnwrapParenExpr(call.Fun).(*ast.SelectorExpr)
+		if !ok || (selector.Sel.Name != "String" && selector.Sel.Name != "Bytes") {
+			return true
+		}
+		receiver, ok := astutil.UnwrapParenExpr(selector.X).(*ast.Ident)
+		if !ok || pass.TypesInfo.ObjectOf(receiver) != object {
+			return true
+		}
+		if objectReassignedBetween(pass, body, object, after, call.Pos()) ||
+			capturedStderrConsumedBetween(pass, body, object, after, call.Pos()) {
+			return true
+		}
+		ast.Inspect(branch, func(parent ast.Node) bool {
+			switch parent := parent.(type) {
+			case *ast.ReturnStmt:
+				for _, result := range parent.Results {
+					if nodeContains(result, call) {
+						found = true
+						return false
+					}
+				}
+			case *ast.CallExpr:
+				if parent == call {
+					return true
+				}
+				for _, arg := range parent.Args {
+					if !nodeContains(arg, call) {
+						continue
+					}
+					pkgPath, name, ok := astutil.PackageCall(pass, parent)
+					if ok && (pkgPath == "log" && (name == "Print" || name == "Printf" || name == "Println") ||
+						pkgPath == "log/slog" && (name == "Error" || name == "Warn" || name == "Info" || name == "Debug")) {
+						found = true
+						return false
+					}
+					if ok && pkgPath == "fmt" && name == "Errorf" && returnedCall(branch, parent) {
+						found = true
+						return false
+					}
+				}
+			}
+			return !found
+		})
 		return !found
 	})
 	return found
+}
+
+func returnedCall(branch ast.Node, call *ast.CallExpr) bool {
+	returned := false
+	ast.Inspect(branch, func(node ast.Node) bool {
+		if ret, ok := node.(*ast.ReturnStmt); ok {
+			for _, result := range ret.Results {
+				if nodeContains(result, call) {
+					returned = true
+					return false
+				}
+			}
+		}
+		return !returned
+	})
+	return returned
+}
+
+func nodeContains(root, target ast.Node) bool {
+	contains := false
+	ast.Inspect(root, func(node ast.Node) bool {
+		if node == target {
+			contains = true
+			return false
+		}
+		return !contains
+	})
+	return contains
+}
+
+func isAssignmentDestination(body *ast.BlockStmt, target *ast.SelectorExpr) bool {
+	destination := false
+	ast.Inspect(body, func(node ast.Node) bool {
+		if destination {
+			return false
+		}
+		switch stmt := node.(type) {
+		case *ast.AssignStmt:
+			for _, lhs := range stmt.Lhs {
+				if lhs == target {
+					destination = true
+					return false
+				}
+			}
+		case *ast.IncDecStmt:
+			destination = stmt.X == target
+		}
+		return !destination
+	})
+	return destination
+}
+
+func stderrFieldWrittenBetween(pass *analysis.Pass, body *ast.BlockStmt, receiver ast.Expr, after, before token.Pos) bool {
+	written := false
+	ast.Inspect(body, func(node ast.Node) bool {
+		if written {
+			return false
+		}
+		if node != body {
+			if _, ok := node.(*ast.FuncLit); ok {
+				return false
+			}
+		}
+		assign, ok := node.(*ast.AssignStmt)
+		if !ok || assign.Pos() <= after || assign.Pos() >= before {
+			return true
+		}
+		for _, lhs := range assign.Lhs {
+			selector, ok := astutil.UnwrapParenExpr(lhs).(*ast.SelectorExpr)
+			if ok && selector.Sel.Name == "Stderr" && sameExitErrorReceiver(pass, selector.X, receiver) {
+				written = true
+				return false
+			}
+		}
+		return true
+	})
+	return written
+}
+
+func sameExitErrorReceiver(pass *analysis.Pass, left, right ast.Expr) bool {
+	left, right = astutil.UnwrapParenExpr(left), astutil.UnwrapParenExpr(right)
+	leftAssert, leftIsAssert := left.(*ast.TypeAssertExpr)
+	rightAssert, rightIsAssert := right.(*ast.TypeAssertExpr)
+	if leftIsAssert || rightIsAssert {
+		if !leftIsAssert || !rightIsAssert {
+			return false
+		}
+		leftIdent, leftOK := astutil.UnwrapParenExpr(leftAssert.X).(*ast.Ident)
+		rightIdent, rightOK := astutil.UnwrapParenExpr(rightAssert.X).(*ast.Ident)
+		return leftOK && rightOK && pass.TypesInfo.ObjectOf(leftIdent) == pass.TypesInfo.ObjectOf(rightIdent)
+	}
+	leftIdent, leftOK := left.(*ast.Ident)
+	rightIdent, rightOK := right.(*ast.Ident)
+	return leftOK && rightOK && pass.TypesInfo.ObjectOf(leftIdent) == pass.TypesInfo.ObjectOf(rightIdent)
 }
 
 func findExitErrorObjects(pass *analysis.Pass, body *ast.BlockStmt, errObject types.Object, after token.Pos) map[types.Object]token.Pos {
@@ -481,36 +1383,24 @@ func findExitErrorObjects(pass *analysis.Pass, body *ast.BlockStmt, errObject ty
 		case *ast.AssignStmt:
 			if node.Pos() > after && len(node.Lhs) > 0 && len(node.Rhs) == 1 &&
 				!objectReassignedBetween(pass, body, errObject, after, node.Pos()) {
-				for _, rhs := range node.Rhs {
-					if !isExitErrorAssertion(pass, rhs, errObject) {
-						continue
-					}
-					for _, lhs := range node.Lhs {
-						if object := bindingObject(pass, lhs); object != nil {
-							exitErrorObjects[object] = node.Pos()
-						}
-						break
+				if isExitErrorAssertion(pass, node.Rhs[0], errObject) {
+					if object := bindingObject(pass, node.Lhs[0]); object != nil {
+						exitErrorObjects[object] = node.Pos()
 					}
 				}
 			}
 		case *ast.ValueSpec:
 			if node.Pos() > after && len(node.Names) > 0 && len(node.Values) == 1 &&
 				!objectReassignedBetween(pass, body, errObject, after, node.Pos()) {
-				for _, value := range node.Values {
-					if !isExitErrorAssertion(pass, value, errObject) {
-						continue
-					}
-					for _, name := range node.Names {
-						if object := bindingObject(pass, name); object != nil {
-							exitErrorObjects[object] = node.Pos()
-						}
-						break
+				if isExitErrorAssertion(pass, node.Values[0], errObject) {
+					if object := bindingObject(pass, node.Names[0]); object != nil {
+						exitErrorObjects[object] = node.Pos()
 					}
 				}
 			}
 		case *ast.CallExpr:
 			if node.Pos() > after && !objectReassignedBetween(pass, body, errObject, after, node.Pos()) {
-				isErrorsAsForExitError(pass, node, errObject, node.Pos(), exitErrorObjects)
+				isErrorsAsForExitError(pass, node, errObject, node.End(), exitErrorObjects)
 			}
 		}
 		return true
@@ -532,15 +1422,38 @@ func objectReassignedBetween(pass *analysis.Pass, body *ast.BlockStmt, object ty
 				return false
 			}
 		}
-		assign, ok := node.(*ast.AssignStmt)
-		if !ok || assign.Pos() <= after || assign.Pos() >= before {
-			return true
-		}
-		for _, lhs := range assign.Lhs {
-			ident, ok := astutil.UnwrapParenExpr(lhs).(*ast.Ident)
-			if ok && pass.TypesInfo.ObjectOf(ident) == object {
+		switch node := node.(type) {
+		case *ast.AssignStmt:
+			if node.Pos() <= after || node.Pos() >= before {
+				return true
+			}
+			for _, lhs := range node.Lhs {
+				ident, ok := astutil.UnwrapParenExpr(lhs).(*ast.Ident)
+				if ok && pass.TypesInfo.ObjectOf(ident) == object {
+					reassigned = true
+					return false
+				}
+			}
+		case *ast.IncDecStmt:
+			ident, ok := astutil.UnwrapParenExpr(node.X).(*ast.Ident)
+			if ok && node.Pos() > after && node.Pos() < before && pass.TypesInfo.ObjectOf(ident) == object {
 				reassigned = true
 				return false
+			}
+		case *ast.CallExpr:
+			if node.Pos() <= after || node.Pos() >= before {
+				return true
+			}
+			for _, arg := range node.Args {
+				address, ok := astutil.UnwrapParenExpr(arg).(*ast.UnaryExpr)
+				if !ok || address.Op != token.AND {
+					continue
+				}
+				ident, ok := astutil.UnwrapParenExpr(address.X).(*ast.Ident)
+				if ok && pass.TypesInfo.ObjectOf(ident) == object {
+					reassigned = true
+					return false
+				}
 			}
 		}
 		return true
@@ -558,18 +1471,11 @@ func isDiscardedValue(body *ast.BlockStmt, value ast.Node) bool {
 		if !ok || len(assign.Lhs) != 1 || len(assign.Rhs) != 1 {
 			return true
 		}
-		var lhsExpr, rhsExpr ast.Expr
-		for _, expr := range assign.Lhs {
-			lhsExpr = expr
-		}
-		for _, expr := range assign.Rhs {
-			rhsExpr = expr
-		}
-		lhs, ok := astutil.UnwrapParenExpr(lhsExpr).(*ast.Ident)
+		lhs, ok := astutil.UnwrapParenExpr(assign.Lhs[0]).(*ast.Ident)
 		if !ok || lhs.Name != "_" {
 			return true
 		}
-		ast.Inspect(rhsExpr, func(rhs ast.Node) bool {
+		ast.Inspect(assign.Rhs[0], func(rhs ast.Node) bool {
 			if rhs == value {
 				discarded = true
 				return false
@@ -595,15 +1501,7 @@ func isErrorsAsForExitError(pass *analysis.Pass, call *ast.CallExpr, errObject t
 	if !ok || pkgPath != "errors" || name != "As" || len(call.Args) != 2 {
 		return false
 	}
-	var errArg, targetArg ast.Expr
-	for i, arg := range call.Args {
-		switch i {
-		case 0:
-			errArg = arg
-		case 1:
-			targetArg = arg
-		}
-	}
+	errArg, targetArg := call.Args[0], call.Args[1]
 	errIdent, ok := astutil.UnwrapParenExpr(errArg).(*ast.Ident)
 	if !ok || pass.TypesInfo.ObjectOf(errIdent) != errObject {
 		return false
