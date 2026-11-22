@@ -395,21 +395,27 @@ function resolveCopilotInvocationModel(args, defaultModel) {
   return { model, hasOverride };
 }
 
-/** @param {string[]} args @param {string} resolvedModel */
-function applyCopilotInvocationModel(args, resolvedModel) {
+/** @param {string[]} args @param {string} resolvedModel @param {string | null} [effort] */
+function applyCopilotInvocationModel(args, resolvedModel, effort = null) {
   const result = [];
-  let options = true;
-  for (let i = 0; i < args.length; i++) {
-    if (args[i] === "--") options = false;
-    if (options && (args[i] === "--prompt" || args[i] === "-p")) {
+  let i = 0;
+  for (; i < args.length && args[i] !== "--"; i++) {
+    if (args[i] === "--prompt" || args[i] === "-p") {
       result.push(args[i], args[++i]);
       continue;
     }
-    if (options && args[i] === "--model") {
+    if (args[i] === "--reasoning-effort" || args[i].startsWith("--reasoning-effort=")) effort = null;
+    if (args[i] === "--model") {
       result.push("--model", resolvedModel);
       i++;
-    } else result.push(options && args[i].startsWith("--model=") ? `--model=${resolvedModel}` : args[i]);
+    } else result.push(args[i].startsWith("--model=") ? `--model=${resolvedModel}` : args[i]);
   }
+  if (effort !== null && effort !== "auto") {
+    // Copilot CLI's native reasoning-effort flag supports low, medium, and high.
+    if (!["low", "medium", "high"].includes(effort)) throw new Error("Copilot model suffix ?effort= expects low, medium, or high");
+    result.push("--reasoning-effort", effort);
+  }
+  for (; i < args.length; i++) result.push(args[i]);
   return result;
 }
 
@@ -1815,12 +1821,20 @@ async function main() {
     }
   } else {
     selectionConfiguredModel = applyModelFallback(process.env, "COPILOT_MODEL", log) || configuredCopilotModel;
-    await applyCopilotModelAliasResolution({
+    const resolvedModel = await applyCopilotModelAliasResolution({
       awfReflectData,
       logger: log,
       refetchReflectData,
     });
-    if (invocationModel?.hasOverride) resolvedArgs = applyCopilotInvocationModel(resolvedArgs, process.env.COPILOT_MODEL || "");
+    if (!copilotSDKMode) {
+      // Split after alias resolution so effort inherited from the alias is also applied.
+      const { base, params } = splitModelIdentifier(resolvedModel);
+      const effort = params.get("effort");
+      if (effort !== null && effort !== "auto") process.env.COPILOT_MODEL = base;
+      if (invocationModel?.hasOverride || effort !== null) {
+        resolvedArgs = applyCopilotInvocationModel(resolvedArgs, process.env.COPILOT_MODEL || "", effort);
+      }
+    }
   }
   if (!copilotSDKMode) {
     try {
