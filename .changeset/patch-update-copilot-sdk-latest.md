@@ -2,4 +2,4 @@
 "gh-aw": patch
 ---
 
-Update the bundled @github/copilot-sdk default from 1.0.0-beta.9 to 1.0.0 and recompile generated workflow lock files.
+Migrate the bundled npm SDK and Copilot CLI extensions to `@microsoft/copilot-sdk` v2. Existing custom npm SDK pins need a new lockfile and digest.

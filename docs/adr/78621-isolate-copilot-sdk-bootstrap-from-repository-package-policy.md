@@ -8,11 +8,11 @@
 
 ### Context
 
-Compiled workflows using the Copilot SDK engine installed `@github/copilot-sdk` and `undici` with `npm install` run inside `${GITHUB_WORKSPACE}`, i.e. against the repository under test. Repositories that enforce strict pnpm `devEngines` policies or use `catalog:` / `workspace:` dependency protocols reject that npm invocation, so the SDK bootstrap fails for reasons unrelated to the workflow (see #77386). The SDK is infrastructure owned by gh-aw, not a dependency of the user's application, and the install tree must be visible inside the sandbox and survive Node runtime switches (NVX).
+Compiled workflows using the Copilot SDK engine installed the npm SDK and `undici` with `npm install` run inside `${GITHUB_WORKSPACE}`, i.e. against the repository under test. Repositories that enforce strict pnpm `devEngines` policies or use `catalog:` / `workspace:` dependency protocols reject that npm invocation, so the SDK bootstrap fails for reasons unrelated to the workflow (see #77386). The SDK is infrastructure owned by gh-aw, not a dependency of the user's application, and the install tree must be visible inside the sandbox and survive Node runtime switches (NVX).
 
 ### Decision
 
-We will install the SDK dependencies (normal and inline Node drivers) into a dedicated gh-aw-owned prefix, `${RUNNER_TEMP}/gh-aw/engine-cli/copilot-sdk`, via `npm install --prefix ... --ignore-scripts --no-save`, instead of in the checkout. The driver resolves modules from that prefix by exporting its `node_modules` on `NODE_PATH` (CommonJS) and by registering a scoped ESM resolve hook (`copilot_sdk_module_resolution*.cjs`) that falls back to the prefix only for `@github/copilot-sdk` and `undici` when normal resolution fails. This keeps application-local packages authoritative and leaves application manifests and lockfiles untouched.
+Install the SDK dependencies (normal and inline Node drivers) into a dedicated gh-aw-owned prefix, `${RUNNER_TEMP}/gh-aw/engine-cli/copilot-sdk`, instead of in the checkout. The driver resolves modules from that prefix by exporting its `node_modules` on `NODE_PATH` (CommonJS) and by registering a scoped ESM resolve hook (`copilot_sdk_module_resolution*.cjs`) that falls back to the prefix only for `@microsoft/copilot-sdk` and `undici` when normal resolution fails. This keeps application-local packages authoritative and leaves application manifests and lockfiles untouched.
 
 ### Alternatives Considered
 
@@ -42,7 +42,7 @@ Simplest approach, but ESM `import` ignores `NODE_PATH`, so the inline/ESM drive
 - A repository that deliberately provides its own SDK version is not used as the install source for the bootstrap prefix.
 
 #### Neutral
-- Package versions stay pinned (`@github/copilot-sdk` and `undici@6.28.0`); only the install location changes.
+- The npm SDK and `undici` remain pinned.
 - The Python SDK install path (`.gh-aw/copilot-sdk/python`) is unchanged.
 
 ---

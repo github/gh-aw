@@ -17,7 +17,7 @@ The host app no longer participates in extension canvas registration. Extensions
    ```
    extensions_manage({ operation: "scaffold", kind: "canvas", name: "<name>", location: "project" | "user" | "session" })
    ```
-   The canvas scaffold produces an `extension.mjs` with `joinSession({ canvases: [createCanvas({...})] })`, a working loopback HTTP server per instance, an example action, and `onClose` cleanup. Edit from there.
+   The canvas scaffold produces an `extension.mjs` with `joinSession({ canvases: { definitions: [createCanvas({...})] } })`, a loopback HTTP server per instance, an example action, and `onClose` cleanup. Check that it imports the Microsoft-scoped SDK.
 
 3. **Edit the file.** Implement your `open`, `actions[]`, optional `onClose`, and (if needed) tools/hooks alongside.
 
@@ -34,20 +34,20 @@ A canvas extension is a Copilot CLI extension running as a forked Node process t
 - Entry file **must** be named `extension.mjs` (ES modules only; TypeScript is not supported).
 - Discovery scans only immediate subdirectories of `.github/extensions/` (relative to git root), `$COPILOT_HOME/extensions/`, and `$COPILOT_HOME/session-state/<sessionId>/extensions/`.
 - The runtime auto-derives a stable `extensionId` of `${source}:${name}` (e.g. `project:my-extension`); session-scoped extensions embed the session id as `session:<sessionId>:<name>`.
-- `@github/copilot-sdk` is resolved automatically by the CLI — do **not** add a `package.json` or `node_modules` for it.
+- Use a Copilot CLI that resolves `@microsoft/copilot-sdk/extension` automatically (such as 1.0.113). Do **not** add a `package.json` or `node_modules` for it.
 - `stdout` is reserved for JSON-RPC. **Never `console.log`.** Use `session.log(message, { level, ephemeral })`.
 - Tool names must be globally unique across all loaded extensions — collisions cause the second extension to fail.
 
 ## `joinSession` signature
 
 ```js
-import { joinSession, createCanvas, CanvasError } from "@github/copilot-sdk/extension";
+import { joinSession, createCanvas, CanvasError } from "@microsoft/copilot-sdk/extension";
 
 const session = await joinSession({
-    canvases: [createCanvas({ /* ... */ })],
-    tools: [/* optional */],
-    hooks: {/* optional */},
-    onPermissionRequest: async (request) => ({ kind: "approve-once" }), // optional
+    canvases: { definitions: [createCanvas({ /* ... */ })] },
+    tools: { definitions: [/* optional */] },
+    hooks: { handlers: {/* optional */} },
+    permissions: { onRequest: async (request) => ({ kind: "approve-once" }) }, // optional
 });
 // session.sessionId, session.workspacePath (string | undefined),
 // session.send, session.sendAndWait, session.log, session.on, session.rpc
@@ -56,7 +56,7 @@ const session = await joinSession({
 ## Canvas API (`canvas.d.ts`)
 
 ```js
-import { createCanvas, CanvasError, joinSession } from "@github/copilot-sdk/extension";
+import { createCanvas, CanvasError, joinSession } from "@microsoft/copilot-sdk/extension";
 
 const canvas = createCanvas({
     id: "main",                  // unique within this extension
@@ -97,11 +97,17 @@ Runtime rules:
 - Return raw values from action handlers; throw `CanvasError("code", "message")` for errors.
 - `ctx.canvasId` (not `ctx.id`) is the canvas identifier in handler context.
 
+Bind embedded servers to **loopback only** (`127.0.0.1`). The host only embeds loopback URLs. Push state updates to the iframe with Server-Sent Events (`/events`).
+
+Use the [validation checklist](#validation-checklist) and [debugging steps](#debugging) after editing. See [state model](#state-model) for persistence rules.
+
+<!-- instruction-prefix-end -->
+
 ## Loopback server pattern
 
 ```js
 import { createServer } from "node:http";
-import { createCanvas, joinSession } from "@github/copilot-sdk/extension";
+import { createCanvas, joinSession } from "@microsoft/copilot-sdk/extension";
 
 const servers = new Map(); // instanceId → { server, url }
 
@@ -116,7 +122,7 @@ async function startServer(instanceId) {
 }
 
 await joinSession({
-    canvases: [
+    canvases: { definitions: [
         createCanvas({
             id: "my-canvas",
             displayName: "My canvas",
@@ -137,11 +143,9 @@ await joinSession({
                 }
             },
         }),
-    ],
+    ] },
 });
 ```
-
-Bind embedded servers to **loopback only** (`127.0.0.1`). The host only embeds loopback URLs. Push state updates to the iframe with Server-Sent Events (`/events`).
 
 ## ID model — three distinct identifiers
 
@@ -243,7 +247,7 @@ Use `share_extension` / `install_extension` tools. Gist format:
 - Return raw values from action handlers; throw `CanvasError("code", "message")` for errors.
 - The canvas context field is `ctx.canvasId`, not `ctx.id`.
 - Tool names must be globally unique across all loaded extensions.
-- `extension.mjs` only — `.ts` is not supported. The `@github/copilot-sdk` import is auto-resolved; do not add a `package.json` for it.
+- `extension.mjs` only — `.ts` is not supported. The CLI resolves `@microsoft/copilot-sdk/extension`; do not add a `package.json` for it.
 
 ## Session object quick reference
 
