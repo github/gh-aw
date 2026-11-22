@@ -29,6 +29,14 @@ type advisoryArtifact struct {
 	} `json:"workflow_run"`
 }
 
+type advisorySourceRun struct {
+	ID             int64              `json:"id"`
+	Event          string             `json:"event"`
+	Conclusion     string             `json:"conclusion"`
+	Repository     struct{ ID int64 } `json:"repository"`
+	HeadRepository struct{ ID int64 } `json:"head_repository"`
+}
+
 func (o advisoryHandoff) loadPatch(ctx context.Context) ([]byte, error) {
 	if o.sideRepo == "" {
 		return readAdvisoryPatch(o.filename)
@@ -47,6 +55,13 @@ func (o advisoryHandoff) loadPatch(ctx context.Context) ([]byte, error) {
 	}
 	if repo.ID <= 0 || repo.Visibility != "private" || !strings.EqualFold(repo.FullName, o.sideRepo) {
 		return nil, fmt.Errorf("the artifact source must be the specified private repository")
+	}
+	var run advisorySourceRun
+	if err := readAdvisoryAPI(ctx, fmt.Sprintf("%s/actions/runs/%d", repoPath, o.runID), &run); err != nil {
+		return nil, err
+	}
+	if err := run.verify(o.runID, repo.ID); err != nil {
+		return nil, err
 	}
 	artifactPath := fmt.Sprintf("%s/actions/artifacts/%d", repoPath, o.artifactID)
 	var artifact advisoryArtifact
@@ -72,6 +87,16 @@ func (o advisoryHandoff) loadPatch(ctx context.Context) ([]byte, error) {
 		return nil, fmt.Errorf("could not download the bounded advisory artifact; verify Actions read access and artifact size")
 	}
 	return extractAdvisoryPatch(body, artifact.Digest)
+}
+
+func (r advisorySourceRun) verify(runID, repoID int64) error {
+	if r.ID != runID || r.Repository.ID != repoID || r.HeadRepository.ID != repoID {
+		return fmt.Errorf("the source run and its head must belong to the specified private repository")
+	}
+	if r.Event != "workflow_dispatch" || r.Conclusion != "success" {
+		return fmt.Errorf("the source run must be a successful manual dispatch; select a completed advisory workflow run")
+	}
+	return nil
 }
 
 func readAdvisoryAPI(ctx context.Context, path string, dst any) error {

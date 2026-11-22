@@ -29,6 +29,7 @@ func TestAdvisoryInspectDownloadsExactArtifact(t *testing.T) {
 [ "$1" = api ] && [ "$2" = --hostname ] && [ "$3" = github.com ] || exit 1
 case "$4" in
 repos/owner/side) printf '%%s' '{"id":30,"full_name":"owner/side","visibility":"private"}' ;;
+repos/owner/side/actions/runs/10) printf '%%s' '{"id":10,"event":"workflow_dispatch","conclusion":"success","repository":{"id":30},"head_repository":{"id":30}}' ;;
 repos/owner/side/actions/artifacts/20) printf '%%s' '{"id":20,"size_in_bytes":%d,"digest":"sha256:%x","workflow_run":{"id":10,"repository_id":30}}' ;;
 repos/owner/side/actions/artifacts/20/zip) cat "$ADVISORY_TEST_ZIP" ;;
 repos/owner/upstream/security-advisories/GHSA-2345-6789-cfgh) printf '%%s' '{"ghsa_id":"GHSA-2345-6789-cfgh","state":"draft","private_fork":{"id":40,"full_name":"owner/fork","private":true}}' ;;
@@ -58,6 +59,19 @@ func TestAdvisoryArtifactProvenance(t *testing.T) {
 	o.runID--
 	a.Expired = true
 	require.ErrorContains(t, a.verify(o, 30), "expired")
+}
+
+func TestAdvisorySourceRunRejectsUntrustedTriggers(t *testing.T) {
+	run := advisorySourceRun{ID: 10, Event: "workflow_dispatch", Conclusion: "success"}
+	run.Repository.ID, run.HeadRepository.ID = 30, 30
+	require.NoError(t, run.verify(10, 30))
+	run.HeadRepository.ID++
+	require.ErrorContains(t, run.verify(10, 30), "head must belong")
+	run.HeadRepository.ID--
+	run.Event = "pull_request"
+	require.ErrorContains(t, run.verify(10, 30), "successful manual dispatch")
+	run.Event, run.Conclusion = "workflow_dispatch", "failure"
+	require.ErrorContains(t, run.verify(10, 30), "successful manual dispatch")
 }
 
 func TestAdvisoryArtifactZIP(t *testing.T) {
