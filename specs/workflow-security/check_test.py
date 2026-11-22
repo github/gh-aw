@@ -284,12 +284,23 @@ class ResultContractTest(unittest.TestCase):
             check.check_result(12, "Error parsing module", "DetectionGate")
 
     def test_trace_shape(self):
-        raw = {"counterexample": {"state": [[1, {"s": {"lastEvent": "Init"}}],
-                                            [2, {"s": {"lastEvent": "Execute"}}]]}}
+        raw = ('Error: The behavior up to this point is:\n'
+               'State 1: <Initial predicate>\n'
+               's = [lastEvent |-> "Init", nested |-> [ok |-> TRUE, values |-> {}]]\n\n'
+               'State 2: <Execute line 1>\n'
+               's = [lastEvent |-> "Execute", nested |-> [ok |-> FALSE, '
+               'values |-> {[x |-> 1], [x |-> 2]}, '
+               'mapping |-> ("a" :> "public" @@ "b" :> "private")]]\n\n'
+               '10 states generated, 8 distinct states found\n')
         trace = check.normalize_trace(raw)
         self.assertEqual(trace["states"][1]["s"]["lastEvent"], "Execute")
-        for invalid in [{}, {"counterexample": {"state": []}},
-                        {"counterexample": {"state": [[1, {}], [2, {}]]}}]:
+        self.assertEqual(trace["states"][1]["s"]["nested"]["values"], [{"x": 1}, {"x": 2}])
+        self.assertEqual(trace["states"][1]["s"]["nested"]["mapping"],
+                         [["a", "public"], ["b", "private"]])
+        self.assertEqual(trace["actions"], ["Initial predicate", "Execute line 1"])
+        for invalid in ["", raw.replace("State 2:", "State 3:"),
+                        raw.replace("lastEvent |->", "lastEvent ->"),
+                        raw.replace("10 states generated", "missing counts")]:
             with self.assertRaises(RuntimeError):
                 check.normalize_trace(invalid)
 
@@ -375,7 +386,7 @@ class CrossRepoSourceCompilationTest(unittest.TestCase):
                     return subprocess.CompletedProcess(command, 1, json.dumps(compile_reports), "")
                 Path(command[2]).with_suffix(".lock.yml").write_text(
                     "\n".join([
-                        'GH_AW_CHECKOUT_MANIFEST_COUNT: "2"',
+                        '  GH_AW_CHECKOUT_MANIFEST_COUNT: "2"',
                         'GH_AW_CHECKOUT_REPO_0: "github/gh-aw"',
                         'GH_AW_CHECKOUT_REPO_1: "example/private-dependency"',
                         'GH_AW_CHECKOUT_TOKEN_1: ${{ secrets.MODEL_DEPENDENCY_READ_TOKEN }}',
@@ -422,14 +433,12 @@ class RuntimeCheckoutModelTest(unittest.TestCase):
     def test_runtime_counterexamples_are_separate_from_source_mutations(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            raw = {"counterexample": {"state": [
-                [1, {"s": {"lastEvent": "Init"}}],
-                [2, {"s": {"lastEvent": "Compile"}}],
-            ]}}
-
             def tlc(command, **kwargs):
-                Path(command[command.index("-dumpTrace") + 2]).write_text(json.dumps(raw))
+                self.assertNotIn("-dumpTrace", command)
                 text = ("Invariant PolicyProvenance is violated.\n"
+                        "Error: The behavior up to this point is:\n"
+                        'State 1: <Initial predicate>\ns = [lastEvent |-> "Init"]\n\n'
+                        'State 2: <Compile line 1>\ns = [lastEvent |-> "Compile"]\n\n'
                         "10 states generated, 8 distinct states found")
                 return subprocess.CompletedProcess(command, 12, text, "")
 
