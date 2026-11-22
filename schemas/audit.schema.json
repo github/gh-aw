@@ -2015,6 +2015,9 @@
             "total_aic": {
               "type": "number"
             },
+            "aic_found": {
+              "type": "boolean"
+            },
             "ambient_context": {
               "type": [
                 "null",

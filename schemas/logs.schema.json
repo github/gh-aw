@@ -752,6 +752,9 @@
             "total_aic": {
               "type": "number"
             },
+            "aic_coverage": {
+              "type": "string"
+            },
             "total_tokens": {
               "type": "integer"
             },
@@ -854,6 +857,8 @@
             "executed_success_runs",
             "total_runs",
             "total_duration",
+            "total_aic",
+            "aic_coverage",
             "total_action_minutes",
             "total_turns",
             "total_errors",
@@ -1004,6 +1009,9 @@
               },
               "aic": {
                 "type": "number"
+              },
+              "aic_coverage": {
+                "type": "string"
               },
               "ambient_context": {
                 "type": [
@@ -3606,6 +3614,9 @@
                   "total_aic": {
                     "type": "number"
                   },
+                  "aic_found": {
+                    "type": "boolean"
+                  },
                   "ambient_context": {
                     "type": [
                       "null",
@@ -4925,6 +4936,7 @@
               "classification",
               "token_usage",
               "aic",
+              "aic_coverage",
               "created_at",
               "url",
               "logs_path",
