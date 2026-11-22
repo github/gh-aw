@@ -1106,6 +1106,10 @@ jobs:
                   },
                   "start_line": {
                     "optionalPositiveInteger": true
+                  },
+                  "temporary_id": {
+                    "type": "string",
+                    "pattern": "^#?aw_[A-Za-z0-9_]{3,12}$"
                   }
                 },
                 "customValidation": "startLineLessOrEqualLine"
