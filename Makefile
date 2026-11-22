@@ -566,7 +566,7 @@ test-workflow-tool-contracts:
 test-pageindex-workflow:
 	@set -eu; \
 	if ! command -v uv >/dev/null 2>&1; then \
-		echo "uv is required to run PageIndex workflow tests (requires pageindex==0.5.3)." >&2; \
+		echo "uv is required to run PageIndex workflow tests." >&2; \
 		exit 1; \
 	fi; \
 	tmp_dir=$$(mktemp -d); \

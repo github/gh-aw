@@ -22,7 +22,7 @@ PAGEINDEX_AVAILABLE = importlib.util.find_spec("pageindex") is not None
 
 if not PAGEINDEX_AVAILABLE:
     print(
-        "Skipping PageIndex workflow tests: requires pageindex==0.5.3; "
+        "Skipping PageIndex workflow tests: requires the locked PageIndex package; "
         "run with `make test-pageindex-workflow`.",
         file=sys.stderr,
     )
@@ -30,7 +30,7 @@ if not PAGEINDEX_AVAILABLE:
 
 @unittest.skipUnless(
     PAGEINDEX_AVAILABLE,
-    "requires pageindex==0.5.3; run with `make test-pageindex-workflow`",
+    "requires the locked PageIndex package; run with `make test-pageindex-workflow`",
 )
 class PageIndexWorkflowTests(unittest.TestCase):
     @classmethod

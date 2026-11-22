@@ -1,10 +1,11 @@
 # PageIndex and its full dependency graph for Python 3.12 (wheel-only).
 # Refresh with uv 0.13.7 using a UTC cutoff at least three days in the past:
-#   printf '%s\n' 'pageindex==0.5.3' | uv pip compile - --universal \
+#   printf '%s\n' 'pageindex==0.7.2' | uv pip compile - --universal \
 #     --python-version 3.12 --only-binary=:all: --generate-hashes \
 #     --exclude-newer "$CUTOFF" --no-header --no-annotate
 # Review the pins and run make test-pageindex-workflow against the refreshed lock.
-# These wheel hashes were verified against PyPI with cutoff 2026-11-18T20:38:00Z.
+# Wheel hashes were verified against PyPI: 2026-11-18T20:38:00Z for
+# unchanged pins, and 2026-11-19T05:00:00Z for the filelock remediation.
 aiohappyeyeballs==2.7.1 \
     --hash=sha256:9243213661e29250eb41368e5daa826fc017156c3b8a11440826b2e3ed376472
 aiohttp==3.14.5 \
@@ -887,14 +888,14 @@ jsonschema==4.26.0 \
     --hash=sha256:d489f15263b8d200f8387e64b4c3a75f06629559fb73deb8fdfb525f2dab50ce
 jsonschema-specifications==2025.9.1 \
     --hash=sha256:98802fee3a11ee76ecaca44429fda8a41bff98b00a0f2838151b113f210cc6fe
-litellm==1.105.7 \
-    --hash=sha256:0b4fc0a10f169b0e4267eca5fc10fba5761c363e0352eaa6a2f8f51d403e10a5 \
-    --hash=sha256:1767478f082cd1d311ece801c2c88054002b89ed4970c3ec6f0bdfac00b1b7cd \
-    --hash=sha256:3195cffd85d3e9dc8e21fad8a69abc4cc38d7d03902d6123f50a6adc8945a44a \
-    --hash=sha256:40310aaaee2385df1afc9c91d0a0bd61884a8d2940b91e3d5d7739a4dac6b2dd \
-    --hash=sha256:6f942c5e4f877a42ba943b8328aab911cdf6087cb87a8a4d487cc9f5550f8796 \
-    --hash=sha256:8b3bcb6bf68cf7f2f4f45a692cb26a703676fc79d080ad6dbb97f8371ee18911 \
-    --hash=sha256:c174ac888622603c4de8e6ec247f4a1f4f950beb2a0dab3292c37421dc3df22f
+litellm==1.109.0 \
+    --hash=sha256:27ec560f5405a587c19c564c92c431cfaea9d81fa7dcee989522ba24a2a44e9e \
+    --hash=sha256:38473a723dca07bd92c6596465528da1ca610bdc6976305794c76610a65348d9 \
+    --hash=sha256:4309728c770de22bb797f08c26830b2feaf91e42e14fda584ddf5fa5d5d5cfc7 \
+    --hash=sha256:bda9a3cd0f9deb4678593250ce6e443e3d5928e90e0c51cb7a213ea9fdce7379 \
+    --hash=sha256:d30ef6121630c2380d567c484cb63ece2b74637b38baf240ea23f4f12da0c706 \
+    --hash=sha256:d9a5bf856384f962c3eced5afc82dc0724e6f2433e47df6459e7f5c322af69b0 \
+    --hash=sha256:e2e76acab04fe377f18bd1467fb3033204c93b0c70085df7af0fdcde20edcf07
 markupsafe==3.0.4 \
     --hash=sha256:007e1ffd9bf65bb6ee96df7b258fc632a4868dd5566037986c64781f35a36e98 \
     --hash=sha256:02fa4acbc6a3fc5c693c34d4dd8c1130b7fe99cc915181b0ddd6f72aeb296002 \
@@ -1209,8 +1210,8 @@ opentelemetry-api==1.45.2 \
     --hash=sha256:2cbd737377e710ee740d261c94e93fa0f08e6d037c18f17513cc0a2d94479a34
 packaging==26.3 \
     --hash=sha256:d7193f7c8e4e93f444fde0262bf90af30e16fa0ad0ad44cb553c87339b23cd1c
-pageindex==0.5.3 \
-    --hash=sha256:a095dfe9c72f0ba428c055ff995e5e47b3a8929f61a132312e3224bd2406a3b2
+pageindex==0.7.2 \
+    --hash=sha256:0b16a0798f76f55ad9b0291f3ff08a78dc1c7847bce2288439ec94d6a4a14fd6
 pillow==13.0.0 \
     --hash=sha256:02464da86f561f410e13b061ec37c3068a9cb557a095494157742d07b3c24a27 \
     --hash=sha256:04a63720f79e22fd54d897c233a68314c50ca0603360f54ce2bd5db8f0f43782 \
