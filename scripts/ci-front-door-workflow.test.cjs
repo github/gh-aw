@@ -12,7 +12,7 @@ const catalog = require("../.github/ci/suite-catalog.json");
 
 const workflow = fs.readFileSync(path.join(__dirname, "../.github/workflows/cgo.yml"), "utf8");
 const jobs = Object.fromEntries([...workflow.split("\njobs:\n")[1].matchAll(/^  ([\w-]+):\n([\s\S]*?)(?=^  [\w-]+:\n|$(?![\s\S]))/gm)].map(match => [match[1], match[2]]));
-const infrastructure = ["checkout-cache", "front-door-decision", "summarize-timing"];
+const infrastructure = ["checkout-cache", "front-door-decision", "summarize-timing", "test-pageindex-workflow"];
 const decision = jobs["front-door-decision"];
 const decisionSteps = decision.split(/^    - name: /m).slice(1);
 const validator = decisionSteps.find(step => step.startsWith("Validate suite outputs\n"));
@@ -81,6 +81,20 @@ test("the selector catalog covers every CGO check job", () => {
   assert.doesNotMatch(jobs["cross-platform-build"], /matrix:[\s\S]*outputs\.suite_ids/);
   assert.equal(condition(decision), "github.event_name == 'pull_request'");
   assert.equal(condition(jobs["summarize-timing"]), "always()");
+});
+
+test("PageIndex lock and source changes trigger an independent hash-locked install check", () => {
+  const triggers = workflow.split("\njobs:\n")[0];
+  for (const event of ["push", "pull_request"]) {
+    const trigger = triggers.match(new RegExp(`^  ${event}:\\n((?: {4}.*\\n)+)`, "m"))[1];
+    assert.match(trigger, /^    - '\.github\/workflows\/requirements-pageindex\.txt'$/m);
+    assert.match(trigger, /^    - '\.github\/workflows\/shared\/pageindex\.md'$/m);
+  }
+  const job = jobs["test-pageindex-workflow"];
+  assert.deepEqual(dependencies(job), []);
+  assert.equal(condition(job), undefined);
+  assert.doesNotMatch(job, /continue-on-error:/);
+  assert.match(job, /^      run: make test-pageindex-workflow$/m);
 });
 
 test("CGO unit tests use 12 disjoint shards with complete test-name coverage", () => {
