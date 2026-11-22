@@ -2910,7 +2910,7 @@ These files are loaded automatically by compatible AI tools (e.g., GitHub Copilo
 ### Related Documentation
 
 - [Scratchpad Index](./README.md) - Directory index of all specification and documentation files in the `scratchpad/` directory with status and implementation references
-- [Safe Outputs Specification](./safe-outputs-specification.md) - W3C-style formal specification
+- [Safe Outputs Specification](../docs/src/content/docs/specs/safe-outputs-specification.md) - W3C-style formal specification
 - [Validation Architecture](./validation-architecture.md) - Detailed validation patterns
 - [GitHub Actions Security](./github-actions-security-best-practices.md) - Security guidelines
 - [Code Organization](./code-organization.md) - Detailed file organization patterns

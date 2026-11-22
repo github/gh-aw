@@ -51,6 +51,23 @@ function requireEnvVar(name) {
   return value;
 }
 
+function webFetchStdioConfig() {
+  return {
+    command: "node",
+    args: [path.join(requireEnvVar("RUNNER_TEMP"), "gh-aw/actions/web_fetch_mcp_server.cjs")],
+  };
+}
+
+/**
+ * @param {Record<string, Record<string, unknown>>} servers
+ * @param {(config: ReturnType<typeof webFetchStdioConfig>) => Record<string, unknown>} format
+ */
+function addWebFetchMCPServer(servers, format) {
+  if (process.env.GH_AW_WEB_FETCH_MCP !== "1") return;
+  if (Object.hasOwn(servers, "web-fetch")) throw new Error("The web-fetch MCP server name is reserved when tools.web-fetch is enabled");
+  servers["web-fetch"] = format(webFetchStdioConfig());
+}
+
 /**
  * @param {{ extraRequiredEnv?: string[], keepCLIMountedServers?: boolean }} [options]
  * @returns {{
@@ -207,6 +224,8 @@ function runGatewayConversion(options) {
 }
 
 module.exports = {
+  addWebFetchMCPServer,
+  webFetchStdioConfig,
   rewriteUrl,
   normalizeGatewayEntry,
   loadGatewayContext,

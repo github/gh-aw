@@ -303,6 +303,7 @@ Create an issue and add a comment.
 	// Verify workflow_call outputs section is present
 	assert.Contains(t, yamlOutput, "workflow_call:", "should contain workflow_call trigger")
 	assert.Contains(t, yamlOutput, "outputs:", "should contain outputs section")
+	assert.Contains(t, yamlOutput, "GH_AW_ACTIVATION_CHECK_RUN_ID: ${{ job.check_run_id }}", "artifact names should bind to the activation execution, not the caller inputs")
 
 	// Verify create-issue outputs
 	assert.Contains(t, yamlOutput, "created_issue_number:", "should contain created_issue_number")

@@ -9,7 +9,7 @@ const fs = require("fs");
 const path = require("path");
 const { normalizeRuntimeMessage, readClaimScopeContext, currentClaimHandle } = require("./work_queue_claim_scope.cjs");
 
-const DIAGNOSTIC_AGENT_OUTPUT_TYPES = new Set(["noop", "report_missing_tool", "report_missing_data", "report_incomplete"]);
+const DIAGNOSTIC_AGENT_OUTPUT_TYPES = new Set(["noop", "report_missing_tool", "report_missing_data", "report_incomplete", "request_continuation"]);
 const TASK_COMPLETE_REGISTRATION_SIGNALS = ["not registering", "not registered", "not recognizing", "not recognized", "recognition issue", "not yet marked", "haven't marked", "tool calls are not registering"];
 const TASK_COMPLETE_COMPLETION_SIGNALS = ["completed successfully", "safe-output", "safe output", "no remaining work"];
 const TASK_COMPLETE_COMPLETION_REGEXPS = [/\banalysis steps? completed\b/, /\ball steps completed\b/];

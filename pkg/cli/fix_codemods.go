@@ -79,7 +79,6 @@ func getEarlyCodemods() []Codemod {
 		getInstallScriptURLCodemod(),
 		getBashAnonymousRemovalCodemod(),              // Replace bash: with bash: false
 		getBashSingleQuotedArgsCodemod(),              // Rewrite single-quoted bash args to double-quoted form
-		getCopilotWebFetchRemovalCodemod(),            // Remove native Copilot web-fetch, unavailable in offline BYOK mode
 		getCopilotWebSearchRemovalCodemod(),           // Remove native Copilot web-search, unavailable in offline BYOK mode
 		getBashAllowlistUnsupportedEngineCodemod(),    // Detect restricted tools.bash on engines that ignore it and emit guided error
 		getActivationOutputsCodemod(),                 // Transform needs.activation.outputs.* to steps.sanitized.outputs.*

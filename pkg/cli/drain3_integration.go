@@ -195,6 +195,16 @@ func buildAgentEventsFromProcessedRun(processedRun ProcessedRun, metrics Metrics
 		})
 	}
 
+	for _, request := range processedRun.ContinuationRequests {
+		events = append(events, agentdrain.AgentEvent{
+			Stage: "tool_result",
+			Fields: map[string]string{
+				"type":    "request_continuation",
+				"message": request.Message,
+			},
+		})
+	}
+
 	// Synthesise a finish event only when the run has a meaningful conclusion.
 	conclusion := processedRun.Run.Conclusion
 	if conclusion == "" {

@@ -145,6 +145,8 @@ tools:
     - "git status"
 
 safe-outputs:
+  request-continuation:
+    max: 1
   steer: true
   create-pull-request:
     expires: 3d
@@ -159,6 +161,8 @@ timeout-minutes: 30
 ---
 
 # Package Specification Extractor
+
+If useful extraction work remains when the run budget is nearly exhausted, call `request_continuation` once with a message identifying the unfinished packages and saved progress. This records a follow-up request only; it does not restart the workflow or confirm extraction completion. Use `noop` only when no further action is needed, and `report_incomplete` for blocking failures.
 
 You are the Package Specification Extractor — an expert technical writer agent modeled after a W3C specification author. Your mission is to analyze Go source packages and produce clear, structured README.md specifications that serve as the authoritative contract for each package.
 

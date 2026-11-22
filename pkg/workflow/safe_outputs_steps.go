@@ -2,6 +2,7 @@ package workflow
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/logger"
@@ -113,6 +114,8 @@ type GitHubScriptStepConfig struct {
 	// Environment variables specific to this safe output type
 	// These are added after GH_AW_AGENT_OUTPUT
 	CustomEnvVars []string
+	// ProtectCustomEnvVars prevents safe-outputs.env from overriding compiler-owned step inputs.
+	ProtectCustomEnvVars bool
 
 	// JavaScript script constant to format and include (for inline mode)
 	Script string
@@ -195,7 +198,15 @@ func (c *Compiler) buildGitHubScriptStepCommon(data *WorkflowData, config GitHub
 	steps = append(steps, config.CustomEnvVars...)
 
 	// Add custom environment variables from safe-outputs.env
-	c.addSafeOutputEnvVars(&steps, data, false)
+	var protectedEnv map[string]bool
+	if config.ProtectCustomEnvVars {
+		protectedEnv = map[string]bool{"GH_AW_AGENT_OUTPUT": true}
+		for _, entry := range config.CustomEnvVars {
+			key, _, _ := strings.Cut(strings.TrimSpace(entry), ":")
+			protectedEnv[key] = true
+		}
+	}
+	c.addSafeOutputEnvVars(&steps, data, false, protectedEnv)
 
 	// With section for github-token
 	steps = append(steps, "        with:\n")

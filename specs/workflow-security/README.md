@@ -811,7 +811,7 @@ cleanup failure. The additional runtime-checkout model exhausts both job kinds
 and verifies the controls and witnesses described above. The MCP compilation
 model adds its secure baseline, nineteen negative controls, and seven witnesses.
 
-Counterexamples include raw `tlc-trace.json`, normalized `trace.json`, and
+Counterexamples include the full textual trace in `TLC.log`, normalized `trace.json`, and
 `events.txt`. `CompiledWorkflow` negative controls also generate `source.md` and
 `counterexample.json`; runtime-checkout controls generate classification reports
 without inventing source-level exploits. Only `agent-write` directly changes a supported
@@ -847,8 +847,9 @@ repository-write agent permissions, checkout credentials without immediately
 following fail-closed cleanup and verification,
 cross-run artifact downloads, missing strict detector gates, unpinned external
 actions, wrong dependency credentials, excessive app scopes, or disabled token
-revocation. Its `daily` profile omits seed-specific token/app assertions while
-still requiring detection. The `compiled` profile reads an independent
+revocation. Docker actions require a full SHA-256 image digest; other external
+actions require a full commit SHA. Its `daily` profile omits seed-specific
+token/app assertions while still requiring detection. The `compiled` profile reads an independent
 `gh-aw-manifest.threat_detection` declaration emitted by the compiler. Missing
 or unknown policy is an error; absent jobs cannot establish an opt-out. Reports
 include the effective policy so a disabled detector is never presented as
