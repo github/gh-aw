@@ -27,7 +27,6 @@ func TestForbiddenFieldsImportRejection(t *testing.T) {
 		"if":              `if: success()`,
 		"name":            `name: Test Workflow`,
 		"run-name":        `run-name: Test Run`,
-		"runs-on":         `runs-on: ubuntu-latest`,
 		"sandbox":         `sandbox: {enabled: true}`,
 		"strict":          `strict: true`,
 		"timeout-minutes": `timeout-minutes: 30`,

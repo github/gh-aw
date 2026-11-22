@@ -33,6 +33,7 @@ run_with_env() {
 
 ATTEMPT_FILE="$WORKDIR/attempts"
 OUTPUT="$WORKDIR/retry-output.log"
+EVENT='{"type":"tool.execution_complete","data":{"text":"Quoted ##[error] from a job log"}}'
 if ! run_with_env bash -c '
   attempts_file="$1"
   attempts="$(cat "$attempts_file" 2>/dev/null || echo 0)"
@@ -44,7 +45,8 @@ if ! run_with_env bash -c '
     exit 1
   fi
   echo "[codex-harness] started"
-' bash "$ATTEMPT_FILE" > "$OUTPUT" 2>&1; then
+  printf "%s" "$2" >&2
+' bash "$ATTEMPT_FILE" "$EVENT" > "$OUTPUT" 2>&1; then
   cat "$OUTPUT" >&2
   fail "expected startup retry to recover"
 fi
@@ -53,6 +55,23 @@ fi
 grep -Fq "[codex-awf-retry] AWF startup failed before codex harness; retrying fresh" "$OUTPUT" || fail "expected retry diagnostic"
 grep -Fq "Fatal error: Refusing to use symlink as bind mountpoint" "$WORKDIR/agent.log" || fail "expected first attempt in agent log"
 grep -Fq "[codex-harness] started" "$WORKDIR/agent.log" || fail "expected successful attempt in agent log"
+printf '%s\n' \
+  "Fatal error: Refusing to use symlink as bind mountpoint: /usr/bin/go" \
+  "Process exiting with code: 1" \
+  "[codex-harness] started" > "$WORKDIR/expected-agent.log"
+printf '%s' "$EVENT" >> "$WORKDIR/expected-agent.log"
+cmp "$WORKDIR/expected-agent.log" "$WORKDIR/agent.log" || fail "expected an unchanged agent log"
+node - "$OUTPUT" "$EVENT" <<'NODE'
+const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const output = fs.readFileSync(process.argv[2], "utf8");
+const attempts = [...output.matchAll(/^::stop-commands::([a-f0-9]{32})\n([\s\S]*?)^::\1::$/gm)];
+assert.equal(attempts.length, 2, "expected a matching stop/resume pair per attempt");
+assert.notEqual(attempts[0][1], attempts[1][1], "expected a fresh token on retry");
+assert.match(attempts[0][2], /Process exiting with code: 1/);
+assert.ok(output.indexOf("[codex-awf-retry]") > attempts[0].index + attempts[0][0].length);
+assert.equal(attempts[1][2], `[codex-harness] started\n${process.argv[3]}\n`);
+NODE
 node - "$GH_AW_HARNESS_TELEMETRY_DIR/harness_retry.json" <<'NODE'
 const assert = require("node:assert/strict");
 const telemetry = require(process.argv[2]);
@@ -114,6 +133,58 @@ set -e
 grep -Fq "[ERROR] Fatal error: AWF model routing failed (exit code 78)" "$OUTPUT" || fail "expected routing-specific failure diagnostic"
 grep -Fq "AWF model routing failed (exit code 78)" "$WORKDIR/routing-agent.log" || fail "expected routing diagnostic in agent log"
 
+OUTPUT="$WORKDIR/sdk-masking-output.log"
+ATTEMPT_FILE="$WORKDIR/sdk-attempts"
+: > "$WORKDIR/routing-agent.log"
+GITHUB_ACTIONS=true COPILOT_SDK_URI="http://127.0.0.1:3002" run_routing_with_env bash -c '
+  attempts="$(cat "$1" 2>/dev/null || echo 0)"
+  printf "%s" "$((attempts + 1))" > "$1"
+  node -e '"'"'
+    const { resolveCopilotConnectionToken } = require(process.argv[1]);
+    const { maskSecret } = require(process.argv[2]);
+    const token = resolveCopilotConnectionToken();
+    maskSecret(token);
+    process.stdout.write(token + "\n");
+  '"'"' "$2" "$3"
+  if [ "$attempts" -eq 0 ]; then
+    echo "Fatal error: startup failed"
+    exit 1
+  fi
+  echo "[copilot-harness] started"
+  printf "%s" "$4"
+' bash "$ATTEMPT_FILE" "${SCRIPT_DIR}/../js/copilot_harness.cjs" "${SCRIPT_DIR}/../js/actions_secret_masking.cjs" "$EVENT" > "$OUTPUT" 2>&1
+node - "$OUTPUT" "$WORKDIR/routing-agent.log" <<'NODE'
+const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const output = fs.readFileSync(process.argv[2], "utf8");
+const attempts = [...output.matchAll(/^::add-mask::([a-f0-9]{64})\n::stop-commands::([a-f0-9]{32})\n([\s\S]*?)^::\2::$/gm)];
+assert.equal(attempts.length, 2, "expected host mask registration before each pause");
+assert.notEqual(attempts[0][1], attempts[1][1], "expected a fresh SDK credential on retry");
+for (const attempt of attempts) {
+  assert.ok(attempt[3].startsWith(`::add-mask::${attempt[1]}\n${attempt[1]}\n`), "harness must reuse the host-masked credential");
+}
+assert.equal(fs.readFileSync(process.argv[3], "utf8"), attempts.map(attempt => attempt[3].slice(0, -1)).join(""), "captured attempt bytes must remain unchanged");
+// Simulate the runner: command parsing pauses, but registered masks still apply.
+let paused = "";
+const masks = [];
+const visible = [];
+for (const line of output.split("\n")) {
+  if (paused && line === `::${paused}::`) {
+    paused = "";
+  } else if (!paused && line.startsWith("::add-mask::")) {
+    masks.push(line.slice("::add-mask::".length));
+  } else if (!paused && line.startsWith("::stop-commands::")) {
+    paused = line.slice("::stop-commands::".length);
+  } else {
+    assert.ok(paused || !line.includes("##[error]"), "quoted annotations must remain inside the pause");
+    visible.push(masks.reduce((text, mask) => text.replaceAll(mask, "***"), line));
+  }
+}
+assert.equal(paused, "");
+assert.equal(masks.length, 2);
+for (const mask of masks) assert.ok(!visible.join("\n").includes(mask), "runner-visible output must not expose the SDK credential");
+NODE
+
 run_with_evidence_env() {
   GH_AW_AWF_ENGINE_NAME="codex" \
     GH_AW_AWF_HARNESS_MARKER="[codex-harness]" \
@@ -172,5 +243,27 @@ set -e
 
 [ "$STATUS" -eq 3 ] || fail "expected original post-harness failure status, got $STATUS"
 grep -Fq '"state":"started"' "$EVIDENCE_FILE" || fail "expected execution evidence to remain started after harness ran"
+
+OUTPUT="$WORKDIR/token-failure-output.log"
+INVOKED_FILE="$WORKDIR/token-failure-invoked"
+export GH_AW_HARNESS_TELEMETRY_DIR="$WORKDIR/token-failure-telemetry"
+od() { return 1; }
+export -f od
+set +e
+run_with_evidence_env bash -c 'printf invoked > "$1"' bash "$INVOKED_FILE" > "$OUTPUT" 2>&1
+STATUS=$?
+set -e
+unset -f od
+[ "$STATUS" -eq 1 ] || fail "expected token-generation failure status"
+[ ! -f "$INVOKED_FILE" ] || fail "token-generation failure must not invoke AWF"
+grep -Fq '"state":"not_started"' "$EVIDENCE_FILE" || fail "expected token-generation failure evidence"
+node - "$GH_AW_HARNESS_TELEMETRY_DIR/harness_retry.json" <<'NODE'
+const assert = require("node:assert/strict");
+const telemetry = require(process.argv[2]);
+assert.equal(telemetry.startup_attempt_results.length, 1);
+assert.equal(telemetry.startup_attempt_results[0].outcome, "failure");
+assert.equal(telemetry.startup_attempt_results[0].exit_code, 1);
+assert.deepEqual(telemetry.startup_attempt_results[0].failure_classes, ["startup_error"]);
+NODE
 
 echo "run_awf_with_startup_retries.sh tests passed"

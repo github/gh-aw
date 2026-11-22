@@ -119,7 +119,7 @@ func (c *Compiler) addActivationOAuthTokenCheckStep(ctx *activationJobBuildConte
 }
 
 func (c *Compiler) addActivationCrossRepoGuidanceStep(ctx *activationJobBuildContext) {
-	if !hasWorkflowCallTrigger(ctx.data.On) || ctx.data.InlinedImports {
+	if !needsActivationHostRepoCheckout(ctx.data) {
 		return
 	}
 	compilerActivationJobLog.Print("Adding cross-repo setup guidance step for workflow_call trigger")
@@ -173,12 +173,14 @@ func (c *Compiler) addActivationCheckoutAndBaseRestoreStep(ctx *activationJobBui
 	data := ctx.data
 	checkoutSteps := c.generateCheckoutGitHubFolderForActivation(data)
 	ctx.steps = append(ctx.steps, checkoutSteps...)
-	if len(checkoutSteps) > 0 && (!isPRCheckoutDisabled(data) || dynamicWorkflowsEnabled(ctx.engine, data.EngineConfig)) {
+	stageCopilotSDKAgents := data.EngineConfig != nil && data.EngineConfig.CopilotSDK
+	if len(checkoutSteps) > 0 && (!isPRCheckoutDisabled(data) || dynamicWorkflowsEnabled(ctx.engine, data.EngineConfig) || stageCopilotSDKAgents) {
 		compilerActivationJobLog.Print("Adding step to save agent config folders for base branch restoration")
 		folders, files := resolveAgentManifestPaths(c.engineRegistry, data)
 		ctx.steps = append(ctx.steps, generateSaveBaseGitHubFoldersStep(
 			folders,
 			files,
+			stageCopilotSDKAgents,
 		)...)
 	}
 }

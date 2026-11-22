@@ -87,6 +87,7 @@ type importAccumulator struct {
 	// Values are stored as JSON-encoded raw values so numeric literals and strings
 	// round-trip consistently through import processing.
 	mergedMaxTurns           string
+	runsOn                   any
 	mergedMaxToolDenials     string
 	mergedMaxToolCalls       string
 	mergedMaxRuns            string
@@ -155,6 +156,7 @@ func (acc *importAccumulator) buildImportsResult() *ImportsResult {
 		MergedPreSteps:                acc.preStepsBuilder.String(),
 		MergedPreAgentSteps:           acc.preAgentStepsBuilder.String(),
 		MergedRuntimes:                acc.runtimesBuilder.String(),
+		MergedRunsOn:                  acc.runsOn,
 		MergedRunInstallScripts:       acc.runInstallScripts,
 		MergedServices:                acc.servicesBuilder.String(),
 		MergedNetwork:                 acc.networkBuilder.String(),

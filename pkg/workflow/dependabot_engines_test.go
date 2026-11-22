@@ -172,7 +172,7 @@ func TestDependabotCopilotSDKDependencies(t *testing.T) {
 				}
 			case "pip":
 				assert.Equal(t, []PipDependency{{Name: test.pkg, Version: test.version}}, c.collectPipDependencies(data))
-				assert.NotContains(t, c.collectNpmDependencies(data), NpmDependency{Name: "@github/copilot-sdk", Version: string(constants.DefaultCopilotSDKVersion)})
+				assert.NotContains(t, c.collectNpmDependencies(data), NpmDependency{Name: "@microsoft/copilot-sdk", Version: string(constants.DefaultCopilotSDKNPMVersion)})
 			case "go":
 				assert.Equal(t, []GoDependency{{Path: test.pkg, Version: test.version}}, c.collectGoDependencies(data))
 			}
@@ -231,8 +231,8 @@ updates:
 		variant, manifest, lock string
 		direct                  []string
 	}{
-		{"node", setup.CopilotSDKNodeManifest, setup.CopilotSDKNodeLock, []string{"@github/copilot-sdk", "undici"}},
-		{"typescript", setup.CopilotSDKTypeScriptManifest, setup.CopilotSDKTypeScriptLock, []string{"@github/copilot-sdk", "undici", "ts-node", "typescript"}},
+		{"node", setup.CopilotSDKNodeManifest, setup.CopilotSDKNodeLock, []string{"@microsoft/copilot-sdk", "undici"}},
+		{"typescript", setup.CopilotSDKTypeScriptManifest, setup.CopilotSDKTypeScriptLock, []string{"@microsoft/copilot-sdk", "undici", "ts-node", "typescript"}},
 	} {
 		update := config.Updates[i+1]
 		assert.Equal(t, "npm", update.PackageEcosystem)
