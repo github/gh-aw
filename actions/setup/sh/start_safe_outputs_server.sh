@@ -107,7 +107,7 @@ for i in {1..60}; do
   fi
   
   # Check if server is responding
-  if curl -s -f "http://localhost:$GH_AW_SAFE_OUTPUTS_PORT/health" > /dev/null 2>&1; then
+  if curl -s -f "http://127.0.0.1:$GH_AW_SAFE_OUTPUTS_PORT/health" > /dev/null 2>&1; then
     echo "Safe Outputs MCP server is ready (attempt $i/60)"
     
     # Print the startup log for debugging

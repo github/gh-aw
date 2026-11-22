@@ -104,6 +104,7 @@ function readRequestBody(req) {
  * @param {Object} options - Runner options
  * @param {any} options.transport - Connected MCPHTTPTransport instance
  * @param {number} options.port - Port to listen on
+ * @param {string} [options.host] - Local interface to bind; omitted for Docker host-gateway clients
  * @param {Function} options.getHealthPayload - Zero-argument function that returns the JSON object for GET /health responses
  * @param {Object} options.logger - Logger instance (from mcp_logger.cjs createLogger)
  * @param {string} options.serverLabel - Human-readable label used in log messages (e.g. "MCP Scripts")
@@ -112,7 +113,7 @@ function readRequestBody(req) {
  * @returns {Promise<http.Server>} The started HTTP server
  */
 async function runHttpServer(options) {
-  const { transport, port, getHealthPayload, logger, serverLabel, configureServer } = options;
+  const { transport, port, host, getHealthPayload, logger, serverLabel, configureServer } = options;
   const expectedKey = Buffer.from(requireHttpApiKey(options.apiKey, `${serverLabel} API key`));
 
   const httpServer = http.createServer(async (req, res) => {
@@ -220,9 +221,8 @@ async function runHttpServer(options) {
   httpServer.headersTimeout = REQUEST_BODY_TIMEOUT_MS;
   httpServer.requestTimeout = REQUEST_BODY_TIMEOUT_MS;
 
-  // Bridged gateways and agents reach MCP Scripts through the Docker host gateway.
   logger.debug(`Attempting to bind to port ${port}...`);
-  httpServer.listen(port, () => {
+  httpServer.listen({ port, host }, () => {
     logger.debug(`=== ${serverLabel} HTTP Server Started Successfully ===`);
     logger.debug(`HTTP server listening on http://localhost:${port}`);
     logger.debug(`MCP endpoint: POST http://localhost:${port}/`);

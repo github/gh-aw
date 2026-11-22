@@ -48,6 +48,7 @@ describe("CLI proxy diagnostic redaction", () => {
       "docker",
       `printf '%s\\n' "$*" >> "$TEST_CALLS"
 case "$1" in
+  network) printf '%s\\n' "$TEST_BRIDGE_GATEWAY" ;;
   run)
     if [ "$TEST_OVERSIZED_RUN" = true ]; then
       "$TEST_NODE" -e 'process.stdout.write("x".repeat(2 * 1024 * 1024) + process.env.GH_TOKEN + "\\n")'
@@ -98,7 +99,9 @@ fi
 exec /bin/rm "$@"`
     );
     if (options.captureFailure) executable("mktemp", 'printf "%s" "$TEST_DIAGNOSTICS"; printf "%s" "$TEST_DIAGNOSTICS" >&2; exit 1');
-    if (options.sanitizerFailure) {
+    if (options.mockCapture) {
+      executable("node", "cat >/dev/null");
+    } else if (options.sanitizerFailure) {
       executable("node", 'printf "%s" "$TEST_DIAGNOSTICS"; printf "%s" "$TEST_DIAGNOSTICS" >&2; exit 1');
     } else if (options.redactorThrows) {
       const preload = path.join(root, "throw.cjs");
@@ -107,6 +110,7 @@ exec /bin/rm "$@"`
     }
     const result = spawnSync("bash", [path.join(root, "start_cli_proxy.sh")], {
       encoding: "utf8",
+      timeout: 10_000,
       env: {
         ...process.env,
         ...Object.fromEntries(["HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY", "http_proxy", "https_proxy", "no_proxy"].map(name => [name, undefined])),
@@ -115,6 +119,8 @@ exec /bin/rm "$@"`
         TMPDIR: artifactRoot,
         RUNNER_TEMP: runnerTemp,
         GH_TOKEN: custom,
+        GH_AW_NETWORK_ISOLATION: options.networkIsolation ? "true" : "false",
+        TEST_BRIDGE_GATEWAY: options.bridgeGateway ?? "172.17.0.1",
         CLI_PROXY_IMAGE: options.noImage ? "" : "synthetic-proxy:latest",
         GITHUB_SERVER_URL: "https://github.com",
         TEST_DIAGNOSTICS: options.diagnostics || diagnostics,
@@ -179,6 +185,22 @@ exec /bin/rm "$@"`
     expect(result.output).toContain("CLI proxy ready on port 18443");
     expect(result.output).toContain("connection refused: ***");
     expect(result.calls).not.toContain("logs awmg-cli-proxy");
+  });
+
+  it.each([false, true])("limits host publication to local addresses (network isolation: %s)", networkIsolation => {
+    const result = runProxy({ ready: true, networkIsolation, mockCapture: true });
+    expect(result.status).toBe(0);
+    const run = result.calls.split("\n").find(line => line.startsWith("run "));
+    expect(run).toContain("--network bridge -p 127.0.0.1:18443:18443");
+    if (networkIsolation) expect(run).not.toContain("172.17.0.1:18443:18443");
+    else expect(run).toContain("-p 172.17.0.1:18443:18443");
+  });
+
+  it("fails closed if the legacy sidecar path has no IPv4 bridge gateway", () => {
+    const result = runProxy({ ready: true, bridgeGateway: "fd00::1", mockCapture: true });
+    expect(result.status).toBe(1);
+    expect(result.output).toContain("Cannot determine the IPv4 Docker bridge gateway");
+    expect(result.calls).not.toMatch(/^run /m);
   });
 
   it("trusts Copilot reviews and agentic autofix PRs without disabling integrity filtering", () => {

@@ -319,6 +319,7 @@ async function startHttpServer(options = {}) {
     return await runHttpServer({
       transport,
       port,
+      host: "127.0.0.1",
       apiKey,
       getHealthPayload: () => ({
         status: "ok",

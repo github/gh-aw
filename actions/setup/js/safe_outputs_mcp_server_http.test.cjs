@@ -43,6 +43,7 @@ describe("safe-outputs HTTP authentication", () => {
     vi.stubEnv("GH_AW_SAFE_OUTPUTS_API_KEY", "safeoutputs-http-test-key");
     server = await startHttpServer({ port: 0 });
     await new Promise(resolve => server.once("listening", resolve));
+    expect(server.address().address).toBe("127.0.0.1");
     const url = `http://127.0.0.1:${server.address().port}`;
     expect((await fetch(`${url}/health`)).status).toBe(200);
 

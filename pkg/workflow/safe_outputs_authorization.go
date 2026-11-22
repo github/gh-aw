@@ -669,6 +669,8 @@ func authorizationImplementationDigest(value any) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("cannot serialize safe-output authorization implementation: %w", err)
 	}
+	// This fingerprints compile-time implementation JSON. GitHub Actions secret
+	// expressions are still literal references here, not resolved credentials.
 	digest := sha256.Sum256(data)
 	return hex.EncodeToString(digest[:]), nil
 }

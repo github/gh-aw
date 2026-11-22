@@ -126,14 +126,23 @@ if [ -n "$POLICY" ]; then
   POLICY_ARGS=(--policy "$POLICY")
 fi
 
-DOCKER_NETWORK_ARGS=(--network host)
-if [ "${GH_AW_NETWORK_ISOLATION:-false}" = "true" ]; then
-  DOCKER_NETWORK_ARGS=(--network bridge -p 127.0.0.1:18443:18443)
+DOCKER_NETWORK_ARGS=(--network bridge -p 127.0.0.1:18443:18443)
+if [ "${GH_AW_NETWORK_ISOLATION:-false}" != "true" ]; then
+  # The legacy AWF sidecar resolves host.docker.internal to the default Docker
+  # bridge gateway. Publish there as well as on loopback, but not on external
+  # runner interfaces. Isolation mode uses the proxy's container name instead.
+  BRIDGE_GATEWAY=$(docker network inspect bridge --format '{{range .IPAM.Config}}{{println .Gateway}}{{end}}' |
+    awk '/^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$/ { print; exit }')
+  if [[ -z "$BRIDGE_GATEWAY" || "$BRIDGE_GATEWAY" == "0.0.0.0" ]]; then
+    echo "::error::Cannot determine the IPv4 Docker bridge gateway for the CLI proxy" >&4
+    exit 1
+  fi
+  DOCKER_NETWORK_ARGS+=(-p "$BRIDGE_GATEWAY:18443:18443")
 fi
 
 PROXY_ENV_ARGS=()
 for proxy_var in HTTP_PROXY HTTPS_PROXY NO_PROXY http_proxy https_proxy no_proxy; do
-  if [ "${!proxy_var+x}" = x ]; then
+  if printenv "$proxy_var" >/dev/null; then
     PROXY_ENV_ARGS+=(-e "$proxy_var")
   fi
 done

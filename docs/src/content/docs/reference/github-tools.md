@@ -143,6 +143,8 @@ tools:
 
 ### CLI proxy startup diagnostics
 
+The CLI proxy publishes its port on runner loopback. Without network isolation, it also publishes on the default Docker bridge gateway so the AWF sidecar can reach it. In network-isolation mode, the sidecar reaches it by container name instead.
+
 The CLI proxy waits up to 30 seconds for readiness. Startup diagnostics are captured in a private temporary directory outside artifact upload roots, with a 1 MiB input limit. Before publishing the last 20 lines, the startup script redacts built-in credential patterns and supplied secret values, including a custom GitHub token passed as `GH_TOKEN`. Unrelated workflow secrets are not automatically forwarded to the startup step.
 
 If capture exceeds the limit or sanitization fails, the step withholds the diagnostics and reports a fixed error instead of printing raw output. Timeout diagnostics retain the readiness failure reason. Raw temporary diagnostics are removed on normal exit; a cleanup failure is reported and fails the step.
