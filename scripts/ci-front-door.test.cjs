@@ -433,7 +433,6 @@ test("catalog pins the fast suite and savings exclude required checks", async ()
 });
 
 test("fast checks are retained even when the model would omit every suite", () => {
-  assert.deepEqual(selectSuites({ suite_ids: ["canary-go"], confidence: 1 }, catalog, diff), ["verify-integration-build", "test", "test-slow", "canary-go"]);
   assert.deepEqual(selectSuites({ suite_ids: ["test"], confidence: 1 }, catalog, diff), ["verify-integration-build", "test"]);
   assert.deepEqual(selectSuites({ suite_ids: ["test-slow"], confidence: 1 }, catalog, diff), [...fastBaseline, "test-slow"]);
   for (const [id, dependencies] of Object.entries(JOB_DEPENDENCIES)) {

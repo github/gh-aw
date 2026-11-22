@@ -154,15 +154,18 @@ jobs:
       run: |
         node <<'NODE'
         const fs = require('node:fs');
-        const known = ['front-door-conformance', 'verify-integration-build', 'test', 'test-slow', 'canary-go', 'impacted-go-tests', 'native-javascript-tests', 'build', 'build-wasm', 'validate-yaml', 'check-validator-sizes', 'lint-go-format', 'lint-go-golangci', 'lint-go-govulncheck', 'lint-go-custom', 'lint-error-messages', 'actions-build', 'fuzz', 'security', 'security-scan', 'mcp-server-compile-test', 'cross-platform-build', 'alpine-container-test', 'safe-outputs-conformance'];
-        const dependencies = {test: ['verify-integration-build'], 'test-slow': ['verify-integration-build'], 'canary-go': ['test', 'test-slow'], security: ['build'], 'security-scan': ['build'], 'cross-platform-build': ['build']};
+        const known = ['front-door-conformance', 'verify-integration-build', 'test', 'test-slow', 'impacted-go-tests', 'native-javascript-tests', 'build', 'build-wasm', 'validate-yaml', 'check-validator-sizes', 'lint-go-format', 'lint-go-golangci', 'lint-go-govulncheck', 'lint-go-custom', 'lint-error-messages', 'actions-build', 'fuzz', 'security', 'security-scan', 'mcp-server-compile-test', 'cross-platform-build', 'alpine-container-test', 'safe-outputs-conformance'];
+        const dependencies = {test: ['verify-integration-build'], 'test-slow': ['verify-integration-build'], security: ['build'], 'security-scan': ['build'], 'cross-platform-build': ['build']};
         let suiteIds = '';
         try {
-          const ids = JSON.parse(process.env.RAW_SUITE_IDS);
-          if (process.env.SELECTOR_OUTCOME === 'success' && Array.isArray(ids) &&
-              ids.includes('test') && ids.length <= known.length && new Set(ids).size === ids.length &&
-              ids.every(id => known.includes(id) && (dependencies[id] || []).every(dependency => ids.includes(dependency)))) {
-            suiteIds = JSON.stringify(ids);
+          const raw = JSON.parse(process.env.RAW_SUITE_IDS);
+          if (process.env.SELECTOR_OUTCOME === 'success' && Array.isArray(raw) && new Set(raw).size === raw.length) {
+            // The trusted PR base can still return the retired PR suite during rollout.
+            const ids = raw.filter(id => id !== 'canary-go');
+            if (ids.includes('test') && ids.length <= known.length &&
+                ids.every(id => known.includes(id) && (dependencies[id] || []).every(dependency => ids.includes(dependency)))) {
+              suiteIds = JSON.stringify(ids);
+            }
           }
         } catch (error) {
           if (!(error instanceof SyntaxError)) throw error;
@@ -539,8 +542,7 @@ jobs:
     - checkout-cache
     - test
     - test-slow
-    - front-door-decision
-    if: always() && !cancelled() && needs.checkout-cache.result == 'success' && needs.test.result == 'success' && needs.test-slow.result == 'success' && (github.event_name != 'pull_request' || needs.front-door-decision.result != 'success' || !needs.front-door-decision.outputs.suite_ids || contains(fromJSON(needs.front-door-decision.outputs.suite_ids), 'canary-go'))
+    if: always() && !cancelled() && github.event_name != 'pull_request' && needs.checkout-cache.result == 'success' && needs.test.result == 'success' && needs.test-slow.result == 'success'
     permissions:
       contents: read
     steps:
