@@ -109,8 +109,10 @@ plt.savefig('/tmp/gh-aw/python/charts/trend.png', dpi=300, bbox_inches='tight')
 Call the `upload_asset` tool for each chart image:
 
 ```json
-{ "type": "upload_asset", "path": "/tmp/gh-aw/python/charts/trend.png" }
+{ "path": "/tmp/gh-aw/python/charts/trend.png" }
 ```
+
+Omit `type`; the schema accepts only `path`, plus optional `secrecy` and `integrity`.
 
 The tool returns a direct URL to the uploaded image.
 
