@@ -16,7 +16,8 @@ const { resolveTopLevelDiscussionCommentId } = require("./github_api_helpers.cjs
 const { assembleReportBodyParts } = require("./markdown_body_helpers.cjs");
 const { parseReportMarkdown } = require("./report_markdown.cjs");
 const { renderSizedReport } = require("./report_size.cjs");
-const { normalizeReport, normalizeReportAllowedURL } = require("./report_ast.cjs");
+const { normalizeReport, normalizeReportAllowedURL, normalizeReportText } = require("./report_ast.cjs");
+const { containsSensitiveContent } = require("./redact_secrets.cjs");
 const { buildNoopConclusionSummary } = require("./conclusion_summary.cjs");
 const { generateHistoryUrl } = require("./generate_history_link.cjs");
 
@@ -147,6 +148,11 @@ function appendAgentReports(children, items) {
     }
     if (typeof text !== "string" || !text.trim()) continue;
     try {
+      // Withhold explanations still flagged after the shared report redaction.
+      if (containsSensitiveContent(normalizeReportText(text))) {
+        core.warning("Omitting an agent explanation flagged by credential screening");
+        continue;
+      }
       // Unlike top-level status sections, headings nested in details start at level 3.
       const blocks = parseReportMarkdown(sanitizeContent(text), { agentTainted: true });
       if (!blocks.length) continue;

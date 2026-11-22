@@ -292,6 +292,34 @@ const mockCore = {
           }
         });
 
+        it("masks recognized credentials in the published explanation", async () => {
+          const pat = `ghp_${"A".repeat(36)}`;
+          const awsKey = `AKIA${"B".repeat(16)}`;
+          const body = await renderAcceptedExplanations([{ type: "noop", message: `Credential diagnostics:\n\n\`\`\`text\n${pat}\n${awsKey}\n\`\`\`` }]);
+
+          expect(body).toContain("<summary>No-op message</summary>");
+          expect(body).toContain("Credential diagnostics:");
+          expect(body).toContain("***REDACTED***\n***REDACTED***");
+          expect(body.includes(pat)).toBe(false);
+          expect(body.includes(awsKey)).toBe(false);
+        });
+
+        it.each([
+          ["bearer credential", "Authorization: Bearer synthetic-opaque-bearer"],
+          ["PEM private key", "-----BEGIN PRIVATE KEY-----\nU3ludGhldGljIGZpeHR1cmU=\n-----END PRIVATE KEY-----"],
+          ["sensitive assignment", "API_SECRET=synthetic-opaque-value"],
+        ])("withholds an explanation containing a %s and preserves the status", async (_case, diagnostic) => {
+          const body = await renderAcceptedExplanations([
+            { type: "noop", message: `Credential diagnostics:\n\n\`\`\`text\n${diagnostic}\n\`\`\`` },
+            { type: "report_incomplete", reason: "Review did not finish." },
+          ]);
+
+          expect(body).toContain("completed successfully");
+          expect(body).toContain("Review did not finish.");
+          expect(body.includes("No-op message")).toBe(false);
+          expect(body.includes("Credential diagnostics:")).toBe(false);
+        });
+
         it.each([
           ["parser depth limit", "> ".repeat(20) + "Omitted explanation"],
           ["empty details summary", "<details>\n<summary></summary>\n\nOmitted explanation\n\n</details>"],

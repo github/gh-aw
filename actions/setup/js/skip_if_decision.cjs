@@ -7,8 +7,7 @@ const path = require("node:path");
 const { invokeDecisions } = require("./decisions_client.cjs");
 const { resolveIssueArtifactPath, readGuardedFile } = require("./symlink_guard.cjs");
 const { AWF_API_PROXY_REFLECT_URL, deriveBaseUrlFromModelsURL } = require("./awf_reflect.cjs");
-const { redactBuiltInPatterns, redactSecrets } = require("./redact_secrets.cjs");
-const { isSensitiveConfigKey } = require("./safe_outputs_config_redact.cjs");
+const { containsSensitiveContent } = require("./redact_secrets.cjs");
 
 const DECISION_TIMEOUT_MS = 10000;
 const MAX_SKIP_IF_DECISION_QUESTIONS = 64;
@@ -31,19 +30,6 @@ const DECISION_INPUT = "Evaluate each skip condition using only its supplied con
 function aggregateDecisions(outcomes) {
   if (outcomes.includes("deny")) return "deny";
   return outcomes.includes("allow") ? "allow" : "unknown";
-}
-
-/**
- * Heuristic screening, not a guarantee that arbitrary evidence is secret-free.
- * Reuse artifact credential patterns and config-key classification.
- * @param {string} text
- * @param {string[]} [secretValues]
- * @returns {boolean}
- */
-function containsSensitiveContent(text, secretValues = []) {
-  if (redactBuiltInPatterns(text).redactionCount || redactSecrets(text, secretValues).redactionCount) return true;
-  if (/-----BEGIN (?:[A-Z0-9]+ )*PRIVATE KEY-----/.test(text) || /\bASIA[0-9A-Z]{16}\b/.test(text) || /\bBearer\s+[A-Za-z0-9._~+/-]+=*/i.test(text)) return true;
-  return [...text.matchAll(/(?:^|[\s{,])["']?([A-Za-z_][A-Za-z0-9_.-]*)["']?\s*[:=]\s*["']?([^\s"',;}\]]+)/g)].some(match => isSensitiveConfigKey(match[1]));
 }
 
 /**
