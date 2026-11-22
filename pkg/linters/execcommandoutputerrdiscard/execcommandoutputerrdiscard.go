@@ -115,18 +115,27 @@ func findCallResults(pass *analysis.Pass, body *ast.BlockStmt, call *ast.CallExp
 		}
 		switch stmt := node.(type) {
 		case *ast.AssignStmt:
-			if len(stmt.Rhs) == 1 && sameCall(stmt.Rhs[0], call) {
-				binding = bindResults(pass, stmt.Lhs)
-				return false
+			if len(stmt.Rhs) == 1 {
+				for _, rhs := range stmt.Rhs {
+					if sameCall(rhs, call) {
+						binding = bindResults(pass, stmt.Lhs)
+						return false
+					}
+				}
 			}
 		case *ast.ValueSpec:
-			if len(stmt.Values) == 1 && sameCall(stmt.Values[0], call) {
-				lhs := make([]ast.Expr, len(stmt.Names))
-				for i, name := range stmt.Names {
-					lhs[i] = name
+			if len(stmt.Values) == 1 {
+				for _, value := range stmt.Values {
+					if !sameCall(value, call) {
+						continue
+					}
+					lhs := make([]ast.Expr, 0, len(stmt.Names))
+					for _, name := range stmt.Names {
+						lhs = append(lhs, name)
+					}
+					binding = bindResults(pass, lhs)
+					return false
 				}
-				binding = bindResults(pass, lhs)
-				return false
 			}
 		}
 		return true
@@ -143,10 +152,16 @@ func bindResults(pass *analysis.Pass, lhs []ast.Expr) resultBinding {
 	if len(lhs) != 2 {
 		return resultBinding{}
 	}
-	return resultBinding{
-		output: bindingObject(pass, lhs[0]),
-		err:    bindingObject(pass, lhs[1]),
+	var binding resultBinding
+	for i, expr := range lhs {
+		switch i {
+		case 0:
+			binding.output = bindingObject(pass, expr)
+		case 1:
+			binding.err = bindingObject(pass, expr)
+		}
 	}
+	return binding
 }
 
 func bindingObject(pass *analysis.Pass, expr ast.Expr) types.Object {
@@ -245,7 +260,11 @@ func failureBranchReturnsObject(pass *analysis.Pass, body *ast.BlockStmt, branch
 	if !ok || len(block.List) == 0 {
 		return false
 	}
-	last, ok := block.List[len(block.List)-1].(*ast.ReturnStmt)
+	var lastStatement ast.Stmt
+	for _, statement := range block.List {
+		lastStatement = statement
+	}
+	last, ok := lastStatement.(*ast.ReturnStmt)
 	if !ok || !returnPropagatesObject(pass, body, last, object, namedResult, after) {
 		return false
 	}
@@ -370,8 +389,10 @@ func indexObjectUses(pass *analysis.Pass, body *ast.BlockStmt, object types.Obje
 						writesOutput = true
 					}
 					if ident.Name == "_" && len(stmt.Lhs) == 1 && len(stmt.Rhs) == 1 {
-						if rhs, ok := astutil.UnwrapParenExpr(stmt.Rhs[0]).(*ast.Ident); ok {
-							index.discarded[rhs] = true
+						for _, rhsExpr := range stmt.Rhs {
+							if rhs, ok := astutil.UnwrapParenExpr(rhsExpr).(*ast.Ident); ok {
+								index.discarded[rhs] = true
+							}
 						}
 					}
 				}
@@ -459,18 +480,32 @@ func findExitErrorObjects(pass *analysis.Pass, body *ast.BlockStmt, errObject ty
 		switch node := node.(type) {
 		case *ast.AssignStmt:
 			if node.Pos() > after && len(node.Lhs) > 0 && len(node.Rhs) == 1 &&
-				!objectReassignedBetween(pass, body, errObject, after, node.Pos()) &&
-				isExitErrorAssertion(pass, node.Rhs[0], errObject) {
-				if object := bindingObject(pass, node.Lhs[0]); object != nil {
-					exitErrorObjects[object] = node.Pos()
+				!objectReassignedBetween(pass, body, errObject, after, node.Pos()) {
+				for _, rhs := range node.Rhs {
+					if !isExitErrorAssertion(pass, rhs, errObject) {
+						continue
+					}
+					for _, lhs := range node.Lhs {
+						if object := bindingObject(pass, lhs); object != nil {
+							exitErrorObjects[object] = node.Pos()
+						}
+						break
+					}
 				}
 			}
 		case *ast.ValueSpec:
 			if node.Pos() > after && len(node.Names) > 0 && len(node.Values) == 1 &&
-				!objectReassignedBetween(pass, body, errObject, after, node.Pos()) &&
-				isExitErrorAssertion(pass, node.Values[0], errObject) {
-				if object := bindingObject(pass, node.Names[0]); object != nil {
-					exitErrorObjects[object] = node.Pos()
+				!objectReassignedBetween(pass, body, errObject, after, node.Pos()) {
+				for _, value := range node.Values {
+					if !isExitErrorAssertion(pass, value, errObject) {
+						continue
+					}
+					for _, name := range node.Names {
+						if object := bindingObject(pass, name); object != nil {
+							exitErrorObjects[object] = node.Pos()
+						}
+						break
+					}
 				}
 			}
 		case *ast.CallExpr:
@@ -523,11 +558,18 @@ func isDiscardedValue(body *ast.BlockStmt, value ast.Node) bool {
 		if !ok || len(assign.Lhs) != 1 || len(assign.Rhs) != 1 {
 			return true
 		}
-		lhs, ok := astutil.UnwrapParenExpr(assign.Lhs[0]).(*ast.Ident)
+		var lhsExpr, rhsExpr ast.Expr
+		for _, expr := range assign.Lhs {
+			lhsExpr = expr
+		}
+		for _, expr := range assign.Rhs {
+			rhsExpr = expr
+		}
+		lhs, ok := astutil.UnwrapParenExpr(lhsExpr).(*ast.Ident)
 		if !ok || lhs.Name != "_" {
 			return true
 		}
-		ast.Inspect(assign.Rhs[0], func(rhs ast.Node) bool {
+		ast.Inspect(rhsExpr, func(rhs ast.Node) bool {
 			if rhs == value {
 				discarded = true
 				return false
@@ -553,11 +595,20 @@ func isErrorsAsForExitError(pass *analysis.Pass, call *ast.CallExpr, errObject t
 	if !ok || pkgPath != "errors" || name != "As" || len(call.Args) != 2 {
 		return false
 	}
-	errIdent, ok := astutil.UnwrapParenExpr(call.Args[0]).(*ast.Ident)
+	var errArg, targetArg ast.Expr
+	for i, arg := range call.Args {
+		switch i {
+		case 0:
+			errArg = arg
+		case 1:
+			targetArg = arg
+		}
+	}
+	errIdent, ok := astutil.UnwrapParenExpr(errArg).(*ast.Ident)
 	if !ok || pass.TypesInfo.ObjectOf(errIdent) != errObject {
 		return false
 	}
-	target, ok := astutil.UnwrapParenExpr(call.Args[1]).(*ast.UnaryExpr)
+	target, ok := astutil.UnwrapParenExpr(targetArg).(*ast.UnaryExpr)
 	if !ok || target.Op != token.AND {
 		return false
 	}
