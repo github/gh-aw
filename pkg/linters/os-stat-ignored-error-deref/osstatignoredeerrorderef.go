@@ -6,6 +6,7 @@ import (
 	"go/ast"
 	"go/token"
 	"go/types"
+	"maps"
 
 	"golang.org/x/tools/go/analysis"
 
@@ -92,49 +93,9 @@ func (a *flowAnalyzer) statement(statement ast.Stmt, state flowState) (flowState
 		a.expressionList(statement.Results, state)
 		return state, true
 	case *ast.IfStmt:
-		if statement.Init != nil {
-			var terminated bool
-			state, terminated = a.statement(statement.Init, state)
-			if terminated {
-				return state, true
-			}
-		}
-		trueState, falseState := a.condition(statement.Cond, state)
-		bodyState, bodyTerminated := a.block(statement.Body, trueState)
-		elseState, elseTerminated := falseState, false
-		if statement.Else != nil {
-			elseState, elseTerminated = a.statement(statement.Else, falseState)
-		}
-		if bodyTerminated && elseTerminated {
-			return joinStates(bodyState, elseState), true
-		}
-		if bodyTerminated {
-			return elseState, false
-		}
-		if elseTerminated {
-			return bodyState, false
-		}
-		return joinStates(bodyState, elseState), false
+		return a.ifStatement(statement, state)
 	case *ast.ForStmt:
-		if statement.Init != nil {
-			var terminated bool
-			state, terminated = a.statement(statement.Init, state)
-			if terminated {
-				return state, true
-			}
-		}
-		bodyState := cloneState(state)
-		afterCondition := make(flowState)
-		if statement.Cond != nil {
-			bodyState, afterCondition = a.condition(statement.Cond, state)
-		} else {
-			afterCondition = cloneState(state)
-		}
-		bodyState, bodyTerminated := a.block(statement.Body, bodyState)
-		if statement.Post != nil && !bodyTerminated {
-			bodyState, _ = a.statement(statement.Post, bodyState)
-		}
-		return joinStates(afterCondition, bodyState), false
+		return a.forStatement(statement, state)
 	case *ast.RangeStmt:
 		a.expression(statement.X, state)
 		bodyState, _ := a.block(statement.Body, cloneState(state))
@@ -154,6 +115,53 @@ func (a *flowAnalyzer) statement(statement ast.Stmt, state flowState) (flowState
 		return a.statement(statement.Stmt, state)
 	}
 	return state, false
+}
+
+func (a *flowAnalyzer) ifStatement(statement *ast.IfStmt, state flowState) (flowState, bool) {
+	if statement.Init != nil {
+		var terminated bool
+		state, terminated = a.statement(statement.Init, state)
+		if terminated {
+			return state, true
+		}
+	}
+	trueState, falseState := a.condition(statement.Cond, state)
+	bodyState, bodyTerminated := a.block(statement.Body, trueState)
+	elseState, elseTerminated := falseState, false
+	if statement.Else != nil {
+		elseState, elseTerminated = a.statement(statement.Else, falseState)
+	}
+	if bodyTerminated && elseTerminated {
+		return joinStates(bodyState, elseState), true
+	}
+	if bodyTerminated {
+		return elseState, false
+	}
+	if elseTerminated {
+		return bodyState, false
+	}
+	return joinStates(bodyState, elseState), false
+}
+
+func (a *flowAnalyzer) forStatement(statement *ast.ForStmt, state flowState) (flowState, bool) {
+	if statement.Init != nil {
+		var terminated bool
+		state, terminated = a.statement(statement.Init, state)
+		if terminated {
+			return state, true
+		}
+	}
+	var bodyState, afterCondition flowState
+	if statement.Cond != nil {
+		bodyState, afterCondition = a.condition(statement.Cond, state)
+	} else {
+		bodyState, afterCondition = cloneState(state), cloneState(state)
+	}
+	bodyState, bodyTerminated := a.block(statement.Body, bodyState)
+	if statement.Post != nil && !bodyTerminated {
+		bodyState, _ = a.statement(statement.Post, bodyState)
+	}
+	return joinStates(afterCondition, bodyState), false
 }
 
 func (a *flowAnalyzer) switchStatement(statement *ast.SwitchStmt, state flowState) (flowState, bool) {
@@ -219,10 +227,7 @@ func (a *flowAnalyzer) assignment(statement *ast.AssignStmt, state flowState) {
 
 func (a *flowAnalyzer) valueSpec(spec *ast.ValueSpec, state flowState) {
 	a.expressionList(spec.Values, state)
-	statName := ""
-	if len(spec.Names) == 2 && spec.Names[1].Name == "_" && len(spec.Values) == 1 {
-		statName = discardedStatName(a.pass, spec.Values[0])
-	}
+	statName := discardedStatFromValueSpec(a.pass, spec)
 	for i, name := range spec.Names {
 		object := a.pass.TypesInfo.Defs[name]
 		if object == nil {
@@ -234,6 +239,22 @@ func (a *flowAnalyzer) valueSpec(spec *ast.ValueSpec, state flowState) {
 			delete(state, object)
 		}
 	}
+}
+
+func discardedStatFromValueSpec(pass *analysis.Pass, spec *ast.ValueSpec) string {
+	if len(spec.Names) != 2 || len(spec.Values) != 1 {
+		return ""
+	}
+	for i, name := range spec.Names {
+		if i == 1 && name.Name == "_" {
+			for j, value := range spec.Values {
+				if j == 0 {
+					return discardedStatName(pass, value)
+				}
+			}
+		}
+	}
+	return ""
 }
 
 func discardedStatName(pass *analysis.Pass, expr ast.Expr) string {
@@ -374,16 +395,12 @@ func (a *flowAnalyzer) clearObject(expr ast.Expr, state flowState) {
 
 func cloneState(state flowState) flowState {
 	clone := make(flowState, len(state))
-	for object, funcName := range state {
-		clone[object] = funcName
-	}
+	maps.Copy(clone, state)
 	return clone
 }
 
 func joinStates(left, right flowState) flowState {
 	joined := cloneState(left)
-	for object, funcName := range right {
-		joined[object] = funcName
-	}
+	maps.Copy(joined, right)
 	return joined
 }
