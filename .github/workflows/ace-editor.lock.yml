@@ -1521,7 +1521,7 @@ jobs:
           GH_AW_COMMENT_REPO: ${{ needs.activation.outputs.comment_repo }}
           GH_AW_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           GH_AW_WORKFLOW_NAME: "ACE Editor Session"
-          GH_AW_AGENT_CONCLUSION: ${{ steps.handle_agent_failure.outcome == 'failure' && 'failure' || needs.agent.result }}
+          GH_AW_AGENT_CONCLUSION: ${{ (needs.agent.result == 'success' && steps.handle_agent_failure.outcome == 'failure') && 'failure' || needs.agent.result }}
           GH_AW_ENGINE_ID: "codex"
           GH_AW_ENGINE_MODEL: "copilot/gpt-6.1-sol"
           GH_AW_AIC: ${{ needs.agent.outputs.aic }}

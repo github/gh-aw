@@ -2222,7 +2222,7 @@ jobs:
           GH_AW_COMMENT_REPO: ${{ needs.activation.outputs.comment_repo }}
           GH_AW_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           GH_AW_WORKFLOW_NAME: "Smoke Goose"
-          GH_AW_AGENT_CONCLUSION: ${{ steps.handle_agent_failure.outcome == 'failure' && 'failure' || needs.agent.result }}
+          GH_AW_AGENT_CONCLUSION: ${{ (needs.agent.result == 'success' && steps.handle_agent_failure.outcome == 'failure') && 'failure' || needs.agent.result }}
           GH_AW_ENGINE_ID: "goose"
           GH_AW_ENGINE_VERSION: "1.54.0"
           GH_AW_ENGINE_MODEL: "copilot/claude-haiku-5.5"

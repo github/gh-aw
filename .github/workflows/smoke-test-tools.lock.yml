@@ -1898,7 +1898,7 @@ jobs:
           GH_AW_COMMENT_REPO: ${{ needs.activation.outputs.comment_repo }}
           GH_AW_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           GH_AW_WORKFLOW_NAME: "Agent Container Smoke Test"
-          GH_AW_AGENT_CONCLUSION: ${{ steps.handle_agent_failure.outcome == 'failure' && 'failure' || needs.agent.result }}
+          GH_AW_AGENT_CONCLUSION: ${{ (needs.agent.result == 'success' && steps.handle_agent_failure.outcome == 'failure') && 'failure' || needs.agent.result }}
           GH_AW_ENGINE_ID: "pi"
           GH_AW_ENGINE_MODEL: "copilot/mai-code-1.1-flash"
           GH_AW_AIC: ${{ needs.agent.outputs.aic }}
