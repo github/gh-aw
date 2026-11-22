@@ -988,10 +988,12 @@ func assignCommandGroups(cmds commandSet) {
 }
 
 func addCommandsToRoot(cmds commandSet) {
+	advisoryCmd := cli.NewAdvisoryCommand()
+	advisoryCmd.GroupID = "utilities"
 	rootCmd.AddCommand(
 		compileCmd, cmds.addCmd, cmds.addWizardCmd, cmds.editCmd, cmds.updateCmd, cmds.deployCmd, cmds.upgradeCmd, cmds.trialCmd, newCmd, cmds.initCmd,
 		runCmd, removeCmd, cmds.statusCmd, cmds.listCmd, enableCmd, disableCmd, cmds.logsCmd, cmds.auditCmd, cmds.sessionsCmd, cmds.viewCmd,
-		cmds.healthCmd, cmds.checksCmd, cmds.mcpCmd, cmds.mcpServerCmd, cmds.prCmd, versionCmd, cmds.secretsCmd,
+		cmds.healthCmd, cmds.checksCmd, cmds.mcpCmd, cmds.mcpServerCmd, cmds.prCmd, advisoryCmd, versionCmd, cmds.secretsCmd,
 		cmds.fixCmd, cmds.formatCmd, cmds.validateCmd, cmds.lintCmd, cmds.completionCmd, cmds.hashCmd, cmds.projectCmd, cmds.doctorCmd,
 		cmds.domainsCmd, cmds.experimentsCmd, cmds.forecastCmd, cmds.gradersCmd, cmds.modelsCmd, cmds.envCmd, cmds.jsonSchemaCmd, cmds.workCmd, cmds.skillCmd, cmds.connectorsCmd,
 	)

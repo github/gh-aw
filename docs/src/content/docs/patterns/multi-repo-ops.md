@@ -54,7 +54,72 @@ Use a dedicated private side repository to prepare and test a fix for an unpubli
 1. Restrict access to the side repository, including its run logs and artifacts, to people authorized to see the advisory. Use manual dispatch from trusted workflow code. Do not use a public issue or slash-command relay for confidential work.
 2. Use a [target-only checkout](#target-only-checkout) pinned to the upstream commit you intend to patch. A shallow checkout limits history; a sparse checkout limits files in the working tree. Include the build and test dependencies in the checkout configuration so the agent does not need to fetch them later. Use read-only checkout credentials and keep advisory fork credentials out of Actions. Review the compiled jobs and exclude any maintenance or safe-output jobs that can write to the upstream repository.
 3. Review the fix and test results privately. Keep any patch artifact in the private side repository, use short retention, and check who can download it. Secret redaction does not remove all advisory details.
-4. Apply the reviewed patch to the intended base in the advisory's temporary private fork, push a new branch using your maintainer credentials, and open the PR from the advisory in GitHub. If the base has moved, rebase and retest the fix before handing it off.
+4. Download the patch from the exact private run you reviewed. Use [`gh aw advisory inspect` and `gh aw advisory transfer`](/gh-aw/setup/cli/#advisory-inspect-and-advisory-transfer) to verify the existing temporary fork, review and approve the patch, and push a new branch using your maintainer credentials. Open the PR from the advisory in GitHub. If the base has moved, rebase and retest the fix before handing it off.
+
+For an opt-in starting point, add `"maintenance": false` to the private side repository's `.github/aw.json` and adapt this workflow. Replace the repository, base SHA, and sparse paths with values reviewed by the maintainers. Use the full SHA, not a dispatch input or a branch that can move.
+
+```aw wrap
+---
+on: workflow_dispatch
+if: github.event.repository.private == true && github.event.repository.full_name == 'my-org/private-advisory-work'
+permissions:
+  contents: none
+  copilot-requests: write
+checkout:
+  - repository: my-org/upstream
+    ref: "0123456789abcdef0123456789abcdef01234567"
+    path: target
+    fetch-depth: 1
+    sparse-checkout: |
+      src/
+      tests/
+tools:
+  github: false
+  bash: true
+network:
+  allowed: []
+safe-outputs:
+  report-failure-as-issue: false
+  report-failed-jobs: false
+  report-missing-tool:
+    create-issue: false
+  report-missing-data:
+    create-issue: false
+  report-incomplete: false
+  noop:
+    report-as-issue: false
+  threat-detection:
+    report-as-issue: false
+  upload-artifact:
+    retention-days: 1
+    max-size-bytes: 4194304
+    allowed-paths:
+      - "handoff/fix.patch"
+      - "handoff/review.txt"
+---
+
+# Prepare a defensive fix
+
+Work only in `target/`. Prepare the maintainer-approved remediation, not a
+proof of exploit. Stage only the intended changes and run the targeted tests
+for those changes. If the required files or dependencies are unavailable,
+report that limitation; do not fetch additional code or broaden the checkout.
+
+Export a text Git diff including staged new files to `handoff/fix.patch`
+relative to the workspace root. Diff the staged index against the pinned
+checkout commit, with external diff and text conversion disabled. Record the
+upstream repository, tested base SHA, and the tests actually run in
+`handoff/review.txt`. Ask the maintainer to review both files before transfer.
+Use `upload_artifact` to upload the `handoff` directory only.
+```
+
+Use the artifact name shown in the run summary to download just that artifact:
+
+```bash wrap
+gh run download "$RUN_ID" --repo my-org/private-advisory-work --name "$ARTIFACT_NAME" --dir ./advisory-handoff
+```
+
+The patch and test notes are agent output, not a test attestation. Review them and independently verify the fix as needed. The approval digest binds the downloaded patch bytes and fork destination at handoff; it does not replace that review.
 
 The generic PR transfer command is not an advisory handoff command: it can create a normal fork and open a PR. Likewise, the [security advisory safe outputs](/gh-aw/reference/safe-outputs/#security-advisory-drafts-create-security-advisory) target the workflow repository, not the upstream repository or its temporary private fork.
 

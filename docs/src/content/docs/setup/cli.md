@@ -1557,6 +1557,19 @@ gh aw pr transfer <pr-url> --repo target-owner/target-repo --create-pull-request
 
 **Options:** `--repo/-r`, `--create-pull-request` (compatibility flag; PR creation is always enabled), `--pr-message` (see [pull request descriptions](#pull-request-descriptions)), `--auto-merge` (requires `--create-pull-request`; see [auto-merge requirements](#pull-request-auto-merge))
 
+#### `advisory inspect` and `advisory transfer`
+
+Review a local Git diff from a private workflow run and transfer that exact diff to an existing temporary private advisory fork on GitHub.com.
+
+```bash wrap
+gh aw advisory inspect GHSA-2345-6789-cfgh --repo owner/repo --base "$BASE_SHA" --base-branch main --branch advisory-fix --patch fix.patch
+gh aw advisory transfer GHSA-2345-6789-cfgh --repo owner/repo --base "$BASE_SHA" --base-branch main --branch advisory-fix --patch fix.patch --approve "$APPROVAL_DIGEST"
+```
+
+Both commands require `--repo` (upstream), `--base` (exact tested commit), `--base-branch` (branch in the fork), `--branch` (new fix branch), and `--patch` (text Git diff, up to 4 MiB). `inspect` uses the signed-in GitHub CLI identity to resolve the fork and shows the patch without writing to GitHub. `transfer` also requires `--approve`, the digest printed by `inspect` after review. Run the commands in a private terminal; `inspect` prints the full diff.
+
+`transfer` applies the patch without checking out a working tree. It refuses base drift, changes under `.github/workflows/` or `.github/actions/`, and conflicting destination branches. It does not create a fork or open a PR. Open the PR from the advisory in GitHub once the branch is ready.
+
 #### `mcp-server`
 
 Run MCP server exposing gh-aw commands as tools. Spawns subprocesses to isolate GitHub tokens.
