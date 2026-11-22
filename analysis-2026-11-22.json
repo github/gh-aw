@@ -1,0 +1,155 @@
+{
+ "date": "2026-11-22",
+ "window": "2026-10-23..2026-11-22",
+ "total_prs": 717,
+ "merged": 592,
+ "closed": 115,
+ "open": 10,
+ "merge_rate": 0.837,
+ "merge_rate_basis": "completed (merged/(merged+closed))",
+ "categories": {
+  "feature": {
+   "total": 80,
+   "merged": 69,
+   "closed": 10,
+   "open": 1,
+   "rate": 0.873
+  },
+  "other": {
+   "total": 401,
+   "merged": 324,
+   "closed": 69,
+   "open": 8,
+   "rate": 0.824
+  },
+  "security": {
+   "total": 42,
+   "merged": 31,
+   "closed": 11,
+   "open": 0,
+   "rate": 0.738
+  },
+  "documentation": {
+   "total": 45,
+   "merged": 40,
+   "closed": 4,
+   "open": 1,
+   "rate": 0.909
+  },
+  "dependency": {
+   "total": 27,
+   "merged": 24,
+   "closed": 3,
+   "open": 0,
+   "rate": 0.889
+  },
+  "bug_fix": {
+   "total": 46,
+   "merged": 40,
+   "closed": 6,
+   "open": 0,
+   "rate": 0.87
+  },
+  "testing": {
+   "total": 59,
+   "merged": 57,
+   "closed": 2,
+   "open": 0,
+   "rate": 0.966
+  },
+  "refactor": {
+   "total": 17,
+   "merged": 7,
+   "closed": 10,
+   "open": 0,
+   "rate": 0.412
+  }
+ },
+ "negative_titles": {
+  "triage_verify_investigate": {
+   "total": 22,
+   "merged": 4,
+   "closed": 18,
+   "rate": 0.182
+  },
+  "wip_draft": {
+   "total": 1,
+   "merged": 0,
+   "closed": 1,
+   "rate": 0.0
+  }
+ },
+ "length_buckets_completed": {
+  "0-100": {
+   "total": 392,
+   "merged": 316,
+   "closed": 76,
+   "rate": 0.806
+  },
+  "100-150": {
+   "total": 194,
+   "merged": 166,
+   "closed": 28,
+   "rate": 0.856
+  },
+  "150-250": {
+   "total": 41,
+   "merged": 35,
+   "closed": 6,
+   "rate": 0.854
+  },
+  "250+": {
+   "total": 80,
+   "merged": 75,
+   "closed": 5,
+   "rate": 0.938
+  }
+ },
+ "structural": {
+  "avg_words_merged": 137.3,
+  "avg_words_closed": 101.4,
+  "code_block_merged_pct": 59.6,
+  "code_block_closed_pct": 36.5,
+  "bullet_merged_pct": 99.0,
+  "bullet_closed_pct": 98.3
+ },
+ "weekly_completed_rate": {
+  "2026-10-19": 0.814,
+  "2026-10-26": 0.785,
+  "2026-11-02": 0.914,
+  "2026-11-09": 0.856,
+  "2026-11-16": 0.735
+ },
+ "last_7_days": {
+  "total": 188,
+  "merged": 135,
+  "closed": 43,
+  "open": 10,
+  "rate": 0.758
+ },
+ "authors_top": [
+  [
+   "app/copilot-swe-agent",
+   496
+  ],
+  [
+   "pelikhan",
+   104
+  ],
+  [
+   "gh-aw-bot",
+   100
+  ],
+  [
+   "lpcox",
+   9
+  ],
+  [
+   "mnkiefer",
+   3
+  ]
+ ],
+ "app_agent_body_share_pct": 69.2,
+ "empty_bodies": 0,
+ "category_rules": "v6-title-regex (same as 2026-11-17; first-match wins, leading [tag] stripped)"
+}
