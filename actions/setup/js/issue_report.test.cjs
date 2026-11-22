@@ -166,7 +166,7 @@ describe("issue report publication boundary", () => {
     const client = { rest: { issues: { create: vi.fn().mockRejectedValueOnce(error).mockResolvedValue(response) } } };
     await expect(createReportIssue(client, parameters)).rejects.toBe(error);
     expect(await createReportIssue(client, parameters)).toBe(response);
-    expect(render).toHaveBeenCalledExactlyOnceWith(report);
+    expect(render).toHaveBeenCalledExactlyOnceWith(report, { warnOnNestedAlerts: true });
     expect(client.rest.issues.create.mock.calls.every(([request]) => request === parameters)).toBe(true);
   });
 
@@ -189,7 +189,7 @@ describe("issue report publication boundary", () => {
     parameters.body = "Changed body";
     expect(() => createReportIssue(client, parameters)).toThrow("Prepared issue target or headers changed");
     expect(() => createReportIssue(client, parameters, report)).toThrow("Prepared issue target or headers changed");
-    expect(render).toHaveBeenCalledExactlyOnceWith(report);
+    expect(render).toHaveBeenCalledExactlyOnceWith(report, { warnOnNestedAlerts: true });
     expect(client.rest.issues.create).not.toHaveBeenCalled();
   });
 
