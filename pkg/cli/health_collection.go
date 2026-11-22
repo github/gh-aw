@@ -70,7 +70,6 @@ type HealthCollection struct {
 	fleetResponses            map[string][]byte
 	sampleIncomplete          bool
 	stopped                   bool
-	visited                   map[string]struct{}
 	jobPresence               map[healthRunAttempt]bool
 	jobs                      map[healthRunAttempt]*healthJobs
 	cacheSummaries            map[healthRunAttempt]*RunSummary
@@ -213,13 +212,6 @@ func healthAPI(collection *HealthCollection, endpoint string, extra ...string) (
 		}
 	}
 	return out, err
-}
-
-func (config HealthConfig) collectionWorkflows() []GitHubWorkflow {
-	if config.collection == nil {
-		return nil
-	}
-	return config.collection.workflows
 }
 
 func renderHealthCollection(w io.Writer, collection *HealthCollection) error {

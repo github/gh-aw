@@ -320,10 +320,6 @@ func sampleHealthWorkflow(target GitHubWorkflow, startDate, repoOverride string,
 			return sample, errHealthAPIBudget
 		}
 		if total < opts.Limit || healthWorkflowSampleEnough(sample, target.Path, collection, priorSamples) {
-			if collection.visited == nil {
-				collection.visited = make(map[string]struct{})
-			}
-			collection.visited[target.Path] = struct{}{}
 			return sample, nil
 		}
 		if page*opts.Limit >= healthMaximumRunSearchResults {

@@ -36,7 +36,6 @@ func TestHealthToolFleetResume(t *testing.T) {
 		}
 		assert.NotEmpty(t, path)
 		assert.Equal(t, checkpoint, path)
-		assert.NotContains(t, args, "--fleet")
 		return mockCommandWithOutput(output, "")(ctx, args...)
 	}
 	server := mcp.NewServer(&mcp.Implementation{Name: "test"}, nil)
@@ -119,7 +118,6 @@ func TestHealthToolRejectsInvalidArguments(t *testing.T) {
 		{"days": "30"},
 		{"threshold": "80"},
 		{"unknown": true},
-		{"fleet": true},
 		{"workflow_name": "daily", "full": true},
 		{"workflow_name": "daily", "resume": "token"},
 		{"timeout": "-1s"},
@@ -204,6 +202,5 @@ func TestHealthToolSchema(t *testing.T) {
 	}
 	require.NoError(t, json.Unmarshal(encoded, &schema))
 	assert.Empty(t, schema.Required)
-	assert.NotContains(t, schema.Properties, "fleet")
 	assert.ElementsMatch(t, jsonFieldNames(healthArgs{}), slices.Collect(maps.Keys(schema.Properties)))
 }

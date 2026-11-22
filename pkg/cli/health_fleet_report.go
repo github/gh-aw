@@ -115,9 +115,40 @@ type healthFleetReport struct {
 }
 
 type healthFleetDetails struct {
-	Workflows            []WorkflowHealth      `json:"workflows"`
-	FailureClusters      []FailureCluster      `json:"failure_clusters"`
-	FailureInvestigation *FailureInvestigation `json:"failure_investigation,omitempty"`
+	Workflows              []WorkflowHealth      `json:"workflows"`
+	FailureRepresentatives []healthFleetRunRef   `json:"failure_representatives"`
+	FailureClusters        []FailureCluster      `json:"failure_clusters"`
+	FailureInvestigation   *FailureInvestigation `json:"failure_investigation,omitempty"`
+}
+
+type healthFleetRunRef struct {
+	RunID        int64  `json:"run_id"`
+	WorkflowPath string `json:"workflow_path"`
+}
+
+func fleetFailureRepresentatives(evidence healthFleetWorkflowEvidence) []healthFleetRunRef {
+	if evidence.Health.IntentionalFailure {
+		return nil
+	}
+	failures := make(map[int64]RunData, len(evidence.Failures))
+	for _, failure := range evidence.Failures {
+		if failure.Conclusion == "failure" && !failure.IntentionalFailure {
+			failures[failure.RunID] = failure
+		}
+	}
+	var representatives []healthFleetRunRef
+	for _, revision := range evidence.Health.Revisions {
+		if revision.Current == nil || revision.Status == "revision_unknown" {
+			continue
+		}
+		for _, id := range revision.Current.RunIDs {
+			if failure, ok := failures[id]; ok {
+				representatives = append(representatives, healthFleetRunRef{RunID: id, WorkflowPath: failure.WorkflowPath})
+				break
+			}
+		}
+	}
+	return representatives
 }
 
 func renderHealthFleet(state *healthFleetState, config HealthConfig) error {
@@ -171,12 +202,16 @@ func makeHealthFleetReport(state *healthFleetState, config HealthConfig) healthF
 		StatusCounts: make(map[string]int), TopFailures: []healthFleetFailure{}, Clusters: []healthFleetCluster{}}
 	report.summarizeInventory(state)
 	var failures []RunData
-	var workflows []WorkflowHealth
+	workflows := make([]WorkflowHealth, 0, len(state.Workflows))
+	representatives := []healthFleetRunRef{}
 	for _, workflow := range state.Workflows {
 		health := WorkflowHealth{WorkflowName: workflow.Name, WorkflowPath: workflow.Path, Status: "not_collected"}
 		if evidence, done := state.Verified[workflow.Path]; done {
 			health = evidence.Health
 			failures = append(failures, evidence.Failures...)
+			if config.Full {
+				representatives = append(representatives, fleetFailureRepresentatives(evidence)...)
+			}
 		}
 		report.StatusCounts[health.Status]++
 		workflows = append(workflows, health)
@@ -196,7 +231,7 @@ func makeHealthFleetReport(state *healthFleetState, config HealthConfig) healthF
 		report.NextAction = &healthFleetAction{Type: "audit", RunURL: investigation.SelectedRuns[0].URL}
 	}
 	if config.Full {
-		report.Details = &healthFleetDetails{Workflows: workflows, FailureClusters: clusters, FailureInvestigation: investigation}
+		report.Details = &healthFleetDetails{Workflows: workflows, FailureRepresentatives: representatives, FailureClusters: clusters, FailureInvestigation: investigation}
 	}
 	return report
 }

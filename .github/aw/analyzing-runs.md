@@ -22,7 +22,8 @@ not an unrelated checkout. Default to the last 24 hours; record actual repositor
 window and collection limits.
 
 For "healthy now" or fix-verification questions, follow
-[revision-aware workflow health](debug-workflow-health.md) using `gh aw health --json`.
+[revision-aware workflow health](debug-workflow-health.md). Use `gh aw health --json`
+for the default-branch fleet or `gh aw health WORKFLOW --json` for a named workflow.
 That guide owns source/hash matching, collection completeness, superseded-run
 handling, and verification gaps. Keep using `logs` below for historical failures.
 

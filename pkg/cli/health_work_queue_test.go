@@ -171,7 +171,7 @@ func TestHealthWorkQueueUnavailableEvidence(t *testing.T) {
 }
 
 func TestRunHealthWorkQueueWithoutRuns(t *testing.T) {
-	for _, name := range []string{"", "worker-0"} {
+	for _, name := range []string{"worker-0"} {
 		t.Run("workflow="+name, func(t *testing.T) {
 			fixture := healthWorkQueueFixture(t, "env:\n  GH_AW_WORK_QUEUE_ENABLED: true")
 			originalDiscover, originalList := healthDiscoverWorkflows, healthListWorkflowRuns
@@ -198,7 +198,6 @@ func TestRunHealthWorkQueueWithoutRuns(t *testing.T) {
 			}
 			output := captureAuditGroupStdout(t, func() {
 				require.NoError(t, runHealth(context.Background(), HealthConfig{
-					AllBranches:  name == "",
 					WorkflowName: name, Days: 7, Threshold: 80, JSONOutput: true, RepoOverride: fixture.repoOverride,
 				}))
 			})

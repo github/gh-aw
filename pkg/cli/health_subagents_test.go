@@ -70,14 +70,10 @@ func TestHealthSubagentFailureDegradesGreenCurrentRevision(t *testing.T) {
 func TestHealthSubagentFailureOutput(t *testing.T) {
 	runs, config := healthSubagentFixture(t)
 	cacheHealthSubagentFailure(t, runs[9], config)
-	for _, detailed := range []bool{false, true} {
+	{
 		config.JSONOutput = true
 		output := captureAuditGroupStdout(t, func() {
-			if detailed {
-				require.NoError(t, displayDetailedHealth(runs, config))
-			} else {
-				require.NoError(t, displayHealthSummary(runs, config))
-			}
+			require.NoError(t, displayDetailedHealth(runs, config))
 		})
 		var report struct {
 			SubagentFailureCount int `json:"subagent_failure_count"`
@@ -92,12 +88,11 @@ func TestHealthSubagentFailureOutput(t *testing.T) {
 	}
 	config.JSONOutput = false
 	output := captureAuditGroupStderr(t, func() {
-		require.NoError(t, displayHealthSummary(runs, config))
 		require.NoError(t, displayDetailedHealth(runs, config))
 	})
 	assert.Contains(t, output, "[subagent_failures]")
 	assert.Contains(t, output, `agent="report-formatter" requested_model="kiwi"`)
-	assert.Contains(t, output, "failed sub-agent invocations")
+	assert.Contains(t, output, "sub-agent invocation(s) failed")
 	assert.Contains(t, output, "Actions success rate does not establish healthy delegation")
 	assert.NotContains(t, output, "All evaluated workflows above")
 	assert.NotContains(t, output, "is above threshold")

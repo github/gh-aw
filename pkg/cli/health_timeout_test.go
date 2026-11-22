@@ -111,15 +111,12 @@ func TestHealthTimeBudgetReturnsPartialJSON(t *testing.T) {
 			start := time.Now()
 			output := captureAuditGroupStdout(t, func() {
 				require.NoError(t, runHealth(context.Background(), HealthConfig{
-					AllBranches: true, Days: 7, Threshold: 80, RepoOverride: "org/repo",
+					WorkflowName: "example", Days: 7, Threshold: 80, RepoOverride: "org/repo",
 					JSONOutput: true, LogsDir: t.TempDir(), Timeout: 30 * time.Millisecond,
 				}))
 			})
 			assert.Less(t, time.Since(start), time.Second)
-			var report struct {
-				Collection HealthCollection `json:"collection"`
-				Workflows  []WorkflowHealth `json:"workflows"`
-			}
+			var report WorkflowHealth
 			require.NoError(t, json.Unmarshal([]byte(output), &report))
 			assert.True(t, report.Collection.Partial)
 			assert.Equal(t, "time_budget", report.Collection.Reason)
@@ -131,8 +128,7 @@ func TestHealthTimeBudgetReturnsPartialJSON(t *testing.T) {
 			if stage == "representative_jobs" || stage == "sampling" {
 				assert.Equal(t, 1, report.Collection.FailureCandidates)
 				assert.Len(t, report.Collection.PotentialIssues, 1)
-				require.Len(t, report.Workflows, 1)
-				assert.Equal(t, 1, report.Workflows[0].TotalRuns, "collected runs must survive deadline expiry")
+				assert.Equal(t, 1, report.TotalRuns, "collected runs must survive deadline expiry")
 			}
 		})
 	}

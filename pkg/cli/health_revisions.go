@@ -248,43 +248,6 @@ func calculateCurrentWorkflowHealth(name string, runs []WorkflowRun, config Heal
 	return health
 }
 
-func calculateHealthWorkflowReports(runs []WorkflowRun, config HealthConfig) []WorkflowHealth {
-	grouped := make(map[string][]WorkflowRun)
-	names := make(map[string]string)
-	for _, registered := range config.collectionWorkflows() {
-		grouped[registered.Path] = nil
-		names[registered.Path] = registered.Name
-	}
-	for _, run := range runs {
-		key := run.WorkflowPath
-		if key == "" {
-			key = run.WorkflowName
-		}
-		grouped[key] = append(grouped[key], run)
-		if names[key] == "" {
-			names[key] = run.WorkflowName
-		}
-	}
-	var reports []WorkflowHealth
-	for key, history := range grouped {
-		health := calculateCurrentWorkflowHealth(names[key], history, config)
-		if health.WorkflowPath == "" && strings.HasPrefix(key, logsWorkflowsPathSegment) {
-			health.WorkflowPath = key
-		}
-		if len(history) == 0 && config.collection != nil && config.collection.Partial {
-			health.Status = "not_collected"
-			if _, visited := config.collection.visited[key]; visited {
-				health.Status = "no_recent_runs"
-			}
-		}
-		if config.RepoOverride == "" {
-			health.IntentionalFailure = workflow.IsIntentionalFailure(health.WorkflowPath)
-		}
-		reports = append(reports, health)
-	}
-	return reports
-}
-
 func isHealthEvidenceInsufficient(status string) bool {
 	switch status {
 	case "no_recent_runs", "no_current_revision_runs", "revision_unknown", "insufficient_evidence", "not_collected":

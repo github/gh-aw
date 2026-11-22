@@ -102,47 +102,33 @@ func TestHealthTimeWindowReachesSamplingAndJSON(t *testing.T) {
 	}
 	const start = "2026-10-14T04:49:11Z"
 	const end = "2026-10-15T13:20:00Z"
-	for _, detailed := range []bool{false, true} {
-		t.Run(map[bool]string{false: "summary", true: "detailed"}[detailed], func(t *testing.T) {
-			calls := 0
-			healthListWorkflowRuns = func(opts ListWorkflowRunsOptions, page int, collection *HealthCollection) ([]WorkflowRun, int, error) {
-				calls++
-				assert.Equal(t, start, opts.StartDate)
-				assert.Equal(t, end, opts.EndDate)
-				assert.Equal(t, 2, collection.MaximumDays)
-				assert.Equal(t, 1, page)
-				return nil, 0, nil
-			}
-			args := []string{"--repo", "org/repo", "--json", "--start-date", start, "--end-date", end}
-			if detailed {
-				args = append(args, "example")
-			} else {
-				args = append(args, "--all-branches")
-			}
-			output := captureAuditGroupStdout(t, func() {
-				cmd := NewHealthCommand()
-				cmd.SetArgs(args)
-				require.NoError(t, cmd.Execute())
-			})
-			require.Equal(t, 1, calls)
-			var report struct {
-				Period     string            `json:"period"`
-				Collection *HealthCollection `json:"collection"`
-			}
-			require.NoError(t, json.Unmarshal([]byte(output), &report))
-			require.NotNil(t, report.Collection)
-			assert.Equal(t, start, report.Collection.StartDate)
-			assert.Equal(t, end, report.Collection.EndDate)
-			assert.Equal(t, GetVersion(), report.Collection.ProducerVersion)
-			assert.Equal(t, 1, report.Collection.ReportSchemaVersion)
-			assert.False(t, report.Collection.ObservedAt.IsZero())
-			assert.Contains(t, report.Collection.Capabilities, "typed_job_steps")
-			assert.Contains(t, report.Collection.Capabilities, "cross_version_raw_jobs")
-			if !detailed {
-				assert.Contains(t, report.Period, start)
-				assert.Contains(t, report.Period, end)
-			}
+	{
+		calls := 0
+		healthListWorkflowRuns = func(opts ListWorkflowRunsOptions, page int, collection *HealthCollection) ([]WorkflowRun, int, error) {
+			calls++
+			assert.Equal(t, start, opts.StartDate)
+			assert.Equal(t, end, opts.EndDate)
+			assert.Equal(t, 2, collection.MaximumDays)
+			assert.Equal(t, 1, page)
+			return nil, 0, nil
+		}
+		args := []string{"example", "--repo", "org/repo", "--json", "--start-date", start, "--end-date", end}
+		output := captureAuditGroupStdout(t, func() {
+			cmd := NewHealthCommand()
+			cmd.SetArgs(args)
+			require.NoError(t, cmd.Execute())
 		})
+		require.Equal(t, 1, calls)
+		var report WorkflowHealth
+		require.NoError(t, json.Unmarshal([]byte(output), &report))
+		require.NotNil(t, report.Collection)
+		assert.Equal(t, start, report.Collection.StartDate)
+		assert.Equal(t, end, report.Collection.EndDate)
+		assert.Equal(t, GetVersion(), report.Collection.ProducerVersion)
+		assert.Equal(t, 1, report.Collection.ReportSchemaVersion)
+		assert.False(t, report.Collection.ObservedAt.IsZero())
+		assert.Contains(t, report.Collection.Capabilities, "typed_job_steps")
+		assert.Contains(t, report.Collection.Capabilities, "cross_version_raw_jobs")
 	}
 }
 
@@ -182,14 +168,14 @@ func TestHealthDaysOnlyPeriodThroughCommand(t *testing.T) {
 
 	output := captureAuditGroupStdout(t, func() {
 		cmd := NewHealthCommand()
-		cmd.SetArgs([]string{"--all-branches", "--repo", "org/repo", "--json", "--days", "7"})
+		cmd.SetArgs([]string{"example", "--repo", "org/repo", "--json", "--days", "7"})
 		require.NoError(t, cmd.Execute())
 	})
 	var report struct {
-		Period string `json:"period"`
+		Collection HealthCollection `json:"collection"`
 	}
 	require.NoError(t, json.Unmarshal([]byte(output), &report))
-	assert.Equal(t, "Current status (up to 7 days)", report.Period)
+	assert.Equal(t, 7, report.Collection.MaximumDays)
 }
 
 func stubHealthTimeWindowAPI(t *testing.T) {

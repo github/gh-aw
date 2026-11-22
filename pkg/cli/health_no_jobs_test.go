@@ -264,15 +264,12 @@ func TestHealthOnlyNoJobFailuresRemainInsufficient(t *testing.T) {
 		}
 	}
 	output := captureAuditGroupStdout(t, func() {
-		require.NoError(t, runHealth(context.Background(), HealthConfig{AllBranches: true, Days: 7, Threshold: 80, JSONOutput: true, RepoOverride: "org/repo"}))
+		require.NoError(t, runHealth(context.Background(), HealthConfig{WorkflowName: "example", Days: 7, Threshold: 80, JSONOutput: true, RepoOverride: "org/repo"}))
 	})
-	var report HealthSummary
+	var report WorkflowHealth
 	require.NoError(t, json.Unmarshal([]byte(output), &report))
-	assert.Zero(t, report.HealthyWorkflows)
-	assert.Zero(t, report.BelowThreshold)
-	assert.Equal(t, 1, report.InsufficientWorkflows)
-	require.Len(t, report.Workflows, 1)
-	assert.Zero(t, report.Workflows[0].TotalRuns)
-	assert.Equal(t, "no_recent_runs", report.Workflows[0].Status)
+	assert.False(t, report.BelowThresh)
+	assert.Zero(t, report.TotalRuns)
+	assert.Equal(t, "no_recent_runs", report.Status)
 	assert.Empty(t, report.FailureClusters)
 }

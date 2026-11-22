@@ -86,11 +86,11 @@ Continuation requests are metadata-only intent, not successful continuations. Pe
 			cmd = append(cmd, "--checkpoint="+filepath.Join(checkpoint.dir, "health.json"))
 			return runHealthMCPFleet(ctx, req, execCmd, cmd, token, &keep)
 		}
-		return runLegacyHealthMCP(ctx, req, execCmd, cmd)
+		return runNamedHealthMCP(ctx, req, execCmd, cmd)
 	})
 }
 
-func runLegacyHealthMCP(ctx context.Context, req *mcp.CallToolRequest, execCmd execCmdFunc, cmd []string) (*mcp.CallToolResult, any, error) {
+func runNamedHealthMCP(ctx context.Context, req *mcp.CallToolRequest, execCmd execCmdFunc, cmd []string) (*mcp.CallToolResult, any, error) {
 	notifyProgress(ctx, req, 0, 100, "Reading workflow health...")
 	stdout, stderr, err := runMCPExecOutputWithStderr(ctx, execCmd, cmd...)
 	if err != nil {

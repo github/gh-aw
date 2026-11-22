@@ -96,14 +96,15 @@ Each cluster's `statistics` exposes its `failed_population`, observed `share`, a
 
 ### Checking Workflow Health
 
-`gh aw health` reports workflow status across all workflows in a repository.
-It walks backward independently for each active AW until it has five completed, first-attempt runs for the current revision, encounters a revision boundary, or exhausts the maximum horizon (`--days 7`, `30`, or `90`; default `7`). Rates, trends, durations, and token averages describe the recent current-revision sample, not the entire period. Sparse workflows and workflows with no recent runs remain visible as insufficient evidence.
+`gh aw health` reports historical run outcomes and current-revision evidence separately for active agentic workflows on the default branch, excluding PR events. Check `coverage` before interpreting counts. Use `--checkpoint PATH` to save progress; if `next_action.type` is `resume`, reuse the checkpoint without date flags. Use `--full` to inspect `details.workflows`.
 
-Revision identity uses `frontmatter_hash`, `body_hash`, and compiler version from `gh-aw-metadata` at each run's immutable commit, not repository SHA changes alone. A branch-head metadata check detects pushed revisions with no runs yet. JSON `workflows[].revisions` (or `revisions` for one workflow) separates branch/event cohorts and includes current/previous hashes, counts, and run IDs. `recovery_observed` requires five successful first-attempt runs after a changed revision whose sampled predecessor failed and finished before those runs began. This is observed recovery, not proof that a particular commit fixed the cause. Missing hashes and triggers whose head SHA does not identify the executing workflow, including `workflow_run` and `pull_request`, remain `revision_unknown`.
+`gh aw health WORKFLOW` checks a named workflow across branch/event scopes. It samples toward five completed first attempts per current revision, bounded by the time window and API budget. Rates, trends, durations, and token averages describe the revision sample, not the entire period.
 
-`failure_clusters` and `failure_investigation` describe current-revision failures using the same implementation as `logs`; historical failures remain in revision comparisons, not the current audit plan. Health reuses fresh summaries from `.github/aw/logs` (override with `--logs-dir PATH`) without downloading artifacts. Missing or stale summaries produce `metadata_only` clusters. Cluster shares are not workflow failure rates.
+Revision identity uses workflow source and `gh-aw-metadata`, not repository SHA changes alone. JSON `details.workflows[].revisions` (fleet with `--full`) or `revisions` (named) contains current/previous evidence. `recovery_observed` is not proof that a particular commit fixed the cause. Missing hashes or triggers whose head SHA does not identify the executing workflow can leave `revision_unknown`.
 
-Health checks the target host's core API quota, reuses immutable revision lookups, and stops rather than sleeping or retrying on primary or secondary rate limits. `collection` records quota, request counts, and partial results. Collection is bounded to 1,000 data requests and 20 pages per workflow; quota, request, or pagination limits are explicit. Incomplete evidence never counts as healthy. Use `logs` for a wider historical population and `audit` for targeted comparisons.
+Failure clusters describe current-revision symptoms, not workflow failure rates. Full fleet JSON puts `failure_clusters` and `failure_investigation` under `details`; named JSON exposes them at the top level. Health can reuse matching summaries from `--logs-dir PATH` without downloading artifacts.
+
+Health stops on exhausted API or time budgets. Fleet coverage is under `coverage`; named collection limits are under `collection`. Incomplete evidence never counts as healthy. Use `logs` for a wider historical population and `audit` for targeted comparisons.
 
 ### Inspecting MCP Configuration
 

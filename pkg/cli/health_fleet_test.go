@@ -154,6 +154,7 @@ func TestHealthFleetResumesLargeInventoryAndVerification(t *testing.T) {
 	require.Equal(t, first.Scope, resumed.Scope)
 	require.Equal(t, 1, resumed.StatusCounts["failures_observed"])
 	require.NotEmpty(t, resumed.Clusters)
+	require.Equal(t, []healthFleetRunRef{{RunID: 1, WorkflowPath: registry[0].Path}}, resumed.Details.FailureRepresentatives)
 	require.Equal(t, "audit", resumed.NextAction.Type)
 	for endpoint, count := range calls {
 		require.Equal(t, 1, count, "completed API response was fetched again: %s", endpoint)

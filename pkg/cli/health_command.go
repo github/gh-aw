@@ -1,13 +1,11 @@
 package cli
 
 import (
-	"cmp"
 	"context"
 	"errors"
 	"fmt"
 	"math"
 	"os"
-	"slices"
 	"strconv"
 	"time"
 
@@ -35,7 +33,6 @@ type HealthConfig struct {
 	RepoOverride       string
 	LogsDir            string
 	Timeout            time.Duration
-	AllBranches        bool
 	Full               bool
 	Checkpoint         string
 	collection         *HealthCollection
@@ -59,7 +56,7 @@ With a workflow name, shows detailed metrics including:
 - Warnings when success rate drops below threshold
 - Work-queue diagnostics when a selected published workflow uses work-queue
 
-Named checks and --all-branches scan non-PR runs on the repository's default branch before reviewing PR and other
+Named checks scan non-PR runs on the repository's default branch before reviewing PR and other
 branch runs, even when a PR's source branch has the default branch's name.
 Their failures may reflect unmerged code rather than a default-branch regression.
 Within each pass, inventories failure signals from run-list payloads, verifies one
@@ -131,7 +128,6 @@ func NewHealthCommand() *cobra.Command {
 				RepoOverride: getStringFlag(cmd, "repo"),
 				LogsDir:      getStringFlag(cmd, "logs-dir"),
 				Timeout:      timeout,
-				AllBranches:  getBoolFlag(cmd, "all-branches"),
 				Full:         getBoolFlag(cmd, "full"),
 				Checkpoint:   getStringFlag(cmd, "checkpoint"),
 			})
@@ -154,7 +150,6 @@ func addHealthFlags(cmd *cobra.Command) {
 	cmd.Flags().Float64("threshold", 80.0, "Success rate threshold for warnings (percentage)")
 	cmd.Flags().String("logs-dir", defaultLogsOutputDir, "Existing logs cache for failure clustering and sub-agent failures (reports cache compatibility; no artifact downloads)")
 	cmd.Flags().Duration("timeout", 2*time.Minute, "Maximum collection duration (e.g., 30s or 5m; 0 disables the deadline). Returns explicitly partial results when exhausted")
-	cmd.Flags().Bool("all-branches", false, "Include PR and other branches in the legacy summary (omit the workflow name)")
 	cmd.Flags().Bool("full", false, "Include per-workflow and full failure evidence in the fleet report")
 	cmd.Flags().String("checkpoint", "", "Create or resume a private fleet checkpoint at this path")
 	addRepoFlag(cmd)
@@ -163,12 +158,9 @@ func addHealthFlags(cmd *cobra.Command) {
 
 func runHealth(ctx context.Context, config HealthConfig) error {
 	healthLog.Printf("Running health check: workflow=%s, days=%d, threshold=%.1f", config.WorkflowName, config.Days, config.Threshold)
-	if config.AllBranches && config.WorkflowName != "" {
-		return errors.New("--all-branches requires omitting the workflow name")
-	}
-	fleet := config.WorkflowName == "" && !config.AllBranches
+	fleet := config.WorkflowName == ""
 	if !fleet && (config.Checkpoint != "" || config.Full) {
-		return errors.New("--checkpoint and --full require omitting the workflow name and --all-branches")
+		return errors.New("--checkpoint and --full require omitting the workflow name")
 	}
 	if config.Timeout < 0 {
 		return errors.New("--timeout must not be negative")
@@ -190,10 +182,10 @@ func runHealth(ctx context.Context, config HealthConfig) error {
 	if fleet {
 		return runHealthFleet(ctx, config, start, end, started)
 	}
-	return runLegacyHealth(ctx, config, start, end, started)
+	return runNamedHealth(ctx, config, start, end, started)
 }
 
-func runLegacyHealth(ctx context.Context, config HealthConfig, start, end, started time.Time) error {
+func runNamedHealth(ctx context.Context, config HealthConfig, start, end, started time.Time) error {
 	if config.Verbose {
 		fmt.Fprintln(os.Stderr, console.FormatVerboseMessage("Fetching workflow runs created from "+config.StartDate+" to "+config.EndDate))
 	}
@@ -214,29 +206,12 @@ func runLegacyHealth(ctx context.Context, config HealthConfig, start, end, start
 	}
 
 	if len(runs) == 0 && len(config.collection.workflows) == 0 && !config.collection.Partial {
-		if config.WorkflowName != "" {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("No runs found for workflow '%s' created from %s to %s", config.WorkflowName, config.StartDate, config.EndDate)))
-			// When JSON output is requested for a specific workflow, still output a valid
-			// zero-run JSON structure so callers can parse the result programmatically.
-			if config.JSONOutput {
-				return displayDetailedHealth(runs, config)
-			}
-		} else {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("No workflow runs found created from %s to %s", config.StartDate, config.EndDate)))
-			if config.JSONOutput {
-				return displayHealthSummary(runs, config)
-			}
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("No runs found for workflow '%s' created from %s to %s", config.WorkflowName, config.StartDate, config.EndDate)))
+		if !config.JSONOutput {
+			return nil
 		}
-		return nil
 	}
-
-	if config.WorkflowName != "" {
-		// Detailed view for specific workflow
-		return displayDetailedHealth(runs, config)
-	}
-
-	// Summary view for all workflows
-	return displayHealthSummary(runs, config)
+	return displayDetailedHealth(runs, config)
 }
 
 func newHealthCollection(ctx context.Context, config HealthConfig, start, end time.Time) *HealthCollection {
@@ -252,31 +227,6 @@ func newHealthCollection(ctx context.Context, config HealthConfig, start, end ti
 		EndDate:             config.EndDate,
 		MaximumDays:         max(1, int(math.Ceil(end.Sub(start).Hours()/24))),
 	}
-}
-
-// displayHealthSummary displays a summary of health metrics for all workflows
-func displayHealthSummary(runs []WorkflowRun, config HealthConfig) error {
-	healthLog.Printf("Displaying health summary: %d runs", len(runs))
-
-	workflowHealths := calculateHealthWorkflowReports(runs, config)
-
-	// Sort by success rate ascending (lowest first to highlight issues)
-	slices.SortFunc(workflowHealths, func(a, b WorkflowHealth) int {
-		return cmp.Or(cmp.Compare(a.SuccessRate, b.SuccessRate), cmp.Compare(a.WorkflowPath, b.WorkflowPath), cmp.Compare(a.WorkflowName, b.WorkflowName))
-	})
-
-	// Calculate summary (intentional-failure workflows excluded from rollup counts)
-	summary := CalculateHealthSummary(workflowHealths, config.healthPeriod(), config.Threshold)
-	summary.Collection = config.collection
-	summary.FailureClusters, summary.FailureInvestigation = buildHealthFailureClusters(runs, config)
-	finishHealthCollection(config.collection)
-
-	// Output results
-	if config.JSONOutput {
-		return outputHealthJSON(summary)
-	}
-
-	return outputHealthTable(summary, config.Threshold)
 }
 
 // displayDetailedHealth displays detailed health metrics for a specific workflow
@@ -359,60 +309,4 @@ func displayDetailedHealthStatus(health WorkflowHealth, threshold float64) {
 	} else {
 		fmt.Fprintln(os.Stderr, console.FormatWarningMessage("Current revision has insufficient evidence for a healthy status"))
 	}
-}
-
-// outputHealthJSON outputs health summary in JSON format
-func outputHealthJSON(summary HealthSummary) error {
-	jsonBytes, err := marshalIndentJSONOrWrap(summary, "health summary")
-	if err != nil {
-		return err
-	}
-	fmt.Fprintln(os.Stdout, string(jsonBytes))
-	return nil
-}
-
-// outputHealthTable outputs health summary as a formatted table
-func outputHealthTable(summary HealthSummary, threshold float64) error {
-	fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Workflow Health Summary (%s)", summary.Period)))
-	fmt.Fprintln(os.Stderr, "")
-
-	// Render table
-	fmt.Fprint(os.Stderr, console.RenderStruct(summary.Workflows))
-	fmt.Fprintln(os.Stderr, "")
-
-	// Display summary message
-	fmt.Fprintf(os.Stderr, "[health_population] workflows=%d healthy=%d observed_failure_workflows=%d degraded_workflows=%d statuses=%v\n",
-		summary.TotalWorkflows, summary.HealthyWorkflows, summary.ObservedFailureWorkflows, summary.DegradedWorkflows, summary.StatusCounts)
-	if summary.ObservedFailureWorkflows > 0 {
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("%d workflow(s) have sampled current-revision Actions failures", summary.ObservedFailureWorkflows)))
-	}
-	if summary.SubagentFailureCount > 0 {
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("%d failed sub-agent invocations across %d run(s)", summary.SubagentFailureCount, summary.SubagentFailureRuns)))
-	}
-	if summary.DetectionFailureRuns > 0 {
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("%d run(s) have threat-detection failures or threats; Actions success rate does not establish successful threat detection", summary.DetectionFailureRuns)))
-	}
-	if summary.BelowThreshold > 0 {
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("%d workflow(s) below %.0f%% success threshold", summary.BelowThreshold, threshold)))
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Run '%s health <workflow-name>' for details", string(constants.CLIExtensionPrefix))))
-	} else if summary.ObservedFailureWorkflows == 0 && summary.DegradedWorkflows == 0 && summary.InsufficientWorkflows == 0 && (summary.Collection == nil || !summary.Collection.Partial) {
-		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(fmt.Sprintf("All evaluated workflows above %.0f%% success threshold", threshold)))
-	} else if summary.InsufficientWorkflows > 0 {
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("%d workflows have insufficient current-revision evidence", summary.InsufficientWorkflows)))
-	} else if summary.Collection != nil && summary.Collection.Partial {
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessage("Health collection is partial; see collection limits"))
-	}
-
-	if err := renderHealthCollection(os.Stderr, summary.Collection); err != nil {
-		return err
-	}
-	for _, health := range summary.Workflows {
-		if err := renderHealthRevisions(os.Stderr, health.Revisions); err != nil {
-			return err
-		}
-		if err := renderHealthSessionEvidence(os.Stderr, health); err != nil {
-			return err
-		}
-	}
-	return renderFailureReportToWriter(os.Stderr, summary.FailureClusters, summary.FailureInvestigation, "", false)
 }

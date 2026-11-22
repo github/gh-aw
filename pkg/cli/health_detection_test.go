@@ -142,14 +142,10 @@ func TestHealthDetectionFailureOutput(t *testing.T) {
 	subagents := cacheHealthSubagentFailure(t, runs[9], config)
 	detection.TokenUsage = subagents.TokenUsage
 	require.NoError(t, saveRunSummary(filepath.Join(config.LogsDir, "run-10"), detection, false))
-	for _, detailed := range []bool{false, true} {
+	{
 		config.JSONOutput = true
 		output := captureAuditGroupStdout(t, func() {
-			if detailed {
-				require.NoError(t, displayDetailedHealth(runs, config))
-			} else {
-				require.NoError(t, displayHealthSummary(runs, config))
-			}
+			require.NoError(t, displayDetailedHealth(runs, config))
 		})
 		var report struct {
 			DetectionFailureRuns int `json:"detection_failure_runs"`
@@ -164,12 +160,11 @@ func TestHealthDetectionFailureOutput(t *testing.T) {
 	}
 	config.JSONOutput = false
 	output := captureAuditGroupStderr(t, func() {
-		require.NoError(t, displayHealthSummary(runs, config))
 		require.NoError(t, displayDetailedHealth(runs, config))
 	})
 	assert.Contains(t, output, "[detection_failures]")
 	assert.Contains(t, output, "Threat Detection Warning")
-	assert.Contains(t, output, "failed sub-agent invocations")
+	assert.Contains(t, output, "sub-agent invocation(s) failed")
 	assert.Contains(t, output, "prompt injection")
 	assert.Contains(t, output, runs[9].URL)
 	assert.Contains(t, output, "Actions success rate does not establish successful threat detection")

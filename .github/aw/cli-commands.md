@@ -234,7 +234,7 @@ gh aw health                                 # Default-branch fleet report
 gh aw health <workflow-name>                 # Detailed metrics for a specific workflow
 gh aw health --days 30 --threshold 90        # Bound lookback; warn below 90% success
 gh aw health --json                          # JSON output for programmatic use
-gh aw health --start-date -24h --logs-dir ./workflow-logs  # Reuse cached logs, no downloads
+gh aw health <workflow-name> --start-date -24h --logs-dir ./workflow-logs  # Reuse cached logs
 ```
 
 Reports a bounded current-revision sample: compares `gh-aw-metadata` hashes across
