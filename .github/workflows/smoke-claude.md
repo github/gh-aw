@@ -91,7 +91,7 @@ safe-outputs:
       group: true
       close-older-issues: true
       close-older-key: "smoke-claude"
-      labels: [automation, testing]
+      labels: [automation, testing, "backlog:smoke-tests"]
     add-labels:
       allowed: [smoke-claude]
     create-code-scanning-alert:

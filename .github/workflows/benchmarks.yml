@@ -25,14 +25,15 @@ jobs:
   bench:
     if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: ${{ matrix.shard == 'workqueue' && 25 || 15 }}
     strategy:
       fail-fast: false
       matrix:
         shard: [cli, workflow, workqueue, other]
     env:
       SHARD: ${{ matrix.shard }}
-      ARTIFACT_NAME: benchmark-results-${{ matrix.shard }}
+      # Keep time-based samples separate from the old fixed-iteration baselines.
+      ARTIFACT_NAME: benchmark-results-${{ matrix.shard }}${{ matrix.shard != 'workqueue' && '-timed' || '' }}
       # Scanner integration is covered by CGO; do not benchmark Docker pulls or timeouts.
       BENCH_SKIP: '^BenchmarkCompile(With(Zizmor|Poutine|AllSecurityTools)|ComplexWithSecurityTools)$'
     steps:
@@ -71,12 +72,13 @@ jobs:
           echo "::error::No benchmark packages found for $SHARD"
           exit 1
         fi
-        benchtime=3x
+        # Average short benchmarks over many iterations to reduce runner noise.
+        benchtime=100ms
         # Each replay already takes seconds; retain every ledger size with one iteration.
         if [ "$SHARD" = workqueue ]; then
           benchtime=1x
         fi
-        make bench BENCH_PACKAGES="${selected[*]}" BENCH_TIME="$benchtime"
+        make bench BENCH_PACKAGES="${selected[*]}" BENCH_TIME="$benchtime" BENCH_COUNT=6
         {
           echo "## Benchmark results: $SHARD"
           echo '```'
@@ -122,8 +124,17 @@ jobs:
           echo '```'
         } >> "$GITHUB_STEP_SUMMARY"
         regression=false
+        lower_is_better=false
+        comparison='\+([0-9]+(\.[0-9]+)?)%[[:space:]]+\((p=[0-9.]+[[:space:]]+)?n=[0-9+]+\)'
         while IFS= read -r line; do
-          if [[ "$line" =~ \+([0-9]+(\.[0-9]+)?)% ]]; then
+          if [[ "$line" == *│* ]]; then
+            case "$line" in
+              *" sec/op "*|*" B/op "*|*" allocs/op "*) lower_is_better=true ;;
+              *" vs base "*) lower_is_better=false ;;
+            esac
+          fi
+          # Geomeans have no significance test; only gate on individual comparisons.
+          if [[ "$lower_is_better" == true && "$line" =~ $comparison ]]; then
             if awk -v p="${BASH_REMATCH[1]}" 'BEGIN {exit !(p > 10)}'; then
               echo "::error::Performance regression >10%: $line"
               regression=true

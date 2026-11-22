@@ -36,7 +36,7 @@ safe-outputs:
     expires: 2h
     close-older-issues: true
     close-older-key: smoke-factory
-    labels: [automation, testing]
+    labels: [automation, testing, "backlog:smoke-tests"]
 timeout-minutes: 15
 features:
   gh-aw-detection: false

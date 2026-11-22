@@ -240,6 +240,7 @@ func TestCopilotEngineExecutionSteps_WithLSPConfig(t *testing.T) {
 	if !strings.Contains(stepContent, `"lspServers":{"typescript":{"command":"typescript-language-server","args":["--stdio"],"fileExtensions":{".ts":"typescript"}}}`) {
 		t.Fatalf("Expected lspServers config in step content, got:\n%s", stepContent)
 	}
+	assert.Contains(t, stepContent, `export PATH="${RUNNER_TEMP}/gh-aw/engine-cli/typescript-lsp/node_modules/.bin:$PATH" &&`)
 }
 
 func TestCopilotDynamicWorkflowsSettings(t *testing.T) {

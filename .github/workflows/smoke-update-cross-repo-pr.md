@@ -47,7 +47,7 @@ safe-outputs:
   create-issue:
     expires: 2h
     close-older-issues: true
-    labels: [automation, testing]
+    labels: [automation, testing, "backlog:smoke-tests"]
   add-comment:
     hide-older-comments: true
     max: 2

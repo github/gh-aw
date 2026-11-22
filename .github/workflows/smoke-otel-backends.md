@@ -34,7 +34,7 @@ safe-outputs:
     expires: 2h
     close-older-issues: true
     close-older-key: "smoke-otel-backends"
-    labels: [automation, testing, observability]
+    labels: [automation, testing, observability, "backlog:smoke-tests"]
     max: 1
 timeout-minutes: 20
 imports:

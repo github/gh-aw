@@ -171,6 +171,7 @@ safe-outputs:
     draft: true
     title-prefix: "[avenger] "
     labels: [automated, ci-fix]
+    fallback-labels: ["backlog:engineering-quality", automated, ci-fix]
     protected-files: fallback-to-issue
     excluded-files:
       - ".github/workflows/**"

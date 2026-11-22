@@ -136,7 +136,7 @@ safe-outputs:
   create-issue:
     expires: 2d
     title-prefix: "[git-sim] "
-    labels: ["git-simulator", "safe-outputs", "automated"]
+    labels: ["git-simulator", "safe-outputs", "automated", "backlog:safe-outputs-git"]
     max: 10
     close-older-issues: false
     deduplicate-by-title: 3
