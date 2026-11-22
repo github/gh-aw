@@ -410,7 +410,8 @@ function applyCopilotInvocationModel(args, resolvedModel, effort = null) {
       i++;
     } else result.push(args[i].startsWith("--model=") ? `--model=${resolvedModel}` : args[i]);
   }
-  if (effort !== null) {
+  if (effort !== null && effort !== "auto") {
+    // Copilot CLI's native reasoning-effort flag supports low, medium, and high.
     if (!["low", "medium", "high"].includes(effort)) throw new Error("Copilot model suffix ?effort= expects low, medium, or high");
     result.push("--reasoning-effort", effort);
   }
@@ -1829,7 +1830,7 @@ async function main() {
       // Split after alias resolution so effort inherited from the alias is also applied.
       const { base, params } = splitModelIdentifier(resolvedModel);
       const effort = params.get("effort");
-      if (effort !== null) process.env.COPILOT_MODEL = base;
+      if (effort !== null && effort !== "auto") process.env.COPILOT_MODEL = base;
       if (invocationModel?.hasOverride || effort !== null) {
         resolvedArgs = applyCopilotInvocationModel(resolvedArgs, process.env.COPILOT_MODEL || "", effort);
       }
