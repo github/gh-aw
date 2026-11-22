@@ -62,6 +62,7 @@ const mockCore = {
           GH_AW_AMBIENT_CONTEXT: process.env.GH_AW_AMBIENT_CONTEXT,
           GH_AW_AGENT_CONCLUSION: process.env.GH_AW_AGENT_CONCLUSION,
           GH_AW_DETECTION_CONCLUSION: process.env.GH_AW_DETECTION_CONCLUSION,
+          GH_AW_DETECTION_ACCEPTED: process.env.GH_AW_DETECTION_ACCEPTED,
           GH_AW_ASSIGNMENT_ERROR_COUNT: process.env.GH_AW_ASSIGNMENT_ERROR_COUNT,
           GH_AW_SAFE_OUTPUT_MESSAGES: process.env.GH_AW_SAFE_OUTPUT_MESSAGES,
           GH_AW_SAFE_OUTPUT_JOBS: process.env.GH_AW_SAFE_OUTPUT_JOBS,
@@ -185,9 +186,54 @@ const mockCore = {
             delete process.env.GH_AW_SAFE_OUTPUT_MESSAGES;
             await eval(`(async () => { ${notifyCommentScript}; await main(); })()`);
             expect(mockGithub.request.mock.calls[0][1].body).not.toContain("private agent prose");
-            expect(mockCore.warning).toHaveBeenCalledWith(expect.stringContaining("omitting agent messages"));
+            expect(mockCore.warning).toHaveBeenCalledWith(expect.stringContaining("omitting the no-op category"));
           } finally {
             fs.rmSync(outputPath, { force: true });
+          }
+        });
+      }),
+      describe("agent explanations in status comments", () => {
+        it.each([
+          { verdict: "success", accepted: "true", published: true },
+          { verdict: "success", accepted: "false", published: false },
+          { verdict: "warning", accepted: "false", published: false },
+          { verdict: "failure", accepted: "false", published: false },
+          { verdict: "skipped", accepted: "true", published: false },
+          { verdict: "", accepted: "false", published: false },
+          { published: false },
+        ])("requires a clean, accepted verdict: %j", async ({ verdict, accepted, published }) => {
+          const tempDir = fs.mkdtempSync(path.join(process.cwd(), "gh-aw-status-reports-"));
+          const outputPath = path.join(tempDir, "agent-output.json");
+          const items = [
+            { type: "noop", message: "Nothing to change." },
+            { type: "report_incomplete", reason: "Review did not finish.", details: "Unrequested details" },
+            { type: "report_missing_tool", reason: "The build tool was unavailable." },
+            { type: "report_missing_data", reason: "No input was provided." },
+            { type: "add_comment", body: "Unrelated safe output" },
+          ];
+          fs.writeFileSync(outputPath, JSON.stringify({ items }));
+          try {
+            process.env.GH_AW_AGENT_OUTPUT = outputPath;
+            process.env.GH_AW_COMMENT_ID = "123456";
+            process.env.GH_AW_RUN_URL = "https://github.com/owner/repo/actions/runs/123";
+            process.env.GH_AW_AGENT_CONCLUSION = "failure";
+            delete process.env.GH_AW_NOOP_COMMENT_BODY;
+            delete process.env.GH_AW_SAFE_OUTPUT_MESSAGES;
+            if (verdict === undefined) delete process.env.GH_AW_DETECTION_CONCLUSION;
+            else process.env.GH_AW_DETECTION_CONCLUSION = verdict;
+            if (accepted === undefined) delete process.env.GH_AW_DETECTION_ACCEPTED;
+            else process.env.GH_AW_DETECTION_ACCEPTED = accepted;
+
+            await eval(`(async () => { ${notifyCommentScript}; await main(); })()`);
+
+            const body = mockGithub.request.mock.calls.find(call => call[0] === "PATCH /repos/{owner}/{repo}/issues/comments/{comment_id}")[1].body;
+            for (const item of items.slice(0, 4)) {
+              expect(body.includes(item.message || item.reason)).toBe(published);
+            }
+            expect(body).not.toContain("Unrequested details");
+            expect(body).not.toContain("Unrelated safe output");
+          } finally {
+            fs.rmSync(tempDir, { recursive: true, force: true });
           }
         });
       }),

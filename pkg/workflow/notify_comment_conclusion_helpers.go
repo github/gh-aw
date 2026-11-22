@@ -620,6 +620,7 @@ func (c *Compiler) buildConclusionScriptEnvVars(data *WorkflowData, mainJobName 
 		}
 	}
 	if IsDetectionJobEnabled(data.SafeOutputs) {
+		envVars = append(envVars, fmt.Sprintf("          GH_AW_DETECTION_ACCEPTED: ${{ %s }}\n", RenderCondition(buildDetectionAcceptedCondition())))
 		envVars = append(envVars, fmt.Sprintf("          GH_AW_DETECTION_CONCLUSION: ${{ needs.%s.outputs.detection_conclusion }}\n", constants.DetectionJobName))
 		envVars = append(envVars, fmt.Sprintf("          GH_AW_DETECTION_REASON: ${{ needs.%s.outputs.detection_reason }}\n", constants.DetectionJobName))
 		envVars = append(envVars, fmt.Sprintf("          GH_AW_DETECTION_THREAT_KINDS: ${{ needs.%s.outputs.detection_threat_kinds }}\n", constants.DetectionJobName))

@@ -41,6 +41,7 @@ func TestCompletionCommentFooterMetadata(t *testing.T) {
 		`GH_AW_ENGINE_MODEL: "gpt-5.6-luna"`,
 		`GH_AW_AIC: ${{ needs.agent.outputs.aic }}`,
 		`GH_AW_THREAT_DETECTION_AIC: ${{ needs.detection.outputs.aic }}`,
+		`GH_AW_DETECTION_ACCEPTED: ${{ needs.detection.result == 'success' && needs.detection.outputs.detection_success == 'true' }}`,
 		`GH_AW_EVALS_AIC: ${{ needs.evals.outputs.aic }}`,
 		`GH_AW_AMBIENT_CONTEXT: ${{ needs.agent.outputs.ambient_context }}`,
 		`GH_AW_WORKFLOW_ID: "test-workflow"`,

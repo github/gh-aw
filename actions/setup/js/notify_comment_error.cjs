@@ -3,7 +3,7 @@
 
 // This script updates an existing comment created by the activation job
 // to notify about the workflow completion status (success or failure).
-// It also adds the categorized, privacy-safe noop body to the activation comment.
+// Agent-authored explanations are published only after a clean detection verdict.
 
 const { loadAgentOutput } = require("./load_agent_output.cjs");
 const { getRunSuccessMessage, getRunFailureMessage, getDetectionFailureBlocks, getDetectionWarningBlocks } = require("./messages_run_status.cjs");
@@ -113,6 +113,40 @@ function getRunFailureStatusText(agentConclusion, assignToAgentErrorCount, safeO
   }
 }
 
+/**
+ * @param {import("./report_ast.cjs").ReportBlock[]} children
+ * @param {Array<{type?: string, message?: unknown, reason?: unknown} | null>} items
+ */
+function appendAgentReports(children, items) {
+  for (const item of items) {
+    let summary;
+    let text;
+    switch (item?.type) {
+      case "noop":
+        summary = "No-op message";
+        text = item.message;
+        break;
+      case "report_incomplete":
+        summary = "Incomplete work";
+        text = item.reason;
+        break;
+      case "report_missing_tool":
+        summary = "Missing tool";
+        text = item.reason;
+        break;
+      case "report_missing_data":
+        summary = "Missing data";
+        text = item.reason;
+        break;
+      default:
+        continue;
+    }
+    if (typeof text !== "string" || !text.trim()) continue;
+    const blocks = parseReportMarkdown(sanitizeContent(text), { agentTainted: true });
+    if (blocks.length > 0) children.push({ type: "details", summary, children: blocks, agentTainted: true });
+  }
+}
+
 async function main() {
   const commentId = process.env.GH_AW_COMMENT_ID;
   const commentRepo = process.env.GH_AW_COMMENT_REPO;
@@ -153,11 +187,11 @@ async function main() {
     core.info(`Safe Outputs Result: ${safeOutputsResult}`);
   }
 
-  // Load agent output to check for noop messages
+  // Load agent output for the step-summary fallback and vetted reports.
   let noopMessages = [];
   const agentOutputResult = loadAgentOutput();
   if (agentOutputResult.success) {
-    const noopItems = agentOutputResult.items.filter(item => item.type === "noop");
+    const noopItems = agentOutputResult.items.filter(item => item?.type === "noop");
     if (noopItems.length > 0) {
       core.info(`Found ${noopItems.length} noop message(s)`);
       noopMessages = noopItems.map(item => item.message);
@@ -252,11 +286,15 @@ async function main() {
     children.push(...parseReportMarkdown(sanitizeContent(activationCommentLinks), { agentTainted: false, minimumHeadingLevel: 2 }));
   }
 
-  // Never fall back to raw agent prose in a public comment if rendering failed.
   if (noopCommentBody) {
     children.push(...parseReportMarkdown(sanitizeContent(noopCommentBody), { agentTainted: true, minimumHeadingLevel: 2 }));
   } else if (noopMessages.length > 0) {
-    core.warning("No categorized no-op comment body is available; omitting agent messages from the public comment");
+    core.warning("No categorized no-op comment body is available; omitting the no-op category from the public comment");
+  }
+
+  // The detector may accept a skipped run, so also require an explicit clean verdict.
+  if (process.env.GH_AW_DETECTION_ACCEPTED === "true" && detectionConclusion === "success" && agentOutputResult.success) {
+    appendAgentReports(children, agentOutputResult.items);
   }
 
   // Collect generated asset URLs from safe output jobs
