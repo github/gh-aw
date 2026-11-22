@@ -3,9 +3,9 @@ description: Verify whether a pushed agentic workflow fix has matching existing-
 disable-model-invocation: true
 ---
 
-# Verify Workflow Health After a Fix
+# Check Current Workflow Health
 
-Use this route for "is it healthy now?", "did the patch work?", or "can we close
+Use this route for fleet health checks, "did the patch work?", or "can we close
 the investigation?" An older green run cannot verify a new patch. For historical
 failure clustering, use [existing-run analysis](analyzing-runs.md) instead.
 Follow the [shared strategy](debug-agentic-workflow.md); this is existing-evidence
@@ -13,26 +13,47 @@ verification, not authorization to dispatch or rerun a workflow.
 
 ## Collect Revision-Aware Health
 
-Use `gh aw health --json` in a matching repository. For a named workflow or a
-different checkout, retain the supplied workflow and explicitly scope the repository;
-do not broaden to the fleet or infer another repository from the current checkout.
+Use `gh aw health --json` against the identified repository. For fleet triage,
+start with the last 24 hours unless the user supplied another window. Save the
+full report privately and project a compact summary before reading individual
+workflows. For a named workflow, pass its name or path and retain that scope.
+If collecting from a source build, substitute the verified binary path from
+the [bootstrap](debug-bootstrap.md#2-check-the-cli-and-run-identity).
 
 ```bash
-gh aw health WORKFLOW --repo HOST/OWNER/REPO --json
+health_dir=$(mktemp -d "$TMPDIR/gh-aw-health.XXXXXX") &&
+  gh aw health --repo HOST/OWNER/REPO --start-date=-24h --timeout 2m --json \
+    > "$health_dir/health.json" &&
+  jq '{status_counts, total_workflows,
+       collection: (.collection | {start_date, end_date, default_branch, partial,
+         reason, default_branch_pass_complete, failure_listing_complete, failure_pass_complete}),
+       targets: [.failure_investigation.selected_runs[]? |
+         {workflow_name, branch, url}]}' "$health_dir/health.json"
 ```
 
-Collection defaults to a two-minute budget. Set `--timeout 30s` for a shorter
-check or `--timeout 0` to disable the deadline. Exhaustion returns available
-evidence with `collection.partial=true` and `reason=time_budget`; it does not
-verify health. Use `DEBUG=cli:health` to trace request progress and timings on
-stderr. Increase the budget or narrow the scope when more evidence is needed.
+For a named workflow, use `gh aw health WORKFLOW --repo HOST/OWNER/REPO --json`
+and inspect its own revision evidence; the fleet projection above is not its
+output schema.
+
+Collection defaults to two minutes. On `collection.partial=true`, report
+`collection.reason` and the uncovered scope, even when the command exits
+successfully. `not_collected` means unassessed; `no_current_revision_runs` means
+the scan found no matching run for the pushed revision, not that it passed.
+Health has no resume cursor. If more evidence is needed after `time_budget`,
+prefer a targeted workflow check or one longer bounded fleet retry. Reuse the
+report's resolved `start_date` and `end_date` for a comparable window. A retry
+is a new sample: do not merge counts or assume the branch revision stayed fixed.
+For other stop reasons, follow the reported limit or warning rather than
+blindly retrying. Use `DEBUG=cli:health` for timings on stderr.
 
 Use available health evidence when the CLI is unavailable; do not assume that
 an MCP equivalent exists without discovering its actual schema.
 
 Health scans the repository's default branch before PR and other branches.
 Check `collection.default_branch` and `default_branch_pass_complete`; PR failures
-may reflect unmerged code rather than a default-branch regression. Within each
+may reflect unmerged code rather than a default-branch regression. Fleet
+`status_counts` are not default-branch-only; check the representative run's
+branch before attributing a failure to the default branch. Within each
 branch pass, health inventories registered AW `failure` conclusions from run-list payloads before
 any job or revision lookups, then verifies one job-backed representative per
 branch/event. `collection.potential_issues` are approximate, list-only signals;
