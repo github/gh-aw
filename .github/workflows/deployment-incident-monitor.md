@@ -29,7 +29,7 @@ safe-outputs:
   create-issue:
     expires: 7d
     title-prefix: "[Incident] "
-    labels: [incident, deployment-failure]
+    labels: [incident, deployment-failure, "backlog:run-alerts"]
     close-older-issues: true
   noop:
 timeout-minutes: 10

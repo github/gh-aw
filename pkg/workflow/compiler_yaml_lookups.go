@@ -254,6 +254,11 @@ func collectEngineVersionsForMetadata(data *WorkflowData, registry *EngineRegist
 
 	if isCopilotSDKEnabledForActiveEngine(data, mainEngineID) {
 		filteredVersions["copilot-sdk"] = string(constants.DefaultCopilotSDKVersion)
+		if data.EngineConfig != nil {
+			if pin := data.EngineConfig.CopilotSDKPin; pin != nil && pin.valid() {
+				filteredVersions["copilot-sdk"] = pin.Version
+			}
+		}
 	}
 
 	return filteredVersions

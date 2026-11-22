@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 
 const setupDirectory = resolve(import.meta.dirname, "..");
 const actionsDirectory = resolve(setupDirectory, "..");
-const existingGoFiles = new Set(["setup/session_parsers.go", "setup/session_parsers_test.go", "setup/sh/validate_multi_secret_test.go"]);
+const existingGoFiles = new Set(["setup/copilot_sdk_assets.go", "setup/session_parsers.go", "setup/session_parsers_test.go", "setup/sh/validate_multi_secret_test.go", "setup/typescript_lsp.go"]);
 const parserPackages = /^(?:yaml|js-yaml|work_queue_yaml)(?:[/.]|$)/;
 
 function normalizeSeparators(file) {

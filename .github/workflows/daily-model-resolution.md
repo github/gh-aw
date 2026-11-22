@@ -27,6 +27,7 @@ tools:
   bash: true
 safe-outputs:
   create-issue:
+    labels: ["backlog:reports"]
     expires: 3d
     title-prefix: "[model-resolution] "
     close-older-issues: true

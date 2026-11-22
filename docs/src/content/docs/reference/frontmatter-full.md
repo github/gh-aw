@@ -3581,11 +3581,21 @@ engine:
     # (optional)
     tool-timeout: "example-value"
 
-  # Enables the experimental GitHub Copilot SDK integration (copilot engine only).
-  # When true, the harness starts a separate headless Copilot CLI sidecar on the
-  # configured localhost port and sets COPILOT_SDK_URI on child processes.
+  # Enables Copilot SDK integration. An object pins a checked-in npm project for a
+  # Node.js or TypeScript driver.
   # (optional)
+  # Accepted formats:
+
+  # Format 1: boolean
   copilot-sdk: true
+
+  # Format 2: object
+  copilot-sdk:
+    # Exact stable version of @github/copilot-sdk, independent of engine.version.
+    version: "example-value"
+
+    # Lowercase SHA-256 of the checked-in manifest, a NUL byte, and the npm lockfile.
+    sha256: "example-value"
 
   # Custom driver script, command, or inline source for the engine. String values
   # accept a workspace-relative path or bare name. Inline object values are
@@ -22599,11 +22609,21 @@ safe-outputs:
         # (optional)
         tool-timeout: "example-value"
 
-      # Enables the experimental GitHub Copilot SDK integration (copilot engine only).
-      # When true, the harness starts a separate headless Copilot CLI sidecar on the
-      # configured localhost port and sets COPILOT_SDK_URI on child processes.
+      # Enables Copilot SDK integration. An object pins a checked-in npm project for a
+      # Node.js or TypeScript driver.
       # (optional)
+      # Accepted formats:
+
+      # Format 1: boolean
       copilot-sdk: true
+
+      # Format 2: object
+      copilot-sdk:
+        # Exact stable version of @github/copilot-sdk, independent of engine.version.
+        version: "example-value"
+
+        # Lowercase SHA-256 of the checked-in manifest, a NUL byte, and the npm lockfile.
+        sha256: "example-value"
 
       # Custom driver script, command, or inline source for the engine. String values
       # accept a workspace-relative path or bare name. Inline object values are

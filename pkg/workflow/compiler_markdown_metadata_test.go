@@ -138,9 +138,10 @@ func TestCompilerEmbedsLargeActivationMarkdownMetadata(t *testing.T) {
 }
 
 func TestInertJSON(t *testing.T) {
-	input := []byte(`{"a":"${{ x }}'é😀\u003c"}`)
+	input, err := json.Marshal(map[string]string{"a": "${{ x }}'é😀<\x7f"})
+	require.NoError(t, err)
 	encoded := inertJSON(input)
-	require.Equal(t, `{"a":"\u0024{{ x }}\u0027\u00e9\ud83d\ude00\u003c"}`, encoded) //nolint:testifylint // Exact escapes keep Actions and shell expressions inert.
+	require.Equal(t, `{"a":"\u0024{{ x }}\u0027\u00e9\ud83d\ude00\u003c\u007f"}`, encoded) //nolint:testifylint // Exact escapes keep Actions and shell expressions inert.
 	var want, got any
 	require.NoError(t, json.Unmarshal(input, &want))
 	require.NoError(t, json.Unmarshal([]byte(encoded), &got))

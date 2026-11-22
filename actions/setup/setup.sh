@@ -228,7 +228,23 @@ else
   debug_log "No shell scripts directory found at ${SH_SOURCE_DIR}"
 fi
 
+# Stage only the locked npm project, not the maintainer's registry settings.
+create_dir "${DESTINATION}/typescript-lsp"
+for filename in package.json package-lock.json; do
+  cp "${SCRIPT_DIR}/typescript-lsp/${filename}" "${DESTINATION}/typescript-lsp/${filename}"
+  FILE_COUNT=$((FILE_COUNT + 1))
+done
+
 echo "Successfully copied ${FILE_COUNT} files to ${DESTINATION}"
+
+# Keep the locked SDK projects beside their installer; runner npm configuration
+# still controls the registry, not the development projects' .npmrc files.
+for variant in node typescript; do
+  sdk_project="${DESTINATION}/copilot-sdk/${variant}"
+  mkdir -p "$sdk_project"
+  cp "${SCRIPT_DIR}/copilot-sdk/${variant}/package.json" \
+    "${SCRIPT_DIR}/copilot-sdk/${variant}/package-lock.json" "$sdk_project/"
+done
 
 if ! bash "${DESTINATION}/runtime_trust_inventory.sh"; then
   echo "::warning::Runtime TLS inventory inspection failed; trust status unknown. Continuing setup; artifact-integrity checks remain required."
