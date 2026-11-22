@@ -857,6 +857,21 @@ func TestAddHandlerManagerConfigEnvVar(t *testing.T) {
 			expectedKeys: []string{"report_incomplete"},
 		},
 		{
+			name: "request_continuation config",
+			safeOutputs: &SafeOutputsConfig{
+				RequestContinuation: &RequestContinuationConfig{
+					BaseSafeOutputConfig: BaseSafeOutputConfig{
+						Max: strPtr("1"),
+					},
+				},
+			},
+			checkContains: []string{
+				"GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG",
+			},
+			checkJSON:    true,
+			expectedKeys: []string{"request_continuation"},
+		},
+		{
 			name: "create report incomplete issue config",
 			safeOutputs: &SafeOutputsConfig{
 				ReportIncomplete: &ReportIncompleteConfig{

@@ -3,11 +3,67 @@
 package workflow
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
+	"github.com/github/gh-aw/pkg/stringutil"
+	"github.com/goccy/go-yaml"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestImportedRunsOn(t *testing.T) {
+	for _, tt := range []struct {
+		name, shared, local, wantError string
+		wantRunner                     any
+	}{
+		{name: "first import wins", shared: "ubuntu-24.04", wantRunner: "ubuntu-24.04"},
+		{name: "main overrides import", shared: "macos-latest", local: "runs-on: ubuntu-22.04\n", wantRunner: "ubuntu-22.04"},
+		{name: "label array", shared: "[self-hosted, linux, x64]", wantRunner: []any{"self-hosted", "linux", "x64"}},
+		{name: "runner group", shared: "{group: linux-pool, labels: [linux]}", wantRunner: map[string]any{"group": "linux-pool", "labels": []any{"linux"}}},
+		{name: "reject unsupported runner", shared: "macos-latest", wantError: "unsupported runner 'macos-latest'"},
+		{name: "reject empty runner group", shared: "{}", wantError: "runs-on object is empty"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			dir := filepath.Join(t.TempDir(), ".github", "workflows")
+			require.NoError(t, os.MkdirAll(dir, 0755))
+			require.NoError(t, os.WriteFile(filepath.Join(dir, "shared.md"), []byte("---\nruns-on: "+tt.shared+"\nengine: claude\n---\n"), 0644))
+			require.NoError(t, os.WriteFile(filepath.Join(dir, "second.md"), []byte("---\nruns-on: ubuntu-latest\n---\n"), 0644))
+			main := filepath.Join(dir, "main.md")
+			require.NoError(t, os.WriteFile(main, []byte(`---
+on: workflow_dispatch
+strict: false
+permissions:
+  contents: read
+safe-outputs:
+  add-comment:
+imports:
+  - shared.md
+  - second.md
+`+tt.local+`---
+Say hello.
+`), 0644))
+
+			err := NewCompiler().CompileWorkflow(main)
+			if tt.wantError != "" {
+				require.ErrorContains(t, err, tt.wantError)
+				return
+			}
+			require.NoError(t, err)
+			lock, err := os.ReadFile(stringutil.MarkdownToLockFile(main))
+			require.NoError(t, err)
+			var workflow struct {
+				Jobs map[string]struct {
+					RunsOn any `yaml:"runs-on"`
+				} `yaml:"jobs"`
+			}
+			require.NoError(t, yaml.Unmarshal(lock, &workflow))
+			assert.Equal(t, tt.wantRunner, workflow.Jobs["agent"].RunsOn)
+			assert.Equal(t, "ubuntu-latest", workflow.Jobs["detection"].RunsOn)
+		})
+	}
+}
 
 func TestValidateRunsOn(t *testing.T) {
 	tests := []struct {

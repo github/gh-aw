@@ -35,12 +35,17 @@ Additional package constants define admission defaults (`DefaultAdmissionAudienc
 `DefaultDetectionJobTimeoutMinutes`), engine model defaults
 (`DefaultModelClaude`, `DefaultModelCodex`, `DefaultModelCopilot`), the OTLP
 protocol key (`OTLPProtocol`), and the creation policies
-(`PolicyAllowCreatePullRequest`, `PolicyStrict`).
+(`PolicyAllowCreatePullRequest`, `PolicyStrict`). `DefaultSafeOutputAuthorizationURL`
+and `DefaultSafeOutputAuthorizationAudience` name the authorization endpoint
+and audience overrides.
 
 Other environment-variable identifiers are
 `DefaultDetectionMaxAICredits`, `DefaultDetectionModel`,
 `DefaultEvalsMaxAICredits`, `DefaultEvalsModel`, `DefaultMaxAICredits`,
 `DefaultMaxDailyAICredits`, `DefaultMaxTurnCacheMisses`, `DefaultMaxTurns`,
 `DefaultOTLPEndpoint`, `DefaultOTLPHeaders`, `DefaultTimeoutMinutes`,
-`DefaultUTC`, `PolicyModelsAllowed`, `PolicyModelsBlocked`, and
+`DefaultUTC`, `OTLPMetrics`, `PolicyModelsAllowed`, `PolicyModelsBlocked`, and
 `RequireSelfHostedRunners`.
+
+`OTLPMetrics` controls the JavaScript OTLP metrics exporter; it defaults to
+enabled when the corresponding Actions variable is unset.

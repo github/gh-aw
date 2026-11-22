@@ -246,6 +246,9 @@ Inline skills are secondary skill definitions embedded in the same markdown file
 | Function | Signature | Description |
 |----------|-----------|-------------|
 | `ActionPinSourceVersions` | `func(content []byte) map[string]string` | Collects inline version labels for SHA-pinned action references in YAML. |
+| `LegacyModelRoutingWarning` | `func(frontmatter map[string]any) string` | Describes the authored main-agent model-routing declaration, excluding synthesized router settings. |
+| `ImportCache.ResolvedLocalFiles` | `func() []string` | Returns canonical filenames resolved in local-only mode, independently of display paths and section selectors. |
+| `ImportCache.SetLocalOnlyRoot` | `func(root string)` | Enables local-only import resolution, rejecting remote dependencies and local imports outside the configured root. |
 | `ExtractSubAgentModels` | `func(body string) []SubAgentModel` | Reads model declarations from inline sub-agent frontmatter; malformed frontmatter is handled as an advisory. |
 | `ParseMCPCACertFile` | `func(config map[string]any, serverType, name string) (string, error)` | Validates and returns an optional per-server CA certificate path from MCP configuration. |
 | `ValidateMCPCACertFile` | `func(value string) error` | Validates an author-controlled CA certificate path before it is used by generated shell content. |

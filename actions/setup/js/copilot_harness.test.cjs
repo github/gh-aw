@@ -56,6 +56,7 @@ const {
   fetchAWFReflect,
   fetchModelsFromUrl,
   generateCopilotConnectionToken,
+  resolveCopilotConnectionToken,
   GEMINI_MODEL_NAME_PREFIX,
   isCAPIQuotaExceededError,
   isCAPIServerError,
@@ -673,6 +674,21 @@ describe("copilot_harness.cjs", () => {
     it("generates a 32-byte hex token", () => {
       const token = generateCopilotConnectionToken();
       expect(token).toMatch(/^[a-f0-9]{64}$/);
+    });
+
+    describe("resolveCopilotConnectionToken", () => {
+      it("reuses the host-masked token without generating a new credential", () => {
+        const token = generateCopilotConnectionToken();
+        expect(resolveCopilotConnectionToken({ COPILOT_CONNECTION_TOKEN: token })).toBe(token);
+      });
+
+      it("generates a credential for standalone execution", () => {
+        expect(resolveCopilotConnectionToken({})).toMatch(/^[a-f0-9]{64}$/);
+      });
+
+      it("rejects malformed inherited credentials without logging their value", () => {
+        expect(() => resolveCopilotConnectionToken({ COPILOT_CONNECTION_TOKEN: "invalid\n::error::injected" })).toThrow(/^COPILOT_CONNECTION_TOKEN must be a 32-byte hexadecimal token$/);
+      });
     });
 
     it("uses a pluggable random byte source", () => {

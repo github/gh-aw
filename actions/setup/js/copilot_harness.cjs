@@ -325,6 +325,18 @@ function generateCopilotConnectionToken(options) {
 }
 
 /**
+ * Reuse the host-masked AWF credential, or generate one for standalone execution.
+ * @param {NodeJS.ProcessEnv} [sourceEnv]
+ * @returns {string}
+ */
+function resolveCopilotConnectionToken(sourceEnv = process.env) {
+  const token = sourceEnv.COPILOT_CONNECTION_TOKEN;
+  if (!token) return generateCopilotConnectionToken();
+  if (!/^[a-f0-9]{64}$/i.test(token)) throw new Error("COPILOT_CONNECTION_TOKEN must be a 32-byte hexadecimal token");
+  return token;
+}
+
+/**
  * Determines if the collected output contains a transient CAPIError 400
  * @param {string} output - Collected stdout+stderr from the process
  * @returns {boolean}
@@ -1754,12 +1766,12 @@ async function main() {
   const copilotSDKMode = isCopilotSDKEnabled();
   let copilotConnectionToken = "";
   if (copilotSDKMode) {
-    // The harness always generates the connection token when SDK mode is active.
+    // AWF supplies a host-masked token; standalone execution generates its own.
     // The token is injected into the driver subprocess env so the harness-managed
     // sidecar and the driver's SDK client share the same token.
-    copilotConnectionToken = generateCopilotConnectionToken();
+    copilotConnectionToken = resolveCopilotConnectionToken();
     maskSecret(copilotConnectionToken);
-    log("copilot-sdk mode active: generated per-run COPILOT_CONNECTION_TOKEN");
+    log("copilot-sdk mode active: using per-run COPILOT_CONNECTION_TOKEN");
     log(`copilot-sdk mode active: COPILOT_SDK_URI=${sdkEnv.COPILOT_SDK_URI || "(not set)"}`);
   }
 
@@ -2678,6 +2690,7 @@ if (typeof module !== "undefined" && module.exports) {
     buildCopilotEngineChildEnv,
     envFlagEnabled,
     generateCopilotConnectionToken,
+    resolveCopilotConnectionToken,
     buildCopilotSDKServerArgs,
     getCopilotSDKServerPort,
     hasNoopInSafeOutputs,
