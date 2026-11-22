@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -94,23 +95,48 @@ func saveAdvisoryHandoff(cmd *cobra.Command, id string, record advisoryRecord, c
 	if err := os.MkdirAll(filepath.Dir(filename), 0o700); err != nil {
 		return fmt.Errorf("create private advisory record directory: %w", err)
 	}
+	requestPath := filename + ".fork-request"
 	if forkErr != nil {
-		if err := handoff.createAndWaitForFork(ctx); err != nil {
+		if err := handoff.createAndWaitForFork(ctx, requestPath); err != nil {
 			return err
 		}
+	} else if err := clearAdvisoryForkRequest(requestPath); err != nil {
+		return err
 	}
-	if err := writeSessionFileAtomically(filename, data); err != nil {
-		return fmt.Errorf("save private advisory record: %w", err)
+	current, err := os.ReadFile(filename)
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("read existing private advisory record: %w", err)
+	}
+	if !bytes.Equal(current, data) {
+		if err := writeSessionFileAtomically(filename, data); err != nil {
+			return fmt.Errorf("save private advisory record: %w", err)
+		}
 	}
 	_, err = fmt.Fprintf(cmd.OutOrStdout(), "Saved %s locally. Review with gh aw advisory inspect %s.\n", id, id)
 	return err
 }
 
-func (o advisoryHandoff) createAndWaitForFork(ctx context.Context) error {
+func (o advisoryHandoff) createAndWaitForFork(ctx context.Context, requestPath string) error {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
 	defer cancel()
-	if _, err := advisorySetupAPI(ctx, path.Join(o.advisoryAPIPath(), "forks"), "--method", "POST"); err != nil {
-		return errors.New("could not confirm the temporary private fork creation request; check the advisory in GitHub and verify your account can create its fork")
+	// Claim before POST so retries after interruption or a lost response only poll.
+	err := os.Mkdir(requestPath, 0o700)
+	switch {
+	case err == nil:
+		// The fork may have appeared while the artifact was being verified.
+		if _, err := o.resolveFork(ctx); err == nil {
+			return clearAdvisoryForkRequest(requestPath)
+		} else if !errors.Is(err, errAdvisoryForkMissing) {
+			return errors.Join(err, clearAdvisoryForkRequest(requestPath))
+		}
+		if _, err := advisorySetupAPI(ctx, path.Join(o.advisoryAPIPath(), "forks"), "--method", "POST"); err != nil {
+			if _, verifyErr := o.resolveFork(ctx); verifyErr == nil {
+				return clearAdvisoryForkRequest(requestPath)
+			}
+			return errors.New("could not confirm the temporary private fork creation request; rerun record to check for the fork without resending the request, or create it in GitHub if needed")
+		}
+	case !errors.Is(err, os.ErrExist):
+		return fmt.Errorf("claim private fork creation request: %w", err)
 	}
 
 	ticker := time.NewTicker(5 * time.Second)
@@ -118,7 +144,7 @@ func (o advisoryHandoff) createAndWaitForFork(ctx context.Context) error {
 	for {
 		_, err := o.resolveFork(ctx)
 		if err == nil {
-			return nil
+			return clearAdvisoryForkRequest(requestPath)
 		}
 		if !errors.Is(err, errAdvisoryForkMissing) && ctx.Err() == nil {
 			return fmt.Errorf("fork creation was requested, but the fork could not be verified; check the advisory in GitHub before rerunning record: %w", err)
@@ -129,6 +155,13 @@ func (o advisoryHandoff) createAndWaitForFork(ctx context.Context) error {
 		case <-ticker.C:
 		}
 	}
+}
+
+func clearAdvisoryForkRequest(requestPath string) error {
+	if err := os.Remove(requestPath); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("clear private fork request marker: %w", err)
+	}
+	return nil
 }
 
 func loadAdvisoryHandoff(ctx context.Context, id string) (advisoryHandoff, error) {

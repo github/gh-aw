@@ -43,14 +43,19 @@ repos/owner/upstream/security-advisories/GHSA-2345-6789-cfgh) printf '%%s' '{"gh
 repos/owner/upstream/security-advisories/GHSA-2345-6789-jmpq) printf '%%s' '{"ghsa_id":"GHSA-2345-6789-jmpq","state":"draft","private_fork":{"id":41,"full_name":"owner/other-fork","private":true}}' ;;
 repos/owner/upstream/security-advisories/GHSA-2345-6789-rvwx)
   fork="${ADVISORY_TEST_FORK:-null}"
-  if [ -f "$ADVISORY_TEST_CREATE_LOG" ]; then
-    fork='{"id":42,"full_name":"owner/created-fork","private":true}'
+  if [ -f "$ADVISORY_TEST_CREATE_LOG" ] && [ "$ADVISORY_TEST_HIDE_FORK" != yes ]; then
+    if [ -n "$ADVISORY_TEST_REVEAL_ON_RECHECK" ] && [ ! -f "$ADVISORY_TEST_REVEAL_ON_RECHECK" ]; then
+      : > "$ADVISORY_TEST_REVEAL_ON_RECHECK"
+    else
+      fork='{"id":42,"full_name":"owner/created-fork","private":true}'
+    fi
   fi
   printf '{"ghsa_id":"GHSA-2345-6789-rvwx","state":"%%s","private_fork":%%s}' "${ADVISORY_TEST_STATE:-draft}" "$fork"
   ;;
 repos/owner/upstream/security-advisories/GHSA-2345-6789-rvwx/forks)
   [ "$#" -eq 6 ] && [ "$5" = --method ] && [ "$6" = POST ] || exit 1
   printf 'created\n' >> "$ADVISORY_TEST_CREATE_LOG"
+  [ "$ADVISORY_TEST_HIDE_FORK" != yes ]
   ;;
 *) exit 1 ;;
 esac
@@ -142,10 +147,26 @@ esac
 		require.NoFileExists(t, createLog)
 
 		t.Setenv("ADVISORY_TEST_ATTEMPT", `,"run_attempt":1`)
+		t.Setenv("ADVISORY_TEST_HIDE_FORK", "yes")
 		_, err = run(args...)
+		require.ErrorContains(t, err, "without resending")
+		filename, err := advisoryRecordPath(42, newID)
+		require.NoError(t, err)
+		require.NoFileExists(t, filename)
+		require.DirExists(t, filename+".fork-request")
+
+		t.Setenv("ADVISORY_TEST_HIDE_FORK", "no")
+		t.Setenv("ADVISORY_TEST_REVEAL_ON_RECHECK", filepath.Join(dir, "fork-rechecked"))
+		_, err = run(args...)
+		require.NoError(t, err)
+		require.NoDirExists(t, filename+".fork-request")
+		before, err := os.Stat(filename)
 		require.NoError(t, err)
 		_, err = run(args...)
 		require.NoError(t, err)
+		after, err := os.Stat(filename)
+		require.NoError(t, err)
+		require.True(t, os.SameFile(before, after), "an identical handoff should not be rewritten")
 		requests, err := os.ReadFile(createLog)
 		require.NoError(t, err)
 		require.Equal(t, "created\n", string(requests))
