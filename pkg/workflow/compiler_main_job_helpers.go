@@ -255,6 +255,9 @@ func (c *Compiler) buildMainJobOutputs(data *WorkflowData) map[string]string {
 		outputs["output"] = "${{ steps.collect_output.outputs.output }}"
 		outputs["output_types"] = "${{ steps.collect_output.outputs.output_types }}"
 		outputs["has_patch"] = "${{ steps.collect_output.outputs.has_patch }}"
+		if isRoutedRequestContinuation(data.SafeOutputs) {
+			outputs["continuation_evidence"] = "${{ steps." + continuationEvidenceStepID + ".outputs.continuation_evidence }}"
+		}
 	}
 	// Add checkout_pr_success output to track PR checkout status only if the checkout-pr step will be generated
 	// This is used by the conclusion job to skip failure handling when checkout fails

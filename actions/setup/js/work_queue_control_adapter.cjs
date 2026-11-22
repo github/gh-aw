@@ -40,22 +40,33 @@ function credentialBindings(raw) {
   return normalized;
 }
 
-/** A client restricted to GET reads of one repository, its Issues and its pull requests. */
-function readOnlyRepositoryClient(client, scope) {
+const LOGIN = /^[A-Za-z0-9](?:[A-Za-z0-9]|-(?=[A-Za-z0-9])){0,38}$/;
+
+/**
+ * A client restricted to GET reads of one repository, its Issues and its pull requests.
+ * `collaborators` (the queue's own repository through the job client only) also exposes
+ * the collaborator permission read used to verify continuation approvals.
+ */
+function readOnlyRepositoryClient(client, scope, { collaborators = false } = {}) {
   const [owner, repo] = scope.repository.split("/");
   const parameters = { owner, repo, headers: { "X-GitHub-Api-Version": API_VERSION }, request: { retries: 0, timeout: 15000 } };
-  const get = (namespace, selector) => async input => {
+  const call = (namespace, name, selector, normalize) => async input => {
     const keys = new Set(["owner", "repo", "headers", "request", ...(selector ? [selector] : [])]);
     if (!input || Object.keys(input).some(key => !keys.has(key)) || `${input.owner}/${input.repo}`.toLowerCase() !== scope.repository.toLowerCase()) throw new Error("work_queue_dependency_client_scope_invalid");
-    const method = client?.rest?.[namespace]?.get;
+    const method = client?.rest?.[namespace]?.[name];
     if (typeof method !== "function") throw new Error("external_read_credentials_missing");
-    return method.call(client.rest[namespace], { ...parameters, headers: { ...parameters.headers }, request: { ...parameters.request }, ...(selector ? { [selector]: Number(nativeId(input[selector], "external resource number")) } : {}) });
+    return method.call(client.rest[namespace], { ...parameters, headers: { ...parameters.headers }, request: { ...parameters.request }, ...(selector ? { [selector]: normalize(input[selector]) } : {}) });
+  };
+  const number = value => Number(nativeId(value, "external resource number"));
+  const login = value => {
+    if (typeof value !== "string" || !LOGIN.test(value)) throw new Error("work_queue_dependency_client_scope_invalid");
+    return value;
   };
   return Object.freeze({
     rest: Object.freeze({
-      repos: Object.freeze({ get: get("repos") }),
-      issues: Object.freeze({ get: get("issues", "issue_number") }),
-      pulls: Object.freeze({ get: get("pulls", "pull_number") }),
+      repos: Object.freeze({ get: call("repos", "get"), ...(collaborators ? { getCollaboratorPermissionLevel: call("repos", "getCollaboratorPermissionLevel", "username", login) } : {}) }),
+      issues: Object.freeze({ get: call("issues", "get", "issue_number", number) }),
+      pulls: Object.freeze({ get: call("pulls", "get", "pull_number", number) }),
     }),
   });
 }
@@ -90,7 +101,8 @@ function createCompilerDependencyResolver(options) {
         client = await factory(token, { baseUrl: api.href.replace(/\/$/, "") });
       } else if (key === ownRepository.toLowerCase()) client = options.githubClient;
       else return null;
-      clients.set(key, readOnlyRepositoryClient(client, approved));
+      // Continuation approvals are verified only through the job's own-repository client.
+      clients.set(key, readOnlyRepositoryClient(client, approved, { collaborators: !token }));
     }
     return clients.get(key);
   };

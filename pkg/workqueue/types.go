@@ -61,21 +61,30 @@ type Replacement struct {
 	WorkID string `json:"work_id"`
 }
 
+// WorkContinuation is the remaining-work context a finish hands to its successor,
+// kept beside (never inside) the inherited payload.
+type WorkContinuation struct {
+	Route     string `json:"route"`
+	Message   string `json:"message"`
+	Remaining int    `json:"remaining"`
+}
+
 // WorkDefinition is the immutable Work operation.
 type WorkDefinition struct {
-	Kind          string          `json:"kind"`
-	WorkID        string          `json:"work_id"`
-	GraphID       string          `json:"graph_id"`
-	NodeKey       string          `json:"node_key"`
-	Pool          string          `json:"pool"`
-	Priority      int             `json:"priority"`
-	FairnessKey   string          `json:"fairness_key"`
-	WorkerProfile string          `json:"worker_profile"`
-	Payload       json.RawMessage `json:"payload"`
-	DependsOn     []Dependency    `json:"depends_on"`
-	Subject       *Resource       `json:"subject,omitempty"`
-	BackingIssue  *Resource       `json:"backing_issue,omitempty"`
-	ReplacementOf *Replacement    `json:"replacement_of,omitempty"`
+	Kind          string            `json:"kind"`
+	WorkID        string            `json:"work_id"`
+	GraphID       string            `json:"graph_id"`
+	NodeKey       string            `json:"node_key"`
+	Pool          string            `json:"pool"`
+	Priority      int               `json:"priority"`
+	FairnessKey   string            `json:"fairness_key"`
+	WorkerProfile string            `json:"worker_profile"`
+	Payload       json.RawMessage   `json:"payload"`
+	DependsOn     []Dependency      `json:"depends_on"`
+	Subject       *Resource         `json:"subject,omitempty"`
+	BackingIssue  *Resource         `json:"backing_issue,omitempty"`
+	ReplacementOf *Replacement      `json:"replacement_of,omitempty"`
+	Continuation  *WorkContinuation `json:"continuation,omitempty"`
 }
 
 type ObservationOperation struct {
@@ -87,6 +96,8 @@ type ObservationOperation struct {
 	StateReason   string   `json:"state_reason,omitempty"`
 	Merged        *bool    `json:"merged,omitempty"`
 	MergeCommit   string   `json:"merge_commit,omitempty"`
+	// ApprovedBy is the account ID of the writer whose close as completed approved the gate.
+	ApprovedBy string `json:"approved_by,omitempty"`
 }
 
 type ClaimOperation struct {
@@ -296,11 +307,12 @@ type Assignment struct {
 }
 
 type AssignmentClaim struct {
-	Handle     string            `json:"handle"`
-	ClaimID    string            `json:"claim_id"`
-	WorkID     string            `json:"work_id"`
-	Work       json.RawMessage   `json:"work"`
-	ResultRefs []ResultReference `json:"result_refs"`
+	Handle       string            `json:"handle"`
+	ClaimID      string            `json:"claim_id"`
+	WorkID       string            `json:"work_id"`
+	Work         json.RawMessage   `json:"work"`
+	ResultRefs   []ResultReference `json:"result_refs"`
+	Continuation *WorkContinuation `json:"continuation,omitempty"`
 }
 
 type ResultReference struct {

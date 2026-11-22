@@ -5,7 +5,7 @@ const log = require("./work_queue_logging.cjs").createWorkQueueLogger("dispatch"
 const { queueControlErrorCode } = require("./work_queue_logging.cjs");
 const { canonical, closed, integer, queueError } = require("./work_queue_codec.cjs");
 const { poolEnv, readWorkQueuePolicyEnv } = require("./work_queue_policy.cjs");
-const { gateKey } = require("./work_queue_graph.cjs");
+const { approvalGate, gateKey } = require("./work_queue_graph.cjs");
 const { observationRefreshBudget } = require("./work_queue_limits.cjs");
 const { cloneState, openClaims } = require("./work_queue_replay.cjs");
 const { fifoCompare, planDispatch } = require("./work_queue_scheduler.cjs");
@@ -157,16 +157,21 @@ async function refreshObservations(options, state, parameters) {
     .filter(work => work.depends_on.every(edge => edge.kind !== "work" || state.works.get(edge.work_id)?.state === "completed"))
     .sort((a, b) => a.priority - b.priority || fifoCompare(a, b));
   const edges = new Map();
+  let approvals = 0;
   for (const work of candidates) {
     for (const edge of work.depends_on) {
       if (edge.kind === "work" || edges.size >= budget) continue;
       const key = gateKey(edge.resource, edge.condition);
-      if (state.observations.get(key)?.state !== "ready") edges.set(key, edge);
+      if (state.observations.get(key)?.state !== "ready" && !edges.has(key)) {
+        edges.set(key, edge);
+        if (edge.condition === "approved") approvals++;
+      }
     }
   }
   if (!edges.size) return [];
   try {
-    return await resolveExternalEdges([...edges.values()], { ...options.dependencyResolver, maxResources: edges.size, maxReads: Math.min(512, edges.size * 2) });
+    // An approval read also verifies the closer's current repository permission.
+    return await resolveExternalEdges([...edges.values()], { ...options.dependencyResolver, maxResources: edges.size, maxReads: Math.min(512, edges.size * 2 + approvals) });
   } catch (error) {
     log.failure("dependencies.refresh.failed", error, true);
     options.core?.warning?.("Work queue dependency refresh failed; external edges stay unsatisfied.");
@@ -241,11 +246,23 @@ async function dispatchQueueIntent(options) {
     kind: "dispatch_next",
     parameters,
     operationsFor: (state, request) => {
-      const fresh = observations.filter(observation => canonical(state.observations.get(gateKey(observation.resource, observation.condition)) ?? null) !== canonical(observation));
-      const observed = cloneState(state);
-      for (const observation of fresh) observed.observations.set(gateKey(observation.resource, observation.condition), observation);
-      const decision = planDispatch(observed, parameters, request.id);
-      log.debug("dispatch.plan", { claims: decision.operations.length, observations: fresh.length });
+      const changed = observations.filter(observation => canonical(state.observations.get(gateKey(observation.resource, observation.condition)) ?? null) !== canonical(observation));
+      const plan = overlay => {
+        const observed = cloneState(state);
+        for (const observation of overlay) observed.observations.set(gateKey(observation.resource, observation.condition), observation);
+        return planDispatch(observed, parameters, request.id);
+      };
+      let decision = plan(changed);
+      // A new ready approval grants one pinned successor; commit it only with that Claim.
+      const granted = new Set(
+        decision.operations.flatMap(operation => {
+          const gate = approvalGate(state.works.get(operation.work_id));
+          return gate ? [gateKey(gate.resource, gate.condition)] : [];
+        })
+      );
+      const fresh = changed.filter(observation => observation.condition !== "approved" || observation.state !== "ready" || granted.has(gateKey(observation.resource, observation.condition)));
+      if (fresh.length !== changed.length) decision = plan(fresh);
+      log.debug("dispatch.plan", { claims: decision.operations.length, observations: fresh.length, deferred_approvals: changed.length - fresh.length });
       return [...fresh, ...decision.operations];
     },
   });

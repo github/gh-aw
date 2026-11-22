@@ -94,6 +94,9 @@ func (c *Compiler) configureAWWorkQueue(data *WorkflowData, markdownPath string)
 		return err
 	}
 	workQueueRepoConfigLog.Printf("Configuring work queue policy: path=%s, workers=%d", markdownPath, len(workers))
+	if err := c.configureWorkQueueApprovalReads(data, markdownPath, workers); err != nil {
+		return err
+	}
 	env, err := workqueue.BuildPolicyEnv(settings, workQueueRepositoryTemplate, workers)
 	if err != nil {
 		return fmt.Errorf("%s %w", RepoConfigFileName, err)
@@ -110,6 +113,28 @@ func (c *Compiler) configureAWWorkQueue(data *WorkflowData, markdownPath string)
 		return fmt.Errorf("work-queue: encode compiled policy: %w", err)
 	}
 	data.WorkQueuePolicy.PolicyJSON = string(encoded)
+	return nil
+}
+
+// configureWorkQueueApprovalReads remembers, for a dispatcher whose schedulable worker
+// profiles include an effective issue continuation route, that dependency refresh must
+// read approval Issues. Only the dispatcher's safe-output read grant changes.
+func (c *Compiler) configureWorkQueueApprovalReads(data *WorkflowData, markdownPath string, workers []string) error {
+	if workQueueRuntimeRole(data) != "dispatcher" || data.SafeOutputs == nil {
+		return nil
+	}
+	for _, worker := range workers {
+		path := filepath.Join(filepath.Dir(markdownPath), worker+".md")
+		route, err := c.workQueueWorkerContinuationRoute(path)
+		if err != nil {
+			return fmt.Errorf("work-queue: resolve request-continuation route of worker %s: %w", worker, err)
+		}
+		if route == RequestContinuationRouteIssue {
+			workQueueRepoConfigLog.Printf("Worker %s uses issue-gated continuations; dispatcher reads approval Issues", worker)
+			data.SafeOutputs.workQueueApprovalReads = true
+			return nil
+		}
+	}
 	return nil
 }
 

@@ -92,6 +92,18 @@ describe("work queue MCP server", () => {
     expect(readWorkQueueState(setup("dispatcher").snapshot, {})).not.toHaveProperty("assignment");
   });
 
+  it("shows a continuation successor its parent's message beside the unchanged payload", () => {
+    const ledger = require("../../../specs/work-queue/fixtures/canonical-prefix.json").continuation;
+    const directory = fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()), "gh-aw-queue-mcp-"));
+    directories.push(directory);
+    const snapshotPath = path.join(directory, "snapshot.json");
+    fs.writeFileSync(snapshotPath, JSON.stringify({ version: 4, sha: "head", transactionLog: ledger.canonical, origin: h.dispatcher, role: "worker", worker: ledger.assignment }));
+    const [claim] = readWorkQueueState(loadWorkQueueSnapshot(snapshotPath), {}).assignment.claims;
+    expect(claim.continuation).toEqual({ route: "issue", message: "Audit page 3", remaining: 0 });
+    expect(claim.work).toEqual({ task: "audit pages", effect_contract: { kind: "none" } });
+    expect(claim.result_refs).toHaveLength(1);
+  });
+
   it("validates the v4 envelope strictly", () => {
     const test = setup("worker");
     expect(parseSnapshotEnvelope(JSON.stringify(test.envelope))).toEqual(test.envelope);

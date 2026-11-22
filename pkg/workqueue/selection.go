@@ -144,7 +144,7 @@ func (state Projection) assignmentOnly(dispatch *DispatchState) (Assignment, err
 		if err != nil {
 			return Assignment{}, err
 		}
-		assignment.Claims = append(assignment.Claims, AssignmentClaim{Handle: claim.Handle, ClaimID: claim.ClaimID, WorkID: work.WorkID, Work: work.Payload, ResultRefs: refs})
+		assignment.Claims = append(assignment.Claims, AssignmentClaim{Handle: claim.Handle, ClaimID: claim.ClaimID, WorkID: work.WorkID, Work: work.Payload, ResultRefs: refs, Continuation: work.Continuation})
 	}
 	return assignment, nil
 }

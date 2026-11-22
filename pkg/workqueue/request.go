@@ -33,12 +33,13 @@ var requestKinds = map[string]requestKind{
 	"dispatch_next": {[]string{"Observation", "Claim"}, []string{"pool", "max_claims", "max_dispatches", "concurrency", "per_account_limit", "profiles"}},
 	"launch":        {[]string{"Dispatch", "Release", "WorkCancellation"}, []string{"dispatch_id"}},
 	"bind":          {[]string{"Bound"}, []string{"dispatch_id"}},
-	"finish":        {[]string{"Completion", "ClaimCancellation", "WorkCancellation"}, []string{"dispatch_id"}},
-	"release":       {[]string{"Release", "WorkCancellation"}, []string{"dispatch_id", "reason"}},
-	"cancel_work":   {[]string{"WorkCancellation"}, []string{"work_ids", "reason"}},
-	"checkpoint":    {[]string{"Checkpoint"}, []string{"prior_tip"}},
-	"issue_link":    {[]string{"IssueLink", "IssueComment"}, []string{"operations"}},
-	"migrate":       {[]string{"Work"}, []string{"work_ids"}},
+	// A finish may admit one continuation Work right after each paired Completion.
+	"finish":      {[]string{"Completion", "ClaimCancellation", "WorkCancellation", "Work"}, []string{"dispatch_id"}},
+	"release":     {[]string{"Release", "WorkCancellation"}, []string{"dispatch_id", "reason"}},
+	"cancel_work": {[]string{"WorkCancellation"}, []string{"work_ids", "reason"}},
+	"checkpoint":  {[]string{"Checkpoint"}, []string{"prior_tip"}},
+	"issue_link":  {[]string{"IssueLink", "IssueComment"}, []string{"operations"}},
+	"migrate":     {[]string{"Work"}, []string{"work_ids"}},
 }
 
 var operationRoles = map[string][]string{

@@ -75,6 +75,23 @@ describe("v4 snapshot assignment", () => {
     expect(Object.isFrozen(normalized.claims[0].result_refs[0].descriptor)).toBe(true);
   });
 
+  it("carries a validated continuation beside each Claim's payload", () => {
+    const value = assignment(1);
+    value.claims[0].continuation = { route: "workqueue", message: "Audit page 2", remaining: 0 };
+    const normalized = normalizeAssignment(value);
+    expect(normalized).toEqual(value);
+    expect(Object.isFrozen(normalized.claims[0].continuation)).toBe(true);
+    for (const continuation of [
+      { route: "dispatch", message: "x", remaining: 0 },
+      { route: "workqueue", message: " ", remaining: 0 },
+      { route: "issue", message: "x", remaining: 1 },
+      { route: "workqueue", message: "x", remaining: 0, target: "main" },
+    ]) {
+      value.claims[0].continuation = continuation;
+      expect(() => normalizeAssignment(value)).toThrow(/invalid assignment continuation/);
+    }
+  });
+
   it("rejects v3 fields, empty or oversized Claim arrays, object descriptors and duplicates", () => {
     for (const value of [{ ...assignment(1), version: 3 }, { ...assignment(1), pool: "default" }, assignment(0), assignment(17), { work_id: "w", claim_id: "c" }]) {
       expect(() => normalizeAssignment(value)).toThrow();

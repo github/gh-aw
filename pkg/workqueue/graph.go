@@ -1,18 +1,30 @@
 package workqueue
 
 import (
+	"encoding/json"
 	"maps"
 	"slices"
+	"strconv"
 	"strings"
+	"unicode"
 )
 
 var (
-	workRequired     = []string{"kind", "work_id", "graph_id", "node_key", "pool", "priority", "fairness_key", "worker_profile", "payload", "depends_on"}
-	workOptional     = []string{"subject", "backing_issue", "replacement_of"}
-	resourceFields   = []string{"kind", "host", "repository", "repository_id", "resource_id", "number"}
-	issueConditions  = []string{"completed", "closed"}
-	pullConditions   = []string{"merged"}
-	observationState = []string{"ready", "waiting", "failed", "unknown"}
+	workRequired       = []string{"kind", "work_id", "graph_id", "node_key", "pool", "priority", "fairness_key", "worker_profile", "payload", "depends_on"}
+	workOptional       = []string{"subject", "backing_issue", "replacement_of", "continuation"}
+	resourceFields     = []string{"kind", "host", "repository", "repository_id", "resource_id", "number"}
+	issueConditions    = []string{"completed", "closed", "approved"}
+	pullConditions     = []string{"merged"}
+	observationState   = []string{"ready", "waiting", "failed", "unknown"}
+	continuationFields = []string{"route", "message", "remaining"}
+	continuationRoutes = []string{"workqueue", "issue"}
+)
+
+const (
+	// ContinuationMessageBytes bounds the remaining-work context of a continuation.
+	ContinuationMessageBytes = 16384
+	// ContinuationRemainingMax bounds the automatic hops a continuation may still spend.
+	ContinuationRemainingMax = 15
 )
 
 // GateKey identifies an external dependency gate independently of repository renames.
@@ -138,45 +150,116 @@ func validateWorkValue(value any) (object, error) {
 	if err := boundedBytes(node["payload"], PayloadBytes, "Work payload"); err != nil {
 		return nil, err
 	}
-	workEdges, err := validateWorkEdges(node["depends_on"])
+	workBytes, err := workPayloadBytes(node)
 	if err != nil {
 		return nil, err
+	}
+	workEdges, approvals, err := validateWorkEdges(node["depends_on"])
+	if err != nil {
+		return nil, err
+	}
+	expected := 0
+	if continuation, ok := node["continuation"].(map[string]any); ok && continuation["route"] == "issue" {
+		expected = 1
+	}
+	if approvals != expected {
+		return nil, queueError("request_invalid", "exactly an issue-routed continuation carries one approval gate")
 	}
 	if err := validateWorkReferences(node, workID); err != nil {
 		return nil, err
 	}
-	payload, err := canonicalGeneric(node["payload"])
-	if err != nil {
-		return nil, err
-	}
-	if len(payload)+workEdges*EffectsBytes > AssignmentBytes {
+	// A worker receives its payload and continuation plus each predecessor's recorded effects.
+	if workBytes+workEdges*EffectsBytes > AssignmentBytes {
 		return nil, queueError("assignment_limit", "Work payload and predecessor effects cannot fit one assignment")
 	}
 	return node, nil
 }
 
-// validateWorkEdges validates a Work's predecessor list and returns its count of Work edges.
-func validateWorkEdges(value any) (int, error) {
-	edges, ok := value.([]any)
-	if !ok || len(edges) > Predecessors {
-		return 0, queueError("resource_limit", "Work may declare at most %d predecessors", Predecessors)
+// workPayloadBytes validates the optional continuation and returns the canonical
+// bytes it shares with the payload under PayloadBytes.
+func workPayloadBytes(node object) (int, error) {
+	payload, err := canonicalGeneric(node["payload"])
+	if err != nil {
+		return 0, err
 	}
-	seen := map[string]struct{}{}
-	workEdges := 0
-	for _, edge := range edges {
-		key, err := validateDependencyValue(edge)
+	total := len(payload)
+	if has(node, "continuation") {
+		if err := validateContinuationValue(node["continuation"]); err != nil {
+			return 0, err
+		}
+		data, err := canonicalGeneric(node["continuation"])
 		if err != nil {
 			return 0, err
 		}
+		total += len(data)
+	}
+	if total > PayloadBytes {
+		return 0, queueError("resource_limit", "Work payload and continuation exceed %d canonical bytes", PayloadBytes)
+	}
+	return total, nil
+}
+
+// jsSpace reports whether r is in JavaScript's `\s` class (work_queue_graph.cjs).
+func jsSpace(r rune) bool {
+	return r == 0xFEFF || r != 0x85 && unicode.IsSpace(r)
+}
+
+// validateContinuationValue is the structural validation of a Work `continuation`.
+func validateContinuationValue(value any) error {
+	continuation, err := closed(value, continuationFields, nil, "continuation", "request_invalid")
+	if err != nil {
+		return err
+	}
+	route, ok := continuation["route"].(string)
+	if !ok || !slices.Contains(continuationRoutes, route) {
+		return queueError("request_invalid", "continuation route must be one of %s", strings.Join(continuationRoutes, ", "))
+	}
+	message, ok := continuation["message"].(string)
+	if !ok {
+		return queueError("invalid_unicode", "strings must contain valid Unicode scalar values")
+	}
+	if strings.IndexFunc(message, func(r rune) bool { return !jsSpace(r) }) < 0 {
+		return queueError("request_invalid", "continuation message must be nonblank")
+	}
+	if len(message) > ContinuationMessageBytes {
+		return queueError("resource_limit", "continuation message exceeds %d UTF-8 bytes", ContinuationMessageBytes)
+	}
+	number, ok := continuation["remaining"].(json.Number)
+	remaining, parseErr := strconv.ParseInt(string(number), 10, 64)
+	if !ok || parseErr != nil || remaining < 0 || remaining > ContinuationRemainingMax {
+		return queueError("request_invalid", "continuation remaining must be an integer 0..%d", ContinuationRemainingMax)
+	}
+	if route == "issue" && remaining != 0 {
+		return queueError("request_invalid", "an issue-routed continuation carries no automatic budget")
+	}
+	return nil
+}
+
+// validateWorkEdges validates a Work's predecessor list and returns its counts of
+// Work edges and approval gates.
+func validateWorkEdges(value any) (int, int, error) {
+	edges, ok := value.([]any)
+	if !ok || len(edges) > Predecessors {
+		return 0, 0, queueError("resource_limit", "Work may declare at most %d predecessors", Predecessors)
+	}
+	seen := map[string]struct{}{}
+	workEdges, approvals := 0, 0
+	for _, edge := range edges {
+		key, err := validateDependencyValue(edge)
+		if err != nil {
+			return 0, 0, err
+		}
 		if _, duplicate := seen[key]; duplicate {
-			return 0, queueError("dependency_invalid", "duplicate predecessor")
+			return 0, 0, queueError("dependency_invalid", "duplicate predecessor")
 		}
 		seen[key] = struct{}{}
 		if strings.HasPrefix(key, "work:") {
 			workEdges++
+		} else if fields, ok := edge.(map[string]any); ok && fields["condition"] == "approved" {
+			approvals++
 		}
 	}
-	return workEdges, nil
+	return workEdges, approvals, nil
 }
 
 // validateWorkReferences validates a Work's optional subject, backing Issue and replacement.
@@ -234,6 +317,38 @@ func NewWork(graphID, nodeKey, pool, profile, fairnessKey string, priority int, 
 	return work, ValidateWork(work)
 }
 
+// approvalGate returns the approval edge of an issue-routed continuation.
+func approvalGate(work WorkDefinition) *Dependency {
+	if work.Continuation == nil || work.Continuation.Route != "issue" {
+		return nil
+	}
+	for index := range work.DependsOn {
+		if edge := &work.DependsOn[index]; edge.Kind == "issue" && edge.Condition == "approved" {
+			return edge
+		}
+	}
+	return nil
+}
+
+// ContinuationChild is the successor a finish commit admits for a completed
+// parent (work_queue_graph.cjs continuationChild): inherited graph, pool,
+// scheduling, profile, payload and subject; the parent edge, plus the approval
+// gate of an issue-routed continuation.
+func ContinuationChild(parent WorkDefinition, continuation WorkContinuation, approval *Resource) (WorkDefinition, error) {
+	nodeKey := "continuation:" + parent.WorkID
+	dependsOn := []Dependency{{Kind: "work", WorkID: parent.WorkID}}
+	if approval != nil {
+		resource := *approval
+		dependsOn = append(dependsOn, Dependency{Kind: "issue", Resource: &resource, Condition: "approved"})
+	}
+	child := WorkDefinition{Kind: "Work", WorkID: NodeID(parent.GraphID, nodeKey), GraphID: parent.GraphID, NodeKey: nodeKey, Pool: parent.Pool, Priority: parent.Priority, FairnessKey: parent.FairnessKey, WorkerProfile: parent.WorkerProfile, Payload: slices.Clone(parent.Payload), DependsOn: dependsOn, Continuation: &continuation}
+	if parent.Subject != nil {
+		subject := *parent.Subject
+		child.Subject = &subject
+	}
+	return child, ValidateWork(child)
+}
+
 func pendingWork(state string) bool {
 	return state == "available" || state == "claimed"
 }
@@ -245,14 +360,15 @@ type graphIndex struct {
 
 // admissionIndex is derived bookkeeping, rebuilt from Works whenever absent.
 type admissionIndex struct {
-	graphs  map[string]*graphIndex
-	pending map[string]int
-	issues  map[string]string
+	graphs    map[string]*graphIndex
+	pending   map[string]int
+	issues    map[string]string
+	approvals map[string]string
 }
 
 func (state *Projection) admissionIndex() *admissionIndex {
 	if state.admission == nil {
-		index := &admissionIndex{graphs: map[string]*graphIndex{}, pending: map[string]int{}, issues: map[string]string{}}
+		index := &admissionIndex{graphs: map[string]*graphIndex{}, pending: map[string]int{}, issues: map[string]string{}, approvals: map[string]string{}}
 		for _, work := range state.Works {
 			index.add(work)
 		}
@@ -278,6 +394,9 @@ func (index *admissionIndex) add(work *WorkState) {
 	}
 	if work.BackingIssue != nil {
 		index.issues[issueKey(*work.BackingIssue)] = work.WorkID
+	}
+	if approval := approvalGate(work.WorkDefinition); approval != nil {
+		index.approvals[issueKey(*approval.Resource)] = work.WorkID
 	}
 }
 
@@ -326,21 +445,35 @@ func admitWorkNodes(index *admissionIndex, nodes []any) (map[string]WorkDefiniti
 		}
 		admitted[work.WorkID] = work
 		order = append(order, work.WorkID)
-		if work.BackingIssue == nil {
-			continue
-		}
-		key := issueKey(*work.BackingIssue)
-		if owner, ok := index.issues[key]; ok && owner != work.WorkID {
-			return nil, nil, queueError("issue_binding_conflict", "one Work per backing Issue")
-		}
-		for _, id := range order[:len(order)-1] {
-			other := admitted[id]
-			if other.BackingIssue != nil && issueKey(*other.BackingIssue) == key {
-				return nil, nil, queueError("issue_binding_conflict", "one Work per backing Issue")
-			}
+		if err := index.checkIssueBindings(work, admitted, order[:len(order)-1]); err != nil {
+			return nil, nil, err
 		}
 	}
 	return admitted, order, nil
+}
+
+// checkIssueBindings enforces one Work per backing Issue and one successor per
+// approval Issue; finish admits continuations one at a time, so the approval
+// check consults only the index.
+func (index *admissionIndex) checkIssueBindings(work WorkDefinition, admitted map[string]WorkDefinition, earlier []string) error {
+	if work.BackingIssue != nil {
+		key := issueKey(*work.BackingIssue)
+		if owner, ok := index.issues[key]; ok && owner != work.WorkID {
+			return queueError("issue_binding_conflict", "one Work per backing Issue")
+		}
+		for _, id := range earlier {
+			other := admitted[id]
+			if other.BackingIssue != nil && issueKey(*other.BackingIssue) == key {
+				return queueError("issue_binding_conflict", "one Work per backing Issue")
+			}
+		}
+	}
+	if approval := approvalGate(work); approval != nil {
+		if owner, ok := index.approvals[issueKey(*approval.Resource)]; ok && owner != work.WorkID {
+			return queueError("issue_binding_conflict", "one successor per approval Issue")
+		}
+	}
+	return nil
 }
 
 // checkAdmissionBounds checks predecessors, graph pools, graph vertex counts and

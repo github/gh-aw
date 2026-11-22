@@ -21,7 +21,7 @@ const MAX_READ = 128;
 const ROLES = ["observer", "dispatcher", "worker"];
 
 /**
- * @typedef {{handle: string, claim_id: string, work_id: string, work: Record<string, unknown>, result_refs: Array<{work_id: string, result_commit_id: string, descriptor: unknown}>}} AssignedClaim
+ * @typedef {{handle: string, claim_id: string, work_id: string, work: Record<string, unknown>, result_refs: Array<{work_id: string, result_commit_id: string, descriptor: unknown}>, continuation?: {route: string, message: string, remaining: number}}} AssignedClaim
  * @typedef {{dispatch_id: string, claims: AssignedClaim[]}} SnapshotAssignment
  * @typedef {{version: 4, sha: string | null, transactionLog: string, origin: Record<string, unknown>, role: "observer" | "dispatcher" | "worker", worker: SnapshotAssignment | null, visible_work_ids?: string[]}} SnapshotEnvelope
  */
@@ -80,7 +80,15 @@ function assignmentView(snapshot) {
   if (!snapshot.worker) return null;
   return {
     dispatch_id: snapshot.worker.dispatch_id,
-    claims: snapshot.worker.claims.map(claim => ({ claim_handle: claim.handle, claim_id: claim.claim_id, work_id: claim.work_id, work: claim.work, result_refs: claim.result_refs })),
+    // A continuation is untrusted remaining-work context from the parent run, beside the unchanged payload.
+    claims: snapshot.worker.claims.map(claim => ({
+      claim_handle: claim.handle,
+      claim_id: claim.claim_id,
+      work_id: claim.work_id,
+      work: claim.work,
+      result_refs: claim.result_refs,
+      ...(claim.continuation ? { continuation: claim.continuation } : {}),
+    })),
   };
 }
 

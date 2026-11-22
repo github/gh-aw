@@ -27,6 +27,8 @@ const (
 	safeOutputsSteeringIssueFile            = "safe_outputs_steering_issue.md"
 	safeOutputsPushToBranchFile             = "safe_outputs_push_to_pr_branch.md"
 	safeOutputsCommentMemoryFile            = "safe_outputs_comment_memory.md"
+	safeOutputsContinuationQueueFile        = "safe_outputs_request_continuation_queue.md"
+	safeOutputsContinuationDispatchFile     = "safe_outputs_request_continuation_dispatch.md"
 	safeOutputsAutoCreateIssueFile          = "safe_outputs_auto_create_issue.md"
 	githubMCPToolsPromptFile                = "github_mcp_tools_prompt.md"
 	githubMCPToolsWithSafeOutputsPromptFile = "github_mcp_tools_with_safeoutputs_prompt.md"

@@ -1,14 +1,22 @@
 // @ts-check
 "use strict";
 
-const { canonical, canonicalBytes, closed, digest, identity, integer, queueError, utf8Compare } = require("./work_queue_codec.cjs");
+const { canonical, canonicalBytes, closed, digest, identity, integer, queueError, utf8Compare, validString } = require("./work_queue_codec.cjs");
 const { ASSIGNMENT_BYTES, EFFECTS_BYTES, GRAPH_NODES, MAX_PENDING_WORK, PAYLOAD_BYTES, PREDECESSORS, boundedBytes } = require("./work_queue_limits.cjs");
 const { decimal } = require("./work_queue_policy.cjs");
 const { expectedGitHubHost } = require("./work_queue_host.cjs");
 
 const WORK_REQUIRED = ["kind", "work_id", "graph_id", "node_key", "pool", "priority", "fairness_key", "worker_profile", "payload", "depends_on"];
-const WORK_OPTIONAL = ["subject", "backing_issue", "replacement_of"];
+const WORK_OPTIONAL = ["subject", "backing_issue", "replacement_of", "continuation"];
 const RESOURCE_FIELDS = ["kind", "host", "repository", "repository_id", "resource_id", "number"];
+const ISSUE_CONDITIONS = ["completed", "closed", "approved"];
+const CONTINUATION_FIELDS = ["route", "message", "remaining"];
+const CONTINUATION_ROUTES = ["workqueue", "issue"];
+// A continuation message is bounded remaining-work context, never a payload extension.
+const CONTINUATION_MESSAGE_BYTES = 16384;
+const CONTINUATION_REMAINING_MAX = 15;
+// JavaScript `\s`; pkg/workqueue mirrors this exact set.
+const BLANK = /^\s*$/u;
 
 function nodeId(graph_id, node_key) {
   return digest({ graph_id, node_key });
@@ -39,9 +47,31 @@ function validateDependency(dependency) {
   }
   closed(dependency, ["kind", "resource", "condition"], [], "external edge", "dependency_invalid");
   validateResource(dependency.resource);
-  if (dependency.kind !== dependency.resource.kind || !(dependency.kind === "issue" ? ["completed", "closed"] : ["merged"]).includes(dependency.condition)) {
+  if (dependency.kind !== dependency.resource.kind || !(dependency.kind === "issue" ? ISSUE_CONDITIONS : ["merged"]).includes(dependency.condition)) {
     throw queueError("dependency_invalid", "typed external condition does not match resource");
   }
+}
+
+function approvalEdge(dependency) {
+  return dependency.kind === "issue" && dependency.condition === "approved";
+}
+
+/** The approval gate of an issue-routed continuation (its only `approved` edge). */
+function approvalGate(work) {
+  return work.continuation?.route === "issue" ? work.depends_on.find(approvalEdge) : undefined;
+}
+
+/** Structural validation of the optional Work `continuation` member. */
+function validateContinuation(continuation) {
+  closed(continuation, CONTINUATION_FIELDS, [], "continuation", "request_invalid");
+  if (!CONTINUATION_ROUTES.includes(continuation.route)) throw queueError("request_invalid", `continuation route must be one of ${CONTINUATION_ROUTES.join(", ")}`);
+  validString(continuation.message);
+  if (BLANK.test(continuation.message)) throw queueError("request_invalid", "continuation message must be nonblank");
+  if (Buffer.byteLength(continuation.message, "utf8") > CONTINUATION_MESSAGE_BYTES) throw queueError("resource_limit", `continuation message exceeds ${CONTINUATION_MESSAGE_BYTES} UTF-8 bytes`);
+  if (!Number.isSafeInteger(continuation.remaining) || continuation.remaining < 0 || continuation.remaining > CONTINUATION_REMAINING_MAX)
+    throw queueError("request_invalid", `continuation remaining must be an integer 0..${CONTINUATION_REMAINING_MAX}`);
+  if (continuation.route === "issue" && continuation.remaining !== 0) throw queueError("request_invalid", "an issue-routed continuation carries no automatic budget");
+  return continuation;
 }
 
 function edgeKey(dependency) {
@@ -58,16 +88,23 @@ function validateWork(node) {
   identity(node.fairness_key, "fairness key", true, 128);
   if (!node.payload || typeof node.payload !== "object" || Array.isArray(node.payload)) throw queueError("work_invalid", "payload must be a JSON object");
   boundedBytes(node.payload, PAYLOAD_BYTES, "Work payload");
+  const continuation = Object.hasOwn(node, "continuation") ? validateContinuation(node.continuation) : undefined;
+  // The continuation travels with the payload and shares its budget.
+  const workBytes = canonicalBytes(node.payload) + (continuation ? canonicalBytes(continuation) : 0);
+  if (workBytes > PAYLOAD_BYTES) throw queueError("resource_limit", `Work payload and continuation exceed ${PAYLOAD_BYTES} canonical bytes`);
   if (!Array.isArray(node.depends_on) || node.depends_on.length > PREDECESSORS) throw queueError("resource_limit", `Work may declare at most ${PREDECESSORS} predecessors`);
   const edges = new Set();
   let workEdges = 0;
+  let approvals = 0;
   for (const dependency of node.depends_on) {
     validateDependency(dependency);
     const key = edgeKey(dependency);
     if (edges.has(key)) throw queueError("dependency_invalid", "duplicate predecessor");
     edges.add(key);
     if (dependency.kind === "work") workEdges++;
+    if (approvalEdge(dependency)) approvals++;
   }
+  if (approvals !== (continuation?.route === "issue" ? 1 : 0)) throw queueError("request_invalid", "exactly an issue-routed continuation carries one approval gate");
   if (Object.hasOwn(node, "subject")) validateResource(node.subject);
   if (Object.hasOwn(node, "backing_issue") && validateResource(node.backing_issue).kind !== "issue") throw queueError("resource_invalid", "backing Issue must be an Issue");
   if (Object.hasOwn(node, "replacement_of")) {
@@ -75,9 +112,37 @@ function validateWork(node) {
     identity(node.replacement_of.work_id, "replaced Work");
     if (node.replacement_of.work_id === node.work_id) throw queueError("work_invalid", "Work cannot replace itself");
   }
-  // A worker receives its payload plus each predecessor's recorded effects.
-  if (canonicalBytes(node.payload) + workEdges * EFFECTS_BYTES > ASSIGNMENT_BYTES) throw queueError("assignment_limit", "Work payload and predecessor effects cannot fit one assignment");
+  // A worker receives its payload and continuation plus each predecessor's recorded effects.
+  if (workBytes + workEdges * EFFECTS_BYTES > ASSIGNMENT_BYTES) throw queueError("assignment_limit", "Work payload and predecessor effects cannot fit one assignment");
   return node;
+}
+
+/**
+ * The successor a finish commit admits for a completed parent: inherited graph,
+ * pool, scheduling, profile, payload and subject; the parent edge, plus the
+ * approval gate of an issue-routed continuation.
+ * @param {Record<string, any>} parent Work record or definition
+ * @param {{route: string, message: string, remaining: number}} continuation
+ * @param {Record<string, any>} [approval] Issue resource gating an issue-routed continuation
+ */
+function continuationChild(parent, { route, message, remaining }, approval = undefined) {
+  const node_key = `continuation:${parent.work_id}`;
+  /** @type {Record<string, any>} */
+  const child = {
+    kind: "Work",
+    work_id: nodeId(parent.graph_id, node_key),
+    graph_id: parent.graph_id,
+    node_key,
+    pool: parent.pool,
+    priority: parent.priority,
+    fairness_key: parent.fairness_key,
+    worker_profile: parent.worker_profile,
+    payload: structuredClone(parent.payload),
+    depends_on: [{ kind: "work", work_id: parent.work_id }, ...(approval ? [{ kind: "issue", resource: structuredClone(approval), condition: "approved" }] : [])],
+    continuation: { route, message, remaining },
+  };
+  if (Object.hasOwn(parent, "subject")) child.subject = structuredClone(parent.subject);
+  return validateWork(child);
 }
 
 function workDefinition(work) {
@@ -94,7 +159,7 @@ const admissionIndexes = new WeakMap();
 function admissionIndex(state) {
   let index = admissionIndexes.get(state);
   if (!index) {
-    index = { graphs: new Map(), pending: new Map(), issues: new Map() };
+    index = { graphs: new Map(), pending: new Map(), issues: new Map(), approvals: new Map() };
     for (const work of state.works.values()) indexAdmittedWork(index, work);
     admissionIndexes.set(state, index);
   }
@@ -108,6 +173,8 @@ function indexAdmittedWork(index, work) {
   for (const edge of work.depends_on) if (edge.kind !== "work") graph.vertices.add(edgeKey(edge));
   if (pendingWork(work)) index.pending.set(work.pool, (index.pending.get(work.pool) ?? 0) + 1);
   if (work.backing_issue) index.issues.set(issueKey(work.backing_issue), work.work_id);
+  const approval = approvalGate(work);
+  if (approval) index.approvals.set(issueKey(approval.resource), work.work_id);
 }
 
 /** Record a Work state transition in the admission index. */
@@ -146,6 +213,9 @@ function validateGraphAdmission(state, nodes) {
       if (owner !== undefined && owner !== node.work_id) throw queueError("issue_binding_conflict", "one Work per backing Issue");
       for (const other of admitted.values()) if (other !== node && other.backing_issue && issueKey(other.backing_issue) === issueKey(node.backing_issue)) throw queueError("issue_binding_conflict", "one Work per backing Issue");
     }
+    const approval = approvalGate(node);
+    // One successor per approval resource; finish admits continuations one at a time.
+    if (approval && (index.approvals.get(issueKey(approval.resource)) ?? node.work_id) !== node.work_id) throw queueError("issue_binding_conflict", "one successor per approval Issue");
   }
   const candidate = id => admitted.get(id) || state.works.get(id);
   const graphVertices = new Map();
@@ -237,9 +307,15 @@ function resultReferences(state, work) {
 }
 
 module.exports = {
+  CONTINUATION_MESSAGE_BYTES,
+  CONTINUATION_REMAINING_MAX,
+  CONTINUATION_ROUTES,
+  ISSUE_CONDITIONS,
   WORK_OPTIONAL,
   WORK_REQUIRED,
+  approvalGate,
   backingIssueOwner,
+  continuationChild,
   dependencyStatus,
   gateKey,
   issueKey,
@@ -252,6 +328,7 @@ module.exports = {
   validateDependency,
   validateGraphAdmission,
   validateResource,
+  validateContinuation,
   validateWork,
   workDefinition,
 };

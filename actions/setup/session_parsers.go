@@ -41,6 +41,7 @@ import "embed"
 //go:embed js/work_queue_claim_scope.cjs js/work_queue_codec.cjs js/lock_file_headers.cjs js/work_queue_resource_scope.cjs
 //go:embed js/work_queue_host.cjs
 //go:embed js/aw_context.cjs js/experiment_helpers.cjs js/finish_work_queue_claim.cjs
+//go:embed js/work_queue_continuation.cjs js/request_continuation_routes.cjs js/check_permissions_utils.cjs
 //go:embed js/webhook_context.cjs js/provider_issue_webhook.cjs js/webhook_resource.cjs
 //go:embed js/connector_webhook.cjs js/event_predicate.cjs
 //go:embed js/gateway_command_webhook.cjs js/slash_command_matcher.cjs

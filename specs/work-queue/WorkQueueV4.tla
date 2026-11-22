@@ -8,6 +8,7 @@
 (* actions/setup/js/work_queue_replay.cjs and pkg/workqueue:               *)
 (*                                                                         *)
 (*   Work      available -> claimed -> completed | available | cancelled  *)
+(*             (submit, or a finish admitting a continuation successor)   *)
 (*   Claim     open -> completed | cancelled                               *)
 (*   Dispatch  reserved -> started -> bound -> closed                      *)
 (*   Run       queued -> in_progress -> completed (rerun: next attempt)    *)
@@ -191,15 +192,25 @@ Bind(d) ==
 
 \* Finish step, outcome completed: Completion is accepted only for an open
 \* Claim whose Dispatch is bound to this run attempt (else claim_scope_invalid
-\* / claim_ineffective and the ledger is unchanged).
+\* / claim_ineffective and the ledger is unchanged). The same finish commit
+\* may also admit the completed Work's continuation successor: one previously
+\* absent Work, distinct from the completed one, available at the next log
+\* position (request_continuation route workqueue/issue). Its external
+\* approval gate is abstracted like every other gate.
 Complete(d) ==
     /\ run[d].phase = "agent"
     /\ run' = [run EXCEPT ![d].phase = "finishing"]
     /\ IF HasOpenClaim(d) /\ BoundToRun(d)
-       THEN LET w == claim[d].work IN
+       THEN LET w == claim[d].work
+                completed == [work EXCEPT ![w].state = "completed"]
+            IN
             /\ claim' = [claim EXCEPT ![d].state = "completed", ![d].by = run[d].attempt]
-            /\ work' = [work EXCEPT ![w].state = "completed"]
             /\ dispatch' = [dispatch EXCEPT ![d].state = "closed"]
+            /\ \/ work' = completed
+               \/ \E c \in Works \ {w} :
+                    /\ work[c].state = "none"
+                    /\ work' = [completed EXCEPT ![c].state = "available",
+                                                 ![c].pos = Cardinality({x \in Works : work[x].state # "none"}) + 1]
        ELSE UNCHANGED <<work, claim, dispatch>>
 
 \* Finish step, outcome failed: ClaimCancellation{worker_failed} (+ attempts rule).

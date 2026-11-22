@@ -43,7 +43,7 @@ its Dispatch slot.
 | `RunStart`, `RunComplete` | GitHub run environment; a run can stop at any point |
 | `Rerun` | GitHub re-run: same run id, next run attempt, up to `MaxRunAttempts` |
 | `Bind` | activation job `bind` commit `[Bound]`; rebinding by a later attempt; with no open Claim the assignment is settled and the agent is skipped |
-| `Complete`, `Fail` | finish step `[Completion]` or `[ClaimCancellation{worker_failed}]` (+ attempts rule); rejected unless the Claim is open and the Dispatch is bound to this run attempt |
+| `Complete`, `Fail` | finish step `[Completion]`, `[Completion, Work]` admitting one previously absent continuation successor, or `[ClaimCancellation{worker_failed}]` (+ attempts rule); rejected unless the Claim is open and the Dispatch is bound to this run attempt |
 | `Terminate` | conclusion job `[Release{worker_terminated}]` when the Dispatch still has an open Claim |
 | `MaintainRelease` | maintenance `[Release{run_terminal}]` for a bound Dispatch whose run completed, `[Release{run_missing}]` for an unbound Dispatch with no visible in-progress run |
 

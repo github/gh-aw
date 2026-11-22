@@ -4,8 +4,12 @@
 const { API_VERSION, nativeId } = require("./work_queue_native.cjs");
 const { canonical, digest } = require("./work_queue_codec.cjs");
 const { gateKey } = require("./work_queue_graph.cjs");
+const { matchRepositoryRole, resolveRepositoryRole } = require("./check_permissions_utils.cjs");
 
 const COMMIT_SHA = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/;
+const LOGIN = /^[A-Za-z0-9](?:[A-Za-z0-9]|-(?=[A-Za-z0-9])){0,38}$/;
+// Repository roles whose "Close as completed" approves one continuation successor.
+const APPROVER_ROLES = ["write", "maintain", "admin"];
 
 /** Stable key of an external reference, with or without its numeric identities. */
 function dependencyKey(resource) {
@@ -20,7 +24,7 @@ function allowedScope(resource, scopes) {
   if (!resource || !["issue", "pull_request"].includes(resource.kind) || typeof resource.host !== "string" || !/^[a-z0-9.-]+$/.test(resource.host) || !/^[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+$/.test(resource.repository))
     throw new TypeError("external_resource_invalid");
   nativeId(resource.number, "external resource number");
-  if (!(resource.kind === "issue" ? ["completed", "closed"] : ["merged"]).includes(resource.condition)) throw new TypeError("external_condition_invalid");
+  if (!(resource.kind === "issue" ? ["completed", "closed", "approved"] : ["merged"]).includes(resource.condition)) throw new TypeError("external_condition_invalid");
   const scope = scopes.find(candidate => candidate.host === resource.host && candidate.repository.toLowerCase() === resource.repository.toLowerCase());
   if (!scope) throw new Error("external_not_allowlisted");
   return scope;
@@ -43,6 +47,44 @@ function predicate(resource, data) {
   if (data.merged) return typeof data.merge_commit_sha === "string" && COMMIT_SHA.test(data.merge_commit_sha) ? { state: "ready", merged: true, merge_commit: data.merge_commit_sha } : { state: "unknown", merged: true };
   if (data.state === "closed") return { state: "failed", merged: false };
   return data.state === "open" ? { state: "waiting", merged: false } : { state: "unknown", merged: false };
+}
+
+/** A positive decimal account ID, or undefined. */
+function accountId(value) {
+  if (Number.isSafeInteger(value) && value > 0) return String(value);
+  return typeof value === "string" && /^[1-9][0-9]{0,19}$/.test(value) ? value : undefined;
+}
+
+/**
+ * Observation fields of a continuation approval gate. Only a GitHub `User` with
+ * write, maintain or admin permission closing the Issue as completed approves it;
+ * a verified bot or non-writer close fails, and missing closer evidence or an
+ * indeterminate permission read stays unknown.
+ * @param {Record<string, any>} data the verified `issues.get` response body
+ * @param {(username: string) => Promise<any>} permissionOf reads `repos.getCollaboratorPermissionLevel`
+ * @returns {Promise<{state: string, state_reason?: string, approved_by?: string}>}
+ */
+async function approvalPredicate(data, permissionOf) {
+  if (data.pull_request !== undefined) throw new Error("external_resource_type_mismatch");
+  if (data.state === "open") return { state: "waiting", state_reason: "reopened" };
+  if (data.state !== "closed") return { state: "unknown" };
+  if (data.state_reason === "not_planned") return { state: "failed", state_reason: "not_planned" };
+  if (data.state_reason !== "completed") return { state: "unknown" };
+  const closer = data.closed_by;
+  if (!closer || typeof closer !== "object" || typeof closer.type !== "string") return { state: "unknown" };
+  if (closer.type !== "User") return { state: "failed", state_reason: "completed" };
+  const id = accountId(closer.id);
+  if (!id || typeof closer.login !== "string" || !LOGIN.test(closer.login)) return { state: "unknown" };
+  let permission;
+  try {
+    permission = await permissionOf(closer.login);
+  } catch (error) {
+    if (error instanceof Error && error.message === "external_read_budget_exhausted") throw error;
+    return { state: "unknown" };
+  }
+  const user = permission?.user;
+  if (!user || accountId(user.id) !== id || typeof user.login !== "string" || user.login.toLowerCase() !== closer.login.toLowerCase() || typeof permission.permission !== "string") return { state: "unknown" };
+  return matchRepositoryRole(resolveRepositoryRole(permission), APPROVER_ROLES) ? { state: "ready", state_reason: "completed", approved_by: id } : { state: "failed", state_reason: "completed" };
 }
 
 /**
@@ -89,7 +131,7 @@ async function resolveDependencies(resources, options) {
       if (nativeId(data?.number, "external resource number") !== number || (resource.resource_id !== undefined && nativeId(resource.resource_id) !== resourceId)) throw new Error("external_identity_mismatch");
       if (resource.kind === "pull_request" && String(data?.base?.repo?.id) !== repositoryId) throw new Error("external_resource_type_mismatch");
       const binding = { kind: resource.kind, host: resource.host, repository: repository.full_name, repository_id: repositoryId, resource_id: resourceId, number };
-      const fields = predicate(resource, data);
+      const fields = resource.condition === "approved" ? await approvalPredicate(data, username => read(() => client.rest.repos.getCollaboratorPermissionLevel({ ...parameters, username }))) : predicate(resource, data);
       const operation = { kind: "Observation", resource: binding, condition: resource.condition, ...fields };
       results.set(key, { resource, binding, observation: { ...operation, observation_id: `observation:${digest(operation)}` } });
     } catch (error) {
@@ -122,4 +164,4 @@ async function resolveExternalEdges(edges, options) {
   return [...resolved.results.values()].flatMap(result => (result.observation ? [result.observation] : []));
 }
 
-module.exports = { allowedScope, dependencyKey, failureCode, predicate, resolveDependencies, resolveExternalEdges };
+module.exports = { allowedScope, approvalPredicate, dependencyKey, failureCode, predicate, resolveDependencies, resolveExternalEdges };

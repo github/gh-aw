@@ -49,37 +49,51 @@ function minimalWithReason(kind, reason) {
   return { kind, dispatch_id: "d", reason };
 }
 
+/** Replay every prefix, the projection and the assignment of one shared ledger fixture. */
+function checkLedger(ledger) {
+  assert.equal(serializeTransactionLog(ledger.commits), ledger.canonical);
+  assert.equal(canonical(parseTransactionLog(ledger.canonical)), canonical(ledger.commits));
+  for (let index = 0; index < ledger.commits.length; index++) {
+    const expected = ledger.prefixes[index];
+    const state = replayTransactions(ledger.commits.slice(0, index + 1));
+    assert.equal(state.tip, expected.tip);
+    assert.equal(state.commits, expected.commits);
+    assert.deepEqual(state.stats, expected.stats);
+    for (const work of state.works.values()) assert.deepEqual({ state: work.state, attempts: work.attempts }, expected.works[work.node_key]);
+    for (const dispatch of state.dispatches.values()) assert.equal(dispatch.state, expected.dispatches[dispatch.dispatch_id]);
+    const decision = planDispatch(state, sharedPrefix.next_parameters, sharedPrefix.next_request_id);
+    assert.deepEqual({ keys: decision.operations.map(operation => state.works.get(operation.work_id).node_key), reason: decision.reason }, expected.next);
+  }
+  const state = replayTransactions(ledger.commits);
+  assert.equal(canonical(serializeProjection(state)), canonical(ledger.projection));
+  assert.equal(canonical(assignmentForDispatch(state, ledger.assignment.dispatch_id)), canonical(ledger.assignment));
+}
+
+function checkCheckpoint(ledger) {
+  assert.equal(canonical(serializeProjection(replayTransactions([ledger.checkpoint.commit]))), canonical(ledger.checkpoint.projection));
+  const folded = serializeProjection(replayTransactions(ledger.commits));
+  const restored = ledger.checkpoint.projection;
+  for (const field of ["repository", "works", "claims", "dispatches", "observations", "work_creators"]) assert.equal(canonical(restored[field]), canonical(folded[field]));
+}
+
 function registerTests({ describe, it }) {
   describe("shared v4 queue conformance fixtures", () => {
     it("regenerates the shared lifecycle fixture byte for byte", () => assert.equal(canonical(buildFixtures()), canonical(sharedPrefix)));
-    it("replays every prefix of the shared lifecycle ledger", () => {
-      assert.equal(serializeTransactionLog(sharedPrefix.commits), sharedPrefix.canonical);
-      assert.equal(canonical(parseTransactionLog(sharedPrefix.canonical)), canonical(sharedPrefix.commits));
-      for (let index = 0; index < sharedPrefix.commits.length; index++) {
-        const expected = sharedPrefix.prefixes[index];
-        const state = replayTransactions(sharedPrefix.commits.slice(0, index + 1));
-        assert.equal(state.tip, expected.tip);
-        assert.equal(state.commits, expected.commits);
-        assert.deepEqual(state.stats, expected.stats);
-        for (const work of state.works.values()) assert.deepEqual({ state: work.state, attempts: work.attempts }, expected.works[work.node_key]);
-        for (const dispatch of state.dispatches.values()) assert.equal(dispatch.state, expected.dispatches[dispatch.dispatch_id]);
-        const decision = planDispatch(state, sharedPrefix.next_parameters, sharedPrefix.next_request_id);
-        assert.deepEqual({ keys: decision.operations.map(operation => state.works.get(operation.work_id).node_key), reason: decision.reason }, expected.next);
-      }
-      const state = replayTransactions(sharedPrefix.commits);
-      assert.equal(canonical(serializeProjection(state)), canonical(sharedPrefix.projection));
-      assert.equal(canonical(assignmentForDispatch(state, sharedPrefix.assignment.dispatch_id)), canonical(sharedPrefix.assignment));
-    });
-    it("restores the shared checkpoint to the same projection", () => {
-      assert.equal(canonical(serializeProjection(replayTransactions([sharedPrefix.checkpoint.commit]))), canonical(sharedPrefix.checkpoint.projection));
-      const folded = serializeProjection(replayTransactions(sharedPrefix.commits));
-      const restored = sharedPrefix.checkpoint.projection;
-      for (const field of ["repository", "works", "claims", "dispatches", "observations", "work_creators"]) assert.equal(canonical(restored[field]), canonical(folded[field]));
-    });
+    it("replays every prefix of the shared lifecycle ledger", () => checkLedger(sharedPrefix));
+    it("restores the shared checkpoint to the same projection", () => checkCheckpoint(sharedPrefix));
     for (const rejection of sharedPrefix.rejections)
       it(`shared rejection: ${rejection.name}`, () =>
         assert.throws(
           () => replayTransactions([...sharedPrefix.commits, ...rejection.extra, rejection.commit]),
+          error => errorCode(error) === rejection.code
+        ));
+    const continuation = sharedPrefix.continuation;
+    it("replays every prefix of the shared continuation ledger", () => checkLedger(continuation));
+    it("restores the shared continuation checkpoint to the same projection", () => checkCheckpoint(continuation));
+    for (const rejection of continuation.rejections)
+      it(`shared continuation rejection: ${rejection.name}`, () =>
+        assert.throws(
+          () => replayTransactions([...continuation.commits.slice(0, rejection.base), ...rejection.extra, rejection.commit]),
           error => errorCode(error) === rejection.code
         ));
     it("replays migrate genesis and rejects a late migrate", () => {

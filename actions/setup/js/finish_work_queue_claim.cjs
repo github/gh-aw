@@ -16,6 +16,20 @@ const { effectsPath } = require("./work_queue_effect_client.cjs");
 const { readInboundWorkQueueAssignment } = require("./aw_context.cjs");
 const { isStagedMode } = require("./safe_output_helpers.cjs");
 const { getPromptPath, renderTemplateFromFile } = require("./messages_core.cjs");
+const { nodeId } = require("./work_queue_graph.cjs");
+const {
+  admissionInputs,
+  admissionRequirement,
+  assertContinuationPending,
+  authorizationProtocol,
+  authorizeAdmission,
+  continuationOperations,
+  matchContinuations,
+  parseContinuationReceipts,
+  readContinuationConfig,
+  readContinuationRequests,
+  readHandlerConfig,
+} = require("./work_queue_continuation.cjs");
 
 /** Max effects-file size read by the finish step (16 Claims × EFFECTS_BYTES with headroom). */
 const MAX_EFFECTS_FILE_BYTES = 1024 * 1024;
@@ -104,22 +118,125 @@ function boundedEffects(entries, handle, coreApi) {
 }
 
 /**
+ * @typedef {{
+ *   config: import("./work_queue_continuation.cjs").ContinuationConfig,
+ *   entries: Map<string, import("./work_queue_continuation.cjs").ContinuationEntry | null>,
+ *   verify?: (state: any, operations: Array<any>) => void
+ * }} FinishContinuations
+ */
+
+/**
  * Operations of one `finish` commit: Completion for a `completed` intent, else
  * ClaimCancellation{worker_failed} plus WorkCancellation{attempts_exhausted} on the last attempt.
+ * With routed continuations, a completed Claim holding a ready receipt is followed
+ * immediately by its successor Work; a request without a receipt fails the plan.
  * @param {any} state
  * @param {string} dispatchId
  * @param {Map<string, string>} intents
  * @param {Map<string, Array<unknown>>} effects bounded effects per handle
  * @param {import("./work_queue_policy.cjs").PolicyEnv | null} policy
+ * @param {FinishContinuations} [continuations]
  */
-function finishOperations(state, dispatchId, intents, effects, policy) {
+function finishOperations(state, dispatchId, intents, effects, policy, continuations = undefined) {
   const dispatch = state.dispatches.get(dispatchId);
   if (!dispatch) throw queueError("dispatch_missing", "the assigned Dispatch is not in the ledger");
-  return openClaims(state, dispatch).flatMap(claim =>
-    intents.get(claim.handle) === "completed"
-      ? [{ kind: "Completion", work_id: claim.work_id, claim_id: claim.claim_id, dispatch_id: dispatchId, claim_handle: claim.handle, effects: effects.get(claim.handle) ?? [] }]
-      : [{ kind: "ClaimCancellation", work_id: claim.work_id, claim_id: claim.claim_id, reason: "worker_failed" }, ...exhaustedCancellation(state, claim, policy)]
-  );
+  const operations = openClaims(state, dispatch).flatMap(claim => {
+    if (intents.get(claim.handle) !== "completed") return [{ kind: "ClaimCancellation", work_id: claim.work_id, claim_id: claim.claim_id, reason: "worker_failed" }, ...exhaustedCancellation(state, claim, policy)];
+    const completion = { kind: "Completion", work_id: claim.work_id, claim_id: claim.claim_id, dispatch_id: dispatchId, claim_handle: claim.handle, effects: effects.get(claim.handle) ?? [] };
+    if (!continuations?.entries.has(claim.handle)) return [completion];
+    const entry = continuations.entries.get(claim.handle);
+    if (!entry) throw queueError("continuation_receipt_missing", `completed Claim ${claim.handle} requested a continuation without an accepted receipt`);
+    return [completion, ...continuationOperations(state, claim, entry, continuations.config, policy)];
+  });
+  if (continuations) {
+    assertContinuationPending(state, operations, policy);
+    continuations.verify?.(state, operations);
+  }
+  return operations;
+}
+
+/** Each successor Work paired with the Completion that precedes it. */
+function continuationPairs(operations) {
+  return operations.flatMap((operation, index) => (operation.kind === "Work" ? [{ child: operation, completion: operations[index - 1] }] : []));
+}
+
+/**
+ * Read the routed request evidence and receipts for this Dispatch and, when global
+ * authorization is configured, authorize each planned successor's admission now.
+ * @returns {Promise<{continuations: FinishContinuations, decisions: Array<{decision: any, evidencePath: string}>} | null>}
+ */
+async function prepareContinuations({ env, githubClient, context, coreApi, branch, dispatchId, intents, effects, policy, authorization }) {
+  const config = readContinuationConfig(env);
+  if (!config) return null;
+  const { state } = await loadQueue({ githubClient, context, role: "worker", core: coreApi, ...(branch === undefined ? {} : { branch }) });
+  const dispatch = state.dispatches.get(dispatchId);
+  if (!dispatch) throw queueError("work_queue_assignment_unknown", "the assigned Dispatch is not in the ledger");
+  const claims = dispatch.claims.map(id => state.claims.get(id)).map(claim => ({ handle: claim.handle, claim_id: claim.claim_id, work_id: claim.work_id }));
+  const { available, evidence, requests } = readContinuationRequests({ env, context, claims });
+  if (!available) coreApi.info("Work queue finish: no bound agent output; no continuation can be admitted");
+  const entries = matchContinuations({ config, requests, receipts: parseContinuationReceipts(env.GH_AW_WORK_QUEUE_CONTINUATIONS), intents, claims });
+  /** @type {FinishContinuations} */
+  const continuations = { config, entries };
+  const decisions = [];
+  const handlerConfig = readHandlerConfig(env);
+  const requirement = admissionRequirement(handlerConfig);
+  if (!requirement || !entries.size) return { continuations, decisions };
+  const repository = `${context.repo.owner}/${context.repo.repo}`;
+  const inputsFor = ({ child, completion }) => admissionInputs({ child, claim: completion, dispatchId, repository, evidence, entry: entries.get(completion.claim_handle) });
+  /** @type {Map<string, {digest: string, decision: any}>} */
+  const bindings = new Map();
+  // A finish already committed plans no successor here: recovery is a read.
+  for (const pair of continuationPairs(finishOperations(state, dispatchId, intents, effects, policy, continuations))) {
+    const inputs = inputsFor(pair);
+    const { decision, digest, evidencePath } = await authorizeAdmission({ requirement, inputs, handlerConfig, config, core: coreApi, env, authorization });
+    bindings.set(pair.child.work_id, { digest, decision });
+    decisions.push({ decision, evidencePath });
+  }
+  const { assertAuthorizationBatchFresh, canonicalDigest } = authorizationProtocol();
+  continuations.verify = (_current, operations) => {
+    const used = continuationPairs(operations).map(pair => {
+      const binding = bindings.get(pair.child.work_id);
+      if (!binding || binding.digest !== canonicalDigest(inputsFor(pair))) throw queueError("continuation_authorization_scope_changed", "the successor no longer matches its authorized admission");
+      return binding.decision;
+    });
+    assertAuthorizationBatchFresh({ authorizations: used });
+  };
+  return { continuations, decisions };
+}
+
+function recordAdmissionOutcomes(prepared, operationStatus, coreApi) {
+  const { recordAuthorizationOutcome } = authorizationProtocol();
+  for (const { decision, evidencePath } of prepared?.decisions ?? []) recordAuthorizationOutcome({ evidencePath, authorization: decision, operationStatus, core: coreApi });
+}
+
+/**
+ * Committed successors of this Dispatch's completed Claims, reported only after the finish commit.
+ * @param {any} state
+ * @param {FinishContinuations | undefined} continuations
+ * @returns {Array<{claim_handle: string, status: "admitted" | "depth_limit", work_id?: string, approval_issue?: number}>}
+ */
+function continuationResults(state, continuations) {
+  /** @type {Array<{claim_handle: string, status: "admitted" | "depth_limit", work_id?: string, approval_issue?: number}>} */
+  const results = [];
+  for (const [handle, entry] of continuations?.entries ?? []) {
+    if (!entry) continue;
+    const claim = state.claims.get(entry.receipt.claim_id);
+    const childId = claim && nodeId(state.works.get(claim.work_id).graph_id, `continuation:${claim.work_id}`);
+    const child = childId && state.works.get(childId);
+    if (child) results.push({ claim_handle: handle, status: "admitted", work_id: child.work_id, ...(entry.receipt.issue ? { approval_issue: Number(entry.receipt.issue.number) } : {}) });
+    else if (entry.receipt.status === "depth_limit" && claim?.state === "completed") results.push({ claim_handle: handle, status: "depth_limit" });
+  }
+  return results;
+}
+
+/** Approval Issues the manager created for this run; after a failed finish none pins a successor. */
+function orphanApprovalIssues(env) {
+  if (env.GH_AW_CONTINUATION_ROUTE !== "issue") return [];
+  try {
+    return (parseContinuationReceipts(env.GH_AW_WORK_QUEUE_CONTINUATIONS) ?? []).flatMap(receipt => (receipt.issue ? [receipt.issue.number] : []));
+  } catch {
+    return [];
+  }
 }
 
 function renderSummary(claims) {
@@ -133,6 +250,7 @@ function renderSummary(claims) {
  */
 async function main(options = {}) {
   const { githubClient, context, core: coreApi, branch } = runtimeOptions(options);
+  const env = options.env || process.env;
   const reference = readInboundWorkQueueAssignment(context.payload);
   if (!reference) {
     coreApi.info("Work queue finish: this run has no work_queue_assignment");
@@ -152,22 +270,43 @@ async function main(options = {}) {
     intents = new Map();
   }
   const effects = new Map([...readClaimEffects(options.effectsPath ?? effectsPath())].map(([handle, entries]) => [handle, boundedEffects(entries, handle, coreApi)]));
-  const published = await publishRequest({
-    githubClient,
-    context,
-    role: "worker",
-    core: coreApi,
-    ...(branch === undefined ? {} : { branch }),
-    kind: "finish",
-    parameters: { dispatch_id: dispatchId },
-    operationsFor: state => finishOperations(state, dispatchId, intents, effects, policy),
-  });
+  /** @type {Awaited<ReturnType<typeof prepareContinuations>>} */
+  let prepared = null;
+  let published;
+  try {
+    prepared = await prepareContinuations({ env, githubClient, context, coreApi, branch, dispatchId, intents, effects, policy, authorization: options.authorization ?? {} });
+    const continuations = prepared?.continuations;
+    published = await publishRequest({
+      githubClient,
+      context,
+      role: "worker",
+      core: coreApi,
+      ...(branch === undefined ? {} : { branch }),
+      kind: "finish",
+      parameters: { dispatch_id: dispatchId },
+      operationsFor: state => finishOperations(state, dispatchId, intents, effects, policy, continuations),
+    });
+  } catch (error) {
+    recordAdmissionOutcomes(prepared, "skipped", coreApi);
+    const orphans = orphanApprovalIssues(env);
+    if (orphans.length) coreApi.warning(`Work queue finish was not published; continuation approval Issue(s) ${orphans.map(number => `#${number}`).join(", ")} pin no successor and cannot release work.`);
+    throw error;
+  }
+  recordAdmissionOutcomes(prepared, published.committed && !published.recovered ? "confirmed" : "skipped", coreApi);
   const dispatch = published.state.dispatches.get(dispatchId);
   if (!dispatch) throw queueError("work_queue_assignment_unknown", "the assigned Dispatch is not in the ledger");
   const claims = dispatch.claims.map(id => published.state.claims.get(id));
   const outcome = claims.length && claims.every(claim => claim.state === "completed") ? "completed" : "failed";
+  const continuations = published.committed ? continuationResults(published.state, prepared?.continuations) : [];
   coreApi.setOutput("work_queue_outcome", outcome);
   coreApi.info(`Work queue finish: ${dispatchId} ${outcome} (${published.committed ? (published.recovered ? "already committed" : "committed") : "nothing to finish"})`);
+  for (const result of continuations) {
+    coreApi.info(
+      result.status === "admitted"
+        ? `Work queue continuation of ${result.claim_handle}: queued Work ${result.work_id}${result.approval_issue ? ` awaiting approval Issue #${result.approval_issue}` : ""}`
+        : `Work queue continuation of ${result.claim_handle}: depth limit reached; no successor queued`
+    );
+  }
   await coreApi.summary?.addRaw(renderSummary(claims)).write();
   if (policy) {
     try {
@@ -176,7 +315,13 @@ async function main(options = {}) {
       coreApi.warning(`Work queue Issue projection failed: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
-  return { dispatch_id: dispatchId, outcome, committed: published.committed, claims: Object.fromEntries(claims.map(claim => [claim.handle, claim.state])) };
+  return {
+    dispatch_id: dispatchId,
+    outcome,
+    committed: published.committed,
+    claims: Object.fromEntries(claims.map(claim => [claim.handle, claim.state])),
+    ...(prepared ? { continuations } : {}),
+  };
 }
 
 module.exports = { authorizeWorkerClaim, finishOperations, main, readClaimEffects };

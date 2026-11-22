@@ -123,6 +123,9 @@ func (c *Compiler) validateWorkflowData(workflowData *WorkflowData, markdownPath
 	if err := c.validateWorkQueueTargets(workflowData, markdownPath); err != nil {
 		return formatCompilerError(markdownPath, "error", err.Error(), err)
 	}
+	if err := c.validateRequestContinuationRoute(workflowData, markdownPath); err != nil {
+		return formatCompilerError(markdownPath, "error", err.Error(), err)
+	}
 
 	if err := validateRepoMemoryLedgerIsolation(workflowData); err != nil {
 		return formatCompilerError(markdownPath, "error", err.Error(), err)

@@ -808,6 +808,12 @@ func buildSafeOutputsSections(safeOutputs *SafeOutputsConfig, commentMemory *Com
 	if commentMemory != nil {
 		sections = append(sections, PromptSection{Content: safeOutputsCommentMemoryFile, IsFile: true})
 	}
+	switch requestContinuationRoute(safeOutputs) {
+	case RequestContinuationRouteWorkqueue, RequestContinuationRouteIssue:
+		sections = append(sections, PromptSection{Content: safeOutputsContinuationQueueFile, IsFile: true})
+	case RequestContinuationRouteDispatch:
+		sections = append(sections, PromptSection{Content: safeOutputsContinuationDispatchFile, IsFile: true})
+	}
 	if safeOutputs.UploadAssets != nil {
 		sections = append(sections, PromptSection{
 			Content: "\nupload_asset: provide a file path; returns a URL; assets are published after the workflow completes (" + constants.SafeOutputsMCPServerID.String() + ").",

@@ -87,3 +87,55 @@ describe("v4 lifecycle without clocks", () => {
     expect(offenders).toEqual([]);
   });
 });
+
+describe("finish-carried continuations", () => {
+  const { MAX_PENDING_WORK, OPERATIONS_PER_COMMIT } = require("./work_queue_limits.cjs");
+  const { continuationChild } = require("./work_queue_graph.cjs");
+  const { appendCommit, buildCommit, newRequest } = require("./work_queue_replay.cjs");
+  const fails = (callback, code) => expect(callback).toThrow(expect.objectContaining({ code }));
+
+  function boundParent(log, parent) {
+    const planned = h.dispatchNext(log, { max_claims: 1, max_dispatches: 1 });
+    const dispatchId = planned.decision.dispatches[0];
+    expect(replayTransactions(planned.log).claims.get(replayTransactions(planned.log).dispatches.get(dispatchId).claims[0]).work_id).toBe(parent.work_id);
+    return { log: h.bind(h.launch(planned.log, dispatchId), dispatchId, h.workerActor("7")), dispatchId };
+  }
+
+  function finishCommit(log, dispatchId, extra) {
+    const state = replayTransactions(log);
+    const claim = state.claims.get(state.dispatches.get(dispatchId).claims[0]);
+    const completion = { kind: "Completion", work_id: claim.work_id, claim_id: claim.claim_id, dispatch_id: dispatchId, claim_handle: claim.handle, effects: [] };
+    const actor = h.workerActor("7");
+    return buildCommit(state, actor, newRequest("finish", actor, { dispatch_id: dispatchId }), [completion, ...extra], 1);
+  }
+
+  it("lets a pool at its pending ceiling replace the completed parent with its successor", () => {
+    const parent = h.work("p", { priority: 1 });
+    const log = h.submit([], [parent]);
+    let state = replayTransactions(log);
+    const fillers = Array.from({ length: MAX_PENDING_WORK - 1 }, (_, index) => h.work(`filler-${index}`, { graph_id: "fillers", priority: 5 }));
+    const submit = works => buildCommit(state, h.producer, newRequest("submit", h.producer, { work_ids: works.map(work => work.work_id) }), works, 1);
+    for (let start = 0; start < fillers.length; start += OPERATIONS_PER_COMMIT) {
+      const next = submit(fillers.slice(start, start + OPERATIONS_PER_COMMIT));
+      state = appendCommit(state, next);
+      log.push(next);
+    }
+    fails(() => appendCommit(state, submit([h.work("overflow")])), "resource_limit");
+    const bound = boundParent(log, parent);
+    const child = continuationChild(parent, { route: "workqueue", message: "next", remaining: 0 });
+    const commit = finishCommit(bound.log, bound.dispatchId, [child]);
+    const finished = appendCommit(replayTransactions(bound.log), commit);
+    expect(finished.works.get(child.work_id).state).toBe("available");
+    // A lost acknowledgement replays the same request, never a second child.
+    fails(() => replayTransactions([...bound.log, commit, commit]), "ledger_invalid");
+    fails(() => appendCommit(finished, buildCommit(finished, commit.actor, commit.request, commit.operations, 1)), "request_reused");
+  });
+
+  it("keeps ordinary finish commits unchanged", () => {
+    const parent = h.work("p");
+    const bound = boundParent(h.submit([], [parent]), parent);
+    const state = appendCommit(replayTransactions(bound.log), finishCommit(bound.log, bound.dispatchId, []));
+    expect(state.works.get(parent.work_id).state).toBe("completed");
+    expect(state.works.size).toBe(1);
+  });
+});

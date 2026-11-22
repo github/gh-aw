@@ -8,7 +8,8 @@ import { createRequire } from "node:module";
 const require = createRequire(import.meta.url);
 const h = require("./work_queue_test_helpers.cjs");
 const { replayTransactionLog } = require("./work_queue_replay.cjs");
-const { main, dispatchQueueIntent } = require("./work_queue_dispatch.cjs");
+const { main, dispatchQueueIntent, refreshObservations } = require("./work_queue_dispatch.cjs");
+const { continuationChild } = require("./work_queue_graph.cjs");
 
 const DISPATCHER_REF = "owner/repo/.github/workflows/dispatcher.lock.yml@refs/heads/main";
 const WORKER_REF = "owner/repo/.github/workflows/worker.lock.yml@refs/heads/main";
@@ -182,5 +183,33 @@ describe("dispatcher controls", () => {
     const result = await main({ githubClient: h.fakeQueueGitHub().githubClient, context: dispatcherContext, core, policy: policy(), intentPath });
     expect(result.receipts).toEqual([{ status: "blocked", reason: "work_queue_dispatcher_intents_missing" }]);
     expect(core.setFailed).toHaveBeenCalledWith("Work queue dispatcher produced no control intents; inspect the preparation step and tool-denial logs.");
+  });
+
+  it("budgets the closer's permission read when refreshing a continuation approval gate", async () => {
+    const approval = { kind: "issue", host: "github.com", repository: "owner/repo", repository_id: "1", resource_id: "55", number: "5" };
+    const parent = h.work("parent");
+    const planned = h.dispatchNext(h.submit([], [parent]));
+    const dispatchId = planned.decision.dispatches[0];
+    let log = h.bind(h.launch(planned.log, dispatchId), dispatchId, h.workerActor("200", 1));
+    const claim = [...replayTransactionLog(h.ledgerText(log)).claims.values()][0];
+    const child = continuationChild(replayTransactionLog(h.ledgerText(log)).works.get(parent.work_id), { route: "issue", message: "next", remaining: 0 }, approval);
+    log = h.commit(log, h.workerActor("200", 1), "finish", { dispatch_id: dispatchId }, [{ kind: "Completion", work_id: parent.work_id, claim_id: claim.claim_id, dispatch_id: dispatchId, claim_handle: claim.handle, effects: [] }, child]);
+    const reader = {
+      rest: {
+        repos: {
+          get: vi.fn(async () => ({ status: 200, data: { full_name: "owner/repo", id: 1 } })),
+          getCollaboratorPermissionLevel: vi.fn(async () => ({ status: 200, data: { permission: "admin", role_name: "admin", user: { login: "octo", id: 7 } } })),
+        },
+        issues: { get: vi.fn(async () => ({ status: 200, data: { id: 55, number: 5, state: "closed", state_reason: "completed", closed_by: { login: "octo", id: 7, type: "User" } } })) },
+      },
+    };
+    const parameters = { pool: "default", max_claims: 1, max_dispatches: 1, concurrency: 3, per_account_limit: 0, profiles: { worker: { workflow: h.WORKER_WORKFLOW } } };
+    const observations = await refreshObservations(
+      { dependencyResolver: { scopes: [{ host: "github.com", repository: "owner/repo" }], getClient: async () => reader }, core: fakeCore() },
+      replayTransactionLog(h.ledgerText(log)),
+      parameters
+    );
+    expect(observations).toEqual([expect.objectContaining({ resource: approval, condition: "approved", state: "ready", approved_by: "7" })]);
+    expect(reader.rest.repos.getCollaboratorPermissionLevel).toHaveBeenCalledTimes(1);
   });
 });
