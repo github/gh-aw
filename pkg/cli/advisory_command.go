@@ -22,6 +22,8 @@ import (
 
 const maxAdvisoryPatchBytes = 4 << 20
 
+var errAdvisoryForkMissing = errors.New("the advisory has no temporary private fork; use advisory record --create-fork or create it in GitHub")
+
 var (
 	advisoryIDPattern   = regexp.MustCompile(`^GHSA(-[23456789cfghjmpqrvwx]{4}){3}$`)
 	advisorySHA         = regexp.MustCompile(`^[0-9a-f]{40}$`)
@@ -169,18 +171,22 @@ func validAdvisoryRepo(repo string) bool {
 
 func (o advisoryHandoff) resolveFork(ctx context.Context) (advisoryFork, error) {
 	out, err := workflow.RunGHContextWithHost(ctx, "Verifying the private advisory fork", "github.com", "api", "--hostname", "github.com",
-		path.Join("repos", o.upstream, "security-advisories", o.id))
+		o.advisoryAPIPath())
 	if err != nil {
 		return advisoryFork{}, errors.New("could not read the advisory on github.com; verify the repository, advisory ID, and collaborator access")
 	}
 	return o.parseFork(out)
 }
 
+func (o advisoryHandoff) advisoryAPIPath() string {
+	return path.Join("repos", o.upstream, "security-advisories", o.id)
+}
+
 func (o advisoryHandoff) parseFork(out []byte) (advisoryFork, error) {
 	var advisory struct {
-		ID          string       `json:"ghsa_id"`
-		State       string       `json:"state"`
-		PrivateFork advisoryFork `json:"private_fork"`
+		ID          string          `json:"ghsa_id"`
+		State       string          `json:"state"`
+		PrivateFork json.RawMessage `json:"private_fork"`
 	}
 	if err := json.Unmarshal(out, &advisory); err != nil || advisory.ID != o.id {
 		return advisoryFork{}, errors.New("GitHub did not return the requested advisory")
@@ -188,10 +194,14 @@ func (o advisoryHandoff) parseFork(out []byte) (advisoryFork, error) {
 	if advisory.State != "draft" && advisory.State != "triage" {
 		return advisoryFork{}, errors.New("only unpublished draft or triage advisories are supported")
 	}
-	fork := advisory.PrivateFork
+	if bytes.Equal(advisory.PrivateFork, []byte("null")) {
+		return advisoryFork{}, errAdvisoryForkMissing
+	}
+	var fork advisoryFork
 	// GitHub may report fork:false for a temporary advisory fork. The advisory's
 	// private_fork association, not the generic repository fork flag, identifies it.
-	if fork.ID <= 0 || !fork.Private || !validAdvisoryRepo(fork.FullName) || strings.EqualFold(fork.FullName, o.upstream) {
+	if json.Unmarshal(advisory.PrivateFork, &fork) != nil || fork.ID <= 0 || !fork.Private ||
+		!validAdvisoryRepo(fork.FullName) || strings.EqualFold(fork.FullName, o.upstream) {
 		return advisoryFork{}, errors.New("the advisory has no verified temporary private fork; create or check it in GitHub before transferring")
 	}
 	return fork, nil

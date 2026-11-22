@@ -1572,6 +1572,8 @@ gh aw advisory transfer GHSA-2345-6789-cfgh --approve "$APPROVAL_DIGEST"
 
 `advisory record` saves the handoff coordinates, not the patch or credentials, in the user configuration directory. Records are separate for each GitHub account and GHSA ID. The destination branch defaults to `advisory/<lowercase-ghsa-id>`; override it with `--branch`. Run `record` again to replace a handoff, then use `inspect` to obtain a fresh approval digest.
 
+If the advisory has no fork, add `--create-fork` to `record`. This requests a temporary private fork for the existing draft or triage advisory after verifying the artifact. The GitHub CLI account must have [permission to create the advisory fork](https://docs.github.com/en/rest/security-advisories/repository-advisories#create-a-temporary-private-fork). The command waits up to five minutes for GitHub to confirm the fork before saving the handoff. If it times out, check the advisory in GitHub, then rerun `record` once the fork appears. An existing verified fork is reused.
+
 For a one-off handoff, pass `--repo` (upstream), `--base` (exact tested commit), `--base-branch` (branch in the fork), and `--branch` (new fix branch) directly to both `inspect` and `transfer`. Supply either `--side-repo`, `--run`, and `--artifact` together, or `--patch` for a local text Git diff whose origin you verified separately. The patch limit is 4 MiB in either mode.
 
 Artifact mode verifies that the ZIP belongs to a successful first attempt of a manual run whose head is in the specified private repository, checks its GitHub SHA-256 digest, and reads `handoff/fix.patch`. Start a fresh manual dispatch rather than rerunning an earlier attempt. A successful run is not proof that the patch passed its tests.

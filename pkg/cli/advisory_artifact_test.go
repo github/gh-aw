@@ -41,6 +41,17 @@ repos/owner/gh-aw-advisories/actions/artifacts/20/zip|\
 repos/owner/side/actions/artifacts/20/zip) cat "$ADVISORY_TEST_ZIP" ;;
 repos/owner/upstream/security-advisories/GHSA-2345-6789-cfgh) printf '%%s' '{"ghsa_id":"GHSA-2345-6789-cfgh","state":"draft","private_fork":{"id":40,"full_name":"owner/fork","private":true}}' ;;
 repos/owner/upstream/security-advisories/GHSA-2345-6789-jmpq) printf '%%s' '{"ghsa_id":"GHSA-2345-6789-jmpq","state":"draft","private_fork":{"id":41,"full_name":"owner/other-fork","private":true}}' ;;
+repos/owner/upstream/security-advisories/GHSA-2345-6789-rvwx)
+  fork="${ADVISORY_TEST_FORK:-null}"
+  if [ -f "$ADVISORY_TEST_CREATE_LOG" ]; then
+    fork='{"id":42,"full_name":"owner/created-fork","private":true}'
+  fi
+  printf '{"ghsa_id":"GHSA-2345-6789-rvwx","state":"%%s","private_fork":%%s}' "${ADVISORY_TEST_STATE:-draft}" "$fork"
+  ;;
+repos/owner/upstream/security-advisories/GHSA-2345-6789-rvwx/forks)
+  [ "$#" -eq 6 ] && [ "$5" = --method ] && [ "$6" = POST ] || exit 1
+  printf 'created\n' >> "$ADVISORY_TEST_CREATE_LOG"
+  ;;
 *) exit 1 ;;
 esac
 `, archive.Len(), sha256.Sum256(archive.Bytes()))
@@ -107,6 +118,40 @@ esac
 		t.Setenv("ADVISORY_TEST_ACCOUNT", "43")
 		_, err = run("inspect", advisoryTestID)
 		require.ErrorContains(t, err, "no saved handoff")
+
+		t.Setenv("ADVISORY_TEST_ACCOUNT", "42")
+		createLog := filepath.Join(dir, "fork-requests")
+		t.Setenv("ADVISORY_TEST_CREATE_LOG", createLog)
+		const newID = "GHSA-2345-6789-rvwx"
+		args := []string{"record", newID, "--repo", "owner/upstream", "--base", strings.Repeat("a", 40),
+			"--base-branch", "main", "--run", "10", "--artifact", "20"}
+		_, err = run(args...)
+		require.ErrorIs(t, err, errAdvisoryForkMissing)
+		args = append(args, "--create-fork")
+		t.Setenv("ADVISORY_TEST_STATE", "published")
+		_, err = run(args...)
+		require.ErrorContains(t, err, "only unpublished")
+		t.Setenv("ADVISORY_TEST_STATE", "draft")
+		t.Setenv("ADVISORY_TEST_FORK", `{"id":42,"full_name":"owner/public-fork","private":false}`)
+		_, err = run(args...)
+		require.ErrorContains(t, err, "no verified temporary private fork")
+		t.Setenv("ADVISORY_TEST_FORK", "null")
+		t.Setenv("ADVISORY_TEST_ATTEMPT", `,"run_attempt":2`)
+		_, err = run(args...)
+		require.ErrorContains(t, err, "successful first attempt")
+		require.NoFileExists(t, createLog)
+
+		t.Setenv("ADVISORY_TEST_ATTEMPT", `,"run_attempt":1`)
+		_, err = run(args...)
+		require.NoError(t, err)
+		_, err = run(args...)
+		require.NoError(t, err)
+		requests, err := os.ReadFile(createLog)
+		require.NoError(t, err)
+		require.Equal(t, "created\n", string(requests))
+		output, err = run("inspect", newID)
+		require.NoError(t, err)
+		require.Contains(t, output, "Private fork: owner/created-fork")
 	})
 }
 

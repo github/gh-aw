@@ -6,9 +6,11 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 )
@@ -25,6 +27,7 @@ type advisoryRecord struct {
 
 func newAdvisoryRecordCommand() *cobra.Command {
 	var record advisoryRecord
+	var createFork bool
 	cmd := &cobra.Command{
 		Use:   "record <GHSA-ID>",
 		Short: "Experimental: save an exact artifact handoff for later review",
@@ -35,7 +38,7 @@ func newAdvisoryRecordCommand() *cobra.Command {
 			if saved.Branch == "" {
 				saved.Branch = "advisory/" + strings.ToLower(id)
 			}
-			return saveAdvisoryHandoff(cmd, id, saved)
+			return saveAdvisoryHandoff(cmd, id, saved, createFork)
 		},
 	}
 	cmd.Flags().StringVar(&record.Upstream, "repo", "", "Upstream GitHub repository (OWNER/REPO)")
@@ -44,6 +47,7 @@ func newAdvisoryRecordCommand() *cobra.Command {
 	cmd.Flags().StringVar(&record.Branch, "branch", "", "New branch in the advisory fork (default: advisory/<lowercase-ghsa-id>)")
 	cmd.Flags().Int64Var(&record.RunID, "run", 0, "Source workflow run ID")
 	cmd.Flags().Int64Var(&record.ArtifactID, "artifact", 0, "Exact source artifact ID")
+	cmd.Flags().BoolVar(&createFork, "create-fork", false, "Create the temporary private advisory fork if none exists")
 	for _, flag := range []string{"repo", "base", "base-branch", "run", "artifact"} {
 		_ = cmd.MarkFlagRequired(flag)
 	}
@@ -57,7 +61,7 @@ func (r advisoryRecord) handoff(id string, repo advisorySideRepository) advisory
 	}
 }
 
-func saveAdvisoryHandoff(cmd *cobra.Command, id string, record advisoryRecord) error {
+func saveAdvisoryHandoff(cmd *cobra.Command, id string, record advisoryRecord, createFork bool) error {
 	ctx := cmd.Context()
 	account, err := currentAdvisoryAccount(ctx)
 	if err != nil {
@@ -71,8 +75,9 @@ func saveAdvisoryHandoff(cmd *cobra.Command, id string, record advisoryRecord) e
 	if err := handoff.validate(); err != nil {
 		return err
 	}
-	if _, err := handoff.resolveFork(ctx); err != nil {
-		return err
+	_, forkErr := handoff.resolveFork(ctx)
+	if forkErr != nil && (!createFork || !errors.Is(forkErr, errAdvisoryForkMissing)) {
+		return forkErr
 	}
 	if _, err := handoff.loadPatch(ctx); err != nil {
 		return err
@@ -89,11 +94,41 @@ func saveAdvisoryHandoff(cmd *cobra.Command, id string, record advisoryRecord) e
 	if err := os.MkdirAll(filepath.Dir(filename), 0o700); err != nil {
 		return fmt.Errorf("create private advisory record directory: %w", err)
 	}
+	if forkErr != nil {
+		if err := handoff.createAndWaitForFork(ctx); err != nil {
+			return err
+		}
+	}
 	if err := writeSessionFileAtomically(filename, data); err != nil {
 		return fmt.Errorf("save private advisory record: %w", err)
 	}
 	_, err = fmt.Fprintf(cmd.OutOrStdout(), "Saved %s locally. Review with gh aw advisory inspect %s.\n", id, id)
 	return err
+}
+
+func (o advisoryHandoff) createAndWaitForFork(ctx context.Context) error {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
+	defer cancel()
+	if _, err := advisorySetupAPI(ctx, path.Join(o.advisoryAPIPath(), "forks"), "--method", "POST"); err != nil {
+		return errors.New("could not confirm the temporary private fork creation request; check the advisory in GitHub and verify your account can create its fork")
+	}
+
+	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
+	for {
+		_, err := o.resolveFork(ctx)
+		if err == nil {
+			return nil
+		}
+		if !errors.Is(err, errAdvisoryForkMissing) && ctx.Err() == nil {
+			return fmt.Errorf("fork creation was requested, but the fork could not be verified; check the advisory in GitHub before rerunning record: %w", err)
+		}
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("fork creation was requested, but GitHub did not confirm the fork before the wait ended; check the advisory in GitHub, then rerun record: %w", ctx.Err())
+		case <-ticker.C:
+		}
+	}
 }
 
 func loadAdvisoryHandoff(ctx context.Context, id string) (advisoryHandoff, error) {

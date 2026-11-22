@@ -16,7 +16,9 @@ Use a bounded text patch rather than a live branch or an automatically opened PR
 
 The experimental `gh aw advisory inspect` command verifies that the artifact belongs to the successful first attempt of a manual run in the specified private repository and that the downloaded archive matches GitHub's SHA-256 digest. It resolves the existing temporary private fork from the unpublished advisory and displays the patch and an approval digest. That digest binds the patch bytes, source identifiers, base, fork identity, and destination branch.
 
-`gh aw advisory transfer` repeats those checks, requires the matching digest, checks the fork's base branch against the tested commit, and applies the patch in an isolated Git index. It uses the maintainer's Git credentials to create a branch without overwriting an existing one. It does not create a fork, open a PR, merge changes, or publish the advisory. The maintainer opens the PR from the advisory in GitHub.
+If the advisory does not already have a temporary private fork, the maintainer can explicitly request one with `gh aw advisory record --create-fork`. The command verifies the source artifact before requesting the fork and waits for GitHub to confirm the advisory association before saving the record.
+
+`gh aw advisory transfer` repeats the handoff checks, requires the matching digest, checks the fork's base branch against the tested commit, and applies the patch in an isolated Git index. It uses the maintainer's Git credentials to create a branch without overwriting an existing one. It does not create a fork, open a PR, merge changes, or publish the advisory. The maintainer opens the PR from the advisory in GitHub.
 
 ## Alternatives Considered
 
