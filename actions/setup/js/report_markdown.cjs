@@ -167,10 +167,10 @@ function transformMarkdownLinkDestinations(markdown, transform) {
           continue;
         }
         if (line[index] === "`") {
-          const openingTicks = /^`+/.exec(line.slice(index))[0];
+          const openingTicks = /^`+/.exec(line.slice(index))?.[0] ?? "`";
           let closingIndex = line.indexOf("`", index + openingTicks.length);
           while (closingIndex >= 0) {
-            const closingTicks = /^`+/.exec(line.slice(closingIndex))[0];
+            const closingTicks = /^`+/.exec(line.slice(closingIndex))?.[0] ?? "`";
             if (closingTicks.length === openingTicks.length) {
               index = closingIndex + closingTicks.length - 1;
               break;
