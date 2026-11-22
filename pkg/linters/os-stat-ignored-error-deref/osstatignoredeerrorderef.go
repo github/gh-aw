@@ -276,6 +276,9 @@ func (a *flowAnalyzer) expressionList(expressions []ast.Expr, state flowState) {
 }
 
 func (a *flowAnalyzer) expression(expr ast.Expr, state flowState) {
+	if expr == nil {
+		return
+	}
 	if unary, ok := astutil.UnwrapParenExpr(expr).(*ast.UnaryExpr); ok && unary.Op == token.NOT {
 		a.condition(unary, state)
 		return

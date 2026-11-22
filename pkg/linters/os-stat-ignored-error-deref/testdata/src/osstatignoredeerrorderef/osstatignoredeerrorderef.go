@@ -123,6 +123,16 @@ func builtinPanicTerminates(path string) int64 {
 	return info.Size()
 }
 
+func ignoredStatInExpressionlessSwitch(path string) int64 {
+	info, _ := os.Stat(path)
+	switch {
+	case true:
+		return info.Size() // want "result of os.Stat is dereferenced"
+	default:
+		return 0
+	}
+}
+
 func checkedInIfInitializer(path string) int64 {
 	if info, _ := os.Lstat(path); info != nil {
 		return info.Size()
