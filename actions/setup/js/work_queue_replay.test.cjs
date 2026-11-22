@@ -6,6 +6,7 @@ const h = require("./work_queue_test_helpers.cjs");
 const { canonical } = require("./work_queue_codec.cjs");
 const { LEDGER_BYTES } = require("./work_queue_limits.cjs");
 const {
+  applyCommit,
   appendCommit,
   buildCommit,
   checkpointCommit,
@@ -17,6 +18,7 @@ const {
   requestId,
   restoreCheckpointState,
   serializeProjection,
+  serializeTransactionLog,
   validateCommit,
 } = require("./work_queue_replay.cjs");
 
@@ -267,6 +269,34 @@ describe("v4 checkpoints", () => {
     fails(() => restoreCheckpointState(tamper(state => delete Object.values(state.dispatches)[0].workflow)), "checkpoint_invalid");
     fails(() => restoreCheckpointState(tamper(state => (state.extra = true))), "checkpoint_invalid");
     fails(() => restoreCheckpointState({ ...checkpoint, actor: h.producer }), "request_invalid");
+  });
+
+  it("replays the same checkpoint objects repeatedly without changing the checkpoint", () => {
+    const { log, dispatch } = bound();
+    const source = replayTransactions(log);
+    const claimId = source.dispatches.get(dispatch).claims[0];
+    const checkpoint = checkpointCommit(source, h.reconciler, 5);
+    const checkpointBytes = h.ledgerText([checkpoint]);
+    expect(checkpoint.operations[0].state.claims[claimId].state).toBe("open");
+
+    // Advancing the source projection in place must not reach into the checkpoint it produced.
+    applyCommit(source, h.finish(log, dispatch, h.workerActor("7")).at(-1));
+    expect(source.claims.get(claimId).state).toBe("completed");
+    expect(h.ledgerText([checkpoint])).toBe(checkpointBytes);
+
+    const finished = h.finish([checkpoint], dispatch, h.workerActor("7"));
+    const text = h.ledgerText(finished);
+    for (const state of [replayTransactions(finished), replayTransactions(finished)]) {
+      expect(state.claims.get(claimId)).toMatchObject({ state: "completed", dispatch_id: dispatch });
+      expect(state.dispatches.get(dispatch)).toMatchObject({ state: "closed", run: { run_id: "7", run_attempt: 1 } });
+      expect(state.tip).toBe(finished.at(-1).id);
+      expect(state.transactions[0]).toBe(checkpoint);
+    }
+    expect(serializeTransactionLog(finished)).toBe(text);
+    expect(finished[0]).toBe(checkpoint);
+    expect(h.ledgerText([checkpoint])).toBe(checkpointBytes);
+    expect(checkpoint.operations[0].state.claims[claimId].state).toBe("open");
+    expect(checkpoint.operations[0].state.dispatches[dispatch].state).toBe("bound");
   });
 
   it("appendCommit validates against a copy and leaves the source projection unchanged", () => {

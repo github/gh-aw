@@ -5,6 +5,9 @@
 // ownership comes from the dispatcher's own dispatch_next grants, and terminal
 // state from each granted Claim (never from the Work, which a retry can reuse).
 
+// Same revision as the queue logger, so both apply one request-ID redaction rule.
+const { getGitHubRequestId, ownValue, validGitHubRequestId } = require("../../actions/setup/js/work_queue_logging.cjs");
+
 const POOL = "smoke-work-queue";
 const EXPECTED_CLAIMS = 3;
 const DISPATCHER_WORKFLOW_ID = "smoke-work-queue-dispatcher.lock.yml";
@@ -17,21 +20,24 @@ const MAX_ARCHIVED_SEGMENTS = 6;
 const LEDGER_PATH = "work-queue.jsonl";
 const FULL_SHA = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/;
 
+// Only this module's own ledger inconsistencies carry the tag; a caught dependency
+// error claiming `evidence: true` takes the redacted read-error path.
+const EVIDENCE = Symbol("smoke-monitor-evidence");
+
 /** A ledger inconsistency, reported without its details. */
 function evidenceFailure(code) {
-  return Object.assign(new Error(), { code, evidence: true });
+  return Object.assign(new Error(), { code, [EVIDENCE]: true });
 }
 
 /** Allowlisted summary of a failed read; messages, headers and bodies are withheld. */
 function safeError(operation, error) {
-  if (error?.evidence === true) {
+  if (error instanceof Error && Object.hasOwn(error, EVIDENCE)) {
     return { operation, status: null, code: error.code, category: "evidence", short_message: "Ledger evidence is missing or inconsistent.", correlation_id: null };
   }
   const status = Number.isInteger(error?.status) ? error.status : Number.isInteger(error?.response?.status) ? error.response.status : null;
   const rawCode = error?.code;
   const code = typeof rawCode === "string" && /^[A-Z0-9_]{1,32}$/.test(rawCode) ? rawCode : null;
-  const rawRequestId = error?.response?.headers?.["x-github-request-id"] ?? error?.request?.requestId;
-  const correlation_id = typeof rawRequestId === "string" && /^[A-Za-z0-9._-]{1,64}$/.test(rawRequestId) ? rawRequestId : null;
+  const correlation_id = getGitHubRequestId(error) ?? validGitHubRequestId(ownValue(ownValue(error, "request"), "requestId")) ?? null;
   return {
     operation,
     status,

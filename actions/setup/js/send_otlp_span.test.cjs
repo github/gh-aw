@@ -7,6 +7,7 @@ import { createRequire } from "module";
 
 const require = createRequire(import.meta.url);
 const nodeFs = require("node:fs");
+const perfHooks = require("perf_hooks");
 const originalMkdirSync = nodeFs.mkdirSync.bind(nodeFs);
 const originalOpenSync = nodeFs.openSync.bind(nodeFs);
 const originalReadSync = nodeFs.readSync.bind(nodeFs);
@@ -2917,6 +2918,8 @@ describe("sendJobConclusionSpan", () => {
     "GH_AW_ENGINE_ID",
     "GH_AW_ENGINE_MODEL",
     "GH_AW_ENGINE_MODEL_EFFORT",
+    "GH_AW_AWF_CONFIG_PATH",
+    "GH_AW_AGENT_OUTPUT",
     "GH_AW_INFO_MODEL",
     "GH_AW_MODEL_ROUTING_STATUS",
     "GH_AW_PHASE",
@@ -3497,6 +3500,25 @@ describe("sendJobConclusionSpan", () => {
     expect(span.name).toBe("gh-aw.job.conclusion");
   });
 
+  /**
+   * Hides host runner evidence (e.g. a retained /tmp/gh-aw/agent_cli_start_ms.txt or
+   * awf-config.json from an earlier job) so each test controls its own inputs.
+   */
+  function useNoRunnerEvidence() {
+    const enoent = () => {
+      throw Object.assign(new Error("ENOENT"), { code: "ENOENT" });
+    };
+    vi.spyOn(fs, "existsSync").mockReturnValue(false);
+    vi.spyOn(fs, "readFileSync").mockImplementation(enoent);
+    vi.spyOn(fs, "statSync").mockImplementation(enoent);
+  }
+
+  /** @param {number} startMs */
+  function useKilledJobClock(startMs) {
+    vi.spyOn(perfHooks.performance, "timeOrigin", "get").mockReturnValue(startMs);
+    vi.spyOn(perfHooks.performance, "now").mockReturnValue(5000);
+  }
+
   it("emits a dedicated agent span on timed_out when agent_output mtime is unavailable", async () => {
     const mockFetch = vi.fn().mockResolvedValue({ ok: true, status: 200, statusText: "OK" });
     vi.stubGlobal("fetch", mockFetch);
@@ -3506,20 +3528,18 @@ describe("sendJobConclusionSpan", () => {
     process.env.GH_AW_AGENT_CONCLUSION = "timed_out";
 
     const startMs = 1_700_000_000_000;
-    const statSpy = vi.spyOn(fs, "statSync").mockImplementation(() => {
-      throw Object.assign(new Error("ENOENT"), { code: "ENOENT" });
-    });
+    useNoRunnerEvidence();
+    useKilledJobClock(startMs);
 
     await sendJobConclusionSpan("gh-aw.agent.conclusion", { startMs });
 
-    statSpy.mockRestore();
     expect(mockFetch).toHaveBeenCalledTimes(2);
 
     const agentBody = JSON.parse(mockFetch.mock.calls[0][1].body);
     const agentSpan = agentBody.resourceSpans[0].scopeSpans[0].spans[0];
     expect(agentSpan.name).toBe("gh-aw.agent.agent");
     expect(agentSpan.startTimeUnixNano).toBe(toNanoString(startMs));
-    expect(BigInt(agentSpan.endTimeUnixNano)).toBeGreaterThan(BigInt(toNanoString(startMs)));
+    expect(agentSpan.endTimeUnixNano).toBe(toNanoString(startMs + 5000));
 
     const conclusionBody = JSON.parse(mockFetch.mock.calls[1][1].body);
     const conclusionSpan = conclusionBody.resourceSpans[0].scopeSpans[0].spans[0];
@@ -3538,20 +3558,18 @@ describe("sendJobConclusionSpan", () => {
     process.env.GH_AW_AGENT_CONCLUSION = "cancelled";
 
     const startMs = 1_700_000_000_000;
-    const statSpy = vi.spyOn(fs, "statSync").mockImplementation(() => {
-      throw Object.assign(new Error("ENOENT"), { code: "ENOENT" });
-    });
+    useNoRunnerEvidence();
+    useKilledJobClock(startMs);
 
     await sendJobConclusionSpan("gh-aw.agent.conclusion", { startMs });
 
-    statSpy.mockRestore();
     expect(mockFetch).toHaveBeenCalledTimes(2);
 
     const agentBody = JSON.parse(mockFetch.mock.calls[0][1].body);
     const agentSpan = agentBody.resourceSpans[0].scopeSpans[0].spans[0];
     expect(agentSpan.name).toBe("gh-aw.agent.agent");
     expect(agentSpan.startTimeUnixNano).toBe(toNanoString(startMs));
-    expect(BigInt(agentSpan.endTimeUnixNano)).toBeGreaterThan(BigInt(toNanoString(startMs)));
+    expect(agentSpan.endTimeUnixNano).toBe(toNanoString(startMs + 5000));
 
     const conclusionBody = JSON.parse(mockFetch.mock.calls[1][1].body);
     const conclusionSpan = conclusionBody.resourceSpans[0].scopeSpans[0].spans[0];
@@ -4702,6 +4720,7 @@ describe("sendJobConclusionSpan", () => {
 
     process.env.GH_AW_OTLP_ENDPOINTS = JSON.stringify([{ url: "https://traces.example.com" }]);
     process.env.GH_AW_MAX_AI_CREDITS = "1000.5";
+    useNoRunnerEvidence();
 
     await sendJobConclusionSpan("gh-aw.job.conclusion");
 
@@ -4758,14 +4777,20 @@ describe("sendJobConclusionSpan", () => {
     vi.stubGlobal("fetch", mockFetch);
 
     process.env.GH_AW_OTLP_ENDPOINTS = JSON.stringify([{ url: "https://traces.example.com" }]);
-    process.env.GH_AW_MAX_AI_CREDITS = "not-a-number";
+    useNoRunnerEvidence();
 
-    await sendJobConclusionSpan("gh-aw.job.conclusion");
+    for (const budget of [undefined, "not-a-number"]) {
+      if (budget === undefined) delete process.env.GH_AW_MAX_AI_CREDITS;
+      else process.env.GH_AW_MAX_AI_CREDITS = budget;
+      mockFetch.mockClear();
 
-    const body = JSON.parse(mockFetch.mock.calls[0][1].body);
-    const span = body.resourceSpans[0].scopeSpans[0].spans[0];
-    const keys = span.attributes.map(a => a.key);
-    expect(keys).not.toContain("gh-aw.max_ai_credits");
+      await sendJobConclusionSpan("gh-aw.job.conclusion");
+
+      const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+      const span = body.resourceSpans[0].scopeSpans[0].spans[0];
+      const keys = span.attributes.map(a => a.key);
+      expect(keys).not.toContain("gh-aw.max_ai_credits");
+    }
   });
 
   it("emits dashboard metrics and aliases on the conclusion span", async () => {

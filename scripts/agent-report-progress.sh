@@ -267,7 +267,7 @@ run_change_scoped_go_linter() {
 lint_go_packages() {
     GOPATH=$(go env GOPATH)
     if command -v golangci-lint >/dev/null 2>&1 || [ -x "$GOPATH/bin/golangci-lint" ]; then
-        run_change_scoped_go_linter "Go linter" env PATH="$GOPATH/bin:$PATH" golangci-lint run "${go_packages[@]}"
+        run_change_scoped_go_linter "Go linter" env PATH="$GOPATH/bin:$PATH" golangci-lint run --timeout=40m "${go_packages[@]}"
     else
         echo "golangci-lint is not installed. Run 'make deps-dev' to install dependencies." >&2
         return 1
