@@ -25,7 +25,7 @@ func TestAdvisoryInspectDownloadsExactArtifact(t *testing.T) {
 	zipPath := filepath.Join(dir, "artifact.zip")
 	require.NoError(t, os.WriteFile(zipPath, archive.Bytes(), 0600))
 	t.Setenv("ADVISORY_TEST_ZIP", zipPath)
-	prependFakeGH(t, fmt.Sprintf(`
+	script := fmt.Sprintf(`#!/bin/sh
 [ "$1" = api ] && [ "$2" = --hostname ] && [ "$3" = github.com ] || exit 1
 case "$4" in
 repos/owner/side) printf '%%s' '{"id":30,"full_name":"owner/side","visibility":"private"}' ;;
@@ -35,7 +35,9 @@ repos/owner/side/actions/artifacts/20/zip) cat "$ADVISORY_TEST_ZIP" ;;
 repos/owner/upstream/security-advisories/GHSA-2345-6789-cfgh) printf '%%s' '{"ghsa_id":"GHSA-2345-6789-cfgh","state":"draft","private_fork":{"id":40,"full_name":"owner/fork","private":true}}' ;;
 *) exit 1 ;;
 esac
-`, archive.Len(), sha256.Sum256(archive.Bytes())))
+`, archive.Len(), sha256.Sum256(archive.Bytes()))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "gh"), []byte(script), 0o700))
+	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
 	cmd := NewAdvisoryCommand()
 	var output bytes.Buffer
 	cmd.SetOut(&output)
