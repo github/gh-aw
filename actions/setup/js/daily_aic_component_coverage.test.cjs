@@ -42,7 +42,7 @@ function evaluate(files, jobs, overrides = {}) {
   const list = vi.fn(async () => ({ status: 200, headers: {}, data: { jobs } }));
   const client = {
     listArtifacts: vi.fn(async () => ({
-      artifacts: [
+      artifacts: overrides.artifacts || [
         { id: 10, name: "usage", createdAt: new Date(overrides.artifactTime || later) },
         ...["agent", "detection", "evals"].map(name => {
           const latest = jobs.filter(item => componentName(item.name) === name && item.conclusion !== "skipped").sort((a, b) => b.run_attempt - a.run_attempt)[0];
@@ -51,7 +51,7 @@ function evaluate(files, jobs, overrides = {}) {
       ],
     })),
     downloadArtifact: vi.fn(async (_id, options) => {
-      const artifactFiles = _id === 1 && overrides.agentFiles ? overrides.agentFiles : files;
+      const artifactFiles = overrides.filesById?.[_id] ?? (_id === 1 && overrides.agentFiles ? overrides.agentFiles : files);
       for (const [name, value] of Object.entries(artifactFiles)) {
         const file = path.join(options.path, ...name.split("/"));
         fs.mkdirSync(path.dirname(file), { recursive: true });
@@ -350,6 +350,58 @@ it.each(["caller / ", "outer / caller / "])("rejects a stale producer for %j-pre
   await expect(f.result).rejects.toThrow("Cannot verify the agent producer artifact for its job attempt");
 });
 
+function repeatedCalls() {
+  const jobs = [101, 102].flatMap((id, index) => {
+    const prefix = index === 0 ? "worker-a / " : "outer / worker-b / ";
+    return [job(`${prefix}activation`, { id, check_run_url: `https://api.github.com/repos/example/project/check-runs/${id}` }), job(`${prefix}conclusion`, { id: id + 200 }), job(`${prefix}Agent`, { job_id: "agent", id: id + 100 })];
+  });
+  const artifacts = [102, 999, 101].map(id => ({ id, name: `call-${id}-usage`, createdAt: new Date(later) }));
+  const filesById = { 101: { "agent/token_usage.jsonl": '{"aic":2}' }, 102: { "agent/token_usage.jsonl": '{"aic":3}' }, 999: { "agent/token_usage.jsonl": '{"aic":99}' } };
+  return { jobs, artifacts, filesById };
+}
+
+it("counts each reusable invocation's own usage once even when job times overlap", async () => {
+  const { jobs, artifacts, filesById } = repeatedCalls();
+  const f = evaluate({}, jobs, { artifacts, filesById });
+  await expect(f.result).resolves.toBe(5);
+  expect(f.client.listArtifacts).toHaveBeenCalledOnce();
+  expect(f.client.downloadArtifact.mock.calls.map(([id]) => id)).toEqual([101, 102]);
+});
+
+it("reports the unresolved caller rather than borrowing another invocation's artifact", async () => {
+  const { jobs, artifacts, filesById } = repeatedCalls();
+  const f = evaluate({}, jobs, { artifacts: artifacts.filter(artifact => artifact.id !== 102), filesById });
+  await expect(f.result).rejects.toThrow("Daily AIC unresolved for outer / worker-b: No usage artifact");
+  expect(f.client.downloadArtifact.mock.calls.map(([id]) => id)).toEqual([101]);
+});
+
+it("does not assign legacy hash artifacts to overlapping callers without a binding", async () => {
+  const { jobs, artifacts, filesById } = repeatedCalls();
+  const legacy = artifacts.slice(0, 2).map((artifact, index) => ({ ...artifact, name: index === 0 ? "aaaaaaaa-usage" : "bbbbbbbb-usage" }));
+  const f = evaluate({}, jobs, { artifacts: legacy, filesById });
+  await expect(f.result).rejects.toThrow("Daily AIC unresolved for worker-a: No usage artifact");
+  expect(f.client.downloadArtifact).not.toHaveBeenCalled();
+});
+
+it("does not require a usage artifact for a skipped reusable invocation", async () => {
+  const { jobs, artifacts, filesById } = repeatedCalls();
+  jobs.find(item => item.id === 202).conclusion = "skipped";
+  const f = evaluate({}, jobs, { artifacts: artifacts.filter(artifact => artifact.id === 101), filesById });
+  await expect(f.result).resolves.toBe(2);
+  expect(f.client.downloadArtifact.mock.calls.map(([id]) => id)).toEqual([101]);
+});
+
+it("matches retained and rerun producers only within their own reusable invocation", async () => {
+  const { jobs, artifacts, filesById } = repeatedCalls();
+  jobs.push(job("outer / worker-b / Agent", { id: 203, run_attempt: 2, started_at: later, completed_at: later }));
+  artifacts.push({ id: 401, name: "call-101-agent", createdAt: new Date(time) }, { id: 402, name: "call-102-agent", createdAt: new Date(later) });
+  const f = evaluate({}, jobs, { artifacts, filesById, attempt: 2 });
+  await expect(f.result).resolves.toBe(5);
+  const stale = artifacts.map(artifact => (artifact.id === 402 ? { ...artifact, createdAt: new Date(time) } : artifact));
+  const g = evaluate({}, jobs, { artifacts: stale, filesById, attempt: 2 });
+  await expect(g.result).rejects.toThrow("Daily AIC unresolved for outer / worker-b: Cannot verify the agent producer artifact");
+});
+
 it.each(["caller / agent-helper", "caller / my-agent", "outer / caller / agent-helper"])("ignores look-alike component %s even in a compiler caller", async name => {
   const prefix = name.slice(0, name.lastIndexOf(" / ") + 3);
   const f = evaluate({ "agent/token_usage.jsonl": '{"aic":99}' }, [job(name), ...callerJobs(prefix)]);
@@ -376,7 +428,7 @@ it("recognizes compiler siblings on a later job page", async () => {
   const agent = job("outer / caller / agent");
   const pages = [[agent, ...Array.from({ length: 99 }, (_, id) => job("unrelated", { id: id + 100 }))], callerJobs("outer / caller / ")];
   const listJobsForWorkflowRun = vi.fn(async ({ page }) => ({ data: { jobs: pages[page - 1] } }));
-  const { components } = await loadBillableJobs({ github: { rest: { actions: { listJobsForWorkflowRun } } }, budget: createAPIBudget() }, "example", "project", { id: 1, run_attempt: 1 });
+  const [{ components }] = await loadBillableJobs({ github: { rest: { actions: { listJobsForWorkflowRun } } }, budget: createAPIBudget() }, "example", "project", { id: 1, run_attempt: 1 });
   expect(components.get("agent")).toBe(agent);
   expect(listJobsForWorkflowRun).toHaveBeenCalledTimes(2);
 });

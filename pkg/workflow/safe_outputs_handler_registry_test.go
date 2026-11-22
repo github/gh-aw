@@ -20,7 +20,7 @@ func TestHandlerRegistryDomainComposition(t *testing.T) {
 		{name: "assignmentHandlerRegistry", registry: assignmentHandlerRegistry, wantKeys: []string{"assign_to_agent", "assign_to_user", "unassign_from_user", "create_agent_session"}},
 		{name: "commentHandlerRegistry", registry: commentHandlerRegistry, wantKeys: []string{"add_security_advisory_comment", "add_comment", "hide_comment"}},
 		{name: "releaseHandlerRegistry", registry: releaseHandlerRegistry, wantKeys: []string{"update_release"}},
-		{name: "diagnosticHandlerRegistry", registry: diagnosticHandlerRegistry, wantKeys: []string{"report_missing_tool", "report_missing_data", "noop", "report_incomplete", "create_report_incomplete_issue"}},
+		{name: "diagnosticHandlerRegistry", registry: diagnosticHandlerRegistry, wantKeys: []string{"report_missing_tool", "report_missing_data", "noop", "report_incomplete", "request_continuation", "create_report_incomplete_issue"}},
 	}
 
 	wantAll := map[string]struct{}{}

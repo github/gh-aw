@@ -860,6 +860,19 @@ func cachedJSONLCanSatisfy(artifactFilter []string, parse, train, toolGraph bool
 }
 
 func processedRunFromCachedData(data RunData, audit *AuditData, outputDir string) ProcessedRun {
+	attempt, err := strconv.Atoi(data.RunAttempt)
+	if err != nil {
+		// Unknown attempt: cached continuation evidence cannot be matched to the run.
+		attempt = 0
+	}
+	run := WorkflowRun{
+		DatabaseID: data.RunID, WorkflowName: data.WorkflowName, Repository: data.Repository,
+		Attempt: attempt, UpdatedAt: data.UpdatedAt,
+	}
+	runDir := filepath.Join(outputDir, fmt.Sprintf("run-%d", data.RunID))
+	backfillContinuationRequests(&data.ContinuationRequests, run, runDir, false)
+	data.ContinuationRequestCount = continuationRequestCount(data.ContinuationRequests)
+	mergeContinuationRequestsIntoAudit(audit, data.ContinuationRequests)
 	return ProcessedRun{
 		Run: WorkflowRun{
 			DatabaseID:       data.RunID,
@@ -877,6 +890,7 @@ func processedRunFromCachedData(data RunData, audit *AuditData, outputDir string
 			HeadSha:          data.HeadSHA,
 			DisplayTitle:     data.DisplayTitle,
 			Repository:       data.Repository,
+			Attempt:          attempt,
 			Actor:            data.Actor,
 			Duration:         parseDurationString(data.Duration),
 			ActionMinutes:    data.ActionMinutes,
@@ -889,16 +903,17 @@ func processedRunFromCachedData(data RunData, audit *AuditData, outputDir string
 			SafeItemsCount:   data.SafeItemsCount,
 			LogsPath:         filepath.Join(outputDir, fmt.Sprintf("run-%d", data.RunID)),
 		},
-		AwContext:           data.AwContext,
-		TaskDomain:          data.TaskDomain,
-		BehaviorFingerprint: data.BehaviorFingerprint,
-		AgenticAssessments:  data.AgenticAssessments,
-		TokenUsage:          data.TokenUsageSummary,
-		WorkingSet:          data.WorkingSet,
-		Ledger:              data.Ledger,
-		WorkQueue:           data.WorkQueue,
-		Friction:            data.Friction,
-		cachedData:          &data,
-		cachedAudit:         audit,
+		AwContext:            data.AwContext,
+		TaskDomain:           data.TaskDomain,
+		BehaviorFingerprint:  data.BehaviorFingerprint,
+		AgenticAssessments:   data.AgenticAssessments,
+		TokenUsage:           data.TokenUsageSummary,
+		WorkingSet:           data.WorkingSet,
+		ContinuationRequests: data.ContinuationRequests,
+		Ledger:               data.Ledger,
+		WorkQueue:            data.WorkQueue,
+		Friction:             data.Friction,
+		cachedData:           &data,
+		cachedAudit:          audit,
 	}
 }

@@ -422,21 +422,37 @@ function writeInlineSubAgents(content, workspaceDir, agentsBaseDir, engineId, re
 }
 
 /**
- * Read repository and workflow-written Copilot agents when the SDK session starts.
+ * Locate the two SDK agent sources staged by activation, in precedence order.
+ * Do not discover agents in the workspace: it can contain a PR or custom checkout.
+ *
+ * @param {string} agentsBaseDir
+ */
+function copilotSDKAgentDirectories(agentsBaseDir) {
+  return {
+    repository: path.join(agentsBaseDir, "base", "copilot-agents"),
+    declared: path.join(agentsBaseDir, getEngineSubAgentTarget("copilot").dir),
+  };
+}
+
+// Generated jobs download activation to a fixed location, regardless of TMPDIR.
+function defaultCopilotSDKAgentsBaseDir() {
+  return process.env.GITHUB_ACTIONS === "true" ? "/tmp/gh-aw" : path.join(require("node:os").tmpdir(), "gh-aw");
+}
+
+/**
+ * Read staged repository and workflow-written Copilot agents.
  * Workflow definitions override repository definitions with the same name.
  *
- * @param {string} workspaceDir
  * @param {string} agentsBaseDir
  * @param {(message: string) => void} logger
- * @returns {import("@github/copilot-sdk").CustomAgentConfig[]}
+ * @returns {import("@microsoft/copilot-sdk").CustomAgentConfig[]}
  */
-function loadCopilotSDKCustomAgents(workspaceDir, agentsBaseDir, logger) {
+function loadCopilotSDKCustomAgents(agentsBaseDir, logger) {
   const { extractFrontmatterAndBody } = require("./frontmatter_hash_pure.cjs");
   const { readMarkdownMetadata, CompilerMetadataUnavailableError } = require("./markdown_metadata.cjs");
-  const target = inlineArtifactTarget("SUB_AGENT", getEngineSubAgentTarget("copilot"));
-  const directories = new Set([path.join(workspaceDir, ".github/agents"), path.join(agentsBaseDir, target.dir)]);
+  const { repository, declared } = copilotSDKAgentDirectories(agentsBaseDir);
   const agents = new Map();
-  for (const directory of directories) {
+  for (const directory of [repository, declared]) {
     let entries;
     try {
       entries = fs.readdirSync(directory, { withFileTypes: true });
@@ -485,5 +501,7 @@ module.exports = {
   resolveSubAgentExperimentReferences,
   ensureSubAgentIdentity,
   closeUnterminatedSubAgentMarkers,
+  copilotSDKAgentDirectories,
+  defaultCopilotSDKAgentsBaseDir,
   loadCopilotSDKCustomAgents,
 };

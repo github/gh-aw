@@ -15,33 +15,34 @@ var healthMetricsLog = logger.New("cli:health_metrics")
 
 // WorkflowHealth represents health metrics for a single workflow
 type WorkflowHealth struct {
-	WorkflowPath           string                   `json:"workflow_path,omitempty" console:"-"`
-	Revisions              []HealthRevisionStatus   `json:"revisions,omitempty" console:"-"`
-	Status                 string                   `json:"status,omitempty" console:"header:Status"`
-	Collection             *HealthCollection        `json:"collection,omitempty" console:"-"`
-	FailureClusters        []FailureCluster         `json:"failure_clusters,omitempty" console:"-"`
-	FailureInvestigation   *FailureInvestigation    `json:"failure_investigation,omitempty" console:"-"`
-	WorkflowName           string                   `json:"workflow_name" console:"header:Workflow"`
-	TotalRuns              int                      `json:"total_runs" console:"-"`
-	SuccessCount           int                      `json:"success_count" console:"-"`
-	FailureCount           int                      `json:"failure_count" console:"-"`
-	DriverExitCount        int                      `json:"driver_exit_count" console:"-"`
-	AgentLogicFailureCount int                      `json:"agent_logic_failure_count" console:"-"`
-	SubagentFailureCount   int                      `json:"subagent_failure_count" console:"header:Sub-agent Failures"`
-	SubagentFailureRuns    int                      `json:"subagent_failure_runs" console:"-"`
-	SubagentFailures       []HealthSubagentFailure  `json:"subagent_failures,omitempty" console:"-"`
-	DetectionFailureRuns   int                      `json:"detection_failure_runs" console:"header:Detection Failure Runs"`
-	DetectionFailures      []HealthDetectionFailure `json:"detection_failures,omitempty" console:"-"`
-	DurableSessions        *HealthDurableSessions   `json:"durable_sessions,omitempty" console:"-"`
-	SuccessRate            float64                  `json:"success_rate" console:"-"`
-	DisplayRate            string                   `json:"-" console:"header:Success Rate"`
-	Trend                  string                   `json:"trend" console:"header:Trend"`
-	AvgDuration            time.Duration            `json:"avg_duration" console:"-"`
-	DisplayDur             string                   `json:"-" console:"header:Avg Duration"`
-	TotalTokens            int                      `json:"total_tokens" console:"-"`
-	AvgTokens              int                      `json:"avg_tokens" console:"-"`
-	DisplayTokens          string                   `json:"-" console:"header:Avg Tokens"`
-	BelowThresh            bool                     `json:"below_threshold" console:"-"`
+	WorkflowPath           string                      `json:"workflow_path,omitempty" console:"-"`
+	Revisions              []HealthRevisionStatus      `json:"revisions,omitempty" console:"-"`
+	Status                 string                      `json:"status,omitempty" console:"header:Status"`
+	Collection             *HealthCollection           `json:"collection,omitempty" console:"-"`
+	FailureClusters        []FailureCluster            `json:"failure_clusters,omitempty" console:"-"`
+	FailureInvestigation   *FailureInvestigation       `json:"failure_investigation,omitempty" console:"-"`
+	WorkflowName           string                      `json:"workflow_name" console:"header:Workflow"`
+	TotalRuns              int                         `json:"total_runs" console:"-"`
+	SuccessCount           int                         `json:"success_count" console:"-"`
+	FailureCount           int                         `json:"failure_count" console:"-"`
+	DriverExitCount        int                         `json:"driver_exit_count" console:"-"`
+	AgentLogicFailureCount int                         `json:"agent_logic_failure_count" console:"-"`
+	SubagentFailureCount   int                         `json:"subagent_failure_count" console:"header:Sub-agent Failures"`
+	SubagentFailureRuns    int                         `json:"subagent_failure_runs" console:"-"`
+	SubagentFailures       []HealthSubagentFailure     `json:"subagent_failures,omitempty" console:"-"`
+	DetectionFailureRuns   int                         `json:"detection_failure_runs" console:"header:Detection Failure Runs"`
+	DetectionFailures      []HealthDetectionFailure    `json:"detection_failures,omitempty" console:"-"`
+	DurableSessions        *HealthDurableSessions      `json:"durable_sessions,omitempty" console:"-"`
+	ContinuationRequests   *HealthContinuationRequests `json:"continuation_requests,omitempty" console:"-"`
+	SuccessRate            float64                     `json:"success_rate" console:"-"`
+	DisplayRate            string                      `json:"-" console:"header:Success Rate"`
+	Trend                  string                      `json:"trend" console:"header:Trend"`
+	AvgDuration            time.Duration               `json:"avg_duration" console:"-"`
+	DisplayDur             string                      `json:"-" console:"header:Avg Duration"`
+	TotalTokens            int                         `json:"total_tokens" console:"-"`
+	AvgTokens              int                         `json:"avg_tokens" console:"-"`
+	DisplayTokens          string                      `json:"-" console:"header:Avg Tokens"`
+	BelowThresh            bool                        `json:"below_threshold" console:"-"`
 	// IntentionalFailure is true when the workflow is tagged with intentional-failure: true.
 	// These workflows are excluded from fleet-health and prod-main success-rate rollups.
 	IntentionalFailure bool `json:"intentional_failure,omitempty" console:"-"`

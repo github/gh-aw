@@ -97,6 +97,9 @@ func renderHealthDurableSessions(w io.Writer, health WorkflowHealth) error {
 }
 
 func renderHealthSessionEvidence(w io.Writer, health WorkflowHealth) error {
+	if err := renderHealthContinuationRequests(w, health); err != nil {
+		return err
+	}
 	if err := renderHealthSubagentFailures(w, health); err != nil {
 		return err
 	}

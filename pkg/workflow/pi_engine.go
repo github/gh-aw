@@ -47,6 +47,7 @@ func NewPiEngine() *PiEngine {
 				ContextWindow:        true,
 				MaxContinuations:     false,
 				WebSearch:            false,
+				WebFetchFallback:     true,
 				NativeAgentFile:      false,
 				BareMode:             true,
 				BashCommandAllowlist: true,

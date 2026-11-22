@@ -512,6 +512,23 @@ async function inspect(repo, pr, runs, api = gh, now = Date.now()) {
 
 const prFields = "number,updatedAt,author,isDraft,state,labels";
 
+async function fetchCommitChecks(repo, head, number, endpoint, field, validItem, api) {
+  const items = [];
+  let total;
+  for (let page = 1; ; page++) {
+    // Link pagination can switch to numeric repository routes rejected by the guard.
+    const response = await api(["api", `repos/${repo}/commits/${head}/${endpoint}&page=${page}`]);
+    const count = response?.total_count;
+    const entries = response?.[field];
+    if (!Number.isSafeInteger(count) || count < 0 || (total !== undefined && count !== total) || !Array.isArray(entries) || entries.length !== Math.min(100, count - items.length) || !entries.every(validItem)) {
+      throw new Error(`PR #${number}: could not refresh ${field}; incomplete or malformed GitHub response (possibly proxy-filtered or changing totals)`);
+    }
+    total = count;
+    items.push(...entries);
+    if (items.length === total) return items;
+  }
+}
+
 export async function fetchCandidate(repo, number, api = gh, now) {
   // The proxy can mistake REST PR labels for the response collection and return [].
   // Use an explicit repository-scoped query, without gh pr view's union fragments.
@@ -563,8 +580,24 @@ export async function fetchCandidate(repo, number, api = gh, now) {
     throw new Error(`PR #${number}: could not refresh head commit activity`);
   }
   metadata.headCommittedAt = head.commit.committer.date;
-  const checkRuns = (await api(["api", `repos/${repo}/commits/${candidate.headRefOid}/check-runs?per_page=100&filter=latest`, "--paginate", "--slurp"])).flatMap(page => page.check_runs);
-  const statuses = (await api(["api", `repos/${repo}/commits/${candidate.headRefOid}/status?per_page=100`, "--paginate", "--slurp"])).flatMap(page => page.statuses);
+  const checkRuns = await fetchCommitChecks(
+    repo,
+    candidate.headRefOid,
+    number,
+    "check-runs?per_page=100&filter=latest",
+    "check_runs",
+    check => typeof check?.name === "string" && check.name.length > 0 && typeof check.status === "string" && check.status.length > 0 && (check.conclusion === null || (typeof check.conclusion === "string" && check.conclusion.length > 0)),
+    api
+  );
+  const statuses = await fetchCommitChecks(
+    repo,
+    candidate.headRefOid,
+    number,
+    "status?per_page=100",
+    "statuses",
+    check => typeof check?.context === "string" && check.context.length > 0 && typeof check.state === "string" && check.state.length > 0,
+    api
+  );
   return {
     ...metadata,
     statusCheckRollup: [

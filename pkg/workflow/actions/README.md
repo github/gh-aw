@@ -19,9 +19,11 @@ The resolver validates output references and job dependencies without changing t
 | `Resolve` | Validates the dependency graph and derives output bindings and `needs` edges. |
 | `Lower`, `LowerStep` | Converts the resolved AST to YAML-compatible values. |
 | `Emit` | Serializes a workflow, retaining source formatting and comments for parsed documents. |
+| `Workflow.OriginalSource` | Returns the originally parsed YAML, or an empty string for constructed workflows; use `Emit` after AST edits. |
 | `EditSource` | Merges semantic changes into authored YAML while retaining unaffected syntax. |
 | `ValidateJob` | Validates one job's native Actions structure. |
 | `RenderExpression` | `func(expr Expression, consumer JobID, resolved *Workflow, wrap bool) (string, error)` renders an expression using resolved output bindings; call `Resolve` first to validate dependencies and populate bindings. |
+| `SourceForInspection` | Emits source-preserving YAML for analysis, allowing typed script interpolation that executable workflow emission rejects. |
 
 Workflow and step IDs are job-scoped. A step can read only outputs from earlier steps in its job, and workflow-level environment values cannot reference job or step outputs.
 

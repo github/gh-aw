@@ -2,8 +2,6 @@
 
 "use strict";
 
-const { fetch: undiciFetch, ProxyAgent } = require("undici");
-
 const DEFAULT_MAX_LENGTH = 5_000;
 const MAX_MAX_LENGTH = 20_000;
 const DEFAULT_TIMEOUT_MS = 30_000;
@@ -130,6 +128,7 @@ function createWebFetchTransport(options) {
   if (options.fetchImpl) {
     return { fetch: options.fetchImpl, close: async () => {} };
   }
+  const { fetch: undiciFetch, ProxyAgent } = require("undici");
   const env = options.env ?? process.env;
   /** @type {Map<string, InstanceType<typeof ProxyAgent>>} */
   const agents = new Map();
@@ -191,11 +190,11 @@ async function executeCopilotSDKWebFetch(input, options = {}) {
   const startIndex = boundedInteger(input.start_index, "start_index", 0, 0, Number.MAX_SAFE_INTEGER);
   const timeoutMs = boundedInteger(options.timeoutMs, "timeoutMs", DEFAULT_TIMEOUT_MS, 1, 5 * 60_000);
   const maxRedirects = boundedInteger(options.maxRedirects, "maxRedirects", MAX_REDIRECTS, 0, 20);
+  let currentURL = parseWebFetchURL(input.url);
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
   timeout.unref?.();
 
-  let currentURL = parseWebFetchURL(input.url);
   let response;
   try {
     for (let redirectCount = 0; ; redirectCount++) {
@@ -245,14 +244,14 @@ function executeCopilotSDKWebFetchToolHandler(input, options) {
 }
 
 /**
- * Create the compiler-controlled web_fetch tool. @github/copilot-sdk 1.0.11
+ * Create the compiler-controlled web_fetch tool. The Copilot SDK
  * explicitly supports replacing a same-name built-in through
  * overridesBuiltInTool. Assert that defineTool preserves the override contract
  * so future incompatible SDK changes fail during session initialization.
  *
- * @param {typeof import("@github/copilot-sdk").defineTool} defineTool
+ * @param {typeof import("@microsoft/copilot-sdk").defineTool} defineTool
  * @param {{fetchImpl?: typeof fetch, env?: NodeJS.ProcessEnv, timeoutMs?: number, maxRedirects?: number}} [options]
- * @returns {import("@github/copilot-sdk").Tool<any>}
+ * @returns {import("@microsoft/copilot-sdk").Tool<any>}
  */
 function createCopilotSDKWebFetchTool(defineTool, options = {}) {
   if (typeof defineTool !== "function") {

@@ -97,6 +97,9 @@ func renderLogsCompactToWriter(writer io.Writer, data LogsData) error {
 	logsCompactLog.Printf("Rendering %d runs in compact format", data.Summary.TotalRuns)
 	w := &compactLogsWriter{writer: writer}
 	renderCompactLogsSummary(w, data.Summary)
+	if err := renderContinuationRequests(w, data.ContinuationRequests); err != nil {
+		return err
+	}
 	if len(data.Runs) == 0 {
 		return w.err
 	}
@@ -142,6 +145,11 @@ func renderCompactLogsSummary(w *compactLogsWriter, s LogsSummary) {
 	}
 	if s.TotalMissingTools > 0 {
 		summaryParts = append(summaryParts, "missing_tools="+strconv.Itoa(s.TotalMissingTools))
+	}
+	if s.TotalContinuationRequests > 0 || s.ContinuationRequestsUnavailableRuns > 0 {
+		summaryParts = append(summaryParts, "continuation_requests="+strconv.Itoa(s.TotalContinuationRequests),
+			"continuation_requested_runs="+strconv.Itoa(s.ContinuationRequestedRuns),
+			"continuation_requests_unavailable_runs="+strconv.Itoa(s.ContinuationRequestsUnavailableRuns))
 	}
 	if s.TotalGitHubAPICalls > 0 {
 		summaryParts = append(summaryParts, "github_api="+strconv.Itoa(s.TotalGitHubAPICalls))
@@ -312,6 +320,9 @@ func renderLogsCompactVerboseToWriter(writer io.Writer, data LogsData) error {
 	logsCompactLog.Printf("Rendering %d runs in verbose compact format", data.Summary.TotalRuns)
 	w := &compactLogsWriter{writer: writer}
 	renderCompactLogsVerboseSummary(w, data.Summary)
+	if err := renderContinuationRequests(w, data.ContinuationRequests); err != nil {
+		return err
+	}
 	if len(data.Runs) == 0 {
 		return w.err
 	}
@@ -352,6 +363,9 @@ func renderLogsCompactVerboseToWriter(writer io.Writer, data LogsData) error {
 }
 
 func renderCompactLogsVerboseSummary(w *compactLogsWriter, s LogsSummary) {
+	if s.TotalContinuationRequests > 0 || s.ContinuationRequestsUnavailableRuns > 0 {
+		w.printf("[continuation_request_summary] requests=%d requested_runs=%d unavailable_runs=%d\n", s.TotalContinuationRequests, s.ContinuationRequestedRuns, s.ContinuationRequestsUnavailableRuns)
+	}
 	// [summary] extended
 	summaryParts := []string{
 		"runs=" + strconv.Itoa(s.TotalRuns),

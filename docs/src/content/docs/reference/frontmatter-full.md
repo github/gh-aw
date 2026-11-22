@@ -3591,7 +3591,7 @@ engine:
 
   # Format 2: object
   copilot-sdk:
-    # Exact stable version of @github/copilot-sdk, independent of engine.version.
+    # Exact stable version of @microsoft/copilot-sdk, independent of engine.version.
     version: "example-value"
 
     # Lowercase SHA-256 of the checked-in manifest, a NUL byte, and the npm lockfile.
@@ -3979,6 +3979,12 @@ engine:
 
       # (optional)
       web-search: true
+
+      # Use the built-in sandboxed web-fetch MCP server when the workflow enables
+      # tools.web-fetch. Requires MCP support and a config adapter that registers the
+      # stdio server.
+      # (optional)
+      web-fetch-fallback: true
 
       # (optional)
       max-continuations: true
@@ -22619,7 +22625,7 @@ safe-outputs:
 
       # Format 2: object
       copilot-sdk:
-        # Exact stable version of @github/copilot-sdk, independent of engine.version.
+        # Exact stable version of @microsoft/copilot-sdk, independent of engine.version.
         version: "example-value"
 
         # Lowercase SHA-256 of the checked-in manifest, a NUL byte, and the npm lockfile.
@@ -23007,6 +23013,12 @@ safe-outputs:
 
           # (optional)
           web-search: true
+
+          # Use the built-in sandboxed web-fetch MCP server when the workflow enables
+          # tools.web-fetch. Requires MCP support and a config adapter that registers the
+          # stdio server.
+          # (optional)
+          web-fetch-fallback: true
 
           # (optional)
           max-continuations: true

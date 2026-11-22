@@ -102,6 +102,16 @@ func (c *Compiler) setupWorkflowBuildContext(ctx *workflowBuildContext) error {
 	if err != nil {
 		return c.formatEngineSetupError(ctx, err)
 	}
+	if _, local := ctx.frontmatter.Frontmatter["runs-on"]; !local && engineSetup.importsResult.MergedRunsOn != nil {
+		runsOn := engineSetup.importsResult.MergedRunsOn
+		if err := validateRunsOnValue(runsOn); err != nil {
+			return c.formatToolsProcessingError(ctx.cleanPath, fmt.Errorf("imported runner configuration: %w", err))
+		}
+		if err := validateRunsOn(map[string]any{"runs-on": runsOn}, ctx.cleanPath); err != nil {
+			return err
+		}
+		ctx.frontmatter.Frontmatter["runs-on"] = runsOn
+	}
 	toolsResult, err := c.processToolsAndMarkdown(
 		ctx.frontmatter,
 		ctx.cleanPath,
@@ -121,6 +131,12 @@ func (c *Compiler) setupWorkflowBuildContext(ctx *workflowBuildContext) error {
 	}
 	if err := c.validateCopilotWebToolsSupport(engineSetup.agenticEngine, ctx.workflowData); err != nil {
 		return c.formatToolsProcessingError(ctx.cleanPath, err)
+	}
+	ctx.workflowData.webFetchFallback = engineSetup.agenticEngine.UsesWebFetchFallback(ctx.workflowData)
+	if usesWebFetchMCP(ctx.workflowData) && !isFirewallEnabled(ctx.workflowData) {
+		return c.formatToolsProcessingError(ctx.cleanPath, NewValidationError(
+			"tools.web-fetch", "web-fetch", "The built-in web fetch MCP server requires the AWF agent sandbox",
+			"Enable the AWF sandbox:\n\nsandbox:\n  agent:\n    id: awf"))
 	}
 	if err := c.validateResolvedEngineEnvSecrets(ctx); err != nil {
 		return c.formatEngineSetupError(ctx, err)

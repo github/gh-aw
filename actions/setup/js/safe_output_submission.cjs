@@ -5,7 +5,7 @@ const { randomUUID } = require("node:crypto");
 
 const OUTPUT_ID_PATTERN = "^so_[A-Za-z0-9_-]{12}$";
 const outputIdRegex = new RegExp(OUTPUT_ID_PATTERN);
-const DEPENDENCY_UNSUPPORTED_TYPES = new Set(["upload_asset", "noop", "call_workflow", "push_repo_memory", "report_incomplete", "report_missing_tool", "report_missing_data"]);
+const DEPENDENCY_UNSUPPORTED_TYPES = new Set(["upload_asset", "noop", "call_workflow", "push_repo_memory", "report_incomplete", "report_missing_tool", "report_missing_data", "request_continuation"]);
 const DELEGATED_EFFECT_TYPES = new Set([...DEPENDENCY_UNSUPPORTED_TYPES, "upload_code_coverage", "dispatch_workflow", "dispatch_repository"]);
 
 /**
@@ -49,7 +49,7 @@ function addDependencySchema(tool) {
   tool.inputSchema.properties ||= {};
   const dependencySchema = {
     description:
-      "One output_id, or a nonempty array of output_id values returned by earlier safe-output calls. Execute only after every prerequisite succeeds; otherwise this output fails. These are not temporary resource IDs. Not supported by noop, report_incomplete, report_missing_tool, report_missing_data, upload_asset, call_workflow, push_repo_memory, or custom safe jobs: omit depends-on on those calls (they are rejected). Do not use ledger output IDs as prerequisites: ledger writes are queued until the later persistence job. Submit related ledger operations sequentially without depends-on; use temporary record IDs for same-batch references.",
+      "One output_id, or a nonempty array of output_id values returned by earlier safe-output calls. Execute only after every prerequisite succeeds; otherwise this output fails. These are not temporary resource IDs. Not supported by noop, request_continuation, report_incomplete, report_missing_tool, report_missing_data, upload_asset, call_workflow, push_repo_memory, or custom safe jobs: omit depends-on on those calls (they are rejected). Do not use ledger output IDs as prerequisites: ledger writes are queued until the later persistence job. Submit related ledger operations sequentially without depends-on; use temporary record IDs for same-batch references.",
     "x-synonyms": ["depends_on"],
     oneOf: [
       { type: "string", pattern: OUTPUT_ID_PATTERN },

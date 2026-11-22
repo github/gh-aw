@@ -3,6 +3,8 @@ private: true
 emoji: "👨‍🍳"
 name: PR Sous Chef
 description: Nudges idle PRs without duplicate agent work and flags CI failures after assigned tasks finish
+# Avoid the ubuntu-latest image on which the MCP gateway could not reach Docker (#80150).
+runs-on: ubuntu-24.04
 max-daily-ai-credits: -1
 on:
   schedule: every 5m

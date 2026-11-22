@@ -26,7 +26,7 @@ The `copilot/` prefix selects the provider and is removed from the model ID pass
 
 With `engine.model-provider: github` and no `model`, `engine.model`, or `engine.model-routing`, the main agent uses [model routing](/gh-aw/reference/model-routing/#default-routing-for-workflows-without-a-model) with `goal: cost` and `mode: auto`, limited to Claude models. A nonempty `GH_AW_MODEL_AGENT_CLAUDE` or `GH_AW_DEFAULT_MODEL_CLAUDE` variable bypasses routing at run time; top-level `model-routing: false` opts out. The native Anthropic route, including `copilot-requests: write` without `model-provider: github`, isn't routed by default.
 
-Native `tools.web-fetch` and `tools.web-search` are unavailable on GitHub Copilot inference because the proxy sets `COPILOT_OFFLINE=true`, even for allowlisted domains. The compiler rejects these tools on this provider. Use `engine.model-provider: anthropic`, or configure an MCP fetch server for `web-fetch` or an MCP search server for `web-search`.
+On GitHub Copilot inference, `tools.web-fetch` uses the built-in MCP server inside AWF. Native web search is unavailable on this provider; use `engine.model-provider: anthropic` or configure an MCP search server.
 
 Copilot writes Claude model versions with a dot (`claude-opus-5.5`), while Anthropic uses hyphenated ids (`claude-opus-5-5`). With GitHub inference, the gh-aw harness maps Anthropic ids to Copilot ids before launching Claude Code, including fixed models, dynamic expressions, and threat-detection models. Dotted ids and major-only ids such as `claude-sonnet-5` remain unchanged; Anthropic inference keeps its native ids.
 

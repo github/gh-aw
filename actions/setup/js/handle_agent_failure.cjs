@@ -4531,9 +4531,9 @@ async function main() {
         hasMissingSafeOutputs = true;
         core.info("Agent succeeded but produced no safe outputs");
       } else {
-        // Check if all outputs are noop types
-        const nonNoopItems = agentOutputResult.items.filter(item => item.type !== "noop");
-        if (nonNoopItems.length === 0) {
+        const hasNoopOutput = agentOutputResult.items.some(item => item.type === "noop");
+        const taskOutputItems = agentOutputResult.items.filter(item => item.type !== "noop" && item.type !== "request_continuation");
+        if (taskOutputItems.length === 0 && hasNoopOutput) {
           hasOnlyNoopOutputs = true;
           core.info("Agent succeeded with only noop outputs - this is not a failure");
         }
@@ -4544,11 +4544,12 @@ async function main() {
       // causing exit code 1. In that case we should not report a failure issue since the
       // agent completed its intended work.
       if (agentOutputResult.success && agentOutputResult.items && agentOutputResult.items.length > 0) {
-        const nonNoopItems = agentOutputResult.items.filter(item => item.type !== "noop");
-        if (nonNoopItems.length === 0) {
+        const hasNoopOutput = agentOutputResult.items.some(item => item.type === "noop");
+        const taskOutputItems = agentOutputResult.items.filter(item => item.type !== "noop" && item.type !== "request_continuation");
+        if (taskOutputItems.length === 0 && hasNoopOutput) {
           hasOnlyNoopOutputs = true;
           core.info("Agent failed with exit code 1 but produced only noop outputs - treating as successful no-action (transient AI model error)");
-        } else if (!nonNoopItems.some(item => item.type === "report_incomplete" && !isTaskCompleteRegistrationIssue(item))) {
+        } else if (taskOutputItems.length > 0 && !taskOutputItems.some(item => item.type === "report_incomplete" && !isTaskCompleteRegistrationIssue(item))) {
           // The agent produced valid non-noop safe outputs (e.g. create_discussion) but the
           // job exit code is non-zero. If terminal_reason: completed is present in the log,
           // the failure was a transient error after the agent finished its task — do not report

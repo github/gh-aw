@@ -21,14 +21,6 @@ safe-outputs:
 
 ## PR Code Review Configuration
 
-This shared component provides the standard tooling for AI pull request code review agents.
-
-### Available Tools
-
-- **GitHub PR tools** — Access PR diffs, file changes, review threads, and check runs
-
-### Review Guidelines
-
-1. **Use pre-fetched diff** — Read `/tmp/gh-aw/agent/pr-diff.patch` instead of calling `get_diff`; it is already capped to prevent token-heavy context payloads.
-2. **Use pre-fetched review comments** — Read `/tmp/gh-aw/agent/pr-review-comments.json` instead of calling `get_review_comments`; check this file before posting new comments to avoid duplication.
-3. **Submit as a unified review** — Batch comments and call `submit-pull-request-review` once with an overall assessment.
+- Read `/tmp/gh-aw/agent/pr-diff.patch` instead of calling `get_diff`; it is capped to bound context.
+- Read `/tmp/gh-aw/agent/pr-review-comments.json` instead of calling `get_review_comments`; avoid duplicate comments.
+- Batch findings into one unified review and submit it once.

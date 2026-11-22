@@ -127,16 +127,12 @@ func extractLogsStaleWarning(outputStr string) string {
 	return parsed.StaleWarning
 }
 
-// buildLogsFileResponse writes the logs JSON output to a content-addressed cache
+// buildLogsFileResponseWithCache writes the logs JSON output to a content-addressed cache
 // file and returns a JSON response containing the file path.
 // The file is named by the SHA256 hash of its content so that identical results
 // are deduplicated — if the file already exists it is not rewritten.
 // The cache directory is kept separate from the artifact download directory so
 // these summary files are never included in artifact uploads.
-func buildLogsFileResponse(outputStr string) string {
-	return buildLogsFileResponseWithCache(outputStr, defaultMCPLogsCache.store)
-}
-
 func buildLogsFileResponseWithCache(outputStr string, store func(string) (string, error)) string {
 	filePath, err := store(outputStr)
 	if err != nil {

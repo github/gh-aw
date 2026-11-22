@@ -62,19 +62,19 @@ cp "$project/package.json" "$project/package-lock.json" .
 
 if [[ -n "$version" ]]; then
   verify_project_digest .
-  if ! jq -e --arg version "$version" '.dependencies["@github/copilot-sdk"] == $version' package.json >/dev/null ||
+  if ! jq -e --arg version "$version" '.dependencies["@microsoft/copilot-sdk"] == $version' package.json >/dev/null ||
      ! jq -e --arg version "$version" '
        .lockfileVersion == 3 and
-       .packages[""].dependencies["@github/copilot-sdk"] == $version and
-       .packages["node_modules/@github/copilot-sdk"].version == $version and
+       .packages[""].dependencies["@microsoft/copilot-sdk"] == $version and
+       .packages["node_modules/@microsoft/copilot-sdk"].version == $version and
        all(.packages | to_entries[] | select(.key != "");
          (.key | startswith("node_modules/")) and
          (.value.link != true) and
          (.value.resolved | startswith("https://registry.npmjs.org/")) and
          (.value.integrity | test("^sha512-[A-Za-z0-9+/]{86}==$")))
      ' package-lock.json >/dev/null; then
-    echo "::error::Expected a registry-only npm v3 lockfile with SHA-512 integrity and @github/copilot-sdk@$version" >&2
+    echo "::error::Expected a registry-only npm v3 lockfile with SHA-512 integrity and @microsoft/copilot-sdk@$version" >&2
     exit 1
   fi
 fi
-npm ci --prefix "$target" --ignore-scripts --no-audit --no-fund
+npm ci --ignore-scripts --no-audit --no-fund

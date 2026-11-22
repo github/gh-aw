@@ -13671,6 +13671,27 @@
             }
           }
         },
+        "request-continuation": {
+          "description": "Opt-in metadata-only request for follow-up work. Does not resume work or dispatch a workflow.",
+          "oneOf": [
+            {
+              "type": "object",
+              "properties": {
+                "authorization": { "$ref": "#/$defs/safeOutputAuthorization" },
+                "max": {
+                  "description": "Maximum number of continuation requests (default: 1).",
+                  "oneOf": [
+                    { "type": "integer", "minimum": 1 },
+                    { "type": "string", "pattern": "^\\$\\{\\{.*\\}\\}$" }
+                  ]
+                }
+              },
+              "additionalProperties": false
+            },
+            { "type": "null" },
+            { "type": "boolean" }
+          ]
+        },
         "report-incomplete": {
           "oneOf": [
             {
@@ -16114,7 +16135,7 @@
                     "version": {
                       "type": "string",
                       "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$",
-                      "description": "Exact stable version of @github/copilot-sdk, independent of engine.version."
+                      "description": "Exact stable version of @microsoft/copilot-sdk, independent of engine.version."
                     },
                     "sha256": {
                       "type": "string",
@@ -16526,6 +16547,10 @@
                     },
                     "web-search": {
                       "type": "boolean"
+                    },
+                    "web-fetch-fallback": {
+                      "type": "boolean",
+                      "description": "Use the built-in sandboxed web-fetch MCP server when the workflow enables tools.web-fetch. Requires MCP support and a config adapter that registers the stdio server."
                     },
                     "max-continuations": {
                       "type": "boolean"

@@ -710,13 +710,22 @@ func TestAuditEngineStepFailure_EvalsSummaryRerunCountsAuditedAttempt(t *testing
 }
 
 func TestAuditEngineStepFailure_EvalsSummaryFlattenedPrefixedArtifact(t *testing.T) {
+	for _, prefix := range []string{"aaaaaaaa-", "call-12345678901-"} {
+		t.Run(prefix, func(t *testing.T) {
+			testEvalsSummaryFlattenedPrefixedArtifact(t, prefix)
+		})
+	}
+}
+
+func testEvalsSummaryFlattenedPrefixedArtifact(t *testing.T, prefix string) {
+	t.Helper()
 	runDir := t.TempDir()
 	writeEngineStepFixture(t, runDir, map[string]string{
 		jobsAPIResponseFileName:              reusableEvalsJobs40955414354,
-		"workflow-logs/3_caller _ evals.txt": evalsUploadJobLog("aaaaaaaa-"),
-		// The single-file aaaaaaaa-evals artifact was flattened to the run root.
+		"workflow-logs/3_caller _ evals.txt": evalsUploadJobLog(prefix),
+		// The single-file evals artifact was flattened to the run root.
 		"evals.jsonl":                evalsPreflightResults40955414354,
-		"aaaaaaaa-usage/evals.jsonl": evalsPreflightResults40955414354,
+		prefix + "usage/evals.jsonl": evalsPreflightResults40955414354,
 	})
 	processedRun := engineStepFixtureRun(t, runDir, 40955414354, "Reusable Evals", "success")
 
@@ -726,7 +735,7 @@ func TestAuditEngineStepFailure_EvalsSummaryFlattenedPrefixedArtifact(t *testing
 	assert.Equal(t, EvalsSummary{Questions: 2, Unknown: 2}, *summary, "the flattened root copy is not counted as another invocation")
 
 	t.Run("root copy is used when it is the only copy", func(t *testing.T) {
-		require.NoError(t, os.RemoveAll(filepath.Join(runDir, "aaaaaaaa-usage")))
+		require.NoError(t, os.RemoveAll(filepath.Join(runDir, prefix+"usage")))
 
 		summary := buildEvalsSummary(processedRun.Run)
 

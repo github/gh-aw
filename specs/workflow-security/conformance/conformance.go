@@ -48,6 +48,7 @@ type report struct {
 }
 
 var pinnedAction = regexp.MustCompile(`^[^@]+@[0-9a-f]{40}$`)
+var pinnedDockerAction = regexp.MustCompile(`^docker://[A-Za-z0-9][A-Za-z0-9._:/-]*@sha256:[0-9a-f]{64}$`)
 
 func dependencies(node yaml.Node) ([]string, error) {
 	switch node.Kind {
@@ -128,7 +129,11 @@ func verify(doc document, profile string) []string {
 	violations = append(violations, checkArtifacts(doc)...)
 	for name, j := range doc.Jobs {
 		for _, s := range j.Steps {
-			if s.Uses != "" && !strings.HasPrefix(s.Uses, "./") && !pinnedAction.MatchString(s.Uses) {
+			pinned := pinnedAction.MatchString(s.Uses)
+			if strings.HasPrefix(s.Uses, "docker://") {
+				pinned = pinnedDockerAction.MatchString(s.Uses)
+			}
+			if s.Uses != "" && !strings.HasPrefix(s.Uses, "./") && !pinned {
 				violations = append(violations, "TrustedConfiguration: unpinned action in "+name)
 			}
 		}

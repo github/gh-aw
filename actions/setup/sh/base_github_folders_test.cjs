@@ -95,6 +95,20 @@ test("save: empty or unset lists remove stale snapshot; reruns replace old conte
   assert.equal(f.read(".github/new.md"), "trusted");
 });
 
+test("save: SDK agents are staged separately from the execution checkout", t => {
+  const f = fixture(t);
+  f.write(".github/agents/reader.agent.md", "Base version.");
+  f.write(".github/agents/notes.md", "Not an SDK agent.");
+  const staged = path.join(f.base, "copilot-agents");
+  f.run("save", { env: { GH_AW_STAGE_COPILOT_SDK_AGENTS: "true" } });
+  f.write(".github/agents/reader.agent.md", "Checkout version.");
+  f.write(".github/agents/new.agent.md", "Checkout only.");
+  assert.deepEqual(fs.readdirSync(staged), ["reader.agent.md"]);
+  assert.equal(fs.readFileSync(path.join(staged, "reader.agent.md"), "utf8"), "Base version.");
+  f.run("save");
+  assert.equal(fs.existsSync(staged), false);
+});
+
 test("save: root instruction symlinks are materialized with trusted mode", t => {
   const f = fixture(t);
   f.write("INSTRUCTIONS.md", "trusted", 0o600);

@@ -487,6 +487,12 @@ var ValidationConfig = map[string]TypeValidationConfig{
 			"message": {Required: true, Type: "string", Sanitize: true, MaxLength: MaxBodyLength},
 		},
 	},
+	"request_continuation": {
+		DefaultMax: 1,
+		Fields: map[string]FieldValidation{
+			"message": {Required: true, Type: "string", Sanitize: true, MaxLength: MaxBodyLength},
+		},
+	},
 	"create_code_scanning_alert": {
 		DefaultMax: 40,
 		Fields: map[string]FieldValidation{

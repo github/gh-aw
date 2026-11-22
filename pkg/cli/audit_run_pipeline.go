@@ -317,6 +317,13 @@ func renderCachedAuditIfAvailable(ctx context.Context, cfg auditRunConfig) (done
 		}
 		return false, false, nil
 	}
+	if auditNeedsContinuationAgentOutput(cfg) {
+		auditLog.Printf("Cache miss for run %d continuation requests: requested agent output is not present locally, bypassing cache", cfg.runID)
+		if err := invalidateAgentOutputDownloadMarkers(cfg.outputDir); err != nil {
+			return false, false, err
+		}
+		return false, false, nil
+	}
 	if downloaded, err := downloadRegisteredCustomGraders(ctx, cfg); err != nil {
 		return false, false, err
 	} else if downloaded {
@@ -332,6 +339,31 @@ func invalidateCompleteArtifactDownloadMarker(runOutputDir string) error {
 		return fmt.Errorf("failed to invalidate complete artifact download marker: %w", err)
 	}
 	return nil
+}
+
+func invalidateAgentOutputDownloadMarkers(runOutputDir string) error {
+	if err := invalidateCompleteArtifactDownloadMarker(runOutputDir); err != nil {
+		return err
+	}
+	for _, artifact := range []string{constants.AgentArtifactName.String(), constants.AgentOutputFallbackArtifactName.String()} {
+		markerPath := filepath.Join(runOutputDir, downloadedArtifactsMarkerDir, artifact)
+		if err := os.Remove(markerPath); err != nil && !errors.Is(err, os.ErrNotExist) {
+			return fmt.Errorf("failed to invalidate %s download marker: %w", artifact, err)
+		}
+	}
+	return nil
+}
+
+// auditNeedsContinuationAgentOutput reports whether explicitly requested agent output
+// is absent locally. Only sets that request agent output (agent, outcomes, graders)
+// include the fallback artifact; sets that use the agent artifact for logs
+// (work-queue, mcp, firewall) and default all-artifact audits keep the cache.
+func auditNeedsContinuationAgentOutput(cfg auditRunConfig) bool {
+	if len(cfg.artifactFilter) == 0 || !artifactMatchesFilter(constants.AgentOutputFallbackArtifactName.String(), cfg.artifactFilter) {
+		return false
+	}
+	return resolveAgentOutputFile(cfg.outputDir, false) == "" &&
+		len(findMissingFilterEntries(cfg.artifactFilter, cfg.outputDir)) > 0
 }
 
 func auditNeedsDetectionArtifact(cfg auditRunConfig, summary *RunSummary) bool {
@@ -353,6 +385,7 @@ func auditNeedsDetectionArtifact(cfg auditRunConfig, summary *RunSummary) bool {
 }
 
 func processedRunFromSummary(summary *RunSummary, runOutputDir string) ProcessedRun {
+	backfillContinuationRequests(&summary.ContinuationRequests, summary.Run, runOutputDir, false)
 	backfillWorkQueueReport(&summary.WorkQueue, runOutputDir)
 	if summary.Ledger == nil {
 		if activity, err := loadUsageActivitySummary(runOutputDir); err == nil && activity != nil {
@@ -378,6 +411,7 @@ func processedRunFromSummary(summary *RunSummary, runOutputDir string) Processed
 		MissingTools:            summary.MissingTools,
 		MissingData:             summary.MissingData,
 		Noops:                   summary.Noops,
+		ContinuationRequests:    summary.ContinuationRequests,
 		MCPFailures:             summary.MCPFailures,
 		SkillActivations:        summary.SkillActivations,
 		GatewaySteeringEvents:   gatewaySteeringEvents,
