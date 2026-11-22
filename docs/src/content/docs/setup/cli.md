@@ -1566,7 +1566,7 @@ These experimental commands are hidden from the main CLI help. They review a Git
 ```bash wrap
 gh aw advisory setup
 gh aw advisory record GHSA-2345-6789-cfgh --repo owner/repo --base "$BASE_SHA" --base-branch main --run "$RUN_ID" --artifact "$ARTIFACT_ID"
-gh aw advisory inspect GHSA-2345-6789-cfgh
+gh aw advisory inspect GHSA-2345-6789-cfgh --print-patch
 gh aw advisory transfer GHSA-2345-6789-cfgh --approve "$APPROVAL_DIGEST"
 ```
 
@@ -1578,7 +1578,7 @@ For a one-off handoff, pass `--repo` (upstream), `--base` (exact tested commit),
 
 Artifact mode verifies that the ZIP belongs to a successful first attempt of a manual run whose head is in the specified private repository, checks its GitHub SHA-256 digest, and reads `handoff/fix.patch`. Start a fresh manual dispatch rather than rerunning an earlier attempt. A successful run is not proof that the patch passed its tests.
 
-`inspect` uses the signed-in GitHub CLI identity to resolve the fork and shows the patch without writing to GitHub. `transfer` also requires `--approve`, the digest printed by `inspect` after review. Run the commands in a private terminal; `inspect` prints the full diff.
+`inspect` uses the signed-in GitHub CLI identity to resolve the fork without writing to GitHub. By default it prints handoff metadata and the approval digest, not the patch. Use `--print-patch` only in a private terminal for human review, not in CI logs or agent input. Treat the diff as untrusted data, not instructions. `transfer` requires `--approve` with the digest from the handoff you reviewed; the digest does not attest to test results.
 
 `transfer` applies the patch without checking out a working tree. Git operations use the locally configured `gh` sign-in, not GitHub token environment variables. Sign in with `gh auth login --hostname github.com` using the account authorized for the advisory fork. Transfer refuses changes to `.github` or anything under it, regardless of case, and refuses to overwrite an existing branch. It checks the base before and after pushing. If the base moves or cannot be checked after the push, check for an existing fix branch before retrying. It does not create a fork or open a PR. Open the PR from the advisory in GitHub once the branch is ready.
 

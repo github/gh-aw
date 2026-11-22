@@ -14,7 +14,7 @@ GitHub does not run Actions or PR status checks in temporary private advisory fo
 
 Use a bounded text patch rather than a live branch or an automatically opened PR. A trusted manual workflow in the private side repository checks out the pinned upstream commit with read-only access and produces a short-retention artifact containing `handoff/fix.patch` and review notes.
 
-The experimental `gh aw advisory inspect` command verifies that the artifact belongs to the successful first attempt of a manual run in the specified private repository and that the downloaded archive matches GitHub's SHA-256 digest. It resolves the existing temporary private fork from the unpublished advisory and displays the patch and an approval digest. That digest binds the patch bytes, source identifiers, base, fork identity, and destination branch.
+The experimental `gh aw advisory inspect` command verifies that the artifact belongs to the successful first attempt of a manual run in the specified private repository and that the downloaded archive matches GitHub's SHA-256 digest. It resolves the existing temporary private fork from the unpublished advisory and displays handoff metadata and an approval digest. The raw diff requires `--print-patch` for human review in a private terminal; display markers do not make its contents trusted. The digest binds the patch bytes, source identifiers, base, fork identity, and destination branch.
 
 If the advisory does not already have a temporary private fork, the maintainer can explicitly request one with `gh aw advisory record --create-fork`. The command verifies the source artifact before requesting the fork and waits for GitHub to confirm the advisory association before saving the record.
 

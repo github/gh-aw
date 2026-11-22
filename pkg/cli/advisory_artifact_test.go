@@ -87,7 +87,7 @@ esac
 			}
 			require.NoError(t, err)
 			require.Contains(t, output.String(), "Verified source: owner/side, run 10, artifact 20")
-			require.Contains(t, output.String(), "+reviewed change")
+			require.NotContains(t, output.String(), "+reviewed change")
 			require.Regexp(t, `Approval digest: [a-f0-9]{64}`, output.String())
 		})
 	}
@@ -115,6 +115,10 @@ esac
 		require.NoError(t, err)
 		require.Contains(t, output, "New branch: advisory/ghsa-2345-6789-cfgh")
 		require.Contains(t, output, "Verified source: owner/gh-aw-advisories, run 10, artifact 20")
+		require.NotContains(t, output, "+reviewed change")
+		withPatch, err := run("inspect", advisoryTestID, "--print-patch")
+		require.NoError(t, err)
+		require.Contains(t, withPatch, "--- BEGIN UNTRUSTED PATCH ---\ndiff --git a/file b/file\n+reviewed change\n--- END UNTRUSTED PATCH ---")
 		second, err := run("inspect", "GHSA-2345-6789-jmpq")
 		require.NoError(t, err)
 		require.Contains(t, second, "Private fork: owner/other-fork")

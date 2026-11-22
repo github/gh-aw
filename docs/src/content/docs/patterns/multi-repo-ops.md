@@ -119,7 +119,7 @@ that passed. Ask the maintainer to review both files before transfer.
 Use `upload_artifact` to upload the `handoff` directory only.
 ```
 
-Use the artifact link in the run summary to identify the artifact ID and review the test notes. Artifact handoff requires a successful first attempt; start a fresh manual dispatch instead of rerunning an earlier attempt. The patch and test notes are agent output, not a test attestation. Review them and independently verify the fix as needed. The approval digest binds the source identity, patch bytes, and fork destination at handoff; it does not replace that review.
+Use the artifact link in the run summary to identify the artifact ID and review the test notes. Artifact handoff requires a successful first attempt; start a fresh manual dispatch instead of rerunning an earlier attempt. Review the patch with `gh aw advisory inspect <GHSA-ID> --print-patch` in a private terminal. Do not send the untrusted diff to agents or logs. The approval digest binds the source identity, patch bytes, and fork destination; it does not replace review or independent verification.
 
 The generic PR transfer command is not an advisory handoff command: it can create a normal fork and open a PR. Likewise, the [security advisory safe outputs](/gh-aw/reference/safe-outputs/#security-advisory-drafts-create-security-advisory) target the workflow repository, not the upstream repository or its temporary private fork.
 
