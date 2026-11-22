@@ -138,6 +138,7 @@ const HANDLER_MAP = {
   ledger_mutation: "./ledger_mutation.cjs",
   noop: "./noop_handler.cjs",
   report_incomplete: "./report_incomplete_handler.cjs",
+  request_continuation: "./request_continuation_handler.cjs",
   create_report_incomplete_issue: "./create_report_incomplete_issue.cjs",
   create_project: "./create_project.cjs",
   create_project_status_update: "./create_project_status_update.cjs",
@@ -151,10 +152,10 @@ const HANDLER_MAP = {
  * Message types handled by standalone steps (not through the handler manager)
  * These types should not trigger warnings when skipped by the handler manager
  *
- * Standalone types: upload_asset, noop
+ * Standalone types: upload_asset, noop, request_continuation
  *   - Have dedicated processing steps with specialized logic
  */
-const STANDALONE_STEP_TYPES = new Set(["upload_asset", "noop"]);
+const STANDALONE_STEP_TYPES = new Set(["upload_asset", "noop", "request_continuation"]);
 
 /**
  * Code-push safe output types whose failures are tracked for later comment annotations
@@ -261,6 +262,7 @@ const THREAT_WARNING_REVIEWABLE_TYPES = new Set([
   "ledger_mutation",
   "create_report_incomplete_issue",
   "report_incomplete",
+  "request_continuation",
 ]);
 
 /**
@@ -860,7 +862,7 @@ async function initializeHandlers(config, prReviewBufferRegistry, resolvedAllowe
             }
           }
           const loadedHandler = factoryClaim ? authorizedHandler : bindHandlerToFactoryScope(executable);
-          if (type === "report_incomplete") localDiagnosticHandlers.add(loadedHandler);
+          if (type === "report_incomplete" || type === "request_continuation") localDiagnosticHandlers.add(loadedHandler);
           messageHandlers.set(type, loadedHandler);
           core.info(`✓ Loaded and initialized handler for: ${type}`);
         } else {
@@ -1731,7 +1733,9 @@ async function processMessages(messageHandlers, messages, onItemCreated = null, 
       return;
     }
 
-    const messageHandler = messageHandlers.get(messageType);
+    // Ordinary continuation requests are recorded once in conclusion; Claims
+    // retain their scoped diagnostic handler rather than an anonymous replay.
+    const messageHandler = messageType === "request_continuation" && !currentClaimHandle() ? undefined : messageHandlers.get(messageType);
 
     if (!messageHandler) {
       // Check if this message type is handled by a standalone step

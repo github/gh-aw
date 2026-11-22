@@ -212,6 +212,7 @@ approved resource arguments, staging, and migration limitations.
 | Output | Key | Description |
 |--------|-----|-------------|
 | [No-Op](#no-op-logging-noop) | `noop` | Log completion messages for transparency (max: 2, same-repo only) |
+| [Continuation Request](#continuation-requests-request-continuation) | `request-continuation` | Record remaining work for follow-up without dispatching a workflow (max: 1) |
 | [Missing Tool](#missing-tool-reporting-report-missing-tool) | `report-missing-tool` | Report missing tools (max: unlimited, same-repo only) |
 | [Missing Data](#missing-data-reporting-report-missing-data) | `report-missing-data` | Report missing data required to achieve goals (max: unlimited, same-repo only) |
 | [Create Issue](#issue-creation-create-issue) | `create-issue` | Auto-injected when no `safe-outputs:` section is present or when only system types (`noop`, `report-missing-tool`, `report-missing-data`) are configured (max: 1, labels and title-prefix set to workflow ID). |
@@ -1443,7 +1444,11 @@ The unified session records the recommendation separately as
 proof of task completion or zero model usage: the decision request itself may
 consume AI credits.
 
-The `[aw] No-Op Runs` tracker and no-op sections of completion status comments omit agent messages and reuse the same categorized body. For runs with only no-op outputs, `reported_no_action` means the agent succeeded and reported no action; it does not independently verify task completion or publication readiness. `incomplete` means the agent failed despite emitting a no-op. An explicit `report_incomplete` also makes reusable tracking comments `incomplete`, while its failure report remains separate from the no-op tracker. The existing failure-policy exception for task-complete registration diagnostics also applies: registration-only reports are ignored only with terminal completion evidence and real task-level outputs. Other agent conclusions remain `unconfirmed` and are not posted to the tracker. Categories use run status and the existing incomplete-report policy, not interpretation of no-op prose. Existing tracker comments are not rewritten.
+The `[aw] No-Op Runs` tracker and completion status comments can include the same categorized no-op body. The tracker omits agent messages. Completion status comments can also show the agent's `noop` message and the reasons from `report_incomplete`, `report_missing_tool`, and `report_missing_data`. A `noop` output alone can trigger threat detection.
+
+Completion status comments show agent explanations only after a clean threat detection verdict. They omit explanations when detection is skipped or disabled, staging is enabled globally or for the diagnostic, or the diagnostic requires explicit authorization. They mask recognized credentials and omit explanations flagged by additional credential checks. The run status still appears.
+
+For runs with only no-op outputs, `reported_no_action` means the agent succeeded and reported no action; it does not independently verify task completion or publication readiness. `incomplete` means the agent failed despite emitting a no-op. An explicit `report_incomplete` also makes reusable tracking comments `incomplete`, while its failure report remains separate from the no-op tracker. The existing failure-policy exception for task-complete registration diagnostics also applies: registration-only reports are ignored only with terminal completion evidence and real task-level outputs. Other agent conclusions remain `unconfirmed` and are not posted to the tracker. Categories use run status and the existing incomplete-report policy, not interpretation of no-op prose. Existing tracker comments are not rewritten.
 
 If GitHub rejects a tracker comment because the issue has reached its 2,500-comment limit, the handler posts to a replacement `[aw] No-Op Runs` issue, creating one if needed, then closes the full tracker as completed. Later runs select the newest open tracker. Posting or closing failures are logged as warnings without failing the workflow.
 
@@ -1455,6 +1460,22 @@ Up to two `noop` calls are accepted by default (`max: 2`), since an agent's firs
 If no action is needed, you MUST call the `noop` tool with a message explaining why:
 {"noop": {"message": "No action needed: [brief explanation]"}}
 ```
+
+### Continuation Requests (`request-continuation:`)
+
+Opt-in diagnostic tool for recording useful work that remains beyond the current run's budget.
+
+```yaml wrap
+safe-outputs:
+  request-continuation:
+    max: 1
+```
+
+The `request_continuation` tool accepts a required nonempty `message` describing the remaining work and relevant context. Its default limit is one request per run. Requests appear in workflow logs and step summaries, but are excluded from GitHub mutation manifests and activity notifications, like `noop`. Completion status comments follow the same publication rules for continuation messages as for no-op messages.
+
+A request does not dispatch another workflow, resume an engine session, or prove task completion. It is separate from Copilot's `engine.max-continuations` autopilot setting and artifact-backed durable sessions. Use `noop` when no work remains and `report_incomplete` for blocking failures.
+
+`gh aw audit` and `gh aw logs` expose `continuation_requests` with run and experiment provenance. `gh aw logs --safe-output request-continuation` selects runs containing requests. `gh aw health` summarizes cached requests and affected runs separately from Actions conclusions; missing cached evidence is not evidence of zero requests. Include the `agent` artifact set when collecting evidence, for example `gh aw audit <run-id> --artifacts agent`.
 
 ### Missing Tool Reporting (`report-missing-tool:`)
 

@@ -359,7 +359,7 @@ The reporter requires `aw_info.run_attempt` to equal the current attempt. Rerunn
 
 The current git-backed CLI cannot analyze broker records. Operators need a deployment-owned analysis/export facility; such a facility is outside this protocol and must preserve assignment attribution, missingness, and observation trust labels.
 
-Reusable-workflow invocation hints reuse the existing artifact prefix, which hashes inputs and attempt. Repeated calls with identical inputs within the same attempt therefore remain unsupported: they do not have distinct artifact/invocation hints. Operators must not assume those calls have isolated assignments or reports. The hint is not an attestation; a deployment lacking trusted evidence to distinguish supported invocations must deny them rather than use an unverified hash as authority.
+Reusable-workflow invocation hints use the artifact prefix, which is derived from the activation job's check run ID. Repeated calls with identical inputs have distinct prefixes in newly compiled workflows. Older compiled workflows that hash inputs and attempt do not distinguish those calls. The hint is not an attestation; a deployment lacking trusted evidence to distinguish invocations must deny them rather than use an unverified hint as authority.
 
 ### Appendix C: Security and privacy considerations (normative)
 

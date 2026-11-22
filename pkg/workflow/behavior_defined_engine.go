@@ -71,6 +71,9 @@ func NewBehaviorDefinedEngine(def *EngineDefinition) (*BehaviorDefinedEngine, er
 	if def.MCP != nil {
 		capabilities.MCP = *def.MCP
 	}
+	if capabilities.WebFetchFallback && (!capabilities.MCP || def.Behaviors.MCP == nil || def.Behaviors.MCP.ConfigAdapter == "") {
+		return nil, fmt.Errorf("engine definition %q enables web-fetch-fallback without MCP support and a config-adapter", def.ID)
+	}
 
 	engine := &BehaviorDefinedEngine{
 		id:               def.ID,

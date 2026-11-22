@@ -426,8 +426,8 @@ Uses imported web-fetch tool.
 		t.Fatalf("Failed to read lock file: %v", err)
 	}
 
-	if !strings.Contains(string(lockFileContent), `"webFetch":true`) {
-		t.Error("Expected imported web-fetch to enable the SDK custom tool")
+	if !strings.Contains(string(lockFileContent), "export GH_AW_WEB_FETCH_MCP=1") {
+		t.Error("Expected imported web-fetch to enable the MCP fallback")
 	}
 }
 
@@ -678,8 +678,8 @@ Uses all imported neutral tools.
 		t.Error("Expected compiled workflow to contain --allow-all-paths flag for edit tool")
 	}
 
-	if !strings.Contains(workflowData, `"webFetch":true`) {
-		t.Error("Expected imported web-fetch to enable the SDK custom tool")
+	if !strings.Contains(workflowData, "export GH_AW_WEB_FETCH_MCP=1") {
+		t.Error("Expected imported web-fetch to enable the MCP fallback")
 	}
 
 	// Verify timeout is configured (120 seconds)

@@ -1511,14 +1511,14 @@
   },
   {
     "name": "upload_asset",
-    "description": "Upload a file as a URL-addressable asset that can be referenced in issues, PRs, or comments. The file is stored on an orphaned git branch and returns a permanent URL. Use this for images, diagrams, or other files that need to be embedded in GitHub content.",
+    "description": "Upload a file as a URL-addressable asset that can be referenced in issues, PRs, or comments. The file is stored on an orphaned git branch and returns a permanent URL. Use this for images and diagrams that need to be embedded in GitHub content. Only image extensions are accepted unless the workflow configures more; non-image files (for example .csv, .json, .md, .txt, .pdf) are rejected with \"File extension ... is not allowed\". For tabular or text data, embed it inline in the report body, or use upload_artifact if it is available.",
     "inputSchema": {
       "type": "object",
       "required": ["path"],
       "properties": {
         "path": {
           "type": "string",
-          "description": "Absolute file path to upload (e.g., '/tmp/chart.png'). Must be under the workspace or /tmp directory. By default, only image files (.png, .jpg, .jpeg) are allowed; other file types require workflow configuration."
+          "description": "Absolute file path to upload (e.g., '/tmp/chart.png'). Must be under the workspace or /tmp directory. By default, only image files (.png, .jpg, .jpeg) are allowed; a workflow may configure a different extension list (for example adding .svg). Any other extension, such as .csv, .json, .md or .txt, fails validation, so do not call this tool for non-image files."
         },
         "secrecy": {
           "type": "string",
@@ -1669,6 +1669,24 @@
         "integrity": {
           "type": "string",
           "description": "Trustworthiness level of the message source (e.g., \"low\", \"medium\", \"high\")."
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "request_continuation",
+    "description": "Record a request for follow-up work with the reason and task to continue in message. This is metadata only: it does not dispatch a workflow, resume work, or confirm that a continuation occurred. It does not mark the current task completed.",
+    "inputSchema": {
+      "type": "object",
+      "required": ["message"],
+      "properties": {
+        "message": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S",
+          "maxLength": 65536,
+          "description": "Nonempty reason for requesting follow-up and the task to continue."
         }
       },
       "additionalProperties": false

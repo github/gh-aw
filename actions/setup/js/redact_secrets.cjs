@@ -17,7 +17,19 @@ const { maskedValueMatches, overlappingMatchGroups } = require("./mask_value_mat
 const { redactSafeOutputContent } = require("./safe_output_redaction.cjs");
 const { redactPiSessionHTML } = require("./pi_session_redaction.cjs");
 const { getOTLPSecretValues } = require("./otlp_header_helpers.cjs");
-const { redactSensitiveConfig } = require("./safe_outputs_config_redact.cjs");
+const { isSensitiveConfigKey, redactSensitiveConfig } = require("./safe_outputs_config_redact.cjs");
+
+/**
+ * Heuristic screening, not a guarantee that arbitrary text is secret-free.
+ * @param {string} text
+ * @param {string[]} [secretValues]
+ * @returns {boolean}
+ */
+function containsSensitiveContent(text, secretValues = []) {
+  if (redactBuiltInPatterns(text).redactionCount || redactSecrets(text, secretValues).redactionCount) return true;
+  if (/-----BEGIN (?:[A-Z0-9]+ )*PRIVATE KEY-----/.test(text) || /\bASIA[0-9A-Z]{16}\b/.test(text) || /\bBearer\s+[A-Za-z0-9._~+/-]+=*/i.test(text)) return true;
+  return [...text.matchAll(/(?:^|[\s{,])["']?([A-Za-z_][A-Za-z0-9_.-]*)["']?\s*[:=]\s*["']?([^\s"',;}\]]+)/g)].some(match => isSensitiveConfigKey(match[1]));
+}
 
 const AWF_RESOLVED_CONFIG_PATH_PATTERN = /^\/run\/awf-config-audit\/run-[a-zA-Z0-9]{6}\/awf-resolved-config\.json$/;
 const AWF_RESOLVED_CONFIG_STAGING_PATH = "/tmp/gh-aw/awf-resolved-config.json";
@@ -855,6 +867,7 @@ module.exports = {
   processFile,
   redactSecrets,
   redactBuiltInPatterns,
+  containsSensitiveContent,
   redactArtifactContent,
   redactStepSummaryContent,
   extractMCPGatewayTokens,

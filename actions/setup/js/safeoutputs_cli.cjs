@@ -171,10 +171,10 @@ function emitInfrastructureIncomplete(details, options) {
 // but it is non-terminal for shared harness checks by default. Engines with
 // legacy terminal semantics opt report_missing_data/report_incomplete in via flags.
 const TERMINAL_SAFE_OUTPUT_TYPES = new Set(["noop"]);
-const DIAGNOSTIC_SAFE_OUTPUT_TYPES = new Set(["noop", "report_missing_tool", "report_incomplete"]);
+const DIAGNOSTIC_SAFE_OUTPUT_TYPES = new Set(["noop", "report_missing_tool", "report_incomplete", "request_continuation"]);
 // Types in this set are excluded by the catch-all fallthrough; opt-in checks for
 // report_missing_data/report_incomplete must run before that fallthrough.
-const NON_TERMINAL_SAFE_OUTPUT_TYPES = new Set(["report_missing_tool", "report_missing_data", "report_incomplete"]);
+const NON_TERMINAL_SAFE_OUTPUT_TYPES = new Set(["report_missing_tool", "report_missing_data", "report_incomplete", "request_continuation"]);
 
 /**
  * Read the safe-outputs JSONL file and check whether it contains at least one

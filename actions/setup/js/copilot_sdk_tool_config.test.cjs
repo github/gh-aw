@@ -201,6 +201,16 @@ describe("loadCopilotSDKMCPServers", () => {
     });
   });
 
+  it("registers only the compiler-owned stdio web fetch entrypoint", () => {
+    withConfig({ mcpServers: { "web-fetch": { type: "stdio", command: "ignored", args: ["ignored"] } } }, file => {
+      vi.stubEnv("RUNNER_TEMP", "/runner-temp");
+      expect(loadCopilotSDKMCPServers(validToolConfig({ permissions: { allowedTools: ["read", "web-fetch"] } }), file)).toEqual({
+        "web-fetch": { type: "stdio", command: "node", args: [join("/runner-temp", "gh-aw/actions/web_fetch_mcp_server.cjs")], tools: ["web_fetch"] },
+      });
+      expect(() => loadCopilotSDKMCPServers(validToolConfig(), file)).toThrow("HTTP gateway");
+    });
+  });
+
   it("does not read any MCP configuration when the capability is disabled", () => {
     expect(loadCopilotSDKMCPServers(validToolConfig({ capabilities: { mcp: false } }), "/missing/config.json")).toEqual({});
   });

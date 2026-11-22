@@ -45,6 +45,21 @@ describe("historical diagnostic delivery contracts", () => {
     expect((await deliver(original, [{ type: "report_incomplete" }])).diagnostics).toEqual({ event: "delivery.contract.undeclared_output", types: ["report_incomplete"] });
   });
 
+  it("never settles a Claim using continuation metadata, including a no-write contract", async () => {
+    for (const contract of [
+      { version: 1, no_writes: true, outputs: [] },
+      { version: 1, outputs: [{ type: "request_continuation", min: 1, max: 1 }] },
+    ]) {
+      const data = JSON.parse(JSON.stringify(assignment([])));
+      data.claims[0].work.effect_contract = contract;
+      const original = normalizeAssignment(data);
+      const delivered = await deliver(original, [{ type: "request_continuation", message: "Continue remaining analysis" }]);
+      expect(delivered.verification).not.toBe("verified");
+      expect(delivered.reason).toBe("A continuation request does not establish Claim completion");
+      expect(delivered.descriptor).toBeNull();
+    }
+  });
+
   for (const legacy of ["missing_tool", "missing_data"]) {
     const canonical = `report_${legacy}`;
 

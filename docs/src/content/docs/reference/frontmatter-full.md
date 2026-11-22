@@ -3980,6 +3980,12 @@ engine:
       # (optional)
       web-search: true
 
+      # Use the built-in sandboxed web-fetch MCP server when the workflow enables
+      # tools.web-fetch. Requires MCP support and a config adapter that registers the
+      # stdio server.
+      # (optional)
+      web-fetch-fallback: true
+
       # (optional)
       max-continuations: true
 
@@ -23007,6 +23013,12 @@ safe-outputs:
 
           # (optional)
           web-search: true
+
+          # Use the built-in sandboxed web-fetch MCP server when the workflow enables
+          # tools.web-fetch. Requires MCP support and a config adapter that registers the
+          # stdio server.
+          # (optional)
+          web-fetch-fallback: true
 
           # (optional)
           max-continuations: true

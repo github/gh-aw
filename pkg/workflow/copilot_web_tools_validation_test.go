@@ -4,10 +4,128 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestWebFetchMCPRequiresAWF(t *testing.T) {
+	_, err := NewCompiler().ParseWorkflowString(`---
+on: workflow_dispatch
+strict: false
+engine: copilot
+sandbox:
+  agent: false
+tools:
+  web-fetch:
+---
+Fetch a page.
+`, "web-fetch-no-awf.md")
+	require.ErrorContains(t, err, "requires the AWF agent sandbox")
+}
+
+func TestWebFetchMCPCompilation(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		engine     string
+		importFile string
+		model      string
+		fallback   bool
+	}{
+		{name: "copilot", engine: "copilot", fallback: true},
+		{name: "copilot-sdk", engine: "\n  id: copilot\n  copilot-sdk: true", fallback: true},
+		{name: "pi", engine: "pi", fallback: true},
+		{name: "claude-copilot", engine: "\n  id: claude\n  model-provider: github", fallback: true},
+		{name: "claude-anthropic", engine: "claude"},
+		{name: "codex", engine: "codex"},
+		{name: "gemini", engine: "gemini"},
+		{name: "agy", engine: "agy"},
+		{name: "goose", engine: "\n  id: goose", importFile: "goose.md", model: "copilot/auto", fallback: true},
+		{name: "opencode", engine: "\n  id: opencode", importFile: "opencode.md", model: "copilot/auto", fallback: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			imports := ""
+			if tc.importFile != "" {
+				source, err := os.ReadFile(filepath.Join("../../.github/workflows/shared", tc.importFile))
+				require.NoError(t, err)
+				require.NoError(t, os.WriteFile(filepath.Join(dir, tc.importFile), source, 0600))
+				imports = fmt.Sprintf("imports: [%s]\nmodel: %s\n", tc.importFile, tc.model)
+			}
+			path := filepath.Join(dir, "web-fetch.md")
+			require.NoError(t, os.WriteFile(path, []byte(fmt.Sprintf(`---
+on: workflow_dispatch
+engine: %s
+%s
+tools:
+  github: false
+  web-fetch:
+---
+Fetch a page.
+`, tc.engine, imports)), 0600))
+			require.NoError(t, NewCompiler().CompileWorkflow(path))
+			lock, err := os.ReadFile(filepath.Join(dir, "web-fetch.lock.yml"))
+			require.NoError(t, err)
+			assert.Equal(t, tc.fallback, strings.Contains(string(lock), "export GH_AW_WEB_FETCH_MCP=1"))
+			assert.Equal(t, tc.fallback, strings.Contains(string(lock), `"name":"web-fetch","tools":["web_fetch"]`))
+			assert.NotContains(t, string(lock), "web_fetch_mcp_server.cjs", "the host gateway must not start the server")
+		})
+	}
+}
+
+func TestWebFetchMCPDeclarativeEngine(t *testing.T) {
+	sample, err := os.ReadFile("../../.github/workflows/shared/opencode.md")
+	require.NoError(t, err)
+	sampleDefinition := strings.ReplaceAll(string(sample), "id: opencode", "id: custom-fetch")
+	require.Contains(t, sampleDefinition, "web-fetch-fallback: true")
+	for _, tc := range []struct {
+		name       string
+		capability string
+		tool       string
+		want       bool
+	}{
+		{"opted in", "web-fetch-fallback: true", "  web-fetch: {}", true},
+		{"not opted in", "web-fetch-fallback: false", "  web-fetch: {}", false},
+		{"tool omitted", "web-fetch-fallback: true", "", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			definition := strings.Replace(sampleDefinition, "web-fetch-fallback: true", tc.capability, 1)
+			require.NoError(t, os.WriteFile(filepath.Join(dir, "engine.md"), []byte(definition), 0600))
+			path := filepath.Join(dir, "workflow.md")
+			require.NoError(t, os.WriteFile(path, fmt.Appendf(nil, `---
+on: workflow_dispatch
+imports:
+  - engine.md
+engine:
+  id: custom-fetch
+  model: copilot/auto
+tools:
+  github: false
+%s
+---
+Fetch a page.
+`, tc.tool), 0600))
+			require.NoError(t, NewCompiler(WithSkipValidation(true)).CompileWorkflow(path))
+			lock, err := os.ReadFile(filepath.Join(dir, "workflow.lock.yml"))
+			require.NoError(t, err)
+			assert.Equal(t, tc.want, strings.Contains(string(lock), "export GH_AW_WEB_FETCH_MCP=1"))
+			assert.Equal(t, tc.want, strings.Contains(string(lock), `"name":"web-fetch","tools":["web_fetch"]`))
+		})
+	}
+}
+
+func TestWebFetchMCPDeclarativeEngineRequiresAdapter(t *testing.T) {
+	_, err := NewBehaviorDefinedEngine(&EngineDefinition{
+		ID: "custom-fetch",
+		Behaviors: &EngineBehaviorDefinition{
+			Capabilities: EngineCapabilitiesDefinition{WebFetchFallback: true},
+		},
+	})
+	require.ErrorContains(t, err, "enables web-fetch-fallback without MCP support and a config-adapter")
+}
 
 func TestCopilotWebToolsCompilation(t *testing.T) {
 	for _, strict := range []bool{false, true} {
@@ -27,9 +145,9 @@ tools:
 ---
 Test Copilot web tool availability.
 `, strict, sdk, tool, value), "copilot-web-tools.md")
-						if sdk && tool == "web-fetch" {
+						if tool == "web-fetch" {
 							require.NoError(t, err)
-							require.NotNil(t, data)
+							require.True(t, usesWebFetchMCP(data))
 							return
 						}
 
@@ -77,14 +195,10 @@ Use imported fetch configuration.
 					data, err = compiler.ParseWorkflowString(markdown, path)
 				}
 
-				if sdk {
-					require.NoError(t, err)
-					require.True(t, data.EngineConfig.CopilotSDK)
-					require.True(t, buildCopilotSDKToolConfig(data, nil).Capabilities.WebFetch)
-				} else {
-					require.ErrorContains(t, err, "tools.web-fetch")
-					require.ErrorContains(t, err, "COPILOT_OFFLINE=true")
-				}
+				require.NoError(t, err)
+				require.True(t, usesWebFetchMCP(data))
+				require.Equal(t, sdk, data.EngineConfig.CopilotSDK)
+				require.False(t, buildCopilotSDKToolConfig(data, nil).Capabilities.WebFetch)
 			}
 		})
 	}
@@ -118,7 +232,7 @@ engine:
 ---
 Test Claude web tool availability.
 `, strict, config.engine, config.model, tool, value), "claude-web-tools.md")
-						if config.wantErr {
+						if config.wantErr && tool == "web-search" {
 							require.ErrorContains(t, err, "tools."+tool)
 							require.ErrorContains(t, err, "GitHub Copilot inference")
 							require.ErrorContains(t, err, "COPILOT_OFFLINE=true")
@@ -132,6 +246,7 @@ Test Claude web tool availability.
 						} else {
 							require.NoError(t, err)
 							require.NotNil(t, data)
+							require.Equal(t, config.wantErr && tool == "web-fetch", usesWebFetchMCP(data))
 						}
 					})
 				}
@@ -159,13 +274,14 @@ func TestClaudeCopilotWebToolsImportedEngineConfig(t *testing.T) {
 					} else {
 						data, err = compiler.ParseWorkflowString(markdown, path)
 					}
-					if provider == "github" {
+					if provider == "github" && tool == "web-search" {
 						require.ErrorContains(t, err, "tools."+tool)
 						require.ErrorContains(t, err, "COPILOT_OFFLINE=true")
 						require.Nil(t, data)
 					} else {
 						require.NoError(t, err)
 						require.NotNil(t, data)
+						require.Equal(t, provider == "github" && tool == "web-fetch", usesWebFetchMCP(data))
 					}
 				}
 			})

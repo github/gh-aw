@@ -112,6 +112,7 @@ func writeLogsAuditFile(processedRun ProcessedRun, processedRuns []ProcessedRun,
 	if processedRun.WorkQueue != nil {
 		auditData.WorkQueue = processedRun.WorkQueue
 	}
+	mergeContinuationRequestsIntoAudit(&auditData, processedRun.ContinuationRequests)
 	if auditData.Retries == nil {
 		auditData.Retries = readAuditRetrySummary(runOutputDir)
 	}

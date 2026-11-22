@@ -43,7 +43,7 @@ func configureWorkQueueMemory(data *WorkflowData) error {
 		data.SafeOutputs = &SafeOutputsConfig{WorkQueueEnabled: true}
 	}
 	outputs := data.SafeOutputs
-	for _, name := range []string{"noop", "constructor", "prototype", "work_queue_read", "work_queue_explain", "work_queue_submit", "work_queue_dispatch_next", "work_queue_claim_finish"} {
+	for _, name := range []string{"noop", "request_continuation", "constructor", "prototype", "work_queue_read", "work_queue_explain", "work_queue_submit", "work_queue_dispatch_next", "work_queue_claim_finish"} {
 		if config.Name == name {
 			return fmt.Errorf("tools.work-queue.memory.name: %q is reserved", name)
 		}

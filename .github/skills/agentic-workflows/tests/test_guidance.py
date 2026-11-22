@@ -123,6 +123,36 @@ class GuidanceTests(unittest.TestCase):
                         headings = re.findall(r"^#{1,6} (.+)$", target.read_text(), re.MULTILINE)
                         self.assertIn(anchor, [heading_anchor(heading) for heading in headings])
 
+    def test_creator_requires_references_and_distinguishes_incomplete_from_noop(self):
+        creator = (ROOT / ".github/aw/create-agentic-workflow.md").read_text()
+        required_reads = creator.split("## Load These References First\n", 1)[1].split(
+            "\n## Modes\n", 1
+        )[0]
+        paths = (
+            "intent.md", "github-agentic-workflows.md", "workflow-editing.md",
+            "workflow-constraints.md", "workflow-patterns.md", "safe-outputs.md",
+            "syntax.md", "mcp-clis.md",
+        )
+        for earlier, later in zip(paths, paths[1:]):
+            with self.subTest(earlier=earlier, later=later):
+                self.assertLess(required_reads.index(earlier), required_reads.index(later))
+        self.assertIn("stop and report its path", required_reads)
+        self.assertIn("`report_incomplete`", required_reads)
+        self.assertIn("reserve `noop`", required_reads)
+
+    def test_persona_evaluator_excludes_ambient_guidance_or_marks_contamination(self):
+        workflow = (ROOT / ".github/workflows/agent-persona-explorer.md").read_text()
+        probe = workflow.split("### Paired prefix probe\n", 1)[1].split(
+            "\n## Phase 4:", 1
+        )[0]
+        evaluator = workflow.split("## agent: `persona-evaluator`\n", 1)[1]
+        for label, source in (("probe", probe), ("evaluator", evaluator)):
+            with self.subTest(source=label):
+                self.assertIn("ambient", source)
+                self.assertIn("AGENTS.md", source)
+                self.assertIn("skill inventories", source)
+                self.assertIn("contaminated", source)
+
     def test_execution_routes_and_completion_survive_prefix_only_reads(self):
         contracts = {
             "AGENTS.md": ("make agent-report-progress", "make recompile", "pkg/logger", "prompt-token-efficiency"),
@@ -193,7 +223,7 @@ class GuidanceTests(unittest.TestCase):
         self.assertIn("For each material undefined term, propose and clearly label a reasonable `Default:`", creator)
         for contract in (
             "Verify config files named in the request",
-            "require `noop` and report, never guess",
+            "if missing, do not guess; use `report_incomplete` if their absence prevents meaningful work",
             "what “adds” covers",
             "lockfile scope",
             "zero-item behavior",
