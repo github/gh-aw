@@ -23,6 +23,7 @@ import (
 	"github.com/github/gh-aw/pkg/linters/errortypeassertion"
 	"github.com/github/gh-aw/pkg/linters/errstringmatch"
 	"github.com/github/gh-aw/pkg/linters/excessivefuncparams"
+	"github.com/github/gh-aw/pkg/linters/execcommandoutputerrdiscard"
 	"github.com/github/gh-aw/pkg/linters/execcommandwithoutcontext"
 	"github.com/github/gh-aw/pkg/linters/fileclosenotdeferred"
 	"github.com/github/gh-aw/pkg/linters/filepathwalkpreferwalkdir"
@@ -135,6 +136,7 @@ var allAnalyzers = []*analysis.Analyzer{
 	errstringmatch.Analyzer,
 	errorfwrapv.Analyzer,
 	errorsnewerrorstring.Analyzer,
+	execcommandoutputerrdiscard.Analyzer,
 	execcommandwithoutcontext.Analyzer,
 	excessivefuncparams.Analyzer,
 	fileclosenotdeferred.Analyzer,
