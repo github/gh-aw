@@ -49,12 +49,12 @@ Authentication details and step-by-step setup are covered in the [Triage from Si
 
 ### Preparing an advisory fix
 
-Use a dedicated private side repository to prepare and test a fix for an unpublished advisory. GitHub does not run Actions or PR status checks in [temporary private advisory forks](https://docs.github.com/en/code-security/security-advisories/collaborating-in-a-temporary-private-fork-to-resolve-a-security-vulnerability).
+Use your personal private side repository to prepare and test fixes for unpublished advisories. GitHub does not run Actions or PR status checks in [temporary private advisory forks](https://docs.github.com/en/code-security/security-advisories/collaborating-in-a-temporary-private-fork-to-resolve-a-security-vulnerability).
 
-1. Restrict access to the side repository, including its run logs and artifacts, to people authorized to see the advisory. Use manual dispatch from trusted workflow code. Do not use a public issue or slash-command relay for confidential work.
+1. Run `gh aw advisory setup` once to create or reuse `<your-login>/gh-aw-advisories` under the personal GitHub.com account authenticated by `gh`. Do not add collaborators or share logs or artifacts. Keep collaboration in the existing temporary advisory fork. Follow any upstream policy on copying private source code to a personal repository. Use manual dispatch from trusted workflow code, not a public issue or slash-command relay.
 2. Use a [target-only checkout](#target-only-checkout) pinned to the upstream commit you intend to patch. A shallow checkout limits history; a sparse checkout limits files in the working tree. Include the build and test dependencies in the checkout configuration so the agent does not need to fetch them later. Use read-only checkout credentials and keep advisory fork credentials out of Actions. Review the compiled jobs and exclude any maintenance or safe-output jobs that can write to the upstream repository.
 3. Review the fix and test results privately. Keep any patch artifact in the private side repository, use short retention, and check who can download it. Secret redaction does not remove all advisory details.
-4. Use the experimental [`gh aw advisory inspect` and `gh aw advisory transfer`](/gh-aw/setup/cli/#advisory-inspect-and-advisory-transfer) commands with the exact private run and artifact IDs. The commands verify the artifact and existing temporary fork, then let you review and approve the patch before pushing a new branch with your maintainer credentials. Open the PR from the advisory in GitHub. If the base has moved, rebase and retest the fix before handing it off.
+4. Use the experimental [`gh aw advisory record`, `inspect`, and `transfer`](/gh-aw/setup/cli/#advisory-inspect-and-advisory-transfer) commands to save the exact private run and artifact IDs locally, then review and approve the patch by GHSA ID. The same side repository can hold separate runs for multiple advisories. Open the PR from the advisory in GitHub after transfer. If the base has moved, rebase and retest the fix before handing it off.
 
 For an opt-in starting point, add `"maintenance": false` to the private side repository's `.github/aw.json` and adapt this workflow. Replace the repository, base SHA, and sparse paths with values reviewed by the maintainers. Use the full SHA, not a dispatch input or a branch that can move.
 
@@ -63,7 +63,7 @@ Before dispatching, create a fine-grained token scoped to the upstream repositor
 ```aw wrap
 ---
 on: workflow_dispatch
-if: github.event.repository.private == true && github.event.repository.full_name == 'my-org/private-advisory-work'
+if: github.event.repository.private == true && github.event.repository.full_name == 'my-login/gh-aw-advisories'
 permissions:
   contents: none
   copilot-requests: write

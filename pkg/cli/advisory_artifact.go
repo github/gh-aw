@@ -59,6 +59,9 @@ func (o advisoryHandoff) loadPatch(ctx context.Context) ([]byte, error) {
 	if repo.ID <= 0 || repo.Visibility != "private" || !strings.EqualFold(repo.FullName, o.sideRepo) {
 		return nil, errors.New("the artifact source must be the specified private repository")
 	}
+	if o.sideRepoID != 0 && o.sideRepoID != repo.ID {
+		return nil, errors.New("the artifact source repository changed; verify the source and run gh aw advisory record again")
+	}
 	artifactPath := fmt.Sprintf("%s/actions/artifacts/%d", repoPath, o.artifactID)
 	var artifact advisoryArtifact
 	if err := readAdvisoryAPI(ctx, artifactPath, &artifact); err != nil {

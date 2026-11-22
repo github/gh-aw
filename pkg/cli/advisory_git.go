@@ -8,6 +8,8 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+
+	"github.com/github/gh-aw/pkg/constants"
 )
 
 func (o advisoryHandoff) pushPatch(ctx context.Context, fork advisoryFork, patch []byte) error {
@@ -123,7 +125,7 @@ func (g advisoryGit) patchTree(base string, patch []byte) (string, error) {
 			return "", errors.New("could not verify paths in the staged patch")
 		}
 		lower := strings.ToLower(filename)
-		if lower == ".github" || strings.HasPrefix(lower, ".github/") {
+		if strings.EqualFold(filename, strings.TrimSuffix(constants.GithubDir, "/")) || strings.HasPrefix(lower, constants.GithubDir) {
 			return "", errors.New("patch changes a workflow or another path under .github; use a manual handoff for this patch")
 		}
 		if !advisoryFileMode(oldMode) || !advisoryFileMode(newMode) {

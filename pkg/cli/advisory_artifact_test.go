@@ -29,10 +29,18 @@ func TestAdvisoryInspectDownloadsExactArtifact(t *testing.T) {
 [ "$1" = api ] && [ "$2" = --hostname ] && [ "$3" = github.com ] || exit 1
 case "$4" in
 repos/owner/side) printf '%%s' '{"id":30,"full_name":"owner/side","visibility":"private"}' ;;
+user) printf '{"id":%%s,"login":"owner","type":"User"}' "$ADVISORY_TEST_ACCOUNT" ;;
+repos/owner/gh-aw-advisories) printf '%%s' '{"id":30,"full_name":"owner/gh-aw-advisories","visibility":"private","owner":{"id":42,"type":"User"}}' ;;
+'repos/owner/gh-aw-advisories/collaborators?per_page=2') printf '%%s' '[{"id":42}]' ;;
+'repos/owner/gh-aw-advisories/invitations?per_page=1') printf '%%s' '[]' ;;
+repos/owner/gh-aw-advisories/actions/runs/10|\
 repos/owner/side/actions/runs/10) printf '{"id":10,"event":"workflow_dispatch","conclusion":"success","repository":{"id":30},"head_repository":{"id":30}%%s}' "$ADVISORY_TEST_ATTEMPT" ;;
+repos/owner/gh-aw-advisories/actions/artifacts/20|\
 repos/owner/side/actions/artifacts/20) printf '%%s' '{"id":20,"size_in_bytes":%d,"digest":"sha256:%x","workflow_run":{"id":10,"repository_id":30}}' ;;
+repos/owner/gh-aw-advisories/actions/artifacts/20/zip|\
 repos/owner/side/actions/artifacts/20/zip) cat "$ADVISORY_TEST_ZIP" ;;
 repos/owner/upstream/security-advisories/GHSA-2345-6789-cfgh) printf '%%s' '{"ghsa_id":"GHSA-2345-6789-cfgh","state":"draft","private_fork":{"id":40,"full_name":"owner/fork","private":true}}' ;;
+repos/owner/upstream/security-advisories/GHSA-2345-6789-jmpq) printf '%%s' '{"ghsa_id":"GHSA-2345-6789-jmpq","state":"draft","private_fork":{"id":41,"full_name":"owner/other-fork","private":true}}' ;;
 *) exit 1 ;;
 esac
 `, archive.Len(), sha256.Sum256(archive.Bytes()))
@@ -67,6 +75,39 @@ esac
 			require.Regexp(t, `Approval digest: [a-f0-9]{64}`, output.String())
 		})
 	}
+	t.Run("saved handoffs by account and GHSA", func(t *testing.T) {
+		t.Setenv("HOME", dir)
+		t.Setenv("XDG_CONFIG_HOME", dir)
+		t.Setenv("APPDATA", dir)
+		t.Setenv("ADVISORY_TEST_ACCOUNT", "42")
+		t.Setenv("ADVISORY_TEST_ATTEMPT", `,"run_attempt":1`)
+		run := func(args ...string) (string, error) {
+			cmd := NewAdvisoryCommand()
+			var output bytes.Buffer
+			cmd.SetOut(&output)
+			cmd.SetErr(&output)
+			cmd.SetArgs(args)
+			err := cmd.ExecuteContext(t.Context())
+			return output.String(), err
+		}
+		for _, id := range []string{strings.ToLower(advisoryTestID), "GHSA-2345-6789-jmpq"} {
+			_, err := run("record", id, "--repo", "owner/upstream", "--base", strings.Repeat("a", 40),
+				"--base-branch", "main", "--run", "10", "--artifact", "20")
+			require.NoError(t, err)
+		}
+		output, err := run("inspect", strings.ToLower(advisoryTestID))
+		require.NoError(t, err)
+		require.Contains(t, output, "New branch: advisory/ghsa-2345-6789-cfgh")
+		require.Contains(t, output, "Verified source: owner/gh-aw-advisories, run 10, artifact 20")
+		second, err := run("inspect", "GHSA-2345-6789-jmpq")
+		require.NoError(t, err)
+		require.Contains(t, second, "Private fork: owner/other-fork")
+		_, err = run("transfer", advisoryTestID, "--approve", "incorrect")
+		require.ErrorContains(t, err, "approval digest does not match")
+		t.Setenv("ADVISORY_TEST_ACCOUNT", "43")
+		_, err = run("inspect", advisoryTestID)
+		require.ErrorContains(t, err, "no saved handoff")
+	})
 }
 
 func TestAdvisoryArtifactProvenance(t *testing.T) {

@@ -32,7 +32,7 @@ var (
 type advisoryHandoff struct {
 	upstream, id, base, baseBranch, branch, filename, approval string
 	sideRepo                                                   string
-	runID, artifactID                                          int64
+	runID, artifactID, sideRepoID                              int64
 }
 
 type advisoryFork struct {
@@ -44,7 +44,7 @@ type advisoryFork struct {
 // NewAdvisoryCommand creates the experimental local security advisory handoff commands.
 func NewAdvisoryCommand() *cobra.Command {
 	cmd := &cobra.Command{Use: "advisory", Short: "Experimental: review and transfer a fix to a private advisory fork", Hidden: true}
-	cmd.AddCommand(newAdvisoryHandoffCommand(false), newAdvisoryHandoffCommand(true))
+	cmd.AddCommand(newAdvisorySetupCommand(), newAdvisoryRecordCommand(), newAdvisoryHandoffCommand(false), newAdvisoryHandoffCommand(true))
 	return cmd
 }
 
@@ -53,13 +53,21 @@ func newAdvisoryHandoffCommand(transfer bool) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "inspect <GHSA-ID>",
 		Short: "Experimental: review a patch and get its transfer approval digest",
-		Args:  cobra.ExactArgs(1),
+		Args:  advisoryIDArg,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			opts.id = strings.Join(args, "")
-			if prefix, suffix, ok := strings.Cut(opts.id, "-"); ok && strings.EqualFold(prefix, "GHSA") {
-				opts.id = "GHSA-" + strings.ToLower(suffix)
+			handoff := opts
+			handoff.id = normalizeAdvisoryID(strings.Join(args, ""))
+			for _, flag := range []string{"repo", "base", "base-branch", "branch", "patch", "side-repo", "run", "artifact"} {
+				if cmd.Flags().Changed(flag) {
+					return handoff.run(cmd, transfer)
+				}
 			}
-			return opts.run(cmd, transfer)
+			saved, err := loadAdvisoryHandoff(cmd.Context(), handoff.id)
+			if err != nil {
+				return err
+			}
+			saved.approval = handoff.approval
+			return saved.run(cmd, transfer)
 		},
 	}
 	if transfer {
@@ -78,19 +86,46 @@ func newAdvisoryHandoffCommand(transfer bool) *cobra.Command {
 	cmd.Flags().Int64Var(&opts.artifactID, "artifact", 0, "Exact source artifact ID")
 	cmd.MarkFlagsRequiredTogether("side-repo", "run", "artifact")
 	cmd.MarkFlagsMutuallyExclusive("patch", "side-repo")
-	cmd.MarkFlagsOneRequired("patch", "side-repo")
-	for _, flag := range []string{"repo", "base", "base-branch", "branch"} {
-		_ = cmd.MarkFlagRequired(flag)
-	}
 	return cmd
 }
 
-func (o advisoryHandoff) run(cmd *cobra.Command, transfer bool) error {
+func normalizeAdvisoryID(id string) string {
+	if prefix, suffix, ok := strings.Cut(id, "-"); ok && strings.EqualFold(prefix, "GHSA") {
+		return "GHSA-" + strings.ToLower(suffix)
+	}
+	return id
+}
+
+func advisoryIDArg(cmd *cobra.Command, args []string) error {
+	if err := cobra.ExactArgs(1)(cmd, args); err != nil {
+		return err
+	}
+	if !advisoryIDPattern.MatchString(normalizeAdvisoryID(strings.Join(args, ""))) {
+		return errors.New("provide a GHSA identifier, for example GHSA-2345-6789-cfgh")
+	}
+	return nil
+}
+
+func (o advisoryHandoff) validate() error {
 	if !advisoryIDPattern.MatchString(o.id) || !validAdvisoryRepo(o.upstream) || !advisorySHA.MatchString(o.base) {
 		return errors.New("provide a GHSA ID, a GitHub OWNER/REPO, and an exact 40-character base SHA")
 	}
 	if !advisoryRefPattern.MatchString(o.baseBranch) || !advisoryRefPattern.MatchString(o.branch) || o.baseBranch == o.branch {
 		return errors.New("provide distinct branch names for --base-branch and --branch")
+	}
+	if o.sideRepo == "" {
+		if o.filename == "" || o.runID != 0 || o.artifactID != 0 {
+			return errors.New("supply --patch or all of --side-repo, --run, and --artifact")
+		}
+	} else if o.filename != "" || !validAdvisoryRepo(o.sideRepo) || o.runID <= 0 || o.artifactID <= 0 {
+		return errors.New("provide a private --side-repo and positive --run and --artifact IDs, without --patch")
+	}
+	return nil
+}
+
+func (o advisoryHandoff) run(cmd *cobra.Command, transfer bool) error {
+	if err := o.validate(); err != nil {
+		return err
 	}
 	patch, err := o.loadPatch(cmd.Context())
 	if err != nil {
@@ -189,7 +224,7 @@ func validateAdvisoryPatch(patch []byte) ([]byte, error) {
 		return nil, errors.New("provide a bounded, UTF-8 git diff")
 	}
 	for i, char := range string(patch) {
-		if char == '\r' && i+1 < len(patch) && patch[i+1] == '\n' {
+		if char == '\r' && i >= 0 && i+1 < len(patch) && bytes.HasPrefix(patch[i+1:], []byte("\n")) {
 			continue
 		}
 		if char != '\n' && char != '\t' && (unicode.IsControl(char) || unicode.Is(unicode.Cf, char)) {

@@ -1561,12 +1561,20 @@ gh aw pr transfer <pr-url> --repo target-owner/target-repo --create-pull-request
 
 These experimental commands are hidden from the main CLI help. They review a Git diff from a private workflow run and transfer that exact diff to an existing temporary private advisory fork on GitHub.com.
 
+`advisory setup` creates or reuses `<your-login>/gh-aw-advisories`, a private repository owned by the personal GitHub.com account authenticated by `gh`. It does not add collaborators or send invitations, and it refuses to reuse a shared repository or one with pending invitations. Install the [reviewed workflow and checkout credential](/gh-aw/patterns/multi-repo-ops/#preparing-an-advisory-fix) separately.
+
 ```bash wrap
-gh aw advisory inspect GHSA-2345-6789-cfgh --repo owner/repo --base "$BASE_SHA" --base-branch main --branch advisory-fix --side-repo owner/private-side --run "$RUN_ID" --artifact "$ARTIFACT_ID"
-gh aw advisory transfer GHSA-2345-6789-cfgh --repo owner/repo --base "$BASE_SHA" --base-branch main --branch advisory-fix --side-repo owner/private-side --run "$RUN_ID" --artifact "$ARTIFACT_ID" --approve "$APPROVAL_DIGEST"
+gh aw advisory setup
+gh aw advisory record GHSA-2345-6789-cfgh --repo owner/repo --base "$BASE_SHA" --base-branch main --run "$RUN_ID" --artifact "$ARTIFACT_ID"
+gh aw advisory inspect GHSA-2345-6789-cfgh
+gh aw advisory transfer GHSA-2345-6789-cfgh --approve "$APPROVAL_DIGEST"
 ```
 
-Both commands require `--repo` (upstream), `--base` (exact tested commit), `--base-branch` (branch in the fork), and `--branch` (new fix branch). Supply `--side-repo`, `--run`, and `--artifact` together to verify that the ZIP belongs to a successful first attempt of a manual run whose head is in the specified private repository, check its GitHub SHA-256 digest, and read `handoff/fix.patch`. Start a fresh manual dispatch rather than rerunning an earlier attempt. A successful run is not proof that the patch passed its tests. Alternatively, use `--patch` with a local text Git diff if you verified its origin separately. The patch limit is 4 MiB in either mode.
+`advisory record` saves the handoff coordinates, not the patch or credentials, in the user configuration directory. Records are separate for each GitHub account and GHSA ID. The destination branch defaults to `advisory/<lowercase-ghsa-id>`; override it with `--branch`. Run `record` again to replace a handoff, then use `inspect` to obtain a fresh approval digest.
+
+For a one-off handoff, pass `--repo` (upstream), `--base` (exact tested commit), `--base-branch` (branch in the fork), and `--branch` (new fix branch) directly to both `inspect` and `transfer`. Supply either `--side-repo`, `--run`, and `--artifact` together, or `--patch` for a local text Git diff whose origin you verified separately. The patch limit is 4 MiB in either mode.
+
+Artifact mode verifies that the ZIP belongs to a successful first attempt of a manual run whose head is in the specified private repository, checks its GitHub SHA-256 digest, and reads `handoff/fix.patch`. Start a fresh manual dispatch rather than rerunning an earlier attempt. A successful run is not proof that the patch passed its tests.
 
 `inspect` uses the signed-in GitHub CLI identity to resolve the fork and shows the patch without writing to GitHub. `transfer` also requires `--approve`, the digest printed by `inspect` after review. Run the commands in a private terminal; `inspect` prints the full diff.
 
