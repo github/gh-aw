@@ -982,7 +982,9 @@ func TestBuildLogsDataPreservesCachedRunRecord(t *testing.T) {
 
 	data := buildLogsData([]ProcessedRun{processedRun}, outputDir, nil)
 
-	require.Equal(t, []RunData{cached}, data.Runs)
+	expected := cached
+	expected.AICCoverage = logsAICUnavailable
+	require.Equal(t, []RunData{expected}, data.Runs)
 	assert.Equal(t, 1, data.Summary.TotalRuns)
 	assert.Equal(t, "2.0m", data.Summary.TotalDuration)
 	assert.Equal(t, 2, data.Summary.TotalSteeringEvents)

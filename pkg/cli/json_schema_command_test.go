@@ -29,9 +29,10 @@ func TestJSONSchemaCommand(t *testing.T) {
 			oneOfCount: 4,
 			validOutput: []any{
 				AuditData{
-					Overview:        OverviewData{},
-					Metrics:         MetricsData{},
-					DownloadedFiles: []FileInfo{},
+					Overview:           OverviewData{},
+					Metrics:            MetricsData{},
+					DownloadedFiles:    []FileInfo{},
+					FirewallTokenUsage: &TokenUsageSummary{AICFound: true, ByModel: map[string]*ModelTokenUsage{}},
 					KeyFindings: []AuditFinding{{
 						Code:        AuditFindingModelUnavailable,
 						Title:       "Model unavailable",
@@ -71,6 +72,11 @@ func TestJSONSchemaCommand(t *testing.T) {
 			oneOfCount: 2,
 			validOutput: []any{
 				LogsData{
+					Summary: LogsSummary{AICCoverage: logsAICPartial},
+					Runs: []RunData{
+						{RunID: 1, AICCoverage: logsAICAvailable, TokenUsageSummary: &TokenUsageSummary{AICFound: true, ByModel: map[string]*ModelTokenUsage{}}},
+						{RunID: 2, AICCoverage: logsAICUnavailable},
+					},
 					ToolUsage: []ToolUsageSummary{{
 						ToolUsageStatsBase: ToolUsageStatsBase{
 							ToolName:  "github_get_issue",
@@ -120,8 +126,9 @@ func TestJSONSchemaCommand(t *testing.T) {
 					SchemaVersion: cachedLogsJSONLSchemaVersion,
 					Kind:          cachedLogsJSONLKindRun,
 					Run: cachedLogsJSONLRunData{
-						RunData: RunData{RunID: 42},
+						RunData: RunData{RunID: 42, AICCoverage: logsAICAvailable, TokenUsageSummary: &TokenUsageSummary{AICFound: true, ByModel: map[string]*ModelTokenUsage{}}},
 						Audit: &AuditData{
+							FirewallTokenUsage: &TokenUsageSummary{AICFound: true, ByModel: map[string]*ModelTokenUsage{}},
 							KeyFindings: []AuditFinding{{
 								Code:        AuditFindingModelAvailabilityUnknown,
 								Title:       "Model availability unknown",
@@ -315,6 +322,74 @@ func TestGeneratedOutputSchemasAreCurrent(t *testing.T) {
 	}
 }
 
+func TestLogsSchemaAICCoverage(t *testing.T) {
+	tests := []struct {
+		name       string
+		schemaName string
+		output     any
+		mutate     func(map[string]any, string)
+		valid      []string
+		invalid    []string
+	}{
+		{
+			name: "summary", schemaName: "logs",
+			output: LogsData{Summary: LogsSummary{AICCoverage: logsAICAvailable}},
+			mutate: func(v map[string]any, coverage string) { v["summary"].(map[string]any)["aic_coverage"] = coverage },
+			valid:  []string{logsAICAvailable, logsAICPartial, logsAICUnavailable}, invalid: []string{"", "unknown"},
+		},
+		{
+			name: "run", schemaName: "logs",
+			output: LogsData{Summary: LogsSummary{AICCoverage: logsAICAvailable}, Runs: []RunData{{AICCoverage: logsAICAvailable}}},
+			mutate: func(v map[string]any, coverage string) {
+				v["runs"].([]any)[0].(map[string]any)["aic_coverage"] = coverage
+			},
+			valid: []string{logsAICAvailable, logsAICUnavailable}, invalid: []string{"", logsAICPartial},
+		},
+		{
+			name: "cached run", schemaName: "logs-jsonl",
+			output: cachedLogsJSONLRunItemSchema{SchemaVersion: cachedLogsJSONLSchemaVersion, Kind: cachedLogsJSONLKindRun, Run: cachedLogsJSONLRunData{RunData: RunData{AICCoverage: logsAICAvailable}}},
+			mutate: func(v map[string]any, coverage string) { v["run"].(map[string]any)["aic_coverage"] = coverage },
+			valid:  []string{logsAICAvailable, logsAICUnavailable}, invalid: []string{"", logsAICPartial},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			data, err := GenerateNamedOutputSchema(tt.schemaName)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var schema jsonschema.Schema
+			if err := json.Unmarshal(data, &schema); err != nil {
+				t.Fatal(err)
+			}
+			resolved, err := schema.Resolve(nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			data, err = json.Marshal(tt.output)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var value map[string]any
+			if err := json.Unmarshal(data, &value); err != nil {
+				t.Fatal(err)
+			}
+			for _, coverage := range tt.valid {
+				tt.mutate(value, coverage)
+				if err := resolved.Validate(value); err != nil {
+					t.Errorf("valid coverage %q rejected: %v", coverage, err)
+				}
+			}
+			for _, coverage := range tt.invalid {
+				tt.mutate(value, coverage)
+				if err := resolved.Validate(value); err == nil {
+					t.Errorf("invalid coverage %q accepted", coverage)
+				}
+			}
+		})
+	}
+}
+
 func TestGeneratedOutputSchemasPairSteeringTriggerAndThreshold(t *testing.T) {
 	t.Parallel()
 
@@ -322,12 +397,12 @@ func TestGeneratedOutputSchemasPairSteeringTriggerAndThreshold(t *testing.T) {
 	placeholder := []SteeringDelivery{{Type: "ai_credit", Trigger: steeringTriggerThreshold, Threshold: &threshold, First: true}}
 	outputs := map[string]any{
 		"audit": AuditData{Overview: OverviewData{}, Metrics: MetricsData{}, DownloadedFiles: []FileInfo{}, SteeringDeliveries: placeholder},
-		"logs":  LogsData{Runs: []RunData{{RunID: 42, SteeringDeliveries: placeholder}}},
+		"logs":  LogsData{Summary: LogsSummary{AICCoverage: logsAICAvailable}, Runs: []RunData{{RunID: 42, AICCoverage: logsAICAvailable, SteeringDeliveries: placeholder}}},
 		"logs-jsonl": cachedLogsJSONLRunItemSchema{
 			SchemaVersion: cachedLogsJSONLSchemaVersion,
 			Kind:          cachedLogsJSONLKindRun,
 			Run: cachedLogsJSONLRunData{
-				RunData: RunData{RunID: 42, SteeringDeliveries: placeholder},
+				RunData: RunData{RunID: 42, AICCoverage: logsAICAvailable, SteeringDeliveries: placeholder},
 				Audit:   &AuditData{SteeringDeliveries: placeholder},
 			},
 		},

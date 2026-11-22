@@ -269,6 +269,7 @@ func generateLogsJSONLItemSchema() (*jsonschema.Schema, error) {
 	}
 	run.Properties["schema_version"].Enum = []any{cachedLogsJSONLSchemaVersion}
 	run.Properties["kind"].Enum = []any{cachedLogsJSONLKindRun}
+	run.Properties["run"].Properties["aic_coverage"].Enum = []any{logsAICAvailable, logsAICUnavailable}
 	auditData, err := generateAuditDataOutputSchema()
 	if err != nil {
 		return nil, err
@@ -397,6 +398,8 @@ func generateLogsDataOutputSchema() (*jsonschema.Schema, error) {
 	if err != nil {
 		return nil, err
 	}
+	schema.Properties["summary"].Properties["aic_coverage"].Enum = []any{logsAICAvailable, logsAICPartial, logsAICUnavailable}
+	schema.Properties["runs"].Items.Properties["aic_coverage"].Enum = []any{logsAICAvailable, logsAICUnavailable}
 	wire, err := GenerateOutputSchema[toolUsageSummaryWire]()
 	if err != nil {
 		return nil, err

@@ -145,7 +145,11 @@
               "type": "number"
             },
             "aic_coverage": {
-              "type": "string"
+              "type": "string",
+              "enum": [
+                "available",
+                "unavailable"
+              ]
             },
             "ambient_context": {
               "type": [

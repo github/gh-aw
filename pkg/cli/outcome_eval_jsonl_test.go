@@ -58,7 +58,8 @@ func TestOutcomeJSONLObjectiveRoundtrip(t *testing.T) {
 
 	logs := episodeLogs(42)
 	logs.Runs[0].LogsPath = filepath.Dir(usageDir)
-	data := LogsData{Runs: logs.Runs, Episodes: []EpisodeData{logs.Episodes[0].EpisodeData}}
+	logs.Runs[0].AICCoverage = logsAICUnavailable
+	data := LogsData{Summary: LogsSummary{AICCoverage: logsAICUnavailable}, Runs: logs.Runs, Episodes: []EpisodeData{logs.Episodes[0].EpisodeData}}
 	require.NoError(t, attachLogsOutcomes(&data, []OutcomesData{{RunID: 42, Items: reports}}))
 	require.NotNil(t, data.EpisodeOutcomes)
 	require.Len(t, data.EpisodeOutcomes.Episodes, 1)
