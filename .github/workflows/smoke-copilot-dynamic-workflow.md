@@ -12,7 +12,8 @@ permissions:
   copilot-requests: write
 engine:
   id: copilot
-  version: 1.0.98
+  version: 1.0.113
+  checksums-sha256: 854036b59b745d4f4b44a169327ffc0eab007f39e74b3dc3670f4d609a6c1072
   dynamic-workflows: true
   args: ["--experimental"]
 checkout:

@@ -19,8 +19,8 @@ describe("copilot_sdk_driver.cjs", () => {
     const runtimeFs = require("fs");
     const readdirSync = runtimeFs.readdirSync;
     agentDirectorySpy = vi.spyOn(runtimeFs, "readdirSync").mockImplementation((directory, options) => {
-      // Never inspect the developer checkout's agents when exercising the SDK.
-      if (!String(directory).startsWith(testSessionStateDir) && String(directory).endsWith("/.github/agents")) return [];
+      // Do not discover agents left by unrelated runs in the default staging root.
+      if (!String(directory).startsWith(testSessionStateDir) && ["/.github/agents", "/base/copilot-agents"].some(suffix => String(directory).endsWith(suffix))) return [];
       return readdirSync(directory, options);
     });
   });
@@ -42,10 +42,10 @@ describe("copilot_sdk_driver.cjs", () => {
     ])("qualifies %s session and cross-provider %s custom agents at runtime", async (sessionModel, agentModel, sessionProvider, agentProvider) => {
       const workspace = path.join(testSessionStateDir, `${sessionProvider}-workspace`);
       const workflow = path.join(testSessionStateDir, `${sessionProvider}-workflow`);
-      fs.mkdirSync(path.join(workspace, ".github/agents"), { recursive: true });
+      fs.mkdirSync(path.join(workflow, "base/copilot-agents"), { recursive: true });
       fs.mkdirSync(path.join(workflow, ".github/agents"), { recursive: true });
       fs.writeFileSync(
-        path.join(workspace, ".github/agents/researcher.agent.md"),
+        path.join(workflow, "base/copilot-agents/researcher.agent.md"),
         `---\nname: researcher\ndescription: >-\n  Research across\n  providers\ntools:\n  - read\n  - grep\nmodel: copilot/${agentModel}\n---\nResearch carefully.\n`
       );
       fs.writeFileSync(path.join(workflow, ".github/agents/workflow.agent.md"), "---\nname: workflow-agent\ntools: read, grep\n---\nWorkflow prompt.");
@@ -84,21 +84,23 @@ describe("copilot_sdk_driver.cjs", () => {
         agentsBaseDir: workflow,
         bare: true,
         logger,
-        sdkModule: { CopilotClient: FakeCopilotClient, RuntimeConnection: { forUri: vi.fn(() => ({})) }, approveAll: () => "allow" },
+        sdkModule: { CopilotClient: FakeCopilotClient, RuntimeConnection: { forTcp: vi.fn(() => ({})) }, approveAll: () => "allow" },
       });
       expect(result.exitCode).toBe(0);
-      expect(constructor).toHaveBeenCalledWith(expect.objectContaining({ workingDirectory: workspace }));
+      expect(constructor).toHaveBeenCalledWith(expect.objectContaining({ mode: "coding-agent" }));
       expect(createSession).toHaveBeenCalledWith(
         expect.objectContaining({
           model: `${sessionProvider}/${sessionModel}`,
           workingDirectory: workspace,
-          skipCustomInstructions: true,
-          customAgents: expect.arrayContaining([
-            { name: "researcher", displayName: "researcher", description: "Research across providers", tools: ["read", "grep"], prompt: "Research carefully.", model: `${agentProvider}/${agentModel}` },
-            { name: "workflow-agent", displayName: "workflow-agent", tools: ["read", "grep"], prompt: "Workflow prompt.", model: `${sessionProvider}/${sessionModel}` },
-            { name: "small", displayName: "small", prompt: "Alias prompt.", model: `${agentProvider}/${agentModel}` },
-            { name: "large", displayName: "large", prompt: "Alias prompt.", model: `${agentProvider}/${agentModel}` },
-          ]),
+          instructions: { skipCustomInstructions: true },
+          agents: {
+            definitions: expect.arrayContaining([
+              { name: "researcher", displayName: "researcher", description: "Research across providers", tools: ["read", "grep"], prompt: "Research carefully.", model: `${agentProvider}/${agentModel}` },
+              { name: "workflow-agent", displayName: "workflow-agent", tools: ["read", "grep"], prompt: "Workflow prompt.", model: `${sessionProvider}/${sessionModel}` },
+              { name: "small", displayName: "small", prompt: "Alias prompt.", model: `${agentProvider}/${agentModel}` },
+              { name: "large", displayName: "large", prompt: "Alias prompt.", model: `${agentProvider}/${agentModel}` },
+            ]),
+          },
         })
       );
     });
@@ -127,10 +129,10 @@ describe("copilot_sdk_driver.cjs", () => {
         agentsBaseDir: workflow,
         bare: true,
         logger,
-        sdkModule: { CopilotClient: FakeCopilotClient, RuntimeConnection: { forUri: vi.fn(() => ({})) }, approveAll: () => "allow" },
+        sdkModule: { CopilotClient: FakeCopilotClient, RuntimeConnection: { forTcp: vi.fn(() => ({})) }, approveAll: () => "allow" },
       });
       expect(result.exitCode).toBe(0);
-      expect(createSession.mock.calls[0][0].customAgents).toEqual([{ name: "unknown-agent", displayName: "unknown-agent", prompt: "Unknown model.", model: "copilot-responses/gpt-5.4" }]);
+      expect(createSession.mock.calls[0][0].agents.definitions).toEqual([{ name: "unknown-agent", displayName: "unknown-agent", prompt: "Unknown model.", model: "copilot-responses/gpt-5.4" }]);
       expect(logger).toHaveBeenCalledWith(expect.stringMatching(/warning:.*unknown-agent.*session model/i));
       const captured = fs
         .readFileSync(path.join(testSessionStateDir, `${sessionId}/events.jsonl`), "utf8")
@@ -160,7 +162,7 @@ describe("copilot_sdk_driver.cjs", () => {
           disconnect: vi.fn().mockResolvedValue(undefined),
         });
       }
-      await runWithCopilotSDK({ sdkUri: "http://127.0.0.1:3002", prompt: "test", logger: () => {}, sdkModule: { CopilotClient: FakeCopilotClient, RuntimeConnection: { forUri: vi.fn(() => ({})) }, approveAll: () => "allow" } });
+      await runWithCopilotSDK({ sdkUri: "http://127.0.0.1:3002", prompt: "test", logger: () => {}, sdkModule: { CopilotClient: FakeCopilotClient, RuntimeConnection: { forTcp: vi.fn(() => ({})) }, approveAll: () => "allow" } });
       const events = fs.readFileSync(path.join(testSessionStateDir, "final-model-result/events.jsonl"), "utf8").trim().split("\n").map(JSON.parse);
       expect(events).toContainEqual(event);
       expect(events).toContainEqual(selected);
@@ -200,7 +202,7 @@ describe("copilot_sdk_driver.cjs", () => {
           logger: () => {},
           sdkModule: {
             CopilotClient: FakeCopilotClient,
-            RuntimeConnection: { forUri: vi.fn(() => ({})) },
+            RuntimeConnection: { forTcp: vi.fn(() => ({})) },
             approveAll: () => "allow",
           },
         });
@@ -278,7 +280,7 @@ describe("copilot_sdk_driver.cjs", () => {
           logger: () => {},
           sdkModule: {
             CopilotClient: FakeCopilotClient,
-            RuntimeConnection: { forUri: vi.fn(() => ({})) },
+            RuntimeConnection: { forTcp: vi.fn(() => ({})) },
             approveAll: () => "allow",
           },
         });
@@ -313,7 +315,7 @@ describe("copilot_sdk_driver.cjs", () => {
         logger: () => {},
         sdkModule: {
           CopilotClient: FakeCopilotClient,
-          RuntimeConnection: { forUri: vi.fn(() => ({})) },
+          RuntimeConnection: { forTcp: vi.fn(() => ({})) },
           approveAll: () => "allow",
         },
       });
@@ -368,7 +370,7 @@ describe("copilot_sdk_driver.cjs", () => {
           logger: () => {},
           sdkModule: {
             CopilotClient: FakeCopilotClient,
-            RuntimeConnection: { forUri: vi.fn(() => ({})) },
+            RuntimeConnection: { forTcp: vi.fn(() => ({})) },
             approveAll: () => "allow",
           },
         });
@@ -447,7 +449,7 @@ describe("copilot_sdk_driver.cjs", () => {
           logger: () => {},
           sdkModule: {
             CopilotClient: FakeCopilotClient,
-            RuntimeConnection: { forUri: vi.fn(() => ({})) },
+            RuntimeConnection: { forTcp: vi.fn(() => ({})) },
             approveAll: () => "allow",
           },
         });
@@ -528,7 +530,7 @@ describe("copilot_sdk_driver.cjs", () => {
         logger: () => {},
         sdkModule: {
           CopilotClient: FakeCopilotClient,
-          RuntimeConnection: { forUri: vi.fn(() => ({})) },
+          RuntimeConnection: { forTcp: vi.fn(() => ({})) },
           approveAll: () => "allow",
         },
       });
@@ -581,7 +583,7 @@ describe("copilot_sdk_driver.cjs", () => {
         logger: () => {},
         sdkModule: {
           CopilotClient: FakeCopilotClient,
-          RuntimeConnection: { forUri: vi.fn(() => ({})) },
+          RuntimeConnection: { forTcp: vi.fn(() => ({})) },
           approveAll: () => "allow",
         },
       });
@@ -614,7 +616,7 @@ describe("copilot_sdk_driver.cjs", () => {
         logger: () => {},
         sdkModule: {
           CopilotClient: FakeCopilotClient,
-          RuntimeConnection: { forUri: vi.fn(() => ({})) },
+          RuntimeConnection: { forTcp: vi.fn(() => ({})) },
           approveAll: () => "allow",
         },
       });
@@ -687,7 +689,7 @@ describe("copilot_sdk_driver.cjs", () => {
           logger: () => {},
           sdkModule: {
             CopilotClient: FakeCopilotClient,
-            RuntimeConnection: { forUri: vi.fn(() => ({})) },
+            RuntimeConnection: { forTcp: vi.fn(() => ({})) },
             approveAll: () => "allow",
           },
         });
@@ -755,7 +757,7 @@ describe("copilot_sdk_driver.cjs", () => {
           logger: () => {},
           sdkModule: {
             CopilotClient: FakeCopilotClient,
-            RuntimeConnection: { forUri: vi.fn(() => ({})) },
+            RuntimeConnection: { forTcp: vi.fn(() => ({})) },
             approveAll: () => "allow",
           },
         });
@@ -834,7 +836,7 @@ describe("copilot_sdk_driver.cjs", () => {
           logger: () => {},
           sdkModule: {
             CopilotClient: FakeCopilotClient,
-            RuntimeConnection: { forUri: vi.fn(() => ({})) },
+            RuntimeConnection: { forTcp: vi.fn(() => ({})) },
             approveAll: () => "allow",
           },
         });
@@ -902,7 +904,7 @@ describe("copilot_sdk_driver.cjs", () => {
           logger: () => {},
           sdkModule: {
             CopilotClient: FakeCopilotClient,
-            RuntimeConnection: { forUri: vi.fn(() => ({})) },
+            RuntimeConnection: { forTcp: vi.fn(() => ({})) },
             approveAll: () => "allow",
           },
         });
@@ -958,7 +960,7 @@ describe("copilot_sdk_driver.cjs", () => {
           logger: () => {},
           sdkModule: {
             CopilotClient: FakeCopilotClient,
-            RuntimeConnection: { forUri: vi.fn(() => ({})) },
+            RuntimeConnection: { forTcp: vi.fn(() => ({})) },
             approveAll: () => "allow",
           },
         });
@@ -1039,7 +1041,7 @@ describe("copilot_sdk_driver.cjs", () => {
           logger: () => {},
           sdkModule: {
             CopilotClient: FakeCopilotClient,
-            RuntimeConnection: { forUri: vi.fn(() => ({})) },
+            RuntimeConnection: { forTcp: vi.fn(() => ({})) },
             approveAll: () => "allow",
           },
         });
@@ -1096,7 +1098,7 @@ describe("copilot_sdk_driver.cjs", () => {
         logger: () => {},
         sdkModule: {
           CopilotClient: FakeCopilotClient,
-          RuntimeConnection: { forUri: vi.fn(() => ({})) },
+          RuntimeConnection: { forTcp: vi.fn(() => ({})) },
           approveAll: () => "allow",
         },
       });
@@ -1119,7 +1121,7 @@ describe("copilot_sdk_driver.cjs", () => {
     it("passes multi-provider config and model through to SDK createSession", async () => {
       const disconnect = vi.fn().mockResolvedValue(undefined);
       const stop = vi.fn().mockResolvedValue(undefined);
-      const forUri = vi.fn(() => ({}));
+      const forTcp = vi.fn(() => ({}));
       const createSession = vi.fn().mockResolvedValue({
         sessionId: "session-provider",
         on: () => {},
@@ -1143,7 +1145,7 @@ describe("copilot_sdk_driver.cjs", () => {
         models,
         sdkModule: {
           CopilotClient: FakeCopilotClient,
-          RuntimeConnection: { forUri },
+          RuntimeConnection: { forTcp },
           approveAll: () => "allow",
         },
       });
@@ -1152,18 +1154,17 @@ describe("copilot_sdk_driver.cjs", () => {
       expect(createSession).toHaveBeenCalledWith(
         expect.objectContaining({
           model: "copilot/gpt-5.4",
-          providers,
-          models,
+          inference: expect.objectContaining({ providers, models }),
         })
       );
-      expect(forUri).toHaveBeenCalledWith("http://127.0.0.1:3002", {});
+      expect(forTcp).toHaveBeenCalledWith("127.0.0.1", 3002, {});
     });
 
-    it("passes COPILOT_CONNECTION_TOKEN to RuntimeConnection.forUri", async () => {
+    it("passes COPILOT_CONNECTION_TOKEN to RuntimeConnection.forTcp", async () => {
       const disconnect = vi.fn().mockResolvedValue(undefined);
       const stop = vi.fn().mockResolvedValue(undefined);
       const connection = { kind: "uri", url: "http://127.0.0.1:3002", connectionToken: "token-123" };
-      const forUri = vi.fn(() => connection);
+      const forTcp = vi.fn(() => connection);
       const constructorSpy = vi.fn();
       const createSession = vi.fn().mockResolvedValue({
         sessionId: "session-connection-token",
@@ -1187,16 +1188,16 @@ describe("copilot_sdk_driver.cjs", () => {
         connectionToken: "token-123",
         sdkModule: {
           CopilotClient: FakeCopilotClient,
-          RuntimeConnection: { forUri },
+          RuntimeConnection: { forTcp },
           approveAll: () => "allow",
         },
       });
 
       expect(result.exitCode).toBe(0);
-      expect(forUri).toHaveBeenCalledWith("http://127.0.0.1:3002", { connectionToken: "token-123" });
+      expect(forTcp).toHaveBeenCalledWith("127.0.0.1", 3002, { connectionToken: "token-123" });
       expect(constructorSpy).toHaveBeenCalledWith(
         expect.objectContaining({
-          connection,
+          runtime: connection,
         })
       );
     });
@@ -1225,14 +1226,14 @@ describe("copilot_sdk_driver.cjs", () => {
         },
         sdkModule: {
           CopilotClient: FakeCopilotClient,
-          RuntimeConnection: { forUri: vi.fn(() => ({})) },
+          RuntimeConnection: { forTcp: vi.fn(() => ({})) },
           approveAll: () => ({ kind: "approve-once" }),
         },
       });
 
       expect(result.exitCode).toBe(0);
       const sessionConfig = createSession.mock.calls[0][0];
-      const onPermissionRequest = sessionConfig.onPermissionRequest;
+      const onPermissionRequest = sessionConfig.permissions.onRequest;
       expect(onPermissionRequest({ kind: "shell", commands: [{ identifier: "git" }], fullCommandText: "git status" })).toEqual({ kind: "approve-once" });
       expect(onPermissionRequest({ kind: "mcp", serverName: "github", toolName: "get_file_contents" })).toEqual({ kind: "approve-once" });
       expect(onPermissionRequest({ kind: "url", url: "https://example.com" })).toEqual({ kind: "approve-once" });
@@ -1272,14 +1273,14 @@ describe("copilot_sdk_driver.cjs", () => {
         },
         sdkModule: {
           CopilotClient: FakeCopilotClient,
-          RuntimeConnection: { forUri: vi.fn(() => ({})) },
+          RuntimeConnection: { forTcp: vi.fn(() => ({})) },
           approveAll: () => ({ kind: "approve-once" }),
         },
       });
 
       expect(result.exitCode).toBe(0);
       const sessionConfig = createSession.mock.calls[0][0];
-      const onPermissionRequest = sessionConfig.onPermissionRequest;
+      const onPermissionRequest = sessionConfig.permissions.onRequest;
       expect(onPermissionRequest({ kind: "read", path: "a.txt", intention: "" })).toEqual({ kind: "approve-once" });
     });
 
@@ -1307,14 +1308,14 @@ describe("copilot_sdk_driver.cjs", () => {
         },
         sdkModule: {
           CopilotClient: FakeCopilotClient,
-          RuntimeConnection: { forUri: vi.fn(() => ({})) },
+          RuntimeConnection: { forTcp: vi.fn(() => ({})) },
           approveAll: () => ({ kind: "approve-once" }),
         },
       });
 
       expect(result.exitCode).toBe(0);
       const sessionConfig = createSession.mock.calls[0][0];
-      const onPermissionRequest = sessionConfig.onPermissionRequest;
+      const onPermissionRequest = sessionConfig.permissions.onRequest;
       // Copilot SDK treats any granted read capability as global; read(path) entries are
       // effectively equivalent to read for the onPermissionRequest contract.
       expect(onPermissionRequest({ kind: "read", path: "a.txt", intention: "" })).toEqual({ kind: "approve-once" });
@@ -1345,14 +1346,14 @@ describe("copilot_sdk_driver.cjs", () => {
         },
         sdkModule: {
           CopilotClient: FakeCopilotClient,
-          RuntimeConnection: { forUri: vi.fn(() => ({})) },
+          RuntimeConnection: { forTcp: vi.fn(() => ({})) },
           approveAll: () => ({ kind: "approve-once" }),
         },
       });
 
       expect(result.exitCode).toBe(0);
       const sessionConfig = createSession.mock.calls[0][0];
-      const onPermissionRequest = sessionConfig.onPermissionRequest;
+      const onPermissionRequest = sessionConfig.permissions.onRequest;
       expect(onPermissionRequest({ kind: "read", path: "a.txt", intention: "" })).toEqual({ kind: "approve-once" });
     });
 
@@ -1380,14 +1381,14 @@ describe("copilot_sdk_driver.cjs", () => {
         },
         sdkModule: {
           CopilotClient: FakeCopilotClient,
-          RuntimeConnection: { forUri: vi.fn(() => ({})) },
+          RuntimeConnection: { forTcp: vi.fn(() => ({})) },
           approveAll: () => ({ kind: "approve-once" }),
         },
       });
 
       expect(result.exitCode).toBe(0);
       const sessionConfig = createSession.mock.calls[0][0];
-      const onPermissionRequest = sessionConfig.onPermissionRequest;
+      const onPermissionRequest = sessionConfig.permissions.onRequest;
       expect(onPermissionRequest({ kind: "read", path: "/tmp/gh-aw/agent/doc-samples.txt", intention: "" })).toEqual({ kind: "approve-once" });
       expect(onPermissionRequest({ kind: "read", path: "/tmp/gh-aw/agent/subdir/nested.txt", intention: "" })).toEqual({
         kind: "approve-once",
@@ -1430,13 +1431,13 @@ describe("copilot_sdk_driver.cjs", () => {
           },
           sdkModule: {
             CopilotClient: FakeCopilotClient,
-            RuntimeConnection: { forUri: vi.fn(() => ({})) },
+            RuntimeConnection: { forTcp: vi.fn(() => ({})) },
             approveAll: () => ({ kind: "approve-once" }),
           },
         });
 
         const sessionConfig = createSession.mock.calls[0][0];
-        const onPermissionRequest = sessionConfig.onPermissionRequest;
+        const onPermissionRequest = sessionConfig.permissions.onRequest;
 
         // Absolute paths within the workspace must be allowed via the relative pattern.
         expect(onPermissionRequest({ kind: "read", path: "/home/runner/work/gh-aw/gh-aw/pkg/workflow/compiler_activation_job_builder.go", intention: "" })).toEqual({ kind: "approve-once" });
@@ -1501,13 +1502,13 @@ describe("copilot_sdk_driver.cjs", () => {
           },
           sdkModule: {
             CopilotClient: FakeCopilotClient,
-            RuntimeConnection: { forUri: vi.fn(() => ({})) },
+            RuntimeConnection: { forTcp: vi.fn(() => ({})) },
             approveAll: () => ({ kind: "approve-once" }),
           },
         });
 
         const sessionConfig = createSession.mock.calls[0][0];
-        const onPermissionRequest = sessionConfig.onPermissionRequest;
+        const onPermissionRequest = sessionConfig.permissions.onRequest;
 
         // The workspace root itself must always be readable.
         expect(onPermissionRequest({ kind: "read", path: "/home/runner/work/gh-aw/gh-aw", intention: "" })).toEqual({ kind: "approve-once" });
@@ -1549,7 +1550,7 @@ describe("copilot_sdk_driver.cjs", () => {
       }
     });
 
-    it("logs permission-denied SDK requests as core warnings", async () => {
+    it("logs permission-denied SDK request kinds without shell or URL details", async () => {
       const disconnect = vi.fn().mockResolvedValue(undefined);
       const stop = vi.fn().mockResolvedValue(undefined);
       const createSession = vi.fn().mockResolvedValue({
@@ -1567,31 +1568,38 @@ describe("copilot_sdk_driver.cjs", () => {
         info: vi.fn(),
         warning: vi.fn(),
       };
+      const logger = vi.fn();
 
       const result = await runWithCopilotSDK({
         sdkUri: "http://127.0.0.1:3002",
         prompt: "test prompt",
-        logger: () => {},
+        logger,
         permissionConfig: {
           allowedTools: ["shell(git:*)"],
         },
         coreLogger,
         sdkModule: {
           CopilotClient: FakeCopilotClient,
-          RuntimeConnection: { forUri: vi.fn(() => ({})) },
+          RuntimeConnection: { forTcp: vi.fn(() => ({})) },
           approveAll: () => ({ kind: "approve-once" }),
         },
       });
 
       expect(result.exitCode).toBe(0);
       const sessionConfig = createSession.mock.calls[0][0];
-      const onPermissionRequest = sessionConfig.onPermissionRequest;
-      expect(onPermissionRequest({ kind: "shell", commands: [{ identifier: "rm" }], fullCommandText: "rm -rf /tmp/x" })).toEqual({
+      const onPermissionRequest = sessionConfig.permissions.onRequest;
+      const rejection = {
         kind: "reject",
         feedback: "Tool invocation is not allowed by workflow tool permissions.",
-      });
-      expect(coreLogger.info).toHaveBeenCalledWith(expect.stringContaining("shell(rm -rf /tmp/x)"));
-      expect(coreLogger.warning).toHaveBeenCalledWith(expect.stringContaining("shell(rm -rf /tmp/x)"));
+      };
+      expect(onPermissionRequest({ kind: "shell", commands: [{ identifier: "echo" }], fullCommandText: "echo SHELL_SECRET" })).toEqual(rejection);
+      expect(onPermissionRequest({ kind: "url", url: "https://USER_SECRET:PASS_SECRET@example.test/PATH_SECRET?q=QUERY_SECRET#FRAGMENT_SECRET" })).toEqual(rejection);
+      expect(onPermissionRequest({ kind: "shell", commands: [{ identifier: "git" }], fullCommandText: "git status" })).toEqual({ kind: "approve-once" });
+      for (const sink of [logger, coreLogger.info, coreLogger.warning]) {
+        expect(sink).toHaveBeenCalledWith(expect.stringMatching(/permission denied.*: shell$/));
+        expect(sink).toHaveBeenCalledWith(expect.stringMatching(/permission denied.*: url$/));
+        expect(JSON.stringify(sink.mock.calls)).not.toMatch(/_SECRET|example\.test/);
+      }
     });
 
     it("always configures onPermissionRequest and defaults to approveAll when permissionConfig is absent", async () => {
@@ -1616,15 +1624,15 @@ describe("copilot_sdk_driver.cjs", () => {
         logger: () => {},
         sdkModule: {
           CopilotClient: FakeCopilotClient,
-          RuntimeConnection: { forUri: vi.fn(() => ({})) },
+          RuntimeConnection: { forTcp: vi.fn(() => ({})) },
           approveAll,
         },
       });
 
       expect(result.exitCode).toBe(0);
       const sessionConfig = createSession.mock.calls[0][0];
-      expect(sessionConfig).toHaveProperty("onPermissionRequest");
-      const decision = sessionConfig.onPermissionRequest({ kind: "read", path: "a.txt", intention: "" });
+      expect(sessionConfig).toHaveProperty("permissions.onRequest");
+      const decision = sessionConfig.permissions.onRequest({ kind: "read", path: "a.txt", intention: "" });
       expect(decision).toEqual({ kind: "approve-once" });
       expect(approveAll).toHaveBeenCalledTimes(1);
     });
@@ -1639,9 +1647,9 @@ describe("copilot_sdk_driver.cjs", () => {
         on: () => {},
         sendAndWait: vi.fn().mockImplementation(async () => {
           const denyRequest = { kind: "shell", commands: [{ identifier: "rm" }], fullCommandText: "rm -rf /tmp/x" };
-          sessionConfig.onPermissionRequest(denyRequest);
-          sessionConfig.onPermissionRequest(denyRequest);
-          sessionConfig.onPermissionRequest(denyRequest);
+          sessionConfig.permissions.onRequest(denyRequest);
+          sessionConfig.permissions.onRequest(denyRequest);
+          sessionConfig.permissions.onRequest(denyRequest);
           return { data: { content: "should-not-complete" } };
         }),
         disconnect,
@@ -1667,7 +1675,7 @@ describe("copilot_sdk_driver.cjs", () => {
           },
           sdkModule: {
             CopilotClient: FakeCopilotClient,
-            RuntimeConnection: { forUri: vi.fn(() => ({})) },
+            RuntimeConnection: { forTcp: vi.fn(() => ({})) },
             approveAll: () => ({ kind: "approve-once" }),
           },
         });
@@ -1691,7 +1699,7 @@ describe("copilot_sdk_driver.cjs", () => {
           data: {
             denialCount: 3,
             threshold: 3,
-            reason: expect.stringContaining("permission denied"),
+            reason: "permission denied: shell",
           },
         });
       } finally {
@@ -1713,9 +1721,9 @@ describe("copilot_sdk_driver.cjs", () => {
         on: () => {},
         sendAndWait: vi.fn().mockImplementation(async () => {
           const denyRequest = { kind: "shell", commands: [{ identifier: "rm" }], fullCommandText: "rm -rf /tmp/x" };
-          sessionConfig.onPermissionRequest(denyRequest);
-          sessionConfig.onPermissionRequest(denyRequest);
-          sessionConfig.onPermissionRequest(denyRequest);
+          sessionConfig.permissions.onRequest(denyRequest);
+          sessionConfig.permissions.onRequest(denyRequest);
+          sessionConfig.permissions.onRequest(denyRequest);
           return { data: { content: "completed" } };
         }),
         disconnect,
@@ -1741,7 +1749,7 @@ describe("copilot_sdk_driver.cjs", () => {
           },
           sdkModule: {
             CopilotClient: FakeCopilotClient,
-            RuntimeConnection: { forUri: vi.fn(() => ({})) },
+            RuntimeConnection: { forTcp: vi.fn(() => ({})) },
             approveAll: () => ({ kind: "approve-once" }),
           },
         });
@@ -1768,8 +1776,8 @@ describe("copilot_sdk_driver.cjs", () => {
         on: () => {},
         sendAndWait: vi.fn().mockImplementation(async () => {
           const denyRequest = { kind: "shell", commands: [{ identifier: "rm" }], fullCommandText: "rm -rf /tmp/x" };
-          sessionConfig.onPermissionRequest(denyRequest);
-          sessionConfig.onPermissionRequest(denyRequest);
+          sessionConfig.permissions.onRequest(denyRequest);
+          sessionConfig.permissions.onRequest(denyRequest);
           if (disconnected) {
             throw new Error("transport disconnected");
           }
@@ -1798,7 +1806,7 @@ describe("copilot_sdk_driver.cjs", () => {
           },
           sdkModule: {
             CopilotClient: FakeCopilotClient,
-            RuntimeConnection: { forUri: vi.fn(() => ({})) },
+            RuntimeConnection: { forTcp: vi.fn(() => ({})) },
             approveAll: () => ({ kind: "approve-once" }),
           },
         });
@@ -1826,8 +1834,8 @@ describe("copilot_sdk_driver.cjs", () => {
         on: () => {},
         sendAndWait: vi.fn().mockImplementation(() => {
           const denyRequest = { kind: "shell", commands: [{ identifier: "rm" }], fullCommandText: "rm -rf /tmp/x" };
-          sessionConfig.onPermissionRequest(denyRequest);
-          sessionConfig.onPermissionRequest(denyRequest);
+          sessionConfig.permissions.onRequest(denyRequest);
+          sessionConfig.permissions.onRequest(denyRequest);
           // sendAndWait itself never settles — simulates the in-flight SDK request
           // that never resolves once disconnect() is stuck.
           return new Promise(() => {});
@@ -1858,7 +1866,7 @@ describe("copilot_sdk_driver.cjs", () => {
           },
           sdkModule: {
             CopilotClient: FakeCopilotClient,
-            RuntimeConnection: { forUri: vi.fn(() => ({})) },
+            RuntimeConnection: { forTcp: vi.fn(() => ({})) },
             approveAll: () => ({ kind: "approve-once" }),
           },
         });
@@ -2008,7 +2016,7 @@ describe("copilot_sdk_driver.cjs", () => {
       const stop = vi.fn().mockResolvedValue(undefined);
       let capturedHandler;
       const createSession = vi.fn().mockImplementation(async config => {
-        capturedHandler = config.onPermissionRequest;
+        capturedHandler = config.permissions.onRequest;
         return {
           sessionId: "session-pipe-test",
           on: () => {},
@@ -2028,7 +2036,7 @@ describe("copilot_sdk_driver.cjs", () => {
         permissionConfig: { allowedTools },
         sdkModule: {
           CopilotClient: FakeCopilotClient,
-          RuntimeConnection: { forUri: vi.fn(() => ({})) },
+          RuntimeConnection: { forTcp: vi.fn(() => ({})) },
           approveAll: () => ({ kind: "approve-once" }),
         },
       });

@@ -475,7 +475,7 @@ it("uses native SDK createSession on first run and resumeSession with rebound po
     workingDirectory: directory,
     agentsBaseDir: directory,
     logger() {},
-    sdkModule: { CopilotClient: Client, RuntimeConnection: { forUri: () => ({}) }, approveAll: () => "allow" },
+    sdkModule: { CopilotClient: Client, RuntimeConnection: { forTcp: () => ({}) }, approveAll: () => "allow" },
   };
   vi.spyOn(process.stderr, "write").mockImplementation(() => true);
   expect((await runWithCopilotSDK(options)).exitCode).toBe(0);
@@ -491,7 +491,7 @@ it("uses native SDK createSession on first run and resumeSession with rebound po
   vi.stubEnv("GH_AW_DURABLE_RESUMED", "true");
   expect((await runWithCopilotSDK(options)).exitCode).toBe(0);
   expect(create).toHaveBeenCalledTimes(1);
-  expect(resume).toHaveBeenCalledWith(sessionId, expect.objectContaining({ allowTranscriptRecovery: false, onPermissionRequest: expect.any(Function), model: "new-model", workingDirectory: directory }));
+  expect(resume).toHaveBeenCalledWith(sessionId, expect.objectContaining({ allowTranscriptRecovery: false, permissions: { onRequest: expect.any(Function) }, model: "new-model", workingDirectory: directory }));
 });
 
 it("ignores restored SDK model history but still rejects a new substitution", () => {

@@ -273,7 +273,7 @@ const (
 	// CopilotSDKURIEnvVar is the environment variable name for the Copilot SDK URI.
 	// When copilot-sdk: true is set, this env var holds the HTTP endpoint URI
 	// where the harness-managed Copilot CLI sidecar listens for SDK connections
-	// (e.g. "http://127.0.0.1:3002"). It is set on every child process so that the @github/copilot-sdk
+	// (e.g. "http://127.0.0.1:3002"). It is set on every child process so that the @microsoft/copilot-sdk
 	// library can locate the running Copilot HTTP server.
 	CopilotSDKURIEnvVar = "COPILOT_SDK_URI"
 

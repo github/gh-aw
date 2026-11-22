@@ -93,7 +93,7 @@ describe("Copilot SDK main-session model observation", () => {
       logger,
       workingDirectory: root,
       agentsBaseDir: root,
-      sdkModule: { CopilotClient: FakeCopilotClient, RuntimeConnection: { forUri: () => ({}) }, approveAll: () => "allow" },
+      sdkModule: { CopilotClient: FakeCopilotClient, RuntimeConnection: { forTcp: () => ({}) }, approveAll: () => "allow" },
     });
     return { result, disconnect, createSession, logger };
   }
@@ -233,10 +233,10 @@ runWithCopilotSDK({
   logger: message => process.stderr.write(message + "\\n"),
   workingDirectory: ${JSON.stringify(root)},
   agentsBaseDir: ${JSON.stringify(root)},
-  sdkModule: { CopilotClient, RuntimeConnection: { forUri: () => ({}) }, approveAll: () => "allow" },
+  sdkModule: { CopilotClient, RuntimeConnection: { forTcp: () => ({}) }, approveAll: () => "allow" },
 }).then(result => process.exit(result.exitCode));`
     );
-    const env = { ...process.env, AWF_REFLECT_ENABLED: "1", COPILOT_MODEL: "gpt-5.6-luna", COPILOT_SDK_URI: `http://127.0.0.1:${sdkPort}`, GH_AW_AWF_CONFIG_PATH: path.join(root, "awf-config.json") };
+    const env = { ...process.env, RUNNER_TEMP: root, AWF_REFLECT_ENABLED: "1", COPILOT_MODEL: "gpt-5.6-luna", COPILOT_SDK_URI: `http://127.0.0.1:${sdkPort}`, GH_AW_AWF_CONFIG_PATH: path.join(root, "awf-config.json") };
     Object.assign(env, { GH_AW_HARNESS_MAX_RETRIES: "3", GH_AW_HARNESS_INITIAL_DELAY_MS: "1", GH_AW_HARNESS_MAX_DELAY_MS: "1", GH_AW_HARNESS_STALL_WARNING_MS: "0", NODE_OPTIONS: `--require ${preloadPath}` });
     fs.writeFileSync(env.GH_AW_AWF_CONFIG_PATH, JSON.stringify({ network: { allowDomains: [] } }));
     for (const key of [

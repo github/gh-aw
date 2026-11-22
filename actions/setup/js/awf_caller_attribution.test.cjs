@@ -235,9 +235,9 @@ process.stdin.on("end", () => {
     // and haiku-whoami share the copilot-completions provider and served model,
     // so any header would also label child traffic. The SDK sends none and
     // relies on native per-agent metrics instead.
-    fs.mkdirSync(path.join(dir, ".github/agents"), { recursive: true });
+    fs.mkdirSync(path.join(dir, "base/copilot-agents"), { recursive: true });
     const agent = "---\nmodel: claude-haiku-4.5\n---\nSay which model you are.";
-    fs.writeFileSync(path.join(dir, ".github/agents/haiku-whoami.agent.md"), agent);
+    fs.writeFileSync(path.join(dir, "base/copilot-agents/haiku-whoami.agent.md"), agent);
     prepareMarkdownFixtures(agent);
     vi.stubEnv("GH_AW_SESSION_STATE_BASE_DIR", dir);
     vi.stubEnv("GH_AW_ENGINE_CWD", dir);
@@ -273,17 +273,17 @@ process.stdin.on("end", () => {
       logger: () => {},
       workingDirectory: dir,
       agentsBaseDir: dir,
-      sdkModule: { CopilotClient: FakeCopilotClient, RuntimeConnection: { forUri: () => ({}) }, approveAll: () => "allow" },
+      sdkModule: { CopilotClient: FakeCopilotClient, RuntimeConnection: { forTcp: () => ({}) }, approveAll: () => "allow" },
     });
     expect(result.exitCode).toBe(0);
     const session = createSession.mock.calls[0][0];
     // Wire APIs, providers and model resolution are unchanged.
-    expect(session.providers).toEqual(config.providers);
-    expect(session.models).toEqual(config.models);
+    expect(session.inference.providers).toEqual(config.providers);
+    expect(session.inference.models).toEqual(config.models);
     expect(session.model).toBe("copilot-completions/claude-haiku-4.5");
-    expect(session.customAgents).toEqual([expect.objectContaining({ name: "haiku-whoami", model: "copilot-completions/claude-haiku-4.5" })]);
+    expect(session.agents.definitions).toEqual([expect.objectContaining({ name: "haiku-whoami", model: "copilot-completions/claude-haiku-4.5" })]);
     expect(JSON.stringify(session).toLowerCase()).not.toContain("x-awf-caller");
-    expect(session.providers.every(provider => provider.headers === undefined)).toBe(true);
+    expect(session.inference.providers.every(provider => provider.headers === undefined)).toBe(true);
     for (const call of sendAndWait.mock.calls) expect(JSON.stringify(call).toLowerCase()).not.toContain("x-awf-caller");
   });
 

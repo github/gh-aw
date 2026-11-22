@@ -32,6 +32,7 @@ set -euo pipefail
 WORKSPACE="${GITHUB_WORKSPACE:-$(pwd)}"
 DEST="/tmp/gh-aw/base"
 rm -f "${DEST}/snapshot.tar"
+rm -rf "${DEST}/copilot-agents"
 
 # Parse the engine-registry-derived lists from environment variables.
 # The compiler sets these so this script never needs manual maintenance.
@@ -131,4 +132,14 @@ for (const item of new Set(items)) {
 }
 NODE
   tar -cf "${DEST}/snapshot.tar" -C "${STAGING_DIR}" -- "${ITEMS[@]}"
+  # Keep SDK discovery separate from the agent job's mutable checkout. The
+  # snapshot has already confined and materialized out-of-tree symlink targets.
+  if [ "${GH_AW_STAGE_COPILOT_SDK_AGENTS:-}" = "true" ] && [ -d "${STAGING_DIR}/.github/agents" ]; then
+    mkdir "${DEST}/copilot-agents"
+    for AGENT in "${STAGING_DIR}/.github/agents/"*.agent.md; do
+      if [ -f "${AGENT}" ] && [ ! -L "${AGENT}" ]; then
+        cp -- "${AGENT}" "${DEST}/copilot-agents/"
+      fi
+    done
+  fi
 fi

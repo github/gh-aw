@@ -24,17 +24,17 @@ describe("loadCopilotSDKCustomAgents", () => {
   it("loads runtime files, preserving YAML descriptions and workflow precedence", () => {
     const base = fs.mkdtempSync(path.join(process.cwd(), ".sdk-agents-test-"));
     try {
-      const workspace = path.join(base, "workspace");
-      const workflow = path.join(base, "workflow");
-      fs.mkdirSync(path.join(workspace, ".github/agents"), { recursive: true });
-      fs.mkdirSync(path.join(workflow, ".github/agents"), { recursive: true });
-      fs.writeFileSync(path.join(workspace, ".github/agents/helper.agent.md"), "---\nname: helper\n---\nRepository version.");
-      fs.writeFileSync(path.join(workflow, ".github/agents/helper.agent.md"), "---\nname: helper\ndescription: |\n  First line\n  Second line\ntools: []\nmodel: small\n---\nWorkflow version.");
-      fs.writeFileSync(path.join(workspace, ".github/agents/plain.agent.md"), "Prompt without frontmatter.");
-      fs.writeFileSync(path.join(workspace, ".github/agents/ignored.md"), "Ignored file.");
-      fs.writeFileSync(path.join(workspace, ".github/agents/broken.agent.md"), "---\ntools: {invalid: true}\n---\nInvalid tools.");
+      const repository = path.join(base, "base/copilot-agents");
+      const workflow = path.join(base, ".github/agents");
+      fs.mkdirSync(repository, { recursive: true });
+      fs.mkdirSync(workflow, { recursive: true });
+      fs.writeFileSync(path.join(repository, "helper.agent.md"), "---\nname: helper\n---\nRepository version.");
+      fs.writeFileSync(path.join(workflow, "helper.agent.md"), "---\nname: helper\ndescription: |\n  First line\n  Second line\ntools: []\nmodel: small\n---\nWorkflow version.");
+      fs.writeFileSync(path.join(repository, "plain.agent.md"), "Prompt without frontmatter.");
+      fs.writeFileSync(path.join(repository, "ignored.md"), "Ignored file.");
+      fs.writeFileSync(path.join(repository, "broken.agent.md"), "---\ntools: {invalid: true}\n---\nInvalid tools.");
       const warnings = [];
-      expect(loadCopilotSDKCustomAgents(workspace, workflow, message => warnings.push(message))).toEqual([
+      expect(loadCopilotSDKCustomAgents(base, message => warnings.push(message))).toEqual([
         { name: "helper", displayName: "helper", description: "First line\nSecond line\n", tools: [], model: "small", prompt: "Workflow version." },
         { name: "plain", displayName: "plain", prompt: "Prompt without frontmatter." },
       ]);

@@ -106,9 +106,9 @@ async function main() {
     process.exit(1);
   }
 
-  /** @type {import("@github/copilot-sdk").NamedProviderConfig[]} */
+  /** @type {import("@microsoft/copilot-sdk").NamedProviderConfig[]} */
   const providers = multiProviderConfig.providers;
-  /** @type {import("@github/copilot-sdk").ProviderModelConfig[]} */
+  /** @type {import("@microsoft/copilot-sdk").ProviderModelConfig[]} */
   const sdkModels = multiProviderConfig.models;
   const routingEnabled = process.env.GH_AW_MODEL_ROUTING === "1";
   let model = (routingEnabled ? process.env.COPILOT_MODEL : applyModelFallback(process.env, "COPILOT_MODEL", log)) || multiProviderConfig.model || undefined;
