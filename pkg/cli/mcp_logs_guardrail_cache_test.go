@@ -18,7 +18,7 @@ func TestBuildLogsFileResponse_WritesFile(t *testing.T) {
 	// buildLogsFileResponse always writes to a file and returns file_path
 	output := `{"summary": {"total_runs": 1}, "runs": []}`
 
-	result := buildLogsFileResponse(output)
+	result := buildLogsFileResponseWithCache(output, defaultMCPLogsCache.store)
 
 	// Verify the result is valid JSON
 	var response MCPLogsGuardrailResponse
@@ -136,8 +136,8 @@ func TestBuildLogsFileResponse_ContentDeduplication(t *testing.T) {
 	// Same content should yield the same file path (content-addressed)
 	output := `{"summary": {"total_runs": 5}, "runs": []}`
 
-	result1 := buildLogsFileResponse(output)
-	result2 := buildLogsFileResponse(output)
+	result1 := buildLogsFileResponseWithCache(output, defaultMCPLogsCache.store)
+	result2 := buildLogsFileResponseWithCache(output, defaultMCPLogsCache.store)
 
 	var r1, r2 MCPLogsGuardrailResponse
 	if err := json.Unmarshal([]byte(result1), &r1); err != nil {
@@ -165,7 +165,7 @@ func TestBuildLogsFileResponse_LargeOutput(t *testing.T) {
 	// buildLogsFileResponse should always write to file regardless of output size
 	largeOutput := strings.Repeat("x", 50000)
 
-	result := buildLogsFileResponse(largeOutput)
+	result := buildLogsFileResponseWithCache(largeOutput, defaultMCPLogsCache.store)
 
 	var response MCPLogsGuardrailResponse
 	if err := json.Unmarshal([]byte(result), &response); err != nil {
@@ -192,7 +192,7 @@ func TestBuildLogsFileResponse_LargeOutput(t *testing.T) {
 func TestBuildLogsFileResponse_ResponseStructure(t *testing.T) {
 	output := `{"summary": {"total_runs": 2}}`
 
-	result := buildLogsFileResponse(output)
+	result := buildLogsFileResponseWithCache(output, defaultMCPLogsCache.store)
 
 	var response MCPLogsGuardrailResponse
 	if err := json.Unmarshal([]byte(result), &response); err != nil {
@@ -214,7 +214,7 @@ func TestBuildLogsFileResponse_ResponseStructure(t *testing.T) {
 func TestBuildLogsFileResponse_MarksPartialResults(t *testing.T) {
 	output := `{"summary":{"total_runs":2},"continuation":{"message":"Timeout reached. Use these parameters to continue fetching more logs.","before_run_id":42,"count":100}}`
 
-	result := buildLogsFileResponse(output)
+	result := buildLogsFileResponseWithCache(output, defaultMCPLogsCache.store)
 
 	var response MCPLogsGuardrailResponse
 	if err := json.Unmarshal([]byte(result), &response); err != nil {
@@ -241,7 +241,7 @@ func TestBuildLogsFileResponse_MarksPartialResults(t *testing.T) {
 func TestBuildLogsFileResponse_CompleteResultsNotPartial(t *testing.T) {
 	output := `{"summary":{"total_runs":2},"runs":[]}`
 
-	result := buildLogsFileResponse(output)
+	result := buildLogsFileResponseWithCache(output, defaultMCPLogsCache.store)
 
 	var response MCPLogsGuardrailResponse
 	if err := json.Unmarshal([]byte(result), &response); err != nil {
@@ -356,7 +356,7 @@ func TestBuildLogsFileResponse_CollectionCoverage(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var response MCPLogsGuardrailResponse
-			require.NoError(t, json.Unmarshal([]byte(buildLogsFileResponse(tt.output)), &response))
+			require.NoError(t, json.Unmarshal([]byte(buildLogsFileResponseWithCache(tt.output, defaultMCPLogsCache.store)), &response))
 			require.NotEmpty(t, response.FilePath)
 			t.Cleanup(func() { assert.NoError(t, os.Remove(response.FilePath)) })
 			assert.Equal(t, tt.partial, response.Partial)
@@ -377,7 +377,7 @@ func TestBuildLogsFileResponse_CollectionCoverage(t *testing.T) {
 func TestBuildLogsFileResponse_SurfacesStaleDataWarning(t *testing.T) {
 	output := `{"summary":{"total_runs":1},"runs":[],"stale_warning":"No start_date/end_date was specified, and the most recent run in this result is 11 days old."}`
 
-	result := buildLogsFileResponse(output)
+	result := buildLogsFileResponseWithCache(output, defaultMCPLogsCache.store)
 
 	var response MCPLogsGuardrailResponse
 	if err := json.Unmarshal([]byte(result), &response); err != nil {
@@ -401,7 +401,7 @@ func TestBuildLogsFileResponse_DoesNotWarnOnOrdinaryMessage(t *testing.T) {
 	// trigger the WARNING prefix.
 	output := `{"summary":{"total_runs":1},"runs":[],"message":"Only the usage artifact was downloaded."}`
 
-	result := buildLogsFileResponse(output)
+	result := buildLogsFileResponseWithCache(output, defaultMCPLogsCache.store)
 
 	var response MCPLogsGuardrailResponse
 	if err := json.Unmarshal([]byte(result), &response); err != nil {
