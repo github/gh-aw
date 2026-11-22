@@ -116,7 +116,7 @@ observability:
   otlp: false
 ```
 
-The compiler omits its OTLP environment variables and credential references, even if an import configures OTLP. This does not change variables you define explicitly in `env:` or disable local telemetry artifacts.
+The compiler omits its OTLP endpoint and credential environment variables, even if an import configures OTLP. This does not change variables you define explicitly in `env:`, trace-context propagation, or local telemetry artifacts. The opt-out applies only in the main workflow; `observability.otlp: false` in an imported workflow has no effect.
 
 Behavior:
 

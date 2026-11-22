@@ -31,20 +31,30 @@ env:
 	for _, tc := range []struct {
 		name, config string
 		disabled     bool
+		importedOff  bool
 	}{
 		{name: "defaults"},
 		{name: "disabled", config: "observability: { otlp: false }\n", disabled: true},
 		{name: "disabled with import", config: "observability: { otlp: false }\nimports: [shared.md]\n", disabled: true},
+		{name: "imported opt-out has no effect", config: "imports: [shared.md]\n", importedOff: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			dir := t.TempDir()
-			require.NoError(t, os.WriteFile(filepath.Join(dir, "shared.md"), []byte(`---
+			importedConfig := `---
 observability:
   otlp:
     endpoint: https://imported.example.com
     headers: ${{ secrets.IMPORTED_OTLP_HEADERS }}
 ---
-`), 0600))
+`
+			if tc.importedOff {
+				importedConfig = `---
+observability:
+  otlp: false
+---
+`
+			}
+			require.NoError(t, os.WriteFile(filepath.Join(dir, "shared.md"), []byte(importedConfig), 0600))
 			path := filepath.Join(dir, "telemetry.md")
 			require.NoError(t, os.WriteFile(path, []byte(source+tc.config+"---\nSay hello.\n"), 0600))
 			require.NoError(t, NewCompiler().CompileWorkflow(path))
@@ -68,9 +78,37 @@ observability:
 				assert.NotContains(t, string(lock), "secrets.IMPORTED_OTLP_HEADERS")
 				assert.NotContains(t, string(lock), "imported.example.com")
 				assert.NotContains(t, string(lock), "Check OTLP telemetry configuration")
+				assert.Contains(t, workflow.Env, "GH_AW_OTEL_METRICS")
+				assert.Contains(t, string(lock), "/tmp/gh-aw/otel.jsonl")
+				assert.Contains(t, string(lock), "otel-metrics.jsonl")
+				assert.Contains(t, string(lock), "Generate observability summary")
+				assert.Contains(t, string(lock), "Emit OTLP job conclusion before artifacts")
+			} else if tc.importedOff {
+				assert.Contains(t, workflow.Env, "OTEL_EXPORTER_OTLP_ENDPOINT")
+				assert.NotContains(t, string(lock), "imported.example.com")
 			}
 		})
 	}
+}
+
+func TestNormalizeFrontmatterConfigOTLPDisabled(t *testing.T) {
+	frontmatter := map[string]any{
+		"observability": map[string]any{
+			"otlp":  false,
+			"other": "preserved",
+		},
+	}
+
+	normalized, err := normalizeFrontmatterConfig(frontmatter)
+	require.NoError(t, err)
+	normalizedObservability := normalized["observability"].(map[string]any)
+	assert.NotContains(t, normalizedObservability, "otlp")
+	assert.Equal(t, "preserved", normalizedObservability["other"])
+
+	config, err := ParseFrontmatterConfig(frontmatter)
+	require.NoError(t, err)
+	require.NotNil(t, config.Observability)
+	assert.Nil(t, config.Observability.OTLP)
 }
 
 // TestExtractOTLPEndpointDomain verifies hostname extraction from OTLP endpoint URLs.

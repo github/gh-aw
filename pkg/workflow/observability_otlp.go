@@ -931,6 +931,15 @@ func isOTLPDisabled(frontmatter map[string]any) bool {
 
 func (c *Compiler) injectOTLPConfig(workflowData *WorkflowData) {
 	if isOTLPDisabled(workflowData.RawFrontmatter) {
+		existingEnv := workflowData.Env
+		if !workflowEnvHasKey(existingEnv, compilerenv.OTLPMetrics) {
+			metricsLine := fmt.Sprintf("  %s: ${{ vars.%s || 'true' }}", compilerenv.OTLPMetrics, compilerenv.OTLPMetrics)
+			if workflowData.Env == "" {
+				workflowData.Env = "env:\n" + metricsLine
+			} else {
+				workflowData.Env += "\n" + metricsLine
+			}
+		}
 		return
 	}
 	entries, usesEnterpriseDefaults := resolveOTLPEndpointEntries(workflowData)
