@@ -8,9 +8,9 @@ sidebar:
 
 # AI Credits Specification
 
-**Version**: 1.5.4<br />
+**Version**: 1.5.5<br />
 **Status**: Draft  
-**Publication Date**: 2026-11-13<br />
+**Publication Date**: 2026-11-22<br />
 **Editor**: GitHub Agentic Workflows Team  
 **This Version**: [ai-credits-specification](/gh-aw/specs/ai-credits-specification/)  
 **Latest Published Version**: This document
@@ -502,7 +502,7 @@ Individually resolved observations are persisted even if a later historical read
 
 The runtime MUST list billable jobs with all attempts, validate completed job metadata, and independently account for Agent, Detection, and Evaluations. It normalizes display names to component IDs, rejects ambiguous same-attempt jobs, and retains the relevant executed job when a failed-only rerun preserves a successful earlier attempt. A complete empty job list or a list containing only skipped billable jobs proves zero for the run without an artifact read.
 
-Otherwise, the runtime selects the latest matching `usage` or invocation-prefixed `*-usage` artifact. It orders aggregate and producer artifacts by creation time, not artifact ID. Missing identity, expiry, missing creation time, or incomplete component coverage is unresolved accounting, not zero. An aggregate artifact MUST cover each executed component's start/end timestamps. On reruns, unless the cancelled-attempt exception below applies, the original component producer artifact MUST also exist, be unexpired, and have a creation time from the job start through strictly before its completion plus one second. Repacking old data with a new aggregate timestamp MUST NOT establish coverage.
+Otherwise, the runtime MUST list all artifacts, order aggregate and producer artifacts by `createdAt` descending, and select the first matching `usage` or invocation-prefixed `*-usage` artifact. Artifact ID MUST NOT determine artifact selection. Missing identity, expiry, missing creation time, or incomplete component coverage is unresolved accounting, not zero. An aggregate artifact MUST cover each executed component's start/end timestamps. On reruns, unless the cancelled-attempt exception below applies, the original component producer artifact MUST also exist, be unexpired, and have a creation time from the job start through strictly before its completion plus one second. Repacking old data with a new aggregate timestamp MUST NOT establish coverage.
 
 If the selected latest component job is `cancelled` and its attempt has no verifiable producer artifact, the runtime MAY count carried-forward usage only when the latest earlier executed job for that component is unambiguous and has a verifiable, unexpired producer artifact created within that job's start/completion bounds, and the selected aggregate accounting completely covers that attempt. The runtime MUST warn that usage from the cancelled attempt may be unaccounted for. Missing accounting, ambiguous jobs on the latest earlier attempt, or an unverifiable producer for that attempt remains unresolved accounting; it MUST NOT be treated as zero or carried forward from an arbitrary older job. This fallback MUST NOT apply to any outcome other than `cancelled`. A verified producer for the selected attempt takes precedence and does not require older attempts to be unambiguous.
 
@@ -736,6 +736,10 @@ explicit workflow pricing overrides, or the specification's minor version change
 
 <a id="change-log"></a>
 ## Change Log
+
+### Version 1.5.5 (2026-11-22)
+
+- **Updated**: §9.11 requires artifact selection by descending creation time rather than artifact ID, while preserving timestamp verification and cancelled-rerun fallback behavior.
 
 ### Version 1.5.4 (2026-11-13)
 
