@@ -38,8 +38,10 @@ function buildFailureReport(template, title, values) {
   context.run_links_context = [{ type: "paragraph", children: links, agentTainted: false }];
   context.pull_request_context = Array.isArray(values.pull_request_info) ? values.pull_request_info : parseReportMarkdown(scalar("pull_request_info"), { agentTainted: false });
 
-  const evidence = [context.report_incomplete_context, context.failure_diagnostics_context].flatMap(value => (Array.isArray(value) ? value : []));
-  context.runtime_evidence_context = evidence.length ? [{ type: "details", summary: "Runtime evidence", children: evidence, agentTainted: false }] : [];
+  const evidence = [context.completion_evidence_context, context.failure_diagnostics_context].flatMap(value => (Array.isArray(value) ? value : []));
+  context.runtime_alerts_context = evidence.filter(block => block.type === "alert");
+  const diagnostics = evidence.filter(block => block.type !== "alert");
+  context.runtime_evidence_context = diagnostics.length ? [{ type: "details", summary: "Runtime evidence", children: diagnostics, agentTainted: false }] : [];
 
   return { type: "report", title, children: parseReportMarkdown(template, { context, minimumHeadingLevel: 3, agentTainted: false }), agentTainted: false };
 }

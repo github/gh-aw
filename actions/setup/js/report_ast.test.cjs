@@ -751,11 +751,28 @@ describe("report Markdown import boundary", () => {
       "</details>",
     ].join("\n");
     const { body } = renderReport(report(parseReportMarkdown(markdown)));
-    expect(body).toContain("> [!WARNING]\n> **Missing tool:** `github.read`");
+    expect(body).toContain("> **Warning:**\n>\n> **Missing tool:** `github.read`");
     expect(body).toContain("- First\n  \n  - Nested\n- Second");
     expect(body).toContain("| `gh` | *missing* |");
     expect(body).toContain("````text\n</details>\n```\n````");
     expect(body.endsWith("\n</details>\n")).toBe(true);
+  });
+
+  it.each([
+    ["- > [!TIP]\n  > List content", "- > **Tip:**"],
+    ["> Outer quote\n>\n> > [!TIP]\n> > Quote content", "> > **Tip:**"],
+    ["> [!NOTE]\n> > [!TIP]\n> > Alert content", "> > **Tip:**"],
+  ])("warns when rendering a nested alert in %s", (markdown, expected) => {
+    const warning = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      const { body } = renderReport(report(parseReportMarkdown(markdown)));
+      expect(body).toContain(expected);
+      expect(body).not.toContain("[!TIP]");
+      expect(body).toContain("content");
+      expect(warning).toHaveBeenCalledExactlyOnceWith(expect.stringContaining("Nested alerts (TIP)"));
+    } finally {
+      warning.mockRestore();
+    }
   });
 
   it("does not promote diagnostic headings to report sections or permit arbitrary HTML", () => {

@@ -328,6 +328,12 @@ Synthetic pull_request_context.
 
 
 
+Synthetic report_incomplete_context.
+
+Synthetic agent_report_context.
+
+
+
 ### Next step
 
 Review the failure details below for a targeted fix, or **assign this issue to a coding agent** to investigate.
@@ -405,6 +411,8 @@ Synthetic timeout_context.
 Synthetic fork_context.
 
 
+
+Synthetic runtime_alerts_context.
 
 Synthetic runtime_evidence_context.
 
@@ -816,8 +824,7 @@ gh aw compile
 
 Commit and push the updated `.lock.yml` file.
 
-> [!NOTE]
-> Raising the limit increases the number of AI inference calls the workflow can make
+> **Note:** Raising the limit increases the number of AI inference calls the workflow can make
 > per 24-hour window. Review your Copilot or model provider billing
 > before significantly increasing the threshold (for example, before doubling the current
 > value or setting it far above expected usage).
@@ -838,8 +845,7 @@ The guardrail is evaluated at activation time, not retrospectively, so a single 
 <details>
 <summary>How to disable this guardrail</summary>
 
-> [!CAUTION]
-> Disabling this guardrail removes the per-workflow spending cap. Only disable it if you have
+> **Caution:** Disabling this guardrail removes the per-workflow spending cap. Only disable it if you have
 > an alternative mechanism for controlling AI cost usage or if the workflow is intentionally
 > uncapped.
 
@@ -1940,8 +1946,7 @@ gh aw compile
 <details>
 <summary>How to disable this check</summary>
 
-> [!CAUTION]
-> Disabling this check means the agent can run against an out-of-date compiled workflow. Only disable it if you have an alternative mechanism to keep lock files in sync.
+> **Caution:** Disabling this check means the agent can run against an out-of-date compiled workflow. Only disable it if you have an alternative mechanism to keep lock files in sync.
 
 Set `stale-check: false` in the `on:` section of your workflow frontmatter:
 

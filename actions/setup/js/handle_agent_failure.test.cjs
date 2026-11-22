@@ -1007,7 +1007,7 @@ describe("handle_agent_failure", () => {
     it("explains the incomplete handoff without exposing agent diagnostic details", () => {
       const rendered = buildReportIncompleteContext([{ type: "report_incomplete", reason: "infrastructure_error", details: "agent-generated diagnostic" }]);
       expect(rendered).toContain("completion could not be confirmed");
-      expect(rendered).toContain("Treat the agent-declared reason as a lead, not a confirmed root cause");
+      expect(rendered).toContain("Treat any agent-declared reason as a lead, not a confirmed root cause");
       expect(rendered).toContain("agent diagnostic details are excluded");
       expect(rendered).not.toContain("agent-generated");
       expect(rendered).toContain("infrastructure_error");
@@ -1633,12 +1633,14 @@ describe("handle_agent_failure", () => {
                   collectorFailureCause: "driver_crash",
                   collectorDriverExitCode: 139,
                 }
-              : { items: [{ type: "noop", message: "Done" }] }
+              : { items: [{ type: "report_incomplete", reason: "Reason withheld after redaction failure" }] }
         )
       );
       if (crashed) fs.writeFileSync(path.join(tmpDir, "agent-session.jsonl"), JSON.stringify({ type: "agent.execution", data: { categories: [], errorCodes: [], errorTypes: [], exitCode: 139 } }));
       vi.stubEnv("GH_AW_AGENT_OUTPUT", output);
       vi.stubEnv("GH_AW_AGENT_CONCLUSION", "failure");
+      vi.stubEnv("GH_AW_DETECTION_ACCEPTED", "true");
+      vi.stubEnv("GH_AW_DETECTION_CONCLUSION", "success");
       vi.stubEnv("GH_AW_FAILURE_REPORT_AS_ISSUE", "true");
       vi.stubEnv("GH_AW_FAILURE_CATEGORIES_FILTER", JSON.stringify([cause]));
       vi.stubEnv("GH_AW_MODEL_NOT_SUPPORTED_ERROR", "true");
@@ -1674,13 +1676,14 @@ describe("handle_agent_failure", () => {
       const write = vi.spyOn(fs, "writeFileSync");
       try {
         await main();
-        expect(global.core.setFailed.mock.calls).toEqual(startup || crashed ? [[expect.stringContaining("Agent reported that it could not complete the task (report_incomplete)")]] : []);
+        expect(global.core.setFailed.mock.calls).toEqual([[expect.stringContaining("Agent reported that it could not complete the task (report_incomplete)")]]);
         expect(create).toHaveBeenCalledOnce();
         const issue = create.mock.calls[0][0];
         expect(issue.title).toBe(startup ? "[aw] Test Workflow: failed before agent execution started" : "[aw] Test Workflow: failed to redact secrets in logs");
         expect(issue.body).toContain(`failure_cause: ${cause}`);
         expect(issue.body).toMatch(new RegExp(`failure_categories: [^>]*${cause}`));
         expect(issue.body).toContain(`Failing step:** \`${startup ? "Start MCP gateway" : "Redact secrets in logs"}\``);
+        expect(issue.body).not.toContain("Reason withheld after redaction failure");
         if (startup) {
           expect(issue.body).not.toContain("secret_redaction_failure");
           expect(issue.body).not.toContain("input_bytes=12");
@@ -1692,7 +1695,6 @@ describe("handle_agent_failure", () => {
         }
         expect(write).toHaveBeenCalledWith(require("./handle_agent_failure.cjs").FAILURE_CATEGORIES_PATH, expect.stringContaining(`"${cause}"`));
         if (!startup) expect(global.core.summary.addRaw).not.toHaveBeenCalled();
-        if (!startup && !crashed) expect(global.core.setFailed).not.toHaveBeenCalled();
       } finally {
         write.mockRestore();
         vi.unstubAllEnvs();
@@ -2282,7 +2284,7 @@ describe("handle_agent_failure", () => {
         expect(body).toContain("The workflow recorded a `report_incomplete` signal");
         expect(body).not.toContain("# untrusted heading");
         expect(body).not.toContain("infrastructure_error");
-        expect(body).toContain("private-agent-reason");
+        expect(body).not.toContain("private-agent-reason");
         expect(body).not.toContain("private-data");
         expect(body).not.toContain("private-tool");
         expect(body).toContain("Completion signal: agent reported incomplete");
@@ -2411,7 +2413,7 @@ describe("handle_agent_failure", () => {
 
     it.each([false, true, "disabled"])("deduplicates missing-output notices by workflow and reports the cause (existing issue: %s)", async existingIssue => {
       const template = "{report_incomplete_context}{missing_data_context}{missing_tool_context}{permission_denied_context}{engine_failure_context}";
-      fs.writeFileSync(path.join(promptsDir, "agent_failure_issue.md"), template);
+      fs.writeFileSync(path.join(promptsDir, "agent_failure_issue.md"), "{agent_report_context}{runtime_evidence_context}" + template);
       fs.writeFileSync(path.join(promptsDir, "agent_failure_comment.md"), template);
       const outputPath = path.join(tmpDir, "agent_output.json");
       fs.writeFileSync(
@@ -2433,6 +2435,8 @@ describe("handle_agent_failure", () => {
         JSON.stringify({ type: "tool.execution_complete", data: { toolName: "private-tool", success: false, exitCode: 2, error: "private-tool-error", output: "private-tool-output" } })
       );
       vi.stubEnv("GH_AW_AGENT_OUTPUT", outputPath);
+      vi.stubEnv("GH_AW_DETECTION_ACCEPTED", "true");
+      vi.stubEnv("GH_AW_DETECTION_CONCLUSION", "success");
       if (existingIssue === "disabled") vi.stubEnv("GH_AW_FAILURE_REPORT_AS_ISSUE", "false");
       const create = vi.fn(async () => ({ data: { number: 99, html_url: "https://github.com/owner/repo/issues/99" } }));
       const createComment = vi.fn(async () => ({ data: { id: 1001 } }));
@@ -2486,11 +2490,20 @@ describe("handle_agent_failure", () => {
       }
     });
 
-    it("creates one report_incomplete issue across clean-exit runs with changing diagnostics", async () => {
+    it.each([
+      ["true", "success", true],
+      ["true", "warning", false],
+      ["true", "failure", false],
+      ["true", "skipped", false],
+      ["false", "success", false],
+      [undefined, undefined, false],
+    ])("deduplicates incomplete reports and gates the public reason (accepted: %s, verdict: %s)", async (accepted, conclusion, showReason) => {
       syncRuntimePromptTemplates(import.meta.url);
       fs.writeFileSync(path.join(tmpDir, "agent_execution_exit_code.txt"), "0");
       const outputPath = path.join(tmpDir, "agent_output.json");
       vi.stubEnv("GH_AW_AGENT_OUTPUT", outputPath);
+      vi.stubEnv("GH_AW_DETECTION_ACCEPTED", accepted);
+      vi.stubEnv("GH_AW_DETECTION_CONCLUSION", conclusion);
       let existingBody;
       const create = vi.fn(async ({ body }) => {
         existingBody = body;
@@ -2522,9 +2535,14 @@ describe("handle_agent_failure", () => {
       expect(createComment).toHaveBeenCalledOnce();
       expect(createComment).toHaveBeenCalledWith(expect.objectContaining({ issue_number: 99 }));
       expect(create.mock.calls[0][0].title).toContain("reported incomplete result");
-      for (const body of [create.mock.calls[0][0].body, createComment.mock.calls[0][0].body]) {
-        expect(body).toContain("Required data could not be read");
-      }
+      const issueBody = create.mock.calls[0][0].body;
+      const commentBody = createComment.mock.calls[0][0].body;
+      const reason = "Required data could not be read";
+      expect(issueBody.includes(reason)).toBe(showReason);
+      expect(commentBody.includes(reason)).toBe(showReason);
+      if (showReason) expect(issueBody.indexOf(reason)).toBeLessThan(issueBody.indexOf("### Next step"));
+      expect(issueBody).toMatch(/> \[!WARNING\]\n> \*\*Task Could Not Be Completed/);
+      expect(issueBody).toMatch(/<summary>Runtime evidence<\/summary>[\s\S]*Completion signal: agent reported incomplete/);
     });
 
     it("reuses the steering issue instead of searching for or creating a failure issue", async () => {
@@ -2659,7 +2677,7 @@ describe("handle_agent_failure", () => {
     ])("posts metadata-only generic diagnostics (missing job data: %s, existing issue: %s)", async (missingJobs, existingIssue) => {
       fs.copyFileSync(path.join(__dirname, "../md/engine_driver_failure.md"), path.join(promptsDir, "engine_driver_failure.md"));
       const template = "{failure_diagnostics_context}{report_incomplete_context}{engine_failure_context}";
-      fs.writeFileSync(path.join(promptsDir, "agent_failure_issue.md"), template);
+      fs.writeFileSync(path.join(promptsDir, "agent_failure_issue.md"), "{report_incomplete_context}{engine_failure_context}{runtime_alerts_context}{runtime_evidence_context}");
       fs.writeFileSync(path.join(promptsDir, "agent_failure_comment.md"), template);
       const outputPath = path.join(tmpDir, "agent_output.json");
       fs.writeFileSync(outputPath, JSON.stringify({ items: [{ type: "report_incomplete", reason: "infrastructure_error", details: "agent-generated diagnostic" }] }));
@@ -2716,7 +2734,7 @@ describe("handle_agent_failure", () => {
       expect(body).toContain("*Only runtime metadata is shown; agent-generated text is excluded.*");
       expect(body).toContain("The workflow recorded a `report_incomplete` signal");
       expect(body).not.toContain("agent-generated diagnostic");
-      expect(body).toContain("infrastructure_error");
+      expect(body).not.toContain("infrastructure_error");
       if (missingJobs) {
         expect(body).toContain("**Failing step:** Unavailable");
         expect(body).toContain("The Actions jobs API returned no agent job.");
@@ -3730,12 +3748,11 @@ describe("handle_agent_failure", () => {
         expect(rendered).not.toContain(reportIncompleteMarker);
         expect(rendered).toContain("The workflow recorded a `report_incomplete` signal");
         expect(rendered).toContain("completion could not be confirmed");
-        expect(rendered).toContain("This run needs a follow-up");
         expect(rendered).toContain("A successful agent job only confirms a clean process exit");
-        expect(rendered).toContain("gh aw audit 123456");
         expect(rendered).not.toContain("due to an infrastructure or tool failure");
       }
       expect(reportIncompleteContext).toContain("infrastructure_error");
+      expect(reportIncompleteContext).toContain("gh aw audit 123456");
       expect(reportIncompleteContext).not.toContain(reportIncompleteMarker);
       expect(failureDiagnosticsContext).toContain("Failing step:** `Run agent`");
     });

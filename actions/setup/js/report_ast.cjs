@@ -660,8 +660,10 @@ function escapeURLDestination(url) {
 /**
  * @param {ReportBlock[]} nodes
  * @param {boolean} [compactExpiration]
+ * @param {Set<string>} [nestedAlerts]
+ * @param {boolean} [nested]
  */
-function renderBlocks(nodes, compactExpiration = false) {
+function renderBlocks(nodes, compactExpiration = false, nestedAlerts, nested = false) {
   return nodes
     .map(node => {
       switch (node.type) {
@@ -696,14 +698,18 @@ function renderBlocks(nodes, compactExpiration = false) {
           return node.items
             .map((item, index) => {
               const marker = node.ordered ? `${index + 1}. ` : "- ";
-              return marker + renderBlocks(item).replace(/\n/g, "\n" + " ".repeat(marker.length));
+              return marker + renderBlocks(item, false, nestedAlerts, true).replace(/\n/g, () => "\n" + " ".repeat(marker.length));
             })
             .join("\n");
         case "quote":
-        case "alert":
-          return (node.type === "alert" ? `[!${node.kind}]\n` : "") + renderBlocks(node.children, node.type === "quote");
+          return renderBlocks(node.children, true, nestedAlerts, true);
+        case "alert": {
+          if (nested) nestedAlerts?.add(node.kind);
+          const label = nested ? `**${node.kind[0]}${node.kind.slice(1).toLowerCase()}:**\n\n` : `[!${node.kind}]\n`;
+          return label + renderBlocks(node.children, false, nestedAlerts, true);
+        }
         case "details":
-          return `<details${node.open === true ? " open" : ""}>\n<summary>${typeof node.summary === "string" ? escapeSummaryText(node.summary) : renderInlines(node.summary, true)}</summary>\n\n${renderBlocks(node.children)}\n\n</details>`;
+          return `<details${node.open === true ? " open" : ""}>\n<summary>${typeof node.summary === "string" ? escapeSummaryText(node.summary) : renderInlines(node.summary, true)}</summary>\n\n${renderBlocks(node.children, false, nestedAlerts, true)}\n\n</details>`;
         case "table": {
           const row = cells => `| ${cells.map(cell => renderInlines(cell).replace(/(?<!\\)\|/g, "\\|")).join(" | ")} |`;
           return [row(node.headers), `| ${node.headers.map(() => "---").join(" | ")} |`, ...node.rows.map(row)].join("\n");
@@ -731,9 +737,9 @@ function renderXMLMarker(marker) {
   return `<!-- ${marker.name}${value === undefined ? "" : `${marker.compact ? ":" : ": "}${value}`}${fields} -->`;
 }
 
-/** @param {ReportFooter} footer */
-function renderFooter(footer) {
-  const attribution = renderBlocks(footer.children);
+/** @param {ReportFooter} footer @param {Set<string>} nestedAlerts */
+function renderFooter(footer, nestedAlerts) {
+  const attribution = renderBlocks(footer.children, false, nestedAlerts);
   const expiration = footer.expiresAt ? `> ${createExpirationLine(new Date(footer.expiresAt))}` : "";
   const markers = footer.markers.map(renderXMLMarker).join("\n");
   return [[attribution, expiration].filter(Boolean).join("\n"), markers].filter(Boolean).join("\n\n");
@@ -850,14 +856,22 @@ function redactReportForRendering(report) {
 
 /**
  * @param {Report} report
+ * @param {{warnOnNestedAlerts?: boolean}} [options]
  * @returns {{title: string, body: string}}
  */
-function renderReport(report) {
+function renderReport(report, { warnOnNestedAlerts = true } = {}) {
   const redacted = redactReportForRendering(report);
   assertRedactedReport(redacted);
-  const parts = [redacted.preamble ? renderBlocks(redacted.preamble) : "", renderBlocks(redacted.children), redacted.footer ? renderFooter(redacted.footer) : ""];
+  /** @type {Set<string>} */
+  const nestedAlerts = new Set();
+  const parts = [redacted.preamble ? renderBlocks(redacted.preamble, false, nestedAlerts) : "", renderBlocks(redacted.children, false, nestedAlerts), redacted.footer ? renderFooter(redacted.footer, nestedAlerts) : ""];
   const result = { title: redacted.title, body: parts.filter(Boolean).join("\n\n").trim() + "\n" };
   assertNoTaintedStrings(result);
+  if (warnOnNestedAlerts && nestedAlerts.size) {
+    const message = `GitHub alerts must be top-level blocks. Nested alerts (${[...nestedAlerts].join(", ")}) were rendered as labeled blockquotes.`;
+    if (typeof core !== "undefined") core.warning(message);
+    else console.warn(message);
+  }
   return result;
 }
 

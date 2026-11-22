@@ -88,7 +88,7 @@ describe("failure report structure", () => {
     const evidencePosition = body.indexOf("<summary>Runtime evidence</summary>");
     expect(body.indexOf("Model has no AI credits pricing")).toBeLessThan(evidencePosition);
     expect(body.indexOf("retrying will not help")).toBeLessThan(evidencePosition);
-    expect(body.indexOf("Task completion could not be confirmed")).toBeGreaterThan(evidencePosition);
+    expect(body.indexOf("Task completion could not be confirmed")).toBeLessThan(evidencePosition);
     expect(body.indexOf("Driver exit code: 1")).toBeGreaterThan(evidencePosition);
     expect(body).toContain("#### Failure Diagnostics");
     expect(body).not.toContain("did not record a specific cause");
