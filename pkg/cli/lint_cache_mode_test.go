@@ -7,9 +7,9 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
-	"github.com/github/gh-aw/pkg/constants"
 	workflowlint "github.com/github/gh-aw/pkg/workflow/lint"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -63,6 +63,26 @@ func TestCacheWriteOverrideCLI(t *testing.T) {
 }
 
 func TestLintCacheModeLiteralsCLI(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("test binaries use a POSIX shell")
+	}
+	dir := actionlintTestDir(t)
+	script := `#!/bin/sh
+if [ "$#" -eq 1 ] && [ "$1" = "--version" ]; then
+  printf '1.7.12\n'
+  exit 0
+fi
+printf '%s\n' "$@" > "$ACTIONLINT_TEST_ARGS"
+printf '[]\n'
+`
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "actionlint"), []byte(script), 0o755))
+	t.Setenv("PATH", dir)
+	argsPath := filepath.Join(dir, "args.txt")
+	t.Setenv("ACTIONLINT_TEST_ARGS", argsPath)
+	originalVersion, originalStats := actionlintVersion, actionlintStats
+	actionlintVersion, actionlintStats = "", nil
+	t.Cleanup(func() { actionlintVersion, actionlintStats = originalVersion, originalStats })
+
 	for _, scope := range []string{"workflow", "job"} {
 		for _, test := range []struct {
 			name, mode string
@@ -96,18 +116,25 @@ func TestLintCacheModeLiteralsCLI(t *testing.T) {
 					source += "    cache-mode: " + test.mode + "\n"
 				}
 				source += "    steps: [{run: echo data}]\n"
-				dir := actionlintTestDir(t)
-				// Docker actionlint runs as guest, so its non-sensitive fixture must be readable.
-				require.NoError(t, os.Chmod(dir, constants.DirPermPublic))
 				file := filepath.Join(dir, "cache.yml")
-				require.NoError(t, os.WriteFile(file, []byte(source), constants.FilePermPublic))
-				for _, args := range [][]string{{file}, {"--rules=cache-poisoning", file}} {
+				require.NoError(t, os.WriteFile(file, []byte(source), 0o600))
+				for i, args := range [][]string{{file}, {"--rules=cache-poisoning", file}} {
+					if i == 1 {
+						require.NoError(t, os.Remove(argsPath))
+					}
 					cmd := NewLintCommand()
 					var output bytes.Buffer
 					cmd.SetOut(&output)
 					cmd.SetErr(&output)
 					cmd.SetArgs(args)
 					err := cmd.Execute()
+					if i == 0 {
+						_, statErr := os.Stat(argsPath)
+						require.NoError(t, statErr, "default lint must invoke actionlint")
+					} else {
+						_, statErr := os.Stat(argsPath)
+						require.True(t, os.IsNotExist(statErr), "selected rules must skip actionlint")
+					}
 					if test.valid {
 						require.NoError(t, err, output.String())
 					} else {
