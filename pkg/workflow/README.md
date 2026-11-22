@@ -650,6 +650,16 @@ Detects dangerous patterns in externally-sourced markdown files (e.g., from `gh 
 | `ExtractGHAWManifestFromLockFile` | `func(string) (*GHAWManifest, error)` | Extracts the manifest from a lock file |
 | `EnforceSafeUpdate` | `func(*GHAWManifest, []string, []string) error` | Validates that a lock file update passes manifest checks |
 
+### Authorization and Continuation APIs
+
+| Symbol | Description |
+|--------|-------------|
+| `AuthorizationRoute`, `InspectEffectiveAuthorization` | Describe and inspect compiler-resolved safe-output routes without supplying defaults or changing authorization requirements. |
+| `NewAuthorizationVerificationCompiler`, `Compiler.CompileAuthorizationSnapshot` | Build an isolated, non-emitting compiler and capture the generated lock for authorization verification. |
+| `SafeOutputAuthorization`, `ValidateSafeOutputAuthorization` | Represent and validate the literal authority binding required for safe outputs. |
+| `RequestContinuationConfig` | Records a follow-up request without dispatching work. |
+| `EnginePythonRequirement` | Pins a Python distribution to a version and wheel SHA-256. |
+
 ### Additional API Functions
 
 | Function | Signature | Description |

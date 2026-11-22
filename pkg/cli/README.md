@@ -189,6 +189,7 @@ The `cli` package is intentionally large and command-oriented. The tables below 
 | `NewWorkCommandWithNativeDeliveryHost` | `func(host *workqueue.NativeDeliveryHost) *cobra.Command` | Constructs the protected native work command using a host-supplied delivery boundary. |
 | `NewConnectorsCommand` | `func() *cobra.Command` | Constructs commands for validating and inspecting connector definitions and hosting frozen plans. |
 | `NewConnectorCommand` | `func() *cobra.Command` | Constructs the id-first setup and local-test interface for AW Markdown connectors. |
+| `NewValueCommand` | `func() *cobra.Command` | Constructs the longitudinal value report command. |
 | `RetrieveEpisodeLogs` | `func(ctx context.Context, opts EpisodeRetrievalOptions) (LogsData, error)` | Collects canonical workflow-run members using compact artifacts and the standard log report builder. |
 | `ValidateDevelopmentCompileFlags` | `func(dev bool, flags map[string]bool) error` | Rejects explicit development-compile opt-outs while allowing omitted defaults. |
 
@@ -330,7 +331,7 @@ The `cli` package exports many types used across its command implementations. Th
 | `OverviewData` | struct | High-level overview data for a workflow run |
 | `OutcomeEvaluation` | struct | Evaluation state embedded in `OutcomeReport` (status, merge/close metadata) |
 | `OutcomeReport` | struct | Result of evaluating one safe output item — outcome, timing, human engagement, and objective value |
-| `OutcomeStatus` | string alias | Outcome classification: `accepted`, `rejected`, `ignored`, `pending`, `skipped`, `unknown`, `lifecycle`, `lifecycle_close`, `error` |
+| `OutcomeStatus` | string alias | Outcome classification: `accepted`, `rejected`, `ignored`, `pending`, `skipped`, `unknown`, `lifecycle`, `lifecycle_close`, `error`, `not_applicable` (`OutcomeStatusNotApplicable`) |
 | `OutcomeSummary` | struct | Aggregated outcome statistics across multiple safe output items |
 | `PRCheckRun` | struct | A single CI check run attached to a pull request |
 | `PRCommitStatus` | struct | A commit status context for a pull request |
@@ -413,6 +414,15 @@ The `cli` package exports many types used across its command implementations. Th
 | `ForecastWorkflowResult` | struct | Per-workflow forecast result including Monte Carlo projections |
 | `ForecastMonteCarloSummary` | struct | Monte Carlo simulation summary (P10/P50/P90 confidence intervals) |
 | `ForecastEvaluation` | struct | Backtesting evaluation comparing forecast against actual runs |
+| `AdoptionErrorData` | struct | Identifies a run whose lifecycle evidence could not be evaluated; its coverage remains unavailable. |
+| `AuthorizationFinding` | struct | A policy verification finding with an optional workflow route and expected policy fingerprint. |
+| `AuthorizationPolicy` | struct | Versioned repository authorization policy binding eligible outputs to a literal authority. |
+| `AuthorizationPolicyResult` | struct | Verification result and policy fingerprints for a candidate commit. |
+| `AuthorizationRouteResult` | struct | A compiler-resolved authorization route and its observed binding. |
+| `AuthorizationWorkflowResult` | struct | Source, lock, import, and route evidence for one workflow in policy verification. |
+| `ContinuationRequestReport` | struct | Records a continuation request as intent, not as dispatch or successful continuation. |
+| `HealthContinuationRequestRun` | struct | Per-run continuation request count and evidence status in a health report. |
+| `HealthContinuationRequests` | struct | Aggregate continuation request counts, including unavailable run evidence. |
 
 ### Constants and Sentinel Errors
 
