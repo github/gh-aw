@@ -1,0 +1,129 @@
+package cli
+
+import (
+	"archive/zip"
+	"bytes"
+	"context"
+	"crypto/sha256"
+	"encoding/json"
+	"fmt"
+	"io"
+	"regexp"
+	"strings"
+
+	"github.com/github/gh-aw/pkg/workflow"
+)
+
+const maxAdvisoryArchiveBytes = 8 << 20
+
+var advisoryArchiveDigest = regexp.MustCompile(`^sha256:[0-9a-f]{64}$`)
+
+type advisoryArtifact struct {
+	ID      int64  `json:"id"`
+	Size    int64  `json:"size_in_bytes"`
+	Digest  string `json:"digest"`
+	Expired bool   `json:"expired"`
+	Run     struct {
+		ID           int64 `json:"id"`
+		RepositoryID int64 `json:"repository_id"`
+	} `json:"workflow_run"`
+}
+
+func (o advisoryHandoff) loadPatch(ctx context.Context) ([]byte, error) {
+	if o.sideRepo == "" {
+		return readAdvisoryPatch(o.filename)
+	}
+	if !validAdvisoryRepo(o.sideRepo) || o.runID <= 0 || o.artifactID <= 0 {
+		return nil, fmt.Errorf("provide a private --side-repo and positive --run and --artifact IDs")
+	}
+	repoPath := "repos/" + o.sideRepo
+	var repo struct {
+		ID         int64  `json:"id"`
+		FullName   string `json:"full_name"`
+		Visibility string `json:"visibility"`
+	}
+	if err := readAdvisoryAPI(ctx, repoPath, &repo); err != nil {
+		return nil, err
+	}
+	if repo.ID <= 0 || repo.Visibility != "private" || !strings.EqualFold(repo.FullName, o.sideRepo) {
+		return nil, fmt.Errorf("the artifact source must be the specified private repository")
+	}
+	artifactPath := fmt.Sprintf("%s/actions/artifacts/%d", repoPath, o.artifactID)
+	var artifact advisoryArtifact
+	if err := readAdvisoryAPI(ctx, artifactPath, &artifact); err != nil {
+		return nil, err
+	}
+	if err := artifact.verify(o, repo.ID); err != nil {
+		return nil, err
+	}
+	cmd := workflow.ExecGHContext(ctx, "api", "--hostname", "github.com", artifactPath+"/zip")
+	pipe, err := cmd.StdoutPipe()
+	if err != nil {
+		return nil, fmt.Errorf("prepare advisory artifact download: %w", err)
+	}
+	if err := cmd.Start(); err != nil {
+		return nil, fmt.Errorf("start advisory artifact download: %w", err)
+	}
+	body, readErr := io.ReadAll(io.LimitReader(pipe, maxAdvisoryArchiveBytes+1))
+	// Close before waiting so an oversized response cannot block the producer.
+	_ = pipe.Close()
+	waitErr := cmd.Wait()
+	if readErr != nil || waitErr != nil || len(body) > maxAdvisoryArchiveBytes {
+		return nil, fmt.Errorf("could not download the bounded advisory artifact; verify Actions read access and artifact size")
+	}
+	return extractAdvisoryPatch(body, artifact.Digest)
+}
+
+func readAdvisoryAPI(ctx context.Context, path string, dst any) error {
+	body, err := workflow.RunGHContextWithHost(ctx, "Verifying advisory artifact source", "github.com", "api", "--hostname", "github.com", path)
+	if err != nil {
+		return fmt.Errorf("could not verify advisory artifact source on GitHub; check repository and Actions read access")
+	}
+	if err := json.Unmarshal(body, dst); err != nil {
+		return fmt.Errorf("GitHub returned invalid advisory artifact metadata")
+	}
+	return nil
+}
+
+func (a advisoryArtifact) verify(o advisoryHandoff, repoID int64) error {
+	if a.ID != o.artifactID || a.Run.ID != o.runID || a.Run.RepositoryID != repoID {
+		return fmt.Errorf("artifact does not belong to the specified repository and run")
+	}
+	if a.Expired || a.Size <= 0 || a.Size > maxAdvisoryArchiveBytes || !advisoryArchiveDigest.MatchString(a.Digest) {
+		return fmt.Errorf("artifact is expired, oversized, or missing its GitHub SHA-256 digest")
+	}
+	return nil
+}
+
+func extractAdvisoryPatch(body []byte, digest string) ([]byte, error) {
+	if fmt.Sprintf("sha256:%x", sha256.Sum256(body)) != digest {
+		return nil, fmt.Errorf("downloaded advisory artifact does not match its GitHub digest")
+	}
+	reader, err := zip.NewReader(bytes.NewReader(body), int64(len(body)))
+	if err != nil {
+		return nil, fmt.Errorf("advisory artifact is not a valid ZIP")
+	}
+	var patch *zip.File
+	for _, file := range reader.File {
+		if file.Name != "handoff/fix.patch" {
+			continue
+		}
+		if patch != nil || !file.Mode().IsRegular() || file.UncompressedSize64 > maxAdvisoryPatchBytes {
+			return nil, fmt.Errorf("artifact must contain one bounded regular handoff/fix.patch")
+		}
+		patch = file
+	}
+	if patch == nil {
+		return nil, fmt.Errorf("artifact is missing handoff/fix.patch")
+	}
+	src, err := patch.Open()
+	if err != nil {
+		return nil, fmt.Errorf("open patch in advisory artifact: %w", err)
+	}
+	defer src.Close()
+	data, err := io.ReadAll(io.LimitReader(src, maxAdvisoryPatchBytes+1))
+	if err != nil {
+		return nil, fmt.Errorf("read patch in advisory artifact: %w", err)
+	}
+	return validateAdvisoryPatch(data)
+}

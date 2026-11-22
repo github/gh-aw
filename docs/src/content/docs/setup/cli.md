@@ -1559,14 +1559,16 @@ gh aw pr transfer <pr-url> --repo target-owner/target-repo --create-pull-request
 
 #### `advisory inspect` and `advisory transfer`
 
-Review a local Git diff from a private workflow run and transfer that exact diff to an existing temporary private advisory fork on GitHub.com.
+Review a Git diff from a private workflow run and transfer that exact diff to an existing temporary private advisory fork on GitHub.com.
 
 ```bash wrap
-gh aw advisory inspect GHSA-2345-6789-cfgh --repo owner/repo --base "$BASE_SHA" --base-branch main --branch advisory-fix --patch fix.patch
-gh aw advisory transfer GHSA-2345-6789-cfgh --repo owner/repo --base "$BASE_SHA" --base-branch main --branch advisory-fix --patch fix.patch --approve "$APPROVAL_DIGEST"
+gh aw advisory inspect GHSA-2345-6789-cfgh --repo owner/repo --base "$BASE_SHA" --base-branch main --branch advisory-fix --side-repo owner/private-side --run "$RUN_ID" --artifact "$ARTIFACT_ID"
+gh aw advisory transfer GHSA-2345-6789-cfgh --repo owner/repo --base "$BASE_SHA" --base-branch main --branch advisory-fix --side-repo owner/private-side --run "$RUN_ID" --artifact "$ARTIFACT_ID" --approve "$APPROVAL_DIGEST"
 ```
 
-Both commands require `--repo` (upstream), `--base` (exact tested commit), `--base-branch` (branch in the fork), `--branch` (new fix branch), and `--patch` (text Git diff, up to 4 MiB). `inspect` uses the signed-in GitHub CLI identity to resolve the fork and shows the patch without writing to GitHub. `transfer` also requires `--approve`, the digest printed by `inspect` after review. Run the commands in a private terminal; `inspect` prints the full diff.
+Both commands require `--repo` (upstream), `--base` (exact tested commit), `--base-branch` (branch in the fork), and `--branch` (new fix branch). Supply `--side-repo`, `--run`, and `--artifact` together to verify that the ZIP belongs to the specified private repository and run, check its GitHub SHA-256 digest, and read `handoff/fix.patch`. Alternatively, use `--patch` with a local text Git diff if you verified its origin separately. The patch limit is 4 MiB in either mode.
+
+`inspect` uses the signed-in GitHub CLI identity to resolve the fork and shows the patch without writing to GitHub. `transfer` also requires `--approve`, the digest printed by `inspect` after review. Run the commands in a private terminal; `inspect` prints the full diff.
 
 `transfer` applies the patch without checking out a working tree. It refuses base drift, changes under `.github/workflows/` or `.github/actions/`, and conflicting destination branches. It does not create a fork or open a PR. Open the PR from the advisory in GitHub once the branch is ready.
 

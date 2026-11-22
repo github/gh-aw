@@ -28,6 +28,8 @@ var (
 
 type advisoryHandoff struct {
 	upstream, id, base, baseBranch, branch, filename, approval string
+	sideRepo                                                   string
+	runID, artifactID                                          int64
 }
 
 type advisoryFork struct {
@@ -50,7 +52,11 @@ func newAdvisoryHandoffCommand(transfer bool) *cobra.Command {
 		Short: "Review a patch and get its transfer approval digest",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			opts.id = strings.ToUpper(args[0])
+			if prefix, suffix, ok := strings.Cut(args[0], "-"); ok && strings.EqualFold(prefix, "GHSA") {
+				opts.id = "GHSA-" + strings.ToLower(suffix)
+			} else {
+				opts.id = args[0]
+			}
 			return opts.run(cmd, transfer)
 		},
 	}
@@ -65,7 +71,13 @@ func newAdvisoryHandoffCommand(transfer bool) *cobra.Command {
 	cmd.Flags().StringVar(&opts.baseBranch, "base-branch", "", "Branch in the advisory fork to check against the tested base")
 	cmd.Flags().StringVar(&opts.branch, "branch", "", "New branch in the advisory fork")
 	cmd.Flags().StringVar(&opts.filename, "patch", "", "Path to the reviewed git diff")
-	for _, flag := range []string{"repo", "base", "base-branch", "branch", "patch"} {
+	cmd.Flags().StringVar(&opts.sideRepo, "side-repo", "", "Private source repository (OWNER/REPO)")
+	cmd.Flags().Int64Var(&opts.runID, "run", 0, "Source workflow run ID")
+	cmd.Flags().Int64Var(&opts.artifactID, "artifact", 0, "Exact source artifact ID")
+	cmd.MarkFlagsRequiredTogether("side-repo", "run", "artifact")
+	cmd.MarkFlagsMutuallyExclusive("patch", "side-repo")
+	cmd.MarkFlagsOneRequired("patch", "side-repo")
+	for _, flag := range []string{"repo", "base", "base-branch", "branch"} {
 		_ = cmd.MarkFlagRequired(flag)
 	}
 	return cmd
@@ -78,7 +90,7 @@ func (o advisoryHandoff) run(cmd *cobra.Command, transfer bool) error {
 	if !advisoryRefPattern.MatchString(o.baseBranch) || !advisoryRefPattern.MatchString(o.branch) || o.baseBranch == o.branch {
 		return fmt.Errorf("provide distinct branch names for --base-branch and --branch")
 	}
-	patch, err := readAdvisoryPatch(o.filename)
+	patch, err := o.loadPatch(cmd.Context())
 	if err != nil {
 		return err
 	}
@@ -91,6 +103,11 @@ func (o advisoryHandoff) run(cmd *cobra.Command, transfer bool) error {
 		output := cmd.OutOrStdout()
 		if _, err := fmt.Fprintf(output, "Advisory: %s/%s\nPrivate fork: %s\nBase: %s (%s)\nNew branch: %s\n\n", o.upstream, o.id, fork.FullName, o.baseBranch, o.base, o.branch); err != nil {
 			return err
+		}
+		if o.sideRepo != "" {
+			if _, err := fmt.Fprintf(output, "Verified source: %s, run %d, artifact %d\n\n", o.sideRepo, o.runID, o.artifactID); err != nil {
+				return err
+			}
 		}
 		if _, err := output.Write(patch); err != nil {
 			return err
@@ -145,7 +162,7 @@ func (o advisoryHandoff) parseFork(out []byte) (advisoryFork, error) {
 
 func (o advisoryHandoff) approvalDigest(fork advisoryFork, patch []byte) string {
 	h := sha256.New()
-	fmt.Fprintf(h, "gh-aw-advisory-v1\n%s\n%s\n%d\n%s\n%s\n%s\n%s\n", o.upstream, o.id, fork.ID, fork.FullName, o.base, o.baseBranch, o.branch)
+	fmt.Fprintf(h, "gh-aw-advisory-v2\n%s\n%s\n%d\n%s\n%s\n%s\n%s\n%s\n%d\n%d\n", o.upstream, o.id, fork.ID, fork.FullName, o.base, o.baseBranch, o.branch, o.sideRepo, o.runID, o.artifactID)
 	_, _ = h.Write(patch)
 	return fmt.Sprintf("%x", h.Sum(nil))
 }
@@ -164,6 +181,10 @@ func readAdvisoryPatch(filename string) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("read patch: %w", err)
 	}
+	return validateAdvisoryPatch(patch)
+}
+
+func validateAdvisoryPatch(patch []byte) ([]byte, error) {
 	if len(patch) > maxAdvisoryPatchBytes || !bytes.HasPrefix(patch, []byte("diff --git ")) || !utf8.Valid(patch) {
 		return nil, fmt.Errorf("provide a bounded, UTF-8 git diff")
 	}
