@@ -8,20 +8,25 @@
     "actions/setup/js/generate_git_patch.cjs": "0dc1feb6e7de5f55e18dc47abc827fc2d1fa8bcb5a6ffe26d154ea17024259e6",
     "actions/setup/js/generate_git_bundle.cjs": "1cfe81c16d8e15554f270699325fd08b58f728bba6f8119130ed87ac3af68ed0",
     "actions/setup/js/safe_outputs_handlers.cjs": "16929785997753db9811a7cee0a3866af04350352635666ff22e8a3c06168e01",
-    "actions/setup/js/create_pull_request.cjs": "d336b1cac5ecc9b2b30d6a9e6529fb8c64ae8eb7f2d6607d60665013da8e21d5",
-    "actions/setup/js/push_to_pull_request_branch.cjs": "61365d0a9e23fafd0d9664762e3ea260a07a5f23b379ff928ba76dc90372d61b",
-    "actions/setup/js/safe_outputs_tools.json": "de043dc8f56f349c0e985d28824bbfe71d6834e56fe9700958f14d5bab965aef",
-    "actions/setup/js/push_signed_commits.test.cjs": "4726a4e098bd1c857a2a16ecded771b18e9b2bb4a2e8d5ef7503df66348e17fc",
+    "actions/setup/js/create_pull_request.cjs": "538313b2153d4bd7d70accb85c59247eb7e45836d28bf4eae5f99d6cf3715ab5",
+    "actions/setup/js/push_to_pull_request_branch.cjs": "e981631b0e38c3be3ca70f103116d506cd56d2b3d65ef14bd009fb4c5ea8b65f",
+    "actions/setup/js/safe_outputs_tools.json": "47fce035f845f4e39e47a1bf3493c51f70b555d76f02d82117622fa3a121ae53",
+    "actions/setup/js/push_signed_commits.test.cjs": "3ac2f1f2c7c41dc2e997b25f33717f4352ad6707822726b37e9730cb135a73f6",
     "pkg/workflow/create_pull_request.go": "69a86e7d308cd1f2040e47ab8f26c4ef0148bbd516149fab454ca0c1a63171ce",
-    "pkg/workflow/safe_outputs_config_global.go": "66f50690898719346f3cf1e7a010e241ecc492239e3bc2316fd3a88446208eed",
+    "pkg/workflow/safe_outputs_config_global.go": "572e0b14344b0bd2a9758ec3a1b662bd6e0eb7b11136391a893dd65df28247a0",
     "pkg/workflow/safe_outputs_handler_registry_pull_requests.go": "e2d0d29a208a6aca31e7543fe745d186f17d8371eb96249b0c6d0e0120ef2cef",
-    "pkg/workflow/safe_outputs_config_generation.go": "464ebbc3ced81220215765b10affe78e4449267b04c40468ee9ecfcf886bbda1",
-    "pkg/workflow/safe_outputs_config_types.go": "c5b29e5b2f7857ea01300712074e12d0b9689afeab63a4da02db46b0302fde10",
-    "pkg/workflow/compiler_types.go": "8eb1d2c2db03342d40be26ad57c5dfe68e9bf529162aaae5356aae0a9e48d181",
+    "pkg/workflow/safe_outputs_config_generation.go": "e07a382b8b443085fdc4657404cd658f081b0b62676cce8073e919df3c022daa",
+    "pkg/workflow/safe_outputs_config_types.go": "bd3ea1531efaeaaccd1230ae858a72da82421d9159d33bf17c6e11d059020708",
+    "pkg/workflow/compiler_types.go": "319a5424fa55761bdaaa73de910c0543b9b22b03eed6850ffbd401076bf8b256",
     ".github/aw/safe-outputs-runtime.md": "85f6ad715e1ac1cb7ca7a115354ff355caa6d0ebf8f9472d26300ef62569e2f6",
-    ".github/workflows/daily-safeoutputs-git-simulator.md": "004e1a963bea0ff4c2f62d4fcf55a16e665f996ae8c4e10dc1bddd47a99615b3"
+    ".github/workflows/daily-safeoutputs-git-simulator.md": "96a4acb40e6b5c562164222ae77176a144e96799e056bb648b4c8992414d6ea8"
   },
-  "reviewed_note_ids": [],
+  "reviewed_note_ids": [
+    "ldg-9ce6aa6e-0c59-4f9f-84aa-8f0e257d0df5",
+    "ldg-431f2296-e848-4a58-aa89-bc75b9cf3f41",
+    "ldg-d89eff10-51e7-4f6b-baa2-d4697492c527",
+    "ldg-d6fd9e56-0d01-44c5-9ca8-3d8085f00bab"
+  ],
   "lesson_count": 10,
   "signals": []
 }

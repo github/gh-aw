@@ -1,6 +1,6 @@
 # Git Simulator Lessons
 
-Derived view built from `git-sim-strategies.md` and `git-sim-state.json`, checked against repository code at this commit. Classifications:
+Derived view built from `git-sim-strategies.md` and `git-sim-state.json`, checked against repository code at commit 41e1970 (2026-11-22). Line citations were re-located on 2026-11-22; several earlier line numbers had drifted. Classifications:
 
 - **code-verified**: current repository code shows the behavior.
 - **measured**: a simulator measurement that this review did not reproduce.
@@ -22,9 +22,9 @@ Only code-verified lessons are actionable. None of them currently produces a con
 
 **Title:** max-patch-files defaults to 100; exactly 100 files is accepted
 - **Scope:** create-pull-request patch file count under the default configuration.
-- **Evidence:** `MAX_FILES = 100`. The check rejects only when `fileCount > limit`, so 100 files pass and 101 fail. The simulator sets `max-patch-files: 200` (its config line 153), so its batch=100 cells are not at the cap.
-- **Citations:** `actions/setup/js/create_pull_request.cjs:526`; `actions/setup/js/create_pull_request.cjs:607`; `.github/aw/safe-outputs-runtime.md:270`.
-- **Caveats:** push-to-pull-request-branch has a separate "exceeds max-patch-files" check. Its test expectation is at `actions/setup/js/push_signed_commits.test.cjs:2953`, and its boundary was not re-read here. This closes the simulator's open ">" versus ">=" question for create-pull-request only.
+- **Evidence:** `MAX_FILES = 100` (line 527). The check at line 608 rejects only when `fileCount > limit`, so 100 files pass and 101 fail. The config value is read at line 777. The simulator sets `max-patch-files: 200` (its config line 153), so its batch=100 cells are not at the cap.
+- **Citations:** `actions/setup/js/create_pull_request.cjs:527`; `actions/setup/js/create_pull_request.cjs:608`; `actions/setup/js/create_pull_request.cjs:777`; `.github/aw/safe-outputs-runtime.md:270`.
+- **Caveats:** push-to-pull-request-branch has a separate "exceeds max-patch-files" check. Its test expectation is at `actions/setup/js/push_signed_commits.test.cjs:2991` (recorded as 2953 on 2026-11-15), and its boundary was not re-read here. This closes the simulator's open ">" versus ">=" question for create-pull-request only.
 - **Classification:** code-verified.
 
 ### Lesson 3
@@ -32,7 +32,7 @@ Only code-verified lessons are actionable. None of them currently produces a con
 **Title:** max-patch-size defaults to 4096 KB; the simulator overrides it to 5120 KB
 - **Scope:** create-pull-request and push-to-pull-request-branch size caps.
 - **Evidence:** the default is 4096 (KB) in the global config and in the pull-request handler registry. The simulator sets `max-patch-size: 5120` on both tools. The earlier headroom analysis compared xlarge cells against 4096, which is the default and not this workflow's cap.
-- **Citations:** `pkg/workflow/safe_outputs_config_global.go:100`; `pkg/workflow/safe_outputs_handler_registry_pull_requests.go:359`; `.github/workflows/daily-safeoutputs-git-simulator.md:152`; `.github/workflows/daily-safeoutputs-git-simulator.md:164`.
+- **Citations:** `pkg/workflow/safe_outputs_config_global.go:101`; `pkg/workflow/safe_outputs_handler_registry_pull_requests.go:359`; `.github/workflows/daily-safeoutputs-git-simulator.md:152`; `.github/workflows/daily-safeoutputs-git-simulator.md:164`.
 - **Caveats:** earlier cited locations no longer resolve (Lesson 10). Headroom percentages are measurements and were not verified here.
 - **Classification:** code-verified for the default and the override; headroom figures are measured.
 
@@ -40,8 +40,8 @@ Only code-verified lessons are actionable. None of them currently produces a con
 
 **Title:** push-to-pull-request-branch cannot chain to a PR created in the same run
 - **Scope:** push-to-pull-request-branch after create-pull-request in the same run (simulator ahead and diverged cells).
-- **Evidence:** incremental patch generation needs a PR-head baseline that exists before the agent runs, and it does not fetch. The `pull_request_number` value is read raw from the message, and the schema does not declare temporary-ID support for it. The simulator's failures on 2026-08-11 (idx 201) and 2026-08-13 (idx 204) match this mechanism.
-- **Citations:** `actions/setup/js/generate_git_patch.cjs:36-37`; `actions/setup/js/generate_git_patch.cjs:518`; `actions/setup/js/push_to_pull_request_branch.cjs:600`.
+- **Evidence:** incremental patch generation needs a PR-head baseline that exists before the agent runs, and it does not fetch. The `pull_request_number` value is read raw from the message (`push_to_pull_request_branch.cjs:621` and `:886`), and the `push_to_pull_request_branch` schema entry declares no temporary-ID property for it (`actions/setup/js/safe_outputs_tools.json:1468`). The simulator's failures on 2026-08-11 (idx 201) and 2026-08-13 (idx 204) match this mechanism.
+- **Citations:** `actions/setup/js/generate_git_patch.cjs:36-37`; `actions/setup/js/generate_git_patch.cjs:518`; `actions/setup/js/push_to_pull_request_branch.cjs:621`; `actions/setup/js/push_to_pull_request_branch.cjs:886`; `actions/setup/js/safe_outputs_tools.json:1468`.
 - **Caveats:** the error text recorded on 2026-08-13 differs from current wording ("could not be fetched" versus "never fetches"). The simulator's "DEFINITIVE" label rests on one run per cell. The code-level reason is what supports the conclusion. This is not a regression.
 - **Classification:** code-verified mechanism. Not a retry target: measure ahead and diverged cells locally, and do not re-attempt same-run chaining.
 
@@ -49,8 +49,8 @@ Only code-verified lessons are actionable. None of them currently produces a con
 
 **Title:** temporary_id echo: the recorded run conflicts with current code
 - **Scope:** the `temporary_id` field on create-pull-request.
-- **Evidence:** the simulator recorded on 2026-08-13 that `temporary_id` was not echoed back. Current generic handler code adds `temporary_id` to the success response when `temporary_id_field` is configured, and config generation sets that field. Whether the simulator's run had it configured is not recorded.
-- **Citations:** `actions/setup/js/safe_outputs_handlers.cjs:690`; `actions/setup/js/safe_outputs_handlers.cjs:703`; `pkg/workflow/safe_outputs_config_generation.go:247`.
+- **Evidence:** the simulator recorded on 2026-08-13 that `temporary_id` was not echoed back. Current generic handler code adds `temporary_id` to the success response when `temporary_id_field` is configured. Config generation copies the connector's `x-gh-aw-temporary-id` marker into `temporary_id_field` (`pkg/workflow/safe_outputs_config_generation.go:249-250`). Whether the simulator's run had it configured is not recorded.
+- **Citations:** `actions/setup/js/safe_outputs_handlers.cjs:690`; `actions/setup/js/safe_outputs_handlers.cjs:703`; `pkg/workflow/safe_outputs_config_generation.go:249-250`.
 - **Caveats:** unresolved. Lesson 4 still blocks same-run chaining under either version. Do not act on either version until a run records its configuration.
 - **Classification:** conflict.
 
@@ -76,7 +76,7 @@ Only code-verified lessons are actionable. None of them currently produces a con
 
 **Title:** the tested map mixes two conventions
 - **Scope:** the `tested` map in `git-sim-state.json` and cell selection in the simulator workflow.
-- **Evidence:** the workflow defines `tested` as outcome `pass|fail|error|rejected` and skips any listed cell. The state file keeps only failures (9 entries out of 220 recorded cells) and treats a missing entry below `next_index` as pass. The cursor keeps this workable only while `next_index` advances consistently. The two records also disagree on cell 204: the state file says `error`, and the strategy log says the push failed.
+- **Evidence:** the workflow defines `tested` as outcome `pass|fail|error|rejected` and skips any listed cell. The state file keeps only non-pass outcomes (9 entries out of 220 recorded cells, using `fail`, `error`, and `rejected`) and treats a missing entry below `next_index` as pass. The cursor keeps this workable only while `next_index` advances consistently. The state file and the strategy log label cell 204 differently (`error` versus "push failed"). Both describe the same failed push, so this is a labeling inconsistency, not a substantive conflict.
 - **Citations:** `.github/workflows/daily-safeoutputs-git-simulator.md:232`; `.github/workflows/daily-safeoutputs-git-simulator.md:287`.
 - **Caveats:** a missing entry is not a verified pass for the safe-output dimension (Lesson 7). The regression refill (fewer than four untested cells) is not near: 220 of 3600 cells are recorded.
 - **Classification:** conflict in the producer's convention; not product behavior.
@@ -94,7 +94,7 @@ Only code-verified lessons are actionable. None of them currently produces a con
 
 **Title:** producer citations are stale; re-locate before use
 - **Scope:** file and line references in `git-sim-strategies.md`.
-- **Evidence:** checked 2026-11-15. `compiler_types.go` has 95 lines, so the cited line 734 does not exist. `safe_outputs_config.go` and `handler_registry.go` are absent at the cited paths. The max-patch-files default is now at `safe-outputs-runtime.md:270`, not 204. The simulator's max-patch-files line is now 153, not 46. The "exceeds max-patch-files" expectation is at `push_signed_commits.test.cjs:2953`, not 2143. `.claude/agents/config-simulator.md` is absent from this checkout. The cell-to-index formula still reproduces the state entries for idx 196, 197, 199, 201, 204, and 216-219, so the index mapping is sound even though the locations drifted.
-- **Citations:** `pkg/workflow/compiler_types.go:1-95`; `.github/aw/safe-outputs-runtime.md:270`.
+- **Evidence:** checked 2026-11-15 and re-checked 2026-11-22 at commit 41e1970. `compiler_types.go` has 97 lines on 2026-11-22 (95 on 2026-11-15), so the cited line 734 does not exist. `safe_outputs_config.go` and `handler_registry.go` are absent at the cited paths. The max-patch-files default is now at `safe-outputs-runtime.md:270`, not 204. The simulator's max-patch-files line is now 153, not 46. The "exceeds max-patch-files" expectation is at `push_signed_commits.test.cjs:2991` (2953 on 2026-11-15; not 2143). The 4096 KB default is now at `safe_outputs_config_global.go:101`, not 100. `.claude/agents/config-simulator.md` is absent from this checkout. The cell-to-index formula still reproduces the state entries for idx 196, 197, 199, 201, 204, and 216-219, so the index mapping is sound even though the locations drifted.
+- **Citations:** `pkg/workflow/compiler_types.go:1-97`; `.github/aw/safe-outputs-runtime.md:270`; `pkg/workflow/safe_outputs_config_global.go:101`.
 - **Caveats:** only the paths and lines listed above were checked. Other producer citations were not audited.
 - **Classification:** correction (verified).
