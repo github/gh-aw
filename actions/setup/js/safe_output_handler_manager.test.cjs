@@ -50,10 +50,10 @@ describe("Safe Output Handler Manager", () => {
         ["aw_find1", { repo: "owner/repo", number: 10 }],
         ["aw_issue1", { repo: "owner/repo", number: 11 }],
       ]);
-      const message = { type: "submit_pull_request_review", body: "[Finding](#aw_find1) and #aw_issue1" };
+      const message = { type: "submit_pull_request_review", body: "[Finding](#aw_find1), #aw_find1 and #aw_issue1" };
       expect(normalizeInvocationInputs(message, temporaryIdMap, "owner/repo", "", new Set(), new Map(), new Set(["aw_find1"]))).toEqual({
         type: "submit_pull_request_review",
-        body: "[Finding](#aw_find1) and #11",
+        body: "[Finding](#aw_find1), #10 and #11",
       });
     });
   });
@@ -2070,7 +2070,7 @@ describe("Safe Output Handler Manager", () => {
       const messages = [
         { type: "upload_artifact", temporary_id: "aw_find1", path: "chart.png" },
         { type: "create_pull_request_review_comment", temporary_id: "aw_find1", path: "src/file.js", line: 10, body: "Finding" },
-        { type: "submit_pull_request_review", body: "[Finding](#aw_find1)" },
+        { type: "submit_pull_request_review", body: "[Finding](#aw_find1) and #aw_find1" },
       ];
       const upload = vi.fn().mockResolvedValue({ tmpId: "aw_find1", artifactUrl: "https://github.com/owner/repo/actions/runs/1/artifacts/42" });
       const comment = vi.fn().mockResolvedValue({ success: true });
@@ -2085,7 +2085,7 @@ describe("Safe Output Handler Manager", () => {
       );
 
       expect(result.success).toBe(true);
-      expect(submit).toHaveBeenCalledWith(expect.objectContaining({ body: "[Finding](#aw_find1)" }), expect.anything(), expect.anything());
+      expect(submit).toHaveBeenCalledWith(expect.objectContaining({ body: "[Finding](#aw_find1) and https://github.com/owner/repo/actions/runs/1/artifacts/42" }), expect.anything(), expect.anything());
     });
 
     it("should silently skip message types handled by standalone steps", async () => {

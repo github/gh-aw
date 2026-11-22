@@ -35,7 +35,8 @@ const { getAssignToAgentAssigned, getAssignToAgentErrors, getAssignToAgentErrorC
 const { createPrReviewBufferRegistry } = require("./pr_review_buffer.cjs");
 const { appendExecutionProvenance, stripExecutionProvenance } = require("./execution_provenance.cjs");
 const { COMMENT_PREAMBLE } = require("./issue_body.cjs");
-const { parseReportMarkdown } = require("./report_markdown.cjs");
+const { parseReportMarkdown, transformMarkdownLinkDestinations } = require("./report_markdown.cjs");
+const { isTemporaryIdLink } = require("./report_ast.cjs");
 const { renderSizedReport } = require("./report_size.cjs");
 const { sanitizeContent } = require("./sanitize_content.cjs");
 const { buildWorkflowRunUrl } = require("./workflow_metadata_helpers.cjs");
@@ -506,6 +507,27 @@ class BoundTemporaryIdMap extends Map {
   }
 }
 
+function protectReviewLocalLinkDestinations(value, reviewLocalTemporaryIds) {
+  const placeholders = new Map();
+  let placeholderIndex = 0;
+  const protectedValue = transformMarkdownLinkDestinations(value, destination => {
+    if (!isTemporaryIdLink(destination) || !reviewLocalTemporaryIds.has(normalizeTemporaryId(destination))) return destination;
+    let placeholder;
+    do {
+      placeholder = `gh_aw_review_link_${placeholderIndex++}`;
+    } while (value.includes(placeholder) || placeholders.has(placeholder));
+    placeholders.set(placeholder, destination);
+    return placeholder;
+  });
+  return {
+    value: protectedValue,
+    restore(text) {
+      for (const [placeholder, destination] of placeholders) text = text.split(placeholder).join(destination);
+      return text;
+    },
+  };
+}
+
 function normalizeInvocationInputs(value, temporaryIdMap, repository, key = "", preservedTargetFields = new Set(), numericTargetValues = new Map(), preservedReviewTemporaryIds = new Set()) {
   if (typeof value === "string") {
     if (numericTargetValues.has(key)) return numericTargetValues.get(key);
@@ -514,7 +536,9 @@ function normalizeInvocationInputs(value, temporaryIdMap, repository, key = "", 
       const target = temporaryIdMap.get(normalizeTemporaryId(value));
       if (target?.number != null) return target.number;
     }
-    return replaceTemporaryIdReferences(value, temporaryIdMap, repository, preservedReviewTemporaryIds);
+    const protectedLinks = key === "body" && preservedReviewTemporaryIds.size > 0 ? protectReviewLocalLinkDestinations(value, preservedReviewTemporaryIds) : null;
+    const normalized = replaceTemporaryIdReferences(protectedLinks?.value ?? value, temporaryIdMap, repository);
+    return protectedLinks ? protectedLinks.restore(normalized) : normalized;
   }
   if (!value || typeof value !== "object") return value;
   const result = Array.isArray(value)
@@ -1874,8 +1898,8 @@ async function processMessages(messageHandlers, messages, onItemCreated = null, 
       // with the actual artifact URL so handlers receive the resolved URL directly.
       // This is applied to all message types that carry a 'body' field.
       if (artifactUrlMap.size > 0 && effectiveMessage.body && typeof effectiveMessage.body === "string") {
-        const preservedIds = messageType === "submit_pull_request_review" ? reviewLocalTemporaryIds : undefined;
-        const resolvedBody = replaceArtifactUrlReferences(effectiveMessage.body, artifactUrlMap, preservedIds);
+        const protectedLinks = messageType === "submit_pull_request_review" ? protectReviewLocalLinkDestinations(effectiveMessage.body, reviewLocalTemporaryIds) : null;
+        const resolvedBody = protectedLinks ? protectedLinks.restore(replaceArtifactUrlReferences(protectedLinks.value, artifactUrlMap)) : replaceArtifactUrlReferences(effectiveMessage.body, artifactUrlMap);
         if (resolvedBody !== effectiveMessage.body) {
           effectiveMessage = { ...effectiveMessage, body: resolvedBody };
           core.info(`Resolved artifact URL reference(s) in ${messageType} body`);
