@@ -61,6 +61,10 @@ func (e *ClaudeEngine) ResolveLLMProvider(workflowData *WorkflowData) LLMProvide
 	return resolveEngineLLMProviderFromModel(workflowData, LLMProviderAnthropic)
 }
 
+func (e *ClaudeEngine) UsesWebFetchFallback(data *WorkflowData) bool {
+	return e.ResolveLLMProvider(data) == LLMProviderGitHub
+}
+
 func (e *ClaudeEngine) GetHostedWebCapabilities(_ *WorkflowData) HostedWebCapabilities {
 	return HostedWebCapabilities{Supported: true, SupportsMaxUses: true}
 }
@@ -262,7 +266,7 @@ func (e *ClaudeEngine) buildClaudeCliArgs(workflowData *WorkflowData, toolsWithM
 	// Note: we use --allowed-tools (not the simpler --tools from v2.0.31+) because it provides
 	// fine-grained control: Bash(git:*), MCP tool prefixes, path-specific tools, etc.
 	allowedTools = e.computeAllowedClaudeToolsStringWithDynamicWorkflows(toolsWithMountedCLIs, workflowData.SafeOutputs, workflowData.CacheMemoryConfig, workflowData.DriveMemoryConfig, workflowData.MCPScripts, workflowData.SandboxConfig, dynamicWorkflowsEnabled(e, workflowData.EngineConfig))
-	if usesWebFetchMCPForEngine("claude", workflowData) {
+	if usesWebFetchMCPForEngine(e, workflowData) {
 		tools := strings.Split(allowedTools, ",")
 		for i, tool := range tools {
 			if tool == "WebFetch" {

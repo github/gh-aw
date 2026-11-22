@@ -16527,6 +16527,10 @@
                     "web-search": {
                       "type": "boolean"
                     },
+                    "web-fetch-fallback": {
+                      "type": "boolean",
+                      "description": "Use the built-in sandboxed web-fetch MCP server when the workflow enables tools.web-fetch. Requires MCP support and a config adapter that registers the stdio server."
+                    },
                     "max-continuations": {
                       "type": "boolean"
                     },

@@ -126,7 +126,7 @@ func (c *Compiler) generateMCPSetup(yaml *strings.Builder, tools map[string]any,
 			yaml.WriteByte('\n')
 		}
 	}
-	if len(mcpTools) == 0 && !needsSetupWithoutMCPTools && !usesWebFetchMCPForEngine(engine.GetID(), workflowData) {
+	if len(mcpTools) == 0 && !needsSetupWithoutMCPTools && !usesWebFetchMCPForEngine(engine, workflowData) {
 		mcpSetupGeneratorLog.Print("No MCP tools configured, skipping MCP setup")
 		return nil
 	}

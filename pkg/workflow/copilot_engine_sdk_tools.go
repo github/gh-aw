@@ -106,7 +106,7 @@ func hasCopilotSDKMCPTools(workflowData *WorkflowData) bool {
 	if workflowData == nil {
 		return false
 	}
-	if HasSafeOutputsEnabled(workflowData.SafeOutputs) || IsMCPScriptsEnabled(workflowData.MCPScripts) || usesWebFetchMCPForEngine("copilot", workflowData) {
+	if HasSafeOutputsEnabled(workflowData.SafeOutputs) || IsMCPScriptsEnabled(workflowData.MCPScripts) || usesWebFetchMCPForEngine(NewCopilotEngine(), workflowData) {
 		return true
 	}
 	for name, value := range workflowData.Tools {

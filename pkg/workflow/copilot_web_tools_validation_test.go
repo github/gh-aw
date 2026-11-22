@@ -50,6 +50,58 @@ Fetch a page.
 	}
 }
 
+func TestWebFetchMCPDeclarativeEngine(t *testing.T) {
+	sample, err := os.ReadFile("../../.github/workflows/shared/opencode.md")
+	require.NoError(t, err)
+	sampleDefinition := strings.ReplaceAll(string(sample), "id: opencode", "id: custom-fetch")
+	require.Contains(t, sampleDefinition, "web-fetch-fallback: true")
+	for _, tc := range []struct {
+		name       string
+		capability string
+		tool       string
+		want       bool
+	}{
+		{"opted in", "web-fetch-fallback: true", "  web-fetch: {}", true},
+		{"not opted in", "web-fetch-fallback: false", "  web-fetch: {}", false},
+		{"tool omitted", "web-fetch-fallback: true", "", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			definition := strings.Replace(sampleDefinition, "web-fetch-fallback: true", tc.capability, 1)
+			require.NoError(t, os.WriteFile(filepath.Join(dir, "engine.md"), []byte(definition), 0600))
+			path := filepath.Join(dir, "workflow.md")
+			require.NoError(t, os.WriteFile(path, fmt.Appendf(nil, `---
+on: workflow_dispatch
+imports:
+  - engine.md
+engine:
+  id: custom-fetch
+  model: copilot/auto
+tools:
+  github: false
+%s
+---
+Fetch a page.
+`, tc.tool), 0600))
+			require.NoError(t, NewCompiler(WithSkipValidation(true)).CompileWorkflow(path))
+			lock, err := os.ReadFile(filepath.Join(dir, "workflow.lock.yml"))
+			require.NoError(t, err)
+			assert.Equal(t, tc.want, strings.Contains(string(lock), "export GH_AW_WEB_FETCH_MCP=1"))
+			assert.Equal(t, tc.want, strings.Contains(string(lock), `"name":"web-fetch","tools":["web_fetch"]`))
+		})
+	}
+}
+
+func TestWebFetchMCPDeclarativeEngineRequiresAdapter(t *testing.T) {
+	_, err := NewBehaviorDefinedEngine(&EngineDefinition{
+		ID: "custom-fetch",
+		Behaviors: &EngineBehaviorDefinition{
+			Capabilities: EngineCapabilitiesDefinition{WebFetchFallback: true},
+		},
+	})
+	require.ErrorContains(t, err, "enables web-fetch-fallback without MCP support and a config-adapter")
+}
+
 func TestCopilotWebToolsCompilation(t *testing.T) {
 	for _, strict := range []bool{false, true} {
 		for _, sdk := range []bool{false, true} {

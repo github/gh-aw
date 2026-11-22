@@ -13,6 +13,7 @@ engine:
     capabilities:
       max-turns: true
       tools-allowlist: true
+      web-fetch-fallback: true
     manifest:
       files:
         - .goosehints

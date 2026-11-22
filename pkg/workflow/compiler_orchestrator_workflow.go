@@ -122,6 +122,7 @@ func (c *Compiler) setupWorkflowBuildContext(ctx *workflowBuildContext) error {
 	if err := c.validateCopilotWebToolsSupport(engineSetup.agenticEngine, ctx.workflowData); err != nil {
 		return c.formatToolsProcessingError(ctx.cleanPath, err)
 	}
+	ctx.workflowData.webFetchFallback = engineSetup.agenticEngine.UsesWebFetchFallback(ctx.workflowData)
 	if usesWebFetchMCP(ctx.workflowData) && !isFirewallEnabled(ctx.workflowData) {
 		return c.formatToolsProcessingError(ctx.cleanPath, NewValidationError(
 			"tools.web-fetch", "web-fetch", "The built-in web fetch MCP server requires the AWF agent sandbox",

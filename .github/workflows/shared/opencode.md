@@ -13,6 +13,7 @@ engine:
     secret-strategy: universal-llm-consumer
     capabilities:
       tools-allowlist: true
+      web-fetch-fallback: true
       max-turns: true
     manifest:
       files:

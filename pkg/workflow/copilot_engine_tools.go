@@ -172,7 +172,7 @@ func (e *CopilotEngine) computeCopilotToolArguments(tools map[string]any, safeOu
 		args = append(args, "--allow-tool", constants.MCPScriptsMCPServerID.String())
 	}
 
-	if isCopilotToolValueEnabled(tools, "web-fetch") {
+	if isCopilotToolValueEnabled(tools, "web-fetch") && e.UsesWebFetchFallback(workflowData) {
 		args = append(args, "--allow-tool", webFetchMCPServer)
 	}
 

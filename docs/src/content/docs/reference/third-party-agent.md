@@ -81,6 +81,10 @@ the definition without `runtimes`, retain its bootstrap steps, and provide Pytho
 
 A definition contains `engine.id`, metadata, and `engine.behaviors`. Its behaviors install the CLI, configure inference and MCP, invoke it headlessly, and expose logs for session reconstruction. Keep secrets outside the agent sandbox and fail explicitly when required credentials, endpoints, or restrictions cannot be honored.
 
+### Web fetch fallback
+
+`engine.behaviors.capabilities.web-fetch-fallback: true` opts an engine into the built-in `web_fetch` MCP tool when a workflow enables `tools.web-fetch`. The engine must support MCP and provide a `behaviors.mcp.config-adapter` that calls `addWebFetchMCPServer` from `convert_gateway_config_shared.cjs` and renders the supplied command as a local stdio server. The workflow must run the agent inside AWF.
+
 ### Python package installation
 
 Python engines can declare a complete, hash-locked dependency list instead of

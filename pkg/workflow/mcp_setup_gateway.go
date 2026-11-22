@@ -392,7 +392,7 @@ func writeMCPGatewayExports(yaml *strings.Builder, opts writeMCPGatewayExportsOp
 		yaml.WriteString("          } >> \"$GITHUB_ENV\"\n")
 	}
 	yaml.WriteString("          export GH_AW_ENGINE=\"" + engine.GetID() + "\"\n")
-	if usesWebFetchMCPForEngine(engine.GetID(), workflowData) {
+	if usesWebFetchMCPForEngine(engine, workflowData) {
 		yaml.WriteString("          export GH_AW_WEB_FETCH_MCP=1\n")
 	}
 	if adapterProvider, ok := engine.(MCPConfigAdapterProvider); ok {
