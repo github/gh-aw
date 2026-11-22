@@ -931,15 +931,7 @@ func isOTLPDisabled(frontmatter map[string]any) bool {
 
 func (c *Compiler) injectOTLPConfig(workflowData *WorkflowData) {
 	if isOTLPDisabled(workflowData.RawFrontmatter) {
-		existingEnv := workflowData.Env
-		if !workflowEnvHasKey(existingEnv, compilerenv.OTLPMetrics) {
-			metricsLine := fmt.Sprintf("  %s: ${{ vars.%s || 'true' }}", compilerenv.OTLPMetrics, compilerenv.OTLPMetrics)
-			if workflowData.Env == "" {
-				workflowData.Env = "env:\n" + metricsLine
-			} else {
-				workflowData.Env += "\n" + metricsLine
-			}
-		}
+		injectLocalOTLPMetricsDefault(workflowData)
 		return
 	}
 	entries, usesEnterpriseDefaults := resolveOTLPEndpointEntries(workflowData)
@@ -960,33 +952,7 @@ func (c *Compiler) injectOTLPConfig(workflowData *WorkflowData) {
 		ifMissingMode = "ignore"
 	}
 
-	// 2. Inject OTEL environment variables, preserving user-authored keys.
-	//    The endpoint remains for backward compatibility with the MCP gateway and
-	//    legacy scripts. Existing env captures only the user's original env block.
-	existingEnv := workflowData.Env
-	var envKeyLines []string
-	addEnvLine := func(key, line string) {
-		if workflowEnvHasKey(existingEnv, key) {
-			otlpLog.Printf("Skipping %s injection: already defined by user", key)
-			return
-		}
-		envKeyLines = append(envKeyLines, line)
-	}
-	addEnvLine("OTEL_EXPORTER_OTLP_ENDPOINT", "  OTEL_EXPORTER_OTLP_ENDPOINT: "+firstEndpoint)
-	addEnvLine(compilerenv.OTLPProtocol, fmt.Sprintf("  %s: ${{ vars.%s }}", compilerenv.OTLPProtocol, compilerenv.OTLPProtocol))
-	addEnvLine(compilerenv.OTLPMetrics, fmt.Sprintf("  %s: ${{ vars.%s || 'true' }}", compilerenv.OTLPMetrics, compilerenv.OTLPMetrics))
-	addEnvLine("OTEL_SERVICE_NAME", "  OTEL_SERVICE_NAME: "+serviceName)
-	addEnvLine("OTEL_RESOURCE_ATTRIBUTES", "  OTEL_RESOURCE_ATTRIBUTES: '"+escapeYAMLSingleQuoted(otelResourceAttributes(workflowData))+"'")
-	otlpEnvLines := strings.Join(envKeyLines, "\n")
-
-	// 3. Inject per-endpoint headers env vars.
-	otlpEnvLines += buildOTLPHeaderEnvLines(entries, existingEnv)
-
-	// 4. Inject GH_AW_OTLP_ENDPOINTS (JSON array) so JavaScript can fan out spans,
-	//    GH_AW_OTLP_IF_MISSING for the resolved missing-configuration policy, and
-	//    GH_AW_OTLP_ATTRIBUTES (JSON object) for custom per-span attributes.
-	otlpEnvLines += buildOTLPPayloadEnvLines(workflowData, entries, ifMissingMode, existingEnv)
-	otlpEnvLines = strings.TrimPrefix(otlpEnvLines, "\n")
+	otlpEnvLines := buildOTLPConfigEnvLines(workflowData, entries, firstEndpoint, serviceName, ifMissingMode)
 
 	if otlpEnvLines == "" {
 		otlpLog.Printf("No OTLP env vars injected: all keys already defined by user")
@@ -1002,6 +968,40 @@ func (c *Compiler) injectOTLPConfig(workflowData *WorkflowData) {
 	workflowData.OTLPEndpoint = firstEndpoint
 	workflowData.OTLPHeaders = firstHeaders
 	workflowData.OTLPEndpoints = encodeOTLPEndpoints(entries)
+}
+
+func injectLocalOTLPMetricsDefault(workflowData *WorkflowData) {
+	existingEnv := workflowData.Env
+	if workflowEnvHasKey(existingEnv, compilerenv.OTLPMetrics) {
+		return
+	}
+	metricsLine := fmt.Sprintf("  %s: ${{ vars.%s || 'true' }}", compilerenv.OTLPMetrics, compilerenv.OTLPMetrics)
+	if workflowData.Env == "" {
+		workflowData.Env = "env:\n" + metricsLine
+	} else {
+		workflowData.Env += "\n" + metricsLine
+	}
+}
+
+func buildOTLPConfigEnvLines(workflowData *WorkflowData, entries []otlpEndpointEntry, endpoint, serviceName, ifMissingMode string) string {
+	existingEnv := workflowData.Env
+	var envKeyLines []string
+	addEnvLine := func(key, line string) {
+		if workflowEnvHasKey(existingEnv, key) {
+			otlpLog.Printf("Skipping %s injection: already defined by user", key)
+			return
+		}
+		envKeyLines = append(envKeyLines, line)
+	}
+	addEnvLine("OTEL_EXPORTER_OTLP_ENDPOINT", "  OTEL_EXPORTER_OTLP_ENDPOINT: "+endpoint)
+	addEnvLine(compilerenv.OTLPProtocol, fmt.Sprintf("  %s: ${{ vars.%s }}", compilerenv.OTLPProtocol, compilerenv.OTLPProtocol))
+	addEnvLine(compilerenv.OTLPMetrics, fmt.Sprintf("  %s: ${{ vars.%s || 'true' }}", compilerenv.OTLPMetrics, compilerenv.OTLPMetrics))
+	addEnvLine("OTEL_SERVICE_NAME", "  OTEL_SERVICE_NAME: "+serviceName)
+	addEnvLine("OTEL_RESOURCE_ATTRIBUTES", "  OTEL_RESOURCE_ATTRIBUTES: '"+escapeYAMLSingleQuoted(otelResourceAttributes(workflowData))+"'")
+	otlpEnvLines := strings.Join(envKeyLines, "\n")
+	otlpEnvLines += buildOTLPHeaderEnvLines(entries, existingEnv)
+	otlpEnvLines += buildOTLPPayloadEnvLines(workflowData, entries, ifMissingMode, existingEnv)
+	return strings.TrimPrefix(otlpEnvLines, "\n")
 }
 
 func otelServiceName(workflowData *WorkflowData) string {
