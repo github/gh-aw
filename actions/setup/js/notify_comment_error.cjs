@@ -16,7 +16,7 @@ const { resolveTopLevelDiscussionCommentId } = require("./github_api_helpers.cjs
 const { assembleReportBodyParts } = require("./markdown_body_helpers.cjs");
 const { parseReportMarkdown } = require("./report_markdown.cjs");
 const { renderSizedReport } = require("./report_size.cjs");
-const { normalizeReportAllowedURL } = require("./report_ast.cjs");
+const { normalizeReport, normalizeReportAllowedURL } = require("./report_ast.cjs");
 const { buildNoopConclusionSummary } = require("./conclusion_summary.cjs");
 const { generateHistoryUrl } = require("./generate_history_link.cjs");
 
@@ -146,8 +146,18 @@ function appendAgentReports(children, items) {
         continue;
     }
     if (typeof text !== "string" || !text.trim()) continue;
-    const blocks = parseReportMarkdown(sanitizeContent(text), { agentTainted: true });
-    if (blocks.length > 0) children.push({ type: "details", summary, children: blocks, agentTainted: true });
+    try {
+      // Unlike top-level status sections, headings nested in details start at level 3.
+      const blocks = parseReportMarkdown(sanitizeContent(text), { agentTainted: true });
+      if (!blocks.length) continue;
+      /** @type {import("./report_ast.cjs").ReportBlock} */
+      const details = { type: "details", summary, children: blocks, agentTainted: true };
+      // Validate with the wrapper in place so nested depth is checked before publication.
+      normalizeReport({ type: "report", title: "Workflow status", children: [details] });
+      children.push(details);
+    } catch {
+      core.warning("Omitting an invalid agent explanation from the completion comment");
+    }
   }
 }
 
@@ -164,6 +174,14 @@ async function main() {
     throw new Error(`${ERR_VALIDATION}: GH_AW_ASSIGNMENT_ERROR_COUNT must be a non-negative integer`);
   }
   const safeOutputsResult = process.env.GH_AW_SAFE_OUTPUTS_RESULT;
+  const staged = (process.env.GH_AW_SAFE_OUTPUTS_STAGED ?? "false") !== "false";
+  const protectedReports = new Set((process.env.GH_AW_AUTHORIZATION_PROTECTED_REPORTS || "").split(","));
+  /** @param {string | undefined} type */
+  const canPublishReport = type => {
+    if (typeof type !== "string" || !type || protectedReports.has(type)) return false;
+    // An authored staging expression must explicitly resolve to false to allow publication.
+    return (process.env[`GH_AW_COMPLETION_STAGED_${type.toUpperCase()}`] ?? "false") === "false";
+  };
   const noopCommentBody = process.env.GH_AW_NOOP_COMMENT_BODY || "";
   const activationCommentLinks = (process.env.GH_AW_ACTIVATION_COMMENT_LINKS || "").trim();
 
@@ -290,15 +308,20 @@ async function main() {
     children.push(...parseReportMarkdown(sanitizeContent(activationCommentLinks), { agentTainted: false, minimumHeadingLevel: 2 }));
   }
 
-  if (noopCommentBody) {
-    children.push(...parseReportMarkdown(sanitizeContent(noopCommentBody), { agentTainted: true, minimumHeadingLevel: 2 }));
-  } else if (noopMessages.length > 0) {
-    core.warning("No categorized no-op comment body is available; omitting the no-op category from the public comment");
+  if (!staged && canPublishReport("noop")) {
+    if (noopCommentBody) {
+      children.push(...parseReportMarkdown(sanitizeContent(noopCommentBody), { agentTainted: true, minimumHeadingLevel: 2 }));
+    } else if (noopMessages.length > 0) {
+      core.warning("No categorized no-op comment body is available; omitting the no-op category from the public comment");
+    }
   }
 
   // The detector may accept a skipped run, so also require an explicit clean verdict.
-  if (process.env.GH_AW_DETECTION_ACCEPTED === "true" && detectionConclusion === "success" && agentOutputResult.success) {
-    appendAgentReports(children, agentOutputResult.items);
+  if (!staged && process.env.GH_AW_DETECTION_ACCEPTED === "true" && detectionConclusion === "success" && agentOutputResult.success) {
+    appendAgentReports(
+      children,
+      agentOutputResult.items.filter(item => typeof item?.type === "string" && canPublishReport(item.type))
+    );
   }
 
   // Collect generated asset URLs from safe output jobs

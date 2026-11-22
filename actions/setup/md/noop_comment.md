@@ -4,4 +4,4 @@
 
 {description}
 
-Agent messages are omitted from this comment. The category uses structured run status, not interpretation of agent prose.
+The `[aw] No-Op Runs` tracker omits agent messages. The category uses structured run status, not interpretation of agent prose.

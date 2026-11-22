@@ -63,6 +63,11 @@ const mockCore = {
           GH_AW_AGENT_CONCLUSION: process.env.GH_AW_AGENT_CONCLUSION,
           GH_AW_DETECTION_CONCLUSION: process.env.GH_AW_DETECTION_CONCLUSION,
           GH_AW_DETECTION_ACCEPTED: process.env.GH_AW_DETECTION_ACCEPTED,
+          GH_AW_AUTHORIZATION_PROTECTED_REPORTS: process.env.GH_AW_AUTHORIZATION_PROTECTED_REPORTS,
+          GH_AW_SAFE_OUTPUTS_STAGED: process.env.GH_AW_SAFE_OUTPUTS_STAGED,
+          GH_AW_COMPLETION_STAGED_NOOP: process.env.GH_AW_COMPLETION_STAGED_NOOP,
+          GH_AW_COMPLETION_STAGED_REPORT_INCOMPLETE: process.env.GH_AW_COMPLETION_STAGED_REPORT_INCOMPLETE,
+          GH_AW_COMPLETION_STAGED_REPORT_MISSING_DATA: process.env.GH_AW_COMPLETION_STAGED_REPORT_MISSING_DATA,
           GH_AW_ASSIGNMENT_ERROR_COUNT: process.env.GH_AW_ASSIGNMENT_ERROR_COUNT,
           GH_AW_SAFE_OUTPUT_MESSAGES: process.env.GH_AW_SAFE_OUTPUT_MESSAGES,
           GH_AW_SAFE_OUTPUT_JOBS: process.env.GH_AW_SAFE_OUTPUT_JOBS,
@@ -236,6 +241,116 @@ const mockCore = {
             if (detectionDisabled) expect(body).toContain("completed successfully");
             expect(body).not.toContain("Unrequested details");
             expect(body).not.toContain("Unrelated safe output");
+          } finally {
+            fs.rmSync(tempDir, { recursive: true, force: true });
+          }
+        });
+      }),
+      describe("rendering accepted agent explanations", () => {
+        async function renderAcceptedExplanations(items) {
+          const fixtureDir = fs.mkdtempSync(path.join(process.cwd(), "gh-aw-explanation-rendering-"));
+          try {
+            const outputPath = path.join(fixtureDir, "agent-output.json");
+            fs.writeFileSync(outputPath, JSON.stringify({ items }));
+            process.env.GH_AW_AGENT_OUTPUT = outputPath;
+            process.env.GH_AW_COMMENT_ID = "123456";
+            process.env.GH_AW_RUN_URL = "https://github.com/owner/repo/actions/runs/123";
+            process.env.GH_AW_AGENT_CONCLUSION = "success";
+            process.env.GH_AW_DETECTION_CONCLUSION = "success";
+            process.env.GH_AW_DETECTION_ACCEPTED = "true";
+            delete process.env.GH_AW_SAFE_OUTPUTS_RESULT;
+            delete process.env.GH_AW_NOOP_COMMENT_BODY;
+            delete process.env.GH_AW_SAFE_OUTPUT_MESSAGES;
+
+            await eval(`(async () => { ${notifyCommentScript}; await main(); })()`);
+
+            const call = mockGithub.request.mock.calls.find(call => call[0] === "PATCH /repos/{owner}/{repo}/issues/comments/{comment_id}");
+            expect(call).toBeDefined();
+            return call[1].body;
+          } finally {
+            fs.rmSync(fixtureDir, { recursive: true, force: true });
+          }
+        }
+
+        it("sanitizes accepted no-op Markdown and preserves allowed links", async () => {
+          vi.stubEnv("GH_AW_ALLOWED_DOMAINS", "api.example.com");
+          try {
+            const body = await renderAcceptedExplanations([
+              {
+                type: "noop",
+                message: "# No changes\n\nNotify @some-org/some-team <b>if needed</b>. [Health](https://api.example.com/health) [Blocked](https://blocked.example.net/health)",
+              },
+            ]);
+            expect(body).toContain("<summary>No-op message</summary>\n\n### No changes\n");
+            expect(body).toContain("Notify `@some-org/some-team` **if needed**.");
+            expect(body.replace("`@some-org/some-team`", "")).not.toContain("@some-org/some-team");
+            expect(body).not.toMatch(/<\/?b>/);
+            expect(body).toContain("[Health](https://api.example.com/health)");
+            expect(body).not.toContain("https://blocked.example.net/health");
+          } finally {
+            vi.unstubAllEnvs();
+          }
+        });
+
+        it.each([
+          ["parser depth limit", "> ".repeat(20) + "Omitted explanation"],
+          ["empty details summary", "<details>\n<summary></summary>\n\nOmitted explanation\n\n</details>"],
+        ])("preserves the completion comment when an explanation fails the %s check", async (_case, message) => {
+          const body = await renderAcceptedExplanations([
+            { type: "noop", message },
+            { type: "report_incomplete", reason: "Review did not finish." },
+          ]);
+          expect(body).toContain("completed successfully");
+          expect(body).toContain("Review did not finish");
+          expect(body).toContain("<!-- gh-aw-agentic-workflow:");
+          expect(body).not.toContain("No-op message");
+          expect(body).not.toContain("Omitted explanation");
+          expect(mockCore.warning).toHaveBeenCalledWith("Omitting an invalid agent explanation from the completion comment");
+          expect(JSON.stringify(mockCore.warning.mock.calls)).not.toContain("Omitted explanation");
+        });
+      }),
+      describe("completion comment publication restrictions", () => {
+        it.each([
+          { staged: true, protectedReports: "", toolStaged: false, publishExempt: false },
+          { staged: false, protectedReports: "noop,report_incomplete", toolStaged: false, publishExempt: true },
+          { staged: false, protectedReports: "", toolStaged: true, publishExempt: true },
+        ])("preserves the status without restricted explanations: %j", async ({ staged, protectedReports, toolStaged, publishExempt }) => {
+          const tempDir = fs.mkdtempSync(path.join(process.cwd(), "gh-aw-status-policy-"));
+          const outputPath = path.join(tempDir, "agent-output.json");
+          fs.writeFileSync(
+            outputPath,
+            JSON.stringify({
+              items: [
+                { type: "noop", message: "Private no-op explanation." },
+                { type: "report_incomplete", reason: "Private incomplete explanation.", authorized: true },
+                { type: "report_missing_data", reason: "Exempt explanation." },
+              ],
+            })
+          );
+          try {
+            process.env.GH_AW_AGENT_OUTPUT = outputPath;
+            process.env.GH_AW_COMMENT_ID = "123456";
+            process.env.GH_AW_RUN_URL = "https://github.com/owner/repo/actions/runs/123";
+            process.env.GH_AW_AGENT_CONCLUSION = "success";
+            process.env.GH_AW_DETECTION_CONCLUSION = "success";
+            process.env.GH_AW_DETECTION_ACCEPTED = "true";
+            process.env.GH_AW_SAFE_OUTPUTS_STAGED = String(staged);
+            process.env.GH_AW_AUTHORIZATION_PROTECTED_REPORTS = protectedReports;
+            if (toolStaged) {
+              process.env.GH_AW_COMPLETION_STAGED_NOOP = "true";
+              process.env.GH_AW_COMPLETION_STAGED_REPORT_INCOMPLETE = "";
+              process.env.GH_AW_COMPLETION_STAGED_REPORT_MISSING_DATA = "false";
+            }
+            process.env.GH_AW_NOOP_COMMENT_BODY = "Private categorized no-op body.";
+            delete process.env.GH_AW_SAFE_OUTPUTS_RESULT;
+            delete process.env.GH_AW_SAFE_OUTPUT_MESSAGES;
+
+            await eval(`(async () => { ${notifyCommentScript}; await main(); })()`);
+
+            const body = mockGithub.request.mock.calls.find(call => call[0] === "PATCH /repos/{owner}/{repo}/issues/comments/{comment_id}")[1].body;
+            expect(body).toContain("completed successfully");
+            expect(body).not.toContain("Private");
+            expect(body.includes("Exempt explanation.")).toBe(publishExempt);
           } finally {
             fs.rmSync(tempDir, { recursive: true, force: true });
           }

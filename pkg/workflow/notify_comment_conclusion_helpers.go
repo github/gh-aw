@@ -601,7 +601,7 @@ func (c *Compiler) buildConclusionScriptEnvVars(data *WorkflowData, mainJobName 
 	if data.TrackerID != "" {
 		envVars = append(envVars, fmt.Sprintf("          GH_AW_TRACKER_ID: %q\n", data.TrackerID))
 	}
-	envVars = append(envVars, fmt.Sprintf("          GH_AW_AGENT_CONCLUSION: ${{ needs.%s.result }}\n", mainJobName))
+	envVars = append(envVars, fmt.Sprintf("          GH_AW_AGENT_CONCLUSION: ${{ steps.handle_agent_failure.outcome == 'failure' && 'failure' || needs.%s.result }}\n", mainJobName))
 	envVars = append(envVars, buildEngineMetadataEnvVars(data.EngineConfig, data.Model, mainJobName)...)
 	envVars = append(envVars, fmt.Sprintf("          GH_AW_AIC: ${{ needs.%s.outputs.aic }}\n", mainJobName))
 	envVars = append(envVars, fmt.Sprintf("          GH_AW_AMBIENT_CONTEXT: ${{ needs.%s.outputs.ambient_context }}\n", mainJobName))
@@ -611,7 +611,37 @@ func (c *Compiler) buildConclusionScriptEnvVars(data *WorkflowData, mainJobName 
 	}
 	if data.SafeOutputs.NoOp != nil {
 		envVars = append(envVars, "          GH_AW_NOOP_COMMENT_BODY: ${{ steps.noop.outputs.noop_comment_body }}\n")
+	} else {
+		envVars = append(envVars, "          GH_AW_NOOP_COMMENT_BODY: \"\"\n")
 	}
+	staged := resolveSafeOutputsStagedValue(c.trialMode, data.SafeOutputs.Staged)
+	if staged == nil {
+		staged = new("false")
+	}
+	envVars = append(envVars, buildTemplatableBoolEnvVar("GH_AW_SAFE_OUTPUTS_STAGED", staged)...)
+	addStagedDiagnostic := func(name string, staged *TemplatableBool) {
+		envVars = append(envVars, buildTemplatableBoolEnvVar("GH_AW_COMPLETION_STAGED_"+name, templatableBoolEnvVarValue(staged))...)
+	}
+	if cfg := data.SafeOutputs.NoOp; cfg != nil {
+		addStagedDiagnostic("NOOP", cfg.Staged)
+	}
+	if cfg := data.SafeOutputs.ReportIncomplete; cfg != nil {
+		addStagedDiagnostic("REPORT_INCOMPLETE", cfg.Staged)
+	}
+	if cfg := data.SafeOutputs.MissingData; cfg != nil {
+		addStagedDiagnostic("REPORT_MISSING_DATA", cfg.Staged)
+	}
+	if cfg := data.SafeOutputs.MissingTool; cfg != nil {
+		addStagedDiagnostic("REPORT_MISSING_TOOL", cfg.Staged)
+	}
+	// Conclusion does not execute invocations or receive their trusted authorization decisions.
+	var protectedReports []string
+	for _, name := range []string{"noop", "report_incomplete", "report_missing_data", "report_missing_tool", "request_continuation"} {
+		if data.SafeOutputs.AuthorizationRequirements[name] != nil {
+			protectedReports = append(protectedReports, name)
+		}
+	}
+	envVars = append(envVars, fmt.Sprintf("          GH_AW_AUTHORIZATION_PROTECTED_REPORTS: %q\n", strings.Join(protectedReports, ",")))
 	if slices.Contains(safeOutputJobNames, string(constants.SafeOutputsJobName)) {
 		envVars = append(envVars, fmt.Sprintf("          GH_AW_SAFE_OUTPUTS_RESULT: ${{ needs.%s.result }}\n", constants.SafeOutputsJobName))
 		notifyCommentLog.Print("Added safe_outputs job result environment variable to conclusion job")
@@ -620,12 +650,15 @@ func (c *Compiler) buildConclusionScriptEnvVars(data *WorkflowData, mainJobName 
 		}
 	}
 	if IsDetectionJobEnabled(data.SafeOutputs) {
+		// Acceptance can also be true for skipped scans; publication still requires an explicit clean conclusion.
 		envVars = append(envVars, fmt.Sprintf("          GH_AW_DETECTION_ACCEPTED: ${{ %s }}\n", RenderCondition(buildDetectionAcceptedCondition())))
 		envVars = append(envVars, fmt.Sprintf("          GH_AW_DETECTION_CONCLUSION: ${{ needs.%s.outputs.detection_conclusion }}\n", constants.DetectionJobName))
 		envVars = append(envVars, fmt.Sprintf("          GH_AW_DETECTION_REASON: ${{ needs.%s.outputs.detection_reason }}\n", constants.DetectionJobName))
 		envVars = append(envVars, fmt.Sprintf("          GH_AW_DETECTION_THREAT_KINDS: ${{ needs.%s.outputs.detection_threat_kinds }}\n", constants.DetectionJobName))
 		envVars = append(envVars, fmt.Sprintf("          GH_AW_THREAT_DETECTION_AIC: ${{ needs.%s.outputs.aic }}\n", constants.DetectionJobName))
 		notifyCommentLog.Print("Added detection conclusion and reason environment variables to conclusion job")
+	} else {
+		envVars = append(envVars, "          GH_AW_DETECTION_ACCEPTED: \"false\"\n", "          GH_AW_DETECTION_CONCLUSION: \"\"\n")
 	}
 	if data.SafeOutputs.AssignToAgent != nil {
 		envVars = append(envVars, "          GH_AW_ASSIGNMENT_ERROR_COUNT: ${{ needs.safe_outputs.outputs.assign_to_agent_assignment_error_count }}\n")
