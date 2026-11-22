@@ -757,11 +757,7 @@ tools:
 		"Gemini MCP_GATEWAY_HOST_DOMAIN must not be localhost under network isolation")
 }
 
-// TestMCPGatewayDockerCommandAddsHostGatewayForMCPScriptsInBridgeMode verifies that when
-// mcp-scripts are configured in network-isolation (bridge) mode, the gateway container command
-// includes --add-host host.docker.internal:host-gateway so the gateway can reach the
-// mcp-scripts HTTP server running on the runner host.
-func TestMCPGatewayDockerCommandAddsHostGatewayForMCPScriptsInBridgeMode(t *testing.T) {
+func TestMCPGatewayDockerCommandUsesMCPScriptsBindHostInBridgeMode(t *testing.T) {
 	frontmatter := `---
 on: workflow_dispatch
 engine: copilot
@@ -771,6 +767,11 @@ tools:
   github:
     mode: remote
     toolsets: [repos]
+mcp-servers:
+  my-local-server:
+    type: http
+    url: "http://localhost:9000/mcp"
+    allowed: ["*"]
 mcp-scripts:
   my-tool:
     description: "A test tool"
@@ -802,8 +803,13 @@ mcp-scripts:
 
 	require.Contains(t, yamlStr, `docker run -i --rm --network bridge`,
 		"Docker command should use bridge networking in network isolation mode")
+	require.Contains(t, yamlStr, `GH_AW_MCP_GATEWAY_SCRIPTS_BIND_HOST: ${{ steps.mcp-scripts-start.outputs.bind_host }}`)
+	require.Contains(t, yamlStr, `--add-host mcp-scripts.docker.internal:'"${GH_AW_MCP_GATEWAY_SCRIPTS_BIND_HOST}"'`,
+		"Docker command must map the dedicated alias to the MCP Scripts server's actual bind address")
 	require.Contains(t, yamlStr, `--add-host host.docker.internal:host-gateway`,
-		"Docker command must add host-gateway mapping in bridge mode when mcp-scripts are present so the gateway can reach the mcp-scripts server on the host")
+		"The custom HTTP MCP server must keep using Docker's host-gateway mapping")
+	require.Contains(t, yamlStr, `http://mcp-scripts.docker.internal:$GH_AW_MCP_SCRIPTS_PORT`)
+	require.Contains(t, yamlStr, `http://host.docker.internal:9000/mcp`)
 	require.Contains(t, yamlStr, `GH_AW_MCP_SCRIPTS_BRIDGED_GATEWAY: 'true'`)
 	require.NotContains(t, yamlStr, `--add-host host.docker.internal:127.0.0.1`,
 		"Docker command should not inject the host loopback mapping in bridge mode")

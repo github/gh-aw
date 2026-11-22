@@ -170,7 +170,7 @@ MCP Scripts MUST use HTTP transport for MCP communication. The transport archite
 - **MCP Scripts Server**: HTTP server on the configurable port (default: 3000)
 - **Authentication**: API key-based authentication via the `Authorization` header
 
-The MCP Scripts server MUST bind to one specific IPv4 address. It MUST NOT bind to an IPv4 wildcard address, an IPv6 address, or a hostname. When the gateway uses host networking, the server MUST bind to `127.0.0.1`. When the gateway uses bridged Docker networking, the server MUST discover the default Docker bridge's IPv4 gateway address and bind to that address. If the bridged gateway address cannot be discovered, server startup MUST fail. Readiness checks MUST use the same IPv4 address and port to which the server is bound.
+The MCP Scripts server MUST bind to one specific IPv4 address. It MUST NOT bind to an IPv4 wildcard address, an IPv6 address, or a hostname. When the gateway uses host networking, the server MUST bind to `127.0.0.1`. When the gateway uses bridged Docker networking, the server MUST discover the default Docker bridge's IPv4 gateway address and bind to that address. If the bridged gateway address cannot be discovered, server startup MUST fail. The bridged gateway container MUST map the dedicated `mcp-scripts.docker.internal` alias to the selected listener address without changing Docker's `host-gateway` mapping for `host.docker.internal`. Readiness checks MUST use the same IPv4 address and port to which the server is bound.
 
 Stdio transport is NOT supported for MCP Scripts. API-key authentication and the existing Origin-rejection behavior remain unchanged.
 
@@ -1037,7 +1037,7 @@ At compilation time, MCP Scripts generates:
 }
 ```
 
-The URL MUST identify the server endpoint using an address reachable from the gateway. The `localhost` value above is illustrative for host networking; bridged Docker networking MAY use a gateway-resolvable host name such as `host.docker.internal` while the server itself binds to the specific IPv4 address selected according to §3.3. The URL MUST NOT require an IPv6 or wildcard listener.
+The URL MUST identify the server endpoint using an address reachable from the gateway. The `localhost` value above is illustrative for host networking; bridged Docker networking uses `mcp-scripts.docker.internal`, which maps to the specific IPv4 address selected according to §3.3. The URL MUST NOT require an IPv6 or wildcard listener.
 
 This configuration is merged with other MCP servers and passed to the gateway.
 

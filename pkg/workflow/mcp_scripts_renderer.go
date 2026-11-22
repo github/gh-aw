@@ -50,18 +50,9 @@ func renderMCPScriptsMCPConfigWithOptions(yaml *strings.Builder, mcpScripts *MCP
 	// Add type field for HTTP (required by MCP specification for HTTP transport)
 	yaml.WriteString("                \"type\": \"http\",\n")
 
-	// Determine host based on whether agent is disabled
-	host := "host.docker.internal"
-	if workflowData != nil && workflowData.SandboxConfig != nil && workflowData.SandboxConfig.Agent != nil && workflowData.SandboxConfig.Agent.Disabled {
-		// When agent is disabled (no firewall), use localhost instead of host.docker.internal
-		host = "localhost"
-		mcpScriptsRendererLog.Print("Agent disabled, using localhost for MCP Scripts server")
-	}
-
 	// HTTP URL using environment variable - NOT escaped so shell expands it before awmg validation
-	// Use host.docker.internal to allow access from firewall container (or localhost if agent disabled)
 	// Note: awmg validates URL format before variable resolution, so we must expand the port variable
-	yaml.WriteString("                \"url\": \"http://" + host + ":$GH_AW_MCP_SCRIPTS_PORT\",\n")
+	yaml.WriteString("                \"url\": \"http://" + mcpScriptsGatewayHost(workflowData) + ":$GH_AW_MCP_SCRIPTS_PORT\",\n")
 
 	// Add Authorization header with API key
 	yaml.WriteString("                \"headers\": {\n")
@@ -85,4 +76,16 @@ func renderMCPScriptsMCPConfigWithOptions(yaml *strings.Builder, mcpScripts *MCP
 	} else {
 		yaml.WriteString("              },\n")
 	}
+}
+
+const mcpScriptsBridgeHost = "mcp-scripts.docker.internal"
+
+func mcpScriptsGatewayHost(workflowData *WorkflowData) string {
+	if isAWFNetworkIsolationEnabled(workflowData) {
+		return mcpScriptsBridgeHost
+	}
+	if agent := getAgentConfig(workflowData); agent != nil && agent.Disabled {
+		return "127.0.0.1"
+	}
+	return "host.docker.internal"
 }
