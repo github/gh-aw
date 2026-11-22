@@ -5409,14 +5409,14 @@ describe("Copilot sub-agent model resolution (recorded /reflect from run 3930457
       workingDirectory: base,
       agentsBaseDir: base,
       bare: true,
-      sdkModule: { CopilotClient: FakeCopilotClient, RuntimeConnection: { forUri: () => ({}) }, approveAll: () => "allow" },
+      sdkModule: { CopilotClient: FakeCopilotClient, RuntimeConnection: { forTcp: () => ({}) }, approveAll: () => "allow" },
     });
     expect(result.exitCode).toBe(0);
     const session = createSession.mock.calls[0][0];
     expect(session.model).toBe(providerConfig.model);
-    expect(session.customAgents.find(agent => agent.name === "haiku-small").model).toBe(expected);
-    expect(session.customAgents.find(agent => agent.name === "haiku-small").model).not.toBe(session.model);
-    expect(session.customAgents.find(agent => agent.name === "helper").model).toBe(session.model);
+    expect(session.agents.definitions.find(agent => agent.name === "haiku-small").model).toBe(expected);
+    expect(session.agents.definitions.find(agent => agent.name === "haiku-small").model).not.toBe(session.model);
+    expect(session.agents.definitions.find(agent => agent.name === "helper").model).toBe(session.model);
   });
 
   const vscodePinnedAgent = "---\nname: planner\ndescription: Plans work\nmodel: GPT-5.4 (copilot)\n---\nPlan the work.\n";
@@ -5480,12 +5480,12 @@ describe("Copilot sub-agent model resolution (recorded /reflect from run 3930457
       workingDirectory: base,
       agentsBaseDir: base,
       bare: true,
-      sdkModule: { CopilotClient: FakeCopilotClient, RuntimeConnection: { forUri: () => ({}) }, approveAll: () => "allow" },
+      sdkModule: { CopilotClient: FakeCopilotClient, RuntimeConnection: { forTcp: () => ({}) }, approveAll: () => "allow" },
     });
     expect(result.exitCode).toBe(0);
     const session = createSession.mock.calls[0][0];
-    expect(session.customAgents.find(agent => agent.name === "planner").model).toBe(session.model);
-    expect(session.customAgents.find(agent => agent.name === "haiku-small").model).toBe(qualifyModelForMultiProvider("claude-haiku-5.5", providerConfig));
+    expect(session.agents.definitions.find(agent => agent.name === "planner").model).toBe(session.model);
+    expect(session.agents.definitions.find(agent => agent.name === "haiku-small").model).toBe(qualifyModelForMultiProvider("claude-haiku-5.5", providerConfig));
     expect(logs).toContainEqual(expect.stringMatching(/warning: custom agent "planner" model "GPT-5\.4 \(copilot\)".*using session model/));
   });
 

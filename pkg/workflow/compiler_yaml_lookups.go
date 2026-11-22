@@ -252,13 +252,8 @@ func collectEngineVersionsForMetadata(data *WorkflowData, registry *EngineRegist
 		}
 	}
 
-	if isCopilotSDKEnabledForActiveEngine(data, mainEngineID) {
-		filteredVersions["copilot-sdk"] = string(constants.DefaultCopilotSDKVersion)
-		if data.EngineConfig != nil {
-			if pin := data.EngineConfig.CopilotSDKPin; pin != nil && pin.valid() {
-				filteredVersions["copilot-sdk"] = pin.Version
-			}
-		}
+	if version := copilotSDKVersionForMetadata(data, mainEngineID); version != "" {
+		filteredVersions["copilot-sdk"] = version
 	}
 
 	return filteredVersions
@@ -278,25 +273,38 @@ func applyMetadataEngineVersionOverrides(versions map[string]string, engineConfi
 	}
 }
 
-func isCopilotSDKEnabledForActiveEngine(data *WorkflowData, mainEngineID string) bool {
+func copilotSDKVersionForMetadata(data *WorkflowData, mainEngineID string) string {
 	if mainEngineID == string(constants.CopilotEngine) && data.EngineConfig != nil && data.EngineConfig.CopilotSDK {
-		return true
+		return copilotSDKInstallVersion(data)
 	}
 
 	if !IsDetectionJobEnabled(data.SafeOutputs) || data.SafeOutputs == nil || data.SafeOutputs.ThreatDetection == nil {
-		return false
+		return ""
 	}
 
 	detectionConfig := data.SafeOutputs.ThreatDetection.EngineConfig
 	if detectionConfig == nil {
-		return false
+		return ""
 	}
 
 	detectionEngineID := strings.TrimSpace(detectionConfig.ID)
 	if detectionEngineID == "" {
 		detectionEngineID = mainEngineID
 	}
-	return detectionEngineID == string(constants.CopilotEngine) && detectionConfig.CopilotSDK
+	if detectionEngineID == string(constants.CopilotEngine) && detectionConfig.CopilotSDK {
+		return copilotSDKInstallVersion(&WorkflowData{EngineConfig: detectionConfig})
+	}
+	return ""
+}
+
+func copilotSDKInstallVersion(data *WorkflowData) string {
+	if selectDefaultCopilotSDKInstallSpec(data).npm == nil {
+		return string(constants.DefaultCopilotSDKVersion)
+	}
+	if pin := data.EngineConfig.CopilotSDKPin; pin != nil && pin.valid() {
+		return pin.Version
+	}
+	return string(constants.DefaultCopilotSDKNPMVersion)
 }
 
 // resolveAgentImageRunnerIdentifier returns a stable identifier for the configured runs-on value.

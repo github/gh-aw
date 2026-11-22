@@ -2,7 +2,11 @@
 
 package workflow
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/github/gh-aw/pkg/constants"
+)
 
 func TestCollectEngineVersionsForMetadata(t *testing.T) {
 	t.Run("only active main engine versions are included", func(t *testing.T) {
@@ -19,11 +23,22 @@ func TestCollectEngineVersionsForMetadata(t *testing.T) {
 		if versions["copilot"] != "1.2.3-custom" {
 			t.Fatalf("Expected copilot override version, got: %q", versions["copilot"])
 		}
-		if versions["copilot-sdk"] == "" {
-			t.Fatal("Expected copilot-sdk version when copilot-sdk is enabled")
+		if versions["copilot-sdk"] != string(constants.DefaultCopilotSDKNPMVersion) {
+			t.Fatalf("Expected npm SDK version, got: %q", versions["copilot-sdk"])
 		}
 		if _, exists := versions["claude"]; exists {
 			t.Fatal("Did not expect inactive claude engine version in metadata map")
+		}
+	})
+
+	t.Run("non-npm drivers keep their own SDK version", func(t *testing.T) {
+		data := &WorkflowData{
+			AI:           "copilot",
+			EngineConfig: &EngineConfig{ID: "copilot", CopilotSDK: true, Driver: "driver.py"},
+		}
+		versions := collectEngineVersionsForMetadata(data, GetGlobalEngineRegistry())
+		if versions["copilot-sdk"] != string(constants.DefaultCopilotSDKVersion) {
+			t.Fatalf("Expected non-npm SDK version, got: %q", versions["copilot-sdk"])
 		}
 	})
 

@@ -206,7 +206,7 @@ describe("Copilot dynamic workflow sessions", () => {
     class FakeClient {
       start = async () => {};
       createSession = async config => {
-        expect(config.customAgents).toEqual([{ name: "smoke-marker", displayName: "smoke-marker", prompt: "Run the smoke workflow.", tools: ["read"] }]);
+        expect(config.agents.definitions).toEqual([{ name: "smoke-marker", displayName: "smoke-marker", prompt: "Run the smoke workflow.", tools: ["read"] }]);
         return session;
       };
       stop = async () => {};
@@ -218,7 +218,7 @@ describe("Copilot dynamic workflow sessions", () => {
       workingDirectory: root,
       agentsBaseDir: root,
       sessionStateBaseDir: root,
-      sdkModule: { CopilotClient: FakeClient, RuntimeConnection: { forUri: () => ({}) }, approveAll: () => "allow" },
+      sdkModule: { CopilotClient: FakeClient, RuntimeConnection: { forTcp: () => ({}) }, approveAll: () => "allow" },
     });
     expect(result).toMatchObject({ exitCode: 0, output: "done", hasOutput: true });
     const events = fs

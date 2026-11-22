@@ -66,7 +66,7 @@ func TestCopilotSDKCompilesWithFrozenNPMGraph(t *testing.T) {
 					Dependencies map[string]string `json:"dependencies"`
 				}
 				require.NoError(t, json.Unmarshal([]byte(manifestJSON), &manifest))
-				want := map[string]string{"@github/copilot-sdk": string(constants.DefaultCopilotSDKVersion), "undici": "6.29.1"}
+				want := map[string]string{"@microsoft/copilot-sdk": string(constants.DefaultCopilotSDKNPMVersion), "undici": "6.29.1"}
 				maps.Copy(want, tt.extra)
 				require.Equal(t, want, manifest.Dependencies)
 
@@ -85,16 +85,12 @@ func TestCopilotSDKCompilesWithFrozenNPMGraph(t *testing.T) {
 				for pkg, version := range want {
 					require.Equal(t, version, lock.Packages["node_modules/"+pkg].Version, pkg)
 				}
-				require.Equal(t, "4.6.6", lock.Packages["node_modules/zod"].Version)
-				require.Contains(t, lock.Packages, "node_modules/@github/copilot-sdk-linux-x64")
-				require.Contains(t, lock.Packages, "node_modules/@github/copilot-sdk-darwin-arm64")
-				require.Contains(t, lock.Packages, "node_modules/koffi")
+				for _, platform := range []string{"linux-x64", "darwin-arm64"} {
+					require.Equal(t, string(constants.DefaultCopilotSDKNPMVersion), lock.Packages["node_modules/@microsoft/copilot-sdk-"+platform].Version)
+				}
 				for path, pkg := range lock.Packages {
 					if path == "" {
 						continue
-					}
-					if strings.HasSuffix(path, "node_modules/zod") {
-						require.Equal(t, "4.6.6", pkg.Version, path)
 					}
 					require.True(t, strings.HasPrefix(pkg.Resolved, "https://registry.npmjs.org/"), path)
 					encoded, ok := strings.CutPrefix(pkg.Integrity, "sha512-")
@@ -158,9 +154,9 @@ func TestCopilotSDKInstallerVerifiesCustomPin(t *testing.T) {
 	script, err := filepath.Abs("../../actions/setup/sh/install_copilot_sdk.sh")
 	require.NoError(t, err)
 	for _, tc := range []struct{ name, version, digest, wantError string }{
-		{name: "matching pin", version: string(constants.DefaultCopilotSDKVersion), digest: copilotSDKNodeProject.digest},
+		{name: "matching pin", version: string(constants.DefaultCopilotSDKNPMVersion), digest: copilotSDKNodeProject.digest},
 		{name: "mismatched version", version: "0.0.0", digest: copilotSDKNodeProject.digest, wantError: "Expected a registry-only npm v3 lockfile"},
-		{name: "mismatched digest", version: string(constants.DefaultCopilotSDKVersion), digest: strings.Repeat("0", 64), wantError: "does not match the compiled workflow"},
+		{name: "mismatched digest", version: string(constants.DefaultCopilotSDKNPMVersion), digest: strings.Repeat("0", 64), wantError: "does not match the compiled workflow"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			root := t.TempDir()
@@ -179,7 +175,7 @@ func TestCopilotSDKInstallerVerifiesCustomPin(t *testing.T) {
 				return
 			}
 			require.NoError(t, err, "%s", output)
-			require.Contains(t, string(output), "npm ci --prefix ")
+			require.Contains(t, string(output), "npm ci --ignore-scripts")
 			require.Contains(t, string(output), "--ignore-scripts")
 		})
 	}

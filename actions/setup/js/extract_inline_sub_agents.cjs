@@ -428,7 +428,7 @@ function writeInlineSubAgents(content, workspaceDir, agentsBaseDir, engineId, re
  * @param {string} workspaceDir
  * @param {string} agentsBaseDir
  * @param {(message: string) => void} logger
- * @returns {import("@github/copilot-sdk").CustomAgentConfig[]}
+ * @returns {import("@microsoft/copilot-sdk").CustomAgentConfig[]}
  */
 function loadCopilotSDKCustomAgents(workspaceDir, agentsBaseDir, logger) {
   const { extractFrontmatterAndBody } = require("./frontmatter_hash_pure.cjs");

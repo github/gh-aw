@@ -221,11 +221,11 @@ This counting requirement tightens the specification to match the existing gh-aw
 
 ### 4.6 TypeScript Example (Non-Normative)
 
-Prerequisite: install [`@github/copilot-sdk`](https://www.npmjs.com/package/@github/copilot-sdk) in the runtime where this example executes.
+Prerequisite: install [`@microsoft/copilot-sdk`](https://www.npmjs.com/package/@microsoft/copilot-sdk) in the runtime where this example executes.
 
 ```ts
 import { readFile } from "node:fs/promises";
-import { CopilotClient, RuntimeConnection } from "@github/copilot-sdk";
+import { CopilotClient, RuntimeConnection } from "@microsoft/copilot-sdk";
 
 const promptPath = process.env.GH_AW_PROMPT;
 const sdkUri = process.env.COPILOT_SDK_URI;
@@ -243,18 +243,17 @@ const logLevel = allowedLogLevels.has(rawLogLevel) ? rawLogLevel : "warning";
 const workingDirectory = process.env.GITHUB_WORKSPACE || process.cwd();
 const prompt = await readFile(promptPath, "utf8");
 
+const endpoint = new URL(sdkUri);
 const client = new CopilotClient({
-  connection: RuntimeConnection.forUri(sdkUri, {
-    connectionToken,
-  }),
-  workingDirectory,
-  logLevel,
+  mode: "coding-agent",
+  runtime: RuntimeConnection.forTcp(endpoint.hostname, Number(endpoint.port), { connectionToken }),
+  observability: { logLevel },
 });
 
 await client.start();
 try {
-  const session = await client.createSession({ model });
-  const response = await session.sendAndWait({ prompt }, { timeoutMs: sendTimeoutMs });
+  const session = await client.createSession({ model, workingDirectory });
+  const response = await session.sendAndWait({ prompt }, sendTimeoutMs);
   console.log(response);
   await session.disconnect();
 } finally {
@@ -566,7 +565,7 @@ A conforming implementation SHOULD:
 
 ### Informative References
 
-- **[Copilot SDK (npm)]** https://www.npmjs.com/package/@github/copilot-sdk
+- **[Copilot SDK (npm)]** https://www.npmjs.com/package/@microsoft/copilot-sdk
 - **[Copilot SDK Repository]** https://github.com/github/copilot-sdk
 - **[Copilot SDK Driver Source]** `actions/setup/js/copilot_sdk_driver.cjs`
 - **[Copilot Harness Source]** `actions/setup/js/copilot_harness.cjs`

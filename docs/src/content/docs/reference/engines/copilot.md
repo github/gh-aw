@@ -132,7 +132,9 @@ engine:
     sha256: "<64 lowercase hex digits>"
 ```
 
-Check in `package.json` and `package-lock.json` under `.github/aw/copilot-sdk/<version>/<variant>/`, where `<variant>` is `node` for the built-in or Node.js driver and `typescript` for an explicit `ts-node` command. Both files must pin `@github/copilot-sdk` to that exact version. Use an npm v3 lockfile with canonical npm registry URLs and SHA-512 integrity for every dependency. The SDK install step needs `jq` and a checkout that includes these files.
+Check in `package.json` and `package-lock.json` under `.github/aw/copilot-sdk/<version>/<variant>/`, where `<variant>` is `node` for the built-in or Node.js driver and `typescript` for an explicit `ts-node` command. Both files must pin `@microsoft/copilot-sdk` to that exact version. Use an npm v3 lockfile with canonical npm registry URLs and SHA-512 integrity for every dependency. The SDK install step needs `jq` and a checkout that includes these files.
+
+When migrating a pin from `@github/copilot-sdk`, regenerate the lockfile and update `sha256`. Custom JavaScript and TypeScript drivers must also use the new package name and v2 API; see the [Copilot SDK driver specification](../../specs/copilot-sdk-driver-specification/).
 
 From the project directory, calculate the frontmatter checksum over the manifest bytes, a NUL byte, and the lockfile bytes:
 

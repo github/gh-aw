@@ -3591,7 +3591,7 @@ engine:
 
   # Format 2: object
   copilot-sdk:
-    # Exact stable version of @github/copilot-sdk, independent of engine.version.
+    # Exact stable version of @microsoft/copilot-sdk, independent of engine.version.
     version: "example-value"
 
     # Lowercase SHA-256 of the checked-in manifest, a NUL byte, and the npm lockfile.
@@ -22625,7 +22625,7 @@ safe-outputs:
 
       # Format 2: object
       copilot-sdk:
-        # Exact stable version of @github/copilot-sdk, independent of engine.version.
+        # Exact stable version of @microsoft/copilot-sdk, independent of engine.version.
         version: "example-value"
 
         # Lowercase SHA-256 of the checked-in manifest, a NUL byte, and the npm lockfile.

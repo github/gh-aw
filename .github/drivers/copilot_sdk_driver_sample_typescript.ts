@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { CopilotClient, RuntimeConnection, approveAll } from "@github/copilot-sdk";
+import { CopilotClient, RuntimeConnection, approveAll } from "@microsoft/copilot-sdk";
 
 // Default timeout for a single sendAndWait call: 10 minutes.
 // Override via the COPILOT_SDK_SEND_TIMEOUT_MS environment variable.
@@ -44,21 +44,22 @@ function extractAssistantContent(message: unknown): string {
 
 async function main(): Promise<void> {
   const promptPath = readRequiredEnv("GH_AW_PROMPT");
-  const sdkUri = readRequiredEnv("COPILOT_SDK_URI");
+  const endpoint = new URL(readRequiredEnv("COPILOT_SDK_URI"));
   const connectionToken = readRequiredEnv("COPILOT_CONNECTION_TOKEN");
   const model = readRequiredEnv("COPILOT_MODEL");
   const prompt = readFileSync(promptPath, "utf8");
 
   const client = new CopilotClient({
-    connection: RuntimeConnection.forUri(sdkUri, { connectionToken }),
-    workingDirectory: process.env.GITHUB_WORKSPACE || process.cwd(),
+    mode: "coding-agent",
+    runtime: RuntimeConnection.forTcp(endpoint.hostname, Number(endpoint.port), { connectionToken }),
   });
 
   let session;
   await client.start();
   try {
     session = await client.createSession({
-      onPermissionRequest: approveAll,
+      permissions: { onRequest: approveAll },
+      workingDirectory: process.env.GITHUB_WORKSPACE || process.cwd(),
       model,
     });
 

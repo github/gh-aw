@@ -3,7 +3,7 @@
 /**
  * Copilot SDK Session Runner
  *
- * Runs a single Copilot agentic session using the @github/copilot-sdk.
+ * Runs a single Copilot agentic session using the @microsoft/copilot-sdk.
  * Serializes all SDK session events to a JSONL file so that
  * unified_session.cjs can collect them for the unified session step summary.
  *
@@ -130,7 +130,7 @@ function parseSubagentModelsJson(value) {
 }
 
 /**
- * Run a Copilot agentic session using the @github/copilot-sdk.
+ * Run a Copilot agentic session using the @microsoft/copilot-sdk.
  *
  * Connects to the already-running headless Copilot CLI server at sdkUri, creates
  * a session, sends the prompt, waits for the session to go idle, and returns a
@@ -148,24 +148,24 @@ function parseSubagentModelsJson(value) {
  *   model?: string,
  *   reasoningEffort?: string,
  *   connectionToken?: string,
- *   providers?: import("@github/copilot-sdk").NamedProviderConfig[],
- *   models?: import("@github/copilot-sdk").ProviderModelConfig[],
+ *   providers?: import("@microsoft/copilot-sdk").NamedProviderConfig[],
+ *   models?: import("@microsoft/copilot-sdk").ProviderModelConfig[],
  *   maxToolDenials?: number | string,
  *   permissionConfig?: {
  *     allowAllTools?: boolean,
  *     allowedTools?: string[],
  *   },
  *   toolConfig?: import("./copilot_sdk_tool_config.cjs").CopilotSDKToolConfig,
- *   mcpServers?: Record<string, import("@github/copilot-sdk").MCPServerConfig>,
+ *   mcpServers?: Record<string, import("@microsoft/copilot-sdk").MCPServerConfig>,
  *   webFetchOptions?: {fetchImpl?: typeof fetch, timeoutMs?: number, maxRedirects?: number},
  *   coreLogger?: import("./copilot_sdk_permissions.cjs").CopilotSDKCoreLogger,
  *   sdkModule?: {
- *     CopilotClient: typeof import("@github/copilot-sdk").CopilotClient,
- *     RuntimeConnection: typeof import("@github/copilot-sdk").RuntimeConnection,
- *     approveAll: typeof import("@github/copilot-sdk").approveAll,
- *     ToolSet?: typeof import("@github/copilot-sdk").ToolSet,
- *     BuiltInTools?: typeof import("@github/copilot-sdk").BuiltInTools,
- *     defineTool?: typeof import("@github/copilot-sdk").defineTool,
+ *     CopilotClient: typeof import("@microsoft/copilot-sdk").CopilotClient,
+ *     RuntimeConnection: typeof import("@microsoft/copilot-sdk").RuntimeConnection,
+ *     approveAll: typeof import("@microsoft/copilot-sdk").approveAll,
+ *     ToolSet?: typeof import("@microsoft/copilot-sdk").ToolSet,
+ *     BuiltInTools?: typeof import("@microsoft/copilot-sdk").BuiltInTools,
+ *     defineTool?: typeof import("@microsoft/copilot-sdk").defineTool,
  *   },
  *   sessionStateBaseDir?: string,
  *   workingDirectory?: string,
@@ -214,7 +214,7 @@ async function runCopilotSDKSession({
 }) {
   // Lazy-require to avoid loading the SDK when it is not needed.
   // The SDK is large and has side-effects on import (worker threads, etc.).
-  const sdk = sdkModule ?? require("@github/copilot-sdk");
+  const sdk = sdkModule ?? require("@microsoft/copilot-sdk");
   const { CopilotClient, RuntimeConnection, approveAll } = sdk;
 
   const startTime = Date.now();
@@ -239,28 +239,29 @@ async function runCopilotSDKSession({
   const defaultSessionStateBase = path.join(TMP_GH_AW_PATH, "sandbox", "agent", "logs", "copilot-session-state");
   const sessionStateBase = sessionStateBaseDir ?? process.env.GH_AW_SESSION_STATE_BASE_DIR ?? defaultSessionStateBase;
 
-  /** @type {ReadonlyArray<NonNullable<import("@github/copilot-sdk").CopilotClientOptions["logLevel"]>>} */
+  /** @typedef {NonNullable<NonNullable<import("@microsoft/copilot-sdk").CopilotClientOptions["observability"]>["logLevel"]>} SDKLogLevel */
+  /** @type {ReadonlyArray<SDKLogLevel>} */
   const VALID_LOG_LEVELS = ["none", "error", "warning", "info", "debug", "all"];
   const rawLogLevel = process.env.COPILOT_SDK_LOG_LEVEL ?? "";
   /**
    * @param {string} value
-   * @returns {value is NonNullable<import("@github/copilot-sdk").CopilotClientOptions["logLevel"]>}
+   * @returns {value is SDKLogLevel}
    */
   const isValidLogLevel = value => {
     /** @type {readonly string[]} */
     const validLogLevels = VALID_LOG_LEVELS;
     return validLogLevels.includes(value);
   };
-  /** @type {import("@github/copilot-sdk").CopilotClientOptions["logLevel"]} */
   const logLevel = isValidLogLevel(rawLogLevel) ? rawLogLevel : "warning";
 
-  const connection = RuntimeConnection.forUri(sdkUri, {
-    connectionToken,
-  });
+  const endpoint = new URL(sdkUri);
+  if (!endpoint.port || !["http:", "tcp:"].includes(endpoint.protocol)) {
+    throw new Error("COPILOT_SDK_URI must identify a plaintext TCP endpoint with an explicit port");
+  }
   const client = new CopilotClient({
-    connection,
-    workingDirectory,
-    logLevel,
+    mode: "coding-agent",
+    runtime: RuntimeConnection.forTcp(endpoint.hostname.replace(/^\[|\]$/g, ""), Number(endpoint.port), { connectionToken }),
+    observability: { logLevel },
   });
   /** @type {any} */
   let session = null;
@@ -386,7 +387,7 @@ async function runCopilotSDKSession({
 
     /**
      * Build the session on-permission handler from configuration input.
-     * @type {import("@github/copilot-sdk").PermissionHandler}
+     * @type {import("@microsoft/copilot-sdk").PermissionHandler}
      */
     const onPermissionRequest = buildCopilotSDKPermissionHandler(permissionConfig, approveAll, {
       coreLogger,
@@ -445,22 +446,19 @@ async function runCopilotSDKSession({
     const skillsStat = fs.lstatSync(skillsDirectory, { throwIfNoEntry: false });
     if (skillsStat && !skillsStat.isDirectory()) throw new Error(`Staged Copilot skills must be a directory: ${skillsDirectory}`);
     const skillDirectories = skillsStat ? [skillsDirectory] : [];
-    /** @type {import("@github/copilot-sdk").SessionConfig} */
+    /** @type {import("@microsoft/copilot-sdk").CreateSessionOptions} */
     const sessionConfig = {
       model: sessionModel || undefined,
-      ...(sdkReasoningEffort ? { reasoningEffort: sdkReasoningEffort } : {}),
-      providers,
-      models: providerModels,
+      inference: { reasoningEffort: sdkReasoningEffort, providers, models: providerModels },
       workingDirectory,
-      skipCustomInstructions: bare,
-      customAgents,
+      instructions: { skipCustomInstructions: bare },
+      agents: { definitions: customAgents },
       enableConfigDiscovery: false,
-      skillDirectories,
-      ...(skillDirectories.length ? { enableSkills: true } : {}),
-      ...(mcpServers === undefined ? {} : { mcpServers }),
-      onPermissionRequest,
-      ...(toolCallBudget ? { hooks: { onPreToolUse: toolCallBudget.onPreToolUse } } : {}),
-      ...buildCopilotSDKSessionToolConfig(toolConfig, sdk, webFetchOptions),
+      skills: { directories: skillDirectories, ...(skillDirectories.length ? { enabled: true } : {}) },
+      ...(mcpServers === undefined ? {} : { mcp: { servers: mcpServers } }),
+      permissions: { onRequest: onPermissionRequest },
+      ...(toolCallBudget ? { hooks: { handlers: { onPreToolUse: toolCallBudget.onPreToolUse } } } : {}),
+      tools: buildCopilotSDKSessionToolConfig(toolConfig, sdk, webFetchOptions),
     };
     log(`creating session with model="${sessionConfig.model || "(none)"}" providers=${providers?.length ?? 0} models=${providerModels?.length ?? 0}`);
     session = restoredSessionId

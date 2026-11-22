@@ -83,7 +83,7 @@ function getEnvPositiveIntOrDefault(key, fallback, env = process.env) {
  * Create a compact, human-readable permission-request summary for diagnostics.
  * Examples: shell(git status), mcp(github.get_file_contents), url(https://example.com).
  *
- * @param {import("@github/copilot-sdk").PermissionRequest} request
+ * @param {import("@microsoft/copilot-sdk").PermissionRequest} request
  * @returns {string}
  */
 function summarizePermissionRequest(request) {
@@ -108,7 +108,7 @@ function summarizePermissionRequest(request) {
 /**
  * @param {CopilotSDKCoreLogger | undefined} coreLogger
  * @param {(msg: string) => void} logger
- * @param {import("@github/copilot-sdk").PermissionRequest} request
+ * @param {import("@microsoft/copilot-sdk").PermissionRequest} request
  */
 function logPermissionDenied(coreLogger, logger, request) {
   const requestSummary = summarizePermissionRequest(request);
@@ -215,9 +215,9 @@ function isReadPathAllowedByShellRules(requestedPath, allowedPathPatterns, works
  * permission behavior derived from configuration input.
  *
  * @param {CopilotSDKPermissionConfig | undefined} permissionConfig
- * @param {import("@github/copilot-sdk").PermissionHandler} approveAll
+ * @param {import("@microsoft/copilot-sdk").PermissionHandler} approveAll
  * @param {{coreLogger?: CopilotSDKCoreLogger, logger?: (msg: string) => void, onDenied?: (requestSummary: string) => void, workspaceRoot?: string}=} logOptions
- * @returns {import("@github/copilot-sdk").PermissionHandler}
+ * @returns {import("@microsoft/copilot-sdk").PermissionHandler}
  */
 function buildCopilotSDKPermissionHandler(permissionConfig, approveAll, logOptions) {
   const logger = logOptions?.logger ?? (() => {});
@@ -322,7 +322,7 @@ function buildCopilotSDKPermissionHandler(permissionConfig, approveAll, logOptio
   }
 
   /**
-   * @param {import("@github/copilot-sdk").PermissionRequest} request
+   * @param {import("@microsoft/copilot-sdk").PermissionRequest} request
    * @returns {boolean}
    */
   function isAllowed(request) {

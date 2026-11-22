@@ -3,7 +3,7 @@
 /**
  * Copilot Harness with Retry Logic
  *
- * Wraps the Copilot CLI command (or @github/copilot-sdk session in SDK mode) with retry logic
+ * Wraps the Copilot CLI command (or @microsoft/copilot-sdk session in SDK mode) with retry logic
  * for failures that occur after the session has been partially executed.  Passes all arguments
  * to the copilot subprocess, forwarding stdout/stderr. Small prompt files are delivered as
  * CLI arguments for compatibility; large prompt files are streamed through stdin.

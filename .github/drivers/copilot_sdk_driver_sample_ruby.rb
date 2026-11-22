@@ -4,7 +4,7 @@ require "open3"
 
 NODE_DRIVER = <<~'JS'
   const fs = require("node:fs");
-  const { CopilotClient, RuntimeConnection, approveAll } = require("@github/copilot-sdk");
+  const { CopilotClient, RuntimeConnection, approveAll } = require("@microsoft/copilot-sdk");
 
   function requiredEnv(name) {
     const value = process.env[name];
@@ -30,21 +30,22 @@ NODE_DRIVER = <<~'JS'
 
   async function main() {
     const promptPath = requiredEnv("GH_AW_PROMPT");
-    const sdkUri = requiredEnv("COPILOT_SDK_URI");
+    const endpoint = new URL(requiredEnv("COPILOT_SDK_URI"));
     const connectionToken = requiredEnv("COPILOT_CONNECTION_TOKEN");
     const model = requiredEnv("COPILOT_MODEL");
     const prompt = fs.readFileSync(promptPath, "utf8");
 
     const client = new CopilotClient({
-      connection: RuntimeConnection.forUri(sdkUri, { connectionToken }),
-      workingDirectory: process.env.GITHUB_WORKSPACE || process.cwd(),
+      mode: "coding-agent",
+      runtime: RuntimeConnection.forTcp(endpoint.hostname, Number(endpoint.port), { connectionToken }),
     });
 
     let session;
     await client.start();
     try {
       session = await client.createSession({
-        onPermissionRequest: approveAll,
+        permissions: { onRequest: approveAll },
+        workingDirectory: process.env.GITHUB_WORKSPACE || process.cwd(),
         model,
       });
       const response = await session.sendAndWait({ prompt });

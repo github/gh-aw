@@ -10,7 +10,7 @@ const parentURL = pathToFileURL(path.join(path.resolve(runnerTemp), "gh-aw", "en
 
 /** @param {string} specifier @param {unknown} error */
 function shouldFallback(specifier, error) {
-  const sdkPackage = specifier === "@github/copilot-sdk" || specifier.startsWith("@github/copilot-sdk/") || specifier === "undici" || specifier.startsWith("undici/");
+  const sdkPackage = specifier === "@microsoft/copilot-sdk" || specifier.startsWith("@microsoft/copilot-sdk/") || specifier === "undici" || specifier.startsWith("undici/");
   return sdkPackage && error !== null && typeof error === "object" && "code" in error && (error.code === "ERR_MODULE_NOT_FOUND" || error.code === "MODULE_NOT_FOUND");
 }
 

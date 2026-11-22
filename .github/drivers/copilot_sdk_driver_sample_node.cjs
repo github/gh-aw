@@ -46,7 +46,7 @@ function extractAssistantContent(message) {
 
 function buildSessionConfig(model, onPermissionRequest) {
   const config = {
-    onPermissionRequest,
+    permissions: { onRequest: onPermissionRequest },
     model,
   };
 
@@ -54,30 +54,29 @@ function buildSessionConfig(model, onPermissionRequest) {
   const multiProviderJson = process.env.GH_AW_COPILOT_SDK_MULTI_PROVIDER_JSON;
   const multiProviderConfig = parseMultiProviderJson(multiProviderJson);
   if (multiProviderConfig) {
-    config.providers = multiProviderConfig.providers;
-    config.models = multiProviderConfig.models;
+    config.inference = { providers: multiProviderConfig.providers, models: multiProviderConfig.models };
   }
 
   return config;
 }
 
 async function main() {
-  const { CopilotClient, RuntimeConnection, approveAll } = require("@github/copilot-sdk");
+  const { CopilotClient, RuntimeConnection, approveAll } = require("@microsoft/copilot-sdk");
   const promptPath = readRequiredEnv("GH_AW_PROMPT");
-  const sdkUri = readRequiredEnv("COPILOT_SDK_URI");
+  const endpoint = new URL(readRequiredEnv("COPILOT_SDK_URI"));
   const connectionToken = readRequiredEnv("COPILOT_CONNECTION_TOKEN");
   const model = readRequiredEnv("COPILOT_MODEL");
   const prompt = fs.readFileSync(promptPath, "utf8");
 
   const client = new CopilotClient({
-    connection: RuntimeConnection.forUri(sdkUri, { connectionToken }),
-    workingDirectory: process.env.GITHUB_WORKSPACE || process.cwd(),
+    mode: "coding-agent",
+    runtime: RuntimeConnection.forTcp(endpoint.hostname, Number(endpoint.port), { connectionToken }),
   });
 
   let session;
   await client.start();
   try {
-    session = await client.createSession(buildSessionConfig(model, approveAll));
+    session = await client.createSession({ ...buildSessionConfig(model, approveAll), workingDirectory: process.env.GITHUB_WORKSPACE || process.cwd() });
     const response = await session.sendAndWait({ prompt }, parseSendTimeoutMs());
     const content = extractAssistantContent(response);
     if (content) {
