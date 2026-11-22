@@ -521,7 +521,6 @@ var SharedWorkflowForbiddenFields = []string{
 	"if",              // Conditional execution
 	"name",            // Workflow name
 	"run-name",        // Run display name
-	"runs-on",         // Runner specification
 	"strict",          // Strict mode
 	"timeout-minutes", // Timeout in minutes
 	"tracker-id",      // Tracker ID

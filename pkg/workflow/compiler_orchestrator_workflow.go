@@ -102,6 +102,16 @@ func (c *Compiler) setupWorkflowBuildContext(ctx *workflowBuildContext) error {
 	if err != nil {
 		return c.formatEngineSetupError(ctx, err)
 	}
+	if _, local := ctx.frontmatter.Frontmatter["runs-on"]; !local && engineSetup.importsResult.MergedRunsOn != nil {
+		runsOn := engineSetup.importsResult.MergedRunsOn
+		if err := validateRunsOnValue(runsOn); err != nil {
+			return c.formatToolsProcessingError(ctx.cleanPath, fmt.Errorf("imported runner configuration: %w", err))
+		}
+		if err := validateRunsOn(map[string]any{"runs-on": runsOn}, ctx.cleanPath); err != nil {
+			return err
+		}
+		ctx.frontmatter.Frontmatter["runs-on"] = runsOn
+	}
 	toolsResult, err := c.processToolsAndMarkdown(
 		ctx.frontmatter,
 		ctx.cleanPath,
