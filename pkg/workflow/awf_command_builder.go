@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path"
 	"slices"
 	"sort"
 	"strconv"
@@ -163,10 +164,10 @@ func buildExpandableAWFArgs(config AWFCommandConfig, isCloudHypervisor, isArcDin
 		var probe, mounts strings.Builder
 		probe.WriteString(arcDindDockerHostProbe)
 		mounts.WriteString(expandableArgs)
-		for _, dir := range []string{"base/copilot-agents", ".github/agents", ".github/skills"} {
-			source := awfArcDindRootPathExpr + "/" + dir
-			fmt.Fprintf(&probe, "\nrm -rf \"%s\" && mkdir -p \"%s\" || exit 1\nif [ -d \"/tmp/gh-aw/%s\" ]; then cp -a \"/tmp/gh-aw/%s/.\" \"%s/\" || exit 1; fi", source, source, dir, dir, source)
-			fmt.Fprintf(&mounts, ` --mount "%s:/tmp/gh-aw/%s:ro"`, source, dir)
+		for _, dir := range []string{"base/copilot-agents", activationSymlinkAgentDir, activationSymlinkSkillDir} {
+			source := path.Join(awfArcDindRootPathExpr, dir)
+			fmt.Fprintf(&probe, "\nrm -rf \"%s\" && mkdir -p \"%s\" || exit 1\nif [ -d \"/tmp/gh-aw/%s\" ]; then cp -a \"/tmp/gh-aw/%s/.\" \"%s/\" || exit 1; fi", source, source, dir, dir, source) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
+			fmt.Fprintf(&mounts, ` --mount "%s:/tmp/gh-aw/%s:ro"`, source, dir)                                                                                                                      //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
 		}
 		arcDindDockerHostProbe, expandableArgs = probe.String(), mounts.String()
 	}
