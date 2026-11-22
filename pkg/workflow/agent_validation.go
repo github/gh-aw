@@ -260,35 +260,16 @@ func (c *Compiler) validateCopilotWebToolsSupport(engine CodingAgentEngine, data
 		return nil
 	}
 
-	engineConfig := data.EngineConfig
-	collector := NewErrorCollector(c.failFast)
-	for _, tool := range []string{"web-fetch", "web-search"} {
-		if !isCopilotToolValueEnabled(data.Tools, tool) || (!claudeOnCopilot && tool == "web-fetch" && engineConfig != nil && engineConfig.CopilotSDK) {
-			continue
-		}
-		message := fmt.Sprintf("Copilot's native '%s' tool is unavailable because offline BYOK mode disables web tools (COPILOT_OFFLINE=true)", tool)
-		suggestion := fmt.Sprintf("Remove tools.%s and configure an MCP server instead, or use a supported engine, for example:\n\nengine: codex", tool)
-		if claudeOnCopilot {
-			message = fmt.Sprintf("Claude's native '%s' tool is unavailable on GitHub Copilot inference because offline BYOK mode disables web tools (COPILOT_OFFLINE=true)", tool)
-			server := "fetch"
-			if tool == "web-search" {
-				server = "search"
-			}
-			suggestion = fmt.Sprintf("Remove tools.%s and configure an MCP %s server instead, or use engine.model-provider: anthropic", tool, server)
-		} else if tool == "web-fetch" {
-			suggestion += "\n\nFor Copilot's proxy-aware custom fetch tool, enable SDK mode:\n\nengine:\n  id: copilot\n  copilot-sdk: true"
-		}
-		err := NewValidationError(
-			"tools."+tool,
-			tool,
-			message,
-			suggestion,
-		)
-		if returnErr := collector.Add(err); returnErr != nil {
-			return returnErr
-		}
+	if !isCopilotToolValueEnabled(data.Tools, "web-search") {
+		return nil
 	}
-	return collector.FormattedError("Copilot web tools")
+	message := "Copilot's native 'web-search' tool is unavailable because offline BYOK mode disables web tools (COPILOT_OFFLINE=true)"
+	suggestion := "Remove tools.web-search and configure an MCP server instead, or use a supported engine, for example:\n\nengine: codex"
+	if claudeOnCopilot {
+		message = "Claude's native 'web-search' tool is unavailable on GitHub Copilot inference because offline BYOK mode disables web tools (COPILOT_OFFLINE=true)"
+		suggestion = "Remove tools.web-search and configure an MCP search server instead, or use engine.model-provider: anthropic"
+	}
+	return NewValidationError("tools.web-search", "web-search", message, suggestion)
 }
 
 // validateWebSearchSupport validates that web-search tool is only used with engines that support this feature

@@ -45,6 +45,9 @@ func renderConsole(data AuditData, logsPath string) {
 		}
 	}
 	renderConsoleSession(data.SessionAnalysis)
+	if err := renderContinuationRequests(os.Stderr, data.ContinuationRequests); err != nil {
+		auditReportLog.Printf("Failed to render continuation requests: %v", err)
+	}
 	renderConsoleTokenUsage(data.FirewallTokenUsage)
 	renderConsoleDetectionModelUsage(data.DetectionModelUsage)
 	renderConsoleModelRouting(data.ModelRouting)
@@ -216,6 +219,11 @@ func renderConsoleSession(session *SessionAnalysis) {
 	}
 	if session.NoopCount > 0 {
 		line += fmt.Sprintf(" noops=%d", session.NoopCount)
+	}
+	if session.ContinuationRequestCount == nil {
+		line += " continuation_requests=unavailable"
+	} else {
+		line += fmt.Sprintf(" continuation_requests=%d", *session.ContinuationRequestCount)
 	}
 	fmt.Fprintln(os.Stderr, line)
 }

@@ -172,21 +172,18 @@ func (e *CopilotEngine) computeCopilotToolArguments(tools map[string]any, safeOu
 		args = append(args, "--allow-tool", constants.MCPScriptsMCPServerID.String())
 	}
 
-	// SDK mode supplies a custom proxy-aware fetch tool; native web tools are unavailable.
-	if isCopilotSDKMode(workflowData) && isCopilotToolValueEnabled(tools, "web-fetch") {
-		copilotEngineToolsLog.Print("Web-fetch tool enabled, adding web_fetch permission")
-		// web-fetch -> web_fetch
-		args = append(args, "--allow-tool", "web_fetch")
+	if isCopilotToolValueEnabled(tools, "web-fetch") && e.UsesWebFetchFallback(workflowData) {
+		args = append(args, "--allow-tool", webFetchMCPServer)
 	}
 
 	// Built-in tool names that should be skipped when processing MCP servers
 	// Note: GitHub is NOT included here because it needs MCP configuration in CLI mode
-	// Note: web-fetch is NOT included here because it needs explicit --allow-tool argument
 	// Note: native web-search is unavailable in offline BYOK mode
 	builtInTools := map[string]struct {
 	}{
 		"bash":         {},
 		"edit":         {},
+		"web-fetch":    {},
 		"web-search":   {},
 		"playwright":   {},
 		"cache-memory": {},

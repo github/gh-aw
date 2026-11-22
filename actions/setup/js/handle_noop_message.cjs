@@ -305,7 +305,7 @@ async function main() {
     const limitedMaxCount = maxCount;
     const allNoopItems = (result.items || []).filter(/** @param {any} item */ item => item.type === "noop");
     const noopItems = limitedMaxCount > 0 ? allNoopItems.slice(0, limitedMaxCount) : allNoopItems;
-    const nonNoopItems = result.items.filter(/** @param {any} item */ ({ type }) => type !== "noop");
+    const nonNoopItems = result.items.filter(/** @param {any} item */ ({ type }) => type !== "noop" && type !== "request_continuation");
 
     if (noopItems.length === 0) {
       core.info("No noop items found in agent output");

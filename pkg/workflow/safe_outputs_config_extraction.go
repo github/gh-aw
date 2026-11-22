@@ -397,6 +397,8 @@ func (c *Compiler) extractSafeOutputsConfig(frontmatter map[string]any) *SafeOut
 
 			c.extractGlobalConfigFields(outputMap, config)
 
+			config.RequestContinuation = c.parseRequestContinuationConfig(outputMap)
+
 			// Handle report-incomplete (parse configuration if present, or enable by default)
 			reportIncompleteConfig := c.parseReportIncompleteConfig(outputMap)
 			if reportIncompleteConfig != nil {

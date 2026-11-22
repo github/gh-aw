@@ -42,9 +42,15 @@ human-decision, rejection and reversal signals, explicit delivery fallback,
 value eligibility, and survival requirement. The registry includes proposal,
 publication, mutation, delegation, and infrastructure classes.
 
-The public states are `pending`, `accepted`, `rejected`, `lifecycle`,
+The lifecycle adoption states are `pending`, `accepted`, `rejected`, `lifecycle`,
 `not_applicable`, and `unknown`. API availability is coverage, not a decision.
 Unknown types fail closed. Infrastructure is not value-eligible.
+
+Outcome-evaluation reports also use `error` in the `adoption_status` field when
+evaluation fails. This is an operational failure status, not an adoption
+decision; the 95-case conformance corpus includes 12 such cases. Lifecycle
+observations with unavailable provider evidence remain `unknown` with partial or
+unavailable coverage.
 
 A qualifying human decision MUST have an authoritative event clock, visible
 actor evidence excluding known bots/publishers, and supported authorization
@@ -167,3 +173,9 @@ Existing low-level provider-adapter conformance remains in the 95-case fixture c
 not the complete adoption contract. Their executable model is documented in
 `specs/outcomes/README.md`. Lifecycle acceptance is governed by the shared core,
 not by a provider adapter's generic retained-existence classification.
+
+Implementation constants: the registry rule version is
+`gh-aw-adoption-v1` (`pkg/lifecycle/rules.go:6`); the retained lifecycle cache is
+capped at 16 MiB and 20,000 items (`pkg/cli/logs_lifecycle_cache.go:20-21`);
+retained observations use a 365-day window
+(`pkg/cli/logs_lifecycle_retained.go:112,134`).

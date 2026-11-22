@@ -84,6 +84,7 @@ func (c *Compiler) buildConclusionJobSteps(data *WorkflowData, mainJobName strin
 		steps = append(steps, c.buildConclusionDetectionRunsStep(data, mainJobName)...)
 		return c.appendConclusionUsageSteps(steps, data)
 	}
+	steps = append(steps, c.buildConclusionRequestContinuationStep(data, mainJobName)...)
 	steps = append(steps, c.buildConclusionNoOpStep(data, mainJobName)...)
 	steps = append(steps, c.buildConclusionDetectionRunsStep(data, mainJobName)...)
 	steps = append(steps, c.buildConclusionMissingToolStep(data, mainJobName)...)
@@ -104,22 +105,27 @@ func (c *Compiler) buildConclusionJobSteps(data *WorkflowData, mainJobName strin
 	// Only add the conclusion update step if status comments are explicitly enabled
 	if data.StatusComment != nil && *data.StatusComment {
 		var token string
-		var stepCondition string
+		stepCondition := "always()"
 		if data.SafeOutputs != nil && data.SafeOutputs.AddComments != nil {
 			token = data.SafeOutputs.AddComments.GitHubToken
 		}
 		if slices.Contains(safeOutputJobNames, "add_comment") {
 			stepCondition = "always() && !(needs.add_comment.outputs.comment_id)"
 		}
+		envVars := c.buildConclusionScriptEnvVars(data, mainJobName, safeOutputJobNames, messagesJSON)
+		if err := c.addSafeOutputDomainEnvVars(&envVars, data); err != nil {
+			return nil, err
+		}
 		steps = append(steps, c.buildGitHubScriptStepWithoutDownload(data, GitHubScriptStepConfig{
-			StepName:      "Update reaction comment with completion status",
-			StepID:        "conclusion",
-			MainJobName:   mainJobName,
-			CustomEnvVars: c.buildConclusionScriptEnvVars(data, mainJobName, safeOutputJobNames, messagesJSON),
-			Script:        getNotifyCommentErrorScript(),
-			ScriptFile:    "notify_comment_error.cjs",
-			CustomToken:   token,
-			StepCondition: stepCondition,
+			StepName:             "Update reaction comment with completion status",
+			StepID:               "conclusion",
+			MainJobName:          mainJobName,
+			CustomEnvVars:        envVars,
+			ProtectCustomEnvVars: true,
+			Script:               getNotifyCommentErrorScript(),
+			ScriptFile:           "notify_comment_error.cjs",
+			CustomToken:          token,
+			StepCondition:        stepCondition,
 		})...)
 	}
 	steps = append(steps, c.buildConclusionSteeringIssueStep(data, mainJobName, steeringToken)...)

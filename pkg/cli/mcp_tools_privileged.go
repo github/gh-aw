@@ -598,6 +598,7 @@ Single-run returns JSON with:
 - missing_tools: Tools that were requested but not available (tool, reason, alternatives, timestamp, workflow_name, run_id, experiment_name, variant)
 - mcp_failures: MCP server failures (server_name, status, timestamp, workflow_name, run_id, experiment_name, variant)
 - noop_reports: Noop signals from agents (message, timestamp, workflow_name, run_id, experiment_name, variant)
+- continuation_requests: Metadata-only continuation requests (message, timestamp, workflow_name, run_id, experiment_name, variant), not successful continuations or automatic dispatch/resume
 - missing_data: Missing data reports (data_type, reason, context, alternatives, timestamp, workflow_name, run_id, experiment_name, variant)
 - errors: Error details (file, line, type, message)
 - warnings: Warning details (file, line, type, message)

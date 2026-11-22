@@ -14,7 +14,7 @@
 
 The 2026-11-08 full revalidation refreshed the documented security evidence against the current requirements and implementation. A targeted RS-05a authorization-model revalidation passed on 2026-11-09; its scope and remaining limits are detailed in §7b. The event-specific mappings describe the default (`pull-request-floating-head: false`) policy.
 
-⚠️ **VALIDATION STATUS**: Full revalidation was completed on 2026-11-08. The representative ten-job structure was checked against `.github/workflows/security-review.lock.yml` (see §1); write permissions remain workflow-specific: `activation`, `safe_outputs`, `conclusion`, and `push_evals_state` have repository write scopes, while the `agent` job includes `copilot-requests: write`. PM-08 is verified for the default fork-deny policy and explicit allowlisting (see §3). The bounded RS-05a authorization model passed targeted formal revalidation on 2026-11-09; the v1.1.4 TT-01–04 requirement-level mapping remains incomplete (see the version status table and §7b).
+⚠️ **VALIDATION STATUS**: Full revalidation was completed on 2026-11-08. The representative ten-job structure was checked against `.github/workflows/security-review.lock.yml` (see §1); write permissions remain workflow-specific: `activation`, `safe_outputs`, `conclusion`, and `push_evals_state` have repository write scopes, while the `agent` job includes `copilot-requests: write`. PM-08 is verified for the default fork-deny policy and explicit allowlisting (see §3). The bounded RS-05a authorization model passed targeted formal revalidation on 2026-11-09. Requirement-level mappings for v1.1.4 (TT-01–04), v1.1.9, and v1.1.10 remain unverified and are assigned to Security Architecture maintainers by 2026-11-30 (see the version status table and §7b).
 
 The revalidation refreshed the following evidence. A verified row does not imply that every implementation or deployment has identical permissions or runtime behavior:
 - ✅ Job architecture (activation, agent, safe_outputs)
@@ -38,20 +38,23 @@ The revalidation refreshed the following evidence. A verified row does not imply
 
 ### Versioned RS-05a and Transport-Trust Validation Status
 
-The statuses below distinguish implementation/runtime evidence from a targeted formal proof. A passing runtime test does not establish a formal proof or live-host behavior. The current bounded authorization model is checked as one property set; version-specific rows remain unverified where a change is outside that abstraction.
+The statuses below distinguish implementation/runtime evidence from a targeted formal proof. A passing runtime test does not establish a formal proof or live-host behavior. The current bounded authorization model is checked as one property set; version-specific rows remain unverified where a change is outside that abstraction. The outstanding v1.1.4, v1.1.9, and v1.1.10 evidence reviews are assigned to Security Architecture maintainers by 2026-11-30.
 
 | Version | Change | Revalidation status | Evidence |
 |---|---|---|---|
 | v1.1.2 | Allow-listed App review checkout | Runtime verified; targeted formal proof unverified. | [`checkout_pr_branch.test.cjs`](../actions/setup/js/checkout_pr_branch.test.cjs), review-author and repository-identity cases; formal model status in §7b. |
 | v1.1.3 | Same-repository bot `ready_for_review` and `reopened` events | Runtime verified; targeted formal proof unverified. | [`checkout_pr_branch.test.cjs`](../actions/setup/js/checkout_pr_branch.test.cjs), lifecycle action and repository-ID cases; formal model status in §7b. |
-| v1.1.4 | Transport trust and bootstrap integrity (TT-01–04) | **UNVERIFIED** at requirement level; the current report has no TT-01–04-to-test mapping. | [`release_integrity_test.sh`](../actions/setup/sh/release_integrity_test.sh) and [`release_integrity_validation.go`](../pkg/workflow/release_integrity_validation.go) provide adjacent implementation evidence, but do not by themselves establish all four requirements. |
+| v1.1.4 | Transport trust and bootstrap integrity (TT-01–04) | **UNVERIFIED** at requirement level; requirement-specific evidence mapping is assigned to Security Architecture maintainers by **2026-11-30**. | The TT-01–04 rows below identify the evidence gaps; [`release_integrity_test.sh`](../actions/setup/sh/release_integrity_test.sh) and [`release_integrity_validation.go`](../pkg/workflow/release_integrity_validation.go) cover only parts of TT-02. |
 | v1.1.5 | Labeled PR permission floor | Runtime verified; targeted formal proof unverified. | [`checkout_pr_branch.test.cjs`](../actions/setup/js/checkout_pr_branch.test.cjs), `labeled` action negative cases; formal model status in §7b. |
 | v1.1.6 | Body-only bot PR edits | Runtime verified; targeted formal proof unverified. | [`checkout_pr_branch.test.cjs`](../actions/setup/js/checkout_pr_branch.test.cjs), body-only and malformed/mixed edit cases; formal model status in §7b. |
 | v1.1.7 | Immutable revision binding and explicit dispatch-context failures | Runtime verified; targeted formal proof unverified. | [`checkout_pr_branch.test.cjs`](../actions/setup/js/checkout_pr_branch.test.cjs), SHA binding, stale-head, malformed-context, and checked-out-HEAD cases; formal model status in §7b. |
 | v1.1.8 | Explicit floating-head checkout | Compiler and runtime tests verified; targeted formal proof unverified. | [`pr_floating_head_test.go`](../pkg/workflow/pr_floating_head_test.go), [`pr_checkout_test.go`](../pkg/workflow/pr_checkout_test.go), and [`checkout_pr_branch.test.cjs`](../actions/setup/js/checkout_pr_branch.test.cjs). |
-| v1.1.9 | Appendix G test mapping | **UNVERIFIED** as a version-specific update; the 2026-11-08 pass mapped through v1.1.8. | Security Architecture maintainers to review the v1.1.9 Appendix G mapping; no separate validation result is recorded. |
-| v1.1.10 | Go toolchain security baseline | **UNVERIFIED** pending release-build evidence. | See the TT-03 evidence row below; Security Architecture maintainers own follow-up. |
-| TT-03 (v1.1.10) | Go 1.27.4 minimum and embedded release-toolchain evidence | **UNVERIFIED**; current-checkout baseline check passed, but release artifacts were not built or inspected. | [`check-go-toolchain.sh`](../scripts/check-go-toolchain.sh) returned `go1.27.4` on 2026-11-15. [`build-release.sh`](../scripts/build-release.sh) was not run, so `dist/build-toolchain.txt` and embedded toolchains remain unverified. **Owner:** Security Architecture maintainers. |
+| v1.1.9 | Appendix G test mapping | **UNVERIFIED** as a version-specific update; the 2026-11-08 pass mapped through v1.1.8. **Owner:** Security Architecture maintainers; **due:** 2026-11-30. | Review the v1.1.9 Appendix G.10 requirement-to-test paths and record a separate validation result. |
+| v1.1.10 | Go toolchain security baseline | **UNVERIFIED** pending release-build evidence. **Owner:** Security Architecture maintainers; **due:** 2026-11-30. | See the TT-03 row below; inspect release artifacts and record the embedded-toolchain result. |
+| TT-01 (v1.1.4) | HTTPS-only bootstrap and TLS certificate validation | **UNVERIFIED**; requirement-to-test mapping is assigned to Security Architecture maintainers by **2026-11-30**. | Map the installer redirect and certificate-validation cases to the hardened bootstrap curl paths in §7b; do not treat release-integrity tests as TLS-policy evidence. |
+| TT-02 (v1.1.4) | Independent release-integrity verification | **PARTIALLY VERIFIED**; requirement-to-test mapping is assigned to Security Architecture maintainers by **2026-11-30**. | [`release_integrity_test.sh`](../actions/setup/sh/release_integrity_test.sh) and [`release_integrity_validation.go`](../pkg/workflow/release_integrity_validation.go) cover selected archive and pin flows; map remaining AWF, Copilot, Compose, apt-key, and override clauses before claiming full coverage. |
+| TT-03 (v1.1.4, v1.1.10) | Go 1.27.4 minimum, embedded release-toolchain evidence, and `GOROOT` isolation | **PARTIALLY VERIFIED**; release-artifact inspection is assigned to Security Architecture maintainers by **2026-11-30**. | [`check-go-toolchain.sh`](../scripts/check-go-toolchain.sh) returned `go1.27.4` on 2026-11-15. [`build-release.sh`](../scripts/build-release.sh) was not run, so `dist/build-toolchain.txt` and embedded toolchains remain unverified; map the `GOROOT` isolation clauses separately. |
+| TT-04 (v1.1.4) | Bounded host TLS-consumer inventory and explicit uninspected stores | **UNVERIFIED**; requirement-to-test mapping is assigned to Security Architecture maintainers by **2026-11-30**. | Map `runtime_trust_inventory.sh` output and its tests to the credential-free inventory, missing-tool, and uninspected-container/proxy clauses; inventory alone does not establish container trust-store selection. |
 
 ---
 
@@ -397,7 +400,7 @@ Actor trust is provided by the shared `assertTrustedCheckoutRuntime()` call. For
 | `workflow_dispatch_uses_api_head_checkout` | `unsat` | workflow_dispatch PR replay cannot reach checkout without the model's abstract API-head checkout path; this does not prove revision freshness |
 | `non_dispatch_pr_trigger_allows_forked_runtime_after_trust` | `sat` | the model admits non-workflow_dispatch PR triggers from structurally forked runtime repositories once actor trust holds |
 
-**Status**: **RUNTIME EVIDENCE VERIFIED; TARGETED FORMAL AUTHORIZATION REVALIDATION PASSED (2026-11-09)** — `checkout_pr_branch_z3.test.cjs` passed with Z3 4.8.12: all 14 expected query results matched (11 `unsat` safety queries and 3 `sat` witnesses). The targeted `checkout_pr_branch.test.cjs` suite passed 335 tests, and `go test ./pkg/workflow -run '^TestFormalRS05a' -count=1` passed. This is a bounded authorization abstraction, not a proof of webhook change fields, revision freshness, fetch-time races, actual checked-out commit identity, or live GitHub SHA-fetch support. The runtime suite covers the same-repository bot exceptions for `opened`, `synchronize`, `ready_for_review`, and `reopened`; allow-listed `edited` events bypass the permission floor only for a body-only change, while `labeled` and malformed or mixed edits retain the collaborator permission floor. Version-specific formal coverage remains unverified where a change is outside the abstraction, and v1.1.4's TT-01–04 mapping remains incomplete.
+**Status**: **RUNTIME EVIDENCE VERIFIED; TARGETED FORMAL AUTHORIZATION REVALIDATION PASSED (2026-11-09)** — `checkout_pr_branch_z3.test.cjs` passed with Z3 4.8.12: all 14 expected query results matched (11 `unsat` safety queries and 3 `sat` witnesses). The targeted `checkout_pr_branch.test.cjs` suite passed 335 tests, and `go test ./pkg/workflow -run '^TestFormalRS05a' -count=1` passed. This is a bounded authorization abstraction, not a proof of webhook change fields, revision freshness, fetch-time races, actual checked-out commit identity, or live GitHub SHA-fetch support. The runtime suite covers the same-repository bot exceptions for `opened`, `synchronize`, `ready_for_review`, and `reopened`; allow-listed `edited` events bypass the permission floor only for a body-only change, while `labeled` and malformed or mixed edits retain the collaborator permission floor. Version-specific formal coverage remains unverified where a change is outside the abstraction. The v1.1.4 TT-01–04, v1.1.9, and v1.1.10 evidence reviews are assigned to Security Architecture maintainers by 2026-11-30.
 
 ---
 
@@ -611,7 +614,7 @@ A conforming CI pipeline SHOULD implement at least Approach 1 and SHOULD run the
 
 This section audits the compliance test matrix defined in `security-architecture-spec.md §12` against the evidence documented in this validation report. Each test category is classified as **EVIDENCED**, **PARTIALLY EVIDENCED**, or **GAP** based on whether this document provides concrete implementation evidence.
 
-The categories and test-ID ranges below were checked against `security-architecture-spec.md §12.3`. TT-03 is not a §12.3 test category; its separate status is recorded in the versioned table above and remains **UNVERIFIED**. This mapping does not treat the toolchain check as evidence for unrelated §12.3 categories.
+The categories and test-ID ranges below were checked against `security-architecture-spec.md §12.3`. TT-03 is not a §12.3 test category; its separate status is recorded in the versioned table above and remains **PARTIALLY VERIFIED**, with release-artifact inspection assigned to Security Architecture maintainers by 2026-11-30. This mapping does not treat the toolchain check as evidence for unrelated §12.3 categories.
 
 | Test Category | Test IDs | Status | Notes |
 |---------------|----------|--------|-------|
@@ -690,7 +693,7 @@ pre_activation:
 
 ## Conclusion
 
-The 2026-11-08 full revalidation confirms the representative ten-job topology, resolves PM-08 for the default fork-deny policy and explicit allowlisting, and records the remaining evidence limits. It does not claim that workflow-specific permission scopes are uniform or that the pending RS-05a formal proof and v1.1.4 TT-01–04 mapping are complete.
+The 2026-11-08 full revalidation confirms the representative ten-job topology, resolves PM-08 for the default fork-deny policy and explicit allowlisting, and records the remaining evidence limits. It does not claim that workflow-specific permission scopes are uniform or that the pending RS-05a formal proof and v1.1.4 TT-01–04 mapping are complete. The v1.1.4, v1.1.9, and v1.1.10 follow-ups have named owners and a 2026-11-30 due date; their evidence remains unverified until reviewed.
 
 The specification provides an accurate formalization of the security architecture that can be used for:
 - Security audits and reviews
@@ -699,13 +702,14 @@ The specification provides an accurate formalization of the security architectur
 - Future security enhancements
 
 **Historical full-validation grade**: **A** (2026-07-15).
-**Current full revalidation**: **Completed 2026-11-08; no overall grade assigned** because the v1.1.4 TT-01–04 requirement-level mapping remains unverified. The bounded RS-05a authorization model passed targeted formal revalidation on 2026-11-09.
+**Current full revalidation**: **Completed 2026-11-08; no overall grade assigned** because the v1.1.4 TT-01–04 requirement-level mapping remains unverified. The v1.1.9 and v1.1.10 version-specific mappings also remain unverified, assigned to Security Architecture maintainers by 2026-11-30. The bounded RS-05a authorization model passed targeted formal revalidation on 2026-11-09.
 
 ## Change Log
 
 ### 2026-11-15
 
-- Added explicit v1.1.9 and v1.1.10 validation rows and a TT-03 evidence row; release-build evidence remains unverified and is owned by Security Architecture maintainers.
+- Added explicit v1.1.9 and v1.1.10 validation rows and a TT-03 evidence row; release-build evidence remains unverified and is assigned to Security Architecture maintainers by 2026-11-30.
+- Split TT-01–04 into requirement-specific status rows and recorded the remaining evidence mapping as due 2026-11-30.
 - Formally rescheduled the incomplete targeted §9/§11 revalidation to 2026-11-30; no completion is claimed.
 
 ### 2026-11-09

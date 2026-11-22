@@ -1334,6 +1334,12 @@
             "noop_count": {
               "type": "integer"
             },
+            "continuation_request_count": {
+              "type": [
+                "null",
+                "integer"
+              ]
+            },
             "agent_active_ratio": {
               "type": "number"
             },
@@ -1342,7 +1348,8 @@
             }
           },
           "required": [
-            "timeout_detected"
+            "timeout_detected",
+            "continuation_request_count"
           ],
           "additionalProperties": false
         },
@@ -1700,6 +1707,40 @@
           }
         },
         "noops": {
+          "type": [
+            "null",
+            "array"
+          ],
+          "items": {
+            "type": "object",
+            "properties": {
+              "message": {
+                "type": "string"
+              },
+              "timestamp": {
+                "type": "string"
+              },
+              "workflow_name": {
+                "type": "string"
+              },
+              "run_id": {
+                "type": "integer"
+              },
+              "experiment_name": {
+                "type": "string"
+              },
+              "variant": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message",
+              "timestamp"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "continuation_requests": {
           "type": [
             "null",
             "array"
@@ -6699,7 +6740,8 @@
         "schema_version",
         "overview",
         "metrics",
-        "downloaded_files"
+        "downloaded_files",
+        "continuation_requests"
       ],
       "additionalProperties": false
     },
