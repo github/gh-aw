@@ -28,7 +28,6 @@ const { getErrorMessage } = require("./error_helpers.cjs");
 const { TMP_GH_AW_PATH } = require("./constants.cjs");
 const fs = require("fs");
 const path = require("path");
-const os = require("os");
 const { openDurableSession } = require("./durable_native_session.cjs");
 const { isDeepStrictEqual } = require("node:util");
 const { buildCopilotSDKPermissionHandler, getEnvPositiveIntOrDefault, parseMaxToolDenialsLimit, MAX_TOOL_DENIALS_DEFAULT } = require("./copilot_sdk_permissions.cjs");
@@ -37,7 +36,7 @@ const { buildCopilotSDKToolCallBudget } = require("./copilot_sdk_tool_budget.cjs
 const { resolveModelWithFallback } = require("./model_fallback.cjs");
 const { COPILOT_WORKFLOW_EVENT_TYPES } = require("./copilot_workflow_events.cjs");
 const { copilotSessionContext, getCopilotMessageRefusal } = require("./copilot_session.cjs");
-const { loadCopilotSDKCustomAgents } = require("./extract_inline_sub_agents.cjs");
+const { defaultCopilotSDKAgentsBaseDir, loadCopilotSDKCustomAgents } = require("./extract_inline_sub_agents.cjs");
 const { qualifyModelForMultiProvider, parseMultiProviderJson } = require("./copilot_sdk_multi_provider.cjs");
 const { COPILOT_MODEL_VERIFICATION_EXIT_CODE, createCopilotSDKModelObserver, copilotSessionStateDirectories } = require("./copilot_model_selection.cjs");
 const { WORKFLOW_TOOL_PERMISSION_DENIED_EXIT_CODE } = require("./permission_denied_helpers.cjs");
@@ -208,7 +207,7 @@ async function runCopilotSDKSession({
   sdkModule,
   sessionStateBaseDir,
   workingDirectory = resolveCopilotSDKWorkingDirectory(),
-  agentsBaseDir = path.join(os.tmpdir(), "gh-aw"),
+  agentsBaseDir = defaultCopilotSDKAgentsBaseDir(),
   bare = isCopilotSDKBareMode(process.env.GH_AW_COPILOT_SDK_SERVER_ARGS, logger),
   verification,
 }) {
@@ -255,12 +254,13 @@ async function runCopilotSDKSession({
   const logLevel = isValidLogLevel(rawLogLevel) ? rawLogLevel : "warning";
 
   const endpoint = new URL(sdkUri);
-  if (!endpoint.port || !["http:", "tcp:"].includes(endpoint.protocol)) {
-    throw new Error("COPILOT_SDK_URI must identify a plaintext TCP endpoint with an explicit port");
+  const port = endpoint.port || (endpoint.protocol === "http:" ? "80" : "");
+  if (!port || !["http:", "tcp:"].includes(endpoint.protocol)) {
+    throw new Error("COPILOT_SDK_URI must identify a plaintext HTTP endpoint or a TCP endpoint with an explicit port");
   }
   const client = new CopilotClient({
     mode: "coding-agent",
-    runtime: RuntimeConnection.forTcp(endpoint.hostname.replace(/^\[|\]$/g, ""), Number(endpoint.port), { connectionToken }),
+    runtime: RuntimeConnection.forTcp(endpoint.hostname.replace(/^\[|\]$/g, ""), Number(port), { connectionToken }),
     observability: { logLevel },
   });
   /** @type {any} */
@@ -415,7 +415,7 @@ async function runCopilotSDKSession({
     // the harness could not resolve is absent from the map and inherits the session model.
     const resolvedSubagentModels = parseSubagentModelsJson(process.env.GH_AW_COPILOT_SDK_SUBAGENT_MODELS);
     const unavailableModels = [];
-    const customAgents = loadCopilotSDKCustomAgents(workingDirectory, agentsBaseDir, log).map(agent => {
+    const customAgents = loadCopilotSDKCustomAgents(agentsBaseDir, log).map(agent => {
       if (!agent.model || agent.model.trim().toLowerCase() === "inherited") return { ...agent, model: sessionModel || undefined };
       if (Object.prototype.hasOwnProperty.call(resolvedSubagentModels, agent.name)) {
         const resolved = resolvedSubagentModels[agent.name];

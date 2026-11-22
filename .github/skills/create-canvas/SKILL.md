@@ -17,7 +17,7 @@ The host app no longer participates in extension canvas registration. Extensions
    ```
    extensions_manage({ operation: "scaffold", kind: "canvas", name: "<name>", location: "project" | "user" | "session" })
    ```
-   The canvas scaffold produces an `extension.mjs` with `joinSession({ canvases: { definitions: [createCanvas({...})] } })`, a loopback HTTP server per instance, an example action, and `onClose` cleanup. Check that it imports the Microsoft-scoped SDK.
+   The scaffold produces `extension.mjs` with a loopback server per instance, an example action, and `onClose` cleanup. Import `joinSession` and `createCanvas` from `@microsoft/copilot-sdk/extension`. In v1 scaffolds, move the bare `canvases` and `tools` arrays into `canvases.definitions` and `tools.definitions`, `hooks` into `hooks.handlers`, and `onPermissionRequest` into `permissions.onRequest`, as shown below.
 
 3. **Edit the file.** Implement your `open`, `actions[]`, optional `onClose`, and (if needed) tools/hooks alongside.
 

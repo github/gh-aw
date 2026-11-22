@@ -210,7 +210,7 @@ func versionToGitRef(version string) string {
 // collectEngineVersionsForMetadata returns engine version metadata for gh-aw lock files.
 // It includes only engines that are active in the current workflow, applies explicit version
 // overrides for those engines, and includes copilot-sdk only when enabled on an active copilot engine.
-func collectEngineVersionsForMetadata(data *WorkflowData, registry *EngineRegistry) map[string]string {
+func (c *Compiler) collectEngineVersionsForMetadata(data *WorkflowData) map[string]string {
 	if data == nil {
 		return map[string]string{}
 	}
@@ -245,14 +245,14 @@ func collectEngineVersionsForMetadata(data *WorkflowData, registry *EngineRegist
 		version := strings.TrimSpace(versions[engineID])
 		if version == "" {
 			// Behavior-defined engines declare their version in the engine definition.
-			version = strings.TrimSpace(behaviorEngineDefaultVersion(engineID, registry))
+			version = strings.TrimSpace(behaviorEngineDefaultVersion(engineID, c.engineRegistry))
 		}
 		if version != "" {
 			filteredVersions[engineID] = version
 		}
 	}
 
-	if version := copilotSDKVersionForMetadata(data, mainEngineID); version != "" {
+	if version := c.copilotSDKVersionForMetadata(data, mainEngineID); version != "" {
 		filteredVersions["copilot-sdk"] = version
 	}
 
@@ -273,26 +273,23 @@ func applyMetadataEngineVersionOverrides(versions map[string]string, engineConfi
 	}
 }
 
-func copilotSDKVersionForMetadata(data *WorkflowData, mainEngineID string) string {
+func (c *Compiler) copilotSDKVersionForMetadata(data *WorkflowData, mainEngineID string) string {
 	if mainEngineID == string(constants.CopilotEngine) && data.EngineConfig != nil && data.EngineConfig.CopilotSDK {
 		return copilotSDKInstallVersion(data)
 	}
 
-	if !IsDetectionJobEnabled(data.SafeOutputs) || data.SafeOutputs == nil || data.SafeOutputs.ThreatDetection == nil {
+	// Inline detection resets CopilotSDK and does not install it.
+	if !IsDetectionJobEnabled(data.SafeOutputs) || !isFeatureEnabled(constants.GHAWDetectionFeatureFlag, data) {
 		return ""
 	}
 
-	detectionConfig := data.SafeOutputs.ThreatDetection.EngineConfig
-	if detectionConfig == nil {
+	detectionEngineID := c.getExternalThreatDetectionEngineID(data)
+	if detectionEngineID != string(constants.CopilotEngine) {
 		return ""
 	}
-
-	detectionEngineID := strings.TrimSpace(detectionConfig.ID)
-	if detectionEngineID == "" {
-		detectionEngineID = mainEngineID
-	}
-	if detectionEngineID == string(constants.CopilotEngine) && detectionConfig.CopilotSDK {
-		return copilotSDKInstallVersion(&WorkflowData{EngineConfig: detectionConfig})
+	detectionData := buildExternalDetectorWorkflowData(data, detectionEngineID)
+	if detectionData.EngineConfig.CopilotSDK {
+		return copilotSDKInstallVersion(detectionData)
 	}
 	return ""
 }

@@ -64,13 +64,17 @@ async function main() {
   const { CopilotClient, RuntimeConnection, approveAll } = require("@microsoft/copilot-sdk");
   const promptPath = readRequiredEnv("GH_AW_PROMPT");
   const endpoint = new URL(readRequiredEnv("COPILOT_SDK_URI"));
+  const port = endpoint.port || (endpoint.protocol === "http:" ? "80" : "");
+  if (!port || !["http:", "tcp:"].includes(endpoint.protocol)) {
+    throw new Error("COPILOT_SDK_URI must identify a plaintext HTTP endpoint or a TCP endpoint with an explicit port");
+  }
   const connectionToken = readRequiredEnv("COPILOT_CONNECTION_TOKEN");
   const model = readRequiredEnv("COPILOT_MODEL");
   const prompt = fs.readFileSync(promptPath, "utf8");
 
   const client = new CopilotClient({
     mode: "coding-agent",
-    runtime: RuntimeConnection.forTcp(endpoint.hostname, Number(endpoint.port), { connectionToken }),
+    runtime: RuntimeConnection.forTcp(endpoint.hostname.replace(/^\[|\]$/g, ""), Number(port), { connectionToken }),
   });
 
   let session;

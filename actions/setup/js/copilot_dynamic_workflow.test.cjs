@@ -184,8 +184,8 @@ describe("Copilot dynamic workflow sessions", () => {
 
   it("serializes ephemeral SDK workflow signals, child metadata and observed message deltas", async () => {
     const root = temporaryRoot();
-    fs.mkdirSync(path.join(root, ".github/agents"), { recursive: true });
-    fs.writeFileSync(path.join(root, ".github/agents/smoke-marker.agent.md"), "---\nname: smoke-marker\ntools: [read]\n---\nRun the smoke workflow.\n");
+    fs.mkdirSync(path.join(root, "base/copilot-agents"), { recursive: true });
+    fs.writeFileSync(path.join(root, "base/copilot-agents/smoke-marker.agent.md"), "---\nname: smoke-marker\ntools: [read]\n---\nRun the smoke workflow.\n");
     vi.spyOn(process.stderr, "write").mockImplementation(() => true);
     vi.stubEnv("GH_AW_SDK_IDLE_MS", "1234");
     const setTimeoutSpy = vi.spyOn(globalThis, "setTimeout");

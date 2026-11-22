@@ -43,6 +43,28 @@ describe("copilot_sdk_session runtime configuration", () => {
     vi.restoreAllMocks();
   });
 
+  it.each([
+    ["http://127.0.0.1", "127.0.0.1", 80],
+    ["http://[::1]:80", "::1", 80],
+    ["tcp://[::1]:3002", "::1", 3002],
+  ])("passes the normalized SDK endpoint %s to the TCP connection", async (sdkUri, host, port) => {
+    const forTcp = vi.fn();
+    const stopBeforeNetwork = new Error("stop before connecting");
+    forTcp.mockImplementation(() => {
+      throw stopBeforeNetwork;
+    });
+    await expect(
+      runWithCopilotSDK({
+        sdkUri,
+        connectionToken: "test-token",
+        prompt: "test",
+        logger: () => {},
+        sdkModule: { CopilotClient: class {}, RuntimeConnection: { forTcp }, approveAll: () => "allow" },
+      })
+    ).rejects.toBe(stopBeforeNetwork);
+    expect(forTcp).toHaveBeenCalledExactlyOnceWith(host, port, { connectionToken: "test-token" });
+  });
+
   // Sanitized final message from run 38513316902: the SDK resolved normally,
   // but this runtime-generated message was not an executed task or model answer.
   const filteredMessage = {
@@ -214,7 +236,10 @@ describe("copilot_sdk_session runtime configuration", () => {
 
     const app = path.join(base, "packages/app");
     fs.mkdirSync(path.join(app, ".github/agents"), { recursive: true });
-    fs.writeFileSync(path.join(app, ".github/agents/local.agent.md"), "---\nmodel: small\n---\nApp agent.");
+    fs.writeFileSync(path.join(app, ".github/agents/local.agent.md"), "Checkout version.");
+    const stagedAgents = path.join(base, "base/copilot-agents");
+    fs.mkdirSync(stagedAgents, { recursive: true });
+    fs.writeFileSync(path.join(stagedAgents, "local.agent.md"), "---\nmodel: small\n---\nApp agent.");
     // The harness resolved `small` before the driver started.
     vi.stubEnv("GH_AW_COPILOT_SDK_SUBAGENT_MODELS", JSON.stringify({ local: "claude-sonnet-4.6" }));
     vi.stubEnv("GITHUB_WORKSPACE", base);
@@ -291,9 +316,11 @@ describe("copilot_sdk_session runtime configuration", () => {
     for (const command of ["cd *", "cut *", "sed *", "*"]) expect(document.tools.bash).not.toContain(command);
   });
 
-  it("does not discover repository skills when no workflow skills were staged", async () => {
+  it("does not discover checkout agents or skills when no activation files were staged", async () => {
     fs.mkdirSync(path.join(base, ".github/skills/ambient"), { recursive: true });
     fs.writeFileSync(path.join(base, ".github/skills/ambient/SKILL.md"), "---\ndescription: Ambient repository skill\n---\nNot staged.");
+    fs.mkdirSync(path.join(base, ".github/agents"), { recursive: true });
+    fs.writeFileSync(path.join(base, ".github/agents/ambient.agent.md"), "Not staged.");
     const createSession = vi.fn().mockResolvedValue({
       sessionId: "no-staged-skills",
       on: () => {},
@@ -314,7 +341,7 @@ describe("copilot_sdk_session runtime configuration", () => {
       sdkModule: { CopilotClient: FakeCopilotClient, RuntimeConnection: { forTcp: () => ({}) }, approveAll: () => "allow" },
     });
     expect(result.exitCode).toBe(0);
-    expect(createSession.mock.calls[0][0]).toMatchObject({ enableConfigDiscovery: false, skills: { directories: [] } });
+    expect(createSession.mock.calls[0][0]).toMatchObject({ enableConfigDiscovery: false, agents: { definitions: [] }, skills: { directories: [] } });
     expect(createSession.mock.calls[0][0].skills.enabled).toBeUndefined();
   });
 

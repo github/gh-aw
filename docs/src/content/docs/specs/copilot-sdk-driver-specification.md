@@ -244,9 +244,13 @@ const workingDirectory = process.env.GITHUB_WORKSPACE || process.cwd();
 const prompt = await readFile(promptPath, "utf8");
 
 const endpoint = new URL(sdkUri);
+const port = endpoint.port || (endpoint.protocol === "http:" ? "80" : "");
+if (!port || !["http:", "tcp:"].includes(endpoint.protocol)) {
+  throw new Error("COPILOT_SDK_URI must identify a plaintext HTTP endpoint or a TCP endpoint with an explicit port");
+}
 const client = new CopilotClient({
   mode: "coding-agent",
-  runtime: RuntimeConnection.forTcp(endpoint.hostname, Number(endpoint.port), { connectionToken }),
+  runtime: RuntimeConnection.forTcp(endpoint.hostname.replace(/^\[|\]$/g, ""), Number(port), { connectionToken }),
   observability: { logLevel },
 });
 

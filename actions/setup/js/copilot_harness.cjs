@@ -127,7 +127,7 @@ const { loadModelsJson } = require("./model_costs.cjs");
 const { applyCopilotWireAPI: configureCopilotWireAPI, warnCopilotSubagentEndpoints, recordModelEndpointMismatch, getSupportedEndpoints, MODEL_ENDPOINT_FIX } = require("./copilot_wire_api.cjs");
 const { loadModelAliasMap, resolveEngineModel, normalizeForCopilotCLI, ModelAliasResolutionError, recordModelResolution, splitModelIdentifier } = require("./resolve_model_alias.cjs");
 const { COPILOT_MODEL_VERIFICATION_EXIT_CODE, createCopilotModelObserver, readCopilotModelSubstitution, recordCopilotModelSelection } = require("./copilot_model_selection.cjs");
-const { getEngineSubAgentTarget } = require("./extract_inline_sub_agents.cjs");
+const { copilotSDKAgentDirectories, defaultCopilotSDKAgentsBaseDir, getEngineSubAgentTarget } = require("./extract_inline_sub_agents.cjs");
 const { inlineArtifactTarget } = require("./inline_artifact_target.cjs");
 const MODEL_NOT_SUPPORTED_PATTERN = /The requested model is not supported|No model available\b[^\n]*policy enablement/i;
 const { parseAICreditsErrorInfoFromAuditLog, parseMaxAICreditsFromAuditLog, parseMaxAICreditsExceededFromAuditLog, parseAPIProxyGuardRejectionFromEventLog, formatAPIProxyGuardRejection } = require("./ai_credits_context.cjs");
@@ -727,16 +727,21 @@ function listCopilotAgentFiles(directory, logger = log) {
 /**
  * List the Copilot sub-agents of a run. Repository agents come from
  * `<workingDirectory>/.github/agents`; workflow-declared inline sub-agents come from the
- * directory they are staged in under `agentsBaseDir` (the one `loadCopilotSDKCustomAgents`
- * reads). An inline sub-agent overrides a repository agent with the same name and is declared.
+ * directory they are staged in under `agentsBaseDir`. In SDK mode both sources
+ * come from activation. An inline sub-agent overrides a repository agent with the same name.
  * @param {string} workingDirectory
  * @param {string} agentsBaseDir
  * @param {(msg: string) => void} [logger]
+ * @param {boolean} [sdk]
  * @returns {Array<{ name: string, model?: string, path: string, declared: boolean }>}
  */
-function listCopilotSubagents(workingDirectory, agentsBaseDir, logger = log) {
-  const declaredDir = path.resolve(agentsBaseDir, inlineArtifactTarget("SUB_AGENT", getEngineSubAgentTarget("copilot")).dir);
-  const repositoryDir = path.resolve(workingDirectory, ".github", "agents");
+function listCopilotSubagents(workingDirectory, agentsBaseDir, logger = log, sdk = false) {
+  const { repository: repositoryDir, declared: declaredDir } = sdk
+    ? copilotSDKAgentDirectories(path.resolve(agentsBaseDir))
+    : {
+        repository: path.resolve(workingDirectory, ".github", "agents"),
+        declared: path.resolve(agentsBaseDir, inlineArtifactTarget("SUB_AGENT", getEngineSubAgentTarget("copilot")).dir),
+      };
   const agents = new Map();
   if (repositoryDir !== declaredDir) {
     for (const agent of listCopilotAgentFiles(repositoryDir, logger)) agents.set(agent.name, { ...agent, declared: false });
@@ -1931,7 +1936,7 @@ async function main() {
 
     // The same custom agents the SDK driver loads: workflow definitions override repository ones.
     const sdkWorkingDirectory = path.resolve(process.env.GITHUB_WORKSPACE || process.cwd(), process.env.GH_AW_ENGINE_CWD || ".");
-    const agents = resolveSubagentModels ? listCopilotSubagents(sdkWorkingDirectory, path.join(os.tmpdir(), "gh-aw"), log) : [];
+    const agents = resolveSubagentModels ? listCopilotSubagents(sdkWorkingDirectory, defaultCopilotSDKAgentsBaseDir(), log, true) : [];
     try {
       const resolutions = await resolveCopilotSubagentModels({
         agents,

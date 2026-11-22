@@ -244,4 +244,11 @@ func TestBuildAWFCommand_ArcDindPreCreatesMountDirs(t *testing.T) {
 	assert.Contains(t, command, `--mount "${RUNNER_TEMP}/gh-aw/home:${RUNNER_TEMP}/gh-aw/home:rw"`)
 	assert.Contains(t, command, `--mount "${RUNNER_TEMP}/gh-aw/sandbox/agent:${RUNNER_TEMP}/gh-aw/sandbox/agent:rw"`)
 	assert.Contains(t, command, `export GH_AW_HARNESS_TELEMETRY_DIR="${RUNNER_TEMP}/gh-aw/sandbox/agent"`)
+	assert.NotContains(t, command, "base/copilot-agents")
+
+	config.WorkflowData.EngineConfig = &EngineConfig{ID: "copilot", CopilotSDK: true}
+	command = BuildAWFCommand(config)
+	assert.Contains(t, command, `cp -a "/tmp/gh-aw/base/copilot-agents/." "${RUNNER_TEMP}/gh-aw/base/copilot-agents/"`)
+	assert.Contains(t, command, `--mount "${RUNNER_TEMP}/gh-aw/base/copilot-agents:/tmp/gh-aw/base/copilot-agents:ro"`)
+	assert.Contains(t, command, `--mount "${RUNNER_TEMP}/gh-aw/.github/agents:/tmp/gh-aw/.github/agents:ro"`)
 }

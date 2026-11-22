@@ -159,6 +159,13 @@ func buildExpandableAWFArgs(config AWFCommandConfig, isCloudHypervisor, isArcDin
 		expandableArgs += fmt.Sprintf(` --mount "%s:%s:ro" --mount "%s:/host%s:ro"`, ghAwDir, ghAwDir, ghAwDir, ghAwDir)
 	}
 	expandableArgs, arcDindDockerHostProbe = appendArcDindMountSettings(expandableArgs, arcDindDockerHostProbe, isArcDind)
+	if isArcDind && config.WorkflowData != nil && config.WorkflowData.EngineConfig != nil && config.WorkflowData.EngineConfig.CopilotSDK {
+		for _, dir := range []string{"base/copilot-agents", ".github/agents", ".github/skills"} {
+			source := awfArcDindRootPathExpr + "/" + dir
+			arcDindDockerHostProbe += fmt.Sprintf("\nrm -rf \"%s\" && mkdir -p \"%s\" || exit 1\nif [ -d \"/tmp/gh-aw/%s\" ]; then cp -a \"/tmp/gh-aw/%s/.\" \"%s/\" || exit 1; fi", source, source, dir, dir, source)
+			expandableArgs += fmt.Sprintf(` --mount "%s:/tmp/gh-aw/%s:ro"`, source, dir)
+		}
+	}
 	if usesArcDindDetectionMount(config.WorkflowData) {
 		detectionDir := rewriteArcDindPath(constants.ThreatDetectionDir)
 		expandableArgs += fmt.Sprintf(` --mount "%s:%s:rw"`, detectionDir, detectionDir)

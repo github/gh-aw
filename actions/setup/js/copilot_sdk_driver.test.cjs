@@ -19,8 +19,8 @@ describe("copilot_sdk_driver.cjs", () => {
     const runtimeFs = require("fs");
     const readdirSync = runtimeFs.readdirSync;
     agentDirectorySpy = vi.spyOn(runtimeFs, "readdirSync").mockImplementation((directory, options) => {
-      // Never inspect the developer checkout's agents when exercising the SDK.
-      if (!String(directory).startsWith(testSessionStateDir) && String(directory).endsWith("/.github/agents")) return [];
+      // Do not discover agents left by unrelated runs in the default staging root.
+      if (!String(directory).startsWith(testSessionStateDir) && ["/.github/agents", "/base/copilot-agents"].some(suffix => String(directory).endsWith(suffix))) return [];
       return readdirSync(directory, options);
     });
   });
@@ -42,10 +42,10 @@ describe("copilot_sdk_driver.cjs", () => {
     ])("qualifies %s session and cross-provider %s custom agents at runtime", async (sessionModel, agentModel, sessionProvider, agentProvider) => {
       const workspace = path.join(testSessionStateDir, `${sessionProvider}-workspace`);
       const workflow = path.join(testSessionStateDir, `${sessionProvider}-workflow`);
-      fs.mkdirSync(path.join(workspace, ".github/agents"), { recursive: true });
+      fs.mkdirSync(path.join(workflow, "base/copilot-agents"), { recursive: true });
       fs.mkdirSync(path.join(workflow, ".github/agents"), { recursive: true });
       fs.writeFileSync(
-        path.join(workspace, ".github/agents/researcher.agent.md"),
+        path.join(workflow, "base/copilot-agents/researcher.agent.md"),
         `---\nname: researcher\ndescription: >-\n  Research across\n  providers\ntools:\n  - read\n  - grep\nmodel: copilot/${agentModel}\n---\nResearch carefully.\n`
       );
       fs.writeFileSync(path.join(workflow, ".github/agents/workflow.agent.md"), "---\nname: workflow-agent\ntools: read, grep\n---\nWorkflow prompt.");
@@ -1550,7 +1550,7 @@ describe("copilot_sdk_driver.cjs", () => {
       }
     });
 
-    it("logs permission-denied SDK requests as core warnings", async () => {
+    it("logs permission-denied SDK request kinds without shell or URL details", async () => {
       const disconnect = vi.fn().mockResolvedValue(undefined);
       const stop = vi.fn().mockResolvedValue(undefined);
       const createSession = vi.fn().mockResolvedValue({
@@ -1568,11 +1568,12 @@ describe("copilot_sdk_driver.cjs", () => {
         info: vi.fn(),
         warning: vi.fn(),
       };
+      const logger = vi.fn();
 
       const result = await runWithCopilotSDK({
         sdkUri: "http://127.0.0.1:3002",
         prompt: "test prompt",
-        logger: () => {},
+        logger,
         permissionConfig: {
           allowedTools: ["shell(git:*)"],
         },
@@ -1587,12 +1588,18 @@ describe("copilot_sdk_driver.cjs", () => {
       expect(result.exitCode).toBe(0);
       const sessionConfig = createSession.mock.calls[0][0];
       const onPermissionRequest = sessionConfig.permissions.onRequest;
-      expect(onPermissionRequest({ kind: "shell", commands: [{ identifier: "rm" }], fullCommandText: "rm -rf /tmp/x" })).toEqual({
+      const rejection = {
         kind: "reject",
         feedback: "Tool invocation is not allowed by workflow tool permissions.",
-      });
-      expect(coreLogger.info).toHaveBeenCalledWith(expect.stringContaining("shell(rm -rf /tmp/x)"));
-      expect(coreLogger.warning).toHaveBeenCalledWith(expect.stringContaining("shell(rm -rf /tmp/x)"));
+      };
+      expect(onPermissionRequest({ kind: "shell", commands: [{ identifier: "echo" }], fullCommandText: "echo SHELL_SECRET" })).toEqual(rejection);
+      expect(onPermissionRequest({ kind: "url", url: "https://USER_SECRET:PASS_SECRET@example.test/PATH_SECRET?q=QUERY_SECRET#FRAGMENT_SECRET" })).toEqual(rejection);
+      expect(onPermissionRequest({ kind: "shell", commands: [{ identifier: "git" }], fullCommandText: "git status" })).toEqual({ kind: "approve-once" });
+      for (const sink of [logger, coreLogger.info, coreLogger.warning]) {
+        expect(sink).toHaveBeenCalledWith(expect.stringMatching(/permission denied.*: shell$/));
+        expect(sink).toHaveBeenCalledWith(expect.stringMatching(/permission denied.*: url$/));
+        expect(JSON.stringify(sink.mock.calls)).not.toMatch(/_SECRET|example\.test/);
+      }
     });
 
     it("always configures onPermissionRequest and defaults to approveAll when permissionConfig is absent", async () => {
@@ -1692,7 +1699,7 @@ describe("copilot_sdk_driver.cjs", () => {
           data: {
             denialCount: 3,
             threshold: 3,
-            reason: expect.stringContaining("permission denied"),
+            reason: "permission denied: shell",
           },
         });
       } finally {

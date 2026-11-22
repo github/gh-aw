@@ -235,9 +235,9 @@ process.stdin.on("end", () => {
     // and haiku-whoami share the copilot-completions provider and served model,
     // so any header would also label child traffic. The SDK sends none and
     // relies on native per-agent metrics instead.
-    fs.mkdirSync(path.join(dir, ".github/agents"), { recursive: true });
+    fs.mkdirSync(path.join(dir, "base/copilot-agents"), { recursive: true });
     const agent = "---\nmodel: claude-haiku-4.5\n---\nSay which model you are.";
-    fs.writeFileSync(path.join(dir, ".github/agents/haiku-whoami.agent.md"), agent);
+    fs.writeFileSync(path.join(dir, "base/copilot-agents/haiku-whoami.agent.md"), agent);
     prepareMarkdownFixtures(agent);
     vi.stubEnv("GH_AW_SESSION_STATE_BASE_DIR", dir);
     vi.stubEnv("GH_AW_ENGINE_CWD", dir);

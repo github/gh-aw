@@ -276,13 +276,28 @@ jobs:
     permissions:
       contents: read
     steps:
+      - name: Check out the Copilot SDK npm project
+        uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: actions/setup/copilot-sdk/node
+
       - name: Install GitHub Copilot SDK with bundled GitHub Copilot CLI
         shell: bash
         run: |
           set -euo pipefail
           SDK_DIR="$RUNNER_TEMP/copilot-sdk"
-          mkdir -p "$SDK_DIR"
-          npm install --prefix "$SDK_DIR" --ignore-scripts --no-save @microsoft/copilot-sdk@2.0.0
+          PROJECT="$GITHUB_WORKSPACE/actions/setup/copilot-sdk/node"
+          mkdir "$SDK_DIR"
+          cd "$SDK_DIR"
+          cp "$PROJECT/package.json" "$PROJECT/package-lock.json" .
+          # Keep in sync with the SHA-256 of package.json + NUL + package-lock.json.
+          digest=$({ cat package.json && printf '\0' && cat package-lock.json; } | sha256sum)
+          if [[ "${digest%% *}" != "b9ed386dd39a36f13439d7d93a4af97c71e19530e5e5af124271b26b63f14022" ]]; then
+            echo "::error::Copilot SDK npm project digest mismatch" >&2
+            exit 1
+          fi
+          npm ci --ignore-scripts --no-audit --no-fund
 
       - name: Fetch GitHub Copilot SDK model billing information
         shell: bash
