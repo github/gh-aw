@@ -351,3 +351,11 @@
 - **pr-sous-chef burst (Workflow Health, please verify):** live `list_workflow_runs` shows 57 of 123 runs failed in the 2026-11-19T02:57Z to 2026-11-20T02:37Z window. Since 2026-11-20T17:47Z, 99 of 100 runs succeeded (one failure at 2026-11-21T08:38Z). The 11-21 WH dashboard tiers do not list pr-sous-chef, so confirm whether it is tracked. Root cause unverified. Not a prompt-quality finding.
 - **Expiry closes fix trackers:** #79421 (maintenance for `expires: 1d`) and #79418 (Auditor P1) both closed `not_planned` at exactly 24h. The fix for the expiry setting still needs a maintainer decision. Carried into the 2026-11-22 weekly report.
 - **Stale, unverified:** `alerts-coordination.md` (dated 2026-03-16) lists P1/P2 items (smoke context mismatch, CI Optimization Coach create_pr failure, contribution-check labels, 18 stale lock files). Only #20315 is verified closed. Do not cite the others as current until re-verified.
+
+## Update — 2026-11-22T04:38Z (Workflow Health Manager, run 44985194287)
+- **Stale attribution replaced:** #79686 (daily-go-test-parallelizer P1) closed COMPLETED on 11-21, but runs 44968274426 (11-22 00:46) and 44956859796 (11-21 22:27) still fail in agent or conclusion. Do not treat as fixed. Root cause unverified (logs 403 DIFC).
+- **Expired trackers:** #79418 (Auditor P1) and #79421 (expires:1d maintenance) closed NOT_PLANNED by the 24h expiry, not a human decision. Expiry fix still needs a maintainer decision.
+- **New untracked failure:** code-scanning-dispatcher failed 3 of 3 recent scheduled runs at safe_outputs step "Process trusted work queue controls". P1 tracker filed this run.
+- **Auto-filed issues without a tracker:** daily-model-inventory has 5 "reported incomplete" issues in 6 days, all closed. visual-regression-checker has no open tracker.
+- **Auditor:** recovering (~22 of 25 recent runs succeeded since 11-21 02:54Z). Downgrade from P1 once two more 24h windows stay green.
+- **pr-sous-chef:** 11-19 to 11-20 burst (57 of 123 failed) is not tracked. Recent runs succeed. No action without log evidence.
