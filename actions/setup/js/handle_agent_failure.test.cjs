@@ -1007,7 +1007,7 @@ describe("handle_agent_failure", () => {
     it("explains the incomplete handoff without exposing agent diagnostic details", () => {
       const rendered = buildReportIncompleteContext([{ type: "report_incomplete", reason: "infrastructure_error", details: "agent-generated diagnostic" }]);
       expect(rendered).toContain("completion could not be confirmed");
-      expect(rendered).toContain("Treat the agent-declared reason as a lead, not a confirmed root cause");
+      expect(rendered).toContain("Treat any agent-declared reason as a lead, not a confirmed root cause");
       expect(rendered).toContain("agent diagnostic details are excluded");
       expect(rendered).not.toContain("agent-generated");
       expect(rendered).toContain("infrastructure_error");
@@ -1633,12 +1633,14 @@ describe("handle_agent_failure", () => {
                   collectorFailureCause: "driver_crash",
                   collectorDriverExitCode: 139,
                 }
-              : { items: [{ type: "noop", message: "Done" }] }
+              : { items: [{ type: "report_incomplete", reason: "Reason withheld after redaction failure" }] }
         )
       );
       if (crashed) fs.writeFileSync(path.join(tmpDir, "agent-session.jsonl"), JSON.stringify({ type: "agent.execution", data: { categories: [], errorCodes: [], errorTypes: [], exitCode: 139 } }));
       vi.stubEnv("GH_AW_AGENT_OUTPUT", output);
       vi.stubEnv("GH_AW_AGENT_CONCLUSION", "failure");
+      vi.stubEnv("GH_AW_DETECTION_ACCEPTED", "true");
+      vi.stubEnv("GH_AW_DETECTION_CONCLUSION", "success");
       vi.stubEnv("GH_AW_FAILURE_REPORT_AS_ISSUE", "true");
       vi.stubEnv("GH_AW_FAILURE_CATEGORIES_FILTER", JSON.stringify([cause]));
       vi.stubEnv("GH_AW_MODEL_NOT_SUPPORTED_ERROR", "true");
@@ -1674,13 +1676,14 @@ describe("handle_agent_failure", () => {
       const write = vi.spyOn(fs, "writeFileSync");
       try {
         await main();
-        expect(global.core.setFailed.mock.calls).toEqual(startup || crashed ? [[expect.stringContaining("Agent reported that it could not complete the task (report_incomplete)")]] : []);
+        expect(global.core.setFailed.mock.calls).toEqual([[expect.stringContaining("Agent reported that it could not complete the task (report_incomplete)")]]);
         expect(create).toHaveBeenCalledOnce();
         const issue = create.mock.calls[0][0];
         expect(issue.title).toBe(startup ? "[aw] Test Workflow: failed before agent execution started" : "[aw] Test Workflow: failed to redact secrets in logs");
         expect(issue.body).toContain(`failure_cause: ${cause}`);
         expect(issue.body).toMatch(new RegExp(`failure_categories: [^>]*${cause}`));
         expect(issue.body).toContain(`Failing step:** \`${startup ? "Start MCP gateway" : "Redact secrets in logs"}\``);
+        expect(issue.body).not.toContain("Reason withheld after redaction failure");
         if (startup) {
           expect(issue.body).not.toContain("secret_redaction_failure");
           expect(issue.body).not.toContain("input_bytes=12");
@@ -1692,7 +1695,6 @@ describe("handle_agent_failure", () => {
         }
         expect(write).toHaveBeenCalledWith(require("./handle_agent_failure.cjs").FAILURE_CATEGORIES_PATH, expect.stringContaining(`"${cause}"`));
         if (!startup) expect(global.core.summary.addRaw).not.toHaveBeenCalled();
-        if (!startup && !crashed) expect(global.core.setFailed).not.toHaveBeenCalled();
       } finally {
         write.mockRestore();
         vi.unstubAllEnvs();
@@ -2282,7 +2284,7 @@ describe("handle_agent_failure", () => {
         expect(body).toContain("The workflow recorded a `report_incomplete` signal");
         expect(body).not.toContain("# untrusted heading");
         expect(body).not.toContain("infrastructure_error");
-        expect(body).toContain("private-agent-reason");
+        expect(body).not.toContain("private-agent-reason");
         expect(body).not.toContain("private-data");
         expect(body).not.toContain("private-tool");
         expect(body).toContain("Completion signal: agent reported incomplete");
@@ -2303,6 +2305,8 @@ describe("handle_agent_failure", () => {
       vi.stubEnv("GH_AW_AGENT_OUTPUT", outputPath);
       vi.stubEnv("GH_AW_AGENT_CONCLUSION", "success");
       vi.stubEnv("GH_AW_FAILURE_REPORT_AS_ISSUE", "false");
+      vi.stubEnv("GH_AW_DETECTION_ACCEPTED", undefined);
+      vi.stubEnv("GH_AW_DETECTION_CONCLUSION", undefined);
       global.context.runId = 123456;
       global.github = {
         rest: {
@@ -2325,7 +2329,8 @@ describe("handle_agent_failure", () => {
         expect(logs).not.toContain("build-resource permissions");
         expect(logs).not.toContain("private-build-diagnostics");
         const summary = JSON.stringify(global.core.summary.addRaw.mock.calls);
-        expect(summary).toContain("build-resource permissions");
+        expect(summary).toContain("Task Could Not Be Completed");
+        expect(summary).not.toContain("build-resource permissions");
         expect(summary).not.toContain("private-build-diagnostics");
         expect(global.core.summary.write).toHaveBeenCalled();
         expect(global.github.rest.issues.create).not.toHaveBeenCalled();
@@ -2411,7 +2416,7 @@ describe("handle_agent_failure", () => {
 
     it.each([false, true, "disabled"])("deduplicates missing-output notices by workflow and reports the cause (existing issue: %s)", async existingIssue => {
       const template = "{report_incomplete_context}{missing_data_context}{missing_tool_context}{permission_denied_context}{engine_failure_context}";
-      fs.writeFileSync(path.join(promptsDir, "agent_failure_issue.md"), template);
+      fs.writeFileSync(path.join(promptsDir, "agent_failure_issue.md"), "{agent_report_context}{runtime_diagnostics_context}" + template);
       fs.writeFileSync(path.join(promptsDir, "agent_failure_comment.md"), template);
       const outputPath = path.join(tmpDir, "agent_output.json");
       fs.writeFileSync(
@@ -2433,6 +2438,8 @@ describe("handle_agent_failure", () => {
         JSON.stringify({ type: "tool.execution_complete", data: { toolName: "private-tool", success: false, exitCode: 2, error: "private-tool-error", output: "private-tool-output" } })
       );
       vi.stubEnv("GH_AW_AGENT_OUTPUT", outputPath);
+      vi.stubEnv("GH_AW_DETECTION_ACCEPTED", "true");
+      vi.stubEnv("GH_AW_DETECTION_CONCLUSION", "success");
       if (existingIssue === "disabled") vi.stubEnv("GH_AW_FAILURE_REPORT_AS_ISSUE", "false");
       const create = vi.fn(async () => ({ data: { number: 99, html_url: "https://github.com/owner/repo/issues/99" } }));
       const createComment = vi.fn(async () => ({ data: { id: 1001 } }));
@@ -2486,11 +2493,20 @@ describe("handle_agent_failure", () => {
       }
     });
 
-    it("creates one report_incomplete issue across clean-exit runs with changing diagnostics", async () => {
+    it.each([
+      ["true", "success", true],
+      ["true", "warning", false],
+      ["true", "failure", false],
+      ["true", "skipped", false],
+      ["false", "success", false],
+      [undefined, undefined, false],
+    ])("deduplicates incomplete reports and gates the public reason (accepted: %s, verdict: %s)", async (accepted, conclusion, showReason) => {
       syncRuntimePromptTemplates(import.meta.url);
       fs.writeFileSync(path.join(tmpDir, "agent_execution_exit_code.txt"), "0");
       const outputPath = path.join(tmpDir, "agent_output.json");
       vi.stubEnv("GH_AW_AGENT_OUTPUT", outputPath);
+      vi.stubEnv("GH_AW_DETECTION_ACCEPTED", accepted);
+      vi.stubEnv("GH_AW_DETECTION_CONCLUSION", conclusion);
       let existingBody;
       const create = vi.fn(async ({ body }) => {
         existingBody = body;
@@ -2522,9 +2538,19 @@ describe("handle_agent_failure", () => {
       expect(createComment).toHaveBeenCalledOnce();
       expect(createComment).toHaveBeenCalledWith(expect.objectContaining({ issue_number: 99 }));
       expect(create.mock.calls[0][0].title).toContain("reported incomplete result");
-      for (const body of [create.mock.calls[0][0].body, createComment.mock.calls[0][0].body]) {
-        expect(body).toContain("Required data could not be read");
+      const issueBody = create.mock.calls[0][0].body;
+      const commentBody = createComment.mock.calls[0][0].body;
+      const reason = "Required data could not be read";
+      expect(issueBody.includes(reason)).toBe(showReason);
+      expect(commentBody.includes(reason)).toBe(showReason);
+      expect(global.core.summary.addRaw).toHaveBeenCalledTimes(2);
+      for (const [summary] of global.core.summary.addRaw.mock.calls) {
+        expect(summary).toContain("Task Could Not Be Completed");
+        expect(summary.includes(reason)).toBe(showReason);
       }
+      if (showReason) expect(issueBody.indexOf(reason)).toBeLessThan(issueBody.indexOf("### Next step"));
+      expect(issueBody).toMatch(/> \[!WARNING\]\n> \*\*Task Could Not Be Completed/);
+      expect(issueBody).toMatch(/<summary>Runtime evidence<\/summary>[\s\S]*Completion signal: agent reported incomplete/);
     });
 
     it("reuses the steering issue instead of searching for or creating a failure issue", async () => {
@@ -2659,7 +2685,7 @@ describe("handle_agent_failure", () => {
     ])("posts metadata-only generic diagnostics (missing job data: %s, existing issue: %s)", async (missingJobs, existingIssue) => {
       fs.copyFileSync(path.join(__dirname, "../md/engine_driver_failure.md"), path.join(promptsDir, "engine_driver_failure.md"));
       const template = "{failure_diagnostics_context}{report_incomplete_context}{engine_failure_context}";
-      fs.writeFileSync(path.join(promptsDir, "agent_failure_issue.md"), template);
+      fs.writeFileSync(path.join(promptsDir, "agent_failure_issue.md"), "{report_incomplete_context}{engine_failure_context}{runtime_alerts_context}{runtime_diagnostics_context}");
       fs.writeFileSync(path.join(promptsDir, "agent_failure_comment.md"), template);
       const outputPath = path.join(tmpDir, "agent_output.json");
       fs.writeFileSync(outputPath, JSON.stringify({ items: [{ type: "report_incomplete", reason: "infrastructure_error", details: "agent-generated diagnostic" }] }));
@@ -2716,7 +2742,7 @@ describe("handle_agent_failure", () => {
       expect(body).toContain("*Only runtime metadata is shown; agent-generated text is excluded.*");
       expect(body).toContain("The workflow recorded a `report_incomplete` signal");
       expect(body).not.toContain("agent-generated diagnostic");
-      expect(body).toContain("infrastructure_error");
+      expect(body).not.toContain("infrastructure_error");
       if (missingJobs) {
         expect(body).toContain("**Failing step:** Unavailable");
         expect(body).toContain("The Actions jobs API returned no agent job.");
@@ -3730,12 +3756,11 @@ describe("handle_agent_failure", () => {
         expect(rendered).not.toContain(reportIncompleteMarker);
         expect(rendered).toContain("The workflow recorded a `report_incomplete` signal");
         expect(rendered).toContain("completion could not be confirmed");
-        expect(rendered).toContain("This run needs a follow-up");
         expect(rendered).toContain("A successful agent job only confirms a clean process exit");
-        expect(rendered).toContain("gh aw audit 123456");
         expect(rendered).not.toContain("due to an infrastructure or tool failure");
       }
       expect(reportIncompleteContext).toContain("infrastructure_error");
+      expect(reportIncompleteContext).toContain("gh aw audit 123456");
       expect(reportIncompleteContext).not.toContain(reportIncompleteMarker);
       expect(failureDiagnosticsContext).toContain("Failing step:** `Run agent`");
     });
@@ -5961,7 +5986,6 @@ describe("handle_agent_failure", () => {
       delete process.env.GH_AW_ENGINE_ID;
       delete process.env.GH_AW_PLUGIN_DIAGNOSTICS_FILE;
       delete process.env.GH_AW_AGENT_OUTPUT;
-      fs.rmSync("/tmp/gh-aw/sandbox/agent/logs/plugin-diagnostics.log", { force: true });
       fs.rmSync(tmpDir, { recursive: true, force: true });
     });
 
@@ -6035,10 +6059,11 @@ describe("handle_agent_failure", () => {
     });
 
     it("reads the declared plugin diagnostics path when agent output is elsewhere", () => {
-      const diagnosticsPath = "/tmp/gh-aw/sandbox/agent/logs/plugin-diagnostics.log";
+      const diagnosticsPath = path.join(tmpDir, "sandbox", "agent", "logs", "plugin-diagnostics.log");
       fs.mkdirSync(path.dirname(diagnosticsPath), { recursive: true });
       fs.writeFileSync(diagnosticsPath, "Markdown files found: 0");
-      process.env.GH_AW_AGENT_OUTPUT = "/tmp/gh-aw/agent_output.json";
+      process.env.GH_AW_PLUGIN_DIAGNOSTICS_FILE = diagnosticsPath;
+      process.env.GH_AW_AGENT_OUTPUT = path.join(tmpDir, "output", "agent_output.json");
       const result = buildCopilotAgentNotFoundContext({ requestedAgent: "foo:bar", availableAgents: [] });
       expect(result).toContain("Plugin installation diagnostics");
       expect(result).toContain("Markdown files found: 0");
@@ -7568,6 +7593,7 @@ describe("handle_agent_failure", () => {
     let tmpDir;
     /** @type {string} */
     let promptsDir;
+    let failureCategories;
 
     function mockCancelledAgentMetadata(annotations = []) {
       global.github.paginate = vi
@@ -7612,9 +7638,21 @@ describe("handle_agent_failure", () => {
       process.env.GH_AW_AGENT_CONCLUSION = "failure";
       process.env.GH_AW_AGENT_OUTPUT = path.join(tmpDir, "agent_output.json");
       process.env.GH_AW_CHECKOUT_PR_SUCCESS = "true";
+      failureCategories = undefined;
+      const { FAILURE_CATEGORIES_PATH } = require("./handle_agent_failure.cjs");
+      const mkdir = fs.mkdirSync;
+      const write = fs.writeFileSync;
+      vi.spyOn(fs, "mkdirSync").mockImplementation((target, options) => {
+        if (target !== path.dirname(FAILURE_CATEGORIES_PATH)) return mkdir(target, options);
+      });
+      vi.spyOn(fs, "writeFileSync").mockImplementation((target, data, options) => {
+        if (target === FAILURE_CATEGORIES_PATH) failureCategories = JSON.parse(data);
+        else write(target, data, options);
+      });
     });
 
     afterEach(() => {
+      vi.restoreAllMocks();
       vi.unstubAllEnvs();
       delete process.env.RUNNER_TEMP;
       delete process.env.GH_AW_WORKFLOW_NAME;
@@ -7754,7 +7792,7 @@ describe("handle_agent_failure", () => {
 
       expect(create).toHaveBeenCalledOnce();
       expect(create.mock.calls[0][0].title).toBe("[aw] Test Workflow: failed before agent execution started");
-      const categories = JSON.parse(fs.readFileSync("/tmp/gh-aw/failure_categories.json", "utf8"));
+      const categories = failureCategories;
       expect(categories).toContain("agent_startup_failure");
       if (evidence === "job-timeout" || evidence === "engine-timeout") expect(categories).toContain("timed_out");
       if (evidence === "job-timeout") {
@@ -7797,7 +7835,7 @@ describe("handle_agent_failure", () => {
       expect(create).toHaveBeenCalledOnce();
       expect(create.mock.calls[0][0].title).toBe("[aw] Test Workflow: failed before agent execution started");
       expect(create.mock.calls[0][0].body).toContain("Failure classification: agent_startup_failure");
-      const categories = JSON.parse(fs.readFileSync("/tmp/gh-aw/failure_categories.json", "utf8"));
+      const categories = failureCategories;
       expect(categories).toContain("agent_startup_failure");
       expect(categories).toContain(signal === "GH_AW_MODEL_ENDPOINT_MISMATCH_ERROR" ? "model_endpoint_mismatch" : "model_not_supported_error");
     });
@@ -7862,7 +7900,7 @@ describe("handle_agent_failure", () => {
       expect(body).toContain("private-tool");
       expect(body).not.toContain("private cancellation diagnostics");
       expect(body).not.toContain(`Failure classification: ${reason}`);
-      const categories = JSON.parse(fs.readFileSync("/tmp/gh-aw/failure_categories.json", "utf8"));
+      const categories = failureCategories;
       expect(categories).toContain("missing_tool");
       expect(categories).not.toContain(reason);
       expect(categories).not.toContain("report_incomplete");
@@ -7941,7 +7979,7 @@ describe("handle_agent_failure", () => {
       const { main: mainFn } = require("./handle_agent_failure.cjs");
       await mainFn();
       expect(createIssueMock).toHaveBeenCalledWith(expect.objectContaining({ title: `[aw] Test Workflow: ${titleSuffix}` }));
-      const categories = JSON.parse(fs.readFileSync("/tmp/gh-aw/failure_categories.json", "utf8"));
+      const categories = failureCategories;
       expect(categories).toContain(reason);
       expect(categories).not.toContain("agent_failure");
       if (reason === "agent_startup_failure") {
@@ -8019,7 +8057,7 @@ describe("handle_agent_failure", () => {
       const { main: mainFn } = require("./handle_agent_failure.cjs");
       await mainFn();
       expect(createIssueMock).toHaveBeenCalledWith(expect.objectContaining({ title: "[aw] Test Workflow: reported incomplete result" }));
-      const categories = JSON.parse(fs.readFileSync("/tmp/gh-aw/failure_categories.json", "utf8"));
+      const categories = failureCategories;
       expect(categories).toContain("report_incomplete");
       expect(categories).not.toContain(reason);
     });
@@ -8357,10 +8395,12 @@ describe("handle_agent_failure", () => {
     beforeEach(() => {
       vi.resetModules();
       tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "rt-usage-test-"));
+      vi.stubEnv("GH_AW_TMP_DIR", tmpDir);
       ({ readTokenUsageMarkdown } = require("./handle_agent_failure.cjs"));
     });
 
     afterEach(() => {
+      vi.unstubAllEnvs();
       fs.rmSync(tmpDir, { recursive: true, force: true });
     });
 
@@ -8370,27 +8410,17 @@ describe("handle_agent_failure", () => {
     });
 
     it("returns markdown and model aliases when a valid token-usage.jsonl file is present", () => {
-      const { TOKEN_USAGE_PATH } = require("./parse_token_usage.cjs");
+      const { getTokenUsagePaths } = require("./parse_token_usage.cjs");
+      const TOKEN_USAGE_PATH = getTokenUsagePaths()[2];
       fs.mkdirSync(path.dirname(TOKEN_USAGE_PATH), { recursive: true });
       const entry = JSON.stringify({ model: "claude-sonnet-4.5", input_tokens: 1000, output_tokens: 500, cache_read_tokens: 0, cache_write_tokens: 0, duration_ms: 1000 });
-      const origContent = fs.existsSync(TOKEN_USAGE_PATH) ? fs.readFileSync(TOKEN_USAGE_PATH, "utf8") : null;
       fs.writeFileSync(TOKEN_USAGE_PATH, entry + "\n");
-      try {
-        vi.resetModules();
-        ({ readTokenUsageMarkdown } = require("./handle_agent_failure.cjs"));
-        const result = readTokenUsageMarkdown();
-        expect(result).not.toBeNull();
-        expect(result.markdown).toContain("sonnet45");
-        expect(result.markdown).toContain("1,000");
-        expect(result.markdown).toContain("Alias");
-        expect(result.modelNames).toEqual(["claude-sonnet-4.5"]);
-      } finally {
-        if (origContent !== null) {
-          fs.writeFileSync(TOKEN_USAGE_PATH, origContent);
-        } else if (fs.existsSync(TOKEN_USAGE_PATH)) {
-          fs.unlinkSync(TOKEN_USAGE_PATH);
-        }
-      }
+      const result = readTokenUsageMarkdown();
+      expect(result).not.toBeNull();
+      expect(result.markdown).toContain("sonnet45");
+      expect(result.markdown).toContain("1,000");
+      expect(result.markdown).toContain("Alias");
+      expect(result.modelNames).toEqual(["claude-sonnet-4.5"]);
     });
   });
 

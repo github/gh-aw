@@ -38,8 +38,15 @@ function buildFailureReport(template, title, values) {
   context.run_links_context = [{ type: "paragraph", children: links, agentTainted: false }];
   context.pull_request_context = Array.isArray(values.pull_request_info) ? values.pull_request_info : parseReportMarkdown(scalar("pull_request_info"), { agentTainted: false });
 
-  const evidence = [context.report_incomplete_context, context.failure_diagnostics_context].flatMap(value => (Array.isArray(value) ? value : []));
-  context.runtime_evidence_context = evidence.length ? [{ type: "details", summary: "Runtime evidence", children: evidence, agentTainted: false }] : [];
+  /** @param {...string} keys */
+  const blocks = (...keys) => keys.flatMap(key => (Array.isArray(context[key]) ? context[key] : []));
+  /** @param {ReportBlock[]} children @returns {ReportBlock[]} */
+  const runtimeDetails = children => (children.length ? [{ type: "details", summary: "Runtime evidence", children, agentTainted: false }] : []);
+  const evidence = blocks("completion_evidence_context", "failure_diagnostics_context");
+  // Keep the complete legacy slot for custom templates; the default template places alerts separately.
+  context.runtime_evidence_context = runtimeDetails([...blocks("report_incomplete_context", "agent_report_context"), ...evidence]);
+  context.runtime_alerts_context = evidence.filter(block => block.type === "alert");
+  context.runtime_diagnostics_context = runtimeDetails(evidence.filter(block => block.type !== "alert"));
 
   return { type: "report", title, children: parseReportMarkdown(template, { context, minimumHeadingLevel: 3, agentTainted: false }), agentTainted: false };
 }

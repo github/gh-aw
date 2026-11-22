@@ -99,11 +99,11 @@ function replaceSelected(report, selected) {
 function renderSizedReport(report, maxLength = MAX_BODY_LENGTH) {
   if (!Number.isSafeInteger(maxLength) || maxLength < 1) throw new TypeError("Report body size limit must be a positive integer");
   /** @param {Report} document */
-  function render(document) {
-    const result = reportAST.renderReport(document);
+  function render(document, warnOnNestedAlerts = false) {
+    const result = reportAST.renderReport(document, { warnOnNestedAlerts });
     return { ...result, body: result.body.trimEnd() };
   }
-  const original = render(report);
+  const original = render(report, true);
   if (original.body.length <= maxLength) return original;
   const normalized = reportAST.redactReportForRendering(report);
   reportAST.assertRedactedReport(normalized);

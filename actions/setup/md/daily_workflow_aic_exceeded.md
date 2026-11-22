@@ -29,8 +29,7 @@ gh aw compile
 
 Commit and push the updated `.lock.yml` file.
 
-> [!NOTE]
-> Raising the limit increases the number of AI inference calls the workflow can make
+> **Note:** Raising the limit increases the number of AI inference calls the workflow can make
 > per 24-hour window. Review your Copilot or model provider billing
 > before significantly increasing the threshold (for example, before doubling the current
 > value or setting it far above expected usage).
@@ -51,8 +50,7 @@ The guardrail is evaluated at activation time, not retrospectively, so a single 
 <details>
 <summary>How to disable this guardrail</summary>
 
-> [!CAUTION]
-> Disabling this guardrail removes the per-workflow spending cap. Only disable it if you have
+> **Caution:** Disabling this guardrail removes the per-workflow spending cap. Only disable it if you have
 > an alternative mechanism for controlling AI cost usage or if the workflow is intentionally
 > uncapped.
 

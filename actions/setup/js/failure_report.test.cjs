@@ -88,10 +88,33 @@ describe("failure report structure", () => {
     const evidencePosition = body.indexOf("<summary>Runtime evidence</summary>");
     expect(body.indexOf("Model has no AI credits pricing")).toBeLessThan(evidencePosition);
     expect(body.indexOf("retrying will not help")).toBeLessThan(evidencePosition);
-    expect(body.indexOf("Task completion could not be confirmed")).toBeGreaterThan(evidencePosition);
+    expect(body.indexOf("Task completion could not be confirmed")).toBeLessThan(evidencePosition);
     expect(body.indexOf("Driver exit code: 1")).toBeGreaterThan(evidencePosition);
     expect(body).toContain("#### Failure Diagnostics");
     expect(body).not.toContain("did not record a specific cause");
+  });
+
+  it("preserves legacy runtime evidence and keeps runtime alerts visible only once in the default template", () => {
+    const context = values({
+      report_incomplete_context: "> [!WARNING]\n> Task completion could not be confirmed.",
+      agent_report_context: "Approved agent reason.",
+      completion_evidence_context: "Completion metadata.",
+      failure_diagnostics_context: "> [!IMPORTANT]\n> Engine stopped unexpectedly.\n\nDriver metadata.",
+    });
+    const legacy = buildFailureReport("{runtime_evidence_context}", "Failure", context);
+    expect(legacy.children).toMatchObject([
+      { type: "details", summary: "Runtime evidence", children: [{ type: "alert", kind: "WARNING" }, { type: "paragraph" }, { type: "paragraph" }, { type: "alert", kind: "IMPORTANT" }, { type: "paragraph" }] },
+    ]);
+    const legacyBody = renderReport(legacy).body;
+    for (const message of ["Task completion could not be confirmed.", "Approved agent reason.", "Completion metadata.", "Engine stopped unexpectedly.", "Driver metadata."]) {
+      expect(legacyBody).toContain(message);
+    }
+
+    const { body } = renderReport(buildFailureReport(template, "Failure", context));
+    expect(body).toMatch(/> \[!IMPORTANT\]\n> Engine stopped unexpectedly\.[\s\S]*<summary>Runtime evidence<\/summary>[\s\S]*Driver metadata\./);
+    for (const message of ["Task completion could not be confirmed.", "Approved agent reason.", "Engine stopped unexpectedly."]) {
+      expect(body.split(message)).toHaveLength(2);
+    }
   });
 
   it("retains uncertainty and never promotes diagnostic headings into report sections", () => {

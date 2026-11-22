@@ -324,6 +324,7 @@ func (c *Compiler) validateCoreToolConfiguration(workflowData *WorkflowData, mar
 	c.warnCheckoutRefWithSteps(workflowData, markdownPath)
 	workflowLog.Printf("Validating push-to-pull-request-branch configuration")
 	c.validatePushToPullRequestBranchWarnings(workflowData.SafeOutputs, workflowData.CheckoutConfigs)
+	c.warnNestedPublicationAlerts(workflowData.SafeOutputs, markdownPath)
 	for _, validation := range validations {
 		workflowLog.Printf("%s", validation.logMessage)
 		if err := validation.validateFn(); err != nil {
