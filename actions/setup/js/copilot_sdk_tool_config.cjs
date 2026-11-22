@@ -274,7 +274,8 @@ function loadCopilotSDKMCPServers(config, configPath) {
  * @returns {import("@microsoft/copilot-sdk").CreateSessionOptions["tools"]}
  */
 function buildCopilotSDKSessionToolConfig(config, sdk, options = {}) {
-  if (!config) return undefined;
+  // An empty allowlist denies all tools; omitting it leaves the SDK catalog unfiltered.
+  if (config == null) return { availableTools: [], definitions: [] };
   if (typeof sdk.ToolSet !== "function" || !sdk.BuiltInTools || !Array.isArray(sdk.BuiltInTools.Isolated)) {
     throw new Error("Copilot SDK ToolSet and BuiltInTools.Isolated are required for compiler-controlled tool filtering");
   }

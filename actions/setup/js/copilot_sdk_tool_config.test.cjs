@@ -515,8 +515,8 @@ describe("buildCopilotSDKSessionToolConfig", () => {
     expect(config.availableTools.toArray()).not.toContain("builtin:dynamic_workflows_manage");
   });
 
-  it("preserves legacy SDK behavior only when the compiler contract is absent", () => {
-    expect(buildCopilotSDKSessionToolConfig(null, {})).toBeUndefined();
+  it.each([null, undefined])("uses an explicit empty catalog when the compiler contract is %s", missingConfig => {
+    expect(buildCopilotSDKSessionToolConfig(missingConfig, {})).toEqual({ availableTools: [], definitions: [] });
   });
 
   it("fails closed when required SDK filtering APIs are missing", () => {
