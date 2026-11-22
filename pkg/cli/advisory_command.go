@@ -41,9 +41,9 @@ type advisoryFork struct {
 	Private  bool   `json:"private"`
 }
 
-// NewAdvisoryCommand creates the local security advisory handoff commands.
+// NewAdvisoryCommand creates the experimental local security advisory handoff commands.
 func NewAdvisoryCommand() *cobra.Command {
-	cmd := &cobra.Command{Use: "advisory", Short: "Review and transfer a fix to a private advisory fork"}
+	cmd := &cobra.Command{Use: "advisory", Short: "Experimental: review and transfer a fix to a private advisory fork", Hidden: true}
 	cmd.AddCommand(newAdvisoryHandoffCommand(false), newAdvisoryHandoffCommand(true))
 	return cmd
 }
@@ -52,7 +52,7 @@ func newAdvisoryHandoffCommand(transfer bool) *cobra.Command {
 	var opts advisoryHandoff
 	cmd := &cobra.Command{
 		Use:   "inspect <GHSA-ID>",
-		Short: "Review a patch and get its transfer approval digest",
+		Short: "Experimental: review a patch and get its transfer approval digest",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.id = strings.Join(args, "")
@@ -64,7 +64,7 @@ func newAdvisoryHandoffCommand(transfer bool) *cobra.Command {
 	}
 	if transfer {
 		cmd.Use = "transfer <GHSA-ID>"
-		cmd.Short = "Push the approved patch to a new private advisory fork branch"
+		cmd.Short = "Experimental: push the approved patch to a new private advisory fork branch"
 		cmd.Flags().StringVar(&opts.approval, "approve", "", "Approval digest produced by inspect")
 		_ = cmd.MarkFlagRequired("approve")
 	}

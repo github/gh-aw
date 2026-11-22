@@ -1559,7 +1559,7 @@ gh aw pr transfer <pr-url> --repo target-owner/target-repo --create-pull-request
 
 #### `advisory inspect` and `advisory transfer`
 
-Review a Git diff from a private workflow run and transfer that exact diff to an existing temporary private advisory fork on GitHub.com.
+These experimental commands are hidden from the main CLI help. They review a Git diff from a private workflow run and transfer that exact diff to an existing temporary private advisory fork on GitHub.com.
 
 ```bash wrap
 gh aw advisory inspect GHSA-2345-6789-cfgh --repo owner/repo --base "$BASE_SHA" --base-branch main --branch advisory-fix --side-repo owner/private-side --run "$RUN_ID" --artifact "$ARTIFACT_ID"

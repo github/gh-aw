@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"os"
@@ -9,10 +10,29 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/require"
 )
 
 const advisoryTestID = "GHSA-2345-6789-cfgh"
+
+func TestAdvisoryExperimentalHelp(t *testing.T) {
+	root := &cobra.Command{Use: "aw"}
+	root.AddCommand(NewAdvisoryCommand(), &cobra.Command{Use: "visible", Short: "Visible command"})
+	var output bytes.Buffer
+	root.SetOut(&output)
+	root.SetArgs([]string{"--help"})
+	require.NoError(t, root.Execute())
+	require.Contains(t, output.String(), "visible")
+	require.NotContains(t, output.String(), "advisory")
+
+	for _, args := range [][]string{{"advisory", "--help"}, {"advisory", "inspect", "--help"}, {"advisory", "transfer", "--help"}} {
+		output.Reset()
+		root.SetArgs(args)
+		require.NoError(t, root.Execute())
+		require.Contains(t, output.String(), "Experimental:")
+	}
+}
 
 func TestAdvisoryForkVerification(t *testing.T) {
 	o := advisoryHandoff{upstream: "owner/repo", id: advisoryTestID, branch: "fix"}
