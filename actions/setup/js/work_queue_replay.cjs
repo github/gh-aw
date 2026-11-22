@@ -578,7 +578,11 @@ function recordEffects(effects) {
   if (!Array.isArray(effects) || effects.some(effect => !plainObject(effect))) throw queueError("checkpoint_invalid", "checkpoint effects must be an array of objects");
 }
 
-/** @param {QueueCommit} commit @returns {QueueState} */
+/**
+ * Restore a checkpoint into fresh mutable records (like `cloneState`), so replaying the same
+ * commit objects again, or serializing them afterwards, still sees the checkpoint as written.
+ * @param {QueueCommit} commit @returns {QueueState}
+ */
 function restoreCheckpointState(commit) {
   validateCommit(commit);
   const invalid = message => queueError("checkpoint_invalid", message);
@@ -606,7 +610,7 @@ function restoreCheckpointState(commit) {
     if ((record.state === "claimed") !== Object.hasOwn(record, "claim_id") && record.state !== "completed") throw invalid("only claimed or completed Work names a Claim");
     if ((record.state === "completed") !== Object.hasOwn(record, "completion_id") || (record.state === "completed") !== Object.hasOwn(record, "effects")) throw invalid("completed Work carries its completion");
     if ((record.state === "cancelled") !== Object.hasOwn(record, "cancellation_reason")) throw invalid("cancelled Work carries its reason");
-    state.works.set(id, record);
+    state.works.set(id, { ...record });
   }
   for (const [id, record] of Object.entries(snapshot.claims)) {
     closed(record, CLAIM_RECORD_REQUIRED, CLAIM_RECORD_OPTIONAL, "checkpoint Claim", "checkpoint_invalid");
@@ -616,7 +620,7 @@ function restoreCheckpointState(commit) {
     const work = state.works.get(record.work_id);
     if (record.claim_id !== id || !CLAIM_STATES.includes(record.state) || !work || !plainObject(snapshot.dispatches[record.dispatch_id])) throw invalid("checkpoint Claim record is inconsistent");
     if ((record.state === "open") !== (work.state === "claimed" && work.claim_id === id)) throw invalid("open Claims and claimed Work must agree");
-    state.claims.set(id, record);
+    state.claims.set(id, { ...record });
   }
   for (const [id, record] of Object.entries(snapshot.dispatches)) {
     closed(record, DISPATCH_RECORD_FIELDS, [], "checkpoint Dispatch", "checkpoint_invalid");
@@ -630,7 +634,7 @@ function restoreCheckpointState(commit) {
     }
     if ((record.state === "bound") !== (record.run !== null) && record.state !== "closed") throw invalid("only bound Dispatches carry a run");
     if (record.state !== "closed" && record.claims.every(claim => state.claims.get(claim).state !== "open")) throw invalid("settled Dispatches must be closed");
-    state.dispatches.set(id, record);
+    state.dispatches.set(id, { ...record, claims: [...record.claims] });
   }
   for (const [key, observation] of Object.entries(snapshot.observations)) {
     validateOperation(observation);
@@ -735,7 +739,8 @@ function buildCommit(state, actor, request, operations, at = Date.now()) {
 function checkpointCommit(state, actor, at = Date.now()) {
   if (!state.tip) throw queueError("checkpoint_invalid", "an empty queue has nothing to checkpoint");
   const request = newRequest("checkpoint", actor, { prior_tip: state.tip });
-  const commit = { version: PROTOCOL_VERSION, id: commitId(null, request.id), previous: null, request, actor, at, operations: [{ kind: "Checkpoint", prior_tip: state.tip, state: serializeProjection(state) }] };
+  // The snapshot must not alias live records that later appends to `state` mutate in place.
+  const commit = { version: PROTOCOL_VERSION, id: commitId(null, request.id), previous: null, request, actor, at, operations: [{ kind: "Checkpoint", prior_tip: state.tip, state: structuredClone(serializeProjection(state)) }] };
   restoreCheckpointState(/** @type {QueueCommit} */ commit);
   return /** @type {QueueCommit} */ commit;
 }

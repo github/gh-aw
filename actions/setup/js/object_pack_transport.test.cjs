@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import childProcess from "child_process";
 import crypto from "crypto";
 import fs from "fs";
+import os from "os";
 import path from "path";
 import { createRequire } from "module";
 import zlib from "zlib";
@@ -14,13 +15,16 @@ import { useExecutionProvenanceFixture } from "./test_execution_provenance.js";
 useExecutionProvenanceFixture();
 const require = createRequire(import.meta.url);
 const { withClaimExecution } = require("./work_queue_claim_scope.cjs");
+const { OBJECT_PACK_LIMIT_ENV } = require("./object_pack_limits.cjs");
+
+const RECOVERY_STAGES = ["fetch-ready", "import-ready", "baseline-resolved", "regeneration-ready", "recovery-ready"];
+const SUBPROCESS_ERRNO_CODES = ["EAGAIN", "ENOMEM", "ENOSPC", "ENOENT", "ENOBUFS", "ETIMEDOUT"];
 
 describe("offline object-pack recovery", () => {
-  let root, repo, base, tip, originalEnv, originalCore, originalGlobals;
+  let root, repo, base, tip, repoName, repoSlug, originalEnv, originalCore, originalGlobals;
   const artifacts = [];
   const transports = [];
   const artifactDirs = [];
-  const repoSlug = "test-owner/recovery";
   function git(args, cwd = repo) {
     return childProcess.execFileSync("git", args, { cwd, encoding: "utf8", stdio: "pipe" }).trim();
   }
@@ -33,28 +37,57 @@ describe("offline object-pack recovery", () => {
     transports.push(transport);
     return { artifact, transport, paths: { patchPath: artifact.patchPath, bundlePath: artifact.bundlePath } };
   }
-  function redirectTrustedFetch() {
+  /** Rewrites only the authorized GitHub fetch to a local file remote; nothing else may reach a network. */
+  function redirectTrustedFetch(source = repo) {
     const original = childProcess.spawnSync;
     const fetches = [];
+    const authorized = `remote.recovery.url=https://github.com/${repoSlug}.git`;
     vi.spyOn(childProcess, "spawnSync").mockImplementation((command, args, options) => {
       if (command === "git" && args.includes("fetch")) {
+        if (!args.includes(authorized)) throw new Error("Recovery fetch did not target the authorized fixture remote");
         fetches.push({ args, options });
-        const redirected = args.map(arg => (arg === `remote.recovery.url=https://github.com/${repoSlug}.git` ? `remote.recovery.url=file://${repo}` : arg));
+        const redirected = args.map(arg => (arg === authorized ? `remote.recovery.url=file://${source}` : arg));
         return original(command, redirected, { ...options, env: { ...options.env, GIT_ALLOW_PROTOCOL: "file" } });
       }
       return original(command, args, options);
     });
     return fetches;
   }
+  /**
+   * Static summary of where recovery stopped: the last completed recovery stage,
+   * plus the exit status and allowlisted errno of the last failed subprocess.
+   * Never includes arguments, output, paths, tokens or exception causes.
+   */
+  function recoveryDiagnostic() {
+    const stages = global.core.debug.mock.calls.map(([message]) => (typeof message === "string" ? /^\[object_pack_transport\] ([a-z-]+)/.exec(message)?.[1] : undefined));
+    const stage = stages.filter(name => RECOVERY_STAGES.includes(name)).pop() ?? "unknown";
+    const results = vi.isMockFunction(childProcess.spawnSync) ? childProcess.spawnSync.mock.results : [];
+    const outcomes = results.map(({ type, value }) => (type === "throw" ? { error: value } : value || {}));
+    const failed = outcomes.filter(outcome => outcome.error || outcome.status !== 0).pop();
+    const status = failed && Number.isInteger(failed.status) ? failed.status : "none";
+    const code = failed?.error?.code;
+    const errno = SUBPROCESS_ERRNO_CODES.includes(code) ? code : "unknown";
+    return `object-pack recovery diagnostic: stage=${stage} status=${status} errno=${errno}`;
+  }
   beforeEach(() => {
     originalEnv = { ...process.env };
     originalCore = global.core;
     originalGlobals = { context: global.context, github: global.github, exec: global.exec };
     global.core = { debug: vi.fn(), info: vi.fn(), warning: vi.fn(), error: vi.fn() };
-    root = path.resolve(`.object-pack-${crypto.randomUUID()}`);
+    const id = crypto.randomUUID();
+    repoName = `recovery-${id}`;
+    repoSlug = `test-owner/${repoName}`;
+    root = path.resolve(`.object-pack-${id}`);
     repo = path.join(root, "source");
     fs.mkdirSync(repo, { recursive: true });
+    for (const key of Object.keys(process.env)) if (key.startsWith("GIT_")) delete process.env[key];
+    for (const name of Object.values(OBJECT_PACK_LIMIT_ENV)) delete process.env[name];
+    process.env.HOME = root;
+    process.env.XDG_CONFIG_HOME = root;
+    process.env.GIT_CONFIG_GLOBAL = os.devNull;
+    process.env.GIT_CONFIG_NOSYSTEM = "1";
     process.env.GIT_CEILING_DIRECTORIES = root;
+    process.env.GITHUB_SERVER_URL = "https://github.com";
     process.env.GITHUB_WORKSPACE = repo;
     process.env.GITHUB_REPOSITORY = repoSlug;
     delete process.env.GITHUB_SHA;
@@ -82,7 +115,8 @@ describe("offline object-pack recovery", () => {
     for (const artifact of artifacts.splice(0)) if (fs.existsSync(artifact)) fs.unlinkSync(artifact);
     for (const directory of artifactDirs.splice(0)) fs.rmdirSync(directory);
     fs.rmSync(root, { recursive: true, force: true });
-    process.env = originalEnv;
+    for (const key of Object.keys(process.env)) if (!(key in originalEnv)) delete process.env[key];
+    Object.assign(process.env, originalEnv);
     global.core = originalCore;
     Object.assign(global, originalGlobals);
   });
@@ -240,17 +274,7 @@ describe("offline object-pack recovery", () => {
     const failed = await generateGitPatch("agent-change", "main", { cwd: repo, pinnedSha: tip });
     expect(failed.success).toBe(false);
     const { transport, paths } = packageObjects();
-    const original = childProcess.spawnSync;
-    vi.spyOn(childProcess, "spawnSync").mockImplementation((command, args, options) => {
-      if (command === "git" && args.includes("fetch")) {
-        return original(
-          command,
-          args.map(arg => (arg === `remote.recovery.url=https://github.com/${repoSlug}.git` ? `remote.recovery.url=file://${remote}` : arg)),
-          { ...options, env: { ...options.env, GIT_ALLOW_PROTOCOL: "file" } }
-        );
-      }
-      return original(command, args, options);
-    });
+    redirectTrustedFetch(remote);
 
     expect(await recoverObjectPack(transport, paths, { repo: repoSlug, baseBranch: "main", mode: "full", config: {}, message: {} })).toBe(true);
     expect(transport.read(paths.patchPath).toString()).toContain("agent content");
@@ -455,7 +479,7 @@ describe("offline object-pack recovery", () => {
   it("queues a triggering-PR update without fetching when its local tracking ref is missing", async () => {
     global.context = {
       eventName: "pull_request",
-      repo: { owner: "test-owner", repo: "recovery" },
+      repo: { owner: "test-owner", repo: repoName },
       payload: { pull_request: { number: 7, head: { sha: base, repo: { full_name: repoSlug } }, base: { ref: "main", repo: { full_name: repoSlug } } } },
     };
     const append = vi.fn();
@@ -484,7 +508,7 @@ describe("offline object-pack recovery", () => {
       head: { ref: "agent-change", sha: base, repo: { full_name: repoSlug, owner: { login: "test-owner" } } },
       base: { ref: "main", sha: base, repo: { full_name: repoSlug, owner: { login: "test-owner" } } },
     };
-    global.context = { eventName: "pull_request", repo: { owner: "test-owner", repo: "recovery" }, payload: { pull_request: pr, repository: { html_url: `https://github.com/${repoSlug}` } } };
+    global.context = { eventName: "pull_request", repo: { owner: "test-owner", repo: repoName }, payload: { pull_request: pr, repository: { html_url: `https://github.com/${repoSlug}` } } };
     global.github = {
       auth: vi.fn().mockResolvedValue({ token: "scoped-token" }),
       rest: {
@@ -497,10 +521,16 @@ describe("offline object-pack recovery", () => {
     };
     global.exec = { exec: vi.fn(), getExecOutput: vi.fn() };
     const { main } = require(`./${handlerName}.cjs`);
-    const handler = await main({ base_branch: "main", target: "triggering", allowed_files: ["allowed.txt"], signed_commits: true, patch_format: patchFormat });
-    const result = await handler({ branch: "agent-change", title: "Preserve checkout recovery", body: "Restore validated output generation." }, {});
-    expect(result.success).toBe(false);
-    expect(result.error).toMatch(/outside.*allowed-files|file protection/i);
+    let result;
+    try {
+      const handler = await main({ base_branch: "main", target: "triggering", allowed_files: ["allowed.txt"], signed_commits: true, patch_format: patchFormat });
+      result = await handler({ branch: "agent-change", title: "Preserve checkout recovery", body: "Restore validated output generation." }, {});
+    } catch {
+      // Report only the static stage and allowlisted subprocess outcome; never the cause, Git output, paths or tokens.
+      throw new Error(recoveryDiagnostic());
+    }
+    expect(result.success, recoveryDiagnostic()).toBe(false);
+    expect(result.error, recoveryDiagnostic()).toMatch(/outside.*allowed-files|file protection/i);
     expect(global.github.rest.pulls.create).not.toHaveBeenCalled();
     expect(global.github.rest.git.createRef).not.toHaveBeenCalled();
     expect(global.exec.exec).not.toHaveBeenCalled();
@@ -562,7 +592,7 @@ describe("offline object-pack recovery", () => {
     if (failure === "closed") livePR.state = "closed";
     if (failure === "wrong-head") livePR.head.repo.full_name = "unapproved/head";
     if (failure === "wrong-event-head") eventPR.head.repo.full_name = "unapproved/head";
-    global.context = { eventName: "pull_request", repo: { owner: "test-owner", repo: "recovery" }, payload: { pull_request: eventPR } };
+    global.context = { eventName: "pull_request", repo: { owner: "test-owner", repo: repoName }, payload: { pull_request: eventPR } };
     global.github = { rest: { pulls: { get: vi.fn().mockResolvedValue({ data: livePR }) } } };
     global.exec = { exec: vi.fn(), getExecOutput: vi.fn() };
     const { main } = require("./push_to_pull_request_branch.cjs");

@@ -170,6 +170,10 @@ post-steps:
       high_fix_found=false
       license_found=false
       while IFS= read -r line || [[ -n "$line" ]]; do
+        case "$line" in
+          *': error: [Critical]'*|*': error: [High]'*|*': warning: [High]'*|*': error: license policy violation:'*) ;;
+          *) continue ;;
+        esac
         [[ "$line" =~ $critical_pattern ]] && critical_found=true
         [[ "$line" =~ $high_fix_pattern ]] && high_fix_found=true
         [[ "$line" =~ $license_pattern ]] && license_found=true

@@ -100,6 +100,26 @@ function responseHeaders(error) {
   return ownValue(ownValue(error, "response"), "headers") ?? ownValue(error, "headers");
 }
 
+/**
+ * Returns a GitHub request ID only in its five-group hex shape; anything else could be provider
+ * text or a credential. The value is returned unchanged, never trimmed or truncated.
+ * @param {unknown} value
+ * @returns {string | undefined}
+ */
+function validGitHubRequestId(value) {
+  return typeof value === "string" && value.length <= 84 && !/\s/.test(value) && /^[0-9a-f]{1,16}(?::[0-9a-f]{1,16}){4}$/i.test(value) ? value : undefined;
+}
+
+/**
+ * The validated `x-github-request-id` of a GitHub API error, preferring the response headers.
+ * Accessors and inherited headers are never read.
+ * @param {unknown} error
+ * @returns {string | undefined}
+ */
+function getGitHubRequestId(error) {
+  return validGitHubRequestId(ownValue(ownValue(ownValue(error, "response"), "headers"), "x-github-request-id")) ?? validGitHubRequestId(ownValue(ownValue(error, "headers"), "x-github-request-id"));
+}
+
 /** @param {unknown} headers @param {string} name */
 function headerInteger(headers, name) {
   const value = ownValue(headers, name);
@@ -272,9 +292,7 @@ function createWorkQueueLogger(component) {
     if (typeof metadata.graphql_errors === "number" && metadata.graphql_errors > count) metadata.graphql_error_details_omitted = metadata.graphql_errors - count;
     const code = queueControlErrorCode(error, metadata);
     const headers = responseHeaders(error);
-    const requestId = [ownValue(ownValue(response, "headers"), "x-github-request-id"), ownValue(ownValue(error, "headers"), "x-github-request-id")].find(
-      value => typeof value === "string" && value.length <= 84 && !/\s/.test(value) && /^[0-9a-f]{1,16}(?::[0-9a-f]{1,16}){4}$/i.test(value)
-    );
+    const requestId = getGitHubRequestId(error);
     const requestDiagnostic = (Number.isInteger(status) && status >= 100 && status <= 599) || headers !== undefined || metadata.graphql_errors ? ` GitHub request ID: ${requestId ?? "unknown"}.` : "";
     diagnostic(
       event,
@@ -304,4 +322,4 @@ function createWorkQueueLogger(component) {
   return { debug, diagnostic, failure };
 }
 
-module.exports = { createWorkQueueLogger, debugEnabled, queueControlErrorCode, queueControlErrorExplanation };
+module.exports = { createWorkQueueLogger, debugEnabled, getGitHubRequestId, ownValue, queueControlErrorCode, queueControlErrorExplanation, validGitHubRequestId };
