@@ -54,6 +54,26 @@ func TestMarshalCompactNoHTMLEscape(t *testing.T) {
 			expected: `{"list":["a","b"],"nested":{"greeting":"héllo"}}`,
 		},
 		{
+			name:     "escapes quotes and control characters inside strings",
+			input:    map[string]string{"s": "say \"hi\"\tnow"},
+			expected: `{"s":"say \"hi\"\tnow"}`,
+		},
+		{
+			name:     "trailing newline inside a value is escaped, not trimmed",
+			input:    map[string]string{"s": "line\n"},
+			expected: `{"s":"line\n"}`,
+		},
+		{
+			name:     "byte slices marshal as base64 strings",
+			input:    []byte("abc"),
+			expected: `"YWJj"`,
+		},
+		{
+			name:     "empty map marshals to empty object",
+			input:    map[string]string{},
+			expected: `{}`,
+		},
+		{
 			name:    "returns error for values json cannot encode",
 			input:   map[string]any{"ch": make(chan int)},
 			wantErr: true,
