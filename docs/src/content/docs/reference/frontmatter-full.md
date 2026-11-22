@@ -24780,8 +24780,10 @@ secret-masking:
 # Optional observability output settings for workflow runs.
 # (optional)
 observability:
-  # OTLP (OpenTelemetry Protocol) trace export configuration.
   # (optional)
+  # Accepted formats:
+
+  # Format 1: OTLP (OpenTelemetry Protocol) trace export configuration.
   otlp:
     # OTLP endpoint configuration. Accepts a plain URL string (backward-compat), a
     # single {url, headers} object, or an array of {url, headers} objects for
@@ -24912,6 +24914,10 @@ observability:
       # Optional Google service account email to impersonate after STS token exchange.
       # (optional)
       service-account: "example-value"
+
+  # Format 2: Disable compiler-managed OTLP configuration, including defaults and
+  # imported settings, when set in the main workflow.
+  otlp: false
 
 # Rate limiting configuration to restrict how frequently users can trigger the
 # workflow. Helps prevent abuse and resource exhaustion from programmatically

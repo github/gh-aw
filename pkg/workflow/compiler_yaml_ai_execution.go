@@ -342,9 +342,9 @@ func (c *Compiler) generateMCPGatewayLogParsing(yaml *strings.Builder, data *Wor
 
 // generateObservabilitySummary generates a step that synthesizes a compact
 // observability section for the GitHub Actions step summary from existing runtime files.
-// The step is only emitted when OTLP is configured in the workflow.
+// The step is emitted when local telemetry is enabled, including remote OTLP export.
 func (c *Compiler) generateObservabilitySummary(yaml *strings.Builder, data *WorkflowData) {
-	if !isOTLPEnabled(data) {
+	if !isOTLPLocalTelemetryEnabled(data) {
 		return
 	}
 
@@ -370,6 +370,10 @@ func isOTLPEnabled(data *WorkflowData) bool {
 		return false
 	}
 	return strings.Contains(data.Env, "OTEL_EXPORTER_OTLP_ENDPOINT") || strings.Contains(data.Env, "GH_AW_OTLP_ENDPOINTS")
+}
+
+func isOTLPLocalTelemetryEnabled(data *WorkflowData) bool {
+	return isOTLPEnabled(data) || (data != nil && !data.DryRun && isOTLPDisabled(data.RawFrontmatter))
 }
 
 // generateStopMCPGateway generates a step that stops the MCP gateway process using its PID from step output

@@ -32,7 +32,8 @@ jobs:
         shard: [cli, workflow, workqueue, other]
     env:
       SHARD: ${{ matrix.shard }}
-      ARTIFACT_NAME: benchmark-results-${{ matrix.shard }}
+      # Keep time-based samples separate from the old fixed-iteration baselines.
+      ARTIFACT_NAME: benchmark-results-${{ matrix.shard }}${{ matrix.shard != 'workqueue' && '-timed' || '' }}
       # Scanner integration is covered by CGO; do not benchmark Docker pulls or timeouts.
       BENCH_SKIP: '^BenchmarkCompile(With(Zizmor|Poutine|AllSecurityTools)|ComplexWithSecurityTools)$'
     steps:
@@ -71,7 +72,8 @@ jobs:
           echo "::error::No benchmark packages found for $SHARD"
           exit 1
         fi
-        benchtime=3x
+        # Average short benchmarks over many iterations to reduce runner noise.
+        benchtime=100ms
         # Each replay already takes seconds; retain every ledger size with one iteration.
         if [ "$SHARD" = workqueue ]; then
           benchtime=1x
