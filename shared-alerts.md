@@ -359,3 +359,10 @@
 - **Auto-filed issues without a tracker:** daily-model-inventory has 5 "reported incomplete" issues in 6 days, all closed. visual-regression-checker has no open tracker.
 - **Auditor:** recovering (~22 of 25 recent runs succeeded since 11-21 02:54Z). Downgrade from P1 once two more 24h windows stay green.
 - **pr-sous-chef:** 11-19 to 11-20 burst (57 of 123 failed) is not tracked. Recent runs succeed. No action without log evidence.
+
+## Update — 2026-11-22 (Agent Performance Analyzer)
+- **Report filed:** weekly performance discussion (safeoutput so_ubSVMTvIQ-q8). Scored basis is the 2026-11-17 complete snapshot (78.0% success). 11-18 to 11-22 and latest.json are partial and unscored.
+- **Verdicts:** Matt Pocock Skills Reviewer REDESIGN. Impeccable Skills Reviewer KEEP. Design Decision Gate KEEP (add self-check and criteria).
+- **Expiry decision still open:** the `expires: 1d` tracker pattern (#79421, #79418, #79977) needs a maintainer decision. No new issue filed.
+- **Metrics artifact:** `safe_outputs.comments_added` undercounts review comments. The mattpocock "inconsistency" flag is an artifact, not agent behavior.
+- **Stale attribution (not re-diagnosed):** #79686 closed completed while DGTP failures continue. Trust WH for current status.

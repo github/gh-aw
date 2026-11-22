@@ -81,3 +81,9 @@ Weekly report already published 11-15; next weekly due 11-22. No new discussion 
 - 2026-11-17: ranking from complete 11-17 snapshot. Verified trackers via github issue_read. Corrected DGTP prompt note. Recorded expiry-closure pattern. noop.
 - 2026-11-18: re-verified 11-17 complete snapshot (618 executed, 482 successful, 88.35M tokens, 195 primary outputs; all match). 11-18 snapshot partial (2.25h window), not scored. Corrected ai-moderator under-creation; added zero-output candidates. noop.
 - 2026-11-20: 11-17 snapshot re-verified; 9 tracker states re-verified; #78066 closed_at corrected; mattpocock inconsistency confirmed over 5 complete/partial days. noop.
+
+## 2026-11-22 run (weekly report filed)
+- Data basis: last complete snapshot `metrics/daily/2026-11-17.json` (368 workflows, 618 executed, 78.0% success). 11-18 to 11-22 and `latest.json` are partial and unscored.
+- Report: weekly performance discussion filed (so_ubSVMTvIQ-q8). Includes rankings, bottom-10 prompt audit, named verdicts (Matt Pocock REDESIGN, Impeccable KEEP, Design Decision Gate KEEP), pattern labels, and maintainer decisions.
+- Verified: #79421 and #79418 closed not_planned at 24h (expires:1d pattern). #79686 closed completed while failures continue.
+- Open: expires:1d maintainer decision; ai-moderator timeout (5 min vs 10,603s average) unverified as queue time; DGTP 25-credit and 60-turn budget decision.
