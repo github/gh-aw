@@ -99,9 +99,7 @@ fi
 exec /bin/rm "$@"`
     );
     if (options.captureFailure) executable("mktemp", 'printf "%s" "$TEST_DIAGNOSTICS"; printf "%s" "$TEST_DIAGNOSTICS" >&2; exit 1');
-    if (options.mockCapture) {
-      executable("node", "cat >/dev/null");
-    } else if (options.sanitizerFailure) {
+    if (options.sanitizerFailure) {
       executable("node", 'printf "%s" "$TEST_DIAGNOSTICS"; printf "%s" "$TEST_DIAGNOSTICS" >&2; exit 1');
     } else if (options.redactorThrows) {
       const preload = path.join(root, "throw.cjs");
@@ -110,7 +108,7 @@ exec /bin/rm "$@"`
     }
     const result = spawnSync("bash", [path.join(root, "start_cli_proxy.sh")], {
       encoding: "utf8",
-      timeout: 10_000,
+      timeout: 30_000,
       env: {
         ...process.env,
         ...Object.fromEntries(["HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY", "http_proxy", "https_proxy", "no_proxy"].map(name => [name, undefined])),
@@ -188,7 +186,7 @@ exec /bin/rm "$@"`
   });
 
   it.each([false, true])("limits host publication to local addresses (network isolation: %s)", networkIsolation => {
-    const result = runProxy({ ready: true, networkIsolation, mockCapture: true });
+    const result = runProxy({ ready: true, networkIsolation });
     expect(result.status).toBe(0);
     const run = result.calls.split("\n").find(line => line.startsWith("run "));
     expect(run).toContain("--network bridge -p 127.0.0.1:18443:18443");
@@ -197,7 +195,7 @@ exec /bin/rm "$@"`
   });
 
   it("fails closed if the legacy sidecar path has no IPv4 bridge gateway", () => {
-    const result = runProxy({ ready: true, bridgeGateway: "fd00::1", mockCapture: true });
+    const result = runProxy({ ready: true, bridgeGateway: "fd00::1" });
     expect(result.status).toBe(1);
     expect(result.output).toContain("Cannot determine the IPv4 Docker bridge gateway");
     expect(result.calls).not.toMatch(/^run /m);

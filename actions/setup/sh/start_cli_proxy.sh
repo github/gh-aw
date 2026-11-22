@@ -62,10 +62,14 @@ if ! mkfifo "$DIAGNOSTIC_DIR/capture" 2>/dev/null; then
   exit 1
 fi
 (
-  capture_status=0
-  node "${SCRIPT_DIR}/redact_cli_proxy_diagnostics.cjs" --capture || capture_status=$?
-  cat > /dev/null
-  exit "$capture_status"
+  set -o pipefail
+  # Node's stdin reader can miss EOF on a named pipe on macOS.
+  cat | {
+    capture_status=0
+    node "${SCRIPT_DIR}/redact_cli_proxy_diagnostics.cjs" --capture || capture_status=$?
+    cat > /dev/null
+    exit "$capture_status"
+  }
 ) < "$DIAGNOSTIC_DIR/capture" > "$DIAGNOSTIC_DIR/startup.log" 2>/dev/null &
 CAPTURE_PID=$!
 exec 3>&1 4>&2
