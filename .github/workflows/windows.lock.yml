@@ -221,7 +221,7 @@ jobs:
       - name: Compute artifact prefix
         id: artifact-prefix
         env:
-          INPUTS_JSON: ${{ toJSON(inputs) }}
+          GH_AW_ACTIVATION_CHECK_RUN_ID: ${{ job.check_run_id }}
         run: bash "${RUNNER_TEMP}/gh-aw/actions/compute_artifact_prefix.sh"
       - name: Generate agentic run info
         id: generate_aw_info
