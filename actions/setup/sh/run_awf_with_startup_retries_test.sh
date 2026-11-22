@@ -33,6 +33,7 @@ run_with_env() {
 
 ATTEMPT_FILE="$WORKDIR/attempts"
 OUTPUT="$WORKDIR/retry-output.log"
+EVENT='{"type":"tool.execution_complete","data":{"text":"Quoted ##[error] from a job log"}}'
 if ! run_with_env bash -c '
   attempts_file="$1"
   attempts="$(cat "$attempts_file" 2>/dev/null || echo 0)"
@@ -44,7 +45,8 @@ if ! run_with_env bash -c '
     exit 1
   fi
   echo "[codex-harness] started"
-' bash "$ATTEMPT_FILE" > "$OUTPUT" 2>&1; then
+  printf "%s" "$2" >&2
+' bash "$ATTEMPT_FILE" "$EVENT" > "$OUTPUT" 2>&1; then
   cat "$OUTPUT" >&2
   fail "expected startup retry to recover"
 fi
@@ -53,6 +55,23 @@ fi
 grep -Fq "[codex-awf-retry] AWF startup failed before codex harness; retrying fresh" "$OUTPUT" || fail "expected retry diagnostic"
 grep -Fq "Fatal error: Refusing to use symlink as bind mountpoint" "$WORKDIR/agent.log" || fail "expected first attempt in agent log"
 grep -Fq "[codex-harness] started" "$WORKDIR/agent.log" || fail "expected successful attempt in agent log"
+printf '%s\n' \
+  "Fatal error: Refusing to use symlink as bind mountpoint: /usr/bin/go" \
+  "Process exiting with code: 1" \
+  "[codex-harness] started" > "$WORKDIR/expected-agent.log"
+printf '%s' "$EVENT" >> "$WORKDIR/expected-agent.log"
+cmp "$WORKDIR/expected-agent.log" "$WORKDIR/agent.log" || fail "expected an unchanged agent log"
+node - "$OUTPUT" "$EVENT" <<'NODE'
+const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const output = fs.readFileSync(process.argv[2], "utf8");
+const attempts = [...output.matchAll(/^::stop-commands::([a-f0-9]{32})\n([\s\S]*?)^::\1::$/gm)];
+assert.equal(attempts.length, 2, "expected a matching stop/resume pair per attempt");
+assert.notEqual(attempts[0][1], attempts[1][1], "expected a fresh token on retry");
+assert.match(attempts[0][2], /Process exiting with code: 1/);
+assert.ok(output.indexOf("[codex-awf-retry]") > attempts[0].index + attempts[0][0].length);
+assert.equal(attempts[1][2], `[codex-harness] started\n${process.argv[3]}\n`);
+NODE
 node - "$GH_AW_HARNESS_TELEMETRY_DIR/harness_retry.json" <<'NODE'
 const assert = require("node:assert/strict");
 const telemetry = require(process.argv[2]);

@@ -107,10 +107,20 @@ gh_aw_awf_record_execution_not_started() {
 }
 
 while true; do
+  # Legacy workflow commands can be recognized anywhere in a line, including
+  # inside agent JSONL. Pause parsing without changing the captured stream.
+  if ! gh_aw_stop_token="$(od -An -N16 -tx1 /dev/urandom | tr -d ' \n')" ||
+    ! [[ "$gh_aw_stop_token" =~ ^[[:xdigit:]]{32}$ ]]; then
+    echo "Could not generate a workflow command stop token" >&2
+    exit 1
+  fi
   gh_aw_awf_attempt_log="$(mktemp "${RUNNER_TEMP:-/tmp}/gh-aw-awf-${gh_aw_awf_attempt_log_name}.XXXXXX")"
   node "$gh_aw_preflight_script" --startup-attempt start "$((gh_aw_awf_attempt + 1))" "$gh_aw_awf_backoff_ms" || true
+  printf '::stop-commands::%s\n' "$gh_aw_stop_token"
   "$@" 2>&1 | tee -a "$GH_AW_AWF_LOG_FILE" "$gh_aw_awf_attempt_log"
   gh_aw_awf_status=${PIPESTATUS[0]}
+  # The subprocess may not have terminated its last line.
+  printf '\n::%s::\n' "$gh_aw_stop_token"
   if [ "$gh_aw_awf_status" -eq 0 ]; then
     node "$gh_aw_preflight_script" --startup-attempt finish "$((gh_aw_awf_attempt + 1))" "$gh_aw_awf_status" || true
     rm -f "$gh_aw_awf_attempt_log"
