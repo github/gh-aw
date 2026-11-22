@@ -56,5 +56,5 @@
 ### Key trends and next actions
 
 - No PR in the current open queue matches the eligible `app/github-copilot` author filter.
-- The current queue consists mainly of same-repo and bot-authored PRs (for example `pelikhan`, `lpcox`, and `gh-aw-bot`), which are outside the required author scope.
+- The current queue consists mainly of same-repo and bot-authored PRs, which are outside the required author scope.
 - Re-run triage when a new `app/github-copilot` PR becomes eligible or when the repository is refreshed with agent-authored work.

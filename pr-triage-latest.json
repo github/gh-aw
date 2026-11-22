@@ -1,11 +1,11 @@
 {
-  "generated_at": "2026-11-22T00:42:19.261681Z",
-  "run_id": "pr-triage-2026-11-22T00:42:19Z",
+  "generated_at": "2026-11-22T06:25:37Z",
+  "run_id": "pr-triage-2026-11-22T06:24:10Z",
   "source": "pr-triage",
   "open_copilot_prs": 0,
   "scanned_open_prs": 14,
   "eligible_total": 0,
-  "cooldown_skipped": 8,
+  "cooldown_skipped": 11,
   "category_counts": {
     "docs": 0,
     "test": 0,
@@ -82,6 +82,24 @@
       "title": "Add linter for unchecked os.Stat and os.Lstat results",
       "updated_at": "2026-11-22T00:19:48Z",
       "author": "gh-aw-bot"
+    },
+    {
+      "number": 79897,
+      "title": "Add issue detail extraction support for node-runner backend",
+      "updated_at": "2026-11-22T00:18:13Z",
+      "author": "pelikhan"
+    },
+    {
+      "number": 79896,
+      "title": "Fix daily AI Credits budget accounting bug",
+      "updated_at": "2026-11-22T00:09:56Z",
+      "author": "pelikhan"
+    },
+    {
+      "number": 79895,
+      "title": "Improve issue comment attachment rendering in the console",
+      "updated_at": "2026-11-22T00:14:32Z",
+      "author": "pelikhan"
     }
   ],
   "notes": [
