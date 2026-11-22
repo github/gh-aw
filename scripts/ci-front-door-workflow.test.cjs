@@ -248,7 +248,7 @@ test("benchmark shards cover every benchmark package once and bound expensive re
         .slice("BENCH_PACKAGES=".length)
         .split(" ")
     );
-    assert.ok(args.includes(`BENCH_TIME=${shard === "workqueue" ? "1x" : "3x"}`));
+    assert.ok(args.includes(`BENCH_TIME=${shard === "workqueue" ? "1x" : "100ms"}`));
     assert.ok(args.includes("BENCH_COUNT=6"));
   }
   assert.deepEqual(selected.sort(), expected);
