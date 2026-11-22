@@ -886,3 +886,6 @@
 {"id":"labels-applied","question":"Did the agent apply triage labels to at least one pull request?","answer":"NO","model":"gpt-6-luna","timestamp":"2026-11-22T00:44:56.872Z","runid":"44967522089"}
 {"id":"triage-data-set","question":"Does the agent output confirm that category, risk, and action data were determined for each processed PR?","answer":"NO","model":"gpt-6-luna","timestamp":"2026-11-22T00:44:56.872Z","runid":"44967522089"}
 {"id":"report-produced","question":"Does the agent output include a triage report summarizing the PRs processed?","answer":"YES","model":"gpt-6-luna","timestamp":"2026-11-22T00:44:56.872Z","runid":"44967522089"}
+{"id":"labels-applied","question":"Did the agent apply triage labels to at least one pull request?","answer":"NO","model":"gpt-6-luna","timestamp":"2026-11-22T06:27:45.163Z","runid":"44993389856"}
+{"id":"triage-data-set","question":"Does the agent output confirm that category, risk, and action data were determined for each processed PR?","answer":"NO","model":"gpt-6-luna","timestamp":"2026-11-22T06:27:45.163Z","runid":"44993389856"}
+{"id":"report-produced","question":"Does the agent output include a triage report summarizing the PRs processed?","answer":"YES","model":"gpt-6-luna","timestamp":"2026-11-22T06:27:45.163Z","runid":"44993389856"}
