@@ -266,6 +266,7 @@ func collectUnexpectedIncludedFrontmatterFields(frontmatter map[string]any) []st
 		"mcp-scripts":     {},
 		"services":        {},
 		"runtimes":        {},
+		"runs-on":         {},
 		"permissions":     {},
 		"secret-masking":  {},
 		"inputs":          {},

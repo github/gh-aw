@@ -306,6 +306,7 @@ Shared workflow files (without `on:` field) can define the fields below. Other f
 | `network` | Network permission specifications |
 | `permissions` | GitHub Actions permissions (validated, not merged) |
 | `runtimes` | Runtime version overrides (node, python, go, etc.) |
+| `runs-on` | Runner specification for the agent job |
 | `plugins` | Agent Plugin references |
 | `secret-masking` | Secret masking steps |
 | `env` | Workflow-level environment variables |
@@ -329,6 +330,7 @@ Step fields merge in dependency order: a file's steps follow those of everything
 | `permissions:` | Validation only. Main must declare all imported permissions at sufficient levels (`write` ≥ `read` ≥ `none`). |
 | `safe-outputs:` | Each type may be defined once; explicit main settings override imports. Duplicate types across imports fail. System reporting settings and `require-agent-success` follow the rules below. |
 | `runtimes:` | Main overrides imports; imported values fill unspecified fields. |
+| `runs-on:` | The main workflow's value takes precedence; otherwise the first imported value is used. Runner labels, label arrays, and runner-group objects are supported. |
 | `plugins:` | Union by plugin path. Identical refs are deduplicated; compatible semantic versions select the highest version. Incompatible majors or conflicting non-semver refs fail. |
 | `services:` | All services merge; duplicate names fail compilation. |
 | `github-app:` | Main takes precedence; otherwise the first imported value is used. |

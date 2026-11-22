@@ -37,7 +37,7 @@ var (
 	engineStepBearerPattern      = regexp.MustCompile(`(?i)\b(bearer)\s+[A-Za-z0-9._~+/=-]{8,}`)
 	// evalsArtifactNamePattern matches constants.EvalsArtifactName with an optional
 	// workflow_call artifact prefix computed by compute_artifact_prefix.sh.
-	evalsArtifactNamePattern = regexp.MustCompile(`^(?:[0-9a-f]{8}-)?evals$`)
+	evalsArtifactNamePattern = regexp.MustCompile(`^(?:[0-9a-f]{8}-|call-[1-9][0-9]*-)?evals$`)
 )
 
 // EvalsSummary summarizes the BinEval answers and execution evidence of the evals job.

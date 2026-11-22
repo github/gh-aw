@@ -393,6 +393,35 @@ func TestConclusionCustomPrerequisitesPreserveReportingGates(t *testing.T) {
 	}
 }
 
+func TestStatusCommentUpdateAfterAgentFailure(t *testing.T) {
+	lock := compileWorkflowAndReadLock(t, `---
+on:
+  slash_command:
+    name: repro
+    events: [pull_request_comment]
+  status-comment: true
+permissions:
+  contents: read
+  pull-requests: read
+engine: copilot
+---
+
+# Repro
+
+Say hello.
+`)
+
+	failureStep := strings.Index(lock, "      - name: Handle agent failure\n")
+	require.NotEqual(t, -1, failureStep)
+	const updateStep = "      - name: Update reaction comment with completion status\n        id: conclusion\n"
+	updateIndex := strings.Index(lock, updateStep)
+	require.Greater(t, updateIndex, failureStep)
+	// The failure handler can fail on report_incomplete even when the agent job succeeded.
+	update := strings.SplitN(lock[updateIndex:], "\n      - name:", 2)[0]
+	assert.True(t, strings.HasPrefix(update, updateStep+"        if: always()\n"), "status update must run after a failed step")
+	assert.Contains(t, update, "GH_AW_AGENT_CONCLUSION: ${{ (needs.agent.result == 'success' && steps.handle_agent_failure.outcome == 'failure') && 'failure' || needs.agent.result }}")
+}
+
 func TestConclusionHandlerReceivesActivationResult(t *testing.T) {
 	compiler := NewCompiler()
 	data := &WorkflowData{
@@ -462,6 +491,7 @@ func TestConclusionJobIntegration(t *testing.T) {
 
 	// Convert job to YAML string for checking
 	jobYAML := strings.Join(job.Steps, "")
+	assert.Contains(t, jobYAML, "id: conclusion\n        if: always() && !(needs.add_comment.outputs.comment_id)\n")
 
 	// Check that environment variables reference activation outputs
 	if !strings.Contains(jobYAML, "needs.activation.outputs.comment_id") {
