@@ -279,19 +279,91 @@ def check_result(status, text, invariant=None):
     return {"generated": int(match[1]), "distinct": int(match[2])}
 
 
-def normalize_trace(raw):
-    if not isinstance(raw, dict) or not isinstance(raw.get("counterexample"), dict):
-        raise RuntimeError("Expected TLC counterexample object")
-    states = raw["counterexample"].get("state")
-    if not isinstance(states, list) or len(states) < 2:
+def normalize_trace(text):
+    """Parse the full state records printed by the pinned TLC 2.19."""
+    header = "Error: The behavior up to this point is:\n"
+    if header not in text:
+        raise RuntimeError("TLC did not print a counterexample")
+    trace_text = text.split(header, 1)[1]
+    matches = list(re.finditer(r"(?m)^State (\d+): <([^\n]+)>\n", trace_text))
+    if len(matches) < 2:
         raise RuntimeError("Counterexample has no transition")
-    normalized = []
-    for entry in states:
-        if (not isinstance(entry, list) or len(entry) != 2
-                or not isinstance(entry[1], dict) or "s" not in entry[1]):
+    states, actions = [], []
+    for i, match in enumerate(matches):
+        if int(match.group(1)) != i + 1:
+            raise RuntimeError("Unexpected TLC state numbering")
+        end = matches[i + 1].start() if i + 1 < len(matches) else len(trace_text)
+        body = trace_text[match.end():end]
+        if not body.startswith("s = "):
             raise RuntimeError("Unexpected TLC state encoding")
-        normalized.append({"index": entry[0], **entry[1]})
-    return {"states": normalized, "actions": raw["counterexample"].get("action", [])}
+        tokens = re.compile(r'\s*("(?:\\.|[^"\\])*"|-?\d+|'
+                            r'[A-Za-z_][A-Za-z_0-9]*|\|->|<<|>>|:>|@@|[\[\]{}(),])')
+        pos = 4
+
+        def token():
+            nonlocal pos
+            found = tokens.match(body, pos)
+            if not found:
+                raise RuntimeError("Unexpected TLC value encoding")
+            pos = found.end()
+            return found.group(1)
+
+        def peek():
+            found = tokens.match(body, pos)
+            if not found:
+                raise RuntimeError("Unexpected end of TLC value")
+            return found.group(1)
+
+        def value():
+            item = token()
+            if item.startswith('"'):
+                return json.loads(item)
+            if item in ("TRUE", "FALSE"):
+                return item == "TRUE"
+            if re.fullmatch(r"-?\d+", item):
+                return int(item)
+            if item == "(":
+                entries = []
+                while True:
+                    key = value()
+                    if token() != ":>":
+                        raise RuntimeError("Expected TLC function mapping")
+                    entries.append([key, value()])
+                    separator = token()
+                    if separator == ")":
+                        return entries
+                    if separator != "@@":
+                        raise RuntimeError("Expected TLC function separator")
+            if item in ("{", "<<", "["):
+                closing = {"{": "}", "<<": ">>", "[": "]"}[item]
+                values = {} if item == "[" else []
+                while peek() != closing:
+                    if values:
+                        if token() != ",":
+                            raise RuntimeError("Expected comma in TLC value")
+                    if item == "[":
+                        key = token()
+                        if not re.fullmatch(r"[A-Za-z_][A-Za-z_0-9]*", key) or key in values or token() != "|->":
+                            raise RuntimeError("Unexpected TLC record field")
+                        values[key] = value()
+                    else:
+                        values.append(value())
+                token()
+                return values
+            raise RuntimeError("Unexpected TLC value encoding")
+
+        state = value()
+        if not isinstance(state, dict) or not isinstance(state.get("lastEvent"), str):
+            raise RuntimeError("TLC state is missing lastEvent")
+        remaining = body[pos:]
+        if i + 1 < len(matches):
+            if remaining.strip():
+                raise RuntimeError("Unexpected text after TLC state")
+        elif not re.match(r"\s*\d+ states generated, \d+ distinct states found", remaining):
+            raise RuntimeError("Unexpected text after final TLC state")
+        states.append({"index": i + 1, "s": state})
+        actions.append(match.group(2))
+    return {"states": states, "actions": actions}
 
 
 def concretize(fault, invariant, destination, trace):
@@ -358,8 +430,6 @@ def run_case(java, jar, results, name, fault="none", profile="sparse",
         "-workers", "1", "-seed", "1", "-fp", "0",
         "-config", "model.cfg", "-metadir", "states",
     ]
-    if invariant:
-        command += ["-dumpTrace", "json", str(destination / "tlc-trace.json")]
     command += [f"{model}.tla"]
     (destination / "command.json").write_text(
         json.dumps({"cwd": str(destination), "argv": command}, indent=2) + "\n"
@@ -378,7 +448,7 @@ def run_case(java, jar, results, name, fault="none", profile="sparse",
     try:
         counts = check_result(result.returncode, text, invariant)
         if invariant:
-            trace = normalize_trace(json.loads((destination / "tlc-trace.json").read_text()))
+            trace = normalize_trace(text)
             (destination / "trace.json").write_text(json.dumps(trace, indent=2) + "\n")
             (destination / "events.txt").write_text(
                 "\n".join(state["s"]["lastEvent"] for state in trace["states"]) + "\n"

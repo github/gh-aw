@@ -811,7 +811,7 @@ cleanup failure. The additional runtime-checkout model exhausts both job kinds
 and verifies the controls and witnesses described above. The MCP compilation
 model adds its secure baseline, nineteen negative controls, and seven witnesses.
 
-Counterexamples include raw `tlc-trace.json`, normalized `trace.json`, and
+Counterexamples include the full textual trace in `TLC.log`, normalized `trace.json`, and
 `events.txt`. `CompiledWorkflow` negative controls also generate `source.md` and
 `counterexample.json`; runtime-checkout controls generate classification reports
 without inventing source-level exploits. Only `agent-write` directly changes a supported
