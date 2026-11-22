@@ -91,7 +91,7 @@ Test mcp-scripts HTTP mode
 				t.Error("Expected type field set to 'http' in MCP config")
 			}
 
-			if !strings.Contains(yamlStr, `"url": "http://host.docker.internal`) {
+			if !strings.Contains(yamlStr, `"url": "http://mcp-scripts.docker.internal:$GH_AW_MCP_SCRIPTS_PORT"`) {
 				t.Error("Expected HTTP URL in config")
 			}
 

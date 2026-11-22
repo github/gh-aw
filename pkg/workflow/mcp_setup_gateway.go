@@ -62,8 +62,18 @@ func generateMCPGatewaySetup(yaml *strings.Builder, tools map[string]any, mcpToo
 	stepEnvVars["DEBUG"] = mcpDebugEnv
 	customGatewayEnvNames := sanitizedGatewayEnvNames(gatewayConfig.Env)
 	writeMCPGatewayStepEnvWithCustomGatewayEnvNames(yaml, stepEnvVars, safeOutputsInputEnvVars, gatewayConfig.Env, customGatewayEnvNames, gatewayConfig.AgentID)
+	if isAWFNetworkIsolationEnabled(workflowData) && IsMCPScriptsEnabled(workflowData.MCPScripts) {
+		yaml.WriteString("          GH_AW_MCP_GATEWAY_SCRIPTS_BIND_HOST: ${{ steps.mcp-scripts-start.outputs.bind_host }}\n")
+	}
 	yaml.WriteString("        run: |\n")
 	yaml.WriteString("          set -eo pipefail\n")
+	if isAWFNetworkIsolationEnabled(workflowData) && IsMCPScriptsEnabled(workflowData.MCPScripts) {
+		// The listener validates IPv4; also guard the command-string argument boundary.
+		yaml.WriteString("          if [[ ! ${GH_AW_MCP_GATEWAY_SCRIPTS_BIND_HOST:-} =~ ^[0-9]{1,3}(\\.[0-9]{1,3}){3}$ ]]; then\n")
+		yaml.WriteString("            echo '::error::Missing or invalid MCP Scripts bind address.'\n")
+		yaml.WriteString("            exit 1\n")
+		yaml.WriteString("          fi\n")
+	}
 	yaml.WriteString("          mkdir -p \"${RUNNER_TEMP}/gh-aw/mcp-config\"\n")
 	yaml.WriteString("          if [ -n \"${GITHUB_EVENT_PATH:-}\" ] && [ -r \"${GITHUB_EVENT_PATH}\" ]; then\n")
 	yaml.WriteString("            GH_AW_SAFEOUTPUTS_EVENT_PATH=\"${RUNNER_TEMP}/gh-aw/safeoutputs/github_event.json\"\n")
@@ -492,13 +502,13 @@ func buildMCPGatewayContainerCommand(opts buildMCPGatewayContainerCommandOptions
 	}
 	if !isAWFNetworkIsolationEnabled(workflowData) {
 		containerCmd.WriteString(" --add-host host.docker.internal:127.0.0.1")
-	} else if shouldRewriteLocalhostToDocker(workflowData) {
-		// In bridge (network-isolation) mode the container's loopback differs from the
-		// host's, so host.docker.internal:127.0.0.1 would not resolve to the host.
-		// Use host-gateway (Docker 20.10+) instead so the gateway container can reach
-		// any host-side server (mcp-scripts HTTP server, custom HTTP MCP tools with
-		// localhost URLs) that is running directly on the runner host.
-		containerCmd.WriteString(" --add-host host.docker.internal:host-gateway")
+	} else {
+		if shouldRewriteLocalhostToDocker(workflowData) {
+			containerCmd.WriteString(" --add-host host.docker.internal:host-gateway")
+		}
+		if IsMCPScriptsEnabled(workflowData.MCPScripts) {
+			containerCmd.WriteString(" --add-host " + mcpScriptsBridgeHost + ":${GH_AW_MCP_GATEWAY_SCRIPTS_BIND_HOST}")
+		}
 	}
 	containerCmd.WriteString(" --user ${MCP_GATEWAY_UID}:${MCP_GATEWAY_GID}")
 	containerCmd.WriteString(" --group-add ${DOCKER_SOCK_GID}")

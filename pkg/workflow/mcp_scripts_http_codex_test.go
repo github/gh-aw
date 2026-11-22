@@ -83,8 +83,8 @@ Test mcp-scripts HTTP transport for Codex
 		t.Error("Expected HTTP transport in the gateway configuration")
 	}
 
-	// Should use HTTP transport (url + headers) with host.docker.internal
-	if !strings.Contains(yamlStr, `"url": "http://host.docker.internal:$GH_AW_MCP_SCRIPTS_PORT"`) {
+	// The bridged gateway reaches the listener over its dedicated alias.
+	if !strings.Contains(yamlStr, `"url": "http://mcp-scripts.docker.internal:$GH_AW_MCP_SCRIPTS_PORT"`) {
 		t.Error("Expected upstream MCP Scripts URL in the gateway configuration")
 	}
 

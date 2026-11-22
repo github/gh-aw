@@ -9,6 +9,32 @@ import (
 	"testing"
 )
 
+func TestRenderMCPScriptsGatewayURL(t *testing.T) {
+	tests := []struct {
+		name  string
+		agent AgentSandboxConfig
+		host  string
+	}{
+		{"disabled", AgentSandboxConfig{Disabled: true}, "127.0.0.1"},
+		{"host access", AgentSandboxConfig{Runtime: AgentRuntimeDockerSudoIptables}, "host.docker.internal"},
+		{"bridge", AgentSandboxConfig{Runtime: AgentRuntimeDocker}, "mcp-scripts.docker.internal"},
+	}
+	for _, tt := range tests {
+		data := &WorkflowData{SandboxConfig: &SandboxConfig{Agent: &tt.agent}}
+		for _, format := range []string{"json", "toml"} {
+			t.Run(tt.name+"/"+format, func(t *testing.T) {
+				var output strings.Builder
+				renderer := NewMCPConfigRenderer(MCPRendererOptions{Format: format, IsLast: true})
+				renderer.RenderMCPScriptsMCP(&output, &MCPScriptsConfig{}, data)
+				want := `"http://` + tt.host + `:$GH_AW_MCP_SCRIPTS_PORT"`
+				if !strings.Contains(output.String(), want) {
+					t.Errorf("expected MCP Scripts URL %s, got:\n%s", want, output.String())
+				}
+			})
+		}
+	}
+}
+
 func TestMCPScriptsPerToolEnvironmentBindings(t *testing.T) {
 	config := &MCPScriptsConfig{Tools: map[string]*MCPScriptToolConfig{
 		"alpha": {Name: "alpha", Script: "return process.env.API_KEY", Env: map[string]string{
@@ -32,6 +58,9 @@ func TestMCPScriptsPerToolEnvironmentBindings(t *testing.T) {
 		t.Fatal(err)
 	}
 	startup := strings.Split(setup.String(), "      - name: Start MCP Scripts HTTP Server\n")[1]
+	if !strings.Contains(startup, "GH_AW_MCP_SCRIPTS_BRIDGED_GATEWAY: 'false'") {
+		t.Fatal("MCP Scripts should use loopback with the host-network gateway")
+	}
 	for _, tool := range manifest.Tools {
 		for name, source := range tool.Env {
 			expected := config.Tools[tool.Name].Env[name]

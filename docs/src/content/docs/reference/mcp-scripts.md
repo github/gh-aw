@@ -5,7 +5,7 @@ sidebar:
   order: 750
 ---
 
-The [`mcp-scripts:`](/gh-aw/reference/glossary/#mcp-scripts) element allows you to define custom [MCP](/gh-aw/reference/glossary/#mcp-model-context-protocol) (Model Context Protocol) tools directly in your workflow [frontmatter](/gh-aw/reference/glossary/#frontmatter) using JavaScript, shell scripts, or Python. These tools are generated at runtime and run as an HTTP MCP server **on the GitHub Actions runner, outside the agent container**. The agent reaches the server via `host.docker.internal`, keeping tool execution isolated from the AI sandbox while still providing controlled secret access.
+The [`mcp-scripts:`](/gh-aw/reference/glossary/#mcp-scripts) element allows you to define custom [MCP](/gh-aw/reference/glossary/#mcp-model-context-protocol) (Model Context Protocol) tools directly in your workflow [frontmatter](/gh-aw/reference/glossary/#frontmatter) using JavaScript, shell scripts, or Python. These tools are generated at runtime and run as an HTTP MCP server **on the GitHub Actions runner, outside the agent container**. The agent reaches the server through the MCP gateway.
 
 The server rejects requests that include an `Origin` header. See [HTTP Transport Limits](#http-transport-limits) for authentication and method requirements.
 
@@ -316,6 +316,8 @@ Analyze provided text using the `analyze-text` tool and create a discussion with
 ## Security Considerations
 
 MCP Scripts tools run on the GitHub Actions **runner host** — outside the agent container — so they can access the runner's file system and environment but are isolated from the AI's own execution environment. Tools also provide secret isolation (only specified env vars are forwarded), process isolation (separate execution), and output sanitization (large outputs saved to files). Only predefined tools are available to agents.
+
+The MCP Scripts HTTP server listens on IPv4 loopback when the gateway uses host networking, or on the default Docker bridge's IPv4 address when the gateway uses bridged networking. In bridged mode, the gateway maps `mcp-scripts.docker.internal` to that same address independently of Docker's `host-gateway` setting. MCP requests still require the per-run API key.
 
 MCP script arguments are withheld from server logs, step summaries, and recent-tool-call diagnostics. Output payloads and error details are also withheld from server logs because they may echo arguments. Handlers receive the original inputs, and tool responses remain unchanged. Do not return secrets to the agent.
 

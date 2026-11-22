@@ -137,6 +137,7 @@ function createMCPServer(configPath, options = {}) {
 async function startHttpServer(configPath, options = {}) {
   const apiKey = requireHttpApiKey(options.apiKey ?? process.env.GH_AW_MCP_SCRIPTS_API_KEY, "GH_AW_MCP_SCRIPTS_API_KEY");
   const port = options.port ?? 3000;
+  const host = process.env.GH_AW_MCP_SCRIPTS_BIND_HOST;
   const stateless = options.stateless || false;
 
   const logger = createLogger("mcp-scripts-startup");
@@ -162,7 +163,7 @@ async function startHttpServer(configPath, options = {}) {
     const transport = new MCPHTTPTransport({
       sessionIdGenerator: stateless ? undefined : () => randomUUID(),
       enableJsonResponse: true,
-      enableDnsRebindingProtection: false, // Disable for local development
+      enableDnsRebindingProtection: false, // The shared HTTP runner rejects Origin and requires the gateway API key.
       redactLogMessage: redactMCPScriptLogMessage,
     });
     logger.debug(`HTTP transport created`);
@@ -175,6 +176,7 @@ async function startHttpServer(configPath, options = {}) {
     return await runHttpServer({
       transport,
       port,
+      host,
       apiKey,
       getHealthPayload: () => ({
         status: "ok",

@@ -168,7 +168,7 @@ describe("MCP gateway runner proxy environment", () => {
     const result = injectProxyEnvArgs(args, env);
 
     expect(result).toEqual(["run", "-e", "HTTP_PROXY", "-e", "NO_PROXY", "-e", "HTTP_PROXY=explicit-proxy", "-e", "NO_PROXY=explicit-no-proxy", "gateway:latest"]);
-    expect(env.NO_PROXY).toBe("localhost,127.0.0.1,host.docker.internal,awf-enclave-mcp");
+    expect(env.NO_PROXY).toBe("localhost,127.0.0.1,host.docker.internal,awf-enclave-mcp,mcp-scripts.docker.internal");
   });
 
   it("adds local MCP backend hosts to existing proxy exclusions and preserves Docker defaults when unset", () => {
@@ -176,7 +176,7 @@ describe("MCP gateway runner proxy environment", () => {
     const args = injectProxyEnvArgs(["run", "--rm", "gateway:latest"], env);
 
     expect(args).toEqual(["run", "-e", "HTTP_PROXY", "-e", "NO_PROXY", "--rm", "gateway:latest"]);
-    expect(env.NO_PROXY).toBe("localhost,127.0.0.1,host.docker.internal,awf-enclave-mcp");
+    expect(env.NO_PROXY).toBe("localhost,127.0.0.1,host.docker.internal,awf-enclave-mcp,mcp-scripts.docker.internal");
     expect(injectProxyEnvArgs(["run", "--rm", "gateway:latest"], {})).toEqual(["run", "--rm", "gateway:latest"]);
   });
 
@@ -185,7 +185,7 @@ describe("MCP gateway runner proxy environment", () => {
     const args = ["run", "--rm", "gateway:latest"];
     const result = injectProxyEnvArgs(args, env);
 
-    expect(env.NO_PROXY).toBe("host.docker.internal,awf-enclave-mcp");
+    expect(env.NO_PROXY).toBe("host.docker.internal,awf-enclave-mcp,mcp-scripts.docker.internal");
     expect(env.no_proxy).toBeUndefined();
     expect(result).toContain(name);
     expect(result).toContain("NO_PROXY");
@@ -197,7 +197,7 @@ describe("MCP gateway runner proxy environment", () => {
     const env = { HTTP_PROXY: "http://proxy.example:8080", no_proxy: "localhost,.example.com" };
     expect(injectProxyEnvArgs(["run", "gateway:latest"], env)).toEqual(["run", "-e", "HTTP_PROXY", "-e", "no_proxy", "gateway:latest"]);
     expect(env.NO_PROXY).toBeUndefined();
-    expect(env.no_proxy).toBe("localhost,.example.com,host.docker.internal,awf-enclave-mcp");
+    expect(env.no_proxy).toBe("localhost,.example.com,host.docker.internal,awf-enclave-mcp,mcp-scripts.docker.internal");
   });
 
   it("keeps explicit gateway exclusions after synthesized proxy-only exclusions", () => {
@@ -300,7 +300,7 @@ describe("MCP gateway CA launcher arguments", () => {
         "gateway:latest",
         "--config-stdin",
       ]);
-      expect(options.env.NO_PROXY).toBe(inheritedProxy ? "host.docker.internal,awf-enclave-mcp" : undefined);
+      expect(options.env.NO_PROXY).toBe(inheritedProxy ? "host.docker.internal,awf-enclave-mcp,mcp-scripts.docker.internal" : undefined);
       expect(launchedConfig.mcpServers.public).not.toHaveProperty("caCertFile");
       expect(core.setFailed).toHaveBeenCalledExactlyOnceWith('ERR_SYSTEM: Pre-agent failure in step "Start MCP Gateway" after 2 startup attempts: ERR_SYSTEM: Failed to start gateway container');
     } finally {

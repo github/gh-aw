@@ -13,6 +13,16 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestSafeOutputAuthorizationImplementationDigestCompatibility(t *testing.T) {
+	implementation := map[string]any{
+		"run": "echo ready",
+		"env": map[string]string{"TOKEN": "${{ secrets.EXAMPLE_TOKEN }}"},
+	}
+	digest, err := authorizationImplementationDigest(implementation)
+	require.NoError(t, err)
+	require.Equal(t, "51f249bc3a82d3c9f414fcae8c3cedde4e183978ed491fb8fa53e8e3c8ea4150", digest)
+}
+
 func TestSafeOutputAuthorizationSerializationFailsClosed(t *testing.T) {
 	config := authorizationTestConfig(t, map[string]any{
 		"create-issue": map[string]any{"authorization": authorizationTestAuthority("https://authority.example/a")},

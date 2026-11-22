@@ -1,9 +1,37 @@
 #!/usr/bin/env bash
-set +o histexpand
 
 # Start MCP Scripts HTTP Server
 # This script starts the mcp-scripts MCP server and waits for it to become ready
 
+select_mcp_scripts_bind_host() {
+  if [[ "${GH_AW_MCP_SCRIPTS_BRIDGED_GATEWAY:-false}" != "true" ]]; then
+    printf '%s\n' 127.0.0.1
+    return
+  fi
+
+  local bridge_addresses bind_host
+  if ! bridge_addresses=$(docker network inspect bridge --format '{{range .IPAM.Config}}{{println .Gateway}}{{end}}'); then
+    echo "::error::Cannot inspect the default Docker bridge for MCP Scripts." >&2
+    return 1
+  fi
+  bind_host=$(printf '%s\n' "$bridge_addresses" |
+    awk -F. 'NF == 4 && $0 != "0.0.0.0" {
+      for (i = 1; i <= 4; i++)
+        if ($i !~ /^(0|[1-9][0-9]?[0-9]?)$/ || $i > 255) next
+      print; exit
+    }')
+  if [[ -z "$bind_host" ]]; then
+    echo "::error::Cannot determine the IPv4 Docker bridge gateway for MCP Scripts." >&2
+    return 1
+  fi
+  printf '%s\n' "$bind_host"
+}
+
+if [[ "${BASH_SOURCE[0]}" != "$0" ]]; then
+  return
+fi
+
+set +o histexpand
 set -e
 
 umask 077
@@ -80,8 +108,12 @@ fi
 echo "Configuration files verified"
 echo "All ${#REQUIRED_DEPS[@]} required dependency files present"
 
+GH_AW_MCP_SCRIPTS_BIND_HOST=$(select_mcp_scripts_bind_host)
+export GH_AW_MCP_SCRIPTS_BIND_HOST
+
 # Log environment configuration
 echo "Server configuration:"
+echo "  Bind address: $GH_AW_MCP_SCRIPTS_BIND_HOST"
 echo "  Port: $GH_AW_MCP_SCRIPTS_PORT"
 echo "  Working directory: $(pwd)"
 
@@ -131,7 +163,7 @@ for i in {1..10}; do
   fi
   
   # Check if server is responding
-  if curl -s -f "http://localhost:$GH_AW_MCP_SCRIPTS_PORT/health" > /dev/null 2>&1; then
+  if curl -sf --noproxy '*' --connect-timeout 1 --max-time 2 "http://$GH_AW_MCP_SCRIPTS_BIND_HOST:$GH_AW_MCP_SCRIPTS_PORT/health" > /dev/null 2>&1; then
     echo "MCP Scripts server is ready (attempt $i/10)"
     
     # Print the startup log for debugging
@@ -160,4 +192,5 @@ done
 {
   echo "port=$GH_AW_MCP_SCRIPTS_PORT"
   echo "api_key=$GH_AW_MCP_SCRIPTS_API_KEY"
+  echo "bind_host=$GH_AW_MCP_SCRIPTS_BIND_HOST"
 } >> "$GITHUB_OUTPUT"

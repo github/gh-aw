@@ -263,7 +263,7 @@ safe-outputs:
 	require.NoError(t, NewCompiler().CompileWorkflow(path))
 	compiled, err := os.ReadFile(filepath.Join(dir, "conformance.lock.yml"))
 	require.NoError(t, err)
-	assert.Contains(t, string(compiled), `"url": "http://host.docker.internal:\${GH_AW_MCP_ENV_GH_AW_MCP_SCRIPTS_PORT}"`)
+	assert.Contains(t, string(compiled), `"url": "http://mcp-scripts.docker.internal:\${GH_AW_MCP_ENV_GH_AW_MCP_SCRIPTS_PORT}"`)
 	assert.Contains(t, string(compiled), `GH_AW_MCP_SCRIPTS_PORT: ${{ steps.mcp-scripts-start.outputs.port }}`)
 }
 

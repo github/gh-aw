@@ -208,17 +208,7 @@ func (r *MCPConfigRendererUnified) renderMCPScriptsTOML(yaml *strings.Builder, m
 	yaml.WriteString("          [mcp_servers." + constants.MCPScriptsMCPServerID.String() + "]\n")
 	yaml.WriteString("          type = \"http\"\n")
 
-	// Determine host based on whether agent is disabled
-	host := "host.docker.internal"
-	if workflowData != nil && workflowData.SandboxConfig != nil && workflowData.SandboxConfig.Agent != nil && workflowData.SandboxConfig.Agent.Disabled {
-		// When agent is disabled (no firewall), use localhost instead of host.docker.internal
-		host = "localhost"
-		mcpRendererLog.Print("Using localhost for mcp-scripts (agent disabled)")
-	} else {
-		mcpRendererLog.Print("Using host.docker.internal for mcp-scripts (agent enabled)")
-	}
-
-	yaml.WriteString("          url = \"http://" + host + ":$GH_AW_MCP_SCRIPTS_PORT\"\n")
+	yaml.WriteString("          url = \"http://" + mcpScriptsGatewayHost(workflowData) + ":$GH_AW_MCP_SCRIPTS_PORT\"\n")
 	yaml.WriteString("          headers = { Authorization = \"$GH_AW_MCP_SCRIPTS_API_KEY\" }\n")
 	// Note: env_vars is not supported for HTTP transport in MCP configuration
 	// Environment variables are passed via the workflow job's env: section instead

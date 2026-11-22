@@ -421,7 +421,7 @@ const gatewayCredentialRedactions = [
   { pattern: /(Bearer\s+)\S+/gi, replacement: "$1[REDACTED]" },
   { pattern: /((?:agent[_-]?id|api[_-]?key|token|secret|password|authorization)"?\s*[:=]\s*"?)[^\s,}"]+/gi, replacement: "$1[REDACTED]" },
 ];
-const gatewayInternalProxyHosts = ["host.docker.internal", "awf-enclave-mcp"];
+const gatewayInternalProxyHosts = ["host.docker.internal", "awf-enclave-mcp", "mcp-scripts.docker.internal"];
 
 /**
  * Redacts common credential formats from gateway diagnostics output.

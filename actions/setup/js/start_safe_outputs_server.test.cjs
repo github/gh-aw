@@ -22,9 +22,9 @@ describe("start_safe_outputs_server.sh", () => {
   });
 
   it.each([
-    ["start_safe_outputs_server.sh", "GH_AW_SAFE_OUTPUTS"],
-    ["start_mcp_scripts_server.sh", "GH_AW_MCP_SCRIPTS"],
-  ])("%s forwards the exact API key without shell quoting", (script, prefix) => {
+    ["start_safe_outputs_server.sh", "GH_AW_SAFE_OUTPUTS", ""],
+    ["start_mcp_scripts_server.sh", "GH_AW_MCP_SCRIPTS", "bind_host=172.17.0.1\n"],
+  ])("%s forwards the exact API key without shell quoting", (script, prefix, extraOutputs) => {
     const content = fs.readFileSync(path.join(__dirname, "../sh", script), "utf8");
     const outputBlock = content.match(/\{\n  echo "port=[\s\S]*?\} >> "\$GITHUB_OUTPUT"/);
     assert.ok(outputBlock, "Client configuration output block should exist");
@@ -33,11 +33,11 @@ describe("start_safe_outputs_server.sh", () => {
     const outputPath = path.join(outputDir, "github-output");
     try {
       const result = spawnSync("bash", ["-c", outputBlock[0]], {
-        env: { ...process.env, [`${prefix}_PORT`]: "3000", [`${prefix}_API_KEY`]: apiKey, GITHUB_OUTPUT: outputPath },
+        env: { ...process.env, [`${prefix}_PORT`]: "3000", [`${prefix}_API_KEY`]: apiKey, GH_AW_MCP_SCRIPTS_BIND_HOST: "172.17.0.1", GITHUB_OUTPUT: outputPath },
         encoding: "utf8",
       });
       assert.strictEqual(result.status, 0, result.stderr);
-      assert.strictEqual(fs.readFileSync(outputPath, "utf8"), `port=3000\napi_key=${apiKey}\n`);
+      assert.strictEqual(fs.readFileSync(outputPath, "utf8"), `port=3000\napi_key=${apiKey}\n${extraOutputs}`);
     } finally {
       fs.rmSync(outputDir, { recursive: true, force: true });
     }

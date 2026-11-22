@@ -2,6 +2,7 @@
 import { afterEach, describe, it, expect, vi } from "vitest";
 import http from "http";
 import net from "net";
+import { once } from "node:events";
 import { runHttpServer, MAX_REQUEST_BODY_BYTES, REQUEST_BODY_TIMEOUT_MS } from "./mcp_http_server_runner.cjs";
 
 const API_KEY = "runner-test-api-key";
@@ -85,6 +86,23 @@ describe("mcp_http_server_runner.cjs - runHttpServer", () => {
       await new Promise(r => currentServer.close(r));
       currentServer = null;
     }
+  });
+
+  it("listens only on IPv4 loopback by default", async () => {
+    currentServer = await runHttpServer({
+      transport: makeMockTransport(),
+      port: 0,
+      getHealthPayload: () => ({}),
+      logger: makeMockLogger(),
+      serverLabel: "Test",
+      apiKey: API_KEY,
+    });
+    if (!currentServer.listening) await once(currentServer, "listening");
+    expect(currentServer.address()).toMatchObject({ address: "127.0.0.1", family: "IPv4" });
+  });
+
+  it.each(["", "0.0.0.0", "::", "localhost"])("refuses an unspecified or non-IPv4 bind address (%s)", async host => {
+    await expect(runHttpServer({ transport: makeMockTransport(), port: 0, host, getHealthPayload: () => ({}), logger: makeMockLogger(), serverLabel: "Test", apiKey: API_KEY })).rejects.toThrow("requires a specific IPv4 bind address");
   });
 
   it("does not advertise browser access on an authenticated MCP response", async () => {
