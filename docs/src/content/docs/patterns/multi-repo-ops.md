@@ -40,12 +40,23 @@ tools:
 
 # Weekly Repository Health Check
 
-Analyze my-org/main-repo and create issues for stale PRs (>30 days), failed CI runs on main, and open security advisories.
+Analyze my-org/main-repo and create issues for stale PRs (>30 days) and failed CI runs on main.
 ```
 
 Using [Slash commands](/gh-aw/reference/command-triggers/) from a side repo require a bridge: a thin relay workflow in the main repo listens for the command and forwards it via `workflow_dispatch` to the side repo. See [Triage from Side Repo](/gh-aw/gallery/multi-repo/triage-from-side-repo/) for a complete walkthrough.
 
 Authentication details and step-by-step setup are covered in the [Triage from Side Repo](/gh-aw/gallery/multi-repo/triage-from-side-repo/) and [Code Quality Monitoring](/gh-aw/gallery/multi-repo/code-quality-monitoring/) examples, and in the [Authentication reference](/gh-aw/reference/auth/).
+
+### Preparing an advisory fix
+
+Use a dedicated private side repository to prepare and test a fix for an unpublished advisory. GitHub does not run Actions or PR status checks in [temporary private advisory forks](https://docs.github.com/en/code-security/security-advisories/collaborating-in-a-temporary-private-fork-to-resolve-a-security-vulnerability).
+
+1. Restrict access to the side repository, including its run logs and artifacts, to people authorized to see the advisory. Use manual dispatch from trusted workflow code. Do not use a public issue or slash-command relay for confidential work.
+2. Use a [target-only checkout](#target-only-checkout) pinned to the upstream commit you intend to patch. A shallow checkout limits history; a sparse checkout limits files in the working tree. Include the build and test dependencies in the checkout configuration so the agent does not need to fetch them later. Use read-only checkout credentials and keep advisory fork credentials out of Actions. Review the compiled jobs and exclude any maintenance or safe-output jobs that can write to the upstream repository.
+3. Review the fix and test results privately. Keep any patch artifact in the private side repository, use short retention, and check who can download it. Secret redaction does not remove all advisory details.
+4. Apply the reviewed patch to the intended base in the advisory's temporary private fork, push a new branch using your maintainer credentials, and open the PR from the advisory in GitHub. If the base has moved, rebase and retest the fix before handing it off.
+
+The generic PR transfer command is not an advisory handoff command: it can create a normal fork and open a PR. Likewise, the [security advisory safe outputs](/gh-aw/reference/safe-outputs/#security-advisory-drafts-create-security-advisory) target the workflow repository, not the upstream repository or its temporary private fork.
 
 ## CentralRepoOps
 
