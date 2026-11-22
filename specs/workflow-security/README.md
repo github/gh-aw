@@ -847,8 +847,9 @@ repository-write agent permissions, checkout credentials without immediately
 following fail-closed cleanup and verification,
 cross-run artifact downloads, missing strict detector gates, unpinned external
 actions, wrong dependency credentials, excessive app scopes, or disabled token
-revocation. Its `daily` profile omits seed-specific token/app assertions while
-still requiring detection. The `compiled` profile reads an independent
+revocation. Docker actions require a full SHA-256 image digest; other external
+actions require a full commit SHA. Its `daily` profile omits seed-specific
+token/app assertions while still requiring detection. The `compiled` profile reads an independent
 `gh-aw-manifest.threat_detection` declaration emitted by the compiler. Missing
 or unknown policy is an error; absent jobs cannot establish an opt-out. Reports
 include the effective policy so a disabled detector is never presented as

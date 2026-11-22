@@ -63,6 +63,36 @@ func TestCompiledProfileMutations(t *testing.T) {
 	}
 }
 
+func TestDockerActionPinning(t *testing.T) {
+	digest := strings.Repeat("a", 64)
+	for _, tc := range []struct {
+		name, uses string
+		pinned     bool
+	}{
+		{"digest", "docker://ghcr.io/example/image:v1@sha256:" + digest, true},
+		{"digest without tag", "docker://ghcr.io/example/image@sha256:" + digest, true},
+		{"tag", "docker://ghcr.io/example/image:v1", false},
+		{"short digest", "docker://ghcr.io/example/image@sha256:" + digest[:63], false},
+		{"nonhex digest", "docker://ghcr.io/example/image@sha256:" + strings.Repeat("g", 64), false},
+		{"git sha", "docker://ghcr.io/example/image@" + strings.Repeat("a", 40), false},
+		{"expression", "docker://${{ inputs.image }}@sha256:" + digest, false},
+		{"not docker", "ghcr.io/example/image@sha256:" + digest, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			data := strings.Replace(minimalLock,
+				"actions/upload-artifact@0000000000000000000000000000000000000000", tc.uses, 1)
+			var doc document
+			if err := yaml.Unmarshal([]byte(data), &doc); err != nil {
+				t.Fatal(err)
+			}
+			got := strings.Join(verify(doc, "daily"), "\n")
+			if strings.Contains(got, "TrustedConfiguration") == tc.pinned {
+				t.Fatalf("pinned=%t, violations: %s", tc.pinned, got)
+			}
+		})
+	}
+}
+
 func TestSeedCredentialMutations(t *testing.T) {
 	const base = `
 jobs:
