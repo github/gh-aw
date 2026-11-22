@@ -379,10 +379,10 @@ describe("copilot_sdk_driver MCP registration", () => {
         preloadPath,
         `const fs = require("node:fs");
 const Module = require("node:module");
-const sdkPath = ${JSON.stringify(require.resolve("@github/copilot-sdk"))};
+const sdkPath = ${JSON.stringify(require.resolve("@microsoft/copilot-sdk"))};
 const sdk = new Module(sdkPath);
 sdk.exports = {
-  RuntimeConnection: { forUri: () => ({}) },
+  RuntimeConnection: { forTcp: () => ({}) },
   CopilotClient: class {
     async start() {}
     async stop() {}
@@ -428,7 +428,7 @@ require.cache[sdkPath] = sdk;`
       expect(result.error).toBeUndefined();
       if (state === "unchanged") {
         expect(result.status, result.stderr).toBe(0);
-        expect(JSON.parse(readFileSync(capturedPath, "utf8")).mcpServers).toEqual(mcpServers);
+        expect(JSON.parse(readFileSync(capturedPath, "utf8")).mcp.servers).toEqual(mcpServers);
       } else {
         expect(result.status, result.stderr).toBe(1);
         expect(result.stderr).toContain("Copilot SDK MCP configuration integrity check failed");
@@ -462,8 +462,8 @@ describe("buildCopilotSDKSessionToolConfig", () => {
     for (const forbiddenTool of ["builtin:bash", "builtin:read_bash", "builtin:stop_bash", "builtin:list_bash", "builtin:apply_patch"]) {
       expect(config.availableTools.toArray()).not.toContain(forbiddenTool);
     }
-    expect(config.tools).toHaveLength(1);
-    expect(config.tools[0]).toMatchObject({
+    expect(config.definitions).toHaveLength(1);
+    expect(config.definitions[0]).toMatchObject({
       name: "web_fetch",
       overridesBuiltInTool: true,
       defer: "never",
@@ -515,8 +515,8 @@ describe("buildCopilotSDKSessionToolConfig", () => {
     expect(config.availableTools.toArray()).not.toContain("builtin:dynamic_workflows_manage");
   });
 
-  it("preserves legacy SDK behavior only when the compiler contract is absent", () => {
-    expect(buildCopilotSDKSessionToolConfig(null, {})).toEqual({});
+  it.each([null, undefined])("uses an explicit empty catalog when the compiler contract is %s", missingConfig => {
+    expect(buildCopilotSDKSessionToolConfig(missingConfig, {})).toEqual({ availableTools: [], definitions: [] });
   });
 
   it("fails closed when required SDK filtering APIs are missing", () => {
@@ -582,16 +582,16 @@ describe("runWithCopilotSDK compiler-owned catalog", () => {
       sdkModule: {
         ...fakeSDKTools,
         CopilotClient: FakeCopilotClient,
-        RuntimeConnection: { forUri: vi.fn(() => ({})) },
+        RuntimeConnection: { forTcp: vi.fn(() => ({})) },
         approveAll: () => ({ kind: "approve-once" }),
       },
     });
     expect(result.exitCode).toBe(0);
     const sessionConfig = createSession.mock.calls[0][0];
-    expect(sessionConfig.availableTools.toArray().includes("builtin:run_dynamic_workflow")).toBe(enabled);
-    expect(sessionConfig.availableTools.toArray().includes("builtin:dynamic_workflows_manage")).toBe(enabled);
-    expect(sessionConfig.onPermissionRequest({ kind: "workflow", name: "review", operation: "run" }).kind).toBe(enabled ? "approve-once" : "reject");
-    expect(sessionConfig.onPermissionRequest({ kind: "shell", fullCommandText: "git status" }).kind).toBe("reject");
+    expect(sessionConfig.tools.availableTools.toArray().includes("builtin:run_dynamic_workflow")).toBe(enabled);
+    expect(sessionConfig.tools.availableTools.toArray().includes("builtin:dynamic_workflows_manage")).toBe(enabled);
+    expect(sessionConfig.permissions.onRequest({ kind: "workflow", name: "review", operation: "run" }).kind).toBe(enabled ? "approve-once" : "reject");
+    expect(sessionConfig.permissions.onRequest({ kind: "shell", fullCommandText: "git status" }).kind).toBe("reject");
   });
 
   it("passes one filtered catalog to the parent session for inherited subagent enforcement", async () => {
@@ -610,7 +610,7 @@ describe("runWithCopilotSDK compiler-owned catalog", () => {
     const sdkModule = {
       ...fakeSDKTools,
       CopilotClient: FakeCopilotClient,
-      RuntimeConnection: { forUri: vi.fn(() => ({})) },
+      RuntimeConnection: { forTcp: vi.fn(() => ({})) },
       approveAll: () => ({ kind: "approve-once" }),
     };
 
@@ -630,15 +630,15 @@ describe("runWithCopilotSDK compiler-owned catalog", () => {
     expect(result.exitCode).toBe(0);
     const sessionConfig = createSession.mock.calls[0][0];
     for (const forbiddenTool of ["builtin:bash", "builtin:read_bash", "builtin:stop_bash", "builtin:list_bash", "builtin:apply_patch"]) {
-      expect(sessionConfig.availableTools.toArray()).not.toContain(forbiddenTool);
+      expect(sessionConfig.tools.availableTools.toArray()).not.toContain(forbiddenTool);
     }
-    expect(sessionConfig.tools.map(tool => tool.name)).toEqual(["web_fetch"]);
-    expect(sessionConfig.mcpServers).toEqual({
+    expect(sessionConfig.tools.definitions.map(tool => tool.name)).toEqual(["web_fetch"]);
+    expect(sessionConfig.mcp.servers).toEqual({
       safeoutputs: { type: "http", url: "http://awmg-mcpg:8080/mcp/safeoutputs", tools: ["noop", "report_incomplete"] },
       mcpscripts: { type: "http", url: "http://awmg-mcpg:8080/mcp/mcpscripts", tools: ["concurrency-audit-state"] },
     });
-    expect(sessionConfig.onPermissionRequest({ kind: "mcp", serverName: "safeoutputs", toolName: "noop" }).kind).toBe("approve-once");
-    expect(sessionConfig.onPermissionRequest({ kind: "mcp", serverName: "unconfigured", toolName: "write" }).kind).toBe("reject");
+    expect(sessionConfig.permissions.onRequest({ kind: "mcp", serverName: "safeoutputs", toolName: "noop" }).kind).toBe("approve-once");
+    expect(sessionConfig.permissions.onRequest({ kind: "mcp", serverName: "unconfigured", toolName: "write" }).kind).toBe("reject");
   });
 
   it("enforces one shared pre-tool budget across the parent and subagent hooks", async () => {
@@ -651,7 +651,7 @@ describe("runWithCopilotSDK compiler-owned catalog", () => {
         onEvent = handler;
       },
       sendAndWait: vi.fn().mockImplementation(async () => {
-        const hook = sessionConfig.hooks.onPreToolUse;
+        const hook = sessionConfig.hooks.handlers.onPreToolUse;
         expect(hook({ toolName: "bash", sessionId: "session-tool-budget", toolArgs: {} }, { sessionId: "session-tool-budget" })).toBeUndefined();
         const denied = hook({ toolName: "mcp", sessionId: "subagent-session", toolArgs: {} }, { sessionId: "session-tool-budget" });
         expect(denied.permissionDecision).toBe("deny");
@@ -677,7 +677,7 @@ describe("runWithCopilotSDK compiler-owned catalog", () => {
     const sdkModule = {
       ...fakeSDKTools,
       CopilotClient: FakeCopilotClient,
-      RuntimeConnection: { forUri: vi.fn(() => ({})) },
+      RuntimeConnection: { forTcp: vi.fn(() => ({})) },
       approveAll: () => ({ kind: "approve-once" }),
     };
 
@@ -721,11 +721,11 @@ describe("runWithCopilotSDK compiler-owned catalog", () => {
         onEvent = handler;
       },
       sendAndWait: vi.fn().mockImplementation(async () => {
-        const onPreToolUse = sessionConfig.hooks.onPreToolUse;
+        const onPreToolUse = sessionConfig.hooks.handlers.onPreToolUse;
         expect(onPreToolUse({ toolName: "web_fetch", sessionId: "root", toolArgs: {} }, { sessionId: "root" })).toBeUndefined();
-        await expect(sessionConfig.tools[0].handler({ url: "https://example.com" })).rejects.toThrow("fetch failed");
+        await expect(sessionConfig.tools.definitions[0].handler({ url: "https://example.com" })).rejects.toThrow("fetch failed");
         expect(onPreToolUse({ toolName: "bash", sessionId: "root", toolArgs: {} }, { sessionId: "root" })).toBeUndefined();
-        expect(sessionConfig.onPermissionRequest({ kind: "shell", fullCommandText: "git status" })).toMatchObject({ kind: "reject" });
+        expect(sessionConfig.permissions.onRequest({ kind: "shell", fullCommandText: "git status" })).toMatchObject({ kind: "reject" });
         onEvent({ type: "assistant.message", ephemeral: false, timestamp: new Date().toISOString(), data: { content: "done" } });
         return { data: { content: "done" } };
       }),
@@ -748,7 +748,7 @@ describe("runWithCopilotSDK compiler-owned catalog", () => {
         permissionConfig: validToolConfig().permissions,
         toolConfig: { ...validToolConfig(), maxToolCalls: 2 },
         webFetchOptions: { fetchImpl: vi.fn().mockRejectedValue(new Error("fetch failed")) },
-        sdkModule: { ...fakeSDKTools, CopilotClient: FakeCopilotClient, RuntimeConnection: { forUri: vi.fn(() => ({})) }, approveAll: () => ({ kind: "approve-once" }) },
+        sdkModule: { ...fakeSDKTools, CopilotClient: FakeCopilotClient, RuntimeConnection: { forTcp: vi.fn(() => ({})) }, approveAll: () => ({ kind: "approve-once" }) },
       });
 
       expect(result.exitCode).toBe(0);

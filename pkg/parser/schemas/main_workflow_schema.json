@@ -16135,7 +16135,7 @@
                     "version": {
                       "type": "string",
                       "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$",
-                      "description": "Exact stable version of @github/copilot-sdk, independent of engine.version."
+                      "description": "Exact stable version of @microsoft/copilot-sdk, independent of engine.version."
                     },
                     "sha256": {
                       "type": "string",

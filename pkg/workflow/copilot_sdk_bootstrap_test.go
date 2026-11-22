@@ -159,13 +159,13 @@ func TestCopilotSDKNodeBootstrapIsolatedFromRepository(t *testing.T) {
 			config := &EngineConfig{ID: "copilot", CopilotSDK: true}
 			probe := `const assert = require("node:assert/strict");
 const path = require("node:path");
-for (const name of ["@github/copilot-sdk", "undici"]) {
+for (const name of ["@microsoft/copilot-sdk", "undici"]) {
   assert.equal(require(name).bootstrapFixture, true);
   assert.ok(require.resolve(name).startsWith(path.join(process.env.RUNNER_TEMP, "gh-aw", "engine-cli", "copilot-sdk", "node_modules") + path.sep));
 }
 assert.equal(require("./relative.cjs"), "relative helper");
 assert.ok(process.env.NODE_PATH.endsWith(path.join(process.env.HOME, "existing-modules")));
-Promise.all(["@github/copilot-sdk", "undici"].map(name => import(name))).then(async modules => {
+Promise.all(["@microsoft/copilot-sdk", "undici"].map(name => import(name))).then(async modules => {
   for (const module of modules) {
     assert.equal(module.default.bootstrapFixture, true);
     assert.equal(module.esmFixture, true);
@@ -178,7 +178,7 @@ Promise.all(["@github/copilot-sdk", "undici"].map(name => import(name))).then(as
 				config.Driver = "driver.mjs"
 				probePath = filepath.Join(workspace, config.Driver)
 				probe = `import { createRequire } from "node:module";
-import sdk from "@github/copilot-sdk";
+import sdk from "@microsoft/copilot-sdk";
 import relative from "./relative.cjs";
 const require = createRequire(import.meta.url);
 if (!sdk.bootstrapFixture || relative !== "relative helper") throw new Error("ESM resolution failed");

@@ -5425,14 +5425,14 @@ describe("Copilot sub-agent model resolution (recorded /reflect from run 3930457
       workingDirectory: base,
       agentsBaseDir: base,
       bare: true,
-      sdkModule: { CopilotClient: FakeCopilotClient, RuntimeConnection: { forUri: () => ({}) }, approveAll: () => "allow" },
+      sdkModule: { CopilotClient: FakeCopilotClient, RuntimeConnection: { forTcp: () => ({}) }, approveAll: () => "allow" },
     });
     expect(result.exitCode).toBe(0);
     const session = createSession.mock.calls[0][0];
     expect(session.model).toBe(providerConfig.model);
-    expect(session.customAgents.find(agent => agent.name === "haiku-small").model).toBe(expected);
-    expect(session.customAgents.find(agent => agent.name === "haiku-small").model).not.toBe(session.model);
-    expect(session.customAgents.find(agent => agent.name === "helper").model).toBe(session.model);
+    expect(session.agents.definitions.find(agent => agent.name === "haiku-small").model).toBe(expected);
+    expect(session.agents.definitions.find(agent => agent.name === "haiku-small").model).not.toBe(session.model);
+    expect(session.agents.definitions.find(agent => agent.name === "helper").model).toBe(session.model);
   });
 
   const vscodePinnedAgent = "---\nname: planner\ndescription: Plans work\nmodel: GPT-5.4 (copilot)\n---\nPlan the work.\n";
@@ -5473,9 +5473,14 @@ describe("Copilot sub-agent model resolution (recorded /reflect from run 3930457
 
     const { runWithCopilotSDK } = require("../../../scripts/markdown_metadata_test_adapter.cjs").withCompilerFixtures(require("./copilot_sdk_session.cjs"));
     const base = tempDir("copilot-subagent-sdk-repository-");
+    const activation = path.join(base, "activation");
+    const stagedAgents = path.join(activation, "base/copilot-agents");
+    fs.mkdirSync(stagedAgents, { recursive: true });
+    fs.writeFileSync(path.join(stagedAgents, "planner.agent.md"), vscodePinnedAgent);
+    fs.writeFileSync(path.join(stagedAgents, "haiku-small.agent.md"), "---\nmodel: small\n---\nWho are you?");
     fs.mkdirSync(path.join(base, ".github/agents"), { recursive: true });
-    fs.writeFileSync(path.join(base, ".github/agents/planner.agent.md"), vscodePinnedAgent);
-    fs.writeFileSync(path.join(base, ".github/agents/haiku-small.agent.md"), "---\nmodel: small\n---\nWho are you?");
+    fs.writeFileSync(path.join(base, ".github/agents/planner.agent.md"), "Checkout version.");
+    fs.writeFileSync(path.join(base, ".github/agents/checkout-only.agent.md"), "Checkout only.");
     vi.stubEnv("GH_AW_SESSION_STATE_BASE_DIR", base);
     vi.stubEnv("COPILOT_MODEL", "");
     vi.stubEnv("GH_AW_MODEL_FALLBACK", "");
@@ -5494,14 +5499,16 @@ describe("Copilot sub-agent model resolution (recorded /reflect from run 3930457
       prompt: "test",
       logger: message => logs.push(message),
       workingDirectory: base,
-      agentsBaseDir: base,
+      agentsBaseDir: activation,
       bare: true,
-      sdkModule: { CopilotClient: FakeCopilotClient, RuntimeConnection: { forUri: () => ({}) }, approveAll: () => "allow" },
+      sdkModule: { CopilotClient: FakeCopilotClient, RuntimeConnection: { forTcp: () => ({}) }, approveAll: () => "allow" },
     });
     expect(result.exitCode).toBe(0);
     const session = createSession.mock.calls[0][0];
-    expect(session.customAgents.find(agent => agent.name === "planner").model).toBe(session.model);
-    expect(session.customAgents.find(agent => agent.name === "haiku-small").model).toBe(qualifyModelForMultiProvider("claude-haiku-5.5", providerConfig));
+    expect(session.agents.definitions.map(agent => agent.name)).toEqual(["haiku-small", "planner"]);
+    expect(session.agents.definitions.find(agent => agent.name === "planner").prompt).toBe("Plan the work.");
+    expect(session.agents.definitions.find(agent => agent.name === "planner").model).toBe(session.model);
+    expect(session.agents.definitions.find(agent => agent.name === "haiku-small").model).toBe(qualifyModelForMultiProvider("claude-haiku-5.5", providerConfig));
     expect(logs).toContainEqual(expect.stringMatching(/warning: custom agent "planner" model "GPT-5\.4 \(copilot\)".*using session model/));
   });
 
@@ -5635,6 +5642,9 @@ Module._load = function(request, ...args) {
     if (engineCwd !== workspace) initGitRepo(engineCwd);
     const ostmp = path.join(dir, "ostmp");
     fs.mkdirSync(path.join(ostmp, "gh-aw", ".github/agents"), { recursive: true });
+    const stagedAgents = path.join(ostmp, "gh-aw", "base/copilot-agents");
+    fs.mkdirSync(stagedAgents, { recursive: true });
+    for (const [name, content] of Object.entries(agents)) fs.writeFileSync(path.join(stagedAgents, name), content);
     for (const [name, content] of Object.entries(inlineAgents)) {
       fs.writeFileSync(path.join(ostmp, "gh-aw", ".github/agents", name), content);
       fs.writeFileSync(path.join(workspace, ".github/agents", name), content);
@@ -5690,6 +5700,7 @@ process.stdout.write("done\\n");`
       ...harnessChildEnv,
       GH_AW_TMP_DIR: dir,
       TMPDIR: ostmp,
+      GITHUB_ACTIONS: "false",
       GITHUB_WORKSPACE: workspace,
       ...(noop ? { GH_AW_SAFE_OUTPUTS: safeOutputsPath } : {}),
       COPILOT_HOME: path.join(dir, "copilot-home"),

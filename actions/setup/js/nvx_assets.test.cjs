@@ -43,9 +43,17 @@ describe.skipIf(process.platform === "darwin" || (process.platform === "linux" &
   afterEach(() => fs.rmSync(temp, { recursive: true, force: true }));
 
   it("exports only runtime assets and selected inputs", () => {
+    fs.mkdirSync(path.join(state, "base/copilot-agents"), { recursive: true });
+    fs.writeFileSync(path.join(state, "base/copilot-agents/reader.agent.md"), "Staged repository agent.");
+    fs.writeFileSync(path.join(state, "base/snapshot.tar"), "Not needed by the guest.");
+    fs.mkdirSync(path.join(state, ".github/agents"), { recursive: true });
+    fs.writeFileSync(path.join(state, ".github/agents/inline.agent.md"), "Staged workflow agent.");
     stage(environment, state);
     const root = path.join(workspace, ".gh-aw-nvx");
     expect(fs.readFileSync(path.join(root, "state", "aw-prompts", "prompt.txt"), "utf8")).toBe("fixture prompt");
+    expect(fs.readFileSync(path.join(root, "state/base/copilot-agents/reader.agent.md"), "utf8")).toBe("Staged repository agent.");
+    expect(fs.readFileSync(path.join(root, "state/.github/agents/inline.agent.md"), "utf8")).toBe("Staged workflow agent.");
+    expect(fs.existsSync(path.join(root, "state/base/snapshot.tar"))).toBe(false);
     expect(fs.existsSync(path.join(root, "gh-aw", "bin", "node"))).toBe(true);
     expect(fs.existsSync(path.join(root, "gh-aw", "provider-token"))).toBe(false);
     expect(fs.existsSync(path.join(root, "state", "gateway-secret"))).toBe(false);

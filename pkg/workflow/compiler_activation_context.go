@@ -183,7 +183,7 @@ func (c *Compiler) addActivationWorkflowCallResolutionSteps(ctx *activationJobBu
 	if isOTLPAttributesPresent(ctx.data) {
 		ctx.steps = append(ctx.steps, generateOTLPAttributesMaskStep())
 	}
-	if hasWorkflowCallTrigger(ctx.data.On) && !ctx.data.InlinedImports {
+	if needsActivationHostRepoCheckout(ctx.data) {
 		compilerActivationJobLog.Print("Adding resolve-host-repo step for workflow_call trigger")
 		ctx.steps = append(ctx.steps, c.generateResolveHostRepoStep(ctx.data))
 	}

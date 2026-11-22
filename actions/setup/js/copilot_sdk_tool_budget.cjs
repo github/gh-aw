@@ -20,7 +20,7 @@ function parseMaxToolCalls(value) {
  *
  * @param {number | string | undefined} configuredLimit
  * @param {(event: {toolName: string, sessionId: string, callCount: number, limit: number, exhausted: boolean}) => void} onDispatch
- * @returns {{onPreToolUse: NonNullable<import("@github/copilot-sdk").SessionHooks["onPreToolUse"]>, getCallCount: () => number} | undefined}
+ * @returns {{onPreToolUse: NonNullable<import("@microsoft/copilot-sdk").SessionHooks["onPreToolUse"]>, getCallCount: () => number} | undefined}
  */
 function buildCopilotSDKToolCallBudget(configuredLimit, onDispatch) {
   if (configuredLimit === undefined) return undefined;

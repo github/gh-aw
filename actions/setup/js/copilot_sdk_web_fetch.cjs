@@ -244,14 +244,14 @@ function executeCopilotSDKWebFetchToolHandler(input, options) {
 }
 
 /**
- * Create the compiler-controlled web_fetch tool. @github/copilot-sdk 1.0.11
+ * Create the compiler-controlled web_fetch tool. The Copilot SDK
  * explicitly supports replacing a same-name built-in through
  * overridesBuiltInTool. Assert that defineTool preserves the override contract
  * so future incompatible SDK changes fail during session initialization.
  *
- * @param {typeof import("@github/copilot-sdk").defineTool} defineTool
+ * @param {typeof import("@microsoft/copilot-sdk").defineTool} defineTool
  * @param {{fetchImpl?: typeof fetch, env?: NodeJS.ProcessEnv, timeoutMs?: number, maxRedirects?: number}} [options]
- * @returns {import("@github/copilot-sdk").Tool<any>}
+ * @returns {import("@microsoft/copilot-sdk").Tool<any>}
  */
 function createCopilotSDKWebFetchTool(defineTool, options = {}) {
   if (typeof defineTool !== "function") {
