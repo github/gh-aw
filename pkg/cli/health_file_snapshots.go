@@ -25,7 +25,7 @@ type healthLockSnapshot struct {
 }
 
 func useHealthFileSnapshots(collection *HealthCollection) bool {
-	return collection.localGit != nil || len(collection.workflows) > 1 || len(collection.fileSnapshots) > 0
+	return collection.pinnedBranchSHA != "" || collection.localGit != nil || len(collection.workflows) > 1 || len(collection.fileSnapshots) > 0
 }
 
 // A directory response supplies source and lock blob identities for every workflow.
@@ -37,8 +37,15 @@ func healthWorkflowFiles(ref string, collection *HealthCollection) healthFileSna
 		return snapshot
 	}
 	snapshotRef := ref
+	if ref == collection.scanBranch && collection.pinnedBranchSHA != "" {
+		snapshotRef = collection.pinnedBranchSHA
+	}
+	if snapshot, checked := collection.fileSnapshots[snapshotRef]; checked {
+		collection.fileSnapshots[ref] = snapshot
+		return snapshot
+	}
 	if collection.localGit != nil {
-		sha := ref
+		sha := snapshotRef
 		if !validHealthBlobSHA(sha) {
 			endpoint := path.Join(healthRepositoryEndpoint(collection.repoOverride), "git/ref/heads", url.PathEscape(ref))
 			out, err := healthAPI(collection, endpoint, "--jq", ".object.sha")
@@ -72,6 +79,9 @@ func healthWorkflowFiles(ref string, collection *HealthCollection) healthFileSna
 	snapshot := healthFileSnapshot{err: err}
 	if err == nil {
 		snapshot.files, snapshot.err = parseHealthWorkflowFiles(out)
+		if snapshot.err != nil {
+			delete(collection.fleetResponses, endpoint+"\x00--jq\x00"+`map({path,sha,type})`)
+		}
 	}
 	collection.fileSnapshots[ref] = snapshot
 	collection.fileSnapshots[snapshotRef] = snapshot
@@ -175,7 +185,7 @@ func readHealthLockContent(endpoint, blobSHA string, collection *HealthCollectio
 		healthLog.Printf("Local lock blob unavailable: %v; using GitHub API", err)
 	}
 	filter := `.content | @base64d | split("\n") | .[0]`
-	if blobSHA != "" {
+	if blobSHA != "" && collection.pinnedBranchSHA == "" {
 		filter = ".content | @base64d"
 	}
 	out, err := healthAPI(collection, endpoint, "--jq", filter)
