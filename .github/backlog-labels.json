@@ -1,0 +1,16 @@
+{
+  "Run alerts and incidents": "backlog:run-alerts",
+  "Recurring reports and experiments": "backlog:reports",
+  "Smoke-test artifacts": "backlog:smoke-tests",
+  "Safe outputs, Git and checkout": "backlog:safe-outputs-git",
+  "Engines, routing and authentication": "backlog:engines",
+  "Security, isolation and threat detection": "backlog:security",
+  "Dependencies and release pins": "backlog:dependencies",
+  "Compiler, workflow configuration and triggers": "backlog:compiler-workflows",
+  "Runners and tool integration": "backlog:runners-tools",
+  "Engineering quality, tests and refactors": "backlog:engineering-quality",
+  "AI credits and cost controls": "backlog:ai-credits",
+  "CLI, logs and telemetry": "backlog:cli-observability",
+  "Docs and discoverability": "backlog:docs",
+  "Work queues and memory": "backlog:queues-memory"
+}

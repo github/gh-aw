@@ -256,6 +256,7 @@ func resetDetectionEngineTaskSettings(config *EngineConfig) {
 	config.Cwd = ""
 	config.Concurrency = ""
 	config.CopilotSDK = false
+	config.CopilotSDKPin = nil
 	config.ModelRouting = nil
 }
 

@@ -15,24 +15,31 @@ var dependabotEnginesLog = logger.New("workflow:dependabot_engines")
 // extractEnginePackages is manifest-only: engine installations must not change the
 // general npx validation surface. Existing command dependencies retain precedence.
 func (c *Compiler) extractEnginePackages(data *WorkflowData, ecosystem string) []string {
+	var packages []string
+	c.forEachManifestEngine(data, func(engine *WorkflowData) {
+		packages = append(packages, c.extractMainEnginePackages(engine, ecosystem)...)
+	})
+	return packages
+}
+
+func (c *Compiler) forEachManifestEngine(data *WorkflowData, visit func(*WorkflowData)) {
 	if data == nil {
-		return nil
+		return
 	}
-	packages := c.extractMainEnginePackages(data, ecosystem)
+	visit(data)
 	if IsDetectionJobEnabled(data.SafeOutputs) && !data.SafeOutputs.ThreatDetection.EngineDisabled {
 		engineID := c.manifestDetectionEngineID(data)
-		dependabotEnginesLog.Printf("Including detection engine packages for manifest: ecosystem=%s engineID=%s", ecosystem, engineID)
+		dependabotEnginesLog.Printf("Including detection engine for manifest: engineID=%s", engineID)
 		if isFeatureEnabled(constants.GHAWDetectionFeatureFlag, data) {
-			packages = append(packages, c.extractMainEnginePackages(buildExternalDetectorWorkflowData(data, engineID), ecosystem)...)
+			visit(buildExternalDetectorWorkflowData(data, engineID))
 		} else {
 			config := resolveExternalDetectorEngineConfig(data, engineID)
 			resetDetectionEngineTaskSettings(config)
-			packages = append(packages, c.extractMainEnginePackages(&WorkflowData{
+			visit(&WorkflowData{
 				AI: engineID, EngineConfig: config,
-			}, ecosystem)...)
+			})
 		}
 	}
-	return packages
 }
 
 func (c *Compiler) manifestDetectionEngineID(data *WorkflowData) string {
@@ -50,10 +57,10 @@ func (c *Compiler) manifestDetectionEngineID(data *WorkflowData) string {
 	return resolver.getThreatDetectionEngineID(data)
 }
 
-func (c *Compiler) extractMainEnginePackages(data *WorkflowData, ecosystem string) []string {
+func (c *Compiler) resolveManifestEngine(data *WorkflowData) (string, *EngineDefinition) {
 	engineID := ResolveEngineID(data)
 	if engineID == "" {
-		return nil
+		return "", nil
 	}
 	def := data.engineDefinition
 	if def == nil {
@@ -66,6 +73,11 @@ func (c *Compiler) extractMainEnginePackages(data *WorkflowData, ecosystem strin
 		runtimeID = engine.GetID()
 	}
 	dependabotEnginesLog.Printf("Resolved manifest runtime for engine: engineID=%s runtimeID=%s", engineID, runtimeID)
+	return runtimeID, def
+}
+
+func (c *Compiler) extractMainEnginePackages(data *WorkflowData, ecosystem string) []string {
+	runtimeID, def := c.resolveManifestEngine(data)
 	var packages []string
 	if data.EngineConfig == nil || data.EngineConfig.Command == "" {
 		install := c.engineInstallationForManifest(def, runtimeID)
@@ -73,7 +85,8 @@ func (c *Compiler) extractMainEnginePackages(data *WorkflowData, ecosystem strin
 			packages = append(packages, pkg)
 		}
 	}
-	if runtimeID == "copilot" {
+	// The frozen npm projects are inventoried separately, not re-resolved here.
+	if runtimeID == "copilot" && ecosystem != "npm" {
 		packages = append(packages, extractCopilotSDKPackages(data, ecosystem)...)
 	}
 	return packages
@@ -135,34 +148,20 @@ func enginePackageForManifest(install *EngineInstallationDefinition, config *Eng
 func extractCopilotSDKPackages(data *WorkflowData, ecosystem string) []string {
 	// Reuse SDK installation selection (including inline/language drivers).
 	// engine.version controls the CLI, not the independently pinned SDK.
-	command := strings.Join(buildCopilotSDKInstallStep(data), "\n")
+	spec := selectCopilotSDKInstallSpec(data)
 	switch ecosystem {
-	case "npm":
-		var installCommands []string
-		for line := range strings.SplitSeq(command, "\n") {
-			if strings.Contains(line, "npm install ") {
-				installCommands = append(installCommands, line)
-			}
-		}
-		extractor := PackageExtractor{
-			CommandNames:        []string{"npm"},
-			RequiredSubcommands: []string{"install"},
-			FlagsWithValues:     []string{"--prefix"},
-			TrimSuffixes:        "&|;",
-		}
-		return extractor.ExtractPackages(strings.Join(installCommands, "\n"))
 	case "pip":
 		// The SDK command has a --target argument, which the general
 		// pip extractor does not distinguish from a package.
 		var packages []string
-		for token := range strings.FieldsSeq(command) {
+		for token := range strings.FieldsSeq(spec.command) {
 			if strings.HasPrefix(token, "github-copilot-sdk==") {
 				packages = append(packages, token)
 			}
 		}
 		return packages
 	case "go":
-		return extractGoFromCommands(command)
+		return extractGoFromCommands(spec.command)
 	}
 	return nil
 }

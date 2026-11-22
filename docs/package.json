@@ -56,7 +56,7 @@
     "p-queue": "9.3.3",
     "postcss": "$postcss",
     "qs": "6.16.1",
-    "zod": "4.6.5",
+    "zod": "4.6.7",
     "mermaid": {
       "katex": "^0.18.2"
     },

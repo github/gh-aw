@@ -552,7 +552,6 @@ Detects dangerous patterns in externally-sourced markdown files (e.g., from `gh 
 | `UnquoteYAMLKey` | `func(yamlStr, key string) string` | Removes unnecessary quotes from a YAML key |
 | `MarshalWithFieldOrder` | `func(map[string]any, []string) ([]byte, error)` | Marshals a map with priority-ordered fields |
 | `OrderMapFields` | `func(map[string]any, []string) yaml.MapSlice` | Returns an ordered map slice |
-| `CleanYAMLNullValues` | `func(string) string` | Removes null values from YAML output |
 | `ConvertStepToYAML` | `func(map[string]any) (string, error)` | Converts a step map to YAML text |
 
 ### Trigger Parsing

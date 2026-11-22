@@ -67,7 +67,7 @@ optional schema first; a cache hit guarantees no particular file. Do not import
 
 Prefer existing local PR diffs, decision outputs, run/job summaries, durations,
 and full-suite outcomes under the restored cache or workspace. Optional existing
-`logs`, `logs-cache`, or `ci-front-door` evidence directories may be inspected if
+`logs` or `ci-front-door` evidence directories may be inspected if
 present and readable. Read a summary/index before selected run records; use only
 paths contained in the evidence directory, never follow symlinks or paths from
 untrusted JSON outside it. Do not enumerate private raw MCP artifact storage.

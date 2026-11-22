@@ -3,6 +3,10 @@ set +o histexpand
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ "${RUNNER_ENVIRONMENT:-}" == "self-hosted" ]]; then
+  # shellcheck source=assert_docker_lease.sh
+  source "${SCRIPT_DIR}/assert_docker_lease.sh" "" || exit 1
+fi
 
 # Runs an AWF command and retries startup/configuration failures that occur
 # before the engine harness writes its first marker line.

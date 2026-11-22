@@ -21,6 +21,10 @@ set +o histexpand
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ "${RUNNER_ENVIRONMENT:-}" == "self-hosted" ]]; then
+  # shellcheck source=assert_docker_lease.sh
+  source "${SCRIPT_DIR}/assert_docker_lease.sh" awmg-cli-proxy
+fi
 
 # Do not inherit TMPDIR: it can point inside an uploaded artifact directory.
 if ! DIAGNOSTIC_DIR="$(mktemp -d /tmp/gh-aw-cli-proxy.XXXXXX 2>/dev/null)"; then
@@ -135,6 +139,7 @@ for proxy_var in HTTP_PROXY HTTPS_PROXY NO_PROXY http_proxy https_proxy no_proxy
 done
 
 docker run -d --name awmg-cli-proxy "${DOCKER_NETWORK_ARGS[@]}" \
+  --label "io.github.gh-aw.invocation=${GH_AW_DOCKER_OWNER:-}" \
   --user "$(id -u):$(id -g)" \
   -e GH_TOKEN \
   -e GH_HOST \

@@ -29,7 +29,7 @@ safe-outputs:
   allowed-github-references: []
   create-issue:
     title-prefix: "[github-docs-seo] "
-    labels: [documentation, automation]
+    labels: [documentation, automation, "backlog:docs"]
     close-older-issues: true
     expires: 7d
     max: 1

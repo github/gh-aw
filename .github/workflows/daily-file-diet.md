@@ -21,6 +21,7 @@ imports:
     - code-health
     - automated-analysis
     - cookie
+    - "backlog:engineering-quality"
     title-prefix: "[file-diet] "
 - shared/go-source-analysis.md
 - shared/safe-output-app.md

@@ -746,9 +746,8 @@ jobs:
       - name: Install AWF binary
         run: bash "${RUNNER_TEMP}/gh-aw/actions/install_awf_binary.sh" v0.29.17 --rootless
       - name: Install GitHub Copilot SDK (Node.js)
-        run: npm install --prefix "${RUNNER_TEMP}/gh-aw/engine-cli/copilot-sdk" --ignore-scripts --no-save @github/copilot-sdk@1.0.16 undici@6.28.0
-        env:
-          NPM_CONFIG_MIN_RELEASE_AGE: '3'
+        shell: bash
+        run: bash "${RUNNER_TEMP}/gh-aw/actions/install_copilot_sdk.sh" node c90e9653d2d50970ae1e10adc236cc22109b26cf7bd23e7d9735afd50b4c6ff8
       - name: Determine automatic lockdown mode for GitHub MCP Server
         id: determine-automatic-lockdown
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
@@ -1419,6 +1418,10 @@ jobs:
       - name: Write agent output placeholder if missing
         if: always()
         run: |
+          if [[ "${RUNNER_ENVIRONMENT:-}" == "self-hosted" ]] && ! "${GH_AW_NODE:-node}" "${RUNNER_TEMP}/gh-aw/actions/docker_lease.cjs" assert; then
+            echo "Skipping shared agent output finalization without a validated Docker lease."
+            exit 0
+          fi
           if [ ! -f /tmp/gh-aw/agent_output.json ]; then
             echo '{"items":[]}' > /tmp/gh-aw/agent_output.json
           fi

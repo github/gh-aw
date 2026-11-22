@@ -51,7 +51,10 @@ describe("work-queue deployment documentation", () => {
 
   it("separates published docs and specifications from bounded agent instructions", () => {
     for (const file of [deploymentPath, referencePath, specificationPath]) {
-      expect(readRepositoryFile(file)).toMatch(/^---\ntitle: [^\n]+\ndescription: [^\n]+\n/);
+      const frontmatter = readRepositoryFile(file).match(/^---\n([\s\S]*?)\n---/);
+      expect(frontmatter).not.toBeNull();
+      expect(frontmatter[1]).toMatch(/^title: [^\n]+$/m);
+      expect(frontmatter[1]).toMatch(/^description: [^\n]+$/m);
     }
     expect(fs.existsSync(path.join(repositoryRoot, "specs/work-queue/priority-and-fairness.md"))).toBe(false);
     expect(fs.existsSync(path.join(repositoryRoot, "specs/work-queue/transactions.tsp"))).toBe(true);

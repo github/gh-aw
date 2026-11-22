@@ -30,6 +30,7 @@ safe-outputs:
     exclude-lock-yml: true
     title-prefix: "[safeoutputs] "
     labels: [bug, safe-outputs, tool-improvement, automated-analysis, cookie]
+    fallback-labels: ["backlog:safe-outputs-git", bug, safe-outputs, tool-improvement, automated-analysis, cookie]
     max: 1
 
 timeout-minutes: 30

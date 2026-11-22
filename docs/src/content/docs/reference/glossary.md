@@ -998,6 +998,8 @@ A compact syntax for label-based triggers: `on: issue labeled bug` or `on: pull_
 
 An experimental frontmatter field that declares Language Server Protocol (LSP) servers for Copilot-engine workflows. At compile time, the compiler generates `~/.copilot/settings.json` with an `lspServers` block and injects install steps for known server ecosystems. When configured, Copilot gets semantic code-intelligence tools: symbol lookup, go-to-definition, find references, hover/type info, diagnostics, and rename/refactor — enabling symbol-aware navigation of large codebases.
 
+The built-in `typescript` entry installs TypeScript and its language server from a bundled npm lockfile. Omit `version` or specify the bundled server version (`6.1.0`).
+
 Only supported with `engine: copilot`; any other engine causes a compile-time error. Emits an experimental feature warning at compile time.
 
 ```aw wrap

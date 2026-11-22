@@ -35,7 +35,7 @@ safe-outputs:
   create-issue:
     expires: 2d
     title-prefix: "[spec-coverage] "
-    labels: [automation, documentation]
+    labels: [automation, documentation, "backlog:reports"]
     max: 1
     close-older-issues: true
     close-older-key: daily-spec-coverage-kiro

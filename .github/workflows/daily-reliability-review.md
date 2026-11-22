@@ -38,7 +38,7 @@ safe-outputs:
   create-issue:
     expires: 2d
     title-prefix: "[reliability] "
-    labels: [observability, automated-analysis]
+    labels: [observability, automated-analysis, "backlog:reports"]
     max: 1
     close-older-issues: true
 timeout-minutes: 30

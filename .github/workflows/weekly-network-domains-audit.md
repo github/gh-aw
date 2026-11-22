@@ -24,7 +24,7 @@ safe-outputs:
   create-issue:
     expires: 2d
     title-prefix: "[domains-audit] "
-    labels: [cookie, security]
+    labels: [cookie, security, "backlog:security"]
     close-older-issues: false
     max: 3
   noop:

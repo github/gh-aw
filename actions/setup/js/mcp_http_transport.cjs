@@ -16,7 +16,6 @@ moduleLogger.debug("Module is being loaded");
  * Features:
  * - HTTP request/response handling
  * - Session management (stateful and stateless modes)
- * - CORS support for development
  * - JSON-RPC 2.0 compatible
  *
  * References:
@@ -158,18 +157,6 @@ class MCPHTTPTransport {
    * @param {Object} [parsedBody] - Pre-parsed request body
    */
   async handleRequest(req, res, parsedBody) {
-    // Set CORS headers
-    res.setHeader("Access-Control-Allow-Origin", "*");
-    res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Accept, Mcp-Session-Id");
-
-    // Handle OPTIONS preflight
-    if (req.method === "OPTIONS") {
-      res.writeHead(200);
-      res.end();
-      return;
-    }
-
     // Only handle POST requests for MCP protocol
     if (req.method !== "POST") {
       res.writeHead(405, { "Content-Type": "application/json" });

@@ -43,7 +43,7 @@ type execCmdFunc func(ctx context.Context, args ...string) *exec.Cmd
 // The second return value is a reserved SDK extension slot and must be nil for now.
 
 // createMCPServer creates and configures the MCP server with all tools
-func createMCPServer(cmdPath string, actor string, validateActor bool, allowWriteTools bool, manifestCacheFile string, env []string) *mcp.Server {
+func createMCPServer(cmdPath string, actor string, validateActor bool, allowWriteTools bool, manifestCacheFile string, env []string, logsCache ...*mcpLogsReportCache) *mcp.Server {
 	// Helper function to execute command with proper path
 	execCmd := func(ctx context.Context, args ...string) *exec.Cmd {
 		var cmd *exec.Cmd
@@ -84,7 +84,7 @@ func createMCPServer(cmdPath string, actor string, validateActor bool, allowWrit
 
 	server.AddReceivingMiddleware(mcpWriteToolsMiddleware(allowWriteTools, actor, validateActor))
 
-	if err := registerMCPTools(server, execCmd, actor, validateActor, manifestCacheFile, allowWriteTools); err != nil {
+	if err := registerMCPTools(server, execCmd, actor, validateActor, manifestCacheFile, allowWriteTools, logsCache...); err != nil {
 		return server
 	}
 
@@ -95,7 +95,7 @@ func createMCPServer(cmdPath string, actor string, validateActor bool, allowWrit
 	return server
 }
 
-func registerMCPTools(server *mcp.Server, execCmd execCmdFunc, actor string, validateActor bool, manifestCacheFile string, allowWriteTools bool) error {
+func registerMCPTools(server *mcp.Server, execCmd execCmdFunc, actor string, validateActor bool, manifestCacheFile string, allowWriteTools bool, logsCache ...*mcpLogsReportCache) error {
 	// Register read-only tools
 	registerStatusTool(server)
 	registerHealthTool(server, execCmd)
@@ -105,7 +105,7 @@ func registerMCPTools(server *mcp.Server, execCmd execCmdFunc, actor string, val
 	}
 
 	// Register privileged tools (require write+ access)
-	if err := registerLogsTool(server, execCmd, actor, validateActor); err != nil {
+	if err := registerLogsTool(server, execCmd, actor, validateActor, logsCache...); err != nil {
 		return err
 	}
 

@@ -6,6 +6,7 @@
 #   - the max-agent field of the latest interval (the entry with "open": true) in
 #     .github/aw/compat.json
 #   - the DEFAULT_COPILOT_VERSION constant baked into actions/setup/sh/install_copilot_cli.sh
+# Refuses to update either file unless the default checksum matches the reviewed pin.
 #
 # Usage:
 #   sync-compat.sh [--check]
@@ -38,6 +39,19 @@ done
 COPILOT_VERSION=$(grep -E '^\s*const DefaultCopilotVersion' "$CONSTANTS_FILE" | sed -E 's/.*"([^"]+)".*/\1/')
 if [ -z "$COPILOT_VERSION" ]; then
   echo "Error: could not extract DefaultCopilotVersion from $CONSTANTS_FILE" >&2
+  exit 1
+fi
+
+# Never propagate a version unless its compiled checksum matches the reviewed pin.
+COPILOT_CHECKSUM=$(sed -nE 's/^const DefaultCopilotChecksumsSHA256 = "([0-9a-f]{64})"$/\1/p' "$CONSTANTS_FILE")
+# shellcheck source=actions/setup/sh/release_integrity.sh
+source "$REPO_ROOT/actions/setup/sh/release_integrity.sh"
+REVIEWED_CHECKSUM="$(release_artifact_sha256 github/copilot-cli "$COPILOT_VERSION" SHA256SUMS.txt)" || {
+  echo "Error: no reviewed checksum for Copilot version $COPILOT_VERSION" >&2
+  exit 1
+}
+if [ "$COPILOT_CHECKSUM" != "$REVIEWED_CHECKSUM" ]; then
+  echo "Error: Copilot version and checksum do not match the reviewed pin; run scripts/update-copilot-version.sh $COPILOT_VERSION" >&2
   exit 1
 fi
 
