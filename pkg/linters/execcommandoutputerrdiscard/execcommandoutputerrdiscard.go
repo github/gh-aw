@@ -231,7 +231,7 @@ func returnsNamedResultOnFailurePath(pass *analysis.Pass, body *ast.BlockStmt, f
 			return true
 		}
 		branch := errorFailureBranch(pass, ifStmt, errObject)
-		if branch == nil {
+		if branch == nil || objectReassignedBetween(pass, body, errObject, after, ifStmt.Cond.Pos()) {
 			return true
 		}
 		returned = failureBranchReturnsObject(pass, body, branch, resultObject, true, after)

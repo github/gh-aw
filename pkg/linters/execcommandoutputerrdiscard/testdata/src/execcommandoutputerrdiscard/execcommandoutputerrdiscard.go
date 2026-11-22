@@ -121,6 +121,16 @@ func returnedNamedCombinedOutputOnFailurePath() (output []byte, err error) {
 	return
 }
 
+func reassignedNamedCombinedOutputError() (output []byte, err error) {
+	cmd := exec.Command("test")
+	output, err = cmd.CombinedOutput() // want "exec.Cmd.CombinedOutput result"
+	err = errors.New("unrelated")
+	if err != nil {
+		return
+	}
+	return
+}
+
 func discardedExitErrorStderr() {
 	cmd := exec.Command("test")
 	output, err := cmd.Output() // want "exec.Cmd.Output error handling"
