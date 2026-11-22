@@ -1,8 +1,12 @@
 ---
+network:
+  allowed:
+    - mcp.sentry.dev
 mcp-servers:
   sentry:
-    command: "npx"
-    args: ["@sentry/mcp-server@0.49.0"]
+    url: "https://mcp.sentry.dev/mcp"
+    headers:
+      Authorization: "Sentry-Bearer ${{ secrets.SENTRY_ACCESS_TOKEN }}"
     allowed:
       - whoami
       - find_organizations
@@ -17,28 +21,15 @@ mcp-servers:
       - search_logs
       - search_issues
       - find_dsns
-      - search_docs # requires SENTRY_OPENAI_API_KEY
+      - search_docs
       - get_doc
-    env:
-      SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_ACCESS_TOKEN }}
-      SENTRY_HOST: ${{ env.SENTRY_HOST || 'sentry.io' }} # Optional - hostname only, not a full URL
-      OPENAI_API_KEY: ${{ secrets.SENTRY_OPENAI_API_KEY }} # Optional
 ---
 
-<!-- 
-
-https://github.com/getsentry/sentry-mcp 
-
-To utilize the stdio transport, you'll need to create an User Auth Token in Sentry with the necessary scopes. As of writing this is:
-
-```
-org:read
-project:read
-project:write
-team:read
-team:write
-event:write
-```
+<!--
+This import uses Sentry's hosted MCP for sentry.io. Provision
+SENTRY_ACCESS_TOKEN with a Sentry API token limited to the required reads.
+The Sentry-Bearer scheme forwards that token to Sentry without interactive OAuth.
+Self-hosted Sentry and local model-provider settings are not supported by this import.
 -->
 
 Use this Sentry MCP import for read-only reliability triage with evidence-first reporting.
