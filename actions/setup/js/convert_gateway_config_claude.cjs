@@ -23,7 +23,7 @@ require("./shim.cjs");
  */
 
 const path = require("path");
-const { normalizeGatewayEntry, runGatewayConversion } = require("./convert_gateway_config_shared.cjs");
+const { normalizeGatewayEntry, runGatewayConversion, addWebFetchMCPServer } = require("./convert_gateway_config_shared.cjs");
 
 const OUTPUT_PATH = path.join(process.env.RUNNER_TEMP || "/tmp", "gh-aw/mcp-config/mcp-servers.json");
 
@@ -48,7 +48,10 @@ function main() {
     engine: "Claude",
     outputPath: OUTPUT_PATH,
     transformServer: (_name, entry, urlPrefix) => transformClaudeEntry(entry, urlPrefix),
-    serialize: servers => JSON.stringify({ mcpServers: servers }, null, 2),
+    serialize: servers => {
+      addWebFetchMCPServer(servers, config => ({ ...config, type: "stdio" }));
+      return JSON.stringify({ mcpServers: servers }, null, 2);
+    },
   });
 }
 

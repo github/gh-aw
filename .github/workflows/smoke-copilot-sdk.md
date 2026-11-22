@@ -28,11 +28,16 @@ imports:
   - shared/smoke-test-brevity.md
   - shared/reporting.md
 max-tool-denials: 3
+network:
+  allowed: [defaults, github]
 tools:
   bash:
     - "*"
   edit:
+  web-fetch:
 evals:
+  - id: sandboxed_web_fetch
+    question: Did the web-fetch MCP server return GitHub homepage content without using the shell or a browser?
   - id: sdk_file_readback
     question: Does the output show readback of the run-specific Copilot SDK test file containing the phrase smoke test passed?
   - id: bash_calculation
@@ -82,6 +87,8 @@ post-steps:
 2. **Verify**: Read the file back with `cat` and confirm it contains the phrase "smoke test passed".
 
 3. **Bash calculation**: Run a bash command to compute `echo $((6 * 7))` and confirm the output is `42`.
+
+4. **Web fetch**: Use `web_fetch` from the `web-fetch` MCP server to fetch `https://github.com/` and confirm the response contains "GitHub". Do not use the shell or a browser for this check.
 
 ## Output
 

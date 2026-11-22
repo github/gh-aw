@@ -34,6 +34,10 @@ func collectMCPServersForManifest(data *WorkflowData) []GHAWManifestMCPServer {
 		}
 	}
 
+	if usesWebFetchMCP(data) {
+		add(webFetchMCPServer, []string{"web_fetch"})
+	}
+
 	// collectMCPTools intentionally excludes GitHub when gh-proxy is configured,
 	// because that mode exposes GitHub access through the gh CLI rather than MCP.
 	for _, toolName := range collectMCPTools(data) {
@@ -67,9 +71,6 @@ func collectMCPServersForManifest(data *WorkflowData) []GHAWManifestMCPServer {
 		}
 	}
 
-	if len(serversByName) == 0 {
-		return []GHAWManifestMCPServer{}
-	}
 	names := sliceutil.SortedKeys(serversByName)
 	servers := make([]GHAWManifestMCPServer, 0, len(names))
 	for _, name := range names {

@@ -11,6 +11,9 @@ func HasMCPServers(workflowData *WorkflowData) bool {
 	if workflowData == nil {
 		return false
 	}
+	if usesWebFetchMCP(workflowData) {
+		return true
+	}
 
 	if mcpDetectionLog.Enabled() {
 		mcpDetectionLog.Printf("Checking for MCP servers in workflow '%s': tools=%d", workflowData.Name, len(workflowData.Tools))

@@ -133,6 +133,7 @@ type EngineCapabilitiesDefinition struct {
 	ToolsAllowlist       bool `yaml:"tools-allowlist,omitempty"`
 	MaxTurns             bool `yaml:"max-turns,omitempty"`
 	WebSearch            bool `yaml:"web-search,omitempty"`
+	WebFetchFallback     bool `yaml:"web-fetch-fallback,omitempty"`
 	MaxContinuations     bool `yaml:"max-continuations,omitempty"`
 	NativeAgentFile      bool `yaml:"native-agent-file,omitempty"`
 	BareMode             bool `yaml:"bare-mode,omitempty"`
@@ -147,6 +148,7 @@ func (d EngineCapabilitiesDefinition) ToRuntimeCapabilities() EngineCapabilities
 		ToolsAllowlist:       d.ToolsAllowlist,
 		MaxTurns:             d.MaxTurns,
 		WebSearch:            d.WebSearch,
+		WebFetchFallback:     d.WebFetchFallback,
 		MaxContinuations:     d.MaxContinuations,
 		NativeAgentFile:      d.NativeAgentFile,
 		BareMode:             d.BareMode,

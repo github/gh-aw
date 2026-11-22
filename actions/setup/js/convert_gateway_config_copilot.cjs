@@ -28,7 +28,7 @@ require("./shim.cjs");
  */
 
 const path = require("path");
-const { rewriteUrl, normalizeGatewayEntry, runGatewayConversion } = require("./convert_gateway_config_shared.cjs");
+const { rewriteUrl, normalizeGatewayEntry, runGatewayConversion, addWebFetchMCPServer } = require("./convert_gateway_config_shared.cjs");
 const { publishCopilotSDKMCPConfig } = require("./copilot_sdk_mcp_config.cjs");
 const { resolveCopilotSDKMCPConfigPath } = require("./copilot_sdk_mcp_config_path.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
@@ -91,6 +91,7 @@ function main() {
     outputPath,
     transformServer: (_name, entry, urlPrefix) => transformCopilotEntry(entry, urlPrefix),
     serialize: servers => {
+      addWebFetchMCPServer(servers, config => ({ ...config, type: "stdio", tools: ["web_fetch"] }));
       const output = JSON.stringify({ mcpServers: servers }, null, 2);
       publishCopilotSDKMCPConfig(output);
       return output;

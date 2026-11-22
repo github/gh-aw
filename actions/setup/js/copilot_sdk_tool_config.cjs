@@ -228,6 +228,12 @@ function loadCopilotSDKMCPServers(config, configPath) {
   /** @type {Record<string, import("@github/copilot-sdk").MCPServerConfig>} */
   const servers = {};
   for (const [name, entry] of Object.entries(parsed.mcpServers)) {
+    if (name === "web-fetch" && isRecord(entry) && entry.type === "stdio" && config.permissions.allowedTools.includes(name)) {
+      // Reconstruct the sole permitted local server from the setup path, not from config arguments.
+      const { webFetchStdioConfig } = require("./convert_gateway_config_shared.cjs");
+      servers[name] = { type: "stdio", ...webFetchStdioConfig(), tools: ["web_fetch"] };
+      continue;
+    }
     if (!isRecord(entry) || (entry.type !== "http" && entry.type !== "sse") || typeof entry.url !== "string") {
       throw new Error("Copilot SDK MCP configuration servers must use the generated HTTP gateway configuration");
     }

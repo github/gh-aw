@@ -10,21 +10,6 @@ import (
 
 var copilotWebFetchCodemodLog = logger.New("cli:codemod_copilot_web_fetch")
 
-func getCopilotWebFetchRemovalCodemod() Codemod {
-	return Codemod{
-		ID:           "copilot-web-fetch-removal",
-		Name:         "Remove unsupported Copilot web-fetch tool",
-		Description:  "Removes tools.web-fetch when Copilot CLI runs in offline BYOK mode. Copilot SDK mode retains its proxy-aware custom fetch tool.",
-		IntroducedIn: "1.0.0",
-		Apply: func(content string, frontmatter map[string]any) (string, bool, error) {
-			return applyCopilotWebFetchRemoval(content, frontmatter, "")
-		},
-		ApplyWithContext: func(content string, frontmatter map[string]any, filePath string) (string, bool, error) {
-			return applyCopilotWebFetchRemoval(content, frontmatter, filePath)
-		},
-	}
-}
-
 func getCopilotWebSearchRemovalCodemod() Codemod {
 	return Codemod{
 		ID:           "copilot-web-search-removal",
@@ -38,10 +23,6 @@ func getCopilotWebSearchRemovalCodemod() Codemod {
 			return applyCopilotWebToolRemoval(content, frontmatter, filePath, "web-search")
 		},
 	}
-}
-
-func applyCopilotWebFetchRemoval(content string, frontmatter map[string]any, filePath string) (string, bool, error) {
-	return applyCopilotWebToolRemoval(content, frontmatter, filePath, "web-fetch")
 }
 
 func applyCopilotWebToolRemoval(content string, frontmatter map[string]any, filePath, tool string) (string, bool, error) {
@@ -76,7 +57,7 @@ func applyCopilotWebToolRemoval(content string, frontmatter map[string]any, file
 		}
 		_, engineConfig, _ = compiler.ExtractEngineConfig(frontmatter)
 	}
-	if engineConfig == nil || engineConfig.ID != "copilot" || (tool == "web-fetch" && engineConfig.CopilotSDK) {
+	if engineConfig == nil || engineConfig.ID != "copilot" {
 		return content, false, nil
 	}
 

@@ -122,6 +122,7 @@ type WorkflowData struct {
 	EngineConfig                   *EngineConfig // Extended engine configuration
 	durableExecutionPlan           *DurableExecutionPlan
 	engineDefinition               *EngineDefinition // Per-workflow metadata, retained across batch compiler registry resets
+	webFetchFallback               bool              // Resolved engine preference for MCP detection and manifest generation
 	AgentFile                      string            // Path to custom agent file (from imports)
 	AgentImportSpec                string            // Original import specification for agent file (e.g., "owner/repo/path@ref")
 	RepositoryImports              []string          // Repository-only imports (format: "owner/repo@ref") for .github folder merging
