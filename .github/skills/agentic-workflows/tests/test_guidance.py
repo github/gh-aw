@@ -43,6 +43,41 @@ def checklist(text):
 
 
 class GuidanceTests(unittest.TestCase):
+    def test_workflow_preferences_routes_survive_prefix_reads(self):
+        for name in (
+            "AGENTS.md",
+            ".github/aw/create-agentic-workflow.md",
+            ".github/aw/designer.md",
+            ".github/skills/agentic-workflows/SKILL.md",
+            "pkg/cli/data/agentic_workflows_skill.md",
+        ):
+            with self.subTest(guide=name):
+                prefix = (ROOT / name).read_bytes()[:7500].decode("utf-8")
+                self.assertIn(".github/aw/preferences.md", prefix)
+                self.assertIn("github-agentic-workflows.md#workflow-preferences", prefix)
+                self.assertIn("target repository", prefix)
+
+    def test_workflow_preferences_contract(self):
+        guide = (ROOT / ".github/aw/github-agentic-workflows.md").read_text()
+        section = normalized(guide.split("## Workflow Preferences\n", 1)[1]
+                             .split("<!-- instruction-prefix-end -->", 1)[0])
+        for required in (
+            "unstructured Markdown", "not YAML frontmatter or compiler configuration",
+            "If absent, retain existing defaults", "present but unreadable",
+            "Explicit task requirements and repository instructions take precedence",
+            "Preserve existing workflow choices", "never relax security",
+            "**Agentic engine:**", "**Issues to pull requests:**",
+            "**Background agents:**", "**Inference provider:**",
+            "assign-to-agent", "create-issue", "create-pull-request",
+            "allowed-files", "create-agent-session", "supported worker workflow",
+            "In-run sub-agents are distinct", "secret values",
+            "copilot-requests: write", "github.token",
+            "do not assume credentials are provisioned",
+            "neither launches agents nor authorizes execution",
+        ):
+            with self.subTest(required=required):
+                self.assertIn(required, section)
+
     def test_browser_decision_routes_survive_prefix_reads(self):
         route = "playwright.md#browser-decision-and-readiness"
         for name in (

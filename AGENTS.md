@@ -12,6 +12,10 @@ GitHub Agentic Workflows (`gh-aw`) is a GitHub CLI extension that compiles markd
 
 Load only `AGENTS.md` (rules/routing) and `SKILL.md` (capabilities) initially.
 Load task-specific guidance lazily through local skills.
+When generating workflows, read the target repository's optional
+`.github/aw/preferences.md` for engine, inference and delegation defaults.
+Follow [the preferences convention](.github/aw/github-agentic-workflows.md#workflow-preferences);
+explicit requirements, repository instructions and safety gates take precedence.
 
 ## Critical Rules (Always Applicable)
 

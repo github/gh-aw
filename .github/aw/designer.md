@@ -19,6 +19,12 @@ Before tool selection, apply the
 success criteria and repository scripts/tests. Infer browser needs without a
 mandatory extra interview question; include supporting lifecycle permissions.
 
+Before the interview, read the target repository's optional
+`.github/aw/preferences.md` using the
+[preferences convention](github-agentic-workflows.md#workflow-preferences).
+Reuse its engine, inference and delegation choices instead of asking answered
+questions; include applied preferences in the confirmation.
+
 Follow the [interview](#interview-framework), [decision mappings](#decision-heuristics),
 and [confirmation](#confirmation-format) before the [generation template](#generation-template).
 Apply the [validation checklist](#validation-checklist) and the
@@ -129,9 +135,10 @@ Map to:
 Ask **"Any AI engine preference?"** only when the request contains ambiguous
 engine-specific hints.
 
-Omit `engine:` and let the configured default apply unless there's an explicit
-preference or a requirement the default can't satisfy — then map to `engine:`,
-trying Copilot first.
+Honor the task's engine choice, then repository preferences. Omit `engine:` only
+when the configured default satisfies the selected preference and requirements;
+otherwise emit the selected engine. Try Copilot first only when neither source
+specifies a preference.
 
 ### Phase 7b: Skills, Plugins, LSP & Evals (optional)
 

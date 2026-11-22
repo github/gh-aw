@@ -21,9 +21,9 @@ defaults only when no guidance revision is supplied. Reuse already-loaded guides
 The intent index is `.github/aw/debug-scenarios.md`; load only the selected
 specialized route, not every debugging reference.
 
-Repository overlay (optional):
-- Load the target repository's `.github/aw/instructions.md`, if present, after the matched prompt/skill. Use `@.github/aw/instructions.md` only in a matching checkout; do not substitute a guidance-repository overlay.
-- Precedence: repository overlay instructions override upstream defaults when they conflict.
+Target repository context (never guidance-repository files):
+- Load the target repository's optional `.github/aw/instructions.md` after routing, only in a matching checkout; its rules override defaults.
+- Before generation, read optional `.github/aw/preferences.md`; follow `.github/aw/github-agentic-workflows.md#workflow-preferences`. Requirements and safety gates win; preserve existing choices.
 
 ## Load and route
 

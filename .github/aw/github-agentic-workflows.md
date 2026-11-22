@@ -8,6 +8,8 @@ applyTo: ".github/workflows/*.md,.github/workflows/**/*.md"
 Use for workflow authoring. Start with the [creator](create-agentic-workflow.md),
 [updater](update-agentic-workflow.md), or [debugger](debug-agentic-workflow.md).
 Load only the topic references required by the task.
+Use [syntax.md](syntax.md) for schema, [safe-outputs.md](safe-outputs.md) for
+mutations, and [squad.md](squad.md) for local SDLC issue preparation.
 
 ## Persona-to-Pattern Quick Matrix
 
@@ -81,6 +83,57 @@ Use `@.github/aw/instructions.md` as the canonical repository-local overlay for 
 - This file is optional and repository-owned.
 - Installed gh-aw agents should load and apply it automatically when present.
 - Precedence: apply upstream defaults first, then apply repository overlay rules; when they conflict, repository overlay rules win.
+
+## Workflow Preferences
+
+Before choosing workflow defaults, read the **target repository's**
+`.github/aw/preferences.md`, if present. This optional, repository-owned file is
+unstructured Markdown for agents, not YAML frontmatter or compiler configuration.
+Do not substitute the guidance repository's preferences or create the file with
+guessed preferences. If absent, retain existing defaults; if present but unreadable,
+report the path rather than claiming to have applied it.
+
+Use preferences for unspecified choices only. Explicit task requirements and
+repository instructions take precedence; preferences never relax security,
+authorization, supported syntax, or live-execution gates. Preserve existing
+workflow choices during updates unless the requested change concerns them.
+Ask only when ambiguous or incompatible preferences prevent a valid design.
+
+Preferences can describe:
+
+- **Agentic engine:** the preferred `engine:` and model. Emit an explicit engine
+  when needed to honor the preference instead of silently using the compiler
+  default. Validate compatibility with the requested tools.
+- **Issues to pull requests:** with Copilot coding agent, prefer
+  `assign-to-agent` for existing issues, or `create-issue` with `assignees: copilot`
+  for new work. Otherwise, let the workflow implement the change and publish it
+  through `create-pull-request`, with scoped `allowed-files`. A Copilot inference
+  preference alone does not require delegating implementation to coding agent.
+- **Background agents:** choose issue-backed delegation as above when an issue
+  should track work, or `create-agent-session` for a direct Copilot coding agent
+  session. For other engines, use a supported worker workflow pattern; never
+  assume Copilot session APIs accept arbitrary engines. In-run sub-agents are
+  distinct from independent background work.
+- **Inference provider:** distinguish the runtime engine from the model provider.
+  Record preferred models, provider/endpoint, and credential **names**, never
+  secret values. For Copilot inference, recommend
+  `permissions: { copilot-requests: write }`, using `${{ github.token }}` without
+  a PAT or `COPILOT_GITHUB_TOKEN`. For another provider, select supported
+  engine/model/provider settings and document required secret references or
+  OIDC setup and network hosts; do not assume credentials are provisioned.
+
+Load [engine syntax](syntax-engine.md), [inference permissions](syntax-core.md),
+[delegation outputs](safe-outputs-automation.md), [content outputs](safe-outputs-content.md),
+or [worker patterns](patterns.md) when implementing the corresponding preference.
+Keep the agent job read-only and route generated workflow mutations through safe
+outputs. Reading preferences neither launches agents nor authorizes execution.
+Summarize applied preferences and any conflicts or unavailable capabilities.
+
+For trigger choice, evaluations or linked PR references, load the corresponding
+[trigger](#trigger-selection), [evaluation](#ad-hoc-scenario-evaluation), or
+[PR reference](#pr-checks-with-linked-references) rules below before designing.
+
+<!-- instruction-prefix-end -->
 
 ## Trigger Selection
 

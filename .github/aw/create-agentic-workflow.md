@@ -26,9 +26,13 @@ do not infer its guidance. In a proposed workflow, use `report_incomplete` when
 required tools or data are unavailable and the task cannot be meaningfully
 performed; reserve `noop` for cases where available evidence supports no action.
 Load the target repository's optional `.github/aw/instructions.md` overlay.
+Read its optional `.github/aw/preferences.md` before choosing engine, inference
+provider, issue-to-PR or background-agent defaults; follow the
+[preferences convention](github-agentic-workflows.md#workflow-preferences).
 
 Before generation, follow the [design checklist](create-agentic-workflow-design.md)
 and [output/validation contract](create-agentic-workflow-validation.md).
+For ad hoc evaluation, load [evaluation examples](create-agentic-workflow-evaluation.md).
 Load only matching topic references:
 
 - Maintenance: [maintainer.md](maintainer.md); docs agents/checks: [documentation-workflows.md](documentation-workflows.md).
