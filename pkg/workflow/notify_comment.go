@@ -104,7 +104,7 @@ func (c *Compiler) buildConclusionJobSteps(data *WorkflowData, mainJobName strin
 	// Only add the conclusion update step if status comments are explicitly enabled
 	if data.StatusComment != nil && *data.StatusComment {
 		var token string
-		var stepCondition string
+		stepCondition := "always()"
 		if data.SafeOutputs != nil && data.SafeOutputs.AddComments != nil {
 			token = data.SafeOutputs.AddComments.GitHubToken
 		}

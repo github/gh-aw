@@ -587,7 +587,8 @@ func (c *Compiler) buildConclusionScriptEnvVars(data *WorkflowData, mainJobName 
 	if data.TrackerID != "" {
 		envVars = append(envVars, fmt.Sprintf("          GH_AW_TRACKER_ID: %q\n", data.TrackerID))
 	}
-	envVars = append(envVars, fmt.Sprintf("          GH_AW_AGENT_CONCLUSION: ${{ needs.%s.result }}\n", mainJobName))
+	// report_incomplete can fail the handler even when the agent job succeeded.
+	envVars = append(envVars, fmt.Sprintf("          GH_AW_AGENT_CONCLUSION: ${{ (needs.%[1]s.result == 'success' && steps.handle_agent_failure.outcome == 'failure') && 'failure' || needs.%[1]s.result }}\n", mainJobName))
 	envVars = append(envVars, buildEngineMetadataEnvVars(data.EngineConfig, data.Model, mainJobName)...)
 	envVars = append(envVars, fmt.Sprintf("          GH_AW_AIC: ${{ needs.%s.outputs.aic }}\n", mainJobName))
 	envVars = append(envVars, fmt.Sprintf("          GH_AW_AMBIENT_CONTEXT: ${{ needs.%s.outputs.ambient_context }}\n", mainJobName))

@@ -2758,6 +2758,7 @@ jobs:
             await main();
       - name: Update reaction comment with completion status
         id: conclusion
+        if: always()
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           GH_AW_AGENT_OUTPUT: ${{ steps.setup-agent-output-env.outputs.GH_AW_AGENT_OUTPUT }}
@@ -2765,7 +2766,7 @@ jobs:
           GH_AW_COMMENT_REPO: ${{ needs.activation.outputs.comment_repo }}
           GH_AW_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           GH_AW_WORKFLOW_NAME: "Smoke Claude"
-          GH_AW_AGENT_CONCLUSION: ${{ needs.agent.result }}
+          GH_AW_AGENT_CONCLUSION: ${{ (needs.agent.result == 'success' && steps.handle_agent_failure.outcome == 'failure') && 'failure' || needs.agent.result }}
           GH_AW_ENGINE_ID: "claude"
           GH_AW_ENGINE_MODEL: "claude-sonnet-4-6"
           GH_AW_AIC: ${{ needs.agent.outputs.aic }}
