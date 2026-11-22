@@ -6,7 +6,7 @@ This model describes the maintainer-driven handoff to a temporary private GitHub
 
 1. Run `gh aw advisory setup` once to create or reuse a personal private side repository without collaborators or pending invitations. Configure a trusted, manually dispatched workflow with an upstream-scoped read-only checkout credential.
 2. Prepare and test a remediation at an exact base commit. Keep the patch and test notes in the side repository's artifact. Record the exact successful first-attempt run and artifact IDs with `gh aw advisory record <GHSA-ID>`. Use `--create-fork` only if the advisory needs a temporary private fork.
-3. Run `gh aw advisory inspect <GHSA-ID> --print-patch` in a private terminal to review the untrusted patch and the destination. Without `--print-patch`, inspection shows only metadata and the digest. The digest identifies the handoff; it does not attest that the fix passed tests.
+3. Run `gh aw advisory inspect <GHSA-ID> --print-patch` in a private terminal and type `yes` to review the untrusted patch and the destination. The flag requires terminal stdin and stdout. Omit it for metadata and the digest in scripts or CI. The digest identifies the handoff; it does not attest that the fix passed tests.
 4. Run `gh aw advisory transfer <GHSA-ID> --approve <digest>`. Transfer verifies the handoff again and attempts to create only the destination branch. Open the PR from the advisory page. If transfer warns about base drift, check whether the branch already exists before rebasing and retesting.
 
 ## Model boundary
