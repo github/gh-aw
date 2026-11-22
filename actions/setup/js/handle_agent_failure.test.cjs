@@ -5978,7 +5978,6 @@ describe("handle_agent_failure", () => {
       delete process.env.GH_AW_ENGINE_ID;
       delete process.env.GH_AW_PLUGIN_DIAGNOSTICS_FILE;
       delete process.env.GH_AW_AGENT_OUTPUT;
-      fs.rmSync("/tmp/gh-aw/sandbox/agent/logs/plugin-diagnostics.log", { force: true });
       fs.rmSync(tmpDir, { recursive: true, force: true });
     });
 
@@ -6052,10 +6051,11 @@ describe("handle_agent_failure", () => {
     });
 
     it("reads the declared plugin diagnostics path when agent output is elsewhere", () => {
-      const diagnosticsPath = "/tmp/gh-aw/sandbox/agent/logs/plugin-diagnostics.log";
+      const diagnosticsPath = path.join(tmpDir, "sandbox", "agent", "logs", "plugin-diagnostics.log");
       fs.mkdirSync(path.dirname(diagnosticsPath), { recursive: true });
       fs.writeFileSync(diagnosticsPath, "Markdown files found: 0");
-      process.env.GH_AW_AGENT_OUTPUT = "/tmp/gh-aw/agent_output.json";
+      process.env.GH_AW_PLUGIN_DIAGNOSTICS_FILE = diagnosticsPath;
+      process.env.GH_AW_AGENT_OUTPUT = path.join(tmpDir, "output", "agent_output.json");
       const result = buildCopilotAgentNotFoundContext({ requestedAgent: "foo:bar", availableAgents: [] });
       expect(result).toContain("Plugin installation diagnostics");
       expect(result).toContain("Markdown files found: 0");
@@ -7585,6 +7585,7 @@ describe("handle_agent_failure", () => {
     let tmpDir;
     /** @type {string} */
     let promptsDir;
+    let failureCategories;
 
     function mockCancelledAgentMetadata(annotations = []) {
       global.github.paginate = vi
@@ -7629,9 +7630,21 @@ describe("handle_agent_failure", () => {
       process.env.GH_AW_AGENT_CONCLUSION = "failure";
       process.env.GH_AW_AGENT_OUTPUT = path.join(tmpDir, "agent_output.json");
       process.env.GH_AW_CHECKOUT_PR_SUCCESS = "true";
+      failureCategories = undefined;
+      const { FAILURE_CATEGORIES_PATH } = require("./handle_agent_failure.cjs");
+      const mkdir = fs.mkdirSync;
+      const write = fs.writeFileSync;
+      vi.spyOn(fs, "mkdirSync").mockImplementation((target, options) => {
+        if (target !== path.dirname(FAILURE_CATEGORIES_PATH)) return mkdir(target, options);
+      });
+      vi.spyOn(fs, "writeFileSync").mockImplementation((target, data, options) => {
+        if (target === FAILURE_CATEGORIES_PATH) failureCategories = JSON.parse(data);
+        else write(target, data, options);
+      });
     });
 
     afterEach(() => {
+      vi.restoreAllMocks();
       vi.unstubAllEnvs();
       delete process.env.RUNNER_TEMP;
       delete process.env.GH_AW_WORKFLOW_NAME;
@@ -7771,7 +7784,7 @@ describe("handle_agent_failure", () => {
 
       expect(create).toHaveBeenCalledOnce();
       expect(create.mock.calls[0][0].title).toBe("[aw] Test Workflow: failed before agent execution started");
-      const categories = JSON.parse(fs.readFileSync("/tmp/gh-aw/failure_categories.json", "utf8"));
+      const categories = failureCategories;
       expect(categories).toContain("agent_startup_failure");
       if (evidence === "job-timeout" || evidence === "engine-timeout") expect(categories).toContain("timed_out");
       if (evidence === "job-timeout") {
@@ -7814,7 +7827,7 @@ describe("handle_agent_failure", () => {
       expect(create).toHaveBeenCalledOnce();
       expect(create.mock.calls[0][0].title).toBe("[aw] Test Workflow: failed before agent execution started");
       expect(create.mock.calls[0][0].body).toContain("Failure classification: agent_startup_failure");
-      const categories = JSON.parse(fs.readFileSync("/tmp/gh-aw/failure_categories.json", "utf8"));
+      const categories = failureCategories;
       expect(categories).toContain("agent_startup_failure");
       expect(categories).toContain(signal === "GH_AW_MODEL_ENDPOINT_MISMATCH_ERROR" ? "model_endpoint_mismatch" : "model_not_supported_error");
     });
@@ -7879,7 +7892,7 @@ describe("handle_agent_failure", () => {
       expect(body).toContain("private-tool");
       expect(body).not.toContain("private cancellation diagnostics");
       expect(body).not.toContain(`Failure classification: ${reason}`);
-      const categories = JSON.parse(fs.readFileSync("/tmp/gh-aw/failure_categories.json", "utf8"));
+      const categories = failureCategories;
       expect(categories).toContain("missing_tool");
       expect(categories).not.toContain(reason);
       expect(categories).not.toContain("report_incomplete");
@@ -7958,7 +7971,7 @@ describe("handle_agent_failure", () => {
       const { main: mainFn } = require("./handle_agent_failure.cjs");
       await mainFn();
       expect(createIssueMock).toHaveBeenCalledWith(expect.objectContaining({ title: `[aw] Test Workflow: ${titleSuffix}` }));
-      const categories = JSON.parse(fs.readFileSync("/tmp/gh-aw/failure_categories.json", "utf8"));
+      const categories = failureCategories;
       expect(categories).toContain(reason);
       expect(categories).not.toContain("agent_failure");
       if (reason === "agent_startup_failure") {
@@ -8036,7 +8049,7 @@ describe("handle_agent_failure", () => {
       const { main: mainFn } = require("./handle_agent_failure.cjs");
       await mainFn();
       expect(createIssueMock).toHaveBeenCalledWith(expect.objectContaining({ title: "[aw] Test Workflow: reported incomplete result" }));
-      const categories = JSON.parse(fs.readFileSync("/tmp/gh-aw/failure_categories.json", "utf8"));
+      const categories = failureCategories;
       expect(categories).toContain("report_incomplete");
       expect(categories).not.toContain(reason);
     });
@@ -8374,10 +8387,12 @@ describe("handle_agent_failure", () => {
     beforeEach(() => {
       vi.resetModules();
       tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "rt-usage-test-"));
+      vi.stubEnv("GH_AW_TMP_DIR", tmpDir);
       ({ readTokenUsageMarkdown } = require("./handle_agent_failure.cjs"));
     });
 
     afterEach(() => {
+      vi.unstubAllEnvs();
       fs.rmSync(tmpDir, { recursive: true, force: true });
     });
 
@@ -8387,27 +8402,17 @@ describe("handle_agent_failure", () => {
     });
 
     it("returns markdown and model aliases when a valid token-usage.jsonl file is present", () => {
-      const { TOKEN_USAGE_PATH } = require("./parse_token_usage.cjs");
+      const { getTokenUsagePaths } = require("./parse_token_usage.cjs");
+      const TOKEN_USAGE_PATH = getTokenUsagePaths()[2];
       fs.mkdirSync(path.dirname(TOKEN_USAGE_PATH), { recursive: true });
       const entry = JSON.stringify({ model: "claude-sonnet-4.5", input_tokens: 1000, output_tokens: 500, cache_read_tokens: 0, cache_write_tokens: 0, duration_ms: 1000 });
-      const origContent = fs.existsSync(TOKEN_USAGE_PATH) ? fs.readFileSync(TOKEN_USAGE_PATH, "utf8") : null;
       fs.writeFileSync(TOKEN_USAGE_PATH, entry + "\n");
-      try {
-        vi.resetModules();
-        ({ readTokenUsageMarkdown } = require("./handle_agent_failure.cjs"));
-        const result = readTokenUsageMarkdown();
-        expect(result).not.toBeNull();
-        expect(result.markdown).toContain("sonnet45");
-        expect(result.markdown).toContain("1,000");
-        expect(result.markdown).toContain("Alias");
-        expect(result.modelNames).toEqual(["claude-sonnet-4.5"]);
-      } finally {
-        if (origContent !== null) {
-          fs.writeFileSync(TOKEN_USAGE_PATH, origContent);
-        } else if (fs.existsSync(TOKEN_USAGE_PATH)) {
-          fs.unlinkSync(TOKEN_USAGE_PATH);
-        }
-      }
+      const result = readTokenUsageMarkdown();
+      expect(result).not.toBeNull();
+      expect(result.markdown).toContain("sonnet45");
+      expect(result.markdown).toContain("1,000");
+      expect(result.markdown).toContain("Alias");
+      expect(result.modelNames).toEqual(["claude-sonnet-4.5"]);
     });
   });
 
