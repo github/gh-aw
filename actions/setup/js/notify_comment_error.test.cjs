@@ -209,6 +209,7 @@ const mockCore = {
             { type: "report_incomplete", reason: "Review did not finish.", details: "Unrequested details" },
             { type: "report_missing_tool", reason: "The build tool was unavailable." },
             { type: "report_missing_data", reason: "No input was provided." },
+            { type: "request_continuation", message: "Review the remaining files." },
             { type: "add_comment", body: "Unrelated safe output" },
           ];
           fs.writeFileSync(outputPath, JSON.stringify({ items }));
@@ -227,9 +228,10 @@ const mockCore = {
             await eval(`(async () => { ${notifyCommentScript}; await main(); })()`);
 
             const body = mockGithub.request.mock.calls.find(call => call[0] === "PATCH /repos/{owner}/{repo}/issues/comments/{comment_id}")[1].body;
-            for (const item of items.slice(0, 4)) {
+            for (const item of items.slice(0, -1)) {
               expect(body.includes(item.message || item.reason)).toBe(published);
             }
+            expect(body.includes("<summary>Continuation requested</summary>")).toBe(published);
             expect(body).not.toContain("Unrequested details");
             expect(body).not.toContain("Unrelated safe output");
           } finally {

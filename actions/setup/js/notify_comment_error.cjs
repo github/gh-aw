@@ -126,6 +126,10 @@ function appendAgentReports(children, items) {
         summary = "No-op message";
         text = item.message;
         break;
+      case "request_continuation":
+        summary = "Continuation requested";
+        text = item.message;
+        break;
       case "report_incomplete":
         summary = "Incomplete work";
         text = item.reason;

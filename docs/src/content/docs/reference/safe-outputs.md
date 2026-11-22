@@ -1467,7 +1467,7 @@ safe-outputs:
     max: 1
 ```
 
-The `request_continuation` tool accepts a required nonempty `message` describing the remaining work and relevant context. Its default limit is one request per run. Requests appear in workflow logs and step summaries, but are excluded from GitHub mutation manifests and activity notifications, like `noop`.
+The `request_continuation` tool accepts a required nonempty `message` describing the remaining work and relevant context. Its default limit is one request per run. Requests appear in workflow logs and step summaries, but are excluded from GitHub mutation manifests and activity notifications, like `noop`. If completion status comments are enabled, they include the message only when threat detection runs successfully and returns a clean verdict.
 
 A request does not dispatch another workflow, resume an engine session, or prove task completion. It is separate from Copilot's `engine.max-continuations` autopilot setting and artifact-backed durable sessions. Use `noop` when no work remains and `report_incomplete` for blocking failures.
 
