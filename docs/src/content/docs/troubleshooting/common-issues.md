@@ -406,7 +406,7 @@ The failed workflow run is at https://github.com/OWNER/REPO/actions/runs/RUN_ID
 
 For manual investigation, use `gh aw audit <run-id>` and `gh aw logs`, then inspect the generated `.lock.yml`. See the [Debugging Workflows](/gh-aw/troubleshooting/debugging/) guide for a full walkthrough.
 
-If the failure annotation names `report_incomplete`, the agent reported that it could not complete the task. The conclusion can fail even when the agent job succeeded. Check the conclusion job summary for the reported reason, when available, and inspect `agent_output.json` in the `agent` artifact. The annotation omits agent-provided reasons and details; summaries can also be suppressed if secret redaction fails. Use `gh aw audit <run-id>` to compare the report with runtime evidence.
+If the failure annotation names `report_incomplete`, the conclusion did not treat the task as complete, even if the agent job succeeded. The annotation distinguishes an explicit agent report from a collector classification (for example, `missing_terminal_safe_output`) without logging agent-provided reasons or details. Check the conclusion job summary for runtime evidence and, if detection approved it, the agent-declared reason. Treat that reason as a lead, not a confirmed cause. If the summary is unavailable or secret redaction suppressed it, check `agent_output.json` in the `agent` artifact, if available. Use `gh aw audit <run-id>` to compare the report with runtime evidence.
 
 ### Enable Debug Logging
 
