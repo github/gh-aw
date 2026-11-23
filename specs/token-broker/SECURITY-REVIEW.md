@@ -40,7 +40,7 @@ remove one baseline control and produce the expected breach. Reproduce with
 
 ## Residual risk
 
-- Runner attestation is maintained by the operator.
-- Approving a caller workflow approves every reusable workflow it is allowed to call.
-- Secrets outside the broker remain reachable from CI triggered by bot-authored pull requests.
-- The model is bounded and abstracts cryptography, policy contents, egress, and expiry.
+- Runner attestation is maintained by the operator (TM-13; SV-36).
+- Approving a caller workflow approves every reusable workflow it is allowed to call (TM-14; SV-16).
+- Secrets outside the broker remain reachable from CI triggered by bot-authored pull requests (TM-16; SV-16, SV-17).
+- **Model limitation, not a broker-spec residual risk:** the bounded model abstracts cryptography, policy contents, egress, and expiry.

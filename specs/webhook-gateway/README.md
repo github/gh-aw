@@ -8,11 +8,16 @@ The generated [threat model](threat-model.md) records TLC results, attack contro
 reachability witnesses, trust assumptions and residual risks.
 
 The receiver and admission server are external integration requirements, not
-services implemented here. Destination checks are implemented in
-[`actions/setup/js/`](../../actions/setup/js/), notably
-`check_gateway_provenance.cjs`, `check_gateway_admission.cjs`,
-`validate_webhook.cjs` and `webhook_context.cjs`. The model abstracts these checks
-as validity predicates; it does not prove that the implementation refines them.
+services implemented here. The four gateway JavaScript components map to these
+normative requirements and safeguards; the model abstracts the checks as
+validity predicates and does not prove implementation refinement.
+
+| Component | Norm | Safeguard |
+| --- | --- | --- |
+| [`check_gateway_provenance.cjs`](../../actions/setup/js/check_gateway_provenance.cjs) | [Mandatory destination gate](../../docs/src/content/docs/specs/webhook-gateway-specification.md#mandatory-destination-gate) | Binds the original event, sender, actor and destination to the centrally approved App identity. |
+| [`check_gateway_admission.cjs`](../../actions/setup/js/check_gateway_admission.cjs) | [Workflow-hash-bound admission](../../docs/src/content/docs/specs/webhook-gateway-specification.md#workflow-hash-bound-gettoken-admission) | Checks bounded OIDC claims and an exact closed approval response; signature and artifact verification remain server responsibilities. |
+| [`validate_webhook.cjs`](../../actions/setup/js/validate_webhook.cjs) | [Dispatch envelope](../../docs/src/content/docs/specs/webhook-gateway-specification.md#dispatch-envelope) | Enforces the versioned closed envelope, configured selectors and filters, and payload size limits. |
+| [`webhook_context.cjs`](../../actions/setup/js/webhook_context.cjs) | [Derived context and responsibility boundary](../../docs/src/content/docs/specs/webhook-gateway-specification.md#derived-context-and-responsibility-boundary) | Derives and deduplicates resources from inline deliveries and provides webhook-payload redaction. |
 
 ## Reproduce and regenerate
 
@@ -41,11 +46,13 @@ The JSON records exact commands, input/config/log hashes, Java identity and
 verdicts. Negative-control and witness state counts are explored prefixes,
 **not** exhausted state spaces.
 
-`WebhookGateway.cfg` enables all 18 invariants. The runner exhausts the secure
-model, checks 18 single-fault mutations against exact expected invariant
-failures, then checks six reachability witnesses with security invariants still
-enabled. Parse errors, timeouts, deadlocks, wrong invariant failures, missing
-traces, wrong tooling and incomplete baseline searches are failures.
+`WebhookGateway.cfg` enables all 18 invariants. The checked-in secure report
+records 81,295 generated states (23,620 distinct; zero queued), with all 18
+invariants satisfied. The runner also checks 18 single-fault mutations against
+exact expected invariant failures, then checks six reachability witnesses with
+security invariants still enabled. Parse errors, timeouts, deadlocks, wrong
+invariant failures, missing traces, wrong tooling and incomplete baseline
+searches are failures.
 
 ## Abstraction and ordering
 

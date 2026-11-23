@@ -1029,19 +1029,19 @@ All dispatcher, worker, recovery, and compaction pushes use `Publish`. It requir
 
 | Predicate | Guarantee |
 |---|---|
-| `TypeOK`, `ValidLog` | Valid identities/references; at most one terminal transaction per Work; Completion belongs to the trusted inbound Claim and the selected claimant. |
-| `SnapshotValidity`, `SnapshotVersions`, `ActivationSnapshotValidity`, `CandidateDerivation` | A matching writer snapshot contains the current source log and an exactly regenerated candidate; activation admission reflects its immutable artifact snapshot; no snapshot is based on a future version. |
-| `Serialization` | Every locally proposed dispatcher transaction is serialized identically for safe-output processing. |
-| `TerminalPersistence` | Previously committed Completion/WorkCancellation facts remain durable. |
-| `TerminalHistoryValid`, `TerminalFreeze` | All facts for a terminal Work item are frozen; neither late Claims nor other new transactions can change the decision. |
-| `SingleCompletionPerWorker`, `WorkerOneShot` | One fixed inbound Claim and at most one distinct Completion per worker; terminal worker phases never restart. |
-| `SingleEffectiveClaim` | At most one effective Claim per Work. |
-| `QueueSelection` (action property) | Every staged Claim selects the oldest available Work in the local view at that step, not necessarily the oldest at publication or completion. |
-| `WorkResubmissionNoOp` (action property) | A same-identity Work resubmission with different enqueue metadata may be staged, but does not change replayed facts or the original Work age. |
-| `WorkerOrigin`, `FinishRequired` | Worker mutations concern only the inbound Claim; authorization requires finalize. |
-| `AuthorizationSoundness`, `EffectSoundness` | Authorization follows durable Completion; effects follow authorization. |
-| `LifecycleAccounting` | Each attempt authorizes/emits at most once, without resetting its lifecycle. |
-| `SingleAuthorization`, `SingleEffect` | At most one safe-output attempt per Work receives authorization or enters its output batch. |
+| [`TypeOK`](WorkQueue.tla#L361), [`ValidLog`](WorkQueue.tla#L359) | Valid identities/references; at most one terminal transaction per Work; Completion belongs to the trusted inbound Claim and the selected claimant. |
+| [`SnapshotValidity`](WorkQueue.tla#L388), [`SnapshotVersions`](WorkQueue.tla#L404), [`ActivationSnapshotValidity`](WorkQueue.tla#L410), [`CandidateDerivation`](WorkQueue.tla#L394) | A matching writer snapshot contains the current source log and an exactly regenerated candidate; activation admission reflects its immutable artifact snapshot; no snapshot is based on a future version. |
+| [`Serialization`](WorkQueue.tla#L413) | Every locally proposed dispatcher transaction is serialized identically for safe-output processing. |
+| [`TerminalPersistence`](WorkQueue.tla#L418) | Previously committed Completion/WorkCancellation facts remain durable. |
+| [`TerminalHistoryValid`](WorkQueue.tla#L414), [`TerminalFreeze`](WorkQueue.tla#L420) | All facts for a terminal Work item are frozen; neither late Claims nor other new transactions can change the decision. |
+| [`SingleCompletionPerWorker`](WorkQueue.tla#L423), [`WorkerOneShot`](WorkQueue.tla#L332) | One fixed inbound Claim and at most one distinct Completion per worker; terminal worker phases never restart. |
+| [`SingleEffectiveClaim`](WorkQueue.tla#L426) | At most one effective Claim per Work. |
+| [`QueueSelection`](WorkQueue.tla#L337) (action property) | Every staged Claim selects the oldest available Work in the local view at that step, not necessarily the oldest at publication or completion. |
+| [`WorkResubmissionNoOp`](WorkQueue.tla#L343) (action property) | A same-identity Work resubmission with different enqueue metadata may be staged, but does not change replayed facts or the original Work age. |
+| [`WorkerOrigin`](WorkQueue.tla#L433), [`FinishRequired`](WorkQueue.tla#L443) | Worker mutations concern only the inbound Claim; authorization requires finalize. |
+| [`AuthorizationSoundness`](WorkQueue.tla#L429), [`EffectSoundness`](WorkQueue.tla#L431) | Authorization follows durable Completion; effects follow authorization. |
+| [`LifecycleAccounting`](WorkQueue.tla#L445) | Each attempt authorizes/emits at most once, without resetting its lifecycle. |
+| [`SingleAuthorization`](WorkQueue.tla#L456), [`SingleEffect`](WorkQueue.tla#L459) | At most one safe-output attempt per Work receives authorization or enters its output batch. |
 
 ## Inductive proof argument
 

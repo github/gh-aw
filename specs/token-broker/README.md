@@ -53,6 +53,13 @@ insecure and are never runtime options.
 | `close-first` | Close the job before revoking; recording re-checks closure atomically. | SV-28, SV-31 |
 | `server-close` | Close and revoke on trusted job-completion evidence. | SV-37 |
 
+## Safeguards
+
+The compiler warns when broker-enabled jobs select self-hosted runners and
+recommends ephemeral runners that start clean for each job; the broker must
+also deny unenrolled runners. See
+[`tokenBrokerSelfHostedWarning`](../../pkg/workflow/token_broker.go#L121-L123).
+
 ## Discovered attack vectors
 
 Each `Discover*` configuration removes one fix from the hardened profile and
