@@ -16,6 +16,7 @@ const {
   isRateLimitError,
   isTokenPerMinuteRateLimitError,
   isAuthenticationFailedError,
+  isCodexSessionProgress,
   isMissingApiKeyError,
   isServerError,
   isInvalidModelError,
@@ -150,6 +151,45 @@ function runHarnessFixture(script, { prompt = "fix the bug", args = [], env = {}
 }
 
 describe("codex_harness.cjs", () => {
+  describe("successful main-session progress", () => {
+    it.each([
+      { type: "thread.started" },
+      { type: "item.completed", item: { type: "error", message: "Authentication failed (Request ID: abc)" } },
+      { type: "item.completed", item: { type: "user_message", text: "Please fix this" } },
+      { type: "item.completed", item: { type: "todo_list", items: [] } },
+      { type: "item.completed", item: { type: "command_execution", exit_code: 1 } },
+      { type: "item.completed", item: { type: "mcp_tool_call", status: "completed", result: { isError: true } } },
+      { type: "item.completed", item: { type: "mcp_tool_call", status: "pending" } },
+      { type: "item.completed", item: { type: "collab_tool_call", status: "completed" } },
+      { type: "item.completed", parent_thread_id: "main", item: { type: "agent_message", text: "Subagent output" } },
+      { type: "item.completed", item: { type: "agent_message", error: "Runtime failure" } },
+    ])("does not count metadata, diagnostics, or failed work: %j", event => {
+      expect(isCodexSessionProgress(event)).toBe(false);
+    });
+
+    it.each([
+      { type: "turn.completed" },
+      { type: "item.completed", item: { type: "agent_message", text: "Working" } },
+      { type: "item.completed", item: { type: "reasoning", text: "Planning the fix" } },
+      { type: "item.completed", item: { type: "command_execution", exit_code: 0 } },
+      { type: "item.completed", item: { type: "mcp_tool_call", status: "completed" } },
+    ])("counts successful model/tool work: %j", event => {
+      expect(isCodexSessionProgress(event)).toBe(true);
+    });
+  });
+
+  it.each(["error", "user_message"])("does not retry startup authentication after an %s completion", itemType => {
+    const message = "Authentication failed (Request ID: abc)";
+    const { result, calls } = runHarnessFixture(`
+if (process.argv.includes("resume")) process.exit(0);
+console.log(JSON.stringify({type:"thread.started",thread_id:"12345678-1234-1234-1234-123456789abc"}));
+console.log(JSON.stringify({type:"item.completed",item:{id:"diagnostic",type:${JSON.stringify(itemType)},message:${JSON.stringify(message)},text:${JSON.stringify(message)}}}));
+console.log(JSON.stringify({type:"error",message:${JSON.stringify(message)}}));
+process.exit(1);`);
+    expect(result.status, result.stderr).toBe(1);
+    expect(calls).toHaveLength(1);
+  });
+
   it.each([
     { progress: true, challenge: true, retries: true },
     { progress: true, challenge: false, retries: true },

@@ -47,7 +47,7 @@ function classifyGenericHarnessFailure(output) {
   }
   const tail = retrySignalTail(text);
   if (RATE_LIMIT_PATTERN.test(tail)) return "rate_limit_error";
-  if (TRANSIENT_ERROR_PATTERN.test(tail) || isHTMLResponseError(tail)) return "transient_error";
+  if (TRANSIENT_ERROR_PATTERN.test(tail) || isHTMLResponseError(text, { tailChars: GENERIC_HARNESS_RETRY_SIGNAL_TAIL_CHARS })) return "transient_error";
   return null;
 }
 

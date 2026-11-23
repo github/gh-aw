@@ -15,7 +15,7 @@ const {
   parseAICreditsExceededProxyRejection,
   parseAPIProxyGuardRejection,
 } = require("./harness_retry_guard.cjs");
-const { parseModelEndpointMismatch, MODEL_ENDPOINT_MISMATCH_PATTERN, shouldSuppressGuardCategory } = require("./harness_error_patterns.cjs");
+const { parseModelEndpointMismatch, MODEL_ENDPOINT_MISMATCH_PATTERN, shouldSuppressGuardCategory, isHTMLResponseError } = require("./harness_error_patterns.cjs");
 
 describe("harness_retry_guard.cjs", () => {
   describe("shared operational decisions", () => {
@@ -524,6 +524,59 @@ describe("harness_retry_guard.cjs", () => {
 
   it("isAuthenticationFailedError returns true for bare Authentication failed", () => {
     expect(isAuthenticationFailedError("Authentication failed")).toBe(true);
+  });
+
+  it.each([
+    "Authentication failed\n<!DOCTYPE html>",
+    "Authentication failed\n<!doctype html><html><title>Login</title></html>",
+    "Authentication failed (Request ID: abc)\nJust a moment...",
+    "Authentication failed: HTTP 403\nunrelated transcript\n<!DOCTYPE html>",
+    "Authentication failed: HTTP 403\n" + "\n".repeat(17) + "<!DOCTYPE html>",
+    "Authentication failed: HTTP 403\nX-Long-Header: " + "x".repeat(8192) + "\n<!DOCTYPE html>",
+  ])("does not associate unrelated or unbounded HTML with a credential diagnostic: %s", output => {
+    expect(isAuthenticationFailedError(output)).toBe(true);
+    expect(isHTMLResponseError(output)).toBe(false);
+  });
+
+  it.each(["<!DOCTYPE html>", "<html>Forbidden</html>", "Just a moment...", "cf-chl-token", "/cdn-cgi/challenge-platform"])("associates %s with an explicit HTTP error through headers and blank lines", body => {
+    const output = `Authentication failed: HTTP 403\nContent-Type: text/html\nServer: cloudflare\n\n${body}`;
+    expect(isAuthenticationFailedError(output)).toBe(false);
+    expect(isHTMLResponseError(output)).toBe(true);
+    expect(isAuthenticationFailedError(output + "\nAuthentication failed (Request ID: abc)")).toBe(true);
+  });
+
+  it.each([
+    { type: "item.completed", item: { type: "error", message: "Authentication failed: <html>Forbidden</html>" } },
+    { type: "item.updated", item: { type: "error", message: "Just a moment..." } },
+    { event: "result", result: { status: "ERROR", error: "Authentication failed: <html>Forbidden</html>" } },
+    { type: "session.error", data: { message: "Authentication failed\n<!DOCTYPE html><html>Forbidden</html>" } },
+  ])("recognizes supported native item and Agy error envelopes: %j", record => {
+    const output = JSON.stringify(record);
+    expect(isHTMLResponseError(output)).toBe(true);
+    expect(isAuthenticationFailedError(output)).toBe(false);
+  });
+
+  it.each([
+    { type: "item.completed", item: { type: "agent_message", text: "API Error: <html>Forbidden</html>" } },
+    { type: "item.completed", item: { type: "command_execution", aggregated_output: "API Error: Just a moment..." } },
+    { event: "result", result: { status: "DONE", error: "API Error: <html>Forbidden</html>" } },
+    { type: "error", message: "connection reset", metadata: { quoted: "API Error: <html>Forbidden</html>" } },
+  ])("does not classify challenge text outside native error diagnostics: %j", record => {
+    expect(isHTMLResponseError(JSON.stringify(record))).toBe(false);
+  });
+
+  it.each([
+    { type: "result", is_error: true, errors: ["API Error: Just a moment...", "Authentication failed (Request ID: abc)"] },
+    { type: "result", is_error: true, result: "API Error: Just a moment...", errors: ["Authentication failed (Request ID: abc)"] },
+    { type: "session.error", data: { message: "API Error: Just a moment...\nAuthentication failed (Request ID: abc)" } },
+    { type: "session.error", data: { message: "Authentication failed (Request ID: abc)\nAPI Error: Just a moment..." } },
+    { event: "result", result: { status: "ERROR", error: "API Error: Just a moment...\nAuthentication failed (Request ID: abc)" } },
+    { type: "session.error", data: { message: "API Error: <html>\nNot logged in\n</html>" } },
+    { type: "turn.failed", error: { message: JSON.stringify({ message: "API Error: Just a moment...", error: { message: "Authentication failed (Request ID: abc)" } }) } },
+  ])("retains independent credential diagnostics inside a single native record: %j", record => {
+    const output = JSON.stringify(record);
+    expect(isHTMLResponseError(output)).toBe(true);
+    expect(isAuthenticationFailedError(output)).toBe(true);
   });
 
   it('isAuthenticationFailedError returns true for Claude Code stream-JSON "error":"authentication_failed" field', () => {

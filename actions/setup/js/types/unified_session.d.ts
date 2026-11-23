@@ -593,6 +593,7 @@ export type HarnessFailureClass =
   | "null_type_tool_call"
   | "no_auth_info"
   | "authentication_failed"
+  | "transient_error"
   | "sdk_session_idle_timeout"
   | "mcp_gateway_shutdown"
   | "permission_denied"

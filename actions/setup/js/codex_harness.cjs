@@ -35,6 +35,7 @@
 const { mergeTerminalRetryAfterMs } = require("./copilot_retry_after.cjs");
 const { iterateJsonl, JsonlParser } = require("./jsonl_helpers.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
+const { sessionToolSuccess } = require("./agent_session.cjs");
 const { isGitHubProviderCybersecurityPolicyRejection } = require("./github_provider_policy_rejection.cjs");
 const fs = require("fs");
 const { openDurableSession, observeDurableSession } = require("./durable_native_session.cjs");
@@ -108,6 +109,20 @@ const SERVER_ERROR_PATTERN = /InternalServerError|ServiceUnavailableError|500 In
 // (e.g. `"code": "empty_array"` on `messages[N].content`), so an identical fresh run produces
 // an identical rejection: retrying only re-bills the turns that succeeded before the failure point.
 const INVALID_REQUEST_ERROR_PATTERN = /invalid_request_(?:error|body)/i;
+
+function isCodexSessionProgress(event) {
+  // Cross-engine progress means confirmed successful main-session model/tool work,
+  // not session creation, user input, diagnostics, or subagent activity.
+  if (event?.parent_thread_id || event?.parentId || event?.agentId) return false;
+  if (event?.type === "turn.completed") return true;
+  if (event?.type !== "item.completed") return false;
+  const item = event.item;
+  if (!item || sessionToolSuccess(item) === false || sessionToolSuccess(item.result ?? {}) === false || ["declined", "pending", "in_progress"].includes(item.status) || (typeof item.exit_code === "number" && item.exit_code !== 0))
+    return false;
+  if (item.type === "agent_message" || item.type === "reasoning") return true;
+  if (!["mcp_tool_call", "command_execution", "file_change", "web_search"].includes(item.type)) return false;
+  return item.success === true || ["completed", "succeeded", "success"].includes(item.status) || item.exit_code === 0 || (item.type === "web_search" && item.status === undefined);
+}
 
 function resolveMCPServerToolTimeouts(config, runtimeToolTimeoutSeconds) {
   const configuredServers = config.defaults?.mcp_servers && typeof config.defaults.mcp_servers === "object" ? config.defaults.mcp_servers : {};
@@ -1110,7 +1125,7 @@ async function main() {
           const event = mcpWatchdog.observe(line);
           if (!event) return;
           if (event.type === "thread.started" && typeof event.thread_id === "string") lastThreadId = event.thread_id;
-          if (event.type === "turn.completed" || event.type === "item.completed") sessionHasProgress = true;
+          if ((!event.thread_id || event.thread_id === lastThreadId) && isCodexSessionProgress(event)) sessionHasProgress = true;
           if (event.type === "turn.failed" || event.type === "error") recordTerminalError(line);
           retryAfterMs = mergeTerminalRetryAfterMs(retryAfterMs, line, "codex");
         },
@@ -1339,6 +1354,7 @@ if (typeof module !== "undefined" && module.exports) {
     isRateLimitError,
     isTokenPerMinuteRateLimitError,
     isAuthenticationFailedError,
+    isCodexSessionProgress,
     isMissingApiKeyError,
     isServerError,
     isInvalidModelError,

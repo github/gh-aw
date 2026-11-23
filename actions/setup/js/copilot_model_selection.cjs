@@ -117,9 +117,9 @@ function persistCopilotModelSelection(env = process.env) {
 /**
  * Observe only the invocation's exact session and newly appended records, not other sessions or subagents.
  * Native CLI startup fallback is not an authorized AWF fallback.
- * @param {{ configuredModel: string, resolvedModel: string, sessionId?: string, env?: NodeJS.ProcessEnv, sessionDirs?: string[], logger?: (message: string) => void, onSessionProgress?: () => void }} options
+ * @param {{ configuredModel: string, resolvedModel: string, sessionId?: string, env?: NodeJS.ProcessEnv, sessionDirs?: string[], logger?: (message: string) => void, onSessionProgress?: () => void, verifyModel?: boolean }} options
  */
-function createCopilotModelObserver({ configuredModel, resolvedModel, sessionId, env = process.env, sessionDirs, logger = () => {}, onSessionProgress = () => {} }) {
+function createCopilotModelObserver({ configuredModel, resolvedModel, sessionId, env = process.env, sessionDirs, logger = () => {}, onSessionProgress = () => {}, verifyModel = true }) {
   const directories = sessionDirs || copilotSessionStateDirectories(env);
   /** @type {Map<string, number>} */
   const offsets = new Map();
@@ -128,7 +128,7 @@ function createCopilotModelObserver({ configuredModel, resolvedModel, sessionId,
   let diagnostic = "";
   let observedModel = "";
   const expected = modelID(resolvedModel);
-  if (!expected || (env.GH_AW_PHASE && env.GH_AW_PHASE !== "agent")) return { check: () => "" };
+  const checkModel = verifyModel && Boolean(expected) && (!env.GH_AW_PHASE || env.GH_AW_PHASE === "agent");
   const observedModels = new Set(previouslyObservedModels(env));
   if (!sessionId || !/^[a-z0-9_-]+$/i.test(sessionId)) throw new Error("Copilot model verification requires an exact invocation session ID");
   const ownedSessionId = sessionId;
@@ -179,7 +179,8 @@ function createCopilotModelObserver({ configuredModel, resolvedModel, sessionId,
         for (const event of iterateJsonl(text.slice(0, end))) {
           const context = copilotSessionContext(event);
           if (context.agentId !== undefined || context.parentToolUseId || (context.sessionId !== undefined && context.sessionId !== ownedSessionId)) continue;
-          if (event.type === "assistant.message" || event.type === "tool.execution_start") onSessionProgress();
+          if (isCopilotSessionProgress(event, ownedSessionId)) onSessionProgress();
+          if (!checkModel) continue;
           const model = modelID(event.type === "session.model_change" && event.data?.source === "startup" ? event.data.newModel : event.type === "assistant.message" ? event.data?.model : "");
           if (!model || model === observedModel) continue;
           observedModel = model;
@@ -214,6 +215,19 @@ function createCopilotModelObserver({ configuredModel, resolvedModel, sessionId,
     }
   }
   return { check };
+}
+
+/**
+ * Progress means successful main-session model/tool work, not startup, user input,
+ * subagent activity or synthesized runtime-error messages. Native JSONL and SDK
+ * stream events use the same contract, independently of model verification.
+ * @param {any} event
+ * @param {string | undefined} [sessionId]
+ */
+function isCopilotSessionProgress(event, sessionId) {
+  const context = copilotSessionContext(event);
+  if (context.agentId !== undefined || context.parentToolUseId || (sessionId && context.sessionId !== undefined && context.sessionId !== sessionId)) return false;
+  return event?.type === "tool.execution_start" || (event?.type === "assistant.message" && event.data?.rte !== true);
 }
 
 /** @param {any} event */
@@ -356,4 +370,13 @@ function readCopilotModelSubstitution(env = process.env) {
   }
 }
 
-module.exports = { COPILOT_MODEL_VERIFICATION_EXIT_CODE, copilotSessionStateDirectories, createCopilotModelObserver, createCopilotSDKModelObserver, readCopilotModelSubstitution, recordCopilotModelSelection, persistCopilotModelSelection };
+module.exports = {
+  COPILOT_MODEL_VERIFICATION_EXIT_CODE,
+  copilotSessionStateDirectories,
+  createCopilotModelObserver,
+  createCopilotSDKModelObserver,
+  isCopilotSessionProgress,
+  readCopilotModelSubstitution,
+  recordCopilotModelSelection,
+  persistCopilotModelSelection,
+};

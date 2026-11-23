@@ -591,7 +591,8 @@ async function main() {
   let continueDisabledPermanently = false;
   let startupRetriesUsed = 0;
   // Tracks whether the *active session* (the run currently being resumed via --continue)
-  // has ever produced an assistant response. This must persist across attempts — a later
+  // has ever produced an assistant response. Progress means successful model/tool work,
+  // not session creation, user messages, or error diagnostics. This must persist across attempts — a later
   // --continue attempt can fail during its own startup (e.g. connection refused before it
   // emits anything) even though earlier attempts in the same session already made progress.
   // Reset only when a genuinely fresh run begins (see below), never on a --continue attempt.
