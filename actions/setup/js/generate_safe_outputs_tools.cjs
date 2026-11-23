@@ -99,12 +99,13 @@ function stripIssueIntentSchemaFields(tool) {
   if (tool.name === "add_labels" && typeof tool.description === "string") {
     tool.description = tool.description.replace(ADD_LABELS_INTENT_RATIONALE_TOOL_DESC_REGEX, "");
   }
+  /** @type {any} */
   const labelsSchema = tool.name === "add_labels" ? tool.inputSchema.properties.labels : undefined;
   if (labelsSchema && typeof labelsSchema === "object") {
-    stripIssueIntentLabelItemFields(/** @type {any} */ labelsSchema.items);
-    const description = /** @type {any} */ labelsSchema.description;
+    stripIssueIntentLabelItemFields(labelsSchema.items);
+    const description = labelsSchema.description;
     if (typeof description === "string") {
-      /** @type {any} */ labelsSchema.description = description.replace(ADD_LABELS_INTENT_METADATA_DESC_REGEX, "an object with a name field");
+      labelsSchema.description = description.replace(ADD_LABELS_INTENT_METADATA_DESC_REGEX, "an object with a name field");
     }
   }
 }
@@ -119,7 +120,8 @@ function stripIssueIntentLabelItemFields(itemSchema) {
   if (!itemSchema || typeof itemSchema !== "object" || Array.isArray(itemSchema)) {
     return;
   }
-  const schema = /** @type {Record<string, any>} */ itemSchema;
+  /** @type {Record<string, any>} */
+  const schema = itemSchema;
   for (const key of ["oneOf", "anyOf"]) {
     if (Array.isArray(schema[key])) {
       for (const branch of schema[key]) {
