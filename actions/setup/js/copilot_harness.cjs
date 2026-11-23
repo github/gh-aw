@@ -125,7 +125,7 @@ const { recordAWFModelRoutingOutcome } = require("./awf_model_routing.cjs");
 const COPILOT_ROUTING_POLICY = getAWFModelRoutingPolicy("copilot");
 const { loadModelsJson } = require("./model_costs.cjs");
 const { applyCopilotWireAPI: configureCopilotWireAPI, warnCopilotSubagentEndpoints, recordModelEndpointMismatch, getSupportedEndpoints, MODEL_ENDPOINT_FIX } = require("./copilot_wire_api.cjs");
-const { loadModelAliasMap, resolveEngineModel, normalizeForCopilotCLI, ModelAliasResolutionError, recordModelResolution, splitModelIdentifier } = require("./resolve_model_alias.cjs");
+const { isModelCatalogDisabled, loadModelAliasMap, resolveEngineModel, normalizeForCopilotCLI, ModelAliasResolutionError, recordModelResolution, splitModelIdentifier } = require("./resolve_model_alias.cjs");
 const { COPILOT_MODEL_VERIFICATION_EXIT_CODE, createCopilotModelObserver, readCopilotModelSubstitution, recordCopilotModelSelection } = require("./copilot_model_selection.cjs");
 const { copilotSDKAgentDirectories, defaultCopilotSDKAgentsBaseDir, getEngineSubAgentTarget } = require("./extract_inline_sub_agents.cjs");
 const { inlineArtifactTarget } = require("./inline_artifact_target.cjs");
@@ -860,7 +860,8 @@ async function resolveCopilotSubagentModels(options) {
     });
     return refresh;
   };
-  const liveCheck = env.AWF_REFLECT_ENABLED === "1" || Boolean(options.reflectData);
+  // engine.model-catalog: false passes sub-agent models through verbatim, without a catalogue check.
+  const liveCheck = !isModelCatalogDisabled(env) && (env.AWF_REFLECT_ENABLED === "1" || Boolean(options.reflectData));
   /** @type {InstanceType<typeof ModelAliasResolutionError>[]} */
   const failures = [];
   const resolutions = [];

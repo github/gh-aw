@@ -245,6 +245,7 @@ func (c *Compiler) validateWorkflowEngineSettings(cleanPath string, workflowData
 		c.validateEngineMCPToolTimeout,
 		validateCopilotSDKEngineArgs,
 		validateCopilotSDKPin,
+		validateCopilotSDKModelCatalog,
 		validatePiSubagents,
 	}
 	for _, check := range checks {

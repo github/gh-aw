@@ -487,6 +487,20 @@ func TestModelCatalogDisablesRouting(t *testing.T) {
 	assert.Contains(t, err.Error(), "engine.model-catalog: false")
 }
 
+// TestModelCatalogRejectsCopilotSDK verifies that Copilot SDK mode, whose startup needs the
+// live catalogue, cannot be combined with model-catalog: false.
+func TestModelCatalogRejectsCopilotSDK(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "workflow.md")
+	require.NoError(t, os.WriteFile(path, []byte("---\non: workflow_dispatch\npermissions:\n  contents: read\nengine:\n  id: copilot\n  copilot-sdk: true\n  model-catalog: false\nmodel: gpt-5-mini\n---\n\n# Test\n"), 0o600))
+	err := NewCompiler().CompileWorkflow(path)
+	require.Error(t, err, "SDK mode without a catalogue must fail")
+	assert.Contains(t, err.Error(), "engine.model-catalog: false")
+	assert.Contains(t, err.Error(), "removing engine.copilot-sdk")
+
+	compileModelAliasWorkflow(t, "engine:\n  id: copilot\n  model-catalog: false\nmodel: gpt-5-mini\n")
+}
+
 // TestImportedModelAliasValidation verifies that imported alias maps get the same V-MAF key
 // and entry checks as the main workflow's.
 func TestImportedModelAliasValidation(t *testing.T) {

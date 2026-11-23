@@ -3580,7 +3580,8 @@ engine:
   # stops if no catalogue is available. Set to false for BYOK providers without a
   # /models route (for example Azure AI Gateway): configured models are then passed
   # to the engine verbatim, without alias resolution, and model routing (implicit or
-  # model: router) is disabled because it selects models from the catalogue.
+  # model: router) is disabled because it selects models from the catalogue. Not
+  # supported with engine.copilot-sdk: true, which needs the catalogue at startup.
   # (optional)
   model-catalog: true
 
@@ -3779,7 +3780,8 @@ engine:
   # stops if no catalogue is available. Set to false for BYOK providers without a
   # /models route (for example Azure AI Gateway): configured models are then passed
   # to the engine verbatim, without alias resolution, and model routing (implicit or
-  # model: router) is disabled because it selects models from the catalogue.
+  # model: router) is disabled because it selects models from the catalogue. Not
+  # supported with engine.copilot-sdk: true, which needs the catalogue at startup.
   # (optional)
   model-catalog: true
 
@@ -4396,7 +4398,8 @@ engine:
     # stops if no catalogue is available. Set to false for BYOK providers without a
     # /models route (for example Azure AI Gateway): configured models are then passed
     # to the engine verbatim, without alias resolution, and model routing (implicit or
-    # model: router) is disabled because it selects models from the catalogue.
+    # model: router) is disabled because it selects models from the catalogue. Not
+    # supported with engine.copilot-sdk: true, which needs the catalogue at startup.
     # (optional)
     model-catalog: true
 
@@ -22655,7 +22658,8 @@ safe-outputs:
       # stops if no catalogue is available. Set to false for BYOK providers without a
       # /models route (for example Azure AI Gateway): configured models are then passed
       # to the engine verbatim, without alias resolution, and model routing (implicit or
-      # model: router) is disabled because it selects models from the catalogue.
+      # model: router) is disabled because it selects models from the catalogue. Not
+      # supported with engine.copilot-sdk: true, which needs the catalogue at startup.
       # (optional)
       model-catalog: true
 
@@ -22854,7 +22858,8 @@ safe-outputs:
       # stops if no catalogue is available. Set to false for BYOK providers without a
       # /models route (for example Azure AI Gateway): configured models are then passed
       # to the engine verbatim, without alias resolution, and model routing (implicit or
-      # model: router) is disabled because it selects models from the catalogue.
+      # model: router) is disabled because it selects models from the catalogue. Not
+      # supported with engine.copilot-sdk: true, which needs the catalogue at startup.
       # (optional)
       model-catalog: true
 
@@ -23471,7 +23476,8 @@ safe-outputs:
         # stops if no catalogue is available. Set to false for BYOK providers without a
         # /models route (for example Azure AI Gateway): configured models are then passed
         # to the engine verbatim, without alias resolution, and model routing (implicit or
-        # model: router) is disabled because it selects models from the catalogue.
+        # model: router) is disabled because it selects models from the catalogue. Not
+        # supported with engine.copilot-sdk: true, which needs the catalogue at startup.
         # (optional)
         model-catalog: true
 

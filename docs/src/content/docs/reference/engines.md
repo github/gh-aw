@@ -220,6 +220,10 @@ Copilot, Claude, Codex, Pi, and Agy resolve aliases against the configured provi
 
 Set `engine.model-catalog: false` (default `true`) for BYOK providers without a `/models` route, such as Azure AI Gateway. The configured model is then passed to the engine verbatim: aliases are not resolved, and a model ID that matches a built-in alias (such as `gpt-5-mini`) no longer fails with `catalog_unavailable`. Model routing also needs the catalogue, so the implicit routing default is not applied and `model: router` fails compilation. Threat detection inherits the workflow `model`; when none is set, it uses the engine's main-agent default instead of the `detection` alias.
 
+`engine.copilot-sdk: true` also needs the catalogue, so combining it with `model-catalog: false` fails compilation; use Copilot CLI mode instead.
+
+Sub-agent models are also passed verbatim, without catalogue or endpoint checks; a Claude or Codex sub-agent model whose `provider/` prefix names a different provider still fails.
+
 Workflow-defined `models:` aliases are not resolved either: naming one passes the alias name to the engine as a literal model ID and logs a warning, so set a concrete model ID instead.
 
 ```yaml wrap
