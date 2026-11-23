@@ -5015,11 +5015,38 @@ process.exit(1);`
         expect(exitSpy).not.toHaveBeenCalled();
       });
 
-      it("still requires the catalogue for built-in aliases by default, even with an explicit provider", async () => {
+      it.each(["gpt-5-mini", "small", "copilot/gpt-5-mini", "gpt-5-mini-2025-08-07", "gpt-5-mini?effort=high"])("passes BYOK model %s through by default without a catalogue", async model => {
+        process.env.COPILOT_MODEL = model;
+        const refetch = vi.fn();
+
+        const resolved = await applyCopilotModelAliasResolution({ awfReflectData: emptyReflect, logger: () => {}, refetchReflectData: refetch });
+
+        expect(resolved).toBe(model);
+        expect(process.env.COPILOT_MODEL).toBe(model);
+        expect(exitSpy).not.toHaveBeenCalled();
+        expect(refetch).not.toHaveBeenCalled();
+        expect(JSON.parse(fs.readFileSync(path.join(process.env.GH_AW_TMP_DIR, "agent/model-resolution.json"), "utf8"))).toEqual([
+          { engine: "copilot", role: "main", configured_model: model, resolved_model: model, provider: null, status: "exact", cause: null },
+        ]);
+      });
+
+      it("does not replace a BYOK model with a newer catalog alias match", async () => {
         process.env.COPILOT_MODEL = "gpt-5-mini";
+        const reflect = { endpoints: [{ configured: true, provider: "copilot", models: ["gpt-5.4-mini"] }] };
 
-        await applyCopilotModelAliasResolution({ awfReflectData: emptyReflect, logger: () => {}, refetchReflectData: async () => null });
+        expect(await applyCopilotModelAliasResolution({ awfReflectData: reflect, logger: () => {} })).toBe("gpt-5-mini");
+        expect(process.env.COPILOT_MODEL).toBe("gpt-5-mini");
+        expect(exitSpy).not.toHaveBeenCalled();
+      });
 
+      it.each(["", "   "])("still requires the catalogue when the provider URL is %j", async baseURL => {
+        vi.stubEnv("COPILOT_PROVIDER_BASE_URL", baseURL);
+        process.env.COPILOT_MODEL = "gpt-5-mini";
+        const refetch = vi.fn().mockResolvedValue(null);
+
+        await applyCopilotModelAliasResolution({ awfReflectData: emptyReflect, logger: () => {}, refetchReflectData: refetch });
+
+        expect(refetch).toHaveBeenCalledTimes(1);
         expect(exitSpy).toHaveBeenCalledWith(1);
       });
     });
