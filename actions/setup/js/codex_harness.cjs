@@ -1147,11 +1147,9 @@ async function main() {
           if (!event) return;
           if (event.type === "thread.started" && typeof event.thread_id === "string") lastThreadId = event.thread_id;
           if (event.type === "turn.failed" || event.type === "error") recordTerminalError(line);
-          const { isGitHubRetryAfterProvider, parseTerminalRetryAfterMs } = require("./copilot_retry_after.cjs");
-          if (isGitHubRetryAfterProvider(process.env.GH_AW_LLM_PROVIDER)) {
-            const delay = parseTerminalRetryAfterMs(line, "codex");
-            if (delay != null) retryAfterMs = Math.max(retryAfterMs ?? 0, delay);
-          }
+          const { parseTerminalRetryAfterMs } = require("./copilot_retry_after.cjs");
+          const delay = parseTerminalRetryAfterMs(line, "codex");
+          if (delay != null) retryAfterMs = Math.max(retryAfterMs ?? 0, delay);
         },
         onStdoutLinePrefix: prefix => {
           const event = mcpWatchdog.observePrefix(prefix);

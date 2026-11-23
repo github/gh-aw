@@ -672,11 +672,9 @@ async function main() {
         onStdoutLine: line => {
           observeDurableSession(durableSession, "claude", line);
           if (isRateLimitError(classifiableOutput(line))) nativeTerminalRateLimitError = true;
-          const { isGitHubRetryAfterProvider, parseTerminalRetryAfterMs } = require("./copilot_retry_after.cjs");
-          if (isGitHubRetryAfterProvider(process.env.GH_AW_LLM_PROVIDER)) {
-            const delay = parseTerminalRetryAfterMs(line, "claude");
-            if (delay != null) retryAfterMs = Math.max(retryAfterMs ?? 0, delay);
-          }
+          const { parseTerminalRetryAfterMs } = require("./copilot_retry_after.cjs");
+          const delay = parseTerminalRetryAfterMs(line, "claude");
+          if (delay != null) retryAfterMs = Math.max(retryAfterMs ?? 0, delay);
         },
         onStderrLine: line => {
           if (isRateLimitError(line)) nativeTerminalRateLimitError = true;
