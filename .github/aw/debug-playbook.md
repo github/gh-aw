@@ -31,7 +31,7 @@ Keep codes/severity; advisory/pending/skipped/policy-denied may be intentional.
 | Codes|Check|Remedy|
 | ---|---|---|
 | `workflow_failed`|First error.|Fix cause, not conclusion.|
-| `workflow_timeout`|Step/budget/result.|Unblock/narrow scope; justify timeout changes.|
+| `workflow_timeout`|Step/budget/result.|Unblock/narrow; justify timeout changes.|
 | `multiple_errors`|Cause vs cascades.|Fix cause.|
 | `mcp_server_failures`, `tools_not_available`|MCP setup/availability.|Fix tool/server/config/auth; retain permission scope.|
 | `tool_error`|Call result.|Fix tool/config/auth; retain permission scope.|
@@ -48,7 +48,7 @@ Keep codes/severity; advisory/pending/skipped/policy-denied may be intentional.
 | `high_token_usage`, `many_iterations`|Tokens/cache/turns, repeated calls.|[Optimize](optimize-agentic-workflow.md) scope/context/loops before raising caps.|
 | `agentic_resource_heavy_for_domain`, `agentic_overkill_for_agentic`|Assessment, deterministic alternatives.|Script mechanical work; retain necessary judgment.|
 | `agentic_poor_agentic_control`, `agentic_partially_reducible`|Stop rules, tools, reducible stages.|Bound loops; extract deterministic work; preserve outcomes.|
-| `agentic_model_downgrade_available`|Capability/API needs; measured alternatives.|Benchmark; no automatic downgrade.|
+| `agentic_model_downgrade_available`|Capability/API needs; measured alternatives.|Benchmark; no auto-downgrade.|
 | `agentic_delegated_context_present`|Delegation/context.|Deduplicate; advisory, not always error.|
 | `workflow_succeeded`|Downstream effect.|Verify effect; conclusion alone insufficient.|
 
@@ -70,11 +70,11 @@ Prose != native error.
 | `max_ai_credits_exceeded`, `ai_credits_rate_limit_error`, `ai_credits_limit_exceeded`|Used/max credits; cap.|Stop; reduce work or authorize future budget.|
 | `max_cache_misses_exceeded`|Miss counters; prompt/cache changes.|Stabilize context/cache; no exhausted-guard retry.|
 | `effective_tokens_limit_exceeded`|Effective tokens; prompt/turn growth.|Reduce context/iterations; retain guard.|
-| `permission_denied_limit_exceeded`|Denied calls; allowed tools.|Stop denied calls; use allowed tools, not larger denial budget.|
+| `permission_denied_limit_exceeded`|Denied calls; allowed tools.|Stop denied calls; use allowed tools; don't raise budget.|
 | `model_policy_violation`, `content_filter`|Provider/proxy reason; endpoint mismatch separately.|Correct request within policy; no credential swap/bypass.|
 | `awf_api_proxy_blocking_requests`|Specific budget/policy/filter guard.|Address guard; blocking alone != authentication failure.|
 | `capi_quota_exceeded_error`|Native 429; exhausted retries.|Respect quota/reset; no retry storm.|
-| `rate_limit_wait_exceeded`, `rate_limit_error`|429/provider, usable `Retry-After`, harness retries, `max-delay-ms`, timeout.|All providers incl. BYOK and all built-in harnesses (Pi/Gemini/Agy/behavior-defined retry only 429/transient, never after safe outputs): wait within both bounds or stop. Preserve terminal quota/proxy guards. No unauthorized redispatch.|
+| `rate_limit_wait_exceeded`, `rate_limit_error`|429/provider, usable `Retry-After`, harness retries, `max-delay-ms`, timeout.|All providers/harnesses (BYOK; Pi/Gemini/Agy/behavior-defined): retry only 429/transient; never after safe outputs. Wait within both bounds or stop; preserve terminal quota/proxy guards; no unauthorized redispatch.|
 | `capi_server_error`, `engine_outage`, `infrastructure_error`|Exhausted native 5xx/infrastructure timeline.|Report cause; bounded backoff, no unapproved redispatch.|
 | `agentic_engine_timeout`|Step/SDK budget vs post-result `watchdogFired=true`.|Fix genuine stall; post-result watchdog alone != timeout.|
 | `sandbox_runtime_crash`|Exit/signal, resources, runtime revision.|Fix crash/resources; retain redacted diagnostic/version.|
@@ -114,9 +114,7 @@ jq --arg model "$MODEL" --arg provider "$PROVIDER" '
   ]}' "$EVIDENCE/run-$RUN_ID/sandbox/firewall/awf-reflect.json"
 ```
 
-`model_aliases`/harness: resolve `github` → `copilot`, `auto`/`opus`;
-retain dated/version IDs, strip provider prefix/query.
-Aliases != IDs; `routing_models` != inventory.
+Resolve `model_aliases`/harness: `github`→`copilot`, `auto`/`opus`; retain dated/version IDs, strip provider prefix/query. Aliases != IDs; `routing_models` != inventory.
 
 | Evidence|Meaning|
 | ---|---|
@@ -137,18 +135,15 @@ gh aw audit "$BASE_RUN_ID" "$RUN_ID" --repo "$REPO" \
   --output "$EVIDENCE" --json
 ```
 
-First run = reference. Compare model/provider, credential source (names only),
-revision/runtimes/inventory; success != identity.
-Different inventories/same AWF version: not proof of regression/retirement.
-Evidence required for removal time/cause.
-Trace pins: `git log -S 'model: PROVIDER/MODEL' -- WORKFLOW.md`.
+First run = reference. Compare model/provider, credential source (names only), revision/runtimes/inventory; success != identity. Different inventories at same AWF version: not proof of regression/retirement; removal time/cause needs evidence.
+Pins: `git log -S 'model: PROVIDER/MODEL' -- WORKFLOW.md`.
 
 Absent pin: verify provider/API/capabilities/policy.
 Authorized patch: edit/recompile; compilation != inference.
 
 ## Completion and safe-output errors
 
-Trace registration/invocation/persistence/validation/publication.
+Trace registration through publication.
 Nonempty `safeoutputs.jsonl` != publication.
 
 | Codes|Check|Remedy|
