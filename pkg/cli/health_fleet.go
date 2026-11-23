@@ -42,20 +42,21 @@ type healthFleetWorkflowEvidence struct {
 }
 
 type healthFleetState struct {
-	Version          int                                    `json:"version"`
-	Scope            healthFleetScope                       `json:"scope"`
-	Threshold        float64                                `json:"threshold"`
-	LogsDir          string                                 `json:"logs_dir,omitempty"`
-	RegistryPage     int                                    `json:"registry_page"`
-	RegistryDrift    bool                                   `json:"registry_drift,omitempty"`
-	RegistryIssues   map[string]string                      `json:"registry_issues,omitempty"`
-	RegistrySeen     map[string]bool                        `json:"registry_seen,omitempty"`
-	Workflows        []GitHubWorkflow                       `json:"workflows"`
-	Windows          []healthFleetWindow                    `json:"windows"`
-	UnresolvedSlices int                                    `json:"unresolved_slices"`
-	Runs             map[int64]WorkflowRun                  `json:"runs"`
-	Verified         map[string]healthFleetWorkflowEvidence `json:"verified"`
-	Responses        map[string][]byte                      `json:"responses"`
+	Version            int                                    `json:"version"`
+	Scope              healthFleetScope                       `json:"scope"`
+	Threshold          float64                                `json:"threshold"`
+	LogsDir            string                                 `json:"logs_dir,omitempty"`
+	RegistryPage       int                                    `json:"registry_page"`
+	RegistryExclusions []string                               `json:"registry_exclusions,omitempty"`
+	RegistryDrift      bool                                   `json:"registry_drift,omitempty"`
+	RegistryIssues     map[string]string                      `json:"registry_issues,omitempty"`
+	RegistrySeen       map[string]bool                        `json:"registry_seen,omitempty"`
+	Workflows          []GitHubWorkflow                       `json:"workflows"`
+	Windows            []healthFleetWindow                    `json:"windows"`
+	UnresolvedSlices   int                                    `json:"unresolved_slices"`
+	Runs               map[int64]WorkflowRun                  `json:"runs"`
+	Verified           map[string]healthFleetWorkflowEvidence `json:"verified"`
+	Responses          map[string][]byte                      `json:"responses"`
 }
 
 func runHealthFleet(ctx context.Context, config HealthConfig, start, end, started time.Time) error {
@@ -212,6 +213,9 @@ func collectHealthFleetRegistry(state *healthFleetState, collection *HealthColle
 		state.RegistryPage++
 	}
 	if state.RegistryPage == 0 {
+		if err := state.verifyRegistryExclusions(collection); err != nil {
+			return err
+		}
 		for file := range snapshot.files {
 			if validHealthFleetPath(file) && !state.RegistrySeen[file] {
 				state.flagRegistryIssue(file, "missing_registry_entry")
@@ -223,7 +227,6 @@ func collectHealthFleetRegistry(state *healthFleetState, collection *HealthColle
 }
 
 func (state *healthFleetState) compareRegistryPage(workflows []GitHubWorkflow, files map[string]string, collection *HealthCollection) error {
-	var exclusions []string
 	for _, workflow := range workflows {
 		file := workflow.Path
 		if !validHealthFleetPath(file) {
@@ -250,24 +253,35 @@ func (state *healthFleetState) compareRegistryPage(workflows []GitHubWorkflow, f
 			healthLog.Printf("Workflow registry evidence unavailable for %q", file)
 		}
 		if outsideScope {
-			exclusions = append(exclusions, file)
+			if !slices.Contains(state.RegistryExclusions, file) {
+				state.RegistryExclusions = append(state.RegistryExclusions, file)
+			}
 		} else {
 			state.flagRegistryIssue(file, "active_registry_only")
 		}
 	}
-	if len(exclusions) > 0 {
-		// Check after collecting the page's evidence: an addition at a newer
-		// head may not have any runs yet, so the pinned history is insufficient.
-		head, err := healthFleetRegistryHead(state.Scope, collection)
-		if err != nil && collection.stopped {
-			return err
+	return nil
+}
+
+func (state *healthFleetState) verifyRegistryExclusions(collection *HealthCollection) error {
+	if len(state.RegistryExclusions) == 0 {
+		return nil
+	}
+	// Recheck only after all pages and exclusion evidence have been collected.
+	// Keep candidates in the checkpoint until then so a resumed scan can verify them.
+	head, err := healthFleetRegistryHead(state.Scope, collection)
+	if err != nil && collection.stopped {
+		return err
+	}
+	if err != nil || head != state.Scope.HeadSHA {
+		if err != nil {
+			healthLog.Printf("Default branch head unavailable after registry scan: %v", err)
 		}
-		if head != state.Scope.HeadSHA {
-			for _, file := range exclusions {
-				state.flagRegistryIssue(file, "active_registry_only")
-			}
+		for _, file := range state.RegistryExclusions {
+			state.flagRegistryIssue(file, "active_registry_only")
 		}
 	}
+	state.RegistryExclusions = nil
 	return nil
 }
 

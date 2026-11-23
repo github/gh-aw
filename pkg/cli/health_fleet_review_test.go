@@ -4,6 +4,7 @@ package cli
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/url"
@@ -83,15 +84,16 @@ func TestHealthFleetReviewRegistryOnlyEvidence(t *testing.T) {
 	pin, deletion := strings.Repeat("a", 40), strings.Repeat("b", 40)
 	start := time.Date(2026, 11, 1, 0, 0, 0, 0, time.UTC)
 	for _, tt := range []struct {
-		name        string
-		head        string
-		date        time.Time
-		history     string
-		runs        string
-		unavailable bool
-		resume      bool
-		advance     bool
-		drift       bool
+		name            string
+		head            string
+		date            time.Time
+		history         string
+		runs            string
+		unavailable     bool
+		headUnavailable bool
+		resume          bool
+		advance         bool
+		drift           bool
 	}{
 		{name: "confirmed old deletion", head: pin, date: start.Add(-time.Second)},
 		{name: "deletion within scan", head: pin, date: start, drift: true},
@@ -99,9 +101,10 @@ func TestHealthFleetReviewRegistryOnlyEvidence(t *testing.T) {
 		{name: "branch-only registration", head: pin, history: `[]`, runs: `{"total_count":0,"workflow_runs":[]}`},
 		{name: "branch-only proof with changed head", head: deletion, history: `[]`, runs: `{"total_count":0,"workflow_runs":[]}`, drift: true},
 		{name: "head advances during page", head: pin, history: `[]`, runs: `{"total_count":0,"workflow_runs":[]}`, advance: true, drift: true},
-		{name: "default branch run exists", history: `[]`, runs: `{"total_count":1,"workflow_runs":[{"id":2}]}`, drift: true},
-		{name: "incomplete run evidence", history: `[]`, runs: `{"total_count":0}`, drift: true},
-		{name: "unavailable run evidence", history: `[]`, drift: true},
+		{name: "default branch run exists", head: pin, history: `[]`, runs: `{"total_count":1,"workflow_runs":[{"id":2}]}`, drift: true},
+		{name: "incomplete run evidence", head: pin, history: `[]`, runs: `{"total_count":0}`, drift: true},
+		{name: "unavailable run evidence", head: pin, history: `[]`, drift: true},
+		{name: "unavailable final head evidence", head: pin, history: `[]`, runs: `{"total_count":0,"workflow_runs":[]}`, headUnavailable: true, drift: true},
 		{name: "invalid path history", history: `null`, drift: true},
 		{name: "unavailable commit", unavailable: true, drift: true},
 		{name: "resume interrupted proof", head: pin, date: start.Add(-time.Second), resume: true},
@@ -155,6 +158,9 @@ func TestHealthFleetReviewRegistryOnlyEvidence(t *testing.T) {
 					}
 					return []byte(fmt.Sprintf(`{"sha":%q,"date":%q,"removed":[%q]}`, deletion, tt.date.Format(time.RFC3339), file)), nil
 				case "repos/org/repo/git/ref/heads/main":
+					if tt.headUnavailable {
+						return nil, errors.New("head unavailable")
+					}
 					return []byte(fmt.Sprintf(`{"sha":%q}`, head)), nil
 				default:
 					t.Fatalf("unexpected request %s", args[3])
@@ -199,6 +205,83 @@ func TestHealthFleetReviewRegistryOnlyEvidence(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestHealthFleetReviewRegistryExclusionsRecheckedAfterAllPages(t *testing.T) {
+	old := healthRunGH
+	t.Cleanup(func() { healthRunGH = old })
+	const file = ".github/workflows/branch-only.lock.yml"
+	pin, advanced := strings.Repeat("a", 40), strings.Repeat("b", 40)
+	start := time.Date(2026, 11, 1, 0, 0, 0, 0, time.UTC)
+	config := HealthConfig{Checkpoint: filepath.Join(t.TempDir(), "checkpoint.json")}
+	state := newHealthFleetState(config, "github.com", "org/repo", start, start.Add(time.Hour))
+	state.Scope.Branch, state.Scope.HeadSHA = "main", pin
+	state.RegistryPage = 1
+	head := pin
+	failSecondPage := true
+	collection := &HealthCollection{Host: "github.com", repoOverride: "org/repo", scanBranch: "main",
+		pinnedBranchSHA: pin, fleetResponses: state.Responses, APIRateLimit: &GitHubAPIRateLimitState{Remaining: 4000}}
+	healthRunGH = func(_ context.Context, _ string, args ...string) ([]byte, error) {
+		u, err := url.Parse(args[3])
+		require.NoError(t, err)
+		switch u.Path {
+		case "repos/org/repo/contents/.github/workflows":
+			return []byte(`[]`), nil
+		case "repos/org/repo/actions/workflows":
+			switch u.Query().Get("page") {
+			case "1":
+				workflows := make([]GitHubWorkflow, 100)
+				for i := range workflows {
+					workflows[i] = GitHubWorkflow{
+						ID: int64(i + 1), Path: fmt.Sprintf(".github/workflows/disabled-%d.lock.yml", i),
+						State: "disabled_manually",
+					}
+				}
+				workflows[0] = GitHubWorkflow{ID: 1, Path: file, State: "active"}
+				payload, err := json.Marshal(struct {
+					Workflows []GitHubWorkflow `json:"workflows"`
+				}{Workflows: workflows})
+				require.NoError(t, err)
+				return payload, nil
+			case "2":
+				if failSecondPage {
+					failSecondPage = false
+					return nil, errors.New("page 2 unavailable")
+				}
+				head = advanced
+				return []byte(`{"workflows":[]}`), nil
+			default:
+				t.Fatalf("unexpected registry page %q", u.Query().Get("page"))
+				return nil, nil
+			}
+		case "repos/org/repo/commits":
+			require.Equal(t, file, u.Query().Get("path"))
+			return []byte(`[]`), nil
+		case "repos/org/repo/actions/workflows/1/runs":
+			return []byte(`{"total_count":0,"workflow_runs":[]}`), nil
+		case "repos/org/repo/git/ref/heads/main":
+			return []byte(fmt.Sprintf(`{"sha":%q}`, head)), nil
+		default:
+			t.Fatalf("unexpected request %s", args[3])
+			return nil, nil
+		}
+	}
+
+	require.ErrorContains(t, collectHealthFleetRegistry(state, collection), "page 2 unavailable")
+	require.Equal(t, 2, state.RegistryPage)
+	require.Equal(t, []string{file}, state.RegistryExclusions)
+	require.False(t, state.RegistryDrift)
+	require.NoError(t, saveHealthFleetCheckpoint(config.Checkpoint, state))
+
+	state, err := loadHealthFleetCheckpoint(config, "github.com", "org/repo", start, start.Add(time.Hour))
+	require.NoError(t, err)
+	collection = &HealthCollection{Host: "github.com", repoOverride: "org/repo", scanBranch: "main",
+		pinnedBranchSHA: pin, fleetResponses: state.Responses, APIRateLimit: &GitHubAPIRateLimitState{Remaining: 4000}}
+	require.NoError(t, collectHealthFleetRegistry(state, collection))
+	require.Zero(t, state.RegistryPage)
+	require.Empty(t, state.RegistryExclusions)
+	require.Equal(t, map[string]string{file: "active_registry_only"}, state.RegistryIssues)
+	require.True(t, state.RegistryDrift)
 }
 
 func TestHealthFleetReviewRepositoryHosts(t *testing.T) {
