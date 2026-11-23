@@ -31,6 +31,7 @@ func returnsErrorOnFailurePath(pass *analysis.Pass, body *ast.BlockStmt, functio
 	}
 	return false
 }
+
 func returnsOutputOnAllReturns(pass *analysis.Pass, body *ast.BlockStmt, functionType *ast.FuncType, resultObject types.Object, after token.Pos) bool {
 	if body == nil || resultObject == nil {
 		return false
@@ -56,6 +57,7 @@ func returnsOutputOnAllReturns(pass *analysis.Pass, body *ast.BlockStmt, functio
 	})
 	return foundReturn && allReturnsRetain
 }
+
 func returnsObjectOnFailurePath(pass *analysis.Pass, body *ast.BlockStmt, object, errObject types.Object, after token.Pos) bool {
 	if body == nil || object == nil || errObject == nil {
 		return false
@@ -73,6 +75,7 @@ func returnsObjectOnFailurePath(pass *analysis.Pass, body *ast.BlockStmt, object
 	}
 	return false
 }
+
 func hasRetainedObjectUseOnFailurePath(pass *analysis.Pass, body *ast.BlockStmt, object, errObject types.Object, after token.Pos) bool {
 	if body == nil || object == nil || errObject == nil {
 		return false
@@ -119,6 +122,7 @@ func hasRetainedObjectUseOnFailurePath(pass *analysis.Pass, body *ast.BlockStmt,
 	}
 	return false
 }
+
 func isDiagnosticSinkCall(pass *analysis.Pass, call *ast.CallExpr) bool {
 	pkgPath, name, ok := astutil.PackageCall(pass, call)
 	if !ok {
@@ -133,6 +137,7 @@ func isDiagnosticSinkCall(pass *analysis.Pass, call *ast.CallExpr) bool {
 		return false
 	}
 }
+
 func failureBranchReturnsObject(pass *analysis.Pass, body *ast.BlockStmt, branch ast.Stmt, object types.Object, namedResult bool, after token.Pos) bool {
 	block, ok := branch.(*ast.BlockStmt)
 	if !ok || len(block.List) == 0 {
@@ -165,6 +170,7 @@ func failureBranchReturnsObject(pass *analysis.Pass, body *ast.BlockStmt, branch
 	})
 	return allReturnsPropagate
 }
+
 func returnPropagatesObject(pass *analysis.Pass, body *ast.BlockStmt, ret *ast.ReturnStmt, object types.Object, namedResult bool, after token.Pos) bool {
 	if len(ret.Results) == 0 {
 		if !namedResult {
@@ -188,6 +194,7 @@ func returnPropagatesObject(pass *analysis.Pass, body *ast.BlockStmt, ret *ast.R
 	}
 	return false
 }
+
 func expressionPropagatesError(pass *analysis.Pass, body *ast.BlockStmt, expr ast.Expr, object types.Object, after, before token.Pos) bool {
 	if object == nil || before <= after || objectReassignedBetween(pass, body, object, after, before) {
 		return false
@@ -222,6 +229,7 @@ func expressionPropagatesError(pass *analysis.Pass, body *ast.BlockStmt, expr as
 	return err == nil && hasOnlyWrapVerb(formatString) &&
 		expressionPropagatesError(pass, body, call.Args[1], object, after, before) //nolint:uncheckedsliceindex // len(call.Args) is checked above
 }
+
 func hasOnlyWrapVerb(format string) bool {
 	wrapCount := 0
 	for i := 0; i < len(format)-1; i++ {
@@ -253,6 +261,7 @@ func hasOnlyWrapVerb(format string) bool {
 	}
 	return wrapCount == 1
 }
+
 func hasReturnBefore(body *ast.BlockStmt, target *ast.IfStmt, after token.Pos) bool {
 	found := false
 	for _, stmt := range body.List {
@@ -280,6 +289,7 @@ func hasReturnBefore(body *ast.BlockStmt, target *ast.IfStmt, after token.Pos) b
 	}
 	return false
 }
+
 func hasNamedResult(pass *analysis.Pass, functionType *ast.FuncType, object types.Object) bool {
 	if functionType == nil || functionType.Results == nil || object == nil {
 		return false
@@ -293,6 +303,7 @@ func hasNamedResult(pass *analysis.Pass, functionType *ast.FuncType, object type
 	}
 	return false
 }
+
 func errorFailureBranch(pass *analysis.Pass, ifStmt *ast.IfStmt, object types.Object) ast.Stmt {
 	condition, ok := astutil.UnwrapParenExpr(ifStmt.Cond).(*ast.BinaryExpr)
 	if !ok || (condition.Op != token.NEQ && condition.Op != token.EQL) {

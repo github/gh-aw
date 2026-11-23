@@ -17,10 +17,12 @@ func isErrorObject(object types.Object) bool {
 	errorType := types.Universe.Lookup("error")
 	return errorType != nil && types.Identical(types.Unalias(object.Type()), types.Unalias(errorType.Type()))
 }
+
 func isObjectIdent(pass *analysis.Pass, expr ast.Expr, object types.Object) bool {
 	ident, ok := astutil.UnwrapParenExpr(expr).(*ast.Ident)
 	return ok && pass.TypesInfo.ObjectOf(ident) == object
 }
+
 func expressionUsesObject(pass *analysis.Pass, expr ast.Expr, object types.Object) bool {
 	usesObject := false
 	ast.Inspect(expr, func(node ast.Node) bool {
@@ -33,6 +35,7 @@ func expressionUsesObject(pass *analysis.Pass, expr ast.Expr, object types.Objec
 	})
 	return usesObject
 }
+
 func nodeContains(root, target ast.Node) bool {
 	contains := false
 	ast.Inspect(root, func(node ast.Node) bool {
@@ -44,6 +47,7 @@ func nodeContains(root, target ast.Node) bool {
 	})
 	return contains
 }
+
 func isAssignmentDestination(body *ast.BlockStmt, target *ast.SelectorExpr) bool {
 	destination := false
 	ast.Inspect(body, func(node ast.Node) bool {
@@ -65,6 +69,7 @@ func isAssignmentDestination(body *ast.BlockStmt, target *ast.SelectorExpr) bool
 	})
 	return destination
 }
+
 func sameExitErrorReceiver(pass *analysis.Pass, left, right ast.Expr) bool {
 	left, right = astutil.UnwrapParenExpr(left), astutil.UnwrapParenExpr(right)
 	leftAssert, leftIsAssert := left.(*ast.TypeAssertExpr)
@@ -81,6 +86,7 @@ func sameExitErrorReceiver(pass *analysis.Pass, left, right ast.Expr) bool {
 	rightIdent, rightOK := right.(*ast.Ident)
 	return leftOK && rightOK && pass.TypesInfo.ObjectOf(leftIdent) == pass.TypesInfo.ObjectOf(rightIdent)
 }
+
 func findExitErrorObjects(pass *analysis.Pass, body *ast.BlockStmt, errObject types.Object, after token.Pos) map[types.Object]token.Pos {
 	exitErrorObjects := make(map[types.Object]token.Pos)
 	ast.Inspect(body, func(node ast.Node) bool {
@@ -117,6 +123,7 @@ func findExitErrorObjects(pass *analysis.Pass, body *ast.BlockStmt, errObject ty
 	})
 	return exitErrorObjects
 }
+
 func objectReassignedBetween(pass *analysis.Pass, body *ast.BlockStmt, object types.Object, after, before token.Pos) bool {
 	if body == nil || object == nil {
 		return false
@@ -169,6 +176,7 @@ func objectReassignedBetween(pass *analysis.Pass, body *ast.BlockStmt, object ty
 	})
 	return reassigned
 }
+
 func isDiscardedValue(body *ast.BlockStmt, value ast.Node) bool {
 	discarded := false
 	ast.Inspect(body, func(node ast.Node) bool {
@@ -194,6 +202,7 @@ func isDiscardedValue(body *ast.BlockStmt, value ast.Node) bool {
 	})
 	return discarded
 }
+
 func isExitErrorAssertion(pass *analysis.Pass, expr ast.Expr, errObject types.Object) bool {
 	assertion, ok := astutil.UnwrapParenExpr(expr).(*ast.TypeAssertExpr)
 	if !ok || !isExecExitErrorType(pass.TypesInfo.TypeOf(assertion.Type)) {
@@ -202,6 +211,7 @@ func isExitErrorAssertion(pass *analysis.Pass, expr ast.Expr, errObject types.Ob
 	ident, ok := astutil.UnwrapParenExpr(assertion.X).(*ast.Ident)
 	return ok && pass.TypesInfo.ObjectOf(ident) == errObject
 }
+
 func isErrorsAsForExitError(pass *analysis.Pass, call *ast.CallExpr, errObject types.Object, position token.Pos, objects map[types.Object]token.Pos) bool {
 	pkgPath, name, ok := astutil.PackageCall(pass, call)
 	if !ok || pkgPath != "errors" || name != "As" || len(call.Args) != 2 {
@@ -226,6 +236,7 @@ func isErrorsAsForExitError(pass *analysis.Pass, call *ast.CallExpr, errObject t
 	}
 	return true
 }
+
 func isExecExitErrorType(t types.Type) bool {
 	if t == nil {
 		return false

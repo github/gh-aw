@@ -18,6 +18,7 @@ import (
 const linterName = "execcommandoutputerrdiscard"
 
 // Analyzer is the exec-command-output-error-discard analysis pass.
+
 var Analyzer = analyzerutil.New(linterName, "reports exec.Cmd output calls whose failures discard stderr diagnostics", run)
 
 func run(pass *analysis.Pass) (any, error) {
@@ -68,6 +69,7 @@ func run(pass *analysis.Pass) (any, error) {
 	}
 	return nil, nil
 }
+
 func execOutputMethod(pass *analysis.Pass, call *ast.CallExpr) string {
 	selector, ok := astutil.UnwrapParenExpr(call.Fun).(*ast.SelectorExpr)
 	if !ok {
@@ -88,6 +90,7 @@ func execOutputMethod(pass *analysis.Pass, call *ast.CallExpr) string {
 		return ""
 	}
 }
+
 func enclosingFunction(cur inspector.Cursor) (*ast.FuncType, *ast.BlockStmt) {
 	for enclosing := range cur.Enclosing((*ast.FuncDecl)(nil), (*ast.FuncLit)(nil)) {
 		switch fn := enclosing.Node().(type) {
@@ -99,6 +102,7 @@ func enclosingFunction(cur inspector.Cursor) (*ast.FuncType, *ast.BlockStmt) {
 	}
 	return nil, nil
 }
+
 func findCallResults(pass *analysis.Pass, body *ast.BlockStmt, call *ast.CallExpr) resultBinding {
 	var binding resultBinding
 	if body == nil {
@@ -145,6 +149,7 @@ func bindResults(pass *analysis.Pass, lhs []ast.Expr) resultBinding {
 		err:    bindingObject(pass, lhs[1]), //nolint:uncheckedsliceindex // len(lhs) is checked above
 	}
 }
+
 func bindingObject(pass *analysis.Pass, expr ast.Expr) types.Object {
 	ident, ok := astutil.UnwrapParenExpr(expr).(*ast.Ident)
 	if !ok || ident.Name == "_" {
@@ -152,10 +157,12 @@ func bindingObject(pass *analysis.Pass, expr ast.Expr) types.Object {
 	}
 	return pass.TypesInfo.ObjectOf(ident)
 }
+
 func sameCall(expr ast.Expr, call *ast.CallExpr) bool {
 	exprCall, ok := astutil.UnwrapParenExpr(expr).(*ast.CallExpr)
 	return ok && exprCall == call
 }
+
 func callIsReturned(body *ast.BlockStmt, call *ast.CallExpr) bool {
 	if body == nil {
 		return false

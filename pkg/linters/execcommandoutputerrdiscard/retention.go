@@ -35,6 +35,7 @@ func expressionRetainsObject(pass *analysis.Pass, body *ast.BlockStmt, expr ast.
 	}
 	return false
 }
+
 func objectRetainedUntil(pass *analysis.Pass, body *ast.BlockStmt, object types.Object, after, before token.Pos) bool {
 	if body == nil || object == nil {
 		return false
@@ -90,6 +91,7 @@ func objectRetainedUntil(pass *analysis.Pass, body *ast.BlockStmt, object types.
 	})
 	return retained
 }
+
 func findSliceAliases(pass *analysis.Pass, body *ast.BlockStmt, object types.Object, after, before token.Pos) map[types.Object]bool {
 	aliases := make(map[types.Object]bool)
 	addAlias := func(lhs ast.Expr) {
@@ -129,6 +131,7 @@ func findSliceAliases(pass *analysis.Pass, body *ast.BlockStmt, object types.Obj
 	})
 	return aliases
 }
+
 func expressionAliasesObjectAt(pass *analysis.Pass, body *ast.BlockStmt, expr ast.Expr, object types.Object, aliases map[types.Object]bool, after, before token.Pos) bool {
 	switch expr := astutil.UnwrapParenExpr(expr).(type) {
 	case *ast.Ident:
@@ -147,6 +150,7 @@ func expressionAliasesObjectAt(pass *analysis.Pass, body *ast.BlockStmt, expr as
 		return false
 	}
 }
+
 func sliceAliasMayAliasAt(pass *analysis.Pass, body *ast.BlockStmt, alias, object types.Object, aliases map[types.Object]bool, after, before token.Pos) bool {
 	mayAlias := false
 	ast.Inspect(body, func(node ast.Node) bool {
@@ -188,6 +192,7 @@ func sliceAliasMayAliasAt(pass *analysis.Pass, body *ast.BlockStmt, alias, objec
 	})
 	return mayAlias
 }
+
 func isFullSliceAliasAt(pass *analysis.Pass, body *ast.BlockStmt, expr ast.Expr, object types.Object, aliases map[types.Object]bool, after, before token.Pos, visiting map[types.Object]bool) bool {
 	switch expr := astutil.UnwrapParenExpr(expr).(type) {
 	case *ast.Ident:
@@ -242,8 +247,8 @@ func isFullSliceAliasOfIdentAt(pass *analysis.Pass, body *ast.BlockStmt, ident *
 					latestPos = node.Pos()
 					found = true
 					latestDirect = isDirectFunctionBodyAssignment(body, node)
-					if i < len(node.Rhs) && len(node.Lhs) == len(node.Rhs) {
-						rhs = node.Rhs[i] //nolint:uncheckedsliceindex // index and slice lengths are checked above
+					if i >= 0 && i < len(node.Rhs) && len(node.Lhs) == len(node.Rhs) {
+						rhs = node.Rhs[i]
 					} else {
 						rhs = nil
 					}
@@ -258,8 +263,8 @@ func isFullSliceAliasOfIdentAt(pass *analysis.Pass, body *ast.BlockStmt, ident *
 					latestPos = node.Pos()
 					found = true
 					latestDirect = isDirectFunctionBodyAssignment(body, node)
-					if i < len(node.Values) && len(node.Names) == len(node.Values) {
-						rhs = node.Values[i] //nolint:uncheckedsliceindex // index and slice lengths are checked above
+					if i >= 0 && i < len(node.Values) && len(node.Names) == len(node.Values) {
+						rhs = node.Values[i]
 					} else {
 						rhs = nil
 					}
@@ -273,6 +278,7 @@ func isFullSliceAliasOfIdentAt(pass *analysis.Pass, body *ast.BlockStmt, ident *
 	}
 	return isFullSliceAliasAt(pass, body, rhs, object, aliases, after, latestPos, visiting)
 }
+
 func isSliceConversion(pass *analysis.Pass, call *ast.CallExpr) bool {
 	if !pass.TypesInfo.Types[call.Fun].IsType() || len(call.Args) != 1 {
 		return false
@@ -281,6 +287,7 @@ func isSliceConversion(pass *analysis.Pass, call *ast.CallExpr) bool {
 	source, sourceOK := pass.TypesInfo.TypeOf(call.Args[0]).Underlying().(*types.Slice) //nolint:uncheckedsliceindex // len(call.Args) is checked above
 	return targetOK && sourceOK && types.Identical(target, source)
 }
+
 func isDirectFunctionBodyAssignment(body *ast.BlockStmt, node ast.Node) bool {
 	for _, statement := range body.List {
 		if statement == node {
@@ -302,6 +309,7 @@ func isDirectFunctionBodyAssignment(body *ast.BlockStmt, node ast.Node) bool {
 	}
 	return false
 }
+
 func expressionUsesObjectOrAliasAt(pass *analysis.Pass, body *ast.BlockStmt, expr ast.Expr, object types.Object, aliases map[types.Object]bool, after, before token.Pos) bool {
 	usesObject := false
 	ast.Inspect(expr, func(node ast.Node) bool {
@@ -318,6 +326,7 @@ func expressionUsesObjectOrAliasAt(pass *analysis.Pass, body *ast.BlockStmt, exp
 	})
 	return usesObject
 }
+
 func isBuiltinCall(pass *analysis.Pass, call *ast.CallExpr, name string) bool {
 	ident, ok := astutil.UnwrapParenExpr(call.Fun).(*ast.Ident)
 	if !ok || ident.Name != name {
@@ -326,6 +335,7 @@ func isBuiltinCall(pass *analysis.Pass, call *ast.CallExpr, name string) bool {
 	builtin, ok := pass.TypesInfo.Uses[ident].(*types.Builtin)
 	return ok && builtin.Name() == name
 }
+
 func isRetainingAppend(pass *analysis.Pass, expr ast.Expr, object types.Object) bool {
 	call, ok := astutil.UnwrapParenExpr(expr).(*ast.CallExpr)
 	if !ok {

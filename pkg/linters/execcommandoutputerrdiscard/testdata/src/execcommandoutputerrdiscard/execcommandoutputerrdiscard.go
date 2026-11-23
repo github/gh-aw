@@ -270,6 +270,33 @@ func clearingExitErrorStderrDoesNotHandleCommandError() {
 	_ = output
 }
 
+func matchingExitErrorStderrWriteDoesNotHandleCommandError() {
+	cmd := exec.Command("test")
+	output, err := cmd.Output() // want "exec.Cmd.Output error handling"
+	if err != nil {
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) {
+			exitErr.Stderr = nil
+			slog.Error("command failed", "stderr", exitErr.Stderr)
+		}
+	}
+	_ = output
+}
+
+func mismatchedExitErrorStderrWriteDoesNotBlockHandling() {
+	cmd := exec.Command("test")
+	output, err := cmd.Output()
+	if err != nil {
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) {
+			otherExitErr := &exec.ExitError{}
+			otherExitErr.Stderr = nil
+			slog.Error("command failed", "stderr", exitErr.Stderr)
+		}
+	}
+	_ = output
+}
+
 func retainedCombinedOutput() []byte {
 	cmd := exec.Command("test")
 	output, err := cmd.CombinedOutput()
@@ -332,6 +359,24 @@ func combinedOutputExtendedThroughAlias() []byte {
 	output, _ := cmd.CombinedOutput()
 	alias := output
 	alias = append(alias, []byte("suffix")...)
+	return output
+}
+
+func combinedOutputExtendedThroughIntermediateFullSliceAlias() []byte {
+	cmd := exec.Command("test")
+	output, _ := cmd.CombinedOutput()
+	alias := output
+	intermediate := alias
+	intermediate = append(intermediate, 'x')
+	return output
+}
+
+func combinedOutputExtendedThroughReassignedFullSliceAlias() []byte {
+	cmd := exec.Command("test")
+	output, _ := cmd.CombinedOutput()
+	alias := []byte("unrelated")
+	alias = output
+	alias = append(alias, 'x')
 	return output
 }
 

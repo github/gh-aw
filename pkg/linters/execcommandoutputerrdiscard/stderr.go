@@ -57,6 +57,7 @@ func hasExitErrorStderrUse(pass *analysis.Pass, body *ast.BlockStmt, errObject t
 	}
 	return false
 }
+
 func hasConfiguredStderrUse(pass *analysis.Pass, body *ast.BlockStmt, call *ast.CallExpr, errObject types.Object, after token.Pos) bool {
 	streamed, capturedObject := configuredStderrWriter(pass, body, call, after)
 	if streamed {
@@ -79,7 +80,7 @@ func hasConfiguredStderrUse(pass *analysis.Pass, body *ast.BlockStmt, call *ast.
 	return false
 }
 
-func configuredStderrWriter(pass *analysis.Pass, body *ast.BlockStmt, call *ast.CallExpr, after token.Pos) (bool, types.Object) {
+func configuredStderrWriter(pass *analysis.Pass, body *ast.BlockStmt, call *ast.CallExpr, after token.Pos) (streamed bool, capturedObject types.Object) {
 	if body == nil {
 		return false, nil
 	}
@@ -92,8 +93,7 @@ func configuredStderrWriter(pass *analysis.Pass, body *ast.BlockStmt, call *ast.
 		return false, nil
 	}
 	commandObject := pass.TypesInfo.ObjectOf(receiver)
-	var capturedObject types.Object
-	streamed := false
+	streamed = false
 	var sinkPosition token.Pos
 	for _, stmt := range body.List {
 		assign, ok := stmt.(*ast.AssignStmt)
@@ -130,6 +130,7 @@ func configuredStderrWriter(pass *analysis.Pass, body *ast.BlockStmt, call *ast.
 	}
 	return streamed, capturedObject
 }
+
 func isOSStderr(pass *analysis.Pass, expr ast.Expr) bool {
 	selector, ok := astutil.UnwrapParenExpr(expr).(*ast.SelectorExpr)
 	if !ok || selector.Sel.Name != "Stderr" {
@@ -142,6 +143,7 @@ func isOSStderr(pass *analysis.Pass, expr ast.Expr) bool {
 	pkgName, ok := pass.TypesInfo.Uses[pkgIdent].(*types.PkgName)
 	return ok && pkgName.Imported().Path() == "os"
 }
+
 func stderrWriterObject(pass *analysis.Pass, expr ast.Expr) types.Object {
 	if !isKnownCapturedStderrWriter(pass.TypesInfo.TypeOf(expr)) {
 		return nil
@@ -156,6 +158,7 @@ func stderrWriterObject(pass *analysis.Pass, expr ast.Expr) types.Object {
 	}
 	return nil
 }
+
 func isKnownCapturedStderrWriter(t types.Type) bool {
 	if t == nil {
 		return false
@@ -171,6 +174,7 @@ func isKnownCapturedStderrWriter(t types.Type) bool {
 	return named.Obj().Pkg().Path() == "bytes" && named.Obj().Name() == "Buffer" ||
 		named.Obj().Pkg().Path() == "strings" && named.Obj().Name() == "Builder"
 }
+
 func stderrSinkReassignedBetween(pass *analysis.Pass, body *ast.BlockStmt, commandObject types.Object, after, before token.Pos) bool {
 	reassigned := false
 	ast.Inspect(body, func(node ast.Node) bool {
@@ -201,6 +205,7 @@ func stderrSinkReassignedBetween(pass *analysis.Pass, body *ast.BlockStmt, comma
 	})
 	return reassigned
 }
+
 func capturedStderrConsumedBetween(pass *analysis.Pass, body *ast.BlockStmt, object types.Object, after, before token.Pos) bool {
 	aliases := findCapturedBufferAliases(pass, body, object, after, before)
 	consumed := false
@@ -272,6 +277,7 @@ func callConsumesCapturedStderr(pass *analysis.Pass, call *ast.CallExpr, object 
 	}
 	return false
 }
+
 func findCapturedBufferAliases(pass *analysis.Pass, body *ast.BlockStmt, object types.Object, after, before token.Pos) map[types.Object]bool {
 	aliases := make(map[types.Object]bool)
 	isAlias := func(expr ast.Expr) bool {
@@ -329,6 +335,7 @@ func findCapturedBufferAliases(pass *analysis.Pass, body *ast.BlockStmt, object 
 	})
 	return aliases
 }
+
 func expressionUsesBufferBytes(pass *analysis.Pass, expr ast.Expr, object types.Object, aliases map[types.Object]bool) bool {
 	usesBytes := false
 	ast.Inspect(expr, func(node ast.Node) bool {
@@ -355,6 +362,7 @@ func expressionUsesBufferBytes(pass *analysis.Pass, expr ast.Expr, object types.
 	})
 	return usesBytes
 }
+
 func hasRetainedCapturedStderrUse(pass *analysis.Pass, body *ast.BlockStmt, branch ast.Stmt, object types.Object, after token.Pos) bool {
 	found := false
 	ast.Inspect(branch, func(node ast.Node) bool {
@@ -417,6 +425,7 @@ func hasRetainedCapturedStderrUse(pass *analysis.Pass, body *ast.BlockStmt, bran
 	})
 	return found
 }
+
 func returnedCall(branch ast.Node, call *ast.CallExpr) bool {
 	returned := false
 	ast.Inspect(branch, func(node ast.Node) bool {
@@ -432,6 +441,7 @@ func returnedCall(branch ast.Node, call *ast.CallExpr) bool {
 	})
 	return returned
 }
+
 func stderrFieldWrittenBetween(pass *analysis.Pass, body *ast.BlockStmt, receiver ast.Expr, after, before token.Pos) bool {
 	written := false
 	ast.Inspect(body, func(node ast.Node) bool {
