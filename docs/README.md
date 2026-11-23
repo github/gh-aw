@@ -75,7 +75,7 @@ slide that lists the band's slides (click or tap a tile to jump) and a map of al
 The Central Agentic Ops (CAO, `gh cao`) band covers a research prototype, so each of its
 slides carries a "Research prototype" badge.
 Clicking a slide never changes it; on touch screens, swipe left/right to step, up/down to walk a column or switch bands, and pinch in to zoom out to the slide map.
-Cmd/Ctrl+Left/Right (and the dock's ‹ › buttons) move between the slides of the main line in reading
+Cmd+Left/Right on macOS or Alt+Left/Right on Windows and Linux (and the dock's ‹ › buttons) move between the slides of the main line in reading
 order and wrap between bands, never through a slide's in-slide steps; Right/Space/Enter (and Left/Backspace)
 play a slide's in-slide steps first and then move on, and Page Up/Page Down (or Shift+Up/Down) move to the band above or
 below like a text cursor: they keep the horizontal position (clamped to the band's length) until

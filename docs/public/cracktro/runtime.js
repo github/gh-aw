@@ -660,8 +660,8 @@
     };
     const lineStartBtn = arrowBtn("First slide of the band", "Shift+Home", "Shift+Home", "M5 5v14M13 6l-6 6 6 6M20 6l-6 6 6 6", () => lineStart());
     const bandPrevBtn = arrowBtn("Previous band", "PgUp or Shift+↑", "PageUp Shift+ArrowUp", "M6 5v14M18 6l-7 6 7 6", () => band(-1));
-    const prevBtn = arrowBtn("Previous slide", "⌘/Ctrl+←", "Meta+ArrowLeft Control+ArrowLeft", "M15 5l-7 7 7 7", () => prev());
-    const nextBtn = arrowBtn("Next slide", "⌘/Ctrl+→", "Meta+ArrowRight Control+ArrowRight", "M9 5l7 7-7 7", () => next());
+    const prevBtn = arrowBtn("Previous slide", "⌘/Alt+←", "Meta+ArrowLeft Alt+ArrowLeft", "M15 5l-7 7 7 7", () => prev());
+    const nextBtn = arrowBtn("Next slide", "⌘/Alt+→", "Meta+ArrowRight Alt+ArrowRight", "M9 5l7 7-7 7", () => next());
     const bandNextBtn = arrowBtn("Next band", "PgDn or Shift+↓", "PageDown Shift+ArrowDown", "M18 5v14M6 6l7 6-7 6", () => band(1));
     const arrows = h("div", { class: "arrows" }, lineStartBtn, bandPrevBtn, prevBtn, nextBtn, bandNextBtn);
     // Column button (dock): shown on a column's head and its examples. On the head it is lit with a bouncing
@@ -1194,7 +1194,7 @@
       vnb.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="${back ? "M12 19V5M5 12l7-7 7 7" : "M12 5v14M5 12l7 7 7-7"}"/></svg><span class="vnb-t">${at ? `${at}/${N}` : N}</span>`;
       vnb._nav = back ? () => go(slides.indexOf(col)) : () => vstep(1);
     }
-    // Cmd/Ctrl+Left/Right, the dock arrows and swipes always change slide; Right/Space/Enter and Left/Backspace
+    // Cmd/Alt+Left/Right, the dock arrows and swipes always change slide; Right/Space/Enter and Left/Backspace
     // run the slide's in-slide steps (onNext/onPrev) first and change slide only when none is left.
     const next = () => {
         const i = nextTop(cur);
@@ -1219,7 +1219,8 @@
         openSearch();
         return;
       }
-      if ((e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey && (e.key === "ArrowRight" || e.key === "ArrowLeft")) {
+      // Cmd+Left/Right (macOS) or Alt+Left/Right (Windows, Linux) change slide; preventDefault stops browser history moves
+      if (e.metaKey !== e.altKey && !e.ctrlKey && !e.shiftKey && (e.key === "ArrowRight" || e.key === "ArrowLeft")) {
         if (target.closest?.("input, textarea, select, [contenteditable]")) return;
         e.preventDefault();
         (e.key === "ArrowRight" ? next : prev)();
@@ -1687,7 +1688,7 @@
       [
         "Move",
         [
-          [["Ctrl+←", "Ctrl+→", "⌘+←", "⌘+→"], "Previous or next slide"],
+          [["Alt+←", "Alt+→", "⌘+←", "⌘+→"], "Previous or next slide"],
           [["→", "Space", "Enter"], "Next step in the slide, then next slide"],
           [["←", "Backspace"], "Previous step in the slide, then previous slide"],
           [["↑", "↓"], "Up or down a column, or to the next band; keeps your place in the line"],
@@ -1799,10 +1800,13 @@
       L: "link",
       Shift: "mod",
       Ctrl: "mod ⌘",
+      Alt: "mod ⌘",
       "1…9": "jump",
     };
-    const KALIAS = { "⌘": "Ctrl" };
-    const chord = k => k.split(/(?<=.)\+(?=.)/).map(p => KALIAS[p] || p);
+    // ⌘ sits on Ctrl for ⌘+K and on Alt for ⌘+←/→ (Alt+←/→ is the Windows and Linux slide shortcut)
+    const KALIAS = { "⌘": "Ctrl" },
+      CALIAS = { "⌘+←": "Alt+←", "⌘+→": "Alt+→" };
+    const chord = k => (CALIAS[k] || k).split(/(?<=.)\+(?=.)/).map(p => KALIAS[p] || p);
     const smpKeyboard = (() => {
       const U = 40,
         NS = "http://www.w3.org/2000/svg";
@@ -1874,7 +1878,7 @@
         const poly = dy => p.map(([x, y]) => `${x},${y + dy}`).join(" ");
         return s(
           "g",
-          { class: `kb-k${on ? " on" : ""}${key.k === "Shift" || key.k === "Ctrl" ? " mod" : ""}`, "data-k": key.k },
+          { class: `kb-k${on ? " on" : ""}${key.k === "Shift" || key.k === "Ctrl" || key.k === "Alt" ? " mod" : ""}`, "data-k": key.k },
           s("polygon", { class: "kb-sk", points: poly(0) }),
           s("polygon", { class: "kb-top", points: poly(-3) }),
           s("text", { x: cx, y: cy - (tag ? 6 : 2), class: "kb-l" }, key.label),

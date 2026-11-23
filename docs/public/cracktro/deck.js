@@ -1,5 +1,5 @@
 // GitHub Agentic Workflows — a zero-dependency, all-JavaScript slide deck.
-// Open index.html directly in a browser. Keys: ⌘/Ctrl+← → slides, ← → Space/Backspace in-slide steps, Home/End, F fullscreen, N notes.
+// Open index.html directly in a browser. Keys: ⌘/Alt+← → slides, ← → Space/Backspace in-slide steps, Home/End, F fullscreen, N notes.
 (() => {
   const W = 1920,
     H = 1080;
