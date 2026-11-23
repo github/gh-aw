@@ -9035,7 +9035,7 @@
     });
   }
 
-  // Repo Factory: five roles share one issue-to-merge loop: several Researchers file issues, one Dispatcher starts concurrent pull request flows in three weekday coding slots, where a coding agent, Reviewers and Finisher drive each to a maintainer, and Dreamer turns outcomes into one proposed change
+  // Repo Factory: five roles share one issue-to-merge loop: several Researchers file issues, one Dispatcher starts concurrent pull request flows in three weekday coding slots, where a Coder, Reviewers and Finisher drive each to a maintainer, and Dreamer turns outcomes into one proposed change
   {
     const AG = pickAgent();
     resetIndex();
@@ -9114,7 +9114,7 @@
     }
     // several researchers, one dispatcher: ghost cards stacked behind Researchers
     [2, 1].forEach(i => (g += `<g class="rf-ghost-a"><rect x="${50 + i * 6}" y="${125 - i * 13}" width="230" height="50" rx="25"/><circle cx="${50 + i * 6}" cy="${150 - i * 13}" r="34"/></g>`));
-    g += agent("nResearch", 50, 150, 230, "Researchers") + agent("nDispatch", 400, 150, 230, "Dispatcher") + agent("nCoder", 750, 150, 230, "Coding agent");
+    g += agent("nResearch", 50, 150, 230, "Researchers") + agent("nDispatch", 400, 150, 230, "Dispatcher") + agent("nCoder", 750, 150, 230, "Coder");
     g += agent("nReview", 1100, 150, 230, "Reviewers") + agent("nFinish", 1450, 150, 210, "Finisher") + agent("nDreamer", 50, 570, 230, "Dreamer");
     // concurrent pull requests: ghost cards stacked behind each per-PR artifact
     [750, 1100, 1450].forEach(x => [2, 1].forEach(i => (g += `<rect class="rf-ghost-a" x="${x - 36 + i * 6}" y="${306 - i * 13}" width="72" height="68" rx="14"/>`)));
@@ -9150,7 +9150,7 @@
     slides.push({
       group: "process",
       notes:
-        "What: An illustrative Repo Factory, the recipe a coding agent follows to give a repository a small set of agentic workflows in five roles. Several Researchers file scoped issues, never pull requests. One Dispatcher admits issues into three shared coding slots on weekdays, so up to three pull request flows run at once. In each flow a coding agent opens the pull request, Reviewers leave at most three findings and Finisher repairs them, looping back for re-review for at most two rounds; then the pull request is ready or escalated, and a maintainer merges. Dreamer observes runs, costs and outcomes, then proposes one reversible change as a new issue.\nWhy: Handoffs go through issues and pull requests, and capacity is capped, so agents cannot flood the repository and people stay at the gates.\nWhen: Use it to bootstrap continuous improvement in a repository that already has CI and maintainers who review.",
+        "What: An illustrative Repo Factory, the recipe a coding agent follows to give a repository a small set of agentic workflows in five roles. Several Researchers file scoped issues, never pull requests. One Dispatcher admits issues into three shared coding slots on weekdays, so up to three pull request flows run at once. In each flow a Coder opens the pull request, Reviewers leave at most three findings and Finisher repairs them, looping back for re-review for at most two rounds; then the pull request is ready or escalated, and a maintainer merges. Dreamer observes runs, costs and outcomes, then proposes one reversible change as a new issue.\nWhy: Handoffs go through issues and pull requests, and capacity is capped, so agents cannot flood the repository and people stay at the gates.\nWhen: Use it to bootstrap continuous improvement in a repository that already has CI and maintainers who review.",
       enter() {
         t0 = 0;
         cyc = -1;
