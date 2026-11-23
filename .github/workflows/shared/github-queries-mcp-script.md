@@ -2,6 +2,7 @@
 mcp-scripts:
   github-issue-query:
     description: "Query GitHub issues with jq filtering support. Without --jq, returns schema and data size info. Use --jq '.' to get all data, or specific jq expressions to filter."
+    timeout: 600
     inputs:
       repo:
         type: string
@@ -247,6 +248,7 @@ mcp-scripts:
 
   github-pr-query:
     description: "Query GitHub pull requests with jq filtering support. Without --jq, returns schema and data size info. Use --jq '.' to get all data, or specific jq expressions to filter."
+    timeout: 600
     inputs:
       repo:
         type: string

@@ -31,6 +31,16 @@ func loadSharedMCPScripts(t *testing.T, filename string) *MCPScriptsConfig {
 	return NewCompiler().mergeMCPScripts(nil, []string{string(scripts)})
 }
 
+func requireSharedGitHubQueryPrerequisites(t *testing.T) {
+	t.Helper()
+	if _, err := exec.LookPath("jq"); err != nil {
+		t.Skip("jq is required for bounded GitHub query tests")
+	}
+	if err := exec.Command("date", "-u", "-d", "2026-10-01", "+%s").Run(); err != nil {
+		t.Skip("GNU-compatible date is required for bounded GitHub query tests")
+	}
+}
+
 func TestSharedGitHubQueryRepositoryBindings(t *testing.T) {
 	config := loadSharedMCPScripts(t, "github-queries-mcp-script.md")
 	var manifest MCPScriptsConfigJSON
@@ -144,9 +154,13 @@ SINCE="${INPUT_SINCE:-}"` + "\n" + repoSelection + "\nprintf '%s' \"$API_PATH\"\
 }
 
 func TestSharedGitHubQueryBoundedRangesRetryAndSplit(t *testing.T) {
+	requireSharedGitHubQueryPrerequisites(t)
 	config := loadSharedMCPScripts(t, "github-queries-mcp-script.md")
 	for _, name := range []string{"github-issue-query", "github-pr-query"} {
 		t.Run(name, func(t *testing.T) {
+			if timeout := config.Tools[name].Timeout; timeout != 600 {
+				t.Fatalf("timeout = %d, want 600 seconds", timeout)
+			}
 			callLog := filepath.Join(t.TempDir(), "queries.log")
 			stub := `GH_CALLS=0
 DAY_ONE_CALLS=0
@@ -243,6 +257,7 @@ gh() {
 }
 
 func TestSharedGitHubQuerySingleDayLimitFails(t *testing.T) {
+	requireSharedGitHubQueryPrerequisites(t)
 	config := loadSharedMCPScripts(t, "github-queries-mcp-script.md")
 	script := `gh() {
   printf '[{"number":1,"updatedAt":"2026-10-01T12:00:00Z"},{"number":2,"updatedAt":"2026-10-01T13:00:00Z"}]\n'
