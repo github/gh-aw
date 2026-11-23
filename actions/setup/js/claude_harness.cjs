@@ -41,7 +41,7 @@ const { getErrorMessage } = require("./error_helpers.cjs");
 const { isGitHubProviderCybersecurityPolicyRejection } = require("./github_provider_policy_rejection.cjs");
 const fs = require("fs");
 const { openDurableSession, observeDurableSession } = require("./durable_native_session.cjs");
-const { runProcess, formatDuration, resolvePostResultWatchdogIdleTimeoutMs } = require("./process_runner.cjs");
+const { runProcess } = require("./process_runner.cjs");
 const { applyClaudeRuntimeTimeouts } = require("./tool_timeouts.cjs");
 const {
   CLAUDE_RESUME_PROMPT,
@@ -54,18 +54,10 @@ const {
   claudeSafeOutputsOffset,
   removeClaudePlugin,
 } = require("./claude_runtime.cjs");
-const {
-  captureExecutionEvidenceConfiguration,
-  resolveHarnessRetryTelemetryPath,
-  runHarnessRetryLoop,
-  selectedHarnessStrategy,
-  shouldSkipForNoopSafeOutputs,
-  shouldStopForNoopSafeOutputs,
-  stripExecutionEvidenceEnv,
-} = require("./harness_retry_runner.cjs");
+const { selectedHarnessStrategy, shouldStopForNoopSafeOutputs, stripExecutionEvidenceEnv } = require("./harness_retry_runner.cjs");
+const { formatAttemptFailure, recordFailureClasses, resolveNonRetryableGuardDecision, startEngineHarness } = require("./harness_engine.cjs");
 const { resolveRetryConfig: resolveSharedRetryConfig } = require("./harness_retry_config.cjs");
 const { stopForPermissionDenied } = require("./harness_failure_handling.cjs");
-const { hasAttemptTerminalSafeOutput } = require("./harness_safe_outputs.cjs");
 const { resolveHarnessPromptFileArgs } = require("./harness_prompt_input.cjs");
 const {
   AWF_API_PROXY_REFLECT_URL,
@@ -82,21 +74,12 @@ const {
 } = require("./awf_reflect.cjs");
 const { emitMissingToolPermissionIssue, emitInfrastructureIncomplete, hasExpectedSafeOutputs, hasNoopInSafeOutputs } = require("./safeoutputs_cli.cjs");
 const { countPermissionDeniedIssues, hasNumerousPermissionDeniedIssues, extractDeniedCommands, buildMissingToolPermissionIssuePayload } = require("./permission_denied_helpers.cjs");
-const {
-  createOutputPatternMatcher,
-  detectNonRetryableHarnessGuard,
-  observeInvocationBudget,
-  buildSoftTimeoutGuard,
-  emitSoftTimeoutSignal,
-  isAuthenticationFailedError,
-  parseAICreditsExceededProxyRejection,
-} = require("./harness_retry_guard.cjs");
+const { createOutputPatternMatcher, emitSoftTimeoutSignal, isAuthenticationFailedError } = require("./harness_retry_guard.cjs");
 const { isCrashSignalExitCode, crashSignalNameForExitCode } = require("./harness_crash_signals.cjs");
 const { MODEL_NOT_SUPPORTED_PATTERN: INVALID_MODEL_ERROR_PATTERN } = require("./detect_agent_errors.cjs");
 const { applyModelFallback, normalizeClaudeModel } = require("./model_fallback.cjs");
 const { buildCatalogFromReflect, resolveEngineModel, splitModelIdentifier } = require("./resolve_model_alias.cjs");
 const { applyClaudeSubagentModels, isDetectionPhase } = require("./engine_subagent_models.cjs");
-const { parseMaxAICreditsExceededFromAuditLog } = require("./ai_credits_context.cjs");
 const { resolveAWFModelRoutingSelection, mapAWFRoutingEffort, recordAWFModelRoutingOutcome, getAWFModelRoutingPolicy, getAWFModelRoutingFailureCode, resolveAWFRoutingProvider } = require("./awf_model_routing.cjs");
 const CLAUDE_ROUTING_POLICY = getAWFModelRoutingPolicy("claude");
 
@@ -506,19 +489,12 @@ function applyClaudeSettingsEnv(args, env = process.env, reflectData, resolvedMo
  * Main entry point: run claude with retry logic for transient API failures.
  */
 async function main() {
-  const executionEvidence = captureExecutionEvidenceConfiguration(process.env);
-  stripExecutionEvidenceEnv(process.env);
-  const [, , command, ...args] = process.argv;
-  const retryConfig = resolveRetryConfig(process.env, log);
-  const { maxRetries, initialDelayMs, backoffMultiplier, maxDelayMs } = retryConfig;
+  // Claude inspects safe outputs strictly: an unreadable file fails the attempt instead of disabling attempt-scoped checks.
+  const harness = startEngineHarness({ engine: "claude", harnessName: "Claude harness", log, resolveRetryConfig, safeOutputsOffset: claudeSafeOutputsOffset });
+  if (!harness) return;
+  const { command, args, safeOutputsPath, softTimeoutGuard } = harness;
+  const { maxRetries, initialDelayMs } = harness.retryConfig;
   const startupRetryLimit = resolveStartupRetryLimit(process.env, log);
-
-  if (!command) {
-    process.stderr.write("claude-harness: Usage: node claude_harness.cjs <command> [args...]\n");
-    process.exit(1);
-  }
-
-  log(`starting: command=${command} maxRetries=${maxRetries} initialDelayMs=${initialDelayMs}` + ` backoffMultiplier=${backoffMultiplier} maxDelayMs=${maxDelayMs}` + ` nodeVersion=${process.version} platform=${process.platform}`);
 
   // Resolve the prompt for the initial run (reads --prompt-file content).
   // A missing or unreadable prompt file is treated as a fatal startup error.
@@ -573,8 +549,7 @@ async function main() {
   // Pre-flight: skip the agent entirely when a noop has already been written by a prior step.
   // A noop indicates the work is complete or there is nothing to do — starting the agent
   // would be wasteful and potentially harmful.
-  const safeOutputsPath = process.env.GH_AW_SAFE_OUTPUTS || "";
-  if (shouldSkipForNoopSafeOutputs({ safeOutputsPath, hasNoopInSafeOutputs, log, executionEvidence })) {
+  if (harness.shouldSkipForPreexistingNoop()) {
     removeClaudePlugin(pluginDir);
     process.exit(0);
   }
@@ -623,22 +598,11 @@ async function main() {
   let sessionHasProgress = false;
   const durableSession = openDurableSession("claude");
   let sessionId = durableSession?.id || undefined;
-  const driverStartTime = Date.now();
-  // The same deadline guards both the retry loop and each active child process.
-  const softTimeoutGuard = buildSoftTimeoutGuard(driverStartTime);
 
-  const retryRun = await runHarnessRetryLoop({
-    telemetryPath: resolveHarnessRetryTelemetryPath(),
-    maxRetries,
-    initialDelayMs,
-    backoffMultiplier,
-    maxDelayMs,
-    driverStartTime,
-    harnessName: "Claude harness",
-    log,
-    softTimeoutGuard,
+  // The same soft deadline guards both the retry loop and each active child process.
+  const retryRun = await harness.run({
     getRetryMode: () => (useContinueOnRetry ? `--resume ${sessionId}` : "fresh run"),
-    runAttempt: async (attempt, observeStrategy) => {
+    runAttempt: async (attempt, observeStrategy, { safeOutputsByteOffset }) => {
       let nativeTerminalRateLimitError = false;
       /** @type {number | null} */
       let retryAfterMs = null;
@@ -662,7 +626,6 @@ async function main() {
       const strategy = selectedHarnessStrategy(currentArgs, "claude");
       observeStrategy(strategy);
       const logArgs = attempt === 0 ? safeInitialArgs : useContinueOnRetry ? currentArgs : safeFreshRetryArgs;
-      const safeOutputsByteOffset = claudeSafeOutputsOffset(safeOutputsPath);
       const result = await runProcess({
         command,
         args: currentArgs,
@@ -679,12 +642,7 @@ async function main() {
           if (isRateLimitError(line)) nativeTerminalRateLimitError = true;
         },
         stdin: attempt > 0 && useContinueOnRetry ? CLAUDE_RESUME_PROMPT : (prompt ?? undefined),
-        postResultWatchdog: safeOutputsPath
-          ? {
-              shouldArm: () => hasAttemptTerminalSafeOutput(safeOutputsPath, safeOutputsByteOffset, { logger: log }),
-              inactivityTimeoutMs: resolvePostResultWatchdogIdleTimeoutMs(),
-            }
-          : undefined,
+        postResultWatchdog: harness.postResultWatchdog(safeOutputsByteOffset),
         runtimeGuard: softTimeoutGuard
           ? {
               shouldTerminate: () => (Date.now() >= softTimeoutGuard.softDeadlineMs ? { terminate: true, reason: "Claude execution reached its soft deadline" } : false),
@@ -694,7 +652,6 @@ async function main() {
       sessionId = claudeSessionId(result.output) || sessionId;
       return {
         ...result,
-        safeOutputsByteOffset,
         strategy,
         nativeTerminalRateLimitError,
         retryAfterMs,
@@ -705,7 +662,7 @@ async function main() {
         emitSoftTimeoutSignal(softTimeoutGuard, "during execution", "Claude harness", log);
         return { action: "stop" };
       }
-      if (result.watchdogFired === true && hasAttemptTerminalSafeOutput(safeOutputsPath, result.safeOutputsByteOffset ?? 0, { logger: log })) {
+      if (result.watchdogFired === true && harness.attemptWroteTerminalSafeOutput(result)) {
         log("post-result watchdog stopped an idle process after terminal safe-output — treating as success");
         return { action: "stop", exitCode: 0 };
       }
@@ -727,7 +684,7 @@ async function main() {
       const permissionDeniedCount = denials.count;
       const hasNumerousPermissionDenied = permissionDeniedCount >= 3;
       const crashSignalName = crashSignalNameForExitCode(result.exitCode);
-      result.failureClasses = Object.entries({
+      recordFailureClasses(result, {
         content_filter: isCybersecurityPolicyRejection,
         overloaded_error: isOverloaded,
         rate_limit_error: isRateLimit,
@@ -740,27 +697,26 @@ async function main() {
         permission_denied: hasNumerousPermissionDenied,
         sandbox_runtime_crash: !!crashSignalName,
         cancelled_or_timed_out: isSignalTerminationExitCode(result.exitCode),
-      })
-        .filter(([, detected]) => detected)
-        .map(([reason]) => reason);
+      });
       log(
-        `attempt ${attempt + 1} failed:` +
-          ` exitCode=${result.exitCode}` +
-          (crashSignalName ? ` crashSignal=${crashSignalName}` : "") +
-          ` isOverloadedError=${isOverloaded}` +
-          ` isRateLimitError=${isRateLimit}` +
-          ` isAuthenticationFailedError=${isAuthenticationFailed}` +
-          ` isMaxTurnsExit=${isMaxTurns}` +
-          ` isNoDeferredMarkerError=${isNoDeferredMarker}` +
-          ` isInvalidModelError=${isInvalidModel}` +
-          ` isInvalidJsonBodyError=${isInvalidJsonBody}` +
-          ` isConnectionRefusedError=${isConnectionRefused}` +
-          ` isCybersecurityPolicyRejection=${isCybersecurityPolicyRejection}` +
-          ` sessionHasProgress=${sessionHasProgress}` +
-          ` permissionDeniedCount=${permissionDeniedCount}` +
-          ` hasNumerousPermissionDenied=${hasNumerousPermissionDenied}` +
-          ` hasOutput=${result.hasOutput}` +
-          ` retriesRemaining=${maxRetries - attempt}`
+        formatAttemptFailure(attempt, {
+          exitCode: result.exitCode,
+          crashSignal: crashSignalName || undefined,
+          isOverloadedError: isOverloaded,
+          isRateLimitError: isRateLimit,
+          isAuthenticationFailedError: isAuthenticationFailed,
+          isMaxTurnsExit: isMaxTurns,
+          isNoDeferredMarkerError: isNoDeferredMarker,
+          isInvalidModelError: isInvalidModel,
+          isInvalidJsonBodyError: isInvalidJsonBody,
+          isConnectionRefusedError: isConnectionRefused,
+          isCybersecurityPolicyRejection,
+          sessionHasProgress,
+          permissionDeniedCount,
+          hasNumerousPermissionDenied,
+          hasOutput: result.hasOutput,
+          retriesRemaining: maxRetries - attempt,
+        })
       );
 
       if (isCybersecurityPolicyRejection) {
@@ -772,42 +728,8 @@ async function main() {
         return { action: "stop", exitCode: 0 };
       }
 
-      const nonRetryableGuard = detectNonRetryableHarnessGuard(classifierOutput);
-      await observeInvocationBudget({ guard: nonRetryableGuard, nativeTerminalRateLimitError: result.nativeTerminalRateLimitError === true, attempt, log, result });
-      if (nonRetryableGuard.apiProxyGuardRejection) {
-        const reason = `AWF API proxy guardrail rejected the request: ${nonRetryableGuard.apiProxyGuardRejection.guard}`;
-        log(`${reason} — not retrying`);
-        emitInfrastructureIncomplete(reason, { logger: log });
-        return { action: "stop" };
-      }
-      const proxyAICreditsRejection = parseAICreditsExceededProxyRejection(result.output);
-      if (proxyAICreditsRejection) {
-        log(`attempt ${attempt + 1}: AWF API proxy rejected the request with HTTP 403 max-AI-credits (${proxyAICreditsRejection.aiCredits}/${proxyAICreditsRejection.maxAICredits}) — trusted budget-abort evidence`);
-      }
-      const trustedAICreditsExceeded = nonRetryableGuard.aiCreditsExceeded && (!!proxyAICreditsRejection || parseMaxAICreditsExceededFromAuditLog());
-      if (nonRetryableGuard.aiCreditsExceeded && !trustedAICreditsExceeded) {
-        log(`attempt ${attempt + 1}: AI credits marker found in CLI output without trusted firewall audit confirmation — preserving normal failure handling`);
-      }
-      // Some CLIs surface the proxy's budget rejection as an authentication failure (e.g. Claude Code
-      // reports `error: authentication_failed` for "403 Maximum AI credits exceeded"). When the trusted
-      // proxy signature is present that veto must not mask intentional budget enforcement.
-      const shouldTreatAICreditsExceededAsSuccess = trustedAICreditsExceeded && (!isAuthenticationFailed || !!proxyAICreditsRejection);
-      if (shouldTreatAICreditsExceededAsSuccess || nonRetryableGuard.awfAPIProxyBlockingRequests || nonRetryableGuard.maxRunsExceeded) {
-        const reasons = [];
-        if (shouldTreatAICreditsExceededAsSuccess) reasons.push("AI credits budget exceeded");
-        if (nonRetryableGuard.awfAPIProxyBlockingRequests) reasons.push("AWF API proxy is blocking requests");
-        if (nonRetryableGuard.maxRunsExceeded) reasons.push("maximum LLM invocations exceeded");
-        log(`attempt ${attempt + 1}: ${reasons.join(" and ")} — not retrying (non-retryable guard condition)`);
-        if (shouldTreatAICreditsExceededAsSuccess) {
-          log(`attempt ${attempt + 1}: AI credits budget enforced — exiting 0 (budget control, not an error)`);
-          return { action: "stop", exitCode: 0 };
-        }
-        if (nonRetryableGuard.maxRunsExceeded && safeOutputsPath && hasExpectedSafeOutputs(safeOutputsPath, { logger: log })) {
-          log(`attempt ${attempt + 1}: invocation cap saturated but safe-outputs already contain expected output — suppressing terminal verdict (false-red: core work succeeded)`);
-          return { action: "stop", exitCode: 0 };
-        }
-        return { action: "stop" };
-      }
+      const guardDecision = await resolveNonRetryableGuardDecision({ attempt, result, log, safeOutputsPath, guardOutput: classifierOutput, isAuthenticationFailed });
+      if (guardDecision) return guardDecision;
 
       const isSignalTermination = isSignalTerminationExitCode(result.exitCode);
       const isCrashSignal = isCrashSignalExitCode(result.exitCode);
@@ -936,7 +858,7 @@ async function main() {
   // Fetch AWF API proxy reflection data and persist to disk for post-run step summary.
   await fetchAWFReflect({ logger: log });
 
-  log(`done: exitCode=${lastExitCode} totalDuration=${formatDuration(Date.now() - driverStartTime)}`);
+  harness.finish(lastExitCode);
   removeClaudePlugin(pluginDir);
   process.exit(lastExitCode);
 }
