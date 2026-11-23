@@ -1811,6 +1811,64 @@ test.describe("reusable runtime", () => {
     expect(errors).toEqual([]);
   });
 
+  test("shares a deep link whose kiosk lobby starts sound, captions and fullscreen kiosk from one click", async ({ page }) => {
+    await page.clock.install();
+    await fakeFullscreen(page);
+    const { errors } = await open(page, "/gh-aw/cracktro/tiny.html?sound=off&cc&fs=grant#alpha");
+    await page.keyboard.press("s");
+    const dialog = page.locator("dialog.shr");
+    await expect(dialog).toBeVisible();
+    const link = dialog.locator("input[readonly]");
+    const cc = dialog.getByRole("checkbox", { name: /Captions/ });
+    await expect(link).toHaveValue(/#alpha&sound=0$/);
+    // captions and voice only apply to kiosk links
+    await expect(cc).toBeDisabled();
+    await dialog.getByRole("checkbox", { name: /Kiosk/ }).check();
+    await dialog.getByRole("checkbox", { name: /Sound/ }).check();
+    await expect(cc).toBeEnabled();
+    await cc.check();
+    // voice is offered only where the browser can speak; keep it off so the rotation is not held
+    const voice = dialog.getByRole("checkbox", { name: /Voice/ });
+    if (await voice.isEnabled()) await voice.uncheck();
+    await expect(link).toHaveValue(/#alpha&kiosk=1&sound=1&cc=1(&voice=0)?$/);
+    await dialog.getByRole("checkbox", { name: /Start at this slide/ }).uncheck();
+    await expect(link).toHaveValue(/#kiosk=1&sound=1&cc=1(&voice=0)?$/);
+    await dialog.getByRole("checkbox", { name: /Start at this slide/ }).check();
+    const url = await link.inputValue();
+
+    // a fresh page waits in the lobby, paused and chrome-free, until the Start gesture
+    await page.goto("about:blank");
+    await page.goto(url);
+    const lobby = page.locator(".lby");
+    await expect(lobby).toBeVisible();
+    await expect(lobby).toContainText("sound on");
+    await expect(heading(page)).toHaveText("Alpha");
+    await expect(page).toHaveURL(/#alpha$/);
+    await expect(page.locator("body")).toHaveClass(/\blobby\b/);
+    await expect(page.locator(".dots")).toBeHidden();
+    await page.clock.runFor(2 * KIOSK_MS);
+    await expect(heading(page)).toHaveText("Alpha");
+    expect(await fsCalls(page)).toEqual([]);
+    await lobby.getByRole("button", { name: "Start" }).click();
+    await expect(lobby).toBeHidden();
+    await expect(page.locator("body")).toHaveClass(/\bkiosk\b/);
+    await expect(page.locator("body")).toHaveClass(/\bcc-on\b/);
+    await expect(page.getByRole("button", { name: "Toggle sound (M)", exact: true })).toHaveAttribute("aria-pressed", "true");
+    expect(await fsCalls(page)).toEqual(["request"]);
+    expect(await page.evaluate(() => (window as unknown as { hooks: string[] }).hooks)).toContain("unlock");
+    await page.clock.runFor(KIOSK_MS);
+    await expect(heading(page)).toHaveText("Beta");
+
+    // Escape leaves the lobby for manual browsing
+    await page.goto(url.replace("#alpha", "#hello"));
+    await expect(lobby).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(lobby).toBeHidden();
+    await expect(page.locator("body")).not.toHaveClass(/\b(kiosk|lobby)\b/);
+    await expect(page.locator(".dots")).toBeVisible();
+    expect(errors).toEqual([]);
+  });
+
   test("starts kiosk mode with closed captions on, toggles them from the CC button or C, and ends them with kiosk mode", async ({ page }) => {
     await page.clock.install();
     await fakeFullscreen(page);
