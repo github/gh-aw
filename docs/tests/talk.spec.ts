@@ -599,8 +599,7 @@ test.describe("compact navigation on touch screens", () => {
       const input = document.createElement("input");
       slide.append(input);
       const touch = (id: number, x: number, target = slide) => new Touch({ identifier: id, target, clientX: x, clientY: 300 });
-      const send = (type: string, touches: Touch[], target = slide) =>
-        !target.dispatchEvent(new TouchEvent(type, { bubbles: true, cancelable: true, touches }));
+      const send = (type: string, touches: Touch[], target = slide) => !target.dispatchEvent(new TouchEvent(type, { bubbles: true, cancelable: true, touches }));
       const gesture = (type: string) => !slide.dispatchEvent(new Event(type, { bubbles: true, cancelable: true }));
       const pair = [touch(0, 60), touch(1, 260)];
       const first = send("touchstart", pair.slice(0, 1));
@@ -625,8 +624,18 @@ test.describe("compact navigation on touch screens", () => {
       return { first, second, start, beforeThreshold, change, openedEarly, afterCancel, mixed, zoomed, inward, afterOpen, afterEnd };
     });
     expect(canceled).toEqual({
-      first: false, second: true, start: true, beforeThreshold: true, change: true, openedEarly: false,
-      afterCancel: false, mixed: false, zoomed: false, inward: true, afterOpen: true, afterEnd: false,
+      first: false,
+      second: true,
+      start: true,
+      beforeThreshold: true,
+      change: true,
+      openedEarly: false,
+      afterCancel: false,
+      mixed: false,
+      zoomed: false,
+      inward: true,
+      afterOpen: true,
+      afterEnd: false,
     });
     await expect(page.locator("dialog.smp")).toBeVisible();
   });
@@ -1831,14 +1840,20 @@ test.describe("reusable runtime", () => {
     await fakeFullscreen(page);
     // a fake engine: speaks one utterance at a time for 15 s each, so two lines outlast the 15 s kiosk dwell
     await page.addInitScript(() => {
-      const w = window as unknown as { spoken: string[]; speechSynthesis: unknown };
+      const w = window as unknown as { spoken: string[]; voiceNames: string[]; speechSynthesis: unknown };
       w.spoken = [];
+      w.voiceNames = [];
+      const voices = [
+        { name: "Online Natural", lang: "en-US", localService: false },
+        { name: "Local Anchor", lang: "en-US", localService: true },
+      ] as SpeechSynthesisVoice[];
       let queue: SpeechSynthesisUtterance[] = [];
       let timer: ReturnType<typeof setTimeout> | undefined;
       const run = () => {
         const u = queue[0];
         if (!u) return;
         w.spoken.push(u.text);
+        w.voiceNames.push(u.voice?.name || "");
         timer = setTimeout(() => {
           queue.shift();
           u.dispatchEvent(new Event("end"));
@@ -1848,7 +1863,7 @@ test.describe("reusable runtime", () => {
       Object.defineProperty(window, "speechSynthesis", {
         configurable: true,
         value: {
-          getVoices: () => [],
+          getVoices: () => voices,
           speak: (u: SpeechSynthesisUtterance) => queue.push(u) === 1 && run(),
           cancel: () => {
             clearTimeout(timer);
@@ -1880,6 +1895,7 @@ test.describe("reusable runtime", () => {
     await page.clock.runFor(20000);
     await expect(heading(page)).toHaveText("Hello");
     expect(await spoken()).toEqual(["Good evening, the top story.", "Thanks, glad to be here."]);
+    expect(await page.evaluate(() => (window as unknown as { voiceNames: string[] }).voiceNames)).toEqual(["Local Anchor", "Local Anchor"]);
     await page.clock.runFor(11000);
     await expect(heading(page)).not.toHaveText("Hello");
     // the button turns it off without leaving kiosk mode; Escape ends kiosk mode, and the choice holds for the next run
@@ -1893,6 +1909,63 @@ test.describe("reusable runtime", () => {
     await expect(voice).toHaveAttribute("aria-pressed", "false");
     await page.keyboard.press("k");
     await expect(voice).toHaveAttribute("aria-pressed", "true");
+    expect(errors).toEqual([]);
+  });
+
+  test("waits for local voices to load without using the browser default", async ({ page }) => {
+    await page.clock.install();
+    await fakeFullscreen(page);
+    await page.addInitScript(() => {
+      const w = window as unknown as { spoken: string[]; loadVoice: () => void; speechSynthesis: unknown };
+      w.spoken = [];
+      let voices: SpeechSynthesisVoice[] = [];
+      let voicesChanged: (() => void) | undefined;
+      const localVoice = { name: "Local Voice", lang: "en-US", localService: true } as SpeechSynthesisVoice;
+      w.loadVoice = () => {
+        voices = [localVoice];
+        voicesChanged?.();
+      };
+      Object.defineProperty(window, "speechSynthesis", {
+        configurable: true,
+        value: {
+          getVoices: () => voices,
+          addEventListener: (_type: string, listener: () => void) => (voicesChanged = listener),
+          speak: (u: SpeechSynthesisUtterance) => w.spoken.push(u.text),
+          cancel: () => {},
+        },
+      });
+    });
+    const { errors } = await open(page, "/gh-aw/cracktro/tiny.html?cc&fs=none#hello");
+    await page.keyboard.press("v");
+    expect(await page.evaluate(() => (window as unknown as { spoken: string[] }).spoken)).toEqual([]);
+    await page.evaluate(() => (window as unknown as { loadVoice: () => void }).loadVoice());
+    expect(await page.evaluate(() => (window as unknown as { spoken: string[] }).spoken)).toEqual(["Good evening, the top story."]);
+    expect(errors).toEqual([]);
+  });
+
+  test("releases a stalled narration after the kiosk dwell plus the voice hold limit", async ({ page }) => {
+    await page.clock.install();
+    await fakeFullscreen(page);
+    await page.addInitScript(() => {
+      const w = window as unknown as { spoken: string[]; speechSynthesis: unknown };
+      w.spoken = [];
+      const voice = { name: "Local Voice", lang: "en-US", localService: true } as SpeechSynthesisVoice;
+      Object.defineProperty(window, "speechSynthesis", {
+        configurable: true,
+        value: {
+          getVoices: () => [voice],
+          speak: (u: SpeechSynthesisUtterance) => w.spoken.push(u.text),
+          cancel: () => {},
+        },
+      });
+    });
+    const { errors } = await open(page, "/gh-aw/cracktro/tiny.html?cc&fs=none#hello");
+    await page.keyboard.press("v");
+    await page.clock.runFor(74999);
+    await expect(heading(page)).toHaveText("Hello");
+    await page.clock.runFor(1);
+    await expect(heading(page)).not.toHaveText("Hello");
+    expect(await page.evaluate(() => (window as unknown as { spoken: string[] }).spoken)).toEqual(["Good evening, the top story.", "Thanks, glad to be here."]);
     expect(errors).toEqual([]);
   });
 

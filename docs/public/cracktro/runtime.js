@@ -951,7 +951,7 @@
     // still rotate in the window. Escape, K, the button or leaving fullscreen stop it; a manual move restarts the
     // countdown. One timer at a time, cleared on every re-arm and stop.
     const KIOSK_MS = Math.max(1000, Number(config.kioskInterval) || 15000);
-    /** @type {{ t: ReturnType<typeof setTimeout> | null, full: boolean, entered: boolean } | null} */
+    /** @type {{ t: ReturnType<typeof setTimeout> | null, full: boolean, entered: boolean, dwellUntil: number } | null} */
     let kiosk = null;
     /** @type {any} */
     const doc = document;
@@ -972,17 +972,16 @@
     const kioskArm = ms => {
       if (!kiosk) return;
       clearTimeout(kiosk.t);
-      kiosk.t = setTimeout(
-        () => {
-          if (!kiosk) return;
-          // hold the slide while its voice is still speaking (see "voice" below)
-          if (voiceBusy()) return kioskArm(500);
-          // hold the slide while any dialog (search, map, a deck's own modal) is open
-          if (!document.querySelector("dialog[open], [aria-modal='true']")) go(kioskNext());
-          kioskArm();
-        },
-        ms ?? (capOn ? Math.max(KIOSK_MS, capDwell(cur)) : KIOSK_MS)
-      );
+      const delay = ms ?? (capOn ? Math.max(KIOSK_MS, capDwell(cur)) : KIOSK_MS);
+      if (ms == null) kiosk.dwellUntil = performance.now() + delay;
+      kiosk.t = setTimeout(() => {
+        if (!kiosk) return;
+        // hold the slide while its voice is still speaking (see "voice" below)
+        if (voiceBusy()) return kioskArm(500);
+        // hold the slide while any dialog (search, map, a deck's own modal) is open
+        if (!document.querySelector("dialog[open], [aria-modal='true']")) go(kioskNext());
+        kioskArm();
+      }, delay);
     };
     const paintKiosk = () => {
       const label = kiosk ? "Stop kiosk mode" : "Start kiosk mode: rotate slides in fullscreen",
@@ -1000,7 +999,7 @@
       on = !!on;
       if (on === !!kiosk) return on;
       if (on) {
-        kiosk = { t: null, full: !!fsEl(), entered: false };
+        kiosk = { t: null, full: !!fsEl(), entered: false, dwellUntil: 0 };
         const k = kiosk;
         if (config.sound && !sfx.muted) sfx.unlock?.();
         const de = doc.documentElement,
@@ -1350,8 +1349,7 @@
       else if ((e.key === "w" || e.key === "W") && wizard && !e.repeat && !target.closest?.("input, textarea, select, [contenteditable]")) {
         e.preventDefault();
         openWizard();
-      }
-      else if ((e.key === "x" || e.key === "X") && view) setView(null);
+      } else if ((e.key === "x" || e.key === "X") && view) setView(null);
     });
     // Clicks never move between slides (only keys, the dock, swipes and jump targets do); a click on a
     // jump target (band-header tile) opens its slide. The listener sits on the stage so iOS Safari dispatches it.
@@ -1769,20 +1767,19 @@
           [["U"], "Back to the pattern of an example"],
         ],
       ],
-      [
-        "Jump",
-        [
-          [["Shift+Home"], "First slide of the band"],
-          [["Home", "End"], "First or last slide"],
-          [["1…9+Enter"], "Slide by number"],
-          [["/", "Ctrl+K", "⌘+K"], "Search slides"],
-          [["G"], "Slide map (this screen)"],
-          ...WIZARD_KEYS,
-        ],
-      ],
+      ["Jump", [[["Shift+Home"], "First slide of the band"], [["Home", "End"], "First or last slide"], [["1…9+Enter"], "Slide by number"], [["/", "Ctrl+K", "⌘+K"], "Search slides"], [["G"], "Slide map (this screen)"], ...WIZARD_KEYS]],
       [
         "Show",
-        [[["N"], "Speaker notes"], [["F"], "Fullscreen"], [["K"], "Kiosk: auto-advance (Esc stops)"], [["C"], "Closed captioning (CC) in kiosk mode"], [["V"], "Voice: read captions aloud in kiosk mode"], ...SOUND_KEYS, [["X"], "Leave the tour or view"], [["Esc"], "Close notes or dialogs"]],
+        [
+          [["N"], "Speaker notes"],
+          [["F"], "Fullscreen"],
+          [["K"], "Kiosk: auto-advance (Esc stops)"],
+          [["C"], "Closed captioning (CC) in kiosk mode"],
+          [["V"], "Voice: read captions aloud in kiosk mode"],
+          ...SOUND_KEYS,
+          [["X"], "Leave the tour or view"],
+          [["Esc"], "Close notes or dialogs"],
+        ],
       ],
       [
         "Slide map",
@@ -2451,7 +2448,7 @@
     // it, and holds a kiosk slide until its last line is spoken (at most VOICE_HOLD_MS past the dwell, so a stalled
     // engine never freezes the rotation). The first utterance is spoken inside the V or K gesture that turned it on.
     const VOICE_HOLD_MS = 60000;
-    /** @type {{ t0: number, done: boolean } | null} */
+    /** @type {{ done: boolean, waitingForVoice?: boolean } | null} */
     let vc = null;
     // Web Speech only tunes voice, rate, pitch and volume (no styles; browsers ignore SSML), so a relaxed sports-anchor
     // read comes from ranking voices (natural/neural first, warm broadcast-style names next, novelty and robotic voices
@@ -2460,26 +2457,37 @@
       VOICE_PITCH = 0.92;
     const VOICE_NOVELTY = /\b(albert|bad news|bahh|bells|boing|bubbles|cellos|wobble|deranged|good news|hysterical|jester|junior|organ|princess|superstar|trinoids|whisper|zarvox)\b/i,
       VOICE_ROBOTIC = /\b(eddy|flo|grandma|grandpa|reed|rocko|sandy|shelley|fred|ralph|kathy|espeak)\b/i,
-      VOICE_NATURAL = /natural|neural|premium|enhanced|online|wavenet|studio/i,
+      VOICE_NATURAL = /natural|neural|premium|enhanced|wavenet|studio/i,
       VOICE_ANCHOR = /\b(andrew|guy|davis|brian|christopher|eric|roger|steffan|aria|jenny|ava|emma|michelle|evan|nathan|tom|alex|aaron|samantha|allison|zoe|daniel|google us english|google uk english male)\b/i;
-    const voiceScore = (/** @type {SpeechSynthesisVoice} */ v) =>
-      (VOICE_NATURAL.test(v.name) ? 4 : 0) + (VOICE_ANCHOR.test(v.name) ? 2 : 0) + (v.localService ? 0 : 1) + (VOICE_ROBOTIC.test(v.name) ? -3 : 0);
+    const voiceScore = (/** @type {SpeechSynthesisVoice} */ v) => (VOICE_NATURAL.test(v.name) ? 4 : 0) + (VOICE_ANCHOR.test(v.name) ? 2 : 0) + (VOICE_ROBOTIC.test(v.name) ? -3 : 0);
     const voicePick = () => {
-      const all = (TTS.getVoices?.() || []).filter(v => !VOICE_NOVELTY.test(v.name)),
+      const all = (TTS.getVoices?.() || []).filter(v => v.localService && !VOICE_NOVELTY.test(v.name)),
         lang = (document.documentElement.lang || navigator.language || "en").slice(0, 2).toLowerCase(),
-        mine = all.filter(v => String(v.lang || "").toLowerCase().startsWith(lang)),
-        pool = (mine.length ? mine : all).map((v, i) => ({ v, s: voiceScore(v) * 100 - i })).sort((a, b) => b.s - a.s).map(x => x.v),
+        mine = all.filter(v =>
+          String(v.lang || "")
+            .toLowerCase()
+            .startsWith(lang)
+        ),
+        pool = (mine.length ? mine : all)
+          .map((v, i) => ({ v, s: voiceScore(v) * 100 - i }))
+          .sort((a, b) => b.s - a.s)
+          .map(x => x.v),
         first = pool[0] || null;
       return [first, pool[1] || first];
     };
     function voiceEnter() {
       if (!TTS) return;
       TTS.cancel();
-      const s = { t0: performance.now(), done: false };
+      const s = { done: false };
       vc = s;
       const lines = capLines(cur).map(String).filter(Boolean),
         voices = voicePick();
       if (!lines.length) return void (s.done = true);
+      if (!voices[0]) {
+        s.done = true;
+        s.waitingForVoice = true;
+        return;
+      }
       lines.forEach((line, turn) => {
         const u = new SpeechSynthesisUtterance(line);
         const v = voices[turn % 2];
@@ -2494,7 +2502,10 @@
         TTS.speak(u);
       });
     }
-    const voiceBusy = () => !!(vc && !vc.done && performance.now() - vc.t0 < VOICE_HOLD_MS);
+    TTS?.addEventListener?.("voiceschanged", () => {
+      if (voiceOn && kiosk && vc?.waitingForVoice && voicePick()[0]) voiceEnter();
+    });
+    const voiceBusy = () => !!(vc && !vc.done && kiosk && performance.now() < kiosk.dwellUntil + VOICE_HOLD_MS);
     const paintVoice = () => {
       const lbl = !TTS ? "Voice is not supported in this browser" : voiceOn ? "Turn off the voice" : "Turn on the voice: read captions aloud";
       vcb.setAttribute("aria-pressed", String(voiceOn));
@@ -2629,7 +2640,20 @@
       setView(v);
       if (v) go(firstVis());
     };
-    return { slides, rows, go, next, prev, band, current: () => cur, tour, tours: () => Object.keys(TOURS), kiosk: on => setKiosk(on ?? !kiosk), captions: on => setCap((capPref = on ?? !capOn)), voice: on => setVoice((voicePref = (on ?? !voiceOn) && !!TTS)) };
+    return {
+      slides,
+      rows,
+      go,
+      next,
+      prev,
+      band,
+      current: () => cur,
+      tour,
+      tours: () => Object.keys(TOURS),
+      kiosk: on => setKiosk(on ?? !kiosk),
+      captions: on => setCap((capPref = on ?? !capOn)),
+      voice: on => setVoice((voicePref = (on ?? !voiceOn) && !!TTS)),
+    };
   }
 
   window.CracktroDeck = { h, letters, resetIndex, create };
