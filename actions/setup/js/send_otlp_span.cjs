@@ -96,6 +96,28 @@ function resolveGenAiProvider(engineId) {
   return ENGINE_TO_PROVIDER_MAP[engineId] || engineId;
 }
 
+/** Legacy gen_ai.system values for BYOK gen_ai.provider.name values. */
+const BYOK_PROVIDER_TO_SYSTEM_MAP = Object.assign(Object.create(null), {
+  "azure.ai.openai": "az.ai.openai",
+  "gcp.gen_ai": "google_vertex_ai",
+});
+
+/**
+ * Resolve gen_ai.provider.name and gen_ai.system for a run. The compiler-resolved
+ * BYOK provider (aw_info.genai_provider or GH_AW_INFO_GENAI_PROVIDER) overrides the
+ * engine mapping so BYOK traffic is not reported as GitHub-hosted inference.
+ * @param {any} awInfo
+ * @param {string} engineId
+ * @returns {{ provider: string, system: string }}
+ */
+function resolveRunGenAiProvider(awInfo, engineId) {
+  const byok = readContextString(awInfo?.genai_provider) || (process.env.GH_AW_INFO_GENAI_PROVIDER || "").trim();
+  if (byok) {
+    return { provider: byok, system: BYOK_PROVIDER_TO_SYSTEM_MAP[byok] || byok };
+  }
+  return { provider: resolveGenAiProvider(engineId), system: ENGINE_TO_SYSTEM_MAP[engineId] || engineId };
+}
+
 /** True when OTEL_SEMCONV_STABILITY_OPT_IN contains gen_ai_v1 (spec §6.7). */
 function isGenAiV1() {
   return (process.env.OTEL_SEMCONV_STABILITY_OPT_IN || "")
@@ -1638,10 +1660,11 @@ async function sendJobSetupSpan(options = {}) {
   }
 
   if (engineId) {
+    const genAi = resolveRunGenAiProvider(awInfo, engineId);
     if (!isGenAiV1()) {
-      attributes.push(buildAttr("gen_ai.system", ENGINE_TO_SYSTEM_MAP[engineId] || engineId));
+      attributes.push(buildAttr("gen_ai.system", genAi.system));
     }
-    attributes.push(buildAttr(OTEL_ATTR_GEN_AI_PROVIDER_NAME, resolveGenAiProvider(engineId)));
+    attributes.push(buildAttr(OTEL_ATTR_GEN_AI_PROVIDER_NAME, genAi.provider));
     attributes.push(buildAttr(OTEL_ATTR_ENGINE_ID, engineId));
   }
   if (eventName) {
@@ -2557,8 +2580,9 @@ async function sendJobConclusionSpan(spanName, options = {}) {
 
   if (jobName) attributes.push(buildAttr("gh-aw.job.name", jobName));
   if (engineId) {
-    if (!optIn) attributes.push(buildAttr("gen_ai.system", ENGINE_TO_SYSTEM_MAP[engineId] || engineId));
-    attributes.push(buildAttr(OTEL_ATTR_GEN_AI_PROVIDER_NAME, resolveGenAiProvider(engineId)));
+    const genAi = resolveRunGenAiProvider(awInfo, engineId);
+    if (!optIn) attributes.push(buildAttr("gen_ai.system", genAi.system));
+    attributes.push(buildAttr(OTEL_ATTR_GEN_AI_PROVIDER_NAME, genAi.provider));
     attributes.push(buildAttr(OTEL_ATTR_ENGINE_ID, engineId));
   }
   if (model) attributes.push(buildAttr("gen_ai.request.model", model));
@@ -2958,7 +2982,7 @@ async function sendJobConclusionSpan(spanName, options = {}) {
         outputTokens: agentUsage.output_tokens,
         cacheReadTokens: agentUsage.cache_read_tokens,
         cacheWriteTokens: agentUsage.cache_write_tokens,
-        provider: engineId ? resolveGenAiProvider(engineId) : "",
+        provider: engineId ? resolveRunGenAiProvider(awInfo, engineId).provider : "",
         inclusiveInputTokens,
         agentName: jobName === "agent" ? workflowName : "",
         agentDurationSeconds: hasDedicatedAgentSpan ? (agentEndMs - agentStartMs) / 1000 : undefined,
@@ -3038,6 +3062,7 @@ module.exports = {
   parseOTLPCustomAttributes,
   buildCustomOTLPAttributes,
   resolveGenAiProvider,
+  resolveRunGenAiProvider,
   isGenAiV1,
   GEN_AI_SCHEMA_URL,
   resolveInclusiveInputTokens,

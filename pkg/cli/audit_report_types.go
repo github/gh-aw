@@ -30,6 +30,7 @@ type AuditData struct {
 	MissingTools               []MissingToolReport         `json:"missing_tools,omitempty"`
 	MissingData                []MissingDataReport         `json:"missing_data,omitempty"`
 	Noops                      []NoopReport                `json:"noops,omitempty"`
+	Incomplete                 []IncompleteReport          `json:"incomplete,omitempty"`
 	ContinuationRequests       []ContinuationRequestReport `json:"continuation_requests"`
 	MCPFailures                []MCPFailureReport          `json:"mcp_failures,omitempty"`
 	SkillActivations           []SkillActivation           `json:"skill_activations,omitempty"`

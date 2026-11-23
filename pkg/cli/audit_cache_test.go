@@ -82,7 +82,7 @@ func TestLoadCachedAuditDataRejectsOlderSchema(t *testing.T) {
 	// resolution findings, engine step failure findings, evals summaries scoped
 	// to the audited attempt, threat-detection outcomes, and AWF steering
 	// deliveries with gateway steering metadata and lifecycle observations,
-	// so must be regenerated.
+	// and report_incomplete signals, so must be regenerated.
 	for schemaVersion := range auditSchemaVersion {
 		runDir := t.TempDir()
 		run := WorkflowRun{DatabaseID: 42, Status: "completed", Conclusion: "success"}

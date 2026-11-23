@@ -226,7 +226,7 @@ features:
   gh-aw-detection: true
 evals:
   - id: review_decision_consistent
-    question: Did the agent either post a Test Quality Score with an APPROVE or REQUEST_CHANGES decision that matches the tests and guideline violations it flagged, or call noop with a scope reason the workflow's act-vs-noop rubric allows (pre-fetch unavailable, no changed or only unsupported-language test files, or no behavioral test change and no hard violation)? Return UNKNOWN when the output records a skip-if-decision no-op before agent execution.
+    question: Did the agent either post a Test Quality Score with an APPROVE or REQUEST_CHANGES decision that matches the tests and guideline violations it flagged, call report_incomplete (not noop) when pre-fetch data was unavailable, or call noop with a scope reason the workflow's act-vs-noop rubric allows (no changed or only unsupported-language test files, or no behavioral test change and no hard violation)? Return UNKNOWN when the output records a skip-if-decision no-op before agent execution.
 
 ---
 
@@ -245,13 +245,13 @@ High test counts can create an illusion of safety. The real signal is whether te
 
 ## Step 1: Load Pre-fetched PR Data and Identify Test Files
 
-First check whether `/tmp/gh-aw/agent/test-prefetch-unavailable.txt` exists. If it exists, read the reason from that file and immediately call `noop` with the reason:
+First check whether `/tmp/gh-aw/agent/test-prefetch-unavailable.txt` exists. If it exists, the review could not run, so read the reason from that file and immediately call `report_incomplete` (never `noop`) with the reason:
 
 ```json
-{"noop": {"message": "Test Quality Sentinel skipped because pre-fetch PR data was unavailable: <reason>"}}
+{"report_incomplete": {"reason": "Test Quality Sentinel could not review tests because pre-fetch PR data was unavailable: <reason>"}}
 ```
 
-Do not analyze the empty fallback files when this marker exists.
+Do not analyze the empty fallback files, post a report, or submit a review when this marker exists. `noop` means the review completed and found nothing to act on; unavailable input is an incomplete review, not a no-action result.
 
 PR data has already been fetched before the agent started. Read from:
 
@@ -340,7 +340,8 @@ Decide whether there is a reviewable signal before drafting a report. Do not use
 
 | Evidence after the scoped review | Required outcome |
 |---|---|
-| Pre-fetch unavailable, no changed test files, or only unsupported-language tests | Call `noop` immediately with the specific scope reason; do not post a report. |
+| Pre-fetch unavailable (marker file exists) | Call `report_incomplete` immediately with the marker reason; never `noop`; do not post a report. |
+| No changed test files, or only unsupported-language tests | Call `noop` immediately with the specific scope reason; do not post a report. |
 | Recognized test files changed but no behavioral test case changed and no hard violation exists | Call `noop` with the specific scope reason; do not post a report. |
 | A hard violation exists, or the implementation-test ratio exceeds 30% | Act: include each concrete file, test, and evidence in the report, then request changes. |
 | A red flag exists but does not meet the failure threshold | Act: flag only the evidenced test in the report; do not escalate a speculative concern. |

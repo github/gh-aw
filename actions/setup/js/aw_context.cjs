@@ -354,6 +354,10 @@ function normalizeLegacyWorkQueueContext(awContext, rawClaim) {
  *     pattern).  Propagated to child workflows so their confused-deputy check can
  *     skip the actor-vs-comment-author mismatch guard for this known-safe scenario.
  *     `false` in all other cases.
+ *
+ * Not produced here: `continuation_run_id` names the run whose durable checkpoint
+ * a dispatched run should resume. Only continuation dispatchers set it, and it is
+ * never relayed, so it applies to exactly one hop.
  */
 function buildAwContext() {
   const { item_type, item_number, comment_id, comment_node_id } = resolveItemContext(context.payload);

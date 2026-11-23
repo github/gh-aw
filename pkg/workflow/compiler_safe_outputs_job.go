@@ -1022,7 +1022,7 @@ func (c *Compiler) appendFinalSafeOutputSteps(data *WorkflowData, steps []string
 		consolidatedSafeOutputsJobLog.Print("Added restore actions folder step to safe_outputs job (dev mode with checkout)")
 	}
 	if c.actionMode.IsScript() {
-		steps = append(steps, c.generateScriptModeCleanupStep())
+		steps = append(steps, c.generateScriptModeCleanupStep(data))
 	}
 	return steps
 }
