@@ -709,6 +709,33 @@ test("status refresh handles the gateway's rewritten singleton count on every pa
   }
 });
 
+test("status refresh accepts the gateway's combined error state", async () => {
+  const { api } = queueAPI({ statuses: [{ context: "external-ci", state: "error" }] });
+  const candidate = await fetchCandidate("github/gh-aw", "42", async args => {
+    const response = await api(args);
+    return args[1].includes("/status?") ? { ...response, sha: "abc", state: "error", total_count: 1, incomplete_results: false } : response;
+  });
+  assert.deepEqual(candidate.statusCheckRollup.map(check => check.state), ["ERROR"]);
+});
+
+test("status refresh rejects gateway pagination that repeats or never ends", async () => {
+  for (const distinct of [false, true]) {
+    const { api } = queueAPI();
+    let pageCalls = 0;
+    await assert.rejects(
+      () =>
+        fetchCandidate("github/gh-aw", "42", args => {
+          if (!args[1].includes("/status?")) return api(args);
+          const page = pageCalls++;
+          const statuses = Array.from({ length: 100 }, (_, i) => ({ context: `status-${distinct ? page : 0}-${i}`, state: "success" }));
+          return { sha: "abc", state: "success", total_count: 1, incomplete_results: false, statuses };
+        }),
+      /PR #42: could not refresh statuses/
+    );
+    assert.equal(pageCalls, distinct ? 10 : 2);
+  }
+});
+
 test("status refresh rejects filtered, wrong-head, and malformed gateway responses", async () => {
   const valid = { sha: "abc", state: "success", total_count: 1, incomplete_results: false, statuses: [] };
   for (const response of [
