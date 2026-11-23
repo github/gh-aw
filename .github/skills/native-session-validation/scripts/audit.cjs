@@ -8,6 +8,7 @@ const root = path.resolve(__dirname, "../../../..");
 const { collectUnifiedSession, parseEngineSession, mergeSessionSources } = require(path.join(root, "actions/setup/js/unified_session.cjs"));
 const { serializeSessionArtifact, collectAddMaskedValues } = require(path.join(root, "actions/setup/js/session_artifact.cjs"));
 const { validateSession } = require(path.join(root, "actions/setup/js/scripts/validate_session.cjs"));
+const { iterateJsonlEvents, iterateLines } = require(path.join(root, "actions/setup/js/jsonl_helpers.cjs"));
 
 const hash = content => crypto.createHash("sha256").update(content).digest("hex");
 const eventsOf = content =>
@@ -29,7 +30,7 @@ function safePath(directory, relative) {
 
 function subset(actual, expected) {
   if (expected && typeof expected === "object" && !Array.isArray(expected)) {
-    return actual !== null && typeof actual === "object" && Object.entries(expected).every(([key, value]) => Object.hasOwn(actual, key) && subset(actual[key], value));
+    return actual !== null && typeof actual === "object" && !Array.isArray(actual) && Object.entries(expected).every(([key, value]) => Object.hasOwn(actual, key) && subset(actual[key], value));
   }
   return isDeepStrictEqual(actual, expected);
 }
@@ -88,6 +89,25 @@ function comparison(left, right) {
   return { matched, leftOnly, rightOnly };
 }
 
+function nativeWarnings(source, relative, parsed) {
+  const diagnosedLines = new Set(parsed.filter(event => event.type === "session.collection_warning" && ["malformed_json", "malformed_jsonl"].includes(event.data.code)).map(event => event.data.line));
+  try {
+    JSON.parse(source);
+    return [];
+  } catch {
+    // Infer JSONL only from an entirely record-framed stream. Plaintext,
+    // fenced examples and multiline debug blocks belong to the engine adapter.
+    for (const line of iterateLines(source)) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith("::add-mask::")) continue;
+      if (!trimmed.startsWith("{") && !trimmed.startsWith("[{")) return [];
+    }
+    return [...iterateJsonlEvents(source, { lineFilter: line => line.startsWith("{") || line.startsWith("[{") })]
+      .filter(entry => entry.type === "invalid" && entry.reason !== "blank" && !diagnosedLines.has(entry.lineNumber))
+      .map(entry => ({ type: "session.collection_warning", data: { path: relative, code: "malformed_json", line: entry.lineNumber } }));
+  }
+}
+
 function audit({ input, engine, native = [], output, expectations }) {
   if (!/^[a-z][a-z0-9-]*$/.test(engine)) throw new Error("Invalid engine ID");
   const inputRoot = fs.realpathSync(input);
@@ -101,12 +121,15 @@ function audit({ input, engine, native = [], output, expectations }) {
   const parent = fs.lstatSync(path.dirname(outputRoot));
   if (!parent.isDirectory() || parent.isSymbolicLink() || (parent.mode & 0o077) !== 0) throw new Error("Output parent must be an existing private directory");
 
-  const { events, maskedValues } = collectUnifiedSession({ rootDir: inputRoot, engine, warn: () => {}, dailyAIC: {}, admission: {}, jobResults: "", safeJobNames: "", safeJobResults: "", memorySaveResults: "" });
+  const { events, maskedValues } = collectUnifiedSession({ rootDir: inputRoot, engine, render: false, warn: () => {}, dailyAIC: {}, admission: {}, jobResults: "", safeJobNames: "", safeJobResults: "", memorySaveResults: "" });
   const observedEngine = events.find(event => event.type === "workflow.info")?.data.engineId;
   if (observedEngine !== undefined && observedEngine !== engine) throw new Error("Requested engine does not match recorded metadata");
   const content = serializeSessionArtifact(events, maskedValues, { secretValues: [] });
   validateSession(content);
   const reconstructed = eventsOf(content);
+  const header = reconstructed.find(event => event.type === "session.format" && event.provenance.component === "collector");
+  if (!header) throw new Error("Reconstructed session is missing its file-format header");
+  const workflowInfo = reconstructed.find(event => event.type === "workflow.info");
   const agentEvents = reconstructed.filter(event => event.provenance.component === "agent");
   if (!agentEvents.length || agentEvents.every(event => event.type === "agent.execution")) throw new Error("No recognizable agent session evidence");
   const sessions = new Map([["reconstructed", reconstructed]]);
@@ -122,16 +145,32 @@ function audit({ input, engine, native = [], output, expectations }) {
     const source = fs.readFileSync(safePath(inputRoot, relative), "utf8");
     if (!source.trim()) throw new Error("Empty native input");
     if (relative.split(/[/\\]/).at(-1) === "agent-session.jsonl" || relative.split(/[/\\]/).at(-1) === "aw_session.jsonl") throw new Error("Canonical traces are not native evidence");
-    const parsed = parseEngineSession(source, engine);
+    const parsed = parseEngineSession(source, engine, { render: false });
     if (!parsed.length || parsed.every(event => event.type === "agent.execution")) throw new Error("Unrecognized native input");
-    const merged = mergeSessionSources([{ component: "agent", phase: "agent", path: relative.split(path.sep).join("/"), events: parsed }], engine);
-    const normalized = serializeSessionArtifact([reconstructed[0], ...merged], [...maskedValues, ...collectAddMaskedValues(source)], { secretValues: [] });
+    const nativePath = relative.split(path.sep).join("/");
+    const merged = mergeSessionSources(
+      [
+        ...(workflowInfo ? [{ component: "workflow", phase: workflowInfo.provenance.phase, path: workflowInfo.provenance.path, events: [workflowInfo] }] : []),
+        { component: "agent", phase: "agent", path: nativePath, events: parsed },
+        { component: "collector", phase: "conclusion", path: nativePath, events: nativeWarnings(source, nativePath, parsed) },
+      ],
+      engine
+    );
+    const normalized = serializeSessionArtifact([header, ...merged], [...maskedValues, ...collectAddMaskedValues(source)], { secretValues: [] });
     validateSession(normalized);
     const normalizedEvents = eventsOf(normalized);
     const name = `native-${index}`;
     sessions.set(name, normalizedEvents);
     files.set(`${name}.jsonl`, normalized);
-    report.native.push({ source: name, path: relative, inputSha256: hash(source), records: normalizedEvents.length, sha256: hash(normalized), comparison: comparison(normalizedEvents, reconstructed) });
+    report.native.push({
+      source: name,
+      path: relative,
+      inputSha256: hash(source),
+      records: normalizedEvents.length,
+      sha256: hash(normalized),
+      warnings: normalizedEvents.filter(event => event.type === "session.collection_warning").length,
+      comparison: comparison(normalizedEvents, reconstructed),
+    });
   }
   for (const relative of ["usage/aw_session.jsonl", "aw_session.jsonl"]) {
     if (!fs.existsSync(path.join(inputRoot, relative))) continue;
@@ -166,7 +205,7 @@ function main(args) {
   if (!options.input || !options.engine || !options.output) throw new Error("Require --root, --engine and --output");
   const report = audit(options);
   process.stdout.write(JSON.stringify(report) + "\n");
-  if (report.semantics.status === "failed" || report.reconstructed.warnings) process.exitCode = 1;
+  if (report.semantics.status === "failed" || report.reconstructed.warnings || report.native.some(source => source.warnings)) process.exitCode = 1;
 }
 
 if (require.main === module) {

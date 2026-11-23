@@ -71,7 +71,7 @@ def inventory(repo, start, end, request, max_requests=200):
                     raise CollectionError("API returned a run outside the fixed window")
                 window_ids.add(run["id"])
                 observed.add(run["id"])
-                if run["path"].endswith(".lock.yml"):
+                if run["path"].split("@", 1)[0].endswith(".lock.yml"):
                     runs[run["id"]] = {
                         key: run[key]
                         for key in (

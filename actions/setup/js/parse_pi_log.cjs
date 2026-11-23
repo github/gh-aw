@@ -16,10 +16,10 @@ const main = createEngineLogParser({
  * Normalize native streaming events and historical flat records directly into
  * canonical session events, then render the shared conversation and usage view.
  * @param {string} logContent - The raw log content to parse
- * @param {{sourceEngine?: string, displayName?: string}} [options]
+ * @param {{sourceEngine?: string, displayName?: string, render?: boolean}} [options]
  * @returns {{markdown: string, logEntries: Array, mcpFailures: Array<string>, maxTurnsHit: boolean}} Parsed log data
  */
-function parsePiStreamLog(logContent, { sourceEngine = "pi", displayName = "Pi" } = {}) {
+function parsePiStreamLog(logContent, { sourceEngine = "pi", displayName = "Pi", render = true } = {}) {
   if (!logContent) {
     return {
       markdown: buildStepSummaryDetailsSection(displayName, "No log content provided."),
@@ -68,6 +68,7 @@ function parsePiStreamLog(logContent, { sourceEngine = "pi", displayName = "Pi" 
   if (canonicalLogEntries.length === 0) {
     return { markdown: buildStepSummaryDetailsSection(displayName, `Log format not recognized as ${displayName} JSONL.`), logEntries: [], mcpFailures: [], maxTurnsHit: false };
   }
+  if (!render) return { markdown: "", logEntries: canonicalLogEntries, mcpFailures: [], maxTurnsHit: false };
   const conversationResult = generateConversationMarkdown(canonicalLogEntries, {
     includeInformation: false,
     formatToolCallback: (toolUse, toolResult) => formatToolUse(toolUse, toolResult, { includeDetailedParameters: false }),
@@ -88,10 +89,11 @@ function parsePiStreamLog(logContent, { sourceEngine = "pi", displayName = "Pi" 
 
 /**
  * @param {string} logContent - The raw log content to parse
+ * @param {{render?: boolean}} [options]
  * @returns {{markdown: string, logEntries: Array, mcpFailures: Array<string>, maxTurnsHit: boolean}} Parsed log data
  */
-function parsePiLog(logContent) {
-  return parsePiStreamLog(logContent, { sourceEngine: "pi", displayName: "Pi" });
+function parsePiLog(logContent, options = {}) {
+  return parsePiStreamLog(logContent, { ...options, sourceEngine: "pi", displayName: "Pi" });
 }
 
 /**

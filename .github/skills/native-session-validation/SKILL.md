@@ -80,8 +80,9 @@ registered in supplied evidence, not unrelated local credentials.
 The helper writes `reconstructed.jsonl`, one `native-N.jsonl` per supplied file,
 and a compact `report.json`. Existing artifacts are not overwritten. Reports
 contain hashes, counts, structural outcomes and aggregate comparison counts,
-never excerpts. Saved UAS is validated separately. Differences are candidates,
-not automatic parser bugs: compiler versions, redaction, source precedence,
+never excerpts. Collection warnings in reconstructed or independent native
+evidence fail the CLI even when assertions pass. Saved UAS is validated separately.
+Differences are candidates, not automatic parser bugs: compiler versions, redaction, source precedence,
 partial streams and deduplication can legitimately differ.
 
 **Schema success is not semantic success.** Independently derive assertions from

@@ -2016,10 +2016,10 @@ MUST NOT duplicate equivalent stdout observations.
 | AI `data.tool_calls[]` with `id`, `name`, and optional `args` | `tool.execution_start`, mapping the native ID to `toolCallId`, the name to `toolName`, and `args` to `input` without truthiness-based omission. |
 | AI `data.invalid_tool_calls[]` | `langgraph.invalid_tool_call`, retaining the invalid call record as an opaque diagnostic record. |
 | `type: "tool"` with `data.tool_call_id` | `tool.execution_complete`, correlating the observed tool name when its start was observed and retaining content, artifact, status, and explicit error outcome. A status of `"error"` maps to unsuccessful execution; other statuses MUST NOT imply success beyond the supplied observation. |
-| AI `data.usage_metadata` | `usage.report`, mapping supplied token and cache fields, including reasoning tokens, and marking input tokens as including cache when LangChain reports `input_tokens`. These are source-reported observations. |
+| AI `data.usage_metadata` | `usage.report`, mapping supplied token and cache fields, including reasoning tokens. Cache inclusion MUST remain unknown unless matching raw provider counters establish the relationship. These are source-reported observations. |
 | Any other valid message type | `langgraph.message`, retaining the complete native message as an opaque diagnostic record. |
 | Trajectory `exit_status` | `session.result.data.status`; the number of AI messages maps to `numTurns`. |
-| Invalid trajectory envelope, message, tool call, or token count | Reject the malformed trajectory and report a validation or parse failure without fabricating canonical events or accounting values. |
+| Invalid trajectory envelope, message, tool call, or token count | Reject the malformed trajectory and report a payload-free collection warning, marking the source incomplete while retaining independent evidence and artifacts. Do not fabricate canonical events or accounting values. |
 
 The LangGraph trajectory format is retained as untrusted diagnostic evidence after
 redaction and recovery validation. A trajectory-derived `usage.report` records

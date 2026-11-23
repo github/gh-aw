@@ -178,6 +178,8 @@ func TestSessionParserEngines(t *testing.T) {
 		{"pi", "agent-stdio.log", "{\"type\":\"session\",\"version\":4,\"id\":\"pi-session\",\"createdAt\":\"2026-11-12T02:45:30.124Z\",\"cwd\":\"/workspace\"}\n{\"type\":\"message_end\",\"message\":{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"Engine session text\"}]}}"},
 		{"opencode", "agent-stdio.log", `{"type":"text","sessionID":"ses_fixture","timestamp":1790899201000,"part":{"id":"prt_fixture","type":"text","text":"Engine session text"}}`},
 		{"goose", "agent-stdio.log", `{"type":"message","message":{"id":"goose-native","role":"assistant","created":1790899201,"content":[{"type":"text","text":"Engine session text"}]}}`},
+		{"langgraph", "agent/langgraph.traj.json", `{"exit_status":"Completed","messages":[{"type":"ai","data":{"content":"Engine session text","usage_metadata":{"input_tokens":10,"output_tokens":2,"total_tokens":12}}}]}`},
+		{"langgraph", "agent-stdio.log", `{"exit_status":"Completed","messages":[{"type":"ai","data":{"content":"Engine session text"}}]}`},
 		{"custom", "agent-stdio.log", `{"type":"assistant.message","data":{"content":"Engine session text"}}`},
 	}
 	for _, test := range tests {

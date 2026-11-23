@@ -4,20 +4,25 @@ const { iterateJsonlEvents } = require("./jsonl_helpers.cjs");
 const { isSessionEvent, isTokenCount } = require("./agent_session.cjs");
 const { ERR_PARSE, ERR_VALIDATION } = require("./error_codes.cjs");
 
+/** @param {string} code @param {string} message */
+function evidenceError(code, message) {
+  return Object.assign(new Error(`${code}: ${message}`), { code });
+}
+
 /**
  * @param {any} trajectory
  * @returns {import("./types/agent_session").SessionEvent[]}
  */
 function normalizeLangGraphSession(trajectory) {
   if (!trajectory || !Array.isArray(trajectory.messages) || typeof trajectory.exit_status !== "string") {
-    throw new Error(`${ERR_VALIDATION}: Invalid LangGraph trajectory envelope`);
+    throw evidenceError(ERR_VALIDATION, "Invalid LangGraph trajectory envelope");
   }
   const events = [];
   const tools = new Map();
   let turns = 0;
   for (const [index, message] of trajectory.messages.entries()) {
     if (!message || typeof message.type !== "string" || !message.data || typeof message.data !== "object" || Array.isArray(message.data)) {
-      throw new Error(`${ERR_VALIDATION}: Invalid LangGraph message at index ${index}`);
+      throw evidenceError(ERR_VALIDATION, `Invalid LangGraph message at index ${index}`);
     }
     const data = message.data;
     const metadata = {
@@ -37,18 +42,18 @@ function normalizeLangGraphSession(trajectory) {
       if (message.type !== "ai") continue;
       turns++;
       if ((data.tool_calls !== undefined && !Array.isArray(data.tool_calls)) || (data.invalid_tool_calls !== undefined && !Array.isArray(data.invalid_tool_calls))) {
-        throw new Error(`${ERR_VALIDATION}: Invalid LangGraph tool call list at message index ${index}`);
+        throw evidenceError(ERR_VALIDATION, `Invalid LangGraph tool call list at message index ${index}`);
       }
       for (const call of data.tool_calls ?? []) {
         if (!call || typeof call.id !== "string" || typeof call.name !== "string") {
-          throw new Error(`${ERR_VALIDATION}: Invalid LangGraph tool call at message index ${index}`);
+          throw evidenceError(ERR_VALIDATION, `Invalid LangGraph tool call at message index ${index}`);
         }
         tools.set(call.id, call.name);
         emit("tool.execution_start", { toolCallId: call.id, toolName: call.name, ...(call.args !== undefined ? { input: structuredClone(call.args) } : {}) });
       }
       for (const call of data.invalid_tool_calls ?? []) emit("langgraph.invalid_tool_call", { record: structuredClone(call) });
       if (data.usage_metadata != null) {
-        if (typeof data.usage_metadata !== "object" || Array.isArray(data.usage_metadata)) throw new Error(`${ERR_VALIDATION}: Invalid LangGraph usage at message index ${index}`);
+        if (typeof data.usage_metadata !== "object" || Array.isArray(data.usage_metadata)) throw evidenceError(ERR_VALIDATION, `Invalid LangGraph usage at message index ${index}`);
         /** @type {Record<string, number | boolean>} */
         const usage = {};
         for (const [key, value] of [
@@ -60,15 +65,30 @@ function normalizeLangGraphSession(trajectory) {
           ["reasoning_output_tokens", data.usage_metadata.output_token_details?.reasoning],
         ]) {
           if (value === undefined) continue;
-          if (!isTokenCount(value)) throw new Error(`${ERR_VALIDATION}: Invalid LangGraph token count at message index ${index}`);
+          if (!isTokenCount(value)) throw evidenceError(ERR_VALIDATION, `Invalid LangGraph token count at message index ${index}`);
           usage[key] = value;
         }
-        // LangChain input_tokens includes cache reads and writes.
-        if (Object.hasOwn(usage, "input_tokens")) usage.input_tokens_include_cache = true;
+        // Prove cache inclusion against the adapter's raw provider counters.
+        const providerUsage = data.response_metadata?.token_usage ?? data.response_metadata?.usage;
+        const input = usage.input_tokens;
+        const cacheRead = usage.cache_read_input_tokens ?? 0;
+        const cacheWrite = usage.cache_creation_input_tokens ?? 0;
+        if (isTokenCount(input) && providerUsage && typeof providerUsage === "object") {
+          if (isTokenCount(providerUsage.prompt_tokens) && providerUsage.prompt_tokens === input && (providerUsage.prompt_tokens_details?.cached_tokens ?? 0) === cacheRead && cacheWrite === 0) {
+            usage.input_tokens_include_cache = true;
+          } else if (
+            isTokenCount(providerUsage.input_tokens) &&
+            (providerUsage.cache_read_input_tokens ?? 0) === cacheRead &&
+            (providerUsage.cache_creation_input_tokens ?? 0) === cacheWrite &&
+            input === providerUsage.input_tokens + cacheRead + cacheWrite
+          ) {
+            usage.input_tokens_include_cache = true;
+          }
+        }
         if (Object.keys(usage).length) emit("usage.report", { usage, ...(typeof data.response_metadata?.model_name === "string" ? { model: data.response_metadata.model_name } : {}) });
       }
     } else if (message.type === "tool") {
-      if (typeof data.tool_call_id !== "string") throw new Error(`${ERR_VALIDATION}: Invalid LangGraph tool result at message index ${index}`);
+      if (typeof data.tool_call_id !== "string") throw evidenceError(ERR_VALIDATION, `Invalid LangGraph tool result at message index ${index}`);
       emit("tool.execution_complete", {
         toolCallId: data.tool_call_id,
         ...(tools.has(data.tool_call_id) ? { toolName: tools.get(data.tool_call_id) } : {}),
@@ -86,19 +106,37 @@ function normalizeLangGraphSession(trajectory) {
   return events;
 }
 
+/** @param {string} content @returns {import("./types/agent_session").SessionEvent[]} */
+function parseLangGraphTrajectory(content) {
+  let trajectory;
+  try {
+    trajectory = JSON.parse(content);
+  } catch (error) {
+    if (!(error instanceof SyntaxError)) throw error;
+    throw evidenceError(ERR_PARSE, "Malformed LangGraph trajectory JSON");
+  }
+  return normalizeLangGraphSession(trajectory);
+}
+
 /**
  * Parse the native JSON file or the final snapshot emitted to stdio. Do not
  * interpret JSON embedded inside message content as separate session events.
  * @param {string} content
- * @returns {{logEntries: import("./types/agent_session").SessionEvent[], mcpFailures: string[], maxTurnsHit: boolean}}
+ * @returns {{markdown: string, logEntries: import("./types/agent_session").SessionEvent[], mcpFailures: string[], maxTurnsHit: boolean}}
  */
 function parseLangGraphLog(content) {
   let trajectory;
   let whole;
+  let wholeParsed = false;
   try {
     whole = JSON.parse(content);
-  } catch {
+    wholeParsed = true;
+  } catch (error) {
+    if (!(error instanceof SyntaxError)) throw error;
     // Stdio also contains harness diagnostics and the final plaintext answer.
+  }
+  if (wholeParsed && !isSessionEvent(whole)) {
+    return { markdown: "LangGraph session observations captured.", logEntries: normalizeLangGraphSession(whole), mcpFailures: [], maxTurnsHit: whole?.exit_status === "LimitsExceeded" };
   }
   if (whole && (Object.hasOwn(whole, "messages") || Object.hasOwn(whole, "exit_status"))) trajectory = whole;
   const records = [];
@@ -110,13 +148,14 @@ function parseLangGraphLog(content) {
     }
   }
   if (!trajectory && content.trimStart().startsWith("{") && /"(?:messages|exit_status)"\s*:/.test(content)) {
-    throw new Error(`${ERR_PARSE}: Malformed LangGraph trajectory JSON`);
+    throw evidenceError(ERR_PARSE, "Malformed LangGraph trajectory JSON");
   }
   return {
+    markdown: "LangGraph session observations captured.",
     logEntries: trajectory ? normalizeLangGraphSession(trajectory) : records,
     mcpFailures: [],
     maxTurnsHit: trajectory?.exit_status === "LimitsExceeded",
   };
 }
 
-module.exports = { normalizeLangGraphSession, parseLangGraphLog };
+module.exports = { normalizeLangGraphSession, parseLangGraphTrajectory, parseLangGraphLog };

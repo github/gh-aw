@@ -56,6 +56,24 @@ class CollectionTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "one second"):
             collector.inventory("example/repo", start, start, lambda _: {"total_count": 1001, "workflow_runs": []})
 
+    def test_classifies_workflow_paths_with_optional_refs(self):
+        start = collector.utc("2026-11-23T05:45:15Z")
+        for path, included in (
+            (".github/workflows/dispatcher.lock.yml", True),
+            (".github/workflows/dispatcher.lock.yml@refs/heads/main", True),
+            (".github/workflows/dispatcher.yml", False),
+            (".github/workflows/dispatcher.yml@refs/heads/main", False),
+            (".github/workflows/dispatcher.yml@refs/heads/example.lock.yml", False),
+        ):
+            with self.subTest(path=path):
+                record = run(1, collector.stamp(start), path)
+                result = collector.inventory(
+                    "example/repo", start, start,
+                    lambda _: {"total_count": 1, "workflow_runs": [record]},
+                )
+                self.assertEqual(result["all_workflow_runs"], 1)
+                self.assertEqual(result["runs"], [record] if included else [])
+
     def test_pins_github_host_without_shell_or_credential_output(self):
         with patch.object(collector.subprocess, "run", return_value=SimpleNamespace(returncode=0, stdout="{}", stderr="")) as execute:
             self.assertEqual(collector.gh_request("repos/example/repo/actions/runs"), {})
