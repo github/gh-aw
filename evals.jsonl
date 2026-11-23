@@ -152,3 +152,5 @@
 {"id":"test_results_reported","question":"Were the test results reported with any issues or anomalies identified?","answer":"YES","model":"gpt-6-luna","timestamp":"2026-11-20T05:24:29.990Z","runid":"44679716049"}
 {"id":"cli_tools_tested","question":"Did the agent run exploratory tests on the audit, logs, and compile CLI tools?","answer":"YES","model":"gpt-6-luna","timestamp":"2026-11-21T05:21:29.029Z","runid":"44869824946"}
 {"id":"test_results_reported","question":"Were the test results reported with any issues or anomalies identified?","answer":"YES","model":"gpt-6-luna","timestamp":"2026-11-21T05:21:29.029Z","runid":"44869824946"}
+{"id":"cli_tools_tested","question":"Did the agent run exploratory tests on the audit, logs, and compile CLI tools?","answer":"YES","model":"gpt-6-luna","timestamp":"2026-11-23T05:25:09.120Z","runid":"45116671998"}
+{"id":"validated_fix_or_diagnostic","question":"Did the agent propose at most one draft PR with a locally validated fix for a reproducible defect, or report why no PR qualified without claiming unverified coverage?","answer":"YES","model":"gpt-6-luna","timestamp":"2026-11-23T05:25:09.120Z","runid":"45116671998"}
