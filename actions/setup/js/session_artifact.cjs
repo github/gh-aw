@@ -20,11 +20,11 @@ function removeFailedSessionArtifacts(files, originalError) {
  * Redact decoded string values before JSON serialization, including correlation IDs.
  * @param {import("./types/agent_session").AgentSession} events
  * @param {string[]} [maskedValues]
- * @param {{rejectStructuralRedaction?: boolean}} [options]
+ * @param {{rejectStructuralRedaction?: boolean, secretValues?: string[]}} [options]
  * @returns {string}
  */
 function serializeSessionArtifact(events, maskedValues = [], options = {}) {
-  const secretValues = collectArtifactSecretValues();
+  const secretValues = options.secretValues ?? collectArtifactSecretValues();
   const redacted = redactManifestValue(events, secretValues);
   if (!Array.isArray(redacted)) throw new Error(`${ERR_VALIDATION}: Expected a session event array`);
   const maskedSourceClocks = redacted.map((event, index) => {
