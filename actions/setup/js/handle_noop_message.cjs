@@ -233,7 +233,7 @@ function buildHistoryLink() {
   return historyUrl
     ? [
         { type: "text", value: " · ", agentTainted: false },
-        { type: "link", url: historyUrl, children: [{ type: "text", value: "◷", agentTainted: false }], agentTainted: false },
+        { type: "link", url: historyUrl, children: [{ type: "text", value: "history", agentTainted: false }], agentTainted: false },
       ]
     : [];
 }

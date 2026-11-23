@@ -65,7 +65,7 @@ function footerHistoryLink(url) {
     children: url
       ? [
           { type: "text", value: " · ", agentTainted: false },
-          { type: "link", url, children: [{ type: "text", value: "◷", agentTainted: false }], agentTainted: false },
+          { type: "link", url, children: [{ type: "text", value: "history", agentTainted: false }], agentTainted: false },
         ]
       : [],
   };
@@ -280,7 +280,7 @@ function getAICFromEnv() {
  * @property {number|string} [triggeringNumber] - Issue, PR, or discussion number that triggered this workflow
  * @property {"issue"|"PR"|"discussion"} [triggeringType] - Triggering item type used in the default footer
  * @property {string} [historyUrl] - GitHub search URL for items created by this workflow (for the history link)
- * @property {string} [historyLink] - Pre-formatted markdown history link (e.g. " · [◷](url)"), or "" if unavailable
+ * @property {string} [historyLink] - Pre-formatted markdown history link (e.g. " · [history](url)"), or "" if unavailable
  * @property {number|string} [aiCredits] - Total AI Credits cost for the run (1 AIC == 0.01 USD)
  * @property {string} [emoji] - Optional emoji representing the workflow (from frontmatter)
  * @property {string} [slashCommand] - Slash command name (without leading slash) for the run-again hint, when applicable
@@ -409,7 +409,7 @@ function getFooterMessageParts(ctx) {
   }
   // Append history link when available
   if (ctx.historyUrl) {
-    children.push({ type: "text", value: " · ", agentTainted: false }, { type: "link", url: ctx.historyUrl, children: [{ type: "text", value: "◷", agentTainted: false }], agentTainted: false });
+    children.push({ type: "text", value: " · ", agentTainted: false }, { type: "link", url: ctx.historyUrl, children: [{ type: "text", value: "history", agentTainted: false }], agentTainted: false });
   }
   return [{ type: "quote_line", children }, ...getFooterHints()];
 }
@@ -639,7 +639,7 @@ function getFooterAgentFailureIssueTemplate(ctx) {
     template = "> Generated from [{workflow_name}]({run_url}){failure_metrics_suffix}";
     // Append history link when available
     if (ctx.historyUrl) {
-      template += " · [◷]({history_url})";
+      template += " · [history]({history_url})";
     }
   }
 
@@ -745,7 +745,7 @@ function getFooterAgentFailureCommentTemplate(ctx) {
     }
     // Append history link when available
     if (ctx.historyUrl) {
-      defaultFooter += " · [◷]({history_url})";
+      defaultFooter += " · [history]({history_url})";
     }
     footer = defaultFooter;
   }
