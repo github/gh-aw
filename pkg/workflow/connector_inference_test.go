@@ -101,7 +101,6 @@ func TestConnectorInferenceRejectsInvalidSelection(t *testing.T) {
 		{"dynamic model", func(f map[string]any) { inferenceSelection(f)["model"] = "${{ inputs.model }}" }, "literal model"},
 		{"missing model", func(f map[string]any) { delete(inferenceSelection(f), "model") }, "literal model"},
 		{"extra field", func(f map[string]any) { inferenceSelection(f)["endpoint"] = "https://other.invalid" }, "unknown field"},
-		{"missing network approval", func(f map[string]any) { f["network"] = map[string]any{"allowed": []any{"defaults"}} }, "explicit network.allowed"},
 		{"different engine", func(f map[string]any) { f["engine"].(map[string]any)["id"] = "codex" }, "only the copilot"},
 		{"conflicting auth", func(f map[string]any) { f["engine"].(map[string]any)["auth"] = map[string]any{"type": "github-oidc"} }, "conflicts"},
 		{"provider alias", func(f map[string]any) { f["engine"].(map[string]any)["model-provider"] = "openai" }, "conflicts"},
@@ -125,6 +124,66 @@ func TestConnectorInferenceRejectsInvalidSelection(t *testing.T) {
 			_, err := compiler.ParseWorkflowFile(path)
 			require.ErrorContains(t, err, tc.error)
 		})
+	}
+}
+
+func TestConnectorInferenceAutoAllowsSelectedProfileHosts(t *testing.T) {
+	const gateway, login = "example.ai.gateway.azure.com", "login.microsoftonline.com"
+	for _, tc := range []struct {
+		profile string
+		want    []string
+		absent  []string
+	}{
+		{"responses", []string{gateway, login}, nil},
+		{"completions-key", []string{gateway}, []string{login}},
+		{"", nil, []string{gateway, login}},
+	} {
+		t.Run("profile="+tc.profile, func(t *testing.T) {
+			compiler, path := prepareConnectorScenario(t, azureAIGatewayScenario, false, func(f, _ map[string]any) {
+				f["network"] = map[string]any{"allowed": []any{"defaults"}}
+				if tc.profile == "" {
+					delete(f["engine"].(map[string]any), "inference")
+				} else {
+					inferenceSelection(f)["profile"] = tc.profile
+				}
+				if tc.profile != "responses" {
+					delete(f["permissions"].(map[string]any), "id-token")
+				}
+			})
+			data, err := compiler.ParseWorkflowFile(path)
+			require.NoError(t, err)
+			domains, err := compiler.computeAllowedDomainsForFirewall(data)
+			require.NoError(t, err)
+			allowed := strings.Split(domains, ",")
+			for _, host := range tc.want {
+				require.Contains(t, allowed, host)
+			}
+			for _, host := range tc.absent {
+				require.NotContains(t, allowed, host)
+			}
+		})
+	}
+}
+
+func TestConnectorInferenceExplicitHostsAreNotDuplicated(t *testing.T) {
+	compiler, path := prepareConnectorScenario(t, azureAIGatewayScenario, false, func(f, _ map[string]any) {
+		f["network"] = map[string]any{"allowed": []any{"defaults", "example.ai.gateway.azure.com", "login.microsoftonline.com"}}
+	})
+	data, err := compiler.ParseWorkflowFile(path)
+	require.NoError(t, err)
+	domains, err := compiler.computeAllowedDomainsForFirewall(data)
+	require.NoError(t, err)
+	for _, host := range []string{"example.ai.gateway.azure.com", "login.microsoftonline.com"} {
+		require.Equal(t, 1, strings.Count(","+domains+",", ","+host+","))
+	}
+}
+
+func TestConnectorAzureOIDCLoginHost(t *testing.T) {
+	for cloud, want := range map[string]string{
+		"": "login.microsoftonline.com", "public": "login.microsoftonline.com",
+		"usgovernment": "login.microsoftonline.us", "china": "login.chinacloudapi.cn",
+	} {
+		require.Equal(t, want, (&ConnectorAzureOIDC{Cloud: cloud}).loginHost())
 	}
 }
 
