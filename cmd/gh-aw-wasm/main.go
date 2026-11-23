@@ -111,7 +111,15 @@ func doCompile(markdown string, files map[string][]byte, filename string) (js.Va
 	result := js.Global().Get("Object").New()
 	result.Set("yaml", yamlContent)
 	result.Set("error", js.Null())
-	result.Set("warnings", js.Global().Get("Array").New())
+	warnings := js.Global().Get("Array").New()
+	for _, diagnostic := range compiler.GetDiagnostics() {
+		warning := js.Global().Get("Object").New()
+		warning.Set("path", diagnostic.Path)
+		warning.Set("level", diagnostic.Level)
+		warning.Set("message", diagnostic.Message)
+		warnings.Call("push", warning)
+	}
+	result.Set("warnings", warnings)
 	return result, nil
 }
 

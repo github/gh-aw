@@ -21,12 +21,6 @@ import (
 var engineReleaseVersionPattern = regexp.MustCompile(`^v?(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?(\+[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$`)
 var engineReleasePackagePattern = regexp.MustCompile(`^(@[a-z0-9][a-z0-9._-]*/)?[a-z0-9][a-z0-9._-]*$`)
 var engineReleaseCooldownLog = logger.New("workflow:engine_release_cooldown")
-var engineReleaseNPMPackages = map[string]string{
-	"claude": "@anthropic-ai/claude-code",
-	"codex":  "@openai/codex",
-	"pi":     "@earendil-works/pi-coding-agent",
-	"gemini": "@google/gemini-cli",
-}
 
 const engineReleaseCacheTTL = 5 * time.Minute
 
@@ -63,6 +57,8 @@ func (c *Compiler) validateEngineReleaseCooldowns(data *WorkflowData, markdownPa
 		detector := &WorkflowData{AI: id, EngineConfig: resolveExternalDetectorEngineConfig(data, id)}
 		if isFeatureEnabled(constants.GHAWDetectionFeatureFlag, data) {
 			detector = buildExternalDetectorWorkflowData(data, id)
+		} else {
+			resetDetectionEngineTaskSettings(detector.EngineConfig)
 		}
 		if ResolveEngineID(data) == id {
 			detector.engineDefinition = data.engineDefinition
@@ -88,13 +84,33 @@ func (c *Compiler) engineReleaseTarget(data *WorkflowData) (engineReleaseTarget,
 		def = c.engineCatalog.Get(id)
 	}
 	runtimeID := id
-	version := getVersionForSetup(data, c.engineRegistry)
-	if engine, err := c.engineRegistry.GetEngineByPrefix(id); err == nil {
-		runtimeID = engine.GetID()
-		version = getInstallationVersion(data, engine, c.engineRegistry)
-	}
 	if def != nil && def.RuntimeID != "" {
 		runtimeID = def.RuntimeID
+	}
+	var engine CodingAgentEngine
+	if resolved, err := c.engineRegistry.GetEngine(runtimeID); err == nil {
+		engine = resolved
+	} else if resolved, err := c.engineRegistry.GetEngineByPrefix(id); err == nil {
+		engine = resolved
+	}
+	version := getVersionForSetup(data, c.engineRegistry)
+	if engine != nil {
+		runtimeID = engine.GetID()
+		if def == nil {
+			if behaviorEngine, ok := engine.(*BehaviorDefinedEngine); ok {
+				def = behaviorEngine.definition
+			}
+			if def == nil && c.engineCatalog != nil {
+				def = c.engineCatalog.Get(runtimeID)
+			}
+		}
+		installationData := data
+		if data.EngineConfig == nil {
+			copy := *data
+			copy.EngineConfig = &EngineConfig{ID: id}
+			installationData = &copy
+		}
+		version = getInstallationVersion(installationData, engine, c.engineRegistry)
 	}
 	packageName := ""
 	if def != nil && def.Behaviors != nil {
@@ -110,8 +126,8 @@ func (c *Compiler) engineReleaseTarget(data *WorkflowData) (engineReleaseTarget,
 			version = data.EngineConfig.Version
 		}
 	} else if runtimeID != "copilot" {
-		var supported bool
-		if packageName, supported = engineReleaseNPMPackages[runtimeID]; !supported {
+		packageName = builtinEngineNpmPackage(runtimeID)
+		if packageName == "" {
 			return engineReleaseTarget{}, false
 		}
 	}
@@ -150,7 +166,7 @@ func (c *Compiler) validateEngineReleaseCooldown(data *WorkflowData, markdownPat
 		return c.ctx.Err()
 	}
 	if metadata.err != nil {
-		c.warnEngineReleaseCooldown(target, days, markdownPath)
+		c.warnEngineReleaseCooldown(target, markdownPath)
 		return nil
 	}
 	if now.Sub(metadata.published).Hours()/24 < float64(days) {
@@ -173,34 +189,40 @@ func (c *Compiler) engineReleaseMetadata(target engineReleaseTarget, now time.Ti
 		}
 		c.engineReleaseCache = cache
 	}
-	cache.Lock()
-	defer cache.Unlock()
 	key := target.endpoint + "@" + target.version
+	cache.Lock()
 	metadata, found := cache.entries[key]
-	if !found || now.Sub(metadata.fetched) >= engineReleaseCacheTTL || now.Before(metadata.fetched) {
-		metadata = engineReleaseMetadata{fetched: now}
-		metadata.published, metadata.err = engineReleaseTimeLookup(c, target.endpoint, target.packageName, target.version)
-		if metadata.err == nil && (metadata.published.IsZero() || metadata.published.After(now)) {
-			metadata.err = errors.New("missing or future release publication timestamp")
-		}
+	if found && now.Sub(metadata.fetched) < engineReleaseCacheTTL && !now.Before(metadata.fetched) {
+		cache.Unlock()
+		return metadata
+	}
+	cache.Unlock()
+
+	metadata = engineReleaseMetadata{fetched: now}
+	metadata.published, metadata.err = engineReleaseTimeLookup(c, target.endpoint, target.packageName, target.version)
+	if metadata.err == nil && (metadata.published.IsZero() || metadata.published.After(now)) {
+		metadata.err = errors.New("missing or future release publication timestamp")
+	}
+	if c.ctx == nil || c.ctx.Err() == nil {
+		cache.Lock()
 		if cache.entries == nil {
 			cache.entries = map[string]engineReleaseMetadata{}
 		}
-		if c.ctx == nil || c.ctx.Err() == nil {
-			cache.entries[key] = metadata
-		}
+		cache.entries[key] = metadata
+		cache.Unlock()
 	}
 	return metadata
 }
 
-func (c *Compiler) warnEngineReleaseCooldown(target engineReleaseTarget, days int, markdownPath string) {
+func (c *Compiler) warnEngineReleaseCooldown(target engineReleaseTarget, markdownPath string) {
 	key := target.endpoint + "@" + target.version
 	if c.engineReleaseWarnings == nil {
 		c.engineReleaseWarnings = map[string]bool{}
 	}
 	if !c.engineReleaseWarnings[key] {
 		c.engineReleaseWarnings[key] = true
-		message := fmt.Sprintf("Could not validate engine.cooldown for %s@%s from public release metadata; validate the release age manually (minimum %d days) before running this workflow.", target.id, target.version, days)
+		message := fmt.Sprintf("Could not validate engine.cooldown for %s@%s from public release metadata; validate the release age manually against every applicable engine.cooldown setting before running this workflow.", target.id, target.version)
+		c.diagnostics = append(c.diagnostics, CompilerDiagnostic{Path: markdownPath, Level: "warning", Message: message})
 		fmt.Fprintln(os.Stderr, formatCompilerMessage(markdownPath, "warning", message))
 		c.IncrementWarningCount()
 	}
@@ -218,6 +240,9 @@ func (c *Compiler) fetchEngineReleaseTime(endpoint, packageName, version string)
 		return time.Time{}, err
 	}
 	request.Header.Set("Accept", "application/json")
+	if packageName != "" {
+		request.Header.Set("Accept", "application/vnd.npm.install-v1+json")
+	}
 	// Never inherit GH_HOST, registry configuration, or caller/runner credentials.
 	client := &http.Client{Timeout: 5 * time.Second}
 	if c.engineReleaseClient != nil {
@@ -238,6 +263,9 @@ func (c *Compiler) fetchEngineReleaseTime(endpoint, packageName, version string)
 	if response.StatusCode != http.StatusOK {
 		return time.Time{}, fmt.Errorf("release metadata returned HTTP %d", response.StatusCode)
 	}
+	if packageName != "" {
+		return parseNPMReleaseTime(response.Body, packageName, version)
+	}
 	const maxMetadataBytes = 8 * 1024 * 1024
 	body, err := io.ReadAll(io.LimitReader(response.Body, maxMetadataBytes+1))
 	if err != nil {
@@ -246,36 +274,151 @@ func (c *Compiler) fetchEngineReleaseTime(endpoint, packageName, version string)
 	if len(body) > maxMetadataBytes {
 		return time.Time{}, errors.New("release metadata exceeds the size limit")
 	}
-	return parseEngineReleaseTime(body, packageName, version)
+	return parseEngineReleaseTime(body, version)
 }
 
-func parseEngineReleaseTime(body []byte, packageName, version string) (time.Time, error) {
-	var timestamp string
-	if packageName == "" {
-		var release struct {
-			TagName     string `json:"tag_name"`
-			PublishedAt string `json:"published_at"`
-			Draft       bool   `json:"draft"`
-		}
-		if err := json.Unmarshal(body, &release); err != nil {
+func parseEngineReleaseTime(body []byte, version string) (time.Time, error) {
+	var release struct {
+		TagName     string `json:"tag_name"`
+		PublishedAt string `json:"published_at"`
+		Draft       bool   `json:"draft"`
+	}
+	if err := json.Unmarshal(body, &release); err != nil {
+		return time.Time{}, err
+	}
+	if release.TagName != "v"+version || release.Draft {
+		return time.Time{}, errors.New("release metadata does not match the requested published tag")
+	}
+	return time.Parse(time.RFC3339Nano, release.PublishedAt)
+}
+
+func parseNPMReleaseTime(body io.Reader, packageName, version string) (time.Time, error) {
+	decoder := json.NewDecoder(body)
+	token, err := decoder.Token()
+	if err != nil {
+		return time.Time{}, err
+	}
+	if token != json.Delim('{') {
+		return time.Time{}, errors.New("npm release metadata must be a JSON object")
+	}
+
+	var name, timestamp string
+	for decoder.More() {
+		keyToken, err := decoder.Token()
+		if err != nil {
 			return time.Time{}, err
 		}
-		if release.TagName != "v"+version || release.Draft {
-			return time.Time{}, errors.New("release metadata does not match the requested published tag")
+		key, ok := keyToken.(string)
+		if !ok {
+			return time.Time{}, errors.New("npm release metadata contains an invalid key")
 		}
-		timestamp = release.PublishedAt
-	} else {
-		var packument struct {
-			Name string            `json:"name"`
-			Time map[string]string `json:"time"`
+		switch key {
+		case "name":
+			if err := decoder.Decode(&name); err != nil {
+				return time.Time{}, err
+			}
+		case "time":
+			timeToken, err := decoder.Token()
+			if err != nil {
+				return time.Time{}, err
+			}
+			if timeToken != json.Delim('{') {
+				return time.Time{}, errors.New("npm release timestamps must be a JSON object")
+			}
+			for decoder.More() {
+				versionToken, err := decoder.Token()
+				if err != nil {
+					return time.Time{}, err
+				}
+				publishedVersion, ok := versionToken.(string)
+				if !ok {
+					return time.Time{}, errors.New("npm release metadata contains an invalid version key")
+				}
+				if publishedVersion == version {
+					if err := decoder.Decode(&timestamp); err != nil {
+						return time.Time{}, err
+					}
+				} else if err := skipJSONValue(decoder); err != nil {
+					return time.Time{}, err
+				}
+			}
+			closingToken, err := decoder.Token()
+			if err != nil {
+				return time.Time{}, err
+			}
+			if closingToken != json.Delim('}') {
+				return time.Time{}, errors.New("npm release timestamps are not properly closed")
+			}
+		default:
+			if err := skipJSONValue(decoder); err != nil {
+				return time.Time{}, err
+			}
 		}
-		if err := json.Unmarshal(body, &packument); err != nil {
-			return time.Time{}, err
+	}
+	closingToken, err := decoder.Token()
+	if err != nil {
+		return time.Time{}, err
+	}
+	if closingToken != json.Delim('}') {
+		return time.Time{}, errors.New("npm release metadata is not properly closed")
+	}
+	if err := decoder.Decode(new(any)); err != io.EOF {
+		if err == nil {
+			return time.Time{}, errors.New("npm release metadata contains trailing JSON")
 		}
-		if packument.Name != packageName {
-			return time.Time{}, errors.New("release metadata does not match the requested npm package")
-		}
-		timestamp = packument.Time[version]
+		return time.Time{}, err
+	}
+	if name != packageName {
+		return time.Time{}, errors.New("release metadata does not match the requested npm package")
+	}
+	if timestamp == "" {
+		return time.Time{}, errors.New("npm release metadata does not contain the requested version")
 	}
 	return time.Parse(time.RFC3339Nano, timestamp)
+}
+
+func skipJSONValue(decoder *json.Decoder) error {
+	token, err := decoder.Token()
+	if err != nil {
+		return err
+	}
+	delimiter, ok := token.(json.Delim)
+	if !ok {
+		return nil
+	}
+	switch delimiter {
+	case '{':
+		for decoder.More() {
+			if _, err := decoder.Token(); err != nil {
+				return err
+			}
+			if err := skipJSONValue(decoder); err != nil {
+				return err
+			}
+		}
+		closingToken, err := decoder.Token()
+		if err != nil {
+			return err
+		}
+		if closingToken != json.Delim('}') {
+			return errors.New("JSON object is not properly closed")
+		}
+		return nil
+	case '[':
+		for decoder.More() {
+			if err := skipJSONValue(decoder); err != nil {
+				return err
+			}
+		}
+		closingToken, err := decoder.Token()
+		if err != nil {
+			return err
+		}
+		if closingToken != json.Delim(']') {
+			return errors.New("JSON array is not properly closed")
+		}
+		return nil
+	default:
+		return errors.New("unexpected JSON delimiter")
+	}
 }
