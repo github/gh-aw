@@ -51,9 +51,11 @@ require Copilot. Pi lacks `plugins:`. Codex cannot enforce nonempty Bash command
 allowlists: disable Bash if feasible or choose another harness. Never weaken
 required security controls.
 
-For other harnesses, verify ID and import in [engines.json](engines.json); never
-invent IDs or capabilities. If no compatible definition exists, [define a
-custom engine](custom-declarative-agentic-engine.md) only on explicit request.
+Verify built-in IDs in the engine syntax reference; no import is needed.
+For import-based harnesses, verify the ID and required import in
+[engines.json](engines.json). Never invent IDs or capabilities. If no compatible
+definition exists, [define a custom engine](custom-declarative-agentic-engine.md)
+only on explicit request.
 
 ## 3. Select inference
 
