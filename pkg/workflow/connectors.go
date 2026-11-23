@@ -143,7 +143,7 @@ func (c *Compiler) resolveWorkflowConnectors(frontmatter map[string]any) (map[st
 		if err := connectors.Decode(data, &registration); err != nil {
 			return nil, fmt.Errorf("connectors.%s: %w", alias, err)
 		}
-		inference, err := resolveConnectorInference(alias, registration, frontmatter)
+		inference, err := resolveConnectorInference(alias, registration)
 		if err != nil {
 			return nil, fmt.Errorf("connectors.%s: %w", alias, err)
 		}

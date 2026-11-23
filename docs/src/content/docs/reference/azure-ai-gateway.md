@@ -33,15 +33,15 @@ imports:
     with:
       gateway-host: example.ai.gateway.azure.com
       models: [deployment-checklist]
-network:
-  allowed: [defaults, example.ai.gateway.azure.com, login.microsoftonline.com]
 ```
 
 Replace the hostname, model metadata and wire alias with the reviewed Catalog
 deployment. Keep the declaration at the imported local path, or use a reviewed
 commit-pinned remote import. Importing alone does not configure inference or
-approve network access. The connector currently supports Copilot, not the
-other engines.
+approve network access. Selecting an inference profile adds its gateway
+hostname, and `login.microsoftonline.com` for Entra profiles, to the firewall
+allowlist; listing them in `network.allowed` is unnecessary. The connector
+currently supports Copilot, not the other engines.
 
 The `responses` and `completions` profiles use Entra federation. Set
 `AZURE_TENANT_ID` and `AZURE_CLIENT_ID` Actions variables, configure the
@@ -53,8 +53,8 @@ The tenant and client can instead be supplied with the `azure-tenant-id` and
 
 For a gateway key, select `responses-key` or `completions-key` and store it as
 `AZURE_AI_GATEWAY_KEY` (or bind `key-secret` to another secret **name**). Remove
-`id-token: write` and `login.microsoftonline.com` when no other feature needs
-Entra federation. Only the selected profile's
+`id-token: write` when no other feature needs Entra federation; key profiles do
+not allow `login.microsoftonline.com`. Only the selected profile's
 credential is used; there is no credential fallback.
 
 Use the protocol the deployed alias supports. `engine.model` supplies Copilot
