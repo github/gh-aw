@@ -31,6 +31,7 @@ Slides built on a gh-aw agentic workflow show, at `top: 30px`, the first user me
 | Pull Request Review² | pr-sous-chef | #31911 | task `a70501b3-515a-4256-b691-e77b75eb8394`, session `4e5f906c-6ef8-407f-9c87-90e1bf7a7bd4` |
 | Daily Improvers | duplicate-code-detector | #1293 | PR body "Original prompt" (Serena DOCKER.md URL stripped) |
 | Merge fast, unslop daily | jsweep | #6854 | PR body |
+| Build The Factory That Works For You | repo-factory (recipe, not a workflow) | #80178 | Authored for the slide (user-directed), not mined from a session |
 | Issue Monster | issue-monster | #4684 | PR body "Original prompt" |
 | Query · Ask · Grow | daily-otel-instrumentation-advisor | #24655 | task `4f75f9b3-462c-4143-ae1d-0dae11684d5a`, session `2b0febeb-53b8-4f19-83d4-471aed9ce7d9` |
 | Instrument · Debug · Repeat | go-logger | #2084 | PR body "Original prompt" (Copilot PR, merged 2025-10-21) |
