@@ -223,3 +223,6 @@
 {"id":"release-updated","question":"Did the agent update the release with generated highlights?","answer":"YES","model":"gpt-6-luna","timestamp":"2026-11-18T13:54:16.389Z","runid":"44257377120"}
 {"id":"highlights-included","question":"Does the agent output confirm that release highlights were generated and prepended to the release notes?","answer":"YES","model":"gpt-6-luna","timestamp":"2026-11-18T13:54:16.389Z","runid":"44257377120"}
 {"id":"community-attribution","question":"Does the agent output include attribution to community contributors in the release highlights?","answer":"NO","model":"gpt-6-luna","timestamp":"2026-11-18T13:54:16.389Z","runid":"44257377120"}
+{"id":"release-updated","question":"Did the agent update the release with generated highlights?","answer":"YES","model":"gpt-6-luna","timestamp":"2026-11-23T23:33:34.981Z","runid":"45285172830"}
+{"id":"highlights-included","question":"Does the agent output confirm that release highlights were generated and prepended to the release notes?","answer":"YES","model":"gpt-6-luna","timestamp":"2026-11-23T23:33:34.981Z","runid":"45285172830"}
+{"id":"community-attribution","question":"Does the agent output include attribution to community contributors in the release highlights?","answer":"NO","model":"gpt-6-luna","timestamp":"2026-11-23T23:33:34.981Z","runid":"45285172830"}
