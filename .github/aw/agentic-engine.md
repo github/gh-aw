@@ -53,7 +53,7 @@ required security controls.
 
 For other harnesses, verify ID and import in [engines.json](engines.json); never
 invent IDs or capabilities. If no compatible definition exists, [define a
-custom engine](configure-agentic-engine.md) only on explicit request.
+custom engine](custom-declarative-agentic-engine.md) only on explicit request.
 
 ## 3. Select inference
 

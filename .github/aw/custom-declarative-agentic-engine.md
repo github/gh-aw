@@ -2,7 +2,7 @@
 description: Author or maintain a reusable declarative engine definition, including runtime behavior, provider wiring, and strict validation.
 ---
 
-# Define a Custom Engine
+# Define a Custom Declarative Engine
 
 Use this guide to add or edit a reusable `engine.behaviors` definition, not to
 set the engine, provider, or model in a consuming workflow. For those choices,

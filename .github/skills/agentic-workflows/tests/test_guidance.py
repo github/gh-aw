@@ -46,7 +46,7 @@ class GuidanceTests(unittest.TestCase):
     def test_agentic_engine_selection_routes_survive_prefix_reads(self):
         for name in (
             "create-agentic-workflow.md", "designer.md",
-            "update-agentic-workflow.md", "configure-agentic-engine.md",
+            "update-agentic-workflow.md", "custom-declarative-agentic-engine.md",
             "syntax-engine.md",
         ):
             guide = ROOT / ".github/aw" / name

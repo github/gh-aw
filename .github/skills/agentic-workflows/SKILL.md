@@ -35,7 +35,7 @@ After loading the matching workflow prompt or skill, follow it directly:
 - Create new workflows: `.github/aw/create-agentic-workflow.md`
 - Configure scheduled dreaming or consolidate persistent memory: `.github/aw/create-agentic-workflow.md`, then `.github/aw/memory.md#scheduled-dreaming`; load `.github/aw/dreaming.md` only when the decision and input scope justify implementation
 - Choose harness and inference: `.github/aw/agentic-engine.md`
-- Define a custom engine: `.github/aw/configure-agentic-engine.md`
+- Define a custom engine: `.github/aw/custom-declarative-agentic-engine.md`
 - Consume, author, or document third-party connectors: `.github/aw/connectors.md`
 - Create a new connector: `.github/aw/connectors.md#author-or-extend-a-declaration`, then the repository's `.github/skills/create-connector/SKILL.md` when available
 - Update existing workflows: `.github/aw/update-agentic-workflow.md`
@@ -98,7 +98,6 @@ Use the task routes above first. This inventory is not required startup context.
 - `.github/aw/charts.md`
 - `.github/aw/cli-commands.md`
 - `.github/aw/compat.md`
-- `.github/aw/configure-agentic-engine.md`
 - `.github/aw/connectors.md`
 - `.github/aw/context.md`
 - `.github/aw/create-agentic-workflow-design.md`
@@ -107,6 +106,7 @@ Use the task routes above first. This inventory is not required startup context.
 - `.github/aw/create-agentic-workflow-validation.md`
 - `.github/aw/create-agentic-workflow.md`
 - `.github/aw/create-shared-agentic-workflow.md`
+- `.github/aw/custom-declarative-agentic-engine.md`
 - `.github/aw/debug-agentic-workflow.md`
 - `.github/aw/debug-bootstrap.md`
 - `.github/aw/debug-compilation.md`
