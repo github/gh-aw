@@ -126,6 +126,7 @@ follow [token guidance](token-optimization.md).
 
 ## 9. Omit redundant defaults and verify
 
-Usually omit `engine: copilot`, unrestricted bash, edit and default timeouts.
+Keep the selected engine explicit; omit redundant inference settings,
+unrestricted bash, edit and default timeouts.
 Apply [output/validation checks](create-agentic-workflow-validation.md); compile
 source, fix all errors and include its generated lock in the PR.

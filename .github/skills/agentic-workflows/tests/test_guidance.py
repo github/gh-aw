@@ -43,6 +43,64 @@ def checklist(text):
 
 
 class GuidanceTests(unittest.TestCase):
+    def test_agentic_engine_selection_routes_survive_prefix_reads(self):
+        for name in (
+            "create-agentic-workflow.md", "designer.md",
+            "update-agentic-workflow.md", "custom-declarative-agentic-engine.md",
+            "syntax-engine.md",
+        ):
+            guide = ROOT / ".github/aw" / name
+            with self.subTest(guide=name):
+                self.assertIn("](agentic-engine.md)", guide.read_bytes()[:7500].decode("utf-8"))
+        for guide in (
+            ROOT / ".github/skills/agentic-workflows/SKILL.md",
+            ROOT / "pkg/cli/data/agentic_workflows_skill.md",
+        ):
+            with self.subTest(guide=guide):
+                self.assertIn(".github/aw/agentic-engine.md", guide.read_bytes()[:7500].decode("utf-8"))
+        skill = ROOT / ".github/skills/agentic-engine/SKILL.md"
+        self.assertIn("](../../aw/agentic-engine.md)", skill.read_text())
+
+    def test_agentic_engine_selection_contract(self):
+        guide = ROOT / ".github/aw/agentic-engine.md"
+        prefix, marker, _ = guide.read_bytes().partition(b"<!-- instruction-prefix-end -->")
+        self.assertTrue(marker)
+        self.assertLessEqual(len(prefix) + len(marker), 7500)
+        contract = normalized(prefix.decode("utf-8"))
+        for required in (
+            "`copilot`", "`claude`", "`codex`", "`pi`",
+            "repository-root `preferences.md`", "explicit, inferred, or Pi fallback",
+            "prefer confirmed choices to inference", "Prefer corroborated active usage",
+            "`AGENTS.md` and `.agents/skills/` as shared, not engine evidence",
+            "no clear preference applies and Pi meets all requirements",
+            "`engine: pi`", "Omission uses the compiler default",
+            "Preserve engine and inference on unrelated updates",
+            "Do not execute scripts, install tools",
+            "Never weaken required security controls", "Store no credentials",
+            "For recommendations, propose a preference entry without writing",
+        ):
+            with self.subTest(required=required):
+                self.assertIn(required, contract)
+
+    def test_inference_selection_contract_survives_prefix_reads(self):
+        guide = ROOT / ".github/aw/agentic-engine.md"
+        contract = normalized(guide.read_text().split("<!-- instruction-prefix-end -->")[0])
+        for required in (
+            "up to three similar repository-owned `.github/workflows/` sources",
+            "Distinguish explicit settings from inherited defaults",
+            "With no clearer choice, prefer GitHub Copilot inference",
+            "`permissions.copilot-requests: write`",
+            "organization-owned repo has centralized Copilot billing and Actions token access",
+            "Personal repos are ineligible",
+            "Otherwise omit the permission",
+            "if already authorized, list Actions secret names",
+            "Match documented provider names",
+            "never read or log values",
+            "mark availability unknown",
+        ):
+            with self.subTest(required=required):
+                self.assertIn(required, contract)
+
     def test_browser_decision_routes_survive_prefix_reads(self):
         route = "playwright.md#browser-decision-and-readiness"
         for name in (
