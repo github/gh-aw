@@ -664,6 +664,7 @@ func authorizationStagedValue(staged *TemplatableBool) any {
 	return templatableBoolIsTrue(staged)
 }
 
+// authorizationImplementationDigest is a deterministic fingerprint for authorization binding, not a way to conceal secret values. Its input is compiler-time workflow configuration, including unresolved GitHub secret expressions; SHA-256 provides a stable identity for that data.
 func authorizationImplementationDigest(value any) (string, error) {
 	data, err := json.Marshal(value)
 	if err != nil {
