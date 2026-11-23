@@ -1717,7 +1717,7 @@ async function main() {
   const harness = startEngineHarness({ engine: "copilot", harnessName: "Copilot harness", log, resolveRetryConfig, softDeadlineStart: "run" });
   if (!harness) return;
   const { command, args, safeOutputsPath, softTimeoutGuard } = harness;
-  const { maxRetries, maxDelayMs } = harness.retryConfig;
+  const { maxRetries } = harness.retryConfig;
 
   await checkCommandAccessible(command);
 
@@ -2576,7 +2576,7 @@ async function main() {
           if (result.retryAfterMs != null) {
             if (attempt >= maxRetries) {
               // No runner retry decision remains: retain the terminal wait-cap diagnostic here.
-              const decision = resolveRetryAfterDecision({ attempt, result, maxDelayMs, softTimeoutGuard, harnessName: "Copilot harness", log, terminal: true });
+              const decision = resolveRetryAfterDecision({ attempt, result, softTimeoutGuard, harnessName: "Copilot harness", log, terminal: true });
               if (decision?.action === "stop") return decision;
               log(`all ${maxRetries} retries exhausted after HTTP 429 — not retrying`);
               return { action: "stop" };
