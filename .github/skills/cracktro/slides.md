@@ -1248,20 +1248,20 @@ trust, review, process, confidence, skim
 - So we keep improving the process until what, exactly?
 - Until a quick skim is enough. Build confidence into the process, and trust it.
 
-### Cost Optimization {#cost-optimization}
+### FinOps {#cost-optimization}
 
 #### Summary
 
-Band header (Cost Optimization): debug, spend less and route smarter.
+Band header (FinOps): more value, less tokens.
 
 #### Keywords
 
-cost, spend, tokens, budget, savings
+FinOps, cost optimization, cost, spend, tokens, budget, savings
 
 #### Captions
 
-- Coming up next, our Cost Optimization segment. Stay with us.
-- We will look at how to debug agents, spend less on them, and route smarter.
+- Coming up next, our FinOps segment. Stay with us.
+- We will look at how to get more value from agents while spending fewer tokens.
 - Keep your wallets handy, folks. Stay with us.
 
 ### Cost management {#cost-management}
