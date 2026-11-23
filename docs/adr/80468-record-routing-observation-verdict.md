@@ -1,8 +1,8 @@
 # ADR-80468: Record a Routing Observation Verdict for Routed Runs
 
 **Date**: 2026-11-23
-**Status**: Draft
-**Deciders**: Not stated in PR evidence (PR author: rabeckett)
+**Status**: Accepted
+**Deciders**: rabeckett (PR author and author of [#79103](https://github.com/github/gh-aw/issues/79103))
 
 ## Context
 
@@ -24,8 +24,9 @@ For each routed run whose agent made requests, the conclusion job adds one `rout
 
 The verdict uses only:
 
-- AWF's request records (`model_routing`, `token_usage`), attributed by the rule routing analytics already applies (`attributeRequest` in `routing_analytics.cjs`);
-- the job results;
+- AWF's request records (`model_routing`, `token_usage`), attributed by the rule routing analytics already applies (`attributeRequest` in `routing_analytics.cjs`), and the statuses AWF recorded for the agent's failed requests;
+- the job results, including the detection job's;
+- the harness and execution records, and refusals in the main conversation;
 - the validated safe outputs in `agent_output.json`; and
 - threat detection's result.
 
@@ -49,12 +50,14 @@ The verdict appears in `gh aw audit` and as `model_routing.observation` in `audi
 - Platform causes (outages, timeouts, 429s, cancellations) no longer count as model failures.
 - A result counts only when the selected pair actually ran, so the verdict is attributable.
 - The verdict means the same thing across engines and needs no compiler or lock-file change.
-- Old artifacts should remain readable, as issue #79103 requires. The PR evidence reviewed here does not show a specific test for this; the author should confirm it.
+- Sessions without the event stay readable: the CLI reports no observation for them, as the unchanged model-routing golden sessions and the provenance test show.
 
 **Negative**
 
-- The precedence and classification tables are large (platform, rate-limit, and behavioral sets, plus the wrapper and guard exceptions). They must be kept in step with AWF's category names.
-- An agent-filed `infrastructure_error` report counts neither as success nor failure, so a real infrastructure failure that the agent reports yields no signal.
+- The precedence and classification tables are large (platform, rate-limit, and behavioral sets, plus the wrapper and guard exceptions). They must be kept in step with gh-aw's harness and execution category names.
+- An incomplete report whose reason claims an infrastructure error counts neither way, because the agent can file that reason. An infrastructure failure known only from such a report is skipped as `unknown_evidence` rather than `infrastructure`.
 - Many routed runs will produce `skip` verdicts, which give no learning signal for routing history.
 - The vocabulary is closed. A new reason or outcome requires coordinated changes to the session schema, the specification, and the audit output.
 - Consumers must read two separate decisions: the verdict, and the history writer's choice about whether to record it.
+
+*ADR drafted by the Design Decision Gate and reviewed by the PR author.*

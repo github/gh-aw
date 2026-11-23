@@ -205,7 +205,9 @@ function observeRoutedRun(sources, subAgentModels, output) {
   const execution = eventsOf("execution", "agent", "agent.execution")[0]?.data;
   const attempt = harness?.attemptResults?.at(-1);
   const startup = harness?.startupAttemptResults?.at(-1);
-  const agentResult = eventsOf("workflow", "conclusion", "workflow.job_result").find(event => event.data?.jobId === "agent")?.data?.result;
+  const jobResults = eventsOf("workflow", "conclusion", "workflow.job_result");
+  const agentResult = jobResults.find(event => event.data?.jobId === "agent")?.data?.result;
+  const detectionJob = jobResults.find(event => event.data?.jobId === "detection")?.data?.result;
   return routingOutcome({
     pair: run.pair,
     agentResult: typeof agentResult === "string" ? agentResult : undefined,
@@ -215,12 +217,14 @@ function observeRoutedRun(sources, subAgentModels, output) {
     proxyStatuses: run.statuses,
     refused: eventsOf("agent", "agent", "assistant.refusal").some(event => !isNestedSessionEvent(event)),
     output: summarizeAgentOutput(output),
-    // As in the published session, only the conclusion's own detection result carries a reason.
-    detection: detectionVerdict(
-      sources
+    // As in the published session, only the conclusion's own detection result carries a reason. The
+    // detection job's result counts too, for a detector that failed before any result was written.
+    detection: detectionVerdict([
+      ...sources
         .filter(source => source.component === "detection")
-        .flatMap(source => source.events.filter(event => event.type === "detection.result").map(event => (source.path === DETECTION_RESULT_PATH ? event.data : { ...event.data, reason: undefined })))
-    ),
+        .flatMap(source => source.events.filter(event => event.type === "detection.result").map(event => (source.path === DETECTION_RESULT_PATH ? event.data : { ...event.data, reason: undefined }))),
+      ...(typeof detectionJob === "string" ? [{ job_result: detectionJob }] : []),
+    ]),
   });
 }
 

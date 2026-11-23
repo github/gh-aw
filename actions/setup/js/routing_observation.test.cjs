@@ -154,10 +154,11 @@ describe("routing.observation in the unified session", () => {
     return root;
   }
   /** @param {string} agent */
-  const jobResults = agent => JSON.stringify({ activation: { result: "success" }, agent: { result: agent } });
+  /** @param {string} agent @param {string} [detection] */
+  const jobResults = (agent, detection) => JSON.stringify({ activation: { result: "success" }, agent: { result: agent }, ...(detection ? { detection: { result: detection } } : {}) });
   /** @param {string} root @param {{agent?: string, engine?: string, routingObservation?: boolean}} [options] */
-  const collect = (root, { agent = "success", engine, routingObservation = true } = {}) =>
-    collectUnifiedSession({ rootDir: root, engine, warn: () => {}, dailyAIC: {}, admission: {}, jobResults: jobResults(agent), routingObservation }).events;
+  const collect = (root, { agent = "success", detection, engine, routingObservation = true } = {}) =>
+    collectUnifiedSession({ rootDir: root, engine, warn: () => {}, dailyAIC: {}, admission: {}, jobResults: jobResults(agent, detection), routingObservation }).events;
   /** @param {any[]} events */
   const verdicts = events => events.filter(event => event.type === "routing.observation");
 
@@ -194,6 +195,10 @@ describe("routing.observation in the unified session", () => {
     fs.mkdirSync(path.join(threat, "usage/detection"), { recursive: true });
     fs.writeFileSync(path.join(threat, "usage/detection/detection_result.json"), JSON.stringify({ job_result: "failure", conclusion: "failure", reason: "threat_detected" }));
     expect(verdicts(collect(threat)).map(event => event.data)).toEqual([skip("unknown_evidence")]);
+    // A detector that failed before writing any result leaves no clean verdict either.
+    const failedDetector = prepare(fixtures.runDir(routed.id));
+    fs.rmSync(path.join(failedDetector, "usage/detection"), { recursive: true, force: true });
+    expect(verdicts(collect(failedDetector, { detection: "failure" })).map(event => event.data)).toEqual([skip("unknown_evidence")]);
 
     // A failed agent that left no output is unknown evidence, unless AWF recorded a provider outage.
     const outage = prepare(fixtures.runDir(routed.id), empty);
