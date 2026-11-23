@@ -411,13 +411,13 @@ func (c *Compiler) generateScriptModeCleanupStep(data *WorkflowData) string {
 	step.WriteString("          INPUT_DESTINATION: " + SetupActionDestination + "\n")
 	step.WriteString("          INPUT_JOB_NAME: ${{ github.job }}\n")
 	if engineID := ResolveEngineID(data); engineID != "" {
-		writeFormattedYAML(&step, "          GH_AW_INFO_ENGINE_ID: %q\n", engineID)
+		fmt.Fprintf(&step, "          GH_AW_INFO_ENGINE_ID: %q\n", engineID)
 	}
 	if provider := resolveBYOKGenAIProviderName(data); provider != "" {
-		writeFormattedYAML(&step, "          GH_AW_INFO_GENAI_PROVIDER: %q\n", provider)
+		fmt.Fprintf(&step, "          GH_AW_INFO_GENAI_PROVIDER: %q\n", provider)
 	}
 	if endpoint := resolveBYOKGenAIEndpoint(data); endpoint != "" {
-		writeFormattedYAML(&step, "          GH_AW_INFO_GENAI_ENDPOINT: %q\n", endpoint)
+		fmt.Fprintf(&step, "          GH_AW_INFO_GENAI_ENDPOINT: %q\n", endpoint)
 	}
 	return step.String()
 }

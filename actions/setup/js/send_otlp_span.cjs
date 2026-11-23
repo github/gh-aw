@@ -121,6 +121,8 @@ function resolveRunGenAiProvider(awInfo, engineId) {
 
 /** @param {any} awInfo */
 function resolveRunGenAiServerAddress(awInfo) {
+  const byokProvider = readContextString(awInfo?.genai_provider) || (process.env.GH_AW_INFO_GENAI_PROVIDER || "").trim();
+  if (!byokProvider) return "";
   return genAiServerAddress(awInfo?.genai_server_address) || genAiServerAddress(process.env.GH_AW_INFO_GENAI_ENDPOINT);
 }
 

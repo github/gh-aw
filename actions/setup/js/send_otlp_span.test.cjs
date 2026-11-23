@@ -3080,6 +3080,7 @@ describe("sendJobConclusionSpan", () => {
       await sendJobSetupSpan();
       await sendJobConclusionSpan("gh-aw.agent.conclusion", { startMs });
 
+      expect(fetchMock.mock.calls).toHaveLength(3);
       for (const [, options] of fetchMock.mock.calls) {
         const span = JSON.parse(options.body).resourceSpans[0].scopeSpans[0].spans[0];
         const attrs = Object.fromEntries(span.attributes.map(attr => [attr.key, attr.value.stringValue]));
@@ -3087,6 +3088,20 @@ describe("sendJobConclusionSpan", () => {
         expect(attrs["server.address"]).toBe("gw.azure-api.net");
         expect(options.body).not.toContain("placeholder");
         expect(options.body).not.toContain("key=private");
+      }
+    });
+
+    it("omits the endpoint host when no BYOK provider is configured", async () => {
+      vi.stubEnv("GH_AW_INFO_GENAI_ENDPOINT", "https://gw.example.com/v1");
+
+      await sendJobSetupSpan();
+      await sendJobConclusionSpan("gh-aw.agent.conclusion", { startMs });
+
+      expect(fetchMock.mock.calls).toHaveLength(3);
+      for (const [, options] of fetchMock.mock.calls) {
+        const span = JSON.parse(options.body).resourceSpans[0].scopeSpans[0].spans[0];
+        const attrs = Object.fromEntries(span.attributes.map(attr => [attr.key, attr.value.stringValue]));
+        expect(attrs).not.toHaveProperty("server.address");
       }
     });
 

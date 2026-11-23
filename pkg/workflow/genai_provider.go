@@ -28,10 +28,21 @@ func resolveBYOKGenAIEndpoint(workflowData *WorkflowData) string {
 	if resolveBYOKGenAIProviderName(workflowData) == "" {
 		return ""
 	}
-	if endpoint := getEngineEnvOverrides(workflowData)[constants.CopilotProviderBaseURL]; strings.TrimSpace(endpoint) != "" {
+	env := getEngineEnvOverrides(workflowData)
+	if endpoint := env[constants.CopilotProviderBaseURL]; strings.TrimSpace(endpoint) != "" {
 		return endpoint
 	}
-	return workflowData.EngineConfig.APITarget
+	switch resolveEngineLLMProvider(workflowData, LLMProviderGitHub) {
+	case LLMProviderOpenAI:
+		return env["OPENAI_BASE_URL"]
+	case LLMProviderAnthropic:
+		return env["ANTHROPIC_BASE_URL"]
+	default:
+		if endpoint := env["GITHUB_COPILOT_BASE_URL"]; strings.TrimSpace(endpoint) != "" {
+			return endpoint
+		}
+		return workflowData.EngineConfig.APITarget
+	}
 }
 
 // resolveBYOKGenAIProviderName returns the OTel gen_ai.provider.name for Copilot

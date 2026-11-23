@@ -47,10 +47,13 @@ func TestResolveBYOKGenAIEndpoint(t *testing.T) {
 	assert.Empty(t, resolveBYOKGenAIEndpoint(&WorkflowData{EngineConfig: &EngineConfig{ID: "copilot", APITarget: "api.githubcopilot.com"}}))
 
 	data := &WorkflowData{
-		EngineConfig:       &EngineConfig{ID: "copilot", LLMProvider: LLMProviderOpenAI, APITarget: "gateway.example.com:8443"},
+		EngineConfig:       &EngineConfig{ID: "copilot", LLMProvider: LLMProviderOpenAI, APITarget: "copilot-gateway.example.com:8443", Env: map[string]string{"OPENAI_BASE_URL": "https://openai-gateway.example.com/v1"}},
 		NetworkPermissions: &NetworkPermissions{Firewall: &FirewallConfig{Enabled: true}},
 	}
-	assert.Equal(t, "gateway.example.com:8443", resolveBYOKGenAIEndpoint(data))
+	assert.Equal(t, "https://openai-gateway.example.com/v1", resolveBYOKGenAIEndpoint(data))
+	data.EngineConfig.Env = map[string]string{"ANTHROPIC_BASE_URL": "${{ vars.ANTHROPIC_URL }}"}
+	data.EngineConfig.LLMProvider = LLMProviderAnthropic
+	assert.Equal(t, "${{ vars.ANTHROPIC_URL }}", resolveBYOKGenAIEndpoint(data))
 	data.EngineConfig.Env = map[string]string{"COPILOT_PROVIDER_BASE_URL": "${{ vars.GATEWAY_URL }}"}
 	assert.Equal(t, "${{ vars.GATEWAY_URL }}", resolveBYOKGenAIEndpoint(data))
 }
