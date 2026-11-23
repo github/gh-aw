@@ -660,8 +660,8 @@
     };
     const lineStartBtn = arrowBtn("First slide of the band", "Shift+Home", "Shift+Home", "M5 5v14M13 6l-6 6 6 6M20 6l-6 6 6 6", () => lineStart());
     const bandPrevBtn = arrowBtn("Previous band", "PgUp or Shift+↑", "PageUp Shift+ArrowUp", "M6 5v14M18 6l-7 6 7 6", () => band(-1));
-    const prevBtn = arrowBtn("Previous slide", "←", "ArrowLeft", "M15 5l-7 7 7 7", () => prev());
-    const nextBtn = arrowBtn("Next slide", "→", "ArrowRight", "M9 5l7 7-7 7", () => next());
+    const prevBtn = arrowBtn("Previous slide", "⌘/Ctrl+←", "Meta+ArrowLeft Control+ArrowLeft", "M15 5l-7 7 7 7", () => prev());
+    const nextBtn = arrowBtn("Next slide", "⌘/Ctrl+→", "Meta+ArrowRight Control+ArrowRight", "M9 5l7 7-7 7", () => next());
     const bandNextBtn = arrowBtn("Next band", "PgDn or Shift+↓", "PageDown Shift+ArrowDown", "M18 5v14M6 6l7 6-7 6", () => band(1));
     const arrows = h("div", { class: "arrows" }, lineStartBtn, bandPrevBtn, prevBtn, nextBtn, bandNextBtn);
     // Column button (dock): shown on a column's head and its examples. On the head it is lit with a bouncing
@@ -1194,8 +1194,8 @@
       vnb.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="${back ? "M12 19V5M5 12l7-7 7 7" : "M12 5v14M5 12l7 7 7-7"}"/></svg><span class="vnb-t">${at ? `${at}/${N}` : N}</span>`;
       vnb._nav = back ? () => go(slides.indexOf(col)) : () => vstep(1);
     }
-    // Left/Right, the dock arrows and swipes always change slide; Space/Enter and Backspace run the slide's
-    // in-slide steps (onNext/onPrev) first and change slide only when none is left.
+    // Cmd/Ctrl+Left/Right, the dock arrows and swipes always change slide; Right/Space/Enter and Left/Backspace
+    // run the slide's in-slide steps (onNext/onPrev) first and change slide only when none is left.
     const next = () => {
         const i = nextTop(cur);
         if (i != null) go(i);
@@ -1217,6 +1217,12 @@
       if ((e.metaKey || e.ctrlKey) && !e.altKey && (e.key === "k" || e.key === "K")) {
         e.preventDefault();
         openSearch();
+        return;
+      }
+      if ((e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey && (e.key === "ArrowRight" || e.key === "ArrowLeft")) {
+        if (target.closest?.("input, textarea, select, [contenteditable]")) return;
+        e.preventDefault();
+        (e.key === "ArrowRight" ? next : prev)();
         return;
       }
       if (e.metaKey || e.ctrlKey || e.altKey) return;
@@ -1245,13 +1251,10 @@
         go(+typed - 1);
         return;
       }
-      if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
-        e.preventDefault();
-        (e.key === "ArrowRight" ? next : prev)();
-      } else if (e.key === " " || e.key === "Enter") {
+      if (e.key === " " || e.key === "Enter" || e.key === "ArrowRight") {
         e.preventDefault();
         stepNext();
-      } else if (e.key === "Backspace") {
+      } else if (e.key === "Backspace" || e.key === "ArrowLeft") {
         e.preventDefault();
         stepPrev();
       } else if (e.key === "PageDown" || e.key === "PageUp") {
@@ -1684,9 +1687,9 @@
       [
         "Move",
         [
-          [["←", "→"], "Previous or next slide"],
-          [["Space", "Enter"], "Next step in the slide, then next slide"],
-          [["Backspace"], "Previous step in the slide, then previous slide"],
+          [["Ctrl+←", "Ctrl+→", "⌘+←", "⌘+→"], "Previous or next slide"],
+          [["→", "Space", "Enter"], "Next step in the slide, then next slide"],
+          [["←", "Backspace"], "Previous step in the slide, then previous slide"],
           [["↑", "↓"], "Up or down a column, or to the next band; keeps your place in the line"],
           [["Shift+↑", "Shift+↓", "PgUp", "PgDn"], "Previous or next band"],
           [["U"], "Back to the pattern of an example"],
@@ -1769,8 +1772,8 @@
       return keys.map(([label, x, y, w = 1, hh = 1, k = label, shape]) => ({ label, x, y, w, h: hh, k, shape }));
     })();
     const KEYTAG = {
-      "→": "next",
-      "←": "prev",
+      "→": "step",
+      "←": "back",
       "↑": "up",
       "↓": "down",
       Space: "step",
