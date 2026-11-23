@@ -44,9 +44,10 @@ function extractAwfTokenWarnings(logEntries) {
 
 /**
  * @param {string} logContent
+ * @param {{render?: boolean}} [options]
  * @returns {{markdown: string, logEntries: SessionEvent[], mcpFailures?: string[], maxTurnsHit?: boolean}}
  */
-function parseCopilotLog(logContent) {
+function parseCopilotLog(logContent, { render = true } = {}) {
   let logEntries;
   try {
     logEntries = JSON.parse(logContent);
@@ -59,6 +60,7 @@ function parseCopilotLog(logContent) {
   if (!canonicalLogEntries.length) {
     return { markdown: buildStepSummaryDetailsSection("Agent Log Summary", "Log format not recognized as Copilot JSON array or JSONL."), logEntries: [] };
   }
+  if (!render) return { markdown: "", logEntries: canonicalLogEntries };
 
   const conversationResult = generateConversationMarkdown(canonicalLogEntries, {
     includeInformation: false,
