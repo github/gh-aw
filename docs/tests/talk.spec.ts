@@ -63,15 +63,15 @@ test("preserves navigation, slide links, speaker notes, and sound controls", asy
   // Space follows the main line from Event-driven Hand-offs to Repo Commands
   await page.keyboard.press("Space");
   await expect(page).toHaveURL(new RegExp(`/gh-aw/cracktro/#${slideId("Repo Commands")}$`));
-  await page.keyboard.press("ArrowLeft");
+  await page.keyboard.press("Alt+ArrowLeft");
   await expect(page.locator(CURRENT)).toHaveAttribute("aria-label", at(HANDOFFS));
   await page.reload();
   await expect(page.locator(CURRENT)).toHaveAttribute("aria-label", at(HANDOFFS));
   await page.keyboard.press("Home");
-  await page.keyboard.press("ArrowLeft");
+  await page.keyboard.press("Alt+ArrowLeft");
   await expect(page.locator(CURRENT)).toHaveAttribute("aria-label", at(1));
   await page.keyboard.press("End");
-  await page.keyboard.press("ArrowRight");
+  await page.keyboard.press("Alt+ArrowRight");
   await expect(page.locator(CURRENT)).toHaveAttribute("aria-label", at(TOTAL));
 });
 
@@ -97,7 +97,7 @@ test("toggles speaker notes from the toolbar and keyboard without advancing slid
   await expect(toggle).toBeFocused();
   await page.keyboard.press("N");
   await expect(toggle).toHaveAttribute("aria-pressed", "true");
-  await page.keyboard.press("ArrowRight");
+  await page.keyboard.press("Alt+ArrowRight");
   await expect(notes).toBeVisible();
   await expect(notes).not.toHaveText(firstNotes!);
   await toggle.focus();
@@ -169,7 +169,7 @@ test("fuzzy-searches slide titles, keywords, summaries and text from the dock's 
   await expect(dialog).toBeHidden();
   await expect(count).toHaveAttribute("aria-label", at(slideNo("Zero-secret agents")));
   // deck keys work again once the dialog closes
-  await page.keyboard.press("ArrowRight");
+  await page.keyboard.press("Alt+ArrowRight");
   await expect(count).toHaveAttribute("aria-label", at(slideNo("Zero-secret agents") + 1));
 
   // "/" opens it; summaries from slides.md are searchable and shown; arrows pick a result; Escape leaves the deck alone
@@ -255,17 +255,17 @@ test("moves through the bands like a cursor, up/down keeping the horizontal posi
   await page.keyboard.press("ArrowDown");
   await expect(count).toHaveAttribute("aria-label", at(2));
   await expect(page.locator(".slide.active").getByRole("heading").first()).toHaveText("Agentic Workflows");
-  await page.keyboard.press("ArrowRight");
+  await page.keyboard.press("Alt+ArrowRight");
   await expect(count).toHaveAttribute("aria-label", at(3));
   // down walks the Continuous AI column first, then leaves for the same position in the next band
   await page.keyboard.press("ArrowDown");
   await expect(count).toHaveAttribute("aria-label", at(slideNo("Continuous AI")));
   await page.keyboard.press("ArrowDown");
   await expect(count).toHaveAttribute("aria-label", at(SECURITY + 1));
-  await page.keyboard.press("ArrowLeft");
+  await page.keyboard.press("Alt+ArrowLeft");
   await expect(count).toHaveAttribute("aria-label", at(SECURITY));
   // left from a band header wraps to the last main-line slide of the band above, skipping its column of examples
-  await page.keyboard.press("ArrowLeft");
+  await page.keyboard.press("Alt+ArrowLeft");
   await expect(count).toHaveAttribute("aria-label", at(slideNo("Turn Workflows to Value")));
   await page.keyboard.press("ArrowUp");
   await expect(count).toHaveAttribute("aria-label", at(1));
@@ -354,9 +354,9 @@ test("walks a pattern's column of examples with up/down and hints at it from the
   await expect(vnb).toBeHidden();
   // Right from an example of the previous column continues from its pattern to the next main-line slide
   await page.goto(`/gh-aw/cracktro/#${slideNo("Decide · Draft · Record")}`);
-  await page.keyboard.press("ArrowRight");
+  await page.keyboard.press("Alt+ArrowRight");
   await expect(count).toHaveAttribute("aria-label", at(slideNo("Issues as intent")));
-  await page.keyboard.press("ArrowRight");
+  await page.keyboard.press("Alt+ArrowRight");
   await expect(count).toHaveAttribute("aria-label", at(head));
   // the head lights a toolbar button hinting that a column of examples lies below
   await expect(page.getByRole("button", { name: `${n} examples below` })).toBeVisible();
@@ -371,11 +371,11 @@ test("walks a pattern's column of examples with up/down and hints at it from the
   await vnb.click();
   await vnb.click();
   await expect(count).toHaveAttribute("aria-label", at(head + 2));
-  await page.keyboard.press("ArrowRight");
+  await page.keyboard.press("Alt+ArrowRight");
   await expect(count).toHaveAttribute("aria-label", at(last + 1));
   await expect(vnb).toBeHidden();
   // Left from the main line skips the column back to its head
-  await page.keyboard.press("ArrowLeft");
+  await page.keyboard.press("Alt+ArrowLeft");
   await expect(count).toHaveAttribute("aria-label", at(head));
   // on the last example the button leads back up to the pattern
   await page.goto(`/gh-aw/cracktro/#${last}`);
@@ -939,7 +939,7 @@ test("places the enterprise tracing, access and event slides beside their neighb
   // Arrow navigation reaches the slide after each new one.
   await page.goto(`/gh-aw/cracktro/#${slideNo("Distributed tracing")}`);
   await expect(page.locator(CURRENT)).toHaveAttribute("aria-label", at(slideNo("Distributed tracing")));
-  await page.keyboard.press("ArrowRight");
+  await page.keyboard.press("Alt+ArrowRight");
   await expect(page.locator(".slide.active h2")).toHaveText("GitHub-native governance");
   expect(errors).toEqual([]);
 });
@@ -1102,7 +1102,7 @@ test("splits inline skills and agents, defers context and preserves step navigat
   await page.keyboard.press("Space");
   await page.keyboard.press("Space");
   await expect(page.locator(".slide.active h2")).toHaveText("Audit & Optimize");
-  await page.keyboard.press("ArrowLeft");
+  await page.keyboard.press("Alt+ArrowLeft");
   await expect(slide).toHaveClass(/active/);
   await expect(slide.locator(".isa-take")).toHaveClass(/on/);
   expect(errors).toEqual([]);
@@ -1275,6 +1275,8 @@ test("ends the slide map with a keyboard manual of every shortcut and touch gest
   for (const group of ["Move", "Jump", "Show", "Slide map", "Design a view"]) await expect(keys.getByRole("heading", { name: group, exact: true })).toBeVisible();
   await expect(keys.locator("dt", { hasText: "Shift+Home" })).toHaveCount(1);
   await expect(keys).toContainText("First slide of the band");
+  await expect(keys).toContainText("Previous or next slide, skipping in-slide steps");
+  await expect(keys).toContainText("In the map: previous or next tile, in slide order");
   await expect(keys.locator(".kb-k")).toHaveCount(102);
   await expect(keys).toContainText("Closed captioning (CC) in kiosk mode");
   await expect(keys.locator('.kb-k.on[data-k="G"]')).toHaveCount(1);
@@ -1384,7 +1386,7 @@ test.describe("reusable runtime", () => {
     expect(requests.filter(p => /\/(?:deck|ops-visuals)\.js$/.test(p))).toEqual([]);
     expect(await page.evaluate(() => typeof (window as unknown as { sfx?: unknown }).sfx)).toBe("undefined");
 
-    await page.keyboard.press("ArrowRight");
+    await page.keyboard.press("Alt+ArrowRight");
     await expect(page).toHaveURL(/#alpha$/);
     await expect(heading(page)).toHaveText("Alpha");
     await page.keyboard.press("End");
@@ -1399,16 +1401,24 @@ test.describe("reusable runtime", () => {
     const { errors } = await open(page, "/gh-aw/cracktro/tiny.html");
     await expect(heading(page)).toHaveText("Hello");
     await page.keyboard.press("x");
-    // Left/Right change slide without running in-slide steps; Space runs a step first
+    // Cmd/Alt+Left/Right change slide without running in-slide steps; Right runs a step first, like Space
+    await page.keyboard.press("Alt+ArrowRight");
+    await expect(page).toHaveURL(/#part-one$/);
+    await page.keyboard.press("Alt+ArrowLeft");
+    await expect(page).toHaveURL(/#hello$/);
+    await page.keyboard.press("Control+ArrowRight");
+    await expect(page).toHaveURL(/#hello$/);
+    await page.keyboard.press("Meta+ArrowRight");
+    await expect(page).toHaveURL(/#part-one$/);
+    await page.keyboard.press("Meta+ArrowLeft");
+    await expect(page).toHaveURL(/#hello$/);
+    await page.keyboard.press("ArrowRight");
+    await expect(page).toHaveURL(/#hello$/);
+    expect(await page.evaluate(() => (window as unknown as { hooks: string[] }).hooks)).toEqual(["enter:1", "key:Hello notes", "enter:-1", "enter:-1", "step"]);
     await page.keyboard.press("ArrowRight");
     await expect(page).toHaveURL(/#part-one$/);
     await page.keyboard.press("ArrowLeft");
     await expect(page).toHaveURL(/#hello$/);
-    await page.keyboard.press("Space");
-    await expect(page).toHaveURL(/#hello$/);
-    expect(await page.evaluate(() => (window as unknown as { hooks: string[] }).hooks)).toEqual(["enter:1", "key:Hello notes", "enter:-1", "step"]);
-    await page.keyboard.press("Space");
-    await expect(page).toHaveURL(/#part-one$/);
     await page.evaluate(() => (location.hash = "#beta"));
     await expect(heading(page)).toHaveText("Beta");
     await page.keyboard.press("PageUp");
@@ -1452,11 +1462,11 @@ test.describe("reusable runtime", () => {
     await expect(page.locator(".tourp")).toContainText("Both ends");
     await expect(page.locator(".tourp")).toContainText("2/2");
     await expect(page.locator(".dots button:visible")).toHaveCount(2);
-    await page.keyboard.press("ArrowLeft");
+    await page.keyboard.press("Alt+ArrowLeft");
     await expect(heading(page)).toHaveText("Hello");
     await expect(page).toHaveURL(/#hello&tour=ends$/);
-    await page.keyboard.press("ArrowRight");
-    await page.keyboard.press("ArrowRight");
+    await page.keyboard.press("Alt+ArrowRight");
+    await page.keyboard.press("Alt+ArrowRight");
     await expect(heading(page)).toHaveText("Goodbye");
     await page.keyboard.press("Home");
     await expect(heading(page)).toHaveText("Hello");
@@ -1546,11 +1556,11 @@ test.describe("reusable runtime", () => {
     await page.goto(link);
     await expect(heading(page)).toHaveText("Part one");
     await expect(page.locator(".tourp")).toContainText("Part and outro");
-    await page.keyboard.press("ArrowLeft");
+    await page.keyboard.press("Alt+ArrowLeft");
     await expect(heading(page)).toHaveText("Part one");
     await page.getByRole("button", { name: "Leave the tour and show all slides" }).click();
     await expect(page).toHaveURL(/#part-one$/);
-    await page.keyboard.press("ArrowLeft");
+    await page.keyboard.press("Alt+ArrowLeft");
     await expect(heading(page)).toHaveText("Hello");
     expect(errors).toEqual([]);
   });
