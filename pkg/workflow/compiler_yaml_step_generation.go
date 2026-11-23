@@ -286,6 +286,9 @@ func (c *Compiler) generateSetupStepWithArtifactClientCondition(data *WorkflowDa
 			if setupEngineID != "" {
 				setupLines = append(setupLines, fmt.Sprintf("          GH_AW_INFO_ENGINE_ID: %q\n", setupEngineID))
 			}
+			if provider := resolveBYOKGenAIProviderName(data); provider != "" {
+				setupLines = append(setupLines, fmt.Sprintf("          GH_AW_INFO_GENAI_PROVIDER: %q\n", provider))
+			}
 			if hasWorkflowCallOrDispatchTrigger(data.On) {
 				setupLines = append(setupLines, "          GH_AW_SETUP_AW_CONTEXT: ${{ inputs.aw_context }}\n")
 			}
@@ -352,6 +355,9 @@ func (c *Compiler) generateSetupStepWithArtifactClientCondition(data *WorkflowDa
 	}
 	if setupEngineID != "" {
 		setupLines = append(setupLines, fmt.Sprintf("          GH_AW_INFO_ENGINE_ID: %q\n", setupEngineID))
+	}
+	if provider := resolveBYOKGenAIProviderName(data); provider != "" {
+		setupLines = append(setupLines, fmt.Sprintf("          GH_AW_INFO_GENAI_PROVIDER: %q\n", provider))
 	}
 	if hasWorkflowCallOrDispatchTrigger(data.On) {
 		setupLines = append(setupLines, "          GH_AW_SETUP_AW_CONTEXT: ${{ inputs.aw_context }}\n")

@@ -186,6 +186,7 @@ jobs:
           GH_AW_INFO_VERSION: "1.0.103"
           GH_AW_INFO_AWF_VERSION: "v0.29.18"
           GH_AW_INFO_ENGINE_ID: "copilot"
+          GH_AW_INFO_GENAI_PROVIDER: "azure.ai.openai"
           GH_AW_SETUP_AW_CONTEXT: ${{ inputs.aw_context }}
       - name: Check workflow admission
         id: admission
@@ -249,6 +250,7 @@ jobs:
           GH_AW_INFO_MARKDOWN_METADATA: '{"version":2,"records":[{"sha256":"023cae43432cf1b38695d2d3b52f8f97e44e5dfbcf7727d8d897bec5c6373f47","kind":"artifact","value":{"model":"\u0024{{ experiments.subagent_model }}"}}]}'
           GH_AW_INFO_ENGINE_ID: "copilot"
           GH_AW_INFO_ENGINE_NAME: "GitHub Copilot CLI"
+          GH_AW_INFO_GENAI_PROVIDER: "azure.ai.openai"
           GH_AW_INFO_MODEL: "o4-mini-aw"
           GH_AW_INFO_VERSION: "1.0.103"
           GH_AW_INFO_AGENT_VERSION: "1.0.103"
@@ -806,6 +808,7 @@ jobs:
           GH_AW_INFO_VERSION: "1.0.103"
           GH_AW_INFO_AWF_VERSION: "v0.29.18"
           GH_AW_INFO_ENGINE_ID: "copilot"
+          GH_AW_INFO_GENAI_PROVIDER: "azure.ai.openai"
           GH_AW_SETUP_AW_CONTEXT: ${{ inputs.aw_context }}
       - name: Set runtime paths
         id: set-runtime-paths
@@ -3253,6 +3256,7 @@ jobs:
           GH_AW_INFO_VERSION: "1.0.103"
           GH_AW_INFO_AWF_VERSION: "v0.29.18"
           GH_AW_INFO_ENGINE_ID: "copilot"
+          GH_AW_INFO_GENAI_PROVIDER: "azure.ai.openai"
           GH_AW_SETUP_AW_CONTEXT: ${{ inputs.aw_context }}
       - name: Download agent output artifact
         id: download-agent-output
@@ -3718,6 +3722,7 @@ jobs:
           GH_AW_INFO_VERSION: "1.0.103"
           GH_AW_INFO_AWF_VERSION: "v0.29.18"
           GH_AW_INFO_ENGINE_ID: "copilot"
+          GH_AW_INFO_GENAI_PROVIDER: "azure.ai.openai"
           GH_AW_SETUP_AW_CONTEXT: ${{ inputs.aw_context }}
       - name: Download activation artifact
         continue-on-error: true
@@ -4130,6 +4135,7 @@ jobs:
           GH_AW_INFO_VERSION: "1.0.103"
           GH_AW_INFO_AWF_VERSION: "v0.29.18"
           GH_AW_INFO_ENGINE_ID: "copilot"
+          GH_AW_INFO_GENAI_PROVIDER: "azure.ai.openai"
           GH_AW_SETUP_AW_CONTEXT: ${{ inputs.aw_context }}
       - name: Download agent output artifact
         id: download-agent-output
@@ -4313,6 +4319,7 @@ jobs:
           GH_AW_INFO_VERSION: "1.0.103"
           GH_AW_INFO_AWF_VERSION: "v0.29.18"
           GH_AW_INFO_ENGINE_ID: "copilot"
+          GH_AW_INFO_GENAI_PROVIDER: "azure.ai.openai"
           GH_AW_SETUP_AW_CONTEXT: ${{ inputs.aw_context }}
       - name: Check command position
         id: check_command_position
@@ -4379,6 +4386,7 @@ jobs:
           GH_AW_INFO_VERSION: "1.0.103"
           GH_AW_INFO_AWF_VERSION: "v0.29.18"
           GH_AW_INFO_ENGINE_ID: "copilot"
+          GH_AW_INFO_GENAI_PROVIDER: "azure.ai.openai"
           GH_AW_SETUP_AW_CONTEXT: ${{ inputs.aw_context }}
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -4464,6 +4472,7 @@ jobs:
           GH_AW_INFO_VERSION: "1.0.103"
           GH_AW_INFO_AWF_VERSION: "v0.29.18"
           GH_AW_INFO_ENGINE_ID: "copilot"
+          GH_AW_INFO_GENAI_PROVIDER: "azure.ai.openai"
           GH_AW_SETUP_AW_CONTEXT: ${{ inputs.aw_context }}
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -4604,6 +4613,7 @@ jobs:
           GH_AW_INFO_VERSION: "1.0.103"
           GH_AW_INFO_AWF_VERSION: "v0.29.18"
           GH_AW_INFO_ENGINE_ID: "copilot"
+          GH_AW_INFO_GENAI_PROVIDER: "azure.ai.openai"
           GH_AW_SETUP_AW_CONTEXT: ${{ inputs.aw_context }}
       - name: Mask OTLP telemetry headers
         run: bash "${RUNNER_TEMP}/gh-aw/actions/mask_otlp_headers.sh"
@@ -4785,6 +4795,7 @@ jobs:
           GH_AW_INFO_VERSION: "1.0.103"
           GH_AW_INFO_AWF_VERSION: "v0.29.18"
           GH_AW_INFO_ENGINE_ID: "copilot"
+          GH_AW_INFO_GENAI_PROVIDER: "azure.ai.openai"
           GH_AW_SETUP_AW_CONTEXT: ${{ inputs.aw_context }}
       - name: Download cache-memory artifact (default)
         id: download_cache_default

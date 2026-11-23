@@ -92,6 +92,7 @@ const {
   buildCustomOTLPAttributes,
   FAILURE_CATEGORIES_PATH,
   resolveGenAiProvider,
+  resolveRunGenAiProvider,
   isGenAiV1,
   GEN_AI_SCHEMA_URL,
   resolveInclusiveInputTokens,
@@ -1474,6 +1475,20 @@ describe("GenAI semantic convention helpers", () => {
     expect(resolveGenAiProvider(engine)).toBe(provider);
   });
 
+  it("prefers the compiler-resolved BYOK provider over the engine mapping", () => {
+    const saved = process.env.GH_AW_INFO_GENAI_PROVIDER;
+    try {
+      delete process.env.GH_AW_INFO_GENAI_PROVIDER;
+      expect(resolveRunGenAiProvider({}, "copilot")).toEqual({ provider: "github", system: "github_models" });
+      expect(resolveRunGenAiProvider({ genai_provider: "azure.ai.openai" }, "copilot")).toEqual({ provider: "azure.ai.openai", system: "az.ai.openai" });
+      process.env.GH_AW_INFO_GENAI_PROVIDER = "openai";
+      expect(resolveRunGenAiProvider({}, "copilot")).toEqual({ provider: "openai", system: "openai" });
+    } finally {
+      if (saved === undefined) delete process.env.GH_AW_INFO_GENAI_PROVIDER;
+      else process.env.GH_AW_INFO_GENAI_PROVIDER = saved;
+    }
+  });
+
   it("recognizes the v1 opt-in as a trimmed comma-separated value", () => {
     process.env.OTEL_SEMCONV_STABILITY_OPT_IN = "http, gen_ai_v1 ";
     expect(isGenAiV1()).toBe(true);
@@ -2316,6 +2331,29 @@ describe("sendJobSetupSpan", () => {
       expect(attrs["gen_ai.system"]).toBe("anthropic");
       expect(attrs["gen_ai.provider.name"]).toBe("anthropic");
       expect(attrs["gh-aw.engine.id"]).toBe("claude");
+    });
+
+    it("reports the BYOK provider from aw_info.json instead of the engine provider", async () => {
+      const mockFetch = vi.fn().mockResolvedValue({ ok: true, status: 200, statusText: "OK" });
+      vi.stubGlobal("fetch", mockFetch);
+
+      process.env.GH_AW_OTLP_ENDPOINTS = JSON.stringify([{ url: "https://traces.example.com" }]);
+
+      readFileSpy.mockImplementation(filePath => {
+        if (filePath === "/tmp/gh-aw/aw_info.json") {
+          return JSON.stringify({ engine_id: "copilot", genai_provider: "azure.ai.openai" });
+        }
+        throw Object.assign(new Error("ENOENT"), { code: "ENOENT" });
+      });
+
+      await sendJobSetupSpan();
+
+      const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+      const span = body.resourceSpans[0].scopeSpans[0].spans[0];
+      const attrs = Object.fromEntries(span.attributes.map(a => [a.key, a.value.stringValue ?? a.value.intValue ?? a.value.boolValue]));
+      expect(attrs["gen_ai.provider.name"]).toBe("azure.ai.openai");
+      expect(attrs["gen_ai.system"]).toBe("az.ai.openai");
+      expect(attrs["gh-aw.engine.id"]).toBe("copilot");
     });
 
     it("reads gh-aw.engine.id from aw_context when aw_info.json has no engine_id", async () => {
