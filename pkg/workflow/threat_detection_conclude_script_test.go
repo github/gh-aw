@@ -117,7 +117,7 @@ func TestConcludeThreatDetectionScript_RecordedVerdict(t *testing.T) {
 					got := runConclusion(t, "bash", []string{script, result}, "GH_AW_DETECTION_CONTINUE_ON_ERROR="+policy)
 					want, exit := "success", 0
 					if tc.reason != "" {
-						if policy == "true" && tc.reason != "threat_detected" {
+						if policy == "true" {
 							want = "warning"
 							require.Contains(t, got.log, "::warning::")
 						} else {
@@ -158,7 +158,9 @@ func TestConcludeThreatDetectionScript_V053Fixtures(t *testing.T) {
 	}
 	result := filepath.Join(dir, "detection_result.json")
 	got := runConclusion(t, "bash", []string{script, result})
-	require.Equal(t, 1, got.exit, got.log)
+	require.Equal(t, 0, got.exit, got.log)
+	require.Equal(t, "warning", got.outputs["conclusion"])
+	require.Equal(t, "false", got.outputs["success"])
 	require.Equal(t, "threat_detected", got.outputs["reason"])
 	require.Equal(t, "secret_leak", got.outputs["threat_kinds"])
 	require.Contains(t, got.log, "private producer explanation")
@@ -233,19 +235,11 @@ func TestConcludeThreatDetectionScript_V053RoundTrip(t *testing.T) {
 				if tc.name == "confirmed" {
 					require.Contains(t, got.log, "private producer explanation")
 				}
-				if tc.name == "confirmed" && policy == "true" {
-					require.Equal(t, 0, prior.exit)
-					require.Equal(t, "warning", prior.outputs["conclusion"])
-					require.Equal(t, 1, got.exit)
-					require.Equal(t, "failure", got.outputs["conclusion"])
-					require.Equal(t, "failure", got.env["GH_AW_DETECTION_CONCLUSION"])
-				} else {
-					require.Equal(t, prior.exit, got.exit)
-					for _, key := range []string{"conclusion", "reason", "success"} {
-						require.Equal(t, prior.outputs[key], got.outputs[key], key)
-					}
-					require.Equal(t, prior.env, got.env)
+				require.Equal(t, prior.exit, got.exit)
+				for _, key := range []string{"conclusion", "reason", "success"} {
+					require.Equal(t, prior.outputs[key], got.outputs[key], key)
 				}
+				require.Equal(t, prior.env, got.env)
 				if policy == "true" && tc.reason != "" {
 					// The downstream manager uses this helper before applying its
 					// hard failure gate or the warn-mode policy.
@@ -253,11 +247,7 @@ func TestConcludeThreatDetectionScript_V053RoundTrip(t *testing.T) {
 						filepath.Join(filepath.Dir(script), "threat_detection_warning.cjs"), got.outputs["conclusion"], got.outputs["reason"])
 					effective, err := gate.CombinedOutput()
 					require.NoError(t, err, "%s", effective)
-					want := "warning"
-					if tc.name == "confirmed" {
-						want = "failure"
-					}
-					require.Equal(t, want, strings.TrimSpace(string(effective)))
+					require.Equal(t, "warning", strings.TrimSpace(string(effective)))
 				}
 			}
 		})

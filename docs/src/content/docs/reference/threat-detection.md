@@ -501,7 +501,7 @@ safe-outputs:
 
 A detected threat has reason `threat_detected`. A detector execution failure (for example a provider outage or retired model) has reason `agent_failure`; an invalid result has reason `parse_error`. The latter two mean the security assessment is incomplete, not that a threat was found or that the output is clean.
 
-The external detector's host conclusion always blocks safe outputs for a confirmed threat, even with `continue-on-error: true`. For detector failures, invalid results, and findings from the inline detector, enforcement depends on `safe-outputs.threat-detection.continue-on-error`:
+For detected threats, detector failures, and invalid results, enforcement depends on `safe-outputs.threat-detection.continue-on-error`:
 
 - **Warn mode** (`continue-on-error: true`, the default): the run continues and detection concludes `warning`. Safe outputs get the warn-mode policy from the [safe outputs specification](/gh-aw/specs/safe-outputs-specification/) instead of being applied as if detection passed:
   - Reviewable outputs (such as `create-issue`, `add-comment`, `create-pull-request`) carry a `[!CAUTION]` block, `agentic threat detected` label string, and `<!-- gh-aw-threat-detected -->` marker for an actual threat; detector failures use a `[!WARNING]` block, `Threat detection engine error` label string, and `<!-- gh-aw-threat-engine-error -->` marker.

@@ -882,8 +882,8 @@ func (c *Compiler) buildExternalDetectorConcludeStep(data *WorkflowData) []strin
 		"        if: " + detectionConclusionCondition + "\n",
 	}
 
-	// Only the reader can distinguish a warn-mode tooling failure from a
-	// confirmed threat. A step-level override would swallow both failures.
+	// The reader applies warn mode itself; a step-level override would also
+	// swallow failures to record the conclusion.
 	var coeEnvLine string
 	if continueOnErrorExpr != nil {
 		coeEnvLine = fmt.Sprintf("          GH_AW_DETECTION_CONTINUE_ON_ERROR: %s\n", *continueOnErrorExpr)

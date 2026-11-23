@@ -384,7 +384,7 @@ Test workflow`
 	}
 	concludeStep, _, _ := strings.Cut(afterConclude, "\n      - ")
 	if strings.Contains(concludeStep, "continue-on-error:") {
-		t.Error("External conclude must let a confirmed threat fail the detection job even in warn mode")
+		t.Error("External conclude must not suppress failures to record the conclusion")
 	}
 
 	// The install step must reference the pinned version
