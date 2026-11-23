@@ -2697,6 +2697,24 @@ function recordSafeOutputFailure(report, filePath) {
 }
 
 /**
+ * Log a command that replays this run's safe outputs through the Agentic Maintenance workflow.
+ * Skipped when the run ID is unknown.
+ */
+function logSafeOutputReplayHint() {
+  const ctx = typeof context === "undefined" ? undefined : context;
+  if (!ctx?.runId) {
+    return;
+  }
+  const runUrl = buildWorkflowRunUrl(ctx, ctx.repo);
+  const repoSlug = runUrl.split("/").slice(-5, -3).join("/");
+  core.info(
+    `If the failure was transient (for example, a rate limit), replay this run's safe outputs with:\n` +
+      `  gh workflow run agentics-maintenance.yml --repo ${repoSlug} -f operation=safe_outputs -f run_url=${runUrl}\n` +
+      `Requires the Agentic Maintenance workflow. See https://github.github.com/gh-aw/reference/safe-outputs/#replaying-safe-outputs`
+  );
+}
+
+/**
  * Main entry point for the handler manager
  * This is called by the consolidated safe output step
  *
@@ -3175,6 +3193,7 @@ async function main(options = {}) {
 
     if (failureCount > 0) {
       core.warning(`${failureCount} message(s) failed to process`);
+      logSafeOutputReplayHint();
       const failedItemLines = fatalFailures.map(r => `  - ${r.type}: ${r.error || "Unknown error"}`);
       const failedItems = failedItemLines.join("\n");
       failedOutputsMessage = `${failureCount} safe output(s) failed:\n${failedItems}`;
@@ -3324,6 +3343,7 @@ async function main(options = {}) {
 
 module.exports = {
   main,
+  logSafeOutputReplayHint,
   loadConfig,
   loadHandlers,
   normalizeInvocationInputs,

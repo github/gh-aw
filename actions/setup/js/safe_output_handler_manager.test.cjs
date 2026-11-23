@@ -9,6 +9,7 @@ import { expectExecutionProvenance, useExecutionProvenanceFixture } from "./test
 useExecutionProvenanceFixture();
 import {
   main,
+  logSafeOutputReplayHint,
   loadConfig,
   loadHandlers,
   normalizeInvocationInputs,
@@ -415,6 +416,25 @@ describe("Safe Output Handler Manager", () => {
       expect(result).toHaveProperty("add_comment");
       expect(result.create_issue).toEqual({ max: 5 });
       expect(result.add_comment).toEqual({ max: 1 });
+    });
+
+    describe("logSafeOutputReplayHint", () => {
+      it("logs a gh workflow run command that replays the current run", () => {
+        global.context = { runId: 45285172830, serverUrl: "https://github.com", repo: { owner: "github", repo: "gh-aw" } };
+
+        logSafeOutputReplayHint();
+
+        expect(global.core.info).toHaveBeenCalledWith(expect.stringContaining("gh workflow run agentics-maintenance.yml --repo github/gh-aw -f operation=safe_outputs -f run_url=https://github.com/github/gh-aw/actions/runs/45285172830"));
+      });
+
+      it("skips the hint when the run ID is unknown", () => {
+        global.context = {};
+        global.core.info.mockClear();
+
+        logSafeOutputReplayHint();
+
+        expect(global.core.info).not.toHaveBeenCalledWith(expect.stringContaining("gh workflow run"));
+      });
     });
 
     describe("main failure diagnostics artifact", () => {
