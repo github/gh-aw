@@ -192,7 +192,7 @@ func TestEngineReleaseCooldownNPMAndDefaults(t *testing.T) {
 				if id == "custom" {
 					version = "1.2.3"
 				}
-				require.True(t, literalEngineReleaseVersion(version), "defaults are literal and checked")
+				assert.True(t, literalEngineReleaseVersion(version), "defaults are literal and checked")
 				var body []byte
 				if id == "copilot" {
 					body, _ = json.Marshal(map[string]any{"tag_name": "v" + version, "published_at": "2020-01-01T00:00:00Z"})
@@ -367,4 +367,73 @@ func TestEngineReleaseCooldownChecksumWithoutVersion(t *testing.T) {
 	require.ErrorContains(t, c.validateReleaseIntegrityPins(data), "explicit semantic release version")
 	steps := stepsToString(generateCopilotInstallerSteps("", "Install", false, "", "", "", testEngineChecksumsPin, 7))
 	assert.Contains(t, steps, "--cooldown-days 7", "an unresolved selection must not disable runtime enforcement")
+}
+
+func TestEngineReleaseCooldownLargePackument(t *testing.T) {
+	readme := strings.Repeat("r", 9*1024*1024)
+	body := `{"_id":"@openai/codex","versions":{"1.2.3":{"readme":"` + readme + `","deps":[1,{"a":[2]}]}},"readme":"` + readme +
+		`","name":"@openai/codex","time":{"created":"2019-01-01T00:00:00Z","1.2.2":"2019-06-01T00:00:00Z","1.2.3":"2020-01-01T00:00:00Z"},"tail":[true]}`
+	published, err := parseEngineReleaseTime(strings.NewReader(body), "@openai/codex", "1.2.3")
+	require.NoError(t, err, "packuments larger than the GitHub release cap must still be parsed")
+	assert.Equal(t, time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC), published)
+	_, err = parseEngineReleaseTime(strings.NewReader(body[:len(body)/2]), "@openai/codex", "1.2.3")
+	require.Error(t, err, "truncated packuments fail closed to a warning")
+}
+
+func TestEngineReleaseCooldownLookupDoesNotHoldCacheLock(t *testing.T) {
+	c := NewCompiler()
+	c.engineReleaseCache = &engineReleaseCache{entries: map[string]engineReleaseMetadata{}}
+	original := engineReleaseTimeLookup
+	t.Cleanup(func() { engineReleaseTimeLookup = original })
+	engineReleaseTimeLookup = func(*Compiler, string, string, string) (time.Time, error) {
+		locked := c.engineReleaseCache.TryLock()
+		if locked {
+			c.engineReleaseCache.Unlock()
+		}
+		assert.True(t, locked, "the cache lock must not be held during the network lookup")
+		return time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC), nil
+	}
+	target := engineReleaseTarget{id: "copilot", version: "1.2.3", endpoint: "https://example.invalid/v1.2.3"}
+	metadata := c.engineReleaseMetadata(target, time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC))
+	require.NoError(t, metadata.err)
+	assert.Contains(t, c.engineReleaseCache.entries, target.endpoint+"@"+target.version)
+}
+
+func TestEngineReleaseCooldownAliasTargets(t *testing.T) {
+	c := NewCompiler()
+	def := &EngineDefinition{ID: "crush", RuntimeID: "crush", Behaviors: &EngineBehaviorDefinition{
+		Installation: &EngineInstallationDefinition{PackageManager: "npm", PackageName: "@charmland/crush", Version: "0.98.1"},
+	}}
+	engine, err := NewBehaviorDefinedEngine(def)
+	require.NoError(t, err)
+	require.NoError(t, c.engineRegistry.Register(engine))
+	target, supported := c.engineReleaseTarget(&WorkflowData{AI: "crush-experimental", EngineConfig: &EngineConfig{ID: "crush-experimental"}})
+	require.True(t, supported, "prefix alias must recover the behavior definition")
+	assert.Equal(t, "@charmland/crush", target.packageName)
+	assert.Equal(t, "0.98.1", target.version)
+
+	c.engineCatalog.Register(&EngineDefinition{ID: "my-copilot", RuntimeID: "copilot"})
+	target, supported = c.engineReleaseTarget(&WorkflowData{AI: "my-copilot", EngineConfig: &EngineConfig{ID: "my-copilot"}})
+	require.True(t, supported, "catalog alias must resolve the runtime's default version")
+	assert.Equal(t, string(constants.DefaultCopilotVersion), target.version)
+	assert.Empty(t, target.packageName)
+}
+
+func TestEngineReleaseCooldownInlineDetectorResetsCopilotSDK(t *testing.T) {
+	c := NewCompiler()
+	var tags []string
+	c.engineReleaseClient = &http.Client{Transport: engineReleaseRoundTripper(func(request *http.Request) (*http.Response, error) {
+		tag := request.URL.Path[strings.LastIndex(request.URL.Path, "/")+1:]
+		tags = append(tags, tag)
+		body, _ := json.Marshal(map[string]any{"tag_name": tag, "published_at": "2020-01-01T00:00:00Z"})
+		return engineReleaseResponse(string(body), http.StatusOK), nil
+	})}
+	days := 7
+	data := &WorkflowData{AI: "claude", EngineConfig: &EngineConfig{ID: "claude", Command: "claude"},
+		Features: map[string]any{string(constants.GHAWDetectionFeatureFlag): false},
+		SafeOutputs: &SafeOutputsConfig{ThreatDetection: &ThreatDetectionConfig{
+			EngineConfig: &EngineConfig{ID: "copilot", CopilotSDK: true, Cooldown: &days},
+		}}}
+	require.NoError(t, c.validateEngineReleaseCooldowns(data, "workflow.md"))
+	assert.Equal(t, []string{"v" + string(constants.DefaultCopilotVersion)}, tags)
 }

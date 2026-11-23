@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"maps"
 	"strconv"
 	"strings"
@@ -910,12 +909,8 @@ func (c *Compiler) extractEngineConfigFromJSON(engineJSON string) (*EngineConfig
 	}
 
 	var engineData any
-	decoder := json.NewDecoder(strings.NewReader(engineJSON))
-	if err := decoder.Decode(&engineData); err != nil {
+	if err := json.Unmarshal([]byte(engineJSON), &engineData); err != nil {
 		return nil, "", fmt.Errorf("engine configuration must contain valid JSON: %w", err)
-	}
-	if err := decoder.Decode(new(any)); err != io.EOF {
-		return nil, "", errors.New("engine configuration must contain a single valid JSON value")
 	}
 
 	// Use the existing ExtractEngineConfig function by creating a temporary frontmatter map
@@ -925,7 +920,7 @@ func (c *Compiler) extractEngineConfigFromJSON(engineJSON string) (*EngineConfig
 
 	_, config, model := c.ExtractEngineConfig(tempFrontmatter)
 	// Strict policy is validated after merging, using the main workflow's mode.
-	if err := validateEngineCooldown(config, false); err != nil {
+	if err := validateEngineCooldown(config); err != nil {
 		return nil, "", err
 	}
 	return config, model, nil

@@ -113,9 +113,7 @@ func (c *Compiler) setupEngineAndImports(result *parser.FrontmatterResult, clean
 
 func (c *Compiler) extractAndValidateEngineConfig(frontmatter map[string]any) (string, *EngineConfig, string, error) {
 	setting, config, model := c.ExtractEngineConfig(frontmatter)
-	if err := c.withEffectiveStrictMode(frontmatter, func() error {
-		return validateEngineCooldown(config, c.strictMode)
-	}); err != nil {
+	if err := validateEngineCooldown(config); err != nil {
 		return "", nil, "", err
 	}
 	if err := c.validateAndRegisterInlineEngineConfig(config); err != nil {
@@ -787,7 +785,7 @@ func (c *Compiler) runPostEngineValidations(
 		return err
 	}
 	return c.withEffectiveStrictMode(frontmatter, func() error {
-		if err := validateEngineCooldown(engineConfig, c.strictMode); err != nil {
+		if err := validateEngineCooldown(engineConfig); err != nil {
 			return err
 		}
 		orchestratorEngineLog.Printf("Validating strict firewall (strict=%v)", c.strictMode)

@@ -40,16 +40,14 @@ func TestEngineCooldownParsingAndValidation(t *testing.T) {
 					obj["runtime"] = map[string]any{"id": "codex"}
 				}
 				_, config, _ := NewCompiler().ExtractEngineConfig(map[string]any{"engine": obj})
-				err := validateEngineCooldown(config, false)
+				err := validateEngineCooldown(config)
 				if !test.valid {
 					require.Error(t, err)
-					require.Error(t, validateEngineCooldown(config, true))
 					return
 				}
 				require.NoError(t, err)
 				require.NotNil(t, config.Cooldown)
 				assert.Equal(t, test.days, *config.Cooldown)
-				require.NoError(t, validateEngineCooldown(config, true))
 			})
 		}
 	}
@@ -72,7 +70,7 @@ func TestApplyEngineCooldownFieldRejectsNativeIntOverflow(t *testing.T) {
 
 	config := &EngineConfig{}
 	applyEngineCooldownField(config, map[string]any{"cooldown": json.Number("2147483648")})
-	require.Error(t, validateEngineCooldown(config, false))
+	require.Error(t, validateEngineCooldown(config))
 	assert.Nil(t, config.Cooldown)
 }
 

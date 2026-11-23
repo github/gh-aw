@@ -51,7 +51,7 @@ func applyEngineCooldownField(config *EngineConfig, obj map[string]any) {
 	config.Cooldown = &days
 }
 
-func validateEngineCooldown(config *EngineConfig, _ bool) error {
+func validateEngineCooldown(config *EngineConfig) error {
 	if config == nil {
 		return nil
 	}

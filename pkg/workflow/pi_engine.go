@@ -15,6 +15,8 @@ import (
 
 var piLog = logger.New("workflow:pi_engine")
 
+const piNPMPackage = "@earendil-works/pi-coding-agent"
+
 // PiEngine represents the Pi AI coding agent.
 // Pi is a provider-agnostic agentic coding assistant that communicates via stdin/stdout
 // and emits a streaming JSONL log for structured event capture.  When engine.model uses
@@ -225,7 +227,7 @@ func (e *PiEngine) GetInstallationSteps(workflowData *WorkflowData) []GitHubActi
 
 		cooldownDays := resolveEngineCooldownDays(workflowData)
 		npmSteps := GenerateNpmInstallSteps(
-			"@earendil-works/pi-coding-agent",
+			piNPMPackage,
 			version,
 			"Install Pi CLI",
 			"pi",
@@ -240,7 +242,7 @@ func (e *PiEngine) GetInstallationSteps(workflowData *WorkflowData) []GitHubActi
 		// CLI in the hosted tool cache, so stage a second copy under RUNNER_TEMP.
 		if isCloudHypervisorRuntime(workflowData) || isNVXRuntime(workflowData) {
 			npmSteps = append(npmSteps, GenerateMicroVMNpmCLIInstallStep(
-				"@earendil-works/pi-coding-agent",
+				piNPMPackage,
 				version,
 				"Install Pi CLI in microVM path",
 				"pi",
@@ -254,7 +256,7 @@ func (e *PiEngine) GetInstallationSteps(workflowData *WorkflowData) []GitHubActi
 		steps = append(steps, GitHubActionStep{
 			"      - name: Record Pi package location",
 			"        run: |",
-			`          GH_AW_PI_PACKAGE_ROOT="$(npm root -g)/@earendil-works/pi-coding-agent"`,
+			`          GH_AW_PI_PACKAGE_ROOT="$(npm root -g)/` + piNPMPackage + `"`,
 			`          printf 'GH_AW_PI_PACKAGE_ROOT=%s\n' "$GH_AW_PI_PACKAGE_ROOT" >> "$GITHUB_ENV"`,
 		})
 	}

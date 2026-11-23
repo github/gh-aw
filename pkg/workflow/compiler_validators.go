@@ -192,13 +192,12 @@ func (c *Compiler) validateFeatureConfig(workflowData *WorkflowData, markdownPat
 // permission requirement, and dispatch/call-workflow configurations.
 // workflowPermissions is the *Permissions value returned by validatePermissions.
 func (c *Compiler) validateToolConfiguration(workflowData *WorkflowData, markdownPath string, workflowPermissions *Permissions) error {
-	strict := c.effectiveStrictMode(workflowData.RawFrontmatter)
-	if err := validateEngineCooldown(workflowData.EngineConfig, strict); err != nil {
+	if err := validateEngineCooldown(workflowData.EngineConfig); err != nil {
 		return formatCompilerError(markdownPath, "error", err.Error(), err)
 	}
 	c.warnLegacyBehaviorInstallationCooldown(workflowData, markdownPath)
 	if workflowData.SafeOutputs != nil && workflowData.SafeOutputs.ThreatDetection != nil {
-		if err := validateEngineCooldown(workflowData.SafeOutputs.ThreatDetection.EngineConfig, strict); err != nil {
+		if err := validateEngineCooldown(workflowData.SafeOutputs.ThreatDetection.EngineConfig); err != nil {
 			return formatCompilerError(markdownPath, "error", "safe-outputs.threat-detection: "+err.Error(), err)
 		}
 	}

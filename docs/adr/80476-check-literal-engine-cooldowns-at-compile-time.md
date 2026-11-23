@@ -46,5 +46,6 @@ This revises two points of ADR-73829: runtime-only metadata verification for lit
 
 - Literal-version checks are best-effort. When metadata is unavailable, compilation succeeds with a warning and the age check depends on manual validation.
 - Literal Copilot installs no longer recheck release age at runtime, so protection depends on the compile-time check having run for the locked version.
+- When the compile-time lookup cannot complete (network failure, or offline, editor, or wasm compilation), the compiler only warns and the literal Copilot release installs with no runtime cooldown check; authors must verify the release age manually.
 - Strict-mode workflows can now disable release-age enforcement entirely, weakening the previous guarantee for them.
 - Compilation now makes outbound requests to public GitHub and npm endpoints, and the compiler gains about 280 lines of network and cache code to maintain.

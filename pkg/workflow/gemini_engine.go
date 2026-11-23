@@ -11,6 +11,8 @@ import (
 
 var geminiLog = logger.New("workflow:gemini_engine")
 
+const geminiCLINPMPackage = "@google/gemini-cli"
+
 // GeminiEngine represents the Google Gemini CLI agentic engine
 type GeminiEngine struct {
 	BaseEngine
@@ -130,7 +132,7 @@ func (e *GeminiEngine) GetInstallationSteps(workflowData *WorkflowData) []GitHub
 	}
 
 	npmSteps := BuildStandardNpmEngineInstallSteps(
-		"@google/gemini-cli",
+		geminiCLINPMPackage,
 		string(constants.DefaultGeminiVersion),
 		"Install Gemini CLI",
 		"gemini",

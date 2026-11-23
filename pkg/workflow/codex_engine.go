@@ -14,6 +14,8 @@ import (
 
 var codexEngineLog = logger.New("workflow:codex_engine")
 
+const codexNPMPackage = "@openai/codex"
+
 // detectionResponseSchema is the JSON Schema for Codex detection runs.
 // It constrains the model output to exactly the threat detection result fields.
 // The schema is written to detectionSchemaFilePath before Codex runs and passed
@@ -175,7 +177,7 @@ func (e *CodexEngine) GetInstallationSteps(workflowData *WorkflowData) []GitHubA
 	}
 
 	steps := BuildStandardNpmEngineInstallSteps(
-		"@openai/codex",
+		codexNPMPackage,
 		string(constants.DefaultCodexVersion),
 		"Install Codex CLI",
 		"codex",
@@ -211,7 +213,7 @@ func generateCodexMicroVMCLIInstallStep(workflowData *WorkflowData) GitHubAction
 		version = workflowData.EngineConfig.Version
 	}
 	return GenerateMicroVMNpmCLIInstallStep(
-		"@openai/codex",
+		codexNPMPackage,
 		version,
 		"Install Codex CLI in microVM path",
 		"codex",

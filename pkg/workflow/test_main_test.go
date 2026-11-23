@@ -14,12 +14,9 @@ import (
 func TestMain(m *testing.M) {
 	// Unrelated compiler tests must not depend on live release metadata or the
 	// current age of default engine versions. Cooldown tests inject HTTP responses.
-	engineReleaseTimeLookup = func(c *Compiler, endpoint, packageName, version string) (time.Time, error) {
-		if c.engineReleaseClient != nil {
-			return c.fetchEngineReleaseTime(endpoint, packageName, version)
-		}
+	SetEngineReleaseTimeLookupForTesting(func(string, string) (time.Time, error) {
 		return time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC), nil
-	}
+	})
 	goleak.VerifyTestMain(workflowTestMain{m},
 		goleak.IgnoreAnyFunction("net/http.(*http2ClientConn).readLoop"),
 		goleak.IgnoreAnyFunction("net/http.(*http2clientConnReadLoop).run"),
