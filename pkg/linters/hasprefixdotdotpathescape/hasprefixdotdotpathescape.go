@@ -26,8 +26,8 @@ func run(pass *analysis.Pass) (any, error) {
 	}
 
 	return analyzerutil.Preorder(pass, []ast.Node{(*ast.CallExpr)(nil)}, func(n ast.Node) {
-		call := n.(*ast.CallExpr)
-		if len(call.Args) != 2 {
+		call, ok := n.(*ast.CallExpr)
+		if !ok || len(call.Args) != 2 {
 			return
 		}
 		var ident *ast.Ident
@@ -44,7 +44,13 @@ func run(pass *analysis.Pass) (any, error) {
 		if !ok || fn.Name() != "HasPrefix" || fn.Pkg() == nil || fn.Pkg().Path() != "strings" {
 			return
 		}
-		value := pass.TypesInfo.Types[call.Args[1]].Value
+		var prefix ast.Expr
+		for i, arg := range call.Args {
+			if i == 1 {
+				prefix = arg
+			}
+		}
+		value := pass.TypesInfo.Types[prefix].Value
 		if value == nil || value.Kind() != constant.String || constant.StringVal(value) != ".." {
 			return
 		}
