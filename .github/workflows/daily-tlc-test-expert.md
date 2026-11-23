@@ -15,8 +15,8 @@ permissions:
   copilot-requests: write
 model: router/balanced
 engine:
-  id: copilot
-  copilot-sdk: true
+  id: codex
+  model-provider: github
 strict: true
 timeout-minutes: 45
 network:

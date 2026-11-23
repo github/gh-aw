@@ -74,6 +74,7 @@ steps:
       fi
 safe-outputs:
   add-labels:
+    issue-intent: true
     max: 10
     item-schema:
       type: object

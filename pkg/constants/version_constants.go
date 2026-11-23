@@ -127,6 +127,11 @@ const AWFRoutingCandidateModelsMinVersion Version = "v0.28.33"
 // Workflows pinning an older AWF version must not emit --exclude-env flags or the run will fail.
 const AWFExcludeEnvMinVersion Version = "v0.25.3"
 
+// AWFCopilotProviderHostAllowlistMinVersion is the minimum AWF version that derives the
+// Copilot API target from the runtime COPILOT_PROVIDER_BASE_URL value and adds exactly that
+// host to the firewall allow-list. Older versions require the host in network.allowed.
+const AWFCopilotProviderHostAllowlistMinVersion Version = "v0.25.41"
+
 // AWFSessionStateDirMinVersion is the minimum AWF version that supports the
 // --session-state-dir flag used to persist Copilot session artifacts.
 const AWFSessionStateDirMinVersion Version = "v0.25.15"

@@ -179,13 +179,17 @@ func TestSpec_PublicAPI_DefaultBuiltInRules(t *testing.T) {
 		{"AllowedLabelsRule", lint.AllowedLabelsRule},
 		{"ToolScopeRule", lint.ToolScopeRule},
 		{"ImageArgumentRule", lint.ImageArgumentRule},
+		{"UnpinnedImagesRule", lint.UnpinnedImagesRule},
 		{"SandboxConfigRule", lint.SandboxConfigRule},
 		{"FirewallSSLBumpRule", lint.FirewallSSLBumpRule},
 		{"SafeOutputShellExpansionRule", lint.SafeOutputShellExpansionRule},
 		{"SafeOutputCredentialsRule", lint.SafeOutputCredentialsRule},
 		{"ArtifactExecutionRule", lint.ArtifactExecutionRule},
+		{"InsecureCommandsRule", lint.InsecureCommandsRule},
+		{"RemoteScriptExecutionRule", lint.RemoteScriptExecutionRule},
 		{"ArtipackedRule", lint.ArtipackedRule},
 		{"CachePoisoningRule", lint.CachePoisoningRule},
+		{"EnvironmentFileInjectionRule", lint.EnvironmentFileInjectionRule},
 		{"GraderFileIORule", lint.GraderFileIORule},
 	}
 	for _, tt := range constructors {

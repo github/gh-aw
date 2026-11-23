@@ -13,8 +13,8 @@ permissions:
   pull-requests: read
   copilot-requests: write
 engine:
-  id: copilot
-  copilot-sdk: true
+  id: pi
+  model-provider: github
 skip-if-decision:
   - >-
     Do @/tmp/gh-aw/agent/all-help.txt and

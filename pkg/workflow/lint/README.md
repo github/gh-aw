@@ -27,12 +27,12 @@ constructors:
 
 | Policy area | Rule constructors |
 |-------------|-------------------|
-| Expressions and disclosure | `TemplateInjectionRule`, `PromptExpressionRule`, `SecretLeakRule`, `OTLPSecretLeakRule` |
-| Actions and workflow integrity | `ActionPinRule`, `VersionCheckRule`, `JobTimeoutRule`, `NeedsConsistencyRule`, `StepReferenceRule`, `WorkflowRunScopeRule`, `ConditionalImportRule`, `PrivateToPublicRule`, `InstallScriptsRule`, `GatewayDispatchLiteralsRule`, `BashCasePatternRule`, `ObfuscationRule` |
-| Permissions, jobs, and checkout | `PermissionScopeRule`, `ExcessivePermissionsRule`, `CustomJobDetectionRule`, `PrivilegedCheckoutRule`, `CheckoutModeRule`, `ForkAssociationRule`, `PullRequestTargetRolesRule`, `UntrustedRolesDetectionRule`, `PullRequestTargetCheckoutRule` |
+| Expressions and disclosure | `TemplateInjectionRule`, `PromptExpressionRule`, `SecretLeakRule`, `OTLPSecretLeakRule`, `OverprovisionedSecretsRule` |
+| Actions and workflow integrity | `ActionPinRule`, `VersionCheckRule`, `JobTimeoutRule`, `NeedsConsistencyRule`, `StepReferenceRule`, `WorkflowRunScopeRule`, `ConditionalImportRule`, `PrivateToPublicRule`, `InstallScriptsRule`, `GatewayDispatchLiteralsRule`, `BashCasePatternRule`, `ObfuscationRule`, `UnsoundContainsRule`, `RemoteScriptExecutionRule` |
+| Permissions, jobs, and checkout | `PermissionScopeRule`, `ExcessivePermissionsRule`, `CustomJobDetectionRule`, `PrivilegedCheckoutRule`, `CheckoutModeRule`, `ForkAssociationRule`, `PullRequestTargetRolesRule`, `UntrustedRolesDetectionRule`, `PullRequestTargetCheckoutRule`, `BotConditionsRule` |
 | Network, tools, images, and sandbox | `NetworkScopeRule`, `PushTargetRule`, `AllowedLabelsRule`, `ToolScopeRule`, `ImageArgumentRule`, `UnpinnedImagesRule`, `SandboxConfigRule`, `FirewallSSLBumpRule` |
 | Outputs, artifacts, and cache | `SafeOutputShellExpansionRule`, `SafeOutputCredentialsRule`, `ArtifactExecutionRule`, `ArtipackedRule`, `CachePoisoningRule` |
-| Environment-file integrity | `EnvironmentFileInjectionRule` |
+| Environment-file integrity | `EnvironmentFileInjectionRule`, `InsecureCommandsRule` |
 | Grader I/O | `GraderFileIORule` |
 
 `ASTTargets` selects the authored AW AST (`AWAST`), native Actions AST

@@ -51,8 +51,8 @@ safe-outputs:
 description: Daily review of all package README.md specifications to detect inconsistencies, staleness, and cross-package conflicts
 emoji: 📚
 engine:
-  id: copilot
-  copilot-sdk: true
+  id: codex
+  model-provider: github
 name: Package Specification Librarian
 strict: true
 timeout-minutes: 25

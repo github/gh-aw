@@ -18,8 +18,8 @@ permissions:
   issues: read
   pull-requests: read
 engine:
-  id: copilot
-  copilot-sdk: true
+  id: codex
+  model-provider: github
 network:
   allowed:
     - defaults

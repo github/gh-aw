@@ -11,8 +11,8 @@ permissions:
   actions: read
   copilot-requests: write
 engine:
-  id: copilot
-  copilot-sdk: true
+  id: pi
+  model-provider: github
 skip-if-decision:
   - >-
     Does @/tmp/gh-aw/agent/arch-metrics.json conclusively establish that there

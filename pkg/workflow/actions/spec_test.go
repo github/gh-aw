@@ -29,6 +29,95 @@ func TestSpec_PublicAPI_ParseEmit(t *testing.T) {
 	}
 }
 
+// TestSpec_PublicAPI_OriginalSource follows README.md / Public API: parsed
+// workflows retain their original YAML, while Emit reflects later AST edits.
+func TestSpec_PublicAPI_OriginalSource(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		source string
+	}{
+		{name: "constructed workflow"},
+		{name: "parsed LF", source: "# original\nname: 'Before'\non: push\njobs:\n  build:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo ready\n"},
+		{name: "parsed CRLF", source: "# original\r\nname: 'Before'\r\non: push\r\njobs:\r\n  build:\r\n    runs-on: ubuntu-latest\r\n    steps:\r\n      - run: echo ready\r\n"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			workflow := &actions.Workflow{
+				Name: "Before", On: "push",
+				Jobs: []*actions.Job{{
+					ID: "build", RunsOn: "ubuntu-latest",
+					Steps: []actions.Step{actions.RunStep{Run: "echo ready"}},
+				}},
+			}
+			if tc.source != "" {
+				var err error
+				workflow, err = actions.Parse([]byte(tc.source))
+				require.NoError(t, err, "the authored workflow must parse")
+			}
+			assert.Equal(t, tc.source, workflow.OriginalSource(), "OriginalSource must return parsed YAML or an empty string for a constructed workflow")
+
+			workflow.Name = "After"
+			assert.Equal(t, tc.source, workflow.OriginalSource(), "AST edits must not rewrite the original source")
+			emitted, err := actions.Emit(workflow)
+			require.NoError(t, err, "Emit must serialize the edited workflow")
+			var decoded map[string]any
+			require.NoError(t, yaml.Unmarshal([]byte(emitted), &decoded), "emitted workflow must remain valid YAML")
+			assert.Equal(t, "After", decoded["name"], "Emit must reflect the edited AST rather than the original name")
+		})
+	}
+}
+
+// TestSpec_PublicAPI_SourceForInspection follows README.md / Public API:
+// inspection retains parsed syntax and accepts script interpolation in typed
+// steps that executable emission rejects. These strings are only serialized.
+func TestSpec_PublicAPI_SourceForInspection(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		script    string
+		wantError bool
+	}{
+		{name: "literal script", script: "echo ready"},
+		{name: "script interpolation", script: "echo '${{ github.ref }}'", wantError: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			workflow := &actions.Workflow{
+				On: "push",
+				Jobs: []*actions.Job{{
+					ID: "build", RunsOn: "ubuntu-latest",
+					Steps: []actions.Step{actions.RunStep{Run: tc.script}},
+				}},
+			}
+			inspected, err := actions.SourceForInspection(workflow)
+			require.NoError(t, err, "inspection must accept the documented %s case", tc.name)
+			var decoded struct {
+				Jobs map[string]struct {
+					Steps []struct {
+						Run string `yaml:"run"`
+					} `yaml:"steps"`
+				} `yaml:"jobs"`
+			}
+			require.NoError(t, yaml.Unmarshal([]byte(inspected), &decoded), "inspection output must be valid YAML")
+			require.Len(t, decoded.Jobs["build"].Steps, 1, "inspection must retain the typed step")
+			assert.Equal(t, tc.script, decoded.Jobs["build"].Steps[0].Run, "inspection must retain the script without evaluating expressions")
+
+			_, err = actions.Emit(workflow)
+			if tc.wantError {
+				assert.Error(t, err, "executable emission must reject typed script interpolation")
+			} else {
+				require.NoError(t, err, "executable emission must accept a literal script")
+			}
+		})
+	}
+
+	t.Run("parsed source preservation", func(t *testing.T) {
+		source := "# inspection comment\nname: 'Inspect'\non: push\njobs:\n  build:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo '${{ github.ref }}' # authored expression\n"
+		workflow, err := actions.Parse([]byte(source))
+		require.NoError(t, err, "authored source must parse for inspection")
+		inspected, err := actions.SourceForInspection(workflow)
+		require.NoError(t, err, "parsed source must be inspectable")
+		assert.Equal(t, source, inspected, "inspection must preserve authored comments, quoting, field order, and opaque expressions")
+	})
+}
+
 // TestSpec_PublicAPI_Resolve follows README.md's nonmutating resolution and
 // dependency derivation contracts using declared producer outputs.
 func TestSpec_PublicAPI_Resolve(t *testing.T) {
@@ -179,8 +268,8 @@ func TestSpec_DesignDecision_JobScopedStepIDs(t *testing.T) {
 
 // TestSpec_PublicAPI_LowerStep exercises README.md's documented typed and
 // raw step representations through their public YAML conversion API.
-// SPEC_AMBIGUITY: typed run-step interpolation restrictions are unspecified;
-// authored expression opacity is checked separately on parsed source.
+// Typed script interpolation is covered by SourceForInspection; authored
+// expression opacity is checked separately on parsed source.
 func TestSpec_PublicAPI_LowerStep(t *testing.T) {
 	for _, tc := range []struct {
 		name  string

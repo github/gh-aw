@@ -93,6 +93,7 @@ The `cli` package is intentionally large and command-oriented. The tables below 
 | `ChecksConfig` | struct | Inputs for normalizing CI check state for a pull request. |
 | `ChecksResult` | struct | Normalized check-rollup result returned by `FetchChecksResult`. |
 | `OutcomesData` | struct | Structured outcomes report for JSON output. |
+| `IncompleteReport` | struct | Report that an agent could not finish because of an infrastructure or tool failure. |
 | `UpdateWorkflowsOptions` | struct | Options controlling `gh aw update` behavior for sourced workflows. |
 | `WorkflowStatus` | struct | Status view for a workflow, combining list metadata with latest run state. |
 | `MCPRegistryClient` | struct | Client for the MCP registry used by MCP subcommands. |
@@ -123,6 +124,7 @@ The `cli` package is intentionally large and command-oriented. The tables below 
 | Function | Signature | Description |
 |----------|-----------|-------------|
 | `NewAddCommand` | `func NewAddCommand(validateEngine func(string) error) *cobra.Command` | Constructs the `gh aw add` command. |
+| `NewAdvisoryCommand` | `func NewAdvisoryCommand() *cobra.Command` | Constructs the experimental local security advisory handoff commands. |
 | `AddWorkflows` | `func AddWorkflows(ctx context.Context, workflows []string, opts AddOptions) (*AddWorkflowsResult, error)` | Resolves and installs one or more workflows. |
 | `AddResolvedWorkflows` | `func AddResolvedWorkflows(ctx context.Context, workflowStrings []string, resolved *ResolvedWorkflows, opts AddOptions) (*AddWorkflowsResult, error)` | Installs workflows from a pre-resolved batch. |
 | `ResolveWorkflows` | `func ResolveWorkflows(ctx context.Context, workflows []string, verbose bool) (*ResolvedWorkflows, error)` | Parses workflow specs and fetches their source content. |
