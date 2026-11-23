@@ -568,6 +568,17 @@ function collectUnifiedSession({
       }
     }
   }
+  if (!protectedSessionCapture && !agentEvents && engine === "langgraph") {
+    const file = choose(["agent/langgraph.traj.json"]);
+    if (file) {
+      const input = records(file);
+      if (!malformedJsonSources.has(file)) {
+        const events = require("./langgraph_session.cjs").normalizeLangGraphSession(input[0]);
+        sources.push({ component: "agent", phase: "agent", path: path.relative(rootDir, file), events });
+        agentEvents += events.length;
+      }
+    }
+  }
   if (!protectedSessionCapture && !agentEvents) {
     const file = choose(["sandbox/agent/logs/pi-streaming.jsonl", "pi-streaming.jsonl", "agent-stdio.log"]);
     if (file) {
