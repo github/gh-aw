@@ -98,10 +98,7 @@ func (c *Compiler) engineInstallationForManifest(def *EngineDefinition, runtimeI
 	}
 	// Copilot is downloaded as a release binary, but its npm package
 	// represents the same CLI release for dependency alerts.
-	name := engineReleaseNPMPackages[runtimeID]
-	if runtimeID == "copilot" {
-		name = "@github/copilot"
-	}
+	name := builtinEngineNpmPackage(runtimeID)
 	if name == "" {
 		return nil
 	}

@@ -14,8 +14,6 @@ import (
 
 var claudeLog = logger.New("workflow:claude_engine")
 
-const claudeCodeNPMPackage = "@anthropic-ai/claude-code"
-
 const claudeDebugLogFile = constants.TmpGhAwDir + "/claude-debug.log"
 
 // ClaudeEngine represents the Claude Code agentic engine
@@ -143,7 +141,7 @@ func (e *ClaudeEngine) GetInstallationSteps(workflowData *WorkflowData) []GitHub
 	// NOT be passed. This is intentionally different from other engine installs.
 	cooldownDays := resolveEngineCooldownDays(workflowData)
 	npmSteps := GenerateNpmInstallSteps(
-		claudeCodeNPMPackage,
+		claudeNpmPackageName,
 		version,
 		"Install Claude Code CLI",
 		"claude",
@@ -155,7 +153,7 @@ func (e *ClaudeEngine) GetInstallationSteps(workflowData *WorkflowData) []GitHub
 	)
 	if isCloudHypervisorRuntime(workflowData) || isNVXRuntime(workflowData) {
 		npmSteps = append(npmSteps, GenerateMicroVMNpmCLIInstallStep(
-			claudeCodeNPMPackage,
+			claudeNpmPackageName,
 			version,
 			"Install Claude Code CLI in microVM path",
 			"claude",

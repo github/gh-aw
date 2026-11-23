@@ -16,6 +16,13 @@ type FileCreationTracker interface {
 	TrackCreated(filePath string)
 }
 
+// CompilerDiagnostic is a warning or error produced during compilation.
+type CompilerDiagnostic struct {
+	Path    string `json:"path,omitempty"`
+	Level   string `json:"level"`
+	Message string `json:"message"`
+}
+
 // Compiler handles converting markdown workflows to GitHub Actions YAML
 type Compiler struct {
 	ctx                      context.Context // Context for network operations (e.g. SHA resolution); defaults to context.Background()
@@ -95,6 +102,7 @@ type Compiler struct {
 	engineReleaseClient      *http.Client
 	engineReleaseNow         func() time.Time
 	engineReleaseWarnings    map[string]bool // One metadata warning per engine release per compiler instance.
+	diagnostics              []CompilerDiagnostic
 }
 
 type allowedDomain struct {

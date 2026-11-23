@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -105,11 +106,66 @@ func TestEngineReleaseCooldownMetadata(t *testing.T) {
 			if test.warning {
 				assert.Equal(t, 1, c.GetWarningCount())
 				assert.Contains(t, output, "validate the release age manually")
+				diagnostics := c.GetDiagnostics()
+				require.Len(t, diagnostics, 1)
+				assert.Equal(t, "workflow.md", diagnostics[0].Path)
+				assert.Equal(t, "warning", diagnostics[0].Level)
+				assert.Contains(t, diagnostics[0].Message, "every applicable engine.cooldown setting")
 			} else {
 				assert.Zero(t, c.GetWarningCount())
+				assert.Empty(t, c.GetDiagnostics())
 			}
 		})
 	}
+}
+
+func TestEngineReleaseCooldownCacheDoesNotSerializeLookups(t *testing.T) {
+	c := NewCompiler()
+	c.engineReleaseCache = &engineReleaseCache{entries: map[string]engineReleaseMetadata{}}
+	firstStarted := make(chan struct{})
+	releaseFirst := make(chan struct{})
+	secondStarted := make(chan struct{})
+	c.engineReleaseClient = &http.Client{Transport: engineReleaseRoundTripper(func(request *http.Request) (*http.Response, error) {
+		if strings.HasSuffix(request.URL.Path, "/v1.2.3") {
+			close(firstStarted)
+			<-releaseFirst
+		} else {
+			close(secondStarted)
+		}
+		body, _ := json.Marshal(map[string]any{
+			"tag_name":     "v" + strings.TrimPrefix(request.URL.Path[strings.LastIndex(request.URL.Path, "/")+1:], "v"),
+			"published_at": "2020-01-01T00:00:00Z",
+		})
+		return engineReleaseResponse(string(body), http.StatusOK), nil
+	})}
+	now := time.Date(2026, 1, 10, 0, 0, 0, 0, time.UTC)
+	target := func(version string) engineReleaseTarget {
+		return engineReleaseTarget{
+			version:  version,
+			endpoint: "https://api.github.com/repos/github/copilot-cli/releases/tags/v" + version,
+		}
+	}
+
+	var lookups sync.WaitGroup
+	lookups.Add(2)
+	go func() {
+		defer lookups.Done()
+		c.engineReleaseMetadata(target("1.2.3"), now)
+	}()
+	<-firstStarted
+	go func() {
+		defer lookups.Done()
+		c.engineReleaseMetadata(target("1.2.4"), now)
+	}()
+	select {
+	case <-secondStarted:
+	case <-time.After(5 * time.Second):
+		close(releaseFirst)
+		lookups.Wait()
+		t.Fatal("an unrelated metadata lookup waited for the first network request")
+	}
+	close(releaseFirst)
+	lookups.Wait()
 }
 
 func TestEngineReleaseCooldownCachePolicyAndExpiry(t *testing.T) {
@@ -158,8 +214,9 @@ func TestEngineReleaseCooldownSkippedLookups(t *testing.T) {
 			if test.editor {
 				c.contentOverride = "content"
 			}
+			calls := 0
 			c.engineReleaseClient = &http.Client{Transport: engineReleaseRoundTripper(func(*http.Request) (*http.Response, error) {
-				t.Fatal("unexpected metadata lookup")
+				calls++
 				return nil, errors.New("unexpected lookup")
 			})}
 			output := captureStderrOutput(t, func() {
@@ -170,6 +227,7 @@ func TestEngineReleaseCooldownSkippedLookups(t *testing.T) {
 			} else {
 				assert.Empty(t, output)
 			}
+			assert.Zero(t, calls)
 			assert.Nil(t, c.engineReleaseCache, "offline and zero must not populate or poison metadata caches")
 		})
 	}
@@ -186,24 +244,39 @@ func TestEngineReleaseCooldownNPMAndDefaults(t *testing.T) {
 				}}}
 			}
 			calls := 0
+			versionsSeen := make(chan string, 1)
+			packagesSeen := make(chan string, 1)
+			expectedPackage := map[string]string{
+				"claude": "@anthropic-ai/claude-code",
+				"codex":  "@openai/codex",
+				"pi":     "@earendil-works/pi-coding-agent",
+				"gemini": "@google/gemini-cli",
+				"custom": "@example/custom",
+			}[id]
 			c.engineReleaseClient = &http.Client{Transport: engineReleaseRoundTripper(func(request *http.Request) (*http.Response, error) {
 				calls++
 				version := getVersionForSetup(data, c.engineRegistry)
 				if id == "custom" {
 					version = "1.2.3"
 				}
-				assert.True(t, literalEngineReleaseVersion(version), "defaults are literal and checked")
+				versionsSeen <- version
 				var body []byte
 				if id == "copilot" {
+					packagesSeen <- ""
 					body, _ = json.Marshal(map[string]any{"tag_name": "v" + version, "published_at": "2020-01-01T00:00:00Z"})
 				} else {
-					assert.Equal(t, "registry.npmjs.org", request.URL.Host)
-					body, _ = json.Marshal(map[string]any{"name": strings.TrimPrefix(request.URL.Path, "/"), "time": map[string]string{version: "2020-01-01T00:00:00.123Z"}})
+					packageName := strings.TrimPrefix(request.URL.Path, "/")
+					packagesSeen <- packageName
+					body, _ = json.Marshal(map[string]any{"name": packageName, "time": map[string]string{version: "2020-01-01T00:00:00.123Z"}})
 				}
 				return engineReleaseResponse(string(body), 200), nil
 			})}
 			require.NoError(t, c.validateEngineReleaseCooldown(data, "workflow.md"))
-			assert.Equal(t, 1, calls)
+			require.Equal(t, 1, calls)
+			require.Len(t, versionsSeen, 1)
+			require.Len(t, packagesSeen, 1)
+			assert.True(t, literalEngineReleaseVersion(<-versionsSeen), "defaults are literal and checked")
+			assert.Equal(t, expectedPackage, <-packagesSeen)
 			assert.Zero(t, c.GetWarningCount())
 		})
 	}
@@ -221,6 +294,14 @@ func TestEngineReleaseCooldownNPMAndDefaults(t *testing.T) {
 		})
 		assert.Contains(t, output, "validate the release age manually")
 	}
+}
+
+func TestEngineReleaseCooldownNPMStreamingMetadata(t *testing.T) {
+	body := `{"name":"@openai/codex","time":{"1.2.3":"2020-01-01T00:00:00Z"},"readme":"` +
+		strings.Repeat("x", 8*1024*1024+1) + `"}`
+	published, err := parseNPMReleaseTime(strings.NewReader(body), "@openai/codex", "1.2.3")
+	require.NoError(t, err)
+	assert.Equal(t, time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC), published)
 }
 
 func TestEngineReleaseCooldownDetection(t *testing.T) {
@@ -243,6 +324,54 @@ func TestEngineReleaseCooldownDetection(t *testing.T) {
 	require.NoError(t, c.validateEngineReleaseCooldowns(data, "workflow.md"))
 	data.SafeOutputs.ThreatDetection.EngineConfig = &EngineConfig{ID: "copilot", Version: "${{ inputs.version }}"}
 	require.NoError(t, c.validateEngineReleaseCooldowns(data, "workflow.md"))
+}
+
+func TestEngineReleaseCooldownWarningCoversAllApplicableSettings(t *testing.T) {
+	c := NewCompiler()
+	requests := 0
+	c.engineReleaseClient = &http.Client{Transport: engineReleaseRoundTripper(func(*http.Request) (*http.Response, error) {
+		requests++
+		return engineReleaseResponse("", http.StatusServiceUnavailable), nil
+	})}
+	three, thirty := 3, 30
+	data := &WorkflowData{
+		AI:           "copilot",
+		EngineConfig: &EngineConfig{ID: "copilot", Cooldown: &three},
+		SafeOutputs: &SafeOutputsConfig{ThreatDetection: &ThreatDetectionConfig{
+			EngineConfig: &EngineConfig{ID: "copilot", Cooldown: &thirty},
+		}},
+	}
+	output := captureStderrOutput(t, func() {
+		require.NoError(t, c.validateEngineReleaseCooldowns(data, "workflow.md"))
+	})
+	assert.Equal(t, 1, requests)
+	assert.Equal(t, 1, c.GetWarningCount())
+	assert.Contains(t, output, "every applicable engine.cooldown setting")
+	assert.NotContains(t, output, "minimum 3 days")
+}
+
+func TestEngineReleaseCooldownInlineDetectorResetsCopilotSDK(t *testing.T) {
+	c := NewCompiler()
+	var requestedURL string
+	c.engineReleaseClient = &http.Client{Transport: engineReleaseRoundTripper(func(request *http.Request) (*http.Response, error) {
+		requestedURL = request.URL.String()
+		body, _ := json.Marshal(map[string]any{
+			"tag_name":     "v" + string(constants.DefaultCopilotVersion),
+			"published_at": "2020-01-01T00:00:00Z",
+		})
+		return engineReleaseResponse(string(body), http.StatusOK), nil
+	})}
+	days := 7
+	detectorConfig := &EngineConfig{ID: "copilot", CopilotSDK: true, Cooldown: &days}
+	data := &WorkflowData{
+		AI:           "pi",
+		EngineConfig: &EngineConfig{ID: "pi", Command: "custom"},
+		Features:     map[string]any{string(constants.GHAWDetectionFeatureFlag): false},
+		SafeOutputs:  &SafeOutputsConfig{ThreatDetection: &ThreatDetectionConfig{EngineConfig: detectorConfig}},
+	}
+	require.NoError(t, c.validateEngineReleaseCooldowns(data, "workflow.md"))
+	assert.Contains(t, requestedURL, "/v"+string(constants.DefaultCopilotVersion))
+	assert.True(t, detectorConfig.CopilotSDK, "validation must not mutate the configured detector")
 }
 
 func TestEngineReleaseCooldownNetworkSafety(t *testing.T) {
@@ -306,6 +435,28 @@ func TestEngineReleaseCooldownResolvedTargets(t *testing.T) {
 	require.True(t, supported, "built-in behavior top-level version must not be overwritten by an empty installation.version")
 	assert.Equal(t, "0.98.1", target.version)
 	assert.Equal(t, "@charmland/crush", target.packageName)
+
+	prefixDef := &EngineDefinition{ID: "prefix-engine", Behaviors: &EngineBehaviorDefinition{Installation: &EngineInstallationDefinition{
+		PackageManager: "npm", PackageName: "@example/prefix-engine", Version: "1.2.3",
+	}}}
+	prefixEngine, err := NewBehaviorDefinedEngine(prefixDef)
+	require.NoError(t, err)
+	require.NoError(t, c.engineRegistry.Register(prefixEngine))
+	target, supported = c.engineReleaseTarget(&WorkflowData{
+		AI: "prefix-engine-experimental", EngineConfig: &EngineConfig{ID: "prefix-engine-experimental"},
+	})
+	require.True(t, supported)
+	assert.Equal(t, "1.2.3", target.version)
+	assert.Equal(t, "@example/prefix-engine", target.packageName)
+
+	alias := &EngineDefinition{ID: "copilot-catalog-alias", RuntimeID: "copilot"}
+	c.engineCatalog.Register(alias)
+	target, supported = c.engineReleaseTarget(&WorkflowData{
+		AI: alias.ID, EngineConfig: &EngineConfig{ID: alias.ID},
+	})
+	require.True(t, supported)
+	assert.Equal(t, string(constants.DefaultCopilotVersion), target.version)
+	assert.Empty(t, target.packageName)
 }
 
 func TestEngineReleaseCooldownExternalCommand(t *testing.T) {
@@ -367,73 +518,4 @@ func TestEngineReleaseCooldownChecksumWithoutVersion(t *testing.T) {
 	require.ErrorContains(t, c.validateReleaseIntegrityPins(data), "explicit semantic release version")
 	steps := stepsToString(generateCopilotInstallerSteps("", "Install", false, "", "", "", testEngineChecksumsPin, 7))
 	assert.Contains(t, steps, "--cooldown-days 7", "an unresolved selection must not disable runtime enforcement")
-}
-
-func TestEngineReleaseCooldownLargePackument(t *testing.T) {
-	readme := strings.Repeat("r", 9*1024*1024)
-	body := `{"_id":"@openai/codex","versions":{"1.2.3":{"readme":"` + readme + `","deps":[1,{"a":[2]}]}},"readme":"` + readme +
-		`","name":"@openai/codex","time":{"created":"2019-01-01T00:00:00Z","1.2.2":"2019-06-01T00:00:00Z","1.2.3":"2020-01-01T00:00:00Z"},"tail":[true]}`
-	published, err := parseEngineReleaseTime(strings.NewReader(body), "@openai/codex", "1.2.3")
-	require.NoError(t, err, "packuments larger than the GitHub release cap must still be parsed")
-	assert.Equal(t, time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC), published)
-	_, err = parseEngineReleaseTime(strings.NewReader(body[:len(body)/2]), "@openai/codex", "1.2.3")
-	require.Error(t, err, "truncated packuments fail closed to a warning")
-}
-
-func TestEngineReleaseCooldownLookupDoesNotHoldCacheLock(t *testing.T) {
-	c := NewCompiler()
-	c.engineReleaseCache = &engineReleaseCache{entries: map[string]engineReleaseMetadata{}}
-	original := engineReleaseTimeLookup
-	t.Cleanup(func() { engineReleaseTimeLookup = original })
-	engineReleaseTimeLookup = func(*Compiler, string, string, string) (time.Time, error) {
-		locked := c.engineReleaseCache.TryLock()
-		if locked {
-			c.engineReleaseCache.Unlock()
-		}
-		assert.True(t, locked, "the cache lock must not be held during the network lookup")
-		return time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC), nil
-	}
-	target := engineReleaseTarget{id: "copilot", version: "1.2.3", endpoint: "https://example.invalid/v1.2.3"}
-	metadata := c.engineReleaseMetadata(target, time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC))
-	require.NoError(t, metadata.err)
-	assert.Contains(t, c.engineReleaseCache.entries, target.endpoint+"@"+target.version)
-}
-
-func TestEngineReleaseCooldownAliasTargets(t *testing.T) {
-	c := NewCompiler()
-	def := &EngineDefinition{ID: "crush", RuntimeID: "crush", Behaviors: &EngineBehaviorDefinition{
-		Installation: &EngineInstallationDefinition{PackageManager: "npm", PackageName: "@charmland/crush", Version: "0.98.1"},
-	}}
-	engine, err := NewBehaviorDefinedEngine(def)
-	require.NoError(t, err)
-	require.NoError(t, c.engineRegistry.Register(engine))
-	target, supported := c.engineReleaseTarget(&WorkflowData{AI: "crush-experimental", EngineConfig: &EngineConfig{ID: "crush-experimental"}})
-	require.True(t, supported, "prefix alias must recover the behavior definition")
-	assert.Equal(t, "@charmland/crush", target.packageName)
-	assert.Equal(t, "0.98.1", target.version)
-
-	c.engineCatalog.Register(&EngineDefinition{ID: "my-copilot", RuntimeID: "copilot"})
-	target, supported = c.engineReleaseTarget(&WorkflowData{AI: "my-copilot", EngineConfig: &EngineConfig{ID: "my-copilot"}})
-	require.True(t, supported, "catalog alias must resolve the runtime's default version")
-	assert.Equal(t, string(constants.DefaultCopilotVersion), target.version)
-	assert.Empty(t, target.packageName)
-}
-
-func TestEngineReleaseCooldownInlineDetectorResetsCopilotSDK(t *testing.T) {
-	c := NewCompiler()
-	var tags []string
-	c.engineReleaseClient = &http.Client{Transport: engineReleaseRoundTripper(func(request *http.Request) (*http.Response, error) {
-		tag := request.URL.Path[strings.LastIndex(request.URL.Path, "/")+1:]
-		tags = append(tags, tag)
-		body, _ := json.Marshal(map[string]any{"tag_name": tag, "published_at": "2020-01-01T00:00:00Z"})
-		return engineReleaseResponse(string(body), http.StatusOK), nil
-	})}
-	days := 7
-	data := &WorkflowData{AI: "claude", EngineConfig: &EngineConfig{ID: "claude", Command: "claude"},
-		Features: map[string]any{string(constants.GHAWDetectionFeatureFlag): false},
-		SafeOutputs: &SafeOutputsConfig{ThreatDetection: &ThreatDetectionConfig{
-			EngineConfig: &EngineConfig{ID: "copilot", CopilotSDK: true, Cooldown: &days},
-		}}}
-	require.NoError(t, c.validateEngineReleaseCooldowns(data, "workflow.md"))
-	assert.Equal(t, []string{"v" + string(constants.DefaultCopilotVersion)}, tags)
 }

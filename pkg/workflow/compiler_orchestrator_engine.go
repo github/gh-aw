@@ -113,7 +113,9 @@ func (c *Compiler) setupEngineAndImports(result *parser.FrontmatterResult, clean
 
 func (c *Compiler) extractAndValidateEngineConfig(frontmatter map[string]any) (string, *EngineConfig, string, error) {
 	setting, config, model := c.ExtractEngineConfig(frontmatter)
-	if err := validateEngineCooldown(config); err != nil {
+	if err := c.withEffectiveStrictMode(frontmatter, func() error {
+		return validateEngineCooldown(config)
+	}); err != nil {
 		return "", nil, "", err
 	}
 	if err := c.validateAndRegisterInlineEngineConfig(config); err != nil {
