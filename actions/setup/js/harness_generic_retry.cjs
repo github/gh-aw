@@ -13,14 +13,30 @@ const { hasNoopInSafeOutputs } = require("./safeoutputs_cli.cjs");
 /** Bounded tail of combined attempt output retained for failure classification. */
 const GENERIC_HARNESS_OUTPUT_TAIL_BYTES = 256 * 1024;
 
+/**
+ * Retryable signals (rate limits, transient errors, Retry-After) are only read from
+ * the end of the output, where provider/CLI terminal errors appear, so earlier
+ * model-generated transcript text cannot steer a retry.
+ */
+const GENERIC_HARNESS_RETRY_SIGNAL_TAIL_CHARS = 8 * 1024;
+
 const RATE_LIMIT_PATTERN =
   /\b(?:HTTP(?:\/\d(?:\.\d)?)?|status(?:Code|_code)?|code|error)["']?\s*[:=]?\s*["']?429\b|\b429\s+Too Many Requests\b|\btoo many requests\b|\brate[ _-]?limit(?:ed|_error|_exceeded|\s+exceeded|\s+reached)\b|\bRESOURCE_EXHAUSTED\b/i;
 const TRANSIENT_ERROR_PATTERN =
   /\b(?:HTTP(?:\/\d(?:\.\d)?)?|status(?:Code|_code)?)["']?\s*[:=]?\s*["']?(?:500|502|503|504)\b|\b(?:502 Bad Gateway|503 Service Unavailable|504 Gateway Timeout)\b|\b(?:ECONNRESET|ETIMEDOUT|EAI_AGAIN|ECONNREFUSED)\b|\bsocket hang up\b|\boverloaded(?:_error)?\b|["']status["']\s*:\s*["']UNAVAILABLE["']/i;
 
 /**
+ * @param {string} output
+ * @returns {string}
+ */
+function retrySignalTail(output) {
+  return output.length > GENERIC_HARNESS_RETRY_SIGNAL_TAIL_CHARS ? output.slice(-GENERIC_HARNESS_RETRY_SIGNAL_TAIL_CHARS) : output;
+}
+
+/**
  * Classify a failed attempt for harnesses that do not own an engine-specific policy.
- * Only provider rate limits and transient transport/server errors are retryable.
+ * Non-retryable guards are checked across the whole output; only provider rate limits
+ * and transient transport/server errors in the output tail are retryable.
  * @param {string} output
  * @returns {"rate_limit_error" | "transient_error" | "non_retryable" | null}
  */
@@ -30,8 +46,9 @@ function classifyGenericHarnessFailure(output) {
   if (guard.aiCreditsExceeded || guard.awfAPIProxyBlockingRequests || guard.goalAlreadyActive || guard.maxRunsExceeded || guard.modelEndpointMismatch || guard.apiProxyGuardRejection || isAuthenticationFailedError(text)) {
     return "non_retryable";
   }
-  if (RATE_LIMIT_PATTERN.test(text) || parseCopilotRetryAfterMs(text) !== null) return "rate_limit_error";
-  if (TRANSIENT_ERROR_PATTERN.test(text)) return "transient_error";
+  const tail = retrySignalTail(text);
+  if (RATE_LIMIT_PATTERN.test(tail) || parseCopilotRetryAfterMs(tail) !== null) return "rate_limit_error";
+  if (TRANSIENT_ERROR_PATTERN.test(tail)) return "transient_error";
   return null;
 }
 
@@ -92,7 +109,7 @@ async function runRetryingHarness(options) {
       }
       result.failureClasses = [failureClass];
       if (failureClass === "rate_limit_error" && result.retryAfterMs == null) {
-        result.retryAfterMs = parseCopilotRetryAfterMs(result.output);
+        result.retryAfterMs = parseCopilotRetryAfterMs(retrySignalTail(result.output));
       }
       if (attempt >= maxRetries) {
         log(`attempt ${attempt + 1}: ${failureClass} — all ${maxRetries} retries exhausted`);
@@ -103,4 +120,4 @@ async function runRetryingHarness(options) {
   });
 }
 
-module.exports = { GENERIC_HARNESS_OUTPUT_TAIL_BYTES, classifyGenericHarnessFailure, runRetryingHarness };
+module.exports = { GENERIC_HARNESS_OUTPUT_TAIL_BYTES, GENERIC_HARNESS_RETRY_SIGNAL_TAIL_CHARS, classifyGenericHarnessFailure, runRetryingHarness };
