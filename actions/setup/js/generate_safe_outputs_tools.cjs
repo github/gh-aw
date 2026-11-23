@@ -56,6 +56,7 @@ const RATIONALE_REQUIRED_DESC = "Required rationale for this change (max 280 cha
 const CONFIDENCE_REQUIRED_DESC = "Required confidence level for this change. Must be exactly one of: LOW, MEDIUM, HIGH.";
 const ISSUE_INTENT_TOOL_NAMES = new Set(["set_issue_type", "set_issue_field", "add_labels", "close_issue", "assign_to_user", "assign_to_agent"]);
 const ISSUE_INTENT_SCHEMA_FIELDS = ["rationale", "confidence", "suggest"];
+const ADD_LABELS_INTENT_METADATA_DESC_REGEX = /an object with name plus optional rationale\/confidence\/suggest intent metadata/;
 
 /**
  * Determine whether issue-intent guidance is enabled for a tool.
@@ -75,7 +76,8 @@ function isIssueIntentEnabledForTool(toolName, toolConfig) {
 /**
  * Remove issue-intent properties from a tool schema.
  * If this removes all required fields, the required array is omitted.
- * @param {{inputSchema?: {properties?: Record<string, unknown>, required?: string[]}}} tool
+ * For add_labels, also removes them from nested label item object schemas.
+ * @param {{name?: string, inputSchema?: {properties?: Record<string, unknown>, required?: string[]}}} tool
  */
 function stripIssueIntentSchemaFields(tool) {
   if (!tool.inputSchema || !tool.inputSchema.properties) {
@@ -91,6 +93,42 @@ function stripIssueIntentSchemaFields(tool) {
     if (tool.inputSchema.required.length === 0) {
       delete tool.inputSchema.required;
     }
+  }
+  const labelsSchema = tool.name === "add_labels" ? tool.inputSchema.properties.labels : undefined;
+  if (labelsSchema && typeof labelsSchema === "object") {
+    stripIssueIntentLabelItemFields(/** @type {any} */ labelsSchema.items);
+    const description = /** @type {any} */ labelsSchema.description;
+    if (typeof description === "string") {
+      /** @type {any} */ labelsSchema.description = description.replace(ADD_LABELS_INTENT_METADATA_DESC_REGEX, "an object with a name field");
+    }
+  }
+}
+
+/**
+ * Remove issue-intent properties from add_labels label item object schemas.
+ * Handles a plain object item schema as well as object branches of oneOf/anyOf.
+ * The name field and plain-string alternatives are preserved.
+ * @param {unknown} itemSchema
+ */
+function stripIssueIntentLabelItemFields(itemSchema) {
+  if (!itemSchema || typeof itemSchema !== "object" || Array.isArray(itemSchema)) {
+    return;
+  }
+  const schema = /** @type {Record<string, any>} */ itemSchema;
+  for (const key of ["oneOf", "anyOf"]) {
+    if (Array.isArray(schema[key])) {
+      for (const branch of schema[key]) {
+        stripIssueIntentLabelItemFields(branch);
+      }
+    }
+  }
+  if (schema.properties && typeof schema.properties === "object") {
+    for (const field of ISSUE_INTENT_SCHEMA_FIELDS) {
+      delete schema.properties[field];
+    }
+  }
+  if (Array.isArray(schema.required)) {
+    schema.required = schema.required.filter(/** @param {unknown} f */ f => typeof f !== "string" || !ISSUE_INTENT_SCHEMA_FIELDS.includes(f));
   }
 }
 

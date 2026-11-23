@@ -1197,6 +1197,52 @@ describe("generate_safe_outputs_tools", () => {
     expect(disabledTool.inputSchema.properties.labels.items.oneOf).toBeDefined();
   });
 
+  it("strips nested add_labels intent fields unless issue_intent is true", () => {
+    const labelObjectSchema = {
+      type: "object",
+      required: ["name"],
+      properties: {
+        name: { type: "string" },
+        rationale: { type: "string" },
+        confidence: { type: "string", enum: ["LOW", "MEDIUM", "HIGH"] },
+        suggest: { type: "boolean" },
+      },
+      additionalProperties: false,
+    };
+    const addLabelsSourceTool = {
+      name: "add_labels",
+      description: "Adds labels.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          labels: {
+            type: "array",
+            items: { oneOf: [{ type: "string" }, labelObjectSchema] },
+            description: "Labels to add. Each entry can be either a label name string or an object with name plus optional rationale/confidence/suggest intent metadata. Labels must exist in the repository.",
+          },
+        },
+        required: ["labels"],
+      },
+    };
+    fs.writeFileSync(toolsSourcePath, JSON.stringify([addLabelsSourceTool]));
+    fs.writeFileSync(toolsMetaPath, JSON.stringify({ description_suffixes: {}, repo_params: {}, dynamic_tools: [] }));
+    const readLabels = () => JSON.parse(fs.readFileSync(outputPath, "utf8")).find((/** @type {{name: string}} */ t) => t.name === "add_labels").inputSchema.properties.labels;
+
+    fs.writeFileSync(configPath, JSON.stringify({ add_labels: {} }));
+    runScript();
+    const omitted = readLabels();
+    expect(omitted.items.oneOf).toHaveLength(2);
+    expect(omitted.items.oneOf[0]).toEqual({ type: "string" });
+    expect(Object.keys(omitted.items.oneOf[1].properties)).toEqual(["name"]);
+    expect(omitted.items.oneOf[1].required).toEqual(["name"]);
+    expect(omitted.description).not.toMatch(/rationale|confidence|suggest/);
+
+    fs.writeFileSync(configPath, JSON.stringify({ add_labels: { issue_intent: true } }));
+    runScript();
+    const enabled = readLabels();
+    expect(Object.keys(enabled.items.properties)).toEqual(expect.arrayContaining(["name", "rationale", "confidence", "suggest"]));
+  });
+
   it("reflects required/optional/absent intent fields per tool configuration", () => {
     fs.writeFileSync(
       toolsSourcePath,
