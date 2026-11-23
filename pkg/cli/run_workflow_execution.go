@@ -407,7 +407,12 @@ func executeWorkflowRun(ctx context.Context, lockFileName string, args []string,
 	}
 	stdout, err := workflow.ExecGHContext(ctx, args...).Output()
 	if err != nil {
-		return nil, formatWorkflowRunError(err)
+		var stderr []byte
+		var exitError *exec.ExitError
+		if errors.As(err, &exitError) {
+			stderr = exitError.Stderr
+		}
+		return nil, formatWorkflowRunError(err, stderr)
 	}
 	output := strings.TrimSpace(string(stdout))
 	if output != "" {
@@ -422,14 +427,11 @@ func executeWorkflowRun(ctx context.Context, lockFileName string, args []string,
 	}, nil
 }
 
-func formatWorkflowRunError(err error) error {
-	var stderrOutput string
-	var exitError *exec.ExitError
-	if errors.As(err, &exitError) {
-		stderrOutput = string(exitError.Stderr)
-		fmt.Fprintf(os.Stderr, "%s", exitError.Stderr)
-	}
-	errorMsg := err.Error() + " " + stderrOutput
+// formatWorkflowRunError echoes gh's stderr and wraps err with a remediation hint
+// recognized from err and that stderr.
+func formatWorkflowRunError(err error, stderr []byte) error {
+	fmt.Fprintf(os.Stderr, "%s", stderr)
+	errorMsg := err.Error() + " " + string(stderr)
 	if isRunningInCodespace() && is403PermissionError(errorMsg) {
 		fmt.Fprint(os.Stderr, getCodespacePermissionErrorMessage())
 		return errors.New("failed to run workflow on GitHub Actions: permission denied (403)")
