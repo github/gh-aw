@@ -1275,6 +1275,8 @@ test("ends the slide map with a keyboard manual of every shortcut and touch gest
   for (const group of ["Move", "Jump", "Show", "Slide map", "Design a view"]) await expect(keys.getByRole("heading", { name: group, exact: true })).toBeVisible();
   await expect(keys.locator("dt", { hasText: "Shift+Home" })).toHaveCount(1);
   await expect(keys).toContainText("First slide of the band");
+  await expect(keys).toContainText("Previous or next slide, skipping in-slide steps");
+  await expect(keys).toContainText("In the map: previous or next tile, in slide order");
   await expect(keys.locator(".kb-k")).toHaveCount(102);
   await expect(keys).toContainText("Closed captioning (CC) in kiosk mode");
   await expect(keys.locator('.kb-k.on[data-k="G"]')).toHaveCount(1);

@@ -1688,7 +1688,7 @@
       [
         "Move",
         [
-          [["Alt+←", "Alt+→", "⌘+←", "⌘+→"], "Previous or next slide"],
+          [["Alt+←", "Alt+→", "⌘+←", "⌘+→"], "Previous or next slide, skipping in-slide steps"],
           [["→", "Space", "Enter"], "Next step in the slide, then next slide"],
           [["←", "Backspace"], "Previous step in the slide, then previous slide"],
           [["↑", "↓"], "Up or down a column, or to the next band; keeps your place in the line"],
@@ -1713,7 +1713,8 @@
       [
         "Slide map",
         [
-          [["←", "→", "↑", "↓"], "Move between tiles"],
+          [["←", "→"], "In the map: previous or next tile, in slide order"],
+          [["↑", "↓"], "In the map: tile on the line above or below"],
           [["Home", "End"], "First or last tile"],
           [["Enter"], "Open the slide"],
           [["T"], "Tours"],
