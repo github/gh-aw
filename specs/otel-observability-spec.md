@@ -4,7 +4,7 @@ description: Formal W3C-style specification for observability contract for GitHu
 version: 0.8.0
 status: Working Draft
 date: 2026-06-18
-last_updated: 2026-11-22
+last_updated: 2026-11-23
 editors:
   - GitHub gh-aw Team
 ---
@@ -697,11 +697,21 @@ Span links SHOULD be used instead of parent-child relationships when outcome eva
 
 ### 10.3 Model Attributes
 
-Copilot BYOK run spans SHOULD include `server.address` when a configured endpoint is known.
-Resolve expression-valued endpoints at runtime and retain only the hostname (without a port,
-URL credentials, path, query, or fragment). Omit the attribute when the endpoint cannot be parsed.
-This attribution does not enable outbound W3C trace propagation: forwarding `traceparent` and
-`tracestate` only to the configured BYOK endpoint requires support in the AWF api-proxy.
+Copilot BYOK setup and conclusion spans SHOULD include `server.address` when a configured
+provider endpoint is present and successfully normalized. The compiler MUST propagate the
+configured endpoint through `GH_AW_INFO_GENAI_ENDPOINT` to the setup, create-info, and
+script-cleanup runtime paths. Generated GitHub Actions expressions MUST resolve before runtime
+normalization.
+
+The runtime normalizer MUST accept only HTTP(S) URLs or IP literals. It MUST remove URL
+credentials, port, path, query, and fragment components before producing `server.address`.
+Invalid or unparseable values, including unresolved `${{` expressions, MUST be omitted. This
+attribution is additive and data-minimized; it MUST NOT include credentials, paths, queries,
+fragments, or ports.
+
+This requirement does not add outbound W3C trace-context propagation. Forwarding `traceparent`
+or `tracestate` to the configured BYOK endpoint remains out of scope pending support in
+`github/gh-aw-firewall`.
 
 | Attribute | Type | Requirement |
 |---|---|---|
@@ -1319,6 +1329,8 @@ which has no release tag, and semantic-conventions v1.45.0.
 ### Unreleased
 
 - **Added**: Backend service correlation through W3C `traceparent`, header-safe job baggage using `cicd.pipeline.task.name`, and JSON `job_id` (§7.7.1), with endpoint coverage and trust-boundary requirements.
+- **Added**: Additive, data-minimized `server.address` attribution for Copilot BYOK setup and conclusion spans (§10.3), with compiler propagation through `GH_AW_INFO_GENAI_ENDPOINT` and runtime normalization that excludes credentials, ports, paths, queries, fragments, invalid values, and unresolved expressions.
+- **Clarified**: Outbound `traceparent` and `tracestate` forwarding to Copilot BYOK endpoints remains out of scope pending `github/gh-aw-firewall` support.
 
 ### Version 0.8.0 (Working Draft, November 22, 2026)
 
