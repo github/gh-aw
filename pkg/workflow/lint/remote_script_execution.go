@@ -445,7 +445,7 @@ func remoteCurlWritesFile(args []*syntax.Word) bool {
 }
 
 func remoteWgetWritesStdout(args []*syntax.Word) bool {
-	for index := range len(args) {
+	for index := range args {
 		arg := policyShellLiteral(args[index])
 		switch {
 		case arg == "--output-document":
