@@ -1620,18 +1620,18 @@ illustrative
 
 #### Summary
 
-Experimental: durable execution checkpoints the agent's native session, even after a failed step, so a rerun resumes the session instead of starting over.
+Experimental: when the agent calls the request-continuation safe output with hints, its native session is checkpointed and the next run is dispatched, which restores the session and continues instead of starting over.
 
 #### Keywords
 
-resume, checkpoint, rerun, session, retry, experimental
+request-continuation, request_continuation, safe outputs, durable, resume, checkpoint, continuation, hints, dispatch, aw_context, chain, max, session, experimental
 
 #### Captions
 
 - Experimental, and very welcome: agents that pick up where they left off.
-- Durable execution checkpoints the agent's native session, even after a failed step.
-- So a rerun does not start from scratch?
-- Right, a rerun resumes the session instead of starting over. Less wasted work, less waiting.
+- When the work outgrows one run, the agent requests continuation and leaves hints for its successor.
+- So the next run does not start from scratch?
+- Right, it restores the session, reads the hints and carries on. No request, no checkpoint: the chain stops.
 
 ### Agents Trigger Agents {#agents-trigger-agents}
 
