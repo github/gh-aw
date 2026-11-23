@@ -31,6 +31,7 @@ func TestCompilerLintUntrustedDataFlows(t *testing.T) {
 		})
 	}
 	compiler := NewCompiler(WithLint(true))
-	require.NoError(t, compiler.lintCompiledWorkflow(&WorkflowData{}, job+"      - shell: pwsh\n        run: Write-Output public\n", "test.md"))
+	data := &WorkflowData{Tools: map[string]any{"github": map[string]any{"min-integrity": "approved"}}}
+	require.NoError(t, compiler.lintCompiledWorkflow(data, job+"      - shell: pwsh\n        run: Write-Output public\n", "test.md"))
 	require.Zero(t, compiler.GetWarningCount(), "flow coverage remains available through gh aw lint, not compiler warning counts")
 }

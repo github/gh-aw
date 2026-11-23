@@ -38,8 +38,9 @@ const INCONCLUSIVE_DETECTION_REASONS = new Set(["agent_failure", "parse_error", 
 // collector's driver_crash cause also covers unclassified nonzero exits, so a
 // crash counts only through its own evidence: a crash signal or an interrupted attempt.
 const INFRASTRUCTURE_FAILURE_CAUSES = new Set(["agent_startup_failure", "secret_redaction_failure", "engine_outage"]);
-// Generic labels a guard's budget rejection can arrive wrapped in; beside a confirmed limit they are the model's.
-const GUARD_WRAPPERS = new Set(["authentication_failed", "api_proxy_guard_rejected"]);
+// Beside a confirmed limit these labels are the model's: the generic labels a guard's budget rejection can arrive
+// wrapped in, and the transient API errors (HTML challenges) that harnesses labelled authentication_failed before.
+const YIELD_TO_LIMIT = new Set(["authentication_failed", "api_proxy_guard_rejected", "transient_error"]);
 const INFRASTRUCTURE_CATEGORIES = new Set([
   "agentic_engine_timeout",
   "authentication_failed",
@@ -70,6 +71,7 @@ const INFRASTRUCTURE_CLASSES = new Set([
   "sdk_session_idle_timeout",
   "server_error",
   "startup_error",
+  "transient_error",
   "unsupported_model_tools",
   "watchdog",
 ]);
@@ -176,7 +178,7 @@ function cancelled(e) {
 function infrastructure(e) {
   const limit = limitReached(e);
   /** @param {string} value */
-  const platform = value => !(limit && GUARD_WRAPPERS.has(value));
+  const platform = value => !(limit && YIELD_TO_LIMIT.has(value));
   return (
     e.output?.infrastructure === true ||
     (e.output?.failureCause !== undefined && INFRASTRUCTURE_FAILURE_CAUSES.has(e.output.failureCause)) ||

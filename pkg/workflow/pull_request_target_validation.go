@@ -69,6 +69,7 @@ var boundedForkPattern = regexp.MustCompile(`^[A-Za-z0-9_.-]+/([A-Za-z0-9_.-]+|\
 // dangerous-trigger strict-only warning is skipped; the insecure-checkout check still runs
 // and emits a non-strict warning when checkout is not explicitly disabled.
 func (c *Compiler) validatePullRequestTargetTrigger(workflowData *WorkflowData, markdownPath string) error { //nolint:largefunc // Trigger checks share parsed state and diagnostics.
+	workflowData.pullRequestTargetWarned = false
 	// Fast path: skip expensive YAML parsing when the On field cannot possibly contain
 	// a pull_request_target trigger. This avoids yaml.Unmarshal on every
 	// validateWorkflowData call for the common case of non-pull_request_target workflows.
@@ -195,7 +196,10 @@ func (c *Compiler) validatePullRequestTargetTrigger(workflowData *WorkflowData, 
 			"If you only need to react to PR events without write access, use pull_request instead.\n" +
 			"To acknowledge this risk only, set on.pull_request_target.acknowledge-risk: true.\n" +
 			"See: https://securitylab.github.com/resources/github-actions-preventing-pwn-requests/"
-		fmt.Fprintln(os.Stderr, formatCompilerMessage(markdownPath, "warning", warningMsg))
+		if _, err := fmt.Fprintln(os.Stderr, formatCompilerMessage(markdownPath, "warning", warningMsg)); err != nil {
+			return fmt.Errorf("write pull_request_target warning: %w", err)
+		}
+		workflowData.pullRequestTargetWarned = true
 		c.IncrementWarningCount()
 	}
 

@@ -48,6 +48,248 @@ jobs:
 	require.NoError(t, compiler.lintCompiledWorkflow(data, safe, "haiku.md"))
 }
 
+func TestCompilerLintDangerousTriggers(t *testing.T) {
+	t.Parallel()
+	for _, tt := range []struct {
+		name, trigger, policy string
+		resolved              map[string]any
+		roles                 []string
+		warnings              int
+	}{
+		{name: "comment unknown policy", trigger: "issue_comment", roles: []string{"all"}},
+		{name: "comment none with trusted defaults", trigger: "issue_comment", resolved: map[string]any{"github": map[string]any{"min-integrity": "none"}}},
+		{name: "comment none with trusted resolved roles", trigger: "issue_comment", resolved: map[string]any{"github": map[string]any{"min-integrity": "none"}}, roles: []string{"write"}},
+		{name: "comment none with broadened roles", trigger: "issue_comment", resolved: map[string]any{"github": map[string]any{"min-integrity": "none"}}, roles: []string{"all"}, warnings: 1},
+		{name: "comment approved import", trigger: "issue_comment", resolved: map[string]any{"github": map[string]any{"min-integrity": "approved"}}, roles: []string{"all"}},
+		{name: "review comment unknown policy", trigger: "pull_request_review_comment", roles: []string{"all"}},
+		{name: "review comment weak policy", trigger: "pull_request_review_comment", resolved: map[string]any{"github": map[string]any{"min-integrity": "unapproved"}}, roles: []string{"write", "triage"}, warnings: 1},
+		{name: "review comment approved import", trigger: "pull_request_review_comment", resolved: map[string]any{"github": map[string]any{"min-integrity": "approved"}}, roles: []string{"read"}},
+		{name: "comment disabled GitHub", trigger: "issue_comment"},
+		{name: "safe event", trigger: "workflow_dispatch"},
+		{name: "nonstrict target advisory", trigger: "pull_request_target", policy: "strict: false\n", warnings: 1},
+		{name: "strict target without validation", trigger: "pull_request_target", warnings: 1},
+		{name: "nonstrict target acknowledged", trigger: "pull_request_target", policy: "strict: false\n"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			authored := "on: " + tt.trigger + "\n"
+			if tt.name == "nonstrict target acknowledged" {
+				authored = "on: {pull_request_target: {acknowledge-risk: true}}\n"
+			}
+			document, err := aw.Parse("---\n" + tt.policy + authored + "checkout: false\n---\nReview.\n")
+			require.NoError(t, err)
+			data := &WorkflowData{SourceDocument: document, RawFrontmatter: document.Frontmatter, Tools: tt.resolved, Roles: tt.roles}
+			if tt.name == "comment disabled GitHub" {
+				data.ExplicitlyDisabledTools = map[string]struct{}{"github": {}}
+			}
+			content := "on: " + tt.trigger + "\njobs:\n  check:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo safe\n"
+			compiler := NewCompiler(WithLint(true))
+			require.NoError(t, compiler.lintCompiledWorkflow(data, content, "test.md"))
+			require.Equal(t, tt.warnings, compiler.GetWarningCount())
+			compiler = NewCompiler(WithLint(false))
+			require.NoError(t, compiler.lintCompiledWorkflow(data, content, "test.md"))
+			require.Zero(t, compiler.GetWarningCount())
+		})
+	}
+}
+
+func TestCompilerLintPullRequestTargetValidationDeduplication(t *testing.T) {
+	t.Parallel()
+	content := "on: pull_request_target\njobs:\n  check:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo safe\n"
+	for _, tt := range []struct {
+		name, validatedOn string
+		validate          bool
+	}{
+		{name: "validation bypassed"},
+		{name: "equivalent warning emitted", validate: true, validatedOn: "on: pull_request_target"},
+		{name: "validator returned without warning", validate: true, validatedOn: "on: workflow_dispatch"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			document, err := aw.Parse("---\non: pull_request_target\ncheckout: false\n---\nReview.\n")
+			require.NoError(t, err)
+			data := &WorkflowData{
+				SourceDocument: document, RawFrontmatter: document.Frontmatter,
+				On: tt.validatedOn, CheckoutExplicitlyDisabled: true,
+			}
+			compiler := NewCompiler(WithLint(true))
+			compiler.SetSkipValidation(true)
+			if tt.validate {
+				require.NoError(t, compiler.validatePullRequestTargetTrigger(data, "test.md"))
+			}
+			require.NoError(t, compiler.lintCompiledWorkflow(data, content, "test.md"))
+			require.Equal(t, 1, compiler.GetWarningCount(), "exactly one validator or lint warning")
+		})
+	}
+}
+
+func TestCompilerLintPullRequestTargetValidationReuse(t *testing.T) {
+	t.Parallel()
+	content := "on: pull_request_target\njobs:\n  check:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo safe\n"
+	document, err := aw.Parse("---\non: {pull_request_target: {}}\ncheckout: false\n---\nReview.\n")
+	require.NoError(t, err)
+	data := &WorkflowData{
+		SourceDocument: document, RawFrontmatter: document.Frontmatter,
+		On: "on: pull_request_target", CheckoutExplicitlyDisabled: true,
+	}
+	compiler := NewCompiler(WithLint(true))
+	require.NoError(t, compiler.validatePullRequestTargetTrigger(data, "test.md"))
+	require.NoError(t, compiler.lintCompiledWorkflow(data, content, "test.md"))
+	require.Equal(t, 1, compiler.GetWarningCount())
+
+	// A prior workflow's validation must not suppress a new workflow's lint.
+	nextDocument, err := aw.Parse("---\non: pull_request_target\ncheckout: false\n---\nReview.\n")
+	require.NoError(t, err)
+	require.NoError(t, compiler.lintCompiledWorkflow(&WorkflowData{
+		SourceDocument: nextDocument, RawFrontmatter: nextDocument.Frontmatter,
+	}, content, "next.md"))
+	require.Equal(t, 2, compiler.GetWarningCount())
+
+	compiler.ResetWarningCount()
+	trigger := document.Frontmatter["on"].(map[string]any)["pull_request_target"].(map[string]any)
+	trigger["acknowledge-risk"] = true
+	require.NoError(t, compiler.validatePullRequestTargetTrigger(data, "test.md"))
+	require.NoError(t, compiler.lintCompiledWorkflow(data, content, "test.md"))
+	require.Zero(t, compiler.GetWarningCount())
+
+	// Revalidate the same data in non-strict mode: only lint emits the advisory.
+	delete(trigger, "acknowledge-risk")
+	data.RawFrontmatter["strict"] = false
+	require.NoError(t, compiler.validatePullRequestTargetTrigger(data, "test.md"))
+	require.NoError(t, compiler.lintCompiledWorkflow(data, content, "test.md"))
+	require.Equal(t, 1, compiler.GetWarningCount())
+
+}
+
+func TestCompilerLintPullRequestTargetCompilation(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	source := filepath.Join(dir, "review.md")
+	compiler := NewCompiler(WithLint(true))
+	compiler.gitRoot = dir
+	for _, skipSchemaValidation := range []bool{false, true} {
+		for _, acknowledged := range []bool{false, true} {
+			t.Run(fmt.Sprintf("skip-schema=%t/acknowledged=%t", skipSchemaValidation, acknowledged), func(t *testing.T) {
+				require.NoError(t, os.WriteFile(source, []byte(fmt.Sprintf(`---
+on:
+  pull_request_target:
+    acknowledge-risk: %t
+checkout: false
+tools:
+  github: false
+---
+Review.
+`, acknowledged)), 0o600))
+				compiler.SetSkipValidation(skipSchemaValidation)
+				compiler.ResetWarningCount()
+				require.NoError(t, compiler.CompileWorkflow(source))
+				warnings := 1
+				if acknowledged {
+					warnings = 0
+				}
+				require.Equal(t, warnings, compiler.GetWarningCount())
+			})
+		}
+	}
+}
+
+func TestCompilerLintPullRequestTargetCompilationWithoutSourceDocument(t *testing.T) {
+	t.Parallel()
+	source := filepath.Join(t.TempDir(), "review.md")
+	require.NoError(t, os.WriteFile(source, []byte("---\non: pull_request_target\ncheckout: false\ntools: {github: false}\n---\nReview.\n"), 0o600))
+	compiler := NewCompiler(WithLint(true), WithNoEmit(true))
+	compiler.SetSkipValidation(true)
+	compiler.SetApprove(true)
+	data, err := compiler.ParseWorkflowFile(source)
+	require.NoError(t, err)
+	data.SourceDocument = nil
+	require.NoError(t, compiler.CompileWorkflowData(data, source))
+	require.Equal(t, 1, compiler.GetWarningCount(), "source-less compilation must not duplicate the emitted CTR-008 warning")
+}
+
+func TestCompilerLintDangerousTriggersDryRun(t *testing.T) {
+	t.Parallel()
+	for _, dryRun := range []bool{false, true} {
+		t.Run(fmt.Sprintf("dry-run=%t", dryRun), func(t *testing.T) {
+			dir := t.TempDir()
+			source := filepath.Join(dir, "review.md")
+			counts := make(map[string]int)
+			for _, threshold := range []string{"none", "approved"} {
+				require.NoError(t, os.WriteFile(source, []byte(`---
+on:
+  issue_comment:
+    types: [created]
+  roles: all
+checkout: false
+permissions:
+  contents: read
+  issues: read
+  pull-requests: read
+tools:
+  bash: [echo]
+  github:
+    min-integrity: `+threshold+`
+safe-outputs:
+  add-comment: {}
+  threat-detection: true
+---
+Review.
+`), 0o600))
+				compiler := NewCompiler(WithLint(true))
+				compiler.gitRoot = dir
+				compiler.SetSkipValidation(true)
+				compiler.SetDryRun(dryRun)
+				data, err := compiler.ParseWorkflowFile(source)
+				require.NoError(t, err)
+				require.NoError(t, compiler.CompileWorkflowData(data, source))
+				counts[threshold] = compiler.GetWarningCount()
+				require.Equal(t, []string{"all"}, data.Roles, "dry-run must preserve the authored policy")
+				if dryRun {
+					content, err := os.ReadFile(filepath.Join(dir, "review.lock.yml"))
+					require.NoError(t, err)
+					require.Contains(t, string(content), `GH_AW_REQUIRED_ROLES: "admin,maintainer"`, "generated admission is restricted to trusted actors")
+				}
+			}
+			warnings := 1
+			if dryRun {
+				warnings = 0
+			}
+			require.Equal(t, counts["approved"]+warnings, counts["none"], "weak-filtering warnings must reflect effective actor admission")
+		})
+	}
+}
+
+func TestCompilerLintDangerousTriggersImportedFiltering(t *testing.T) {
+	t.Parallel()
+	for _, trigger := range []string{"issue_comment", "pull_request_review_comment", "slash_command"} {
+		for _, roles := range []string{"", ", roles: all"} {
+			t.Run(trigger+roles, func(t *testing.T) {
+				dir := t.TempDir()
+				source := filepath.Join(dir, "review.md")
+				shared := filepath.Join(dir, "shared.md")
+				on := "on: {" + trigger + ": {types: [created]}" + roles + "}\n"
+				warnings := 1
+				if trigger == "slash_command" {
+					on = "on: {slash_command: review" + roles + "}\n"
+					warnings = 2 // Commands expand to both issue_comment and pull_request_review_comment.
+				}
+				if roles == "" {
+					warnings = 0
+				}
+				require.NoError(t, os.WriteFile(source, []byte("---\n"+on+"imports: [shared.md]\ncheckout: false\ntools: {bash: [echo]}\nsafe-outputs: {add-comment: {}, threat-detection: true}\n---\nReview.\n"), 0o600))
+				counts := make(map[string]int)
+				for _, threshold := range []string{"none", "approved"} {
+					require.NoError(t, os.WriteFile(shared, []byte("---\ntools: {github: {min-integrity: "+threshold+"}}\n---\n"), 0o600))
+					compiler := NewCompiler(WithLint(true))
+					compiler.gitRoot = dir
+					compiler.SetSkipValidation(true)
+					require.NoError(t, compiler.CompileWorkflow(source))
+					counts[threshold] = compiler.GetWarningCount()
+				}
+				require.Equal(t, counts["approved"]+warnings, counts["none"], "only the weak-filtering trigger warnings differ")
+			})
+		}
+	}
+}
+
 func TestCompilerLintDoesNotApplySafeOutputCredentialsRule(t *testing.T) {
 	t.Parallel()
 	document, err := aw.Parse("---\non: workflow_dispatch\nsafe-outputs:\n  steps:\n    - run: echo A=1 >> \"$GITHUB_ENV\"\n---\nTest.\n")
