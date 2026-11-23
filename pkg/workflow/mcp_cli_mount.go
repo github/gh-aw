@@ -35,10 +35,10 @@ const (
 //   - Locks the bin directory (chmod 555) so the agent cannot modify the scripts
 //   - Adds the directory to PATH via core.addPath()
 
-// internalMCPServerNames lists the MCP servers that are internal infrastructure and
-// should not be exposed as user-facing CLI tools.
+// internalMCPServerNames excludes specially handled servers from custom-server
+// collection. Engine capabilities select GitHub CLI mounting separately.
 var internalMCPServerNames = map[string]bool{
-	constants.GitHubMCPServerID.String(): true, // GitHub MCP server is handled differently and should not be CLI-mounted
+	constants.GitHubMCPServerID.String(): true,
 }
 
 // appendCustomMCPServerIfEligible returns a new slice with toolName appended if
@@ -103,7 +103,7 @@ func getMCPCLIServerNames(data *WorkflowData) []string { //nolint:largefunc // E
 				continue
 			}
 			// Only include tools that have MCP servers (skip bash, web-fetch, web-search, edit, cache-memory, etc.)
-			// Note: "github" is excluded — it is handled differently and should not be CLI-mounted.
+			// GitHub is collected separately according to engine capabilities and transport.
 			switch toolName {
 			case "playwright":
 				// In CLI mode, playwright is installed as @playwright/cli via npm and is NOT
