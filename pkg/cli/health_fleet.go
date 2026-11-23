@@ -48,6 +48,7 @@ type healthFleetState struct {
 	LogsDir          string                                 `json:"logs_dir,omitempty"`
 	RegistryPage     int                                    `json:"registry_page"`
 	RegistryDrift    bool                                   `json:"registry_drift,omitempty"`
+	RegistryIssues   map[string]string                      `json:"registry_issues,omitempty"`
 	RegistrySeen     map[string]bool                        `json:"registry_seen,omitempty"`
 	Workflows        []GitHubWorkflow                       `json:"workflows"`
 	Windows          []healthFleetWindow                    `json:"windows"`
@@ -182,7 +183,7 @@ func collectHealthFleetRegistry(state *healthFleetState, collection *HealthColle
 	}
 	state.Workflows = slices.DeleteFunc(state.Workflows, func(w GitHubWorkflow) bool {
 		if _, exists := snapshot.files[w.Path]; !exists {
-			state.RegistryDrift = true
+			state.flagRegistryIssue(w.Path, "active_registry_only")
 			delete(state.Verified, w.Path)
 			return true
 		}
@@ -201,19 +202,8 @@ func collectHealthFleetRegistry(state *healthFleetState, collection *HealthColle
 		if payload.Workflows == nil {
 			return errors.New("health fleet registry response did not contain workflows")
 		}
-		for _, workflow := range payload.Workflows {
-			if validHealthFleetPath(workflow.Path) {
-				state.RegistrySeen[workflow.Path] = true
-			}
-			if workflow.State == "active" && validHealthFleetPath(workflow.Path) {
-				if _, exists := snapshot.files[workflow.Path]; !exists {
-					state.RegistryDrift = true
-					continue
-				}
-				if !slices.ContainsFunc(state.Workflows, func(previous GitHubWorkflow) bool { return previous.Path == workflow.Path }) {
-					state.Workflows = append(state.Workflows, workflow)
-				}
-			}
+		if err := state.compareRegistryPage(payload.Workflows, snapshot.files, collection); err != nil {
+			return err
 		}
 		if len(payload.Workflows) < 100 {
 			state.RegistryPage = 0
@@ -224,12 +214,109 @@ func collectHealthFleetRegistry(state *healthFleetState, collection *HealthColle
 	if state.RegistryPage == 0 {
 		for file := range snapshot.files {
 			if validHealthFleetPath(file) && !state.RegistrySeen[file] {
-				state.RegistryDrift = true
+				state.flagRegistryIssue(file, "missing_registry_entry")
 			}
 		}
 	}
 	collection.workflows = state.Workflows
 	return nil
+}
+
+func (state *healthFleetState) compareRegistryPage(workflows []GitHubWorkflow, files map[string]string, collection *HealthCollection) error {
+	var registryHead *string
+	for _, workflow := range workflows {
+		file := workflow.Path
+		if !validHealthFleetPath(file) {
+			continue
+		}
+		state.RegistrySeen[file] = true
+		if workflow.State != "active" {
+			continue
+		}
+		if _, exists := files[file]; exists {
+			if !slices.ContainsFunc(state.Workflows, func(previous GitHubWorkflow) bool { return previous.Path == file }) {
+				state.Workflows = append(state.Workflows, workflow)
+			}
+			continue
+		}
+		if _, checked := state.RegistryIssues[file]; checked {
+			continue
+		}
+		removed, err := healthFleetRemovedBeforeWindow(state.Scope, file, collection)
+		if removed {
+			if registryHead == nil {
+				head, headErr := healthFleetRegistryHead(state.Scope, collection)
+				registryHead, err = &head, headErr
+			}
+			// A newer head could contain a re-addition invisible at the pin.
+			removed = *registryHead == state.Scope.HeadSHA
+		}
+		if err != nil {
+			if collection.stopped {
+				return err
+			}
+			healthLog.Printf("Workflow removal evidence unavailable for %q", file)
+		}
+		if !removed {
+			state.flagRegistryIssue(file, "active_registry_only")
+		}
+	}
+	return nil
+}
+
+func (state *healthFleetState) flagRegistryIssue(file, reason string) {
+	state.RegistryDrift = true
+	if state.RegistryIssues == nil {
+		state.RegistryIssues = make(map[string]string)
+	}
+	state.RegistryIssues[file] = reason
+}
+
+func healthFleetRemovedBeforeWindow(scope healthFleetScope, file string, collection *HealthCollection) (bool, error) {
+	if !validHealthBlobSHA(scope.HeadSHA) || scope.Start.IsZero() {
+		return false, nil
+	}
+	commits := path.Join(healthRepositoryEndpoint(collection.repoOverride), "commits")
+	query := url.Values{"sha": {scope.HeadSHA}, "path": {file}, "per_page": {"1"}}
+	var latest struct {
+		SHA string `json:"sha"`
+	}
+	if err := healthFleetAPI(collection, commits+"?"+query.Encode(), &latest, `{sha:.[0].sha}`); err != nil {
+		return false, err
+	}
+	sha := latest.SHA
+	if !validHealthBlobSHA(sha) {
+		return false, nil
+	}
+	var commit struct {
+		SHA     string    `json:"sha"`
+		Date    time.Time `json:"date"`
+		Removed []string  `json:"removed"`
+	}
+	// A missing file or empty history is not proof of removal. Require an
+	// explicit deletion in the latest path commit reachable from the pin.
+	if err := healthFleetAPI(collection, path.Join(commits, sha), &commit, `{sha,date:.commit.committer.date,removed:[.files[] | select(.status=="removed") | .filename]}`); err != nil {
+		return false, err
+	}
+	return commit.SHA == sha && !commit.Date.IsZero() && commit.Date.Before(scope.Start) &&
+		slices.Contains(commit.Removed, file), nil
+}
+
+func healthFleetRegistryHead(scope healthFleetScope, collection *HealthCollection) (string, error) {
+	endpoint := path.Join(healthRepositoryEndpoint(collection.repoOverride), "git/ref/heads", url.PathEscape(scope.Branch))
+	const projection = `{sha:.object.sha}`
+	// Unlike the pin, this observation must not be reused across invocations.
+	defer delete(collection.fleetResponses, endpoint+"\x00--jq\x00"+projection)
+	var ref struct {
+		SHA string `json:"sha"`
+	}
+	if err := healthFleetAPI(collection, endpoint, &ref, projection); err != nil {
+		return "", err
+	}
+	if !validHealthBlobSHA(ref.SHA) {
+		return "", errors.New("health fleet registry comparison could not determine the live branch SHA")
+	}
+	return ref.SHA, nil
 }
 
 func collectHealthFleetInventory(state *healthFleetState, collection *HealthCollection) error {

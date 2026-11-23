@@ -122,7 +122,7 @@ for license tiers, path scope and escalation.
 | Safe outputs index | [safe-outputs.md](safe-outputs.md) |
 | Trigger patterns | [triggers.md](triggers.md) |
 | Context expressions and `{{#if}}` templates | [context.md](context.md) |
-| Declarative engine configuration | [configure-agentic-engine.md](configure-agentic-engine.md) |
+| Define a custom engine | [Custom declarative engine](custom-declarative-agentic-engine.md) |
 | Agent runtime selection (Docker, Cloud Hypervisor, ARC DinD) | [agent-runtime-instructions.md](agent-runtime-instructions.md) |
 | Private-repository enclaves (preview) | [enclaves.md](enclaves.md) |
 | CLI commands and MCP equivalents | [cli-commands.md](cli-commands.md) |

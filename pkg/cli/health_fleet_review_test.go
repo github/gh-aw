@@ -59,18 +59,112 @@ func TestHealthFleetReviewPinnedSnapshotAndRegistry(t *testing.T) {
 	state := &healthFleetState{Scope: healthFleetScope{Branch: "main", HeadSHA: sha}, RegistryPage: 1, Responses: map[string][]byte{}}
 	require.NoError(t, collectHealthFleetRegistry(state, collection))
 	require.True(t, state.RegistryDrift)
+	require.Equal(t, map[string]string{added: "active_registry_only"}, state.RegistryIssues)
 	require.Len(t, state.Workflows, 1)
 	require.Equal(t, pinned, state.Workflows[0].Path)
 	missing = true
 	state = &healthFleetState{Scope: healthFleetScope{Branch: "main", HeadSHA: sha}, RegistryPage: 1, Responses: map[string][]byte{}}
 	require.NoError(t, collectHealthFleetRegistry(state, collection))
 	require.True(t, state.RegistryDrift)
+	require.Equal(t, map[string]string{pinned: "missing_registry_entry"}, state.RegistryIssues)
 	require.Empty(t, state.Workflows)
 	missing, disabled = false, true
 	state = &healthFleetState{Scope: healthFleetScope{Branch: "main", HeadSHA: sha}, RegistryPage: 1, Responses: map[string][]byte{}}
 	require.NoError(t, collectHealthFleetRegistry(state, collection))
 	require.False(t, state.RegistryDrift)
 	require.Empty(t, state.Workflows)
+}
+
+func TestHealthFleetReviewRegistryDeletionEvidence(t *testing.T) {
+	old := healthRunGH
+	t.Cleanup(func() { healthRunGH = old })
+	const file = ".github/workflows/removed.lock.yml"
+	pin, deletion := strings.Repeat("a", 40), strings.Repeat("b", 40)
+	start := time.Date(2026, 11, 1, 0, 0, 0, 0, time.UTC)
+	for _, tt := range []struct {
+		name        string
+		head        string
+		date        time.Time
+		noHistory   bool
+		unavailable bool
+		resume      bool
+		drift       bool
+	}{
+		{name: "confirmed old deletion", head: pin, date: start.Add(-time.Second)},
+		{name: "deletion within scan", head: pin, date: start, drift: true},
+		{name: "branch advanced", head: deletion, date: start.Add(-time.Second), drift: true},
+		{name: "no history", noHistory: true, drift: true},
+		{name: "unavailable commit", unavailable: true, drift: true},
+		{name: "resume interrupted proof", head: pin, date: start.Add(-time.Second), resume: true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			config := HealthConfig{Checkpoint: filepath.Join(t.TempDir(), "checkpoint.json")}
+			state := newHealthFleetState(config, "github.com", "org/repo", start, start.Add(time.Hour))
+			state.Scope.Branch, state.Scope.HeadSHA = "main", pin
+			collection := &HealthCollection{Host: "github.com", repoOverride: "org/repo", scanBranch: "main",
+				pinnedBranchSHA: pin, fleetResponses: state.Responses, APIRateLimit: &GitHubAPIRateLimitState{Remaining: 4000}}
+			healthRunGH = func(_ context.Context, _ string, args ...string) ([]byte, error) {
+				u, err := url.Parse(args[3])
+				require.NoError(t, err)
+				switch u.Path {
+				case "repos/org/repo/contents/.github/workflows":
+					require.Equal(t, pin, u.Query().Get("ref"))
+					return []byte(`[]`), nil
+				case "repos/org/repo/actions/workflows":
+					return []byte(fmt.Sprintf(`{"workflows":[{"id":1,"path":%q,"state":"active"}]}`, file)), nil
+				case "repos/org/repo/commits":
+					require.Equal(t, pin, u.Query().Get("sha"))
+					require.Equal(t, file, u.Query().Get("path"))
+					require.Equal(t, "1", u.Query().Get("per_page"))
+					if tt.noHistory {
+						return []byte(`{"sha":null}`), nil
+					}
+					return []byte(fmt.Sprintf(`{"sha":%q}`, deletion)), nil
+				case "repos/org/repo/commits/" + deletion:
+					if tt.unavailable {
+						return nil, errors.New("commit unavailable")
+					}
+					return []byte(fmt.Sprintf(`{"sha":%q,"date":%q,"removed":[%q]}`, deletion, tt.date.Format(time.RFC3339), file)), nil
+				case "repos/org/repo/git/ref/heads/main":
+					return []byte(fmt.Sprintf(`{"sha":%q}`, tt.head)), nil
+				default:
+					t.Fatalf("unexpected request %s", args[3])
+					return nil, nil
+				}
+			}
+			if tt.resume {
+				collection.APIRequests = healthMaximumAPIRequests - 2
+				collection.checkedRequests = collection.APIRequests
+				require.ErrorIs(t, collectHealthFleetRegistry(state, collection), errHealthAPIBudget)
+				require.Equal(t, 1, state.RegistryPage)
+				require.False(t, state.RegistryDrift, "an interrupted lookup is not resolved drift")
+				require.NoError(t, saveHealthFleetCheckpoint(config.Checkpoint, state))
+				saved, err := loadHealthFleetCheckpoint(config, "github.com", "org/repo", start, start.Add(time.Hour))
+				require.NoError(t, err)
+				state = saved
+				collection = &HealthCollection{Host: "github.com", repoOverride: "org/repo", scanBranch: "main",
+					pinnedBranchSHA: pin, fleetResponses: state.Responses, APIRateLimit: &GitHubAPIRateLimitState{Remaining: 4000}}
+			}
+			require.NoError(t, collectHealthFleetRegistry(state, collection))
+			require.Empty(t, state.Workflows, "registry-only entries are never inventoried")
+			require.Zero(t, state.RegistryPage)
+			for key := range state.Responses {
+				require.NotContains(t, key, "/git/ref/heads/")
+			}
+			require.NoError(t, saveHealthFleetCheckpoint(config.Checkpoint, state))
+			saved, err := loadHealthFleetCheckpoint(config, "github.com", "org/repo", start, start.Add(time.Hour))
+			require.NoError(t, err)
+			require.Equal(t, pin, saved.Scope.HeadSHA)
+			coverage := makeHealthFleetCoverage(saved, collection)
+			require.Equal(t, !tt.drift, coverage.RegistryComplete)
+			if tt.drift {
+				require.Equal(t, "registry_drift", coverage.Reason)
+				require.Equal(t, map[string]string{file: "active_registry_only"}, coverage.RegistryIssues)
+			} else {
+				require.Empty(t, coverage.RegistryIssues)
+			}
+		})
+	}
 }
 
 func TestHealthFleetReviewRepositoryHosts(t *testing.T) {

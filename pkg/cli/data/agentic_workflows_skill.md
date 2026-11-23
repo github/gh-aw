@@ -7,7 +7,7 @@ description: Route gh-aw design, creation, diagnosis, patching, active debugging
 
 Use this skill when a user asks to design, create, update, debug, or upgrade GitHub Agentic Workflows in this repository, or prepare a substantial issue for a local, self-contained SDLC.
 
-This skill is a dispatcher: identify the task type, load the matching workflow prompt/skill file, and follow it directly. Keep responses concise and ask a clarifying question if the correct prompt is unclear.
+Load and follow the matching prompt or skill. Keep responses concise; ask if the route is unclear.
 
 For debugging sessions needing CLI setup or run-URL scoping, first load
 `https://raw.githubusercontent.com/github/gh-aw/main/.github/aw/debug-bootstrap.md`; it bootstraps
@@ -35,7 +35,8 @@ After loading the matching workflow prompt or skill, follow it directly:
 - Repo Factory: `.github/aw/repo-factory.md`
 - Create new workflows: `.github/aw/create-agentic-workflow.md`
 - Configure scheduled dreaming or consolidate persistent memory: `.github/aw/create-agentic-workflow.md`, then `.github/aw/memory.md#scheduled-dreaming`; load `.github/aw/dreaming.md` only when the decision and input scope justify implementation
-- Configure or add declarative engines: `.github/aw/configure-agentic-engine.md`
+- Select engine and inference: `.github/aw/agentic-engine.md`
+- Define a custom engine: `.github/aw/custom-declarative-agentic-engine.md`
 - Consume, author, or document third-party connectors: `.github/aw/connectors.md`
 - Create a new connector: `.github/aw/connectors.md#author-or-extend-a-declaration`, then the repository's `.github/skills/create-connector/SKILL.md` when available
 - Update existing workflows: `.github/aw/update-agentic-workflow.md`

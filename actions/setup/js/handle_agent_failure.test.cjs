@@ -1676,7 +1676,8 @@ describe("handle_agent_failure", () => {
       const write = vi.spyOn(fs, "writeFileSync");
       try {
         await main();
-        expect(global.core.setFailed.mock.calls).toEqual([[expect.stringContaining("Agent reported that it could not complete the task (report_incomplete)")]]);
+        const opening = startup || crashed ? /^The workflow recorded a report_incomplete signal; task completion was not confirmed\./ : /^Agent reported that it could not complete the task \(report_incomplete\)\./;
+        expect(global.core.setFailed.mock.calls).toEqual([[expect.stringMatching(opening)]]);
         expect(create).toHaveBeenCalledOnce();
         const issue = create.mock.calls[0][0];
         expect(issue.title).toBe(startup ? "[aw] Test Workflow: failed before agent execution started" : "[aw] Test Workflow: failed to redact secrets in logs");
@@ -1805,7 +1806,7 @@ describe("handle_agent_failure", () => {
         };
         try {
           await main();
-          expect(global.core.setFailed.mock.calls).toEqual([[expect.stringContaining("Agent reported that it could not complete the task (report_incomplete)")]]);
+          expect(global.core.setFailed.mock.calls).toEqual([[expect.stringMatching(/^The workflow recorded a report_incomplete signal; task completion was not confirmed\./)]]);
           expect(create).toHaveBeenCalledOnce();
           const { title, body } = create.mock.calls[0][0];
           expect(title).toBe("[aw] Test Workflow: engine driver crashed");
@@ -2322,7 +2323,8 @@ describe("handle_agent_failure", () => {
         const diagnostic = global.core.setFailed.mock.calls[0][0];
         expect(diagnostic).toContain("report_incomplete");
         expect(diagnostic).toContain("A successful agent job does not confirm task completion");
-        expect(diagnostic).toContain("conclusion job summary");
+        expect(diagnostic).toContain("Signal source: explicit agent report (not a collector fallback).");
+        expect(diagnostic).toContain("The conclusion job summary withholds the agent-declared reason because detection did not approve it.");
         expect(diagnostic).toContain("agent_output.json in the agent artifact");
         expect(diagnostic).toContain("gh aw audit 123456");
         const logs = JSON.stringify([...global.core.info.mock.calls, ...global.core.warning.mock.calls, ...global.core.setFailed.mock.calls]);
@@ -2541,6 +2543,11 @@ describe("handle_agent_failure", () => {
       const issueBody = create.mock.calls[0][0].body;
       const commentBody = createComment.mock.calls[0][0].body;
       const reason = "Required data could not be read";
+      expect(global.core.setFailed).toHaveBeenCalledTimes(2);
+      for (const [annotation] of global.core.setFailed.mock.calls) {
+        expect(annotation).toContain(showReason ? "Check the conclusion job summary for the agent-declared, unverified reason" : "withholds the agent-declared reason");
+        expect(annotation).not.toContain(reason);
+      }
       expect(issueBody.includes(reason)).toBe(showReason);
       expect(commentBody.includes(reason)).toBe(showReason);
       expect(global.core.summary.addRaw).toHaveBeenCalledTimes(2);
@@ -7860,6 +7867,8 @@ describe("handle_agent_failure", () => {
       await mainFn();
 
       expect(global.core.setFailed).toHaveBeenCalledWith(expect.stringContaining("Agent reported that it could not complete the task (report_incomplete)"));
+      expect(global.core.setFailed).toHaveBeenCalledWith(expect.stringContaining("Signal source: explicit agent report"));
+      expect(global.core.setFailed.mock.calls[0][0]).not.toContain(reason);
       expect(createIssueMock).toHaveBeenCalled();
     });
 
@@ -7917,11 +7926,12 @@ describe("handle_agent_failure", () => {
     ])("preserves failure reporting for %s agents with %s", async (conclusion, reason) => {
       process.env.GH_AW_AGENT_CONCLUSION = conclusion;
       syncRuntimePromptTemplates(import.meta.url);
+      const collectorOnly = ["missing_terminal_safe_output", "agent_startup_failure"].includes(reason);
       fs.writeFileSync(
         path.join(tmpDir, "agent_output.json"),
         JSON.stringify({
           items: [{ type: "report_incomplete", reason }],
-          ...(["missing_terminal_safe_output", "agent_startup_failure"].includes(reason) ? { collectorEmptyOutputCause: reason } : {}),
+          ...(collectorOnly ? { collectorEmptyOutputCause: reason } : {}),
         })
       );
       const createIssueMock = vi.fn(async () => {
@@ -7939,7 +7949,13 @@ describe("handle_agent_failure", () => {
       const { main: mainFn } = require("./handle_agent_failure.cjs");
       await mainFn();
 
-      expect(global.core.setFailed).toHaveBeenCalledWith(expect.stringContaining("Agent reported that it could not complete the task (report_incomplete)"));
+      if (collectorOnly) {
+        expect(global.core.setFailed).toHaveBeenCalledWith(expect.stringMatching(/^The workflow recorded a report_incomplete signal; task completion was not confirmed\./));
+        expect(global.core.setFailed).toHaveBeenCalledWith(expect.stringContaining(`Collector classification: ${reason}.`));
+        expect(global.core.setFailed).toHaveBeenCalledWith(expect.stringContaining("Check the conclusion job summary for runtime evidence"));
+      } else {
+        expect(global.core.setFailed).toHaveBeenCalledWith(expect.stringMatching(/^Agent reported that it could not complete the task \(report_incomplete\)\./));
+      }
       expect(createIssueMock).toHaveBeenCalled();
     });
 

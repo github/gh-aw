@@ -1193,6 +1193,8 @@ Without a workflow name, `health` returns a compact report for active agentic wo
 
 Fleet JSON returns `scope`, `coverage`, `status_counts`, historical outcomes, top failures and clusters, and a typed `next_action` when available. `--full` adds per-workflow and complete cluster details, including per-run cache diagnostics in `details.cache_evidence`. Registry drift or a revision boundary that exceeds the bounded probe limit leaves coverage partial. The MCP `health` tool returns structured fleet results when `workflow_name` is omitted. Pass `full: true` for details or a returned `next_action.checkpoint` as `resume` in the same session. MCP checkpoints expire 30 minutes after creation and do not survive server restarts.
 
+For registry drift, `coverage.registry_issues` maps each unresolved lock path to `missing_registry_entry` (present at the pinned revision but absent from Actions) or `active_registry_only` (active in Actions but absent at the pin). An active registry-only entry is ignored only if the pinned history confirms its deletion before the scan window and the observed default-branch head still matches the pin. Use a new checkpoint path to refresh discovery after investigating a mismatch.
+
 `--checkpoint` and `--full` apply only to the fleet report. Fleet JSON consumers should read `coverage` for completeness and `details.workflows` for per-workflow evidence. `details.failure_representatives` lists at most one job-backed Actions `failure` from each verified current-revision branch/event sample. It is not an exhaustive failure list. Use a named check for branch/event revision evidence or `gh aw logs` for broader run history.
 
 The `--days` flag accepts only 7, 30, or 90 (default: 7). Other values produce an error.

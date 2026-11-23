@@ -1960,21 +1960,27 @@ function buildReportIncompleteParts(items, { collectorEmptyOutputCause, rootDir,
 }
 
 /**
- * Build safe next-step guidance for an agent-reported incomplete task.
+ * Build safe next-step guidance for a report_incomplete signal.
  * @param {Array<any>} items
- * @param {{runId?: number, secretRedactionFailed?: boolean}} [options]
+ * @param {{runId?: number, secretRedactionFailed?: boolean, detectionApproved?: boolean, collectorEmptyOutputCause?: string}} [options]
  * @returns {string}
  */
-function buildReportIncompleteFailureMessage(items, { runId, secretRedactionFailed = false } = {}) {
-  const hasUsableReason = loadReportIncompleteMessages(items).length > 0;
-  const diagnosticNextStep = !hasUsableReason
-    ? "The report_incomplete signal had no usable reason; inspect agent_output.json in the agent artifact."
-    : secretRedactionFailed
-      ? "The conclusion job summary was suppressed because secret redaction failed; inspect agent_output.json in the agent artifact."
-      : "If available, check the conclusion job summary for the reported reason and inspect agent_output.json in the agent artifact.";
+function buildReportIncompleteFailureMessage(items, { runId, secretRedactionFailed = false, detectionApproved = false, collectorEmptyOutputCause } = {}) {
+  const collectorCause = typeof collectorEmptyOutputCause === "string" && Object.hasOwn(EMPTY_OUTPUT_CAUSES, collectorEmptyOutputCause) ? collectorEmptyOutputCause : undefined;
+  const hasReportedReason = loadReportIncompleteMessages(items).some(message => message.reason !== collectorCause);
+  const opening = collectorCause && !hasReportedReason ? "The workflow recorded a report_incomplete signal; task completion was not confirmed." : "Agent reported that it could not complete the task (report_incomplete).";
+  const signalSource = collectorCause ? `Collector classification: ${collectorCause}.` : "Signal source: explicit agent report (not a collector fallback).";
+  let summaryGuidance = "The report_incomplete signal had no usable reason.";
+  if (secretRedactionFailed) {
+    summaryGuidance = "The conclusion job summary was suppressed because secret redaction failed.";
+  } else if (hasReportedReason) {
+    summaryGuidance = detectionApproved ? "Check the conclusion job summary for the agent-declared, unverified reason, if available." : "The conclusion job summary withholds the agent-declared reason because detection did not approve it.";
+  } else if (collectorCause) {
+    summaryGuidance = "Check the conclusion job summary for runtime evidence, if available.";
+  }
   const auditCommand = typeof runId === "number" && Number.isSafeInteger(runId) && runId > 0 ? `gh aw audit ${runId}` : "gh aw audit <run-id>";
 
-  return `Agent reported that it could not complete the task (report_incomplete). A successful agent job does not confirm task completion. ${diagnosticNextStep} Run ${auditCommand} for runtime evidence.`;
+  return `${opening} A successful agent job does not confirm task completion. ${signalSource} ${summaryGuidance} Inspect agent_output.json in the agent artifact or run ${auditCommand} for runtime evidence.`;
 }
 
 /**
@@ -4683,10 +4689,12 @@ async function main() {
     }
 
     failureDiagnostics ??= await getFailedAgentDiagnostics({ startupFailure: collectorEmptyOutputCause === "agent_startup_failure" });
+    const detectionApproved = process.env.GH_AW_DETECTION_ACCEPTED === "true" && process.env.GH_AW_DETECTION_CONCLUSION === "success";
     if (hasReportIncomplete) {
+      const message = buildReportIncompleteFailureMessage(reportIncompleteItems, { runId: context.runId, secretRedactionFailed: failureDiagnostics.secretRedactionFailed, detectionApproved, collectorEmptyOutputCause });
       // Continue after marking the step failed so optional issue reporting can still run.
       // eslint-disable-next-line gh-aw-custom/require-return-after-core-setfailed
-      core.setFailed(buildReportIncompleteFailureMessage(reportIncompleteItems, { runId: context.runId, secretRedactionFailed: failureDiagnostics.secretRedactionFailed }));
+      core.setFailed(message);
     }
     if (failureDiagnostics.hasNoJobs && !hasCheckoutFailure) {
       core.info("Skipping failure reporting: no workflow jobs started; the run may not have been approved.");
@@ -4745,8 +4753,7 @@ async function main() {
       rootDir: path.dirname(getAgentStdioLogPath()),
       runId: context.runId,
     });
-    const approvedIncompleteReasons =
-      agentOutputResult.success && !failureDiagnostics.secretRedactionFailed && process.env.GH_AW_DETECTION_ACCEPTED === "true" && process.env.GH_AW_DETECTION_CONCLUSION === "success" ? incompleteReasons : [];
+    const approvedIncompleteReasons = agentOutputResult.success && !failureDiagnostics.secretRedactionFailed && detectionApproved ? incompleteReasons : [];
     const reportIncompleteContext = [...incompleteSignal, ...approvedIncompleteReasons, ...incompleteEvidence];
     if (hasReportedIncomplete && reportIncompleteContext.length > 0 && !failureDiagnostics.secretRedactionFailed) {
       try {

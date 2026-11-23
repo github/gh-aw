@@ -55,6 +55,7 @@ Paths below are relative to `.github/skills/`; load only the matching `SKILL.md`
 |---|---|
 | Workflow create/update/debug/upgrade | `agentic-workflows` |
 | Repo Factory bootstrap (interactive/auto) | `agentic-workflows`, then `.github/aw/repo-factory.md` |
+| Choose an agentic engine and inference | `agentic-engine` |
 | Engineering conventions and validation commands | `developer` |
 | Code organization, WASM stubs, string patterns | `developer-code-organization` |
 | Template injection, shell safety, supply chain | `developer-security` |
