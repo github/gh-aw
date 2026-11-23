@@ -497,20 +497,22 @@
   .rpa-svg { left: 150px; top: 300px; width: 1620px; height: 648px; }
   .rf-svg { left: 150px; top: 300px; width: 1620px; height: 648px; }
   .rf-slot { fill: #0d1117; stroke: #9198a1; stroke-width: 2; transition: fill .4s, stroke .4s; }
-  .rf-slot.busy { fill: #ab7df84d; stroke: #ab7df8; }
-  .rf-slots.on .rf-slot { stroke: #ab7df8; } .rf-slots.on .rf-slot:not(.busy) { fill: #ab7df8; }
+  .rf-slot.busy { fill: #3fb9504d; stroke: #3fb950; }
+  .rf-slots.on .rf-slot { stroke: #3fb950; } .rf-slots.on .rf-slot:not(.busy) { fill: #3fb950; }
   .rf-slots rect.rf-slot { filter: none; }
   .rf-cap { fill: #9198a1; font: 600 17px var(--mono); letter-spacing: .08em; text-anchor: middle; }
   .rf-zone { fill: #9198a1; font: 600 17px var(--mono); letter-spacing: .2em; }
-  .rf-pr { fill: #100f1c; stroke: #ab7df8; stroke-opacity: .35; stroke-width: 2; stroke-dasharray: 10 8; transition: fill .5s, stroke-opacity .5s; }
-  .rf-pr.on { fill: #15122a; stroke-opacity: .85; }
-  .rf-prt { fill: #ab7df8; }
+  .rf-pr { fill: #0b1610; stroke: #3fb950; stroke-opacity: .35; stroke-width: 2; stroke-dasharray: 10 8; transition: fill .5s, stroke-opacity .5s; }
+  .rf-pr.on { fill: #0e2116; stroke-opacity: .85; }
+  .rf-prt { fill: #3fb950; }
   .rf-pr.rf-ghost { fill: #0d1117; stroke-opacity: .2; }
-  .rf-ghost-a { fill: #0d1117; stroke: #ab7df8; stroke-opacity: .35; stroke-width: 2; }
+  .rf-ghost-a { fill: #0d1117; stroke: #3fb950; stroke-opacity: .35; stroke-width: 2; }
   .rf-bg { fill: #0d1117; fill-opacity: .88; stroke: #ffffff1f; stroke-width: 1.5; }
-  .rf-svg .mra-l { fill: #d2a8ff; opacity: .9; } .rf-svg .mra-l.b { fill: #a5d6ff; } .rf-svg .fm-wire { opacity: .8; }
-  .rf-svg .fm-lane-t, .rf-svg .rf-cap, .rf-svg .rf-zone { fill: #c9d1d9; } .rf-svg .rf-prt { fill: #d2a8ff; } .rf-svg .fm-div { stroke: #ffffff2e; }
+  .rf-svg .mra-l { fill: #7ee787; opacity: .9; } .rf-svg .mra-l.b { fill: #a5d6ff; } .rf-svg .fm-wire { opacity: .8; }
+  .rf-svg .fm-lane-t, .rf-svg .rf-cap, .rf-svg .rf-zone { fill: #c9d1d9; } .rf-svg .rf-prt { fill: #7ee787; } .rf-svg .fm-div { stroke: #ffffff2e; }
   .rf-st, .rf-crowd { transition: opacity .6s ease; } .rf-st.rf-hide, .rf-crowd.rf-hide { opacity: 0; }
+  .rf-svg .fm-pill:not(.b) rect { stroke: #3fb950; filter: drop-shadow(0 0 10px #23863666); }
+  .rf-svg .fm-wire.p { stroke: #3fb950; } .rf-svg .mra-l.p { fill: #7ee787; }
   .rpa-code { opacity: .6; transition: opacity .4s; } .rpa-code.on { opacity: 1; }
   .rpa-code .card { fill: #0d1117e8; stroke: #3d444d; stroke-width: 2; transition: stroke .4s; }
   .rpa-code.on .card { stroke: #ab7df8; filter: drop-shadow(0 0 10px #8957e566); }
@@ -7062,7 +7064,7 @@
     const EST = Object.fromEntries(EDGES.map(x => [x[0], x[7]]));
     const LANE = { nResearch: 0, nIssue: 0, nDispatch: 1, nSlots: 1, nCoder: 2, nPR: 2, nReview: 3, nFind: 3, nFinish: 4, nFix: 4 };
     let g = `<defs><clipPath id="rfClip" clipPathUnits="objectBoundingBox"><circle cx=".5" cy=".5" r=".5"/></clipPath>
-      <marker id="rfP" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#ab7df8"/></marker>
+      <marker id="rfP" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#3fb950"/></marker>
       <marker id="rfB" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#4493f8"/></marker></defs>`;
     // code, review and finish run as one pull request flow per coding slot; the ghost frames behind are the concurrent ones
     let fr = "";
@@ -7103,7 +7105,7 @@
     const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
     svg.setAttribute("class", "fm-svg rf-svg");
     svg.setAttribute("viewBox", `0 0 ${VW} ${VH}`);
-    svg.style.setProperty("--c", "#ab7df8");
+    svg.style.setProperty("--c", "#3fb950");
     svg.innerHTML = g;
     const $ = id => svg.querySelector("#" + id),
       dot = svg.querySelector(".mra-dot");
@@ -7195,7 +7197,7 @@
         dot.style.opacity = 1;
         dot.setAttribute("cx", q.x);
         dot.setAttribute("cy", q.y);
-        dot.setAttribute("fill", p.classList.contains("b") ? "#4493f8" : "#ab7df8");
+        dot.setAttribute("fill", p.classList.contains("b") ? "#4493f8" : "#3fb950");
         for (let j = 0; j < k; j++) light(seq[j][1]);
         if (stage === LAST) setGrow(Math.min(2, cyc + (k > DRM || (k === DRM && f >= 0.8) ? 1 : 0)));
         if (f >= 0.8) {
