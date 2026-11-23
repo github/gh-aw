@@ -47,7 +47,7 @@ function classifyGenericHarnessFailure(output) {
     return "non_retryable";
   }
   const tail = retrySignalTail(text);
-  if (RATE_LIMIT_PATTERN.test(tail) || parseCopilotRetryAfterMs(tail) !== null) return "rate_limit_error";
+  if (RATE_LIMIT_PATTERN.test(tail)) return "rate_limit_error";
   if (TRANSIENT_ERROR_PATTERN.test(tail)) return "transient_error";
   return null;
 }

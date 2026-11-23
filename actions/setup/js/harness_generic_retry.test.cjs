@@ -7,6 +7,7 @@ const { GENERIC_HARNESS_RETRY_SIGNAL_TAIL_CHARS, classifyGenericHarnessFailure }
 describe("classifyGenericHarnessFailure", () => {
   it.each([
     ["HTTP/1.1 429 Too Many Requests\nRetry-After: 257", "rate_limit_error"],
+    ["Retry-After: 257", null],
     ['{"error":{"code":429,"status":"RESOURCE_EXHAUSTED"}}', "rate_limit_error"],
     ["Error: rate limit exceeded for model", "rate_limit_error"],
     ["502 Bad Gateway", "transient_error"],
