@@ -1190,32 +1190,41 @@ Requests AWF recorded without usage count as well.
 | `reason` | Present only with `skip`: `cancelled`, `infrastructure`, `rate_limited`, `pair_mismatch`, or `unknown_evidence`. |
 
 A run succeeded when the agent job succeeded, its validated safe outputs include at
-least one terminal output (a valid `noop` counts) with no validation errors and no
-incomplete report, and threat detection found nothing. Rules apply in order:
+least one terminal output (a valid `noop` counts; a continuation request does not)
+with no validation errors and no incomplete report, and threat detection, if it
+ran, reached a clean result. Rules apply in order:
 
 1. `skip` with `cancelled` when the agent job or its final harness attempt was
    cancelled, including an attempt classed as cancelled or timed out.
 2. For a run that did not succeed, `skip` with `infrastructure` for platform
-   failures: startup failures, interrupted harness attempts, driver crashes, engine
-   outages and timeouts, authentication and policy rejections, provider 5xx
-   responses, and harness infrastructure failure classes. Then `skip` with
-   `rate_limited` for 429 responses and quota or rate-limit categories and classes.
-   A run that succeeded is not re-examined for transient errors it recovered from.
+   failures: startup failures, interrupted harness attempts, crash signals, engine
+   outages and timeouts, an incomplete report the engine runtime filed for an
+   infrastructure error, a safe-output gateway that registered no tools,
+   authentication and policy rejections, provider 5xx responses that the engine or
+   AWF recorded for an agent request, and harness infrastructure failure classes.
+   Then `skip` with `rate_limited` for such 429 responses and quota or rate-limit
+   categories and classes. A generic authentication or proxy-guard rejection beside
+   a confirmed limit belongs to the limit, not the platform. A run that succeeded is
+   not re-examined for transient errors it recovered from.
 3. `skip` with `pair_mismatch` when an agent request ran another model or effort,
    and `skip` with `unknown_evidence` when the requests cannot be attributed.
-4. `success` for a run that succeeded.
-5. `failure` when the agent reported that it could not finish or exhausted its
-   prompt, the selected pair reached a step, token, credit, tool-denial, or content
-   filter limit, or the validator rejected its outputs or found no terminal output.
-6. Otherwise `skip` with `unknown_evidence`, including an agent job that failed
-   after valid terminal output, and output that threat detection flagged.
+4. `skip` with `unknown_evidence` when threat detection flagged the output.
+5. `success` for a run that succeeded.
+6. `failure` when the agent reported that it could not finish or exhausted its
+   prompt, a content filter blocked a response in the main conversation, the
+   selected pair reached a step, token, credit, or tool-denial limit (with or
+   without output), or the validator rejected its outputs or found no terminal
+   output.
+7. Otherwise `skip` with `unknown_evidence`, including an agent job that failed
+   after valid terminal output, and a run whose threat detection could not reach a
+   result.
 
 The verdict is evidence of validated terminal completion, not of answer quality.
 It uses only engine-neutral evidence (AWF's records, the job results, harness and
-execution records, validated safe outputs, and threat detection), so the same
-evidence gives the same verdict for every engine. It does not decide whether a run
-may update routing history: re-runs, pull request runs, and experiment workflows
-are excluded by the consumer that keeps that history.
+execution records, normalized refusal events, validated safe outputs, and threat
+detection), so the same evidence gives the same verdict for every engine. It does
+not decide whether a run may update routing history: re-runs, pull request runs,
+and experiment workflows are excluded by the consumer that keeps that history.
 
 #### Upstream errors
 

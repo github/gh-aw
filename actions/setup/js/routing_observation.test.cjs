@@ -29,7 +29,16 @@ describe("routedRun", () => {
   const mainRequest = tokenUsage.find(record => !record.purpose && record.model === "gpt-5.6-luna").request_id;
 
   it("matches when the main requests ran as selected beside a declared sub-agent", () => {
-    expect(routedRun({ tokenUsage, routing, subAgentModels })).toEqual({ routed: true, started: true, pair: "match" });
+    expect(routedRun({ tokenUsage, routing, subAgentModels })).toEqual({ routed: true, started: true, pair: "match", statuses: [] });
+  });
+
+  it("reports the statuses AWF recorded for the agent's failed requests, not the classifier's", () => {
+    const classifierRequest = tokenUsage.find(record => record.purpose === "routing_classification").request_id;
+    const upstreamErrors = [
+      { request_id: mainRequest, status: 429 },
+      { request_id: classifierRequest, status: 503 },
+    ];
+    expect(routedRun({ tokenUsage, routing, upstreamErrors, subAgentModels }).statuses).toEqual([429]);
   });
 
   it("treats a model no declared sub-agent uses as a deviation from the selected pair", () => {
@@ -51,7 +60,7 @@ describe("routedRun", () => {
     expect(routedRun({ tokenUsage, routing: routing.filter(record => record.stage !== "selection"), subAgentModels }).routed).toBe(false);
     // Run 39499464895 recorded a selection and the router's classifier call, but no agent request.
     const claude = fixtures.runDir(routedClaude.id);
-    expect(routedRun({ tokenUsage: proxyRecords(claude, "token-usage.jsonl"), routing: proxyRecords(claude, "model-routing.jsonl") })).toEqual({ routed: true, started: false, pair: "unknown" });
+    expect(routedRun({ tokenUsage: proxyRecords(claude, "token-usage.jsonl"), routing: proxyRecords(claude, "model-routing.jsonl") })).toEqual({ routed: true, started: false, pair: "unknown", statuses: [] });
   });
 });
 
@@ -59,26 +68,53 @@ describe("routingOutcome", () => {
   /** @param {string[]} types @param {Record<string, unknown>} [extra] */
   const output = (types, extra = {}) => summarizeAgentOutput({ items: types.map(type => ({ type })), errors: [], ...extra });
   /** @param {Record<string, unknown>} overrides */
-  const evidence = overrides => ({ pair: "match", agentResult: "success", harness: undefined, startupFailed: false, execution: { categories: [], errorCodes: [] }, output: output(["create_issue"]), threat: false, ...overrides });
+  const evidence = overrides => ({
+    pair: "match",
+    agentResult: "success",
+    harness: undefined,
+    startupFailed: false,
+    execution: { categories: [], errorCodes: [] },
+    proxyStatuses: [],
+    contentFiltered: false,
+    output: output(["create_issue"]),
+    detection: "clean",
+    ...overrides,
+  });
+  const turnLimit = { outcome: "failure", failureClasses: ["max_turns"] };
 
   it.each([
     ["a successful agent with terminal output", {}, { outcome: "success" }],
     ["a valid noop", { output: output(["noop"]) }, { outcome: "success" }],
-    ["a success that recovered from a rate limit", { execution: { categories: [], errorCodes: [429] } }, { outcome: "success" }],
+    ["a success that recovered from a rate limit", { execution: { categories: [], errorCodes: [429] }, proxyStatuses: [503] }, { outcome: "success" }],
+    ["only a continuation request", { output: output(["request_continuation"]) }, skip("unknown_evidence")],
     ["a cancelled agent job, before the pair check", { agentResult: "cancelled", pair: "mismatch" }, skip("cancelled")],
     ["a harness attempt cancelled or timed out", { agentResult: "failure", harness: { outcome: "failure", failureClasses: ["cancelled_or_timed_out"] } }, skip("cancelled")],
     ["a startup failure before any harness attempt", { agentResult: "failure", startupFailed: true, output: undefined }, skip("infrastructure")],
     ["an interrupted harness attempt", { agentResult: "failure", harness: { outcome: "interrupted", failureClasses: [] } }, skip("infrastructure")],
     ["a provider 5xx", { agentResult: "failure", execution: { categories: [], errorCodes: ["503"] } }, skip("infrastructure")],
+    ["an authentication failure", { agentResult: "failure", execution: { categories: ["authentication_failed"], errorCodes: [] } }, skip("infrastructure")],
+    ["a runtime's own infrastructure report", { agentResult: "failure", output: summarizeAgentOutput({ items: [{ type: "report_incomplete", reason: "infrastructure_error" }], errors: [] }) }, skip("infrastructure")],
+    [
+      "a safe-output gateway that registered no tools",
+      { agentResult: "failure", output: output(["report_incomplete"], { errors: ["gateway"], collectorFailureCause: "request_rejection", collectorInfrastructureCause: "safeoutputs_gateway_empty" }) },
+      skip("infrastructure"),
+    ],
     ["a 429 without terminal output", { agentResult: "failure", output: output([]), execution: { categories: [], errorCodes: [429] } }, skip("rate_limited")],
+    ["a 429 that only AWF recorded", { agentResult: "failure", output: output(["report_incomplete"]), proxyStatuses: [429] }, skip("rate_limited")],
     ["requests that ran another model or effort", { pair: "mismatch" }, skip("pair_mismatch")],
     ["requests that could not be attributed", { pair: "unknown" }, skip("unknown_evidence")],
     ["an agent that reported it could not finish", { agentResult: "failure", output: output(["report_incomplete"]) }, { outcome: "failure" }],
-    ["a turn limit", { agentResult: "failure", output: output([]), harness: { outcome: "failure", failureClasses: ["max_turns"] } }, { outcome: "failure" }],
+    ["a turn limit", { agentResult: "failure", output: output([]), harness: turnLimit }, { outcome: "failure" }],
+    ["a turn limit without agent output", { agentResult: "failure", output: undefined, harness: turnLimit }, { outcome: "failure" }],
+    ["a turn limit beside an unclassified nonzero exit", { agentResult: "failure", output: output(["report_incomplete"], { collectorFailureCause: "driver_crash" }), harness: turnLimit }, { outcome: "failure" }],
+    ["a credit limit wrapped as an authentication failure", { agentResult: "failure", output: output([]), execution: { categories: ["authentication_failed", "max_ai_credits_exceeded"], errorCodes: [] } }, { outcome: "failure" }],
+    ["a content filter in the main conversation", { agentResult: "failure", output: output([]), contentFiltered: true }, { outcome: "failure" }],
     ["outputs the validator rejected", { agentResult: "failure", output: summarizeAgentOutput({ items: [], errors: ["invalid"] }) }, { outcome: "failure" }],
     ["no terminal output", { agentResult: "failure", output: output(["report_incomplete"], { collectorFailureCause: "missing_terminal_safe_output" }) }, { outcome: "failure" }],
     ["a failed agent job after valid terminal output", { agentResult: "failure" }, skip("unknown_evidence")],
-    ["a threat detection finding", { threat: true }, skip("unknown_evidence")],
+    ["a threat detection finding", { detection: "threat" }, skip("unknown_evidence")],
+    ["rejected output that threat detection flagged", { agentResult: "failure", detection: "threat", output: summarizeAgentOutput({ items: [], errors: ["invalid"] }) }, skip("unknown_evidence")],
+    ["detection that could not reach a result", { detection: "inconclusive" }, skip("unknown_evidence")],
     ["missing agent output", { agentResult: "failure", output: undefined }, skip("unknown_evidence")],
   ])("%s", (_name, overrides, expected) => {
     expect(routingOutcome(evidence(overrides))).toEqual(expected);
@@ -132,6 +168,25 @@ describe("routing.observation in the unified session", () => {
     const root = prepare(FAILED_CHECK_RUN);
     expect(verdicts(collect(root, { agent: "failure" })).map(event => event.data)).toEqual([skip("unknown_evidence")]);
     expect(verdicts(collect(root)).map(event => event.data)).toEqual([{ outcome: "success" }]);
+  });
+
+  it("reads detection results, AWF's failed requests and content-filter refusals from the run", () => {
+    const empty = { items: [], errors: [] };
+    const threat = prepare(fixtures.runDir(routed.id));
+    fs.mkdirSync(path.join(threat, "usage/detection"), { recursive: true });
+    fs.writeFileSync(path.join(threat, "usage/detection/detection_result.json"), JSON.stringify({ job_result: "failure", conclusion: "failure", reason: "threat_detected" }));
+    expect(verdicts(collect(threat)).map(event => event.data)).toEqual([skip("unknown_evidence")]);
+
+    // A failed agent that left no output is unknown evidence, unless AWF recorded a provider outage.
+    const outage = prepare(fixtures.runDir(routed.id), empty);
+    expect(verdicts(collect(outage, { agent: "failure" })).map(event => event.data)).toEqual([skip("unknown_evidence")]);
+    const mainRequest = proxyRecords(outage, "token-usage.jsonl").find(record => !record.purpose && record.model === "gpt-5.6-luna").request_id;
+    fs.writeFileSync(path.join(outage, PROXY_LOGS, "upstream-errors.jsonl"), JSON.stringify({ event: "UPSTREAM_ERROR_RESPONSE", request_id: mainRequest, status: 503 }) + "\n");
+    expect(verdicts(collect(outage, { agent: "failure" })).map(event => event.data)).toEqual([skip("infrastructure")]);
+
+    const filtered = prepare(fixtures.runDir(routed.id), empty);
+    fs.writeFileSync(path.join(filtered, "agent-session.jsonl"), JSON.stringify({ type: "assistant.refusal", data: { reason: "content_filter" } }) + "\n");
+    expect(verdicts(collect(filtered, { agent: "failure" })).map(event => event.data)).toEqual([{ outcome: "failure" }]);
   });
 
   it("has no verdict outside the conclusion job, for an unrouted run, or when the agent made no request", () => {

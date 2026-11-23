@@ -3,7 +3,7 @@ const { iterateJsonlEvents } = require("./jsonl_helpers.cjs");
 
 const fs = require("fs");
 const path = require("path");
-const { isSessionEvent } = require("./agent_session.cjs");
+const { isSessionEvent, isNestedSessionEvent } = require("./agent_session.cjs");
 const { hasCopilotConversation, deduplicateCopilotFallback, normalizeCopilotSession } = require("./copilot_session.cjs");
 const { collectAddMaskedValues, serializeSessionArtifact, writeSessionArtifact, removeFailedSessionArtifacts } = require("./session_artifact.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
@@ -15,14 +15,13 @@ const { sessionTimestamp, orderSessionSources } = require("./unified_session_ord
 const { normalizeOtelEvents } = require("./unified_session_otel.cjs");
 const { getApiProxyEventName } = require("./steering_helpers.cjs");
 const { estimateBaseline, projectModelConfig } = require("./routing_analytics.cjs");
-const { routedRun, routingOutcome, summarizeAgentOutput } = require("./routing_observation.cjs");
+const { routedRun, routingOutcome, summarizeAgentOutput, detectionVerdict } = require("./routing_observation.cjs");
 const { normalizeHarnessRetryRecord } = require("./harness_retry_record.cjs");
 const { parseHarnessAttempts, correlateHarnessAttempts } = require("./harness_retry_session.cjs");
 const { isDurableSessionRecord } = require("./durable_session_record.cjs");
 const { buildWorkflowCallId } = require("./aw_context.cjs");
 
 const SESSION_FILE_FORMAT_VERSION = 1;
-const THREAT_FLAGS = ["prompt_injection", "promptInjection", "secret_leak", "secretLeak", "malicious_patch", "maliciousPatch"];
 
 /** @param {any} data @returns {boolean} */
 function isModelEndpointMismatchData(data) {
@@ -195,7 +194,7 @@ function observeRoutedRun(sources, subAgentModels, output) {
   const eventsOf = (component, phase, type) => sources.filter(source => source.component === component && (phase === undefined || source.phase === phase)).flatMap(source => source.events.filter(event => event.type === type));
   /** @param {string} type */
   const proxyRecords = type => eventsOf("firewall", "agent", type).map(event => event.data);
-  const run = routedRun({ tokenUsage: proxyRecords("firewall.token_usage"), routing: proxyRecords("firewall.model_routing"), subAgentModels });
+  const run = routedRun({ tokenUsage: proxyRecords("firewall.token_usage"), routing: proxyRecords("firewall.model_routing"), upstreamErrors: proxyRecords("firewall.upstream_error"), subAgentModels });
   if (!run.routed || !run.started) return undefined;
   /** @type {any} */
   const harness = eventsOf("harness", "agent", "harness.retry")[0]?.data;
@@ -210,8 +209,10 @@ function observeRoutedRun(sources, subAgentModels, output) {
     harness: attempt ? { outcome: attempt.outcome, failureClasses: Array.isArray(attempt.failureClasses) ? attempt.failureClasses : [] } : undefined,
     startupFailed: !attempt && startup?.outcome === "failure",
     execution: { categories: Array.isArray(execution?.categories) ? execution.categories : [], errorCodes: Array.isArray(execution?.errorCodes) ? execution.errorCodes : [] },
+    proxyStatuses: run.statuses,
+    contentFiltered: eventsOf("agent", "agent", "assistant.refusal").some(event => event.data?.reason === "content_filter" && !isNestedSessionEvent(event)),
     output: summarizeAgentOutput(output),
-    threat: eventsOf("detection", undefined, "detection.result").some(event => THREAT_FLAGS.some(key => event.data?.[key] === true)),
+    detection: detectionVerdict(eventsOf("detection", undefined, "detection.result").map(event => event.data)),
   });
 }
 
