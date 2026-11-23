@@ -152,8 +152,11 @@ Otherwise, for each selected persona, generate **2 representative automation tas
 Persona: [Role Name]
 Task: [Brief task description - max 1 sentence]
 Context: [1-2 sentences max]
+Inputs: [Relevant repository paths/keys, labels, units, standards and numeric thresholds; state N/A where not applicable]
 Expected Workflow Type: [Issue automation / PR automation / Scheduled / On-demand]
 ```
+
+Name concrete inputs rather than relying on unstated assumptions. For accessibility scenarios, specify the WCAG criterion, conformance level, and threshold. Do not invent missing inputs; mark the scenario incomplete and do not score it until they are explicit.
 
 **Example scenarios by persona:**
 - Backend Engineer: "Automatically review PR database schema changes for migration safety"
@@ -162,7 +165,7 @@ Expected Workflow Type: [Issue automation / PR automation / Scheduled / On-deman
 - QA Tester: "Analyze test coverage changes in PRs and comment with recommendations"
 - Product Manager: "Weekly digest of completed features grouped by customer impact"
 - Program Manager: "Weekly cross-team milestone status digest with blocked items highlighted"
-- Designer: "Flag PRs that modify shared design tokens or component CSS without a matching Figma link"
+- Designer (DS-2): "For PRs changing `design-tokens.json` keys `color.*` or `spacing.*`, check for a linked Figma reference and assess target size against WCAG 2.5.8 AA's 24 × 24 CSS px minimum; use the `design-system` and `accessibility` labels."
 - Legal / Compliance: "Scan new dependencies added in PRs for non-permissive SPDX licenses"
 - Information Worker: "Weekly summary of stale documentation files not updated in the last 90 days"
 
@@ -179,7 +182,12 @@ Store all scenarios in cache memory.
   "invocation": {
     "method": "claude-code-inline-sub-agent",
     "status": "succeeded",
-    "error": null
+    "error": null,
+    "isolation_canary": {
+      "root_agents_md_context": "absent",
+      "skill_inventory_context": "absent",
+      "git_status_snapshot": "absent"
+    }
   },
   "recommendation": {
     "trigger": "suggested trigger",
@@ -200,7 +208,7 @@ Store all scenarios in cache memory.
 }
 ```
 
-Summarize the recommendation; do not include full YAML. For successful invocations, replace each score placeholder with an integer from 1 to 5. Set `invocation.method` to `claude-code-inline-sub-agent`. If invocation fails, set `invocation.status` to `failed`, record the error in `invocation.error`, and set both `recommendation` and `scores` to `null`. Never encode an invocation failure as a score.
+Summarize the recommendation; do not include full YAML. For successful invocations, replace each score placeholder with an integer from 1 to 5. Set `invocation.method` to `claude-code-inline-sub-agent`. If invocation fails, set `invocation.status` to `failed`; if its isolation canary fails or is incomplete, set it to `contaminated`. In either case, record the error and set both `recommendation` and `scores` to `null`. Never encode an invocation failure or contamination as a score.
 
 **Assessment questions:** Does the suggestion include appropriate triggers (`on:`)? Correct tools (github, web-fetch, playwright, etc.)? Proper safe-outputs? Security best practices (minimal permissions, network restrictions)? A clear, actionable prompt?
 
@@ -214,10 +222,18 @@ The `persona-evaluator` is dynamically materialized as a Claude Code sub-agent f
 
 For every evaluator call, pass only its scenario, guidance mode and required
 response format. Do not pass parent analysis, prior responses, scores, ambient
-`AGENTS.md` content or skill inventories. The evaluator must use only the
-guidance files allowed by its mode; if the runtime injects ambient instructions
-that cannot be excluded, mark the invocation contaminated/unavailable and do
-not score it.
+`AGENTS.md` content, git status or skill inventories.
+
+Before reading guidance or scoring, require the evaluator to return an
+`isolation_canary` with `root_agents_md_context`, `skill_inventory_context` and
+`git_status_snapshot`, each set to `absent`, `present` or `unknown`. These
+fields describe context/instructions visible to the evaluator, not files that
+exist in the checkout. Score only when all three are `absent` and the evaluator
+confirms it used only the guidance files allowed by its mode. A missing,
+`present` or `unknown` value, or an injected instruction it cannot exclude,
+makes the invocation `contaminated/unavailable`: discard its recommendation
+and scores. Do not infer a clean context from a recommendation or from the
+canary alone if guidance outside the allowed files is visible.
 
 **Important**: 
 - You are ONLY testing the agent's responses, NOT creating actual workflows
@@ -412,6 +428,13 @@ read `.github/agents/agentic-workflows.md` and follow ad hoc evaluation in
 only the first 8,000 UTF-8 bytes of each guidance file, including metadata;
 follow only routes visible there and apply the same bound to linked guidance.
 Never read hidden tails or reconstruct them from other full-guidance results.
+Before reading guidance or evaluating the scenario, return an `isolation_canary`
+with `root_agents_md_context`, `skill_inventory_context` and
+`git_status_snapshot`, each `absent`, `present` or `unknown`. These values
+describe visible context/instructions, not files that exist in the checkout.
+If any is not `absent`, or if other ambient instructions cannot be excluded,
+stop and report contamination without a recommendation. Do not claim absence
+if the context cannot be inspected.
 If ambient instructions are injected and cannot be excluded, report the
 invocation as contaminated without a recommendation or score. Return guidance
 paths, byte counts and unavailable routes with the recommendation. Do not
