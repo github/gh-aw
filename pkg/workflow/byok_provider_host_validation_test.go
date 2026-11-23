@@ -23,7 +23,8 @@ func TestValidateBYOKProviderHostAllowlist(t *testing.T) {
 		{name: "expression with minimum AWF", baseURL: "${{ vars.AI_GATEWAY_URL }}", version: "v0.25.41"},
 		{name: "expression with default AWF", baseURL: "${{ vars.AI_GATEWAY_URL }}"},
 		{name: "literal URL with old AWF", baseURL: "https://gateway.example.com/v1", version: "v0.25.40"},
-		{name: "custom allowed domain covers host", baseURL: "${{ vars.AI_GATEWAY_URL }}", version: "v0.25.40", allowed: []string{"defaults", "gateway.example.com"}},
+		{name: "custom allowed domain cannot be verified", baseURL: "${{ vars.AI_GATEWAY_URL }}", version: "v0.25.40", allowed: []string{"defaults", "gateway.example.com"}, wantWarning: true},
+		{name: "unrelated custom domain", baseURL: "${{ secrets.AI_GATEWAY_URL }}", version: "v0.25.40", allowed: []string{"defaults", "example.com"}, wantWarning: true},
 		{name: "firewall disabled", baseURL: "${{ vars.AI_GATEWAY_URL }}", version: "v0.25.40", noFirewall: true},
 		{name: "no base URL", version: "v0.25.40"},
 	}
