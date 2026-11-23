@@ -173,7 +173,7 @@ function hasIssueIntentFields(source) {
   if (!source || typeof source !== "object") {
     return false;
   }
-  const record = /** @type {Record<string, unknown>} */ (source);
+  const record = /** @type {Record<string, unknown>} */ source;
   return record.rationale !== undefined || record.confidence !== undefined || record.suggest !== undefined;
 }
 
@@ -189,7 +189,7 @@ function logIgnoredIssueIntentMetadata(message, issueIntentEnabled) {
   if (issueIntentEnabled || !message || typeof message !== "object") {
     return false;
   }
-  const labels = /** @type {{ labels?: unknown }} */ (message).labels;
+  const labels = /** @type {{ labels?: unknown }} */ message.labels;
   const hasMetadata = hasIssueIntentFields(message) || (Array.isArray(labels) && labels.some(hasIssueIntentFields));
   if (!hasMetadata) {
     return false;
