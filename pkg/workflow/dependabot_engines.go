@@ -98,19 +98,7 @@ func (c *Compiler) engineInstallationForManifest(def *EngineDefinition, runtimeI
 	}
 	// Copilot is downloaded as a release binary, but its npm package
 	// represents the same CLI release for dependency alerts.
-	name := ""
-	switch runtimeID {
-	case "claude":
-		name = "@anthropic-ai/claude-code"
-	case "codex":
-		name = "@openai/codex"
-	case "copilot":
-		name = "@github/copilot"
-	case "gemini":
-		name = "@google/gemini-cli"
-	case "pi":
-		name = "@earendil-works/pi-coding-agent"
-	}
+	name := builtinEngineNpmPackage(runtimeID)
 	if name == "" {
 		return nil
 	}

@@ -31,7 +31,7 @@ Related decisions:
 - Compiler lint evaluates effective roles and resolved tools, including imports. Dry-run retains only authored `admin`, `maintainer`, or `maintain` roles, defaulting to `admin`, `maintainer` when none remain; compiler lint uses those restricted roles. Standalone `gh aw lint` uses authored values and does not resolve imports.
 - Authored centralized commands remain analyzed alongside generated dispatch graphs without duplicate inline-command findings. AW-backed findings use AW origin paths so authored ignores apply in compilation and companion locks; graph-only findings remain Actions-owned.
 - `pull_request_target` keeps its separate CTR-008 target-trigger warning, independent of actor admission and GitHub tool filtering. Only literal AW `on.pull_request_target.acknowledge-risk: true` suppresses that lint warning; it does not suppress comment-input warnings or existing validator checks. Compiler lint avoids duplicating an equivalent CTR-008 validator warning only when that warning was actually emitted, not merely because strict mode is enabled.
-- The new rule emits warnings only, including in strict mode. Existing validator behavior is preserved. Generated workflow behavior, permissions, and runtime authorization are unchanged. Specification version 1.0.108 and its single unreleased changelog entry document CTR-039, T-CTR-054, and the review refinements.
+- The new rule emits warnings only, including in strict mode. Existing validator behavior is preserved. Generated workflow behavior, permissions, and runtime authorization are unchanged. Specification version 1.0.109 and its single unreleased changelog entry document CTR-039, T-CTR-054, and the review refinements.
 
 ## Alternatives Considered
 

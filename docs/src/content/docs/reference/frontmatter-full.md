@@ -1383,8 +1383,11 @@ on:
 
   # Format 1: GitHub search query string to check before running workflow (implies
   # max=1). If the search returns any results, the workflow will be skipped. Query
-  # is automatically scoped to the current repository. Example: 'is:issue is:open
-  # label:bug'
+  # is automatically scoped to the current repository. Simple queries using only
+  # is:/type:/state:, label:, author:, assignee:, mentions:, and sort: qualifiers
+  # are evaluated via GraphQL/REST instead of the rate-limited search API; free
+  # text, in:, negation, and comma label lists require search. Example: 'is:issue
+  # is:open label:bug'
   skip-if-match: "example-value"
 
   # Format 2: Skip-if-match configuration object with query, maximum match count,
@@ -1421,8 +1424,11 @@ on:
 
   # Format 1: GitHub search query string to check before running workflow (implies
   # min=1). If the search returns no results, the workflow will be skipped. Query is
-  # automatically scoped to the current repository. Example: 'is:pr is:open
-  # label:ready-to-deploy'
+  # automatically scoped to the current repository. Simple queries using only
+  # is:/type:/state:, label:, author:, assignee:, mentions:, and sort: qualifiers
+  # are evaluated via GraphQL/REST instead of the rate-limited search API; free
+  # text, in:, negation, and comma label lists require search. Example: 'is:pr
+  # is:open label:ready-to-deploy'
   skip-if-no-match: "example-value"
 
   # Format 2: Skip-if-no-match configuration object with query, minimum match count,
@@ -3258,7 +3264,7 @@ engine:
   checksums-sha256: "example-value"
 
   # Minimum release age in days for compiler-managed engine installs. Zero disables
-  # the cooldown only outside strict mode.
+  # the cooldown, including in strict mode.
   # (optional)
   cooldown: 1
 
@@ -3687,7 +3693,7 @@ engine:
 # named catalog entry
 engine:
   # Minimum release age in days for compiler-managed engine installs. Zero disables
-  # the cooldown only outside strict mode.
+  # the cooldown, including in strict mode.
   # (optional)
   cooldown: 1
 
@@ -4404,7 +4410,7 @@ engine:
     model-catalog: true
 
     # Minimum release age in days for compiler-managed engine installs. Zero disables
-    # the cooldown only outside strict mode.
+    # the cooldown, including in strict mode.
     # (optional)
     cooldown: 1
 
@@ -22345,7 +22351,7 @@ safe-outputs:
       checksums-sha256: "example-value"
 
       # Minimum release age in days for compiler-managed engine installs. Zero disables
-      # the cooldown only outside strict mode.
+      # the cooldown, including in strict mode.
       # (optional)
       cooldown: 1
 
@@ -22774,7 +22780,7 @@ safe-outputs:
     # named catalog entry
     engine-config:
       # Minimum release age in days for compiler-managed engine installs. Zero disables
-      # the cooldown only outside strict mode.
+      # the cooldown, including in strict mode.
       # (optional)
       cooldown: 1
 
@@ -23491,7 +23497,7 @@ safe-outputs:
         model-catalog: true
 
         # Minimum release age in days for compiler-managed engine installs. Zero disables
-        # the cooldown only outside strict mode.
+        # the cooldown, including in strict mode.
         # (optional)
         cooldown: 1
 

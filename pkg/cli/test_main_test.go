@@ -6,7 +6,9 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
+	"github.com/github/gh-aw/pkg/workflow"
 	"go.uber.org/goleak"
 )
 
@@ -18,6 +20,11 @@ func TestMain(m *testing.M) {
 	if err != nil {
 		panic("Failed to get current working directory: " + err.Error())
 	}
+	// Compiler tests must not depend on live release metadata or the current
+	// age of default engine versions.
+	workflow.SetEngineReleaseTimeLookupForTesting(func(string, string) (time.Time, error) {
+		return time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC), nil
+	})
 
 	goleak.VerifyTestMain(m, goleak.Cleanup(func(_ int) {
 		// Clean up any action cache files created during tests

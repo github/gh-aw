@@ -674,7 +674,7 @@ jobs:
             const { main } = require(path.join(actionsDir, 'checkout_pr_branch.cjs'));
             await main();
       - name: Install GitHub Copilot CLI
-        run: bash "${RUNNER_TEMP}/gh-aw/actions/install_copilot_cli.sh" 1.0.113 --checksums-sha256 854036b59b745d4f4b44a169327ffc0eab007f39e74b3dc3670f4d609a6c1072 --cooldown-days 3
+        run: bash "${RUNNER_TEMP}/gh-aw/actions/install_copilot_cli.sh" 1.0.113 --checksums-sha256 854036b59b745d4f4b44a169327ffc0eab007f39e74b3dc3670f4d609a6c1072 --cooldown-days 0
         env:
           GH_HOST: github.com
           GITHUB_TOKEN: ${{ github.token }}
@@ -2062,7 +2062,7 @@ jobs:
           node-version: '24'
           package-manager-cache: false
       - name: Install GitHub Copilot CLI
-        run: bash "${RUNNER_TEMP}/gh-aw/actions/install_copilot_cli.sh" 1.0.103 --checksums-sha256 26cd3e4b32cde498e4961fb4d48e7b85d7859fc69af1a645a19201fdd577bdb2 --prefer-toolcache --cooldown-days 3
+        run: bash "${RUNNER_TEMP}/gh-aw/actions/install_copilot_cli.sh" 1.0.103 --checksums-sha256 26cd3e4b32cde498e4961fb4d48e7b85d7859fc69af1a645a19201fdd577bdb2 --prefer-toolcache --cooldown-days 0
         env:
           GH_HOST: github.com
           GITHUB_TOKEN: ${{ github.token }}
