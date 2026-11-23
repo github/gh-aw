@@ -39,6 +39,7 @@ const { resolveDataSchema } = require("./data_schema_normalizer.cjs");
 const { normalizeBlankOptionalFields } = require("./optional_field_normalizer.cjs");
 const { clearValidationMarker, formatJSONFiles, runCustomMemoryValidation, writeValidationMarker } = require("./memory_custom_validation.cjs");
 const { compileFileGlobPatterns, isMemoryFileEligible } = require("./memory_file_eligibility.cjs");
+const { copyFileExclusive, copyDirectoryExclusive } = require("./staging_conflicts.cjs");
 const { normalizeRuntimeMessage, readClaimScopeContext, withClaimExecution, currentClaimHandle, claimArtifactPath } = require("./work_queue_claim_scope.cjs");
 const { createSubmissionTracker, isDependencyUnsupportedType } = require("./safe_output_submission.cjs");
 
@@ -2607,14 +2608,29 @@ function createHandlers(server, appendSafeOutput, config = {}) {
    * @param {string} srcDir - Absolute source directory path
    * @param {string} destDir - Absolute destination directory path
    */
-  function copyDirectoryRecursive(srcDir, destDir) {
-    if (!fs.existsSync(destDir)) {
+  function copyDirectoryRecursive(srcDir, destDir, transactional = true) {
+    if (transactional) {
+      let copyResult;
       try {
-        fs.mkdirSync(destDir, { recursive: true });
+        copyResult = copyDirectoryExclusive(srcDir, destDir, tempDir => copyDirectoryRecursive(srcDir, tempDir, false));
       } catch (err) {
-        throw new Error(`${ERR_SYSTEM}: Failed to create directory ${destDir}: ${getErrorMessage(err)}`, { cause: err });
+        throw new Error(`${ERR_SYSTEM}: Failed to stage directory ${srcDir} to ${destDir}: ${getErrorMessage(err)}`, { cause: err });
       }
+      if (copyResult === "conflict") {
+        throw {
+          code: -32602,
+          message: `${ERR_VALIDATION}: upload_artifact: staging name conflict for ${path.basename(destDir)}; rename the directory or use a distinct path`,
+        };
+      }
+      return;
     }
+
+    try {
+      fs.mkdirSync(destDir, { recursive: true });
+    } catch (err) {
+      throw new Error(`${ERR_SYSTEM}: Failed to create directory ${destDir}: ${getErrorMessage(err)}`, { cause: err });
+    }
+
     let entries;
     try {
       entries = fs.readdirSync(srcDir, { withFileTypes: true });
@@ -2639,8 +2655,8 @@ function createHandlers(server, appendSafeOutput, config = {}) {
             message: `${ERR_VALIDATION}: upload_artifact: ${sensitiveErr}`,
           };
         }
-        copyDirectoryRecursive(srcPath, destPath);
-      } else if (ent.isFile() && !ent.isSymbolicLink() && !fs.existsSync(destPath)) {
+        copyDirectoryRecursive(srcPath, destPath, false);
+      } else if (ent.isFile() && !ent.isSymbolicLink()) {
         // Revalidate each file's canonical path before copying.
         let canonicalSrcPath;
         try {
@@ -2655,11 +2671,18 @@ function createHandlers(server, appendSafeOutput, config = {}) {
             message: `${ERR_VALIDATION}: upload_artifact: ${sensitiveErr}`,
           };
         }
+        let copyResult;
         try {
-          fs.copyFileSync(srcPath, destPath);
-          fs.chmodSync(destPath, 0o600);
+          copyResult = copyFileExclusive(srcPath, destPath);
+          if (copyResult === "copied") fs.chmodSync(destPath, 0o600);
         } catch (err) {
           throw new Error(`${ERR_SYSTEM}: Failed to copy file ${srcPath} to ${destPath}: ${getErrorMessage(err)}`, { cause: err });
+        }
+        if (copyResult === "conflict") {
+          throw {
+            code: -32602,
+            message: `${ERR_VALIDATION}: upload_artifact: staging name conflict for ${path.basename(destPath)}; rename the file or use a distinct path`,
+          };
         }
       }
       // Skip symlinks, sockets, pipes, block/char devices — non-regular file types.
@@ -2786,16 +2809,48 @@ function createHandlers(server, appendSafeOutput, config = {}) {
 
       if (!alreadyStaged) {
         if (stat.isDirectory()) {
+          const validateDirectorySourcePaths = dir => {
+            let entries;
+            try {
+              entries = fs.readdirSync(dir, { withFileTypes: true });
+            } catch (err) {
+              throw new Error(`${ERR_SYSTEM}: Failed to read directory ${dir}: ${getErrorMessage(err)}`, { cause: err });
+            }
+            for (const ent of entries) {
+              if (!ent.isDirectory() && !ent.isFile()) continue;
+              const sourcePath = path.join(dir, ent.name);
+              let canonicalSourcePath;
+              try {
+                canonicalSourcePath = fs.realpathSync(sourcePath);
+              } catch (err) {
+                throw new Error(`${ERR_SYSTEM}: Failed to resolve canonical path for ${sourcePath}: ${getErrorMessage(err)}`, { cause: err });
+              }
+              const sensitiveError = validateUploadSourcePath(canonicalSourcePath);
+              if (sensitiveError) {
+                throw {
+                  code: -32602,
+                  message: `${ERR_VALIDATION}: upload_artifact: ${sensitiveError}`,
+                };
+              }
+              if (ent.isDirectory()) validateDirectorySourcePaths(sourcePath);
+            }
+          };
+          validateDirectorySourcePaths(filePath);
           copyDirectoryRecursive(filePath, path.join(stagingDir, destName));
         } else {
           const destPath = path.join(stagingDir, destName);
-          if (!fs.existsSync(destPath)) {
-            try {
-              fs.copyFileSync(filePath, destPath);
-              fs.chmodSync(destPath, 0o600);
-            } catch (err) {
-              throw new Error(`${ERR_SYSTEM}: Failed to copy file ${filePath} to ${destPath}: ${getErrorMessage(err)}`, { cause: err });
-            }
+          let copyResult;
+          try {
+            copyResult = copyFileExclusive(filePath, destPath);
+            if (copyResult === "copied") fs.chmodSync(destPath, 0o600);
+          } catch (err) {
+            throw new Error(`${ERR_SYSTEM}: Failed to copy file ${filePath} to ${destPath}: ${getErrorMessage(err)}`, { cause: err });
+          }
+          if (copyResult === "conflict") {
+            throw {
+              code: -32602,
+              message: `${ERR_VALIDATION}: upload_artifact: staging name conflict for ${destName}; rename the file or use a distinct path`,
+            };
           }
         }
 

@@ -191,22 +191,44 @@ engine:
           if (!fenced && line.trimStart().startsWith("{")) {
             try { record = JSON.parse(line); } catch {}
           }
-          return { line, index, fenced, record };
-        }).filter(({ line }) => !AWF_INFRA_RE.test(line));
+          // The harness writes this prefix only from its catch block.
+          const harnessFailure = !fenced && /^\[cursor-harness\] /.test(line);
+          return { line, index, fenced, record, harnessFailure };
+        }).filter(({ line, fenced, harnessFailure }) => fenced || harnessFailure || !AWF_INFRA_RE.test(line));
+        const contentLines = lines.filter(({ harnessFailure }) => !harnessFailure);
         // An init outside Markdown fences establishes native framing even with
         // startup diagnostics. Otherwise only an all-JSONL log is a native stream.
-        const structured = lines.some(({ fenced, record }) => !fenced &&
+        const structured = contentLines.some(({ fenced, record }) => !fenced &&
           (record?.type === "system" && record.subtype === "init" || record?.type === "session.init")) ||
-          lines.every(({ line, fenced }) => !line.trim() || !fenced && line.trimStart().startsWith("{")) &&
-          lines.some(({ record }) => typeof record?.type === "string");
-        const trailer = lines.findLast(entry => entry.line.trim());
+          contentLines.every(({ line, fenced }) => !line.trim() || !fenced && line.trimStart().startsWith("{")) &&
+          contentLines.some(({ record }) => typeof record?.type === "string");
+        const trailers = new Set();
+        let trailer;
+        for (const entry of lines) {
+          if (entry.harnessFailure) {
+            if (trailer) trailers.add(trailer.index);
+            trailer = undefined;
+          } else if (entry.line.trim()) trailer = entry;
+        }
+        if (trailer) trailers.add(trailer.index);
+        const flushPlaintext = type => {
+          if (plaintext.some(line => line.trim())) emit(type, { sourceEngine: "cursor", content: plaintext.join("\n") });
+          plaintext.length = 0;
+        };
 
-        for (const { line, index, fenced, record } of lines) {
+        for (const { line, index, fenced, record, harnessFailure } of lines) {
           const previousAssistant = lastAssistant;
           lastAssistant = undefined;
+          if (harnessFailure) {
+            plaintext.push(line, "");
+            flushPlaintext("cursor.diagnostic");
+            continue;
+          }
           if (!structured) {
             if (!fenced && record?.type === "result" && record.subtype === undefined && record.session_id === undefined &&
-                trailer?.index === index) {
+                trailers.has(index)) {
+              if (plaintext.length) plaintext.push("");
+              flushPlaintext("assistant.message");
               logEntries.push(...normalizeCursorRecord(record));
             } else plaintext.push(line);
             continue;
@@ -296,7 +318,7 @@ engine:
           }
         }
         // Legacy text contains final-answer prose, not observable tool activity.
-        if (plaintext.some(line => line.trim())) emit(structured ? "cursor.diagnostic" : "assistant.message", { sourceEngine: "cursor", content: plaintext.join("\n") });
+        flushPlaintext(structured ? "cursor.diagnostic" : "assistant.message");
         const toolStarts = logEntries.filter(entry => entry.type === "tool.execution_start").length;
         const markdown = `**Observed tool starts:** ${toolStarts}` + (parseErrors ? ` · **Parse errors:** ${parseErrors}` : "");
         return { markdown, logEntries, mcpFailures: [...mcpFailures], maxTurnsHit: false };
@@ -350,6 +372,11 @@ requires an initialization record outside a fence or an all-JSONL log.
 Rejected native records emit payload-free collection warnings with 1-based
 line numbers. MCP connection failures are recognized only in non-JSON native
 diagnostics, not in legacy answers or JSON-encoded assistant messages.
+Without native framing, residual output ending at a Cursor harness failure
+is retained with the failure diagnostic rather than inferred as assistant prose.
+The harness emits its prefix only on failure, including prompt-read and spawn
+errors. Earlier answers framed by a terminal result remain assistant messages;
+fenced harness examples remain literal answer text.
 Sanitized regressions cover the native shapes observed in an existing
 2026.10.14-941492e conformance run. Failed-tool results and subagent events
 remain fixture-only or unverified where absent from live evidence.

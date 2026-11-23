@@ -20,9 +20,10 @@ const main = createEngineLogParser({
  * - type "tool_result": tool responses with tool_id, status, and output
  * - type "result": final stats with token usage, duration, and tool call count
  * @param {string} logContent - The raw log content to parse
+ * @param {{render?: boolean}} [options]
  * @returns {{markdown: string, logEntries: Array, mcpFailures: Array<string>, maxTurnsHit: boolean}} Parsed log data
  */
-function parseGeminiLog(logContent) {
+function parseGeminiLog(logContent, { render = true } = {}) {
   if (!logContent) {
     return {
       markdown: buildStepSummaryDetailsSection("Gemini", "No log content provided."),
@@ -44,6 +45,7 @@ function parseGeminiLog(logContent) {
       maxTurnsHit: false,
     };
   }
+  if (!render) return { markdown: "", logEntries, mcpFailures: [], maxTurnsHit: false };
 
   // Generate conversation markdown using shared function
   const conversationResult = generateConversationMarkdown(logEntries, {
