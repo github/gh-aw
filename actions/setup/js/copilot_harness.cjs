@@ -111,6 +111,7 @@ const {
   buildSoftTimeoutGuard,
   emitSoftTimeoutSignal,
   isAuthenticationFailedError: isCommonAuthenticationFailedError,
+  isHTMLResponseError,
   createOutputPatternMatcher,
   parseAICreditsExceededProxyRejection,
 } = require("./harness_retry_guard.cjs");
@@ -186,9 +187,6 @@ const MCP_POLICY_BLOCKED_PATTERN = /MCP servers were blocked by policy:/;
 // On a fresh run the token is genuinely absent — retrying will not help.
 const NO_AUTH_INFO_PATTERN = /No authentication information found|Session was not created with authentication info or custom provider/;
 // Pattern to detect authentication failures returned by Copilot API.
-// After a first-attempt auth failure, retrying is futile because the entrypoint unsets
-// COPILOT_GITHUB_TOKEN between attempts.
-//
 // This pattern covers the Copilot CAPI 400 response emitted when the supplied token is a
 // Personal Access Token (classic or fine-grained):
 //   "400 400 checking third-party user token: bad request: Personal Access Tokens
@@ -1251,6 +1249,7 @@ function isCopilotContentFilterError(output, provider = "github") {
  *   isContentFiltered?: boolean,
  *   isAuthErr?: boolean,
  *   isAuthenticationFailed?: boolean,
+ *   isTransientHTMLResponse?: boolean,
  *   isTransientCAPIError?: boolean,
  *   isMCPGatewayShutdown?: boolean,
  *   isMCPPolicy?: boolean,
@@ -1292,6 +1291,7 @@ function classifyCopilotFailure(detection) {
   if (detection.isNullTypeToolCall) return "null_type_tool_call";
   if (detection.isAuthErr) return "no_auth_info";
   if (detection.isAuthenticationFailed) return "authentication_failed";
+  if (detection.isTransientHTMLResponse) return "transient_error";
   if (detection.isSDKSessionIdleTimeout) return "sdk_session_idle_timeout";
   if (detection.isMCPGatewayShutdown) return "mcp_gateway_shutdown";
   if (detection.hasWorkflowToolPermissionDenial) return "permission_denied";
@@ -2051,6 +2051,7 @@ async function main() {
   let scheduledExit2Retries = 0;
   let scheduledExit2RetryAttempted = false;
   let useContinueOnRetry = false;
+  let sessionHasProgress = false;
   /** @type {string | undefined} */
   let nativeModelSessionId;
   const durableSession = require("./durable_native_session.cjs").openDurableSession("copilot");
@@ -2140,7 +2141,12 @@ async function main() {
           observeStrategy(strategy);
           const safeOutputsByteOffset = getSafeOutputsByteOffset(safeOutputsPath);
           const safeArgs = currentArgs.map((arg, i) => (currentArgs[i - 1] === "--prompt" || currentArgs[i - 1] === "-p" ? "<redacted>" : arg));
-          const modelObserver = !verifyModel ? { check: () => "" } : createCopilotModelObserver({ configuredModel: selectionConfiguredModel, resolvedModel: process.env.COPILOT_MODEL || "", sessionId, logger: log });
+          const markSessionProgress = () => {
+            sessionHasProgress = true;
+          };
+          const modelObserver = !verifyModel
+            ? { check: () => "" }
+            : createCopilotModelObserver({ configuredModel: selectionConfiguredModel, resolvedModel: process.env.COPILOT_MODEL || "", sessionId, logger: log, onSessionProgress: markSessionProgress });
           let nativeTerminalRateLimitError = false;
           /** @type {number | null} */
           let retryAfterMs = null;
@@ -2200,6 +2206,7 @@ async function main() {
               } catch {
                 return;
               }
+              if (event?.type === "assistant.message" || event?.type === "tool.execution_start") markSessionProgress();
               if (!copilotSDKMode && durableSession && sessionId && ["session.start", "session.resume", "assistant.message", "tool.execution_start"].includes(event?.type)) {
                 durableSession.started(sessionId);
               }
@@ -2272,6 +2279,7 @@ async function main() {
           const hasIncompleteToolCallStream = isIncompleteToolCallStreamError(result.output);
           const isAuthErr = isNoAuthInfoError(result.output);
           const isAuthenticationFailed = isAuthenticationFailedError(result.output);
+          const isTransientHTMLResponse = isHTMLResponseError(result.output);
           const proxyAuthDiagnostic = buildCopilotProxyAuthFailureDiagnostic(result.output, process.env);
           const retryableProxyAuthenticationFailure = isRetryableProxyAuthenticationFailure(result.output, result.hasOutput);
           const isNullTypeToolCall = isNullTypeToolCallError(result.output);
@@ -2309,6 +2317,7 @@ async function main() {
             isModelEndpointMismatch: !!nonRetryableGuard.modelEndpointMismatch,
             isAuthErr,
             isAuthenticationFailed,
+            isTransientHTMLResponse,
             isTransientCAPIError: isCAPIError,
             isMCPGatewayShutdown,
             isMCPPolicy,
@@ -2486,7 +2495,7 @@ async function main() {
             return retryDecision();
           }
 
-          if (isAuthenticationFailed) {
+          if (isAuthenticationFailed && (attempt > 0 || !sessionHasProgress || COPILOT_PAT_AUTH_FAILED_PATTERN.test(result.output))) {
             if (proxyAuthDiagnostic) {
               log(`attempt ${attempt + 1}: ${proxyAuthDiagnostic} — not retrying`);
             } else {
@@ -2617,7 +2626,7 @@ async function main() {
           }
 
           if (shouldRetryFailedExecution({ ...result, isModelRoutingFailure, attempt, maxRetries })) {
-            const reason = hasCAPIServerError ? "CAPI server error (transient)" : isCAPIError ? "CAPIError 400 (transient)" : "partial execution";
+            const reason = isTransientHTMLResponse ? "HTML API response (transient)" : hasCAPIServerError ? "CAPI server error (transient)" : isCAPIError ? "CAPIError 400 (transient)" : "partial execution";
             const isCrashSignal = isCrashSignalExitCode(result.exitCode);
             const crashSignalName = crashSignalNameForExitCode(result.exitCode);
             if (isCrashSignal) {

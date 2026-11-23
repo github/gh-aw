@@ -3257,6 +3257,47 @@ process.stdin.on("end", () => fs.writeFileSync(process.env.COPILOT_HARNESS_STUB_
   });
 
   describe("noop pre-flight and retry guard", () => {
+    it.each([
+      { progress: true, challenge: true, retries: true },
+      { progress: true, challenge: false, retries: true },
+      { progress: false, challenge: false, retries: false },
+    ])("handles Copilot edge and credential failures: %j", ({ progress, challenge, retries }) => {
+      const tempDir = makeHarnessTempDir("copilot-auth-retry-");
+      const stubPath = path.join(tempDir, "stub.cjs");
+      const callsPath = path.join(tempDir, "calls.jsonl");
+      const message = challenge ? "Authentication failed: HTTP 403: Just a moment..." : "Authentication failed (Request ID: abc)";
+      try {
+        fs.writeFileSync(
+          stubPath,
+          `const fs = require("fs");
+const callsPath = ${JSON.stringify(callsPath)};
+const firstAttempt = !fs.existsSync(callsPath);
+fs.appendFileSync(callsPath, JSON.stringify(process.argv.slice(2)) + "\\n");
+if (!firstAttempt) process.exit(0);
+if (${progress}) console.log(JSON.stringify({type:"assistant.message", data:{content:"Working"}}));
+console.error(JSON.stringify({type:"session.error", data:{message:${JSON.stringify(message)}}}));
+process.exit(1);`
+        );
+        const result = spawnSync(process.execPath, ["copilot_harness.cjs", process.execPath, stubPath, "--prompt", "test retry handling"], {
+          cwd: path.dirname(require.resolve("./copilot_harness.cjs")),
+          env: { ...harnessChildEnv, COPILOT_MODEL: "", GH_AW_SAFE_OUTPUTS: "", GH_AW_HARNESS_MAX_RETRIES: "1" },
+          encoding: "utf8",
+          timeout: 10000,
+        });
+        expect(result.status, result.stderr).toBe(retries ? 0 : 1);
+        const calls = fs
+          .readFileSync(callsPath, "utf8")
+          .trim()
+          .split("\n")
+          .map(line => JSON.parse(line));
+        expect(calls).toHaveLength(retries ? 2 : 1);
+        if (retries) expect(calls[1]).toContain("--continue");
+        expect(result.stderr).toContain(`failureClass=${challenge ? "transient_error" : "authentication_failed"}`);
+      } finally {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      }
+    });
+
     const filterEvents = [
       { type: "assistant.message", data: { content: "The model returned no content because the response was blocked by content filtering.", rte: true, toolRequests: [] } },
       { type: "session.error", data: { errorType: "query", message: CYBERSECURITY_POLICY_REJECTION_PREFIX, statusCode: 422 } },

@@ -117,9 +117,9 @@ function persistCopilotModelSelection(env = process.env) {
 /**
  * Observe only the invocation's exact session and newly appended records, not other sessions or subagents.
  * Native CLI startup fallback is not an authorized AWF fallback.
- * @param {{ configuredModel: string, resolvedModel: string, sessionId?: string, env?: NodeJS.ProcessEnv, sessionDirs?: string[], logger?: (message: string) => void }} options
+ * @param {{ configuredModel: string, resolvedModel: string, sessionId?: string, env?: NodeJS.ProcessEnv, sessionDirs?: string[], logger?: (message: string) => void, onSessionProgress?: () => void }} options
  */
-function createCopilotModelObserver({ configuredModel, resolvedModel, sessionId, env = process.env, sessionDirs, logger = () => {} }) {
+function createCopilotModelObserver({ configuredModel, resolvedModel, sessionId, env = process.env, sessionDirs, logger = () => {}, onSessionProgress = () => {} }) {
   const directories = sessionDirs || copilotSessionStateDirectories(env);
   /** @type {Map<string, number>} */
   const offsets = new Map();
@@ -179,6 +179,7 @@ function createCopilotModelObserver({ configuredModel, resolvedModel, sessionId,
         for (const event of iterateJsonl(text.slice(0, end))) {
           const context = copilotSessionContext(event);
           if (context.agentId !== undefined || context.parentToolUseId || (context.sessionId !== undefined && context.sessionId !== ownedSessionId)) continue;
+          if (event.type === "assistant.message" || event.type === "tool.execution_start") onSessionProgress();
           const model = modelID(event.type === "session.model_change" && event.data?.source === "startup" ? event.data.newModel : event.type === "assistant.message" ? event.data?.model : "");
           if (!model || model === observedModel) continue;
           observedModel = model;

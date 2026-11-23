@@ -75,6 +75,7 @@ const {
   buildSoftTimeoutGuard,
   emitSoftTimeoutSignal,
   isAuthenticationFailedError,
+  isHTMLResponseError,
   parseAICreditsExceededProxyRejection,
 } = require("./harness_retry_guard.cjs");
 const { MODEL_NOT_SUPPORTED_PATTERN: INVALID_MODEL_ERROR_PATTERN } = require("./detect_agent_errors.cjs");
@@ -1090,6 +1091,7 @@ async function main() {
   const serverToolTimeouts = resolveMCPServerToolTimeouts(loadCompiledConfig(), configuredToolTimeout);
   const durableSession = openDurableSession("codex");
   let lastThreadId = durableSession?.id || "";
+  let sessionHasProgress = false;
   /** @type {string[] | null} */
   let resumeArgs = lastThreadId ? buildCodexResumeArgs(resolvedArgs, lastThreadId) : null;
   if (lastThreadId && !resumeArgs) throw new Error("Cannot resume the restored durable Codex session with these arguments");
@@ -1147,6 +1149,7 @@ async function main() {
           const event = mcpWatchdog.observe(line);
           if (!event) return;
           if (event.type === "thread.started" && typeof event.thread_id === "string") lastThreadId = event.thread_id;
+          if (event.type === "turn.completed" || event.type === "item.completed") sessionHasProgress = true;
           if (event.type === "turn.failed" || event.type === "error") recordTerminalError(line);
           retryAfterMs = mergeTerminalRetryAfterMs(retryAfterMs, line, "codex");
         },
@@ -1230,6 +1233,7 @@ async function main() {
       const isCybersecurityPolicyRejection = isGitHubProviderCybersecurityPolicyRejection(result.output, process.env.GH_AW_LLM_PROVIDER, "codex");
       const isTokenPerMinuteRateLimit = isTokenPerMinuteRateLimitError(result.output);
       const isAuthenticationFailed = isAuthenticationFailedError(result.output);
+      const isTransientHTMLResponse = isHTMLResponseError(result.output);
       const isMissingApiKey = isMissingApiKeyError(result.output);
       const isServer = isServerError(result.output);
       const isInvalidModel = isInvalidModelError(result.output);
@@ -1243,6 +1247,7 @@ async function main() {
         rate_limit_error: isRateLimit,
         token_per_minute_rate_limit: isTokenPerMinuteRateLimit,
         authentication_failed: isAuthenticationFailed,
+        transient_error: isTransientHTMLResponse,
         missing_api_key: isMissingApiKey,
         server_error: isServer,
         invalid_model: isInvalidModel,
@@ -1325,7 +1330,7 @@ async function main() {
         return { action: "stop" };
       }
 
-      if (attempt === 0 && isAuthenticationFailed) {
+      if (attempt === 0 && isAuthenticationFailed && !sessionHasProgress) {
         log(`attempt ${attempt + 1}: authentication failed — not retrying (first-attempt auth failure is non-retryable)`);
         return { action: "stop" };
       }
@@ -1376,7 +1381,7 @@ async function main() {
         return { action: "stop" };
       }
 
-      const isTransient = isRateLimit || isServer;
+      const isTransient = isRateLimit || isServer || isTransientHTMLResponse;
       // An interrupted run may already have staged irreversible work. Neither a fresh
       // prompt nor a model continuation can guarantee that those outputs are not repeated.
       if (safeOutputsPath && hasExpectedSafeOutputs(safeOutputsPath, { logger: log })) {
@@ -1386,7 +1391,7 @@ async function main() {
       }
       if (attempt < MAX_RETRIES && (result.hasOutput || isTransient)) {
         resumeArgs = lastThreadId ? buildCodexResumeArgs(resolvedArgs, lastThreadId) : null;
-        const reason = isRateLimit ? "rate_limit_exceeded (transient)" : isServer ? "server_error (transient)" : "partial execution";
+        const reason = isRateLimit ? "rate_limit_exceeded (transient)" : isServer ? "server_error (transient)" : isTransientHTMLResponse ? "HTML API response (transient)" : "partial execution";
         log(`attempt ${attempt + 1}: ${reason} — will retry as ${resumeArgs ? `resume ${lastThreadId}` : "fresh run"} (attempt ${attempt + 2}/${MAX_RETRIES + 1})`);
         return { action: "retry" };
       }

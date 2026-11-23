@@ -221,6 +221,39 @@ function parseAPIProxyGuardRejection(output) {
 //   - "not logged in" — Claude Code message when no credentials are available
 const AUTHENTICATION_FAILED_PATTERNS = [/Authentication failed(?:\s*\(Request ID:[^)]+\))?/i, /"error"\s*:\s*"authentication_failed"/i, /not logged in/i];
 
+const HTML_ERROR_BODY_PATTERN = /\bJust a moment\.{3}|\bcf-chl\b|\bchallenge-platform\b|<!doctype[ \t]+html\b|<html[\s>]/i;
+const API_ERROR_CONTEXT_PATTERN = /\b(?:API error|failed to authenticate|authentication failed|authentication_failed|HTTP(?:\/\d(?:\.\d)?)?[ \t]+[45]\d\d|unexpected status[ \t]+[45]\d\d|[45]\d\d[ \t]+(?:Forbidden|Unauthorized|Bad Gateway|Service Unavailable))\b/i;
+
+/** @param {string} line */
+function hasAPIErrorContext(line) {
+  if (!line.trimStart().startsWith("{")) return API_ERROR_CONTEXT_PATTERN.test(line);
+  try {
+    const event = JSON.parse(line);
+    if (event.type === "assistant") return event.is_api_error_message === true || event.error === "authentication_failed";
+    if (event.type === "result") return event.is_error === true;
+    return ["error", "session.error", "turn.failed"].includes(event.type) || (!event.type && (event.error != null || API_ERROR_CONTEXT_PATTERN.test(line)));
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Match challenge pages in error evidence, not free-standing transcript text.
+ * Plain CLI errors can put the HTML body on the line after the error header.
+ * @param {string} line
+ * @param {string} nextLine
+ */
+function isHTMLResponseErrorLine(line, nextLine) {
+  if (HTML_ERROR_BODY_PATTERN.test(line)) return hasAPIErrorContext(line);
+  return !line.trimStart().startsWith("{") && /^\s*(?:<!doctype\b|<html\b|Just a moment\.{3})/i.test(nextLine) && API_ERROR_CONTEXT_PATTERN.test(line);
+}
+
+/** @param {string} output */
+function isHTMLResponseError(output) {
+  const lines = output.split("\n");
+  return lines.some((line, index) => isHTMLResponseErrorLine(line, lines[index + 1] ?? ""));
+}
+
 /**
  * @param {unknown} output
  * @returns {boolean}
@@ -236,8 +269,9 @@ function isMaxRunsExceededError(output) {
  * @returns {boolean}
  */
 function isAuthenticationFailedError(output) {
-  const safeOutput = typeof output === "string" ? output : "";
-  return AUTHENTICATION_FAILED_PATTERNS.some(pattern => pattern.test(safeOutput));
+  if (typeof output !== "string") return false;
+  const lines = output.split("\n");
+  return lines.some((line, index) => AUTHENTICATION_FAILED_PATTERNS.some(pattern => pattern.test(line)) && !isHTMLResponseErrorLine(line, lines[index + 1] ?? ""));
 }
 
 /**
@@ -341,6 +375,7 @@ module.exports = {
   AUTHENTICATION_FAILED_PATTERNS,
   isMaxRunsExceededError,
   isAuthenticationFailedError,
+  isHTMLResponseError,
   MODEL_ENDPOINT_MISMATCH_PATTERN,
   parseModelEndpointMismatch,
   parseAPIProxyGuardRejection,

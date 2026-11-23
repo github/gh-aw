@@ -151,6 +151,25 @@ function runHarnessFixture(script, { prompt = "fix the bug", args = [], env = {}
 
 describe("codex_harness.cjs", () => {
   it.each([
+    { progress: true, challenge: true, retries: true },
+    { progress: true, challenge: false, retries: true },
+    { progress: false, challenge: false, retries: false },
+  ])("only stops on first-attempt credential errors before Codex progress: %j", ({ progress, challenge, retries }) => {
+    const threadId = "12345678-1234-1234-1234-123456789abc";
+    const message = challenge ? "Authentication failed: unexpected status 403 Forbidden: <html>Blocked</html>" : "Authentication failed (Request ID: abc)";
+    const { result, calls } = runHarnessFixture(`
+if (process.argv.includes("resume")) process.exit(0);
+console.log(JSON.stringify({type:"thread.started", thread_id:${JSON.stringify(threadId)}}));
+if (${progress}) console.log(JSON.stringify({type:"item.completed",item:{type:"agent_message",id:"1",text:"Working"}}));
+console.log(JSON.stringify({type:"error",message:${JSON.stringify(message)}}));
+process.exit(1);`);
+    expect(result.status, result.stderr).toBe(retries ? 0 : 1);
+    expect(calls).toHaveLength(retries ? 2 : 1);
+    if (retries) expect(calls[1].args).toEqual(expect.arrayContaining(["resume", threadId]));
+    expect(result.stderr).toContain(`isAuthenticationFailedError=${!challenge}`);
+  });
+
+  it.each([
     ["1", "2000", 2, "rate_limit_error", true],
     ["245", "60000", 1, "rate_limit_wait_exceeded", true],
     ["1", "2000", 2, "rate_limit_error", false],

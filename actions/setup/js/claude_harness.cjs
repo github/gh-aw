@@ -89,6 +89,7 @@ const {
   buildSoftTimeoutGuard,
   emitSoftTimeoutSignal,
   isAuthenticationFailedError,
+  isHTMLResponseError,
   parseAICreditsExceededProxyRejection,
 } = require("./harness_retry_guard.cjs");
 const { isCrashSignalExitCode, crashSignalNameForExitCode } = require("./harness_crash_signals.cjs");
@@ -714,6 +715,7 @@ async function main() {
       const isOverloaded = isOverloadedError(classifierOutput);
       const isRateLimit = isRateLimitError(classifierOutput);
       const isAuthenticationFailed = isAuthenticationFailedError(classifierOutput);
+      const isTransientHTMLResponse = isHTMLResponseError(classifierOutput);
       const isMaxTurns = isMaxTurnsExit(classifierOutput);
       const isNoDeferredMarker = isNoDeferredMarkerError(classifierOutput);
       const isInvalidModel = isInvalidModelError(classifierOutput);
@@ -732,6 +734,7 @@ async function main() {
         overloaded_error: isOverloaded,
         rate_limit_error: isRateLimit,
         authentication_failed: isAuthenticationFailed,
+        transient_error: isTransientHTMLResponse,
         max_turns: isMaxTurns,
         no_deferred_marker: isNoDeferredMarker,
         invalid_model: isInvalidModel,
@@ -827,7 +830,7 @@ async function main() {
         return { action: "retry" };
       }
 
-      if (attempt === 0 && isAuthenticationFailed) {
+      if (attempt === 0 && isAuthenticationFailed && !sessionHasProgress) {
         log(`attempt ${attempt + 1}: authentication failed — not retrying (first-attempt auth failure is non-retryable)`);
         return { action: "stop" };
       }
@@ -905,7 +908,7 @@ async function main() {
           isNoDeferredMarker,
           continueDisabledPermanently,
         });
-        const reason = isOverloaded ? "overloaded_error (transient)" : isRateLimit ? "rate_limit_error (transient)" : "partial execution";
+        const reason = isTransientHTMLResponse ? "HTML API response (transient)" : isOverloaded ? "overloaded_error (transient)" : isRateLimit ? "rate_limit_error (transient)" : "partial execution";
         useContinueOnRetry = retryWithContinue;
         const retryMode = retryWithContinue ? `--resume ${sessionId}` : "fresh run (session resume disabled permanently)";
         log(`attempt ${attempt + 1}: ${reason} — will retry with ${retryMode} (attempt ${attempt + 2}/${maxRetries + 1})`);
