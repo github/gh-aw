@@ -1239,7 +1239,7 @@ describe("safe_outputs_handlers", () => {
       expect(() => handlers.uploadArtifactHandler({ path: linkPath })).toThrow(expect.objectContaining({ message: expect.stringContaining("symlinks are not allowed") }));
     });
 
-    it("should not overwrite existing staged file on duplicate call", () => {
+    it("should allow an identical file to be staged more than once", () => {
       const srcFile = path.join(testWorkspaceDir, "chart.png");
       fs.writeFileSync(srcFile, "original");
 
@@ -1249,10 +1249,22 @@ describe("safe_outputs_handlers", () => {
       const stagedPath = path.join(testStagingDir, "gh-aw", "safeoutputs", "upload-artifacts", "chart.png");
       expect(fs.readFileSync(stagedPath, "utf8")).toBe("original");
 
-      // Second call with modified source should not overwrite
-      fs.writeFileSync(srcFile, "updated");
-      handlers.uploadArtifactHandler({ path: srcFile });
+      // Re-staging identical content is safe.
+      expect(() => handlers.uploadArtifactHandler({ path: srcFile })).not.toThrow();
       expect(fs.readFileSync(stagedPath, "utf8")).toBe("original");
+    });
+
+    it("should reject different files with the same basename", () => {
+      const firstFile = path.join(testWorkspaceDir, "first", "report.png");
+      const secondFile = path.join(testWorkspaceDir, "second", "report.png");
+      fs.mkdirSync(path.dirname(firstFile), { recursive: true });
+      fs.mkdirSync(path.dirname(secondFile), { recursive: true });
+      fs.writeFileSync(firstFile, "first report");
+      fs.writeFileSync(secondFile, "second report");
+
+      handlers.uploadArtifactHandler({ path: firstFile });
+
+      expect(() => handlers.uploadArtifactHandler({ path: secondFile })).toThrow(expect.objectContaining({ message: expect.stringContaining("staging name conflict for report.png") }));
     });
 
     it("should wrap staging copy failures for absolute-path files", () => {
@@ -1371,6 +1383,51 @@ describe("safe_outputs_handlers", () => {
       expect(mockAppendSafeOutput).toHaveBeenCalledWith(expect.objectContaining({ type: "upload_artifact", path: "charts" }));
     });
 
+    it("should return early when the staged directory is identical", () => {
+      const srcDir = path.join(testWorkspaceDir, "charts");
+      fs.mkdirSync(srcDir, { recursive: true });
+      fs.writeFileSync(path.join(srcDir, "chart.png"), "same chart");
+      handlers.uploadArtifactHandler({ path: srcDir });
+
+      const copySpy = vi.spyOn(fs, "copyFileSync");
+      expect(() => handlers.uploadArtifactHandler({ path: srcDir })).not.toThrow();
+
+      expect(copySpy).not.toHaveBeenCalled();
+    });
+
+    it("should remove a partial directory copy so the same source can be retried", () => {
+      const srcDir = path.join(testWorkspaceDir, "retry-charts");
+      fs.mkdirSync(path.join(srcDir, "sub"), { recursive: true });
+      fs.writeFileSync(path.join(srcDir, "a.png"), "first chart");
+      const secondFile = path.join(srcDir, "sub", "b.png");
+      fs.writeFileSync(secondFile, "second chart");
+      const copySpy = vi.spyOn(fs, "copyFileSync").mockImplementation((source, dest) => {
+        if (source === secondFile) throw new Error("disk full");
+        fs.writeFileSync(dest, fs.readFileSync(source));
+      });
+
+      expect(() => handlers.uploadArtifactHandler({ path: srcDir })).toThrow(/disk full/);
+      const stagedDir = path.join(testStagingDir, "gh-aw", "safeoutputs", "upload-artifacts", "retry-charts");
+      expect(fs.existsSync(stagedDir)).toBe(false);
+      copySpy.mockRestore();
+
+      expect(() => handlers.uploadArtifactHandler({ path: srcDir })).not.toThrow();
+      expect(fs.readFileSync(path.join(stagedDir, "sub", "b.png"), "utf8")).toBe("second chart");
+    });
+
+    it("should reject different directories with the same basename", () => {
+      const firstDir = path.join(testWorkspaceDir, "first", "charts");
+      const secondDir = path.join(testWorkspaceDir, "second", "charts");
+      fs.mkdirSync(firstDir, { recursive: true });
+      fs.mkdirSync(secondDir, { recursive: true });
+      fs.writeFileSync(path.join(firstDir, "first.png"), "first chart");
+      fs.writeFileSync(path.join(secondDir, "second.png"), "second chart");
+
+      handlers.uploadArtifactHandler({ path: firstDir });
+
+      expect(() => handlers.uploadArtifactHandler({ path: secondDir })).toThrow(expect.objectContaining({ message: expect.stringContaining("staging name conflict for charts") }));
+    });
+
     it("should reject absolute path outside GITHUB_WORKSPACE and staging directory", () => {
       const outsideDir = path.join(testScratchRoot, "gh-aw-outside-handler-" + Math.random().toString(36).substring(7));
       try {
@@ -1400,6 +1457,20 @@ describe("safe_outputs_handlers", () => {
       fs.writeFileSync(gitConfig, "[core]\n  repositoryformatversion = 0\n");
 
       expect(() => handlers.uploadArtifactHandler({ path: gitConfig })).toThrow(expect.objectContaining({ message: expect.stringContaining("sensitive repository metadata") }));
+    });
+
+    it("should validate nested sensitive paths before comparing an existing directory", () => {
+      const sourceDir = path.join(testWorkspaceDir, "project");
+      const sourceConfig = path.join(sourceDir, ".git", "config");
+      const stagedConfig = path.join(testStagingDir, "gh-aw", "safeoutputs", "upload-artifacts", "project", ".git", "config");
+      fs.mkdirSync(path.dirname(sourceConfig), { recursive: true });
+      fs.mkdirSync(path.dirname(stagedConfig), { recursive: true });
+      fs.writeFileSync(sourceConfig, "sensitive metadata");
+      fs.writeFileSync(stagedConfig, "sensitive metadata");
+      const open = vi.spyOn(fs, "openSync");
+
+      expect(() => handlers.uploadArtifactHandler({ path: sourceDir })).toThrow(expect.objectContaining({ message: expect.stringContaining("sensitive repository metadata") }));
+      expect(open).not.toHaveBeenCalled();
     });
 
     it("should reject absolute path under system directories like /etc", () => {
