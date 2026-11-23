@@ -1383,6 +1383,38 @@ describe("safe_outputs_handlers", () => {
       expect(mockAppendSafeOutput).toHaveBeenCalledWith(expect.objectContaining({ type: "upload_artifact", path: "charts" }));
     });
 
+    it("should return early when the staged directory is identical", () => {
+      const srcDir = path.join(testWorkspaceDir, "charts");
+      fs.mkdirSync(srcDir, { recursive: true });
+      fs.writeFileSync(path.join(srcDir, "chart.png"), "same chart");
+      handlers.uploadArtifactHandler({ path: srcDir });
+
+      const copySpy = vi.spyOn(fs, "copyFileSync");
+      expect(() => handlers.uploadArtifactHandler({ path: srcDir })).not.toThrow();
+
+      expect(copySpy).not.toHaveBeenCalled();
+    });
+
+    it("should remove a partial directory copy so the same source can be retried", () => {
+      const srcDir = path.join(testWorkspaceDir, "retry-charts");
+      fs.mkdirSync(path.join(srcDir, "sub"), { recursive: true });
+      fs.writeFileSync(path.join(srcDir, "a.png"), "first chart");
+      const secondFile = path.join(srcDir, "sub", "b.png");
+      fs.writeFileSync(secondFile, "second chart");
+      const copySpy = vi.spyOn(fs, "copyFileSync").mockImplementation((source, dest) => {
+        if (source === secondFile) throw new Error("disk full");
+        fs.writeFileSync(dest, fs.readFileSync(source));
+      });
+
+      expect(() => handlers.uploadArtifactHandler({ path: srcDir })).toThrow(/disk full/);
+      const stagedDir = path.join(testStagingDir, "gh-aw", "safeoutputs", "upload-artifacts", "retry-charts");
+      expect(fs.existsSync(stagedDir)).toBe(false);
+      copySpy.mockRestore();
+
+      expect(() => handlers.uploadArtifactHandler({ path: srcDir })).not.toThrow();
+      expect(fs.readFileSync(path.join(stagedDir, "sub", "b.png"), "utf8")).toBe("second chart");
+    });
+
     it("should reject different directories with the same basename", () => {
       const firstDir = path.join(testWorkspaceDir, "first", "charts");
       const secondDir = path.join(testWorkspaceDir, "second", "charts");
