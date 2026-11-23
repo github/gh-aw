@@ -278,7 +278,7 @@ Turn Workflows into Factories, processes create factories, Repo Factory, workflo
 - One Dispatcher starts those pull request flows, up to three at once, one per shared weekday coding slot.
 - Several Researchers feed the Dispatcher with scoped issues, never pull requests.
 - A maintainer still decides every merge.
-- And a Dreamer watches the outcomes, then proposes one reversible change as a new issue, so the factory improves itself.
+- And a Dreamer watches the outcomes, then proposes one reversible change as a new issue, so the factory grows: more Researchers, more Reviewers.
 
 ### Security {#security}
 

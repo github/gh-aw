@@ -510,7 +510,7 @@
   .rf-bg { fill: #0d1117; fill-opacity: .88; stroke: #ffffff1f; stroke-width: 1.5; }
   .rf-svg .mra-l { fill: #d2a8ff; opacity: .9; } .rf-svg .mra-l.b { fill: #a5d6ff; } .rf-svg .fm-wire { opacity: .8; }
   .rf-svg .fm-lane-t, .rf-svg .rf-cap, .rf-svg .rf-zone { fill: #c9d1d9; } .rf-svg .rf-prt { fill: #d2a8ff; } .rf-svg .fm-div { stroke: #ffffff2e; }
-  .rf-st { transition: opacity .6s ease; } .rf-st.rf-hide { opacity: 0; }
+  .rf-st, .rf-crowd { transition: opacity .6s ease; } .rf-st.rf-hide, .rf-crowd.rf-hide { opacity: 0; }
   .rpa-code { opacity: .6; transition: opacity .4s; } .rpa-code.on { opacity: 1; }
   .rpa-code .card { fill: #0d1117e8; stroke: #3d444d; stroke-width: 2; transition: stroke .4s; }
   .rpa-code.on .card { stroke: #ab7df8; filter: drop-shadow(0 0 10px #8957e566); }
@@ -7088,8 +7088,8 @@
         `<path class="fm-wire ${c}" id="${id}" d="${d}" marker-end="url(#rf${c.startsWith("p") ? "P" : "B"})"/>` +
           `<text class="mra-l ${c}" x="${lx}" y="${ly}" text-anchor="${an}">${lab.map((l, k) => `<tspan x="${lx}" dy="${k ? 26 : 0}">${l}</tspan>`).join("")}</text>`,
       );
-    // several researchers and reviewers, one dispatcher: ghost cards stacked behind the plural roles
-    const crowd = x => [2, 1].map(i => `<g class="rf-ghost-a"><rect x="${x + i * 6}" y="${125 - i * 13}" width="230" height="50" rx="25"/><circle cx="${x + i * 6}" cy="${150 - i * 13}" r="34"/></g>`).join("");
+    // several researchers and reviewers, one dispatcher: each Dreamer pass adds one more card behind each plural role
+    const crowd = x => [2, 1].map(i => `<g class="rf-ghost-a rf-crowd" data-n="${i}"><rect x="${x + i * 6}" y="${125 - i * 13}" width="230" height="50" rx="25"/><circle cx="${x + i * 6}" cy="${150 - i * 13}" r="34"/></g>`).join("");
     // concurrent pull requests: ghost cards stacked behind each per-PR artifact
     let prs = "";
     [750, 1100, 1450].forEach(x => [2, 1].forEach(i => (prs += `<rect class="rf-ghost-a" x="${x - 36 + i * 6}" y="${306 - i * 13}" width="72" height="68" rx="14"/>`)));
@@ -7132,6 +7132,7 @@
       CYC = END + HOLD;
       t0 = 0;
       cyc = -1;
+      setGrow(0);
     };
     let t0 = 0,
       cyc = -1,
@@ -7141,11 +7142,18 @@
       if (nid in LANE) $("rfLane" + LANE[nid]).classList.add("on");
       if (nid === "nCoder") $("rfPR").classList.add("on");
     };
+    const DRM = SEQ.findIndex(x => x[1] === "nDreamer");
+    let grow = -1;
+    const setGrow = n => {
+      if (n === grow) return;
+      grow = n;
+      svg.querySelectorAll(".rf-crowd").forEach(x => x.classList.toggle("rf-hide", +x.dataset.n > n));
+    };
     slides.push({
       group: "platform",
       id: "workflows-process-factory",
       notes:
-        "What: An illustrative factory: processes create factories. The Repo Factory recipe is the process a coding agent follows to give a repository a small set of agentic workflows in five roles. It builds up from the pull request flow outward. Several Researchers file scoped issues, never pull requests. One Dispatcher admits issues into three shared coding slots on weekdays, so up to three pull request flows run at once. In each flow a Coder opens the pull request, several Reviewers leave at most three findings and Finisher repairs them, looping back for re-review for at most two rounds; then the pull request is ready or escalated, and a maintainer merges. Dreamer observes runs, costs and outcomes, then proposes one reversible change as a new issue.\nWhy: Handoffs go through issues and pull requests, and capacity is capped, so agents cannot flood the repository and people stay at the gates.\nWhen: Use it to bootstrap continuous improvement in a repository that already has CI and maintainers who review.",
+        "What: An illustrative factory: processes create factories. The Repo Factory recipe is the process a coding agent follows to give a repository a small set of agentic workflows in five roles. It builds up from the pull request flow outward. Several Researchers file scoped issues, never pull requests. One Dispatcher admits issues into three shared coding slots on weekdays, so up to three pull request flows run at once. In each flow a Coder opens the pull request, several Reviewers leave at most three findings and Finisher repairs them, looping back for re-review for at most two rounds; then the pull request is ready or escalated, and a maintainer merges. Dreamer observes runs, costs and outcomes, then proposes one reversible change as a new issue; each pass here adds a Researcher and a Reviewer as the factory grows.\nWhy: Handoffs go through issues and pull requests, and capacity is capped, so agents cannot flood the repository and people stay at the gates.\nWhen: Use it to bootstrap continuous improvement in a repository that already has CI and maintainers who review.",
       enter(dir) {
         setStage(dir < 0 ? LAST : 0);
       },
@@ -7189,6 +7197,7 @@
         dot.setAttribute("cy", q.y);
         dot.setAttribute("fill", p.classList.contains("b") ? "#4493f8" : "#ab7df8");
         for (let j = 0; j < k; j++) light(seq[j][1]);
+        if (stage === LAST) setGrow(Math.min(2, cyc + (k > DRM || (k === DRM && f >= 0.8) ? 1 : 0)));
         if (f >= 0.8) {
           if (popK !== k) {
             popK = k;
