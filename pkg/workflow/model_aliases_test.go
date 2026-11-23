@@ -450,6 +450,24 @@ func TestModelCatalogEnv(t *testing.T) {
 	}
 }
 
+// TestModelCatalogDisablesRouting verifies that model routing, which selects models from the
+// live catalogue, is never applied implicitly and is rejected explicitly without one.
+func TestModelCatalogDisablesRouting(t *testing.T) {
+	lock, _ := compileModelAliasWorkflow(t, "engine: copilot\n")
+	require.Contains(t, lock, "Resolve model routing", "baseline: the implicit routing default applies")
+
+	lock, _ = compileModelAliasWorkflow(t, "engine:\n  id: copilot\n  model-catalog: false\n")
+	assert.NotContains(t, lock, "Resolve model routing", "model-catalog: false must suppress implicit routing")
+	assert.NotContains(t, lock, "GH_AW_MODEL_ROUTING", "model-catalog: false must suppress implicit routing")
+
+	dir := t.TempDir()
+	path := filepath.Join(dir, "workflow.md")
+	require.NoError(t, os.WriteFile(path, []byte("---\non: workflow_dispatch\npermissions:\n  contents: read\nengine:\n  id: copilot\n  model-catalog: false\nmodel: router\n---\n\n# Test\n"), 0o600))
+	err := NewCompiler().CompileWorkflow(path)
+	require.Error(t, err, "explicit routing without a catalogue must fail")
+	assert.Contains(t, err.Error(), "engine.model-catalog: false")
+}
+
 // TestImportedModelAliasValidation verifies that imported alias maps get the same V-MAF key
 // and entry checks as the main workflow's.
 func TestImportedModelAliasValidation(t *testing.T) {

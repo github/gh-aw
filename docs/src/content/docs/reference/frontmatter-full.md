@@ -3579,7 +3579,8 @@ engine:
   # aliases that look like model ids such as gpt-5-mini, are resolved and the run
   # stops if no catalogue is available. Set to false for BYOK providers without a
   # /models route (for example Azure AI Gateway): configured models are then passed
-  # to the engine verbatim, without alias resolution.
+  # to the engine verbatim, without alias resolution, and model routing (implicit or
+  # model: router) is disabled because it selects models from the catalogue.
   # (optional)
   model-catalog: true
 
@@ -3777,7 +3778,8 @@ engine:
   # aliases that look like model ids such as gpt-5-mini, are resolved and the run
   # stops if no catalogue is available. Set to false for BYOK providers without a
   # /models route (for example Azure AI Gateway): configured models are then passed
-  # to the engine verbatim, without alias resolution.
+  # to the engine verbatim, without alias resolution, and model routing (implicit or
+  # model: router) is disabled because it selects models from the catalogue.
   # (optional)
   model-catalog: true
 
@@ -4393,7 +4395,8 @@ engine:
     # aliases that look like model ids such as gpt-5-mini, are resolved and the run
     # stops if no catalogue is available. Set to false for BYOK providers without a
     # /models route (for example Azure AI Gateway): configured models are then passed
-    # to the engine verbatim, without alias resolution.
+    # to the engine verbatim, without alias resolution, and model routing (implicit or
+    # model: router) is disabled because it selects models from the catalogue.
     # (optional)
     model-catalog: true
 
@@ -22651,7 +22654,8 @@ safe-outputs:
       # aliases that look like model ids such as gpt-5-mini, are resolved and the run
       # stops if no catalogue is available. Set to false for BYOK providers without a
       # /models route (for example Azure AI Gateway): configured models are then passed
-      # to the engine verbatim, without alias resolution.
+      # to the engine verbatim, without alias resolution, and model routing (implicit or
+      # model: router) is disabled because it selects models from the catalogue.
       # (optional)
       model-catalog: true
 
@@ -22849,7 +22853,8 @@ safe-outputs:
       # aliases that look like model ids such as gpt-5-mini, are resolved and the run
       # stops if no catalogue is available. Set to false for BYOK providers without a
       # /models route (for example Azure AI Gateway): configured models are then passed
-      # to the engine verbatim, without alias resolution.
+      # to the engine verbatim, without alias resolution, and model routing (implicit or
+      # model: router) is disabled because it selects models from the catalogue.
       # (optional)
       model-catalog: true
 
@@ -23465,7 +23470,8 @@ safe-outputs:
         # aliases that look like model ids such as gpt-5-mini, are resolved and the run
         # stops if no catalogue is available. Set to false for BYOK providers without a
         # /models route (for example Azure AI Gateway): configured models are then passed
-        # to the engine verbatim, without alias resolution.
+        # to the engine verbatim, without alias resolution, and model routing (implicit or
+        # model: router) is disabled because it selects models from the catalogue.
         # (optional)
         model-catalog: true
 

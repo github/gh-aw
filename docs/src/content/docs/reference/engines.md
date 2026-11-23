@@ -218,7 +218,7 @@ Copilot, Claude, Codex, Pi, and Agy resolve aliases against the configured provi
 - `auto` keeps its engine-specific meaning. In Copilot CLI mode, `?effort=low`, `?effort=medium`, and `?effort=high` on a model ID or alias become `--reasoning-effort` after alias resolution. The CLI receives the model ID without the suffix. An explicit `--reasoning-effort` in `engine.args` takes precedence.
 - Missing matches fail with `model_unavailable`; incomplete discovery fails with `catalog_unavailable`.
 
-Set `engine.model-catalog: false` (default `true`) for BYOK providers without a `/models` route, such as Azure AI Gateway. The configured model is then passed to the engine verbatim: aliases are not resolved, and a model ID that matches a built-in alias (such as `gpt-5-mini`) no longer fails with `catalog_unavailable`.
+Set `engine.model-catalog: false` (default `true`) for BYOK providers without a `/models` route, such as Azure AI Gateway. The configured model is then passed to the engine verbatim: aliases are not resolved, and a model ID that matches a built-in alias (such as `gpt-5-mini`) no longer fails with `catalog_unavailable`. Model routing also needs the catalogue, so the implicit routing default is not applied and `model: router` fails compilation.
 
 ```yaml wrap
 engine:
