@@ -306,8 +306,11 @@ test_setup_javascript() {
     (
         cd actions/setup/js
         npm run typecheck --silent
+        # Runs beside the CPU-bound custom-linter job; lock-parsing tests that take
+        # ~1s alone have exceeded vitest's 10s default there.
         npm run test:js -- \
             --no-file-parallelism \
+            --testTimeout=30000 \
             --passWithNoTests \
             "${JS_TEST_EXCLUDES[@]}" \
             "${setup_js_files[@]}"
