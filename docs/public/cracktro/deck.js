@@ -1,5 +1,5 @@
 // GitHub Agentic Workflows — a zero-dependency, all-JavaScript slide deck.
-// Open index.html directly in a browser. Keys: ← → space, Home/End, F fullscreen, N notes.
+// Open index.html directly in a browser. Keys: ← → slides, Space/Backspace in-slide steps, Home/End, F fullscreen, N notes.
 (() => {
   const W = 1920,
     H = 1080;
@@ -5036,7 +5036,7 @@
     const cards = SC.map((s, i) =>
       h(
         "button",
-        { class: "atk-card", type: "button", "aria-pressed": "false", "aria-keyshortcuts": "ArrowLeft ArrowRight", title: `${s.t} (← → step through scenarios)`, onclick: () => i !== sc && (done.add(sc), setScenario(i), sfx.step()) },
+        { class: "atk-card", type: "button", "aria-pressed": "false", "aria-keyshortcuts": "Space Backspace", title: `${s.t} (Space/Backspace step through scenarios)`, onclick: () => i !== sc && (done.add(sc), setScenario(i), sfx.step()) },
         h("b", {}, i + 1),
         h("span", { class: "h4" }, s.t),
         h("span", { class: "p" }, s.d)
@@ -5115,7 +5115,7 @@
     const self = {
       group: "security",
       notes:
-        "What: Five simulated attacks, stepped with the arrow keys and mapped to the OWASP Top 10 lists for LLM and agentic applications: malware injection, encoded-secret theft, an image-link leak, hidden text for the next agent, and repository deletion. Each is stopped by a different layer, from integrity filtering and read-only tokens to the firewall and threat detection.\nWhy: No single defence is enough; overlapping layers catch what one misses, and the compiler rejects risky configurations.\nWhen: Use it to review a threat model. By default threat detection warns; strict mode blocks every safe output.",
+        "What: Five simulated attacks, stepped with Space and mapped to the OWASP Top 10 lists for LLM and agentic applications: malware injection, encoded-secret theft, an image-link leak, hidden text for the next agent, and repository deletion. Each is stopped by a different layer, from integrity filtering and read-only tokens to the firewall and threat detection.\nWhy: No single defence is enough; overlapping layers catch what one misses, and the compiler rejects risky configurations.\nWhen: Use it to review a threat model. By default threat detection warns; strict mode blocks every safe output.",
       enter(dir) {
         done = new Set();
         setScenario(dir < 0 ? SC.length - 1 : 0);
@@ -9334,7 +9334,7 @@
       group: "cost",
       experimental: "model: router",
       notes:
-        "What: Five illustrative ways to cut the cost of a daily pull request summary, stepped with the right arrow: run weekly; fetch data in a plain gh step; cap spend with AI-credit limits and optional central admission; fan work out to a sub-agent on a smaller model; and, experimental, model: router. AIC means AI credits; about 2,800 to 110 AIC a week is illustrative, not usage or billing data.\nWhy: Every run costs credits; frequency, input, limits and model each trade against freshness or quality.\nWhen: Walk through these in order before you tune prompts.",
+        "What: Five illustrative ways to cut the cost of a daily pull request summary, stepped with Space: run weekly; fetch data in a plain gh step; cap spend with AI-credit limits and optional central admission; fan work out to a sub-agent on a smaller model; and, experimental, model: router. AIC means AI credits; about 2,800 to 110 AIC a week is illustrative, not usage or billing data.\nWhy: Every run costs credits; frequency, input, limits and model each trade against freshness or quality.\nWhen: Walk through these in order before you tune prompts.",
       enter() {
         t0 = last = spawn = 0;
         pk = [];
@@ -16003,7 +16003,7 @@
     const cards = RAI.map(([name, ic, how, ctl], i) =>
       h(
         "button",
-        { class: "rai-card", type: "button", "--i": i, "aria-pressed": "false", "aria-keyshortcuts": "ArrowLeft ArrowRight", title: `${name} (← → step through principles)`, onclick: () => (focus(f === i ? -1 : i), sfx.step()) },
+        { class: "rai-card", type: "button", "--i": i, "aria-pressed": "false", "aria-keyshortcuts": "Space Backspace", title: `${name} (Space/Backspace step through principles)`, onclick: () => (focus(f === i ? -1 : i), sfx.step()) },
         h("span", { class: "rai-n" }, String(i + 1).padStart(2, "0")),
         h("span", { class: "rai-hd" }, h("span", { innerHTML: `<svg viewBox="0 0 24 24" aria-hidden="true">${ICON[ic].map(d => `<path d="${d}"/>`).join("")}</svg>` }).firstChild, h("span", { class: "rai-nm" }, name)),
         h("span", { class: "rai-p" }, how),
@@ -16032,7 +16032,7 @@
     slides.push({
       group: "security",
       notes:
-        "What: Six responsible AI principles, each paired with gh-aw controls that support them; the arrow keys step through them. Reliability, privacy and accountability come from the sandbox, read-only token, safe outputs and approval gates; transparency from AI-generated footers, reviewable lock files and audits.\nWhy: Principles help only when they become defaults you can inspect. These are safeguards, not guarantees: nothing here certifies that an output is accurate or fair.\nWhen: Before rollout, name who a workflow affects, trial it in staged mode on representative, multilingual and adversarial inputs, and keep a person on impactful writes.",
+        "What: Six responsible AI principles, each paired with gh-aw controls that support them; Space steps through them. Reliability, privacy and accountability come from the sandbox, read-only token, safe outputs and approval gates; transparency from AI-generated footers, reviewable lock files and audits.\nWhy: Principles help only when they become defaults you can inspect. These are safeguards, not guarantees: nothing here certifies that an output is accurate or fair.\nWhen: Before rollout, name who a workflow affects, trial it in staged mode on representative, multilingual and adversarial inputs, and keep a person on impactful writes.",
       enter(dir) {
         focus(dir < 0 ? RAI.length - 1 : -1);
       },
@@ -24395,7 +24395,7 @@
     const tabs = PROCS.map((p, i) =>
       h(
         "button",
-        { class: "pm-tab", type: "button", "aria-pressed": "false", "aria-keyshortcuts": "ArrowLeft ArrowRight", title: `${p.tab[0]} (← → switch process)`, onclick: () => (pick(i), sfx.step()) },
+        { class: "pm-tab", type: "button", "aria-pressed": "false", "aria-keyshortcuts": "Space Backspace", title: `${p.tab[0]} (Space/Backspace switch process)`, onclick: () => (pick(i), sfx.step()) },
         h("i", {}, String(i + 1)),
         h("div", {}, h("b", {}, p.tab[0]), h("em", {}, p.tab[1]))
       )
@@ -25089,7 +25089,7 @@
     },
     // Trust the process: a concept slide, plain soft grey with no grid (light), one heavy review bell against quick merge blips.
     trust: { light: true, base: [200, 209, 218], pal: ["#000000", "#000000", "#000000", "#000000"], grid: [200, 209, 218, 0, 0], ang: Math.PI / 8, cell: 32, accent: ["#56d364", "#2ea043", "#aff5b4", "#4493f8"], music: "trust", prog: [0] },
-    // Cost Optimization: gray base, gold grid turned 45° the other way (-π/4), coins.
+    // FinOps: gray base, gold grid turned 45° the other way (-π/4), coins.
     cost: { base: [13, 17, 23], pal: ["#7d5200", "#4a3000", "#9e6a03", "#2b1d00"], grid: [255, 196, 40, 0.08, 0.2], ang: -Math.PI / 4, cell: 32, accent: ["#e3b341", "#9e6a03", "#f8e3a1", "#d29922"], music: "cost", prog: [0, 2, 4, -3] },
     // Agentic Engineering: Copilot purple, grid tilted 30°, an engine rev.
     engineering: {
@@ -25123,11 +25123,12 @@
   // ---------- bands ----------
   // The deck is a table: each group is one horizontal band (row) led by a header slide.
   // The title and the finale (last) are rows of their own. Right/left walk the deck in reading order; up/down jump between bands.
+  // [title, subtitle, id?]: the optional id pins a renamed header's published #link.
   const BANDS = {
     platform: ["Agentic Workflows", "AI-Powered workflows for GitHub"],
     security: ["Security", "Assume the agent is compromised"],
     process: ["Human agent processes", "Engineer processes, not code"],
-    cost: ["Cost Optimization", "Debug, spend less, route smarter"],
+    cost: ["FinOps", "More value, less tokens", "cost-optimization"],
     engineering: ["Agentic Engineering", "Skip, remember, chain, measure"],
     enterprise: ["Enterprise", "Any agent, any provider, any scale"],
     cao: ["Central Agentic Ops", "CAO · gh cao · research prototype"],
@@ -25421,7 +25422,7 @@
         [64, 67, 71, 67, 64, 67, 71, 74].forEach((m, i) => tone(m, t + 0.2 + i * s, { type: "triangle", dur: 0.22, vol: 0.09, cutoff: 2600 }));
         [0, 0.22, 0.56, 0.78].forEach(d => osc("sine", 70, t + 0.2 + d, 0.18, 0.35, { f1: 40 }));
       },
-      // cost optimization: coins dropping into a jar, then a gentle register "ding"
+      // FinOps: coins dropping into a jar, then a gentle register "ding"
       cost: t => {
         for (let i = 0; i < 9; i++) {
           const d = 0.2 + i * 0.09 + Math.random() * 0.03;
