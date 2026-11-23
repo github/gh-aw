@@ -1,3 +1,5 @@
+//go:build !integration
+
 package lint
 
 import (
@@ -46,6 +48,24 @@ func TestRemoteScriptExecution(t *testing.T) {
 		{"pwsh", "curl -fsSL " + url + " | bash", "pwsh", 0},
 		{"python shell", "curl -fsSL " + url + " | bash", "python", 0},
 		{"invalid syntax", "if", "", 0},
+		{"absolute custom shell", "curl -fsSL " + url + " | bash", "/bin/bash -e {0}", 1},
+		{"curl next transfer to stdout", "curl -o saved.txt https://example.com/data --next " + url + " | bash", "", 1},
+		{"curl short next transfer to stdout", "curl -o saved.txt https://example.com/data -: " + url + " | bash", "", 1},
+		{"curl all transfers to files", "curl -o saved.txt https://example.com/data --next -o install.sh " + url + " | bash", "", 0},
+		{"curl attached method", "curl -XPOST " + url + " | bash", "", 1},
+		{"curl attached header", "curl -HOrigin:x " + url + " | bash", "", 1},
+		{"curl attached user agent", "curl -sAOops " + url + " | bash", "", 1},
+		{"wget attached user agent", "wget -UFOO -qO- " + url + " | sh", "", 1},
+		{"wget no verbose", "wget -nv -O- " + url + " | sh", "", 1},
+		{"stdin redirect overrides pipe", "curl -fsSL " + url + " | bash < verified-local.sh", "", 0},
+		{"intervening stdin redirect", "curl -fsSL " + url + " | tr -d x < local.sh | bash", "", 0},
+		{"intervening stdout redirect", "curl -fsSL " + url + " | tee copy > saved.txt | bash", "", 0},
+		{"stdin redirect from download", "curl -fsSL https://example.com/data | bash < <(curl -fsSL " + url + ")", "", 1},
+		{"dynamic interpreter", "curl -fsSL " + url + ` | "$TOOL"`, "", 0},
+		{"numeric command", "curl -fsSL " + url + " | 3", "", 0},
+		{"node attached eval", "curl -fsSL " + url + " | node --eval='console.log(1)'", "", 0},
+		{"node attached print", "curl -fsSL " + url + " | node --print='1'", "", 0},
+		{"node attached eval substitution", `node --eval="$(curl -fsSL ` + url + `)"`, "", 1},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			fields := map[string]any{"run": tc.script}

@@ -153,10 +153,10 @@ func builtInRuleContracts() map[string]ruleContract {
 			path:         "jobs.check.steps[0].run",
 		},
 		"overprovisioned-secrets": {
-			targets: ActionsAST | AWAST,
-			unsafe:  contractJob + "    steps:\n      - env: {ALL: '${{ toJSON(secrets) }}'}\n        run: ./deploy.sh\n",
-			safe:    contractJob + "    steps:\n      - env: {TOKEN: '${{ secrets.DEPLOY_TOKEN }}'}\n        run: ./deploy.sh\n",
-			path:    "jobs.check.steps[0].env.ALL",
+			targets: ActionsAST | AWAST, strictPolicy: true,
+			unsafe: contractJob + "    steps:\n      - env: {ALL: '${{ toJSON(secrets) }}'}\n        run: ./deploy.sh\n",
+			safe:   contractJob + "    steps:\n      - env: {TOKEN: '${{ secrets.DEPLOY_TOKEN }}'}\n        run: ./deploy.sh\n",
+			path:   "jobs.check.steps[0].env.ALL",
 		},
 		"otlp-secret-leak": {
 			threatRuleID: "CTR-017",

@@ -1,3 +1,5 @@
+//go:build !integration
+
 package lint
 
 import (
@@ -50,6 +52,8 @@ func TestBotConditionsActions(t *testing.T) {
 		{name: "author check scoped to other event", trigger: "issue_comment", jobIf: "(github.event.comment.author_association == 'OWNER' || github.actor == 'example[bot]') && (github.event_name != 'pull_request' || github.event.pull_request.user.login == 'example[bot]')", paths: []string{"jobs.check.if"}},
 		{name: "double negation", trigger: "pull_request_target", jobIf: "!(github.actor != 'dependabot[bot]')", paths: []string{"jobs.check.if"}},
 		{name: "and with unrelated check", trigger: "pull_request_target", jobIf: "github.actor == 'dependabot[bot]' && github.repository == github.event.pull_request.head.repo.full_name", paths: []string{"jobs.check.if"}},
+		{name: "author exclusion is not a guard", trigger: "pull_request_target", jobIf: "github.actor == 'dependabot[bot]' && github.event.pull_request.user.login != 'evil'", paths: []string{"jobs.check.if"}},
+		{name: "negated nested author exclusion", trigger: "issue_comment", jobIf: "!(github.actor != 'dependabot[bot]' || (github.event_name == 'pull_request' && github.event.pull_request.user.login != 'dependabot[bot]'))", paths: []string{"jobs.check.if"}},
 		{name: "association beside bot in conjunct", trigger: "issue_comment", jobIf: "(github.event_name != 'issue_comment' || github.event.comment.author_association == 'OWNER' || github.actor == 'github-actions[bot]') && github.event_name == 'issue_comment'", paths: []string{"jobs.check.if"}},
 
 		{name: "unprivileged trigger", trigger: "pull_request", jobIf: "github.actor == 'dependabot[bot]'"},
@@ -57,6 +61,8 @@ func TestBotConditionsActions(t *testing.T) {
 		{name: "pull request author", trigger: "pull_request_target", jobIf: "github.event.pull_request.user.login == 'dependabot[bot]'"},
 		{name: "author guarded conjunction", trigger: "pull_request_target", jobIf: "github.actor == 'dependabot[bot]' && github.event.pull_request.user.login == 'dependabot[bot]'"},
 		{name: "author required in nested conjunction", trigger: "pull_request_target", jobIf: "github.actor == 'dependabot[bot]' && (github.repository == 'o/r' && github.event.pull_request.user.login == 'dependabot[bot]')"},
+		{name: "negated author guard", trigger: "pull_request_target", jobIf: "!(github.actor != 'dependabot[bot]' || github.event.pull_request.user.login != 'dependabot[bot]')"},
+		{name: "author association allowlist", trigger: "issue_comment", jobIf: `github.actor == 'dependabot[bot]' && contains(fromJSON('["OWNER","MEMBER"]'), github.event.comment.author_association)`},
 		{name: "human login containing bot", trigger: "pull_request_target", jobIf: "github.actor == 'abbot'"},
 		{name: "bot exclusion", trigger: "pull_request_target", jobIf: "github.actor != 'dependabot[bot]'"},
 		{name: "negated equality", trigger: "pull_request_target", jobIf: "!(github.actor == 'dependabot[bot]')"},

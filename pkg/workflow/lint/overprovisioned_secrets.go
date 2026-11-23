@@ -3,6 +3,7 @@ package lint
 import (
 	"context"
 	"errors"
+	"slices"
 	"strings"
 
 	"github.com/github/gh-aw/pkg/workflow/actions"
@@ -33,6 +34,24 @@ func checkOverprovisionedSecrets(ctx context.Context, input Input) ([]Diagnostic
 	if err := integrityInput(ctx, input); err != nil {
 		return nil, err
 	}
+	diagnostics, err := overprovisionedSecretsDiagnostics(ctx, input)
+	// Mirror validateSecretsSerializationExpressions: errors require strict AW
+	// policy; strict: false and Actions-only input without policy report warnings.
+	strict := input.Document != nil
+	if strict {
+		if value, ok := input.Document.Frontmatter["strict"].(bool); ok {
+			strict = value
+		}
+	}
+	if !strict {
+		for i := range diagnostics {
+			diagnostics[i].Severity = Warning
+		}
+	}
+	return diagnostics, err
+}
+
+func overprovisionedSecretsDiagnostics(ctx context.Context, input Input) ([]Diagnostic, error) {
 	var diagnostics []Diagnostic
 	visit := func(path, text string) error {
 		reported := false
@@ -59,12 +78,10 @@ func checkOverprovisionedSecrets(ctx context.Context, input Input) ([]Diagnostic
 			if !job.SecretsInherit {
 				continue
 			}
-			// Compiler-generated call-workflow jobs may fall back to inheritance;
-			// only authored jobs are actionable when provenance is available.
-			if authored != nil {
-				if _, exists := authored[string(job.ID)]; !exists {
-					continue
-				}
+			// Only exempt call-workflow fan-out jobs positively identified as the
+			// compiler's inherit fallback; companion Markdown may omit imported jobs.
+			if _, exists := authored[string(job.ID)]; !exists && isCompilerCallWorkflowFallback(input.Workflow, job) {
+				continue
 			}
 			diagnostics = append(diagnostics, inheritDiagnostic("jobs."+string(job.ID)+".secrets", job.Uses))
 		}
@@ -77,6 +94,18 @@ func checkOverprovisionedSecrets(ctx context.Context, input Input) ([]Diagnostic
 
 	blocks, err := aw.ExecutionBlocks(ctx, input.Document)
 	failures := []error{err}
+	// engine.env and sandbox.agent.env are copied into the agent execution step
+	// environment but are not execution blocks.
+	if input.Document != nil {
+		if engine, ok := input.Document.Frontmatter["engine"].(map[string]any); ok {
+			failures = append(failures, walkExpressionScalars(ctx, engine["env"], "engine.env", visit))
+		}
+		if sandbox, ok := input.Document.Frontmatter["sandbox"].(map[string]any); ok {
+			if agent, ok := sandbox["agent"].(map[string]any); ok {
+				failures = append(failures, walkExpressionScalars(ctx, agent["env"], "sandbox.agent.env", visit))
+			}
+		}
+	}
 	for _, block := range blocks {
 		if secrets, ok := block.Fields["secrets"].(string); ok && strings.EqualFold(strings.TrimSpace(secrets), "inherit") {
 			if uses, ok := block.Fields["uses"].(string); ok {
@@ -93,6 +122,31 @@ func checkOverprovisionedSecrets(ctx context.Context, input Input) ([]Diagnostic
 		}
 	}
 	return diagnostics, errors.Join(failures...)
+}
+
+// isCompilerCallWorkflowFallback reports whether job has the exact shape of a
+// compiler-generated call-workflow fan-out job: call-<worker> needing
+// safe_outputs, gated on call_workflow_name, and calling the local worker file.
+func isCompilerCallWorkflowFallback(workflow *actions.Workflow, job *actions.Job) bool {
+	worker, local := strings.CutPrefix(job.Uses, "./.github/workflows/")
+	if !local || !strings.HasPrefix(string(job.ID), "call-") || !slices.Contains(job.Needs, actions.JobID("safe_outputs")) || job.If == nil {
+		return false
+	}
+	for _, extension := range []string{".lock.yml", ".yml", ".md"} {
+		if name, ok := strings.CutSuffix(worker, extension); ok {
+			worker = name
+			break
+		}
+	}
+	condition, err := actions.RenderExpression(job.If, job.ID, workflow, false)
+	if err != nil {
+		return false
+	}
+	condition = strings.TrimSpace(condition)
+	for strings.HasPrefix(condition, "(") && strings.HasSuffix(condition, ")") {
+		condition = strings.TrimSpace(condition[1 : len(condition)-1])
+	}
+	return condition == "needs.safe_outputs.outputs.call_workflow_name == '"+strings.ReplaceAll(worker, "'", "''")+"'"
 }
 
 func overprovisionedSecretsProvenance(input Input) (map[string]any, error) {
@@ -128,7 +182,7 @@ func materializesSecretsContext(node actionlint.ExprNode) bool {
 			return
 		}
 		variable, ok := child.(*actionlint.VariableNode)
-		if !ok || variable.Name != "secrets" {
+		if !ok || !strings.EqualFold(variable.Name, "secrets") {
 			return
 		}
 		switch parent := parent.(type) {

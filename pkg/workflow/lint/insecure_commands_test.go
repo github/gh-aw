@@ -1,7 +1,10 @@
+//go:build !integration
+
 package lint
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/github/gh-aw/pkg/workflow/actions"
@@ -46,6 +49,7 @@ func TestInsecureCommandsAWOnlyLocations(t *testing.T) {
 	for _, tc := range []struct{ source, path string }{
 		{"engine:\n  id: copilot\n  env: {" + flag + "}\n", "engine.env.ACTIONS_ALLOW_UNSECURE_COMMANDS"},
 		{"steps:\n  - env: {" + flag + "}\n    run: echo public\n", "steps[0].env.ACTIONS_ALLOW_UNSECURE_COMMANDS"},
+		{"sandbox:\n  agent:\n    env: {" + flag + "}\n", "sandbox.agent.env.ACTIONS_ALLOW_UNSECURE_COMMANDS"},
 		{"safe-outputs:\n  jobs:\n    notify:\n      env: {" + flag + "}\n      steps: [{run: echo public}]\n", "safe-outputs.jobs.notify.env.ACTIONS_ALLOW_UNSECURE_COMMANDS"},
 	} {
 		t.Run(tc.path, func(t *testing.T) {
@@ -95,6 +99,29 @@ func TestInsecureCommandsIgnoresOtherNames(t *testing.T) {
 	}
 }
 
+func TestInsecureCommandsWindowsCaseInsensitiveNames(t *testing.T) {
+	const flag = "actions_allow_unsecure_commands"
+	job := "jobs:\n  check:\n    runs-on: windows-latest\n"
+	for _, tc := range []struct{ name, source, path string }{
+		{"workflow", "env: {" + flag + ": 'true'}\n" + job + contractSafeSteps, "env." + flag},
+		{"job", job + "    env: {" + flag + ": 'true'}\n" + contractSafeSteps, "jobs.check.env." + flag},
+		{"step", job + "    steps:\n      - env: {" + flag + ": 'true'}\n        shell: bash\n        run: echo public\n", "jobs.check.steps[0].env." + flag},
+	} {
+		for _, target := range []ASTTargets{ActionsAST, AWAST} {
+			t.Run(tc.name+"/"+target.String(), func(t *testing.T) {
+				diagnostics := runInsecureCommands(t, ruleContractInput(t, tc.source, target, false))
+				require.Len(t, diagnostics, 1)
+				assert.Equal(t, tc.path, diagnostics[0].Path)
+			})
+		}
+	}
+}
+
+func TestInsecureCommandsNilJobIsError(t *testing.T) {
+	_, err := checkInsecureCommands(context.Background(), Input{Workflow: &actions.Workflow{Jobs: []*actions.Job{nil}}})
+	require.Error(t, err)
+}
+
 func TestInsecureCommandsDeprecatedScriptCommands(t *testing.T) {
 	for _, tc := range []struct {
 		name, script, shell string
@@ -115,14 +142,26 @@ func TestInsecureCommandsDeprecatedScriptCommands(t *testing.T) {
 		{"comment", `# echo "::set-output name=a::b"`, "", 0, ""},
 		{"powershell", `echo "::set-output name=a::b"`, "pwsh", 0, ""},
 		{"invalid syntax", "if", "", 0, ""},
+		{"custom bash path", `echo "::set-output name=a::b"`, "/bin/bash -e {0}", 1, "$GITHUB_OUTPUT"},
+		{"windows default shell", `echo "::set-output name=a::b"`, "", 0, ""},
+		{"printf assignment", `printf -v message '::set-output name=x::y'`, "", 0, ""},
+		{"redirected to file", `printf '::set-output name=x::value\n' > fixture.txt`, "", 0, ""},
+		{"redirected block", "{\n  echo \"::set-output name=a::b\"\n} >> out.txt", "", 0, ""},
+		{"captured output", `value=$(echo "::set-output name=a::b")`, "", 0, ""},
+		{"redirected to stderr", `echo "::set-output name=a::b" >&2`, "", 1, "$GITHUB_OUTPUT"},
+		{"stderr redirect only", `echo "::set-output name=a::b" 2> err.txt`, "", 1, "$GITHUB_OUTPUT"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			fields := map[string]any{"run": tc.script}
 			if tc.shell != "" {
 				fields["shell"] = tc.shell
 			}
+			runsOn := "ubuntu-latest"
+			if strings.HasPrefix(tc.name, "windows") {
+				runsOn = "windows-latest"
+			}
 			workflow := &actions.Workflow{Jobs: []*actions.Job{{
-				ID: "check", RunsOn: "ubuntu-latest", Steps: []actions.Step{actions.RawStep{Fields: fields}},
+				ID: "check", RunsOn: runsOn, Steps: []actions.Step{actions.RawStep{Fields: fields}},
 			}}}
 			diagnostics := runInsecureCommands(t, Input{Workflow: workflow})
 			require.Len(t, diagnostics, tc.want)

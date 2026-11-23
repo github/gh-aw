@@ -105,10 +105,7 @@ func stepReferenceBlocks(ctx context.Context, input Input) ([]aw.ExecutionBlock,
 }
 
 func checkStepReferenceBlock(ctx context.Context, block aw.ExecutionBlock, authored bool) ([]Diagnostic, error) {
-	additional, err := stepReferenceSetupSteps(ctx, block, authored)
-	if err != nil {
-		return nil, err
-	}
+	additional := stepReferenceSetupSteps(block, authored)
 	ids := make(map[string]struct{})
 	for _, step := range append(additional, block.Steps...) {
 		if err := ctx.Err(); err != nil {
@@ -129,7 +126,7 @@ func checkStepReferenceBlock(ctx context.Context, block aw.ExecutionBlock, autho
 	}
 	var diagnostics []Diagnostic
 	reported := make(map[string]struct{})
-	err = walkExpressionScalars(ctx, block.Fields, block.Path, func(path, text string) error {
+	err := walkExpressionScalars(ctx, block.Fields, block.Path, func(path, text string) error {
 		if stepReferenceAgentMetadataPath(block.Path, path) {
 			return nil
 		}
@@ -212,45 +209,20 @@ func stepReferenceAgentMetadataPath(jobPath, path string) bool {
 	return found && (field == "description" || strings.HasPrefix(field, "inputs."))
 }
 
-// Custom jobs emit setup/pre-steps in the same Actions job, but the shared
-// authored execution traversal only exposes regular steps and post-steps.
-func stepReferenceSetupSteps(ctx context.Context, block aw.ExecutionBlock, authored bool) ([]aw.ExecutionStep, error) {
+// Custom jobs inject a GHES host configuration step before authored steps.
+func stepReferenceSetupSteps(block aw.ExecutionBlock, authored bool) []aw.ExecutionStep {
 	if !authored || !strings.HasPrefix(block.Path, "jobs.") {
-		return nil, nil
+		return nil
 	}
-	var additional []aw.ExecutionStep
-	_, reusable := block.Fields["uses"]
-	if !reusable {
-		for _, field := range []string{"steps", "setup-steps", "pre-steps"} {
-			if _, exists := block.Fields[field]; exists {
-				additional = append(additional, aw.ExecutionStep{
-					Fields: map[string]any{"id": "ghes-host-config"},
-				})
-				break
-			}
+	if _, reusable := block.Fields["uses"]; reusable {
+		return nil
+	}
+	for _, field := range []string{"steps", "setup-steps", "pre-steps"} {
+		if _, exists := block.Fields[field]; exists {
+			return []aw.ExecutionStep{{Fields: map[string]any{"id": "ghes-host-config"}}}
 		}
 	}
-	for _, field := range []string{"setup-steps", "pre-steps"} {
-		raw := block.Fields[field]
-		if raw == nil {
-			continue
-		}
-		steps, ok := raw.([]any)
-		if !ok {
-			return nil, errors.New("step-reference requires setup-steps and pre-steps to be step lists")
-		}
-		for _, raw := range steps {
-			if err := ctx.Err(); err != nil {
-				return nil, err
-			}
-			fields, ok := raw.(map[string]any)
-			if !ok {
-				return nil, errors.New("step-reference requires setup-steps and pre-steps to contain step mappings")
-			}
-			additional = append(additional, aw.ExecutionStep{Fields: fields})
-		}
-	}
-	return additional, nil
+	return nil
 }
 
 func stepReferenceConditionPath(jobPath, path string) bool {

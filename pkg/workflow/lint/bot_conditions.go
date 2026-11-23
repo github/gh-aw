@@ -18,10 +18,11 @@ import (
 // the actor of an event on attacker-controlled content (for example, by having
 // Dependabot update a fork branch) and pass the gate.
 //
-// Only conditions with a positive bot match are reported. A conjunction with
-// an author check (pull request user or author association) is treated as
-// guarded. Actor checks outside if fields, dynamic actor names, and bot logins
-// not recognizable from literals are not analyzed.
+// Only conditions with a positive bot match are reported. A conjunction that
+// requires the pull request user or author association to equal or appear in
+// a trusted allowlist is treated as guarded. Actor checks outside if fields,
+// dynamic actor names, and bot logins not recognizable from literals are not
+// analyzed.
 func BotConditionsRule() Rule {
 	return Rule{
 		ID:          "bot-conditions",
@@ -135,10 +136,10 @@ func spoofableBotGate(node actionlint.ExprNode, positive bool) (string, bool) {
 		// In a conjunction, an author check in the sibling operand guards the
 		// gate; one beside the bot check in the same disjunction does not.
 		conjunction := (node.Kind == actionlint.LogicalOpNodeKindAnd) == positive
-		if actor, found := spoofableBotGate(node.Left, positive); found && (!conjunction || !botAuthorGuard(node.Right)) {
+		if actor, found := spoofableBotGate(node.Left, positive); found && (!conjunction || !botAuthorRequired(node.Right, positive)) {
 			return actor, true
 		}
-		if actor, found := spoofableBotGate(node.Right, positive); found && (!conjunction || !botAuthorGuard(node.Left)) {
+		if actor, found := spoofableBotGate(node.Right, positive); found && (!conjunction || !botAuthorRequired(node.Left, positive)) {
 			return actor, true
 		}
 		return "", false
@@ -245,13 +246,11 @@ func botLoginList(node actionlint.ExprNode) bool {
 	return ok && strings.Contains(strings.ToLower(literal.Value), "[bot]")
 }
 
-// botAuthorGuard reports whether node always requires an author check. An
-// author check under a disjunction (for example, one limited to another event
-// by github.event_name != 'x' || ...) does not guard the bot gate.
-func botAuthorGuard(node actionlint.ExprNode) bool {
-	return botAuthorRequired(node, true)
-}
-
+// botAuthorRequired reports whether node, under the given polarity, always
+// requires the pull request author or author association to match a trusted
+// value. An author check under a disjunction (for example, one limited to
+// another event by github.event_name != 'x' || ...) does not guard the bot
+// gate, nor does an exclusion such as user.login != 'x'.
 func botAuthorRequired(node actionlint.ExprNode, positive bool) bool {
 	switch node := node.(type) {
 	case *actionlint.NotOpNode:
@@ -261,27 +260,49 @@ func botAuthorRequired(node actionlint.ExprNode, positive bool) bool {
 			return botAuthorRequired(node.Left, positive) || botAuthorRequired(node.Right, positive)
 		}
 		return botAuthorRequired(node.Left, positive) && botAuthorRequired(node.Right, positive)
+	case *actionlint.CompareOpNode:
+		equal := node.Kind == actionlint.CompareOpNodeKindEq && positive ||
+			node.Kind == actionlint.CompareOpNodeKindNotEq && !positive
+		return equal && (botAuthorField(node.Left) && botAuthorValue(node.Right) ||
+			botAuthorField(node.Right) && botAuthorValue(node.Left))
+	case *actionlint.FuncCallNode:
+		// contains(fromJSON('[...]'), author) or contains('A,B', author).
+		if !positive || !strings.EqualFold(node.Callee, "contains") || len(node.Args) != 2 || !botAuthorField(node.Args[1]) {
+			return false
+		}
+		if call, ok := node.Args[0].(*actionlint.FuncCallNode); ok {
+			if !strings.EqualFold(call.Callee, "fromjson") || len(call.Args) != 1 {
+				return false
+			}
+			_, literal := call.Args[0].(*actionlint.StringNode)
+			return literal
+		}
+		literal, ok := node.Args[0].(*actionlint.StringNode)
+		return ok && strings.TrimSpace(literal.Value) != ""
 	}
-	return botAuthorReference(node)
+	return false
 }
 
-func botAuthorReference(node actionlint.ExprNode) bool {
-	guarded := false
-	actionlint.VisitExprNode(node, func(child, _ actionlint.ExprNode, entering bool) {
-		if !entering || guarded {
-			return
-		}
-		path, ok := contextPath(child)
-		if !ok {
-			return
-		}
-		switch {
-		case path == "github.event.pull_request.user.login", path == "github.event.pull_request.user.id",
-			strings.HasPrefix(path, "github.event.") && strings.HasSuffix(path, ".author_association"):
-			guarded = true
-		}
-	})
-	return guarded
+func botAuthorField(node actionlint.ExprNode) bool {
+	path, ok := contextPath(node)
+	if !ok {
+		return false
+	}
+	return path == "github.event.pull_request.user.login" || path == "github.event.pull_request.user.id" ||
+		strings.HasPrefix(path, "github.event.") && strings.HasSuffix(path, ".author_association")
+}
+
+// The compared value must be a non-empty literal or another context value
+// (for example github.actor), not a second author field or null.
+func botAuthorValue(node actionlint.ExprNode) bool {
+	switch node := node.(type) {
+	case *actionlint.StringNode:
+		return strings.TrimSpace(node.Value) != ""
+	case *actionlint.IntNode:
+		return true
+	}
+	_, ok := contextPath(node)
+	return ok && !botAuthorField(node)
 }
 
 // contextPath returns a lowercase dotted path for literal property accesses.

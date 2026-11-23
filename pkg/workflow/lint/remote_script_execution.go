@@ -39,8 +39,7 @@ func checkRemoteScriptExecution(ctx context.Context, input Input) ([]Diagnostic,
 				continue
 			}
 			shell, known := policyRunShell(input, block, step)
-			if !known || (shell != "bash" && shell != "sh" &&
-				!strings.HasPrefix(shell, "bash ") && !strings.HasPrefix(shell, "sh ")) {
+			if !known || !remotePosixShell(shell) {
 				continue
 			}
 			found, err := remoteScriptExecutions(ctx, script, step.Path+".run")
@@ -49,6 +48,17 @@ func checkRemoteScriptExecution(ctx context.Context, input Input) ([]Diagnostic,
 		}
 	}
 	return diagnostics, errors.Join(failures...)
+}
+
+// remotePosixShell reports whether a run shell such as bash, sh -e {0} or
+// /bin/bash -e {0} executes the script with a POSIX shell.
+func remotePosixShell(shell string) bool {
+	fields := strings.Fields(shell)
+	if len(fields) == 0 {
+		return false
+	}
+	name := path.Base(fields[0])
+	return name == "bash" || name == "sh"
 }
 
 func remoteScriptExecutions(ctx context.Context, script, diagnosticPath string) ([]Diagnostic, error) {
@@ -96,8 +106,13 @@ func remoteScriptExecutions(ctx context.Context, script, diagnosticPath string) 
 				if !ok || !interpreter.stdin {
 					continue
 				}
-				for _, previous := range stages[:index] {
-					if downloader := remoteDownload(previous); downloader != "" {
+				// Walk upstream while each receiving stage still reads the pipe
+				// and each sending stage still writes to it.
+				for previous := index - 1; previous >= 0 && !remoteRedirectsStdin(stages[previous+1]); previous-- {
+					if previous < index-1 && remoteRedirectsStdout(stages[previous+1]) {
+						break
+					}
+					if downloader := remoteDownload(stages[previous]); downloader != "" {
 						report(stage, "Content downloaded with %s is piped into %s", downloader, interpreter.name)
 						break
 					}
@@ -143,6 +158,36 @@ func remoteScriptExecutions(ctx context.Context, script, diagnosticPath string) 
 		return true
 	})
 	return diagnostics, ctx.Err()
+}
+
+func remoteRedirectsStdin(stmt *syntax.Stmt) bool {
+	for _, redirect := range stmt.Redirs {
+		if redirect.N != nil && redirect.N.Value != "0" {
+			continue
+		}
+		switch redirect.Op {
+		case syntax.RdrIn, syntax.RdrInOut, syntax.DplIn, syntax.WordHdoc, syntax.Hdoc, syntax.DashHdoc:
+			return true
+		}
+	}
+	return false
+}
+
+func remoteRedirectsStdout(stmt *syntax.Stmt) bool {
+	for _, redirect := range stmt.Redirs {
+		if redirect.N != nil && redirect.N.Value != "1" {
+			continue
+		}
+		switch redirect.Op {
+		case syntax.RdrOut, syntax.AppOut, syntax.RdrClob, syntax.RdrAll, syntax.AppAll:
+			return true
+		case syntax.DplOut:
+			if policyShellLiteral(redirect.Word) != "1" {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func remotePipe(node *syntax.BinaryCmd) bool {
@@ -207,7 +252,7 @@ var remoteInterpreters = map[string]remoteInterpreterSyntax{
 
 func remoteInterpreterName(name string) (string, bool) {
 	name = path.Base(name)
-	if trimmed := strings.TrimRight(strings.TrimPrefix(name, "python"), "0123456789."); name != trimmed && trimmed == "" {
+	if strings.HasPrefix(name, "python") && strings.TrimRight(strings.TrimPrefix(name, "python"), "0123456789.") == "" {
 		return "python", true
 	}
 	_, ok := remoteInterpreters[name]
@@ -243,6 +288,14 @@ func remoteInterpreterCall(call *syntax.CallExpr) (remoteInterpreter, bool) {
 			if index+1 < len(args) {
 				result.code = append(result.code, args[index+1])
 			}
+			return result, true
+		}
+		if options && slices.ContainsFunc(grammar.longCodeFlags, func(flag string) bool {
+			return strings.HasPrefix(remoteLeadingLiteral(args[index]), flag+"=")
+		}) {
+			// Attached program text, such as --eval='...', is literal unless
+			// the word contains a substitution, which remoteDownload inspects.
+			result.code = append(result.code, args[index])
 			return result, true
 		}
 		if options && slices.Contains(grammar.longValueFlags, arg) {
@@ -297,6 +350,32 @@ func remoteInterpreterCall(call *syntax.CallExpr) (remoteInterpreter, bool) {
 	}
 	result.stdin = !codeFlag
 	return result, true
+}
+
+// remoteLeadingLiteral returns the literal text before the first dynamic part
+// of word, so --eval="$(curl ...)" yields --eval=.
+func remoteLeadingLiteral(word *syntax.Word) string {
+	var text strings.Builder
+	var parts func([]syntax.WordPart) bool
+	parts = func(values []syntax.WordPart) bool {
+		for _, value := range values {
+			switch value := value.(type) {
+			case *syntax.Lit:
+				text.WriteString(value.Value)
+			case *syntax.SglQuoted:
+				text.WriteString(value.Value)
+			case *syntax.DblQuoted:
+				if !parts(value.Parts) {
+					return false
+				}
+			default:
+				return false
+			}
+		}
+		return true
+	}
+	parts(word.Parts)
+	return text.String()
 }
 
 // remoteUnwrapCommand removes privilege and environment wrappers so the
@@ -357,11 +436,8 @@ func remoteDownload(node syntax.Node) string {
 		if !ok {
 			return true
 		}
-		for _, redirect := range stmt.Redirs {
-			if (redirect.N == nil || redirect.N.Value == "1") &&
-				(redirect.Op == syntax.RdrOut || redirect.Op == syntax.AppOut || redirect.Op == syntax.RdrClob) {
-				return true
-			}
+		if remoteRedirectsStdout(stmt) {
+			return true
 		}
 		if name := remoteDownloader(call); name != "" {
 			found = name
@@ -380,7 +456,7 @@ func remoteDownloader(call *syntax.CallExpr) string {
 	name := path.Base(policyShellLiteral(args[0]))
 	switch name {
 	case "curl":
-		if remoteCurlWritesFile(args[1:]) {
+		if !remoteCurlWritesStdout(args[1:]) {
 			return ""
 		}
 	case "wget":
@@ -397,10 +473,16 @@ func remoteStdoutPath(value string) bool {
 	return value == "-" || value == "/dev/stdout"
 }
 
-// remoteFlagValue returns the value of a short flag inside a cluster such as
-// -fsSLo file or -qO-, and whether the following argument was consumed.
-func remoteFlagValue(cluster string, flag byte, next []*syntax.Word) (string, bool) {
-	position := strings.IndexByte(cluster, flag)
+// remoteCurlValueFlags are curl short options that take a value.
+const remoteCurlValueFlags = "AbcCdDeEFHKmoPQrtTuUwxXyYz"
+
+// remoteWgetValueFlags are wget short options that take a value.
+const remoteWgetValueFlags = "aABDeIilOoPQRtTUwX"
+
+// remoteShortValue returns the value of the short flag at position in
+// cluster, either attached or from the next argument, and whether the next
+// argument was consumed.
+func remoteShortValue(cluster string, position int, next []*syntax.Word) (string, bool) {
 	if rest := cluster[position+1:]; rest != "" {
 		return rest, false
 	}
@@ -410,38 +492,55 @@ func remoteFlagValue(cluster string, flag byte, next []*syntax.Word) (string, bo
 	return policyShellLiteral(next[0]), true
 }
 
-func remoteCurlWritesFile(args []*syntax.Word) bool {
+// remoteCurlWritesStdout reports whether any transfer, as separated by
+// --next or -:, writes its download to standard output.
+func remoteCurlWritesStdout(args []*syntax.Word) bool {
+	toFile := false
 	for index := 0; index < len(args); index++ {
 		arg := policyShellLiteral(args[index])
 		switch {
+		case arg == "--next":
+			if !toFile {
+				return true
+			}
+			toFile = false
 		case arg == "--remote-name" || arg == "--remote-name-all" || arg == "--remote-header-name":
-			return true
+			toFile = true
 		case arg == "--output":
 			if index+1 >= len(args) || !remoteStdoutPath(policyShellLiteral(args[index+1])) {
-				return true
+				toFile = true
 			}
 			index++
 		case strings.HasPrefix(arg, "--output="):
 			if !remoteStdoutPath(strings.TrimPrefix(arg, "--output=")) {
-				return true
+				toFile = true
 			}
 		case len(arg) > 1 && arg[0] == '-' && arg[1] != '-':
 			cluster := arg[1:]
-			if strings.IndexByte(cluster, 'O') >= 0 && (strings.IndexByte(cluster, 'o') < 0 || strings.IndexByte(cluster, 'O') < strings.IndexByte(cluster, 'o')) {
-				return true
-			}
-			if strings.IndexByte(cluster, 'o') >= 0 {
-				value, consumed := remoteFlagValue(cluster, 'o', args[index+1:])
-				if !remoteStdoutPath(value) {
-					return true
-				}
-				if consumed {
-					index++
+			for position := 0; position < len(cluster); position++ {
+				flag := cluster[position]
+				switch {
+				case flag == ':':
+					if !toFile {
+						return true
+					}
+					toFile = false
+				case flag == 'O':
+					toFile = true
+				case strings.IndexByte(remoteCurlValueFlags, flag) >= 0:
+					value, consumed := remoteShortValue(cluster, position, args[index+1:])
+					if flag == 'o' && !remoteStdoutPath(value) {
+						toFile = true
+					}
+					if consumed {
+						index++
+					}
+					position = len(cluster)
 				}
 			}
 		}
 	}
-	return false
+	return !toFile
 }
 
 func remoteWgetWritesStdout(args []*syntax.Word) bool {
@@ -452,9 +551,23 @@ func remoteWgetWritesStdout(args []*syntax.Word) bool {
 			return index+1 < len(args) && remoteStdoutPath(policyShellLiteral(args[index+1]))
 		case strings.HasPrefix(arg, "--output-document="):
 			return remoteStdoutPath(strings.TrimPrefix(arg, "--output-document="))
-		case len(arg) > 1 && arg[0] == '-' && arg[1] != '-' && strings.IndexByte(arg, 'O') >= 0:
-			value, _ := remoteFlagValue(arg[1:], 'O', args[index+1:])
-			return remoteStdoutPath(value)
+		case len(arg) > 1 && arg[0] == '-' && arg[1] != '-':
+			cluster := arg[1:]
+			for position := range len(cluster) {
+				flag := cluster[position]
+				if flag == 'n' {
+					// -nv, -nc and similar consume the rest of the cluster.
+					break
+				}
+				if strings.IndexByte(remoteWgetValueFlags, flag) < 0 {
+					continue
+				}
+				if flag == 'O' {
+					value, _ := remoteShortValue(cluster, position, args[index+1:])
+					return remoteStdoutPath(value)
+				}
+				break
+			}
 		}
 	}
 	return false
