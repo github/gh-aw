@@ -1,9 +1,9 @@
 ### Executive Summary
 
 - Eligible open `app/github-copilot` PRs: 0
-- Open PRs scanned: 14
-- PRs skipped by 1h cooldown: 11
-- Recommended action: none; no eligible agent-authored PRs are in the current queue.
+- Open PRs scanned: 11
+- PRs skipped by the 1h cooldown: 11
+- Recommended action: none; no agent-authored PRs are currently eligible for review.
 
 ### Distribution
 
@@ -55,6 +55,6 @@
 
 ### Key trends and next actions
 
-- No PR in the current open queue matches the required `app/github-copilot` author filter.
-- The queue is composed of same-repo and bot-authored PRs outside the eligible scope.
-- Re-run triage when a new `app/github-copilot` PR becomes eligible or when the repository is refreshed with agent-authored changes.
+- The current open queue contains 11 PRs, but none are authored by `app/github-copilot`.
+- Every open PR was excluded by the eligibility gate or the 1h cooldown window.
+- Re-run triage once an eligible agent-authored PR appears or after the repository queue refreshes.

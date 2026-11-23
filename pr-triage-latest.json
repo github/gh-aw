@@ -1,9 +1,9 @@
 {
-  "generated_at": "2026-11-23T06:35:10Z",
-  "run_id": "pr-triage-2026-11-23T06:35:10Z",
+  "generated_at": "2026-11-23T12:26:23Z",
+  "run_id": "pr-triage-2026-11-23T12:26:23Z",
   "source": "pr-triage",
   "open_copilot_prs": 0,
-  "scanned_open_prs": 14,
+  "scanned_open_prs": 11,
   "eligible_total": 0,
   "cooldown_skipped": 11,
   "category_counts": {
@@ -36,76 +36,76 @@
   "batches": [],
   "skipped_prs": [
     {
-      "number": 79964,
-      "title": "[WIP] Bump AWF to v0.29.18 and MCP gateway to v0.5.12",
-      "updated_at": "2026-11-22T00:32:04Z",
-      "author": "lpcox"
+      "number": 80364,
+      "title": "github-actions[bot] PR",
+      "updated_at": "2026-11-23T11:44:31Z",
+      "author": "github-actions[bot]"
     },
     {
-      "number": 79961,
-      "title": "Fix CI assertions and reduce benchmark timing noise",
-      "updated_at": "2026-11-22T00:15:11Z",
-      "author": "pelikhan"
-    },
-    {
-      "number": 79909,
-      "title": "Allow workflows to opt out of default OTLP configuration",
-      "updated_at": "2026-11-22T00:20:22Z",
-      "author": "pelikhan"
-    },
-    {
-      "number": 79908,
-      "title": "Link PR review summaries to their inline comments",
-      "updated_at": "2026-11-22T00:21:14Z",
-      "author": "pelikhan"
-    },
-    {
-      "number": 79907,
-      "title": "Docs: Correct the default path base for `#runtime-import`",
-      "updated_at": "2026-11-22T00:04:54Z",
-      "author": "pelikhan"
-    },
-    {
-      "number": 79905,
-      "title": "Translate Copilot model effort suffixes into CLI flags",
-      "updated_at": "2026-11-22T00:22:34Z",
-      "author": "pelikhan"
-    },
-    {
-      "number": 79904,
-      "title": "Distinguish missing AI credit cost from zero in `logs --json`",
-      "updated_at": "2026-11-22T00:21:36Z",
-      "author": "pelikhan"
-    },
-    {
-      "number": 79898,
-      "title": "Add linter for unchecked os.Stat and os.Lstat results",
-      "updated_at": "2026-11-22T00:19:48Z",
+      "number": 80354,
+      "title": "gh-aw-bot PR",
+      "updated_at": "2026-11-23T09:54:21Z",
       "author": "gh-aw-bot"
     },
     {
-      "number": 79897,
-      "title": "Add issue detail extraction support for node-runner backend",
-      "updated_at": "2026-11-22T00:18:13Z",
+      "number": 80342,
+      "title": "github-actions[bot] PR",
+      "updated_at": "2026-11-23T08:54:39Z",
+      "author": "github-actions[bot]"
+    },
+    {
+      "number": 80338,
+      "title": "github-actions[bot] PR",
+      "updated_at": "2026-11-23T08:49:06Z",
+      "author": "github-actions[bot]"
+    },
+    {
+      "number": 80333,
+      "title": "github-actions[bot] PR",
+      "updated_at": "2026-11-23T08:46:24Z",
+      "author": "github-actions[bot]"
+    },
+    {
+      "number": 80321,
+      "title": "pelikhan PR",
+      "updated_at": "2026-11-23T08:24:21Z",
       "author": "pelikhan"
     },
     {
-      "number": 79896,
-      "title": "Fix daily AI Credits budget accounting bug",
-      "updated_at": "2026-11-22T00:09:54Z",
+      "number": 80320,
+      "title": "pelikhan PR",
+      "updated_at": "2026-11-23T08:29:54Z",
       "author": "pelikhan"
     },
     {
-      "number": 79895,
-      "title": "Improve issue comment attachment rendering in the console",
-      "updated_at": "2026-11-22T00:14:32Z",
+      "number": 80318,
+      "title": "pelikhan PR",
+      "updated_at": "2026-11-23T08:06:58Z",
       "author": "pelikhan"
+    },
+    {
+      "number": 80016,
+      "title": "gh-aw-bot PR",
+      "updated_at": "2026-11-22T16:01:03Z",
+      "author": "gh-aw-bot"
+    },
+    {
+      "number": 79748,
+      "title": "elefthei PR",
+      "updated_at": "2026-11-23T10:04:41Z",
+      "author": "elefthei"
+    },
+    {
+      "number": 79612,
+      "title": "davidslater PR",
+      "updated_at": "2026-11-20T23:48:52Z",
+      "author": "davidslater"
     }
   ],
   "notes": [
-    "No eligible open pull requests authored by app/github-copilot were present in the repository's persisted triage state.",
-    "This environment does not provide GitHub MCP or authenticated GitHub API reads, so live PR verification is limited to the latest repo memory snapshot.",
-    "No labels, comments, or batch assignments were created because the eligible queue is empty."
+    "No eligible open pull requests authored by app/github-copilot were present after filtering the repository open PR queue.",
+    "The current open queue includes bot and non-agent authors; all of them were excluded by the author and cooldown gates.",
+    "No PR labels or comments were added because the eligible queue is empty."
   ],
   "review_status": "triaged"
 }
