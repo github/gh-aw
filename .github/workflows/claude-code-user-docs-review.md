@@ -46,6 +46,7 @@ tools:
     - "ls *"
     - "grep *"
     - "safeoutputs *"
+    - "safeoutputs create_discussion *"
 
 timeout-minutes: 30
 

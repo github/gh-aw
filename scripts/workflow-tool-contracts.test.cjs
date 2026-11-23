@@ -6,7 +6,21 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { test } = require("node:test");
 const { buildCopilotSDKPermissionHandler } = require("../actions/setup/js/copilot_sdk_permissions.cjs");
+const { parseToolArgs } = require("../actions/setup/js/mcp_cli_bridge.cjs");
+const { hasTerminalSafeOutput } = require("../actions/setup/js/safeoutputs_cli.cjs");
 const { queryArguments } = require("../.github/workflows/shared/graft/query.cjs");
+
+function workflowSource(name) {
+  return fs.readFileSync(path.join(__dirname, "..", ".github", "workflows", `${name}.md`), "utf8");
+}
+
+function instructionPrefix(source) {
+  const marker = "<!-- instruction-prefix-end -->";
+  const end = source.indexOf(marker);
+  assert.notEqual(end, -1, "Missing self-contained instruction prefix");
+  assert.ok(Buffer.byteLength(source.slice(0, end + marker.length)) <= 7500);
+  return source.slice(0, end);
+}
 
 function workflowLock(name) {
   const lockPath = path.join(__dirname, "..", ".github", "workflows", `${name}.lock.yml`);
@@ -146,5 +160,54 @@ test("Daily Graft permits native queries but rejects duplicate checks and graph 
     "npx -y @nanonets/graft@0.8.0 check",
   ]) {
     checkCommand(handler, command, "reject");
+  }
+});
+
+test("Dependabot missing-read diagnostics require a terminal incomplete outcome in every experiment", () => {
+  const source = workflowSource("dependabot-go-checker");
+  const prefix = instructionPrefix(source);
+  assert.ok(source.indexOf("{{#if experiments.prompt_style") > prefix.length);
+  assert.match(prefix, /`github` CLI bridge if it is\s+listed in the runtime's available CLI transports/);
+  assert.match(prefix, /issue search or another\s+required read is unavailable, stop analysis/);
+  assert.match(prefix, /`report_missing_tool` diagnostic is\s+nonterminal/);
+  assert.match(prefix, /never use noop for\s+blocked or unfinished analysis/);
+
+  const example = prefix.match(/safeoutputs report_incomplete '([^']+)'/);
+  assert.ok(example, "Missing supported blocked-outcome invocation");
+  const { args } = parseToolArgs([example[1]]);
+  const tool = require("../actions/setup/js/safe_outputs_tools.json").find(tool => tool.name === "report_incomplete");
+  for (const key of tool.inputSchema.required) assert.equal(typeof args[key], tool.inputSchema.properties[key].type);
+  assert.deepEqual(Object.keys(args), ["reason"]);
+
+  const diagnostic = { type: "report_missing_tool", tool: "GitHub issue search", reason: "Required read unavailable" };
+  const terminal = records =>
+    hasTerminalSafeOutput("fixture.jsonl", {
+      readFileSync: () => records.map(record => JSON.stringify(record)).join("\n"),
+      includeReportIncomplete: true,
+      logger: () => {},
+    });
+  assert.equal(terminal([diagnostic]), false);
+  assert.equal(terminal([diagnostic, { type: "report_incomplete", ...args }]), true);
+});
+
+test("API report collection cannot stand in for reporting or a submitted safe output", () => {
+  const source = workflowSource("api-consumption-report");
+  const prefix = instructionPrefix(source);
+  assert.match(prefix, /pagination\s+allowance ends collection only, not the reporting task/);
+  assert.match(prefix, /complete\s+\*\*Steps 2–6\*\*/);
+  assert.match(prefix, /`safeoutputs create_discussion`.*JSON payload\s+\(`title` and `body`\) and wait for its response/);
+  assert.match(prefix, /final text response is not evidence/);
+  assert.match(prefix, /Use noop only when no reporting action is needed, never for an unfinished report/);
+  assert.match(prefix, /safe-output transport itself is unavailable or denied, stop/);
+  assert.doesNotMatch(source, /Do NOT call the CLI directly/);
+  assert.match(source, /`agenticworkflows logs` CLI bridge when MCP calls are not exposed/);
+
+  const examples = [...source.matchAll(/safeoutputs (report_incomplete|noop) '([^']+)'/g)];
+  assert.equal(examples.length, 2);
+  for (const [, name, payload] of examples) {
+    const { args } = parseToolArgs([payload]);
+    const tool = require("../actions/setup/js/safe_outputs_tools.json").find(tool => tool.name === name);
+    for (const key of tool.inputSchema.required) assert.equal(typeof args[key], tool.inputSchema.properties[key].type);
+    for (const key of Object.keys(args)) assert.ok(Object.hasOwn(tool.inputSchema.properties, key), `${name}: unknown field ${key}`);
   }
 });

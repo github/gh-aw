@@ -69,13 +69,48 @@ Every day, analyse the **last 24 hours** of agentic workflow runs to understand:
 - **Run ID**: ${{ github.run_id }}
 - **Report Date**: today (UTC)
 
+## Completion Contract
+
+Before collecting logs, check `safeoutputs --help` as a standalone command.
+Use exposed MCP tools, or the declared `agenticworkflows` and `safeoutputs` CLI
+bridges when the engine has no MCP call interface. The bridges invoke the same
+configured tools; do not call `gh aw` directly or discover credentials.
+
+Follow **Step 1** below for bounded collection and retries, then complete
+**Steps 2–6**: aggregate the downloaded dataset, update history, generate charts,
+upload available charts and submit the discussion. Exhausting the pagination
+allowance ends collection only, not the reporting task. Treat missing or partial
+data as a limitation, not proof that the remaining steps ran.
+
+Call `safeoutputs create_discussion` with the real report's JSON payload
+(`title` and `body`) and wait for its response. Only claim an aggregation file,
+chart, uploaded asset or submitted discussion when the corresponding operation
+has actually succeeded; a planned action or final text response is not evidence.
+Use the detailed report format and sub-agent instructions below when performing
+their named steps; if delegation is unavailable, perform those steps directly
+with permitted tools or report the blocker.
+
+If any required reporting step cannot be completed, call
+`safeoutputs report_incomplete` with the failed step and saved progress. For example:
+
+```bash
+safeoutputs report_incomplete '{"reason":"Logs were collected, but the daily report was not submitted; reporting remains incomplete."}'
+```
+
+Use noop only when no reporting action is needed, never for an unfinished report.
+If the safe-output transport itself is unavailable or denied, stop and state that
+no terminal outcome could be recorded; do not claim submission or bypass the denial.
+
+<!-- instruction-prefix-end -->
+
 ---
 
 ## Step 1 — Collect Logs via MCP
 
 Run **Step T1** from the cache-memory trending pattern above to inspect the cache state and choose a collection window.
 
-Use the `agentic-workflows` MCP `logs` tool:
+Use the `agentic-workflows` MCP `logs` tool, or the declared
+`agenticworkflows logs` CLI bridge when MCP calls are not exposed:
 
 - **Incremental** (history is already rich per the threshold in **Step T1**): `logs(start_date="-1d")`
 - **Backfill** (first run, cache miss, or sparse history per the threshold in **Step T1**): `logs(start_date="-90d")`
@@ -96,7 +131,8 @@ This downloads one directory per run to `/tmp/gh-aw/aw-mcp/logs/`. Each run dire
 - `run_summary.json` — cached CLI analysis with `run.safe_items_count` — **authoritative post-processing actuation count**
 - `agent/` — raw agent step logs
 
-**Do NOT call the CLI directly** — always use the MCP tools.
+**Do NOT call `gh aw` directly** — use the configured MCP tools or their declared
+CLI bridges.
 
 After collecting, use `audit` on any runs flagged as failed to get deeper diagnostics:
 
@@ -255,11 +291,13 @@ Create a discussion with the following structure. Replace placeholders with real
 - **Efficiency**: Parse logs in memory; don't make redundant MCP calls
 - **Completeness**: Always produce a discussion even if some charts fail — skip failed charts and note them
 
-**Important**: After completing your work, you **MUST** call at least one safe-output tool (discussion or noop).
+**Important**: Before finishing, record the terminal outcome: submit the discussion
+for completed reporting, or use `report_incomplete` for blocked or unfinished
+reporting. Diagnostics and chart uploads alone do not complete the report.
 If no discussion is needed (unlikely), call:
 
-```json
-{"noop": {"message": "No action needed: [brief explanation]"}}
+```bash
+safeoutputs noop '{"message":"No reporting action needed: [brief explanation]"}'
 ```
 
 ## agent: `metrics-aggregator`
