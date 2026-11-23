@@ -80,5 +80,14 @@
     "experiment_name": "retry_policy_v1",
     "pr_or_issue": "issue",
     "decision": null
+  },
+  {
+    "date": "2026-11-23",
+    "workflow_id": "go-fan",
+    "primary_dimension": "tool interaction",
+    "subtype": "retry_policy",
+    "experiment_name": "retry_policy_v1",
+    "pr_or_issue": "issue",
+    "decision": null
   }
 ]
