@@ -130,6 +130,7 @@ type ProcessedRun struct {
 	MissingTools            []MissingToolReport
 	MissingData             []MissingDataReport
 	Noops                   []NoopReport
+	Incomplete              []IncompleteReport
 	ContinuationRequests    []ContinuationRequestReport
 	MCPFailures             []MCPFailureReport
 	SkillActivations        []SkillActivation
@@ -183,6 +184,14 @@ type MissingToolReport struct {
 // NoopReport represents a noop message reported by an agentic workflow
 type NoopReport struct {
 	Message string `json:"message"`
+	ReportProvenance
+}
+
+// IncompleteReport represents a report_incomplete safe output: the agent
+// could not finish because of an infrastructure or tool failure.
+type IncompleteReport struct {
+	Reason  string `json:"reason"`
+	Details string `json:"details,omitempty"`
 	ReportProvenance
 }
 
@@ -310,6 +319,7 @@ type RunAnalysis struct {
 	MissingTools            []MissingToolReport         `json:"missing_tools"`                  // Missing tool reports
 	MissingData             []MissingDataReport         `json:"missing_data"`                   // Missing data reports
 	Noops                   []NoopReport                `json:"noops"`                          // Noop messages
+	Incomplete              []IncompleteReport          `json:"incomplete,omitempty"`           // report_incomplete signals
 	ContinuationRequests    []ContinuationRequestReport `json:"continuation_requests"`
 	MCPFailures             []MCPFailureReport          `json:"mcp_failures"`                      // MCP server failures
 	SkillActivations        []SkillActivation           `json:"skill_activations,omitempty"`       // Detected skill invocations
@@ -340,9 +350,10 @@ type RunAnalysis struct {
 // - If the CLI version in the summary doesn't match the current version, the run is reprocessed
 // - This ensures that bug fixes and improvements in log parsing are automatically applied
 type RunSummary struct {
-	CLIVersion  string    `json:"cli_version"`  // CLI version used to process this run
-	RunID       int64     `json:"run_id"`       // Workflow run database ID
-	ProcessedAt time.Time `json:"processed_at"` // When this summary was created
+	SchemaVersion int       `json:"schema_version"` // Run summary schema version (cache invalidation key)
+	CLIVersion    string    `json:"cli_version"`    // CLI version used to process this run
+	RunID         int64     `json:"run_id"`         // Workflow run database ID
+	ProcessedAt   time.Time `json:"processed_at"`   // When this summary was created
 	RunAnalysis
 	PolicyAnalysis *PolicyAnalysis `json:"policy_analysis,omitempty"` // Firewall policy rule attribution
 	ArtifactsList  []string        `json:"artifacts_list"`            // List of downloaded artifact files
