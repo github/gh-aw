@@ -101,8 +101,8 @@ describe("skip_if_query.cjs - countSearchMatches", () => {
 
   it("falls back to REST when GraphQL fails and stops paging at the threshold", async () => {
     global.github.graphql.mockRejectedValue(new Error("boom"));
-    const page = Array.from({ length: 100 }, (_, i) => (i % 2 ? { pull_request: {} } : {}));
-    global.github.rest.issues.listForRepo.mockResolvedValue({ data: page });
+    const page = offset => Array.from({ length: 100 }, (_, i) => (i % 2 ? { id: offset + i, pull_request: {} } : { id: offset + i }));
+    global.github.rest.issues.listForRepo.mockResolvedValueOnce({ data: page(0) }).mockResolvedValueOnce({ data: page(100) });
 
     const result = await countSearchMatches(`is:issue is:open label:bug ${REPO}`, 60);
 
@@ -112,8 +112,22 @@ describe("skip_if_query.cjs - countSearchMatches", () => {
     expect(global.github.rest.search.issuesAndPullRequests).not.toHaveBeenCalled();
   });
 
+  it("does not double count items repeated across overlapping REST pages", async () => {
+    global.github.graphql.mockRejectedValue(new Error("boom"));
+    const ids = start => Array.from({ length: 100 }, (_, i) => ({ id: start + i }));
+    global.github.rest.issues.listForRepo
+      .mockResolvedValueOnce({ data: ids(1) })
+      .mockResolvedValueOnce({ data: ids(100) })
+      .mockResolvedValueOnce({ data: [] });
+
+    const result = await countSearchMatches(`is:issue is:open label:bug ${REPO}`, 200);
+
+    expect(result).toEqual({ totalCount: 199, exact: true, backend: "rest" });
+    expect(global.github.rest.issues.listForRepo).toHaveBeenCalledTimes(3);
+  });
+
   it("uses REST with AND label semantics when GraphQL cannot express the query", async () => {
-    global.github.rest.issues.listForRepo.mockResolvedValue({ data: [{}] });
+    global.github.rest.issues.listForRepo.mockResolvedValue({ data: [{ id: 1 }] });
 
     const result = await countSearchMatches(`label:a label:b assignee:octocat ${REPO}`, 2);
 
@@ -124,7 +138,12 @@ describe("skip_if_query.cjs - countSearchMatches", () => {
 
   it("counts merged pull requests through the pulls endpoint", async () => {
     global.github.rest.rateLimit.get.mockResolvedValue({ data: { resources: { graphql: { limit: 5000, remaining: 0 } } } });
-    global.github.rest.pulls.list.mockResolvedValue({ data: [{ merged_at: "2026-01-01" }, { merged_at: null }] });
+    global.github.rest.pulls.list.mockResolvedValue({
+      data: [
+        { id: 1, merged_at: "2026-01-01" },
+        { id: 2, merged_at: null },
+      ],
+    });
 
     const result = await countSearchMatches(`is:pr is:merged ${REPO}`, 5);
 

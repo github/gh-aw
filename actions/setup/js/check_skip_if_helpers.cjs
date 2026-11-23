@@ -77,8 +77,7 @@ async function runSkipQueryGate(options) {
   try {
     const { totalCount, exact, backend } = await countSearchMatches(searchQuery, threshold);
 
-    core.info(`Evaluated query via ${backend} API`);
-    core.info(`Search found ${exact ? "" : "at least "}${totalCount} matching items`);
+    core.info(`Query matched ${exact ? "" : "at least "}${totalCount} items (via ${backend} API)`);
 
     if (shouldSkip(totalCount, threshold)) {
       core.warning(warningMessage(totalCount, threshold));

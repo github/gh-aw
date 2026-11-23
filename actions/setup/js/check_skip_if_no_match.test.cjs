@@ -217,7 +217,7 @@ describe("check_skip_if_no_match", () => {
     expect(mockCore.infos).toContain("Checking skip-if-no-match query: is:open is:issue label:enhancement");
     expect(mockCore.infos).toContain("Minimum matches threshold: 5");
     expect(mockCore.infos).toContain("Scoped query: is:open is:issue label:enhancement repo:test-owner/test-repo");
-    expect(mockCore.infos).toContain("Search found 8 matching items");
+    expect(mockCore.infos).toContain("Query matched 8 items (via search API)");
   });
 
   it("should use raw query when GH_AW_SKIP_SCOPE is 'none'", async () => {

@@ -304,7 +304,10 @@ async function countWithRest(q, threshold) {
     return true;
   };
 
-  let count = 0;
+  // Page-number pagination can shift items across pages when new issues/PRs
+  // arrive mid-scan, so count distinct ids rather than raw matches.
+  /** @type {Set<number>} */
+  const seen = new Set();
   for (let page = 1; page <= REST_MAX_PAGES; page++) {
     /** @type {any[]} */
     let items;
@@ -319,11 +322,13 @@ async function countWithRest(q, threshold) {
       if (q.mentions) params.mentioned = q.mentions;
       ({ data: items } = await github.rest.issues.listForRepo(params));
     }
-    count += items.filter(matches).length;
-    if (items.length < perPage) return { totalCount: count, exact: true, backend: "rest" };
-    if (count >= threshold) return { totalCount: count, exact: false, backend: "rest" };
+    for (const item of items) {
+      if (matches(item)) seen.add(item.id);
+    }
+    if (items.length < perPage) return { totalCount: seen.size, exact: true, backend: "rest" };
+    if (seen.size >= threshold) return { totalCount: seen.size, exact: false, backend: "rest" };
   }
-  throw new Error(`inconclusive after ${REST_MAX_PAGES} pages (${count} matches, threshold ${threshold})`);
+  throw new Error(`inconclusive after ${REST_MAX_PAGES} pages (${seen.size} matches, threshold ${threshold})`);
 }
 
 /**
