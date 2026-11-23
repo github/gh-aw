@@ -317,7 +317,7 @@ func TestExtractNoopsFromRun_NoExperimentProvenance(t *testing.T) {
 	}
 }
 
-func TestExtractReportIncompleteFromRun(t *testing.T) {
+func TestExtractIncompleteFromRun(t *testing.T) {
 	t.Parallel()
 	runDir := testutil.TempDir(t, "test-*")
 	content := `{"items":[
@@ -329,9 +329,9 @@ func TestExtractReportIncompleteFromRun(t *testing.T) {
 	}
 	run := WorkflowRun{DatabaseID: 4242, WorkflowName: "Incomplete Test"}
 
-	reports, err := extractReportIncompleteFromRun(runDir, run, false, "", "")
+	reports, err := extractIncompleteFromRun(runDir, run, false, "", "")
 	if err != nil {
-		t.Fatalf("extractReportIncompleteFromRun: %v", err)
+		t.Fatalf("extractIncompleteFromRun: %v", err)
 	}
 	if len(reports) != 1 {
 		t.Fatalf("Expected 1 report_incomplete, got %d", len(reports))

@@ -32,7 +32,7 @@ Recompute with `its-ok-to-say-noop.sh` (wraps `gh aw audit`), then patch `deck.j
 ## 3. Sources
 
 - Repository: gh-aw (public), GitHub Actions runs API (listing) and run artifacts via `gh aw audit` (agent artifact only).
-- Audit fields: `pkg/cli/audit_report_types.go` (`AuditData`: `noops`, `missing_tools`, `missing_data`, `report_incomplete`); extractors in `pkg/cli/logs_metrics.go`.
+- Audit fields: `pkg/cli/audit_report_types.go` (`AuditData`: `noops`, `missing_tools`, `missing_data`, `incomplete` for `report_incomplete`); extractors in `pkg/cli/logs_metrics.go`.
 - Where each type lands (side-row text): `docs/src/content/docs/reference/safe-outputs.md` (noop, missing tool/data, report_incomplete sections).
 
 ## 4. Queries
@@ -93,7 +93,7 @@ cd docs && npx playwright test tests/talk.spec.ts
 - **Truncated listing:** never use the repo-wide `actions/runs?created=` list; it silently stops at 1,000.
 - **Partial sample:** rate limits or transient errors fail single audits; the helper stops rather than shrink the denominator. Publish only with `missing: 0`.
 - **Diff mode:** `gh aw audit` with several IDs diffs them against the first; the helper audits one run per call.
-- **Audit version:** `report_incomplete` in the audit JSON needs a gh-aw build that includes it; older builds omit the field and report 0.
+- **Audit version:** the `incomplete` field (`report_incomplete` signals) in the audit JSON needs a gh-aw build that includes it; older builds omit the field and report 0.
 - **No `safe_output_summary`:** with `--artifacts agent` the audit JSON leaves it null; count from the per-type arrays instead.
 - **Stale cache:** audit reuses `$OUT/run-<id>/run_summary.json`, and a local `dev` build never invalidates it. Use a fresh `OUT` after changing gh-aw.
 - **Cache size:** each run caches its agent artifact; delete `$OUT` when done.

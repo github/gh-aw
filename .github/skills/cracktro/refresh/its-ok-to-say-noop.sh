@@ -56,7 +56,7 @@ fi
 while read -r id; do
   if [ -s "$OUT/json/$id.json" ]; then cat "$OUT/json/$id.json"; fi
 done < "$IDS" | jq -s --arg s "$START" --arg e "$END" --arg snap "$(date -u +%F)" --argjson listed "$(sort -u "$ALL" | wc -l)" --argjson sampled "$(wc -l < "$IDS")" --argjson missing "$(wc -l < "$MISSING")" '
-  def kinds: {noop:"noops", missing_tool:"missing_tools", missing_data:"missing_data", report_incomplete:"report_incomplete"};
+  def kinds: {noop:"noops", missing_tool:"missing_tools", missing_data:"missing_data", report_incomplete:"incomplete"};
   map(. as $r | {w:.overview.workflow_name, agent:((.metrics.turns // 0) > 0),
                  n:(kinds | map_values(($r[.] // []) | length))}) as $a
   | ($a | map(select(.agent))) as $g
