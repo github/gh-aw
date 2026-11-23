@@ -1,8 +1,8 @@
 ---
 name: Daily Workflow Security Model
 engine:
-  id: copilot
-  copilot-sdk: true
+  id: codex
+  model-provider: github
 description: Model-check and refine the compiled-workflow TLA+ security architecture, preserving concrete counterexamples.
 on:
   schedule: daily
