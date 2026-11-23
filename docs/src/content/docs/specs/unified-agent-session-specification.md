@@ -4,7 +4,7 @@ spec: true
 description: Draft contract for canonical traces, full unified artifacts, and bounded compact unified sessions.
 sidebar:
   order: 1365
-version: "2.13.0"
+version: "2.14.0"
 status: Draft
 publication_date: "2026-11-23"
 editors:
@@ -14,7 +14,7 @@ editors:
 
 # Unified Agent Session Specification
 
-**Version**: 2.13.0<br>
+**Version**: 2.14.0<br>
 **Status**: Draft<br>
 **Publication Date**: 2026-11-23<br>
 **Editors**: GitHub Agentic Workflows Team (GitHub)<br>
@@ -31,7 +31,7 @@ This specification defines the session traces used by GitHub Agentic Workflows: 
 
 This is a **GitHub Agentic Workflows project specification**, written using W3C-inspired document conventions. It is **not an official W3C standard**, W3C publication, or W3C-endorsed recommendation.
 
-Version 2.13.0 is a draft governed by the project's normal review process. It may be updated, replaced, or superseded. The accompanying implementation and regression suites exercise this contract, including the sampled CI sessions identified in Section 9.4. This is not a blanket declaration of conformance for every engine version or source format. Section 10 records historical pre-implementation gaps, not current defects. Approval and ongoing compliance testing remain project responsibilities.
+Version 2.14.0 is a draft governed by the project's normal review process. It may be updated, replaced, or superseded. The accompanying implementation and regression suites exercise this contract, including the sampled CI sessions identified in Section 9.4. This is not a blanket declaration of conformance for every engine version or source format. Section 10 records historical pre-implementation gaps, not current defects. Approval and ongoing compliance testing remain project responsibilities.
 
 The specification version belongs to this document. The unified file's leading
 `session.format` record carries an independent numeric serialization-format
@@ -849,6 +849,7 @@ source for opaque fields.
 | `firewall.http_access` | AWF network audit observations, including operational entries without a host. |
 | `firewall.token_usage`, `firewall.model_routing`, `firewall.upstream_error`, `firewall.steering`, `firewall.event` | API proxy accounting, essential AWF model-routing selection/request records, identifier-only upstream error responses (T-UAS-082), token/time steering, tracker and other firewall messages. |
 | `model.config`, `model.baseline_estimate` | Runner-written configured routing/model policy, budget, and baseline model (T-UAS-080), and the collector's counterfactual baseline repricing for routed runs (T-UAS-081). |
+| `routing.observation` | The collector's verdict on a routed run: whether its result counts as evidence about the pair AWF selected, or why not (T-UAS-094). |
 | `safe_output.request`, `safe_output.result`, `safe_output.error` | Requested operation identities, executed item identities, and structured error codes. Requests are not execution results. Bodies, titles, raw errors, messages, and arbitrary metadata are excluded. |
 | `safe_output.execution` | Handler application outcomes from `safe-output-executions.jsonl`, transported in `safe-outputs-items`: operation `type`, zero-based `messageIndex`, `status`, and `staged`. Status is `success`, `failed`, `skipped`, `warning`, `cancelled`, `deferred`, `delegated`, or `staged`. This is the handler's run-time snapshot, not later human adoption, object survival, or longitudinal repository Value. Buffered reviews remain deferred until final submission; submission failures and skips replace provisional success. Delegation to a standalone step, custom action, or custom job is not evidence of application. Exporting a custom action payload records delegation, not application; available `workflow.job_result` observations preserve actual job success or failure separately. An optional canonical HTTPS GitHub resource `url` preserves numeric resource IDs, commit hashes, and recognized comment/review anchors, without credentials, query parameters, or free-form fragments. GitHub Enterprise uses the configured server origin; unrecognized URLs are omitted. Claim-scoped outcome files retain their source path in provenance. |
 | `lifecycle.adoption` | A post-run supplement from `gh aw logs --adoption --adoption-dir`, written as `adoption-session-<runID>.jsonl`. The supplement carries distinct delivery, adoption, and survival fields plus source run correlation. It is a separate observation stream: consumers MAY join it to the original session by `sourceRunId`, but MUST NOT append it to or rewrite the original run's immutable `usage/aw_session.jsonl`. |
@@ -1163,6 +1164,71 @@ model is indistinguishable from the main agent in this evidence.
 | `pricedRequests`, `unpricedRequests` | Main requests with and without baseline pricing and complete token counts. Unknown pricing is unpriced, never zero cost. |
 | `unattributedRequests` | Agent-phase requests that could not be attributed. |
 | `complete` | `true` only when `baselineModel` is known, at least one main request was observed, and no request is unpriced or unattributed. A priced subtotal with unpriced or unattributed requests is incomplete. |
+
+**T-UAS-094 — Routing observation.** The conclusion job's collector emits one
+`routing.observation` event, with `collector` provenance and phase `conclusion`,
+for a run in which AWF recorded a selection (`firewall.model_routing` with
+`stage: selection`) and the agent made at least one agent-phase proxy request
+other than the classifier's. A run that was not routed, or whose agent made no
+request, has no observation, and neither does a session collected outside the
+conclusion job, which lacks the final job results. Readers MUST treat a missing
+observation as no verdict, never as a failure. Events of this type from any other
+source are dropped.
+
+The event records only the verdict: whether the run's result counts as evidence
+about the selected pair, and if not, why. The selected pair, the requests that ran
+it, and their priced usage stay in the run's `firewall.model_routing` and
+`firewall.token_usage` events, which readers attribute with the rules of T-UAS-081.
+Under those rules, the selected pair ran when at least one main request was
+observed and no request is unattributed. A request AWF recorded as
+`routed: deviated` that matches no declared sub-agent ran another model or effort.
+Requests AWF recorded without usage count as well.
+
+| Field | Meaning |
+| --- | --- |
+| `outcome` | `success`, `failure`, or `skip`. |
+| `reason` | Present only with `skip`: `cancelled`, `infrastructure`, `rate_limited`, `pair_mismatch`, or `unknown_evidence`. |
+
+A run succeeded when the agent job succeeded, its validated safe outputs include at
+least one terminal output (a valid `noop` counts; a continuation request does not)
+with no validation errors and no incomplete report, and threat detection, if it
+ran, reached a clean result. Rules apply in order:
+
+1. `skip` with `cancelled` when the agent job or its final harness attempt was
+   cancelled, including an attempt classed as cancelled or timed out.
+2. For a run that did not succeed, `skip` with `infrastructure` for platform
+   failures: startup failures, interrupted harness attempts, crash signals, engine
+   outages and timeouts, a safe-output gateway that registered no tools,
+   authentication and policy rejections, provider 5xx responses that the engine or
+   AWF recorded for an agent request, and harness infrastructure failure classes.
+   Then `skip` with `rate_limited` for such 429 responses and quota or rate-limit
+   categories and classes. A generic authentication or proxy-guard rejection beside
+   a confirmed limit belongs to the limit, not the platform. An incomplete report
+   whose reason claims an infrastructure error is neither the agent's own report nor
+   platform evidence, because runtimes use that reason for budgets and rate-limit
+   waits too and the agent can file it. A run that succeeded is not re-examined for
+   transient errors it recovered from.
+3. `skip` with `pair_mismatch` when an agent request ran another model or effort,
+   and `skip` with `unknown_evidence` when the requests cannot be attributed.
+4. `skip` with `unknown_evidence` when threat detection flagged the output.
+5. `success` for a run that succeeded.
+6. `failure` when the agent reported that it could not finish or exhausted its
+   prompt, the main conversation recorded a refusal or content filter and the run
+   left no terminal output, the selected pair reached a step, token, credit, or
+   tool-denial limit (with or without output), or the validator rejected its
+   outputs or found no terminal output.
+7. Otherwise `skip` with `unknown_evidence`, including an agent job that failed
+   after valid terminal output, and a run whose threat detection could not reach a
+   result: a warning or failure conclusion, a detector failure, or a failed or
+   cancelled detection job. As in the published `detection.result`, only the
+   conclusion's own result supplies a reason.
+
+The verdict is evidence of validated terminal completion, not of answer quality.
+It uses only engine-neutral evidence (AWF's records, the job results, harness and
+execution records, normalized refusal events, validated safe outputs, and threat
+detection), so the same evidence gives the same verdict for every engine. It does
+not decide whether a run may update routing history: re-runs, pull request runs,
+and experiment workflows are excluded by the consumer that keeps that history.
 
 #### Upstream errors
 
@@ -2798,6 +2864,11 @@ Malformed logs and very large records can exhaust memory or produce misleading s
 Native IDs can collide, timestamps can be out of order, and a trace can contain ambiguous concurrent calls. Exact-ID pairing avoids attributing a failure or output to the wrong tool. Cross-session concatenation requires an external boundary policy; this specification does not invent a wrapper or fabricated session IDs to resolve such ambiguity.
 
 ## 13. Change Log (Informative)
+
+### Version 2.14.0 - Draft (2026-11-23)
+
+- Added `routing.observation`, the conclusion collector's verdict on a routed run: `success`, `failure`, or `skip` with a reason, decided from AWF's request records, the job results, and the validated safe outputs (T-UAS-094).
+- Retained serialization-format version 1.
 
 ### Version 2.13.0 - Draft (2026-11-23)
 

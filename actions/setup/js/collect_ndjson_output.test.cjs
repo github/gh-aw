@@ -262,6 +262,7 @@ describe("collect_ndjson_output.cjs", () => {
         const output = JSON.parse(mockCore.setOutput.mock.calls.find(call => call[0] === "output")[1]);
         expect(output.items[0].type).toBe("report_incomplete");
         expect(output.items[0].details).toContain("Safe-output tools: unavailable (gateway registered zero tools)");
+        expect(output.collectorInfrastructureCause).toBe("safeoutputs_gateway_empty");
         expect(fs.existsSync(path.join(TMP_GH_AW_PATH, AGENT_OUTPUT_FILENAME))).toBe(true);
       } finally {
         if (originalRunnerTemp === undefined) {
