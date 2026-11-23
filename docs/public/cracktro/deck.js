@@ -9035,7 +9035,7 @@
     });
   }
 
-  // Repo Factory: five roles share one issue-to-merge loop: several Researchers file issues, one Dispatcher starts concurrent pull request flows in three weekday coding slots, where a Coder, Reviewers and Finisher drive each to a maintainer, and Dreamer turns outcomes into one proposed change
+  // Factory Factory: processes create factories; the Repo Factory recipe builds one where five roles share one issue-to-merge loop: several Researchers file issues, one Dispatcher starts concurrent pull request flows in three weekday coding slots, where a Coder, Reviewers and Finisher drive each to a maintainer, and Dreamer turns outcomes into one proposed change
   {
     const AG = pickAgent();
     resetIndex();
@@ -9150,7 +9150,7 @@
     slides.push({
       group: "process",
       notes:
-        "What: An illustrative Repo Factory, the recipe a coding agent follows to give a repository a small set of agentic workflows in five roles. Several Researchers file scoped issues, never pull requests. One Dispatcher admits issues into three shared coding slots on weekdays, so up to three pull request flows run at once. In each flow a Coder opens the pull request, Reviewers leave at most three findings and Finisher repairs them, looping back for re-review for at most two rounds; then the pull request is ready or escalated, and a maintainer merges. Dreamer observes runs, costs and outcomes, then proposes one reversible change as a new issue.\nWhy: Handoffs go through issues and pull requests, and capacity is capped, so agents cannot flood the repository and people stay at the gates.\nWhen: Use it to bootstrap continuous improvement in a repository that already has CI and maintainers who review.",
+        "What: An illustrative Factory Factory: processes create factories. The Repo Factory recipe is the process a coding agent follows to give a repository a small set of agentic workflows in five roles. Several Researchers file scoped issues, never pull requests. One Dispatcher admits issues into three shared coding slots on weekdays, so up to three pull request flows run at once. In each flow a Coder opens the pull request, Reviewers leave at most three findings and Finisher repairs them, looping back for re-review for at most two rounds; then the pull request is ready or escalated, and a maintainer merges. Dreamer observes runs, costs and outcomes, then proposes one reversible change as a new issue.\nWhy: Handoffs go through issues and pull requests, and capacity is capped, so agents cannot flood the repository and people stay at the gates.\nWhen: Use it to bootstrap continuous improvement in a repository that already has CI and maintainers who review.",
       enter() {
         t0 = 0;
         cyc = -1;
@@ -9193,7 +9193,7 @@
           light(nid);
         }
       },
-      el: h("section", { class: "slide" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Researchers · Dispatcher · Reviewers · Finisher · Dreamer"), h("h2", {}, letters("Repo "), letters("Factory", "l-grad"))), svg),
+      el: h("section", { class: "slide" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Processes create factories"), h("h2", {}, letters("Factory "), letters("Factory", "l-grad"))), svg),
     });
   }
 
@@ -25138,7 +25138,7 @@
       "Add agentic workflow that uses Serena MCP docker … to analyze the changes in commits to main and detect duplicated code.",
       "Add agentic workflow that uses Serena MCP docker (using container feature) to analyze the changes in commits to main and detect duplicated code.",
     ],
-    "Repo Factory": [
+    "Factory Factory": [
       "repo-factory",
       "create a factory that researches this repo daily, dispatches issues to coding agents, reviews and finishes PRs, and dreams up improvements",
       "create a factory that researches this repository every day, files scoped issues, dispatches up to three at a time to coding agents on weekdays, reviews and finishes the pull requests, and lets a Dreamer propose one reversible improvement at a time for a maintainer to approve.",

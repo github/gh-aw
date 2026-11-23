@@ -952,7 +952,7 @@ slop, nits, small PRs, velocity, cleanup, iterate
 - And who tidies up the slop left behind?
 - Agentic reviewers and daily improvers handle the cleanup, so velocity stays high and the code keeps improving.
 
-### Repo Factory {#repo-factory}
+### Factory Factory {#factory-factory}
 
 #### Notes
 
@@ -960,15 +960,15 @@ illustrative
 
 #### Summary
 
-A Repo Factory gives a repository five agentic roles that hand work along through issues and pull requests: several Researchers file issues, one Dispatcher admits them into a few shared weekday coding slots, and each slot runs its own pull request flow in which a Coder writes the change and Reviewers and a Finisher loop on it for a bounded number of rounds before a maintainer decides, and a Dreamer turns measured outcomes into one proposed change at a time.
+Processes create factories: the Repo Factory recipe gives a repository five agentic roles that hand work along through issues and pull requests: several Researchers file issues, one Dispatcher admits them into a few shared weekday coding slots, and each slot runs its own pull request flow in which a Coder writes the change and Reviewers and a Finisher loop on it for a bounded number of rounds before a maintainer decides, and a Dreamer turns measured outcomes into one proposed change at a time.
 
 #### Keywords
 
-Repo Factory, factory, roles, Researchers, Dispatcher, Reviewers, Finisher, Dreamer, Coder, coding agents, capacity, coding slots, concurrent pull requests, pull request flow, review loop, re-review, weekdays, handoffs, recipe, bootstrap, Issue Monster, PR Sous Chef, maintainer gate
+Factory Factory, processes create factories, Repo Factory, factory, roles, Researchers, Dispatcher, Reviewers, Finisher, Dreamer, Coder, coding agents, capacity, coding slots, concurrent pull requests, pull request flow, review loop, re-review, weekdays, handoffs, recipe, bootstrap, Issue Monster, PR Sous Chef, maintainer gate
 
 #### Captions
 
-- Tonight, a tour of the Repo Factory, five agent roles working one repository together.
+- Processes create factories: one recipe builds a factory of five agent roles working one repository together.
 - Several Researchers file issues, and one Dispatcher starts up to three pull requests at once, one per shared coding slot.
 - Each pull request runs its own flow: a Coder writes it, Reviewers and a Finisher loop for at most two rounds, then a maintainer still decides the merge.
 - And a Dreamer watches the outcomes, then proposes one reversible change as a new issue, so the factory improves itself.
