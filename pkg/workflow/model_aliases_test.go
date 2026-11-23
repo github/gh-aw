@@ -441,12 +441,31 @@ func TestModelAliasesEnvWithoutAWF(t *testing.T) {
 // TestModelCatalogEnv verifies that `engine.model-catalog: false` reaches every engine harness
 // as GH_AW_MODEL_CATALOG=false, and that the variable is absent by default.
 func TestModelCatalogEnv(t *testing.T) {
-	for _, engine := range []string{"copilot", "claude", "codex", "pi"} {
+	for _, engine := range []string{"copilot", "claude", "codex", "pi", "agy"} {
 		lock, _ := compileModelAliasWorkflow(t, "engine:\n  id: "+engine+"\n  model-catalog: false\nmodel: gpt-5-mini\n")
 		assert.Contains(t, lock, "GH_AW_MODEL_CATALOG: false", "engine %s: model-catalog: false must reach the harness", engine)
 
 		lock, _ = compileModelAliasWorkflow(t, "engine: "+engine+"\n")
 		assert.NotContains(t, lock, "GH_AW_MODEL_CATALOG", "engine %s: the catalogue is required by default", engine)
+	}
+}
+
+// TestModelCatalogDetectionDefault verifies that, without a catalogue and without a configured
+// model, the threat-detection job does not default to the `detection` alias, which would be
+// passed to the provider verbatim, and uses the engine's main-agent default instead.
+func TestModelCatalogDetectionDefault(t *testing.T) {
+	const safeOutputs = "safe-outputs:\n  create-issue:\n"
+	for engine, want := range map[string]string{
+		"copilot": "COPILOT_MODEL: ${{ vars.GH_AW_MODEL_DETECTION_COPILOT || vars.GH_AW_DEFAULT_MODEL_COPILOT || 'auto' }}",
+		"claude":  "ANTHROPIC_MODEL: ${{ vars.GH_AW_MODEL_DETECTION_CLAUDE || vars.GH_AW_DEFAULT_MODEL_CLAUDE || 'claude-sonnet-5' }}",
+		"codex":   "GH_AW_MODEL_DETECTION_CODEX: ${{ vars.GH_AW_MODEL_DETECTION_CODEX || vars.GH_AW_DEFAULT_MODEL_CODEX || '' }}",
+	} {
+		lock, _ := compileModelAliasWorkflow(t, "engine:\n  id: "+engine+"\n  model-catalog: false\n"+safeOutputs)
+		assert.Contains(t, lock, want, "engine %s: detection must default to a model usable without a catalogue", engine)
+		assert.NotContains(t, lock, "'detection' }}", "engine %s: the detection alias needs the catalogue", engine)
+
+		lock, _ = compileModelAliasWorkflow(t, "engine: "+engine+"\n"+safeOutputs)
+		assert.Contains(t, lock, "'detection' }}", "engine %s: the catalogue default is unchanged", engine)
 	}
 }
 

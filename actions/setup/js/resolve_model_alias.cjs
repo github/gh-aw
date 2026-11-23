@@ -659,6 +659,27 @@ function isModelCatalogDisabled(env = process.env) {
   return String(env[MODEL_CATALOG_ENV_VAR] || "").trim() === "false";
 }
 
+/**
+ * The workflow-defined alias (from `GH_AW_MODEL_ALIASES`) that the configured model names,
+ * or "" when it names none. Built-in aliases are not consulted.
+ * @param {string} configuredModel
+ * @param {NodeJS.ProcessEnv} env
+ * @returns {string}
+ */
+function workflowAliasNamedBy(configuredModel, env) {
+  let aliases;
+  try {
+    aliases = JSON.parse(String(env[MODEL_ALIASES_ENV_VAR] || ""));
+  } catch {
+    return "";
+  }
+  if (!aliases || typeof aliases !== "object" || Array.isArray(aliases)) return "";
+  const { base } = splitModelIdentifier(configuredModel);
+  const slash = base.indexOf("/");
+  const aliasKey = slash > 0 ? base.slice(slash + 1) : base;
+  return aliasKey && Object.prototype.hasOwnProperty.call(aliases, aliasKey) ? aliasKey : "";
+}
+
 /** @type {Record<string, string[]>|null|undefined} */
 let builtinModelAliases;
 
@@ -793,7 +814,15 @@ async function resolveEngineModel(options) {
   const role = options.role || "main";
   const configuredModel = String(options.configuredModel || "").trim();
   const catalogDisabled = isModelCatalogDisabled(env);
-  if (catalogDisabled) logger(`model resolution: engine=${options.engine} role=${role} engine.model-catalog is false; using '${configuredModel}' verbatim`);
+  if (catalogDisabled) {
+    logger(`model resolution: engine=${options.engine} role=${role} engine.model-catalog is false; using '${configuredModel}' verbatim`);
+    const workflowAlias = workflowAliasNamedBy(configuredModel, env);
+    if (workflowAlias) {
+      logger(
+        `model resolution: warning: '${configuredModel}' names the workflow-defined alias '${workflowAlias}' from models:, but engine.model-catalog is false, so aliases are not resolved; it is passed to the engine as a literal model id (set the model to a concrete id instead)`
+      );
+    }
+  }
   const aliasMap = catalogDisabled ? null : options.aliasMap !== undefined ? options.aliasMap : loadModelAliasMap({ reflectData: options.reflectData, env });
   // Without AWF no /reflect catalogue can exist; an explicit catalogue or /reflect data overrides.
   const noCatalog = options.noCatalog ?? (env.AWF_REFLECT_ENABLED !== "1" && !options.reflectData && !Array.isArray(options.catalog));

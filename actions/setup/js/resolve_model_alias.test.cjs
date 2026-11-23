@@ -397,6 +397,30 @@ describe("resolveEngineModel without a possible catalogue", () => {
   });
 });
 
+describe("resolveEngineModel with engine.model-catalog: false", () => {
+  const run = (configuredModel, aliases) => {
+    const logs = [];
+    const env = { GH_AW_MODEL_CATALOG: "false", ...(aliases ? { GH_AW_MODEL_ALIASES: JSON.stringify(aliases) } : {}) };
+    return resolveEngineModel({ engine: "test", configuredModel, reflectData: null, env, record: false, logger: msg => logs.push(msg) }).then(result => ({ result, logs }));
+  };
+
+  it("warns that a workflow-defined alias is passed through verbatim", async () => {
+    for (const model of ["gpt-fast", "copilot/gpt-fast?effort=high"]) {
+      const { result, logs } = await run(model, { "gpt-fast": ["copilot/gpt-5.6*"] });
+      expect(result).toMatchObject({ engineModel: model, status: "exact", alias: false });
+      expect(logs.some(msg => msg.includes("warning") && msg.includes("workflow-defined alias 'gpt-fast'"))).toBe(true);
+    }
+  });
+
+  it("does not warn for built-in aliases or concrete ids", async () => {
+    for (const model of ["gpt-5-mini", "small", "my-deployment"]) {
+      const { result, logs } = await run(model, { "gpt-fast": ["copilot/gpt-5.6*"] });
+      expect(result).toMatchObject({ engineModel: model, status: "exact" });
+      expect(logs.some(msg => msg.includes("warning"))).toBe(false);
+    }
+  });
+});
+
 describe("bundled built-in model aliases", () => {
   const env = { GH_AW_AWF_CONFIG_PATH: "/nonexistent" };
 
