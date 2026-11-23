@@ -3,14 +3,10 @@ package lint
 import (
 	"context"
 	"errors"
-	"fmt"
 	"strconv"
 	"strings"
 
-	"github.com/github/gh-aw/pkg/workflow/actions"
-	"github.com/github/gh-aw/pkg/workflow/aw"
 	"github.com/github/gh-aw/pkg/workflow/taint"
-	"github.com/goccy/go-yaml"
 	"github.com/rhysd/actionlint"
 )
 
@@ -35,67 +31,26 @@ func checkUnsoundContains(ctx context.Context, input Input) ([]Diagnostic, error
 	if err := integrityInput(ctx, input); err != nil {
 		return nil, err
 	}
+	conditions, err := conditionFields(ctx, input, "unsound-contains")
 	var diagnostics []Diagnostic
-	visit := func(path string, value any) error {
-		found, err := unsoundContainsCondition(ctx, path, value)
-		if found {
-			diagnostics = append(diagnostics, Diagnostic{Path: path, Message: unsoundContainsMessage})
-		}
-		return err
-	}
-	if input.Workflow != nil {
-		root, err := actions.Lower(input.Workflow)
-		if err != nil {
-			return nil, errors.New("unsound-contains cannot lower the Actions AST; correct the workflow before linting")
-		}
-		return diagnostics, unsoundContainsActions(ctx, root, visit)
-	}
-	blocks, err := aw.ExecutionBlocks(ctx, input.Document)
 	failures := []error{err}
-	for _, block := range blocks {
+	for _, condition := range conditions {
 		if err := ctx.Err(); err != nil {
-			return diagnostics, err
+			return diagnostics, errors.Join(append(failures, err)...)
 		}
-		failures = append(failures, visit(block.FieldPath("if"), block.Fields["if"]))
-		for _, step := range block.Steps {
-			failures = append(failures, visit(step.Path+".if", step.Fields["if"]))
+		found, err := unsoundContainsCondition(ctx, condition.path, condition.text)
+		if found {
+			diagnostics = append(diagnostics, Diagnostic{Path: condition.path, Message: unsoundContainsMessage})
 		}
+		failures = append(failures, err)
 	}
 	return diagnostics, errors.Join(failures...)
 }
 
-func unsoundContainsActions(ctx context.Context, root yaml.MapSlice, visit func(string, any) error) error {
-	var failures []error
-	for _, item := range root {
-		if item.Key != "jobs" {
-			continue
-		}
-		jobs, _ := item.Value.(yaml.MapSlice)
-		for _, job := range jobs {
-			if err := ctx.Err(); err != nil {
-				return errors.Join(append(failures, err)...)
-			}
-			id, _ := job.Key.(string)
-			fields, _ := job.Value.(map[string]any)
-			path := "jobs." + id
-			failures = append(failures, visit(path+".if", fields["if"]))
-			steps, _ := fields["steps"].([]map[string]any)
-			for index, step := range steps {
-				failures = append(failures, visit(fmt.Sprintf("%s.steps[%d].if", path, index), step["if"]))
-			}
-		}
-	}
-	return errors.Join(failures...)
-}
-
 // unsoundContainsCondition parses bare and ${{ }}-wrapped conditions alike.
-func unsoundContainsCondition(ctx context.Context, path string, value any) (bool, error) {
+func unsoundContainsCondition(ctx context.Context, path, text string) (bool, error) {
 	if err := ctx.Err(); err != nil {
 		return false, err
-	}
-	text, ok := value.(string)
-	if !ok {
-		return false, nil
 	}
 	found := false
 	inspect := func(_, _, _ int, node actionlint.ExprNode) error {
