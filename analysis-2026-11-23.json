@@ -1,0 +1,45 @@
+{
+ "date": "2026-11-23",
+ "window": "2026-10-24..2026-11-23 (dataset as fetched; 733 PRs)",
+ "total_prs": 733,
+ "merged": 609,
+ "closed": 115,
+ "open": 9,
+ "merge_rate": 0.841,
+ "merge_rate_basis": "completed (merged/(merged+closed)); 724 completed",
+ "categories": {
+  "feature": {"total": 80, "merged": 71, "closed": 9, "open": 0, "rate": 0.887},
+  "other": {"total": 411, "merged": 335, "closed": 70, "open": 6, "rate": 0.827},
+  "security": {"total": 42, "merged": 31, "closed": 11, "open": 0, "rate": 0.738},
+  "documentation": {"total": 46, "merged": 41, "closed": 4, "open": 1, "rate": 0.911},
+  "dependency": {"total": 28, "merged": 25, "closed": 3, "open": 0, "rate": 0.893},
+  "bug_fix": {"total": 48, "merged": 40, "closed": 6, "open": 2, "rate": 0.87},
+  "testing": {"total": 61, "merged": 59, "closed": 2, "open": 0, "rate": 0.967},
+  "refactor": {"total": 17, "merged": 7, "closed": 10, "open": 0, "rate": 0.412}
+ },
+ "negative_titles": {
+  "triage_verify_investigate": {"total": 24, "merged": 4, "closed": 19, "open": 1, "rate": 0.174},
+  "wip_draft": {"total": 12, "merged": 3, "rate_note": "3 of 12 merged"}
+ },
+ "length_buckets_completed": {
+  "0-100": {"total": 398, "merged": 321, "closed": 77, "rate": 0.807},
+  "100-150": {"total": 202, "merged": 175, "closed": 27, "rate": 0.866},
+  "150-250": {"total": 44, "merged": 38, "closed": 6, "rate": 0.864},
+  "250+": {"total": 80, "merged": 75, "closed": 5, "rate": 0.938}
+ },
+ "structural": {
+  "avg_words_merged": 136.7,
+  "avg_words_closed": 101.0,
+  "code_block_merged_pct": 59.3,
+  "code_block_closed_pct": 35.7,
+  "bullet_merged_pct": 99.0,
+  "bullet_closed_pct": 98.3
+ },
+ "keyword_lift_closed_leaning": ["unverified", "unresolved", "unsupported", "actionable", "reported", "needed", "installation", "validated"],
+ "last_7_days": {"total": 165, "merged": 120, "closed": 36, "open": 9, "rate": 0.769},
+ "weekly_completed_rate": {"2026-10-19": 0.827, "2026-10-26": 0.785, "2026-11-02": 0.914, "2026-11-09": 0.856, "2026-11-16": 0.758},
+ "authors_top": [["app/copilot-swe-agent", 489], ["pelikhan", 121], ["gh-aw-bot", 104], ["lpcox", 10]],
+ "empty_bodies": 0,
+ "category_rules": "v6-title-regex (same as 2026-11-17; first-match wins, leading [tag] stripped); comparable to 2026-11-22",
+ "caveat": "PR body used as prompt proxy; bodies are often agent-written summaries. Keyword lift confounded by batch clusters from single authors; not causal. Closed review/triage PRs may reflect no-change outcomes, not bad prompts."
+}
