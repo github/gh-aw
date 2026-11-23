@@ -8,9 +8,9 @@ sidebar:
 
 # Safe Outputs MCP Gateway Specification
 
-**Version**: 1.31.0<br>
+**Version**: 1.31.1<br>
 **Status**: Working Draft<br>
-**Publication Date**: 2026-11-19<br>
+**Publication Date**: 2026-11-23<br>
 **Editor**: GitHub Agentic Workflows Team<br>
 **This Version**: [safe-outputs-specification](/gh-aw/specs/safe-outputs-specification/)<br>
 **Latest Published Version**: This document
@@ -3399,7 +3399,7 @@ Paths in this table are under `actions/setup/js/`. The bounded [Git-operation mo
 
 ### 7.2 System Types
 
-System types are always available in every workflow. The types `noop`, `report-missing-tool`, and `report-missing-data` are unconditionally enabled, while `create-issue` is conditionally auto-injected when no other safe output types are explicitly configured (see Section 4.3 for auto-injection rules).
+System types are always available in every workflow. The types `noop`, `report-missing-tool`, `report-missing-data`, and `report-incomplete` are unconditionally enabled, while `create-issue` is conditionally auto-injected when no other safe output types are explicitly configured (see Section 4.3 for auto-injection rules). `noop` records completion when the agent has completed its assigned task without requiring another safe-output action. `report-incomplete` is reserved for cases in which the agent cannot complete or publish its assigned task because of a tool, authentication, permission, safe-output, essential-input/data, timeout, or other external blocker.
 
 #### Type: noop
 
@@ -6974,7 +6974,7 @@ The YAML configuration key is `report-missing-data`. The legacy tool/output type
 
 #### Type: report_incomplete
 
-**Purpose**: Signal that the task could not be completed due to an infrastructure or tool failure (e.g., MCP server crash, missing authentication, inaccessible repository). This is distinct from `noop` (no action needed) — it indicates an active failure that prevented the task from running. The workflow framework treats this as a failure signal even when the agent exits successfully.
+**Purpose**: Signal that the agent could not complete or publish its assigned task because of a tool, authentication, permission, safe-output, essential-input/data, timeout, or other external blocker. Completion is judged against the agent's assigned task, not against the state of the subject examined. Negative or unresolved findings—including a review requesting changes, bugs found during triage, failing checks, or follow-up work left for humans—are completed outcomes and MUST NOT result in `report_incomplete` solely because the subject remains unresolved. This is distinct from `noop` (no additional action was needed) and remains a failure signal even when the agent exits successfully.
 
 **Default Max**: 5  
 **Cross-Repository Support**: N/A (logging only)  
@@ -6985,7 +6985,7 @@ The YAML configuration key is `report-missing-data`. The legacy tool/output type
 ```json
 {
   "name": "report_incomplete",
-  "description": "Signal that the task could not be completed due to an infrastructure or tool failure (e.g., MCP server crash, missing authentication, inaccessible repository). Use this when required tools or data are unavailable and the task cannot be meaningfully performed. This is distinct from noop (no action needed) — it indicates an active failure that prevented the task from running. The workflow framework will treat this as a failure signal even when the agent exits successfully.",
+  "description": "Signal that the agent could not complete or publish its assigned task because of a tool, authentication, permission, safe-output, essential-input/data, timeout, or other external blocker. Judge completion by the assigned task, not by whether the subject examined was resolved. Do not use it for negative or unresolved findings, including a review requesting changes, bugs found during triage, failing checks, or follow-up left for humans; those are completed outcomes. Provide a specific reason and optional details so downstream issue aggregation can preserve complete incomplete-signal context. The workflow framework will treat this as a failure signal even when the agent exits successfully.",
   "inputSchema": {
     "type": "object",
     "required": ["reason"],
@@ -8441,6 +8441,11 @@ This specification revision aligns with directly relevant `CHANGELOG.md` entries
 - **v0.40.1**: append-only status comment behavior was documented for smoke workflow execution.
 - **Earlier changelog entry**: status comments were decoupled from default AI reaction behavior; explicit `on.status-comment` configuration is required when status comments are desired.
 - **Earlier changelog entry**: `command` trigger was renamed to `slash_command` with deprecation compatibility.
+
+**Version 1.31.1** (2026-11-23):
+
+- **Clarified**: `report_incomplete` is based on inability to complete or publish the agent's assigned task, rather than the unresolved state of the subject examined.
+- **Clarified**: Negative findings and human follow-up outcomes do not require `report_incomplete`; tool, authentication, permission, safe-output, essential-input/data, timeout, and external blockers remain incomplete outcomes.
 
 **Version 1.31.0** (2026-11-19):
 
