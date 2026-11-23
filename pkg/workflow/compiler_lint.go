@@ -76,9 +76,9 @@ func (c *Compiler) omitCompilerLintWarning(data *WorkflowData, diagnostic workfl
 	if diagnostic.Severity != workflowlint.Warning {
 		return false
 	}
-	// CTR-008 validation already emits the strict trigger warning before lint.
+	// Deduplicate CTR-008 only when validation emitted the equivalent warning.
 	if diagnostic.RuleID == "dangerous-triggers" && diagnostic.ThreatRuleID == "CTR-008" &&
-		data.SourceDocument != nil && c.effectiveStrictMode(data.RawFrontmatter) {
+		data.pullRequestTargetWarned {
 		return true
 	}
 	_, exemptCheckout := checkouts[diagnostic.Path]

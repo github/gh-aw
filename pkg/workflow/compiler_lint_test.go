@@ -67,7 +67,7 @@ func TestCompilerLintDangerousTriggers(t *testing.T) {
 		{name: "comment disabled GitHub", trigger: "issue_comment"},
 		{name: "safe event", trigger: "workflow_dispatch"},
 		{name: "nonstrict target advisory", trigger: "pull_request_target", policy: "strict: false\n", warnings: 1},
-		{name: "strict target handled by validation", trigger: "pull_request_target"},
+		{name: "strict target without validation", trigger: "pull_request_target", warnings: 1},
 		{name: "nonstrict target acknowledged", trigger: "pull_request_target", policy: "strict: false\n"},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
@@ -89,6 +89,105 @@ func TestCompilerLintDangerousTriggers(t *testing.T) {
 			require.NoError(t, compiler.lintCompiledWorkflow(data, content, "test.md"))
 			require.Zero(t, compiler.GetWarningCount())
 		})
+	}
+}
+
+func TestCompilerLintPullRequestTargetValidationDeduplication(t *testing.T) {
+	t.Parallel()
+	content := "on: pull_request_target\njobs:\n  check:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo safe\n"
+	for _, tt := range []struct {
+		name, validatedOn string
+		validate          bool
+	}{
+		{name: "validation bypassed"},
+		{name: "equivalent warning emitted", validate: true, validatedOn: "on: pull_request_target"},
+		{name: "validator returned without warning", validate: true, validatedOn: "on: workflow_dispatch"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			document, err := aw.Parse("---\non: pull_request_target\ncheckout: false\n---\nReview.\n")
+			require.NoError(t, err)
+			data := &WorkflowData{
+				SourceDocument: document, RawFrontmatter: document.Frontmatter,
+				On: tt.validatedOn, CheckoutExplicitlyDisabled: true,
+			}
+			compiler := NewCompiler(WithLint(true))
+			compiler.SetSkipValidation(true)
+			if tt.validate {
+				require.NoError(t, compiler.validatePullRequestTargetTrigger(data, "test.md"))
+			}
+			require.NoError(t, compiler.lintCompiledWorkflow(data, content, "test.md"))
+			require.Equal(t, 1, compiler.GetWarningCount(), "exactly one validator or lint warning")
+		})
+	}
+}
+
+func TestCompilerLintPullRequestTargetValidationReuse(t *testing.T) {
+	t.Parallel()
+	content := "on: pull_request_target\njobs:\n  check:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo safe\n"
+	document, err := aw.Parse("---\non: {pull_request_target: {}}\ncheckout: false\n---\nReview.\n")
+	require.NoError(t, err)
+	data := &WorkflowData{
+		SourceDocument: document, RawFrontmatter: document.Frontmatter,
+		On: "on: pull_request_target", CheckoutExplicitlyDisabled: true,
+	}
+	compiler := NewCompiler(WithLint(true))
+	require.NoError(t, compiler.validatePullRequestTargetTrigger(data, "test.md"))
+	require.NoError(t, compiler.lintCompiledWorkflow(data, content, "test.md"))
+	require.Equal(t, 1, compiler.GetWarningCount())
+
+	// A prior workflow's validation must not suppress a new workflow's lint.
+	nextDocument, err := aw.Parse("---\non: pull_request_target\ncheckout: false\n---\nReview.\n")
+	require.NoError(t, err)
+	require.NoError(t, compiler.lintCompiledWorkflow(&WorkflowData{
+		SourceDocument: nextDocument, RawFrontmatter: nextDocument.Frontmatter,
+	}, content, "next.md"))
+	require.Equal(t, 2, compiler.GetWarningCount())
+
+	compiler.ResetWarningCount()
+	trigger := document.Frontmatter["on"].(map[string]any)["pull_request_target"].(map[string]any)
+	trigger["acknowledge-risk"] = true
+	require.NoError(t, compiler.validatePullRequestTargetTrigger(data, "test.md"))
+	require.NoError(t, compiler.lintCompiledWorkflow(data, content, "test.md"))
+	require.Zero(t, compiler.GetWarningCount())
+
+	// Revalidate the same data in non-strict mode: only lint emits the advisory.
+	delete(trigger, "acknowledge-risk")
+	data.RawFrontmatter["strict"] = false
+	require.NoError(t, compiler.validatePullRequestTargetTrigger(data, "test.md"))
+	require.NoError(t, compiler.lintCompiledWorkflow(data, content, "test.md"))
+	require.Equal(t, 1, compiler.GetWarningCount())
+
+}
+
+func TestCompilerLintPullRequestTargetCompilation(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	source := filepath.Join(dir, "review.md")
+	compiler := NewCompiler(WithLint(true))
+	compiler.gitRoot = dir
+	for _, skipSchemaValidation := range []bool{false, true} {
+		for _, acknowledged := range []bool{false, true} {
+			t.Run(fmt.Sprintf("skip-schema=%t/acknowledged=%t", skipSchemaValidation, acknowledged), func(t *testing.T) {
+				require.NoError(t, os.WriteFile(source, []byte(fmt.Sprintf(`---
+on:
+  pull_request_target:
+    acknowledge-risk: %t
+checkout: false
+tools:
+  github: false
+---
+Review.
+`, acknowledged)), 0o600))
+				compiler.SetSkipValidation(skipSchemaValidation)
+				compiler.ResetWarningCount()
+				require.NoError(t, compiler.CompileWorkflow(source))
+				warnings := 1
+				if acknowledged {
+					warnings = 0
+				}
+				require.Equal(t, warnings, compiler.GetWarningCount())
+			})
+		}
 	}
 }
 
