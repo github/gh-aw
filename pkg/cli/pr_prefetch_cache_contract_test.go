@@ -135,6 +135,27 @@ func TestImpeccableSkillsReviewerHasDeterministicSkillSelectionGuidance(t *testi
 	assert.Contains(t, text, "If the Impeccable skill cannot be found or read, do not abort", "Impeccable reviewer should continue when skill discovery fails")
 }
 
+func TestMattPocockSkillsReviewerCompletionContract(t *testing.T) {
+	t.Parallel()
+	repoRoot, err := gitutil.FindGitRoot()
+	if err != nil {
+		t.Skipf("Skipping test: not in a git repository: %v", err)
+	}
+
+	content, err := os.ReadFile(filepath.Join(repoRoot, ".github", "workflows", "mattpocock-skills-reviewer.md"))
+	require.NoError(t, err)
+
+	prefix, _, found := strings.Cut(string(content), "<!-- instruction-prefix-end -->")
+	require.True(t, found, "Completion rules must be in the self-contained instruction prefix")
+	require.LessOrEqual(t, len(prefix)+len("<!-- instruction-prefix-end -->"), 7500)
+	assert.Contains(t, prefix, "A completed review is successful with `APPROVE`, `COMMENT`, or `REQUEST_CHANGES`.")
+	assert.Contains(t, prefix, "Author changes requested by the review are follow-up work, not an incomplete review.")
+	assert.Contains(t, prefix, "After queuing the required inline comments and exactly one overall review, finish normally; no extra terminal signal is needed.")
+	assert.Contains(t, prefix, "a successful CLI call is not proof of GitHub publication. Publication failures must remain failures.")
+	assert.Contains(t, prefix, "Use `report_incomplete` only when the review cannot be finished or required outputs cannot be queued: missing essential evidence, stale-head rejection, tool/authentication/timeout failures, or external blockers.")
+	assert.Contains(t, prefix, "Never call `report_incomplete` merely because findings require author fixes, tests fail in the reviewed PR, or the review requests changes.")
+}
+
 func assertSubstringsInOrder(t *testing.T, text string, substrings []string, msgAndArgs ...any) {
 	t.Helper()
 
