@@ -486,6 +486,8 @@ function isExplicitModelId(modelId) {
  * - when no `/reflect` catalogue can exist on this run (`noCatalog`, set when AWF is
  *   disabled), an explicit overlay id or a version-shaped built-in alias matching
  *   its provider pattern passes through as exact; other aliases fail with catalog_unavailable.
+ * - `catalogOptional` (an explicit BYOK provider that may expose no `/models` route) applies
+ *   the same pass-through when the catalogue for the model's scope is empty.
  *
  * `resolvedModel` keeps the configured form: a provider-prefixed alias resolves to a
  * provider-prefixed id, a provider-scoped bare alias resolves to a bare id, and an
@@ -499,6 +501,7 @@ function isExplicitModelId(modelId) {
  *   provider?: string,
  *   preserveAuto?: boolean,
  *   noCatalog?: boolean,
+ *   catalogOptional?: boolean,
  *   logger?: (msg: string) => void,
  *   logPrefix?: string,
  * }} options
@@ -545,6 +548,10 @@ function resolveConfiguredModel(options) {
   if (isLiveModelId(aliasKey, catalog)) {
     // A live exact id wins over an alias with the same name (for example gpt-5-mini).
     logger(`${logPrefix}: '${configuredModel}' is a live model id${scope ? ` (provider=${scope})` : ""}; not resolving it as an alias`);
+    return exact;
+  }
+  if (catalog.length === 0 && options.catalogOptional && (isExplicitModelId(aliasKey) || isNativeModelId)) {
+    logger(`${logPrefix}: no live catalogue for the explicit provider; '${configuredModel}' is an explicit model id${scope ? ` (provider=${scope})` : ""}; passing it through as exact`);
     return exact;
   }
   if (catalog.length === 0) {

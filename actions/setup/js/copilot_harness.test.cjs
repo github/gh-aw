@@ -4744,6 +4744,53 @@ process.exit(1);`
       }
     });
 
+    describe("explicit BYOK provider without a /models route", () => {
+      const { loadBuiltinModelAliases } = require("./resolve_model_alias.cjs");
+      const emptyReflect = { models_fetch_complete: false, endpoints: [{ configured: true, provider: "copilot", models: [] }] };
+      let exitSpy;
+      beforeEach(() => {
+        vi.stubEnv("GH_AW_TMP_DIR", makeHarnessTempDir("copilot-byok-alias-"));
+        vi.stubEnv("COPILOT_SDK_URI", "");
+        writeAwfConfig(loadBuiltinModelAliases());
+        exitSpy = vi.spyOn(process, "exit").mockImplementation(() => undefined);
+      });
+      afterEach(() => {
+        fs.rmSync(process.env.GH_AW_TMP_DIR, { recursive: true, force: true });
+        vi.unstubAllEnvs();
+      });
+
+      it("passes a model id that is also a built-in alias through unchanged", async () => {
+        vi.stubEnv("COPILOT_PROVIDER_BASE_URL", "https://example.ai.gateway.azure.com/default/models/openai/v1");
+        process.env.COPILOT_MODEL = "gpt-5-mini";
+        const refetch = vi.fn();
+
+        const resolved = await applyCopilotModelAliasResolution({ awfReflectData: emptyReflect, logger: () => {}, refetchReflectData: refetch });
+
+        expect(resolved).toBe("gpt-5-mini");
+        expect(process.env.COPILOT_MODEL).toBe("gpt-5-mini");
+        expect(exitSpy).not.toHaveBeenCalled();
+        expect(refetch).not.toHaveBeenCalled();
+      });
+
+      it("still refuses a non-model-id alias it cannot resolve", async () => {
+        vi.stubEnv("COPILOT_PROVIDER_BASE_URL", "https://example.ai.gateway.azure.com/default/models/openai/v1");
+        process.env.COPILOT_MODEL = "small";
+
+        await applyCopilotModelAliasResolution({ awfReflectData: emptyReflect, logger: () => {}, refetchReflectData: async () => null });
+
+        expect(exitSpy).toHaveBeenCalledWith(1);
+      });
+
+      it("keeps failing for the gh-aw api-proxy gateway", async () => {
+        vi.stubEnv("COPILOT_PROVIDER_BASE_URL", "http://api-proxy:10002");
+        process.env.COPILOT_MODEL = "gpt-5-mini";
+
+        await applyCopilotModelAliasResolution({ awfReflectData: emptyReflect, logger: () => {}, refetchReflectData: async () => null });
+
+        expect(exitSpy).toHaveBeenCalledWith(1);
+      });
+    });
+
     it("stops before spawning Copilot when catalog retries are exhausted for a known alias", async () => {
       process.env.COPILOT_MODEL = "sol";
       writeAwfConfig({ sol: ["copilot/gpt-5.6-sol"] });
