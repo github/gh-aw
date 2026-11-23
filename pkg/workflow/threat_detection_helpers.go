@@ -335,7 +335,7 @@ func resolveThreatDetectionModel(data *WorkflowData, engineID string, engine Cod
 	}
 	defaultModel := func() string {
 		if engine != nil {
-			return defaultDetectionModel(engine)
+			return defaultDetectionModel(engine, data != nil && resolveExternalDetectorEngineConfig(data, engineID).ModelCatalogDisabled)
 		}
 		if defaultModel := compilerenv.ResolveDefaultDetectionModel(""); defaultModel != "" {
 			return defaultModel
@@ -374,18 +374,41 @@ func inheritedDetectionModel(data *WorkflowData, detectionEngineID string) strin
 // organization/repository variables override the built-in detection default. The fallback
 // was accidentally removed from inline detection in a93e36ea4; sharing it here keeps inline
 // and external detection from diverging again.
-func defaultDetectionModel(engine CodingAgentEngine) string {
+//
+// Without a live model catalogue (`engine.model-catalog: false`) the `detection` alias
+// cannot resolve and would reach the provider verbatim, so the built-in fallback is the
+// engine's main-agent default instead.
+func defaultDetectionModel(engine CodingAgentEngine, catalogDisabled bool) string {
 	if model := compilerenv.ResolveDefaultDetectionModel(""); model != "" {
 		return model
 	}
-	model := engine.GetDefaultDetectionModel()
-	if model == "" {
-		model = "detection"
-	}
 	suffix := strings.ToUpper(engine.GetID())
-	return compilerenv.BuildModelOverrideExpression(
-		"GH_AW_MODEL_DETECTION_"+suffix,
-		"GH_AW_DEFAULT_MODEL_"+suffix,
-		model,
-	)
+	primaryVar := "GH_AW_MODEL_DETECTION_" + suffix
+	enterpriseVar := "GH_AW_DEFAULT_MODEL_" + suffix
+	var model string
+	if catalogDisabled {
+		model = catalogFreeDefaultModel(engine.GetID())
+		if model == "" {
+			return compilerenv.BuildModelOverrideExpressionEmptyFallback(primaryVar, enterpriseVar)
+		}
+	} else {
+		model = engine.GetDefaultDetectionModel()
+		if model == "" {
+			model = "detection"
+		}
+	}
+	return compilerenv.BuildModelOverrideExpression(primaryVar, enterpriseVar, model)
+}
+
+// catalogFreeDefaultModel returns the built-in default model the engine's main agent job
+// uses when no model is configured, or "" when the engine chooses its own default.
+func catalogFreeDefaultModel(engineID string) string {
+	switch engineID {
+	case string(constants.CopilotEngine):
+		return constants.CopilotBYOKDefaultModel
+	case string(constants.ClaudeEngine):
+		return constants.SonnetDefaultModel
+	default:
+		return ""
+	}
 }

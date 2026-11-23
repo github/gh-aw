@@ -3574,6 +3574,17 @@ engine:
   # (optional)
   bare: true
 
+  # Whether the engine harness resolves the configured model against the live model
+  # catalogue (/models). Defaults to true: gh-aw model aliases, including built-in
+  # aliases that look like model ids such as gpt-5-mini, are resolved and the run
+  # stops if no catalogue is available. Set to false for BYOK providers without a
+  # /models route (for example Azure AI Gateway): configured models are then passed
+  # to the engine verbatim, without alias resolution, and model routing (implicit or
+  # model: router) is disabled because it selects models from the catalogue. Not
+  # supported with engine.copilot-sdk: true, which needs the catalogue at startup.
+  # (optional)
+  model-catalog: true
+
   # Whether dynamic workflows are enabled for engines that support them. Defaults to
   # false. Copilot dynamic workflows are experimental.
   # (optional)
@@ -3762,6 +3773,17 @@ engine:
   # not support this option and emit a warning. Defaults to false.
   # (optional)
   bare: true
+
+  # Whether the engine harness resolves the configured model against the live model
+  # catalogue (/models). Defaults to true: gh-aw model aliases, including built-in
+  # aliases that look like model ids such as gpt-5-mini, are resolved and the run
+  # stops if no catalogue is available. Set to false for BYOK providers without a
+  # /models route (for example Azure AI Gateway): configured models are then passed
+  # to the engine verbatim, without alias resolution, and model routing (implicit or
+  # model: router) is disabled because it selects models from the catalogue. Not
+  # supported with engine.copilot-sdk: true, which needs the catalogue at startup.
+  # (optional)
+  model-catalog: true
 
   # Whether dynamic workflows are enabled for engines that support them. Defaults to
   # false. Copilot dynamic workflows are experimental.
@@ -4369,6 +4391,17 @@ engine:
     # not support this option and emit a warning. Defaults to false.
     # (optional)
     bare: true
+
+    # Whether the engine harness resolves the configured model against the live model
+    # catalogue (/models). Defaults to true: gh-aw model aliases, including built-in
+    # aliases that look like model ids such as gpt-5-mini, are resolved and the run
+    # stops if no catalogue is available. Set to false for BYOK providers without a
+    # /models route (for example Azure AI Gateway): configured models are then passed
+    # to the engine verbatim, without alias resolution, and model routing (implicit or
+    # model: router) is disabled because it selects models from the catalogue. Not
+    # supported with engine.copilot-sdk: true, which needs the catalogue at startup.
+    # (optional)
+    model-catalog: true
 
     # Minimum release age in days for compiler-managed engine installs. Zero disables
     # the cooldown only outside strict mode.
@@ -22619,6 +22652,17 @@ safe-outputs:
       # (optional)
       bare: true
 
+      # Whether the engine harness resolves the configured model against the live model
+      # catalogue (/models). Defaults to true: gh-aw model aliases, including built-in
+      # aliases that look like model ids such as gpt-5-mini, are resolved and the run
+      # stops if no catalogue is available. Set to false for BYOK providers without a
+      # /models route (for example Azure AI Gateway): configured models are then passed
+      # to the engine verbatim, without alias resolution, and model routing (implicit or
+      # model: router) is disabled because it selects models from the catalogue. Not
+      # supported with engine.copilot-sdk: true, which needs the catalogue at startup.
+      # (optional)
+      model-catalog: true
+
       # Whether dynamic workflows are enabled for engines that support them. Defaults to
       # false. Copilot dynamic workflows are experimental.
       # (optional)
@@ -22807,6 +22851,17 @@ safe-outputs:
       # not support this option and emit a warning. Defaults to false.
       # (optional)
       bare: true
+
+      # Whether the engine harness resolves the configured model against the live model
+      # catalogue (/models). Defaults to true: gh-aw model aliases, including built-in
+      # aliases that look like model ids such as gpt-5-mini, are resolved and the run
+      # stops if no catalogue is available. Set to false for BYOK providers without a
+      # /models route (for example Azure AI Gateway): configured models are then passed
+      # to the engine verbatim, without alias resolution, and model routing (implicit or
+      # model: router) is disabled because it selects models from the catalogue. Not
+      # supported with engine.copilot-sdk: true, which needs the catalogue at startup.
+      # (optional)
+      model-catalog: true
 
       # Whether dynamic workflows are enabled for engines that support them. Defaults to
       # false. Copilot dynamic workflows are experimental.
@@ -23414,6 +23469,17 @@ safe-outputs:
         # not support this option and emit a warning. Defaults to false.
         # (optional)
         bare: true
+
+        # Whether the engine harness resolves the configured model against the live model
+        # catalogue (/models). Defaults to true: gh-aw model aliases, including built-in
+        # aliases that look like model ids such as gpt-5-mini, are resolved and the run
+        # stops if no catalogue is available. Set to false for BYOK providers without a
+        # /models route (for example Azure AI Gateway): configured models are then passed
+        # to the engine verbatim, without alias resolution, and model routing (implicit or
+        # model: router) is disabled because it selects models from the catalogue. Not
+        # supported with engine.copilot-sdk: true, which needs the catalogue at startup.
+        # (optional)
+        model-catalog: true
 
         # Minimum release age in days for compiler-managed engine installs. Zero disables
         # the cooldown only outside strict mode.

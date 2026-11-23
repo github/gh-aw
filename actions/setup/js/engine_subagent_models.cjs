@@ -33,7 +33,7 @@ const { isModelAvailableInReflectData, routingEndpointPaths } = require("./awf_m
 const { MODEL_NOT_SUPPORTED_PATTERN } = require("./detect_agent_errors.cjs");
 const { inlineArtifactTarget } = require("./inline_artifact_target.cjs");
 const { getEngineSubAgentTarget } = require("./extract_inline_sub_agents.cjs");
-const { loadModelAliasMap, ModelAliasResolutionError, recordModelResolution, resolveConfiguredModel, resolveEngineModel, splitModelIdentifier } = require("./resolve_model_alias.cjs");
+const { isModelCatalogDisabled, loadModelAliasMap, ModelAliasResolutionError, recordModelResolution, resolveConfiguredModel, resolveEngineModel, splitModelIdentifier } = require("./resolve_model_alias.cjs");
 
 /** The `model.resolution` role of the engine's main model; no sub-agent may use it. */
 const RESERVED_SUBAGENT_NAME = "main";
@@ -253,6 +253,9 @@ function restrictReflectToEndpoint(reflectData, providers, wireApi) {
  * verified (no routing entry or incomplete metadata, also after one refresh) fails with cause
  * `catalog_unavailable`. Providers without per-model endpoint metadata are not filtered.
  *
+ * With `engine.model-catalog: false` (`GH_AW_MODEL_CATALOG=false`), models are used verbatim
+ * without alias resolution, inventory or endpoint checks; input and provider checks still apply.
+ *
  * @param {{
  *   engine: "claude" | "codex",
  *   agents: Array<{ name: string, model?: string, invalidModel?: string, path?: string, fatal: boolean, origin: string }>,
@@ -302,8 +305,11 @@ async function resolveEngineSubagentModels(options) {
       );
     return refresh;
   };
-  const liveCheck = env.AWF_REFLECT_ENABLED === "1" || Boolean(options.reflectData);
-  const wireApi = options.wireApi || "";
+  // engine.model-catalog: false passes sub-agent models through verbatim: no inventory or
+  // endpoint-metadata check; the provider-prefix and input checks below still apply.
+  const catalogDisabled = isModelCatalogDisabled(env);
+  const liveCheck = !catalogDisabled && (env.AWF_REFLECT_ENABLED === "1" || Boolean(options.reflectData));
+  const wireApi = catalogDisabled ? "" : options.wireApi || "";
   const appliedParams = new Set(options.appliedParams || []);
   // The engine id an alias resolves to without the endpoint constraint, or null; never recorded.
   const resolveUnconstrained = (/** @type {string} */ configuredModel, /** @type {any} */ data, /** @type {(resolution: { resolvedModel: string }) => string} */ engineId) => {

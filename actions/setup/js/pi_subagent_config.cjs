@@ -3,7 +3,7 @@
 
 const fs = require("node:fs");
 const path = require("node:path");
-const { loadBuiltinModelAliases, ModelAliasResolutionError, recordModelResolution, resolveConfiguredModel, splitModelIdentifier } = require("./resolve_model_alias.cjs");
+const { isModelCatalogDisabled, loadBuiltinModelAliases, ModelAliasResolutionError, recordModelResolution, resolveConfiguredModel, splitModelIdentifier } = require("./resolve_model_alias.cjs");
 const { writeSecureOutput } = require("./convert_gateway_config_shared.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { verifyPiThinkingEffort } = require("./pi_runtime.cjs");
@@ -48,6 +48,8 @@ function readPiSubagents(agentDir) {
  * limited to the parent's provider. Pass `reflectData` (the live /reflect catalogue)
  * or an explicit `catalog`; without either, aliases fail with catalog_unavailable.
  * Set `noCatalog` when no catalogue can exist (AWF disabled) so bundled model ids pass through.
+ * When `GH_AW_MODEL_CATALOG=false` (`engine.model-catalog: false`), declared and inherited
+ * models are used verbatim; the parent-provider restriction still applies.
  *
  * @param {{agentDir: string, sdk: any, provider: string, catalog?: string[], reflectData?: any, noCatalog?: boolean, gateway: boolean, parentModel: string, logger?: (message: string) => void, env?: NodeJS.ProcessEnv}} options
  */
@@ -61,7 +63,9 @@ function preparePiSubagents(options) {
   }
   if (!aliases || typeof aliases !== "object" || Array.isArray(aliases)) throw new Error("Pi sub-agent model aliases must be an object");
   // GH_AW_PI_MODEL_ALIASES carries only workflow-defined and imported aliases; built-ins ship with the setup action.
-  aliases = { ...loadBuiltinModelAliases(), ...aliases };
+  // With engine.model-catalog: false, models are used verbatim: no alias or catalogue lookup.
+  const catalogDisabled = isModelCatalogDisabled(env);
+  aliases = catalogDisabled ? null : { ...loadBuiltinModelAliases(), ...aliases };
   const scopedProvider = aliasProvider(provider);
   const agents = readPiSubagents(agentDir).map(agent => {
     const requested = agent.declaredModel || parentModel;

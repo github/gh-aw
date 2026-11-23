@@ -643,6 +643,43 @@ async function resolveConfiguredModelWithRefresh(options) {
  */
 const MODEL_ALIASES_ENV_VAR = "GH_AW_MODEL_ALIASES";
 
+/**
+ * Environment variable the compiler sets to "false" on engine steps when the workflow sets
+ * `engine.model-catalog: false`: configured models are passed to the engine verbatim,
+ * without alias resolution or a live model-catalogue lookup.
+ */
+const MODEL_CATALOG_ENV_VAR = "GH_AW_MODEL_CATALOG";
+
+/**
+ * Whether the workflow disabled live model-catalogue resolution (`engine.model-catalog: false`).
+ * @param {NodeJS.ProcessEnv} [env]
+ * @returns {boolean}
+ */
+function isModelCatalogDisabled(env = process.env) {
+  return String(env[MODEL_CATALOG_ENV_VAR] || "").trim() === "false";
+}
+
+/**
+ * The workflow-defined alias (from `GH_AW_MODEL_ALIASES`) that the configured model names,
+ * or "" when it names none. Built-in aliases are not consulted.
+ * @param {string} configuredModel
+ * @param {NodeJS.ProcessEnv} env
+ * @returns {string}
+ */
+function workflowAliasNamedBy(configuredModel, env) {
+  let aliases;
+  try {
+    aliases = JSON.parse(String(env[MODEL_ALIASES_ENV_VAR] || ""));
+  } catch {
+    return "";
+  }
+  if (!aliases || typeof aliases !== "object" || Array.isArray(aliases)) return "";
+  const { base } = splitModelIdentifier(configuredModel);
+  const slash = base.indexOf("/");
+  const aliasKey = slash > 0 ? base.slice(slash + 1) : base;
+  return aliasKey && Object.prototype.hasOwnProperty.call(aliases, aliasKey) ? aliasKey : "";
+}
+
 /** @type {Record<string, string[]>|null|undefined} */
 let builtinModelAliases;
 
@@ -757,6 +794,9 @@ function recordModelResolution(record, env = process.env) {
  * `noCatalog` defaults to true when AWF is disabled (`AWF_REFLECT_ENABLED` is not "1")
  * and neither `/reflect` data nor a catalogue is supplied.
  *
+ * When the workflow sets `engine.model-catalog: false` (`GH_AW_MODEL_CATALOG=false`), the
+ * configured model is used verbatim: no alias is resolved and no catalogue is required.
+ *
  * @param {Omit<Parameters<typeof resolveConfiguredModel>[0], "aliasMap"> & {
  *   aliasMap?: Record<string, string[]>|null,
  *   engine: string,
@@ -773,7 +813,17 @@ async function resolveEngineModel(options) {
   const env = options.env || process.env;
   const role = options.role || "main";
   const configuredModel = String(options.configuredModel || "").trim();
-  const aliasMap = options.aliasMap !== undefined ? options.aliasMap : loadModelAliasMap({ reflectData: options.reflectData, env });
+  const catalogDisabled = isModelCatalogDisabled(env);
+  if (catalogDisabled) {
+    logger(`model resolution: engine=${options.engine} role=${role} engine.model-catalog is false; using '${configuredModel}' verbatim`);
+    const workflowAlias = workflowAliasNamedBy(configuredModel, env);
+    if (workflowAlias) {
+      logger(
+        `model resolution: warning: '${configuredModel}' names the workflow-defined alias '${workflowAlias}' from models:, but engine.model-catalog is false, so aliases are not resolved; it is passed to the engine as a literal model id (set the model to a concrete id instead)`
+      );
+    }
+  }
+  const aliasMap = catalogDisabled ? null : options.aliasMap !== undefined ? options.aliasMap : loadModelAliasMap({ reflectData: options.reflectData, env });
   // Without AWF no /reflect catalogue can exist; an explicit catalogue or /reflect data overrides.
   const noCatalog = options.noCatalog ?? (env.AWF_REFLECT_ENABLED !== "1" && !options.reflectData && !Array.isArray(options.catalog));
   const record = (/** @type {any} */ fields) => {
@@ -807,6 +857,8 @@ module.exports = {
   loadModelAliasMap,
   mergeParams,
   MODEL_ALIASES_ENV_VAR,
+  MODEL_CATALOG_ENV_VAR,
+  isModelCatalogDisabled,
   MODEL_RESOLUTION_RECORD_PATH,
   ModelAliasResolutionError,
   normalizeForCopilotCLI,

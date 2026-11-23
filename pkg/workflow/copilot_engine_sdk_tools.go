@@ -84,6 +84,16 @@ func validateCopilotSDKEngineArgs(workflowData *WorkflowData) error {
 	return nil
 }
 
+// validateCopilotSDKModelCatalog rejects engine.copilot-sdk with engine.model-catalog: false:
+// SDK startup resolves its provider and model from the live catalogue.
+func validateCopilotSDKModelCatalog(workflowData *WorkflowData) error {
+	if !isCopilotSDKMode(workflowData) || !workflowData.EngineConfig.ModelCatalogDisabled {
+		return nil
+	}
+	return NewValidationError("engine.copilot-sdk", "true", "Copilot SDK mode resolves its provider and model from the live model catalogue, which engine.model-catalog: false disables",
+		"Use Copilot CLI mode by removing engine.copilot-sdk, or remove engine.model-catalog: false.")
+}
+
 func isCopilotBashToolEnabled(workflowData *WorkflowData) bool {
 	if workflowData == nil || workflowData.BashDisabled || workflowData.Tools == nil {
 		return false

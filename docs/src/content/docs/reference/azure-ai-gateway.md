@@ -59,6 +59,9 @@ credential is used; there is no credential fallback.
 
 Use the protocol the deployed alias supports. `engine.model` supplies Copilot
 model metadata; `engine.inference.model` is the exact approved wire alias.
+The gateway has no `/models` route, so the connector sets
+`engine.model-catalog: false` and `engine.model` is passed through verbatim
+rather than resolved as a gh-aw alias. Direct BYOK must set it explicitly.
 Native provider/auth/env overrides, routing, model fallback and Copilot SDK
 mode cannot be combined with connector inference. A threat detector that
 inherits the main engine cannot override its engine or model configuration.
@@ -88,6 +91,7 @@ key stored as a GitHub Actions secret:
 engine:
   id: copilot
   model: <published-model-id>
+  model-catalog: false
   env:
     COPILOT_PROVIDER_BASE_URL: https://YOUR_GATEWAY_HOST/default/models/openai/v1
     COPILOT_PROVIDER_TYPE: openai

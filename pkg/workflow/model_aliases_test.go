@@ -438,6 +438,69 @@ func TestModelAliasesEnvWithoutAWF(t *testing.T) {
 	assert.Contains(t, lock, `"opus":["anthropic/claude-opus-4-7"]`, "the workflow's opus pin must reach the harness without AWF")
 }
 
+// TestModelCatalogEnv verifies that `engine.model-catalog: false` reaches every engine harness
+// as GH_AW_MODEL_CATALOG=false, and that the variable is absent by default.
+func TestModelCatalogEnv(t *testing.T) {
+	for _, engine := range []string{"copilot", "claude", "codex", "pi", "agy"} {
+		lock, _ := compileModelAliasWorkflow(t, "engine:\n  id: "+engine+"\n  model-catalog: false\nmodel: gpt-5-mini\n")
+		assert.Contains(t, lock, "GH_AW_MODEL_CATALOG: false", "engine %s: model-catalog: false must reach the harness", engine)
+
+		lock, _ = compileModelAliasWorkflow(t, "engine: "+engine+"\n")
+		assert.NotContains(t, lock, "GH_AW_MODEL_CATALOG", "engine %s: the catalogue is required by default", engine)
+	}
+}
+
+// TestModelCatalogDetectionDefault verifies that, without a catalogue and without a configured
+// model, the threat-detection job does not default to the `detection` alias, which would be
+// passed to the provider verbatim, and uses the engine's main-agent default instead.
+func TestModelCatalogDetectionDefault(t *testing.T) {
+	const safeOutputs = "safe-outputs:\n  create-issue:\n"
+	for engine, want := range map[string]string{
+		"copilot": "COPILOT_MODEL: ${{ vars.GH_AW_MODEL_DETECTION_COPILOT || vars.GH_AW_DEFAULT_MODEL_COPILOT || 'auto' }}",
+		"claude":  "ANTHROPIC_MODEL: ${{ vars.GH_AW_MODEL_DETECTION_CLAUDE || vars.GH_AW_DEFAULT_MODEL_CLAUDE || 'claude-sonnet-5' }}",
+		"codex":   "GH_AW_MODEL_DETECTION_CODEX: ${{ vars.GH_AW_MODEL_DETECTION_CODEX || vars.GH_AW_DEFAULT_MODEL_CODEX || '' }}",
+	} {
+		lock, _ := compileModelAliasWorkflow(t, "engine:\n  id: "+engine+"\n  model-catalog: false\n"+safeOutputs)
+		assert.Contains(t, lock, want, "engine %s: detection must default to a model usable without a catalogue", engine)
+		assert.NotContains(t, lock, "'detection' }}", "engine %s: the detection alias needs the catalogue", engine)
+
+		lock, _ = compileModelAliasWorkflow(t, "engine: "+engine+"\n"+safeOutputs)
+		assert.Contains(t, lock, "'detection' }}", "engine %s: the catalogue default is unchanged", engine)
+	}
+}
+
+// TestModelCatalogDisablesRouting verifies that model routing, which selects models from the
+// live catalogue, is never applied implicitly and is rejected explicitly without one.
+func TestModelCatalogDisablesRouting(t *testing.T) {
+	lock, _ := compileModelAliasWorkflow(t, "engine: copilot\n")
+	require.Contains(t, lock, "Resolve model routing", "baseline: the implicit routing default applies")
+
+	lock, _ = compileModelAliasWorkflow(t, "engine:\n  id: copilot\n  model-catalog: false\n")
+	assert.NotContains(t, lock, "Resolve model routing", "model-catalog: false must suppress implicit routing")
+	assert.NotContains(t, lock, "GH_AW_MODEL_ROUTING", "model-catalog: false must suppress implicit routing")
+
+	dir := t.TempDir()
+	path := filepath.Join(dir, "workflow.md")
+	require.NoError(t, os.WriteFile(path, []byte("---\non: workflow_dispatch\npermissions:\n  contents: read\nengine:\n  id: copilot\n  model-catalog: false\nmodel: router\n---\n\n# Test\n"), 0o600))
+	err := NewCompiler().CompileWorkflow(path)
+	require.Error(t, err, "explicit routing without a catalogue must fail")
+	assert.Contains(t, err.Error(), "engine.model-catalog: false")
+}
+
+// TestModelCatalogRejectsCopilotSDK verifies that Copilot SDK mode, whose startup needs the
+// live catalogue, cannot be combined with model-catalog: false.
+func TestModelCatalogRejectsCopilotSDK(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "workflow.md")
+	require.NoError(t, os.WriteFile(path, []byte("---\non: workflow_dispatch\npermissions:\n  contents: read\nengine:\n  id: copilot\n  copilot-sdk: true\n  model-catalog: false\nmodel: gpt-5-mini\n---\n\n# Test\n"), 0o600))
+	err := NewCompiler().CompileWorkflow(path)
+	require.Error(t, err, "SDK mode without a catalogue must fail")
+	assert.Contains(t, err.Error(), "engine.model-catalog: false")
+	assert.Contains(t, err.Error(), "removing engine.copilot-sdk")
+
+	compileModelAliasWorkflow(t, "engine:\n  id: copilot\n  model-catalog: false\nmodel: gpt-5-mini\n")
+}
+
 // TestImportedModelAliasValidation verifies that imported alias maps get the same V-MAF key
 // and entry checks as the main workflow's.
 func TestImportedModelAliasValidation(t *testing.T) {

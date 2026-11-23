@@ -222,6 +222,21 @@ Copilot, Claude, Codex, Pi, and Agy resolve aliases against the configured provi
 - `auto` keeps its engine-specific meaning. In Copilot CLI mode, `?effort=low`, `?effort=medium`, and `?effort=high` on a model ID or alias become `--reasoning-effort` after alias resolution. The CLI receives the model ID without the suffix. An explicit `--reasoning-effort` in `engine.args` takes precedence.
 - Missing matches fail with `model_unavailable`; incomplete discovery fails with `catalog_unavailable`.
 
+Set `engine.model-catalog: false` (default `true`) for BYOK providers without a `/models` route, such as Azure AI Gateway. The configured model is then passed to the engine verbatim: aliases are not resolved, and a model ID that matches a built-in alias (such as `gpt-5-mini`) no longer fails with `catalog_unavailable`. Model routing also needs the catalogue, so the implicit routing default is not applied and `model: router` fails compilation. Threat detection inherits the workflow `model`; when none is set, it uses the engine's main-agent default instead of the `detection` alias.
+
+`engine.copilot-sdk: true` also needs the catalogue, so combining it with `model-catalog: false` fails compilation; use Copilot CLI mode instead.
+
+Sub-agent models are also passed verbatim, without catalogue or endpoint checks; a Claude or Codex sub-agent model whose `provider/` prefix names a different provider still fails.
+
+Workflow-defined `models:` aliases are not resolved either: naming one passes the alias name to the engine as a literal model ID and logs a warning, so set a concrete model ID instead.
+
+```yaml wrap
+engine:
+  id: copilot
+  model: gpt-5-mini
+  model-catalog: false
+```
+
 Gemini and declarative engines pass model names through unchanged and warn about gh-aw aliases. AWF can independently rewrite unrecognized models on non-Copilot providers; disable [`sandbox.agent.model-fallback`](/gh-aw/reference/sandbox/#model-fallback-sandboxagentmodel-fallback) when exact routing is required.
 
 Resolution produces `model.resolution` evidence in `usage/aw_session.jsonl`. See [Model Aliases](/gh-aw/reference/model-tables/) for the catalog and [Model Routing](/gh-aw/reference/model-routing/) for experimental per-run model/effort selection on Copilot-backed Copilot, Claude, Codex, and Pi, chosen with `model: router` (or `router/economy`, `router/balanced`, `router/robust`). Router values are not model names: `router` and `router/*` are reserved and can't be used as aliases.
