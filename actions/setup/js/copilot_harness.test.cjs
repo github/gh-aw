@@ -4977,7 +4977,7 @@ process.exit(1);`
       }
     });
 
-    describe("engine.model-catalog: false (provider without a /models route)", () => {
+    describe("BYOK provider without a /models route", () => {
       const { loadBuiltinModelAliases } = require("./resolve_model_alias.cjs");
       const emptyReflect = { models_fetch_complete: false, endpoints: [{ configured: true, provider: "copilot", models: [] }] };
       let exitSpy;
@@ -5015,11 +5015,14 @@ process.exit(1);`
         expect(exitSpy).not.toHaveBeenCalled();
       });
 
-      it("still requires the catalogue for built-in aliases by default, even with an explicit provider", async () => {
+      it("still resolves aliases when the gateway supplies a provider URL without a workflow opt-out", async () => {
+        vi.stubEnv("GH_AW_MODEL_CATALOG", "true");
         process.env.COPILOT_MODEL = "gpt-5-mini";
+        const refetch = vi.fn().mockResolvedValue(null);
 
-        await applyCopilotModelAliasResolution({ awfReflectData: emptyReflect, logger: () => {}, refetchReflectData: async () => null });
+        await applyCopilotModelAliasResolution({ awfReflectData: emptyReflect, logger: () => {}, refetchReflectData: refetch });
 
+        expect(refetch).toHaveBeenCalledOnce();
         expect(exitSpy).toHaveBeenCalledWith(1);
       });
     });
