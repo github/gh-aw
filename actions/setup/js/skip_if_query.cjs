@@ -122,6 +122,7 @@ function parseSearchQuery(query) {
     const rawValue = unquote(token.slice(colon + 1));
     const value = rawValue.toLowerCase();
     if (!rawValue) return { ok: false, reason: `empty qualifier "${token}"` };
+    if (rawValue.includes('"')) return { ok: false, reason: `unsupported quoting "${token}"` };
 
     /** @type {string | null} */
     let conflict = null;
