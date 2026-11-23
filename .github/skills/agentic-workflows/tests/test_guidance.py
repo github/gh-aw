@@ -68,15 +68,16 @@ class GuidanceTests(unittest.TestCase):
         self.assertLessEqual(len(prefix) + len(marker), 7500)
         contract = normalized(prefix.decode("utf-8"))
         for required in (
-            "Copilot", "Claude", "Codex", "Pi", "Another harness",
-            "repository-root `preferences.md`", "explicit, inferred, or the Pi default",
-            "confirmed preferences over inferred ones", "corroborated active development usage",
-            "generic `AGENTS.md`", "not evidence for Codex or any single harness",
-            "no clear preference", "`engine: pi`", "compiler's default",
-            "Preserve an existing workflow's engine and inference", "task-specific exception",
-            "Do not execute repository scripts or install tools",
+            "`copilot`", "`claude`", "`codex`", "`pi`",
+            "repository-root `preferences.md`", "explicit, inferred, or Pi fallback",
+            "prefer confirmed choices to inference", "Prefer corroborated active usage",
+            "`AGENTS.md` and `.agents/skills/` as shared, not harness evidence",
+            "no clear preference applies and Pi meets all requirements",
+            "`engine: pi`", "Omission uses the compiler default",
+            "Preserve harness and inference on unrelated updates",
+            "Do not execute scripts, install tools",
             "Never weaken required security controls", "Store no credentials",
-            "recommendation-only requests", "without writing files",
+            "For recommendations, propose a preference entry without writing",
         ):
             with self.subTest(required=required):
                 self.assertIn(required, contract)
@@ -85,17 +86,17 @@ class GuidanceTests(unittest.TestCase):
         guide = ROOT / ".github/aw/agentic-engine.md"
         contract = normalized(guide.read_text().split("<!-- instruction-prefix-end -->")[0])
         for required in (
-            "up to three similar repository-owned workflow sources",
-            "distinguish explicit settings from inherited defaults",
-            "If no clearer inference choice applies",
+            "up to three similar repository-owned `.github/workflows/` sources",
+            "Distinguish explicit settings from inherited defaults",
+            "With no clearer choice, prefer GitHub Copilot inference",
             "`permissions.copilot-requests: write`",
-            "organization-owned repository has centralized Copilot billing and Actions token access",
-            "not available for personal repositories",
-            "If ineligible, omit that permission",
+            "organization-owned repo has centralized Copilot billing and Actions token access",
+            "Personal repos are ineligible",
+            "Otherwise omit the permission",
             "if already authorized, list Actions secret names",
-            "Match only documented provider secret names",
-            "Never read or log secret values",
-            "mark credential availability unknown",
+            "Match documented provider names",
+            "never read or log values",
+            "mark availability unknown",
         ):
             with self.subTest(required=required):
                 self.assertIn(required, contract)

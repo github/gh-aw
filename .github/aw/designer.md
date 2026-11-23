@@ -19,8 +19,7 @@ Before tool selection, apply the
 success criteria and repository scripts/tests. Infer browser needs without a
 mandatory extra interview question; include supporting lifecycle permissions.
 
-Before choosing a harness and inference, follow
-[agentic engine selection](agentic-engine.md) and compare similar workflows.
+For harness and inference, use the [decision guide](agentic-engine.md).
 
 Follow the [interview](#interview-framework), [decision mappings](#decision-heuristics),
 and [confirmation](#confirmation-format) before the [generation template](#generation-template).
@@ -129,12 +128,8 @@ Map to:
 
 ### Phase 7: Harness and inference
 
-Apply [agentic engine selection](agentic-engine.md) before asking questions.
-Honor explicit preferences; infer the developer's harness from repository
-evidence and saved `preferences.md`. Confirm the provider and model or routing
-separately. Ask only when ambiguity affects feasibility or policy. Choose
-`engine: pi` if no clear harness preference applies and Pi meets all requirements.
-Record the choice during authorized generation, not the interview.
+Carry both decisions into the confirmation. Record preferences only during
+authorized generation.
 
 ### Phase 7b: Skills, Plugins, LSP & Evals (optional)
 
