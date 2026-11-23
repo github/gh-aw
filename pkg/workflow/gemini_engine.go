@@ -130,7 +130,7 @@ func (e *GeminiEngine) GetInstallationSteps(workflowData *WorkflowData) []GitHub
 	}
 
 	npmSteps := BuildStandardNpmEngineInstallSteps(
-		"@google/gemini-cli",
+		geminiNpmPackageName,
 		string(constants.DefaultGeminiVersion),
 		"Install Gemini CLI",
 		"gemini",

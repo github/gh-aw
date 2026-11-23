@@ -2,6 +2,8 @@ package workflow
 
 import (
 	"context"
+	"net/http"
+	"time"
 
 	"github.com/github/gh-aw/pkg/logger"
 	"github.com/github/gh-aw/pkg/parser"
@@ -12,6 +14,13 @@ var logTypes = logger.New("workflow:compiler_types")
 // FileCreationTracker interface for tracking files created during compilation
 type FileCreationTracker interface {
 	TrackCreated(filePath string)
+}
+
+// CompilerDiagnostic is a warning or error produced during compilation.
+type CompilerDiagnostic struct {
+	Path    string `json:"path,omitempty"`
+	Level   string `json:"level"`
+	Message string `json:"message"`
 }
 
 // Compiler handles converting markdown workflows to GitHub Actions YAML
@@ -89,6 +98,11 @@ type Compiler struct {
 	allowedDomainsCache      map[string]allowedDomain // Cached allowed-domains per markdown path with the frontmatter hash that produced it
 	wildcardAppTokenSteps    map[appTokenStepKey]bool // Job-scoped compiler-generated token steps with explicit repositories: ["*"].
 	configuredModelValidator func(data *WorkflowData) []string
+	engineReleaseCache       *engineReleaseCache
+	engineReleaseClient      *http.Client
+	engineReleaseNow         func() time.Time
+	engineReleaseWarnings    map[string]bool // One metadata warning per engine release per compiler instance.
+	diagnostics              []CompilerDiagnostic
 }
 
 type allowedDomain struct {
