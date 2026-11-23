@@ -91,6 +91,43 @@ func TestClaudeWorkflowsNotSavedWhenDynamicWorkflowsDisabled(t *testing.T) {
 	assert.NotContains(t, strings.Join(job.Steps, ""), "Save agent config folders for base branch restoration")
 }
 
+func TestActivationSnapshotCheckoutIncludesSymlinkTargets(t *testing.T) {
+	disabled := false
+	for _, tt := range []struct {
+		name        string
+		data        *WorkflowData
+		wantFull    bool
+		wantRepoRef bool
+	}{
+		{name: "default snapshot", data: &WorkflowData{Name: "test", AI: "claude"}, wantFull: true},
+		{name: "no snapshot", data: &WorkflowData{Name: "test", AI: "claude", CheckoutConfigs: []*CheckoutConfig{{PullRequest: &disabled}}, EngineConfig: &EngineConfig{ID: "claude", DynamicWorkflows: &disabled}}},
+		{name: "reusable workflow", data: &WorkflowData{Name: "test", AI: "claude", On: `"on":
+  workflow_call:`}, wantFull: true, wantRepoRef: true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			job, err := NewCompiler().buildActivationJob(tt.data, false, "", "test.lock.yml")
+			require.NoError(t, err)
+			steps := strings.Join(job.Steps, "")
+			if tt.wantFull {
+				checkout := extractWorkflowStepByName(t, steps, "Checkout repository for base branch snapshot")
+				assert.NotContains(t, checkout, "sparse-checkout:")
+				assert.Contains(t, checkout, "persist-credentials: false")
+				assert.Contains(t, checkout, "fetch-depth: 1")
+				assert.Less(t, strings.Index(steps, checkout), strings.Index(steps, "Save agent config folders for base branch restoration"))
+				if tt.wantRepoRef {
+					assert.Contains(t, checkout, "repository: "+workflowCallRepo)
+					assert.Contains(t, checkout, "ref: "+workflowCallRef)
+					assert.Contains(t, checkout, sameRepoCondition)
+				}
+			} else {
+				checkout := extractWorkflowStepByName(t, steps, "Checkout .github and .agents folders")
+				assert.Contains(t, checkout, "sparse-checkout:")
+				assert.NotContains(t, steps, "Save agent config folders for base branch restoration")
+			}
+		})
+	}
+}
+
 func TestCopilotDynamicWorkflowsSnapshotWithPRCheckoutDisabled(t *testing.T) {
 	enabled, disabled := true, false
 	for _, tt := range []struct {
@@ -360,7 +397,7 @@ func TestGenerateCheckoutGitHubFolderForActivation_WorkflowCall(t *testing.T) {
 				InlinedImports: tt.inlinedImports,
 			}
 
-			result := c.generateCheckoutGitHubFolderForActivation(data)
+			result := c.generateCheckoutGitHubFolderForActivation(data, false)
 
 			if tt.wantNil {
 				assert.Nil(t, result, "expected nil checkout steps for action-tag case")
@@ -517,7 +554,7 @@ func TestCheckoutDoesNotUseEventNameExpression(t *testing.T) {
   workflow_call:`,
 	}
 
-	result := c.generateCheckoutGitHubFolderForActivation(data)
+	result := c.generateCheckoutGitHubFolderForActivation(data, false)
 	combined := strings.Join(result, "")
 
 	// Must use the step output, not the broken expression
@@ -843,7 +880,7 @@ func TestActivationJobTargetRefIsDispatchCompatible(t *testing.T) {
 		"target_checkout_ref should be the immutable SHA for checkout pinning")
 
 	// The checkout step itself must use target_checkout_ref (SHA), not target_ref
-	checkoutSteps := compiler.generateCheckoutGitHubFolderForActivation(data)
+	checkoutSteps := compiler.generateCheckoutGitHubFolderForActivation(data, false)
 	combined := strings.Join(checkoutSteps, "")
 	assert.Contains(t, combined, "ref: ${{ steps.resolve-host-repo.outputs.target_checkout_ref }}",
 		"activation checkout must use target_checkout_ref (SHA) for exact-revision pinning")
@@ -973,7 +1010,7 @@ func TestCheckoutGitHubFolderIncludesRef(t *testing.T) {
 				InlinedImports: tt.inlinedImports,
 			}
 
-			result := c.generateCheckoutGitHubFolderForActivation(data)
+			result := c.generateCheckoutGitHubFolderForActivation(data, false)
 			combined := strings.Join(result, "")
 
 			if tt.wantRef {
@@ -1030,7 +1067,7 @@ func TestGenerateCheckoutGitHubFolderForActivation_ActionsModeSetupPath(t *testi
     types: [opened]`,
 			}
 
-			result := c.generateCheckoutGitHubFolderForActivation(data)
+			result := c.generateCheckoutGitHubFolderForActivation(data, false)
 			require.NotNil(t, result, "should return checkout steps")
 			combined := strings.Join(result, "")
 
@@ -1060,7 +1097,7 @@ func TestGenerateCheckoutGitHubFolderForActivation_LocalSkillSparseCheckout(t *t
 		},
 	}
 
-	steps := c.generateCheckoutGitHubFolderForActivation(data)
+	steps := c.generateCheckoutGitHubFolderForActivation(data, false)
 	combined := strings.Join(steps, "")
 
 	assert.Contains(t, combined, "\n            skills\n", "local skill dirs outside .github/.agents should be included in sparse checkout")
@@ -1191,7 +1228,7 @@ func TestCheckoutTokenPropagatedToActivation(t *testing.T) {
 				ActivationGitHubToken: tt.activationToken,
 			}
 
-			result := c.generateCheckoutGitHubFolderForActivation(data)
+			result := c.generateCheckoutGitHubFolderForActivation(data, false)
 			combined := strings.Join(result, "")
 
 			if tt.wantTokenInStep {
@@ -1280,7 +1317,7 @@ func TestCheckoutSameRepoGuardWithCustomToken(t *testing.T) {
 				ActivationGitHubApp:   tt.activationApp,
 			}
 
-			result := c.generateCheckoutGitHubFolderForActivation(data)
+			result := c.generateCheckoutGitHubFolderForActivation(data, false)
 			combined := strings.Join(result, "")
 
 			if tt.wantSameRepoCondition {

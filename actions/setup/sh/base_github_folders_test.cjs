@@ -153,6 +153,23 @@ test("save: external skill targets are materialized; internal links and modes su
   assert.equal(execution.stdout.trim(), "ok");
 });
 
+test("save: materializes skills linked outside agent folders before PR checkout", t => {
+  const f = fixture(t);
+  f.write("skills/mui-renovate-fix/SKILL.md", "trusted base skill");
+  fs.mkdirSync(path.join(f.workspace, ".agents/skills"), { recursive: true });
+  f.link(".agents/skills/mui-renovate-fix", "../../skills/mui-renovate-fix");
+  fs.mkdirSync(path.join(f.workspace, ".claude/skills"), { recursive: true });
+  f.link(".claude/skills/mui-renovate-fix", "../../.agents/skills/mui-renovate-fix");
+  f.run("save");
+  f.write("skills/mui-renovate-fix/SKILL.md", "untrusted PR skill");
+  f.run("restore");
+  for (const folder of [".agents", ".claude"]) {
+    const skill = `${folder}/skills/mui-renovate-fix`;
+    assert.equal(f.read(`${skill}/SKILL.md`), "trusted base skill");
+    assert.equal(fs.lstatSync(path.join(f.workspace, skill)).isSymbolicLink(), false);
+  }
+});
+
 test("save: invalid candidates fail closed in both lists", t => {
   const f = fixture(t);
   for (const item of ["../sentinel", "/etc/passwd", ".", "..", ".github//skills", ".github/../sentinel", "--checkpoint-action=exec=echo"]) {

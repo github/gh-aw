@@ -386,12 +386,12 @@ func (c *Compiler) generateResolveHostRepoStep(data *WorkflowData) string {
 	return step.String()
 }
 
-// generateCheckoutGitHubFolderForActivation generates the checkout step for .github and .agents folders
-// specifically for the activation job. Unlike generateCheckoutGitHubFolder, this method doesn't skip
+// generateCheckoutGitHubFolderForActivation generates the activation checkout.
+// Unlike generateCheckoutGitHubFolder, this method doesn't skip
 // the checkout when the agent job will have a full repository checkout, because the activation job
 // runs before the agent job and needs independent access to workflow files for runtime imports during
 // prompt generation.
-func (c *Compiler) generateCheckoutGitHubFolderForActivation(data *WorkflowData) []string {
+func (c *Compiler) generateCheckoutGitHubFolderForActivation(data *WorkflowData, fullCheckout bool) []string {
 	// Check if action-tag is specified - if so, skip checkout
 	if activationCheckoutDisabledByActionTag(data) {
 		compilerActivationJobLog.Print("Skipping .github checkout in activation: action-tag specified")
@@ -426,11 +426,12 @@ func (c *Compiler) generateCheckoutGitHubFolderForActivation(data *WorkflowData)
 		} else if prCheckoutRef := activationCheckoutRef(data, "steps.resolve-host-repo.outputs.target_checkout_ref"); prCheckoutRef != "" {
 			checkoutRef = prCheckoutRef
 		}
-		checkoutSteps := cm.GenerateGitHubFolderCheckoutStep(
+		checkoutSteps := cm.generateActivationCheckoutStep(
 			cm.GetCrossRepoTargetRepo(),
 			checkoutRef,
 			activationToken,
 			c.getActionPin,
+			fullCheckout,
 			extraPaths...,
 		)
 		// When no custom token is configured, GITHUB_TOKEN is scoped to the calling
@@ -446,11 +447,8 @@ func (c *Compiler) generateCheckoutGitHubFolderForActivation(data *WorkflowData)
 		return checkoutSteps
 	}
 
-	// For activation job, sparse checkout .github, .agents, and engine-specific config directories
-	// (plus actions/setup in dev mode). Root instruction files are excluded as they are not needed
-	// during activation. sparse-checkout-cone-mode: true ensures subdirectories are recursively included.
-	compilerActivationJobLog.Print("Adding .github, .agents, and engine-specific dirs to sparse checkout for activation job")
-	return cm.GenerateGitHubFolderCheckoutStep("", activationCheckoutRef(data, "github.sha"), activationToken, c.getActionPin, extraPaths...)
+	compilerActivationJobLog.Printf("Adding activation checkout: full=%t", fullCheckout)
+	return cm.generateActivationCheckoutStep("", activationCheckoutRef(data, "github.sha"), activationToken, c.getActionPin, fullCheckout, extraPaths...)
 }
 
 func needsActivationHostRepoCheckout(data *WorkflowData) bool {
@@ -458,7 +456,7 @@ func needsActivationHostRepoCheckout(data *WorkflowData) bool {
 }
 
 // activationCheckoutDisabledByActionTag reports whether action-tag supplies setup
-// assets outside the workspace, making the activation sparse checkout unnecessary.
+// assets outside the workspace, making the activation checkout unnecessary.
 func activationCheckoutDisabledByActionTag(data *WorkflowData) bool {
 	if data == nil || data.Features == nil {
 		return false
@@ -506,7 +504,7 @@ func (c *Compiler) activationSparseCheckoutExtraPaths(data *WorkflowData) []stri
 	return resolveSymlinkExtraPaths(repoRoot, extraPaths)
 }
 
-// activationCheckoutRef returns the ref expression for activation sparse checkout.
+// activationCheckoutRef returns the ref expression for activation checkout.
 // It returns an empty string when the workflow has no pull-request event whose payload
 // includes a pull request. fallbackExpression must be a raw GitHub Actions expression
 // without a ${{ }} wrapper.

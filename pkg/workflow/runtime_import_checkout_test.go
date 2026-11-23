@@ -340,22 +340,15 @@ strict: false
 
 	activationJobSection := lockContentStr[activationJobStart:activationJobEnd]
 
-	// Verify that the activation job contains the checkout step for .github and .agents folders
-	if !strings.Contains(activationJobSection, "Checkout .github and .agents folders") {
-		t.Error("Activation job should contain 'Checkout .github and .agents folders' step even without explicit contents: read permission")
+	// Verify activation can snapshot all symlink targets without explicit contents: read permission.
+	checkoutParts := strings.SplitN(activationJobSection, "name: Checkout repository for base branch snapshot", 2)
+	if len(checkoutParts) != 2 {
+		t.Error("Activation job should contain the base snapshot checkout step")
 		t.Logf("Activation job section:\n%s", activationJobSection)
+		return
 	}
 
-	// Verify the checkout has sparse-checkout configuration
-	if !strings.Contains(activationJobSection, "sparse-checkout:") {
-		t.Error("Checkout step should use sparse-checkout")
-	}
-
-	// Verify both .github and .agents are in the sparse-checkout
-	if !strings.Contains(activationJobSection, ".github") {
-		t.Error("Sparse checkout should include .github folder")
-	}
-	if !strings.Contains(activationJobSection, ".agents") {
-		t.Error("Sparse checkout should include .agents folder")
+	if strings.Contains(strings.SplitN(checkoutParts[1], "\n      - name:", 2)[0], "sparse-checkout:") {
+		t.Error("Base snapshot checkout must include symlink targets outside agent folders")
 	}
 }

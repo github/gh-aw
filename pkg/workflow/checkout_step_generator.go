@@ -251,10 +251,18 @@ func (cm *CheckoutManager) checkoutManifestEntries() ([]checkoutManifestEntry, [
 //
 // Returns a slice of YAML lines (each ending with \n).
 func (cm *CheckoutManager) GenerateGitHubFolderCheckoutStep(repository, ref, token string, getActionPin func(string) string, extraPaths ...string) []string {
+	return cm.generateActivationCheckoutStep(repository, ref, token, getActionPin, false, extraPaths...)
+}
+
+func (cm *CheckoutManager) generateActivationCheckoutStep(repository, ref, token string, getActionPin func(string) string, fullCheckout bool, extraPaths ...string) []string {
 	checkoutManagerLog.Printf("Generating .github/.agents folder checkout: repository=%q ref=%q", repository, ref)
 	var sb strings.Builder
 
-	sb.WriteString("      - name: Checkout .github and .agents folders\n")
+	if fullCheckout {
+		sb.WriteString("      - name: Checkout repository for base branch snapshot\n")
+	} else {
+		sb.WriteString("      - name: Checkout .github and .agents folders\n")
+	}
 	fmt.Fprintf(&sb, "        uses: %s\n", getActionPin("actions/checkout"))
 	sb.WriteString("        with:\n")
 	sb.WriteString("          persist-credentials: false\n")
@@ -267,13 +275,15 @@ func (cm *CheckoutManager) GenerateGitHubFolderCheckoutStep(repository, ref, tok
 	if token != "" && token != "${{ secrets.GITHUB_TOKEN }}" {
 		fmt.Fprintf(&sb, "          token: %s\n", token)
 	}
-	sb.WriteString("          sparse-checkout: |\n")
-	sb.WriteString("            .github\n")
-	sb.WriteString("            .agents\n")
-	for _, p := range extraPaths {
-		fmt.Fprintf(&sb, "            %s\n", p)
+	if !fullCheckout {
+		sb.WriteString("          sparse-checkout: |\n")
+		sb.WriteString("            .github\n")
+		sb.WriteString("            .agents\n")
+		for _, p := range extraPaths {
+			fmt.Fprintf(&sb, "            %s\n", p)
+		}
+		sb.WriteString("          sparse-checkout-cone-mode: true\n")
 	}
-	sb.WriteString("          sparse-checkout-cone-mode: true\n")
 	sb.WriteString("          fetch-depth: 1\n")
 
 	return []string{sb.String()}

@@ -65,7 +65,7 @@ Run builtin pre-step ordering checks.
 	assertStepOrderInSection(t, activationSection,
 		"id: setup",
 		"- name: Activation pre-step",
-		"- name: Checkout .github and .agents folders",
+		"- name: Checkout repository for base branch snapshot",
 	)
 
 	preActivationSection := extractJobSection(lockYAML, "pre_activation")

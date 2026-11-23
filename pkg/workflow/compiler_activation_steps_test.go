@@ -191,7 +191,7 @@ func TestActivationStepsAddRepositoryAndOutputSteps(t *testing.T) {
 
 		require.NoError(t, err)
 		steps := strings.Join(ctx.steps, "")
-		assert.Contains(t, steps, "Checkout .github and .agents folders")
+		assert.Contains(t, steps, "Checkout repository for base branch snapshot")
 		assert.Contains(t, steps, "Check workflow lock file")
 		assert.Contains(t, steps, "Check compile-agentic version")
 		assert.Equal(t, `""`, ctx.outputs["comment_id"])
@@ -223,7 +223,7 @@ func TestActivationStepsAddCheckoutAndBaseRestoreStep(t *testing.T) {
 		compiler.addActivationCheckoutAndBaseRestoreStep(ctx)
 
 		steps := strings.Join(ctx.steps, "")
-		assert.Contains(t, steps, "Checkout .github and .agents folders")
+		assert.Contains(t, steps, "Checkout repository for base branch snapshot")
 		assert.Contains(t, steps, "Save agent config folders for base branch restoration")
 		assert.Contains(t, steps, "save_base_github_folders.sh")
 		assert.NotContains(t, steps, "GH_AW_STAGE_COPILOT_SDK_AGENTS")
