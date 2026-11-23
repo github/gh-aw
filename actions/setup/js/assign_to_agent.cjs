@@ -10,7 +10,7 @@ const { sleep } = require("./error_recovery.cjs");
 const { parseAllowedRepos, validateRepo, resolveTargetRepoConfig, resolveAndValidateRepo } = require("./repo_helpers.cjs");
 const { resolvePullRequestRepo } = require("./pr_helpers.cjs");
 const { renderSizedReport } = require("./report_size.cjs");
-const { normalizeIssueIntentMetadata } = require("./issue_intents.cjs");
+const { normalizeIssueIntentMetadata, logIgnoredIssueIntentMetadata } = require("./issue_intents.cjs");
 const { getPromptPath, renderTemplateFromFile } = require("./messages_core.cjs");
 const { createTokenBrokerGitHubClient, isTokenBrokerEnabled } = require("./token_broker_github.cjs");
 
@@ -229,7 +229,7 @@ async function main(config = {}) {
   const configuredBaseBranch = config["base-branch"] ? String(config["base-branch"]).trim() : null;
   const targetConfig = config.target ? String(config.target).trim() : "triggering";
   const ignoreIfError = config["ignore-if-error"] === true || config["ignore-if-error"] === "true";
-  const issueIntentEnabled = config.issue_intent !== false;
+  const issueIntentEnabled = config.issue_intent === true;
   const allowedAgents = config.allowed
     ? Array.isArray(config.allowed)
       ? config.allowed.map(a => String(a).trim()).filter(Boolean)
@@ -362,6 +362,7 @@ async function main(config = {}) {
     }
 
     const agentName = message.agent ?? defaultAgent;
+    logIgnoredIssueIntentMetadata(message, issueIntentEnabled);
     const intentMetadata = issueIntentEnabled ? normalizeIssueIntentMetadata(message) : {};
     const model = defaultModel;
     const customAgent = defaultCustomAgent;

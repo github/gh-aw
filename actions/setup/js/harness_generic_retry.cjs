@@ -4,9 +4,8 @@
 
 const { parseCopilotRetryAfterMs } = require("./copilot_retry_after.cjs");
 const { detectNonRetryableHarnessGuard, isAuthenticationFailedError, isHTMLResponseError } = require("./harness_error_patterns.cjs");
-const { resolveRetryConfig } = require("./harness_retry_config.cjs");
-const { buildSoftTimeoutGuard } = require("./harness_retry_guard.cjs");
-const { resolveHarnessRetryTelemetryPath, runHarnessRetryLoop, shouldStopForNoopSafeOutputs } = require("./harness_retry_runner.cjs");
+const { createHarnessRuntime } = require("./harness_engine.cjs");
+const { shouldStopForNoopSafeOutputs } = require("./harness_retry_runner.cjs");
 const { getSafeOutputsByteOffset } = require("./harness_safe_outputs.cjs");
 const { hasNoopInSafeOutputs } = require("./safeoutputs_cli.cjs");
 
@@ -70,34 +69,21 @@ function classifyGenericHarnessFailure(output) {
  * }} options
  */
 async function runRetryingHarness(options) {
-  const env = options.env ?? process.env;
-  const { harnessName, log } = options;
-  const { maxRetries: configuredMaxRetries, initialDelayMs, backoffMultiplier, maxDelayMs } = resolveRetryConfig(env, log);
-  const driverStartTime = Date.now();
-  const safeOutputsPath = env.GH_AW_SAFE_OUTPUTS || "";
+  const { log } = options;
+  const runtime = createHarnessRuntime({ harnessName: options.harnessName, log, env: options.env });
+  const { safeOutputsPath } = runtime;
+  const configuredMaxRetries = runtime.retryConfig.maxRetries;
   const maxRetries = safeOutputsPath ? configuredMaxRetries : 0;
   if (!safeOutputsPath && configuredMaxRetries > 0) {
     log("GH_AW_SAFE_OUTPUTS is not set — retries disabled because safe-output side effects cannot be observed");
   }
-  let safeOutputsByteOffset = 0;
-  return runHarnessRetryLoop({
-    telemetryPath: resolveHarnessRetryTelemetryPath(env),
+  return runtime.run({
     maxRetries,
-    initialDelayMs,
-    backoffMultiplier,
-    maxDelayMs,
-    driverStartTime,
-    harnessName,
-    log,
-    softTimeoutGuard: buildSoftTimeoutGuard(driverStartTime, env),
     getRetryMode: options.getRetryMode,
     sleepFn: options.sleepFn,
-    runAttempt: async attempt => {
-      safeOutputsByteOffset = safeOutputsPath ? getSafeOutputsByteOffset(safeOutputsPath) : 0;
-      const result = await options.runAttempt(attempt);
-      return { ...result, safeOutputsByteOffset };
-    },
+    runAttempt: attempt => options.runAttempt(attempt),
     handleFailure: ({ attempt, result }) => {
+      const safeOutputsByteOffset = result.safeOutputsByteOffset ?? 0;
       const failureClass = classifyGenericHarnessFailure(result.output);
       log(`attempt ${attempt + 1}: failed with exitCode=${result.exitCode} failureClass=${failureClass ?? "unclassified"}`);
       if (shouldStopForNoopSafeOutputs({ attempt, safeOutputsPath, hasNoopInSafeOutputs, log })) return { action: "stop" };

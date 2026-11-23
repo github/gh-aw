@@ -44,6 +44,7 @@ func NewCopilotEngine() *CopilotEngine {
 			capabilities: EngineCapabilities{
 				ToolsAllowlist:       true,
 				MCP:                  true,
+				AutoMCPCLI:           true,
 				MaxTurns:             true,  // AWF max-turns is supported for Copilot runs
 				MaxContinuations:     true,  // Copilot CLI supports --autopilot with --max-autopilot-continues
 				WebSearch:            false, // Offline BYOK mode disables native web tools

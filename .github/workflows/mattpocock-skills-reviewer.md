@@ -82,6 +82,14 @@ tools:
 
 Review the PR with the best-fit engineering skills and publish only focused, actionable findings from the changed lines. Use pre-fetched PR data as the evidence source; do not call GitHub PR-data tools. Invoke `pr-triage` once, then apply its recommendations to the highest-impact files. If triage fails, use the documented fallback without retrying more than once. Post up to 10 inline comments, then submit exactly one overall review via `safeoutputs`. Do not skip the current review based on history.
 
+## Completion Contract
+
+A completed review is successful with `APPROVE`, `COMMENT`, or `REQUEST_CHANGES`. Author changes requested by the review are follow-up work, not an incomplete review.
+
+Follow Steps 1-6 below for data, skill selection, and safe-output payloads. After queuing the required inline comments and exactly one overall review, finish normally; no extra terminal signal is needed. The `safeoutputs` CLI queues outputs for later publication; a successful CLI call is not proof of GitHub publication. Publication failures must remain failures.
+
+Use `report_incomplete` only when the review cannot be finished or required outputs cannot be queued: missing essential evidence, stale-head rejection, tool/authentication/timeout failures, or external blockers. Never call `report_incomplete` merely because findings require author fixes, tests fail in the reviewed PR, or the review requests changes.
+
 <!-- instruction-prefix-end -->
 
 If useful review work remains when the run budget is nearly exhausted, call `request_continuation` once with a message identifying the remaining work and relevant PR context. This records a follow-up request only; it does not restart the workflow or confirm review completion. Use `noop` only when no further action is needed, and `report_incomplete` for blocking failures.

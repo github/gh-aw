@@ -523,57 +523,23 @@ describe("set_issue_type (Handler Factory Architecture)", () => {
     expect(mockGithub.graphql).not.toHaveBeenCalledWith(expect.stringContaining("updateIssue"), expect.anything());
   });
 
-  it("should use GraphQL intent path by default when issue_intent is omitted", async () => {
+  it("should use legacy REST issue type update when issue_intent is omitted", async () => {
     const { main } = require("./set_issue_type.cjs");
-    const defaultHandler = await main({ max: 5 });
+    const defaultHandler = await main({ max: 5, target: "*" });
 
     const result = await defaultHandler(
       {
         type: "set_issue_type",
         issue_number: 42,
         issue_type: "Bug",
-      },
-      {}
-    );
-
-    expect(result.success).toBe(true);
-    expect(mockGithub.rest.issues.update).not.toHaveBeenCalled();
-    expect(mockGithub.graphql).toHaveBeenCalledWith(
-      expect.stringContaining("IssueTypeUpdateInput"),
-      expect.objectContaining({
-        issueId: "I_kwDO_testissue",
-        issueType: expect.objectContaining({ issueTypeId: "IT_kwDO_bug" }),
-      })
-    );
-  });
-
-  it("should forward intent metadata by default when issue_intent is omitted", async () => {
-    const { main } = require("./set_issue_type.cjs");
-    const defaultHandler = await main({ max: 5 });
-
-    const result = await defaultHandler(
-      {
-        type: "set_issue_type",
-        issue_number: 42,
-        issue_type: "Bug",
-        rationale: "Author explicitly requests a bug fix",
+        rationale: "should be ignored",
         confidence: "high",
       },
       {}
     );
 
     expect(result.success).toBe(true);
-    expect(mockGithub.rest.issues.update).not.toHaveBeenCalled();
-    expect(mockGithub.graphql).toHaveBeenCalledWith(
-      expect.stringContaining("IssueTypeUpdateInput"),
-      expect.objectContaining({
-        issueId: "I_kwDO_testissue",
-        issueType: {
-          issueTypeId: "IT_kwDO_bug",
-          rationale: "Author explicitly requests a bug fix",
-          confidence: "HIGH",
-        },
-      })
-    );
+    expect(mockGithub.rest.issues.update).toHaveBeenCalledWith({ owner: "test-owner", repo: "test-repo", issue_number: 42, type: "Bug" });
+    expect(mockGithub.graphql).not.toHaveBeenCalledWith(expect.stringContaining("IssueTypeUpdateInput"), expect.anything());
   });
 });

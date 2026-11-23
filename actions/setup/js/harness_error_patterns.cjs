@@ -2,7 +2,7 @@
 
 "use strict";
 
-const { iterateJsonl } = require("./jsonl_helpers.cjs");
+const { iterateJsonl, iterateJsonlEvents } = require("./jsonl_helpers.cjs");
 const { BUILT_IN_PATTERNS } = require("./redact_secrets.cjs");
 const { collectAddMaskedValues, redactMaskedValues } = require("./add_mask_redaction.cjs");
 
@@ -222,36 +222,38 @@ function parseAPIProxyGuardRejection(output) {
 const AUTHENTICATION_FAILED_PATTERNS = [/Authentication failed(?:\s*\(Request ID:[^)]+\))?/i, /"error"\s*:\s*"authentication_failed"/i, /not logged in/i];
 
 const HTML_ERROR_BODY_PATTERN = /\bJust a moment\.{3}|\bcf-chl\b|\bchallenge-platform\b|<!doctype[ \t]+html\b|<html[\s>]/i;
-const API_ERROR_CONTEXT_PATTERN = /\b(?:API error|failed to authenticate|authentication failed|authentication_failed|HTTP(?:\/\d(?:\.\d)?)?[ \t]+[45]\d\d|unexpected status[ \t]+[45]\d\d|[45]\d\d[ \t]+(?:Forbidden|Unauthorized|Bad Gateway|Service Unavailable))\b/i;
+const API_ERROR_CONTEXT_PATTERN =
+  /\b(?:API error|failed to authenticate|authentication failed|authentication_failed|HTTP(?:\/\d(?:\.\d)?)?[ \t]+[45]\d\d|unexpected status[ \t]+[45]\d\d|[45]\d\d[ \t]+(?:Forbidden|Unauthorized|Bad Gateway|Service Unavailable))\b/i;
 
-/** @param {string} line */
-function hasAPIErrorContext(line) {
+/** @param {import("./jsonl_helpers.cjs").JsonlEvent} record */
+function hasAPIErrorContext(record) {
+  const line = record.rawLine;
   if (!line.trimStart().startsWith("{")) return API_ERROR_CONTEXT_PATTERN.test(line);
-  try {
-    const event = JSON.parse(line);
-    if (event.type === "assistant") return event.is_api_error_message === true || event.error === "authentication_failed";
-    if (event.type === "result") return event.is_error === true;
-    return ["error", "session.error", "turn.failed"].includes(event.type) || (!event.type && (event.error != null || API_ERROR_CONTEXT_PATTERN.test(line)));
-  } catch {
-    return false;
-  }
+  if (record.type !== "json") return false;
+  const event = record.value;
+  if (!event || typeof event !== "object" || Array.isArray(event)) return false;
+  if (event.type === "assistant") return event.is_api_error_message === true || event.error === "authentication_failed";
+  if (event.type === "result") return event.is_error === true;
+  return ["error", "session.error", "turn.failed"].includes(event.type) || (!event.type && (event.error != null || API_ERROR_CONTEXT_PATTERN.test(line)));
 }
 
 /**
  * Match challenge pages in error evidence, not free-standing transcript text.
  * Plain CLI errors can put the HTML body on the line after the error header.
- * @param {string} line
- * @param {string} nextLine
+ * @param {import("./jsonl_helpers.cjs").JsonlEvent} record
+ * @param {import("./jsonl_helpers.cjs").JsonlEvent | undefined} nextRecord
  */
-function isHTMLResponseErrorLine(line, nextLine) {
-  if (HTML_ERROR_BODY_PATTERN.test(line)) return hasAPIErrorContext(line);
+function isHTMLResponseErrorLine(record, nextRecord) {
+  const line = record.rawLine;
+  const nextLine = nextRecord?.rawLine ?? "";
+  if (HTML_ERROR_BODY_PATTERN.test(line)) return hasAPIErrorContext(record);
   return !line.trimStart().startsWith("{") && /^\s*(?:<!doctype\b|<html\b|Just a moment\.{3})/i.test(nextLine) && API_ERROR_CONTEXT_PATTERN.test(line);
 }
 
 /** @param {string} output */
 function isHTMLResponseError(output) {
-  const lines = output.split("\n");
-  return lines.some((line, index) => isHTMLResponseErrorLine(line, lines[index + 1] ?? ""));
+  const records = [...iterateJsonlEvents(output)];
+  return records.some((record, index) => isHTMLResponseErrorLine(record, records[index + 1]));
 }
 
 /**
@@ -270,8 +272,8 @@ function isMaxRunsExceededError(output) {
  */
 function isAuthenticationFailedError(output) {
   if (typeof output !== "string") return false;
-  const lines = output.split("\n");
-  return lines.some((line, index) => AUTHENTICATION_FAILED_PATTERNS.some(pattern => pattern.test(line)) && !isHTMLResponseErrorLine(line, lines[index + 1] ?? ""));
+  const records = [...iterateJsonlEvents(output)];
+  return records.some((record, index) => AUTHENTICATION_FAILED_PATTERNS.some(pattern => pattern.test(record.rawLine)) && !isHTMLResponseErrorLine(record, records[index + 1]));
 }
 
 /**

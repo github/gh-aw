@@ -555,7 +555,7 @@ describe("set_issue_field (Handler Factory Architecture)", () => {
     expect(mutationCall[1].issueFields[0]).not.toHaveProperty("suggest");
   });
 
-  it("should include intent metadata by default when issue_intent is omitted", async () => {
+  it("should omit intent metadata when issue_intent is omitted", async () => {
     const { main } = require("./set_issue_field.cjs");
     const defaultHandler = await main({ max: 5 });
 
@@ -565,7 +565,7 @@ describe("set_issue_field (Handler Factory Architecture)", () => {
         issue_number: 42,
         field_name: "Customer Impact",
         value: "High",
-        rationale: "Customer-reported with SLA breach risk",
+        rationale: "should be ignored",
         confidence: "high",
         suggest: true,
       },
@@ -575,14 +575,8 @@ describe("set_issue_field (Handler Factory Architecture)", () => {
     expect(result.success).toBe(true);
     const mutationCall = mockGraphql.mock.calls.find(([query]) => query.includes("setIssueFieldValue"));
     expect(mutationCall).toBeTruthy();
-    expect(mutationCall[1].issueFields[0]).toEqual(
-      expect.objectContaining({
-        fieldId: textFieldId,
-        textValue: "High",
-        rationale: "Customer-reported with SLA breach risk",
-        confidence: "HIGH",
-        suggest: true,
-      })
-    );
+    expect(mutationCall[1].issueFields[0]).not.toHaveProperty("rationale");
+    expect(mutationCall[1].issueFields[0]).not.toHaveProperty("confidence");
+    expect(mutationCall[1].issueFields[0]).not.toHaveProperty("suggest");
   });
 });

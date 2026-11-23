@@ -73,7 +73,7 @@ compiler notices and the feature lookup API.
 | Type | Kind | Description |
 |------|------|-------------|
 | `Engine` | interface | Core identity: `GetID()`, `GetDisplayName()`, `GetDescription()`, `IsExperimental()` |
-| `CapabilityProvider` | interface | Optional feature detection via `GetCapabilities()` |
+| `CapabilityProvider` | interface | Optional feature detection via `GetCapabilities()` and `UsesWebFetchFallback(*WorkflowData)`, which reports whether the engine needs an MCP fallback independently of whether `tools.web-fetch` is enabled. |
 | `WorkflowExecutor` | interface | Compilation: `GetDeclaredOutputFiles`, `GetInstallationSteps`, `GetExecutionSteps` |
 | `MCPConfigProvider` | interface | MCP configuration generation |
 | `LogParser` | interface | Log parsing for audit/metrics |
@@ -253,6 +253,9 @@ and lowers selected capabilities into the runtime plan described in the
 |------|-------------|
 | `ConnectorDeclaration` | Typed AW frontmatter declaration for connector endpoints, credentials, resources, triggers, tools, MCP servers, and safe outputs. |
 | `ConnectorCredential` | Credential configuration selecting a secret token, GitHub App, or GitHub OIDC route. |
+| `ConnectorAzureOIDC` | Azure OIDC settings for an inference-phase connector credential. |
+| `ConnectorInferenceSelection` | Exact connector, profile, and model selected by `engine.inference`. |
+| `ResolvedConnectorInference` | Compiler-only provider settings, authentication, and allowed firewall domains resolved from a selection; it is not a connector tool plan. |
 
 ### Safe Outputs
 
