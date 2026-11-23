@@ -40,6 +40,7 @@ var notYetEnforced = map[string]string{
 	"fprintferrorunchecked":            "existing production violations need remediation before enforcement; nolint suppression already works",
 	"goroutineresourceleak":            "requires an enforcement-readiness audit before native and WebAssembly CI enable it",
 	"hardcodedfilepath":                "requires an enforcement audit after the same-package constant fix (#52428)",
+	"hasprefixdotdotpathescape":        "existing parent-path checks need review and remediation before CI enforcement",
 	"httpclientnotimeout":              "the new HTTP client timeout analyzer needs an enforcement-readiness audit",
 	"ignoredlocalerror":                "existing ignored local errors need review before CI enforcement",
 	"jsondecodertrailingdataunchecked": "new JSON decoder correctness analyzer needs an enforcement-readiness audit before CI enables it",
