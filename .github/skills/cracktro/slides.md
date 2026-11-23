@@ -1248,20 +1248,20 @@ trust, review, process, confidence, skim
 - So we keep improving the process until what, exactly?
 - Until a quick skim is enough. Build confidence into the process, and trust it.
 
-### Cost Optimization {#cost-optimization}
+### FinOps {#cost-optimization}
 
 #### Summary
 
-Band header (Cost Optimization): debug, spend less and route smarter.
+Band header (FinOps): more value, less tokens.
 
 #### Keywords
 
-cost, spend, tokens, budget, savings
+FinOps, cost optimization, cost, spend, tokens, budget, savings
 
 #### Captions
 
-- Coming up next, our Cost Optimization segment. Stay with us.
-- We will look at how to debug agents, spend less on them, and route smarter.
+- Coming up next, our FinOps segment. Stay with us.
+- We will look at how to get more value from agents while spending fewer tokens.
 - Keep your wallets handy, folks. Stay with us.
 
 ### Cost management {#cost-management}
@@ -1510,6 +1510,27 @@ skip, gates, noop, skip-if, pre-activation, cheap checks
 - The cheapest agent call is the one never made. Cheap deterministic gates, from triggers to noop short-circuits, run first.
 - And what if those cheap gates cannot decide on their own?
 - Only then, if necessary, an experimental model-based skip decision steps in. Cheap checks first, agents last.
+
+### It’s ok to say no(op) {#its-ok-to-noop}
+
+#### Notes
+
+illustrative
+
+#### Summary
+
+When there is nothing to do an agent calls the noop safe output instead of inventing work, and when a run goes wrong it reports the missing tool, missing data or incomplete run rather than faking a result. Measured runs of gh-aw itself, counted with gh aw audit, show how often each honest outcome occurs.
+
+#### Keywords
+
+noop, no-op, hallucination, report_missing_tool, report_missing_data, report_incomplete, missing tool, missing data, honest failure, diagnostics, gh aw audit, measured
+
+#### Captions
+
+- Tonight, a lesson in honesty: sometimes the best thing an agent can do is nothing at all.
+- When there is nothing to do, the agent calls the noop safe output instead of inventing an issue or a fake finding.
+- And when a run hits a wall, say a missing tool, missing data or a crashed server?
+- It reports exactly that, missing tool, missing data or incomplete, instead of faking a result. Silence never counts as a noop.
 
 ### Fuzzy schedules {#fuzzy-schedules}
 

@@ -493,6 +493,34 @@ func extractNoopsFromRun(runDir string, run WorkflowRun, verbose bool, experimen
 	return noops, nil
 }
 
+// extractIncompleteFromRun extracts report_incomplete signals from a workflow run's artifacts.
+// experimentName and variant are the pre-resolved experiment assignment for this run; pass empty
+// strings when no experiment context is available.
+func extractIncompleteFromRun(runDir string, run WorkflowRun, verbose bool, experimentName, variant string) ([]IncompleteReport, error) {
+	logsMetricsLog.Printf("Extracting report_incomplete from run: %d", run.DatabaseID)
+	var reports []IncompleteReport
+
+	type incompleteItem struct {
+		Type      string `json:"type"`
+		Reason    string `json:"reason,omitempty"`
+		Details   string `json:"details,omitempty"`
+		Timestamp string `json:"timestamp,omitempty"`
+	}
+	forEachSafeOutputItem(runDir, run, verbose, func(item incompleteItem) {
+		if item.Type != "report_incomplete" {
+			return
+		}
+		reports = append(reports, IncompleteReport{
+			Reason:           item.Reason,
+			Details:          item.Details,
+			ReportProvenance: buildReportProvenance(run, item.Timestamp, experimentName, variant),
+		})
+	})
+	logsMetricsLog.Printf("Found %d report_incomplete signals", len(reports))
+
+	return reports, nil
+}
+
 // extractMissingDataFromRun extracts missing data reports from a workflow run's artifacts.
 // experimentName and variant are the pre-resolved experiment assignment for this run; pass empty
 // strings when no experiment context is available.

@@ -70,7 +70,8 @@ declare namespace CracktroDeck {
   interface Config {
     slides?: Slide[] | ((services: Services) => Slide[]);
     themes?: Record<string, Partial<Theme>>;
-    bands?: Record<string, [title: string, subtitle: string]>;
+    /** Band title, subtitle and optional header slide id (defaults to the group). */
+    bands?: Record<string, [title: string, subtitle: string, id?: string]>;
     solo?: Record<string, string>;
     prototypes?: Record<string, string>;
     tours?: Record<string, Tour>;

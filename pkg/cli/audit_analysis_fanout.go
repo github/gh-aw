@@ -88,6 +88,11 @@ func launchCoreAuditAnalyses(g *errgroup.Group, gctx context.Context, results *a
 	}, func() ([]NoopReport, error) {
 		return extractNoopsFromRun(runOutputDir, run, verbose, expName, expVariant)
 	})
+	runAuditAnalysis(g, gctx, verbose, "extractIncompleteFromRun", "Failed to extract report_incomplete", func(v []IncompleteReport) {
+		results.incomplete = v
+	}, func() ([]IncompleteReport, error) {
+		return extractIncompleteFromRun(runOutputDir, run, verbose, expName, expVariant)
+	})
 	runAuditAnalysis(g, gctx, verbose, "extractContinuationRequestsFromRun", "Failed to extract continuation requests", func(v []ContinuationRequestReport) {
 		results.continuationRequests = v
 	}, func() ([]ContinuationRequestReport, error) {

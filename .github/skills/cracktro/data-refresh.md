@@ -50,6 +50,7 @@ Every slide that shows measured data has a refresh mini skill. Load only the one
 | Skills in review | `refresh/skills-in-review.md` |
 | Ponytail Reviewer | `refresh/ponytail-reviewer.md` |
 | Inlined Skills & Agents | `refresh/inlined-skills-agents.md` |
+| It’s ok to say no(op) | `refresh/its-ok-to-say-noop.md` |
 | Fuzzy schedules | `refresh/fuzzy-schedules.md` |
 | Week of daily runs | `refresh/week-of-daily-runs.md` |
 | From Delivery to Value | `refresh/from-delivery-to-value.md` |

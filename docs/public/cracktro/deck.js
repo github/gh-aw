@@ -1,5 +1,5 @@
 // GitHub Agentic Workflows — a zero-dependency, all-JavaScript slide deck.
-// Open index.html directly in a browser. Keys: ← → space, Home/End, F fullscreen, N notes.
+// Open index.html directly in a browser. Keys: ← → slides, Space/Backspace in-slide steps, Home/End, F fullscreen, N notes.
 (() => {
   const W = 1920,
     H = 1080;
@@ -2102,6 +2102,43 @@
   .eph-log div:first-child { color: #f0f6fc; }
   .eph-foot { left: 110px; top: 870px; width: 1700px; height: 76px; padding: 0 30px; display: flex; align-items: center; gap: 22px; font: 500 22px/1 var(--mono); color: #9198a1; white-space: nowrap; }
   .eph-foot b { color: #79c0ff; font-weight: 600; }
+  .nop .slide-head h2 { --lg: #79c0ff; }
+  .nop-board, .nop-side, .nop-foot { position: absolute; box-sizing: border-box; border: 2px solid var(--c); background: #0d1117ee; opacity: 0; border-radius: 22px; }
+  .active .nop-board, .active .nop-side, .active .nop-foot { animation: sec-in .9s cubic-bezier(.2,.9,.2,1) both calc(var(--i) * 260ms + 400ms); }
+  .nop-board > i, .nop-side > i, .nop-foot i { font: 600 17px/1 var(--mono); letter-spacing: .18em; color: var(--c); font-style: normal; white-space: nowrap; }
+  .nop-board { left: 110px; top: 300px; width: 1100px; height: 540px; padding: 24px 28px; }
+  .nop-step { position: absolute; right: 28px; top: 22px; display: flex; gap: 10px; }
+  .nop-step span { width: 14px; height: 14px; border-radius: 50%; border: 2px solid #79c0ff; opacity: .4; transition: background .3s, opacity .3s; }
+  .nop-step span.on { background: #79c0ff; opacity: 1; }
+  .nop-task { margin-top: 22px; font: 500 24px/1.3 var(--mono); color: #9198a1; white-space: nowrap; }
+  .nop-task b { color: #f0f6fc; font-weight: 600; }
+  .nop-ctx { margin-top: 10px; font: 500 24px/1.3 var(--mono); color: #c9d1d9; white-space: nowrap; }
+  .nop-ctx::before { content: "▸ "; color: #79c0ff; }
+  .nop-card { position: relative; margin-top: 26px; height: 150px; box-sizing: border-box; padding: 20px 24px; border: 2px solid var(--k); border-radius: 14px; opacity: 0; transform: translateX(-40px); transition: opacity .45s, transform .45s cubic-bezier(.2,.9,.2,1); }
+  .nop-card.on { opacity: 1; transform: none; }
+  .nop-card::before { content: ""; position: absolute; inset: 0; border-radius: 12px; background: var(--k); opacity: .1; }
+  .nop-card em { display: block; font: 600 16px/1 var(--mono); letter-spacing: .14em; color: var(--k); font-style: normal; }
+  .nop-card code { display: block; margin-top: 14px; font: 600 30px/1.2 var(--mono); color: #f0f6fc; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-right: 230px; }
+  .nop-card code var { display: block; margin-top: 6px; font: 500 22px/1.2 var(--mono); font-style: normal; color: #9198a1; }
+  .nop-bad { --k: #ffa657; border-style: dashed; }
+  .nop-good { --k: #79c0ff; }
+  .nop-card .stamp { position: absolute; right: 22px; top: 52px; padding: 8px 14px; border: 2px solid var(--k); border-radius: 10px; font: 700 22px/1 var(--mono); color: var(--k); opacity: 0; transform: scale(1.6) rotate(-6deg); transition: opacity .25s, transform .35s cubic-bezier(.3,1.6,.4,1); }
+  .nop-card.done .stamp { opacity: 1; transform: rotate(-6deg); }
+  .nop-bad.done code { text-decoration: line-through; text-decoration-color: #db6d28; text-decoration-thickness: 3px; color: #9198a1; }
+  .nop-side { left: 1250px; top: 300px; width: 560px; height: 540px; padding: 24px 30px; }
+  .nop-row { margin-top: 18px; padding: 16px 18px; border: 2px solid #30363d; border-radius: 14px; transition: border-color .3s, background .3s, opacity .3s; opacity: .45; }
+  .nop-row:first-of-type { margin-top: 22px; }
+  .nop-row b { display: block; font: 600 24px/1 var(--mono); color: #79c0ff; }
+  .nop-row span { display: block; margin-top: 10px; font: 500 18px/1.25 var(--mono); color: #9198a1; white-space: nowrap; }
+  .nop-row.on { opacity: 1; border-color: #79c0ff; background: #4493f81a; }
+  .nop-row.on span { color: #e6edf3; }
+  .nop-row { position: relative; }
+  .nop-row em { position: absolute; right: 18px; top: 14px; font: 600 26px/1 var(--mono); color: #f0f6fc; font-style: normal; }
+  .nop-row em small { font-size: 16px; color: #9198a1; margin-left: 6px; }
+  .nop-cap { position: absolute; left: 110px; top: 968px; font: 500 16px/1 var(--mono); color: #6e7681; letter-spacing: .04em; opacity: 0; }
+  .active .nop-cap { animation: rise .6s ease-out both 2s; }
+  .nop-foot { left: 110px; top: 870px; width: 1700px; height: 76px; padding: 0 30px; display: flex; align-items: center; gap: 22px; font: 500 22px/1 var(--mono); color: #9198a1; white-space: nowrap; }
+  .nop-foot b { color: #79c0ff; font-weight: 600; }
   .so-card .st { position: absolute; right: 18px; bottom: 16px; font: 600 16px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: #79c0ff; }
   .so.p-pass .so-card .st { color: #4493f8; }
   .so.p-done .so-card { border-style: solid; border-color: #4493f8; box-shadow: 0 0 60px -6px #4493f855; }
@@ -5036,7 +5073,7 @@
     const cards = SC.map((s, i) =>
       h(
         "button",
-        { class: "atk-card", type: "button", "aria-pressed": "false", "aria-keyshortcuts": "ArrowLeft ArrowRight", title: `${s.t} (← → step through scenarios)`, onclick: () => i !== sc && (done.add(sc), setScenario(i), sfx.step()) },
+        { class: "atk-card", type: "button", "aria-pressed": "false", "aria-keyshortcuts": "Space Backspace", title: `${s.t} (Space/Backspace step through scenarios)`, onclick: () => i !== sc && (done.add(sc), setScenario(i), sfx.step()) },
         h("b", {}, i + 1),
         h("span", { class: "h4" }, s.t),
         h("span", { class: "p" }, s.d)
@@ -5115,7 +5152,7 @@
     const self = {
       group: "security",
       notes:
-        "What: Five simulated attacks, stepped with the arrow keys and mapped to the OWASP Top 10 lists for LLM and agentic applications: malware injection, encoded-secret theft, an image-link leak, hidden text for the next agent, and repository deletion. Each is stopped by a different layer, from integrity filtering and read-only tokens to the firewall and threat detection.\nWhy: No single defence is enough; overlapping layers catch what one misses, and the compiler rejects risky configurations.\nWhen: Use it to review a threat model. By default threat detection warns; strict mode blocks every safe output.",
+        "What: Five simulated attacks, stepped with Space and mapped to the OWASP Top 10 lists for LLM and agentic applications: malware injection, encoded-secret theft, an image-link leak, hidden text for the next agent, and repository deletion. Each is stopped by a different layer, from integrity filtering and read-only tokens to the firewall and threat detection.\nWhy: No single defence is enough; overlapping layers catch what one misses, and the compiler rejects risky configurations.\nWhen: Use it to review a threat model. By default threat detection warns; strict mode blocks every safe output.",
       enter(dir) {
         done = new Set();
         setScenario(dir < 0 ? SC.length - 1 : 0);
@@ -9334,7 +9371,7 @@
       group: "cost",
       experimental: "model: router",
       notes:
-        "What: Five illustrative ways to cut the cost of a daily pull request summary, stepped with the right arrow: run weekly; fetch data in a plain gh step; cap spend with AI-credit limits and optional central admission; fan work out to a sub-agent on a smaller model; and, experimental, model: router. AIC means AI credits; about 2,800 to 110 AIC a week is illustrative, not usage or billing data.\nWhy: Every run costs credits; frequency, input, limits and model each trade against freshness or quality.\nWhen: Walk through these in order before you tune prompts.",
+        "What: Five illustrative ways to cut the cost of a daily pull request summary, stepped with Space: run weekly; fetch data in a plain gh step; cap spend with AI-credit limits and optional central admission; fan work out to a sub-agent on a smaller model; and, experimental, model: router. AIC means AI credits; about 2,800 to 110 AIC a week is illustrative, not usage or billing data.\nWhy: Every run costs credits; frequency, input, limits and model each trade against freshness or quality.\nWhen: Walk through these in order before you tune prompts.",
       enter() {
         t0 = last = spawn = 0;
         pk = [];
@@ -12184,6 +12221,110 @@
         svg,
         h("div", { class: "aex-foot" }, h("b", {}, "The cheapest agent call is the one you never make"), " · a skipped agent ≠ a skipped Actions run")
       ),
+    });
+  }
+
+  // It’s ok to say no(op): four illustrative runs; each time the agent could invent an output (orange, struck out) it calls an honest safe output instead (blue): noop when there is nothing to do, report_missing_tool, report_missing_data, or report_incomplete when infrastructure fails
+  {
+    resetIndex();
+    const START = 1000,
+      SC = 6200;
+    // [task, context, tempting tool, args, stamp, honest tool, args]
+    const RUNS = [
+      ["daily issue triage", "0 issues opened since the last run", "create_issue", '{"title":"Auth tests may be flaky"}', "✕ invented", "noop", '{"message":"No new issues since the last run"}'],
+      ["fix the failing build", "needs npm test · bash is not an allowed tool", "add_comment", '{"body":"All tests pass ✓"}', "✕ invented", "report_missing_tool", '{"tool":"bash","reason":"cannot run npm test"}'],
+      ["weekly spend report", "billing export is not readable in this run", "create_discussion", '{"title":"Spend down 12% this week"}', "✕ invented", "report_missing_data", '{"data_type":"billing export"}'],
+      ["summarize open pull requests", "GitHub MCP server crashed · 0 results", "noop", '{"message":"Nothing to review"}', "✕ hides failure", "report_incomplete", '{"reason":"GitHub MCP server unavailable"}'],
+    ];
+    // Measured with gh aw audit (refresh/its-ok-to-say-noop.md): agent runs in the window and runs per type
+    const M = { agent: "712", start: "15", end: "21 Nov 2026", snap: "23 Nov 2026" };
+    const ROWS = [
+      ["noop", "step summary · No-Op Runs tracker", "168"],
+      ["report_missing_tool", "run summary · completion comment", "37"],
+      ["report_missing_data", "optional [missing data] issue", "4"],
+      ["report_incomplete", "failure handling, even on exit 0", "266"],
+    ];
+    const dots = RUNS.map(() => h("span", {}));
+    const task = h("b", {}),
+      ctx = h("div", { class: "nop-ctx" });
+    const card = (cls, label) => {
+      const tool = h("span", {}),
+        args = h("var", {}),
+        stamp = h("div", { class: "stamp" });
+      const el = h("div", { class: `nop-card ${cls}` }, h("em", {}, label), h("code", {}, tool, args), stamp);
+      return { el, tool, args, stamp };
+    };
+    const bad = card("nop-bad", "TEMPTING · HALLUCINATED OUTPUT"),
+      good = card("nop-good", "HONEST · SAFE OUTPUT");
+    good.stamp.textContent = "✓ reported";
+    const rows = ROWS.map(([k, v, n]) => h("div", { class: "nop-row" }, h("b", {}, k), h("em", {}, n, h("small", {}, "runs")), h("span", {}, v)));
+    const el = h(
+      "section",
+      { class: "slide nop" },
+      h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "noop · report_missing_tool · report_missing_data · report_incomplete"), h("h2", {}, letters("It’s ok to say "), letters("no(op)", "l-grad"))),
+      h(
+        "div",
+        { class: "nop-board", "--c": "#8b949e", "--i": 0 },
+        h("i", {}, "AGENT RUN"),
+        h("div", { class: "nop-step" }, dots),
+        h("div", { class: "nop-task" }, "task: ", task),
+        ctx,
+        bad.el,
+        good.el
+      ),
+      h("div", { class: "nop-side", "--c": "#79c0ff", "--i": 1 }, h("i", {}, "WHERE IT LANDS"), rows),
+      h("div", { class: "nop-foot", "--c": "#79c0ff", "--i": 2 }, h("i", {}, "RULE"), h("span", {}, h("b", {}, "Silence is not a noop"), " · finish without a terminal safe output and validation adds report_incomplete")),
+      h("div", { class: "nop-cap" }, `MEASURED · gh aw audit · ${M.agent} sampled gh-aw agent runs ${M.start}–${M.end} · snapshot ${M.snap} · runs per type · scenarios illustrative`)
+    );
+    let t0 = 0,
+      cur = -1,
+      seen = new Set();
+    const fire = (name, fn) => {
+      if (seen.has(name)) return;
+      seen.add(name);
+      fn();
+    };
+    const show = i => {
+      const [tk, cx, bt, ba, bs, gt, ga] = RUNS[i];
+      task.textContent = tk;
+      ctx.textContent = cx;
+      bad.tool.textContent = bt;
+      bad.args.textContent = ba;
+      bad.stamp.textContent = bs;
+      good.tool.textContent = gt;
+      good.args.textContent = ga;
+      bad.el.className = "nop-card nop-bad";
+      good.el.className = "nop-card nop-good";
+      dots.forEach((d, j) => d.classList.toggle("on", j <= i));
+      rows.forEach(r => r.classList.remove("on"));
+    };
+    slides.push({
+      id: "its-ok-to-noop",
+      group: "engineering",
+      notes:
+        "What: Four illustrative runs with synthetic tasks. Orange is what a pressured agent might invent; blue is the honest safe output it calls instead. noop says there was nothing to do; report_missing_tool and report_missing_data name what blocked it; report_incomplete flags an infrastructure failure and starts failure handling. A false noop that hides a failure is just another invention.\nWhy: An agent told to act tends to produce something, and a plausible fake finding costs more human attention than an honest no.\nWhen: Tell every workflow prompt to call noop when no action is needed. noop ends a run; the missing-tool and missing-data reports are diagnostics, and a run with no terminal safe output is reported incomplete. The side counts are measured on gh-aw itself with gh aw audit: of 712 sampled agent runs from 15 to 21 Nov 2026, 168 called noop, 37 reported a missing tool, 4 missing data and 266 ended with report_incomplete (about 110 of those added by the system for engine or startup failures, the rest agent-authored environment or policy blocks).",
+      enter() {
+        t0 = 0;
+        cur = -1;
+        show(0);
+      },
+      tick(t) {
+        if (!t0) t0 = t;
+        const e = Math.max(0, t - t0 - START),
+          n = Math.floor(e / SC),
+          i = n % RUNS.length,
+          u = e % SC;
+        if (n !== cur) {
+          cur = n;
+          seen = new Set();
+          show(i);
+        }
+        if (u > 700) fire("b", () => (bad.el.classList.add("on"), sfx.key(0.6)));
+        if (u > 1900) fire("x", () => (bad.el.classList.add("done"), sfx.block()));
+        if (u > 2800) fire("g", () => (good.el.classList.add("on"), sfx.key(0.8)));
+        if (u > 3600) fire("r", () => (good.el.classList.add("done"), rows[i].classList.add("on"), sfx.pop(i + 3)));
+      },
+      el,
     });
   }
 
@@ -16003,7 +16144,7 @@
     const cards = RAI.map(([name, ic, how, ctl], i) =>
       h(
         "button",
-        { class: "rai-card", type: "button", "--i": i, "aria-pressed": "false", "aria-keyshortcuts": "ArrowLeft ArrowRight", title: `${name} (← → step through principles)`, onclick: () => (focus(f === i ? -1 : i), sfx.step()) },
+        { class: "rai-card", type: "button", "--i": i, "aria-pressed": "false", "aria-keyshortcuts": "Space Backspace", title: `${name} (Space/Backspace step through principles)`, onclick: () => (focus(f === i ? -1 : i), sfx.step()) },
         h("span", { class: "rai-n" }, String(i + 1).padStart(2, "0")),
         h("span", { class: "rai-hd" }, h("span", { innerHTML: `<svg viewBox="0 0 24 24" aria-hidden="true">${ICON[ic].map(d => `<path d="${d}"/>`).join("")}</svg>` }).firstChild, h("span", { class: "rai-nm" }, name)),
         h("span", { class: "rai-p" }, how),
@@ -16032,7 +16173,7 @@
     slides.push({
       group: "security",
       notes:
-        "What: Six responsible AI principles, each paired with gh-aw controls that support them; the arrow keys step through them. Reliability, privacy and accountability come from the sandbox, read-only token, safe outputs and approval gates; transparency from AI-generated footers, reviewable lock files and audits.\nWhy: Principles help only when they become defaults you can inspect. These are safeguards, not guarantees: nothing here certifies that an output is accurate or fair.\nWhen: Before rollout, name who a workflow affects, trial it in staged mode on representative, multilingual and adversarial inputs, and keep a person on impactful writes.",
+        "What: Six responsible AI principles, each paired with gh-aw controls that support them; Space steps through them. Reliability, privacy and accountability come from the sandbox, read-only token, safe outputs and approval gates; transparency from AI-generated footers, reviewable lock files and audits.\nWhy: Principles help only when they become defaults you can inspect. These are safeguards, not guarantees: nothing here certifies that an output is accurate or fair.\nWhen: Before rollout, name who a workflow affects, trial it in staged mode on representative, multilingual and adversarial inputs, and keep a person on impactful writes.",
       enter(dir) {
         focus(dir < 0 ? RAI.length - 1 : -1);
       },
@@ -24395,7 +24536,7 @@
     const tabs = PROCS.map((p, i) =>
       h(
         "button",
-        { class: "pm-tab", type: "button", "aria-pressed": "false", "aria-keyshortcuts": "ArrowLeft ArrowRight", title: `${p.tab[0]} (← → switch process)`, onclick: () => (pick(i), sfx.step()) },
+        { class: "pm-tab", type: "button", "aria-pressed": "false", "aria-keyshortcuts": "Space Backspace", title: `${p.tab[0]} (Space/Backspace switch process)`, onclick: () => (pick(i), sfx.step()) },
         h("i", {}, String(i + 1)),
         h("div", {}, h("b", {}, p.tab[0]), h("em", {}, p.tab[1]))
       )
@@ -25089,7 +25230,7 @@
     },
     // Trust the process: a concept slide, plain soft grey with no grid (light), one heavy review bell against quick merge blips.
     trust: { light: true, base: [200, 209, 218], pal: ["#000000", "#000000", "#000000", "#000000"], grid: [200, 209, 218, 0, 0], ang: Math.PI / 8, cell: 32, accent: ["#56d364", "#2ea043", "#aff5b4", "#4493f8"], music: "trust", prog: [0] },
-    // Cost Optimization: gray base, gold grid turned 45° the other way (-π/4), coins.
+    // FinOps: gray base, gold grid turned 45° the other way (-π/4), coins.
     cost: { base: [13, 17, 23], pal: ["#7d5200", "#4a3000", "#9e6a03", "#2b1d00"], grid: [255, 196, 40, 0.08, 0.2], ang: -Math.PI / 4, cell: 32, accent: ["#e3b341", "#9e6a03", "#f8e3a1", "#d29922"], music: "cost", prog: [0, 2, 4, -3] },
     // Agentic Engineering: Copilot purple, grid tilted 30°, an engine rev.
     engineering: {
@@ -25123,11 +25264,12 @@
   // ---------- bands ----------
   // The deck is a table: each group is one horizontal band (row) led by a header slide.
   // The title and the finale (last) are rows of their own. Right/left walk the deck in reading order; up/down jump between bands.
+  // [title, subtitle, id?]: the optional id pins a renamed header's published #link.
   const BANDS = {
     platform: ["Agentic Workflows", "AI-Powered workflows for GitHub"],
     security: ["Security", "Assume the agent is compromised"],
     process: ["Human agent processes", "Engineer processes, not code"],
-    cost: ["Cost Optimization", "Debug, spend less, route smarter"],
+    cost: ["FinOps", "More value, less tokens", "cost-optimization"],
     engineering: ["Agentic Engineering", "Skip, remember, chain, measure"],
     enterprise: ["Enterprise", "Any agent, any provider, any scale"],
     cao: ["Central Agentic Ops", "CAO · gh cao · research prototype"],
@@ -25421,7 +25563,7 @@
         [64, 67, 71, 67, 64, 67, 71, 74].forEach((m, i) => tone(m, t + 0.2 + i * s, { type: "triangle", dur: 0.22, vol: 0.09, cutoff: 2600 }));
         [0, 0.22, 0.56, 0.78].forEach(d => osc("sine", 70, t + 0.2 + d, 0.18, 0.35, { f1: 40 }));
       },
-      // cost optimization: coins dropping into a jar, then a gentle register "ding"
+      // FinOps: coins dropping into a jar, then a gentle register "ding"
       cost: t => {
         for (let i = 0; i < 9; i++) {
           const d = 0.2 + i * 0.09 + Math.random() * 0.03;
