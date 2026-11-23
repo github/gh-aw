@@ -266,6 +266,43 @@ func TestBuiltInSourcePolicyRulesCLI(t *testing.T) {
 	}
 }
 
+func TestDangerousTriggersIntegrityCLI(t *testing.T) {
+	t.Parallel()
+	for _, trigger := range []string{"issue_comment", "pull_request_review", "pull_request_review_comment"} {
+		for _, threshold := range []string{"none", "approved"} {
+			for _, extension := range []string{".md", ".lock.yml"} {
+				t.Run(trigger+"/"+threshold+extension, func(t *testing.T) {
+					dir := t.TempDir()
+					source := "---\non: {" + trigger + ": null}\ntools: {github: {min-integrity: " + threshold + "}}\n---\nReview.\n"
+					require.NoError(t, os.WriteFile(filepath.Join(dir, "test.md"), []byte(source), 0o600))
+					file := filepath.Join(dir, "test"+extension)
+					if extension != ".md" {
+						graph := "on: {" + trigger + ": null}\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps: [{run: echo safe}]\n"
+						require.NoError(t, os.WriteFile(file, []byte(graph), 0o600))
+					}
+					cmd := NewLintCommand()
+					var output bytes.Buffer
+					cmd.SetOut(&output)
+					cmd.SetErr(&output)
+					cmd.SetArgs([]string{"--rules=dangerous-triggers", "--json", file})
+					require.NoError(t, cmd.Execute())
+					var diagnostics []workflowLintDiagnostic
+					require.NoError(t, json.NewDecoder(&output).Decode(&diagnostics))
+					if threshold == "approved" {
+						require.Empty(t, diagnostics)
+					} else {
+						require.Len(t, diagnostics, 1)
+						assert.Equal(t, "dangerous-triggers", diagnostics[0].RuleID)
+						assert.Equal(t, "CTR-039", diagnostics[0].ThreatRuleID)
+						assert.Equal(t, workflowlint.Warning, diagnostics[0].Severity)
+						assert.Equal(t, "on."+trigger, diagnostics[0].Path)
+					}
+				})
+			}
+		}
+	}
+}
+
 func TestNewThreatRulesCLIInputModes(t *testing.T) {
 	const source = "---\non: {pull_request_target: {acknowledge-risk: true}}\ncheckout: {ref: '${{ github.event.pull_request.head.sha }}'}\n---\nPrompt ${{ inputs.PRIVATE_VALUE.constructor }}\n"
 	for _, extension := range []string{".md", ".lock.yml", ".yaml"} {

@@ -7,7 +7,7 @@ sidebar:
 
 # GitHub Actions Compiler Threat Detection Specification
 
-**Version**: 1.0.107
+**Version**: 1.0.108
 **Status**: Candidate Recommendation  
 **Latest Version**: https://github.com/github/gh-aw/blob/main/specs/compiler-threat-detection-spec.md  
 **Editors**: GitHub Next (GitHub, Inc.)
@@ -32,7 +32,7 @@ Each version maps to the minimum compatible binary. A version change MUST update
 
 | Versions | Minimum gh-aw |
 |---|---:|
-| `1.0.60`–`1.0.107` | Unreleased |
+| `1.0.60`–`1.0.108` | Unreleased |
 | `1.0.44`–`1.0.59` | Unreleased |
 | `1.0.40`–`1.0.43` | `v0.87.9` |
 | `1.0.39` | `v0.87.9` |
@@ -86,6 +86,8 @@ The [November 2026 Depi Security Codex disclosure](https://depi.security/blog/20
 - Cache-memory namespaces and publication gates (Section 5.1.3) do not stop a stolen runtime token from writing cache entries directly.
 
 Workflows that publish packages or hold `id-token: write` SHOULD NOT restore caches that untrusted-trigger workflows on the same repository can write. Agent jobs SHOULD NOT hold `id-token: write`.
+
+The [Alpha-Omega dangerous-trigger guidance](https://alpha-omega.dev/blog/de-fanging-dangerous-triggers-in-github-actions-across-an-organization/) recommends explicit GitHub Actions event allowlists, especially excluding `pull_request_target` and `issue_comment` when unnecessary. Both can be triggered by untrusted contributors in the base repository context; comment interpolation and privileged execution of PR code can expose credentials or compromise releases. CTR-008 retains its independent role and checkout enforcement. CTR-039 adds advisory comment-trigger coverage, including AW command shorthands. GitHub organization/repository event policies are external controls: operators SHOULD evaluate an explicit allowlist before enforcing it. Compilation cannot inspect or attest those policies, and a local warning or its suppression does not authorize execution.
 
 Compiler-controlled bootstrap code uses independently provisioned release digests and HTTPS-only redirects as mapped in [security architecture §6.8](security-architecture-spec.md#68-transport-trust-and-bootstrap-integrity). The trusted setup action authenticates AWF and Copilot checksum manifests before consuming asset digests; threat-detect uses compiler-supplied asset digests, and Docker Compose uses compiler-supplied per-architecture digests. Release builds enforce the actual Go toolchain floor independently of `go.mod`. These are bootstrap/runtime controls, not a new `CTR-*` rejection of workflow network declarations. Broader executable-download enforcement remains a candidate under §5.3 until all engine/package-manager paths have independent authentication and deployment evidence. Compilation cannot attest arbitrary runner, proxy, MCP, or container trust stores; runtime inventory is diagnostic evidence, not conformance proof.
 
@@ -265,6 +267,7 @@ Each rule has a stable `CTR-*` ID, threat class, trigger, compiler action, diagn
 - **CTR-036 Safe-Output Environment File Mutation**: Writes from authored safe-output steps to `GITHUB_ENV` or `GITHUB_PATH`, in `run` scripts or via `core.exportVariable`/`core.addPath` in `actions/github-script`, persist into later handler steps that hold write tokens. The Actions/AW linter MUST report them; step-level `env` and `GITHUB_OUTPUT` remain accepted.
 - **CTR-037 Safe-Output Credential-Persisting Checkout**: An authored safe-output `actions/checkout` step that omits `persist-credentials: false` replaces the workspace and git credentials prepared for handlers. The Actions/AW linter MUST report it.
 - **CTR-038 Safe-Output Handler Input Tampering**: Handlers apply agent output and patch files under `/tmp/gh-aw` (including `GH_AW_AGENT_OUTPUT`, `GH_AW_SAFE_OUTPUTS`, and `RUNNER_TEMP`/`runner.temp` `gh-aw` paths) after threat detection. The Actions/AW linter MUST report authored `run` scripts that redirect into, `tee`, edit in place, remove, truncate, move, or copy onto those paths.
+- **CTR-039 Privileged Comment Trigger Exposure**: The default Actions/AW linter and lint-enabled compiler MUST correlate `issue_comment`, `pull_request_review`, and `pull_request_review_comment`, including AW `slash_command` and `command` shorthands for issue comments, with `tools.github` integrity filtering in strict and non-strict mode. Explicit `min-integrity: approved` or `merged` without `lockdown: true`, or explicit `tools.github: false`, MUST suppress this tool-input exposure finding. Thresholds `none` and `unapproved`, absent thresholds, and lockdown-overridden guard policies MUST warn. Compiler analysis MUST use resolved tools, including imports; standalone AW analysis MUST NOT infer imported policy or visibility-dependent runtime defaults, and standalone Actions without AW policy MUST report unknown filtering. Malformed modeled policy MUST fail explicitly without reproducing values. Diagnostics MUST recommend approved/merged filtering, actor authorization, data-only comment handling, trusted code execution, and external event-allowlist review. Checkout disablement, role filters, and `pull_request_target` risk acknowledgment MUST NOT suppress this warning. The `dangerous-triggers` rule MUST also report `pull_request_target` as a CTR-008 advisory warning on standalone Actions and AW inputs, including non-strict AW; a literal AW `on.pull_request_target.acknowledge-risk: true` suppresses only that trigger warning. Compilation MUST avoid duplicating the existing strict CTR-008 trigger warning. Integrity filtering controls GitHub tool inputs, not event admission, raw scripts, or checkout safety; credential availability depends on event and job configuration, and review triggers MUST NOT be described as unconditionally granting fork PRs write tokens or secrets. These diagnostics MUST NOT change generated triggers, permissions, runtime authorization, or independent rejection controls. Field-scoped lint suppression and explicit lint disablement remain available; neither proves safety nor changes GitHub event policy.
 
 CTR-035 through CTR-038 are lint-only guards against accidental misuse by trusted authored steps; they are not a sandbox. Findings MUST be errors under strict mode and warnings otherwise, and MUST NOT include script values.
 
@@ -523,6 +526,7 @@ Every active rule MUST map to implementation and test coverage. References are p
 | CTR-036 Safe-Output Environment File Mutation | `pkg/workflow/lint/safe_output_credentials.go` | `pkg/workflow/lint/safe_output_credentials_test.go`, `pkg/workflow/lint/rule_contract_test.go` |
 | CTR-037 Safe-Output Credential-Persisting Checkout | `pkg/workflow/lint/safe_output_credentials.go` | `pkg/workflow/lint/safe_output_credentials_test.go`, `pkg/workflow/lint/rule_contract_test.go` |
 | CTR-038 Safe-Output Handler Input Tampering | `pkg/workflow/lint/safe_output_credentials.go` | `pkg/workflow/lint/safe_output_credentials_test.go`, `pkg/workflow/lint/rule_contract_test.go` |
+| CTR-039 Privileged Comment Trigger Exposure | `pkg/workflow/lint/dangerous_triggers.go`, `pkg/workflow/compiler_lint.go` | `pkg/workflow/lint/dangerous_triggers_test.go`, `pkg/workflow/compiler_lint_test.go`, `pkg/workflow/lint/rule_contract_test.go` |
 
 ### 7.2 Mapping Audit History
 
@@ -581,6 +585,7 @@ Rules with a known compiler threat mapping MUST declare its `CTR-*` ID in `Rule.
 | CTR-036 | `safe-output-credentials` | Authored safe-output `run` and `actions/github-script` steps do not write `GITHUB_ENV`/`GITHUB_PATH` or call `core.exportVariable`/`core.addPath`. | `pkg/workflow/lint/safe_output_credentials.go`, `safe_output_credentials_test.go` |
 | CTR-037 | `safe-output-credentials` | Authored safe-output `actions/checkout` steps set literal `persist-credentials: false`. | `pkg/workflow/lint/safe_output_credentials.go`, `safe_output_credentials_test.go` |
 | CTR-038 | `safe-output-credentials` | Authored safe-output `run` scripts do not modify handler inputs under `/tmp/gh-aw`, `GH_AW_AGENT_OUTPUT`, `GH_AW_SAFE_OUTPUTS`, or the runner-temp `gh-aw` directory. Lexical only; does not follow variables or subprocesses. | `pkg/workflow/lint/safe_output_credentials.go`, `safe_output_credentials_test.go` |
+| CTR-008, CTR-039 | `dangerous-triggers` | Advisory target-trigger warnings and comment-trigger warnings correlated with GitHub integrity filtering, including AW command shorthands and compiler-resolved imports. Approved/merged filtering or explicit GitHub disablement suppresses only comment tool-input exposure; literal AW target-risk acknowledgment suppresses only the CTR-008 warning. Does not prove actor authorization, code safety, or external event-policy enforcement. | `pkg/workflow/lint/dangerous_triggers.go`, `dangerous_triggers_test.go`; `pkg/workflow/compiler_lint.go`, `compiler_lint_test.go` |
 
 `pkg/workflow/lint/repository_workflows_test.go` applies the registered checks to repository lock files and companion AW documents. `pkg/workflow/lint/rule_contract_test.go` requires positive and negative fixtures for every registered rule and supported AST, including strict/non-strict AW severity, read-only inputs, and repeatable diagnostics. `pkg/cli/lint_workflow_test.go` exercises default execution and preserves diagnostics from independent rules even when another rule fails.
 
@@ -955,6 +960,7 @@ Each active rule MUST have at least one deterministic test that covers its prima
 | **T-CTR-051** | CTR-036 Safe-Output Environment File Mutation | An authored safe-output step writes `GITHUB_ENV`/`GITHUB_PATH` or calls `core.exportVariable`/`core.addPath` | Report the script field; error under strict mode, warning otherwise | `CTR-036` |
 | **T-CTR-052** | CTR-037 Safe-Output Credential-Persisting Checkout | An authored safe-output `actions/checkout` step omits `persist-credentials: false` | Report the checkout step; error under strict mode, warning otherwise | `CTR-037` |
 | **T-CTR-053** | CTR-038 Safe-Output Handler Input Tampering | An authored safe-output `run` script writes, edits, removes, truncates, moves, or copies onto `/tmp/gh-aw` handler inputs | Report the `run` field; error under strict mode, warning otherwise | `CTR-038` |
+| **T-CTR-054** | CTR-039 Privileged Comment Trigger Exposure | Actions or AW declares `issue_comment`, `pull_request_review`, or `pull_request_review_comment`, or AW declares `slash_command` or `command`, with weak, absent, strong, disabled, imported, malformed, or lockdown-overridden GitHub tool filtering | Warn with `dangerous-triggers` and CTR-039 for weak/unknown filtering; preserve approved/merged filtering, explicit tool disablement, safe triggers, field suppression, lint opt-out, independent CTR-008 controls, and nonduplicated compiler target warnings | `CTR-039` |
 
 The core tests exercise their catalog trigger and assert the expected rejection, warning, rewrite, or runtime-safe output.
 

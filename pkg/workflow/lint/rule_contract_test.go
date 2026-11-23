@@ -34,6 +34,12 @@ const contractSafeSteps = "    steps:\n      - shell: bash\n        run: echo pu
 
 func builtInRuleContracts() map[string]ruleContract {
 	return map[string]ruleContract{
+		"dangerous-triggers": {
+			targets: ActionsAST | AWAST, severity: Warning, threatRuleID: "CTR-039",
+			unsafe: "on: {issue_comment: {types: [created]}}\n" + contractJob + contractSafeSteps,
+			safe:   "on: workflow_dispatch\n" + contractJob + contractSafeSteps,
+			path:   "on.issue_comment",
+		},
 		"unpinned-images": {
 			targets: ActionsAST | AWAST, severity: Warning,
 			unsafe: contractJob + "    container: node:latest\n" + contractSafeSteps,

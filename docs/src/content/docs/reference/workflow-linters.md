@@ -17,6 +17,7 @@ Threat IDs refer to the [Compiler Threat Detection Specification](https://github
 | `step-reference` | — | AW, Actions | Literal `steps` accesses name a step ID declared in the same job, including bare `if` conditions. Output declarations and ordering are not checked. |
 | `template-injection` | `CTR-006` | AW, Actions | Known attacker-controlled expressions are not interpolated into executable `run` or reviewed action code inputs, including values transported through modeled shell step and job outputs. Use environment bindings and runtime data access instead. |
 | `workflow-run-scope` | `CTR-021` | AW, Actions | `workflow_run` selects workflows and has a positive branch scope, not only wildcard, negated, or empty filters. |
+| `dangerous-triggers` | `CTR-008`, `CTR-039` | AW, Actions | Target-trigger warnings and comment-trigger warnings correlated with `tools.github.min-integrity`, including AW `slash_command` and `command` shorthands. Approved/merged filtering or explicit GitHub disablement suppresses the comment-input finding; literal AW target-risk acknowledgment suppresses only the target warning. |
 | `secret-leak` | `CTR-017` | AW, Actions | Symbolic secrets do not reach modeled disclosure sinks. AW-only checks report missing generated execution coverage. |
 | `otlp-secret-leak` | `CTR-017` | AW, Actions | Secret-tainted expressions are not exported through OTLP span or resource attributes. Hard-coded credentials and runtime values are not detected. |
 | `permission-scope` | `CTR-001` | AW, Actions | Permissions avoid blanket `write-all`; OIDC does not use invalid `id-token: read`. Scoped writes and `id-token: write` are not violations. |
@@ -76,6 +77,14 @@ Place the comment at the field's indentation, with no blank line before the fiel
 Directives work in Actions YAML and AW frontmatter. AW comments are not copied into compiled execution graphs: when linting a compiled workflow and its companion AW document, execution diagnostics use comments in the Actions YAML, while findings from authored AW fields use the frontmatter, including AW-owned findings from mixed-target rules. Suppressions on YAML anchors do not implicitly carry over to alias uses; an alias field needs its own directive, scoped to its actual descendants rather than similarly prefixed sibling keys.
 
 Suppression acknowledges a diagnostic; it does not establish safety. These comments do not disable independent compiler validation, strict-mode security controls, runtime protections, or external tools such as actionlint and shellcheck.
+
+### Privileged triggers
+
+`dangerous-triggers` correlates `issue_comment`, `pull_request_review`, and `pull_request_review_comment` (plus AW command shorthands) with GitHub integrity filtering. It warns in strict and non-strict mode when these triggers use `tools.github.min-integrity: none` or `unapproved`, lack an explicit threshold, or use lockdown, which overrides guard-policy fields. Explicit `approved` or `merged` filtering, or `tools.github: false`, suppresses the comment tool-input finding. `integrity-proxy: false` does not disable MCP gateway filtering. Compilation uses resolved tools, including imports; standalone lint cannot verify imported policy or visibility-dependent defaults. Actions YAML without companion AW policy reports filtering as unknown.
+
+Integrity filtering protects GitHub tool inputs, not event admission, arbitrary scripts, or PR-code execution. It does not suppress independent checkout or template-injection findings. `on.pull_request_target.acknowledge-risk: true` suppresses only the target-trigger warning on AW inputs; standalone Actions YAML has no AW acknowledgment. Compilation retains the existing strict CTR-008 warning without duplicating it during lint.
+
+The [Alpha-Omega event-policy guidance](https://alpha-omega.dev/blog/de-fanging-dangerous-triggers-in-github-actions-across-an-organization/) recommends an explicit GitHub Actions event allowlist, excluding `pull_request_target` and `issue_comment` when unnecessary. Evaluate the policy before enforcement. These policies are external to gh-aw: compilation does not query or configure them. A role check, risk acknowledgment, lint suppression, or absence of findings does not prove policy enforcement or that untrusted code is safe to execute with credentials.
 
 ### Privileged custom code
 
