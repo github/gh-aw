@@ -11,6 +11,8 @@ Copilot is the default engine. Grant [`copilot-requests: write`](/gh-aw/referenc
 
 The default CLI pin is `1.0.103`. The compiler embeds this version and its reviewed checksum-manifest digest in the generated workflow. Installation prefers that exact version from the trusted runner toolcache; a cache miss downloads and verifies the pinned release instead of selecting a version from the live compatibility matrix. `engine.version` overrides the default. CLI-only execution is the default. `engine.copilot-sdk: true` or `engine.driver` selects SDK mode.
 
+With the built-in installer and `@microsoft/copilot-sdk` `2.0.0`, the default CLI is `1.0.113`, the SDK's companion release for protocol v4. The installer verifies the release against a pinned checksum manifest. An explicit `engine.version` still wins; when selecting a different SDK version, pin a compatible CLI with `engine.version`.
+
 ### Default model routing
 
 Without a `model`, `engine.model`, or `engine.model-routing`, a Copilot workflow on GitHub Copilot inference uses [model routing](/gh-aw/reference/model-routing/#default-routing-for-workflows-without-a-model) with `goal: cost` and `mode: auto` for its main agent, instead of the `auto` model. A nonempty `GH_AW_MODEL_AGENT_COPILOT` or `GH_AW_DEFAULT_MODEL_COPILOT` variable bypasses routing at run time, with the agent variable winning. Set top-level `model-routing: false` to opt out without pinning a model. BYOK providers aren't routed by default.
@@ -57,7 +59,7 @@ An explicit pin overrides the built-in manifest pin and bypasses the runner tool
 
 The engine's version and pin are inherited by detection and eval jobs that reuse that engine. A separate `safe-outputs.threat-detection.engine` override accepts its own `version` and `checksums-sha256`. For AWF, use [`sandbox.agent.checksums-sha256`](/gh-aw/reference/sandbox/#release-integrity-sandboxagentchecksums-sha256).
 
-The compiler supplies the reviewed digest automatically when `engine.version` is omitted or matches the compiler's default version. These generated installs pass `--prefer-toolcache`: the pin authenticates downloaded archives, not the cached host binary. A musl guest archive is still downloaded and verified when the host uses cache. User-supplied frontmatter pins continue to bypass the toolcache.
+The compiler supplies the reviewed digest automatically when `engine.version` is omitted or matches the CLI-only default. Installs using the CLI-only default digest pass `--prefer-toolcache`: the pin authenticates downloaded archives, not the cached host binary. A musl guest archive is still downloaded and verified when the host uses cache. The automatic SDK companion pin and user-supplied frontmatter pins bypass the toolcache.
 
 Compilation fails if the compiler's default version or digest is missing or malformed. Other versions without an explicit pin retain the trusted toolcache policy and setup action's built-in release pins; an unreviewed download still fails closed. A frontmatter pin requires a literal semantic release version such as `"1.0.101"` or `"v1.0.101"`; it cannot be combined with `latest`, an omitted version, or a version expression.
 

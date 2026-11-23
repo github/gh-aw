@@ -49,6 +49,11 @@ func TestCopilotSDKCompilesWithFrozenNPMGraph(t *testing.T) {
 				} `yaml:"jobs"`
 			}
 			require.NoError(t, yaml.Unmarshal([]byte(content), &workflow))
+			if tt.extra == nil {
+				require.Contains(t, content, `install_copilot_cli.sh" 1.0.113 --checksums-sha256 `+constants.DefaultCopilotSDKNPMCLIChecksumsSHA256)
+			} else {
+				require.NotContains(t, content, `install_copilot_cli.sh"`)
+			}
 			for _, step := range workflow.Jobs["agent"].Steps {
 				if !strings.HasPrefix(step.Name, "Install GitHub Copilot SDK (") {
 					continue

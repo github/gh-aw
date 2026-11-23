@@ -57,6 +57,14 @@ const DefaultCopilotSDKVersion Version = "1.0.16"
 // DefaultCopilotSDKNPMVersion is the default version of the @microsoft/copilot-sdk package.
 const DefaultCopilotSDKNPMVersion Version = "2.0.0"
 
+// DefaultCopilotSDKNPMCLIVersion is the CLI release paired with the npm SDK's protocol v4.
+// https://github.com/microsoft/copilot-sdk/blob/v2.0.0/nodejs/src/cliVersion.ts
+const DefaultCopilotSDKNPMCLIVersion Version = "1.0.113"
+
+// DefaultCopilotSDKNPMCLIChecksumsSHA256 authenticates the paired CLI's SHA256SUMS.txt.
+// Reviewed 2026-11-22 against https://api.github.com/repos/github/copilot-cli/releases/assets/759810328.
+const DefaultCopilotSDKNPMCLIChecksumsSHA256 = "854036b59b745d4f4b44a169327ffc0eab007f39e74b3dc3670f4d609a6c1072"
+
 // DefaultCodexVersion is the default version of the OpenAI Codex CLI
 const DefaultCodexVersion Version = "0.169.0"
 
