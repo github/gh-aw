@@ -7005,7 +7005,7 @@
     ],
   };
 
-  // A Factory of Factories: processes create factories; the Repo Factory recipe builds one where five roles share one issue-to-merge loop: several Researchers file issues, one Dispatcher starts concurrent pull request flows in three weekday coding slots, where a Coder, Reviewers and Finisher drive each to a maintainer, and Dreamer turns outcomes into one proposed change
+  // Build The Factory That Works For You: processes create factories; the Repo Factory recipe builds one where five roles share one issue-to-merge loop: several Researchers file issues, one Dispatcher starts concurrent pull request flows in three weekday coding slots, where a Coder, Reviewers and Finisher drive each to a maintainer, and Dreamer turns outcomes into one proposed change
   {
     const AG = pickAgent();
     resetIndex();
@@ -7211,7 +7211,7 @@
           light(nid);
         }
       },
-      el: h("section", { class: "slide" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Workflows → Process → Factory"), h("h2", { class: "pf-h" }, letters("A Factory of "), letters("Factories", "l-grad"))), svg),
+      el: h("section", { class: "slide" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Workflows → Process → Factory"), h("h2", { class: "pf-h" }, letters("Build The Factory That "), letters("Works For You", "l-grad"))), svg),
     });
   }
   // Repo widget: repo octicon, name and star count. Shows the snapshot default; on the published https page it
@@ -24899,7 +24899,7 @@
       "Add agentic workflow that uses Serena MCP docker … to analyze the changes in commits to main and detect duplicated code.",
       "Add agentic workflow that uses Serena MCP docker (using container feature) to analyze the changes in commits to main and detect duplicated code.",
     ],
-    "A Factory of Factories": [
+    "Build The Factory That Works For You": [
       "repo-factory",
       "create a factory that researches this repo daily, dispatches issues to coding agents, reviews and finishes PRs, and dreams up improvements",
       "create a factory that researches this repository every day, files scoped issues, dispatches up to three at a time to coding agents on weekdays, reviews and finishes the pull requests, and lets a Dreamer propose one reversible improvement at a time for a maintainer to approve.",
