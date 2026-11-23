@@ -2453,13 +2453,24 @@
     const VOICE_HOLD_MS = 60000;
     /** @type {{ t0: number, done: boolean } | null} */
     let vc = null;
+    // Web Speech only tunes voice, rate, pitch and volume (no styles; browsers ignore SSML), so a relaxed sports-anchor
+    // read comes from ranking voices (natural/neural first, warm broadcast-style names next, novelty and robotic voices
+    // never), a touch lower pitch and an unhurried rate; each caption line is its own utterance, so lines get a beat.
+    const VOICE_RATE = 0.98,
+      VOICE_PITCH = 0.92;
+    const VOICE_NOVELTY = /\b(albert|bad news|bahh|bells|boing|bubbles|cellos|wobble|deranged|good news|hysterical|jester|junior|organ|princess|superstar|trinoids|whisper|zarvox)\b/i,
+      VOICE_ROBOTIC = /\b(eddy|flo|grandma|grandpa|reed|rocko|sandy|shelley|fred|ralph|kathy|espeak)\b/i,
+      VOICE_NATURAL = /natural|neural|premium|enhanced|online|wavenet|studio/i,
+      VOICE_ANCHOR = /\b(andrew|guy|davis|brian|christopher|eric|roger|steffan|aria|jenny|ava|emma|michelle|evan|nathan|tom|alex|aaron|samantha|allison|zoe|daniel|google us english|google uk english male)\b/i;
+    const voiceScore = (/** @type {SpeechSynthesisVoice} */ v) =>
+      (VOICE_NATURAL.test(v.name) ? 4 : 0) + (VOICE_ANCHOR.test(v.name) ? 2 : 0) + (v.localService ? 0 : 1) + (VOICE_ROBOTIC.test(v.name) ? -3 : 0);
     const voicePick = () => {
-      const all = TTS.getVoices?.() || [],
+      const all = (TTS.getVoices?.() || []).filter(v => !VOICE_NOVELTY.test(v.name)),
         lang = (document.documentElement.lang || navigator.language || "en").slice(0, 2).toLowerCase(),
         mine = all.filter(v => String(v.lang || "").toLowerCase().startsWith(lang)),
-        pool = mine.length ? mine : all,
-        first = pool.find(v => v.default) || pool[0] || null;
-      return [first, pool.find(v => v !== first) || first];
+        pool = (mine.length ? mine : all).map((v, i) => ({ v, s: voiceScore(v) * 100 - i })).sort((a, b) => b.s - a.s).map(x => x.v),
+        first = pool[0] || null;
+      return [first, pool[1] || first];
     };
     function voiceEnter() {
       if (!TTS) return;
@@ -2477,8 +2488,8 @@
           u.lang = v.lang;
         }
         // one voice for both speakers: a lower and a higher pitch tell them apart
-        if (voices[0] === voices[1]) u.pitch = turn % 2 ? 1.2 : 0.9;
-        u.rate = 1.05;
+        u.pitch = voices[0] === voices[1] && turn % 2 ? VOICE_PITCH + 0.2 : VOICE_PITCH;
+        u.rate = VOICE_RATE;
         if (turn === lines.length - 1) u.onend = u.onerror = () => (s.done = true);
         TTS.speak(u);
       });
