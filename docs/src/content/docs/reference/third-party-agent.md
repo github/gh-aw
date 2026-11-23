@@ -121,6 +121,17 @@ Start from a sample with a matching transport rather than copying installation o
 
 See [imports](/gh-aw/reference/imports/) for resolution and pinning rules.
 
+### MCP CLI capabilities
+
+`engine.behaviors.capabilities.github-cli-proxy: true` includes the GitHub CLI
+bridge when a workflow enables `tools.cli-proxy`. CLI-mounted servers are then
+excluded from native MCP configuration. GitHub in `gh-proxy` mode remains separate.
+
+`engine.behaviors.capabilities.auto-mcp-cli: true` augments active CLI mounts with
+configured GitHub, work-queue and custom MCP servers, including when infrastructure
+tools activate the mount without `tools.cli-proxy`. Neither capability changes
+server credentials or permissions.
+
 ### Secret environment overrides
 
 An imported definition declares supported environment variable names in

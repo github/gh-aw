@@ -5,6 +5,7 @@ package workflow
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 
 	"github.com/github/gh-aw/pkg/constants"
@@ -496,6 +497,45 @@ func TestBuildMCPCLIPromptSection_OmittedWhenBashDisabled(t *testing.T) {
 
 	require.NotEmpty(t, getMCPCLIServerNames(data), "safeoutputs is still CLI-mounted")
 	assert.Nil(t, buildMCPCLIPromptSection(data), "CLI-only instructions must be omitted when the agent has no shell")
+}
+
+func TestMCPCLIMountEngineCapabilities(t *testing.T) {
+	for _, tc := range []struct {
+		name         string
+		capabilities EngineCapabilitiesDefinition
+		cliProxy     bool
+		wantGitHub   bool
+		wantCustom   bool
+	}{
+		{"native default", EngineCapabilitiesDefinition{}, true, false, true},
+		{"explicit GitHub proxy", EngineCapabilitiesDefinition{GitHubCLIProxy: true}, true, true, true},
+		{"GitHub proxy needs opt-in", EngineCapabilitiesDefinition{GitHubCLIProxy: true}, false, false, false},
+		{"automatic augmentation", EngineCapabilitiesDefinition{AutoMCPCLI: true}, false, true, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			tools := map[string]any{
+				"github":    map[string]any{"mode": "local"},
+				"cli-proxy": tc.cliProxy,
+				"custom":    map[string]any{"command": "custom-server"},
+			}
+			data := &WorkflowData{
+				EngineConfig: &EngineConfig{ID: "custom-read-engine"},
+				engineDefinition: &EngineDefinition{
+					ID: "custom-read-engine",
+					Behaviors: &EngineBehaviorDefinition{
+						Capabilities: tc.capabilities,
+					},
+				},
+				Tools:       tools,
+				ParsedTools: NewTools(tools),
+				SafeOutputs: &SafeOutputsConfig{NoOp: &NoOpConfig{}},
+			}
+			servers := getMCPCLIServerNames(data)
+			assert.Equal(t, tc.wantGitHub, slices.Contains(servers, "github"))
+			assert.Equal(t, tc.wantCustom, slices.Contains(servers, "custom"))
+			assert.Equal(t, tc.wantGitHub && tc.cliProxy, slices.Contains(getMCPCLIExcludeFromAgentConfig(data), "github"))
+		})
+	}
 }
 
 func TestCodexGitHubCLIReadTransport(t *testing.T) {
