@@ -4,8 +4,8 @@ set +o histexpand
 # Safe Outputs Specification Conformance Checker
 # This script implements automated checks for the Safe Outputs specification
 # Specification: docs/src/content/docs/specs/safe-outputs-specification.md
-# Spec Version: 1.29.26 (2026-11-13)
-# Script Version: 1.29.26 (2026-11-16)
+# Spec Version: 1.31.0 (2026-11-19)
+# Script Version: 1.31.0 (2026-11-23)
 
 set -euo pipefail
 
@@ -3766,6 +3766,155 @@ PY
     fi
 }
 check_update_issue_default_operation
+
+# SEC-014: Fail-Closed Safe-Output Invocation Authorization (Section 5.2 "Safe-output invocation authorization", v1.30.0-1.31.0)
+# `safe-outputs.authorization` requires an HTTPS endpoint (no credentials/query/fragment) and audience;
+# conflicting authorities MUST fail compilation; builtin diagnostics are exempt from global inheritance only.
+# Staged mode MUST short-circuit as `skipped_staged` before OIDC/authority requests. Requests are bounded
+# (64 KiB request, 8 KiB response, 10 s per HTTP request, 20 s total, validity <= 30 s with >= 2 s remaining),
+# redirects block execution, and the companion TypeSpec definition describes the decision endpoint.
+# v1.31.0: top-level `job_id` sits outside `request_digest`; W3C `traceparent` and
+# `baggage: cicd.pipeline.task.name=<encodeURIComponent(job)>` carry diagnostic correlation only.
+echo "Running SEC-014: Fail-Closed Safe-Output Invocation Authorization..."
+check_safe_output_invocation_authorization() {
+    local spec="docs/src/content/docs/specs/safe-outputs-specification.md"
+    local compiler="pkg/workflow/safe_outputs_authorization.go"
+    local client="actions/setup/js/safe_output_authorization.cjs"
+    local gate="actions/setup/js/safe_output_authorization_gate.cjs"
+    local correlation="actions/setup/js/service_correlation.cjs"
+    local typespec="docs/src/content/docs/specs/safe-output-authorization.tsp"
+    local failed=0
+    local f
+
+    if ! grep -qF '#### Safe-output invocation authorization' "$spec"; then
+        log_high "SEC-014: Specification is missing the safe-output invocation authorization section"
+        failed=1
+    fi
+    for f in "$compiler" "$client" "$gate" "$correlation"; do
+        if [ ! -f "$f" ]; then
+            log_critical "SEC-014: Safe-output authorization implementation file missing: $f"
+            failed=1
+        fi
+    done
+    if [ ! -f "$typespec" ]; then
+        log_medium "SEC-014: Companion TypeSpec definition for the authorization decision endpoint missing: $typespec"
+        failed=1
+    fi
+    if [ $failed -ne 0 ]; then
+        return
+    fi
+
+    # Compiler: HTTPS-only endpoint without credentials/query/fragment, conflicts fail compilation, builtin exemption
+    if ! grep -qF 'u.Scheme != "https"' "$compiler" || ! grep -qF 'u.User != nil' "$compiler" || ! grep -qF 'u.Fragment != ""' "$compiler"; then
+        log_critical "SEC-014: Compiler does not reject non-HTTPS authorization endpoints or endpoints with credentials/fragments"
+        failed=1
+    fi
+    if ! grep -qF 'conflicting safe-outputs authorization authorities across imports' "$compiler" || ! grep -qF 'local authorization conflicts with inherited global authority' "$compiler"; then
+        log_critical "SEC-014: Conflicting global/local/imported authorization authorities do not fail compilation"
+        failed=1
+    fi
+    if ! grep -qF 'builtin-exempt' "$compiler"; then
+        log_high "SEC-014: Builtin diagnostics are not classified separately from global authorization inheritance"
+        failed=1
+    fi
+
+    # Runtime client: staged isolation, fixed bounds, manual redirects (redirects block)
+    if ! grep -qF 'state: "skipped_staged"' "$client" || ! grep -qF 'state: "skipped_staged"' "$gate"; then
+        log_critical "SEC-014: Staged mode does not short-circuit authorization as skipped_staged"
+        failed=1
+    fi
+    local bound
+    for bound in 'MAX_REQUEST_BYTES = 65536' 'MAX_RESPONSE_BYTES = 8192' 'HTTP_TIMEOUT_MS = 10000' 'TOTAL_TIMEOUT_MS = 20000' 'MIN_VALIDITY_MS = 2000' 'MAX_VALIDITY_MS = 30000'; do
+        if ! grep -qF "$bound" "$client"; then
+            log_high "SEC-014: Authorization client missing specified bound: $bound"
+            failed=1
+        fi
+    done
+    if ! grep -qF 'redirect: "manual"' "$client" || ! grep -qF 'response.redirected' "$client"; then
+        log_critical "SEC-014: Authorization requests do not block on redirects"
+        failed=1
+    fi
+
+    # v1.31.0: job_id outside request_digest, correlation headers
+    if ! grep -qE 'request_digest: requestDigest, invocation, .*job_id: jobId' "$client"; then
+        log_high "SEC-014: Authorization request does not carry top-level job_id outside the canonical invocation/request_digest"
+        failed=1
+    fi
+    if ! grep -qF 'buildServiceRequestHeaders' "$client"; then
+        log_medium "SEC-014: Authorization decision POST does not attach W3C trace correlation headers"
+        failed=1
+    fi
+    if ! grep -qF 'cicd.pipeline.task.name' "$correlation" || ! grep -qF 'encodeURIComponent(jobId)' "$correlation"; then
+        log_medium "SEC-014: Job baggage is not emitted as cicd.pipeline.task.name with encodeURIComponent sanitization"
+        failed=1
+    fi
+    if ! grep -qF 'isValidTraceId(traceId) && isValidSpanId(spanId)' "$correlation"; then
+        log_medium "SEC-014: traceparent is not omitted for invalid or incomplete trace context"
+        failed=1
+    fi
+
+    if [ $failed -eq 0 ]; then
+        log_pass "SEC-014: Safe-output invocation authorization is HTTPS-only, conflict-checked, staged-isolated, bounded, redirect-blocking, and carries diagnostic-only job correlation"
+    fi
+}
+check_safe_output_invocation_authorization
+
+# IMP-006: Pull Request Review Target Authorization (Section 7.3 CRC-001-004, SPR-001-004, RRC-001-004)
+# create_pull_request_review_comment, submit_pull_request_review and reply_to_pull_request_review_comment
+# MUST default to target "triggering", ignore agent-supplied pull_request_number for triggering/fixed targets,
+# and accept agent-selected pull requests only with target "*" (CRC/RRC: omission MUST fail the item).
+echo "Running IMP-006: Pull Request Review Target Authorization..."
+check_pr_review_target_authorization() {
+    local spec="docs/src/content/docs/specs/safe-outputs-specification.md"
+    local failed=0
+    local entry type_name prefix handler target_var section n
+
+    for entry in \
+        "create_pull_request_review_comment:CRC:actions/setup/js/create_pr_review_comment.cjs:commentTarget" \
+        "submit_pull_request_review:SPR:actions/setup/js/submit_pr_review.cjs:targetConfig" \
+        "reply_to_pull_request_review_comment:RRC:actions/setup/js/reply_to_pr_review_comment.cjs:replyTarget"; do
+        IFS=':' read -r type_name prefix handler target_var <<< "$entry"
+        section=$(awk -v hdr="#### Type: ${type_name}" '$0 == hdr {found=1; print; next} found && /^#### Type: / {exit} found {print}' "$spec")
+        if [ -z "$section" ]; then
+            log_high "IMP-006: Specification section missing for $type_name"
+            failed=1
+            continue
+        fi
+        if ! grep -qF '**Target Authorization**' <<< "$section"; then
+            log_high "IMP-006: $type_name is missing a Target Authorization section"
+            failed=1
+        fi
+        for n in 001 002 003 004; do
+            if ! grep -qF "**${prefix}-${n}**" <<< "$section"; then
+                log_high "IMP-006: $type_name is missing ${prefix}-${n} target authorization requirement"
+                failed=1
+            fi
+        done
+        if [ ! -f "$handler" ]; then
+            log_high "IMP-006: Handler missing for $type_name: $handler"
+            failed=1
+            continue
+        fi
+        if ! grep -qE "const ${target_var} = config\.target \|\| \"triggering\"" "$handler"; then
+            log_high "IMP-006: $handler does not default an omitted target to \"triggering\" (${prefix}-001)"
+            failed=1
+        fi
+        if [ "$prefix" = "SPR" ]; then
+            if ! grep -qF 'resolveTarget' "$handler"; then
+                log_high "IMP-006: $handler does not resolve review targets via resolveTarget (SPR-002-004)"
+                failed=1
+            fi
+        elif ! grep -qE "${target_var} === \"\\*\"" "$handler" || ! grep -qF 'pull_request_number' "$handler"; then
+            log_high "IMP-006: $handler does not restrict agent-supplied pull_request_number to target \"*\" (${prefix}-004)"
+            failed=1
+        fi
+    done
+
+    if [ $failed -eq 0 ]; then
+        log_pass "IMP-006: Pull request review handlers specify and enforce CRC/SPR/RRC target authorization"
+    fi
+}
+check_pr_review_target_authorization
 
 # Summary
 echo ""
