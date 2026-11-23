@@ -1,15 +1,5 @@
 [
   {
-    "date": "2026-10-07",
-    "workflow_name": "PR Code Quality Reviewer",
-    "workflow_file": "pr-code-quality-reviewer",
-    "total_aic_analyzed": 267.7,
-    "runs_audited": 5,
-    "recommendations_count": 5,
-    "subagent_candidates": 0,
-    "estimated_aic_savings_per_run": 30
-  },
-  {
     "date": "2026-10-08",
     "workflow_name": "Design Decision Gate 🏗️",
     "workflow_file": "design-decision-gate",
@@ -298,5 +288,15 @@
     "recommendations_count": 5,
     "subagent_candidates": 0,
     "estimated_aic_savings_per_run": 70
+  },
+  {
+    "date": "2026-11-23",
+    "workflow_name": "Smoke OTEL",
+    "workflow_file": "smoke-otel-backends",
+    "total_aic_analyzed": 137.665,
+    "runs_audited": 1,
+    "recommendations_count": 5,
+    "subagent_candidates": 0,
+    "estimated_aic_savings_per_run": 40
   }
 ]
