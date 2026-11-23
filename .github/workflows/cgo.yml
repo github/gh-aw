@@ -1867,6 +1867,7 @@ jobs:
           tests: >-
             FuzzExpressionParser:./pkg/workflow/
             FuzzBashCommandParserModel:./pkg/workflow/
+            FuzzSkipIfQueryParser:./pkg/workflow/
             FuzzMentionsFiltering:./pkg/workflow/
             FuzzSanitizeOutput:./pkg/workflow/
             FuzzSanitizeIncomingText:./pkg/workflow/

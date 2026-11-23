@@ -4,6 +4,7 @@
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { ERR_API, ERR_CONFIG } = require("./error_codes.cjs");
 const { writeDenialSummary } = require("./pre_activation_summary.cjs");
+const { countSearchMatches } = require("./skip_if_query.cjs");
 
 /**
  * Builds the GitHub search query, optionally scoping it to the current repository.
@@ -74,14 +75,9 @@ async function runSkipQueryGate(options) {
   const searchQuery = buildSearchQuery(skipQuery, skipScope);
 
   try {
-    const {
-      data: { total_count: totalCount },
-    } = await github.rest.search.issuesAndPullRequests({
-      q: searchQuery,
-      per_page: 1,
-    });
+    const { totalCount, exact, backend } = await countSearchMatches(searchQuery, threshold);
 
-    core.info(`Search found ${totalCount} matching items`);
+    core.info(`Query matched ${exact ? "" : "at least "}${totalCount} items (via ${backend} API)`);
 
     if (shouldSkip(totalCount, threshold)) {
       core.warning(warningMessage(totalCount, threshold));
