@@ -1903,9 +1903,9 @@
   .mem-foot { position: absolute; left: 110px; top: 948px; font: 500 20px/1 var(--mono); color: #9198a1; opacity: 0; }
   .active .mem-foot { animation: rise .6s ease-out both 2s; }
 
-  /* --- durable execution: an interrupted attempt checkpoints its native session; the rerun restores it and resumes --- */
+  /* --- durable execution: a run requests continuation, checkpoints its native session and dispatches the next run, which restores it and resumes --- */
   .dur { --lg: #d2a8ff; }
-  .dur-svg { left: 150px; top: 310px; width: 1620px; height: 580px; }
+  .dur-svg { left: 150px; top: 290px; width: 1620px; height: 640px; }
   .active .dur-svg { animation: rise .9s cubic-bezier(.2,.9,.2,1) both .35s; }
   .dur-card .sfl-card { transition: stroke .4s, filter .4s; }
   .dur-card.bad .sfl-card { stroke: #db6d28; filter: drop-shadow(0 0 10px #db6d2855); }
@@ -1920,19 +1920,20 @@
   .dur-chip.ok.on rect { fill: #1f6feb33; stroke: #4493f8; filter: drop-shadow(0 0 12px #4493f855); }
   .dur-cell { fill: #21262d; stroke: #30363d; stroke-width: 1; transition: fill .25s, stroke .25s; }
   .dur-cell.on { fill: #8957e5; stroke: #ab7df8; }
-  .dur-cell.x { fill: #db6d28; stroke: #ffa657; animation: dur-blink .5s steps(2) 3; }
+  .dur-cell.x { fill: #d2a8ff; stroke: #f0f6fc; animation: dur-blink .5s steps(2) 3; }
   .dur-cell.rest { fill: #8957e533; stroke: #ab7df8; stroke-dasharray: 4 3; }
   .dur-cell.new { fill: #1f6feb; stroke: #79c0ff; }
   @keyframes dur-blink { 50% { fill: #21262d; } }
   .dur-ax { fill: #9198a1; font: 500 16px var(--mono); }
   .dur-cut { opacity: 0; transition: opacity .3s; } .dur-cut.on { opacity: 1; }
-  .dur-cut line { stroke: #db6d28; stroke-width: 3; stroke-dasharray: 6 5; } .dur-cut text { fill: #ffa657; font: 600 16px var(--mono); }
+  .dur-cut line { stroke: #ab7df8; stroke-width: 3; stroke-dasharray: 6 5; } .dur-cut text { fill: #d2a8ff; font: 600 16px var(--mono); }
+  .dur-disp { opacity: 0; transition: opacity .3s; } .dur-disp.on { opacity: 1; }
   .dur-if { fill: #c297ff; font: 600 18px var(--mono); } .dur-ifd { fill: #9198a1; font: 500 14px var(--mono); }
   .dur-code { fill: #c9d1d9; font: 500 20px var(--mono); } .dur-code.k { fill: #c297ff; font-weight: 600; }
   .dur-exp { fill: #e3b341; font: 600 13px var(--mono); letter-spacing: .12em; text-anchor: end; }
   .dur-svg .sfl-row .k { fill: #79c0ff; }
   .dur-svg .sfl-row .ok { fill: #79c0ff; } .dur-svg .sfl-row .ko { fill: #ffa657; }
-  .dur-foot { position: absolute; left: 150px; top: 930px; font: 500 22px/1 var(--mono); color: #9198a1; opacity: 0; }
+  .dur-foot { position: absolute; left: 150px; top: 960px; font: 500 22px/1 var(--mono); color: #9198a1; opacity: 0; }
   .dur-foot b { color: #f0f6fc; font-weight: 600; }
   .active .dur-foot { animation: rise .6s ease-out both 1.6s; }
   /* Agentic Engineering: Don’t Run the Agent, Memory with a History, Agents Trigger Agents */
@@ -13056,19 +13057,19 @@
     });
   }
 
-  // Durable execution: engine.durable publishes the native agent session as a checkpoint artifact even after a failed agent step; the rerun restores it and resumes the exact session instead of starting over
+  // Durable execution: the agent calls the request-continuation safe output with hints; only then is its native session checkpointed and the next run dispatched, which restores the session, reads the hints and carries on instead of starting over
   {
     const AG = pickAgent();
     resetIndex();
     const VW = 1620,
-      VH = 580;
+      VH = 640;
     const ico = (n, x, y, sz, fill = "#f0f6fc") => `<g transform="translate(${x - sz / 2},${y - sz / 2}) scale(${sz / 24})" fill="${fill}">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</g>`;
-    // turns per attempt, the turn the first attempt is interrupted at, and each turn cell's x
+    // turns per run, the turn the first run requests continuation at, and each turn cell's x
     const N = 24,
       CUT = 14,
       CX = i => 250 + i * 34;
     let g = `<defs><marker id="durP" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#ab7df8"/></marker></defs>`;
-    // one attempt: agent badge, title, status, restore chip and a bar of turn cells
+    // one run: agent badge, title, status, restore chip and a bar of turn cells
     const attempt = (k, y, title, restoreText) => {
       let s = `<g class="sfl-box dur-card" id="dur${k}"><rect class="sfl-card" x="0" y="${y}" width="1120" height="180" rx="16"/>`;
       s += `<circle cx="266" cy="${y + 28}" r="16" ${agDisc(AG)}/>${ico(AG, 266, y + 29, 20, agFg(AG))}`;
@@ -13078,9 +13079,9 @@
       s += `<text class="dur-ax" id="dur${k}ct" x="250" y="${y + 154}"></text>`;
       return s;
     };
-    g += attempt("A", 0, "RUN 57 · ATTEMPT 1", "fresh · no parent");
-    g += `<g class="dur-cut" id="durCut"><line x1="${CX(CUT) - 4}" y1="52" x2="${CX(CUT) - 4}" y2="136"/><text x="${CX(CUT) + 6}" y="154">✕ interrupted · step timed out</text></g></g>`;
-    // checkpoint publication runs right to left under the interrupted turn, into the artifact store
+    g += attempt("A", 0, "RUN 57 · AGENT", "fresh · no parent");
+    g += `<g class="dur-cut" id="durCut"><line x1="${CX(CUT) - 4}" y1="52" x2="${CX(CUT) - 4}" y2="136"/><text x="${CX(CUT) + 6}" y="154">⇢ request_continuation({ hints })</text></g></g>`;
+    // checkpoint publication runs right to left under the requesting turn, into the artifact store
     const PUB = [
       ["durR0", 662, "redact", "secrets"],
       ["durR1", 462, "validate", "integrity"],
@@ -13091,40 +13092,41 @@
       ["durW2", "M660 278 L628 278"],
       ["durW3", "M460 278 L428 278"],
       ["durW4", "M260 278 L226 278"],
-      ["durW5", "M110 348 L110 434"],
+      ["durW5", "M110 348 L110 494"],
     ];
     PUB.forEach(([id, x, n, d]) => (g += `<g class="dur-chip" id="${id}"><rect x="${x}" y="246" width="160" height="64" rx="12"/><text class="n c" x="${x + 80}" y="274">${n}</text><text class="d c" x="${x + 80}" y="298">${d}</text></g>`));
-    g += `<text class="dur-if" x="846" y="270">if: always()</text><text class="dur-ifd" x="846" y="296">even after a failed agent step</text><text class="dur-ifd" x="846" y="320">runner loss → no checkpoint</text>`;
-    g += `<g class="sfl-box" id="durS"><rect class="sfl-card" x="0" y="214" width="222" height="132" rx="14"/><text class="sfl-title" x="18" y="240">CHECKPOINT 57-1</text><text class="dur-code" x="18" y="272">session files</text><text class="dur-code" x="18" y="300">+ session ID</text><text class="dur-ax" id="durSst" x="18" y="330">none yet</text></g>`;
-    g += attempt("C", 380, "RE-RUN · RUN 57 · ATTEMPT 2", "from attempt 1");
-    g += `<text class="dur-ax" id="durCmd" x="1096" y="534" text-anchor="end" opacity="0">copilot --session-id sess-7f3c</text></g>`;
+    g += `<text class="dur-if" x="846" y="270">only if requested</text><text class="dur-ifd" x="846" y="296">no request → no checkpoint</text><text class="dur-ifd" x="846" y="320">and the chain stops</text>`;
+    g += `<g class="sfl-box" id="durS"><rect class="sfl-card" x="0" y="214" width="222" height="132" rx="14"/><text class="sfl-title" x="18" y="240">CHECKPOINT 57</text><text class="dur-code" x="18" y="272">session files</text><text class="dur-code" x="18" y="300">+ session ID</text><text class="dur-ax" id="durSst" x="18" y="330">none yet</text></g>`;
+    g += `<g class="dur-disp" id="durD"><text class="dur-if" x="134" y="380">safe outputs · dispatch run 58</text><text class="dur-ifd" x="134" y="404">aw_context: parent 57 · depth 1/5 · hints</text></g>`;
+    g += attempt("C", 440, "RUN 58 · CONTINUATION", "from run 57");
+    g += `<text class="dur-ax" id="durCmd" x="1096" y="594" text-anchor="end" opacity="0">resume sess-7f3c · read hints</text></g>`;
     // right column: the setting, what comes back, and the audit evidence
     const CODE = [
-      [0, "engine:", ""],
-      [1, "id: copilot", ""],
-      [1, "durable:", " k"],
-      [2, "retention-days: 7", " k"],
+      [0, "on: workflow_dispatch", ""],
+      [0, "safe-outputs:", ""],
+      [1, "request-continuation:", " k"],
+      [2, "max: 5  # chain depth", " k"],
     ];
     g += `<g class="sfl-box on" id="durK1"><rect class="sfl-card" x="1170" y="0" width="450" height="180" rx="14"/><text class="sfl-title" x="1190" y="30">FRONTMATTER</text><text class="dur-exp" x="1600" y="30">EXPERIMENTAL</text>`;
     CODE.forEach(([ind, t, c], i) => (g += `<text class="dur-code${c}" x="${1190 + ind * 24}" y="${72 + i * 30}">${t}</text>`));
     g += `</g>`;
     const KEEP = [
-      ["ok", "✓ native session + session ID"],
+      ["ok", "✓ native session + hints"],
       ["k", "↻ current prompt · tools · creds"],
-      ["ko", "✕ workspace edits"],
+      ["ko", "✕ workspace edits → rebuild"],
       ["ko", "✕ exactly-once tool calls"],
     ];
-    g += `<g class="sfl-box" id="durK2"><rect class="sfl-card" x="1170" y="200" width="450" height="160" rx="14"/><text class="sfl-title" x="1190" y="228">WHAT COMES BACK</text>`;
-    KEEP.forEach(([c, t], i) => (g += `<g class="sfl-row dur-k2"><text class="${c}" x="1190" y="${262 + i * 28}">${t}</text></g>`));
+    g += `<g class="sfl-box" id="durK2"><rect class="sfl-card" x="1170" y="200" width="450" height="220" rx="14"/><text class="sfl-title" x="1190" y="228">WHAT COMES BACK</text>`;
+    KEEP.forEach(([c, t], i) => (g += `<g class="sfl-row dur-k2"><text class="${c}" x="1190" y="${272 + i * 38}">${t}</text></g>`));
     g += `</g>`;
     const AUDIT = [
       ["durable.restore", "restored"],
       ["durable.session", "resumed"],
       ["parent_run_id", "57"],
     ];
-    g += `<g class="sfl-box" id="durK3"><rect class="sfl-card" x="1170" y="380" width="450" height="180" rx="14"/><text class="sfl-title" x="1190" y="408">AUDIT · UNIFIED SESSION</text>`;
-    AUDIT.forEach(([k, v], i) => (g += `<g class="sfl-row dur-k3"><text x="1190" y="${446 + i * 30}">${k}</text><text class="ok" x="1600" y="${446 + i * 30}" text-anchor="end">${v}</text></g>`));
-    g += `<g class="sfl-row dur-k3"><text class="k" x="1190" y="540">$ gh aw audit 57 --json</text></g></g>`;
+    g += `<g class="sfl-box" id="durK3"><rect class="sfl-card" x="1170" y="440" width="450" height="180" rx="14"/><text class="sfl-title" x="1190" y="468">AUDIT · UNIFIED SESSION</text>`;
+    AUDIT.forEach(([k, v], i) => (g += `<g class="sfl-row dur-k3"><text x="1190" y="${506 + i * 30}">${k}</text><text class="ok" x="1600" y="${506 + i * 30}" text-anchor="end">${v}</text></g>`));
+    g += `<g class="sfl-row dur-k3"><text class="k" x="1190" y="600">$ gh aw audit 58 --json</text></g></g>`;
     // wires go on top of the cards they cross
     for (const [id, d] of WIRES) g += `<path class="fm-wire p" id="${id}" d="${d}" marker-end="url(#durP)"/>`;
     g += `<circle class="fm-dot dur-dot" r="8" fill="#ab7df8"/>`;
@@ -13140,7 +13142,7 @@
       x.textContent = t;
       x.setAttribute("class", x.classList[0] + (c ? " " + c : ""));
     };
-    // ms into the cycle: attempt 1 works then is interrupted, the checkpoint publishes, attempt 2 restores and finishes
+    // ms into the cycle: run 57 works then requests continuation, the checkpoint publishes, run 58 is dispatched, restores and finishes
     const T_A = i => 1100 + i * 240,
       T_CUT = 4700,
       // [wire, start, end, node lit on arrival]
@@ -13177,9 +13179,9 @@
     };
     slides.push({
       group: "engineering",
-      experimental: "engine.durable",
+      experimental: "request-continuation",
       notes:
-        "What: Experimental, an illustrative run with a synthetic run number, turns and session ID. With engine.durable, the agent's session files are redacted, validated and saved as an artifact after the agent step, even on failure. A re-run restores them, and the agent resumes at turn 15 instead of redoing 14.\nWhy: Timeouts waste work. Only session files return, not workspace edits, credentials or exactly-once tool execution; cancellation or runner loss can prevent saving, and restored history is data, never instructions.\nWhen: Use it for long, often-interrupted runs, and keep every write retry-safe.",
+        "What: Experimental, an illustrative chain with synthetic run numbers, turns and session ID. With the request-continuation safe output, the agent calls request_continuation with self-contained hints. Only then are its session files redacted, validated and saved, and the next run of the same workflow is dispatched with the parent run, depth and hints. That run restores the session, reads the hints and carries on at turn 15 instead of redoing 14.\nWhy: Long jobs outgrow one run. Only session files return, not workspace edits, credentials or exactly-once tool execution, so the agent rebuilds its working context from the hints; hints and restored history are data, never instructions. No request, no checkpoint: the chain stops, and max caps its depth.\nWhen: Use it for long, multi-run work that needs workflow_dispatch, and keep every write retry-safe.",
       enter() {
         t0 = 0;
         cyc = -1;
@@ -13211,10 +13213,9 @@
           fire("cut", () => {
             $("durA" + CUT).classList.add("x");
             $("durCut").classList.add("on");
-            $("durA").classList.add("bad");
             $("durAr").classList.remove("on");
-            setText("durAst", "✕ failed", "ko");
-            sfx.bug();
+            setText("durAst", "⇢ continuation requested", "b");
+            sfx.notify(true);
           });
         svg.querySelectorAll(".fm-wire.hot").forEach(w => w.classList.remove("hot"));
         dot.style.opacity = 0;
@@ -13232,6 +13233,7 @@
               $(nid).classList.add("on");
               if (nid === "durS") {
                 setText("durSst", "✓ kept 7 days", "ok");
+                $("durD").classList.add("on");
                 sfx.notify(false);
               } else if (nid === "durCr") {
                 $("durC").classList.add("on");
@@ -13268,7 +13270,7 @@
       el: h(
         "section",
         { class: "slide dur" },
-        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "engine.durable · checkpoint · interrupt · resume"), h("h2", {}, letters("Durable "), letters("execution", "l-grad"))),
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "request-continuation · checkpoint · dispatch · resume"), h("h2", {}, letters("Durable "), letters("execution", "l-grad"))),
         svg,
         h("div", { class: "dur-foot" }, h("b", {}, "Resume the session, not the side effects"), " · keep every write retry-safe and idempotent")
       ),
