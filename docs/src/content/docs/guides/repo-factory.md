@@ -63,7 +63,8 @@ All role selection and workflow policy must derive from this profile.
 Use the following installation sequence:
 
 1. Establish the repository mission and profile.
-2. Inventory existing workflows, skills, review mechanisms, and any Squad setup.
+2. Inventory existing workflows, skills, and review mechanisms. Check for
+   `.github/workflows/squad.md` and an initialized `.squad/` team separately.
 3. Detect visibility, integrity requirements, protected-file restrictions, and CI
    behavior.
 4. Choose provider/credentials, GH-AW engine, coding backend, PR authentication,
@@ -73,17 +74,31 @@ Use the following installation sequence:
 6. Generate self-contained workflows with supported triggers, permissions, safe
    outputs, integrity policies, and small execution budgets.
 7. Compile and validate permissions, MCP configuration, and CI-trigger behavior.
-8. Document the role map, selected policies, operating instructions, and blockers.
+8. Document the role map, the Squad reuse or skip decision, selected policies,
+   operating instructions, and blockers.
 9. Let Dreamer propose future incremental changes from measured outcomes.
 
-Interactive mode asks only for essential missing choices, including whether to use
-Squad. Auto mode uses conservative repository-grounded defaults and does not install
-Squad without authorization. If Squad already exists, inspect the
-`.github/workflows/squad.md` workflow, `.squad/team.md`, `.squad/routing.md`, and agent definitions. Reuse its
-roles and coordination, mapping the factory's Researchers, Dispatcher, Reviewers,
-and Finisher into the existing team; Dreamer remains a specialized Researcher.
-See [Squad's GH-AW guide](https://github.github.com/squad/docs/guide/gh-aw/) and
-[Squad repository](https://github.com/github/squad).
+### Decide whether to reuse Squad
+
+If `.github/workflows/squad.md` exists, inspect its triggers, permissions, and
+outputs. It is the GitHub Actions workflow for casting, connecting, or adopting
+a Squad team; its presence alone does not mean a team is initialized. Check
+`.squad/team.md`, `.squad/routing.md`, and the member charters for the team and its
+routing rules. Treat a workflow with `source:` as read-only and use the approved
+upstream update path if it needs to change.
+
+With authorization, map Researchers, Dispatcher, Reviewers, and Finisher to
+existing Squad roles where they fit; keep Dreamer within Researchers. Record
+which workflow owns each trigger and handoff so Squad and the factory do not
+both assign, review, or repair the same work.
+
+If no team is initialized, skip Squad unless the user explicitly authorizes
+setup. Interactive mode can ask about that choice; auto mode does not install
+or initialize Squad. For an explicitly requested local SDLC bootstrap, use the
+[separate Squad issue recipe](https://github.com/github/gh-aw/blob/main/.github/aw/squad.md).
+That recipe prepares a coding-agent issue; it is not the GitHub Actions workflow
+and does not authorize setup as part of the factory. For the Actions integration,
+see [Squad's GH-AW guide](https://github.github.com/squad/docs/guide/gh-aw/).
 
 Keep the repository profile in Dreamer's prompt/context and ensure Dreamer can
 consult this original `factory.md` recipe. Use only a supported workspace-context
