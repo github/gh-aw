@@ -38,6 +38,7 @@ var notYetEnforced = map[string]string{
 	"filepathwalkpreferwalkdir":        "existing filepath.Walk calls need remediation before CI enforcement",
 	"formatintitoa":                    "existing FormatInt conversions need remediation before CI enforcement",
 	"fprintferrorunchecked":            "existing production violations need remediation before enforcement; nolint suppression already works",
+	"hasprefixdotdotpathescape":        "existing parent-path checks need review and remediation before CI enforcement",
 	"goroutineresourceleak":            "requires an enforcement-readiness audit before native and WebAssembly CI enable it",
 	"hardcodedfilepath":                "requires an enforcement audit after the same-package constant fix (#52428)",
 	"httpclientnotimeout":              "the new HTTP client timeout analyzer needs an enforcement-readiness audit",
