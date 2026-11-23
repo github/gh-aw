@@ -1554,7 +1554,26 @@
       } catch {}
       return { id, q };
     };
+    // Shared links carry the same state as query parameters (?slide=<id>&tour=...&kiosk=1): social sites such as
+    // LinkedIn drop the #fragment of a posted URL. Without a hash, the last value of each deck key moves into it.
+    const DEEP = ["slide", "tour", "view", ...LAUNCH];
+    const deepLink = parts => {
+      const base = location.href.split("#")[0];
+      return parts.length ? base + (base.includes("?") ? "&" : "?") + parts.join("&") : base;
+    };
+    const queryToHash = () => {
+      if (location.hash.length > 1 || !location.search) return;
+      const p = new URLSearchParams(location.search),
+        last = k => p.getAll(k).at(-1);
+      if (!DEEP.some(k => p.has(k))) return;
+      const parts = p.has("slide") ? [encodeURIComponent(last("slide"))] : [];
+      for (const k of DEEP.slice(1)) if (p.has(k)) parts.push(`${k}=${encodeURIComponent(last(k))}`);
+      for (const k of DEEP) p.delete(k);
+      const rest = p.toString();
+      history.replaceState(null, "", location.pathname + (rest ? "?" + rest : "") + "#" + parts.join("&"));
+    };
     const followHash = () => {
+      queryToHash();
       const { id, q } = parseHash(),
         v = viewFrom(q);
       if ((v?.key ?? null) !== (view?.key ?? null)) setView(v);
@@ -1829,7 +1848,7 @@
     const smpHead = h("h2", { class: "smp-h" }, "Slide map");
     // Tours (very bottom of the map): every slide, each config.tours entry, the custom view in use, and "Design a view".
     // Design mode turns tiles into toggles and band headings into whole-band checkboxes; the bar below the map shows
-    // the count, an optional title and the shareable link (#<first slide>&view=<base64url { t, b, s }>).
+    // the count, an optional title and the shareable link (?slide=<first slide>&view=<base64url { t, b, s }>).
     let smpDesign = false;
     const smpSel = new Set();
     const bandIdx = b => slides.flatMap((s, i) => (s.band === b ? [i] : []));
@@ -2259,7 +2278,7 @@
       const spec = smpSpec(),
         first = slides.findIndex((s, i) => smpSel.has(i));
       smpCount.textContent = `${smpSel.size} of ${count(slides.length)}`;
-      smpLink.value = smpSel.size ? `${location.href.split("#")[0]}#${slides[first].id}&view=${b64e(spec)}` : "";
+      smpLink.value = smpSel.size ? deepLink([`slide=${encodeURIComponent(slides[first].id)}`, `view=${b64e(spec)}`]) : "";
       smpApply.disabled = smpCopy.disabled = !smpSel.size;
     }
     const smp = h(
@@ -2496,13 +2515,13 @@
       shrCc.input.disabled = !k;
       shrVoice.input.disabled = !k || !VOICE;
       const parts = [];
-      if (shrHere.input.checked) parts.push(encodeURIComponent(slides[cur].id));
+      if (shrHere.input.checked) parts.push(`slide=${encodeURIComponent(slides[cur].id)}`);
       if (shrTour.value) parts.push(shrTour.value);
       if (k) parts.push("kiosk=1");
       if (config.sound) parts.push(`sound=${shrSound.input.checked ? 1 : 0}`);
       if (k) parts.push(`cc=${shrCc.input.checked ? 1 : 0}`);
       if (k && VOICE) parts.push(`voice=${shrVoice.input.checked ? 1 : 0}`);
-      shrLink.value = location.href.split("#")[0] + (parts.length ? "#" + parts.join("&") : "");
+      shrLink.value = deepLink(parts);
     }
     function openShare() {
       if (shr.open || lobby) return;
