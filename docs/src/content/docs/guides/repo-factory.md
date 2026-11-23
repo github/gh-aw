@@ -8,7 +8,7 @@ sidebar:
 A Repo Factory is a small portfolio of GitHub Agentic Workflows designed around
 the target repository's mission and coordinated through issues and pull requests.
 The reusable
-[`factory.md` instruction recipe](https://github.com/github/gh-aw/blob/main/.github/aw/factory.md)
+[`repo-factory.md` instruction recipe](https://github.com/github/gh-aw/blob/main/.github/aw/repo-factory.md)
 guides a coding agent through repository reconnaissance, policy selection, workflow
 generation, compilation, and a bootstrap PR. It is not a new CLI command,
 frontmatter schema, or central factory server.
@@ -24,7 +24,7 @@ resolve all recipe links at that revision.
 Interactive creation is the default. For example:
 
 ```text wrap
-Read https://github.com/github/gh-aw/blob/main/.github/aw/factory.md
+Read https://github.com/github/gh-aw/blob/main/.github/aw/repo-factory.md
 and create a Repo Factory in this repository. First profile the repository and
 reuse existing workflows. Ask only for missing provider/engine, backend/PR
 authentication, Squad preference, or capacity choices; then open a bootstrap PR.
@@ -33,7 +33,7 @@ authentication, Squad preference, or capacity choices; then open a bootstrap PR.
 To use conservative defaults without an interview:
 
 ```text wrap
-Read https://github.com/github/gh-aw/blob/main/.github/aw/factory.md
+Read https://github.com/github/gh-aw/blob/main/.github/aw/repo-factory.md
 and create a Repo Factory in auto mode. Reuse the established engine;
 prefer Pi where consistent, use native GH-AW coding if Cloud Agent credentials
 are not configured, and do not install Squad.
@@ -80,7 +80,7 @@ Use the following installation sequence:
 9. Let Dreamer propose future incremental changes from measured outcomes.
 
 Keep the repository profile in Dreamer's prompt/context and ensure Dreamer can
-consult this original `factory.md` recipe. Use only a supported workspace-context
+consult the `repo-factory.md` recipe. Use only a supported workspace-context
 mechanism; otherwise carry the concise profile and relevant architecture invariants
 in its prompt.
 
