@@ -2549,26 +2549,32 @@ models:
 # array of two or more variant strings (bare-array form) or an object with a
 # 'variants' field plus optional metadata fields (description, metric, weight,
 # issue, start_date, end_date, hypothesis, secondary_metrics, guardrail_metrics,
-# min_samples, analysis_type, decision). The reserved 'storage' key controls how
-# experiment state is persisted: 'repo' (default) commits state to a git branch
-# named 'experiments/{sanitizedWorkflowID}' (workflow ID lowercased with hyphens
-# removed) for durability; 'cache' uses GitHub Actions cache. At runtime the
-# activation job picks a variant and persists the updated counters. Use ${{
-# experiments.<name> }} in the workflow prompt to reference the selected variant.
-# When multiple experiments are declared, assignments are statistically balanced
-# using a least-used counter that round-robins across variants (or weighted when
-# 'weight' is provided); ties are broken randomly so no variant is systematically
-# favoured on the first run.
+# min_samples, analysis_type, decision). The reserved 'storage' key controls
+# persistence: 'repo' (default) commits state to
+# 'experiments/{sanitizedWorkflowID}'; 'cache' uses GitHub Actions cache; opt-in
+# 'broker' delegates variant selection and aggregate result reporting to an
+# OIDC-authenticated API. The optional 'broker-url' configures its HTTPS endpoint.
+# Broker dry-runs use local ephemeral selection without broker calls or broker
+# OIDC grants. Use ${{ experiments.<name> }} in the workflow prompt to reference
+# the selected variant. Repo and cache modes use local least-used counters
+# (weighted when 'weight' is provided), with random tie-breaking; in broker mode
+# the API owns selection and cumulative counts.
 # (optional)
 experiments:
   # Storage backend for experiment state. 'repo' (default) persists state to a git
   # branch named 'experiments/{sanitizedWorkflowID}' (workflow ID lowercased with
   # hyphens removed, e.g. 'my-workflow' -> 'experiments/myworkflow') for durability
   # across cache evictions. 'cache' uses GitHub Actions cache (legacy behavior).
-  # Repo storage is recommended because experiment data is valuable and more durable
-  # than cache.
+  # 'broker' delegates assignment and aggregate reporting to an OIDC-authenticated
+  # service without git or cache persistence. Broker dry-runs use local ephemeral
+  # assignments and never contact the broker.
   # (optional)
   storage: "cache"
+
+  # Literal HTTPS broker endpoint without credentials or expressions. Defaults to
+  # the GH_AW_EXPERIMENTS_BROKER_URL secret.
+  # (optional)
+  broker-url: "example-value"
 
 # Secret values passed to workflow execution. Secrets can be defined as simple
 # strings (GitHub Actions expressions) or objects with 'value' and 'description'
@@ -3450,6 +3456,17 @@ engine:
   # (optional)
   env:
     {}
+
+  # Explicit workflow inference selection. Model is an exact granted wire alias,
+  # separate from engine.model metadata. Initially supports Copilot
+  # OpenAI-compatible BYOK only.
+  # (optional)
+  inference:
+    connector: "example-value"
+
+    profile: "example-value"
+
+    model: "example-value"
 
   # Engine-level authentication configuration for AWF API proxy sidecar integration
   # (for example, Azure OpenAI via GitHub OIDC). Values are mapped to AWF_AUTH_*
@@ -22485,6 +22502,17 @@ safe-outputs:
       env:
         {}
 
+      # Explicit workflow inference selection. Model is an exact granted wire alias,
+      # separate from engine.model metadata. Initially supports Copilot
+      # OpenAI-compatible BYOK only.
+      # (optional)
+      inference:
+        connector: "example-value"
+
+        profile: "example-value"
+
+        model: "example-value"
+
       # Engine-level authentication configuration for AWF API proxy sidecar integration
       # (for example, Azure OpenAI via GitHub OIDC). Values are mapped to AWF_AUTH_*
       # environment variables.
@@ -24164,6 +24192,35 @@ safe-outputs:
   # (optional)
   actions:
     {}
+
+  # Opt-in metadata-only request for follow-up work. Does not resume work or
+  # dispatch a workflow.
+  # (optional)
+  # Accepted formats:
+
+  # Format 1: object
+  request-continuation:
+    # (optional)
+    authorization:
+      endpoint: "example-value"
+
+      audience: "example-value"
+
+    # Maximum number of continuation requests (default: 1).
+    # (optional)
+    # Accepted formats:
+
+    # Format 1: integer
+    max: 1
+
+    # Format 2: string
+    max: "example-value"
+
+  # Format 2: null
+  request-continuation: null
+
+  # Format 3: boolean
+  request-continuation: true
 
   # Enable AI agents to signal that a task could not be completed due to
   # infrastructure or tool failures (e.g., MCP crash, missing auth, inaccessible

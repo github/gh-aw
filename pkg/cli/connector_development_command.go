@@ -149,8 +149,8 @@ func runDevelopmentConnector(cmd *cobra.Command, args []string, options *connect
 				return fmt.Errorf("--%s applies only to connector test", flag)
 			}
 		}
-		if options.phase != "" && options.phase != "agent" && options.phase != "context" && options.phase != "safe-output" {
-			return errors.New("--phase must be agent, context, or safe-output")
+		if options.phase != "" && options.phase != "agent" && options.phase != "context" && options.phase != "safe-output" && options.phase != "inference" {
+			return errors.New("--phase must be agent, context, safe-output, or inference")
 		}
 		root := options.root
 		if root == "" {

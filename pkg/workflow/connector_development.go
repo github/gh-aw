@@ -85,6 +85,9 @@ func developmentConnectorRegistration(id string, frontmatter map[string]any, gra
 	if err := validateConnectorOIDC(id, registration); err != nil {
 		return registration, err
 	}
+	if err := validateConnectorAzureOIDC(id, registration); err != nil {
+		return registration, err
+	}
 	for resource, values := range grants {
 		if !developmentConnectorResource(registration.Spec, resource) {
 			return registration, fmt.Errorf("grant %q is not a declared resource constraint", resource)
@@ -150,6 +153,11 @@ func developmentConnectorSource(root, id, source string) (content []byte, resolv
 }
 
 func developmentConnectorResource(spec *connectors.ConnectorSpec, resource string) bool {
+	for _, profile := range spec.Inference {
+		if profile.Models == resource {
+			return true
+		}
+	}
 	has := func(resources map[string]string) bool {
 		for _, name := range resources {
 			if name == resource {

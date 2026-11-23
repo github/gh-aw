@@ -28,6 +28,7 @@ var azureFoundryIQCompilerScenario = connectorCompilerScenario{
 }
 
 var connectorCompilerScenarios = []connectorCompilerScenario{
+	{"azure-ai-gateway", nil, "", "create-issue"},
 	azureFoundryIQCompilerScenario,
 	{"azure-monitor", []string{"get_activity_count"}, "AZURE_MONITOR_READ_ACCESS_TOKEN", "create-issue"},
 	{"asana", []string{"get_task"}, "ASANA_READ_ACCESS_TOKEN", "asana-add-comment"},
@@ -52,10 +53,16 @@ func assertConnectorScenarioAuthority(t *testing.T, data *WorkflowData, scenario
 	require.Len(t, data.Connectors, 1)
 	connector := data.Connectors[scenario.provider]
 	require.NotNil(t, connector)
-	require.NotNil(t, connector.Agent)
-	require.Equal(t, scenario.readers, connector.Agent.ToolNames())
-	require.Equal(t, []string{scenario.secret}, connector.Agent.Secrets())
-	require.Empty(t, connector.Agent.SafeOutputNames())
+	if len(scenario.readers) == 0 {
+		require.NotNil(t, connector.Inference)
+		require.Nil(t, connector.Agent, "inference must not create an agent-callable tool plan")
+		require.Nil(t, connector.Plan)
+	} else {
+		require.NotNil(t, connector.Agent)
+		require.Equal(t, scenario.readers, connector.Agent.ToolNames())
+		require.Equal(t, []string{scenario.secret}, connector.Agent.Secrets())
+		require.Empty(t, connector.Agent.SafeOutputNames())
+	}
 	require.Nil(t, connector.Context)
 	require.Empty(t, data.WebhookSubscriptions)
 	require.NotNil(t, data.SafeOutputs)
@@ -77,7 +84,9 @@ func assertConnectorScenarioAuthority(t *testing.T, data *WorkflowData, scenario
 
 func assertConnectorScenarioEmission(t *testing.T, compiler *Compiler, data *WorkflowData, scenario connectorCompilerScenario, output string) {
 	t.Helper()
-	require.Contains(t, output, "${{ secrets."+scenario.secret+" }}", "staging must retain the selected reader credential")
+	if scenario.secret != "" {
+		require.Contains(t, output, "${{ secrets."+scenario.secret+" }}", "staging must retain the selected reader credential")
+	}
 	if plan := data.Connectors[scenario.provider].SafeOutputs; plan != nil {
 		for _, secret := range plan.Secrets() {
 			require.NotContains(t, output, "${{ secrets."+secret+" }}", "staging must omit provider writer delivery")
@@ -123,6 +132,9 @@ func TestConnectorScenarioImportDoesNotSelectCapabilities(t *testing.T) {
 				tools := consumer["tools"].(map[string]any)
 				delete(tools, scenario.provider)
 				delete(consumer, "safe-outputs")
+				if len(scenario.readers) == 0 {
+					delete(consumer["engine"].(map[string]any), "inference")
+				}
 			})
 			data, err := compiler.ParseWorkflowFile(path)
 			require.NoError(t, err)
@@ -134,6 +146,9 @@ func TestConnectorScenarioImportDoesNotSelectCapabilities(t *testing.T) {
 
 func TestConnectorScenarioIndependentPhases(t *testing.T) {
 	for _, scenario := range connectorCompilerScenarios {
+		if len(scenario.readers) == 0 {
+			continue // Inference has its own engine-host boundary tests.
+		}
 		t.Run(scenario.provider, func(t *testing.T) {
 			for _, phase := range []string{"read-only", "effect-only"} {
 				t.Run(phase, func(t *testing.T) {
@@ -208,6 +223,9 @@ func TestConnectorScenarioNumericIDsRequireStrings(t *testing.T) {
 
 func TestConnectorScenarioRejectsInvalidConfiguration(t *testing.T) {
 	for _, scenario := range connectorCompilerScenarios {
+		if len(scenario.readers) == 0 {
+			continue // Inference arguments and model grants use a distinct selection.
+		}
 		t.Run(scenario.provider, func(t *testing.T) {
 			mutations := map[string]func(map[string]any, map[string]any){
 				"unknown-reader": func(consumer, _ map[string]any) {

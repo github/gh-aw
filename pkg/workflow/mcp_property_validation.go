@@ -163,6 +163,9 @@ func validateMCPRequirements(toolName string, mcpConfig map[string]any, toolConf
 					fmt.Sprintf("Example:\n\ntools:\n  %s:\n    type: http\n    url: \"https://api.example.com/mcp\"\n    auth:\n      type: github-oidc\n\nSee: %s", toolName, constants.DocsToolsURL),
 				)
 			}
+			if _, err := parser.ParseMCPAuthConfig(authRaw, toolName); err != nil {
+				return err
+			}
 		}
 
 		return validateStringProperty(toolName, "url", url, hasURL)

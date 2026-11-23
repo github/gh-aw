@@ -55,6 +55,11 @@ func connectorSetupRequirements(registration workflow.ConnectorRegistration, pha
 			app := registration.GitHubApps[row.Credential]
 			addReference(app.AppID)
 			addReference(app.PrivateKey)
+		case "Azure OIDC":
+			azure := registration.AzureOIDC[row.Credential]
+			addReference(azure.TenantID)
+			addReference(azure.ClientID)
+			addReference(azure.Scope)
 		}
 	}
 	result := slices.Collect(maps.Keys(requirements))
