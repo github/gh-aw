@@ -1826,6 +1826,85 @@ test.describe("reusable runtime", () => {
     expect(errors).toEqual([]);
   });
 
+  test("reads the caption lines aloud with browser speech synthesis and holds the kiosk slide until they end", async ({ page }) => {
+    await page.clock.install();
+    await fakeFullscreen(page);
+    // a fake engine: speaks one utterance at a time for 15 s each, so two lines outlast the 15 s kiosk dwell
+    await page.addInitScript(() => {
+      const w = window as unknown as { spoken: string[]; speechSynthesis: unknown };
+      w.spoken = [];
+      let queue: SpeechSynthesisUtterance[] = [];
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const run = () => {
+        const u = queue[0];
+        if (!u) return;
+        w.spoken.push(u.text);
+        timer = setTimeout(() => {
+          queue.shift();
+          u.dispatchEvent(new Event("end"));
+          run();
+        }, 15000);
+      };
+      Object.defineProperty(window, "speechSynthesis", {
+        configurable: true,
+        value: {
+          getVoices: () => [],
+          speak: (u: SpeechSynthesisUtterance) => queue.push(u) === 1 && run(),
+          cancel: () => {
+            clearTimeout(timer);
+            queue = [];
+          },
+        },
+      });
+    });
+    const { errors } = await open(page, "/gh-aw/cracktro/tiny.html?cc&fs=none#hello");
+    const voice = page.locator(".vcb");
+    const spoken = () => page.evaluate(() => (window as unknown as { spoken: string[] }).spoken);
+    await expect(voice).toBeHidden();
+    // V starts kiosk mode with the voice on and speaks the slide's first line from that gesture
+    await page.keyboard.press("v");
+    await expect(page.locator("body")).toHaveClass(/\bkiosk\b/);
+    await expect(voice).toBeVisible();
+    await expect(voice).toBeEnabled();
+    await expect(voice).toHaveAttribute("aria-pressed", "true");
+    await expect(voice).toHaveAttribute("title", "Turn off the voice (V)");
+    expect(await spoken()).toEqual(["Good evening, the top story."]);
+    // the slide waits past its dwell until the second line ends (30 s)
+    await page.clock.runFor(20000);
+    await expect(heading(page)).toHaveText("Hello");
+    expect(await spoken()).toEqual(["Good evening, the top story.", "Thanks, glad to be here."]);
+    await page.clock.runFor(11000);
+    await expect(heading(page)).not.toHaveText("Hello");
+    // the button turns it off without leaving kiosk mode; Escape ends kiosk mode, and the choice holds for the next run
+    await voice.click();
+    await expect(voice).toHaveAttribute("aria-pressed", "false");
+    await expect(page.locator("body")).toHaveClass(/\bkiosk\b/);
+    await page.keyboard.press("v");
+    await expect(voice).toHaveAttribute("aria-pressed", "true");
+    await page.keyboard.press("Escape");
+    await expect(page.locator("body")).not.toHaveClass(/\bkiosk\b/);
+    await expect(voice).toHaveAttribute("aria-pressed", "false");
+    await page.keyboard.press("k");
+    await expect(voice).toHaveAttribute("aria-pressed", "true");
+    expect(errors).toEqual([]);
+  });
+
+  test("disables the voice button where the browser has no speech synthesis", async ({ page }) => {
+    await page.clock.install();
+    await fakeFullscreen(page);
+    await page.addInitScript(() => Object.defineProperty(window, "speechSynthesis", { configurable: true, value: undefined }));
+    const { errors } = await open(page, "/gh-aw/cracktro/tiny.html?cc&fs=none#hello");
+    const voice = page.locator(".vcb");
+    await page.keyboard.press("v");
+    await expect(page.locator("body")).not.toHaveClass(/\bkiosk\b/);
+    await page.keyboard.press("k");
+    await expect(voice).toBeVisible();
+    await expect(voice).toBeDisabled();
+    await expect(voice).toHaveAttribute("aria-pressed", "false");
+    await expect(voice).toHaveAttribute("title", "Voice is not supported in this browser");
+    expect(errors).toEqual([]);
+  });
+
   test("rolls a long caption turn up a row at a time under reduced motion, showing its opening before it scrolls off", async ({ page }) => {
     await page.emulateMedia({ reducedMotion: "reduce" });
     await page.clock.install();

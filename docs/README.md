@@ -108,7 +108,10 @@ button or leaving fullscreen stops kiosk mode. Kiosk mode starts with closed cap
 CC button in the kiosk dock) turns them off or on, and the choice holds for later kiosk runs. Like a muted TV in a bar or airport, a short two-speaker news conversation
 about each slide rolls in as captions at the bottom of the screen, and each slide stays up until its
 conversation ends. C starts kiosk mode if needed, and captions end with it; while it runs, Escape stops it before it
-hides notes. A manual move restarts the countdown, and an open
+hides notes. V (or the voice button beside CC in the kiosk dock) reads the same conversation aloud
+with the browser's built-in speech synthesis, alternating two voices (or two pitches), and holds each slide until
+its last line is spoken; voice is off by default, starts kiosk mode if needed, ends with it, and the choice holds for
+later kiosk runs. Where the browser has no speech synthesis the voice button is disabled. A manual move restarts the countdown, and an open
 dialog holds the current slide. The slide map button (or G) opens a full-screen grid of
 every slide under its band's title, each pattern's examples beside it, with the current slide focused and the tiles fanning in from it; arrows move between
 tiles and Enter or a click jumps there. The search button next to the sound toggle (or `/`,

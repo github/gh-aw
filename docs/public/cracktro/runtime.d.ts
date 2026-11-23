@@ -111,6 +111,8 @@ declare namespace CracktroDeck {
     kiosk(on?: boolean): boolean;
     /** Start (`true`), stop (`false`) or toggle closed captioning (CC); starting it starts kiosk mode, stopping kiosk mode stops it. Returns whether it is on. */
     captions(on?: boolean): boolean;
+    /** Start (`true`), stop (`false`) or toggle the voice (V): browser speech synthesis reads the caption lines aloud; starting it starts kiosk mode, stopping kiosk mode stops it. Always `false` where the browser lacks speech synthesis. Returns whether it is on. */
+    voice(on?: boolean): boolean;
   }
 
   interface API {
