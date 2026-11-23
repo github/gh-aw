@@ -1826,6 +1826,144 @@ test.describe("reusable runtime", () => {
     expect(errors).toEqual([]);
   });
 
+  test("reads the caption lines aloud with browser speech synthesis and holds the kiosk slide until they end", async ({ page }) => {
+    await page.clock.install();
+    await fakeFullscreen(page);
+    // a fake engine: speaks one utterance at a time for 15 s each, so two lines outlast the 15 s kiosk dwell
+    await page.addInitScript(() => {
+      const w = window as unknown as { spoken: string[]; voices: string[]; speechSynthesis: unknown; SpeechSynthesisUtterance: unknown };
+      w.spoken = [];
+      w.voices = [];
+      // fake voices are plain objects, which the native voice setter rejects, so the utterance keeps its own
+      class Utterance extends SpeechSynthesisUtterance {}
+      const picked = new WeakMap<object, unknown>();
+      Object.defineProperty(Utterance.prototype, "voice", {
+        get() {
+          return picked.get(this) ?? null;
+        },
+        set(v) {
+          picked.set(this, v);
+        },
+      });
+      w.SpeechSynthesisUtterance = Utterance;
+      let queue: SpeechSynthesisUtterance[] = [];
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const run = () => {
+        const u = queue[0];
+        if (!u) return;
+        w.spoken.push(u.text);
+        w.voices.push((u.voice as { name: string } | null)?.name ?? "");
+        timer = setTimeout(() => {
+          queue.shift();
+          u.dispatchEvent(new Event("end"));
+          run();
+        }, 15000);
+      };
+      Object.defineProperty(window, "speechSynthesis", {
+        configurable: true,
+        value: {
+          // only local voices are used: the remote voice ranks higher but would need the network
+          getVoices: () => [
+            { name: "Remote Natural Online", lang: "en-US", localService: false },
+            { name: "Local Alex", lang: "en-US", localService: true },
+          ],
+          speak: (u: SpeechSynthesisUtterance) => queue.push(u) === 1 && run(),
+          cancel: () => {
+            clearTimeout(timer);
+            queue = [];
+          },
+        },
+      });
+    });
+    const { errors } = await open(page, "/gh-aw/cracktro/tiny.html?cc&fs=none#hello");
+    const voice = page.locator(".vcb");
+    const spoken = () => page.evaluate(() => (window as unknown as { spoken: string[] }).spoken);
+    await expect(voice).toBeHidden();
+    // voice is off by default: kiosk mode alone starts silent
+    await page.keyboard.press("k");
+    await expect(page.locator("body")).toHaveClass(/\bkiosk\b/);
+    await expect(voice).toHaveAttribute("aria-pressed", "false");
+    expect(await spoken()).toEqual([]);
+    await page.keyboard.press("Escape");
+    await expect(page.locator("body")).not.toHaveClass(/\bkiosk\b/);
+    // V starts kiosk mode with the voice on and speaks the slide's first line from that gesture
+    await page.keyboard.press("v");
+    await expect(page.locator("body")).toHaveClass(/\bkiosk\b/);
+    await expect(voice).toBeVisible();
+    await expect(voice).toBeEnabled();
+    await expect(voice).toHaveAttribute("aria-pressed", "true");
+    await expect(voice).toHaveAttribute("title", "Turn off the voice (V)");
+    expect(await spoken()).toEqual(["Good evening, the top story."]);
+    // the slide waits past its dwell until the second line ends (30 s)
+    await page.clock.runFor(20000);
+    await expect(heading(page)).toHaveText("Hello");
+    expect(await spoken()).toEqual(["Good evening, the top story.", "Thanks, glad to be here."]);
+    expect(await page.evaluate(() => (window as unknown as { voices: string[] }).voices)).toEqual(["Local Alex", "Local Alex"]);
+    await page.clock.runFor(11000);
+    await expect(heading(page)).not.toHaveText("Hello");
+    // the button turns it off without leaving kiosk mode; Escape ends kiosk mode, and the choice holds for the next run
+    await voice.click();
+    await expect(voice).toHaveAttribute("aria-pressed", "false");
+    await expect(page.locator("body")).toHaveClass(/\bkiosk\b/);
+    await page.keyboard.press("v");
+    await expect(voice).toHaveAttribute("aria-pressed", "true");
+    await page.keyboard.press("Escape");
+    await expect(page.locator("body")).not.toHaveClass(/\bkiosk\b/);
+    await expect(voice).toHaveAttribute("aria-pressed", "false");
+    await page.keyboard.press("k");
+    await expect(voice).toHaveAttribute("aria-pressed", "true");
+    expect(errors).toEqual([]);
+  });
+
+  test("releases a kiosk slide whose voice never ends 60 s after its dwell, not after its entry", async ({ page }) => {
+    await page.clock.install();
+    await fakeFullscreen(page);
+    // a stalled engine: accepts utterances but never fires end or error
+    await page.addInitScript(() => {
+      // fake voices are plain objects, which the native voice setter rejects, so the utterance keeps its own
+      class Utterance extends SpeechSynthesisUtterance {}
+      const picked = new WeakMap<object, unknown>();
+      Object.defineProperty(Utterance.prototype, "voice", {
+        get() {
+          return picked.get(this) ?? null;
+        },
+        set(v) {
+          picked.set(this, v);
+        },
+      });
+      (window as unknown as { SpeechSynthesisUtterance: unknown }).SpeechSynthesisUtterance = Utterance;
+      Object.defineProperty(window, "speechSynthesis", {
+        configurable: true,
+        value: { getVoices: () => [{ name: "Local Alex", lang: "en-US", localService: true }], speak: () => {}, cancel: () => {} },
+      });
+    });
+    const { errors } = await open(page, "/gh-aw/cracktro/tiny.html?cc&fs=none#hello");
+    await page.keyboard.press("v");
+    await expect(page.locator("body")).toHaveClass(/\bkiosk\b/);
+    // dwell (15 s) plus most of the hold: still on the slide well past 60 s from entry
+    await page.clock.runFor(15000 + 59000);
+    await expect(heading(page)).toHaveText("Hello");
+    await page.clock.runFor(2000);
+    await expect(heading(page)).not.toHaveText("Hello");
+    expect(errors).toEqual([]);
+  });
+
+  test("disables the voice button where the browser has no speech synthesis", async ({ page }) => {
+    await page.clock.install();
+    await fakeFullscreen(page);
+    await page.addInitScript(() => Object.defineProperty(window, "speechSynthesis", { configurable: true, value: undefined }));
+    const { errors } = await open(page, "/gh-aw/cracktro/tiny.html?cc&fs=none#hello");
+    const voice = page.locator(".vcb");
+    await page.keyboard.press("v");
+    await expect(page.locator("body")).not.toHaveClass(/\bkiosk\b/);
+    await page.keyboard.press("k");
+    await expect(voice).toBeVisible();
+    await expect(voice).toBeDisabled();
+    await expect(voice).toHaveAttribute("aria-pressed", "false");
+    await expect(voice).toHaveAttribute("title", "Voice is not supported in this browser");
+    expect(errors).toEqual([]);
+  });
+
   test("rolls a long caption turn up a row at a time under reduced motion, showing its opening before it scrolls off", async ({ page }) => {
     await page.emulateMedia({ reducedMotion: "reduce" });
     await page.clock.install();
