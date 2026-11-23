@@ -5208,6 +5208,18 @@ process.stdout.write("done\\n");`
     expect(selection).toEqual({ status: "observed", configured_model: "gpt-5.6-luna", resolved_model: "gpt-5.6-luna", effective_model: "gpt-5.6-luna" });
   });
 
+  it("launches the CLI with a built-in alias name verbatim for BYOK without a catalog", () => {
+    const { tmpDir, result, selection } = runHarness({ COPILOT_PROVIDER_BASE_URL: "https://example.ai.gateway.azure.com/openai/v1", COPILOT_MODEL: "gpt-5-mini" }, { routed: false, modelAliases: { "gpt-5-mini": ["copilot/gpt-5*mini*"] } });
+
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stderr).toContain("explicit BYOK provider; using 'gpt-5-mini' verbatim");
+    expect(result.stderr).not.toContain("retrying awf-reflect");
+    expect(selection).toEqual({ status: "observed", configured_model: "gpt-5-mini", resolved_model: "gpt-5-mini", effective_model: "gpt-5-mini" });
+    expect(JSON.parse(fs.readFileSync(path.join(tmpDir, "agent/model-resolution.json"), "utf8"))).toEqual([
+      { engine: "copilot", role: "main", configured_model: "gpt-5-mini", resolved_model: "gpt-5-mini", provider: null, status: "exact", cause: null },
+    ]);
+  });
+
   it.each([
     ["inherits alias effort", [], "high"],
     ["lets caller effort override alias effort", ["--reasoning-effort", "low", "--prompt", "Hello"], "low"],
