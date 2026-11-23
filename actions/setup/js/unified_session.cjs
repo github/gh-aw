@@ -182,7 +182,7 @@ function parseEngineSession(content, engine) {
 /**
  * Collect only known runtime directories; never follow artifact symlinks.
  * Replicated firewall files use logs > audit > legacy precedence, including empty files.
- * @param {{rootDir?: string, engine?: string, protectedSessionCapture?: boolean, warn?: (message: string) => void, dailyAIC?: NodeJS.ProcessEnv, executionIdentity?: {runId?: string, runAttempt: number}, admission?: NodeJS.ProcessEnv, jobResults?: string, safeJobNames?: string, safeJobResults?: string, jobDurations?: Record<string, number>}} [options]
+ * @param {{rootDir?: string, engine?: string, protectedSessionCapture?: boolean, warn?: (message: string) => void, dailyAIC?: NodeJS.ProcessEnv, executionIdentity?: {runId?: string, runAttempt: number}, admission?: NodeJS.ProcessEnv, jobResults?: string, safeJobNames?: string, safeJobResults?: string, memorySaveResults?: string, jobDurations?: Record<string, number>}} [options]
  * @returns {{events: import("./types/unified_session").UnifiedSession, maskedValues: string[]}}
  */
 function collectUnifiedSession({
@@ -196,6 +196,7 @@ function collectUnifiedSession({
   jobResults = process.env.GH_AW_JOB_RESULTS,
   safeJobNames = process.env.GH_AW_SAFE_JOB_NAMES,
   safeJobResults = process.env.GH_AW_SAFE_JOB_RESULTS,
+  memorySaveResults = process.env.GH_AW_MEMORY_SAVE_RESULTS,
   jobDurations = {},
 } = {}) {
   const liveIdentity = executionIdentity?.runId && Number.isSafeInteger(executionIdentity.runAttempt) && executionIdentity.runAttempt > 0 ? executionIdentity : undefined;
@@ -927,7 +928,7 @@ function collectUnifiedSession({
     }
   }
   const persistedWarnings = sources.flatMap(source => source.events.filter(event => event.type === "session.collection_warning"));
-  const memorySaves = require("./memory_save_results.cjs").readMemorySaveResults();
+  const memorySaves = require("./memory_save_results.cjs").readMemorySaveResults(memorySaveResults);
   if (memorySaves.length) {
     sources.push({ component: "memory", phase: "conclusion", path: "usage/aw_session.jsonl", events: memorySaves.map(data => ({ type: "memory.push", data: { ...data } })) });
   }
