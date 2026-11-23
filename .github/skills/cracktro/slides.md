@@ -270,11 +270,12 @@ Processes create factories: the Repo Factory recipe gives a repository five agen
 
 #### Keywords
 
-Turn Workflows into Factories, processes create factories, Repo Factory, workflows, process, composition, blueprint, factory, roles, Researchers, Dispatcher, Reviewers, Finisher, Dreamer, Coder, coding agents, capacity, coding slots, concurrent pull requests, pull request flow, review loop, re-review, weekdays, handoffs, recipe, bootstrap, Issue Monster, PR Sous Chef, maintainer gate
+Turn Workflows into Factories, processes create factories, Repo Factory, workflows, process, composition, blueprint, factory, roles, Researchers, Dispatcher, Reviewers, Finisher, Dreamer, Coder, coding agents, capacity, coding slots, concurrent pull requests, pull request flow, review loop, re-review, CI loop, iterate, weekdays, handoffs, recipe, bootstrap, Issue Monster, PR Sous Chef, maintainer gate
 
 #### Captions
 
-- Processes create factories, and this one starts with the pull request: a Coder writes it, several Reviewers and a Finisher loop for at most two rounds.
+- Processes create factories, and this one starts small: a Coder opens a pull request and iterates until CI passes.
+- Then it grows: several Reviewers and a Finisher loop on each pull request for at most two rounds.
 - A maintainer still decides every merge.
 - One Dispatcher starts those pull request flows, up to three at once, one per shared weekday coding slot.
 - Several Researchers feed the Dispatcher with scoped issues, never pull requests.
