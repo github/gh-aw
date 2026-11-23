@@ -52,6 +52,7 @@ func TestAzureAIGatewayInferenceCompilation(t *testing.T) {
 			require.Equal(t, "openai", env["COPILOT_PROVIDER_TYPE"])
 			require.Equal(t, "deployment-checklist", env["COPILOT_PROVIDER_MODEL_ID"])
 			require.Equal(t, "gpt-5.2", data.Model, "catalog metadata must not replace the granted wire alias")
+			require.True(t, data.EngineConfig.ModelCatalogDisabled, "the gateway has no /models route")
 			wire := "responses"
 			if strings.HasPrefix(profile, "completions") {
 				wire = "completions"
@@ -59,6 +60,7 @@ func TestAzureAIGatewayInferenceCompilation(t *testing.T) {
 			require.Equal(t, wire, env["COPILOT_PROVIDER_WIRE_API"])
 			output, err := compiler.CompileToYAML(data, path)
 			require.NoError(t, err)
+			require.Contains(t, output, "GH_AW_MODEL_CATALOG: false")
 			agent, effects := connectorPhaseJobJSON(t, output)
 			require.NotContains(t, output, "GH_AW_CONNECTOR_PLAN")
 			require.NotContains(t, effects, "AZURE_AI_GATEWAY_KEY")
@@ -114,6 +116,7 @@ func TestConnectorInferenceRejectsInvalidSelection(t *testing.T) {
 			f["engine"].(map[string]any)["env"] = map[string]any{"COPILOT_MODEL": "other"}
 		}, "COPILOT_MODEL conflicts"},
 		{"SDK mode", func(f map[string]any) { f["engine"].(map[string]any)["copilot-sdk"] = true }, "cannot preserve the granted wire model"},
+		{"model catalogue", func(f map[string]any) { f["engine"].(map[string]any)["model-catalog"] = true }, "model-catalog: true conflicts"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

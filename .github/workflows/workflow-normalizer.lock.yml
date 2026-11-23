@@ -1491,6 +1491,7 @@ jobs:
           GH_AW_MCP_CONFIG: /tmp/gh-aw/opencode-mcp.json
           GH_AW_PROMPT: /tmp/gh-aw/aw-prompts/prompt.txt
           GH_AW_SAFE_OUTPUTS: ${{ steps.set-runtime-paths.outputs.GH_AW_SAFE_OUTPUTS }}
+          GH_AW_TIMEOUT_MINUTES: 30
           GH_AW_TOOL_TIMEOUT: 300
           GITHUB_WORKSPACE: ${{ github.workspace }}
           NO_COLOR: 1

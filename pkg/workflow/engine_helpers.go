@@ -158,8 +158,19 @@ func applyEngineHarnessRetryEnv(env map[string]string, workflowData *WorkflowDat
 		return
 	}
 
-	cfg := workflowData.EngineConfig
 	applyFallbackProviderEnv(env, workflowData)
+	applyHarnessRetryPolicyEnv(env, workflowData)
+}
+
+// applyHarnessRetryPolicyEnv injects only the GH_AW_HARNESS_* retry policy fields.
+// Engines that run through the generic shell harness use it without inheriting
+// fallback-provider credential wiring. Call it before engine.env overrides.
+func applyHarnessRetryPolicyEnv(env map[string]string, workflowData *WorkflowData) {
+	if workflowData == nil || workflowData.EngineConfig == nil {
+		return
+	}
+
+	cfg := workflowData.EngineConfig
 	if cfg.HarnessMaxRetries != "" {
 		env["GH_AW_HARNESS_MAX_RETRIES"] = cfg.HarnessMaxRetries
 	}

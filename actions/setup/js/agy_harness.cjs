@@ -9,6 +9,7 @@ const os = require("node:os");
 const path = require("node:path");
 const { fetchAWFReflect, deriveBaseUrlFromModelsURL } = require("./awf_reflect.cjs");
 const { resolveEngineModel } = require("./resolve_model_alias.cjs");
+const { runRetryingHarness } = require("./harness_generic_retry.cjs");
 const [command, ...commandArgs] = process.argv.slice(2);
 const log = message => process.stderr.write(`[agy-harness] ${message}\n`);
 const reportError = error => {
@@ -17,6 +18,7 @@ const reportError = error => {
   process.stdout.write(JSON.stringify({ type: "session.error", data: { error: message } }) + "\n");
 };
 const maxPendingRecordLength = 16 * 1024 * 1024; // UTF-16 code units, including the record terminator.
+const outputTailLength = 64 * 1024;
 const checksums = {
   "1.3.1": "0e313b309ea58c71431ce86bb820936a3700e17e44eabce7bf2264617dc822db",
   "1.3.3": "8ee3ca32574c431285efbf4d4732f7f8d53e959370bc4a61646e4fa496f7f2b6",
@@ -146,7 +148,6 @@ const main = async () => {
     const prompt = fs.readFileSync(promptPath, "utf8");
     const args = [...commandArgs, "--input-format", "stream-json", "--output-format", "stream-json", "--print-timeout", "5m", "--model", model, "--dangerously-skip-permissions"];
     log(`verified experimental Agy ${version}`);
-    const decisionEnabled = Boolean(process.env.GH_AW_SKIP_IF_DECISION);
     const runAttempt = () =>
       new Promise(
         /** @param {(value: import("./harness_retry_runner.cjs").HarnessAttemptResult) => void} resolve */ (resolve, reject) => {
@@ -154,6 +155,7 @@ const main = async () => {
           const parser = new JsonlParser({ maxPendingRecordLength });
           let outputFailure = "";
           let stderrTail = "",
+            stdoutTail = "",
             result,
             invalid = false,
             denied = false,
@@ -238,10 +240,11 @@ const main = async () => {
           child.stdout.setEncoding("utf8").on("data", chunk => {
             if (outputFailure) return;
             process.stdout.write(chunk);
+            stdoutTail = (stdoutTail + chunk).slice(-outputTailLength);
             consumeEvents(parser.push(chunk));
           });
           child.stderr.setEncoding("utf8").on("data", chunk => {
-            stderrTail = (stderrTail + chunk).slice(-4096);
+            stderrTail = (stderrTail + chunk).slice(-outputTailLength);
             if (/soft[- ]denied|permission[^\n]*denied|requires approval/i.test(stderrTail)) denied = true;
             process.stderr.write(chunk);
           });
@@ -260,12 +263,13 @@ const main = async () => {
             process.removeListener("SIGTERM", onTerminate);
           };
           const failAttempt = (error, code) => {
-            if (!decisionEnabled || interrupted) {
+            if (interrupted) {
               reject(error);
               return;
             }
             reportError(error);
-            resolve({ exitCode: Number.isSafeInteger(code) && code !== 0 ? code : 1, output: "", hasOutput: true });
+            const output = [stdoutTail, stderrTail, result?.error ? JSON.stringify(result.error) : ""].filter(Boolean).join("\n");
+            resolve({ exitCode: Number.isSafeInteger(code) && code !== 0 ? code : 1, output, hasOutput: true });
           };
           child.once("error", () => {
             if (settled) return;
@@ -297,12 +301,8 @@ const main = async () => {
           child.stdin.end(JSON.stringify({ event: "user", message: { content: prompt } }) + "\n");
         }
       );
-    if (decisionEnabled) {
-      const run = await require("./harness_retry_runner.cjs").runSingleHarnessInvocation({ runAttempt, harnessName: "Agy harness", log });
-      process.exitCode = run.exitCode;
-    } else {
-      await runAttempt();
-    }
+    const run = await runRetryingHarness({ runAttempt, harnessName: "Agy harness", log });
+    process.exitCode = run.exitCode;
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }

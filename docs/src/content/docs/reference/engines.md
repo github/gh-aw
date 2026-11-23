@@ -201,7 +201,9 @@ The built-in Copilot, Claude, and Codex harnesses accept:
 
 All accept integers or Actions expressions. A watchdog expression must already be in milliseconds. Explicit `engine.env.GH_AW_HARNESS_*` values override these fields; see [runtime tuning variables](/gh-aw/reference/environment-variables/#harness-settings-and-runtime-tuning-variables).
 
-For GitHub-provided models, the Copilot, Claude, and Codex harnesses wait at least the duration of a valid HTTP 429 `Retry-After` header (seconds or HTTP-date) before a permitted retry. Claude and Codex use headers from structured terminal errors on stdout; other output does not provide retry timing. If the wait exceeds `max-delay-ms` or the remaining step timeout budget (including the harness's shutdown buffer), they stop immediately with failure class `rate_limit_wait_exceeded` instead of retrying early. For example, a 245-second wait requires `max-delay-ms: 245000` and sufficient time remaining. Other providers and missing or invalid headers keep the existing retry policy, and terminal guards still apply. This does not enable model fallback on HTTP 429. Engines without a retrying harness do not gain automatic retries.
+For every inference provider, including BYOK endpoints such as Azure AI Gateway, the Copilot, Claude, and Codex harnesses wait at least the duration of a valid HTTP 429 `Retry-After` header (seconds or HTTP-date) before a permitted retry. Claude and Codex use headers from structured terminal errors on stdout; other output does not provide retry timing. If the wait exceeds `max-delay-ms` or the remaining step timeout budget (including the harness's shutdown buffer), they stop immediately with failure class `rate_limit_wait_exceeded` instead of retrying early. For example, a 245-second wait requires `max-delay-ms: 245000` and sufficient time remaining. Missing or invalid headers keep the existing retry policy, and terminal guards still apply. This does not enable model fallback on HTTP 429.
+
+Pi, Gemini, Agy, and behavior-defined engines use the same retry loop with a conservative failure policy. They retry only HTTP 429 or rate-limit errors and transient failures (HTTP 5xx, connection resets, or timeouts) found in the last 8 KB of a failed attempt's output, where terminal errors appear. They apply the same `Retry-After` bounds to a `Retry-After` header in that output tail when it accompanies an HTTP 429 or rate-limit error; a `Retry-After` header alone does not trigger a retry. They stop without retrying on authentication or guard failures, unrecognized failures, `noop`, or any failed attempt that recorded safe outputs. Retries are disabled when `GH_AW_SAFE_OUTPUTS` is unset, because safe-output side effects cannot be observed. Pi resumes a durable session when one exists; other engines start a fresh attempt. Agy rejects `engine.harness`, so it always uses the defaults.
 
 The watchdog arms after a terminal safe output (not diagnostic reports such as `report_incomplete`) and resets on any stdout or stderr activity. It can end a quiet process that is still working and count that as success. Claude counts only current-attempt terminal outputs; its [resume rules](/gh-aw/reference/engines/claude/#harness-recovery) also apply.
 
@@ -219,6 +221,21 @@ Copilot, Claude, Codex, Pi, and Agy resolve aliases against the configured provi
 - Exact live IDs take precedence over same-named aliases, and unrecognized IDs are not rewritten. Pi checks exact IDs before launch; Copilot, Claude, and Codex fail on the first unavailable-model request.
 - `auto` keeps its engine-specific meaning. In Copilot CLI mode, `?effort=low`, `?effort=medium`, and `?effort=high` on a model ID or alias become `--reasoning-effort` after alias resolution. The CLI receives the model ID without the suffix. An explicit `--reasoning-effort` in `engine.args` takes precedence.
 - Missing matches fail with `model_unavailable`; incomplete discovery fails with `catalog_unavailable`.
+
+Set `engine.model-catalog: false` (default `true`) for BYOK providers without a `/models` route, such as Azure AI Gateway. The configured model is then passed to the engine verbatim: aliases are not resolved, and a model ID that matches a built-in alias (such as `gpt-5-mini`) no longer fails with `catalog_unavailable`. Model routing also needs the catalogue, so the implicit routing default is not applied and `model: router` fails compilation. Threat detection inherits the workflow `model`; when none is set, it uses the engine's main-agent default instead of the `detection` alias.
+
+`engine.copilot-sdk: true` also needs the catalogue, so combining it with `model-catalog: false` fails compilation; use Copilot CLI mode instead.
+
+Sub-agent models are also passed verbatim, without catalogue or endpoint checks; a Claude or Codex sub-agent model whose `provider/` prefix names a different provider still fails.
+
+Workflow-defined `models:` aliases are not resolved either: naming one passes the alias name to the engine as a literal model ID and logs a warning, so set a concrete model ID instead.
+
+```yaml wrap
+engine:
+  id: copilot
+  model: gpt-5-mini
+  model-catalog: false
+```
 
 Gemini and declarative engines pass model names through unchanged and warn about gh-aw aliases. AWF can independently rewrite unrecognized models on non-Copilot providers; disable [`sandbox.agent.model-fallback`](/gh-aw/reference/sandbox/#model-fallback-sandboxagentmodel-fallback) when exact routing is required.
 

@@ -8,9 +8,9 @@ sidebar:
 
 # Connector Specification
 
-**Version**: 1.2.0<br>
+**Version**: 1.3.0<br>
 **Status**: Experimental Working Draft<br>
-**Publication Date**: 2026-11-18<br>
+**Publication Date**: 2026-11-23<br>
 **Editor**: GitHub Agentic Workflows Team
 
 ## Abstract
@@ -26,9 +26,11 @@ TLA+ models of selected authority boundaries.
 
 This Experimental Working Draft is maintained by the GitHub Agentic Workflows
 project through repository review. It is not a W3C Recommendation or evidence
-of provider certification. Version 1.2.0 adds explicitly selected inference
-profiles lowered through the existing engine transport. Publication does not
-establish provider authorization or operational trigger ingress.
+of provider certification. Version 1.3.0 adds the optional
+`model-catalog: false` inference-profile declaration and its corresponding
+consumer engine constraint, while retaining the existing inference transport
+and authority boundaries. Publication does not establish provider authorization
+or operational trigger ingress.
 
 ## Table of Contents
 
@@ -321,6 +323,13 @@ Authorization/bearer credential), and `models` (an exact resource collection
 name). Paths MUST NOT contain traversal, escaping, expressions, query or fragment.
 Protocols are `openai-responses` and `openai-chat-completions`. No arbitrary
 request templates, scripts, model discovery or inference-as-reader POSTs are added.
+An optional `model-catalog: false` declares that the provider has no `/models`
+route. For a selected profile, the compiler MUST set
+`engine.model-catalog: false` on the consumer so that the explicitly granted
+wire model is passed through without model-catalog discovery. An explicit
+consumer `engine.model-catalog: true` MUST fail. This option does not authorize
+egress, change model grants, or alter any credential, reader, safe-output, or
+trigger obligations.
 
 The main workflow selects one profile with
 `engine.inference: {connector: id, profile: name, model: alias}`. Names MUST be
@@ -988,6 +997,12 @@ separate redaction and privacy controls. Errors are described semantically in
 sections 4–8; this specification defines no new public error-code registry.
 
 ## 14. Change Log
+
+### Version 1.3.0 (Experimental Working Draft) — 2026-11-23
+
+- Added optional inference-profile `model-catalog: false` for providers without a `/models` route.
+- Required the compiler to propagate that declaration as `engine.model-catalog: false` and reject conflicting `engine.model-catalog: true` settings.
+- Preserved existing explicit model grants, network approval, credential isolation, and native engine transport obligations.
 
 ### Version 1.2.0 (Experimental Working Draft)
 

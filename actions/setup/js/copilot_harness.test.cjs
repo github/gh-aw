@@ -4744,6 +4744,53 @@ process.exit(1);`
       }
     });
 
+    describe("engine.model-catalog: false (provider without a /models route)", () => {
+      const { loadBuiltinModelAliases } = require("./resolve_model_alias.cjs");
+      const emptyReflect = { models_fetch_complete: false, endpoints: [{ configured: true, provider: "copilot", models: [] }] };
+      let exitSpy;
+      beforeEach(() => {
+        vi.stubEnv("GH_AW_TMP_DIR", makeHarnessTempDir("copilot-model-catalog-"));
+        vi.stubEnv("COPILOT_PROVIDER_BASE_URL", "https://example.ai.gateway.azure.com/default/models/openai/v1");
+        writeAwfConfig(loadBuiltinModelAliases());
+        exitSpy = vi.spyOn(process, "exit").mockImplementation(() => undefined);
+      });
+      afterEach(() => {
+        fs.rmSync(process.env.GH_AW_TMP_DIR, { recursive: true, force: true });
+        vi.unstubAllEnvs();
+      });
+
+      it("uses a model that matches a built-in alias verbatim without a catalogue", async () => {
+        vi.stubEnv("GH_AW_MODEL_CATALOG", "false");
+        process.env.COPILOT_MODEL = "gpt-5-mini";
+        const refetch = vi.fn();
+
+        const resolved = await applyCopilotModelAliasResolution({ awfReflectData: emptyReflect, logger: () => {}, refetchReflectData: refetch });
+
+        expect(resolved).toBe("gpt-5-mini");
+        expect(process.env.COPILOT_MODEL).toBe("gpt-5-mini");
+        expect(exitSpy).not.toHaveBeenCalled();
+        expect(refetch).not.toHaveBeenCalled();
+      });
+
+      it("does not resolve aliases at all", async () => {
+        vi.stubEnv("GH_AW_MODEL_CATALOG", "false");
+        process.env.COPILOT_MODEL = "small";
+
+        const resolved = await applyCopilotModelAliasResolution({ awfReflectData: emptyReflect, logger: () => {}, refetchReflectData: async () => null });
+
+        expect(resolved).toBe("small");
+        expect(exitSpy).not.toHaveBeenCalled();
+      });
+
+      it("still requires the catalogue for built-in aliases by default, even with an explicit provider", async () => {
+        process.env.COPILOT_MODEL = "gpt-5-mini";
+
+        await applyCopilotModelAliasResolution({ awfReflectData: emptyReflect, logger: () => {}, refetchReflectData: async () => null });
+
+        expect(exitSpy).toHaveBeenCalledWith(1);
+      });
+    });
+
     it("stops before spawning Copilot when catalog retries are exhausted for a known alias", async () => {
       process.env.COPILOT_MODEL = "sol";
       writeAwfConfig({ sol: ["copilot/gpt-5.6-sol"] });
@@ -5252,9 +5299,9 @@ describe("Copilot sub-agent model resolution (recorded /reflect from run 3930457
   };
 
   /** In-process: the harness sub-agent resolution step against the recorded catalogue. */
-  async function resolveAgents(agents, { reflect = recordedReflect(), refreshed = [], providerConfig = null, refreshProviderConfig } = {}) {
+  async function resolveAgents(agents, { reflect = recordedReflect(), refreshed = [], providerConfig = null, refreshProviderConfig, extraEnv = {} } = {}) {
     const dir = tempDir("copilot-subagent-models-");
-    const env = { GH_AW_TMP_DIR: dir, AWF_REFLECT_ENABLED: "1" };
+    const env = { GH_AW_TMP_DIR: dir, AWF_REFLECT_ENABLED: "1", ...extraEnv };
     const logs = [];
     const refetch = vi.fn().mockResolvedValue(null);
     for (const data of refreshed) refetch.mockResolvedValueOnce(data);
@@ -5289,6 +5336,18 @@ describe("Copilot sub-agent model resolution (recorded /reflect from run 3930457
     expect(run.refetch).not.toHaveBeenCalled();
     expect(run.resolutions).toEqual([{ name: "haiku-whoami", configuredModel: "claude-haiku-4.5", resolvedModel: "claude-haiku-4.5", model: "claude-haiku-4.5" }]);
     expect(run.records).toEqual([{ engine: "copilot", role: "haiku-whoami", configured_model: "claude-haiku-4.5", resolved_model: "claude-haiku-4.5", provider: "copilot", status: "exact", cause: null }]);
+  });
+
+  it("passes a declared model through verbatim with model-catalog false and no catalogue", async () => {
+    // Fixture mutation: a BYOK provider without a /models route (empty inventory).
+    const reflect = recordedReflect();
+    reflect.models_fetch_complete = false;
+    reflect.endpoints.forEach(endpoint => (endpoint.models = null));
+    const run = await resolveAgents([{ name: "gateway-worker", model: "gpt-5.4-mini" }], { reflect, extraEnv: { GH_AW_MODEL_CATALOG: "false" } });
+    expect(run.error).toBeNull();
+    expect(run.refetch).not.toHaveBeenCalled();
+    expect(run.resolutions).toEqual([{ name: "gateway-worker", configuredModel: "gpt-5.4-mini", resolvedModel: "gpt-5.4-mini", model: "gpt-5.4-mini" }]);
+    expect(run.records).toEqual([expect.objectContaining({ role: "gateway-worker", resolved_model: "gpt-5.4-mini", status: "exact", cause: null })]);
   });
 
   it("case 3: a dead id gpt-5.4-mini fails closed with model_unavailable after one refresh", async () => {

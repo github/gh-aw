@@ -4,6 +4,7 @@
 
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { runProcess } = require("./process_runner.cjs");
+const { GENERIC_HARNESS_OUTPUT_TAIL_BYTES, runRetryingHarness } = require("./harness_generic_retry.cjs");
 const { openPiDurableSession, observeDurableSession } = require("./durable_native_session.cjs");
 const path = require("node:path");
 
@@ -24,16 +25,22 @@ async function main() {
   if (process.env.GH_AW_SKIP_IF_DECISION) {
     log("decision gate: harness initialized before decision evaluation");
   }
-  const runAttempt = () =>
-    runProcess({
-      command: "bash",
-      args: ["-o", "pipefail", "-c", command],
-      logArgs: [engineName],
-      attempt: 0,
-      log,
-      onStdoutLine: line => observeDurableSession(durableSession, engineName, line),
-    });
-  const result = process.env.GH_AW_SKIP_IF_DECISION ? await require("./harness_retry_runner.cjs").runSingleHarnessInvocation({ runAttempt, harnessName: `${engineName} harness`, log }) : await runAttempt();
+  // Durable Pi transcripts are bound by --session, so later attempts resume that session.
+  const result = await runRetryingHarness({
+    harnessName: `${engineName} harness`,
+    log,
+    getRetryMode: () => (durableSession ? "resume durable session" : "fresh run"),
+    runAttempt: attempt =>
+      runProcess({
+        command: "bash",
+        args: ["-o", "pipefail", "-c", command],
+        logArgs: [engineName],
+        attempt,
+        log,
+        maxCollectedOutputBytes: GENERIC_HARNESS_OUTPUT_TAIL_BYTES,
+        onStdoutLine: line => observeDurableSession(durableSession, engineName, line),
+      }),
+  });
   process.exitCode = result.exitCode;
 }
 

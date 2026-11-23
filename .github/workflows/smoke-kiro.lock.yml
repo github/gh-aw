@@ -1445,6 +1445,7 @@ jobs:
           GH_AW_MCP_CONFIG: .kiro/settings/mcp.json
           GH_AW_PROMPT: /tmp/gh-aw/aw-prompts/prompt.txt
           GH_AW_SAFE_OUTPUTS: ${{ steps.set-runtime-paths.outputs.GH_AW_SAFE_OUTPUTS }}
+          GH_AW_TIMEOUT_MINUTES: 15
           GITHUB_WORKSPACE: ${{ github.workspace }}
           KIRO_API_KEY: ${{ secrets.KIRO_API_KEY }}
           KIRO_LOG_NO_COLOR: 1

@@ -376,6 +376,7 @@ touch %s
 	// This allows users to override the default engine token expression (e.g.
 	// GEMINI_API_KEY: ${{ secrets.MY_ORG_GEMINI_KEY }}) via engine.env.
 	applyEngineCwdEnv(env, workflowData)
+	applyHarnessRetryPolicyEnv(env, workflowData)
 	if workflowData.EngineConfig != nil && len(workflowData.EngineConfig.Env) > 0 {
 		maps.Copy(env, workflowData.EngineConfig.Env)
 	}

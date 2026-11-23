@@ -73,7 +73,7 @@ const {
 } = require("./process_runner.cjs");
 const { buildCopilotSDKServerArgs, getCopilotSDKServerPort, startCopilotSDKServer, stopCopilotSDKServer, waitForCopilotSDKServer } = require("./copilot_sdk_sidecar.cjs");
 const { resolveRetryConfig: resolveSharedRetryConfig } = require("./harness_retry_config.cjs");
-const { hasCopilotResponseStatus, isGitHubRetryAfterProvider, parseCopilotRetryAfterMs } = require("./copilot_retry_after.cjs");
+const { hasCopilotResponseStatus, parseCopilotRetryAfterMs } = require("./copilot_retry_after.cjs");
 const { stopForPermissionDenied } = require("./harness_failure_handling.cjs");
 const {
   captureExecutionEvidenceConfiguration,
@@ -125,7 +125,7 @@ const { recordAWFModelRoutingOutcome } = require("./awf_model_routing.cjs");
 const COPILOT_ROUTING_POLICY = getAWFModelRoutingPolicy("copilot");
 const { loadModelsJson } = require("./model_costs.cjs");
 const { applyCopilotWireAPI: configureCopilotWireAPI, warnCopilotSubagentEndpoints, recordModelEndpointMismatch, getSupportedEndpoints, MODEL_ENDPOINT_FIX } = require("./copilot_wire_api.cjs");
-const { loadModelAliasMap, resolveEngineModel, normalizeForCopilotCLI, ModelAliasResolutionError, recordModelResolution, splitModelIdentifier } = require("./resolve_model_alias.cjs");
+const { isModelCatalogDisabled, loadModelAliasMap, resolveEngineModel, normalizeForCopilotCLI, ModelAliasResolutionError, recordModelResolution, splitModelIdentifier } = require("./resolve_model_alias.cjs");
 const { COPILOT_MODEL_VERIFICATION_EXIT_CODE, createCopilotModelObserver, readCopilotModelSubstitution, recordCopilotModelSelection } = require("./copilot_model_selection.cjs");
 const { copilotSDKAgentDirectories, defaultCopilotSDKAgentsBaseDir, getEngineSubAgentTarget } = require("./extract_inline_sub_agents.cjs");
 const { inlineArtifactTarget } = require("./inline_artifact_target.cjs");
@@ -860,7 +860,8 @@ async function resolveCopilotSubagentModels(options) {
     });
     return refresh;
   };
-  const liveCheck = env.AWF_REFLECT_ENABLED === "1" || Boolean(options.reflectData);
+  // engine.model-catalog: false passes sub-agent models through verbatim, without a catalogue check.
+  const liveCheck = !isModelCatalogDisabled(env) && (env.AWF_REFLECT_ENABLED === "1" || Boolean(options.reflectData));
   /** @type {InstanceType<typeof ModelAliasResolutionError>[]} */
   const failures = [];
   const resolutions = [];
@@ -2010,8 +2011,6 @@ async function main() {
     });
   }
 
-  const honorRetryAfter = isGitHubRetryAfterProvider(copilotSDKMode ? primaryProviderName : process.env.GH_AW_LLM_PROVIDER || "github");
-
   // Merge SDK env additions into the child process env only when the SDK helper
   // returned at least one variable; otherwise leave the env undefined so that
   // runProcess inherits the full process.env (the common case).
@@ -2147,10 +2146,14 @@ async function main() {
           let retryAfterMs = null;
           let pendingStderrResponse = "";
           let pendingStderrHeaderLines = 0;
+          /** @param {number | null} delay */
+          const keepLongestRetryAfter = delay => {
+            if (delay !== null) retryAfterMs = Math.max(retryAfterMs ?? 0, delay);
+          };
           /** @param {string} line */
           const observeRetryAfter = line => {
             if (!hasCopilotResponseStatus(line)) return;
-            retryAfterMs = parseCopilotRetryAfterMs(line);
+            keepLongestRetryAfter(parseCopilotRetryAfterMs(line));
           };
           /** @param {string} line */
           const observeStderrRetryAfter = line => {
@@ -2165,7 +2168,7 @@ async function main() {
             if (hasCopilotResponseStatus(line)) {
               pendingStderrResponse = line;
               pendingStderrHeaderLines = 0;
-              retryAfterMs = parseCopilotRetryAfterMs(line);
+              keepLongestRetryAfter(parseCopilotRetryAfterMs(line));
               return;
             }
             if (!pendingStderrResponse) return;
@@ -2178,8 +2181,7 @@ async function main() {
             }
             pendingStderrResponse += `\n${line}`;
             pendingStderrHeaderLines += 1;
-            const delay = parseCopilotRetryAfterMs(pendingStderrResponse);
-            if (delay !== null) retryAfterMs = delay;
+            keepLongestRetryAfter(parseCopilotRetryAfterMs(pendingStderrResponse));
           };
           // Driver mode: run copilot_sdk_driver.cjs as a normal subprocess. The harness has
           // already started the sidecar; the driver only opens an SDK client connection.
@@ -2202,12 +2204,12 @@ async function main() {
                 durableSession.started(sessionId);
               }
               if (["error", "session.error", "turn.failed"].includes(event?.type)) {
-                if (honorRetryAfter) observeRetryAfter(line);
+                observeRetryAfter(line);
                 if (NATIVE_RATE_LIMIT_ERROR_PATTERN.test(JSON.stringify(event))) nativeTerminalRateLimitError = true;
               }
             },
             onStderrLine: line => {
-              if (honorRetryAfter) observeStderrRetryAfter(line);
+              observeStderrRetryAfter(line);
               if (NATIVE_RATE_LIMIT_ERROR_PATTERN.test(line)) nativeTerminalRateLimitError = true;
             },
             runtimeGuard: { shouldTerminate: () => ({ terminate: Boolean(modelObserver.check()), reason: "copilot_model_verification" }) },
