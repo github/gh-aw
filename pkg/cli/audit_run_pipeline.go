@@ -264,6 +264,31 @@ func (cfg auditRunConfig) auditOptions() AuditOptions {
 	}
 }
 
+// cachedAuditArtifactsUsable reports whether the locally cached artifacts cover
+// everything the requested audit needs, invalidating download markers where a
+// re-download is required.
+func cachedAuditArtifactsUsable(cfg auditRunConfig) (bool, error) {
+	if cfg.models && len(findMissingFilterEntries(ResolveArtifactFilter([]string{"agent", "usage", "info"}), cfg.outputDir)) > 0 {
+		return false, invalidateCompleteArtifactDownloadMarker(cfg.outputDir)
+	}
+	if (cfg.delivery || cfg.adoption) && len(findMissingFilterEntries(ResolveArtifactFilter([]string{"delivery"}), cfg.outputDir)) > 0 {
+		return false, invalidateCompleteArtifactDownloadMarker(cfg.outputDir)
+	}
+	if cfg.search != "" {
+		path, err := findUnifiedSessionPath(cfg.outputDir)
+		if err != nil {
+			return false, err
+		}
+		if path == "" {
+			return false, invalidateCompleteArtifactDownloadMarker(cfg.outputDir)
+		}
+	}
+	if cfg.includeWorkQueue && len(cfg.artifactFilter) > 0 && len(findMissingFilterEntries(cfg.artifactFilter, cfg.outputDir)) > 0 {
+		return false, nil
+	}
+	return !workQueueLogsMissing(cfg.includeWorkQueue, cfg.outputDir), nil
+}
+
 // renderCachedAuditIfAvailable attempts to render an audit report from a cached run
 // summary. It returns done=true when no further processing is needed (either because
 // the cached report was rendered or the run was skipped by filtering), along with
@@ -273,26 +298,8 @@ func renderCachedAuditIfAvailable(ctx context.Context, cfg auditRunConfig) (done
 	if !ok {
 		return false, false, nil
 	}
-	if cfg.models && len(findMissingFilterEntries(ResolveArtifactFilter([]string{"agent", "usage", "info"}), cfg.outputDir)) > 0 {
-		return false, false, invalidateCompleteArtifactDownloadMarker(cfg.outputDir)
-	}
-	if (cfg.delivery || cfg.adoption) && len(findMissingFilterEntries(ResolveArtifactFilter([]string{"delivery"}), cfg.outputDir)) > 0 {
-		return false, false, invalidateCompleteArtifactDownloadMarker(cfg.outputDir)
-	}
-	if cfg.search != "" {
-		path, err := findUnifiedSessionPath(cfg.outputDir)
-		if err != nil {
-			return false, false, err
-		}
-		if path == "" {
-			return false, false, invalidateCompleteArtifactDownloadMarker(cfg.outputDir)
-		}
-	}
-	if cfg.includeWorkQueue && len(cfg.artifactFilter) > 0 && len(findMissingFilterEntries(cfg.artifactFilter, cfg.outputDir)) > 0 {
-		return false, false, nil
-	}
-	if workQueueLogsMissing(cfg.includeWorkQueue, cfg.outputDir) {
-		return false, false, nil
+	if usable, err := cachedAuditArtifactsUsable(cfg); !usable || err != nil {
+		return false, false, err
 	}
 	auditLog.Printf("Using cached run summary for run %d (processed at %s)", cfg.runID, summary.ProcessedAt.Format(time.RFC3339))
 	if cfg.verbose {

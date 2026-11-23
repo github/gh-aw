@@ -16,23 +16,8 @@ func tryLoadCachedRunResult(
 	if !ok || workQueueLogsMissing(params.includeWorkQueue, runOutputDir) {
 		return nil, false
 	}
-	if continuationEvidenceIdentityChanged(summary.Run, run) {
-		logsOrchestratorLog.Printf("Cache bypass for run %d: continuation evidence belongs to a different attempt or run revision", run.DatabaseID)
-		if err := invalidateContinuationArtifactEvidence(runOutputDir); err != nil {
-			logsOrchestratorLog.Printf("Failed to invalidate stale continuation evidence for run %d: %v", run.DatabaseID, err)
-		}
+	if !cachedRunArtifactsUsable(run, runOutputDir, summary.Run, params.artifactFilter) {
 		return nil, false
-	}
-	if len(params.artifactFilter) == 0 {
-		if missing := findMissingFilterEntries([]string{string(ArtifactSetAll)}, runOutputDir); len(missing) > 0 {
-			logsOrchestratorLog.Printf("Cache bypass for run %d: complete artifact marker missing", run.DatabaseID)
-			return nil, false
-		}
-	} else {
-		if missing := findMissingFilterEntries(params.artifactFilter, runOutputDir); len(missing) > 0 {
-			logsOrchestratorLog.Printf("Cache bypass for run %d: requested artifacts missing locally: %v", run.DatabaseID, missing)
-			return nil, false
-		}
 	}
 
 	// When --evals is requested but evals are not present in the cached run directory
@@ -64,23 +49,53 @@ func tryLoadCachedRunResult(
 	// the api-consumption-report) see the correct count without having to fall back to
 	// usage/activity/summary.json.
 	if result.Run.SafeItemsCount != safeItemsBefore || activitySummaryApplied || steeringBackfillApplied || workQueueBackfillApplied || continuationBackfillApplied || metadataRefresh.Applied {
-		healed := *summary
-		healed.Run = result.Run
-		healed.Metrics = result.Metrics
-		healed.MCPToolUsage = result.MCPToolUsage
-		healed.WorkingSet = result.WorkingSet
-		healed.Ledger = result.Ledger
-		healed.Friction = result.Friction
-		healed.SafeOutputs = result.SafeOutputs
-		healed.GatewaySteeringEvents = result.GatewaySteeringEvents
-		healed.WorkQueue = result.WorkQueue
-		healed.ContinuationRequests = result.ContinuationRequests
-		if err := saveRunSummary(runOutputDir, &healed, params.verbose); err != nil {
-			logsOrchestratorLog.Printf("Warning: failed to persist healed run summary for run %d: %v", result.Run.DatabaseID, err)
-		}
+		persistHealedRunSummary(summary, &result, runOutputDir, params.verbose)
 	}
 	applyCachedRunWorkflowPathGate(&result, run, metadataRefresh.WorkflowPathVerified, params.verbose)
 	return &result, true
+}
+
+// cachedRunArtifactsUsable reports whether the cached run directory still holds the
+// continuation evidence and artifacts the current request needs. Stale continuation
+// evidence is invalidated so the fresh download replaces it.
+func cachedRunArtifactsUsable(run WorkflowRun, runOutputDir string, cachedRun WorkflowRun, artifactFilter []string) bool {
+	if continuationEvidenceIdentityChanged(cachedRun, run) {
+		logsOrchestratorLog.Printf("Cache bypass for run %d: continuation evidence belongs to a different attempt or run revision", run.DatabaseID)
+		if err := invalidateContinuationArtifactEvidence(runOutputDir); err != nil {
+			logsOrchestratorLog.Printf("Failed to invalidate stale continuation evidence for run %d: %v", run.DatabaseID, err)
+		}
+		return false
+	}
+	if len(artifactFilter) == 0 {
+		if missing := findMissingFilterEntries([]string{string(ArtifactSetAll)}, runOutputDir); len(missing) > 0 {
+			logsOrchestratorLog.Printf("Cache bypass for run %d: complete artifact marker missing", run.DatabaseID)
+			return false
+		}
+	} else {
+		if missing := findMissingFilterEntries(artifactFilter, runOutputDir); len(missing) > 0 {
+			logsOrchestratorLog.Printf("Cache bypass for run %d: requested artifacts missing locally: %v", run.DatabaseID, missing)
+			return false
+		}
+	}
+	return true
+}
+
+// persistHealedRunSummary writes the backfilled cache-hit fields back to run_summary.json.
+func persistHealedRunSummary(summary *RunSummary, result *DownloadResult, runOutputDir string, verbose bool) {
+	healed := *summary
+	healed.Run = result.Run
+	healed.Metrics = result.Metrics
+	healed.MCPToolUsage = result.MCPToolUsage
+	healed.WorkingSet = result.WorkingSet
+	healed.Ledger = result.Ledger
+	healed.Friction = result.Friction
+	healed.SafeOutputs = result.SafeOutputs
+	healed.GatewaySteeringEvents = result.GatewaySteeringEvents
+	healed.WorkQueue = result.WorkQueue
+	healed.ContinuationRequests = result.ContinuationRequests
+	if err := saveRunSummary(runOutputDir, &healed, verbose); err != nil {
+		logsOrchestratorLog.Printf("Warning: failed to persist healed run summary for run %d: %v", result.Run.DatabaseID, err)
+	}
 }
 
 // applyCachedRunWorkflowPathGate enforces current workflow-path trust for cache hits.

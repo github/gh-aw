@@ -3,7 +3,6 @@ package workflow
 import (
 	"fmt"
 	"slices"
-	"sort"
 	"strings"
 
 	"github.com/github/gh-aw/pkg/constants"
@@ -489,7 +488,7 @@ func generateCustomJobToolDefinition(jobName string, jobConfig *SafeJobConfig) m
 	requiredFields := populateCustomJobToolProperties(properties, jobConfig.Inputs)
 
 	if len(requiredFields) > 0 {
-		sort.Strings(requiredFields)
+		slices.Sort(requiredFields)
 		inputSchema["required"] = requiredFields
 	}
 
