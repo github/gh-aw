@@ -26,7 +26,9 @@ func TestResolveBYOKGenAIProviderName(t *testing.T) {
 		{name: "azure provider type", engine: &EngineConfig{ID: "copilot", Env: map[string]string{"COPILOT_PROVIDER_BASE_URL": "${{ vars.GATEWAY_URL }}", "COPILOT_PROVIDER_TYPE": "azure"}}, want: "azure.ai.openai"},
 		{name: "generic openai-compatible", engine: &EngineConfig{ID: "copilot", Env: map[string]string{"COPILOT_PROVIDER_BASE_URL": "http://localhost:11434/v1"}}, want: "openai"},
 		{name: "anthropic provider type", engine: &EngineConfig{ID: "copilot", Env: map[string]string{"COPILOT_PROVIDER_BASE_URL": "https://api.anthropic.com", "COPILOT_PROVIDER_TYPE": "anthropic"}}, want: "anthropic"},
+		{name: "gcp auth with base url", engine: &EngineConfig{ID: "copilot", Env: map[string]string{"COPILOT_PROVIDER_BASE_URL": "https://gateway.example.com/v1"}, Auth: &EngineAuthConfig{Type: "github-oidc", Provider: "gcp"}}, want: "openai"},
 		{name: "engine provider override", engine: &EngineConfig{ID: "copilot", LLMProvider: LLMProviderAnthropic}, network: firewall, want: "anthropic"},
+		{name: "gcp engine provider override", engine: &EngineConfig{ID: "copilot", LLMProvider: "gcp"}, network: firewall, want: "gcp.gen_ai"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

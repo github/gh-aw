@@ -41,14 +41,15 @@ func resolveBYOKGenAIProviderName(workflowData *WorkflowData) string {
 	if workflowData.EngineConfig.Auth != nil {
 		authProvider = literalLower(workflowData.EngineConfig.Auth.Provider)
 	}
+	// engine.auth.provider only selects how gh-aw authenticates to the endpoint
+	// (e.g. GCP OIDC to an OpenAI-compatible gateway), so only Azure auth changes
+	// the endpoint type; every other auth provider keeps the openai default.
 	provider := genAIProviderOpenAI
 	switch {
 	case providerType == "anthropic":
 		provider = genAIProviderAnthropic
 	case providerType == "azure" || authProvider == "azure" || isAzureInferenceHost(extractLiteralEngineEnvHost(workflowData, constants.CopilotProviderBaseURL)):
 		provider = genAIProviderAzureOpenAI
-	case authProvider != "":
-		provider = genAIProviderForName(authProvider)
 	}
 	genAIProviderLog.Printf("Resolved BYOK GenAI provider: %s (type=%q, auth=%q)", provider, providerType, authProvider)
 	return provider
