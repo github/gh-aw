@@ -46,7 +46,7 @@ func TestFormatWorkflowRunError_DispatchGuidance(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			original := &exec.ExitError{Stderr: []byte(tt.message)}
-			err := formatWorkflowRunError(original)
+			err := formatWorkflowRunError(original, original.Stderr)
 			require.ErrorIs(t, err, original)
 			if tt.wantHint != "" {
 				assert.Contains(t, err.Error(), tt.wantHint)
@@ -59,7 +59,7 @@ func TestFormatWorkflowRunError_DispatchGuidance(t *testing.T) {
 	}
 	t.Run("non-exit error", func(t *testing.T) {
 		original := errors.New("gh executable not found")
-		require.ErrorIs(t, formatWorkflowRunError(original), original)
+		require.ErrorIs(t, formatWorkflowRunError(original, nil), original)
 	})
 }
 
