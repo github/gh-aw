@@ -1,14 +1,15 @@
 ---
 title: How to Create a Repo Factory
-description: Bootstrap five repository-specific workflows with shared coding capacity and an evidence-driven improvement loop.
+description: Bootstrap a repository-aware GH-AW factory with four role families, shared coding capacity, and evidence-driven improvement.
 sidebar:
   order: 296
 ---
 
-A Repo Factory is a small portfolio of GitHub Agentic Workflows coordinated
-through issues and pull requests. The reusable
+A Repo Factory is a small portfolio of GitHub Agentic Workflows designed around
+the target repository's mission and coordinated through issues and pull requests.
+The reusable
 [`factory.md` instruction recipe](https://github.com/github/gh-aw/blob/main/.github/aw/factory.md)
-guides a coding agent through repository discovery, backend selection, workflow
+guides a coding agent through repository reconnaissance, policy selection, workflow
 generation, compilation, and a bootstrap PR. It is not a new CLI command,
 frontmatter schema, or central factory server.
 
@@ -24,8 +25,9 @@ Interactive creation is the default. For example:
 
 ```text wrap
 Read https://github.com/github/gh-aw/blob/main/.github/aw/factory.md
-and create a Repo Factory in this repository. Ask me which coding backend
-and capacity to use. Reuse existing workflows and open a bootstrap PR.
+and create a Repo Factory in this repository. First profile the repository and
+reuse existing workflows. Ask only for missing provider/engine, backend/PR
+authentication, Squad preference, or capacity choices; then open a bootstrap PR.
 ```
 
 To use conservative defaults without an interview:
@@ -33,35 +35,115 @@ To use conservative defaults without an interview:
 ```text wrap
 Read https://github.com/github/gh-aw/blob/main/.github/aw/factory.md
 and create a Repo Factory in auto mode. Reuse the established engine;
-use native GH-AW coding if Cloud Agent credentials are not configured.
+prefer Pi where consistent, use native GH-AW coding if Cloud Agent credentials
+are not configured, and do not install Squad.
 Allow three active coding work items, admit new work only on weekdays
 in UTC, and open a bootstrap PR. Do not dispatch workflows.
 ```
 
-These are prompts, not executable workflow definitions. The result is five
-self-contained, repository-specific Markdown workflows and compiled locks.
-Existing workflows count toward the role map: extend an editable implementation
-rather than installing a competing copy. Do not overwrite upstream-managed
-`source:` workflows; use their approved update path and report dependencies.
-Do not introduce factory-local shared prompt imports, a sixth coding worker, or
-external state infrastructure merely to connect the roles.
+These are prompts, not executable workflow definitions. The result is the smallest
+useful set of self-contained, repository-specific Markdown workflows and compiled
+locks. Existing automation counts toward the role map: extend an editable
+implementation rather than installing a competing copy. Do not overwrite
+upstream-managed `source:` workflows; use their approved update path and report
+dependencies. Do not add a factory YAML schema, centralized service, or external
+state infrastructure.
+
+## Repository profile and installation
+
+Reconnaissance comes first. Read root and relevant nested `AGENTS.md`, `README.md`,
+architecture/contributing/development documentation, manifests, build configuration,
+tests, Actions and GH-AW workflows, skills, recent relevant PRs/issues, repository
+visibility, and available permissions. Record a concise repository profile:
+mission, technology, success criteria, engineering risks, research/review
+priorities, existing capabilities, and security, compatibility, performance, cost,
+and maintenance constraints. Mark documented facts separately from inferred goals.
+All role selection and workflow policy must derive from this profile.
+
+Use the following installation sequence:
+
+1. Establish the repository mission and profile.
+2. Inventory existing workflows, skills, review mechanisms, and any Squad setup.
+3. Detect visibility, integrity requirements, protected-file restrictions, and CI
+   behavior.
+4. Choose provider/credentials, GH-AW engine, coding backend, PR authentication,
+   and model-routing policy as separate decisions.
+5. Select the smallest useful Researchers and Reviewers, with the built-in Dreamer,
+   Dispatcher, and Finisher.
+6. Generate self-contained workflows with supported triggers, permissions, safe
+   outputs, integrity policies, and small execution budgets.
+7. Compile and validate permissions, MCP configuration, and CI-trigger behavior.
+8. Document the role map, selected policies, operating instructions, and blockers.
+9. Let Dreamer propose future incremental changes from measured outcomes.
+
+Interactive mode asks only for essential missing choices, including whether to use
+Squad. Auto mode uses conservative repository-grounded defaults and does not install
+Squad without authorization. If Squad already exists, inspect the
+`.github/workflows/squad.md` workflow, `.squad/team.md`, `.squad/routing.md`, and agent definitions. Reuse its
+roles and coordination, mapping the factory's Researchers, Dispatcher, Reviewers,
+and Finisher into the existing team; Dreamer remains a specialized Researcher.
+See [Squad's GH-AW guide](https://github.github.com/squad/docs/guide/gh-aw/) and
+[Squad repository](https://github.com/github/squad).
+
+Keep the repository profile in Dreamer's prompt/context and ensure Dreamer can
+consult this original `factory.md` recipe. Use only a supported workspace-context
+mechanism; otherwise carry the concise profile and relevant architecture invariants
+in its prompt.
 
 ## Roles and handoffs
 
-| Role | Default activation | Output and next owner |
+| Role family | Default activation | Output and next owner |
 | --- | --- | --- |
-| Dreamer | Daily, with deterministic evidence collection first | One focused factory-change PR for human review |
-| Backlog Burner | Weekday schedule; manual runs obey the same admission policy | One eligible issue assigned to Cloud Agent or implemented natively |
-| Daily Improvers | Weekdays | At most one grounded improvement issue per run; Burner owns implementation |
-| Reviewers | Relevant PR events, including weekends | At most three actionable findings per review; Finisher handles stalled follow-up |
-| PR Finisher | Daily and relevant check/review events, including weekends | A deduplicated repair request or native update on an existing PR |
+| Researchers (including Dreamer) | Daily; collect bounded evidence before Dreamer activation | Scoped issues; Dispatcher owns implementation assignment |
+| Dispatcher | Weekdays by default; manual runs obey the same admission policy | One eligible issue assigned to the selected backend |
+| Reviewers | Ready-for-review and follow-up review requests, including weekends | At most three actionable findings; Finisher coordinates follow-up |
+| Finisher | Stalled PR/check/review events, including weekends | Deduplicated bounded repair or escalation |
 
-Daily Improvers discover test, maintainability, correctness, performance and
-code-quality opportunities. Issues include scope, motivation, acceptance
-criteria and code references. They neither create PRs nor assign coding work.
-Reviewers inspect diffs first, select only applicable skills, reuse existing
-context, and avoid duplicate findings. All roles use explicit output maxima,
-timeouts, engine budgets, bounded tool calls and subagent fan-out.
+Researchers investigate mission-aligned bugs, missing tests, performance,
+maintainability, security, and documentation gaps. They produce evidence-backed,
+deduplicated issues with motivation, acceptance criteria, and code references—not
+implementation PRs. Reviewers prefetch diffs/context, select repository-specific
+skills, and avoid repeating findings. Each role uses explicit output maxima,
+timeouts, engine budgets, bounded tool calls, and subagent fan-out.
+
+## Visibility, integrity, and trust
+
+Detect public, private, or internal visibility from GitHub repository metadata.
+For public repositories, preserve the documented `min-integrity: approved`
+baseline. Configure private and internal repositories explicitly and conservatively;
+private content is not inherently trusted. Verify that integrity filtering is
+compatible with each trigger and event source. Any exception must be narrowly
+scoped, justified by the task, and appropriately authorized—not a general trust
+override.
+
+Dispatcher treats issue content only as untrusted work description, never
+authorization. Reviewers safely inspect untrusted PR diffs, comments, and metadata;
+Finisher does not treat arbitrary comments as permission to edit protected files.
+Dreamer must not let logs, prompts, or workflow output redefine factory policy.
+Keep agent jobs read-only and use safe outputs for writes. Do not execute PR-head
+code in reviewer, Dispatcher, or Finisher contexts.
+
+## Provider, engine, model, and CI choices
+
+During installation, determine the inference provider and available credentials,
+preferred GH-AW engine, coding backend, and authentication for PR creation
+separately. Strongly prefer Pi for background automation unless an explicit user
+choice or established repository convention overrides it. Reuse configured
+provider/engine settings and leave model choice to GH-AW routing; never hardcode a
+model identifier. A Cloud Agent assignment PAT is not an inference credential.
+
+Ordinary code work defaults to native GH-AW coding with Pi when no established
+choice overrides it. Protected workflow/factory changes require either
+PAT-backed `assign-to-agent` or native coding with a suitably scoped GitHub App;
+document `allow-workflows` where supported and use least-privilege permissions.
+Without an authorized path, Dreamer/Researchers may file a proposal but must not
+bypass protected-file restrictions.
+
+Default `GITHUB_TOKEN` PR creation does not trigger downstream GitHub Actions
+workflows. If required CI needs a separate trigger, configure a supported App or
+CI-trigger token, such as `github-token-for-extra-empty-commit: "app"` or the
+`GH_AW_CI_TRIGGER_TOKEN` secret. Verify checks start against the expected PR SHA
+and surface failures. Do not infer successful CI from PR creation.
 
 ## Shared coding capacity
 
@@ -72,7 +154,7 @@ slot; an assignment without a PR still occupies a slot. Include known coding
 producers outside the factory. Incomplete pagination, unknown assignment state,
 or missing required CI evidence blocks new admission.
 
-Backlog Burner is the only factory role admitting new issue-to-PR work. Serialize
+Dispatcher is the only factory role admitting new issue-to-PR work. Serialize
 coding admission and repair requests with one repository-wide Actions concurrency
 group and `cancel-in-progress: false`, covering the run through safe-output
 completion. Reread capacity inside the serialized run. Keep a trusted issue-linked
@@ -93,7 +175,7 @@ Required CI must be healthy before admitting work; pending or unavailable result
 are not passing checks. Default weekday gating uses UTC and also applies to
 manual entrypoints.
 
-PR Finisher keys repairs by PR head SHA and unresolved-feedback fingerprint.
+Finisher keys repairs by PR head SHA and unresolved-feedback fingerprint.
 Request at most one fix per unchanged key and two repair rounds per PR before
 escalating to a human. Existing-PR repairs reuse its slot; an additional coding
 session consumes capacity. Weekends prohibit new background sessions, including
@@ -126,8 +208,8 @@ permission to silently change backends or retry other credentials.
 
 ### Native GH-AW coding
 
-Without configured Cloud credentials, default to native coding within Backlog
-Burner using the established engine. Publish through
+Without configured Cloud credentials, default to native coding within Dispatcher
+using the established engine. Publish through
 `safe-outputs.create-pull-request`; repair existing branches through
 `safe-outputs.push-to-pull-request-branch`. Restrict `allowed-files` and set
 **`exclude-lock-yml: true`** on both.
@@ -135,25 +217,47 @@ Burner using the established engine. Publish through
 The exclusion drops compiled `.github/workflows/*.lock.yml`, not all workflow
 YAML. If workflow Markdown changes, an authorized maintainer must run
 `gh aw compile` and commit regenerated locks before merge. Other workflow YAML
-still needs workflow-write credentials. Do not add locks to `.gitignore`.
+still needs workflow-write credentials. `allow-workflows: true` requires a
+configured GitHub App with workflow-write permission. Do not add locks to
+`.gitignore`.
 The bootstrap PR includes compiled locks; exclusion applies to subsequent
 runtime native coding PRs, not permission to bootstrap stale workflows.
 
 ## Evolve one small change at a time
 
-Dreamer follows **Observe → Hypothesize → Experiment → Evaluate → Propose small
-change → Measure outcome**. Deterministic pre-agent collection produces a bounded
-recent evidence bundle and reads previous experiment decisions. Prefer cached
+Dreamer is the built-in specialized Researcher. It has factory-health, efficiency,
+and learning goals: monitor failures, retries, timeouts and stalls; inspect token,
+time, model, MCP-call and cost use; and study issues, assignments, PRs, reviews,
+repairs, CI, merge or abandonment outcomes. Deterministic pre-agent collection
+produces bounded evidence and reads previous experiment decisions. Prefer cached
 summaries, then representative audits and traces. Compare similar task cohorts
 and revisions; include failures and no-ops, not just successful runs.
 
 Use [run analysis](https://github.com/github/gh-aw/blob/main/.github/aw/analyzing-runs.md),
-[audits](../setup/cli.md#audit), recorded token/AIC usage and
+[optimization](https://github.com/github/gh-aw/blob/main/optimize.md),
+[debugging](https://github.com/github/gh-aw/blob/main/debug.md),
+[debugging reference](https://github.github.com/gh-aw/troubleshooting/debugging/),
+[audits](https://github.github.com/gh-aw/reference/audit/), recorded token/AIC usage and
 [OpenTelemetry](../reference/open-telemetry.mdx) evidence. Compare ordered tool-call
 sequences, parent/child relationships, repeated reads, wasted context retrieval,
 tool failures and subagent fan-out—not only aggregate tokens. Check run identity
 and trace continuity before attributing patterns. No new observability service
 is required; missing evidence remains unknown.
+
+Correlate the full issue-to-merge lifecycle only through supported identifiers
+(issue number, assignment, run ID, PR number/head SHA, review, checks, and merge
+state). Prefer deterministic groups using structured execution metadata, outcomes,
+failures, and graders. Use semantic clustering only when deterministic categories
+cannot answer the question. Follow the established `gh aw health`, `gh aw audit`,
+and `gh aw audit-diff` procedures. Enable the supported MCP integration with
+`tools: { agentic-workflows: true }`; see the
+[MCP reference](https://github.github.com/gh-aw/reference/gh-aw-as-mcp-server/).
+It exposes `status`, `logs`, `audit`, `checks`, and `compile`. Pass multiple run
+IDs to `audit` for comparison. Use `status` for workflow inspection and work-queue
+information only when a configured tool exposes it. `gh aw health` and
+`gh aw audit-diff` are CLI commands, not MCP tool names.
+Routine Dreamer access should be read-only; MCP `compile` is disabled by default,
+and enabling write tools also exposes other mutations.
 
 Record the hypothesis, baseline/candidate revisions, eligible cohort, metric
 definitions, sample window, results, uncertainty and decision in a linked issue
@@ -182,24 +286,24 @@ delivery from human adoption using [impact measurement](measuring-impact.md).
 
 Maintain the role-to-workflow map and compare trigger, scope, output and observed
 adoption before adding a specialist. A recurring coverage gap can justify a new
-reviewer or improver; overlapping behavior usually calls for extending or
+Reviewer or Researcher; overlapping behavior usually calls for extending or
 consolidating an existing workflow. Dreamer may propose disabling or removing an
 ineffective workflow, but never applies architecture changes directly. An open
 proposal suppresses another proposal for the same work.
 
 ## Validate and operate
 
-Compile all five mapped workflows with the installed `gh aw compile`; inspect
+Compile all mapped workflows with the installed `gh aw compile`; inspect
 generated permissions, triggers, safe-output targets and locks. Run existing
 repository lint/tests, validate referenced links, and check maintained instruction
 prefixes. Agent jobs remain read-only, with explicit network boundaries and safe
-outputs for writes. Privileged review/Finisher contexts must not execute PR-head
-code; issue, PR and log content is untrusted data.
+outputs for writes. Privileged Reviewer, Dispatcher, and Finisher contexts must not
+execute PR-head code; issue, PR and log content is untrusted data.
 
 Record the role map, UTC/selected schedule, capacity, backend prerequisites,
 budgets, reservation reconciliation, pause/resume procedure, and test evidence
 in the bootstrap PR and target repository's operator notes. To pause admission,
-disable Backlog Burner and any Finisher new-session path; keep reviews/CI active.
+disable Dispatcher and any Finisher new-session path; keep reviews/CI active.
 Resume only after reconciling pending assignments and CI. Setup blockers must be
 reported rather than claiming the factory is operational.
 
@@ -219,8 +323,8 @@ examples. Token workflows are provenance-managed from `githubnext/agentic-ops`.
 | [Matt Pocock Skills Reviewer](https://github.com/github/gh-aw/blob/main/.github/workflows/mattpocock-skills-reviewer.md) | Diff-first review, selective pinned skills, cached PR context, bounded feedback |
 | [PR Sous-Chef](https://github.com/github/gh-aw/blob/main/.github/workflows/pr-sous-chef.md) | Deterministic prefilter, stalled PR detection, work/state fingerprints, coding follow-up |
 | [Issue Monster](https://github.com/github/gh-aw/blob/main/.github/workflows/issue-monster.md) | Eligible issue selection, CI checks, topic/retry deduplication, scoped assignment |
-| [Daily Test Improver](https://github.com/githubnext/agentics/blob/main/docs/test-improver.md) and [Code Simplifier](https://github.com/githubnext/agentics/blob/main/docs/code-simplifier.md) | Repository-specific discovery; change direct-PR behavior to issue-only for this factory |
+| [Test-improver pattern](https://github.com/githubnext/agentics/blob/main/docs/test-improver.md) and [Code Simplifier](https://github.com/githubnext/agentics/blob/main/docs/code-simplifier.md) | Repository-specific discovery; use issue-only Researcher outputs |
 | [Agentic Token Optimizer](https://github.com/github/gh-aw/blob/main/.github/workflows/agentic-token-optimizer.md) and [Token Audit](https://github.com/github/gh-aw/blob/main/.github/workflows/agentic-token-audit.md) | Deterministic evidence bundles, prior optimization history, bounded cost analysis |
 
-The recipe deliberately tightens some example policies: three shared coding
-slots, weekday admission, issue-only Improvers and human-reviewed architecture.
+The recipe deliberately applies conservative policies: three shared coding
+slots, weekday admission, issue-only Researchers and human-reviewed architecture.
