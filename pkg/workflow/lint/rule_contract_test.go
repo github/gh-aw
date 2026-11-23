@@ -106,6 +106,12 @@ func builtInRuleContracts() map[string]ruleContract {
 			safe:   contractJob + "    outputs: {comment_id: ''}\n" + contractSafeSteps,
 			path:   "jobs.check.outputs.comment_id",
 		},
+		"unsound-contains": {
+			targets: ActionsAST | AWAST, severity: Warning,
+			unsafe: contractJob + "    if: contains('refs/heads/main refs/heads/develop', github.ref)\n" + contractSafeSteps,
+			safe:   contractJob + "    if: contains(fromJSON('[\"refs/heads/main\",\"refs/heads/develop\"]'), github.ref)\n" + contractSafeSteps,
+			path:   "jobs.check.if",
+		},
 		"grader-file-io": {
 			targets: AWAST, javaScript: true,
 			unsafe: "graders:\n  custom:\n    script: const fs = require('node:fs'); return fs.readFileSync('evidence');\n",

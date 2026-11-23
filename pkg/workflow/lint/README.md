@@ -28,7 +28,7 @@ constructors:
 | Policy area | Rule constructors |
 |-------------|-------------------|
 | Expressions and disclosure | `TemplateInjectionRule`, `PromptExpressionRule`, `SecretLeakRule`, `OTLPSecretLeakRule` |
-| Actions and workflow integrity | `ActionPinRule`, `VersionCheckRule`, `JobTimeoutRule`, `NeedsConsistencyRule`, `StepReferenceRule`, `WorkflowRunScopeRule`, `ConditionalImportRule`, `PrivateToPublicRule`, `InstallScriptsRule`, `GatewayDispatchLiteralsRule`, `BashCasePatternRule`, `ObfuscationRule` |
+| Actions and workflow integrity | `ActionPinRule`, `VersionCheckRule`, `JobTimeoutRule`, `NeedsConsistencyRule`, `StepReferenceRule`, `WorkflowRunScopeRule`, `ConditionalImportRule`, `PrivateToPublicRule`, `InstallScriptsRule`, `GatewayDispatchLiteralsRule`, `BashCasePatternRule`, `ObfuscationRule`, `UnsoundContainsRule` |
 | Permissions, jobs, and checkout | `PermissionScopeRule`, `ExcessivePermissionsRule`, `CustomJobDetectionRule`, `PrivilegedCheckoutRule`, `CheckoutModeRule`, `ForkAssociationRule`, `PullRequestTargetRolesRule`, `UntrustedRolesDetectionRule`, `PullRequestTargetCheckoutRule` |
 | Network, tools, images, and sandbox | `NetworkScopeRule`, `PushTargetRule`, `AllowedLabelsRule`, `ToolScopeRule`, `ImageArgumentRule`, `UnpinnedImagesRule`, `SandboxConfigRule`, `FirewallSSLBumpRule` |
 | Outputs, artifacts, and cache | `SafeOutputShellExpansionRule`, `SafeOutputCredentialsRule`, `ArtifactExecutionRule`, `ArtipackedRule`, `CachePoisoningRule` |

@@ -302,5 +302,6 @@ func Default() *Runner {
 		BashCasePatternRule(),
 		PrivilegedCheckoutRule(),
 		ArtifactExecutionRule(),
+		UnsoundContainsRule(),
 	}}
 }
