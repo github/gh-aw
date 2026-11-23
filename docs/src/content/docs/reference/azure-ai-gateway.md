@@ -104,8 +104,9 @@ gh-aw allows a literal `COPILOT_PROVIDER_BASE_URL` host automatically, so no
 `${{ vars.* }}` or `${{ secrets.* }}`, AWF v0.25.41 or later (the default) resolves it at
 runtime and allows exactly that host; avoid broad entries such as `services.ai.azure.com`.
 If `sandbox.agent.version` pins an older AWF, expression-valued URLs fail compilation
-in all modes. Upgrade AWF or use a literal gateway URL so the compiler can allow
-its host; a `network.allowed` entry alone does not bypass this check.
+in all modes. Remove both `sandbox.agent.version` and `sandbox.agent.checksums-sha256`
+to use the bundled default, upgrade with a matching trusted checksum when required,
+or use a literal gateway URL. A `network.allowed` entry alone does not bypass this check.
 
 Select `responses` only for an alias that exposes Responses; use `completions`
 for Chat Completions. If the gateway alias differs from the model ID, set

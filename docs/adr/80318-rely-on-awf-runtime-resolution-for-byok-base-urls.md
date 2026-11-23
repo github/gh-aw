@@ -23,10 +23,10 @@ Rely on AWF runtime host resolution for expression-valued BYOK base URLs. Fix th
 - The docs (including `reference/engines/copilot.md`) state that AWF allows exactly the runtime provider host for both runs, warn against broad `network.allowed` entries, and state the AWF v0.25.41 minimum.
 - `pkg/constants/version_constants.go` defines `AWFCopilotProviderHostAllowlistMinVersion = "v0.25.41"`.
 - `pkg/workflow/byok_provider_host_validation.go` reports a diagnostic only when all three hold:
-  1. `engine.env.COPILOT_PROVIDER_BASE_URL` contains a `${{ … }}` expression;
+  1. the effective Copilot main-agent or threat-detection `COPILOT_PROVIDER_BASE_URL` contains a `${{ … }}` expression;
   2. the firewall is enabled; and
   3. the effective AWF version is older than v0.25.41.
-- The diagnostic is an error in all modes. It recommends removing the `sandbox.agent.version` pin or raising it to v0.25.41 or later, or using a literal provider URL so the compiler can allow its host.
+- The diagnostic is an error in all modes. It recommends removing both `sandbox.agent.version` and `sandbox.agent.checksums-sha256`, upgrading to v0.25.41 or later with a matching trusted checksum when required, or using a literal provider URL.
 - `network.allowed` entries do not suppress the diagnostic, because the compiler cannot verify that any entry covers a host known only at runtime. An earlier revision suppressed the diagnostic when any custom domain was present. Review changed this.
 
 ## Alternatives Considered
