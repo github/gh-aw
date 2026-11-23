@@ -30,7 +30,7 @@ Keep codes/severity; advisory/pending/skipped/policy-denied may be intentional.
 
 | Codes|Check|Remedy|
 | ---|---|---|
-| `workflow_failed`|First error.|Fix cause, not conclusion.|
+| `workflow_failed`|First error.|Fix cause.|
 | `workflow_timeout`|Step/budget/result.|Unblock/narrow scope; justify timeout changes.|
 | `multiple_errors`|Cause vs cascades.|Fix cause.|
 | `mcp_server_failures`, `tools_not_available`|MCP setup/availability.|Fix tool/server/config/auth; retain permission scope.|
@@ -54,8 +54,7 @@ Keep codes/severity; advisory/pending/skipped/policy-denied may be intentional.
 
 ## Agent, model, and proxy classifications
 
-Inspect `agent-stdio.log`/`agent_execution.json`/errors/reflection/proxy/[inventory](#model-availability).
-Prose != native error.
+Inspect `agent-stdio.log`/`agent_execution.json`/errors/reflection/proxy/[inventory](#model-availability); prose != native error.
 
 | Codes|Check|Remedy|
 | ---|---|---|
@@ -63,7 +62,7 @@ Prose != native error.
 | `mcp_policy_error`|Blocked MCP server; organization policy.|Use approved tool/authorized policy correction; no bypass.|
 | `model_not_supported_error`, `model_endpoint_mismatch_error`, `model_endpoint_mismatch`|Model, API, tool protocol, same-run inventory/routes.|Follow [model/engine guide](debug-model-engine-misconfiguration.md); endpoint change != availability.|
 | `http_400_response_error`|Provider diagnostic, endpoint, feature/schema.|Fix unsupported request; 400 alone != model removal.|
-| `unsupported_endpoint`, `invalid_selection`, `uncorroborated_endpoint`, `uncorroborated_selection`, `harness_selection_mismatch`, `provider_mismatch`|Selection vs harness model/API/metadata.|Align selection/API; never invent evidence.|
+| `unsupported_endpoint`, `invalid_selection`, `uncorroborated_endpoint`, `uncorroborated_selection`, `harness_selection_mismatch`, `provider_mismatch`|Selection vs harness model/API/metadata.|Align selection/API; no invented evidence.|
 | `unsupported_effort`|Effort vs engine/model support.|Use supported effort/mapping; no silent discard.|
 | `missing_model_pricing_error`, `unknown_model_ai_credits`|Proxy pricing/`missing_model_pricing_model_name`.|Fix pricing/version/config; retain accounting.|
 | `invocation_cap_exceeded`, `max_runs_exceeded`|Used/max pooled inference calls.|Narrow work; exhausted run cannot recover via identical retries.|
@@ -74,7 +73,7 @@ Prose != native error.
 | `model_policy_violation`, `content_filter`|Provider/proxy reason; endpoint mismatch separately.|Correct request within policy; no credential swap/bypass.|
 | `awf_api_proxy_blocking_requests`|Specific budget/policy/filter guard.|Address guard; blocking alone != authentication failure.|
 | `capi_quota_exceeded_error`|Native 429; exhausted retries.|Respect quota/reset; no retry storm.|
-| `rate_limit_wait_exceeded`, `rate_limit_error`|429/provider, usable `Retry-After`, harness retries, `max-delay-ms`, timeout.|All providers incl. BYOK and all built-in harnesses (Pi/Gemini/Agy/behavior-defined retry only 429/transient, never after safe outputs): wait within both bounds or stop. Preserve terminal quota/proxy guards. No unauthorized redispatch.|
+| `rate_limit_wait_exceeded`, `rate_limit_error`|429/provider, usable `Retry-After`, harness retries, `max-delay-ms`, timeout.|All providers incl. BYOK/built-in harnesses (Pi/Gemini/Agy/behavior-defined retry only 429/transient, never after safe outputs): wait within both bounds or stop. Keep terminal quota/proxy guards. No unauthorized redispatch.|
 | `capi_server_error`, `engine_outage`, `infrastructure_error`|Exhausted native 5xx/infrastructure timeline.|Report cause; bounded backoff, no unapproved redispatch.|
 | `agentic_engine_timeout`|Step/SDK budget vs post-result `watchdogFired=true`.|Fix genuine stall; post-result watchdog alone != timeout.|
 | `sandbox_runtime_crash`|Exit/signal, resources, runtime revision.|Fix crash/resources; retain redacted diagnostic/version.|
@@ -87,8 +86,7 @@ Prose != native error.
 Read `engine_config` ([start](#start-here)). Pi `not advertised`:
 confirmed absence → `model_unavailable`; incomplete/invalid/ambiguous evidence →
 `model_availability_unknown`. No auto-substitution.
-Missing job/step evidence:
-`gh run view "$RUN_ID" --repo "$REPO" --log`.
+Missing job/step evidence: `gh run view "$RUN_ID" --repo "$REPO" --log`.
 
 ### Inspect cached models
 
@@ -101,7 +99,7 @@ gh aw models --repo "$REPO" --logs-dir "$EVIDENCE" --refresh-count 5
 
 ### Verify exact same-run inventory
 
-Read same-run `$EVIDENCE/run-$RUN_ID/sandbox/firewall/awf-reflect.json` (or audit path).
+Read same-run `$EVIDENCE/run-$RUN_ID/sandbox/firewall/awf-reflect.json`.
 
 ```bash
 : "${MODEL:?Set exact model}" "${PROVIDER:?Set provider}"
@@ -139,10 +137,8 @@ gh aw audit "$BASE_RUN_ID" "$RUN_ID" --repo "$REPO" \
 
 First run = reference. Compare model/provider, credential source (names only),
 revision/runtimes/inventory; success != identity.
-Different inventories/same AWF version: not proof of regression/retirement.
-Evidence required for removal time/cause.
+Different inventories/same AWF version: not proof of regression/retirement; removal time/cause needs evidence.
 Trace pins: `git log -S 'model: PROVIDER/MODEL' -- WORKFLOW.md`.
-
 Absent pin: verify provider/API/capabilities/policy.
 Authorized patch: edit/recompile; compilation != inference.
 
@@ -153,11 +149,11 @@ Nonempty `safeoutputs.jsonl` != publication.
 
 | Codes|Check|Remedy|
 | ---|---|---|
-| `agent_startup_failure`|First setup/engine error.|Fix startup; missing output != agent choice.|
+| `agent_startup_failure`|First setup/engine error.|Fix startup; missing output != choice.|
 | `engine_driver_failure`, `driver_crash`|Driver exit/signal; final native error.|Fix driver first; nonzero exit alone != outage.|
 | `secret_redaction_failure`|Redaction status; sanitized diagnostic.|Repair redaction before publication; never expose raw logs/disable masking.|
 | `safeoutputs_cli_error`|Arguments, registration, denial.|Fix supported invocation/allowlist; no unauthorized `gh` writes.|
-| `invalid_safe_outputs`|Record errors; generated schema.|Fix emitted type/fields; retain validation.|
+| `invalid_safe_outputs`|Record errors; generated schema.|Fix type/fields; retain validation.|
 | `safe_output_dependency_invalid`, `safe_output_dependency_failed`|Graph IDs/aliases/edges/cycles/results.|Fix graph/prerequisites; queued/staged/delegated != published. Never replay mutations.|
 | `missing_terminal_safe_output`|Expected terminal tool, denied calls, last session event.|Fix publication/prompt completion contract; silence is not an intentional noop.|
 | `request_rejection`, `prompt_exhaustion`, `unknown`|Native error/budget/evidence.|Resolve cause; unevidenced stays unknown.|
@@ -170,11 +166,11 @@ Nonempty `safeoutputs.jsonl` != publication.
 | `ERR_API`, `E007`|GitHub status; operation guard.|Resolve API/target cause; policy skip != failed mutation.|
 | `ERR_CONFIG`, `ERR_ADMISSION`, `ERR_TOKEN_BROKER_AUTHENTICATION`|Schema/OIDC/auth/admission.|Fix config/auth; honor denials/outage policy; recompile; keep credentials/environment private.|
 | `ERR_COMPILED_WORKFLOW_PROVENANCE_REQUIRED`, `ERR_COMPILE_AGENTIC_VERSION_BLOCKED`, `ERR_COMPILE_AGENTIC_VERSION_OUTDATED`|Version/provenance/minimums/blocklist.|Update gh-aw; recompile/publish source+lock; retain enforcement.|
-| `ERR_GRADER_SESSION_INVALID`|Unified event array: type/data/provenance.|Fix producer/caller; never fabricate sessions.|
+| `ERR_GRADER_SESSION_INVALID`|Unified event array: type/data/provenance.|Fix producer/caller; no fabricated sessions.|
 | `ERR_SAFE_OUTPUT_TOOL_COPY_FAILED`|Tool deep-copy failure.|Fix definition/loader; retain copy isolation.|
 | `ERR_SAFE_OUTPUTS_GATEWAY_CONFIG`|Numeric `MCP_GATEWAY_PORT`; private `MCP_GATEWAY_AGENT_ID` present.|Fix config; retain readiness/auth.|
 | `ERR_NOT_FOUND`, `TARGET_NOT_FOUND`|Target/repository/visibility.|Correct target/access; 404 may hide resources.|
-| `ERR_PARSE`|JSON/NDJSON framing/schema/producer.|Fix producer/format; retain private evidence.|
+| `ERR_PARSE`|JSON/NDJSON framing/schema/producer.|Fix producer/format; keep evidence private.|
 | `ERR_SYSTEM`, `E099`|First file/git/process failure.|Fix I/O/runtime/checkout; wrapper is not cause.|
 | `no_new_commits`, `missing_pr_head`, `shallow_history`|Commits/refs/history.|Verify no-op; prepare PR refs/full history before agent.|
 | `E009`, `CONFIG_HASH_MISMATCH`|Source vs lock hash.|Recompile/publish source+lock together; no manual hash edit.|
@@ -184,10 +180,9 @@ Nonempty `safeoutputs.jsonl` != publication.
 | `NO_LABELS_PROVIDED`|Requested/existing labels.|Supply valid labels; don't claim mutation.|
 | `REQUIRED_LABELS_MISMATCH`, `REQUIRED_TITLE_PREFIX_MISMATCH`|Labels/title vs guards.|Respect deliberate skip; fix mistaken target/config only.|
 | `TARGET_LOCKED`, `NOT_AWAITING_APPROVAL`|Lock/approval state.|Respect state; no unrelated unlock/approval.|
-| `DAILY_AIC_QUOTA_STOP`, `quota_reserve`, `quota_exhausted`, `rate_limited`|Quota/retry-not-before.|Stop/defer within bounds; missing accounting != zero.|
+| `DAILY_AIC_QUOTA_STOP`, `quota_reserve`, `quota_exhausted`, `rate_limited`|Quota/retry-not-before.|Stop/defer in bounds; missing accounting != zero.|
 | `AIC_USAGE_UNKNOWN`, `AIC_USAGE_UNPRICED`|Missing/unpriced usage.|Fix access/pricing; budget unknown.|
 | `permission_denied`|Business response; operation authority.|Fix authorized credentials/permissions, not quota.|
-
 | `skipped_staged`|Staging.|No authorization/mutation.|
 | `not_configured`|Requirement.|Correct omission; recompile.|
 | `allowed`, `completed`|Decision/request.|Verify freshness/effect; not publication.|
