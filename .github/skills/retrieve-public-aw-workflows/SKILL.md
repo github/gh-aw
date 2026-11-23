@@ -10,6 +10,12 @@ candidates produced by `top-public-aw-repositories`. For discovery and popularit
 ranking, load `../top-public-aw-repositories/SKILL.md`; do not infer stars from
 workflow search frequency.
 
+For ranked collection, run `../top-public-aw-repositories/collect.mjs`; it
+implements this contract (pinning, tree enumeration, anonymous raw downloads,
+blob-ID verification, lock evidence, source pairing, manifests). Its exported
+helpers (`lockEvidence`, `hasFrontmatter`, `gitBlobId`, `isSafeWorkflowEntry`)
+are reusable for explicit-repository retrieval.
+
 ## Contract
 
 - Default scope: gh-aw source Markdown and generated `.lock.yml` files directly
