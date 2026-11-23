@@ -54,9 +54,14 @@ pre-agent-steps:
         exit 1
       fi
 
-      for command_path in "${command_paths[@]}"; do
+      for i in "${!command_paths[@]}"; do
+        command_path="${command_paths[i]}"
+        if [[ ! "${command_path}" =~ ^[A-Za-z0-9][A-Za-z0-9_-]*(\ [A-Za-z0-9][A-Za-z0-9_-]*)*$ ]]; then
+          echo "Invalid command path in Cobra command tree" >&2
+          exit 1
+        fi
         read -r -a command_parts <<< "${command_path}"
-        help_file="${output_dir}/${command_path// /-}.txt"
+        help_file="${output_dir}/command-${i}.txt"
         if ! ./gh-aw "${command_parts[@]}" --help > "${help_file}" 2>&1; then
           echo "warning: failed to collect help for '${command_path}'" >&2
         fi
