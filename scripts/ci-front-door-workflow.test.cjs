@@ -64,10 +64,10 @@ function validatedSuites(raw, outcome = "success") {
   return output.slice("suite_ids=".length, -1);
 }
 
-test("the selector catalog covers every CGO check job", () => {
+test("the selector catalog covers every CGO check job eligible for PRs", () => {
   assert.deepEqual(
     Object.keys(jobs)
-      .filter(id => !infrastructure.includes(id))
+      .filter(id => !infrastructure.includes(id) && id !== "canary-go")
       .sort(),
     [...SUITE_IDS].sort()
   );
@@ -174,7 +174,7 @@ test("PR decisions keep the fast baseline and control optional jobs through the 
   }
 });
 
-test("invalid outputs and missing, failed or skipped decisions run every check job", () => {
+test("invalid outputs and missing, failed or skipped decisions run every PR check job", () => {
   for (const raw of ["", "not-json", "null", "{}", '["unknown"]', JSON.stringify([...SUITE_IDS, "unknown"]), '["build","build"]', '["go-tests"]', ...Object.keys(JOB_DEPENDENCIES).map(id => JSON.stringify([id]))]) {
     assert.equal(validatedSuites(raw), "", raw);
   }
@@ -189,6 +189,27 @@ test("invalid outputs and missing, failed or skipped decisions run every check j
   }
   for (const outcome of ["failure", "skipped", "cancelled", ""]) assert.equal(validatedSuites("[]", outcome), "", outcome);
   assert.match(decision, /suite_ids: \$\{\{ steps\.validated\.outputs\.suite_ids \}\}/);
+});
+
+test("the coverage canary never runs on PRs and still requires both unit suites on non-PR runs", () => {
+  const job = jobs["canary-go"];
+  const expression = condition(job);
+  assert.equal(dependencies(job).includes("front-door-decision"), false);
+  const legacySuites = '["verify-integration-build","test","test-slow","canary-go"]';
+  assert.equal(validatedSuites(legacySuites), '["verify-integration-build","test","test-slow"]');
+  assert.equal(validatedSuites('["verify-integration-build","test","canary-go","canary-go"]'), "");
+  assert.equal(evaluate(expression, { suites: legacySuites }), false);
+  assert.equal(evaluate(expression, { suites: validatedSuites(legacySuites) }), false);
+  assert.equal(evaluate(expression, { suites: "" }), false);
+  assert.equal(evaluate(expression, { result: "failure" }), false);
+  for (const event of ["push", "schedule", "workflow_dispatch"]) {
+    const context = { event, ref: "refs/heads/main", result: "skipped" };
+    assert.equal(evaluate(expression, context), true, event);
+    assert.equal(evaluate(expression, { ...context, cancelled: true }), false, event);
+    for (const id of ["checkout-cache", "test", "test-slow"]) {
+      assert.equal(evaluate(expression, { ...context, results: { [id]: "failure" } }), false, `${event}: ${id}`);
+    }
+  }
 });
 
 test("selected prerequisite jobs match the CGO graph and dependency failures still block consumers", () => {

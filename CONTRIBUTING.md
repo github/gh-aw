@@ -563,7 +563,8 @@ including slow Go tests, security checks, linters, conformance, builds, fuzzing,
 and both macOS and Windows. The fast Go unit suite and its integration compilation
 prerequisite always run. Main-branch pushes,
 manual runs, and the weekly scheduled control run all applicable suites without
-calling the Decision API. CJS and Windows CI are unchanged.
+calling the Decision API. The Go coverage canary runs only on non-PR events,
+after both Go unit suites succeed. CJS and Windows CI are unchanged.
 
 Benchmarks run separately in `.github/workflows/benchmarks.yml`, only on main
 pushes, weekly schedules, or manual main-branch runs, never on PRs. CLI,
@@ -596,12 +597,12 @@ trusted selector is skipped and older trusted versions fall back to all suites;
 the PR implementation is never used to bootstrap credential-bearing execution.
 No endpoint variable or PAT is needed, and credentials are never sent to another
 host. Missing tokens or denied inference permissions, including restricted fork
-PRs, run all suites.
+PRs, run all PR-eligible suites.
 A configured token makes one POST containing the diff summary and a named
 safe-to-omit predicate for every catalog job. The model decides relevance;
 there is no path allowlist or mandatory check-job list. Invalid inputs,
 empty/unavailable/incomplete evidence, and selector-policy changes bypass
-inference and retain all jobs.
+inference and retain all PR-eligible suites.
 There are no retries or redirects. Diff-evidence API requests are counted
 separately. Checkout, existing CI cache/artifact
 actions, and timing collection are outside this selector boundary.
@@ -631,12 +632,12 @@ malformed JSON, non-200 status, 10-second deadline, or more than 16 KiB of respo
 data forces all suites. The adapter preserves normalized replay responses such
 as `{"suite_ids":["build-wasm"],"confidence":0.95}`. Selected jobs retain
 their direct and transitive prerequisites: `test` and `test-slow` require
-`verify-integration-build`, `canary-go` requires both unit suites, and `security`,
+`verify-integration-build`, and `security`,
 `security-scan`, and `cross-platform-build` require `build`.
 Invalid IDs or missing prerequisites are rejected before reaching downstream job
 conditions. A skipped or failed decision job, step failure, or missing outputs
-also runs all check jobs. Selection runs independently of the checkout
-cache; all check jobs wait for its validated output on PRs. Cross-platform
+also runs all PR-eligible check jobs. Selection runs independently of the checkout
+cache; PR check jobs wait for its validated output. Cross-platform
 selection enables or omits both macOS and Windows together.
 Pushes and other non-PR events skip the decision job without suppressing
 any suite.
@@ -698,8 +699,8 @@ the manifest from complete CGO artifacts when timings change. Move a whole
 top-level test, including all subtests, and keep its shard unique.
 
 The front door retains the fast suite (including new or unmeasured tests).
-It can omit the slow suite only when its coverage is unaffected. Selecting the
-coverage canary retains both. Main pushes, scheduled controls, and invalid/missing
+It can omit the slow suite only when its coverage is unaffected. The coverage
+canary does not run on PRs. Main pushes, scheduled controls, and invalid/missing
 decisions still run both. The researcher mines cached test and job timing to
 identify candidates with critical-path savings rather than treating every slow
 test as skippable. Split-suite runner durations remain `null` in the
