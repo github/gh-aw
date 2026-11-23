@@ -26,6 +26,7 @@ The unreleased 1.0.81 merge-policy mapping also covers ambiguous check producers
 
 | Version | Change |
 |---|---|
+| 1.0.108 | Mapping-only: adds Section 7.17 for compile-time engine release cooldown lookups (fixed public endpoints, no credentials or redirects, streamed npm metadata, in-memory cache, fail-open warning diagnostics) and the residual risk that literal Copilot installs skip the runtime age check. No new `CTR-*` rule or `T-CTR-*` test ID. |
 | 1.0.107 | Mapping-only: adds Section 7.16 for loopback-only pre-agent DIFC proxy binding, `Origin` header rejection without wildcard CORS in the HTTP MCP server runner, the owner-private MCP logs report cache, and the `observability.otlp: false` default opt-out. No new `CTR-*` rule or `T-CTR-*` test ID. |
 | 1.0.106 | Mapping-only: adds Section 7.15 for inert embedding of authored activation markdown metadata (`inertJSON`, chunked `printf` transport) as a CTR-006 data-transport boundary. No new `CTR-*` rule or `T-CTR-*` test ID. |
 | 1.0.105 | Mapping-only: adds Sections 7.12–7.14 for the experimental token-broker credential boundary, protected safe-output authorization baseline verification (`validate --authorization-policy`), and host runtime temp-variable exclusion with hardened source-download Git. No new `CTR-*` rule or `T-CTR-*` test ID. |
