@@ -3784,6 +3784,7 @@ check_safe_output_invocation_authorization() {
     local correlation="actions/setup/js/service_correlation.cjs"
     local typespec="docs/src/content/docs/specs/safe-output-authorization.tsp"
     local failed=0
+    local implementation_missing=0
     local f
 
     if ! grep -qF '#### Safe-output invocation authorization' "$spec"; then
@@ -3794,13 +3795,14 @@ check_safe_output_invocation_authorization() {
         if [ ! -f "$f" ]; then
             log_critical "SEC-014: Safe-output authorization implementation file missing: $f"
             failed=1
+            implementation_missing=1
         fi
     done
     if [ ! -f "$typespec" ]; then
         log_medium "SEC-014: Companion TypeSpec definition for the authorization decision endpoint missing: $typespec"
         failed=1
     fi
-    if [ $failed -ne 0 ]; then
+    if [ $implementation_missing -ne 0 ]; then
         return
     fi
 
@@ -3819,19 +3821,51 @@ check_safe_output_invocation_authorization() {
     fi
 
     # Runtime client: staged isolation, fixed bounds, manual redirects (redirects block)
-    if ! grep -qF 'state: "skipped_staged"' "$client" || ! grep -qF 'state: "skipped_staged"' "$gate"; then
-        log_critical "SEC-014: Staged mode does not short-circuit authorization as skipped_staged"
+    local client_body gate_body
+    client_body=$(sed -n '/^async function authorizePreparedInvocation(/,/^}/p' "$client")
+    gate_body=$(sed -n '/^async function main(options = {})/,/^}/p' "$gate")
+    if ! awk '
+        /if \(staged === true\)/ { guard = NR }
+        /return \{ state: "skipped_staged"/ { skipped = NR }
+        /const config = configuration/ { config = NR }
+        /buildServiceRequestHeaders/ { headers = NR }
+        /await acquireToken/ { credential = NR }
+        END { exit !(guard && skipped > guard && config > skipped && headers > config && credential > headers) }
+    ' <<< "$client_body"; then
+        log_critical "SEC-014: Authorization client does not short-circuit staged mode before correlation headers or credential requests"
         failed=1
     fi
-    local bound
-    for bound in 'MAX_REQUEST_BYTES = 65536' 'MAX_RESPONSE_BYTES = 8192' 'HTTP_TIMEOUT_MS = 10000' 'TOTAL_TIMEOUT_MS = 20000' 'MIN_VALIDITY_MS = 2000' 'MAX_VALIDITY_MS = 30000'; do
-        if ! grep -qF "$bound" "$client"; then
-            log_high "SEC-014: Authorization client missing specified bound: $bound"
+    if ! awk '
+        /if \(staged\)/ { guard = NR }
+        /return \{ state: "skipped_staged"/ { skipped = NR }
+        /const batch =/ { batch = NR }
+        /claimIdentity\(/ { claim = NR }
+        END { exit !(guard && skipped > guard && batch > skipped && claim > batch) }
+    ' <<< "$gate_body"; then
+        log_critical "SEC-014: Authorization gate does not short-circuit staged mode before loading invocations or Claims"
+        failed=1
+    fi
+    local bound bound_name bound_value
+    for bound in 'MAX_REQUEST_BYTES:65536' 'MAX_RESPONSE_BYTES:8192' 'HTTP_TIMEOUT_MS:10000' 'TOTAL_TIMEOUT_MS:20000' 'MIN_VALIDITY_MS:2000' 'MAX_VALIDITY_MS:30000'; do
+        IFS=':' read -r bound_name bound_value <<< "$bound"
+        if ! grep -qE "^[[:space:]]*const[[:space:]]+${bound_name}[[:space:]]*=[[:space:]]*${bound_value};[[:space:]]*$" "$client"; then
+            log_high "SEC-014: Authorization client missing specified bound: ${bound_name} = ${bound_value}"
             failed=1
         fi
     done
-    if ! grep -qF 'redirect: "manual"' "$client" || ! grep -qF 'response.redirected' "$client"; then
-        log_critical "SEC-014: Authorization requests do not block on redirects"
+    local oidc_request authority_request
+    oidc_request=$(sed -n '/fetchImpl(url, { method: "GET"/,/);/p' "$client")
+    authority_request=$(sed -n '/fetchImpl(config.endpoint, {/,/});/p' "$client")
+    if ! grep -qF 'redirect: "manual"' <<< "$oidc_request"; then
+        log_critical "SEC-014: OIDC credential request does not disable automatic redirects"
+        failed=1
+    fi
+    if ! grep -qF 'redirect: "manual"' <<< "$authority_request"; then
+        log_critical "SEC-014: Authorization decision request does not disable automatic redirects"
+        failed=1
+    fi
+    if ! grep -qF 'response.redirected' "$client"; then
+        log_critical "SEC-014: Authorization responses do not block on redirects"
         failed=1
     fi
 
@@ -3867,7 +3901,7 @@ echo "Running IMP-006: Pull Request Review Target Authorization..."
 check_pr_review_target_authorization() {
     local spec="docs/src/content/docs/specs/safe-outputs-specification.md"
     local failed=0
-    local entry type_name prefix handler target_var section n
+    local entry type_name prefix handler target_var section n registry_path legacy_path triggering wildcard fixed
 
     for entry in \
         "create_pull_request_review_comment:CRC:actions/setup/js/create_pr_review_comment.cjs:commentTarget" \
@@ -3895,18 +3929,68 @@ check_pr_review_target_authorization() {
             failed=1
             continue
         fi
-        if ! grep -qE "const ${target_var} = config\.target \|\| \"triggering\"" "$handler"; then
+        if ! grep -qE "^[[:space:]]*const ${target_var} = config\.target \|\| \"triggering\";[[:space:]]*$" "$handler"; then
             log_high "IMP-006: $handler does not default an omitted target to \"triggering\" (${prefix}-001)"
             failed=1
         fi
         if [ "$prefix" = "SPR" ]; then
-            if ! grep -qF 'resolveTarget' "$handler"; then
-                log_high "IMP-006: $handler does not resolve review targets via resolveTarget (SPR-002-004)"
+            registry_path=$(sed -n '/async function handleWithRegistry/,/async function handleWithLegacyBuffer/p' "$handler")
+            legacy_path=$(sed -n '/async function handleWithLegacyBuffer/,/async function setReviewContextOnBuffer/p' "$handler")
+            if ! grep -qF 'const targetResult = resolveTarget({' <<< "$registry_path" ||
+                ! grep -qF 'targetConfig,' <<< "$registry_path" ||
+                ! grep -qF 'const prNum = targetResult.number;' <<< "$registry_path" ||
+                ! grep -qF 'registry.getOrCreate(repo, prNum)' <<< "$registry_path" ||
+                ! grep -qF 'pull_request_number: prNum' <<< "$registry_path"; then
+                log_high "IMP-006: $handler does not resolve and propagate the configured target in the registry path (SPR-002-004)"
                 failed=1
             fi
-        elif ! grep -qE "${target_var} === \"\\*\"" "$handler" || ! grep -qF 'pull_request_number' "$handler"; then
-            log_high "IMP-006: $handler does not restrict agent-supplied pull_request_number to target \"*\" (${prefix}-004)"
-            failed=1
+            if ! grep -qF 'const targetResult = resolveTarget({' <<< "$legacy_path" ||
+                ! grep -qF 'targetConfig,' <<< "$legacy_path" ||
+                ! grep -qF 'const prNum = targetResult.number;' <<< "$legacy_path" ||
+                ! grep -qF 'setReviewContextOnBuffer(buffer, prNum, repo, repoParts, message)' <<< "$legacy_path"; then
+                log_high "IMP-006: $handler does not resolve and propagate the configured target in the legacy path (SPR-002-004)"
+                failed=1
+            fi
+        elif [ "$prefix" = "CRC" ]; then
+            triggering=$(sed -n '/\/\/ Default behavior: use triggering PR/,/if (!pullRequestNumber)/p' "$handler")
+            wildcard=$(sed -n '/if (commentTarget === "\*")/,/} else if (commentTarget && commentTarget !== "triggering")/p' "$handler")
+            fixed=$(sed -n '/} else if (commentTarget && commentTarget !== "triggering")/,/\/\/ Default behavior: use triggering PR/p' "$handler")
+            if ! grep -qF 'pullRequestNumber = effectivePayload.pull_request.number' <<< "$triggering" &&
+                ! grep -qF 'pullRequestNumber = effectivePayload.issue.number' <<< "$triggering" ||
+                grep -qF 'commentItem.pull_request_number' <<< "$triggering"; then
+                log_high "IMP-006: $handler does not bind triggering targets to the triggering PR (CRC-001-003)"
+                failed=1
+            fi
+            if ! grep -qF 'if (commentItem.pull_request_number)' <<< "$wildcard" ||
+                ! grep -qF 'Target is "*" but no pull_request_number specified' <<< "$wildcard"; then
+                log_high "IMP-006: $handler does not require pull_request_number for wildcard targets (CRC-004)"
+                failed=1
+            fi
+            if ! grep -qF 'parseInt(commentTarget, 10)' <<< "$fixed" ||
+                grep -qF 'commentItem.pull_request_number' <<< "$fixed"; then
+                log_high "IMP-006: $handler does not bind fixed targets to configured target (CRC-002-003)"
+                failed=1
+            fi
+        else
+            triggering=$(sed -n '/if (replyTarget === "triggering")/,/} else if (replyTarget === "\*")/p' "$handler")
+            wildcard=$(sed -n '/} else if (replyTarget === "\*")/,/\/\/ Explicit PR number in target/p' "$handler")
+            fixed=$(sed -n '/\/\/ Explicit PR number in target/,/\/\/ Apply required-labels/p' "$handler")
+            if ! grep -qF 'targetPRNumber = triggeringPRNumber' <<< "$triggering" ||
+                grep -qF 'item.pull_request_number' <<< "$triggering"; then
+                log_high "IMP-006: $handler does not bind triggering targets to the triggering PR (RRC-001-003)"
+                failed=1
+            fi
+            if ! grep -qF 'targetPRNumber = item.pull_request_number' <<< "$wildcard" ||
+                ! grep -qF 'if (!targetPRNumber)' <<< "$wildcard" ||
+                ! grep -qF 'pull_request_number is required when target is' <<< "$wildcard"; then
+                log_high "IMP-006: $handler does not require pull_request_number for wildcard targets (RRC-004)"
+                failed=1
+            fi
+            if ! grep -qF 'targetPRNumber = parseInt(replyTarget, 10)' <<< "$fixed" ||
+                grep -qF 'item.pull_request_number' <<< "$fixed"; then
+                log_high "IMP-006: $handler does not bind fixed targets to configured target (RRC-002-003)"
+                failed=1
+            fi
         fi
     done
 
