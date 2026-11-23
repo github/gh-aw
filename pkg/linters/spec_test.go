@@ -44,6 +44,7 @@ import (
 	"github.com/github/gh-aw/pkg/linters/goroutinemissingrecover"
 	"github.com/github/gh-aw/pkg/linters/goroutineresourceleak"
 	"github.com/github/gh-aw/pkg/linters/hardcodedfilepath"
+	hasprefixdotdotpathescape "github.com/github/gh-aw/pkg/linters/hasprefix-dotdot-path-escape"
 	"github.com/github/gh-aw/pkg/linters/httpclientnotimeout"
 	"github.com/github/gh-aw/pkg/linters/httpnoctx"
 	"github.com/github/gh-aw/pkg/linters/httprespbodyclose"
@@ -127,7 +128,7 @@ type docAnalyzer struct {
 }
 
 // documentedAnalyzers returns the analyzer subpackages documented in the README
-// "Public API > Subpackages" table. The README documents 100 analyzer
+// "Public API > Subpackages" table. The README documents 101 analyzer
 // subpackages (the non-analyzer `internal` helper subpackage is excluded because
 // it exposes no Analyzer).
 //
@@ -176,6 +177,7 @@ func documentedAnalyzers() []docAnalyzer {
 		{"goroutinemissingrecover", goroutinemissingrecover.Analyzer},
 		{"goroutineresourceleak", goroutineresourceleak.Analyzer},
 		{"hardcodedfilepath", hardcodedfilepath.Analyzer},
+		{"hasprefixdotdotpathescape", hasprefixdotdotpathescape.Analyzer},
 		{"httpclientnotimeout", httpclientnotimeout.Analyzer},
 		{"httpnoctx", httpnoctx.Analyzer},
 		{"httprespbodyclose", httprespbodyclose.Analyzer},
