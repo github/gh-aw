@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
+	"slices"
 	"strings"
 	"unicode"
 
@@ -360,7 +360,7 @@ func formatModelRoutingCounts(counts map[string]int) string {
 	for key := range counts {
 		keys = append(keys, key)
 	}
-	sort.Strings(keys)
+	slices.Sort(keys)
 	parts := make([]string, 0, len(keys))
 	for _, key := range keys {
 		parts = append(parts, fmt.Sprintf("%s=%d", safeModelRoutingText(key), counts[key]))
@@ -856,7 +856,7 @@ func renderConsoleExperiments(experiments *ExperimentData) {
 	for name, variant := range experiments.Assignments {
 		parts = append(parts, name+"="+variant)
 	}
-	sort.Strings(parts)
+	slices.Sort(parts)
 	fmt.Fprintf(os.Stderr, "  experiments: %s\n", strings.Join(parts, " "))
 }
 

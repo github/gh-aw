@@ -12,6 +12,7 @@
 package cli
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -56,9 +57,12 @@ func extractLogMetrics(logDir string, verbose bool, workflowPath ...string) (Log
 
 	// First check if this is a GitHub Copilot coding agent run (not Copilot CLI)
 	var detector *CopilotCodingAgentDetector
-	if len(workflowPath) > 0 && workflowPath[0] != "" {
-		detector = NewCopilotCodingAgentDetectorWithPath(logDir, verbose, workflowPath[0])
-	} else {
+	if len(workflowPath) > 0 {
+		if path := workflowPath[0]; path != "" {
+			detector = NewCopilotCodingAgentDetectorWithPath(logDir, verbose, path)
+		}
+	}
+	if detector == nil {
 		detector = NewCopilotCodingAgentDetector(logDir, verbose)
 	}
 	isGitHubCopilotCodingAgent := detector.IsGitHubCopilotCodingAgent()
@@ -68,180 +72,208 @@ func extractLogMetrics(logDir string, verbose bool, workflowPath ...string) (Log
 		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Detected GitHub Copilot coding agent run, using specialized parser"))
 	}
 
-	// First check for aw_info.json to determine the engine
-	var detectedEngine workflow.CodingAgentEngine
+	detectedEngine := detectEngineFromAwInfo(logDir, verbose)
+	reportRunArtifactFiles(logDir, verbose)
+	ensureAgentOutputAtRunRoot(logDir, verbose)
+
+	// Try events.jsonl first – it provides a precise, structured event list from the Copilot CLI
+	// session state and is the most reliable source for tool calls, turns, and usage metrics.
+	// Fall back to walking .log files if events.jsonl is not present or cannot be parsed.
+	var walkErr error
+	eventsMetrics, eventsJSONLParsed := parseEventsJSONLIfPresent(logDir, verbose)
+	if eventsJSONLParsed {
+		metrics = eventsMetrics
+	} else {
+		walkErr = aggregateLogFileMetrics(logDir, &metrics, detectedEngine, isGitHubCopilotCodingAgent, verbose)
+	}
+
+	reportGatewayLogs(logDir, verbose)
+
+	if logsMetricsLog.Enabled() {
+		logsMetricsLog.Printf("Metrics extraction completed: tokens=%d, cost=%.4f, turns=%d",
+			metrics.TokenUsage, metrics.EstimatedCost, metrics.Turns)
+	}
+	return metrics, walkErr
+}
+
+// detectEngineFromAwInfo reads aw_info.json in logDir to determine the coding agent engine.
+// It returns nil when the file is missing or the engine cannot be extracted.
+func detectEngineFromAwInfo(logDir string, verbose bool) workflow.CodingAgentEngine {
 	infoFilePath := filepath.Join(logDir, "aw_info.json")
 	logsMetricsLog.Printf("Checking for aw_info.json at: %s", infoFilePath)
 	if fileutil.FileExists(infoFilePath) {
 		logsMetricsLog.Print("Found aw_info.json, extracting engine")
 		// aw_info.json exists, try to extract engine information
 		if engine := extractEngineFromAwInfo(infoFilePath, verbose); engine != nil {
-			detectedEngine = engine
 			logsMetricsLog.Printf("Detected engine: %s", engine.GetID())
 			if verbose {
 				fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Detected engine from aw_info.json: "+engine.GetID()))
 			}
-		} else {
-			logsMetricsLog.Print("Failed to extract engine from aw_info.json")
-			if verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage("aw_info.json exists but failed to extract engine"))
-			}
+			return engine
+		}
+		logsMetricsLog.Print("Failed to extract engine from aw_info.json")
+		if verbose {
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage("aw_info.json exists but failed to extract engine"))
+		}
+		return nil
+	}
+	if _, statErr := os.Stat(infoFilePath); statErr != nil {
+		logsMetricsLog.Printf("No aw_info.json found at %s: %v", infoFilePath, statErr)
+		if verbose {
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("No aw_info.json found at %s: %v", infoFilePath, statErr)))
 		}
 	} else {
-		if _, statErr := os.Stat(infoFilePath); statErr != nil {
-			logsMetricsLog.Printf("No aw_info.json found at %s: %v", infoFilePath, statErr)
-			if verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("No aw_info.json found at %s: %v", infoFilePath, statErr)))
-			}
-		} else {
-			// Path exists but is not a regular file (for example, a directory).
-			logsMetricsLog.Printf("No aw_info.json file found at %s", infoFilePath)
-			if verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage("No aw_info.json file found at "+infoFilePath))
-			}
+		// Path exists but is not a regular file (for example, a directory).
+		logsMetricsLog.Printf("No aw_info.json file found at %s", infoFilePath)
+		if verbose {
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage("No aw_info.json file found at "+infoFilePath))
 		}
 	}
+	return nil
+}
 
-	// Check for safe_output.jsonl artifact file
+// reportRunArtifactFiles reports safe_output.jsonl and aw-*.patch/aw-*.bundle artifacts in verbose mode.
+func reportRunArtifactFiles(logDir string, verbose bool) {
+	if !verbose {
+		return
+	}
 	awOutputPath := filepath.Join(logDir, "safe_output.jsonl")
 	if fileutil.FileExists(awOutputPath) {
-		if verbose {
-			// Report that the agentic output file was found
-			fileInfo, statErr := os.Stat(awOutputPath)
-			if statErr == nil {
-				fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Found agentic output file: safe_output.jsonl (%s)", console.FormatFileSize(fileInfo.Size()))))
-			}
+		if fileInfo, statErr := os.Stat(awOutputPath); statErr == nil {
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Found agentic output file: safe_output.jsonl (%s)", console.FormatFileSize(fileInfo.Size()))))
 		}
 	}
 
-	// Check for aw-*.patch and aw-*.bundle artifact files (branch-named patches/bundles)
-	if dirEntries, err := os.ReadDir(logDir); err == nil {
-		for _, entry := range dirEntries {
-			name := entry.Name()
-			isPatch, _ := filepath.Match("aw-*.patch", name)
-			isBundle, _ := filepath.Match("aw-*.bundle", name)
-			if isPatch || isBundle {
-				if verbose {
-					filePath := filepath.Join(logDir, name)
-					if fileInfo, statErr := os.Stat(filePath); statErr == nil {
-						fileType := "git patch"
-						if isBundle {
-							fileType = "git bundle"
-						}
-						fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Found %s file: %s (%s)", fileType, name, console.FormatFileSize(fileInfo.Size()))))
-					}
-				}
+	// Branch-named patches/bundles
+	dirEntries, err := os.ReadDir(logDir)
+	if err != nil {
+		return
+	}
+	for _, entry := range dirEntries {
+		name := entry.Name()
+		isPatch, _ := filepath.Match("aw-*.patch", name)
+		isBundle, _ := filepath.Match("aw-*.bundle", name)
+		if !isPatch && !isBundle {
+			continue
+		}
+		if fileInfo, statErr := os.Stat(filepath.Join(logDir, name)); statErr == nil {
+			fileType := "git patch"
+			if isBundle {
+				fileType = "git bundle"
 			}
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Found %s file: %s (%s)", fileType, name, console.FormatFileSize(fileInfo.Size()))))
 		}
 	}
+}
 
-	// Check for agent_output.json artifact (some workflows may store this under a nested directory)
+// ensureAgentOutputAtRunRoot locates agent_output.json (possibly nested) and copies it
+// to the run root when it is not already there.
+func ensureAgentOutputAtRunRoot(logDir string, verbose bool) {
 	agentOutputPath, agentOutputFound := findAgentOutputFile(logDir)
-	if agentOutputFound {
-		if verbose {
-			fileInfo, statErr := os.Stat(agentOutputPath)
-			if statErr == nil {
-				fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Found agent output file: %s (%s)", filepath.Base(agentOutputPath), console.FormatFileSize(fileInfo.Size()))))
-			}
-		}
-		// If the file is not already in the logDir root, copy it for convenience
-		if filepath.Dir(agentOutputPath) != logDir {
-			rootCopy := filepath.Join(logDir, constants.AgentOutputArtifactName.String())
-			if _, err := os.Stat(rootCopy); errors.Is(err, os.ErrNotExist) {
-				if copyErr := fileutil.CopyFile(agentOutputPath, rootCopy); copyErr == nil && verbose {
-					fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Copied agent_output.json to run root for easy access"))
-				}
-			}
+	if !agentOutputFound {
+		return
+	}
+	if verbose {
+		if fileInfo, statErr := os.Stat(agentOutputPath); statErr == nil {
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Found agent output file: %s (%s)", filepath.Base(agentOutputPath), console.FormatFileSize(fileInfo.Size()))))
 		}
 	}
-
-	// Try events.jsonl first – it provides a precise, structured event list from the Copilot CLI
-	// session state and is the most reliable source for tool calls, turns, and usage metrics.
-	// Fall back to walking .log files if events.jsonl is not present or cannot be parsed.
-	var walkErr error
-	eventsJSONLParsed := false
-	if eventsJSONLPath := findEventsJSONLFile(logDir); eventsJSONLPath != "" {
-		if verbose {
-			fileInfo, statErr := os.Stat(eventsJSONLPath)
-			if statErr == nil {
-				fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Found events.jsonl (%s), using as primary metrics source", console.FormatFileSize(fileInfo.Size()))))
-			} else {
-				fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Found events.jsonl, using as primary metrics source"))
-			}
+	if filepath.Dir(agentOutputPath) == logDir {
+		return
+	}
+	rootCopy := filepath.Join(logDir, constants.AgentOutputArtifactName.String())
+	if _, err := os.Stat(rootCopy); errors.Is(err, os.ErrNotExist) {
+		if copyErr := fileutil.CopyFile(agentOutputPath, rootCopy); copyErr == nil && verbose {
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Copied agent_output.json to run root for easy access"))
 		}
-		eventsMetrics, eventsErr := parseEventsJSONLMetrics(eventsJSONLPath, verbose)
-		if eventsErr == nil {
-			metrics = eventsMetrics
-			eventsJSONLParsed = true
-			logsMetricsLog.Printf("events.jsonl parsed: turns=%d tokens=%d toolCalls=%d",
-				metrics.Turns, metrics.TokenUsage, len(metrics.ToolCalls))
+	}
+}
+
+// parseEventsJSONLIfPresent parses events.jsonl when present. The boolean reports success.
+func parseEventsJSONLIfPresent(logDir string, verbose bool) (LogMetrics, bool) {
+	eventsJSONLPath := findEventsJSONLFile(logDir)
+	if eventsJSONLPath == "" {
+		return LogMetrics{}, false
+	}
+	if verbose {
+		if fileInfo, statErr := os.Stat(eventsJSONLPath); statErr == nil {
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Found events.jsonl (%s), using as primary metrics source", console.FormatFileSize(fileInfo.Size()))))
 		} else {
-			logsMetricsLog.Printf("Failed to parse events.jsonl, falling back to log files: %v", eventsErr)
-			if verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to parse events.jsonl: %v", eventsErr)))
-			}
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Found events.jsonl, using as primary metrics source"))
 		}
 	}
-
-	// Walk through all .log files when events.jsonl was not available or failed to parse
-	if !eventsJSONLParsed {
-		walkErr = filepath.Walk(logDir, func(path string, info os.FileInfo, err error) error {
-			if err != nil {
-				return err
-			}
-
-			// Skip directories. workflow-logs/ is explicitly excluded because it contains
-			// GitHub Actions runner captures of each job/step's stdout rather than the agent
-			// artifact data. Parsing those files would double-count token usage and turns;
-			// the same agent session output appears in both the agent artifact
-			// (e.g. agent-stdio.log) and the workflow run logs (workflow-logs/).
-			if info.IsDir() {
-				if info.Name() == "workflow-logs" {
-					logsMetricsLog.Printf("Skipping workflow-logs directory (GHA runner logs, not agent metrics): %s", path)
-					return filepath.SkipDir
-				}
-				return nil
-			}
-
-			// Process log files - exclude output artifacts like aw_output.txt and agent_output.json
-			fileName := strings.ToLower(info.Name())
-			if (strings.HasSuffix(fileName, ".log") ||
-				(strings.HasSuffix(fileName, ".txt") && strings.Contains(fileName, "log"))) &&
-				!strings.Contains(fileName, "aw_output") &&
-				fileName != constants.AgentOutputFilename.String() {
-
-				fileMetrics, err := parseLogFileWithEngine(path, detectedEngine, isGitHubCopilotCodingAgent, verbose)
-				if err != nil && verbose {
-					fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to parse log file %s: %v", path, err)))
-					return nil // Continue processing other files
-				}
-
-				// Aggregate metrics
-				metrics.TokenUsage += fileMetrics.TokenUsage
-				metrics.EstimatedCost += fileMetrics.EstimatedCost
-				if fileMetrics.Turns > metrics.Turns {
-					// For turns, take the maximum rather than summing, since turns represent
-					// the total conversation turns for the entire workflow run
-					metrics.Turns = fileMetrics.Turns
-				}
-
-				// Aggregate tool sequences and tool calls
-				metrics.ToolSequences = append(metrics.ToolSequences, fileMetrics.ToolSequences...)
-				metrics.ToolCalls = append(metrics.ToolCalls, fileMetrics.ToolCalls...)
-			}
-
-			return nil
-		})
+	eventsMetrics, eventsErr := parseEventsJSONLMetrics(eventsJSONLPath, verbose)
+	if eventsErr != nil {
+		logsMetricsLog.Printf("Failed to parse events.jsonl, falling back to log files: %v", eventsErr)
+		if verbose {
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to parse events.jsonl: %v", eventsErr)))
+		}
+		return LogMetrics{}, false
 	}
+	logsMetricsLog.Printf("events.jsonl parsed: turns=%d tokens=%d toolCalls=%d",
+		eventsMetrics.Turns, eventsMetrics.TokenUsage, len(eventsMetrics.ToolCalls))
+	return eventsMetrics, true
+}
 
-	// Try to parse gateway.jsonl if it exists
+// aggregateLogFileMetrics walks logDir and aggregates metrics from agent log files into metrics.
+func aggregateLogFileMetrics(logDir string, metrics *LogMetrics, detectedEngine workflow.CodingAgentEngine, isGitHubCopilotCodingAgent bool, verbose bool) error {
+	return filepath.WalkDir(logDir, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+
+		// Skip directories. workflow-logs/ is explicitly excluded because it contains
+		// GitHub Actions runner captures of each job/step's stdout rather than the agent
+		// artifact data. Parsing those files would double-count token usage and turns;
+		// the same agent session output appears in both the agent artifact
+		// (e.g. agent-stdio.log) and the workflow run logs (workflow-logs/).
+		if d.IsDir() {
+			if d.Name() == "workflow-logs" {
+				logsMetricsLog.Printf("Skipping workflow-logs directory (GHA runner logs, not agent metrics): %s", path)
+				return filepath.SkipDir
+			}
+			return nil
+		}
+
+		// Process log files - exclude output artifacts like aw_output.txt and agent_output.json
+		fileName := strings.ToLower(d.Name())
+		if (strings.HasSuffix(fileName, ".log") ||
+			(strings.HasSuffix(fileName, ".txt") && strings.Contains(fileName, "log"))) &&
+			!strings.Contains(fileName, "aw_output") &&
+			fileName != constants.AgentOutputFilename.String() {
+
+			fileMetrics, err := parseLogFileWithEngine(path, detectedEngine, isGitHubCopilotCodingAgent, verbose)
+			if err != nil && verbose {
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to parse log file %s: %v", path, err)))
+				return nil // Continue processing other files
+			}
+
+			// Aggregate metrics
+			metrics.TokenUsage += fileMetrics.TokenUsage
+			metrics.EstimatedCost += fileMetrics.EstimatedCost
+			if fileMetrics.Turns > metrics.Turns {
+				// For turns, take the maximum rather than summing, since turns represent
+				// the total conversation turns for the entire workflow run
+				metrics.Turns = fileMetrics.Turns
+			}
+
+			// Aggregate tool sequences and tool calls
+			metrics.ToolSequences = append(metrics.ToolSequences, fileMetrics.ToolSequences...)
+			metrics.ToolCalls = append(metrics.ToolCalls, fileMetrics.ToolCalls...)
+		}
+
+		return nil
+	})
+}
+
+// reportGatewayLogs parses gateway.jsonl when present and reports the outcome.
+// Gateway metrics are tracked separately and not merged into LogMetrics.
+func reportGatewayLogs(logDir string, verbose bool) {
 	gatewayMetrics, gatewayErr := parseGatewayLogs(logDir, verbose)
 	if gatewayErr == nil && gatewayMetrics != nil {
 		if verbose {
 			fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Successfully parsed gateway.jsonl"))
 		}
-		// We've successfully parsed gateway metrics, but we don't add them to the main metrics
-		// structure since they're tracked separately and displayed in their own table
 		logsMetricsLog.Printf("Parsed gateway.jsonl: %d servers, %d requests",
 			len(gatewayMetrics.Servers), gatewayMetrics.TotalRequests)
 	} else if gatewayErr != nil && !errorutil.IsNotFoundError(gatewayErr) {
@@ -251,12 +283,6 @@ func extractLogMetrics(logDir string, verbose bool, workflowPath ...string) (Log
 			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to parse gateway.jsonl: %v", gatewayErr)))
 		}
 	}
-
-	if logsMetricsLog.Enabled() {
-		logsMetricsLog.Printf("Metrics extraction completed: tokens=%d, cost=%.4f, turns=%d",
-			metrics.TokenUsage, metrics.EstimatedCost, metrics.Turns)
-	}
-	return metrics, walkErr
 }
 
 // ExtractLogMetricsFromRun extracts log metrics from a processed run's log directory
@@ -515,18 +541,18 @@ func extractMCPFailuresFromRun(runDir string, run WorkflowRun, verbose bool, exp
 
 	// Look for agent output logs that contain the system init entry with MCP server status
 	// This information is available in the raw log files, typically with names containing "log"
-	walkErr := filepath.Walk(runDir, func(path string, info os.FileInfo, err error) error {
+	walkErr := filepath.WalkDir(runDir, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
 
 		// Skip directories
-		if info.IsDir() {
+		if d.IsDir() {
 			return nil
 		}
 
 		// Process log files - exclude output artifacts
-		fileName := strings.ToLower(info.Name())
+		fileName := strings.ToLower(d.Name())
 		if (strings.HasSuffix(fileName, ".log") ||
 			(strings.HasSuffix(fileName, ".txt") && strings.Contains(fileName, "log"))) &&
 			!strings.Contains(fileName, "aw_output") &&
@@ -567,8 +593,6 @@ func extractMCPFailuresFromLogFile(logPath string, run WorkflowRun, verbose bool
 		return mcpFailures, fmt.Errorf("error reading log file: %w", err)
 	}
 
-	logContent := string(content)
-
 	// First try to parse as JSON array
 	var logEntries []map[string]any
 	if err := json.Unmarshal(content, &logEntries); err == nil {
@@ -578,16 +602,15 @@ func extractMCPFailuresFromLogFile(logPath string, run WorkflowRun, verbose bool
 		}
 	} else {
 		// Fallback: Try to parse as JSON lines (Claude logs are typically NDJSON format)
-		lines := strings.SplitSeq(logContent, "\n")
-		for line := range lines {
-			line = strings.TrimSpace(line)
-			if line == "" || !strings.HasPrefix(line, "{") {
+		for line := range bytes.SplitSeq(content, []byte("\n")) {
+			line = bytes.TrimSpace(line)
+			if !bytes.HasPrefix(line, []byte("{")) {
 				continue
 			}
 
 			// Try to parse each line as JSON
 			var entry map[string]any
-			if err := json.Unmarshal([]byte(line), &entry); err != nil {
+			if err := json.Unmarshal(line, &entry); err != nil {
 				continue // Skip non-JSON lines
 			}
 
@@ -838,16 +861,16 @@ func extractSkillActivationsFromLogFiles(runDir string, run WorkflowRun, verbose
 	seen := make(map[string]struct{})
 	var activations []SkillActivation
 
-	walkErr := filepath.Walk(runDir, func(path string, info os.FileInfo, err error) error {
+	walkErr := filepath.WalkDir(runDir, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
-		if info.IsDir() {
+		if d.IsDir() {
 			return nil
 		}
 
 		// Only inspect agent log files; skip output artifacts.
-		fileName := strings.ToLower(info.Name())
+		fileName := strings.ToLower(d.Name())
 		isLogFile := strings.HasSuffix(fileName, ".log") ||
 			(strings.HasSuffix(fileName, ".txt") && strings.Contains(fileName, "log"))
 		isOutputArtifact := strings.Contains(fileName, "aw_output") ||
@@ -888,10 +911,12 @@ func extractSkillActivationsFromLogFile(logPath string, run WorkflowRun, verbose
 		}
 		for _, pat := range skillInvocationPatterns {
 			matches := pat.re.FindStringSubmatch(line)
-			if len(matches) < 2 {
-				continue
+			// Capture group 1 of each skill invocation pattern holds the skill name.
+			const skillNameGroup = 1
+			var skillName string
+			if len(matches) > skillNameGroup {
+				skillName = strings.TrimSpace(matches[skillNameGroup])
 			}
-			skillName := strings.TrimSpace(matches[1])
 			if skillName == "" {
 				continue
 			}

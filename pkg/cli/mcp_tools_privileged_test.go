@@ -1222,7 +1222,7 @@ func TestAuditTimeoutErrorSummarizesPartialResults(t *testing.T) {
 		`{"overview":`,
 		"",
 	} {
-		result, _, err := buildAuditErrorResult(context.DeadlineExceeded, output, []string{"123"})
+		result, _, err := buildAuditErrorResult(context.DeadlineExceeded, []byte(output), []string{"123"})
 		require.NoError(t, err)
 		assert.True(t, result.IsError)
 		content, ok := result.Content[0].(*mcp.TextContent)

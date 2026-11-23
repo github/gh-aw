@@ -11,7 +11,10 @@ import (
 	"strings"
 
 	"github.com/github/gh-aw/pkg/constants"
+	"github.com/github/gh-aw/pkg/logger"
 )
+
+var continuationRequestsLog = logger.New("cli:continuation_requests")
 
 func continuationRequestCount(requests []ContinuationRequestReport) *int {
 	if requests == nil {
@@ -30,7 +33,11 @@ func backfillContinuationRequests(requests *[]ContinuationRequestReport, run Wor
 		return false
 	}
 	experiment, variant, _ := firstExperimentAssignment(extractExperimentData(runDir))
-	*requests, _ = extractContinuationRequestsFromRun(runDir, run, verbose, experiment, variant)
+	var err error
+	*requests, err = extractContinuationRequestsFromRun(runDir, run, verbose, experiment, variant)
+	if err != nil {
+		continuationRequestsLog.Printf("Failed to backfill continuation requests: run_id=%d run_dir=%s error=%v", run.DatabaseID, runDir, err)
+	}
 	return *requests != nil
 }
 
@@ -114,9 +121,9 @@ func mergeContinuationRequestsIntoAudit(auditData *AuditData, requests []Continu
 	return changed
 }
 
-func renderTSVContinuationRequestSummary(w io.Writer, summary LogsSummary) {
+func renderTSVContinuationRequestSummary(w *compactLogsWriter, summary LogsSummary) {
 	if summary.TotalContinuationRequests > 0 || summary.ContinuationRequestsUnavailableRuns > 0 {
-		fmt.Fprintf(w, "# continuation_requests=%d continuation_requested_runs=%d continuation_requests_unavailable_runs=%d (requests only; no automatic dispatch or resume)\n",
+		w.printf("# continuation_requests=%d continuation_requested_runs=%d continuation_requests_unavailable_runs=%d (requests only; no automatic dispatch or resume)\n",
 			summary.TotalContinuationRequests, summary.ContinuationRequestedRuns, summary.ContinuationRequestsUnavailableRuns)
 	}
 }
