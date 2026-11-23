@@ -3,6 +3,10 @@
 package workflow
 
 import (
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -11,26 +15,28 @@ import (
 
 func TestValidateBYOKProviderHostAllowlist(t *testing.T) {
 	tests := []struct {
-		name        string
-		baseURL     string
-		version     string
-		allowed     []string
-		noFirewall  bool
-		wantWarning bool
+		name       string
+		baseURL    string
+		version    string
+		allowed    []string
+		noFirewall bool
+		wantError  bool
 	}{
-		{name: "expression with old AWF", baseURL: "${{ vars.AI_GATEWAY_URL }}", version: "v0.25.40", allowed: []string{"defaults"}, wantWarning: true},
-		{name: "secret expression with old AWF", baseURL: "${{ secrets.AI_GATEWAY_URL }}", version: "v0.25.40", wantWarning: true},
+		{name: "expression with old AWF", baseURL: "${{ vars.AI_GATEWAY_URL }}", version: "v0.25.40", allowed: []string{"defaults"}, wantError: true},
+		{name: "secret expression with old AWF", baseURL: "${{ secrets.AI_GATEWAY_URL }}", version: "v0.25.40", wantError: true},
+		{name: "expression with unknown AWF", baseURL: "${{ vars.AI_GATEWAY_URL }}", version: "custom-build", wantError: true},
 		{name: "expression with minimum AWF", baseURL: "${{ vars.AI_GATEWAY_URL }}", version: "v0.25.41"},
+		{name: "secret expression with minimum AWF", baseURL: "${{ secrets.AI_GATEWAY_URL }}", version: "v0.25.41"},
 		{name: "expression with default AWF", baseURL: "${{ vars.AI_GATEWAY_URL }}"},
 		{name: "literal URL with old AWF", baseURL: "https://gateway.example.com/v1", version: "v0.25.40"},
-		{name: "custom allowed domain cannot be verified", baseURL: "${{ vars.AI_GATEWAY_URL }}", version: "v0.25.40", allowed: []string{"defaults", "gateway.example.com"}, wantWarning: true},
-		{name: "unrelated custom domain", baseURL: "${{ secrets.AI_GATEWAY_URL }}", version: "v0.25.40", allowed: []string{"defaults", "example.com"}, wantWarning: true},
+		{name: "custom allowed domain cannot be verified", baseURL: "${{ vars.AI_GATEWAY_URL }}", version: "v0.25.40", allowed: []string{"defaults", "gateway.example.com"}, wantError: true},
+		{name: "unrelated custom domain", baseURL: "${{ secrets.AI_GATEWAY_URL }}", version: "v0.25.40", allowed: []string{"defaults", "example.com"}, wantError: true},
 		{name: "firewall disabled", baseURL: "${{ vars.AI_GATEWAY_URL }}", version: "v0.25.40", noFirewall: true},
 		{name: "no base URL", version: "v0.25.40"},
 	}
 	for _, tt := range tests {
 		for _, strict := range []bool{false, true} {
-			t.Run(tt.name, func(t *testing.T) {
+			t.Run(fmt.Sprintf("%s/strict=%t", tt.name, strict), func(t *testing.T) {
 				env := map[string]string{}
 				if tt.baseURL != "" {
 					env["COPILOT_PROVIDER_BASE_URL"] = tt.baseURL
@@ -46,18 +52,65 @@ func TestValidateBYOKProviderHostAllowlist(t *testing.T) {
 				compiler := NewCompiler()
 				compiler.SetStrictMode(strict)
 				err := compiler.validateBYOKProviderHostAllowlist(data, "workflow.md")
-				switch {
-				case tt.wantWarning && strict:
+				if tt.wantError {
 					require.Error(t, err)
-					assert.Contains(t, err.Error(), "strict mode")
+					assert.Contains(t, err.Error(), "COPILOT_PROVIDER_BASE_URL")
 					assert.Contains(t, err.Error(), "v0.25.41")
+					assert.Contains(t, err.Error(), "sandbox.agent.version")
 					assert.Contains(t, err.Error(), "network.allowed")
-				case tt.wantWarning:
+					assert.Contains(t, err.Error(), "literal URL")
+				} else {
 					require.NoError(t, err)
-					assert.Equal(t, 1, compiler.GetWarningCount())
-				default:
+				}
+				assert.Zero(t, compiler.GetWarningCount())
+			})
+		}
+	}
+}
+
+func TestCompileBYOKProviderHostAllowlist(t *testing.T) {
+	for _, strict := range []bool{false, true} {
+		for _, context := range []string{"vars", "secrets"} {
+			t.Run(fmt.Sprintf("%s/strict=%t", context, strict), func(t *testing.T) {
+				path := filepath.Join(t.TempDir(), "byok.md")
+				content := fmt.Sprintf(`---
+on: workflow_dispatch
+permissions:
+  contents: read
+strict: %t
+network: defaults
+sandbox:
+  agent:
+    version: v0.25.40
+engine:
+  id: copilot
+  env:
+    COPILOT_PROVIDER_BASE_URL: ${{ %s.AI_GATEWAY_URL }}
+    COPILOT_PROVIDER_WIRE_API: responses
+---
+Report.
+`, strict, context)
+				require.NoError(t, os.WriteFile(path, []byte(content), 0600))
+				compiler := NewCompiler()
+				compiler.SetStrictMode(strict)
+				err := compiler.CompileWorkflow(path)
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), "COPILOT_PROVIDER_BASE_URL")
+				assert.Contains(t, err.Error(), "network.allowed")
+				assert.Contains(t, err.Error(), "v0.25.41")
+
+				for _, pin := range []string{"    version: v0.25.41", ""} {
+					supported := strings.Replace(content, "    version: v0.25.40", pin, 1)
+					if pin == "" {
+						supported = strings.Replace(content, "sandbox:\n  agent:\n    version: v0.25.40\n", "", 1)
+					}
+					require.NoError(t, os.WriteFile(path, []byte(supported), 0600))
+					compiler := NewCompiler()
+					compiler.SetStrictMode(strict)
+					require.NoError(t, compiler.CompileWorkflow(path))
+					lock, err := os.ReadFile(filepath.Join(filepath.Dir(path), "byok.lock.yml"))
 					require.NoError(t, err)
-					assert.Zero(t, compiler.GetWarningCount())
+					assert.Contains(t, string(lock), fmt.Sprintf("COPILOT_PROVIDER_BASE_URL: ${{ %s.AI_GATEWAY_URL }}", context))
 				}
 			})
 		}

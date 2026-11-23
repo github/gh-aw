@@ -3,7 +3,6 @@ package workflow
 import (
 	"errors"
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/github/gh-aw/pkg/constants"
@@ -34,15 +33,15 @@ func byokProviderHostAllowlistGap(workflowData *WorkflowData) bool {
 }
 
 // validateBYOKProviderHostAllowlist reports an expression-valued Copilot provider base URL
-// whose host the pinned AWF version cannot add to the firewall allow-list. Strict mode
-// fails compilation; otherwise a warning is emitted to preserve existing workflows.
+// whose host the pinned AWF version cannot add to the firewall allow-list.
 func (c *Compiler) validateBYOKProviderHostAllowlist(workflowData *WorkflowData, markdownPath string) error {
 	if !byokProviderHostAllowlistGap(workflowData) {
 		return nil
 	}
 	msg := fmt.Sprintf("engine.env.%s is a GitHub Actions expression, so its host is resolved only at runtime. "+
 		"AWF %s and later add exactly that host to the firewall allow-list, but the pinned AWF version is older, so the compiler cannot verify the host is allowed and the agent's model requests may be blocked. "+
-		"Remove the sandbox.agent.version pin or set it to %s or later (recommended), or confirm the exact provider host is listed in network.allowed.\n"+
+		"Remove the sandbox.agent.version pin or set it to %s or later (recommended). "+
+		"If you keep the older pin, use a literal URL for engine.env.%s so the compiler can allow its host; list only the exact provider host in network.allowed if needed.\n"+
 		"✓ Example:\n"+
 		"network:\n"+
 		"  allowed:\n"+
@@ -50,12 +49,8 @@ func (c *Compiler) validateBYOKProviderHostAllowlist(workflowData *WorkflowData,
 		"    - my-gateway.openai.azure.com",
 		constants.CopilotProviderBaseURL,
 		constants.AWFCopilotProviderHostAllowlistMinVersion,
-		constants.AWFCopilotProviderHostAllowlistMinVersion)
-	if c.strictMode {
-		err := errors.New("strict mode: " + msg)
-		return formatCompilerError(markdownPath, "error", err.Error(), err)
-	}
-	fmt.Fprintln(os.Stderr, formatCompilerMessage(markdownPath, "warning", msg))
-	c.IncrementWarningCount()
-	return nil
+		constants.AWFCopilotProviderHostAllowlistMinVersion,
+		constants.CopilotProviderBaseURL)
+	err := errors.New(msg)
+	return formatCompilerError(markdownPath, "error", err.Error(), err)
 }

@@ -26,7 +26,7 @@ Rely on AWF runtime host resolution for expression-valued BYOK base URLs. Fix th
   1. `engine.env.COPILOT_PROVIDER_BASE_URL` contains a `${{ … }}` expression;
   2. the firewall is enabled; and
   3. the effective AWF version is older than v0.25.41.
-- The diagnostic is a warning by default and an error in strict mode. It recommends removing the `sandbox.agent.version` pin or raising it to v0.25.41 or later.
+- The diagnostic is an error in all modes. It recommends removing the `sandbox.agent.version` pin or raising it to v0.25.41 or later, or using a literal provider URL so the compiler can allow its host.
 - `network.allowed` entries do not suppress the diagnostic, because the compiler cannot verify that any entry covers a host known only at runtime. An earlier revision suppressed the diagnostic when any custom domain was present. Review changed this.
 
 ## Alternatives Considered
@@ -47,7 +47,7 @@ Positive:
 
 Negative:
 
-- In strict mode, workflows that pin AWF below v0.25.41 must upgrade AWF, even if they already list the exact provider host in `network.allowed`.
+- Workflows that pin AWF below v0.25.41 must upgrade AWF or use a literal provider URL, even if they already list the exact provider host in `network.allowed`.
 - `AWFCopilotProviderHostAllowlistMinVersion` must stay correct as AWF changes.
 - AWF does not mark a secret-derived Copilot target host as sensitive, so the hostname may appear in AWF logs. This is tracked as follow-up work.
 - The connector inference path (#80315) is handled separately and is not affected by this decision.
