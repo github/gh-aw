@@ -1960,7 +1960,7 @@ function buildReportIncompleteParts(items, { collectorEmptyOutputCause, rootDir,
 }
 
 /**
- * Build safe next-step guidance for an agent-reported incomplete task.
+ * Build safe next-step guidance for a report_incomplete signal.
  * @param {Array<any>} items
  * @param {{runId?: number, secretRedactionFailed?: boolean, detectionApproved?: boolean, collectorEmptyOutputCause?: string}} [options]
  * @returns {string}
@@ -1968,6 +1968,7 @@ function buildReportIncompleteParts(items, { collectorEmptyOutputCause, rootDir,
 function buildReportIncompleteFailureMessage(items, { runId, secretRedactionFailed = false, detectionApproved = false, collectorEmptyOutputCause } = {}) {
   const collectorCause = typeof collectorEmptyOutputCause === "string" && Object.hasOwn(EMPTY_OUTPUT_CAUSES, collectorEmptyOutputCause) ? collectorEmptyOutputCause : undefined;
   const hasReportedReason = loadReportIncompleteMessages(items).some(message => message.reason !== collectorCause);
+  const opening = collectorCause && !hasReportedReason ? "The workflow recorded a report_incomplete signal; task completion was not confirmed." : "Agent reported that it could not complete the task (report_incomplete).";
   const signalSource = collectorCause ? `Collector classification: ${collectorCause}.` : "Signal source: explicit agent report (not a collector fallback).";
   let summaryGuidance = "The report_incomplete signal had no usable reason.";
   if (secretRedactionFailed) {
@@ -1979,7 +1980,7 @@ function buildReportIncompleteFailureMessage(items, { runId, secretRedactionFail
   }
   const auditCommand = typeof runId === "number" && Number.isSafeInteger(runId) && runId > 0 ? `gh aw audit ${runId}` : "gh aw audit <run-id>";
 
-  return `Agent reported that it could not complete the task (report_incomplete). A successful agent job does not confirm task completion. ${signalSource} ${summaryGuidance} Inspect agent_output.json in the agent artifact or run ${auditCommand} for runtime evidence.`;
+  return `${opening} A successful agent job does not confirm task completion. ${signalSource} ${summaryGuidance} Inspect agent_output.json in the agent artifact or run ${auditCommand} for runtime evidence.`;
 }
 
 /**
