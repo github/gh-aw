@@ -141,7 +141,7 @@ func (e *ClaudeEngine) GetInstallationSteps(workflowData *WorkflowData) []GitHub
 	// NOT be passed. This is intentionally different from other engine installs.
 	cooldownDays := resolveEngineCooldownDays(workflowData)
 	npmSteps := GenerateNpmInstallSteps(
-		"@anthropic-ai/claude-code",
+		claudeNpmPackageName,
 		version,
 		"Install Claude Code CLI",
 		"claude",
@@ -153,7 +153,7 @@ func (e *ClaudeEngine) GetInstallationSteps(workflowData *WorkflowData) []GitHub
 	)
 	if isCloudHypervisorRuntime(workflowData) || isNVXRuntime(workflowData) {
 		npmSteps = append(npmSteps, GenerateMicroVMNpmCLIInstallStep(
-			"@anthropic-ai/claude-code",
+			claudeNpmPackageName,
 			version,
 			"Install Claude Code CLI in microVM path",
 			"claude",

@@ -265,6 +265,17 @@ func TestHelpTextUsesStandardEgPunctuation(t *testing.T) {
 	assert.Contains(t, NewExperimentsAnalyzeSubcommand().Long, "e.g., \"my-workflow\"", "experiments analyze help should use e.g., punctuation")
 }
 
+func TestHelpTextUsesConsistentFlagDescriptions(t *testing.T) {
+	t.Parallel()
+	add := NewAddCommand(func(string) error { return nil })
+	assert.Contains(t, add.Long, "default: $GH_AW_WORKFLOWS_DIR or .github/workflows")
+
+	value := NewValueCommand()
+	jsonFlag := value.Flags().Lookup("json")
+	require.NotNil(t, jsonFlag)
+	assert.Equal(t, "Output results in JSON format", jsonFlag.Usage)
+}
+
 func TestCommandExamplesDoNotEndWithTrailingNewline(t *testing.T) {
 	t.Parallel()
 	tests := []struct {

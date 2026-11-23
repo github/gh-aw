@@ -40,20 +40,14 @@ func TestEngineCooldownParsingAndValidation(t *testing.T) {
 					obj["runtime"] = map[string]any{"id": "codex"}
 				}
 				_, config, _ := NewCompiler().ExtractEngineConfig(map[string]any{"engine": obj})
-				err := validateEngineCooldown(config, false)
+				err := validateEngineCooldown(config)
 				if !test.valid {
 					require.Error(t, err)
-					require.Error(t, validateEngineCooldown(config, true))
 					return
 				}
 				require.NoError(t, err)
 				require.NotNil(t, config.Cooldown)
 				assert.Equal(t, test.days, *config.Cooldown)
-				if test.days == 0 {
-					require.Error(t, validateEngineCooldown(config, true))
-				} else {
-					require.NoError(t, validateEngineCooldown(config, true))
-				}
 			})
 		}
 	}
@@ -76,7 +70,7 @@ func TestApplyEngineCooldownFieldRejectsNativeIntOverflow(t *testing.T) {
 
 	config := &EngineConfig{}
 	applyEngineCooldownField(config, map[string]any{"cooldown": json.Number("2147483648")})
-	require.Error(t, validateEngineCooldown(config, false))
+	require.Error(t, validateEngineCooldown(config))
 	assert.Nil(t, config.Cooldown)
 }
 
@@ -159,8 +153,8 @@ func TestCompileEngineCooldown(t *testing.T) {
 					path := filepath.Join(t.TempDir(), "cooldown.md")
 					content := fmt.Sprintf("---\non: workflow_dispatch\nstrict: %t\nnetwork: defaults\nengine:\n%s  cooldown: %s\n---\nInspect the repository.\n", strict, engine, value)
 					require.NoError(t, os.WriteFile(path, []byte(content), 0o644))
-					err := NewCompiler(WithSkipValidation(true)).CompileWorkflow(path)
-					if value != "7" && (value != "0" || strict) {
+					err := newCooldownTestCompiler().CompileWorkflow(path)
+					if value != "7" && value != "0" {
 						require.Error(t, err)
 						assert.Contains(t, err.Error(), "cooldown")
 						return
@@ -180,8 +174,8 @@ func TestEngineCooldownSecondaryJobInheritance(t *testing.T) {
 	days := 7
 	data.EngineConfig.Cooldown = &days
 	c := NewCompiler()
-	assert.Contains(t, strings.Join(c.buildDetectionEngineExecutionStep(data), ""), "--cooldown-days 7")
-	assert.Contains(t, strings.Join(c.buildInstallDetectionEngineForExternalDetectorStep(data), ""), "--cooldown-days 7")
+	assert.Contains(t, strings.Join(c.buildDetectionEngineExecutionStep(data), ""), "--cooldown-days 0")
+	assert.Contains(t, strings.Join(c.buildInstallDetectionEngineForExternalDetectorStep(data), ""), "--cooldown-days 0")
 	assert.NotContains(t, strings.Join(c.buildEvalsDecisionSteps(data), ""), "--cooldown-days")
 	cloned := cloneThreatDetectionEngineConfig("copilot", &EngineConfig{ID: "pi", Cooldown: &days})
 	assert.Equal(t, &days, cloned.Cooldown, "age policy is not specific to an engine identity")
@@ -211,7 +205,7 @@ func TestEngineCooldownInheritedByCrossEngineDetection(t *testing.T) {
 		"external": compiler.buildInstallDetectionEngineForExternalDetectorStep,
 	} {
 		t.Run(name, func(t *testing.T) {
-			assert.Contains(t, strings.Join(build(data), ""), "--cooldown-days 7")
+			assert.Contains(t, strings.Join(build(data), ""), "--cooldown-days 0")
 		})
 	}
 }
@@ -234,7 +228,7 @@ func TestWarnLegacyBehaviorInstallationCooldown(t *testing.T) {
 	})
 	assert.Contains(t, output, `engine definition "legacy" uses deprecated behaviors.installation.cooldown, which is ignored`)
 	assert.Contains(t, output, "set workflow engine.cooldown instead")
-	assert.Contains(t, output, "0 disables cooldown only outside strict mode; strict mode rejects zero")
+	assert.Contains(t, output, "0 disables cooldown, including in strict mode")
 	assert.Equal(t, 1, compiler.GetWarningCount())
 
 	compiler.ResetWarningCount()
@@ -265,8 +259,8 @@ safe-outputs:
 Inspect the repository.
 `, strict, value)
 				require.NoError(t, os.WriteFile(path, []byte(content), 0o644))
-				err := NewCompiler(WithSkipValidation(true)).CompileWorkflow(path)
-				if value != "7" && (value != "0" || strict) {
+				err := newCooldownTestCompiler().CompileWorkflow(path)
+				if value != "7" && value != "0" {
 					require.Error(t, err)
 					assert.Contains(t, err.Error(), "cooldown")
 					return
@@ -274,8 +268,7 @@ Inspect the repository.
 				require.NoError(t, err)
 				result, err := os.ReadFile(strings.TrimSuffix(path, ".md") + ".lock.yml")
 				require.NoError(t, err)
-				assert.Contains(t, string(result), "--cooldown-days "+value)
-				assert.Contains(t, string(result), "--cooldown-days 3", "main engine retains default age")
+				assert.Contains(t, string(result), "--cooldown-days 0", "literal releases use compile-time age checks")
 			})
 		}
 	}
@@ -299,6 +292,10 @@ func TestEngineCooldownImportOverrides(t *testing.T) {
 	imported := &EngineConfig{Cooldown: &importedDays}
 	applyMainWorkflowEngineOverrides(imported, &EngineConfig{Cooldown: &overrideDays})
 	assert.Equal(t, &overrideDays, imported.Cooldown, "explicit zero must not be lost when overriding an import")
+	for _, invalid := range []string{`{"id":"codex","cooldown":0} {}`, `{"id":"codex","cooldown":0} trailing`} {
+		_, _, err := NewCompiler().extractEngineConfigFromJSON(invalid)
+		require.Error(t, err, "imported engine configuration must remain a single JSON document")
+	}
 }
 
 func TestCompileEngineCooldownImport(t *testing.T) {
@@ -309,12 +306,7 @@ func TestCompileEngineCooldownImport(t *testing.T) {
 			path := filepath.Join(dir, "main.md")
 			content := fmt.Sprintf("---\non: workflow_dispatch\nstrict: %t\nnetwork: defaults\nimports:\n  - shared.md\n---\nInspect the repository.\n", strict)
 			require.NoError(t, os.WriteFile(path, []byte(content), 0o644))
-			err := NewCompiler(WithSkipValidation(true)).CompileWorkflow(path)
-			if strict {
-				require.Error(t, err)
-				assert.Contains(t, err.Error(), "cooldown")
-				return
-			}
+			err := newCooldownTestCompiler().CompileWorkflow(path)
 			require.NoError(t, err)
 			result, err := os.ReadFile(strings.TrimSuffix(path, ".md") + ".lock.yml")
 			require.NoError(t, err)

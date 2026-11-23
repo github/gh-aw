@@ -214,7 +214,9 @@ func TestDevelopmentCompileAllowsRestrictedBashShorthand(t *testing.T) {
 	source := filepath.Join(t.TempDir(), "restricted-bash.md")
 	content := `---
 on: workflow_dispatch
-engine: copilot
+engine:
+  id: copilot
+  cooldown: 0
 tools:
   bash: ["echo"]
 excluded-env:

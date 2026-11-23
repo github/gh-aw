@@ -32,7 +32,7 @@ func generateCopilotInstallerSteps(version, stepName string, rootless bool, comp
 		installerFlags += " --prefer-toolcache"
 	}
 	if len(cooldownDays) > 0 {
-		installerFlags += fmt.Sprintf(" --cooldown-days %d", cooldownDays[0])
+		installerFlags += fmt.Sprintf(" --cooldown-days %d", copilotRuntimeCooldownDays(version, cooldownDays[0]))
 	}
 
 	// Use the install_copilot_cli.sh script from actions/setup/sh
@@ -70,6 +70,15 @@ func generateCopilotInstallerSteps(version, stepName string, rootless bool, comp
 	stepLines = appendCopilotInstallerVersionEnv(stepLines, "", copilotMinVersion, guestLibc)
 
 	return []GitHubActionStep{GitHubActionStep(stepLines)}
+}
+
+func copilotRuntimeCooldownDays(version string, days int) int {
+	// Literal releases are checked during compilation, never with a runner's
+	// potentially enterprise-scoped GitHub token. Dynamic versions retain runtime policy.
+	if literalEngineReleaseVersion(version) {
+		return 0
+	}
+	return days
 }
 
 func appendCopilotInstallerVersionEnv(stepLines []string, compiledVersion, copilotMinVersion, guestLibc string) []string {
