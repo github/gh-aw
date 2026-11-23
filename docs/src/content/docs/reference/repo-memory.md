@@ -89,6 +89,8 @@ tools:
 
 `branch-prefix` changes the default `memory` prefix and must be 4-32 alphanumeric, hyphen, or underscore characters; it cannot be `copilot`. `allowed-extensions` limits which file types can be stored, `format-json: true` pretty-prints `.json` files before commit, `validation.json-schemas` declares mandatory per-file JSON/JSONL validation, `validation.script` runs an optional custom JavaScript domain validator, and `max-patch-size` caps the total diff size for one push (default 10KB, max 1MB) to prevent oversized updates.
 
+Branches under `memory/adaptive-routing/` are reserved for [adaptive routing](/gh-aw/reference/adaptive-routing/) histories, which only gh-aw writes, so a repo-memory entry whose branch is `memory/adaptive-routing` or under it fails to compile. Adaptive routing itself requires `tools.repo-memory`.
+
 ## GitHub App authentication
 
 `github-app` is optional in the object form and in each array entry. Without it, memory operations use `github.token`. Configure an installed GitHub App to write memory branches protected by rulesets:
@@ -130,7 +132,7 @@ Literal `target-repo` values authorize that repository. For expression targets, 
 
 Create an active branch ruleset targeting `memory/**` (or the configured branch prefix). Enable **Restrict updates** and **Restrict creations**. Add the installed memory app to the bypass list with **Always allow**; optionally add an administrator team for recovery. The built-in GitHub Actions token is not the app bypass actor.
 
-Every workflow and array entry writing to that pattern needs a bypass-listed app. Use a narrower pattern when other memories must continue using `github.token`.
+Every workflow and array entry writing to that pattern needs a bypass-listed app. Use a narrower pattern when other memories must continue using `github.token`. [Adaptive routing](/gh-aw/reference/adaptive-routing/#branch-rulesets) histories are saved with the workflow's `github.token`, so a ruleset covering `memory/**` must also allow GitHub Actions to update `memory/adaptive-routing/**`, or exclude that pattern.
 
 Keep the app's private key available only to trusted workflows and environments. A branch ruleset controls writers, not the content an authorized workflow accepts.
 
@@ -292,7 +294,7 @@ For fast 7-day caching without version control, see [Cache Memory](/gh-aw/refere
 - **Validation or patch-size failures**: Keep changes within `file-glob`, `max-file-size` (100KB default), `max-file-count` (100 default), and `max-patch-size` (10KB default).
 - **Changes not persisting**: Confirm the directory path, let the workflow finish, and check the push job's **Repo-memory push failed** summary and logs for the underlying error. Custom validation failures include both stdout and stderr; updates rejected by validation are not committed or pushed.
 - **Merge conflicts**: Each save applies only this run's changes. The push job compares every memory file with the commit the agent started from, so files this run did not change keep their latest version on the branch, even if another run saved them while this run was working. When both runs changed the same file, `.jsonl` files keep the rows from both runs (`merge=union`), and other file types keep this run's version of the lines both runs changed. If the starting commit is unknown or no longer in the branch history, the push job copies this run's files over the latest branch and logs a warning that rows saved by other runs in the meantime may be lost.
-- **Many runs finishing at once**: Pushes are not serialized. A save is committed only if the branch head is still the one the save was prepared on. If another run saved first, the push re-reads the head, rebases its change with JSONL union merging, and retries with exponential backoff. If the branch keeps moving and all 11 attempts fail, the save fails, this run's changes are not pushed, and the job reports an error. To avoid conflicts entirely, have each run write its own file instead of all runs editing the same file, for example `runs/${{ matrix.worker }}.jsonl` or `targets/${{ matrix.target }}.jsonl`.
+- **Many runs finishing at once**: Pushes are not serialized. A save is committed only if the branch head is still the one the save was prepared on. If another run saved first, the push re-reads the head, rebases its change with JSONL union merging, and retries with exponential backoff. If the branch keeps moving and all 11 attempts fail, the save fails, this run's changes are not pushed, and the job reports an error. To avoid conflicts entirely, have each run write its own file instead of all runs editing the same file, for example `runs/${{ matrix.worker }}.jsonl` or `targets/${{ matrix.target }}.jsonl`. gh-aw's own state writers, such as the adaptive routing history, use an option of the same save loop that applies their change again to the newest files instead of rebasing; it is not available for agent memory.
 - **GH013 — Commits must have verified signatures**: This usually means the artifact included a symlink, executable file, or submodule entry, which forced a fallback to plain `git push`. Remove the unsupported file type and re-run.
 
 ## Security

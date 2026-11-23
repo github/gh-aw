@@ -33,5 +33,8 @@ pkg/workflow/actionslanguageservice/testdata/conformance.json
 # Verbatim routing-analytics run artifacts (github/gh-aw#70668)
 actions/setup/js/fixtures/routing-analytics/**/*.json
 
+# Adaptive routing oracle vectors, generated from the reference bandit and compared numerically
+actions/setup/js/fixtures/routing-history/*.json
+
 # Pinned upstream Harbor golden fixtures (Git blob checksum verified)
 pkg/cli/testdata/harbor/*.json

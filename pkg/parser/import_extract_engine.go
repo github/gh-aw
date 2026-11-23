@@ -125,6 +125,7 @@ func (acc *importAccumulator) extractConfigFields(fm map[string]any, fullPath st
 	acc.extractFirstWinsJSONField(fm, fullPath, "max-turn-cache-misses", &acc.mergedMaxTurnCacheMisses)
 	acc.extractFirstWinsJSONField(fm, fullPath, "max-ai-credits", &acc.mergedMaxAICredits)
 	acc.extractFirstWinsJSONField(fm, fullPath, "max-daily-ai-credits", &acc.mergedMaxDailyAICredits)
+	acc.extractFirstWinsJSONField(fm, fullPath, "adaptive-routing", &acc.mergedAdaptiveRouting)
 	acc.extractConcurrencyInImport(fm, fullPath)
 	acc.extractConcurrencyJobDiscriminator(fm, fullPath)
 	if acc.metadataDocs == "" {
