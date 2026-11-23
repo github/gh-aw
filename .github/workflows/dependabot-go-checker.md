@@ -94,6 +94,33 @@ Close any existing open dependency update issues with the `[deps]` prefix, then 
 - **Go Module File**: `go.mod` in repository root
 - **NPM Packages**: Check for `@playwright/cli` updates in `pkg/constants/version_constants.go`
 
+## Read Transport and Completion
+
+Use the exposed GitHub MCP tools for reads, or the `github` CLI bridge if it is
+listed in the runtime's available CLI transports. Check that bridge with
+`github --help` as a standalone command; use its advertised tool names and
+schemas. Do not use unauthenticated `gh` commands or discover credentials.
+
+Close existing `[deps]` issues before analysis. If issue search or another
+required read is unavailable, stop analysis and record the blocker with
+`safeoutputs report_incomplete`. A `report_missing_tool` diagnostic is
+nonterminal: it does not replace this incomplete outcome. For example:
+
+```bash
+safeoutputs report_incomplete '{"reason":"Required GitHub issue search is unavailable; dependency analysis was not completed."}'
+```
+
+For completed analysis, create the configured issues for qualifying updates.
+If none qualify, call `safeoutputs noop` with the reason; never use noop for
+blocked or unfinished analysis. Wait for each safe-output response before
+claiming submission. Do not treat a final text response as a safe output.
+
+Follow the configured experiment's **Your Tasks** section below for the task
+sequence, tier criteria, repository links, issue formats and limits. It applies
+in addition to this transport and completion contract.
+
+<!-- instruction-prefix-end -->
+
 {{#if experiments.prompt_style == 'concise' }}
 ## Your Tasks
 
