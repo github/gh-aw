@@ -81,7 +81,7 @@ See [Copilot Agent Files](/gh-aw/reference/copilot-custom-agents/) for details.
 
 The Copilot engine supports routing requests to an external LLM provider instead of GitHub's default routing. This is useful when you want to use a different model or provider (e.g., OpenAI, Anthropic, Azure OpenAI, or a local Ollama/vLLM instance) while still using the Copilot CLI tooling.
 
-Set `COPILOT_PROVIDER_BASE_URL` in `engine.env` to activate BYOK mode. The credential variables `COPILOT_PROVIDER_BASE_URL`, `COPILOT_PROVIDER_API_KEY`, and `COPILOT_PROVIDER_BEARER_TOKEN` are explicitly allowed to carry `${{ secrets.* }}` references in `engine.env` under strict mode — they are not leaked to the agent container. Other `COPILOT_PROVIDER_*` variables hold non-sensitive configuration and can be set as plain strings. When `COPILOT_PROVIDER_BASE_URL` is a literal URL, gh-aw automatically adds its provider hostname to the AWF allow-list for both the main agent run and the threat-detection Copilot step, and the threat-detection step now derives its Copilot API target from that literal BYOK URL even when `engine.api-target` and `GITHUB_COPILOT_BASE_URL` are unset. When it is supplied via a `${{ secrets.* }}` or `${{ vars.* }}` expression, AWF resolves the value at runtime and allows exactly that provider host for both runs, so do not add broad entries such as `openai.azure.com` to `network.allowed`. Runtime resolution requires AWF v0.25.41 or later (the default); with an older pinned `sandbox.agent.version`, compilation warns (or fails in strict mode) because the host cannot be verified; upgrade AWF, or keep the exact host in `network.allowed`.
+Set `COPILOT_PROVIDER_BASE_URL` in `engine.env` to activate BYOK mode. The credential variables `COPILOT_PROVIDER_BASE_URL`, `COPILOT_PROVIDER_API_KEY`, and `COPILOT_PROVIDER_BEARER_TOKEN` are explicitly allowed to carry `${{ secrets.* }}` references in `engine.env` under strict mode — they are not leaked to the agent container. Other `COPILOT_PROVIDER_*` variables hold non-sensitive configuration and can be set as plain strings. When `COPILOT_PROVIDER_BASE_URL` is a literal URL, gh-aw automatically adds its provider hostname to the AWF allow-list for both the main agent run and the threat-detection Copilot step, and the threat-detection step now derives its Copilot API target from that literal BYOK URL even when `engine.api-target` and `GITHUB_COPILOT_BASE_URL` are unset. When it is supplied via a `${{ secrets.* }}` or `${{ vars.* }}` expression, AWF resolves the value at runtime and allows exactly that provider host for both runs, so do not add broad entries such as `openai.azure.com` to `network.allowed`. Runtime resolution requires AWF v0.25.41 or later (the default); with an older pinned `sandbox.agent.version`, compilation fails in all modes because the host cannot be verified. Remove both `sandbox.agent.version` and `sandbox.agent.checksums-sha256` to use the bundled default, upgrade to a supported version with a matching trusted checksum when required, or use a literal provider URL. Adding a `network.allowed` entry alone does not bypass this check.
 
 | Variable | Required | Description |
 |---|---|---|
@@ -110,7 +110,6 @@ engine:
 network:
   allowed:
     - defaults
-    - your-provider-domain.example.com
 ```
 
 > [!NOTE]
