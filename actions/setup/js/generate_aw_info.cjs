@@ -155,6 +155,12 @@ async function main(core, ctx, githubClient) {
     }
   }
 
+  // Compiler-resolved BYOK GenAI provider (e.g. azure.ai.openai); absent for GitHub-hosted inference.
+  const genAiProvider = (process.env.GH_AW_INFO_GENAI_PROVIDER || "").trim();
+  if (genAiProvider) {
+    awInfo.genai_provider = genAiProvider;
+  }
+
   const frontmatterSource = process.env.GH_AW_INFO_FRONTMATTER_SOURCE || "";
   if (frontmatterSource) {
     awInfo.frontmatter_source = frontmatterSource;
