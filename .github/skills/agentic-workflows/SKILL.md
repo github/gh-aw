@@ -128,6 +128,7 @@ Use the task routes above first. This inventory is not required startup context.
 - `.github/aw/enclaves.md`
 - `.github/aw/evals.md`
 - `.github/aw/experiments.md`
+- `.github/aw/factory.md`
 - `.github/aw/formal-methods.md`
 - `.github/aw/github-agentic-workflows.md`
 - `.github/aw/github-mcp-server-pagination.md`

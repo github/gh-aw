@@ -194,7 +194,7 @@ Use `safe-outputs.assign-to-agent` for existing eligible issues or PRs, with
 repository-scoped **PAT** as `GH_AW_AGENT_TOKEN`: a fine-grained PAT needs metadata
 read and actions, contents, issues and pull requests read/write; a classic PAT
 requires `repo`. Follow the current
-[Cloud Agent authentication reference](../reference/copilot-cloud-agent.mdx#authentication)
+[Cloud Agent authentication reference](/gh-aw/reference/copilot-cloud-agent/#authentication)
 for acquisition, secret setup and organization approval/SSO requirements.
 Inspect secret names only; never put token values in prompts, code or logs.
 
@@ -238,7 +238,7 @@ Use [run analysis](https://github.com/github/gh-aw/blob/main/.github/aw/analyzin
 [debugging](https://github.com/github/gh-aw/blob/main/debug.md),
 [debugging reference](https://github.github.com/gh-aw/troubleshooting/debugging/),
 [audits](https://github.github.com/gh-aw/reference/audit/), recorded token/AIC usage and
-[OpenTelemetry](../reference/open-telemetry.mdx) evidence. Compare ordered tool-call
+[OpenTelemetry](/gh-aw/reference/open-telemetry/) evidence. Compare ordered tool-call
 sequences, parent/child relationships, repeated reads, wasted context retrieval,
 tool failures and subagent fan-out—not only aggregate tokens. Check run identity
 and trace continuity before attributing patterns. No new observability service
@@ -262,8 +262,8 @@ and enabling write tools also exposes other mutations.
 Record the hypothesis, baseline/candidate revisions, eligible cohort, metric
 definitions, sample window, results, uncertainty and decision in a linked issue
 or PR. Freeze quality guardrails before reading candidate results. Reuse
-[experiments](../reference/experiments.md),
-[session graders](../experimental/trace-graders.md), and
+[experiments](/gh-aw/reference/experiments/),
+[session graders](/gh-aw/experimental/trace-graders/), and
 [evals](https://github.com/github/gh-aw/blob/main/.github/aw/evals.md). Built-in graders run in conclusion; custom
 `graders.<id>.script` runs only in the isolated graders job.
 `graders.operational-value.script` returns ordered `{id,value}` metrics with
@@ -280,7 +280,7 @@ Keep one focused architecture PR open at a time. Propose one reversible change
 to a skill, budget, trigger, or workflow rather than a broad redesign. Require
 human review; after merge, measure a fresh outcome window and retain the change
 or propose rollback. Preserve earlier experiment and grader results. Separate
-delivery from human adoption using [impact measurement](measuring-impact.md).
+delivery from human adoption using [impact measurement](/gh-aw/guides/measuring-impact/).
 
 ### Avoid redundant workflows
 
