@@ -7,8 +7,8 @@
     "sampleRate": 24000
   },
   "personas": [
-    { "id": "host", "voice": "af_nova", "speed": 1.1 },
-    { "id": "builder", "voice": "am_eric", "speed": 1.05 }
+    { "id": "host", "voice": "am_eric", "speed": 1.05 },
+    { "id": "builder", "voice": "af_nova", "speed": 1.1 }
   ],
   "timing": { "lead": 0.15, "sentence": 0.15, "turn": 0.35, "tail": 0.4 },
   "encode": { "codec": "libopus", "bitrate": "32k", "application": "audio", "loudness": -16 },

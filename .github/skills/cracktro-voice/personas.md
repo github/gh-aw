@@ -7,7 +7,7 @@ Turn 1, 3, 5, ... is the **Host**; turn 2, 4, 6, ... is the **Builder**. The gen
 | | Host | Builder |
 |---|---|---|
 | Role | Developer advocate who frames the topic and asks the questions the audience would ask. | Hands-on engineer advocate who answers with the mechanism, the example or the trade-off. |
-| Voice (`voice.json`) | `af_nova`, speed 1.1 | `am_eric`, speed 1.05 |
+| Voice (`voice.json`) | `am_eric`, speed 1.05 | `af_nova`, speed 1.1 |
 | Tone | Bright, energetic, curious, like a YouTube developer channel; welcomes newcomers. | Calm, practical, precise; a little dry humour. |
 | Typical turn | "Let's look at...", "Here's a question we hear a lot...", "Up next..." | "It works like this...", "In practice...", "Exactly, and..." |
 
@@ -34,8 +34,8 @@ They are roles, not people: never name them, give them a gender in text, or tie 
 | Setting | Value | Why |
 |---|---|---|
 | Engine | Kokoro-82M ONNX (`kokoro-js`), fp32, 24 kHz | Open model (Apache-2.0), runs offline on CPU, deterministic for identical text. |
-| Voices | `af_nova` / `am_eric` | Fresh, expressive American English pair with contrasting pitch; `af_nova` sounds livelier and less synthetic than `af_heart`. |
-| Speed | 1.1 / 1.05 | Creator-video pace: brisk but clear; the host is a touch quicker. |
+| Voices | `am_eric` / `af_nova` | Fresh, expressive American English pair with contrasting pitch: a male interviewer and a female expert; `af_nova` sounds livelier and less synthetic than `af_heart`. |
+| Speed | 1.05 / 1.1 | Creator-video pace: brisk but clear; each voice at the speed that sounds most natural for it. |
 | Pauses | lead 0.15 s, sentence 0.15 s, turn 0.35 s, tail 0.4 s | Natural hand-offs; the tail is a beat before the kiosk moves on. |
 | Loudness | -16 dBFS speech RMS, -1 dBFS peak cap, one gain per slide | Even level across slides, under the synth music. |
 
