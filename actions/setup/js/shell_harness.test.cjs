@@ -93,6 +93,13 @@ describe("shell_harness.cjs", () => {
       expect(result.invocations).toBe(1);
       expect(result.stderr).toContain("safe outputs were recorded");
     });
+
+    it("does not retry when no safe-outputs path is configured", () => {
+      const result = runRetry(`echo '429 Too Many Requests' >&2; exit 1`, { GH_AW_SAFE_OUTPUTS: "" });
+      expect(result.status).toBe(1);
+      expect(result.invocations).toBe(1);
+      expect(result.stderr).toContain("retries disabled");
+    });
   });
 
   it("reports invalid invocations", () => {

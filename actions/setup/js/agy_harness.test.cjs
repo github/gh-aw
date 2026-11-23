@@ -85,7 +85,7 @@ describe("agy_harness.cjs gated attempt outcomes", () => {
         GH_AW_HARNESS_TELEMETRY_DIR: path.join(root, "agent"),
         GH_AW_DURABLE_SESSION_DIR: root,
         GH_AW_MCP_CONFIG: "provided",
-        GH_AW_SAFE_OUTPUTS: "",
+        GH_AW_SAFE_OUTPUTS: path.join(root, "safeoutputs.jsonl"),
         GH_AW_PHASE: "agent",
         AWF_REFLECT_ENABLED: "0",
         GEMINI_API_KEY: "test-key",

@@ -58,7 +58,8 @@ function classifyGenericHarnessFailure(output) {
  * Retry-After handling and a conservative default failure policy.
  *
  * A retry is never attempted after the agent appended safe outputs, because a
- * re-run could duplicate externally visible side effects.
+ * re-run could duplicate externally visible side effects. Without a safe-outputs
+ * path those side effects cannot be observed, so retries are disabled.
  * @param {{
  *   harnessName: string,
  *   log: (message: string) => void,
@@ -71,9 +72,13 @@ function classifyGenericHarnessFailure(output) {
 async function runRetryingHarness(options) {
   const env = options.env ?? process.env;
   const { harnessName, log } = options;
-  const { maxRetries, initialDelayMs, backoffMultiplier, maxDelayMs } = resolveRetryConfig(env, log);
+  const { maxRetries: configuredMaxRetries, initialDelayMs, backoffMultiplier, maxDelayMs } = resolveRetryConfig(env, log);
   const driverStartTime = Date.now();
   const safeOutputsPath = env.GH_AW_SAFE_OUTPUTS || "";
+  const maxRetries = safeOutputsPath ? configuredMaxRetries : 0;
+  if (!safeOutputsPath && configuredMaxRetries > 0) {
+    log("GH_AW_SAFE_OUTPUTS is not set — retries disabled because safe-output side effects cannot be observed");
+  }
   let safeOutputsByteOffset = 0;
   return runHarnessRetryLoop({
     telemetryPath: resolveHarnessRetryTelemetryPath(env),
