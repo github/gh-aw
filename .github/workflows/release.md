@@ -818,7 +818,7 @@ jobs:
           provenance: mode=max
 
   comment_release_prs:
-    needs: ["agent", "config", "release"]
+    needs: ["agent", "config", "release", "safe_outputs"]
     runs-on: ubuntu-latest
     permissions:
       pull-requests: write
