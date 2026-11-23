@@ -507,6 +507,10 @@
   .rf-prt { fill: #ab7df8; }
   .rf-pr.rf-ghost { fill: #0d1117; stroke-opacity: .2; }
   .rf-ghost-a { fill: #0d1117; stroke: #ab7df8; stroke-opacity: .35; stroke-width: 2; }
+  .rf-bg { fill: #0d1117; fill-opacity: .88; stroke: #ffffff1f; stroke-width: 1.5; }
+  .rf-svg .mra-l { fill: #d2a8ff; opacity: .9; } .rf-svg .mra-l.b { fill: #a5d6ff; } .rf-svg .fm-wire { opacity: .8; }
+  .rf-svg .fm-lane-t, .rf-svg .rf-cap, .rf-svg .rf-zone { fill: #c9d1d9; } .rf-svg .rf-prt { fill: #d2a8ff; } .rf-svg .fm-div { stroke: #ffffff2e; }
+  .rf-st { transition: opacity .6s ease; } .rf-st.rf-hide { opacity: 0; }
   .rpa-code { opacity: .6; transition: opacity .4s; } .rpa-code.on { opacity: 1; }
   .rpa-code .card { fill: #0d1117e8; stroke: #3d444d; stroke-width: 2; transition: stroke .4s; }
   .rpa-code.on .card { stroke: #ab7df8; filter: drop-shadow(0 0 10px #8957e566); }
@@ -7017,22 +7021,24 @@
       [0, 1, 2].forEach(i => (s += `<rect class="rf-slot${i < 2 ? " busy" : ""}" x="${x - 70 + i * 50}" y="${y - 26}" width="40" height="52" rx="8"/>`));
       return s + `<text class="rf-cap" x="${x}" y="${y + 58}">3 shared slots</text><text class="rf-cap" x="${x}" y="${y + 82}">weekdays · UTC</text></g>`;
     };
-    // [edge id, path, color, label, lx, ly, anchor]
+    // build-up steps: 0 PR flow, 1 Dispatcher, 2 Researchers, 3 Maintainer, 4 Dreamer
+    const S = (n, x) => `<g class="rf-st" data-s="${n}">${x}</g>`;
+    // [edge id, path, color, label, lx, ly, anchor, step]
     const EDGES = [
-      ["e1", "M50 184 V304", "p", ["files scoped", "issues"], 72, 236, "start"],
-      ["e2", "M86 340 H300 V150 H364", "p", ["eligible issue"], 190, 324, "middle"],
-      ["e3", "M400 184 V310", "p", ["reserves", "a slot"], 422, 236, "start"],
-      ["e4", "M476 340 H650 V150 H714", "p", ["starts PRs"], 563, 324, "middle"],
-      ["e5", "M750 184 V304", "p", ["opens", "pull request"], 772, 236, "start"],
-      ["e6", "M786 340 H1000 V150 H1064", "p", ["ready for review"], 893, 324, "middle"],
-      ["e7", "M1100 184 V304", "p", ["≤ 3", "findings"], 1122, 236, "start"],
-      ["e8", "M1136 340 H1350 V150 H1414", "p", ["stalled · failing"], 1243, 324, "middle"],
-      ["e9", "M1450 184 V304", "p", ["bounded repair,", "≤ 2 rounds"], 1472, 236, "start"],
-      ["e14", "M1430 376 V418 H1100 V380", "p", ["re-review"], 1265, 448, "middle"],
-      ["e10", "M1470 376 V570 H1330", "b", ["ready, or", "escalate"], 1492, 470, "start"],
-      ["e11", "M1064 570 H788", "b", ["reviews & merges"], 926, 554, "middle"],
-      ["e12", "M714 570 H290", "p day", ["observes runs · costs · outcomes"], 502, 554, "middle"],
-      ["e13", "M50 536 V380", "p day", ["proposes one", "reversible change"], 72, 450, "start"],
+      ["e1", "M50 184 V304", "p", ["files scoped", "issues"], 72, 236, "start", 2],
+      ["e2", "M86 340 H300 V150 H364", "p", ["eligible issue"], 190, 324, "middle", 2],
+      ["e3", "M400 184 V310", "p", ["reserves", "a slot"], 422, 236, "start", 1],
+      ["e4", "M476 340 H650 V150 H714", "p", ["starts PRs"], 563, 324, "middle", 1],
+      ["e5", "M750 184 V304", "p", ["opens", "pull request"], 772, 236, "start", 0],
+      ["e6", "M786 340 H1000 V150 H1064", "p", ["ready for review"], 893, 324, "middle", 0],
+      ["e7", "M1100 184 V304", "p", ["≤ 3", "findings"], 1122, 236, "start", 0],
+      ["e8", "M1136 340 H1350 V150 H1414", "p", ["stalled · failing"], 1243, 324, "middle", 0],
+      ["e9", "M1450 184 V304", "p", ["bounded repair,", "≤ 2 rounds"], 1472, 236, "start", 0],
+      ["e14", "M1430 376 V418 H1100 V380", "p", ["re-review"], 1265, 448, "middle", 0],
+      ["e10", "M1470 376 V570 H1330", "b", ["ready, or", "escalate"], 1492, 470, "start", 3],
+      ["e11", "M1064 570 H788", "b", ["reviews & merges"], 926, 554, "middle", 3],
+      ["e12", "M714 570 H290", "p day", ["observes runs · costs · outcomes"], 502, 554, "middle", 4],
+      ["e13", "M50 536 V380", "p day", ["proposes one", "reversible change"], 72, 450, "start", 4],
     ];
     // the work item's journey: [edge, node lit on arrival, duration]
     const SEQ = [
@@ -7053,13 +7059,16 @@
       ["e12", "nDreamer", 1500],
       ["e13", "nIssue", 1500],
     ];
+    const EST = Object.fromEntries(EDGES.map(x => [x[0], x[7]]));
     const LANE = { nResearch: 0, nIssue: 0, nDispatch: 1, nSlots: 1, nCoder: 2, nPR: 2, nReview: 3, nFind: 3, nFinish: 4, nFix: 4 };
     let g = `<defs><clipPath id="rfClip" clipPathUnits="objectBoundingBox"><circle cx=".5" cy=".5" r=".5"/></clipPath>
       <marker id="rfP" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#ab7df8"/></marker>
       <marker id="rfB" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#4493f8"/></marker></defs>`;
     // code, review and finish run as one pull request flow per coding slot; the ghost frames behind are the concurrent ones
-    [2, 1].forEach(i => (g += `<rect class="rf-pr rf-ghost" x="${682 + i * 10}" y="${78 - i * 12}" width="986" height="544" rx="26"/>`));
-    g += `<rect class="rf-pr" id="rfPR" x="682" y="78" width="986" height="544" rx="26"/><text class="rf-zone rf-prt" x="1692" y="660" text-anchor="end">CONCURRENT PR FLOWS · ONE PER SLOT</text>`;
+    let fr = "";
+    [2, 1].forEach(i => (fr += `<rect class="rf-pr rf-ghost" x="${682 + i * 10}" y="${78 - i * 12}" width="986" height="544" rx="26"/>`));
+    g += S(0, fr + `<rect class="rf-pr" id="rfPR" x="682" y="78" width="986" height="544" rx="26"/><text class="rf-zone rf-prt" x="1676" y="658" text-anchor="end">CONCURRENT PR FLOWS · ONE PER SLOT</text>`);
+    g = g.replace("</defs>", `</defs><rect class="rf-bg" x="-20" y="0" width="${VW + 20}" height="${VH}" rx="20"/>`);
     g += `<rect class="fm-lane" x="-20" y="0" width="${VW + 20}" height="60"/>`;
     [
       [-20, 350, "RESEARCH"],
@@ -7068,22 +7077,28 @@
       [1050, 1400, "REVIEW"],
       [1400, VW, "FINISH"],
     ].forEach(([x0, x1, t], i) => {
-      g += `<text class="fm-lane-t mra-lane" id="rfLane${i}" x="${(x0 + x1) / 2}" y="40">${t}</text>`;
-      if (i) g += `<line class="fm-div" x1="${x0}" y1="0" x2="${x0}" y2="440"/>`;
+      const st = i > 1 ? 0 : 2 - i;
+      g += S(st, `<text class="fm-lane-t mra-lane" id="rfLane${i}" x="${(x0 + x1) / 2}" y="40">${t}</text>`);
+      if (i) g += S(st, `<line class="fm-div" x1="${x0}" y1="0" x2="${x0}" y2="440"/>`);
     });
-    g += `<line class="fm-div rf-gate" x1="-20" y1="470" x2="${VW}" y2="470"/><text class="rf-zone" x="-20" y="660">HUMAN GATE · DREAMER LEARNS</text>`;
-    for (const [id, d, c, lab, lx, ly, an] of EDGES) {
-      g += `<path class="fm-wire ${c}" id="${id}" d="${d}" marker-end="url(#rf${c.startsWith("p") ? "P" : "B"})"/>`;
-      g += `<text class="mra-l ${c}" x="${lx}" y="${ly}" text-anchor="${an}">${lab.map((l, k) => `<tspan x="${lx}" dy="${k ? 26 : 0}">${l}</tspan>`).join("")}</text>`;
-    }
-    // several researchers, one dispatcher: ghost cards stacked behind Researchers
-    [2, 1].forEach(i => (g += `<g class="rf-ghost-a"><rect x="${50 + i * 6}" y="${125 - i * 13}" width="230" height="50" rx="25"/><circle cx="${50 + i * 6}" cy="${150 - i * 13}" r="34"/></g>`));
-    g += agent("nResearch", 50, 150, 230, "Researchers") + agent("nDispatch", 400, 150, 230, "Dispatcher") + agent("nCoder", 750, 150, 230, "Coder");
-    g += agent("nReview", 1100, 150, 230, "Reviewers") + agent("nFinish", 1450, 150, 210, "Finisher") + agent("nDreamer", 50, 570, 230, "Dreamer");
+    g += S(3, `<line class="fm-div rf-gate" x1="-20" y1="470" x2="${VW}" y2="470"/>`) + S(4, `<text class="rf-zone" x="4" y="658">HUMAN GATE · DREAMER LEARNS</text>`);
+    for (const [id, d, c, lab, lx, ly, an, st] of EDGES)
+      g += S(
+        st,
+        `<path class="fm-wire ${c}" id="${id}" d="${d}" marker-end="url(#rf${c.startsWith("p") ? "P" : "B"})"/>` +
+          `<text class="mra-l ${c}" x="${lx}" y="${ly}" text-anchor="${an}">${lab.map((l, k) => `<tspan x="${lx}" dy="${k ? 26 : 0}">${l}</tspan>`).join("")}</text>`,
+      );
+    // several researchers and reviewers, one dispatcher: ghost cards stacked behind the plural roles
+    const crowd = x => [2, 1].map(i => `<g class="rf-ghost-a"><rect x="${x + i * 6}" y="${125 - i * 13}" width="230" height="50" rx="25"/><circle cx="${x + i * 6}" cy="${150 - i * 13}" r="34"/></g>`).join("");
     // concurrent pull requests: ghost cards stacked behind each per-PR artifact
-    [750, 1100, 1450].forEach(x => [2, 1].forEach(i => (g += `<rect class="rf-ghost-a" x="${x - 36 + i * 6}" y="${306 - i * 13}" width="72" height="68" rx="14"/>`)));
-    g += box("nIssue", 50, 340, "issue") + slots("nSlots", 400, 340) + box("nPR", 750, 340, "pr") + box("nFind", 1100, 340, "comment") + box("nFix", 1450, 340, "tasklist") + box("nMerge", 750, 570, "merge");
-    g += dev("nMaint", 1100, 570);
+    let prs = "";
+    [750, 1100, 1450].forEach(x => [2, 1].forEach(i => (prs += `<rect class="rf-ghost-a" x="${x - 36 + i * 6}" y="${306 - i * 13}" width="72" height="68" rx="14"/>`)));
+    g += S(0, agent("nCoder", 750, 150, 230, "Coder") + crowd(1100) + agent("nReview", 1100, 150, 230, "Reviewers") + agent("nFinish", 1450, 150, 210, "Finisher"));
+    g += S(0, prs + box("nPR", 750, 340, "pr") + box("nFind", 1100, 340, "comment") + box("nFix", 1450, 340, "tasklist"));
+    g += S(1, agent("nDispatch", 400, 150, 230, "Dispatcher") + slots("nSlots", 400, 340));
+    g += S(2, crowd(50) + agent("nResearch", 50, 150, 230, "Researchers") + box("nIssue", 50, 340, "issue"));
+    g += S(3, box("nMerge", 750, 570, "merge") + dev("nMaint", 1100, 570));
+    g += S(4, agent("nDreamer", 50, 570, 230, "Dreamer"));
     g += `<circle class="fm-dot mra-dot" r="8"/>`;
     const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
     svg.setAttribute("class", "fm-svg rf-svg");
@@ -7096,13 +7111,28 @@
     const STEP = 950,
       START = 700,
       HOLD = 900,
+      LAST = 4,
+      ROOT = ["nCoder", "nDispatch", "nResearch"];
+    let stage = 0,
+      seq = SEQ,
+      T = [],
+      END = START,
+      CYC = 0;
+    // reveal the steps up to n and replay the journey over the visible edges only
+    const setStage = n => {
+      stage = n;
+      svg.querySelectorAll(".rf-st").forEach(x => x.classList.toggle("rf-hide", +x.dataset.s > n));
+      seq = SEQ.filter(x => EST[x[0]] <= n);
       T = [];
-    let END = START;
-    for (const s of SEQ) {
-      T.push(END);
-      END += s[2] || STEP;
-    }
-    const CYC = END + HOLD;
+      END = START;
+      for (const s of seq) {
+        T.push(END);
+        END += s[2] || STEP;
+      }
+      CYC = END + HOLD;
+      t0 = 0;
+      cyc = -1;
+    };
     let t0 = 0,
       cyc = -1,
       popK = -1;
@@ -7115,10 +7145,19 @@
       group: "platform",
       id: "workflows-process-factory",
       notes:
-        "What: An illustrative factory: processes create factories. The Repo Factory recipe is the process a coding agent follows to give a repository a small set of agentic workflows in five roles. Several Researchers file scoped issues, never pull requests. One Dispatcher admits issues into three shared coding slots on weekdays, so up to three pull request flows run at once. In each flow a Coder opens the pull request, Reviewers leave at most three findings and Finisher repairs them, looping back for re-review for at most two rounds; then the pull request is ready or escalated, and a maintainer merges. Dreamer observes runs, costs and outcomes, then proposes one reversible change as a new issue.\nWhy: Handoffs go through issues and pull requests, and capacity is capped, so agents cannot flood the repository and people stay at the gates.\nWhen: Use it to bootstrap continuous improvement in a repository that already has CI and maintainers who review.",
-      enter() {
-        t0 = 0;
-        cyc = -1;
+        "What: An illustrative factory: processes create factories. The Repo Factory recipe is the process a coding agent follows to give a repository a small set of agentic workflows in five roles. It builds up from the pull request flow outward. Several Researchers file scoped issues, never pull requests. One Dispatcher admits issues into three shared coding slots on weekdays, so up to three pull request flows run at once. In each flow a Coder opens the pull request, several Reviewers leave at most three findings and Finisher repairs them, looping back for re-review for at most two rounds; then the pull request is ready or escalated, and a maintainer merges. Dreamer observes runs, costs and outcomes, then proposes one reversible change as a new issue.\nWhy: Handoffs go through issues and pull requests, and capacity is capped, so agents cannot flood the repository and people stay at the gates.\nWhen: Use it to bootstrap continuous improvement in a repository that already has CI and maintainers who review.",
+      enter(dir) {
+        setStage(dir < 0 ? LAST : 0);
+      },
+      onNext() {
+        if (stage >= LAST) return false;
+        setStage(stage + 1);
+        return true;
+      },
+      onPrev() {
+        if (stage <= 0) return false;
+        setStage(stage - 1);
+        return true;
       },
       tick(t) {
         if (!t0) t0 = t;
@@ -7128,7 +7167,7 @@
         if (c !== cyc) {
           cyc = c;
           svg.querySelectorAll(".on, .hot").forEach(x => x.classList.remove("on", "hot"));
-          light("nResearch");
+          light(ROOT[Math.min(stage, 2)]);
           popK = -1;
         }
         svg.querySelectorAll(".fm-wire.hot").forEach(w => w.classList.remove("hot"));
@@ -7137,8 +7176,8 @@
           return;
         }
         let k = 0;
-        while (k + 1 < SEQ.length && T[k + 1] <= u) k++;
-        const [eid, nid, dur = STEP] = SEQ[k],
+        while (k + 1 < seq.length && T[k + 1] <= u) k++;
+        const [eid, nid, dur = STEP] = seq[k],
           f = (u - T[k]) / dur,
           p = $(eid),
           n = p.getTotalLength(),
@@ -7149,7 +7188,7 @@
         dot.setAttribute("cx", q.x);
         dot.setAttribute("cy", q.y);
         dot.setAttribute("fill", p.classList.contains("b") ? "#4493f8" : "#ab7df8");
-        for (let j = 0; j < k; j++) light(SEQ[j][1]);
+        for (let j = 0; j < k; j++) light(seq[j][1]);
         if (f >= 0.8) {
           if (popK !== k) {
             popK = k;

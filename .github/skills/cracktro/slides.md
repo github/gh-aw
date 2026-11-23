@@ -266,7 +266,7 @@ illustrative
 
 #### Summary
 
-Processes create factories: the Repo Factory recipe gives a repository five agentic roles that hand work along through issues and pull requests: several Researchers file issues, one Dispatcher admits them into a few shared weekday coding slots, and each slot runs its own pull request flow in which a Coder writes the change and Reviewers and a Finisher loop on it for a bounded number of rounds before a maintainer decides, and a Dreamer turns measured outcomes into one proposed change at a time.
+Processes create factories: the Repo Factory recipe gives a repository five agentic roles that hand work along through issues and pull requests: several Researchers file issues, one Dispatcher admits them into a few shared weekday coding slots, and each slot runs its own pull request flow in which a Coder writes the change and several Reviewers and a Finisher loop on it for a bounded number of rounds before a maintainer decides, and a Dreamer turns measured outcomes into one proposed change at a time.
 
 #### Keywords
 
@@ -274,9 +274,10 @@ Turn Workflows into Factories, processes create factories, Repo Factory, workflo
 
 #### Captions
 
-- Processes create factories: one recipe builds a factory of five agent roles working one repository together.
-- Several Researchers file issues, and one Dispatcher starts up to three pull requests at once, one per shared coding slot.
-- Each pull request runs its own flow: a Coder writes it, Reviewers and a Finisher loop for at most two rounds, then a maintainer still decides the merge.
+- Processes create factories, and this one starts with the pull request: a Coder writes it, several Reviewers and a Finisher loop for at most two rounds.
+- One Dispatcher starts those pull request flows, up to three at once, one per shared weekday coding slot.
+- Several Researchers feed the Dispatcher with scoped issues, never pull requests.
+- A maintainer still decides every merge.
 - And a Dreamer watches the outcomes, then proposes one reversible change as a new issue, so the factory improves itself.
 
 ### Security {#security}
