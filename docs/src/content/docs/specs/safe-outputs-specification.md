@@ -2674,7 +2674,7 @@ Test Case 4: Mention Filtering
 This section provides complete normative definitions for all safe output types. Each definition includes tool schema, operational semantics, configuration parameters, and security requirements.
 
 :::caution[Experimental]
-Issue-intent metadata (`rationale`, `confidence`, `suggest`) and the per-type `issue-intent` configuration toggle are experimental. Their schema and runtime behavior may change without notice.
+Issue-intent metadata (`rationale`, `confidence`, `suggest`) and the per-type `issue-intent` configuration toggle are experimental and disabled by default. Set `issue-intent: true` on a supported safe output to opt in; the compiler emits an experimental-feature warning. Their schema and runtime behavior may change without notice.
 :::
 
 ### 7.0 Schema and Agent Sync Requirements
@@ -5089,7 +5089,7 @@ or review bodies to returned or persisted decision evidence.
 6. **Staged Mode**: In staged mode the handler previews the labels it would add and performs no mutation.
 7. **Additive Application**: Labels are added through the REST add-labels endpoint and existing labels on the target MUST be preserved.
 8. **Missing Labels**: When `create-if-missing` is `true`, labels absent from the target repository are created (with a deterministic color) before they are applied. Otherwise, labels that do not exist produce an API error or warning.
-9. **Issue-Intent Metadata**: When a label object carries `rationale`, `confidence`, or `suggest` and issue intent is not disabled, the handler applies it through the GraphQL `updateIssue` mutation, merging the existing labels so that add-only semantics hold and restoring any pre-existing label the mutation removed. Pull requests have no intent-aware mutation and fall back to the REST endpoint without metadata.
+9. **Issue-Intent Metadata**: When a label object carries `rationale`, `confidence`, or `suggest` and `issue-intent: true` is set, the handler applies it through the GraphQL `updateIssue` mutation, merging the existing labels so that add-only semantics hold and restoring any pre-existing label the mutation removed. Pull requests have no intent-aware mutation and fall back to the REST endpoint without metadata.
 10. **Strict Intent Mode**: When `issue-intent` is explicitly `true`, plain-string labels MUST be rejected and every label object MUST include both `rationale` and `confidence`.
 
 **Configuration Parameters**:
@@ -5105,7 +5105,7 @@ or review bodies to returned or persisted decision evidence.
 - `required-title-prefix`: Title prefix the target MUST have for the operation to proceed
 - `create-if-missing`: Create labels that do not exist in the target repository (default: `false`)
 - `issues` / `pull-requests`: Set to `false` to drop the corresponding write permission (at least one MUST remain enabled)
-- `issue-intent`: Experimental. Controls issue-intent metadata handling (`false` disables, `true` makes it mandatory)
+- `issue-intent`: Experimental, disabled by default. `true` enables issue-intent metadata and makes it mandatory
 - `staged`: Staged mode override
 
 **Security Requirements**:
@@ -5577,7 +5577,7 @@ or review bodies to returned or persisted decision evidence.
 6. **Empty Result**: When no assignee remains after selection, the item succeeds with no assignees added and no API mutation.
 7. **Staged Mode**: In staged mode the handler previews the assignment (and the `unassign-first` step when enabled) and performs no mutation.
 8. **Unassign First**: When `unassign-first` is `true`, the current assignees are fetched and removed before the new assignees are added.
-9. **Assignment**: Assignees are added with the REST add-assignees endpoint. When issue intent is not disabled, normalized `rationale`, `confidence`, and `suggest` metadata are forwarded with the request.
+9. **Assignment**: Assignees are added with the REST add-assignees endpoint. When `issue-intent: true` is set, normalized `rationale`, `confidence`, and `suggest` metadata are forwarded with the request.
 
 **Configuration Parameters**:
 
@@ -5756,8 +5756,8 @@ or review bodies to returned or persisted decision evidence.
 5. **Clearing**: An empty `issue_type` clears the issue type and bypasses the `allowed` list.
 6. **Allowlist Check**: When `allowed` is configured, a non-empty `issue_type` MUST match an entry case-insensitively; otherwise the item fails. The configured spelling is used for the mutation.
 7. **Staged Mode**: In staged mode the handler previews the change and performs no mutation.
-8. **Issue-Intent Path**: Unless issue intent is disabled, the handler resolves the issue node ID and the repository issue type by case-insensitive name, then applies the type with the GraphQL `updateIssue` mutation together with normalized `rationale`, `confidence`, and `suggest` metadata. An unknown type fails with the list of available types.
-9. **REST Path**: When issue intent is disabled, or when clearing, the type is applied with the REST issue update endpoint.
+8. **Issue-Intent Path**: When `issue-intent: true` is set, the handler resolves the issue node ID and the repository issue type by case-insensitive name, then applies the type with the GraphQL `updateIssue` mutation together with normalized `rationale`, `confidence`, and `suggest` metadata. An unknown type fails with the list of available types.
+9. **REST Path**: When issue intent is not enabled, or when clearing, the type is applied with the REST issue update endpoint.
 10. **Error Mapping**: A 422 response for a non-empty type is mapped to an actionable error naming the type and, when reported, the available types.
 
 **Configuration Parameters**:
@@ -5847,7 +5847,7 @@ or review bodies to returned or persisted decision evidence.
 7. **Field Discovery**: The handler fetches the repository issue fields. When none are visible, the item is skipped with a warning. A `field_name` is matched case-insensitively; a `field_node_id` MUST match a discovered field. When both are supplied they MUST resolve to the same field.
 8. **Allowlist Check**: The resolved field name MUST satisfy `allowed-fields` (when configured and not `["*"]`) before any mutation.
 9. **Value Typing**: The value is converted according to the field type: single-select values MUST match an option name (case-insensitive), number values MUST be finite numbers, date values MUST use `YYYY-MM-DD`, and other fields are set as text.
-10. **Mutation**: The value is applied with the GraphQL `setIssueFieldValue` mutation together with normalized `rationale`, `confidence`, and `suggest` metadata unless issue intent is disabled.
+10. **Mutation**: The value is applied with the GraphQL `setIssueFieldValue` mutation together with normalized `rationale`, `confidence`, and `suggest` metadata when `issue-intent: true` is set.
 
 **Configuration Parameters**:
 

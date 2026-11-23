@@ -184,6 +184,7 @@
     {
       "id": "issue-intent",
       "name": "Issue intent metadata",
+      "compiler_warning": "issue-intent",
       "docs": ["/specs/safe-outputs-specification/", "/reference/frontmatter-full/"]
     },
     {

@@ -1,7 +1,7 @@
 # ADR-46207: Default-On Issue Intent Metadata for Handler Flags
 
 **Date**: 2026-07-18
-**Status**: Draft
+**Status**: Superseded — `issue-intent` is now an experimental, opt-in feature (`issue-intent: true`) that is disabled by default and emits a compiler warning when enabled.
 **Deciders**: Unknown
 
 ---

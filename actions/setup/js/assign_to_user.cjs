@@ -31,7 +31,7 @@ const main = createCountGatedHandler({
     const blockedAssignees = config.blocked ?? [];
     const targetConfig = config.target || "triggering";
     const unassignFirst = parseBoolTemplatable(config.unassign_first, false);
-    const issueIntentEnabled = config.issue_intent !== false;
+    const issueIntentEnabled = config.issue_intent === true;
     const { defaultTargetRepo, allowedRepos } = resolveTargetRepoConfig(config);
     const githubClient = await createAuthenticatedGitHubClient(config);
     const requiredLabels = Array.isArray(config.required_labels) ? config.required_labels : [];

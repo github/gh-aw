@@ -394,7 +394,7 @@ describe("add_labels", () => {
     });
 
     it("should skip an already-applied label instead of re-proposing its intent metadata", async () => {
-      const handler = await main({ max: 10 });
+      const handler = await main({ max: 10, issue_intent: true });
       const graphqlMutationCalls = [];
       const addLabelsCalls = [];
 
@@ -434,7 +434,7 @@ describe("add_labels", () => {
     });
 
     it("should report a confidence-gated intent label as suggested rather than added", async () => {
-      const handler = await main({ max: 10, target: "*" });
+      const handler = await main({ max: 10, issue_intent: true, target: "*" });
 
       mockGithub.rest.issues.get = async () => ({
         data: {
@@ -475,62 +475,8 @@ describe("add_labels", () => {
       expect(mockCore.infos).toContain("Successfully added 0 labels to issue #68619 in test-owner/test-repo");
     });
 
-    it("should add metadata-free labels through REST when the intent mutation does not apply them", async () => {
-      const handler = await main({ max: 10 });
-      const addLabelsCalls = [];
-      const graphqlMutationCalls = [];
-
-      mockGithub.rest.issues.get = async () => ({
-        data: {
-          node_id: "ISSUE_NODE_ID",
-          title: "Test issue title",
-          labels: [{ name: "feature-openapi" }],
-        },
-      });
-      mockGithub.graphql = async (query, variables) => {
-        if (typeof query === "string" && query.includes("repository(owner")) {
-          return {
-            repository: {
-              labels: {
-                nodes: [
-                  { id: "LABEL_feature-openapi", name: "feature-openapi" },
-                  { id: "LABEL_area-minimal", name: "area-minimal" },
-                  { id: "LABEL_bug", name: "bug" },
-                ],
-                pageInfo: { hasNextPage: false, endCursor: null },
-              },
-            },
-          };
-        }
-        graphqlMutationCalls.push(variables);
-        return { updateIssue: { issue: { labels: { nodes: [{ name: "feature-openapi" }] } } } };
-      };
-      mockGithub.rest.issues.addLabels = async params => {
-        addLabelsCalls.push(params);
-        return { data: [{ name: "bug" }] };
-      };
-
-      const result = await handler(
-        {
-          item_number: 68619,
-          labels: [{ name: "area-minimal", rationale: "Minimal APIs area", confidence: "MEDIUM" }, { name: "bug" }],
-        },
-        {}
-      );
-
-      expect(result.success).toBe(true);
-      expect(result.labelsAdded).toEqual(["bug"]);
-      expect(result.labelsSuggested).toEqual(["area-minimal"]);
-      expect(result.after_state.labels).toEqual(["feature-openapi", "bug"]);
-      expect(result.after_state.labels).not.toContain("area-minimal");
-      expect(graphqlMutationCalls).toHaveLength(1);
-      expect(graphqlMutationCalls[0].labels).toEqual([{ labelId: "LABEL_area-minimal", rationale: "Minimal APIs area", confidence: "MEDIUM" }, { labelId: "LABEL_bug" }, { labelId: "LABEL_feature-openapi" }]);
-      expect(addLabelsCalls).toHaveLength(1);
-      expect(addLabelsCalls[0].labels).toEqual(["bug"]);
-    });
-
     it("should restore pre-existing labels omitted by the intent mutation", async () => {
-      const handler = await main({ max: 10 });
+      const handler = await main({ max: 10, issue_intent: true });
       const addLabelsCalls = [];
       const restoredLabels = [{ name: "area-minimal" }];
 
@@ -945,35 +891,6 @@ describe("add_labels", () => {
       expect(result.labelsAdded).toEqual(["bug", "enhancement"]);
     });
 
-    it("should prefer the metadata-bearing entry when a duplicate label name appears", async () => {
-      // Default (omitted issue_intent) accepts both strings and objects; deduplication favours the metadata-bearing entry.
-      const handler = await main({ max: 10 });
-      const graphqlMutationCalls = [];
-
-      const originalGraphql = mockGithub.graphql;
-      mockGithub.graphql = async (query, variables) => {
-        if (typeof query === "string" && query.includes("updateIssue")) {
-          graphqlMutationCalls.push(variables);
-        }
-        return originalGraphql(query, variables);
-      };
-
-      const result = await handler(
-        {
-          item_number: 100,
-          // First "bug" has no metadata; second "bug" carries intent metadata — second should win
-          labels: [{ name: "bug" }, { name: "bug", rationale: "Known crash path", confidence: "HIGH", suggest: true }],
-        },
-        {}
-      );
-
-      expect(result.success).toBe(true);
-      expect(result.labelsAdded).toEqual(["bug"]);
-      // Intent metadata routes through the GraphQL mutation; the metadata-bearing spec wins
-      expect(graphqlMutationCalls).toHaveLength(1);
-      expect(graphqlMutationCalls[0].labels).toEqual([{ labelId: "LABEL_bug", rationale: "Known crash path", confidence: "HIGH", suggest: true }]);
-    });
-
     it("should strip structured intent metadata when issue_intent is disabled", async () => {
       const handler = await main({ max: 10, issue_intent: false });
       const addLabelsCalls = [];
@@ -996,18 +913,10 @@ describe("add_labels", () => {
       expect(addLabelsCalls[0].labels).toEqual(["bug"]);
     });
 
-    it("should forward per-label intent metadata via GraphQL when issue_intent is omitted", async () => {
+    it("should strip structured intent metadata when issue_intent is omitted", async () => {
       const handler = await main({ max: 10 });
-      const graphqlMutationCalls = [];
       const addLabelsCalls = [];
 
-      const originalGraphql = mockGithub.graphql;
-      mockGithub.graphql = async (query, variables) => {
-        if (typeof query === "string" && query.includes("updateIssue")) {
-          graphqlMutationCalls.push(variables);
-        }
-        return originalGraphql(query, variables);
-      };
       mockGithub.rest.issues.addLabels = async params => {
         addLabelsCalls.push(params);
         return {};
@@ -1022,10 +931,8 @@ describe("add_labels", () => {
       );
 
       expect(result.success).toBe(true);
-      // Intent metadata is forwarded through GraphQL, not the REST addLabels endpoint
-      expect(addLabelsCalls).toHaveLength(0);
-      expect(graphqlMutationCalls).toHaveLength(1);
-      expect(graphqlMutationCalls[0].labels).toEqual([{ labelId: "LABEL_bug", rationale: "Known crash path", confidence: "HIGH", suggest: true }]);
+      expect(addLabelsCalls).toHaveLength(1);
+      expect(addLabelsCalls[0].labels).toEqual(["bug"]);
     });
 
     it("should accept plain string labels by default when issue_intent is omitted", async () => {

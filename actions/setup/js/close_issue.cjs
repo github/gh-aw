@@ -270,7 +270,7 @@ async function main(config = {}) {
   // Omitted       → default to "COMPLETED" (backward compatible).
   const defaultStateReason = configStateReason || (configStateReasons ? configStateReasons[0] : "COMPLETED");
 
-  const issueIntentEnabled = config.issue_intent !== false;
+  const issueIntentEnabled = config.issue_intent === true;
   const requiredLabels = config.required_labels || [];
   const requiredTitlePrefix = config.required_title_prefix || "";
   const { defaultTargetRepo, allowedRepos } = resolveTargetRepoConfig(config);

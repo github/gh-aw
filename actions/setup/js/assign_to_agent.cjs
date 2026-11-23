@@ -229,7 +229,7 @@ async function main(config = {}) {
   const configuredBaseBranch = config["base-branch"] ? String(config["base-branch"]).trim() : null;
   const targetConfig = config.target ? String(config.target).trim() : "triggering";
   const ignoreIfError = config["ignore-if-error"] === true || config["ignore-if-error"] === "true";
-  const issueIntentEnabled = config.issue_intent !== false;
+  const issueIntentEnabled = config.issue_intent === true;
   const allowedAgents = config.allowed
     ? Array.isArray(config.allowed)
       ? config.allowed.map(a => String(a).trim()).filter(Boolean)

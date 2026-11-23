@@ -45,12 +45,8 @@ const ADD_COMMENT_DISCUSSIONS_DISABLED_NOTE =
 const ADD_COMMENT_REPLY_SUPPORT_SENTENCE = "Supports reply_to_id for discussion threading.";
 const ADD_COMMENT_REPLY_SUPPORT_REGEX = /\s*Supports reply_to_id for discussion threading\./g;
 const ISSUE_INTENT_REQUIRED_SUFFIX = "INTENT REQUIRED: rationale (string, max 280 chars) and confidence (exactly one of: LOW, MEDIUM, HIGH) are required for each call.";
-const ISSUE_INTENT_OPTIONAL_SUFFIX =
-  "INTENT ENCOURAGED: Include rationale (string, max 280 chars) and confidence (exactly one of: LOW, MEDIUM, HIGH) with each call. These fields are optional but strongly encouraged — they improve transparency and should normally be included. Use suggest: true alongside rationale and confidence to route for human review.";
 const ADD_LABELS_STRICT_FIELD_DESC =
   'Labels to add. Each label must be an object with required fields: name (string), rationale (string, max 280 chars), and confidence (exactly one of: LOW, MEDIUM, HIGH). Plain string label names are not permitted. Example: [{"name": "bug", "rationale": "The report describes reproducible incorrect behavior.", "confidence": "HIGH"}]. Labels must exist in the repository.';
-const ADD_LABELS_OPTIONAL_FIELD_DESC =
-  'Labels to add. Prefer structured label objects: {"name": "bug", "rationale": "The report describes reproducible incorrect behavior.", "confidence": "HIGH", "suggest": true}. Plain strings are also accepted for compatibility. Include rationale (string, max 280 chars) and confidence (LOW, MEDIUM, or HIGH) to improve transparency; use suggest: true to route for human review. Labels must exist in the repository.';
 const ADD_LABELS_STRING_ONLY_FIELD_DESC = "Labels to add. Each label must be a plain string matching the configured item schema. Labels must exist in the repository.";
 
 const ASSIGN_TO_AGENT_EXAMPLE_USAGE_REGEX = /Example usage: assign_to_agent\([^)]+\)(?: or assign_to_agent\([^)]+\))?/g;
@@ -77,21 +73,6 @@ function isIssueIntentEnabledForTool(toolName, toolConfig) {
 }
 
 /**
- * Determine whether issue-intent schema fields should be omitted for a tool.
- * Default is optional (present, not required); explicit issue_intent: false omits them.
- *
- * @param {string} toolName
- * @param {unknown} toolConfig
- * @returns {boolean}
- */
-function isIssueIntentDisabledForTool(toolName, toolConfig) {
-  if (!ISSUE_INTENT_TOOL_NAMES.has(toolName)) {
-    return false;
-  }
-  return !!(toolConfig && typeof toolConfig === "object" && "issue_intent" in toolConfig && toolConfig.issue_intent === false);
-}
-
-/**
  * Remove issue-intent properties from a tool schema.
  * If this removes all required fields, the required array is omitted.
  * @param {{inputSchema?: {properties?: Record<string, unknown>, required?: string[]}}} tool
@@ -111,21 +92,6 @@ function stripIssueIntentSchemaFields(tool) {
       delete tool.inputSchema.required;
     }
   }
-}
-
-/**
- * Determine whether issue-intent guidance is omitted (neither enabled nor disabled) for a tool.
- * This is the default state: intent fields are present and optional, but no guidance suffix is added yet.
- *
- * @param {string} toolName
- * @param {unknown} toolConfig
- * @returns {boolean}
- */
-function isIssueIntentOmittedForTool(toolName, toolConfig) {
-  if (!ISSUE_INTENT_TOOL_NAMES.has(toolName)) {
-    return false;
-  }
-  return !isIssueIntentEnabledForTool(toolName, toolConfig) && !isIssueIntentDisabledForTool(toolName, toolConfig);
 }
 
 /**
@@ -417,18 +383,9 @@ async function main() {
         if (tool.name === "assign_to_agent") {
           enhancedTool.description = enhancedTool.description.replace(ASSIGN_TO_AGENT_EXAMPLE_USAGE_REGEX, ASSIGN_TO_AGENT_STRICT_EXAMPLE_USAGE);
         }
-      } else if (isIssueIntentDisabledForTool(tool.name, config[tool.name])) {
+      } else if (ISSUE_INTENT_TOOL_NAMES.has(tool.name)) {
+        // issue-intent is experimental and opt-in: omit intent fields unless issue_intent: true.
         stripIssueIntentSchemaFields(enhancedTool);
-      } else if (isIssueIntentOmittedForTool(tool.name, config[tool.name])) {
-        enhancedTool.description = `${enhancedTool.description || ""} ${ISSUE_INTENT_OPTIONAL_SUFFIX}`.trim();
-        // For add_labels omitted mode, update the labels description to prefer structured objects,
-        // but only when the source schema actually supports plain strings via items.oneOf.
-        if (tool.name === "add_labels") {
-          const labelsSchema = enhancedTool.inputSchema?.properties?.labels;
-          if (labelsSchema && Array.isArray(labelsSchema.items?.oneOf)) {
-            labelsSchema.description = ADD_LABELS_OPTIONAL_FIELD_DESC;
-          }
-        }
       }
 
       if (tool.name === "add_comment") {
@@ -489,14 +446,8 @@ async function main() {
               const configuredItemSchema = itemSchema && typeof itemSchema === "object" ? itemSchema : {};
               if (configuredItemSchema.type === "object") {
                 propertySchema.description = isIssueIntentEnabledForTool(tool.name, config[tool.name]) ? ADD_LABELS_STRICT_FIELD_DESC : buildAddLabelsObjectOnlyFieldDesc(configuredItemSchema);
-                const itemProperties = configuredItemSchema.properties && typeof configuredItemSchema.properties === "object" ? configuredItemSchema.properties : {};
-                const required = Array.isArray(configuredItemSchema.required) ? configuredItemSchema.required : [];
-                if (!isIssueIntentEnabledForTool(tool.name, config[tool.name]) && (!("rationale" in itemProperties) || !("confidence" in itemProperties) || required.includes("rationale") || required.includes("confidence"))) {
-                  enhancedTool.description = (enhancedTool.description || "").replace(ISSUE_INTENT_OPTIONAL_SUFFIX, "").trim();
-                }
               } else if (configuredItemSchema.type === "string") {
                 propertySchema.description = ADD_LABELS_STRING_ONLY_FIELD_DESC;
-                enhancedTool.description = (enhancedTool.description || "").replace(ISSUE_INTENT_OPTIONAL_SUFFIX, "").trim();
               }
             }
           }

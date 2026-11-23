@@ -182,7 +182,7 @@ async function main(config = {}) {
   core.info(`Set issue type configuration: max=${maxCount}`);
   const requiredLabels = Array.isArray(config.required_labels) ? config.required_labels : [];
   const requiredTitlePrefix = config.required_title_prefix || "";
-  const issueIntentEnabled = config.issue_intent !== false;
+  const issueIntentEnabled = config.issue_intent === true;
   if (requiredLabels.length > 0) core.info(`Required labels (all): ${requiredLabels.join(", ")}`);
   if (requiredTitlePrefix) core.info(`Required title prefix: ${requiredTitlePrefix}`);
   if (allowedTypes.length > 0) {

@@ -1259,8 +1259,9 @@ describe("generate_safe_outputs_tools", () => {
     expect(closeIssue.inputSchema.properties).toHaveProperty("confidence");
     expect(closeIssue.inputSchema.required).toEqual(expect.arrayContaining(["rationale", "confidence"]));
 
-    expect(assignToUser.inputSchema.properties).toHaveProperty("rationale");
-    expect(assignToUser.inputSchema.properties).toHaveProperty("confidence");
+    expect(assignToUser.inputSchema.properties).not.toHaveProperty("rationale");
+    expect(assignToUser.inputSchema.properties).not.toHaveProperty("confidence");
+    expect(assignToUser.inputSchema.properties).not.toHaveProperty("suggest");
     expect(assignToUser.inputSchema.required).not.toContain("rationale");
     expect(assignToUser.inputSchema.required).not.toContain("confidence");
 
@@ -1271,7 +1272,7 @@ describe("generate_safe_outputs_tools", () => {
     expect(assignToAgent.inputSchema.required).not.toContain("confidence");
   });
 
-  it("adds encouraged intent guidance for all intent-aware tools when issue_intent is omitted", () => {
+  it("strips intent fields and guidance for all intent-aware tools when issue_intent is omitted", () => {
     fs.writeFileSync(
       toolsSourcePath,
       JSON.stringify([
@@ -1339,28 +1340,14 @@ describe("generate_safe_outputs_tools", () => {
     runScript();
 
     const result = JSON.parse(fs.readFileSync(outputPath, "utf8"));
-    const optionalSuffix = "INTENT ENCOURAGED:";
-    const requiredSuffix = "INTENT REQUIRED:";
     const toolNames = ["set_issue_type", "set_issue_field", "add_labels", "close_issue", "assign_to_user", "assign_to_agent"];
     for (const name of toolNames) {
       const tool = result.find((/** @type {{name: string}} */ t) => t.name === name);
       expect(tool, `${name} should be in result`).toBeDefined();
-      expect(tool.description, `${name} should have encouraged suffix`).toContain(optionalSuffix);
-      expect(tool.description, `${name} should not have required suffix`).not.toContain(requiredSuffix);
-    }
-    // Rationale and confidence should remain optional (not added to required array, descriptions unchanged)
-    for (const name of toolNames.filter(n => n !== "add_labels")) {
-      const tool = result.find((/** @type {{name: string, inputSchema: {required?: string[]}}} */ t) => t.name === name);
-      const required = tool.inputSchema.required ?? [];
-      expect(required, `${name} rationale should not be required`).not.toContain("rationale");
-      expect(required, `${name} confidence should not be required`).not.toContain("confidence");
-      const props = tool.inputSchema.properties;
-      if (props?.rationale?.description) {
-        expect(props.rationale.description, `${name} rationale description should remain optional`).toMatch(/optional/i);
-      }
-      if (props?.confidence?.description) {
-        expect(props.confidence.description, `${name} confidence description should remain optional`).toMatch(/optional/i);
-      }
+      expect(tool.description, `${name} should not have intent guidance`).not.toMatch(/INTENT (ENCOURAGED|REQUIRED):/);
+      expect(tool.inputSchema.properties, `${name} rationale should be stripped`).not.toHaveProperty("rationale");
+      expect(tool.inputSchema.properties, `${name} confidence should be stripped`).not.toHaveProperty("confidence");
+      expect(tool.inputSchema.required ?? [], `${name} rationale should not be required`).not.toContain("rationale");
     }
   });
 
@@ -1422,44 +1409,6 @@ describe("generate_safe_outputs_tools", () => {
     const items = tool.inputSchema.properties.labels.items;
     expect(items.properties.rationale.description).not.toMatch(/optional/i);
     expect(items.properties.confidence.description).not.toMatch(/optional/i);
-  });
-
-  it("omitted mode add_labels description prefers structured label objects and permits plain strings", () => {
-    const addLabelsSourceTool = {
-      name: "add_labels",
-      description: "Adds labels.",
-      inputSchema: {
-        type: "object",
-        properties: {
-          labels: {
-            type: "array",
-            description: "Original description.",
-            items: { oneOf: [{ type: "string" }, { type: "object", required: ["name"], properties: { name: { type: "string" } } }] },
-          },
-        },
-        required: ["labels"],
-      },
-    };
-    fs.writeFileSync(toolsSourcePath, JSON.stringify([addLabelsSourceTool]));
-    fs.writeFileSync(configPath, JSON.stringify({ add_labels: {} }));
-    fs.writeFileSync(toolsMetaPath, JSON.stringify({ description_suffixes: {}, repo_params: {}, dynamic_tools: [] }));
-
-    runScript();
-
-    const result = JSON.parse(fs.readFileSync(outputPath, "utf8"));
-    const tool = result.find((/** @type {{name: string}} */ t) => t.name === "add_labels");
-    const labelsDesc = tool.inputSchema.properties.labels.description;
-
-    // Should include a structured object example
-    expect(labelsDesc).toContain('"name"');
-    expect(labelsDesc).toContain('"rationale"');
-    expect(labelsDesc).toContain('"confidence"');
-    // Should show suggest inside the label object example (not as a top-level field)
-    expect(labelsDesc).toContain('"suggest"');
-    // Should not say plain strings are forbidden (they are still allowed in omitted mode)
-    expect(labelsDesc).not.toMatch(/plain string.*not permitted/i);
-    // oneOf schema must be preserved (plain strings still valid)
-    expect(tool.inputSchema.properties.labels.items.oneOf).toBeDefined();
   });
 
   it("strict mode updates rationale and confidence property descriptions to say required", () => {

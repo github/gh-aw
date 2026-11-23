@@ -6085,7 +6085,7 @@
                 },
                 "issue-intent": {
                   "type": "boolean",
-                  "description": "Experimental: Enable issue-intent metadata support (rationale/confidence/suggest) for this output type."
+                  "description": "Experimental: Enable issue-intent metadata support (rationale/confidence/suggest) for this output type. Disabled by default; set to true to opt in (makes rationale and confidence required)."
                 },
                 "samples": {
                   "description": "Internal hidden feature. Optional list of declarative sample payloads that exercise this safe-output handler. Used by the hidden `gh aw compile --use-samples` flag to replace the agentic step with a deterministic replay through the safe-outputs MCP server. Each entry should conform to the corresponding MCP tool inputSchema; recognized sidecar keys (currently `patch` for create-pull-request and push-to-pull-request-branch) are stripped before schema validation and consumed by the replay driver.",
@@ -6956,7 +6956,7 @@
                 },
                 "issue-intent": {
                   "type": "boolean",
-                  "description": "Experimental: Enable issue-intent metadata support (rationale/confidence/suggest) for this output type."
+                  "description": "Experimental: Enable issue-intent metadata support (rationale/confidence/suggest) for this output type. Disabled by default; set to true to opt in (makes rationale and confidence required)."
                 },
                 "samples": {
                   "description": "Internal hidden feature. Optional list of declarative sample payloads that exercise this safe-output handler. Used by the hidden `gh aw compile --use-samples` flag to replace the agentic step with a deterministic replay through the safe-outputs MCP server. Each entry should conform to the corresponding MCP tool inputSchema; recognized sidecar keys (currently `patch` for create-pull-request and push-to-pull-request-branch) are stripped before schema validation and consumed by the replay driver.",
@@ -7068,7 +7068,7 @@
                 },
                 "issue-intent": {
                   "type": "boolean",
-                  "description": "Experimental: Enable issue-intent metadata support (rationale/confidence/suggest) for this output type."
+                  "description": "Experimental: Enable issue-intent metadata support (rationale/confidence/suggest) for this output type. Disabled by default; set to true to opt in (makes rationale and confidence required)."
                 },
                 "samples": {
                   "description": "Internal hidden feature. Optional list of declarative sample payloads that exercise this safe-output handler. Used by the hidden `gh aw compile --use-samples` flag to replace the agentic step with a deterministic replay through the safe-outputs MCP server. Each entry should conform to the corresponding MCP tool inputSchema; recognized sidecar keys (currently `patch` for create-pull-request and push-to-pull-request-branch) are stripped before schema validation and consumed by the replay driver.",
@@ -8009,7 +8009,7 @@
                 },
                 "issue-intent": {
                   "type": "boolean",
-                  "description": "Experimental: Enable issue-intent metadata support (rationale/confidence/suggest) for this output type."
+                  "description": "Experimental: Enable issue-intent metadata support (rationale/confidence/suggest) for this output type. Disabled by default; set to true to opt in (makes rationale and confidence required)."
                 },
                 "samples": {
                   "description": "Internal hidden feature. Optional list of declarative sample payloads that exercise this safe-output handler. Used by the hidden `gh aw compile --use-samples` flag to replace the agentic step with a deterministic replay through the safe-outputs MCP server. Each entry should conform to the corresponding MCP tool inputSchema; recognized sidecar keys (currently `patch` for create-pull-request and push-to-pull-request-branch) are stripped before schema validation and consumed by the replay driver.",
@@ -9861,7 +9861,7 @@
                 },
                 "issue-intent": {
                   "type": "boolean",
-                  "description": "Experimental: Enable issue-intent metadata support (rationale/confidence/suggest) for this output type."
+                  "description": "Experimental: Enable issue-intent metadata support (rationale/confidence/suggest) for this output type. Disabled by default; set to true to opt in (makes rationale and confidence required)."
                 },
                 "create-if-missing": {
                   "type": "boolean",
@@ -10362,7 +10362,7 @@
                 },
                 "issue-intent": {
                   "type": "boolean",
-                  "description": "Experimental: Enable issue-intent metadata support (rationale/confidence/suggest) for this output type."
+                  "description": "Experimental: Enable issue-intent metadata support (rationale/confidence/suggest) for this output type. Disabled by default; set to true to opt in (makes rationale and confidence required)."
                 },
                 "samples": {
                   "description": "Internal hidden feature. Optional list of declarative sample payloads that exercise this safe-output handler. Used by the hidden `gh aw compile --use-samples` flag to replace the agentic step with a deterministic replay through the safe-outputs MCP server. Each entry should conform to the corresponding MCP tool inputSchema; recognized sidecar keys (currently `patch` for create-pull-request and push-to-pull-request-branch) are stripped before schema validation and consumed by the replay driver.",
@@ -10460,7 +10460,7 @@
                 },
                 "issue-intent": {
                   "type": "boolean",
-                  "description": "Experimental: Enable issue-intent metadata support (rationale/confidence/suggest) for this output type."
+                  "description": "Experimental: Enable issue-intent metadata support (rationale/confidence/suggest) for this output type. Disabled by default; set to true to opt in (makes rationale and confidence required)."
                 },
                 "samples": {
                   "description": "Internal hidden feature. Optional list of declarative sample payloads that exercise this safe-output handler. Used by the hidden `gh aw compile --use-samples` flag to replace the agentic step with a deterministic replay through the safe-outputs MCP server. Each entry should conform to the corresponding MCP tool inputSchema; recognized sidecar keys (currently `patch` for create-pull-request and push-to-pull-request-branch) are stripped before schema validation and consumed by the replay driver.",
@@ -11543,7 +11543,7 @@
                 },
                 "issue-intent": {
                   "type": "boolean",
-                  "description": "Experimental: Enable issue-intent metadata support (rationale/confidence/suggest) for this output type."
+                  "description": "Experimental: Enable issue-intent metadata support (rationale/confidence/suggest) for this output type. Disabled by default; set to true to opt in (makes rationale and confidence required)."
                 },
                 "staged": {
                   "$ref": "#/$defs/templatable_boolean",
@@ -11640,7 +11640,7 @@
                 },
                 "issue-intent": {
                   "type": "boolean",
-                  "description": "Experimental: Enable issue-intent metadata support (rationale/confidence/suggest) for this output type."
+                  "description": "Experimental: Enable issue-intent metadata support (rationale/confidence/suggest) for this output type. Disabled by default; set to true to opt in (makes rationale and confidence required)."
                 },
                 "staged": {
                   "$ref": "#/$defs/templatable_boolean",

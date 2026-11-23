@@ -248,8 +248,8 @@ const main = createCountGatedHandler({
       throw new Error(`${ERR_CONFIG}: Invalid max-labels value: ${configuredMaxLabels}. Must be a positive integer`);
     }
     const target = config.target || "triggering";
-    const issueIntentEnabled = config.issue_intent !== false;
-    const issueIntentStrict = config.issue_intent === true; // strict mode: plain-string labels rejected, metadata required
+    const issueIntentEnabled = config.issue_intent === true;
+    const issueIntentStrict = issueIntentEnabled; // strict mode: plain-string labels rejected, metadata required
     const createIfMissing = config.create_if_missing === true;
     const requiredLabels = Array.isArray(config.required_labels) ? config.required_labels : [];
     const requiredTitlePrefix = config.required_title_prefix || "";

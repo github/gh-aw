@@ -5594,7 +5594,8 @@ tools:
     staged: "example-value"
 
     # Experimental: Enable issue-intent metadata support
-    # (rationale/confidence/suggest) for this output type.
+    # (rationale/confidence/suggest) for this output type. Disabled by default; set to
+    # true to opt in (makes rationale and confidence required).
     # (optional)
     issue-intent: true
 
@@ -6220,7 +6221,8 @@ safe-outputs:
     staged: "example-value"
 
     # Experimental: Enable issue-intent metadata support
-    # (rationale/confidence/suggest) for this output type.
+    # (rationale/confidence/suggest) for this output type. Disabled by default; set to
+    # true to opt in (makes rationale and confidence required).
     # (optional)
     issue-intent: true
 
@@ -6517,7 +6519,8 @@ safe-outputs:
     staged: "example-value"
 
     # Experimental: Enable issue-intent metadata support
-    # (rationale/confidence/suggest) for this output type.
+    # (rationale/confidence/suggest) for this output type. Disabled by default; set to
+    # true to opt in (makes rationale and confidence required).
     # (optional)
     issue-intent: true
 
@@ -9216,7 +9219,8 @@ safe-outputs:
     staged: "example-value"
 
     # Experimental: Enable issue-intent metadata support
-    # (rationale/confidence/suggest) for this output type.
+    # (rationale/confidence/suggest) for this output type. Disabled by default; set to
+    # true to opt in (makes rationale and confidence required).
     # (optional)
     issue-intent: true
 
@@ -14192,7 +14196,8 @@ safe-outputs:
     required-title-prefix: "example-value"
 
     # Experimental: Enable issue-intent metadata support
-    # (rationale/confidence/suggest) for this output type.
+    # (rationale/confidence/suggest) for this output type. Disabled by default; set to
+    # true to opt in (makes rationale and confidence required).
     # (optional)
     issue-intent: true
 
@@ -15500,7 +15505,8 @@ safe-outputs:
     staged: "example-value"
 
     # Experimental: Enable issue-intent metadata support
-    # (rationale/confidence/suggest) for this output type.
+    # (rationale/confidence/suggest) for this output type. Disabled by default; set to
+    # true to opt in (makes rationale and confidence required).
     # (optional)
     issue-intent: true
 
@@ -15804,7 +15810,8 @@ safe-outputs:
     staged: "example-value"
 
     # Experimental: Enable issue-intent metadata support
-    # (rationale/confidence/suggest) for this output type.
+    # (rationale/confidence/suggest) for this output type. Disabled by default; set to
+    # true to opt in (makes rationale and confidence required).
     # (optional)
     issue-intent: true
 
@@ -18529,7 +18536,8 @@ safe-outputs:
     head-github-token: "example-value"
 
     # Experimental: Enable issue-intent metadata support
-    # (rationale/confidence/suggest) for this output type.
+    # (rationale/confidence/suggest) for this output type. Disabled by default; set to
+    # true to opt in (makes rationale and confidence required).
     # (optional)
     issue-intent: true
 
@@ -18833,7 +18841,8 @@ safe-outputs:
     github-token: "${{ secrets.GITHUB_TOKEN }}"
 
     # Experimental: Enable issue-intent metadata support
-    # (rationale/confidence/suggest) for this output type.
+    # (rationale/confidence/suggest) for this output type. Disabled by default; set to
+    # true to opt in (makes rationale and confidence required).
     # (optional)
     issue-intent: true
 
