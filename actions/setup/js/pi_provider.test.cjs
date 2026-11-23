@@ -164,6 +164,10 @@ describe("pi_provider.cjs", () => {
         values: { type: "array", uniqueItems: true, items: { anyOf: [{ type: "string" }, { type: "array", uniqueItems: false, items: { type: "number" } }] } },
       },
       $defs: { values: { type: "array", uniqueItems: true, items: { type: "string" } } },
+      dependencies: {
+        trigger: { properties: { values: { type: "array", uniqueItems: true, items: { type: "string" } } } },
+        propertyTrigger: ["values", "uniqueItems"],
+      },
       examples: [{ uniqueItems: true }],
       enum: [{ uniqueItems: false }],
     };
@@ -181,12 +185,22 @@ describe("pi_provider.cjs", () => {
     expect(parameters.properties.values.uniqueItems).toBeUndefined();
     expect(parameters.properties.values.items.anyOf[1].uniqueItems).toBeUndefined();
     expect(parameters.$defs.values.uniqueItems).toBeUndefined();
+    expect(parameters.dependencies.trigger.properties.values).toEqual({ type: "array", items: { type: "string" } });
+    expect(parameters.dependencies.propertyTrigger).toEqual(["values", "uniqueItems"]);
     expect(parameters.properties.uniqueItems).toEqual({ type: "boolean" });
     expect(parameters.examples).toEqual(schema.examples);
     expect(parameters.enum).toEqual(schema.enum);
     expect(adapted.tools[1]).toEqual(custom);
     expect(adapted.input[0].tools[0].tools[0]).toEqual(adapted.tools[0]);
     expect(payload).toEqual(original);
+
+    const validate = new Ajv({ strict: false }).compile({ type: "object", dependencies: schema.dependencies });
+    expect(validate({ trigger: true, values: ["duplicate", "duplicate"] })).toBe(false);
+    expect(validate.errors.some(error => error.keyword === "uniqueItems")).toBe(true);
+    expect(validate({ trigger: true, values: ["first", "second"] })).toBe(true);
+    expect(validate({ propertyTrigger: true, values: ["first"] })).toBe(false);
+    expect(validate.errors.some(error => error.keyword === "dependencies")).toBe(true);
+    expect(validate({ propertyTrigger: true, values: ["first"], uniqueItems: true })).toBe(true);
   });
 
   it("leaves non-OpenAI provider schemas untouched", () => {

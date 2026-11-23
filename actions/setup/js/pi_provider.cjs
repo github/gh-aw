@@ -195,7 +195,7 @@ function formatResponseHeaderNames(headers) {
 function adaptProviderToolSchemas(payload, api, logger) {
   if (!["openai-completions", "openai-responses", "azure-openai-responses", "openai-codex-responses"].includes(api) || !payload || typeof payload !== "object") return payload;
   let omitted = 0;
-  const schemaMaps = new Set(["properties", "patternProperties", "$defs", "definitions", "dependentSchemas"]);
+  const schemaMaps = new Set(["properties", "patternProperties", "$defs", "definitions", "dependentSchemas", "dependencies"]);
   const schemaNodes = new Set(["items", "additionalProperties", "additionalItems", "contains", "not", "if", "then", "else", "unevaluatedProperties", "unevaluatedItems", "propertyNames"]);
   const schemaArrays = new Set(["allOf", "anyOf", "oneOf", "prefixItems"]);
   /** @param {any} schema @returns {any} */
