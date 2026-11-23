@@ -520,12 +520,24 @@ async function fetchCommitChecks(repo, head, number, endpoint, field, validItem,
     const response = await api(["api", `repos/${repo}/commits/${head}/${endpoint}&page=${page}`]);
     const count = response?.total_count;
     const entries = response?.[field];
-    if (!Number.isSafeInteger(count) || count < 0 || (total !== undefined && count !== total) || !Array.isArray(entries) || entries.length !== Math.min(100, count - items.length) || !entries.every(validItem)) {
+    // The gateway mistakes combined statuses for search results: it preserves
+    // the status object but replaces total_count with the accessible object count.
+    // Only that exact-head, accessible singleton may paginate by page length.
+    const gatewayStatuses = field === "statuses" && Object.hasOwn(response ?? {}, "incomplete_results");
+    const proxyStatuses = gatewayStatuses && count === 1 && response.incomplete_results === false && response.sha === head && ["success", "pending", "failure"].includes(response.state);
+    if (
+      (gatewayStatuses && !proxyStatuses) ||
+      !Number.isSafeInteger(count) ||
+      count < 0 ||
+      !Array.isArray(entries) ||
+      (proxyStatuses ? entries.length > 100 : (total !== undefined && count !== total) || entries.length !== Math.min(100, count - items.length)) ||
+      !entries.every(validItem)
+    ) {
       throw new Error(`PR #${number}: could not refresh ${field}; incomplete or malformed GitHub response (possibly proxy-filtered or changing totals)`);
     }
     total = count;
     items.push(...entries);
-    if (items.length === total) return items;
+    if (proxyStatuses ? entries.length < 100 : items.length === total) return items;
   }
 }
 

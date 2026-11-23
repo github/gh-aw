@@ -694,6 +694,40 @@ test("explicit zero totals with empty collections are valid check and status ref
   assert.equal(calls.length, 4);
 });
 
+test("status refresh handles the gateway's rewritten singleton count on every page", async () => {
+  for (const statuses of [[], [{ context: "external-ci", state: "failure" }], ...[100, 101, 201].map(count => Array.from({ length: count }, (_, i) => ({ context: `status-${i}`, state: "success" })))]) {
+    const { api } = queueAPI({ statuses });
+    const candidate = await fetchCandidate("github/gh-aw", "42", async args => {
+      const response = await api(args);
+      return args[1].includes("/status?") ? { ...response, sha: "abc", state: "success", total_count: 1, incomplete_results: false } : response;
+    });
+    assert.deepEqual(
+      candidate.statusCheckRollup.map(check => check.context),
+      statuses.map(check => check.context)
+    );
+    if (statuses.length === 1) assert.equal(candidate.statusCheckRollup[0].state, "FAILURE");
+  }
+});
+
+test("status refresh rejects filtered, wrong-head, and malformed gateway responses", async () => {
+  const valid = { sha: "abc", state: "success", total_count: 1, incomplete_results: false, statuses: [] };
+  for (const response of [
+    { ...valid, total_count: 0 },
+    { ...valid, total_count: 0, statuses: [{ context: "external-ci", state: "failure" }] },
+    { ...valid, total_count: 2 },
+    { ...valid, sha: "other" },
+    { ...valid, sha: undefined },
+    { ...valid, state: undefined },
+    { ...valid, incomplete_results: true },
+    { ...valid, statuses: null },
+    { ...valid, statuses: [null] },
+    { ...valid, statuses: Array.from({ length: 101 }, () => ({ context: "external-ci", state: "success" })) },
+  ]) {
+    const { api } = queueAPI();
+    await assert.rejects(() => fetchCandidate("github/gh-aw", "42", args => (args[1].includes("/status?") ? response : api(args))), /PR #42: could not refresh statuses/);
+  }
+});
+
 test("targeted refresh fails closed when metadata is incomplete or the PR is absent", async () => {
   for (const result of [
     null,
