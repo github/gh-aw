@@ -1,15 +1,16 @@
 ---
-description: Guide for configuring new declarative agentic engines — engine definition fields, auth wiring, behavior blocks, and validation.
+description: Author or maintain a reusable declarative engine definition, including runtime behavior, provider wiring, and strict validation.
 ---
 
-# Configure a New Agentic Engine
+# Define a Custom Engine
 
-Use this guide when adding or updating a declarative engine definition in a repository that uses the `gh aw` extension. Do not assume that the gh-aw source repository, its build system, or its Go packages are available.
+Use this guide to add or edit a reusable `engine.behaviors` definition, not to
+set the engine, provider, or model in a consuming workflow. For those choices,
+use [Choose a Harness and Inference](agentic-engine.md).
 
-Before adding a definition, follow [agentic engine selection](agentic-engine.md)
-to check developer harness preferences and existing supported engines. Configure
-a new engine only when a compatible definition is missing and implementation
-is requested.
+Add a definition only if selection found no compatible engine and implementation
+was requested. Use the installed `gh aw` extension; do not assume a gh-aw source
+checkout or build system is available.
 
 ## Prefer shared agentic workflow definitions
 
@@ -38,7 +39,7 @@ For CLI-style engines, create a repository-scoped definition in `.github/workflo
 
 Use a `config-adapter` only to transform generated MCP configuration. Use a `harness-script` when endpoint selection, model transformation, prompt delivery, or CLI invocation requires runtime logic.
 
-## Auth and provider rules
+## Wire credentials and providers into the runtime
 
 For `universal-llm-consumer` execution with a `copilot/` model, the compiler
 supplies the real credential only as `COPILOT_GITHUB_TOKEN`. OpenAI-compatible

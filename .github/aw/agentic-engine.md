@@ -2,12 +2,13 @@
 description: Choose a workflow harness and inference configuration using repository preferences, comparable workflows, and task requirements.
 ---
 
-# Agentic Engine
+# Choose a Harness and Inference
 
 Choose the harness (`engine` or `engine.id`) and inference (provider and model
 or routing policy) separately, then verify the combination. Align the harness
 with developer skills, instructions, and tools; use inference approved for the
-task and deployment.
+task and deployment. This guide selects an existing engine for a workflow;
+it does not define a new engine.
 
 ## Detect the developer's harness
 
@@ -65,8 +66,8 @@ preference, provider approval, or runtime availability. See
 - For another harness, inspect the supported definitions in
   [engines.json](engines.json). Use its verified import and engine ID; do not
   invent built-in IDs or imply unsupported capabilities. Follow
-  [configure-agentic-engine.md](configure-agentic-engine.md) only when adding a
-  missing declarative definition is explicitly requested.
+  [define a custom engine](configure-agentic-engine.md) only when no compatible
+  definition exists and implementation is explicitly requested.
 - Honor explicit inference preferences and repository policy. Verify provider
   support, approved endpoints and data handling, and required authentication
   without reading secret values. Use `engine.model-provider` where supported;
@@ -92,9 +93,8 @@ preference, provider approval, or runtime availability. See
   switch providers or send repository data to an unapproved endpoint. Stop and
   report the blocker if no compatible combination can be verified.
 - With no clear preference and no conflicting task requirement, explicitly set
-  `engine: pi` in newly authored workflows. Pi is this selection policy's
-  efficiency-oriented fallback, not a claim that it wins every benchmark.
-  This does not change the compiler's default when `engine:` is omitted.
+  `engine: pi` in new workflows. This authoring fallback does not change the
+  compiler's default when `engine:` is omitted.
 - Preserve an existing workflow's engine and inference during unrelated
   updates. Re-select only what was requested or made incompatible by changed
   requirements.
