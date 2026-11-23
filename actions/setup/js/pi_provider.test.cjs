@@ -3,6 +3,8 @@ import childProcess from "node:child_process";
 import fs from "fs";
 import os from "os";
 import path from "path";
+import Ajv from "ajv";
+import { addDependencySchema, createSubmissionTracker } from "./safe_output_submission.cjs";
 
 describe("pi_provider.cjs", () => {
   let module;
@@ -118,6 +120,81 @@ describe("pi_provider.cjs", () => {
 
     expect(stderrOutput.some(line => line.includes("provider_request provider=copilot model=claude-sonnet-4 api=openai-completions method=POST url=http://api-proxy:10002/v1/chat/completions"))).toBe(true);
     expect(stderrOutput.some(line => line.includes("provider_response provider=copilot model=claude-sonnet-4 status=503 method=POST url=http://api-proxy:10002/v1/chat/completions response_headers=content-type,x-request-id"))).toBe(true);
+  });
+
+  it("adapts the rejected eighth tool without changing argument validation or other request fields", () => {
+    const tool = { name: "mcp__safeoutputs__create_issue", inputSchema: { type: "object", properties: { title: { type: "string" } }, required: ["title"] } };
+    addDependencySchema(tool);
+    const original = structuredClone(tool.inputSchema);
+    const tools = Array.from({ length: 7 }, (_, index) => ({ type: "function", name: `tool_${index}`, strict: true, parameters: { type: "object", properties: {}, additionalProperties: false } }));
+    tools.push({ type: "function", name: tool.name, strict: false, parameters: tool.inputSchema });
+    const payload = { model: "gpt-6.1-terra", tools, input: [{ role: "user", content: "Audit domains" }] };
+    const handlers = {};
+    module.default({ registerProvider: vi.fn(), on: (name, handler) => (handlers[name] = handler) });
+
+    const adapted = handlers.before_provider_request({ payload }, { model: { provider: "aw-gateway", id: payload.model, api: "openai-responses", baseUrl: "http://api-proxy:10002" } });
+    expect(adapted.tools[7].parameters.properties["depends-on"].oneOf[1]).toEqual({
+      type: "array",
+      minItems: 1,
+      items: { type: "string", pattern: "^so_[A-Za-z0-9_-]{12}$" },
+    });
+    expect(adapted.tools[7].strict).toBe(false);
+    expect(adapted.tools.slice(0, 7)).toEqual(tools.slice(0, 7));
+    expect(adapted.input).toEqual(payload.input);
+    expect(adapted.model).toBe(payload.model);
+    expect(tool.inputSchema).toEqual(original);
+    expect(stderrOutput.join("")).toContain("provider_schema_compat omitted_unique_items=1 argument_validation=unchanged");
+
+    const validate = new Ajv({ strict: false }).compile(tool.inputSchema);
+    const duplicate = { title: "Audit", "depends-on": ["so_AAAAAAAAAAAA", "so_AAAAAAAAAAAA"] };
+    expect(validate(duplicate)).toBe(false);
+    expect(validate.errors.some(error => error.keyword === "uniqueItems")).toBe(true);
+    const tracker = createSubmissionTracker();
+    const effect = vi.fn();
+    expect(tracker.wrap(effect)(duplicate).isError).toBe(true);
+    expect(effect).not.toHaveBeenCalled();
+    expect(validate({ title: "Audit", "depends-on": ["so_AAAAAAAAAAAA", "so_BBBBBBBBBBBB"] })).toBe(true);
+  });
+
+  it.each(["openai-completions", "openai-responses", "azure-openai-responses", "openai-codex-responses"])("adapts nested and deferred %s schemas without rewriting data or property names", api => {
+    const schema = {
+      type: "object",
+      properties: {
+        uniqueItems: { type: "boolean" },
+        values: { type: "array", uniqueItems: true, items: { anyOf: [{ type: "string" }, { type: "array", uniqueItems: false, items: { type: "number" } }] } },
+      },
+      $defs: { values: { type: "array", uniqueItems: true, items: { type: "string" } } },
+      examples: [{ uniqueItems: true }],
+      enum: [{ uniqueItems: false }],
+    };
+    const definition = { name: "nested", strict: true, parameters: schema };
+    const tool = api === "openai-completions" ? { type: "function", function: definition } : { type: "function", ...definition };
+    const deferred = { type: "tool_search_output", tools: [{ type: "namespace", name: "safeoutputs", tools: [tool] }] };
+    const custom = { type: "custom", format: { type: "grammar", definition: "uniqueItems" } };
+    const payload = { tools: [tool, custom], input: [deferred] };
+    const original = structuredClone(payload);
+    const handlers = {};
+    module.default({ registerProvider: vi.fn(), on: (name, handler) => (handlers[name] = handler) });
+
+    const adapted = handlers.before_provider_request({ payload }, { model: { api } });
+    const parameters = api === "openai-completions" ? adapted.tools[0].function.parameters : adapted.tools[0].parameters;
+    expect(parameters.properties.values.uniqueItems).toBeUndefined();
+    expect(parameters.properties.values.items.anyOf[1].uniqueItems).toBeUndefined();
+    expect(parameters.$defs.values.uniqueItems).toBeUndefined();
+    expect(parameters.properties.uniqueItems).toEqual({ type: "boolean" });
+    expect(parameters.examples).toEqual(schema.examples);
+    expect(parameters.enum).toEqual(schema.enum);
+    expect(adapted.tools[1]).toEqual(custom);
+    expect(adapted.input[0].tools[0].tools[0]).toEqual(adapted.tools[0]);
+    expect(payload).toEqual(original);
+  });
+
+  it("leaves non-OpenAI provider schemas untouched", () => {
+    const payload = { tools: [{ name: "unique", input_schema: { type: "array", uniqueItems: true } }] };
+    const handlers = {};
+    module.default({ registerProvider: vi.fn(), on: (name, handler) => (handlers[name] = handler) });
+    expect(handlers.before_provider_request({ payload }, { model: { api: "anthropic-messages" } })).toBe(payload);
+    expect(stderrOutput.join("")).not.toContain("provider_schema_compat");
   });
 
   it("includes the provider status and redacted response message in the incomplete report", async () => {
