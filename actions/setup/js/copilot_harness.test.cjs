@@ -4149,7 +4149,7 @@ process.exit(1);`,
 
     it.each([
       { used: 240.22396, expectedExit: 0, expectedAttempts: 1 },
-      { used: 239.9, expectedExit: 1, expectedAttempts: 2 },
+      { used: 239.9, expectedExit: 1, expectedAttempts: 1 },
     ])("classifies proxy HTTP 403 with network-only audit and compiled cap at usage $used", ({ used, expectedExit, expectedAttempts }) => {
       const tempDir = makeHarnessTempDir("copilot-proxy-403-compiled-cap-");
       const auditDir = path.join(tempDir, "sandbox", "firewall", "logs");
@@ -4190,6 +4190,8 @@ process.exit(1);`
         expect(result.stderr).not.toContain("centralized Copilot billing");
       } else {
         expect(result.stderr).toContain("failureClass=authentication_failed");
+        expect(result.stderr).toContain("not retrying");
+        expect(result.stderr).not.toContain("will retry");
         expect(result.stderr).not.toContain("AI credits budget enforced");
       }
     });
