@@ -2145,10 +2145,14 @@ async function main() {
           let retryAfterMs = null;
           let pendingStderrResponse = "";
           let pendingStderrHeaderLines = 0;
+          /** @param {number | null} delay */
+          const keepLongestRetryAfter = delay => {
+            if (delay !== null) retryAfterMs = Math.max(retryAfterMs ?? 0, delay);
+          };
           /** @param {string} line */
           const observeRetryAfter = line => {
             if (!hasCopilotResponseStatus(line)) return;
-            retryAfterMs = parseCopilotRetryAfterMs(line);
+            keepLongestRetryAfter(parseCopilotRetryAfterMs(line));
           };
           /** @param {string} line */
           const observeStderrRetryAfter = line => {
@@ -2163,7 +2167,7 @@ async function main() {
             if (hasCopilotResponseStatus(line)) {
               pendingStderrResponse = line;
               pendingStderrHeaderLines = 0;
-              retryAfterMs = parseCopilotRetryAfterMs(line);
+              keepLongestRetryAfter(parseCopilotRetryAfterMs(line));
               return;
             }
             if (!pendingStderrResponse) return;
@@ -2176,8 +2180,7 @@ async function main() {
             }
             pendingStderrResponse += `\n${line}`;
             pendingStderrHeaderLines += 1;
-            const delay = parseCopilotRetryAfterMs(pendingStderrResponse);
-            if (delay !== null) retryAfterMs = delay;
+            keepLongestRetryAfter(parseCopilotRetryAfterMs(pendingStderrResponse));
           };
           // Driver mode: run copilot_sdk_driver.cjs as a normal subprocess. The harness has
           // already started the sidecar; the driver only opens an SDK client connection.

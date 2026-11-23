@@ -126,6 +126,51 @@ describe("Copilot Retry-After harness integration", () => {
     }
   });
 
+  it.each(["stderr", "session.error"])("keeps the longest %s Retry-After when a later 429 has no header", source => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), "copilot-retry-after-longest-"));
+    const callsPath = path.join(directory, "calls.jsonl");
+    const stubPath = path.join(directory, "stub.cjs");
+    const messages = ["HTTP 429\nretry-after: 257", "HTTP 429"];
+    const lines = source === "stderr" ? messages : messages.map(message => JSON.stringify({ type: source, data: { message } }));
+    fs.writeFileSync(
+      stubPath,
+      `const fs = require("fs");
+fs.appendFileSync(${JSON.stringify(callsPath)}, JSON.stringify({ time: Date.now() }) + "\\n");
+for (const line of ${JSON.stringify(lines)}) console.${source === "stderr" ? "error" : "log"}(line);
+process.exitCode = 1;`
+    );
+    try {
+      const result = spawnSync(process.execPath, [harnessPath, process.execPath, stubPath, "--prompt", "test"], {
+        cwd: directory,
+        env: {
+          ...process.env,
+          GITHUB_WORKSPACE: directory,
+          GH_AW_TMP_DIR: directory,
+          GH_AW_HARNESS_TELEMETRY_DIR: directory,
+          GH_AW_HARNESS_MAX_RETRIES: "1",
+          GH_AW_HARNESS_INITIAL_DELAY_MS: "1",
+          GH_AW_HARNESS_MAX_DELAY_MS: "60000",
+          GH_AW_TIMEOUT_MINUTES: "",
+          GH_AW_SAFE_OUTPUTS: "",
+          GH_AW_SKIP_REFLECT: "true",
+          AWF_REFLECT_ENABLED: "",
+          COPILOT_MODEL: "",
+          GH_AW_COPILOT_SDK: "",
+          GH_AW_LLM_PROVIDER: "github",
+          GH_AW_SKIP_IF_DECISION: "",
+        },
+        encoding: "utf8",
+        timeout: 10000,
+      });
+      expect(result.status, result.stderr).toBe(1);
+      expect(fs.readFileSync(callsPath, "utf8").trim().split("\n")).toHaveLength(1);
+      const telemetry = JSON.parse(fs.readFileSync(path.join(directory, "harness_retry.json"), "utf8"));
+      expect(telemetry.attempt_results[0].failure_classes).toEqual(["rate_limit_wait_exceeded"]);
+    } finally {
+      fs.rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
   it.each([
     ["stderr", "1", "2000", "", 0, 2, "rate_limit_error"],
     ["session.error", "1", "2000", "", 0, 2, "rate_limit_error"],
