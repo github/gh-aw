@@ -551,6 +551,7 @@
         );
         r.header = {
           group: r.group,
+          id: BANDS[r.group][2],
           header: true,
           notes: `What: ${PROTO[r.group] ? `Research prototype: ${PROTO[r.group]}. ` : ""}The ${title} section map shows topic tiles; a down-arrow badge marks worked examples.\nWhy: ${sub}.\nWhen: Use this map to choose a topic, then open a tile or follow its examples.`,
           el: h(

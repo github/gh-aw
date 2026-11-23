@@ -25149,7 +25149,7 @@
     },
     // Trust the process: a concept slide, plain soft grey with no grid (light), one heavy review bell against quick merge blips.
     trust: { light: true, base: [200, 209, 218], pal: ["#000000", "#000000", "#000000", "#000000"], grid: [200, 209, 218, 0, 0], ang: Math.PI / 8, cell: 32, accent: ["#56d364", "#2ea043", "#aff5b4", "#4493f8"], music: "trust", prog: [0] },
-    // Cost Optimization: gray base, gold grid turned 45° the other way (-π/4), coins.
+    // FinOps: gray base, gold grid turned 45° the other way (-π/4), coins.
     cost: { base: [13, 17, 23], pal: ["#7d5200", "#4a3000", "#9e6a03", "#2b1d00"], grid: [255, 196, 40, 0.08, 0.2], ang: -Math.PI / 4, cell: 32, accent: ["#e3b341", "#9e6a03", "#f8e3a1", "#d29922"], music: "cost", prog: [0, 2, 4, -3] },
     // Agentic Engineering: Copilot purple, grid tilted 30°, an engine rev.
     engineering: {
@@ -25183,11 +25183,12 @@
   // ---------- bands ----------
   // The deck is a table: each group is one horizontal band (row) led by a header slide.
   // The title and the finale (last) are rows of their own. Right/left walk the deck in reading order; up/down jump between bands.
+  // [title, subtitle, id?]: the optional id pins a renamed header's published #link.
   const BANDS = {
     platform: ["Agentic Workflows", "AI-Powered workflows for GitHub"],
     security: ["Security", "Assume the agent is compromised"],
     process: ["Human agent processes", "Engineer processes, not code"],
-    cost: ["Cost Optimization", "Debug, spend less, route smarter"],
+    cost: ["FinOps", "Debug, spend less, route smarter", "cost-optimization"],
     engineering: ["Agentic Engineering", "Skip, remember, chain, measure"],
     enterprise: ["Enterprise", "Any agent, any provider, any scale"],
     cao: ["Central Agentic Ops", "CAO · gh cao · research prototype"],
@@ -25481,7 +25482,7 @@
         [64, 67, 71, 67, 64, 67, 71, 74].forEach((m, i) => tone(m, t + 0.2 + i * s, { type: "triangle", dur: 0.22, vol: 0.09, cutoff: 2600 }));
         [0, 0.22, 0.56, 0.78].forEach(d => osc("sine", 70, t + 0.2 + d, 0.18, 0.35, { f1: 40 }));
       },
-      // cost optimization: coins dropping into a jar, then a gentle register "ding"
+      // FinOps: coins dropping into a jar, then a gentle register "ding"
       cost: t => {
         for (let i = 0; i < 9; i++) {
           const d = 0.2 + i * 0.09 + Math.random() * 0.03;

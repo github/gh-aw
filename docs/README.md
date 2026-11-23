@@ -70,7 +70,7 @@ The [interactive talk](https://github.github.com/gh-aw/cracktro/) is served from
 It is a standalone slide deck, separate from the homepage slideshow, linked
 from the site footer. The deck is laid out as a table of horizontal bands: the
 title, the factory mindset, trust the process and the finale are rows of their own, and every other band (Workflows,
-Security, Human agent processes, Cost Optimization, Agentic Engineering, Enterprise, Central Agentic Ops, AW factory) starts with a header
+Security, Human agent processes, FinOps, Agentic Engineering, Enterprise, Central Agentic Ops, AW factory) starts with a header
 slide that lists the band's slides (click or tap a tile to jump) and a map of all bands.
 The Central Agentic Ops (CAO, `gh cao`) band covers a research prototype, so each of its
 slides carries a "Research prototype" badge.
