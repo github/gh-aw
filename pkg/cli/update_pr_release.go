@@ -11,9 +11,12 @@ import (
 
 	"github.com/github/gh-aw/pkg/console"
 	"github.com/github/gh-aw/pkg/constants"
+	"github.com/github/gh-aw/pkg/logger"
 	"github.com/github/gh-aw/pkg/parser"
 	"github.com/github/gh-aw/pkg/workflow"
 )
+
+var updatePRReleaseLog = logger.New("cli:update_pr_release")
 
 func updatePRTitle(title string) string {
 	version := normalizeDisplayVersion(GetVersion())
@@ -37,10 +40,12 @@ func appendUpdatePRReleaseHighlights(ctx context.Context, body, message, marker 
 		return finish(body)
 	}
 	if highlights == "" {
+		updatePRReleaseLog.Print("No release highlights found, using release link only")
 		return finish(body)
 	}
 	candidate := finish(strings.TrimRight(body, "\n") + "\n\n" + fenceUpdatePRReleaseHighlights(highlights) + "\n")
 	if validatePRBody(candidate) != nil {
+		updatePRReleaseLog.Print("PR body with release highlights failed validation, omitting highlights")
 		return finish(body)
 	}
 	return candidate
@@ -80,6 +85,7 @@ func prepareOrgRolloutReleaseHighlights(ctx context.Context, opts orgRolloutOpti
 		return nil
 	}
 	version := normalizeDisplayVersion(GetVersion())
+	updatePRReleaseLog.Printf("Preparing rollout release highlights: version=%s, command=%s", version, opts.command)
 	highlights, err := fetchUpdatePRReleaseHighlights(ctx, version)
 	if err != nil {
 		warnUpdatePRReleaseHighlights(err)
@@ -96,6 +102,7 @@ func prepareOrgRolloutReleaseHighlights(ctx context.Context, opts orgRolloutOpti
 
 func loadUpdatePRReleaseHighlights(ctx context.Context, version string) (string, error) {
 	if opts := orgRolloutFromContext(ctx); opts != nil && opts.worker && opts.cacheDir != "" {
+		updatePRReleaseLog.Printf("Loading release highlights from rollout cache: version=%s", version)
 		data, err := os.ReadFile(filepath.Join(opts.cacheDir, rolloutReleaseHighlightsFile))
 		if err != nil {
 			return "", err
@@ -116,6 +123,7 @@ func fetchUpdatePRReleaseHighlights(ctx context.Context, version string) (string
 	if summaryReleaseLink(ghawReleaseRepo, version) == "" {
 		return "", nil
 	}
+	updatePRReleaseLog.Printf("Fetching release highlights: repo=%s, version=%s", ghawReleaseRepo, version)
 	// Releases belong to github.com, even when the target repository is on GHES.
 	output, err := workflow.RunGHContext(ctx, "Loading gh-aw release highlights...",
 		"api", "--hostname", "github.com", "repos/"+ghawReleaseRepo+"/releases/tags/"+url.PathEscape(version))
