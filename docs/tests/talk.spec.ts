@@ -1831,14 +1831,28 @@ test.describe("reusable runtime", () => {
     await fakeFullscreen(page);
     // a fake engine: speaks one utterance at a time for 15 s each, so two lines outlast the 15 s kiosk dwell
     await page.addInitScript(() => {
-      const w = window as unknown as { spoken: string[]; speechSynthesis: unknown };
+      const w = window as unknown as { spoken: string[]; voices: string[]; speechSynthesis: unknown; SpeechSynthesisUtterance: unknown };
       w.spoken = [];
+      w.voices = [];
+      // fake voices are plain objects, which the native voice setter rejects, so the utterance keeps its own
+      class Utterance extends SpeechSynthesisUtterance {}
+      const picked = new WeakMap<object, unknown>();
+      Object.defineProperty(Utterance.prototype, "voice", {
+        get() {
+          return picked.get(this) ?? null;
+        },
+        set(v) {
+          picked.set(this, v);
+        },
+      });
+      w.SpeechSynthesisUtterance = Utterance;
       let queue: SpeechSynthesisUtterance[] = [];
       let timer: ReturnType<typeof setTimeout> | undefined;
       const run = () => {
         const u = queue[0];
         if (!u) return;
         w.spoken.push(u.text);
+        w.voices.push((u.voice as { name: string } | null)?.name ?? "");
         timer = setTimeout(() => {
           queue.shift();
           u.dispatchEvent(new Event("end"));
@@ -1848,7 +1862,11 @@ test.describe("reusable runtime", () => {
       Object.defineProperty(window, "speechSynthesis", {
         configurable: true,
         value: {
-          getVoices: () => [],
+          // only local voices are used: the remote voice ranks higher but would need the network
+          getVoices: () => [
+            { name: "Remote Natural Online", lang: "en-US", localService: false },
+            { name: "Local Alex", lang: "en-US", localService: true },
+          ],
           speak: (u: SpeechSynthesisUtterance) => queue.push(u) === 1 && run(),
           cancel: () => {
             clearTimeout(timer);
@@ -1880,6 +1898,7 @@ test.describe("reusable runtime", () => {
     await page.clock.runFor(20000);
     await expect(heading(page)).toHaveText("Hello");
     expect(await spoken()).toEqual(["Good evening, the top story.", "Thanks, glad to be here."]);
+    expect(await page.evaluate(() => (window as unknown as { voices: string[] }).voices)).toEqual(["Local Alex", "Local Alex"]);
     await page.clock.runFor(11000);
     await expect(heading(page)).not.toHaveText("Hello");
     // the button turns it off without leaving kiosk mode; Escape ends kiosk mode, and the choice holds for the next run
@@ -1893,6 +1912,39 @@ test.describe("reusable runtime", () => {
     await expect(voice).toHaveAttribute("aria-pressed", "false");
     await page.keyboard.press("k");
     await expect(voice).toHaveAttribute("aria-pressed", "true");
+    expect(errors).toEqual([]);
+  });
+
+  test("releases a kiosk slide whose voice never ends 60 s after its dwell, not after its entry", async ({ page }) => {
+    await page.clock.install();
+    await fakeFullscreen(page);
+    // a stalled engine: accepts utterances but never fires end or error
+    await page.addInitScript(() => {
+      // fake voices are plain objects, which the native voice setter rejects, so the utterance keeps its own
+      class Utterance extends SpeechSynthesisUtterance {}
+      const picked = new WeakMap<object, unknown>();
+      Object.defineProperty(Utterance.prototype, "voice", {
+        get() {
+          return picked.get(this) ?? null;
+        },
+        set(v) {
+          picked.set(this, v);
+        },
+      });
+      (window as unknown as { SpeechSynthesisUtterance: unknown }).SpeechSynthesisUtterance = Utterance;
+      Object.defineProperty(window, "speechSynthesis", {
+        configurable: true,
+        value: { getVoices: () => [{ name: "Local Alex", lang: "en-US", localService: true }], speak: () => {}, cancel: () => {} },
+      });
+    });
+    const { errors } = await open(page, "/gh-aw/cracktro/tiny.html?cc&fs=none#hello");
+    await page.keyboard.press("v");
+    await expect(page.locator("body")).toHaveClass(/\bkiosk\b/);
+    // dwell (15 s) plus most of the hold: still on the slide well past 60 s from entry
+    await page.clock.runFor(15000 + 59000);
+    await expect(heading(page)).toHaveText("Hello");
+    await page.clock.runFor(2000);
+    await expect(heading(page)).not.toHaveText("Hello");
     expect(errors).toEqual([]);
   });
 

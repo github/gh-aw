@@ -110,7 +110,7 @@ about each slide rolls in as captions at the bottom of the screen, and each slid
 conversation ends. C starts kiosk mode if needed, and captions end with it; while it runs, Escape stops it before it
 hides notes. V (or the voice button beside CC in the kiosk dock) reads the same conversation aloud
 with the browser's built-in speech synthesis, alternating two voices (or two pitches), and holds each slide until
-its last line is spoken; voice is off by default, starts kiosk mode if needed, ends with it, and the choice holds for
+its last line is spoken (at most 60 s past the slide's dwell); voice is off by default, starts kiosk mode if needed, ends with it, and the choice holds for
 later kiosk runs. Where the browser has no speech synthesis the voice button is disabled. A manual move restarts the countdown, and an open
 dialog holds the current slide. The slide map button (or G) opens a full-screen grid of
 every slide under its band's title, each pattern's examples beside it, with the current slide focused and the tiles fanning in from it; arrows move between
