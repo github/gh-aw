@@ -10,8 +10,8 @@ permissions:
   issues: read
   copilot-requests: write
 engine:
-  id: copilot
-  copilot-sdk: true
+  id: pi
+  model-provider: github
 strict: true
 timeout-minutes: 25
 tools:
