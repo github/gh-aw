@@ -9116,6 +9116,8 @@
     [2, 1].forEach(i => (g += `<g class="rf-ghost-a"><rect x="${50 + i * 6}" y="${125 - i * 13}" width="230" height="50" rx="25"/><circle cx="${50 + i * 6}" cy="${150 - i * 13}" r="34"/></g>`));
     g += agent("nResearch", 50, 150, 230, "Researchers") + agent("nDispatch", 400, 150, 230, "Dispatcher") + agent("nCoder", 750, 150, 230, "Coding agent");
     g += agent("nReview", 1100, 150, 230, "Reviewers") + agent("nFinish", 1450, 150, 210, "Finisher") + agent("nDreamer", 50, 570, 230, "Dreamer");
+    // concurrent pull requests: ghost cards stacked behind each per-PR artifact
+    [750, 1100, 1450].forEach(x => [2, 1].forEach(i => (g += `<rect class="rf-ghost-a" x="${x - 36 + i * 6}" y="${306 - i * 13}" width="72" height="68" rx="14"/>`)));
     g += box("nIssue", 50, 340, "issue") + slots("nSlots", 400, 340) + box("nPR", 750, 340, "pr") + box("nFind", 1100, 340, "comment") + box("nFix", 1450, 340, "tasklist") + box("nMerge", 750, 570, "merge");
     g += dev("nMaint", 1100, 570);
     g += `<circle class="fm-dot mra-dot" r="8"/>`;
