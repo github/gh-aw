@@ -36,9 +36,7 @@ func TestSafeOutputAuthorizationFingerprintDoesNotExposeConfiguration(t *testing
 
 	var gate map[string]any
 	require.NoError(t, json.Unmarshal([]byte(encoded), &gate))
-	digest, err := authorizationImplementationDigest(implementation)
-	require.NoError(t, err)
-	require.Equal(t, digest, gate["implementation"])
+	require.Equal(t, "188dec00605d5d6ef26e62137bd6085b659e2d011baa7439d377632f2764ee69", gate["implementation"])
 	require.Regexp(t, `^[a-f0-9]{64}$`, gate["implementation"])
 }
 
