@@ -1720,6 +1720,8 @@
     // shortcuts. Each entry is [keys, action]; a key is a string whose "+" joins a chord ("Shift+Home").
     /** @type {Array<[string[], string]>} */
     const SOUND_KEYS = config.sound ? [[["M"], "Sound on or off"]] : [];
+    /** @type {Array<[string[], string]>} */
+    const WIZARD_KEYS = wizard ? [[["W"], `${wizard.title || "Wizard"}: choose your own workflow`]] : [];
     /** @type {Array<[string, Array<[string[], string]>]>} */
     const KEYMAP = [
       [
@@ -1741,7 +1743,7 @@
           [["1…9+Enter"], "Slide by number"],
           [["/", "Ctrl+K", "⌘+K"], "Search slides"],
           [["G"], "Slide map (this screen)"],
-          ...(wizard ? [[["W"], `${wizard.title || "Wizard"}: choose your own workflow`]] : []),
+          ...WIZARD_KEYS,
         ],
       ],
       [
