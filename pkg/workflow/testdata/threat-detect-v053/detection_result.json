@@ -1,0 +1,13 @@
+{
+  "prompt_injection": false,
+  "secret_leak": true,
+  "malicious_patch": false,
+  "reasons": [],
+  "warnings": [
+    {
+      "field": "prompt_import_tree",
+      "code": "ERR_VALIDATION",
+      "message": "Missing or empty prompt analysis artifact: aw-prompts/prompt-import-tree.json. Trusted-vs-untrusted prompt analysis is degraded; ensure the host stages it non-empty. This failure is not itself evidence of a threat."
+    }
+  ]
+}

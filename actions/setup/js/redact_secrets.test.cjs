@@ -385,6 +385,32 @@ describe("redact_secrets.cjs", () => {
       }
     }),
     describe("file handling", () => {
+      it.each(["secret_leak", "reasons"])("fails closed when redaction changes a verdict field: %s", mask => {
+        const { processFile } = require("./redact_secrets.cjs");
+        const directory = path.join(tempDir, "threat-detection");
+        fs.mkdirSync(directory);
+        const file = path.join(directory, "detection_result.json");
+        fs.writeFileSync(file, JSON.stringify({ prompt_injection: false, secret_leak: true, malicious_patch: false, reasons: [] }));
+
+        processFile(file, [], [mask]);
+
+        expect(fs.existsSync(file)).toBe(false);
+        expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("Removed artifact source after secret redaction failed"));
+      });
+
+      it("redacts verdict explanations without changing the verdict", () => {
+        const { processFile } = require("./redact_secrets.cjs");
+        const directory = path.join(tempDir, "threat-detection");
+        fs.mkdirSync(directory);
+        const file = path.join(directory, "detection_result.json");
+        fs.writeFileSync(file, JSON.stringify({ prompt_injection: false, secret_leak: true, malicious_patch: false, reasons: ["private-example"] }));
+
+        processFile(file, ["private-example"]);
+
+        expect(JSON.parse(fs.readFileSync(file, "utf8"))).toEqual({ prompt_injection: false, secret_leak: true, malicious_patch: false, reasons: ["***REDACTED***"] });
+        expect(mockCore.setFailed).not.toHaveBeenCalled();
+      });
+
       it.each(["ordinary.json", "safeoutputs.jsonl"])("silently redacts UTF-8 payloads in %s", filename => {
         const { processFile } = require("./redact_secrets.cjs");
         const secret = "synthetic-private-value";
