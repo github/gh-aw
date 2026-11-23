@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"os/signal"
+	"slices"
 	"sort"
 	"strings"
 	"syscall"
@@ -1023,7 +1024,7 @@ func commandTreePaths(root *cobra.Command) []string {
 		}
 	}
 	visit(root, "")
-	sort.Strings(paths)
+	slices.Sort(paths)
 	return paths
 }
 
