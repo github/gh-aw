@@ -204,6 +204,8 @@ func TestComposedPromptSafeOutputsGuidanceStaysTransportNeutral(t *testing.T) {
 		"final composed prompt should preserve genuine incomplete outcomes")
 	assert.Contains(t, finalPrompt, "call `report_incomplete` with the blocker instead",
 		"final composed prompt should report blocked work as incomplete")
+	assert.Contains(t, finalPrompt, "Never call `report_incomplete` just because someone else must still act on your findings",
+		"final composed prompt should treat negative findings as completed outcomes")
 	assert.Contains(t, finalPrompt, "Earlier safe-output calls do not satisfy this final-step requirement",
 		"final composed prompt should not treat an earlier output as the terminal signal")
 }

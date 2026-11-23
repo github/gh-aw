@@ -1694,7 +1694,7 @@
   },
   {
     "name": "noop",
-    "description": "Log a transparency message when no significant actions are needed. Use this to confirm workflow completion and provide visibility when analysis is complete but no changes or outputs are required (e.g., 'No issues found', 'All checks passed'). This ensures the workflow produces human-visible output even when no other actions are taken.",
+    "description": "Log a transparency message when no significant actions are needed. Use this to confirm workflow completion and provide visibility when analysis is complete but no changes or outputs are required (e.g., 'No issues found', 'All checks passed'). This ensures the workflow produces human-visible output even when no other actions are taken. If your own task could not be finished or published because of a failure or blocker, use report_incomplete instead.",
     "inputSchema": {
       "type": "object",
       "required": ["message"],
@@ -2043,7 +2043,7 @@
   },
   {
     "name": "report_incomplete",
-    "description": "Signal that the task could not be completed due to an infrastructure or tool failure (e.g., MCP server crash, missing authentication, inaccessible repository). Use this when required tools or data are unavailable and the task cannot be meaningfully performed. This is distinct from noop (no action needed) \u2014 it indicates an active failure that prevented the task from running. Provide a specific reason and optional details so downstream issue aggregation can preserve complete incomplete-signal context. The workflow framework will treat this as a failure signal even when the agent exits successfully.",
+    "description": "Signal that the task could not be completed due to an infrastructure or tool failure (e.g., MCP server crash, missing authentication, inaccessible repository). Use this when required tools or data are unavailable and the task cannot be meaningfully performed. This is distinct from noop (no action needed) \u2014 it indicates an active failure that prevented the task from running. Do not use it for negative or unresolved findings (e.g., a review requesting changes, bugs found, failing checks, or follow-up left for humans); those are completed outcomes. Provide a specific reason and optional details so downstream issue aggregation can preserve complete incomplete-signal context. The workflow framework will treat this as a failure signal even when the agent exits successfully.",
     "inputSchema": {
       "type": "object",
       "required": ["reason"],

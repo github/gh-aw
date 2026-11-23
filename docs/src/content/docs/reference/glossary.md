@@ -629,7 +629,7 @@ A safe output capability for dismissing existing pull request reviews authored b
 
 ### Report Incomplete (`report_incomplete`)
 
-A mandatory safe output signal that agents emit when a task cannot be completed due to an infrastructure or tool failure — for example, an MCP server crash, missing authentication, or an inaccessible repository. Unlike `noop` (which signals no action was needed), `report_incomplete` indicates an active failure that prevented the task from running. The safe-outputs handler activates failure handling regardless of agent exit code. Accepts a required `reason` field (max 1024 characters) and an optional `details` field for extended diagnostic context.
+A mandatory safe output signal that agents emit when a task cannot be completed due to an infrastructure or tool failure — for example, an MCP server crash, missing authentication, or an inaccessible repository. Unlike `noop` (which signals no action was needed), `report_incomplete` indicates an active failure that prevented the task from running. Completeness refers to the agent's own task, not the subject it examined: a published review requesting changes, a triage that finds bugs, or findings left for humans to act on are completed outcomes and must not be reported as incomplete. The safe-outputs handler activates failure handling regardless of agent exit code. Accepts a required `reason` field (max 1024 characters) and an optional `details` field for extended diagnostic context.
 
 ### Review Attribution Pinning (`GH_AW_HEAD_SHA`)
 
