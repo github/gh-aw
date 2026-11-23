@@ -26,6 +26,7 @@ safe-outputs:
     confidence: string
     reasoning: string
   add-labels:
+    issue-intent: true
     target: "*"
     max: 5
     pull-requests: false

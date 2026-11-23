@@ -12,8 +12,8 @@ concurrency:
   group: ci-front-door-researcher
   cancel-in-progress: false
 engine:
-  id: copilot
-  copilot-sdk: true
+  id: pi
+  model-provider: github
 network:
   allowed: []
 tools:

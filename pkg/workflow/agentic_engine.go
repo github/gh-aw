@@ -118,6 +118,12 @@ type EngineCapabilities struct {
 	// MCP reports whether the engine supports MCP servers directly.
 	MCP bool
 
+	// GitHubCLIProxy includes GitHub in explicit tools.cli-proxy mounts.
+	GitHubCLIProxy bool
+
+	// AutoMCPCLI augments active CLI mounts with GitHub, work-queue and custom servers.
+	AutoMCPCLI bool
+
 	// MaxTurns reports whether the engine supports the max-turns feature.
 	MaxTurns bool
 

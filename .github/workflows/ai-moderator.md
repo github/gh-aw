@@ -56,6 +56,7 @@ permissions:
   copilot-requests: write
 safe-outputs:
   add-labels:
+    issue-intent: true
     allowed: [spam, ai-generated, link-spam, ai-inspected]
     target: "*"
     item-schema:

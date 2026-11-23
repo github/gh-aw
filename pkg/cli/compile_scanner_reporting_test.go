@@ -370,6 +370,7 @@ func TestDryRunScannerFiltersAdvisoryFromMixedFailure(t *testing.T) {
 }
 
 func TestScannerValidationIssueSanitizationPreservesFields(t *testing.T) {
+	t.Parallel()
 	issue := ValidationIssue{
 		Type: "shellcheck_finding", Message: "secrets.PRIVATE_TOKEN must not be exposed",
 		RuleID: "SC2086", File: "workflow.lock.yml", Line: 9, Column: 17, Severity: scanfindings.SeverityMedium,

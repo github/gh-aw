@@ -222,29 +222,13 @@ describe("workflow native MCP permission alignment", () => {
     expect(lock).not.toContain("--allow-all-tools");
   });
 
-  it("allows draft reads and safe outputs but rejects the observed compound commands", () => {
-    const { workflow, prompt, sdkConfig } = readWorkflow("draft-pr-cleanup");
+  it("keeps draft cleanup on native MCP reads and safe outputs without a shell", () => {
+    const { workflow, prompt, steps } = readWorkflow("draft-pr-cleanup");
+    expect(workflow.engine.id).toBe("codex");
     expect(workflow.tools.bash).toBe(false);
-    expect(workflow["max-tool-denials"]).toBe(3);
-    expect(sdkConfig.capabilities).toMatchObject({ bash: false, cliProxy: false, mcp: true });
-    const denied = [];
-    const handler = buildCopilotSDKPermissionHandler(sdkConfig.permissions, () => ({ kind: "approve-once" }), { onDenied: command => denied.push(command) });
-    for (const [serverName, toolName] of [
-      ["github", "search_pull_requests"],
-      ["safeoutputs", "add_comment"],
-      ["safeoutputs", "report_incomplete"],
-    ]) {
-      expect(handler({ kind: "mcp", serverName, toolName })).toEqual({ kind: "approve-once" });
-    }
-    for (const fullCommandText of [
-      'github search_pull_requests --query "repo:github/gh-aw is:pr is:open is:draft" --perPage 100 | python3 -c "import json"',
-      'github search_pull_requests --query "repo:github/gh-aw is:pr is:open is:draft" > /tmp/gh-aw/agent/o.json; python3 -c "import json"',
-      'cd /tmp/gh-aw/agent && github search_pull_requests --query "repo:github/gh-aw is:pr is:open is:draft"',
-    ]) {
-      expect(handler({ kind: "shell", commands: [], fullCommandText }).kind).toBe("reject");
-    }
-    expect(denied).toHaveLength(3);
-    expect(handler({ kind: "mcp", serverName: "undeclared", toolName: "write" }).kind).toBe("reject");
+    const codexConfig = JSON.parse(steps.find(step => step.env?.GH_AW_CODEX_CONFIG_JSON).env.GH_AW_CODEX_CONFIG_JSON);
+    expect(codexConfig.defaults.features).toMatchObject({ shell_tool: false, code_mode: false, plugins: false });
+    expect(Object.keys(codexConfig.defaults.mcp_servers).sort()).toEqual(["github", "safeoutputs"]);
     expect(prompt).toContain("at most 20 results per page");
     expect(prompt).not.toMatch(/"type": "(?:add_labels|add_comment|close_pull_request)"/);
     expect(prompt).toContain("Label removal is not enabled");
@@ -283,7 +267,7 @@ describe("workflow native MCP permission alignment", () => {
     expect(prompt).toContain("Complete the cache read-back and ledger query/submission before calling `noop`");
   });
 
-  it.each(names)("%s produces native gateway config rather than CLI-only config", name => {
+  it.each(names.filter(name => readWorkflow(name).workflow.engine.id !== "codex"))("%s produces native gateway config rather than CLI-only config", name => {
     const { workflow, manifest, steps } = readWorkflow(name);
     const directory = mkdtempSync(resolve(tmpdir(), "gh-aw-tool-policy-"));
     try {

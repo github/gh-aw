@@ -169,3 +169,120 @@ func TestMergePullRequestExperimentalNoticeClassification(t *testing.T) {
 		}
 	}
 }
+
+func TestIssueIntentExperimentalNoticeClassification(t *testing.T) {
+	t.Parallel()
+	enabled, disabled := true, false
+	tests := []struct {
+		name        string
+		safeOutputs func() *SafeOutputsConfig
+		wantWarning bool
+	}{
+		{
+			name: "enabled on close-issue",
+			safeOutputs: func() *SafeOutputsConfig {
+				so := &SafeOutputsConfig{CloseIssues: &CloseIssuesConfig{}, AddLabels: &AddLabelsConfig{}}
+				so.CloseIssues.IssueIntent = &enabled
+				return so
+			},
+			wantWarning: true,
+		},
+		{
+			name: "enabled on add-labels",
+			safeOutputs: func() *SafeOutputsConfig {
+				so := &SafeOutputsConfig{CloseIssues: &CloseIssuesConfig{}, AddLabels: &AddLabelsConfig{}}
+				so.AddLabels.IssueIntent = &enabled
+				return so
+			},
+			wantWarning: true,
+		},
+		{
+			name: "enabled on assign-to-agent",
+			safeOutputs: func() *SafeOutputsConfig {
+				so := &SafeOutputsConfig{AssignToAgent: &AssignToAgentConfig{}}
+				so.AssignToAgent.IssueIntent = &enabled
+				return so
+			},
+			wantWarning: true,
+		},
+		{
+			name: "enabled on assign-to-user",
+			safeOutputs: func() *SafeOutputsConfig {
+				so := &SafeOutputsConfig{AssignToUser: &AssignToUserConfig{}}
+				so.AssignToUser.IssueIntent = &enabled
+				return so
+			},
+			wantWarning: true,
+		},
+		{
+			name: "enabled on set-issue-type",
+			safeOutputs: func() *SafeOutputsConfig {
+				so := &SafeOutputsConfig{SetIssueType: &SetIssueTypeConfig{}}
+				so.SetIssueType.IssueIntent = &enabled
+				return so
+			},
+			wantWarning: true,
+		},
+		{
+			name: "enabled on set-issue-field",
+			safeOutputs: func() *SafeOutputsConfig {
+				so := &SafeOutputsConfig{SetIssueField: &SetIssueFieldConfig{}}
+				so.SetIssueField.IssueIntent = &enabled
+				return so
+			},
+			wantWarning: true,
+		},
+		{
+			name: "enabled on multiple outputs counts once",
+			safeOutputs: func() *SafeOutputsConfig {
+				so := &SafeOutputsConfig{AddLabels: &AddLabelsConfig{}, AssignToUser: &AssignToUserConfig{}}
+				so.AddLabels.IssueIntent = &enabled
+				so.AssignToUser.IssueIntent = &enabled
+				return so
+			},
+			wantWarning: true,
+		},
+		{
+			name: "explicitly disabled on all outputs",
+			safeOutputs: func() *SafeOutputsConfig {
+				so := &SafeOutputsConfig{
+					CloseIssues:   &CloseIssuesConfig{},
+					AddLabels:     &AddLabelsConfig{},
+					AssignToAgent: &AssignToAgentConfig{},
+					AssignToUser:  &AssignToUserConfig{},
+					SetIssueType:  &SetIssueTypeConfig{},
+					SetIssueField: &SetIssueFieldConfig{},
+				}
+				so.CloseIssues.IssueIntent = &disabled
+				so.AddLabels.IssueIntent = &disabled
+				so.AssignToAgent.IssueIntent = &disabled
+				so.AssignToUser.IssueIntent = &disabled
+				so.SetIssueType.IssueIntent = &disabled
+				so.SetIssueField.IssueIntent = &disabled
+				return so
+			},
+		},
+		{
+			name: "omitted",
+			safeOutputs: func() *SafeOutputsConfig {
+				return &SafeOutputsConfig{CloseIssues: &CloseIssuesConfig{}, SetIssueField: &SetIssueFieldConfig{}}
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			compiler := NewCompiler()
+			data := &WorkflowData{SafeOutputs: tt.safeOutputs()}
+			var output bytes.Buffer
+			compiler.emitExperimentalFeatureWarningsTo(data, &output)
+			if tt.wantWarning {
+				assert.Contains(t, output.String(), "Using experimental feature: issue-intent", "issue-intent: true should emit the experimental warning")
+				assert.Equal(t, 1, compiler.GetExperimentalWarningCount(), "exactly one experimental warning should be counted")
+			} else {
+				assert.NotContains(t, output.String(), "issue-intent", "issue-intent warning should not be emitted")
+				assert.Zero(t, compiler.GetExperimentalWarningCount(), "no experimental warnings should be counted")
+			}
+		})
+	}
+}

@@ -19,8 +19,12 @@ imports:
   - shared/trending-charts-simple.md
   - shared/reporting.md
 tools:
+  cli-proxy: true
   github:
     mode: local
+    min-integrity: approved
+    approval-labels: [cookie, community]
+    toolsets: [repos, issues, actions]
   agentic-workflows: true
 steps:
   - name: Build gh-aw from source
@@ -122,17 +126,37 @@ The structured initial command output is in
    samples, outliers, inconsistent date windows, implausible run frequencies, missing
    workflows, and confidence intervals that are too broad to support a reliable budget.
    Do not invent missing values.
-3. If the prepared output is incomplete or suspicious, rerun
-   `$GITHUB_WORKSPACE/gh-aw forecast` with targeted arguments (including `--eval` when
-   backtesting would clarify accuracy). If sample collection still fails — especially
-   when `sampled_runs` is zero for all workflows or artifact downloads fail — you MUST
-   use the `agentic-workflows` MCP server to inspect recent runs and usage artifacts
-   and derive observed/projected AIC directly from that evidence.
+3. If the prepared output is incomplete or suspicious, first use the mounted
+   `agenticworkflows` CLI: run `agenticworkflows --help`, then the selected read
+   command's `--help` for its actual schema. Use `logs` or `audit` to inspect recent
+   runs and usage artifacts and derive spending only from returned evidence.
+   Do not call tool-search/discovery functions or invent MCP tools. Do not use
+   `mcp-inspect`, start servers, dispatch workflows, or change credentials.
+   GitHub reads may also use the mounted `github` CLI (`github --help`, then the
+   selected command's `--help`), which calls the configured read-only MCP server
+   through its existing integrity policy. Shell `gh` is not authenticated.
+   The runner's `$GITHUB_WORKSPACE/gh-aw forecast` uses a step-scoped token that is
+   not available in the agent sandbox; do not rerun that binary as an authenticated
+   recovery path. If supported reads fail or cannot establish sample coverage,
+   report the evidence as unavailable, not zero spending or a reliable projection,
+   and finish with `report_incomplete` after publishing the operational report.
    Preserve any additional structured output in the spending forecast directory so it
    is included in the artifact, but do not persist process stdout or stderr logs. Limit
    follow-up to the evidence needed to resolve or document the discrepancy.
-4. Calculate historical spending from `run_samples[].aic` and clearly distinguish
+4. Calculate historical spending only from usage-verified `run_samples[].aic`;
+   numeric values alone do not establish coverage, including zero placeholders
+   for missing artifacts. Feed charts and report totals only verified observations
+   and coverage-supported projections; omit unverified entries. Clearly distinguish
    observed spending from projected spending.
+
+Before writing output, read the complete [Terminology](#terminology),
+[Charts](#charts), and [Report](#report) sections below for percentile definitions,
+chart scripts, paths, upload procedure and report format. Save `report.md` in the
+spending forecast directory and create at most one issue with the same body.
+If evidence remains insufficient, publish diagnostics without fabricated
+projections and call `report_incomplete`. Do not treat missing samples as zero.
+
+<!-- instruction-prefix-end -->
 
 ## Terminology
 
@@ -149,7 +173,8 @@ need to guess:
 
 ## Charts
 
-Generate two PNG charts, save them to `/tmp/gh-aw/python/charts/`, upload each with
+Use the evidence-filtered chart input described below, never the original forecast
+directly. Generate two PNG charts, save them to `/tmp/gh-aw/python/charts/`, upload each with
 the `upload_asset` safe-output tool, and embed them in the report using the returned
 asset URLs. Run both scripts with `/tmp/gh-aw/python/venv/bin/python` — the `python3` on
 `PATH` inside the sandbox is PyPy and cannot import Pandas/Matplotlib.
@@ -161,7 +186,7 @@ per run. Include a 7-day rolling-average overlay. Title: "Spending Trend — Las
 
 ```python
 #!/tmp/gh-aw/python/venv/bin/python
-import json, os
+import json, os, sys
 import pandas as pd
 import matplotlib
 matplotlib.use("Agg")
@@ -178,15 +203,26 @@ except (OSError, json.JSONDecodeError):
     forecast = None
 
 samples = []
-if isinstance(forecast, dict):
-    for wf in forecast.get("workflows") or []:
-        if not isinstance(wf, dict) or not wf.get("workflow_id"):
+if isinstance(forecast, dict) and isinstance(forecast.get("workflows"), list):
+    for wf in forecast["workflows"]:
+        if (not isinstance(wf, dict)
+                or not isinstance(wf.get("workflow_id"), str)
+                or not wf["workflow_id"].strip()):
             continue
-        run_samples = wf.get("run_samples") or []
+        run_samples = wf.get("run_samples")
         if isinstance(run_samples, list):
             for sample in run_samples:
-                if isinstance(sample, dict):
-                    samples.append({**sample, "workflow_id": wf["workflow_id"]})
+                if (isinstance(sample, dict)
+                        and sample.get("usage_verified") is True
+                        and isinstance(sample.get("date"), str)
+                        and sample["date"].strip()
+                        and type(sample.get("aic")) in (int, float)
+                        and 0 <= sample["aic"] <= sys.float_info.max):
+                    samples.append({
+                        "date": sample["date"],
+                        "aic": sample["aic"],
+                        "workflow_id": wf["workflow_id"],
+                    })
 
 df = pd.DataFrame(samples)
 if not {"date", "aic", "workflow_id"}.issubset(df.columns):
@@ -236,7 +272,7 @@ Forecast Distribution (P10 optimistic / P50 median / P90 conservative)".
 
 ```python
 #!/tmp/gh-aw/python/venv/bin/python
-import json, math, os
+import json, os, sys
 import pandas as pd
 import matplotlib
 matplotlib.use("Agg")
@@ -253,9 +289,13 @@ except (OSError, json.JSONDecodeError):
     forecast = None
 
 rows = []
-if isinstance(forecast, dict):
-    for wf in forecast.get("workflows") or []:
-        if not isinstance(wf, dict) or not wf.get("workflow_id"):
+if isinstance(forecast, dict) and isinstance(forecast.get("workflows"), list):
+    for wf in forecast["workflows"]:
+        if (not isinstance(wf, dict)
+                or not isinstance(wf.get("workflow_id"), str)
+                or not wf["workflow_id"].strip()):
+            continue
+        if wf.get("coverage_verified") is not True:
             continue
         weekly = wf.get("weekly_monte_carlo")
         if not isinstance(weekly, dict):
@@ -265,8 +305,10 @@ if isinstance(forecast, dict):
             weekly.get("p50_projected_aic"),
             weekly.get("p90_projected_aic"),
         ]
-        if not all(isinstance(value, (int, float)) and math.isfinite(value)
+        if not all(type(value) in (int, float) and 0 <= value <= sys.float_info.max
                    for value in percentiles):
+            continue
+        if not 0 <= percentiles[0] <= percentiles[1] <= percentiles[2]:
             continue
         rows.append({
             "workflow": wf["workflow_id"][-30:],
@@ -307,11 +349,24 @@ plt.savefig(chart_file, dpi=300, bbox_inches="tight", facecolor="white")
 print(f"Chart saved: {chart_file}")
 ```
 
-Before running these scripts, write the necessary JSON data files:
-- Copy or symlink `forecast.json` to `/tmp/gh-aw/python/data/forecast.json`. Chart 1
-  combines each workflow's `run_samples` with its parent `workflow_id` and uses the
-  sample's `date` field. Both charts show an explicit unavailable message when their
-  required data is missing rather than treating missing values as zero spending.
+Before running these scripts, preserve the original `forecast.json` and write a
+separate evidence-filtered JSON object to `/tmp/gh-aw/python/data/forecast.json`:
+- Retain a run sample only when returned usage artifacts or run-level usage
+  evidence establish its AIC; mark that sample `usage_verified: true`. A numeric
+  value, successful forecast exit code, or absent artifact is not verification.
+  Retain a genuine zero only when usage evidence explicitly establishes zero.
+- Retain a workflow's projections and mark it `coverage_verified: true` only
+  after verifying usage for every observation that fed those projections and
+  reconciling sample counts, history window and run frequency. Partial recovery
+  does not validate the original projections; omit them if coverage is unresolved.
+- Record supporting run IDs, evidence references and excluded counts/reasons in
+  the report. Do not create verification flags without supporting evidence.
+  If no evidence is verified, write `{"workflows": []}`.
+- Chart 1 combines verified `run_samples` with their parent `workflow_id` and
+  uses `date`. Chart 2 accepts only coverage-verified weekly projections. Both
+  scripts render unavailable diagnostics when no eligible data remains.
+  Label partial charts with their verified/excluded counts in the report; never
+  present a partial observed total as complete spending.
 
 After generating charts, upload each with `upload_asset` and store the returned URLs for
 embedding in the report.

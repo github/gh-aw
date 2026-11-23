@@ -185,6 +185,8 @@ func TestSpec_PublicAPI_DefaultBuiltInRules(t *testing.T) {
 		{"SafeOutputShellExpansionRule", lint.SafeOutputShellExpansionRule},
 		{"SafeOutputCredentialsRule", lint.SafeOutputCredentialsRule},
 		{"ArtifactExecutionRule", lint.ArtifactExecutionRule},
+		{"InsecureCommandsRule", lint.InsecureCommandsRule},
+		{"RemoteScriptExecutionRule", lint.RemoteScriptExecutionRule},
 		{"ArtipackedRule", lint.ArtipackedRule},
 		{"CachePoisoningRule", lint.CachePoisoningRule},
 		{"EnvironmentFileInjectionRule", lint.EnvironmentFileInjectionRule},
