@@ -35,7 +35,7 @@
 //   - goroutinemissingrecover — flags goroutines started via a function literal whose body does not install a top-level defer/recover guard
 //   - goroutineresourceleak — flags goroutine resource acquisitions without immediate deferred cleanup, channels without a close or safely buffered send/receive pair, and loop-launched goroutines without WaitGroup synchronization
 //   - hardcodedfilepath — flags hard-coded file path string literals that match known path constants or should be extracted as named constants
-//   - hasprefixdotdotpathescape — reports strings.HasPrefix(value, "..") checks that also match legitimate names like "..foo"
+//   - hasprefixdotdotpathescape — reports path-like strings.HasPrefix(value, "..") checks that also match legitimate names like "..foo"
 //   - httpclientnotimeout — reports net/http.Client composite literals without a Timeout field
 //   - httpnoctx — flags HTTP calls that do not accept a context.Context
 //   - httprespbodyclose — flags HTTP response bodies that are not closed

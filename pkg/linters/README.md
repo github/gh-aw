@@ -41,7 +41,7 @@ The method names mentioned in analyzer descriptions (such as `Err`, `Flush`, `Re
 - `goroutinemissingrecover` — reports goroutines started via a function literal whose body does not install a top-level `defer func() { recover() }()` guard.
 - `goroutineresourceleak` — reports goroutine resource acquisitions without deferred cleanup before a possible exit, channels without a close or safely buffered send/receive pair, and loop-launched goroutines without matching `WaitGroup` synchronization.
 - `hardcodedfilepath` — reports hard-coded file path string literals that match known path constants or should be extracted into named constants; also annotates paths that appear in log/print calls.
-- `hasprefixdotdotpathescape` — reports `strings.HasPrefix(value, "..")` checks that also match names like `..foo`; check the exact `..` component and separator or use `filepath.IsLocal`. Not enforced in CI until existing checks are reviewed.
+- `hasprefixdotdotpathescape` — reports `strings.HasPrefix(value, "..")` checks on path-like values, identified by path-related names or `path`/`filepath` operations; checks on ordinary text are ignored. Check the exact `..` component and separator or use `filepath.IsLocal`. Not enforced in CI until existing checks are reviewed.
 - `httpclientnotimeout` — reports `net/http.Client` composite literals that do not set a `Timeout` field.
 - `httpnoctx` — reports HTTP client and package-level HTTP calls that do not accept a `context.Context`.
 - `httprespbodyclose` — reports directly matched HTTP response `Body.Close()` calls that are not deferred.
@@ -226,7 +226,7 @@ environment variable and gates findings on the recorded execution hit count for 
 | `goroutinemissingrecover` | Custom `go/analysis` analyzer that flags goroutines started via a function literal that do not install a top-level defer/recover guard |
 | `goroutineresourceleak` | Custom `go/analysis` analyzer that flags goroutine resource acquisitions without immediate deferred cleanup, channels without a close or safely buffered send/receive pair, and loop-launched goroutines without matching `WaitGroup` synchronization |
 | `hardcodedfilepath` | Custom `go/analysis` analyzer that flags hard-coded file path string literals that match known path constants or should be extracted as named constants; annotates paths in log/print calls |
-| `hasprefixdotdotpathescape` | Custom `go/analysis` analyzer that flags overbroad `strings.HasPrefix(value, "..")` checks |
+| `hasprefixdotdotpathescape` | Custom `go/analysis` analyzer that flags overbroad `strings.HasPrefix(value, "..")` checks on path-like values |
 | `httpclientnotimeout` | Custom `go/analysis` analyzer that flags `net/http.Client` composite literals without a `Timeout` field |
 | `httpnoctx` | Custom `go/analysis` analyzer that flags HTTP calls that do not accept a `context.Context` |
 | `httprespbodyclose` | Custom `go/analysis` analyzer that flags directly matched HTTP response `Body.Close()` calls that are not deferred |
