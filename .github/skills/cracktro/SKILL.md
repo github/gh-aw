@@ -38,7 +38,7 @@ Optional tail: `## More files` (fonts, tests, parser, README), `## Layout` (`dec
 | `data-refresh.md` | Adding, changing or refreshing a data slide; refresh mini-skills and the slide→`refresh/<slug>.md` index. |
 | `brand.md` | Any colour, gradient, glow, title or font change; brand/Primer palette, semantic hues, regularization pass. |
 | `concept-style.md` | Adding or restyling a concept slide like The factory mindset or Trust the process (light header-less row, problem/answer statements, one live metaphor, horizontal split motion). |
-| `guide-style.md` | Adding or restyling a guide slide like the `/agentic-workflows` router, authoring loop or persona optimization (column under Turn Intent to Workflow, title block, one looping board, blue accent). |
+| `guide-style.md` | Adding or restyling a guide slide like the `/agentic-workflows` router, authoring loop or persona optimization (column under Turn Intent to Workflows, title block, one looping board, blue accent). |
 | `asset-generator.md` | Setting up or using the `asset-generator` MCP (og/social cards, wallpapers, charts, `create_slide_deck`); where outputs may live. |
 | `perf.md` | Changing `runtime.js` rendering or adding slide animations, timers, `tick` work or runtime DOM; run the performance guard before and after. |
 
