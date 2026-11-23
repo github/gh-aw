@@ -701,12 +701,39 @@ test("starts the slide-change whoosh silent instead of with a full-scale bass bu
   expect(level.peak).toBeLessThan(0.3);
 });
 
+test("walks the choose-your-own-workflow wizard from the dock to a generated prompt", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("pageerror", e => errors.push(e.message));
+  await page.goto(`/gh-aw/cracktro/#${SLIDES[0].id}`);
+  await expect(page.locator(".wzb")).toHaveAttribute("title", /\(W\)/);
+  await page.keyboard.press("w");
+  const dlg = page.locator("dialog.wz");
+  await expect(dlg).toBeVisible();
+  await page.keyboard.press("Enter");
+  await expect(dlg.locator(".wz-page .wz-h")).toHaveText(["Why do you set out?"]);
+  await page.keyboard.press("ArrowRight");
+  await expect(dlg.locator(".wz-page .wz-pno")).toHaveText(["PAGE 14"]);
+  await page.keyboard.press("1");
+  await expect(dlg.locator(".wz-page .wz-h")).toHaveText(["When does your agent wake?"]);
+  for (const no of [42, 58, 77]) {
+    await page.keyboard.press("ArrowRight");
+    await expect(dlg.locator(".wz-page .wz-pno")).toHaveText([`PAGE ${no}`]);
+  }
+  await page.keyboard.press("1");
+  const prompt = dlg.locator(".wz-scrollp pre");
+  await expect(prompt).toContainText("The purpose of the workflow is:");
+  await expect(dlg.locator(".wz-tale")).not.toContainText("..");
+  await page.keyboard.press("Escape");
+  await expect(dlg).toBeHidden();
+  expect(errors).toEqual([]);
+});
+
 test("ships local assets with the docs and links to the talk from the footer", async ({ page, request }) => {
   await page.goto("/gh-aw/");
   await page.locator(".site-footer").getByRole("link", { name: "Interactive talk", exact: true }).click();
   await expect(page).toHaveURL(new RegExp(`/gh-aw/cracktro/#${SLIDES[0].id}$`));
 
-  const assets = ["runtime.js", "captions.js", "deck.js", "fonts/MonaspaceNeonVF.woff", "fonts/Monaspace-LICENSE.txt", "../fonts/MonaSansVF.woff2"];
+  const assets = ["runtime.js", "captions.js", "wizard-data.js", "wizard.js", "deck.js", "fonts/MonaspaceNeonVF.woff", "fonts/Monaspace-LICENSE.txt", "../fonts/MonaSansVF.woff2"];
   for (const asset of assets) {
     const response = await request.get(`/gh-aw/cracktro/${asset}`);
     expect(response.ok(), asset).toBe(true);
@@ -1381,6 +1408,7 @@ test.describe("reusable runtime", () => {
     await expect(page.locator(CURRENT)).toHaveAttribute("aria-label", at(2));
     await expect(heading(page)).toHaveText("Part one");
     await expect(page.locator(".snd")).toHaveCount(0);
+    await expect(page.locator(".wzb")).toHaveCount(0);
     await expect(page.locator(".stage")).not.toContainText(/agentic|github/i);
     expect(await page.locator(".dots .drow").evaluateAll(rows => rows.map(r => r.getAttribute("title")))).toEqual(["intro", "Part one", "outro"]);
     expect(requests.filter(p => /\/(?:deck|ops-visuals)\.js$/.test(p))).toEqual([]);

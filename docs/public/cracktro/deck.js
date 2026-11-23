@@ -25961,5 +25961,5 @@
 
   // ---------- start ----------
   // runtime.js (CracktroDeck) builds the bands, chrome, navigation, search, slide map and background from this content.
-  window.CracktroDeck.create({ width: W, height: H, css, slides, themes: THEME, bands: BANDS, solo: SOLO, prototypes: PROTO, tours: TOURS, last: "finale", sound: sfx, captions: window.CracktroCaptions });
+  window.CracktroDeck.create({ width: W, height: H, css, slides, themes: THEME, bands: BANDS, solo: SOLO, prototypes: PROTO, tours: TOURS, last: "finale", sound: sfx, captions: window.CracktroCaptions, wizard: window.CracktroWizard });
 })();

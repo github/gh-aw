@@ -85,8 +85,8 @@
   body.light .dots button { background: #1f232833; }
   body.light .dots button.hd { background: transparent; box-shadow: inset 0 0 0 2px #1f232859; }
   body.light .dots button.on { background: #1f2328; box-shadow: none; }
-  body.light .snd, body.light .fzb, body.light .smb, body.light .ntb, body.light .ksb, body.light .ccb, body.light .arrows button { border-color: #9ea7b3; background: #e6eaefcc; color: #424a53; }
-  body.light .snd:hover, body.light .fzb:hover, body.light .smb:hover, body.light .ntb:hover, body.light .ksb:hover, body.light .ccb:hover, body.light .arrows button:hover { color: #1f2328; border-color: #818b98; }
+  body.light .snd, body.light .fzb, body.light .smb, body.light .ntb, body.light .ksb, body.light .ccb, body.light .wzb, body.light .arrows button { border-color: #9ea7b3; background: #e6eaefcc; color: #424a53; }
+  body.light .snd:hover, body.light .fzb:hover, body.light .smb:hover, body.light .ntb:hover, body.light .ksb:hover, body.light .ccb:hover, body.light .wzb:hover, body.light .arrows button:hover { color: #1f2328; border-color: #818b98; }
   /* research prototype badge on every gh cao slide (top right, clear of the chrome) */
   .proto { position: absolute; right: 110px; top: 76px; display: flex; align-items: center; gap: 14px; padding: 12px 22px; border: 2px dashed #e3b341; border-radius: 999px; background: #0d1117cc; font: 600 20px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: #e3b341; z-index: 5; }
   .proto i { width: 12px; height: 12px; border-radius: 50%; background: #e3b341; box-shadow: 0 0 12px #e3b341; animation: proto-blink 1.6s ease-in-out infinite; }
@@ -112,7 +112,7 @@
   .dots button.sub { width: 4px; height: 6px; margin: 1px -1px 0; border-radius: 2px; background: #ffffff26; }
   .dots button.sub.on { width: 12px; background: #f0f6fc; }
   /* --- example column button (dock): only on a column's head and its examples --- */
-  .vnb { position: fixed; right: calc(224px + var(--sr)); bottom: calc(10px + var(--sb)); height: 34px; padding: 0 10px 0 6px; display: none; align-items: center; gap: 4px; border: 1px solid #3d444d; border-radius: 8px;
+  .vnb { position: fixed; right: calc(264px + var(--sr)); bottom: calc(10px + var(--sb)); height: 34px; padding: 0 10px 0 6px; display: none; align-items: center; gap: 4px; border: 1px solid #3d444d; border-radius: 8px;
     background: #151b23cc; color: #9198a1; font: 600 13px/1 var(--mono); cursor: pointer; z-index: 5; transition: color .2s, border-color .2s, background .2s; touch-action: manipulation; }
   .vnb.on { display: flex; }
   .vnb:hover { color: #f0f6fc; border-color: #9198a1; }
@@ -169,24 +169,27 @@
   body.compact-nav .arrows { display: flex; }
   /* compact dock: translucent after a few idle seconds (body.nav-idle); any touch, key or focus restores it.
      Idle fading preserves hit targets; keyboard focus keeps its control fully readable. */
-  body.compact-nav :is(.arrows, .vnb, .snd, .fzb, .smb, .ntb, .ksb, .tourp) { transition: opacity .4s, color .2s, border-color .2s, background .2s,
+  body.compact-nav :is(.arrows, .vnb, .snd, .fzb, .smb, .ntb, .ksb, .wzb, .tourp) { transition: opacity .4s, color .2s, border-color .2s, background .2s,
     transform .45s cubic-bezier(.2,.9,.2,1), bottom .45s cubic-bezier(.2,.9,.2,1); }
-  body.compact-nav.nav-idle :is(.arrows, .vnb, .snd, .fzb, .smb, .ntb, .ksb, .tourp) { opacity: .4; }
-  body.compact-nav.nav-idle :is(.arrows:has(:focus-visible), .vnb:focus-visible, .snd:focus-visible, .fzb:focus-visible, .smb:focus-visible, .ntb:focus-visible, .ksb:focus-visible, .tourp:has(:focus-visible)) { opacity: 1; }
-  @media (prefers-reduced-motion: reduce) { body.compact-nav :is(.arrows, .vnb, .snd, .fzb, .smb, .ntb, .ksb, .tourp) { transition: none; } }
-  .snd, .fzb, .smb, .ntb, .ksb, .ccb { position: fixed; right: calc(24px + var(--sr)); bottom: calc(10px + var(--sb)); width: 34px; height: 34px; padding: 6px; border: 1px solid #3d444d; border-radius: 8px;
+  body.compact-nav.nav-idle :is(.arrows, .vnb, .snd, .fzb, .smb, .ntb, .ksb, .wzb, .tourp) { opacity: .4; }
+  body.compact-nav.nav-idle :is(.arrows:has(:focus-visible), .vnb:focus-visible, .snd:focus-visible, .fzb:focus-visible, .smb:focus-visible, .ntb:focus-visible, .ksb:focus-visible, .wzb:focus-visible, .tourp:has(:focus-visible)) { opacity: 1; }
+  @media (prefers-reduced-motion: reduce) { body.compact-nav :is(.arrows, .vnb, .snd, .fzb, .smb, .ntb, .ksb, .wzb, .tourp) { transition: none; } }
+  .snd, .fzb, .smb, .ntb, .ksb, .ccb, .wzb { position: fixed; right: calc(24px + var(--sr)); bottom: calc(10px + var(--sb)); width: 34px; height: 34px; padding: 6px; border: 1px solid #3d444d; border-radius: 8px;
     background: #151b23cc; color: #9198a1; cursor: pointer; z-index: 5; transition: color .2s, border-color .2s, background .2s; }
-  .snd:hover, .fzb:hover, .smb:hover, .ntb:hover, .ksb:hover, .ccb:hover { color: #f0f6fc; border-color: #9198a1; }
-  .snd svg, .fzb svg, .smb svg, .ntb svg, .ksb svg, .ccb svg { width: 100%; height: 100%; display: block; }
+  .snd:hover, .fzb:hover, .smb:hover, .ntb:hover, .ksb:hover, .ccb:hover, .wzb:hover { color: #f0f6fc; border-color: #9198a1; }
+  .snd svg, .fzb svg, .smb svg, .ntb svg, .ksb svg, .ccb svg, .wzb svg { width: 100%; height: 100%; display: block; }
   .fzb { right: calc(64px + var(--sr)); }
   .smb { right: calc(104px + var(--sr)); }
   .ntb { right: calc(144px + var(--sr)); }
   .ksb { right: calc(184px + var(--sr)); }
+  /* workflow wizard (W): only when create() receives config.wizard */
+  .wzb { right: calc(224px + var(--sr)); }
+  .wzb:hover { color: #e3b341; border-color: #d29922; }
   .ntb[aria-pressed="true"] { color: #f0f6fc; border-color: currentColor; box-shadow: inset 0 -3px currentColor; }
   body.light .ntb[aria-pressed="true"] { color: #1f2328; }
   /* kiosk mode: slides rotate on their own; the chrome hides except the stop button and the sound toggle beside it,
      which fade (with the cursor) when idle */
-  body.kiosk :is(.dots, .arrows, .vnb, .fzb, .smb, .ntb, .tourp, .notes, .progress) { display: none !important; }
+  body.kiosk :is(.dots, .arrows, .vnb, .fzb, .smb, .ntb, .wzb, .tourp, .notes, .progress) { display: none !important; }
   body.kiosk :is(.ksb, .snd) { opacity: 1; color: #f0f6fc; border-color: #f0f6fc; transition: opacity .4s, color .2s, border-color .2s; }
   body.kiosk .snd { right: calc(144px + var(--sr)); }
   body.kiosk.nav-idle { cursor: none; }
@@ -221,6 +224,9 @@
   .notes .cue-k { font: 600 13px/1.4 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: #79c0ff; white-space: nowrap; }
   @media (max-width: 640px) {
     .snd, .fzb, .smb, .ntb, .ksb, .vnb { bottom: calc(52px + var(--sb)); }
+    /* the tools row is full on a phone: the column button keeps its old slot and the wizard joins the arrows' row, at the left */
+    .vnb { right: calc(224px + var(--sr)); }
+    .wzb { right: auto; left: calc(12px + var(--sl)); }
     /* Translate rather than switch anchors so the arrows can slide beneath the toolbar. */
     .arrows { transform: translateX(calc(100vw - 100% - 36px - var(--sl) - var(--sr))); }
     .notes { bottom: calc(94px + var(--sb)); padding: 14px 16px; font-size: 16px; line-height: 1.5; }
@@ -775,6 +781,33 @@
         setKiosk(!kiosk);
       },
     });
+    // workflow wizard (W): a full-screen dialog owned by config.wizard (wizard.js); the runtime only opens it
+    const wizard = config.wizard || null;
+    const wizOpen = () => !!wizard?.isOpen?.();
+    const wzBtn = wizard
+      ? h("button", {
+          class: "wzb",
+          type: "button",
+          "aria-label": `${wizard.title || "Wizard"} (W)`,
+          "aria-keyshortcuts": "W",
+          title: `${wizard.title || "Wizard"} (W)`,
+          onclick: e => {
+            e.stopPropagation();
+            openWizard();
+          },
+        })
+      : null;
+    if (wzBtn)
+      wzBtn.innerHTML =
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5.5C5.5 4 8.5 4 12 6c3.5-2 6.5-2 9-.5V19c-2.5-1.5-5.5-1.5-9 .5-3.5-2-6.5-2-9-.5z"/><path d="M12 6v13.5"/></svg>';
+    function openWizard() {
+      if (!wizard || wizOpen()) return;
+      if (fz.open) fz.close();
+      if (smp.open) smp.close();
+      if (kiosk) setKiosk(false);
+      wizard.open({ sound: sfx });
+    }
+    for (const t of ["touchstart", "touchend"]) wzBtn?.addEventListener(t, e => e.stopPropagation(), { passive: true });
     // closed captioning (C, CC): kiosk mode as a captioned news TV; its dock button shows only while kiosk mode runs
     const ccb = h("button", {
       class: "ccb",
@@ -836,7 +869,7 @@
     // kiosk mode starts captioned; turning CC off keeps it off for later kiosk runs until it is turned back on
     let capOn = false,
       capPref = true;
-    document.body.append(canvas, wash, gridc, stage, ccEl, progress, dots, arrows, vnb, ksb, ccb, notesBtn, smBtn, fzBtn, ...(config.sound ? [snd] : []), notes, tourP);
+    document.body.append(canvas, wash, gridc, stage, ccEl, progress, dots, arrows, vnb, ksb, ccb, ...(wzBtn ? [wzBtn] : []), notesBtn, smBtn, fzBtn, ...(config.sound ? [snd] : []), notes, tourP);
     // the pressed state (sound on) and the struck-out icon (.off) always follow the sound service
     const paintSound = () => {
       snd.classList.toggle("off", !!sfx.muted);
@@ -844,12 +877,12 @@
     };
     paintSound();
 
-    // Dot map: left offset + the longest band of 8px dots with 5px gaps (example dots are 4px with 3px gaps) + 16px for the wide active dot; dock buttons need ~230px on the right.
+    // Dot map: left offset + the longest band of 8px dots with 5px gaps (example dots are 4px with 3px gaps) + 16px for the wide active dot; dock buttons need ~230px on the right (~270px with the wizard).
     const dotsWidth = 28 + Math.max(...rows.map(r => r.items.reduce((w, s) => w + (s.parent ? 7 : 13), r.header ? 13 : 0))) + 16 + 400;
     const fit = () => {
       const s = Math.min(innerWidth / W, innerHeight / H);
       ccF.style.transform = stage.style.transform = `scale(${s}) translate(-50%, -50%)`;
-      document.body.classList.toggle("compact-nav", dotsWidth > innerWidth - 230);
+      document.body.classList.toggle("compact-nav", dotsWidth > innerWidth - (wzBtn ? 270 : 230));
     };
     addEventListener("resize", fit);
     fit();
@@ -1212,7 +1245,7 @@
     addEventListener("keydown", e => {
       /** @type {any} */
       const target = e.target;
-      if (fz.open || smp.open) return; // the search and map dialogs handle their own keys
+      if (fz.open || smp.open || wizOpen()) return; // the search, map and wizard dialogs handle their own keys
       if (target.closest?.(".notes") && !["n", "N", "Escape"].includes(e.key)) return;
       if ((e.metaKey || e.ctrlKey) && !e.altKey && (e.key === "k" || e.key === "K")) {
         e.preventDefault();
@@ -1280,6 +1313,10 @@
       else if (e.key === "Escape" && notes.classList.contains("on")) toggleNotes();
       else if (e.key === "m" || e.key === "M") toggleSound();
       else if (e.key === "g" || e.key === "G") openMap();
+      else if ((e.key === "w" || e.key === "W") && wizard && !e.repeat && !target.closest?.("input, textarea, select, [contenteditable]")) {
+        e.preventDefault();
+        openWizard();
+      }
       else if ((e.key === "x" || e.key === "X") && view) setView(null);
     });
     // Clicks never move between slides (only keys, the dock, swipes and jump targets do); a click on a
@@ -1296,7 +1333,7 @@
       ty = null,
       pinch0 = null,
       ownsPinch = false;
-    const touchIgnored = t => fz.open || smp.open || !!t.closest?.(".notes, dialog, input, textarea, select, [contenteditable]");
+    const touchIgnored = t => fz.open || smp.open || wizOpen() || !!t.closest?.(".notes, dialog, input, textarea, select, [contenteditable]");
     const pageZoomed = () => (window.visualViewport?.scale ?? 1) > 1.01;
     const spread = ts => Math.hypot(ts[0].clientX - ts[1].clientX, ts[0].clientY - ts[1].clientY);
     const webkitGestures = "GestureEvent" in window;
@@ -1357,7 +1394,7 @@
     addEventListener(
       "touchend",
       e => {
-        if (tx == null || e.touches.length || fz.open || smp.open) return (tx = ty = null);
+        if (tx == null || e.touches.length || fz.open || smp.open || wizOpen()) return (tx = ty = null);
         const t = e.changedTouches[0],
           dx = t.clientX - tx,
           dy = t.clientY - ty;
@@ -1704,6 +1741,7 @@
           [["1…9+Enter"], "Slide by number"],
           [["/", "Ctrl+K", "⌘+K"], "Search slides"],
           [["G"], "Slide map (this screen)"],
+          ...(wizard ? [[["W"], `${wizard.title || "Wizard"}: choose your own workflow`]] : []),
         ],
       ],
       [
@@ -1787,6 +1825,7 @@
       End: "last",
       U: "pattern",
       G: "map",
+      W: "wizard",
       "/": "search",
       N: "notes",
       F: "full",
