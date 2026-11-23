@@ -133,6 +133,7 @@ triggers are recognized only when a registration declares an `on` list.
 |----------|-----------|-------------|
 | `ExtractMCPConfigurations` | `func(frontmatter map[string]any, serverFilter string) ([]RegistryMCPServerConfig, error)` | Extracts all MCP server configurations from frontmatter |
 | `ParseMCPConfig` | `func(toolName string, mcpSection any, toolConfig map[string]any) (RegistryMCPServerConfig, error)` | Parses a single MCP server entry |
+| `ParseMCPAuthConfig` | `func(value any, toolName string) (*types.MCPAuthConfig, error)` | Parses and validates HTTP MCP authentication fields, including direct GitHub OIDC and Azure OIDC configuration. |
 | `IsMCPType` | `func(typeStr string) bool` | Validates an MCP transport type string |
 | `IsSimpleSecretExpression` | `func(value string) bool` | Reports whether `value` is a direct `${{ secrets.NAME }}` GitHub Actions reference without additional expression operators |
 

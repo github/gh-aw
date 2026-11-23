@@ -319,6 +319,10 @@ func (c *Compiler) validateCoreToolConfiguration(workflowData *WorkflowData, mar
 		fmt.Fprintln(os.Stderr, formatCompilerMessage(markdownPath, "warning", err.Error()))
 		c.IncrementWarningCount()
 	}
+	workflowLog.Printf("Validating BYOK provider host firewall coverage")
+	if err := c.validateBYOKProviderHostAllowlist(workflowData, markdownPath); err != nil {
+		return err
+	}
 	workflowLog.Printf("Validating cross-repo checkout paths")
 	c.deriveAndWarnCrossRepoCheckoutPaths(workflowData.CheckoutConfigs, markdownPath)
 	c.warnCheckoutRefWithSteps(workflowData, markdownPath)
@@ -615,6 +619,35 @@ var experimentalFeatureChecks = []struct {
 	{"drive-memory", func(w *WorkflowData) bool { return w.DriveMemoryConfig != nil && len(w.DriveMemoryConfig.Drives) > 0 }},
 	{"continual-experiments", func(w *WorkflowData) bool { return hasContinualExperiment(w.ExperimentConfigs) }},
 	{"safe-outputs-steer", func(w *WorkflowData) bool { return w.SafeOutputs != nil && w.SafeOutputs.Steer }},
+	{"issue-intent", hasIssueIntentEnabled},
+}
+
+// hasIssueIntentEnabled reports whether any intent-capable safe output opts in with issue-intent: true.
+func hasIssueIntentEnabled(w *WorkflowData) bool {
+	so := w.SafeOutputs
+	if so == nil {
+		return false
+	}
+	var toggles []*bool
+	if so.CloseIssues != nil {
+		toggles = append(toggles, so.CloseIssues.IssueIntent)
+	}
+	if so.AddLabels != nil {
+		toggles = append(toggles, so.AddLabels.IssueIntent)
+	}
+	if so.AssignToAgent != nil {
+		toggles = append(toggles, so.AssignToAgent.IssueIntent)
+	}
+	if so.AssignToUser != nil {
+		toggles = append(toggles, so.AssignToUser.IssueIntent)
+	}
+	if so.SetIssueType != nil {
+		toggles = append(toggles, so.SetIssueType.IssueIntent)
+	}
+	if so.SetIssueField != nil {
+		toggles = append(toggles, so.SetIssueField.IssueIntent)
+	}
+	return slices.ContainsFunc(toggles, issueIntentRequired)
 }
 
 func hasWebhookSubscriptionEvent(workflowData *WorkflowData, event string) bool {

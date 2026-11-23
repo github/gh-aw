@@ -264,6 +264,7 @@ func Default() *Runner {
 	return &Runner{rules: []Rule{
 		SecretLeakRule(),
 		OTLPSecretLeakRule(),
+		OverprovisionedSecretsRule(),
 		ActionPinRule(),
 		JobTimeoutRule(),
 		NeedsConsistencyRule(),
@@ -302,5 +303,9 @@ func Default() *Runner {
 		BashCasePatternRule(),
 		PrivilegedCheckoutRule(),
 		ArtifactExecutionRule(),
+		BotConditionsRule(),
+		UnsoundContainsRule(),
+		InsecureCommandsRule(),
+		RemoteScriptExecutionRule(),
 	}}
 }

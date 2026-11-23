@@ -19,6 +19,7 @@ that contract as the source of truth when adding or changing connector behavior.
 | Symbol | Description |
 |--------|-------------|
 | `ConnectorSpec`, `Connection`, `Binding` | Validated source documents and selected capability bindings. |
+| `Inference` | Fixed model-provider profile lowered to the existing engine transport; it is not an agent-callable operation. |
 | `Service`, `Selection`, `NewService`, `LoadService`, `Select` | Construct or load a service and select capabilities into a plan. |
 | `Plan`, `Lower`, `DecodePlan`, `Plan.ForPhase` | Produce, decode, or prune an immutable execution plan for a phase. |
 | `Runtime`, `SecretResolver`, `Plan.Execute` | Execute a selected capability using host-resolved credentials and approved origins. |
@@ -34,6 +35,7 @@ that contract as the source of truth when adding or changing connector behavior.
 | Read and MCP capabilities | `ReadTool`, `HTTPMCP`, `MCPTool`, `Result`, `ToolCapability` | Describe REST-backed reads, remote streamable-HTTP MCP tools, and untrusted execution results. |
 | Events | `Trigger`, `EventPredicate`, `EventFilter`, `EventVariant`, `EventProjection`, `EventEvaluationVersion` | Represent bounded matching and projection rules over authenticated evidence; variants cannot grant resource authority. |
 | Connections and payloads | `APIVersion`, `SecretRef`, `Connection`, `Binding`, `InputSchema`, `Inputs`, `Secrets`, `Origins`, `ToolNames`, `SafeOutputNames`, `TriggerNames`, `UsesStagedFile` | Represent the versioned declaration contract, credential names, selected capabilities, and staged-file requirements in the frozen, phase-restricted plan. |
+| Inference | `Inference` | Describes a fixed model provider using a declared endpoint, path, protocol, inference credential, and approved model resource collection; `model-catalog: false` disables live model-catalog resolution. |
 
 ### Additional exported operations
 

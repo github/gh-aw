@@ -111,10 +111,10 @@ func (source *scannerSource) indexAW(content []byte) ([]byte, any, error) {
 		return nil, nil, err
 	}
 	for _, block := range blocks {
-		for _, field := range []string{"steps", "post-steps"} {
+		for _, field := range aw.StepSections {
 			var fields []map[string]any
 			for _, step := range block.Steps {
-				if step.Post == (field == "post-steps") {
+				if step.Section == field {
 					fields = append(fields, step.Fields)
 				}
 			}

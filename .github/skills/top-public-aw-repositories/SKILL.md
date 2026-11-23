@@ -25,7 +25,33 @@ Find public gh-aw adopters ranked by GitHub stars. Use for requests such as
   in the active worktree, or a task-scoped directory under `$TMPDIR`. Do not
   overwrite another collection or commit downloaded workflows.
 
-For adoption checks and downloads, load
+## Fast path: run the bundled collector
+
+Prefer the zero-dependency Node script over hand-written API loops. It
+implements this skill and `retrieve-public-aw-workflows` end to end and writes
+every required output file:
+
+```bash
+node .github/skills/top-public-aw-repositories/collect.mjs \
+  [--count 100] [--out "$TMPDIR/aw-top-public/<UTC-stamp>"] [--owner OWNER] \
+  [--code-pages 10] [--repo-pages 2]
+```
+
+- Takes ~3 minutes for 100 repos after search; a fresh search adds ~6 minutes
+  of code-search pacing (10 requests/minute). Run it async and read the JSON
+  summary on stdout; progress goes to stderr.
+- Metadata, commit pinning, and workflow-tree listing use batched GraphQL
+  (~1 point per 10–50 repos), with a REST fallback only for repos whose tree
+  times out in GraphQL. Raw bytes come anonymously from raw.githubusercontent.com.
+  It stops on host-wide rate limits and keeps partial evidence (`host_stop`).
+- Corpus layout: `repos/{owner}/{repo}/.github/workflows/*.{md,lock.yml}` plus
+  `repos/{owner}/{repo}/manifest.json`. Non-adopters get a manifest only.
+  Adopters visited past `--count` are listed in `unselected_adopters_beyond_count`.
+- Unit tests: `node --test .github/skills/top-public-aw-repositories/collect.test.mjs`.
+- Rerun without repeating search: `--from-search <prev-out>/search-candidates.json`.
+- Extend the script instead of re-implementing it when requirements change.
+
+For contract details on adoption checks and downloads, see
 `../retrieve-public-aw-workflows/SKILL.md`. Use that skill's immutable snapshots,
 public-only checks, file classifications, and failure handling.
 

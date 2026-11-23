@@ -2312,6 +2312,23 @@ create-pull-request, patch, signed commits, git push, safe output
 - And can reviewers trust the pushes that come out of it?
 - They are signed, and if a pull request cannot be created, it falls back to opening issues.
 
+### Choose your own workflow {#choose-your-own-workflow}
+
+#### Summary
+
+Choose your own workflow: a gamebook wizard walks through a goal, a pattern, a trigger, safe outputs, extras and an engine, and ends with a prompt that asks your agent to build the workflow.
+
+#### Keywords
+
+wizard, workflow wizard, gamebook, choose your own adventure, workflow generator, getting started, prompt, W key, quest, pattern, trigger, schedule, safe outputs, engine, agentic-workflows
+
+#### Captions
+
+- Where do you start with your first workflow?
+- Open the book. Pick a quest, the hour it wakes and what it may write.
+- Then choose the agent at your side.
+- The last page is a prompt. Paste it into your agent and it builds the workflow.
+
 ### GıtHub Agentic Workflows {#finale}
 
 #### Notes

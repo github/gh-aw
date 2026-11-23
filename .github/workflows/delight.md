@@ -42,9 +42,8 @@ safe-outputs:
 description: Targeted scan of user-facing aspects to improve clarity, usability, and professionalism in enterprise software context
 emoji: ✨
 engine:
-  id: copilot
-  copilot-sdk: true
-max-tool-denials: 3
+  id: claude
+  model-provider: github
 name: Delight
 pre-agent-steps:
 - name: Setup Go

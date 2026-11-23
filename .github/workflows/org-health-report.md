@@ -13,9 +13,8 @@ permissions:
 
 
 engine:
-  id: copilot
-  copilot-sdk: true
-max-tool-denials: 3
+  id: claude
+  model-provider: github
 tools:
   cli-proxy: true
   github:

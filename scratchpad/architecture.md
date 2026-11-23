@@ -1,6 +1,6 @@
 # Architecture Diagram
 
-> Last updated: 2026-11-16 · Source: [Architecture Diagram issue](https://github.com/github/gh-aw/issues?q=is%3Aissue%20%22Architecture%20Diagram%20%E2%80%94%202026-11-16%22)
+> Last updated: 2026-11-23 · Source: [Workflow run](https://github.com/github/gh-aw/actions/runs/45140538836)
 
 ## Overview
 
@@ -20,6 +20,7 @@ This diagram shows the package structure and dependencies of the `gh-aw` codebas
 │ workflow ─▶ workflow/{actions,aw,lint,taint,...} (compiler internals)                          │
 │ parser ─▶ console, githubapi (API), workflow/actionslanguageservice                            │
 │ workqueue ─▶ parser, console, githubapi;  cli ─▶ github, modelsdev, scanfindings               │
+│ cli ─▶ lifecycle (safe-output rules and evidence)                                              │
 │ cmd/linters ─▶ linters ─▶ linters/* (Go analyzers)                                             │
 ├────────────────────────────────────────────────────────────────────────────────────────────────┤
 │ UTILITIES                                                                                      │
@@ -47,6 +48,7 @@ This diagram shows the package structure and dependencies of the `gh-aw` codebas
 | `github` | Core | GitHub label and objective mapping |
 | `githubapi` | Core | GitHub API requests |
 | `intent` | Core | Intent policy resolution |
+| `lifecycle` | Core | Safe-output lifecycle rules and evidence |
 | `linters` | Core | Custom Go analyzers |
 | `linters/*` | Core | Individual Go analyzer packages |
 | `modelsdev` | Core | Model catalog normalization |

@@ -358,6 +358,40 @@ describe("push_experiment_state", () => {
       fs.rmSync(repoDir, { recursive: true, force: true });
     });
 
+    it("fetches only the state branch tip while preserving its files and local commit base", async () => {
+      const { spawnSync } = require("child_process");
+      const remoteDir = fs.mkdtempSync(path.join(os.tmpdir(), "push-state-remote-"));
+      try {
+        const git = (args, cwd = remoteDir) => {
+          const result = spawnSync("git", args, { cwd, encoding: "utf8" });
+          expect(result.status, result.stderr).toBe(0);
+          return result.stdout.trim();
+        };
+        git(["init"]);
+        git(["config", "user.email", "test@example.com"]);
+        git(["config", "user.name", "Test"]);
+        git(["checkout", "--orphan", "evals/myworkflow"]);
+        fs.writeFileSync(path.join(remoteDir, "evals.jsonl"), '{"runid":"old"}\n');
+        git(["add", "."]);
+        git(["commit", "-m", "old history"]);
+        const oldHead = git(["rev-parse", "HEAD"]);
+        fs.appendFileSync(path.join(remoteDir, "evals.jsonl"), '{"runid":"latest"}\n');
+        git(["commit", "-am", "latest history"]);
+        const remoteHead = git(["rev-parse", "HEAD"]);
+
+        const baseRef = await checkoutOrCreateBranch("evals/myworkflow", `file://${remoteDir}`, repoDir);
+        expect(baseRef).toBe(remoteHead);
+        expect(git(["rev-list", "--count", "HEAD"], repoDir)).toBe("1");
+        expect(spawnSync("git", ["cat-file", "-e", oldHead], { cwd: repoDir }).status).not.toBe(0);
+        expect(fs.readFileSync(path.join(repoDir, "evals.jsonl"), "utf8")).toBe('{"runid":"old"}\n{"runid":"latest"}\n');
+        fs.appendFileSync(path.join(repoDir, "evals.jsonl"), '{"runid":"new"}\n');
+        git(["commit", "-am", "new answers"], repoDir);
+        expect(git(["rev-list", "--count", `${baseRef}..HEAD`], repoDir)).toBe("1");
+      } finally {
+        fs.rmSync(remoteDir, { recursive: true, force: true });
+      }
+    });
+
     it("retries only the fetch on transient failures and then checks out", async () => {
       const fetchFn = vi
         .fn()

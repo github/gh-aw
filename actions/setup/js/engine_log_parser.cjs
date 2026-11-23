@@ -22,12 +22,14 @@ const sessionParsers = {
   custom: ["parse_custom_log.cjs", "parseCustomLog"],
 };
 
-/** @param {string} content @param {string} engine @returns {any} */
-function parseEngineLog(content, engine) {
+/** @param {string} content @param {string} engine @param {{render?: boolean}} [options] @returns {any} */
+function parseEngineLog(content, engine, options = {}) {
   const known = Object.hasOwn(sessionParsers, engine);
   const [moduleName, functionName] = known ? sessionParsers[engine] : sessionParsers.custom;
   const parse = require(`./${moduleName}`)[functionName];
-  return known ? parse(content) : parse(content, engine);
+  if (engine === "codex") return parse(content, undefined, options);
+  if (engine === "custom") return parse(content, "", options);
+  return known ? parse(content, options) : parse(content, engine, options);
 }
 
 /**
@@ -147,6 +149,7 @@ function normalizeEngineLogEntries(entries, engine) {
 /** @type {Map<string, (entries: any[]) => boolean>} */
 const declaredFirstParserPolicies = new Map([
   ["aider", () => true],
+  ["langgraph", () => true],
   // Older plaintext definitions relied on terminal extraction; canonical producers own framing.
   ["crush", entries => entries.every(isSessionEvent)],
   ["cursor", entries => entries.every(isSessionEvent)],
