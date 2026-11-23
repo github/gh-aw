@@ -64,6 +64,7 @@ Paths below are relative to `.github/skills/`; load only the matching `SKILL.md`
 | Error handling/recovery | `error-recovery-patterns` |
 | GitHub MCP usage | `github-mcp-server` |
 | Issue/PR/workflow/discussion/label queries | matching `github-*-query` |
+| noop/missing-tool/missing-data/incomplete stats | `safe-output-stats` |
 | Verify or merge Dependabot npm updates through 1ES | `dependabot-1es` |
 | Workflow review: compile/scans/audit/optimization | `review-agentic-workflows` |
 | Documentation | `documentation` |

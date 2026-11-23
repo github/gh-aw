@@ -871,6 +871,19 @@ test.describe("agentic engineering slides", () => {
     expect(errors).toEqual([]);
   });
 
+  test("replaces an invented output with an honest noop or report", async ({ page }) => {
+    const errors = await open(page, "It’s ok to say no(op)", 23_800);
+    for (const text of ["noop", "report_missing_tool", "report_missing_data", "report_incomplete"]) {
+      await expect(page.locator(".nop-side")).toContainText(text);
+    }
+    await expect(page.locator(".nop-step span.on")).toHaveCount(4);
+    await expect(page.locator(".nop-bad")).toHaveClass(/\bdone\b/);
+    await expect(page.locator(".nop-bad")).toContainText("✕ hides failure");
+    await expect(page.locator(".nop-good")).toContainText("report_incomplete");
+    await expect(page.locator(".nop-row.on")).toHaveText(/report_incomplete/);
+    expect(errors).toEqual([]);
+  });
+
   test("appends a validated ledger record from a trusted job", async ({ page }) => {
     const errors = await open(page, "Memory with a History", 12_000);
     await expect(page.locator("#mhlR4")).toHaveClass(/\bon\b/);
