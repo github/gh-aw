@@ -2322,7 +2322,8 @@ describe("handle_agent_failure", () => {
         const diagnostic = global.core.setFailed.mock.calls[0][0];
         expect(diagnostic).toContain("report_incomplete");
         expect(diagnostic).toContain("A successful agent job does not confirm task completion");
-        expect(diagnostic).toContain("conclusion job summary");
+        expect(diagnostic).toContain("Signal source: explicit agent report (not a collector fallback).");
+        expect(diagnostic).toContain("The conclusion job summary withholds the agent-declared reason because detection did not approve it.");
         expect(diagnostic).toContain("agent_output.json in the agent artifact");
         expect(diagnostic).toContain("gh aw audit 123456");
         const logs = JSON.stringify([...global.core.info.mock.calls, ...global.core.warning.mock.calls, ...global.core.setFailed.mock.calls]);
@@ -2541,6 +2542,11 @@ describe("handle_agent_failure", () => {
       const issueBody = create.mock.calls[0][0].body;
       const commentBody = createComment.mock.calls[0][0].body;
       const reason = "Required data could not be read";
+      expect(global.core.setFailed).toHaveBeenCalledTimes(2);
+      for (const [annotation] of global.core.setFailed.mock.calls) {
+        expect(annotation).toContain(showReason ? "Check the conclusion job summary for the agent-declared, unverified reason" : "withholds the agent-declared reason");
+        expect(annotation).not.toContain(reason);
+      }
       expect(issueBody.includes(reason)).toBe(showReason);
       expect(commentBody.includes(reason)).toBe(showReason);
       expect(global.core.summary.addRaw).toHaveBeenCalledTimes(2);
@@ -7860,6 +7866,8 @@ describe("handle_agent_failure", () => {
       await mainFn();
 
       expect(global.core.setFailed).toHaveBeenCalledWith(expect.stringContaining("Agent reported that it could not complete the task (report_incomplete)"));
+      expect(global.core.setFailed).toHaveBeenCalledWith(expect.stringContaining("Signal source: explicit agent report"));
+      expect(global.core.setFailed.mock.calls[0][0]).not.toContain(reason);
       expect(createIssueMock).toHaveBeenCalled();
     });
 
@@ -7940,6 +7948,10 @@ describe("handle_agent_failure", () => {
       await mainFn();
 
       expect(global.core.setFailed).toHaveBeenCalledWith(expect.stringContaining("Agent reported that it could not complete the task (report_incomplete)"));
+      if (conclusion === "success") {
+        expect(global.core.setFailed).toHaveBeenCalledWith(expect.stringContaining(`Collector classification: ${reason}.`));
+        expect(global.core.setFailed).toHaveBeenCalledWith(expect.stringContaining("Check the conclusion job summary for runtime evidence"));
+      }
       expect(createIssueMock).toHaveBeenCalled();
     });
 
