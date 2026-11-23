@@ -184,6 +184,54 @@ function formatResponseHeaderNames(headers) {
 }
 
 /**
+ * Adapt only provider-facing tool schemas. Pi and MCP retain the original
+ * schemas for argument validation; strict inference rejects uniqueItems.
+ *
+ * @param {any} payload
+ * @param {string} api
+ * @param {(msg: string) => void} logger
+ * @returns {any}
+ */
+function adaptProviderToolSchemas(payload, api, logger) {
+  if (!["openai-completions", "openai-responses", "azure-openai-responses", "openai-codex-responses"].includes(api) || !payload || typeof payload !== "object") return payload;
+  let omitted = 0;
+  const schemaMaps = new Set(["properties", "patternProperties", "$defs", "definitions", "dependentSchemas", "dependencies"]);
+  const schemaNodes = new Set(["items", "additionalProperties", "additionalItems", "contains", "not", "if", "then", "else", "unevaluatedProperties", "unevaluatedItems", "propertyNames"]);
+  const schemaArrays = new Set(["allOf", "anyOf", "oneOf", "prefixItems"]);
+  /** @param {any} schema @returns {any} */
+  function adaptSchema(schema) {
+    if (!schema || typeof schema !== "object") return schema;
+    if (Array.isArray(schema)) return schema.map(adaptSchema);
+    return Object.fromEntries(
+      Object.entries(schema).flatMap(([key, value]) => {
+        if (key === "uniqueItems") {
+          omitted += 1;
+          return [];
+        }
+        if (schemaMaps.has(key) && value && typeof value === "object" && !Array.isArray(value)) {
+          return [[key, Object.fromEntries(Object.entries(value).map(([name, child]) => [name, adaptSchema(child)]))]];
+        }
+        return [[key, schemaNodes.has(key) || schemaArrays.has(key) ? adaptSchema(value) : value]];
+      })
+    );
+  }
+  /** @param {any} tool @returns {any} */
+  function adaptTool(tool) {
+    if (tool?.type === "namespace" && Array.isArray(tool.tools)) return { ...tool, tools: tool.tools.map(adaptTool) };
+    if (tool?.type !== "function") return tool;
+    if (tool.function) return { ...tool, function: { ...tool.function, parameters: adaptSchema(tool.function.parameters) } };
+    return { ...tool, parameters: adaptSchema(tool.parameters) };
+  }
+  const adapted = {
+    ...payload,
+    ...(Array.isArray(payload.tools) ? { tools: payload.tools.map(adaptTool) } : {}),
+    ...(Array.isArray(payload.input) ? { input: payload.input.map(item => (item?.type === "tool_search_output" && Array.isArray(item.tools) ? { ...item, tools: item.tools.map(adaptTool) } : item)) } : {}),
+  };
+  if (omitted) logger(`provider_schema_compat omitted_unique_items=${omitted} argument_validation=unchanged`);
+  return omitted ? adapted : payload;
+}
+
+/**
  * Emit a report_incomplete safe output when provider infrastructure fails
  * before any safe outputs have been recorded.
  *
@@ -366,13 +414,14 @@ function piProviderExtension(pi) {
     pi.on("before_provider_headers", event => applyAwfCallerHeader(event?.headers, awfCaller));
   }
 
-  pi.on("before_provider_request", (_event, ctx) => {
+  pi.on("before_provider_request", (event, ctx) => {
     providerRequestCount += 1;
     lastProviderRequest = resolveProviderRequestTarget(ctx && ctx.model);
     lastProviderResponse = null;
     const provider = ctx?.model?.provider || "(unknown provider)";
     const model = ctx?.model?.id || getConfiguredModel() || "(unknown model)";
     log(`provider_request provider=${provider} model=${model} api=${lastProviderRequest.api} method=${lastProviderRequest.method} url=${lastProviderRequest.url}`);
+    return adaptProviderToolSchemas(event?.payload, lastProviderRequest.api, log);
   });
 
   pi.on("after_provider_response", (event, ctx) => {
