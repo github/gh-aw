@@ -1557,31 +1557,6 @@ gh aw pr transfer <pr-url> --repo target-owner/target-repo --create-pull-request
 
 **Options:** `--repo/-r`, `--create-pull-request` (compatibility flag; PR creation is always enabled), `--pr-message` (see [pull request descriptions](#pull-request-descriptions)), `--auto-merge` (requires `--create-pull-request`; see [auto-merge requirements](#pull-request-auto-merge))
 
-#### `advisory inspect` and `advisory transfer`
-
-These experimental commands are hidden from the main CLI help. They review a Git diff from a private workflow run and transfer that exact diff to an existing temporary private advisory fork on GitHub.com.
-
-`advisory setup` creates or reuses `<your-login>/gh-aw-advisories`, a private repository owned by the personal GitHub.com account authenticated by `gh`. It does not add collaborators or send invitations, and it refuses to reuse a shared repository or one with pending invitations. Install the [reviewed workflow and checkout credential](/gh-aw/patterns/multi-repo-ops/#preparing-an-advisory-fix) separately.
-
-```bash wrap
-gh aw advisory setup
-gh aw advisory record GHSA-2345-6789-cfgh --repo owner/repo --base "$BASE_SHA" --base-branch main --run "$RUN_ID" --artifact "$ARTIFACT_ID"
-gh aw advisory inspect GHSA-2345-6789-cfgh --print-patch
-gh aw advisory transfer GHSA-2345-6789-cfgh --approve "$APPROVAL_DIGEST"
-```
-
-`advisory record` saves the handoff coordinates, not the patch or credentials, in the user configuration directory. Records are separate for each GitHub account and GHSA ID. The destination branch defaults to `advisory/<lowercase-ghsa-id>`; override it with `--branch`. Run `record` again to replace a handoff, then use `inspect` to obtain a fresh approval digest.
-
-If the advisory has no fork, add `--create-fork` to `record`. This requests a temporary private fork for the existing draft or triage advisory after verifying the artifact. The GitHub CLI account must have [permission to create the advisory fork](https://docs.github.com/en/rest/security-advisories/repository-advisories#create-a-temporary-private-fork). The command waits up to five minutes for GitHub to confirm the fork before saving the handoff. On the same machine, retries check for a pending fork without sending another creation request. If the request failed and no fork appears, create it in GitHub before rerunning `record`. An existing verified fork is reused, and an identical saved handoff is not rewritten.
-
-For a one-off handoff, pass `--repo` (upstream), `--base` (exact tested commit), `--base-branch` (branch in the fork), and `--branch` (new fix branch) directly to both `inspect` and `transfer`. Supply either `--side-repo`, `--run`, and `--artifact` together, or `--patch` for a local text Git diff whose origin you verified separately. The patch limit is 4 MiB in either mode.
-
-Artifact mode verifies that the ZIP belongs to a successful first attempt of a manual run whose head is in the specified private repository, checks its GitHub SHA-256 digest, and reads `handoff/fix.patch`. Start a fresh manual dispatch rather than rerunning an earlier attempt. A successful run is not proof that the patch passed its tests.
-
-`inspect` uses the signed-in GitHub CLI identity to resolve the fork without writing to GitHub. By default it prints handoff metadata and the approval digest, not the patch. `--print-patch` requires terminal stdin and stdout and an exact `yes` response. Omit the flag in scripts, pipes, and CI. A terminal does not prove a human is present: review the diff in a private terminal, treat it as untrusted data, and keep it out of logs and agent input. `transfer` requires `--approve` with the digest from the handoff you reviewed; the digest does not attest to test results.
-
-`transfer` applies the patch without checking out a working tree. Git operations use the locally configured `gh` sign-in, not GitHub token environment variables. Sign in with `gh auth login --hostname github.com` using the account authorized for the advisory fork. Transfer refuses changes to `.github` or anything under it, regardless of case, and refuses to overwrite an existing branch. It checks the base before and after pushing. If the base moves or cannot be checked after the push, check for an existing fix branch before retrying. It does not create a fork or open a PR. Open the PR from the advisory in GitHub once the branch is ready.
-
 #### `mcp-server`
 
 Run MCP server exposing gh-aw commands as tools. Spawns subprocesses to isolate GitHub tokens.
