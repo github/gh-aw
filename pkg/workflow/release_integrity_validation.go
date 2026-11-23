@@ -17,6 +17,9 @@ func (c *Compiler) validateReleaseIntegrityPins(data *WorkflowData) error {
 	if err := validateReleaseManifestPin("compiler.default-copilot", string(constants.DefaultCopilotVersion), constants.DefaultCopilotChecksumsSHA256); err != nil {
 		return fmt.Errorf("invalid compiler default Copilot release pin; add an independently authenticated release pin, then run 'bash scripts/update-copilot-version.sh %s' to update the version and SHA256 together in pkg/constants/version_constants.go: %w", constants.DefaultCopilotVersion, err)
 	}
+	if err := validateReleaseManifestPin("compiler.default-copilot-sdk-cli", string(constants.DefaultCopilotSDKNPMCLIVersion), constants.DefaultCopilotSDKNPMCLIChecksumsSHA256); err != nil {
+		return fmt.Errorf("invalid compiler default Copilot SDK companion CLI pin: %w", err)
+	}
 	if err := validateEngineReleaseIntegrityPin(data.EngineConfig, ResolveEngineID(data), "engine"); err != nil {
 		return err
 	}

@@ -7,7 +7,44 @@ import (
 	"testing"
 
 	"github.com/github/gh-aw/pkg/constants"
+	"github.com/stretchr/testify/require"
 )
+
+func TestCopilotSDKCompanionCLIPin(t *testing.T) {
+	t.Parallel()
+
+	const sdkDigest = "854036b59b745d4f4b44a169327ffc0eab007f39e74b3dc3670f4d609a6c1072"
+	cliOnlyPin := string(constants.DefaultCopilotVersion) + " --checksums-sha256 " + constants.DefaultCopilotChecksumsSHA256
+	for _, tt := range []struct {
+		name        string
+		config      EngineConfig
+		wantVersion string
+		wantPin     string
+	}{
+		{"default npm SDK", EngineConfig{CopilotSDK: true}, "1.0.113", "1.0.113 --checksums-sha256 " + sdkDigest},
+		{"Node.js driver", EngineConfig{CopilotSDK: true, Driver: "driver.cjs"}, "1.0.113", "1.0.113 --checksums-sha256 " + sdkDigest},
+		{"explicit CLI pin", EngineConfig{CopilotSDK: true, Version: "1.0.101", ChecksumsSHA256: testEngineChecksumsPin}, "1.0.101", "1.0.101 --checksums-sha256 " + testEngineChecksumsPin},
+		{"explicit CLI expression", EngineConfig{CopilotSDK: true, Version: "${{ inputs.cli-version }}"}, "${{ inputs.cli-version }}", `"${ENGINE_VERSION}"`},
+		{"custom npm SDK version", EngineConfig{CopilotSDK: true, CopilotSDKPin: &copilotSDKNPMProjectPin{Version: "2.1.0", SHA256: testEngineChecksumsPin}}, string(constants.DefaultCopilotVersion), cliOnlyPin},
+		{"Python SDK driver", EngineConfig{CopilotSDK: true, Driver: "driver.py"}, string(constants.DefaultCopilotVersion), cliOnlyPin},
+		{"CLI only", EngineConfig{}, string(constants.DefaultCopilotVersion), cliOnlyPin},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			data := &WorkflowData{Name: "sdk-companion-cli-pin", AI: "copilot", EngineConfig: &tt.config}
+			engine := NewCopilotEngine()
+			var lines []string
+			for _, step := range engine.GetInstallationSteps(data) {
+				lines = append(lines, step...)
+			}
+			require.Contains(t, strings.Join(lines, "\n"), `install_copilot_cli.sh" `+tt.wantPin+" --")
+			compiler := NewCompiler()
+			registry := compiler.engineRegistry
+			require.Equal(t, tt.wantVersion, getInstallationVersion(data, engine, registry))
+			require.Equal(t, tt.wantVersion, getVersionForSetup(data, registry))
+			require.Equal(t, tt.wantVersion, compiler.collectEngineVersionsForMetadata(data)["copilot"])
+		})
+	}
+}
 
 func TestCopilotInstallerPassesGitHubToken(t *testing.T) {
 	for _, version := range []string{"1.0.0", "${{ inputs.engine-version }}"} {

@@ -14,19 +14,30 @@ func TestExternalDetectorSDKVersionMetadata(t *testing.T) {
 	for _, tc := range []struct {
 		name        string
 		driver      string
+		cliPin      string
+		wantCLI     string
 		wantVersion string
 		wantInstall string
 	}{
 		{
 			name:        "custom command is ignored",
+			wantCLI:     string(constants.DefaultCopilotSDKNPMCLIVersion),
 			wantVersion: string(constants.DefaultCopilotSDKNPMVersion),
 			wantInstall: copilotSDKNodeInstallCommand,
 		},
 		{
 			name:        "explicit Python driver is retained",
 			driver:      "driver.py",
+			wantCLI:     string(constants.DefaultCopilotVersion),
 			wantVersion: string(constants.DefaultCopilotSDKVersion),
 			wantInstall: "github-copilot-sdk==" + string(constants.DefaultCopilotSDKVersion),
+		},
+		{
+			name:        "explicit CLI pin wins",
+			cliPin:      "1.0.101",
+			wantCLI:     "1.0.101",
+			wantVersion: string(constants.DefaultCopilotSDKNPMVersion),
+			wantInstall: copilotSDKNodeInstallCommand,
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -38,6 +49,7 @@ func TestExternalDetectorSDKVersionMetadata(t *testing.T) {
 						EngineConfig: &EngineConfig{
 							ID:         "copilot",
 							CopilotSDK: true,
+							Version:    tc.cliPin,
 							Command:    "python3 driver.py",
 							Driver:     tc.driver,
 						},
@@ -48,7 +60,13 @@ func TestExternalDetectorSDKVersionMetadata(t *testing.T) {
 			if !strings.Contains(install, tc.wantInstall) {
 				t.Fatalf("Expected detector installation to contain %q, got:\n%s", tc.wantInstall, install)
 			}
+			if !strings.Contains(install, `install_copilot_cli.sh" `+tc.wantCLI+" ") {
+				t.Fatalf("Expected detector to install CLI version %q, got:\n%s", tc.wantCLI, install)
+			}
 			versions := compiler.collectEngineVersionsForMetadata(data)
+			if got := versions["copilot"]; got != tc.wantCLI {
+				t.Fatalf("Expected detector CLI version %q in metadata, got %q", tc.wantCLI, got)
+			}
 			if got := versions["copilot-sdk"]; got != tc.wantVersion {
 				t.Fatalf("Expected detector SDK version %q in metadata, got %q", tc.wantVersion, got)
 			}
@@ -126,7 +144,11 @@ func TestCollectEngineVersionsForMetadata(t *testing.T) {
 				},
 			},
 		}
-		if got, exists := compiler.collectEngineVersionsForMetadata(data)["copilot-sdk"]; exists {
+		versions := compiler.collectEngineVersionsForMetadata(data)
+		if got := versions["copilot"]; got != string(constants.DefaultCopilotVersion) {
+			t.Fatalf("Expected CLI-only version for inline detection, got %q", got)
+		}
+		if got, exists := versions["copilot-sdk"]; exists {
 			t.Fatalf("Did not expect an SDK version for inline detection, got %q", got)
 		}
 	})

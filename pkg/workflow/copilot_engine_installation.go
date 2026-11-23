@@ -123,13 +123,17 @@ func (e *CopilotEngine) GetInstallationSteps(workflowData *WorkflowData) []GitHu
 	// The shared installer generator binds an omitted version to the compiler's
 	// reviewed default version and checksum instead of resolving it at runtime.
 	copilotVersion := ""
+	checksumsSHA256 := ""
 	if workflowData.EngineConfig != nil {
-		if workflowData.EngineConfig.Version != "" {
-			copilotVersion = workflowData.EngineConfig.Version
+		copilotVersion = workflowData.EngineConfig.Version
+		checksumsSHA256 = workflowData.EngineConfig.ChecksumsSHA256
+		if copilotVersion != "" {
 			copilotInstallLog.Printf("Using engine.version for Copilot CLI installation: %s", copilotVersion)
-		} else {
-			copilotInstallLog.Printf("No engine.version specified; using compiler default version and checksum")
 		}
+	}
+	if copilotVersion == "" && checksumsSHA256 == "" && usesDefaultCopilotSDKNPM(workflowData) {
+		copilotVersion = string(constants.DefaultCopilotSDKNPMCLIVersion)
+		checksumsSHA256 = constants.DefaultCopilotSDKNPMCLIChecksumsSHA256
 	}
 
 	// Use the installer script for global installation
@@ -140,10 +144,6 @@ func (e *CopilotEngine) GetInstallationSteps(workflowData *WorkflowData) []GitHu
 	// the rootless location to ${RUNNER_TEMP}/gh-aw/bin/copilot where AWF expects it.
 	rootless := useRootlessCLIInstallation(workflowData)
 	compiledVersion := workflowData.CompiledVersion
-	checksumsSHA256 := ""
-	if workflowData.EngineConfig != nil {
-		checksumsSHA256 = workflowData.EngineConfig.ChecksumsSHA256
-	}
 	npmSteps := generateCopilotInstallerSteps(copilotVersion, "Install GitHub Copilot CLI", rootless, compiledVersion, string(constants.CopilotSessionIDMinVersion), getNVXGuestLibc(workflowData), checksumsSHA256, resolveEngineCooldownDays(workflowData))
 	if len(inlineDriverWriteStep) > 0 {
 		npmSteps = append(npmSteps, inlineDriverWriteStep)
@@ -197,6 +197,14 @@ func buildCopilotSDKInstallStep(workflowData *WorkflowData) GitHubActionStep {
 	}
 	copilotInstallLog.Printf("copilot-sdk enabled; runtime=%s", spec.runtimeID)
 	return specToInstallStep(spec)
+}
+
+func usesDefaultCopilotSDKNPM(data *WorkflowData) bool {
+	if data.EngineConfig == nil || data.EngineConfig.Command != "" {
+		return false
+	}
+	project := selectCopilotSDKInstallSpec(data).npm
+	return project != nil && (project.version == "" || project.version == string(constants.DefaultCopilotSDKNPMVersion))
 }
 
 func selectCopilotSDKInstallSpec(workflowData *WorkflowData) copilotSDKInstallSpec {
