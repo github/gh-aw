@@ -420,31 +420,12 @@ async function runHarnessRetryLoop(options) {
   return { exitCode: lastExitCode, attempts, lastResult };
 }
 
-/**
- * Sandboxed engines without a native retry loop still use the same invocation gate.
- * @param {{runAttempt: () => Promise<HarnessAttemptResult>, harnessName: string, log: (message: string) => void}} options
- */
-function runSingleHarnessInvocation(options) {
-  return runHarnessRetryLoop({
-    ...options,
-    maxRetries: 0,
-    initialDelayMs: 0,
-    backoffMultiplier: 1,
-    maxDelayMs: 0,
-    driverStartTime: Date.now(),
-    softTimeoutGuard: null,
-    handleFailure: () => ({ action: "stop" }),
-    telemetryPath: resolveHarnessRetryTelemetryPath(),
-  });
-}
-
 if (typeof module !== "undefined" && module.exports) {
   module.exports = {
     captureExecutionEvidenceConfiguration,
     resolveHarnessRetryTelemetryPath,
     recordStartupAttempt,
     runHarnessRetryLoop,
-    runSingleHarnessInvocation,
     runPreflightNoopCheck,
     shouldSkipForNoopSafeOutputs,
     shouldStopForNoopSafeOutputs,

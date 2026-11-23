@@ -1508,6 +1508,7 @@ jobs:
           GH_AW_MCP_CONFIG: /tmp/gh-aw/opencode-mcp.json
           GH_AW_PROMPT: /tmp/gh-aw/aw-prompts/prompt.txt
           GH_AW_SAFE_OUTPUTS: ${{ steps.set-runtime-paths.outputs.GH_AW_SAFE_OUTPUTS }}
+          GH_AW_TIMEOUT_MINUTES: 25
           GITHUB_COPILOT_BASE_URL: http://api-proxy:10002
           GITHUB_WORKSPACE: ${{ github.workspace }}
           NO_COLOR: 1

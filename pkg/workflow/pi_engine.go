@@ -608,6 +608,7 @@ func (e *PiEngine) buildPiExecutionEnv(workflowData *WorkflowData, profile unive
 		env["GH_AW_MAX_TURNS"] = compilerenv.BuildDefaultMaxTurnsExpression()
 	}
 	applyEngineCwdEnv(env, workflowData)
+	applyHarnessRetryPolicyEnv(env, workflowData)
 	e.applyPiConfigEnv(env, workflowData)
 	if workflowData.EngineConfig != nil && len(workflowData.EngineConfig.Env) > 0 {
 		maps.Copy(env, workflowData.EngineConfig.Env)
