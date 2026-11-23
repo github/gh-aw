@@ -170,6 +170,7 @@ engine:
         };
         const logEntries = [];
         const AWF_INFRA_RE = /^\[(INFO|WARN|SUCCESS|ERROR|entrypoint|health-check|cursor-harness)\]|^ (?:Container|Network|Volume) |^Process exiting with code:/;
+        let harnessFailed = false;
         const plaintext = [];
         const append = event => {
           const timestamp = event.data.timestamp_ms;
@@ -191,6 +192,7 @@ engine:
           if (!fenced && line.trimStart().startsWith("{")) {
             try { record = JSON.parse(line); } catch {}
           }
+          if (!fenced && /^\[cursor-harness\] Cursor Agent (?:download|extraction|verification|execution) failed with exit code (?:[1-9]\d*|unknown)\s*$/.test(line)) harnessFailed = true;
           return { line, index, fenced, record };
         }).filter(({ line }) => !AWF_INFRA_RE.test(line));
         // An init outside Markdown fences establishes native framing even with
@@ -296,7 +298,7 @@ engine:
           }
         }
         // Legacy text contains final-answer prose, not observable tool activity.
-        if (plaintext.some(line => line.trim())) emit(structured ? "cursor.diagnostic" : "assistant.message", { sourceEngine: "cursor", content: plaintext.join("\n") });
+        if (plaintext.some(line => line.trim())) emit(structured || harnessFailed ? "cursor.diagnostic" : "assistant.message", { sourceEngine: "cursor", content: plaintext.join("\n") });
         const toolStarts = logEntries.filter(entry => entry.type === "tool.execution_start").length;
         const markdown = `**Observed tool starts:** ${toolStarts}` + (parseErrors ? ` · **Parse errors:** ${parseErrors}` : "");
         return { markdown, logEntries, mcpFailures: [...mcpFailures], maxTurnsHit: false };
@@ -350,6 +352,8 @@ requires an initialization record outside a fence or an all-JSONL log.
 Rejected native records emit payload-free collection warnings with 1-based
 line numbers. MCP connection failures are recognized only in non-JSON native
 diagnostics, not in legacy answers or JSON-encoded assistant messages.
+Without native framing, residual output from an explicitly failed Cursor
+harness operation is retained as diagnostics rather than assistant prose.
 Sanitized regressions cover the native shapes observed in an existing
 2026.10.14-941492e conformance run. Failed-tool results and subagent events
 remain fixture-only or unverified where absent from live evidence.

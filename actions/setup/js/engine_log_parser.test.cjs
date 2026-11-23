@@ -81,6 +81,18 @@ describe("Declared custom engine log parsers", () => {
     expect(unified.some(event => event.type === "session.init")).toBe(false);
   });
 
+  it("retains failed Cursor startup output as diagnostics, not an assistant answer", () => {
+    const content = "2026.10.14-941492e\nAPI key is invalid.\n[cursor-harness] Cursor Agent execution failed with exit code 1\n";
+    const events = parseEngineSession(content, "cursor");
+    expect(events.some(event => event.type === "assistant.message")).toBe(false);
+    expect(events.filter(event => event.type === "cursor.diagnostic")).toEqual([{ type: "cursor.diagnostic", data: { sourceEngine: "cursor", content: "2026.10.14-941492e\nAPI key is invalid.\n" } }]);
+    expect(events.some(event => event.type === "session.init" || event.type.startsWith("tool."))).toBe(false);
+    const unified = mergeSessionSources([{ component: "agent", phase: "agent", path: "agent-stdio.log", events }], "cursor");
+    expect(unified.find(event => event.type === "cursor.diagnostic").data).toEqual(events[0].data);
+    expect(parseEngineSession("Assistant: The harness failed with exit code 1.\n", "cursor").some(event => event.type === "assistant.message")).toBe(true);
+    expect(parseEngineSession("Example:\n```\n[cursor-harness] Cursor Agent execution failed with exit code 1\n```\n", "cursor").some(event => event.type === "assistant.message")).toBe(true);
+  });
+
   it("does not turn arbitrary unknown plaintext into assistant output", () => {
     expect(loadEngineLogParser("../cursor")).toBeUndefined();
     expect(loadEngineLogParser("unknown-engine")).toBeUndefined();
