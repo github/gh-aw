@@ -21,7 +21,6 @@ and explicitly select its inference profile:
 engine:
   id: copilot
   model: gpt-5.2
-  model-catalog: false
   inference:
     connector: azure-ai-gateway
     profile: responses
@@ -60,9 +59,9 @@ credential is used; there is no credential fallback.
 
 Use the protocol the deployed alias supports. `engine.model` supplies Copilot
 model metadata; `engine.inference.model` is the exact approved wire alias.
-The gateway has no `/models` route, so set `engine.model-catalog: false` to pass
-`engine.model` verbatim; otherwise a model ID that is also a gh-aw alias, such as
-`gpt-5.2`, fails with `catalog_unavailable`.
+The gateway has no `/models` route, so the connector sets
+`engine.model-catalog: false` and `engine.model` is passed through verbatim
+rather than resolved as a gh-aw alias. Direct BYOK must set it explicitly.
 Native provider/auth/env overrides, routing, model fallback and Copilot SDK
 mode cannot be combined with connector inference. A threat detector that
 inherits the main engine cannot override its engine or model configuration.

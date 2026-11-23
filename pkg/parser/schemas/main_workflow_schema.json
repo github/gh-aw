@@ -15000,7 +15000,12 @@
               "path": { "type": "string", "minLength": 1, "maxLength": 2048 },
               "protocol": { "enum": ["openai-responses", "openai-chat-completions"] },
               "credential": { "$ref": "#/$defs/connectorName" },
-              "models": { "$ref": "#/$defs/connectorName" }
+              "models": { "$ref": "#/$defs/connectorName" },
+              "model-catalog": {
+                "type": "boolean",
+                "default": true,
+                "description": "Whether the provider exposes a live model catalogue (/models). False sets engine.model-catalog: false on consumers so engine.model is passed through verbatim instead of being resolved as a gh-aw alias."
+              }
             }
           }
         },

@@ -320,6 +320,9 @@ Authorization/bearer credential), and `models` (an exact resource collection
 name). Paths MUST NOT contain traversal, escaping, expressions, query or fragment.
 Protocols are `openai-responses` and `openai-chat-completions`. No arbitrary
 request templates, scripts, model discovery or inference-as-reader POSTs are added.
+An optional `model-catalog: false` declares that the provider has no `/models`
+route; the compiler then sets `engine.model-catalog: false` on the consumer, and
+an explicit consumer `engine.model-catalog: true` MUST fail.
 
 The main workflow selects one profile with
 `engine.inference: {connector: id, profile: name, model: alias}`. Names MUST be

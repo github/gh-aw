@@ -24,6 +24,8 @@ type ResolvedConnectorInference struct {
 	Selection ConnectorInferenceSelection
 	Env       map[string]string
 	Auth      *EngineAuthConfig
+	// ModelCatalogDisabled mirrors the profile's `model-catalog: false`.
+	ModelCatalogDisabled bool
 }
 
 func consumeConnectorInferenceSelection(frontmatter, registrations map[string]any) error {
@@ -106,7 +108,7 @@ func resolveConnectorInference(alias string, registration ConnectorRegistration,
 		"COPILOT_PROVIDER_BASE_URL": strings.TrimSuffix(endpoint.String(), "/") + profile.Path,
 		"COPILOT_PROVIDER_TYPE":     "openai",
 		"COPILOT_PROVIDER_MODEL_ID": selection.Model,
-	}}
+	}, ModelCatalogDisabled: profile.ModelCatalog != nil && !*profile.ModelCatalog}
 	switch profile.Protocol {
 	case "openai-responses":
 		result.Env["COPILOT_PROVIDER_WIRE_API"] = "responses"
@@ -162,6 +164,12 @@ func expandConnectorInference(frontmatter map[string]any, inference *ResolvedCon
 				}
 			}
 		}
+	}
+	if inference.ModelCatalogDisabled {
+		if enabled, ok := engine["model-catalog"].(bool); ok && enabled {
+			return errors.New("engine.model-catalog: true conflicts with a connector inference profile that has no model catalogue")
+		}
+		engine["model-catalog"] = false
 	}
 	env := connectorMap(engine, "env")
 	for key, value := range inference.Env {
