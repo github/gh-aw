@@ -42,6 +42,22 @@ func TestResolveBYOKGenAIProviderName(t *testing.T) {
 	assert.Empty(t, resolveBYOKGenAIProviderName(nil))
 }
 
+func TestResolveBYOKGenAIEndpoint(t *testing.T) {
+	assert.Empty(t, resolveBYOKGenAIEndpoint(nil))
+	assert.Empty(t, resolveBYOKGenAIEndpoint(&WorkflowData{EngineConfig: &EngineConfig{ID: "copilot", APITarget: "api.githubcopilot.com"}}))
+
+	data := &WorkflowData{
+		EngineConfig:       &EngineConfig{ID: "copilot", LLMProvider: LLMProviderOpenAI, APITarget: "copilot-gateway.example.com:8443", Env: map[string]string{"OPENAI_BASE_URL": "https://openai-gateway.example.com/v1"}},
+		NetworkPermissions: &NetworkPermissions{Firewall: &FirewallConfig{Enabled: true}},
+	}
+	assert.Equal(t, "https://openai-gateway.example.com/v1", resolveBYOKGenAIEndpoint(data))
+	data.EngineConfig.Env = map[string]string{"ANTHROPIC_BASE_URL": "${{ vars.ANTHROPIC_URL }}"}
+	data.EngineConfig.LLMProvider = LLMProviderAnthropic
+	assert.Equal(t, "${{ vars.ANTHROPIC_URL }}", resolveBYOKGenAIEndpoint(data))
+	data.EngineConfig.Env = map[string]string{"COPILOT_PROVIDER_BASE_URL": "${{ vars.GATEWAY_URL }}"}
+	assert.Equal(t, "${{ vars.GATEWAY_URL }}", resolveBYOKGenAIEndpoint(data))
+}
+
 func TestCompiledBYOKWorkflowRecordsGenAIProvider(t *testing.T) {
 	compile := func(t *testing.T, env string) string {
 		t.Helper()
@@ -59,7 +75,13 @@ engine:
 	byok := compile(t, "  env:\n    COPILOT_PROVIDER_BASE_URL: https://example.ai.gateway.azure.com/default/models/openai/v1\n")
 	assert.Contains(t, byok, `GH_AW_INFO_GENAI_PROVIDER: "azure.ai.openai"`)
 	require.Greater(t, strings.Count(byok, "GH_AW_INFO_GENAI_PROVIDER"), 1, "setup steps should carry the provider for job spans")
+	assert.Contains(t, byok, `GH_AW_INFO_GENAI_ENDPOINT: "https://example.ai.gateway.azure.com/default/models/openai/v1"`)
+	require.Greater(t, strings.Count(byok, "GH_AW_INFO_GENAI_ENDPOINT"), 1, "setup steps should carry the endpoint for job spans")
+
+	expression := compile(t, "  env:\n    COPILOT_PROVIDER_BASE_URL: ${{ vars.GATEWAY_URL }}\n")
+	assert.Contains(t, expression, `GH_AW_INFO_GENAI_ENDPOINT: "${{ vars.GATEWAY_URL }}"`)
 
 	github := compile(t, "")
 	assert.NotContains(t, github, "GH_AW_INFO_GENAI_PROVIDER")
+	assert.NotContains(t, github, "GH_AW_INFO_GENAI_ENDPOINT")
 }
