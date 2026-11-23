@@ -1,0 +1,52 @@
+{
+  "version": 1,
+  "engine": {
+    "package": "kokoro-js@1.2.1",
+    "model": "onnx-community/Kokoro-82M-v1.0-ONNX",
+    "dtype": "fp32",
+    "sampleRate": 24000
+  },
+  "personas": [
+    { "id": "host", "voice": "af_nova", "speed": 1.1 },
+    { "id": "builder", "voice": "am_eric", "speed": 1.05 }
+  ],
+  "timing": { "lead": 0.15, "sentence": 0.15, "turn": 0.35, "tail": 0.4 },
+  "encode": { "codec": "libopus", "bitrate": "32k", "application": "audio", "loudness": -16 },
+  "lexicon": {
+    "gh-aw": "G H A W",
+    "gh cao": "G H C A O",
+    "gh-proxy": "G H proxy",
+    "cli-proxy": "C L I proxy",
+    "CI/CD": "C I, C D",
+    "A/B": "A B",
+    ".NET": "dot net",
+    "micro-VM": "micro V M",
+    "SQLite": "sequel light",
+    "YAML": "yammel",
+    "OpenTelemetry": "Open Telemetry",
+    "FinOps": "Fin Ops",
+    "DevOps": "Dev Ops",
+    "IssueOps": "Issue Ops",
+    "DailyOps": "Daily Ops",
+    "ReviewOps": "Review Ops",
+    "LabelOps": "Label Ops",
+    "PMs": "P Ms",
+    "PRs": "P Rs",
+    "AW": "A W",
+    "MCP": "M C P",
+    "OIDC": "O I D C",
+    "CLI": "C L I",
+    "API": "A P I",
+    "ADR": "A D R",
+    "TLA": "T L A",
+    "TLC": "T L C",
+    "UTC": "U T C",
+    "SHA": "shah",
+    "PR": "P R",
+    "PM": "P M",
+    "CI": "C I",
+    "CD": "C D",
+    "ID": "I D",
+    "AI": "A I"
+  }
+}
