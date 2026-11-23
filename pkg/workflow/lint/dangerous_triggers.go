@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 )
 
 func DangerousTriggersRule() Rule {
@@ -24,19 +25,16 @@ func checkDangerousTriggers(ctx context.Context, input Input) ([]Diagnostic, err
 		if err := ctx.Err(); err != nil {
 			return diagnostics, err
 		}
-		if input.Workflow != nil && (name == "slash_command" || name == "command") {
-			continue
-		}
-		_, found, err := authoredTrigger(ctx, on, name)
+		triggerOn, found, err := dangerousTriggerDeclaration(ctx, input, on, name)
 		if err != nil {
 			return diagnostics, err
 		}
 		if !found {
 			continue
 		}
-		path := "on"
-		if _, mapping := on.(map[string]any); mapping {
-			path += "." + name
+		source, path, err := dangerousTriggerOrigin(ctx, input, triggerOn, name)
+		if err != nil {
+			return diagnostics, err
 		}
 		if name == "pull_request_target" {
 			acknowledged, err := targetTriggerRiskAcknowledged(ctx, input)
@@ -47,7 +45,7 @@ func checkDangerousTriggers(ctx context.Context, input Input) ([]Diagnostic, err
 				continue
 			}
 			diagnostics = append(diagnostics, Diagnostic{
-				ThreatRuleID: "CTR-008", Path: path,
+				Source: source, ThreatRuleID: "CTR-008", Path: path,
 				Message: "pull_request_target runs in the base repository context with access to secrets and potentially write-capable tokens, even for fork PRs; prefer pull_request when privileged access is unnecessary. Actor authorization and trusted checkout restrictions remain required",
 			})
 			continue
@@ -63,11 +61,88 @@ func checkDangerousTriggers(ctx context.Context, input Input) ([]Diagnostic, err
 		if filtering == "" || !untrusted {
 			continue
 		}
-		diagnostics = append(diagnostics, Diagnostic{Path: path,
-			Message: fmt.Sprintf("%s can deliver untrusted comment or review content from actors outside trusted repository roles with %s; restrict on.roles to admin, maintainer, or write, or configure tools.github.min-integrity: approved or merged. Credential access depends on the event and job configuration: keep comment text out of executable expressions and do not execute untrusted PR code with privileged credentials. Review an explicit GitHub Actions event allowlist in Evaluate mode before enforcement", name, filtering),
+		remediation := ""
+		if filtering == "GitHub integrity filtering overridden by lockdown" {
+			remediation = " Disable tools.github.lockdown before applying approved/merged filtering."
+		}
+		diagnostics = append(diagnostics, Diagnostic{Source: source, Path: path,
+			Message: fmt.Sprintf("%s admits untrusted comment or review content with %s.%s See https://github.github.com/gh-aw/reference/workflow-linters/#privileged-triggers", name, filtering, remediation),
 		})
 	}
 	return diagnostics, nil
+}
+
+func dangerousTriggerDeclaration(ctx context.Context, input Input, on any, name string) (any, bool, error) {
+	if input.Workflow != nil && (name == "slash_command" || name == "command") {
+		if input.Document == nil {
+			return nil, false, nil
+		}
+		on = input.Document.Frontmatter["on"]
+		trigger, found, err := authoredTrigger(ctx, on, name)
+		if err != nil || !found {
+			return nil, false, err
+		}
+		settings, mapped := trigger.(map[string]any)
+		strategy, configured := settings["strategy"].(string)
+		return on, mapped && configured && strings.EqualFold(strings.TrimSpace(strategy), "centralized"), nil
+	}
+	_, found, err := authoredTrigger(ctx, on, name)
+	return on, found, err
+}
+
+func dangerousTriggerOrigin(ctx context.Context, input Input, on any, name string) (ASTTargets, string, error) {
+	path := "on"
+	if _, mapping := on.(map[string]any); mapping {
+		path += "." + name
+	}
+	if input.Document == nil {
+		return ActionsAST, path, nil
+	}
+	authoredOn := input.Document.Frontmatter["on"]
+	if _, found, err := authoredTrigger(ctx, authoredOn, name); err != nil {
+		return 0, "", err
+	} else if found {
+		if _, mapping := authoredOn.(map[string]any); mapping {
+			return AWAST, "on." + name, nil
+		}
+		return AWAST, "on", nil
+	}
+	if name == "issue_comment" || name == "pull_request_review" || name == "pull_request_review_comment" {
+		for _, command := range []string{"slash_command", "command"} {
+			trigger, found, err := authoredTrigger(ctx, authoredOn, command)
+			if err != nil {
+				return 0, "", err
+			}
+			if !found {
+				continue
+			}
+			settings, mapped := trigger.(map[string]any)
+			strategy, configured := settings["strategy"].(string)
+			if mapped && configured && strings.EqualFold(strings.TrimSpace(strategy), "centralized") {
+				continue
+			}
+			events := settings["events"]
+			if events == nil {
+				events = []string{}
+			}
+			if event, scalar := events.(string); scalar {
+				events = []string{event}
+			}
+			names, err := policyStrings(ctx, events, "on."+command+".events")
+			if err != nil {
+				return 0, "", err
+			}
+			if len(names) == 0 {
+				names = []string{"issue_comment", "pull_request_review_comment"}
+			}
+			for _, event := range names {
+				if event == name || event == "*" || (event == "pull_request_comment" && name == "issue_comment") {
+					return AWAST, "on." + command, nil
+				}
+			}
+		}
+	}
+	return ActionsAST, path, nil
 }
 
 func commentTriggerAdmitsUntrustedActors(ctx context.Context, input Input) (bool, error) {
@@ -124,12 +199,23 @@ func commentIntegrityFiltering(input Input) (string, error) {
 			return "", err
 		}
 	}
-	if _, literal := tools["github"].(bool); literal {
+	switch tools["github"].(type) {
+	case bool, string:
 		return "", nil
 	}
 	github, err := policyMapping(tools["github"], "tools.github")
 	if err != nil {
 		return "", err
+	}
+	filtering := ""
+	if value, exists := github["min-integrity"]; exists {
+		switch value {
+		case "approved", "merged":
+		case "none", "unapproved":
+			filtering = "a GitHub integrity threshold that admits untrusted content"
+		default:
+			return "", errors.New("dangerous-triggers requires tools.github.min-integrity to be none, unapproved, approved, or merged")
+		}
 	}
 	if value, exists := github["lockdown"]; exists {
 		lockdown, ok := value.(bool)
@@ -137,21 +223,28 @@ func commentIntegrityFiltering(input Input) (string, error) {
 			return "", errors.New("dangerous-triggers requires tools.github.lockdown to be a boolean")
 		}
 		if lockdown {
-			return "GitHub integrity filtering overridden by lockdown", nil
+			for _, field := range []string{"allowed-repos", "repos", "min-integrity", "blocked-users", "trusted-users", "approval-labels"} {
+				value, configured := github[field]
+				if value == nil {
+					continue
+				}
+				if field == "blocked-users" || field == "trusted-users" || field == "approval-labels" {
+					switch entries := value.(type) {
+					case string:
+						configured = entries != ""
+					case []any:
+						configured = len(entries) > 0
+					case []string:
+						configured = len(entries) > 0
+					}
+				}
+				if configured {
+					return "GitHub integrity filtering overridden by lockdown", nil
+				}
+			}
 		}
 	}
-	value, exists := github["min-integrity"]
-	if !exists {
-		return "", nil
-	}
-	switch value {
-	case "approved", "merged":
-		return "", nil
-	case "none", "unapproved":
-		return "a GitHub integrity threshold that admits untrusted content", nil
-	default:
-		return "", errors.New("dangerous-triggers requires tools.github.min-integrity to be none, unapproved, approved, or merged")
-	}
+	return filtering, nil
 }
 
 func targetTriggerRiskAcknowledged(ctx context.Context, input Input) (bool, error) {

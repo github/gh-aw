@@ -191,6 +191,72 @@ Review.
 	}
 }
 
+func TestCompilerLintPullRequestTargetCompilationWithoutSourceDocument(t *testing.T) {
+	t.Parallel()
+	source := filepath.Join(t.TempDir(), "review.md")
+	require.NoError(t, os.WriteFile(source, []byte("---\non: pull_request_target\ncheckout: false\ntools: {github: false}\n---\nReview.\n"), 0o600))
+	compiler := NewCompiler(WithLint(true), WithNoEmit(true))
+	compiler.SetSkipValidation(true)
+	compiler.SetApprove(true)
+	data, err := compiler.ParseWorkflowFile(source)
+	require.NoError(t, err)
+	data.SourceDocument = nil
+	require.NoError(t, compiler.CompileWorkflowData(data, source))
+	require.Equal(t, 1, compiler.GetWarningCount(), "source-less compilation must not duplicate the emitted CTR-008 warning")
+}
+
+func TestCompilerLintDangerousTriggersDryRun(t *testing.T) {
+	t.Parallel()
+	for _, dryRun := range []bool{false, true} {
+		t.Run(fmt.Sprintf("dry-run=%t", dryRun), func(t *testing.T) {
+			dir := t.TempDir()
+			source := filepath.Join(dir, "review.md")
+			counts := make(map[string]int)
+			for _, threshold := range []string{"none", "approved"} {
+				require.NoError(t, os.WriteFile(source, []byte(`---
+on:
+  issue_comment:
+    types: [created]
+  roles: all
+checkout: false
+permissions:
+  contents: read
+  issues: read
+  pull-requests: read
+tools:
+  bash: [echo]
+  github:
+    min-integrity: `+threshold+`
+safe-outputs:
+  add-comment: {}
+  threat-detection: true
+---
+Review.
+`), 0o600))
+				compiler := NewCompiler(WithLint(true))
+				compiler.gitRoot = dir
+				compiler.SetSkipValidation(true)
+				compiler.SetDryRun(dryRun)
+				data, err := compiler.ParseWorkflowFile(source)
+				require.NoError(t, err)
+				require.NoError(t, compiler.CompileWorkflowData(data, source))
+				counts[threshold] = compiler.GetWarningCount()
+				require.Equal(t, []string{"all"}, data.Roles, "dry-run must preserve the authored policy")
+				if dryRun {
+					content, err := os.ReadFile(filepath.Join(dir, "review.lock.yml"))
+					require.NoError(t, err)
+					require.Contains(t, string(content), `GH_AW_REQUIRED_ROLES: "admin,maintainer"`, "generated admission is restricted to trusted actors")
+				}
+			}
+			warnings := 1
+			if dryRun {
+				warnings = 0
+			}
+			require.Equal(t, counts["approved"]+warnings, counts["none"], "weak-filtering warnings must reflect effective actor admission")
+		})
+	}
+}
+
 func TestCompilerLintDangerousTriggersImportedFiltering(t *testing.T) {
 	t.Parallel()
 	for _, trigger := range []string{"issue_comment", "pull_request_review_comment", "slash_command"} {
@@ -203,7 +269,7 @@ func TestCompilerLintDangerousTriggersImportedFiltering(t *testing.T) {
 				warnings := 1
 				if trigger == "slash_command" {
 					on = "on: {slash_command: review" + roles + "}\n"
-					warnings = 2
+					warnings = 2 // Commands expand to both issue_comment and pull_request_review_comment.
 				}
 				if roles == "" {
 					warnings = 0

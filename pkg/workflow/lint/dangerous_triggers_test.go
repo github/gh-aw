@@ -1,3 +1,5 @@
+//go:build !integration
+
 package lint
 
 import (
@@ -35,8 +37,13 @@ func TestDangerousTriggersIntegrityFiltering(t *testing.T) {
 		{"gateway filtering without proxy", "on: {issue_comment: null, roles: all}\ntools: {github: {min-integrity: approved, integrity-proxy: false}}\n", nil},
 		{"disabled", "on: {issue_comment: null, roles: all}\ntools: {github: false}\n", nil},
 		{"boolean enabled unknown threshold", "on: {issue_comment: null, roles: all}\ntools: {github: true}\n", nil},
+		{"string enabled unknown threshold", "on: {issue_comment: null, roles: all}\ntools: {github: default}\n", nil},
+		{"string enabled trusted roles", "on: issue_comment\ntools: {github: default}\n", nil},
 		{"null enabled unknown threshold", "on: {issue_comment: null, roles: all}\ntools: {github: null}\n", nil},
 		{"lockdown overrides", "on: {issue_comment: null, roles: all}\ntools: {github: {min-integrity: approved, lockdown: true}}\n", []string{"on.issue_comment"}},
+		{"bare lockdown unknown threshold", "on: {issue_comment: null, roles: all}\ntools: {github: {lockdown: true}}\n", nil},
+		{"empty lockdown guards unknown threshold", "on: {issue_comment: null, roles: all}\ntools: {github: {blocked-users: [], trusted-users: '', approval-labels: [], allowed-repos: null, lockdown: true}}\n", nil},
+		{"lockdown overrides other guard fields", "on: {issue_comment: null, roles: all}\ntools: {github: {blocked-users: [spam], lockdown: true}}\n", []string{"on.issue_comment"}},
 		{"lockdown trusted roles", "on: issue_comment\ntools: {github: {min-integrity: approved, lockdown: true}}\n", nil},
 		{"lockdown false", "on: {issue_comment: null, roles: all}\ntools: {github: {min-integrity: approved, lockdown: false}}\n", nil},
 		{"roles gate weak filtering", "on: {issue_comment: null, roles: [write]}\ntools: {github: {min-integrity: none}}\n", nil},
@@ -118,9 +125,12 @@ func TestDangerousTriggersMalformedPolicyAndCancellation(t *testing.T) {
 	require.NoError(t, err)
 	for _, policy := range []string{
 		"tools: PRIVATE_VALUE",
-		"tools: {github: PRIVATE_VALUE}",
+		"tools: {github: [PRIVATE_VALUE]}",
 		"tools: {github: {min-integrity: PRIVATE_VALUE}}",
 		"tools: {github: {min-integrity: [PRIVATE_VALUE]}}",
+		"tools: {github: {min-integrity: PRIVATE_VALUE, lockdown: true}}",
+		"tools: {github: {min-integrity: [PRIVATE_VALUE], lockdown: true}}",
+		"tools: {github: {min-integrity: null, lockdown: true}}",
 		"tools: {github: {lockdown: PRIVATE_VALUE}}",
 	} {
 		input := ruleContractInput(t, "on: issue_comment\n"+policy+"\n", AWAST, false)
@@ -142,4 +152,68 @@ func TestDangerousTriggersMalformedPolicyAndCancellation(t *testing.T) {
 	cancel()
 	_, err = runner.Run(ctx, input)
 	require.ErrorIs(t, err, context.Canceled)
+}
+
+func TestDangerousTriggersAuthoredOrigins(t *testing.T) {
+	t.Parallel()
+	for _, tt := range []struct {
+		name, authored, graph, path string
+		source                      ASTTargets
+	}{
+		{"centralized slash", "slash_command: {name: review, strategy: centralized}", "workflow_dispatch: null", "on.slash_command", AWAST},
+		{"centralized legacy command", "command: {name: review, strategy: centralized}", "workflow_dispatch: null", "on.command", AWAST},
+		{"inline slash", "slash_command: review", "issue_comment: null", "on.slash_command", AWAST},
+		{"inline legacy command", "command: review", "pull_request_review_comment: null", "on.command", AWAST},
+		{"inline PR comment alias", "slash_command: {name: review, events: [pull_request_comment]}", "issue_comment: null", "on.slash_command", AWAST},
+		{"authored review", "pull_request_review: null", "pull_request_review: null", "on.pull_request_review", AWAST},
+		{"authored target", "pull_request_target: null", "pull_request_target: null", "on.pull_request_target", AWAST},
+		{"graph only", "workflow_dispatch: null", "issue_comment: null", "on.issue_comment", ActionsAST},
+		{"default command unrelated review", "slash_command: review", "pull_request_review: null", "on.pull_request_review", ActionsAST},
+		{"empty command events unrelated review", "command: {name: review, events: []}", "pull_request_review: null", "on.pull_request_review", ActionsAST},
+		{"unrelated command event", "slash_command: {name: review, events: [issues]}", "pull_request_review: null", "on.pull_request_review", ActionsAST},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			for _, suppressed := range []bool{false, true} {
+				ignore := ""
+				if suppressed {
+					ignore = "  # gh-aw: ignore[dangerous-triggers] -- Reviewed this authored entry point.\n"
+				}
+				input := ruleContractInput(t, "on:\n"+ignore+"  "+tt.authored+"\n  roles: all\ntools: {github: {min-integrity: none}}\n", AWAST, false)
+				graph, err := actions.Parse([]byte("on: {" + tt.graph + "}\n" + contractJob + contractSafeSteps))
+				require.NoError(t, err)
+				input.Workflow = graph
+				runner, err := Default().Select("dangerous-triggers")
+				require.NoError(t, err)
+				diagnostics, err := runner.Run(context.Background(), input)
+				require.NoError(t, err)
+				if suppressed && tt.source == AWAST {
+					require.Empty(t, diagnostics)
+				} else {
+					require.Len(t, diagnostics, 1, "inline expansions must not add a second shorthand finding")
+					assert.Equal(t, tt.path, diagnostics[0].Path)
+					assert.Equal(t, tt.source, diagnostics[0].Source)
+				}
+			}
+		})
+	}
+	input := ruleContractInput(t, "on: pull_request_target\ntools: {github: {min-integrity: none}}\n", AWAST, false)
+	graph, err := actions.Parse([]byte("on: {pull_request_target: null}\n" + contractJob + contractSafeSteps))
+	require.NoError(t, err)
+	input.Workflow = graph
+	diagnostics, err := checkDangerousTriggers(context.Background(), input)
+	require.NoError(t, err)
+	require.Len(t, diagnostics, 1)
+	assert.Equal(t, "on", diagnostics[0].Path, "scalar authored trigger keeps its suppression path")
+	assert.Equal(t, AWAST, diagnostics[0].Source)
+}
+
+func TestDangerousTriggersDiagnosticRemediation(t *testing.T) {
+	t.Parallel()
+	input := ruleContractInput(t, "on: {issue_comment: null, roles: all}\ntools: {github: {min-integrity: approved, lockdown: true}}\n", AWAST, false)
+	diagnostics, err := checkDangerousTriggers(context.Background(), input)
+	require.NoError(t, err)
+	require.Len(t, diagnostics, 1)
+	assert.Contains(t, diagnostics[0].Message, "Disable tools.github.lockdown before applying approved/merged filtering")
+	assert.Contains(t, diagnostics[0].Message, "/reference/workflow-linters/#privileged-triggers")
+	assert.Less(t, len(diagnostics[0].Message), 350)
 }

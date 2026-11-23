@@ -24,13 +24,14 @@ The decision prioritizes actionable warnings over trigger-only noise without cla
 Add the default lint rule `dangerous-triggers` as an advisory check, not an authorization mechanism. It covers CTR-039 comment-input risk and the separate CTR-008 target-trigger risk, has Warning severity, and targets both Actions and AW ASTs. The AW comment, review, and slash-command input warning requires both conditions:
 
 1. **Actor admission is broadened.** The effective `on.roles` contains `all`, `read`, or `triage`. The protected defaults (`admin`, `maintainer`, `write`) and explicit trusted-only roles, including `maintain`, do not warn.
-2. **Integrity filtering is weak.** GitHub tools are enabled and `tools.github.min-integrity` is `none` or `unapproved`, or enabled GitHub tools use `tools.github.lockdown: true`, which overrides the guard policy. Without that override, explicit `approved` or `merged` filtering suppresses the comment-input warning. Disabled GitHub tools suppress it regardless of policy; missing or unknown thresholds alone do not produce it.
+2. **Integrity filtering is weak.** GitHub tools are enabled and `tools.github.min-integrity` is `none` or `unapproved`, or `tools.github.lockdown: true` overrides configured guard-policy fields. Explicit thresholds are validated before considering lockdown. Without that override, explicit `approved` or `merged` filtering suppresses the comment-input warning. Disabled GitHub tools suppress it; missing or unknown thresholds, string GitHub shorthand, and bare lockdown without configured guard fields do not establish weak filtering. Lockdown must be disabled before approved/merged filtering takes effect as remediation. `integrity-proxy: false` does not bypass gateway filtering.
 
 Related decisions:
 
-- Compiler lint evaluates effective roles and resolved tools, including imports. Standalone `gh aw lint` uses authored values and does not resolve imports.
+- Compiler lint evaluates effective roles and resolved tools, including imports. Dry-run retains only authored `admin`, `maintainer`, or `maintain` roles, defaulting to `admin`, `maintainer` when none remain; compiler lint uses those restricted roles. Standalone `gh aw lint` uses authored values and does not resolve imports.
+- Authored centralized commands remain analyzed alongside generated dispatch graphs without duplicate inline-command findings. AW-backed findings use AW origin paths so authored ignores apply in compilation and companion locks; graph-only findings remain Actions-owned.
 - `pull_request_target` keeps its separate CTR-008 target-trigger warning, independent of actor admission and GitHub tool filtering. Only literal AW `on.pull_request_target.acknowledge-risk: true` suppresses that lint warning; it does not suppress comment-input warnings or existing validator checks. Compiler lint avoids duplicating an equivalent CTR-008 validator warning only when that warning was actually emitted, not merely because strict mode is enabled.
-- The new rule emits warnings only, including in strict mode. Existing validator behavior is preserved. Generated workflow behavior, permissions, and runtime authorization are unchanged. Specification version 1.0.109 and the changelog document CTR-039 and T-CTR-054.
+- The new rule emits warnings only, including in strict mode. Existing validator behavior is preserved. Generated workflow behavior, permissions, and runtime authorization are unchanged. Specification version 1.0.108 and its single unreleased changelog entry document CTR-039, T-CTR-054, and the review refinements.
 
 ## Alternatives Considered
 
@@ -61,7 +62,7 @@ Related decisions:
 
 The previously verified public corpus contained 26 authored sources and 26 generated locks across six repositories. Static checks did not execute workflows or resolve imports. Findings fell from eight to zero after actor-role and unknown-policy refinement; this supports reduced false-positive noise in that sample, not universal safety. Discovery was capped and had 30 metadata-access gaps, so the sample is not an exhaustive ranking or prevalence estimate.
 
-Previously reported local build, lint, schema, and impacted-test checks passed. The final repository gate remained blocked by unrelated workflow-lock drift. Neither that partial result nor the corpus check establishes a complete full-gate pass or live/runtime validation.
+Previously reported local build, lint, schema, and impacted-test checks passed. At that earlier revision, the repository gate remained blocked by unrelated workflow-lock drift. That historical result is not the validation status of the current revision; neither it nor the corpus check establishes live/runtime validation.
 
 ## References
 

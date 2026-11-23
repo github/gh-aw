@@ -11,9 +11,11 @@ import (
 	"path/filepath"
 	"runtime"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/github/gh-aw/pkg/testutil"
+	"github.com/github/gh-aw/pkg/workflow"
 	workflowlint "github.com/github/gh-aw/pkg/workflow/lint"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -315,6 +317,105 @@ func TestDangerousTriggersIntegrityCLI(t *testing.T) {
 				})
 			}
 		}
+	}
+}
+
+func TestDangerousTriggersSourceAndCompanionCLI(t *testing.T) {
+	t.Parallel()
+	for _, tt := range []struct {
+		name, trigger, graph, github, path string
+	}{
+		{"comment", "issue_comment: null", "issue_comment: null", "{min-integrity: none}", "on.issue_comment"},
+		{"review", "pull_request_review: null", "pull_request_review: null", "{min-integrity: none}", "on.pull_request_review"},
+		{"target", "pull_request_target: null", "pull_request_target: null", "default", "on.pull_request_target"},
+		{"inline command", "slash_command: {name: review, events: [issue_comment]}", "issue_comment: null", "{min-integrity: none}", "on.slash_command"},
+		{"centralized command", "slash_command: {name: review, strategy: centralized}", "workflow_dispatch: null", "{min-integrity: none}", "on.slash_command"},
+		{"legacy centralized command", "command: {name: review, strategy: centralized}", "workflow_dispatch: null", "{min-integrity: none}", "on.command"},
+		{"string shorthand", "issue_comment: null", "issue_comment: null", "default", ""},
+		{"bare lockdown", "issue_comment: null", "issue_comment: null", "{lockdown: true}", ""},
+		{"lockdown override", "issue_comment: null", "issue_comment: null", "{lockdown: true, min-integrity: merged}", "on.issue_comment"},
+	} {
+		for _, suppressed := range []bool{false, true} {
+			suffix := ""
+			if suppressed {
+				suffix = "/ignored"
+			}
+			for _, extension := range []string{".md", ".lock.yml"} {
+				t.Run(tt.name+"/"+extension+suffix, func(t *testing.T) {
+					dir := t.TempDir()
+					ignore := ""
+					if suppressed {
+						ignore = "  # gh-aw: ignore[dangerous-triggers] -- Reviewed this authored entry point.\n"
+					}
+					source := "---\non:\n" + ignore + "  " + tt.trigger + "\n  roles: all\ntools: {github: " + tt.github + "}\n---\nReview.\n"
+					authored := filepath.Join(dir, "test.md")
+					require.NoError(t, os.WriteFile(authored, []byte(source), 0o600))
+					file := filepath.Join(dir, "test"+extension)
+					if extension == ".lock.yml" {
+						require.NoError(t, os.WriteFile(file, []byte("on: {"+tt.graph+"}\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps: [{run: echo safe}]\n"), 0o600))
+					}
+					cmd := NewLintCommand()
+					var output bytes.Buffer
+					cmd.SetOut(&output)
+					cmd.SetErr(&output)
+					cmd.SetArgs([]string{"--rules=dangerous-triggers", "--json", file})
+					require.NoError(t, cmd.Execute())
+					var diagnostics []workflowLintDiagnostic
+					require.NoError(t, json.NewDecoder(&output).Decode(&diagnostics))
+					if suppressed || tt.path == "" {
+						require.Empty(t, diagnostics)
+					} else {
+						require.Len(t, diagnostics, 1)
+						assert.Equal(t, tt.path, diagnostics[0].Path)
+						assert.Equal(t, file, diagnostics[0].File)
+					}
+				})
+			}
+		}
+	}
+}
+
+func TestDangerousTriggersCompiledCentralizedCommand(t *testing.T) {
+	for _, suppressed := range []bool{false, true} {
+		name := "warning"
+		if suppressed {
+			name = "ignored"
+		}
+		t.Run(name, func(t *testing.T) {
+			dir := t.TempDir()
+			path := filepath.Join(dir, "test.md")
+			ignore := ""
+			if suppressed {
+				ignore = "  # gh-aw: ignore[dangerous-triggers] -- Reviewed command admission.\n"
+			}
+			source := "---\nstrict: false\non:\n" + ignore + "  slash_command: {name: review, strategy: centralized}\n  roles: all\ntools: {github: {min-integrity: none}}\n---\nReview.\n"
+			require.NoError(t, os.WriteFile(path, []byte(source), 0o600))
+			compiler := workflow.NewCompiler(workflow.WithLint(true))
+			var compileErr error
+			stderr := testutil.CaptureStderr(t, func() { compileErr = compiler.CompileWorkflow(path) })
+			require.NoError(t, compileErr)
+			assert.Equal(t, !suppressed, strings.Contains(stderr, "CTR-039:"), stderr)
+			lock := filepath.Join(dir, "test.lock.yml")
+			content, err := os.ReadFile(lock)
+			require.NoError(t, err)
+			assert.Contains(t, string(content), "workflow_dispatch:")
+			assert.NotContains(t, string(content), "issue_comment:")
+			cmd := NewLintCommand()
+			var output bytes.Buffer
+			cmd.SetOut(&output)
+			cmd.SetErr(&output)
+			cmd.SetArgs([]string{"--rules=dangerous-triggers", "--json", lock})
+			require.NoError(t, cmd.Execute())
+			var diagnostics []workflowLintDiagnostic
+			require.NoError(t, json.NewDecoder(&output).Decode(&diagnostics))
+			if suppressed {
+				require.Empty(t, diagnostics)
+			} else {
+				require.Len(t, diagnostics, 1)
+				assert.Equal(t, "on.slash_command", diagnostics[0].Path)
+				assert.Equal(t, lock, diagnostics[0].File)
+			}
+		})
 	}
 }
 
