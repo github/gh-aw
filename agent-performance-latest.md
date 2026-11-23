@@ -1,4 +1,9 @@
-# Agent Performance Analyzer - Latest Run (2026-11-21)
+# Agent Performance Analyzer - Latest Run (2026-11-23)
+
+## 2026-11-23 run (noop)
+- Data basis: unchanged. Last complete scored snapshot is `metrics/daily/2026-11-17.json`. `metrics/daily/2026-11-23.json` is partial (2.9h coverage, 2026-11-22T02:41Z to 2026-11-23T02:49Z; log collection hit the 60s deadline after 40 runs). `daily/2026-11-22.json` and `latest.json` are also partial and not scored.
+- No new verified finding. Weekly discussion was filed 2026-11-22 and the next is due 2026-11-29, so none is due today.
+- Decision: noop. No new issue or discussion, since the open items (expires:1d maintainer decision, DGTP budget, ai-moderator timeout) are already on record.
 
 ## 2026-11-21 run (noop)
 - Data basis: unchanged. Last complete scored snapshot is `metrics/daily/2026-11-17.json` (368 workflows, 618 executed, 78.0% success, 195 primary outputs, 88.35M tokens). 11-18, 11-19, 11-20 and `latest.json` (window 11-19 to 11-20) are partial and not scored.
