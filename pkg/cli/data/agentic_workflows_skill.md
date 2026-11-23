@@ -34,7 +34,7 @@ After loading the matching workflow prompt or skill, follow it directly:
 - Design workflows from scratch via interview: `.github/aw/designer.md`
 - Create new workflows: `.github/aw/create-agentic-workflow.md`
 - Configure scheduled dreaming or consolidate persistent memory: `.github/aw/create-agentic-workflow.md`, then `.github/aw/memory.md#scheduled-dreaming`; load `.github/aw/dreaming.md` only when the decision and input scope justify implementation
-- Choose harness and inference: `.github/aw/agentic-engine.md`
+- Select engine and inference: `.github/aw/agentic-engine.md`
 - Define a custom engine: `.github/aw/custom-declarative-agentic-engine.md`
 - Consume, author, or document third-party connectors: `.github/aw/connectors.md`
 - Create a new connector: `.github/aw/connectors.md#author-or-extend-a-declaration`, then the repository's `.github/skills/create-connector/SKILL.md` when available

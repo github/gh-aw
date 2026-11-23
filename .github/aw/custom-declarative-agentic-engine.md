@@ -6,7 +6,7 @@ description: Author or maintain a reusable declarative engine definition, includ
 
 Use this guide to add or edit a reusable `engine.behaviors` definition, not to
 set the engine, provider, or model in a consuming workflow. For those choices,
-use [Choose a Harness and Inference](agentic-engine.md).
+use [Choose an Agentic Engine and Inference](agentic-engine.md).
 
 Add a definition only if selection found no compatible engine and implementation
 was requested. Use the installed `gh aw` extension; do not assume a gh-aw source

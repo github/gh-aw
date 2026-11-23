@@ -1,12 +1,12 @@
 ---
-description: Select an existing workflow harness, inference provider, and model or routing policy.
+description: Select an existing agentic engine, inference provider, and model or routing policy.
 ---
 
-# Choose a Harness and Inference
+# Choose an Agentic Engine and Inference
 
-Decide separately: **harness** (`engine` or `engine.id`), **provider**, and
+Decide separately: **agentic engine** (`engine` or `engine.id`), **provider**, and
 **model or routing policy**. Verify the combination can run with approved credentials
-and data handling. Preserve harness and inference on unrelated updates; revisit
+and data handling. Preserve engine and inference on unrelated updates; revisit
 only requested or newly incompatible settings. Stop if required guidance is
 unavailable.
 
@@ -18,15 +18,15 @@ unavailable.
   scripts; read relevant non-secret fields only. Do not execute scripts, install
   tools, or inspect home directories, credentials, sessions, or unrelated repos.
 
-| Harness | Project signals (confirm active use) |
+| Agentic engine | Project signals (confirm active use) |
 |---|---|
 | `copilot` | `.github/copilot-instructions.md`, `.github/instructions/`, dev scripts invoking `copilot` |
 | `claude` | `CLAUDE.md`, `.claude/`, dev scripts invoking `claude` |
 | `codex` | `.codex/`, dev scripts invoking `codex` |
 | `pi` | `.pi/` settings, extensions or skills, dev scripts invoking `pi` |
-| Other | Harness-specific rules, CLI dependencies, dev scripts |
+| Other | Engine-specific rules, CLI dependencies, dev scripts |
 
-- Treat `AGENTS.md` and `.agents/skills/` as shared, not harness evidence.
+- Treat `AGENTS.md` and `.agents/skills/` as shared, not engine evidence.
   Do not infer preference from model names, provider credentials, current assistant,
   installed binaries, generated locks, vendored code, or examples.
 - Compare frontmatter and relevant imports of up to three similar
@@ -36,7 +36,7 @@ unavailable.
   none match. Existing settings suggest candidates, not developer preference,
   provider approval, or live access. See [examples](#examples).
 
-## 2. Select the harness
+## 2. Select the agentic engine
 
 Filter by task requirements first. Prefer corroborated active usage over
 filenames; break ties by task conventions and existing skills. Mark ambiguity;
@@ -48,11 +48,11 @@ Check [engine syntax](syntax-engine.md) and [skills/plugins](skills.md) for
 required native instructions, skills, plugins, tools, and transports. Shared
 skill format does not imply identical behavior. `lsp:` and `engine.agent`
 require Copilot. Pi lacks `plugins:`. Codex cannot enforce nonempty Bash command
-allowlists: disable Bash if feasible or choose another harness. Never weaken
+allowlists: disable Bash if feasible or choose another engine. Never weaken
 required security controls.
 
 Verify built-in IDs in the engine syntax reference; no import is needed.
-For import-based harnesses, verify the ID and required import in
+For import-based engines, verify the ID and required import in
 [engines.json](engines.json). Never invent IDs or capabilities. If no compatible
 definition exists, [define a custom engine](custom-declarative-agentic-engine.md)
 only on explicit request.
@@ -70,9 +70,9 @@ only on explicit request.
   inventory. Matches hint at setup, not access. If listing fails, mark
   availability unknown; do not seek broader access.
 - With no clearer choice, prefer GitHub Copilot inference via
-  `permissions.copilot-requests: write` if the harness supports it and the
+  `permissions.copilot-requests: write` if the engine supports it and the
   organization-owned repo has centralized Copilot billing and Actions token
-  access. No PAT or Copilot harness required. Personal repos are ineligible.
+  access. No PAT or Copilot engine required. Personal repos are ineligible.
   Otherwise omit the permission; use approved inference, including
   `COPILOT_GITHUB_TOKEN` only if PAT-based auth is approved. See
   [authentication](https://github.github.com/gh-aw/reference/auth/#copilot-requests-write-permission).
@@ -82,10 +82,10 @@ only on explicit request.
 
 ## 4. Report, record, verify
 
-Report harness ID, provider, model or routing, auth mode, evidence/confidence, skill
+Report engine ID, provider, model or routing, auth mode, evidence/confidence, skill
 compatibility, and exceptions. For recommendations, propose a preference entry
 without writing. During authorized setup or authoring, update only the engine
-section of repository-root `preferences.md`: developer harness, selected ID,
+section of repository-root `preferences.md`: developer's preferred engine, selected ID,
 basis (explicit, inferred, or Pi fallback), evidence paths, confirmed inference
 preferences, selected inference, and exceptions or uncertainty. Separate durable
 preferences from task overrides. Store no credentials, personal information,
@@ -93,14 +93,14 @@ or session data. Never persist preferences from a running workflow or bypass
 safe outputs.
 
 For implementation, follow creator/updater safety and compile rules. Verify
-explicit harness for new workflows, inference configuration, and imports.
+explicit engine for new workflows, inference configuration, and imports.
 Compilation neither proves live access nor authorizes a run.
 
 <!-- instruction-prefix-end -->
 
 ## Examples
 
-Same harness, different inference:
+Same engine, different inference:
 [Auto Triage Issues](../workflows/auto-triage-issues.md) uses Codex with GitHub;
 [Daily Cache Strategy Analyzer](../workflows/daily-cache-strategy-analyzer.md)
 uses Codex with OpenAI.

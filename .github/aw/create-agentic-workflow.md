@@ -20,7 +20,7 @@ Read these required references in order before designing:
 6. [Safe outputs](safe-outputs.md)
 7. [Schema index](syntax.md)
 8. [MCP CLIs](mcp-clis.md)
-9. [Choose a harness and inference](agentic-engine.md)
+9. [Choose an agentic engine and inference](agentic-engine.md)
 
 If any required reference is missing or unreadable, stop and report its path;
 do not infer its guidance. In a proposed workflow, use `report_incomplete` when

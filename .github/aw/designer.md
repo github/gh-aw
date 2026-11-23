@@ -19,7 +19,7 @@ Before tool selection, apply the
 success criteria and repository scripts/tests. Infer browser needs without a
 mandatory extra interview question; include supporting lifecycle permissions.
 
-For harness and inference, use the [decision guide](agentic-engine.md).
+For engine and inference selection, use the [decision guide](agentic-engine.md).
 
 Follow the [interview](#interview-framework), [decision mappings](#decision-heuristics),
 and [confirmation](#confirmation-format) before the [generation template](#generation-template).
@@ -126,7 +126,7 @@ Map to:
 - `secrets:` / `env:` wiring for integration tokens
 - GHES/GHEC settings such as `engine.api-target` and `aw.json` `ghes: true` (when applicable)
 
-### Phase 7: Harness and inference
+### Phase 7: Agentic engine and inference
 
 Carry both decisions into the confirmation. Record preferences only during
 authorized generation.
@@ -176,7 +176,7 @@ Use this exact structure:
 📋 Proposed workflow:
 - Name: <workflow-id>
 - Trigger: <event + key options>
-- Harness: <selected engine ID>
+- Agentic engine: <selected engine ID>
 - Inference: <provider, model or routing policy, and authentication mode>
 - Tools: <tool summary>
 - Safe outputs: <list or none>
@@ -207,7 +207,7 @@ permissions:
   pull-requests: read
   # copilot-requests: write  # Only for confirmed organization-billed Copilot inference
 engine:
-  id: <selected harness>
+  id: <selected engine ID>
   # model-provider: <selected provider, only when supported and needed>
 # model: <selected model or routing policy, if explicitly configured>
 tools:
@@ -265,7 +265,7 @@ Before final output, run this internal self-check:
 - [ ] `intent:` is a concise outcome, and the selected architecture follows the augmented IntentSpec
 - [ ] Prompt instructs agent to call `noop` when no action is needed
 - [ ] Prompt states applicability, required effects, and inverse/no-op conditions
-- [ ] Selected harness is explicit; inference settings match the confirmed plan
+- [ ] Selected engine is explicit; inference settings match the confirmed plan
 - [ ] If reading GitHub data, `steps:` pre-fetches compact JSON (DataOps)
 - [ ] `tools.github.mode` is `gh-proxy` unless broader MCP toolsets are explicitly needed
 - [ ] Only required toolsets are listed (avoid blanket toolset lists)

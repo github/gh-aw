@@ -6,7 +6,7 @@ description: `engine:` frontmatter field detail for GitHub Agentic Workflows.
 
 See [syntax-agentic.md](syntax-agentic.md) for the full frontmatter field index.
 
-For selection policy, use [Choose a Harness and Inference](agentic-engine.md).
+For selection policy, use [Choose an Agentic Engine and Inference](agentic-engine.md).
 Before configuring engine fields, load the relevant entries in the
 [field reference](#field-reference), including capability and security limits.
 
