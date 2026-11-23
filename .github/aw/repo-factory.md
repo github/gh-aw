@@ -20,9 +20,8 @@ inferred goals: mission, tech, success criteria, risks, priorities, automation
 and security/compatibility/performance/cost/maintenance limits. Base choices on
 this profile. In `auto`, infer conservatively. Reuse workflows.
 
-Load [creation guidance](create-agentic-workflow.md), required references,
-any target `.github/aw/instructions.md`, and the
-[operating guide](../../docs/src/content/docs/guides/repo-factory.md).
+Load [creation guidance](create-agentic-workflow.md), its required references,
+and any target `.github/aw/instructions.md`.
 Factory mode and portfolio scope take precedence; retain the creation guide's
 design, safety and validation rules. Update `source:` workflows only via approved
 paths. Avoid duplicates/imports.
@@ -74,7 +73,7 @@ mandatory within Researchers.
   bypassing protections or capacity.
 
 Lifecycle: Researchers → issues → Dispatcher → coding agents → PRs → Reviewers →
-Finisher. Separate selection from execution. Weekdays gate new coding; CI, reviews
+Finisher. Separate selection from execution. Weekdays UTC gate new coding; CI, reviews
 and repairs to existing sessions remain active on weekends.
 
 Count reservations, assignments, native runs and open coding PRs (drafts included)
@@ -82,7 +81,8 @@ once per work item. Require an authorized metadata-only check with complete
 producer visibility (including fork PRs) and pagination; keep agent integrity
 unchanged. Pause admission if capacity or required CI is unknown. Serialize
 admissions and repairs in one shared workflow-level group with
-`cancel-in-progress: false` and `queue: max`. Recheck capacity there. Keep trusted
+`cancel-in-progress: false` and `queue: max` through safe-output completion.
+Recheck capacity there. Keep trusted
 reservations until verified termination or PR reconciliation. Cancellation does
 not prove remote work stopped. Deduplicate by issue key or PR SHA/feedback key;
 one repair per unchanged key, two rounds max, then escalate. Prompt/output
@@ -97,9 +97,8 @@ abandonment only when IDs support attribution. Prefer structured deterministic
 groups; use semantic clustering only when needed. Read prior experiments first;
 missing evidence is unknown, not zero or success.
 
-Follow [analysis](analyzing-runs.md), [optimization](../../optimize.md),
-[debugging](../../debug.md), [debugging reference](https://github.github.com/gh-aw/troubleshooting/debugging/),
-[audits](https://github.github.com/gh-aw/reference/audit/),
+Follow [analysis and audits](analyzing-runs.md),
+[optimization](optimize-agentic-workflow.md), [debugging](debug-agentic-workflow.md),
 [experiments](experiments.md), [evals](evals.md), [graders](../skills/operational-value-designer/SKILL.md),
 and [trace queries](../skills/otel-queries/SKILL.md).
 CLI: `gh aw health`, `gh aw audit <base> <compare>...`.
