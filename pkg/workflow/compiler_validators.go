@@ -319,6 +319,10 @@ func (c *Compiler) validateCoreToolConfiguration(workflowData *WorkflowData, mar
 		fmt.Fprintln(os.Stderr, formatCompilerMessage(markdownPath, "warning", err.Error()))
 		c.IncrementWarningCount()
 	}
+	workflowLog.Printf("Validating BYOK provider host firewall coverage")
+	if err := c.validateBYOKProviderHostAllowlist(workflowData, markdownPath); err != nil {
+		return err
+	}
 	workflowLog.Printf("Validating cross-repo checkout paths")
 	c.deriveAndWarnCrossRepoCheckoutPaths(workflowData.CheckoutConfigs, markdownPath)
 	c.warnCheckoutRefWithSteps(workflowData, markdownPath)
