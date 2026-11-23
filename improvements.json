@@ -1,5 +1,5 @@
 {
-  "last_updated": "2026-11-22",
+  "last_updated": "2026-11-23",
   "pending_tasks": [
     {
       "file": "docs/src/content/docs/reference/workflow-linters.md",
@@ -11,7 +11,7 @@
       "file": ".github/workflows/smoke-agent-public-approved.md",
       "created": "2026-11-18",
       "status": "pending",
-      "issue": "run-success (line 61) claims 'Issue assigned' but also fires on the noop no-match path; use neutral wording. Recompile to regenerate the lock file (derived, not hand-edited)"
+      "issue": "run-success (line 61) claims 'Issue assigned' but also fires on the noop no-match path; use neutral wording. Recompile to regenerate the lock file (derived, not hand-edited). Mechanism confirmed 2026-11-23 at actions/setup/js/notify_comment_error.cjs:291-295, where the success branch keys off the agent conclusion only"
     },
     {
       "file": "pkg/workflow/model_costs_pricing_validation.go",
@@ -58,8 +58,8 @@
     {
       "file": "cmd/gh-aw/main.go",
       "created": "2026-11-11",
-      "status": "pending",
-      "issue": "Root 'Common Tasks' help (lines 92-103) mixes tab and space padding; the doctor row's '#' lands at column 48 while others land at column 40"
+      "status": "completed",
+      "issue": "Root 'Common Tasks' help (lines 92-103) mixes tab and space padding; the doctor row's '#' lands at column 48 while others land at column 40. Resolved: all '#' columns align in cmd/gh-aw/main.go lines 93-101 (verified 2026-11-23)"
     },
     {
       "file": "docs/src/content/docs/reference/workflow-structure.md",
@@ -132,6 +132,36 @@
       "created": "2026-11-22",
       "status": "pending",
       "issue": "Owner mismatch: frontmatter and safe-output target use github/gh-aw-side-repo (lines 31, 55, 61) while prompt body uses githubnext/gh-aw-side-repo (lines 76, 98, 100). Canonical owner unverified (gh repo view failed for both). Confirm before editing. Sibling smoke-create-cross-repo-pr.md has the same mix."
+    },
+    {
+      "file": "docs/src/content/docs/reference/copilot-cloud-agent.mdx",
+      "created": "2026-11-23",
+      "status": "pending",
+      "issue": "Lines 15 and 99 say both safe outputs require a fine-grained PAT; the PAT section (lines 117-135) documents classic PATs as valid. Proposed as Task 1 in the 2026-11-23 discussion. Confirm classic PAT support before editing"
+    },
+    {
+      "file": ".github/workflows/spec-librarian.md",
+      "created": "2026-11-23",
+      "status": "pending",
+      "issue": "run-success (line 50) Report delivered! fires on the noop path; run-failure (line 48) repeats failed because {status} defaults to failed. Proposed as Task 2 in the 2026-11-23 discussion. Recompile to regenerate the lock file (derived)"
+    },
+    {
+      "file": ".github/workflows/cloclo.md",
+      "created": "2026-11-23",
+      "status": "pending",
+      "issue": "run-success (line 63) claims a stunning performance but fires on the noop path (dispatched issue not open); run-failure (line 64) repeats run_url twice. Persona is intentional; the French run-started phrase (line 62) is unexplained to enterprise readers. Maintainer call"
+    },
+    {
+      "file": "docs/src/content/docs/patterns/spec-ops.md",
+      "created": "2026-11-23",
+      "status": "pending",
+      "issue": "Line 22 is one ~200-word paragraph; split into bullets. The mermaid diagram above line 14 omits the compliance-test refresh step described under How SpecOps Works"
+    },
+    {
+      "file": "cmd/gh-aw/main.go",
+      "created": "2026-11-23",
+      "status": "pending",
+      "issue": "compile --dry-run flag help (line 882) is about 90 words on one line; keep a one-line summary and move scanner and dispatch rules to docs"
     }
   ]
 }

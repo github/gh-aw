@@ -1,0 +1,68 @@
+{
+  "date": "2026-11-23",
+  "run_id": "45197022211",
+  "files_analyzed": {
+    "documentation": [
+      "docs/src/content/docs/reference/copilot-cloud-agent.mdx",
+      "docs/src/content/docs/patterns/spec-ops.md"
+    ],
+    "cli": [
+      "gh aw (main help)",
+      "gh aw compile",
+      "gh aw run"
+    ],
+    "messages": [
+      ".github/workflows/spec-librarian.md",
+      ".github/workflows/cloclo.md"
+    ],
+    "validation": [
+      "pkg/workflow/safe_outputs_allowed_labels_validation.go (test: pkg/workflow/safe_outputs_allowed_labels_validation_test.go)"
+    ]
+  },
+  "overall_quality": "needs-work",
+  "quality_highlights": [
+    "CTR-015 compile error names the rule ID, field path, effect, and replacement patterns in one message",
+    "gh aw Common Tasks block: the # comment column is aligned in source (prior pending item closed)"
+  ],
+  "single_file_improvements": [
+    {
+      "file": "docs/src/content/docs/reference/copilot-cloud-agent.mdx",
+      "priority": "high",
+      "issue": "Lines 15 and 99 say both safe outputs require a fine-grained PAT; the PAT section (lines 117-135) documents classic PATs as valid"
+    },
+    {
+      "file": ".github/workflows/spec-librarian.md",
+      "priority": "high",
+      "issue": "run-success (line 50) says Report delivered! but also fires on the noop path (notify_comment_error.cjs:291-295); run-failure (line 48) repeats failed because status defaults to failed (notify_comment_error.cjs:102-114)"
+    },
+    {
+      "file": ".github/workflows/cloclo.md",
+      "priority": "medium",
+      "issue": "run-success (line 63) says delivered a stunning performance but also fires on the noop path; run-failure (line 64) repeats run_url"
+    },
+    {
+      "file": "docs/src/content/docs/patterns/spec-ops.md",
+      "priority": "medium",
+      "issue": "Line 22 is one ~200-word paragraph; the mermaid diagram above line 14 omits the compliance-test refresh step described under How SpecOps Works"
+    },
+    {
+      "file": "cmd/gh-aw/main.go",
+      "priority": "medium",
+      "issue": "compile --dry-run flag help (line 882) is about 90 words on one line"
+    }
+  ],
+  "unverified": [
+    "Classic PAT acceptance at runtime (the page body says it is supported; not tested)",
+    "noop-path run-success behavior is inferred from notify_comment_error.cjs logic; no live run observed",
+    "gh aw run --approve flag text refers to compiler warnings; relevance to run was not checked"
+  ],
+  "observations": [
+    "Pending smoke-agent-public-approved run-success noop issue: mechanism confirmed at notify_comment_error.cjs:291-295",
+    "Compile help sentence about gh aw upgrade still sits in the action-mode section (pending since 2026-11-12)"
+  ],
+  "tasks_proposed": [
+    "docs/src/content/docs/reference/copilot-cloud-agent.mdx",
+    ".github/workflows/spec-librarian.md"
+  ],
+  "caveats": "No repository files were edited and no workflows were compiled or dispatched. Tasks are proposals in the discussion."
+}
