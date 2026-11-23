@@ -3849,6 +3849,24 @@
                     "additionalProperties": false
                   }
                 },
+                "observation": {
+                  "type": [
+                    "null",
+                    "object"
+                  ],
+                  "properties": {
+                    "outcome": {
+                      "type": "string"
+                    },
+                    "reason": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "outcome"
+                  ],
+                  "additionalProperties": false
+                },
                 "endpoint_only_deviation_normalized": {
                   "type": "boolean"
                 }
@@ -7234,6 +7252,24 @@
                         ],
                         "additionalProperties": false
                       }
+                    },
+                    "observation": {
+                      "type": [
+                        "null",
+                        "object"
+                      ],
+                      "properties": {
+                        "outcome": {
+                          "type": "string"
+                        },
+                        "reason": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "outcome"
+                      ],
+                      "additionalProperties": false
                     },
                     "endpoint_only_deviation_normalized": {
                       "type": "boolean"

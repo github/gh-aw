@@ -15,12 +15,14 @@ const { sessionTimestamp, orderSessionSources } = require("./unified_session_ord
 const { normalizeOtelEvents } = require("./unified_session_otel.cjs");
 const { getApiProxyEventName } = require("./steering_helpers.cjs");
 const { estimateBaseline, projectModelConfig } = require("./routing_analytics.cjs");
+const { routedRun, routingOutcome, summarizeAgentOutput } = require("./routing_observation.cjs");
 const { normalizeHarnessRetryRecord } = require("./harness_retry_record.cjs");
 const { parseHarnessAttempts, correlateHarnessAttempts } = require("./harness_retry_session.cjs");
 const { isDurableSessionRecord } = require("./durable_session_record.cjs");
 const { buildWorkflowCallId } = require("./aw_context.cjs");
 
 const SESSION_FILE_FORMAT_VERSION = 1;
+const THREAT_FLAGS = ["prompt_injection", "promptInjection", "secret_leak", "secretLeak", "malicious_patch", "maliciousPatch"];
 
 /** @param {any} data @returns {boolean} */
 function isModelEndpointMismatchData(data) {
@@ -180,9 +182,43 @@ function parseEngineSession(content, engine) {
 }
 
 /**
+ * The routing verdict for a run AWF routed and whose agent made requests
+ * (T-UAS-093). A run that was not routed, or whose agent never made a request,
+ * has none.
+ * @param {SessionSource[]} sources
+ * @param {unknown} subAgentModels aw_info.sub_agent_models
+ * @param {unknown} output agent_output.json
+ * @returns {import("./types/unified_session").RoutingObservationData | undefined}
+ */
+function observeRoutedRun(sources, subAgentModels, output) {
+  /** @param {string} component @param {string | undefined} phase @param {string} type */
+  const eventsOf = (component, phase, type) => sources.filter(source => source.component === component && (phase === undefined || source.phase === phase)).flatMap(source => source.events.filter(event => event.type === type));
+  /** @param {string} type */
+  const proxyRecords = type => eventsOf("firewall", "agent", type).map(event => event.data);
+  const run = routedRun({ tokenUsage: proxyRecords("firewall.token_usage"), routing: proxyRecords("firewall.model_routing"), subAgentModels });
+  if (!run.routed || !run.started) return undefined;
+  /** @type {any} */
+  const harness = eventsOf("harness", "agent", "harness.retry")[0]?.data;
+  /** @type {any} */
+  const execution = eventsOf("execution", "agent", "agent.execution")[0]?.data;
+  const attempt = harness?.attemptResults?.at(-1);
+  const startup = harness?.startupAttemptResults?.at(-1);
+  const agentResult = eventsOf("workflow", "conclusion", "workflow.job_result").find(event => event.data?.jobId === "agent")?.data?.result;
+  return routingOutcome({
+    pair: run.pair,
+    agentResult: typeof agentResult === "string" ? agentResult : undefined,
+    harness: attempt ? { outcome: attempt.outcome, failureClasses: Array.isArray(attempt.failureClasses) ? attempt.failureClasses : [] } : undefined,
+    startupFailed: !attempt && startup?.outcome === "failure",
+    execution: { categories: Array.isArray(execution?.categories) ? execution.categories : [], errorCodes: Array.isArray(execution?.errorCodes) ? execution.errorCodes : [] },
+    output: summarizeAgentOutput(output),
+    threat: eventsOf("detection", undefined, "detection.result").some(event => THREAT_FLAGS.some(key => event.data?.[key] === true)),
+  });
+}
+
+/**
  * Collect only known runtime directories; never follow artifact symlinks.
  * Replicated firewall files use logs > audit > legacy precedence, including empty files.
- * @param {{rootDir?: string, engine?: string, protectedSessionCapture?: boolean, warn?: (message: string) => void, dailyAIC?: NodeJS.ProcessEnv, executionIdentity?: {runId?: string, runAttempt: number}, admission?: NodeJS.ProcessEnv, jobResults?: string, safeJobNames?: string, safeJobResults?: string, jobDurations?: Record<string, number>}} [options]
+ * @param {{rootDir?: string, engine?: string, protectedSessionCapture?: boolean, warn?: (message: string) => void, dailyAIC?: NodeJS.ProcessEnv, executionIdentity?: {runId?: string, runAttempt: number}, admission?: NodeJS.ProcessEnv, jobResults?: string, safeJobNames?: string, safeJobResults?: string, jobDurations?: Record<string, number>, routingObservation?: boolean}} [options]
  * @returns {{events: import("./types/unified_session").UnifiedSession, maskedValues: string[]}}
  */
 function collectUnifiedSession({
@@ -197,6 +233,7 @@ function collectUnifiedSession({
   safeJobNames = process.env.GH_AW_SAFE_JOB_NAMES,
   safeJobResults = process.env.GH_AW_SAFE_JOB_RESULTS,
   jobDurations = {},
+  routingObservation = false,
 } = {}) {
   const liveIdentity = executionIdentity?.runId && Number.isSafeInteger(executionIdentity.runAttempt) && executionIdentity.runAttempt > 0 ? executionIdentity : undefined;
   let currentRunId = liveIdentity?.runId ?? dailyAIC.GITHUB_RUN_ID;
@@ -926,6 +963,19 @@ function collectUnifiedSession({
       }
     }
   }
+  // Only the collector publishes routing verdicts; no source can supply its own.
+  for (const source of sources) {
+    if (!source.events.some(event => event.type === "routing.observation")) continue;
+    source.indices = source.events.flatMap((event, index) => (event.type === "routing.observation" ? [] : [source.indices?.[index] ?? index]));
+    source.events = source.events.filter(event => event.type !== "routing.observation");
+  }
+  /** @type {SessionEvent[]} */
+  const routingObservations = [];
+  if (routingObservation) {
+    const outputFile = choose(["agent_output.json"]);
+    const observation = observeRoutedRun(sources, runInfo?.sub_agent_models, outputFile ? records(outputFile)[0] : undefined);
+    if (observation) routingObservations.push({ type: "routing.observation", data: { ...observation } });
+  }
   const persistedWarnings = sources.flatMap(source => source.events.filter(event => event.type === "session.collection_warning"));
   const memorySaves = require("./memory_save_results.cjs").readMemorySaveResults();
   if (memorySaves.length) {
@@ -949,7 +999,7 @@ function collectUnifiedSession({
   };
   /** @type {import("./types/agent_session").SessionFileFormatEvent} */
   const format = { type: "session.format", data: { version: SESSION_FILE_FORMAT_VERSION } };
-  sources.push({ component: "collector", phase: "conclusion", path: "usage/aw_session.jsonl", events: [format, ...warnings, ...routingEstimates, summary] });
+  sources.push({ component: "collector", phase: "conclusion", path: "usage/aw_session.jsonl", events: [format, ...warnings, ...routingEstimates, ...routingObservations, summary] });
   const events = correlateHarnessAttempts(mergeSessionSources(sources, engine ?? (canonicalCopilot ? "copilot" : undefined)));
   const formatIndex = events.findIndex(event => event.type === "session.format" && event.provenance.component === "collector" && event.provenance.index === 0);
   // File metadata leads the stream without inventing a timestamp for it.
@@ -958,7 +1008,7 @@ function collectUnifiedSession({
 }
 
 /**
- * @param {{rootDir?: string, engine?: string, outputPath?: string, warn?: (message: string) => void, executionIdentity?: {runId?: string, runAttempt: number}, admission?: NodeJS.ProcessEnv, jobDurations?: Record<string, number>, graders?: any[], customGraderIds?: string[]}} [options]
+ * @param {{rootDir?: string, engine?: string, outputPath?: string, warn?: (message: string) => void, executionIdentity?: {runId?: string, runAttempt: number}, admission?: NodeJS.ProcessEnv, jobDurations?: Record<string, number>, graders?: any[], customGraderIds?: string[], routingObservation?: boolean}} [options]
  * @returns {import("./types/unified_session").UnifiedSession}
  */
 function writeUnifiedSession(options = {}) {
@@ -992,7 +1042,8 @@ async function main(options = {}) {
   const { readGraderManifestEnvironment, publishGraderSummary } = require("./grader_artifacts.cjs");
   const manifest = options.graders === undefined ? readGraderManifestEnvironment() : { graders: options.graders };
   const executionIdentity = options.executionIdentity ?? { runId: process.env.GITHUB_RUN_ID, runAttempt: Number(process.env.GITHUB_RUN_ATTEMPT) };
-  const events = writeUnifiedSession({ ...options, executionIdentity, jobDurations, graders: manifest.graders, customGraderIds: options.customGraderIds ?? manifest.customGraders });
+  // Only the conclusion job has the final job results the routing verdict needs.
+  const events = writeUnifiedSession({ ...options, executionIdentity, jobDurations, graders: manifest.graders, customGraderIds: options.customGraderIds ?? manifest.customGraders, routingObservation: true });
   const { publishUnifiedSessionSummary } = require("./unified_session_render.cjs");
   await publishUnifiedSessionSummary(options.outputPath ?? path.join(options.rootDir ?? "/tmp/gh-aw", "usage/aw_session.jsonl"));
   await publishGraderSummary(events);

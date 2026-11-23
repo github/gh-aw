@@ -96,7 +96,15 @@ type ModelRoutingSummary struct {
 	DeviatedTrafficCost             ModelRoutingCost        `json:"deviated_traffic_cost"`
 	MainAgentCost                   ModelRoutingCost        `json:"main_agent_cost,omitzero"`
 	SubagentCosts                   []ModelRoutingAgentCost `json:"subagent_costs,omitempty"`
+	Observation                     *RoutingObservation     `json:"observation,omitempty"`
 	EndpointOnlyDeviationNormalized bool                    `json:"endpoint_only_deviation_normalized,omitempty"`
+}
+
+// RoutingObservation is the unified session's verdict on a routed run (T-UAS-093):
+// whether its result counts as evidence about the selected pair, and if not, why.
+type RoutingObservation struct {
+	Outcome string `json:"outcome"`
+	Reason  string `json:"reason,omitempty"`
 }
 
 type effectiveModelAttribution struct {
@@ -267,8 +275,8 @@ func findModelRoutingFile(runDir string) string {
 		return legacy
 	}
 	var found string
-	_ = filepath.WalkDir(runDir, func(path string, entry os.DirEntry, err error) error {
-		if err != nil || entry.IsDir() {
+	if err := filepath.WalkDir(runDir, func(path string, entry os.DirEntry, walkErr error) error {
+		if walkErr != nil || entry.IsDir() {
 			return nil
 		}
 		if entry.Name() == "model-routing.jsonl" {
@@ -276,7 +284,9 @@ func findModelRoutingFile(runDir string) string {
 			return filepath.SkipAll
 		}
 		return nil
-	})
+	}); err != nil {
+		tokenUsageSubagentLog.Printf("failed to search for model routing records: %v", err)
+	}
 	return found
 }
 
@@ -348,6 +358,7 @@ func applySessionModelRouting(summary *ModelRoutingSummary, session *sessionMode
 	if summary == nil || session == nil {
 		return
 	}
+	summary.Observation = session.Observation
 	routing := session.modelRouting()
 	if routing == nil {
 		return
@@ -435,7 +446,11 @@ func parseModelRoutingFile(path string, usageEntries []TokenUsageEntry) *ModelRo
 	if err != nil {
 		return &ModelRoutingSummary{Status: "unavailable"}
 	}
-	defer file.Close()
+	defer func() {
+		if closeErr := file.Close(); closeErr != nil {
+			tokenUsageSubagentLog.Printf("failed to close model routing records: %v", closeErr)
+		}
+	}()
 
 	summary := &ModelRoutingSummary{
 		Status:        "not_routed",
