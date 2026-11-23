@@ -168,17 +168,18 @@ type healthFleetAction struct {
 }
 
 type healthFleetCoverage struct {
-	RegistryComplete    bool   `json:"registry_complete"`
-	InventoryComplete   bool   `json:"inventory_complete"`
-	VerificationDone    bool   `json:"verification_complete"`
-	WorkflowsVerified   int    `json:"workflows_verified"`
-	WorkflowsRemaining  int    `json:"workflows_remaining"`
-	WindowsRemaining    int    `json:"windows_remaining"`
-	UnresolvedSlices    int    `json:"unresolved_slices"`
-	IncompleteJobs      int    `json:"workflows_with_incomplete_job_evidence"`
-	IncompleteRevisions int    `json:"workflows_with_incomplete_revision_evidence"`
-	Partial             bool   `json:"partial"`
-	Reason              string `json:"reason,omitempty"`
+	RegistryComplete    bool              `json:"registry_complete"`
+	InventoryComplete   bool              `json:"inventory_complete"`
+	VerificationDone    bool              `json:"verification_complete"`
+	WorkflowsVerified   int               `json:"workflows_verified"`
+	WorkflowsRemaining  int               `json:"workflows_remaining"`
+	WindowsRemaining    int               `json:"windows_remaining"`
+	UnresolvedSlices    int               `json:"unresolved_slices"`
+	IncompleteJobs      int               `json:"workflows_with_incomplete_job_evidence"`
+	IncompleteRevisions int               `json:"workflows_with_incomplete_revision_evidence"`
+	Partial             bool              `json:"partial"`
+	Reason              string            `json:"reason,omitempty"`
+	RegistryIssues      map[string]string `json:"registry_issues,omitempty"`
 }
 
 type healthFleetReport struct {
@@ -251,6 +252,12 @@ func renderHealthFleet(state *healthFleetState, config HealthConfig) error {
 	if report.Coverage.Partial {
 		fmt.Fprintf(os.Stdout, "Partial: %s\n", report.Coverage.Reason)
 	}
+	for _, file := range slices.Sorted(maps.Keys(report.Coverage.RegistryIssues)) {
+		fmt.Fprintf(os.Stdout, "Registry mismatch: %q (%s)\n", file, report.Coverage.RegistryIssues[file])
+	}
+	if report.Coverage.Reason == "registry_drift" {
+		fmt.Fprintln(os.Stdout, "Compare the Actions workflow registry with the pinned default-branch revision; use a new checkpoint path to refresh discovery.")
+	}
 	if action := report.NextAction; action != nil {
 		fmt.Fprintf(os.Stdout, "Next action: %s %q\n", action.Type, cmp.Or(action.Checkpoint, action.RunURL))
 	}
@@ -266,7 +273,7 @@ func makeHealthFleetCoverage(state *healthFleetState, collection *HealthCollecti
 		InventoryComplete: state.RegistryPage == 0 && !state.RegistryDrift && len(state.Windows) == 0 && state.UnresolvedSlices == 0,
 		WorkflowsVerified: len(state.Verified), WorkflowsRemaining: len(state.Workflows) - len(state.Verified),
 		WindowsRemaining: len(state.Windows), UnresolvedSlices: state.UnresolvedSlices,
-		Reason: collection.Reason,
+		Reason: collection.Reason, RegistryIssues: state.RegistryIssues,
 	}
 	coverage.VerificationDone = coverage.InventoryComplete && coverage.WorkflowsRemaining == 0
 	for _, evidence := range state.Verified {
