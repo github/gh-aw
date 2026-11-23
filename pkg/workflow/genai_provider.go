@@ -22,6 +22,18 @@ const (
 // including Azure OpenAI, AI Foundry, APIM and Azure AI Gateway hosts.
 var azureInferenceHostSuffixes = []string{".azure.com", ".azure-api.net", ".azure.us", ".azure.cn"}
 
+// resolveBYOKGenAIEndpoint passes the configured endpoint to runtime telemetry,
+// where only its hostname is retained, including for expression-valued URLs.
+func resolveBYOKGenAIEndpoint(workflowData *WorkflowData) string {
+	if resolveBYOKGenAIProviderName(workflowData) == "" {
+		return ""
+	}
+	if endpoint := getEngineEnvOverrides(workflowData)[constants.CopilotProviderBaseURL]; strings.TrimSpace(endpoint) != "" {
+		return endpoint
+	}
+	return workflowData.EngineConfig.APITarget
+}
+
 // resolveBYOKGenAIProviderName returns the OTel gen_ai.provider.name for Copilot
 // BYOK inference. It returns "" when the run is not Copilot BYOK, so telemetry
 // keeps the engine-derived provider for GitHub-hosted inference.

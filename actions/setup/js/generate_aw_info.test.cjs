@@ -161,12 +161,21 @@ describe("generate_aw_info.cjs", () => {
   });
 
   it("records the BYOK GenAI provider only when configured", async () => {
+    const endpoint = new URL("https://gw.azure-api.net:8443/v1?key=private#fragment");
+    endpoint.username = "user";
+    endpoint.password = "placeholder";
+    process.env.GH_AW_INFO_GENAI_ENDPOINT = endpoint.href;
     await main(mockCore, mockContext);
     expect(JSON.parse(fs.readFileSync(awInfoPath, "utf8"))).not.toHaveProperty("genai_provider");
+    expect(JSON.parse(fs.readFileSync(awInfoPath, "utf8"))).not.toHaveProperty("genai_server_address");
 
     process.env.GH_AW_INFO_GENAI_PROVIDER = "azure.ai.openai";
     await main(mockCore, mockContext);
-    expect(JSON.parse(fs.readFileSync(awInfoPath, "utf8")).genai_provider).toBe("azure.ai.openai");
+    const contents = fs.readFileSync(awInfoPath, "utf8");
+    expect(JSON.parse(contents).genai_provider).toBe("azure.ai.openai");
+    expect(JSON.parse(contents).genai_server_address).toBe("gw.azure-api.net");
+    expect(contents).not.toContain("placeholder");
+    expect(contents).not.toContain("key=private");
   });
 
   it("should write aw_info.json with values from env vars and context", async () => {

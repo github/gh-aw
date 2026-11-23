@@ -282,6 +282,9 @@ func (c *Compiler) generateSetupStepWithArtifactClientCondition(data *WorkflowDa
 			if provider := resolveBYOKGenAIProviderName(data); provider != "" {
 				setupLines = append(setupLines, fmt.Sprintf("          GH_AW_INFO_GENAI_PROVIDER: %q\n", provider))
 			}
+			if endpoint := resolveBYOKGenAIEndpoint(data); endpoint != "" {
+				setupLines = append(setupLines, fmt.Sprintf("          GH_AW_INFO_GENAI_ENDPOINT: %q\n", endpoint))
+			}
 			if hasWorkflowCallOrDispatchTrigger(data.On) {
 				setupLines = append(setupLines, "          GH_AW_SETUP_AW_CONTEXT: ${{ inputs.aw_context }}\n")
 			}
@@ -352,6 +355,9 @@ func (c *Compiler) generateSetupStepWithArtifactClientCondition(data *WorkflowDa
 	if provider := resolveBYOKGenAIProviderName(data); provider != "" {
 		setupLines = append(setupLines, fmt.Sprintf("          GH_AW_INFO_GENAI_PROVIDER: %q\n", provider))
 	}
+	if endpoint := resolveBYOKGenAIEndpoint(data); endpoint != "" {
+		setupLines = append(setupLines, fmt.Sprintf("          GH_AW_INFO_GENAI_ENDPOINT: %q\n", endpoint))
+	}
 	if hasWorkflowCallOrDispatchTrigger(data.On) {
 		setupLines = append(setupLines, "          GH_AW_SETUP_AW_CONTEXT: ${{ inputs.aw_context }}\n")
 	}
@@ -409,6 +415,9 @@ func (c *Compiler) generateScriptModeCleanupStep(data *WorkflowData) string {
 	}
 	if provider := resolveBYOKGenAIProviderName(data); provider != "" {
 		fmt.Fprintf(&step, "          GH_AW_INFO_GENAI_PROVIDER: %q\n", provider)
+	}
+	if endpoint := resolveBYOKGenAIEndpoint(data); endpoint != "" {
+		fmt.Fprintf(&step, "          GH_AW_INFO_GENAI_ENDPOINT: %q\n", endpoint)
 	}
 	return step.String()
 }

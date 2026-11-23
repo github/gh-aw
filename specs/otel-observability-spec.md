@@ -697,6 +697,12 @@ Span links SHOULD be used instead of parent-child relationships when outcome eva
 
 ### 10.3 Model Attributes
 
+Copilot BYOK run spans SHOULD include `server.address` when a configured endpoint is known.
+Resolve expression-valued endpoints at runtime and retain only the hostname (without a port,
+URL credentials, path, query, or fragment). Omit the attribute when the endpoint cannot be parsed.
+This attribution does not enable outbound W3C trace propagation: forwarding `traceparent` and
+`tracestate` only to the configured BYOK endpoint requires support in the AWF api-proxy.
+
 | Attribute | Type | Requirement |
 |---|---|---|
 | `gen_ai.operation.name` | string | REQUIRED on GenAI operation spans, except where §9.5 prohibits it on the agent conclusion span. |

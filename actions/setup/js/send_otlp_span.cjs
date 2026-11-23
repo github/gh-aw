@@ -21,6 +21,7 @@ const { isDurableSessionRecord } = require("./durable_session_record.cjs");
 const { readEvalsNotEvaluatedStatus } = require("./evals_status.cjs");
 const { MAX_OTLP_RESPONSE_BYTES, readOTLPResponse, inspectOTLPResponse, unavailableOTLPResponse } = require("./otlp_response.cjs");
 const { buildTraceparent, buildServiceRequestHeaders, isValidTraceId, isValidSpanId } = require("./service_correlation.cjs");
+const { genAiServerAddress } = require("./genai_endpoint.cjs");
 const {
   OTEL_ATTR_CICD_PIPELINE_NAME,
   OTEL_ATTR_CICD_PIPELINE_RUN_ID,
@@ -116,6 +117,11 @@ function resolveRunGenAiProvider(awInfo, engineId) {
     return { provider: byok, system: BYOK_PROVIDER_TO_SYSTEM_MAP[byok] || byok };
   }
   return { provider: resolveGenAiProvider(engineId), system: ENGINE_TO_SYSTEM_MAP[engineId] || engineId };
+}
+
+/** @param {any} awInfo */
+function resolveRunGenAiServerAddress(awInfo) {
+  return genAiServerAddress(awInfo?.genai_server_address) || genAiServerAddress(process.env.GH_AW_INFO_GENAI_ENDPOINT);
 }
 
 /** True when OTEL_SEMCONV_STABILITY_OPT_IN contains gen_ai_v1 (spec §6.7). */
@@ -1665,6 +1671,8 @@ async function sendJobSetupSpan(options = {}) {
       attributes.push(buildAttr("gen_ai.system", genAi.system));
     }
     attributes.push(buildAttr(OTEL_ATTR_GEN_AI_PROVIDER_NAME, genAi.provider));
+    const serverAddress = resolveRunGenAiServerAddress(awInfo);
+    if (serverAddress) attributes.push(buildAttr("server.address", serverAddress));
     attributes.push(buildAttr(OTEL_ATTR_ENGINE_ID, engineId));
   }
   if (eventName) {
@@ -2583,6 +2591,8 @@ async function sendJobConclusionSpan(spanName, options = {}) {
     const genAi = resolveRunGenAiProvider(awInfo, engineId);
     if (!optIn) attributes.push(buildAttr("gen_ai.system", genAi.system));
     attributes.push(buildAttr(OTEL_ATTR_GEN_AI_PROVIDER_NAME, genAi.provider));
+    const serverAddress = resolveRunGenAiServerAddress(awInfo);
+    if (serverAddress) attributes.push(buildAttr("server.address", serverAddress));
     attributes.push(buildAttr(OTEL_ATTR_ENGINE_ID, engineId));
   }
   if (model) attributes.push(buildAttr("gen_ai.request.model", model));
