@@ -2110,7 +2110,7 @@ async function main() {
             }
             if (isCopilotSessionProgress(event, sessionId)) markSessionProgress();
             const context = copilotSessionContext(event);
-            if (!copilotSDKMode && context.agentId === undefined && !context.parentToolUseId && (!context.sessionId || context.sessionId === sessionId) && ["session.start", "session.resume"].includes(event?.type)) {
+            if (!copilotSDKMode && context.agentId === undefined && !context.parentToolUseId && sessionId && context.sessionId === sessionId && ["session.start", "session.resume"].includes(event?.type)) {
               nativeSessionEstablished = true;
             }
             if (!copilotSDKMode && durableSession && sessionId && nativeSessionEstablished) durableSession.started(sessionId);

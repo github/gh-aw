@@ -242,7 +242,20 @@ function nativeResponseDiagnostic(event) {
   if (["error", "session.error", "turn.failed"].includes(event.type)) return selectNativeErrorDiagnostic(event.type === "session.error" ? (event.data ?? event) : event);
   if (/^item\./.test(event.type ?? "") && event.item?.type === "error") return selectNativeErrorDiagnostic({ ...event.item, message: event.item.message ?? event.item.text });
   if (event.event === "result" && event.result?.status === "ERROR") return selectNativeErrorDiagnostic(event.result);
-  if (!event.type && event.error != null) return selectNativeErrorDiagnostic(event);
+  if (!event.type && event.error != null) {
+    const hasNativeStructure = [event, event.error].some(
+      diagnostic =>
+        diagnostic &&
+        typeof diagnostic === "object" &&
+        !Array.isArray(diagnostic) &&
+        (typeof diagnostic.message === "string" ||
+          diagnostic.message?.role === "assistant" ||
+          typeof diagnostic.errorMessage === "string" ||
+          diagnostic.is_api_error_message === true ||
+          (diagnostic.is_error === true && (typeof diagnostic.result === "string" || (diagnostic.result && typeof diagnostic.result === "object") || Array.isArray(diagnostic.errors))))
+    );
+    if (hasNativeStructure) return selectNativeErrorDiagnostic(event);
+  }
   return undefined;
 }
 

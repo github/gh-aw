@@ -557,6 +557,40 @@ describe("harness_retry_guard.cjs", () => {
   });
 
   it.each([
+    { error: "Just a moment..." },
+    { error: "<html>Forbidden</html>" },
+    { error: { metadata: { quoted: "Just a moment..." } } },
+    { error: "Just a moment...", message: null },
+    { error: "Just a moment...", message: 42 },
+    { error: "Just a moment...", errors: "quoted diagnostic" },
+  ])("does not attribute typeless error objects without native diagnostic structure: %j", record => {
+    expect(isHTMLResponseError(JSON.stringify(record))).toBe(false);
+  });
+
+  it("does not decode an unstructured typeless error string into an authentication diagnostic", () => {
+    const output = JSON.stringify({ error: '{"message":"Authentication\\u0020failed"}' });
+    expect(isAuthenticationFailedError(output)).toBe(false);
+  });
+
+  it("retains nested provider authentication diagnostics", () => {
+    const output = JSON.stringify({ error: { type: "authentication_error", message: '{"message":"Authentication\\u0020failed"}' } });
+    expect(isAuthenticationFailedError(output)).toBe(true);
+  });
+
+  it.each([
+    { error: "api_error", message: "Just a moment..." },
+    { error: "api_error", errorMessage: "<html>Forbidden</html>" },
+    { error: { status: 403, message: "<html>Forbidden</html>" } },
+    { error: { type: "api_error", message: '{"error":{"message":"Just a moment..."}}' } },
+    { error: "api_error", is_api_error_message: true, message: { role: "assistant", content: [{ type: "text", text: "Just a moment..." }] } },
+    { error: "api_error", is_error: true, result: "Just a moment..." },
+    { error: "api_error", is_error: true, errors: ["Just a moment..."] },
+  ])("retains recognizable typeless native and nested provider diagnostics: %j", record => {
+    expect(isHTMLResponseError(JSON.stringify(record))).toBe(true);
+    expect(isAuthenticationFailedError(JSON.stringify(record))).toBe(false);
+  });
+
+  it.each([
     { type: "item.completed", item: { type: "agent_message", text: "API Error: <html>Forbidden</html>" } },
     { type: "item.completed", item: { type: "command_execution", aggregated_output: "API Error: Just a moment..." } },
     { event: "result", result: { status: "DONE", error: "API Error: <html>Forbidden</html>" } },

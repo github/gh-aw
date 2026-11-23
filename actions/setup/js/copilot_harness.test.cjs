@@ -3247,6 +3247,77 @@ process.stdin.on("end", () => fs.writeFileSync(process.env.COPILOT_HARNESS_STUB_
   });
 
   describe("noop pre-flight and retry guard", () => {
+    it.each(
+      ["session.start", "session.resume"].flatMap(type =>
+        ["stdout", "stderr"].flatMap(channel =>
+          [
+            { identity: "omitted", established: false },
+            { identity: "null", established: false },
+            { identity: "wrong", established: false },
+            { identity: "matching", established: true },
+            { identity: "matching", agentId: "subagent", established: false },
+            { identity: "matching", parentToolUseId: "parent-tool", established: false },
+          ].map(context => ({ type, channel, ...context }))
+        )
+      )
+    )("requires an exact main-session identity for native lifecycle establishment: %j", ({ type, channel, identity, agentId, parentToolUseId, established }) => {
+      const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "copilot-lifecycle-retry-"));
+      const stubPath = path.join(tempDir, "stub.cjs");
+      const callsPath = path.join(tempDir, "calls.jsonl");
+      try {
+        fs.writeFileSync(
+          stubPath,
+          `const fs = require("fs");
+const args = process.argv.slice(2);
+const callsPath = ${JSON.stringify(callsPath)};
+const firstAttempt = !fs.existsSync(callsPath);
+fs.appendFileSync(callsPath, JSON.stringify(args) + "\\n");
+if (!firstAttempt) process.exit(0);
+const sessionId = args[args.indexOf("--session-id") + 1];
+const data = ${JSON.stringify({ agentId, parentToolUseId })};
+if (${JSON.stringify(identity)} === "matching") data.sessionId = sessionId;
+if (${JSON.stringify(identity)} === "wrong") data.sessionId = "aabbccdd-1122-3344-5566-778899aabbcc";
+if (${JSON.stringify(identity)} === "null") data.sessionId = null;
+process.${channel}.write(JSON.stringify({type:${JSON.stringify(type)}, data}) + "\\n");
+console.error(JSON.stringify({type:"session.error", data:{message:"Authentication failed: HTTP 403: Just a moment..."}}));
+process.exit(1);`
+        );
+        const result = spawnSync(process.execPath, ["copilot_harness.cjs", process.execPath, stubPath, "--prompt", "test lifecycle retry"], {
+          cwd: path.dirname(require.resolve("./copilot_harness.cjs")),
+          env: {
+            ...harnessChildEnv,
+            GH_AW_TMP_DIR: tempDir,
+            RUNNER_TEMP: tempDir,
+            GH_AW_HARNESS_TELEMETRY_DIR: tempDir,
+            COPILOT_HOME: path.join(tempDir, ".copilot"),
+            COPILOT_MODEL: "",
+            COPILOT_SDK_URI: "",
+            GH_AW_DURABLE_STORAGE: "",
+            GH_AW_PHASE: "agent",
+            GH_AW_SAFE_OUTPUTS: "",
+            GH_AW_HARNESS_MAX_RETRIES: "1",
+          },
+          encoding: "utf8",
+          timeout: 10000,
+        });
+        expect(result.status, result.stderr).toBe(0);
+        const calls = fs
+          .readFileSync(callsPath, "utf8")
+          .trim()
+          .split("\n")
+          .map(line => JSON.parse(line));
+        expect(calls).toHaveLength(2);
+        expect(calls[1]).not.toContain("--continue");
+        const sessionId = args => args[args.indexOf("--session-id") + 1];
+        expect(sessionId(calls[1]) === sessionId(calls[0])).toBe(established);
+        const telemetry = JSON.parse(fs.readFileSync(path.join(tempDir, "harness_retry.json"), "utf8"));
+        expect(telemetry.attempt_results.map(attempt => attempt.strategy)).toEqual(["restart", established ? "resume" : "restart"]);
+        expect(telemetry.attempt_results[0].failure_classes).toEqual(["transient_error"]);
+      } finally {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      }
+    });
+
     it.each([
       { progress: true, challenge: true, retries: true, channel: "stdout" },
       { progress: true, challenge: true, retries: true, channel: "native" },

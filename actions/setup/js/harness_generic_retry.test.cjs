@@ -21,6 +21,7 @@ describe("classifyGenericHarnessFailure", () => {
     ["API Error: 403 Forbidden: /cdn-cgi/challenge-platform", "transient_error"],
     ["API Error: 403 Forbidden: cf-chl-token", "transient_error"],
     ['{"error":{"status":403,"message":"<html>Forbidden</html>"}}', "transient_error"],
+    [JSON.stringify({ error: "Just a moment..." }), null],
     ["HTTP 403 Forbidden", null],
     ["Authentication failed: API Error: Just a moment...\nAuthentication failed (Request ID: abc)", "non_retryable"],
     [JSON.stringify({ type: "assistant", message: "API Error: Just a moment..." }), null],
