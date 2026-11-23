@@ -13,8 +13,6 @@ strict: true
 permissions:
   contents: read
   id-token: write
-network:
-  allowed: [defaults]
 imports:
   - uses: ".github/workflows/connectors/azure-ai-gateway.md"
     with:

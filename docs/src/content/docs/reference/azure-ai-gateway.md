@@ -33,8 +33,6 @@ imports:
     with:
       gateway-host: example.ai.gateway.azure.com
       models: [deployment-checklist]
-network:
-  allowed: [defaults]
 ```
 
 Replace the hostname, model metadata and wire alias with the reviewed Catalog
