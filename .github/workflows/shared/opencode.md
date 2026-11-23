@@ -179,7 +179,15 @@ engine:
               name: "GitHub Agentic Workflows",
               package: isAnthropic ? "@opencode/ai/providers/anthropic" : "@opencode/ai/providers/openai-compatible",
               settings: { baseURL, apiKey },
-              models: Object.fromEntries(roster.map(entry => [entry, { name: entry }])),
+              models: Object.fromEntries(roster.map(entry => [
+                entry,
+                {
+                  name: entry,
+                  ...(provider === "openai" && entry === "gpt-5.6-luna"
+                    ? { options: { reasoningEffort: "none" } }
+                    : {}),
+                },
+              ])),
             },
           },
         };
