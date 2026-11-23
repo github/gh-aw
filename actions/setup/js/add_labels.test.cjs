@@ -914,6 +914,8 @@ describe("add_labels", () => {
     });
 
     it("should strip structured intent metadata when issue_intent is omitted", async () => {
+      const infos = [];
+      mockCore.info = msg => infos.push(msg);
       const handler = await main({ max: 10 });
       const addLabelsCalls = [];
 
@@ -933,6 +935,7 @@ describe("add_labels", () => {
       expect(result.success).toBe(true);
       expect(addLabelsCalls).toHaveLength(1);
       expect(addLabelsCalls[0].labels).toEqual(["bug"]);
+      expect(infos.some(msg => msg.includes("issue-intent is not enabled") && msg.includes("issue-intent: true"))).toBe(true);
     });
 
     it("should accept plain string labels by default when issue_intent is omitted", async () => {

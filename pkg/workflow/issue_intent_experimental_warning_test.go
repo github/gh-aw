@@ -14,50 +14,53 @@ import (
 )
 
 func TestIssueIntentExperimentalWarning(t *testing.T) {
-	tests := []struct {
+	outputs := []string{"close-issue", "add-labels", "assign-to-agent", "assign-to-user", "set-issue-type", "set-issue-field"}
+	settings := []struct {
 		name          string
 		issueIntent   string
 		expectWarning bool
 	}{
-		{name: "issue-intent true", issueIntent: "    issue-intent: true\n", expectWarning: true},
-		{name: "issue-intent false", issueIntent: "    issue-intent: false\n", expectWarning: false},
-		{name: "issue-intent omitted", issueIntent: "", expectWarning: false},
+		{name: "true", issueIntent: "    issue-intent: true\n", expectWarning: true},
+		{name: "false", issueIntent: "    issue-intent: false\n", expectWarning: false},
+		{name: "omitted", issueIntent: "", expectWarning: false},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			content := "---\non: workflow_dispatch\nengine: copilot\nsafe-outputs:\n  add-labels:\n" + tt.issueIntent + "    max: 3\n---\n\n# Test Workflow\n"
-			tmpDir := testutil.TempDir(t, "issue-intent-experimental-warning-test")
-			testFile := filepath.Join(tmpDir, "test-workflow.md")
-			if err := os.WriteFile(testFile, []byte(content), 0644); err != nil {
-				t.Fatal(err)
-			}
+	for _, output := range outputs {
+		for _, tt := range settings {
+			t.Run(output+"/issue-intent "+tt.name, func(t *testing.T) {
+				content := "---\non: workflow_dispatch\nengine: copilot\nsafe-outputs:\n  " + output + ":\n" + tt.issueIntent + "    max: 1\n---\n\n# Test Workflow\n"
+				tmpDir := testutil.TempDir(t, "issue-intent-experimental-warning-test")
+				testFile := filepath.Join(tmpDir, "test-workflow.md")
+				if err := os.WriteFile(testFile, []byte(content), 0644); err != nil {
+					t.Fatal(err)
+				}
 
-			oldStderr := os.Stderr
-			r, w, _ := os.Pipe()
-			os.Stderr = w
+				oldStderr := os.Stderr
+				r, w, _ := os.Pipe()
+				os.Stderr = w
 
-			compiler := NewCompiler()
-			compiler.SetStrictMode(false)
-			err := compiler.CompileWorkflow(testFile)
+				compiler := NewCompiler()
+				compiler.SetStrictMode(false)
+				err := compiler.CompileWorkflow(testFile)
 
-			w.Close()
-			os.Stderr = oldStderr
-			var buf bytes.Buffer
-			io.Copy(&buf, r)
-			stderrOutput := buf.String()
+				w.Close()
+				os.Stderr = oldStderr
+				var buf bytes.Buffer
+				io.Copy(&buf, r)
+				stderrOutput := buf.String()
 
-			if err != nil {
-				t.Fatalf("expected compilation to succeed but it failed: %v", err)
-			}
+				if err != nil {
+					t.Fatalf("expected compilation to succeed but it failed: %v", err)
+				}
 
-			const message = "Using experimental feature: issue-intent"
-			if got := strings.Contains(stderrOutput, message); got != tt.expectWarning {
-				t.Errorf("warning %q present=%v, want %v; stderr:\n%s", message, got, tt.expectWarning, stderrOutput)
-			}
-			if got := compiler.GetExperimentalWarningCount(); (got == 1) != tt.expectWarning {
-				t.Errorf("experimental warning count = %d, expectWarning=%v", got, tt.expectWarning)
-			}
-		})
+				const message = "Using experimental feature: issue-intent"
+				if got := strings.Contains(stderrOutput, message); got != tt.expectWarning {
+					t.Errorf("warning %q present=%v, want %v; stderr:\n%s", message, got, tt.expectWarning, stderrOutput)
+				}
+				if got := compiler.GetExperimentalWarningCount(); (got == 1) != tt.expectWarning {
+					t.Errorf("experimental warning count = %d, expectWarning=%v", got, tt.expectWarning)
+				}
+			})
+		}
 	}
 }

@@ -147,6 +147,28 @@ describe("close_issue", () => {
       expect(updateCalls[0].state).toBe("closed");
     });
 
+    it("should log and drop issue-intent metadata when issue_intent is omitted", async () => {
+      const handler = await main({ max: 10 });
+      const updateCalls = [];
+      mockGithub.rest.issues.update = async params => {
+        updateCalls.push(params);
+        return {
+          data: {
+            number: params.issue_number,
+            title: "Test Issue",
+            html_url: `https://github.com/${params.owner}/${params.repo}/issues/${params.issue_number}`,
+          },
+        };
+      };
+
+      const result = await handler({ issue_number: 456, body: "Closing this issue", rationale: "Duplicate confirmed", confidence: "MEDIUM" }, {});
+
+      expect(result.success).toBe(true);
+      expect(updateCalls).toHaveLength(1);
+      expect(updateCalls[0].state).toBe("closed");
+      expect(mockCore.infos.some(msg => msg.includes("issue-intent is not enabled") && msg.includes("issue-intent: true"))).toBe(true);
+    });
+
     it("should include issue-intent metadata on close when enabled", async () => {
       const handler = await main({ issue_intent: true, max: 10 });
       const requestCalls = [];

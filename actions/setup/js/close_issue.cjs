@@ -11,7 +11,7 @@ const { ERR_NOT_FOUND, ERR_VALIDATION } = require("./error_codes.cjs");
 const { createCloseEntityHandler, buildCommentBody, ISSUE_CONFIG } = require("./close_entity_helpers.cjs");
 const { loadTemporaryIdMapFromResolved, resolveRepoIssueTarget } = require("./temporary_id.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
-const { normalizeIssueIntentMetadata } = require("./issue_intents.cjs");
+const { normalizeIssueIntentMetadata, logIgnoredIssueIntentMetadata } = require("./issue_intents.cjs");
 const { resolveTarget } = require("./safe_output_helpers.cjs");
 const { withRetry, RATE_LIMIT_RETRY_CONFIG } = require("./error_recovery.cjs");
 
@@ -399,6 +399,7 @@ async function main(config = {}) {
           stateReason = defaultStateReason;
         }
 
+        logIgnoredIssueIntentMetadata(item, issueIntentEnabled);
         const intentMetadata = issueIntentEnabled ? normalizeIssueIntentMetadata(item) : {};
         core.info(`Closing issue #${entityNumber} with state_reason=${stateReason}`);
 

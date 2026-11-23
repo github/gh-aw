@@ -34,7 +34,7 @@ const { MAX_LABELS } = require("./constants.cjs");
 const { createCountGatedHandler } = require("./handler_scaffold.cjs");
 const { withRetry, RATE_LIMIT_RETRY_CONFIG } = require("./error_recovery.cjs");
 const { resolveInvocationContext } = require("./invocation_context_helpers.cjs");
-const { normalizeIssueIntentLabelInputs, buildIssueIntentLabelUpdates } = require("./issue_intents.cjs");
+const { normalizeIssueIntentLabelInputs, buildIssueIntentLabelUpdates, logIgnoredIssueIntentMetadata } = require("./issue_intents.cjs");
 const { fetchAllRepoLabels } = require("./github_api_helpers.cjs");
 const { ERR_CONFIG, SAFE_OUTPUT_E099 } = require("./error_codes.cjs");
 const { deterministicLabelColor } = require("./create_labels.cjs");
@@ -320,6 +320,7 @@ const main = createCountGatedHandler({
       }
 
       const requestedLabels = message.labels ?? [];
+      logIgnoredIssueIntentMetadata(message, issueIntentEnabled);
       core.info(`Requested labels: ${JSON.stringify(requestedLabels)}`);
       /** @type {Map<string, {name: string, rationale?: string, confidence?: "LOW"|"MEDIUM"|"HIGH", suggest?: boolean}>} */
       const requestedLabelSpecByLowerName = new Map();

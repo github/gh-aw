@@ -165,8 +165,42 @@ function buildIssueIntentLabelUpdates(labelSpecs, labelIdByName) {
   });
 }
 
+/**
+ * @param {unknown} source
+ * @returns {boolean}
+ */
+function hasIssueIntentFields(source) {
+  if (!source || typeof source !== "object") {
+    return false;
+  }
+  const record = /** @type {Record<string, unknown>} */ (source);
+  return record.rationale !== undefined || record.confidence !== undefined || record.suggest !== undefined;
+}
+
+/**
+ * Logs an info message when intent metadata (rationale/confidence/suggest) is
+ * supplied while issue-intent is not enabled, since it is silently dropped.
+ * For add_labels messages, label objects in `labels` are also inspected.
+ * @param {unknown} message
+ * @param {boolean} issueIntentEnabled
+ * @returns {boolean} true when the message was logged
+ */
+function logIgnoredIssueIntentMetadata(message, issueIntentEnabled) {
+  if (issueIntentEnabled || !message || typeof message !== "object") {
+    return false;
+  }
+  const labels = /** @type {{ labels?: unknown }} */ (message).labels;
+  const hasMetadata = hasIssueIntentFields(message) || (Array.isArray(labels) && labels.some(hasIssueIntentFields));
+  if (!hasMetadata) {
+    return false;
+  }
+  core.info("Ignoring issue intent metadata (rationale/confidence/suggest) because issue-intent is not enabled. Set `issue-intent: true` to opt in.");
+  return true;
+}
+
 module.exports = {
   buildIssueIntentLabelUpdates,
+  logIgnoredIssueIntentMetadata,
   getIssueIntentLabelNames,
   normalizeIssueIntentLabelInputs,
   normalizeIssueIntentLabelNames,

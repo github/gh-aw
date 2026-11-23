@@ -179,11 +179,66 @@ func TestIssueIntentExperimentalNoticeClassification(t *testing.T) {
 		wantWarning bool
 	}{
 		{
-			name: "enabled on one output",
+			name: "enabled on close-issue",
 			safeOutputs: func() *SafeOutputsConfig {
-				labels := &AddLabelsConfig{}
-				labels.IssueIntent = &enabled
-				return &SafeOutputsConfig{CloseIssues: &CloseIssuesConfig{}, AddLabels: labels}
+				so := &SafeOutputsConfig{CloseIssues: &CloseIssuesConfig{}, AddLabels: &AddLabelsConfig{}}
+				so.CloseIssues.IssueIntent = &enabled
+				return so
+			},
+			wantWarning: true,
+		},
+		{
+			name: "enabled on add-labels",
+			safeOutputs: func() *SafeOutputsConfig {
+				so := &SafeOutputsConfig{CloseIssues: &CloseIssuesConfig{}, AddLabels: &AddLabelsConfig{}}
+				so.AddLabels.IssueIntent = &enabled
+				return so
+			},
+			wantWarning: true,
+		},
+		{
+			name: "enabled on assign-to-agent",
+			safeOutputs: func() *SafeOutputsConfig {
+				so := &SafeOutputsConfig{AssignToAgent: &AssignToAgentConfig{}}
+				so.AssignToAgent.IssueIntent = &enabled
+				return so
+			},
+			wantWarning: true,
+		},
+		{
+			name: "enabled on assign-to-user",
+			safeOutputs: func() *SafeOutputsConfig {
+				so := &SafeOutputsConfig{AssignToUser: &AssignToUserConfig{}}
+				so.AssignToUser.IssueIntent = &enabled
+				return so
+			},
+			wantWarning: true,
+		},
+		{
+			name: "enabled on set-issue-type",
+			safeOutputs: func() *SafeOutputsConfig {
+				so := &SafeOutputsConfig{SetIssueType: &SetIssueTypeConfig{}}
+				so.SetIssueType.IssueIntent = &enabled
+				return so
+			},
+			wantWarning: true,
+		},
+		{
+			name: "enabled on set-issue-field",
+			safeOutputs: func() *SafeOutputsConfig {
+				so := &SafeOutputsConfig{SetIssueField: &SetIssueFieldConfig{}}
+				so.SetIssueField.IssueIntent = &enabled
+				return so
+			},
+			wantWarning: true,
+		},
+		{
+			name: "enabled on multiple outputs counts once",
+			safeOutputs: func() *SafeOutputsConfig {
+				so := &SafeOutputsConfig{AddLabels: &AddLabelsConfig{}, AssignToUser: &AssignToUserConfig{}}
+				so.AddLabels.IssueIntent = &enabled
+				so.AssignToUser.IssueIntent = &enabled
+				return so
 			},
 			wantWarning: true,
 		},
