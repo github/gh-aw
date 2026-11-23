@@ -5,6 +5,10 @@ package workflow
 import (
 	"archive/tar"
 	"compress/gzip"
+	"crypto/sha256"
+	"crypto/sha512"
+	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"os"
 	"os/exec"
@@ -12,7 +16,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/github/gh-aw/pkg/constants"
+	"github.com/github/gh-aw/actions/setup"
 	"github.com/goccy/go-yaml"
 	"github.com/stretchr/testify/require"
 )
@@ -42,11 +46,14 @@ func TestCopilotSDKNodeBootstrapIsolatedFromRepository(t *testing.T) {
 	require.Contains(t, string(output), "RUNNER_TEMP must be set for Copilot SDK module resolution")
 
 	fixtures := t.TempDir()
-	packages := map[string]string{}
-	for name, version := range map[string]string{
-		"@github/copilot-sdk": string(constants.DefaultCopilotSDKVersion),
-		"undici":              strings.TrimPrefix(copilotSDKWebFetchDependency, "undici@"),
-	} {
+	var stagedManifest struct {
+		Dependencies map[string]string `json:"dependencies"`
+	}
+	manifest := []byte(setup.CopilotSDKNodeManifest)
+	require.NoError(t, json.Unmarshal(manifest, &stagedManifest))
+	dependencies := stagedManifest.Dependencies
+	packages := map[string]any{"": map[string]any{"dependencies": dependencies}}
+	for name, version := range dependencies {
 		archivePath := filepath.Join(fixtures, filepath.Base(name)+".tgz")
 		archive, err := os.Create(archivePath)
 		require.NoError(t, err)
@@ -55,6 +62,7 @@ func TestCopilotSDKNodeBootstrapIsolatedFromRepository(t *testing.T) {
 		manifest, err := json.Marshal(map[string]any{
 			"name": name, "version": version,
 			"exports": map[string]string{"import": "./index.mjs", "require": "./index.cjs"},
+			"scripts": map[string]string{"install": "exit 99"},
 		})
 		require.NoError(t, err)
 		for path, content := range map[string]string{
@@ -69,8 +77,16 @@ func TestCopilotSDKNodeBootstrapIsolatedFromRepository(t *testing.T) {
 		require.NoError(t, tw.Close())
 		require.NoError(t, gz.Close())
 		require.NoError(t, archive.Close())
-		packages[name+"@"+version] = archivePath
+		tarball, err := os.ReadFile(archivePath)
+		require.NoError(t, err)
+		digest := sha512.Sum512(tarball)
+		packages["node_modules/"+name] = map[string]any{
+			"version": version, "resolved": "file:" + archivePath,
+			"integrity": "sha512-" + base64.StdEncoding.EncodeToString(digest[:]), "hasInstallScript": true,
+		}
 	}
+	fixtureLock, err := json.Marshal(map[string]any{"lockfileVersion": 3, "packages": packages})
+	require.NoError(t, err)
 
 	for _, name := range []string{"normal", "esm", "inline", "legacy-node"} {
 		t.Run(name, func(t *testing.T) {
@@ -80,6 +96,13 @@ func TestCopilotSDKNodeBootstrapIsolatedFromRepository(t *testing.T) {
 			require.NoError(t, os.MkdirAll(workspace, 0o755))
 			actionsDir := filepath.Join(runnerTemp, "gh-aw", "actions")
 			require.NoError(t, os.MkdirAll(actionsDir, 0o755))
+			stagedProject := filepath.Join(actionsDir, "copilot-sdk", "node")
+			require.NoError(t, os.MkdirAll(stagedProject, 0o755))
+			installer, err := os.ReadFile("../../actions/setup/sh/install_copilot_sdk.sh")
+			require.NoError(t, err)
+			require.NoError(t, os.WriteFile(filepath.Join(actionsDir, "install_copilot_sdk.sh"), installer, 0o600))
+			require.NoError(t, os.WriteFile(filepath.Join(stagedProject, "package.json"), manifest, 0o600))
+			require.NoError(t, os.WriteFile(filepath.Join(stagedProject, "package-lock.json"), fixtureLock, 0o600))
 			resolverPath := filepath.Join(actionsDir, "copilot_sdk_module_resolution.cjs")
 			for _, name := range []string{"copilot_sdk_module_resolution.cjs", "copilot_sdk_module_resolution_hooks.cjs"} {
 				resolver, err := os.ReadFile(filepath.Join("../../actions/setup/js", name))
@@ -116,7 +139,7 @@ func TestCopilotSDKNodeBootstrapIsolatedFromRepository(t *testing.T) {
 			globalRootCommand.Env = env
 			globalRoot, err := globalRootCommand.Output()
 			require.NoError(t, err)
-			for name := range packages {
+			for name := range dependencies {
 				globalPackage := filepath.Join(strings.TrimSpace(string(globalRoot)), filepath.FromSlash(name))
 				require.NoError(t, os.MkdirAll(globalPackage, 0o755))
 				manifest, err := json.Marshal(map[string]string{"name": name, "version": "0.0.0-conflict", "main": "index.cjs"})
@@ -136,13 +159,13 @@ func TestCopilotSDKNodeBootstrapIsolatedFromRepository(t *testing.T) {
 			config := &EngineConfig{ID: "copilot", CopilotSDK: true}
 			probe := `const assert = require("node:assert/strict");
 const path = require("node:path");
-for (const name of ["@github/copilot-sdk", "undici"]) {
+for (const name of ["@microsoft/copilot-sdk", "undici"]) {
   assert.equal(require(name).bootstrapFixture, true);
   assert.ok(require.resolve(name).startsWith(path.join(process.env.RUNNER_TEMP, "gh-aw", "engine-cli", "copilot-sdk", "node_modules") + path.sep));
 }
 assert.equal(require("./relative.cjs"), "relative helper");
 assert.ok(process.env.NODE_PATH.endsWith(path.join(process.env.HOME, "existing-modules")));
-Promise.all(["@github/copilot-sdk", "undici"].map(name => import(name))).then(async modules => {
+Promise.all(["@microsoft/copilot-sdk", "undici"].map(name => import(name))).then(async modules => {
   for (const module of modules) {
     assert.equal(module.default.bootstrapFixture, true);
     assert.equal(module.esmFixture, true);
@@ -155,7 +178,7 @@ Promise.all(["@github/copilot-sdk", "undici"].map(name => import(name))).then(as
 				config.Driver = "driver.mjs"
 				probePath = filepath.Join(workspace, config.Driver)
 				probe = `import { createRequire } from "node:module";
-import sdk from "@github/copilot-sdk";
+import sdk from "@microsoft/copilot-sdk";
 import relative from "./relative.cjs";
 const require = createRequire(import.meta.url);
 if (!sdk.bootstrapFixture || relative !== "relative helper") throw new Error("ESM resolution failed");
@@ -175,11 +198,31 @@ if (!sdk.bootstrapFixture || relative !== "relative helper") throw new Error("ES
 			}
 			require.NoError(t, yaml.Unmarshal([]byte(strings.Join(buildCopilotSDKInstallStep(data), "\n")), &install))
 			require.Len(t, install, 1)
-			require.Contains(t, install[0].Run, `npm install --prefix "${RUNNER_TEMP}/gh-aw/engine-cli/copilot-sdk"`)
-			// Substitute local tarballs, leaving the generated npm invocation and repository policy intact.
-			command := install[0].Run
-			for dependency, archive := range packages {
-				command = strings.ReplaceAll(command, dependency, shellEscapeArg(archive))
+			require.Contains(t, install[0].Run, copilotSDKNodeInstallCommand)
+			// Bind the fixture lock with local tarballs so npm ci runs offline.
+			digest := sha256.Sum256(append(append(manifest, 0), fixtureLock...))
+			command := strings.Replace(install[0].Run, copilotSDKNodeProject.digest, hex.EncodeToString(digest[:]), 1)
+			require.NotEqual(t, install[0].Run, command)
+			if name == "normal" {
+				mismatch := exec.CommandContext(t.Context(), "bash", "-c", install[0].Run)
+				mismatch.Dir = workspace
+				mismatch.Env = env
+				output, err := mismatch.CombinedOutput()
+				require.Error(t, err)
+				require.Contains(t, string(output), "does not match the compiled workflow")
+				require.NoDirExists(t, filepath.Join(runnerTemp, "gh-aw", "engine-cli", "copilot-sdk"))
+				outside := filepath.Join(root, "outside")
+				engineDir := filepath.Join(runnerTemp, "gh-aw", "engine-cli")
+				require.NoError(t, os.Mkdir(outside, 0o755))
+				require.NoError(t, os.Symlink(outside, engineDir))
+				linked := exec.CommandContext(t.Context(), "bash", "-c", command)
+				linked.Dir = workspace
+				linked.Env = env
+				output, err = linked.CombinedOutput()
+				require.Error(t, err)
+				require.Contains(t, string(output), "Unexpected symlink")
+				require.NoDirExists(t, filepath.Join(outside, "copilot-sdk"))
+				require.NoError(t, os.Remove(engineDir))
 			}
 			run(command)
 

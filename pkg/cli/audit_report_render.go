@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
+	"slices"
 	"strings"
 	"unicode"
 
@@ -45,6 +45,9 @@ func renderConsole(data AuditData, logsPath string) {
 		}
 	}
 	renderConsoleSession(data.SessionAnalysis)
+	if err := renderContinuationRequests(os.Stderr, data.ContinuationRequests); err != nil {
+		auditReportLog.Printf("Failed to render continuation requests: %v", err)
+	}
 	renderConsoleTokenUsage(data.FirewallTokenUsage)
 	renderConsoleDetectionModelUsage(data.DetectionModelUsage)
 	renderConsoleModelRouting(data.ModelRouting)
@@ -217,6 +220,11 @@ func renderConsoleSession(session *SessionAnalysis) {
 	if session.NoopCount > 0 {
 		line += fmt.Sprintf(" noops=%d", session.NoopCount)
 	}
+	if session.ContinuationRequestCount == nil {
+		line += " continuation_requests=unavailable"
+	} else {
+		line += fmt.Sprintf(" continuation_requests=%d", *session.ContinuationRequestCount)
+	}
 	fmt.Fprintln(os.Stderr, line)
 }
 
@@ -259,6 +267,13 @@ func renderConsoleModelRouting(routing *ModelRoutingSummary) {
 	if routing.Failure != nil {
 		fmt.Fprintf(os.Stderr, "    failure: code=%s detail=%s\n",
 			safeModelRoutingText(routing.Failure.Code), safeModelRoutingText(routing.Failure.Detail))
+	}
+	if observation := routing.Observation; observation != nil {
+		line := "    observation: outcome=" + observation.Outcome
+		if observation.Reason != "" {
+			line += " reason=" + observation.Reason
+		}
+		fmt.Fprintln(os.Stderr, safeModelRoutingText(line))
 	}
 	fmt.Fprintf(os.Stderr, "    cost_aic: classifier=%.3f selected_model=%.3f deviated=%.3f\n",
 		routing.ClassifierCost.AIC, routing.SelectedModelCost.AIC, routing.DeviatedTrafficCost.AIC)
@@ -352,7 +367,7 @@ func formatModelRoutingCounts(counts map[string]int) string {
 	for key := range counts {
 		keys = append(keys, key)
 	}
-	sort.Strings(keys)
+	slices.Sort(keys)
 	parts := make([]string, 0, len(keys))
 	for _, key := range keys {
 		parts = append(parts, fmt.Sprintf("%s=%d", safeModelRoutingText(key), counts[key]))
@@ -848,7 +863,7 @@ func renderConsoleExperiments(experiments *ExperimentData) {
 	for name, variant := range experiments.Assignments {
 		parts = append(parts, name+"="+variant)
 	}
-	sort.Strings(parts)
+	slices.Sort(parts)
 	fmt.Fprintf(os.Stderr, "  experiments: %s\n", strings.Join(parts, " "))
 }
 

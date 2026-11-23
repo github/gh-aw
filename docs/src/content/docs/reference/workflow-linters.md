@@ -15,7 +15,7 @@ Threat IDs refer to the [Compiler Threat Detection Specification](https://github
 | `job-timeout` | `CTR-026` | AW, Actions | Explicit workflow and job timeouts are positive integer literals. Omission is allowed. |
 | `needs-consistency` | — | AW, Actions | `needs` names existing jobs without self-edges or cycles. Literal accesses name direct dependencies and declared outputs. Prompt references must be available during activation. Ordering-only dependencies are valid. |
 | `step-reference` | — | AW, Actions | Literal `steps` accesses name a step ID declared in the same job, including bare `if` conditions. Output declarations and ordering are not checked. |
-| `template-injection` | `CTR-006` | AW, Actions | Known attacker-controlled expressions are not interpolated into executable `run` or `actions/github-script` code. Use environment bindings, quoted shell expansions, or `process.env` instead. |
+| `template-injection` | `CTR-006` | AW, Actions | Known attacker-controlled expressions are not interpolated into executable `run` or reviewed action code inputs, including values transported through modeled shell step and job outputs. Use environment bindings and runtime data access instead. |
 | `workflow-run-scope` | `CTR-021` | AW, Actions | `workflow_run` selects workflows and has a positive branch scope, not only wildcard, negated, or empty filters. |
 | `secret-leak` | `CTR-017` | AW, Actions | Symbolic secrets do not reach modeled disclosure sinks. AW-only checks report missing generated execution coverage. |
 | `otlp-secret-leak` | `CTR-017` | AW, Actions | Secret-tainted expressions are not exported through OTLP span or resource attributes. Hard-coded credentials and runtime values are not detected. |
@@ -30,6 +30,8 @@ Threat IDs refer to the [Compiler Threat Detection Specification](https://github
 | `tool-scope` | `CTR-003` | AW | Shell refusal does not conflict with CLI/`gh` proxies; `min-integrity: none` declares shell intent; cache memory avoids repository-wide scope. Defers when imports may supply prerequisites. |
 | `sandbox-config` | `CTR-004` | AW | The agent sandbox is not disabled, and internal agent or MCP command, environment, argument, image, or version overrides are not enabled. Empty overrides are ignored. |
 | `image-argument` | `CTR-013` | AW, Actions | Job, service, and authored MCP image operands do not start with `-`. Registries and computed images are not inspected. |
+| `unpinned-images` | — | AW, Actions | Job and service images use valid immutable digests. Literal matrix alternatives, including `include` values, are checked; other computed images produce an incomplete-analysis warning. |
+| `environment-file-injection` | — | AW, Actions | Attacker-controlled data does not flow through modeled Bash/sh redirects or `tee` into `GITHUB_ENV` or `GITHUB_PATH`. Quoting alone does not prevent injected records. Literal writes and boolean-filtered values are allowed. |
 | `checkout-mode` | `CTR-033` | AW | Repository-list expansion is an explicit boolean. Literal lists need multi mode, a literal non-root prefix, and a scoped allowlist without LFS, submodules, current identity, or wiki expansion. |
 | `fork-association` | `CTR-034` | AW | Explicit fork admission uses GitHub's uppercase author-association enum. Empty lists and repository wildcards are valid. |
 | `pull-request-target-roles` | `CTR-008` | AW | `pull_request_target` does not admit explicit `read` or `all` roles. Checkout disablement and risk acknowledgment do not bypass this. |
@@ -49,6 +51,31 @@ Threat IDs refer to the [Compiler Threat Detection Specification](https://github
 | `bash-case-pattern` | — | AW, Actions | Bash `case` patterns inside `$(...)` use balanced `(pattern)` syntax for Bash 3.2 compatibility. Intentional unquoted glob matching remains allowed. |
 | `privileged-checkout` | — | AW, Actions | Privileged triggers warn on enabled or dynamic `allow-unsafe-pr-checkout`, PR-head, dispatch, or upstream-head checkout selectors, literal `refs/pull/` refs, and direct `gh pr checkout` or Git calls selecting them. Trusted base checkouts are not flagged. |
 | `artifact-execution` | — | AW, Actions | `workflow_run` warns when cross-run downloads extract into the workspace or an unknown path, or when later direct execution uses their literal destination. |
+| `remote-script-execution` | — | AW, Actions | Bash/sh `run` scripts do not execute `curl` or `wget` output directly: pipes into a shell or interpreter, process substitution (`bash <(curl …)`), command substitution as code (`sh -c "$(curl …)"`, `eval`), and stdin redirects. Downloads to files, and pipes into data tools such as `jq` or `tee`, are not flagged. |
+
+### Suppressing a diagnostic
+
+A standalone YAML comment can acknowledge a false positive for specific rule IDs on the immediately following field:
+
+```yaml
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    # gh-aw: ignore[unpinned-images] -- Reviewed caller supplies an immutable digest.
+    container: ${{ inputs.container-image }}
+    steps:
+      - run: echo ready
+```
+
+Use comma-separated IDs for multiple rules: `# gh-aw: ignore[template-injection, environment-file-injection] -- Reason`. A nonempty reason and exact registered rule IDs are required. Wildcards, empty lists, unknown IDs, and malformed or misplaced directives fail linting.
+
+Ordinary notes containing `gh-aw:` are not directives. Suppression recognition is restricted to the `ignore` syntax; malformed suppression attempts still fail linting.
+
+Place the comment at the field's indentation, with no blank line before the field. Other YAML comments may intervene. Before `- run:`, match the list marker's indentation; only that first field is targeted, not the whole step. A mapping or sequence field includes its authored child fields. Sibling fields and steps, other rules, and analysis failures remain visible. There is no file-wide or disable/enable directive. Comments inside strings, scripts, or the Markdown prompt do not suppress anything.
+
+Directives work in Actions YAML and AW frontmatter. AW comments are not copied into compiled execution graphs: when linting a compiled workflow and its companion AW document, execution diagnostics use comments in the Actions YAML, while findings from authored AW fields use the frontmatter, including AW-owned findings from mixed-target rules. Suppressions on YAML anchors do not implicitly carry over to alias uses; an alias field needs its own directive, scoped to its actual descendants rather than similarly prefixed sibling keys.
+
+Suppression acknowledges a diagnostic; it does not establish safety. These comments do not disable independent compiler validation, strict-mode security controls, runtime protections, or external tools such as actionlint and shellcheck.
 
 ### Privileged custom code
 
@@ -58,13 +85,37 @@ Threat IDs refer to the [Compiler Threat Detection Specification](https://github
 
 An exact `github.event.pull_request.merge_commit_sha` checkout is exempt when its job or step condition requires `github.event.pull_request.merged` to be true, so the revision has already landed. Guards may test the property directly or compare it to literal `true`; a conjunction needs one guarding branch, and every branch of a disjunction must guard. The proof follows declared `needs` edges. A status override such as `always()` inherits it only if the condition requires the dependency's success, or requires both `!cancelled()` and a non-skipped dependency result. Step-level `success()` does not prove dependency success. `closed` alone is insufficient.
 
-`artifact-execution` recognizes `actions/download-artifact` with an explicit cross-run `run-id` and a potentially nonempty `github-token`, and `dawidd6/action-download-artifact`, whose default selects another run. Explicit current `github.run_id` is exempt; dynamic tokens count as potentially cross-run. Extraction into the workspace root or an ancestor warns, because downloads can overwrite code or configuration. Extract into a dedicated literal directory instead. Modeled execution sinks include direct script or interpreter calls, local action paths, and package or build commands (`npm ci`, `npm run build`, `make`) inside the download destination. Data-only reads such as `cat`, `jq`, and checksums are not execution, and `npm run` without a script name only lists metadata. A successful producer does not prove artifact authenticity.
+`artifact-execution` recognizes `actions/download-artifact` with an explicit cross-run `run-id` and a potentially nonempty `github-token`, and `dawidd6/action-download-artifact`, whose default selects another run. Explicit current `github.run_id` is exempt; dynamic tokens count as potentially cross-run. Extraction into the workspace root or an ancestor warns, because downloads can overwrite code or configuration. Extract into a dedicated literal directory instead. Modeled execution sinks include direct script or interpreter calls, Node preload/import/loader operands (`-r`, `--require`, `--import`, `--loader`, `--experimental-loader`), local action paths, and package or build commands (`npm ci`, `npm run build`, `make`) inside the download destination. Data-only reads such as `cat`, `jq`, and checksums are not execution, and `npm run` without a script name only lists metadata. A successful producer does not prove artifact authenticity.
 
 `runner.temp` expressions resolve to a distinct symbolic directory, and shell operands can use `$RUNNER_TEMP` or `${RUNNER_TEMP}`. Data-only downloads there do not warn about unknown paths or workspace overwrite. Direct execution from them still warns, and traversal to the workspace or a common ancestor is not exempt.
 
 These are bounded static checks, not whole-program analysis or provenance verification. They do not follow arbitrary environment indirection, `cd`, nested command strings, aliases, command wrappers, other interpreters, third-party action internals, cross-job artifact flows, or dynamically computed paths. Unsupported shells are not analyzed. Implicit Windows PowerShell is not treated as Bash, but explicit Bash or sh overrides are. Malformed modeled shell syntax produces an incomplete-analysis warning. Missing findings do not establish that shell or artifacts are safe.
 
 Compilation stays offline and deterministic. These rules neither resolve action tags nor classify unknown SHAs as vulnerable. Keep full-SHA pinning and update pins to reviewed patched releases, not mutable tags.
+
+### Executable inputs and runner environment files
+
+`template-injection` recognizes `actions/github-script.script`, `amadevus/pwsh-script.script`, `jannekem/run-python-script-action.script`, `cardinalby/js-eval-action.expression`, and `addnab/docker-run-action.run`. Action names match exactly, independently of their version or SHA; reviewed input names match case-insensitively, while diagnostics retain authored key casing. Other inputs are not assumed to be executable.
+
+Output-flow analysis reuses the symbolic shell model, preserving known event/input origins through `GITHUB_OUTPUT`, environment aliases, and declared dependency outputs. Unknown action outputs are not automatically trusted or classified as attacker-controlled. AW-only analysis tracks explicit steps within each execution block; cross-job propagation requires the Actions AST. Unsupported interpreters, unresolved output names, and malformed modeled scripts produce coverage warnings. JavaScript-produced output propagation and arbitrary external-script behavior are outside this shell model.
+
+Analysis does not mutate typed steps or remove their output declarations and emission-time interpolation safeguards. Findings collected before an analysis failure are preserved; malformed Actions expressions remain explicit failures, not warning-only success.
+
+`environment-file-injection` is an error in strict and non-strict mode. An attacker-controlled multiline value can append extra environment records even when passed through a quoted shell variable or a fixed heredoc delimiter. An attacker-controlled path can change later executable lookup. The check is conservative: arbitrary shell validation is not treated as sanitization. PowerShell, other unsupported shells, and unavailable generated AW execution produce incomplete-analysis warnings rather than a clean bill of health. This rule does not replace the stricter prohibition on environment-file writes in authored safe-output steps.
+
+Shell stdout follows ordered descriptor redirects and duplication, including routing through fd 2 into runner command files. Unmodeled persistent, dynamic, compound, or independently produced stderr flows remain coverage gaps. Unsupported Node commands with tainted inherited environment values also produce coverage warnings when JavaScript analysis is unavailable.
+
+As with secret-flow coverage, the compiler omits environment-file and output-flow coverage warnings from its warning count. `gh aw lint` retains them. Confirmed findings still fail compilation.
+
+### False-positive boundaries
+
+| Check | Safe cases and conservative limits |
+|---|---|
+| Artifact preloads | Only explicit relative paths, absolute paths, and local file URLs for ESM imports/loaders are resolved as local preload files. CommonJS `--require` does not accept file URLs. Bare package specifiers are not workspace-relative paths; unresolved package resolution produces an incomplete-analysis warning, while known Node builtins are exempt. Options after eval/print payloads are inspected. `--version`, `-v`, and `--v8-options` do not execute preloads, including when supplied later. `--help` and `--check` can still load preloads and are not blanket exemptions. |
+| Executable action inputs | Only the reviewed action/input pairs above are code sinks. Lookalike action names and unrelated data inputs are not sinks. Runtime environment access and expressions returning booleans do not trigger executable interpolation findings. |
+| Output interpolation | Quoted runtime environment access, boolean comparisons, and boolean predicate results remain data. Taint is conservatively unioned across shell branches and assignments; overwrites and arbitrary sanitizers do not prove a value safe. Unknown outputs do not become attacker-controlled solely because another output is tainted, except where unresolved or multiline records require wildcard tracking. |
+| Environment files | Literal filenames such as `'$GITHUB_ENV'`, `'$GITHUB_PATH'`, and `'$GITHUB_OUTPUT'` are ordinary working-directory-relative files, not runner command files. They retain ordinary file taint without publishing runner environment records or outputs. Expanded runner variables and their modeled aliases are checked. Constants and boolean-filtered values are allowed; quoting untrusted multiline data or using a fixed heredoc delimiter is not sanitization. |
+| Image pins | An explicitly empty service `image`, including an empty fully substituted matrix alternative, disables that service and is allowed; an empty job-container image is not. Matrix values are substituted into the full image template before validation. A matrix `exclude` entry naming only the image axis removes that alternative, but a later `include` can restore it. Partial multi-axis exclusions remain conservative; unresolved expressions produce coverage warnings, not proof of mutable images. |
 
 ### Historical zizmor regressions
 
@@ -249,6 +300,15 @@ matched=$(case "$remote_ref" in ($source_ref) printf 1 ;; esac)
 ```
 
 The opening parenthesis avoids a Bash 3.2 command-substitution parsing ambiguity. Quoting `$source_ref` would turn intentional glob matching into literal matching. For execution coverage, run `go test ./pkg/workflow -run TestGenerateFetchStep -count=1` with Bash 3.2 and a modern Bash on `PATH` separately.
+
+### Remote script execution
+
+`remote-script-execution` warns when a parsed Bash or `sh` `run` script executes network content without verification, a common supply-chain risk (compare the 2021 Codecov uploader compromise). It recognizes `curl` and `wget` writing to standard output, followed through `sudo`/`env` wrappers into `bash`, `sh`, `zsh`, `dash`, `ksh`, `python`, `node`, `perl`, `ruby`, `eval`, or `source`. Interpreters given a script file or inline literal program are not flagged. Program text inside quoted strings, PowerShell steps, and multi-step download-then-execute flows are not analyzed. Prefer a pinned action, or download a versioned artifact and verify it before execution:
+
+```bash
+curl -fsSLo tool.tar.gz "https://example.com/tool-v1.2.3.tar.gz"
+echo "<sha256>  tool.tar.gz" | sha256sum -c -
+```
 
 ### Comparing compiler revisions
 

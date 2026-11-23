@@ -276,6 +276,7 @@ func (c *Compiler) validateCoreToolConfiguration(workflowData *WorkflowData, mar
 		{logMessage: "Validating GitHub CLI proxy version", validateFn: func() error { return validateGitHubCLIProxyVersion(workflowData) }},
 		{logMessage: "Validating safe-outputs target fields", validateFn: func() error { return validateSafeOutputsTarget(workflowData.SafeOutputs) }},
 		{logMessage: "Validating safe-outputs max fields", validateFn: func() error { return validateSafeOutputsMax(workflowData.SafeOutputs) }},
+		{logMessage: "Validating request-continuation authorization", validateFn: func() error { return validateRequestContinuationAuthorization(workflowData.SafeOutputs) }},
 		{logMessage: "Validating steering issue configuration", validateFn: func() error { return validateSteeringIssue(workflowData) }},
 		{logMessage: "Validating safe-outputs data schema", validateFn: func() error { return validateSafeOutputsDataSchema(workflowData.SafeOutputs) }},
 		{logMessage: "Validating safe-outputs samples entries against MCP tool schemas", validateFn: func() error { return validateSafeOutputsSamples(workflowData.SafeOutputs) }},
@@ -318,11 +319,16 @@ func (c *Compiler) validateCoreToolConfiguration(workflowData *WorkflowData, mar
 		fmt.Fprintln(os.Stderr, formatCompilerMessage(markdownPath, "warning", err.Error()))
 		c.IncrementWarningCount()
 	}
+	workflowLog.Printf("Validating BYOK provider host firewall coverage")
+	if err := c.validateBYOKProviderHostAllowlist(workflowData, markdownPath); err != nil {
+		return err
+	}
 	workflowLog.Printf("Validating cross-repo checkout paths")
 	c.deriveAndWarnCrossRepoCheckoutPaths(workflowData.CheckoutConfigs, markdownPath)
 	c.warnCheckoutRefWithSteps(workflowData, markdownPath)
 	workflowLog.Printf("Validating push-to-pull-request-branch configuration")
 	c.validatePushToPullRequestBranchWarnings(workflowData.SafeOutputs, workflowData.CheckoutConfigs)
+	c.warnNestedPublicationAlerts(workflowData.SafeOutputs, markdownPath)
 	for _, validation := range validations {
 		workflowLog.Printf("%s", validation.logMessage)
 		if err := validation.validateFn(); err != nil {
@@ -613,6 +619,35 @@ var experimentalFeatureChecks = []struct {
 	{"drive-memory", func(w *WorkflowData) bool { return w.DriveMemoryConfig != nil && len(w.DriveMemoryConfig.Drives) > 0 }},
 	{"continual-experiments", func(w *WorkflowData) bool { return hasContinualExperiment(w.ExperimentConfigs) }},
 	{"safe-outputs-steer", func(w *WorkflowData) bool { return w.SafeOutputs != nil && w.SafeOutputs.Steer }},
+	{"issue-intent", hasIssueIntentEnabled},
+}
+
+// hasIssueIntentEnabled reports whether any intent-capable safe output opts in with issue-intent: true.
+func hasIssueIntentEnabled(w *WorkflowData) bool {
+	so := w.SafeOutputs
+	if so == nil {
+		return false
+	}
+	var toggles []*bool
+	if so.CloseIssues != nil {
+		toggles = append(toggles, so.CloseIssues.IssueIntent)
+	}
+	if so.AddLabels != nil {
+		toggles = append(toggles, so.AddLabels.IssueIntent)
+	}
+	if so.AssignToAgent != nil {
+		toggles = append(toggles, so.AssignToAgent.IssueIntent)
+	}
+	if so.AssignToUser != nil {
+		toggles = append(toggles, so.AssignToUser.IssueIntent)
+	}
+	if so.SetIssueType != nil {
+		toggles = append(toggles, so.SetIssueType.IssueIntent)
+	}
+	if so.SetIssueField != nil {
+		toggles = append(toggles, so.SetIssueField.IssueIntent)
+	}
+	return slices.ContainsFunc(toggles, issueIntentRequired)
 }
 
 func hasWebhookSubscriptionEvent(workflowData *WorkflowData, event string) bool {

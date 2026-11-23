@@ -24,11 +24,41 @@ var DefaultMarshalOptions = []yaml.EncodeOption{
 // marshalYAMLWithOptions preserves multiline values that bare literal blocks
 // would misindent or normalize. Ordinary multiline strings retain literal style.
 func marshalYAMLWithOptions(value any, options ...yaml.EncodeOption) ([]byte, error) {
+	return marshalYAML(value, false, options...)
+}
+
+func marshalYAMLWithImplicitMappingNulls(value any, options ...yaml.EncodeOption) ([]byte, error) {
+	return marshalYAML(value, true, options...)
+}
+
+func marshalYAML(value any, implicitMappingNulls bool, options ...yaml.EncodeOption) ([]byte, error) {
 	node, err := yaml.NewEncoder(nil, options...).EncodeToNode(value)
 	if err != nil {
 		return nil, err
 	}
 	repaired := false
+	if implicitMappingNulls {
+		// Render only actual mapping nulls as empty values, never text inside
+		// a block scalar or null entries in a sequence.
+		flowEntries := make(map[*ast.MappingValueNode]bool)
+		for _, candidate := range ast.Filter(ast.MappingType, node) {
+			if mapping, ok := candidate.(*ast.MappingNode); ok && mapping.IsFlowStyle {
+				for _, entry := range mapping.Values {
+					flowEntries[entry] = true
+				}
+			}
+		}
+		for _, candidate := range ast.Filter(ast.MappingValueType, node) {
+			entry, ok := candidate.(*ast.MappingValueNode)
+			if !ok || entry.IsFlowStyle || flowEntries[entry] {
+				continue
+			}
+			if nullNode, ok := entry.Value.(*ast.NullNode); ok {
+				nullNode.Token.Type = token.ImplicitNullType
+				repaired = true
+			}
+		}
+	}
 	for _, candidate := range ast.Filter(ast.StringType, node) {
 		text, ok := candidate.(*ast.StringNode)
 		if !ok {

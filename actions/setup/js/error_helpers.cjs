@@ -88,6 +88,21 @@ function isLockedError(error) {
 }
 
 /**
+ * Check if an error is GitHub refusing a new comment because the issue reached
+ * its maximum comment count ("Commenting is disabled on issues with more than
+ * 2500 comments"). Retrying on the same issue can never succeed.
+ *
+ * @param {unknown} error - The error value to check
+ * @returns {boolean} True if the issue has reached the comment limit
+ */
+function isCommentLimitError(error) {
+  if (getErrorStatus(error) !== 403) {
+    return false;
+  }
+  return /commenting is disabled on issues with more than \d+ comments/i.test(getErrorMessage(error));
+}
+
+/**
  * Check if an error is due to a GitHub API rate limit being exceeded.
  * This includes both installation-level and user-level rate limits.
  * Used to determine if a check should fail-open (allow workflow to proceed)
@@ -113,4 +128,4 @@ function isConnectTimeoutError(error) {
   return ("code" in error && error.code === "UND_ERR_CONNECT_TIMEOUT") || ("message" in error && error.message === "Connect Timeout Error");
 }
 
-module.exports = { getErrorMessage, getErrorStatus, isHtmlContent, isLockedError, isRateLimitError, isConnectTimeoutError };
+module.exports = { getErrorMessage, getErrorStatus, isHtmlContent, isLockedError, isCommentLimitError, isRateLimitError, isConnectTimeoutError };

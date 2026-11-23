@@ -1,21 +1,21 @@
 ---
 title: gh-aw OpenTelemetry Observability Specification
 description: Formal W3C-style specification for observability contract for GitHub Agentic Workflows using OpenTelemetry traces, metrics, logs, and OTLP export.
-version: 0.7.0
+version: 0.8.0
 status: Working Draft
 date: 2026-06-18
-last_updated: 2026-11-19
+last_updated: 2026-11-22
 editors:
   - GitHub gh-aw Team
 ---
 
 # gh-aw OpenTelemetry Observability Specification
 
-**Version**: 0.7.0
+**Version**: 0.8.0
 **Status**: Working Draft  
 **Publication Date**: June 18, 2026
 **Latest Version**: https://github.com/github/gh-aw/blob/main/specs/otel-observability-spec.md  
-**Previous Version**: 0.6.0
+**Previous Version**: 0.7.0
 **Editors**: GitHub gh-aw Team
 
 ---
@@ -28,7 +28,7 @@ This specification defines the compatibility-first OpenTelemetry observability c
 
 This document is a **Working Draft** maintained by the GitHub `gh-aw` Team. It may be changed, replaced, or made obsolete by subsequent versions.
 
-Version 0.7.0 adds OTLP metrics emission (enabled by default when configured) and the `logMetric()` API.
+Version 0.8.0 adds an explicit `observability.otlp: false` opt-out while preserving authored environment configuration and local telemetry mirrors. Version 0.7.0 added OTLP metrics emission (enabled by default when configured) and the `logMetric()` API.
 
 Sections explicitly marked **Informative** are non-normative. All other sections are normative unless stated otherwise.
 
@@ -210,7 +210,15 @@ Clock comparisons across jobs SHOULD tolerate runner clock skew. Implementations
 
 ### 5.1 Frontmatter Declaration
 
-A workflow MAY declare an `observability.otlp` object.
+A workflow MAY declare `observability.otlp` as either the literal value `false` or an object.
+
+The `false` form is an explicit opt-out. When the main workflow's `observability.otlp` value is `false`, the compiler:
+
+- MUST treat remote OTLP export as disabled for that workflow;
+- MUST NOT merge `observability.otlp` configuration from imported workflows;
+- MUST NOT inject compiler-managed OTLP environment variables or credential references;
+- MUST preserve environment variables and credential references explicitly authored by the workflow; and
+- MUST NOT disable local telemetry mirrors or artifacts that are otherwise produced by the runtime.
 
 When `observability.otlp` is absent:
 
@@ -280,9 +288,9 @@ Expressions such as `${{ secrets.OTLP_ENDPOINT }}` MUST NOT produce a compile-ti
 
 ### 5.8 Default Fallback
 
-When a workflow declares no `observability.otlp` endpoint in its own frontmatter or in any imported workflow, the compiler MUST fall back to a repository- or organization-level default endpoint expressed as `${{ secrets.GH_AW_DEFAULT_OTLP_ENDPOINT || vars.GH_AW_DEFAULT_OTLP_ENDPOINT }}` with headers `${{ secrets.GH_AW_DEFAULT_OTLP_HEADERS }}`. The secret takes precedence when both endpoint values are configured; implementations MUST require clearing both endpoint values to disable export when both are present.
+When the main workflow's frontmatter does not declare `observability.otlp: false`, and no `observability.otlp` endpoint is declared in its own frontmatter or in any imported workflow, the compiler MUST fall back to a repository- or organization-level default endpoint expressed as `${{ secrets.GH_AW_DEFAULT_OTLP_ENDPOINT || vars.GH_AW_DEFAULT_OTLP_ENDPOINT }}` with headers `${{ secrets.GH_AW_DEFAULT_OTLP_HEADERS }}`. The secret takes precedence when both endpoint values are configured; implementations MUST require clearing both endpoint values to disable export when both are present.
 
-An explicit `observability.otlp` endpoint from frontmatter or an import MUST take precedence over the default fallback; the fallback MUST only apply when no endpoint entry can be resolved from frontmatter or imports.
+An explicit `observability.otlp: false` in the main workflow's frontmatter takes precedence over imported observability declarations and MUST suppress this default fallback. An explicit `observability.otlp` endpoint from frontmatter or an import MUST take precedence over the default fallback; the fallback MUST only apply when no endpoint entry can be resolved from frontmatter or imports.
 
 The compiler MUST set the effective `if-missing` policy to `ignore` for the default fallback path when the workflow has not explicitly configured `if-missing`. This makes an unset `GH_AW_DEFAULT_OTLP_ENDPOINT` a silent no-op instead of a compile- or runtime-time failure.
 
@@ -692,7 +700,7 @@ Span links SHOULD be used instead of parent-child relationships when outcome eva
 | Attribute | Type | Requirement |
 |---|---|---|
 | `gen_ai.operation.name` | string | REQUIRED on GenAI operation spans, except where §9.5 prohibits it on the agent conclusion span. |
-| `gen_ai.provider.name` | string | REQUIRED when the engine is known. Values: `copilot` → `github`, `claude` → `anthropic`, `codex` → `openai`, `gemini` → `gcp.gen_ai`; any other engine ID is used unchanged. |
+| `gen_ai.provider.name` | string | REQUIRED when the engine is known. Values: `copilot` → `github`, `claude` → `anthropic`, `codex` → `openai`, `gemini` → `gcp.gen_ai`; any other engine ID is used unchanged. For Copilot BYOK inference (`COPILOT_PROVIDER_BASE_URL`, connector inference or a provider override), the compiler-resolved provider MUST be used instead. The auth provider is `AWF_AUTH_PROVIDER` from `engine.env` when set, otherwise `engine.auth.provider`. With `COPILOT_PROVIDER_BASE_URL`: `azure.ai.openai` for Azure endpoints or `azure` provider type/auth, `anthropic` for the Anthropic provider type, otherwise `openai` (any other auth provider, such as `gcp`, only selects authentication and does not change the value). Expression-valued endpoints (for example `${{ secrets.ENDPOINT }}`) cannot be inspected at compile time, so an Azure endpoint supplied that way reports `openai` unless `COPILOT_PROVIDER_TYPE` is `azure` or the auth provider is `azure`. For a provider override without a base URL: `azure.ai.openai` when the auth provider is `azure`, otherwise the declared provider (`azure` → `azure.ai.openai`, `anthropic` → `anthropic`, `gcp`/`gemini`/`google` → `gcp.gen_ai`), otherwise `openai`; `gen_ai.system` then uses `az.ai.openai` for `azure.ai.openai` and the provider value otherwise. |
 | `gen_ai.system` | string | **Deprecated upstream; compatibility only.** Use `gen_ai.provider.name`; provider value changes are listed in §6.7.1. Without the opt-in, REQUIRED on built-in agent spans when the engine mapping is known. Not deprecated by gh-aw in this version. |
 | `gen_ai.agent.name` | string | REQUIRED on the built-in agent span (§9.5), including an agent conclusion span acting as the agent span; the workflow name. |
 | `gen_ai.request.model` | string | CONDITIONALLY REQUIRED when available. |
@@ -1204,11 +1212,11 @@ The following test IDs are stubs for Level 1 (Stable Configuration and Export) c
 
 | Test ID | Area | Description |
 |---------|------|-------------|
-| **T-OT-001** | Compiler config | Compiler accepts `observability.otlp.endpoint` with a valid HTTPS URL and emits `OTEL_EXPORTER_OTLP_ENDPOINT` in the generated workflow environment. |
+| **T-OT-001** | Compiler config | Compiler accepts `observability.otlp.endpoint` with a valid HTTPS URL and emits `OTEL_EXPORTER_OTLP_ENDPOINT` in the generated workflow environment; when the main workflow declares `observability.otlp: false`, it emits no compiler-managed OTLP environment or credential references. |
 | **T-OT-002** | Compiler config | Compiler rejects `observability.otlp.endpoint` set to a non-HTTPS URL when `if-missing: block` is configured, producing a descriptive validation error. |
 | **T-OT-003** | Endpoint normalization | When multiple endpoints are declared, the compiler preserves them in declaration order and retains the first endpoint in the `OTEL_EXPORTER_OTLP_ENDPOINT` variable for backward compatibility. |
 | **T-OT-004** | OTLP export | The runtime JavaScript helper defaults to valid OTLP/HTTP JSON and supports binary OTLP/HTTP protobuf selected through the standard protocol environment variables. Both POST to the configured traces endpoint and recognize a successful 200 response as accepted. Protobuf conformance for traces and metrics is compared byte-for-byte with the official OpenTelemetry SDK protocol types in CI. |
-| **T-OT-005** | Trace context | The compiler injects `GITHUB_AW_OTEL_TRACE_ID`, `GITHUB_AW_OTEL_PARENT_SPAN_ID`, and `TRACEPARENT` into the generated workflow environment when OTLP observability is enabled. |
+| **T-OT-005** | Trace context | The compiler injects `GITHUB_AW_OTEL_TRACE_ID`, `GITHUB_AW_OTEL_PARENT_SPAN_ID`, and `TRACEPARENT` into the generated workflow environment when OTLP observability is enabled, and does not inject compiler-managed values when the main workflow declares `observability.otlp: false`. |
 | **T-OT-006** | Local mirrors | The runtime helper writes each exported span as a raw OTLP/HTTP JSON line with a `resourceSpans` key to `/tmp/gh-aw/otel.jsonl`; the file format MUST NOT be an envelope-only summary. |
 | **T-OT-007** | Compiler config | `observability.otlp.headers` entries are emitted as `OTEL_EXPORTER_OTLP_HEADERS` in `key=value,key=value` format and are masked in diagnostics, job summaries, and artifacts. |
 
@@ -1305,6 +1313,10 @@ which has no release tag, and semantic-conventions v1.45.0.
 ### Unreleased
 
 - **Added**: Backend service correlation through W3C `traceparent`, header-safe job baggage using `cicd.pipeline.task.name`, and JSON `job_id` (§7.7.1), with endpoint coverage and trust-boundary requirements.
+
+### Version 0.8.0 (Working Draft, November 22, 2026)
+
+- **Added**: An explicit `observability.otlp: false` declaration (§5.1) that suppresses imported observability configuration, compiler-managed OTLP environment and credential injection, and §5.8 default fallback while preserving explicitly authored environment configuration and local telemetry mirrors.
 - **Clarified**: Explicit upstream deprecation/removal labels and the §6.7.1 migration map for legacy agent spans,
   GenAI attributes and token metrics, including provider values, token-count semantics and mixed-mode queries.
 - **Added**: the §6.7 opt-in; the §8.1 standard resource attributes; `gen_ai.provider.name`, `gen_ai.agent.name`,
@@ -1317,6 +1329,7 @@ which has no release tag, and semantic-conventions v1.45.0.
 - **Added**: Opt-in built-in job metrics and the `logMetric()` API (§11.5, §12.6), including a separate local metrics mirror.
 - **Added**: A normative requirement (§10.8) that completed BinEval records MUST produce `eval.result` events on `gh-aw.evals.conclusion`; when a not-evaluated status marker is present it takes precedence and answers are not emitted.
 - **Added**: Non-normative follow-ups for PII redaction and exporter-failure test coverage, with tracked IDs T-OT-012 and T-OT-013.
+- **Changed**: Copilot BYOK runs report the BYOK provider in `gen_ai.provider.name` (§10.3) instead of `github`.
 
 ### Version 0.6.0 (Working Draft, November 5, 2026)
 

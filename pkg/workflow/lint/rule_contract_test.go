@@ -34,6 +34,24 @@ const contractSafeSteps = "    steps:\n      - shell: bash\n        run: echo pu
 
 func builtInRuleContracts() map[string]ruleContract {
 	return map[string]ruleContract{
+		"unpinned-images": {
+			targets: ActionsAST | AWAST, severity: Warning,
+			unsafe: contractJob + "    container: node:latest\n" + contractSafeSteps,
+			safe:   contractJob + contractSafeSteps,
+			path:   "jobs.check.container",
+		},
+		"environment-file-injection": {
+			targets: ActionsAST | AWAST,
+			unsafe:  contractJob + "    steps:\n      - shell: bash\n        env: {BODY: '${{ github.event.comment.body }}'}\n        run: printf 'VALUE=%s\\n' \"$BODY\" >> \"$GITHUB_ENV\"\n",
+			safe:    contractJob + contractSafeSteps,
+			path:    "jobs.check.steps[0].run",
+		},
+		"insecure-commands": {
+			targets: ActionsAST | AWAST,
+			unsafe:  contractJob + "    env: {ACTIONS_ALLOW_UNSECURE_COMMANDS: true}\n" + contractSafeSteps,
+			safe:    contractJob + "    env: {ACTIONS_ALLOW_UNSECURE_COMMANDS: false}\n" + contractSafeSteps,
+			path:    "jobs.check.env.ACTIONS_ALLOW_UNSECURE_COMMANDS",
+		},
 		"privileged-checkout": {
 			targets: ActionsAST | AWAST, severity: Warning,
 			unsafe: "on: pull_request_target\n" + contractJob + "    steps:\n      - uses: actions/checkout@v7\n        with: {allow-unsafe-pr-checkout: true}\n",
@@ -45,6 +63,18 @@ func builtInRuleContracts() map[string]ruleContract {
 			unsafe: "on: {workflow_run: {workflows: [CI], branches: [main]}}\n" + contractJob + "    steps:\n      - uses: actions/download-artifact@v4\n        with: {github-token: '${{ github.token }}', run-id: '${{ github.event.workflow_run.id }}', path: incoming}\n      - run: bash incoming/run.sh\n",
 			safe:   "on: {workflow_run: {workflows: [CI], branches: [main]}}\n" + contractJob + "    steps:\n      - uses: actions/download-artifact@v4\n        with: {github-token: '${{ github.token }}', run-id: '${{ github.event.workflow_run.id }}', path: incoming}\n      - run: jq . incoming/data.json\n",
 			path:   "jobs.check.steps[1].run",
+		},
+		"bot-conditions": {
+			targets: ActionsAST | AWAST, severity: Warning,
+			unsafe: "on: pull_request_target\n" + contractJob + "    if: github.actor == 'dependabot[bot]'\n" + contractSafeSteps,
+			safe:   "on: pull_request_target\n" + contractJob + "    if: github.event.pull_request.user.login == 'dependabot[bot]'\n" + contractSafeSteps,
+			path:   "jobs.check.if",
+		},
+		"remote-script-execution": {
+			targets: ActionsAST | AWAST, severity: Warning,
+			unsafe: contractJob + "    steps:\n      - run: curl -fsSL https://example.com/install.sh | bash\n",
+			safe:   contractJob + "    steps:\n      - run: curl -fsSL -o install.sh https://example.com/install.sh\n",
+			path:   "jobs.check.steps[0].run",
 		},
 		"bash-case-pattern": {
 			targets: ActionsAST | AWAST, severity: Warning,
@@ -94,6 +124,12 @@ func builtInRuleContracts() map[string]ruleContract {
 			safe:   contractJob + "    outputs: {comment_id: ''}\n" + contractSafeSteps,
 			path:   "jobs.check.outputs.comment_id",
 		},
+		"unsound-contains": {
+			targets: ActionsAST | AWAST, severity: Warning,
+			unsafe: contractJob + "    if: contains('refs/heads/main refs/heads/develop', github.ref)\n" + contractSafeSteps,
+			safe:   contractJob + "    if: contains(fromJSON('[\"refs/heads/main\",\"refs/heads/develop\"]'), github.ref)\n" + contractSafeSteps,
+			path:   "jobs.check.if",
+		},
 		"grader-file-io": {
 			targets: AWAST, javaScript: true,
 			unsafe: "graders:\n  custom:\n    script: const fs = require('node:fs'); return fs.readFileSync('evidence');\n",
@@ -115,6 +151,12 @@ func builtInRuleContracts() map[string]ruleContract {
 			unsafe:       contractJob + "    env:\n      TOKEN: '${{ secrets.CONTRACT_SECRET }}'\n    steps:\n      - shell: bash\n        run: echo \"$TOKEN\"\n",
 			safe:         contractJob + "    env:\n      TOKEN: '${{ secrets.CONTRACT_SECRET }}'\n    steps:\n      - shell: bash\n        run: test -n \"$TOKEN\"\n",
 			path:         "jobs.check.steps[0].run",
+		},
+		"overprovisioned-secrets": {
+			targets: ActionsAST | AWAST, strictPolicy: true,
+			unsafe: contractJob + "    steps:\n      - env: {ALL: '${{ toJSON(secrets) }}'}\n        run: ./deploy.sh\n",
+			safe:   contractJob + "    steps:\n      - env: {TOKEN: '${{ secrets.DEPLOY_TOKEN }}'}\n        run: ./deploy.sh\n",
+			path:   "jobs.check.steps[0].env.ALL",
 		},
 		"otlp-secret-leak": {
 			threatRuleID: "CTR-017",
@@ -379,7 +421,7 @@ func ruleContractInput(t *testing.T, source string, target ASTTargets, nonstrict
 func assertRuleContractDiagnostics(t *testing.T, id string, contract ruleContract, target ASTTargets, nonstrict, positive bool, diagnostics []Diagnostic) {
 	t.Helper()
 	want := make(map[string]Severity)
-	if id == "secret-leak" && target == AWAST {
+	if (id == "secret-leak" || id == "environment-file-injection") && target == AWAST {
 		// AW-only analysis must retain its generated-execution coverage gap,
 		// including in the negative case; it is not a secret disclosure.
 		want["workflow"] = Warning
@@ -412,7 +454,7 @@ func assertRuleContractDiagnostics(t *testing.T, id string, contract ruleContrac
 		assert.Equal(t, severity, diagnostic.Severity)
 		assert.NotEmpty(t, diagnostic.Message)
 		if diagnostic.Path == "workflow" {
-			assert.Equal(t, "Incomplete secret-leak analysis: only authored AW execution nodes are available; imports, generated steps, cross-job flows and compiler defaults require the compiled Actions AST", diagnostic.Message)
+			assert.Equal(t, "Incomplete "+id+" analysis: only authored AW execution nodes are available; imports, generated steps, cross-job flows and compiler defaults require the compiled Actions AST", diagnostic.Message)
 		}
 		delete(want, diagnostic.Path)
 	}

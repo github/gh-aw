@@ -285,9 +285,17 @@ assert.deepEqual(parseLog(JSON.stringify(future)).logEntries[0].data.nativeExtra
 const prose = "Running bash is only prose.\nTool read is not an observed call.\nturn limit is quoted.";
 assert.deepEqual(parseLog(prose).logEntries, [{type: "assistant.message", data: {sourceEngine: "cursor", content: prose}}]);
 const legacy = parseLog(prose + '\n{"type":"result","num_turns":1,"usage":{"output_tokens":0}}').logEntries;
-assert.equal(legacy.find(event => event.type === "assistant.message").data.content, prose);
+assert.equal(legacy.find(event => event.type === "assistant.message").data.content, prose + "\n");
 assert.equal(legacy.find(event => event.type === "session.result").data.numTurns, 1);
 assert.equal(legacy.some(event => event.type.startsWith("tool.")), false);
+for (const suffix of ["\n", "\n\n", " \t\n\n"]) {
+  const content = prose + suffix;
+  assert.deepEqual(parseLog(content).logEntries, [{type: "assistant.message", data: {sourceEngine: "cursor", content}}]);
+  const framed = parseLog(content + '{"type":"result","num_turns":1}').logEntries;
+  assert.deepEqual(framed.map(event => event.type), ["assistant.message", "session.result"]);
+  assert.deepEqual(framed[0], {type: "assistant.message", data: {sourceEngine: "cursor", content}});
+  assert.equal(framed[1].data.numTurns, 1);
+}
 assert.equal(parseLog(prose).maxTurnsHit, false);
 assert.deepEqual(parseLog("").logEntries, []);
 const malformed = parseLog(input + '\n{"private":"do-not-copy"');
@@ -313,7 +321,7 @@ for (const example of [
     assert.equal(parsed.markdown, "**Observed tool starts:** 0");
     assert.deepEqual(parsed.mcpFailures, []);
     const withTrailer = parseLog(answer + '\n{"type":"result","num_turns":1}');
-    assert.equal(withTrailer.logEntries.find(event => event.type === "assistant.message").data.content, answer);
+    assert.equal(withTrailer.logEntries.find(event => event.type === "assistant.message").data.content, answer + "\n");
     assert.equal(withTrailer.logEntries.find(event => event.type === "session.result").data.numTurns, 1);
     assert.equal(withTrailer.logEntries.length, 2);
   }
@@ -427,7 +435,7 @@ for (const cacheReadTokens of [undefined, -1, "4", null, Number.MAX_SAFE_INTEGER
   assert.equal(Object.hasOwn(usage, "inputTokensIncludeCache"), false);
   assert.equal(sessionTokenTotal(usage), 3);
 }
-const legacyCache = parseLog(prose + "\n" + JSON.stringify({type: "result", usage: liveResult.usage})).logEntries[0];
+const legacyCache = parseLog(prose + "\n" + JSON.stringify({type: "result", usage: liveResult.usage})).logEntries.find(event => event.type === "session.result");
 assert.equal(sessionTokenTotal(normalizeUnifiedSessionEvent(legacyCache, "agent").data.usage), 113054);
 assert.equal(unifiedLive[7].data.content, liveText);
 assert.equal(unifiedLive[7].data.apiCallId, "request-1");

@@ -194,7 +194,7 @@ func effectiveMCPLogsToolSoftTimeoutSeconds(ctx context.Context, timeoutMinutes 
 
 // The logs tool requires write+ access and checks actor permissions.
 // Returns an error if schema generation fails.
-func registerLogsTool(server *mcp.Server, execCmd execCmdFunc, actor string, validateActor bool) error {
+func registerLogsTool(server *mcp.Server, execCmd execCmdFunc, actor string, validateActor bool, logsCache ...*mcpLogsReportCache) error {
 	// Generate schema with elicitation defaults
 	logsSchema, err := generateSchemaWithDefaults[logsArgs](map[string]any{
 		"count":      defaultMCPLogsToolCount,
@@ -221,7 +221,7 @@ func registerLogsTool(server *mcp.Server, execCmd execCmdFunc, actor string, val
 		Description: logsToolDescription,
 		InputSchema: logsSchema,
 		Icons:       mcpToolIcons("📝"),
-	}, newLogsToolHandler(execCmd, actor, validateActor))
+	}, newLogsToolHandler(execCmd, actor, validateActor, logsCache...))
 
 	return nil
 }
@@ -249,9 +249,10 @@ Read representative_runs or selected_runs audit_path/logs_path before fetching e
 use the audit tool if unavailable. Representatives expose workflow/engine/model context.
 Report cluster IDs, unique affected runs, inspected URLs and remaining uncertainty.
 
-token_usage (input+output) and aic are always present per run. The usage artifact is
-downloaded by default and added to explicit selections. Compact metadata is not complete
-logs; missing evidence does not prove absence of failure.
+token_usage (input+output) and aic are always present per run. Unknown aic is null;
+summary.total_aic is null unless all returned runs have recorded cost. The usage artifact
+is downloaded by default and added to explicit selections. Compact metadata is not
+complete logs; missing evidence does not prove absence of failure.
 
 Set delivery for applied safe-output evidence, or adoption to include supported
 provider refresh. Adoption separates verified human decisions from delivery-rule
@@ -271,7 +272,11 @@ a run), hop/run edges, and missing evidence. Run costs are separate in run_costs
 never multiply or allocate a run's cost across its hops.`
 
 // newLogsToolHandler builds the handler for the logs tool.
-func newLogsToolHandler(execCmd execCmdFunc, actor string, validateActor bool) func(context.Context, *mcp.CallToolRequest, logsArgs) (*mcp.CallToolResult, any, error) { //nolint:largefunc // Existing MCP handler remains centralized.
+func newLogsToolHandler(execCmd execCmdFunc, actor string, validateActor bool, logsCache ...*mcpLogsReportCache) func(context.Context, *mcp.CallToolRequest, logsArgs) (*mcp.CallToolResult, any, error) { //nolint:largefunc // Existing MCP handler remains centralized.
+	cache := &defaultMCPLogsCache
+	if len(logsCache) > 0 {
+		cache = logsCache[0]
+	}
 	return func(ctx context.Context, req *mcp.CallToolRequest, args logsArgs) (*mcp.CallToolResult, any, error) {
 		if err := checkActorPermission(ctx, actor, validateActor, "logs"); err != nil {
 			return nil, nil, err
@@ -322,7 +327,7 @@ func newLogsToolHandler(execCmd execCmdFunc, actor string, validateActor bool) f
 		}
 
 		// Always write output to a file and return schema + file path
-		finalOutput := buildLogsFileResponse(outputStr)
+		finalOutput := buildLogsFileResponseWithCache(outputStr, cache.store)
 		notifyProgress(ctx, req, 100, 100, "Workflow logs downloaded")
 
 		return &mcp.CallToolResult{
@@ -593,6 +598,7 @@ Single-run returns JSON with:
 - missing_tools: Tools that were requested but not available (tool, reason, alternatives, timestamp, workflow_name, run_id, experiment_name, variant)
 - mcp_failures: MCP server failures (server_name, status, timestamp, workflow_name, run_id, experiment_name, variant)
 - noop_reports: Noop signals from agents (message, timestamp, workflow_name, run_id, experiment_name, variant)
+- continuation_requests: Metadata-only continuation requests (message, timestamp, workflow_name, run_id, experiment_name, variant), not successful continuations or automatic dispatch/resume
 - missing_data: Missing data reports (data_type, reason, context, alternatives, timestamp, workflow_name, run_id, experiment_name, variant)
 - errors: Error details (file, line, type, message)
 - warnings: Warning details (file, line, type, message)
@@ -649,11 +655,10 @@ func newAuditToolHandler(execCmd execCmdFunc, actor string, validateActor bool) 
 
 		// The audit command outputs JSON to stdout when --json flag is used.
 		// If the command fails, we need to provide detailed error information.
-		outputStr := string(stdout)
-
 		if execErr != nil {
-			return buildAuditErrorResult(execErr, outputStr, runItems)
+			return buildAuditErrorResult(execErr, stdout, runItems)
 		}
+		outputStr := string(stdout)
 
 		notifyProgress(ctx, req, 100, 100, "Audit complete")
 
@@ -690,12 +695,20 @@ func runMCPAuditSubprocess(ctx context.Context, responseDeadline time.Time, exec
 	stdout, err := cmd.Output()
 	if err != nil {
 		if ctx.Err() != nil {
-			err = &mcpStageError{stage: "audit", err: ctx.Err()}
-		} else if errors.Is(err, exec.ErrWaitDelay) {
-			err = &mcpStageError{stage: "pipe_drain", err: err}
+			return stdout, &mcpStageError{stage: "audit", err: ctx.Err()}
 		}
+		if errors.Is(err, exec.ErrWaitDelay) {
+			return stdout, &mcpStageError{stage: "pipe_drain", err: err}
+		}
+		// The *exec.ExitError (with Stderr) is returned unchanged: buildAuditErrorResult
+		// extracts the user-facing message from it without leaking debug log lines.
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) {
+			mcpLog.Printf("Audit subprocess exited with code %d (stderr: %d bytes)", exitErr.ExitCode(), len(exitErr.Stderr))
+		}
+		return stdout, err
 	}
-	return stdout, err
+	return stdout, nil
 }
 
 // resolveAuditRunItems resolves the list of run IDs/URLs to pass to the audit
@@ -775,7 +788,7 @@ func buildAuditCommandArgs(args auditArgs, runItems []string) []string {
 // error envelope instead of an MCP protocol error so callers always receive
 // consistent JSON and the run IDs are always present. Timeouts are tool errors;
 // other failures retain the existing graceful JSON error envelope.
-func buildAuditErrorResult(err error, outputStr string, runItems []string) (*mcp.CallToolResult, any, error) {
+func buildAuditErrorResult(err error, stdout []byte, runItems []string) (*mcp.CallToolResult, any, error) {
 	// Try to get stderr for message extraction
 	var stderr string
 	var exitErr *exec.ExitError
@@ -784,7 +797,7 @@ func buildAuditErrorResult(err error, outputStr string, runItems []string) (*mcp
 	}
 
 	mcpLog.Printf("Audit command exited with error: %v (stdout length: %d, stderr length: %d)",
-		err, len(outputStr), len(stderr))
+		err, len(stdout), len(stderr))
 
 	// Extract the user-facing message from stderr, filtering out debug log lines
 	// (e.g. "workflow:script_registry Creating new script registry +151ns")
@@ -806,7 +819,7 @@ func buildAuditErrorResult(err error, outputStr string, runItems []string) (*mcp
 			"Use the 'logs' tool to list recent run IDs",
 		},
 	}
-	report, partial := decodeAuditReport(outputStr)
+	report, partial := decodeAuditReport(stdout)
 	if partial != nil && partial["partial"] == true && partial["complete"] == false {
 		errorEnvelope["partial"] = true
 		errorEnvelope["complete"] = false
@@ -851,9 +864,9 @@ func summarizeMCPAuditPartialResults(partial map[string]any) map[string]any {
 	return summary
 }
 
-func decodeAuditReport(outputStr string) (any, map[string]any) {
+func decodeAuditReport(stdout []byte) (any, map[string]any) {
 	var report any
-	if json.Unmarshal([]byte(outputStr), &report) != nil {
+	if json.Unmarshal(stdout, &report) != nil {
 		return nil, nil
 	}
 	partial, ok := report.(map[string]any)

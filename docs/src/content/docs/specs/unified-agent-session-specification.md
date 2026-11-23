@@ -1,11 +1,12 @@
 ---
 title: Unified Agent Session Specification
+spec: true
 description: Draft contract for canonical traces, full unified artifacts, and bounded compact unified sessions.
 sidebar:
   order: 1365
-version: "2.12.0"
+version: "2.14.0"
 status: Draft
-publication_date: "2026-11-19"
+publication_date: "2026-11-23"
 editors:
   - name: GitHub Agentic Workflows Team
     organization: GitHub
@@ -13,9 +14,9 @@ editors:
 
 # Unified Agent Session Specification
 
-**Version**: 2.12.0<br>
+**Version**: 2.14.0<br>
 **Status**: Draft<br>
-**Publication Date**: 2026-11-19<br>
+**Publication Date**: 2026-11-23<br>
 **Editors**: GitHub Agentic Workflows Team (GitHub)<br>
 **This Version**: [unified-agent-session-specification](/gh-aw/specs/unified-agent-session-specification/)<br>
 **Latest Version**: This document
@@ -24,13 +25,13 @@ editors:
 
 ## Abstract
 
-This specification defines the session traces used by GitHub Agentic Workflows: ordered arrays of Copilot-compatible event objects containing `type`, `data`, and optional native metadata. It establishes a loss-preserving parser contract for Claude, Copilot, Codex, Gemini, Pi, and custom engines, including OpenCode and Goose sample integrations, and a conclusion-job projection of essential agent, MCP gateway (MCPG), agent workflow firewall (AWF), safe-output, experiment, grader, and eval payloads. The serialized `usage/aw_session.jsonl` begins with a numeric file-format version header, followed by timestamp-ordered evidence with source provenance; untimed observations remain available without invented timestamps. Native evidence, canonical parser traces, and existing accounting artifacts remain available separately. TypeScript declarations generate machine-readable schemas for both representations.
+This specification defines the session traces used by GitHub Agentic Workflows: ordered arrays of Copilot-compatible event objects containing `type`, `data`, and optional native metadata. It establishes a loss-preserving parser contract for Claude, Copilot, Codex, Gemini, LangGraph, Pi, and custom engines, including OpenCode and Goose sample integrations, and a conclusion-job projection of essential agent, MCP gateway (MCPG), agent workflow firewall (AWF), safe-output, experiment, grader, and eval payloads. The serialized `usage/aw_session.jsonl` begins with a numeric file-format version header, followed by timestamp-ordered evidence with source provenance; untimed observations remain available without invented timestamps. Native evidence, canonical parser traces, and existing accounting artifacts remain available separately. TypeScript declarations generate machine-readable schemas for both representations.
 
 ## Status of This Document
 
 This is a **GitHub Agentic Workflows project specification**, written using W3C-inspired document conventions. It is **not an official W3C standard**, W3C publication, or W3C-endorsed recommendation.
 
-Version 2.12.0 is a draft governed by the project's normal review process. It may be updated, replaced, or superseded. The accompanying implementation and regression suites exercise this contract, including the sampled CI sessions identified in Section 9.4. This is not a blanket declaration of conformance for every engine version or source format. Section 10 records historical pre-implementation gaps, not current defects. Approval and ongoing compliance testing remain project responsibilities.
+Version 2.14.0 is a draft governed by the project's normal review process. It may be updated, replaced, or superseded. The accompanying implementation and regression suites exercise this contract, including the sampled CI sessions identified in Section 9.4. This is not a blanket declaration of conformance for every engine version or source format. Section 10 records historical pre-implementation gaps, not current defects. Approval and ongoing compliance testing remain project responsibilities.
 
 The specification version belongs to this document. The unified file's leading
 `session.format` record carries an independent numeric serialization-format
@@ -848,6 +849,7 @@ source for opaque fields.
 | `firewall.http_access` | AWF network audit observations, including operational entries without a host. |
 | `firewall.token_usage`, `firewall.model_routing`, `firewall.upstream_error`, `firewall.steering`, `firewall.event` | API proxy accounting, essential AWF model-routing selection/request records, identifier-only upstream error responses (T-UAS-082), token/time steering, tracker and other firewall messages. |
 | `model.config`, `model.baseline_estimate` | Runner-written configured routing/model policy, budget, and baseline model (T-UAS-080), and the collector's counterfactual baseline repricing for routed runs (T-UAS-081). |
+| `routing.observation` | The collector's verdict on a routed run: whether its result counts as evidence about the pair AWF selected, or why not (T-UAS-094). |
 | `safe_output.request`, `safe_output.result`, `safe_output.error` | Requested operation identities, executed item identities, and structured error codes. Requests are not execution results. Bodies, titles, raw errors, messages, and arbitrary metadata are excluded. |
 | `safe_output.execution` | Handler application outcomes from `safe-output-executions.jsonl`, transported in `safe-outputs-items`: operation `type`, zero-based `messageIndex`, `status`, and `staged`. Status is `success`, `failed`, `skipped`, `warning`, `cancelled`, `deferred`, `delegated`, or `staged`. This is the handler's run-time snapshot, not later human adoption, object survival, or longitudinal repository Value. Buffered reviews remain deferred until final submission; submission failures and skips replace provisional success. Delegation to a standalone step, custom action, or custom job is not evidence of application. Exporting a custom action payload records delegation, not application; available `workflow.job_result` observations preserve actual job success or failure separately. An optional canonical HTTPS GitHub resource `url` preserves numeric resource IDs, commit hashes, and recognized comment/review anchors, without credentials, query parameters, or free-form fragments. GitHub Enterprise uses the configured server origin; unrecognized URLs are omitted. Claim-scoped outcome files retain their source path in provenance. |
 | `lifecycle.adoption` | A post-run supplement from `gh aw logs --adoption --adoption-dir`, written as `adoption-session-<runID>.jsonl`. The supplement carries distinct delivery, adoption, and survival fields plus source run correlation. It is a separate observation stream: consumers MAY join it to the original session by `sourceRunId`, but MUST NOT append it to or rewrite the original run's immutable `usage/aw_session.jsonl`. |
@@ -1162,6 +1164,71 @@ model is indistinguishable from the main agent in this evidence.
 | `pricedRequests`, `unpricedRequests` | Main requests with and without baseline pricing and complete token counts. Unknown pricing is unpriced, never zero cost. |
 | `unattributedRequests` | Agent-phase requests that could not be attributed. |
 | `complete` | `true` only when `baselineModel` is known, at least one main request was observed, and no request is unpriced or unattributed. A priced subtotal with unpriced or unattributed requests is incomplete. |
+
+**T-UAS-094 — Routing observation.** The conclusion job's collector emits one
+`routing.observation` event, with `collector` provenance and phase `conclusion`,
+for a run in which AWF recorded a selection (`firewall.model_routing` with
+`stage: selection`) and the agent made at least one agent-phase proxy request
+other than the classifier's. A run that was not routed, or whose agent made no
+request, has no observation, and neither does a session collected outside the
+conclusion job, which lacks the final job results. Readers MUST treat a missing
+observation as no verdict, never as a failure. Events of this type from any other
+source are dropped.
+
+The event records only the verdict: whether the run's result counts as evidence
+about the selected pair, and if not, why. The selected pair, the requests that ran
+it, and their priced usage stay in the run's `firewall.model_routing` and
+`firewall.token_usage` events, which readers attribute with the rules of T-UAS-081.
+Under those rules, the selected pair ran when at least one main request was
+observed and no request is unattributed. A request AWF recorded as
+`routed: deviated` that matches no declared sub-agent ran another model or effort.
+Requests AWF recorded without usage count as well.
+
+| Field | Meaning |
+| --- | --- |
+| `outcome` | `success`, `failure`, or `skip`. |
+| `reason` | Present only with `skip`: `cancelled`, `infrastructure`, `rate_limited`, `pair_mismatch`, or `unknown_evidence`. |
+
+A run succeeded when the agent job succeeded, its validated safe outputs include at
+least one terminal output (a valid `noop` counts; a continuation request does not)
+with no validation errors and no incomplete report, and threat detection, if it
+ran, reached a clean result. Rules apply in order:
+
+1. `skip` with `cancelled` when the agent job or its final harness attempt was
+   cancelled, including an attempt classed as cancelled or timed out.
+2. For a run that did not succeed, `skip` with `infrastructure` for platform
+   failures: startup failures, interrupted harness attempts, crash signals, engine
+   outages and timeouts, a safe-output gateway that registered no tools,
+   authentication and policy rejections, provider 5xx responses that the engine or
+   AWF recorded for an agent request, and harness infrastructure failure classes.
+   Then `skip` with `rate_limited` for such 429 responses and quota or rate-limit
+   categories and classes. A generic authentication or proxy-guard rejection beside
+   a confirmed limit belongs to the limit, not the platform. An incomplete report
+   whose reason claims an infrastructure error is neither the agent's own report nor
+   platform evidence, because runtimes use that reason for budgets and rate-limit
+   waits too and the agent can file it. A run that succeeded is not re-examined for
+   transient errors it recovered from.
+3. `skip` with `pair_mismatch` when an agent request ran another model or effort,
+   and `skip` with `unknown_evidence` when the requests cannot be attributed.
+4. `skip` with `unknown_evidence` when threat detection flagged the output.
+5. `success` for a run that succeeded.
+6. `failure` when the agent reported that it could not finish or exhausted its
+   prompt, the main conversation recorded a refusal or content filter and the run
+   left no terminal output, the selected pair reached a step, token, credit, or
+   tool-denial limit (with or without output), or the validator rejected its
+   outputs or found no terminal output.
+7. Otherwise `skip` with `unknown_evidence`, including an agent job that failed
+   after valid terminal output, and a run whose threat detection could not reach a
+   result: a warning or failure conclusion, a detector failure, or a failed or
+   cancelled detection job. As in the published `detection.result`, only the
+   conclusion's own result supplies a reason.
+
+The verdict is evidence of validated terminal completion, not of answer quality.
+It uses only engine-neutral evidence (AWF's records, the job results, harness and
+execution records, normalized refusal events, validated safe outputs, and threat
+detection), so the same evidence gives the same verdict for every engine. It does
+not decide whether a run may update routing history: re-runs, pull request runs,
+and experiment workflows are excluded by the consumer that keeps that history.
 
 #### Upstream errors
 
@@ -1997,6 +2064,38 @@ historical runs verify this text path, whereas stream-json mappings are
 documentation-derived synthetic coverage, not evidence that the new invocation
 succeeded in a deployed run.
 
+### 7.10 LangGraph
+
+**T-UAS-093 — LangGraph adapter.** An implementation declaring LangGraph
+support MUST normalize the declared LangGraph trajectory envelope into canonical
+events while preserving observed message order, supported values, native
+identities, and diagnostic records. It MUST prefer the canonical
+`agent-session.jsonl` capture when collecting a unified session, and MUST use
+`agent/langgraph.traj.json` only as the declared native trajectory fallback. It
+MUST NOT duplicate equivalent stdout observations.
+
+| Source observation | Canonical mapping |
+| --- | --- |
+| `messages[]` record with `type: "human"` and `data.content` | `user.message`, preserving the content value exactly. |
+| `messages[]` record with `type: "ai"` and `data.content` | `assistant.message`, preserving the content value exactly; `response_metadata.model_name` maps to the observed model when supplied. |
+| `messages[]` record with `type: "system"` and `data.content` | `session.info`, preserving the content value and supplied model metadata. |
+| AI `data.tool_calls[]` with `id`, `name`, and optional `args` | `tool.execution_start`, mapping the native ID to `toolCallId`, the name to `toolName`, and `args` to `input` without truthiness-based omission. |
+| AI `data.invalid_tool_calls[]` | `langgraph.invalid_tool_call`, retaining the invalid call record as an opaque diagnostic record. |
+| `type: "tool"` with `data.tool_call_id` | `tool.execution_complete`, correlating the observed tool name when its start was observed and retaining content, artifact, status, and explicit error outcome. A status of `"error"` maps to unsuccessful execution; other statuses MUST NOT imply success beyond the supplied observation. |
+| AI `data.usage_metadata` | `usage.report`, mapping supplied token and cache fields, including reasoning tokens. Cache inclusion MUST remain unknown unless matching raw provider counters establish the relationship. These are source-reported observations. |
+| Any other valid message type | `langgraph.message`, retaining the complete native message as an opaque diagnostic record. |
+| Trajectory `exit_status` | `session.result.data.status`; the number of AI messages maps to `numTurns`. |
+| Invalid trajectory envelope, message, tool call, or token count | Reject the malformed trajectory and report a payload-free collection warning, marking the source incomplete while retaining independent evidence and artifacts. Do not fabricate canonical events or accounting values. |
+
+The LangGraph trajectory format is retained as untrusted diagnostic evidence after
+redaction and recovery validation. A trajectory-derived `usage.report` records
+what the trajectory reported; it is not verified accounting evidence, regardless
+of whether it is read from the native trajectory or the canonical capture derived
+from it. Verified accounting claims MUST use an authoritative accounting source
+declared by this specification. Collection MUST not treat LangGraph stdout or the
+diagnostic trajectory as an additional source when the canonical
+`agent-session.jsonl` is present.
+
 ## 8. Renderers and Bootstrap Telemetry (Normative)
 
 ### 8.1 Reader and presentation compatibility
@@ -2218,7 +2317,7 @@ evidence; compilation alone is not a conformance claim.
 | T-UAS-028, T-UAS-029 | Legacy result; canonical JSON round trip; claimed reversible legacy conversion | Canonical result only; supported content, values, metadata, errors, and extensions survive promised round trips. |
 | T-UAS-030, T-UAS-031 | All token names/aliases, canonical zero versus nonzero alias, overlapping cache/input, invalid numbers | Canonical names emitted; zero wins by presence; no invalid/default counts or cache double counting. |
 | T-UAS-032, T-UAS-033, T-UAS-034 | Two per-turn reports, duplicate report, terminal snapshot, missing duration/cost/turns | Cumulative distinct contributions once; snapshots not added; missing totals omitted. |
-| T-UAS-036–T-UAS-041 | Engine fixtures in 9.3 | Every declared engine signature maps according to Section 7. |
+| T-UAS-036–T-UAS-041, T-UAS-093 | Engine fixtures in 9.3 | Every declared engine signature maps according to Section 7. |
 | T-UAS-042, T-UAS-043 | Canonical-only trace through all renderer variants, trailing extension after result | Initialization/statistics found; command/MCP display correct; originals unchanged. |
 | T-UAS-044, T-UAS-045 | Dangling/orphan calls and a uniquely identifiable sensitive user prompt | Unknown calls not successful; prompt absent from all default summaries and previews. |
 | T-UAS-046, T-UAS-047, T-UAS-048 | Canonical snapshots, alias usage, zero/missing metrics, existing telemetry, no trailing newline, failed append | Correct single projection; no double counting/defaults; safe line boundary; best-effort failure; activity not success. |
@@ -2254,6 +2353,7 @@ evidence; compilation alone is not a conformance claim.
 | Custom | Actual native/Claude/Codex signatures; deterministic delegate ties; mixed legacy/events; unrelated JSON, unknown-only dotted record, plain prose, delegate fallback markdown | Correct supported detection and delegation; no false format recognition from parseability or nonempty markdown. |
 | OpenCode | Recognized session/part envelopes; tool lifecycle; distinct step finishes; structured errors; budget/server diagnostics | Source IDs and millisecond timestamps, accounting once, independent failures and absent metrics. |
 | Goose | Message/channel deltas; source-second timestamps; repeated tool observations; structured-only results; zero/invalid cumulative metrics; startup and maximum-turn errors | Exact content, retained identities, snapshot accounting, observed turn counts, explicit malformed-record warnings and no fabricated outcomes. |
+| LangGraph | Native `messages_to_dict` trajectory with human, AI, system, and tool messages; tool calls/results; `usage_metadata`; cache and reasoning fields; invalid tool calls; unknown message types; `Completed` and `LimitsExceeded` exit statuses; malformed envelopes; canonical-session precedence; duplicate stdout | Exact message and structured-value preservation; native tool correlation and observed failure handling; per-response usage retained without invented totals; unknown records retained diagnostically; canonical capture preferred; trajectory and stdout are not duplicated; diagnostic trajectory is not treated as verified accounting evidence. |
 | Shared helpers | Per-record mixed conversion; JSON round trip; reversible supported-field interchange; missing IDs; structured/falsy values; source extras; frozen nested fixtures | Open vocabulary, exact values/metadata/order, deterministic/idempotent normalization, no mutation or fabricated results. |
 | Renderers | All three summary functions and information/statistics paths; canonical-only and normalized mixed fixtures; command/MCP forms; structured outputs; trailing extension; partial execution; private prompt | Compatible display, known-zero versus unknown accounting, truthful success counts, no new prompt exposure, unchanged canonical trace. |
 | Bootstrap | Canonical `session.result` only; token aliases; multiple snapshots; zero/absent/invalid values; preexisting legacy telemetry; line separation; redaction; I/O failure | Legacy metric projection derives from canonical data, remains idempotent/best-effort, and never appends legacy result to `logEntries`. |
@@ -2495,6 +2595,8 @@ loads selected files and the merged array into memory; streaming external sort
 for exceptionally large sessions remains future work.
 
 ## 11. References
+
+The [TLA+ session artifact model](https://github.com/github/gh-aw/blob/main/specs/unified-agent-session/UnifiedAgentSession.tla) and [TLC configuration](https://github.com/github/gh-aw/blob/main/specs/unified-agent-session/UnifiedAgentSession.cfg) cover the producer–collector–reader handoff in Section 3.5 and the observation rules in Section 5. For a trace of up to three records and two tool IDs, the model checks that collection preserves supported records in order without inventing completions, publication precedes cleanup, and the reader sees the published artifact. It abstracts payloads, JSONL framing, redaction, tool pairing, and artifact transport failures.
 
 ### 11.1 Normative references
 
@@ -2762,6 +2864,18 @@ Malformed logs and very large records can exhaust memory or produce misleading s
 Native IDs can collide, timestamps can be out of order, and a trace can contain ambiguous concurrent calls. Exact-ID pairing avoids attributing a failure or output to the wrong tool. Cross-session concatenation requires an external boundary policy; this specification does not invent a wrapper or fabricated session IDs to resolve such ambiguity.
 
 ## 13. Change Log (Informative)
+
+### Version 2.14.0 - Draft (2026-11-23)
+
+- Added `routing.observation`, the conclusion collector's verdict on a routed run: `success`, `failure`, or `skip` with a reason, decided from AWF's request records, the job results, and the validated safe outputs (T-UAS-094).
+- Retained serialization-format version 1.
+
+### Version 2.13.0 - Draft (2026-11-23)
+
+- Added the LangGraph native-session mapping for `messages_to_dict` trajectories, including human, AI, system, tool, invalid-tool-call, unknown-message, usage, and exit-status observations (T-UAS-093).
+- Defined canonical `agent-session.jsonl` precedence over `agent/langgraph.traj.json` and equivalent stdout, without duplicate observations.
+- Distinguished the retained LangGraph trajectory's diagnostic purpose from verified accounting evidence.
+- Retained serialization-format version 1.
 
 ### Version 2.11.0 - Draft (2026-11-17)
 

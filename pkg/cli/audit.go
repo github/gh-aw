@@ -80,6 +80,8 @@ type auditAnalysisResults struct {
 	missingTools            []MissingToolReport
 	missingData             []MissingDataReport
 	noops                   []NoopReport
+	incomplete              []IncompleteReport
+	continuationRequests    []ContinuationRequestReport
 	mcpFailures             []MCPFailureReport
 	skillActivations        []SkillActivation
 	gatewaySteeringEvents   []GatewaySteeringEvent

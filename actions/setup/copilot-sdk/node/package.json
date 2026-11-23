@@ -1,0 +1,8 @@
+{
+  "name": "gh-aw-copilot-sdk-node",
+  "private": true,
+  "dependencies": {
+    "@microsoft/copilot-sdk": "2.0.0",
+    "undici": "6.29.1"
+  }
+}

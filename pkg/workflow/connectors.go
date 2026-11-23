@@ -23,6 +23,8 @@ type ConnectorRegistration struct {
 	Resources         map[string][]string                  `json:"resources,omitempty"`
 	GitHubApps        map[string]*ConnectorGitHubApp       `json:"github-apps,omitempty"`
 	OIDCTokens        map[string]*ConnectorGitHubOIDC      `json:"oidc-tokens,omitempty"`
+	AzureOIDC         map[string]*ConnectorAzureOIDC       `json:"azure-oidc,omitempty"`
+	Inference         *ConnectorInferenceSelection         `json:"selected-inference,omitempty"`
 	On                []string                             `json:"on,omitempty"`
 	Tools             []string                             `json:"tools,omitempty"`
 	Context           map[string]map[string]any            `json:"context,omitempty"`
@@ -45,6 +47,7 @@ type WorkflowConnector struct {
 	Alias             string
 	GitHubApps        map[string]*ConnectorGitHubApp
 	OIDCTokens        map[string]*ConnectorGitHubOIDC
+	Inference         *ResolvedConnectorInference
 }
 
 func validateConnectorNames(names []string) error {
@@ -140,7 +143,11 @@ func (c *Compiler) resolveWorkflowConnectors(frontmatter map[string]any) (map[st
 		if err := connectors.Decode(data, &registration); err != nil {
 			return nil, fmt.Errorf("connectors.%s: %w", alias, err)
 		}
-		if len(registration.GitHubApps)+len(registration.OIDCTokens) != 0 {
+		inference, err := resolveConnectorInference(alias, registration)
+		if err != nil {
+			return nil, fmt.Errorf("connectors.%s: %w", alias, err)
+		}
+		if len(registration.GitHubApps)+len(registration.OIDCTokens)+len(registration.AzureOIDC) != 0 {
 			if registration.Spec == nil {
 				return nil, errors.New("connector github-app requires an inline declaration")
 			}
@@ -159,12 +166,17 @@ func (c *Compiler) resolveWorkflowConnectors(frontmatter map[string]any) (map[st
 		if err != nil {
 			return nil, fmt.Errorf("connectors.%s: %w", alias, err)
 		}
-		if len(selection.Triggers)+len(selection.MCP)+len(selection.HTTPMCP)+len(selection.Context)+len(selection.SafeOutputs) == 0 {
+		hasRuntimeSelection := len(selection.Triggers)+len(selection.MCP)+len(selection.HTTPMCP)+len(selection.Context)+len(selection.SafeOutputs) != 0
+		if !hasRuntimeSelection && inference == nil {
 			continue
 		}
-		config, err := resolveWorkflowConnector(service, selection, registration.Context)
-		if err != nil {
-			return nil, fmt.Errorf("connectors.%s: %w", alias, err)
+		config := &WorkflowConnector{Inference: inference}
+		if hasRuntimeSelection {
+			config, err = resolveWorkflowConnector(service, selection, registration.Context)
+			if err != nil {
+				return nil, fmt.Errorf("connectors.%s: %w", alias, err)
+			}
+			config.Inference = inference
 		}
 		resolved[alias] = config
 		config.Alias, config.GitHubApps = alias, registration.GitHubApps

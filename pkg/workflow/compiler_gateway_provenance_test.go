@@ -252,6 +252,11 @@ func TestGatewayProvenanceSetupDoesNotMintConfiguredCredentials(t *testing.T) {
 			assert.NotContains(t, strings.Join(gate.Steps, ""), "mint-otlp-oidc-token")
 			assert.NotContains(t, strings.Join(gate.Steps, ""), "https://example.com/collector")
 			assert.NotContains(t, gate.Permissions, "id-token")
+			if mode.IsScript() {
+				assert.Contains(t, strings.Join(gate.Steps, ""), "if: always()\n        run: |\n          bash \"${GH_AW_ACTIONS_SOURCE_DIR}/actions/setup/clean.sh\"")
+			} else {
+				assert.NotContains(t, strings.Join(gate.Steps, ""), "Clean Scripts")
+			}
 		})
 	}
 }

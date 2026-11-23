@@ -14,6 +14,8 @@ on:
     - 'actions/setup/sh/**'
     - '.github/workflows/ci.yml'
     - '.github/workflows/cgo.yml'
+    - '.github/workflows/requirements-pageindex.txt'
+    - '.github/workflows/shared/pageindex.md'
     - '.github/workflows/CWI.yml'
     - '.github/workflows/license-check.yml'
     - '.github/aw/releases.json'
@@ -36,6 +38,8 @@ on:
     - 'actions/setup/sh/**'
     - '.github/workflows/ci.yml'
     - '.github/workflows/cgo.yml'
+    - '.github/workflows/requirements-pageindex.txt'
+    - '.github/workflows/shared/pageindex.md'
     - '.github/workflows/CWI.yml'
     - '.github/workflows/license-check.yml'
     - '.github/aw/releases.json'
@@ -50,6 +54,26 @@ on:
     - cron: '23 4 * * 1'
   workflow_dispatch:
 jobs:
+  test-pageindex-workflow:
+    name: PageIndex hash-locked install and tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        persist-credentials: false
+    - name: Set up uv
+      # zizmor: ignore[github_action_from_unverified_creator_used]
+      uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+      with:
+        version: "0.13.7"
+        enable-cache: false
+    - name: Verify locked install and run PageIndex workflow tests
+      run: make test-pageindex-workflow
+
   checkout-cache:
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -130,15 +154,18 @@ jobs:
       run: |
         node <<'NODE'
         const fs = require('node:fs');
-        const known = ['front-door-conformance', 'verify-integration-build', 'test', 'canary-go', 'impacted-go-tests', 'native-javascript-tests', 'build', 'build-wasm', 'validate-yaml', 'check-validator-sizes', 'lint-go-format', 'lint-go-golangci', 'lint-go-govulncheck', 'lint-go-custom', 'lint-error-messages', 'actions-build', 'fuzz', 'security', 'security-scan', 'mcp-server-compile-test', 'cross-platform-build', 'alpine-container-test', 'safe-outputs-conformance'];
-        const dependencies = {test: ['verify-integration-build'], 'canary-go': ['test'], security: ['build'], 'security-scan': ['build'], 'cross-platform-build': ['build']};
+        const known = ['front-door-conformance', 'verify-integration-build', 'test', 'test-slow', 'impacted-go-tests', 'native-javascript-tests', 'build', 'build-wasm', 'validate-yaml', 'check-validator-sizes', 'lint-go-format', 'lint-go-golangci', 'lint-go-govulncheck', 'lint-go-custom', 'lint-error-messages', 'actions-build', 'fuzz', 'security', 'security-scan', 'mcp-server-compile-test', 'cross-platform-build', 'alpine-container-test', 'safe-outputs-conformance'];
+        const dependencies = {test: ['verify-integration-build'], 'test-slow': ['verify-integration-build'], security: ['build'], 'security-scan': ['build'], 'cross-platform-build': ['build']};
         let suiteIds = '';
         try {
-          const ids = JSON.parse(process.env.RAW_SUITE_IDS);
-          if (process.env.SELECTOR_OUTCOME === 'success' && Array.isArray(ids) &&
-              ids.length <= known.length && new Set(ids).size === ids.length &&
-              ids.every(id => known.includes(id) && (dependencies[id] || []).every(dependency => ids.includes(dependency)))) {
-            suiteIds = JSON.stringify(ids);
+          const raw = JSON.parse(process.env.RAW_SUITE_IDS);
+          if (process.env.SELECTOR_OUTCOME === 'success' && Array.isArray(raw) && new Set(raw).size === raw.length) {
+            // The trusted PR base can still return the retired PR suite during rollout.
+            const ids = raw.filter(id => id !== 'canary-go');
+            if (ids.includes('test') && ids.length <= known.length &&
+                ids.every(id => known.includes(id) && (dependencies[id] || []).every(dependency => ids.includes(dependency)))) {
+              suiteIds = JSON.stringify(ids);
+            }
           }
         } catch (error) {
           if (!(error instanceof SyntaxError)) throw error;
@@ -165,6 +192,7 @@ jobs:
         node --test scripts/ci-front-door.test.cjs
         node --test scripts/ci-front-door-researcher.test.cjs
         node --test scripts/ci-front-door-workflow.test.cjs
+        node --test scripts/go-unit-suite.test.cjs
 
   verify-integration-build:
     needs: [checkout-cache, front-door-decision]
@@ -254,7 +282,7 @@ jobs:
         go test -run='^$' -exec=true -tags=integration ./...
 
   test:
-    name: Unit tests (${{ matrix.name }})
+    name: Fast unit tests (${{ matrix.name }})
     if: always() && !cancelled() && needs.checkout-cache.result == 'success' && needs.verify-integration-build.result == 'success' && (github.event_name != 'pull_request' || needs.front-door-decision.result != 'success' || !needs.front-door-decision.outputs.suite_ids || contains(fromJSON(needs.front-door-decision.outputs.suite_ids), 'test'))
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -264,6 +292,9 @@ jobs:
     - front-door-decision
     permissions:
       contents: read
+    env:
+      UNIT_TEST_SUITE: fast
+      UNIT_TEST_TIMEOUT: 3m
     strategy:
       fail-fast: false
       matrix:
@@ -292,8 +323,6 @@ jobs:
         - name: N-R
           pattern: ^Test[N-R]
           shard: n-r
-          # Includes a compile sweep of the repository workflows.
-          timeout: 5m
         - name: S
           pattern: ^TestS
           shard: s
@@ -309,7 +338,7 @@ jobs:
     concurrency:
       group: ci-${{ github.ref }}-test-${{ matrix.shard }}
       cancel-in-progress: true
-    steps:
+    steps: &unit-test-steps
     - name: Restore checkout
       id: restore-checkout
       uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9   # v6.1.0
@@ -413,10 +442,22 @@ jobs:
 
     - name: Run unit tests with coverage
       id: run-unit-tests
+      env:
+        TEST_PATTERN: ${{ matrix.pattern }}
       run: |
         set -o pipefail
+        if [ "$UNIT_TEST_SUITE" = "fast" ]; then
+          slow_pattern=$(node scripts/go-unit-suite.cjs)
+          selection=(-run "$TEST_PATTERN" -skip "$slow_pattern")
+        elif [ "$UNIT_TEST_SUITE" = "slow" ]; then
+          slow_pattern=$(node scripts/go-unit-suite.cjs "$TEST_PATTERN")
+          selection=(-run "$slow_pattern")
+        else
+          echo "Unknown unit-test suite: $UNIT_TEST_SUITE" >&2
+          exit 1
+        fi
         # Run tests with JSON output for artifacts, but also show failures
-        if ! go test -v -parallel=8 -timeout='${{ matrix.timeout || '3m' }}' -run='${{ matrix.pattern }}' -tags '!integration' -coverprofile=coverage-${{ matrix.shard }}.out -json ./... > test-result-unit-${{ matrix.shard }}.json; then
+        if ! go test -v -parallel=8 -timeout="$UNIT_TEST_TIMEOUT" "${selection[@]}" -tags '!integration' -coverprofile=coverage-${{ matrix.shard }}.out -json ./... > test-result-unit-${{ matrix.shard }}.json; then
           cat test-result-unit-${{ matrix.shard }}.json
           exit 1
         fi
@@ -459,14 +500,49 @@ jobs:
         path: test-result-unit-${{ matrix.shard }}.json
         retention-days: 7
 
+  test-slow:
+    name: Slow unit tests (${{ matrix.name }})
+    if: always() && !cancelled() && needs.checkout-cache.result == 'success' && needs.verify-integration-build.result == 'success' && (github.event_name != 'pull_request' || needs.front-door-decision.result != 'success' || !needs.front-door-decision.outputs.suite_ids || contains(fromJSON(needs.front-door-decision.outputs.suite_ids), 'test-slow'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs:
+    - checkout-cache
+    - verify-integration-build
+    - front-door-decision
+    permissions:
+      contents: read
+    env:
+      UNIT_TEST_SUITE: slow
+      UNIT_TEST_TIMEOUT: 5m
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        - name: Repository sweeps
+          pattern: repository
+          shard: slow-repository
+        - name: Azure runtime
+          pattern: workflow-azure
+          shard: slow-workflow-azure
+        - name: Workflow readers
+          pattern: workflow-readers
+          shard: slow-workflow-readers
+        - name: CLI, parser and workqueue
+          pattern: cli-parser-workqueue
+          shard: slow-cli-parser-workqueue
+    concurrency:
+      group: ci-${{ github.ref }}-test-${{ matrix.shard }}
+      cancel-in-progress: true
+    steps: *unit-test-steps
+
   canary-go:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     needs:
     - checkout-cache
     - test
-    - front-door-decision
-    if: always() && !cancelled() && needs.checkout-cache.result == 'success' && needs.test.result == 'success' && (github.event_name != 'pull_request' || needs.front-door-decision.result != 'success' || !needs.front-door-decision.outputs.suite_ids || contains(fromJSON(needs.front-door-decision.outputs.suite_ids), 'canary-go'))
+    - test-slow
+    if: always() && !cancelled() && github.event_name != 'pull_request' && needs.checkout-cache.result == 'success' && needs.test.result == 'success' && needs.test-slow.result == 'success'
     permissions:
       contents: read
     steps:
@@ -1791,6 +1867,7 @@ jobs:
           tests: >-
             FuzzExpressionParser:./pkg/workflow/
             FuzzBashCommandParserModel:./pkg/workflow/
+            FuzzSkipIfQueryParser:./pkg/workflow/
             FuzzMentionsFiltering:./pkg/workflow/
             FuzzSanitizeOutput:./pkg/workflow/
             FuzzSanitizeIncomingText:./pkg/workflow/
@@ -2864,9 +2941,11 @@ jobs:
     needs:
     - front-door-decision
     - front-door-conformance
+    - test-pageindex-workflow
     - checkout-cache
     - verify-integration-build
     - test
+    - test-slow
     - canary-go
     - impacted-go-tests
     - native-javascript-tests

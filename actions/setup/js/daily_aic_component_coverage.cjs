@@ -18,26 +18,30 @@ const COMPONENT_FILES = {
 // Generated jobs display as "Agent", "Detection" and "Evaluations".
 const COMPONENT_DISPLAY_NAMES = { evaluations: "evals" };
 
-function componentKey(job, jobNames) {
+function callerPrefix(name) {
+  const separator = typeof name === "string" ? name.lastIndexOf(" / ") : -1;
+  return separator === -1 ? "" : name.slice(0, separator + 3);
+}
+
+function componentIdentity(job, jobNames) {
   for (const candidate of [job.job_id, job.name]) {
     if (typeof candidate !== "string") continue;
-    const separator = candidate.lastIndexOf(" / ");
-    if (separator !== -1) {
+    const candidatePrefix = callerPrefix(candidate);
+    const prefix = candidatePrefix || callerPrefix(job.name);
+    if (prefix) {
       // Caller names are arbitrary. Require the compiler's sibling jobs rather
       // than treating every reusable workflow with an "agent" job as gh-aw.
-      const prefix = candidate.slice(0, separator + 3);
       if (!jobNames.has(`${prefix}activation`) || !jobNames.has(`${prefix}conclusion`)) continue;
     }
-    const lower = (candidate.split(" / ").pop() ?? "").toLowerCase();
+    const lower = candidate.slice(candidatePrefix.length).toLowerCase();
     const key = COMPONENT_DISPLAY_NAMES[lower] ?? lower;
-    if (Object.hasOwn(COMPONENT_FILES, key)) return key;
+    if (Object.hasOwn(COMPONENT_FILES, key)) return { prefix, key };
   }
-  return "";
+  return null;
 }
 
 async function loadBillableJobs({ github, budget }, owner, repo, run) {
-  const components = new Map();
-  const jobsByComponent = new Map();
+  const invocations = new Map();
   const allJobs = [];
   let complete = false;
   for (let page = 1; page <= 10; page++) {
@@ -65,43 +69,69 @@ async function loadBillableJobs({ github, budget }, owner, repo, run) {
   if (!complete) throw new Error("Cannot prove complete billable-component coverage");
   const jobNames = new Set(allJobs.flatMap(job => [job.job_id, job.name]));
   for (const job of allJobs) {
-    const name = componentKey(job, jobNames);
-    if (!name) continue;
+    const identity = componentIdentity(job, jobNames);
+    if (!identity) continue;
+    const { prefix, key } = identity;
     if (!Number.isSafeInteger(job.run_attempt) || job.run_attempt < 1 || job.run_attempt > run.run_attempt || job.status !== "completed" || !job.conclusion) {
-      throw new Error("Incomplete daily AIC component attempt metadata");
+      throw new Error(`Incomplete daily AIC component attempt metadata for ${prefix}${key}`);
     }
-    if (!jobsByComponent.has(name)) jobsByComponent.set(name, []);
-    jobsByComponent.get(name).push(job);
-    const prior = components.get(name);
-    const notStarted = job.conclusion === "skipped" || provesJobExecutionNotStarted(job);
-    const priorNotStarted = prior && (prior.conclusion === "skipped" || provesJobExecutionNotStarted(prior));
-    if (!prior || (priorNotStarted && !notStarted) || (notStarted === priorNotStarted && job.run_attempt > prior.run_attempt)) {
-      components.set(name, job);
-    }
+    if (!invocations.has(prefix)) invocations.set(prefix, new Map());
+    const group = invocations.get(prefix);
+    if (!group.has(key)) group.set(key, []);
+    group.get(key).push(job);
   }
-  // A complete empty job list proves the run ended before any billable job existed.
-  if (components.size > 0 && !components.has("agent")) throw new Error("Cannot prove complete billable-component coverage");
+  return [...invocations].map(([prefix, jobsByComponent]) => {
+    const label = prefix ? prefix.slice(0, -3) : "top-level workflow";
+    const activationJobs = allJobs.filter(job => job.name === `${prefix}activation` || (job.job_id === `${prefix}activation` && (!callerPrefix(job.name) || callerPrefix(job.name) === prefix)));
+    return { prefix, label, activationJobs, ...selectInvocationJobs(jobsByComponent, label) };
+  });
+}
+
+function selectInvocationJobs(jobsByComponent, label) {
+  const components = new Map();
   const priorJobs = new Map();
-  for (const [name, selected] of components) {
-    const selectedAttemptJobs = jobsByComponent.get(name).filter(job => job.run_attempt === selected.run_attempt);
+  for (const [name, jobs] of jobsByComponent) {
+    for (const job of jobs) {
+      const prior = components.get(name);
+      const notStarted = jobNotStarted(job);
+      const priorNotStarted = prior && jobNotStarted(prior);
+      if (!prior || (priorNotStarted && !notStarted) || (notStarted === priorNotStarted && job.run_attempt > prior.run_attempt)) {
+        components.set(name, job);
+      }
+    }
+    const selected = components.get(name);
+    const selectedAttemptJobs = jobs.filter(job => job.run_attempt === selected.run_attempt);
     if (new Set(selectedAttemptJobs.map(job => job.id)).size > 1) {
-      throw new Error("Ambiguous daily AIC component jobs");
+      throw new Error(`Ambiguous daily AIC component jobs for ${label} (${name}, attempt ${selected.run_attempt})`);
     }
     if (selected.conclusion === "cancelled") {
       priorJobs.set(
         name,
-        jobsByComponent
-          .get(name)
-          .filter(job => job.conclusion !== "skipped" && job.run_attempt < selected.run_attempt)
-          .sort((a, b) => b.run_attempt - a.run_attempt)
+        jobs.filter(job => job.conclusion !== "skipped" && job.run_attempt < selected.run_attempt).sort((a, b) => b.run_attempt - a.run_attempt)
       );
     }
   }
+  if (!components.has("agent")) throw new Error(`Cannot prove complete billable-component coverage for ${label}`);
   return { components, priorJobs };
 }
 
+function jobNotStarted(job) {
+  return job.conclusion === "skipped" || provesJobExecutionNotStarted(job);
+}
+
 function allBillableJobsNotStarted(components) {
-  return [...components.values()].every(job => job.conclusion === "skipped" || provesJobExecutionNotStarted(job));
+  return [...components.values()].every(jobNotStarted);
+}
+
+function invocationUsageArtifactName({ activationJobs, components, label }) {
+  const attempt = [...components.values()].reduce((max, job) => (jobNotStarted(job) ? max : Math.max(max, job.run_attempt)), 0);
+  // A failed-only rerun may reuse the previous activation and its prefix.
+  const eligible = activationJobs.filter(job => Number.isSafeInteger(job.run_attempt) && job.run_attempt >= 1 && job.run_attempt <= attempt && job.conclusion === "success");
+  const latest = eligible.reduce((max, job) => Math.max(max, job.run_attempt), 0);
+  const checkIds = new Set(eligible.filter(job => job.run_attempt === latest).map(job => /\/check-runs\/([1-9]\d*)$/.exec(job.check_run_url ?? "")?.[1]));
+  if (checkIds.size > 1) throw new Error(`Ambiguous daily AIC activation jobs for ${label} (attempt ${latest})`);
+  const [checkId] = checkIds;
+  return checkId ? `call-${checkId}-usage` : null;
 }
 
 function allBillableJobsSkipped(components) {
@@ -335,4 +365,4 @@ function sumCoveredComponents(directory, components, artifactCreatedAt, artifact
   return total;
 }
 
-module.exports = { loadBillableJobs, allBillableJobsNotStarted, allBillableJobsSkipped, sumCoveredComponents };
+module.exports = { loadBillableJobs, allBillableJobsNotStarted, allBillableJobsSkipped, invocationUsageArtifactName, sumCoveredComponents };

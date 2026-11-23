@@ -10,7 +10,7 @@ const SUITE_IDS = Object.freeze([
   "front-door-conformance",
   "verify-integration-build",
   "test",
-  "canary-go",
+  "test-slow",
   "impacted-go-tests",
   "native-javascript-tests",
   "build",
@@ -33,11 +33,12 @@ const SUITE_IDS = Object.freeze([
 ]);
 const JOB_DEPENDENCIES = Object.freeze({
   test: Object.freeze(["verify-integration-build"]),
-  "canary-go": Object.freeze(["test"]),
+  "test-slow": Object.freeze(["verify-integration-build"]),
   security: Object.freeze(["build"]),
   "security-scan": Object.freeze(["build"]),
   "cross-platform-build": Object.freeze(["build"]),
 });
+const REQUIRED_SUITES = Object.freeze(["test"]);
 const LIMITS = Object.freeze({ ...DIFF_LIMITS, response: 16384, request: 262144 });
 const DECISIONS_BASE_URL = "https://api.githubcopilot.com/v1";
 const DECISIONS_MODEL = "gpt-6-luna-decisions";
@@ -81,7 +82,8 @@ function validateCatalog(catalog) {
   if (catalog?.version !== 1 || !Array.isArray(catalog.suites) || catalog.suites.length !== SUITE_IDS.length) throw new Error("invalid-catalog");
   const seen = new Set();
   for (const suite of catalog.suites) {
-    if (!SUITE_IDS.includes(suite.id) || seen.has(suite.id) || typeof suite.description !== "string" || !suite.description || suite.description.length > 500 || suite.mandatory !== false) throw new Error("invalid-catalog");
+    if (!SUITE_IDS.includes(suite.id) || seen.has(suite.id) || typeof suite.description !== "string" || !suite.description || suite.description.length > 500 || suite.mandatory !== REQUIRED_SUITES.includes(suite.id))
+      throw new Error("invalid-catalog");
     if (suite.historical_duration_seconds !== null && (!Number.isFinite(suite.historical_duration_seconds) || suite.historical_duration_seconds < 0)) throw new Error("invalid-catalog");
     seen.add(suite.id);
   }
@@ -152,7 +154,7 @@ function selectSuites(response, catalog, diff) {
   if (!validDiffSummary(diff) || diff.truncated || diff.unavailable || !diff.files.length) throw new Error("invalid-diff-summary");
   if (!response || !Array.isArray(response.suite_ids) || !Number.isFinite(response.confidence) || response.confidence < 0.9 || response.confidence > 1) throw new Error("invalid-or-low-confidence");
   if (response.suite_ids.length > SUITE_IDS.length || new Set(response.suite_ids).size !== response.suite_ids.length || response.suite_ids.some(id => typeof id !== "string" || !SUITE_IDS.includes(id))) throw new Error("invalid-suite-ids");
-  const selected = new Set(response.suite_ids);
+  const selected = new Set([...REQUIRED_SUITES, ...response.suite_ids]);
   const include = id => {
     for (const dependency of JOB_DEPENDENCIES[id] || []) {
       if (selected.has(dependency)) continue;
@@ -160,7 +162,7 @@ function selectSuites(response, catalog, diff) {
       include(dependency);
     }
   };
-  for (const id of response.suite_ids) include(id);
+  for (const id of selected) include(id);
   return SUITE_IDS.filter(id => selected.has(id));
 }
 
@@ -174,7 +176,11 @@ async function frontDoor({ catalog, diff, prompt, token, fullRun = false, decide
   let decisionCalls = 0;
   let response;
   let reason = fullRun ? "full-run" : !validCatalog ? "invalid-catalog" : !validDiffSummary(diff) ? "invalid-diff-summary" : diff.unavailable ? "diff-unavailable" : diff.truncated ? "diff-truncated" : null;
-  if (!reason && diff.files.some(file => file.startsWith(".github/ci/") || file.startsWith("scripts/ci-front-door") || file === ".github/workflows/cgo.yml" || file === "actions/setup/js/decisions_client.cjs")) reason = "policy-changed";
+  if (
+    !reason &&
+    diff.files.some(file => file.startsWith(".github/ci/") || file.startsWith("scripts/ci-front-door") || file.startsWith("scripts/go-unit-suite") || file === ".github/workflows/cgo.yml" || file === "actions/setup/js/decisions_client.cjs")
+  )
+    reason = "policy-changed";
   if (!reason && !diff.files.length) reason = "empty-diff";
   if (!reason) {
     try {
@@ -219,6 +225,41 @@ async function frontDoor({ catalog, diff, prompt, token, fullRun = false, decide
   };
 }
 
+function renderSummary({ suite_ids: suiteIds, fallback, reason, metrics }) {
+  const selected = new Set(suiteIds);
+  const omitted = SUITE_IDS.filter(id => !selected.has(id));
+  const status = fallback ? "Fallback: keeping every suite." : reason === "full-run" ? "Full run: suite selection was not applied." : omitted.length ? "Selection applied." : "Decision kept every suite.";
+  const suiteList = ids => (ids.length ? ids.map(id => `- \`${id}\``).join("\n") : "_None._");
+  const minutes = metrics.estimated_test_minutes_saved;
+  return [
+    "### CI Front Door",
+    "",
+    `${status} **${selected.size} of ${SUITE_IDS.length} suites retained**, **${omitted.length} omitted**.`,
+    "",
+    "<details>",
+    "<summary>Suite selection and diagnostics</summary>",
+    "",
+    `**Retained suites (${selected.size})**`,
+    "",
+    suiteList(suiteIds),
+    "",
+    `**Omitted suites (${omitted.length})**`,
+    "",
+    suiteList(omitted),
+    "",
+    "| Diagnostic | Value |",
+    "| --- | --- |",
+    `| Outcome | \`${reason}\` |`,
+    `| Estimated test minutes saved | ${minutes === null ? "Unavailable" : Number(minutes.toFixed(2))} |`,
+    `| Missed regressions | ${metrics.missed_regressions ?? "Not measured"} |`,
+    `| Decisions API requests | ${metrics.decision_api_requests} |`,
+    `| Other GitHub API requests | ${metrics.other_github_api_requests} |`,
+    "",
+    "</details>",
+    "",
+  ].join("\n");
+}
+
 async function main() {
   const cwd = path.resolve(__dirname, "..");
   const diffCwd = path.resolve(process.env.CI_DIFF_WORKSPACE || cwd);
@@ -254,7 +295,7 @@ async function main() {
   result.metrics.other_github_api_requests = githubApiRequests;
   const json = JSON.stringify(result);
   if (process.env.GITHUB_OUTPUT) fs.appendFileSync(process.env.GITHUB_OUTPUT, `suite_ids=${JSON.stringify(result.suite_ids)}\nfallback=${result.fallback}\nmetrics=${JSON.stringify(result.metrics)}\n`);
-  if (process.env.GITHUB_STEP_SUMMARY) fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, `### CI Front Door\n\n${json}\n`);
+  if (process.env.GITHUB_STEP_SUMMARY) fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, renderSummary(result));
   process.stdout.write(json + "\n");
 }
 

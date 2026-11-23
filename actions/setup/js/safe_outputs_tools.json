@@ -619,6 +619,12 @@
           "description": "Review comment content in Markdown. Provide specific, actionable feedback about the code at this location. Oversized agent content is automatically redacted to fit the published body without shortening footers or markers.",
           "maxLength": 524288
         },
+        "temporary_id": {
+          "type": "string",
+          "pattern": "^#?aw_[A-Za-z0-9_]{3,12}$",
+          "description": "Unique temporary identifier for this inline comment. Use #aw_ID as a Markdown link destination in the summary of the same review, e.g. [Finding](#aw_find1). The optional # prefix is accepted on the identifier.",
+          "x-synonyms": ["temporaryId"]
+        },
         "pull_request_number": {
           "type": ["number", "string"],
           "description": "Pull request number to add the review comment to. This is the numeric ID from the GitHub URL (e.g., 876 in github.com/owner/repo/pull/876). If omitted, adds the comment to the PR that triggered this workflow. Required when the workflow target is '*' (any PR) \u2014 omitting it will cause the comment to fail.",
@@ -1505,14 +1511,14 @@
   },
   {
     "name": "upload_asset",
-    "description": "Upload a file as a URL-addressable asset that can be referenced in issues, PRs, or comments. The file is stored on an orphaned git branch and returns a permanent URL. Use this for images, diagrams, or other files that need to be embedded in GitHub content.",
+    "description": "Upload a file as a URL-addressable asset that can be referenced in issues, PRs, or comments. The file is stored on an orphaned git branch and returns a permanent URL. Use this for images and diagrams that need to be embedded in GitHub content. Only image extensions are accepted unless the workflow configures more; non-image files (for example .csv, .json, .md, .txt, .pdf) are rejected with \"File extension ... is not allowed\". For tabular or text data, embed it inline in the report body, or use upload_artifact if it is available.",
     "inputSchema": {
       "type": "object",
       "required": ["path"],
       "properties": {
         "path": {
           "type": "string",
-          "description": "Absolute file path to upload (e.g., '/tmp/chart.png'). Must be under the workspace or /tmp directory. By default, only image files (.png, .jpg, .jpeg) are allowed; other file types require workflow configuration."
+          "description": "Absolute file path to upload (e.g., '/tmp/chart.png'). Must be under the workspace or /tmp directory. By default, only image files (.png, .jpg, .jpeg) are allowed; a workflow may configure a different extension list (for example adding .svg). Any other extension, such as .csv, .json, .md or .txt, fails validation, so do not call this tool for non-image files."
         },
         "secrecy": {
           "type": "string",
@@ -1669,8 +1675,26 @@
     }
   },
   {
+    "name": "request_continuation",
+    "description": "Record a request for follow-up work with the reason and task to continue in message. This is metadata only: it does not dispatch a workflow, resume work, or confirm that a continuation occurred. It does not mark the current task completed.",
+    "inputSchema": {
+      "type": "object",
+      "required": ["message"],
+      "properties": {
+        "message": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S",
+          "maxLength": 65536,
+          "description": "Nonempty reason for requesting follow-up and the task to continue."
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  {
     "name": "noop",
-    "description": "Log a transparency message when no significant actions are needed. Use this to confirm workflow completion and provide visibility when analysis is complete but no changes or outputs are required (e.g., 'No issues found', 'All checks passed'). This ensures the workflow produces human-visible output even when no other actions are taken.",
+    "description": "Log a transparency message when no significant actions are needed. Use this to confirm workflow completion and provide visibility when analysis is complete but no changes or outputs are required (e.g., 'No issues found', 'All checks passed'). This ensures the workflow produces human-visible output even when no other actions are taken. If your own task could not be finished or published because of a failure or blocker, use report_incomplete instead.",
     "inputSchema": {
       "type": "object",
       "required": ["message"],
@@ -2019,7 +2043,7 @@
   },
   {
     "name": "report_incomplete",
-    "description": "Signal that the task could not be completed due to an infrastructure or tool failure (e.g., MCP server crash, missing authentication, inaccessible repository). Use this when required tools or data are unavailable and the task cannot be meaningfully performed. This is distinct from noop (no action needed) \u2014 it indicates an active failure that prevented the task from running. Provide a specific reason and optional details so downstream issue aggregation can preserve complete incomplete-signal context. The workflow framework will treat this as a failure signal even when the agent exits successfully.",
+    "description": "Signal that the task could not be completed due to an infrastructure or tool failure (e.g., MCP server crash, missing authentication, inaccessible repository, a check that could not run). Use this when required tools or data are unavailable and the task cannot be meaningfully performed. This is distinct from noop (no action needed) \u2014 it indicates an active failure that prevented the task from running. Do not use it for negative or unresolved findings when reporting them is your task (e.g., a review requesting changes, bugs found, checks on the reviewed code that ran and reported failures, or follow-up left for humans); those are completed outcomes. If your task is to fix or resolve something, merely identifying the problem is not completion. Provide a specific reason and optional details so downstream issue aggregation can preserve complete incomplete-signal context. The workflow framework will treat this as a failure signal even when the agent exits successfully.",
     "inputSchema": {
       "type": "object",
       "required": ["reason"],

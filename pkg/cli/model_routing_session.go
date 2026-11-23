@@ -91,6 +91,7 @@ type sessionModelRoutingAttribution struct {
 	Mismatches                []ModelEndpointMismatch
 	UnavailableSubagentModels []sessionSubagentModelUnavailable
 	RetryEvents               []sessionModelRoutingEvent
+	Observation               *RoutingObservation
 }
 
 // ModelEndpointMismatch describes a model/API incompatibility reported by the unified session.
@@ -247,7 +248,30 @@ func decodeSessionModelRoutingEvent(line []byte, lineNumber int, attribution *se
 			unavailable.AgentName != "" && unavailable.DeclaredModel != "" && unavailable.Model != "" {
 			attribution.UnavailableSubagentModels = append(attribution.UnavailableSubagentModels, unavailable)
 		}
+	case event.Type == "routing.observation" && event.Provenance.Component == "collector" && event.Provenance.Phase == "conclusion":
+		attribution.Observation = parseRoutingObservation(event.Data, lineNumber)
 	}
+	return nil
+}
+
+// parseRoutingObservation returns the verdict when it uses T-UAS-094's
+// vocabulary: a known reason, and only with skip.
+func parseRoutingObservation(data json.RawMessage, lineNumber int) *RoutingObservation {
+	var observation RoutingObservation
+	if json.Unmarshal(data, &observation) == nil {
+		switch observation.Outcome {
+		case "success", "failure":
+			if observation.Reason == "" {
+				return &observation
+			}
+		case "skip":
+			switch observation.Reason {
+			case "cancelled", "infrastructure", "rate_limited", "pair_mismatch", "unknown_evidence":
+				return &observation
+			}
+		}
+	}
+	auditReportLog.Printf("Ignoring invalid routing.observation on line %d", lineNumber)
 	return nil
 }
 

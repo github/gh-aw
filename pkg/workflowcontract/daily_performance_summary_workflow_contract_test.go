@@ -3,8 +3,11 @@ package workflowcontract
 import (
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
+
+	"go.yaml.in/yaml/v3"
 )
 
 // TestDailyPerformanceSummaryUsesStableWindowMetrics verifies that the daily
@@ -53,12 +56,32 @@ func TestGitHubQueryScriptsUseFileBackedPagination(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to read GitHub query MCP scripts: %v", err)
 	}
-	text := string(content)
-
-	if strings.Contains(text, "--argjson all") {
-		t.Error("query scripts must not pass accumulated API data through command arguments")
+	parts := strings.SplitN(string(content), "---", 3)
+	if len(parts) != 3 {
+		t.Fatal("query scripts must have YAML frontmatter")
 	}
-	if count := strings.Count(text, `jq -s '.[0] + .[1]'`); count != 3 {
-		t.Errorf("expected all three paginated query scripts to merge data through files, got %d", count)
+	var config struct {
+		Scripts map[string]struct {
+			Run string `yaml:"run"`
+		} `yaml:"mcp-scripts"`
+	}
+	if err := yaml.Unmarshal([]byte(parts[1]), &config); err != nil {
+		t.Fatalf("failed to parse GitHub query MCP scripts: %v", err)
+	}
+
+	fileMerge := regexp.MustCompile(`jq -s '\.\[0\] \+ \.\[1\]' "\$[A-Z_]+_FILE" "\$[A-Z_]+_FILE" > "\$[A-Z_]+_FILE"`)
+	for _, name := range []string{"github-issue-query", "github-pr-query", "github-discussion-query"} {
+		t.Run(name, func(t *testing.T) {
+			run := config.Scripts[name].Run
+			if run == "" {
+				t.Fatal("missing query script run body")
+			}
+			if strings.Contains(run, "--argjson all") {
+				t.Error("query script must not pass accumulated API data through command arguments")
+			}
+			if !fileMerge.MatchString(run) {
+				t.Error("query script must merge paginated data from input files into an output file")
+			}
+		})
 	}
 }

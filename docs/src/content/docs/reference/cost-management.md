@@ -72,10 +72,11 @@ gh aw logs --start-date -30d --json | \
 # AIC spend grouped by workflow over the past 30 days
 gh aw logs --start-date -30d --json | \
   jq '[.runs[]] | group_by(.workflow_name) |
-  map({workflow: .[0].workflow_name, runs: length, total_aic: (map(.aic // 0) | add)})'
+  map({workflow: .[0].workflow_name, runs: length,
+       total_aic: (if any(.[]; .aic == null) then null else (map(.aic) | add) end)})'
 ```
 
-Each run under `.runs[]` includes `duration`, `token_usage`, `aic`, `workflow_name`, and `agent`. For orchestrated workflows, the same JSON includes deterministic lineage under `.episodes[]` and `.edges[]` — see the next section.
+Each run under `.runs[]` includes `duration`, `token_usage`, `aic`, `workflow_name`, and `agent`. Unknown run costs are `null`; the grouped total above is also `null` if any run in the group has unknown cost. For orchestrated workflows, the same JSON includes deterministic lineage under `.episodes[]` and `.edges[]` — see the next section.
 
 ### Interpret Episode-Level Usage
 

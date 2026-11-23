@@ -207,7 +207,7 @@ function parseCopilotSDKToolConfig(value) {
  *
  * @param {CopilotSDKToolConfig} config
  * @param {string | undefined} [configPath]
- * @returns {Record<string, import("@github/copilot-sdk").MCPServerConfig>}
+ * @returns {Record<string, import("@microsoft/copilot-sdk").MCPServerConfig>}
  */
 function loadCopilotSDKMCPServers(config, configPath) {
   if (!config.capabilities.mcp) return {};
@@ -225,13 +225,19 @@ function loadCopilotSDKMCPServers(config, configPath) {
     throw new Error("Copilot SDK MCP configuration must contain an mcpServers object");
   }
 
-  /** @type {Record<string, import("@github/copilot-sdk").MCPServerConfig>} */
+  /** @type {Record<string, import("@microsoft/copilot-sdk").MCPServerConfig>} */
   const servers = {};
   for (const [name, entry] of Object.entries(parsed.mcpServers)) {
+    if (name === "web-fetch" && isRecord(entry) && entry.type === "stdio" && config.permissions.allowedTools.includes(name)) {
+      // Reconstruct the sole permitted local server from the setup path, not from config arguments.
+      const { webFetchStdioConfig } = require("./convert_gateway_config_shared.cjs");
+      servers[name] = { type: "stdio", ...webFetchStdioConfig(), tools: ["web_fetch"] };
+      continue;
+    }
     if (!isRecord(entry) || (entry.type !== "http" && entry.type !== "sse") || typeof entry.url !== "string") {
       throw new Error("Copilot SDK MCP configuration servers must use the generated HTTP gateway configuration");
     }
-    /** @type {import("@github/copilot-sdk").MCPHTTPServerConfig} */
+    /** @type {import("@microsoft/copilot-sdk").MCPHTTPServerConfig} */
     const server = { type: entry.type === "http" ? "http" : "sse", url: entry.url };
     if (entry.tools !== undefined) {
       if (!Array.isArray(entry.tools) || entry.tools.some(tool => typeof tool !== "string" || tool.trim() === "")) {
@@ -260,15 +266,16 @@ function loadCopilotSDKMCPServers(config, configPath) {
 /**
  * @param {CopilotSDKToolConfig | null | undefined} config
  * @param {{
- *   ToolSet?: typeof import("@github/copilot-sdk").ToolSet,
- *   BuiltInTools?: typeof import("@github/copilot-sdk").BuiltInTools,
- *   defineTool?: typeof import("@github/copilot-sdk").defineTool,
+ *   ToolSet?: typeof import("@microsoft/copilot-sdk").ToolSet,
+ *   BuiltInTools?: typeof import("@microsoft/copilot-sdk").BuiltInTools,
+ *   defineTool?: typeof import("@microsoft/copilot-sdk").defineTool,
  * }} sdk
  * @param {{fetchImpl?: typeof fetch, timeoutMs?: number, maxRedirects?: number}} [options]
- * @returns {Pick<import("@github/copilot-sdk").SessionConfig, "availableTools" | "tools">}
+ * @returns {import("@microsoft/copilot-sdk").CreateSessionOptions["tools"]}
  */
 function buildCopilotSDKSessionToolConfig(config, sdk, options = {}) {
-  if (!config) return {};
+  // An empty allowlist denies all tools; omitting it leaves the SDK catalog unfiltered.
+  if (config == null) return { availableTools: [], definitions: [] };
   if (typeof sdk.ToolSet !== "function" || !sdk.BuiltInTools || !Array.isArray(sdk.BuiltInTools.Isolated)) {
     throw new Error("Copilot SDK ToolSet and BuiltInTools.Isolated are required for compiler-controlled tool filtering");
   }
@@ -289,7 +296,7 @@ function buildCopilotSDKSessionToolConfig(config, sdk, options = {}) {
   // validateToolPermissionParity enforces that cliProxy can only be true when
   // bash is also true, so this capability is never silently unreachable.
 
-  /** @type {import("@github/copilot-sdk").Tool<any>[]} */
+  /** @type {import("@microsoft/copilot-sdk").Tool<any>[]} */
   const tools = [];
   if (config.capabilities.webFetch) {
     if (typeof sdk.defineTool !== "function") {
@@ -300,7 +307,7 @@ function buildCopilotSDKSessionToolConfig(config, sdk, options = {}) {
     // overrides, rather than as a custom tool.
     availableTools.addBuiltIn("web_fetch");
   }
-  return { availableTools, tools };
+  return { availableTools, definitions: tools };
 }
 
 module.exports = {

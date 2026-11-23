@@ -2362,7 +2362,7 @@
               "oneOf": [
                 {
                   "type": "string",
-                  "description": "GitHub search query string to check before running workflow (implies max=1). If the search returns any results, the workflow will be skipped. Query is automatically scoped to the current repository. Example: 'is:issue is:open label:bug'"
+                  "description": "GitHub search query string to check before running workflow (implies max=1). If the search returns any results, the workflow will be skipped. Query is automatically scoped to the current repository. Simple queries using only is:/type:/state:, label:, author:, assignee:, mentions:, and sort: qualifiers are evaluated via GraphQL/REST instead of the rate-limited search API; free text, in:, negation, and comma label lists require search. Example: 'is:issue is:open label:bug'"
                 },
                 {
                   "type": "object",
@@ -2402,7 +2402,7 @@
               "oneOf": [
                 {
                   "type": "string",
-                  "description": "GitHub search query string to check before running workflow (implies min=1). If the search returns no results, the workflow will be skipped. Query is automatically scoped to the current repository. Example: 'is:pr is:open label:ready-to-deploy'"
+                  "description": "GitHub search query string to check before running workflow (implies min=1). If the search returns no results, the workflow will be skipped. Query is automatically scoped to the current repository. Simple queries using only is:/type:/state:, label:, author:, assignee:, mentions:, and sort: qualifiers are evaluated via GraphQL/REST instead of the rate-limited search API; free text, in:, negation, and comma label lists require search. Example: 'is:pr is:open label:ready-to-deploy'"
                 },
                 {
                   "type": "object",
@@ -3574,13 +3574,17 @@
       }
     },
     "experiments": {
-      "description": "A/B testing experiments. Each key is an experiment name; the value is either an array of two or more variant strings (bare-array form) or an object with a 'variants' field plus optional metadata fields (description, metric, weight, issue, start_date, end_date, hypothesis, secondary_metrics, guardrail_metrics, min_samples, analysis_type, decision). The reserved 'storage' key controls how experiment state is persisted: 'repo' (default) commits state to a git branch named 'experiments/{sanitizedWorkflowID}' (workflow ID lowercased with hyphens removed) for durability; 'cache' uses GitHub Actions cache. At runtime the activation job picks a variant and persists the updated counters. Use ${{ experiments.<name> }} in the workflow prompt to reference the selected variant. When multiple experiments are declared, assignments are statistically balanced using a least-used counter that round-robins across variants (or weighted when 'weight' is provided); ties are broken randomly so no variant is systematically favoured on the first run.",
+      "description": "A/B testing experiments. Each key is an experiment name; the value is either an array of two or more variant strings (bare-array form) or an object with a 'variants' field plus optional metadata fields (description, metric, weight, issue, start_date, end_date, hypothesis, secondary_metrics, guardrail_metrics, min_samples, analysis_type, decision). The reserved 'storage' key controls persistence: 'repo' (default) commits state to 'experiments/{sanitizedWorkflowID}'; 'cache' uses GitHub Actions cache; opt-in 'broker' delegates variant selection and aggregate result reporting to an OIDC-authenticated API. The optional 'broker-url' configures its HTTPS endpoint. Broker dry-runs use local ephemeral selection without broker calls or broker OIDC grants. Use ${{ experiments.<name> }} in the workflow prompt to reference the selected variant. Repo and cache modes use local least-used counters (weighted when 'weight' is provided), with random tie-breaking; in broker mode the API owns selection and cumulative counts.",
       "type": "object",
       "propertyNames": {
         "anyOf": [
           {
             "const": "storage",
             "description": "Reserved key for storage mode configuration."
+          },
+          {
+            "const": "broker-url",
+            "description": "Reserved key for the experiments broker endpoint."
           },
           {
             "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
@@ -3819,9 +3823,15 @@
       "properties": {
         "storage": {
           "type": "string",
-          "enum": ["cache", "repo"],
+          "enum": ["cache", "repo", "broker"],
           "default": "repo",
-          "description": "Storage backend for experiment state. 'repo' (default) persists state to a git branch named 'experiments/{sanitizedWorkflowID}' (workflow ID lowercased with hyphens removed, e.g. 'my-workflow' -> 'experiments/myworkflow') for durability across cache evictions. 'cache' uses GitHub Actions cache (legacy behavior). Repo storage is recommended because experiment data is valuable and more durable than cache."
+          "description": "Storage backend for experiment state. 'repo' (default) persists state to a git branch named 'experiments/{sanitizedWorkflowID}' (workflow ID lowercased with hyphens removed, e.g. 'my-workflow' -> 'experiments/myworkflow') for durability across cache evictions. 'cache' uses GitHub Actions cache (legacy behavior). 'broker' delegates assignment and aggregate reporting to an OIDC-authenticated service without git or cache persistence. Broker dry-runs use local ephemeral assignments and never contact the broker."
+        },
+        "broker-url": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^https://[^$]*$",
+          "description": "Literal HTTPS broker endpoint without credentials or expressions. Defaults to the GH_AW_EXPERIMENTS_BROKER_URL secret."
         }
       }
     },
@@ -6075,7 +6085,7 @@
                 },
                 "issue-intent": {
                   "type": "boolean",
-                  "description": "Enable issue-intent metadata support (rationale/confidence/suggest) for this output type."
+                  "description": "Experimental: Enable issue-intent metadata support (rationale/confidence/suggest) for this output type. Disabled by default; set to true to opt in (makes rationale and confidence required)."
                 },
                 "samples": {
                   "description": "Internal hidden feature. Optional list of declarative sample payloads that exercise this safe-output handler. Used by the hidden `gh aw compile --use-samples` flag to replace the agentic step with a deterministic replay through the safe-outputs MCP server. Each entry should conform to the corresponding MCP tool inputSchema; recognized sidecar keys (currently `patch` for create-pull-request and push-to-pull-request-branch) are stripped before schema validation and consumed by the replay driver.",
@@ -6557,7 +6567,7 @@
             "version": {
               "type": "string",
               "minLength": 1,
-              "description": "Package version to install for this language server (e.g. \"5.8.3\"). Overrides the built-in pinned default. Has no effect for custom servers not in the built-in install spec table."
+              "description": "Package version to install for built-in language servers that support overrides. The built-in TypeScript server accepts only its bundled lockfile version. Has no effect for custom servers."
             }
           },
           "required": ["command", "fileExtensions"],
@@ -6946,7 +6956,7 @@
                 },
                 "issue-intent": {
                   "type": "boolean",
-                  "description": "Enable issue-intent metadata support (rationale/confidence/suggest) for this output type."
+                  "description": "Experimental: Enable issue-intent metadata support (rationale/confidence/suggest) for this output type. Disabled by default; set to true to opt in (makes rationale and confidence required)."
                 },
                 "samples": {
                   "description": "Internal hidden feature. Optional list of declarative sample payloads that exercise this safe-output handler. Used by the hidden `gh aw compile --use-samples` flag to replace the agentic step with a deterministic replay through the safe-outputs MCP server. Each entry should conform to the corresponding MCP tool inputSchema; recognized sidecar keys (currently `patch` for create-pull-request and push-to-pull-request-branch) are stripped before schema validation and consumed by the replay driver.",
@@ -7058,7 +7068,7 @@
                 },
                 "issue-intent": {
                   "type": "boolean",
-                  "description": "Enable issue-intent metadata support (rationale/confidence/suggest) for this output type."
+                  "description": "Experimental: Enable issue-intent metadata support (rationale/confidence/suggest) for this output type. Disabled by default; set to true to opt in (makes rationale and confidence required)."
                 },
                 "samples": {
                   "description": "Internal hidden feature. Optional list of declarative sample payloads that exercise this safe-output handler. Used by the hidden `gh aw compile --use-samples` flag to replace the agentic step with a deterministic replay through the safe-outputs MCP server. Each entry should conform to the corresponding MCP tool inputSchema; recognized sidecar keys (currently `patch` for create-pull-request and push-to-pull-request-branch) are stripped before schema validation and consumed by the replay driver.",
@@ -7999,7 +8009,7 @@
                 },
                 "issue-intent": {
                   "type": "boolean",
-                  "description": "Enable issue-intent metadata support (rationale/confidence/suggest) for this output type."
+                  "description": "Experimental: Enable issue-intent metadata support (rationale/confidence/suggest) for this output type. Disabled by default; set to true to opt in (makes rationale and confidence required)."
                 },
                 "samples": {
                   "description": "Internal hidden feature. Optional list of declarative sample payloads that exercise this safe-output handler. Used by the hidden `gh aw compile --use-samples` flag to replace the agentic step with a deterministic replay through the safe-outputs MCP server. Each entry should conform to the corresponding MCP tool inputSchema; recognized sidecar keys (currently `patch` for create-pull-request and push-to-pull-request-branch) are stripped before schema validation and consumed by the replay driver.",
@@ -9851,7 +9861,7 @@
                 },
                 "issue-intent": {
                   "type": "boolean",
-                  "description": "Enable issue-intent metadata support (rationale/confidence/suggest) for this output type."
+                  "description": "Experimental: Enable issue-intent metadata support (rationale/confidence/suggest) for this output type. Disabled by default; set to true to opt in (makes rationale and confidence required)."
                 },
                 "create-if-missing": {
                   "type": "boolean",
@@ -10352,7 +10362,7 @@
                 },
                 "issue-intent": {
                   "type": "boolean",
-                  "description": "Enable issue-intent metadata support (rationale/confidence/suggest) for this output type."
+                  "description": "Experimental: Enable issue-intent metadata support (rationale/confidence/suggest) for this output type. Disabled by default; set to true to opt in (makes rationale and confidence required)."
                 },
                 "samples": {
                   "description": "Internal hidden feature. Optional list of declarative sample payloads that exercise this safe-output handler. Used by the hidden `gh aw compile --use-samples` flag to replace the agentic step with a deterministic replay through the safe-outputs MCP server. Each entry should conform to the corresponding MCP tool inputSchema; recognized sidecar keys (currently `patch` for create-pull-request and push-to-pull-request-branch) are stripped before schema validation and consumed by the replay driver.",
@@ -10450,7 +10460,7 @@
                 },
                 "issue-intent": {
                   "type": "boolean",
-                  "description": "Enable issue-intent metadata support (rationale/confidence/suggest) for this output type."
+                  "description": "Experimental: Enable issue-intent metadata support (rationale/confidence/suggest) for this output type. Disabled by default; set to true to opt in (makes rationale and confidence required)."
                 },
                 "samples": {
                   "description": "Internal hidden feature. Optional list of declarative sample payloads that exercise this safe-output handler. Used by the hidden `gh aw compile --use-samples` flag to replace the agentic step with a deterministic replay through the safe-outputs MCP server. Each entry should conform to the corresponding MCP tool inputSchema; recognized sidecar keys (currently `patch` for create-pull-request and push-to-pull-request-branch) are stripped before schema validation and consumed by the replay driver.",
@@ -11533,7 +11543,7 @@
                 },
                 "issue-intent": {
                   "type": "boolean",
-                  "description": "Enable issue-intent metadata support (rationale/confidence/suggest) for this output type."
+                  "description": "Experimental: Enable issue-intent metadata support (rationale/confidence/suggest) for this output type. Disabled by default; set to true to opt in (makes rationale and confidence required)."
                 },
                 "staged": {
                   "$ref": "#/$defs/templatable_boolean",
@@ -11630,7 +11640,7 @@
                 },
                 "issue-intent": {
                   "type": "boolean",
-                  "description": "Enable issue-intent metadata support (rationale/confidence/suggest) for this output type."
+                  "description": "Experimental: Enable issue-intent metadata support (rationale/confidence/suggest) for this output type. Disabled by default; set to true to opt in (makes rationale and confidence required)."
                 },
                 "staged": {
                   "$ref": "#/$defs/templatable_boolean",
@@ -12715,12 +12725,14 @@
                       "description": "Disable AI engine for threat detection (only run custom steps)"
                     },
                     {
-                      "$ref": "#/$defs/engine_config"
+                      "$ref": "#/$defs/engine_config",
+                      "not": { "type": "object", "required": ["inference"] }
                     }
                   ]
                 },
                 "engine-config": {
                   "$ref": "#/$defs/engine_config",
+                  "not": { "type": "object", "required": ["inference"] },
                   "description": "Extended engine configuration for threat detection."
                 },
                 "model": {
@@ -13661,6 +13673,27 @@
             }
           }
         },
+        "request-continuation": {
+          "description": "Opt-in metadata-only request for follow-up work. Does not resume work or dispatch a workflow.",
+          "oneOf": [
+            {
+              "type": "object",
+              "properties": {
+                "authorization": { "$ref": "#/$defs/safeOutputAuthorization" },
+                "max": {
+                  "description": "Maximum number of continuation requests (default: 1).",
+                  "oneOf": [
+                    { "type": "integer", "minimum": 1 },
+                    { "type": "string", "pattern": "^\\$\\{\\{.*\\}\\}$" }
+                  ]
+                }
+              },
+              "additionalProperties": false
+            },
+            { "type": "null" },
+            { "type": "boolean" }
+          ]
+        },
         "report-incomplete": {
           "oneOf": [
             {
@@ -13911,6 +13944,18 @@
       "description": "Optional observability output settings for workflow runs.",
       "properties": {
         "otlp": {
+          "oneOf": [
+            { "$ref": "#/properties/observability/$defs/otlp_config" },
+            {
+              "type": "boolean",
+              "const": false,
+              "description": "Disable compiler-managed OTLP configuration, including defaults and imported settings, when set in the main workflow."
+            }
+          ]
+        }
+      },
+      "$defs": {
+        "otlp_config": {
           "type": "object",
           "description": "OTLP (OpenTelemetry Protocol) trace export configuration.",
           "properties": {
@@ -14868,6 +14913,8 @@
         "resources": { "type": "object", "additionalProperties": { "type": "array", "items": { "type": "string" } } },
         "github-apps": { "type": "object", "additionalProperties": { "$ref": "#/$defs/connectorGitHubApp" } },
         "oidc-tokens": { "type": "object", "additionalProperties": { "$ref": "#/$defs/connectorGitHubOIDC" } },
+        "azure-oidc": { "type": "object", "additionalProperties": { "$ref": "#/$defs/connectorAzureOIDC" } },
+        "selected-inference": { "$ref": "#/$defs/connectorInferenceSelection" },
         "on": { "$ref": "#/$defs/connectorCapabilities" },
         "tools": { "$ref": "#/$defs/connectorCapabilities" },
         "safe-outputs": { "$ref": "#/$defs/connectorCapabilities" },
@@ -14922,13 +14969,14 @@
             "required": ["phase", "header", "scheme", "scopes"],
             "additionalProperties": false,
             "properties": {
-              "phase": { "enum": ["agent", "safe-output"] },
+              "phase": { "enum": ["agent", "safe-output", "inference"] },
               "header": { "enum": ["Authorization", "X-API-Key", "PRIVATE-TOKEN"] },
               "scheme": { "enum": ["bearer", "token", "basic", "raw"] },
               "scopes": { "type": "array", "minItems": 1, "items": { "type": "string" } },
               "secret": { "type": "string", "minLength": 1, "description": "GitHub Actions secret name, not a credential value or expression." },
               "github-app": { "$ref": "#/$defs/connectorGitHubApp" },
               "github-oidc": { "$ref": "#/$defs/connectorGitHubOIDC" },
+              "azure-oidc": { "$ref": "#/$defs/connectorAzureOIDC" },
               "token": {
                 "type": "object",
                 "required": ["secret"],
@@ -14939,6 +14987,28 @@
           }
         },
         "resources": { "type": "object", "additionalProperties": { "type": "array", "items": { "type": "string" } } },
+        "inference": {
+          "type": "object",
+          "minProperties": 1,
+          "propertyNames": { "$ref": "#/$defs/connectorName" },
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["endpoint", "path", "protocol", "credential", "models"],
+            "properties": {
+              "endpoint": { "$ref": "#/$defs/connectorName" },
+              "path": { "type": "string", "minLength": 1, "maxLength": 2048 },
+              "protocol": { "enum": ["openai-responses", "openai-chat-completions"] },
+              "credential": { "$ref": "#/$defs/connectorName" },
+              "models": { "$ref": "#/$defs/connectorName" },
+              "model-catalog": {
+                "type": "boolean",
+                "default": true,
+                "description": "Whether the provider exposes a live model catalogue (/models). False sets engine.model-catalog: false on consumers so engine.model is passed through verbatim instead of being resolved as a gh-aw alias."
+              }
+            }
+          }
+        },
         "triggers": { "$ref": "#/$defs/connectorTriggers" },
         "tools": { "$ref": "#/$defs/connectorDefinitions" },
         "mcp-servers": { "$ref": "#/$defs/connectorDefinitions" },
@@ -14957,6 +15027,30 @@
         "owner": { "type": "string" },
         "repositories": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string" } },
         "permissions": { "type": "object", "additionalProperties": { "enum": ["read", "write", "none"] } }
+      }
+    },
+    "connectorInferenceSelection": {
+      "description": "Explicit workflow inference selection. Model is an exact granted wire alias, separate from engine.model metadata. Initially supports Copilot OpenAI-compatible BYOK only.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["connector", "profile", "model"],
+      "properties": {
+        "connector": { "$ref": "#/$defs/connectorName" },
+        "profile": { "$ref": "#/$defs/connectorName" },
+        "model": { "type": "string", "minLength": 1, "maxLength": 256 }
+      }
+    },
+    "connectorAzureOIDC": {
+      "description": "Inference-only Azure Entra federation through the existing AWF engine transport. Scope is explicit; no Azure OpenAI default is assumed.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["azure-tenant-id", "azure-client-id", "azure-scope"],
+      "properties": {
+        "azure-tenant-id": { "type": "string", "minLength": 1, "maxLength": 2048, "pattern": "\\S" },
+        "azure-client-id": { "type": "string", "minLength": 1, "maxLength": 2048, "pattern": "\\S" },
+        "azure-scope": { "type": "string", "minLength": 1, "maxLength": 2048, "pattern": "\\S" },
+        "audience": { "type": "string", "minLength": 1, "maxLength": 2048, "format": "uri" },
+        "azure-cloud": { "enum": ["public", "usgovernment", "china"] }
       }
     },
     "connectorDocumentationURLs": {
@@ -15632,6 +15726,7 @@
         "extensions": { "$ref": "#/$defs/engine_config/oneOf/1/properties/extensions" },
         "command": { "$ref": "#/$defs/engine_config/oneOf/1/properties/command" },
         "bare": { "$ref": "#/$defs/engine_config/oneOf/1/properties/bare" },
+        "model-catalog": { "$ref": "#/$defs/engine_config/oneOf/1/properties/model-catalog" },
         "cooldown": { "$ref": "#/$defs/engine_config/oneOf/1/properties/cooldown" },
         "cwd": { "$ref": "#/$defs/engine_config/oneOf/1/properties/cwd" },
         "model-routing": { "$ref": "#/$defs/engine_config/oneOf/1/properties/model-routing" },
@@ -15958,6 +16053,7 @@
                 "type": "string"
               }
             },
+            "inference": { "$ref": "#/$defs/connectorInferenceSelection" },
             "auth": {
               "type": "object",
               "description": "Engine-level authentication configuration for AWF API proxy sidecar integration (for example, Azure OpenAI via GitHub OIDC). Values are mapped to AWF_AUTH_* environment variables.",
@@ -16058,6 +16154,11 @@
               "description": "When true, disables automatic loading of context and custom instructions where supported. Copilot uses --no-custom-instructions, Claude uses --bare, and Pi disables context-file, skill, prompt-template, extension, and theme discovery while retaining explicit workflow infrastructure extensions. Codex and Gemini do not support this option and emit a warning. Defaults to false.",
               "default": false
             },
+            "model-catalog": {
+              "type": "boolean",
+              "description": "Whether the engine harness resolves the configured model against the live model catalogue (/models). Defaults to true: gh-aw model aliases, including built-in aliases that look like model ids such as gpt-5-mini, are resolved and the run stops if no catalogue is available. Set to false for BYOK providers without a /models route (for example Azure AI Gateway): configured models are then passed to the engine verbatim, without alias resolution, and model routing (implicit or model: router) is disabled because it selects models from the catalogue. Not supported with engine.copilot-sdk: true, which needs the catalogue at startup.",
+              "default": true
+            },
             "dynamic-workflows": {
               "type": "boolean",
               "description": "Whether dynamic workflows are enabled for engines that support them. Defaults to false. Copilot dynamic workflows are experimental.",
@@ -16081,8 +16182,27 @@
               "additionalProperties": false
             },
             "copilot-sdk": {
-              "type": "boolean",
-              "description": "Enables the experimental GitHub Copilot SDK integration (copilot engine only). When true, the harness starts a separate headless Copilot CLI sidecar on the configured localhost port and sets COPILOT_SDK_URI on child processes."
+              "description": "Enables Copilot SDK integration. An object pins a checked-in npm project for a Node.js or TypeScript driver.",
+              "oneOf": [
+                { "type": "boolean" },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["version", "sha256"],
+                  "properties": {
+                    "version": {
+                      "type": "string",
+                      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$",
+                      "description": "Exact stable version of @microsoft/copilot-sdk, independent of engine.version."
+                    },
+                    "sha256": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{64}$",
+                      "description": "Lowercase SHA-256 of the checked-in manifest, a NUL byte, and the npm lockfile."
+                    }
+                  }
+                }
+              ]
             },
             "driver": {
               "description": "Custom driver script, command, or inline source for the engine. String values accept a workspace-relative path or bare name. Inline object values are supported for the Copilot engine and materialize runtime files before execution. Supported inline runtimes are node, python, go, and java.",
@@ -16264,6 +16384,11 @@
               "type": "boolean",
               "description": "When true, disables automatic loading of context and custom instructions where supported. Copilot uses --no-custom-instructions, Claude uses --bare, and Pi disables context-file, skill, prompt-template, extension, and theme discovery while retaining explicit workflow infrastructure extensions. Codex and Gemini do not support this option and emit a warning. Defaults to false.",
               "default": false
+            },
+            "model-catalog": {
+              "type": "boolean",
+              "description": "Whether the engine harness resolves the configured model against the live model catalogue (/models). Defaults to true: gh-aw model aliases, including built-in aliases that look like model ids such as gpt-5-mini, are resolved and the run stops if no catalogue is available. Set to false for BYOK providers without a /models route (for example Azure AI Gateway): configured models are then passed to the engine verbatim, without alias resolution, and model routing (implicit or model: router) is disabled because it selects models from the catalogue. Not supported with engine.copilot-sdk: true, which needs the catalogue at startup.",
+              "default": true
             },
             "dynamic-workflows": {
               "type": "boolean",
@@ -16480,11 +16605,23 @@
                     "tools-allowlist": {
                       "type": "boolean"
                     },
+                    "github-cli-proxy": {
+                      "type": "boolean",
+                      "description": "Include the GitHub CLI bridge when tools.cli-proxy is enabled, excluding it from native MCP configuration."
+                    },
+                    "auto-mcp-cli": {
+                      "type": "boolean",
+                      "description": "Augment active CLI mounts with configured GitHub, work-queue and custom MCP servers."
+                    },
                     "max-turns": {
                       "type": "boolean"
                     },
                     "web-search": {
                       "type": "boolean"
+                    },
+                    "web-fetch-fallback": {
+                      "type": "boolean",
+                      "description": "Use the built-in sandboxed web-fetch MCP server when the workflow enables tools.web-fetch. Requires MCP support and a config adapter that registers the stdio server."
                     },
                     "max-continuations": {
                       "type": "boolean"
@@ -16994,7 +17131,7 @@
     },
     "http_mcp_auth": {
       "type": "object",
-      "description": "Upstream authentication configuration for the HTTP MCP server. When configured, the gateway dynamically acquires tokens and injects them as Authorization headers on every outgoing request to this server. Currently only GitHub Actions OIDC is supported.",
+      "description": "Upstream HTTP MCP authentication. The gateway acquires GitHub OIDC tokens directly or exchanges them for Microsoft Entra tokens. Azure federation requires MCP gateway v0.5.12 or newer.",
       "properties": {
         "type": {
           "type": "string",
@@ -17003,11 +17140,50 @@
         },
         "audience": {
           "type": "string",
-          "description": "The intended audience for the OIDC token (the 'aud' claim). If omitted, defaults to the server's url field.",
-          "format": "uri"
+          "description": "GitHub assertion audience. Defaults to the server URL for direct OIDC or api://AzureADTokenExchange for Azure. Accepts an Actions expression.",
+          "anyOf": [{ "format": "uri" }, { "pattern": "^\\$\\{\\{[\\s\\S]+\\}\\}$" }]
+        },
+        "provider": {
+          "type": "string",
+          "enum": ["azure"],
+          "description": "Exchange the GitHub assertion for a Microsoft Entra token. Omit for direct GitHub OIDC."
+        },
+        "azure-tenant-id": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S",
+          "description": "Entra tenant ID. Required for provider: azure. Accepts Actions expressions."
+        },
+        "azure-client-id": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S",
+          "description": "Federated Entra application client ID. Required for provider: azure. Accepts Actions expressions."
+        },
+        "azure-scope": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S",
+          "description": "Entra token scope. Defaults to https://cognitiveservices.azure.com/.default; Azure AI Gateway requires its own scope."
+        },
+        "azure-cloud": {
+          "type": "string",
+          "enum": ["public", "usgovernment", "china"],
+          "description": "Azure authority cloud. Defaults to public."
         }
       },
       "required": ["type"],
+      "allOf": [
+        {
+          "if": { "required": ["provider"], "properties": { "provider": { "const": "azure" } } },
+          "then": { "required": ["azure-tenant-id", "azure-client-id"] },
+          "else": {
+            "not": {
+              "anyOf": [{ "required": ["azure-tenant-id"] }, { "required": ["azure-client-id"] }, { "required": ["azure-scope"] }, { "required": ["azure-cloud"] }]
+            }
+          }
+        }
+      ],
       "additionalProperties": false
     },
     "github_token": {

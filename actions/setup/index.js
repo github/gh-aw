@@ -25,6 +25,7 @@ const result = spawnSync("bash", [path.join(__dirname, "setup.sh")], {
     INPUT_PARENT_SPAN_ID: inputParentSpanId,
     INPUT_JOB_NAME: inputJobName,
     INPUT_OTLP_OIDC_TOKEN: inputOTLPOIDCToken,
+    GH_AW_NODE: process.execPath,
     // Tell setup.sh to skip the OTLP span: in action mode index.js sends it
     // after setup.sh returns so that the startMs captured here is used.
     GH_AW_SKIP_SETUP_OTLP: "1",

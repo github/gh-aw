@@ -41,7 +41,7 @@ func applyHealthSubagentFailures(health *WorkflowHealth, runs []WorkflowRun, con
 		for _, id := range revision.Current.RunIDs {
 			revision.Current.SubagentFailures += failuresByRun[id]
 		}
-		if revision.Current.SubagentFailures > 0 {
+		if revision.Current.SubagentFailures > 0 && revision.Status != "revision_unknown" {
 			revision.Status = health.Status
 		}
 	}

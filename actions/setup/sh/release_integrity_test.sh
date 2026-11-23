@@ -409,6 +409,8 @@ test "$(release_artifact_sha256 github/gh-aw-firewall v0.29.16 checksums.txt)" =
   "6891cd50542511cbae92fc89adbec0bbe0586d332d038bd494e582be76afa478"
 test "$(release_artifact_sha256 github/gh-aw-firewall v0.29.17 checksums.txt)" = \
   "f56a82090eb65c9afba912c43fb2aa08de2ca54f8776f27a3fb851bbac21fa92"
+test "$(release_artifact_sha256 github/gh-aw-firewall v0.29.18 checksums.txt)" = \
+  "bd7b3b0ed6d7a29d5711e1b7ce066e229c2a38577be0c363da899ef17b036b86"
 for version in v0.29.10 0.29.10; do
   test "$(release_artifact_sha256 github/gh-aw-firewall "$version" checksums.txt)" = \
     "a60c61e67aad4810e9a4f52ae26d3b2a58a7cf190aff66aeb338238b7b0e1467"
@@ -417,6 +419,11 @@ test "$(release_artifact_sha256 github/copilot-cli v1.0.101 SHA256SUMS.txt)" = \
   "018625eac68670d66ede904b9b82cdcd6ab8f87ba20e6e1fbdf0b62c8295d5be"
 test "$(release_artifact_sha256 github/copilot-cli v1.0.103 SHA256SUMS.txt)" = \
   "26cd3e4b32cde498e4961fb4d48e7b85d7859fc69af1a645a19201fdd577bdb2"
+sdk_companion_pin="854036b59b745d4f4b44a169327ffc0eab007f39e74b3dc3670f4d609a6c1072"
+test "$(release_artifact_sha256 github/copilot-cli v1.0.113 SHA256SUMS.txt "$sdk_companion_pin")" = "$sdk_companion_pin"
+if release_artifact_sha256 github/copilot-cli v1.0.113 SHA256SUMS.txt >/dev/null 2>&1; then
+  echo "FAIL: SDK companion release resolved without its compiler-supplied pin" >&2; exit 1
+fi
 if release_artifact_sha256 github/gh-aw-firewall v0.28.62 wrong-asset >/dev/null 2>&1; then
   echo "FAIL: digest pin was not asset-bound" >&2; exit 1
 fi

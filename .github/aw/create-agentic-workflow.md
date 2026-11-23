@@ -5,19 +5,32 @@ disable-model-invocation: true
 
 # GitHub Agentic Workflow Designer & Creator
 
-Create one `.github/workflows/<workflow-id>.md` using `gh aw`. Evaluation is
-recommendations only; do not create/edit without an explicit implementation request.
+Create one `.github/workflows/<workflow-id>.md` and compile it with
+`gh aw compile <workflow-id>`. Evaluation is recommendations only; do not
+create/edit without an explicit implementation request.
 
 ## Load These References First
 
-Read [intent](intent.md), [workflow rules](github-agentic-workflows.md),
-[editing/compilation](workflow-editing.md), [constraints](workflow-constraints.md),
-[patterns](workflow-patterns.md), [safe outputs](safe-outputs.md),
-[schema index](syntax.md) and [MCP CLIs](mcp-clis.md).
+Read these required references in order before designing:
+1. [Intent](intent.md)
+2. [Workflow rules](github-agentic-workflows.md)
+3. [Editing and compilation](workflow-editing.md)
+4. [Constraints](workflow-constraints.md)
+5. [Patterns](workflow-patterns.md)
+6. [Safe outputs](safe-outputs.md)
+7. [Schema index](syntax.md)
+8. [MCP CLIs](mcp-clis.md)
+9. [Choose an agentic engine and inference](agentic-engine.md)
+
+If any required reference is missing or unreadable, stop and report its path;
+do not infer its guidance. In a proposed workflow, use `report_incomplete` when
+required tools or data are unavailable and the task cannot be meaningfully
+performed; reserve `noop` for cases where available evidence supports no action.
 Load the target repository's optional `.github/aw/instructions.md` overlay.
 
 Before generation, follow the [design checklist](create-agentic-workflow-design.md)
 and [output/validation contract](create-agentic-workflow-validation.md).
+For recommendations only, follow [evaluation guidance](create-agentic-workflow-evaluation.md).
 Load only matching topic references:
 
 - Maintenance: [maintainer.md](maintainer.md); docs agents/checks: [documentation-workflows.md](documentation-workflows.md).
@@ -63,17 +76,17 @@ compile it and include its generated `.lock.yml` in the PR.
 
 1. Derive architecture from intent; define activation, effects, inverse/`noop`,
    evidence window and scope. Verify config files named in the request; if
-   missing, require `noop` and report, never guess. Put each chosen definition
+   missing, do not guess; use `report_incomplete` if their absence prevents
+   meaningful work. Put each chosen definition
    (e.g., what “adds” covers, lockfile scope, zero-item behavior) in the proposed
    prompt, not only notes. Apply the [memory reuse checkpoint](designer.md#memory-reuse-checkpoint)
    before tool/persistence selection.
 2. Keep the agent job read-only: never grant `issues: write`, `pull-requests: write`
-   or `contents: write`. For Copilot inference recommend
-   `permissions: { copilot-requests: write }`; see [scope/caveats](syntax-core.md).
+   or `contents: write`. Apply the inference auth decision from step 9.
 3. Use configured safe outputs for mutations, never raw `gh`, API, GitHub write
    tools or `post-steps:`. Require `update-release` for release notes; restrict
-   `create-pull-request.allowed-files`; require `noop` for duplicates,
-   insufficient evidence or no action.
+   `create-pull-request.allowed-files`; require `noop` for duplicates or when
+   available evidence supports no action.
 4. Apply the [browser decision](playwright.md#browser-decision-and-readiness).
    Prefer `gh-proxy` and `toolsets:`; use `cli-proxy: true` only for needed
    non-GitHub MCP CLIs. Codex cannot enforce nonempty per-command `tools.bash`

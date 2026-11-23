@@ -299,6 +299,8 @@ func modelRoutingRuntimeIneligibility(data *WorkflowData) string {
 		return "model routing is already configured"
 	case config.ModelRoutingDisabled:
 		return "engine.model-routing is false"
+	case config.ModelCatalogDisabled:
+		return "engine.model-catalog is false"
 	}
 	engineID := strings.ToLower(config.ID)
 	if engineID != string(constants.CopilotEngine) && engineID != string(constants.ClaudeEngine) &&

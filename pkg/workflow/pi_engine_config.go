@@ -168,6 +168,7 @@ func piRuntimeConfigJSON(data *WorkflowData) string {
 func (e *PiEngine) applyPiConfigEnv(env map[string]string, data *WorkflowData) {
 	env["GH_AW_PI_CONFIG"] = piRuntimeConfigJSON(data)
 	applyModelAliasOverridesEnv(env, "GH_AW_PI_MODEL_ALIASES", data)
+	applyModelCatalogEnv(env, data)
 	childData := *data
 	if data.EngineConfig != nil {
 		childConfig := *data.EngineConfig

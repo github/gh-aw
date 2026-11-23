@@ -74,7 +74,7 @@ safe-outputs:
   allowed-github-references: []
   create-issue:
     title-prefix: "[agentrx-optimizer] "
-    labels: [automation, observability, optimization, traces]
+    labels: [automation, observability, optimization, traces, "backlog:reports"]
     close-older-issues: true
     expires: 7d
     max: 1

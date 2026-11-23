@@ -250,20 +250,24 @@ jobs:
             try {
               health = JSON.parse(execFileSync('gh', ['aw', 'health',
                 '--repo', repository, '--start-date', retentionStart, '--end-date', end,
-                '--logs-dir', path.join(cache, 'health'), '--timeout', `${healthTimeoutSeconds}s`, '--json'], {
+                '--logs-dir', path.join(cache, 'health'), '--timeout', `${healthTimeoutSeconds}s`, '--full', '--json'], {
                 encoding: 'utf8', timeout: (healthTimeoutSeconds + 30) * 1000, // 30s slack beyond the CLI deadline
                 maxBuffer: 16 * 1024 * 1024
               }));
             } catch (error) {
               if (error.code !== 'ETIMEDOUT') throw error;
               // The subprocess was killed before reporting; retry like a CLI time budget.
-              health = {collection: {partial: true, reason: 'time_budget', subprocess_timeout: true}, workflows: []};
+              health = {schema_version: 1, coverage: {partial: true, reason: 'time_budget', subprocess_timeout: true},
+                details: {workflows: [], failure_representatives: []}};
             }
-            const discovery = health.collection;
-            if (discovery?.partial === true && discovery.reason === 'time_budget' &&
-                Array.isArray(health.workflows) &&
-                (discovery.potential_issues === undefined || Array.isArray(discovery.potential_issues)) &&
-                (discovery.failure_listing_complete !== true || discovery.failure_pass_complete !== true)) {
+            const discovery = health.coverage;
+            const workflows = health.details?.workflows;
+            const representatives = health.details?.failure_representatives;
+            if (health.schema_version !== 1 || !Array.isArray(workflows) || !Array.isArray(representatives)) {
+              throw new Error('Invalid health report; checkpoint unchanged');
+            }
+            const verified = discovery?.inventory_complete === true && discovery.verification_complete === true;
+            if (!verified && discovery?.partial === true && discovery.reason === 'time_budget') {
               const nextTimeout = Math.min(healthTimeoutSeconds + 300, 900);
               write(retryFile, {
                 version: 1, repository, checkpoint: state.checkpoint, timeout_seconds: nextTimeout,
@@ -283,34 +287,21 @@ jobs:
               await core.summary.addRaw(message + ' Partial diagnostics are in auditor-collection/health.json.').write();
               return;
             }
-            if (!discovery || !Array.isArray(health.workflows) ||
-                (discovery.partial !== false &&
-                  !(discovery.partial === true && (discovery.reason === 'failure_listing_limit' ||
-                    ((discovery.reason === 'time_budget' || discovery.reason === 'request_budget') &&
-                      discovery.failure_listing_complete === true && discovery.failure_pass_complete === true)))) ||
-                (discovery.partial === false &&
-                  (discovery.failure_listing_complete !== true || discovery.failure_pass_complete !== true)) ||
-                (discovery.potential_issues !== undefined && !Array.isArray(discovery.potential_issues))) {
-              throw new Error('Incomplete or invalid health discovery; checkpoint unchanged: ' +
-                JSON.stringify({partial: discovery?.partial, reason: discovery?.reason,
-                  failure_listing_complete: discovery?.failure_listing_complete,
-                  failure_pass_complete: discovery?.failure_pass_complete,
-                  workflows_array: Array.isArray(health.workflows)}));
+            if (!verified || (discovery.partial !== false &&
+                !(discovery.partial === true && discovery.reason === 'job_evidence_incomplete'))) {
+              throw new Error('Incomplete health discovery; checkpoint unchanged: ' + JSON.stringify(discovery));
             }
-            // Health is a bounded current-revision sample, not an all-run census.
-            // Only verified representatives can activate collection, even when
-            // the cheap failure inventory reaches its documented page limit.
-            const candidates = (discovery.potential_issues || []).filter(issue =>
-              issue.representative_status === 'revision_checked' &&
-              issue.workflow_path !== '.github/workflows/auditor.lock.yml' &&
-              health.workflows.some(w => w.workflow_path === issue.workflow_path && !w.intentional_failure));
-            const currentIDs = new Set(health.workflows.filter(w => !w.intentional_failure &&
+            const currentPaths = new Map(workflows.filter(w => !w.intentional_failure &&
               w.workflow_path !== '.github/workflows/auditor.lock.yml').flatMap(w =>
-              (w.revisions || []).flatMap(revision => revision.current?.run_ids || [])));
+              (w.revisions || []).filter(revision => revision.status !== 'revision_unknown').flatMap(revision =>
+                (revision.current?.run_ids || []).map(id => [id, w.workflow_path]))));
+            const candidates = representatives.filter(run =>
+              currentPaths.has(run.run_id) && currentPaths.get(run.run_id) === run.workflow_path)
+              .map(run => run.run_id);
             const pendingIDs = [...new Set([...(state.pending || []),
               ...state.backlog.filter(item => Date.parse(item.run.updated_at) >= Date.parse(retentionStart))
-                .map(item => item.run.id)])].filter(id => currentIDs.has(id));
-            const selectedIDs = [...new Set([...candidates.map(issue => issue.representative_run_id), ...pendingIDs])];
+                .map(item => item.run.id)])].filter(id => currentPaths.has(id));
+            const selectedIDs = [...new Set([...candidates, ...pendingIDs])];
             if (selectedIDs.length >= 1000 || selectedIDs.some(id => !Number.isSafeInteger(id) || id <= 0)) {
               throw new Error('Invalid or oversized tracked run scope');
             }
@@ -318,9 +309,8 @@ jobs:
             for (const id of selectedIDs) {
               const response = await request(github.rest.actions.getWorkflowRun, {run_id: id});
               if (response.data.id !== id) throw new Error('Tracked run identity changed');
-              const candidate = candidates.find(issue => issue.representative_run_id === id);
-              if (candidate && (response.data.path || '').split('@')[0] !== candidate.workflow_path) {
-                throw new Error('Health representative workflow changed');
+              if ((response.data.path || '').split('@')[0] !== currentPaths.get(id)) {
+                throw new Error('Health run workflow changed');
               }
               observed.push(response.data);
             }
@@ -761,16 +751,16 @@ If no safe, novel, evidenced fix is available, call `noop` with a concise reason
 
 ## Usage and collection limits
 
-Scheduled collection samples the preceding 24 hours; manual dispatch is
-default-branch recovery only and cannot activate the agent. Only revision-checked
-representatives of registered agentic workflows are eligible; superseded,
-jobless, unverified, intentional and auditor failures are excluded.
-`discovery` describes a bounded sample, not a census or fleet failure rate.
-The `failure_listing_limit` may leave rankings partial. A `time_budget` result is
-usable only if both failure inventory and representative verification completed;
-unfinished success sampling is not required for failure collection.
+Scheduled collection inventories the preceding 24 hours of default-branch,
+non-PR runs. Manual dispatch is default-branch recovery only and cannot activate
+the agent. Only revision-checked failure representatives are eligible; superseded,
+jobless, unverified, intentional and Auditor failures are excluded. `discovery`
+records fleet coverage, not a failure rate. Inventory and revision verification
+must finish before the Auditor advances its checkpoint. Missing optional job-step
+details do not block verified representatives; the logs and audit pass still
+checks evidence before activation.
 
-When either failure pass times out, including a killed `gh aw health` subprocess,
+When health discovery times out, including a killed `gh aw health` subprocess,
 collection defers without activating the agent
 or advancing the last-successful-sample checkpoint. It uploads `health.json` and an
 explicitly incomplete manifest, preserves seen/backlog/pending state, and caches

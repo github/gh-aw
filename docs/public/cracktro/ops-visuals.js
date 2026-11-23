@@ -8,7 +8,6 @@
   const text = (x, y, s, cls = "ov-t", anchor = "start") => `<text class="${cls}" x="${x}" y="${y}"${anchor === "start" ? "" : ` text-anchor="${anchor}"`}>${esc(s)}</text>`;
   const path = (d, cls = "ov-line") => `<path class="${cls}" d="${d}"/>`;
   const head = (x, y) => path(`M${x - 8} ${y - 5} L${x} ${y} L${x - 8} ${y + 5}`, "ov-line");
-  const down = (x, y) => path(`M${x - 5} ${y - 8} L${x} ${y} L${x + 5} ${y - 8}`, "ov-line");
   const svg = (label, body) => `<svg class="ov" viewBox="0 0 560 360" role="img" aria-label="${esc(label)}">${body}</svg>`;
 
   const observability = svg(

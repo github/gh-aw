@@ -67,7 +67,7 @@ safe-outputs:
       expires: 2h
       close-older-issues: true
       close-older-key: "smoke-pi"
-      labels: [automation, testing]
+      labels: [automation, testing, "backlog:smoke-tests"]
     add-labels:
       allowed: [smoke-pi]
     messages:
@@ -104,7 +104,7 @@ success before starting the next test; use additional turns as needed. Never sub
 file creation, its readback, and Codemode verification as parallel tool calls.
 
 1. **GitHub CLI Testing**: Use `gh` CLI commands to fetch details of exactly 2 merged pull requests from ${{ github.repository }} (title and number only)
-2. **Web Fetch Testing**: Use the web-fetch MCP tool to fetch https://github.com and verify the response contains "GitHub" (do NOT use bash or playwright for this test - use the web-fetch MCP tool directly)
+2. **Web Fetch Testing**: Use `web_fetch` from the built-in `web-fetch` MCP server to fetch https://github.com and verify the response contains "GitHub". Do not use bash or Playwright.
 3. **File Writing Testing**: Create a test file `/tmp/gh-aw/agent/smoke-test-pi-${{ github.run_id }}.txt` with content "Smoke test passed for Pi at $(date)" (create the directory if it doesn't exist)
 4. **Bash Tool Testing**: Execute bash commands to verify file creation was successful (use `cat` to read the file back)
 5. **Build gh-aw**: Run `GOCACHE=/tmp/gh-aw/agent/go-cache GOMODCACHE=/tmp/gh-aw/agent/go-mod make build` to verify the agent can successfully build the gh-aw project. If the command fails, mark this test as ❌ and report the failure.

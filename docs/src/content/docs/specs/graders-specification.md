@@ -1,5 +1,6 @@
 ---
 title: Graders Specification
+spec: true
 description: Pure deterministic metrics over the in-memory unified agent session
 sidebar:
   order: 1360
@@ -99,6 +100,14 @@ Potentially quadratic trajectory analyses MUST retain bounded input sizes.
 The full registry is documented in the [Graders Reference](/gh-aw/experimental/trace-graders/).
 
 ## 5. Execution and artifacts
+
+The [GraderDelivery TLA+ model](https://github.com/github/gh-aw/blob/main/specs/graders/GraderDelivery.tla)
+and [TLC configuration](https://github.com/github/gh-aw/blob/main/specs/graders/GraderDelivery.cfg)
+check the one-run handoff from conclusion to the separate graders job and audit.
+They check that custom grading waits for published usage, that the combined artifact
+preserves built-in results, and that audit can refresh a built-in-only view without
+rewriting the conclusion session. The model abstracts grader computation, runner
+isolation, and artifact formats.
 
 Built-in grading MUST execute in the **conclusion job**, after agent, detection,
 safe-output, experiment, and eval observations have been collected into the

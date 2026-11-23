@@ -1,5 +1,6 @@
 ---
 title: Safe Outputs MCP Gateway Specification
+spec: true
 description: Formal W3C-style specification defining the Safe Outputs Model Context Protocol Gateway for secure AI-to-GitHub operation translation
 sidebar:
   order: 1360
@@ -7,9 +8,9 @@ sidebar:
 
 # Safe Outputs MCP Gateway Specification
 
-**Version**: 1.31.0<br>
+**Version**: 1.31.1<br>
 **Status**: Working Draft<br>
-**Publication Date**: 2026-11-19<br>
+**Publication Date**: 2026-11-23<br>
 **Editor**: GitHub Agentic Workflows Team<br>
 **This Version**: [safe-outputs-specification](/gh-aw/specs/safe-outputs-specification/)<br>
 **Latest Published Version**: This document
@@ -1821,7 +1822,8 @@ run and attempt, logical invocation identity, implementation and input digests,
 binding level and relevant evidence references. Private bodies, patches, prompts,
 secret-valued inputs and tokens MUST NOT be transmitted or logged; bind digests
 and reviewed secret references instead. The authority independently verifies any
-evidence required by its policy.
+evidence required by its policy. The [companion TypeSpec definition](https://github.com/github/gh-aw/blob/main/docs/src/content/docs/specs/safe-output-authorization.tsp)
+describes the decision endpoint and its request and response bodies.
 
 The request object contains `version`, `request_digest`, and `invocation`, plus
 top-level `job_id` whenever nonempty `GITHUB_JOB` is available. `job_id` preserves
@@ -2671,6 +2673,10 @@ Test Case 4: Mention Filtering
 
 This section provides complete normative definitions for all safe output types. Each definition includes tool schema, operational semantics, configuration parameters, and security requirements.
 
+:::caution[Experimental]
+Issue-intent metadata (`rationale`, `confidence`, `suggest`) and the per-type `issue-intent` configuration toggle are experimental and disabled by default. Set `issue-intent: true` on a supported safe output to opt in; the compiler emits an experimental-feature warning. Their schema and runtime behavior may change without notice.
+:::
+
 ### 7.0 Schema and Agent Sync Requirements
 
 When a safe-output MCP tool schema changes (new required field, removed field, renamed field, or semantic contract change), the same pull request **MUST** update:
@@ -3397,7 +3403,7 @@ Paths in this table are under `actions/setup/js/`. The bounded [Git-operation mo
 
 ### 7.2 System Types
 
-System types are always available in every workflow. The types `noop`, `report-missing-tool`, and `report-missing-data` are unconditionally enabled, while `create-issue` is conditionally auto-injected when no other safe output types are explicitly configured (see Section 4.3 for auto-injection rules).
+System types are always available in every workflow. The types `noop`, `report-missing-tool`, `report-missing-data`, and `report-incomplete` are unconditionally enabled, while `create-issue` is conditionally auto-injected when no other safe output types are explicitly configured (see Section 4.3 for auto-injection rules). `noop` records completion when the agent has completed its assigned task without requiring another safe-output action. `report-incomplete` is reserved for cases in which the agent cannot complete or publish its assigned task because of a tool, authentication, permission, safe-output, essential-input/data, timeout, or other external blocker.
 
 #### Type: noop
 
@@ -5083,7 +5089,7 @@ or review bodies to returned or persisted decision evidence.
 6. **Staged Mode**: In staged mode the handler previews the labels it would add and performs no mutation.
 7. **Additive Application**: Labels are added through the REST add-labels endpoint and existing labels on the target MUST be preserved.
 8. **Missing Labels**: When `create-if-missing` is `true`, labels absent from the target repository are created (with a deterministic color) before they are applied. Otherwise, labels that do not exist produce an API error or warning.
-9. **Issue-Intent Metadata**: When a label object carries `rationale`, `confidence`, or `suggest` and issue intent is not disabled, the handler applies it through the GraphQL `updateIssue` mutation, merging the existing labels so that add-only semantics hold and restoring any pre-existing label the mutation removed. Pull requests have no intent-aware mutation and fall back to the REST endpoint without metadata.
+9. **Issue-Intent Metadata**: When a label object carries `rationale`, `confidence`, or `suggest` and `issue-intent: true` is set, the handler applies it through the GraphQL `updateIssue` mutation, merging the existing labels so that add-only semantics hold and restoring any pre-existing label the mutation removed. Pull requests have no intent-aware mutation and fall back to the REST endpoint without metadata.
 10. **Strict Intent Mode**: When `issue-intent` is explicitly `true`, plain-string labels MUST be rejected and every label object MUST include both `rationale` and `confidence`.
 
 **Configuration Parameters**:
@@ -5099,7 +5105,7 @@ or review bodies to returned or persisted decision evidence.
 - `required-title-prefix`: Title prefix the target MUST have for the operation to proceed
 - `create-if-missing`: Create labels that do not exist in the target repository (default: `false`)
 - `issues` / `pull-requests`: Set to `false` to drop the corresponding write permission (at least one MUST remain enabled)
-- `issue-intent`: Controls issue-intent metadata handling (`false` disables, `true` makes it mandatory)
+- `issue-intent`: Experimental, disabled by default. `true` enables issue-intent metadata and makes it mandatory
 - `staged`: Staged mode override
 
 **Security Requirements**:
@@ -5571,7 +5577,7 @@ or review bodies to returned or persisted decision evidence.
 6. **Empty Result**: When no assignee remains after selection, the item succeeds with no assignees added and no API mutation.
 7. **Staged Mode**: In staged mode the handler previews the assignment (and the `unassign-first` step when enabled) and performs no mutation.
 8. **Unassign First**: When `unassign-first` is `true`, the current assignees are fetched and removed before the new assignees are added.
-9. **Assignment**: Assignees are added with the REST add-assignees endpoint. When issue intent is not disabled, normalized `rationale`, `confidence`, and `suggest` metadata are forwarded with the request.
+9. **Assignment**: Assignees are added with the REST add-assignees endpoint. When `issue-intent: true` is set, normalized `rationale`, `confidence`, and `suggest` metadata are forwarded with the request.
 
 **Configuration Parameters**:
 
@@ -5750,8 +5756,8 @@ or review bodies to returned or persisted decision evidence.
 5. **Clearing**: An empty `issue_type` clears the issue type and bypasses the `allowed` list.
 6. **Allowlist Check**: When `allowed` is configured, a non-empty `issue_type` MUST match an entry case-insensitively; otherwise the item fails. The configured spelling is used for the mutation.
 7. **Staged Mode**: In staged mode the handler previews the change and performs no mutation.
-8. **Issue-Intent Path**: Unless issue intent is disabled, the handler resolves the issue node ID and the repository issue type by case-insensitive name, then applies the type with the GraphQL `updateIssue` mutation together with normalized `rationale`, `confidence`, and `suggest` metadata. An unknown type fails with the list of available types.
-9. **REST Path**: When issue intent is disabled, or when clearing, the type is applied with the REST issue update endpoint.
+8. **Issue-Intent Path**: When `issue-intent: true` is set, the handler resolves the issue node ID and the repository issue type by case-insensitive name, then applies the type with the GraphQL `updateIssue` mutation together with normalized `rationale`, `confidence`, and `suggest` metadata. An unknown type fails with the list of available types.
+9. **REST Path**: When issue intent is not enabled, or when clearing, the type is applied with the REST issue update endpoint.
 10. **Error Mapping**: A 422 response for a non-empty type is mapped to an actionable error naming the type and, when reported, the available types.
 
 **Configuration Parameters**:
@@ -5841,7 +5847,7 @@ or review bodies to returned or persisted decision evidence.
 7. **Field Discovery**: The handler fetches the repository issue fields. When none are visible, the item is skipped with a warning. A `field_name` is matched case-insensitively; a `field_node_id` MUST match a discovered field. When both are supplied they MUST resolve to the same field.
 8. **Allowlist Check**: The resolved field name MUST satisfy `allowed-fields` (when configured and not `["*"]`) before any mutation.
 9. **Value Typing**: The value is converted according to the field type: single-select values MUST match an option name (case-insensitive), number values MUST be finite numbers, date values MUST use `YYYY-MM-DD`, and other fields are set as text.
-10. **Mutation**: The value is applied with the GraphQL `setIssueFieldValue` mutation together with normalized `rationale`, `confidence`, and `suggest` metadata unless issue intent is disabled.
+10. **Mutation**: The value is applied with the GraphQL `setIssueFieldValue` mutation together with normalized `rationale`, `confidence`, and `suggest` metadata when `issue-intent: true` is set.
 
 **Configuration Parameters**:
 
@@ -6972,7 +6978,7 @@ The YAML configuration key is `report-missing-data`. The legacy tool/output type
 
 #### Type: report_incomplete
 
-**Purpose**: Signal that the task could not be completed due to an infrastructure or tool failure (e.g., MCP server crash, missing authentication, inaccessible repository). This is distinct from `noop` (no action needed) — it indicates an active failure that prevented the task from running. The workflow framework treats this as a failure signal even when the agent exits successfully.
+**Purpose**: Signal that the agent could not complete or publish its assigned task because of a tool, authentication, permission, safe-output, essential-input/data, timeout, or other external blocker. Completion is judged against the agent's assigned task, not against the state of the subject examined. Negative or unresolved findings—including a review requesting changes, bugs found during triage, failing checks, or follow-up work left for humans—are completed outcomes and MUST NOT result in `report_incomplete` solely because the subject remains unresolved. This is distinct from `noop` (no additional action was needed) and remains a failure signal even when the agent exits successfully.
 
 **Default Max**: 5  
 **Cross-Repository Support**: N/A (logging only)  
@@ -6983,7 +6989,7 @@ The YAML configuration key is `report-missing-data`. The legacy tool/output type
 ```json
 {
   "name": "report_incomplete",
-  "description": "Signal that the task could not be completed due to an infrastructure or tool failure (e.g., MCP server crash, missing authentication, inaccessible repository). Use this when required tools or data are unavailable and the task cannot be meaningfully performed. This is distinct from noop (no action needed) — it indicates an active failure that prevented the task from running. The workflow framework will treat this as a failure signal even when the agent exits successfully.",
+  "description": "Signal that the agent could not complete or publish its assigned task because of a tool, authentication, permission, safe-output, essential-input/data, timeout, or other external blocker. Judge completion by the assigned task, not by whether the subject examined was resolved. Do not use it for negative or unresolved findings, including a review requesting changes, bugs found during triage, failing checks, or follow-up left for humans; those are completed outcomes. Provide a specific reason and optional details so downstream issue aggregation can preserve complete incomplete-signal context. The workflow framework will treat this as a failure signal even when the agent exits successfully.",
   "inputSchema": {
     "type": "object",
     "required": ["reason"],
@@ -7047,6 +7053,8 @@ The YAML configuration key is `report-missing-data`. The legacy tool/output type
 ---
 
 ## 8. Protocol Exchange Patterns
+
+The bounded [compiled workflow model](https://github.com/github/gh-aw/blob/main/specs/workflow-security/CompiledWorkflow.tla) abstracts the handoff from agent requests through artifact provenance, detection, authorization, and privileged effects. It does not model JSON-RPC framing or the NDJSON encoding.
 
 ### 8.1 Stdio Container Transport Layer
 
@@ -8437,6 +8445,11 @@ This specification revision aligns with directly relevant `CHANGELOG.md` entries
 - **v0.40.1**: append-only status comment behavior was documented for smoke workflow execution.
 - **Earlier changelog entry**: status comments were decoupled from default AI reaction behavior; explicit `on.status-comment` configuration is required when status comments are desired.
 - **Earlier changelog entry**: `command` trigger was renamed to `slash_command` with deprecation compatibility.
+
+**Version 1.31.1** (2026-11-23):
+
+- **Clarified**: `report_incomplete` is based on inability to complete or publish the agent's assigned task, rather than the unresolved state of the subject examined.
+- **Clarified**: Negative findings and human follow-up outcomes do not require `report_incomplete`; tool, authentication, permission, safe-output, essential-input/data, timeout, and external blockers remain incomplete outcomes.
 
 **Version 1.31.0** (2026-11-19):
 

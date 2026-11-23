@@ -35,7 +35,8 @@ const { getAssignToAgentAssigned, getAssignToAgentErrors, getAssignToAgentErrorC
 const { createPrReviewBufferRegistry } = require("./pr_review_buffer.cjs");
 const { appendExecutionProvenance, stripExecutionProvenance } = require("./execution_provenance.cjs");
 const { COMMENT_PREAMBLE } = require("./issue_body.cjs");
-const { parseReportMarkdown } = require("./report_markdown.cjs");
+const { parseReportMarkdown, transformMarkdownLinkDestinations } = require("./report_markdown.cjs");
+const { isTemporaryIdLink } = require("./report_ast.cjs");
 const { renderSizedReport } = require("./report_size.cjs");
 const { sanitizeContent } = require("./sanitize_content.cjs");
 const { buildWorkflowRunUrl } = require("./workflow_metadata_helpers.cjs");
@@ -137,6 +138,7 @@ const HANDLER_MAP = {
   ledger_mutation: "./ledger_mutation.cjs",
   noop: "./noop_handler.cjs",
   report_incomplete: "./report_incomplete_handler.cjs",
+  request_continuation: "./request_continuation_handler.cjs",
   create_report_incomplete_issue: "./create_report_incomplete_issue.cjs",
   create_project: "./create_project.cjs",
   create_project_status_update: "./create_project_status_update.cjs",
@@ -150,10 +152,10 @@ const HANDLER_MAP = {
  * Message types handled by standalone steps (not through the handler manager)
  * These types should not trigger warnings when skipped by the handler manager
  *
- * Standalone types: upload_asset, noop
+ * Standalone types: upload_asset, noop, request_continuation
  *   - Have dedicated processing steps with specialized logic
  */
-const STANDALONE_STEP_TYPES = new Set(["upload_asset", "noop"]);
+const STANDALONE_STEP_TYPES = new Set(["upload_asset", "noop", "request_continuation"]);
 
 /**
  * Code-push safe output types whose failures are tracked for later comment annotations
@@ -260,6 +262,7 @@ const THREAT_WARNING_REVIEWABLE_TYPES = new Set([
   "ledger_mutation",
   "create_report_incomplete_issue",
   "report_incomplete",
+  "request_continuation",
 ]);
 
 /**
@@ -506,7 +509,28 @@ class BoundTemporaryIdMap extends Map {
   }
 }
 
-function normalizeInvocationInputs(value, temporaryIdMap, repository, key = "", preservedTargetFields = new Set(), numericTargetValues = new Map()) {
+function protectReviewLocalLinkDestinations(value, reviewLocalTemporaryIds) {
+  const placeholders = new Map();
+  let placeholderIndex = 0;
+  const protectedValue = transformMarkdownLinkDestinations(value, destination => {
+    if (!isTemporaryIdLink(destination) || !reviewLocalTemporaryIds.has(normalizeTemporaryId(destination))) return destination;
+    let placeholder;
+    do {
+      placeholder = `gh_aw_review_link_${placeholderIndex++}`;
+    } while (value.includes(placeholder) || placeholders.has(placeholder));
+    placeholders.set(placeholder, destination);
+    return placeholder;
+  });
+  return {
+    value: protectedValue,
+    restore(text) {
+      for (const [placeholder, destination] of placeholders) text = text.split(placeholder).join(destination);
+      return text;
+    },
+  };
+}
+
+function normalizeInvocationInputs(value, temporaryIdMap, repository, key = "", preservedTargetFields = new Set(), numericTargetValues = new Map(), preservedReviewTemporaryIds = new Set()) {
   if (typeof value === "string") {
     if (numericTargetValues.has(key)) return numericTargetValues.get(key);
     if (preservedTargetFields.has(key)) return value;
@@ -514,12 +538,14 @@ function normalizeInvocationInputs(value, temporaryIdMap, repository, key = "", 
       const target = temporaryIdMap.get(normalizeTemporaryId(value));
       if (target?.number != null) return target.number;
     }
-    return replaceTemporaryIdReferences(value, temporaryIdMap, repository);
+    const protectedLinks = key === "body" && preservedReviewTemporaryIds.size > 0 ? protectReviewLocalLinkDestinations(value, preservedReviewTemporaryIds) : null;
+    const normalized = replaceTemporaryIdReferences(protectedLinks?.value ?? value, temporaryIdMap, repository);
+    return protectedLinks ? protectedLinks.restore(normalized) : normalized;
   }
   if (!value || typeof value !== "object") return value;
   const result = Array.isArray(value)
-    ? value.map(item => normalizeInvocationInputs(item, temporaryIdMap, repository, "", preservedTargetFields, numericTargetValues))
-    : Object.fromEntries(Reflect.ownKeys(value).map(name => [name, normalizeInvocationInputs(value[name], temporaryIdMap, repository, String(name), preservedTargetFields, numericTargetValues)]));
+    ? value.map(item => normalizeInvocationInputs(item, temporaryIdMap, repository, "", preservedTargetFields, numericTargetValues, preservedReviewTemporaryIds))
+    : Object.fromEntries(Reflect.ownKeys(value).map(name => [name, normalizeInvocationInputs(value[name], temporaryIdMap, repository, String(name), preservedTargetFields, numericTargetValues, preservedReviewTemporaryIds)]));
   return Object.freeze(result);
 }
 
@@ -836,7 +862,7 @@ async function initializeHandlers(config, prReviewBufferRegistry, resolvedAllowe
             }
           }
           const loadedHandler = factoryClaim ? authorizedHandler : bindHandlerToFactoryScope(executable);
-          if (type === "report_incomplete") localDiagnosticHandlers.add(loadedHandler);
+          if (type === "report_incomplete" || type === "request_continuation") localDiagnosticHandlers.add(loadedHandler);
           messageHandlers.set(type, loadedHandler);
           core.info(`✓ Loaded and initialized handler for: ${type}`);
         } else {
@@ -1331,6 +1357,7 @@ function sortMessagesByTemporaryIdDependencies(messages) {
 async function processMessages(messageHandlers, messages, onItemCreated = null, finalizeBufferedOutputs = null) {
   const trustedConfig = handlerConfigurations.get(messageHandlers) || {};
   const originalMessages = JSON.parse(JSON.stringify(messages));
+  const reviewLocalTemporaryIds = new Set(originalMessages.filter(message => message.type === "create_pull_request_review_comment" && isTemporaryId(message.temporary_id)).map(message => normalizeTemporaryId(message.temporary_id)));
   const authorizations = new Map();
   const permissions = new Map();
   const actionTypes = loadCustomSafeOutputActionHandlers();
@@ -1371,7 +1398,15 @@ async function processMessages(messageHandlers, messages, onItemCreated = null, 
       } else preservedTargetFields.add(targetField.field);
     }
     const preparedAdapter = !!currentClaimHandle() && ["prepared", "script"].includes(trustedConfig.claim_adapters?.[type]?.mode);
-    const preparedMessage = normalizeInvocationInputs(message, preparedAdapter ? new Map() : temporaryIdMap, getDefaultTargetRepo(descriptor), "", preservedTargetFields, numericTargetValues);
+    const preparedMessage = normalizeInvocationInputs(
+      message,
+      preparedAdapter ? new Map() : temporaryIdMap,
+      getDefaultTargetRepo(descriptor),
+      "",
+      preservedTargetFields,
+      numericTargetValues,
+      type === "submit_pull_request_review" ? reviewLocalTemporaryIds : new Set()
+    );
     authorizations.set(index, { state: "error", reason_code: "invalid_preparation" });
     const invocationBatchDigest = sourceBatch?.digests?.[index] || batchDigest || protocol.canonicalDigest(originalMessages);
     const implementationPath = preparedAdapter
@@ -1698,7 +1733,9 @@ async function processMessages(messageHandlers, messages, onItemCreated = null, 
       return;
     }
 
-    const messageHandler = messageHandlers.get(messageType);
+    // Ordinary continuation requests are recorded once in conclusion; Claims
+    // retain their scoped diagnostic handler rather than an anonymous replay.
+    const messageHandler = messageType === "request_continuation" && !currentClaimHandle() ? undefined : messageHandlers.get(messageType);
 
     if (!messageHandler) {
       // Check if this message type is handled by a standalone step
@@ -1865,7 +1902,8 @@ async function processMessages(messageHandlers, messages, onItemCreated = null, 
       // with the actual artifact URL so handlers receive the resolved URL directly.
       // This is applied to all message types that carry a 'body' field.
       if (artifactUrlMap.size > 0 && effectiveMessage.body && typeof effectiveMessage.body === "string") {
-        const resolvedBody = replaceArtifactUrlReferences(effectiveMessage.body, artifactUrlMap);
+        const protectedLinks = messageType === "submit_pull_request_review" ? protectReviewLocalLinkDestinations(effectiveMessage.body, reviewLocalTemporaryIds) : null;
+        const resolvedBody = protectedLinks ? protectedLinks.restore(replaceArtifactUrlReferences(protectedLinks.value, artifactUrlMap)) : replaceArtifactUrlReferences(effectiveMessage.body, artifactUrlMap);
         if (resolvedBody !== effectiveMessage.body) {
           effectiveMessage = { ...effectiveMessage, body: resolvedBody };
           core.info(`Resolved artifact URL reference(s) in ${messageType} body`);
@@ -3288,6 +3326,7 @@ module.exports = {
   main,
   loadConfig,
   loadHandlers,
+  normalizeInvocationInputs,
   processMessages,
   sortMessagesByTemporaryIdDependencies,
   sortMessageIndicesByTemporaryIdDependencies,

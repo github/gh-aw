@@ -73,7 +73,7 @@ compiler notices and the feature lookup API.
 | Type | Kind | Description |
 |------|------|-------------|
 | `Engine` | interface | Core identity: `GetID()`, `GetDisplayName()`, `GetDescription()`, `IsExperimental()` |
-| `CapabilityProvider` | interface | Optional feature detection via `GetCapabilities()` |
+| `CapabilityProvider` | interface | Optional feature detection via `GetCapabilities()` and `UsesWebFetchFallback(*WorkflowData)`, which reports whether the engine needs an MCP fallback independently of whether `tools.web-fetch` is enabled. |
 | `WorkflowExecutor` | interface | Compilation: `GetDeclaredOutputFiles`, `GetInstallationSteps`, `GetExecutionSteps` |
 | `MCPConfigProvider` | interface | MCP configuration generation |
 | `LogParser` | interface | Log parsing for audit/metrics |
@@ -253,6 +253,9 @@ and lowers selected capabilities into the runtime plan described in the
 |------|-------------|
 | `ConnectorDeclaration` | Typed AW frontmatter declaration for connector endpoints, credentials, resources, triggers, tools, MCP servers, and safe outputs. |
 | `ConnectorCredential` | Credential configuration selecting a secret token, GitHub App, or GitHub OIDC route. |
+| `ConnectorAzureOIDC` | Azure OIDC settings for an inference-phase connector credential. |
+| `ConnectorInferenceSelection` | Exact connector, profile, and model selected by `engine.inference`. |
+| `ResolvedConnectorInference` | Compiler-only provider settings, authentication, and allowed firewall domains resolved from a selection; it is not a connector tool plan. |
 
 ### Safe Outputs
 
@@ -552,7 +555,6 @@ Detects dangerous patterns in externally-sourced markdown files (e.g., from `gh 
 | `UnquoteYAMLKey` | `func(yamlStr, key string) string` | Removes unnecessary quotes from a YAML key |
 | `MarshalWithFieldOrder` | `func(map[string]any, []string) ([]byte, error)` | Marshals a map with priority-ordered fields |
 | `OrderMapFields` | `func(map[string]any, []string) yaml.MapSlice` | Returns an ordered map slice |
-| `CleanYAMLNullValues` | `func(string) string` | Removes null values from YAML output |
 | `ConvertStepToYAML` | `func(map[string]any) (string, error)` | Converts a step map to YAML text |
 
 ### Trigger Parsing
@@ -650,6 +652,16 @@ Detects dangerous patterns in externally-sourced markdown files (e.g., from `gh 
 | `NewGHAWManifest` | `func(secretNames, actionRefs []string, containers []GHAWManifestContainer) *GHAWManifest` | Creates a new manifest |
 | `ExtractGHAWManifestFromLockFile` | `func(string) (*GHAWManifest, error)` | Extracts the manifest from a lock file |
 | `EnforceSafeUpdate` | `func(*GHAWManifest, []string, []string) error` | Validates that a lock file update passes manifest checks |
+
+### Authorization and Continuation APIs
+
+| Symbol | Description |
+|--------|-------------|
+| `AuthorizationRoute`, `InspectEffectiveAuthorization` | Describe and inspect compiler-resolved safe-output routes without supplying defaults or changing authorization requirements. |
+| `NewAuthorizationVerificationCompiler`, `Compiler.CompileAuthorizationSnapshot` | Build an isolated, non-emitting compiler and capture the generated lock for authorization verification. |
+| `SafeOutputAuthorization`, `ValidateSafeOutputAuthorization` | Represent and validate the literal authority binding required for safe outputs. |
+| `RequestContinuationConfig` | Records a follow-up request without dispatching work. |
+| `EnginePythonRequirement` | Pins a Python distribution to a version and wheel SHA-256. |
 
 ### Additional API Functions
 

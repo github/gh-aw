@@ -62,7 +62,7 @@ func (c *Compiler) buildPreActivationJob(data *WorkflowData, needsPermissionChec
 
 	jobIfCondition := c.applyPreActivationIfConditionGuards(data, needsPermissionCheck, c.buildPreActivationBaseIfCondition(data))
 	if c.actionMode.IsScript() {
-		steps = append(steps, c.generateScriptModeCleanupStep())
+		steps = append(steps, c.generateScriptModeCleanupStep(data))
 	}
 
 	runsOn := c.formatFrameworkJobRunsOn(data)

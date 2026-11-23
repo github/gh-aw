@@ -192,7 +192,7 @@ func TestBuildEpisodeDataAggregatesAIC(t *testing.T) {
 			AwContext:    &AwContext{EpisodeID: "episode-501"},
 			WorkflowName: "effective-a",
 			Status:       "completed",
-			AIC:          1.2,
+			AIC:          new(float64(1.2)),
 			CreatedAt:    time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC),
 		},
 		{
@@ -200,7 +200,7 @@ func TestBuildEpisodeDataAggregatesAIC(t *testing.T) {
 			AwContext:    &AwContext{EpisodeID: "episode-502"},
 			WorkflowName: "effective-b",
 			Status:       "completed",
-			AIC:          0.345,
+			AIC:          new(float64(0.345)),
 			CreatedAt:    time.Date(2024, 1, 1, 12, 1, 0, 0, time.UTC),
 		},
 	}
@@ -223,15 +223,15 @@ func TestBuildEpisodeDataPreservesCanonicalIdentityAcrossSelections(t *testing.T
 
 	const episodeID = "100-1:org/repo/.github/workflows/root.yml@refs/heads/main"
 	root := RunData{
-		RunID: 100, Repository: "org/repo", TokenUsage: 10, AIC: 0.1,
+		RunID: 100, Repository: "org/repo", TokenUsage: 10, AIC: new(float64(0.1)),
 		AwContext: &AwContext{RunID: "100", EpisodeID: episodeID},
 	}
 	child := RunData{
-		RunID: 200, Repository: "org/repo", TokenUsage: 20, AIC: 0.2,
+		RunID: 200, Repository: "org/repo", TokenUsage: 20, AIC: new(float64(0.2)),
 		AwContext: &AwContext{Repo: "org/repo", RunID: "100", WorkflowCallID: episodeID, EpisodeID: episodeID},
 	}
 	grandchild := RunData{
-		RunID: 300, Repository: "org/repo", TokenUsage: 30, AIC: 0.3,
+		RunID: 300, Repository: "org/repo", TokenUsage: 30, AIC: new(float64(0.3)),
 		AwContext: &AwContext{Repo: "org/repo", RunID: "200", WorkflowCallID: "200-1:worker", EpisodeID: episodeID},
 	}
 

@@ -56,7 +56,9 @@ async function restoreCheckpoint({ github, context, core, token, artifactClient 
 }
 
 /**
- * Explicit aw_context lineage wins over the latest successful same-branch run.
+ * Only aw_context.continuation_run_id selects an explicit parent; other aw_context
+ * fields describe the caller (lineage), so dispatched runs without it start fresh.
+ * Without aw_context, the latest successful same-workflow, same-branch run is used.
  * Fork runs and other in-progress writers are never continuation sources.
  */
 async function selectCheckpoint({ github, context, core }) {
@@ -74,8 +76,12 @@ async function selectCheckpoint({ github, context, core }) {
   const inbound = readInboundAwContext(context.payload);
   const rawContext = context.payload.inputs?.aw_context ?? context.payload.client_payload?.aw_context;
   if (rawContext && !inbound) throw new Error("Durable continuation requires a valid aw_context object");
-  const explicitParent = String(inbound?.run_id || "") !== String(current.id) && inbound?.run_id ? inbound.run_id : inbound?.parent_run_id || undefined;
-  if (explicitParent !== undefined && !/^[1-9]\d*$/.test(String(explicitParent))) throw new Error("aw_context parent run ID must be a positive integer");
+  const rawParent = inbound?.continuation_run_id;
+  const explicitParent = rawParent === undefined ? undefined : String(rawParent);
+  if (explicitParent !== undefined && (!["string", "number"].includes(typeof rawParent) || (typeof rawParent === "number" && !Number.isSafeInteger(rawParent)) || !/^[1-9]\d*$/.test(explicitParent))) {
+    throw new Error("aw_context continuation_run_id must be a positive integer");
+  }
+  if (explicitParent === String(current.id)) throw new Error("aw_context continuation_run_id must not reference the current run");
   async function restoreFrom(run) {
     const artifacts = await github.paginate(github.rest.actions.listWorkflowRunArtifacts, { owner, repo, run_id: run.id, per_page: 100 });
     const artifact = artifacts
@@ -99,7 +105,10 @@ async function selectCheckpoint({ github, context, core }) {
   if (Number(process.env.GITHUB_RUN_ATTEMPT || "1") > 1 && (await restoreFrom(current))) return;
   let parent;
   if (explicitParent) {
-    ({ data: parent } = await github.rest.actions.getWorkflowRun({ owner, repo, run_id: String(explicitParent) }));
+    ({ data: parent } = await github.rest.actions.getWorkflowRun({ owner, repo, run_id: explicitParent }));
+  } else if (inbound) {
+    core.info("Inbound aw_context is caller lineage, not a continuation request; starting a new session");
+    return;
   } else {
     if (!current.head_branch) throw new Error("Durable continuation requires a branch or an explicit aw_context parent run");
     const {

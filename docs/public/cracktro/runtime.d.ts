@@ -70,7 +70,8 @@ declare namespace CracktroDeck {
   interface Config {
     slides?: Slide[] | ((services: Services) => Slide[]);
     themes?: Record<string, Partial<Theme>>;
-    bands?: Record<string, [title: string, subtitle: string]>;
+    /** Band title, subtitle and optional header slide id (defaults to the group). */
+    bands?: Record<string, [title: string, subtitle: string, id?: string]>;
     solo?: Record<string, string>;
     prototypes?: Record<string, string>;
     tours?: Record<string, Tour>;
@@ -80,6 +81,8 @@ declare namespace CracktroDeck {
     kioskInterval?: number;
     /** Closed captions (C, CC) in kiosk mode: `scripts` maps a slide id to two speakers' alternating lines, captioned as roll-up speech-to-text; slides without one read their heading and slides.md summary. */
     captions?: { scripts?: Record<string, string[]> };
+    /** Optional full-screen workflow wizard (wizard.js); adds a dock button and the W key. */
+    wizard?: { title?: string; key?: string; open(o?: { sound?: Sound }): void; isOpen(): boolean; close?(): void };
     css?: string;
     width?: number;
     height?: number;
@@ -108,6 +111,8 @@ declare namespace CracktroDeck {
     kiosk(on?: boolean): boolean;
     /** Start (`true`), stop (`false`) or toggle closed captioning (CC); starting it starts kiosk mode, stopping kiosk mode stops it. Returns whether it is on. */
     captions(on?: boolean): boolean;
+    /** Start (`true`), stop (`false`) or toggle the voice (V): browser speech synthesis reads the caption lines aloud; starting it starts kiosk mode, stopping kiosk mode stops it. Always `false` where the browser lacks speech synthesis. Returns whether it is on. */
+    voice(on?: boolean): boolean;
   }
 
   interface API {

@@ -37,8 +37,8 @@ function isValidModelConfig(m) {
  * @param {string | undefined} value
  * @returns {{
  *   model: string,
- *   providers: import("@github/copilot-sdk").NamedProviderConfig[],
- *   models: import("@github/copilot-sdk").ProviderModelConfig[],
+ *   providers: import("@microsoft/copilot-sdk").NamedProviderConfig[],
+ *   models: import("@microsoft/copilot-sdk").ProviderModelConfig[],
  * } | null}
  */
 function parseMultiProviderJson(value) {

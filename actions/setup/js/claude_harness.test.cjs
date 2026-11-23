@@ -91,9 +91,39 @@ function runHarnessWithStub({ stubScript, prompt = "fix the bug", extraArgs = []
 
 describe("claude_harness.cjs", () => {
   it.each([
+    { progress: true, challenge: true, retries: true },
+    { progress: false, challenge: true, retries: true },
+    { progress: true, challenge: false, retries: true },
+    { progress: false, challenge: false, retries: false },
+  ])("recovers from first-attempt errors based on progress and challenge: %j", ({ progress, challenge, retries }) => {
+    const sessionId = "12345678-1234-1234-1234-123456789abc";
+    const message = challenge ? "Failed to authenticate. API Error: Just a moment..." : "Authentication failed (Request ID: abc)";
+    const { result, calls } = runHarnessWithStub({
+      extraEnv: { GH_AW_SAFE_OUTPUTS: "", GH_AW_HARNESS_MAX_RETRIES: "1", GH_AW_LLM_PROVIDER: "anthropic" },
+      stubScript: `
+const fs = require("fs");
+const callsPath = process.env.CLAUDE_HARNESS_STUB_CALLS;
+const firstAttempt = !fs.existsSync(callsPath);
+fs.appendFileSync(callsPath, JSON.stringify(process.argv.slice(2)) + "\\n");
+if (!firstAttempt) process.exit(0);
+const session_id = ${JSON.stringify(sessionId)};
+const text = ${JSON.stringify(message)};
+if (${progress}) console.log(JSON.stringify({type:"assistant", session_id, message:{content:[{type:"text", text:"Working"}]}}));
+console.log(JSON.stringify({type:"assistant", session_id, message:{model:"<synthetic>", content:[{type:"text",text}]}, error:"authentication_failed", is_api_error_message:true}));
+console.log(JSON.stringify({type:"result", session_id, is_error:true, num_turns:${progress ? 45 : 0}, terminal_reason:"api_error", api_error_status:${challenge ? 403 : 401}, result:text}));
+process.exit(1);`,
+    });
+    expect(result.status, result.stderr).toBe(retries ? 0 : 1);
+    expect(calls).toHaveLength(retries ? 2 : 1);
+    expect(calls[1]?.includes("--resume") ?? false).toBe(progress);
+    expect(result.stderr).toContain(`isAuthenticationFailedError=${!challenge}`);
+  });
+
+  it.each([
     ["1", "2000", 2, "rate_limit_error", true],
     ["245", "60000", 1, "rate_limit_wait_exceeded", true],
-    ["245", "60000", 2, null, false],
+    ["1", "2000", 2, "rate_limit_error", false],
+    ["245", "60000", 1, "rate_limit_wait_exceeded", false],
   ])("honors Retry-After=%s within cap=%s, attempts=%i, class=%s, GitHub=%s", (delay, cap, attempts, failureClass, github) => {
     const { result, calls, harnessRetry } = runHarnessWithStub({
       extraEnv: { GH_AW_SAFE_OUTPUTS: "", GH_AW_HARNESS_MAX_RETRIES: "1", GH_AW_HARNESS_MAX_DELAY_MS: cap, GH_AW_LLM_PROVIDER: github ? "github" : "anthropic", ...(github ? { ANTHROPIC_MODEL: "claude-sonnet-5" } : {}) },
@@ -113,7 +143,7 @@ describe("claude_harness.cjs", () => {
     expect(calls).toHaveLength(attempts);
     if (failureClass) expect(harnessRetry.attempt_results[0].failure_classes).toEqual([failureClass]);
     else expect(harnessRetry.attempt_results[0].failure_classes || []).not.toContain("rate_limit_wait_exceeded");
-    if (attempts === 2) expect(harnessRetry.attempt_results[1].backoff_ms).toBe(github ? 1000 : 1);
+    if (attempts === 2) expect(harnessRetry.attempt_results[1].backoff_ms).toBe(1000);
   });
 
   it("does not use stderr Retry-After as timing evidence", () => {

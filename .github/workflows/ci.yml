@@ -25,6 +25,10 @@ on:
       - '.github/aw/compat.schema.json'
       - 'install-gh-aw.sh'
       - 'specs/github-mcp-access-control-compliance/**'
+      - '**/*.tsp'
+      - 'specs/otel/build_specs.mjs'
+      - 'specs/otel/.npmrc'
+      - 'specs/otel/package*.json'
       - 'scratchpad/github-mcp-access-control-specification.md'
   schedule:
   - cron: 0 * * * *
@@ -46,6 +50,28 @@ jobs:
       run: "if [ \"${{ github.event_name }}\" != \"schedule\" ]; then\n  echo \"has_changes=true\" >> \"$GITHUB_OUTPUT\"\n  echo \"✅ Non-scheduled run: integration tests enabled\" >> \"$GITHUB_STEP_SUMMARY\"\n  exit 0\nfi\n\nCHANGES_IN_LAST_HOUR=$(git log --since='1 hour ago' --pretty=format:'%H' | wc -l | tr -d ' ')\nif [ \"$CHANGES_IN_LAST_HOUR\" -gt 0 ]; then\n  echo \"has_changes=true\" >> \"$GITHUB_OUTPUT\"\n  echo \"✅ Detected $CHANGES_IN_LAST_HOUR commit(s) in the last hour\" >> \"$GITHUB_STEP_SUMMARY\"\nelse\n  echo \"has_changes=false\" >> \"$GITHUB_OUTPUT\"\n  echo \"ℹ️ No commits in the last hour; skipping integration jobs\" >> \"$GITHUB_STEP_SUMMARY\"\nfi"
     outputs:
       has_changes: ${{ steps.detect.outputs.has_changes }}
+  spec-build:
+    name: Build TypeSpec contracts
+    needs: changes
+    if: needs.changes.outputs.has_changes == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      with:
+        persist-credentials: false
+    - name: Set up Node.js
+      uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v6
+      with:
+        node-version: "24"
+        package-manager-cache: false
+    - name: Install TypeSpec dependencies
+      run: npm ci --prefix specs/otel --ignore-scripts
+    - name: Compile specifications
+      run: make spec-build
   validate-latest-releases:
     name: Validate latest release alignment
     if: ${{ !github.event.repository.fork }}
@@ -192,7 +218,7 @@ jobs:
       run: |
         set -euo pipefail
 
-        pinned="3c0818071eacec40f0356b1245a777a8cf9bd54c"
+        pinned="444ac7e1c72c0f04f749db57e00dc1cc89cd2308"
         current="$(git log -n1 --format=%H -- scratchpad/github-mcp-access-control-specification.md)"
         if [ -z "$current" ]; then
           echo "No commit found for scratchpad/github-mcp-access-control-specification.md"

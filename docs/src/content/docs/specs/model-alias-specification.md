@@ -1,5 +1,6 @@
 ---
 title: Model Alias Format Specification
+spec: true
 description: Formal W3C-style specification defining the model alias format, naming conventions, URL-style parameter encoding, and fallback resolution strategies for GitHub Agentic Workflows
 sidebar:
   order: 1360
@@ -553,6 +554,20 @@ Resolution runs at runtime, in the engine harness, before the harness launches t
 The built-in aliases ship with the setup action (`model_aliases.json`, a copy of `pkg/workflow/data/model_aliases.json`). The compiler passes only the workflow-defined and imported aliases that differ from the built-ins to every harness in the `GH_AW_MODEL_ALIASES` step environment variable (`GH_AW_PI_MODEL_ALIASES` on Pi), with or without AWF, and omits the variable when the workflow defines and imports no aliases. The harness overlays the variable on the built-ins at run time, which reproduces the merged alias map, so the unsandboxed path resolves workflow-defined and imported aliases too.
 
 The harness logs the configured and resolved model and writes a runner record to `agent/model-resolution.json`, projected into the unified session as `model.resolution`. Engines without the shared step (Gemini and declarative engines) receive the configured model unchanged, and the compiler warns when such an engine is given an alias.
+
+The informative [TLA+ discovery model and TLC configuration](https://github.com/github/gh-aw/tree/main/specs/model-alias)
+cover one supported harness and one configured model, from compiler handoff through selection or failure.
+The model checks exact-ID precedence, a single catalog refresh after failed alias resolution, preservation
+of a first `model_unavailable` result if the refresh also fails, and that unresolved aliases do not launch
+except for the native-engine pass-through above. It abstracts catalog responses as resolution outcomes rather
+than modeling alias matching, engine-specific exact-ID validation, or best-effort runner records.
+
+From the repository root, run with the pinned [TLC v1.7.4 release](https://github.com/tlaplus/tlaplus/releases/tag/v1.7.4):
+
+```sh
+java -cp "$TLA2TOOLS_JAR" tlc2.TLC \
+  -config specs/model-alias/ModelAliasDiscovery.cfg specs/model-alias/ModelAliasDiscovery.tla
+```
 
 ---
 

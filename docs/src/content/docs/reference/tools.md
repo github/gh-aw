@@ -74,10 +74,12 @@ Engine behavior differs:
 
 - **Claude**: Web search is off by default and enabled only when `web-search:` is declared.
 - **Codex**: Enabled when either `web-search:` or `web-fetch:` is declared; the two cannot be disabled independently. With neither, Codex runs with `-c web_search="disabled"`. Use `network.hosted-web` to restrict hosted retrieval.
-- **Copilot**: Runs in offline BYOK mode, so native web tools are disabled. Compilation rejects `web-search:` and, in CLI mode, `web-fetch:`. With `engine.copilot-sdk: true`, `web-fetch:` works through a proxy-aware custom tool that follows `network.allowed`; this does not enable native search.
+- **Copilot**: Both CLI and SDK always run in offline BYOK mode. `web-fetch:` enables the built-in MCP server, not a native tool. Compilation still rejects `web-search:`.
 - **Gemini** and **Pi**: No built-in web search. `web-search:` has no effect and `gh aw compile` prints a warning.
 
-Copilot, Gemini, and Pi need a third-party MCP server for search (Copilot CLI mode also needs one for fetch). See [Using Web Search](/gh-aw/reference/web-search/).
+For Copilot, Claude on GitHub Copilot inference, Pi, and the Goose and OpenCode samples, `web-fetch:` exposes the `web_fetch` MCP tool. The agent launches the stateless server inside AWF. It sends only HTTP(S) GET requests, checks redirects through the firewall, and does not add destinations to `network.allowed`. The tool returns bounded, paginated text and does not perform web search.
+
+Copilot, Gemini, and Pi need a separate MCP server for search. See [Using Web Search](/gh-aw/reference/web-search/).
 
 ### Playwright Tool (`playwright:`)
 

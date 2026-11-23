@@ -79,7 +79,7 @@ async function checkShellProgramModel(bytes, payload) {
   }
   const allowed = COMMANDS.filter(name => name !== "python3");
   const handler = buildCopilotSDKPermissionHandler({ allowedTools: allowed.map(name => `shell(${name})`) }, () => ({ kind: "approve-once" }));
-  /** @type {import("@github/copilot-sdk").PermissionRequest} */
+  /** @type {import("@microsoft/copilot-sdk").PermissionRequest} */
   const request = { kind: "shell", fullCommandText: model.source, commands: [], canOfferSessionApproval: false, hasWriteFileRedirection: false, intention: "Parse only", possiblePaths: [], possibleUrls: [] };
   const permission = await handler(request, { sessionId: "shell-model-fuzz" });
   assert.equal(permission.kind, model.names.length > 0 && !model.names.includes("python3") ? "approve-once" : "reject", context);

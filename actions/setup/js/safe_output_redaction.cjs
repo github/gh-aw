@@ -157,7 +157,7 @@ function redactSafeOutputContent(filePath, content, maskedValues, redactText) {
     if (!value || typeof value !== "object" || !Array.isArray(value.items)) {
       throw new Error(`${ERR_VALIDATION}: Invalid agent-output envelope during secret redaction`);
     }
-    const properties = Object.fromEntries(["errors", "collectorEmptyOutputCause", "collectorFailureCause", "collectorDriverExitCode", "collectorRetryCount", "collectorEngineErrorType"].map(key => [key, {}]));
+    const properties = Object.fromEntries(["errors", "collectorEmptyOutputCause", "collectorFailureCause", "collectorDriverExitCode", "collectorRetryCount", "collectorEngineErrorType", "collectorInfrastructureCause"].map(key => [key, {}]));
     return Object.fromEntries(
       Object.entries(value).map(([key, nested]) =>
         key === "items" ? [key, nested.map(item => redactMessage(item, redactText))] : [Object.hasOwn(properties, key) ? key : redactText(key), redactBySchema(nested, properties[key], redactText)]

@@ -38,6 +38,7 @@ type ImportsResult struct {
 	MergedPluginObjects           []map[string]any      // Object-form Agent Plugin references from all imports
 	MergedSafeOutputs             []string              // Merged safe-outputs configurations from all imports
 	MergedGraders                 string                // Merged graders configuration from all imports (JSON objects, one per line)
+	MergedExperiments             string                // Experiment configuration from imports (JSON objects, one per line)
 	MergedMCPScripts              []string              // Merged mcp-scripts configurations from all imports
 	MergedMarkdown                string                // Only contains imports WITH inputs (for compile-time substitution)
 	ImportPaths                   []string              // List of import file paths for runtime-import macro generation (replaces MergedMarkdown)
@@ -47,6 +48,7 @@ type ImportsResult struct {
 	MergedPreSteps                string                // Merged pre-steps configuration from all imports (prepended in order)
 	MergedPreAgentSteps           string                // Merged pre-agent-steps configuration from all imports (prepended in order)
 	MergedRuntimes                string                // Merged runtimes configuration from all imports
+	MergedRunsOn                  any                   // First imported top-level runner specification
 	MergedRunInstallScripts       bool                  // true if any imported workflow sets runtimes.node.run-install-scripts: true
 	MergedServices                string                // Merged services configuration from all imports
 	MergedNetwork                 string                // Merged network configuration from all imports

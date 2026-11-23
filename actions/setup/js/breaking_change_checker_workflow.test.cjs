@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { runInNewContext } from "node:vm";
 import { describe, expect, it } from "vitest";
-import { BuiltInTools, ToolSet } from "@github/copilot-sdk";
+import { BuiltInTools, ToolSet } from "@microsoft/copilot-sdk";
 import { readDocumentMetadata } from "../../../scripts/markdown_metadata_test_adapter.cjs";
 import { buildCopilotSDKPermissionHandler, parsePermissionConfigFromServerArgs } from "./copilot_sdk_permissions.cjs";
 import { buildCopilotSDKSessionToolConfig } from "./copilot_sdk_tool_config.cjs";

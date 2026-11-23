@@ -33,8 +33,8 @@ function record(id, overrides = {}) {
   };
 }
 
-function writeRows(filename, records) {
-  fs.writeFileSync(filename, records.map(lifecycle => JSON.stringify({ schema_version: 7, kind: "output_lifecycle", lifecycle }) + "\n").join(""));
+function writeRows(filename, records, version = 7) {
+  fs.writeFileSync(filename, records.map(lifecycle => JSON.stringify({ schema_version: version, kind: "output_lifecycle", lifecycle }) + "\n").join(""));
 }
 
 function rows(filename) {
@@ -73,7 +73,7 @@ describe("deterministic retained lifecycle collection", () => {
   it("refreshes an older delivery after restoring only its ledger on a cold runner", () => {
     const options = directories();
     const original = record("old-delivery");
-    writeRows(path.join(options.memoryDir, "lifecycle.jsonl"), [original]);
+    writeRows(path.join(options.memoryDir, "lifecycle.jsonl"), [original], 8);
     const collect = vi.fn(args => {
       if (!args.includes("--retained")) return { runs: [] };
       return refresh(args, item => ({

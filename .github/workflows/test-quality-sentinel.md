@@ -27,10 +27,10 @@ skip-if-decision:
     for unavailable, stale, or truncated evidence, any hard violation, or any
     behavioral test change; clean behavioral tests still require approval.
 cache:
-  key: pr-test-prefetch-${{ github.event.pull_request.head.sha || github.event.issue.number }}
+  key: pr-test-prefetch-v2-${{ github.event.pull_request.number || github.event.issue.number || (fromJSON(github.event.inputs.aw_context || github.event.client_payload.aw_context || '{}').item_type == 'pull_request' && fromJSON(github.event.inputs.aw_context || github.event.client_payload.aw_context || '{}').item_number) }}-${{ github.event.pull_request.head.sha || 'unknown' }}-${{ github.run_id }}-${{ github.run_attempt }}
   path: /tmp/gh-aw/agent
   restore-keys:
-    - pr-test-prefetch-${{ github.event.pull_request.number || github.event.issue.number }}-
+    - pr-test-prefetch-v2-${{ github.event.pull_request.number || github.event.issue.number || (fromJSON(github.event.inputs.aw_context || github.event.client_payload.aw_context || '{}').item_type == 'pull_request' && fromJSON(github.event.inputs.aw_context || github.event.client_payload.aw_context || '{}').item_number) }}-${{ github.event.pull_request.head.sha && format('{0}-', github.event.pull_request.head.sha) || '' }}
 tools:
   cli-proxy: true
   github:
@@ -40,11 +40,11 @@ tools:
     - "grep:*"
     - "cat:*"
     - "echo:*"
-steps:
+pre-agent-steps:
   - name: Pre-fetch PR data
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      PR_NUMBER: ${{ github.event.issue.number || github.event.pull_request.number }}
+      PR_NUMBER: ${{ github.event.issue.number || github.event.pull_request.number || (fromJSON(github.event.inputs.aw_context || github.event.client_payload.aw_context || '{}').item_type == 'pull_request' && fromJSON(github.event.inputs.aw_context || github.event.client_payload.aw_context || '{}').item_number) }}
       PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
       EXPR_GITHUB_EVENT_PULL_REQUEST_BASE_SHA: ${{ github.event.pull_request.base.sha }}
     run: |
@@ -72,6 +72,10 @@ steps:
         rm -f /tmp/gh-aw/agent/changed-files.txt /tmp/gh-aw/agent/test-diff-full.txt
         rm -f /tmp/gh-aw/agent/test-data-head-sha.txt
       }
+      if [[ ! "$PR_NUMBER" =~ ^[0-9]+$ ]]; then
+        write_prefetch_fallback "unable to determine the pull request number"
+        exit 0
+      fi
       CURRENT_HEAD_SHA="${PR_HEAD_SHA:-}"
       if [ -z "$CURRENT_HEAD_SHA" ]; then
         CURRENT_HEAD_SHA=$(gh pr view "$PR_NUMBER" --json headRefOid --jq '.headRefOid' 2>/dev/null || true)
@@ -81,10 +85,14 @@ steps:
         CACHE_HEAD_SHA="$(tr -d '\n' < /tmp/gh-aw/agent/test-data-head-sha.txt)"
       fi
       if [ -n "$CURRENT_HEAD_SHA" ] && [ "$CURRENT_HEAD_SHA" = "$CACHE_HEAD_SHA" ] && \
+         [ ! -f /tmp/gh-aw/agent/test-prefetch-unavailable.txt ] && \
          [ -f /tmp/gh-aw/agent/pr-meta.json ] && \
          [ -f /tmp/gh-aw/agent/test-files.txt ] && \
          [ -f /tmp/gh-aw/agent/test-diff.txt ] && \
-         [ -f /tmp/gh-aw/agent/diff-numstat.txt ]; then
+         [ -f /tmp/gh-aw/agent/diff-numstat.txt ] && \
+         jq -e --arg sha "$CURRENT_HEAD_SHA" --argjson number "$PR_NUMBER" \
+           '.headRefOid == $sha and .number == $number and (.files | type == "array")' \
+           /tmp/gh-aw/agent/pr-meta.json >/dev/null 2>&1; then
         echo "Cache hit: using pre-fetched test data for head ${CURRENT_HEAD_SHA}"
         rm -f /tmp/gh-aw/agent/test-prefetch-unavailable.txt
         exit 0
@@ -92,9 +100,19 @@ steps:
 
       # PR metadata
       if ! gh pr view "$PR_NUMBER" \
-        --json files,additions,deletions,baseRefName,headRefName,headRefOid \
+        --json number,files,additions,deletions,baseRefName,baseRefOid,headRefName,headRefOid \
         > /tmp/gh-aw/agent/pr-meta.json; then
         write_prefetch_fallback "unable to fetch PR metadata"
+        exit 0
+      fi
+      if [ -z "$CURRENT_HEAD_SHA" ]; then
+        CURRENT_HEAD_SHA="$(jq -r '.headRefOid // empty' /tmp/gh-aw/agent/pr-meta.json)"
+      fi
+      if [ -z "$CURRENT_HEAD_SHA" ] || \
+         ! jq -e --arg sha "$CURRENT_HEAD_SHA" --argjson number "$PR_NUMBER" \
+           '.headRefOid == $sha and .number == $number and (.files | type == "array")' \
+           /tmp/gh-aw/agent/pr-meta.json >/dev/null 2>&1; then
+        write_prefetch_fallback "PR metadata does not match the requested head"
         exit 0
       fi
 
@@ -108,21 +126,36 @@ steps:
 
       # Diff for test files only; capped at 40 KB to control cache token costs
       if [ -s /tmp/gh-aw/agent/test-files.txt ]; then
-        # shellcheck disable=SC2046
-        if ! gh pr diff "$PR_NUMBER" \
-          -- $(tr '\n' ' ' < /tmp/gh-aw/agent/test-files.txt) \
-          > /tmp/gh-aw/agent/test-diff-full.txt 2>/dev/null; then
+        # gh pr diff accepts a PR argument, not git-style pathspecs.
+        if ! gh pr diff "$PR_NUMBER" --color=never \
+          | awk '
+              /^diff --git / { keep = ($0 ~ / "?b\/.*(_test\.go|\.test\.cjs|\.test\.js)"?$/) }
+              keep { print }
+            ' > /tmp/gh-aw/agent/test-diff-full.txt; then
           write_prefetch_fallback "unable to fetch test file diff"
           exit 0
         fi
-        head -c 40000 /tmp/gh-aw/agent/test-diff-full.txt > /tmp/gh-aw/agent/test-diff.txt
-        rm -f /tmp/gh-aw/agent/test-diff-full.txt
+        if [ ! -s /tmp/gh-aw/agent/test-diff-full.txt ] || \
+           [ "$(wc -c < /tmp/gh-aw/agent/test-diff-full.txt)" -gt 40000 ] || \
+           [ "$(grep -c '^diff --git ' /tmp/gh-aw/agent/test-diff-full.txt)" != \
+             "$(grep -c . /tmp/gh-aw/agent/test-files.txt)" ]; then
+          write_prefetch_fallback "test file diff is missing or exceeds the 40 KB review limit"
+          exit 0
+        fi
+        mv /tmp/gh-aw/agent/test-diff-full.txt /tmp/gh-aw/agent/test-diff.txt
       else
-        touch /tmp/gh-aw/agent/test-diff.txt
+        : > /tmp/gh-aw/agent/test-diff.txt
       fi
 
-      git diff "$EXPR_GITHUB_EVENT_PULL_REQUEST_BASE_SHA...HEAD" --numstat \
-        > /tmp/gh-aw/agent/diff-numstat.txt 2>/dev/null || true
+      BASE_SHA="${EXPR_GITHUB_EVENT_PULL_REQUEST_BASE_SHA:-}"
+      if [ -z "$BASE_SHA" ]; then
+        BASE_SHA="$(jq -r '.baseRefOid // empty' /tmp/gh-aw/agent/pr-meta.json)"
+      fi
+      if [ -z "$BASE_SHA" ] || \
+         ! git diff "$BASE_SHA...HEAD" --numstat > /tmp/gh-aw/agent/diff-numstat.txt; then
+        write_prefetch_fallback "unable to compute PR diff statistics from local base history"
+        exit 0
+      fi
 
       # Extract new/modified test function signatures from the diff
       if [ -s /tmp/gh-aw/agent/test-diff.txt ]; then
@@ -149,13 +182,26 @@ steps:
         grep -E '(\.test\.cjs|\.test\.js)$' /tmp/gh-aw/agent/test-files.txt \
           > /tmp/gh-aw/agent/js-changed-test-files.txt || true
         # Check for new Go test files missing mandatory build tags
-        git diff "$EXPR_GITHUB_EVENT_PULL_REQUEST_BASE_SHA...HEAD" \
-          --diff-filter=A --name-only 2>/dev/null \
-          | grep '_test\.go$' | while read -r f; do
-            if ! head -1 "$f" | grep -qE '^//go:build'; then
-              echo "MISSING BUILD TAG: $f"
-            fi
-          done > /tmp/gh-aw/agent/missing-build-tags.txt || true
+        if ! git diff "$BASE_SHA...HEAD" --diff-filter=A --name-only \
+          > /tmp/gh-aw/agent/new-files.txt; then
+          write_prefetch_fallback "unable to identify new test files from local base history"
+          exit 0
+        fi
+        : > /tmp/gh-aw/agent/missing-build-tags.txt
+        while IFS= read -r f; do
+          case "$f" in
+            *_test.go)
+              if [ ! -r "$f" ]; then
+                write_prefetch_fallback "new test file is unavailable in the PR checkout"
+                exit 0
+              fi
+              if ! head -1 "$f" | grep -qE '^//go:build'; then
+                printf 'MISSING BUILD TAG: %s\n' "$f" >> /tmp/gh-aw/agent/missing-build-tags.txt
+              fi
+              ;;
+          esac
+        done < /tmp/gh-aw/agent/new-files.txt
+        rm -f /tmp/gh-aw/agent/new-files.txt
         # Go test structural stats (assertions, error checks, table-driven, forbidden mocks)
         # TestMain is excluded: it is infrastructure, not a behavioral test case
         awk '
@@ -185,7 +231,7 @@ steps:
           END { if (test_name) print test_name, "assertions=" assertions, "errors=" errors, "mocks=" mocks }
         ' /tmp/gh-aw/agent/test-diff.txt > /tmp/gh-aw/agent/js-test-stats.txt || true
       else
-        touch /tmp/gh-aw/agent/go-new-test-funcs.txt \
+        for file in /tmp/gh-aw/agent/go-new-test-funcs.txt \
               /tmp/gh-aw/agent/js-new-test-funcs.txt \
               /tmp/gh-aw/agent/go-modified-test-funcs.txt \
               /tmp/gh-aw/agent/js-changed-test-files.txt \
@@ -193,16 +239,16 @@ steps:
               /tmp/gh-aw/agent/go-test-stats.txt \
               /tmp/gh-aw/agent/js-test-stats.txt \
               /tmp/gh-aw/agent/go-testmain-funcs.txt \
-              /tmp/gh-aw/agent/go-goleak-entries.txt
+              /tmp/gh-aw/agent/go-goleak-entries.txt; do
+          : > "$file"
+        done
       fi
-      if [ -z "$CURRENT_HEAD_SHA" ]; then
-        CURRENT_HEAD_SHA="$(jq -r '.headRefOid // empty' /tmp/gh-aw/agent/pr-meta.json)"
+      if ! FINAL_HEAD_SHA=$(gh pr view "$PR_NUMBER" --json headRefOid --jq '.headRefOid') || \
+         [ "$FINAL_HEAD_SHA" != "$CURRENT_HEAD_SHA" ]; then
+        write_prefetch_fallback "PR head changed or became unavailable while fetching test data"
+        exit 0
       fi
-      if [ -n "$CURRENT_HEAD_SHA" ]; then
-        printf '%s\n' "$CURRENT_HEAD_SHA" > /tmp/gh-aw/agent/test-data-head-sha.txt
-      else
-        rm -f /tmp/gh-aw/agent/test-data-head-sha.txt
-      fi
+      printf '%s\n' "$CURRENT_HEAD_SHA" > /tmp/gh-aw/agent/test-data-head-sha.txt
       rm -f /tmp/gh-aw/agent/test-prefetch-unavailable.txt
 
       echo "Pre-fetched $(grep -c . /tmp/gh-aw/agent/test-files.txt || echo 0) test files"
@@ -226,7 +272,7 @@ features:
   gh-aw-detection: true
 evals:
   - id: review_decision_consistent
-    question: Did the agent either post a Test Quality Score with an APPROVE or REQUEST_CHANGES decision that matches the tests and guideline violations it flagged, or call noop with a scope reason the workflow's act-vs-noop rubric allows (pre-fetch unavailable, no changed or only unsupported-language test files, or no behavioral test change and no hard violation)? Return UNKNOWN when the output records a skip-if-decision no-op before agent execution.
+    question: Did the agent either post a Test Quality Score with an APPROVE or REQUEST_CHANGES decision that matches the tests and guideline violations it flagged, call report_incomplete (not noop) when pre-fetch data was unavailable, or call noop with a scope reason the workflow's act-vs-noop rubric allows (no changed or only unsupported-language test files, or no behavioral test change and no hard violation)? Return UNKNOWN when the output records a skip-if-decision no-op before agent execution.
 
 ---
 
@@ -245,19 +291,19 @@ High test counts can create an illusion of safety. The real signal is whether te
 
 ## Step 1: Load Pre-fetched PR Data and Identify Test Files
 
-First check whether `/tmp/gh-aw/agent/test-prefetch-unavailable.txt` exists. If it exists, read the reason from that file and immediately call `noop` with the reason:
+First check whether `/tmp/gh-aw/agent/test-prefetch-unavailable.txt` exists. If it exists, the review could not run, so read the reason from that file and immediately call `report_incomplete` (never `noop`) with the reason:
 
 ```json
-{"noop": {"message": "Test Quality Sentinel skipped because pre-fetch PR data was unavailable: <reason>"}}
+{"report_incomplete": {"reason": "Test Quality Sentinel could not review tests because pre-fetch PR data was unavailable: <reason>"}}
 ```
 
-Do not analyze the empty fallback files when this marker exists.
+Do not analyze the empty fallback files, post a report, or submit a review when this marker exists. `noop` means the review completed and found nothing to act on; unavailable input is an incomplete review, not a no-action result.
 
 PR data has already been fetched before the agent started. Read from:
 
 - `/tmp/gh-aw/agent/pr-meta.json` — PR metadata (files, additions, deletions, branch names)
 - `/tmp/gh-aw/agent/test-files.txt` — list of changed test files
-- `/tmp/gh-aw/agent/test-diff.txt` — diff for test files only _(capped at 40 KB; if truncated, prioritize newly added `func Test*` functions)_
+- `/tmp/gh-aw/agent/test-diff.txt` — complete diff for test files only _(40 KB maximum; missing, oversized, or stale evidence requires `report_incomplete`, never approval or `noop`)_
 - `/tmp/gh-aw/agent/diff-numstat.txt` — numstat for all changed files
 - `/tmp/gh-aw/agent/go-testmain-funcs.txt` — newly added `TestMain` infrastructure entries _(separate from behavioral tests)_
 - `/tmp/gh-aw/agent/go-goleak-entries.txt` — `goleak.VerifyTestMain` calls added in this PR _(goroutine-leak guard signal)_
@@ -340,7 +386,8 @@ Decide whether there is a reviewable signal before drafting a report. Do not use
 
 | Evidence after the scoped review | Required outcome |
 |---|---|
-| Pre-fetch unavailable, no changed test files, or only unsupported-language tests | Call `noop` immediately with the specific scope reason; do not post a report. |
+| Pre-fetch unavailable (marker file exists) | Call `report_incomplete` immediately with the marker reason; never `noop`; do not post a report. |
+| No changed test files, or only unsupported-language tests | Call `noop` immediately with the specific scope reason; do not post a report. |
 | Recognized test files changed but no behavioral test case changed and no hard violation exists | Call `noop` with the specific scope reason; do not post a report. |
 | A hard violation exists, or the implementation-test ratio exceeds 30% | Act: include each concrete file, test, and evidence in the report, then request changes. |
 | A red flag exists but does not meet the failure threshold | Act: flag only the evidenced test in the report; do not escalate a speculative concern. |

@@ -112,11 +112,27 @@ func TestProviderDocumentationXMLConsumers(t *testing.T) {
 							compiler := NewCompiler(WithVersion("v0.0.0-1-g72c8a3ff80e"))
 							compiler.gitRoot = dir
 							compiler.SetActionMode(ActionModeDev)
+							data, err := compiler.ParseWorkflowFile(path)
+							require.NoError(t, err)
+							connector := data.Connectors[provider]
+							require.NotNil(t, connector)
 							require.NoError(t, compiler.CompileWorkflow(path))
 							output, err := os.ReadFile(strings.TrimSuffix(path, ".md") + ".lock.yml")
 							require.NoError(t, err)
 							require.Contains(t, string(output), "workflow_dispatch:")
-							require.Contains(t, string(output), "connector_runtime.cjs")
+							if connector.Inference != nil {
+								require.Nil(t, connector.Plan)
+								require.Nil(t, connector.Agent)
+								require.Nil(t, connector.Context)
+								require.Nil(t, connector.SafeOutputs)
+								require.NotContains(t, string(output), "connector_runtime.cjs")
+								require.NotContains(t, string(output), "GH_AW_CONNECTOR_PLAN")
+								require.NotEmpty(t, connector.Inference.Env["COPILOT_PROVIDER_BASE_URL"])
+								require.Contains(t, string(output), connector.Inference.Env["COPILOT_PROVIDER_BASE_URL"])
+								require.Contains(t, string(output), connector.Inference.Selection.Model)
+							} else {
+								require.Contains(t, string(output), "connector_runtime.cjs")
+							}
 							require.NotContains(t, string(output), "go build")
 							require.NotContains(t, string(output), "gh extension install")
 							if remote {

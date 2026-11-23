@@ -84,6 +84,7 @@ func (c *Compiler) buildConclusionJobSteps(data *WorkflowData, mainJobName strin
 		steps = append(steps, c.buildConclusionDetectionRunsStep(data, mainJobName)...)
 		return c.appendConclusionUsageSteps(steps, data)
 	}
+	steps = append(steps, c.buildConclusionRequestContinuationStep(data, mainJobName)...)
 	steps = append(steps, c.buildConclusionNoOpStep(data, mainJobName)...)
 	steps = append(steps, c.buildConclusionDetectionRunsStep(data, mainJobName)...)
 	steps = append(steps, c.buildConclusionMissingToolStep(data, mainJobName)...)
@@ -104,22 +105,27 @@ func (c *Compiler) buildConclusionJobSteps(data *WorkflowData, mainJobName strin
 	// Only add the conclusion update step if status comments are explicitly enabled
 	if data.StatusComment != nil && *data.StatusComment {
 		var token string
-		var stepCondition string
+		stepCondition := "always()"
 		if data.SafeOutputs != nil && data.SafeOutputs.AddComments != nil {
 			token = data.SafeOutputs.AddComments.GitHubToken
 		}
 		if slices.Contains(safeOutputJobNames, "add_comment") {
 			stepCondition = "always() && !(needs.add_comment.outputs.comment_id)"
 		}
+		envVars := c.buildConclusionScriptEnvVars(data, mainJobName, safeOutputJobNames, messagesJSON)
+		if err := c.addSafeOutputDomainEnvVars(&envVars, data); err != nil {
+			return nil, err
+		}
 		steps = append(steps, c.buildGitHubScriptStepWithoutDownload(data, GitHubScriptStepConfig{
-			StepName:      "Update reaction comment with completion status",
-			StepID:        "conclusion",
-			MainJobName:   mainJobName,
-			CustomEnvVars: c.buildConclusionScriptEnvVars(data, mainJobName, safeOutputJobNames, messagesJSON),
-			Script:        getNotifyCommentErrorScript(),
-			ScriptFile:    "notify_comment_error.cjs",
-			CustomToken:   token,
-			StepCondition: stepCondition,
+			StepName:             "Update reaction comment with completion status",
+			StepID:               "conclusion",
+			MainJobName:          mainJobName,
+			CustomEnvVars:        envVars,
+			ProtectCustomEnvVars: true,
+			Script:               getNotifyCommentErrorScript(),
+			ScriptFile:           "notify_comment_error.cjs",
+			CustomToken:          token,
+			StepCondition:        stepCondition,
 		})...)
 	}
 	steps = append(steps, c.buildConclusionSteeringIssueStep(data, mainJobName, steeringToken)...)
@@ -144,7 +150,7 @@ func (c *Compiler) appendConclusionUsageSteps(steps []string, data *WorkflowData
 	// Admission still runs in dry-run mode; record its decision without applying
 	// its budget to agent, detection, or evals execution.
 	steps = append(steps, buildUsageActivityGenerationStep(data.AdmissionEnabled, hasMaxDailyAICGuardrail(data), !isWorkQueueParticipant(data) && conclusionReportFailedJobsEnabled(data), c.getActionPin, usageEnv...)...)
-	steps = append(steps, buildUsageArtifactUploadStep(artifactPrefixExprForDownstreamJob(data), c.getActionPin)...)
+	steps = append(steps, buildUsageArtifactUploadStep(artifactPrefixExprForDownstreamJob(data), usesExperimentsBroker(data), c.getActionPin)...)
 	if data.AdmissionEnabled {
 		if err := validateAdmissionWorkflowHashes(data); err != nil {
 			return nil, err
@@ -152,7 +158,7 @@ func (c *Compiler) appendConclusionUsageSteps(steps []string, data *WorkflowData
 		steps = append(steps, c.buildConclusionAdmissionStep(data)...)
 	}
 	if c.actionMode.IsScript() {
-		steps = append(steps, c.generateScriptModeCleanupStep())
+		steps = append(steps, c.generateScriptModeCleanupStep(data))
 	}
 	steps = append(steps, c.buildReactionCleanupSteps(data)...)
 	return steps, nil
@@ -355,13 +361,43 @@ func buildUsageArtifactUploadSteps(prefix string, hasEvals bool, experimentArtif
 func buildUsageArtifactPublishSteps(prefix string, hasDetection, hasDailyAICGuardrail, reuseJobDurations bool, pinAction func(string) string, gradersEnv ...string) []string {
 	steps := buildUsageArtifactCollectionStep(hasDetection)
 	steps = append(steps, buildUsageActivityGenerationStep(false, hasDailyAICGuardrail, reuseJobDurations, pinAction, gradersEnv...)...)
-	return append(steps, buildUsageArtifactUploadStep(prefix, pinAction)...)
+	return append(steps, buildUsageArtifactUploadStep(prefix, false, pinAction)...)
 }
 
-func buildUsageArtifactUploadStep(prefix string, pinAction func(string) string) []string {
+func buildUsageArtifactUploadStep(prefix string, broker bool, pinAction func(string) string) []string {
 	var steps []string
 	usageArtifactUploadAction := pinAction("actions/upload-artifact")
-	usageArtifactUploadWithLines := []string{
+	usageArtifactUploadWithLines := buildUsageArtifactUploadPathLines(prefix, broker)
+	retryUsageArtifactUploadWithLines := append([]string{}, usageArtifactUploadWithLines...)
+	retryUsageArtifactUploadWithLines = append(retryUsageArtifactUploadWithLines, "          overwrite: true\n")
+	steps = append(steps,
+		"      - name: Upload usage artifact\n",
+		"        id: upload-usage-artifact\n",
+		"        if: always()\n",
+		"        continue-on-error: true\n",
+		fmt.Sprintf("        uses: %s\n", usageArtifactUploadAction),
+	)
+	steps = append(steps, usageArtifactUploadWithLines...)
+	// The initial upload can fail transiently (e.g. a runner-side DNS blip while
+	// talking to blob storage). A missing usage artifact permanently blocks the
+	// daily AI Credits guardrail for this run, so wait briefly and retry once
+	// before giving up, so a short-lived network hiccup has time to clear.
+	steps = append(steps,
+		"      - name: Wait before retrying usage artifact upload\n",
+		"        if: always() && steps.upload-usage-artifact.outcome == 'failure'\n",
+		"        run: sleep 10\n",
+		"      - name: Retry upload usage artifact\n",
+		"        id: upload-usage-artifact-retry\n",
+		"        if: always() && steps.upload-usage-artifact.outcome == 'failure'\n",
+		"        continue-on-error: true\n",
+		fmt.Sprintf("        uses: %s\n", usageArtifactUploadAction),
+	)
+	steps = append(steps, retryUsageArtifactUploadWithLines...)
+	return steps
+}
+
+func buildUsageArtifactUploadPathLines(prefix string, broker bool) []string {
+	lines := []string{
 		"        with:\n",
 		fmt.Sprintf("          name: %susage\n", prefix),
 		"          path: |\n",
@@ -391,34 +427,11 @@ func buildUsageArtifactUploadStep(prefix string, pinAction func(string) string) 
 		"            /tmp/gh-aw/usage/experiment/state.json\n",
 		"            /tmp/gh-aw/usage/experiment/assignments.json\n",
 		"            /tmp/gh-aw/usage/activity/summary.json\n",
-		"          if-no-files-found: ignore\n",
 	}
-	retryUsageArtifactUploadWithLines := append([]string{}, usageArtifactUploadWithLines...)
-	retryUsageArtifactUploadWithLines = append(retryUsageArtifactUploadWithLines, "          overwrite: true\n")
-	steps = append(steps,
-		"      - name: Upload usage artifact\n",
-		"        id: upload-usage-artifact\n",
-		"        if: always()\n",
-		"        continue-on-error: true\n",
-		fmt.Sprintf("        uses: %s\n", usageArtifactUploadAction),
-	)
-	steps = append(steps, usageArtifactUploadWithLines...)
-	// The initial upload can fail transiently (e.g. a runner-side DNS blip while
-	// talking to blob storage). A missing usage artifact permanently blocks the
-	// daily AI Credits guardrail for this run, so wait briefly and retry once
-	// before giving up, so a short-lived network hiccup has time to clear.
-	steps = append(steps,
-		"      - name: Wait before retrying usage artifact upload\n",
-		"        if: always() && steps.upload-usage-artifact.outcome == 'failure'\n",
-		"        run: sleep 10\n",
-		"      - name: Retry upload usage artifact\n",
-		"        id: upload-usage-artifact-retry\n",
-		"        if: always() && steps.upload-usage-artifact.outcome == 'failure'\n",
-		"        continue-on-error: true\n",
-		fmt.Sprintf("        uses: %s\n", usageArtifactUploadAction),
-	)
-	steps = append(steps, retryUsageArtifactUploadWithLines...)
-	return steps
+	if broker {
+		lines = append(lines, "            /tmp/gh-aw/usage/activity/experiment-results.json\n")
+	}
+	return append(lines, "          if-no-files-found: ignore\n")
 }
 
 func buildUsageArtifactCollectionStep(hasDetection bool) []string {

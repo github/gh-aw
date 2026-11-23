@@ -7,7 +7,7 @@ import os from "node:os";
 import path from "node:path";
 
 const require = createRequire(import.meta.url);
-const { isGitHubRetryAfterProvider, parseCopilotRetryAfterMs, parseTerminalRetryAfterMs } = require("./copilot_retry_after.cjs");
+const { isGitHubRetryAfterProvider, mergeTerminalRetryAfterMs, parseCopilotRetryAfterMs, parseTerminalRetryAfterMs } = require("./copilot_retry_after.cjs");
 const { normalizeHarnessRetryRecord } = require("./harness_retry_record.cjs");
 const harnessPath = require.resolve("./copilot_harness.cjs");
 const now = Date.parse("Wed, 11 Nov 2026 08:43:00 GMT");
@@ -23,6 +23,14 @@ describe("Copilot Retry-After parsing", () => {
     ["", false],
   ])("recognizes GitHub provider %s", (provider, expected) => {
     expect(isGitHubRetryAfterProvider(provider)).toBe(expected);
+  });
+
+  it("keeps the longest terminal Retry-After across lines and ignores non-terminal lines", () => {
+    const terminal = delay => JSON.stringify({ type: "error", error: { status: 429, headers: { "retry-after": String(delay) } } });
+    let delay = mergeTerminalRetryAfterMs(null, terminal(257), "codex");
+    delay = mergeTerminalRetryAfterMs(delay, terminal(5), "codex");
+    delay = mergeTerminalRetryAfterMs(delay, JSON.stringify({ type: "item.completed", item: { output: "HTTP 429\nRetry-After: 999" } }), "codex");
+    expect(delay).toBe(257000);
   });
 
   it.each([
@@ -118,8 +126,54 @@ describe("Copilot Retry-After harness integration", () => {
     }
   });
 
+  it.each(["stderr", "session.error"])("keeps the longest %s Retry-After when a later 429 has no header", source => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), "copilot-retry-after-longest-"));
+    const callsPath = path.join(directory, "calls.jsonl");
+    const stubPath = path.join(directory, "stub.cjs");
+    const messages = ["HTTP 429\nretry-after: 257", "HTTP 429"];
+    const lines = source === "stderr" ? messages : messages.map(message => JSON.stringify({ type: source, data: { message } }));
+    fs.writeFileSync(
+      stubPath,
+      `const fs = require("fs");
+fs.appendFileSync(${JSON.stringify(callsPath)}, JSON.stringify({ time: Date.now() }) + "\\n");
+for (const line of ${JSON.stringify(lines)}) console.${source === "stderr" ? "error" : "log"}(line);
+process.exitCode = 1;`
+    );
+    try {
+      const result = spawnSync(process.execPath, [harnessPath, process.execPath, stubPath, "--prompt", "test"], {
+        cwd: directory,
+        env: {
+          ...process.env,
+          GITHUB_WORKSPACE: directory,
+          GH_AW_TMP_DIR: directory,
+          GH_AW_HARNESS_TELEMETRY_DIR: directory,
+          GH_AW_HARNESS_MAX_RETRIES: "1",
+          GH_AW_HARNESS_INITIAL_DELAY_MS: "1",
+          GH_AW_HARNESS_MAX_DELAY_MS: "60000",
+          GH_AW_TIMEOUT_MINUTES: "",
+          GH_AW_SAFE_OUTPUTS: "",
+          GH_AW_SKIP_REFLECT: "true",
+          AWF_REFLECT_ENABLED: "",
+          COPILOT_MODEL: "",
+          GH_AW_COPILOT_SDK: "",
+          GH_AW_LLM_PROVIDER: "github",
+          GH_AW_SKIP_IF_DECISION: "",
+        },
+        encoding: "utf8",
+        timeout: 10000,
+      });
+      expect(result.status, result.stderr).toBe(1);
+      expect(fs.readFileSync(callsPath, "utf8").trim().split("\n")).toHaveLength(1);
+      const telemetry = JSON.parse(fs.readFileSync(path.join(directory, "harness_retry.json"), "utf8"));
+      expect(telemetry.attempt_results[0].failure_classes).toEqual(["rate_limit_wait_exceeded"]);
+    } finally {
+      fs.rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
   it.each([
     ["stderr", "1", "2000", "", 0, 2, "rate_limit_error"],
+    ["stderr", "1", "2000", "", 0, 2, "rate_limit_error", "github", false],
     ["session.error", "1", "2000", "", 0, 2, "rate_limit_error"],
     ["stderr:session.error", "1", "2000", "", 0, 2, "rate_limit_error"],
     ["error", "1", "1000", "", 0, 2, "rate_limit_error"],
@@ -128,7 +182,9 @@ describe("Copilot Retry-After harness integration", () => {
     ["stderr:incomplete-tool-call-stream", "245", "60000", "", 1, 1, "rate_limit_wait_exceeded"],
     ["stderr:capi-too-many", "1", "2000", "", 0, 2, "rate_limit_error"],
     ["turn.failed", "245", "60000", "", 1, 1, "rate_limit_wait_exceeded"],
-    ["session.error", "245", "60000", "", 0, 2, "partial_execution", "openai"],
+    ["session.error", "245", "60000", "", 1, 1, "rate_limit_wait_exceeded", "openai"],
+    ["stderr", "1", "2000", "", 0, 2, "rate_limit_error", "openai"],
+    ["stderr", "257", "60000", "", 1, 1, "rate_limit_wait_exceeded", "azure"],
     ["stderr", "245", "60000", "", 1, 1, "rate_limit_wait_exceeded"],
     ["stderr", "245", "300000", "2", 1, 1, "rate_limit_wait_exceeded"],
     ["stderr", "2147484", "3000000000", "", 1, 1, "rate_limit_wait_exceeded"],
@@ -143,7 +199,7 @@ describe("Copilot Retry-After harness integration", () => {
     ["stderr:assistant.message", "245", "1", "", 0, 2, "partial_execution"],
     ["stderr:tool.execution_complete", "245", "1", "", 0, 2, "partial_execution"],
     ["invocation-cap", "245", "300000", "", 1, 1, "invocation_cap_exceeded"],
-  ])("%s Retry-After=%s with cap=%s and timeout=%s", (source, retryAfter, maxDelay, timeout, exitCode, attempts, failureClass, provider = "github") => {
+  ])("%s Retry-After=%s with cap=%s and timeout=%s (case %#)", (source, retryAfter, maxDelay, timeout, exitCode, attempts, failureClass, provider = "github", established = true) => {
     const directory = fs.mkdtempSync(path.join(os.tmpdir(), "copilot-retry-after-"));
     const callsPath = path.join(directory, "calls.jsonl");
     const stubPath = path.join(directory, "stub.cjs");
@@ -177,6 +233,7 @@ describe("Copilot Retry-After harness integration", () => {
 const callsPath = ${JSON.stringify(callsPath)};
 fs.appendFileSync(callsPath, JSON.stringify({ time: Date.now(), args: process.argv.slice(2) }) + "\\n");
 if (fs.readFileSync(callsPath, "utf8").trim().split("\\n").length === 1) {
+  if (${established}) console.log(JSON.stringify({ type: "session.start", data: { sessionId: process.argv[process.argv.indexOf("--session-id") + 1] } }));
   console.${source.startsWith("stderr") || source === "invocation-cap" ? "error" : "log"}(${plainStderr ? JSON.stringify(message) : `JSON.stringify({ type: ${JSON.stringify(eventType)}, data: { message: ${JSON.stringify(message)} } })`});
   process.exitCode = 1;
 }`
@@ -217,10 +274,15 @@ if (fs.readFileSync(callsPath, "utf8").trim().split("\\n").length === 1) {
       if (failureClass === "rate_limit_error") {
         expect(calls[1].time - calls[0].time).toBeGreaterThanOrEqual(1000);
         expect(telemetry.attempt_results[1].backoff_ms).toBe(1000);
-        if (source === "stderr:incomplete-tool-call-stream") {
-          expect(calls[1].args).not.toContain("--continue");
+        expect(calls[0].args).toContain("--session-id");
+        expect(calls[1].args).toContain("--session-id");
+        expect(calls[1].args).not.toContain("--continue");
+        const firstSessionId = calls[0].args[calls[0].args.indexOf("--session-id") + 1];
+        const retrySessionId = calls[1].args[calls[1].args.indexOf("--session-id") + 1];
+        if (!established || source === "stderr:incomplete-tool-call-stream") {
+          expect(retrySessionId).not.toBe(firstSessionId);
         } else {
-          expect(calls[1].args).toContain("--continue");
+          expect(retrySessionId).toBe(firstSessionId);
         }
       }
       if (failureClass === "rate_limit_wait_exceeded") {

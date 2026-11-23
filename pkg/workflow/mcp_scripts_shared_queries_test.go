@@ -31,6 +31,16 @@ func loadSharedMCPScripts(t *testing.T, filename string) *MCPScriptsConfig {
 	return NewCompiler().mergeMCPScripts(nil, []string{string(scripts)})
 }
 
+func requireSharedGitHubQueryPrerequisites(t *testing.T) {
+	t.Helper()
+	if _, err := exec.LookPath("jq"); err != nil {
+		t.Skip("jq is required for bounded GitHub query tests")
+	}
+	if err := exec.Command("date", "-u", "-d", "2026-10-01", "+%s").Run(); err != nil {
+		t.Skip("GNU-compatible date is required for bounded GitHub query tests")
+	}
+}
+
 func TestSharedGitHubQueryRepositoryBindings(t *testing.T) {
 	config := loadSharedMCPScripts(t, "github-queries-mcp-script.md")
 	var manifest MCPScriptsConfigJSON
@@ -140,6 +150,135 @@ SINCE="${INPUT_SINCE:-}"` + "\n" + repoSelection + "\nprintf '%s' \"$API_PATH\"\
 				})
 			}
 		}
+	}
+}
+
+func TestSharedGitHubQueryBoundedRangesRetryAndSplit(t *testing.T) {
+	requireSharedGitHubQueryPrerequisites(t)
+	config := loadSharedMCPScripts(t, "github-queries-mcp-script.md")
+	for _, name := range []string{"github-issue-query", "github-pr-query"} {
+		t.Run(name, func(t *testing.T) {
+			if timeout := config.Tools[name].Timeout; timeout != 600 {
+				t.Fatalf("timeout = %d, want 600 seconds", timeout)
+			}
+			callLog := filepath.Join(t.TempDir(), "queries.log")
+			stub := `GH_CALLS=0
+DAY_ONE_CALLS=0
+gh() {
+  local search=""
+  while [[ $# -gt 0 ]]; do
+    if [[ "$1" == "--search" ]]; then
+      search="$2"
+      shift 2
+    else
+      shift
+    fi
+  done
+  printf '%s\n' "$search" >> "$GH_CALL_LOG"
+  case "$search" in
+    "updated:2026-10-01..2026-10-04")
+      GH_CALLS=$((GH_CALLS + 1))
+      if [[ "$GH_CALLS" -eq 1 ]]; then
+        echo "HTTP 502: 502 Bad Gateway" >&2
+        return 1
+      fi
+      printf '[{"number":1,"updatedAt":"2026-10-01T12:00:00Z"},{"number":2,"updatedAt":"2026-10-02T12:00:00Z"}]\n'
+      ;;
+    "updated:2026-10-01..2026-10-02")
+      printf '[{"number":1,"updatedAt":"2026-10-01T12:00:00Z"},{"number":2,"updatedAt":"2026-10-02T12:00:00Z"}]\n'
+      ;;
+    "updated:2026-10-01..2026-10-01")
+      DAY_ONE_CALLS=$((DAY_ONE_CALLS + 1))
+      if [[ "$DAY_ONE_CALLS" -eq 1 ]]; then
+        printf '{"number":'
+        return 0
+      fi
+      printf '[{"number":1,"updatedAt":"2026-10-01T12:00:00Z"}]\n'
+      ;;
+    "updated:2026-10-02..2026-10-02")
+      printf '[{"number":2,"updatedAt":"2026-10-02T12:00:00Z"}]\n'
+      ;;
+    "updated:2026-10-03..2026-10-04")
+      printf '[{"number":3,"updatedAt":"2026-10-03T12:00:00Z"}]\n'
+      ;;
+    *)
+      echo "unexpected query range: $search" >&2
+      return 1
+      ;;
+  esac
+}
+`
+			cmd := exec.Command("bash", "-c", stub+config.Tools[name].Run)
+			cmd.Env = []string{
+				"PATH=" + os.Getenv("PATH"),
+				"GH_CALL_LOG=" + callLog,
+				"INPUT_STATE=all",
+				"INPUT_SINCE=2026-10-01T00:00:00Z",
+				"INPUT_UNTIL=2026-10-04T23:59:59Z",
+				"INPUT_LIMIT=2",
+				"INPUT_JQ=.",
+				"GITHUB_REPOSITORY=current/repository",
+			}
+			output, err := cmd.Output()
+			if err != nil {
+				t.Fatalf("bounded query failed: %v", err)
+			}
+			var items []struct {
+				Number int `json:"number"`
+			}
+			if err := json.Unmarshal(output, &items); err != nil {
+				t.Fatalf("query output is invalid JSON: %v\n%s", err, output)
+			}
+			var numbers []int
+			for _, item := range items {
+				numbers = append(numbers, item.Number)
+			}
+			if want := []int{1, 2, 3}; !reflect.DeepEqual(numbers, want) {
+				t.Errorf("query item numbers = %v, want %v", numbers, want)
+			}
+			log, err := os.ReadFile(callLog)
+			if err != nil {
+				t.Fatal(err)
+			}
+			wantCalls := []string{
+				"updated:2026-10-01..2026-10-04",
+				"updated:2026-10-01..2026-10-04",
+				"updated:2026-10-01..2026-10-02",
+				"updated:2026-10-01..2026-10-01",
+				"updated:2026-10-01..2026-10-01",
+				"updated:2026-10-02..2026-10-02",
+				"updated:2026-10-03..2026-10-04",
+			}
+			if got := strings.Fields(string(log)); !reflect.DeepEqual(got, wantCalls) {
+				t.Errorf("query ranges = %v, want %v", got, wantCalls)
+			}
+		})
+	}
+}
+
+func TestSharedGitHubQuerySingleDayLimitFails(t *testing.T) {
+	requireSharedGitHubQueryPrerequisites(t)
+	config := loadSharedMCPScripts(t, "github-queries-mcp-script.md")
+	script := `gh() {
+  printf '[{"number":1,"updatedAt":"2026-10-01T12:00:00Z"},{"number":2,"updatedAt":"2026-10-01T13:00:00Z"}]\n'
+}
+` + config.Tools["github-issue-query"].Run
+	cmd := exec.Command("bash", "-c", script)
+	cmd.Env = []string{
+		"PATH=" + os.Getenv("PATH"),
+		"INPUT_STATE=all",
+		"INPUT_SINCE=2026-10-01T00:00:00Z",
+		"INPUT_UNTIL=2026-10-01T23:59:59Z",
+		"INPUT_LIMIT=1",
+		"INPUT_JQ=.",
+		"GITHUB_REPOSITORY=current/repository",
+	}
+	output, err := cmd.CombinedOutput()
+	if err == nil {
+		t.Fatal("expected a saturated single-day query to fail")
+	}
+	if !strings.Contains(string(output), "item limit for single-day range 2026-10-01") {
+		t.Fatalf("error = %q, want single-day item-limit guidance", output)
 	}
 }
 

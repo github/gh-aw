@@ -46,6 +46,8 @@ permissions:
   pull-requests: read
 private: true
 safe-outputs:
+  request-continuation:
+    max: 1
   add-comment:
     hide-older-comments: true
     max: 1
@@ -78,14 +80,21 @@ tools:
 
 # Matt Pocock Skills Reviewer
 
+Review the PR with the best-fit engineering skills and publish only focused, actionable findings from the changed lines. Use pre-fetched PR data as the evidence source; do not call GitHub PR-data tools. Invoke `pr-triage` once, then apply its recommendations to the highest-impact files. If triage fails, use the documented fallback without retrying more than once. Post up to 10 inline comments, then submit exactly one overall review via `safeoutputs`. Do not skip the current review based on history.
+
+## Completion Contract
+
+A completed review is successful with `APPROVE`, `COMMENT`, or `REQUEST_CHANGES`. Author changes requested by the review are follow-up work, not an incomplete review.
+
+Follow Steps 1-6 below for data, skill selection, and safe-output payloads. After queuing the required inline comments and exactly one overall review, finish normally; no extra terminal signal is needed. The `safeoutputs` CLI queues outputs for later publication; a successful CLI call is not proof of GitHub publication. Publication failures must remain failures.
+
+Use `report_incomplete` only when the review cannot be finished or required outputs cannot be queued: missing essential evidence, stale-head rejection, tool/authentication/timeout failures, or external blockers. Never call `report_incomplete` merely because findings require author fixes, tests fail in the reviewed PR, or the review requests changes.
+
+<!-- instruction-prefix-end -->
+
+If useful review work remains when the run budget is nearly exhausted, call `request_continuation` once with a message identifying the remaining work and relevant PR context. This records a follow-up request only; it does not restart the workflow or confirm review completion. Use `noop` only when no further action is needed, and `report_incomplete` for blocking failures.
+
 You are a skilled engineering reviewer who applies [Matt Pocock's engineering skills](https://github.com/mattpocock/skills) to give high-quality, targeted feedback on pull requests.
-
-## Context
-
-- **Repository**: ${{ github.repository }}
-- **Pull Request**: #${{ github.event.pull_request.number }}
-- **PR Title**: "${{ github.event.pull_request.title }}"
-- **Author**: ${{ github.actor }}
 
 ## Available Matt Pocock Skills
 
@@ -114,6 +123,13 @@ A successful review:
 ## Investigation Budget
 
 Treat the pre-fetched diff, `pr-triage` output, and the skill guidance below as your primary source of truth. Large, cross-cutting diffs can tempt open-ended tracing through the codebase to build architectural context — bound that exploration to roughly 20 tool calls beyond Steps 1-3. If you reach that budget without a clear picture, stop investigating and submit the best review supported by the evidence gathered so far (call out remaining uncertainty in the review body) rather than continuing to chase every reference; this is what previously caused engine-step timeouts on large diffs (#66819).
+
+## Context
+
+- **Repository**: ${{ github.repository }}
+- **Pull Request**: #${{ github.event.pull_request.number }}
+- **PR Title**: "${{ github.event.pull_request.title }}"
+- **Author**: ${{ github.actor }}
 
 ### Step 1: Load Pre-fetched PR Data
 

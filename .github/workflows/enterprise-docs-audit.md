@@ -10,8 +10,8 @@ permissions:
   issues: read
   copilot-requests: write
 engine:
-  id: copilot
-  copilot-sdk: true
+  id: pi
+  model-provider: github
 strict: true
 timeout-minutes: 25
 tools:
@@ -34,7 +34,7 @@ safe-outputs:
     report-as-issue: false
   create-issue:
     title-prefix: "[enterprise-docs] "
-    labels: [cookie]
+    labels: [cookie, "backlog:docs"]
     allowed-labels: [cookie]
     max: 3
     expires: 2d

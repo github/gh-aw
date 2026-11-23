@@ -63,13 +63,9 @@ func TestHealthFailureClusterOutput(t *testing.T) {
 		{DatabaseID: 13, WorkflowName: "missing-cache", Conclusion: "success"}}
 	config := HealthConfig{Days: 7, Threshold: 80, JSONOutput: true, LogsDir: t.TempDir(),
 		RepoOverride: "org/repo", WorkflowName: "missing-cache"}
-	for _, detailed := range []bool{false, true} {
+	{
 		output := captureAuditGroupStdout(t, func() {
-			if detailed {
-				require.NoError(t, displayDetailedHealth(runs, config))
-			} else {
-				require.NoError(t, displayHealthSummary(runs, config))
-			}
+			require.NoError(t, displayDetailedHealth(runs, config))
 
 		})
 		var data struct {
@@ -83,7 +79,6 @@ func TestHealthFailureClusterOutput(t *testing.T) {
 	}
 	config.JSONOutput = false
 	output := captureAuditGroupStderr(t, func() {
-		require.NoError(t, displayHealthSummary(runs, config))
 		require.NoError(t, displayDetailedHealth(runs, config))
 	})
 	assert.Contains(t, output, "[failure_clusters]")

@@ -1,8 +1,8 @@
 ---
 name: Daily Workflow Security Model
 engine:
-  id: copilot
-  copilot-sdk: true
+  id: codex
+  model-provider: github
 description: Model-check and refine the compiled-workflow TLA+ security architecture, preserving concrete counterexamples.
 on:
   schedule: daily
@@ -30,10 +30,11 @@ steps:
     with:
       go-version-file: go.mod
       cache: true
-  - name: Build compiled-profile verifier
+  - name: Build compiled-profile verifier and compiler
     run: |
       set -euo pipefail
       go build -o /tmp/gh-aw/agent/tla-tools/verify-lock ./cmd/gh-aw-security-model
+      go build -o /tmp/gh-aw/agent/tla-tools/gh-aw ./cmd/gh-aw
 tools:
   edit:
   bash: ["*"]
@@ -91,8 +92,9 @@ python3 specs/workflow-security/check.py --results /tmp/gh-aw/agent/tla-results 
 /tmp/gh-aw/agent/tla-tools/verify-lock --profile daily .github/workflows/daily-workflow-security-model.lock.yml
 ```
 
-The Java runtime, compiled-profile verifier, and checksum-verified TLC jar are already installed; do not
-download other tools. The results directory must be new. Retain the command,
+The Java runtime, checked-out compiler, compiled-profile verifier, and checksum-verified TLC jar are already installed; do not
+download other tools. Use `/tmp/gh-aw/agent/tla-tools/gh-aw compile` for source
+fixture checks. The results directory must be new. Retain the command,
 exit status, model/config hashes, state counts, and complete reports. A parse
 error, timeout, missing tool, wrong invariant, or unfinished exploration is a
 failed investigation, not a counterexample or security success.
@@ -124,7 +126,7 @@ do not assume every token is forbidden in the agent.
 Refine one bounded aspect of the model when warranted. Preserve all existing
 secure runs, negative controls, and witness traces. Add a targeted mutation or
 reachability witness for new properties, rerun the entire checker and unit tests,
-and compile any new source fixtures with `gh aw compile --no-emit --json`.
+and compile any new source fixtures with `/tmp/gh-aw/agent/tla-tools/gh-aw compile --no-emit --json`.
 When the model changes, run the checker with `--write-examples` and a new results
 directory before the unit tests so the checked-in examples match the model hash.
 If Go verifier code changes, run its Go tests and rebuild the verifier before

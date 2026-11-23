@@ -158,7 +158,7 @@ Guideline: Files should typically be 100-500 lines. Split files exceeding 800 li
 **Group by Functionality, Not by Type**
 
 ```go
-// ✅ Good: Feature-based organization
+// ✅ Preferred: Feature-based organization
 create_issue.go            // Issue creation logic
 create_issue_test.go       // Issue tests
 add_comment.go             // Comment logic
@@ -173,7 +173,7 @@ tests.go                   // All tests
 **Use Descriptive File Names**
 
 ```go
-// ✅ Good
+// ✅ Preferred
 create_pull_request_reviewers_test.go
 engine_error_patterns_infinite_loop_test.go
 copilot_mcp_http_integration_test.go
@@ -241,7 +241,7 @@ Rationale:
 
 The engine system implements Interface Segregation Principle (ISP) with 7 focused interfaces composed into a single composite interface (`CodingAgentEngine`):
 
-```
+```text
 CodingAgentEngine (composite)
 ├── Engine            – core identity (GetID, GetDisplayName, IsExperimental)
 ├── CapabilityProvider – feature flags (SupportsFirewall, SupportsMaxTurns, ...)
@@ -963,7 +963,7 @@ The project enforces this rule via `testifylint` in golangci-lint.
 ### Running Tests
 
 ```bash
-make test-unit       # Fast unit tests only (~25s)
+make test-unit       # Unit tests only (~25s)
 make test            # All tests including integration (~30s)
 make test-security   # Security regression tests only
 make test-coverage   # Generate coverage report
@@ -1607,7 +1607,7 @@ func SanitizeLabel(label string) string {
 
 The JavaScript sanitization module (`actions/setup/js/sanitize_content_core.cjs`) applies a multi-stage pipeline to all incoming content before it is written to GitHub resources:
 
-```
+```text
 Input Text
     │
     ▼ hardenUnicodeText()
@@ -1647,7 +1647,7 @@ type TemplateData struct {
     User  string
 }
 
-// ✅ Good: Structured template with validated data
+// ✅ Preferred: Structured template with validated data
 func renderTemplate(data TemplateData) (string, error) {
     tmpl := template.New("issue")
     tmpl, err := tmpl.Parse("Title: {{.Title}}\nBody: {{.Body}}")
@@ -1694,7 +1694,7 @@ func ValidateExpression(expr string) error {
 
 AI agents processing GitHub content (issue bodies, PR descriptions, comments) are vulnerable to prompt injection attacks where malicious content attempts to override agent instructions.
 
-**Defense Mechanism**: The `actions/setup/md/xpia.md` template provides a standard XPIA defense policy that workflows include in the agent system prompt. It instructs the AI model to treat all external content as untrusted data and to ignore embedded instructions.
+**Defense Mechanism**: The `actions/setup/md/xpia.md` template provides an XPIA defense policy that workflows include in the agent system prompt. It instructs the AI model to treat all external content as untrusted data and to ignore embedded instructions.
 
 **Key Principles**:
 - Treat issue/PR/comment bodies, file contents, repo names, error messages, and API responses as untrusted data only
@@ -2064,7 +2064,7 @@ DEBUG=workflow:expression_extraction gh aw compile workflow.md
 
 WorkQueueOps processes a backlog of work items incrementally — surviving interruptions, rate limits, and multi-day horizons. Use it when operations are idempotent and progress visibility matters. Four queue strategies are available:
 
-| Strategy | Backend | Best For |
+| Strategy | Backend | Typical use |
 |----------|---------|----------|
 | Issue Checklist | GitHub issue checkboxes | Small batches (< 100 items), human-readable |
 | Sub-Issues | Sub-issues of a parent tracking issue | Hundreds of items with per-item discussion threads |
@@ -2081,7 +2081,7 @@ See `docs/src/content/docs/patterns/workqueue-ops.md` for complete examples.
 
 ### BatchOps Pattern
 
-BatchOps processes large volumes of independent work items efficiently by splitting work into chunks and parallelizing where possible. Use it when items are independent and throughput matters over ordering.
+BatchOps processes large volumes of independent work items by splitting work into chunks and parallelizing where possible. Use it when items are independent and throughput matters over ordering.
 
 **When to use BatchOps vs WorkQueueOps**:
 
@@ -2452,7 +2452,7 @@ func (g GitHubToolsets) ToStringSlice() []string { ... }
 
 **Use `any` instead of `interface{}`** (Go 1.18+ standard):
 ```go
-// ✅ Modern
+// ✅ Go 1.18+ syntax
 func Process(data any) error { ... }
 
 // ❌ Legacy — do not use in new code
@@ -2467,7 +2467,7 @@ See `scratchpad/go-type-patterns.md` for the full type reference, typed slice pa
 
 **Use Strongly-Typed Structs**:
 ```go
-// ✅ Good: Strongly-typed configuration
+// ✅ Preferred: Strongly-typed configuration
 type CreateIssueConfig struct {
     Max          int      `json:"max"`
     TitlePrefix  string   `json:"title-prefix"`
@@ -2491,7 +2491,7 @@ const (
     PermissionAdmin PermissionLevel = "admin"
 )
 
-// ✅ Good: Type-safe permission
+// ✅ Preferred: Type-safe permission
 func SetPermission(level PermissionLevel) {
     // Compiler enforces valid values
 }
@@ -2519,7 +2519,7 @@ func (e *WorkflowError) Unwrap() error {
     return e.Err
 }
 
-// ✅ Good: Typed error
+// ✅ Preferred: Typed error
 return &WorkflowError{
     Path:    workflowPath,
     Message: "compilation failed",
@@ -2587,7 +2587,7 @@ func (p Point) Distance() float64 {
 
 **Small, Focused Interfaces**:
 ```go
-// ✅ Good: Small, focused interfaces
+// ✅ Preferred: Small, focused interfaces
 type Reader interface {
     Read(p []byte) (n int, err error)
 }
@@ -2910,7 +2910,7 @@ These files are loaded automatically by compatible AI tools (e.g., GitHub Copilo
 ### Related Documentation
 
 - [Scratchpad Index](./README.md) - Directory index of all specification and documentation files in the `scratchpad/` directory with status and implementation references
-- [Safe Outputs Specification](./safe-outputs-specification.md) - W3C-style formal specification
+- [Safe Outputs Specification](../docs/src/content/docs/specs/safe-outputs-specification.md) - W3C-style formal specification
 - [Validation Architecture](./validation-architecture.md) - Detailed validation patterns
 - [GitHub Actions Security](./github-actions-security-best-practices.md) - Security guidelines
 - [Code Organization](./code-organization.md) - Detailed file organization patterns

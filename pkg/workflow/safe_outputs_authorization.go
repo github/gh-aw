@@ -664,6 +664,7 @@ func authorizationStagedValue(staged *TemplatableBool) any {
 	return templatableBoolIsTrue(staged)
 }
 
+// authorizationImplementationDigest fingerprints compiler-time configuration for authorization binding. Inputs must never contain resolved secret values or other low-entropy secrets: this unsalted SHA-256 digest provides no confidentiality. The fingerprint supports correlation, not proof of integrity.
 func authorizationImplementationDigest(value any) (string, error) {
 	data, err := json.Marshal(value)
 	if err != nil {

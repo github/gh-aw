@@ -1,5 +1,6 @@
 ---
 title: AW Admission Service Specification
+spec: true
 description: OIDC-authenticated admission, conclusion session delivery, component allowances, and the independent opt-in token broker contract
 sidebar:
   order: 1362
@@ -12,6 +13,8 @@ sidebar:
 The terms MUST, MUST NOT, SHOULD, and MAY indicate normative requirements. This repository implements the gh-aw client and compiler integration. The admission authority, trusted accounting ingestion, provisioning, and backend claim verification remain deployment-owned services; the contracts below apply to both sides.
 
 ## 1. Scope and Ownership
+
+The [companion TypeSpec definition](https://github.com/github/gh-aw/blob/main/docs/src/content/docs/specs/admission-service-specification.tsp) describes both service operations: activation admission and conclusion notification. This specification also defines strict wire validation, identity binding, and delivery behavior.
 
 The compiler MUST omit admission code by default. Set `"admission": true` in `.github/workflows/aw.json` to generate the admission check in `activation` and callback in `conclusion` for all workflows. An explicit repository `admission` boolean takes precedence over workflow frontmatter `on.admission`; absent either setting, the default is `false`. When the effective setting is `false`, the compiler MUST omit both steps and admission outputs without changing either job's permissions. Changing these settings requires recompilation. The check runs after activation setup and before author pre-steps, daily validation and agent execution. Only validated results and component allowances propagate to downstream jobs; credentials, request identity and service diagnostics remain client-local. Without a configured endpoint, an explicit step `if` skips admission, and activation continues through its existing fallback checks. A deployment-selected **admission authority server** (the authority) MUST implement the HTTPS admission service, trusted usage ingestion, policy evaluation, and protected operator diagnostics. It MAY use a server-side GitHub App for backend verification and configuration provisioning.
 

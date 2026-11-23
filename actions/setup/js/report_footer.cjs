@@ -19,7 +19,7 @@ function buildFailureReportFooter(ctx, { expiresHours, failureFields, now = new 
     children: ctx.historyUrl
       ? [
           { type: "text", value: " · ", agentTainted: false },
-          { type: "link", url: ctx.historyUrl, children: [{ type: "text", value: "◷", agentTainted: false }], agentTainted: false },
+          { type: "link", url: ctx.historyUrl, children: [{ type: "text", value: "history", agentTainted: false }], agentTainted: false },
         ]
       : [],
   };

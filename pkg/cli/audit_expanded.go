@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"slices"
@@ -57,16 +58,17 @@ type PromptAnalysis struct {
 
 // SessionAnalysis represents session and agent performance metrics
 type SessionAnalysis struct {
-	WallTime            string  `json:"wall_time,omitempty" console:"header:Wall Time,omitempty"`
-	TurnCount           int     `json:"turn_count,omitempty" console:"header:Turn Count,omitempty"`
-	AvgTurnDuration     string  `json:"avg_turn_duration,omitempty" console:"header:Avg Turn Duration,omitempty"`
-	AvgTimeBetweenTurns string  `json:"avg_time_between_turns,omitempty" console:"header:Avg Time Between Turns,omitempty"`
-	MaxTimeBetweenTurns string  `json:"max_time_between_turns,omitempty" console:"header:Max Time Between Turns,omitempty"`
-	TokensPerMinute     float64 `json:"tokens_per_minute,omitempty"`
-	TimeoutDetected     bool    `json:"timeout_detected"`
-	NoopCount           int     `json:"noop_count,omitempty" console:"header:Noop Count,omitempty"`
-	AgentActiveRatio    float64 `json:"agent_active_ratio,omitempty"` // 0.0 - 1.0
-	CacheWarning        string  `json:"cache_warning,omitempty" console:"header:Cache Warning,omitempty"`
+	WallTime                 string  `json:"wall_time,omitempty" console:"header:Wall Time,omitempty"`
+	TurnCount                int     `json:"turn_count,omitempty" console:"header:Turn Count,omitempty"`
+	AvgTurnDuration          string  `json:"avg_turn_duration,omitempty" console:"header:Avg Turn Duration,omitempty"`
+	AvgTimeBetweenTurns      string  `json:"avg_time_between_turns,omitempty" console:"header:Avg Time Between Turns,omitempty"`
+	MaxTimeBetweenTurns      string  `json:"max_time_between_turns,omitempty" console:"header:Max Time Between Turns,omitempty"`
+	TokensPerMinute          float64 `json:"tokens_per_minute,omitempty"`
+	TimeoutDetected          bool    `json:"timeout_detected"`
+	NoopCount                int     `json:"noop_count,omitempty" console:"header:Noop Count,omitempty"`
+	ContinuationRequestCount *int    `json:"continuation_request_count" console:"header:Continuation Requests,omitempty"`
+	AgentActiveRatio         float64 `json:"agent_active_ratio,omitempty"` // 0.0 - 1.0
+	CacheWarning             string  `json:"cache_warning,omitempty" console:"header:Cache Warning,omitempty"`
 }
 
 // SafeOutputSummary provides a summary of safe output items by type
@@ -299,7 +301,11 @@ func readHarnessRoutingOutcomeArtifact(logsPath string) *sessionModelRoutingOutc
 	if err != nil {
 		return nil
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			auditExpandedLog.Printf("Failed to close routing outcome artifact %s: %v", path, err)
+		}
+	}()
 	content, err := io.ReadAll(io.LimitReader(file, (64<<10)+1))
 	if err != nil || len(content) > 64<<10 {
 		return nil
@@ -386,11 +392,11 @@ func findAgentStdioLogPath(logsPath string) string {
 	}
 
 	var found string
-	walkErr := filepath.Walk(logsPath, func(path string, info os.FileInfo, err error) error {
-		if err != nil || info == nil || info.IsDir() {
+	walkErr := filepath.WalkDir(logsPath, func(path string, d fs.DirEntry, err error) error {
+		if err != nil || d == nil || d.IsDir() {
 			return nil
 		}
-		if info.Name() == "agent-stdio.log" {
+		if d.Name() == "agent-stdio.log" {
 			found = path
 			return filepath.SkipAll
 		}
@@ -485,8 +491,9 @@ func buildSessionAnalysis(processedRun ProcessedRun, metrics LogMetrics) *Sessio
 	run := processedRun.Run
 
 	session := &SessionAnalysis{
-		TurnCount: metrics.Turns,
-		NoopCount: run.NoopCount,
+		TurnCount:                metrics.Turns,
+		NoopCount:                run.NoopCount,
+		ContinuationRequestCount: continuationRequestCount(processedRun.ContinuationRequests),
 	}
 
 	// Wall time from run duration

@@ -264,6 +264,31 @@ func (cfg auditRunConfig) auditOptions() AuditOptions {
 	}
 }
 
+// cachedAuditArtifactsUsable reports whether the locally cached artifacts cover
+// everything the requested audit needs, invalidating download markers where a
+// re-download is required.
+func cachedAuditArtifactsUsable(cfg auditRunConfig) (bool, error) {
+	if cfg.models && len(findMissingFilterEntries(ResolveArtifactFilter([]string{"agent", "usage", "info"}), cfg.outputDir)) > 0 {
+		return false, invalidateCompleteArtifactDownloadMarker(cfg.outputDir)
+	}
+	if (cfg.delivery || cfg.adoption) && len(findMissingFilterEntries(ResolveArtifactFilter([]string{"delivery"}), cfg.outputDir)) > 0 {
+		return false, invalidateCompleteArtifactDownloadMarker(cfg.outputDir)
+	}
+	if cfg.search != "" {
+		path, err := findUnifiedSessionPath(cfg.outputDir)
+		if err != nil {
+			return false, err
+		}
+		if path == "" {
+			return false, invalidateCompleteArtifactDownloadMarker(cfg.outputDir)
+		}
+	}
+	if cfg.includeWorkQueue && len(cfg.artifactFilter) > 0 && len(findMissingFilterEntries(cfg.artifactFilter, cfg.outputDir)) > 0 {
+		return false, nil
+	}
+	return !workQueueLogsMissing(cfg.includeWorkQueue, cfg.outputDir), nil
+}
+
 // renderCachedAuditIfAvailable attempts to render an audit report from a cached run
 // summary. It returns done=true when no further processing is needed (either because
 // the cached report was rendered or the run was skipped by filtering), along with
@@ -273,26 +298,8 @@ func renderCachedAuditIfAvailable(ctx context.Context, cfg auditRunConfig) (done
 	if !ok {
 		return false, false, nil
 	}
-	if cfg.models && len(findMissingFilterEntries(ResolveArtifactFilter([]string{"agent", "usage", "info"}), cfg.outputDir)) > 0 {
-		return false, false, invalidateCompleteArtifactDownloadMarker(cfg.outputDir)
-	}
-	if (cfg.delivery || cfg.adoption) && len(findMissingFilterEntries(ResolveArtifactFilter([]string{"delivery"}), cfg.outputDir)) > 0 {
-		return false, false, invalidateCompleteArtifactDownloadMarker(cfg.outputDir)
-	}
-	if cfg.search != "" {
-		path, err := findUnifiedSessionPath(cfg.outputDir)
-		if err != nil {
-			return false, false, err
-		}
-		if path == "" {
-			return false, false, invalidateCompleteArtifactDownloadMarker(cfg.outputDir)
-		}
-	}
-	if cfg.includeWorkQueue && len(cfg.artifactFilter) > 0 && len(findMissingFilterEntries(cfg.artifactFilter, cfg.outputDir)) > 0 {
-		return false, false, nil
-	}
-	if workQueueLogsMissing(cfg.includeWorkQueue, cfg.outputDir) {
-		return false, false, nil
+	if usable, err := cachedAuditArtifactsUsable(cfg); !usable || err != nil {
+		return false, false, err
 	}
 	auditLog.Printf("Using cached run summary for run %d (processed at %s)", cfg.runID, summary.ProcessedAt.Format(time.RFC3339))
 	if cfg.verbose {
@@ -317,6 +324,13 @@ func renderCachedAuditIfAvailable(ctx context.Context, cfg auditRunConfig) (done
 		}
 		return false, false, nil
 	}
+	if auditNeedsContinuationAgentOutput(cfg) {
+		auditLog.Printf("Cache miss for run %d continuation requests: requested agent output is not present locally, bypassing cache", cfg.runID)
+		if err := invalidateAgentOutputDownloadMarkers(cfg.outputDir); err != nil {
+			return false, false, err
+		}
+		return false, false, nil
+	}
 	if downloaded, err := downloadRegisteredCustomGraders(ctx, cfg); err != nil {
 		return false, false, err
 	} else if downloaded {
@@ -332,6 +346,31 @@ func invalidateCompleteArtifactDownloadMarker(runOutputDir string) error {
 		return fmt.Errorf("failed to invalidate complete artifact download marker: %w", err)
 	}
 	return nil
+}
+
+func invalidateAgentOutputDownloadMarkers(runOutputDir string) error {
+	if err := invalidateCompleteArtifactDownloadMarker(runOutputDir); err != nil {
+		return err
+	}
+	for _, artifact := range []string{constants.AgentArtifactName.String(), constants.AgentOutputFallbackArtifactName.String()} {
+		markerPath := filepath.Join(runOutputDir, downloadedArtifactsMarkerDir, artifact)
+		if err := os.Remove(markerPath); err != nil && !errors.Is(err, os.ErrNotExist) {
+			return fmt.Errorf("failed to invalidate %s download marker: %w", artifact, err)
+		}
+	}
+	return nil
+}
+
+// auditNeedsContinuationAgentOutput reports whether explicitly requested agent output
+// is absent locally. Only sets that request agent output (agent, outcomes, graders)
+// include the fallback artifact; sets that use the agent artifact for logs
+// (work-queue, mcp, firewall) and default all-artifact audits keep the cache.
+func auditNeedsContinuationAgentOutput(cfg auditRunConfig) bool {
+	if len(cfg.artifactFilter) == 0 || !artifactMatchesFilter(constants.AgentOutputFallbackArtifactName.String(), cfg.artifactFilter) {
+		return false
+	}
+	return resolveAgentOutputFile(cfg.outputDir, false) == "" &&
+		len(findMissingFilterEntries(cfg.artifactFilter, cfg.outputDir)) > 0
 }
 
 func auditNeedsDetectionArtifact(cfg auditRunConfig, summary *RunSummary) bool {
@@ -353,6 +392,7 @@ func auditNeedsDetectionArtifact(cfg auditRunConfig, summary *RunSummary) bool {
 }
 
 func processedRunFromSummary(summary *RunSummary, runOutputDir string) ProcessedRun {
+	backfillContinuationRequests(&summary.ContinuationRequests, summary.Run, runOutputDir, false)
 	backfillWorkQueueReport(&summary.WorkQueue, runOutputDir)
 	if summary.Ledger == nil {
 		if activity, err := loadUsageActivitySummary(runOutputDir); err == nil && activity != nil {
@@ -378,6 +418,8 @@ func processedRunFromSummary(summary *RunSummary, runOutputDir string) Processed
 		MissingTools:            summary.MissingTools,
 		MissingData:             summary.MissingData,
 		Noops:                   summary.Noops,
+		Incomplete:              summary.Incomplete,
+		ContinuationRequests:    summary.ContinuationRequests,
 		MCPFailures:             summary.MCPFailures,
 		SkillActivations:        summary.SkillActivations,
 		GatewaySteeringEvents:   gatewaySteeringEvents,

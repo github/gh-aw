@@ -253,14 +253,22 @@ type auditDataInputs struct {
 	observabilityInsights []ObservabilityInsight
 }
 
+// auditActionMinutes returns the run's billed action minutes, falling back to
+// its rounded-up duration, or current when neither is known.
+func auditActionMinutes(run WorkflowRun, current float64) float64 {
+	if run.ActionMinutes > 0 {
+		return run.ActionMinutes
+	}
+	if run.Duration > 0 {
+		return math.Ceil(run.Duration.Minutes())
+	}
+	return current
+}
+
 func assembleAuditData(inputs auditDataInputs) AuditData {
 	run := inputs.processedRun.Run
 	metricsData := inputs.metricsData
-	if run.ActionMinutes > 0 {
-		metricsData.ActionMinutes = run.ActionMinutes
-	} else if run.Duration > 0 {
-		metricsData.ActionMinutes = math.Ceil(run.Duration.Minutes())
-	}
+	metricsData.ActionMinutes = auditActionMinutes(run, metricsData.ActionMinutes)
 
 	performanceMetrics := generatePerformanceMetrics(inputs.processedRun, metricsData, inputs.toolUsage)
 	chainMetrics := buildSafeOutputChainMetrics(run.LogsPath)
@@ -297,6 +305,8 @@ func assembleAuditData(inputs auditDataInputs) AuditData {
 		MissingTools:            inputs.processedRun.MissingTools,
 		MissingData:             inputs.processedRun.MissingData,
 		Noops:                   inputs.processedRun.Noops,
+		Incomplete:              inputs.processedRun.Incomplete,
+		ContinuationRequests:    inputs.processedRun.ContinuationRequests,
 		MCPFailures:             inputs.processedRun.MCPFailures,
 		SkillActivations:        inputs.processedRun.SkillActivations,
 		GatewaySteeringEvents:   inputs.processedRun.GatewaySteeringEvents,

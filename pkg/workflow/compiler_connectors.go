@@ -40,6 +40,11 @@ func (c *Compiler) expandWorkflowConnectors(frontmatter map[string]any, configs 
 	delete(frontmatter, "connectors")
 	for _, alias := range sliceutil.SortedKeys(configs) {
 		config := configs[alias]
+		if config.Inference != nil {
+			if err := expandConnectorInference(frontmatter, config.Inference); err != nil {
+				return err
+			}
+		}
 		if config.Agent != nil {
 			tools := connectorMap(frontmatter, "mcp-servers")
 			name := alias

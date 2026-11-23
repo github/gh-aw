@@ -72,6 +72,8 @@ model-routing: false
 
 Don't combine the opt-out with a router value or shortlist. A configured runtime model override can take precedence over implicit routing, but does not bypass an explicit `model: router`.
 
+Routing picks models from the live model catalogue. With [`engine.model-catalog: false`](/gh-aw/reference/engines/#model-aliases) (for example, for Azure AI Gateway), implicit routing is not applied and `model: router` fails compilation.
+
 <span id="engines-and-providers"></span>
 
 ## Which engines can route?

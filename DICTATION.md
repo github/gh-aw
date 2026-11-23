@@ -45,6 +45,7 @@ artifacts
 audit
 aw.json
 aw.yml
+aw_info.json
 bash
 batch-ops
 blocked-users
@@ -105,7 +106,6 @@ firewall-audit-logs
 footer
 forcePublicRepos
 frontmatter
-fuzzy-schedule
 gemini
 gemini-flash
 GEMINI_API_KEY
@@ -166,7 +166,6 @@ opus
 organization
 otlp
 outcomes
-outputs.jsonl
 PAT
 paths-ignore
 permissions
@@ -175,6 +174,7 @@ playwright
 pre-activation
 pre-agent
 pre-steps
+pre_activation
 protected-files
 pull-request
 pull-requests

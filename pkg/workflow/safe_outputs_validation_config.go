@@ -294,6 +294,7 @@ var ValidationConfig = map[string]TypeValidationConfig{
 			"start_line":          {OptionalPositiveInteger: true},
 			"side":                {Type: "string", Enum: []string{"LEFT", "RIGHT"}},
 			"repo":                {Type: "string", MaxLength: 256}, // Optional: target repository in format "owner/repo"
+			"temporary_id":        {Type: "string", Pattern: "^#?aw_[A-Za-z0-9_]{3,12}$"},
 		},
 	},
 	"submit_pull_request_review": {
@@ -482,6 +483,12 @@ var ValidationConfig = map[string]TypeValidationConfig{
 	},
 	"noop": {
 		DefaultMax: 2,
+		Fields: map[string]FieldValidation{
+			"message": {Required: true, Type: "string", Sanitize: true, MaxLength: MaxBodyLength},
+		},
+	},
+	"request_continuation": {
+		DefaultMax: 1,
 		Fields: map[string]FieldValidation{
 			"message": {Required: true, Type: "string", Sanitize: true, MaxLength: MaxBodyLength},
 		},

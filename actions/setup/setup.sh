@@ -20,7 +20,15 @@ set -e
 
 # Capture start time immediately so the OTLP setup span reflects actual setup duration.
 # Falls back to 0 when node is unavailable.
-SETUP_START_MS=$(node -e "process.stdout.write(String(Date.now()))" 2>/dev/null || echo "0")
+GH_AW_NODE="${GH_AW_NODE:-$(command -v node 2>/dev/null || true)}"
+if [[ "${GH_AW_NODE}" == *$'\n'* || "${GH_AW_NODE}" == *$'\r'* ]]; then
+  echo "::error::Node.js executable path contains unsupported control characters."
+  exit 1
+fi
+if [[ -n "${GH_AW_NODE}" && -n "${GITHUB_ENV:-}" ]]; then
+  printf 'GH_AW_NODE=%s\n' "${GH_AW_NODE}" >> "${GITHUB_ENV}"
+fi
+SETUP_START_MS=$("${GH_AW_NODE:-node}" -e "process.stdout.write(String(Date.now()))" 2>/dev/null || echo "0")
 
 # Log a message only when GitHub Actions debug mode is active.
 # Handles both RUNNER_DEBUG=1 and RUNNER_DEBUG=true (GitHub Actions sets 'true').
@@ -85,6 +93,15 @@ if [ "${RESOLVED_RUNNER_TEMP%/}" = "/tmp" ]; then
 fi
 
 debug_log "Using RUNNER_TEMP: ${RUNNER_TEMP_BASH} (resolved: ${RESOLVED_RUNNER_TEMP}, writable: yes)"
+
+# Acquire before touching shared paths, containers, or listeners. Kept until always/post.
+if [[ "${RUNNER_ENVIRONMENT:-}" == "self-hosted" ]]; then
+  if [[ -z "${GH_AW_NODE}" || ! -x "${GH_AW_NODE}" ]]; then
+    echo "::error::Node.js is required before acquiring the shared-daemon lease."
+    exit 1
+  fi
+  "${GH_AW_NODE}" "$(dirname "${BASH_SOURCE[0]}")/js/docker_lease.cjs" acquire
+fi
 
 # Get destination from input or use default
 DESTINATION="${INPUT_DESTINATION:-${GH_AW_ROOT}/actions}"
@@ -211,7 +228,23 @@ else
   debug_log "No shell scripts directory found at ${SH_SOURCE_DIR}"
 fi
 
+# Stage only the locked npm project, not the maintainer's registry settings.
+create_dir "${DESTINATION}/typescript-lsp"
+for filename in package.json package-lock.json; do
+  cp "${SCRIPT_DIR}/typescript-lsp/${filename}" "${DESTINATION}/typescript-lsp/${filename}"
+  FILE_COUNT=$((FILE_COUNT + 1))
+done
+
 echo "Successfully copied ${FILE_COUNT} files to ${DESTINATION}"
+
+# Keep the locked SDK projects beside their installer; runner npm configuration
+# still controls the registry, not the development projects' .npmrc files.
+for variant in node typescript; do
+  sdk_project="${DESTINATION}/copilot-sdk/${variant}"
+  mkdir -p "$sdk_project"
+  cp "${SCRIPT_DIR}/copilot-sdk/${variant}/package.json" \
+    "${SCRIPT_DIR}/copilot-sdk/${variant}/package-lock.json" "$sdk_project/"
+done
 
 if ! bash "${DESTINATION}/runtime_trust_inventory.sh"; then
   echo "::warning::Runtime TLS inventory inspection failed; trust status unknown. Continuing setup; artifact-integrity checks remain required."
@@ -425,6 +458,7 @@ SAFE_OUTPUTS_FILES=(
   "safe_output_redaction.cjs"
   "safe_outputs_config_redact.cjs"
   "safe_outputs_handlers.cjs"
+  "staging_conflicts.cjs"
   "issue_artifacts.cjs"
   "safe_output_submission.cjs"
   "ledger_append.cjs"

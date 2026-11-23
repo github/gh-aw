@@ -1,5 +1,6 @@
 ---
 title: Copilot SDK Driver Specification
+spec: true
 description: Formal W3C-style specification for Copilot SDK driver configuration, environment variables, permission checks, and logging requirements
 sidebar:
   order: 1365
@@ -220,11 +221,11 @@ This counting requirement tightens the specification to match the existing gh-aw
 
 ### 4.6 TypeScript Example (Non-Normative)
 
-Prerequisite: install [`@github/copilot-sdk`](https://www.npmjs.com/package/@github/copilot-sdk) in the runtime where this example executes.
+Prerequisite: install [`@microsoft/copilot-sdk`](https://www.npmjs.com/package/@microsoft/copilot-sdk) in the runtime where this example executes.
 
 ```ts
 import { readFile } from "node:fs/promises";
-import { CopilotClient, RuntimeConnection } from "@github/copilot-sdk";
+import { CopilotClient, RuntimeConnection } from "@microsoft/copilot-sdk";
 
 const promptPath = process.env.GH_AW_PROMPT;
 const sdkUri = process.env.COPILOT_SDK_URI;
@@ -242,18 +243,21 @@ const logLevel = allowedLogLevels.has(rawLogLevel) ? rawLogLevel : "warning";
 const workingDirectory = process.env.GITHUB_WORKSPACE || process.cwd();
 const prompt = await readFile(promptPath, "utf8");
 
+const endpoint = new URL(sdkUri);
+const port = endpoint.port || (endpoint.protocol === "http:" ? "80" : "");
+if (!port || !["http:", "tcp:"].includes(endpoint.protocol)) {
+  throw new Error("COPILOT_SDK_URI must identify a plaintext HTTP endpoint or a TCP endpoint with an explicit port");
+}
 const client = new CopilotClient({
-  connection: RuntimeConnection.forUri(sdkUri, {
-    connectionToken,
-  }),
-  workingDirectory,
-  logLevel,
+  mode: "coding-agent",
+  runtime: RuntimeConnection.forTcp(endpoint.hostname.replace(/^\[|\]$/g, ""), Number(port), { connectionToken }),
+  observability: { logLevel },
 });
 
 await client.start();
 try {
-  const session = await client.createSession({ model });
-  const response = await session.sendAndWait({ prompt }, { timeoutMs: sendTimeoutMs });
+  const session = await client.createSession({ model, workingDirectory });
+  const response = await session.sendAndWait({ prompt }, sendTimeoutMs);
   console.log(response);
   await session.disconnect();
 } finally {
@@ -443,6 +447,10 @@ Nested-agent refusals do not independently establish main-session rejection.
 
 The implementation MUST perform best-effort cleanup of event streams, session handles, and client handles regardless of success or failure.
 
+### 7.4 Formal Model
+
+The [TLA+ driver model](https://github.com/github/gh-aw/blob/main/specs/copilot-sdk-driver/CopilotSDKDriver.tla) and [TLC configuration](https://github.com/github/gh-aw/blob/main/specs/copilot-sdk-driver/CopilotSDKDriver.cfg) check one SDK session with a denial limit of two. The model checks startup and dispatch order, result classification from SDK observations, and cleanup attempts for resources acquired before success or failure. It abstracts connection and permission configuration into classified inputs; it does not verify token handling, policy matching, log strings, or actual cleanup success.
+
 ---
 
 ## 8. Compliance Testing
@@ -561,7 +569,7 @@ A conforming implementation SHOULD:
 
 ### Informative References
 
-- **[Copilot SDK (npm)]** https://www.npmjs.com/package/@github/copilot-sdk
+- **[Copilot SDK (npm)]** https://www.npmjs.com/package/@microsoft/copilot-sdk
 - **[Copilot SDK Repository]** https://github.com/github/copilot-sdk
 - **[Copilot SDK Driver Source]** `actions/setup/js/copilot_sdk_driver.cjs`
 - **[Copilot Harness Source]** `actions/setup/js/copilot_harness.cjs`

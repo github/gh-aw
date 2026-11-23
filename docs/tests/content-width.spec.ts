@@ -53,3 +53,39 @@ test("the landing page keeps its own wide layout", async ({ page }) => {
       .evaluate(hero => getComputedStyle(hero).maxWidth)
   ).toBe("1152px");
 });
+
+test("specs open in a full-viewport zen layout with a readable measure", async ({ page }) => {
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await page.goto("/gh-aw/specs/unified-agent-session-specification/#abstract");
+
+  const title = page.getByRole("heading", { level: 1, name: "Unified Agent Session Specification" });
+  await expect(title).toBeVisible();
+  await expect(page.getByText("Specification", { exact: true })).toBeVisible();
+  const abstract = page.locator("#abstract");
+  await expect(abstract).toBeInViewport();
+  const section = abstract.locator("..");
+  await expect(section).toHaveCSS("border-block-start-width", "1px");
+  expect((await section.boundingBox())?.width).toBeLessThanOrEqual(PROSE_WIDTH + 1);
+
+  const frame = page.locator(".main-pane");
+  const bounds = await frame.boundingBox();
+  expect(bounds?.x).toBe(0);
+  expect(bounds?.width).toBe(await page.evaluate(() => document.documentElement.clientWidth));
+  const chrome = [".page > header", "#starlight__sidebar", ".right-sidebar-panel", ".content-panel footer", ".site-footer"];
+  for (const selector of chrome) await expect(page.locator(selector)).toBeHidden();
+
+  const toggle = page.getByRole("button", { name: "Zen mode" });
+  await expect(toggle).toHaveAttribute("aria-pressed", "true");
+  await toggle.focus();
+  await toggle.press("Space");
+  await expect(toggle).toHaveAttribute("aria-pressed", "false");
+  await expect(toggle).toBeFocused();
+  for (const selector of chrome) await expect(page.locator(selector)).toBeVisible();
+  await toggle.press("Space");
+  await expect(page.locator("#starlight__sidebar")).toBeHidden();
+
+  await page.goto("/gh-aw/reference/work-queue/");
+  await expect(toggle).toHaveCount(0);
+  await expect(page.locator(".spec-label")).toHaveCount(0);
+  await expect(page.locator(".sl-markdown-content > .level-h2").first()).toHaveCSS("border-block-start-width", "0px");
+});

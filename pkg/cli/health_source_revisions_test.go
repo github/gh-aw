@@ -109,14 +109,13 @@ func TestHealthSamplingStopsAtPushedSourceChanges(t *testing.T) {
 			assert.Empty(t, collection.Warning)
 			if scenario.name == "source-only-push" {
 				output := captureAuditGroupStdout(t, func() {
-					require.NoError(t, displayHealthSummary(runs, HealthConfig{
-						Threshold: 80, RepoOverride: "org/repo", JSONOutput: true, LogsDir: config.LogsDir, collection: collection,
+					require.NoError(t, displayDetailedHealth(runs, HealthConfig{
+						WorkflowName: "Example", Threshold: 80, RepoOverride: "org/repo", JSONOutput: true, LogsDir: config.LogsDir, collection: collection,
 					}))
 				})
-				var report HealthSummary
+				var report WorkflowHealth
 				require.NoError(t, json.Unmarshal([]byte(output), &report))
-				assert.Zero(t, report.HealthyWorkflows)
-				assert.Equal(t, 1, report.InsufficientWorkflows)
+				assert.Equal(t, "no_current_revision_runs", report.Status)
 				assert.Empty(t, report.FailureClusters)
 				assert.Nil(t, report.FailureInvestigation)
 				output = captureAuditGroupStderr(t, func() {

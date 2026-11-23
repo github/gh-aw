@@ -5,7 +5,6 @@ package cli
 import (
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/github/gh-aw/pkg/parser"
@@ -79,25 +78,17 @@ func TestCopilotWebSearchRemovalCodemod_ResolvesIncludedEngine(t *testing.T) {
 	assert.Equal(t, unresolved, updated)
 }
 
-func TestCopilotWebFetchRemovalCodemodPreservesNestedFragmentWithoutEngine(t *testing.T) {
+func TestFixPreservesCopilotWebFetch(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), ".github", "workflows")
-	filePath := filepath.Join(dir, "shared", "fragment.md")
-	content := "---\ntools:\n  web-fetch: true\n---\n"
-	fm, err := parser.ExtractFrontmatterFromContent(content)
+	filePath := filepath.Join(dir, "fetch.md")
+	content := "---\non: workflow_dispatch\nengine: copilot\ntools:\n  web-fetch: true\n---\nFetch.\n"
+	require.NoError(t, os.MkdirAll(dir, 0o700))
+	require.NoError(t, os.WriteFile(filePath, []byte(content), 0o600))
+	_, _, err := processWorkflowFileWithInfo(filePath, GetAllCodemods(), true, false)
 	require.NoError(t, err)
-
-	updated, applied, err := getCopilotWebFetchRemovalCodemod().ApplyWithContext(content, fm.Frontmatter, filePath)
+	updated, err := os.ReadFile(filePath)
 	require.NoError(t, err)
-	assert.False(t, applied)
-	assert.Equal(t, content, updated)
-
-	withEngine := strings.Replace(content, "---\n", "---\nengine: copilot\n", 1)
-	fm, err = parser.ExtractFrontmatterFromContent(withEngine)
-	require.NoError(t, err)
-	updated, applied, err = getCopilotWebFetchRemovalCodemod().ApplyWithContext(withEngine, fm.Frontmatter, filePath)
-	require.NoError(t, err)
-	assert.True(t, applied)
-	assert.NotContains(t, updated, "web-fetch")
+	assert.Contains(t, string(updated), "web-fetch: true")
 }
 
 func TestCopilotWebSearchRemovalCodemod_FixesStrictCompilation(t *testing.T) {

@@ -20,7 +20,7 @@ describe("agy_harness.cjs gated attempt outcomes", () => {
   });
   afterEach(() => fs.rmSync(root, { recursive: true, force: true }));
 
-  function run(scenario, decision = "allow") {
+  function run(scenario, decision = "allow", extraEnv = {}) {
     const binary = path.join(root, "fake-agy.cjs");
     const preload = path.join(root, "decision.cjs");
     const prompt = path.join(root, "prompt.txt");
@@ -45,7 +45,15 @@ describe("agy_harness.cjs gated attempt outcomes", () => {
     process.exit(0);
   }
   fs.appendFileSync(${JSON.stringify(path.join(root, "invocations"))}, "run\\n");
+  const invocation = fs.readFileSync(${JSON.stringify(path.join(root, "invocations"))}, "utf8").trim().split("\\n").length;
   process.stdin.once("data", () => {
+    if (scenario.startsWith("rate_limited_") && (scenario === "rate_limited_long" || invocation === 1)) {
+      console.error("HTTP/1.1 429 Too Many Requests\\nRetry-After: " + (scenario === "rate_limited_long" ? "257" : "1"));
+      console.log(JSON.stringify({ event: "result", result: { status: "ERROR", error: "rate limited" } }));
+      process.exitCode = 1;
+      process.stdin.destroy();
+      return;
+    }
     if (scenario === "interrupted") {
       process.on("SIGTERM", () => process.exit(143));
       process.kill(process.ppid, "SIGTERM");
@@ -77,13 +85,14 @@ describe("agy_harness.cjs gated attempt outcomes", () => {
         GH_AW_HARNESS_TELEMETRY_DIR: path.join(root, "agent"),
         GH_AW_DURABLE_SESSION_DIR: root,
         GH_AW_MCP_CONFIG: "provided",
-        GH_AW_SAFE_OUTPUTS: "",
+        GH_AW_SAFE_OUTPUTS: path.join(root, "safeoutputs.jsonl"),
         GH_AW_PHASE: "agent",
         AWF_REFLECT_ENABLED: "0",
         GEMINI_API_KEY: "test-key",
         GH_AW_SKIP_IF_DECISION: decision === "disabled" ? "" : '["Is work already complete?"]',
         GH_AW_TEST_DECISION: decision,
         GH_AW_TEST_SCENARIO: scenario,
+        ...extraEnv,
       },
     });
     expect(result.error).toBeUndefined();
@@ -134,12 +143,35 @@ describe("agy_harness.cjs gated attempt outcomes", () => {
     expect(result.events.filter(event => event.type === "session.error")).toHaveLength(1);
   });
 
-  it.each(failures)("preserves disabled-gate error reporting for %s", scenario => {
+  it.each(failures)("records disabled-gate %s through the shared retry loop without retrying", (scenario, code) => {
     const result = run(scenario, "disabled");
-    expect(result.status).toBe(1);
+    expect(result.status).toBe(code);
     expect(result.decisions).toBe(0);
-    expect(result.telemetry).toBeNull();
+    expect(result.invocations).toBe(scenario === "spawn_failure" ? 0 : 1);
+    expect(result.telemetry).toMatchObject({ attempts: 1, exit_code: code, attempt_results: [{ outcome: "failure", exit_code: code }] });
+    expect(result.telemetry.decision_results).toBeUndefined();
     expect(result.events.filter(event => event.type === "session.error")).toHaveLength(1);
+  });
+
+  it("retries an HTTP 429 after the provider Retry-After", () => {
+    const result = run("rate_limited_once", "disabled", { GH_AW_HARNESS_MAX_DELAY_MS: "5000" });
+    expect(result.status).toBe(0);
+    expect(result.invocations).toBe(2);
+    expect(result.telemetry).toMatchObject({
+      attempts: 2,
+      exit_code: 0,
+      attempt_results: [
+        { outcome: "failure", failure_classes: ["rate_limit_error"] },
+        { outcome: "success", backoff_ms: 1000 },
+      ],
+    });
+  });
+
+  it("fails fast when Retry-After exceeds max-delay-ms", () => {
+    const result = run("rate_limited_long", "disabled", { GH_AW_HARNESS_MAX_DELAY_MS: "60000" });
+    expect(result.status).toBe(1);
+    expect(result.invocations).toBe(1);
+    expect(result.telemetry).toMatchObject({ attempts: 1, exit_code: 1, attempt_results: [{ outcome: "failure", failure_classes: ["rate_limit_wait_exceeded"] }] });
   });
 
   it.each(["allow", "unknown"])("preserves successful inference after %s", decision => {

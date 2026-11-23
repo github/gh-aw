@@ -22,7 +22,7 @@ PAGEINDEX_AVAILABLE = importlib.util.find_spec("pageindex") is not None
 
 if not PAGEINDEX_AVAILABLE:
     print(
-        "Skipping PageIndex workflow tests: requires pageindex==0.5.3; "
+        "Skipping PageIndex workflow tests: requires the locked PageIndex package; "
         "run with `make test-pageindex-workflow`.",
         file=sys.stderr,
     )
@@ -30,7 +30,7 @@ if not PAGEINDEX_AVAILABLE:
 
 @unittest.skipUnless(
     PAGEINDEX_AVAILABLE,
-    "requires pageindex==0.5.3; run with `make test-pageindex-workflow`",
+    "requires the locked PageIndex package; run with `make test-pageindex-workflow`",
 )
 class PageIndexWorkflowTests(unittest.TestCase):
     @classmethod
@@ -168,7 +168,6 @@ class PageIndexWorkflowTests(unittest.TestCase):
         self.assertIn('patterns: "pkg/**/README.md"', specs)
         self.assertIn("exhaustive checks", specs)
         self.assertNotIn("secrets.", self.source)
-        self.assertIn('"pageindex==0.5.3"', self.source)
         self.assertIn("inventory and search the current source files directly", self.source)
         self.index()
         self.assertEqual((self.output / "revision.txt").read_text(), "fixture-revision")
@@ -189,12 +188,17 @@ class PageIndexWorkflowTests(unittest.TestCase):
         self.assertNotIn("uv ", agent_steps)
         self.assertNotIn("python", agent_steps)
 
-    def test_uv_setup_and_three_day_package_cooldown(self):
+    def test_uv_setup_and_hash_locked_install(self):
         self.assertLess(self.source.index("uses: astral-sh/setup-uv@"),
                         self.source.index("uv venv"))
         self.assertIn('version: "0.13.7"', self.source)
-        self.assertIn("--exclude-newer \"$(date -u -d '3 days ago'", self.source)
-        self.assertIn("--only-binary=:all:", self.source)
+        self.assertIn("uv pip sync --require-hashes --only-binary=:all:", self.source)
+        self.assertIn("uv pip check", self.source)
+        lock_path = ".github/workflows/requirements-pageindex.txt"
+        self.assertIn(lock_path, self.source)
+        cache_key = next(line for line in self.source.splitlines()
+                         if "INDEX_SOURCE_HASH:" in line)
+        self.assertIn(lock_path, cache_key)
 
     def test_compiled_consumers_use_separate_indexing_job(self):
         for name in ("daily-doc-updater", "spec-librarian"):

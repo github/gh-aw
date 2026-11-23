@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	slashpath "path"
 	"path/filepath"
 	"reflect"
 	"slices"
@@ -50,28 +51,28 @@ func loadOrInitDependabotConfig(path string) (DependabotConfig, error) {
 // have a .github/workflows entry in the given config.
 func addMissingDependabotEcosystems(config *DependabotConfig, ecosystems map[string]struct{}) {
 	for ecosystem := range ecosystems {
-		exists := false
-		for _, update := range config.Updates {
-			if update.PackageEcosystem == ecosystem && update.Directory == "/.github/workflows" {
-				exists = true
-				break
-			}
-		}
+		addMissingDependabotUpdate(config, ecosystem, "/.github/workflows", nil)
+	}
+}
 
-		if !exists {
-			entry := DependabotUpdateEntry{
-				PackageEcosystem: ecosystem,
-				Directory:        "/.github/workflows",
-			}
-			entry.Schedule.Interval = "weekly"
-			config.Updates = append(config.Updates, entry)
+func addMissingDependabotUpdate(config *DependabotConfig, ecosystem, directory string, pullRequestLimit *int) {
+	for _, update := range config.Updates {
+		if update.PackageEcosystem == ecosystem && update.Directory == directory {
+			return
 		}
 	}
+	entry := DependabotUpdateEntry{
+		PackageEcosystem: ecosystem,
+		Directory:        directory,
+		PullRequestLimit: pullRequestLimit,
+	}
+	entry.Schedule.Interval = "weekly"
+	config.Updates = append(config.Updates, entry)
 }
 
 // generateDependabotConfig creates or updates .github/dependabot.yml
 func (c *Compiler) generateDependabotConfig(path string, ecosystems map[string]struct {
-}, forceOverwrite bool) error {
+}, forceOverwrite bool, sdkDirectories ...string) error {
 	dependabotLog.Printf("Generating dependabot.yml at %s", path)
 
 	config, err := loadOrInitDependabotConfig(path)
@@ -79,6 +80,10 @@ func (c *Compiler) generateDependabotConfig(path string, ecosystems map[string]s
 		return err
 	}
 	addMissingDependabotEcosystems(&config, ecosystems)
+	noVersionUpdates := 0
+	for _, directory := range sdkDirectories {
+		addMissingDependabotUpdate(&config, "npm", directory, &noVersionUpdates)
+	}
 
 	// Write dependabot.yml
 	yamlData, err := yaml.Marshal(&config)
@@ -130,7 +135,7 @@ func (c *Compiler) ReconcileManagedDependabotIgnores(path string) error {
 		return nil
 	}
 
-	managedPatterns := []string{c.effectiveActionsRepo() + "/*"}
+	managedPatterns := []string{slashpath.Join(c.effectiveActionsRepo(), "*")}
 	changed := false
 	originalStr := string(original)
 	managedPatternsWithComment := managedPatternsWithInlineComment(originalStr, managedPatterns)
@@ -179,8 +184,8 @@ func reconcileGithubActionsIgnoreEntry(updateAny any, managedPatterns []string, 
 		return reconcileGithubActionsIgnoreResult{}
 	}
 
-	ecosystem, _ := updateMap["package-ecosystem"].(string)
-	if ecosystem != "github-actions" {
+	ecosystem, ok := updateMap["package-ecosystem"].(string)
+	if !ok || ecosystem != "github-actions" {
 		return reconcileGithubActionsIgnoreResult{}
 	}
 
@@ -203,9 +208,9 @@ func reconcileGithubActionsIgnoreEntry(updateAny any, managedPatterns []string, 
 	managedPresent := make(map[string]struct{}, len(managedPatterns))
 	reconciledIgnoreEntries := make([]any, 0, len(ignoreEntries))
 	for _, ignoreEntryAny := range ignoreEntries {
-		ignoreEntryMap, ok := dependabotToStringAnyMap(ignoreEntryAny)
-		dependencyName, _ := ignoreEntryMap["dependency-name"].(string)
-		if !ok || dependencyName == "" {
+		ignoreEntryMap, isMap := dependabotToStringAnyMap(ignoreEntryAny)
+		dependencyName, isString := ignoreEntryMap["dependency-name"].(string)
+		if !isMap || !isString || dependencyName == "" {
 			reconciledIgnoreEntries = append(reconciledIgnoreEntries, ignoreEntryAny)
 			continue
 		}
@@ -261,9 +266,9 @@ func dependabotToAnySlice(value any) ([]any, bool) {
 	)
 
 	length := rv.Len()
-	out := make([]any, length)
+	out := make([]any, 0, length)
 	for i := range length {
-		out[i] = rv.Index(i).Interface()
+		out = append(out, rv.Index(i).Interface())
 	}
 	return out, true
 }
@@ -336,20 +341,20 @@ func managedPatternsWithInlineComment(content string, managedPatterns []string) 
 }
 
 func normalizeDependabotIgnoreEntries(content []byte, managedPatterns []string) []byte {
-	lines := strings.Split(string(content), "\n")
+	lines := slices.Collect(strings.SplitSeq(strings.ReplaceAll(string(content), "\r\n", "\n"), "\n"))
 	for i, line := range lines {
 		if !strings.Contains(line, "dependency-name:") {
 			continue
 		}
 
 		beforeComment, comment, hasComment := strings.Cut(line, "#")
-		parts := strings.SplitN(beforeComment, "dependency-name:", 2)
-		if len(parts) != 2 {
+		beforeName, rawName, found := strings.Cut(beforeComment, "dependency-name:")
+		if !found {
 			continue
 		}
 
-		prefix := parts[0] + "dependency-name: "
-		rawDependencyName := strings.TrimSpace(parts[1])
+		prefix := beforeName + "dependency-name: "
+		rawDependencyName := strings.TrimSpace(rawName)
 		quote := `"`
 		// Assume quote characters are balanced when present. If the scalar starts
 		// with a quote but does not end with the same quote, skip normalization.

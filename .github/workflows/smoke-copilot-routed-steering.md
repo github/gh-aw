@@ -38,7 +38,7 @@ safe-outputs:
     group: true
     close-older-issues: true
     close-older-key: "smoke-copilot-routed-steering"
-    labels: [automation, testing]
+    labels: [automation, testing, "backlog:smoke-tests"]
 # Long enough that no timeout notice comes due before the AI-credit notices.
 timeout-minutes: 30
 features:

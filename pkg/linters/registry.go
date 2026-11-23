@@ -23,6 +23,7 @@ import (
 	"github.com/github/gh-aw/pkg/linters/errortypeassertion"
 	"github.com/github/gh-aw/pkg/linters/errstringmatch"
 	"github.com/github/gh-aw/pkg/linters/excessivefuncparams"
+	"github.com/github/gh-aw/pkg/linters/execcommandoutputerrdiscard"
 	"github.com/github/gh-aw/pkg/linters/execcommandwithoutcontext"
 	"github.com/github/gh-aw/pkg/linters/fileclosenotdeferred"
 	"github.com/github/gh-aw/pkg/linters/filepathwalkpreferwalkdir"
@@ -53,6 +54,7 @@ import (
 	"github.com/github/gh-aw/pkg/linters/mapclearloop"
 	"github.com/github/gh-aw/pkg/linters/mapdeletecheck"
 	"github.com/github/gh-aw/pkg/linters/nilctxpassed"
+	osstatignoredeerrorderef "github.com/github/gh-aw/pkg/linters/os-stat-ignored-error-deref"
 	"github.com/github/gh-aw/pkg/linters/osexitinlibrary"
 	"github.com/github/gh-aw/pkg/linters/osgetenvlibrary"
 	"github.com/github/gh-aw/pkg/linters/osisnotexist"
@@ -134,6 +136,7 @@ var allAnalyzers = []*analysis.Analyzer{
 	errstringmatch.Analyzer,
 	errorfwrapv.Analyzer,
 	errorsnewerrorstring.Analyzer,
+	execcommandoutputerrdiscard.Analyzer,
 	execcommandwithoutcontext.Analyzer,
 	excessivefuncparams.Analyzer,
 	fileclosenotdeferred.Analyzer,
@@ -164,6 +167,7 @@ var allAnalyzers = []*analysis.Analyzer{
 	osisnotexist.Analyzer,
 	osopenreadallpreferreadfile.Analyzer,
 	osremoveuncheckedcleanup.Analyzer,
+	osstatignoredeerrorderef.Analyzer,
 	ossetenvlibrary.Analyzer,
 	packagelevelmutableslicemap.Analyzer,
 	panicinlibrarycode.Analyzer,

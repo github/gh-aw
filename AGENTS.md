@@ -15,10 +15,11 @@ Load task-specific guidance lazily through local skills.
 
 ## Critical Rules (Always Applicable)
 
-1. If you changed files, use `report_progress` to commit and push if available; otherwise, use Git directly after the same validation gates.
+1. After changes, validate then commit/push with `report_progress` if available, otherwise Git.
 2. Before **intermediate** `report_progress` calls, run `make agent-report-progress-no-test` (fast, no tests). Before the **final** `report_progress`, run `make agent-report-progress` (includes `test-unit`).
-   - `test-unit` is impacted-first by default (~30s target). Use `TEST_UNIT_RUN_FULL=1 make test-unit` or `make test-unit-all` when full-suite coverage is required.
-   - Run `test-unit` only once per PR — at the final push, not on every intermediate save.
+   - `test-unit` selects impacted tests (~30s runtime, plus compilation). Full: `make test-unit-all` or `TEST_UNIT_RUN_FULL=1 make test-unit`.
+   - [Fast/slow suites](CONTRIBUTING.md#cgo-unit-test-timing): neither alone is full coverage.
+   - Run `test-unit` once per PR at final push, not intermediate saves.
 3. After Go changes, run `make fmt`.
 4. After workflow markdown changes (`.md` under `.github/workflows/`), run `make recompile`.
 5. Do not add `.lock.yml` files to `.gitignore`.
@@ -42,14 +43,9 @@ Workflows that declare a `source:` frontmatter entry (for example `source: githu
 
 ## Lazy Skill Loading Policy
 
-Use skills only when the task requires specialized guidance. Do not pre-load every skill.
-
-All skills are local to this repository under `.github/skills/`. **NEVER** use GitHub Agent Finder (`agentfinder.github.com`) or any other remote skill discovery service to look for skills.
-
-When the relevant skill is not obvious, first discover candidates locally and then load only the minimal guidance needed:
-
-- Discover skills by listing or searching `.github/skills/*/SKILL.md` in this repository.
-- Use **skill fusion** after discovery: read only the specific skill sections or fragments needed instead of loading full skills broadly.
+Load only the skill guidance the task requires. If the route is unclear,
+search `.github/skills/*/SKILL.md` locally, then read only relevant sections.
+Never use GitHub Agent Finder (`agentfinder.github.com`) or other remote skill discovery.
 
 ### Skill routes
 
@@ -58,6 +54,8 @@ Paths below are relative to `.github/skills/`; load only the matching `SKILL.md`
 | Task | Skill directory |
 |---|---|
 | Workflow create/update/debug/upgrade | `agentic-workflows` |
+| Repo Factory bootstrap (interactive/auto) | `agentic-workflows`, then `.github/aw/repo-factory.md` |
+| Choose an agentic engine and inference | `agentic-engine` |
 | Engineering conventions and validation commands | `developer` |
 | Code organization, WASM stubs, string patterns | `developer-code-organization` |
 | Template injection, shell safety, supply chain | `developer-security` |
@@ -67,6 +65,7 @@ Paths below are relative to `.github/skills/`; load only the matching `SKILL.md`
 | Error handling/recovery | `error-recovery-patterns` |
 | GitHub MCP usage | `github-mcp-server` |
 | Issue/PR/workflow/discussion/label queries | matching `github-*-query` |
+| Verify or merge Dependabot npm updates through 1ES | `dependabot-1es` |
 | Workflow review: compile/scans/audit/optimization | `review-agentic-workflows` |
 | Documentation | `documentation` |
 | Issue/comment/review Markdown | `issue-markdown` |

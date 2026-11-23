@@ -11,13 +11,15 @@ Copilot is the default engine. Grant [`copilot-requests: write`](/gh-aw/referenc
 
 The default CLI pin is `1.0.103`. The compiler embeds this version and its reviewed checksum-manifest digest in the generated workflow. Installation prefers that exact version from the trusted runner toolcache; a cache miss downloads and verifies the pinned release instead of selecting a version from the live compatibility matrix. `engine.version` overrides the default. CLI-only execution is the default. `engine.copilot-sdk: true` or `engine.driver` selects SDK mode.
 
+With the built-in installer and `@microsoft/copilot-sdk` `2.0.0`, the default CLI is `1.0.113`, the SDK's companion release for protocol v4. The installer verifies the release against a pinned checksum manifest. An explicit `engine.version` still wins; when selecting a different SDK version, pin a compatible CLI with `engine.version`.
+
 ### Default model routing
 
 Without a `model`, `engine.model`, or `engine.model-routing`, a Copilot workflow on GitHub Copilot inference uses [model routing](/gh-aw/reference/model-routing/#default-routing-for-workflows-without-a-model) with `goal: cost` and `mode: auto` for its main agent, instead of the `auto` model. A nonempty `GH_AW_MODEL_AGENT_COPILOT` or `GH_AW_DEFAULT_MODEL_COPILOT` variable bypasses routing at run time, with the agent variable winning. Set top-level `model-routing: false` to opt out without pinning a model. BYOK providers aren't routed by default.
 
 ## Capabilities and limitations
 
-Copilot supports `engine.agent`, custom harnesses, `max-continuations`, bare mode, and per-command bash allowlists. Compilation rejects native `tools.web-search` and CLI-mode `tools.web-fetch`; use MCP instead. SDK mode provides a proxy-aware `web-fetch` tool. Offline BYOK disables native web tools.
+Copilot supports `engine.agent`, custom harnesses, `max-continuations`, bare mode, and per-command bash allowlists. Both CLI and SDK always run in offline BYOK mode, where native web tools are unavailable. `tools.web-fetch` enables the built-in MCP fallback inside AWF; `tools.web-search` remains unsupported.
 
 Sandboxed CLI sessions derive URL approvals from finalized AWF network rules, including `network_allowed` additions. Domain rules cover apex/subdomains and HTTP/HTTPS unless restricted by protocol/port. These approvals do not grant shell access or bypass the firewall.
 
@@ -57,7 +59,7 @@ An explicit pin overrides the built-in manifest pin and bypasses the runner tool
 
 The engine's version and pin are inherited by detection and eval jobs that reuse that engine. A separate `safe-outputs.threat-detection.engine` override accepts its own `version` and `checksums-sha256`. For AWF, use [`sandbox.agent.checksums-sha256`](/gh-aw/reference/sandbox/#release-integrity-sandboxagentchecksums-sha256).
 
-The compiler supplies the reviewed digest automatically when `engine.version` is omitted or matches the compiler's default version. These generated installs pass `--prefer-toolcache`: the pin authenticates downloaded archives, not the cached host binary. A musl guest archive is still downloaded and verified when the host uses cache. User-supplied frontmatter pins continue to bypass the toolcache.
+The compiler supplies the reviewed digest automatically when `engine.version` is omitted or matches the CLI-only default. Installs using the CLI-only default digest pass `--prefer-toolcache`: the pin authenticates downloaded archives, not the cached host binary. A musl guest archive is still downloaded and verified when the host uses cache. The automatic SDK companion pin and user-supplied frontmatter pins bypass the toolcache.
 
 Compilation fails if the compiler's default version or digest is missing or malformed. Other versions without an explicit pin retain the trusted toolcache policy and setup action's built-in release pins; an unreviewed download still fails closed. A frontmatter pin requires a literal semantic release version such as `"1.0.101"` or `"v1.0.101"`; it cannot be combined with `latest`, an omitted version, or a version expression.
 
@@ -79,7 +81,7 @@ See [Copilot Agent Files](/gh-aw/reference/copilot-custom-agents/) for details.
 
 The Copilot engine supports routing requests to an external LLM provider instead of GitHub's default routing. This is useful when you want to use a different model or provider (e.g., OpenAI, Anthropic, Azure OpenAI, or a local Ollama/vLLM instance) while still using the Copilot CLI tooling.
 
-Set `COPILOT_PROVIDER_BASE_URL` in `engine.env` to activate BYOK mode. The credential variables `COPILOT_PROVIDER_BASE_URL`, `COPILOT_PROVIDER_API_KEY`, and `COPILOT_PROVIDER_BEARER_TOKEN` are explicitly allowed to carry `${{ secrets.* }}` references in `engine.env` under strict mode — they are not leaked to the agent container. Other `COPILOT_PROVIDER_*` variables hold non-sensitive configuration and can be set as plain strings. When `COPILOT_PROVIDER_BASE_URL` is a literal URL, gh-aw automatically adds its provider hostname to the AWF allow-list for both the main agent run and the threat-detection Copilot step, and the threat-detection step now derives its Copilot API target from that literal BYOK URL even when `engine.api-target` and `GITHUB_COPILOT_BASE_URL` are unset. When it is supplied via a secret or variable expression, add the provider hostname explicitly to `network.allowed` so the threat-detection step can reuse that concrete host safely.
+Set `COPILOT_PROVIDER_BASE_URL` in `engine.env` to activate BYOK mode. The credential variables `COPILOT_PROVIDER_BASE_URL`, `COPILOT_PROVIDER_API_KEY`, and `COPILOT_PROVIDER_BEARER_TOKEN` are explicitly allowed to carry `${{ secrets.* }}` references in `engine.env` under strict mode — they are not leaked to the agent container. Other `COPILOT_PROVIDER_*` variables hold non-sensitive configuration and can be set as plain strings. When `COPILOT_PROVIDER_BASE_URL` is a literal URL, gh-aw automatically adds its provider hostname to the AWF allow-list for both the main agent run and the threat-detection Copilot step, and the threat-detection step now derives its Copilot API target from that literal BYOK URL even when `engine.api-target` and `GITHUB_COPILOT_BASE_URL` are unset. When it is supplied via a `${{ secrets.* }}` or `${{ vars.* }}` expression, AWF resolves the value at runtime and allows exactly that provider host for both runs, so do not add broad entries such as `openai.azure.com` to `network.allowed`. Runtime resolution requires AWF v0.25.41 or later (the default); with an older pinned `sandbox.agent.version`, compilation warns (or fails in strict mode) because the host cannot be verified; upgrade AWF, or keep the exact host in `network.allowed`.
 
 | Variable | Required | Description |
 |---|---|---|
@@ -121,13 +123,46 @@ Use the resource's `/openai/v1` endpoint with API-key or GitHub OIDC authenticat
 ## Copilot SDK Support
 
 Set `engine.copilot-sdk: true` to run a local Copilot sidecar and SDK driver.
+
+For Node.js and TypeScript drivers, use the object form to pin a specific SDK version independently of `engine.version`, which still controls the CLI:
+
+```aw wrap
+engine:
+  id: copilot
+  copilot-sdk:
+    version: "1.0.16"
+    sha256: "<64 lowercase hex digits>"
+```
+
+Check in `package.json` and `package-lock.json` under `.github/aw/copilot-sdk/<version>/<variant>/`, where `<variant>` is `node` for the built-in or Node.js driver and `typescript` for an explicit `ts-node` command. Both files must pin `@microsoft/copilot-sdk` to that exact version. Use an npm v3 lockfile with canonical npm registry URLs and SHA-512 integrity for every dependency. The SDK install step needs `jq` and a checkout that includes these files.
+
+When migrating an existing pin to the new npm package, regenerate the lockfile and update `sha256`. Custom JavaScript and TypeScript drivers must also use the new package name and v2 API; see the [Copilot SDK driver specification](/gh-aw/specs/copilot-sdk-driver-specification/).
+
+From the project directory, calculate the frontmatter checksum over the manifest bytes, a NUL byte, and the lockfile bytes:
+
+```bash
+{ cat package.json && printf '\0' && cat package-lock.json; } | shasum -a 256 -b
+```
+
+Use the first field of the output. Keep both files byte-for-byte stable across checkouts (for example, enforce LF with `.gitattributes`). The installer verifies the digest before running `npm ci` with lifecycle scripts disabled. `copilot-sdk: true` still uses the bundled graph. Custom graphs are already checked into the repository, so `gh aw compile --dependabot` does not copy them into the generated inventory.
+
 In this mode, the harness starts a local sidecar and runs the
 SDK driver process instead of the default CLI-only flow.
+
+For Node.js drivers, generated workflows install the SDK and its dependencies
+from a compiler-pinned npm lockfile in runner temporary storage. The install
+verifies package integrity and disables npm lifecycle scripts without changing
+the application's package files. The locked SDK dependencies are not subject
+to `engine.cooldown`.
 
 The built-in driver registers native MCP servers from converter-owned `RUNNER_TEMP/gh-aw/mcp-config/copilot-sdk.json`, not the user-managed CLI catalog. `tools.cli-proxy` servers remain CLI-only. A SHA-256 integrity value is bound to the run, attempt, and job; missing, malformed, changed, linked, or stale catalogs fail before inference. This does not protect against a compromised runner able to replace both catalog and trusted environment.
 
 The built-in SDK driver loads inline sub-agents and repository
-`.github/agents/*.agent.md` files as custom agents. It qualifies session and
+`.github/agents/*.agent.md` files staged by the activation job as custom agents.
+It does not discover agents from the execution checkout, including custom
+checkouts. If activation skips repository checkout, only staged inline agents
+are available. The standalone driver can load staged definitions but does not
+fall back to its current directory. The driver qualifies session and
 sub-agent models against the AWF model catalog. Copilot models use separate
 Responses and Chat Completions providers according to their supported endpoints,
 so GPT and Claude agents can use different wire APIs in the same session.

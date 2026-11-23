@@ -70,7 +70,7 @@ func (c *Compiler) buildActivationJob(data *WorkflowData, preActivationJobCreate
 	}
 
 	if c.actionMode.IsScript() {
-		ctx.steps = append(ctx.steps, c.generateScriptModeCleanupStep())
+		ctx.steps = append(ctx.steps, c.generateScriptModeCleanupStep(data))
 	}
 
 	permissions, err := c.buildActivationPermissions(ctx)
@@ -410,18 +410,20 @@ func (c *Compiler) generateCheckoutGitHubFolderForActivation(data *WorkflowData)
 	// exact commit, correctly handling all relay patterns including cross-repo and cross-org scenarios.
 	// (target_checkout_ref carries the SHA; target_ref carries the dispatch-compatible branch/tag ref.)
 	//
-	// Skip when inlined-imports is enabled: content is embedded at compile time and no
-	// runtime-import macros are used, so the callee's .md files are not needed at runtime.
+	// Inlined imports normally need no callee checkout. The SDK still needs it
+	// to stage repository agents from the workflow repository, not the caller.
 	extraPaths := c.activationSparseCheckoutExtraPaths(data)
 
 	cm := NewCheckoutManager(nil)
 	activationToken := c.resolveActivationToken(data)
-	if data != nil && hasWorkflowCallTrigger(data.On) && !data.InlinedImports {
+	if needsActivationHostRepoCheckout(data) {
 		compilerActivationJobLog.Print("Adding cross-repo-aware .github checkout for workflow_call trigger")
 		cm.SetCrossRepoTargetRepo("${{ steps.resolve-host-repo.outputs.target_repo }}")
 		cm.SetCrossRepoTargetRef("${{ steps.resolve-host-repo.outputs.target_checkout_ref }}")
 		checkoutRef := cm.GetCrossRepoTargetRef()
-		if prCheckoutRef := activationCheckoutRef(data, "steps.resolve-host-repo.outputs.target_checkout_ref"); prCheckoutRef != "" {
+		if data.EngineConfig != nil && data.EngineConfig.CopilotSDK {
+			checkoutRef = fmt.Sprintf("${{ (steps.resolve-host-repo.outputs.target_repo == github.repository && %s) || steps.resolve-host-repo.outputs.target_checkout_ref }}", pullRequestBaseSHAExpression)
+		} else if prCheckoutRef := activationCheckoutRef(data, "steps.resolve-host-repo.outputs.target_checkout_ref"); prCheckoutRef != "" {
 			checkoutRef = prCheckoutRef
 		}
 		checkoutSteps := cm.GenerateGitHubFolderCheckoutStep(
@@ -449,6 +451,10 @@ func (c *Compiler) generateCheckoutGitHubFolderForActivation(data *WorkflowData)
 	// during activation. sparse-checkout-cone-mode: true ensures subdirectories are recursively included.
 	compilerActivationJobLog.Print("Adding .github, .agents, and engine-specific dirs to sparse checkout for activation job")
 	return cm.GenerateGitHubFolderCheckoutStep("", activationCheckoutRef(data, "github.sha"), activationToken, c.getActionPin, extraPaths...)
+}
+
+func needsActivationHostRepoCheckout(data *WorkflowData) bool {
+	return data != nil && hasWorkflowCallTrigger(data.On) && (!data.InlinedImports || (data.EngineConfig != nil && data.EngineConfig.CopilotSDK))
 }
 
 // activationCheckoutDisabledByActionTag reports whether action-tag supplies setup

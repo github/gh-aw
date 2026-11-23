@@ -3,8 +3,9 @@ title: Connectors
 description: Copyable integration examples, credential setup, and security boundaries for third-party connectors.
 ---
 
-Connectors let a workflow read approved third-party resources and propose changes
-through [safe outputs](/gh-aw/reference/safe-outputs/). Each connector is an
+Connectors let a workflow configure approved inference providers, read
+third-party resources and propose changes through
+[safe outputs](/gh-aw/reference/safe-outputs/). Each connector is an
 ordinary workflow Markdown file under `.github/workflows/connectors/`, declaring
 its endpoints, credential names, exact resource grants, and capabilities.
 Importing a connector makes those capabilities available; it does not enable them.
@@ -20,6 +21,7 @@ Each integration includes an example and its credential and resource requirement
 | Conversations and knowledge | [Slack](#slack), [Microsoft Teams](#microsoft-teams), [Confluence](#confluence), [Notion](#notion) |
 | Incidents and support | [Sentry](#sentry), [ServiceNow](#servicenow), [PagerDuty](#pagerduty), [Datadog](#datadog), [Azure Monitor](#azure-monitor), [Zendesk](#zendesk) |
 | Research and retrieval | [Microsoft Web IQ](#microsoft-web-iq), [Foundry IQ](#foundry-iq) |
+| Workflow inference | [Azure AI Gateway](#azure-ai-gateway) |
 
 For deeper reference, see [credential routes](#credential-routes),
 [local checks](#local-setup-and-conformance), [triggers](#connector-triggers-and-the-webhook-gateway),
@@ -33,6 +35,33 @@ and [runtime boundaries](#validation-and-runtime-boundaries).
 > and establishes no hosted compatibility. Connector triggers use the shared
 > webhook gateway and its admission gates; use `workflow_dispatch` until the
 > receiver integration is approved.
+
+## Azure AI Gateway
+
+Declaration: `.github/workflows/connectors/azure-ai-gateway.md`.
+
+Select `engine.inference: {connector: azure-ai-gateway, profile: responses,
+model: deployment-checklist}` to route Copilot inference through the selected
+gateway endpoint and approved wire model alias. Selection adds that endpoint
+host (and the Entra login host for OIDC profiles) to the firewall allowlist.
+Importing selects nothing and approves no network access.
+This capability configures the workflow's inference transport; it exposes no
+callable reader, MCP method or provider writer.
+
+The `responses`/`completions` profiles use inference-only Entra OIDC and explicit
+gateway scope; `responses-key`/`completions-key` use the named gateway-key secret.
+No inference credential is included in reader or safe-output plans. Existing
+engine authentication/firewall safeguards still apply. Keys retain their
+provider-side access, and staging does not prevent inference charges or
+prompt/context disclosure. Other engines, routing/fallback, model discovery
+and live compatibility are not established by this declaration.
+
+Follow [Azure AI Gateway setup](/gh-aw/reference/azure-ai-gateway/#import-the-inference-connector)
+and the
+[source-only checklist consumer](https://github.com/github/gh-aw/blob/main/pkg/cli/workflows/azure-ai-gateway-golden.md).
+`gh aw connector azure-ai-gateway setup --phase inference` is offline guidance;
+validate the selected configuration by compiling its consumer, not by treating
+inference as a connector read test.
 
 ## Configuration
 
@@ -235,8 +264,9 @@ does not make other imported content trusted.
 | `experimental` | Boolean stability marker; defaults to `false`. Selecting capabilities from an experimental connector emits a compile-time warning. All included connectors currently set `true`. |
 | `docs` | Array of unique literal HTTPS URLs for official documentation used to author the connector. Provenance only; never fetched automatically or treated as authority. |
 | `endpoints` | Named, fixed HTTPS origins. |
-| `credentials` | Header, authentication scheme, scopes, phase, and a token, GitHub App, or GitHub OIDC route. |
+| `credentials` | Header, authentication scheme, scopes, phase, and one credential route; inference also supports Azure Entra OIDC. |
 | `resources` | Exact approved resource-ID allowlists; no wildcards. Independent lists do not establish tenant, parent, or tuple membership. |
+| `inference` | Named fixed endpoint/path/protocol profiles with inference-only credentials and model grants; selected through `engine.inference`, not tools. |
 | `triggers` | Event definitions; consumers select them through root `on`. |
 | `tools` | Bounded REST/GraphQL reads exposed through the shared MCP adapter. |
 | `mcp-servers` | Read-only HTTP MCP registrations with exact remote tool allowlists. |
@@ -358,6 +388,32 @@ Only selected phases mint tokens. Write credentials are minted in the safe-outpu
 agent job, and staged writes mint nothing. Tokens never cross job outputs, and private keys and OIDC
 request credentials stay out of frozen plans. A failed route never falls back to another credential.
 
+Inference profiles use `phase: inference` and `Authorization`/`bearer`, with
+either a stored token or a separate `azure-oidc` route:
+
+```yaml
+credentials:
+  model-runtime:
+    phase: inference
+    header: Authorization
+    scheme: bearer
+    scopes: [model runtime access]
+    azure-oidc:
+      azure-tenant-id: ${{ vars.AZURE_TENANT_ID }}
+      azure-client-id: ${{ vars.AZURE_CLIENT_ID }}
+      azure-scope: https://ai.gateway.azure.com/.default
+```
+
+Unlike `github-oidc`, `azure-oidc` delegates Entra token exchange to the selected
+native engine authentication host. The tenant, client and scope are required;
+the GitHub assertion audience defaults to `api://AzureADTokenExchange`, and
+`azure-cloud` defaults to `public`. The selected OIDC route requires explicit
+`permissions.id-token: write` and the existing engine/firewall version guards.
+Importing alone adds neither permission nor a token exchange. Other connector
+phases cannot use this route, and their frozen plans never contain inference
+credentials. See [inference selection](#azure-ai-gateway) for protocol and
+engine limits.
+
 ## Context
 
 There is **no configurable `context` field or context credential**. Events carry identifiers,
@@ -428,7 +484,15 @@ resolving an uncached remote import can require network access.
 | `setup --repo OWNER/REPO` | GitHub inventory only | Uses the configured `gh` account; lists names, not values |
 | `test --phase safe-output` | None; always staged | None |
 | `test --phase trigger` | None; projects a native fixture | None; does not authenticate a delivery |
+| `setup --phase inference` | None; prints provisioning metadata | No secret values |
+| `compile CONSUMER --strict --no-emit` | No provider call; uncached remote imports may need GitHub | References only; does not test token trust |
+| `test --phase inference` | Rejected; use consumer compilation | None |
 | `test --phase agent` | Live read against the declared provider | Selected phase's named environment secrets |
+
+The [connector specification](/gh-aw/specs/connector-specification/#inference-binding-model)
+records reproducible bounded inference-model checks, negative controls and
+reachability witnesses. These complement compiler/runtime fixtures; they do
+not prove live Azure compatibility, credential validity or useful output.
 
 ### Setup metadata
 

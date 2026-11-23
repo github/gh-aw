@@ -11,9 +11,8 @@ permissions:
   actions: read
   deployments: read
 engine:
-  id: copilot
-  copilot-sdk: true
-max-tool-denials: 3
+  id: claude
+  model-provider: github
 imports:
   - shared/mcp-pagination.md
   - shared/reporting.md
@@ -29,7 +28,7 @@ safe-outputs:
   create-issue:
     expires: 7d
     title-prefix: "[Incident] "
-    labels: [incident, deployment-failure]
+    labels: [incident, deployment-failure, "backlog:run-alerts"]
     close-older-issues: true
   noop:
 timeout-minutes: 10

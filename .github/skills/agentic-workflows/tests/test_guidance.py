@@ -43,6 +43,64 @@ def checklist(text):
 
 
 class GuidanceTests(unittest.TestCase):
+    def test_agentic_engine_selection_routes_survive_prefix_reads(self):
+        for name in (
+            "create-agentic-workflow.md", "designer.md",
+            "update-agentic-workflow.md", "custom-declarative-agentic-engine.md",
+            "syntax-engine.md",
+        ):
+            guide = ROOT / ".github/aw" / name
+            with self.subTest(guide=name):
+                self.assertIn("](agentic-engine.md)", guide.read_bytes()[:7500].decode("utf-8"))
+        for guide in (
+            ROOT / ".github/skills/agentic-workflows/SKILL.md",
+            ROOT / "pkg/cli/data/agentic_workflows_skill.md",
+        ):
+            with self.subTest(guide=guide):
+                self.assertIn(".github/aw/agentic-engine.md", guide.read_bytes()[:7500].decode("utf-8"))
+        skill = ROOT / ".github/skills/agentic-engine/SKILL.md"
+        self.assertIn("](../../aw/agentic-engine.md)", skill.read_text())
+
+    def test_agentic_engine_selection_contract(self):
+        guide = ROOT / ".github/aw/agentic-engine.md"
+        prefix, marker, _ = guide.read_bytes().partition(b"<!-- instruction-prefix-end -->")
+        self.assertTrue(marker)
+        self.assertLessEqual(len(prefix) + len(marker), 7500)
+        contract = normalized(prefix.decode("utf-8"))
+        for required in (
+            "`copilot`", "`claude`", "`codex`", "`pi`",
+            "repository-root `preferences.md`", "explicit, inferred, or Pi fallback",
+            "prefer confirmed choices to inference", "Prefer corroborated active usage",
+            "`AGENTS.md` and `.agents/skills/` as shared, not engine evidence",
+            "no clear preference applies and Pi meets all requirements",
+            "`engine: pi`", "Omission uses the compiler default",
+            "Preserve engine and inference on unrelated updates",
+            "Do not execute scripts, install tools",
+            "Never weaken required security controls", "Store no credentials",
+            "For recommendations, propose a preference entry without writing",
+        ):
+            with self.subTest(required=required):
+                self.assertIn(required, contract)
+
+    def test_inference_selection_contract_survives_prefix_reads(self):
+        guide = ROOT / ".github/aw/agentic-engine.md"
+        contract = normalized(guide.read_text().split("<!-- instruction-prefix-end -->")[0])
+        for required in (
+            "up to three similar repository-owned `.github/workflows/` sources",
+            "Distinguish explicit settings from inherited defaults",
+            "With no clearer choice, prefer GitHub Copilot inference",
+            "`permissions.copilot-requests: write`",
+            "organization-owned repo has centralized Copilot billing and Actions token access",
+            "Personal repos are ineligible",
+            "Otherwise omit the permission",
+            "if already authorized, list Actions secret names",
+            "Match documented provider names",
+            "never read or log values",
+            "mark availability unknown",
+        ):
+            with self.subTest(required=required):
+                self.assertIn(required, contract)
+
     def test_browser_decision_routes_survive_prefix_reads(self):
         route = "playwright.md#browser-decision-and-readiness"
         for name in (
@@ -123,6 +181,36 @@ class GuidanceTests(unittest.TestCase):
                         headings = re.findall(r"^#{1,6} (.+)$", target.read_text(), re.MULTILINE)
                         self.assertIn(anchor, [heading_anchor(heading) for heading in headings])
 
+    def test_creator_requires_references_and_distinguishes_incomplete_from_noop(self):
+        creator = (ROOT / ".github/aw/create-agentic-workflow.md").read_text()
+        required_reads = creator.split("## Load These References First\n", 1)[1].split(
+            "\n## Modes\n", 1
+        )[0]
+        paths = (
+            "intent.md", "github-agentic-workflows.md", "workflow-editing.md",
+            "workflow-constraints.md", "workflow-patterns.md", "safe-outputs.md",
+            "syntax.md", "mcp-clis.md",
+        )
+        for earlier, later in zip(paths, paths[1:]):
+            with self.subTest(earlier=earlier, later=later):
+                self.assertLess(required_reads.index(earlier), required_reads.index(later))
+        self.assertIn("stop and report its path", required_reads)
+        self.assertIn("`report_incomplete`", required_reads)
+        self.assertIn("reserve `noop`", required_reads)
+
+    def test_persona_evaluator_excludes_ambient_guidance_or_marks_contamination(self):
+        workflow = (ROOT / ".github/workflows/agent-persona-explorer.md").read_text()
+        probe = workflow.split("### Paired prefix probe\n", 1)[1].split(
+            "\n## Phase 4:", 1
+        )[0]
+        evaluator = workflow.split("## agent: `persona-evaluator`\n", 1)[1]
+        for label, source in (("probe", probe), ("evaluator", evaluator)):
+            with self.subTest(source=label):
+                self.assertIn("ambient", source)
+                self.assertIn("AGENTS.md", source)
+                self.assertIn("skill inventories", source)
+                self.assertIn("contaminated", source)
+
     def test_execution_routes_and_completion_survive_prefix_only_reads(self):
         contracts = {
             "AGENTS.md": ("make agent-report-progress", "make recompile", "pkg/logger", "prompt-token-efficiency"),
@@ -193,7 +281,7 @@ class GuidanceTests(unittest.TestCase):
         self.assertIn("For each material undefined term, propose and clearly label a reasonable `Default:`", creator)
         for contract in (
             "Verify config files named in the request",
-            "require `noop` and report, never guess",
+            "if missing, do not guess; use `report_incomplete` if their absence prevents meaningful work",
             "what “adds” covers",
             "lockfile scope",
             "zero-item behavior",
@@ -1408,7 +1496,9 @@ class GuidanceTests(unittest.TestCase):
         explorer = (ROOT / ".github/workflows/agent-persona-explorer.md").read_text()
         self.assertIn("If 1 or 2 remain, select those before resetting", explorer)
         self.assertIn("If the updated list now contains all 9 personas, reset to an empty list", explorer)
-        self.assertIn('labels: ["agent-research", "cookie"]', explorer)
+        labels = re.search(r"^    labels: (\[.*\])$", explorer.split("\n---", 1)[0], re.MULTILINE)
+        self.assertIsNotNone(labels)
+        self.assertTrue({"agent-research", "cookie"}.issubset(json.loads(labels.group(1))))
         self.assertNotIn("If fewer than 3 remain, reset", explorer)
 
     def test_security_reporting_omits_empty_findings_tables(self):

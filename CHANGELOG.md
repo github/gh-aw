@@ -18,6 +18,23 @@ and mixed edits continue to require write-or-higher repository permission.
 
 ### Breaking changes
 
+`issue-intent` is now experimental and disabled by default for `close-issue`,
+`add-labels`, `assign-to-agent`, `assign-to-user`, `set-issue-type`, and
+`set-issue-field`. Workflows that relied on the implicit default no longer
+include intent metadata (`rationale`, `confidence`, `suggest`) in their tool
+schemas or send it to handlers. Set `issue-intent: true` on each affected
+safe output and recompile to retain that behavior; enabling it emits an
+experimental-feature warning. With intent enabled, `add-labels` requires label
+objects with `rationale` and `confidence` rather than plain strings.
+
+The experimental built-in TypeScript LSP accepts only the bundled server
+version (`6.1.0`, paired with TypeScript `6.0.3`). Omit `lsp.typescript.version`
+to use the bundled lockfile. To retain the former server (`4.3.3`) and TypeScript
+(`5.8.3`) or use other versions, rename the `lsp.typescript` entry to a key
+not used by a built-in server and remove `version`. Install the desired
+packages from a checked-in npm project using `npm ci` in `pre-agent-steps`,
+and point `command` to the installed executable using a workspace-relative path.
+
 Safe-output lifecycle reporting now uses `logs --delivery` and `logs --adoption`,
 with the same evaluator available in single-run `audit` and episode retrieval.
 Replace `--outcomes`, `--outcomes-dir`, and `GH_AW_OUTCOMES_DIR` with `--adoption`,

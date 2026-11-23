@@ -79,6 +79,8 @@ describe("assign_to_user (Handler Factory Architecture)", () => {
   });
 
   it("should include issue-intent metadata when enabled", async () => {
+    const { main } = require("./assign_to_user.cjs");
+    const handler = await main({ max: 10, allowed: ["user1", "user2", "user3"], issue_intent: true });
     mockGithub.rest.issues.addAssignees.mockResolvedValue({});
 
     const message = {
@@ -101,12 +103,12 @@ describe("assign_to_user (Handler Factory Architecture)", () => {
     });
   });
 
-  it("should omit issue-intent metadata when disabled", async () => {
+  it.each([false, undefined])("should omit issue-intent metadata when issue_intent is %s", async issueIntent => {
     const { main } = require("./assign_to_user.cjs");
     const noIntentHandler = await main({
       max: 10,
       allowed: ["user1", "user2", "user3"],
-      issue_intent: false,
+      issue_intent: issueIntent,
     });
     mockGithub.rest.issues.addAssignees.mockResolvedValue({});
 

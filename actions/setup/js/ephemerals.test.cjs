@@ -169,6 +169,14 @@ describe("ephemerals", () => {
       expect(result?.toISOString()).toBe("2026-01-25T15:54:08.894Z");
     });
 
+    it("should ignore expiration markers inside fenced code blocks", async () => {
+      const { extractExpirationDate } = await import("./ephemerals.cjs");
+      const example = "```markdown\n- [x] expires <!-- gh-aw-expires: 2020-01-01T00:00:00.000Z --> on Jan 1, 2020 UTC\n```";
+
+      expect(extractExpirationDate(`${example}\n\n> - [ ] expires <!-- gh-aw-expires: 2020-01-01T00:00:00.000Z --> on Jan 1, 2020 UTC`)).toBeNull();
+      expect(extractExpirationDate(`${example}\n\n> - [x] expires <!-- gh-aw-expires: 2099-01-01T00:00:00.000Z --> on Jan 1, 2099 UTC`)?.toISOString()).toBe("2099-01-01T00:00:00.000Z");
+    });
+
     it("should parse a generated expiration line when project utc is configured", async () => {
       process.env.GH_AW_PROJECT_UTC = "-08:00";
 
@@ -386,11 +394,11 @@ describe("ephemerals", () => {
       expect(EXPIRATION_PATTERN).toBeInstanceOf(RegExp);
     });
 
-    it("should NOT match standard expiration line without blockquote", async () => {
+    it("should match report-body expiration line without blockquote", async () => {
       const { EXPIRATION_PATTERN } = await import("./ephemerals.cjs");
       const line = "- [x] expires <!-- gh-aw-expires: 2026-01-25T15:54:08.894Z --> on Jan 25, 2026";
-      // This should NOT match because the pattern requires blockquote prefix
-      expect(EXPIRATION_PATTERN.test(line)).toBe(false);
+      expect(EXPIRATION_PATTERN.test(line)).toBe(true);
+      expect(EXPIRATION_PATTERN.test(line.replace("[x]", "[ ]"))).toBe(false);
     });
 
     it("should match expiration line with blockquote prefix", async () => {

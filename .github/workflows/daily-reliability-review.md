@@ -38,7 +38,7 @@ safe-outputs:
   create-issue:
     expires: 2d
     title-prefix: "[reliability] "
-    labels: [observability, automated-analysis]
+    labels: [observability, automated-analysis, "backlog:reports"]
     max: 1
     close-older-issues: true
 timeout-minutes: 30
@@ -112,7 +112,7 @@ Order findings by:
 - Use the narrowest time window that still captures the last 24 hours.
 - Prefer current-run and current-day evidence over historical anecdotes.
 - Use `get_trace_details` to verify trace continuity before drawing conclusions.
-- If `search_events` is unavailable, fall back to `list_events` and filter client-side.
+- Without an embedded provider, call `search_traces` with direct Sentry query syntax, explicit fields, and sort. If Sentry is unavailable, call `noop` with a short explanation and stop.
 
 ## Output
 

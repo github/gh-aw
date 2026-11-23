@@ -71,6 +71,9 @@ func NewBehaviorDefinedEngine(def *EngineDefinition) (*BehaviorDefinedEngine, er
 	if def.MCP != nil {
 		capabilities.MCP = *def.MCP
 	}
+	if capabilities.WebFetchFallback && (!capabilities.MCP || def.Behaviors.MCP == nil || def.Behaviors.MCP.ConfigAdapter == "") {
+		return nil, fmt.Errorf("engine definition %q enables web-fetch-fallback without MCP support and a config-adapter", def.ID)
+	}
 
 	engine := &BehaviorDefinedEngine{
 		id:               def.ID,
@@ -653,10 +656,11 @@ func (e *BehaviorDefinedEngine) buildBehaviorDefinedExecutionCommand(exec *Engin
 
 func (e *BehaviorDefinedEngine) buildBehaviorDefinedExecutionEnv(exec *EngineExecutionDefinition, workflowData *WorkflowData, firewallEnabled bool, backend UniversalLLMBackend) map[string]string {
 	env := map[string]string{
-		"GH_AW_PROMPT":     constants.AwPromptsFile,
-		"GITHUB_WORKSPACE": "${{ github.workspace }}",
-		"NO_PROXY":         constants.AWFNoProxyHosts,
-		"RUNNER_TEMP":      "${{ runner.temp }}",
+		"GH_AW_PROMPT":          constants.AwPromptsFile,
+		"GITHUB_WORKSPACE":      "${{ github.workspace }}",
+		"GH_AW_TIMEOUT_MINUTES": resolveStepTimeoutValue(workflowData),
+		"NO_PROXY":              constants.AWFNoProxyHosts,
+		"RUNNER_TEMP":           "${{ runner.temp }}",
 	}
 	injectWorkflowCallNetworkAllowedEnv(env, workflowData)
 	maps.Copy(env, exec.Env)
@@ -686,6 +690,7 @@ func (e *BehaviorDefinedEngine) buildBehaviorDefinedExecutionEnv(exec *EngineExe
 	applyEngineMaxTurnsEnv(env, workflowData)
 	applyEngineCwdEnv(env, workflowData)
 	applyEngineVersionEnv(env, workflowData)
+	applyHarnessRetryPolicyEnv(env, workflowData)
 	applyEngineAndAgentEnv(env, workflowData, behaviorDefinedEngineLog)
 	e.applyBehaviorDefinedModelEnv(exec, workflowData, env)
 	if exec.ProtectedSessionCapture && firewallEnabled {

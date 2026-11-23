@@ -11,7 +11,7 @@ import (
 func TestRenderLogsTSVSummaryPreservesTokenField(t *testing.T) {
 	t.Parallel()
 	var buf bytes.Buffer
-	renderLogsTSVToWriter(&buf, LogsData{
+	err := renderLogsTSVToWriter(&buf, LogsData{
 		Summary: LogsSummary{
 			TotalRuns:     2,
 			TotalDuration: "8m0s",
@@ -19,6 +19,9 @@ func TestRenderLogsTSVSummaryPreservesTokenField(t *testing.T) {
 			TotalErrors:   1,
 		},
 	})
+	if err != nil {
+		t.Fatalf("renderLogsTSVToWriter: %v", err)
+	}
 	output := buf.String()
 
 	lines := strings.Split(strings.TrimSpace(output), "\n")
@@ -33,7 +36,7 @@ func TestRenderLogsTSVSummaryPreservesTokenField(t *testing.T) {
 func TestRenderLogsTSVVerboseSummaryPreservesTokenField(t *testing.T) {
 	t.Parallel()
 	var buf bytes.Buffer
-	renderLogsTSVVerboseToWriter(&buf, LogsData{
+	err := renderLogsTSVVerboseToWriter(&buf, LogsData{
 		Summary: LogsSummary{
 			TotalRuns:           2,
 			TotalDuration:       "8m0s",
@@ -44,6 +47,9 @@ func TestRenderLogsTSVVerboseSummaryPreservesTokenField(t *testing.T) {
 			TotalGitHubAPICalls: 3,
 		},
 	})
+	if err != nil {
+		t.Fatalf("renderLogsTSVVerboseToWriter: %v", err)
+	}
 	output := buf.String()
 
 	lines := strings.Split(strings.TrimSpace(output), "\n")

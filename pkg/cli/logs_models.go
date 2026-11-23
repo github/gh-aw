@@ -130,6 +130,8 @@ type ProcessedRun struct {
 	MissingTools            []MissingToolReport
 	MissingData             []MissingDataReport
 	Noops                   []NoopReport
+	Incomplete              []IncompleteReport
+	ContinuationRequests    []ContinuationRequestReport
 	MCPFailures             []MCPFailureReport
 	SkillActivations        []SkillActivation
 	GatewaySteeringEvents   []GatewaySteeringEvent
@@ -182,6 +184,20 @@ type MissingToolReport struct {
 // NoopReport represents a noop message reported by an agentic workflow
 type NoopReport struct {
 	Message string `json:"message"`
+	ReportProvenance
+}
+
+// IncompleteReport represents a report_incomplete safe output: the agent
+// could not finish because of an infrastructure or tool failure.
+type IncompleteReport struct {
+	Reason  string `json:"reason"`
+	Details string `json:"details,omitempty"`
+	ReportProvenance
+}
+
+// ContinuationRequestReport records intent only, not a dispatch or successful continuation.
+type ContinuationRequestReport struct {
+	Message string `json:"message" console:"header:Message"`
 	ReportProvenance
 }
 
@@ -291,31 +307,33 @@ var ErrNoArtifacts = errors.New("no artifacts found for this run")
 // workflow run's logs and artifacts. It is embedded by both RunSummary and DownloadResult
 // so both carriers share a single definition of the analysis surface.
 type RunAnalysis struct {
-	Run                     WorkflowRun              `json:"run"`                               // Full workflow run metadata
-	Metrics                 LogMetrics               `json:"metrics"`                           // Extracted log metrics
-	AwContext               *AwContext               `json:"context,omitempty"`                 // aw_context data from aw_info.json
-	TaskDomain              *TaskDomainInfo          `json:"task_domain,omitempty"`             // Inferred workflow task domain
-	BehaviorFingerprint     *BehaviorFingerprint     `json:"behavior_fingerprint,omitempty"`    // Compact execution profile
-	AgenticAssessments      []AgenticAssessment      `json:"agentic_assessments,omitempty"`     // Derived agentic judgments
-	AccessAnalysis          *DomainAnalysis          `json:"access_analysis"`                   // Network access analysis
-	FirewallAnalysis        *FirewallAnalysis        `json:"firewall_analysis"`                 // Firewall log analysis
-	RedactedDomainsAnalysis *RedactedDomainsAnalysis `json:"redacted_domains_analysis"`         // Redacted URL domains analysis
-	MissingTools            []MissingToolReport      `json:"missing_tools"`                     // Missing tool reports
-	MissingData             []MissingDataReport      `json:"missing_data"`                      // Missing data reports
-	Noops                   []NoopReport             `json:"noops"`                             // Noop messages
-	MCPFailures             []MCPFailureReport       `json:"mcp_failures"`                      // MCP server failures
-	SkillActivations        []SkillActivation        `json:"skill_activations,omitempty"`       // Detected skill invocations
-	MCPToolUsage            *MCPToolUsageData        `json:"mcp_tool_usage,omitempty"`          // MCP tool usage data
-	TokenUsage              *TokenUsageSummary       `json:"token_usage_summary,omitempty"`     // Token usage from firewall proxy
-	ModelRouting            *ModelRoutingSummary     `json:"model_routing,omitempty"`           // AWF model routing decisions and cost attribution
-	GatewaySteeringEvents   []GatewaySteeringEvent   `json:"gateway_steering_events,omitempty"` // AI-credit and timeout steering events
-	WorkingSet              *WorkingSetMetrics       `json:"working_set,omitempty"`             // Working-set rebuild metric from usage summary
-	Ledger                  *LedgerActivity          `json:"ledger,omitempty"`                  // Recorded ledger append transactions
-	WorkQueue               *WorkQueueReport         `json:"work_queue,omitempty"`
-	Friction                *FrictionCostSummary     `json:"friction,omitempty"`                // Precomputed cost of wasted work from usage summary
-	GitHubRateLimitUsage    *GitHubRateLimitUsage    `json:"github_rate_limit_usage,omitempty"` // GitHub API quota consumption
-	JobDetails              []JobInfoWithDuration    `json:"job_details"`                       // Job execution details
-	SafeOutputs             []CreatedItemReport      `json:"safe_outputs,omitempty"`            // Entities affected by safe-output handlers
+	Run                     WorkflowRun                 `json:"run"`                            // Full workflow run metadata
+	Metrics                 LogMetrics                  `json:"metrics"`                        // Extracted log metrics
+	AwContext               *AwContext                  `json:"context,omitempty"`              // aw_context data from aw_info.json
+	TaskDomain              *TaskDomainInfo             `json:"task_domain,omitempty"`          // Inferred workflow task domain
+	BehaviorFingerprint     *BehaviorFingerprint        `json:"behavior_fingerprint,omitempty"` // Compact execution profile
+	AgenticAssessments      []AgenticAssessment         `json:"agentic_assessments,omitempty"`  // Derived agentic judgments
+	AccessAnalysis          *DomainAnalysis             `json:"access_analysis"`                // Network access analysis
+	FirewallAnalysis        *FirewallAnalysis           `json:"firewall_analysis"`              // Firewall log analysis
+	RedactedDomainsAnalysis *RedactedDomainsAnalysis    `json:"redacted_domains_analysis"`      // Redacted URL domains analysis
+	MissingTools            []MissingToolReport         `json:"missing_tools"`                  // Missing tool reports
+	MissingData             []MissingDataReport         `json:"missing_data"`                   // Missing data reports
+	Noops                   []NoopReport                `json:"noops"`                          // Noop messages
+	Incomplete              []IncompleteReport          `json:"incomplete,omitempty"`           // report_incomplete signals
+	ContinuationRequests    []ContinuationRequestReport `json:"continuation_requests"`
+	MCPFailures             []MCPFailureReport          `json:"mcp_failures"`                      // MCP server failures
+	SkillActivations        []SkillActivation           `json:"skill_activations,omitempty"`       // Detected skill invocations
+	MCPToolUsage            *MCPToolUsageData           `json:"mcp_tool_usage,omitempty"`          // MCP tool usage data
+	TokenUsage              *TokenUsageSummary          `json:"token_usage_summary,omitempty"`     // Token usage from firewall proxy
+	ModelRouting            *ModelRoutingSummary        `json:"model_routing,omitempty"`           // AWF model routing decisions and cost attribution
+	GatewaySteeringEvents   []GatewaySteeringEvent      `json:"gateway_steering_events,omitempty"` // AI-credit and timeout steering events
+	WorkingSet              *WorkingSetMetrics          `json:"working_set,omitempty"`             // Working-set rebuild metric from usage summary
+	Ledger                  *LedgerActivity             `json:"ledger,omitempty"`                  // Recorded ledger append transactions
+	WorkQueue               *WorkQueueReport            `json:"work_queue,omitempty"`
+	Friction                *FrictionCostSummary        `json:"friction,omitempty"`                // Precomputed cost of wasted work from usage summary
+	GitHubRateLimitUsage    *GitHubRateLimitUsage       `json:"github_rate_limit_usage,omitempty"` // GitHub API quota consumption
+	JobDetails              []JobInfoWithDuration       `json:"job_details"`                       // Job execution details
+	SafeOutputs             []CreatedItemReport         `json:"safe_outputs,omitempty"`            // Entities affected by safe-output handlers
 }
 
 // RunSummary represents a complete summary of a workflow run's artifacts and metrics.
@@ -332,9 +350,10 @@ type RunAnalysis struct {
 // - If the CLI version in the summary doesn't match the current version, the run is reprocessed
 // - This ensures that bug fixes and improvements in log parsing are automatically applied
 type RunSummary struct {
-	CLIVersion  string    `json:"cli_version"`  // CLI version used to process this run
-	RunID       int64     `json:"run_id"`       // Workflow run database ID
-	ProcessedAt time.Time `json:"processed_at"` // When this summary was created
+	SchemaVersion int       `json:"schema_version"` // Run summary schema version (cache invalidation key)
+	CLIVersion    string    `json:"cli_version"`    // CLI version used to process this run
+	RunID         int64     `json:"run_id"`         // Workflow run database ID
+	ProcessedAt   time.Time `json:"processed_at"`   // When this summary was created
 	RunAnalysis
 	PolicyAnalysis *PolicyAnalysis `json:"policy_analysis,omitempty"` // Firewall policy rule attribution
 	ArtifactsList  []string        `json:"artifacts_list"`            // List of downloaded artifact files

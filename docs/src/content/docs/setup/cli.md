@@ -720,6 +720,13 @@ artifact (token usage and run metadata) is downloaded. `--artifacts` replaces th
 firewall and network data. Use `--artifacts usage,agent` to download both compact usage
 and agent data. Results are cached for 10-100x speedup on subsequent runs.
 
+In `--json` output, `runs[].aic` is `null` when AI credit cost is unknown and a
+number when recorded, including zero. `runs[].aic_coverage` is `available` or
+`unavailable` accordingly. `summary.total_aic` is `null` unless every returned
+run has a recorded cost. `summary.aic_coverage` is `available` when all costs
+are recorded, `partial` when only some are recorded, and `unavailable` when none
+are recorded, including when there are no runs.
+
 ```bash wrap
 gh aw logs workflow                        # Download logs for workflow
 gh aw logs workflow --artifacts agent     # Download only detailed agent data
@@ -862,7 +869,7 @@ Events are written without output buffering. Concurrent targets can interleave e
 gh aw logs --format jsonl | jq --unbuffered 'select(.type == "run") | .run'
 ```
 
-`--cached-jsonl` is independent of streaming stdout: it reuses compatible, schema-versioned run records and workflow-run discovery responses. It writes exactly one JSON value per line, appending every complete `gh run list` payload before downloading artifacts and available GitHub API rate-limit reports after collection. Each enriched `run` record includes job execution data, sanitized MCP tool-call metadata, and available engine, model, runtime, and component versions for downstream dashboards. Raw tool errors, arguments, responses, and artifact bodies are excluded. Discovered runs therefore remain available when a timeout or API limit interrupts processing. Records from incompatible schema versions are ignored. Use `gh aw json-schema logs-jsonl` to generate the schema for each cached JSON Lines item (not the stdout event stream).
+`--cached-jsonl` is independent of streaming stdout: it reuses compatible, schema-versioned run records and workflow-run discovery responses. It writes exactly one JSON value per line, appending every complete `gh run list` payload before downloading artifacts and available GitHub API rate-limit reports after collection. Each enriched `run` record includes job execution data, sanitized MCP tool-call metadata, and available engine, model, runtime, and component versions for downstream dashboards. Raw tool errors, arguments, responses, and artifact bodies are excluded. Discovered runs therefore remain available when a timeout or API limit interrupts processing. Records from incompatible schema versions are ignored. Use `gh aw json-schema logs-jsonl` to generate the schema for newly written cached JSON Lines items (not the stdout event stream). Existing caches may also contain compatible older-version items.
 
 Each safe-output entity recorded for a run (the same provider-neutral records surfaced in `usage/activity/summary.json`) is also appended as its own `safe_output_item` line immediately after the `run` record, carrying a `run_id` correlating it back to the run plus the entity's type, provider, durable ID, human-readable identifier, URL, and target/state metadata. These per-entity lines are informational projections of the `run` record's `safe_outputs` array and are ignored by the in-memory run cache used to skip already-downloaded runs.
 
@@ -1164,29 +1171,43 @@ Observed models are aggregated from `summary.json` token usage, per-run token us
 Display workflow health metrics and success rates.
 
 ```bash wrap
-gh aw health                       # Summary of all workflows (last 7 days)
+gh aw health                       # Default-branch fleet report (last 7 days)
 gh aw health issue-monster         # Detailed metrics for specific workflow
 gh aw health --days 30             # Summary for last 30 days
 gh aw health --threshold 90        # Warn if below 90% success rate
 gh aw health --json                # Output in JSON format
 gh aw health --start-date -24h      # Evidence from the last 24 hours
 gh aw health --timeout 30s --json   # Return available evidence within a 30-second collection budget
+gh aw health --start-date=-24h --timeout 30s --checkpoint ./health-checkpoint.json --json
+gh aw health --checkpoint ./health-checkpoint.json --timeout 2m --json
 gh aw health --start-date 2026-10-14T04:49:11Z  # Evidence since a release timestamp
 gh aw health --start-date 2026-10-14 --end-date 2026-10-15  # Bounded window
 gh aw health issue-monster --days 90  # 90-day metrics for workflow
 ```
 
-**Options:** `--days`, `--start-date`, `--end-date`, `--logs-dir`, `--timeout`, `--threshold`, `--repo/-r`, `--json/-j`
+**Options:** `--days`, `--start-date`, `--end-date`, `--logs-dir`, `--timeout`, `--threshold`, `--repo/-r`, `--json/-j`, `--checkpoint`, `--full`
+
+Without a workflow name, `health` returns a compact report for active agentic workflows on the default branch, excluding pull request events. It inventories historical Actions conclusions first, including skipped runs, then checks sampled runs against the pinned workflow revision. Historical outcomes and current-revision verdicts are separate. Coverage reports which phases finished, what remains, and why collection stopped. `not_collected` means verification did not finish; it does not imply the workflow is healthy or that no matching run exists. If GitHub's search cap cannot be resolved even for a one-second window, coverage remains partial.
+
+`--checkpoint` creates a private local file or resumes from an existing one. Use the same path and repository on resume and omit date flags: the checkpoint preserves the original UTC window, default-branch commit, logs directory, completed inventory pages, and verification evidence. Omit `--logs-dir` on resume to reuse the saved directory, or specify the same directory. Use a new path to start a fresh scan. Keep checkpoint files private; they contain run evidence. Run conclusions can change while a scan is in progress, so its inventory reflects the results observed as pages were collected.
+
+Fleet JSON returns `scope`, `coverage`, `status_counts`, historical outcomes, top failures and clusters, and a typed `next_action` when available. `--full` adds per-workflow and complete cluster details, including per-run cache diagnostics in `details.cache_evidence`. Registry drift or a revision boundary that exceeds the bounded probe limit leaves coverage partial. The MCP `health` tool returns structured fleet results when `workflow_name` is omitted. Pass `full: true` for details or a returned `next_action.checkpoint` as `resume` in the same session. MCP checkpoints expire 30 minutes after creation and do not survive server restarts.
+
+For registry drift, `coverage.registry_issues` maps each unresolved lock path to `missing_registry_entry` (present at the pinned revision but absent from Actions) or `active_registry_only` (active in Actions but absent at the pin). An active registry-only entry is excluded if pinned history confirms its deletion before the scan window, or if pinned path history is empty and Actions reports no runs for that workflow on the default branch. Both cases require the observed default-branch head to match the pin. Use a new checkpoint path to refresh discovery after investigating a mismatch.
+
+`--checkpoint` and `--full` apply only to the fleet report. Fleet JSON consumers should read `coverage` for completeness and `details.workflows` for per-workflow evidence. `details.failure_representatives` lists at most one job-backed Actions `failure` from each verified current-revision branch/event sample. It is not an exhaustive failure list. Use a named check for branch/event revision evidence or `gh aw logs` for broader run history.
 
 The `--days` flag accepts only 7, 30, or 90 (default: 7). Other values produce an error.
 
-`--timeout` bounds evidence collection (default: `2m`; `0` disables the deadline). The shared deadline cancels API quota checks, requests, local Git revision reads, and work-queue ledger reads. Expiry skips further cache reads and returns available evidence with `collection.partial: true`, `reason: "time_budget"`, and a warning, rather than discarding the report. JSON includes `timeout_seconds` when bounded and `elapsed_seconds`, measured after cache enrichment. An in-progress local cache read and report rendering may finish after the deadline. Partial results do not establish fleet health; increase the budget or narrow the workflow/time window to collect more evidence. `DEBUG=cli:health` logs request progress and elapsed times to stderr without logging response bodies.
+`--timeout` bounds evidence collection (default: `2m`; `0` disables the deadline). On expiry, fleet reports mark `coverage.partial` and named reports mark `collection.partial`, with reason `time_budget`. Partial results do not establish fleet health. Resume from a checkpoint, increase the budget, or narrow the scope. `DEBUG=cli:health` logs request progress and elapsed times to stderr without logging response bodies.
 
 `--start-date` and `--end-date` filter run creation times inclusively. Both accept `YYYY-MM-DD` dates, RFC3339 timestamps with time zones, and relative times such as `-24h`, `-1d`, or `-1w`. Dates use UTC; an end date includes that entire day. The end defaults to the current time. Without an explicit start, `--days` counts backward from the end. An explicit start replaces the default seven-day horizon and cannot be combined with an explicit `--days`.
 
-For release-scoped evidence, pass the release's publication timestamp as `--start-date`; this filters by time, not compiler version. Text output and JSON `collection.start_date` / `collection.end_date` show the resolved UTC window. Health still samples current workflow revisions toward five completed first-attempt runs per scope, subject to API limits; it does not enumerate every run or reconstruct historical branch heads. A narrow window can leave insufficient evidence.
+For release-scoped evidence, pass the release's publication timestamp as `--start-date`; this filters by time, not compiler version. Fleet JSON shows the resolved UTC window under `scope`; named JSON shows it under `collection`. A narrow window can leave insufficient evidence.
 
-Runs with `skipped` or `action_required` conclusions are excluded from health metrics, revision evidence, and failure clusters. Waiting and failed runs without jobs are also excluded when the Jobs API confirms their run attempt has no jobs, including runs whose approval expired. Job-backed waiting runs remain pending revision evidence. Successful job-presence lookups are reused per run ID and attempt within the collection, including across overlapping search windows. Collection continues past ignored runs to find executed runs within the requested window and API limits. An unavailable or malformed Jobs API response is reported as an error, not treated as evidence that no jobs ran.
+##### Named workflow evidence
+
+Named checks exclude `skipped` and `action_required` runs from metrics, revision evidence, and failure clusters. Waiting and failed runs are also excluded when the Jobs API confirms their attempt had no jobs. Job-backed waiting runs remain pending evidence. Successful presence lookups are reused per run ID and attempt. An unavailable or malformed Jobs API response is not evidence that no jobs ran.
 
 For confirmed jobless failures, health checks the attempt-specific GitHub run page for the annotation `This workflow run required approval but was not approved before it expired.` Confirmed approval expiries are also removed from `failure_candidates` and `potential_issues`, without counting as successes. JSON `collection.approval_expiry_evidence` and text `[health_approval_expiry]` entries retain the run URL, attempt, classification, and reason; JSON also retains the matched message and update time. Missing annotations, inaccessible pages, or unrecognized messages never establish approval expiry. These optional page requests use the configured host and repository, share the collection's request budget, and are capped at 20 per collection (`approval_requests`). Results are reused only for the same run attempt and update time. Other jobless failures remain approximate potential issues.
 
@@ -1206,7 +1227,7 @@ Within each branch pass, collection prioritizes early detection over exhaustive 
 
 Job-presence checks inspect only the jobs array, without decoding job/step fields. Current failure-first representatives separately fetch typed jobs in at most three 100-job pages per run attempt, without downloading artifacts. Only complete live inventories contribute job/step failure signals; incomplete runs remain metadata-only unless compatible cached evidence is available. Shared failed steps cluster across workflow names; conclusion-job aftermath remains separate from the original failure boundary. `collection.job_evidence` reports each representative's source, fetched job count, attempt, update time, and completeness. Failed or capped optional enrichment marks collection partial with a warning and preserves collected runs while sampling continues; primary inventory and presence errors remain errors, and quota or request-budget limits still stop collection. `job_requests` counts actual Jobs API requests within `api_requests`.
 
-JSON `collection.producer_version`, `report_schema_version`, `capabilities`, and `observed_at` identify the producer and supported evidence. The creation-time bounds do not make the API responses an atomic snapshot. Investigation representatives include branch, event, head SHA, attempt, and update time when known. `status_counts` partitions all workflow entries, including intentional-failure workflows. `healthy_workflows` counts non-intentional workflows with `healthy` or `recovery_observed` status that meet the threshold and have no observed sub-agent or threat-detection failures; an above-threshold rate alone does not establish health. `observed_failure_workflows` counts non-intentional workflows with sampled current-revision Actions failures, including insufficient samples. `degraded_workflows` counts non-intentional workflows with sub-agent or threat-detection failures; a workflow with both is counted once.
+JSON `collection.producer_version`, `report_schema_version`, `capabilities`, and `observed_at` identify the producer and supported evidence. The creation-time bounds do not make the API responses an atomic snapshot. Investigation representatives include branch, event, head SHA, attempt, and update time when known. An above-threshold rate alone does not establish health.
 
 For events whose head SHA identifies the executing workflow, health also compares the workflow's Markdown source at that SHA with the pushed source on the run's branch. Source blob SHAs are included as `revisions[].current.source_sha` and `previous.source_sha`. A source change stops older evidence collection for that branch/event and excludes superseded failures from current failure clusters and investigation targets, even if the lock file is unchanged. A pushed source with no matching runs has `no_current_revision_runs`, not a healthy or fixed status. Unrelated repository commits do not stop collection. Unavailable source revisions produce a warning and unknown revision evidence rather than proof of recovery.
 
@@ -1216,9 +1237,9 @@ Shows success/failure rates, trend indicators (↑ improving, → stable, ↓ de
 
 When a selected workflow's published default-branch lock file enables work-queue, health also reads and validates the repository's current `work-queue` ledger once. This includes workflows without recent runs. Text `[health_work_queue]` and JSON `collection.work_queue` report backlog, eligible and blocked work by pool, oldest available work, pauses, native reservations, and pending, verified, or failed delivery. Pauses and failed deliveries produce `attention_required`; an otherwise readable snapshot is `observed`, not proof of live worker health. Detection warnings do not change the status of a successfully read ledger. Missing or invalid definitions, policy, ledger, or credentials remain explicit, privacy-safe warnings rather than healthy results. Queue diagnostics are current ledger evidence independent of `--days` or date bounds, do not download artifacts, and do not mutate the queue or launch workers. Optional workflow detection runs after primary Actions collection, uses its remaining API budget, and reuses downloaded lock content. The ledger uses the authenticated, isolated Git transport without fetching into the checkout, and validates resource references against the selected GitHub host. Actions rates and fleet workflow counts remain unchanged.
 
-Health also reads matching `run_summary.json` files from `--logs-dir` (default: `.github/aw/logs`) for failed sub-agent invocations, including workflows whose Actions conclusion is `success`. An affected current revision has status `subagent_failures_observed` and is excluded from `healthy_workflows`; its Actions success/failure counts and success rate remain unchanged. JSON reports include `subagent_failure_count` (invocations), `subagent_failure_runs` (distinct runs), and per-workflow `subagent_failures` with run URLs, agent names, and requested models. Fleet JSON also includes `degraded_workflows`.
+Health also reads matching `run_summary.json` files from `--logs-dir` (default: `.github/aw/logs`) for failed sub-agent invocations, including workflows whose Actions conclusion is `success`. An affected current revision can have status `subagent_failures_observed`; its Actions counts and rate remain unchanged. Workflow evidence includes `subagent_failure_count` (invocations), `subagent_failure_runs` (distinct runs), and `subagent_failures` with run URLs, agent names, and requested models.
 
-Threat-detection failures, warnings, and detected threats also degrade the current revision, with status `detection_failures_observed`. JSON includes `detection_failure_runs` and per-workflow `detection_failures` with run URLs and findings; text reports include `[detection_failures]`. Actions success rates remain unchanged, and a workflow with both detection and sub-agent failures counts only once in `degraded_workflows`. Audit reports expose detection outcomes in findings and error or warning counts. Detection engine errors such as `parse_error` are tooling failures, not security findings. When older usage artifacts omit the outcome, audit and health can recover it from downloaded conclusion-job environment logs.
+Threat-detection failures, warnings, and detected threats can produce `detection_failures_observed`. Workflow JSON includes `detection_failure_runs` and `detection_failures` with run URLs and findings; named text reports include `[detection_failures]`. Actions success rates remain unchanged. Detection engine errors such as `parse_error` are tooling failures, not security findings. When older usage artifacts omit the outcome, audit and health can recover it from cached conclusion-job environment logs.
 
 This check does not download artifacts. Populate the cache with `gh aw logs --artifacts usage` or `gh aw audit <run-id>` before checking health. `collection.cache_evidence` reports per-run `compatible`, `missing`, `unreadable`, `invalid`, `stale`, or `version_mismatch_raw_jobs_only` status, with the cached producer version when readable. A producer-version mismatch permits reuse of raw Jobs API observations only, after checking run identity, repository URL, attempt, head SHA, workflow, status, conclusion, and update time. Derived usage, classification, and sub-agent metrics still require the current CLI version; cached producer metadata is never rewritten. Missing or rejected derived evidence does not establish failure-free delegation. Historical-revision failures do not degrade the current revision.
 
@@ -1434,7 +1455,7 @@ Unlike `gh aw compile --fix`, `gh aw upgrade` runs codemods, action version upda
 
 #### `env`
 
-Manage compiler defaults as GitHub variables at repository, organization, or enterprise scope.
+Manage compiler defaults as GitHub variables at repository, organization, or enterprise scope, and configure default OpenTelemetry export with `env otel`.
 
 ##### `env get [file]`
 
@@ -1466,6 +1487,25 @@ gh aw env update defaults.yml --scope ent --enterprise my-enterprise --yes
 The `--visibility` flag sets access for newly created org or ent variables (`all`, `private`, or `selected`; default: `all`). Existing variables keep their current visibility. The flag is rejected with `--scope repo`.
 
 For repository scope, `--repo` currently accepts `owner/repo` only. To target GitHub Enterprise Server, select the host via `GH_HOST` rather than prefixing the repository with `[HOST/]`.
+
+##### `env otel`
+
+Test an authenticated empty OTLP traces export, then configure the `GH_AW_DEFAULT_OTLP_ENDPOINT` and `GH_AW_DEFAULT_OTLP_HEADERS` Actions secrets and the `OTEL_EXPORTER_OTLP_PROTOCOL` and `GH_AW_OTEL_METRICS` Actions variables. This command changes GitHub settings without editing or compiling workflows.
+
+```bash wrap
+gh aw env otel
+gh aw env otel --repo my-org/my-repo \
+  --endpoint https://collector.example.com \
+  --protocol http/protobuf --headers-stdin --yes < otlp-headers.txt
+```
+
+**Options:** `--scope`, `--repo/-r`, `--org`, `--enterprise`, `--endpoint`, `--protocol`, `--metrics`, `--headers-stdin`, `--yes/-y`, `--visibility`, `--selected`
+
+Without target flags, the command uses the current repository. Repeat `--repo`, `--org`, or `--enterprise` for multiple targets; enterprise targets expand to visible organizations. `--visibility` defaults to `private` and is invalid for repository targets. With `selected` visibility, repeat `--selected owner/repo` for an organization or `--selected org` for an enterprise.
+
+Interactive header input is hidden. Noninteractive use requires `--endpoint`, `--headers-stdin`, and `--yes`; keep header credentials out of command arguments. `--protocol` defaults to `http/json`, and metrics are enabled unless `--metrics=false` is set.
+
+The probe verifies route and credential acceptance, not span ingestion or connectivity from GitHub runners. Settings updates are not transactional: a failed write can leave export disabled until the command is rerun. See [Configure defaults in one command](/gh-aw/reference/open-telemetry/#configure-defaults-in-one-command) for endpoint constraints, access requirements, override checks, and recovery.
 
 ### Advanced
 

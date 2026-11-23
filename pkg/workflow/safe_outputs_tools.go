@@ -3,12 +3,31 @@ package workflow
 import (
 	_ "embed"
 	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
 	"strings"
 
 	"github.com/github/gh-aw/pkg/logger"
 )
 
 var safeOutputsToolsLog = logger.New("workflow:safe_outputs_tools")
+
+// decodeSafeOutputsToolsJSON decodes the embedded tools JSON without copying it,
+// rejecting trailing data exactly like json.Unmarshal.
+func decodeSafeOutputsToolsJSON(v any) error {
+	decoder := json.NewDecoder(strings.NewReader(safeOutputsToolsJSONContent))
+	if err := decoder.Decode(v); err != nil {
+		return err
+	}
+	if err := decoder.Decode(new(json.RawMessage)); !errors.Is(err, io.EOF) {
+		if err == nil {
+			return errors.New("invalid character after top-level value")
+		}
+		return fmt.Errorf("invalid trailing data: %w", err)
+	}
+	return nil
+}
 
 //go:embed js/safe_outputs_tools.json
 var safeOutputsToolsJSONContent string
@@ -26,10 +45,11 @@ type SafeOutputToolOption struct {
 // internalSafeOutputs are tool names that are internal / system-level and should
 // not be presented to users as selectable safe outputs.
 var internalSafeOutputs = map[string]bool{
-	"report_missing_tool": true,
-	"noop":                true,
-	"report_missing_data": true,
-	"report_incomplete":   true,
+	"report_missing_tool":  true,
+	"noop":                 true,
+	"report_missing_data":  true,
+	"report_incomplete":    true,
+	"request_continuation": true,
 }
 
 // GetSafeOutputToolOptions parses safe_outputs_tools.json and returns all user-facing
@@ -40,7 +60,7 @@ func GetSafeOutputToolOptions() []SafeOutputToolOption {
 		Name        string `json:"name"`
 		Description string `json:"description"`
 	}
-	if err := json.Unmarshal([]byte(safeOutputsToolsJSONContent), &tools); err != nil {
+	if err := decodeSafeOutputsToolsJSON(&tools); err != nil {
 		safeOutputsToolsLog.Printf("Failed to parse safe_outputs_tools.json: %v", err)
 		return nil
 	}

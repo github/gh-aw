@@ -629,7 +629,7 @@ A safe output capability for dismissing existing pull request reviews authored b
 
 ### Report Incomplete (`report_incomplete`)
 
-A mandatory safe output signal that agents emit when a task cannot be completed due to an infrastructure or tool failure — for example, an MCP server crash, missing authentication, or an inaccessible repository. Unlike `noop` (which signals no action was needed), `report_incomplete` indicates an active failure that prevented the task from running. The safe-outputs handler activates failure handling regardless of agent exit code. Accepts a required `reason` field (max 1024 characters) and an optional `details` field for extended diagnostic context.
+A mandatory safe output signal that agents emit when a task cannot be completed due to an infrastructure or tool failure — for example, an MCP server crash, missing authentication, or an inaccessible repository. Unlike `noop` (which signals no action was needed), `report_incomplete` indicates an active failure that prevented the task from running. Completeness refers to the agent's own task, not the subject it examined: a published review requesting changes, a triage that finds bugs, or findings left for humans to act on are completed outcomes and must not be reported as incomplete when reporting them is the task. If the task is to fix or resolve something, merely identifying the problem is not completion. The safe-outputs handler activates failure handling regardless of agent exit code. Accepts a required `reason` field (max 1024 characters) and an optional `details` field for extended diagnostic context.
 
 ### Review Attribution Pinning (`GH_AW_HEAD_SHA`)
 
@@ -712,7 +712,7 @@ jobs:
 
 ### BYOK (Bring Your Own Key)
 
-A Copilot engine mode that routes AI requests to an external LLM provider (such as OpenAI, Anthropic, or a self-hosted Ollama/vLLM instance) instead of the default GitHub Copilot backend. Activated by setting `COPILOT_PROVIDER_BASE_URL` in `engine.env`. The three BYOK credential variables (`COPILOT_PROVIDER_BASE_URL`, `COPILOT_PROVIDER_API_KEY`, `COPILOT_PROVIDER_BEARER_TOKEN`) accept `${{ secrets.* }}` references under strict mode and are never exposed to the agent container. gh-aw automatically adds the provider hostname to the AWF allow-list when it can resolve a literal BYOK URL, and otherwise reuses the concrete provider hostname from `network.allowed` for the threat-detection Copilot step. Use `COPILOT_MODEL` to specify the target model. See [AI Engines Reference](/gh-aw/reference/engines/copilot/#copilot-bring-your-own-key-byok-mode).
+A Copilot engine mode that routes AI requests to an external LLM provider (such as OpenAI, Anthropic, or a self-hosted Ollama/vLLM instance) instead of the default GitHub Copilot backend. Activated by setting `COPILOT_PROVIDER_BASE_URL` in `engine.env`. The three BYOK credential variables (`COPILOT_PROVIDER_BASE_URL`, `COPILOT_PROVIDER_API_KEY`, `COPILOT_PROVIDER_BEARER_TOKEN`) accept `${{ secrets.* }}` references under strict mode and are never exposed to the agent container. The provider hostname is allowed automatically: gh-aw adds literal BYOK URLs at compile time, and AWF v0.25.41+ resolves `${{ secrets.* }}`/`${{ vars.* }}` values at runtime and allows exactly that host. Use `COPILOT_MODEL` to specify the target model. See [AI Engines Reference](/gh-aw/reference/engines/copilot/#copilot-bring-your-own-key-byok-mode).
 
 ### Cron Schedule
 
@@ -997,6 +997,8 @@ A compact syntax for label-based triggers: `on: issue labeled bug` or `on: pull_
 ### LSP (`lsp:`)
 
 An experimental frontmatter field that declares Language Server Protocol (LSP) servers for Copilot-engine workflows. At compile time, the compiler generates `~/.copilot/settings.json` with an `lspServers` block and injects install steps for known server ecosystems. When configured, Copilot gets semantic code-intelligence tools: symbol lookup, go-to-definition, find references, hover/type info, diagnostics, and rename/refactor — enabling symbol-aware navigation of large codebases.
+
+The built-in `typescript` entry installs TypeScript and its language server from a bundled npm lockfile. Omit `version` or specify the bundled server version (`6.1.0`).
 
 Only supported with `engine: copilot`; any other engine causes a compile-time error. Emits an experimental feature warning at compile time.
 
@@ -1578,7 +1580,7 @@ An auto-generated slash command available when [centralized routing](#centralize
 
 ### `aw_context`
 
-A structured context payload passed by the centralized slash-command router (`agentic_commands.yml`) when dispatching target workflows via `workflow_dispatch`. Contains the original GitHub event context (issue number, repository, actor, etc.) so the dispatched workflow can act on the correct resource even though it is triggered as a `workflow_dispatch`. See [Command Triggers](/gh-aw/reference/command-triggers/).
+A structured context payload passed by the centralized slash-command router (`agentic_commands.yml`) when dispatching target workflows via `workflow_dispatch`. Contains the original GitHub event context (issue number, repository, actor, etc.) so the dispatched workflow can act on the correct resource even though it is triggered as a `workflow_dispatch`. See [Command Triggers](/gh-aw/reference/command-triggers/). Its caller fields (`run_id`, `parent_run_id`) record lineage only; the dedicated `continuation_run_id` field names the run whose [durable session](/gh-aw/reference/engines/) to resume and is never relayed to further dispatches.
 
 `on.gateway-dispatch` and its nested GitHub notification, Projects, security, [external issue](/gh-aw/reference/provider-issue-triggers/), and command triggers are experimental. Custom webhooks are unsupported. Optional shared `repos` selects repository-aware sources; `orgs` selects GitHub organizations with case-insensitive names or `*` patterns. Neither grants access. No other trigger can coexist with this mapping. They use `aw_context.webhook.deliveries` for same-kind minimal notifications containing only canonical resource URLs, event types, and declared matching filter literals, and `aw_context.items` for URL-derived affected references, without selecting a single implicit item. Additional resource data requires provider-authenticated workflow reads. See [Webhook Triggers](/gh-aw/reference/webhook-triggers/).
 

@@ -1,5 +1,6 @@
 ---
 title: Connector Specification
+spec: true
 description: Declaration, selection, execution, and conformance requirements for third-party connectors.
 sidebar:
   order: 1365
@@ -7,28 +8,29 @@ sidebar:
 
 # Connector Specification
 
-**Version**: 1.1.1<br>
+**Version**: 1.3.0<br>
 **Status**: Experimental Working Draft<br>
-**Publication Date**: 2026-11-18<br>
+**Publication Date**: 2026-11-23<br>
 **Editor**: GitHub Agentic Workflows Team
 
 ## Abstract
 
 This specification defines declaration-only third-party connectors for GitHub
 Agentic Workflows: explicit capability selection, phase-separated credentials,
-typed fixed requests, bounded response evidence, staged effects, and protected
-event subscriptions. It specifies compiler and trusted-host obligations,
-offline compliance evidence, and an informative bounded TLA+ model of selected
-authority boundaries.
+typed fixed requests, bounded response evidence, staged effects, protected
+event subscriptions, and engine inference profiles. It specifies compiler and
+trusted-host obligations, offline compliance evidence, and informative bounded
+TLA+ models of selected authority boundaries.
 
 ## Status of This Document
 
 This Experimental Working Draft is maintained by the GitHub Agentic Workflows
 project through repository review. It is not a W3C Recommendation or evidence
-of provider certification. Version 1.1.1 clarifies existing requirements and
-adds identifiable compliance checks and informative formal models; it does not
-add runtime capabilities or change accepted declarations. Publication does not
-establish provider authorization or operational trigger ingress.
+of provider certification. Version 1.3.0 adds the optional
+`model-catalog: false` inference-profile declaration and its corresponding
+consumer engine constraint, while retaining the existing inference transport
+and authority boundaries. Publication does not establish provider authorization
+or operational trigger ingress.
 
 ## Table of Contents
 
@@ -51,7 +53,7 @@ establish provider authorization or operational trigger ingress.
 
 This specification defines the declaration-only connector interface implemented
 by the gh-aw compiler and shared Go/Node runtimes. It covers imported provider
-definitions, explicitly selected reads, safe outputs, and protected event
+definitions, explicitly selected inference, reads, safe outputs, and protected event
 subscriptions. It does not define a provider catalog, token acquisition service,
 webhook receiver deployment, or arbitrary API/script execution interface.
 
@@ -129,6 +131,7 @@ the same value is an import input.
 | `endpoints` | Nonempty map of named HTTPS origins without credentials, query, fragment, or a non-root path. |
 | `credentials` | Named authentication contracts and references, described in section 4. |
 | `resources` | Named arrays of exact approved string IDs or other explicitly constrained identifiers. No wildcard authority. |
+| `inference` | Named fixed inference-provider profiles, described in section 5.4. These configure the engine, not callable tools. |
 | `tools` | Named REST/fixed-GraphQL reader operations, each with an exact exposed `tool` name. |
 | `mcp-servers` | Named streamable-HTTP registrations with exact native tool contracts. |
 | `safe-outputs` | Named typed mutation operations executed only by a separately authorized safe-output host. |
@@ -139,7 +142,7 @@ configuration. Content is obtained through selected readers; the compiler MUST
 NOT hydrate event references or run automatic context fetches.
 
 For authoring consistency, declarations SHOULD order fields as `experimental`,
-`docs`, `endpoints`, `credentials`, `resources`, `triggers`, `tools`,
+`docs`, `endpoints`, `credentials`, `resources`, `inference`, `triggers`, `tools`,
 `mcp-servers`, and `safe-outputs`. Primitive inputs SHOULD put `type` and
 `required` before bounds, `enum`, `pattern`, and `sanitize`. Import bindings
 SHOULD include concise descriptions and explicit array item types. These are
@@ -168,6 +171,7 @@ Importing a declaration selects nothing. The consumer independently selects:
 
 | Consumer surface | Selection |
 | --- | --- |
+| `engine.inference: {connector: id, profile: name, model: alias}` | One declared inference profile and exact granted wire model alias. Only the main workflow may select inference. |
 | `tools.<id>: [read-name]` | Declared REST/GraphQL readers or complete named HTTP MCP registrations. |
 | `tools.<id>: {registration: [nativeTool]}` | A nonempty exact subset of an imported HTTP MCP registration. Unknown, duplicate, wildcard, and empty subsets MUST fail. |
 | `safe-outputs.<id>-<operation>` | One effect, with null, `{}`, or the options in section 7. |
@@ -188,11 +192,12 @@ and credential references from each delivered phase plan. Writer credentials
 MUST NOT reach the agent. Removing all selections MUST remove connector
 execution from the workflow. A selected endpoint MUST also be approved by the
 workflow/host network policy; importing an endpoint is not network approval.
+Selecting an inference profile is the sole exception (section 5.4).
 
 ## 4. Authentication and authority
 
 A credential declares `phase`, `header`, `scheme`, nonempty `scopes`, and one
-source route. Public execution uses `agent` or `safe-output` phases. Scope
+source route. Public execution uses `agent`, `safe-output`, or `inference` phases. Scope
 strings document provider requirements; they MUST NOT be treated as permission
 grants. The runtime MUST use only the selected phase's host-owned resolver.
 
@@ -203,11 +208,21 @@ grants. The runtime MUST use only the selected phase's host-owned resolver.
 | `token: {secret: NAME}` | A stored secret-name reference. `secret: NAME` is the legacy shorthand. Names MUST be valid and MUST NOT impersonate reserved minted-token references. |
 | `github-app` | Explicit client ID/private-key reference, installation scope, and bounded permissions. An explicit owner requires exact repositories. Agent-phase permissions MUST NOT include `write`; missing credentials MUST NOT be ignored. |
 | `github-oidc: {audience: ...}` | A nonempty bounded literal audience; requires Authorization/bearer and phase-specific GitHub OIDC plumbing. |
+| `azure-oidc` | Inference-only Entra exchange using required `azure-tenant-id`, `azure-client-id`, and explicit `azure-scope`, plus optional `audience` and `azure-cloud` (`public`, `usgovernment`, `china`). Requires Authorization/bearer and the existing engine OIDC permission, firewall and version gates. |
 
 Exactly one source route MUST be used for an executable credential. GitHub App
 tokens are GitHub installation tokens; GitHub OIDC produces an identity JWT.
 Neither route implements a provider-token exchange. Provider consent,
 installation, token renewal, audience acceptance, and ACLs remain external.
+
+Inference credentials MUST use a stored token-name reference or `azure-oidc`,
+never a GitHub App or direct GitHub OIDC route. The Azure route lowers to existing
+`engine.auth` and delegates acquisition and refresh to AWF; it MUST NOT mint
+tokens in connector tool setup. Its tenant, client and scope are bounded to 2048
+bytes and MAY reference Actions variables or secrets; they MUST NOT contain
+token values. Its audience defaults to the existing Azure engine exchange
+audience. The scope has no implicit Azure OpenAI default. Other phase routes
+retain their existing behavior.
 
 Resource-constrained arguments MUST be required strings, or nonempty bounded
 string arrays on hosted HTTP MCP tools. Each string MUST match an exact authored
@@ -299,6 +314,64 @@ and endpoint before forwarding `tools/call`. Remote read-only annotations are
 advisory, not proof of provider authorization. Initialization success does not
 prove a later tool is authorized. REST retry configuration does not apply to
 the MCP protocol. Interactive input-required results are not completed reads.
+
+### 5.4 Inference-provider configuration
+
+Each `inference.<profile>` MUST declare `endpoint` (a named origin), `path`
+(a fixed absolute SDK base path), `protocol`, `credential` (an inference-phase
+Authorization/bearer credential), and `models` (an exact resource collection
+name). Paths MUST NOT contain traversal, escaping, expressions, query or fragment.
+Protocols are `openai-responses` and `openai-chat-completions`. No arbitrary
+request templates, scripts, model discovery or inference-as-reader POSTs are added.
+An optional `model-catalog: false` declares that the provider has no `/models`
+route. For a selected profile, the compiler MUST set
+`engine.model-catalog: false` on the consumer so that the explicitly granted
+wire model is passed through without model-catalog discovery. An explicit
+consumer `engine.model-catalog: true` MUST fail. This option does not authorize
+egress, change model grants, or alter any credential, reader, safe-output, or
+trigger obligations.
+
+The main workflow selects one profile with
+`engine.inference: {connector: id, profile: name, model: alias}`. Names MUST be
+exact, and the wire alias MUST be a bounded literal matching the profile's model
+grant before credentials are referenced. Import-only declarations MUST leave
+the engine, environment, permissions and network unchanged. Selecting a profile
+MUST add exactly that profile's endpoint hostname, and the Entra authority host
+for its Azure cloud when it uses Azure OIDC, to the effective firewall
+allowlist without duplicating hosts the consumer already lists. Importing an
+inference profile, or declaring unselected profiles, MUST NOT authorize egress.
+
+Initially only Copilot's existing OpenAI-compatible BYOK transport is supported.
+The compiler lowers the selected SDK base, protocol, alias and credential to
+`COPILOT_PROVIDER_*` and optional Azure `engine.auth`. `engine.model` remains
+the Copilot model metadata selection; the granted wire alias is preserved in
+`COPILOT_PROVIDER_MODEL_ID`. Model metadata MUST be explicit and literal, not
+a router value or expression. Unknown engines/protocols and conflicting native
+provider/auth/environment, routing, fallback or CLI overrides MUST fail rather
+than silently override either configuration. Imported engine settings MUST NOT
+override the resolved inference binding.
+
+Inference is a compiler-owned engine configuration, not an MCP method, local
+connector transport operation, safe output or implicit read. It MUST NOT be
+included in agent-reader, context, trigger or safe-output phase plans; its
+credentials MUST NOT be added to those plans. The selected engine transport
+retains its existing credential handling, budget, telemetry and firewall
+behavior. Model grants bind the compiled wire alias; they do not narrow a
+gateway key's provider-side permissions or certify runtime RBAC.
+
+`connector setup` MAY display inference-phase provisioning guidance without
+reading credentials. `connector test --phase inference` MUST reject execution
+and direct the author to offline consumer compilation. Compilation does not
+prove protocol/model compatibility, token trust, provider access, pricing,
+context limits or output quality. Staging writes MUST NOT be described as
+preventing inference, prompt/context disclosure or model charges.
+
+The informative inference model in [Appendix A](#inference-binding-model)
+abstracts selection, fixed bindings, credential separation and terminal
+authentication denial. Token exchange is symbolic, not a model of Entra,
+JWT validation or transport internals. Compiler and phase-pruning fixtures
+provide separate implementation evidence; model checking does not prove the
+implementation refines the model.
 
 ## 6. Response evidence and bounds
 
@@ -611,6 +684,7 @@ The following evidence is required before claiming connector conformance:
 | Failure policy | Budgets, declared retries, threat gating and receipt scope remain enforced on failure. |
 | Distribution | Local and pinned imports compile; complete consumer/XML examples compile; deployed runtime includes transitive dependencies. |
 | Trigger, if declared | Offline native fixtures establish matching/nonmatching evidence and Go/Node predicate parity; result states `operational: false`. |
+| Inference, if declared | Import-only leaves the engine unchanged; exact profile/model selection, selected-profile hostname approval and conflict rejection compile correctly. Reader/effect plans exclude inference configuration and credentials; setup reads no secret values and inference test execution rejects. |
 
 `gh aw connector <id> setup` is offline metadata discovery by default.
 An explicit `--repo OWNER/REPO` permits read-only repository secret/variable
@@ -622,6 +696,9 @@ OIDC trust, or availability of organization/environment settings.
 `gh aw connector <id> test --phase safe-output` always stages; annotated text
 requires a trusted matching `--node-runtime`.
 `--phase trigger` projects fixture JSON offline.
+`setup --phase inference` reports provisioning metadata only;
+`test --phase inference` MUST reject execution and direct the author to
+consumer compilation, not invoke a model.
 In contrast, `--phase agent` contacts the provider with named environment
 credentials and is a live test, not an offline validation command.
 
@@ -647,6 +724,8 @@ class; it is not sufficient by itself to certify a complete implementation.
 | **C-RSP-001**: The execution host MUST enforce every declared response check before exposing successful evidence (section 6). | Execution host | **T-CON-006** | Supply wrong types, malformed or oversized responses, missing required evidence, and a different granted ID where request correlation is declared. All reject; an allowed ID alone does not establish requested identity. |
 | **C-AUT-001**: Live writes MUST require explicit host write authorization; authorization denial MUST NOT cause retry or credential fallback (sections 4, 7). | Execution host | **T-CON-007** | Attempt an unauthorized write; observe zero secret accesses/requests. Return 401/403 for an authorized attempt; observe no subsequent request or alternate credential resolution. |
 | **C-TRG-001**: Trigger fixture projection MUST NOT establish operational ingress; missing/ambiguous required evidence MUST NOT authorize a match (section 8). | Compiler, execution host | **T-CON-008** | Project matching, nonmatching, incomplete, and ambiguous fixtures with Go/Node predicate parity. Only complete matching evidence projects; fixture results remain `operational: false`. |
+| **C-INF-001**: Inference binding MUST require explicit main-workflow selection, a known profile, exact wire-model grant, selected-profile hostname approval, compatible engine metadata and no conflicting native/imported override (section 5.4). | Compiler | **T-CON-009** | Compile import-only and valid key/OIDC consumers for both protocols. Verify only the selected profile's hosts are allowed. Reject unknown profiles, ungranted/dynamic aliases, unsupported engines, conflicting overrides and missing selected OIDC prerequisites. Import-only emits no inference binding. |
+| **C-INF-002**: Inference configuration and credentials MUST remain outside reader/effect plans; the selected native engine transport MUST retain the fixed SDK base, protocol, model and credential route (sections 4, 5.4). | Compiler, execution host | **T-CON-010** | Inspect compiled native engine settings and Go/Node-decoded reader/effect plans. Only the engine receives inference configuration. Setup reads zero secret values; inference test execution rejects. Native authentication-denial evidence must be reported separately from compilation or symbolic model checks. |
 
 ### 10.2 Compliance testing procedure
 
@@ -654,8 +733,8 @@ Test reports MUST distinguish schema/semantic validation, compilation,
 instrumented runtime tests, bounded model checking, and authorized live tests.
 For each applicable test ID, the report MUST record the implementation revision,
 fixture or input, command/tool version, expected result, observed result, and
-pass/fail status. An unexecuted test is untested, not passed. A trigger test is
-inapplicable only when no trigger support is claimed.
+pass/fail status. An unexecuted test is untested, not passed. Trigger and inference
+tests are inapplicable only when their respective capability is not claimed.
 
 Run negative cases alongside a valid authorized read, an authorized write in a
 mock host, and a staged effect. A suite that rejects everything does not
@@ -731,7 +810,8 @@ not a claim that every low-level Node entry point implements a firewall.
 The model does not cover token minting, secret values or leakage through text,
 cryptography, concurrent invocations, transient retry schedules, publication
 formatting, lookups, receipts, binary files, hosted MCP session sequencing,
-trigger admission/replay, or provider persistence. It makes no liveness or live
+trigger admission/replay, inference bindings, or provider persistence. Inference
+has a separate model below. Neither model makes a liveness or live
 delivery claim. A rejected response after a write does not prove that the
 provider made no mutation.
 
@@ -826,6 +906,80 @@ the executable examples in
 and bundled Node staging in
 [`connector_staging_parity_test.go`](https://github.com/github/gh-aw/blob/main/pkg/workflow/connector_staging_parity_test.go).
 
+#### Inference binding model
+
+[`inference/ConnectorInference.tla`](https://github.com/github/gh-aw/blob/main/specs/connectors/inference/ConnectorInference.tla)
+models one compiler selection and at most one engine inference request. Its
+2,304 initial states vary import-only/explicit selection, two known profiles
+and an unknown profile, granted/ungranted aliases, network approval, engine
+compatibility, override conflicts, OIDC prerequisites, key/Entra routes,
+engine/reader/writer execution contexts and independent write staging.
+`inference` denotes the engine credential boundary, not a new connector
+transport phase or callable operation.
+
+| Requirement | Model predicates | Implementation evidence |
+| --- | --- | --- |
+| C-INF-001 | `ImportOnly`, `ExplicitProfile`, `ModelGrant`, `NetworkApproval`, `NoOverrides`, `OIDCPrerequisites` | `connector_inference.go`, selected native engine OIDC guards, and compiler selection/rejection fixtures. |
+| C-INF-002 | `PhasePruning`, `EngineOnly`, `CredentialBinding`, `WireBinding` | Compiler-only lowering, `Spec.ForPhase` pruning and Go/Node plan-decoding fixtures. |
+| C-AUT-001 denial policy, applied to inference | `FailClosed` | Symbolic exchange/provider denial is terminal without another request or alternate credential. This is a host assumption, not live native-engine evidence. |
+
+`binding` and `sent` preserve the SDK destination, protocol, wire model and
+credential identity. `resolutions` counts symbolic credential acquisitions;
+`exchanges` counts symbolic Entra exchanges. Neither contains token values.
+`oidcReady` abstracts the selected native engine's permission/version/auth
+prerequisites, not provider trust or successful authorization. `conflict`
+abstracts all rejected native/imported overrides; it does not enumerate every
+environment variable or prove the compiler detects them.
+
+The trusted compiler/engine host, immutable declaration and faithful transport
+are assumptions. This single-request abstraction excludes token bytes,
+cryptography, refresh, expiry, concurrent requests, budgets, model responses,
+prompt leakage prevention, provider RBAC and live protocol compatibility.
+It does not prove refinement of Go, Node, AWF or Copilot. Successful inference
+means only a symbolic successful response, not useful or safe model output.
+
+For reproduction, reuse the verified tools and exact loop above, replacing
+`cd "$repo/specs/connectors"` with `cd "$repo/specs/connectors/inference"`,
+and every `ConnectorBoundary` with `ConnectorInference`. Keep the expected
+exit-code and invariant-name checks. Use `-Djava.io.tmpdir="$TMPDIR"` when
+invoking Java to keep scratch files local.
+
+Using checksum-verified TLA+ Tools v1.7.4 (TLC 2.19), installed Temurin 27+35,
+one worker and seed 1 on 2026-11-20, `ConnectorInference.cfg` exhausted the
+queue: **7,036 generated / 4,696 distinct states**, depth 5. All ten controls
+and six witnesses produced their expected invariant violation:
+
+| Configuration | Expected result | Generated / distinct states |
+| --- | --- | --- |
+| `ControlImplicitSelection.cfg` | `ImportOnly` violated | 2,329 / 2,329 |
+| `ControlUnknownProfile.cfg` | `ExplicitProfile` violated | 3,129 / 3,129 |
+| `ControlModelGrant.cfg` | `ModelGrant` violated | 2,425 / 2,425 |
+| `ControlNetworkApproval.cfg` | `NetworkApproval` violated | 2,345 / 2,345 |
+| `ControlOverride.cfg` | `NoOverrides` violated | 2,365 / 2,365 |
+| `ControlOIDCReadiness.cfg` | `OIDCPrerequisites` violated | 3,513 / 3,513 |
+| `ControlPhasePruning.cfg` | `PhasePruning` violated | 2,305 / 2,305 |
+| `ControlToolExecution.cfg` | `EngineOnly` violated | 4,797 / 4,613 |
+| `ControlWireBinding.cfg` | `WireBinding` violated | 6,925 / 4,649 |
+| `ControlAuthorizationRetry.cfg` | `FailClosed` violated | 6,966 / 4,662 |
+| `WitnessResponsesKey.cfg` | `ProbeAbsent` violated; Responses/key success reached | 6,965 / 4,661 |
+| `WitnessCompletionsOIDC.cfg` | `ProbeAbsent` violated; Chat Completions/Entra success reached | 6,995 / 4,691 |
+| `WitnessImportOnly.cfg` | `ProbeAbsent` violated; unchanged import-only state reached | 2,305 / 2,305 |
+| `WitnessExchangeDenied.cfg` | `ProbeAbsent` violated; exchange denial, no inference request | 5,827 / 4,633 |
+| `WitnessProviderDenied.cfg` | `ProbeAbsent` violated; terminal inference authorization denial | 6,966 / 4,662 |
+| `WitnessStagedInference.cfg` | `ProbeAbsent` violated; inference still runs with staged writes | 6,968 / 4,664 |
+
+These are partial counterexample counts, not coverage percentages. Witnesses
+check `Safety` before falsifying `ProbeAbsent`; the staged witness prevents
+equating write staging with suppression of inference. Parser errors, missing
+witnesses and unexpected violations are verification failures.
+
+Implementation checks remain independent:
+`pkg/workflow/connector_inference_test.go` covers selection, both protocols and
+routes, import-only behavior, overrides and native OIDC guards;
+`pkg/connectors/inference_test.go` checks profile validation and Go/Node phase
+pruning; `pkg/cli/connector_inference_test.go` checks offline setup and refusal
+to run inference through connector tests. None authorizes a live request.
+
 ### Appendix B: Security and privacy considerations
 
 Provider responses, event fixtures, and author documentation remain untrusted.
@@ -835,12 +989,27 @@ authority but do not validate consent or token provisioning. A digest identifies
 a frozen plan; it is not a signature authenticating an untrusted author.
 
 Staging prevents the selected effect's credential/network accesses, not other
-selected reads or arbitrary authored scripts. Model traces use symbolic
+selected reads, workflow inference or arbitrary authored scripts. Exact model
+grants bind the compiled alias, not a gateway key's provider-side authority.
+Model traces use symbolic
 identifiers, never credential values. Production evidence collection needs
 separate redaction and privacy controls. Errors are described semantically in
 sections 4–8; this specification defines no new public error-code registry.
 
 ## 14. Change Log
+
+### Version 1.3.0 (Experimental Working Draft) — 2026-11-23
+
+- Added optional inference-profile `model-catalog: false` for providers without a `/models` route.
+- Required the compiler to propagate that declaration as `engine.model-catalog: false` and reject conflicting `engine.model-catalog: true` settings.
+- Preserved existing explicit model grants, network approval, credential isolation, and native engine transport obligations.
+
+### Version 1.2.0 (Experimental Working Draft)
+
+- Added compiler-owned inference profiles, exact model grants and explicit `engine.inference` selection.
+- Added inference-only stored-token and Azure Entra OIDC routes without changing reader or safe-output transports.
+- Selecting an inference profile adds only its endpoint host, and the Entra authority host for Azure OIDC, to the firewall allowlist; importing remains no network approval.
+- Added C-INF-001/002 compliance procedures and a separate bounded inference model with negative controls and reachability witnesses.
 
 ### Version 1.1.1 (Experimental Working Draft) — 2026-11-18
 

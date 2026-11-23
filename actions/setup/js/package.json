@@ -5,9 +5,9 @@
     "@actions/exec": "^3.0.0",
     "@actions/github": "^9.1.1",
     "@actions/github-script": "github:actions/github-script#v9.0.0",
-    "@actions/glob": "^0.7.0",
+    "@actions/glob": "0.6.1",
     "@actions/io": "^3.0.2",
-    "@github/copilot-sdk": "^1.0.29",
+    "@microsoft/copilot-sdk": "2.0.0",
     "@types/node": "26.6.6",
     "@vitest/coverage-v8": "^5.1.0",
     "@vitest/ui": "^5.1.0",
@@ -22,8 +22,14 @@
     "vitest": "^5.1.0"
   },
   "overrides": {
+    "archiver-utils@5.0.2": {
+      "glob": "^14.0.6"
+    },
     "magic-string": "1.4.2",
     "minimatch@3": "^3.1.5",
+    "ts-json-schema-generator@2.9.0": {
+      "glob": "^14.0.6"
+    },
     "undici": "^6.23.0",
     "vite": {
       "rolldown": "1.2.14",

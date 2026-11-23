@@ -148,6 +148,13 @@ func buildAgentEventsFromProcessedRun(processedRun ProcessedRun, metrics Metrics
 		})
 	}
 
+	events = appendErrorEvents(events, processedRun)
+	events = appendToolResultEvents(events, processedRun)
+	return appendFinishEvent(events, processedRun, metrics)
+}
+
+// appendErrorEvents adds error-stage events for MCP failures, missing tools and missing data.
+func appendErrorEvents(events []agentdrain.AgentEvent, processedRun ProcessedRun) []agentdrain.AgentEvent {
 	// MCP failures become error-stage events.
 	for _, f := range processedRun.MCPFailures {
 		events = append(events, agentdrain.AgentEvent{
@@ -183,7 +190,11 @@ func buildAgentEventsFromProcessedRun(processedRun ProcessedRun, metrics Metrics
 			},
 		})
 	}
+	return events
+}
 
+// appendToolResultEvents adds tool_result-stage events for no-ops and continuation requests.
+func appendToolResultEvents(events []agentdrain.AgentEvent, processedRun ProcessedRun) []agentdrain.AgentEvent {
 	// No-ops map to tool_result stage.
 	for _, n := range processedRun.Noops {
 		events = append(events, agentdrain.AgentEvent{
@@ -195,7 +206,20 @@ func buildAgentEventsFromProcessedRun(processedRun ProcessedRun, metrics Metrics
 		})
 	}
 
-	// Synthesise a finish event only when the run has a meaningful conclusion.
+	for _, request := range processedRun.ContinuationRequests {
+		events = append(events, agentdrain.AgentEvent{
+			Stage: "tool_result",
+			Fields: map[string]string{
+				"type":    "request_continuation",
+				"message": request.Message,
+			},
+		})
+	}
+	return events
+}
+
+// appendFinishEvent synthesises a finish event only when the run has a meaningful conclusion.
+func appendFinishEvent(events []agentdrain.AgentEvent, processedRun ProcessedRun, metrics MetricsData) []agentdrain.AgentEvent {
 	conclusion := processedRun.Run.Conclusion
 	if conclusion == "" {
 		conclusion = processedRun.Run.Status

@@ -5,9 +5,7 @@ sidebar:
   order: 710
 ---
 
-The GitHub Tools (`tools.github`) let the agentic step read information such as issues and pull requests from GitHub.
-
-In most workflows, no extra configuration is needed. The default toolset already provides access to the current repository and public repositories, subject to the network firewall.
+The GitHub Tools (`tools.github`) let the agentic step read information such as issues and pull requests from GitHub. Most workflows need no extra configuration: the default toolset reads the current repository and public repositories, subject to the network firewall.
 
 ## GitHub Toolsets
 
@@ -28,21 +26,17 @@ tools:
 
 **Default**: `context`, `repos`, `issues`, `pull_requests`, `users`
 
-Common toolsets include `context` (user and team info), `repos` (repository operations, code search, commits, releases), `issues`, `pull_requests`, `actions` (workflows, runs, artifacts), `code_security`, `discussions`, and `labels`.
+`repos` covers repository operations, code search, commits, and releases; `actions` covers workflows, runs, and artifacts.
 
 :::note
-`toolsets: [all]` does **not** include the `dependabot` toolset. The `dependabot` toolset must be opted into explicitly. See [Using the `dependabot` toolset](#using-the-dependabot-toolset) for authentication requirements.
+`toolsets: [all]` does **not** include `dependabot`. Opt into it explicitly and see [Using the `dependabot` toolset](#using-the-dependabot-toolset) for authentication. Some other toolsets also require [additional authentication](#additional-authentication-for-github-tools).
 :::
-
-Some toolsets require [additional authentication](#additional-authentication-for-github-tools).
 
 ### Code Search Rate Limits
 
-The GitHub MCP `search_code` tool uses a separate, much smaller budget than ordinary GitHub API reads. GitHub's [search rate limits](https://docs.github.com/en/rest/search/search#rate-limit) allow 10 authenticated code-search requests per minute, compared with 30 per minute for other search endpoints. An available `core` quota does not imply that code search is available.
+The MCP `search_code` tool has a much smaller budget than other GitHub reads: [GitHub's search rate limits](https://docs.github.com/en/rest/search/search#rate-limit) allow 10 authenticated code-search requests per minute, versus 30 for other search endpoints. An available `core` quota does not mean code search is available. Agent start and end snapshots log the `core`, `code_search`, and `search` limits, and MCP HTTP 429 failures appear in the agent job summary with any retry hint.
 
-Agent start/end rate-limit snapshots log `core`, `code_search`, and `search` with their limit, remaining requests, and reset time. MCP HTTP 429 failures appear in the agent job summary with the server's retry hint, when provided. These snapshots reflect the configured GitHub tools credential; they do not prove that concurrent runs share an identity or explain every secondary limit or MCP-server throttle. A retry hint is not a guarantee that waiting will make the next request succeed.
-
-For inspecting code in another repository, the recommended alternative is [`checkout:` with `sparse-checkout`](/gh-aw/reference/checkout/), then local `grep` or `rg` searches. This checkout configuration is supported in v0.89.17:
+To inspect code in another repository, prefer [`checkout:` with `sparse-checkout`](/gh-aw/reference/checkout/) and then search locally with `grep` or `rg` (supported since v0.89.17):
 
 ```aw wrap
 permissions:
@@ -59,11 +53,11 @@ tools:
   bash: ["grep", "rg"]
 ```
 
-Use a token or GitHub App with read access to the target repository; the workflow's `GITHUB_TOKEN` is scoped to its own repository. The checkout credential is separate from `tools.github` authentication. Search the checked-out paths locally rather than fetching missing files during agent execution. For occasional API code searches, keep a small per-run [`max-calls` limit](#restricting-tools-toolsgithuballowed); it does not reserve quota or prevent throttling.
+The checkout token must have read access to the target repository, since `GITHUB_TOKEN` is scoped to the workflow's own repository. This credential is separate from `tools.github` authentication. For occasional API code searches, set a small [`max-calls` limit](#restricting-tools-toolsgithuballowed); it does not reserve quota or prevent throttling.
 
 ## Restricting Tools (`tools.github.allowed`)
 
-Use `tools.github.allowed` to restrict which GitHub MCP tools the agent can call. Each entry is either a string tool name or an object with a per-tool call limit:
+`tools.github.allowed` limits which GitHub MCP tools the agent can call. Entries are either a tool name (unlimited calls) or an object with a `max-calls` cap:
 
 ```yaml wrap
 tools:
@@ -75,12 +69,9 @@ tools:
       - pull_request_read
 ```
 
-- **String entries** (`list_labels`) — allow unlimited calls to that tool within the run.
-- **Object entries** (`{ name: <tool>, max-calls: <n> }`) — cap how many times the tool can be invoked. `max-calls` must be a positive integer; the MCP gateway enforces the cap at runtime.
+`max-calls` must be a positive integer, enforced by the MCP gateway at runtime. The shorthand `"issue_read:1"` is **not** a call limit; it is treated as a literal, unknown tool name.
 
-The shorthand form `"issue_read:1"` is **not** interpreted as a call limit — it is treated as a literal (and therefore unknown) tool name.
-
-This complements toolset selection: `toolsets` decides which API groups are loaded, while `allowed` further narrows which individual tools the agent may invoke and how many times.
+`toolsets` selects which API groups load, while `allowed` narrows which individual tools can be called and how often.
 
 ## GitHub Integrity Filtering (`tools.github.min-integrity`)
 
@@ -112,7 +103,7 @@ tools:
 
 ## GitHub Cross-Repository Reading
 
-By default, the GitHub Tools can read from the current repository and all public repositories, subject to the network firewall. To read from other private repositories, configure additional authentication. You can further restrict repository access during execution with `tools.github.allowed-repos`. See [Cross-Repository Operations](/gh-aw/reference/cross-repository/) for details and examples.
+By default, the GitHub Tools read the current repository and public repositories, subject to the network firewall. For private repositories, configure additional authentication, and optionally narrow access with `tools.github.allowed-repos`. See [Cross-Repository Operations](/gh-aw/reference/cross-repository/).
 
 ## GitHub Tools Access Modes
 
@@ -133,7 +124,7 @@ tools:
     github-token: ${{ secrets.CUSTOM_PAT }}  # Required for remote mode
 ```
 
-**`gh-proxy` mode** — uses the pre-authenticated `gh` CLI directly instead of an MCP server. This offers lower latency because there is no MCP server startup overhead, and it is required for workflows that use [integrity reactions](/gh-aw/reference/integrity/). The legacy `features: {cli-proxy: true}` feature flag is equivalent and is still accepted for backward compatibility.
+**`gh-proxy` mode** — uses the pre-authenticated `gh` CLI directly, with no MCP server startup overhead. It is required for [integrity reactions](/gh-aw/reference/integrity/). The legacy `features: {cli-proxy: true}` flag is equivalent and still accepted.
 
 ```yaml wrap
 tools:
@@ -143,21 +134,15 @@ tools:
 
 ### CLI proxy startup diagnostics
 
-The CLI proxy waits up to 30 seconds for readiness. Startup diagnostics are captured in a private temporary directory outside artifact upload roots, with a 1 MiB input limit. Before publishing the last 20 lines, the startup script redacts built-in credential patterns and supplied secret values, including a custom GitHub token passed as `GH_TOKEN`. Unrelated workflow secrets are not automatically forwarded to the startup step.
-
-If capture exceeds the limit or sanitization fails, the step withholds the diagnostics and reports a fixed error instead of printing raw output. Timeout diagnostics retain the readiness failure reason. Raw temporary diagnostics are removed on normal exit; a cleanup failure is reported and fails the step.
+The CLI proxy waits up to 30 seconds for readiness. Diagnostics are captured outside artifact upload roots (1 MiB input limit). On failure, the last 20 lines are printed after redacting credentials, including a custom `GH_TOKEN`; unrelated workflow secrets are not forwarded. If capture exceeds the limit or redaction fails, the diagnostics are withheld and a fixed error is reported. Timeout diagnostics keep the readiness failure reason, and a cleanup failure fails the step.
 
 ## Additional Authentication for GitHub Tools
 
-In some circumstances you must use a GitHub PAT or GitHub app to give the GitHub tools used by your workflow additional capabilities.
-
-This authentication relates to **reading** information from GitHub. Additional authentication to write to GitHub is handled separately through various [Safe Outputs](/gh-aw/reference/safe-outputs/).
-
-This is required when your workflow needs read access to org or user information, other private repositories, projects, or GitHub tools [remote mode](#github-tools-access-modes).
+Some workflows need a GitHub PAT or GitHub App to read more than the default scope allows: org or user information, other private repositories, projects, or [remote mode](#github-tools-access-modes). This authentication is for **reading** only; writes are configured through [Safe Outputs](/gh-aw/reference/safe-outputs/).
 
 ### Using a Personal Access Token (PAT)
 
-If additional authentication is required, one way is to create a fine-grained PAT with appropriate permissions, add it as a repository secret, and reference it in your workflow:
+Create a fine-grained PAT, store it as a repository secret, and reference it in your workflow:
 
 1. Create a [fine-grained PAT](https://github.com/settings/personal-access-tokens/new?description=GitHub+Agentic+Workflows+-+GitHub+tools+access&contents=read&issues=read&pull_requests=read) (this link pre-fills the description and common read permissions) with repository access to the repos you need and read permissions that match your toolsets:
 
@@ -181,11 +166,11 @@ If additional authentication is required, one way is to create a fine-grained PA
 
 ### Using a GitHub App
 
-Alternatively, you can use a GitHub App for enhanced security. See [Using a GitHub App for Authentication](/gh-aw/reference/auth/#using-a-github-app-for-authentication) for complete setup instructions.
+A GitHub App is the more secure option. See [Using a GitHub App for Authentication](/gh-aw/reference/auth/#using-a-github-app-for-authentication) for complete setup instructions.
 
 ### Using a magic secret
 
-Alternatively, you can set the magic secret `GH_AW_GITHUB_MCP_SERVER_TOKEN` to a suitable PAT (see the above guide for creating one). This secret name is known to GitHub Agentic Workflows and does not need to be explicitly referenced in your workflow.
+Alternatively, set the magic secret `GH_AW_GITHUB_MCP_SERVER_TOKEN` to a suitable PAT. GitHub Agentic Workflows recognizes this name automatically, so it need not be referenced in frontmatter.
 
 ```bash wrap
 gh aw secrets set GH_AW_GITHUB_MCP_SERVER_TOKEN --value "<your-pat-token>"
@@ -193,7 +178,7 @@ gh aw secrets set GH_AW_GITHUB_MCP_SERVER_TOKEN --value "<your-pat-token>"
 
 ### Using the `dependabot` toolset
 
-The `dependabot` toolset requires the `vulnerability-alerts: read` and `security-events: read` permissions. These are now supported natively by `GITHUB_TOKEN`. Add them to your workflow's `permissions:` field:
+The `dependabot` toolset needs `vulnerability-alerts: read` and `security-events: read` in `permissions:`, which `GITHUB_TOKEN` supports natively:
 
 ```yaml
 permissions:
@@ -201,16 +186,16 @@ permissions:
   security-events: read
 ```
 
-Alternatively, you can authenticate with a PAT or GitHub App. If using a GitHub App, add `vulnerability-alerts: read` to your workflow's `permissions:` field and ensure the GitHub App is configured with this permission.
+A PAT or GitHub App also works. For an App, grant it `vulnerability-alerts: read` as well.
 
 ## Cross-Visibility Opt-Out (`private-to-public-flows`)
 
-By default, the MCP Gateway enforces _cross-visibility protections_ that prevent private repository data from flowing into public-repository sinks. These protections are active whenever the workflow runs in a public repository:
+In public repositories, the MCP Gateway enforces _cross-visibility protections_ that stop private repository data from reaching public sinks:
 
-- **`forcePublicRepos`** — restricts the GitHub MCP server to public repositories only at runtime, preventing private-data secrecy tags from accumulating in the agent's context.
-- **`sink-visibility` enforcement** — blocks any output to a sink whose visibility is `public` when the agent carries non-empty secrecy tags from private-repo reads.
+- **`forcePublicRepos`** — restricts the GitHub MCP server to public repositories at runtime.
+- **`sink-visibility` enforcement** — blocks output to a `public` sink when the agent holds secrecy tags from private-repo reads.
 
-When you intentionally need private-to-public data flows, declare `private-to-public-flows` under `tools.github`.
+To intentionally allow private-to-public flows, declare `private-to-public-flows` under `tools.github`.
 
 ### Blanket opt-out (`allow`)
 
@@ -220,7 +205,7 @@ tools:
     private-to-public-flows: allow
 ```
 
-This disables both `forcePublicRepos` and the default `sink-visibility` enforcement for **all** MCP servers. The MCP Gateway emits `"forcePublicRepos": false` in its startup config.
+This disables both `forcePublicRepos` and `sink-visibility` enforcement for **all** MCP servers (the gateway emits `"forcePublicRepos": false`).
 
 :::caution
 `private-to-public-flows` is **not compatible with strict mode** in either form. In non-strict mode, the compiler warns because GitHub Actions logs are public and agents may expose private data through public destinations.
@@ -240,9 +225,7 @@ mcp-servers:
     url: "http://localhost:9000/mcp"
 ```
 
-This exempts only the listed MCP server IDs from the default `sink-visibility` enforcement. `forcePublicRepos` is **not** disabled; private repo access still requires the allow-only policy to permit it. This form is rejected in strict mode.
-
-The compiler emits `"sinkVisibilityExemptServers": ["github", "my-custom-server"]` in the gateway config. The built-in GitHub MCP server ID is `github`. Custom server IDs match the key used in `mcp-servers`.
+This exempts only the listed server IDs from `sink-visibility` enforcement. `forcePublicRepos` stays in effect. The form is rejected in strict mode. The compiler emits the IDs as `"sinkVisibilityExemptServers"`; the built-in GitHub server ID is `github`, and custom IDs match their `mcp-servers` key.
 
 ### Security implications
 

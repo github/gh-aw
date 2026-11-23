@@ -42,6 +42,11 @@ func GetSafeOutputFieldKeys() ([]string, error) {
 
 // Imports register services but cannot select capabilities on the consumer's behalf.
 func validateSharedConnectorFields(frontmatter map[string]any) error {
+	if engine, ok := frontmatter["engine"].(map[string]any); ok {
+		if _, selected := engine["inference"]; selected {
+			return errors.New("select engine.inference in the main workflow; shared imports may only declare inference profiles")
+		}
+	}
 	value, present := frontmatter["connectors"]
 	if !present {
 		return nil
@@ -56,7 +61,7 @@ func validateSharedConnectorFields(frontmatter map[string]any) error {
 			return fmt.Errorf("connector %q must be an object", alias)
 		}
 		if _, declaration := config["endpoints"]; declaration {
-			for _, field := range []string{"triggers", "tools", "safe-outputs", "mcp-servers"} {
+			for _, field := range []string{"triggers", "tools", "safe-outputs", "mcp-servers", "inference"} {
 				if value, present := config[field]; present {
 					if _, definitions := value.(map[string]any); !definitions {
 						return fmt.Errorf("connector %q: %s must declare capabilities as an object; select capabilities in the main workflow", alias, field)
@@ -65,7 +70,7 @@ func validateSharedConnectorFields(frontmatter map[string]any) error {
 			}
 			continue
 		}
-		for _, field := range []string{"on", "tools", "context", "safe-outputs"} {
+		for _, field := range []string{"on", "tools", "context", "safe-outputs", "selected-inference"} {
 			if _, selected := config[field]; selected {
 				return fmt.Errorf("connector %q: select %s in the main workflow; shared imports may only register definition and connection", alias, field)
 			}

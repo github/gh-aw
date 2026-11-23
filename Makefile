@@ -110,6 +110,15 @@ test: test-unit test-integration
 test-unit-all:
 	go test -v -parallel=4 -timeout=10m -run='^Test' ./... -short
 
+.PHONY: test-unit-fast test-unit-slow
+test-unit-fast:
+	@pattern=$$(node scripts/go-unit-suite.cjs) && \
+	go test -v -parallel=4 -timeout=10m -run='^Test' -skip="$$pattern" ./... -short
+
+test-unit-slow:
+	@pattern=$$(node scripts/go-unit-suite.cjs) && \
+	go test -v -parallel=4 -timeout=10m -run="$$pattern" ./... -short
+
 # Run concurrency-heavy package tests with the Go race detector
 .PHONY: test-race
 test-race:
@@ -217,12 +226,13 @@ test-perf:
 # Run benchmarks for performance testing
 BENCH_PACKAGES ?= ./pkg/...
 BENCH_TIME ?= 3x
+BENCH_COUNT ?= 1
 BENCH_SKIP ?= ^$$
 .PHONY: bench
 bench: SHELL := /bin/bash -eu -o pipefail
 bench:
 	@echo "Running benchmarks..."
-	go test -bench=. -benchmem -benchtime=$(BENCH_TIME) -count=1 -skip='$(BENCH_SKIP)' -run=^$$ $(BENCH_PACKAGES) | tee bench_results.txt
+	go test -bench=. -benchmem -benchtime=$(BENCH_TIME) -count=$(BENCH_COUNT) -skip='$(BENCH_SKIP)' -run=^$$ $(BENCH_PACKAGES) | tee bench_results.txt
 
 # Run only critical performance benchmarks for daily monitoring
 # Uses time-based -benchtime (not a fixed low iteration count) so that results are
@@ -265,6 +275,7 @@ fuzz:
 	go test -fuzz=FuzzParseFrontmatter -fuzztime=30s ./pkg/parser/
 	go test -fuzz=FuzzExpressionParser -fuzztime=30s ./pkg/workflow/
 	go test -run='^$$' -fuzz=FuzzBashCommandParserModel -fuzztime=30s ./pkg/workflow/
+	go test -run='^$$' -fuzz=FuzzSkipIfQueryParser -fuzztime=30s ./pkg/workflow/
 
 # Run security regression tests
 .PHONY: test-security
@@ -556,13 +567,14 @@ test-workflow-tool-contracts:
 test-pageindex-workflow:
 	@set -eu; \
 	if ! command -v uv >/dev/null 2>&1; then \
-		echo "uv is required to run PageIndex workflow tests (requires pageindex==0.5.3)." >&2; \
+		echo "uv is required to run PageIndex workflow tests." >&2; \
 		exit 1; \
 	fi; \
 	tmp_dir=$$(mktemp -d); \
 	trap 'rm -rf "$$tmp_dir"' EXIT; \
 	uv venv --python 3.12 "$$tmp_dir/venv"; \
-	uv pip install --exclude-newer "$$(date -u -d '3 days ago' +%Y-%m-%dT%H:%M:%SZ)" --only-binary=:all: --python "$$tmp_dir/venv/bin/python" "pageindex==0.5.3"; \
+	uv pip sync --require-hashes --only-binary=:all: --python "$$tmp_dir/venv/bin/python" .github/workflows/requirements-pageindex.txt; \
+	uv pip check --python "$$tmp_dir/venv/bin/python"; \
 	"$$tmp_dir/venv/bin/python" scripts/test_pageindex_workflow.py
 
 .PHONY: test-scripts
@@ -621,6 +633,7 @@ test-all: test test-js test-wasm-golden test-scripts test-guidance
 .PHONY: test-guidance
 test-guidance:
 	python3 -m unittest discover -s .github/skills/agentic-workflows/tests -p 'test_*.py'
+	python3 -m unittest discover -s .github/skills/native-session-validation/scripts -p 'test_*.py'
 
 # Run tests with coverage
 .PHONY: test-coverage
@@ -1226,6 +1239,10 @@ check-otel-attributes:
 generate-otel-attributes:
 	npm run generate --prefix specs/otel
 
+.PHONY: spec-build
+spec-build:
+	node specs/otel/build_specs.mjs
+
 # Check file sizes and function counts
 .PHONY: check-file-sizes
 check-file-sizes:
@@ -1555,6 +1572,8 @@ help:
 	@echo "  test             - Run Go tests (unit + integration)"
 	@echo "  test-unit        - Run impacted Go unit tests first (~$(TEST_UNIT_MAX_SECONDS)s budget); set TEST_UNIT_RUN_FULL=1 for full suite"
 	@echo "  test-unit-all    - Run full Go unit test suite"
+	@echo "  test-unit-fast   - Run all unit tests except measured >=10s tests"
+	@echo "  test-unit-slow   - Run only measured >=10s unit tests"
 	@echo "  test-security    - Run security regression tests"
 	@echo "  check-agent-local-settings - Reject tracked Claude Code local permission settings"
 	@echo "  test-agent-local-settings - Test local settings secret-leak prevention"
@@ -1643,6 +1662,7 @@ help:
 	@echo "  generate-schema-docs - Generate frontmatter full reference documentation from JSON schema"
 	@echo "  session-schemas - Generate canonical and unified session JSON schemas from TypeScript declarations"
 	@echo "  check-session-schemas - Check generated session schemas for declaration drift"
+	@echo "  spec-build       - Compile TypeSpec contracts and emit schemas under dist/specs"
 	@echo "  generate-agent-factory     - Generate agent factory documentation page"
 	@echo "  generate-llms-txt  - Generate llms.txt at repository root from .github/aw/*.md"
 	@echo "  build-slides     - Build slides with Marp to docs/public/slides/gh-aw.html"

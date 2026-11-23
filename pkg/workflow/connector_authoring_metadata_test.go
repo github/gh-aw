@@ -124,7 +124,7 @@ func TestBundledConnectorAuthoringOrder(t *testing.T) {
 			require.Len(t, connectors.Content, 2)
 			declaration := connectors.Content[1]
 			checkConnectorMapOrder(t, declaration, []string{
-				"experimental", "docs", "endpoints", "credentials", "resources", "triggers", "tools", "mcp-servers", "safe-outputs",
+				"experimental", "docs", "endpoints", "credentials", "resources", "inference", "triggers", "tools", "mcp-servers", "safe-outputs",
 			})
 			for _, kind := range []string{"tools", "safe-outputs"} {
 				operations := connectorAuthoringField(declaration, kind)

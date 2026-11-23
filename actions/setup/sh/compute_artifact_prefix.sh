@@ -8,34 +8,21 @@ set +o histexpand
 # workflow run, all invocations would upload artifacts with identical names
 # (e.g. "activation", "agent") causing 409 Conflict errors.
 #
-# This script derives a unique prefix from the workflow inputs and run attempt so
-# that each distinct invocation produces separate artifact names (e.g.
-# "a1b2c3d4-activation", "e5f6a7b8-activation").
-#
-# Environment variables:
-#   INPUTS_JSON          (required) JSON-serialised workflow inputs, typically
-#                        set via ${{ toJSON(inputs) }} in the workflow step env.
-#                        Passed through an env-var to prevent template injection.
-#   GITHUB_RUN_ATTEMPT   (auto-provided by GitHub Actions) run attempt number,
-#                        ensures prefixes differ across retries of the same run.
-#
-# GitHub Actions output:
-#   prefix               8-hex-char SHA256 digest followed by "-"
-#                        (e.g. "a1b2c3d4-"), or empty string on error.
-#
-# Uniqueness guarantee:
-#   - Two calls with different inputs → different prefixes (collision-resistant SHA256).
-#   - Two calls with the same inputs on different run attempts → different prefixes
-#     because GITHUB_RUN_ATTEMPT is included in the digest.
-#   - Two calls with identical inputs on the same run attempt → same prefix (conflict).
-#     Callers MUST provide different inputs to avoid this edge case.
-#
-# Security:
-#   Inputs are consumed via an environment variable, never interpolated directly
-#   into the shell, preventing script-injection attacks.
+# Bind the prefix to the activation job's check run so consumers can identify
+# the invocation via the Jobs API even when concurrent calls share inputs.
 
 set -euo pipefail
 
+if [[ -v GH_AW_ACTIVATION_CHECK_RUN_ID ]]; then
+  if [[ ! "$GH_AW_ACTIVATION_CHECK_RUN_ID" =~ ^[1-9][0-9]*$ ]]; then
+    echo "::error::Cannot compute artifact prefix without an activation check run ID"
+    exit 1
+  fi
+  echo "prefix=call-${GH_AW_ACTIVATION_CHECK_RUN_ID}-" >> "$GITHUB_OUTPUT"
+  exit 0
+fi
+
+# Older compiled locks pass inputs instead of a check run ID.
 # INPUTS_JSON is set to ${{ toJSON(inputs) }} in the step env.
 # When a workflow_call has no inputs, toJSON(inputs) returns "{}", so "{}" is
 # the correct default for the no-inputs case (not an error).

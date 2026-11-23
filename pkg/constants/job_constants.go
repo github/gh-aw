@@ -75,6 +75,7 @@ const ConclusionAdmissionJobName JobName = "conclusion_admission"
 const GradersJobName JobName = "graders"
 const UnlockJobName JobName = "unlock"
 const PushExperimentsStateJobName JobName = "push_experiments_state"
+const ReportExperimentsJobName JobName = "report_experiments"
 const PushEvalsStateJobName JobName = "push_evals_state"
 const PushRepoMemoryJobName JobName = "push_repo_memory"
 const PushLedgerChangesJobName JobName = "push_ledger_changes"
@@ -147,6 +148,7 @@ var MaintenanceJobDependencies = map[string]JobName{
 	string(PushLedgerChangesJobName):    AgentJobName,
 	string(PushEvalsStateJobName):       AgentJobName,
 	string(PushExperimentsStateJobName): ActivationJobName,
+	string(ReportExperimentsJobName):    ConclusionJobName,
 }
 
 // IsCompilerOwnedJobName includes generated maintenance jobs, which are not

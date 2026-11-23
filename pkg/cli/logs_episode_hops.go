@@ -140,7 +140,7 @@ func explainEpisode(episode EpisodeData, runs []RunData, runEdges []EpisodeEdge)
 			continue
 		}
 		seenRuns[run.RunID] = true
-		view.RunCosts = append(view.RunCosts, EpisodeRunCost{RunID: run.RunID, Repository: run.Repository, Tokens: run.TokenUsage, AIC: run.AIC})
+		view.RunCosts = append(view.RunCosts, EpisodeRunCost{RunID: run.RunID, Repository: run.Repository, Tokens: run.TokenUsage, AIC: runAICValue(run)})
 		hops := run.EpisodeHops
 		if len(hops) == 0 && run.AwContext != nil {
 			hops = collectRunEpisodeHops(ProcessedRun{Run: WorkflowRun{DatabaseID: run.RunID, Repository: run.Repository, WorkflowName: run.WorkflowName}}, run.AwContext)

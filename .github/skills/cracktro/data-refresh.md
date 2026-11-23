@@ -26,6 +26,8 @@ Every slide that shows measured data has a refresh mini skill. Load only the one
 - **When adding or changing a data slide:** write or update its refresh skill and its Exception bullet in `content-rules.md` in the same change, and add a row to the table below. When a refresh shows that a published number is wrong (for example because of a result cap or a parsing bug), fix the slide, its notes, its `content-rules.md` Exception bullet and the plan's baseline together.
 - **Repo widgets** (`repoWidget(id, name, stars, cls)` in `deck.js`, used on Ponytail Reviewer, Index & search and Skills): the slide shows the hard-coded `stars` default and fetches the live count on https pages only. Refresh the default with `gh api repositories/<id> --jq .stargazers_count` and update the snapshot date in the slide's Exception bullet.
 
+The wizard is not a slide: refresh it with `refresh/wizard.md`.
+
 | Slide | Refresh skill |
 |---|---|
 | Human Agent Processes | `refresh/human-agent-processes.md` |
@@ -50,6 +52,7 @@ Every slide that shows measured data has a refresh mini skill. Load only the one
 | Skills in review | `refresh/skills-in-review.md` |
 | Ponytail Reviewer | `refresh/ponytail-reviewer.md` |
 | Inlined Skills & Agents | `refresh/inlined-skills-agents.md` |
+| It’s ok to say no(op) | `refresh/its-ok-to-say-noop.md` |
 | Fuzzy schedules | `refresh/fuzzy-schedules.md` |
 | Week of daily runs | `refresh/week-of-daily-runs.md` |
 | From Delivery to Value | `refresh/from-delivery-to-value.md` |

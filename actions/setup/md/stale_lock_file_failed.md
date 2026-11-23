@@ -58,8 +58,7 @@ gh aw compile
 <details>
 <summary>How to disable this check</summary>
 
-> [!CAUTION]
-> Disabling this check means the agent can run against an out-of-date compiled workflow. Only disable it if you have an alternative mechanism to keep lock files in sync.
+> **Caution:** Disabling this check means the agent can run against an out-of-date compiled workflow. Only disable it if you have an alternative mechanism to keep lock files in sync.
 
 Set `stale-check: false` in the `on:` section of your workflow frontmatter:
 

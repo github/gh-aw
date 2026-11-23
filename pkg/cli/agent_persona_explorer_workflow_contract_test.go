@@ -28,6 +28,12 @@ func TestAgentPersonaExplorerWorkflowSubAgentContract(t *testing.T) {
 	require.Len(t, agents, 1)
 	require.Equal(t, "persona-evaluator", agents[0].Name)
 	assert.Contains(t, main, "## Success Criteria", "Extraction must preserve the parent's publishing instructions")
+	assert.Contains(t, main, "Before reading guidance or scoring")
+	assert.Contains(t, main, "discard its recommendation")
+	assert.Contains(t, main, "Designer (DS-2)")
+	assert.Contains(t, main, "`color.*` or `spacing.*`")
+	assert.Contains(t, main, "WCAG 2.5.8 AA's 24 × 24 CSS px minimum")
+	assert.Contains(t, main, "the `design-system` and `accessibility` labels")
 
 	agent, err := parser.ExtractFrontmatterFromContent(agents[0].Content)
 	require.NoError(t, err)
@@ -36,5 +42,9 @@ func TestAgentPersonaExplorerWorkflowSubAgentContract(t *testing.T) {
 	assert.Equal(t, "inherit", agent.Frontmatter["model"], "Claude uses inherit, not inherited, for the parent model")
 	assert.Contains(t, agent.Markdown, ".github/agents/agentic-workflows.md")
 	assert.Contains(t, agent.Markdown, ".github/aw/create-agentic-workflow.md")
+	assert.Contains(t, agent.Markdown, "root_agents_md_context")
+	assert.Contains(t, agent.Markdown, "skill_inventory_context")
+	assert.Contains(t, agent.Markdown, "git_status_snapshot")
+	assert.Contains(t, agent.Markdown, "Do not claim absence")
 	assert.NotContains(t, agent.Markdown, "## Success Criteria", "Parent instructions must stay outside the evaluator")
 }

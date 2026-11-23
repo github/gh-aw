@@ -2256,6 +2256,16 @@ describe("log_parser_shared.cjs", () => {
       expect(result).toContain("**Message:** Nothing to do here");
     });
 
+    it.each([true, false])("should surface continuation requests without a title or body (plain=%s)", async isPlainText => {
+      const { formatSafeOutputsPreview } = await import("./log_parser_shared.cjs");
+      const result = formatSafeOutputsPreview(JSON.stringify({ type: "request_continuation", message: "Review the remaining packages" }), { isPlainText });
+
+      expect(result).toContain("request_continuation");
+      expect(result).toContain("Review the remaining packages");
+      expect(result).not.toContain("Title:");
+      expect(result).not.toContain("Body:");
+    });
+
     it("should surface the reason field for report_missing_tool/report_missing_data entries", async () => {
       const { formatSafeOutputsPreview } = await import("./log_parser_shared.cjs");
 

@@ -252,6 +252,9 @@ func parseThreatDetectionReportingFields(configMap map[string]any, threatConfig 
 func (c *Compiler) parseThreatDetectionEngineField(configMap map[string]any, threatConfig *ThreatDetectionConfig) {
 	engine, exists := configMap["engine"]
 	if !exists {
+		engine, exists = configMap["engine-config"]
+	}
+	if !exists {
 		return
 	}
 	// Handle boolean false to disable AI engine

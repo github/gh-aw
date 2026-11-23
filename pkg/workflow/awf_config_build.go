@@ -183,8 +183,8 @@ func BuildAWFConfigJSON(config AWFCommandConfig) (string, error) { //nolint:larg
 		awfConfigLog.Printf("Skipping apiProxy.enableTokenSteering: AWF version %q requires at least %s", getAWFImageTag(firewallConfig), constants.AWFTokenSteeringMinVersion)
 	}
 
-	if config.WorkflowData != nil && config.WorkflowData.EngineConfig != nil && len(config.WorkflowData.EngineConfig.FallbackModels) > 0 {
-		// An explicit ordered chain must not silently insert a catalog-selected model.
+	if usesConnectorInference(config.WorkflowData) || (config.WorkflowData != nil && config.WorkflowData.EngineConfig != nil && len(config.WorkflowData.EngineConfig.FallbackModels) > 0) {
+		// An exact connector grant or explicit chain must not silently insert a catalog-selected model.
 		disabled := TemplatableBool("false")
 		apiProxy.ModelFallback = &AWFModelFallbackConfig{Enabled: &disabled}
 	} else if mf := extractModelFallback(config.WorkflowData); mf != nil {

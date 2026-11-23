@@ -551,28 +551,37 @@ For comprehensive testing guidelines including assert vs require usage, table-dr
 Quick reference:
 - `make test-unit` - Impacted Go tests (30-second selected-runtime budget; compilation is additional)
 - `make test-unit-all` - Full Go unit test suite
+- `make test-unit-fast` - All unit tests except measured >=10s tests
+- `make test-unit-slow` - Only measured >=10s unit tests
 - `make agent-report-progress` - Final branch-scoped validation before pushing
 - `make agent-finish` - Explicit repository-wide maintenance sweep; not an inner-loop command
 
 ### CI Front Door
 
-CGO filters every check job on PRs through `scripts/ci-front-door.cjs`, including
-Go tests, security checks, linters, conformance, builds, fuzzing, and
-both macOS and Windows. Only checkout, selection, and timing/cache cleanup are
-unconditional infrastructure. Main-branch pushes,
+CGO uses `scripts/ci-front-door.cjs` on PRs to filter optional check jobs,
+including slow Go tests, security checks, linters, conformance, builds, fuzzing,
+and both macOS and Windows. The fast Go unit suite and its integration compilation
+prerequisite always run. Main-branch pushes,
 manual runs, and the weekly scheduled control run all applicable suites without
-calling the Decision API. CJS and Windows CI are unchanged.
+calling the Decision API. The Go coverage canary runs only on non-PR events,
+after both Go unit suites succeed. CJS and Windows CI are unchanged.
 
 Benchmarks run separately in `.github/workflows/benchmarks.yml`, only on main
 pushes, weekly schedules, or manual main-branch runs, never on PRs. CLI,
-workflow, workqueue, and other benchmark packages run in parallel. Workqueue
-replay uses one iteration per size instead of three; all sizes are retained.
+workflow, workqueue, and other benchmark packages run in parallel. Most shards
+target 100 ms per sample to reduce timing noise. Workqueue replay uses one
+iteration per sample and retains every ledger size.
 Routine benchmarks exclude external Zizmor/Poutine scanner invocations, which
 can measure container startup or timeouts rather than Go performance; the
 separate CGO security scan is unchanged. `make bench` still runs the full set
-locally. Use `BENCH_PACKAGES`, `BENCH_TIME`, and `BENCH_SKIP` to narrow a run.
+locally. Use `BENCH_PACKAGES`, `BENCH_TIME`, `BENCH_COUNT`, and `BENCH_SKIP` to
+configure a run.
 Each shard publishes its own results and compares with its previous main-branch
-baseline; the first run establishes the new shard baseline.
+baseline. The time-based shards use separate artifacts from the old
+fixed-iteration runs, so their first run establishes a fresh baseline.
+CI takes six samples per benchmark and fails on statistically significant
+increases above 10% in time, bytes allocated, or allocations per operation.
+Geomeans are reported but do not fail the gate.
 
 The selector uses GitHub Decisions at
 `https://api.githubcopilot.com/v1/decisions` with model `gpt-6-luna-decisions`.
@@ -588,12 +597,12 @@ trusted selector is skipped and older trusted versions fall back to all suites;
 the PR implementation is never used to bootstrap credential-bearing execution.
 No endpoint variable or PAT is needed, and credentials are never sent to another
 host. Missing tokens or denied inference permissions, including restricted fork
-PRs, run all suites.
+PRs, run all PR-eligible suites.
 A configured token makes one POST containing the diff summary and a named
 safe-to-omit predicate for every catalog job. The model decides relevance;
 there is no path allowlist or mandatory check-job list. Invalid inputs,
 empty/unavailable/incomplete evidence, and selector-policy changes bypass
-inference and retain all jobs.
+inference and retain all PR-eligible suites.
 There are no retries or redirects. Diff-evidence API requests are counted
 separately. Checkout, existing CI cache/artifact
 actions, and timing collection are outside this selector boundary.
@@ -617,35 +626,97 @@ first parent against the event on every page before filtering locks. A raw
 deadline still fails open. Local `CI_DIFF_WORKSPACE` evidence never fetches.
 
 GitHub returns a named safe-to-omit predicate for each check job.
-Probabilities at least 0.9 permit omission; probabilities at most 0.1 retain the
-suite. Any intermediate probability, refusal, missing/duplicate/unknown answer,
+Probabilities at least 0.9 permit omission of optional suites; lower probabilities
+retain the suite. A refusal, missing/duplicate/unknown answer,
 malformed JSON, non-200 status, 10-second deadline, or more than 16 KiB of response
 data forces all suites. The adapter preserves normalized replay responses such
 as `{"suite_ids":["build-wasm"],"confidence":0.95}`. Selected jobs retain
-their direct and transitive prerequisites: `test` requires
-`verify-integration-build`, `canary-go` requires `test`, and `security`,
+their direct and transitive prerequisites: `test` and `test-slow` require
+`verify-integration-build`, and `security`,
 `security-scan`, and `cross-platform-build` require `build`.
 Invalid IDs or missing prerequisites are rejected before reaching downstream job
 conditions. A skipped or failed decision job, step failure, or missing outputs
-also runs all check jobs. Selection runs independently of the checkout
-cache; all check jobs wait for its validated output on PRs. Cross-platform
+also runs all PR-eligible check jobs. Selection runs independently of the checkout
+cache; PR check jobs wait for its validated output. Cross-platform
 selection enables or omits both macOS and Windows together.
 Pushes and other non-PR events skip the decision job without suppressing
 any suite.
+
+The decision step summary shows retained and omitted suite counts at a glance.
+Expand **Suite selection and diagnostics** to see the suite IDs, fallback reason
+when applicable, and metrics. The selector still emits JSON to stdout and keeps
+its workflow outputs machine-readable.
 
 The same model-driven selection and prerequisite closure apply during
 recorded-response replay. Source, test-only, dependency, configuration, and
 unknown paths all reach the model; no path category automatically forces all
 jobs to run or skip. This is a relevance decision, not a guarantee of safety:
-uncertain answers still run every job, and independent full runs remain the
+uncertain answers retain the associated suite, and independent full runs remain the
 control for missed regressions.
 
 `.github/ci/suite-catalog.json` has schema version 1 and entries with a stable
 `id`, short `description`, `mandatory` flag, and
 `historical_duration_seconds` (nonnegative seconds, or `null` for unknown).
-All `mandatory` flags are false. IDs match the 24 selectable CGO check jobs.
+The `test` suite is mandatory; its prerequisite is included by the runtime.
+IDs match CGO check jobs.
 Adding a suite requires updating both the catalog and the runtime's fixed ID
 list, plus job wiring and tests. Never invent historical durations.
+
+### CGO unit-test timing
+
+The split uses completed top-level `pass`/`fail` events (not subtests) from
+[failed run 44921173289](https://github.com/github/gh-aw/actions/runs/44921173289)
+and [successful run 44880152498](https://github.com/github/gh-aw/actions/runs/44880152498),
+both on 2026-11-21. The ten slowest tests by maximum observed elapsed time:
+
+| Test | Package | Failed-run seconds | Successful-run seconds |
+|------|---------|-------------------:|-----------------------:|
+| `TestRepositoryAgenticWorkflows` | `pkg/workflow/lint` | 103.57 | 130.67 |
+| `TestRepositoryWorkflowsCompileWithoutEmitting` | `pkg/workflow` | 45.80 | 57.81 |
+| `TestLastAttemptCompletionCanSpendReservedClosureBytes` | `pkg/workqueue` | 50.39 | 44.70 |
+| `TestLinearAutomaticLookupFrozenHosts` | `pkg/workflow` | 35.79 | 33.71 |
+| `TestAzureBoundedReadersBundledNode` | `pkg/workflow` | 25.72 | 23.42 |
+| `TestCompileJSONOptionalScannerFindings` | `pkg/cli` | 15.05 | 22.00 |
+| `TestLintCacheModeLiteralsCLI` | `pkg/cli` | 19.12 | 20.29 |
+| `TestAzureDevOpsConnectorBundledNodeResponseIdentity` | `pkg/workflow` | 19.77 | 18.42 |
+| `TestNestedImportHashGoJavaScriptParity` | `pkg/parser` | 13.39 | 18.76 |
+| `TestUpdateUpgradeAutoMergeOrgDispatchErrors` | `pkg/cli` | 16.01 | 16.01 |
+
+The failed H-J shard's test step lasted 212 seconds, but its failure,
+`TestJavaScriptSummaryCatalogSourceIdentity`, took 0.00 seconds. Its reviewed
+runtime source hash no longer matched the source. This is an assertion failure,
+not a timeout or a slow-test failure; it remains in the fast suite. Compilation,
+setup and preceding tests delay feedback even for instantaneous failures.
+The A and N-R shards' longest package durations were 153.56 and 166.35 seconds.
+
+`.github/ci/go-unit-slow-tests.json` records the 20 tests taking at least
+10 seconds in either run, their packages, maxima, and four slow shards.
+The `test` job retains 12 alphabetical fast shards and excludes exactly those
+top-level names with `-skip`. `test-slow` runs those names with anchored `-run`
+patterns and five-minute package timeouts. Shared steps preserve coverage and
+failure artifacts under unique shard names. New tests default to fast; refresh
+the manifest from complete CGO artifacts when timings change. Move a whole
+top-level test, including all subtests, and keep its shard unique.
+
+The front door retains the fast suite (including new or unmeasured tests).
+It can omit the slow suite only when its coverage is unaffected. The coverage
+canary does not run on PRs. Main pushes, scheduled controls, and invalid/missing
+decisions still run both. The researcher mines cached test and job timing to
+identify candidates with critical-path savings rather than treating every slow
+test as skippable. Split-suite runner durations remain `null` in the
+catalog until measured: per-test times and old shard times cannot establish
+split-suite runner-minutes or a guaranteed fast-suite wall-clock budget.
+Local `test-unit-fast` and `test-unit-slow` retain the full suite's `-short`
+behavior; CI retains its existing non-short behavior.
+
+Download existing artifacts and rank tests without double-counting subtests:
+
+```bash
+gh run download RUN_ID --pattern 'test-result-cgo-unit-*' --dir "$TMPDIR/cgo-results"
+find "$TMPDIR/cgo-results" -name '*.json' -exec cat {} + |
+  jq -r 'select((.Action == "pass" or .Action == "fail") and .Test != null and (.Test | contains("/") | not)) | [.Elapsed, .Package, .Test, .Action] | @tsv' |
+  sort -rn | head -20
+```
 
 Run `node --test scripts/ci-front-door.test.cjs scripts/ci-front-door-workflow.test.cjs`
 for selector and workflow trust-boundary conformance checks.

@@ -23,6 +23,9 @@ type connectorDevelopmentReadHost struct {
 }
 
 func testDevelopmentConnector(ctx context.Context, output io.Writer, declaration *workflow.DevelopmentConnector, options *connectorDevelopmentOptions, getenv func(string) string, client *http.Client) error {
+	if options.phase == "inference" {
+		return errors.New("inference profiles configure the workflow engine, not connector test operations; validate a consumer with gh aw compile --strict --no-emit (no live inference)")
+	}
 	args, err := decodeDevelopmentConnectorArguments(options)
 	if err != nil {
 		return err

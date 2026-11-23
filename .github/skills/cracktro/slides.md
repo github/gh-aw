@@ -32,7 +32,7 @@ sandbox, firewall, read-only token
 - **Notes** (optional): `illustrative` when the speaker notes must match `/illustrative|synthetic|simulated/i`; omit the field otherwise.
 - **Summary**: one public sentence with the slide's executive takeaway. Start band headers with `Band header (<band>):`. Describe the durable point, not measured counts or dates that age. No URLs, handles or slide numbers.
 - **Keywords**: comma-separated public search terms a viewer might type for this slide: synonyms, acronyms, feature and option names, pattern names. Prefer terms absent from the Heading and Summary; each must be accurate for the slide. No URLs, handles or slide numbers.
-- **Captions**: the kiosk closed captions (C): a short two-speaker TV news conversation retelling the Summary, one `- ` list item per turn, at least two turns, alternating speakers (each turn a sentence or two). Public, plain text: no URLs, handles, slide numbers, real people or mascot names.
+- **Captions**: the kiosk closed captions (C), also spoken by the voice (V): a short two-speaker TV news conversation retelling the Summary, one `- ` list item per turn, at least two turns, alternating speakers (each turn a sentence or two). Public, plain text: no URLs, handles, slide numbers, real people or mascot names.
 
 A field's lines join with spaces, so long text may wrap. `docs/src/lib/cracktro/slides.js` parses this file and fails, with the line number, on a malformed slide title, an invalid Id, an unknown, repeated, missing or out-of-order field, an empty Heading, Summary, keyword or caption turn, fewer than two caption turns, an unknown Notes value or a duplicate. The docs build injects every slide into the talk page's JSON-LD (`hasPart`: position, name, description, keywords, `#<id>` URL); the deck's fuzzy search (`/`) reads keywords from there, and `docs/tests/talk.spec.ts` checks the deck's ids, headings and that metadata against this list. The build and dev server also generate `cracktro/captions.js` (`window.CracktroCaptions`) from the Captions fields; it is never committed, so the plain `python3 -m http.server` preview has no captions and kiosk CC falls back to each slide's notes.
 
@@ -157,7 +157,7 @@ runners, OIDC, Entra ID, Vault, GitHub Apps, marketplace, reusable workflows, cu
 - What about the identity plumbing, things like Entra ID and Vault OIDC, or custom jobs?
 - All reused, along with reusable workflow calls. Every piece of your Actions infrastructure keeps doing its job.
 
-### Turn Intent to Workflow {#turn-intent-to-workflow}
+### Turn Intent to Workflows {#turn-intent-to-workflow}
 
 #### Summary
 
@@ -237,7 +237,7 @@ Agent Persona Explorer, personas, evaluation, scoring, prefix probe, 8000 bytes,
 - What happens when an answer falls short?
 - It checks what fits in the first eight thousand bytes, files the gaps, and an agent fixes the guidance.
 
-### Turn Workflow to Value {#turn-workflow-to-value}
+### Turn Workflows to Value {#turn-workflow-to-value}
 
 #### Notes
 
@@ -258,7 +258,7 @@ ROI, metrics, outcomes, backlog burndown, delivery speed, value
 - So the measure is results on the board, not just how busy the robots look?
 - Exactly. Outcomes are what show the value of agentic workflows, and teams can track them over time.
 
-### Workflows → Process → Factory {#workflows-process-factory}
+### Build The Factory That Works For You {#workflows-process-factory}
 
 #### Notes
 
@@ -266,18 +266,20 @@ illustrative
 
 #### Summary
 
-Every factory is made of processes: a workflow goes from an issue to an agent to a pull request, sequencing workflows makes a process, and processes that feed each other, on any harness with developers at the gates, make a factory.
+Processes create factories: the Repo Factory recipe gives a repository five agentic roles that hand work along through issues and pull requests: several Researchers file issues, one Dispatcher admits them into a few shared weekday coding slots, and each slot runs its own pull request flow in which a Coder writes the change and several Reviewers and a Finisher loop on it for a bounded number of rounds before a maintainer decides, and a Dreamer turns measured outcomes into one proposed change at a time.
 
 #### Keywords
 
-workflows, process, factory, sequencing, composition, chaining, safe outputs, zoom out, blueprint, harnesses, engines, human in the loop
+Build The Factory That Works For You, A Factory of Factories, Workflows → Process → Factory, Turn Workflows into Factories, factory factory, processes create factories, Repo Factory, workflows, process, composition, blueprint, factory, roles, Researchers, Dispatcher, Reviewers, Finisher, Dreamer, Coder, coding agents, capacity, coding slots, concurrent pull requests, pull request flow, review loop, re-review, CI loop, iterate, weekdays, handoffs, recipe, bootstrap, Issue Monster, PR Sous Chef, maintainer gate
 
 #### Captions
 
-- Zooming out tonight: how single workflows add up to something much bigger.
-- Start small. One workflow takes an issue, hands it to an agent and comes back with a pull request.
-- And when you line several of those up, one after another?
-- Sequence them and you have a process. Let processes feed each other, on any harness, with developers at the gates, and you have a factory.
+- A factory of factories: processes create factories, and this one starts small: a Coder opens a pull request and iterates until CI passes.
+- Then it grows: several Reviewers and a Finisher loop on each pull request for at most two rounds.
+- A maintainer still decides every merge.
+- One Dispatcher starts those pull request flows, up to three at once, one per shared weekday coding slot.
+- Several Researchers feed the Dispatcher with scoped issues, never pull requests.
+- And a Dreamer watches the outcomes, then proposes one reversible change as a new issue, so the factory grows: more Researchers, more Reviewers.
 
 ### Security {#security}
 
@@ -439,6 +441,28 @@ writes, threat detection, safe-outputs, scoped jobs, permissions, proposals, YAM
 - So who actually presses the button once a proposal is cleared?
 - A separate, scoped job applies only the declared outputs, adding the configured prefix and labels. The agent itself never writes.
 
+### Extend safe outputs {#extend-safe-outputs}
+
+#### Notes
+
+illustrative
+
+#### Summary
+
+Every agent write is a typed tool: built-in handlers cover common GitHub writes such as issues, pull requests, comments and labels, safe scripts add inline JavaScript run once per call without secrets, and safe jobs add a custom Actions job with its own steps and secrets, all behind threat detection and outside the sandbox.
+
+#### Keywords
+
+extensibility, custom safe outputs, safe-outputs.scripts, safe-outputs.jobs, safe-outputs.actions, inline script handlers, custom jobs, MCP tools, GH_AW_AGENT_OUTPUT, create-issue, create-pull-request, add-comment, create-discussion, add-labels, update-issue, push-to-pull-request-branch, chat notification, webhooks, secrets, built-in handlers
+
+#### Captions
+
+- Safe outputs are not a closed list. Tonight: how teams extend what an agent may change.
+- Built-in handlers cover the common GitHub writes, such as issues, pull requests, comments and labels.
+- And when a team needs something gh-aw does not ship, like a chat notification?
+- A safe script adds a little JavaScript that runs once per call, with no secrets.
+- A safe job is a full Actions job with its own steps and secrets. All three stay typed tools, behind threat detection, outside the sandbox.
+
 ### Model-checked {#model-checked}
 
 #### Notes
@@ -501,6 +525,23 @@ red team, firewall escape, pentest, adversarial, security testing
 - A daily red-team agent keeps trying new ways to escape the agent firewall.
 - And when it actually succeeds? That sounds like bad news for someone.
 - It is good news, really. Each escape it finds gets turned into a fix for the firewall.
+
+### Responsible AI {#responsible-ai}
+
+#### Summary
+
+GitHub Agentic Workflows supports responsible AI principles (fairness, reliability and safety, privacy and security, inclusiveness, transparency and accountability) through reviewable instructions, a sandboxed agent, gated writes and traceable outputs, as safeguards rather than guarantees.
+
+#### Keywords
+
+RAI, responsible AI principles, fairness, reliability and safety, privacy and security, inclusiveness, transparency, accountability, AI-generated footer, staged mode, safe outputs, manual-approval, roles, human in the loop, read-only token, min-integrity, threat detection, transparency note
+
+#### Captions
+
+- Responsible AI has six principles on paper. How do they show up in an agent that runs in your repository?
+- Each one maps to a control. Reliability and privacy come from the sandbox, the read-only token and filtered input.
+- And who answers for what the agent posts?
+- People do. The agent only proposes, every post links back to its run, and owners still trial each workflow.
 
 ### Stop manually translating intent into code. {#stop-manually-translating-intent-into-code}
 
@@ -1207,20 +1248,20 @@ trust, review, process, confidence, skim
 - So we keep improving the process until what, exactly?
 - Until a quick skim is enough. Build confidence into the process, and trust it.
 
-### Cost Optimization {#cost-optimization}
+### FinOps {#cost-optimization}
 
 #### Summary
 
-Band header (Cost Optimization): debug, spend less and route smarter.
+Band header (FinOps): more value, less tokens.
 
 #### Keywords
 
-cost, spend, tokens, budget, savings
+FinOps, cost optimization, cost, spend, tokens, budget, savings
 
 #### Captions
 
-- Coming up next, our Cost Optimization segment. Stay with us.
-- We will look at how to debug agents, spend less on them, and route smarter.
+- Coming up next, our FinOps segment. Stay with us.
+- We will look at how to get more value from agents while spending fewer tokens.
 - Keep your wallets handy, folks. Stay with us.
 
 ### Cost management {#cost-management}
@@ -1469,6 +1510,27 @@ skip, gates, noop, skip-if, pre-activation, cheap checks
 - The cheapest agent call is the one never made. Cheap deterministic gates, from triggers to noop short-circuits, run first.
 - And what if those cheap gates cannot decide on their own?
 - Only then, if necessary, an experimental model-based skip decision steps in. Cheap checks first, agents last.
+
+### It’s ok to say no(op) {#its-ok-to-noop}
+
+#### Notes
+
+illustrative
+
+#### Summary
+
+When there is nothing to do an agent calls the noop safe output instead of inventing work, and when a run goes wrong it reports the missing tool, missing data or incomplete run rather than faking a result. Measured runs of gh-aw itself, counted with gh aw audit, show how often each honest outcome occurs.
+
+#### Keywords
+
+noop, no-op, hallucination, report_missing_tool, report_missing_data, report_incomplete, missing tool, missing data, honest failure, diagnostics, gh aw audit, measured
+
+#### Captions
+
+- Tonight, a lesson in honesty: sometimes the best thing an agent can do is nothing at all.
+- When there is nothing to do, the agent calls the noop safe output instead of inventing an issue or a fake finding.
+- And when a run hits a wall, say a missing tool, missing data or a crashed server?
+- It reports exactly that, missing tool, missing data or incomplete, instead of faking a result. Silence never counts as a noop.
 
 ### Fuzzy schedules {#fuzzy-schedules}
 
@@ -2249,6 +2311,23 @@ create-pull-request, patch, signed commits, git push, safe output
 - The create-pull-request safe output turns local commits into a pull request through scanning and file policy checks.
 - And can reviewers trust the pushes that come out of it?
 - They are signed, and if a pull request cannot be created, it falls back to opening issues.
+
+### Choose your own workflow {#choose-your-own-workflow}
+
+#### Summary
+
+Choose your own workflow: a gamebook wizard walks through a goal, a pattern, a trigger, safe outputs, extras and an engine, and ends with a prompt that asks your agent to build the workflow.
+
+#### Keywords
+
+wizard, workflow wizard, gamebook, choose your own adventure, workflow generator, getting started, prompt, W key, quest, pattern, trigger, schedule, safe outputs, engine, agentic-workflows
+
+#### Captions
+
+- Where do you start with your first workflow?
+- Open the book. Pick a quest, the hour it wakes and what it may write.
+- Then choose the agent at your side.
+- The last page is a prompt. Paste it into your agent and it builds the workflow.
 
 ### GıtHub Agentic Workflows {#finale}
 

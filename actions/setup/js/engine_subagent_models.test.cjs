@@ -118,6 +118,35 @@ describe("Claude sub-agent models (Typist run 39415087125)", () => {
     expect(run.records()).toEqual([expect.objectContaining({ role: "duplicate-type-finder", status: "failed", cause: "catalog_unavailable" })]);
   });
 
+  it("passes declared models through verbatim with model-catalog false and no catalogue, keeping the provider check", async () => {
+    const run = layout();
+    run.env.GH_AW_MODEL_CATALOG = "false";
+    stageInline(run, "claude", { "duplicate-type-finder": typistAgent().replace("model: small", "model: claude-gateway-deployment"), "wrong-provider": typistAgent().replace("model: small", "model: openai/gpt-5") });
+    // Fixture mutation: a BYOK provider without a /models route (empty inventory).
+    const reflectData = runs.typistReflect();
+    reflectData.models_fetch_complete = false;
+    reflectData.endpoints.forEach(endpoint => (endpoint.models = null));
+    let refreshes = 0;
+
+    const outcome = await applyClaudeSubagentModels({
+      reflectData,
+      refetchReflectData: async () => (refreshes++, reflectData),
+      provider: "anthropic",
+      workspaceDir: run.workspaceDir,
+      agentsBaseDir: run.agentsBaseDir,
+      env: run.env,
+      logger: run.logger,
+    });
+
+    expect(outcome.ok).toBe(false);
+    expect(refreshes).toBe(0);
+    expect(outcome.resolutions).toEqual([{ name: "duplicate-type-finder", configuredModel: "claude-gateway-deployment", model: "claude-gateway-deployment", status: "exact" }]);
+    expect(run.records()).toEqual([
+      expect.objectContaining({ role: "duplicate-type-finder", resolved_model: "claude-gateway-deployment", status: "exact", cause: null }),
+      expect.objectContaining({ role: "wrong-provider", status: "failed", cause: "model_unavailable" }),
+    ]);
+  });
+
   it("records every agent as catalog_unavailable when the /reflect refresh rejects", async () => {
     const run = layout();
     stageInline(run, "claude", { "first-worker": typistAgent().replace("model: small", "model: claude-haiku-5-5"), "second-worker": typistAgent().replace("model: small", "model: claude-sonnet-5-5") });
@@ -838,6 +867,22 @@ describe("Codex sub-agent endpoint compatibility (purelock run 39601756922)", ()
     expect(run.logs).toContainEqual(expect.stringMatching(/has no complete endpoint metadata .*cannot be verified that it supports \/responses/));
     expect(run.logs.join("\n")).not.toMatch(/does not list \/responses/);
     expect(roleFiles(run)).toEqual([]);
+  });
+
+  it("skips the endpoint metadata check with model-catalog false", async () => {
+    const run = codexLayout();
+    run.env.GH_AW_MODEL_CATALOG = "false";
+    // Fixture mutation: the recorded test-writer pinned to gpt-4o, whose recorded entry is incomplete.
+    stageInline(run, "codex", { "test-writer": purelockAgent().replace("model: large", "model: gpt-4o") });
+    const reflectData = runs.purelockReflect();
+    reflectData.models_fetch_complete = false;
+    reflectData.endpoints.forEach(endpoint => (endpoint.models = null));
+
+    const outcome = await apply(run, { reflectData });
+
+    expect(outcome.ok).toBe(true);
+    expect(outcome.resolutions).toEqual([{ name: "test-writer", configuredModel: "gpt-4o", model: "gpt-4o", status: "exact" }]);
+    expect(roleFiles(run)).toEqual(["test-writer.toml"]);
   });
 
   it("keeps alias candidates with unknown endpoints and accepts them once a refresh verifies them", async () => {

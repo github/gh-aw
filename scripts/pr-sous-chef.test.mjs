@@ -584,8 +584,8 @@ test("targeted refresh uses explicit GraphQL metadata and paginated REST checks"
     calls.push(args);
     if (args[1] === "graphql") return metadataResponse();
     if (args[1] === "repos/github/gh-aw/commits/abc") return headCommit;
-    if (args[1].includes("/check-runs?")) return [{ check_runs: [{ name: "CGO", status: "completed", conclusion: "failure", html_url: "https://github.com/run/1" }] }];
-    return [{ statuses: [{ context: "external-ci", state: "pending", target_url: "https://github.com/run/2" }] }];
+    if (args[1].includes("/check-runs?")) return { total_count: 1, check_runs: [{ name: "CGO", status: "completed", conclusion: "failure", html_url: "https://github.com/run/1" }] };
+    return { total_count: 1, statuses: [{ context: "external-ci", state: "pending", target_url: "https://github.com/run/2" }] };
   });
   assert.equal(candidate.number, 42);
   assert.equal(calls[0][1], "graphql");
@@ -595,14 +595,164 @@ test("targeted refresh uses explicit GraphQL metadata and paginated REST checks"
   assert.deepEqual(calls[0].slice(4), ["-f", "owner=github", "-f", "name=gh-aw", "-F", "number=42"]);
   assert.deepEqual(calls.slice(1), [
     ["api", "repos/github/gh-aw/commits/abc"],
-    ["api", "repos/github/gh-aw/commits/abc/check-runs?per_page=100&filter=latest", "--paginate", "--slurp"],
-    ["api", "repos/github/gh-aw/commits/abc/status?per_page=100", "--paginate", "--slurp"],
+    ["api", "repos/github/gh-aw/commits/abc/check-runs?per_page=100&filter=latest&page=1"],
+    ["api", "repos/github/gh-aw/commits/abc/status?per_page=100&page=1"],
   ]);
   assert.equal(candidate.mergeStateStatus, "CONFLICTING");
   assert.equal(candidate.baseRefName, "main");
   assert.equal(candidate.headCommittedAt, recent);
   assert.equal(candidate.statusCheckRollup[0].conclusion, "FAILURE");
   assert.equal(candidate.statusCheckRollup[1].state, "PENDING");
+});
+
+test("check and status pagination keeps every page on the guarded exact-head repository route", async () => {
+  const checks = Array.from({ length: 205 }, (_, i) => ({ name: `check-${i}`, status: "completed", conclusion: i === 204 ? "failure" : "success" }));
+  const statuses = Array.from({ length: 201 }, (_, i) => ({ context: `status-${i}`, state: i === 200 ? "pending" : "success" }));
+  const { api, calls } = queueAPI({ checks, statuses });
+  const candidate = await fetchCandidate("github/gh-aw", "42", api);
+  assert.equal(candidate.statusCheckRollup.length, checks.length + statuses.length);
+  assert.deepEqual(
+    candidate.statusCheckRollup.slice(0, checks.length).map(check => check.name),
+    checks.map(check => check.name)
+  );
+  assert.deepEqual(
+    candidate.statusCheckRollup.slice(checks.length).map(check => check.context),
+    statuses.map(check => check.context)
+  );
+  assert.equal(candidate.statusCheckRollup[204].conclusion, "FAILURE");
+  assert.equal(candidate.statusCheckRollup.at(-1).state, "PENDING");
+  assert.deepEqual(
+    calls.slice(2),
+    [
+      "check-runs?per_page=100&filter=latest&page=1",
+      "check-runs?per_page=100&filter=latest&page=2",
+      "check-runs?per_page=100&filter=latest&page=3",
+      "status?per_page=100&page=1",
+      "status?per_page=100&page=2",
+      "status?per_page=100&page=3",
+    ].map(endpoint => ["api", `repos/github/gh-aw/commits/abc/${endpoint}`])
+  );
+});
+
+test("check and status refreshes reject missing, malformed, filtered, or changing pages", async () => {
+  for (const field of ["check_runs", "statuses"]) {
+    const item = field === "check_runs" ? { name: "CGO", status: "completed", conclusion: "success" } : { context: "external-ci", state: "success" };
+    const fullPage = { total_count: 101, [field]: Array.from({ length: 100 }, () => item) };
+    const invalidItems =
+      field === "check_runs"
+        ? [
+            { ...item, name: null },
+            { ...item, status: null },
+            { ...item, conclusion: undefined },
+            { ...item, conclusion: 1 },
+          ]
+        : [
+            { ...item, context: null },
+            { ...item, state: null },
+          ];
+    for (const pages of [
+      [null],
+      [[]],
+      [{}],
+      [{ total_count: 0 }],
+      [{ [field]: [] }],
+      [{ total_count: "0", [field]: [] }],
+      [{ total_count: -1, [field]: [] }],
+      [{ total_count: 0.5, [field]: [] }],
+      [{ total_count: Number.MAX_SAFE_INTEGER + 1, [field]: [] }],
+      [{ total_count: 0, [field]: null }],
+      [{ total_count: 0, [field]: [item] }],
+      [{ total_count: 1, [field]: [] }],
+      [{ total_count: 101, [field]: [item] }],
+      ...[null, {}, ...invalidItems].map(entry => [{ total_count: 1, [field]: [entry] }]),
+      [fullPage, null],
+      [fullPage, { total_count: 101 }],
+      [fullPage, { total_count: 101, [field]: [] }],
+      [fullPage, { total_count: 101, [field]: [null] }],
+      [fullPage, { total_count: 101, [field]: [item, item] }],
+      [fullPage, { total_count: 100, [field]: [] }],
+      [fullPage, { total_count: 102, [field]: [item, item] }],
+    ]) {
+      const { api } = queueAPI();
+      let pageCalls = 0;
+      await assert.rejects(
+        () =>
+          fetchCandidate("github/gh-aw", "42", args => {
+            if (args[1].includes(field === "check_runs" ? "/check-runs?" : "/status?")) return pages[pageCalls++];
+            return api(args);
+          }),
+        new RegExp(`PR #42: could not refresh ${field}`)
+      );
+      assert.equal(pageCalls, pages.length);
+    }
+  }
+});
+
+test("explicit zero totals with empty collections are valid check and status refreshes", async () => {
+  const { api, calls } = queueAPI();
+  assert.deepEqual((await fetchCandidate("github/gh-aw", "42", api)).statusCheckRollup, []);
+  assert.equal(calls.length, 4);
+});
+
+test("status refresh handles the gateway's rewritten singleton count on every page", async () => {
+  for (const statuses of [[], [{ context: "external-ci", state: "failure" }], ...[100, 101, 201].map(count => Array.from({ length: count }, (_, i) => ({ context: `status-${i}`, state: "success" })))]) {
+    const { api } = queueAPI({ statuses });
+    const candidate = await fetchCandidate("github/gh-aw", "42", async args => {
+      const response = await api(args);
+      return args[1].includes("/status?") ? { ...response, sha: "abc", state: "success", total_count: 1, incomplete_results: false } : response;
+    });
+    assert.deepEqual(
+      candidate.statusCheckRollup.map(check => check.context),
+      statuses.map(check => check.context)
+    );
+    if (statuses.length === 1) assert.equal(candidate.statusCheckRollup[0].state, "FAILURE");
+  }
+});
+
+test("status refresh accepts the gateway's combined error state", async () => {
+  const { api } = queueAPI({ statuses: [{ context: "external-ci", state: "error" }] });
+  const candidate = await fetchCandidate("github/gh-aw", "42", async args => {
+    const response = await api(args);
+    return args[1].includes("/status?") ? { ...response, sha: "abc", state: "error", total_count: 1, incomplete_results: false } : response;
+  });
+  assert.deepEqual(candidate.statusCheckRollup.map(check => check.state), ["ERROR"]);
+});
+
+test("status refresh rejects gateway pagination that repeats or never ends", async () => {
+  for (const distinct of [false, true]) {
+    const { api } = queueAPI();
+    let pageCalls = 0;
+    await assert.rejects(
+      () =>
+        fetchCandidate("github/gh-aw", "42", args => {
+          if (!args[1].includes("/status?")) return api(args);
+          const page = pageCalls++;
+          const statuses = Array.from({ length: 100 }, (_, i) => ({ context: `status-${distinct ? page : 0}-${i}`, state: "success" }));
+          return { sha: "abc", state: "success", total_count: 1, incomplete_results: false, statuses };
+        }),
+      /PR #42: could not refresh statuses/
+    );
+    assert.equal(pageCalls, distinct ? 10 : 2);
+  }
+});
+
+test("status refresh rejects filtered, wrong-head, and malformed gateway responses", async () => {
+  const valid = { sha: "abc", state: "success", total_count: 1, incomplete_results: false, statuses: [] };
+  for (const response of [
+    { ...valid, total_count: 0 },
+    { ...valid, total_count: 0, statuses: [{ context: "external-ci", state: "failure" }] },
+    { ...valid, total_count: 2 },
+    { ...valid, sha: "other" },
+    { ...valid, sha: undefined },
+    { ...valid, state: undefined },
+    { ...valid, incomplete_results: true },
+    { ...valid, statuses: null },
+    { ...valid, statuses: [null] },
+    { ...valid, statuses: Array.from({ length: 101 }, () => ({ context: "external-ci", state: "success" })) },
+  ]) {
+    const { api } = queueAPI();
+    await assert.rejects(() => fetchCandidate("github/gh-aw", "42", args => (args[1].includes("/status?") ? response : api(args))), /PR #42: could not refresh statuses/);
+  }
 });
 
 test("targeted refresh fails closed when metadata is incomplete or the PR is absent", async () => {
@@ -1182,8 +1332,12 @@ function queueAPI({ listed = [pr], candidate = graphPr, head = headCommit, check
       if (args[1] === "rate_limit") return budgets;
       if (args[0] === "pr") return listed;
       if (args[1] === "graphql" && args[3].includes("headRefOid")) return metadataResponse(candidate);
-      if (args[1].includes("/check-runs?")) return [{ check_runs: checks }];
-      if (args[1].includes("/status?")) return [{ statuses }];
+      if (args[1].includes("/check-runs?") || args[1].includes("/status?")) {
+        const page = Number(new URL(args[1], "https://api.github.com/").searchParams.get("page"));
+        const field = args[1].includes("/check-runs?") ? "check_runs" : "statuses";
+        const items = field === "check_runs" ? checks : statuses;
+        return { total_count: items.length, [field]: items.slice((page - 1) * 100, page * 100) };
+      }
       if (args[1] === `repos/github/gh-aw/commits/${candidate.headRefOid}`) return head;
       if (args[1].includes("/actions/runs?status=completed&event=dynamic")) return { workflow_runs: completedRuns };
       if (args[1].includes("/actions/runs?") || args[1].includes("/actions/workflows/pr-finisher.lock.yml/runs?")) return [{ workflow_runs: args[1].includes("status=action_required") ? approvals : runs }];
@@ -1733,6 +1887,45 @@ test("check-runs HTTP 500 exhaustion fails closed after the bounded retries", as
   assert.ok(!calls.some(args => args[1].includes("/status?") || args[1].includes("/actions/")));
 });
 
+test("check and status page HTTP 403 stops the queue without retry or alternate routes", async t => {
+  const { config, delays } = retryTestConfig(t);
+  for (const endpoint of ["/check-runs?", "/status?"]) {
+    delays.length = 0;
+    const { api } = queueAPI({
+      checks: Array.from({ length: 101 }, (_, i) => ({ name: `check-${i}`, status: "completed", conclusion: "success" })),
+      statuses: Array.from({ length: 101 }, (_, i) => ({ context: `status-${i}`, state: "success" })),
+    });
+    const calls = [];
+    await assert.rejects(
+      () =>
+        fetchQueue(
+          "github/gh-aw",
+          undefined,
+          args =>
+            gh(
+              args,
+              async (_command, commandArgs) => {
+                calls.push(commandArgs);
+                if (commandArgs[1].includes(endpoint) && commandArgs[1].endsWith("&page=2")) {
+                  throw Object.assign(new Error("Command failed"), { code: 1, stderr: "gh: HTTP 403 numeric repository routes require guarded repository selectors" });
+                }
+                return { stdout: JSON.stringify(api(commandArgs)) };
+              },
+              config
+            ),
+          now
+        ),
+      /HTTP 403/
+    );
+    const denied = calls.filter(args => args[1].includes(endpoint) && args[1].endsWith("&page=2"));
+    assert.equal(denied.length, 1);
+    assert.equal(calls.at(-1), denied[0]);
+    assert.deepEqual(delays, []);
+    assert.ok(!calls.some(args => args[1].startsWith("repositories/")));
+    assert.ok(calls.filter(args => args[1].includes("/check-runs?") || args[1].includes("/status?")).every(args => args.length === 2 && args[1].startsWith("repos/github/gh-aw/commits/abc/")));
+  }
+});
+
 test("cheap metadata exclusions avoid all detail and active-run reads", async () => {
   for (const [changes, reason] of [
     [{ isDraft: true }, "closed_or_draft"],
@@ -1778,8 +1971,8 @@ test("metadata is rechecked when the PR changed after list enumeration", async (
 
 test("pending checks and active agent checks avoid review and run lookups", async () => {
   for (const [check, reason] of [
-    [{ name: "build", status: "queued", created_at: "2026-10-03T17:55:00Z" }, "checks_pending"],
-    [{ name: "Copilot coding agent", status: "in_progress", started_at: recent }, "agent_active"],
+    [{ name: "build", status: "queued", conclusion: null, created_at: "2026-10-03T17:55:00Z" }, "checks_pending"],
+    [{ name: "Copilot coding agent", status: "in_progress", conclusion: null, started_at: recent }, "agent_active"],
   ]) {
     const { api, calls } = queueAPI({ checks: [check] });
     assert.equal((await fetchQueue("github/gh-aw", undefined, api, now)).skipped[0].skip_reason, reason);
@@ -1790,7 +1983,7 @@ test("pending checks and active agent checks avoid review and run lookups", asyn
 test("approval-required runs are discovered by conclusion, scoped to the PR branch", async () => {
   for (const check of [
     { name: "CGO", status: "completed", conclusion: "action_required" },
-    { name: "CGO", status: "waiting" },
+    { name: "CGO", status: "waiting", conclusion: null },
   ]) {
     const { api, calls } = queueAPI({
       candidate: { ...graphPr, mergeStateStatus: "BLOCKED" },

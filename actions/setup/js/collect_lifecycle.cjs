@@ -59,7 +59,7 @@ function readLedger(filename) {
       throw new Error(`${ERR_PARSE}: Invalid retained lifecycle JSONL at line ${event.lineNumber}`, { cause: event.error });
     }
     const row = event.value;
-    if (row?.schema_version !== 7 || row.kind !== "output_lifecycle" || typeof row.lifecycle?.id !== "string" || rows.has(row.lifecycle.id)) {
+    if (![7, 8].includes(row?.schema_version) || row.kind !== "output_lifecycle" || typeof row.lifecycle?.id !== "string" || rows.has(row.lifecycle.id)) {
       throw new Error(`${ERR_VALIDATION}: Invalid or duplicate retained lifecycle record`);
     }
     rows.set(row.lifecycle.id, { line: event.rawLine.trim(), record: row.lifecycle });

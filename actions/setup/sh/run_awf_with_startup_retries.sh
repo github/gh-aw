@@ -3,6 +3,10 @@ set +o histexpand
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ "${RUNNER_ENVIRONMENT:-}" == "self-hosted" ]]; then
+  # shellcheck source=assert_docker_lease.sh
+  source "${SCRIPT_DIR}/assert_docker_lease.sh" "" || exit 1
+fi
 
 # Runs an AWF command and retries startup/configuration failures that occur
 # before the engine harness writes its first marker line.
@@ -103,10 +107,35 @@ gh_aw_awf_record_execution_not_started() {
 }
 
 while true; do
-  gh_aw_awf_attempt_log="$(mktemp "${RUNNER_TEMP:-/tmp}/gh-aw-awf-${gh_aw_awf_attempt_log_name}.XXXXXX")"
   node "$gh_aw_preflight_script" --startup-attempt start "$((gh_aw_awf_attempt + 1))" "$gh_aw_awf_backoff_ms" || true
+  # Legacy workflow commands can be recognized anywhere in a line, including
+  # inside agent JSONL. Pause parsing without changing the captured stream.
+  if ! gh_aw_stop_token="$(od -An -N16 -tx1 /dev/urandom | tr -d ' \n')" ||
+    ! [[ "$gh_aw_stop_token" =~ ^[[:xdigit:]]{32}$ ]]; then
+    echo "Could not generate a workflow command stop token" >&2
+    node "$gh_aw_preflight_script" --startup-attempt finish "$((gh_aw_awf_attempt + 1))" 1 startup_error || true
+    gh_aw_awf_record_execution_not_started
+    exit 1
+  fi
+  if [ "$GH_AW_AWF_ENGINE_NAME" = "copilot" ]; then
+    # Register the SDK credential on the trusted host before commands are paused.
+    # AWF forwards it via --env-all to the harness and its SDK subprocesses.
+    if ! COPILOT_CONNECTION_TOKEN="$(od -An -N32 -tx1 /dev/urandom | tr -d ' \n')" ||
+      ! [[ "$COPILOT_CONNECTION_TOKEN" =~ ^[[:xdigit:]]{64}$ ]]; then
+      echo "Could not generate a Copilot SDK connection token" >&2
+      node "$gh_aw_preflight_script" --startup-attempt finish "$((gh_aw_awf_attempt + 1))" 1 startup_error || true
+      gh_aw_awf_record_execution_not_started
+      exit 1
+    fi
+    export COPILOT_CONNECTION_TOKEN
+    printf '::add-mask::%s\n' "$COPILOT_CONNECTION_TOKEN"
+  fi
+  gh_aw_awf_attempt_log="$(mktemp "${RUNNER_TEMP:-/tmp}/gh-aw-awf-${gh_aw_awf_attempt_log_name}.XXXXXX")"
+  printf '::stop-commands::%s\n' "$gh_aw_stop_token"
   "$@" 2>&1 | tee -a "$GH_AW_AWF_LOG_FILE" "$gh_aw_awf_attempt_log"
   gh_aw_awf_status=${PIPESTATUS[0]}
+  # The subprocess may not have terminated its last line.
+  printf '\n::%s::\n' "$gh_aw_stop_token"
   if [ "$gh_aw_awf_status" -eq 0 ]; then
     node "$gh_aw_preflight_script" --startup-attempt finish "$((gh_aw_awf_attempt + 1))" "$gh_aw_awf_status" || true
     rm -f "$gh_aw_awf_attempt_log"

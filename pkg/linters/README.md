@@ -28,6 +28,7 @@ The method names mentioned in analyzer descriptions (such as `Err`, `Flush`, `Re
 - `errorsnewerrorstring` — reports `errors.New(err.Error())` calls that discard the original error and break error-chain matching.
 - `errortypeassertion` — reports type assertions from `error` to concrete types and recommends `errors.As`.
 - `errstringmatch` — reports `strings.Contains(err.Error(), "...")` patterns and recommends `errors.Is` / `errors.As`.
+- `execcommandoutputerrdiscard` — reports `exec.Cmd.Output()` failures that do not preserve stderr diagnostics and `CombinedOutput()` results that are discarded on failure.
 - `fileclosenotdeferred` — reports non-deferred file `Close()` calls that can leak resources.
 - `filepathwalkpreferwalkdir` — reports `filepath.Walk` calls and recommends `filepath.WalkDir`.
 - `execcommandwithoutcontext` — reports `exec.Command(...)` calls inside functions that already receive `context.Context` and should use `exec.CommandContext(...)`.
@@ -63,6 +64,7 @@ The method names mentioned in analyzer descriptions (such as `Err`, `Flush`, `Re
 - `osexitinlibrary` — reports `os.Exit` calls in library packages (`pkg/*`) where process termination should be delegated to `cmd/*` entry points.
 - `osopenreadallpreferreadfile` — implements the `osopen-readall-prefer-readfile` rule: recommends `os.ReadFile` when a newly declared `os.Open` file is used only by a direct deferred `Close` and one `io.ReadAll` or `ioutil.ReadAll` in the same block. Extra uses, reassignment, nested reads, and write-side opens are excluded. No automatic fix is offered; review open/read error handling when simplifying.
 - `osremoveuncheckedcleanup` — reports `os.Remove` and `os.RemoveAll` expression and `go` statements whose errors are discarded, which can hide cleanup failures.
+- `osstatignoredeerrorderef` — reports dereferences of `os.Stat` and `os.Lstat` results when their errors are discarded without a preceding nil check.
 - `ossetenvlibrary` — reports `os.Setenv` calls in library packages (`pkg/*`) where side effects should be isolated.
 - `packagelevelmutableslicemap` — reports package-level (file/package-scope) `var` slice/map declarations mutated from inside a function body via `append()` re-assignment, index assignment, or `delete()`. Mutations inside a top-level `init()` are exempt.
 - `panic-in-library-code` — reports `panic()` calls in library packages (`pkg/*`) where errors should be returned instead.
@@ -210,6 +212,7 @@ environment variable and gates findings on the recorded execution hit count for 
 | `errorsnewerrorstring` | Custom `go/analysis` analyzer that flags `errors.New(err.Error())` calls that discard the original error and break `errors.Is` / `errors.As` matching |
 | `errortypeassertion` | Custom `go/analysis` analyzer that flags type assertions from `error` to concrete types and recommends `errors.As` |
 | `errstringmatch` | Custom `go/analysis` analyzer that flags brittle `strings.Contains(err.Error(), "...")` checks |
+| `execcommandoutputerrdiscard` | Custom `go/analysis` analyzer that reports `exec.Cmd.Output()` failures that do not preserve stderr diagnostics and `CombinedOutput()` results discarded on failure |
 | `execcommandwithoutcontext` | Custom `go/analysis` analyzer that flags `exec.Command(...)` calls that should use `exec.CommandContext(...)` in context-receiving functions |
 | `fileclosenotdeferred` | Custom `go/analysis` analyzer that flags file `Close()` calls that are not deferred immediately |
 | `filepathwalkpreferwalkdir` | Custom `go/analysis` analyzer that flags `filepath.Walk` calls and recommends `filepath.WalkDir` |
@@ -245,6 +248,7 @@ environment variable and gates findings on the recorded execution hit count for 
 | `osopenreadallpreferreadfile` | Custom `go/analysis` analyzer that recommends `os.ReadFile` for an `os.Open` file used only by deferred `Close` and one `ReadAll` |
 | `osexitinlibrary` | Custom `go/analysis` analyzer that flags `os.Exit` usage in library packages |
 | `osremoveuncheckedcleanup` | Custom `go/analysis` analyzer that flags discarded errors from `os.Remove` and `os.RemoveAll` expression and `go` statements |
+| `osstatignoredeerrorderef` | Custom `go/analysis` analyzer that flags dereferences of `os.Stat` and `os.Lstat` results after their errors are discarded without a nil check |
 | `ossetenvlibrary` | Custom `go/analysis` analyzer that flags `os.Setenv` usage in library packages |
 | `packagelevelmutableslicemap` | Custom `go/analysis` analyzer that flags package-level slice/map `var` declarations mutated from inside a function body via `append()` re-assignment, index assignment, or `delete()` |
 | `panic-in-library-code` | Custom `go/analysis` analyzer that flags `panic()` usage in library packages |
@@ -309,6 +313,7 @@ import (
 	"github.com/github/gh-aw/pkg/linters/errormessage"
 	"github.com/github/gh-aw/pkg/linters/errorsnewerrorstring"
 	"github.com/github/gh-aw/pkg/linters/errstringmatch"
+	"github.com/github/gh-aw/pkg/linters/execcommandoutputerrdiscard"
 	"github.com/github/gh-aw/pkg/linters/execcommandwithoutcontext"
 	"github.com/github/gh-aw/pkg/linters/fileclosenotdeferred"
 	"github.com/github/gh-aw/pkg/linters/hardcodedfilepath"
@@ -346,6 +351,7 @@ _ = excessivefuncparams.Analyzer
 _ = errormessage.Analyzer
 _ = errorsnewerrorstring.Analyzer
 _ = errstringmatch.Analyzer
+_ = execcommandoutputerrdiscard.Analyzer
 _ = execcommandwithoutcontext.Analyzer
 _ = fileclosenotdeferred.Analyzer
 _ = hardcodedfilepath.Analyzer
@@ -390,6 +396,7 @@ _ = typeassertionnil.Analyzer
 - `github.com/github/gh-aw/pkg/linters/errormessage` — error-message analyzer subpackage (also re-exported as `ErrorMessageAnalyzer`)
 - `github.com/github/gh-aw/pkg/linters/errortypeassertion` — error-type-assertion analyzer subpackage
 - `github.com/github/gh-aw/pkg/linters/errstringmatch` — err-string-match analyzer subpackage
+- `github.com/github/gh-aw/pkg/linters/execcommandoutputerrdiscard` — exec-command-output-error-discard analyzer subpackage
 - `github.com/github/gh-aw/pkg/linters/execcommandwithoutcontext` — exec-command-without-context analyzer subpackage
 - `github.com/github/gh-aw/pkg/linters/excessivefuncparams` — excessive-func-params analyzer subpackage
 - `github.com/github/gh-aw/pkg/linters/fileclosenotdeferred` — file-close-not-deferred analyzer subpackage
@@ -418,6 +425,7 @@ _ = typeassertionnil.Analyzer
 - `github.com/github/gh-aw/pkg/linters/osisnotexist` — os-error-predicate analyzer subpackage
 - `github.com/github/gh-aw/pkg/linters/osopenreadallpreferreadfile` — os.Open/ReadAll simplification analyzer subpackage
 - `github.com/github/gh-aw/pkg/linters/osremoveuncheckedcleanup` — os-remove-unchecked-cleanup analyzer subpackage
+- `github.com/github/gh-aw/pkg/linters/os-stat-ignored-error-deref` — os-stat-ignored-error-deref analyzer subpackage
 - `github.com/github/gh-aw/pkg/linters/osexitinlibrary` — os-exit-in-library analyzer subpackage
 - `github.com/github/gh-aw/pkg/linters/ossetenvlibrary` — os-setenv-library analyzer subpackage
 - `github.com/github/gh-aw/pkg/linters/packagelevelmutableslicemap` — package-level-mutable-slice-map analyzer subpackage

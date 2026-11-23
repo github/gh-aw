@@ -3,13 +3,17 @@
 package workflow
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
 
+	"github.com/github/gh-aw/actions/setup"
 	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/testutil"
+	"github.com/goccy/go-yaml"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -107,7 +111,6 @@ func TestDependabotCompiledSDKDependencies(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, []NpmDependency{
 		{Name: "@github/copilot", Version: "1.2.3"},
-		{Name: "@github/copilot-sdk", Version: string(constants.DefaultCopilotSDKVersion)},
 	}, c.collectNpmDependencies([]*WorkflowData{data}))
 }
 
@@ -126,20 +129,21 @@ func TestDependabotExternalDetectorInstallsCopilotDespiteCustomCommand(t *testin
 	data.SafeOutputs.ThreatDetection.EngineConfig = &EngineConfig{ID: "copilot", Version: "2.3.4", CopilotSDK: true}
 	assert.Equal(t, []NpmDependency{
 		{Name: "@github/copilot", Version: "2.3.4"},
-		{Name: "@github/copilot-sdk", Version: string(constants.DefaultCopilotSDKVersion)},
 	}, c.collectNpmDependencies([]*WorkflowData{data}))
+	assert.Equal(t, []string{"/.github/gh-aw-dependencies/copilot-sdk/node"},
+		requireFrozenSDKInventories(t, c, []*WorkflowData{data}, testutil.TempDir(t, "detector-sdk-inventory")))
 }
 
 func TestDependabotCopilotSDKDependencies(t *testing.T) {
 	for _, test := range []struct {
 		name, command, driver, inline, ecosystem, pkg, version string
 	}{
-		{"node", "", "", "", "npm", "@github/copilot-sdk", string(constants.DefaultCopilotSDKVersion)},
-		{"typescript", "ts-node driver.ts", "", "", "npm", "@github/copilot-sdk", string(constants.DefaultCopilotSDKVersion)},
+		{"node", "", "", "", "npm", "node", ""},
+		{"typescript", "ts-node driver.ts", "", "", "npm", "typescript", ""},
 		{"python driver", "", "driver.py", "", "pip", "github-copilot-sdk", "==" + string(constants.DefaultCopilotSDKVersion)},
 		{"python command", "python3 driver.py", "", "", "pip", "github-copilot-sdk", "==" + string(constants.DefaultCopilotSDKVersion)},
 		{"go command", "go run driver.go", "", "", "go", "github.com/github/copilot-sdk/go", "v" + string(constants.DefaultCopilotSDKVersion)},
-		{"inline node", "", "", "javascript", "npm", "@github/copilot-sdk", string(constants.DefaultCopilotSDKVersion)},
+		{"inline node", "", "", "javascript", "npm", "node", ""},
 		{"inline python", "", "", "python", "pip", "github-copilot-sdk", "==" + string(constants.DefaultCopilotSDKVersion)},
 		{"inline go", "", "", "go", "go", "github.com/github/copilot-sdk/go", "v" + string(constants.DefaultCopilotSDKVersion)},
 		{"rust is not npm", "cargo run", "", "", "npm", "", ""},
@@ -155,22 +159,102 @@ func TestDependabotCopilotSDKDependencies(t *testing.T) {
 			data := []*WorkflowData{{AI: "copilot", EngineConfig: config}}
 			switch test.ecosystem {
 			case "npm":
-				deps := c.collectNpmDependencies(data)
+				dirs := requireFrozenSDKInventories(t, c, data, testutil.TempDir(t, "sdk-inventory"))
 				if test.pkg != "" {
-					assert.Contains(t, deps, NpmDependency{Name: test.pkg, Version: test.version})
+					assert.Equal(t, []string{"/.github/gh-aw-dependencies/copilot-sdk/" + test.pkg}, dirs)
 				} else {
-					assert.Empty(t, deps)
+					assert.Empty(t, dirs)
 				}
 				if test.command == "" {
-					assert.Contains(t, deps, NpmDependency{Name: "@github/copilot", Version: "1.2.3"})
+					assert.Equal(t, []NpmDependency{{Name: "@github/copilot", Version: "1.2.3"}}, c.collectNpmDependencies(data))
+				} else {
+					assert.Empty(t, c.collectNpmDependencies(data))
 				}
 			case "pip":
 				assert.Equal(t, []PipDependency{{Name: test.pkg, Version: test.version}}, c.collectPipDependencies(data))
-				assert.NotContains(t, c.collectNpmDependencies(data), NpmDependency{Name: "@github/copilot-sdk", Version: string(constants.DefaultCopilotSDKVersion)})
+				assert.NotContains(t, c.collectNpmDependencies(data), NpmDependency{Name: "@microsoft/copilot-sdk", Version: string(constants.DefaultCopilotSDKNPMVersion)})
 			case "go":
 				assert.Equal(t, []GoDependency{{Path: test.pkg, Version: test.version}}, c.collectGoDependencies(data))
 			}
 		})
+	}
+}
+
+func requireFrozenSDKInventories(t *testing.T, c *Compiler, data []*WorkflowData, configDir string) []string {
+	t.Helper()
+	dirs, err := c.generateCopilotSDKNpmInventories(data, configDir)
+	require.NoError(t, err)
+	return dirs
+}
+
+func TestGenerateDependabotManifests_FrozenSDKGraphs(t *testing.T) {
+	c := NewCompiler()
+	c.SetStrictMode(true)
+	configDir := filepath.Join(testutil.TempDir(t, "frozen-sdk"), ".github")
+	workflowDir := filepath.Join(configDir, "workflows")
+	require.NoError(t, os.MkdirAll(workflowDir, 0o755))
+	setupFakeFailingNpm(t) // A frozen-only inventory does not invoke npm at all.
+	configPath := filepath.Join(configDir, "dependabot.yml")
+	require.NoError(t, os.WriteFile(configPath, []byte(`version: 2
+registries:
+  private-npm:
+    type: npm-registry
+    url: https://registry.example.com
+updates:
+  - package-ecosystem: npm
+    directory: /.github/workflows
+    registries: [private-npm]
+    schedule:
+      interval: weekly
+      day: monday
+`), 0o644))
+
+	data := []*WorkflowData{
+		{AI: "copilot", EngineConfig: &EngineConfig{CopilotSDK: true, Command: "node driver.js"}},
+		{AI: "copilot", EngineConfig: &EngineConfig{CopilotSDK: true, Command: "ts-node driver.ts"}},
+	}
+	require.NoError(t, c.GenerateDependabotManifests(context.Background(), data, workflowDir, false))
+	require.NoError(t, c.GenerateDependabotManifests(context.Background(), data, workflowDir, false)) // no duplicate entries
+	assert.NoFileExists(t, filepath.Join(workflowDir, "package.json"))
+	assert.NoFileExists(t, filepath.Join(workflowDir, "package-lock.json"))
+
+	configYAML, err := os.ReadFile(configPath)
+	require.NoError(t, err)
+	var config DependabotConfig
+	require.NoError(t, yaml.Unmarshal(configYAML, &config))
+	assert.Contains(t, config.Extra, "registries")
+	require.Len(t, config.Updates, 3)
+	assert.Equal(t, "/.github/workflows", config.Updates[0].Directory)
+	assert.Contains(t, config.Updates[0].Extra, "registries")
+	assert.Equal(t, "monday", config.Updates[0].Schedule.Extra["day"])
+	for i, graph := range []struct {
+		variant, manifest, lock string
+		direct                  []string
+	}{
+		{"node", setup.CopilotSDKNodeManifest, setup.CopilotSDKNodeLock, []string{"@microsoft/copilot-sdk", "undici"}},
+		{"typescript", setup.CopilotSDKTypeScriptManifest, setup.CopilotSDKTypeScriptLock, []string{"@microsoft/copilot-sdk", "undici", "ts-node", "typescript"}},
+	} {
+		update := config.Updates[i+1]
+		assert.Equal(t, "npm", update.PackageEcosystem)
+		assert.Equal(t, "/.github/gh-aw-dependencies/copilot-sdk/"+graph.variant, update.Directory)
+		assert.NotContains(t, update.Extra, "registries")
+		if assert.NotNil(t, update.PullRequestLimit) {
+			assert.Zero(t, *update.PullRequestLimit)
+		}
+
+		dir := filepath.Join(configDir, "gh-aw-dependencies", "copilot-sdk", graph.variant)
+		require.NoFileExists(t, filepath.Join(dir, ".npmrc"))
+		manifest, err := os.ReadFile(filepath.Join(dir, "package.json"))
+		require.NoError(t, err)
+		lock, err := os.ReadFile(filepath.Join(dir, "package-lock.json"))
+		require.NoError(t, err)
+		assert.Equal(t, graph.manifest, string(manifest))
+		assert.Equal(t, graph.lock, string(lock))
+		var pkg PackageJSON
+		require.NoError(t, json.Unmarshal(manifest, &pkg))
+		for _, dep := range graph.direct {
+			assert.Contains(t, pkg.Dependencies, dep)
+		}
 	}
 }
 

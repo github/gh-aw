@@ -42,8 +42,13 @@ type execCmdFunc func(ctx context.Context, args ...string) *exec.Cmd
 // MCP tool handlers in this package return (*mcp.CallToolResult, any, error).
 // The second return value is a reserved SDK extension slot and must be nil for now.
 
+type mcpServerCaches struct {
+	logs              *mcpLogsReportCache
+	healthCheckpoints *healthMCPCheckpoints
+}
+
 // createMCPServer creates and configures the MCP server with all tools
-func createMCPServer(cmdPath string, actor string, validateActor bool, allowWriteTools bool, manifestCacheFile string, env []string) *mcp.Server {
+func createMCPServer(cmdPath string, actor string, validateActor bool, allowWriteTools bool, manifestCacheFile string, env []string, caches ...mcpServerCaches) *mcp.Server {
 	// Helper function to execute command with proper path
 	execCmd := func(ctx context.Context, args ...string) *exec.Cmd {
 		var cmd *exec.Cmd
@@ -84,7 +89,7 @@ func createMCPServer(cmdPath string, actor string, validateActor bool, allowWrit
 
 	server.AddReceivingMiddleware(mcpWriteToolsMiddleware(allowWriteTools, actor, validateActor))
 
-	if err := registerMCPTools(server, execCmd, actor, validateActor, manifestCacheFile, allowWriteTools); err != nil {
+	if err := registerMCPTools(server, execCmd, actor, validateActor, manifestCacheFile, allowWriteTools, caches...); err != nil {
 		return server
 	}
 
@@ -95,17 +100,25 @@ func createMCPServer(cmdPath string, actor string, validateActor bool, allowWrit
 	return server
 }
 
-func registerMCPTools(server *mcp.Server, execCmd execCmdFunc, actor string, validateActor bool, manifestCacheFile string, allowWriteTools bool) error {
+func registerMCPTools(server *mcp.Server, execCmd execCmdFunc, actor string, validateActor bool, manifestCacheFile string, allowWriteTools bool, caches ...mcpServerCaches) error {
+	var cache mcpServerCaches
+	if len(caches) > 0 {
+		cache = caches[0]
+	}
 	// Register read-only tools
 	registerStatusTool(server)
-	registerHealthTool(server, execCmd)
+	registerHealthTool(server, execCmd, cache.healthCheckpoints)
 
 	if err := registerCompileTool(server, execCmd, manifestCacheFile, allowWriteTools); err != nil {
 		return err
 	}
 
 	// Register privileged tools (require write+ access)
-	if err := registerLogsTool(server, execCmd, actor, validateActor); err != nil {
+	var logsCache []*mcpLogsReportCache
+	if cache.logs != nil {
+		logsCache = append(logsCache, cache.logs)
+	}
+	if err := registerLogsTool(server, execCmd, actor, validateActor, logsCache...); err != nil {
 		return err
 	}
 

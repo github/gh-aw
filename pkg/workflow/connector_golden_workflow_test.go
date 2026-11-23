@@ -46,13 +46,19 @@ func TestConnectorGoldenWorkflows(t *testing.T) {
 			require.NoError(t, err)
 			assertConnectorScenarioAuthority(t, data, scenario)
 			connector := data.Connectors[provider]
-			encoded, err := connector.Agent.Encode()
-			require.NoError(t, err)
-			checkMinimalConnectorAdvertisement(t, encoded, scenario.readers)
+			if connector.Agent != nil {
+				encoded, err := connector.Agent.Encode()
+				require.NoError(t, err)
+				checkMinimalConnectorAdvertisement(t, encoded, scenario.readers)
+			}
 			output, err := compiler.CompileToYAML(data, path)
 			require.NoError(t, err)
 			require.Contains(t, output, "workflow_dispatch:")
-			require.Contains(t, output, "connector_runtime.cjs")
+			if connector.Agent != nil {
+				require.Contains(t, output, "connector_runtime.cjs")
+			} else {
+				require.NotContains(t, output, "GH_AW_CONNECTOR_PLAN")
+			}
 			require.NotContains(t, output, "repository_dispatch:")
 			assertConnectorScenarioEmission(t, compiler, data, scenario, output)
 			require.NoFileExists(t, strings.TrimSuffix(sourcePath, ".md")+".lock.yml", "fixtures have no checked-in generated locks")
@@ -75,7 +81,11 @@ func validateGoldenWorkflowSource(t *testing.T, provider string, frontmatter map
 	}
 	tools, ok := frontmatter["tools"].(map[string]any)
 	require.True(t, ok)
-	require.Contains(t, tools, provider)
+	if provider == "azure-ai-gateway" {
+		require.NotContains(t, tools, provider, "inference is not selected through tools")
+	} else {
+		require.Contains(t, tools, provider)
+	}
 	for _, control := range []string{"bash", "edit", "cli-proxy"} {
 		require.Equal(t, false, tools[control])
 	}

@@ -140,6 +140,7 @@
       { "if": { "properties": { "type": { "const": "plugin.installation" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/PluginInstallationData" } } } },
       { "if": { "properties": { "type": { "const": "prompt.system" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/Pick%3CMessageData%2C%22content%22%3E" } } } },
       { "if": { "properties": { "type": { "const": "prompt.user" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/Pick%3CMessageData%2C%22content%22%3E" } } } },
+      { "if": { "properties": { "type": { "const": "routing.observation" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/RoutingObservationData" } } } },
       { "if": { "properties": { "type": { "const": "safe_output.error" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/SafeOutputErrorData" } } } },
       { "if": { "properties": { "type": { "const": "safe_output.execution" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/SafeOutputData" } } } },
       { "if": { "properties": { "type": { "const": "safe_output.request" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/SafeOutputData" } } } },
@@ -900,6 +901,7 @@
         "null_type_tool_call",
         "no_auth_info",
         "authentication_failed",
+        "transient_error",
         "sdk_session_idle_timeout",
         "mcp_gateway_shutdown",
         "permission_denied",
@@ -1282,6 +1284,22 @@
       "additionalProperties": false
     },
     "Record<string,JsonValue>": { "type": "object", "additionalProperties": { "$ref": "#/definitions/JsonValue" } },
+    "RoutingCountedObservationData": {
+      "type": "object",
+      "properties": { "outcome": { "type": "string", "enum": ["success", "failure"] } },
+      "required": ["outcome"],
+      "additionalProperties": false,
+      "description": "A routed run whose result counts: the selected pair succeeded or failed on its own."
+    },
+    "RoutingObservationData": { "anyOf": [{ "$ref": "#/definitions/RoutingCountedObservationData" }, { "$ref": "#/definitions/RoutingSkippedObservationData" }], "description": "Collector-written verdict on a routed run (T-UAS-094)." },
+    "RoutingSkipReason": { "type": "string", "enum": ["cancelled", "infrastructure", "rate_limited", "pair_mismatch", "unknown_evidence"], "description": "Why a routed run's result does not count as evidence about the selected pair." },
+    "RoutingSkippedObservationData": {
+      "type": "object",
+      "properties": { "outcome": { "type": "string", "const": "skip" }, "reason": { "$ref": "#/definitions/RoutingSkipReason" } },
+      "required": ["outcome", "reason"],
+      "additionalProperties": false,
+      "description": "A routed run whose result does not count, and why."
+    },
     "RuntimeObservationData": {
       "type": "object",
       "properties": {

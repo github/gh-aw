@@ -218,19 +218,19 @@ func TestCopilotEngineComputeToolArguments(t *testing.T) {
 			expected: []string{"--allow-tool", "github"},
 		},
 		{
-			name: "native web-fetch tool is unavailable",
+			name: "CLI web-fetch MCP fallback",
 			tools: map[string]any{
 				"web-fetch": nil,
 			},
-			expected: []string{},
+			expected: []string{"--allow-tool", "web-fetch"},
 		},
 		{
-			name: "SDK custom web-fetch tool",
+			name: "SDK web-fetch MCP fallback",
 			tools: map[string]any{
 				"web-fetch": nil,
 			},
 			workflowData: &WorkflowData{EngineConfig: &EngineConfig{CopilotSDK: true}},
-			expected:     []string{"--allow-tool", "web_fetch"},
+			expected:     []string{"--allow-tool", "web-fetch"},
 		},
 		{
 			name: "native web-search tool is unavailable",

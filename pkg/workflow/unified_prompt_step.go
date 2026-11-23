@@ -55,6 +55,7 @@ func removeConsecutiveEmptyLines(content string) string {
 // collectPromptSections collects all prompt sections in the order they should be appended
 func (c *Compiler) collectPromptSections(data *WorkflowData) []PromptSection { //nolint:largefunc // Existing prompt section assembly preserves emitted section ordering.
 	var sections []PromptSection
+	githubCLIOnly := slices.Contains(getMCPCLIExcludeFromAgentConfig(data), constants.GitHubMCPServerID.String())
 
 	// 0. XPia instructions (unless disabled by feature flag)
 	if !isFeatureEnabled(constants.DisableXPIAPromptFeatureFlag, data) {
@@ -166,7 +167,15 @@ func (c *Compiler) collectPromptSections(data *WorkflowData) []PromptSection { /
 			IsFile:  true,
 		})
 		// Per-tool sections: opening tag + tools list (inline), tool instruction files, closing tag
-		sections = append(sections, buildSafeOutputsSections(data.SafeOutputs, data.CommentMemoryConfig, data.LedgerConfig)...)
+		safeOutputsSections := buildSafeOutputsSections(data.SafeOutputs, data.CommentMemoryConfig, data.LedgerConfig)
+		if githubCLIOnly || isGitHubCLIModeEnabled(data) {
+			for i := range safeOutputsSections {
+				if safeOutputsSections[i].IsFile && safeOutputsSections[i].Content == safeOutputsSteeringIssueFile {
+					safeOutputsSections[i].Content = safeOutputsSteeringIssueCLIFile
+				}
+			}
+		}
+		sections = append(sections, safeOutputsSections...)
 	}
 
 	// 8a. MCP CLI tools instructions (if any MCP servers are mounted as CLIs)
@@ -230,7 +239,7 @@ func (c *Compiler) collectPromptSections(data *WorkflowData) []PromptSection { /
 	// GitHub reads (and writes when safe-outputs is also enabled).
 	// When GitHub mode is gh-proxy, the agent uses the pre-authenticated gh CLI for reads
 	// instead of a GitHub MCP server (which is not registered). Otherwise, the GitHub
-	// MCP server is used for reads.
+	// MCP server is used for reads, through its CLI wrapper when excluded from native config.
 	if isGitHubCLIModeEnabled(data) {
 		unifiedPromptLog.Print("Adding cli-proxy tool-use guidance (gh CLI for reads, no GitHub MCP server)")
 		cliProxyFile := cliProxyPromptFile
@@ -239,6 +248,11 @@ func (c *Compiler) collectPromptSections(data *WorkflowData) []PromptSection { /
 		}
 		sections = append(sections, PromptSection{
 			Content: cliProxyFile,
+			IsFile:  true,
+		})
+	} else if hasGitHubTool(data.ParsedTools) && githubCLIOnly {
+		sections = append(sections, PromptSection{
+			Content: githubMCPCLIToolsPromptFile,
 			IsFile:  true,
 		})
 	} else if hasGitHubTool(data.ParsedTools) {
@@ -710,6 +724,9 @@ func buildSafeOutputsSections(safeOutputs *SafeOutputsConfig, commentMemory *Com
 	}
 	if safeOutputs.ReportIncomplete != nil {
 		tools = append(tools, toolWithMaxBudget("report_incomplete", safeOutputs.ReportIncomplete.Max))
+	}
+	if safeOutputs.RequestContinuation != nil {
+		tools = append(tools, toolWithMaxBudget("request_continuation", safeOutputs.RequestContinuation.Max))
 	}
 	// noop is always included: it is auto-injected by extractSafeOutputsConfig and
 	// must always appear in the tools list so agents can signal no-op completion.

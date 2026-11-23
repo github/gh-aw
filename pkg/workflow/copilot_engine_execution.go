@@ -424,6 +424,7 @@ func (e *CopilotEngine) buildCopilotSDKExecPrefix(workflowData *WorkflowData, co
 func (e *CopilotEngine) buildCopilotCommand(workflowData *WorkflowData, copilotArgs []string, execPrefix, customCommandScriptSetup, logFile, mkdirCommands string, isBYOKMode bool) (string, string) {
 	copilotCommand, copilotSDKServerArgsJSON := e.buildCopilotBaseCommand(workflowData, copilotArgs, execPrefix)
 	copilotCommand = wrapCustomHarnessDecisionCommand(workflowData, e.GetID(), e.GetHarnessScriptName(), copilotCommand)
+	copilotCommand = prependTypeScriptLSPPath(workflowData, copilotCommand)
 	if isFirewallEnabled(workflowData) {
 		return e.buildCopilotFirewallCommand(workflowData, copilotCommand, customCommandScriptSetup, isBYOKMode, logFile), copilotSDKServerArgsJSON
 	}

@@ -8,6 +8,11 @@ set +o histexpand
 
 set -e
 
+if [[ "${RUNNER_ENVIRONMENT:-}" == "self-hosted" ]]; then
+  # shellcheck source=assert_docker_lease.sh
+  source "$(dirname "${BASH_SOURCE[0]}")/assert_docker_lease.sh" awmg-mcpg
+fi
+
 # Get PID from command line argument (passed from step output)
 GATEWAY_PID="$1"
 

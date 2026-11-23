@@ -141,6 +141,32 @@ describe("Pi sub-agent model resolution", () => {
     expect(() => prepare()).toThrow("different provider");
   });
 
+  describe("with engine.model-catalog: false on a provider without a catalogue", () => {
+    beforeEach(() => {
+      vi.stubEnv("GH_AW_MODEL_CATALOG", "false");
+      vi.stubEnv("GH_AW_PI_MODEL_ALIASES", JSON.stringify({ small: ["copilot/*haiku*"] }));
+    });
+    const noCatalogue = overrides => prepare({ catalog: undefined, reflectData: undefined, gateway: false, ...overrides });
+
+    it("uses an inherited built-in alias name verbatim", () => {
+      delete frontmatter.model;
+      expect(noCatalogue({ parentModel: "github-copilot/gpt-5-mini" })[0]).toMatchObject({ requested: "github-copilot/gpt-5-mini", modelId: "gpt-5-mini", model: "github-copilot/gpt-5-mini" });
+      expect(JSON.parse(fs.readFileSync(path.join(dir, "agent/model-resolution.json"), "utf8"))).toEqual([
+        { engine: "pi", role: "reader", configured_model: "github-copilot/gpt-5-mini", resolved_model: "gpt-5-mini", provider: "copilot", status: "exact", cause: null },
+      ]);
+    });
+
+    it.each(["gpt-5-mini", "small", "haiku?effort=low"])("uses declared model %s verbatim", model => {
+      frontmatter.model = model;
+      expect(noCatalogue()[0]).toMatchObject({ requested: model, modelId: model.split("?")[0] });
+    });
+
+    it("still refuses other provider routes", () => {
+      frontmatter.model = "anthropic/claude-haiku-4-5";
+      expect(() => noCatalogue()).toThrow("different provider");
+    });
+  });
+
   it.each([{ model: 123 }, { tools: { read: true } }])("rejects malformed frontmatter %j", invalid => {
     Object.assign(frontmatter, invalid);
     expect(() => prepare()).toThrow();

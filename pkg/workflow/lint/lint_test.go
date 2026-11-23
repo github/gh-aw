@@ -20,7 +20,7 @@ func TestRuleRegistrationAndSelection(t *testing.T) {
 		ruleIDs = append(ruleIDs, rule.ID)
 	}
 	assert.ElementsMatch(t, []string{
-		"secret-leak", "otlp-secret-leak", "action-pin", "job-timeout", "needs-consistency", "step-reference", "template-injection", "workflow-run-scope",
+		"secret-leak", "otlp-secret-leak", "overprovisioned-secrets", "action-pin", "job-timeout", "needs-consistency", "step-reference", "template-injection", "workflow-run-scope",
 		"permission-scope", "version-check", "conditional-import", "private-to-public",
 		"install-scripts", "allowed-labels", "network-scope", "push-target",
 		"tool-scope", "sandbox-config", "image-argument", "checkout-mode", "fork-association",
@@ -30,8 +30,11 @@ func TestRuleRegistrationAndSelection(t *testing.T) {
 		"pull-request-target-checkout", "prompt-expression",
 		"gateway-dispatch-literals",
 		"artipacked", "cache-poisoning", "excessive-permissions", "obfuscation",
-		"bash-case-pattern",
-		"privileged-checkout", "artifact-execution",
+		"bash-case-pattern", "unsound-contains",
+		"privileged-checkout", "artifact-execution", "unpinned-images", "environment-file-injection",
+		"bot-conditions",
+		"insecure-commands",
+		"remote-script-execution",
 	}, ruleIDs)
 	selected, err := runner.Select("secret-leak", "secret-leak")
 	require.NoError(t, err)
@@ -155,11 +158,20 @@ jobs:
 	require.NoError(t, err)
 	diagnostics, err := Default().Run(context.Background(), Input{Workflow: workflow})
 	require.NoError(t, err)
-	require.Len(t, diagnostics, 2)
-	assert.Equal(t, Error, diagnostics[0].Severity)
-	assert.Equal(t, Warning, diagnostics[1].Severity)
-	assert.NotContains(t, diagnostics[0].Message, "TOKEN")
-	assert.Contains(t, diagnostics[1].Message, "Incomplete")
+	require.Len(t, diagnostics, 3)
+	var disclosures, gaps int
+	for _, diagnostic := range diagnostics {
+		if diagnostic.Severity == Error {
+			disclosures++
+			assert.Equal(t, "secret-leak", diagnostic.RuleID)
+			assert.NotContains(t, diagnostic.Message, "TOKEN")
+		} else {
+			gaps++
+			assert.Contains(t, diagnostic.Message, "Incomplete")
+		}
+	}
+	assert.Equal(t, 1, disclosures)
+	assert.Equal(t, 2, gaps)
 }
 
 func TestSecretRuleCoverageWarningLocation(t *testing.T) {

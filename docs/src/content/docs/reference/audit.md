@@ -366,6 +366,8 @@ gh aw json-schema logs-jsonl > logs-jsonl.schema.json
 
 When routing records are available, single-run `audit --json` includes `model_routing` with status, objective, labels, classifier and selected model details, ranked choices, router metadata, effective and selected endpoints, request outcome/deviation counts, failure details, and classifier/selected/deviated cost buckets. Logs JSON includes `model_routing.routes` entries keyed by labels, mode, model, effort, router version, and endpoint attribution, with `run_count`, `total_aic`, and `average_aic`, plus classifier AIC and deviation totals.
 
+For a routed run whose agent made requests, `model_routing` in `audit --json` and in each run of `logs --json` also includes `observation`: whether the run's result counts as evidence about the model and effort AWF selected (`outcome` is `success` or `failure`), or why it does not (`skip` with a `reason`: `cancelled`, `infrastructure`, `rate_limited`, `pair_mismatch`, or `unknown_evidence`). The console report prints it as an `observation` line in the model routing details. Older sessions and unrouted runs have no observation. The [Unified Agent Session Specification](/gh-aw/specs/unified-agent-session-specification/#routing-analytics) defines the rules.
+
 ## `gh aw logs --format <fmt>`
 
 Generates a cross-run security and performance audit report across recent runs, built into `gh aw logs`.

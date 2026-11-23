@@ -1383,8 +1383,11 @@ on:
 
   # Format 1: GitHub search query string to check before running workflow (implies
   # max=1). If the search returns any results, the workflow will be skipped. Query
-  # is automatically scoped to the current repository. Example: 'is:issue is:open
-  # label:bug'
+  # is automatically scoped to the current repository. Simple queries using only
+  # is:/type:/state:, label:, author:, assignee:, mentions:, and sort: qualifiers
+  # are evaluated via GraphQL/REST instead of the rate-limited search API; free
+  # text, in:, negation, and comma label lists require search. Example: 'is:issue
+  # is:open label:bug'
   skip-if-match: "example-value"
 
   # Format 2: Skip-if-match configuration object with query, maximum match count,
@@ -1421,8 +1424,11 @@ on:
 
   # Format 1: GitHub search query string to check before running workflow (implies
   # min=1). If the search returns no results, the workflow will be skipped. Query is
-  # automatically scoped to the current repository. Example: 'is:pr is:open
-  # label:ready-to-deploy'
+  # automatically scoped to the current repository. Simple queries using only
+  # is:/type:/state:, label:, author:, assignee:, mentions:, and sort: qualifiers
+  # are evaluated via GraphQL/REST instead of the rate-limited search API; free
+  # text, in:, negation, and comma label lists require search. Example: 'is:pr
+  # is:open label:ready-to-deploy'
   skip-if-no-match: "example-value"
 
   # Format 2: Skip-if-no-match configuration object with query, minimum match count,
@@ -2549,26 +2555,32 @@ models:
 # array of two or more variant strings (bare-array form) or an object with a
 # 'variants' field plus optional metadata fields (description, metric, weight,
 # issue, start_date, end_date, hypothesis, secondary_metrics, guardrail_metrics,
-# min_samples, analysis_type, decision). The reserved 'storage' key controls how
-# experiment state is persisted: 'repo' (default) commits state to a git branch
-# named 'experiments/{sanitizedWorkflowID}' (workflow ID lowercased with hyphens
-# removed) for durability; 'cache' uses GitHub Actions cache. At runtime the
-# activation job picks a variant and persists the updated counters. Use ${{
-# experiments.<name> }} in the workflow prompt to reference the selected variant.
-# When multiple experiments are declared, assignments are statistically balanced
-# using a least-used counter that round-robins across variants (or weighted when
-# 'weight' is provided); ties are broken randomly so no variant is systematically
-# favoured on the first run.
+# min_samples, analysis_type, decision). The reserved 'storage' key controls
+# persistence: 'repo' (default) commits state to
+# 'experiments/{sanitizedWorkflowID}'; 'cache' uses GitHub Actions cache; opt-in
+# 'broker' delegates variant selection and aggregate result reporting to an
+# OIDC-authenticated API. The optional 'broker-url' configures its HTTPS endpoint.
+# Broker dry-runs use local ephemeral selection without broker calls or broker
+# OIDC grants. Use ${{ experiments.<name> }} in the workflow prompt to reference
+# the selected variant. Repo and cache modes use local least-used counters
+# (weighted when 'weight' is provided), with random tie-breaking; in broker mode
+# the API owns selection and cumulative counts.
 # (optional)
 experiments:
   # Storage backend for experiment state. 'repo' (default) persists state to a git
   # branch named 'experiments/{sanitizedWorkflowID}' (workflow ID lowercased with
   # hyphens removed, e.g. 'my-workflow' -> 'experiments/myworkflow') for durability
   # across cache evictions. 'cache' uses GitHub Actions cache (legacy behavior).
-  # Repo storage is recommended because experiment data is valuable and more durable
-  # than cache.
+  # 'broker' delegates assignment and aggregate reporting to an OIDC-authenticated
+  # service without git or cache persistence. Broker dry-runs use local ephemeral
+  # assignments and never contact the broker.
   # (optional)
   storage: "cache"
+
+  # Literal HTTPS broker endpoint without credentials or expressions. Defaults to
+  # the GH_AW_EXPERIMENTS_BROKER_URL secret.
+  # (optional)
+  broker-url: "example-value"
 
 # Secret values passed to workflow execution. Secrets can be defined as simple
 # strings (GitHub Actions expressions) or objects with 'value' and 'description'
@@ -3451,6 +3463,17 @@ engine:
   env:
     {}
 
+  # Explicit workflow inference selection. Model is an exact granted wire alias,
+  # separate from engine.model metadata. Initially supports Copilot
+  # OpenAI-compatible BYOK only.
+  # (optional)
+  inference:
+    connector: "example-value"
+
+    profile: "example-value"
+
+    model: "example-value"
+
   # Engine-level authentication configuration for AWF API proxy sidecar integration
   # (for example, Azure OpenAI via GitHub OIDC). Values are mapped to AWF_AUTH_*
   # environment variables.
@@ -3557,6 +3580,17 @@ engine:
   # (optional)
   bare: true
 
+  # Whether the engine harness resolves the configured model against the live model
+  # catalogue (/models). Defaults to true: gh-aw model aliases, including built-in
+  # aliases that look like model ids such as gpt-5-mini, are resolved and the run
+  # stops if no catalogue is available. Set to false for BYOK providers without a
+  # /models route (for example Azure AI Gateway): configured models are then passed
+  # to the engine verbatim, without alias resolution, and model routing (implicit or
+  # model: router) is disabled because it selects models from the catalogue. Not
+  # supported with engine.copilot-sdk: true, which needs the catalogue at startup.
+  # (optional)
+  model-catalog: true
+
   # Whether dynamic workflows are enabled for engines that support them. Defaults to
   # false. Copilot dynamic workflows are experimental.
   # (optional)
@@ -3581,11 +3615,21 @@ engine:
     # (optional)
     tool-timeout: "example-value"
 
-  # Enables the experimental GitHub Copilot SDK integration (copilot engine only).
-  # When true, the harness starts a separate headless Copilot CLI sidecar on the
-  # configured localhost port and sets COPILOT_SDK_URI on child processes.
+  # Enables Copilot SDK integration. An object pins a checked-in npm project for a
+  # Node.js or TypeScript driver.
   # (optional)
+  # Accepted formats:
+
+  # Format 1: boolean
   copilot-sdk: true
+
+  # Format 2: object
+  copilot-sdk:
+    # Exact stable version of @microsoft/copilot-sdk, independent of engine.version.
+    version: "example-value"
+
+    # Lowercase SHA-256 of the checked-in manifest, a NUL byte, and the npm lockfile.
+    sha256: "example-value"
 
   # Custom driver script, command, or inline source for the engine. String values
   # accept a workspace-relative path or bare name. Inline object values are
@@ -3735,6 +3779,17 @@ engine:
   # not support this option and emit a warning. Defaults to false.
   # (optional)
   bare: true
+
+  # Whether the engine harness resolves the configured model against the live model
+  # catalogue (/models). Defaults to true: gh-aw model aliases, including built-in
+  # aliases that look like model ids such as gpt-5-mini, are resolved and the run
+  # stops if no catalogue is available. Set to false for BYOK providers without a
+  # /models route (for example Azure AI Gateway): configured models are then passed
+  # to the engine verbatim, without alias resolution, and model routing (implicit or
+  # model: router) is disabled because it selects models from the catalogue. Not
+  # supported with engine.copilot-sdk: true, which needs the catalogue at startup.
+  # (optional)
+  model-catalog: true
 
   # Whether dynamic workflows are enabled for engines that support them. Defaults to
   # false. Copilot dynamic workflows are experimental.
@@ -3969,6 +4024,12 @@ engine:
 
       # (optional)
       web-search: true
+
+      # Use the built-in sandboxed web-fetch MCP server when the workflow enables
+      # tools.web-fetch. Requires MCP support and a config adapter that registers the
+      # stdio server.
+      # (optional)
+      web-fetch-fallback: true
 
       # (optional)
       max-continuations: true
@@ -4336,6 +4397,17 @@ engine:
     # not support this option and emit a warning. Defaults to false.
     # (optional)
     bare: true
+
+    # Whether the engine harness resolves the configured model against the live model
+    # catalogue (/models). Defaults to true: gh-aw model aliases, including built-in
+    # aliases that look like model ids such as gpt-5-mini, are resolved and the run
+    # stops if no catalogue is available. Set to false for BYOK providers without a
+    # /models route (for example Azure AI Gateway): configured models are then passed
+    # to the engine verbatim, without alias resolution, and model routing (implicit or
+    # model: router) is disabled because it selects models from the catalogue. Not
+    # supported with engine.copilot-sdk: true, which needs the catalogue at startup.
+    # (optional)
+    model-catalog: true
 
     # Minimum release age in days for compiler-managed engine installs. Zero disables
     # the cooldown only outside strict mode.
@@ -5527,8 +5599,9 @@ tools:
     # Format 2: GitHub Actions expression that resolves to a boolean at runtime
     staged: "example-value"
 
-    # Enable issue-intent metadata support (rationale/confidence/suggest) for this
-    # output type.
+    # Experimental: Enable issue-intent metadata support
+    # (rationale/confidence/suggest) for this output type. Disabled by default; set to
+    # true to opt in (makes rationale and confidence required).
     # (optional)
     issue-intent: true
 
@@ -6153,8 +6226,9 @@ safe-outputs:
     # Format 2: GitHub Actions expression that resolves to a boolean at runtime
     staged: "example-value"
 
-    # Enable issue-intent metadata support (rationale/confidence/suggest) for this
-    # output type.
+    # Experimental: Enable issue-intent metadata support
+    # (rationale/confidence/suggest) for this output type. Disabled by default; set to
+    # true to opt in (makes rationale and confidence required).
     # (optional)
     issue-intent: true
 
@@ -6450,8 +6524,9 @@ safe-outputs:
     # Format 2: GitHub Actions expression that resolves to a boolean at runtime
     staged: "example-value"
 
-    # Enable issue-intent metadata support (rationale/confidence/suggest) for this
-    # output type.
+    # Experimental: Enable issue-intent metadata support
+    # (rationale/confidence/suggest) for this output type. Disabled by default; set to
+    # true to opt in (makes rationale and confidence required).
     # (optional)
     issue-intent: true
 
@@ -9149,8 +9224,9 @@ safe-outputs:
     # Format 2: GitHub Actions expression that resolves to a boolean at runtime
     staged: "example-value"
 
-    # Enable issue-intent metadata support (rationale/confidence/suggest) for this
-    # output type.
+    # Experimental: Enable issue-intent metadata support
+    # (rationale/confidence/suggest) for this output type. Disabled by default; set to
+    # true to opt in (makes rationale and confidence required).
     # (optional)
     issue-intent: true
 
@@ -14125,8 +14201,9 @@ safe-outputs:
     # (optional)
     required-title-prefix: "example-value"
 
-    # Enable issue-intent metadata support (rationale/confidence/suggest) for this
-    # output type.
+    # Experimental: Enable issue-intent metadata support
+    # (rationale/confidence/suggest) for this output type. Disabled by default; set to
+    # true to opt in (makes rationale and confidence required).
     # (optional)
     issue-intent: true
 
@@ -15433,8 +15510,9 @@ safe-outputs:
     # Format 2: GitHub Actions expression that resolves to a boolean at runtime
     staged: "example-value"
 
-    # Enable issue-intent metadata support (rationale/confidence/suggest) for this
-    # output type.
+    # Experimental: Enable issue-intent metadata support
+    # (rationale/confidence/suggest) for this output type. Disabled by default; set to
+    # true to opt in (makes rationale and confidence required).
     # (optional)
     issue-intent: true
 
@@ -15737,8 +15815,9 @@ safe-outputs:
     # Format 2: GitHub Actions expression that resolves to a boolean at runtime
     staged: "example-value"
 
-    # Enable issue-intent metadata support (rationale/confidence/suggest) for this
-    # output type.
+    # Experimental: Enable issue-intent metadata support
+    # (rationale/confidence/suggest) for this output type. Disabled by default; set to
+    # true to opt in (makes rationale and confidence required).
     # (optional)
     issue-intent: true
 
@@ -18462,8 +18541,9 @@ safe-outputs:
     # (optional)
     head-github-token: "example-value"
 
-    # Enable issue-intent metadata support (rationale/confidence/suggest) for this
-    # output type.
+    # Experimental: Enable issue-intent metadata support
+    # (rationale/confidence/suggest) for this output type. Disabled by default; set to
+    # true to opt in (makes rationale and confidence required).
     # (optional)
     issue-intent: true
 
@@ -18766,8 +18846,9 @@ safe-outputs:
     # (optional)
     github-token: "${{ secrets.GITHUB_TOKEN }}"
 
-    # Enable issue-intent metadata support (rationale/confidence/suggest) for this
-    # output type.
+    # Experimental: Enable issue-intent metadata support
+    # (rationale/confidence/suggest) for this output type. Disabled by default; set to
+    # true to opt in (makes rationale and confidence required).
     # (optional)
     issue-intent: true
 
@@ -22469,6 +22550,17 @@ safe-outputs:
       env:
         {}
 
+      # Explicit workflow inference selection. Model is an exact granted wire alias,
+      # separate from engine.model metadata. Initially supports Copilot
+      # OpenAI-compatible BYOK only.
+      # (optional)
+      inference:
+        connector: "example-value"
+
+        profile: "example-value"
+
+        model: "example-value"
+
       # Engine-level authentication configuration for AWF API proxy sidecar integration
       # (for example, Azure OpenAI via GitHub OIDC). Values are mapped to AWF_AUTH_*
       # environment variables.
@@ -22575,6 +22667,17 @@ safe-outputs:
       # (optional)
       bare: true
 
+      # Whether the engine harness resolves the configured model against the live model
+      # catalogue (/models). Defaults to true: gh-aw model aliases, including built-in
+      # aliases that look like model ids such as gpt-5-mini, are resolved and the run
+      # stops if no catalogue is available. Set to false for BYOK providers without a
+      # /models route (for example Azure AI Gateway): configured models are then passed
+      # to the engine verbatim, without alias resolution, and model routing (implicit or
+      # model: router) is disabled because it selects models from the catalogue. Not
+      # supported with engine.copilot-sdk: true, which needs the catalogue at startup.
+      # (optional)
+      model-catalog: true
+
       # Whether dynamic workflows are enabled for engines that support them. Defaults to
       # false. Copilot dynamic workflows are experimental.
       # (optional)
@@ -22599,11 +22702,21 @@ safe-outputs:
         # (optional)
         tool-timeout: "example-value"
 
-      # Enables the experimental GitHub Copilot SDK integration (copilot engine only).
-      # When true, the harness starts a separate headless Copilot CLI sidecar on the
-      # configured localhost port and sets COPILOT_SDK_URI on child processes.
+      # Enables Copilot SDK integration. An object pins a checked-in npm project for a
+      # Node.js or TypeScript driver.
       # (optional)
+      # Accepted formats:
+
+      # Format 1: boolean
       copilot-sdk: true
+
+      # Format 2: object
+      copilot-sdk:
+        # Exact stable version of @microsoft/copilot-sdk, independent of engine.version.
+        version: "example-value"
+
+        # Lowercase SHA-256 of the checked-in manifest, a NUL byte, and the npm lockfile.
+        sha256: "example-value"
 
       # Custom driver script, command, or inline source for the engine. String values
       # accept a workspace-relative path or bare name. Inline object values are
@@ -22753,6 +22866,17 @@ safe-outputs:
       # not support this option and emit a warning. Defaults to false.
       # (optional)
       bare: true
+
+      # Whether the engine harness resolves the configured model against the live model
+      # catalogue (/models). Defaults to true: gh-aw model aliases, including built-in
+      # aliases that look like model ids such as gpt-5-mini, are resolved and the run
+      # stops if no catalogue is available. Set to false for BYOK providers without a
+      # /models route (for example Azure AI Gateway): configured models are then passed
+      # to the engine verbatim, without alias resolution, and model routing (implicit or
+      # model: router) is disabled because it selects models from the catalogue. Not
+      # supported with engine.copilot-sdk: true, which needs the catalogue at startup.
+      # (optional)
+      model-catalog: true
 
       # Whether dynamic workflows are enabled for engines that support them. Defaults to
       # false. Copilot dynamic workflows are experimental.
@@ -22987,6 +23111,12 @@ safe-outputs:
 
           # (optional)
           web-search: true
+
+          # Use the built-in sandboxed web-fetch MCP server when the workflow enables
+          # tools.web-fetch. Requires MCP support and a config adapter that registers the
+          # stdio server.
+          # (optional)
+          web-fetch-fallback: true
 
           # (optional)
           max-continuations: true
@@ -23354,6 +23484,17 @@ safe-outputs:
         # not support this option and emit a warning. Defaults to false.
         # (optional)
         bare: true
+
+        # Whether the engine harness resolves the configured model against the live model
+        # catalogue (/models). Defaults to true: gh-aw model aliases, including built-in
+        # aliases that look like model ids such as gpt-5-mini, are resolved and the run
+        # stops if no catalogue is available. Set to false for BYOK providers without a
+        # /models route (for example Azure AI Gateway): configured models are then passed
+        # to the engine verbatim, without alias resolution, and model routing (implicit or
+        # model: router) is disabled because it selects models from the catalogue. Not
+        # supported with engine.copilot-sdk: true, which needs the catalogue at startup.
+        # (optional)
+        model-catalog: true
 
         # Minimum release age in days for compiler-managed engine installs. Zero disables
         # the cooldown only outside strict mode.
@@ -24133,6 +24274,35 @@ safe-outputs:
   actions:
     {}
 
+  # Opt-in metadata-only request for follow-up work. Does not resume work or
+  # dispatch a workflow.
+  # (optional)
+  # Accepted formats:
+
+  # Format 1: object
+  request-continuation:
+    # (optional)
+    authorization:
+      endpoint: "example-value"
+
+      audience: "example-value"
+
+    # Maximum number of continuation requests (default: 1).
+    # (optional)
+    # Accepted formats:
+
+    # Format 1: integer
+    max: 1
+
+    # Format 2: string
+    max: "example-value"
+
+  # Format 2: null
+  request-continuation: null
+
+  # Format 3: boolean
+  request-continuation: true
+
   # Enable AI agents to signal that a task could not be completed due to
   # infrastructure or tool failures (e.g., MCP crash, missing auth, inaccessible
   # repository). Activates failure handling even when the agent exits 0.
@@ -24760,8 +24930,10 @@ secret-masking:
 # Optional observability output settings for workflow runs.
 # (optional)
 observability:
-  # OTLP (OpenTelemetry Protocol) trace export configuration.
   # (optional)
+  # Accepted formats:
+
+  # Format 1: OTLP (OpenTelemetry Protocol) trace export configuration.
   otlp:
     # OTLP endpoint configuration. Accepts a plain URL string (backward-compat), a
     # single {url, headers} object, or an array of {url, headers} objects for
@@ -24892,6 +25064,10 @@ observability:
       # Optional Google service account email to impersonate after STS token exchange.
       # (optional)
       service-account: "example-value"
+
+  # Format 2: Disable compiler-managed OTLP configuration, including defaults and
+  # imported settings, when set in the main workflow.
+  otlp: false
 
 # Rate limiting configuration to restrict how frequently users can trigger the
 # workflow. Helps prevent abuse and resource exhaustion from programmatically

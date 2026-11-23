@@ -236,10 +236,13 @@ func (c *Compiler) addCustomSafeOutputEnvVars(steps *[]string, data *WorkflowDat
 	c.addSafeOutputEnvVars(steps, data, true)
 }
 
-func (c *Compiler) addSafeOutputEnvVars(steps *[]string, data *WorkflowData, includeConnectorCredentials bool) {
+func (c *Compiler) addSafeOutputEnvVars(steps *[]string, data *WorkflowData, includeConnectorCredentials bool, excludedKeys ...map[string]bool) {
 	if data.SafeOutputs != nil && len(data.SafeOutputs.Env) > 0 {
 		ciTriggerTokenDisabled := isCITriggerTokenDisabled(data.SafeOutputs)
 		for _, key := range sliceutil.SortedKeys(data.SafeOutputs.Env) {
+			if len(excludedKeys) > 0 && excludedKeys[0][strings.ToUpper(key)] {
+				continue
+			}
 			if !includeConnectorCredentials {
 				connectorCredential := false
 				for alias, config := range data.Connectors {

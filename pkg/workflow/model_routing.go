@@ -444,6 +444,10 @@ func validateModelRouting(workflowData *WorkflowData, engineName string) error {
 	if !isFirewallEnabled(workflowData) {
 		return NewValidationError("engine.model-routing", "", "task-level model routing requires the AWF firewall", "Enable the AWF firewall for this workflow.")
 	}
+	if workflowData.EngineConfig.ModelCatalogDisabled {
+		return NewValidationError("engine.model-routing", "", "task-level model routing requires the live model catalogue, which engine.model-catalog: false disables",
+			"Remove model-routing (or set it to false), or remove engine.model-catalog: false.")
+	}
 	if err := validateModelRoutingProviderTarget(workflowData, engineName); err != nil {
 		return err
 	}

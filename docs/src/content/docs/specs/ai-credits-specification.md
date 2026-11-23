@@ -1,5 +1,6 @@
 ---
 title: AI Credits Specification
+spec: true
 description: Formal W3C-style specification for AI Credits (AIC) calculation, model pricing catalog format, and Copilot billing reference requirements.
 sidebar:
   order: 1361
@@ -7,9 +8,9 @@ sidebar:
 
 # AI Credits Specification
 
-**Version**: 1.5.4<br />
+**Version**: 1.5.5<br />
 **Status**: Draft  
-**Publication Date**: 2026-11-13<br />
+**Publication Date**: 2026-11-22<br />
 **Editor**: GitHub Agentic Workflows Team  
 **This Version**: [ai-credits-specification](/gh-aw/specs/ai-credits-specification/)  
 **Latest Published Version**: This document
@@ -501,7 +502,7 @@ Individually resolved observations are persisted even if a later historical read
 
 The runtime MUST list billable jobs with all attempts, validate completed job metadata, and independently account for Agent, Detection, and Evaluations. It normalizes display names to component IDs, rejects ambiguous same-attempt jobs, and retains the relevant executed job when a failed-only rerun preserves a successful earlier attempt. A complete empty job list or a list containing only skipped billable jobs proves zero for the run without an artifact read.
 
-Otherwise, the runtime selects the latest matching `usage` or invocation-prefixed `*-usage` artifact. Missing identity, expiry, missing creation time, or incomplete component coverage is unresolved accounting, not zero. An aggregate artifact MUST cover each executed component's start/end timestamps. On reruns, unless the cancelled-attempt exception below applies, the original component producer artifact MUST also exist, be unexpired, and have a creation time from the job start through strictly before its completion plus one second. Repacking old data with a new aggregate timestamp MUST NOT establish coverage.
+Otherwise, the runtime MUST list all artifacts, order aggregate and producer artifacts by `createdAt` descending, and select the first matching `usage` or invocation-prefixed `*-usage` artifact. Artifact ID MUST NOT determine artifact selection. Missing identity, expiry, missing creation time, or incomplete component coverage is unresolved accounting, not zero. An aggregate artifact MUST cover each executed component's start/end timestamps. On reruns, unless the cancelled-attempt exception below applies, the original component producer artifact MUST also exist, be unexpired, and have a creation time from the job start through strictly before its completion plus one second. Repacking old data with a new aggregate timestamp MUST NOT establish coverage.
 
 If the selected latest component job is `cancelled` and its attempt has no verifiable producer artifact, the runtime MAY count carried-forward usage only when the latest earlier executed job for that component is unambiguous and has a verifiable, unexpired producer artifact created within that job's start/completion bounds, and the selected aggregate accounting completely covers that attempt. The runtime MUST warn that usage from the cancelled attempt may be unaccounted for. Missing accounting, ambiguous jobs on the latest earlier attempt, or an unverifiable producer for that attempt remains unresolved accounting; it MUST NOT be treated as zero or carried forward from an arbitrary older job. This fallback MUST NOT apply to any outcome other than `cancelled`. A verified producer for the selected attempt takes precedence and does not require older attempts to be unambiguous.
 
@@ -588,6 +589,8 @@ The writer uses staged usage files and the permissive usage parser, appending ti
 ### 9.16 Native Contract Coverage and Validation Boundary
 
 Focused Vitest suites exercise the runtime behavior described in Sections 9.9–9.15, including history completeness, snapshot trust and reinspection, component accounting, fallback decisions, API retries and quota handling, and repo-memory ledger rules. The spec-derived fixed-output contract cases are in `actions/setup/js/daily_aic_spec_conformance.test.cjs`; quota-blocked cases verify empty totals, `exceeded: false`, and no activation failure, while compiler tests verify enforced startup gating and configured fail-open behavior. These tests are executable conformance examples, not a proof of provider billing or GitHub API behavior.
+
+The [bounded daily guardrail TLA+ model](https://github.com/github/gh-aw/tree/main/specs/daily-aic) checks history completeness, exact-match snapshot reuse, whole-run estimates, quota deferral, startup decisions, and repo-memory backend selection. A separate model checks the cancelled-rerun evidence rule in §9.11. Neither model verifies provider billing, GitHub API behavior, or the runtime implementation.
 
 ---
 
@@ -733,6 +736,10 @@ explicit workflow pricing overrides, or the specification's minor version change
 
 <a id="change-log"></a>
 ## Change Log
+
+### Version 1.5.5 (2026-11-22)
+
+- **Updated**: §9.11 requires artifact selection by descending creation time rather than artifact ID, while preserving timestamp verification and cancelled-rerun fallback behavior.
 
 ### Version 1.5.4 (2026-11-13)
 

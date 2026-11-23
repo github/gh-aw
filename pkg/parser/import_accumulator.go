@@ -36,6 +36,7 @@ type importAccumulator struct {
 	pluginObjects            []map[string]any
 	safeOutputs              []string
 	gradersBuilder           strings.Builder
+	experimentsBuilder       strings.Builder
 	mcpScripts               []string
 	bots                     []string
 	botsSet                  map[string]bool
@@ -86,6 +87,7 @@ type importAccumulator struct {
 	// Values are stored as JSON-encoded raw values so numeric literals and strings
 	// round-trip consistently through import processing.
 	mergedMaxTurns           string
+	runsOn                   any
 	mergedMaxToolDenials     string
 	mergedMaxToolCalls       string
 	mergedMaxRuns            string
@@ -143,6 +145,7 @@ func (acc *importAccumulator) buildImportsResult() *ImportsResult {
 		MergedPluginObjects:           acc.pluginObjects,
 		MergedSafeOutputs:             acc.safeOutputs,
 		MergedGraders:                 acc.gradersBuilder.String(),
+		MergedExperiments:             acc.experimentsBuilder.String(),
 		MergedMCPScripts:              acc.mcpScripts,
 		MergedMarkdown:                acc.markdownBuilder.String(),
 		ImportPaths:                   acc.importPaths,
@@ -153,6 +156,7 @@ func (acc *importAccumulator) buildImportsResult() *ImportsResult {
 		MergedPreSteps:                acc.preStepsBuilder.String(),
 		MergedPreAgentSteps:           acc.preAgentStepsBuilder.String(),
 		MergedRuntimes:                acc.runtimesBuilder.String(),
+		MergedRunsOn:                  acc.runsOn,
 		MergedRunInstallScripts:       acc.runInstallScripts,
 		MergedServices:                acc.servicesBuilder.String(),
 		MergedNetwork:                 acc.networkBuilder.String(),

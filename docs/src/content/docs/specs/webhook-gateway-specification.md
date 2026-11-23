@@ -1,5 +1,6 @@
 ---
 title: Webhook Gateway Specification
+spec: true
 description: Experimental contract for supported webhook triggers, expected source data, normalized activities, and batched dispatch.
 sidebar:
   order: 1360
@@ -667,6 +668,8 @@ The request URL and `ACTIONS_ID_TOKEN_REQUEST_TOKEN` come from the runner; this 
 The workflow presents that value, not the runner's request credential, to the independently configured `getToken` endpoint over HTTPS. Neither credential may be printed, included in diagnostic HTTP traces, stored in artifacts, or forwarded to the agent. No hash or bearer-token field is added to the closed repository-dispatch envelope.
 
 #### Compiler continuation profile
+
+The [companion TypeSpec definition](https://github.com/github/gh-aw/blob/main/docs/src/content/docs/specs/webhook-gateway-specification.tsp) describes the gateway's `getToken` continuation endpoint. It does not define provider ingress or reproduce the GitHub REST API.
 
 The reserved `gateway_admission` job MUST follow successful `gateway_provenance`. Every other job, including custom, reusable, and `on.needs` jobs, directly requires both gates' successful results and `verified == 'true'` outputs. Custom conditions, activation outputs, or `strict: false` cannot bypass either gate. Customizing `jobs.gateway_admission` is rejected. Both control-plane jobs remain outside job environments, including when `--environment` is used, so environment-specific settings cannot replace central trust configuration. Their setup does not mint user-configured App or observability credentials.
 
