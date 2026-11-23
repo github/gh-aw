@@ -81,8 +81,9 @@ describe("native work queue smoke verification", () => {
     const controls = lock.jobs.safe_outputs.steps.find(step => step.id === "work_queue_controls");
     const policy = compiledPolicy(controls.env);
     expect(policy.version).toBe(4);
-    expect(policy.pools["smoke-work-queue"]).toMatchObject({ concurrency: 3, max_attempts: 3 });
-    expect(policy.pools["smoke-work-queue"].profiles["smoke-work-queue-worker"]).toEqual({ workflow: ".github/workflows/smoke-work-queue-worker.lock.yml", effect_scope: "${{ github.repository }}" });
+    expect(policy.pools["smoke-work-queue"]).toEqual({ concurrency: 3, per_account_limit: 0, max_attempts: 3 });
+    expect(policy.workers).toContain("smoke-work-queue-worker");
+    expect(policy.effect_scope).toBe("${{ github.repository }}");
   });
 
   it("uses isolated worker concurrency and a read-only monitor", () => {
@@ -127,6 +128,8 @@ describe("native work queue smoke verification", () => {
       dispatchReceipt({ dispatches: 2, launches: startedLaunches.slice(0, 2) }),
       dispatchReceipt({ launches: [{ dispatch_id: dispatchId(1), state: "launch_failed", reason: "http_5xx" }, ...startedLaunches.slice(1)] }),
       dispatchReceipt({ launches: [{ dispatch_id: "dispatch:smoke", state: "started" }, ...startedLaunches.slice(1)] }),
+      dispatchReceipt({ launches: [startedLaunches[0], startedLaunches[0], startedLaunches[0]] }),
+      dispatchReceipt({ launches: [startedLaunches[0], startedLaunches[1], startedLaunches[1]] }),
       { ...dispatchReceipt(), version: 3 },
       { ...dispatchReceipt(), success: false },
       { ...dispatchReceipt(), receipts: [] },
@@ -250,14 +253,15 @@ describe("smoke work queue monitor collector", () => {
         append(current => helpers.submit(current, works, dispatcherActor(runId)));
         return works.map(node => node.work_id);
       },
-      grant(actor, max = 3) {
+      // Each launch records the worker run that later binds: `${runPrefix}1`, `${runPrefix}2`, ...
+      grant(actor, max = 3, runPrefix = "700") {
         let claims = [];
         append(current => {
           const { log: next, decision } = helpers.dispatchNext(current, { pool: POOL, max_claims: max, max_dispatches: max, concurrency: 3, profiles: { [PROFILE]: { workflow: SMOKE_WORKER } } }, actor);
           claims = decision.operations;
           return next;
         });
-        for (const claim of claims) append(current => helpers.launch(current, claim.dispatch_id, true, actor));
+        claims.forEach((claim, index) => append(current => helpers.launch(current, claim.dispatch_id, true, actor, `${runPrefix}${index + 1}`)));
         return claims;
       },
       bind: (dispatchId, runId, attempt = 1) => append(current => helpers.bind(current, dispatchId, helpers.workerActor(runId, attempt, SMOKE_WORKER))),
@@ -272,13 +276,13 @@ describe("smoke work queue monitor collector", () => {
   function fifoIncident({ checkpoint = false, tamper = false } = {}) {
     const ledger = smokeLedger();
     const aWork = ledger.submit("1001");
-    const a = ledger.grant(dispatcherActor("1001"));
+    const a = ledger.grant(dispatcherActor("1001"), 3, "500");
     a.forEach((claim, index) => {
       ledger.bind(claim.dispatch_id, `500${index + 1}`);
       ledger.release(claim.dispatch_id, "worker_terminated");
     });
     const bWork = ledger.submit("1002");
-    const b = ledger.grant(dispatcherActor("1002"));
+    const b = ledger.grant(dispatcherActor("1002"), 3, "600");
     if (tamper) ledger.git.install(ledger.withoutLastLine());
     if (checkpoint) ledger.checkpoint();
     b.forEach((claim, index) => {

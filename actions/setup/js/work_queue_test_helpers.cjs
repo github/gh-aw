@@ -6,6 +6,7 @@ const { planDispatch } = require("./work_queue_scheduler.cjs");
 const { createHash } = require("node:crypto");
 const { canonical } = require("./work_queue_codec.cjs");
 const { registerQueueLedgerClient } = require("./work_queue_git_transport.cjs");
+const { readWorkQueuePolicyEnv } = require("./work_queue_policy.cjs");
 
 const repository = "owner/repo";
 const WORKER_WORKFLOW = ".github/workflows/worker.lock.yml";
@@ -15,6 +16,8 @@ const dispatcher = { role: "dispatcher", repository, workflow: ".github/workflow
 const reconciler = { role: "reconciler", repository, workflow: ".github/workflows/agentics-maintenance.yml", run_id: "300", run_attempt: 1 };
 const projector = { role: "projector", repository, workflow: ".github/workflows/dispatcher.lock.yml", run_id: "100", run_attempt: 1 };
 const PROFILES = { worker: { workflow: WORKER_WORKFLOW } };
+/** The head_sha of every launched test worker run. */
+const WORKER_REVISION = "c".repeat(40);
 
 /** A worker actor for one run attempt. */
 function workerActor(runId = "200", runAttempt = 1, workflow = WORKER_WORKFLOW) {
@@ -58,8 +61,15 @@ function dispatchNext(log, overrides = {}, actor = dispatcher, observations = []
   return { log: [...log, next], decision };
 }
 
-function launch(log, dispatchId, started = true, actor = dispatcher) {
-  return commit(log, actor, "launch", { dispatch_id: dispatchId }, started ? [{ kind: "Dispatch", dispatch_id: dispatchId, state: "started" }] : [{ kind: "Release", dispatch_id: dispatchId, reason: "launch_failed" }]);
+/** Record a launch: `Dispatch{started}` naming the launched run (default: workerActor()'s run "200"), or a launch_failed Release. */
+function launch(log, dispatchId, started = true, actor = dispatcher, runId = "200", revision = WORKER_REVISION) {
+  return commit(
+    log,
+    actor,
+    "launch",
+    { dispatch_id: dispatchId },
+    started ? [{ kind: "Dispatch", dispatch_id: dispatchId, state: "started", run_id: runId, revision }] : [{ kind: "Release", dispatch_id: dispatchId, reason: "launch_failed" }]
+  );
 }
 
 function bind(log, dispatchId, actor = workerActor()) {
@@ -85,6 +95,33 @@ function release(log, dispatchId, reason = "run_missing", actor = reconciler, ex
 /** Canonical JSONL text of a log. */
 function ledgerText(log) {
   return log.map(entry => canonical(entry) + "\n").join("");
+}
+
+/** The Actions API view of a launched worker run: a workflow_dispatch run of the worker at WORKER_REVISION. */
+function workflowRun(runId, overrides = {}) {
+  return { id: Number(runId), path: WORKER_WORKFLOW, event: "workflow_dispatch", head_sha: WORKER_REVISION, run_attempt: 1, repository: { full_name: repository }, ...overrides };
+}
+
+/**
+ * In-memory Actions API. `createWorkflowDispatch` creates run `nextRunId` (then +1) of the
+ * posted workflow and returns it as `return_run_details` does; `getWorkflowRun` serves `runs`.
+ */
+function fakeActions({ runs = new Map(), nextRunId = 200, revision = WORKER_REVISION } = {}) {
+  const posts = [];
+  const actions = {
+    createWorkflowDispatch: async input => {
+      posts.push(input);
+      const id = String(nextRunId++);
+      runs.set(id, workflowRun(id, { path: `.github/workflows/${input.workflow_id}`, head_sha: revision }));
+      return { status: 200, data: { workflow_run_id: Number(id) } };
+    },
+    getWorkflowRun: async ({ run_id }) => {
+      const run = runs.get(String(run_id));
+      if (!run) throw Object.assign(new Error("Not Found"), { status: 404 });
+      return { status: 200, data: run };
+    },
+  };
+  return { actions, runs, posts };
 }
 
 /**
@@ -115,10 +152,12 @@ function fakeQueueGitHub(initialContents = undefined, { branch = "work-queue", r
   }
   if (initialContents !== undefined) install(initialContents);
   const contents = () => (refs.has(branch) ? blobs.get(trees.get(commits.get(refs.get(branch)).tree)) : undefined);
+  const actionsApi = fakeActions();
   const githubClient = {
     graphql: async () => ({ repository: { nameWithOwner: fullName, isEmpty: false } }),
     rest: {
       repos: { get: async () => ({ data: { full_name: fullName, default_branch: "main", size: 1 } }) },
+      actions: actionsApi.actions,
       git: {
         getRef: async ({ ref }) => {
           if (ref === "heads/main") return { data: { object: { sha: "a".repeat(40) } } };
@@ -179,11 +218,27 @@ function fakeQueueGitHub(initialContents = undefined, { branch = "work-queue", r
     },
   };
   registerQueueLedgerClient(githubClient, githubClient);
-  return { githubClient, state, refs, commits, contents, install };
+  return { githubClient, state, refs, commits, contents, install, runs: actionsApi.runs, posts: actionsApi.posts };
+}
+
+/**
+ * The compiled GH_AW_WORK_QUEUE_POLICY text for an in-memory policy. The compiled form lists
+ * workers once, so every pool must share one profile set; the round trip rejects a fixture
+ * the compiler could not emit.
+ * @param {import("./work_queue_policy.cjs").PolicyEnv} policy
+ */
+function policyEnvText(policy) {
+  const [first] = Object.values(policy.pools);
+  const workers = Object.keys(first.profiles).sort();
+  const pools = Object.fromEntries(Object.entries(policy.pools).map(([name, pool]) => [name, { concurrency: pool.concurrency, per_account_limit: pool.per_account_limit, max_attempts: pool.max_attempts }]));
+  const text = JSON.stringify({ version: policy.version, pending_limit: policy.pending_limit, issues: policy.issues, effect_scope: first.profiles[workers[0]].effect_scope, workers, pools });
+  if (canonical(readWorkQueuePolicyEnv({ GH_AW_WORK_QUEUE_POLICY: text })) !== canonical(policy)) throw new Error("policy fixture is not expressible as a compiled policy environment");
+  return text;
 }
 
 module.exports = {
   PROFILES,
+  WORKER_REVISION,
   WORKER_WORKFLOW,
   administrator,
   bind,
@@ -191,10 +246,12 @@ module.exports = {
   dispatchNext,
   dispatchParameters,
   dispatcher,
+  fakeActions,
   fakeQueueGitHub,
   finish,
   launch,
   ledgerText,
+  policyEnvText,
   producer,
   projector,
   reconciler,
@@ -203,4 +260,5 @@ module.exports = {
   submit,
   work,
   workerActor,
+  workflowRun,
 };

@@ -9,6 +9,7 @@ const ROLES = ["administrator", "producer", "dispatcher", "worker", "reconciler"
 const REPOSITORY = /^[^/\s]+\/[^/\s]+$/;
 const ACTOR_WORKFLOW = /^\.github\/workflows\/[^/]+\.ya?ml$/;
 const PROFILE_WORKFLOW = /^\.github\/workflows\/[^/]+\.lock\.yml$/;
+const WORKER_ID = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 
 /** @typedef {{role: string, repository: string, workflow?: string, run_id?: string, run_attempt?: number}} QueueActor */
 /** @typedef {{workflow: string, effect_scope: string}} PolicyProfile */
@@ -118,6 +119,36 @@ function validatePolicyEnv(value) {
 }
 
 /**
+ * Decode the compiled environment. Every pool routes to every approved worker, so the
+ * compiler lists each worker ID once: profile `<id>` runs `.github/workflows/<id>.lock.yml`
+ * within `effect_scope`, and each pool's default profile is the first (smallest) ID.
+ * @param {unknown} value
+ * @returns {PolicyEnv}
+ */
+function expandPolicyEnv(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw queueError("policy_invalid", "work queue policy must be an object");
+  // prettier-ignore
+  if (/** @type {{version?: unknown}} */ (value).version !== 4) throw queueError("unsupported_protocol", "work queue policy environment v4 required");
+  closed(value, ["version", "pending_limit", "issues", "effect_scope", "workers", "pools"], [], "work queue policy", "policy_invalid");
+  // prettier-ignore
+  const { pending_limit: pendingLimit, issues, effect_scope: effectScope, workers, pools } = /** @type {Record<string, any>} */ (value);
+  if (!Array.isArray(workers) || !workers.length || workers.length > 256) throw queueError("policy_invalid", "policy must approve 1..256 workers");
+  workers.forEach((worker, index) => {
+    if (!WORKER_ID.test(identity(worker, "worker")) || worker.includes("..")) throw queueError("policy_invalid", `invalid worker ${worker}`);
+    if (index > 0 && workers[index - 1] >= worker) throw queueError("policy_invalid", "workers must be sorted and unique");
+  });
+  if (!pools || typeof pools !== "object" || Array.isArray(pools)) throw queueError("policy_invalid", "pools must be an object");
+  /** @type {Record<string, PolicyPool>} */
+  const expanded = {};
+  for (const [name, pool] of Object.entries(pools)) {
+    closed(pool, ["concurrency", "per_account_limit", "max_attempts"], [], `pool ${name}`, "policy_invalid");
+    const profiles = Object.fromEntries(workers.map(worker => [worker, { workflow: `.github/workflows/${worker}.lock.yml`, effect_scope: effectScope }]));
+    expanded[name] = { concurrency: pool.concurrency, per_account_limit: pool.per_account_limit, max_attempts: pool.max_attempts, default_profile: workers[0], profiles };
+  }
+  return validatePolicyEnv({ version: 4, pending_limit: pendingLimit, issues, pools: expanded });
+}
+
+/**
  * Read and validate GH_AW_WORK_QUEUE_POLICY (including chunked transport).
  * @param {Record<string, unknown>} [environment]
  * @returns {PolicyEnv | null}
@@ -125,7 +156,7 @@ function validatePolicyEnv(value) {
 function readWorkQueuePolicyEnv(environment = process.env) {
   const raw = readWorkQueuePolicyConfig(environment);
   if (!raw) return null;
-  return validatePolicyEnv(parseStrictJSON(raw));
+  return expandPolicyEnv(parseStrictJSON(raw));
 }
 
 /**

@@ -128,9 +128,12 @@ Plan ==
            /\ dispatch' = [dispatch EXCEPT ![d] = [state |-> "reserved", launched |-> FALSE, bound |-> 0]]
     /\ UNCHANGED run
 
-\* workflow_dispatch POST succeeded: GitHub queues run attempt 1. The launch
-\* commit [Dispatch{started}] applies only to a still reserved Dispatch and may
-\* be lost (CAS exhausted, job killed); the Dispatch then stays reserved.
+\* workflow_dispatch POST succeeded and the dispatcher read back the created
+\* run: GitHub queues run attempt 1. The launch commit
+\* [Dispatch{started, run_id, revision}] names exactly that run (the run of
+\* slot d), applies only to a still reserved Dispatch and may be lost (CAS
+\* exhausted, job killed); the Dispatch then stays reserved and no run can
+\* bind it. A POST whose run cannot be identified or verified is LaunchFail.
 LaunchOK(d) ==
     /\ dispatch[d].state = "reserved"
     /\ ~dispatch[d].launched
@@ -139,9 +142,10 @@ LaunchOK(d) ==
        \/ dispatch' = [dispatch EXCEPT ![d].launched = TRUE]
     /\ UNCHANGED <<work, claim>>
 
-\* workflow_dispatch POST failed: launch commit [Release{launch_failed}]
-\* (+ attempts rule), or the commit is lost and the Dispatch stays reserved.
-\* An ambiguous failure (transport error, 5xx) may still have queued a run.
+\* workflow_dispatch POST failed, or returned no verifiable run: launch commit
+\* [Release{launch_failed}] (+ attempts rule), or the commit is lost and the
+\* Dispatch stays reserved. An ambiguous failure (transport error, 5xx) or an
+\* unverified launch may still have queued a run; it can never bind.
 LaunchFail(d) ==
     /\ dispatch[d].state = "reserved"
     /\ ~dispatch[d].launched
@@ -175,13 +179,14 @@ Rerun(d) ==
 (* Worker run *)
 
 \* Activation job: bind commit [Bound{dispatch_id, run_id, run_attempt}].
-\* Allowed from reserved/started/bound with an open Claim; a later attempt of
-\* the same run rebinds; the same attempt is an idempotent no-op. Without an
-\* open Claim the assignment is settled: agent and safe_outputs jobs are
-\* skipped and only the conclusion job remains.
+\* Allowed only once the dispatcher recorded the launch of this run (started)
+\* or for its later attempts (bound), with an open Claim; the same attempt is
+\* an idempotent no-op. A run without a recorded launch, or without an open
+\* Claim, receives no Claim: agent and safe_outputs jobs are skipped and only
+\* the conclusion job remains.
 Bind(d) ==
     /\ run[d].phase = "activation"
-    /\ IF /\ dispatch[d].state \in {"reserved", "started", "bound"}
+    /\ IF /\ dispatch[d].state \in {"started", "bound"}
           /\ HasOpenClaim(d)
           /\ dispatch[d].bound <= run[d].attempt
        THEN /\ dispatch' = [dispatch EXCEPT ![d].state = "bound", ![d].bound = run[d].attempt]
@@ -223,12 +228,14 @@ Fail(d) ==
 
 \* Conclusion job "Terminate work queue worker" (if: always(); it also runs
 \* when activation or the agent failed), after which the run completes:
-\* Release{worker_terminated} when the Dispatch still has an open Claim and is
-\* unbound or bound to this run.
+\* Release{worker_terminated} when the Dispatch still has an open Claim and
+\* records this run: launched as this run (started) or bound to it. A
+\* reserved Dispatch records no launched run, so no worker run releases it;
+\* maintenance does.
 Terminate(d) ==
     /\ run[d].phase \in InProgress
     /\ run' = [run EXCEPT ![d].phase = "completed"]
-    /\ IF dispatch[d].state \in {"reserved", "started", "bound"} /\ HasOpenClaim(d)
+    /\ IF dispatch[d].state \in {"started", "bound"} /\ HasOpenClaim(d)
        THEN CancelClaim(d)
        ELSE UNCHANGED <<work, claim, dispatch>>
 

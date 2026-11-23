@@ -30,7 +30,7 @@ func TestLifecycleSubmitDispatchBindFinishRelease(t *testing.T) {
 	require.Len(t, decision.Operations, 1)
 	require.Equal(t, a.WorkID, decision.Operations[0].WorkID)
 	first := decision.Dispatches[0]
-	launched := testLaunch(t, log, first)
+	launched := testLaunch(t, log, first, "7")
 
 	other := Actor{Role: "worker", Repository: testRepository, Workflow: ".github/workflows/other.lock.yml", RunID: "9", RunAttempt: 1}
 	foreignBind := buildTestCommit(t, launched, other, "bind", DispatchIDParameters{DispatchID: first}, mustOps(t, BoundOperation{Kind: "Bound", DispatchID: first, RunID: "9", RunAttempt: 1}))
@@ -85,7 +85,7 @@ func TestReplayRejectsNonV4AndDuplicateRequests(t *testing.T) {
 func TestCheckpointRoundTripPreservesProjection(t *testing.T) {
 	log := testSubmit(t, nil, testWork(t, "a", nil), testWork(t, "b", nil))
 	log, decision := testDispatchNext(t, log, testDispatchParameters(nil))
-	log = testLaunch(t, log, decision.Dispatches[0])
+	log = testLaunch(t, log, decision.Dispatches[0], "7")
 	state, err := Replay(log)
 	require.NoError(t, err)
 	commit, err := CheckpointCommit(state, testReconciler, 5)

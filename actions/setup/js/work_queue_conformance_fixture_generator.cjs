@@ -42,7 +42,7 @@ function lifecycle() {
   let step = h.dispatchNext(log, NEXT_PARAMETERS, dispatcherRun("101"), [waiting]);
   log = step.log;
   const [dispatchD, dispatchA] = step.decision.dispatches;
-  log = h.launch(log, dispatchD, true, dispatcherRun("101"));
+  log = h.launch(log, dispatchD, true, dispatcherRun("101"), "7");
   log = h.launch(log, dispatchA, false, dispatcherRun("101"));
   const run7 = h.workerActor("7");
   log = h.bind(log, dispatchD, run7);
@@ -51,7 +51,7 @@ function lifecycle() {
   step = h.dispatchNext(log, NEXT_PARAMETERS, dispatcherRun("102"), [ready]);
   log = step.log;
   const [dispatchA2, dispatchC] = step.decision.dispatches;
-  log = h.launch(log, dispatchA2, true, dispatcherRun("102"));
+  log = h.launch(log, dispatchA2, true, dispatcherRun("102"), "8");
   const run8 = h.workerActor("8");
   log = h.bind(log, dispatchA2, run8);
   log = h.finish(log, dispatchA2, run8, { h1: "failed" });
@@ -66,7 +66,7 @@ function lifecycle() {
   step = h.dispatchNext(log, NEXT_PARAMETERS, dispatcherRun("103"));
   log = step.log;
   const [dispatchA3] = step.decision.dispatches;
-  log = h.launch(log, dispatchA3, true, dispatcherRun("103"));
+  log = h.launch(log, dispatchA3, true, dispatcherRun("103"), "9");
   log = h.bind(log, dispatchA3, h.workerActor("9", 1));
   log = h.bind(log, dispatchA3, h.workerActor("9", 2));
   log = h.finish(log, dispatchA3, h.workerActor("9", 2), {}, [{ kind: "create_pull_request", resource: { repository: "owner/repo", number: 43 } }]);
@@ -82,11 +82,11 @@ function rejections(log, { dispatchB, dispatchA3 }) {
   const claimA = state.dispatches.get(dispatchA3).claims[0];
   const a = h.work("a");
   const b = h.work("b", { depends_on: [{ kind: "work", work_id: a.work_id }] });
-  const started = h.launch(log, dispatchB, true, dispatcherRun("104"));
+  const started = h.launch(log, dispatchB, true, dispatcherRun("104"), "11");
   const bound = h.bind(started, dispatchB, h.workerActor("11"));
   const completeB = [{ kind: "Completion", work_id: b.work_id, claim_id: claimB, dispatch_id: dispatchB, claim_handle: "h1", effects: [] }];
   const launchB = { dispatch_id: dispatchB };
-  const startedB = [{ kind: "Dispatch", dispatch_id: dispatchB, state: "started" }];
+  const startedB = [{ kind: "Dispatch", dispatch_id: dispatchB, state: "started", run_id: "11", revision: h.WORKER_REVISION }];
   const cases = [
     { name: "Completion from another run", prefix: bound, commit: raw(bound, h.workerActor("12"), "finish", launchB, completeB), code: "claim_scope_invalid" },
     {
@@ -96,6 +96,20 @@ function rejections(log, { dispatchB, dispatchA3 }) {
       code: "run_binding_conflict",
     },
     { name: "Bound to a second run", prefix: bound, commit: raw(bound, h.workerActor("12"), "bind", launchB, [{ kind: "Bound", dispatch_id: dispatchB, run_id: "12", run_attempt: 1 }]), code: "run_binding_conflict" },
+    { name: "Bound before the launch is recorded", prefix: log, commit: raw(log, h.workerActor("11"), "bind", launchB, [{ kind: "Bound", dispatch_id: dispatchB, run_id: "11", run_attempt: 1 }]), code: "dispatch_state_conflict" },
+    {
+      name: "Bound by a run the dispatcher did not launch",
+      prefix: started,
+      commit: raw(started, h.workerActor("12"), "bind", launchB, [{ kind: "Bound", dispatch_id: dispatchB, run_id: "12", run_attempt: 1 }]),
+      code: "run_binding_conflict",
+    },
+    { name: "Dispatch started without its launched run", prefix: log, commit: raw(log, dispatcherRun("104"), "launch", launchB, [{ kind: "Dispatch", dispatch_id: dispatchB, state: "started" }]), code: "request_invalid" },
+    {
+      name: "Dispatch started with an abbreviated revision",
+      prefix: log,
+      commit: raw(log, dispatcherRun("104"), "launch", launchB, [{ kind: "Dispatch", dispatch_id: dispatchB, state: "started", run_id: "11", revision: "c".repeat(7) }]),
+      code: "request_invalid",
+    },
     {
       name: "Completion of an already completed Claim",
       prefix: log,
@@ -174,7 +188,7 @@ function continuationLedger() {
   const p = h.work("p", { payload: { task: "audit pages", effect_contract: { kind: "none" } }, subject: RESOURCE });
   let log = h.submit([], [p]);
   let step = h.dispatchNext(log, NEXT_PARAMETERS, dispatcherRun("201"));
-  log = h.launch(step.log, step.decision.dispatches[0], true, dispatcherRun("201"));
+  log = h.launch(step.log, step.decision.dispatches[0], true, dispatcherRun("201"), "21");
   const dispatchP = step.decision.dispatches[0];
   const run21 = h.workerActor("21");
   log = h.bind(log, dispatchP, run21);
@@ -183,7 +197,7 @@ function continuationLedger() {
   log = h.commit(log, run21, "finish", { dispatch_id: dispatchP }, [completion(replayTransactions(log), dispatchP), c1]);
   step = h.dispatchNext(log, NEXT_PARAMETERS, dispatcherRun("202"));
   const dispatchC1 = step.decision.dispatches[0];
-  log = h.launch(step.log, dispatchC1, true, dispatcherRun("202"));
+  log = h.launch(step.log, dispatchC1, true, dispatcherRun("202"), "22");
   const run22 = h.workerActor("22");
   log = h.bind(log, dispatchC1, run22);
   const boundC1 = log;
@@ -202,7 +216,7 @@ function continuationLedger() {
   };
   const finishP = operations => raw(boundP, run21, "finish", { dispatch_id: dispatchP }, [completion(replayTransactions(boundP), dispatchP), ...operations]);
   const preexisting = h.submit(boundP, [h.work(c1.node_key)]);
-  const boundC2 = h.bind(h.launch(log, dispatchC2, true, dispatcherRun("204")), dispatchC2, h.workerActor("24"));
+  const boundC2 = h.bind(h.launch(log, dispatchC2, true, dispatcherRun("204"), "24"), dispatchC2, h.workerActor("24"));
   // An ordinary producer cannot mint the continuation member, even for a fresh graph.
   const forged = { ...c1, graph_id: "forged", work_id: h.work(c1.node_key, { graph_id: "forged" }).work_id, depends_on: [] };
   const cases = [

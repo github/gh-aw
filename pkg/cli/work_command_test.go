@@ -300,7 +300,7 @@ func TestWorkCommandCurrentProtocolWithoutCheckout(t *testing.T) {
 	log := newWorkQueueTestLog(t)
 	log.commits = commits()
 	dispatchID := log.dispatch(1)[0]
-	log.launch(dispatchID)
+	log.launch(dispatchID, "301")
 	log.bind(dispatchID, workQueueTestWorker("301"))
 	queue.write(t, log.jsonl())
 	require.Equal(t, "claimed", log.state().Works[id].State, "FIFO dispatch must claim the oldest Work")

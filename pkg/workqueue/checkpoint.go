@@ -15,7 +15,7 @@ var (
 	workRecordOptional  = append(slices.Clone(workOptional), "claim_id", "completion_id", "effects", "cancellation_reason", "cancellation_commit_id", "issue_comment")
 	claimRecordRequired = []string{"claim_id", "work_id", "dispatch_id", "handle", "state", "commit_id", "request_id"}
 	claimRecordOptional = []string{"terminal_commit_id", "cancellation_reason", "effects", "issue_comment"}
-	dispatchFields      = []string{"dispatch_id", "request_id", "commit_id", "pool", "worker_profile", "workflow", "state", "run", "claims"}
+	dispatchFields      = []string{"dispatch_id", "request_id", "commit_id", "pool", "worker_profile", "workflow", "state", "run", "launch", "claims"}
 )
 
 type projectionRecord struct {
@@ -309,20 +309,8 @@ func restoreDispatches(state *Projection, dispatches object) error {
 			}
 			names = append(names, name)
 		}
-		if record["run"] != nil {
-			run, err := closed(record["run"], []string{"run_id", "run_attempt"}, nil, "checkpoint run", "checkpoint_invalid")
-			if err != nil {
-				return err
-			}
-			if _, err := decimal(run["run_id"], "checkpoint run ID", "checkpoint_invalid"); err != nil {
-				return err
-			}
-			if _, err := integer(run["run_attempt"], 1, 4096, "checkpoint run attempt"); err != nil {
-				return err
-			}
-		}
-		if (recordState == "bound") != (record["run"] != nil) && recordState != "closed" {
-			return checkpointInvalid("only bound Dispatches carry a run")
+		if err := validateDispatchExecution(record, recordState); err != nil {
+			return err
 		}
 		if recordState != "closed" && !slices.ContainsFunc(names, func(name string) bool { return state.Claims[name].State == "open" }) {
 			return checkpointInvalid("settled Dispatches must be closed")
@@ -333,6 +321,49 @@ func restoreDispatches(state *Projection, dispatches object) error {
 		}
 		state.Dispatches[id] = &dispatch
 		state.dispatchOrder = append(state.dispatchOrder, id)
+	}
+	return nil
+}
+
+// validateDispatchExecution checks a checkpoint Dispatch's bound run and recorded launch:
+// only bound Dispatches carry a run, only started or bound ones carry their launch, and a
+// bound run is the launched run.
+func validateDispatchExecution(record object, recordState string) error {
+	var runID, launchRunID any
+	if record["run"] != nil {
+		run, err := closed(record["run"], []string{"run_id", "run_attempt"}, nil, "checkpoint run", "checkpoint_invalid")
+		if err != nil {
+			return err
+		}
+		if _, err := decimal(run["run_id"], "checkpoint run ID", "checkpoint_invalid"); err != nil {
+			return err
+		}
+		if _, err := integer(run["run_attempt"], 1, 4096, "checkpoint run attempt"); err != nil {
+			return err
+		}
+		runID = run["run_id"]
+	}
+	if (recordState == "bound") != (record["run"] != nil) && recordState != "closed" {
+		return checkpointInvalid("only bound Dispatches carry a run")
+	}
+	if record["launch"] != nil {
+		launch, err := closed(record["launch"], []string{"run_id", "revision"}, nil, "checkpoint launch", "checkpoint_invalid")
+		if err != nil {
+			return err
+		}
+		if _, err := decimal(launch["run_id"], "checkpoint launched run ID", "checkpoint_invalid"); err != nil {
+			return err
+		}
+		if revision, named := launch["revision"].(string); !named || !revisionPattern.MatchString(revision) {
+			return checkpointInvalid("checkpoint launch revision is malformed")
+		}
+		launchRunID = launch["run_id"]
+	}
+	if (recordState == "reserved") != (record["launch"] == nil) && recordState != "closed" {
+		return checkpointInvalid("only started or bound Dispatches carry their launch")
+	}
+	if runID != nil && launchRunID != runID {
+		return checkpointInvalid("a bound run must be the launched run")
 	}
 	return nil
 }

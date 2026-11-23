@@ -51,6 +51,10 @@ const CONTROL_ERROR_EXPLANATIONS = {
   work_queue_control_claim_not_authorized: "The worker has no open Claim bound to this run, so it cannot submit child Work.",
   work_queue_worker_dispatch_unsupported: "Workers cannot claim Work; only dispatcher workflows publish dispatch_next.",
   work_queue_dispatch_ref_missing: "No dispatch ref is configured. Set safe-outputs.dispatch-workflow target-ref or run the dispatcher on a branch.",
+  work_queue_worker_not_allowlisted:
+    "No worker profile of the pool is in this dispatcher's compiled safe-outputs.dispatch-workflow allowlist. Add the worker to dispatch-workflow workflows and recompile; other profiles are never claimed or launched.",
+  work_queue_launch_unverified:
+    "This run is not the exact worker run its dispatcher recorded launching (run, workflow, event or revision differ, or no launch is recorded yet). It neither binds the Dispatch nor receives its Claims; maintenance releases an unbound Dispatch.",
   external_admission_unverified: "An external dependency, subject or backing Issue could not be identified. Check the reference and the dependency read credentials.",
   work_missing: "The request references Work that is not in the queue.",
   ownership_conflict: "The Work is no longer available; another dispatch claimed or settled it first.",

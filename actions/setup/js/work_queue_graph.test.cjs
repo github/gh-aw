@@ -102,7 +102,7 @@ describe("dependency readiness", () => {
     const planned = h.dispatchNext(log, {}, h.dispatcher, [ready]);
     expect(dependencyStatus(replayTransactions(planned.log), replayTransactions(planned.log).works.get(b.work_id))).toEqual({ ready: false, reason: "dependency_pending", work_id: a.work_id });
     const dispatch = planned.decision.dispatches[0];
-    log = h.finish(h.bind(planned.log, dispatch, h.workerActor("7")), dispatch, h.workerActor("7"), {}, [{ kind: "create_issue" }]);
+    log = h.finish(h.bind(h.launch(planned.log, dispatch, true, h.dispatcher, "7"), dispatch, h.workerActor("7")), dispatch, h.workerActor("7"), {}, [{ kind: "create_issue" }]);
     const state = replayTransactions(log);
     expect(dependencyStatus(state, state.works.get(b.work_id))).toEqual({ ready: true, reason: "ready" });
     expect(resultReferences(state, state.works.get(b.work_id))).toEqual([{ work_id: a.work_id, result_commit_id: state.works.get(a.work_id).completion_id, descriptor: [{ kind: "create_issue" }] }]);

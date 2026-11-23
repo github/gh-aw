@@ -63,11 +63,10 @@ func TestAWQueueDefaultOnlyCompilerPolicy(t *testing.T) {
 			require.Equal(t, 16, pool.Concurrency)
 			require.Equal(t, 0, pool.PerAccountLimit)
 			require.Equal(t, 3, pool.MaxAttempts)
-			require.Equal(t, "alpha", pool.DefaultProfile)
-			for _, name := range []string{"alpha", "beta"} {
-				require.Equal(t, workqueue.ProfileEnv{Workflow: ".github/workflows/" + name + ".lock.yml", EffectScope: "owner/repo"}, pool.Profiles[name])
-			}
+			require.Equal(t, []string{"alpha", "beta"}, policy.Workers)
+			require.Equal(t, "owner/repo", policy.EffectScope)
 			require.Contains(t, data.WorkQueuePolicy.PolicyJSON, `"effect_scope":"${{ github.repository }}"`)
+			require.NotContains(t, data.WorkQueuePolicy.PolicyJSON, `"profiles"`, "workers are listed once, not per pool")
 			env := strings.Join(workQueuePolicyEnvironment(data), "")
 			require.Contains(t, env, "GH_AW_WORK_QUEUE_POLICY:")
 			require.NotContains(t, env, "GH_AW_WORK_QUEUE_ISSUES")
@@ -98,7 +97,7 @@ func TestAWQueueSharedSchedulingAndGlobalIssues(t *testing.T) {
 	require.Equal(t, 2, policy.Pools["default"].MaxAttempts)
 	require.Equal(t, 2, policy.Pools["reports"].Concurrency)
 	require.Equal(t, 1, policy.Pools["reports"].PerAccountLimit)
-	require.Equal(t, policy.Pools["default"].Profiles, policy.Pools["reports"].Profiles)
+	require.Len(t, policy.Pools, 2)
 }
 
 func TestAWQueueConfigErrorsDoNotFallBackToDefaults(t *testing.T) {
@@ -138,7 +137,7 @@ func TestAWQueueWorkerCarriesCompiledPolicy(t *testing.T) {
 	data := &WorkflowData{Tools: map[string]any{"work-queue": map[string]any{"worker": true}}}
 	policy := compileAWQueuePolicy(t, c, data, filepath.Join(filepath.Dir(path), "alpha.md"))
 	require.Equal(t, 2, policy.Pools["default"].Concurrency)
-	require.Contains(t, policy.Pools["default"].Profiles, "alpha")
+	require.Contains(t, policy.Workers, "alpha")
 	env := strings.Join(workQueuePolicyEnvironment(data), "")
 	require.Contains(t, env, "GH_AW_WORK_QUEUE_POLICY:")
 	require.NotContains(t, env, "GH_AW_WORK_QUEUE_CONTRACT")

@@ -6,7 +6,7 @@ import path from "path";
 import { main } from "./write_work_queue_snapshot.cjs";
 import { readClaimScopeContext } from "./work_queue_claim_scope.cjs";
 import { readWorkQueueLog } from "./work_queue_store.cjs";
-import { dispatcher, fakeQueueGitHub, ledgerText, release } from "./work_queue_test_helpers.cjs";
+import { WORKER_REVISION, dispatchNext, dispatcher, fakeQueueGitHub, launch, ledgerText, release, submit, work, workflowRun } from "./work_queue_test_helpers.cjs";
 import { workerContext, workerQueue } from "./work_queue_worker.test_helpers.cjs";
 
 const directories = [];
@@ -93,6 +93,87 @@ describe("worker activation snapshot", () => {
     } finally {
       global.context = previous;
     }
+  });
+});
+
+describe("worker launch provenance", () => {
+  const noWait = { launchWait: { attempts: 2, delayMs: 0 }, sleep: async () => undefined };
+
+  /** Run activation for `context` and assert it neither bound the Dispatch nor wrote a snapshot. */
+  async function refused(queue, context, extra = {}) {
+    const file = snapshotPath();
+    const before = await ledger(queue.githubClient);
+    await expect(main({ githubClient: queue.githubClient, context, core: core(), role: "worker", snapshotPath: file, ...noWait, ...extra })).rejects.toMatchObject({ code: "work_queue_launch_unverified" });
+    expect(fs.existsSync(file)).toBe(false);
+    const after = await ledger(queue.githubClient);
+    expect(after.sha).toBe(before.sha);
+    expect(after.state.dispatches.get(queue.dispatchId).state).toBe("started");
+  }
+
+  it("binds the exact run the dispatcher launched and records it", async () => {
+    const queue = worker();
+    const snapshot = await main({ githubClient: queue.githubClient, context: queue.context, core: core(), role: "worker", snapshotPath: snapshotPath(), ...noWait });
+    expect(snapshot.worker).toEqual(queue.assignment);
+    expect((await ledger(queue.githubClient)).state.dispatches.get(queue.dispatchId)).toMatchObject({ state: "bound", run: { run_id: "200", run_attempt: 1 }, launch: { run_id: "200", revision: WORKER_REVISION } });
+  });
+
+  it("refuses another run of the worker workflow that names the same Dispatch", async () => {
+    const queue = worker();
+    // e.g. a manual workflow_dispatch passing a Dispatch ID read from the ledger.
+    queue.fake.runs.set("201", workflowRun("201"));
+    await refused(queue, workerContext(queue.dispatchId, "201"));
+  });
+
+  it.each([
+    ["workflow", { path: ".github/workflows/other.lock.yml" }],
+    ["revision", { head_sha: "d".repeat(40) }],
+    ["event", { event: "schedule" }],
+    ["repository", { repository: { full_name: "other/repo" } }],
+    ["identity", { id: 999 }],
+  ])("refuses a launched run whose Actions API %s differs", async (_field, overrides) => {
+    const queue = worker();
+    queue.fake.runs.set("200", workflowRun("200", overrides));
+    await refused(queue, queue.context);
+  });
+
+  it("refuses a job checked out at another revision than the launch", async () => {
+    const queue = worker();
+    await refused(queue, { ...queue.context, sha: "d".repeat(40) });
+  });
+
+  it("refuses staged activations without provenance too", async () => {
+    const queue = worker();
+    queue.fake.runs.set("200", workflowRun("200", { event: "push" }));
+    await refused(queue, queue.context, { config: { staged: true } });
+  });
+
+  it("binds nothing and exposes no Claims while the launch is unrecorded, then binds once it lands", async () => {
+    const log = submit([], [work("n1")]);
+    const planned = dispatchNext(log, { max_claims: 1, max_dispatches: 1 });
+    const dispatchId = planned.decision.dispatches[0];
+    const fake = fakeQueueGitHub(ledgerText(planned.log));
+    fake.runs.set("200", workflowRun("200"));
+    vi.stubEnv("GITHUB_WORKFLOW_REF", worker().workflowRef);
+    const file = snapshotPath();
+    await expect(main({ githubClient: fake.githubClient, context: workerContext(dispatchId), core: core(), role: "worker", snapshotPath: file, ...noWait })).rejects.toMatchObject({ code: "work_queue_launch_unverified" });
+    expect(fs.existsSync(file)).toBe(false);
+    expect((await ledger(fake.githubClient)).state.dispatches.get(dispatchId).state).toBe("reserved");
+
+    // The dispatcher records the launch while the worker waits.
+    const sleep = vi.fn(async () => fake.install(ledgerText(launch(planned.log, dispatchId))));
+    const snapshot = await main({ githubClient: fake.githubClient, context: workerContext(dispatchId), core: core(), role: "worker", snapshotPath: snapshotPath(), launchWait: { attempts: 3, delayMs: 0 }, sleep });
+    expect(sleep).toHaveBeenCalledTimes(1);
+    expect(snapshot.worker?.dispatch_id).toBe(dispatchId);
+    expect((await ledger(fake.githubClient)).state.dispatches.get(dispatchId)).toMatchObject({ state: "bound", run: { run_id: "200" } });
+  });
+
+  it("fails closed when the run cannot be read", async () => {
+    const queue = worker();
+    queue.fake.runs.delete("200");
+    const file = snapshotPath();
+    await expect(main({ githubClient: queue.githubClient, context: queue.context, core: core(), role: "worker", snapshotPath: file, ...noWait })).rejects.toMatchObject({ status: 404 });
+    expect(fs.existsSync(file)).toBe(false);
+    expect((await ledger(queue.githubClient)).transactions.some(commit => commit.request.kind === "bind")).toBe(false);
   });
 });
 

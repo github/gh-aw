@@ -128,7 +128,7 @@ describe("checkpoints", () => {
   it("replaces the log with one Checkpoint line whose Git parent is the previous head", async () => {
     const planned = h.dispatchNext(h.submit([], [h.work("a")]));
     const dispatch = planned.decision.dispatches[0];
-    const log = h.finish(h.bind(planned.log, dispatch, h.workerActor("7")), dispatch, h.workerActor("7"));
+    const log = h.finish(h.bind(h.launch(planned.log, dispatch, true, h.dispatcher, "7"), dispatch, h.workerActor("7")), dispatch, h.workerActor("7"));
     const fake = h.fakeQueueGitHub(h.ledgerText(log));
     const head = fake.refs.get("work-queue");
     expect(await publishWorkQueueCheckpoint({ ...target(fake), actor: h.reconciler, minimumLines: log.length })).toMatchObject({ checkpointed: false });

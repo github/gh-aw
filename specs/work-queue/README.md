@@ -38,13 +38,13 @@ its Dispatch slot.
 |---|---|
 | `Submit` | `submit` commit with a `Work` operation |
 | `Plan` | `dispatch_next`: one `Claim` in a new `reserved` Dispatch for the FIFO head while non-closed pool Dispatches are below `Concurrency` |
-| `LaunchOK` | `workflow_dispatch` succeeded; `launch` commit `[Dispatch{started}]`, which may be lost (Dispatch stays `reserved`) |
-| `LaunchFail` | `workflow_dispatch` failed; `launch` commit `[Release{launch_failed}]` (+ attempts rule) or lost; an ambiguous failure may still queue a run |
+| `LaunchOK` | `workflow_dispatch` succeeded and the dispatcher read back and verified the created run; `launch` commit `[Dispatch{started, run_id, revision}]` naming that run, which may be lost (Dispatch stays `reserved`) |
+| `LaunchFail` | `workflow_dispatch` failed or returned no verifiable run; `launch` commit `[Release{launch_failed}]` (+ attempts rule) or lost; an ambiguous failure may still queue a run, which can never bind |
 | `RunStart`, `RunComplete` | GitHub run environment; a run can stop at any point |
 | `Rerun` | GitHub re-run: same run id, next run attempt, up to `MaxRunAttempts` |
-| `Bind` | activation job `bind` commit `[Bound]`; rebinding by a later attempt; with no open Claim the assignment is settled and the agent is skipped |
+| `Bind` | activation job `bind` commit `[Bound]` only for the run the launch recorded (`started`) or a later attempt of the bound run; a run without a recorded launch or open Claim gets no Claims and the agent is skipped |
 | `Complete`, `Fail` | finish step `[Completion]`, `[Completion, Work]` admitting one previously absent continuation successor, or `[ClaimCancellation{worker_failed}]` (+ attempts rule); rejected unless the Claim is open and the Dispatch is bound to this run attempt |
-| `Terminate` | conclusion job `[Release{worker_terminated}]` when the Dispatch still has an open Claim |
+| `Terminate` | conclusion job `[Release{worker_terminated}]` when the Dispatch still has an open Claim and was launched as or bound to this run; never for a `reserved` Dispatch |
 | `MaintainRelease` | maintenance `[Release{run_terminal}]` for a bound Dispatch whose run completed, `[Release{run_missing}]` for an unbound Dispatch with no visible in-progress run |
 
 The attempts rule: when a Claim is cancelled, the publisher appends

@@ -3,6 +3,7 @@ package cli
 import (
 	"encoding/json"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/github/gh-aw/pkg/workqueue"
@@ -107,10 +108,11 @@ func (l *workQueueTestLog) dispatch(maxClaims int) []string {
 	return decision.Dispatches
 }
 
-func (l *workQueueTestLog) launch(dispatchID string) {
+// launch records the dispatcher's launch of worker run runID for a Dispatch.
+func (l *workQueueTestLog) launch(dispatchID, runID string) {
 	l.t.Helper()
 	l.append(workQueueTestDispatcher, "launch", workqueue.DispatchIDParameters{DispatchID: dispatchID},
-		workqueue.DispatchOperation{Kind: "Dispatch", DispatchID: dispatchID, State: "started"})
+		workqueue.DispatchOperation{Kind: "Dispatch", DispatchID: dispatchID, State: "started", RunID: runID, Revision: strings.Repeat("c", 40)})
 }
 
 func (l *workQueueTestLog) bind(dispatchID string, worker workqueue.Actor) {
@@ -160,11 +162,11 @@ func workQueueMixedFixture(t testing.TB) (*workQueueTestLog, map[string]string) 
 	works := []workqueue.WorkDefinition{log.work("done", nil), log.work("running", nil), log.work("waiting", nil), log.work("dropped", nil)}
 	log.submit(works...)
 	done := log.dispatch(1)[0]
-	log.launch(done)
+	log.launch(done, "201")
 	log.bind(done, workQueueTestWorker("201"))
 	log.finish(done, workQueueTestWorker("201"))
 	running := log.dispatch(1)[0]
-	log.launch(running)
+	log.launch(running, "202")
 	log.bind(running, workQueueTestWorker("202"))
 	log.cancel(works[3].WorkID)
 	return log, map[string]string{

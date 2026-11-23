@@ -157,6 +157,7 @@ func (state *Projection) applyDispatch(operation DispatchOperation, _ QueueCommi
 		return queueError("dispatch_state_conflict", "only a reserved Dispatch can start")
 	}
 	dispatch.State = "started"
+	dispatch.Launch = &LaunchRecord{RunID: operation.RunID, Revision: operation.Revision}
 	return nil
 }
 
@@ -165,12 +166,16 @@ func (state *Projection) applyBound(operation BoundOperation, commit QueueCommit
 	if err != nil {
 		return err
 	}
-	if dispatch.State == "closed" || len(state.OpenClaims(dispatch)) == 0 {
-		return queueError("dispatch_state_conflict", "only a Dispatch with open Claims can bind a run")
+	if (dispatch.State != "started" && dispatch.State != "bound") || len(state.OpenClaims(dispatch)) == 0 {
+		return queueError("dispatch_state_conflict", "only a started Dispatch with open Claims can bind a run")
 	}
 	actor := commit.Actor
 	if actor.Workflow != dispatch.Workflow || actor.RunID != operation.RunID || actor.RunAttempt != operation.RunAttempt {
 		return queueError("run_binding_conflict", "a worker may bind only its own run of the dispatched workflow")
+	}
+	// Only the run the dispatcher recorded launching may receive the Dispatch's Claims.
+	if operation.RunID != dispatch.Launch.RunID {
+		return queueError("run_binding_conflict", "a worker may bind only the run its dispatcher launched")
 	}
 	if dispatch.State == "bound" {
 		if dispatch.Run.RunID != operation.RunID || operation.RunAttempt < dispatch.Run.RunAttempt {

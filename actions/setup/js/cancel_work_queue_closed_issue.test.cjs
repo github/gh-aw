@@ -15,8 +15,10 @@ function closedEvent(issueId = 1000) {
   return { repo: { owner: "owner", repo: "repo" }, runId: 400, runAttempt: 1, eventName: "issues", payload: { action: "closed", issue: { id: issueId, number: 1 } } };
 }
 
-async function run(log, context = closedEvent()) {
+async function run(log, context = closedEvent(), liveIssue = () => ({ id: 1000, number: 1, state: "closed" }), setup = queue => {}) {
   const queue = fakeQueueGitHub(ledgerText(log));
+  queue.githubClient.rest.issues = { get: async ({ issue_number }) => ({ data: { ...liveIssue(), number: issue_number } }) };
+  setup(queue);
   const result = await main({ githubClient: queue.githubClient, context, core: { info() {} } });
   const state = replayTransactions(
     queue
@@ -33,6 +35,36 @@ describe("cancel_work_queue_closed_issue", () => {
     const { result, state } = await run(linkedLog());
     expect(result).toEqual({ status: "cancelled", committed: true });
     expect(state.works.get(work("a").work_id)).toMatchObject({ state: "cancelled", cancellation_reason: "related_issue_closed" });
+  });
+
+  it("does not cancel when the matching Issue has been reopened", async () => {
+    const { result, state, queue } = await run(linkedLog(), closedEvent(), () => ({ id: 1000, state: "open" }));
+    expect(result).toEqual({ status: "available", committed: false });
+    expect(state.works.get(work("a").work_id).state).toBe("available");
+    expect(queue.state.writes).toBe(0);
+  });
+
+  it("does not cancel when the Issue number now resolves to a different Issue", async () => {
+    const { result } = await run(linkedLog(), closedEvent(), () => ({ id: 2000, state: "closed" }));
+    expect(result).toEqual({ status: "available", committed: false });
+  });
+
+  it("rechecks the live Issue on a publication retry after it reopens", async () => {
+    let live = "closed";
+    const { result, state } = await run(
+      linkedLog(),
+      closedEvent(),
+      () => ({ id: 1000, state: live }),
+      queue => {
+        queue.state.beforeUpdate = () => {
+          live = "open";
+          queue.install(ledgerText(submit(linkedLog(), [work("b")])));
+        };
+      }
+    );
+    expect(result).toEqual({ status: "available", committed: false });
+    expect(state.works.get(work("a").work_id).state).toBe("available");
+    expect(state.works.get(work("b").work_id).state).toBe("available");
   });
 
   it("leaves claimed Work alone", async () => {

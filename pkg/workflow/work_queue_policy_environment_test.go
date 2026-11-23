@@ -15,9 +15,10 @@ import (
 func TestWorkQueuePolicyEnvironmentSharedRegistryWithinActionsLimit(t *testing.T) {
 	settings, err := workqueue.ParseSettings([]byte(`{"pools":{"reports":{"concurrency":3},"engines":{"concurrency":3,"per_account_limit":1},"smoke":{},"scanning":{}}}`))
 	require.NoError(t, err)
-	workers := make([]string, 0, 60)
-	for index := range 60 {
-		workers = append(workers, fmt.Sprintf("worker-%d", index))
+	// Workers are listed once, so only a large approved set exceeds one Actions value.
+	workers := make([]string, 0, 256)
+	for index := range 256 {
+		workers = append(workers, fmt.Sprintf("worker-%03d-%s", index, strings.Repeat("x", 80)))
 	}
 	policy, err := workqueue.BuildPolicyEnv(settings, "${{ github.repository }}", workers)
 	require.NoError(t, err)

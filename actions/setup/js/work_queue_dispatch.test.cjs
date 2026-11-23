@@ -8,7 +8,7 @@ import { createRequire } from "node:module";
 const require = createRequire(import.meta.url);
 const h = require("./work_queue_test_helpers.cjs");
 const { replayTransactionLog } = require("./work_queue_replay.cjs");
-const { main, dispatchQueueIntent, refreshObservations } = require("./work_queue_dispatch.cjs");
+const { main, dispatchQueueIntent, launchDispatch, refreshObservations } = require("./work_queue_dispatch.cjs");
 const { continuationChild } = require("./work_queue_graph.cjs");
 
 const DISPATCHER_REF = "owner/repo/.github/workflows/dispatcher.lock.yml@refs/heads/main";
@@ -28,8 +28,12 @@ function fakeCore() {
   return { info: vi.fn(), warning: vi.fn(), setOutput: vi.fn(), setFailed: vi.fn(), summary: { addRaw: vi.fn().mockReturnThis(), write: vi.fn(async () => undefined) } };
 }
 
-function dispatchClient(createWorkflowDispatch = vi.fn(async () => ({ status: 204 }))) {
-  return { rest: { actions: { createWorkflowDispatch } } };
+/** The dispatcher's compiled dispatch-workflow config: it may launch only `worker`. */
+const CONFIG = { workflows: ["worker"], work_queue_workflows: ["worker"], workflow_files: { worker: ".lock.yml" } };
+
+/** A dispatch-token client over the in-memory Actions API; `createWorkflowDispatch` may be replaced. */
+function dispatchClient(createWorkflowDispatch = undefined, actions = h.fakeActions()) {
+  return { rest: { actions: { ...actions.actions, ...(createWorkflowDispatch ? { createWorkflowDispatch } : {}) } } };
 }
 
 const dispatcherContext = { repo: { owner: "owner", repo: "repo" }, runId: 100, runAttempt: 1, payload: {}, ref: "refs/heads/main" };
@@ -69,10 +73,11 @@ describe("dispatcher controls", () => {
   it("claims and launches one worker per Dispatch up to the pool concurrency", async () => {
     const works = ["a", "b", "c", "d"].map(key => h.work(key));
     const fake = h.fakeQueueGitHub(h.ledgerText(h.submit([], works)));
-    const post = vi.fn(async () => ({ status: 204 }));
+    const actions = h.fakeActions();
+    const post = vi.spyOn(actions.actions, "createWorkflowDispatch");
     const core = fakeCore();
     stage({ intent_id: "dispatch", kind: "dispatch_next", parameters: { pool: "default", max_claims: 4, max_dispatches: 4 } });
-    const result = await main({ githubClient: fake.githubClient, dispatchClient: dispatchClient(post), context: dispatcherContext, core, policy: policy(), intentPath, maxDispatches: 4 });
+    const result = await main({ githubClient: fake.githubClient, dispatchClient: dispatchClient(undefined, actions), context: dispatcherContext, core, policy: policy(), config: CONFIG, intentPath, maxDispatches: 4 });
 
     expect(result.success).toBe(true);
     expect(result.receipts).toHaveLength(1);
@@ -87,8 +92,109 @@ describe("dispatcher controls", () => {
       expect(Object.keys(JSON.parse(parameters.inputs.work_queue_assignment))).toEqual(["version", "dispatch_id"]);
     }
     const state = stateOf(fake);
-    expect([...state.dispatches.values()].map(dispatch => dispatch.state)).toEqual(["started", "started", "started"]);
+    // Each Dispatch records the exact run its POST created and that run's revision.
+    expect([...state.dispatches.values()].map(dispatch => [dispatch.state, dispatch.launch])).toEqual(["200", "201", "202"].map(run_id => ["started", { run_id, revision: h.WORKER_REVISION }]));
     expect(works.map(node => state.works.get(node.work_id).state)).toEqual(["claimed", "claimed", "claimed", "available"]);
+  });
+
+  it("grants Claims only for profiles in the compiled dispatch-workflow allowlist", async () => {
+    const pools = {
+      default: {
+        concurrency: 3,
+        per_account_limit: 0,
+        max_attempts: 3,
+        default_profile: "worker",
+        profiles: { worker: { workflow: h.WORKER_WORKFLOW, effect_scope: "owner/repo" }, other: { workflow: ".github/workflows/other.lock.yml", effect_scope: "owner/repo" } },
+      },
+    };
+    const foreign = h.work("foreign", { worker_profile: "other", priority: 1 });
+    const own = h.work("own");
+    const fake = h.fakeQueueGitHub(h.ledgerText(h.submit([], [foreign, own])));
+    const actions = h.fakeActions();
+    const post = vi.spyOn(actions.actions, "createWorkflowDispatch");
+    const receipt = await dispatchQueueIntent({
+      githubClient: fake.githubClient,
+      dispatchClient: dispatchClient(undefined, actions),
+      context: dispatcherContext,
+      core: fakeCore(),
+      policy: policy({ pools }),
+      config: CONFIG,
+      remainingDispatches: 2,
+      message: { intent_id: "dispatch", pool: "default", max_claims: 2, max_dispatches: 2 },
+    });
+
+    expect(receipt).toMatchObject({ status: "committed", dispatches: 1, launches: [{ state: "started" }] });
+    expect(post.mock.calls.map(([parameters]) => parameters.workflow_id)).toEqual(["worker.lock.yml"]);
+    const state = stateOf(fake);
+    // The higher-priority Work of the non-allowlisted profile is never claimed.
+    expect(state.works.get(foreign.work_id)).toMatchObject({ state: "available", attempts: 0 });
+    expect(state.works.get(own.work_id).state).toBe("claimed");
+    const request = state.transactions.find(commit => commit.request.kind === "dispatch_next").request;
+    expect(Object.keys(request.parameters.profiles)).toEqual(["worker"]);
+  });
+
+  it("blocks a dispatch whose pool has no allowlisted profile without claiming or launching", async () => {
+    const node = h.work("a");
+    const fake = h.fakeQueueGitHub(h.ledgerText(h.submit([], [node])));
+    const post = vi.fn();
+    const core = fakeCore();
+    stage({ intent_id: "dispatch", kind: "dispatch_next", parameters: { pool: "default", max_claims: 1, max_dispatches: 1 } });
+    const before = fake.contents();
+    const config = { workflows: ["other"], work_queue_workflows: ["other"], workflow_files: { other: ".lock.yml" } };
+    const result = await main({ githubClient: fake.githubClient, dispatchClient: dispatchClient(post), context: dispatcherContext, core, policy: policy(), config, intentPath });
+
+    expect(result.receipts).toEqual([{ intent_id: "dispatch", status: "blocked", reason: "work_queue_worker_not_allowlisted" }]);
+    expect(post).not.toHaveBeenCalled();
+    expect(fake.contents()).toBe(before);
+  });
+
+  it("re-checks the resolved workflow before launch and releases a Dispatch outside the allowlist", async () => {
+    const node = h.work("a");
+    const planned = h.dispatchNext(h.submit([], [node]), { max_claims: 1, max_dispatches: 1 });
+    const fake = h.fakeQueueGitHub(h.ledgerText(planned.log));
+    const dispatch = stateOf(fake).dispatches.get(planned.decision.dispatches[0]);
+    const post = vi.fn();
+    const options = { githubClient: fake.githubClient, dispatchClient: dispatchClient(post), context: dispatcherContext, core: fakeCore(), config: CONFIG };
+    const receipt = await launchDispatch(options, policy(), dispatch, new Set([".github/workflows/other.lock.yml"]));
+
+    expect(receipt).toEqual({ dispatch_id: dispatch.dispatch_id, state: "launch_failed", reason: "not_allowlisted" });
+    expect(post).not.toHaveBeenCalled();
+    expect(stateOf(fake).dispatches.get(dispatch.dispatch_id)).toMatchObject({ state: "closed", launch: null });
+    expect(stateOf(fake).works.get(node.work_id).state).toBe("available");
+  });
+
+  it.each([
+    ["no run details", async () => ({ status: 204 }), undefined],
+    ["a run of another workflow", undefined, { path: ".github/workflows/other.lock.yml" }],
+    ["a run that was not workflow_dispatch", undefined, { event: "push" }],
+  ])("records no launch a worker could bind when the POST returns %s", async (_case, post, runOverrides) => {
+    const node = h.work("a");
+    const fake = h.fakeQueueGitHub(h.ledgerText(h.submit([], [node])));
+    const actions = h.fakeActions();
+    if (runOverrides) {
+      const create = actions.actions.createWorkflowDispatch;
+      actions.actions.createWorkflowDispatch = async input => {
+        const response = await create(input);
+        const id = String(response.data.workflow_run_id);
+        actions.runs.set(id, h.workflowRun(id, runOverrides));
+        return response;
+      };
+    }
+    const receipt = await dispatchQueueIntent({
+      githubClient: fake.githubClient,
+      dispatchClient: dispatchClient(post, actions),
+      context: dispatcherContext,
+      core: fakeCore(),
+      policy: policy(),
+      config: CONFIG,
+      remainingDispatches: 1,
+      message: { intent_id: "dispatch", pool: "default", max_claims: 1, max_dispatches: 1 },
+    });
+
+    expect(receipt.launches).toEqual([{ dispatch_id: expect.stringMatching(/^d_/), state: "launch_failed", reason: "unverified" }]);
+    const state = stateOf(fake);
+    expect(state.dispatches.get(receipt.launches[0].dispatch_id)).toMatchObject({ state: "closed", launch: null });
+    expect(state.works.get(node.work_id)).toMatchObject({ state: "available", attempts: 1 });
   });
 
   it("releases a Dispatch whose launch POST fails and returns its Work to the pool", async () => {
@@ -103,7 +209,7 @@ describe("dispatcher controls", () => {
       context: dispatcherContext,
       core: fakeCore(),
       policy: policy(),
-      config: { "target-ref": "refs/heads/release" },
+      config: { ...CONFIG, "target-ref": "refs/heads/release" },
       remainingDispatches: 1,
       message: { intent_id: "dispatch", pool: "default", max_claims: 1, max_dispatches: 1 },
     });
@@ -133,6 +239,7 @@ describe("dispatcher controls", () => {
       context: dispatcherContext,
       core: fakeCore(),
       policy: policy(),
+      config: CONFIG,
       dependencyResolver: { scopes: [{ host: "github.com", repository: "owner/repo" }], getClient: async () => reader },
       remainingDispatches: 1,
       message: { intent_id: "dispatch", pool: "default", max_claims: 1, max_dispatches: 1 },

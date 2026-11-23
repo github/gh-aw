@@ -67,7 +67,7 @@ func TestWorkQueueCapturedDiagnosticsReasonsAndAttempts(t *testing.T) {
 	log, ids := workQueueMixedFixture(t)
 	log.release(ids["running_dispatch"], "run_missing")
 	retried := log.dispatch(1)[0]
-	log.launch(retried)
+	log.launch(retried, "203")
 	worker := workQueueTestWorker("203")
 	log.bind(retried, worker)
 	assignment, err := workqueue.AssignmentForDispatch(log.state(), retried)

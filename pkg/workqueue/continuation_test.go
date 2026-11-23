@@ -35,7 +35,7 @@ func claimAndBind(t *testing.T, log []QueueCommit, dispatcherRun, workerRun stri
 	require.NoError(t, err)
 	log = append(append([]QueueCommit{}, log...), commit)
 	dispatchID := decision.Dispatches[0]
-	log = appendTestCommit(t, log, dispatcher, "launch", DispatchIDParameters{DispatchID: dispatchID}, mustOps(t, DispatchOperation{Kind: "Dispatch", DispatchID: dispatchID, State: "started"}))
+	log = appendTestCommit(t, log, dispatcher, "launch", DispatchIDParameters{DispatchID: dispatchID}, mustOps(t, DispatchOperation{Kind: "Dispatch", DispatchID: dispatchID, State: "started", RunID: workerRun, Revision: testRevision}))
 	worker := testWorker(workerRun, 1)
 	return testBind(t, log, dispatchID, worker), dispatchID, worker
 }

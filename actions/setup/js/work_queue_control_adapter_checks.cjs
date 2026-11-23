@@ -75,8 +75,10 @@ function registerTests({ describe, it }) {
         const intentPath = path.join(directory, "intents.jsonl");
         fs.writeFileSync(intentPath, JSON.stringify({ version: 4, intent_id: "dispatch", kind: "dispatch_next", parameters: { pool: "default", max_claims: 2, max_dispatches: 2 } }) + "\n");
         const queue = h.fakeQueueGitHub(h.ledgerText(h.submit([], [h.work("a"), h.work("b"), h.work("c")])));
-        const posts = [];
-        const dispatchClient = { rest: { actions: { createWorkflowDispatch: async input => (posts.push(input), { status: 204 }) } } };
+        // The dispatch-token client is the in-memory Actions API, which creates and reports each worker run.
+        const actions = h.fakeActions();
+        const posts = actions.posts;
+        const dispatchClient = { rest: { actions: actions.actions } };
         const created = [];
         const outputs = new Map();
         const result = await main({
@@ -87,7 +89,7 @@ function registerTests({ describe, it }) {
             created.push([token, options]);
             return token === "queue-token" ? queue.githubClient : dispatchClient;
           },
-          config: { "github-token": "dispatch-token", "target-ref": "refs/heads/main" },
+          config: { "github-token": "dispatch-token", "target-ref": "refs/heads/main", workflows: ["worker"], workflow_files: { worker: ".lock.yml" }, work_queue_workflows: ["worker"] },
           core: { info() {}, warning() {}, setFailed: message => assert.fail(message), setOutput: (name, value) => outputs.set(name, value) },
           policy: POLICY,
           intentPath,

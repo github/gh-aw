@@ -31,6 +31,8 @@ const PROTOCOL_VERSION = 4;
 const CLAIM_CANCELLATION_REASONS = ["worker_failed", "worker_terminated", "launch_failed", "run_terminal", "run_missing", "operator"];
 const WORK_CANCELLATION_REASONS = ["attempts_exhausted", "operator", "related_issue_closed", "worker_contract_obsolete"];
 const RELEASE_REASONS = ["launch_failed", "worker_terminated", "run_terminal", "run_missing", "operator"];
+// The worker revision a dispatcher recorded for its launched run: a full Git object ID.
+const LAUNCH_REVISION = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/;
 
 const OP_FIELDS = {
   Work: [WORK_REQUIRED, WORK_OPTIONAL],
@@ -39,7 +41,7 @@ const OP_FIELDS = {
     ["state_reason", "merged", "merge_commit", "approved_by"],
   ],
   Claim: [["kind", "work_id", "claim_id", "dispatch_id", "handle"], []],
-  Dispatch: [["kind", "dispatch_id", "state"], []],
+  Dispatch: [["kind", "dispatch_id", "state", "run_id", "revision"], []],
   Bound: [["kind", "dispatch_id", "run_id", "run_attempt"], []],
   Completion: [["kind", "work_id", "claim_id", "dispatch_id", "claim_handle", "effects"], []],
   ClaimCancellation: [["kind", "work_id", "claim_id", "reason"], []],
@@ -87,7 +89,7 @@ const CHECKPOINT_FIELDS = ["repository", "tip", "commits", "works", "claims", "d
 const WORK_RECORD_OPTIONAL = [...WORK_OPTIONAL, "claim_id", "completion_id", "effects", "cancellation_reason", "cancellation_commit_id", "issue_comment"];
 const CLAIM_RECORD_REQUIRED = ["claim_id", "work_id", "dispatch_id", "handle", "state", "commit_id", "request_id"];
 const CLAIM_RECORD_OPTIONAL = ["terminal_commit_id", "cancellation_reason", "effects", "issue_comment"];
-const DISPATCH_RECORD_FIELDS = ["dispatch_id", "request_id", "commit_id", "pool", "worker_profile", "workflow", "state", "run", "claims"];
+const DISPATCH_RECORD_FIELDS = ["dispatch_id", "request_id", "commit_id", "pool", "worker_profile", "workflow", "state", "run", "launch", "claims"];
 
 /**
  * @typedef {{role: string, repository: string, workflow?: string, run_id?: string, run_attempt?: number}} QueueActor
@@ -156,6 +158,8 @@ function validateOperation(operation) {
       break;
     case "Dispatch":
       if (operation.state !== "started") throw queueError("request_invalid", "a Dispatch operation records only the started launch");
+      decimal(operation.run_id, "launched run ID", "request_invalid");
+      if (typeof operation.revision !== "string" || !LAUNCH_REVISION.test(operation.revision)) throw queueError("request_invalid", "a started Dispatch records the launched run's full commit revision");
       break;
     case "Bound":
       decimal(operation.run_id, "bound run ID", "request_invalid");
@@ -390,6 +394,7 @@ function applyClaim(state, operation, commit) {
       workflow: profiles[work.worker_profile].workflow,
       state: "reserved",
       run: null,
+      launch: null,
       claims: [],
     };
     state.dispatches.set(dispatch.dispatch_id, dispatch);
@@ -402,9 +407,11 @@ function applyClaim(state, operation, commit) {
 
 function applyBound(state, operation, commit) {
   const dispatch = requireDispatch(state, operation.dispatch_id);
-  if (!["reserved", "started", "bound"].includes(dispatch.state) || !dispatch.claims.some(id => state.claims.get(id).state === "open")) throw queueError("dispatch_state_conflict", "only a Dispatch with open Claims can bind a run");
+  if (!["started", "bound"].includes(dispatch.state) || !dispatch.claims.some(id => state.claims.get(id).state === "open")) throw queueError("dispatch_state_conflict", "only a started Dispatch with open Claims can bind a run");
   const actor = commit.actor;
   if (actor.workflow !== dispatch.workflow || actor.run_id !== operation.run_id || actor.run_attempt !== operation.run_attempt) throw queueError("run_binding_conflict", "a worker may bind only its own run of the dispatched workflow");
+  // Only the run the dispatcher recorded launching may receive the Dispatch's Claims.
+  if (operation.run_id !== dispatch.launch.run_id) throw queueError("run_binding_conflict", "a worker may bind only the run its dispatcher launched");
   if (dispatch.state === "bound") {
     if (dispatch.run.run_id !== operation.run_id || operation.run_attempt < dispatch.run.run_attempt) throw queueError("run_binding_conflict", "the Dispatch is bound to another run");
     if (operation.run_attempt === dispatch.run.run_attempt) return;
@@ -537,6 +544,7 @@ function applyOperation(state, operation, commit, ordinal, index) {
       const dispatch = requireDispatch(state, operation.dispatch_id);
       if (dispatch.state !== "reserved") throw queueError("dispatch_state_conflict", "only a reserved Dispatch can start");
       dispatch.state = "started";
+      dispatch.launch = { run_id: operation.run_id, revision: operation.revision };
       return;
     }
     case "Bound":
@@ -684,6 +692,13 @@ function restoreCheckpointState(commit) {
       integer(record.run.run_attempt, 1, 4096, "checkpoint run attempt");
     }
     if ((record.state === "bound") !== (record.run !== null) && record.state !== "closed") throw invalid("only bound Dispatches carry a run");
+    if (record.launch !== null) {
+      closed(record.launch, ["run_id", "revision"], [], "checkpoint launch", "checkpoint_invalid");
+      decimal(record.launch.run_id, "checkpoint launched run ID", "checkpoint_invalid");
+      if (typeof record.launch.revision !== "string" || !LAUNCH_REVISION.test(record.launch.revision)) throw invalid("checkpoint launch revision is malformed");
+    }
+    if ((record.state === "reserved") !== (record.launch === null) && record.state !== "closed") throw invalid("only started or bound Dispatches carry their launch");
+    if (record.run !== null && record.launch?.run_id !== record.run.run_id) throw invalid("a bound run must be the launched run");
     if (record.state !== "closed" && record.claims.every(claim => state.claims.get(claim).state !== "open")) throw invalid("settled Dispatches must be closed");
     state.dispatches.set(id, { ...record, claims: [...record.claims] });
   }
@@ -809,6 +824,7 @@ function committedRequest(state, id) {
 
 module.exports = {
   CLAIM_CANCELLATION_REASONS,
+  LAUNCH_REVISION,
   OP_FIELDS,
   OP_ROLES,
   PROTOCOL_VERSION,

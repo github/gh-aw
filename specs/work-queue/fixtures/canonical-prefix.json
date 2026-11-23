@@ -198,7 +198,9 @@
         {
           "kind": "Dispatch",
           "dispatch_id": "d_790d09c149340286ab4b761f7c0f7238c2d6c100fd556c01387880f406677d4e_1",
-          "state": "started"
+          "state": "started",
+          "run_id": "7",
+          "revision": "cccccccccccccccccccccccccccccccccccccccc"
         }
       ]
     },
@@ -378,7 +380,9 @@
         {
           "kind": "Dispatch",
           "dispatch_id": "d_b7c1efcca2f282dd691948319dfe67c605c3126f84b8c6fe46943fdfcd545c03_1",
-          "state": "started"
+          "state": "started",
+          "run_id": "8",
+          "revision": "cccccccccccccccccccccccccccccccccccccccc"
         }
       ]
     },
@@ -614,7 +618,9 @@
         {
           "kind": "Dispatch",
           "dispatch_id": "d_20004b7c6ff1e4a0afe77a2c769fcabd81feec6fdddb0057f50421e4a845ed45_1",
-          "state": "started"
+          "state": "started",
+          "run_id": "9",
+          "revision": "cccccccccccccccccccccccccccccccccccccccc"
         }
       ]
     },
@@ -751,7 +757,7 @@
       ]
     }
   ],
-  "canonical": "{\"actor\":{\"repository\":\"owner/repo\",\"role\":\"producer\",\"run_attempt\":1,\"run_id\":\"10\",\"workflow\":\".github/workflows/producer.lock.yml\"},\"at\":1,\"id\":\"q_6d0f681ee2429fc116a630a405f7078602430654ac0d0ea0432fa1791a6929b1\",\"operations\":[{\"depends_on\":[],\"fairness_key\":\"\",\"graph_id\":\"graph\",\"kind\":\"Work\",\"node_key\":\"a\",\"payload\":{\"task\":\"a\"},\"pool\":\"default\",\"priority\":3,\"work_id\":\"c26bb3b003984e39a4945d5b9e06e9d67fe7fa15e78b222ab43495857e882f2d\",\"worker_profile\":\"worker\"},{\"depends_on\":[{\"kind\":\"work\",\"work_id\":\"c26bb3b003984e39a4945d5b9e06e9d67fe7fa15e78b222ab43495857e882f2d\"}],\"fairness_key\":\"\",\"graph_id\":\"graph\",\"kind\":\"Work\",\"node_key\":\"b\",\"payload\":{\"task\":\"b\"},\"pool\":\"default\",\"priority\":3,\"work_id\":\"1e74d1b8ad16053d592df448d63b2fe0e6e53f904031a6147a2ff95f9ac32f60\",\"worker_profile\":\"worker\"},{\"depends_on\":[{\"condition\":\"completed\",\"kind\":\"issue\",\"resource\":{\"host\":\"github.com\",\"kind\":\"issue\",\"number\":\"7\",\"repository\":\"owner/repo\",\"repository_id\":\"1\",\"resource_id\":\"9007199254740993\"}}],\"fairness_key\":\"\",\"graph_id\":\"graph\",\"kind\":\"Work\",\"node_key\":\"c\",\"payload\":{\"task\":\"c\"},\"pool\":\"default\",\"priority\":3,\"work_id\":\"d5767d8baefdf1499aba5c64badac086cdfb019aee9bc3ccacafe13f02677abb\",\"worker_profile\":\"worker\"},{\"depends_on\":[],\"fairness_key\":\"\",\"graph_id\":\"graph\",\"kind\":\"Work\",\"node_key\":\"d\",\"payload\":{\"task\":\"d\"},\"pool\":\"default\",\"priority\":1,\"work_id\":\"8ee985799f4fd27f44973f20eed7c1a75fd36303c924ef5a2b01ea4e7ab4a100\",\"worker_profile\":\"worker\"}],\"previous\":null,\"request\":{\"id\":\"request:c4edbdd1627809c04b5b5fd06a30599bbacf14704b29f2d6eea8062bd27fa51c\",\"kind\":\"submit\",\"parameters\":{\"work_ids\":[\"c26bb3b003984e39a4945d5b9e06e9d67fe7fa15e78b222ab43495857e882f2d\",\"1e74d1b8ad16053d592df448d63b2fe0e6e53f904031a6147a2ff95f9ac32f60\",\"d5767d8baefdf1499aba5c64badac086cdfb019aee9bc3ccacafe13f02677abb\",\"8ee985799f4fd27f44973f20eed7c1a75fd36303c924ef5a2b01ea4e7ab4a100\"]}},\"version\":4}\n{\"actor\":{\"repository\":\"owner/repo\",\"role\":\"dispatcher\",\"run_attempt\":1,\"run_id\":\"101\",\"workflow\":\".github/workflows/dispatcher.lock.yml\"},\"at\":1,\"id\":\"q_3845819f8056b82ecb56ad9cd97b7fcfd9578eb77d52703b35c52d523c3f9ad0\",\"operations\":[{\"condition\":\"completed\",\"kind\":\"Observation\",\"observation_id\":\"o-waiting\",\"resource\":{\"host\":\"github.com\",\"kind\":\"issue\",\"number\":\"7\",\"repository\":\"owner/repo\",\"repository_id\":\"1\",\"resource_id\":\"9007199254740993\"},\"state\":\"waiting\"},{\"claim_id\":\"c_790d09c149340286ab4b761f7c0f7238c2d6c100fd556c01387880f406677d4e_1\",\"dispatch_id\":\"d_790d09c149340286ab4b761f7c0f7238c2d6c100fd556c01387880f406677d4e_1\",\"handle\":\"h1\",\"kind\":\"Claim\",\"work_id\":\"8ee985799f4fd27f44973f20eed7c1a75fd36303c924ef5a2b01ea4e7ab4a100\"},{\"claim_id\":\"c_6879e7b4111b46ab9b3ebb51283db9b8e552a6cbce9bdfa92685553a84ee8e30_1\",\"dispatch_id\":\"d_6879e7b4111b46ab9b3ebb51283db9b8e552a6cbce9bdfa92685553a84ee8e30_1\",\"handle\":\"h1\",\"kind\":\"Claim\",\"work_id\":\"c26bb3b003984e39a4945d5b9e06e9d67fe7fa15e78b222ab43495857e882f2d\"}],\"previous\":\"q_6d0f681ee2429fc116a630a405f7078602430654ac0d0ea0432fa1791a6929b1\",\"request\":{\"id\":\"request:571dfa0a9d6a2b0da291b47e9355ac5749517454f0820ef3ab8abbacc0956e44\",\"kind\":\"dispatch_next\",\"parameters\":{\"concurrency\":2,\"max_claims\":16,\"max_dispatches\":16,\"per_account_limit\":0,\"pool\":\"default\",\"profiles\":{\"worker\":{\"workflow\":\".github/workflows/worker.lock.yml\"}}}},\"version\":4}\n{\"actor\":{\"repository\":\"owner/repo\",\"role\":\"dispatcher\",\"run_attempt\":1,\"run_id\":\"101\",\"workflow\":\".github/workflows/dispatcher.lock.yml\"},\"at\":1,\"id\":\"q_075d8d4c841b28cabff9033099b89eb7fbfc0d4ccce2638f828a2a5b5f40c072\",\"operations\":[{\"dispatch_id\":\"d_790d09c149340286ab4b761f7c0f7238c2d6c100fd556c01387880f406677d4e_1\",\"kind\":\"Dispatch\",\"state\":\"started\"}],\"previous\":\"q_3845819f8056b82ecb56ad9cd97b7fcfd9578eb77d52703b35c52d523c3f9ad0\",\"request\":{\"id\":\"request:83f8f28470b2a0426fe8bfbe97340d6123b0d99b5b93324c1fe81814bbe34e55\",\"kind\":\"launch\",\"parameters\":{\"dispatch_id\":\"d_790d09c149340286ab4b761f7c0f7238c2d6c100fd556c01387880f406677d4e_1\"}},\"version\":4}\n{\"actor\":{\"repository\":\"owner/repo\",\"role\":\"dispatcher\",\"run_attempt\":1,\"run_id\":\"101\",\"workflow\":\".github/workflows/dispatcher.lock.yml\"},\"at\":1,\"id\":\"q_4e7200fd7e1f1ba3347a0c4f8a1186cd66a884f9828c26dec8173ef2cfe49efb\",\"operations\":[{\"dispatch_id\":\"d_6879e7b4111b46ab9b3ebb51283db9b8e552a6cbce9bdfa92685553a84ee8e30_1\",\"kind\":\"Release\",\"reason\":\"launch_failed\"}],\"previous\":\"q_075d8d4c841b28cabff9033099b89eb7fbfc0d4ccce2638f828a2a5b5f40c072\",\"request\":{\"id\":\"request:131a47c6beb52a56af592c7a19d09dc085eccabe12194daa66128a2ac9c3667c\",\"kind\":\"launch\",\"parameters\":{\"dispatch_id\":\"d_6879e7b4111b46ab9b3ebb51283db9b8e552a6cbce9bdfa92685553a84ee8e30_1\"}},\"version\":4}\n{\"actor\":{\"repository\":\"owner/repo\",\"role\":\"worker\",\"run_attempt\":1,\"run_id\":\"7\",\"workflow\":\".github/workflows/worker.lock.yml\"},\"at\":1,\"id\":\"q_fcb2a59d09b93e0b10917e980dedca1be3fae8b1bad37a65569f988f37858ebc\",\"operations\":[{\"dispatch_id\":\"d_790d09c149340286ab4b761f7c0f7238c2d6c100fd556c01387880f406677d4e_1\",\"kind\":\"Bound\",\"run_attempt\":1,\"run_id\":\"7\"}],\"previous\":\"q_4e7200fd7e1f1ba3347a0c4f8a1186cd66a884f9828c26dec8173ef2cfe49efb\",\"request\":{\"id\":\"request:b77c40ee32cd70c1c37a70ca577a04a6a4b398f400498d1628e76158a965fbcd\",\"kind\":\"bind\",\"parameters\":{\"dispatch_id\":\"d_790d09c149340286ab4b761f7c0f7238c2d6c100fd556c01387880f406677d4e_1\"}},\"version\":4}\n{\"actor\":{\"repository\":\"owner/repo\",\"role\":\"worker\",\"run_attempt\":1,\"run_id\":\"7\",\"workflow\":\".github/workflows/worker.lock.yml\"},\"at\":1,\"id\":\"q_ab5ba1877fc59b1062dd1539ffbdf246897a98ec53299fb03bccaeeb1719c107\",\"operations\":[{\"claim_handle\":\"h1\",\"claim_id\":\"c_790d09c149340286ab4b761f7c0f7238c2d6c100fd556c01387880f406677d4e_1\",\"dispatch_id\":\"d_790d09c149340286ab4b761f7c0f7238c2d6c100fd556c01387880f406677d4e_1\",\"effects\":[{\"kind\":\"create_issue\",\"resource\":{\"number\":42,\"repository\":\"owner/repo\"}}],\"kind\":\"Completion\",\"work_id\":\"8ee985799f4fd27f44973f20eed7c1a75fd36303c924ef5a2b01ea4e7ab4a100\"}],\"previous\":\"q_fcb2a59d09b93e0b10917e980dedca1be3fae8b1bad37a65569f988f37858ebc\",\"request\":{\"id\":\"request:3800d7a8513af5128ebceebd392c3fa492295c14ec5a8d8b61bb0f5eef985e1b\",\"kind\":\"finish\",\"parameters\":{\"dispatch_id\":\"d_790d09c149340286ab4b761f7c0f7238c2d6c100fd556c01387880f406677d4e_1\"}},\"version\":4}\n{\"actor\":{\"repository\":\"owner/repo\",\"role\":\"dispatcher\",\"run_attempt\":1,\"run_id\":\"102\",\"workflow\":\".github/workflows/dispatcher.lock.yml\"},\"at\":1,\"id\":\"q_625ddc35c20cca04d1752051a56e213bcac9badb6ca5a3399598e87a079e74c5\",\"operations\":[{\"condition\":\"completed\",\"kind\":\"Observation\",\"observation_id\":\"o-ready\",\"resource\":{\"host\":\"github.com\",\"kind\":\"issue\",\"number\":\"7\",\"repository\":\"owner/repo\",\"repository_id\":\"1\",\"resource_id\":\"9007199254740993\"},\"state\":\"ready\",\"state_reason\":\"completed\"},{\"claim_id\":\"c_b7c1efcca2f282dd691948319dfe67c605c3126f84b8c6fe46943fdfcd545c03_1\",\"dispatch_id\":\"d_b7c1efcca2f282dd691948319dfe67c605c3126f84b8c6fe46943fdfcd545c03_1\",\"handle\":\"h1\",\"kind\":\"Claim\",\"work_id\":\"c26bb3b003984e39a4945d5b9e06e9d67fe7fa15e78b222ab43495857e882f2d\"},{\"claim_id\":\"c_6f6de9d18393c284f15f2bc54d2d7ed5d5853d7c0c516c1d4ec8b07dea350f44_1\",\"dispatch_id\":\"d_6f6de9d18393c284f15f2bc54d2d7ed5d5853d7c0c516c1d4ec8b07dea350f44_1\",\"handle\":\"h1\",\"kind\":\"Claim\",\"work_id\":\"d5767d8baefdf1499aba5c64badac086cdfb019aee9bc3ccacafe13f02677abb\"}],\"previous\":\"q_ab5ba1877fc59b1062dd1539ffbdf246897a98ec53299fb03bccaeeb1719c107\",\"request\":{\"id\":\"request:973f84c6ac4d39621a02e4050431e1d94ff35ff9064dc2743044508882670e9d\",\"kind\":\"dispatch_next\",\"parameters\":{\"concurrency\":2,\"max_claims\":16,\"max_dispatches\":16,\"per_account_limit\":0,\"pool\":\"default\",\"profiles\":{\"worker\":{\"workflow\":\".github/workflows/worker.lock.yml\"}}}},\"version\":4}\n{\"actor\":{\"repository\":\"owner/repo\",\"role\":\"dispatcher\",\"run_attempt\":1,\"run_id\":\"102\",\"workflow\":\".github/workflows/dispatcher.lock.yml\"},\"at\":1,\"id\":\"q_7c7cbcdafddb1cc22141405a2ee23793aec17325b1d9cfa063a3804d3aa7e101\",\"operations\":[{\"dispatch_id\":\"d_b7c1efcca2f282dd691948319dfe67c605c3126f84b8c6fe46943fdfcd545c03_1\",\"kind\":\"Dispatch\",\"state\":\"started\"}],\"previous\":\"q_625ddc35c20cca04d1752051a56e213bcac9badb6ca5a3399598e87a079e74c5\",\"request\":{\"id\":\"request:5d7f79304e1b6d25fa345715f94434c4f12ead77e5502e902dd86d2322736f2c\",\"kind\":\"launch\",\"parameters\":{\"dispatch_id\":\"d_b7c1efcca2f282dd691948319dfe67c605c3126f84b8c6fe46943fdfcd545c03_1\"}},\"version\":4}\n{\"actor\":{\"repository\":\"owner/repo\",\"role\":\"worker\",\"run_attempt\":1,\"run_id\":\"8\",\"workflow\":\".github/workflows/worker.lock.yml\"},\"at\":1,\"id\":\"q_560416870d9773a60d846f8b90eb7950886a0d3afe46691e65022db3defbc4e1\",\"operations\":[{\"dispatch_id\":\"d_b7c1efcca2f282dd691948319dfe67c605c3126f84b8c6fe46943fdfcd545c03_1\",\"kind\":\"Bound\",\"run_attempt\":1,\"run_id\":\"8\"}],\"previous\":\"q_7c7cbcdafddb1cc22141405a2ee23793aec17325b1d9cfa063a3804d3aa7e101\",\"request\":{\"id\":\"request:c8c615b6bb19d8d1f4995ba6653b478c400cad1d2030dbbea5cc666d009faa04\",\"kind\":\"bind\",\"parameters\":{\"dispatch_id\":\"d_b7c1efcca2f282dd691948319dfe67c605c3126f84b8c6fe46943fdfcd545c03_1\"}},\"version\":4}\n{\"actor\":{\"repository\":\"owner/repo\",\"role\":\"worker\",\"run_attempt\":1,\"run_id\":\"8\",\"workflow\":\".github/workflows/worker.lock.yml\"},\"at\":1,\"id\":\"q_7872e21585c5ae391bfc109e3e528ce1d3e97a0030192fdcd1a3158f02c6504c\",\"operations\":[{\"claim_id\":\"c_b7c1efcca2f282dd691948319dfe67c605c3126f84b8c6fe46943fdfcd545c03_1\",\"kind\":\"ClaimCancellation\",\"reason\":\"worker_failed\",\"work_id\":\"c26bb3b003984e39a4945d5b9e06e9d67fe7fa15e78b222ab43495857e882f2d\"}],\"previous\":\"q_560416870d9773a60d846f8b90eb7950886a0d3afe46691e65022db3defbc4e1\",\"request\":{\"id\":\"request:f104509f609d6fa077263af85c9f34b790e488367ee4c94a3c661da0685ff45c\",\"kind\":\"finish\",\"parameters\":{\"dispatch_id\":\"d_b7c1efcca2f282dd691948319dfe67c605c3126f84b8c6fe46943fdfcd545c03_1\"}},\"version\":4}\n{\"actor\":{\"repository\":\"owner/repo\",\"role\":\"reconciler\",\"run_attempt\":1,\"run_id\":\"300\",\"workflow\":\".github/workflows/agentics-maintenance.yml\"},\"at\":1,\"id\":\"q_d1420ffdb2e4e88c5bdba674d01e689acf02e884b21ab2c473348595982df041\",\"operations\":[{\"dispatch_id\":\"d_6f6de9d18393c284f15f2bc54d2d7ed5d5853d7c0c516c1d4ec8b07dea350f44_1\",\"kind\":\"Release\",\"reason\":\"run_missing\"}],\"previous\":\"q_7872e21585c5ae391bfc109e3e528ce1d3e97a0030192fdcd1a3158f02c6504c\",\"request\":{\"id\":\"request:1451e43162d487960867f92253c7de501125d5931d1d35ed08906bcbd70b1513\",\"kind\":\"release\",\"parameters\":{\"dispatch_id\":\"d_6f6de9d18393c284f15f2bc54d2d7ed5d5853d7c0c516c1d4ec8b07dea350f44_1\",\"reason\":\"run_missing\"}},\"version\":4}\n{\"actor\":{\"repository\":\"owner/repo\",\"role\":\"producer\",\"run_attempt\":1,\"run_id\":\"10\",\"workflow\":\".github/workflows/producer.lock.yml\"},\"at\":1,\"id\":\"q_5eb6ee458b2e4c1f3e0fd054a8cecbf1bbea810855661eeb0a4900ad04ef13e7\",\"operations\":[{\"kind\":\"WorkCancellation\",\"reason\":\"operator\",\"work_id\":\"d5767d8baefdf1499aba5c64badac086cdfb019aee9bc3ccacafe13f02677abb\"}],\"previous\":\"q_d1420ffdb2e4e88c5bdba674d01e689acf02e884b21ab2c473348595982df041\",\"request\":{\"id\":\"request:63858c037d8612e67ccfa74dd555149b3aed8fb76d31b4aadf83393baabe3602\",\"kind\":\"cancel_work\",\"parameters\":{\"reason\":\"operator\",\"work_ids\":[\"d5767d8baefdf1499aba5c64badac086cdfb019aee9bc3ccacafe13f02677abb\"]}},\"version\":4}\n{\"actor\":{\"repository\":\"owner/repo\",\"role\":\"projector\",\"run_attempt\":1,\"run_id\":\"100\",\"workflow\":\".github/workflows/dispatcher.lock.yml\"},\"at\":1,\"id\":\"q_2c9868446698f3eb1c17ea497a5339b53772c8a6446957fe36394717f4af20cd\",\"operations\":[{\"kind\":\"IssueLink\",\"resource\":{\"host\":\"github.com\",\"kind\":\"issue\",\"number\":\"8\",\"repository\":\"owner/repo\",\"repository_id\":\"1\",\"resource_id\":\"8\"},\"work_id\":\"8ee985799f4fd27f44973f20eed7c1a75fd36303c924ef5a2b01ea4e7ab4a100\"},{\"claim_id\":\"c_790d09c149340286ab4b761f7c0f7238c2d6c100fd556c01387880f406677d4e_1\",\"comment_id\":\"IC_1\",\"kind\":\"IssueComment\",\"work_id\":\"8ee985799f4fd27f44973f20eed7c1a75fd36303c924ef5a2b01ea4e7ab4a100\"}],\"previous\":\"q_5eb6ee458b2e4c1f3e0fd054a8cecbf1bbea810855661eeb0a4900ad04ef13e7\",\"request\":{\"id\":\"request:7674bf8f57bdb283e1ca2a62117b911e7f63dce3a6f3f6cff10091535a0a4045\",\"kind\":\"issue_link\",\"parameters\":{\"operations\":[{\"kind\":\"IssueLink\",\"resource\":{\"host\":\"github.com\",\"kind\":\"issue\",\"number\":\"8\",\"repository\":\"owner/repo\",\"repository_id\":\"1\",\"resource_id\":\"8\"},\"work_id\":\"8ee985799f4fd27f44973f20eed7c1a75fd36303c924ef5a2b01ea4e7ab4a100\"},{\"claim_id\":\"c_790d09c149340286ab4b761f7c0f7238c2d6c100fd556c01387880f406677d4e_1\",\"comment_id\":\"IC_1\",\"kind\":\"IssueComment\",\"work_id\":\"8ee985799f4fd27f44973f20eed7c1a75fd36303c924ef5a2b01ea4e7ab4a100\"}]}},\"version\":4}\n{\"actor\":{\"repository\":\"owner/repo\",\"role\":\"dispatcher\",\"run_attempt\":1,\"run_id\":\"103\",\"workflow\":\".github/workflows/dispatcher.lock.yml\"},\"at\":1,\"id\":\"q_523a0189ffd931372c7af670807bfbc4a27b8b0e282c45e417f2d0a7d089cfcc\",\"operations\":[{\"claim_id\":\"c_20004b7c6ff1e4a0afe77a2c769fcabd81feec6fdddb0057f50421e4a845ed45_1\",\"dispatch_id\":\"d_20004b7c6ff1e4a0afe77a2c769fcabd81feec6fdddb0057f50421e4a845ed45_1\",\"handle\":\"h1\",\"kind\":\"Claim\",\"work_id\":\"c26bb3b003984e39a4945d5b9e06e9d67fe7fa15e78b222ab43495857e882f2d\"}],\"previous\":\"q_2c9868446698f3eb1c17ea497a5339b53772c8a6446957fe36394717f4af20cd\",\"request\":{\"id\":\"request:5da05e73dd7bd380ab5daaf503cda37648162a5a115bc0cbe8846d563a62c710\",\"kind\":\"dispatch_next\",\"parameters\":{\"concurrency\":2,\"max_claims\":16,\"max_dispatches\":16,\"per_account_limit\":0,\"pool\":\"default\",\"profiles\":{\"worker\":{\"workflow\":\".github/workflows/worker.lock.yml\"}}}},\"version\":4}\n{\"actor\":{\"repository\":\"owner/repo\",\"role\":\"dispatcher\",\"run_attempt\":1,\"run_id\":\"103\",\"workflow\":\".github/workflows/dispatcher.lock.yml\"},\"at\":1,\"id\":\"q_2270f2f09b020bad8d256accd1aa8a56c0404c6718242b9e615945fe09262b0b\",\"operations\":[{\"dispatch_id\":\"d_20004b7c6ff1e4a0afe77a2c769fcabd81feec6fdddb0057f50421e4a845ed45_1\",\"kind\":\"Dispatch\",\"state\":\"started\"}],\"previous\":\"q_523a0189ffd931372c7af670807bfbc4a27b8b0e282c45e417f2d0a7d089cfcc\",\"request\":{\"id\":\"request:58365ba035e6510ae02421fbe71a8bd02a65ac49f6a4c013c7e39e53876a819b\",\"kind\":\"launch\",\"parameters\":{\"dispatch_id\":\"d_20004b7c6ff1e4a0afe77a2c769fcabd81feec6fdddb0057f50421e4a845ed45_1\"}},\"version\":4}\n{\"actor\":{\"repository\":\"owner/repo\",\"role\":\"worker\",\"run_attempt\":1,\"run_id\":\"9\",\"workflow\":\".github/workflows/worker.lock.yml\"},\"at\":1,\"id\":\"q_2e81f04fdcd04b02c7bb75bd031b9c0d6dce80d2c819ea948ff91a98ca76dbde\",\"operations\":[{\"dispatch_id\":\"d_20004b7c6ff1e4a0afe77a2c769fcabd81feec6fdddb0057f50421e4a845ed45_1\",\"kind\":\"Bound\",\"run_attempt\":1,\"run_id\":\"9\"}],\"previous\":\"q_2270f2f09b020bad8d256accd1aa8a56c0404c6718242b9e615945fe09262b0b\",\"request\":{\"id\":\"request:1f88bd705b55c3b492bc62aa3b1f4ba4735f49edd5b7fee1bb273c30af68cceb\",\"kind\":\"bind\",\"parameters\":{\"dispatch_id\":\"d_20004b7c6ff1e4a0afe77a2c769fcabd81feec6fdddb0057f50421e4a845ed45_1\"}},\"version\":4}\n{\"actor\":{\"repository\":\"owner/repo\",\"role\":\"worker\",\"run_attempt\":2,\"run_id\":\"9\",\"workflow\":\".github/workflows/worker.lock.yml\"},\"at\":1,\"id\":\"q_d6722f88e6b2567bdddb9c3c00c6e56c1f3f68e511212dfb472c4bf3919e1370\",\"operations\":[{\"dispatch_id\":\"d_20004b7c6ff1e4a0afe77a2c769fcabd81feec6fdddb0057f50421e4a845ed45_1\",\"kind\":\"Bound\",\"run_attempt\":2,\"run_id\":\"9\"}],\"previous\":\"q_2e81f04fdcd04b02c7bb75bd031b9c0d6dce80d2c819ea948ff91a98ca76dbde\",\"request\":{\"id\":\"request:823cbded720cd8cd89c7be1edaa22bf6260169f140894146d61101b1912f46a1\",\"kind\":\"bind\",\"parameters\":{\"dispatch_id\":\"d_20004b7c6ff1e4a0afe77a2c769fcabd81feec6fdddb0057f50421e4a845ed45_1\"}},\"version\":4}\n{\"actor\":{\"repository\":\"owner/repo\",\"role\":\"worker\",\"run_attempt\":2,\"run_id\":\"9\",\"workflow\":\".github/workflows/worker.lock.yml\"},\"at\":1,\"id\":\"q_0ab9444ef9b5a46b6a13677383f04782ded11830b4795edb11a484c935eec2c8\",\"operations\":[{\"claim_handle\":\"h1\",\"claim_id\":\"c_20004b7c6ff1e4a0afe77a2c769fcabd81feec6fdddb0057f50421e4a845ed45_1\",\"dispatch_id\":\"d_20004b7c6ff1e4a0afe77a2c769fcabd81feec6fdddb0057f50421e4a845ed45_1\",\"effects\":[{\"kind\":\"create_pull_request\",\"resource\":{\"number\":43,\"repository\":\"owner/repo\"}}],\"kind\":\"Completion\",\"work_id\":\"c26bb3b003984e39a4945d5b9e06e9d67fe7fa15e78b222ab43495857e882f2d\"}],\"previous\":\"q_d6722f88e6b2567bdddb9c3c00c6e56c1f3f68e511212dfb472c4bf3919e1370\",\"request\":{\"id\":\"request:22fe9337c8b88614bfbef82c568ac970964ccf7b03d2b77f1e327a770ef8bd25\",\"kind\":\"finish\",\"parameters\":{\"dispatch_id\":\"d_20004b7c6ff1e4a0afe77a2c769fcabd81feec6fdddb0057f50421e4a845ed45_1\"}},\"version\":4}\n{\"actor\":{\"repository\":\"owner/repo\",\"role\":\"dispatcher\",\"run_attempt\":1,\"run_id\":\"104\",\"workflow\":\".github/workflows/dispatcher.lock.yml\"},\"at\":1,\"id\":\"q_bcff5932e0f01458280ee1139d27e588a1bd061d1ce5aa8f1ccdb652dfff042d\",\"operations\":[{\"claim_id\":\"c_83f3bdd644647f12a0738640d18347bc1f25d224c7fd1ad808aebd41197c5cc9_1\",\"dispatch_id\":\"d_83f3bdd644647f12a0738640d18347bc1f25d224c7fd1ad808aebd41197c5cc9_1\",\"handle\":\"h1\",\"kind\":\"Claim\",\"work_id\":\"1e74d1b8ad16053d592df448d63b2fe0e6e53f904031a6147a2ff95f9ac32f60\"}],\"previous\":\"q_0ab9444ef9b5a46b6a13677383f04782ded11830b4795edb11a484c935eec2c8\",\"request\":{\"id\":\"request:837ce147d14e822cb4ae73501143e8c4d03b91c30faa4d1a81ca43091d348312\",\"kind\":\"dispatch_next\",\"parameters\":{\"concurrency\":2,\"max_claims\":16,\"max_dispatches\":16,\"per_account_limit\":0,\"pool\":\"default\",\"profiles\":{\"worker\":{\"workflow\":\".github/workflows/worker.lock.yml\"}}}},\"version\":4}\n",
+  "canonical": "{\"actor\":{\"repository\":\"owner/repo\",\"role\":\"producer\",\"run_attempt\":1,\"run_id\":\"10\",\"workflow\":\".github/workflows/producer.lock.yml\"},\"at\":1,\"id\":\"q_6d0f681ee2429fc116a630a405f7078602430654ac0d0ea0432fa1791a6929b1\",\"operations\":[{\"depends_on\":[],\"fairness_key\":\"\",\"graph_id\":\"graph\",\"kind\":\"Work\",\"node_key\":\"a\",\"payload\":{\"task\":\"a\"},\"pool\":\"default\",\"priority\":3,\"work_id\":\"c26bb3b003984e39a4945d5b9e06e9d67fe7fa15e78b222ab43495857e882f2d\",\"worker_profile\":\"worker\"},{\"depends_on\":[{\"kind\":\"work\",\"work_id\":\"c26bb3b003984e39a4945d5b9e06e9d67fe7fa15e78b222ab43495857e882f2d\"}],\"fairness_key\":\"\",\"graph_id\":\"graph\",\"kind\":\"Work\",\"node_key\":\"b\",\"payload\":{\"task\":\"b\"},\"pool\":\"default\",\"priority\":3,\"work_id\":\"1e74d1b8ad16053d592df448d63b2fe0e6e53f904031a6147a2ff95f9ac32f60\",\"worker_profile\":\"worker\"},{\"depends_on\":[{\"condition\":\"completed\",\"kind\":\"issue\",\"resource\":{\"host\":\"github.com\",\"kind\":\"issue\",\"number\":\"7\",\"repository\":\"owner/repo\",\"repository_id\":\"1\",\"resource_id\":\"9007199254740993\"}}],\"fairness_key\":\"\",\"graph_id\":\"graph\",\"kind\":\"Work\",\"node_key\":\"c\",\"payload\":{\"task\":\"c\"},\"pool\":\"default\",\"priority\":3,\"work_id\":\"d5767d8baefdf1499aba5c64badac086cdfb019aee9bc3ccacafe13f02677abb\",\"worker_profile\":\"worker\"},{\"depends_on\":[],\"fairness_key\":\"\",\"graph_id\":\"graph\",\"kind\":\"Work\",\"node_key\":\"d\",\"payload\":{\"task\":\"d\"},\"pool\":\"default\",\"priority\":1,\"work_id\":\"8ee985799f4fd27f44973f20eed7c1a75fd36303c924ef5a2b01ea4e7ab4a100\",\"worker_profile\":\"worker\"}],\"previous\":null,\"request\":{\"id\":\"request:c4edbdd1627809c04b5b5fd06a30599bbacf14704b29f2d6eea8062bd27fa51c\",\"kind\":\"submit\",\"parameters\":{\"work_ids\":[\"c26bb3b003984e39a4945d5b9e06e9d67fe7fa15e78b222ab43495857e882f2d\",\"1e74d1b8ad16053d592df448d63b2fe0e6e53f904031a6147a2ff95f9ac32f60\",\"d5767d8baefdf1499aba5c64badac086cdfb019aee9bc3ccacafe13f02677abb\",\"8ee985799f4fd27f44973f20eed7c1a75fd36303c924ef5a2b01ea4e7ab4a100\"]}},\"version\":4}\n{\"actor\":{\"repository\":\"owner/repo\",\"role\":\"dispatcher\",\"run_attempt\":1,\"run_id\":\"101\",\"workflow\":\".github/workflows/dispatcher.lock.yml\"},\"at\":1,\"id\":\"q_3845819f8056b82ecb56ad9cd97b7fcfd9578eb77d52703b35c52d523c3f9ad0\",\"operations\":[{\"condition\":\"completed\",\"kind\":\"Observation\",\"observation_id\":\"o-waiting\",\"resource\":{\"host\":\"github.com\",\"kind\":\"issue\",\"number\":\"7\",\"repository\":\"owner/repo\",\"repository_id\":\"1\",\"resource_id\":\"9007199254740993\"},\"state\":\"waiting\"},{\"claim_id\":\"c_790d09c149340286ab4b761f7c0f7238c2d6c100fd556c01387880f406677d4e_1\",\"dispatch_id\":\"d_790d09c149340286ab4b761f7c0f7238c2d6c100fd556c01387880f406677d4e_1\",\"handle\":\"h1\",\"kind\":\"Claim\",\"work_id\":\"8ee985799f4fd27f44973f20eed7c1a75fd36303c924ef5a2b01ea4e7ab4a100\"},{\"claim_id\":\"c_6879e7b4111b46ab9b3ebb51283db9b8e552a6cbce9bdfa92685553a84ee8e30_1\",\"dispatch_id\":\"d_6879e7b4111b46ab9b3ebb51283db9b8e552a6cbce9bdfa92685553a84ee8e30_1\",\"handle\":\"h1\",\"kind\":\"Claim\",\"work_id\":\"c26bb3b003984e39a4945d5b9e06e9d67fe7fa15e78b222ab43495857e882f2d\"}],\"previous\":\"q_6d0f681ee2429fc116a630a405f7078602430654ac0d0ea0432fa1791a6929b1\",\"request\":{\"id\":\"request:571dfa0a9d6a2b0da291b47e9355ac5749517454f0820ef3ab8abbacc0956e44\",\"kind\":\"dispatch_next\",\"parameters\":{\"concurrency\":2,\"max_claims\":16,\"max_dispatches\":16,\"per_account_limit\":0,\"pool\":\"default\",\"profiles\":{\"worker\":{\"workflow\":\".github/workflows/worker.lock.yml\"}}}},\"version\":4}\n{\"actor\":{\"repository\":\"owner/repo\",\"role\":\"dispatcher\",\"run_attempt\":1,\"run_id\":\"101\",\"workflow\":\".github/workflows/dispatcher.lock.yml\"},\"at\":1,\"id\":\"q_075d8d4c841b28cabff9033099b89eb7fbfc0d4ccce2638f828a2a5b5f40c072\",\"operations\":[{\"dispatch_id\":\"d_790d09c149340286ab4b761f7c0f7238c2d6c100fd556c01387880f406677d4e_1\",\"kind\":\"Dispatch\",\"revision\":\"cccccccccccccccccccccccccccccccccccccccc\",\"run_id\":\"7\",\"state\":\"started\"}],\"previous\":\"q_3845819f8056b82ecb56ad9cd97b7fcfd9578eb77d52703b35c52d523c3f9ad0\",\"request\":{\"id\":\"request:83f8f28470b2a0426fe8bfbe97340d6123b0d99b5b93324c1fe81814bbe34e55\",\"kind\":\"launch\",\"parameters\":{\"dispatch_id\":\"d_790d09c149340286ab4b761f7c0f7238c2d6c100fd556c01387880f406677d4e_1\"}},\"version\":4}\n{\"actor\":{\"repository\":\"owner/repo\",\"role\":\"dispatcher\",\"run_attempt\":1,\"run_id\":\"101\",\"workflow\":\".github/workflows/dispatcher.lock.yml\"},\"at\":1,\"id\":\"q_4e7200fd7e1f1ba3347a0c4f8a1186cd66a884f9828c26dec8173ef2cfe49efb\",\"operations\":[{\"dispatch_id\":\"d_6879e7b4111b46ab9b3ebb51283db9b8e552a6cbce9bdfa92685553a84ee8e30_1\",\"kind\":\"Release\",\"reason\":\"launch_failed\"}],\"previous\":\"q_075d8d4c841b28cabff9033099b89eb7fbfc0d4ccce2638f828a2a5b5f40c072\",\"request\":{\"id\":\"request:131a47c6beb52a56af592c7a19d09dc085eccabe12194daa66128a2ac9c3667c\",\"kind\":\"launch\",\"parameters\":{\"dispatch_id\":\"d_6879e7b4111b46ab9b3ebb51283db9b8e552a6cbce9bdfa92685553a84ee8e30_1\"}},\"version\":4}\n{\"actor\":{\"repository\":\"owner/repo\",\"role\":\"worker\",\"run_attempt\":1,\"run_id\":\"7\",\"workflow\":\".github/workflows/worker.lock.yml\"},\"at\":1,\"id\":\"q_fcb2a59d09b93e0b10917e980dedca1be3fae8b1bad37a65569f988f37858ebc\",\"operations\":[{\"dispatch_id\":\"d_790d09c149340286ab4b761f7c0f7238c2d6c100fd556c01387880f406677d4e_1\",\"kind\":\"Bound\",\"run_attempt\":1,\"run_id\":\"7\"}],\"previous\":\"q_4e7200fd7e1f1ba3347a0c4f8a1186cd66a884f9828c26dec8173ef2cfe49efb\",\"request\":{\"id\":\"request:b77c40ee32cd70c1c37a70ca577a04a6a4b398f400498d1628e76158a965fbcd\",\"kind\":\"bind\",\"parameters\":{\"dispatch_id\":\"d_790d09c149340286ab4b761f7c0f7238c2d6c100fd556c01387880f406677d4e_1\"}},\"version\":4}\n{\"actor\":{\"repository\":\"owner/repo\",\"role\":\"worker\",\"run_attempt\":1,\"run_id\":\"7\",\"workflow\":\".github/workflows/worker.lock.yml\"},\"at\":1,\"id\":\"q_ab5ba1877fc59b1062dd1539ffbdf246897a98ec53299fb03bccaeeb1719c107\",\"operations\":[{\"claim_handle\":\"h1\",\"claim_id\":\"c_790d09c149340286ab4b761f7c0f7238c2d6c100fd556c01387880f406677d4e_1\",\"dispatch_id\":\"d_790d09c149340286ab4b761f7c0f7238c2d6c100fd556c01387880f406677d4e_1\",\"effects\":[{\"kind\":\"create_issue\",\"resource\":{\"number\":42,\"repository\":\"owner/repo\"}}],\"kind\":\"Completion\",\"work_id\":\"8ee985799f4fd27f44973f20eed7c1a75fd36303c924ef5a2b01ea4e7ab4a100\"}],\"previous\":\"q_fcb2a59d09b93e0b10917e980dedca1be3fae8b1bad37a65569f988f37858ebc\",\"request\":{\"id\":\"request:3800d7a8513af5128ebceebd392c3fa492295c14ec5a8d8b61bb0f5eef985e1b\",\"kind\":\"finish\",\"parameters\":{\"dispatch_id\":\"d_790d09c149340286ab4b761f7c0f7238c2d6c100fd556c01387880f406677d4e_1\"}},\"version\":4}\n{\"actor\":{\"repository\":\"owner/repo\",\"role\":\"dispatcher\",\"run_attempt\":1,\"run_id\":\"102\",\"workflow\":\".github/workflows/dispatcher.lock.yml\"},\"at\":1,\"id\":\"q_625ddc35c20cca04d1752051a56e213bcac9badb6ca5a3399598e87a079e74c5\",\"operations\":[{\"condition\":\"completed\",\"kind\":\"Observation\",\"observation_id\":\"o-ready\",\"resource\":{\"host\":\"github.com\",\"kind\":\"issue\",\"number\":\"7\",\"repository\":\"owner/repo\",\"repository_id\":\"1\",\"resource_id\":\"9007199254740993\"},\"state\":\"ready\",\"state_reason\":\"completed\"},{\"claim_id\":\"c_b7c1efcca2f282dd691948319dfe67c605c3126f84b8c6fe46943fdfcd545c03_1\",\"dispatch_id\":\"d_b7c1efcca2f282dd691948319dfe67c605c3126f84b8c6fe46943fdfcd545c03_1\",\"handle\":\"h1\",\"kind\":\"Claim\",\"work_id\":\"c26bb3b003984e39a4945d5b9e06e9d67fe7fa15e78b222ab43495857e882f2d\"},{\"claim_id\":\"c_6f6de9d18393c284f15f2bc54d2d7ed5d5853d7c0c516c1d4ec8b07dea350f44_1\",\"dispatch_id\":\"d_6f6de9d18393c284f15f2bc54d2d7ed5d5853d7c0c516c1d4ec8b07dea350f44_1\",\"handle\":\"h1\",\"kind\":\"Claim\",\"work_id\":\"d5767d8baefdf1499aba5c64badac086cdfb019aee9bc3ccacafe13f02677abb\"}],\"previous\":\"q_ab5ba1877fc59b1062dd1539ffbdf246897a98ec53299fb03bccaeeb1719c107\",\"request\":{\"id\":\"request:973f84c6ac4d39621a02e4050431e1d94ff35ff9064dc2743044508882670e9d\",\"kind\":\"dispatch_next\",\"parameters\":{\"concurrency\":2,\"max_claims\":16,\"max_dispatches\":16,\"per_account_limit\":0,\"pool\":\"default\",\"profiles\":{\"worker\":{\"workflow\":\".github/workflows/worker.lock.yml\"}}}},\"version\":4}\n{\"actor\":{\"repository\":\"owner/repo\",\"role\":\"dispatcher\",\"run_attempt\":1,\"run_id\":\"102\",\"workflow\":\".github/workflows/dispatcher.lock.yml\"},\"at\":1,\"id\":\"q_7c7cbcdafddb1cc22141405a2ee23793aec17325b1d9cfa063a3804d3aa7e101\",\"operations\":[{\"dispatch_id\":\"d_b7c1efcca2f282dd691948319dfe67c605c3126f84b8c6fe46943fdfcd545c03_1\",\"kind\":\"Dispatch\",\"revision\":\"cccccccccccccccccccccccccccccccccccccccc\",\"run_id\":\"8\",\"state\":\"started\"}],\"previous\":\"q_625ddc35c20cca04d1752051a56e213bcac9badb6ca5a3399598e87a079e74c5\",\"request\":{\"id\":\"request:5d7f79304e1b6d25fa345715f94434c4f12ead77e5502e902dd86d2322736f2c\",\"kind\":\"launch\",\"parameters\":{\"dispatch_id\":\"d_b7c1efcca2f282dd691948319dfe67c605c3126f84b8c6fe46943fdfcd545c03_1\"}},\"version\":4}\n{\"actor\":{\"repository\":\"owner/repo\",\"role\":\"worker\",\"run_attempt\":1,\"run_id\":\"8\",\"workflow\":\".github/workflows/worker.lock.yml\"},\"at\":1,\"id\":\"q_560416870d9773a60d846f8b90eb7950886a0d3afe46691e65022db3defbc4e1\",\"operations\":[{\"dispatch_id\":\"d_b7c1efcca2f282dd691948319dfe67c605c3126f84b8c6fe46943fdfcd545c03_1\",\"kind\":\"Bound\",\"run_attempt\":1,\"run_id\":\"8\"}],\"previous\":\"q_7c7cbcdafddb1cc22141405a2ee23793aec17325b1d9cfa063a3804d3aa7e101\",\"request\":{\"id\":\"request:c8c615b6bb19d8d1f4995ba6653b478c400cad1d2030dbbea5cc666d009faa04\",\"kind\":\"bind\",\"parameters\":{\"dispatch_id\":\"d_b7c1efcca2f282dd691948319dfe67c605c3126f84b8c6fe46943fdfcd545c03_1\"}},\"version\":4}\n{\"actor\":{\"repository\":\"owner/repo\",\"role\":\"worker\",\"run_attempt\":1,\"run_id\":\"8\",\"workflow\":\".github/workflows/worker.lock.yml\"},\"at\":1,\"id\":\"q_7872e21585c5ae391bfc109e3e528ce1d3e97a0030192fdcd1a3158f02c6504c\",\"operations\":[{\"claim_id\":\"c_b7c1efcca2f282dd691948319dfe67c605c3126f84b8c6fe46943fdfcd545c03_1\",\"kind\":\"ClaimCancellation\",\"reason\":\"worker_failed\",\"work_id\":\"c26bb3b003984e39a4945d5b9e06e9d67fe7fa15e78b222ab43495857e882f2d\"}],\"previous\":\"q_560416870d9773a60d846f8b90eb7950886a0d3afe46691e65022db3defbc4e1\",\"request\":{\"id\":\"request:f104509f609d6fa077263af85c9f34b790e488367ee4c94a3c661da0685ff45c\",\"kind\":\"finish\",\"parameters\":{\"dispatch_id\":\"d_b7c1efcca2f282dd691948319dfe67c605c3126f84b8c6fe46943fdfcd545c03_1\"}},\"version\":4}\n{\"actor\":{\"repository\":\"owner/repo\",\"role\":\"reconciler\",\"run_attempt\":1,\"run_id\":\"300\",\"workflow\":\".github/workflows/agentics-maintenance.yml\"},\"at\":1,\"id\":\"q_d1420ffdb2e4e88c5bdba674d01e689acf02e884b21ab2c473348595982df041\",\"operations\":[{\"dispatch_id\":\"d_6f6de9d18393c284f15f2bc54d2d7ed5d5853d7c0c516c1d4ec8b07dea350f44_1\",\"kind\":\"Release\",\"reason\":\"run_missing\"}],\"previous\":\"q_7872e21585c5ae391bfc109e3e528ce1d3e97a0030192fdcd1a3158f02c6504c\",\"request\":{\"id\":\"request:1451e43162d487960867f92253c7de501125d5931d1d35ed08906bcbd70b1513\",\"kind\":\"release\",\"parameters\":{\"dispatch_id\":\"d_6f6de9d18393c284f15f2bc54d2d7ed5d5853d7c0c516c1d4ec8b07dea350f44_1\",\"reason\":\"run_missing\"}},\"version\":4}\n{\"actor\":{\"repository\":\"owner/repo\",\"role\":\"producer\",\"run_attempt\":1,\"run_id\":\"10\",\"workflow\":\".github/workflows/producer.lock.yml\"},\"at\":1,\"id\":\"q_5eb6ee458b2e4c1f3e0fd054a8cecbf1bbea810855661eeb0a4900ad04ef13e7\",\"operations\":[{\"kind\":\"WorkCancellation\",\"reason\":\"operator\",\"work_id\":\"d5767d8baefdf1499aba5c64badac086cdfb019aee9bc3ccacafe13f02677abb\"}],\"previous\":\"q_d1420ffdb2e4e88c5bdba674d01e689acf02e884b21ab2c473348595982df041\",\"request\":{\"id\":\"request:63858c037d8612e67ccfa74dd555149b3aed8fb76d31b4aadf83393baabe3602\",\"kind\":\"cancel_work\",\"parameters\":{\"reason\":\"operator\",\"work_ids\":[\"d5767d8baefdf1499aba5c64badac086cdfb019aee9bc3ccacafe13f02677abb\"]}},\"version\":4}\n{\"actor\":{\"repository\":\"owner/repo\",\"role\":\"projector\",\"run_attempt\":1,\"run_id\":\"100\",\"workflow\":\".github/workflows/dispatcher.lock.yml\"},\"at\":1,\"id\":\"q_2c9868446698f3eb1c17ea497a5339b53772c8a6446957fe36394717f4af20cd\",\"operations\":[{\"kind\":\"IssueLink\",\"resource\":{\"host\":\"github.com\",\"kind\":\"issue\",\"number\":\"8\",\"repository\":\"owner/repo\",\"repository_id\":\"1\",\"resource_id\":\"8\"},\"work_id\":\"8ee985799f4fd27f44973f20eed7c1a75fd36303c924ef5a2b01ea4e7ab4a100\"},{\"claim_id\":\"c_790d09c149340286ab4b761f7c0f7238c2d6c100fd556c01387880f406677d4e_1\",\"comment_id\":\"IC_1\",\"kind\":\"IssueComment\",\"work_id\":\"8ee985799f4fd27f44973f20eed7c1a75fd36303c924ef5a2b01ea4e7ab4a100\"}],\"previous\":\"q_5eb6ee458b2e4c1f3e0fd054a8cecbf1bbea810855661eeb0a4900ad04ef13e7\",\"request\":{\"id\":\"request:7674bf8f57bdb283e1ca2a62117b911e7f63dce3a6f3f6cff10091535a0a4045\",\"kind\":\"issue_link\",\"parameters\":{\"operations\":[{\"kind\":\"IssueLink\",\"resource\":{\"host\":\"github.com\",\"kind\":\"issue\",\"number\":\"8\",\"repository\":\"owner/repo\",\"repository_id\":\"1\",\"resource_id\":\"8\"},\"work_id\":\"8ee985799f4fd27f44973f20eed7c1a75fd36303c924ef5a2b01ea4e7ab4a100\"},{\"claim_id\":\"c_790d09c149340286ab4b761f7c0f7238c2d6c100fd556c01387880f406677d4e_1\",\"comment_id\":\"IC_1\",\"kind\":\"IssueComment\",\"work_id\":\"8ee985799f4fd27f44973f20eed7c1a75fd36303c924ef5a2b01ea4e7ab4a100\"}]}},\"version\":4}\n{\"actor\":{\"repository\":\"owner/repo\",\"role\":\"dispatcher\",\"run_attempt\":1,\"run_id\":\"103\",\"workflow\":\".github/workflows/dispatcher.lock.yml\"},\"at\":1,\"id\":\"q_523a0189ffd931372c7af670807bfbc4a27b8b0e282c45e417f2d0a7d089cfcc\",\"operations\":[{\"claim_id\":\"c_20004b7c6ff1e4a0afe77a2c769fcabd81feec6fdddb0057f50421e4a845ed45_1\",\"dispatch_id\":\"d_20004b7c6ff1e4a0afe77a2c769fcabd81feec6fdddb0057f50421e4a845ed45_1\",\"handle\":\"h1\",\"kind\":\"Claim\",\"work_id\":\"c26bb3b003984e39a4945d5b9e06e9d67fe7fa15e78b222ab43495857e882f2d\"}],\"previous\":\"q_2c9868446698f3eb1c17ea497a5339b53772c8a6446957fe36394717f4af20cd\",\"request\":{\"id\":\"request:5da05e73dd7bd380ab5daaf503cda37648162a5a115bc0cbe8846d563a62c710\",\"kind\":\"dispatch_next\",\"parameters\":{\"concurrency\":2,\"max_claims\":16,\"max_dispatches\":16,\"per_account_limit\":0,\"pool\":\"default\",\"profiles\":{\"worker\":{\"workflow\":\".github/workflows/worker.lock.yml\"}}}},\"version\":4}\n{\"actor\":{\"repository\":\"owner/repo\",\"role\":\"dispatcher\",\"run_attempt\":1,\"run_id\":\"103\",\"workflow\":\".github/workflows/dispatcher.lock.yml\"},\"at\":1,\"id\":\"q_2270f2f09b020bad8d256accd1aa8a56c0404c6718242b9e615945fe09262b0b\",\"operations\":[{\"dispatch_id\":\"d_20004b7c6ff1e4a0afe77a2c769fcabd81feec6fdddb0057f50421e4a845ed45_1\",\"kind\":\"Dispatch\",\"revision\":\"cccccccccccccccccccccccccccccccccccccccc\",\"run_id\":\"9\",\"state\":\"started\"}],\"previous\":\"q_523a0189ffd931372c7af670807bfbc4a27b8b0e282c45e417f2d0a7d089cfcc\",\"request\":{\"id\":\"request:58365ba035e6510ae02421fbe71a8bd02a65ac49f6a4c013c7e39e53876a819b\",\"kind\":\"launch\",\"parameters\":{\"dispatch_id\":\"d_20004b7c6ff1e4a0afe77a2c769fcabd81feec6fdddb0057f50421e4a845ed45_1\"}},\"version\":4}\n{\"actor\":{\"repository\":\"owner/repo\",\"role\":\"worker\",\"run_attempt\":1,\"run_id\":\"9\",\"workflow\":\".github/workflows/worker.lock.yml\"},\"at\":1,\"id\":\"q_2e81f04fdcd04b02c7bb75bd031b9c0d6dce80d2c819ea948ff91a98ca76dbde\",\"operations\":[{\"dispatch_id\":\"d_20004b7c6ff1e4a0afe77a2c769fcabd81feec6fdddb0057f50421e4a845ed45_1\",\"kind\":\"Bound\",\"run_attempt\":1,\"run_id\":\"9\"}],\"previous\":\"q_2270f2f09b020bad8d256accd1aa8a56c0404c6718242b9e615945fe09262b0b\",\"request\":{\"id\":\"request:1f88bd705b55c3b492bc62aa3b1f4ba4735f49edd5b7fee1bb273c30af68cceb\",\"kind\":\"bind\",\"parameters\":{\"dispatch_id\":\"d_20004b7c6ff1e4a0afe77a2c769fcabd81feec6fdddb0057f50421e4a845ed45_1\"}},\"version\":4}\n{\"actor\":{\"repository\":\"owner/repo\",\"role\":\"worker\",\"run_attempt\":2,\"run_id\":\"9\",\"workflow\":\".github/workflows/worker.lock.yml\"},\"at\":1,\"id\":\"q_d6722f88e6b2567bdddb9c3c00c6e56c1f3f68e511212dfb472c4bf3919e1370\",\"operations\":[{\"dispatch_id\":\"d_20004b7c6ff1e4a0afe77a2c769fcabd81feec6fdddb0057f50421e4a845ed45_1\",\"kind\":\"Bound\",\"run_attempt\":2,\"run_id\":\"9\"}],\"previous\":\"q_2e81f04fdcd04b02c7bb75bd031b9c0d6dce80d2c819ea948ff91a98ca76dbde\",\"request\":{\"id\":\"request:823cbded720cd8cd89c7be1edaa22bf6260169f140894146d61101b1912f46a1\",\"kind\":\"bind\",\"parameters\":{\"dispatch_id\":\"d_20004b7c6ff1e4a0afe77a2c769fcabd81feec6fdddb0057f50421e4a845ed45_1\"}},\"version\":4}\n{\"actor\":{\"repository\":\"owner/repo\",\"role\":\"worker\",\"run_attempt\":2,\"run_id\":\"9\",\"workflow\":\".github/workflows/worker.lock.yml\"},\"at\":1,\"id\":\"q_0ab9444ef9b5a46b6a13677383f04782ded11830b4795edb11a484c935eec2c8\",\"operations\":[{\"claim_handle\":\"h1\",\"claim_id\":\"c_20004b7c6ff1e4a0afe77a2c769fcabd81feec6fdddb0057f50421e4a845ed45_1\",\"dispatch_id\":\"d_20004b7c6ff1e4a0afe77a2c769fcabd81feec6fdddb0057f50421e4a845ed45_1\",\"effects\":[{\"kind\":\"create_pull_request\",\"resource\":{\"number\":43,\"repository\":\"owner/repo\"}}],\"kind\":\"Completion\",\"work_id\":\"c26bb3b003984e39a4945d5b9e06e9d67fe7fa15e78b222ab43495857e882f2d\"}],\"previous\":\"q_d6722f88e6b2567bdddb9c3c00c6e56c1f3f68e511212dfb472c4bf3919e1370\",\"request\":{\"id\":\"request:22fe9337c8b88614bfbef82c568ac970964ccf7b03d2b77f1e327a770ef8bd25\",\"kind\":\"finish\",\"parameters\":{\"dispatch_id\":\"d_20004b7c6ff1e4a0afe77a2c769fcabd81feec6fdddb0057f50421e4a845ed45_1\"}},\"version\":4}\n{\"actor\":{\"repository\":\"owner/repo\",\"role\":\"dispatcher\",\"run_attempt\":1,\"run_id\":\"104\",\"workflow\":\".github/workflows/dispatcher.lock.yml\"},\"at\":1,\"id\":\"q_bcff5932e0f01458280ee1139d27e588a1bd061d1ce5aa8f1ccdb652dfff042d\",\"operations\":[{\"claim_id\":\"c_83f3bdd644647f12a0738640d18347bc1f25d224c7fd1ad808aebd41197c5cc9_1\",\"dispatch_id\":\"d_83f3bdd644647f12a0738640d18347bc1f25d224c7fd1ad808aebd41197c5cc9_1\",\"handle\":\"h1\",\"kind\":\"Claim\",\"work_id\":\"1e74d1b8ad16053d592df448d63b2fe0e6e53f904031a6147a2ff95f9ac32f60\"}],\"previous\":\"q_0ab9444ef9b5a46b6a13677383f04782ded11830b4795edb11a484c935eec2c8\",\"request\":{\"id\":\"request:837ce147d14e822cb4ae73501143e8c4d03b91c30faa4d1a81ca43091d348312\",\"kind\":\"dispatch_next\",\"parameters\":{\"concurrency\":2,\"max_claims\":16,\"max_dispatches\":16,\"per_account_limit\":0,\"pool\":\"default\",\"profiles\":{\"worker\":{\"workflow\":\".github/workflows/worker.lock.yml\"}}}},\"version\":4}\n",
   "prefixes": [
     {
       "tip": "q_6d0f681ee2429fc116a630a405f7078602430654ac0d0ea0432fa1791a6929b1",
@@ -1796,6 +1802,10 @@
           "run_id": "7",
           "run_attempt": 1
         },
+        "launch": {
+          "run_id": "7",
+          "revision": "cccccccccccccccccccccccccccccccccccccccc"
+        },
         "claims": ["c_790d09c149340286ab4b761f7c0f7238c2d6c100fd556c01387880f406677d4e_1"]
       },
       "d_6879e7b4111b46ab9b3ebb51283db9b8e552a6cbce9bdfa92685553a84ee8e30_1": {
@@ -1807,6 +1817,7 @@
         "workflow": ".github/workflows/worker.lock.yml",
         "state": "closed",
         "run": null,
+        "launch": null,
         "claims": ["c_6879e7b4111b46ab9b3ebb51283db9b8e552a6cbce9bdfa92685553a84ee8e30_1"]
       },
       "d_b7c1efcca2f282dd691948319dfe67c605c3126f84b8c6fe46943fdfcd545c03_1": {
@@ -1821,6 +1832,10 @@
           "run_id": "8",
           "run_attempt": 1
         },
+        "launch": {
+          "run_id": "8",
+          "revision": "cccccccccccccccccccccccccccccccccccccccc"
+        },
         "claims": ["c_b7c1efcca2f282dd691948319dfe67c605c3126f84b8c6fe46943fdfcd545c03_1"]
       },
       "d_6f6de9d18393c284f15f2bc54d2d7ed5d5853d7c0c516c1d4ec8b07dea350f44_1": {
@@ -1832,6 +1847,7 @@
         "workflow": ".github/workflows/worker.lock.yml",
         "state": "closed",
         "run": null,
+        "launch": null,
         "claims": ["c_6f6de9d18393c284f15f2bc54d2d7ed5d5853d7c0c516c1d4ec8b07dea350f44_1"]
       },
       "d_20004b7c6ff1e4a0afe77a2c769fcabd81feec6fdddb0057f50421e4a845ed45_1": {
@@ -1846,6 +1862,10 @@
           "run_id": "9",
           "run_attempt": 2
         },
+        "launch": {
+          "run_id": "9",
+          "revision": "cccccccccccccccccccccccccccccccccccccccc"
+        },
         "claims": ["c_20004b7c6ff1e4a0afe77a2c769fcabd81feec6fdddb0057f50421e4a845ed45_1"]
       },
       "d_83f3bdd644647f12a0738640d18347bc1f25d224c7fd1ad808aebd41197c5cc9_1": {
@@ -1857,6 +1877,7 @@
         "workflow": ".github/workflows/worker.lock.yml",
         "state": "reserved",
         "run": null,
+        "launch": null,
         "claims": ["c_83f3bdd644647f12a0738640d18347bc1f25d224c7fd1ad808aebd41197c5cc9_1"]
       }
     },
@@ -2214,6 +2235,10 @@
                   "run_id": "7",
                   "run_attempt": 1
                 },
+                "launch": {
+                  "run_id": "7",
+                  "revision": "cccccccccccccccccccccccccccccccccccccccc"
+                },
                 "claims": ["c_790d09c149340286ab4b761f7c0f7238c2d6c100fd556c01387880f406677d4e_1"]
               },
               "d_6879e7b4111b46ab9b3ebb51283db9b8e552a6cbce9bdfa92685553a84ee8e30_1": {
@@ -2225,6 +2250,7 @@
                 "workflow": ".github/workflows/worker.lock.yml",
                 "state": "closed",
                 "run": null,
+                "launch": null,
                 "claims": ["c_6879e7b4111b46ab9b3ebb51283db9b8e552a6cbce9bdfa92685553a84ee8e30_1"]
               },
               "d_b7c1efcca2f282dd691948319dfe67c605c3126f84b8c6fe46943fdfcd545c03_1": {
@@ -2239,6 +2265,10 @@
                   "run_id": "8",
                   "run_attempt": 1
                 },
+                "launch": {
+                  "run_id": "8",
+                  "revision": "cccccccccccccccccccccccccccccccccccccccc"
+                },
                 "claims": ["c_b7c1efcca2f282dd691948319dfe67c605c3126f84b8c6fe46943fdfcd545c03_1"]
               },
               "d_6f6de9d18393c284f15f2bc54d2d7ed5d5853d7c0c516c1d4ec8b07dea350f44_1": {
@@ -2250,6 +2280,7 @@
                 "workflow": ".github/workflows/worker.lock.yml",
                 "state": "closed",
                 "run": null,
+                "launch": null,
                 "claims": ["c_6f6de9d18393c284f15f2bc54d2d7ed5d5853d7c0c516c1d4ec8b07dea350f44_1"]
               },
               "d_20004b7c6ff1e4a0afe77a2c769fcabd81feec6fdddb0057f50421e4a845ed45_1": {
@@ -2264,6 +2295,10 @@
                   "run_id": "9",
                   "run_attempt": 2
                 },
+                "launch": {
+                  "run_id": "9",
+                  "revision": "cccccccccccccccccccccccccccccccccccccccc"
+                },
                 "claims": ["c_20004b7c6ff1e4a0afe77a2c769fcabd81feec6fdddb0057f50421e4a845ed45_1"]
               },
               "d_83f3bdd644647f12a0738640d18347bc1f25d224c7fd1ad808aebd41197c5cc9_1": {
@@ -2275,6 +2310,7 @@
                 "workflow": ".github/workflows/worker.lock.yml",
                 "state": "reserved",
                 "run": null,
+                "launch": null,
                 "claims": ["c_83f3bdd644647f12a0738640d18347bc1f25d224c7fd1ad808aebd41197c5cc9_1"]
               }
             },
@@ -2583,6 +2619,10 @@
             "run_id": "7",
             "run_attempt": 1
           },
+          "launch": {
+            "run_id": "7",
+            "revision": "cccccccccccccccccccccccccccccccccccccccc"
+          },
           "claims": ["c_790d09c149340286ab4b761f7c0f7238c2d6c100fd556c01387880f406677d4e_1"]
         },
         "d_6879e7b4111b46ab9b3ebb51283db9b8e552a6cbce9bdfa92685553a84ee8e30_1": {
@@ -2594,6 +2634,7 @@
           "workflow": ".github/workflows/worker.lock.yml",
           "state": "closed",
           "run": null,
+          "launch": null,
           "claims": ["c_6879e7b4111b46ab9b3ebb51283db9b8e552a6cbce9bdfa92685553a84ee8e30_1"]
         },
         "d_b7c1efcca2f282dd691948319dfe67c605c3126f84b8c6fe46943fdfcd545c03_1": {
@@ -2608,6 +2649,10 @@
             "run_id": "8",
             "run_attempt": 1
           },
+          "launch": {
+            "run_id": "8",
+            "revision": "cccccccccccccccccccccccccccccccccccccccc"
+          },
           "claims": ["c_b7c1efcca2f282dd691948319dfe67c605c3126f84b8c6fe46943fdfcd545c03_1"]
         },
         "d_6f6de9d18393c284f15f2bc54d2d7ed5d5853d7c0c516c1d4ec8b07dea350f44_1": {
@@ -2619,6 +2664,7 @@
           "workflow": ".github/workflows/worker.lock.yml",
           "state": "closed",
           "run": null,
+          "launch": null,
           "claims": ["c_6f6de9d18393c284f15f2bc54d2d7ed5d5853d7c0c516c1d4ec8b07dea350f44_1"]
         },
         "d_20004b7c6ff1e4a0afe77a2c769fcabd81feec6fdddb0057f50421e4a845ed45_1": {
@@ -2633,6 +2679,10 @@
             "run_id": "9",
             "run_attempt": 2
           },
+          "launch": {
+            "run_id": "9",
+            "revision": "cccccccccccccccccccccccccccccccccccccccc"
+          },
           "claims": ["c_20004b7c6ff1e4a0afe77a2c769fcabd81feec6fdddb0057f50421e4a845ed45_1"]
         },
         "d_83f3bdd644647f12a0738640d18347bc1f25d224c7fd1ad808aebd41197c5cc9_1": {
@@ -2644,6 +2694,7 @@
           "workflow": ".github/workflows/worker.lock.yml",
           "state": "reserved",
           "run": null,
+          "launch": null,
           "claims": ["c_83f3bdd644647f12a0738640d18347bc1f25d224c7fd1ad808aebd41197c5cc9_1"]
         }
       },
@@ -2745,7 +2796,9 @@
             {
               "kind": "Dispatch",
               "dispatch_id": "d_83f3bdd644647f12a0738640d18347bc1f25d224c7fd1ad808aebd41197c5cc9_1",
-              "state": "started"
+              "state": "started",
+              "run_id": "11",
+              "revision": "cccccccccccccccccccccccccccccccccccccccc"
             }
           ]
         },
@@ -2836,7 +2889,9 @@
             {
               "kind": "Dispatch",
               "dispatch_id": "d_83f3bdd644647f12a0738640d18347bc1f25d224c7fd1ad808aebd41197c5cc9_1",
-              "state": "started"
+              "state": "started",
+              "run_id": "11",
+              "revision": "cccccccccccccccccccccccccccccccccccccccc"
             }
           ]
         }
@@ -2897,7 +2952,9 @@
             {
               "kind": "Dispatch",
               "dispatch_id": "d_83f3bdd644647f12a0738640d18347bc1f25d224c7fd1ad808aebd41197c5cc9_1",
-              "state": "started"
+              "state": "started",
+              "run_id": "11",
+              "revision": "cccccccccccccccccccccccccccccccccccccccc"
             }
           ]
         },
@@ -2961,6 +3018,168 @@
       "code": "run_binding_conflict"
     },
     {
+      "name": "Bound before the launch is recorded",
+      "extra": [],
+      "commit": {
+        "version": 4,
+        "id": "q_15a33802e2ef1296724371483fa69370bcb5fe04cacdf6bce3288eba73a1fb66",
+        "previous": "q_bcff5932e0f01458280ee1139d27e588a1bd061d1ce5aa8f1ccdb652dfff042d",
+        "request": {
+          "id": "request:df570f547089be898b4020cb7ddada8fe06688b36a5a74b2da252e042180b8d5",
+          "kind": "bind",
+          "parameters": {
+            "dispatch_id": "d_83f3bdd644647f12a0738640d18347bc1f25d224c7fd1ad808aebd41197c5cc9_1"
+          }
+        },
+        "actor": {
+          "role": "worker",
+          "repository": "owner/repo",
+          "workflow": ".github/workflows/worker.lock.yml",
+          "run_id": "11",
+          "run_attempt": 1
+        },
+        "at": 1,
+        "operations": [
+          {
+            "kind": "Bound",
+            "dispatch_id": "d_83f3bdd644647f12a0738640d18347bc1f25d224c7fd1ad808aebd41197c5cc9_1",
+            "run_id": "11",
+            "run_attempt": 1
+          }
+        ]
+      },
+      "code": "dispatch_state_conflict"
+    },
+    {
+      "name": "Bound by a run the dispatcher did not launch",
+      "extra": [
+        {
+          "version": 4,
+          "id": "q_1321534f4c4be51008b8292245b15f87b6196c29c3269fbab974ec7a350d149b",
+          "previous": "q_bcff5932e0f01458280ee1139d27e588a1bd061d1ce5aa8f1ccdb652dfff042d",
+          "request": {
+            "id": "request:efa08ba465e06a0ab70f42e5281e1e2fa77b169b0e7edaf5b2f31ce53b35b0f2",
+            "kind": "launch",
+            "parameters": {
+              "dispatch_id": "d_83f3bdd644647f12a0738640d18347bc1f25d224c7fd1ad808aebd41197c5cc9_1"
+            }
+          },
+          "actor": {
+            "role": "dispatcher",
+            "repository": "owner/repo",
+            "workflow": ".github/workflows/dispatcher.lock.yml",
+            "run_id": "104",
+            "run_attempt": 1
+          },
+          "at": 1,
+          "operations": [
+            {
+              "kind": "Dispatch",
+              "dispatch_id": "d_83f3bdd644647f12a0738640d18347bc1f25d224c7fd1ad808aebd41197c5cc9_1",
+              "state": "started",
+              "run_id": "11",
+              "revision": "cccccccccccccccccccccccccccccccccccccccc"
+            }
+          ]
+        }
+      ],
+      "commit": {
+        "version": 4,
+        "id": "q_8d0d987d1875a6ef5b5502c98cb2b15d95709d486346ccd32f4d3bd8156e1d8a",
+        "previous": "q_1321534f4c4be51008b8292245b15f87b6196c29c3269fbab974ec7a350d149b",
+        "request": {
+          "id": "request:ce27f4eb60bbe2e083f0b136ca5c6fba4e0106e9e3fa0ece67d7b09f4efe8923",
+          "kind": "bind",
+          "parameters": {
+            "dispatch_id": "d_83f3bdd644647f12a0738640d18347bc1f25d224c7fd1ad808aebd41197c5cc9_1"
+          }
+        },
+        "actor": {
+          "role": "worker",
+          "repository": "owner/repo",
+          "workflow": ".github/workflows/worker.lock.yml",
+          "run_id": "12",
+          "run_attempt": 1
+        },
+        "at": 1,
+        "operations": [
+          {
+            "kind": "Bound",
+            "dispatch_id": "d_83f3bdd644647f12a0738640d18347bc1f25d224c7fd1ad808aebd41197c5cc9_1",
+            "run_id": "12",
+            "run_attempt": 1
+          }
+        ]
+      },
+      "code": "run_binding_conflict"
+    },
+    {
+      "name": "Dispatch started without its launched run",
+      "extra": [],
+      "commit": {
+        "version": 4,
+        "id": "q_1321534f4c4be51008b8292245b15f87b6196c29c3269fbab974ec7a350d149b",
+        "previous": "q_bcff5932e0f01458280ee1139d27e588a1bd061d1ce5aa8f1ccdb652dfff042d",
+        "request": {
+          "id": "request:efa08ba465e06a0ab70f42e5281e1e2fa77b169b0e7edaf5b2f31ce53b35b0f2",
+          "kind": "launch",
+          "parameters": {
+            "dispatch_id": "d_83f3bdd644647f12a0738640d18347bc1f25d224c7fd1ad808aebd41197c5cc9_1"
+          }
+        },
+        "actor": {
+          "role": "dispatcher",
+          "repository": "owner/repo",
+          "workflow": ".github/workflows/dispatcher.lock.yml",
+          "run_id": "104",
+          "run_attempt": 1
+        },
+        "at": 1,
+        "operations": [
+          {
+            "kind": "Dispatch",
+            "dispatch_id": "d_83f3bdd644647f12a0738640d18347bc1f25d224c7fd1ad808aebd41197c5cc9_1",
+            "state": "started"
+          }
+        ]
+      },
+      "code": "request_invalid"
+    },
+    {
+      "name": "Dispatch started with an abbreviated revision",
+      "extra": [],
+      "commit": {
+        "version": 4,
+        "id": "q_1321534f4c4be51008b8292245b15f87b6196c29c3269fbab974ec7a350d149b",
+        "previous": "q_bcff5932e0f01458280ee1139d27e588a1bd061d1ce5aa8f1ccdb652dfff042d",
+        "request": {
+          "id": "request:efa08ba465e06a0ab70f42e5281e1e2fa77b169b0e7edaf5b2f31ce53b35b0f2",
+          "kind": "launch",
+          "parameters": {
+            "dispatch_id": "d_83f3bdd644647f12a0738640d18347bc1f25d224c7fd1ad808aebd41197c5cc9_1"
+          }
+        },
+        "actor": {
+          "role": "dispatcher",
+          "repository": "owner/repo",
+          "workflow": ".github/workflows/dispatcher.lock.yml",
+          "run_id": "104",
+          "run_attempt": 1
+        },
+        "at": 1,
+        "operations": [
+          {
+            "kind": "Dispatch",
+            "dispatch_id": "d_83f3bdd644647f12a0738640d18347bc1f25d224c7fd1ad808aebd41197c5cc9_1",
+            "state": "started",
+            "run_id": "11",
+            "revision": "ccccccc"
+          }
+        ]
+      },
+      "code": "request_invalid"
+    },
+    {
       "name": "Completion of an already completed Claim",
       "extra": [],
       "commit": {
@@ -3021,7 +3240,9 @@
             {
               "kind": "Dispatch",
               "dispatch_id": "d_83f3bdd644647f12a0738640d18347bc1f25d224c7fd1ad808aebd41197c5cc9_1",
-              "state": "started"
+              "state": "started",
+              "run_id": "11",
+              "revision": "cccccccccccccccccccccccccccccccccccccccc"
             }
           ]
         },
@@ -3110,7 +3331,9 @@
             {
               "kind": "Dispatch",
               "dispatch_id": "d_83f3bdd644647f12a0738640d18347bc1f25d224c7fd1ad808aebd41197c5cc9_1",
-              "state": "started"
+              "state": "started",
+              "run_id": "11",
+              "revision": "cccccccccccccccccccccccccccccccccccccccc"
             }
           ]
         }
@@ -3171,7 +3394,9 @@
             {
               "kind": "Dispatch",
               "dispatch_id": "d_83f3bdd644647f12a0738640d18347bc1f25d224c7fd1ad808aebd41197c5cc9_1",
-              "state": "started"
+              "state": "started",
+              "run_id": "11",
+              "revision": "cccccccccccccccccccccccccccccccccccccccc"
             }
           ]
         },
@@ -3260,7 +3485,9 @@
             {
               "kind": "Dispatch",
               "dispatch_id": "d_83f3bdd644647f12a0738640d18347bc1f25d224c7fd1ad808aebd41197c5cc9_1",
-              "state": "started"
+              "state": "started",
+              "run_id": "11",
+              "revision": "cccccccccccccccccccccccccccccccccccccccc"
             }
           ]
         },
@@ -3349,7 +3576,9 @@
             {
               "kind": "Dispatch",
               "dispatch_id": "d_83f3bdd644647f12a0738640d18347bc1f25d224c7fd1ad808aebd41197c5cc9_1",
-              "state": "started"
+              "state": "started",
+              "run_id": "11",
+              "revision": "cccccccccccccccccccccccccccccccccccccccc"
             }
           ]
         }
@@ -3377,7 +3606,9 @@
           {
             "kind": "Dispatch",
             "dispatch_id": "d_83f3bdd644647f12a0738640d18347bc1f25d224c7fd1ad808aebd41197c5cc9_1",
-            "state": "started"
+            "state": "started",
+            "run_id": "11",
+            "revision": "cccccccccccccccccccccccccccccccccccccccc"
           }
         ]
       },
@@ -3444,7 +3675,9 @@
             {
               "kind": "Dispatch",
               "dispatch_id": "d_83f3bdd644647f12a0738640d18347bc1f25d224c7fd1ad808aebd41197c5cc9_1",
-              "state": "started"
+              "state": "started",
+              "run_id": "11",
+              "revision": "cccccccccccccccccccccccccccccccccccccccc"
             }
           ]
         }
@@ -3472,7 +3705,9 @@
           {
             "kind": "Dispatch",
             "dispatch_id": "d_83f3bdd644647f12a0738640d18347bc1f25d224c7fd1ad808aebd41197c5cc9_1",
-            "state": "started"
+            "state": "started",
+            "run_id": "11",
+            "revision": "cccccccccccccccccccccccccccccccccccccccc"
           }
         ]
       },
@@ -3504,7 +3739,9 @@
             {
               "kind": "Dispatch",
               "dispatch_id": "d_83f3bdd644647f12a0738640d18347bc1f25d224c7fd1ad808aebd41197c5cc9_1",
-              "state": "started"
+              "state": "started",
+              "run_id": "11",
+              "revision": "cccccccccccccccccccccccccccccccccccccccc"
             }
           ]
         }
@@ -3532,7 +3769,9 @@
           {
             "kind": "Dispatch",
             "dispatch_id": "d_83f3bdd644647f12a0738640d18347bc1f25d224c7fd1ad808aebd41197c5cc9_1",
-            "state": "started"
+            "state": "started",
+            "run_id": "11",
+            "revision": "cccccccccccccccccccccccccccccccccccccccc"
           }
         ]
       },
@@ -4062,7 +4301,9 @@
           {
             "kind": "Dispatch",
             "dispatch_id": "d_3ac298b078167e4c1eff6439c134ba4fea5b17ee3a21b8ffa8399dd9969e189b_1",
-            "state": "started"
+            "state": "started",
+            "run_id": "21",
+            "revision": "cccccccccccccccccccccccccccccccccccccccc"
           }
         ]
       },
@@ -4220,7 +4461,9 @@
           {
             "kind": "Dispatch",
             "dispatch_id": "d_df88ad74c699ff0f3a1498f3227a5758d0e72fbe676e29a6a7a0aa100e06d656_1",
-            "state": "started"
+            "state": "started",
+            "run_id": "22",
+            "revision": "cccccccccccccccccccccccccccccccccccccccc"
           }
         ]
       },
@@ -4429,7 +4672,7 @@
         ]
       }
     ],
-    "canonical": "{\"actor\":{\"repository\":\"owner/repo\",\"role\":\"producer\",\"run_attempt\":1,\"run_id\":\"10\",\"workflow\":\".github/workflows/producer.lock.yml\"},\"at\":1,\"id\":\"q_692ec79f0943173be3ebb3b2a6040592fd7bb841e5188160170aa8acef3b8741\",\"operations\":[{\"depends_on\":[],\"fairness_key\":\"\",\"graph_id\":\"graph\",\"kind\":\"Work\",\"node_key\":\"p\",\"payload\":{\"effect_contract\":{\"kind\":\"none\"},\"task\":\"audit pages\"},\"pool\":\"default\",\"priority\":3,\"subject\":{\"host\":\"github.com\",\"kind\":\"issue\",\"number\":\"7\",\"repository\":\"owner/repo\",\"repository_id\":\"1\",\"resource_id\":\"9007199254740993\"},\"work_id\":\"3d459bf6097a00c7a08c46dc585b70179444c35b9fa37bd97e4ecbb4eeccd306\",\"worker_profile\":\"worker\"}],\"previous\":null,\"request\":{\"id\":\"request:016fa5c1fa0f1e2539494dfff13dbbfd0c138e0d4f82fa0802c260000d4b5499\",\"kind\":\"submit\",\"parameters\":{\"work_ids\":[\"3d459bf6097a00c7a08c46dc585b70179444c35b9fa37bd97e4ecbb4eeccd306\"]}},\"version\":4}\n{\"actor\":{\"repository\":\"owner/repo\",\"role\":\"dispatcher\",\"run_attempt\":1,\"run_id\":\"201\",\"workflow\":\".github/workflows/dispatcher.lock.yml\"},\"at\":1,\"id\":\"q_1b59d59e5738d29bd715652dfa61860d6d0dc16d610e60c8a4f7676f5e7b0312\",\"operations\":[{\"claim_id\":\"c_3ac298b078167e4c1eff6439c134ba4fea5b17ee3a21b8ffa8399dd9969e189b_1\",\"dispatch_id\":\"d_3ac298b078167e4c1eff6439c134ba4fea5b17ee3a21b8ffa8399dd9969e189b_1\",\"handle\":\"h1\",\"kind\":\"Claim\",\"work_id\":\"3d459bf6097a00c7a08c46dc585b70179444c35b9fa37bd97e4ecbb4eeccd306\"}],\"previous\":\"q_692ec79f0943173be3ebb3b2a6040592fd7bb841e5188160170aa8acef3b8741\",\"request\":{\"id\":\"request:37c48289ad81720cf71ed85f074e1882808cee536c0923875887a6a467680684\",\"kind\":\"dispatch_next\",\"parameters\":{\"concurrency\":2,\"max_claims\":16,\"max_dispatches\":16,\"per_account_limit\":0,\"pool\":\"default\",\"profiles\":{\"worker\":{\"workflow\":\".github/workflows/worker.lock.yml\"}}}},\"version\":4}\n{\"actor\":{\"repository\":\"owner/repo\",\"role\":\"dispatcher\",\"run_attempt\":1,\"run_id\":\"201\",\"workflow\":\".github/workflows/dispatcher.lock.yml\"},\"at\":1,\"id\":\"q_d94f13a93f7dc6fcbf9ce2f8f3431483b3bc85abcecc78fd951c105a5b285fe2\",\"operations\":[{\"dispatch_id\":\"d_3ac298b078167e4c1eff6439c134ba4fea5b17ee3a21b8ffa8399dd9969e189b_1\",\"kind\":\"Dispatch\",\"state\":\"started\"}],\"previous\":\"q_1b59d59e5738d29bd715652dfa61860d6d0dc16d610e60c8a4f7676f5e7b0312\",\"request\":{\"id\":\"request:3adf0671621a5c7fae207ae41de0ef866b97e5b8ca8eacec5a30ed306ad23b57\",\"kind\":\"launch\",\"parameters\":{\"dispatch_id\":\"d_3ac298b078167e4c1eff6439c134ba4fea5b17ee3a21b8ffa8399dd9969e189b_1\"}},\"version\":4}\n{\"actor\":{\"repository\":\"owner/repo\",\"role\":\"worker\",\"run_attempt\":1,\"run_id\":\"21\",\"workflow\":\".github/workflows/worker.lock.yml\"},\"at\":1,\"id\":\"q_3570b4dc99bfaeca5e7e1ec65deedcf944731186090d0baf6d7c9e07eeff03c1\",\"operations\":[{\"dispatch_id\":\"d_3ac298b078167e4c1eff6439c134ba4fea5b17ee3a21b8ffa8399dd9969e189b_1\",\"kind\":\"Bound\",\"run_attempt\":1,\"run_id\":\"21\"}],\"previous\":\"q_d94f13a93f7dc6fcbf9ce2f8f3431483b3bc85abcecc78fd951c105a5b285fe2\",\"request\":{\"id\":\"request:1ea99ba9b9d426ff0368a5ded934ed628721f9d18f750a7af9589b2a638412e7\",\"kind\":\"bind\",\"parameters\":{\"dispatch_id\":\"d_3ac298b078167e4c1eff6439c134ba4fea5b17ee3a21b8ffa8399dd9969e189b_1\"}},\"version\":4}\n{\"actor\":{\"repository\":\"owner/repo\",\"role\":\"worker\",\"run_attempt\":1,\"run_id\":\"21\",\"workflow\":\".github/workflows/worker.lock.yml\"},\"at\":1,\"id\":\"q_886152e1f6423c4ec7529243c38d4d3b848e710751a6d2aad0aeeea68692a501\",\"operations\":[{\"claim_handle\":\"h1\",\"claim_id\":\"c_3ac298b078167e4c1eff6439c134ba4fea5b17ee3a21b8ffa8399dd9969e189b_1\",\"dispatch_id\":\"d_3ac298b078167e4c1eff6439c134ba4fea5b17ee3a21b8ffa8399dd9969e189b_1\",\"effects\":[],\"kind\":\"Completion\",\"work_id\":\"3d459bf6097a00c7a08c46dc585b70179444c35b9fa37bd97e4ecbb4eeccd306\"},{\"continuation\":{\"message\":\"Audit page 2\",\"remaining\":1,\"route\":\"workqueue\"},\"depends_on\":[{\"kind\":\"work\",\"work_id\":\"3d459bf6097a00c7a08c46dc585b70179444c35b9fa37bd97e4ecbb4eeccd306\"}],\"fairness_key\":\"\",\"graph_id\":\"graph\",\"kind\":\"Work\",\"node_key\":\"continuation:3d459bf6097a00c7a08c46dc585b70179444c35b9fa37bd97e4ecbb4eeccd306\",\"payload\":{\"effect_contract\":{\"kind\":\"none\"},\"task\":\"audit pages\"},\"pool\":\"default\",\"priority\":3,\"subject\":{\"host\":\"github.com\",\"kind\":\"issue\",\"number\":\"7\",\"repository\":\"owner/repo\",\"repository_id\":\"1\",\"resource_id\":\"9007199254740993\"},\"work_id\":\"865269593bfe9cf30d99c4b9e6912ed3e89fcdb71e6d9946c6fe74bbbdb230cf\",\"worker_profile\":\"worker\"}],\"previous\":\"q_3570b4dc99bfaeca5e7e1ec65deedcf944731186090d0baf6d7c9e07eeff03c1\",\"request\":{\"id\":\"request:52db46c8dba364b1511f26a0cd8fba58d60c5a54b300dcf272e8f2ffc154b309\",\"kind\":\"finish\",\"parameters\":{\"dispatch_id\":\"d_3ac298b078167e4c1eff6439c134ba4fea5b17ee3a21b8ffa8399dd9969e189b_1\"}},\"version\":4}\n{\"actor\":{\"repository\":\"owner/repo\",\"role\":\"dispatcher\",\"run_attempt\":1,\"run_id\":\"202\",\"workflow\":\".github/workflows/dispatcher.lock.yml\"},\"at\":1,\"id\":\"q_f2ba1a88f58309413dca2b266d6d5c2565f7c7c0b85918f2c34178904a38831d\",\"operations\":[{\"claim_id\":\"c_df88ad74c699ff0f3a1498f3227a5758d0e72fbe676e29a6a7a0aa100e06d656_1\",\"dispatch_id\":\"d_df88ad74c699ff0f3a1498f3227a5758d0e72fbe676e29a6a7a0aa100e06d656_1\",\"handle\":\"h1\",\"kind\":\"Claim\",\"work_id\":\"865269593bfe9cf30d99c4b9e6912ed3e89fcdb71e6d9946c6fe74bbbdb230cf\"}],\"previous\":\"q_886152e1f6423c4ec7529243c38d4d3b848e710751a6d2aad0aeeea68692a501\",\"request\":{\"id\":\"request:24cb88532cbcb12bda6da082d34308b8fcc94243d32c9647d53650565c38eb57\",\"kind\":\"dispatch_next\",\"parameters\":{\"concurrency\":2,\"max_claims\":16,\"max_dispatches\":16,\"per_account_limit\":0,\"pool\":\"default\",\"profiles\":{\"worker\":{\"workflow\":\".github/workflows/worker.lock.yml\"}}}},\"version\":4}\n{\"actor\":{\"repository\":\"owner/repo\",\"role\":\"dispatcher\",\"run_attempt\":1,\"run_id\":\"202\",\"workflow\":\".github/workflows/dispatcher.lock.yml\"},\"at\":1,\"id\":\"q_6a145f268f3cb90d58ba948c32901b7d6ba52734d626f92ed132ac76d3aba3a5\",\"operations\":[{\"dispatch_id\":\"d_df88ad74c699ff0f3a1498f3227a5758d0e72fbe676e29a6a7a0aa100e06d656_1\",\"kind\":\"Dispatch\",\"state\":\"started\"}],\"previous\":\"q_f2ba1a88f58309413dca2b266d6d5c2565f7c7c0b85918f2c34178904a38831d\",\"request\":{\"id\":\"request:32fd4a2965e3140dda5e1066dda0486e619b5e24d2b842f34b9adbb6373587df\",\"kind\":\"launch\",\"parameters\":{\"dispatch_id\":\"d_df88ad74c699ff0f3a1498f3227a5758d0e72fbe676e29a6a7a0aa100e06d656_1\"}},\"version\":4}\n{\"actor\":{\"repository\":\"owner/repo\",\"role\":\"worker\",\"run_attempt\":1,\"run_id\":\"22\",\"workflow\":\".github/workflows/worker.lock.yml\"},\"at\":1,\"id\":\"q_509fec990f17e6ec26cfa76d6b59417b7f49d22a4a8871e6fc35ff5cbe2a16f4\",\"operations\":[{\"dispatch_id\":\"d_df88ad74c699ff0f3a1498f3227a5758d0e72fbe676e29a6a7a0aa100e06d656_1\",\"kind\":\"Bound\",\"run_attempt\":1,\"run_id\":\"22\"}],\"previous\":\"q_6a145f268f3cb90d58ba948c32901b7d6ba52734d626f92ed132ac76d3aba3a5\",\"request\":{\"id\":\"request:d2b30d73e5fe29640afb9db1b684bfd2154a733362b8e183ebd5f1eb05302b47\",\"kind\":\"bind\",\"parameters\":{\"dispatch_id\":\"d_df88ad74c699ff0f3a1498f3227a5758d0e72fbe676e29a6a7a0aa100e06d656_1\"}},\"version\":4}\n{\"actor\":{\"repository\":\"owner/repo\",\"role\":\"worker\",\"run_attempt\":1,\"run_id\":\"22\",\"workflow\":\".github/workflows/worker.lock.yml\"},\"at\":1,\"id\":\"q_9c7434c17ec9d7b9ff86fed2ae566cea09e72417d7a187ccf21f74ed6a32402d\",\"operations\":[{\"claim_handle\":\"h1\",\"claim_id\":\"c_df88ad74c699ff0f3a1498f3227a5758d0e72fbe676e29a6a7a0aa100e06d656_1\",\"dispatch_id\":\"d_df88ad74c699ff0f3a1498f3227a5758d0e72fbe676e29a6a7a0aa100e06d656_1\",\"effects\":[],\"kind\":\"Completion\",\"work_id\":\"865269593bfe9cf30d99c4b9e6912ed3e89fcdb71e6d9946c6fe74bbbdb230cf\"},{\"continuation\":{\"message\":\"Audit page 3\",\"remaining\":0,\"route\":\"issue\"},\"depends_on\":[{\"kind\":\"work\",\"work_id\":\"865269593bfe9cf30d99c4b9e6912ed3e89fcdb71e6d9946c6fe74bbbdb230cf\"},{\"condition\":\"approved\",\"kind\":\"issue\",\"resource\":{\"host\":\"github.com\",\"kind\":\"issue\",\"number\":\"5\",\"repository\":\"owner/repo\",\"repository_id\":\"1\",\"resource_id\":\"55\"}}],\"fairness_key\":\"\",\"graph_id\":\"graph\",\"kind\":\"Work\",\"node_key\":\"continuation:865269593bfe9cf30d99c4b9e6912ed3e89fcdb71e6d9946c6fe74bbbdb230cf\",\"payload\":{\"effect_contract\":{\"kind\":\"none\"},\"task\":\"audit pages\"},\"pool\":\"default\",\"priority\":3,\"subject\":{\"host\":\"github.com\",\"kind\":\"issue\",\"number\":\"7\",\"repository\":\"owner/repo\",\"repository_id\":\"1\",\"resource_id\":\"9007199254740993\"},\"work_id\":\"8687a391f089495f34a86578e4c515c9d758c7354fe66f033fe646e7d019b96b\",\"worker_profile\":\"worker\"}],\"previous\":\"q_509fec990f17e6ec26cfa76d6b59417b7f49d22a4a8871e6fc35ff5cbe2a16f4\",\"request\":{\"id\":\"request:ea08b73004ab046cf7bf2fc635e6eb05713163e5ca873cde55bfa759203c2278\",\"kind\":\"finish\",\"parameters\":{\"dispatch_id\":\"d_df88ad74c699ff0f3a1498f3227a5758d0e72fbe676e29a6a7a0aa100e06d656_1\"}},\"version\":4}\n{\"actor\":{\"repository\":\"owner/repo\",\"role\":\"dispatcher\",\"run_attempt\":1,\"run_id\":\"203\",\"workflow\":\".github/workflows/dispatcher.lock.yml\"},\"at\":1,\"id\":\"q_bca824821fcb13bb1097e9284297e1a0daa3dd7912228b398529759e8b1720ea\",\"operations\":[{\"condition\":\"approved\",\"kind\":\"Observation\",\"observation_id\":\"o-approval-waiting\",\"resource\":{\"host\":\"github.com\",\"kind\":\"issue\",\"number\":\"5\",\"repository\":\"owner/repo\",\"repository_id\":\"1\",\"resource_id\":\"55\"},\"state\":\"waiting\"}],\"previous\":\"q_9c7434c17ec9d7b9ff86fed2ae566cea09e72417d7a187ccf21f74ed6a32402d\",\"request\":{\"id\":\"request:00fff950622fca607aaf75baff7d1e2baa73021b1767f7e5359828359d3fc824\",\"kind\":\"dispatch_next\",\"parameters\":{\"concurrency\":2,\"max_claims\":16,\"max_dispatches\":16,\"per_account_limit\":0,\"pool\":\"default\",\"profiles\":{\"worker\":{\"workflow\":\".github/workflows/worker.lock.yml\"}}}},\"version\":4}\n{\"actor\":{\"repository\":\"owner/repo\",\"role\":\"dispatcher\",\"run_attempt\":1,\"run_id\":\"204\",\"workflow\":\".github/workflows/dispatcher.lock.yml\"},\"at\":1,\"id\":\"q_1adcf17b77f3bbba7f07ec08df7969eeb11467279959964a4f6ecae36c9b2cce\",\"operations\":[{\"approved_by\":\"583231\",\"condition\":\"approved\",\"kind\":\"Observation\",\"observation_id\":\"o-approval-ready\",\"resource\":{\"host\":\"github.com\",\"kind\":\"issue\",\"number\":\"5\",\"repository\":\"owner/repo\",\"repository_id\":\"1\",\"resource_id\":\"55\"},\"state\":\"ready\",\"state_reason\":\"completed\"},{\"claim_id\":\"c_952c7b14793a92d3e50c004a26b07a1d573434effdcf8016fa837b58073d7769_1\",\"dispatch_id\":\"d_952c7b14793a92d3e50c004a26b07a1d573434effdcf8016fa837b58073d7769_1\",\"handle\":\"h1\",\"kind\":\"Claim\",\"work_id\":\"8687a391f089495f34a86578e4c515c9d758c7354fe66f033fe646e7d019b96b\"}],\"previous\":\"q_bca824821fcb13bb1097e9284297e1a0daa3dd7912228b398529759e8b1720ea\",\"request\":{\"id\":\"request:cc84926a04c88a79d00231c6ef4a7e5a0cab72fb6e8da7f407406f4a4c920bff\",\"kind\":\"dispatch_next\",\"parameters\":{\"concurrency\":2,\"max_claims\":16,\"max_dispatches\":16,\"per_account_limit\":0,\"pool\":\"default\",\"profiles\":{\"worker\":{\"workflow\":\".github/workflows/worker.lock.yml\"}}}},\"version\":4}\n",
+    "canonical": "{\"actor\":{\"repository\":\"owner/repo\",\"role\":\"producer\",\"run_attempt\":1,\"run_id\":\"10\",\"workflow\":\".github/workflows/producer.lock.yml\"},\"at\":1,\"id\":\"q_692ec79f0943173be3ebb3b2a6040592fd7bb841e5188160170aa8acef3b8741\",\"operations\":[{\"depends_on\":[],\"fairness_key\":\"\",\"graph_id\":\"graph\",\"kind\":\"Work\",\"node_key\":\"p\",\"payload\":{\"effect_contract\":{\"kind\":\"none\"},\"task\":\"audit pages\"},\"pool\":\"default\",\"priority\":3,\"subject\":{\"host\":\"github.com\",\"kind\":\"issue\",\"number\":\"7\",\"repository\":\"owner/repo\",\"repository_id\":\"1\",\"resource_id\":\"9007199254740993\"},\"work_id\":\"3d459bf6097a00c7a08c46dc585b70179444c35b9fa37bd97e4ecbb4eeccd306\",\"worker_profile\":\"worker\"}],\"previous\":null,\"request\":{\"id\":\"request:016fa5c1fa0f1e2539494dfff13dbbfd0c138e0d4f82fa0802c260000d4b5499\",\"kind\":\"submit\",\"parameters\":{\"work_ids\":[\"3d459bf6097a00c7a08c46dc585b70179444c35b9fa37bd97e4ecbb4eeccd306\"]}},\"version\":4}\n{\"actor\":{\"repository\":\"owner/repo\",\"role\":\"dispatcher\",\"run_attempt\":1,\"run_id\":\"201\",\"workflow\":\".github/workflows/dispatcher.lock.yml\"},\"at\":1,\"id\":\"q_1b59d59e5738d29bd715652dfa61860d6d0dc16d610e60c8a4f7676f5e7b0312\",\"operations\":[{\"claim_id\":\"c_3ac298b078167e4c1eff6439c134ba4fea5b17ee3a21b8ffa8399dd9969e189b_1\",\"dispatch_id\":\"d_3ac298b078167e4c1eff6439c134ba4fea5b17ee3a21b8ffa8399dd9969e189b_1\",\"handle\":\"h1\",\"kind\":\"Claim\",\"work_id\":\"3d459bf6097a00c7a08c46dc585b70179444c35b9fa37bd97e4ecbb4eeccd306\"}],\"previous\":\"q_692ec79f0943173be3ebb3b2a6040592fd7bb841e5188160170aa8acef3b8741\",\"request\":{\"id\":\"request:37c48289ad81720cf71ed85f074e1882808cee536c0923875887a6a467680684\",\"kind\":\"dispatch_next\",\"parameters\":{\"concurrency\":2,\"max_claims\":16,\"max_dispatches\":16,\"per_account_limit\":0,\"pool\":\"default\",\"profiles\":{\"worker\":{\"workflow\":\".github/workflows/worker.lock.yml\"}}}},\"version\":4}\n{\"actor\":{\"repository\":\"owner/repo\",\"role\":\"dispatcher\",\"run_attempt\":1,\"run_id\":\"201\",\"workflow\":\".github/workflows/dispatcher.lock.yml\"},\"at\":1,\"id\":\"q_d94f13a93f7dc6fcbf9ce2f8f3431483b3bc85abcecc78fd951c105a5b285fe2\",\"operations\":[{\"dispatch_id\":\"d_3ac298b078167e4c1eff6439c134ba4fea5b17ee3a21b8ffa8399dd9969e189b_1\",\"kind\":\"Dispatch\",\"revision\":\"cccccccccccccccccccccccccccccccccccccccc\",\"run_id\":\"21\",\"state\":\"started\"}],\"previous\":\"q_1b59d59e5738d29bd715652dfa61860d6d0dc16d610e60c8a4f7676f5e7b0312\",\"request\":{\"id\":\"request:3adf0671621a5c7fae207ae41de0ef866b97e5b8ca8eacec5a30ed306ad23b57\",\"kind\":\"launch\",\"parameters\":{\"dispatch_id\":\"d_3ac298b078167e4c1eff6439c134ba4fea5b17ee3a21b8ffa8399dd9969e189b_1\"}},\"version\":4}\n{\"actor\":{\"repository\":\"owner/repo\",\"role\":\"worker\",\"run_attempt\":1,\"run_id\":\"21\",\"workflow\":\".github/workflows/worker.lock.yml\"},\"at\":1,\"id\":\"q_3570b4dc99bfaeca5e7e1ec65deedcf944731186090d0baf6d7c9e07eeff03c1\",\"operations\":[{\"dispatch_id\":\"d_3ac298b078167e4c1eff6439c134ba4fea5b17ee3a21b8ffa8399dd9969e189b_1\",\"kind\":\"Bound\",\"run_attempt\":1,\"run_id\":\"21\"}],\"previous\":\"q_d94f13a93f7dc6fcbf9ce2f8f3431483b3bc85abcecc78fd951c105a5b285fe2\",\"request\":{\"id\":\"request:1ea99ba9b9d426ff0368a5ded934ed628721f9d18f750a7af9589b2a638412e7\",\"kind\":\"bind\",\"parameters\":{\"dispatch_id\":\"d_3ac298b078167e4c1eff6439c134ba4fea5b17ee3a21b8ffa8399dd9969e189b_1\"}},\"version\":4}\n{\"actor\":{\"repository\":\"owner/repo\",\"role\":\"worker\",\"run_attempt\":1,\"run_id\":\"21\",\"workflow\":\".github/workflows/worker.lock.yml\"},\"at\":1,\"id\":\"q_886152e1f6423c4ec7529243c38d4d3b848e710751a6d2aad0aeeea68692a501\",\"operations\":[{\"claim_handle\":\"h1\",\"claim_id\":\"c_3ac298b078167e4c1eff6439c134ba4fea5b17ee3a21b8ffa8399dd9969e189b_1\",\"dispatch_id\":\"d_3ac298b078167e4c1eff6439c134ba4fea5b17ee3a21b8ffa8399dd9969e189b_1\",\"effects\":[],\"kind\":\"Completion\",\"work_id\":\"3d459bf6097a00c7a08c46dc585b70179444c35b9fa37bd97e4ecbb4eeccd306\"},{\"continuation\":{\"message\":\"Audit page 2\",\"remaining\":1,\"route\":\"workqueue\"},\"depends_on\":[{\"kind\":\"work\",\"work_id\":\"3d459bf6097a00c7a08c46dc585b70179444c35b9fa37bd97e4ecbb4eeccd306\"}],\"fairness_key\":\"\",\"graph_id\":\"graph\",\"kind\":\"Work\",\"node_key\":\"continuation:3d459bf6097a00c7a08c46dc585b70179444c35b9fa37bd97e4ecbb4eeccd306\",\"payload\":{\"effect_contract\":{\"kind\":\"none\"},\"task\":\"audit pages\"},\"pool\":\"default\",\"priority\":3,\"subject\":{\"host\":\"github.com\",\"kind\":\"issue\",\"number\":\"7\",\"repository\":\"owner/repo\",\"repository_id\":\"1\",\"resource_id\":\"9007199254740993\"},\"work_id\":\"865269593bfe9cf30d99c4b9e6912ed3e89fcdb71e6d9946c6fe74bbbdb230cf\",\"worker_profile\":\"worker\"}],\"previous\":\"q_3570b4dc99bfaeca5e7e1ec65deedcf944731186090d0baf6d7c9e07eeff03c1\",\"request\":{\"id\":\"request:52db46c8dba364b1511f26a0cd8fba58d60c5a54b300dcf272e8f2ffc154b309\",\"kind\":\"finish\",\"parameters\":{\"dispatch_id\":\"d_3ac298b078167e4c1eff6439c134ba4fea5b17ee3a21b8ffa8399dd9969e189b_1\"}},\"version\":4}\n{\"actor\":{\"repository\":\"owner/repo\",\"role\":\"dispatcher\",\"run_attempt\":1,\"run_id\":\"202\",\"workflow\":\".github/workflows/dispatcher.lock.yml\"},\"at\":1,\"id\":\"q_f2ba1a88f58309413dca2b266d6d5c2565f7c7c0b85918f2c34178904a38831d\",\"operations\":[{\"claim_id\":\"c_df88ad74c699ff0f3a1498f3227a5758d0e72fbe676e29a6a7a0aa100e06d656_1\",\"dispatch_id\":\"d_df88ad74c699ff0f3a1498f3227a5758d0e72fbe676e29a6a7a0aa100e06d656_1\",\"handle\":\"h1\",\"kind\":\"Claim\",\"work_id\":\"865269593bfe9cf30d99c4b9e6912ed3e89fcdb71e6d9946c6fe74bbbdb230cf\"}],\"previous\":\"q_886152e1f6423c4ec7529243c38d4d3b848e710751a6d2aad0aeeea68692a501\",\"request\":{\"id\":\"request:24cb88532cbcb12bda6da082d34308b8fcc94243d32c9647d53650565c38eb57\",\"kind\":\"dispatch_next\",\"parameters\":{\"concurrency\":2,\"max_claims\":16,\"max_dispatches\":16,\"per_account_limit\":0,\"pool\":\"default\",\"profiles\":{\"worker\":{\"workflow\":\".github/workflows/worker.lock.yml\"}}}},\"version\":4}\n{\"actor\":{\"repository\":\"owner/repo\",\"role\":\"dispatcher\",\"run_attempt\":1,\"run_id\":\"202\",\"workflow\":\".github/workflows/dispatcher.lock.yml\"},\"at\":1,\"id\":\"q_6a145f268f3cb90d58ba948c32901b7d6ba52734d626f92ed132ac76d3aba3a5\",\"operations\":[{\"dispatch_id\":\"d_df88ad74c699ff0f3a1498f3227a5758d0e72fbe676e29a6a7a0aa100e06d656_1\",\"kind\":\"Dispatch\",\"revision\":\"cccccccccccccccccccccccccccccccccccccccc\",\"run_id\":\"22\",\"state\":\"started\"}],\"previous\":\"q_f2ba1a88f58309413dca2b266d6d5c2565f7c7c0b85918f2c34178904a38831d\",\"request\":{\"id\":\"request:32fd4a2965e3140dda5e1066dda0486e619b5e24d2b842f34b9adbb6373587df\",\"kind\":\"launch\",\"parameters\":{\"dispatch_id\":\"d_df88ad74c699ff0f3a1498f3227a5758d0e72fbe676e29a6a7a0aa100e06d656_1\"}},\"version\":4}\n{\"actor\":{\"repository\":\"owner/repo\",\"role\":\"worker\",\"run_attempt\":1,\"run_id\":\"22\",\"workflow\":\".github/workflows/worker.lock.yml\"},\"at\":1,\"id\":\"q_509fec990f17e6ec26cfa76d6b59417b7f49d22a4a8871e6fc35ff5cbe2a16f4\",\"operations\":[{\"dispatch_id\":\"d_df88ad74c699ff0f3a1498f3227a5758d0e72fbe676e29a6a7a0aa100e06d656_1\",\"kind\":\"Bound\",\"run_attempt\":1,\"run_id\":\"22\"}],\"previous\":\"q_6a145f268f3cb90d58ba948c32901b7d6ba52734d626f92ed132ac76d3aba3a5\",\"request\":{\"id\":\"request:d2b30d73e5fe29640afb9db1b684bfd2154a733362b8e183ebd5f1eb05302b47\",\"kind\":\"bind\",\"parameters\":{\"dispatch_id\":\"d_df88ad74c699ff0f3a1498f3227a5758d0e72fbe676e29a6a7a0aa100e06d656_1\"}},\"version\":4}\n{\"actor\":{\"repository\":\"owner/repo\",\"role\":\"worker\",\"run_attempt\":1,\"run_id\":\"22\",\"workflow\":\".github/workflows/worker.lock.yml\"},\"at\":1,\"id\":\"q_9c7434c17ec9d7b9ff86fed2ae566cea09e72417d7a187ccf21f74ed6a32402d\",\"operations\":[{\"claim_handle\":\"h1\",\"claim_id\":\"c_df88ad74c699ff0f3a1498f3227a5758d0e72fbe676e29a6a7a0aa100e06d656_1\",\"dispatch_id\":\"d_df88ad74c699ff0f3a1498f3227a5758d0e72fbe676e29a6a7a0aa100e06d656_1\",\"effects\":[],\"kind\":\"Completion\",\"work_id\":\"865269593bfe9cf30d99c4b9e6912ed3e89fcdb71e6d9946c6fe74bbbdb230cf\"},{\"continuation\":{\"message\":\"Audit page 3\",\"remaining\":0,\"route\":\"issue\"},\"depends_on\":[{\"kind\":\"work\",\"work_id\":\"865269593bfe9cf30d99c4b9e6912ed3e89fcdb71e6d9946c6fe74bbbdb230cf\"},{\"condition\":\"approved\",\"kind\":\"issue\",\"resource\":{\"host\":\"github.com\",\"kind\":\"issue\",\"number\":\"5\",\"repository\":\"owner/repo\",\"repository_id\":\"1\",\"resource_id\":\"55\"}}],\"fairness_key\":\"\",\"graph_id\":\"graph\",\"kind\":\"Work\",\"node_key\":\"continuation:865269593bfe9cf30d99c4b9e6912ed3e89fcdb71e6d9946c6fe74bbbdb230cf\",\"payload\":{\"effect_contract\":{\"kind\":\"none\"},\"task\":\"audit pages\"},\"pool\":\"default\",\"priority\":3,\"subject\":{\"host\":\"github.com\",\"kind\":\"issue\",\"number\":\"7\",\"repository\":\"owner/repo\",\"repository_id\":\"1\",\"resource_id\":\"9007199254740993\"},\"work_id\":\"8687a391f089495f34a86578e4c515c9d758c7354fe66f033fe646e7d019b96b\",\"worker_profile\":\"worker\"}],\"previous\":\"q_509fec990f17e6ec26cfa76d6b59417b7f49d22a4a8871e6fc35ff5cbe2a16f4\",\"request\":{\"id\":\"request:ea08b73004ab046cf7bf2fc635e6eb05713163e5ca873cde55bfa759203c2278\",\"kind\":\"finish\",\"parameters\":{\"dispatch_id\":\"d_df88ad74c699ff0f3a1498f3227a5758d0e72fbe676e29a6a7a0aa100e06d656_1\"}},\"version\":4}\n{\"actor\":{\"repository\":\"owner/repo\",\"role\":\"dispatcher\",\"run_attempt\":1,\"run_id\":\"203\",\"workflow\":\".github/workflows/dispatcher.lock.yml\"},\"at\":1,\"id\":\"q_bca824821fcb13bb1097e9284297e1a0daa3dd7912228b398529759e8b1720ea\",\"operations\":[{\"condition\":\"approved\",\"kind\":\"Observation\",\"observation_id\":\"o-approval-waiting\",\"resource\":{\"host\":\"github.com\",\"kind\":\"issue\",\"number\":\"5\",\"repository\":\"owner/repo\",\"repository_id\":\"1\",\"resource_id\":\"55\"},\"state\":\"waiting\"}],\"previous\":\"q_9c7434c17ec9d7b9ff86fed2ae566cea09e72417d7a187ccf21f74ed6a32402d\",\"request\":{\"id\":\"request:00fff950622fca607aaf75baff7d1e2baa73021b1767f7e5359828359d3fc824\",\"kind\":\"dispatch_next\",\"parameters\":{\"concurrency\":2,\"max_claims\":16,\"max_dispatches\":16,\"per_account_limit\":0,\"pool\":\"default\",\"profiles\":{\"worker\":{\"workflow\":\".github/workflows/worker.lock.yml\"}}}},\"version\":4}\n{\"actor\":{\"repository\":\"owner/repo\",\"role\":\"dispatcher\",\"run_attempt\":1,\"run_id\":\"204\",\"workflow\":\".github/workflows/dispatcher.lock.yml\"},\"at\":1,\"id\":\"q_1adcf17b77f3bbba7f07ec08df7969eeb11467279959964a4f6ecae36c9b2cce\",\"operations\":[{\"approved_by\":\"583231\",\"condition\":\"approved\",\"kind\":\"Observation\",\"observation_id\":\"o-approval-ready\",\"resource\":{\"host\":\"github.com\",\"kind\":\"issue\",\"number\":\"5\",\"repository\":\"owner/repo\",\"repository_id\":\"1\",\"resource_id\":\"55\"},\"state\":\"ready\",\"state_reason\":\"completed\"},{\"claim_id\":\"c_952c7b14793a92d3e50c004a26b07a1d573434effdcf8016fa837b58073d7769_1\",\"dispatch_id\":\"d_952c7b14793a92d3e50c004a26b07a1d573434effdcf8016fa837b58073d7769_1\",\"handle\":\"h1\",\"kind\":\"Claim\",\"work_id\":\"8687a391f089495f34a86578e4c515c9d758c7354fe66f033fe646e7d019b96b\"}],\"previous\":\"q_bca824821fcb13bb1097e9284297e1a0daa3dd7912228b398529759e8b1720ea\",\"request\":{\"id\":\"request:cc84926a04c88a79d00231c6ef4a7e5a0cab72fb6e8da7f407406f4a4c920bff\",\"kind\":\"dispatch_next\",\"parameters\":{\"concurrency\":2,\"max_claims\":16,\"max_dispatches\":16,\"per_account_limit\":0,\"pool\":\"default\",\"profiles\":{\"worker\":{\"workflow\":\".github/workflows/worker.lock.yml\"}}}},\"version\":4}\n",
     "prefixes": [
       {
         "tip": "q_692ec79f0943173be3ebb3b2a6040592fd7bb841e5188160170aa8acef3b8741",
@@ -4969,6 +5212,10 @@
             "run_id": "21",
             "run_attempt": 1
           },
+          "launch": {
+            "run_id": "21",
+            "revision": "cccccccccccccccccccccccccccccccccccccccc"
+          },
           "claims": ["c_3ac298b078167e4c1eff6439c134ba4fea5b17ee3a21b8ffa8399dd9969e189b_1"]
         },
         "d_df88ad74c699ff0f3a1498f3227a5758d0e72fbe676e29a6a7a0aa100e06d656_1": {
@@ -4983,6 +5230,10 @@
             "run_id": "22",
             "run_attempt": 1
           },
+          "launch": {
+            "run_id": "22",
+            "revision": "cccccccccccccccccccccccccccccccccccccccc"
+          },
           "claims": ["c_df88ad74c699ff0f3a1498f3227a5758d0e72fbe676e29a6a7a0aa100e06d656_1"]
         },
         "d_952c7b14793a92d3e50c004a26b07a1d573434effdcf8016fa837b58073d7769_1": {
@@ -4994,6 +5245,7 @@
           "workflow": ".github/workflows/worker.lock.yml",
           "state": "reserved",
           "run": null,
+          "launch": null,
           "claims": ["c_952c7b14793a92d3e50c004a26b07a1d573434effdcf8016fa837b58073d7769_1"]
         }
       },
@@ -5288,6 +5540,10 @@
                     "run_id": "21",
                     "run_attempt": 1
                   },
+                  "launch": {
+                    "run_id": "21",
+                    "revision": "cccccccccccccccccccccccccccccccccccccccc"
+                  },
                   "claims": ["c_3ac298b078167e4c1eff6439c134ba4fea5b17ee3a21b8ffa8399dd9969e189b_1"]
                 },
                 "d_df88ad74c699ff0f3a1498f3227a5758d0e72fbe676e29a6a7a0aa100e06d656_1": {
@@ -5302,6 +5558,10 @@
                     "run_id": "22",
                     "run_attempt": 1
                   },
+                  "launch": {
+                    "run_id": "22",
+                    "revision": "cccccccccccccccccccccccccccccccccccccccc"
+                  },
                   "claims": ["c_df88ad74c699ff0f3a1498f3227a5758d0e72fbe676e29a6a7a0aa100e06d656_1"]
                 },
                 "d_952c7b14793a92d3e50c004a26b07a1d573434effdcf8016fa837b58073d7769_1": {
@@ -5313,6 +5573,7 @@
                   "workflow": ".github/workflows/worker.lock.yml",
                   "state": "reserved",
                   "run": null,
+                  "launch": null,
                   "claims": ["c_952c7b14793a92d3e50c004a26b07a1d573434effdcf8016fa837b58073d7769_1"]
                 }
               },
@@ -5558,6 +5819,10 @@
               "run_id": "21",
               "run_attempt": 1
             },
+            "launch": {
+              "run_id": "21",
+              "revision": "cccccccccccccccccccccccccccccccccccccccc"
+            },
             "claims": ["c_3ac298b078167e4c1eff6439c134ba4fea5b17ee3a21b8ffa8399dd9969e189b_1"]
           },
           "d_df88ad74c699ff0f3a1498f3227a5758d0e72fbe676e29a6a7a0aa100e06d656_1": {
@@ -5572,6 +5837,10 @@
               "run_id": "22",
               "run_attempt": 1
             },
+            "launch": {
+              "run_id": "22",
+              "revision": "cccccccccccccccccccccccccccccccccccccccc"
+            },
             "claims": ["c_df88ad74c699ff0f3a1498f3227a5758d0e72fbe676e29a6a7a0aa100e06d656_1"]
           },
           "d_952c7b14793a92d3e50c004a26b07a1d573434effdcf8016fa837b58073d7769_1": {
@@ -5583,6 +5852,7 @@
             "workflow": ".github/workflows/worker.lock.yml",
             "state": "reserved",
             "run": null,
+            "launch": null,
             "claims": ["c_952c7b14793a92d3e50c004a26b07a1d573434effdcf8016fa837b58073d7769_1"]
           }
         },
@@ -6658,7 +6928,9 @@
               {
                 "kind": "Dispatch",
                 "dispatch_id": "d_952c7b14793a92d3e50c004a26b07a1d573434effdcf8016fa837b58073d7769_1",
-                "state": "started"
+                "state": "started",
+                "run_id": "24",
+                "revision": "cccccccccccccccccccccccccccccccccccccccc"
               }
             ]
           },

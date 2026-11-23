@@ -27,6 +27,7 @@ const { withClaimEffectClients } = require("./work_queue_effect_client.cjs");
 const { createRestEffectHandler } = require("./work_queue_rest_adapter.cjs");
 const { createGraphqlEffectHandler } = require("./work_queue_graphql_adapter.cjs");
 const { workerPolicy, workerQueue } = require("./work_queue_worker.test_helpers.cjs");
+const { policyEnvText } = require("./work_queue_test_helpers.cjs");
 
 const processorConfig = { itemType: "noop", configKey: "noop", displayName: "Noop", itemTypeName: "noop", supportsIssue: true, envVars: {} };
 const preview = { title: "Preview", description: "Preview", renderItem: item => item.message };
@@ -188,7 +189,7 @@ describe("real immutable Claim routing", () => {
     const queue = workerQueue();
     process.env.GH_AW_WORK_QUEUE_ENABLED = "true";
     process.env.GH_AW_WORK_QUEUE_ROLE = "worker";
-    process.env.GH_AW_WORK_QUEUE_POLICY = JSON.stringify(workerPolicy());
+    process.env.GH_AW_WORK_QUEUE_POLICY = policyEnvText(workerPolicy());
     process.env.GH_AW_WORK_QUEUE_SNAPSHOT = path.join(root, "bound-snapshot.json");
     process.env.GH_AW_WORK_QUEUE_FINISH_INTENT = path.join(root, "bound-finish.jsonl");
     process.env.GH_AW_WORK_QUEUE_EFFECTS = path.join(root, "bound-effects.jsonl");

@@ -24,7 +24,7 @@ describe("bounded work queue metadata renderer", () => {
   it("shows Work, attempts, Dispatch state and run without payloads", () => {
     const planned = h.dispatchNext(queue().log, { concurrency: 1 });
     const dispatch = planned.decision.dispatches[0];
-    const log = h.bind(planned.log, dispatch, h.workerActor("4242", 2));
+    const log = h.bind(h.launch(planned.log, dispatch, true, h.dispatcher, "4242"), dispatch, h.workerActor("4242", 2));
     const state = replayTransactions(log);
     const summary = renderWorkQueue(state, log.at(-1));
     expect(summary).toContain("2 Work nodes; 1 open Claims; 1 active Dispatches (0 not yet bound to a run).");

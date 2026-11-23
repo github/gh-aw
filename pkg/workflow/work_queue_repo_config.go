@@ -141,19 +141,9 @@ func (c *Compiler) configureWorkQueueApprovalReads(data *WorkflowData, markdownP
 // bindWorkQueuePolicyValidationRepository binds the run-time repository
 // template on a copy so the closed policy shape can be validated at compile time.
 func bindWorkQueuePolicyValidationRepository(env workqueue.PolicyEnv) workqueue.PolicyEnv {
-	pools := make(map[string]workqueue.PoolEnv, len(env.Pools))
-	for name, pool := range env.Pools {
-		profiles := make(map[string]workqueue.ProfileEnv, len(pool.Profiles))
-		for profileName, profile := range pool.Profiles {
-			if profile.EffectScope == workQueueRepositoryTemplate {
-				profile.EffectScope = "owner/repo"
-			}
-			profiles[profileName] = profile
-		}
-		pool.Profiles = profiles
-		pools[name] = pool
+	if env.EffectScope == workQueueRepositoryTemplate {
+		env.EffectScope = "owner/repo"
 	}
-	env.Pools = pools
 	return env
 }
 

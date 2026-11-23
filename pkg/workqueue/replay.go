@@ -21,7 +21,7 @@ var opFields = map[string]operationFields{
 	"Work":              {workRequired, workOptional},
 	"Observation":       {[]string{"kind", "observation_id", "resource", "condition", "state"}, []string{"state_reason", "merged", "merge_commit", "approved_by"}},
 	"Claim":             {[]string{"kind", "work_id", "claim_id", "dispatch_id", "handle"}, nil},
-	"Dispatch":          {[]string{"kind", "dispatch_id", "state"}, nil},
+	"Dispatch":          {[]string{"kind", "dispatch_id", "state", "run_id", "revision"}, nil},
 	"Bound":             {[]string{"kind", "dispatch_id", "run_id", "run_attempt"}, nil},
 	"Completion":        {[]string{"kind", "work_id", "claim_id", "dispatch_id", "claim_handle", "effects"}, nil},
 	"ClaimCancellation": {[]string{"kind", "work_id", "claim_id", "reason"}, nil},
@@ -131,6 +131,10 @@ func validateOperationFields(kind string, operation object) error {
 	case "Dispatch":
 		if operation["state"] != "started" {
 			err = queueError("request_invalid", "a Dispatch operation records only the started launch")
+		} else if _, err = decimal(operation["run_id"], "launched run ID", "request_invalid"); err == nil {
+			if revision, named := operation["revision"].(string); !named || !revisionPattern.MatchString(revision) {
+				err = queueError("request_invalid", "a started Dispatch records the launched run's full commit revision")
+			}
 		}
 	case "Bound":
 		if _, err = decimal(operation["run_id"], "bound run ID", "request_invalid"); err == nil {

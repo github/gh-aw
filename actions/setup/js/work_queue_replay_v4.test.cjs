@@ -24,7 +24,7 @@ describe("v4 lifecycle without clocks", () => {
     let log = h.submit([], [a, b]);
     const planned = h.dispatchNext(log, { concurrency: 1 });
     expect(planned.decision.operations.map(operation => operation.work_id)).toEqual([a.work_id]);
-    log = h.launch(planned.log, planned.decision.dispatches[0]);
+    log = h.launch(planned.log, planned.decision.dispatches[0], true, h.dispatcher, "7");
     log = h.bind(log, planned.decision.dispatches[0], h.workerActor("7", 1));
     return { log: h.finish(log, planned.decision.dispatches[0], h.workerActor("7", 1)), dispatch: planned.decision.dispatches[0] };
   }
@@ -64,7 +64,7 @@ describe("v4 lifecycle without clocks", () => {
     let log = h.submit([], [a, b]);
     const planned = h.dispatchNext(log, { concurrency: 1 });
     const dispatch = planned.decision.dispatches[0];
-    log = h.launch(planned.log, dispatch);
+    log = h.launch(planned.log, dispatch, true, h.dispatcher, "7");
     expect(() => h.bind(log, dispatch, h.workerActor("7", 1, ".github/workflows/other.lock.yml"))).toThrow(expect.objectContaining({ code: "run_binding_conflict" }));
     log = h.bind(log, dispatch, h.workerActor("7", 1));
     expect(() => h.finish(log, dispatch, h.workerActor("8", 1))).toThrow(expect.objectContaining({ code: "claim_scope_invalid" }));
@@ -98,7 +98,7 @@ describe("finish-carried continuations", () => {
     const planned = h.dispatchNext(log, { max_claims: 1, max_dispatches: 1 });
     const dispatchId = planned.decision.dispatches[0];
     expect(replayTransactions(planned.log).claims.get(replayTransactions(planned.log).dispatches.get(dispatchId).claims[0]).work_id).toBe(parent.work_id);
-    return { log: h.bind(h.launch(planned.log, dispatchId), dispatchId, h.workerActor("7")), dispatchId };
+    return { log: h.bind(h.launch(planned.log, dispatchId, true, h.dispatcher, "7"), dispatchId, h.workerActor("7")), dispatchId };
   }
 
   function finishCommit(log, dispatchId, extra) {

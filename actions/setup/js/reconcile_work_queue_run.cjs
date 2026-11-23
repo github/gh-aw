@@ -14,17 +14,35 @@ const { releaseAssignment } = require("./work_queue_reconciler.cjs");
 const { isStagedMode } = require("./safe_output_helpers.cjs");
 const { resolveWorkQueueRuntime } = require("./aw_context.cjs");
 
-// Run statuses of a launched worker that has not finished yet.
-const ACTIVE_RUN_STATUSES = ["queued", "in_progress", "waiting", "pending", "requested"];
-const RUN_PAGES = 2;
+const RUNS_PER_PAGE = 100;
+// GitHub returns at most 1,000 runs for a filtered listing; one that needs more is incomplete.
+const MAX_RUN_PAGES = 10;
+// An unbound Dispatch is judged only this long after the newest ledger commit that
+// touched it (reservation or launch). GitHub ends a hosted dispatcher job within six
+// hours, and the launch loop itself is bounded (one 30 s POST per Dispatch, at most
+// 256 per commit), so by then the POST was sent or never will be, and a dispatched run
+// has long been listed.
+const UNBOUND_GRACE_MS = 6 * 60 * 60 * 1000;
+// GitHub cancels a workflow run after 35 days, so an active worker run was created
+// within this window even when a Checkpoint has compacted the reservation commit.
+const RUN_LIFETIME_MS = 35 * 24 * 60 * 60 * 1000;
+// Runner clocks stamp ledger commits; GitHub stamps run creation.
+const CLOCK_SKEW_MS = 10 * 60 * 1000;
 
 /**
- * @typedef {{githubClient: any, context: any, core?: any, branch?: string, policy?: import("./work_queue_policy.cjs").PolicyEnv | null}} RunOptions
+ * @typedef {{githubClient: any, context: any, core?: any, branch?: string, policy?: import("./work_queue_policy.cjs").PolicyEnv | null, now: () => number}} RunOptions
  */
 
 /** @param {Record<string, any>} options @returns {RunOptions & Record<string, any>} */
 function configure(options) {
-  return { ...options, context: options.context || global.context, githubClient: options.githubClient || global.github, core: options.core || global.core, policy: options.policy ?? readWorkQueuePolicyEnv() };
+  return {
+    ...options,
+    context: options.context || global.context,
+    githubClient: options.githubClient || global.github,
+    core: options.core || global.core,
+    policy: options.policy ?? readWorkQueuePolicyEnv(),
+    now: options.now || Date.now,
+  };
 }
 
 async function projectIssues(options) {
@@ -39,7 +57,7 @@ async function projectIssues(options) {
 
 /**
  * Worker conclusion job ("Terminate work queue worker"): release this run's Dispatch
- * when it still holds an open Claim and is unbound or bound to this run.
+ * when it still holds an open Claim and was launched as this run or is bound to it.
  * @param {Record<string, any>} [options]
  */
 async function main(options = {}) {
@@ -52,7 +70,10 @@ async function main(options = {}) {
   const runId = String(context.runId);
   const owned = state => {
     const dispatch = state.dispatches.get(dispatchId);
-    return !!dispatch && dispatch.state !== "closed" && openClaims(state, dispatch).length > 0 && (dispatch.state !== "bound" || dispatch.run.run_id === runId);
+    if (!dispatch || dispatch.state === "closed" || openClaims(state, dispatch).length === 0) return false;
+    // A reserved Dispatch names no launched run yet, so no worker run can own it.
+    const ownRun = dispatch.state === "bound" ? dispatch.run : dispatch.launch;
+    return !!ownRun && ownRun.run_id === runId;
   };
   const latest = await loadQueue({ ...configured, role: "reconciler" });
   if (!owned(latest.state)) {
@@ -66,56 +87,102 @@ async function main(options = {}) {
 }
 
 /**
- * Titles of the worker workflow's not-yet-finished workflow_dispatch runs.
+ * Status of one worker run: "completed", "missing" (HTTP 404) or "active".
  * @param {RunOptions} options
- * @param {string} workflow
+ * @param {string} runId
  */
-async function activeRunTitles(options, workflow) {
-  const titles = [];
-  for (const status of ACTIVE_RUN_STATUSES) {
-    for (let page = 1; page <= RUN_PAGES; page++) {
-      const response = await options.githubClient.rest.actions.listWorkflowRuns({
-        ...options.context.repo,
-        workflow_id: posix.basename(workflow),
-        event: "workflow_dispatch",
-        status,
-        per_page: 100,
-        page,
-        headers: { "X-GitHub-Api-Version": API_VERSION },
-      });
-      const runs = response?.data?.workflow_runs;
-      if (!Array.isArray(runs)) throw new Error("work_queue_run_listing_invalid");
-      for (const run of runs) if (typeof run?.display_title === "string") titles.push(run.display_title);
-      if (runs.length < 100) break;
-    }
+async function runStatus(options, runId) {
+  let response;
+  try {
+    response = await options.githubClient.rest.actions.getWorkflowRun({ ...options.context.repo, run_id: Number(runId), headers: { "X-GitHub-Api-Version": API_VERSION } });
+  } catch (error) {
+    if (error && typeof error === "object" && "status" in error && error.status === 404) return "missing";
+    throw error;
   }
-  return titles;
+  return response?.data?.status === "completed" ? "completed" : "active";
 }
 
 /**
- * Release reason for a Dispatch whose worker is gone, or null to leave it.
- * Bound: the bound run completed (`run_terminal`) or is missing (`run_missing`).
- * Unbound: no active worker run carries the dispatch ID in its title (`run_missing`);
- * the title is only a correlation hint, never proof of ownership.
+ * Ledger times of a Dispatch: its reservation commit (undefined once a Checkpoint
+ * compacted it) and the newest commit that touched it, where a Checkpoint stands in
+ * for the compacted commits.
+ * @param {any} state
+ * @param {any} dispatch
+ */
+function dispatchTimes(state, dispatch) {
+  let reservedAt;
+  let touchedAt;
+  for (const commit of state.transactions) {
+    if (commit.id === dispatch.commit_id) reservedAt = commit.at;
+    if (commit.request.kind === "checkpoint" || commit.operations.some(operation => operation.dispatch_id === dispatch.dispatch_id)) touchedAt = commit.at;
+  }
+  return { reservedAt, touchedAt };
+}
+
+/**
+ * Every workflow_dispatch run of the worker created since `since` (any status) whose
+ * title carries the dispatch ID, or null when the listing is incomplete. Without a
+ * status filter a run never leaves the listing, so paging (newest first) can repeat
+ * a run but never skip one.
  * @param {RunOptions} options
  * @param {any} dispatch
- * @param {Map<string, Promise<string[]>>} listings
+ * @param {number} since
  */
-async function abandonedReason(options, dispatch, listings) {
-  if (dispatch.state === "bound") {
-    let response;
-    try {
-      response = await options.githubClient.rest.actions.getWorkflowRun({ ...options.context.repo, run_id: Number(dispatch.run.run_id), headers: { "X-GitHub-Api-Version": API_VERSION } });
-    } catch (error) {
-      if (error && typeof error === "object" && "status" in error && error.status === 404) return "run_missing";
-      throw error;
-    }
-    return response?.data?.status === "completed" ? "run_terminal" : null;
+async function correlatedRuns(options, dispatch, since) {
+  const created = `>=${new Date(Math.max(0, since)).toISOString().replace(/\.\d{3}Z$/, "Z")}`;
+  const matches = [];
+  for (let page = 1; page <= MAX_RUN_PAGES; page++) {
+    const response = await options.githubClient.rest.actions.listWorkflowRuns({
+      ...options.context.repo,
+      workflow_id: posix.basename(dispatch.workflow),
+      event: "workflow_dispatch",
+      created,
+      per_page: RUNS_PER_PAGE,
+      page,
+      headers: { "X-GitHub-Api-Version": API_VERSION },
+    });
+    const runs = response?.data?.workflow_runs;
+    if (!Array.isArray(runs)) throw new Error("work_queue_run_listing_invalid");
+    const total = response.data.total_count;
+    if (typeof total === "number" && total > MAX_RUN_PAGES * RUNS_PER_PAGE) return null;
+    for (const run of runs) if (typeof run?.display_title === "string" && run.display_title.includes(dispatch.dispatch_id)) matches.push(run);
+    if (runs.length < RUNS_PER_PAGE) return matches;
   }
-  if (!listings.has(dispatch.workflow)) listings.set(dispatch.workflow, activeRunTitles(options, dispatch.workflow));
-  // prettier-ignore
-  const titles = await /** @type {Promise<string[]>} */ (listings.get(dispatch.workflow));
-  return titles.some(title => title.includes(dispatch.dispatch_id)) ? null : "run_missing";
+  return null;
+}
+
+/**
+ * Release reason for a Dispatch whose worker is gone, or null to leave it open.
+ * Bound or started: the bound or launched run completed (`run_terminal`) or is
+ * missing (`run_missing`). Reserved: the launch outcome is unrecorded, so the
+ * dispatcher may still be about to POST; it is judged only after UNBOUND_GRACE_MS
+ * and only on a complete listing: a not-yet-completed run carrying the dispatch ID
+ * leaves it open, otherwise `run_terminal` (a completed run) or `run_missing`.
+ * The title is only a correlation hint, never proof of ownership.
+ * @param {RunOptions} options
+ * @param {any} state
+ * @param {any} dispatch
+ */
+async function abandonedReason(options, state, dispatch) {
+  const runId = dispatch.state === "bound" ? dispatch.run.run_id : dispatch.launch?.run_id;
+  if (runId !== undefined) {
+    const status = await runStatus(options, runId);
+    return status === "completed" ? "run_terminal" : status === "missing" ? "run_missing" : null;
+  }
+  const { reservedAt, touchedAt } = dispatchTimes(state, dispatch);
+  const now = options.now();
+  if (touchedAt === undefined || now - touchedAt < UNBOUND_GRACE_MS) {
+    log.debug("maintenance.dispatch.in_flight");
+    return null;
+  }
+  const runs = await correlatedRuns(options, dispatch, reservedAt === undefined ? now - RUN_LIFETIME_MS : reservedAt - CLOCK_SKEW_MS);
+  if (!runs) {
+    log.diagnostic("maintenance.listing.incomplete", { pages: MAX_RUN_PAGES });
+    options.core?.warning?.(`Work queue maintenance could not list every worker run for dispatch ${dispatch.dispatch_id}; it stays open.`);
+    return null;
+  }
+  if (runs.some(run => run.status !== "completed")) return null;
+  return runs.length ? "run_terminal" : "run_missing";
 }
 
 /**
@@ -128,12 +195,13 @@ async function maintenance(options = {}) {
   const configured = configure(options);
   const latest = await loadQueue({ ...configured, role: "reconciler" });
   const released = [];
-  const listings = new Map();
   for (const dispatch of latest.state.dispatches.values()) {
     if (dispatch.state === "closed" || !openClaims(latest.state, dispatch).length) continue;
+    // The judged run evidence; every compare-and-swap attempt re-checks it against the latest head.
+    const observed = canonical({ state: dispatch.state, run: dispatch.run, launch: dispatch.launch ?? null });
     let reason;
     try {
-      reason = await abandonedReason(configured, dispatch, listings);
+      reason = await abandonedReason(configured, latest.state, dispatch);
     } catch (error) {
       log.failure("maintenance.read.failed", error, true);
       configured.core?.warning?.(`Work queue maintenance could not read the worker run of dispatch ${dispatch.dispatch_id}; it stays open.`);
@@ -142,7 +210,10 @@ async function maintenance(options = {}) {
     if (!reason) continue;
     const unchanged = state => {
       const current = state.dispatches.get(dispatch.dispatch_id);
-      return !!current && current.state === dispatch.state && canonical(current.run) === canonical(dispatch.run);
+      if (!current || openClaims(state, current).length === 0) return false;
+      const stale = canonical({ state: current.state, run: current.run, launch: current.launch ?? null }) !== observed;
+      if (stale) log.debug("maintenance.release.stale");
+      return !stale;
     };
     try {
       const result = await releaseAssignment(configured, dispatch.dispatch_id, reason, unchanged);
@@ -166,4 +237,4 @@ async function maintenance(options = {}) {
   return { released, checkpointed: checkpoint.checkpointed };
 }
 
-module.exports = { ACTIVE_RUN_STATUSES, main, maintenance };
+module.exports = { UNBOUND_GRACE_MS, main, maintenance };

@@ -15,6 +15,12 @@ function backedWork(state, repository, issueId) {
   return undefined;
 }
 
+/** Whether the live Issue still has the event's immutable id and is closed. @param {any} githubClient @param {any} context @param {number} number @param {string} issueId */
+async function issueStillClosed(githubClient, context, number, issueId) {
+  const { data } = await githubClient.rest.issues.get({ owner: context.repo.owner, repo: context.repo.repo, issue_number: number });
+  return String(data?.id) === issueId && data?.state === "closed" && !data?.pull_request;
+}
+
 /**
  * Issue-closed trigger: cancel the available Work backed by the closed Issue.
  * @param {{githubClient?: any, context?: any, core?: any, branch?: string}} [options]
@@ -25,7 +31,7 @@ async function main(options = {}) {
   const coreApi = options.core || global.core;
   if (context.eventName !== "issues" || context.payload?.action !== "closed") return { status: "ignored" };
   const issue = context.payload.issue;
-  if (!issue || issue.pull_request || issue.id === undefined) throw queueError("issue_binding_invalid", "Issue closure event has no Issue");
+  if (!issue || issue.pull_request || issue.id === undefined || !Number.isSafeInteger(issue.number)) throw queueError("issue_binding_invalid", "Issue closure event has no Issue");
   const repository = `${context.repo.owner}/${context.repo.repo}`;
   const issueId = String(issue.id);
   const queue = { githubClient, context, role: "producer", core: coreApi, ...(options.branch === undefined ? {} : { branch: options.branch }) };
@@ -40,7 +46,16 @@ async function main(options = {}) {
     ...queue,
     kind: "cancel_work",
     parameters: { work_ids: [work.work_id], reason: REASON },
-    operationsFor: latest => (latest.works.get(work.work_id)?.state === "available" ? [{ kind: "WorkCancellation", work_id: work.work_id, reason: REASON }] : []),
+    // Re-read the live Issue on every publication attempt: a delayed or rerun close event
+    // must not cancel Work after the backing Issue was reopened (or replaced).
+    operationsFor: async latest => {
+      if (latest.works.get(work.work_id)?.state !== "available") return [];
+      if (!(await issueStillClosed(githubClient, context, issue.number, issueId))) {
+        coreApi?.info(`Issue #${issue.number} is no longer closed; Work ${work.work_id} stays available`);
+        return [];
+      }
+      return [{ kind: "WorkCancellation", work_id: work.work_id, reason: REASON }];
+    },
   });
   const status = published.state.works.get(work.work_id)?.state ?? "unbound";
   coreApi?.info(`Work queue Issue closure: Work ${work.work_id} is ${status}`);

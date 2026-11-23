@@ -118,6 +118,15 @@ afterAll(() => {
 });
 
 describe("dispatch route end to end", () => {
+  it.each(["plain.yaml", "plain.yml"])("dispatches to a compiler-resolved plain YAML receiver %s", async file => {
+    const item = request();
+    bindOutput([item]);
+    const { results } = await processRouted([item], { ...DISPATCH, workflow: "plain", workflow_file: file });
+    expect(posts()).toHaveLength(1);
+    expect(posts()[0].workflow_id).toBe(file);
+    expect(results[0]).toMatchObject({ success: true, result: { route: "dispatch", workflow: file, status: "accepted" } });
+  });
+
   it("posts once to the compiled target on the default branch, never the PR head", async () => {
     const item = request();
     bindOutput([item]);

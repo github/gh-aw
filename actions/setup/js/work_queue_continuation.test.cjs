@@ -122,7 +122,7 @@ async function runManager(queue, { directory, intents, effects, context, policy:
   vi.stubEnv("GH_AW_WORK_QUEUE_SNAPSHOT", snapshot);
   vi.stubEnv("GH_AW_WORK_QUEUE_EFFECTS", effects);
   vi.stubEnv("GH_AW_WORK_QUEUE_FINISH_INTENT", intents);
-  vi.stubEnv("GH_AW_WORK_QUEUE_POLICY", JSON.stringify(compiled));
+  vi.stubEnv("GH_AW_WORK_QUEUE_POLICY", h.policyEnvText(compiled));
   vi.stubEnv("GITHUB_REPOSITORY", "owner/repo");
   vi.stubEnv("GITHUB_RUN_ID", String(context.runId));
   vi.stubEnv("GITHUB_RUN_ATTEMPT", String(context.runAttempt));
@@ -157,7 +157,7 @@ function nextWorker(queue, runId) {
   const planned = h.dispatchNext(ledgerLog(queue), { max_claims: 1, max_dispatches: 1 }, { ...h.dispatcher, run_id: String(dispatcherRun++) });
   const dispatchId = planned.decision.dispatches[0];
   if (!dispatchId) return null;
-  const log = h.bind(h.launch(planned.log, dispatchId), dispatchId, h.workerActor(runId, 1));
+  const log = h.bind(h.launch(planned.log, dispatchId, true, h.dispatcher, runId), dispatchId, h.workerActor(runId, 1));
   queue.fake.install(h.ledgerText(log));
   return { ...queue, dispatchId, context: workerContext(dispatchId, runId, 1), assignment: assignmentForDispatch(replayTransactionLog(h.ledgerText(log)), dispatchId) };
 }
@@ -191,13 +191,15 @@ const closedBy = (closer, extra = {}) => ({ id: 55, number: 5, state: "closed", 
 
 async function dispatch(queue, { reader = undefined, maxClaims = 1, poolPolicy = queue.policy } = {}) {
   vi.stubEnv("GITHUB_WORKFLOW_REF", DISPATCHER_REF);
-  const posts = vi.fn(async () => ({ status: 204 }));
+  // Accepted POSTs go to the queue's in-memory Actions API, which creates and reports the worker run.
+  const posts = vi.fn(input => queue.githubClient.rest.actions.createWorkflowDispatch(input));
   const receipt = await dispatchQueueIntent({
     githubClient: queue.githubClient,
-    dispatchClient: { rest: { actions: { createWorkflowDispatch: posts } } },
+    dispatchClient: { rest: { actions: { ...queue.githubClient.rest.actions, createWorkflowDispatch: posts } } },
     context: { ...dispatcherContext, runId: dispatcherRun++ },
     core: core(),
     policy: poolPolicy,
+    config: { workflows: ["worker"], workflow_files: { worker: ".lock.yml" }, work_queue_workflows: ["worker"] },
     ...(reader ? { dependencyResolver: createCompilerDependencyResolver({ context: dispatcherContext, env: {}, githubClient: reader }) } : {}),
     remainingDispatches: maxClaims,
     message: { intent_id: "dispatch", pool: "default", max_claims: maxClaims, max_dispatches: maxClaims },
@@ -247,7 +249,8 @@ describe("workqueue continuation end to end", () => {
     const state = ledgerState(queue);
     expect(state.works.get(child.work_id).state).toBe("claimed");
     const dispatchId = [...state.dispatches.values()].find(entry => entry.request_id === receipt.request_id).dispatch_id;
-    const bound = h.bind(ledgerLog(queue), dispatchId, h.workerActor("201", 1));
+    const launched = state.dispatches.get(dispatchId).launch.run_id;
+    const bound = h.bind(ledgerLog(queue), dispatchId, h.workerActor(launched, 1));
     const snapshotPath = path.join(tempDir(), "snapshot.json");
     fs.writeFileSync(
       snapshotPath,

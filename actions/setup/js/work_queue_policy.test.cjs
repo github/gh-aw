@@ -72,12 +72,44 @@ describe("compiled policy environment", () => {
     expect(() => poolEnv(env(), "other")).toThrow(expect.objectContaining({ code: "pool_invalid" }));
   });
 
-  it("reads the complete or chunked environment", () => {
+  it("reads the complete or chunked compiled environment and expands each worker once per pool", () => {
     expect(readWorkQueuePolicyEnv({})).toBeNull();
-    const text = JSON.stringify(env());
-    expect(readWorkQueuePolicyEnv({ GH_AW_WORK_QUEUE_POLICY: text })).toEqual(env());
+    const compiled = () => ({
+      version: 4,
+      pending_limit: 30,
+      issues: env().issues,
+      effect_scope: "octo/queue",
+      workers: ["reviewer", "worker"],
+      pools: { default: { concurrency: 3, per_account_limit: 0, max_attempts: 3 }, reports: { concurrency: 1, per_account_limit: 1, max_attempts: 2 } },
+    });
+    const profiles = {
+      reviewer: { workflow: ".github/workflows/reviewer.lock.yml", effect_scope: "octo/queue" },
+      worker: { workflow: ".github/workflows/worker.lock.yml", effect_scope: "octo/queue" },
+    };
+    const expanded = {
+      ...env(),
+      pools: {
+        default: { concurrency: 3, per_account_limit: 0, max_attempts: 3, default_profile: "reviewer", profiles },
+        reports: { concurrency: 1, per_account_limit: 1, max_attempts: 2, default_profile: "reviewer", profiles },
+      },
+    };
+    const text = JSON.stringify(compiled());
+    const policy = readWorkQueuePolicyEnv({ GH_AW_WORK_QUEUE_POLICY: text });
+    expect(policy).toEqual(expanded);
+    expect(policy?.pools.default.profiles).not.toBe(policy?.pools.reports.profiles);
     const middle = Math.floor(text.length / 2);
-    expect(readWorkQueuePolicyEnv({ GH_AW_WORK_QUEUE_POLICY_PARTS: "2", GH_AW_WORK_QUEUE_POLICY_0: text.slice(0, middle), GH_AW_WORK_QUEUE_POLICY_1: text.slice(middle) })).toEqual(env());
+    expect(readWorkQueuePolicyEnv({ GH_AW_WORK_QUEUE_POLICY_PARTS: "2", GH_AW_WORK_QUEUE_POLICY_0: text.slice(0, middle), GH_AW_WORK_QUEUE_POLICY_1: text.slice(middle) })).toEqual(expanded);
     expect(() => readWorkQueuePolicyEnv({ GH_AW_WORK_QUEUE_POLICY: '{"version":4,"version":4}' })).toThrow(expect.objectContaining({ code: "duplicate_key" }));
+    for (const [value, code] of [
+      [{ ...compiled(), version: 3 }, "unsupported_protocol"],
+      [{ ...compiled(), pools: { default: { ...compiled().pools.default, default_profile: "worker" } } }, "policy_invalid"],
+      [{ ...compiled(), workers: [] }, "policy_invalid"],
+      [{ ...compiled(), workers: ["worker", "reviewer"] }, "policy_invalid"],
+      [{ ...compiled(), workers: ["worker", "worker"] }, "policy_invalid"],
+      [{ ...compiled(), workers: ["../worker"] }, "policy_invalid"],
+      [{ ...compiled(), effect_scope: "octo" }, "policy_invalid"],
+      [{ ...compiled(), profiles: {} }, "policy_invalid"],
+    ])
+      expect(() => readWorkQueuePolicyEnv({ GH_AW_WORK_QUEUE_POLICY: JSON.stringify(value) })).toThrow(expect.objectContaining({ code }));
   });
 });

@@ -117,8 +117,8 @@ Recovery is driven by GitHub run state, never by elapsed time:
 | --- | --- | --- |
 | `workflow_dispatch` request fails | Dispatcher | `Release{launch_failed}` |
 | Worker run ends with an open Claim | Worker conclusion job **Terminate work queue worker** | `Release{worker_terminated}` |
-| Bound run completed or was deleted | Scheduled maintenance | `Release{run_terminal}` or `Release{run_missing}` |
-| Launched run never bound | Scheduled maintenance | `Release{run_missing}` when no queued or in-progress run of the worker has the `dispatch_id` in its title |
+| Bound or launched run completed or was deleted | Scheduled maintenance | `Release{run_terminal}` or `Release{run_missing}` |
+| Launch never recorded | Scheduled maintenance | After 6 hours, on a complete listing of worker runs created since the reservation: `Release{run_missing}` when no run has the `dispatch_id` in its title, `Release{run_terminal}` when that run completed. An incomplete listing leaves the Dispatch open. |
 | Operator decision | `gh aw work-queue release` or `cancel-work` | `Release{operator}` or `WorkCancellation{operator}` |
 
 Maintenance runs in `agentics-maintenance.yml`. It also converts a protocol version 3 ledger, writes a checkpoint when the log exceeds 512 lines, and runs the Issue projection. A run that starts after its Dispatch was released finds no open Claim and exits without effects.

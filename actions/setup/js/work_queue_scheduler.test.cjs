@@ -43,7 +43,7 @@ describe("worker assignments", () => {
     let planned = h.dispatchNext(h.submit([], [a, b]));
     const first = planned.decision.dispatches[0];
     const effects = [{ kind: "create_issue", resource: { number: 3 } }];
-    let log = h.finish(h.bind(planned.log, first, h.workerActor("7")), first, h.workerActor("7"), {}, effects);
+    let log = h.finish(h.bind(h.launch(planned.log, first, true, h.dispatcher, "7"), first, h.workerActor("7")), first, h.workerActor("7"), {}, effects);
     expect(assignmentForDispatch(replayTransactions(log), first)).toEqual({ dispatch_id: first, claims: [] });
     planned = h.dispatchNext(log, {}, { ...h.dispatcher, run_id: "101" });
     log = planned.log;

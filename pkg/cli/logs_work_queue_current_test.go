@@ -48,7 +48,7 @@ func logsWQWorkerFixture(t *testing.T) (map[string]any, logsWQFixture) {
 	}
 	log.submit(log.work("a", private), log.work("b", private))
 	dispatchID := log.dispatch(1)[0]
-	log.launch(dispatchID)
+	log.launch(dispatchID, "201")
 	worker := workQueueTestWorker("201")
 	log.bind(dispatchID, worker)
 	assignment, err := workqueue.AssignmentForDispatch(log.state(), dispatchID)

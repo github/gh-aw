@@ -112,6 +112,8 @@ type DispatchOperation struct {
 	Kind       string `json:"kind"`
 	DispatchID string `json:"dispatch_id"`
 	State      string `json:"state"`
+	RunID      string `json:"run_id"`
+	Revision   string `json:"revision"`
 }
 
 type BoundOperation struct {
@@ -250,16 +252,23 @@ type RunBinding struct {
 	RunAttempt int    `json:"run_attempt"`
 }
 
+// LaunchRecord is the run and head revision a dispatcher recorded launching for a Dispatch.
+type LaunchRecord struct {
+	RunID    string `json:"run_id"`
+	Revision string `json:"revision"`
+}
+
 type DispatchState struct {
-	DispatchID    string      `json:"dispatch_id"`
-	RequestID     string      `json:"request_id"`
-	CommitID      string      `json:"commit_id"`
-	Pool          string      `json:"pool"`
-	WorkerProfile string      `json:"worker_profile"`
-	Workflow      string      `json:"workflow"`
-	State         string      `json:"state"`
-	Run           *RunBinding `json:"run"`
-	Claims        []string    `json:"claims"`
+	DispatchID    string        `json:"dispatch_id"`
+	RequestID     string        `json:"request_id"`
+	CommitID      string        `json:"commit_id"`
+	Pool          string        `json:"pool"`
+	WorkerProfile string        `json:"worker_profile"`
+	Workflow      string        `json:"workflow"`
+	State         string        `json:"state"`
+	Run           *RunBinding   `json:"run"`
+	Launch        *LaunchRecord `json:"launch"`
+	Claims        []string      `json:"claims"`
 }
 
 type Stats struct {

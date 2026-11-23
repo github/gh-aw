@@ -30,7 +30,7 @@ const b = h.work("b");
 function bound() {
   const planned = h.dispatchNext(h.submit([], [a, b]), { concurrency: 1 });
   const dispatch = planned.decision.dispatches[0];
-  return { log: h.bind(h.launch(planned.log, dispatch), dispatch, h.workerActor("7")), dispatch };
+  return { log: h.bind(h.launch(planned.log, dispatch, true, h.dispatcher, "7"), dispatch, h.workerActor("7")), dispatch };
 }
 
 function raw(log, actor, kind, parameters, operations) {
@@ -126,14 +126,19 @@ describe("v4 lifecycle transitions", () => {
     fails(() => replayTransactions(raw(h.submit([], [a]), h.dispatcher, "dispatch_next", h.dispatchParameters({ profiles: { other: { workflow: ".github/workflows/other.lock.yml" } } }), [{ ...claim }])), "request_invalid");
   });
 
-  it("starts only reserved Dispatches and binds the worker's own run, rebinding a later attempt", () => {
+  it("starts only reserved Dispatches and binds only the launched run, rebinding a later attempt", () => {
     const planned = h.dispatchNext(h.submit([], [a]), { concurrency: 1 });
     const dispatch = planned.decision.dispatches[0];
-    // A worker may bind before the dispatcher records the launch.
-    let log = h.bind(planned.log, dispatch, h.workerActor("7"));
-    fails(() => h.launch(log, dispatch), "dispatch_state_conflict");
+    // No run binds before the dispatcher records which run it launched.
+    fails(() => h.bind(planned.log, dispatch, h.workerActor("7")), "dispatch_state_conflict");
+    let log = h.launch(planned.log, dispatch, true, h.dispatcher, "7");
+    expect(replayTransactions(log).dispatches.get(dispatch)).toMatchObject({ state: "started", run: null, launch: { run_id: "7", revision: h.WORKER_REVISION } });
+    fails(() => h.launch(log, dispatch, true, { ...h.dispatcher, run_id: "101" }, "7"), "dispatch_state_conflict");
+    // Another run of the worker workflow, e.g. a manual dispatch naming the same Dispatch, cannot bind.
+    fails(() => h.bind(log, dispatch, h.workerActor("8")), "run_binding_conflict");
+    log = h.bind(log, dispatch, h.workerActor("7"));
     log = h.bind(log, dispatch, h.workerActor("7", 2));
-    expect(replayTransactions(log).dispatches.get(dispatch)).toMatchObject({ state: "bound", run: { run_id: "7", run_attempt: 2 } });
+    expect(replayTransactions(log).dispatches.get(dispatch)).toMatchObject({ state: "bound", run: { run_id: "7", run_attempt: 2 }, launch: { run_id: "7" } });
     fails(() => h.bind(log, dispatch, h.workerActor("7", 1, h.WORKER_WORKFLOW)), "request_reused");
     fails(() => h.bind(log, dispatch, h.workerActor("8")), "run_binding_conflict");
     fails(() => h.commit(log, h.workerActor("9"), "bind", { dispatch_id: dispatch }, [{ kind: "Bound", dispatch_id: dispatch, run_id: "7", run_attempt: 3 }]), "run_binding_conflict");
@@ -267,6 +272,10 @@ describe("v4 checkpoints", () => {
     fails(() => restoreCheckpointState(tamper(state => (Object.values(state.works)[0].state = "completed"))), "checkpoint_invalid");
     fails(() => restoreCheckpointState(tamper(state => (state.repository = "other/repo"))), "checkpoint_invalid");
     fails(() => restoreCheckpointState(tamper(state => delete Object.values(state.dispatches)[0].workflow)), "checkpoint_invalid");
+    // A bound Dispatch keeps the launch that authorized its run.
+    fails(() => restoreCheckpointState(tamper(state => (Object.values(state.dispatches)[0].launch = null))), "checkpoint_invalid");
+    fails(() => restoreCheckpointState(tamper(state => (Object.values(state.dispatches)[0].launch.run_id = "8"))), "checkpoint_invalid");
+    fails(() => restoreCheckpointState(tamper(state => (Object.values(state.dispatches)[0].launch.revision = "main"))), "checkpoint_invalid");
     fails(() => restoreCheckpointState(tamper(state => (state.extra = true))), "checkpoint_invalid");
     fails(() => restoreCheckpointState({ ...checkpoint, actor: h.producer }), "request_invalid");
   });

@@ -227,7 +227,7 @@ function normalizeRouteConfig(descriptor) {
     return { route, max_depth: maxDepth, aw_context: false };
   }
   const file = descriptor.workflow_file;
-  if (typeof file !== "string" || !/^[A-Za-z0-9_.-]+\.(?:lock\.yml|yml)$/.test(file) || file.startsWith(".")) throw routeError("continuation_config_invalid", "dispatch requires a compiled local workflow_file");
+  if (typeof file !== "string" || !/^[A-Za-z0-9_.-]+\.(?:lock\.yml|yml|yaml)$/.test(file) || file.startsWith(".")) throw routeError("continuation_config_invalid", "dispatch requires a compiled local workflow_file");
   if (descriptor.aw_context !== undefined && typeof descriptor.aw_context !== "boolean") throw routeError("continuation_config_invalid", "aw_context must be boolean");
   return { route, max_depth: maxDepth, ...(typeof descriptor.workflow === "string" ? { workflow: descriptor.workflow } : {}), workflow_file: file, aw_context: descriptor.aw_context === true };
 }

@@ -57,6 +57,7 @@ jobs:
             assert.equal(launch.state, "started", "Smoke requires every worker dispatch to be accepted");
             assert.match(launch.dispatch_id, /^d_[0-9a-f]{64}_1$/);
           }
+          assert.equal(new Set(receipt.launches.map(launch => launch.dispatch_id)).size, 3, "Smoke requires three distinct worker dispatches");
           JS
 steps:
   - name: Prepare synthetic work and bounded dispatch

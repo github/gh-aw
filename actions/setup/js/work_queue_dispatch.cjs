@@ -11,7 +11,7 @@ const { cloneState, openClaims } = require("./work_queue_replay.cjs");
 const { fifoCompare, planDispatch } = require("./work_queue_scheduler.cjs");
 const { loadQueue, publishRequest, releaseOperations } = require("./work_queue_binding.cjs");
 const { normalizeDispatchParameters, normalizeSubmitParameters, readStagedIntentBatch, validatePreparedPlanIntentBatch } = require("./work_queue_intents.cjs");
-const { launchFailureReason, postQueueDispatch } = require("./work_queue_native.cjs");
+const { launchFailureReason, launchedRunEvidence, postQueueDispatch } = require("./work_queue_native.cjs");
 const { dependencyKey, resolveDependencies, resolveExternalEdges } = require("./work_queue_dependency_resolver.cjs");
 const { DEFAULT_INTENT_PATH } = require("./work_queue_mcp_server.cjs");
 const { blockedReceipt, controlResult } = require("./work_queue_control_receipts.cjs");
@@ -180,24 +180,53 @@ async function refreshObservations(options, state, parameters) {
 }
 
 /**
- * POST the worker launch, then record it: `Dispatch{started}` on success or a
- * `launch_failed` Release (Work returns to the pool) on any error.
+ * Worker workflow paths this dispatcher's compiled safe-outputs.dispatch-workflow config
+ * allows it to launch: each queue worker name with its compiled file extension.
+ * @param {Record<string, any> | undefined} config
+ * @returns {Set<string>}
+ */
+function allowedWorkerWorkflows(config) {
+  const listed = new Set(Array.isArray(config?.workflows) ? config.workflows : []);
+  const files = config?.workflow_files && typeof config.workflow_files === "object" ? config.workflow_files : {};
+  const allowed = new Set();
+  for (const name of Array.isArray(config?.work_queue_workflows) ? config.work_queue_workflows : []) {
+    if (typeof name === "string" && listed.has(name) && Object.hasOwn(files, name) && typeof files[name] === "string") allowed.add(`.github/workflows/${name}${files[name]}`);
+  }
+  return allowed;
+}
+
+/**
+ * Re-check the resolved workflow against the allowlist, POST the worker launch, and read
+ * back the run GitHub created. Record `Dispatch{started}` with that run and its revision,
+ * or a `launch_failed` Release (Work returns to the pool) when the launch was refused,
+ * failed, or produced no verifiable run: a worker binds only a run recorded here.
  * @param {ControlOptions} options
+ * @param {Set<string>} allowed
  * @returns {Promise<import("./work_queue_control_receipts.cjs").LaunchReceipt>}
  */
-async function launchDispatch(options, policy, dispatch) {
+async function launchDispatch(options, policy, dispatch, allowed) {
   const dispatchId = dispatch.dispatch_id;
   /** @type {string | undefined} */
   let failure;
-  try {
-    await postQueueDispatch(
-      options.dispatchClient || options.githubClient,
-      { owner: options.context.repo.owner, repo: options.context.repo.repo, workflow: dispatch.workflow, ref: options.config?.["target-ref"] || process.env.GITHUB_REF || options.context.ref },
-      { work_queue_assignment: JSON.stringify({ version: 4, dispatch_id: dispatchId }) }
-    );
-  } catch (error) {
-    log.failure("launch.post.failed", error, true);
-    failure = launchFailureReason(error);
+  /** @type {{run_id: string, revision: string} | undefined} */
+  let launch;
+  if (!allowed.has(dispatch.workflow)) {
+    log.debug("launch.workflow.not_allowlisted", { allowed: allowed.size });
+    failure = "not_allowlisted";
+  } else {
+    const client = options.dispatchClient || options.githubClient;
+    const destination = { owner: options.context.repo.owner, repo: options.context.repo.repo, workflow: dispatch.workflow };
+    try {
+      const response = await postQueueDispatch(
+        client,
+        { ...destination, ref: options.config?.["target-ref"] || process.env.GITHUB_REF || options.context.ref },
+        { work_queue_assignment: JSON.stringify({ version: 4, dispatch_id: dispatchId }) }
+      );
+      launch = await launchedRunEvidence(client, destination, response);
+    } catch (error) {
+      log.failure("launch.post.failed", error, true);
+      failure = launchFailureReason(error);
+    }
   }
   try {
     await publishRequest({
@@ -206,7 +235,7 @@ async function launchDispatch(options, policy, dispatch) {
       parameters: { dispatch_id: dispatchId },
       operationsFor: state => {
         if (state.dispatches.get(dispatchId)?.state !== "reserved") return [];
-        return failure ? releaseOperations(state, dispatchId, "launch_failed", policy) : [{ kind: "Dispatch", dispatch_id: dispatchId, state: "started" }];
+        return launch ? [{ kind: "Dispatch", dispatch_id: dispatchId, state: "started", run_id: launch.run_id, revision: launch.revision }] : releaseOperations(state, dispatchId, "launch_failed", policy);
       },
     });
   } catch (error) {
@@ -231,11 +260,16 @@ async function dispatchQueueIntent(options) {
   if (normalized.max_dispatches > options.remainingDispatches) throw queueError("work_queue_dispatch_budget_exceeded", "dispatch request exceeds the run's dispatch budget");
   const policy = requirePolicy(options);
   const pool = poolEnv(policy, normalized.pool);
+  // Claims go only to profiles this dispatcher is compiled to launch; replay pins them to the request.
+  const allowed = allowedWorkerWorkflows(options.config);
+  const profiles = Object.entries(pool.profiles).filter(([, profile]) => allowed.has(profile.workflow));
+  if (!profiles.length) throw queueError("work_queue_worker_not_allowlisted", `pool ${normalized.pool} has no worker profile in this dispatcher's dispatch-workflow allowlist`);
+  log.debug("dispatch.profiles.allowlisted", { profiles: profiles.length, excluded: Object.keys(pool.profiles).length - profiles.length });
   const parameters = {
     ...normalized,
     concurrency: pool.concurrency,
     per_account_limit: pool.per_account_limit,
-    profiles: Object.fromEntries(Object.entries(pool.profiles).map(([name, profile]) => [name, { workflow: profile.workflow }])),
+    profiles: Object.fromEntries(profiles.map(([name, profile]) => [name, { workflow: profile.workflow }])),
   };
   const receiptBase = intentId === undefined ? {} : { intent_id: intentId };
   if (staged(options)) return { ...receiptBase, status: "committed", dispatches: 0, launches: [] };
@@ -268,7 +302,7 @@ async function dispatchQueueIntent(options) {
   });
   const dispatches = [...published.state.dispatches.values()].filter(dispatch => dispatch.request_id === published.request.id);
   const launches = [];
-  for (const dispatch of dispatches) if (dispatch.state === "reserved") launches.push(await launchDispatch(options, policy, dispatch));
+  for (const dispatch of dispatches) if (dispatch.state === "reserved") launches.push(await launchDispatch(options, policy, dispatch, allowed));
   log.debug("intent.dispatch.complete", { dispatches: dispatches.length, launches: launches.length });
   return { ...receiptBase, request_id: published.request.id, ...(published.commit ? { commit_id: published.commit.id } : {}), status: "committed", dispatches: dispatches.length, launches };
 }
@@ -364,4 +398,4 @@ async function main(options = {}) {
   return result;
 }
 
-module.exports = { configuredDispatchBudget, dispatchQueueIntent, inheritWorkerSubmission, main, processParsedWorkQueueIntents, refreshObservations, resolveAdmissionResources };
+module.exports = { allowedWorkerWorkflows, configuredDispatchBudget, dispatchQueueIntent, inheritWorkerSubmission, launchDispatch, main, processParsedWorkQueueIntents, refreshObservations, resolveAdmissionResources };
