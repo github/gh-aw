@@ -13,6 +13,8 @@ import (
 )
 
 func TestGenerateWorkQueueEventWorkflowSkipsRepoConfigWhenIssueMirroringIsUnused(t *testing.T) {
+	t.Parallel()
+
 	repoRoot := t.TempDir()
 	workflowDir := filepath.Join(repoRoot, ".github", "workflows")
 	require.NoError(t, os.MkdirAll(workflowDir, 0o700))
@@ -31,6 +33,8 @@ func TestGenerateWorkQueueEventWorkflowSkipsRepoConfigWhenIssueMirroringIsUnused
 }
 
 func TestGenerateWorkQueueWorkersNeedNoEventWorkflow(t *testing.T) {
+	t.Parallel()
+
 	repoRoot := t.TempDir()
 	workflowDir := filepath.Join(repoRoot, ".github", "workflows")
 	require.NoError(t, os.MkdirAll(workflowDir, 0o700))
