@@ -19,7 +19,7 @@ Decision-model usage remains part of normal proxy accounting.
 
 **Per-handler modifiers** — most handlers accept `max`, `github-token`, `github-app`, and `staged` to override the global equivalents for that one output type. Two extras:
 
-- `issue-intent:` (boolean) on `close-issue`, `set-issue-type`, `set-issue-field`, `assign-to-user`, and `assign-to-agent` — enables issue-intent metadata (rationale/confidence/suggest) fields and their schema requirements on that tool's payload.
+- `issue-intent:` (boolean, experimental) on `close-issue`, `set-issue-type`, `set-issue-field`, `assign-to-user`, and `assign-to-agent` — enables issue-intent metadata (rationale/confidence/suggest) fields and their schema requirements on that tool's payload.
 - `normalize-closing-keywords:` (boolean) on body-carrying handlers (`create-issue`, `add-comment`, `create-pull-request`, …) — strips backticks around recognized issue-closing keywords so they stay active.
 
 - `jobs:` - Custom safe-output jobs registered as MCP tools for third-party integrations

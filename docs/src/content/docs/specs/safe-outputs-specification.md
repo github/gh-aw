@@ -2673,6 +2673,10 @@ Test Case 4: Mention Filtering
 
 This section provides complete normative definitions for all safe output types. Each definition includes tool schema, operational semantics, configuration parameters, and security requirements.
 
+:::caution[Experimental]
+Issue-intent metadata (`rationale`, `confidence`, `suggest`) and the per-type `issue-intent` configuration toggle are experimental. Their schema and runtime behavior may change without notice.
+:::
+
 ### 7.0 Schema and Agent Sync Requirements
 
 When a safe-output MCP tool schema changes (new required field, removed field, renamed field, or semantic contract change), the same pull request **MUST** update:
@@ -5101,7 +5105,7 @@ or review bodies to returned or persisted decision evidence.
 - `required-title-prefix`: Title prefix the target MUST have for the operation to proceed
 - `create-if-missing`: Create labels that do not exist in the target repository (default: `false`)
 - `issues` / `pull-requests`: Set to `false` to drop the corresponding write permission (at least one MUST remain enabled)
-- `issue-intent`: Controls issue-intent metadata handling (`false` disables, `true` makes it mandatory)
+- `issue-intent`: Experimental. Controls issue-intent metadata handling (`false` disables, `true` makes it mandatory)
 - `staged`: Staged mode override
 
 **Security Requirements**:

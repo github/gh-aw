@@ -5593,8 +5593,8 @@ tools:
     # Format 2: GitHub Actions expression that resolves to a boolean at runtime
     staged: "example-value"
 
-    # Enable issue-intent metadata support (rationale/confidence/suggest) for this
-    # output type.
+    # Experimental: Enable issue-intent metadata support
+    # (rationale/confidence/suggest) for this output type.
     # (optional)
     issue-intent: true
 
@@ -6219,8 +6219,8 @@ safe-outputs:
     # Format 2: GitHub Actions expression that resolves to a boolean at runtime
     staged: "example-value"
 
-    # Enable issue-intent metadata support (rationale/confidence/suggest) for this
-    # output type.
+    # Experimental: Enable issue-intent metadata support
+    # (rationale/confidence/suggest) for this output type.
     # (optional)
     issue-intent: true
 
@@ -6516,8 +6516,8 @@ safe-outputs:
     # Format 2: GitHub Actions expression that resolves to a boolean at runtime
     staged: "example-value"
 
-    # Enable issue-intent metadata support (rationale/confidence/suggest) for this
-    # output type.
+    # Experimental: Enable issue-intent metadata support
+    # (rationale/confidence/suggest) for this output type.
     # (optional)
     issue-intent: true
 
@@ -9215,8 +9215,8 @@ safe-outputs:
     # Format 2: GitHub Actions expression that resolves to a boolean at runtime
     staged: "example-value"
 
-    # Enable issue-intent metadata support (rationale/confidence/suggest) for this
-    # output type.
+    # Experimental: Enable issue-intent metadata support
+    # (rationale/confidence/suggest) for this output type.
     # (optional)
     issue-intent: true
 
@@ -14191,8 +14191,8 @@ safe-outputs:
     # (optional)
     required-title-prefix: "example-value"
 
-    # Enable issue-intent metadata support (rationale/confidence/suggest) for this
-    # output type.
+    # Experimental: Enable issue-intent metadata support
+    # (rationale/confidence/suggest) for this output type.
     # (optional)
     issue-intent: true
 
@@ -15499,8 +15499,8 @@ safe-outputs:
     # Format 2: GitHub Actions expression that resolves to a boolean at runtime
     staged: "example-value"
 
-    # Enable issue-intent metadata support (rationale/confidence/suggest) for this
-    # output type.
+    # Experimental: Enable issue-intent metadata support
+    # (rationale/confidence/suggest) for this output type.
     # (optional)
     issue-intent: true
 
@@ -15803,8 +15803,8 @@ safe-outputs:
     # Format 2: GitHub Actions expression that resolves to a boolean at runtime
     staged: "example-value"
 
-    # Enable issue-intent metadata support (rationale/confidence/suggest) for this
-    # output type.
+    # Experimental: Enable issue-intent metadata support
+    # (rationale/confidence/suggest) for this output type.
     # (optional)
     issue-intent: true
 
@@ -18528,8 +18528,8 @@ safe-outputs:
     # (optional)
     head-github-token: "example-value"
 
-    # Enable issue-intent metadata support (rationale/confidence/suggest) for this
-    # output type.
+    # Experimental: Enable issue-intent metadata support
+    # (rationale/confidence/suggest) for this output type.
     # (optional)
     issue-intent: true
 
@@ -18832,8 +18832,8 @@ safe-outputs:
     # (optional)
     github-token: "${{ secrets.GITHUB_TOKEN }}"
 
-    # Enable issue-intent metadata support (rationale/confidence/suggest) for this
-    # output type.
+    # Experimental: Enable issue-intent metadata support
+    # (rationale/confidence/suggest) for this output type.
     # (optional)
     issue-intent: true
 
