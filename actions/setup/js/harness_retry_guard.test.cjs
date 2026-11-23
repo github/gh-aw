@@ -43,10 +43,10 @@ describe("harness_retry_guard.cjs", () => {
       expect(result.failureClasses).toEqual(["no_output"]);
     });
 
-    it.each([0, 100, 2147483647])("accepts bounded timer waits: %s", retryAfterMs => {
+    it.each([0, 100, 257000, 2147483647])("accepts bounded timer waits beyond the backoff cap: %s", retryAfterMs => {
       const log = vi.fn();
       const result = { exitCode: 1, output: "", hasOutput: true, retryAfterMs };
-      expect(resolveRetryAfterDecision({ result, attempt: 0, maxDelayMs: 2147483648, softTimeoutGuard: null, harnessName: "Test", log })).toEqual({ action: "retry", nextDelayMs: retryAfterMs });
+      expect(resolveRetryAfterDecision({ result, attempt: 0, maxDelayMs: 10, softTimeoutGuard: null, harnessName: "Test", log })).toEqual({ action: "retry", nextDelayMs: retryAfterMs });
       expect(result.failureClasses).toEqual(["rate_limit_error"]);
       expect(log).toHaveBeenCalledTimes(1);
     });
@@ -60,7 +60,7 @@ describe("harness_retry_guard.cjs", () => {
     });
 
     it("still rejects excessive waits on an exhausted attempt", () => {
-      const result = { exitCode: 1, output: "", hasOutput: true, retryAfterMs: 101 };
+      const result = { exitCode: 1, output: "", hasOutput: true, retryAfterMs: 2147483648 };
       expect(resolveRetryAfterDecision({ result, attempt: 3, maxDelayMs: 100, softTimeoutGuard: null, harnessName: "Test", log: vi.fn(), terminal: true })).toEqual({ action: "stop" });
       expect(result.failureClasses).toEqual(["rate_limit_wait_exceeded"]);
     });
@@ -75,7 +75,9 @@ describe("harness_retry_guard.cjs", () => {
       const now = vi.spyOn(Date, "now").mockReturnValue(100);
       try {
         const result = { exitCode: 1, output: "", hasOutput: true, retryAfterMs: 10 };
-        expect(resolveRetryAfterDecision({ result, attempt: 0, maxDelayMs: 10, softTimeoutGuard: { softDeadlineMs: 110 }, harnessName: "Test", log: () => {} })).toEqual({ action: "stop" });
+        const log = vi.fn();
+        expect(resolveRetryAfterDecision({ result, attempt: 0, maxDelayMs: 10, softTimeoutGuard: { softDeadlineMs: 110 }, harnessName: "Test", log })).toEqual({ action: "stop" });
+        expect(log.mock.calls.flat().join("\n")).toContain("rate limited, retry after 0.01 s");
       } finally {
         now.mockRestore();
       }

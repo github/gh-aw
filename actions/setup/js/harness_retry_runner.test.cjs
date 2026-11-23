@@ -8,6 +8,7 @@ import os from "node:os";
 import path from "node:path";
 
 const require = createRequire(import.meta.url);
+const { parseCopilotRetryAfterMs } = require("./copilot_retry_after.cjs");
 const {
   captureExecutionEvidenceConfiguration,
   recordStartupAttempt,
@@ -103,9 +104,11 @@ describe("harness_retry_runner.cjs", () => {
 
   it.each([
     [5, 10, null, 2, "rate_limit_error"],
-    [11, 10, null, 1, "rate_limit_wait_exceeded"],
+    [11, 10, null, 2, "rate_limit_error"],
+    [257000, 60000, 600000, 2, "rate_limit_error"],
+    [2147483648, 60000, null, 1, "rate_limit_wait_exceeded"],
     [1000, 2000, 500, 1, "rate_limit_wait_exceeded"],
-  ])("enforces retry-after %i against delay cap %i and deadline %s", async (requested, cap, deadline, attempts, failureClass) => {
+  ])("honors retry-after %i beyond backoff cap %i within deadline %s", async (requested, cap, deadline, attempts, failureClass) => {
     vi.stubEnv("GH_AW_SAFE_OUTPUTS", "");
     const options = telemetryOptions([1, 0]);
     options.maxDelayMs = cap;
@@ -126,6 +129,27 @@ describe("harness_retry_runner.cjs", () => {
     };
     expect(await runHarnessRetryLoop(options)).toMatchObject({ exitCode: 1, attempts: 1 });
     expect(JSON.parse(fs.readFileSync(options.telemetryPath, "utf8")).attempt_results[0].failure_classes).toEqual(["invocation_cap_exceeded"]);
+  });
+
+  it.each(["257", "Wed, 11 Nov 2026 08:47:17 GMT"])("waits the full Azure token-limit Retry-After %s with default backoff settings", async header => {
+    let now = Date.parse("Wed, 11 Nov 2026 08:43:00 GMT");
+    vi.spyOn(Date, "now").mockImplementation(() => now);
+    const options = telemetryOptions([1, 0]);
+    options.initialDelayMs = 5000;
+    options.maxDelayMs = 60000;
+    options.softTimeoutGuard = { timeoutMinutes: 10, softDeadlineMs: now + 510000 };
+    options.runAttempt = async attempt => ({
+      exitCode: attempt === 0 ? 1 : 0,
+      output: "429 Token limit is exceeded. Try again in 257 seconds.",
+      hasOutput: true,
+      retryAfterMs: attempt === 0 ? parseCopilotRetryAfterMs(`429 Token limit is exceeded.\nRetry-After: ${header}`) : null,
+    });
+    options.sleepFn = vi.fn(async delay => {
+      now += delay;
+    });
+    expect(await runHarnessRetryLoop(options)).toMatchObject({ attempts: 2, exitCode: 0 });
+    expect(options.sleepFn).toHaveBeenCalledExactlyOnceWith(257000);
+    expect(JSON.parse(fs.readFileSync(options.telemetryPath, "utf8")).attempt_results[1].backoff_ms).toBe(257000);
   });
 
   it.each(["", "[]"])("does not request decisions without nonempty configured questions: %j", async configuration => {

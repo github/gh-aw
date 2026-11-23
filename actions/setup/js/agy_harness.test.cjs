@@ -167,8 +167,8 @@ describe("agy_harness.cjs gated attempt outcomes", () => {
     });
   });
 
-  it("fails fast when Retry-After exceeds max-delay-ms", () => {
-    const result = run("rate_limited_long", "disabled", { GH_AW_HARNESS_MAX_DELAY_MS: "60000" });
+  it("fails fast when Retry-After exceeds the remaining timeout", () => {
+    const result = run("rate_limited_long", "disabled", { GH_AW_TIMEOUT_MINUTES: "2" });
     expect(result.status).toBe(1);
     expect(result.invocations).toBe(1);
     expect(result.telemetry).toMatchObject({ attempts: 1, exit_code: 1, attempt_results: [{ outcome: "failure", failure_classes: ["rate_limit_wait_exceeded"] }] });

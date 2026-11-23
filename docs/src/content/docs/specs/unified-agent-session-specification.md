@@ -1567,10 +1567,12 @@ observes terminal HTTP 429 evidence, it MUST inspect `Retry-After` only from
 `error`, `session.error`, or `turn.failed` events and from stderr. Assistant and
 tool events MUST NOT be used as `Retry-After` evidence. A valid numeric-seconds
 value or a valid non-expired HTTP-date value MUST determine the requested wait
-duration. The harness MUST wait for that duration unless it exceeds the
-configured `max-delay-ms` limit or the remaining soft-timeout budget, including
-the shutdown buffer. In either exceeded case, the attempt MUST terminate with
-the allowlisted failure identifier `rate_limit_wait_exceeded`. Missing, invalid,
+duration. The harness MUST wait for that duration regardless of the configured
+exponential backoff `max-delay-ms` limit, unless the wait reaches the remaining
+soft-timeout budget, including the shutdown buffer, or exceeds the maximum timer
+delay of 2147483647 milliseconds. In either case, the attempt MUST terminate with
+the allowlisted failure identifier `rate_limit_wait_exceeded` and report the
+requested retry delay in seconds. Missing, invalid,
 or expired `Retry-After` values MUST preserve the existing retry behavior.
 
 The deterministic conformance suite is

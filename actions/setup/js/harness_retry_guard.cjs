@@ -67,17 +67,17 @@ async function observeInvocationBudget({ guard, attempt, nativeTerminalRateLimit
  * }} options
  * @returns {import("./harness_retry_runner.cjs").HarnessFailureDecision | null}
  */
-function resolveRetryAfterDecision({ attempt, result, maxDelayMs, softTimeoutGuard, harnessName, log, terminal = false }) {
+function resolveRetryAfterDecision({ attempt, result, softTimeoutGuard, harnessName, log, terminal = false }) {
   const wait = result.retryAfterMs;
   if (wait == null) return null;
   const invalidWait = !Number.isSafeInteger(wait) || wait < 0;
-  const exceedsDelayCap = wait > Math.min(maxDelayMs, 2147483647);
+  const exceedsTimerLimit = wait > 2147483647;
   const exceedsTimeout = softTimeoutGuard && Date.now() + wait >= softTimeoutGuard.softDeadlineMs;
-  if (invalidWait || exceedsDelayCap || exceedsTimeout) {
-    const reason = invalidWait ? "a valid nonnegative timer delay" : exceedsDelayCap ? `max-delay-ms=${maxDelayMs}` : "remaining job timeout budget";
+  if (invalidWait || exceedsTimerLimit || exceedsTimeout) {
+    const reason = invalidWait ? "a valid nonnegative timer delay" : exceedsTimerLimit ? "maximum timer delay (2147483647ms)" : "remaining job timeout budget";
     result.failureClasses = ["rate_limit_wait_exceeded"];
-    log(`attempt ${attempt + 1}: failureClass=rate_limit_wait_exceeded — HTTP 429 Retry-After=${wait}ms exceeds ${reason}; not retrying`);
-    emitInfrastructureIncomplete(`${harnessName} HTTP 429 Retry-After wait exceeds ${reason}. Stopping rather than retrying inside the rate-limit window.`, { logger: log });
+    log(`attempt ${attempt + 1}: failureClass=rate_limit_wait_exceeded — HTTP 429 rate limited, retry after ${wait / 1000} s; Retry-After=${wait}ms exceeds ${reason}; not retrying`);
+    emitInfrastructureIncomplete(`${harnessName} HTTP 429 rate limited, retry after ${wait / 1000} s. Retry-After wait exceeds ${reason}. Stopping rather than retrying inside the rate-limit window.`, { logger: log });
     return { action: "stop" };
   }
   if (terminal) return null;
