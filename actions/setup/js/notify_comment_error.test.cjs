@@ -171,7 +171,7 @@ const mockCore = {
             expect(body).toContain("⌖ \\~1 AIC");
             expect(body).toContain("◇ \\~1 AIC");
             expect(body).toContain("⊞ 1.7K");
-            expect(body).toContain("[◷](https://github.com/search?");
+            expect(body).toContain("[history](https://github.com/search?");
             expect(body).toContain("<!-- gh-aw-agentic-workflow: test-workflow");
             if (safeOutputsResult === "failure") expect(body).toContain("failed to deliver outputs");
           } finally {

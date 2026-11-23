@@ -141,7 +141,7 @@ describe("Claim-scoped safe-output footers", () => {
     const result = withClaimExecution({ assignment, claim_handle: "h1" }, () => getFooterMessage({ ...footerContext, triggeringNumber: 42, historyUrl: "https://github.com/search?q=worker" }));
     expect(result).toContain(" for #42");
     expect(result).toContain("~13 AIC");
-    expect(result).toContain("[◷](https://github.com/search?q=worker)");
+    expect(result).toContain("[history](https://github.com/search?q=worker)");
     expect(result).toContain("> Work `work-one` · Claim `claim-one`");
   });
 
