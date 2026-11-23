@@ -164,11 +164,8 @@ function conclude(resultFile, env) {
     return conclusion === "failure" ? 1 : 0;
   };
   const fail = (reason, message, kinds = [], exportEnv = true) => {
-    // A confirmed threat must not enter the tooling-failure warn policy, even
-    // when the workflow's step-level continue-on-error absorbs this exit code.
-    const allowWarning = warn && reason !== "threat_detected";
-    annotate(allowWarning ? "warning" : "error", message);
-    return finish(allowWarning ? "warning" : "failure", reason, kinds, exportEnv);
+    annotate(warn ? "warning" : "error", message);
+    return finish(warn ? "warning" : "failure", reason, kinds, exportEnv);
   };
   if (run !== "true") {
     info("Detection skipped — no threats to evaluate.");

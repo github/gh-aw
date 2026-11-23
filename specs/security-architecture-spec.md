@@ -7,7 +7,7 @@ sidebar:
 
 # GitHub Agentic Workflows Security Architecture Specification
 
-**Version**: 1.1.10<br>
+**Version**: 1.1.11<br>
 **Status**: Candidate Recommendation  
 **Latest Version**: https://github.com/github/gh-aw/blob/main/specs/security-architecture-spec.md  
 **Editors**: GitHub Next (GitHub, Inc.)
@@ -24,7 +24,7 @@ The security architecture employs defense-in-depth principles including input sa
 
 This is a Candidate Recommendation specification and represents the current state of the GitHub Agentic Workflows security architecture. This specification is subject to updates based on security research, community feedback, and operational experience. Future versions may introduce additional security controls or refine existing requirements.
 
-**Publication Date**: November 11, 2026  
+**Publication Date**: November 23, 2026  
 **Governance**: This specification is maintained by GitHub Next and governed by GitHub's security and research processes.
 
 ## Table of Contents
@@ -834,7 +834,10 @@ threat-detection:
 }
 ```
 
-**TD-09**: If any threat is detected (`true`), the workflow MUST fail and safe outputs MUST NOT execute.
+**TD-09**: If any threat is detected (`true`), the implementation MUST apply the configured detection mode:
+
+- In strict mode (`continue-on-error: false`), the workflow MUST fail and safe outputs MUST NOT execute.
+- In warn mode (`continue-on-error: true`), the workflow MUST conclude with a warning and MUST enforce the applicable safe-output warn-mode requirements defined by WTD1, WTD1a, WTD2, and WTD3 in the Safe Outputs MCP Gateway Specification. Reviewable outputs MUST receive the required threat annotation, convertible outputs MUST be transformed into their mapped reviewable type, and non-reviewable outputs MUST NOT be applied. A warning MUST NOT be treated as a passed detection or as an access grant.
 
 **TD-10**: The `reasons` array SHOULD contain human-readable explanations for detected threats.
 
@@ -2098,6 +2101,14 @@ roles: [admin, maintainer]  # Restrict to trusted roles
 ---
 
 ## Change Log
+
+### Version 1.1.11 (Warn-Mode Threat Enforcement Clarification)
+
+**Published**: November 23, 2026
+
+- Clarifies TD-09 to distinguish strict-mode blocking from warn-mode threat surfacing.
+- Aligns TD-09 with the existing §11.9 threat-detection gate and Safe Outputs requirements WTD1, WTD1a, WTD2, and WTD3.
+- Preserves mandatory blocking in strict mode and all existing safe-output security requirements.
 
 ### Version 1.1.10 (Go Toolchain Security Baseline)
 
