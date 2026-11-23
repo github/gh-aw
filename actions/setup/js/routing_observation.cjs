@@ -70,6 +70,7 @@ const INFRASTRUCTURE_CLASSES = new Set([
   "sdk_session_idle_timeout",
   "server_error",
   "startup_error",
+  "transient_error",
   "unsupported_model_tools",
   "watchdog",
 ]);

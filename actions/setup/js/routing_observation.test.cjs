@@ -95,6 +95,7 @@ describe("routingOutcome", () => {
     ["an interrupted harness attempt", { agentResult: "failure", harness: { outcome: "interrupted", failureClasses: [] } }, skip("infrastructure")],
     ["a provider 5xx", { agentResult: "failure", execution: { categories: [], errorCodes: ["503"] } }, skip("infrastructure")],
     ["an authentication failure", { agentResult: "failure", execution: { categories: ["authentication_failed"], errorCodes: [] } }, skip("infrastructure")],
+    ["an API challenge the harness retries could not clear", { agentResult: "failure", output: output([]), harness: { outcome: "failure", failureClasses: ["transient_error"] } }, skip("infrastructure")],
     ["an incomplete report claiming an infrastructure error", { agentResult: "failure", output: summarizeAgentOutput({ items: [{ type: "report_incomplete", reason: "infrastructure_error" }], errors: [] }) }, skip("unknown_evidence")],
     [
       "a safe-output gateway that registered no tools",
