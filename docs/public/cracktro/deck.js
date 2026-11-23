@@ -3009,6 +3009,46 @@
   .fin-cap b { color: #f0f6fc; font-weight: 700; }
 
 
+  /* --- choose your own workflow (wizard cover) --- */
+  .cyo { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; color: #f0f6fc; }
+  .cyo-c { position: absolute; width: 150px; height: 150px; border: 0 solid #e3b341; opacity: 0; }
+  .cyo-c.tl { left: 96px; top: 96px; border-width: 4px 0 0 4px; } .cyo-c.tr { right: 96px; top: 96px; border-width: 4px 4px 0 0; }
+  .cyo-c.bl { left: 96px; bottom: 96px; border-width: 0 0 4px 4px; } .cyo-c.br { right: 96px; bottom: 96px; border-width: 0 4px 4px 0; }
+  .cyo.go .cyo-c { animation: cyoCorner .7s cubic-bezier(.2,.9,.3,1.3) both; }
+  .cyo.go .cyo-c.tr { animation-delay: .08s; } .cyo.go .cyo-c.br { animation-delay: .16s; } .cyo.go .cyo-c.bl { animation-delay: .24s; }
+  @keyframes cyoCorner { from { opacity: 0; transform: scale(.4); } to { opacity: 1; transform: none; } }
+  .cyo-book { width: 112px; height: 76px; perspective: 400px; position: relative; margin-bottom: 26px; }
+  .cyo-book i { position: absolute; top: 0; width: 56px; height: 76px; border: 4px solid #e3b341; background: #161b22; }
+  .cyo-book i:nth-child(1) { left: 0; border-radius: 10px 2px 2px 10px; } .cyo-book i:nth-child(2) { right: 0; border-radius: 2px 10px 10px 2px; }
+  .cyo-book i:nth-child(3) { right: 0; border-radius: 2px 10px 10px 2px; transform-origin: 0 50%; background: #2b1d00; }
+  .cyo.go .cyo-book i:nth-child(3) { animation: cyoFlip 2.4s ease-in-out .6s infinite; }
+  @keyframes cyoFlip { 0%, 30% { transform: rotateY(0); } 70%, 100% { transform: rotateY(-180deg); } }
+  .cyo-k { margin: 0; font: 600 26px/1 var(--mono); letter-spacing: .3em; text-transform: uppercase; color: #e3b341; }
+  .cyo h1 { margin: 26px 0 0; font-size: 150px; line-height: 1; letter-spacing: -.02em; font-variation-settings: "wght" 800, "wdth" 100; }
+  .cyo h1 .line { display: block; }
+  .cyo h1 .line + .line { background: linear-gradient(100deg, #9e6a03 0%, #e3b341 35%, #f8e3a1 60%, #e3b341 100%); background-size: 200% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; padding-bottom: .08em; }
+  .cyo.go h1 .line + .line { animation: cyoShine 6s ease-in-out infinite alternate; }
+  @keyframes cyoShine { to { background-position: 100% 0; } }
+  .cyo-l { margin: 18px 0 0; font-size: 38px; line-height: 1.35; color: #d1d7e0; max-width: 1300px; }
+  .cyo-trail { width: 1500px; height: 190px; margin-top: 18px; overflow: visible; }
+  .cyo-trail path { fill: none; stroke: #e3b341; stroke-width: 4; stroke-linecap: round; stroke-dasharray: 1; stroke-dashoffset: 1; }
+  .cyo.go .cyo-trail path { animation: cyoDraw 2.2s ease-out .4s forwards; }
+  @keyframes cyoDraw { to { stroke-dashoffset: 0; } }
+  .cyo-trail .n circle { fill: #0d1117; stroke: #e3b341; stroke-width: 4; }
+  .cyo-trail .n text { font: 700 22px var(--mono); fill: #e3b341; text-anchor: middle; dominant-baseline: central; }
+  .cyo-trail .n .lb { font: 600 18px var(--mono); letter-spacing: .14em; fill: #9198a1; text-transform: uppercase; }
+  .cyo-trail .n { opacity: 0; transform-box: fill-box; transform-origin: center; }
+  .cyo.go .cyo-trail .n { animation: cyoNode .5s cubic-bezier(.2,.9,.3,1.4) both; animation-delay: calc(.5s + var(--i) * .3s); }
+  @keyframes cyoNode { from { opacity: 0; transform: scale(.3); } to { opacity: 1; transform: none; } }
+  .cyo-trail .end circle { fill: #e3b341; }
+  .cyo-trail .end text:not(.lb) { fill: #0d1117; }
+  .cyo-trail .hero { fill: #f8e3a1; filter: drop-shadow(0 0 10px #e3b341); }
+  .cyo-go { margin-top: 30px; display: inline-flex; align-items: center; gap: 18px; padding: 22px 44px; border: 0; border-radius: 16px; background: #e3b341; color: #0d1117; font: 700 40px/1 "Mona Sans", sans-serif; font-variation-settings: "wdth" 100; cursor: pointer; box-shadow: 0 0 0 4px #0d1117, 0 0 0 8px #e3b341; }
+  .cyo-go:hover, .cyo-go:focus-visible { background: #f8e3a1; outline: none; }
+  .cyo-go kbd { font: 700 24px/1 var(--mono); padding: 6px 12px; border-radius: 8px; border: 2px solid #0d1117; }
+  .cyo.go .cyo-go { animation: cyoPulse 2.4s ease-in-out 2.8s infinite; }
+  @keyframes cyoPulse { 50% { box-shadow: 0 0 0 4px #0d1117, 0 0 0 8px #e3b341, 0 0 48px 12px rgba(227,179,65,.45); } }
+
   /* --- any engine --- */
   .ae { --lg: #d2a8ff; }
   .ae-ed { position: absolute; left: 110px; top: 330px; width: 760px; border-radius: 16px; background: #0d1117f0; border: 1px solid #3d444d; box-shadow: 0 30px 80px -30px #000; overflow: hidden; opacity: 0; }
@@ -25026,6 +25066,73 @@
     });
   }
 
+  // Choose your own workflow: a gamebook cover for the wizard (W): seven chapters on a trail, then a ready-to-run prompt
+  {
+    const CH = [["I", "Prologue"], ["II", "Quest"], ["III", "Hour"], ["IV", "Mark"], ["V", "Pack"], ["VI", "Companion"], ["✦", "The end"]];
+    const pts = CH.map((_, i) => [60 + i * 230, i % 2 ? 120 : 50]);
+    let d = `M${pts[0][0]} ${pts[0][1]}`;
+    for (let i = 1; i < pts.length; i++) {
+      const [ax, ay] = pts[i - 1],
+        [bx, by] = pts[i],
+        mx = (ax + bx) / 2;
+      d += ` C${mx} ${ay} ${mx} ${by} ${bx} ${by}`;
+    }
+    const trail = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    trail.setAttribute("class", "cyo-trail");
+    trail.setAttribute("viewBox", "0 0 1500 190");
+    trail.setAttribute("aria-hidden", "true");
+    trail.innerHTML =
+      `<path d="${d}" pathLength="1"/>` +
+      CH.map(([n, lb], i) => `<g class="n${i === CH.length - 1 ? " end" : ""}" style="--i:${i}"><circle cx="${pts[i][0]}" cy="${pts[i][1]}" r="28"/><text x="${pts[i][0]}" y="${pts[i][1]}">${n}</text><text class="lb" x="${pts[i][0]}" y="${pts[i][1] + (i % 2 ? 58 : -54)}">${lb}</text></g>`).join("") +
+      `<circle class="hero" r="11" cx="${pts[0][0]}" cy="${pts[0][1]}"/>`;
+    const path = trail.querySelector("path"),
+      hero = trail.querySelector(".hero");
+    const open = () => document.querySelector(".wzb")?.click();
+    const go = h("button", { class: "cyo-go", type: "button", title: "Open the wizard (W)", onclick: e => (e.stopPropagation(), open()) }, "Open the book", h("kbd", {}, "W"));
+    const root = h(
+      "div",
+      { class: "cyo" },
+      ["tl", "tr", "bl", "br"].map(c => h("i", { class: `cyo-c ${c}`, "aria-hidden": "true" })),
+      h("div", { class: "cyo-book", "aria-hidden": "true" }, h("i"), h("i"), h("i")),
+      h("p", { class: "cyo-k" }, "A GitHub Agentic Workflows adventure"),
+      h("h1", {}, h("span", { class: "line" }, "Choose your own"), h("span", { class: "line" }, "workflow")),
+      h("p", { class: "cyo-l" }, "Pick a quest, the hour it wakes, what it may write and the agent at its side. The last page is a prompt that builds the workflow."),
+      trail,
+      go
+    );
+    let t0 = 0,
+      len = 0;
+    slides.push({
+      group: "adventure",
+      id: "choose-your-own-workflow",
+      notes:
+        "What: The workflow wizard as a gamebook: seven short chapters choose a goal, a pattern, a trigger, the outputs it may write, extras and the engine, then the last page is a prompt that asks your agent to build the workflow.\nWhy: A blank page is the hardest part of a first workflow; the wizard turns patterns seen across many repositories into a few choices, each with sensible guardrails already set.\nWhen: Press W or Enter here, or the book button in the toolbar, at the end of a talk or whenever someone asks where to start. Copy the prompt into an agent in the repository you want to automate.",
+      enter() {
+        root.classList.remove("go");
+        void root.offsetWidth;
+        root.classList.add("go");
+        t0 = 0;
+        len = len || path.getTotalLength();
+      },
+      tick(t) {
+        if (!t0) t0 = t;
+        if (!len) len = path.getTotalLength();
+        const e = (t - t0) / 1000;
+        // the hero walks the trail once it is drawn, then rests at the end and sets out again
+        const f = e < 2.6 ? 0 : Math.min(1, ((e - 2.6) % 7) / 5);
+        const p = path.getPointAtLength(len * (f < 0.5 ? 2 * f * f : 1 - (-2 * f + 2) ** 2 / 2));
+        hero.setAttribute("cx", p.x);
+        hero.setAttribute("cy", p.y);
+      },
+      onKey(e) {
+        if (e.key !== "Enter" || e.metaKey || e.ctrlKey || e.altKey) return false;
+        open();
+        return true;
+      },
+      el: h("section", { class: "slide" }, root),
+    });
+  }
+
   // ---------- workflow prompts ----------
   // First user message of the Copilot session whose PR created each slide's workflow.
   // [workflow, abridged line, full first user message]; the line opens the full prompt in a phone-style dialog.
@@ -25258,6 +25365,8 @@
     cao: { base: [4, 20, 24], pal: ["#0b5560", "#073b44", "#12707a", "#04242b"], grid: [120, 220, 230, 0.03, 0.075], ang: Math.PI / 3, cell: 40, accent: ["#56d4dd", "#1b9aaa", "#b3f0f5", "#39c5cf"], music: "cao", prog: [0, 3, -2, 5, -4] },
     // AW factory (measured data): violet graph paper, a fine straight grid, a rising arpeggio.
     data: { base: [11, 7, 26], pal: ["#3d1a7a", "#1f1650", "#5a32a3", "#2a1660"], grid: [171, 125, 248, 0.035, 0.09], ang: 0, cell: 20, accent: ["#bc8cff", "#8957e5", "#e2c5ff", "#a371f7"], music: "data", prog: [0, 4, 7, 2] },
+    // Choose your own workflow: parchment-dark gold, a gentle tilt, a little quest fanfare.
+    adventure: { base: [18, 14, 6], pal: ["#7d5200", "#4a3000", "#9e6a03", "#2b1d00"], grid: [248, 227, 161, 0.025, 0.06], ang: -Math.PI / 18, cell: 40, accent: ["#e3b341", "#9e6a03", "#f8e3a1", "#d29922"], music: "adventure", prog: [0] },
     finale: { base: [13, 17, 23], pal: ["#0a8a2e", "#104c35", "#08872b", "#196c2e"], grid: [240, 246, 252, 0.028, 0.07], ang: 0, cell: 32, accent: ["#5fed83", "#0fbf3e", "#aff5b4", "#08872b"], music: "finale", prog: [0] },
   };
 
@@ -25276,7 +25385,7 @@
     data: ["AW factory", "How gh-aw builds gh-aw"],
   };
   // Header-less rows of a single slide.
-  const SOLO = { intro: "Title", mindset: "Factory mindset", trust: "Trust the process", finale: "Finale" };
+  const SOLO = { intro: "Title", mindset: "Factory mindset", trust: "Trust the process", adventure: "Choose your own workflow", finale: "Finale" };
   // Bands that are not shipped product: every slide (header included) carries a corner badge.
   const PROTO = { cao: "gh cao" };
   // Tours: shareable filtered views (#<slide id>&tour=<name>), listed at the bottom of the slide map (G).
@@ -25611,6 +25720,12 @@
         [48, 52, 55, 60, 64, 67, 72, 76].forEach((m, i) => tone(m, t + 0.15 + i * 0.22, { type: "triangle", dur: 0.3, vol: 0.05, cutoff: 2600, detune: 5 }));
         pad([48, 55, 60, 64], t + 0.1, 3.4, 0.022, "triangle", 1400);
         [79, 84, 88].forEach((m, i) => bell(m, t + 2 + i * 0.09, 0.035, 1.6));
+      },
+      // adventure: a rising horn call (5th, octave) answered by a bright bell, like opening a storybook
+      adventure: t => {
+        [55, 62, 67, 71, 74].forEach((m, i) => tone(m, t + 0.1 + i * 0.16, { type: "triangle", dur: i === 4 ? 0.9 : 0.22, vol: 0.05, cutoff: 2200, detune: 4 }));
+        pad([43, 50, 55, 59, 62], t + 0.1, 3, 0.022, "triangle", 1300);
+        [79, 83, 86].forEach((m, i) => bell(m, t + 0.95 + i * 0.1, 0.03, 1.4));
       },
       // finale: a warm major swell with a cascade of bells radiating out
       finale: t => {
