@@ -202,7 +202,11 @@ describe("offline object-pack recovery", () => {
     process.env.GH_AW_OBJECT_PACK_MAX_OBJECTS = "390";
     process.env.GH_AW_OBJECT_PACK_FETCH_DEPTHS = "2,32,131072";
     const fetches = redirectTrustedFetch();
-    await expect(recoverObjectPack(transport, paths, { repo: repoSlug, baseBranch: "main", mode: "full", config: {}, message: {} })).resolves.toBe(true);
+    // Report only the static stage and allowlisted subprocess outcome; never the cause, Git output, paths or tokens.
+    const recovered = await recoverObjectPack(transport, paths, { repo: repoSlug, baseBranch: "main", mode: "full", config: {}, message: {} }).catch(() => {
+      throw new Error(recoveryDiagnostic());
+    });
+    expect(recovered).toBe(true);
     expect(fetches[0].args).toContain("--depth=2");
     for (const fetch of fetches) {
       expect(fetch.options.timeout).toBeGreaterThan(0);
