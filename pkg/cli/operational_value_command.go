@@ -98,7 +98,7 @@ func NewValueCommand() *cobra.Command {
 	cmd.Flags().BoolVar(&config.Daily, "daily", false, "Show daily Git measurements and retained human acceptance evidence at noon UTC")
 	cmd.Flags().StringVarP(&config.Repo, "repo", "r", "", "Repository in [HOST/]OWNER/REPO format (defaults to the current repository)")
 	cmd.Flags().DurationVar(&timeout, "timeout", 5*time.Minute, "Maximum report collection duration")
-	cmd.Flags().BoolVarP(&jsonOutput, "json", "j", false, "Output the report as JSON")
+	cmd.Flags().BoolVarP(&jsonOutput, "json", "j", false, "Output results in JSON format")
 	cmd.SetOut(os.Stdout)
 	return cmd
 }
