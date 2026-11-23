@@ -111,7 +111,7 @@ The built-in Copilot, Claude, and Codex harnesses expose a small set of runtime 
 | `GH_AW_HARNESS_MAX_RETRIES` | `engine.harness.max-retries` | `3` | retry attempts after the initial run; minimum `0`, maximum `100` | Maximum retries. `0` disables retries. Invalid values use the default; values above `100` are clamped. |
 | `GH_AW_HARNESS_INITIAL_DELAY_MS` | `engine.harness.initial-delay-ms` | `5000` | milliseconds; minimum `1` | Delay before the first retry. Invalid values use the default. |
 | `GH_AW_HARNESS_BACKOFF_MULTIPLIER` | `engine.harness.backoff-multiplier` | `2` | decimal multiplier; minimum `1` | Multiplier applied after each retry. Invalid values use the default. |
-| `GH_AW_HARNESS_MAX_DELAY_MS` | `engine.harness.max-delay-ms` | `60000` | milliseconds; minimum `1` | Maximum retry delay. Invalid values use the default. Values below `GH_AW_HARNESS_INITIAL_DELAY_MS` are clamped up to it. |
+| `GH_AW_HARNESS_MAX_DELAY_MS` | `engine.harness.max-delay-ms` | `60000` | milliseconds; minimum `1` | Maximum exponential backoff delay; does not cap provider `Retry-After` waits, which have a separate 60-second fallback limit if the timeout is unset or invalid. Invalid values use the default. Values below `GH_AW_HARNESS_INITIAL_DELAY_MS` are clamped up to it. |
 
 ### Shared post-result watchdog
 

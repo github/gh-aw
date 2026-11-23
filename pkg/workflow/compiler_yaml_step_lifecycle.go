@@ -161,6 +161,9 @@ func (c *Compiler) generateCreateAwInfo(yaml *strings.Builder, data *WorkflowDat
 	if provider := resolveBYOKGenAIProviderName(data); provider != "" {
 		writeFormattedYAML(yaml, "          GH_AW_INFO_GENAI_PROVIDER: \"%s\"\n", provider)
 	}
+	if endpoint := resolveBYOKGenAIEndpoint(data); endpoint != "" {
+		writeFormattedYAML(yaml, "          GH_AW_INFO_GENAI_ENDPOINT: %q\n", endpoint)
+	}
 	if modelConfigured {
 		// data.Model may reference an experiment variant as needs.activation.outputs.<name>
 		// (rewritten from engine.model: ${{ experiments.<name> }} for jobs downstream of

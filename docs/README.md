@@ -109,7 +109,8 @@ CC button in the kiosk dock) turns them off or on, and the choice holds for late
 about each slide rolls in as captions at the bottom of the screen, and each slide stays up until its
 conversation ends. C starts kiosk mode if needed, and captions end with it; while it runs, Escape stops it before it
 hides notes. V (or the voice button beside CC in the kiosk dock) reads the same conversation aloud
-with the browser's built-in speech synthesis, alternating two voices (or two pitches), and holds each slide until
+from a pre-recorded two-anchor track (one small Opus file per slide, used only while it matches the slide's captions;
+otherwise the browser's built-in speech synthesis, alternating two voices or two pitches), and holds each slide until
 its last line is spoken (at most 60 s past the slide's dwell); voice is off by default, starts kiosk mode if needed, ends with it, and the choice holds for
 later kiosk runs. Where the browser has no speech synthesis the voice button is disabled. A manual move restarts the countdown, and an open
 dialog holds the current slide. The slide map button (or G) opens a full-screen grid of
@@ -128,7 +129,14 @@ the slide map: picking one adds `&tour=<name>` to the hash, a pill shows the tou
 and position, navigation skips the other slides, and × (or X) leaves the tour. Examples
 in a pattern's column only appear together with their pattern. "Design a view"
 in the slide map lets you tick slides or whole bands and copy a link that
-encodes the selection as `&view=<base64url>`. Clicks never change slides.
+encodes the selection as `view=<base64url>`. The share dock button (or S) opens a dialog that
+builds a deep link: start at the current slide or the first, all slides, the current view or a tour, plus
+kiosk, sound, captions and voice (`?slide=<id>&kiosk=1&sound=1&cc=1&voice=0`; captions and voice only with kiosk).
+Shared links use query parameters because social sites such as LinkedIn drop `#` fragments; on load they move
+into the hash. The launch options apply once and then leave the hash. Sound takes effect on load; a kiosk link opens a
+lobby with a Start button whose click is the gesture browsers require to turn on sound, start the
+animations and go fullscreen in kiosk mode; Escape or "Browse the slides instead" leaves the lobby
+for manual navigation. Clicks never change slides.
 On touch screens, swipe left or right within a band, up or down between bands,
 and pinch in for the slide map. On phones the toolbar dims after a
 few idle seconds and brightens on any touch, key or focus. iPhone Safari offers no

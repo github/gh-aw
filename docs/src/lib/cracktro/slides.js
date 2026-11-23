@@ -195,3 +195,15 @@ export function renderCaptions(slides) {
   const scripts = Object.fromEntries(slides.map(slide => [slide.id, slide.captions]));
   return `// Generated from .github/skills/cracktro/slides.md (Captions) by the docs build; do not edit.\nwindow.CracktroCaptions = ${serializeJsonLd({ scripts })};\n`;
 }
+
+/**
+ * The voice track's sync key for a slide's caption turns: FNV-1a 32-bit over the UTF-16 code units of the turns
+ * joined by "\n", as 8 hex digits. runtime.js computes the same key and plays a recorded segment only when they match.
+ * @param {string[]} captions
+ */
+export function captionHash(captions) {
+  const text = captions.join("\n");
+  let h = 0x811c9dc5;
+  for (let i = 0; i < text.length; i++) h = Math.imul(h ^ text.charCodeAt(i), 0x01000193) >>> 0;
+  return h.toString(16).padStart(8, "0");
+}

@@ -82,6 +82,7 @@ type WorkflowData struct {
 	IncludedFiles                  []string             // list of files included via @include directives (rendered as comment in lock file)
 	ImportInputs                   map[string]any       // input values from imports with inputs (for github.aw.inputs.* substitution)
 	On                             string
+	pullRequestTargetWarned        bool // Per-workflow CTR-008 validation warning used to deduplicate compiler lint
 	AdmissionEnabled               bool // Effective compile-time setting for admission steps
 	TokenBrokerEnabled             bool // True when at least one token-broker capability is enabled
 	TokenBrokerCopilotRequest      bool // Use the broker for Copilot inference authentication in supported jobs

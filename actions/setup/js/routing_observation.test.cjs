@@ -95,6 +95,7 @@ describe("routingOutcome", () => {
     ["an interrupted harness attempt", { agentResult: "failure", harness: { outcome: "interrupted", failureClasses: [] } }, skip("infrastructure")],
     ["a provider 5xx", { agentResult: "failure", execution: { categories: [], errorCodes: ["503"] } }, skip("infrastructure")],
     ["an authentication failure", { agentResult: "failure", execution: { categories: ["authentication_failed"], errorCodes: [] } }, skip("infrastructure")],
+    ["an API challenge the harness retries could not clear", { agentResult: "failure", output: output([]), harness: { outcome: "failure", failureClasses: ["transient_error"] } }, skip("infrastructure")],
     ["an incomplete report claiming an infrastructure error", { agentResult: "failure", output: summarizeAgentOutput({ items: [{ type: "report_incomplete", reason: "infrastructure_error" }], errors: [] }) }, skip("unknown_evidence")],
     [
       "a safe-output gateway that registered no tools",
@@ -110,6 +111,7 @@ describe("routingOutcome", () => {
     ["a turn limit without agent output", { agentResult: "failure", output: undefined, harness: turnLimit }, { outcome: "failure" }],
     ["a turn limit beside an unclassified nonzero exit", { agentResult: "failure", output: output(["report_incomplete"], { collectorFailureCause: "driver_crash" }), harness: turnLimit }, { outcome: "failure" }],
     ["a credit limit wrapped as an authentication failure", { agentResult: "failure", output: output([]), execution: { categories: ["authentication_failed", "max_ai_credits_exceeded"], errorCodes: [] } }, { outcome: "failure" }],
+    ["a turn limit beside a retried API challenge", { agentResult: "failure", output: output([]), harness: { outcome: "failure", failureClasses: ["transient_error", "max_turns"] } }, { outcome: "failure" }],
     ["a refusal that left no terminal output", { agentResult: "failure", output: output([]), refused: true }, { outcome: "failure" }],
     ["a refusal the agent recovered from", { agentResult: "failure", refused: true }, skip("unknown_evidence")],
     ["outputs the validator rejected", { agentResult: "failure", output: summarizeAgentOutput({ items: [], errors: ["invalid"] }) }, { outcome: "failure" }],

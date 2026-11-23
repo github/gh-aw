@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -40,9 +41,7 @@ func TestMCPHTTPServerAddr_BindsToLoopback(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		if got := mcpHTTPServerAddr(tc.port); got != tc.want {
-			t.Errorf("mcpHTTPServerAddr(%d) = %q, want %q", tc.port, got, tc.want)
-		}
+		assert.Equal(t, tc.want, mcpHTTPServerAddr(tc.port), "mcpHTTPServerAddr(%d)", tc.port)
 	}
 }
 
@@ -58,56 +57,29 @@ func TestMCPHTTPServerDisplayURL_UsesLoopbackAddress(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		if got := mcpHTTPServerDisplayURL(tc.port); got != tc.want {
-			t.Errorf("mcpHTTPServerDisplayURL(%d) = %q, want %q", tc.port, got, tc.want)
-		}
+		assert.Equal(t, tc.want, mcpHTTPServerDisplayURL(tc.port), "mcpHTTPServerDisplayURL(%d)", tc.port)
 	}
 }
 
-func TestSanitizeForLog_NoSpecialChars(t *testing.T) {
+func TestSanitizeForLog(t *testing.T) {
 	t.Parallel()
-	input := "/api/v1/workflows"
-	got := sanitizeForLog(input)
-	if got != input {
-		t.Errorf("sanitizeForLog(%q) = %q, want %q", input, got, input)
+	testCases := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{name: "no special chars", input: "/api/v1/workflows", want: "/api/v1/workflows"},
+		{name: "newline injection", input: "/path\nINJECTED LOG ENTRY", want: "/pathINJECTED LOG ENTRY"},
+		{name: "carriage return", input: "/path\rmalicious", want: "/pathmalicious"},
+		{name: "both newline and carriage return", input: "line1\r\nline2", want: "line1line2"},
+		{name: "empty", input: "", want: ""},
 	}
-}
 
-func TestSanitizeForLog_NewlineInjection(t *testing.T) {
-	t.Parallel()
-	input := "/path\nINJECTED LOG ENTRY"
-	got := sanitizeForLog(input)
-	expected := "/pathINJECTED LOG ENTRY"
-	if got != expected {
-		t.Errorf("sanitizeForLog(%q) = %q, want %q", input, got, expected)
-	}
-}
-
-func TestSanitizeForLog_CarriageReturn(t *testing.T) {
-	t.Parallel()
-	input := "/path\rmalicious"
-	got := sanitizeForLog(input)
-	expected := "/pathmalicious"
-	if got != expected {
-		t.Errorf("sanitizeForLog(%q) = %q, want %q", input, got, expected)
-	}
-}
-
-func TestSanitizeForLog_BothNewlineAndCarriageReturn(t *testing.T) {
-	t.Parallel()
-	input := "line1\r\nline2"
-	got := sanitizeForLog(input)
-	expected := "line1line2"
-	if got != expected {
-		t.Errorf("sanitizeForLog(%q) = %q, want %q", input, got, expected)
-	}
-}
-
-func TestSanitizeForLog_Empty(t *testing.T) {
-	t.Parallel()
-	got := sanitizeForLog("")
-	if got != "" {
-		t.Errorf("sanitizeForLog(\"\") = %q, want empty string", got)
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tc.want, sanitizeForLog(tc.input))
+		})
 	}
 }
 
@@ -117,9 +89,7 @@ func TestResponseWriter_DefaultStatusCode(t *testing.T) {
 		ResponseWriter: httptest.NewRecorder(),
 		statusCode:     http.StatusOK,
 	}
-	if rw.statusCode != http.StatusOK {
-		t.Errorf("default statusCode = %d, want %d", rw.statusCode, http.StatusOK)
-	}
+	assert.Equal(t, http.StatusOK, rw.statusCode, "default statusCode")
 }
 
 func TestResponseWriter_EmbeddedResponseWriter(t *testing.T) {
@@ -131,12 +101,8 @@ func TestResponseWriter_EmbeddedResponseWriter(t *testing.T) {
 	}
 	// The responseWriter delegates writes to the embedded ResponseWriter
 	rw.WriteHeader(http.StatusCreated)
-	if rec.Code != http.StatusCreated {
-		t.Errorf("embedded ResponseWriter code = %d, want %d", rec.Code, http.StatusCreated)
-	}
-	if rw.statusCode != http.StatusCreated {
-		t.Errorf("responseWriter statusCode = %d, want %d", rw.statusCode, http.StatusCreated)
-	}
+	assert.Equal(t, http.StatusCreated, rec.Code, "embedded ResponseWriter code")
+	assert.Equal(t, http.StatusCreated, rw.statusCode, "responseWriter statusCode")
 }
 
 func TestLoggingHandler_PassesRequestToHandler(t *testing.T) {
@@ -153,11 +119,24 @@ func TestLoggingHandler_PassesRequestToHandler(t *testing.T) {
 	rec := httptest.NewRecorder()
 	handler.ServeHTTP(rec, req)
 
-	if !handlerCalled {
-		t.Error("loggingHandler did not call the inner handler")
-	}
-	if rec.Code != http.StatusOK {
-		t.Errorf("response code = %d, want %d", rec.Code, http.StatusOK)
+	assert.True(t, handlerCalled, "loggingHandler should call the inner handler")
+	assert.Equal(t, http.StatusOK, rec.Code, "response code")
+}
+
+func TestLoggingHandler_PreservesResponseStatus(t *testing.T) {
+	t.Parallel()
+	for _, status := range []int{http.StatusOK, http.StatusNotFound, http.StatusInternalServerError} {
+		t.Run(http.StatusText(status), func(t *testing.T) {
+			t.Parallel()
+			inner := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(status)
+			})
+
+			rec := httptest.NewRecorder()
+			loggingHandler(inner).ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/status", nil))
+
+			assert.Equal(t, status, rec.Code, "status should reach the client unchanged")
+		})
 	}
 }
 
@@ -177,7 +156,5 @@ func TestLoggingHandler_SanitizesPath(t *testing.T) {
 	// Should not panic
 	handler.ServeHTTP(rec, req)
 
-	if rec.Code != http.StatusOK {
-		t.Errorf("response code = %d, want %d", rec.Code, http.StatusOK)
-	}
+	assert.Equal(t, http.StatusOK, rec.Code, "response code")
 }

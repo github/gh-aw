@@ -35,6 +35,7 @@ describe("Copilot Retry-After parsing", () => {
 
   it.each([
     ["HTTP 429\nretry-after: 245", 245000],
+    ["429 Token limit is exceeded. Try again in 257 seconds.\nRetry-After: 257", 257000],
     ["CAPIError: Too Many Requests\nretry-after: 245", 245000],
     ['CAPIError: 429 Too Many Requests\nheaders: { "Retry-After": "245" }', 245000],
     ["HTTP 429\n{ 'retry-after': '245', 'x-ratelimit-exceeded': 'global-chat:model:userID' }", 245000],
@@ -150,7 +151,7 @@ process.exitCode = 1;`
           GH_AW_HARNESS_MAX_RETRIES: "1",
           GH_AW_HARNESS_INITIAL_DELAY_MS: "1",
           GH_AW_HARNESS_MAX_DELAY_MS: "60000",
-          GH_AW_TIMEOUT_MINUTES: "",
+          GH_AW_TIMEOUT_MINUTES: "2",
           GH_AW_SAFE_OUTPUTS: "",
           GH_AW_SKIP_REFLECT: "true",
           AWF_REFLECT_ENABLED: "",
@@ -173,19 +174,22 @@ process.exitCode = 1;`
 
   it.each([
     ["stderr", "1", "2000", "", 0, 2, "rate_limit_error"],
+    ["stderr", "1", "1", "5", 0, 2, "rate_limit_error", "azure"],
+    ["stderr:azure-token", "1", "1", "5", 0, 2, "rate_limit_error", "azure"],
+    ["stderr:azure-token", "257", "60000", "2", 1, 1, "rate_limit_wait_exceeded", "azure"],
     ["stderr", "1", "2000", "", 0, 2, "rate_limit_error", "github", false],
     ["session.error", "1", "2000", "", 0, 2, "rate_limit_error"],
     ["stderr:session.error", "1", "2000", "", 0, 2, "rate_limit_error"],
     ["error", "1", "1000", "", 0, 2, "rate_limit_error"],
     ["stderr-long-output", "1", "2000", "", 0, 2, "rate_limit_error"],
     ["stderr:incomplete-tool-call-stream", "1", "2000", "", 0, 2, "rate_limit_error"],
-    ["stderr:incomplete-tool-call-stream", "245", "60000", "", 1, 1, "rate_limit_wait_exceeded"],
+    ["stderr:incomplete-tool-call-stream", "245", "60000", "2", 1, 1, "rate_limit_wait_exceeded"],
     ["stderr:capi-too-many", "1", "2000", "", 0, 2, "rate_limit_error"],
-    ["turn.failed", "245", "60000", "", 1, 1, "rate_limit_wait_exceeded"],
-    ["session.error", "245", "60000", "", 1, 1, "rate_limit_wait_exceeded", "openai"],
+    ["turn.failed", "245", "60000", "2", 1, 1, "rate_limit_wait_exceeded"],
+    ["session.error", "245", "60000", "2", 1, 1, "rate_limit_wait_exceeded", "openai"],
     ["stderr", "1", "2000", "", 0, 2, "rate_limit_error", "openai"],
-    ["stderr", "257", "60000", "", 1, 1, "rate_limit_wait_exceeded", "azure"],
-    ["stderr", "245", "60000", "", 1, 1, "rate_limit_wait_exceeded"],
+    ["stderr", "257", "60000", "2", 1, 1, "rate_limit_wait_exceeded", "azure"],
+    ["stderr", "245", "60000", "2", 1, 1, "rate_limit_wait_exceeded"],
     ["stderr", "245", "300000", "2", 1, 1, "rate_limit_wait_exceeded"],
     ["stderr", "2147484", "3000000000", "", 1, 1, "rate_limit_wait_exceeded"],
     ["stderr", "999999999999999999999999", "60000", "", 1, 1, "rate_limit_wait_exceeded"],
@@ -215,15 +219,17 @@ process.exitCode = 1;`
               ? "HTTP 503"
               : source === "stderr:unscoped"
                 ? "Diagnostic mentions 429 without a response status"
-                : source === "stderr:incomplete-tool-call-stream"
-                  ? "Failed to finalize chat-completions stream: missing choices[0].tool_calls[0].id\nHTTP 429"
-                  : failureClass === "capi_quota_exceeded"
-                    ? "CAPIError: 429 Too Many Requests"
-                    : failureClass === "rate_limit_error" || failureClass === "rate_limit_wait_exceeded"
-                      ? "HTTP 429"
-                      : ["assistant.message", "tool.execution_complete", "session.error"].includes(eventType)
+                : source === "stderr:azure-token"
+                  ? `429 Token limit is exceeded. Try again in ${retryAfter} seconds.`
+                  : source === "stderr:incomplete-tool-call-stream"
+                    ? "Failed to finalize chat-completions stream: missing choices[0].tool_calls[0].id\nHTTP 429"
+                    : failureClass === "capi_quota_exceeded"
+                      ? "CAPIError: 429 Too Many Requests"
+                      : failureClass === "rate_limit_error" || failureClass === "rate_limit_wait_exceeded"
                         ? "HTTP 429"
-                        : "CAPIError: 429 Too Many Requests";
+                        : ["assistant.message", "tool.execution_complete", "session.error"].includes(eventType)
+                          ? "HTTP 429"
+                          : "CAPIError: 429 Too Many Requests";
     const trailingOutput = source === "stderr-long-output" ? `\n${"x".repeat(70 * 1024)}` : "";
     const message = `${error}${retryAfter ? `\nretry-after: ${retryAfter}` : ""}${trailingOutput}`;
     const plainStderr = ["stderr", "invocation-cap"].includes(source) || (source.startsWith("stderr") && !["session.error", "assistant.message", "tool.execution_complete"].includes(eventType));
@@ -288,6 +294,7 @@ if (fs.readFileSync(callsPath, "utf8").trim().split("\\n").length === 1) {
       if (failureClass === "rate_limit_wait_exceeded") {
         expect(result.stderr).toContain("not retrying");
         expect(result.stderr).not.toContain("sleeping");
+        if (timeout) expect(result.stderr).toContain(`rate limited, retry after ${retryAfter} s`);
       }
     } finally {
       fs.rmSync(directory, { recursive: true, force: true });
