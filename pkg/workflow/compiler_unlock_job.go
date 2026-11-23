@@ -106,7 +106,7 @@ func (c *Compiler) buildUnlockJob(data *WorkflowData, threatDetectionEnabled boo
 
 	// In script mode, explicitly add a cleanup step (mirrors post.js in dev/release/action mode).
 	if c.actionMode.IsScript() {
-		steps = append(steps, c.generateScriptModeCleanupStep())
+		steps = append(steps, c.generateScriptModeCleanupStep(data))
 	}
 
 	job := &Job{

@@ -29,19 +29,18 @@ func resolveBYOKGenAIProviderName(workflowData *WorkflowData) string {
 	if ResolveEngineID(workflowData) != "copilot" || !isCopilotBYOKMode(workflowData, isFirewallEnabled(workflowData)) {
 		return ""
 	}
+	authProvider := resolveEngineAuthProvider(workflowData)
 	if !engineEnvHasNonEmptyValue(workflowData, constants.CopilotProviderBaseURL) {
 		// Provider override routed through the AWF gateway (engine.provider).
 		provider := genAIProviderForName(string(resolveEngineLLMProvider(workflowData, LLMProviderGitHub)))
-		genAIProviderLog.Printf("Resolved BYOK GenAI provider from engine provider override: %s", provider)
+		if authProvider == "azure" {
+			provider = genAIProviderAzureOpenAI
+		}
+		genAIProviderLog.Printf("Resolved BYOK GenAI provider from engine provider override: %s (auth=%q)", provider, authProvider)
 		return provider
 	}
-	env := getEngineEnvOverrides(workflowData)
-	providerType := literalLower(env["COPILOT_PROVIDER_TYPE"])
-	authProvider := ""
-	if workflowData.EngineConfig.Auth != nil {
-		authProvider = literalLower(workflowData.EngineConfig.Auth.Provider)
-	}
-	// engine.auth.provider only selects how gh-aw authenticates to the endpoint
+	providerType := literalLower(getEngineEnvOverrides(workflowData)["COPILOT_PROVIDER_TYPE"])
+	// The auth provider only selects how gh-aw authenticates to the endpoint
 	// (e.g. GCP OIDC to an OpenAI-compatible gateway), so only Azure auth changes
 	// the endpoint type; every other auth provider keeps the openai default.
 	provider := genAIProviderOpenAI
@@ -53,6 +52,19 @@ func resolveBYOKGenAIProviderName(workflowData *WorkflowData) string {
 	}
 	genAIProviderLog.Printf("Resolved BYOK GenAI provider: %s (type=%q, auth=%q)", provider, providerType, authProvider)
 	return provider
+}
+
+// resolveEngineAuthProvider mirrors applyEngineAuthEnv precedence: an
+// AWF_AUTH_PROVIDER entry in engine.env wins over engine.auth.provider.
+// Expression values cannot be inspected and resolve to "".
+func resolveEngineAuthProvider(workflowData *WorkflowData) string {
+	if value, ok := getEngineEnvOverrides(workflowData)["AWF_AUTH_PROVIDER"]; ok {
+		return literalLower(value)
+	}
+	if workflowData.EngineConfig != nil && workflowData.EngineConfig.Auth != nil {
+		return literalLower(workflowData.EngineConfig.Auth.Provider)
+	}
+	return ""
 }
 
 func genAIProviderForName(name string) string {

@@ -28,6 +28,9 @@ func TestResolveBYOKGenAIProviderName(t *testing.T) {
 		{name: "anthropic provider type", engine: &EngineConfig{ID: "copilot", Env: map[string]string{"COPILOT_PROVIDER_BASE_URL": "https://api.anthropic.com", "COPILOT_PROVIDER_TYPE": "anthropic"}}, want: "anthropic"},
 		{name: "gcp auth with base url", engine: &EngineConfig{ID: "copilot", Env: map[string]string{"COPILOT_PROVIDER_BASE_URL": "https://gateway.example.com/v1"}, Auth: &EngineAuthConfig{Type: "github-oidc", Provider: "gcp"}}, want: "openai"},
 		{name: "engine provider override", engine: &EngineConfig{ID: "copilot", LLMProvider: LLMProviderAnthropic}, network: firewall, want: "anthropic"},
+		{name: "azure auth with openai provider override", engine: &EngineConfig{ID: "copilot", LLMProvider: "openai", Auth: &EngineAuthConfig{Type: "github-oidc", Provider: "azure"}}, network: firewall, want: "azure.ai.openai"},
+		{name: "azure env auth with expression url", engine: &EngineConfig{ID: "copilot", Env: map[string]string{"COPILOT_PROVIDER_BASE_URL": "${{ secrets.ENDPOINT }}", "AWF_AUTH_PROVIDER": "azure"}}, want: "azure.ai.openai"},
+		{name: "env auth provider overrides engine auth", engine: &EngineConfig{ID: "copilot", Env: map[string]string{"COPILOT_PROVIDER_BASE_URL": "${{ secrets.ENDPOINT }}", "AWF_AUTH_PROVIDER": "gcp"}, Auth: &EngineAuthConfig{Type: "github-oidc", Provider: "azure"}}, want: "openai"},
 		{name: "gcp engine provider override", engine: &EngineConfig{ID: "copilot", LLMProvider: "gcp"}, network: firewall, want: "gcp.gen_ai"},
 	}
 	for _, tt := range tests {

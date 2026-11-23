@@ -22,7 +22,7 @@ Span emission in `actions/setup/js/send_otlp_span.cjs` read only the engine mapp
 Resolve the effective BYOK GenAI provider at compile time and carry it to runtime.
 
 - `pkg/workflow/genai_provider.go` (`resolveBYOKGenAIProviderName`) returns:
-  - `azure.ai.openai` for Azure hosts (`*.azure.com`, `*.azure-api.net`, `*.azure.us`, `*.azure.cn`), or when `COPILOT_PROVIDER_TYPE` or the auth provider is `azure`;
+  - `azure.ai.openai` for Azure hosts (`*.azure.com`, `*.azure-api.net`, `*.azure.us`, `*.azure.cn`), or when `COPILOT_PROVIDER_TYPE` or the auth provider (`AWF_AUTH_PROVIDER` in `engine.env`, otherwise `engine.auth.provider`) is `azure`, in both base-URL and `engine.provider` override modes;
   - `anthropic` for `COPILOT_PROVIDER_TYPE=anthropic`;
   - `openai` for any other OpenAI-compatible BYOK endpoint, including a non-Azure auth provider such as `gcp` with a base URL, because auth describes credentials, not the endpoint;
   - an empty value for non-BYOK runs, which keep the engine-derived provider.

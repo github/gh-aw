@@ -70,7 +70,7 @@ func (c *Compiler) buildActivationJob(data *WorkflowData, preActivationJobCreate
 	}
 
 	if c.actionMode.IsScript() {
-		ctx.steps = append(ctx.steps, c.generateScriptModeCleanupStep())
+		ctx.steps = append(ctx.steps, c.generateScriptModeCleanupStep(data))
 	}
 
 	permissions, err := c.buildActivationPermissions(ctx)
