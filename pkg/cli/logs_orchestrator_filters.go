@@ -282,6 +282,7 @@ func buildProcessedRun(ctx context.Context, result DownloadResult, verbose, logF
 		MissingTools:            result.MissingTools,
 		MissingData:             result.MissingData,
 		Noops:                   result.Noops,
+		ReportIncomplete:        result.ReportIncomplete,
 		ContinuationRequests:    result.ContinuationRequests,
 		MCPFailures:             result.MCPFailures,
 		MCPToolUsage:            result.MCPToolUsage,

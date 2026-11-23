@@ -2145,6 +2145,11 @@
   .nop-row span { display: block; margin-top: 10px; font: 500 18px/1.25 var(--mono); color: #9198a1; white-space: nowrap; }
   .nop-row.on { opacity: 1; border-color: #79c0ff; background: #4493f81a; }
   .nop-row.on span { color: #e6edf3; }
+  .nop-row { position: relative; }
+  .nop-row em { position: absolute; right: 18px; top: 14px; font: 600 26px/1 var(--mono); color: #f0f6fc; font-style: normal; }
+  .nop-row em small { font-size: 16px; color: #9198a1; margin-left: 6px; }
+  .nop-cap { position: absolute; left: 110px; top: 968px; font: 500 16px/1 var(--mono); color: #6e7681; letter-spacing: .04em; opacity: 0; }
+  .active .nop-cap { animation: rise .6s ease-out both 2s; }
   .nop-foot { left: 110px; top: 870px; width: 1700px; height: 76px; padding: 0 30px; display: flex; align-items: center; gap: 22px; font: 500 22px/1 var(--mono); color: #9198a1; white-space: nowrap; }
   .nop-foot b { color: #79c0ff; font-weight: 600; }
   .so-card .st { position: absolute; right: 18px; bottom: 16px; font: 600 16px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: #79c0ff; }
@@ -12296,11 +12301,13 @@
       ["weekly spend report", "billing export is not readable in this run", "create_discussion", '{"title":"Spend down 12% this week"}', "✕ invented", "report_missing_data", '{"data_type":"billing export"}'],
       ["summarize open pull requests", "GitHub MCP server crashed · 0 results", "noop", '{"message":"Nothing to review"}', "✕ hides failure", "report_incomplete", '{"reason":"GitHub MCP server unavailable"}'],
     ];
+    // Measured with gh aw audit (refresh/its-ok-to-say-noop.md): agent runs in the window and runs per type
+    const M = { agent: "712", start: "15", end: "21 Nov 2026", snap: "23 Nov 2026" };
     const ROWS = [
-      ["noop", "step summary · No-Op Runs tracker"],
-      ["report_missing_tool", "run summary · completion comment"],
-      ["report_missing_data", "optional [missing data] issue"],
-      ["report_incomplete", "failure handling, even on exit 0"],
+      ["noop", "step summary · No-Op Runs tracker", "168"],
+      ["report_missing_tool", "run summary · completion comment", "37"],
+      ["report_missing_data", "optional [missing data] issue", "4"],
+      ["report_incomplete", "failure handling, even on exit 0", "266"],
     ];
     const dots = RUNS.map(() => h("span", {}));
     const task = h("b", {}),
@@ -12315,7 +12322,7 @@
     const bad = card("nop-bad", "TEMPTING · HALLUCINATED OUTPUT"),
       good = card("nop-good", "HONEST · SAFE OUTPUT");
     good.stamp.textContent = "✓ reported";
-    const rows = ROWS.map(([k, v]) => h("div", { class: "nop-row" }, h("b", {}, k), h("span", {}, v)));
+    const rows = ROWS.map(([k, v, n]) => h("div", { class: "nop-row" }, h("b", {}, k), h("em", {}, n, h("small", {}, "runs")), h("span", {}, v)));
     const el = h(
       "section",
       { class: "slide nop" },
@@ -12331,7 +12338,8 @@
         good.el
       ),
       h("div", { class: "nop-side", "--c": "#79c0ff", "--i": 1 }, h("i", {}, "WHERE IT LANDS"), rows),
-      h("div", { class: "nop-foot", "--c": "#79c0ff", "--i": 2 }, h("i", {}, "RULE"), h("span", {}, h("b", {}, "Silence is not a noop"), " · finish without a terminal safe output and validation adds report_incomplete"))
+      h("div", { class: "nop-foot", "--c": "#79c0ff", "--i": 2 }, h("i", {}, "RULE"), h("span", {}, h("b", {}, "Silence is not a noop"), " · finish without a terminal safe output and validation adds report_incomplete")),
+      h("div", { class: "nop-cap" }, `MEASURED · gh aw audit · ${M.agent} sampled gh-aw agent runs ${M.start}–${M.end} · snapshot ${M.snap} · runs per type · scenarios illustrative`)
     );
     let t0 = 0,
       cur = -1,
@@ -12359,7 +12367,7 @@
       id: "its-ok-to-noop",
       group: "engineering",
       notes:
-        "What: Four illustrative runs with synthetic tasks. Orange is what a pressured agent might invent; blue is the honest safe output it calls instead. noop says there was nothing to do; report_missing_tool and report_missing_data name what blocked it; report_incomplete flags an infrastructure failure and starts failure handling. A false noop that hides a failure is just another invention.\nWhy: An agent told to act tends to produce something, and a plausible fake finding costs more human attention than an honest no.\nWhen: Tell every workflow prompt to call noop when no action is needed. noop ends a run; the missing-tool and missing-data reports are diagnostics, and a run with no terminal safe output is reported incomplete.",
+        "What: Four illustrative runs with synthetic tasks. Orange is what a pressured agent might invent; blue is the honest safe output it calls instead. noop says there was nothing to do; report_missing_tool and report_missing_data name what blocked it; report_incomplete flags an infrastructure failure and starts failure handling. A false noop that hides a failure is just another invention.\nWhy: An agent told to act tends to produce something, and a plausible fake finding costs more human attention than an honest no.\nWhen: Tell every workflow prompt to call noop when no action is needed. noop ends a run; the missing-tool and missing-data reports are diagnostics, and a run with no terminal safe output is reported incomplete. The side counts are measured on gh-aw itself with gh aw audit: of 712 sampled agent runs from 15 to 21 Nov 2026, 168 called noop, 37 reported a missing tool, 4 missing data and 266 ended with report_incomplete (about 110 of those added by the system for engine or startup failures, the rest agent-authored environment or policy blocks).",
       enter() {
         t0 = 0;
         cur = -1;

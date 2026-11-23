@@ -316,3 +316,31 @@ func TestExtractNoopsFromRun_NoExperimentProvenance(t *testing.T) {
 		t.Errorf("Expected empty variant, got %q", noops[0].Variant)
 	}
 }
+
+func TestExtractReportIncompleteFromRun(t *testing.T) {
+	t.Parallel()
+	runDir := testutil.TempDir(t, "test-*")
+	content := `{"items":[
+  {"type":"noop","message":"nothing to do"},
+  {"type":"report_incomplete","reason":"GitHub MCP server unavailable","details":"0 results","timestamp":"2026-11-21T00:00:00Z"}
+],"errors":[]}`
+	if err := os.WriteFile(filepath.Join(runDir, "agent_output.json"), []byte(content), 0644); err != nil {
+		t.Fatalf("Failed to write agent_output.json: %v", err)
+	}
+	run := WorkflowRun{DatabaseID: 4242, WorkflowName: "Incomplete Test"}
+
+	reports, err := extractReportIncompleteFromRun(runDir, run, false, "", "")
+	if err != nil {
+		t.Fatalf("extractReportIncompleteFromRun: %v", err)
+	}
+	if len(reports) != 1 {
+		t.Fatalf("Expected 1 report_incomplete, got %d", len(reports))
+	}
+	got := reports[0]
+	if got.Reason != "GitHub MCP server unavailable" || got.Details != "0 results" {
+		t.Errorf("Unexpected report: %+v", got)
+	}
+	if got.RunID != run.DatabaseID || got.WorkflowName != run.WorkflowName {
+		t.Errorf("Expected provenance run %d/%q, got %d/%q", run.DatabaseID, run.WorkflowName, got.RunID, got.WorkflowName)
+	}
+}

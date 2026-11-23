@@ -305,6 +305,7 @@ func assembleAuditData(inputs auditDataInputs) AuditData {
 		MissingTools:            inputs.processedRun.MissingTools,
 		MissingData:             inputs.processedRun.MissingData,
 		Noops:                   inputs.processedRun.Noops,
+		ReportIncomplete:        inputs.processedRun.ReportIncomplete,
 		ContinuationRequests:    inputs.processedRun.ContinuationRequests,
 		MCPFailures:             inputs.processedRun.MCPFailures,
 		SkillActivations:        inputs.processedRun.SkillActivations,

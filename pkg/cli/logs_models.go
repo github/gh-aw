@@ -130,6 +130,7 @@ type ProcessedRun struct {
 	MissingTools            []MissingToolReport
 	MissingData             []MissingDataReport
 	Noops                   []NoopReport
+	ReportIncomplete        []ReportIncompleteReport
 	ContinuationRequests    []ContinuationRequestReport
 	MCPFailures             []MCPFailureReport
 	SkillActivations        []SkillActivation
@@ -183,6 +184,14 @@ type MissingToolReport struct {
 // NoopReport represents a noop message reported by an agentic workflow
 type NoopReport struct {
 	Message string `json:"message"`
+	ReportProvenance
+}
+
+// ReportIncompleteReport represents a report_incomplete safe output: the agent
+// could not finish because of an infrastructure or tool failure.
+type ReportIncompleteReport struct {
+	Reason  string `json:"reason"`
+	Details string `json:"details,omitempty"`
 	ReportProvenance
 }
 
@@ -310,6 +319,7 @@ type RunAnalysis struct {
 	MissingTools            []MissingToolReport         `json:"missing_tools"`                  // Missing tool reports
 	MissingData             []MissingDataReport         `json:"missing_data"`                   // Missing data reports
 	Noops                   []NoopReport                `json:"noops"`                          // Noop messages
+	ReportIncomplete        []ReportIncompleteReport    `json:"report_incomplete,omitempty"`    // report_incomplete signals
 	ContinuationRequests    []ContinuationRequestReport `json:"continuation_requests"`
 	MCPFailures             []MCPFailureReport          `json:"mcp_failures"`                      // MCP server failures
 	SkillActivations        []SkillActivation           `json:"skill_activations,omitempty"`       // Detected skill invocations

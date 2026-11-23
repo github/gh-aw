@@ -881,6 +881,8 @@ test.describe("agentic engineering slides", () => {
     await expect(page.locator(".nop-bad")).toContainText("✕ hides failure");
     await expect(page.locator(".nop-good")).toContainText("report_incomplete");
     await expect(page.locator(".nop-row.on")).toHaveText(/report_incomplete/);
+    await expect(page.locator(".nop-row em")).toHaveCount(4);
+    await expect(page.locator(".nop-cap")).toContainText(/MEASURED · gh aw audit .* snapshot .* illustrative/);
     expect(errors).toEqual([]);
   });
 

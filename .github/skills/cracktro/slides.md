@@ -1517,11 +1517,11 @@ illustrative
 
 #### Summary
 
-When there is nothing to do an agent calls the noop safe output instead of inventing work, and when a run goes wrong it reports the missing tool, missing data or incomplete run rather than faking a result.
+When there is nothing to do an agent calls the noop safe output instead of inventing work, and when a run goes wrong it reports the missing tool, missing data or incomplete run rather than faking a result. Measured runs of gh-aw itself, counted with gh aw audit, show how often each honest outcome occurs.
 
 #### Keywords
 
-noop, no-op, hallucination, report_missing_tool, report_missing_data, report_incomplete, missing tool, missing data, honest failure, diagnostics
+noop, no-op, hallucination, report_missing_tool, report_missing_data, report_incomplete, missing tool, missing data, honest failure, diagnostics, gh aw audit, measured
 
 #### Captions
 

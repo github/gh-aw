@@ -418,6 +418,7 @@ func processedRunFromSummary(summary *RunSummary, runOutputDir string) Processed
 		MissingTools:            summary.MissingTools,
 		MissingData:             summary.MissingData,
 		Noops:                   summary.Noops,
+		ReportIncomplete:        summary.ReportIncomplete,
 		ContinuationRequests:    summary.ContinuationRequests,
 		MCPFailures:             summary.MCPFailures,
 		SkillActivations:        summary.SkillActivations,
