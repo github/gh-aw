@@ -16605,6 +16605,14 @@
                     "tools-allowlist": {
                       "type": "boolean"
                     },
+                    "github-cli-proxy": {
+                      "type": "boolean",
+                      "description": "Include the GitHub CLI bridge when tools.cli-proxy is enabled, excluding it from native MCP configuration."
+                    },
+                    "auto-mcp-cli": {
+                      "type": "boolean",
+                      "description": "Augment active CLI mounts with configured GitHub, work-queue and custom MCP servers."
+                    },
                     "max-turns": {
                       "type": "boolean"
                     },

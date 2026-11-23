@@ -131,6 +131,8 @@ type ModelSelection struct {
 // engine definition frontmatter.
 type EngineCapabilitiesDefinition struct {
 	ToolsAllowlist       bool `yaml:"tools-allowlist,omitempty"`
+	GitHubCLIProxy       bool `yaml:"github-cli-proxy,omitempty"`
+	AutoMCPCLI           bool `yaml:"auto-mcp-cli,omitempty"`
 	MaxTurns             bool `yaml:"max-turns,omitempty"`
 	WebSearch            bool `yaml:"web-search,omitempty"`
 	WebFetchFallback     bool `yaml:"web-fetch-fallback,omitempty"`
@@ -146,6 +148,8 @@ type EngineCapabilitiesDefinition struct {
 func (d EngineCapabilitiesDefinition) ToRuntimeCapabilities() EngineCapabilities {
 	return EngineCapabilities{
 		ToolsAllowlist:       d.ToolsAllowlist,
+		GitHubCLIProxy:       d.GitHubCLIProxy,
+		AutoMCPCLI:           d.AutoMCPCLI,
 		MaxTurns:             d.MaxTurns,
 		WebSearch:            d.WebSearch,
 		WebFetchFallback:     d.WebFetchFallback,
