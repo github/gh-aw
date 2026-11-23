@@ -124,9 +124,16 @@ process.exit(1);`,
     ["245", "60000", 1, "rate_limit_wait_exceeded", true],
     ["1", "2000", 2, "rate_limit_error", false],
     ["245", "60000", 1, "rate_limit_wait_exceeded", false],
-  ])("honors Retry-After=%s within cap=%s, attempts=%i, class=%s, GitHub=%s", (delay, cap, attempts, failureClass, github) => {
+  ])("honors Retry-After=%s within timeout budget, backoff cap=%s, attempts=%i, class=%s, GitHub=%s", (delay, cap, attempts, failureClass, github) => {
     const { result, calls, harnessRetry } = runHarnessWithStub({
-      extraEnv: { GH_AW_SAFE_OUTPUTS: "", GH_AW_HARNESS_MAX_RETRIES: "1", GH_AW_HARNESS_MAX_DELAY_MS: cap, GH_AW_LLM_PROVIDER: github ? "github" : "anthropic", ...(github ? { ANTHROPIC_MODEL: "claude-sonnet-5" } : {}) },
+      extraEnv: {
+        GH_AW_SAFE_OUTPUTS: "",
+        GH_AW_HARNESS_MAX_RETRIES: "1",
+        GH_AW_HARNESS_MAX_DELAY_MS: cap,
+        GH_AW_TIMEOUT_MINUTES: "2",
+        GH_AW_LLM_PROVIDER: github ? "github" : "anthropic",
+        ...(github ? { ANTHROPIC_MODEL: "claude-sonnet-5" } : {}),
+      },
       ...(github ? { reflectData: { endpoints: [{ provider: "copilot", configured: true, port: 43123, models_url: "http://api-proxy:43123/models" }] } } : {}),
       stubScript: `
         const fs = require("fs");

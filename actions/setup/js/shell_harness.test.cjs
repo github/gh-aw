@@ -63,8 +63,8 @@ describe("shell_harness.cjs", () => {
       });
     });
 
-    it("fails fast when Retry-After exceeds max-delay-ms", () => {
-      const result = runRetry(`printf 'HTTP/1.1 429 Too Many Requests\nRetry-After: 257\n' >&2; exit 1`, { GH_AW_HARNESS_MAX_DELAY_MS: "60000" });
+    it("fails fast when Retry-After exceeds the remaining timeout", () => {
+      const result = runRetry(`printf 'HTTP/1.1 429 Too Many Requests\nRetry-After: 257\n' >&2; exit 1`, { GH_AW_TIMEOUT_MINUTES: "2" });
       expect(result.status).toBe(1);
       expect(result.invocations).toBe(1);
       expect(result.telemetry.attempt_results).toMatchObject([{ outcome: "failure", failure_classes: ["rate_limit_wait_exceeded"] }]);

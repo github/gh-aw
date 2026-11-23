@@ -34,6 +34,7 @@ func TestRuleRegistrationAndSelection(t *testing.T) {
 		"privileged-checkout", "artifact-execution", "unpinned-images", "environment-file-injection",
 		"bot-conditions",
 		"insecure-commands",
+		"dangerous-triggers",
 		"remote-script-execution",
 	}, ruleIDs)
 	selected, err := runner.Select("secret-leak", "secret-leak")

@@ -214,7 +214,7 @@ process.exit(1);`);
     ["245", "60000", 1, "rate_limit_wait_exceeded", true],
     ["1", "2000", 2, "rate_limit_error", false],
     ["245", "60000", 1, "rate_limit_wait_exceeded", false],
-  ])("honors Retry-After=%s within cap=%s, attempts=%i, class=%s, GitHub=%s", (delay, cap, attempts, failureClass, github) => {
+  ])("honors Retry-After=%s within timeout budget, backoff cap=%s, attempts=%i, class=%s, GitHub=%s", (delay, cap, attempts, failureClass, github) => {
     const { result, calls, harnessRetry } = runHarnessFixture(
       `
         const attempts = fs.readFileSync(process.env.CODEX_HARNESS_STUB_CALLS, "utf8").trim().split("\\n").length;
@@ -224,7 +224,7 @@ process.exit(1);`);
           process.exit(1);
         }
       `,
-      { env: { GH_AW_HARNESS_MAX_DELAY_MS: cap, GH_AW_LLM_PROVIDER: github ? "github" : "openai", ...(github ? { GH_AW_MODEL_AGENT_CODEX: "copilot/gpt-5" } : {}) } }
+      { env: { GH_AW_HARNESS_MAX_DELAY_MS: cap, GH_AW_TIMEOUT_MINUTES: "2", GH_AW_LLM_PROVIDER: github ? "github" : "openai", ...(github ? { GH_AW_MODEL_AGENT_CODEX: "copilot/gpt-5" } : {}) } }
     );
     expect(result.status, result.stderr).toBe(attempts === 2 ? 0 : 1);
     expect(calls).toHaveLength(attempts);
