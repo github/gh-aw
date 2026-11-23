@@ -80,7 +80,7 @@ Analyze all Go source files in the repository to identify:
 1. **Duplicated type definitions** - Same or similar types defined in multiple locations
 2. **Untyped usages** - Use of `interface{}`, `any`, or untyped constants that should be strongly typed
 
-Generate a single formatted discussion summarizing all refactoring opportunities.
+Generate a single formatted discussion summarizing the highest-impact refactoring opportunities.
 {{/if}}
 {{#if experiments.tone_style == 'conversational'}}
 Let's hunt for type consistency issues in the Go codebase! Your mission is to find:
@@ -89,6 +89,27 @@ Let's hunt for type consistency issues in the Go codebase! Your mission is to fi
 
 When you're done, create a discussion that explains what you found and how to fix it—think of it as a friendly code review that helps the team improve type safety.
 {{/if}}
+
+## Completion and Tool Budget
+
+Before analysis, run `safeoutputs --help` by itself to check the output transport.
+If it is unavailable or denied, stop and explain the blocker; do not claim an
+output was submitted or try an unapproved workaround.
+
+Use individual, allowed commands rather than compound shell commands, pipelines,
+redirections, or helper commands. After a denial, do not repeat the denied command
+or assume that every Bash command is denied. Use only separately authorized tools.
+If required analysis cannot be completed, call `safeoutputs report_incomplete`
+with the concrete blocker while the transport is still available; do not report
+partial coverage as complete.
+
+Reserve time to submit the discussion with `safeoutputs create_discussion`.
+Keep the body concise: report aggregate counts and at most three verified,
+high-impact findings, with locations and limitations. The template below shows
+the desired structure, not a requirement to reproduce every example or cluster.
+Pass a complete JSON object as a single shell argument, following the safe-output
+instructions, and wait for the tool response. If submission fails and the
+transport remains available, call `report_incomplete` with the failure.
 
 ## Current Context
 
@@ -121,14 +142,14 @@ First things first—let's activate Serena and discover all the Go files we need
 2. **Discover Go Source Files**:
    Find all non-test Go files in the repository:
    ```bash
-   find pkg -name "*.go" ! -name "*_test.go" -type f | sort
+   find pkg -name "*.go" ! -name "*_test.go" -type f
    ```
 
 ### Phase 1: Identify Duplicated Type Definitions
 
 Use the `duplicate-type-finder` agent to collect all Go type definitions under `pkg/` and cluster them into exact, near, and semantic duplicates.
 
-Store the returned JSON as `phase1_results`. In Phase 3, pass the `duplicate_clusters` array when tracing references. In Phase 4, use `total_types` and `duplicate_clusters` to populate the discussion statistics and per-cluster writeups.
+Store the returned JSON as `phase1_results`. In Phase 3, use the `duplicate_clusters` array when tracing references. In Phase 4, use `total_types` and `duplicate_clusters` for the discussion statistics and selected findings.
 
 ### Phase 2: Identify Untyped Usages
 
@@ -519,7 +540,7 @@ You are a Go type-definition analyst. Collect all type definitions from non-test
 
 **Step 1 — Discover source files**:
 ```bash
-find pkg -name "*.go" ! -name "*_test.go" -type f | sort
+find pkg -name "*.go" ! -name "*_test.go" -type f
 ```
 
 **Step 2 — Extract type definitions**:
