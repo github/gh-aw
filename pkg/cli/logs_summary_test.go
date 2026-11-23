@@ -13,6 +13,8 @@ import (
 
 	"github.com/github/gh-aw/pkg/testutil"
 	"github.com/github/gh-aw/pkg/workflow"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestRunSummaryAndDownloadResultEmbedRunAnalysis(t *testing.T) {
@@ -234,6 +236,25 @@ func TestLoadRunSummaryVersionMismatch(t *testing.T) {
 	if loadedSummary != nil {
 		t.Errorf("Expected nil summary due to version mismatch, but got: %+v", loadedSummary)
 	}
+}
+
+func TestLoadRunSummaryRejectsOlderSchema(t *testing.T) {
+	runDir := filepath.Join(testutil.TempDir(t, "test-*"), "run-12345")
+	require.NoError(t, os.MkdirAll(runDir, 0o755))
+
+	// Summaries written before report_incomplete was captured carry no
+	// schema_version and must be reprocessed even when cli_version matches.
+	data, err := json.Marshal(map[string]any{"cli_version": GetVersion(), "run_id": 12345})
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(filepath.Join(runDir, runSummaryFileName), data, 0o600))
+
+	_, ok := loadRunSummary(runDir, false)
+	assert.False(t, ok, "summary without current schema_version must not be reused")
+
+	require.NoError(t, saveRunSummary(runDir, &RunSummary{CLIVersion: GetVersion(), RunID: 12345}, false))
+	loaded, ok := loadRunSummary(runDir, false)
+	require.True(t, ok, "freshly saved summary should be reused")
+	assert.Equal(t, runSummarySchemaVersion, loaded.SchemaVersion)
 }
 
 func TestLoadRunSummaryMissingFile(t *testing.T) {
