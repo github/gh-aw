@@ -1861,6 +1861,13 @@ test.describe("reusable runtime", () => {
     const voice = page.locator(".vcb");
     const spoken = () => page.evaluate(() => (window as unknown as { spoken: string[] }).spoken);
     await expect(voice).toBeHidden();
+    // voice is off by default: kiosk mode alone starts silent
+    await page.keyboard.press("k");
+    await expect(page.locator("body")).toHaveClass(/\bkiosk\b/);
+    await expect(voice).toHaveAttribute("aria-pressed", "false");
+    expect(await spoken()).toEqual([]);
+    await page.keyboard.press("Escape");
+    await expect(page.locator("body")).not.toHaveClass(/\bkiosk\b/);
     // V starts kiosk mode with the voice on and speaks the slide's first line from that gesture
     await page.keyboard.press("v");
     await expect(page.locator("body")).toHaveClass(/\bkiosk\b/);
