@@ -1,5 +1,5 @@
-# gh-aw-metadata: {"schema_version":"v4","frontmatter_hash":"a709bf8897f46737c314c2757ef0e4e68de2553e994f8bd7481e96515c7cbcf7","body_hash":"00ec387da5eff30875286adc7e2cb7becab753ea576d7d574fcc40c6af0007c9","strict":true,"agent_id":"codex","agent_model":"copilot/gpt-5.6-luna","engine_versions":{"codex":"0.169.0"}}
-# gh-aw-manifest: {"version":1,"secrets":["COPILOT_GITHUB_TOKEN","GH_AW_GITHUB_MCP_SERVER_TOKEN","GH_AW_GITHUB_TOKEN","GH_AW_OTEL_GRAFANA_AUTHORIZATION","GH_AW_OTEL_GRAFANA_ENDPOINT","GH_AW_OTEL_SENTRY_AUTHORIZATION","GH_AW_OTEL_SENTRY_ENDPOINT","GITHUB_TOKEN"],"actions":[{"repo":"actions/checkout","sha":"3d3c42e5aac5ba805825da76410c181273ba90b1","version":"v7.0.1"},{"repo":"actions/download-artifact","sha":"9000827ccba6bdab643e8b6fd33ac0654aef8333","version":"v8.0.2"},{"repo":"actions/github-script","sha":"3a2844b7e9c422d3c10d287c895573f7108da1b3","version":"v9.0.0"},{"repo":"actions/setup-node","sha":"949feb2413d6458794dcd2491c4babbbce0c15c1","version":"v7.1.0"},{"repo":"actions/upload-artifact","sha":"cf430e030ddbb5b0abf93d22962f4752f3646cd9","version":"v7.0.2"}],"containers":[{"image":"ghcr.io/github/gh-aw-firewall/agent:0.29.18","digest":"sha256:271aa6f147ef9b4a29b479fd1077fec834bb60f6a998c0ac46ff666de5ca20f5","pinned_image":"ghcr.io/github/gh-aw-firewall/agent:0.29.18@sha256:271aa6f147ef9b4a29b479fd1077fec834bb60f6a998c0ac46ff666de5ca20f5"},{"image":"ghcr.io/github/gh-aw-firewall/api-proxy:0.29.18","digest":"sha256:04779d40ad81abcce125ceb3ef8cda5cd4a049fe760d3fe1f0e4c3a39307573e","pinned_image":"ghcr.io/github/gh-aw-firewall/api-proxy:0.29.18@sha256:04779d40ad81abcce125ceb3ef8cda5cd4a049fe760d3fe1f0e4c3a39307573e"},{"image":"ghcr.io/github/gh-aw-firewall/squid:0.29.18","digest":"sha256:00fa6db859de828472056f4f74fdf36d03574c8b620eb9f8a2030891ca06802e","pinned_image":"ghcr.io/github/gh-aw-firewall/squid:0.29.18@sha256:00fa6db859de828472056f4f74fdf36d03574c8b620eb9f8a2030891ca06802e"},{"image":"ghcr.io/github/gh-aw-mcpg:v0.5.12","digest":"sha256:3223d0c575227d859f18f390e70f17fcbef81db6ef2c7949a1fac4b04cd201dc","pinned_image":"ghcr.io/github/gh-aw-mcpg:v0.5.12@sha256:3223d0c575227d859f18f390e70f17fcbef81db6ef2c7949a1fac4b04cd201dc"},{"image":"ghcr.io/github/gh-aw-node","digest":"sha256:8735428c2d4e602f90781ba0c571c400e8ff93c7ee1508a75d71f87e34e415cc","pinned_image":"ghcr.io/github/gh-aw-node@sha256:8735428c2d4e602f90781ba0c571c400e8ff93c7ee1508a75d71f87e34e415cc"},{"image":"ghcr.io/github/github-mcp-server:v2.2.0","digest":"sha256:040c4e99810076035eb1d9beb4b4a96fcf589c43cefed6ff51a46a553eb4e174","pinned_image":"ghcr.io/github/github-mcp-server:v2.2.0@sha256:040c4e99810076035eb1d9beb4b4a96fcf589c43cefed6ff51a46a553eb4e174"}],"mcp_servers":[{"name":"github","tools":["get_commit","get_discussion","get_discussion_comments","get_file_contents","get_latest_release","get_me","get_pull_request","get_pull_request_comments","get_pull_request_diff","get_pull_request_files","get_pull_request_review_comments","get_pull_request_reviews","get_pull_request_status","get_release_by_tag","get_tag","issue_read","list_branches","list_commits","list_discussion_categories","list_discussions","list_issue_types","list_issues","list_pull_requests","list_releases","list_starred_repositories","list_tags","pull_request_read","search_code","search_issues","search_pull_requests","search_repositories"]},{"name":"mcpscripts","tools":["github-discussion-query","github-issue-query","github-pr-query"]},{"name":"safeoutputs","tools":["close_discussion","create_discussion","noop","report_incomplete","report_missing_data","report_missing_tool"]},{"name":"work-queue","tools":["work_queue_claim_finish","work_queue_dispatch_next","work_queue_explain","work_queue_read","work_queue_submit"]}],"threat_detection":{"mode":"enabled"},"admission":true,"work_queue":{"worker":true,"logical_contract":"df9455a8063483b354ffa7544ea4f7d3a99ded3c09b8453b3257202580eefc59"},"agent_metadata":{"03cbf8931deff21d5116":{"name":"Agentic Workflows"},"4943cffeebb6706aa8bc":{"name":"Squad","tools":["*"]},"9ea639558df913e650e4":{"name":"technical-doc-writer"},"a17c6c62ffcd7401f40f":{"name":"adr-writer"},"ad6ff0fe9219fbfa5ccc":{"name":"grumpy-reviewer","tools":["read","search"]},"e0c35a96dedfb29cb9b1":{"name":"w3c-specification-writer"}}}
+# gh-aw-metadata: {"schema_version":"v4","frontmatter_hash":"0269fddc909f5d2645345950870178d5b66d7f3d168aeb6175d729f80009011c","body_hash":"00ec387da5eff30875286adc7e2cb7becab753ea576d7d574fcc40c6af0007c9","strict":true,"agent_id":"codex","agent_model":"copilot/gpt-5.6-luna","engine_versions":{"codex":"0.169.0"}}
+# gh-aw-manifest: {"version":1,"secrets":["COPILOT_GITHUB_TOKEN","GH_AW_GITHUB_MCP_SERVER_TOKEN","GH_AW_GITHUB_TOKEN","GH_AW_OTEL_GRAFANA_AUTHORIZATION","GH_AW_OTEL_GRAFANA_ENDPOINT","GH_AW_OTEL_SENTRY_AUTHORIZATION","GH_AW_OTEL_SENTRY_ENDPOINT","GITHUB_TOKEN"],"actions":[{"repo":"actions/checkout","sha":"3d3c42e5aac5ba805825da76410c181273ba90b1","version":"v7.0.1"},{"repo":"actions/download-artifact","sha":"9000827ccba6bdab643e8b6fd33ac0654aef8333","version":"v8.0.2"},{"repo":"actions/github-script","sha":"3a2844b7e9c422d3c10d287c895573f7108da1b3","version":"v9.0.0"},{"repo":"actions/setup-node","sha":"949feb2413d6458794dcd2491c4babbbce0c15c1","version":"v7.1.0"},{"repo":"actions/upload-artifact","sha":"cf430e030ddbb5b0abf93d22962f4752f3646cd9","version":"v7.0.2"}],"containers":[{"image":"ghcr.io/github/gh-aw-firewall/agent:0.29.18","digest":"sha256:271aa6f147ef9b4a29b479fd1077fec834bb60f6a998c0ac46ff666de5ca20f5","pinned_image":"ghcr.io/github/gh-aw-firewall/agent:0.29.18@sha256:271aa6f147ef9b4a29b479fd1077fec834bb60f6a998c0ac46ff666de5ca20f5"},{"image":"ghcr.io/github/gh-aw-firewall/api-proxy:0.29.18","digest":"sha256:04779d40ad81abcce125ceb3ef8cda5cd4a049fe760d3fe1f0e4c3a39307573e","pinned_image":"ghcr.io/github/gh-aw-firewall/api-proxy:0.29.18@sha256:04779d40ad81abcce125ceb3ef8cda5cd4a049fe760d3fe1f0e4c3a39307573e"},{"image":"ghcr.io/github/gh-aw-firewall/squid:0.29.18","digest":"sha256:00fa6db859de828472056f4f74fdf36d03574c8b620eb9f8a2030891ca06802e","pinned_image":"ghcr.io/github/gh-aw-firewall/squid:0.29.18@sha256:00fa6db859de828472056f4f74fdf36d03574c8b620eb9f8a2030891ca06802e"},{"image":"ghcr.io/github/gh-aw-mcpg:v0.5.12","digest":"sha256:3223d0c575227d859f18f390e70f17fcbef81db6ef2c7949a1fac4b04cd201dc","pinned_image":"ghcr.io/github/gh-aw-mcpg:v0.5.12@sha256:3223d0c575227d859f18f390e70f17fcbef81db6ef2c7949a1fac4b04cd201dc"},{"image":"ghcr.io/github/gh-aw-node","digest":"sha256:8735428c2d4e602f90781ba0c571c400e8ff93c7ee1508a75d71f87e34e415cc","pinned_image":"ghcr.io/github/gh-aw-node@sha256:8735428c2d4e602f90781ba0c571c400e8ff93c7ee1508a75d71f87e34e415cc"},{"image":"ghcr.io/github/github-mcp-server:v2.2.0","digest":"sha256:040c4e99810076035eb1d9beb4b4a96fcf589c43cefed6ff51a46a553eb4e174","pinned_image":"ghcr.io/github/github-mcp-server:v2.2.0@sha256:040c4e99810076035eb1d9beb4b4a96fcf589c43cefed6ff51a46a553eb4e174"}],"mcp_servers":[{"name":"github","tools":["get_commit","get_discussion","get_discussion_comments","get_file_contents","get_latest_release","get_me","get_pull_request","get_pull_request_comments","get_pull_request_diff","get_pull_request_files","get_pull_request_review_comments","get_pull_request_reviews","get_pull_request_status","get_release_by_tag","get_tag","issue_read","list_branches","list_commits","list_discussion_categories","list_discussions","list_issue_types","list_issues","list_pull_requests","list_releases","list_starred_repositories","list_tags","pull_request_read","search_code","search_issues","search_pull_requests","search_repositories"]},{"name":"mcpscripts","tools":["github-discussion-query","github-issue-query","github-pr-query"]},{"name":"safeoutputs","tools":["close_discussion","create_discussion","noop","report_incomplete","report_missing_data","report_missing_tool"]},{"name":"work-queue","tools":["work_queue_claim_finish","work_queue_dispatch_next","work_queue_explain","work_queue_read","work_queue_submit"]}],"threat_detection":{"mode":"enabled"},"admission":true,"work_queue":{"worker":true,"logical_contract":"34c60dff7a5aa7036ec1fe125fb7f4b81302e2bac9947ee754f3f0624bb3329e"},"agent_metadata":{"03cbf8931deff21d5116":{"name":"Agentic Workflows"},"4943cffeebb6706aa8bc":{"name":"Squad","tools":["*"]},"9ea639558df913e650e4":{"name":"technical-doc-writer"},"a17c6c62ffcd7401f40f":{"name":"adr-writer"},"ad6ff0fe9219fbfa5ccc":{"name":"grumpy-reviewer","tools":["read","search"]},"e0c35a96dedfb29cb9b1":{"name":"w3c-specification-writer"}}}
 # This file was automatically generated by gh-aw. DO NOT EDIT. To debug this workflow, load the skill at https://github.com/github/gh-aw/blob/main/debug.md
 #
 #    ___                   _   _
@@ -164,7 +164,7 @@ jobs:
           GH_AW_DEFAULT_ADMISSION_URL: ${{ vars.GH_AW_DEFAULT_ADMISSION_URL }}
           GH_AW_DEFAULT_ADMISSION_AUDIENCE: ${{ vars.GH_AW_DEFAULT_ADMISSION_AUDIENCE }}
           GH_AW_DEFAULT_ADMISSION_ON_OUTAGE: ${{ vars.GH_AW_DEFAULT_ADMISSION_ON_OUTAGE }}
-          GH_AW_ADMISSION_WORKFLOW_HASH: "a709bf8897f46737c314c2757ef0e4e68de2553e994f8bd7481e96515c7cbcf7:00ec387da5eff30875286adc7e2cb7becab753ea576d7d574fcc40c6af0007c9"
+          GH_AW_ADMISSION_WORKFLOW_HASH: "0269fddc909f5d2645345950870178d5b66d7f3d168aeb6175d729f80009011c:00ec387da5eff30875286adc7e2cb7becab753ea576d7d574fcc40c6af0007c9"
           GH_AW_INFO_WORKFLOW_ID: ${{ job.workflow_ref }}
           GITHUB_ACTOR: ${{ github.actor }}
           GITHUB_TRIGGERING_ACTOR: ${{ github.triggering_actor }}
@@ -486,7 +486,7 @@ jobs:
           GH_AW_WORK_QUEUE_ROLE: "worker"
           GH_AW_WORK_QUEUE_ISSUES: "{\"label\":\"work\",\"orphaned_after_days\":30}"
           GH_AW_WORK_QUEUE_CHECKED_TRANSPORT: "graphql"
-          GH_AW_WORK_QUEUE_CONTRACT: "df9455a8063483b354ffa7544ea4f7d3a99ded3c09b8453b3257202580eefc59"
+          GH_AW_WORK_QUEUE_CONTRACT: "34c60dff7a5aa7036ec1fe125fb7f4b81302e2bac9947ee754f3f0624bb3329e"
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |
@@ -929,7 +929,7 @@ jobs:
         # runner-guard:ignore RGS-018 -- writes first-party mcp-scripts tools.json manifest and mcp-server.cjs shim generated verbatim from the gh-aw compiler template, not an attacker-controlled dropper.
         run: |
           mkdir -p "${RUNNER_TEMP}/gh-aw/mcp-scripts/logs"
-          cat > "${RUNNER_TEMP}/gh-aw/mcp-scripts/tools.json" << 'GH_AW_MCP_SCRIPTS_TOOLS_4391da13b62d119b_EOF'
+          cat > "${RUNNER_TEMP}/gh-aw/mcp-scripts/tools.json" << 'GH_AW_MCP_SCRIPTS_TOOLS_3efbc69dd0fc3f3b_EOF'
           {
             "serverName": "mcpscripts",
             "version": "1.0.0",
@@ -1004,7 +1004,7 @@ jobs:
                   "GH_TOKEN": "GH_AW_MCP_SCRIPTS_ENV_18_GITHUB_ISSUE_QUERY_GH_TOKEN",
                   "GITHUB_REPOSITORY": "GH_AW_MCP_SCRIPTS_ENV_18_GITHUB_ISSUE_QUERY_GITHUB_REPOSITORY"
                 },
-                "timeout": 60
+                "timeout": 600
               },
               {
                 "name": "github-pr-query",
@@ -1043,11 +1043,11 @@ jobs:
                   "GH_TOKEN": "GH_AW_MCP_SCRIPTS_ENV_15_GITHUB_PR_QUERY_GH_TOKEN",
                   "GITHUB_REPOSITORY": "GH_AW_MCP_SCRIPTS_ENV_15_GITHUB_PR_QUERY_GITHUB_REPOSITORY"
                 },
-                "timeout": 60
+                "timeout": 600
               }
             ]
           }
-          GH_AW_MCP_SCRIPTS_TOOLS_4391da13b62d119b_EOF
+          GH_AW_MCP_SCRIPTS_TOOLS_3efbc69dd0fc3f3b_EOF
           cat > "${RUNNER_TEMP}/gh-aw/mcp-scripts/mcp-server.cjs" << 'GH_AW_MCP_SCRIPTS_SERVER_7f1d774b71e7cfe7_EOF'
             const path = require("path");
             const { startHttpServer } = require("./mcp_scripts_mcp_server_http.cjs");
@@ -1252,7 +1252,7 @@ jobs:
 
           GH_AW_MCP_SCRIPTS_SH_GITHUB-DISCUSSION-QUERY_b198e86dc6d829e6_EOF
           chmod +x "${RUNNER_TEMP}/gh-aw/mcp-scripts/github-discussion-query.sh"
-          cat > "${RUNNER_TEMP}/gh-aw/mcp-scripts/github-issue-query.sh" << 'GH_AW_MCP_SCRIPTS_SH_GITHUB-ISSUE-QUERY_ecb35a2963ba76f8_EOF'
+          cat > "${RUNNER_TEMP}/gh-aw/mcp-scripts/github-issue-query.sh" << 'GH_AW_MCP_SCRIPTS_SH_GITHUB-ISSUE-QUERY_02126f86bbdf60c9_EOF'
           #!/bin/bash
           # Auto-generated mcp-script tool: github-issue-query
           # Query GitHub issues with jq filtering support. Without --jq, returns schema and data size info. Use --jq '.' to get all data, or specific jq expressions to filter.
@@ -1282,6 +1282,75 @@ jobs:
           }
           trap cleanup EXIT
 
+          run_gh_json_with_retry() {
+            local output_file="$1"
+            shift
+            local attempt status
+            for attempt in 1 2 3; do
+              if gh "$@" > "$output_file"; then
+                if jq -e 'type == "array"' "$output_file" >/dev/null 2>&1; then
+                  return 0
+                fi
+                status=1
+              else
+                status=$?
+              fi
+              if [[ "$attempt" -eq 3 ]]; then
+                echo "Error: GitHub query failed or returned invalid JSON after three attempts" >&2
+                return "$status"
+              fi
+              sleep "$attempt"
+            done
+          }
+
+          collect_bounded_range() {
+            local range_start="$1"
+            local range_end="$2"
+            local item_count start_epoch end_epoch midpoint_epoch midpoint_date next_date
+            local gh_args
+            PAGE_OUTPUT_FILE=$(mktemp)
+            gh_args=("$QUERY_COMMAND" list --state "$STATE" --search "updated:${range_start}..${range_end}" --limit "$RANGE_LIMIT" --json "$JSON_FIELDS")
+            [[ -n "$REPO" ]] && gh_args+=(--repo "$REPO")
+            if ! run_gh_json_with_retry "$PAGE_OUTPUT_FILE" "${gh_args[@]}"; then
+              if ! rm -f "$PAGE_OUTPUT_FILE"; then
+                return 1
+              fi
+              PAGE_OUTPUT_FILE=""
+              return 1
+            fi
+            item_count=$(jq 'length' < "$PAGE_OUTPUT_FILE")
+            if [[ "$item_count" -ge "$RANGE_LIMIT" ]]; then
+              if ! rm -f "$PAGE_OUTPUT_FILE"; then
+                return 1
+              fi
+              PAGE_OUTPUT_FILE=""
+              start_epoch=$(date -u -d "$range_start" +%s)
+              end_epoch=$(date -u -d "$range_end" +%s)
+              if (( start_epoch >= end_epoch )); then
+                echo "Error: bounded query reached its $RANGE_LIMIT item limit for single-day range $range_start" >&2
+                return 1
+              fi
+              midpoint_epoch=$(((start_epoch + end_epoch) / 2))
+              midpoint_date=$(date -u -d "@$midpoint_epoch" '+%Y-%m-%d')
+              next_date=$(date -u -d "@$((midpoint_epoch + 86400))" '+%Y-%m-%d')
+              collect_bounded_range "$range_start" "$midpoint_date" || return $?
+              collect_bounded_range "$next_date" "$range_end" || return $?
+              return 0
+            fi
+            FILTERED_OUTPUT_FILE=$(mktemp)
+            if ! jq -s '.[0] + .[1]' "$MERGED_OUTPUT_FILE" "$PAGE_OUTPUT_FILE" > "$FILTERED_OUTPUT_FILE"; then
+              return 1
+            fi
+            if ! mv "$FILTERED_OUTPUT_FILE" "$MERGED_OUTPUT_FILE"; then
+              return 1
+            fi
+            FILTERED_OUTPUT_FILE=""
+            if ! rm -f "$PAGE_OUTPUT_FILE"; then
+              return 1
+            fi
+            PAGE_OUTPUT_FILE=""
+          }
+
           if [[ -n "$UNTIL" && -z "$SINCE" ]]; then
             echo "Error: until requires since" >&2
             exit 1
@@ -1301,17 +1370,12 @@ jobs:
             SEARCH_START=$(date -u -d "$SINCE" '+%Y-%m-%d')
             SEARCH_END=$(date -u -d "$UNTIL" '+%Y-%m-%d')
             RANGE_LIMIT="${INPUT_LIMIT:-1000}"
-            SEARCH_QUERY="updated:${SEARCH_START}..${SEARCH_END}"
-            GH_ARGS=(issue list --state "$STATE" --search "$SEARCH_QUERY" --limit "$RANGE_LIMIT" --json "$JSON_FIELDS")
-            [[ -n "$REPO" ]] && GH_ARGS+=(--repo "$REPO")
-            gh "${GH_ARGS[@]}" > "$OUTPUT_FILE"
-            ITEM_COUNT=$(jq 'length' < "$OUTPUT_FILE")
-            if [[ "$ITEM_COUNT" -ge "$RANGE_LIMIT" ]]; then
-              echo "Error: bounded query reached its $RANGE_LIMIT item limit; retry with a smaller date range" >&2
-              exit 1
-            fi
+            QUERY_COMMAND=issue
+            MERGED_OUTPUT_FILE=$(mktemp)
+            echo '[]' > "$MERGED_OUTPUT_FILE"
+            collect_bounded_range "$SEARCH_START" "$SEARCH_END"
             FILTERED_OUTPUT_FILE=$(mktemp)
-            jq --arg since "$SINCE" --arg until "$UNTIL" '[.[] | select(.updatedAt >= $since and .updatedAt <= $until)]' "$OUTPUT_FILE" > "$FILTERED_OUTPUT_FILE"
+            jq --arg since "$SINCE" --arg until "$UNTIL" '[.[] | select(.updatedAt >= $since and .updatedAt <= $until)] | unique_by(.number)' "$MERGED_OUTPUT_FILE" > "$FILTERED_OUTPUT_FILE"
             mv "$FILTERED_OUTPUT_FILE" "$OUTPUT_FILE"
             FILTERED_OUTPUT_FILE=""
           elif [[ -n "$SINCE" ]]; then
@@ -1329,7 +1393,7 @@ jobs:
             echo '[]' > "$OUTPUT_FILE"
             while :; do
               PAGE_OUTPUT_FILE=$(mktemp)
-              gh api "${API_PATH}?state=${STATE}&sort=updated&direction=desc&per_page=100&page=${PAGE}" > "$PAGE_OUTPUT_FILE"
+              run_gh_json_with_retry "$PAGE_OUTPUT_FILE" api "${API_PATH}?state=${STATE}&sort=updated&direction=desc&per_page=100&page=${PAGE}"
               [[ "$(jq 'length' < "$PAGE_OUTPUT_FILE")" -eq 0 ]] && { rm -f "$PAGE_OUTPUT_FILE"; PAGE_OUTPUT_FILE=""; break; }
               MERGED_OUTPUT_FILE=$(mktemp)
               jq -s '.[0] + .[1]' "$OUTPUT_FILE" "$PAGE_OUTPUT_FILE" > "$MERGED_OUTPUT_FILE"
@@ -1349,9 +1413,9 @@ jobs:
             mv "$FILTERED_OUTPUT_FILE" "$OUTPUT_FILE"
             FILTERED_OUTPUT_FILE=""
           elif [[ -n "$REPO" ]]; then
-            gh issue list --state "$STATE" --limit "$LIMIT" --json "$JSON_FIELDS" --repo "$REPO" > "$OUTPUT_FILE"
+            run_gh_json_with_retry "$OUTPUT_FILE" issue list --state "$STATE" --limit "$LIMIT" --json "$JSON_FIELDS" --repo "$REPO"
           else
-            gh issue list --state "$STATE" --limit "$LIMIT" --json "$JSON_FIELDS" > "$OUTPUT_FILE"
+            run_gh_json_with_retry "$OUTPUT_FILE" issue list --state "$STATE" --limit "$LIMIT" --json "$JSON_FIELDS"
           fi
 
           # Apply jq filter if specified
@@ -1411,9 +1475,9 @@ jobs:
           fi
 
 
-          GH_AW_MCP_SCRIPTS_SH_GITHUB-ISSUE-QUERY_ecb35a2963ba76f8_EOF
+          GH_AW_MCP_SCRIPTS_SH_GITHUB-ISSUE-QUERY_02126f86bbdf60c9_EOF
           chmod +x "${RUNNER_TEMP}/gh-aw/mcp-scripts/github-issue-query.sh"
-          cat > "${RUNNER_TEMP}/gh-aw/mcp-scripts/github-pr-query.sh" << 'GH_AW_MCP_SCRIPTS_SH_GITHUB-PR-QUERY_84be5598473b5844_EOF'
+          cat > "${RUNNER_TEMP}/gh-aw/mcp-scripts/github-pr-query.sh" << 'GH_AW_MCP_SCRIPTS_SH_GITHUB-PR-QUERY_d398dc31abca48f5_EOF'
           #!/bin/bash
           # Auto-generated mcp-script tool: github-pr-query
           # Query GitHub pull requests with jq filtering support. Without --jq, returns schema and data size info. Use --jq '.' to get all data, or specific jq expressions to filter.
@@ -1443,6 +1507,75 @@ jobs:
           }
           trap cleanup EXIT
 
+          run_gh_json_with_retry() {
+            local output_file="$1"
+            shift
+            local attempt status
+            for attempt in 1 2 3; do
+              if gh "$@" > "$output_file"; then
+                if jq -e 'type == "array"' "$output_file" >/dev/null 2>&1; then
+                  return 0
+                fi
+                status=1
+              else
+                status=$?
+              fi
+              if [[ "$attempt" -eq 3 ]]; then
+                echo "Error: GitHub query failed or returned invalid JSON after three attempts" >&2
+                return "$status"
+              fi
+              sleep "$attempt"
+            done
+          }
+
+          collect_bounded_range() {
+            local range_start="$1"
+            local range_end="$2"
+            local item_count start_epoch end_epoch midpoint_epoch midpoint_date next_date
+            local gh_args
+            PAGE_OUTPUT_FILE=$(mktemp)
+            gh_args=("$QUERY_COMMAND" list --state "$STATE" --search "updated:${range_start}..${range_end}" --limit "$RANGE_LIMIT" --json "$JSON_FIELDS")
+            [[ -n "$REPO" ]] && gh_args+=(--repo "$REPO")
+            if ! run_gh_json_with_retry "$PAGE_OUTPUT_FILE" "${gh_args[@]}"; then
+              if ! rm -f "$PAGE_OUTPUT_FILE"; then
+                return 1
+              fi
+              PAGE_OUTPUT_FILE=""
+              return 1
+            fi
+            item_count=$(jq 'length' < "$PAGE_OUTPUT_FILE")
+            if [[ "$item_count" -ge "$RANGE_LIMIT" ]]; then
+              if ! rm -f "$PAGE_OUTPUT_FILE"; then
+                return 1
+              fi
+              PAGE_OUTPUT_FILE=""
+              start_epoch=$(date -u -d "$range_start" +%s)
+              end_epoch=$(date -u -d "$range_end" +%s)
+              if (( start_epoch >= end_epoch )); then
+                echo "Error: bounded query reached its $RANGE_LIMIT item limit for single-day range $range_start" >&2
+                return 1
+              fi
+              midpoint_epoch=$(((start_epoch + end_epoch) / 2))
+              midpoint_date=$(date -u -d "@$midpoint_epoch" '+%Y-%m-%d')
+              next_date=$(date -u -d "@$((midpoint_epoch + 86400))" '+%Y-%m-%d')
+              collect_bounded_range "$range_start" "$midpoint_date" || return $?
+              collect_bounded_range "$next_date" "$range_end" || return $?
+              return 0
+            fi
+            FILTERED_OUTPUT_FILE=$(mktemp)
+            if ! jq -s '.[0] + .[1]' "$MERGED_OUTPUT_FILE" "$PAGE_OUTPUT_FILE" > "$FILTERED_OUTPUT_FILE"; then
+              return 1
+            fi
+            if ! mv "$FILTERED_OUTPUT_FILE" "$MERGED_OUTPUT_FILE"; then
+              return 1
+            fi
+            FILTERED_OUTPUT_FILE=""
+            if ! rm -f "$PAGE_OUTPUT_FILE"; then
+              return 1
+            fi
+            PAGE_OUTPUT_FILE=""
+          }
+
           if [[ -n "$UNTIL" && -z "$SINCE" ]]; then
             echo "Error: until requires since" >&2
             exit 1
@@ -1462,17 +1595,12 @@ jobs:
             SEARCH_START=$(date -u -d "$SINCE" '+%Y-%m-%d')
             SEARCH_END=$(date -u -d "$UNTIL" '+%Y-%m-%d')
             RANGE_LIMIT="${INPUT_LIMIT:-1000}"
-            SEARCH_QUERY="updated:${SEARCH_START}..${SEARCH_END}"
-            GH_ARGS=(pr list --state "$STATE" --search "$SEARCH_QUERY" --limit "$RANGE_LIMIT" --json "$JSON_FIELDS")
-            [[ -n "$REPO" ]] && GH_ARGS+=(--repo "$REPO")
-            gh "${GH_ARGS[@]}" > "$OUTPUT_FILE"
-            ITEM_COUNT=$(jq 'length' < "$OUTPUT_FILE")
-            if [[ "$ITEM_COUNT" -ge "$RANGE_LIMIT" ]]; then
-              echo "Error: bounded query reached its $RANGE_LIMIT item limit; retry with a smaller date range" >&2
-              exit 1
-            fi
+            QUERY_COMMAND=pr
+            MERGED_OUTPUT_FILE=$(mktemp)
+            echo '[]' > "$MERGED_OUTPUT_FILE"
+            collect_bounded_range "$SEARCH_START" "$SEARCH_END"
             FILTERED_OUTPUT_FILE=$(mktemp)
-            jq --arg since "$SINCE" --arg until "$UNTIL" '[.[] | select(.updatedAt >= $since and .updatedAt <= $until)]' "$OUTPUT_FILE" > "$FILTERED_OUTPUT_FILE"
+            jq --arg since "$SINCE" --arg until "$UNTIL" '[.[] | select(.updatedAt >= $since and .updatedAt <= $until)] | unique_by(.number)' "$MERGED_OUTPUT_FILE" > "$FILTERED_OUTPUT_FILE"
             mv "$FILTERED_OUTPUT_FILE" "$OUTPUT_FILE"
             FILTERED_OUTPUT_FILE=""
           elif [[ -n "$SINCE" ]]; then
@@ -1492,7 +1620,7 @@ jobs:
             echo '[]' > "$OUTPUT_FILE"
             while :; do
               PAGE_OUTPUT_FILE=$(mktemp)
-              gh api "${API_PATH}?state=${REST_STATE}&sort=updated&direction=desc&per_page=100&page=${PAGE}" > "$PAGE_OUTPUT_FILE"
+              run_gh_json_with_retry "$PAGE_OUTPUT_FILE" api "${API_PATH}?state=${REST_STATE}&sort=updated&direction=desc&per_page=100&page=${PAGE}"
               [[ "$(jq 'length' < "$PAGE_OUTPUT_FILE")" -eq 0 ]] && { rm -f "$PAGE_OUTPUT_FILE"; PAGE_OUTPUT_FILE=""; break; }
               MERGED_OUTPUT_FILE=$(mktemp)
               jq -s '.[0] + .[1]' "$OUTPUT_FILE" "$PAGE_OUTPUT_FILE" > "$MERGED_OUTPUT_FILE"
@@ -1513,9 +1641,9 @@ jobs:
             mv "$FILTERED_OUTPUT_FILE" "$OUTPUT_FILE"
             FILTERED_OUTPUT_FILE=""
           elif [[ -n "$REPO" ]]; then
-            gh pr list --state "$STATE" --limit "$LIMIT" --json "$JSON_FIELDS" --repo "$REPO" > "$OUTPUT_FILE"
+            run_gh_json_with_retry "$OUTPUT_FILE" pr list --state "$STATE" --limit "$LIMIT" --json "$JSON_FIELDS" --repo "$REPO"
           else
-            gh pr list --state "$STATE" --limit "$LIMIT" --json "$JSON_FIELDS" > "$OUTPUT_FILE"
+            run_gh_json_with_retry "$OUTPUT_FILE" pr list --state "$STATE" --limit "$LIMIT" --json "$JSON_FIELDS"
           fi
 
           # Apply jq filter if specified
@@ -1581,7 +1709,7 @@ jobs:
           fi
 
 
-          GH_AW_MCP_SCRIPTS_SH_GITHUB-PR-QUERY_84be5598473b5844_EOF
+          GH_AW_MCP_SCRIPTS_SH_GITHUB-PR-QUERY_d398dc31abca48f5_EOF
           chmod +x "${RUNNER_TEMP}/gh-aw/mcp-scripts/github-pr-query.sh"
 
       - name: Generate MCP Scripts Server Config
@@ -2350,7 +2478,7 @@ jobs:
           GH_AW_WORK_QUEUE_ROLE: "worker"
           GH_AW_WORK_QUEUE_ISSUES: "{\"label\":\"work\",\"orphaned_after_days\":30}"
           GH_AW_WORK_QUEUE_CHECKED_TRANSPORT: "graphql"
-          GH_AW_WORK_QUEUE_CONTRACT: "df9455a8063483b354ffa7544ea4f7d3a99ded3c09b8453b3257202580eefc59"
+          GH_AW_WORK_QUEUE_CONTRACT: "34c60dff7a5aa7036ec1fe125fb7f4b81302e2bac9947ee754f3f0624bb3329e"
         with:
           script: |
             const path = require('path');
@@ -2366,7 +2494,7 @@ jobs:
           GH_AW_WORK_QUEUE_ROLE: "worker"
           GH_AW_WORK_QUEUE_ISSUES: "{\"label\":\"work\",\"orphaned_after_days\":30}"
           GH_AW_WORK_QUEUE_CHECKED_TRANSPORT: "graphql"
-          GH_AW_WORK_QUEUE_CONTRACT: "df9455a8063483b354ffa7544ea4f7d3a99ded3c09b8453b3257202580eefc59"
+          GH_AW_WORK_QUEUE_CONTRACT: "34c60dff7a5aa7036ec1fe125fb7f4b81302e2bac9947ee754f3f0624bb3329e"
           GH_AW_WORK_QUEUE_JOB_RESULTS: ${{ toJSON(needs) }}
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
@@ -2532,7 +2660,7 @@ jobs:
           GH_AW_DEFAULT_ADMISSION_URL: ${{ vars.GH_AW_DEFAULT_ADMISSION_URL }}
           GH_AW_DEFAULT_ADMISSION_AUDIENCE: ${{ vars.GH_AW_DEFAULT_ADMISSION_AUDIENCE }}
           GH_AW_DEFAULT_ADMISSION_ON_OUTAGE: ${{ vars.GH_AW_DEFAULT_ADMISSION_ON_OUTAGE }}
-          GH_AW_ADMISSION_WORKFLOW_HASH: "a709bf8897f46737c314c2757ef0e4e68de2553e994f8bd7481e96515c7cbcf7:00ec387da5eff30875286adc7e2cb7becab753ea576d7d574fcc40c6af0007c9"
+          GH_AW_ADMISSION_WORKFLOW_HASH: "0269fddc909f5d2645345950870178d5b66d7f3d168aeb6175d729f80009011c:00ec387da5eff30875286adc7e2cb7becab753ea576d7d574fcc40c6af0007c9"
           GH_AW_INFO_WORKFLOW_ID: ${{ job.workflow_ref }}
           GITHUB_ACTOR: ${{ github.actor }}
           GITHUB_TRIGGERING_ACTOR: ${{ github.triggering_actor }}
@@ -3294,7 +3422,7 @@ jobs:
           GH_AW_WORK_QUEUE_ROLE: "worker"
           GH_AW_WORK_QUEUE_ISSUES: "{\"label\":\"work\",\"orphaned_after_days\":30}"
           GH_AW_WORK_QUEUE_CHECKED_TRANSPORT: "graphql"
-          GH_AW_WORK_QUEUE_CONTRACT: "df9455a8063483b354ffa7544ea4f7d3a99ded3c09b8453b3257202580eefc59"
+          GH_AW_WORK_QUEUE_CONTRACT: "34c60dff7a5aa7036ec1fe125fb7f4b81302e2bac9947ee754f3f0624bb3329e"
           GH_AW_WORK_QUEUE_FINISH_INTENT: /tmp/gh-aw/work-queue.finish.jsonl
         with:
           script: |
@@ -3312,7 +3440,7 @@ jobs:
           GH_AW_WORK_QUEUE_ROLE: "worker"
           GH_AW_WORK_QUEUE_ISSUES: "{\"label\":\"work\",\"orphaned_after_days\":30}"
           GH_AW_WORK_QUEUE_CHECKED_TRANSPORT: "graphql"
-          GH_AW_WORK_QUEUE_CONTRACT: "df9455a8063483b354ffa7544ea4f7d3a99ded3c09b8453b3257202580eefc59"
+          GH_AW_WORK_QUEUE_CONTRACT: "34c60dff7a5aa7036ec1fe125fb7f4b81302e2bac9947ee754f3f0624bb3329e"
           GH_AW_GITHUB_TOKEN_SOURCE: ${{ secrets.GH_AW_GITHUB_TOKEN != '' && 'pat' || 'github_actions' }}
           GH_AW_WORK_QUEUE_TOKEN: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           GH_AW_WORK_QUEUE_INTENTS: /tmp/gh-aw/work-queue.intents.jsonl
