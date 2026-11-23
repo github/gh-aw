@@ -511,21 +511,43 @@ async function inspect(repo, pr, runs, api = gh, now = Date.now()) {
 }
 
 const prFields = "number,updatedAt,author,isDraft,state,labels";
+// Gateway-rewritten status pages lack a usable total, so bound page-length paging.
+const maxProxyStatusPages = 10;
 
 async function fetchCommitChecks(repo, head, number, endpoint, field, validItem, api) {
   const items = [];
   let total;
+  let previousPage;
   for (let page = 1; ; page++) {
     // Link pagination can switch to numeric repository routes rejected by the guard.
     const response = await api(["api", `repos/${repo}/commits/${head}/${endpoint}&page=${page}`]);
     const count = response?.total_count;
     const entries = response?.[field];
-    if (!Number.isSafeInteger(count) || count < 0 || (total !== undefined && count !== total) || !Array.isArray(entries) || entries.length !== Math.min(100, count - items.length) || !entries.every(validItem)) {
+    // The gateway mistakes combined statuses for search results: it preserves
+    // the status object but replaces total_count with the accessible object count.
+    // Only that exact-head, accessible singleton may paginate by page length.
+    const gatewayStatuses = field === "statuses" && Object.hasOwn(response ?? {}, "incomplete_results");
+    const proxyStatuses = gatewayStatuses && count === 1 && response.incomplete_results === false && response.sha === head && ["success", "pending", "failure", "error"].includes(response.state);
+    if (
+      (gatewayStatuses && !proxyStatuses) ||
+      !Number.isSafeInteger(count) ||
+      count < 0 ||
+      !Array.isArray(entries) ||
+      (proxyStatuses ? entries.length > 100 : (total !== undefined && count !== total) || entries.length !== Math.min(100, count - items.length)) ||
+      !entries.every(validItem)
+    ) {
       throw new Error(`PR #${number}: could not refresh ${field}; incomplete or malformed GitHub response (possibly proxy-filtered or changing totals)`);
     }
     total = count;
     items.push(...entries);
-    if (items.length === total) return items;
+    if (proxyStatuses ? entries.length < 100 : items.length === total) return items;
+    if (proxyStatuses) {
+      const snapshot = JSON.stringify(entries);
+      if (snapshot === previousPage || page >= maxProxyStatusPages) {
+        throw new Error(`PR #${number}: could not refresh ${field}; gateway status pagination repeated a page or exceeded ${maxProxyStatusPages} pages`);
+      }
+      previousPage = snapshot;
+    }
   }
 }
 

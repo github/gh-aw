@@ -17,10 +17,22 @@ type ExecutionBlock struct {
 }
 
 type ExecutionStep struct {
-	Path   string
-	Fields map[string]any
-	Post   bool
+	Path string
+	// Section is the authored step-list key, such as "pre-steps" or "setup-steps".
+	Section string
+	Fields  map[string]any
+	Post    bool
 }
+
+// Step-list keys in the order the compiler emits them within each scope.
+var (
+	rootStepSections = []string{"pre-steps", "steps", "pre-agent-steps", "post-steps"}
+	jobStepSections  = []string{"setup-steps", "pre-steps", "steps", "post-steps"}
+	safeStepSections = []string{"steps", "post-steps"}
+)
+
+// StepSections lists every authored step-list key ExecutionBlocks can visit.
+var StepSections = []string{"setup-steps", "pre-steps", "steps", "pre-agent-steps", "post-steps"}
 
 func (block ExecutionBlock) FieldPath(field string) string {
 	if block.Path == "" {
@@ -35,12 +47,12 @@ func ExecutionBlocks(ctx context.Context, document *Document) ([]ExecutionBlock,
 	if document == nil {
 		return nil, errors.New("AW execution traversal requires a document")
 	}
-	root, err := executionBlock(ctx, "", document.Frontmatter)
+	root, err := executionBlock(ctx, "", document.Frontmatter, rootStepSections)
 	blocks := []ExecutionBlock{root}
 	failures := []error{err}
 	if outputs, ok := document.Frontmatter["safe-outputs"].(map[string]any); ok {
 		if outputs["steps"] != nil || outputs["post-steps"] != nil {
-			block, err := executionBlock(ctx, "safe-outputs", outputs)
+			block, err := executionBlock(ctx, "safe-outputs", outputs, safeStepSections)
 			blocks = append(blocks, block)
 			failures = append(failures, err)
 		}
@@ -74,7 +86,11 @@ func ExecutionBlocks(ctx context.Context, document *Document) ([]ExecutionBlock,
 				failures = append(failures, fmt.Errorf("AW execution traversal requires a mapping at %s", path))
 				continue
 			}
-			block, err := executionBlock(ctx, path, fields)
+			sections := safeStepSections
+			if section == "jobs" {
+				sections = jobStepSections
+			}
+			block, err := executionBlock(ctx, path, fields, sections)
 			blocks = append(blocks, block)
 			failures = append(failures, err)
 		}
@@ -82,10 +98,10 @@ func ExecutionBlocks(ctx context.Context, document *Document) ([]ExecutionBlock,
 	return blocks, errors.Join(failures...)
 }
 
-func executionBlock(ctx context.Context, path string, fields map[string]any) (ExecutionBlock, error) {
+func executionBlock(ctx context.Context, path string, fields map[string]any, sections []string) (ExecutionBlock, error) {
 	block := ExecutionBlock{Path: path, Fields: fields}
 	var failures []error
-	for _, key := range []string{"steps", "post-steps"} {
+	for _, key := range sections {
 		raw := fields[key]
 		if raw == nil {
 			continue
@@ -109,7 +125,7 @@ func executionBlock(ctx context.Context, path string, fields map[string]any) (Ex
 				failures = append(failures, fmt.Errorf("AW execution traversal requires a step mapping at %s", stepPath))
 				continue
 			}
-			block.Steps = append(block.Steps, ExecutionStep{Path: stepPath, Fields: step, Post: key == "post-steps"})
+			block.Steps = append(block.Steps, ExecutionStep{Path: stepPath, Section: key, Fields: step, Post: key == "post-steps"})
 		}
 	}
 	return block, errors.Join(failures...)

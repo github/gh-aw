@@ -182,6 +182,12 @@
       "docs_group": true
     },
     {
+      "id": "issue-intent",
+      "name": "Issue intent metadata",
+      "compiler_warning": "issue-intent",
+      "docs": ["/specs/safe-outputs-specification/", "/reference/frontmatter-full/"]
+    },
+    {
       "id": "safe-outputs-samples",
       "name": "Safe-outputs samples",
       "docs": ["/experimental/safe-outputs-samples/"],

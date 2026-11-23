@@ -585,6 +585,30 @@ describe("assign_to_agent", () => {
     );
   });
 
+  it.each([
+    ["omitted", {}, "copilot-swe-agent[bot]"],
+    ["false", { issue_intent: false }, "copilot-swe-agent[bot]"],
+    ["true", { issue_intent: true }, { login: "copilot-swe-agent[bot]", rationale: "Agent owns the code path", confidence: "HIGH" }],
+  ])("sends issue-intent assignee metadata only when issue_intent is true (setting: %s)", async (_label, intentConfig, expectedAssignee) => {
+    const handler = await eval(`(async () => {
+      ${assignToAgentScript};
+      return main({ target: "*", ...intentConfig });
+    })()`);
+    mockGithub.rest.issues.get.mockResolvedValueOnce({
+      data: { id: 12345, number: 42, assignees: [], html_url: "", title: "", body: "" },
+    });
+
+    const result = await handler({ type: "assign_to_agent", issue_number: 42, agent: "copilot", rationale: "Agent owns the code path", confidence: "high" }, {}, new Map());
+
+    expect(result).toEqual({ success: true });
+    expect(mockGithub.request).toHaveBeenLastCalledWith(
+      "POST /repos/{owner}/{repo}/issues/{issue_number}/assignees",
+      expect.objectContaining({
+        assignees: [expectedAssignee],
+      })
+    );
+  });
+
   it("should skip assignment when the target lacks a required label", async () => {
     const handler = await eval(`(async () => {
       ${assignToAgentScript};

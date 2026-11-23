@@ -23,8 +23,8 @@ permissions:
 
 
 engine:
-  id: copilot
-  copilot-sdk: true
+  id: pi
+  model-provider: github
 max-tool-denials: 3
 tools:
   github:

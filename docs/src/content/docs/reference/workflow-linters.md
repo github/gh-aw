@@ -51,6 +51,7 @@ Threat IDs refer to the [Compiler Threat Detection Specification](https://github
 | `bash-case-pattern` | — | AW, Actions | Bash `case` patterns inside `$(...)` use balanced `(pattern)` syntax for Bash 3.2 compatibility. Intentional unquoted glob matching remains allowed. |
 | `privileged-checkout` | — | AW, Actions | Privileged triggers warn on enabled or dynamic `allow-unsafe-pr-checkout`, PR-head, dispatch, or upstream-head checkout selectors, literal `refs/pull/` refs, and direct `gh pr checkout` or Git calls selecting them. Trusted base checkouts are not flagged. |
 | `artifact-execution` | — | AW, Actions | `workflow_run` warns when cross-run downloads extract into the workspace or an unknown path, or when later direct execution uses their literal destination. |
+| `remote-script-execution` | — | AW, Actions | Bash/sh `run` scripts do not execute `curl` or `wget` output directly: pipes into a shell or interpreter, process substitution (`bash <(curl …)`), command substitution as code (`sh -c "$(curl …)"`, `eval`), and stdin redirects. Downloads to files, and pipes into data tools such as `jq` or `tee`, are not flagged. |
 
 ### Suppressing a diagnostic
 
@@ -299,6 +300,15 @@ matched=$(case "$remote_ref" in ($source_ref) printf 1 ;; esac)
 ```
 
 The opening parenthesis avoids a Bash 3.2 command-substitution parsing ambiguity. Quoting `$source_ref` would turn intentional glob matching into literal matching. For execution coverage, run `go test ./pkg/workflow -run TestGenerateFetchStep -count=1` with Bash 3.2 and a modern Bash on `PATH` separately.
+
+### Remote script execution
+
+`remote-script-execution` warns when a parsed Bash or `sh` `run` script executes network content without verification, a common supply-chain risk (compare the 2021 Codecov uploader compromise). It recognizes `curl` and `wget` writing to standard output, followed through `sudo`/`env` wrappers into `bash`, `sh`, `zsh`, `dash`, `ksh`, `python`, `node`, `perl`, `ruby`, `eval`, or `source`. Interpreters given a script file or inline literal program are not flagged. Program text inside quoted strings, PowerShell steps, and multi-step download-then-execute flows are not analyzed. Prefer a pinned action, or download a versioned artifact and verify it before execution:
+
+```bash
+curl -fsSLo tool.tar.gz "https://example.com/tool-v1.2.3.tar.gz"
+echo "<sha256>  tool.tar.gz" | sha256sum -c -
+```
 
 ### Comparing compiler revisions
 

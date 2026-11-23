@@ -79,6 +79,7 @@ func TestParseCronField_StepBoundaries(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			vals, err := parseCronField(tt.field, 0, tt.max)
 			require.NoError(t, err)
 			assert.Equal(t, tt.want, vals)
@@ -216,6 +217,7 @@ func TestBuildScheduleGrid_StepBoundaries(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			hours, days, err := parseCronSchedule(tt.cron)
 			require.NoError(t, err)
 			assert.Equal(t, tt.hours, hours)

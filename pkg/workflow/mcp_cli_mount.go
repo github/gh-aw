@@ -35,10 +35,10 @@ const (
 //   - Locks the bin directory (chmod 555) so the agent cannot modify the scripts
 //   - Adds the directory to PATH via core.addPath()
 
-// internalMCPServerNames lists the MCP servers that are internal infrastructure and
-// should not be exposed as user-facing CLI tools.
+// internalMCPServerNames excludes specially handled servers from custom-server
+// collection. Engine capabilities select GitHub CLI mounting separately.
 var internalMCPServerNames = map[string]bool{
-	constants.GitHubMCPServerID.String(): true, // GitHub MCP server is handled differently and should not be CLI-mounted
+	constants.GitHubMCPServerID.String(): true,
 }
 
 // appendCustomMCPServerIfEligible returns a new slice with toolName appended if
@@ -46,7 +46,7 @@ var internalMCPServerNames = map[string]bool{
 // internalMCPServerNames, and the tool is not already present in servers.
 // Returns the original slice otherwise (no mutation).
 // It is the shared implementation used by both the cli-proxy collection loop and
-// the Copilot augmentation sweep, ensuring a single source of truth for "is this
+// the automatic augmentation sweep, ensuring a single source of truth for "is this
 // tool a custom MCP server?" logic.
 func appendCustomMCPServerIfEligible(servers []string, toolName string, toolValue any) []string {
 	if internalMCPServerNames[toolName] {
@@ -74,13 +74,24 @@ func appendCustomMCPServerIfEligible(servers []string, toolName string, toolValu
 // when tools.cli-proxy is true.
 //
 // Returns nil when no servers are eligible for mounting.
-// The GitHub MCP server is excluded (handled differently).
+// Engine capabilities control GitHub CLI proxying and automatic mount augmentation.
 func getMCPCLIServerNames(data *WorkflowData) []string { //nolint:largefunc // Existing CLI proxy selection handles all supported tool sources.
 	if data == nil {
 		return nil
 	}
 
 	var servers []string
+	var capabilities EngineCapabilities
+	if data.engineDefinition != nil && data.engineDefinition.Behaviors != nil {
+		capabilities = data.engineDefinition.Behaviors.Capabilities.ToRuntimeCapabilities()
+	} else if engineID := ResolveEngineID(data); engineID != "" {
+		engine, err := GetGlobalEngineRegistry().GetEngine(engineID)
+		if err != nil {
+			mcpCLIMountLog.Printf("Cannot resolve CLI mount capabilities for engine %q: %v", engineID, err)
+		} else {
+			capabilities = engine.GetCapabilities()
+		}
+	}
 
 	// User-facing MCP servers require cli-proxy: true.
 	if data.ParsedTools != nil && data.ParsedTools.CLIProxy {
@@ -92,7 +103,7 @@ func getMCPCLIServerNames(data *WorkflowData) []string { //nolint:largefunc // E
 				continue
 			}
 			// Only include tools that have MCP servers (skip bash, web-fetch, web-search, edit, cache-memory, etc.)
-			// Note: "github" is excluded — it is handled differently and should not be CLI-mounted.
+			// GitHub is collected separately according to engine capabilities and transport.
 			switch toolName {
 			case "playwright":
 				// In CLI mode, playwright is installed as @playwright/cli via npm and is NOT
@@ -120,6 +131,12 @@ func getMCPCLIServerNames(data *WorkflowData) []string { //nolint:largefunc // E
 		}
 	}
 
+	if data.ParsedTools != nil && data.ParsedTools.CLIProxy &&
+		capabilities.GitHubCLIProxy &&
+		data.Tools["github"] != false && hasGitHubTool(data.ParsedTools) && !isGitHubCLIModeEnabled(data) {
+		servers = append(servers, constants.GitHubMCPServerID.String())
+	}
+
 	// Infrastructure servers (safeoutputs, mcpscripts) are always CLI-mounted when
 	// configured. This allows workflows with engine.command to call safeoutputs or
 	// mcpscripts as shell commands inside the AWF/Copilot chroot without requiring
@@ -135,9 +152,8 @@ func getMCPCLIServerNames(data *WorkflowData) []string { //nolint:largefunc // E
 		servers = append(servers, enclaveMCPServerName)
 	}
 
-	// Copilot normally runs with --disable-builtin-mcps. When at least one CLI
-	// mount trigger is active (safeoutputs/mcpscripts or cli-proxy), the mount
-	// script discovers all MCP servers from the gateway manifest (including
+	// When a CLI mount is active and the engine opts into automatic augmentation,
+	// the mount script discovers all MCP servers from the gateway manifest (including
 	// GitHub and custom servers such as azure-devops) and exposes wrappers on
 	// PATH. Reflect that runtime reality in the generated CLI server list so
 	// agents can call these wrappers deterministically instead of guessing
@@ -148,7 +164,7 @@ func getMCPCLIServerNames(data *WorkflowData) []string { //nolint:largefunc // E
 	// and only a GitHub MCP tool would have len(servers)==0 at this point,
 	// causing the block to be skipped and `github` to never be advertised.
 	isCLIMountActive := len(servers) > 0 || (data.ParsedTools != nil && data.ParsedTools.CLIProxy)
-	if isCLIMountActive && data.EngineConfig != nil && data.EngineConfig.ID == string(constants.CopilotEngine) {
+	if isCLIMountActive && capabilities.AutoMCPCLI {
 		if hasGitHubTool(data.ParsedTools) && !isGitHubCLIModeEnabled(data) && !slices.Contains(servers, constants.GitHubMCPServerID.String()) {
 			servers = append(servers, constants.GitHubMCPServerID.String())
 		}

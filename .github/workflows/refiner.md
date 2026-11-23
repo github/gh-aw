@@ -9,8 +9,8 @@ permissions:
   pull-requests: read
   issues: read
 engine:
-  id: copilot
-  copilot-sdk: true
+  id: claude
+  model-provider: github
 imports:
   - shared/pr-safe-output-defaults.md
   - uses: shared/pr-review-base.md

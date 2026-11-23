@@ -324,10 +324,29 @@ engine:
           except GraphRecursionError:
               status = "LimitsExceeded"
           finally:
-              trajectory.write_text(json.dumps({"exit_status": status, "messages": messages_to_dict(messages)}, indent=2))
+              snapshot = {"exit_status": status, "messages": messages_to_dict(messages)}
+              trajectory.write_text(json.dumps(snapshot, indent=2))
               print(f"LangGraph exit status: {status}", flush=True)
           if status != "Completed":
               raise SystemExit(1)
+    log-parser: |
+      function parseLog(content) {
+        const fs = require("fs");
+        const path = require("path");
+        const root = path.dirname(process.env.GH_AW_AGENT_OUTPUT || "/tmp/gh-aw/agent-stdio.log");
+        const file = path.join(root, "agent", "langgraph.traj.json");
+        if (fs.existsSync(file)) {
+          const { lstatGuard } = require("./symlink_guard.cjs");
+          if (!lstatGuard(path.join(root, "agent"))?.isDirectory() || !lstatGuard(file)?.isFile()) {
+            throw new Error("Invalid LangGraph trajectory file");
+          }
+          content = fs.readFileSync(file, "utf8");
+        }
+        const result = require("./langgraph_session.cjs").parseLangGraphLog(content);
+        const { collectArtifactSecretValues, redactManifestValue } = require("./safe_output_manifest.cjs");
+        result.logEntries = redactManifestValue(result.logEntries, collectArtifactSecretValues());
+        return result;
+      }
     harness-script: |
       const { spawnSync } = require("child_process");
       const { constants } = require("os");
@@ -467,11 +486,19 @@ recursion limit, defaulting to 20.
 
 There is no native MCP client: configured tools and safe outputs are available
 through gh-aw's shell CLI proxies. Native shell command allowlists, disabling
-file edits, Agent Plugins, LangGraph checkpointers, and structured session
-parsing are not supported. The private message trajectory at
+file edits, Agent Plugins, and LangGraph checkpointers are not supported.
+The native message trajectory at
 `/tmp/gh-aw/agent/langgraph.traj.json` is retained as untrusted diagnostic data
 in the unified agent artifact after secret redaction and recovery-envelope
-validation succeed; it is not verified tool or token-accounting evidence.
+validation succeed. The declared parser normalizes native messages, tool calls
+and results, per-response token usage, and the observed exit status into the
+unified agent session. The parser reads the private trajectory for redacted
+canonical session capture; the trajectory is never printed to public stdout.
+Collection prefers an existing canonical session, then the native file, without
+duplicating historical stdout snapshots. Unknown message
+types and invalid tool calls remain explicit LangGraph observations. Missing
+timestamps are not invented. Native ToolMessage status is not verified shell
+success, and native token metadata is not authoritative billing evidence.
 
 Treat issue, comment, and repository text as untrusted input. AWF network
 restrictions, credential exclusion, inference budgets, and policy-controlled

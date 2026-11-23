@@ -11,11 +11,14 @@ const readWorkflow = name => {
   const source = readFileSync(resolve(root, `.github/workflows/${name}.md`), "utf8");
   const [, frontmatter, prompt] = source.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n([\s\S]*)$/);
   const workflow = readDocumentMetadata(frontmatter, { version: "1.2", uniqueKeys: true }).value;
-  const lock = readDocumentMetadata(readFileSync(resolve(root, `.github/workflows/${name}.lock.yml`), "utf8"), { version: "1.2", uniqueKeys: true }).value;
-  const config = JSON.parse(lock.jobs.agent.steps.find(step => step.env?.GH_AW_COPILOT_SDK_TOOL_CONFIG).env.GH_AW_COPILOT_SDK_TOOL_CONFIG);
-  const handler = buildCopilotSDKPermissionHandler(config.permissions, () => ({ kind: "approve-once" }));
+  const lockText = readFileSync(resolve(root, `.github/workflows/${name}.lock.yml`), "utf8");
+  const lock = readDocumentMetadata(lockText, { version: "1.2", uniqueKeys: true }).value;
+  const sdkConfig = lock.jobs.agent.steps.find(step => step.env?.GH_AW_COPILOT_SDK_TOOL_CONFIG)?.env.GH_AW_COPILOT_SDK_TOOL_CONFIG;
+  const config = sdkConfig && JSON.parse(sdkConfig);
+  const handler = config && buildCopilotSDKPermissionHandler(config.permissions, () => ({ kind: "approve-once" }));
   const permission = command => handler({ kind: "shell", fullCommandText: command, commands: [{ identifier: command }] }).kind;
-  return { workflow, prompt, config, permission };
+  const claudeAllowedTools = lockText.match(/--allowed-tools '\\''([^']*)'/)?.[1].split(",");
+  return { workflow, prompt, config, permission, claudeAllowedTools };
 };
 
 describe("restricted workflow operation contracts", () => {
@@ -59,31 +62,21 @@ describe("restricted workflow operation contracts", () => {
   });
 
   it("reads prepared Delight help without granting agent binary execution", () => {
-    const { workflow, prompt, permission } = readWorkflow("delight");
+    const { workflow, prompt, claudeAllowedTools } = readWorkflow("delight");
+    expect(workflow.engine.id).toBe("claude");
     expect(workflow.tools.bash).not.toContain("./gh-aw * --help");
+    expect(claudeAllowedTools).toContain("Bash(cat /tmp/gh-aw/agent/help-output/*)");
+    expect(claudeAllowedTools).toContain("Bash(cat /tmp/gh-aw/agent/*)");
     for (const file of ["main", "compile", "run"]) {
-      const command = `cat /tmp/gh-aw/agent/help-output/${file}.txt`;
-      expect(prompt).toContain(command);
-      expect(permission(command), command).toBe("approve-once");
+      expect(prompt).toContain(`cat /tmp/gh-aw/agent/help-output/${file}.txt`);
     }
-    for (const command of [
-      "./gh-aw --help",
-      "./gh-aw compile --help",
-      "./gh-aw run --help",
-      "./gh-aw run daily-formal-spec-verifier",
-      "./gh-aw compile --help && ./gh-aw run daily-formal-spec-verifier",
-      "which gh-aw",
-      "cd /tmp/gh-aw/repo-memory/default && cat improvements.json",
-      "python3 -c \"import json;json.load(open('improvements.json'))\"",
-    ]) {
-      expect(permission(command), command).toBe("reject");
+    for (const tool of claudeAllowedTools.filter(tool => tool.startsWith("Bash"))) {
+      expect(tool, tool).not.toMatch(/^Bash(?:\(\*?\))?$|^Bash\((?:\.\/gh-aw|gh-aw|which|cd|python3?|go|git|bash|sh)\b/);
     }
-    expect(permission("cat /tmp/gh-aw/repo-memory/default/improvements.json")).toBe("approve-once");
-    expect(permission("cat /tmp/gh-aw/agent/previous-findings.json")).toBe("approve-once");
   });
 
-  it.each(["daily-formal-spec-verifier", "delight"])("%s preserves limits and tells agents how to recover from the first denial", name => {
-    const { workflow, prompt, config } = readWorkflow(name);
+  it("daily-formal-spec-verifier preserves limits and tells agents how to recover from the first denial", () => {
+    const { workflow, prompt, config } = readWorkflow("daily-formal-spec-verifier");
     expect(workflow["max-tool-denials"]).toBe(3);
     expect(workflow.strict).toBe(true);
     expect(config.capabilities.dynamicWorkflows).toBe(false);
@@ -92,6 +85,17 @@ describe("restricted workflow operation contracts", () => {
     expect(config.permissions.allowedTools).not.toContain("shell(git:*)");
     expect(config.permissions.allowedTools).not.toContain("shell(go:*)");
     expect(config.permissions.allowedTools).not.toContain("shell(python3)");
+    expect(prompt).toContain("On the first tool denial");
+    expect(prompt).toContain("one standalone command per call");
+    expect(prompt).toContain("not a GitHub authentication error");
+    expect(prompt).toContain("report_incomplete");
+  });
+
+  it("delight keeps a restricted Claude tool set and tells agents how to recover from the first denial", () => {
+    const { workflow, prompt, claudeAllowedTools } = readWorkflow("delight");
+    expect(workflow.strict).toBe(true);
+    expect(claudeAllowedTools).not.toContain("Bash");
+    expect(claudeAllowedTools.filter(tool => /^Bash\((?:git|go|python3?)\b/.test(tool))).toEqual([]);
     expect(prompt).toContain("On the first tool denial");
     expect(prompt).toContain("one standalone command per call");
     expect(prompt).toContain("not a GitHub authentication error");

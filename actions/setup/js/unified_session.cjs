@@ -8,7 +8,7 @@ const { hasCopilotConversation, deduplicateCopilotFallback, normalizeCopilotSess
 const { collectAddMaskedValues, serializeSessionArtifact, writeSessionArtifact, removeFailedSessionArtifacts } = require("./session_artifact.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { normalizeUnifiedSessionEvent, normalizeModelInventoryData, evalResultRunId } = require("./unified_session_payload.cjs");
-const { ERR_SYSTEM, ERR_VALIDATION } = require("./error_codes.cjs");
+const { ERR_SYSTEM, ERR_VALIDATION, ERR_PARSE } = require("./error_codes.cjs");
 const { collectAgentExecution, parseAgentExitCode, validateAgentExitCode, isAgentExecutionEvent } = require("./agent_execution.cjs");
 const { normalizeEngineLogEntries, normalizeEngineSessionEvents, parseEngineLog } = require("./engine_log_parser.cjs");
 const { sessionTimestamp, orderSessionSources } = require("./unified_session_order.cjs");
@@ -168,10 +168,11 @@ function normalizeRuntimeEvent(component, record) {
 /**
  * @param {string} content
  * @param {string} engine
+ * @param {{render?: boolean}} [options]
  * @returns {SessionEvent[]}
  */
-function parseEngineSession(content, engine) {
-  const parsed = parseEngineLog(content, engine);
+function parseEngineSession(content, engine, options = {}) {
+  const parsed = engine === "langgraph" ? require("./langgraph_session.cjs").parseLangGraphLog(content) : parseEngineLog(content, engine, options);
   const events = parsed.logEntries ?? [];
   const observations = events.filter(isAgentExecutionEvent).map(event => event.data);
   if (observations.length) return events;
@@ -182,12 +183,13 @@ function parseEngineSession(content, engine) {
 /**
  * Collect only known runtime directories; never follow artifact symlinks.
  * Replicated firewall files use logs > audit > legacy precedence, including empty files.
- * @param {{rootDir?: string, engine?: string, protectedSessionCapture?: boolean, warn?: (message: string) => void, dailyAIC?: NodeJS.ProcessEnv, executionIdentity?: {runId?: string, runAttempt: number}, admission?: NodeJS.ProcessEnv, jobResults?: string, safeJobNames?: string, safeJobResults?: string, jobDurations?: Record<string, number>}} [options]
+ * @param {{rootDir?: string, engine?: string, render?: boolean, protectedSessionCapture?: boolean, warn?: (message: string) => void, dailyAIC?: NodeJS.ProcessEnv, executionIdentity?: {runId?: string, runAttempt: number}, admission?: NodeJS.ProcessEnv, jobResults?: string, safeJobNames?: string, safeJobResults?: string, memorySaveResults?: string, jobDurations?: Record<string, number>}} [options]
  * @returns {{events: import("./types/unified_session").UnifiedSession, maskedValues: string[]}}
  */
 function collectUnifiedSession({
   rootDir = "/tmp/gh-aw",
   engine,
+  render = true,
   protectedSessionCapture = false,
   warn = message => console.warn(message),
   dailyAIC = process.env,
@@ -196,6 +198,7 @@ function collectUnifiedSession({
   jobResults = process.env.GH_AW_JOB_RESULTS,
   safeJobNames = process.env.GH_AW_SAFE_JOB_NAMES,
   safeJobResults = process.env.GH_AW_SAFE_JOB_RESULTS,
+  memorySaveResults = process.env.GH_AW_MEMORY_SAVE_RESULTS,
   jobDurations = {},
 } = {}) {
   const liveIdentity = executionIdentity?.runId && Number.isSafeInteger(executionIdentity.runAttempt) && executionIdentity.runAttempt > 0 ? executionIdentity : undefined;
@@ -211,6 +214,17 @@ function collectUnifiedSession({
     const relative = path.relative(rootDir, file);
     warn(`Unified session: ${code} in ${relative}${line === undefined ? "" : `:${line}`}`);
     warnings.push({ type: "session.collection_warning", data: { path: relative, code, ...(line !== undefined ? { line } : {}) } });
+  };
+  const isEvidenceError = error => error instanceof Error && "code" in error && (error.code === ERR_VALIDATION || error.code === ERR_PARSE);
+  const parseFallback = (content, sourceEngine, file) => {
+    try {
+      return parseEngineSession(content, sourceEngine, { render });
+    } catch (error) {
+      if (sourceEngine !== "langgraph" || !isEvidenceError(error)) throw error;
+      incompleteSources.add(file);
+      report(file, "invalid_langgraph_trajectory", undefined);
+      return [];
+    }
   };
   const exists = file => {
     if (!fs.existsSync(file)) return false;
@@ -568,11 +582,26 @@ function collectUnifiedSession({
       }
     }
   }
+  if (!protectedSessionCapture && !agentEvents && engine === "langgraph") {
+    const file = choose(["agent/langgraph.traj.json"]);
+    if (file) {
+      const content = read(file);
+      try {
+        const events = require("./langgraph_session.cjs").parseLangGraphTrajectory(content);
+        sources.push({ component: "agent", phase: "agent", path: path.relative(rootDir, file), events });
+        agentEvents += events.length;
+      } catch (error) {
+        if (!isEvidenceError(error)) throw error;
+        incompleteSources.add(file);
+        report(file, error instanceof Error && "code" in error && error.code === ERR_PARSE ? "malformed_json" : "invalid_langgraph_trajectory", undefined);
+      }
+    }
+  }
   if (!protectedSessionCapture && !agentEvents) {
     const file = choose(["sandbox/agent/logs/pi-streaming.jsonl", "pi-streaming.jsonl", "agent-stdio.log"]);
     if (file) {
       const content = read(file);
-      const parsed = parseEngineSession(content, engine ?? (file.endsWith("pi-streaming.jsonl") ? "pi" : "custom"));
+      const parsed = parseFallback(content, engine ?? (file.endsWith("pi-streaming.jsonl") ? "pi" : "custom"), file);
       const events =
         engine === "copilot" || native.length
           ? deduplicateCopilotFallback(
@@ -580,7 +609,7 @@ function collectUnifiedSession({
               sources.filter(source => source.component === "agent").map(source => source.events)
             )
           : parsed;
-      if (!parsed.length && content.trim()) report(file, "unrecognized_engine_log", undefined);
+      if (!parsed.length && content.trim() && !incompleteSources.has(file)) report(file, "unrecognized_engine_log", undefined);
       sources.push({ component: "agent", phase: "agent", path: path.relative(rootDir, file), events });
     }
   }
@@ -614,7 +643,7 @@ function collectUnifiedSession({
         }
         sources.push({ component: "harness", phase, path: path.relative(rootDir, retryFile), events: retryEvents });
         if (phase === "agent" && !protectedSessionCapture && engine) {
-          const segments = parseHarnessAttempts(stdioContent, engine, data.attemptResults, parseEngineSession);
+          const segments = parseHarnessAttempts(stdioContent, engine, data.attemptResults, (content, sourceEngine) => parseFallback(content, sourceEngine, stdio));
           if (segments) {
             for (let index = sources.length - 1; index >= 0; index--) {
               if (sources[index].component === "agent" && sources[index].phase === "agent") sources.splice(index, 1);
@@ -927,7 +956,7 @@ function collectUnifiedSession({
     }
   }
   const persistedWarnings = sources.flatMap(source => source.events.filter(event => event.type === "session.collection_warning"));
-  const memorySaves = require("./memory_save_results.cjs").readMemorySaveResults();
+  const memorySaves = require("./memory_save_results.cjs").readMemorySaveResults(memorySaveResults);
   if (memorySaves.length) {
     sources.push({ component: "memory", phase: "conclusion", path: "usage/aw_session.jsonl", events: memorySaves.map(data => ({ type: "memory.push", data: { ...data } })) });
   }

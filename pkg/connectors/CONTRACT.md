@@ -61,6 +61,17 @@ and qualified `on["<alias>-<trigger>"]` and
 accept null or `{}`. Ambiguous prefixes and built-in GitHub name collisions
 are rejected; unqualified built-ins are never redirected to a connector.
 
+An `inference` map declares fixed model-provider profiles, not agent-callable
+operations. Each profile names a declared HTTPS endpoint, a request path, an
+`openai-responses` or `openai-chat-completions` protocol, an inference-phase
+credential, and a nonempty resource collection of approved models. The
+workflow selects one profile and exact model with `engine.inference`:
+`{connector: <alias>, profile: <name>, model: <model>}`. Selection lowers the
+provider settings into the Copilot engine transport and approves egress to the
+profile endpoint; importing a declaration alone does neither. Credentials may
+use a stored token or Azure OIDC. Set `model-catalog: false` when the provider
+has no live `/models` route; the selected model is then passed through verbatim.
+
 Credentials select exactly one route: `token: {secret: NAME}` (or the legacy
 `secret: NAME` spelling), `github-app`, or `github-oidc: {audience: LITERAL}`.
 App tokens are minted through the existing pinned GitHub App action with explicit
