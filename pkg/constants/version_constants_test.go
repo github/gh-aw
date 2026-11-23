@@ -28,7 +28,7 @@ func TestDefaultCLIMCPVersions(t *testing.T) {
 		{"OpenAI WIF", AWFOpenAIWIFMinVersion, "v0.29.11"},
 		{"Router", DefaultRouterVersion, "0.1.3"},
 		{"Router image release", AWFRouterReleaseImageMinVersion, "v0.28.62"},
-		{"MCP Gateway", DefaultMCPGatewayVersion, "v0.5.12"},
+		{"MCP Gateway", DefaultMCPGatewayVersion, "v0.5.13"},
 		{"Threat Detect", DefaultThreatDetectVersion, "v0.5.3"},
 	}
 
