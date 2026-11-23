@@ -3,14 +3,16 @@
 package execcommandoutputerrdiscard
 
 import (
+	"go/ast"
+	"go/types"
+
+	"golang.org/x/tools/go/analysis"
+	"golang.org/x/tools/go/ast/inspector"
+
 	"github.com/github/gh-aw/pkg/linters/internal/analyzerutil"
 	"github.com/github/gh-aw/pkg/linters/internal/astutil"
 	"github.com/github/gh-aw/pkg/linters/internal/filecheck"
 	"github.com/github/gh-aw/pkg/linters/internal/nolint"
-	"go/ast"
-	"go/types"
-	"golang.org/x/tools/go/analysis"
-	"golang.org/x/tools/go/ast/inspector"
 )
 
 const linterName = "execcommandoutputerrdiscard"
@@ -110,12 +112,12 @@ func findCallResults(pass *analysis.Pass, body *ast.BlockStmt, call *ast.CallExp
 		}
 		switch stmt := node.(type) {
 		case *ast.AssignStmt:
-			if len(stmt.Rhs) == 1 && sameCall(stmt.Rhs[0], call) {
+			if len(stmt.Rhs) == 1 && sameCall(stmt.Rhs[0], call) { //nolint:uncheckedsliceindex // len(stmt.Rhs) is checked above
 				binding = bindResults(pass, stmt.Lhs)
 				return false
 			}
 		case *ast.ValueSpec:
-			if len(stmt.Values) == 1 && sameCall(stmt.Values[0], call) {
+			if len(stmt.Values) == 1 && sameCall(stmt.Values[0], call) { //nolint:uncheckedsliceindex // len(stmt.Values) is checked above
 				lhs := make([]ast.Expr, 0, len(stmt.Names))
 				for _, name := range stmt.Names {
 					lhs = append(lhs, name)
@@ -139,8 +141,8 @@ func bindResults(pass *analysis.Pass, lhs []ast.Expr) resultBinding {
 		return resultBinding{}
 	}
 	return resultBinding{
-		output: bindingObject(pass, lhs[0]),
-		err:    bindingObject(pass, lhs[1]),
+		output: bindingObject(pass, lhs[0]), //nolint:uncheckedsliceindex // len(lhs) is checked above
+		err:    bindingObject(pass, lhs[1]), //nolint:uncheckedsliceindex // len(lhs) is checked above
 	}
 }
 func bindingObject(pass *analysis.Pass, expr ast.Expr) types.Object {

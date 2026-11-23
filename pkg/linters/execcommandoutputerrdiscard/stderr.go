@@ -1,11 +1,13 @@
 package execcommandoutputerrdiscard
 
 import (
-	"github.com/github/gh-aw/pkg/linters/internal/astutil"
 	"go/ast"
 	"go/token"
 	"go/types"
+
 	"golang.org/x/tools/go/analysis"
+
+	"github.com/github/gh-aw/pkg/linters/internal/astutil"
 )
 
 func hasExitErrorStderrUse(pass *analysis.Pass, body *ast.BlockStmt, errObject types.Object, after token.Pos) bool {
@@ -56,61 +58,11 @@ func hasExitErrorStderrUse(pass *analysis.Pass, body *ast.BlockStmt, errObject t
 	return false
 }
 func hasConfiguredStderrUse(pass *analysis.Pass, body *ast.BlockStmt, call *ast.CallExpr, errObject types.Object, after token.Pos) bool {
-	if body == nil {
-		return false
-	}
-	method, ok := astutil.UnwrapParenExpr(call.Fun).(*ast.SelectorExpr)
-	if !ok {
-		return false
-	}
-	receiver, ok := astutil.UnwrapParenExpr(method.X).(*ast.Ident)
-	if !ok {
-		return false
-	}
-	commandObject := pass.TypesInfo.ObjectOf(receiver)
-	var capturedObject types.Object
-	streamed := false
-	var sinkPosition token.Pos
-	for _, stmt := range body.List {
-		assign, ok := stmt.(*ast.AssignStmt)
-		if !ok || assign.Pos() >= after || len(assign.Lhs) != 1 || len(assign.Rhs) != 1 {
-			continue
-		}
-		if commandIdent, ok := astutil.UnwrapParenExpr(assign.Lhs[0]).(*ast.Ident); ok &&
-			pass.TypesInfo.ObjectOf(commandIdent) == commandObject {
-			streamed = false
-			capturedObject = nil
-			sinkPosition = token.NoPos
-			continue
-		}
-		stderrSelector, ok := astutil.UnwrapParenExpr(assign.Lhs[0]).(*ast.SelectorExpr)
-		if !ok || stderrSelector.Sel.Name != "Stderr" {
-			continue
-		}
-		commandIdent, ok := astutil.UnwrapParenExpr(stderrSelector.X).(*ast.Ident)
-		if !ok || pass.TypesInfo.ObjectOf(commandIdent) != commandObject {
-			continue
-		}
-		streamed = isOSStderr(pass, assign.Rhs[0])
-		capturedObject = stderrWriterObject(pass, assign.Rhs[0])
-		sinkPosition = assign.Pos()
-	}
-	if sinkPosition.IsValid() {
-		if objectReassignedBetween(pass, body, commandObject, sinkPosition, after) ||
-			stderrSinkReassignedBetween(pass, body, commandObject, sinkPosition, after) {
-			streamed = false
-			capturedObject = nil
-		} else if capturedObject != nil && objectReassignedBetween(pass, body, capturedObject, sinkPosition, after) {
-			capturedObject = nil
-		}
-	}
+	streamed, capturedObject := configuredStderrWriter(pass, body, call, after)
 	if streamed {
 		return true
 	}
-	if capturedObject == nil {
-		return false
-	}
-	if errObject == nil {
+	if capturedObject == nil || errObject == nil {
 		return false
 	}
 	for _, stmt := range body.List {
@@ -125,6 +77,58 @@ func hasConfiguredStderrUse(pass *analysis.Pass, body *ast.BlockStmt, call *ast.
 		}
 	}
 	return false
+}
+
+func configuredStderrWriter(pass *analysis.Pass, body *ast.BlockStmt, call *ast.CallExpr, after token.Pos) (bool, types.Object) {
+	if body == nil {
+		return false, nil
+	}
+	method, ok := astutil.UnwrapParenExpr(call.Fun).(*ast.SelectorExpr)
+	if !ok {
+		return false, nil
+	}
+	receiver, ok := astutil.UnwrapParenExpr(method.X).(*ast.Ident)
+	if !ok {
+		return false, nil
+	}
+	commandObject := pass.TypesInfo.ObjectOf(receiver)
+	var capturedObject types.Object
+	streamed := false
+	var sinkPosition token.Pos
+	for _, stmt := range body.List {
+		assign, ok := stmt.(*ast.AssignStmt)
+		if !ok || assign.Pos() >= after || len(assign.Lhs) != 1 || len(assign.Rhs) != 1 {
+			continue
+		}
+		if commandIdent, ok := astutil.UnwrapParenExpr(assign.Lhs[0]).(*ast.Ident); ok && //nolint:uncheckedsliceindex // len(assign.Lhs) is checked above
+			pass.TypesInfo.ObjectOf(commandIdent) == commandObject {
+			streamed = false
+			capturedObject = nil
+			sinkPosition = token.NoPos
+			continue
+		}
+		stderrSelector, ok := astutil.UnwrapParenExpr(assign.Lhs[0]).(*ast.SelectorExpr) //nolint:uncheckedsliceindex // len(assign.Lhs) is checked above
+		if !ok || stderrSelector.Sel.Name != "Stderr" {
+			continue
+		}
+		commandIdent, ok := astutil.UnwrapParenExpr(stderrSelector.X).(*ast.Ident)
+		if !ok || pass.TypesInfo.ObjectOf(commandIdent) != commandObject {
+			continue
+		}
+		streamed = isOSStderr(pass, assign.Rhs[0])               //nolint:uncheckedsliceindex // len(assign.Rhs) is checked above
+		capturedObject = stderrWriterObject(pass, assign.Rhs[0]) //nolint:uncheckedsliceindex // len(assign.Rhs) is checked above
+		sinkPosition = assign.Pos()
+	}
+	if sinkPosition.IsValid() {
+		if objectReassignedBetween(pass, body, commandObject, sinkPosition, after) ||
+			stderrSinkReassignedBetween(pass, body, commandObject, sinkPosition, after) {
+			streamed = false
+			capturedObject = nil
+		} else if capturedObject != nil && objectReassignedBetween(pass, body, capturedObject, sinkPosition, after) {
+			capturedObject = nil
+		}
+	}
+	return streamed, capturedObject
 }
 func isOSStderr(pass *analysis.Pass, expr ast.Expr) bool {
 	selector, ok := astutil.UnwrapParenExpr(expr).(*ast.SelectorExpr)
@@ -211,56 +215,62 @@ func capturedStderrConsumedBetween(pass *analysis.Pass, body *ast.BlockStmt, obj
 		}
 		switch node := node.(type) {
 		case *ast.AssignStmt:
-			if node.Pos() <= after || node.Pos() >= before {
-				return true
-			}
-			if len(node.Lhs) == len(node.Rhs) {
-				for i, lhs := range node.Lhs {
-					if _, ok := astutil.UnwrapParenExpr(lhs).(*ast.Ident); ok &&
-						expressionUsesBufferBytes(pass, node.Rhs[i], object, aliases) {
-						consumed = true
-						return false
-					}
-				}
-			}
-			for _, lhs := range node.Lhs {
-				index, ok := astutil.UnwrapParenExpr(lhs).(*ast.IndexExpr)
-				if ok && expressionUsesBufferBytes(pass, index.X, object, aliases) {
-					consumed = true
-					return false
-				}
-			}
+			consumed = assignmentConsumesCapturedStderr(pass, node, object, aliases, after, before)
 		case *ast.CallExpr:
-			if node.Pos() <= after || node.Pos() >= before {
-				return true
-			}
-			if (isBuiltinCall(pass, node, "clear") || isBuiltinCall(pass, node, "copy") ||
-				isBuiltinCall(pass, node, "append")) &&
-				len(node.Args) > 0 && expressionUsesBufferBytes(pass, node.Args[0], object, aliases) {
-				consumed = true
-				return false
-			}
-			selector, ok := astutil.UnwrapParenExpr(node.Fun).(*ast.SelectorExpr)
-			if !ok {
-				return true
-			}
-			receiver, ok := astutil.UnwrapParenExpr(selector.X).(*ast.Ident)
-			if !ok {
-				return true
-			}
-			receiverObject := pass.TypesInfo.ObjectOf(receiver)
-			if receiverObject != object && !aliases[receiverObject] {
-				return true
-			}
-			switch selector.Sel.Name {
-			case "Reset", "Truncate", "Read", "ReadByte", "ReadBytes", "ReadRune", "Next", "WriteTo":
-				consumed = true
-				return false
-			}
+			consumed = callConsumesCapturedStderr(pass, node, object, aliases, after, before)
 		}
-		return true
+		return !consumed
 	})
 	return consumed
+}
+
+func assignmentConsumesCapturedStderr(pass *analysis.Pass, assign *ast.AssignStmt, object types.Object, aliases map[types.Object]bool, after, before token.Pos) bool {
+	if assign.Pos() <= after || assign.Pos() >= before {
+		return false
+	}
+	if len(assign.Lhs) == len(assign.Rhs) {
+		for i, lhs := range assign.Lhs {
+			if _, ok := astutil.UnwrapParenExpr(lhs).(*ast.Ident); ok &&
+				expressionUsesBufferBytes(pass, assign.Rhs[i], object, aliases) { //nolint:uncheckedsliceindex // index and slice lengths are checked above
+				return true
+			}
+		}
+	}
+	for _, lhs := range assign.Lhs {
+		index, ok := astutil.UnwrapParenExpr(lhs).(*ast.IndexExpr)
+		if ok && expressionUsesBufferBytes(pass, index.X, object, aliases) {
+			return true
+		}
+	}
+	return false
+}
+
+func callConsumesCapturedStderr(pass *analysis.Pass, call *ast.CallExpr, object types.Object, aliases map[types.Object]bool, after, before token.Pos) bool {
+	if call.Pos() <= after || call.Pos() >= before {
+		return false
+	}
+	if (isBuiltinCall(pass, call, "clear") || isBuiltinCall(pass, call, "copy") ||
+		isBuiltinCall(pass, call, "append")) &&
+		len(call.Args) > 0 && expressionUsesBufferBytes(pass, call.Args[0], object, aliases) { //nolint:uncheckedsliceindex // len(call.Args) is checked above
+		return true
+	}
+	selector, ok := astutil.UnwrapParenExpr(call.Fun).(*ast.SelectorExpr)
+	if !ok {
+		return false
+	}
+	receiver, ok := astutil.UnwrapParenExpr(selector.X).(*ast.Ident)
+	if !ok {
+		return false
+	}
+	receiverObject := pass.TypesInfo.ObjectOf(receiver)
+	if receiverObject != object && !aliases[receiverObject] {
+		return false
+	}
+	switch selector.Sel.Name {
+	case "Reset", "Truncate", "Read", "ReadByte", "ReadBytes", "ReadRune", "Next", "WriteTo":
+		return true
+	}
+	return false
 }
 func findCapturedBufferAliases(pass *analysis.Pass, body *ast.BlockStmt, object types.Object, after, before token.Pos) map[types.Object]bool {
 	aliases := make(map[types.Object]bool)
@@ -305,14 +315,14 @@ func findCapturedBufferAliases(pass *analysis.Pass, body *ast.BlockStmt, object 
 				return true
 			}
 			for i, lhs := range node.Lhs {
-				addAlias(lhs, node.Rhs[i])
+				addAlias(lhs, node.Rhs[i]) //nolint:uncheckedsliceindex // index and slice lengths are checked above
 			}
 		case *ast.ValueSpec:
 			if node.Pos() <= after || node.Pos() >= before || len(node.Names) != len(node.Values) {
 				return true
 			}
 			for i, name := range node.Names {
-				addAlias(name, node.Values[i])
+				addAlias(name, node.Values[i]) //nolint:uncheckedsliceindex // index and slice lengths are checked above
 			}
 		}
 		return true

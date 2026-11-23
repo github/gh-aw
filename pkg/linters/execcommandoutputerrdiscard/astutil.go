@@ -1,11 +1,13 @@
 package execcommandoutputerrdiscard
 
 import (
-	"github.com/github/gh-aw/pkg/linters/internal/astutil"
 	"go/ast"
 	"go/token"
 	"go/types"
+
 	"golang.org/x/tools/go/analysis"
+
+	"github.com/github/gh-aw/pkg/linters/internal/astutil"
 )
 
 func isErrorObject(object types.Object) bool {
@@ -91,8 +93,8 @@ func findExitErrorObjects(pass *analysis.Pass, body *ast.BlockStmt, errObject ty
 		case *ast.AssignStmt:
 			if node.Pos() > after && len(node.Lhs) > 0 && len(node.Rhs) == 1 &&
 				!objectReassignedBetween(pass, body, errObject, after, node.Pos()) {
-				if isExitErrorAssertion(pass, node.Rhs[0], errObject) {
-					if object := bindingObject(pass, node.Lhs[0]); object != nil {
+				if isExitErrorAssertion(pass, node.Rhs[0], errObject) { //nolint:uncheckedsliceindex // len(node.Rhs) is checked above
+					if object := bindingObject(pass, node.Lhs[0]); object != nil { //nolint:uncheckedsliceindex // len(node.Lhs) is checked above
 						exitErrorObjects[object] = node.Pos()
 					}
 				}
@@ -100,8 +102,8 @@ func findExitErrorObjects(pass *analysis.Pass, body *ast.BlockStmt, errObject ty
 		case *ast.ValueSpec:
 			if node.Pos() > after && len(node.Names) > 0 && len(node.Values) == 1 &&
 				!objectReassignedBetween(pass, body, errObject, after, node.Pos()) {
-				if isExitErrorAssertion(pass, node.Values[0], errObject) {
-					if object := bindingObject(pass, node.Names[0]); object != nil {
+				if isExitErrorAssertion(pass, node.Values[0], errObject) { //nolint:uncheckedsliceindex // len(node.Values) is checked above
+					if object := bindingObject(pass, node.Names[0]); object != nil { //nolint:uncheckedsliceindex // len(node.Names) is checked above
 						exitErrorObjects[object] = node.Pos()
 					}
 				}
@@ -177,11 +179,11 @@ func isDiscardedValue(body *ast.BlockStmt, value ast.Node) bool {
 		if !ok || len(assign.Lhs) != 1 || len(assign.Rhs) != 1 {
 			return true
 		}
-		lhs, ok := astutil.UnwrapParenExpr(assign.Lhs[0]).(*ast.Ident)
+		lhs, ok := astutil.UnwrapParenExpr(assign.Lhs[0]).(*ast.Ident) //nolint:uncheckedsliceindex // len(assign.Lhs) is checked above
 		if !ok || lhs.Name != "_" {
 			return true
 		}
-		ast.Inspect(assign.Rhs[0], func(rhs ast.Node) bool {
+		ast.Inspect(assign.Rhs[0], func(rhs ast.Node) bool { //nolint:uncheckedsliceindex // len(assign.Rhs) is checked above
 			if rhs == value {
 				discarded = true
 				return false
@@ -205,7 +207,7 @@ func isErrorsAsForExitError(pass *analysis.Pass, call *ast.CallExpr, errObject t
 	if !ok || pkgPath != "errors" || name != "As" || len(call.Args) != 2 {
 		return false
 	}
-	errArg, targetArg := call.Args[0], call.Args[1]
+	errArg, targetArg := call.Args[0], call.Args[1] //nolint:uncheckedsliceindex // len(call.Args) is checked above
 	errIdent, ok := astutil.UnwrapParenExpr(errArg).(*ast.Ident)
 	if !ok || pass.TypesInfo.ObjectOf(errIdent) != errObject {
 		return false

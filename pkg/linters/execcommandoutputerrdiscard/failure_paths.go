@@ -1,12 +1,14 @@
 package execcommandoutputerrdiscard
 
 import (
-	"github.com/github/gh-aw/pkg/linters/internal/astutil"
 	"go/ast"
 	"go/token"
 	"go/types"
-	"golang.org/x/tools/go/analysis"
 	"strconv"
+
+	"golang.org/x/tools/go/analysis"
+
+	"github.com/github/gh-aw/pkg/linters/internal/astutil"
 )
 
 func returnsErrorOnFailurePath(pass *analysis.Pass, body *ast.BlockStmt, functionType *ast.FuncType, object types.Object, after token.Pos) bool {
@@ -212,36 +214,36 @@ func expressionPropagatesError(pass *analysis.Pass, body *ast.BlockStmt, expr as
 	if pkgPath != "fmt" || name != "Errorf" || len(call.Args) != 2 {
 		return false
 	}
-	format, ok := astutil.UnwrapParenExpr(call.Args[0]).(*ast.BasicLit)
+	format, ok := astutil.UnwrapParenExpr(call.Args[0]).(*ast.BasicLit) //nolint:uncheckedsliceindex // len(call.Args) is checked above
 	if !ok || format.Kind != token.STRING {
 		return false
 	}
 	formatString, err := strconv.Unquote(format.Value)
 	return err == nil && hasOnlyWrapVerb(formatString) &&
-		expressionPropagatesError(pass, body, call.Args[1], object, after, before)
+		expressionPropagatesError(pass, body, call.Args[1], object, after, before) //nolint:uncheckedsliceindex // len(call.Args) is checked above
 }
 func hasOnlyWrapVerb(format string) bool {
 	wrapCount := 0
 	for i := 0; i < len(format)-1; i++ {
-		if format[i] != '%' {
+		if format[i] != '%' { //nolint:uncheckedsliceindex // loop stops before the end of format
 			continue
 		}
-		if format[i+1] == '%' {
+		if format[i+1] == '%' { //nolint:uncheckedsliceindex // loop stops before the end of format
 			i++
 			continue
 		}
-		if format[i+1] == 'w' {
+		if format[i+1] == 'w' { //nolint:uncheckedsliceindex // loop stops before the end of format
 			wrapCount++
 			i++
 			continue
 		}
-		if format[i+1] == '[' {
+		if format[i+1] == '[' { //nolint:uncheckedsliceindex // loop stops before the end of format
 			closeBracket := i + 2
-			for closeBracket < len(format) && format[closeBracket] >= '0' && format[closeBracket] <= '9' {
+			for closeBracket < len(format) && format[closeBracket] >= '0' && format[closeBracket] <= '9' { //nolint:uncheckedsliceindex // closeBracket is checked against len(format)
 				closeBracket++
 			}
 			if closeBracket > i+2 && format[i+2:closeBracket] == "1" &&
-				closeBracket+1 < len(format) && format[closeBracket] == ']' && format[closeBracket+1] == 'w' {
+				closeBracket+1 < len(format) && format[closeBracket] == ']' && format[closeBracket+1] == 'w' { //nolint:uncheckedsliceindex // closeBracket+1 is checked against len(format)
 				wrapCount++
 				i = closeBracket + 1
 				continue

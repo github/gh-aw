@@ -1,11 +1,13 @@
 package execcommandoutputerrdiscard
 
 import (
-	"github.com/github/gh-aw/pkg/linters/internal/astutil"
 	"go/ast"
 	"go/token"
 	"go/types"
+
 	"golang.org/x/tools/go/analysis"
+
+	"github.com/github/gh-aw/pkg/linters/internal/astutil"
 )
 
 func expressionRetainsObject(pass *analysis.Pass, body *ast.BlockStmt, expr ast.Expr, object types.Object, after, before token.Pos) bool {
@@ -66,7 +68,7 @@ func objectRetainedUntil(pass *analysis.Pass, body *ast.BlockStmt, object types.
 					break
 				}
 			}
-			if writesObject && (len(node.Rhs) != 1 || !isRetainingAppend(pass, node.Rhs[0], object)) {
+			if writesObject && (len(node.Rhs) != 1 || !isRetainingAppend(pass, node.Rhs[0], object)) { //nolint:uncheckedsliceindex // len(node.Rhs) is checked above
 				retained = false
 				return false
 			}
@@ -76,10 +78,10 @@ func objectRetainedUntil(pass *analysis.Pass, body *ast.BlockStmt, object types.
 			}
 			mutates := isBuiltinCall(pass, node, "clear") || isBuiltinCall(pass, node, "copy")
 			mutatesAlias := isBuiltinCall(pass, node, "append") &&
-				!isFullSliceAliasAt(pass, body, node.Args[0], object, aliases, after, node.Pos(), make(map[types.Object]bool)) &&
-				expressionUsesObjectOrAliasAt(pass, body, node.Args[0], object, aliases, after, node.Pos())
+				!isFullSliceAliasAt(pass, body, node.Args[0], object, aliases, after, node.Pos(), make(map[types.Object]bool)) && //nolint:uncheckedsliceindex // len(node.Args) is checked above
+				expressionUsesObjectOrAliasAt(pass, body, node.Args[0], object, aliases, after, node.Pos()) //nolint:uncheckedsliceindex // len(node.Args) is checked above
 			if (mutates || mutatesAlias) &&
-				expressionUsesObjectOrAliasAt(pass, body, node.Args[0], object, aliases, after, node.Pos()) {
+				expressionUsesObjectOrAliasAt(pass, body, node.Args[0], object, aliases, after, node.Pos()) { //nolint:uncheckedsliceindex // len(node.Args) is checked above
 				retained = false
 				return false
 			}
@@ -137,10 +139,10 @@ func expressionAliasesObjectAt(pass *analysis.Pass, body *ast.BlockStmt, expr as
 		return expressionAliasesObjectAt(pass, body, expr.X, object, aliases, after, before)
 	case *ast.CallExpr:
 		if isBuiltinCall(pass, expr, "append") && len(expr.Args) > 0 {
-			return expressionAliasesObjectAt(pass, body, expr.Args[0], object, aliases, after, before)
+			return expressionAliasesObjectAt(pass, body, expr.Args[0], object, aliases, after, before) //nolint:uncheckedsliceindex // len(expr.Args) is checked above
 		}
 		return isSliceConversion(pass, expr) && len(expr.Args) == 1 &&
-			expressionAliasesObjectAt(pass, body, expr.Args[0], object, aliases, after, before)
+			expressionAliasesObjectAt(pass, body, expr.Args[0], object, aliases, after, before) //nolint:uncheckedsliceindex // len(expr.Args) is checked above
 	default:
 		return false
 	}
@@ -175,7 +177,7 @@ func sliceAliasMayAliasAt(pass *analysis.Pass, body *ast.BlockStmt, alias, objec
 				continue
 			}
 			assignedMayAlias := i < len(rhs) && len(lhs) == len(rhs) &&
-				expressionAliasesObjectAt(pass, body, rhs[i], object, aliases, after, node.Pos())
+				expressionAliasesObjectAt(pass, body, rhs[i], object, aliases, after, node.Pos()) //nolint:uncheckedsliceindex // index and slice lengths are checked above
 			if isDirectFunctionBodyAssignment(body, node) {
 				mayAlias = assignedMayAlias
 			} else {
@@ -189,90 +191,94 @@ func sliceAliasMayAliasAt(pass *analysis.Pass, body *ast.BlockStmt, alias, objec
 func isFullSliceAliasAt(pass *analysis.Pass, body *ast.BlockStmt, expr ast.Expr, object types.Object, aliases map[types.Object]bool, after, before token.Pos, visiting map[types.Object]bool) bool {
 	switch expr := astutil.UnwrapParenExpr(expr).(type) {
 	case *ast.Ident:
-		identObject := pass.TypesInfo.ObjectOf(expr)
-		if identObject == object {
-			return true
-		}
-		if !aliases[identObject] || visiting[identObject] {
-			return false
-		}
-		visiting[identObject] = true
-		var rhs ast.Expr
-		var latestPos token.Pos
-		found := false
-		latestDirect := false
-		ast.Inspect(body, func(node ast.Node) bool {
-			if node != body {
-				if _, ok := node.(*ast.FuncLit); ok {
-					return false
-				}
-			}
-			switch node := node.(type) {
-			case *ast.AssignStmt:
-				if node.Pos() <= after || node.End() > before || node.Pos() < latestPos {
-					return true
-				}
-				for i, lhs := range node.Lhs {
-					lhsIdent, ok := astutil.UnwrapParenExpr(lhs).(*ast.Ident)
-					if ok && pass.TypesInfo.ObjectOf(lhsIdent) == identObject {
-						latestPos = node.Pos()
-						found = true
-						latestDirect = isDirectFunctionBodyAssignment(body, node)
-						if i < len(node.Rhs) && len(node.Lhs) == len(node.Rhs) {
-							rhs = node.Rhs[i]
-						} else {
-							rhs = nil
-						}
-					}
-				}
-			case *ast.ValueSpec:
-				if node.Pos() <= after || node.End() > before || node.Pos() < latestPos {
-					return true
-				}
-				for i, name := range node.Names {
-					if pass.TypesInfo.ObjectOf(name) == identObject {
-						latestPos = node.Pos()
-						found = true
-						latestDirect = isDirectFunctionBodyAssignment(body, node)
-						if i < len(node.Values) && len(node.Names) == len(node.Values) {
-							rhs = node.Values[i]
-						} else {
-							rhs = nil
-						}
-					}
-				}
-			}
-			return true
-		})
-		if !found || rhs == nil || !latestDirect {
-			return false
-		}
-		return isFullSliceAliasAt(pass, body, rhs, object, aliases, after, latestPos, visiting)
+		return isFullSliceAliasOfIdentAt(pass, body, expr, object, aliases, after, before, visiting)
 	case *ast.SliceExpr:
 		return expr.Low == nil && expr.High == nil && expr.Max == nil &&
 			isFullSliceAliasAt(pass, body, expr.X, object, aliases, after, before, visiting)
 	case *ast.CallExpr:
 		if isSliceConversion(pass, expr) && len(expr.Args) == 1 {
-			return isFullSliceAliasAt(pass, body, expr.Args[0], object, aliases, after, before, visiting)
+			return isFullSliceAliasAt(pass, body, expr.Args[0], object, aliases, after, before, visiting) //nolint:uncheckedsliceindex // len(expr.Args) is checked above
 		}
 		if !isBuiltinCall(pass, expr, "append") || len(expr.Args) == 0 {
 			return false
 		}
-		if isFullSliceAliasAt(pass, body, expr.Args[0], object, aliases, after, before, visiting) {
+		if isFullSliceAliasAt(pass, body, expr.Args[0], object, aliases, after, before, visiting) { //nolint:uncheckedsliceindex // append has at least one argument
 			return true
 		}
 		return expr.Ellipsis.IsValid() &&
-			isFullSliceAliasAt(pass, body, expr.Args[len(expr.Args)-1], object, aliases, after, before, visiting)
+			isFullSliceAliasAt(pass, body, expr.Args[len(expr.Args)-1], object, aliases, after, before, visiting) //nolint:uncheckedsliceindex // append has at least one argument
 	default:
 		return false
 	}
+}
+
+func isFullSliceAliasOfIdentAt(pass *analysis.Pass, body *ast.BlockStmt, ident *ast.Ident, object types.Object, aliases map[types.Object]bool, after, before token.Pos, visiting map[types.Object]bool) bool {
+	identObject := pass.TypesInfo.ObjectOf(ident)
+	if identObject == object {
+		return true
+	}
+	if !aliases[identObject] || visiting[identObject] {
+		return false
+	}
+	visiting[identObject] = true
+	var rhs ast.Expr
+	var latestPos token.Pos
+	found := false
+	latestDirect := false
+	ast.Inspect(body, func(node ast.Node) bool {
+		if node != body {
+			if _, ok := node.(*ast.FuncLit); ok {
+				return false
+			}
+		}
+		switch node := node.(type) {
+		case *ast.AssignStmt:
+			if node.Pos() <= after || node.End() > before || node.Pos() < latestPos {
+				return true
+			}
+			for i, lhs := range node.Lhs {
+				lhsIdent, ok := astutil.UnwrapParenExpr(lhs).(*ast.Ident)
+				if ok && pass.TypesInfo.ObjectOf(lhsIdent) == identObject {
+					latestPos = node.Pos()
+					found = true
+					latestDirect = isDirectFunctionBodyAssignment(body, node)
+					if i < len(node.Rhs) && len(node.Lhs) == len(node.Rhs) {
+						rhs = node.Rhs[i] //nolint:uncheckedsliceindex // index and slice lengths are checked above
+					} else {
+						rhs = nil
+					}
+				}
+			}
+		case *ast.ValueSpec:
+			if node.Pos() <= after || node.End() > before || node.Pos() < latestPos {
+				return true
+			}
+			for i, name := range node.Names {
+				if pass.TypesInfo.ObjectOf(name) == identObject {
+					latestPos = node.Pos()
+					found = true
+					latestDirect = isDirectFunctionBodyAssignment(body, node)
+					if i < len(node.Values) && len(node.Names) == len(node.Values) {
+						rhs = node.Values[i] //nolint:uncheckedsliceindex // index and slice lengths are checked above
+					} else {
+						rhs = nil
+					}
+				}
+			}
+		}
+		return true
+	})
+	if !found || rhs == nil || !latestDirect {
+		return false
+	}
+	return isFullSliceAliasAt(pass, body, rhs, object, aliases, after, latestPos, visiting)
 }
 func isSliceConversion(pass *analysis.Pass, call *ast.CallExpr) bool {
 	if !pass.TypesInfo.Types[call.Fun].IsType() || len(call.Args) != 1 {
 		return false
 	}
 	target, targetOK := pass.TypesInfo.TypeOf(call).Underlying().(*types.Slice)
-	source, sourceOK := pass.TypesInfo.TypeOf(call.Args[0]).Underlying().(*types.Slice)
+	source, sourceOK := pass.TypesInfo.TypeOf(call.Args[0]).Underlying().(*types.Slice) //nolint:uncheckedsliceindex // len(call.Args) is checked above
 	return targetOK && sourceOK && types.Identical(target, source)
 }
 func isDirectFunctionBodyAssignment(body *ast.BlockStmt, node ast.Node) bool {
