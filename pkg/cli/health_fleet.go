@@ -42,20 +42,21 @@ type healthFleetWorkflowEvidence struct {
 }
 
 type healthFleetState struct {
-	Version          int                                    `json:"version"`
-	Scope            healthFleetScope                       `json:"scope"`
-	Threshold        float64                                `json:"threshold"`
-	LogsDir          string                                 `json:"logs_dir,omitempty"`
-	RegistryPage     int                                    `json:"registry_page"`
-	RegistryDrift    bool                                   `json:"registry_drift,omitempty"`
-	RegistryIssues   map[string]string                      `json:"registry_issues,omitempty"`
-	RegistrySeen     map[string]bool                        `json:"registry_seen,omitempty"`
-	Workflows        []GitHubWorkflow                       `json:"workflows"`
-	Windows          []healthFleetWindow                    `json:"windows"`
-	UnresolvedSlices int                                    `json:"unresolved_slices"`
-	Runs             map[int64]WorkflowRun                  `json:"runs"`
-	Verified         map[string]healthFleetWorkflowEvidence `json:"verified"`
-	Responses        map[string][]byte                      `json:"responses"`
+	Version            int                                    `json:"version"`
+	Scope              healthFleetScope                       `json:"scope"`
+	Threshold          float64                                `json:"threshold"`
+	LogsDir            string                                 `json:"logs_dir,omitempty"`
+	RegistryPage       int                                    `json:"registry_page"`
+	RegistryExclusions []string                               `json:"registry_exclusions,omitempty"`
+	RegistryDrift      bool                                   `json:"registry_drift,omitempty"`
+	RegistryIssues     map[string]string                      `json:"registry_issues,omitempty"`
+	RegistrySeen       map[string]bool                        `json:"registry_seen,omitempty"`
+	Workflows          []GitHubWorkflow                       `json:"workflows"`
+	Windows            []healthFleetWindow                    `json:"windows"`
+	UnresolvedSlices   int                                    `json:"unresolved_slices"`
+	Runs               map[int64]WorkflowRun                  `json:"runs"`
+	Verified           map[string]healthFleetWorkflowEvidence `json:"verified"`
+	Responses          map[string][]byte                      `json:"responses"`
 }
 
 func runHealthFleet(ctx context.Context, config HealthConfig, start, end, started time.Time) error {
@@ -212,6 +213,9 @@ func collectHealthFleetRegistry(state *healthFleetState, collection *HealthColle
 		state.RegistryPage++
 	}
 	if state.RegistryPage == 0 {
+		if err := state.verifyRegistryExclusions(collection); err != nil {
+			return err
+		}
 		for file := range snapshot.files {
 			if validHealthFleetPath(file) && !state.RegistrySeen[file] {
 				state.flagRegistryIssue(file, "missing_registry_entry")
@@ -223,7 +227,6 @@ func collectHealthFleetRegistry(state *healthFleetState, collection *HealthColle
 }
 
 func (state *healthFleetState) compareRegistryPage(workflows []GitHubWorkflow, files map[string]string, collection *HealthCollection) error {
-	var registryHead *string
 	for _, workflow := range workflows {
 		file := workflow.Path
 		if !validHealthFleetPath(file) {
@@ -242,25 +245,43 @@ func (state *healthFleetState) compareRegistryPage(workflows []GitHubWorkflow, f
 		if _, checked := state.RegistryIssues[file]; checked {
 			continue
 		}
-		removed, err := healthFleetRemovedBeforeWindow(state.Scope, file, collection)
-		if removed {
-			if registryHead == nil {
-				head, headErr := healthFleetRegistryHead(state.Scope, collection)
-				registryHead, err = &head, headErr
-			}
-			// A newer head could contain a re-addition invisible at the pin.
-			removed = *registryHead == state.Scope.HeadSHA
-		}
+		outsideScope, err := healthFleetRegistryEntryOutsideScope(state.Scope, workflow, collection)
 		if err != nil {
 			if collection.stopped {
 				return err
 			}
-			healthLog.Printf("Workflow removal evidence unavailable for %q", file)
+			healthLog.Printf("Workflow registry evidence unavailable for %q", file)
 		}
-		if !removed {
+		if outsideScope {
+			if !slices.Contains(state.RegistryExclusions, file) {
+				state.RegistryExclusions = append(state.RegistryExclusions, file)
+			}
+		} else {
 			state.flagRegistryIssue(file, "active_registry_only")
 		}
 	}
+	return nil
+}
+
+func (state *healthFleetState) verifyRegistryExclusions(collection *HealthCollection) error {
+	if len(state.RegistryExclusions) == 0 {
+		return nil
+	}
+	// Recheck only after all pages and exclusion evidence have been collected.
+	// Keep candidates in the checkpoint until then so a resumed scan can verify them.
+	head, err := healthFleetRegistryHead(state.Scope, collection)
+	if err != nil && collection.stopped {
+		return err
+	}
+	if err != nil || head != state.Scope.HeadSHA {
+		if err != nil {
+			healthLog.Printf("Default branch head unavailable after registry scan: %v", err)
+		}
+		for _, file := range state.RegistryExclusions {
+			state.flagRegistryIssue(file, "active_registry_only")
+		}
+	}
+	state.RegistryExclusions = nil
 	return nil
 }
 
@@ -272,19 +293,30 @@ func (state *healthFleetState) flagRegistryIssue(file, reason string) {
 	state.RegistryIssues[file] = reason
 }
 
-func healthFleetRemovedBeforeWindow(scope healthFleetScope, file string, collection *HealthCollection) (bool, error) {
+func healthFleetRegistryEntryOutsideScope(scope healthFleetScope, workflow GitHubWorkflow, collection *HealthCollection) (bool, error) {
 	if !validHealthBlobSHA(scope.HeadSHA) || scope.Start.IsZero() {
 		return false, nil
 	}
 	commits := path.Join(healthRepositoryEndpoint(collection.repoOverride), "commits")
-	query := url.Values{"sha": {scope.HeadSHA}, "path": {file}, "per_page": {"1"}}
-	var latest struct {
+	query := url.Values{"sha": {scope.HeadSHA}, "path": {workflow.Path}, "per_page": {"1"}}
+	var history []struct {
 		SHA string `json:"sha"`
 	}
-	if err := healthFleetAPI(collection, commits+"?"+query.Encode(), &latest, `{sha:.[0].sha}`); err != nil {
+	if err := healthFleetAPI(collection, commits+"?"+query.Encode(), &history, `if type == "array" then map({sha}) else null end`); err != nil {
 		return false, err
 	}
-	sha := latest.SHA
+	if history != nil && len(history) == 0 {
+		// Actions can register workflows from non-default branches. Empty pinned
+		// history alone is insufficient; corroborate it with branch run inventory.
+		return healthFleetHasNoBranchRuns(scope, workflow, collection)
+	}
+	if len(history) != 1 {
+		return false, nil
+	}
+	var sha string
+	for _, entry := range history {
+		sha = entry.SHA
+	}
 	if !validHealthBlobSHA(sha) {
 		return false, nil
 	}
@@ -293,13 +325,31 @@ func healthFleetRemovedBeforeWindow(scope healthFleetScope, file string, collect
 		Date    time.Time `json:"date"`
 		Removed []string  `json:"removed"`
 	}
-	// A missing file or empty history is not proof of removal. Require an
-	// explicit deletion in the latest path commit reachable from the pin.
+	// With path history, require an explicit deletion in the latest path commit.
 	if err := healthFleetAPI(collection, path.Join(commits, sha), &commit, `{sha,date:.commit.committer.date,removed:[.files[] | select(.status=="removed") | .filename]}`); err != nil {
 		return false, err
 	}
 	return commit.SHA == sha && !commit.Date.IsZero() && commit.Date.Before(scope.Start) &&
-		slices.Contains(commit.Removed, file), nil
+		slices.Contains(commit.Removed, workflow.Path), nil
+}
+
+func healthFleetHasNoBranchRuns(scope healthFleetScope, workflow GitHubWorkflow, collection *HealthCollection) (bool, error) {
+	if workflow.ID <= 0 {
+		return false, nil
+	}
+	query := url.Values{"branch": {scope.Branch}, "per_page": {"1"}}
+	endpoint := fmt.Sprintf("%s/actions/workflows/%d/runs?%s", healthRepositoryEndpoint(collection.repoOverride), workflow.ID, query.Encode())
+	const projection = `{total_count,workflow_runs}`
+	// Run evidence, like the registry, must be fresh after resuming.
+	defer delete(collection.fleetResponses, endpoint+"\x00--jq\x00"+projection)
+	var runs struct {
+		Total *int              `json:"total_count"`
+		Runs  []json.RawMessage `json:"workflow_runs"`
+	}
+	if err := healthFleetAPI(collection, endpoint, &runs, projection); err != nil {
+		return false, err
+	}
+	return runs.Total != nil && *runs.Total == 0 && runs.Runs != nil && len(runs.Runs) == 0, nil
 }
 
 func healthFleetRegistryHead(scope healthFleetScope, collection *HealthCollection) (string, error) {
