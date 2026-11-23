@@ -4,7 +4,7 @@ spec: true
 description: Draft contract for canonical traces, full unified artifacts, and bounded compact unified sessions.
 sidebar:
   order: 1365
-version: "2.14.0"
+version: "2.15.0"
 status: Draft
 publication_date: "2026-11-23"
 editors:
@@ -14,7 +14,7 @@ editors:
 
 # Unified Agent Session Specification
 
-**Version**: 2.14.0<br>
+**Version**: 2.15.0<br>
 **Status**: Draft<br>
 **Publication Date**: 2026-11-23<br>
 **Editors**: GitHub Agentic Workflows Team (GitHub)<br>
@@ -31,7 +31,7 @@ This specification defines the session traces used by GitHub Agentic Workflows: 
 
 This is a **GitHub Agentic Workflows project specification**, written using W3C-inspired document conventions. It is **not an official W3C standard**, W3C publication, or W3C-endorsed recommendation.
 
-Version 2.14.0 is a draft governed by the project's normal review process. It may be updated, replaced, or superseded. The accompanying implementation and regression suites exercise this contract, including the sampled CI sessions identified in Section 9.4. This is not a blanket declaration of conformance for every engine version or source format. Section 10 records historical pre-implementation gaps, not current defects. Approval and ongoing compliance testing remain project responsibilities.
+Version 2.15.0 is a draft governed by the project's normal review process. It may be updated, replaced, or superseded. The accompanying implementation and regression suites exercise this contract, including the sampled CI sessions identified in Section 9.4. This is not a blanket declaration of conformance for every engine version or source format. Section 10 records historical pre-implementation gaps, not current defects. Approval and ongoing compliance testing remain project responsibilities.
 
 The specification version belongs to this document. The unified file's leading
 `session.format` record carries an independent numeric serialization-format
@@ -1565,15 +1565,17 @@ bounded attempt fields but remain subject to their existing loss budgets.
 **T-UAS-090 — Copilot terminal rate-limit waits.** When the Copilot harness
 observes terminal HTTP 429 evidence, it MUST inspect `Retry-After` only from
 `error`, `session.error`, or `turn.failed` events and from stderr. Assistant and
-tool events MUST NOT be used as `Retry-After` evidence. A valid numeric-seconds
-value or a valid non-expired HTTP-date value MUST determine the requested wait
-duration. The harness MUST wait for that duration regardless of the configured
-exponential backoff `max-delay-ms` limit, unless the wait reaches the remaining
-soft-timeout budget, including the shutdown buffer, or exceeds the maximum timer
-delay of 2147483647 milliseconds. In either case, the attempt MUST terminate with
-the allowlisted failure identifier `rate_limit_wait_exceeded` and report the
-requested retry delay in seconds. Missing, invalid,
-or expired `Retry-After` values MUST preserve the existing retry behavior.
+tool events MUST NOT be used as `Retry-After` evidence. The Azure signature `429
+Token limit is exceeded` MUST be recognized as terminal HTTP 429 evidence without
+expanding those evidence sources. A valid numeric-seconds value or a valid
+non-expired HTTP-date value MUST determine the requested wait duration. The
+harness MUST wait for that duration regardless of the configured exponential
+backoff `max-delay-ms` limit, unless the wait reaches the remaining soft-timeout
+budget, including the shutdown buffer, or exceeds the maximum timer delay of
+2147483647 milliseconds. In either case, the attempt MUST terminate with the
+allowlisted failure identifier `rate_limit_wait_exceeded` and report the requested
+retry delay in seconds. Missing, invalid, or expired `Retry-After` values MUST
+preserve the existing retry behavior.
 
 The deterministic conformance suite is
 `actions/setup/js/harness_retry_session.test.cjs`, together with the harness,
@@ -2866,6 +2868,14 @@ Malformed logs and very large records can exhaust memory or produce misleading s
 Native IDs can collide, timestamps can be out of order, and a trace can contain ambiguous concurrent calls. Exact-ID pairing avoids attributing a failure or output to the wrong tool. Cross-session concatenation requires an external boundary policy; this specification does not invent a wrapper or fabricated session IDs to resolve such ambiguity.
 
 ## 13. Change Log (Informative)
+
+### Version 2.15.0 - Draft (2026-11-23)
+
+- Clarified T-UAS-090 to recognize the Azure `429 Token limit is exceeded` terminal signature.
+- Retained evidence-source restrictions and missing, invalid, or expired `Retry-After` behavior.
+- Clarified that valid provider waits are not capped by exponential backoff `max-delay-ms`, subject to the soft-timeout/shutdown-buffer budget and the 2147483647-millisecond timer bound.
+- Retained `rate_limit_wait_exceeded` reporting with the requested delay in seconds.
+- Retained serialization-format version 1.
 
 ### Version 2.14.0 - Draft (2026-11-23)
 
