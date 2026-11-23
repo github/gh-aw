@@ -206,6 +206,9 @@ func (c *Compiler) validateToolConfiguration(workflowData *WorkflowData, markdow
 	if err := c.validateReleaseIntegrityPins(workflowData); err != nil {
 		return formatCompilerError(markdownPath, "error", err.Error(), err)
 	}
+	if err := c.validateEngineReleaseCooldowns(workflowData, markdownPath); err != nil {
+		return formatCompilerError(markdownPath, "error", err.Error(), err)
+	}
 	if err := validateExperimentalSubagentModels(workflowData); err != nil {
 		return formatCompilerError(markdownPath, "error", err.Error(), err)
 	}
@@ -259,7 +262,7 @@ func (c *Compiler) warnLegacyBehaviorInstallationCooldown(workflowData *Workflow
 	}
 
 	message := fmt.Sprintf(
-		"engine definition %q uses deprecated behaviors.installation.cooldown, which is ignored; set workflow engine.cooldown instead (0 disables cooldown only outside strict mode; strict mode rejects zero)",
+		"engine definition %q uses deprecated behaviors.installation.cooldown, which is ignored; set workflow engine.cooldown instead (0 disables cooldown, including in strict mode)",
 		definition.ID,
 	)
 	fmt.Fprintln(os.Stderr, formatCompilerMessage(markdownPath, "warning", message))

@@ -3258,7 +3258,7 @@ engine:
   checksums-sha256: "example-value"
 
   # Minimum release age in days for compiler-managed engine installs. Zero disables
-  # the cooldown only outside strict mode.
+  # the cooldown, including in strict mode.
   # (optional)
   cooldown: 1
 
@@ -3687,7 +3687,7 @@ engine:
 # named catalog entry
 engine:
   # Minimum release age in days for compiler-managed engine installs. Zero disables
-  # the cooldown only outside strict mode.
+  # the cooldown, including in strict mode.
   # (optional)
   cooldown: 1
 
@@ -4404,7 +4404,7 @@ engine:
     model-catalog: true
 
     # Minimum release age in days for compiler-managed engine installs. Zero disables
-    # the cooldown only outside strict mode.
+    # the cooldown, including in strict mode.
     # (optional)
     cooldown: 1
 
@@ -22345,7 +22345,7 @@ safe-outputs:
       checksums-sha256: "example-value"
 
       # Minimum release age in days for compiler-managed engine installs. Zero disables
-      # the cooldown only outside strict mode.
+      # the cooldown, including in strict mode.
       # (optional)
       cooldown: 1
 
@@ -22774,7 +22774,7 @@ safe-outputs:
     # named catalog entry
     engine-config:
       # Minimum release age in days for compiler-managed engine installs. Zero disables
-      # the cooldown only outside strict mode.
+      # the cooldown, including in strict mode.
       # (optional)
       cooldown: 1
 
@@ -23491,7 +23491,7 @@ safe-outputs:
         model-catalog: true
 
         # Minimum release age in days for compiler-managed engine installs. Zero disables
-        # the cooldown only outside strict mode.
+        # the cooldown, including in strict mode.
         # (optional)
         cooldown: 1
 

@@ -51,17 +51,17 @@ func applyEngineCooldownField(config *EngineConfig, obj map[string]any) {
 	config.Cooldown = &days
 }
 
-func validateEngineCooldown(config *EngineConfig, strict bool) error {
+func validateEngineCooldown(config *EngineConfig, _ bool) error {
 	if config == nil {
 		return nil
 	}
 	if config.cooldownError != nil {
 		return config.cooldownError
 	}
-	if config.Cooldown != nil && (*config.Cooldown < 0 || (strict && *config.Cooldown == 0)) {
+	if config.Cooldown != nil && *config.Cooldown < 0 {
 		return NewValidationError("engine.cooldown", strconv.Itoa(*config.Cooldown),
-			"cooldown must be nonnegative and cannot be zero in strict mode",
-			"Use a positive integer number of days, or omit engine.cooldown for the default 3-day cooldown.")
+			"cooldown must be nonnegative",
+			"Use a nonnegative integer number of days, or omit engine.cooldown for the default 3-day cooldown. Zero disables cooldown, including in strict mode.")
 	}
 	return nil
 }

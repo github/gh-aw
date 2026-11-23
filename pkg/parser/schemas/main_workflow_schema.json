@@ -15836,7 +15836,7 @@
               "type": "integer",
               "minimum": 0,
               "default": 3,
-              "description": "Minimum release age in days for compiler-managed engine installs. Zero disables the cooldown only outside strict mode."
+              "description": "Minimum release age in days for compiler-managed engine installs. Zero disables the cooldown, including in strict mode."
             },
             "model": {
               "type": "string",
@@ -16265,7 +16265,7 @@
               "type": "integer",
               "minimum": 0,
               "default": 3,
-              "description": "Minimum release age in days for compiler-managed engine installs. Zero disables the cooldown only outside strict mode."
+              "description": "Minimum release age in days for compiler-managed engine installs. Zero disables the cooldown, including in strict mode."
             },
             "runtime": {
               "type": "object",
