@@ -28,6 +28,11 @@
  *   https://github.com/github/gh-aw/actions/runs/39499464895 (usage 12300520074,
  *   agent 12298393979). Selected claude-haiku-4.5, then failed closed:
  *   `mini-whoami` requested unavailable gpt-5.4-mini.
+ * - run-39147795806: Smoke Copilot Routed, AWF v0.28.62,
+ *   https://github.com/github/gh-aw/actions/runs/39147795806/attempts/1. Selected
+ *   gpt-5.6-luna at max; four main requests and one classifier request. It keeps
+ *   only the api-proxy logs and `agent_output.json`, reduced to its item types:
+ *   the agent created its required report, but a later check failed its job.
  *
  * `routing-analytics/awf-10211/` holds records produced by the gh-aw-firewall
  * writers at b5c683e116470e0aa579ec9bf30a675fcdb66f76 (github/gh-aw-firewall#10211)

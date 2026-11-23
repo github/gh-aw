@@ -228,10 +228,12 @@ function isCodexJsonlFormat(lines, entries = collectCodexJSONRecords(lines.join(
  * Retains native item lifecycles, message snapshots and per-turn accounting.
  * @param {string} logContent - The raw log content
  * @param {Array<any>} [entries] - Already parsed records, when available
+ * @param {{render?: boolean}} [options]
  * @returns {{markdown: string, logEntries: Array, mcpFailures: Array<string>, maxTurnsHit: boolean}} Parsed log data
  */
-function parseCodexJsonl(logContent, entries = collectCodexJSONRecords(logContent)) {
+function parseCodexJsonl(logContent, entries = collectCodexJSONRecords(logContent), { render = true } = {}) {
   const canonicalLogEntries = normalizeCodexSession(collectCodexMixedRecords(logContent, entries), extractCodexModel(logContent));
+  if (!render) return { markdown: "", logEntries: canonicalLogEntries, mcpFailures: [], maxTurnsHit: false };
   const conversation = generateConversationMarkdown(canonicalLogEntries, {
     includeInformation: false,
     formatToolCallback: (toolUse, toolResult) => formatToolUse(toolUse, toolResult),
@@ -412,13 +414,14 @@ function parseCodexLegacySession(lines, model, accounting = { inlineTokens: 0, h
  * Parse codex log content and format as markdown
  * @param {string} logContent - The raw log content to parse
  * @param {Array<any>} [parsed] - Already parsed records, when available
+ * @param {{render?: boolean}} [options]
  * @returns {{markdown: string, logEntries: Array, mcpFailures: Array<string>, maxTurnsHit: boolean}} Parsed log data
  */
-function parseCodexLog(logContent, parsed = collectCodexJSONRecords(logContent)) {
+function parseCodexLog(logContent, parsed = collectCodexJSONRecords(logContent), options = {}) {
   // Newer Codex CLI versions emit a structured JSONL event stream rather than the
   // legacy pretty-printed format. Route those to the dedicated JSONL parser.
   if (logContent && isCodexJsonlFormat([], parsed)) {
-    return parseCodexJsonl(logContent, parsed);
+    return parseCodexJsonl(logContent, parsed, options);
   }
   if (!logContent) {
     return {
@@ -430,6 +433,16 @@ function parseCodexLog(logContent, parsed = collectCodexJSONRecords(logContent))
   }
 
   const lines = logContent.split("\n");
+  if (options.render === false) {
+    return {
+      markdown: "",
+      logEntries: parseCodexLegacySession(lines, extractCodexModel(logContent)),
+      mcpFailures: extractMCPInitialization(lines)
+        .servers.filter(server => server.status === "failed")
+        .map(server => server.name),
+      maxTurnsHit: false,
+    };
+  }
 
   // Look-ahead window size for finding tool results
   // New format has verbose debug logs, so requires larger window

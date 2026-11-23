@@ -302,6 +302,23 @@ export interface ModelBaselineEstimateData {
   complete: boolean;
 }
 
+/** Why a routed run's result does not count as evidence about the selected pair. */
+export type RoutingSkipReason = "cancelled" | "infrastructure" | "rate_limited" | "pair_mismatch" | "unknown_evidence";
+
+/** A routed run whose result counts: the selected pair succeeded or failed on its own. */
+export interface RoutingCountedObservationData {
+  outcome: "success" | "failure";
+}
+
+/** A routed run whose result does not count, and why. */
+export interface RoutingSkippedObservationData {
+  outcome: "skip";
+  reason: RoutingSkipReason;
+}
+
+/** Collector-written verdict on a routed run (T-UAS-094). */
+export type RoutingObservationData = RoutingCountedObservationData | RoutingSkippedObservationData;
+
 export interface ModelRoutingRankedChoice {
   rank: number;
   id?: string;
@@ -593,6 +610,7 @@ export type HarnessFailureClass =
   | "null_type_tool_call"
   | "no_auth_info"
   | "authentication_failed"
+  | "transient_error"
   | "sdk_session_idle_timeout"
   | "mcp_gateway_shutdown"
   | "permission_denied"
@@ -846,6 +864,7 @@ export interface UnifiedSessionEventDataMap {
   "model.inventory": ModelInventoryData;
   "model.config": ModelConfigData;
   "model.baseline_estimate": ModelBaselineEstimateData;
+  "routing.observation": RoutingObservationData;
   "skill.inventory": SkillInventoryData;
   "skill.conflict": SkillConflictData;
   "skill.invoked": SkillInvokedData;

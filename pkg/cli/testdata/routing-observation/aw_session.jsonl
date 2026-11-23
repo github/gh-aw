@@ -1,0 +1,2 @@
+{"type":"session.format","data":{"version":1},"provenance":{"component":"collector","phase":"conclusion","path":"usage/aw_session.jsonl","index":0}}
+{"type":"routing.observation","data":{"outcome":"skip","reason":"unknown_evidence"},"provenance":{"component":"collector","phase":"conclusion","path":"usage/aw_session.jsonl","index":1}}

@@ -3,7 +3,7 @@
 "use strict";
 
 const { parseCopilotRetryAfterMs } = require("./copilot_retry_after.cjs");
-const { detectNonRetryableHarnessGuard, isAuthenticationFailedError } = require("./harness_error_patterns.cjs");
+const { detectNonRetryableHarnessGuard, isAuthenticationFailedError, isHTMLResponseError } = require("./harness_error_patterns.cjs");
 const { createHarnessRuntime } = require("./harness_engine.cjs");
 const { shouldStopForNoopSafeOutputs } = require("./harness_retry_runner.cjs");
 const { getSafeOutputsByteOffset } = require("./harness_safe_outputs.cjs");
@@ -47,7 +47,7 @@ function classifyGenericHarnessFailure(output) {
   }
   const tail = retrySignalTail(text);
   if (RATE_LIMIT_PATTERN.test(tail)) return "rate_limit_error";
-  if (TRANSIENT_ERROR_PATTERN.test(tail)) return "transient_error";
+  if (TRANSIENT_ERROR_PATTERN.test(tail) || isHTMLResponseError(text, { tailChars: GENERIC_HARNESS_RETRY_SIGNAL_TAIL_CHARS })) return "transient_error";
   return null;
 }
 

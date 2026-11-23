@@ -198,6 +198,7 @@ async function main() {
 
     core.info(`[INGESTION] Output file path: ${outputFile}`);
     const collectionErrors = [];
+    let collectorInfrastructureCause;
     if (!outputFile || !fs.existsSync(outputFile)) {
       core.info(outputFile ? `Output file does not exist: ${outputFile}` : "GH_AW_SAFE_OUTPUTS not set, no output to collect");
       const runnerTemp = process.env.RUNNER_TEMP || "/home/runner/work/_temp";
@@ -208,6 +209,7 @@ async function main() {
           `This is a gateway infrastructure failure, not a normal no-op. ` +
           `Check the MCP gateway startup logs for ECONNRESET errors or delayed backend registration and re-run the workflow.`;
         collectionErrors.push(reason);
+        collectorInfrastructureCause = "safeoutputs_gateway_empty";
         // eslint-disable-next-line gh-aw-custom/require-return-after-core-setfailed
         core.setFailed(reason);
       }
@@ -432,6 +434,7 @@ async function main() {
       ...(collectorDriverExitCode !== undefined ? { collectorDriverExitCode } : {}),
       ...(collectorRetryCount !== undefined ? { collectorRetryCount } : {}),
       ...(collectorEngineErrorType ? { collectorEngineErrorType } : {}),
+      ...(collectorInfrastructureCause ? { collectorInfrastructureCause } : {}),
     };
     const path = require("path");
     const agentOutputFile = path.join(TMP_GH_AW_PATH, AGENT_OUTPUT_FILENAME);

@@ -14,9 +14,10 @@ const main = createEngineLogParser({
 /**
  * Parses Claude log content and converts it to markdown format
  * @param {string} logContent - The raw log content as a string
+ * @param {{render?: boolean}} [options]
  * @returns {{markdown: string, mcpFailures: string[], maxTurnsHit: boolean, logEntries: Array}} Result with formatted markdown content, MCP failure list, max-turns status, and parsed log entries
  */
-function parseClaudeLog(logContent) {
+function parseClaudeLog(logContent, { render = true } = {}) {
   // Use shared parseLogEntries function
   const logEntries = parseLogEntries(logContent);
 
@@ -28,6 +29,19 @@ function parseClaudeLog(logContent) {
       maxTurnsHit: false,
       logEntries: [],
     };
+  }
+  const lastEntry = projectSessionResult(canonicalLogEntries);
+  let maxTurnsHit = canonicalLogEntries.some(entry => entry.type === "session.result" && !sessionContext(entry).parentToolUseId && entry.data.subtype === "error_max_turns");
+  const maxTurns = process.env.GH_AW_MAX_TURNS;
+  if (maxTurns && lastEntry && lastEntry.num_turns !== undefined) {
+    const configuredMaxTurns = parseInt(maxTurns, 10);
+    if (!Number.isNaN(configuredMaxTurns) && lastEntry.num_turns >= configuredMaxTurns) {
+      maxTurnsHit = true;
+    }
+  }
+  if (!render) {
+    const mcpFailures = canonicalLogEntries.flatMap(entry => (entry.type === "session.init" && Array.isArray(entry.data.mcpServers) ? entry.data.mcpServers.filter(server => server?.status === "failed").map(server => server.name) : []));
+    return { markdown: "", mcpFailures, maxTurnsHit, logEntries: canonicalLogEntries };
   }
 
   const mcpFailures = [];
@@ -87,18 +101,6 @@ function parseClaudeLog(logContent) {
   });
 
   const markdown = conversationResult.markdown;
-  const lastEntry = projectSessionResult(canonicalLogEntries);
-
-  // Check if max-turns limit was hit
-  let maxTurnsHit = canonicalLogEntries.some(entry => entry.type === "session.result" && !sessionContext(entry).parentToolUseId && entry.data.subtype === "error_max_turns");
-  const maxTurns = process.env.GH_AW_MAX_TURNS;
-  if (maxTurns && lastEntry && lastEntry.num_turns !== undefined) {
-    const configuredMaxTurns = parseInt(maxTurns, 10);
-    if (!Number.isNaN(configuredMaxTurns) && lastEntry.num_turns >= configuredMaxTurns) {
-      maxTurnsHit = true;
-    }
-  }
-
   return { markdown, mcpFailures, maxTurnsHit, logEntries: canonicalLogEntries };
 }
 

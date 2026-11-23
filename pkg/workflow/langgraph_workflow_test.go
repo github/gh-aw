@@ -99,6 +99,7 @@ func TestLangGraphSampleExecution(t *testing.T) {
 			assert.Contains(t, execution, "AWF_REFLECT_ENABLED: 1")
 			assert.Contains(t, execution, "langgraph_harness.cjs")
 			assert.Contains(t, execution, "StateGraph(MessagesState)")
+			assert.NotContains(t, execution, "print(json.dumps(snapshot)")
 		})
 	}
 }
@@ -266,6 +267,9 @@ func TestLangGraphPinnedPackageSmoke(t *testing.T) {
 	output, err := cmd.CombinedOutput()
 	require.NoError(t, err, "%s", output)
 	assert.Contains(t, string(output), "LangGraph exit status: Completed")
+	assert.NotContains(t, string(output), prompt)
+	assert.NotContains(t, string(output), `"messages"`)
+	assert.NotContains(t, string(output), "exit code: 0")
 
 	mu.Lock()
 	require.Len(t, bodies, 2)

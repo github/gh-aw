@@ -268,6 +268,13 @@ func renderConsoleModelRouting(routing *ModelRoutingSummary) {
 		fmt.Fprintf(os.Stderr, "    failure: code=%s detail=%s\n",
 			safeModelRoutingText(routing.Failure.Code), safeModelRoutingText(routing.Failure.Detail))
 	}
+	if observation := routing.Observation; observation != nil {
+		line := "    observation: outcome=" + observation.Outcome
+		if observation.Reason != "" {
+			line += " reason=" + observation.Reason
+		}
+		fmt.Fprintln(os.Stderr, safeModelRoutingText(line))
+	}
 	fmt.Fprintf(os.Stderr, "    cost_aic: classifier=%.3f selected_model=%.3f deviated=%.3f\n",
 		routing.ClassifierCost.AIC, routing.SelectedModelCost.AIC, routing.DeviatedTrafficCost.AIC)
 	if routing.MainAgentCost.Requests > 0 || routing.MainAgentCost.AIC > 0 {
