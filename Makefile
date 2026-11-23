@@ -632,6 +632,7 @@ test-all: test test-js test-wasm-golden test-scripts test-guidance
 .PHONY: test-guidance
 test-guidance:
 	python3 -m unittest discover -s .github/skills/agentic-workflows/tests -p 'test_*.py'
+	python3 -m unittest discover -s .github/skills/native-session-validation/scripts -p 'test_*.py'
 
 # Run tests with coverage
 .PHONY: test-coverage

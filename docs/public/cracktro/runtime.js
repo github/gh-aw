@@ -85,8 +85,8 @@
   body.light .dots button { background: #1f232833; }
   body.light .dots button.hd { background: transparent; box-shadow: inset 0 0 0 2px #1f232859; }
   body.light .dots button.on { background: #1f2328; box-shadow: none; }
-  body.light .snd, body.light .fzb, body.light .smb, body.light .ntb, body.light .ksb, body.light .ccb, body.light .arrows button { border-color: #9ea7b3; background: #e6eaefcc; color: #424a53; }
-  body.light .snd:hover, body.light .fzb:hover, body.light .smb:hover, body.light .ntb:hover, body.light .ksb:hover, body.light .ccb:hover, body.light .arrows button:hover { color: #1f2328; border-color: #818b98; }
+  body.light .snd, body.light .fzb, body.light .smb, body.light .ntb, body.light .ksb, body.light .ccb, body.light .wzb, body.light .arrows button { border-color: #9ea7b3; background: #e6eaefcc; color: #424a53; }
+  body.light .snd:hover, body.light .fzb:hover, body.light .smb:hover, body.light .ntb:hover, body.light .ksb:hover, body.light .ccb:hover, body.light .wzb:hover, body.light .arrows button:hover { color: #1f2328; border-color: #818b98; }
   /* research prototype badge on every gh cao slide (top right, clear of the chrome) */
   .proto { position: absolute; right: 110px; top: 76px; display: flex; align-items: center; gap: 14px; padding: 12px 22px; border: 2px dashed #e3b341; border-radius: 999px; background: #0d1117cc; font: 600 20px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: #e3b341; z-index: 5; }
   .proto i { width: 12px; height: 12px; border-radius: 50%; background: #e3b341; box-shadow: 0 0 12px #e3b341; animation: proto-blink 1.6s ease-in-out infinite; }
@@ -112,7 +112,7 @@
   .dots button.sub { width: 4px; height: 6px; margin: 1px -1px 0; border-radius: 2px; background: #ffffff26; }
   .dots button.sub.on { width: 12px; background: #f0f6fc; }
   /* --- example column button (dock): only on a column's head and its examples --- */
-  .vnb { position: fixed; right: calc(224px + var(--sr)); bottom: calc(10px + var(--sb)); height: 34px; padding: 0 10px 0 6px; display: none; align-items: center; gap: 4px; border: 1px solid #3d444d; border-radius: 8px;
+  .vnb { position: fixed; right: calc(264px + var(--sr)); bottom: calc(10px + var(--sb)); height: 34px; padding: 0 10px 0 6px; display: none; align-items: center; gap: 4px; border: 1px solid #3d444d; border-radius: 8px;
     background: #151b23cc; color: #9198a1; font: 600 13px/1 var(--mono); cursor: pointer; z-index: 5; transition: color .2s, border-color .2s, background .2s; touch-action: manipulation; }
   .vnb.on { display: flex; }
   .vnb:hover { color: #f0f6fc; border-color: #9198a1; }
@@ -169,24 +169,27 @@
   body.compact-nav .arrows { display: flex; }
   /* compact dock: translucent after a few idle seconds (body.nav-idle); any touch, key or focus restores it.
      Idle fading preserves hit targets; keyboard focus keeps its control fully readable. */
-  body.compact-nav :is(.arrows, .vnb, .snd, .fzb, .smb, .ntb, .ksb, .tourp) { transition: opacity .4s, color .2s, border-color .2s, background .2s,
+  body.compact-nav :is(.arrows, .vnb, .snd, .fzb, .smb, .ntb, .ksb, .wzb, .tourp) { transition: opacity .4s, color .2s, border-color .2s, background .2s,
     transform .45s cubic-bezier(.2,.9,.2,1), bottom .45s cubic-bezier(.2,.9,.2,1); }
-  body.compact-nav.nav-idle :is(.arrows, .vnb, .snd, .fzb, .smb, .ntb, .ksb, .tourp) { opacity: .4; }
-  body.compact-nav.nav-idle :is(.arrows:has(:focus-visible), .vnb:focus-visible, .snd:focus-visible, .fzb:focus-visible, .smb:focus-visible, .ntb:focus-visible, .ksb:focus-visible, .tourp:has(:focus-visible)) { opacity: 1; }
-  @media (prefers-reduced-motion: reduce) { body.compact-nav :is(.arrows, .vnb, .snd, .fzb, .smb, .ntb, .ksb, .tourp) { transition: none; } }
-  .snd, .fzb, .smb, .ntb, .ksb, .ccb { position: fixed; right: calc(24px + var(--sr)); bottom: calc(10px + var(--sb)); width: 34px; height: 34px; padding: 6px; border: 1px solid #3d444d; border-radius: 8px;
+  body.compact-nav.nav-idle :is(.arrows, .vnb, .snd, .fzb, .smb, .ntb, .ksb, .wzb, .tourp) { opacity: .4; }
+  body.compact-nav.nav-idle :is(.arrows:has(:focus-visible), .vnb:focus-visible, .snd:focus-visible, .fzb:focus-visible, .smb:focus-visible, .ntb:focus-visible, .ksb:focus-visible, .wzb:focus-visible, .tourp:has(:focus-visible)) { opacity: 1; }
+  @media (prefers-reduced-motion: reduce) { body.compact-nav :is(.arrows, .vnb, .snd, .fzb, .smb, .ntb, .ksb, .wzb, .tourp) { transition: none; } }
+  .snd, .fzb, .smb, .ntb, .ksb, .ccb, .wzb { position: fixed; right: calc(24px + var(--sr)); bottom: calc(10px + var(--sb)); width: 34px; height: 34px; padding: 6px; border: 1px solid #3d444d; border-radius: 8px;
     background: #151b23cc; color: #9198a1; cursor: pointer; z-index: 5; transition: color .2s, border-color .2s, background .2s; }
-  .snd:hover, .fzb:hover, .smb:hover, .ntb:hover, .ksb:hover, .ccb:hover { color: #f0f6fc; border-color: #9198a1; }
-  .snd svg, .fzb svg, .smb svg, .ntb svg, .ksb svg, .ccb svg { width: 100%; height: 100%; display: block; }
+  .snd:hover, .fzb:hover, .smb:hover, .ntb:hover, .ksb:hover, .ccb:hover, .wzb:hover { color: #f0f6fc; border-color: #9198a1; }
+  .snd svg, .fzb svg, .smb svg, .ntb svg, .ksb svg, .ccb svg, .wzb svg { width: 100%; height: 100%; display: block; }
   .fzb { right: calc(64px + var(--sr)); }
   .smb { right: calc(104px + var(--sr)); }
   .ntb { right: calc(144px + var(--sr)); }
   .ksb { right: calc(184px + var(--sr)); }
+  /* workflow wizard (W): only when create() receives config.wizard */
+  .wzb { right: calc(224px + var(--sr)); }
+  .wzb:hover { color: #e3b341; border-color: #d29922; }
   .ntb[aria-pressed="true"] { color: #f0f6fc; border-color: currentColor; box-shadow: inset 0 -3px currentColor; }
   body.light .ntb[aria-pressed="true"] { color: #1f2328; }
   /* kiosk mode: slides rotate on their own; the chrome hides except the stop button and the sound toggle beside it,
      which fade (with the cursor) when idle */
-  body.kiosk :is(.dots, .arrows, .vnb, .fzb, .smb, .ntb, .tourp, .notes, .progress) { display: none !important; }
+  body.kiosk :is(.dots, .arrows, .vnb, .fzb, .smb, .ntb, .wzb, .tourp, .notes, .progress) { display: none !important; }
   body.kiosk :is(.ksb, .snd) { opacity: 1; color: #f0f6fc; border-color: #f0f6fc; transition: opacity .4s, color .2s, border-color .2s; }
   body.kiosk .snd { right: calc(144px + var(--sr)); }
   body.kiosk.nav-idle { cursor: none; }
@@ -221,6 +224,9 @@
   .notes .cue-k { font: 600 13px/1.4 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: #79c0ff; white-space: nowrap; }
   @media (max-width: 640px) {
     .snd, .fzb, .smb, .ntb, .ksb, .vnb { bottom: calc(52px + var(--sb)); }
+    /* the tools row is full on a phone: the column button keeps its old slot and the wizard joins the arrows' row, at the left */
+    .vnb { right: calc(224px + var(--sr)); }
+    .wzb { right: auto; left: calc(12px + var(--sl)); }
     /* Translate rather than switch anchors so the arrows can slide beneath the toolbar. */
     .arrows { transform: translateX(calc(100vw - 100% - 36px - var(--sl) - var(--sr))); }
     .notes { bottom: calc(94px + var(--sb)); padding: 14px 16px; font-size: 16px; line-height: 1.5; }
@@ -551,6 +557,7 @@
         );
         r.header = {
           group: r.group,
+          id: BANDS[r.group][2],
           header: true,
           notes: `What: ${PROTO[r.group] ? `Research prototype: ${PROTO[r.group]}. ` : ""}The ${title} section map shows topic tiles; a down-arrow badge marks worked examples.\nWhy: ${sub}.\nWhen: Use this map to choose a topic, then open a tile or follow its examples.`,
           el: h(
@@ -659,8 +666,8 @@
     };
     const lineStartBtn = arrowBtn("First slide of the band", "Shift+Home", "Shift+Home", "M5 5v14M13 6l-6 6 6 6M20 6l-6 6 6 6", () => lineStart());
     const bandPrevBtn = arrowBtn("Previous band", "PgUp or Shift+↑", "PageUp Shift+ArrowUp", "M6 5v14M18 6l-7 6 7 6", () => band(-1));
-    const prevBtn = arrowBtn("Previous slide", "←", "ArrowLeft Backspace", "M15 5l-7 7 7 7", () => prev());
-    const nextBtn = arrowBtn("Next slide", "→", "ArrowRight Space Enter", "M9 5l7 7-7 7", () => next());
+    const prevBtn = arrowBtn("Previous slide", "⌘/Alt+←", "Meta+ArrowLeft Alt+ArrowLeft", "M15 5l-7 7 7 7", () => prev());
+    const nextBtn = arrowBtn("Next slide", "⌘/Alt+→", "Meta+ArrowRight Alt+ArrowRight", "M9 5l7 7-7 7", () => next());
     const bandNextBtn = arrowBtn("Next band", "PgDn or Shift+↓", "PageDown Shift+ArrowDown", "M18 5v14M6 6l7 6-7 6", () => band(1));
     const arrows = h("div", { class: "arrows" }, lineStartBtn, bandPrevBtn, prevBtn, nextBtn, bandNextBtn);
     // Column button (dock): shown on a column's head and its examples. On the head it is lit with a bouncing
@@ -774,6 +781,33 @@
         setKiosk(!kiosk);
       },
     });
+    // workflow wizard (W): a full-screen dialog owned by config.wizard (wizard.js); the runtime only opens it
+    const wizard = config.wizard || null;
+    const wizOpen = () => !!wizard?.isOpen?.();
+    const wzBtn = wizard
+      ? h("button", {
+          class: "wzb",
+          type: "button",
+          "aria-label": `${wizard.title || "Wizard"} (W)`,
+          "aria-keyshortcuts": "W",
+          title: `${wizard.title || "Wizard"} (W)`,
+          onclick: e => {
+            e.stopPropagation();
+            openWizard();
+          },
+        })
+      : null;
+    if (wzBtn)
+      wzBtn.innerHTML =
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5.5C5.5 4 8.5 4 12 6c3.5-2 6.5-2 9-.5V19c-2.5-1.5-5.5-1.5-9 .5-3.5-2-6.5-2-9-.5z"/><path d="M12 6v13.5"/></svg>';
+    function openWizard() {
+      if (!wizard || wizOpen()) return;
+      if (fz.open) fz.close();
+      if (smp.open) smp.close();
+      if (kiosk) setKiosk(false);
+      wizard.open({ sound: sfx });
+    }
+    for (const t of ["touchstart", "touchend"]) wzBtn?.addEventListener(t, e => e.stopPropagation(), { passive: true });
     // closed captioning (C, CC): kiosk mode as a captioned news TV; its dock button shows only while kiosk mode runs
     const ccb = h("button", {
       class: "ccb",
@@ -835,7 +869,7 @@
     // kiosk mode starts captioned; turning CC off keeps it off for later kiosk runs until it is turned back on
     let capOn = false,
       capPref = true;
-    document.body.append(canvas, wash, gridc, stage, ccEl, progress, dots, arrows, vnb, ksb, ccb, notesBtn, smBtn, fzBtn, ...(config.sound ? [snd] : []), notes, tourP);
+    document.body.append(canvas, wash, gridc, stage, ccEl, progress, dots, arrows, vnb, ksb, ccb, ...(wzBtn ? [wzBtn] : []), notesBtn, smBtn, fzBtn, ...(config.sound ? [snd] : []), notes, tourP);
     // the pressed state (sound on) and the struck-out icon (.off) always follow the sound service
     const paintSound = () => {
       snd.classList.toggle("off", !!sfx.muted);
@@ -843,12 +877,12 @@
     };
     paintSound();
 
-    // Dot map: left offset + the longest band of 8px dots with 5px gaps (example dots are 4px with 3px gaps) + 16px for the wide active dot; dock buttons need ~230px on the right.
+    // Dot map: left offset + the longest band of 8px dots with 5px gaps (example dots are 4px with 3px gaps) + 16px for the wide active dot; dock buttons need ~230px on the right (~270px with the wizard).
     const dotsWidth = 28 + Math.max(...rows.map(r => r.items.reduce((w, s) => w + (s.parent ? 7 : 13), r.header ? 13 : 0))) + 16 + 400;
     const fit = () => {
       const s = Math.min(innerWidth / W, innerHeight / H);
       ccF.style.transform = stage.style.transform = `scale(${s}) translate(-50%, -50%)`;
-      document.body.classList.toggle("compact-nav", dotsWidth > innerWidth - 230);
+      document.body.classList.toggle("compact-nav", dotsWidth > innerWidth - (wzBtn ? 270 : 230));
     };
     addEventListener("resize", fit);
     fit();
@@ -1193,31 +1227,36 @@
       vnb.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="${back ? "M12 19V5M5 12l7-7 7 7" : "M12 5v14M5 12l7 7 7-7"}"/></svg><span class="vnb-t">${at ? `${at}/${N}` : N}</span>`;
       vnb._nav = back ? () => go(slides.indexOf(col)) : () => vstep(1);
     }
+    // Cmd/Alt+Left/Right, the dock arrows and swipes always change slide; Right/Space/Enter and Left/Backspace
+    // run the slide's in-slide steps (onNext/onPrev) first and change slide only when none is left.
     const next = () => {
-        if (slides[cur].onNext?.()) (sfx.touch(), sfx.step(1));
-        else {
-          const i = nextTop(cur);
-          if (i != null) go(i);
-        }
+        const i = nextTop(cur);
+        if (i != null) go(i);
       },
       prev = () => {
-        if (slides[cur].onPrev?.()) (sfx.touch(), sfx.step(-1));
-        else {
-          const i = prevTop(cur);
-          if (i != null) go(i);
-        }
-      };
+        const i = prevTop(cur);
+        if (i != null) go(i);
+      },
+      stepNext = () => (slides[cur].onNext?.() ? (sfx.touch(), sfx.step(1)) : next()),
+      stepPrev = () => (slides[cur].onPrev?.() ? (sfx.touch(), sfx.step(-1)) : prev());
 
     let jumpBuf = "",
       jumpT = null;
     addEventListener("keydown", e => {
       /** @type {any} */
       const target = e.target;
-      if (fz.open || smp.open) return; // the search and map dialogs handle their own keys
+      if (fz.open || smp.open || wizOpen()) return; // the search, map and wizard dialogs handle their own keys
       if (target.closest?.(".notes") && !["n", "N", "Escape"].includes(e.key)) return;
       if ((e.metaKey || e.ctrlKey) && !e.altKey && (e.key === "k" || e.key === "K")) {
         e.preventDefault();
         openSearch();
+        return;
+      }
+      // Cmd+Left/Right (macOS) or Alt+Left/Right (Windows, Linux) change slide; preventDefault stops browser history moves
+      if (e.metaKey !== e.altKey && !e.ctrlKey && !e.shiftKey && (e.key === "ArrowRight" || e.key === "ArrowLeft")) {
+        if (target.closest?.("input, textarea, select, [contenteditable]")) return;
+        e.preventDefault();
+        (e.key === "ArrowRight" ? next : prev)();
         return;
       }
       if (e.metaKey || e.ctrlKey || e.altKey) return;
@@ -1246,12 +1285,12 @@
         go(+typed - 1);
         return;
       }
-      if (["ArrowRight", " ", "Enter"].includes(e.key)) {
+      if (e.key === " " || e.key === "Enter" || e.key === "ArrowRight") {
         e.preventDefault();
-        next();
-      } else if (["ArrowLeft", "Backspace"].includes(e.key)) {
+        stepNext();
+      } else if (e.key === "Backspace" || e.key === "ArrowLeft") {
         e.preventDefault();
-        prev();
+        stepPrev();
       } else if (e.key === "PageDown" || e.key === "PageUp") {
         e.preventDefault();
         band(e.key === "PageDown" ? 1 : -1);
@@ -1274,6 +1313,10 @@
       else if (e.key === "Escape" && notes.classList.contains("on")) toggleNotes();
       else if (e.key === "m" || e.key === "M") toggleSound();
       else if (e.key === "g" || e.key === "G") openMap();
+      else if ((e.key === "w" || e.key === "W") && wizard && !e.repeat && !target.closest?.("input, textarea, select, [contenteditable]")) {
+        e.preventDefault();
+        openWizard();
+      }
       else if ((e.key === "x" || e.key === "X") && view) setView(null);
     });
     // Clicks never move between slides (only keys, the dock, swipes and jump targets do); a click on a
@@ -1290,7 +1333,7 @@
       ty = null,
       pinch0 = null,
       ownsPinch = false;
-    const touchIgnored = t => fz.open || smp.open || !!t.closest?.(".notes, dialog, input, textarea, select, [contenteditable]");
+    const touchIgnored = t => fz.open || smp.open || wizOpen() || !!t.closest?.(".notes, dialog, input, textarea, select, [contenteditable]");
     const pageZoomed = () => (window.visualViewport?.scale ?? 1) > 1.01;
     const spread = ts => Math.hypot(ts[0].clientX - ts[1].clientX, ts[0].clientY - ts[1].clientY);
     const webkitGestures = "GestureEvent" in window;
@@ -1351,7 +1394,7 @@
     addEventListener(
       "touchend",
       e => {
-        if (tx == null || e.touches.length || fz.open || smp.open) return (tx = ty = null);
+        if (tx == null || e.touches.length || fz.open || smp.open || wizOpen()) return (tx = ty = null);
         const t = e.changedTouches[0],
           dx = t.clientX - tx,
           dy = t.clientY - ty;
@@ -1677,13 +1720,16 @@
     // shortcuts. Each entry is [keys, action]; a key is a string whose "+" joins a chord ("Shift+Home").
     /** @type {Array<[string[], string]>} */
     const SOUND_KEYS = config.sound ? [[["M"], "Sound on or off"]] : [];
+    /** @type {Array<[string[], string]>} */
+    const WIZARD_KEYS = wizard ? [[["W"], `${wizard.title || "Wizard"}: choose your own workflow`]] : [];
     /** @type {Array<[string, Array<[string[], string]>]>} */
     const KEYMAP = [
       [
         "Move",
         [
-          [["→", "Space", "Enter"], "Next slide"],
-          [["←", "Backspace"], "Previous slide"],
+          [["Alt+←", "Alt+→", "⌘+←", "⌘+→"], "Previous or next slide, skipping in-slide steps"],
+          [["→", "Space", "Enter"], "Next step in the slide, then next slide"],
+          [["←", "Backspace"], "Previous step in the slide, then previous slide"],
           [["↑", "↓"], "Up or down a column, or to the next band; keeps your place in the line"],
           [["Shift+↑", "Shift+↓", "PgUp", "PgDn"], "Previous or next band"],
           [["U"], "Back to the pattern of an example"],
@@ -1697,6 +1743,7 @@
           [["1…9+Enter"], "Slide by number"],
           [["/", "Ctrl+K", "⌘+K"], "Search slides"],
           [["G"], "Slide map (this screen)"],
+          ...WIZARD_KEYS,
         ],
       ],
       [
@@ -1706,7 +1753,8 @@
       [
         "Slide map",
         [
-          [["←", "→", "↑", "↓"], "Move between tiles"],
+          [["←", "→"], "In the map: previous or next tile, in slide order"],
+          [["↑", "↓"], "In the map: tile on the line above or below"],
           [["Home", "End"], "First or last tile"],
           [["Enter"], "Open the slide"],
           [["T"], "Tours"],
@@ -1766,19 +1814,20 @@
       return keys.map(([label, x, y, w = 1, hh = 1, k = label, shape]) => ({ label, x, y, w, h: hh, k, shape }));
     })();
     const KEYTAG = {
-      "→": "next",
-      "←": "prev",
+      "→": "step",
+      "←": "back",
       "↑": "up",
       "↓": "down",
-      Space: "next",
-      Enter: "next",
-      Backspace: "prev",
+      Space: "step",
+      Enter: "step",
+      Backspace: "back",
       PgUp: "band",
       PgDn: "band",
       Home: "first",
       End: "last",
       U: "pattern",
       G: "map",
+      W: "wizard",
       "/": "search",
       N: "notes",
       F: "full",
@@ -1793,10 +1842,13 @@
       L: "link",
       Shift: "mod",
       Ctrl: "mod ⌘",
+      Alt: "mod ⌘",
       "1…9": "jump",
     };
-    const KALIAS = { "⌘": "Ctrl" };
-    const chord = k => k.split(/(?<=.)\+(?=.)/).map(p => KALIAS[p] || p);
+    // ⌘ sits on Ctrl for ⌘+K and on Alt for ⌘+←/→ (Alt+←/→ is the Windows and Linux slide shortcut)
+    const KALIAS = { "⌘": "Ctrl" },
+      CALIAS = { "⌘+←": "Alt+←", "⌘+→": "Alt+→" };
+    const chord = k => (CALIAS[k] || k).split(/(?<=.)\+(?=.)/).map(p => KALIAS[p] || p);
     const smpKeyboard = (() => {
       const U = 40,
         NS = "http://www.w3.org/2000/svg";
@@ -1868,7 +1920,7 @@
         const poly = dy => p.map(([x, y]) => `${x},${y + dy}`).join(" ");
         return s(
           "g",
-          { class: `kb-k${on ? " on" : ""}${key.k === "Shift" || key.k === "Ctrl" ? " mod" : ""}`, "data-k": key.k },
+          { class: `kb-k${on ? " on" : ""}${key.k === "Shift" || key.k === "Ctrl" || key.k === "Alt" ? " mod" : ""}`, "data-k": key.k },
           s("polygon", { class: "kb-sk", points: poly(0) }),
           s("polygon", { class: "kb-top", points: poly(-3) }),
           s("text", { x: cx, y: cy - (tag ? 6 : 2), class: "kb-l" }, key.label),

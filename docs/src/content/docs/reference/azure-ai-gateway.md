@@ -33,15 +33,15 @@ imports:
     with:
       gateway-host: example.ai.gateway.azure.com
       models: [deployment-checklist]
-network:
-  allowed: [defaults, example.ai.gateway.azure.com, login.microsoftonline.com]
 ```
 
 Replace the hostname, model metadata and wire alias with the reviewed Catalog
 deployment. Keep the declaration at the imported local path, or use a reviewed
 commit-pinned remote import. Importing alone does not configure inference or
-approve network access. The connector currently supports Copilot, not the
-other engines.
+approve network access. Selecting an inference profile adds its gateway
+hostname, and `login.microsoftonline.com` for Entra profiles, to the firewall
+allowlist; listing them in `network.allowed` is unnecessary. The connector
+currently supports Copilot, not the other engines.
 
 The `responses` and `completions` profiles use Entra federation. Set
 `AZURE_TENANT_ID` and `AZURE_CLIENT_ID` Actions variables, configure the
@@ -53,12 +53,15 @@ The tenant and client can instead be supplied with the `azure-tenant-id` and
 
 For a gateway key, select `responses-key` or `completions-key` and store it as
 `AZURE_AI_GATEWAY_KEY` (or bind `key-secret` to another secret **name**). Remove
-`id-token: write` and `login.microsoftonline.com` when no other feature needs
-Entra federation. Only the selected profile's
+`id-token: write` when no other feature needs Entra federation; key profiles do
+not allow `login.microsoftonline.com`. Only the selected profile's
 credential is used; there is no credential fallback.
 
 Use the protocol the deployed alias supports. `engine.model` supplies Copilot
 model metadata; `engine.inference.model` is the exact approved wire alias.
+The gateway has no `/models` route, so the connector sets
+`engine.model-catalog: false` and `engine.model` is passed through verbatim
+rather than resolved as a gh-aw alias. Direct BYOK must set it explicitly.
 Native provider/auth/env overrides, routing, model fallback and Copilot SDK
 mode cannot be combined with connector inference. A threat detector that
 inherits the main engine cannot override its engine or model configuration.
@@ -88,16 +91,20 @@ key stored as a GitHub Actions secret:
 engine:
   id: copilot
   model: <published-model-id>
+  model-catalog: false
   env:
     COPILOT_PROVIDER_BASE_URL: https://YOUR_GATEWAY_HOST/default/models/openai/v1
     COPILOT_PROVIDER_TYPE: openai
     COPILOT_PROVIDER_WIRE_API: responses
     COPILOT_PROVIDER_API_KEY: ${{ secrets.AZURE_AI_GATEWAY_KEY }}
-network:
-  allowed:
-    - defaults
-    - YOUR_GATEWAY_HOST
 ```
+
+gh-aw allows a literal `COPILOT_PROVIDER_BASE_URL` host automatically, so no
+`network.allowed` entry is needed. When the URL comes from
+`${{ vars.* }}` or `${{ secrets.* }}`, AWF v0.25.41 or later (the default) resolves it at
+runtime and allows exactly that host; avoid broad entries such as `services.ai.azure.com`.
+If `sandbox.agent.version` pins an older AWF, upgrade it or list the exact gateway
+host (for example, `YOUR_GATEWAY_HOST`) in `network.allowed`.
 
 Select `responses` only for an alias that exposes Responses; use `completions`
 for Chat Completions. If the gateway alias differs from the model ID, set

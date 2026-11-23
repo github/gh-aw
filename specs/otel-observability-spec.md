@@ -700,7 +700,7 @@ Span links SHOULD be used instead of parent-child relationships when outcome eva
 | Attribute | Type | Requirement |
 |---|---|---|
 | `gen_ai.operation.name` | string | REQUIRED on GenAI operation spans, except where §9.5 prohibits it on the agent conclusion span. |
-| `gen_ai.provider.name` | string | REQUIRED when the engine is known. Values: `copilot` → `github`, `claude` → `anthropic`, `codex` → `openai`, `gemini` → `gcp.gen_ai`; any other engine ID is used unchanged. |
+| `gen_ai.provider.name` | string | REQUIRED when the engine is known. Values: `copilot` → `github`, `claude` → `anthropic`, `codex` → `openai`, `gemini` → `gcp.gen_ai`; any other engine ID is used unchanged. For Copilot BYOK inference (`COPILOT_PROVIDER_BASE_URL`, connector inference or a provider override), the compiler-resolved provider MUST be used instead. The auth provider is `AWF_AUTH_PROVIDER` from `engine.env` when set, otherwise `engine.auth.provider`. With `COPILOT_PROVIDER_BASE_URL`: `azure.ai.openai` for Azure endpoints or `azure` provider type/auth, `anthropic` for the Anthropic provider type, otherwise `openai` (any other auth provider, such as `gcp`, only selects authentication and does not change the value). Expression-valued endpoints (for example `${{ secrets.ENDPOINT }}`) cannot be inspected at compile time, so an Azure endpoint supplied that way reports `openai` unless `COPILOT_PROVIDER_TYPE` is `azure` or the auth provider is `azure`. For a provider override without a base URL: `azure.ai.openai` when the auth provider is `azure`, otherwise the declared provider (`azure` → `azure.ai.openai`, `anthropic` → `anthropic`, `gcp`/`gemini`/`google` → `gcp.gen_ai`), otherwise `openai`; `gen_ai.system` then uses `az.ai.openai` for `azure.ai.openai` and the provider value otherwise. |
 | `gen_ai.system` | string | **Deprecated upstream; compatibility only.** Use `gen_ai.provider.name`; provider value changes are listed in §6.7.1. Without the opt-in, REQUIRED on built-in agent spans when the engine mapping is known. Not deprecated by gh-aw in this version. |
 | `gen_ai.agent.name` | string | REQUIRED on the built-in agent span (§9.5), including an agent conclusion span acting as the agent span; the workflow name. |
 | `gen_ai.request.model` | string | CONDITIONALLY REQUIRED when available. |
@@ -1329,6 +1329,7 @@ which has no release tag, and semantic-conventions v1.45.0.
 - **Added**: Opt-in built-in job metrics and the `logMetric()` API (§11.5, §12.6), including a separate local metrics mirror.
 - **Added**: A normative requirement (§10.8) that completed BinEval records MUST produce `eval.result` events on `gh-aw.evals.conclusion`; when a not-evaluated status marker is present it takes precedence and answers are not emitted.
 - **Added**: Non-normative follow-ups for PII redaction and exporter-failure test coverage, with tracked IDs T-OT-012 and T-OT-013.
+- **Changed**: Copilot BYOK runs report the BYOK provider in `gen_ai.provider.name` (§10.3) instead of `github`.
 
 ### Version 0.6.0 (Working Draft, November 5, 2026)
 

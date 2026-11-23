@@ -13,7 +13,7 @@ const { logStagedPreviewInfo } = require("./staged_preview.cjs");
 const { parseBoolTemplatable } = require("./templatable.cjs");
 const { createAuthenticatedGitHubClient } = require("./handler_auth.cjs");
 const { createCountGatedHandler } = require("./handler_scaffold.cjs");
-const { normalizeIssueIntentMetadata } = require("./issue_intents.cjs");
+const { normalizeIssueIntentMetadata, logIgnoredIssueIntentMetadata } = require("./issue_intents.cjs");
 
 /** @type {string} Safe output type handled by this module */
 const HANDLER_TYPE = "assign_to_user";
@@ -31,7 +31,7 @@ const main = createCountGatedHandler({
     const blockedAssignees = config.blocked ?? [];
     const targetConfig = config.target || "triggering";
     const unassignFirst = parseBoolTemplatable(config.unassign_first, false);
-    const issueIntentEnabled = config.issue_intent !== false;
+    const issueIntentEnabled = config.issue_intent === true;
     const { defaultTargetRepo, allowedRepos } = resolveTargetRepoConfig(config);
     const githubClient = await createAuthenticatedGitHubClient(config);
     const requiredLabels = Array.isArray(config.required_labels) ? config.required_labels : [];
@@ -71,6 +71,7 @@ const main = createCountGatedHandler({
       core.info(`Target repository: ${itemRepo}`);
 
       const assignItem = message;
+      logIgnoredIssueIntentMetadata(assignItem, issueIntentEnabled);
       const intentMetadata = issueIntentEnabled ? normalizeIssueIntentMetadata(assignItem) : {};
 
       const targetResult = resolveTarget({

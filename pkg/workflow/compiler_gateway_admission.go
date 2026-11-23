@@ -52,7 +52,7 @@ func (c *Compiler) addGatewayAdmissionJob(data *WorkflowData) error {
 		generateGitHubScriptWithRequire("check_gateway_admission.cjs"),
 	)
 	if c.actionMode.IsScript() {
-		steps = append(steps, c.generateScriptModeCleanupStep())
+		steps = append(steps, c.generateScriptModeCleanupStep(setupData))
 	}
 	permissions := NewPermissionsContentsRead()
 	permissions.Set(PermissionIdToken, PermissionWrite)

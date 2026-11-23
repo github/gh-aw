@@ -316,7 +316,7 @@ export interface RoutingSkippedObservationData {
   reason: RoutingSkipReason;
 }
 
-/** Collector-written verdict on a routed run (T-UAS-093). */
+/** Collector-written verdict on a routed run (T-UAS-094). */
 export type RoutingObservationData = RoutingCountedObservationData | RoutingSkippedObservationData;
 
 export interface ModelRoutingRankedChoice {

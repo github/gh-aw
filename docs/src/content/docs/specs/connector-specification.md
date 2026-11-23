@@ -8,9 +8,9 @@ sidebar:
 
 # Connector Specification
 
-**Version**: 1.2.0<br>
+**Version**: 1.3.0<br>
 **Status**: Experimental Working Draft<br>
-**Publication Date**: 2026-11-18<br>
+**Publication Date**: 2026-11-23<br>
 **Editor**: GitHub Agentic Workflows Team
 
 ## Abstract
@@ -26,9 +26,11 @@ TLA+ models of selected authority boundaries.
 
 This Experimental Working Draft is maintained by the GitHub Agentic Workflows
 project through repository review. It is not a W3C Recommendation or evidence
-of provider certification. Version 1.2.0 adds explicitly selected inference
-profiles lowered through the existing engine transport. Publication does not
-establish provider authorization or operational trigger ingress.
+of provider certification. Version 1.3.0 adds the optional
+`model-catalog: false` inference-profile declaration and its corresponding
+consumer engine constraint, while retaining the existing inference transport
+and authority boundaries. Publication does not establish provider authorization
+or operational trigger ingress.
 
 ## Table of Contents
 
@@ -190,6 +192,7 @@ and credential references from each delivered phase plan. Writer credentials
 MUST NOT reach the agent. Removing all selections MUST remove connector
 execution from the workflow. A selected endpoint MUST also be approved by the
 workflow/host network policy; importing an endpoint is not network approval.
+Selecting an inference profile is the sole exception (section 5.4).
 
 ## 4. Authentication and authority
 
@@ -320,14 +323,23 @@ Authorization/bearer credential), and `models` (an exact resource collection
 name). Paths MUST NOT contain traversal, escaping, expressions, query or fragment.
 Protocols are `openai-responses` and `openai-chat-completions`. No arbitrary
 request templates, scripts, model discovery or inference-as-reader POSTs are added.
+An optional `model-catalog: false` declares that the provider has no `/models`
+route. For a selected profile, the compiler MUST set
+`engine.model-catalog: false` on the consumer so that the explicitly granted
+wire model is passed through without model-catalog discovery. An explicit
+consumer `engine.model-catalog: true` MUST fail. This option does not authorize
+egress, change model grants, or alter any credential, reader, safe-output, or
+trigger obligations.
 
 The main workflow selects one profile with
 `engine.inference: {connector: id, profile: name, model: alias}`. Names MUST be
 exact, and the wire alias MUST be a bounded literal matching the profile's model
 grant before credentials are referenced. Import-only declarations MUST leave
-the engine, environment, permissions and network unchanged. The consumer MUST
-explicitly list the selected endpoint hostname in its main `network.allowed`.
-Importing an inference profile MUST NOT authorize egress.
+the engine, environment, permissions and network unchanged. Selecting a profile
+MUST add exactly that profile's endpoint hostname, and the Entra authority host
+for its Azure cloud when it uses Azure OIDC, to the effective firewall
+allowlist without duplicating hosts the consumer already lists. Importing an
+inference profile, or declaring unselected profiles, MUST NOT authorize egress.
 
 Initially only Copilot's existing OpenAI-compatible BYOK transport is supported.
 The compiler lowers the selected SDK base, protocol, alias and credential to
@@ -672,7 +684,7 @@ The following evidence is required before claiming connector conformance:
 | Failure policy | Budgets, declared retries, threat gating and receipt scope remain enforced on failure. |
 | Distribution | Local and pinned imports compile; complete consumer/XML examples compile; deployed runtime includes transitive dependencies. |
 | Trigger, if declared | Offline native fixtures establish matching/nonmatching evidence and Go/Node predicate parity; result states `operational: false`. |
-| Inference, if declared | Import-only leaves the engine unchanged; exact profile/model selection, explicit hostname approval and conflict rejection compile correctly. Reader/effect plans exclude inference configuration and credentials; setup reads no secret values and inference test execution rejects. |
+| Inference, if declared | Import-only leaves the engine unchanged; exact profile/model selection, selected-profile hostname approval and conflict rejection compile correctly. Reader/effect plans exclude inference configuration and credentials; setup reads no secret values and inference test execution rejects. |
 
 `gh aw connector <id> setup` is offline metadata discovery by default.
 An explicit `--repo OWNER/REPO` permits read-only repository secret/variable
@@ -712,7 +724,7 @@ class; it is not sufficient by itself to certify a complete implementation.
 | **C-RSP-001**: The execution host MUST enforce every declared response check before exposing successful evidence (section 6). | Execution host | **T-CON-006** | Supply wrong types, malformed or oversized responses, missing required evidence, and a different granted ID where request correlation is declared. All reject; an allowed ID alone does not establish requested identity. |
 | **C-AUT-001**: Live writes MUST require explicit host write authorization; authorization denial MUST NOT cause retry or credential fallback (sections 4, 7). | Execution host | **T-CON-007** | Attempt an unauthorized write; observe zero secret accesses/requests. Return 401/403 for an authorized attempt; observe no subsequent request or alternate credential resolution. |
 | **C-TRG-001**: Trigger fixture projection MUST NOT establish operational ingress; missing/ambiguous required evidence MUST NOT authorize a match (section 8). | Compiler, execution host | **T-CON-008** | Project matching, nonmatching, incomplete, and ambiguous fixtures with Go/Node predicate parity. Only complete matching evidence projects; fixture results remain `operational: false`. |
-| **C-INF-001**: Inference binding MUST require explicit main-workflow selection, a known profile, exact wire-model grant, explicit hostname approval, compatible engine metadata and no conflicting native/imported override (section 5.4). | Compiler | **T-CON-009** | Compile import-only and valid key/OIDC consumers for both protocols. Reject unknown profiles, ungranted/dynamic aliases, missing hostname approval, unsupported engines, conflicting overrides and missing selected OIDC prerequisites. Import-only emits no inference binding. |
+| **C-INF-001**: Inference binding MUST require explicit main-workflow selection, a known profile, exact wire-model grant, selected-profile hostname approval, compatible engine metadata and no conflicting native/imported override (section 5.4). | Compiler | **T-CON-009** | Compile import-only and valid key/OIDC consumers for both protocols. Verify only the selected profile's hosts are allowed. Reject unknown profiles, ungranted/dynamic aliases, unsupported engines, conflicting overrides and missing selected OIDC prerequisites. Import-only emits no inference binding. |
 | **C-INF-002**: Inference configuration and credentials MUST remain outside reader/effect plans; the selected native engine transport MUST retain the fixed SDK base, protocol, model and credential route (sections 4, 5.4). | Compiler, execution host | **T-CON-010** | Inspect compiled native engine settings and Go/Node-decoded reader/effect plans. Only the engine receives inference configuration. Setup reads zero secret values; inference test execution rejects. Native authentication-denial evidence must be reported separately from compilation or symbolic model checks. |
 
 ### 10.2 Compliance testing procedure
@@ -986,10 +998,17 @@ sections 4–8; this specification defines no new public error-code registry.
 
 ## 14. Change Log
 
+### Version 1.3.0 (Experimental Working Draft) — 2026-11-23
+
+- Added optional inference-profile `model-catalog: false` for providers without a `/models` route.
+- Required the compiler to propagate that declaration as `engine.model-catalog: false` and reject conflicting `engine.model-catalog: true` settings.
+- Preserved existing explicit model grants, network approval, credential isolation, and native engine transport obligations.
+
 ### Version 1.2.0 (Experimental Working Draft)
 
 - Added compiler-owned inference profiles, exact model grants and explicit `engine.inference` selection.
 - Added inference-only stored-token and Azure Entra OIDC routes without changing reader or safe-output transports.
+- Selecting an inference profile adds only its endpoint host, and the Entra authority host for Azure OIDC, to the firewall allowlist; importing remains no network approval.
 - Added C-INF-001/002 compliance procedures and a separate bounded inference model with negative controls and reachability witnesses.
 
 ### Version 1.1.1 (Experimental Working Draft) — 2026-11-18

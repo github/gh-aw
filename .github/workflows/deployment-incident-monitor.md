@@ -11,9 +11,8 @@ permissions:
   actions: read
   deployments: read
 engine:
-  id: copilot
-  copilot-sdk: true
-max-tool-denials: 3
+  id: claude
+  model-provider: github
 imports:
   - shared/mcp-pagination.md
   - shared/reporting.md

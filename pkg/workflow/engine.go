@@ -98,6 +98,10 @@ type EngineConfig struct {
 	// ModelRoutingDisabled records an explicit `engine.model-routing: false`,
 	// which opts out of the implicit cost/auto routing default.
 	ModelRoutingDisabled bool
+	// ModelCatalogDisabled records an explicit `engine.model-catalog: false`: the
+	// harness passes configured models verbatim instead of resolving aliases against
+	// the live model catalogue (for BYOK providers without a /models route).
+	ModelCatalogDisabled bool
 	FallbackModels       []string
 
 	// CopilotSDK enables the GitHub Copilot SDK integration.
@@ -821,6 +825,10 @@ func applyEngineBareField(config *EngineConfig, engineObj map[string]any) {
 	if bare, ok := engineObj["bare"].(bool); ok {
 		config.Bare = bare
 		engineLog.Printf("Extracted bare mode: %v", config.Bare)
+	}
+	if catalog, ok := engineObj["model-catalog"].(bool); ok {
+		config.ModelCatalogDisabled = !catalog
+		engineLog.Printf("Extracted model-catalog: %v", catalog)
 	}
 }
 

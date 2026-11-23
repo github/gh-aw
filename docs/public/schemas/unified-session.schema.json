@@ -1290,7 +1290,7 @@
       "additionalProperties": false,
       "description": "A routed run whose result counts: the selected pair succeeded or failed on its own."
     },
-    "RoutingObservationData": { "anyOf": [{ "$ref": "#/definitions/RoutingCountedObservationData" }, { "$ref": "#/definitions/RoutingSkippedObservationData" }], "description": "Collector-written verdict on a routed run (T-UAS-093)." },
+    "RoutingObservationData": { "anyOf": [{ "$ref": "#/definitions/RoutingCountedObservationData" }, { "$ref": "#/definitions/RoutingSkippedObservationData" }], "description": "Collector-written verdict on a routed run (T-UAS-094)." },
     "RoutingSkipReason": { "type": "string", "enum": ["cancelled", "infrastructure", "rate_limited", "pair_mismatch", "unknown_evidence"], "description": "Why a routed run's result does not count as evidence about the selected pair." },
     "RoutingSkippedObservationData": {
       "type": "object",

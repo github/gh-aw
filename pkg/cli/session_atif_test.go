@@ -259,7 +259,7 @@ func writeATIFCachedRun(t *testing.T, root string, runID int64) {
 	t.Helper()
 	runDir := resolveAuditOutputDir(root, runID)
 	summary := RunSummary{
-		CLIVersion: GetVersion(), RunID: runID,
+		SchemaVersion: runSummarySchemaVersion, CLIVersion: GetVersion(), RunID: runID,
 		RunAnalysis: RunAnalysis{Run: WorkflowRun{
 			DatabaseID: runID, Status: "completed", Conclusion: "success",
 			WorkflowPath: ".github/workflows/test.lock.yml", LogsPath: runDir,

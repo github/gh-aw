@@ -147,8 +147,30 @@ describe("close_issue", () => {
       expect(updateCalls[0].state).toBe("closed");
     });
 
-    it("should include issue-intent metadata on close when enabled", async () => {
+    it("should log and drop issue-intent metadata when issue_intent is omitted", async () => {
       const handler = await main({ max: 10 });
+      const updateCalls = [];
+      mockGithub.rest.issues.update = async params => {
+        updateCalls.push(params);
+        return {
+          data: {
+            number: params.issue_number,
+            title: "Test Issue",
+            html_url: `https://github.com/${params.owner}/${params.repo}/issues/${params.issue_number}`,
+          },
+        };
+      };
+
+      const result = await handler({ issue_number: 456, body: "Closing this issue", rationale: "Duplicate confirmed", confidence: "MEDIUM" }, {});
+
+      expect(result.success).toBe(true);
+      expect(updateCalls).toHaveLength(1);
+      expect(updateCalls[0].state).toBe("closed");
+      expect(mockCore.infos.some(msg => msg.includes("issue-intent is not enabled") && msg.includes("issue-intent: true"))).toBe(true);
+    });
+
+    it("should include issue-intent metadata on close when enabled", async () => {
+      const handler = await main({ issue_intent: true, max: 10 });
       const requestCalls = [];
       mockGithub.request = async (route, params) => {
         requestCalls.push({ route, params });
@@ -183,7 +205,7 @@ describe("close_issue", () => {
     });
 
     it.each([403, 422, 500])("should fail without a legacy close when the intent request returns %i", async status => {
-      const handler = await main({ max: 10 });
+      const handler = await main({ issue_intent: true, max: 10 });
       let updateCalled = false;
       mockGithub.request = async () => {
         throw Object.assign(new Error("Intent rejected"), { status });
@@ -203,7 +225,7 @@ describe("close_issue", () => {
     });
 
     it.each([404, 501])("should fall back to a legacy close when the intent endpoint returns %i", async status => {
-      const handler = await main({ max: 10 });
+      const handler = await main({ issue_intent: true, max: 10 });
       let updateCalled = false;
       mockGithub.request = async () => {
         throw Object.assign(new Error("Intent endpoint unavailable"), { status });
@@ -221,7 +243,7 @@ describe("close_issue", () => {
     });
 
     it("should fall back when the unavailable intent status is wrapped in the response", async () => {
-      const handler = await main({ max: 10 });
+      const handler = await main({ issue_intent: true, max: 10 });
       let updateCalled = false;
       mockGithub.request = async () => {
         throw Object.assign(new Error("Intent endpoint unavailable"), { response: { status: 404 } });
@@ -1190,7 +1212,7 @@ describe("close_issue", () => {
 
   describe("duplicate_of native marking", () => {
     it.each([50, "50", "#50", "test-owner/test-repo#50", "https://github.com/test-owner/test-repo/issues/50", "other-org/other-repo#50"])("should resolve %s to a database ID before sending a duplicate close intent", async duplicateOf => {
-      const handler = await main({ allowed_repos: ["other-org/other-repo"] });
+      const handler = await main({ issue_intent: true, allowed_repos: ["other-org/other-repo"] });
       const getCalls = [];
       const requestCalls = [];
       const graphqlCalls = [];
@@ -1232,7 +1254,7 @@ describe("close_issue", () => {
     });
 
     it.each([403, 404, "missing ID"])("should fail closed when canonical issue lookup fails with %s", async failure => {
-      const handler = await main();
+      const handler = await main({ issue_intent: true });
       const mutations = [];
       mockGithub.rest.issues.get = async ({ issue_number }) => {
         if (issue_number === 50 && typeof failure === "number") {
@@ -1258,7 +1280,7 @@ describe("close_issue", () => {
       { fields: { duplicate_of: "other-org/other-repo#50" }, rejected: true },
       { fields: { duplicate_of: 50, state_reason: "completed" }, rejected: false },
     ])("should handle an ineligible duplicate reference safely: %j", async ({ fields, rejected }) => {
-      const handler = await main();
+      const handler = await main({ issue_intent: true });
       const getCalls = [];
       const requestCalls = [];
       const updateCalls = [];
@@ -1615,7 +1637,7 @@ describe("close_issue", () => {
     });
 
     it("should mark native duplicate when using allowed_state_reason list with DUPLICATE and duplicate_of", async () => {
-      const handler = await main({ max: 10, allowed_state_reason: ["not_planned", "duplicate"] });
+      const handler = await main({ issue_intent: true, max: 10, allowed_state_reason: ["not_planned", "duplicate"] });
       const graphqlCalls = [];
       const requestCalls = [];
 

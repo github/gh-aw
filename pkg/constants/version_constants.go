@@ -57,6 +57,14 @@ const DefaultCopilotSDKVersion Version = "1.0.16"
 // DefaultCopilotSDKNPMVersion is the default version of the @microsoft/copilot-sdk package.
 const DefaultCopilotSDKNPMVersion Version = "2.0.0"
 
+// DefaultCopilotSDKNPMCLIVersion is the CLI release paired with the npm SDK's protocol v4.
+// https://github.com/microsoft/copilot-sdk/blob/v2.0.0/nodejs/src/cliVersion.ts
+const DefaultCopilotSDKNPMCLIVersion Version = "1.0.113"
+
+// DefaultCopilotSDKNPMCLIChecksumsSHA256 authenticates the paired CLI's SHA256SUMS.txt.
+// Reviewed 2026-11-22 against https://api.github.com/repos/github/copilot-cli/releases/assets/759810328.
+const DefaultCopilotSDKNPMCLIChecksumsSHA256 = "854036b59b745d4f4b44a169327ffc0eab007f39e74b3dc3670f4d609a6c1072"
+
 // DefaultCodexVersion is the default version of the OpenAI Codex CLI
 const DefaultCodexVersion Version = "0.169.0"
 
@@ -118,6 +126,11 @@ const AWFRoutingCandidateModelsMinVersion Version = "v0.28.33"
 // AWFExcludeEnvMinVersion is the minimum AWF version that supports the --exclude-env flag.
 // Workflows pinning an older AWF version must not emit --exclude-env flags or the run will fail.
 const AWFExcludeEnvMinVersion Version = "v0.25.3"
+
+// AWFCopilotProviderHostAllowlistMinVersion is the minimum AWF version that derives the
+// Copilot API target from the runtime COPILOT_PROVIDER_BASE_URL value and adds exactly that
+// host to the firewall allow-list. Older versions require the host in network.allowed.
+const AWFCopilotProviderHostAllowlistMinVersion Version = "v0.25.41"
 
 // AWFSessionStateDirMinVersion is the minimum AWF version that supports the
 // --session-state-dir flag used to persist Copilot session artifacts.
@@ -284,7 +297,7 @@ const CopilotNoAskUserMinVersion Version = "1.0.19"
 //
 // The first recompile regenerates all lock files using the new version; the second recompile
 // refreshes the container SHA pins that were resolved during the first pass.
-const DefaultMCPGatewayVersion Version = "v0.5.12"
+const DefaultMCPGatewayVersion Version = "v0.5.13"
 
 // MCPGAzureOIDCMinVersion is the first MCPG release supporting Azure federation.
 const MCPGAzureOIDCMinVersion Version = "v0.5.12"

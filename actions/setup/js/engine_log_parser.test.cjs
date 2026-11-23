@@ -81,6 +81,72 @@ describe("Declared custom engine log parsers", () => {
     expect(unified.some(event => event.type === "session.init")).toBe(false);
   });
 
+  it("retains failed Cursor startup output as diagnostics, not an assistant answer", () => {
+    const content = "2026.10.14-941492e\nAPI key is invalid.\n[cursor-harness] Cursor Agent execution failed with exit code 1\n";
+    const events = parseEngineSession(content, "cursor");
+    expect(events.some(event => event.type === "assistant.message")).toBe(false);
+    expect(events.filter(event => event.type === "cursor.diagnostic")).toEqual([{ type: "cursor.diagnostic", data: { sourceEngine: "cursor", content } }]);
+    expect(events.some(event => event.type === "session.init" || event.type.startsWith("tool."))).toBe(false);
+    const unified = mergeSessionSources([{ component: "agent", phase: "agent", path: "agent-stdio.log", events }], "cursor");
+    expect(unified.find(event => event.type === "cursor.diagnostic").data).toEqual(events[0].data);
+    expect(parseEngineSession("Assistant: The harness failed with exit code 1.\n", "cursor").some(event => event.type === "assistant.message")).toBe(true);
+    expect(parseEngineSession("Example:\n```\n[cursor-harness] Cursor Agent execution failed with exit code 1\n```\n", "cursor").some(event => event.type === "assistant.message")).toBe(true);
+  });
+
+  it("preserves a framed Cursor answer before a later harness failure", () => {
+    const content = 'Assistant: Real answer\n{"type":"result","num_turns":1}\n[cursor-harness] spawnSync cursor-agent ENOENT\n';
+    const events = parseEngineSession(content, "cursor");
+    // Startup prose alone is not evidence of an answer; the earlier result is.
+    expect(events.filter(event => event.type === "assistant.message")).toEqual([{ type: "assistant.message", data: { sourceEngine: "cursor", content: "Assistant: Real answer\n" } }]);
+    expect(events.filter(event => event.type === "session.result")).toMatchObject([{ data: { numTurns: 1 } }]);
+    expect(events.filter(event => event.type === "cursor.diagnostic")).toEqual([{ type: "cursor.diagnostic", data: { sourceEngine: "cursor", content: "[cursor-harness] spawnSync cursor-agent ENOENT\n" } }]);
+    const unified = mergeSessionSources([{ component: "agent", phase: "agent", path: "agent-stdio.log", events }], "cursor");
+    expect(unified.find(event => event.type === "assistant.message").data.content).toBe("Assistant: Real answer\n");
+  });
+
+  it.each([
+    "GH_AW_PROMPT is required",
+    "ENOENT: no such file or directory, open '/workspace/prompt.md'",
+    "EACCES: permission denied, open '/workspace/prompt.md'",
+    "spawnSync cursor-agent ENOENT",
+    "Unsupported Cursor Agent architecture: riscv64",
+    "Cursor Agent download checksum did not match",
+    "Cursor Agent executable was not found in the release archive",
+    "Cursor Agent download failed with exit code 22",
+    "Cursor Agent extraction failed with exit code 2",
+    "Cursor Agent verification failed with exit code unknown",
+    "Cursor Agent execution failed with exit code 1",
+  ])("retains the actual Cursor harness failure diagnostic: %s", failure => {
+    const content = `2026.10.14-941492e\n[cursor-harness] ${failure}\n`;
+    const events = parseEngineSession(content, "cursor");
+    expect(events).toEqual([{ type: "cursor.diagnostic", data: { sourceEngine: "cursor", content } }]);
+    expect(parseEngineSession(`[cursor-harness] ${failure}\n`, "cursor")).toEqual([{ type: "cursor.diagnostic", data: { sourceEngine: "cursor", content: `[cursor-harness] ${failure}\n` } }]);
+  });
+
+  it.each(["```", "~~~"])("preserves fenced Cursor harness failures as literal answer text (%s)", fence => {
+    const content = `Example:\n${fence}\n[cursor-harness] ENOENT: no such file or directory, open '/workspace/prompt.md'\n[cursor-harness] Cursor Agent execution failed with exit code 1\n${fence}\n`;
+    expect(parseEngineSession(content, "cursor")).toEqual([{ type: "assistant.message", data: { sourceEngine: "cursor", content } }]);
+  });
+
+  it("does not let an earlier Cursor harness failure demote a later framed answer", () => {
+    const content = '2026.10.14-941492e\n[cursor-harness] GH_AW_PROMPT is required\nAssistant: Recovered answer\n{"type":"result","num_turns":1}\n';
+    const events = parseEngineSession(content, "cursor");
+    expect(events.find(event => event.type === "cursor.diagnostic").data.content).toBe("2026.10.14-941492e\n[cursor-harness] GH_AW_PROMPT is required\n");
+    expect(events.filter(event => event.type === "assistant.message")).toEqual([{ type: "assistant.message", data: { sourceEngine: "cursor", content: "Assistant: Recovered answer\n" } }]);
+  });
+
+  it("preserves native Cursor answers and reports a later harness failure", () => {
+    const records = [
+      { type: "system", subtype: "init", session_id: "session" },
+      { type: "assistant", message: { content: [{ type: "text", text: "Native answer" }] } },
+      { type: "result", subtype: "success", session_id: "session", result: "Native answer" },
+    ];
+    const events = parseEngineSession(records.map(JSON.stringify).join("\n") + "\n[cursor-harness] Cursor Agent execution failed with exit code 1\n", "cursor");
+    expect(events.find(event => event.type === "assistant.message").data.content).toBe("Native answer");
+    expect(events.find(event => event.type === "session.result")).toBeDefined();
+    expect(events.find(event => event.type === "cursor.diagnostic").data.content).toBe("[cursor-harness] Cursor Agent execution failed with exit code 1\n");
+  });
+
   it("does not turn arbitrary unknown plaintext into assistant output", () => {
     expect(loadEngineLogParser("../cursor")).toBeUndefined();
     expect(loadEngineLogParser("unknown-engine")).toBeUndefined();

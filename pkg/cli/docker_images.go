@@ -52,7 +52,7 @@ const (
 	ActionlintImage  = "rhysd/actionlint:1.7.12@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667"
 	RunnerGuardImage = "ghcr.io/vigilant-llc/runner-guard:3.1.5@sha256:2df426ef96d21f1622e05b21329f26bd263fc46110609cefb6afe43457613ac0"
 	SyftImage        = "anchore/syft:v1.57.2@sha256:e97e20b6e6d1699c60296b66ab337941724f9bd06ac279d893eda89601fc4b2a"
-	GrypeImage       = "anchore/grype:v0.122.0@sha256:013e16ae96bd64108973e3e9fecec63f7ff276358d34c46c25d33e2aac96539f"
+	GrypeImage       = "anchore/grype:v0.122.1@sha256:661583704a253c0448ed63998b5ea2cd9d5a76ee71eedc4aed439b8ce3e93a1c"
 	GrantImage       = "anchore/grant:v0.8.0@sha256:b1496c1b94608176e6c515108dbc54851b8e6cda5cf7f97b4a4f2a4792e93714"
 	YamllintImage    = "pipelinecomponents/yamllint:latest@sha256:f7f7b4f8824839e33690a880dbe20944128b0dc9c55522a0b92a29b3a905cecf"
 	// ShellcheckImage is the Docker fallback for shellcheck when the binary is not installed.

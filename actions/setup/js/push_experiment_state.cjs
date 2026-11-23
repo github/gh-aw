@@ -335,7 +335,7 @@ function resolveExperimentStateRebaseConflict({ cwd }) {
  * @returns {Promise<string>} baseRef (empty string when branch is brand new)
  */
 async function checkoutOrCreateBranch(branchName, repoUrl, workspaceDir, options = {}) {
-  const { maxRetries, baseDelayMs, fetchFn = () => execGitSync(["fetch", repoUrl, `${branchName}:${branchName}`], { stdio: "pipe", cwd: workspaceDir, suppressLogs: true }) } = options;
+  const { maxRetries, baseDelayMs, fetchFn = () => execGitSync(["fetch", "--depth=1", repoUrl, `${branchName}:${branchName}`], { stdio: "pipe", cwd: workspaceDir, suppressLogs: true }) } = options;
 
   try {
     await withGitRetry(fetchFn, {

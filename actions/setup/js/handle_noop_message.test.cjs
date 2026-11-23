@@ -1160,7 +1160,7 @@ safe-outputs:
     await main();
 
     const commentCall = mockGithub.rest.issues.createComment.mock.calls[0][0];
-    expect(commentCall.body).toContain("◷");
+    expect(commentCall.body).toContain("[history](");
     expect(commentCall.body).toContain("history-link-workflow");
   });
 
@@ -1183,6 +1183,6 @@ safe-outputs:
     await main();
 
     const commentCall = mockGithub.rest.issues.createComment.mock.calls[0][0];
-    expect(commentCall.body).not.toContain("◷");
+    expect(commentCall.body).not.toContain("[history](");
   });
 });

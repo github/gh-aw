@@ -158,7 +158,7 @@ func (c *Compiler) appendConclusionUsageSteps(steps []string, data *WorkflowData
 		steps = append(steps, c.buildConclusionAdmissionStep(data)...)
 	}
 	if c.actionMode.IsScript() {
-		steps = append(steps, c.generateScriptModeCleanupStep())
+		steps = append(steps, c.generateScriptModeCleanupStep(data))
 	}
 	steps = append(steps, c.buildReactionCleanupSteps(data)...)
 	return steps, nil

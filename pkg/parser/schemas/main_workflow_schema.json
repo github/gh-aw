@@ -6085,7 +6085,7 @@
                 },
                 "issue-intent": {
                   "type": "boolean",
-                  "description": "Enable issue-intent metadata support (rationale/confidence/suggest) for this output type."
+                  "description": "Experimental: Enable issue-intent metadata support (rationale/confidence/suggest) for this output type. Disabled by default; set to true to opt in (makes rationale and confidence required)."
                 },
                 "samples": {
                   "description": "Internal hidden feature. Optional list of declarative sample payloads that exercise this safe-output handler. Used by the hidden `gh aw compile --use-samples` flag to replace the agentic step with a deterministic replay through the safe-outputs MCP server. Each entry should conform to the corresponding MCP tool inputSchema; recognized sidecar keys (currently `patch` for create-pull-request and push-to-pull-request-branch) are stripped before schema validation and consumed by the replay driver.",
@@ -6956,7 +6956,7 @@
                 },
                 "issue-intent": {
                   "type": "boolean",
-                  "description": "Enable issue-intent metadata support (rationale/confidence/suggest) for this output type."
+                  "description": "Experimental: Enable issue-intent metadata support (rationale/confidence/suggest) for this output type. Disabled by default; set to true to opt in (makes rationale and confidence required)."
                 },
                 "samples": {
                   "description": "Internal hidden feature. Optional list of declarative sample payloads that exercise this safe-output handler. Used by the hidden `gh aw compile --use-samples` flag to replace the agentic step with a deterministic replay through the safe-outputs MCP server. Each entry should conform to the corresponding MCP tool inputSchema; recognized sidecar keys (currently `patch` for create-pull-request and push-to-pull-request-branch) are stripped before schema validation and consumed by the replay driver.",
@@ -7068,7 +7068,7 @@
                 },
                 "issue-intent": {
                   "type": "boolean",
-                  "description": "Enable issue-intent metadata support (rationale/confidence/suggest) for this output type."
+                  "description": "Experimental: Enable issue-intent metadata support (rationale/confidence/suggest) for this output type. Disabled by default; set to true to opt in (makes rationale and confidence required)."
                 },
                 "samples": {
                   "description": "Internal hidden feature. Optional list of declarative sample payloads that exercise this safe-output handler. Used by the hidden `gh aw compile --use-samples` flag to replace the agentic step with a deterministic replay through the safe-outputs MCP server. Each entry should conform to the corresponding MCP tool inputSchema; recognized sidecar keys (currently `patch` for create-pull-request and push-to-pull-request-branch) are stripped before schema validation and consumed by the replay driver.",
@@ -8009,7 +8009,7 @@
                 },
                 "issue-intent": {
                   "type": "boolean",
-                  "description": "Enable issue-intent metadata support (rationale/confidence/suggest) for this output type."
+                  "description": "Experimental: Enable issue-intent metadata support (rationale/confidence/suggest) for this output type. Disabled by default; set to true to opt in (makes rationale and confidence required)."
                 },
                 "samples": {
                   "description": "Internal hidden feature. Optional list of declarative sample payloads that exercise this safe-output handler. Used by the hidden `gh aw compile --use-samples` flag to replace the agentic step with a deterministic replay through the safe-outputs MCP server. Each entry should conform to the corresponding MCP tool inputSchema; recognized sidecar keys (currently `patch` for create-pull-request and push-to-pull-request-branch) are stripped before schema validation and consumed by the replay driver.",
@@ -9861,7 +9861,7 @@
                 },
                 "issue-intent": {
                   "type": "boolean",
-                  "description": "Enable issue-intent metadata support (rationale/confidence/suggest) for this output type."
+                  "description": "Experimental: Enable issue-intent metadata support (rationale/confidence/suggest) for this output type. Disabled by default; set to true to opt in (makes rationale and confidence required)."
                 },
                 "create-if-missing": {
                   "type": "boolean",
@@ -10362,7 +10362,7 @@
                 },
                 "issue-intent": {
                   "type": "boolean",
-                  "description": "Enable issue-intent metadata support (rationale/confidence/suggest) for this output type."
+                  "description": "Experimental: Enable issue-intent metadata support (rationale/confidence/suggest) for this output type. Disabled by default; set to true to opt in (makes rationale and confidence required)."
                 },
                 "samples": {
                   "description": "Internal hidden feature. Optional list of declarative sample payloads that exercise this safe-output handler. Used by the hidden `gh aw compile --use-samples` flag to replace the agentic step with a deterministic replay through the safe-outputs MCP server. Each entry should conform to the corresponding MCP tool inputSchema; recognized sidecar keys (currently `patch` for create-pull-request and push-to-pull-request-branch) are stripped before schema validation and consumed by the replay driver.",
@@ -10460,7 +10460,7 @@
                 },
                 "issue-intent": {
                   "type": "boolean",
-                  "description": "Enable issue-intent metadata support (rationale/confidence/suggest) for this output type."
+                  "description": "Experimental: Enable issue-intent metadata support (rationale/confidence/suggest) for this output type. Disabled by default; set to true to opt in (makes rationale and confidence required)."
                 },
                 "samples": {
                   "description": "Internal hidden feature. Optional list of declarative sample payloads that exercise this safe-output handler. Used by the hidden `gh aw compile --use-samples` flag to replace the agentic step with a deterministic replay through the safe-outputs MCP server. Each entry should conform to the corresponding MCP tool inputSchema; recognized sidecar keys (currently `patch` for create-pull-request and push-to-pull-request-branch) are stripped before schema validation and consumed by the replay driver.",
@@ -11543,7 +11543,7 @@
                 },
                 "issue-intent": {
                   "type": "boolean",
-                  "description": "Enable issue-intent metadata support (rationale/confidence/suggest) for this output type."
+                  "description": "Experimental: Enable issue-intent metadata support (rationale/confidence/suggest) for this output type. Disabled by default; set to true to opt in (makes rationale and confidence required)."
                 },
                 "staged": {
                   "$ref": "#/$defs/templatable_boolean",
@@ -11640,7 +11640,7 @@
                 },
                 "issue-intent": {
                   "type": "boolean",
-                  "description": "Enable issue-intent metadata support (rationale/confidence/suggest) for this output type."
+                  "description": "Experimental: Enable issue-intent metadata support (rationale/confidence/suggest) for this output type. Disabled by default; set to true to opt in (makes rationale and confidence required)."
                 },
                 "staged": {
                   "$ref": "#/$defs/templatable_boolean",
@@ -15000,7 +15000,12 @@
               "path": { "type": "string", "minLength": 1, "maxLength": 2048 },
               "protocol": { "enum": ["openai-responses", "openai-chat-completions"] },
               "credential": { "$ref": "#/$defs/connectorName" },
-              "models": { "$ref": "#/$defs/connectorName" }
+              "models": { "$ref": "#/$defs/connectorName" },
+              "model-catalog": {
+                "type": "boolean",
+                "default": true,
+                "description": "Whether the provider exposes a live model catalogue (/models). False sets engine.model-catalog: false on consumers so engine.model is passed through verbatim instead of being resolved as a gh-aw alias."
+              }
             }
           }
         },
@@ -15721,6 +15726,7 @@
         "extensions": { "$ref": "#/$defs/engine_config/oneOf/1/properties/extensions" },
         "command": { "$ref": "#/$defs/engine_config/oneOf/1/properties/command" },
         "bare": { "$ref": "#/$defs/engine_config/oneOf/1/properties/bare" },
+        "model-catalog": { "$ref": "#/$defs/engine_config/oneOf/1/properties/model-catalog" },
         "cooldown": { "$ref": "#/$defs/engine_config/oneOf/1/properties/cooldown" },
         "cwd": { "$ref": "#/$defs/engine_config/oneOf/1/properties/cwd" },
         "model-routing": { "$ref": "#/$defs/engine_config/oneOf/1/properties/model-routing" },
@@ -16148,6 +16154,11 @@
               "description": "When true, disables automatic loading of context and custom instructions where supported. Copilot uses --no-custom-instructions, Claude uses --bare, and Pi disables context-file, skill, prompt-template, extension, and theme discovery while retaining explicit workflow infrastructure extensions. Codex and Gemini do not support this option and emit a warning. Defaults to false.",
               "default": false
             },
+            "model-catalog": {
+              "type": "boolean",
+              "description": "Whether the engine harness resolves the configured model against the live model catalogue (/models). Defaults to true: gh-aw model aliases, including built-in aliases that look like model ids such as gpt-5-mini, are resolved and the run stops if no catalogue is available. Set to false for BYOK providers without a /models route (for example Azure AI Gateway): configured models are then passed to the engine verbatim, without alias resolution, and model routing (implicit or model: router) is disabled because it selects models from the catalogue. Not supported with engine.copilot-sdk: true, which needs the catalogue at startup.",
+              "default": true
+            },
             "dynamic-workflows": {
               "type": "boolean",
               "description": "Whether dynamic workflows are enabled for engines that support them. Defaults to false. Copilot dynamic workflows are experimental.",
@@ -16374,6 +16385,11 @@
               "description": "When true, disables automatic loading of context and custom instructions where supported. Copilot uses --no-custom-instructions, Claude uses --bare, and Pi disables context-file, skill, prompt-template, extension, and theme discovery while retaining explicit workflow infrastructure extensions. Codex and Gemini do not support this option and emit a warning. Defaults to false.",
               "default": false
             },
+            "model-catalog": {
+              "type": "boolean",
+              "description": "Whether the engine harness resolves the configured model against the live model catalogue (/models). Defaults to true: gh-aw model aliases, including built-in aliases that look like model ids such as gpt-5-mini, are resolved and the run stops if no catalogue is available. Set to false for BYOK providers without a /models route (for example Azure AI Gateway): configured models are then passed to the engine verbatim, without alias resolution, and model routing (implicit or model: router) is disabled because it selects models from the catalogue. Not supported with engine.copilot-sdk: true, which needs the catalogue at startup.",
+              "default": true
+            },
             "dynamic-workflows": {
               "type": "boolean",
               "description": "Whether dynamic workflows are enabled for engines that support them. Defaults to false. Copilot dynamic workflows are experimental.",
@@ -16588,6 +16604,14 @@
                   "properties": {
                     "tools-allowlist": {
                       "type": "boolean"
+                    },
+                    "github-cli-proxy": {
+                      "type": "boolean",
+                      "description": "Include the GitHub CLI bridge when tools.cli-proxy is enabled, excluding it from native MCP configuration."
+                    },
+                    "auto-mcp-cli": {
+                      "type": "boolean",
+                      "description": "Augment active CLI mounts with configured GitHub, work-queue and custom MCP servers."
                     },
                     "max-turns": {
                       "type": "boolean"

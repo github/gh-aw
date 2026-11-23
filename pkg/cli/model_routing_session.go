@@ -254,7 +254,7 @@ func decodeSessionModelRoutingEvent(line []byte, lineNumber int, attribution *se
 	return nil
 }
 
-// parseRoutingObservation returns the verdict when it uses T-UAS-093's
+// parseRoutingObservation returns the verdict when it uses T-UAS-094's
 // vocabulary: a known reason, and only with skip.
 func parseRoutingObservation(data json.RawMessage, lineNumber int) *RoutingObservation {
 	var observation RoutingObservation

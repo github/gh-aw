@@ -306,8 +306,9 @@ Go/Node contract comparison passes; a generic YAML parse alone is insufficient.
 For workflow inference, follow specification section 5.4: declare named
 `inference` profiles with fixed endpoint/path/protocol, inference-only credentials
 and exact model resource collections. Select one through main-workflow
-`engine.inference: {connector: id, profile: name, model: alias}` and approve its
-literal hostname in `network.allowed`. Initially only Copilot OpenAI-compatible
+`engine.inference: {connector: id, profile: name, model: alias}`; the compiler
+adds that profile's endpoint host (and Entra login host for Azure OIDC) to the
+firewall allowlist. Initially only Copilot OpenAI-compatible
 Responses/Chat Completions are supported. This configures the existing engine;
 it is not a reader, MCP method or safe output. Importing selects nothing.
 Validate inference through offline consumer compilation, not a live read test.

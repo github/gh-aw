@@ -262,7 +262,8 @@ Complete the task.
 			require.Equal(t, false, features["code_mode_only"])
 			require.Contains(t, compiled, "--direct-tools")
 			if test.enabled {
-				require.Contains(t, compiled, `GH_AW_MCP_CLI_SERVERS='["safeoutputs"]'`)
+				require.Contains(t, compiled, `GH_AW_MCP_CLI_SERVERS='["github","safeoutputs"]'`)
+				require.Contains(t, compiled, "github --help")
 				require.Contains(t, compiled, "safeoutputs --help")
 				require.NotContains(t, compiled, "-c features.shell_tool=false")
 			} else {
@@ -270,6 +271,7 @@ Complete the task.
 				require.NotContains(t, compiled, "safeoutputs --help")
 				require.NotContains(t, compiled, "export GH_AW_MCP_CLI_SERVERS=")
 				require.Contains(t, config["mcp_servers"], "safeoutputs")
+				require.Contains(t, config["mcp_servers"], "github")
 			}
 		})
 	}

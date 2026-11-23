@@ -12,7 +12,7 @@ const { isStagedMode, checkRequiredFilter, resolveTarget } = require("./safe_out
 const { createAuthenticatedGitHubClient } = require("./handler_auth.cjs");
 const { parseAllowedIssueFields, validateAllowedIssueFieldName, BUILTIN_ISSUE_FIELD_NAMES } = require("./allowed_issue_fields.cjs");
 const { resolveSafeOutputIssueTarget } = require("./temporary_id.cjs");
-const { normalizeIssueIntentMetadata } = require("./issue_intents.cjs");
+const { normalizeIssueIntentMetadata, logIgnoredIssueIntentMetadata } = require("./issue_intents.cjs");
 
 /** @type {string} Safe output type handled by this module */
 const HANDLER_TYPE = "set_issue_field";
@@ -165,7 +165,7 @@ async function main(config = {}) {
   const { defaultTargetRepo, allowedRepos } = resolveTargetRepoConfig(config);
   const githubClient = await createAuthenticatedGitHubClient(config);
   const isStaged = isStagedMode(config);
-  const issueIntentEnabled = config.issue_intent !== false;
+  const issueIntentEnabled = config.issue_intent === true;
 
   core.info(`Set issue field configuration: max=${maxCount}`);
   const requiredLabels = Array.isArray(config.required_labels) ? config.required_labels : [];
@@ -342,6 +342,8 @@ async function main(config = {}) {
 
       if (issueIntentEnabled) {
         Object.assign(fieldUpdate, normalizeIssueIntentMetadata(item));
+      } else {
+        logIgnoredIssueIntentMetadata(item, issueIntentEnabled);
       }
 
       await setIssueFieldValue(githubClient, issueNodeId, fieldUpdate);

@@ -56,7 +56,7 @@ describe("structured report footer", () => {
   it("preserves custom footer templates and both history-link field spellings", () => {
     vi.stubEnv("GH_AW_SAFE_OUTPUT_MESSAGES", JSON.stringify({ agentFailureIssue: "> Report by **{workflow_name}**{history_link}{historyLink} · {ai_credits_formatted} {ai_credits_unit}" }));
     const { body } = renderReport(document(buildFailureReportFooter(ctx, { expiresHours: 0, failureFields: fields })));
-    expect(body).toContain("> Report by **Smoke Copilot** · [◷](https://github.com/search?q=smoke) · [◷](https://github.com/search?q=smoke) · \\~2 AIC");
+    expect(body).toContain("> Report by **Smoke Copilot** · [history](https://github.com/search?q=smoke) · [history](https://github.com/search?q=smoke) · \\~2 AIC");
     expect(body).not.toContain("gh-aw-expires");
     expect(extractExpirationDate(body)).toBeNull();
   });
@@ -66,7 +66,7 @@ describe("structured report footer", () => {
     vi.stubEnv("GH_AW_SAFE_OUTPUT_MESSAGES", JSON.stringify({ agentFailureIssue: "> {workflow_name}: {triggering_number} {unknownField} {__proto__} {constructor}{history_link}\n\n{unknown_block}" }));
     const footer = buildFailureReportFooter(ctx, { expiresHours: 0, failureFields: fields });
     const { body } = renderReport(document(footer));
-    expect(body).toContain("> Smoke Copilot: {triggering\\_number} {unknownField} {\\_\\_proto\\_\\_} {constructor} · [◷](https://github.com/search?q=smoke)");
+    expect(body).toContain("> Smoke Copilot: {triggering\\_number} {unknownField} {\\_\\_proto\\_\\_} {constructor} · [history](https://github.com/search?q=smoke)");
     expect(body).toContain("{unknown\\_block}");
     expect(footer.children).toEqual([
       {
@@ -79,7 +79,7 @@ describe("structured report footer", () => {
             children: [
               { type: "text", value: "Smoke Copilot: {triggering_number} {unknownField} {__proto__} {constructor}", agentTainted: false },
               { type: "text", value: " · ", agentTainted: false },
-              { type: "link", url: ctx.historyUrl, children: [{ type: "text", value: "◷", agentTainted: false }], agentTainted: false },
+              { type: "link", url: ctx.historyUrl, children: [{ type: "text", value: "history", agentTainted: false }], agentTainted: false },
             ],
           },
         ],
@@ -99,7 +99,7 @@ describe("structured report footer", () => {
     const { body } = renderReport(document(footer));
     expect(body).not.toContain("<!-- injected -->");
     expect(body.split("\n\n<!-- gh-aw-agentic-workflow:")[0]).not.toContain("[bad](https://evil.example)");
-    expect(body).not.toContain("[◷]");
+    expect(body).not.toContain("[history](");
   });
 
   it("keeps internal templates strict about missing fields even when a custom footer is configured", () => {

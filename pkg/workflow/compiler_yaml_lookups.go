@@ -35,7 +35,7 @@ func getVersionForSetup(data *WorkflowData, registry *EngineRegistry) string {
 	}
 	switch engineID {
 	case string(constants.CopilotEngine):
-		return string(constants.DefaultCopilotVersion)
+		return getDefaultCopilotCLIVersion(data)
 	case string(constants.ClaudeEngine):
 		return string(constants.DefaultClaudeCodeVersion)
 	case string(constants.CodexEngine):
@@ -105,7 +105,7 @@ func getInstallationVersion(data *WorkflowData, engine CodingAgentEngine, regist
 	// Otherwise, use the default version for the engine
 	switch engineID {
 	case string(constants.CopilotEngine):
-		return string(constants.DefaultCopilotVersion)
+		return getDefaultCopilotCLIVersion(data)
 	case string(constants.ClaudeEngine):
 		return string(constants.DefaultClaudeCodeVersion)
 	case string(constants.CodexEngine):
@@ -124,6 +124,13 @@ func getInstallationVersion(data *WorkflowData, engine CodingAgentEngine, regist
 		compilerYamlLookupsLog.Printf("No default version for custom engine: %s", engineID)
 		return ""
 	}
+}
+
+func getDefaultCopilotCLIVersion(data *WorkflowData) string {
+	if usesDefaultCopilotSDKNPM(data) {
+		return string(constants.DefaultCopilotSDKNPMCLIVersion)
+	}
+	return string(constants.DefaultCopilotVersion)
 }
 
 // getDefaultAgentModel returns the model display value to use when no explicit model is configured.
@@ -227,6 +234,9 @@ func (c *Compiler) collectEngineVersionsForMetadata(data *WorkflowData) map[stri
 	if mainEngineID == "" {
 		mainEngineID = string(constants.DefaultEngine)
 	}
+	if mainEngineID == string(constants.CopilotEngine) {
+		versions[mainEngineID] = getDefaultCopilotCLIVersion(data)
+	}
 	activeEngineIDs := map[string]struct{}{mainEngineID: {}}
 
 	applyMetadataEngineVersionOverrides(versions, data.EngineConfig, mainEngineID)
@@ -237,6 +247,12 @@ func (c *Compiler) collectEngineVersionsForMetadata(data *WorkflowData) map[stri
 			detectionEngineID = strings.TrimSpace(detectionConfig.ID)
 		}
 		activeEngineIDs[detectionEngineID] = struct{}{}
+		// When both jobs use Copilot, keep the main default unless the detector pins a version.
+		if detectionEngineID == string(constants.CopilotEngine) && detectionEngineID != mainEngineID &&
+			isFeatureEnabled(constants.GHAWDetectionFeatureFlag, data) {
+			detectionData := buildExternalDetectorWorkflowData(data, detectionEngineID)
+			versions[detectionEngineID] = getDefaultCopilotCLIVersion(detectionData)
+		}
 		applyMetadataEngineVersionOverrides(versions, detectionConfig, detectionEngineID)
 	}
 

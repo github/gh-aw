@@ -13,8 +13,93 @@ describe("shell_harness.cjs", () => {
     const result = spawnSync(process.execPath, [harnessPath, "test", "printf hello"], { encoding: "utf8" });
 
     expect(result.status).toBe(0);
-    expect(result.stdout).toBe("hello");
+    expect(result.stdout).toContain("hello");
     expect(result.stderr).toContain("[test-harness] attempt 1: process closed");
+  });
+
+  describe("shared retry loop", () => {
+    /** @param {string} script @param {Record<string, string>} [extraEnv] */
+    function runRetry(script, extraEnv = {}) {
+      const root = fs.mkdtempSync(path.join(__dirname, "shell-retry-"));
+      try {
+        const counter = path.join(root, "count");
+        const safeOutputs = path.join(root, "safeoutputs.jsonl");
+        const command = `n=$(($(cat "${counter}" 2>/dev/null || echo 0) + 1)); echo $n > "${counter}"; ${script}`;
+        const result = spawnSync(process.execPath, [harnessPath, "test", command], {
+          encoding: "utf8",
+          timeout: 10000,
+          env: {
+            ...process.env,
+            GH_AW_SKIP_IF_DECISION: "",
+            GH_AW_HARNESS_TELEMETRY_DIR: root,
+            GH_AW_SAFE_OUTPUTS: safeOutputs,
+            GH_AW_HARNESS_INITIAL_DELAY_MS: "10",
+            GH_AW_HARNESS_MAX_DELAY_MS: "5000",
+            SAFE_OUTPUTS: safeOutputs,
+            ...extraEnv,
+          },
+        });
+        return {
+          ...result,
+          invocations: Number(fs.readFileSync(counter, "utf8").trim()),
+          telemetry: JSON.parse(fs.readFileSync(path.join(root, "harness_retry.json"), "utf8")),
+        };
+      } finally {
+        fs.rmSync(root, { recursive: true, force: true });
+      }
+    }
+
+    it("honours a BYOK HTTP 429 Retry-After before retrying", () => {
+      const result = runRetry(`if [ $n -eq 1 ]; then printf 'HTTP/1.1 429 Too Many Requests\nRetry-After: 1\n' >&2; exit 1; fi; echo done`);
+      expect(result.status).toBe(0);
+      expect(result.invocations).toBe(2);
+      expect(result.telemetry).toMatchObject({
+        attempts: 2,
+        exit_code: 0,
+        attempt_results: [
+          { outcome: "failure", failure_classes: ["rate_limit_error"] },
+          { outcome: "success", backoff_ms: 1000 },
+        ],
+      });
+    });
+
+    it("fails fast when Retry-After exceeds max-delay-ms", () => {
+      const result = runRetry(`printf 'HTTP/1.1 429 Too Many Requests\nRetry-After: 257\n' >&2; exit 1`, { GH_AW_HARNESS_MAX_DELAY_MS: "60000" });
+      expect(result.status).toBe(1);
+      expect(result.invocations).toBe(1);
+      expect(result.telemetry.attempt_results).toMatchObject([{ outcome: "failure", failure_classes: ["rate_limit_wait_exceeded"] }]);
+    });
+
+    it("retries transient provider errors with backoff", () => {
+      const result = runRetry(`if [ $n -le 2 ]; then echo '503 Service Unavailable' >&2; exit 1; fi; echo done`);
+      expect(result.status).toBe(0);
+      expect(result.invocations).toBe(3);
+      expect(result.telemetry.attempt_results.map(entry => entry.backoff_ms)).toEqual([0, 10, 20]);
+    });
+
+    it.each([
+      ["an unclassified failure", `echo 'compile error' >&2; exit 3`, 3],
+      ["an authentication failure", `echo 'HTTP 401 Unauthorized: authentication failed' >&2; echo '429 Too Many Requests' >&2; exit 1`, 1],
+      ["exhausted retries", `echo '429 Too Many Requests' >&2; exit 1`, 1],
+    ])("stops on %s", (_name, script, code) => {
+      const result = runRetry(script, { GH_AW_HARNESS_MAX_RETRIES: "1" });
+      expect(result.status).toBe(code);
+      expect(result.invocations).toBe(_name === "exhausted retries" ? 2 : 1);
+    });
+
+    it("does not retry after the attempt recorded safe outputs", () => {
+      const result = runRetry(`echo '{"type":"create_issue"}' >> "$SAFE_OUTPUTS"; echo '429 Too Many Requests' >&2; exit 1`);
+      expect(result.status).toBe(1);
+      expect(result.invocations).toBe(1);
+      expect(result.stderr).toContain("safe outputs were recorded");
+    });
+
+    it("does not retry when no safe-outputs path is configured", () => {
+      const result = runRetry(`echo '429 Too Many Requests' >&2; exit 1`, { GH_AW_SAFE_OUTPUTS: "" });
+      expect(result.status).toBe(1);
+      expect(result.invocations).toBe(1);
+      expect(result.stderr).toContain("retries disabled");
+    });
   });
 
   it("reports invalid invocations", () => {

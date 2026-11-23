@@ -524,7 +524,13 @@ describe("generate_safe_outputs_tools", () => {
     runScript();
 
     const result = JSON.parse(fs.readFileSync(outputPath, "utf8"));
-    expect(result[0].inputSchema.properties.labels.items).toEqual(itemSchema);
+    expect(result[0].inputSchema.properties.labels.items).toEqual({
+      ...itemSchema,
+      properties: {
+        ...itemSchema.properties,
+        confidence: { ...itemSchema.properties.confidence, description: "Ignored: issue-intent is not enabled for this safe output; this value is not persisted." },
+      },
+    });
     expect(result[0].inputSchema.properties.labels.description).toContain("plain string label names are not permitted");
     expect(result[0].inputSchema.properties.labels.description).toContain("Required fields: name, confidence");
     expect(result[0].inputSchema.properties.labels.description).toContain('Example: [{"name":"bug","confidence":"HIGH"}]');
@@ -1197,6 +1203,95 @@ describe("generate_safe_outputs_tools", () => {
     expect(disabledTool.inputSchema.properties.labels.items.oneOf).toBeDefined();
   });
 
+  it("strips nested add_labels intent fields unless issue_intent is true", () => {
+    const labelObjectSchema = {
+      type: "object",
+      required: ["name"],
+      properties: {
+        name: { type: "string" },
+        rationale: { type: "string" },
+        confidence: { type: "string", enum: ["LOW", "MEDIUM", "HIGH"] },
+        suggest: { type: "boolean" },
+      },
+      additionalProperties: false,
+    };
+    const addLabelsSourceTool = {
+      name: "add_labels",
+      description: "Adds labels.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          labels: {
+            type: "array",
+            items: { oneOf: [{ type: "string" }, labelObjectSchema] },
+            description: "Labels to add. Each entry can be either a label name string or an object with name plus optional rationale/confidence/suggest intent metadata. Labels must exist in the repository.",
+          },
+        },
+        required: ["labels"],
+      },
+    };
+    fs.writeFileSync(toolsSourcePath, JSON.stringify([addLabelsSourceTool]));
+    fs.writeFileSync(toolsMetaPath, JSON.stringify({ description_suffixes: {}, repo_params: {}, dynamic_tools: [] }));
+    const readLabels = () => JSON.parse(fs.readFileSync(outputPath, "utf8")).find((/** @type {{name: string}} */ t) => t.name === "add_labels").inputSchema.properties.labels;
+
+    fs.writeFileSync(configPath, JSON.stringify({ add_labels: {} }));
+    runScript();
+    const omitted = readLabels();
+    expect(omitted.items.oneOf).toHaveLength(2);
+    expect(omitted.items.oneOf[0]).toEqual({ type: "string" });
+    expect(Object.keys(omitted.items.oneOf[1].properties)).toEqual(["name"]);
+    expect(omitted.items.oneOf[1].required).toEqual(["name"]);
+    expect(omitted.description).not.toMatch(/rationale|confidence|suggest/);
+
+    fs.writeFileSync(configPath, JSON.stringify({ add_labels: { issue_intent: true } }));
+    runScript();
+    const enabled = readLabels();
+    expect(Object.keys(enabled.items.properties)).toEqual(expect.arrayContaining(["name", "rationale", "confidence", "suggest"]));
+  });
+
+  it("removes all intent advertising from the real add_labels source schema when issue_intent is omitted", () => {
+    fs.copyFileSync(path.join(__dirname, "safe_outputs_tools.json"), toolsSourcePath);
+    fs.writeFileSync(configPath, JSON.stringify({ add_labels: {} }));
+    fs.writeFileSync(toolsMetaPath, JSON.stringify({ description_suffixes: {}, repo_params: {}, dynamic_tools: [] }));
+
+    runScript();
+
+    const addLabels = JSON.parse(fs.readFileSync(outputPath, "utf8")).find((/** @type {{name: string}} */ t) => t.name === "add_labels");
+    const serialized = JSON.stringify(addLabels);
+    expect(serialized).not.toMatch(/rationale|confidence|suggest/i);
+    expect(serialized).not.toMatch(/human review/i);
+    expect(addLabels.description).toContain("Add labels");
+    expect(addLabels.inputSchema.properties.labels.items.oneOf.find((/** @type {{type: string}} */ s) => s.type === "object").properties).toHaveProperty("name");
+  });
+
+  it("annotates intent fields in add_labels item-schema overrides as ignored when issue_intent is omitted", () => {
+    fs.copyFileSync(path.join(__dirname, "safe_outputs_tools.json"), toolsSourcePath);
+    fs.writeFileSync(configPath, JSON.stringify({ add_labels: {} }));
+    const itemSchema = {
+      type: "object",
+      required: ["name", "rationale"],
+      properties: {
+        name: { type: "string" },
+        rationale: { type: "string", description: "Why this label applies." },
+        confidence: { type: "string", enum: ["LOW", "MEDIUM", "HIGH"] },
+        suggest: { type: "boolean", description: "When true, route through pending human review." },
+      },
+      additionalProperties: false,
+    };
+    fs.writeFileSync(toolsMetaPath, JSON.stringify({ description_suffixes: {}, repo_params: {}, dynamic_tools: [], item_schemas: { add_labels: { labels: itemSchema } } }));
+
+    runScript();
+
+    const labels = JSON.parse(fs.readFileSync(outputPath, "utf8")).find((/** @type {{name: string}} */ t) => t.name === "add_labels").inputSchema.properties.labels;
+    const ignoredNote = "Ignored: issue-intent is not enabled for this safe output; this value is not persisted.";
+    expect(labels.items.required).toEqual(["name", "rationale"]);
+    for (const field of ["rationale", "confidence", "suggest"]) {
+      expect(labels.items.properties[field].description).toBe(ignoredNote);
+    }
+    expect(labels.items.properties.confidence.enum).toEqual(["LOW", "MEDIUM", "HIGH"]);
+    expect(JSON.stringify(labels)).not.toMatch(/human review/i);
+  });
+
   it("reflects required/optional/absent intent fields per tool configuration", () => {
     fs.writeFileSync(
       toolsSourcePath,
@@ -1259,8 +1354,9 @@ describe("generate_safe_outputs_tools", () => {
     expect(closeIssue.inputSchema.properties).toHaveProperty("confidence");
     expect(closeIssue.inputSchema.required).toEqual(expect.arrayContaining(["rationale", "confidence"]));
 
-    expect(assignToUser.inputSchema.properties).toHaveProperty("rationale");
-    expect(assignToUser.inputSchema.properties).toHaveProperty("confidence");
+    expect(assignToUser.inputSchema.properties).not.toHaveProperty("rationale");
+    expect(assignToUser.inputSchema.properties).not.toHaveProperty("confidence");
+    expect(assignToUser.inputSchema.properties).not.toHaveProperty("suggest");
     expect(assignToUser.inputSchema.required).not.toContain("rationale");
     expect(assignToUser.inputSchema.required).not.toContain("confidence");
 
@@ -1271,7 +1367,7 @@ describe("generate_safe_outputs_tools", () => {
     expect(assignToAgent.inputSchema.required).not.toContain("confidence");
   });
 
-  it("adds encouraged intent guidance for all intent-aware tools when issue_intent is omitted", () => {
+  it("strips intent fields and guidance for all intent-aware tools when issue_intent is omitted", () => {
     fs.writeFileSync(
       toolsSourcePath,
       JSON.stringify([
@@ -1339,28 +1435,14 @@ describe("generate_safe_outputs_tools", () => {
     runScript();
 
     const result = JSON.parse(fs.readFileSync(outputPath, "utf8"));
-    const optionalSuffix = "INTENT ENCOURAGED:";
-    const requiredSuffix = "INTENT REQUIRED:";
     const toolNames = ["set_issue_type", "set_issue_field", "add_labels", "close_issue", "assign_to_user", "assign_to_agent"];
     for (const name of toolNames) {
       const tool = result.find((/** @type {{name: string}} */ t) => t.name === name);
       expect(tool, `${name} should be in result`).toBeDefined();
-      expect(tool.description, `${name} should have encouraged suffix`).toContain(optionalSuffix);
-      expect(tool.description, `${name} should not have required suffix`).not.toContain(requiredSuffix);
-    }
-    // Rationale and confidence should remain optional (not added to required array, descriptions unchanged)
-    for (const name of toolNames.filter(n => n !== "add_labels")) {
-      const tool = result.find((/** @type {{name: string, inputSchema: {required?: string[]}}} */ t) => t.name === name);
-      const required = tool.inputSchema.required ?? [];
-      expect(required, `${name} rationale should not be required`).not.toContain("rationale");
-      expect(required, `${name} confidence should not be required`).not.toContain("confidence");
-      const props = tool.inputSchema.properties;
-      if (props?.rationale?.description) {
-        expect(props.rationale.description, `${name} rationale description should remain optional`).toMatch(/optional/i);
-      }
-      if (props?.confidence?.description) {
-        expect(props.confidence.description, `${name} confidence description should remain optional`).toMatch(/optional/i);
-      }
+      expect(tool.description, `${name} should not have intent guidance`).not.toMatch(/INTENT (ENCOURAGED|REQUIRED):/);
+      expect(tool.inputSchema.properties, `${name} rationale should be stripped`).not.toHaveProperty("rationale");
+      expect(tool.inputSchema.properties, `${name} confidence should be stripped`).not.toHaveProperty("confidence");
+      expect(tool.inputSchema.required ?? [], `${name} rationale should not be required`).not.toContain("rationale");
     }
   });
 
@@ -1422,44 +1504,6 @@ describe("generate_safe_outputs_tools", () => {
     const items = tool.inputSchema.properties.labels.items;
     expect(items.properties.rationale.description).not.toMatch(/optional/i);
     expect(items.properties.confidence.description).not.toMatch(/optional/i);
-  });
-
-  it("omitted mode add_labels description prefers structured label objects and permits plain strings", () => {
-    const addLabelsSourceTool = {
-      name: "add_labels",
-      description: "Adds labels.",
-      inputSchema: {
-        type: "object",
-        properties: {
-          labels: {
-            type: "array",
-            description: "Original description.",
-            items: { oneOf: [{ type: "string" }, { type: "object", required: ["name"], properties: { name: { type: "string" } } }] },
-          },
-        },
-        required: ["labels"],
-      },
-    };
-    fs.writeFileSync(toolsSourcePath, JSON.stringify([addLabelsSourceTool]));
-    fs.writeFileSync(configPath, JSON.stringify({ add_labels: {} }));
-    fs.writeFileSync(toolsMetaPath, JSON.stringify({ description_suffixes: {}, repo_params: {}, dynamic_tools: [] }));
-
-    runScript();
-
-    const result = JSON.parse(fs.readFileSync(outputPath, "utf8"));
-    const tool = result.find((/** @type {{name: string}} */ t) => t.name === "add_labels");
-    const labelsDesc = tool.inputSchema.properties.labels.description;
-
-    // Should include a structured object example
-    expect(labelsDesc).toContain('"name"');
-    expect(labelsDesc).toContain('"rationale"');
-    expect(labelsDesc).toContain('"confidence"');
-    // Should show suggest inside the label object example (not as a top-level field)
-    expect(labelsDesc).toContain('"suggest"');
-    // Should not say plain strings are forbidden (they are still allowed in omitted mode)
-    expect(labelsDesc).not.toMatch(/plain string.*not permitted/i);
-    // oneOf schema must be preserved (plain strings still valid)
-    expect(tool.inputSchema.properties.labels.items.oneOf).toBeDefined();
   });
 
   it("strict mode updates rationale and confidence property descriptions to say required", () => {

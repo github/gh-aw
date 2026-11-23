@@ -100,7 +100,7 @@ type ModelRoutingSummary struct {
 	EndpointOnlyDeviationNormalized bool                    `json:"endpoint_only_deviation_normalized,omitempty"`
 }
 
-// RoutingObservation is the unified session's verdict on a routed run (T-UAS-093):
+// RoutingObservation is the unified session's verdict on a routed run (T-UAS-094):
 // whether its result counts as evidence about the selected pair, and if not, why.
 type RoutingObservation struct {
 	Outcome string `json:"outcome"`

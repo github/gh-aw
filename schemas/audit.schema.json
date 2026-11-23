@@ -1740,6 +1740,43 @@
             "additionalProperties": false
           }
         },
+        "incomplete": {
+          "type": [
+            "null",
+            "array"
+          ],
+          "items": {
+            "type": "object",
+            "properties": {
+              "reason": {
+                "type": "string"
+              },
+              "details": {
+                "type": "string"
+              },
+              "timestamp": {
+                "type": "string"
+              },
+              "workflow_name": {
+                "type": "string"
+              },
+              "run_id": {
+                "type": "integer"
+              },
+              "experiment_name": {
+                "type": "string"
+              },
+              "variant": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "reason",
+              "timestamp"
+            ],
+            "additionalProperties": false
+          }
+        },
         "continuation_requests": {
           "type": [
             "null",

@@ -42,6 +42,7 @@ func TestGetRepositoryRelativePath(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			result, err := getRepositoryRelativePath(tt.input)
 			if err != nil {
 				t.Errorf("getRepositoryRelativePath(%q) error = %v", tt.input, err)

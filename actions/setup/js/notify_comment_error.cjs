@@ -1,5 +1,6 @@
 // @ts-check
 /// <reference types="@actions/github-script" />
+// @safe-outputs-exempt USE-003 — completion notifier, not a safe-output handler; staged mode only withholds agent-authored report content and no staged preview is generated.
 
 // This script updates an existing comment created by the activation job
 // to notify about the workflow completion status (success or failure).

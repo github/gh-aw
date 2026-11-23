@@ -30,6 +30,8 @@ Codemode batches tool calls and reduces results before they enter model context.
 
 For Copilot models using the Responses API, gh-aw disables grammar-based custom tools (`model.compat.supportsOpenAIGrammarTools: false`) so Pi sends codemode as a JSON-schema function tool. Codemode remains enabled; the Copilot compatibility adapter does not accept its custom-tool format. Other provider routes retain their configured compatibility settings.
 
+Pi's OpenAI-compatible requests omit `uniqueItems` from provider-facing function tool schemas, including deferred tools, because strict inference schema compilation rejects that keyword. The original Pi and MCP argument schemas remain unchanged; duplicate safe-output dependency IDs are still rejected before handler execution.
+
 | Option | Pi behavior |
 |---|---|
 | `max-turns`, `max-ai-credits` | Enforced by the AWF inference proxy. |

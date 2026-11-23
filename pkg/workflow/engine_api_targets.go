@@ -243,6 +243,7 @@ func extractLiteralEngineEnvHost(workflowData *WorkflowData, envVar string) stri
 // This includes:
 //  1. The BYOK provider host from COPILOT_PROVIDER_BASE_URL in engine.env, when configured.
 //  2. The Copilot API target from engine.api-target or GITHUB_COPILOT_BASE_URL.
+//  3. Hosts required by a selected connector inference profile (endpoint and Entra authority).
 //
 // The BYOK provider host is added first because it is the actual outbound destination for
 // Copilot CLI requests in BYOK mode. Duplicate hosts are removed.
@@ -263,6 +264,9 @@ func GetCopilotAllowlistTargets(workflowData *WorkflowData) []string {
 
 	addTarget(extractLiteralEngineEnvHost(workflowData, constants.CopilotProviderBaseURL))
 	addTarget(GetCopilotAPITarget(workflowData))
+	for _, host := range connectorInferenceAllowedDomains(workflowData) {
+		addTarget(host)
+	}
 
 	return targets
 }

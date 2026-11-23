@@ -27,6 +27,9 @@ type Inference struct {
 	Protocol   string `json:"protocol"`
 	Credential string `json:"credential"`
 	Models     string `json:"models"`
+	// ModelCatalog false declares that the provider has no /models route: consumers
+	// get engine.model-catalog: false so engine.model is passed through verbatim.
+	ModelCatalog *bool `json:"model-catalog,omitempty"`
 }
 
 type Credential struct {

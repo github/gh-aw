@@ -67,6 +67,9 @@ A workflow can look efficient alone while reducing total system value, for examp
 
 ## System Overlap and Waste
 
+For a five-role portfolio with shared coding capacity and human-reviewed,
+evidence-driven tuning, use the [Repo Factory recipe](/gh-aw/guides/repo-factory/).
+
 Waste is any cost, time, or reviewer attention that does not produce proportional value: redundant runs, duplicate outputs, repeated context collection, expensive model calls for deterministic work, and outputs with consistently low acceptance.
 
 Use the `object_url` and `repo` fields in `.adoption[].items[]` from `gh aw logs --adoption --json` to find multiple workflows acting on the same object before changing triggers or consolidating workflows.

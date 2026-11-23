@@ -5,6 +5,7 @@ package workflow
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 
 	"github.com/github/gh-aw/pkg/constants"
@@ -496,6 +497,106 @@ func TestBuildMCPCLIPromptSection_OmittedWhenBashDisabled(t *testing.T) {
 
 	require.NotEmpty(t, getMCPCLIServerNames(data), "safeoutputs is still CLI-mounted")
 	assert.Nil(t, buildMCPCLIPromptSection(data), "CLI-only instructions must be omitted when the agent has no shell")
+}
+
+func TestMCPCLIMountEngineCapabilities(t *testing.T) {
+	for _, tc := range []struct {
+		name         string
+		capabilities EngineCapabilitiesDefinition
+		cliProxy     bool
+		wantGitHub   bool
+		wantCustom   bool
+	}{
+		{"native default", EngineCapabilitiesDefinition{}, true, false, true},
+		{"explicit GitHub proxy", EngineCapabilitiesDefinition{GitHubCLIProxy: true}, true, true, true},
+		{"GitHub proxy needs opt-in", EngineCapabilitiesDefinition{GitHubCLIProxy: true}, false, false, false},
+		{"automatic augmentation", EngineCapabilitiesDefinition{AutoMCPCLI: true}, false, true, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			tools := map[string]any{
+				"github":    map[string]any{"mode": "local"},
+				"cli-proxy": tc.cliProxy,
+				"custom":    map[string]any{"command": "custom-server"},
+			}
+			data := &WorkflowData{
+				EngineConfig: &EngineConfig{ID: "custom-read-engine"},
+				engineDefinition: &EngineDefinition{
+					ID: "custom-read-engine",
+					Behaviors: &EngineBehaviorDefinition{
+						Capabilities: tc.capabilities,
+					},
+				},
+				Tools:       tools,
+				ParsedTools: NewTools(tools),
+				SafeOutputs: &SafeOutputsConfig{NoOp: &NoOpConfig{}},
+			}
+			servers := getMCPCLIServerNames(data)
+			assert.Equal(t, tc.wantGitHub, slices.Contains(servers, "github"))
+			assert.Equal(t, tc.wantCustom, slices.Contains(servers, "custom"))
+			assert.Equal(t, tc.wantGitHub && tc.cliProxy, slices.Contains(getMCPCLIExcludeFromAgentConfig(data), "github"))
+		})
+	}
+}
+
+func TestCodexGitHubCLIReadTransport(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		cliProxy   bool
+		github     any
+		wantBridge bool
+	}{
+		{"local MCP with CLI proxy", true, map[string]any{"mode": "local", "min-integrity": "approved"}, true},
+		{"native MCP without CLI proxy", false, map[string]any{"mode": "local"}, false},
+		{"gh proxy remains separate", true, map[string]any{"mode": "gh-proxy"}, false},
+		{"disabled GitHub", true, false, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			tools := map[string]any{"github": tc.github, "cli-proxy": tc.cliProxy}
+			data := &WorkflowData{
+				EngineConfig: &EngineConfig{ID: string(constants.CodexEngine)},
+				Tools:        tools,
+				ParsedTools:  NewTools(tools),
+				SafeOutputs:  &SafeOutputsConfig{NoOp: &NoOpConfig{}},
+			}
+			servers := getMCPCLIServerNames(data)
+			section := buildMCPCLIPromptSection(data)
+			require.NotNil(t, section)
+			if tc.wantBridge {
+				assert.Contains(t, servers, "github")
+				assert.Contains(t, getMCPCLIExcludeFromAgentConfig(data), "github")
+				assert.Contains(t, section.EnvVars["GH_AW_MCP_CLI_SERVERS_LIST"], "`github --help`")
+			} else {
+				assert.NotContains(t, servers, "github")
+				assert.NotContains(t, getMCPCLIExcludeFromAgentConfig(data), "github")
+				assert.NotContains(t, section.EnvVars["GH_AW_MCP_CLI_SERVERS_LIST"], "`github --help`")
+			}
+			assert.Equal(t, tc.github, data.Tools["github"], "transport selection must not alter GitHub policy")
+		})
+	}
+}
+
+func TestDailyReadWorkflowsExposeCLITransport(t *testing.T) {
+	for _, name := range []string{"daily-doc-updater", "daily-spending-forecast"} {
+		t.Run(name, func(t *testing.T) {
+			compiler := NewCompiler()
+			compiler.SetWorkflowIdentifier(name)
+			data, err := compiler.ParseWorkflowFile(filepath.Join(workflowsDir, name+".md"))
+			require.NoError(t, err)
+			require.True(t, data.ParsedTools.CLIProxy)
+			section := buildMCPCLIPromptSection(data)
+			require.NotNil(t, section)
+			assert.Contains(t, section.EnvVars["GH_AW_MCP_CLI_SERVERS_LIST"], "`github --help`")
+			assert.Contains(t, getMCPCLIExcludeFromAgentConfig(data), "github")
+			if name == "daily-spending-forecast" {
+				assert.Contains(t, section.EnvVars["GH_AW_MCP_CLI_SERVERS_LIST"], "`agenticworkflows --help`")
+				assert.Contains(t, getMCPCLIExcludeFromAgentConfig(data), "agenticworkflows")
+			} else {
+				assert.Equal(t, "approved", data.Tools["github"].(map[string]any)["min-integrity"])
+				assert.Contains(t, data.Tools["github"].(map[string]any)["approval-labels"], "cookie")
+				assert.Contains(t, data.Tools["github"].(map[string]any)["approval-labels"], "community")
+			}
+		})
+	}
 }
 
 func TestWorkQueueCLIMountSelection(t *testing.T) {

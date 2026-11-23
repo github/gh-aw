@@ -61,29 +61,13 @@ const os = require("os");
 const path = require("path");
 const crypto = require("crypto");
 const { getPromptPath, renderTemplateFromFile } = require("./messages_core.cjs");
-const {
-  runProcess,
-  formatDuration,
-  sleep,
-  isCopilotSDKEnabled,
-  buildCopilotSDKEnv,
-  MIN_POST_RESULT_WATCHDOG_TIMEOUT_MS,
-  DEFAULT_POST_RESULT_WATCHDOG_IDLE_TIMEOUT_MS,
-  resolvePostResultWatchdogIdleTimeoutMs,
-} = require("./process_runner.cjs");
+const { runProcess, sleep, isCopilotSDKEnabled, buildCopilotSDKEnv } = require("./process_runner.cjs");
 const { buildCopilotSDKServerArgs, getCopilotSDKServerPort, startCopilotSDKServer, stopCopilotSDKServer, waitForCopilotSDKServer } = require("./copilot_sdk_sidecar.cjs");
 const { resolveRetryConfig: resolveSharedRetryConfig } = require("./harness_retry_config.cjs");
-const { hasCopilotResponseStatus, isGitHubRetryAfterProvider, parseCopilotRetryAfterMs } = require("./copilot_retry_after.cjs");
+const { hasCopilotResponseStatus, parseCopilotRetryAfterMs } = require("./copilot_retry_after.cjs");
 const { stopForPermissionDenied } = require("./harness_failure_handling.cjs");
-const {
-  captureExecutionEvidenceConfiguration,
-  resolveHarnessRetryTelemetryPath,
-  runHarnessRetryLoop,
-  selectedHarnessStrategy,
-  shouldSkipForNoopSafeOutputs,
-  shouldStopForNoopSafeOutputs,
-  stripExecutionEvidenceEnv,
-} = require("./harness_retry_runner.cjs");
+const { selectedHarnessStrategy, shouldStopForNoopSafeOutputs, stripExecutionEvidenceEnv } = require("./harness_retry_runner.cjs");
+const { startEngineHarness, stopAfterUnrecoverableFailure } = require("./harness_engine.cjs");
 const {
   AWF_API_PROXY_REFLECT_URL,
   AWF_REFLECT_OUTPUT_PATH,
@@ -102,13 +86,11 @@ const {
   REFLECT_PROVIDER_ALIASES,
 } = require("./awf_reflect.cjs");
 const { runSafeOutputsCLI, buildMissingToolAlternatives, emitMissingToolPermissionIssue, emitInfrastructureIncomplete, hasExpectedSafeOutputs, hasTerminalSafeOutput, hasNoopInSafeOutputs } = require("./safeoutputs_cli.cjs");
-const { getSafeOutputsByteOffset, hasAttemptTerminalSafeOutput } = require("./harness_safe_outputs.cjs");
 const { countPermissionDeniedIssues, hasNumerousPermissionDeniedIssues, hasWorkflowToolPermissionDenial, extractDeniedCommands, buildMissingToolPermissionIssuePayload } = require("./permission_denied_helpers.cjs");
 const {
   detectNonRetryableHarnessGuard,
   observeInvocationBudget,
   resolveRetryAfterDecision,
-  buildSoftTimeoutGuard,
   emitSoftTimeoutSignal,
   isAuthenticationFailedError: isCommonAuthenticationFailedError,
   createOutputPatternMatcher,
@@ -125,7 +107,7 @@ const { recordAWFModelRoutingOutcome } = require("./awf_model_routing.cjs");
 const COPILOT_ROUTING_POLICY = getAWFModelRoutingPolicy("copilot");
 const { loadModelsJson } = require("./model_costs.cjs");
 const { applyCopilotWireAPI: configureCopilotWireAPI, warnCopilotSubagentEndpoints, recordModelEndpointMismatch, getSupportedEndpoints, MODEL_ENDPOINT_FIX } = require("./copilot_wire_api.cjs");
-const { loadModelAliasMap, resolveEngineModel, normalizeForCopilotCLI, ModelAliasResolutionError, recordModelResolution, splitModelIdentifier } = require("./resolve_model_alias.cjs");
+const { isModelCatalogDisabled, loadModelAliasMap, resolveEngineModel, normalizeForCopilotCLI, ModelAliasResolutionError, recordModelResolution, splitModelIdentifier } = require("./resolve_model_alias.cjs");
 const { COPILOT_MODEL_VERIFICATION_EXIT_CODE, createCopilotModelObserver, readCopilotModelSubstitution, recordCopilotModelSelection } = require("./copilot_model_selection.cjs");
 const { copilotSDKAgentDirectories, defaultCopilotSDKAgentsBaseDir, getEngineSubAgentTarget } = require("./extract_inline_sub_agents.cjs");
 const { inlineArtifactTarget } = require("./inline_artifact_target.cjs");
@@ -158,7 +140,6 @@ function resolveLongRunTokenThreshold(env = process.env) {
   return configured;
 }
 const LONG_RUN_TOKEN_THRESHOLD = resolveLongRunTokenThreshold();
-const POST_RESULT_WATCHDOG_IDLE_TIMEOUT_MS = resolvePostResultWatchdogIdleTimeoutMs();
 const COPILOT_REQUESTS_PROXY_AUTH_403_TEMPLATE_NAME = "copilot_requests_proxy_auth_403.md";
 const NATIVE_RATE_LIMIT_ERROR_PATTERN = /\b429\b|too many requests|rate[\s_-]*limit/i;
 // Pattern to detect transient CAPIError 400 in copilot output
@@ -860,7 +841,8 @@ async function resolveCopilotSubagentModels(options) {
     });
     return refresh;
   };
-  const liveCheck = env.AWF_REFLECT_ENABLED === "1" || Boolean(options.reflectData);
+  // engine.model-catalog: false passes sub-agent models through verbatim, without a catalogue check.
+  const liveCheck = !isModelCatalogDisabled(env) && (env.AWF_REFLECT_ENABLED === "1" || Boolean(options.reflectData));
   /** @type {InstanceType<typeof ModelAliasResolutionError>[]} */
   const failures = [];
   const resolutions = [];
@@ -1743,18 +1725,10 @@ function resolvePromptFileInput(args) {
  * Main entry point: run copilot with retry logic for partially-executed sessions.
  */
 async function main() {
-  const executionEvidence = captureExecutionEvidenceConfiguration(process.env);
-  stripExecutionEvidenceEnv(process.env);
-  const [, , command, ...args] = process.argv;
-  const retryConfig = resolveRetryConfig(process.env, log);
-  const { maxRetries, initialDelayMs, backoffMultiplier, maxDelayMs } = retryConfig;
-
-  if (!command) {
-    process.stderr.write("copilot-harness: Usage: node copilot_harness.cjs <command> [args...]\n");
-    process.exit(1);
-  }
-
-  log(`starting: command=${command} maxRetries=${maxRetries} initialDelayMs=${initialDelayMs}` + ` backoffMultiplier=${backoffMultiplier} maxDelayMs=${maxDelayMs}` + ` nodeVersion=${process.version} platform=${process.platform}`);
+  const harness = startEngineHarness({ engine: "copilot", harnessName: "Copilot harness", log, resolveRetryConfig, softDeadlineStart: "run" });
+  if (!harness) return;
+  const { command, args, safeOutputsPath, softTimeoutGuard } = harness;
+  const { maxRetries, maxDelayMs } = harness.retryConfig;
 
   await checkCommandAccessible(command);
 
@@ -1876,8 +1850,7 @@ async function main() {
   // potentially harmful. This must run before the provider-listener readiness gate so a
   // legitimate noop exit is never turned into an infrastructure-incomplete failure by an
   // unrelated listener being unavailable.
-  const safeOutputsPath = process.env.GH_AW_SAFE_OUTPUTS || "";
-  if (shouldSkipForNoopSafeOutputs({ safeOutputsPath, hasNoopInSafeOutputs, log, executionEvidence })) {
+  if (harness.shouldSkipForPreexistingNoop()) {
     process.exit(0);
   }
 
@@ -2010,8 +1983,6 @@ async function main() {
     });
   }
 
-  const honorRetryAfter = isGitHubRetryAfterProvider(copilotSDKMode ? primaryProviderName : process.env.GH_AW_LLM_PROVIDER || "github");
-
   // Merge SDK env additions into the child process env only when the SDK helper
   // returned at least one variable; otherwise leave the env undefined so that
   // runProcess inherits the full process.env (the common case).
@@ -2040,7 +2011,6 @@ async function main() {
   if (copilotSDKMode) sdkChildEnv.GH_AW_COPILOT_CONFIGURED_MODEL = selectionConfiguredModel;
   const childEnv = Object.keys(sdkChildEnv).length > 0 ? buildCopilotEngineChildEnv(process.env, sdkChildEnv) : undefined;
 
-  let delay = initialDelayMs;
   let lastExitCode = 1;
   let lastHasOutput = false;
   const isScheduledRun = process.env.GITHUB_EVENT_NAME === "schedule";
@@ -2059,12 +2029,6 @@ async function main() {
   // Once set to true, --continue is never re-enabled for the remainder of this run.
   // This prevents a broken --continue recovery from resurrecting --continue on the next attempt.
   let continueDisabledPermanently = false;
-  const driverStartTime = Date.now();
-  // Soft-timeout guard: polled at the top of the retry loop and after each backoff sleep.
-  // It does not preempt a running attempt — if a single invocation runs past the soft
-  // deadline the guard fires on the next iteration. Individual attempts are expected to
-  // complete within the SOFT_TIMEOUT_BUFFER_MS window.
-  const softTimeoutGuard = buildSoftTimeoutGuard(driverStartTime);
   const detectedCopilotErrors = {
     inferenceAccessError: false,
     mcpPolicyError: false,
@@ -2107,18 +2071,11 @@ async function main() {
     if (!copilotSDKMode || copilotSDKServer) {
       // Unified retry loop for CLI and driver modes.
       // --continue is a CLI concept; in SDK mode retries always restart the session fresh.
-      const retryRun = await runHarnessRetryLoop({
-        telemetryPath: resolveHarnessRetryTelemetryPath(),
-        maxRetries,
-        initialDelayMs,
-        backoffMultiplier,
-        maxDelayMs,
-        driverStartTime,
-        harnessName: "Copilot harness",
-        log,
-        softTimeoutGuard,
+      // The shared soft-timeout guard is polled at the top of the retry loop and after each
+      // backoff sleep; it does not preempt a running attempt.
+      const retryRun = await harness.run({
         getRetryMode: () => (!copilotSDKMode && useContinueOnRetry ? "--continue" : "fresh run"),
-        runAttempt: async (attempt, observeStrategy) => {
+        runAttempt: async (attempt, observeStrategy, { safeOutputsByteOffset }) => {
           // Verified native retries resume the exact UUID; other CLI paths retain --continue.
           let currentArgs = !copilotSDKMode && attempt > 0 && useContinueOnRetry ? [...resolvedArgs, "--continue"] : resolvedArgs;
           if (!copilotSDKMode && durableSession?.id && attempt > 0 && !useContinueOnRetry) throw new Error("Durable Copilot continuation cannot restart a recorded session as a fresh conversation");
@@ -2139,7 +2096,6 @@ async function main() {
           // Redact --prompt / -p value from logs to avoid leaking prompt content
           const strategy = copilotSDKMode ? "restart" : attempt > 0 && useContinueOnRetry ? "resume" : selectedHarnessStrategy(currentArgs, "copilot");
           observeStrategy(strategy);
-          const safeOutputsByteOffset = getSafeOutputsByteOffset(safeOutputsPath);
           const safeArgs = currentArgs.map((arg, i) => (currentArgs[i - 1] === "--prompt" || currentArgs[i - 1] === "-p" ? "<redacted>" : arg));
           const modelObserver = !verifyModel ? { check: () => "" } : createCopilotModelObserver({ configuredModel: selectionConfiguredModel, resolvedModel: process.env.COPILOT_MODEL || "", sessionId, logger: log });
           let nativeTerminalRateLimitError = false;
@@ -2147,10 +2103,14 @@ async function main() {
           let retryAfterMs = null;
           let pendingStderrResponse = "";
           let pendingStderrHeaderLines = 0;
+          /** @param {number | null} delay */
+          const keepLongestRetryAfter = delay => {
+            if (delay !== null) retryAfterMs = Math.max(retryAfterMs ?? 0, delay);
+          };
           /** @param {string} line */
           const observeRetryAfter = line => {
             if (!hasCopilotResponseStatus(line)) return;
-            retryAfterMs = parseCopilotRetryAfterMs(line);
+            keepLongestRetryAfter(parseCopilotRetryAfterMs(line));
           };
           /** @param {string} line */
           const observeStderrRetryAfter = line => {
@@ -2165,7 +2125,7 @@ async function main() {
             if (hasCopilotResponseStatus(line)) {
               pendingStderrResponse = line;
               pendingStderrHeaderLines = 0;
-              retryAfterMs = parseCopilotRetryAfterMs(line);
+              keepLongestRetryAfter(parseCopilotRetryAfterMs(line));
               return;
             }
             if (!pendingStderrResponse) return;
@@ -2178,8 +2138,7 @@ async function main() {
             }
             pendingStderrResponse += `\n${line}`;
             pendingStderrHeaderLines += 1;
-            const delay = parseCopilotRetryAfterMs(pendingStderrResponse);
-            if (delay !== null) retryAfterMs = delay;
+            keepLongestRetryAfter(parseCopilotRetryAfterMs(pendingStderrResponse));
           };
           // Driver mode: run copilot_sdk_driver.cjs as a normal subprocess. The harness has
           // already started the sidecar; the driver only opens an SDK client connection.
@@ -2202,21 +2161,16 @@ async function main() {
                 durableSession.started(sessionId);
               }
               if (["error", "session.error", "turn.failed"].includes(event?.type)) {
-                if (honorRetryAfter) observeRetryAfter(line);
+                observeRetryAfter(line);
                 if (NATIVE_RATE_LIMIT_ERROR_PATTERN.test(JSON.stringify(event))) nativeTerminalRateLimitError = true;
               }
             },
             onStderrLine: line => {
-              if (honorRetryAfter) observeStderrRetryAfter(line);
+              observeStderrRetryAfter(line);
               if (NATIVE_RATE_LIMIT_ERROR_PATTERN.test(line)) nativeTerminalRateLimitError = true;
             },
             runtimeGuard: { shouldTerminate: () => ({ terminate: Boolean(modelObserver.check()), reason: "copilot_model_verification" }) },
-            postResultWatchdog: safeOutputsPath
-              ? {
-                  shouldArm: () => hasAttemptTerminalSafeOutput(safeOutputsPath, safeOutputsByteOffset, { logger: log }),
-                  inactivityTimeoutMs: POST_RESULT_WATCHDOG_IDLE_TIMEOUT_MS,
-                }
-              : undefined,
+            postResultWatchdog: harness.postResultWatchdog(safeOutputsByteOffset),
           });
           // The SDK driver observes its main session, records any substitution it refused and
           // exits with COPILOT_MODEL_VERIFICATION_EXIT_CODE on any verification failure.
@@ -2233,7 +2187,7 @@ async function main() {
           detectedCopilotErrors.agenticEngineTimeout ||= attemptDetections.agenticEngineTimeout;
           detectedCopilotErrors.modelNotSupportedError ||= attemptDetections.modelNotSupportedError;
           detectedCopilotErrors.http400ResponseError ||= attemptDetections.http400ResponseError;
-          return { ...result, safeOutputsByteOffset, strategy, nativeTerminalRateLimitError, retryAfterMs };
+          return { ...result, strategy, nativeTerminalRateLimitError, retryAfterMs };
         },
         handleFailure: async ({ attempt, result }) => {
           /**
@@ -2282,6 +2236,7 @@ async function main() {
           const isWorkflowToolPermissionDenied = hasWorkflowToolPermissionDenial(result.exitCode);
           const nonRetryableGuard = detectNonRetryableHarnessGuard(result.output);
           const isContentFiltered = isCopilotContentFilterError(result.output, copilotSDKMode ? primaryProviderName : process.env.GH_AW_LLM_PROVIDER || "github");
+          // No `result`: classifyCopilotFailure derives invocation_cap_exceeded from the guard and sets failureClasses below.
           await observeInvocationBudget({ guard: nonRetryableGuard, nativeTerminalRateLimitError: result.nativeTerminalRateLimitError === true, attempt, log });
           const isInvocationCapExceeded = nonRetryableGuard.maxRunsExceeded;
           const tokenCount = extractTokenCountFromOutput(result.output);
@@ -2407,7 +2362,7 @@ async function main() {
           // run means the agent completed its task (wrote safe-output) but produced no console
           // output before the watchdog terminated the idle process.
           const isExpectedLateExit = failureClass === "partial_execution" || failureClass === "long_run_exit" || (failureClass === "no_output" && result.watchdogFired) || (failureClass === "authentication_failed" && result.watchdogFired);
-          if (isExpectedLateExit && hasAttemptTerminalSafeOutput(safeOutputsPath, result.safeOutputsByteOffset ?? 0, { logger: log })) {
+          if (isExpectedLateExit && harness.attemptWroteTerminalSafeOutput(result)) {
             const lateExitReason = result.watchdogFired ? "post-result watchdog fired after terminal safe-output was emitted" : "partial execution after terminal safe-output was already produced";
             log(`attempt ${attempt + 1}: ${lateExitReason} — treating as success (late-activity exit suppressed)`);
             return { action: "stop", exitCode: 0 };
@@ -2634,14 +2589,8 @@ async function main() {
             return retryDecision();
           }
 
-          if (attempt >= maxRetries) {
-            log(`all ${maxRetries} retries exhausted — giving up (exitCode=${result.exitCode})`);
-          } else {
-            log(`attempt ${attempt + 1}: no output produced — not retrying` + ` (possible causes: binary not found, permission denied, auth failure, or silent startup crash)`);
-          }
-
           // Non-retryable error or retries exhausted — propagate exit code
-          return { action: "stop" };
+          return stopAfterUnrecoverableFailure({ attempt, maxRetries, exitCode: result.exitCode, log });
         },
       });
       lastExitCode = retryRun.exitCode;
@@ -2663,8 +2612,7 @@ async function main() {
   } finally {
     await stopCopilotSDKServer(copilotSDKServer, { logger: log });
   }
-  log(`done: exitCode=${lastExitCode} totalDuration=${formatDuration(Date.now() - driverStartTime)}`);
-  process.exit(lastExitCode);
+  process.exit(harness.finish(lastExitCode));
 }
 
 if (typeof module !== "undefined" && module.exports) {

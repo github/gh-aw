@@ -3,12 +3,15 @@
 package cli
 
 import (
+	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/github/gh-aw/pkg/gitutil"
+	"github.com/github/gh-aw/pkg/workflow/aw"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -103,11 +106,156 @@ func TestTopReviewWorkflowsHaveHeadAwarePRDataCacheKeys(t *testing.T) {
 	sentinelContent, err := os.ReadFile(sentinelWorkflowPath)
 	require.NoError(t, err, "Should read test-quality-sentinel workflow")
 	text := string(sentinelContent)
-	assert.Contains(t, text, "key: pr-test-prefetch-${{ github.event.pull_request.head.sha || github.event.issue.number }}", "Test Quality Sentinel should define a head-aware cache key")
+	assert.Contains(t, text, "key: pr-test-prefetch-v2-${{ github.event.pull_request.number || github.event.issue.number ||", "Test Quality Sentinel should isolate cache data by PR")
+	assert.Contains(t, text, "${{ github.event.pull_request.head.sha || 'unknown' }}-${{ github.run_id }}-${{ github.run_attempt }}", "Test Quality Sentinel should save refreshed cache revisions")
+	assert.Contains(t, text, "item_type == 'pull_request'", "Test Quality Sentinel should resolve centralized slash-command PR context")
+	assert.Contains(t, text, "pre-agent-steps:", "Test Quality Sentinel should validate evidence after cache restoration")
 	assert.Contains(t, text, "test-data-head-sha.txt", "Test Quality Sentinel should persist cache head SHA marker")
-	assert.Contains(t, text, "set -uo pipefail", "Test Quality Sentinel prefetch should not hard-fail under errexit before the agent can noop")
+	assert.Contains(t, text, "set -uo pipefail", "Test Quality Sentinel prefetch should not hard-fail under errexit before the agent can report_incomplete")
 	assert.Contains(t, text, "test-prefetch-unavailable.txt", "Test Quality Sentinel should write a fallback marker when prefetch data is unavailable")
-	assert.Contains(t, text, "Test Quality Sentinel skipped because pre-fetch PR data was unavailable", "Test Quality Sentinel prompt should instruct the agent to noop with the fallback reason")
+	assert.Contains(t, text, `{"report_incomplete": {"reason": "Test Quality Sentinel could not review tests because pre-fetch PR data was unavailable: <reason>"}}`, "Test Quality Sentinel prompt should instruct the agent to report_incomplete with the fallback reason")
+	assert.Contains(t, text, "immediately call `report_incomplete` (never `noop`)", "Test Quality Sentinel prompt should forbid noop when prefetch data is unavailable")
+}
+
+func TestSentinelPrefetchDiffEvidence(t *testing.T) {
+	t.Parallel()
+	repoRoot, err := gitutil.FindGitRoot()
+	require.NoError(t, err)
+	content, err := os.ReadFile(filepath.Join(repoRoot, ".github", "workflows", "test-quality-sentinel.md"))
+	require.NoError(t, err)
+	document, err := aw.Parse(string(content))
+	require.NoError(t, err)
+	step := document.Frontmatter["pre-agent-steps"].([]any)[0].(map[string]any)
+	script := step["run"].(string)
+	diff := "diff --git a/src/main.go b/src/main.go\n--- a/src/main.go\n+++ b/src/main.go\n@@ -1 +1 @@\n-old\n+non-test\n" +
+		"diff --git a/pkg/example_test.go b/pkg/example_test.go\n--- a/pkg/example_test.go\n+++ b/pkg/example_test.go\n@@ -1 +1 @@\n-old\n+go behavior\n" +
+		"diff --git a/scripts/a test.test.cjs b/scripts/a test.test.cjs\n--- a/scripts/a test.test.cjs\n+++ b/scripts/a test.test.cjs\n@@ -1 +1 @@\n-old\n+js behavior\n" +
+		"diff --git a/docs/readme.md b/docs/readme.md\n--- a/docs/readme.md\n+++ b/docs/readme.md\n@@ -1 +1 @@\n-old\n+documentation\n"
+	const section = "diff --git a/pkg/example_test.go b/pkg/example_test.go\n"
+	for _, tc := range []struct {
+		name, mode, diff, unavailable string
+		cache                         bool
+	}{
+		{name: "Go and JS sections with spaces", diff: diff},
+		{name: "quoted diff paths", diff: strings.Replace(diff, "a/scripts/a test.test.cjs b/scripts/a test.test.cjs", `"a/scripts/a test.test.cjs" "b/scripts/a test.test.cjs"`, 1)},
+		{name: "exact byte limit", diff: section + strings.Repeat("x", 40000-len(section)-1) + "\n"},
+		{name: "fetch error", mode: "fail-diff", diff: diff, unavailable: "unable to fetch test file diff"},
+		{name: "empty test diff", diff: "diff --git a/main.go b/main.go\n+code\n", unavailable: "test file diff is missing"},
+		{name: "over byte limit", diff: section + strings.Repeat("x", 40001-len(section)), unavailable: "exceeds the 40 KB"},
+		{name: "stale metadata", mode: "stale-metadata", diff: diff, unavailable: "PR metadata does not match"},
+		{name: "head changes during fetch", mode: "changed-head", diff: diff, unavailable: "PR head changed"},
+		{name: "local diff unavailable", mode: "fail-git", diff: diff, unavailable: "unable to compute PR diff statistics"},
+		{name: "slash-command head and base resolution", mode: "slash-command", diff: diff},
+		{name: "no tests clears restored evidence", mode: "no-tests", cache: true},
+		{name: "wrong PR cache is refreshed", diff: diff, cache: true},
+		{name: "fallback cache is refreshed", mode: "fallback-cache", diff: diff, cache: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			dir := t.TempDir()
+			agent := filepath.Join(dir, "agent")
+			bin := filepath.Join(dir, "bin")
+			require.NoError(t, os.MkdirAll(agent, 0o755))
+			require.NoError(t, os.MkdirAll(bin, 0o755))
+			require.NoError(t, os.WriteFile(filepath.Join(dir, "diff"), []byte(tc.diff), 0o600))
+			gh := `#!/bin/bash
+set -euo pipefail
+printf '%s\n' "$*" >> "$FIXTURE/calls"
+if [ "$1 $2" = "pr view" ]; then
+  if [ "$*" = "pr view 42 --json headRefOid --jq .headRefOid" ]; then
+    if [ "$MODE" = changed-head ]; then echo new-head; else echo head-42; fi
+  elif [ "$*" = "pr view 42 --json number,files,additions,deletions,baseRefName,baseRefOid,headRefName,headRefOid" ]; then
+    head=head-42
+    if [ "$MODE" = stale-metadata ]; then head=old-head; fi
+    printf '{"number":42,"headRefOid":"%s","baseRefOid":"base-42","files":[]}\n' "$head"
+  else
+    echo "Unexpected metadata arguments: $*" >&2; exit 1
+  fi
+elif [ "$*" = "pr diff 42 --name-only" ]; then
+  if [ "$MODE" != no-tests ]; then
+    printf '%s\n' pkg/example_test.go
+    if [ "$TEST_COUNT" = 2 ]; then printf '%s\n' 'scripts/a test.test.cjs'; fi
+  fi
+elif [ "$*" = "pr diff 42 --color=never" ]; then
+  if [ "$MODE" = fail-diff ]; then
+    printf 'diff --git a/pkg/example_test.go b/pkg/example_test.go\n+partial\n'
+    echo 'gh: fixture HTTP 503' >&2; exit 1
+  fi
+  cat "$FIXTURE/diff"
+else
+  echo "Unexpected gh arguments: $*" >&2; exit 1
+fi
+`
+			require.NoError(t, os.WriteFile(filepath.Join(bin, "gh"), []byte(gh), 0o700))
+			require.NoError(t, os.WriteFile(filepath.Join(bin, "git"), []byte(`#!/bin/bash
+if [ "$MODE" = fail-git ]; then echo 'fatal: fixture missing base history' >&2; exit 1; fi
+case "$*" in
+  "diff base-42...HEAD --numstat"|"diff base-42...HEAD --diff-filter=A --name-only") exit 0 ;;
+  *) echo "Unexpected git arguments: $*" >&2; exit 1 ;;
+esac
+`), 0o700))
+			if tc.cache {
+				for _, file := range []string{"test-diff.txt", "test-files.txt", "diff-numstat.txt", "go-new-test-funcs.txt"} {
+					require.NoError(t, os.WriteFile(filepath.Join(agent, file), []byte("stale evidence\n"), 0o600))
+				}
+				require.NoError(t, os.WriteFile(filepath.Join(agent, "test-data-head-sha.txt"), []byte("head-42\n"), 0o600))
+				number := 99
+				if tc.mode == "fallback-cache" {
+					number = 42
+					require.NoError(t, os.WriteFile(filepath.Join(agent, "test-prefetch-unavailable.txt"), []byte("previous failure"), 0o600))
+				}
+				require.NoError(t, os.WriteFile(filepath.Join(agent, "pr-meta.json"),
+					[]byte(fmt.Sprintf(`{"number":%d,"headRefOid":"head-42","files":[]}`, number)), 0o600))
+			}
+			command := exec.Command("bash", "-c", strings.ReplaceAll(script, "/tmp/gh-aw/agent", agent))
+			command.Env = []string{
+				"PATH=" + bin + string(os.PathListSeparator) + os.Getenv("PATH"),
+				"FIXTURE=" + dir, "MODE=" + tc.mode, "PR_NUMBER=42", "PR_HEAD_SHA=head-42",
+				"EXPR_GITHUB_EVENT_PULL_REQUEST_BASE_SHA=base-42", "TMPDIR=" + dir,
+			}
+			if strings.Contains(tc.diff, "+js behavior") {
+				command.Env = append(command.Env, "TEST_COUNT=2")
+			} else {
+				command.Env = append(command.Env, "TEST_COUNT=1")
+			}
+			if tc.mode == "slash-command" {
+				command.Env = append(command.Env, "PR_HEAD_SHA=", "EXPR_GITHUB_EVENT_PULL_REQUEST_BASE_SHA=")
+			}
+			output, err := command.CombinedOutput()
+			require.NoError(t, err, "%s", output)
+			read := func(file string) string {
+				t.Helper()
+				data, readErr := os.ReadFile(filepath.Join(agent, file))
+				require.NoError(t, readErr)
+				return string(data)
+			}
+			if tc.unavailable != "" {
+				assert.Contains(t, read("test-prefetch-unavailable.txt"), tc.unavailable)
+				assert.Empty(t, read("test-diff.txt"))
+				assert.NoFileExists(t, filepath.Join(agent, "test-data-head-sha.txt"))
+				if tc.mode == "fail-diff" {
+					assert.Contains(t, string(output), "gh: fixture HTTP 503", "Fetch stderr must remain visible")
+				}
+				return
+			}
+			assert.NoFileExists(t, filepath.Join(agent, "test-prefetch-unavailable.txt"))
+			assert.Equal(t, "head-42\n", read("test-data-head-sha.txt"))
+			actual := read("test-diff.txt")
+			if tc.mode == "no-tests" {
+				assert.Empty(t, actual)
+				assert.Empty(t, read("go-new-test-funcs.txt"))
+			} else if tc.name == "exact byte limit" {
+				assert.Len(t, actual, 40000)
+			} else {
+				assert.Contains(t, actual, "+go behavior")
+				assert.Contains(t, actual, "+js behavior")
+				assert.NotContains(t, actual, "non-test")
+				assert.NotContains(t, actual, "documentation")
+				assert.NotContains(t, actual, "stale evidence")
+				assert.Contains(t, string(output), "Pre-fetched 2 test files")
+			}
+		})
+	}
 }
 
 func TestImpeccableSkillsReviewerHasDeterministicSkillSelectionGuidance(t *testing.T) {
@@ -132,6 +280,27 @@ func TestImpeccableSkillsReviewerHasDeterministicSkillSelectionGuidance(t *testi
 	assert.Contains(t, text, "`mixed_unclear`")
 	assert.Contains(t, text, "Select 1–2 Impeccable modes", "Impeccable reviewer should limit selected modes")
 	assert.Contains(t, text, "If the Impeccable skill cannot be found or read, do not abort", "Impeccable reviewer should continue when skill discovery fails")
+}
+
+func TestMattPocockSkillsReviewerCompletionContract(t *testing.T) {
+	t.Parallel()
+	repoRoot, err := gitutil.FindGitRoot()
+	if err != nil {
+		t.Skipf("Skipping test: not in a git repository: %v", err)
+	}
+
+	content, err := os.ReadFile(filepath.Join(repoRoot, ".github", "workflows", "mattpocock-skills-reviewer.md"))
+	require.NoError(t, err)
+
+	prefix, _, found := strings.Cut(string(content), "<!-- instruction-prefix-end -->")
+	require.True(t, found, "Completion rules must be in the self-contained instruction prefix")
+	require.LessOrEqual(t, len(prefix)+len("<!-- instruction-prefix-end -->"), 7500)
+	assert.Contains(t, prefix, "A completed review is successful with `APPROVE`, `COMMENT`, or `REQUEST_CHANGES`.")
+	assert.Contains(t, prefix, "Author changes requested by the review are follow-up work, not an incomplete review.")
+	assert.Contains(t, prefix, "After queuing the required inline comments and exactly one overall review, finish normally; no extra terminal signal is needed.")
+	assert.Contains(t, prefix, "a successful CLI call is not proof of GitHub publication. Publication failures must remain failures.")
+	assert.Contains(t, prefix, "Use `report_incomplete` only when the review cannot be finished or required outputs cannot be queued: missing essential evidence, stale-head rejection, tool/authentication/timeout failures, or external blockers.")
+	assert.Contains(t, prefix, "Never call `report_incomplete` merely because findings require author fixes, tests fail in the reviewed PR, or the review requests changes.")
 }
 
 func assertSubstringsInOrder(t *testing.T, text string, substrings []string, msgAndArgs ...any) {

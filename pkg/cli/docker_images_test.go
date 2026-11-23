@@ -239,7 +239,7 @@ func TestScannerImageReleasePins(t *testing.T) {
 		name, got, want string
 	}{
 		{"syft", SyftImage, "anchore/syft:v1.57.2@sha256:e97e20b6e6d1699c60296b66ab337941724f9bd06ac279d893eda89601fc4b2a"},
-		{"grype", GrypeImage, "anchore/grype:v0.122.0@sha256:013e16ae96bd64108973e3e9fecec63f7ff276358d34c46c25d33e2aac96539f"},
+		{"grype", GrypeImage, "anchore/grype:v0.122.1@sha256:661583704a253c0448ed63998b5ea2cd9d5a76ee71eedc4aed439b8ce3e93a1c"},
 		{"grant", GrantImage, "anchore/grant:v0.8.0@sha256:b1496c1b94608176e6c515108dbc54851b8e6cda5cf7f97b4a4f2a4792e93714"},
 	} {
 		t.Run(tt.name, func(t *testing.T) {

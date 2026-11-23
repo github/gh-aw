@@ -33,6 +33,16 @@ describe("buildAwContext PR revision evidence", () => {
     expect(buildAwContext().comment_updated_at).toBe("2026-10-27T12:00:00Z");
     expect(buildAwContext().pr_head_sha).toBe("");
   });
+
+  it("does not relay an inbound continuation_run_id to dispatched children", () => {
+    global.context = {
+      repo: { owner: "owner", repo: "repo" },
+      runId: 200,
+      eventName: "workflow_dispatch",
+      payload: { inputs: { aw_context: JSON.stringify({ run_id: "100", continuation_run_id: "100" }) } },
+    };
+    expect(buildAwContext()).not.toHaveProperty("continuation_run_id");
+  });
 });
 
 describe("resolveItemContext", () => {

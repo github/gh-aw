@@ -157,7 +157,7 @@ runners, OIDC, Entra ID, Vault, GitHub Apps, marketplace, reusable workflows, cu
 - What about the identity plumbing, things like Entra ID and Vault OIDC, or custom jobs?
 - All reused, along with reusable workflow calls. Every piece of your Actions infrastructure keeps doing its job.
 
-### Turn Intent to Workflow {#turn-intent-to-workflow}
+### Turn Intent to Workflows {#turn-intent-to-workflow}
 
 #### Summary
 
@@ -237,7 +237,7 @@ Agent Persona Explorer, personas, evaluation, scoring, prefix probe, 8000 bytes,
 - What happens when an answer falls short?
 - It checks what fits in the first eight thousand bytes, files the gaps, and an agent fixes the guidance.
 
-### Turn Workflow to Value {#turn-workflow-to-value}
+### Turn Workflows to Value {#turn-workflow-to-value}
 
 #### Notes
 
@@ -258,7 +258,7 @@ ROI, metrics, outcomes, backlog burndown, delivery speed, value
 - So the measure is results on the board, not just how busy the robots look?
 - Exactly. Outcomes are what show the value of agentic workflows, and teams can track them over time.
 
-### Workflows → Process → Factory {#workflows-process-factory}
+### Build The Factory That Works For You {#workflows-process-factory}
 
 #### Notes
 
@@ -266,18 +266,20 @@ illustrative
 
 #### Summary
 
-Every factory is made of processes: a workflow goes from an issue to an agent to a pull request, sequencing workflows makes a process, and processes that feed each other, on any harness with developers at the gates, make a factory.
+Processes create factories: the Repo Factory recipe gives a repository five agentic roles that hand work along through issues and pull requests: several Researchers file issues, one Dispatcher admits them into a few shared weekday coding slots, and each slot runs its own pull request flow in which a Coder writes the change and several Reviewers and a Finisher loop on it for a bounded number of rounds before a maintainer decides, and a Dreamer turns measured outcomes into one proposed change at a time.
 
 #### Keywords
 
-workflows, process, factory, sequencing, composition, chaining, safe outputs, zoom out, blueprint, harnesses, engines, human in the loop
+Build The Factory That Works For You, A Factory of Factories, Workflows → Process → Factory, Turn Workflows into Factories, factory factory, processes create factories, Repo Factory, workflows, process, composition, blueprint, factory, roles, Researchers, Dispatcher, Reviewers, Finisher, Dreamer, Coder, coding agents, capacity, coding slots, concurrent pull requests, pull request flow, review loop, re-review, CI loop, iterate, weekdays, handoffs, recipe, bootstrap, Issue Monster, PR Sous Chef, maintainer gate
 
 #### Captions
 
-- Zooming out tonight: how single workflows add up to something much bigger.
-- Start small. One workflow takes an issue, hands it to an agent and comes back with a pull request.
-- And when you line several of those up, one after another?
-- Sequence them and you have a process. Let processes feed each other, on any harness, with developers at the gates, and you have a factory.
+- A factory of factories: processes create factories, and this one starts small: a Coder opens a pull request and iterates until CI passes.
+- Then it grows: several Reviewers and a Finisher loop on each pull request for at most two rounds.
+- A maintainer still decides every merge.
+- One Dispatcher starts those pull request flows, up to three at once, one per shared weekday coding slot.
+- Several Researchers feed the Dispatcher with scoped issues, never pull requests.
+- And a Dreamer watches the outcomes, then proposes one reversible change as a new issue, so the factory grows: more Researchers, more Reviewers.
 
 ### Security {#security}
 
@@ -1246,20 +1248,20 @@ trust, review, process, confidence, skim
 - So we keep improving the process until what, exactly?
 - Until a quick skim is enough. Build confidence into the process, and trust it.
 
-### Cost Optimization {#cost-optimization}
+### FinOps {#cost-optimization}
 
 #### Summary
 
-Band header (Cost Optimization): debug, spend less and route smarter.
+Band header (FinOps): more value, less tokens.
 
 #### Keywords
 
-cost, spend, tokens, budget, savings
+FinOps, cost optimization, cost, spend, tokens, budget, savings
 
 #### Captions
 
-- Coming up next, our Cost Optimization segment. Stay with us.
-- We will look at how to debug agents, spend less on them, and route smarter.
+- Coming up next, our FinOps segment. Stay with us.
+- We will look at how to get more value from agents while spending fewer tokens.
 - Keep your wallets handy, folks. Stay with us.
 
 ### Cost management {#cost-management}
@@ -1508,6 +1510,27 @@ skip, gates, noop, skip-if, pre-activation, cheap checks
 - The cheapest agent call is the one never made. Cheap deterministic gates, from triggers to noop short-circuits, run first.
 - And what if those cheap gates cannot decide on their own?
 - Only then, if necessary, an experimental model-based skip decision steps in. Cheap checks first, agents last.
+
+### It’s ok to say no(op) {#its-ok-to-noop}
+
+#### Notes
+
+illustrative
+
+#### Summary
+
+When there is nothing to do an agent calls the noop safe output instead of inventing work, and when a run goes wrong it reports the missing tool, missing data or incomplete run rather than faking a result. Measured runs of gh-aw itself, counted with gh aw audit, show how often each honest outcome occurs.
+
+#### Keywords
+
+noop, no-op, hallucination, report_missing_tool, report_missing_data, report_incomplete, missing tool, missing data, honest failure, diagnostics, gh aw audit, measured
+
+#### Captions
+
+- Tonight, a lesson in honesty: sometimes the best thing an agent can do is nothing at all.
+- When there is nothing to do, the agent calls the noop safe output instead of inventing an issue or a fake finding.
+- And when a run hits a wall, say a missing tool, missing data or a crashed server?
+- It reports exactly that, missing tool, missing data or incomplete, instead of faking a result. Silence never counts as a noop.
 
 ### Fuzzy schedules {#fuzzy-schedules}
 
@@ -2288,6 +2311,23 @@ create-pull-request, patch, signed commits, git push, safe output
 - The create-pull-request safe output turns local commits into a pull request through scanning and file policy checks.
 - And can reviewers trust the pushes that come out of it?
 - They are signed, and if a pull request cannot be created, it falls back to opening issues.
+
+### Choose your own workflow {#choose-your-own-workflow}
+
+#### Summary
+
+Choose your own workflow: a gamebook wizard walks through a goal, a pattern, a trigger, safe outputs, extras and an engine, and ends with a prompt that asks your agent to build the workflow.
+
+#### Keywords
+
+wizard, workflow wizard, gamebook, choose your own adventure, workflow generator, getting started, prompt, W key, quest, pattern, trigger, schedule, safe outputs, engine, agentic-workflows
+
+#### Captions
+
+- Where do you start with your first workflow?
+- Open the book. Pick a quest, the hour it wakes and what it may write.
+- Then choose the agent at your side.
+- The last page is a prompt. Paste it into your agent and it builds the workflow.
 
 ### GıtHub Agentic Workflows {#finale}
 

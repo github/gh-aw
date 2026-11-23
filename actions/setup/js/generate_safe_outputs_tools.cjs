@@ -45,12 +45,8 @@ const ADD_COMMENT_DISCUSSIONS_DISABLED_NOTE =
 const ADD_COMMENT_REPLY_SUPPORT_SENTENCE = "Supports reply_to_id for discussion threading.";
 const ADD_COMMENT_REPLY_SUPPORT_REGEX = /\s*Supports reply_to_id for discussion threading\./g;
 const ISSUE_INTENT_REQUIRED_SUFFIX = "INTENT REQUIRED: rationale (string, max 280 chars) and confidence (exactly one of: LOW, MEDIUM, HIGH) are required for each call.";
-const ISSUE_INTENT_OPTIONAL_SUFFIX =
-  "INTENT ENCOURAGED: Include rationale (string, max 280 chars) and confidence (exactly one of: LOW, MEDIUM, HIGH) with each call. These fields are optional but strongly encouraged — they improve transparency and should normally be included. Use suggest: true alongside rationale and confidence to route for human review.";
 const ADD_LABELS_STRICT_FIELD_DESC =
   'Labels to add. Each label must be an object with required fields: name (string), rationale (string, max 280 chars), and confidence (exactly one of: LOW, MEDIUM, HIGH). Plain string label names are not permitted. Example: [{"name": "bug", "rationale": "The report describes reproducible incorrect behavior.", "confidence": "HIGH"}]. Labels must exist in the repository.';
-const ADD_LABELS_OPTIONAL_FIELD_DESC =
-  'Labels to add. Prefer structured label objects: {"name": "bug", "rationale": "The report describes reproducible incorrect behavior.", "confidence": "HIGH", "suggest": true}. Plain strings are also accepted for compatibility. Include rationale (string, max 280 chars) and confidence (LOW, MEDIUM, or HIGH) to improve transparency; use suggest: true to route for human review. Labels must exist in the repository.';
 const ADD_LABELS_STRING_ONLY_FIELD_DESC = "Labels to add. Each label must be a plain string matching the configured item schema. Labels must exist in the repository.";
 
 const ASSIGN_TO_AGENT_EXAMPLE_USAGE_REGEX = /Example usage: assign_to_agent\([^)]+\)(?: or assign_to_agent\([^)]+\))?/g;
@@ -60,6 +56,9 @@ const RATIONALE_REQUIRED_DESC = "Required rationale for this change (max 280 cha
 const CONFIDENCE_REQUIRED_DESC = "Required confidence level for this change. Must be exactly one of: LOW, MEDIUM, HIGH.";
 const ISSUE_INTENT_TOOL_NAMES = new Set(["set_issue_type", "set_issue_field", "add_labels", "close_issue", "assign_to_user", "assign_to_agent"]);
 const ISSUE_INTENT_SCHEMA_FIELDS = ["rationale", "confidence", "suggest"];
+const ADD_LABELS_INTENT_METADATA_DESC_REGEX = /an object with name plus optional rationale\/confidence\/suggest intent metadata/;
+const ADD_LABELS_INTENT_RATIONALE_TOOL_DESC_REGEX = /\s*When a label object includes `rationale`, keep it at or under 280 characters; longer values are rejected\./g;
+const ISSUE_INTENT_IGNORED_FIELD_NOTE = "Ignored: issue-intent is not enabled for this safe output; this value is not persisted.";
 
 /**
  * Determine whether issue-intent guidance is enabled for a tool.
@@ -77,24 +76,10 @@ function isIssueIntentEnabledForTool(toolName, toolConfig) {
 }
 
 /**
- * Determine whether issue-intent schema fields should be omitted for a tool.
- * Default is optional (present, not required); explicit issue_intent: false omits them.
- *
- * @param {string} toolName
- * @param {unknown} toolConfig
- * @returns {boolean}
- */
-function isIssueIntentDisabledForTool(toolName, toolConfig) {
-  if (!ISSUE_INTENT_TOOL_NAMES.has(toolName)) {
-    return false;
-  }
-  return !!(toolConfig && typeof toolConfig === "object" && "issue_intent" in toolConfig && toolConfig.issue_intent === false);
-}
-
-/**
  * Remove issue-intent properties from a tool schema.
  * If this removes all required fields, the required array is omitted.
- * @param {{inputSchema?: {properties?: Record<string, unknown>, required?: string[]}}} tool
+ * For add_labels, also removes them from nested label item object schemas.
+ * @param {{name?: string, description?: string, inputSchema?: {properties?: Record<string, unknown>, required?: string[]}}} tool
  */
 function stripIssueIntentSchemaFields(tool) {
   if (!tool.inputSchema || !tool.inputSchema.properties) {
@@ -111,21 +96,79 @@ function stripIssueIntentSchemaFields(tool) {
       delete tool.inputSchema.required;
     }
   }
+  if (tool.name === "add_labels" && typeof tool.description === "string") {
+    tool.description = tool.description.replace(ADD_LABELS_INTENT_RATIONALE_TOOL_DESC_REGEX, "");
+  }
+  /** @type {any} */
+  const labelsSchema = tool.name === "add_labels" ? tool.inputSchema.properties.labels : undefined;
+  if (labelsSchema && typeof labelsSchema === "object") {
+    stripIssueIntentLabelItemFields(labelsSchema.items);
+    const description = labelsSchema.description;
+    if (typeof description === "string") {
+      labelsSchema.description = description.replace(ADD_LABELS_INTENT_METADATA_DESC_REGEX, "an object with a name field");
+    }
+  }
 }
 
 /**
- * Determine whether issue-intent guidance is omitted (neither enabled nor disabled) for a tool.
- * This is the default state: intent fields are present and optional, but no guidance suffix is added yet.
- *
- * @param {string} toolName
- * @param {unknown} toolConfig
- * @returns {boolean}
+ * Remove issue-intent properties from add_labels label item object schemas.
+ * Handles a plain object item schema as well as object branches of oneOf/anyOf.
+ * The name field and plain-string alternatives are preserved.
+ * @param {unknown} itemSchema
  */
-function isIssueIntentOmittedForTool(toolName, toolConfig) {
-  if (!ISSUE_INTENT_TOOL_NAMES.has(toolName)) {
-    return false;
+function stripIssueIntentLabelItemFields(itemSchema) {
+  if (!itemSchema || typeof itemSchema !== "object" || Array.isArray(itemSchema)) {
+    return;
   }
-  return !isIssueIntentEnabledForTool(toolName, toolConfig) && !isIssueIntentDisabledForTool(toolName, toolConfig);
+  /** @type {Record<string, any>} */
+  const schema = itemSchema;
+  for (const key of ["oneOf", "anyOf"]) {
+    if (Array.isArray(schema[key])) {
+      for (const branch of schema[key]) {
+        stripIssueIntentLabelItemFields(branch);
+      }
+    }
+  }
+  if (schema.properties && typeof schema.properties === "object") {
+    for (const field of ISSUE_INTENT_SCHEMA_FIELDS) {
+      delete schema.properties[field];
+    }
+  }
+  if (Array.isArray(schema.required)) {
+    schema.required = schema.required.filter(/** @param {unknown} f */ f => typeof f !== "string" || !ISSUE_INTENT_SCHEMA_FIELDS.includes(f));
+  }
+}
+
+/**
+ * Return a copy of an author-provided add_labels item schema whose issue-intent properties
+ * are annotated as ignored. Author-declared properties are kept so required lists stay valid,
+ * but descriptions are replaced so they cannot promise behavior (such as a review gate)
+ * that the handler does not apply without issue-intent.
+ * Handles a plain object item schema as well as object branches of oneOf/anyOf.
+ * @param {unknown} itemSchema
+ * @returns {unknown}
+ */
+function annotateIgnoredIssueIntentLabelItemFields(itemSchema) {
+  if (!itemSchema || typeof itemSchema !== "object" || Array.isArray(itemSchema)) {
+    return itemSchema;
+  }
+  const schema = /** @type {Record<string, any>} */ { ...itemSchema };
+  for (const key of ["oneOf", "anyOf"]) {
+    if (Array.isArray(schema[key])) {
+      schema[key] = schema[key].map(annotateIgnoredIssueIntentLabelItemFields);
+    }
+  }
+  if (schema.properties && typeof schema.properties === "object" && !Array.isArray(schema.properties)) {
+    const properties = { ...schema.properties };
+    for (const field of ISSUE_INTENT_SCHEMA_FIELDS) {
+      const property = properties[field];
+      if (property && typeof property === "object" && !Array.isArray(property)) {
+        properties[field] = { ...property, description: ISSUE_INTENT_IGNORED_FIELD_NOTE };
+      }
+    }
+    schema.properties = properties;
+  }
+  return schema;
 }
 
 /**
@@ -417,18 +460,9 @@ async function main() {
         if (tool.name === "assign_to_agent") {
           enhancedTool.description = enhancedTool.description.replace(ASSIGN_TO_AGENT_EXAMPLE_USAGE_REGEX, ASSIGN_TO_AGENT_STRICT_EXAMPLE_USAGE);
         }
-      } else if (isIssueIntentDisabledForTool(tool.name, config[tool.name])) {
+      } else if (ISSUE_INTENT_TOOL_NAMES.has(tool.name)) {
+        // issue-intent is experimental and opt-in: omit intent fields unless issue_intent: true.
         stripIssueIntentSchemaFields(enhancedTool);
-      } else if (isIssueIntentOmittedForTool(tool.name, config[tool.name])) {
-        enhancedTool.description = `${enhancedTool.description || ""} ${ISSUE_INTENT_OPTIONAL_SUFFIX}`.trim();
-        // For add_labels omitted mode, update the labels description to prefer structured objects,
-        // but only when the source schema actually supports plain strings via items.oneOf.
-        if (tool.name === "add_labels") {
-          const labelsSchema = enhancedTool.inputSchema?.properties?.labels;
-          if (labelsSchema && Array.isArray(labelsSchema.items?.oneOf)) {
-            labelsSchema.description = ADD_LABELS_OPTIONAL_FIELD_DESC;
-          }
-        }
       }
 
       if (tool.name === "add_comment") {
@@ -483,20 +517,15 @@ async function main() {
         for (const [propertyName, itemSchema] of Object.entries(itemSchemas)) {
           const propertySchema = enhancedTool.inputSchema?.properties?.[propertyName];
           if (propertySchema?.type === "array") {
-            propertySchema.items = itemSchema;
+            const intentEnabled = isIssueIntentEnabledForTool(tool.name, config[tool.name]);
+            propertySchema.items = tool.name === "add_labels" && propertyName === "labels" && !intentEnabled ? annotateIgnoredIssueIntentLabelItemFields(itemSchema) : itemSchema;
             if (tool.name === "add_labels" && propertyName === "labels") {
               /** @type {{type?: unknown, properties?: Record<string, unknown>, required?: unknown}} */
               const configuredItemSchema = itemSchema && typeof itemSchema === "object" ? itemSchema : {};
               if (configuredItemSchema.type === "object") {
-                propertySchema.description = isIssueIntentEnabledForTool(tool.name, config[tool.name]) ? ADD_LABELS_STRICT_FIELD_DESC : buildAddLabelsObjectOnlyFieldDesc(configuredItemSchema);
-                const itemProperties = configuredItemSchema.properties && typeof configuredItemSchema.properties === "object" ? configuredItemSchema.properties : {};
-                const required = Array.isArray(configuredItemSchema.required) ? configuredItemSchema.required : [];
-                if (!isIssueIntentEnabledForTool(tool.name, config[tool.name]) && (!("rationale" in itemProperties) || !("confidence" in itemProperties) || required.includes("rationale") || required.includes("confidence"))) {
-                  enhancedTool.description = (enhancedTool.description || "").replace(ISSUE_INTENT_OPTIONAL_SUFFIX, "").trim();
-                }
+                propertySchema.description = intentEnabled ? ADD_LABELS_STRICT_FIELD_DESC : buildAddLabelsObjectOnlyFieldDesc(configuredItemSchema);
               } else if (configuredItemSchema.type === "string") {
                 propertySchema.description = ADD_LABELS_STRING_ONLY_FIELD_DESC;
-                enhancedTool.description = (enhancedTool.description || "").replace(ISSUE_INTENT_OPTIONAL_SUFFIX, "").trim();
               }
             }
           }
