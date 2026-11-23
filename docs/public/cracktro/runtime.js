@@ -85,8 +85,8 @@
   body.light .dots button { background: #1f232833; }
   body.light .dots button.hd { background: transparent; box-shadow: inset 0 0 0 2px #1f232859; }
   body.light .dots button.on { background: #1f2328; box-shadow: none; }
-  body.light .snd, body.light .fzb, body.light .smb, body.light .ntb, body.light .ksb, body.light .ccb, body.light .vcb, body.light .wzb, body.light .arrows button { border-color: #9ea7b3; background: #e6eaefcc; color: #424a53; }
-  body.light .snd:hover, body.light .fzb:hover, body.light .smb:hover, body.light .ntb:hover, body.light .ksb:hover, body.light .ccb:hover, body.light .vcb:hover, body.light .wzb:hover, body.light .arrows button:hover { color: #1f2328; border-color: #818b98; }
+  body.light .snd, body.light .fzb, body.light .smb, body.light .ntb, body.light .ksb, body.light .ccb, body.light .vcb, body.light .wzb, body.light .shb, body.light .arrows button { border-color: #9ea7b3; background: #e6eaefcc; color: #424a53; }
+  body.light .snd:hover, body.light .fzb:hover, body.light .smb:hover, body.light .ntb:hover, body.light .ksb:hover, body.light .ccb:hover, body.light .vcb:hover, body.light .wzb:hover, body.light .shb:hover, body.light .arrows button:hover { color: #1f2328; border-color: #818b98; }
   /* research prototype badge on every gh cao slide (top right, clear of the chrome) */
   .proto { position: absolute; right: 110px; top: 76px; display: flex; align-items: center; gap: 14px; padding: 12px 22px; border: 2px dashed #e3b341; border-radius: 999px; background: #0d1117cc; font: 600 20px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: #e3b341; z-index: 5; }
   .proto i { width: 12px; height: 12px; border-radius: 50%; background: #e3b341; box-shadow: 0 0 12px #e3b341; animation: proto-blink 1.6s ease-in-out infinite; }
@@ -112,7 +112,7 @@
   .dots button.sub { width: 4px; height: 6px; margin: 1px -1px 0; border-radius: 2px; background: #ffffff26; }
   .dots button.sub.on { width: 12px; background: #f0f6fc; }
   /* --- example column button (dock): only on a column's head and its examples --- */
-  .vnb { position: fixed; right: calc(264px + var(--sr)); bottom: calc(10px + var(--sb)); height: 34px; padding: 0 10px 0 6px; display: none; align-items: center; gap: 4px; border: 1px solid #3d444d; border-radius: 8px;
+  .vnb { position: fixed; right: calc(304px + var(--sr)); bottom: calc(10px + var(--sb)); height: 34px; padding: 0 10px 0 6px; display: none; align-items: center; gap: 4px; border: 1px solid #3d444d; border-radius: 8px;
     background: #151b23cc; color: #9198a1; font: 600 13px/1 var(--mono); cursor: pointer; z-index: 5; transition: color .2s, border-color .2s, background .2s; touch-action: manipulation; }
   .vnb.on { display: flex; }
   .vnb:hover { color: #f0f6fc; border-color: #9198a1; }
@@ -169,27 +169,29 @@
   body.compact-nav .arrows { display: flex; }
   /* compact dock: translucent after a few idle seconds (body.nav-idle); any touch, key or focus restores it.
      Idle fading preserves hit targets; keyboard focus keeps its control fully readable. */
-  body.compact-nav :is(.arrows, .vnb, .snd, .fzb, .smb, .ntb, .ksb, .wzb, .tourp) { transition: opacity .4s, color .2s, border-color .2s, background .2s,
+  body.compact-nav :is(.arrows, .vnb, .snd, .fzb, .smb, .ntb, .ksb, .wzb, .shb, .tourp) { transition: opacity .4s, color .2s, border-color .2s, background .2s,
     transform .45s cubic-bezier(.2,.9,.2,1), bottom .45s cubic-bezier(.2,.9,.2,1); }
-  body.compact-nav.nav-idle :is(.arrows, .vnb, .snd, .fzb, .smb, .ntb, .ksb, .wzb, .tourp) { opacity: .4; }
-  body.compact-nav.nav-idle :is(.arrows:has(:focus-visible), .vnb:focus-visible, .snd:focus-visible, .fzb:focus-visible, .smb:focus-visible, .ntb:focus-visible, .ksb:focus-visible, .wzb:focus-visible, .tourp:has(:focus-visible)) { opacity: 1; }
-  @media (prefers-reduced-motion: reduce) { body.compact-nav :is(.arrows, .vnb, .snd, .fzb, .smb, .ntb, .ksb, .wzb, .tourp) { transition: none; } }
-  .snd, .fzb, .smb, .ntb, .ksb, .ccb, .vcb, .wzb { position: fixed; right: calc(24px + var(--sr)); bottom: calc(10px + var(--sb)); width: 34px; height: 34px; padding: 6px; border: 1px solid #3d444d; border-radius: 8px;
+  body.compact-nav.nav-idle :is(.arrows, .vnb, .snd, .fzb, .smb, .ntb, .ksb, .wzb, .shb, .tourp) { opacity: .4; }
+  body.compact-nav.nav-idle :is(.arrows:has(:focus-visible), .vnb:focus-visible, .snd:focus-visible, .fzb:focus-visible, .smb:focus-visible, .ntb:focus-visible, .ksb:focus-visible, .wzb:focus-visible, .shb:focus-visible, .tourp:has(:focus-visible)) { opacity: 1; }
+  @media (prefers-reduced-motion: reduce) { body.compact-nav :is(.arrows, .vnb, .snd, .fzb, .smb, .ntb, .ksb, .wzb, .shb, .tourp) { transition: none; } }
+  .snd, .fzb, .smb, .ntb, .ksb, .ccb, .vcb, .wzb, .shb { position: fixed; right: calc(24px + var(--sr)); bottom: calc(10px + var(--sb)); width: 34px; height: 34px; padding: 6px; border: 1px solid #3d444d; border-radius: 8px;
     background: #151b23cc; color: #9198a1; cursor: pointer; z-index: 5; transition: color .2s, border-color .2s, background .2s; }
-  .snd:hover, .fzb:hover, .smb:hover, .ntb:hover, .ksb:hover, .ccb:hover, .vcb:hover, .wzb:hover { color: #f0f6fc; border-color: #9198a1; }
-  .snd svg, .fzb svg, .smb svg, .ntb svg, .ksb svg, .ccb svg, .vcb svg, .wzb svg { width: 100%; height: 100%; display: block; }
+  .snd:hover, .fzb:hover, .smb:hover, .ntb:hover, .ksb:hover, .ccb:hover, .vcb:hover, .wzb:hover, .shb:hover { color: #f0f6fc; border-color: #9198a1; }
+  .snd svg, .fzb svg, .smb svg, .ntb svg, .ksb svg, .ccb svg, .vcb svg, .wzb svg, .shb svg { width: 100%; height: 100%; display: block; }
   .fzb { right: calc(64px + var(--sr)); }
   .smb { right: calc(104px + var(--sr)); }
   .ntb { right: calc(144px + var(--sr)); }
   .ksb { right: calc(184px + var(--sr)); }
+  /* share (S): a dialog that builds a deep link with kiosk, sound, tour, CC and voice options */
+  .shb { right: calc(224px + var(--sr)); }
   /* workflow wizard (W): only when create() receives config.wizard */
-  .wzb { right: calc(224px + var(--sr)); }
+  .wzb { right: calc(264px + var(--sr)); }
   .wzb:hover { color: #e3b341; border-color: #d29922; }
   .ntb[aria-pressed="true"] { color: #f0f6fc; border-color: currentColor; box-shadow: inset 0 -3px currentColor; }
   body.light .ntb[aria-pressed="true"] { color: #1f2328; }
   /* kiosk mode: slides rotate on their own; the chrome hides except the stop button and the sound toggle beside it,
      which fade (with the cursor) when idle */
-  body.kiosk :is(.dots, .arrows, .vnb, .fzb, .smb, .ntb, .wzb, .tourp, .notes, .progress) { display: none !important; }
+  body.kiosk :is(.dots, .arrows, .vnb, .fzb, .smb, .ntb, .wzb, .shb, .tourp, .notes, .progress) { display: none !important; }
   body.kiosk :is(.ksb, .snd) { opacity: 1; color: #f0f6fc; border-color: #f0f6fc; transition: opacity .4s, color .2s, border-color .2s; }
   body.kiosk .snd { right: calc(144px + var(--sr)); }
   body.kiosk.nav-idle { cursor: none; }
@@ -235,6 +237,7 @@
     /* the tools row is full on a phone: the column button keeps its old slot and the wizard joins the arrows' row, at the left */
     .vnb { right: calc(224px + var(--sr)); }
     .wzb { right: auto; left: calc(12px + var(--sl)); }
+    .shb { right: auto; left: calc(52px + var(--sl)); }
     /* Translate rather than switch anchors so the arrows can slide beneath the toolbar. */
     .arrows { transform: translateX(calc(100vw - 100% - 36px - var(--sl) - var(--sr))); }
     .notes { bottom: calc(94px + var(--sb)); padding: 14px 16px; font-size: 16px; line-height: 1.5; }
@@ -354,6 +357,52 @@
   body.light .smp-tb span { color: #59636e; }
   body.light .smp-d { background: #f6f8fa; border-color: #9ea7b3; }
   body.light .smp-dc { color: #1f2328; }
+  /* --- share dialog (S): options become hash parameters of a deep link that starts the deck --- */
+  .shr { width: min(600px, calc(100% - 32px)); max-height: calc(100% - 32px); padding: 0; border: 1px solid #3d444d; border-radius: 14px; background: #0d1117; color: #f0f6fc;
+    font-family: "Mona Sans", -apple-system, "Segoe UI", sans-serif; overflow-y: auto; }
+  .shr::backdrop { background: #0d1117b3; -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+  .shr-b { display: flex; flex-direction: column; gap: 14px; padding: 18px 20px 20px; }
+  .shr-bar { display: flex; align-items: center; gap: 12px; }
+  .shr-h { flex: 1; margin: 0; font: 600 14px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: #9198a1; }
+  .shr-g { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 8px; }
+  .shr-o { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid #3d444d; border-left: 3px solid #3d444d; border-radius: 8px; background: #151b23; cursor: pointer;
+    font: 600 15px/1.3 "Mona Sans", sans-serif; }
+  .shr-o input { flex: none; width: 16px; height: 16px; margin: 0; accent-color: #4493f8; cursor: inherit; }
+  .shr-o small { display: block; margin-top: 3px; font: 500 11px/1.35 var(--mono); color: #9198a1; }
+  .shr-o:has(input:checked) { border-color: #4493f8; background: #4493f81f; }
+  .shr-o:has(input:disabled) { opacity: .45; cursor: not-allowed; }
+  .shr-o:has(:focus-visible) { outline: 3px solid #ab7df8; outline-offset: 2px; }
+  .shr-tl { display: flex; align-items: center; gap: 10px; font: 600 13px/1 var(--mono); color: #9198a1; letter-spacing: .04em; }
+  .shr-sel, .shr-in, .shr-db { font: 600 13px/1 var(--mono); color: #c9d1d9; background: #151b23; border: 1px solid #3d444d; border-radius: 8px; padding: 9px 12px; }
+  .shr-sel { flex: 1; min-width: 0; cursor: pointer; }
+  .shr-l { display: flex; flex-wrap: wrap; gap: 8px; }
+  .shr-in { flex: 1; min-width: 200px; font-weight: 500; color: #9198a1; }
+  .shr-db { cursor: pointer; }
+  .shr-db:hover { color: #f0f6fc; border-color: #9198a1; }
+  .shr-db.go { color: #0d1117; background: #4493f8; border-color: #4493f8; }
+  .shr :is(.shr-sel, .shr-in, .shr-db):focus-visible { outline: 3px solid #ab7df8; outline-offset: 2px; }
+  body.light .shr { background: #f6f8fa; color: #1f2328; border-color: #9ea7b3; }
+  body.light :is(.shr-o, .shr-sel, .shr-in, .shr-db) { background: #ffffff; border-color: #9ea7b3; color: #1f2328; }
+  body.light .shr-o:has(input:checked) { border-color: #0969da; background: #0969da14; }
+  body.light :is(.shr-h, .shr-tl, .shr-o small, .shr-in) { color: #59636e; }
+  body.light .shr-db.go { color: #ffffff; background: #0969da; border-color: #0969da; }
+  /* --- kiosk lobby: a shared kiosk link waits for one click, the gesture that may start sound, fullscreen and the animations --- */
+  .lby { position: fixed; inset: 0; z-index: 30; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 22px; padding: 24px;
+    background: #0d1117e6; -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); color: #f0f6fc; text-align: center; font-family: "Mona Sans", -apple-system, "Segoe UI", sans-serif; }
+  body.lobby :is(.dots, .arrows, .vnb, .snd, .fzb, .smb, .ntb, .ksb, .ccb, .vcb, .wzb, .shb, .tourp, .notes, .progress) { display: none !important; }
+  body.lobby .stage * { animation-play-state: paused !important; }
+  .lby-k { margin: 0; font: 600 14px/1 var(--mono); letter-spacing: .16em; text-transform: uppercase; color: #79c0ff; }
+  .lby-t { margin: 0; max-width: 18ch; font-size: clamp(36px, 6vw, 84px); line-height: 1.02; font-variation-settings: "wght" 700, "wdth" 100; }
+  .lby-s { margin: 0; font: 500 15px/1.5 var(--mono); color: #9198a1; }
+  .lby-go { display: flex; align-items: center; gap: 14px; margin-top: 8px; padding: 20px 40px 20px 32px; border: 0; border-radius: 999px; background: #f0f6fc; color: #0d1117; cursor: pointer;
+    font: 700 clamp(22px, 2.4vw, 30px)/1 "Mona Sans", sans-serif; animation: lby-p 2s ease-out infinite; touch-action: manipulation; }
+  .lby-go svg { width: 1.1em; height: 1.1em; display: block; }
+  .lby-go:hover { background: #ffffff; }
+  .lby-go:focus-visible { outline: 3px solid #ab7df8; outline-offset: 5px; }
+  @keyframes lby-p { from { box-shadow: 0 0 0 0 #4493f899; } to { box-shadow: 0 0 0 30px #4493f800; } }
+  @media (prefers-reduced-motion: reduce) { .lby-go { animation: none; } }
+  .lby-x { padding: 6px; border: 0; background: none; color: #9198a1; font: 500 13px/1 var(--mono); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+  .lby-x:hover { color: #f0f6fc; }
   /* keyboard manual (bottom of the map): game-style controls screen, a full keyboard then a card per group; keycaps are inert kbd */
   .smp-kg { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; align-items: start; }
   .smp-kbd { grid-column: 1 / -1; padding: 14px 12px 10px; border: 1px solid #3d444d; border-radius: 8px;
@@ -816,6 +865,22 @@
       wizard.open({ sound: sfx });
     }
     for (const t of ["touchstart", "touchend"]) wzBtn?.addEventListener(t, e => e.stopPropagation(), { passive: true });
+    // share (S): a dialog that builds a deep link (see ---------- share ----------)
+    const shBtn = h("button", {
+      class: "shb",
+      type: "button",
+      "aria-label": "Share a link (S)",
+      "aria-keyshortcuts": "S",
+      "aria-haspopup": "dialog",
+      title: "Share a link: kiosk, sound, tour, CC, voice (S)",
+      onclick: e => {
+        e.stopPropagation();
+        openShare();
+      },
+    });
+    shBtn.innerHTML =
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 14V3M7.5 7.5 12 3l4.5 4.5"/><path d="M8 10H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2h-2"/></svg>';
+    for (const t of ["touchstart", "touchend"]) shBtn.addEventListener(t, e => e.stopPropagation(), { passive: true });
     // closed captioning (C, CC): kiosk mode as a captioned news TV; its dock button shows only while kiosk mode runs
     const ccb = h("button", {
       class: "ccb",
@@ -900,7 +965,7 @@
     // voice is opt-in; once turned on it holds for later kiosk runs until it is turned off
     let voiceOn = false,
       voicePref = false;
-    document.body.append(canvas, wash, gridc, stage, ccEl, progress, dots, arrows, vnb, ksb, ccb, vcb, ...(wzBtn ? [wzBtn] : []), notesBtn, smBtn, fzBtn, ...(config.sound ? [snd] : []), notes, tourP);
+    document.body.append(canvas, wash, gridc, stage, ccEl, progress, dots, arrows, vnb, ksb, ccb, vcb, shBtn, ...(wzBtn ? [wzBtn] : []), notesBtn, smBtn, fzBtn, ...(config.sound ? [snd] : []), notes, tourP);
     // the pressed state (sound on) and the struck-out icon (.off) always follow the sound service
     const paintSound = () => {
       snd.classList.toggle("off", !!sfx.muted);
@@ -908,12 +973,12 @@
     };
     paintSound();
 
-    // Dot map: left offset + the longest band of 8px dots with 5px gaps (example dots are 4px with 3px gaps) + 16px for the wide active dot; dock buttons need ~230px on the right (~270px with the wizard).
+    // Dot map: left offset + the longest band of 8px dots with 5px gaps (example dots are 4px with 3px gaps) + 16px for the wide active dot; dock buttons need ~270px on the right (~310px with the wizard).
     const dotsWidth = 28 + Math.max(...rows.map(r => r.items.reduce((w, s) => w + (s.parent ? 7 : 13), r.header ? 13 : 0))) + 16 + 400;
     const fit = () => {
       const s = Math.min(innerWidth / W, innerHeight / H);
       ccF.style.transform = stage.style.transform = `scale(${s}) translate(-50%, -50%)`;
-      document.body.classList.toggle("compact-nav", dotsWidth > innerWidth - (wzBtn ? 270 : 230));
+      document.body.classList.toggle("compact-nav", dotsWidth > innerWidth - (wzBtn ? 310 : 270));
     };
     addEventListener("resize", fit);
     fit();
@@ -1287,7 +1352,15 @@
     addEventListener("keydown", e => {
       /** @type {any} */
       const target = e.target;
-      if (fz.open || smp.open || wizOpen()) return; // the search, map and wizard dialogs handle their own keys
+      if (lobby) {
+        // the kiosk lobby waits for its Start button (Enter or Space on it); Escape browses the deck instead
+        if (e.key === "Escape") {
+          e.preventDefault();
+          closeLobby();
+        }
+        return;
+      }
+      if (fz.open || smp.open || shr.open || wizOpen()) return; // the search, map, share and wizard dialogs handle their own keys
       if (target.closest?.(".notes") && !["n", "N", "Escape"].includes(e.key)) return;
       if ((e.metaKey || e.ctrlKey) && !e.altKey && (e.key === "k" || e.key === "K")) {
         e.preventDefault();
@@ -1361,13 +1434,17 @@
         openWizard();
       }
       else if ((e.key === "x" || e.key === "X") && view) setView(null);
+      else if ((e.key === "s" || e.key === "S") && !e.repeat && !target.closest?.("input, textarea, select, [contenteditable]")) {
+        e.preventDefault();
+        openShare();
+      }
     });
     // Clicks never move between slides (only keys, the dock, swipes and jump targets do); a click on a
     // jump target (band-header tile) opens its slide. The listener sits on the stage so iOS Safari dispatches it.
     stage.addEventListener("click", e => {
       /** @type {any} */
       const tile = e.target.closest?.("[data-go]");
-      if (tile && !fz.open && !smp.open) go(+tile.dataset.go);
+      if (tile && !fz.open && !smp.open && !shr.open && !lobby) go(+tile.dataset.go);
     });
     // Touch: a horizontal swipe steps along the main line, a vertical one walks the column or switches bands, and a
     // tap on a jump target opens it on touchend (cancelling the synthetic click), so taps work even when the browser
@@ -1376,7 +1453,7 @@
       ty = null,
       pinch0 = null,
       ownsPinch = false;
-    const touchIgnored = t => fz.open || smp.open || wizOpen() || !!t.closest?.(".notes, dialog, input, textarea, select, [contenteditable]");
+    const touchIgnored = t => fz.open || smp.open || shr.open || lobby || wizOpen() || !!t.closest?.(".notes, dialog, input, textarea, select, [contenteditable]");
     const pageZoomed = () => (window.visualViewport?.scale ?? 1) > 1.01;
     const spread = ts => Math.hypot(ts[0].clientX - ts[1].clientX, ts[0].clientY - ts[1].clientY);
     const webkitGestures = "GestureEvent" in window;
@@ -1437,7 +1514,7 @@
     addEventListener(
       "touchend",
       e => {
-        if (tx == null || e.touches.length || fz.open || smp.open || wizOpen()) return (tx = ty = null);
+        if (tx == null || e.touches.length || fz.open || smp.open || shr.open || lobby || wizOpen()) return (tx = ty = null);
         const t = e.changedTouches[0],
           dx = t.clientX - tx,
           dy = t.clientY - ty;
@@ -1455,17 +1532,20 @@
     );
     // #id selects a slide; a legacy numeric #N still opens the Nth slide and is rewritten to its #id.
     // &tour=<name> or &view=<payload> after it starts (or keeps) a tour; a slide outside the tour opens its first slide.
+    // The share dialog's launch options (&kiosk, &sound, &cc, &voice = 1 or 0) apply once and leave the hash.
+    const LAUNCH = ["kiosk", "sound", "cc", "voice"];
     const parseHash = () => {
       const [head, ...rest] = location.hash.slice(1).split("&"),
         q = {};
       for (const p of head.includes("=") ? [head, ...rest] : rest) {
         const k = p.indexOf("="),
           key = p.slice(0, k);
-        if (k < 0 || (key !== "tour" && key !== "view")) continue;
+        if (k < 0 || (key !== "tour" && key !== "view" && !LAUNCH.includes(key))) continue;
         try {
           const value = decodeURIComponent(p.slice(k + 1));
           if (key === "tour") q.tour = value;
-          else q.view = value;
+          else if (key === "view") q.view = value;
+          else (q.launch ||= {})[key] = !/^(0|off|false|no)$/i.test(value);
         } catch {}
       }
       let id = head.includes("=") ? "" : head;
@@ -1482,6 +1562,7 @@
       if (n < 0 || !vis(n)) n = firstVis();
       if (n === cur) history.replaceState(null, "", hashFor(n));
       else go(n);
+      if (q.launch) launch(q.launch);
     };
     addEventListener("hashchange", followHash);
     // Start, switch or (with null) leave a tour; dots, band-header tiles and the dock show only its slides.
@@ -1791,7 +1872,7 @@
       ],
       [
         "Show",
-        [[["N"], "Speaker notes"], [["F"], "Fullscreen"], [["K"], "Kiosk: auto-advance (Esc stops)"], [["C"], "Closed captioning (CC) in kiosk mode"], [["V"], "Voice: read captions aloud in kiosk mode"], ...SOUND_KEYS, [["X"], "Leave the tour or view"], [["Esc"], "Close notes or dialogs"]],
+        [[["N"], "Speaker notes"], [["F"], "Fullscreen"], [["K"], "Kiosk: auto-advance (Esc stops)"], [["C"], "Closed captioning (CC) in kiosk mode"], [["V"], "Voice: read captions aloud in kiosk mode"], ...SOUND_KEYS, [["S"], "Share a link: kiosk, sound, tour, CC, voice"], [["X"], "Leave the tour or view"], [["Esc"], "Close notes or dialogs"]],
       ],
       [
         "Slide map",
@@ -1879,6 +1960,7 @@
       V: "voice",
       M: "sound",
       X: "leave",
+      S: "share",
       Esc: "close",
       T: "tours",
       D: "design",
@@ -2350,6 +2432,188 @@
     });
     for (const t of ["touchstart", "touchend"]) smp.addEventListener(t, e => e.stopPropagation(), { passive: true });
 
+    // ---------- share ----------
+    // S (or the dock's share button) opens a dialog that builds a deep link: the current slide, a tour or the current
+    // view, and launch options as hash parameters (&kiosk=1, &sound=1|0, &cc=1|0, &voice=1|0). Opening the link
+    // applies them once (see launch below); a kiosk link first shows the lobby, whose Start click is the user
+    // gesture browsers require for sound, fullscreen and speech.
+    const shrOpt = (text, sub) => {
+      const input = h("input", { type: "checkbox", onchange: () => shrPaint() }),
+        small = h("small", {}, sub);
+      return { input, small, el: h("label", { class: "shr-o" }, input, h("span", {}, text, small)) };
+    };
+    const shrHere = shrOpt("Start at this slide", ""),
+      shrKiosk = shrOpt("Kiosk", "Lobby, then fullscreen auto-advance"),
+      shrSound = shrOpt("Sound", "Band music and effects"),
+      shrCc = shrOpt("Captions (CC)", "Kiosk news captions"),
+      shrVoice = shrOpt("Voice", VOICE ? "Captions read aloud" : "Not supported in this browser");
+    const shrTour = h("select", { class: "shr-sel", id: "shr-tour", onchange: () => shrPaint() });
+    const shrLink = h("input", { type: "text", class: "shr-in", readOnly: true, "aria-label": "Link to share", onfocus: e => e.target.select() });
+    const shrCopy = h(
+      "button",
+      {
+        class: "shr-db go",
+        type: "button",
+        onclick: () => {
+          const done = () => ((shrCopy.textContent = "Copied"), setTimeout(() => (shrCopy.textContent = "Copy link"), 1500));
+          navigator.clipboard?.writeText(shrLink.value).then(done, () => shrLink.select()) ?? shrLink.select();
+        },
+      },
+      "Copy link"
+    );
+    // Try it applies the link in place: the hash routes the slide and tour, then the launch options run
+    const shrTry = h(
+      "button",
+      {
+        class: "shr-db",
+        type: "button",
+        onclick: () => {
+          const url = shrLink.value;
+          shr.close();
+          history.replaceState(null, "", url);
+          followHash();
+        },
+      },
+      "Try it"
+    );
+    const shr = h(
+      "dialog",
+      { class: "shr", "aria-labelledby": "shr-h" },
+      h(
+        "div",
+        { class: "shr-b" },
+        h("div", { class: "shr-bar" }, h("h2", { class: "shr-h", id: "shr-h" }, "Share a link"), h("button", { class: "fz-x", type: "button", "aria-label": "Close (Esc)", title: "Close (Esc)", onclick: () => shr.close() }, "Esc")),
+        h("label", { class: "shr-tl", for: "shr-tour" }, "Slides", shrTour),
+        h("div", { class: "shr-g" }, shrHere.el, shrKiosk.el, ...(config.sound ? [shrSound.el] : []), shrCc.el, shrVoice.el),
+        h("div", { class: "shr-l" }, shrLink, shrCopy, shrTry)
+      )
+    );
+    document.body.append(shr);
+    shr.addEventListener("click", e => e.target === shr && shr.close());
+    for (const t of ["touchstart", "touchend"]) shr.addEventListener(t, e => e.stopPropagation(), { passive: true });
+    function shrPaint() {
+      const k = shrKiosk.input.checked;
+      shrCc.input.disabled = !k;
+      shrVoice.input.disabled = !k || !VOICE;
+      const parts = [];
+      if (shrHere.input.checked) parts.push(encodeURIComponent(slides[cur].id));
+      if (shrTour.value) parts.push(shrTour.value);
+      if (k) parts.push("kiosk=1");
+      if (config.sound) parts.push(`sound=${shrSound.input.checked ? 1 : 0}`);
+      if (k) parts.push(`cc=${shrCc.input.checked ? 1 : 0}`);
+      if (k && VOICE) parts.push(`voice=${shrVoice.input.checked ? 1 : 0}`);
+      shrLink.value = location.href.split("#")[0] + (parts.length ? "#" + parts.join("&") : "");
+    }
+    function openShare() {
+      if (shr.open || lobby) return;
+      if (fz.open) fz.close();
+      if (smp.open) smp.close();
+      if (wizOpen()) wizard.close?.();
+      const opts = [h("option", { value: "" }, "All slides")];
+      if (view && !view.tour) opts.push(h("option", { value: view.key }, `This view: ${view.title}`));
+      for (const [name, t] of Object.entries(TOURS)) if (resolveView(t)) opts.push(h("option", { value: `tour=${name}` }, `Tour: ${t.title || name}`));
+      shrTour.replaceChildren(...opts);
+      shrTour.value = view?.key || "";
+      shrHere.input.checked = true;
+      shrHere.small.textContent = label(slides[cur]);
+      shrKiosk.input.checked = !!kiosk;
+      shrSound.input.checked = !sfx.muted;
+      shrCc.input.checked = capPref;
+      shrVoice.input.checked = !!voicePref;
+      shrPaint();
+      shr.showModal();
+      shrCopy.focus();
+    }
+
+    // ---------- kiosk lobby ----------
+    // Applies a link's launch options. Sound waits for the lobby's click on a kiosk link (an AudioContext needs a
+    // gesture); CC and voice set the preferences kiosk mode starts with.
+    /** @type {{ kiosk?: boolean, sound?: boolean, cc?: boolean, voice?: boolean } | null} */
+    let lobby = null;
+    const applySound = on => {
+      if (config.sound && on != null && !!sfx.muted === on) {
+        sfx.toggle();
+        paintSound();
+      }
+    };
+    function launch(o) {
+      if (o.cc != null) capPref = o.cc;
+      if (o.voice != null) voicePref = o.voice && VOICE;
+      if (!o.kiosk) return applySound(o.sound);
+      openLobby(o);
+    }
+    const lbyInfo = h("p", { class: "lby-s" });
+    const lbyGo = h(
+      "button",
+      {
+        class: "lby-go",
+        type: "button",
+        onclick: e => {
+          e.stopPropagation();
+          startLobby();
+        },
+      },
+      "Start"
+    );
+    lbyGo.insertAdjacentHTML("afterbegin", '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5v15a1 1 0 0 0 1.5.86l12.5-7.5a1 1 0 0 0 0-1.72L8.5 3.64A1 1 0 0 0 7 4.5z"/></svg>');
+    const lby = h(
+      "div",
+      { class: "lby", role: "dialog", "aria-modal": "true", "aria-labelledby": "lby-t", "aria-describedby": "lby-s" },
+      h("p", { class: "lby-k" }, "Kiosk"),
+      h("h1", { class: "lby-t", id: "lby-t" }, document.title || "Slides"),
+      lbyInfo,
+      lbyGo,
+      h(
+        "button",
+        {
+          class: "lby-x",
+          type: "button",
+          onclick: e => {
+            e.stopPropagation();
+            closeLobby();
+          },
+        },
+        "Browse the slides instead (Esc)"
+      )
+    );
+    lbyInfo.id = "lby-s";
+    for (const t of ["touchstart", "touchend"]) lby.addEventListener(t, e => e.stopPropagation(), { passive: true });
+    function openLobby(o) {
+      if (kiosk) setKiosk(false);
+      for (const d of [fz, smp, shr]) if (d.open) d.close();
+      if (wizOpen()) wizard.close?.();
+      lobby = o;
+      const parts = ["Fullscreen", "auto-advance"];
+      if (view) parts.push(`${view.tour ? "tour" : "view"}: ${view.title}`);
+      if (config.sound) parts.push(`sound ${(o.sound ?? !sfx.muted) ? "on" : "off"}`);
+      if (capPref) parts.push("captions");
+      if (voicePref) parts.push("voice");
+      lbyInfo.textContent = parts.join(" · ");
+      // the lobby joins the page only while it waits: an aria-modal element would otherwise hold the kiosk rotation
+      document.body.append(lby);
+      document.body.classList.add("lobby");
+      lbyGo.focus();
+    }
+    function closeLobby() {
+      lobby = null;
+      lby.remove();
+      document.body.classList.remove("lobby");
+    }
+    // the Start click: sound, the current slide's entrance replayed from the top, then kiosk mode (fullscreen, CC, voice)
+    function startLobby() {
+      const o = lobby;
+      if (!o) return;
+      closeLobby();
+      applySound(o.sound);
+      const el = slides[cur].el;
+      el.classList.remove("active");
+      void el.offsetWidth;
+      el.classList.add("active");
+      slides[cur].enter?.(1);
+      setKiosk(true);
+      sfx.techno(slides[cur].techno || 0);
+    }
+
     // ---------- closed captioning ----------
     // Kiosk mode starts captioned; C (or the CC dock button in kiosk mode) toggles it. Captions run kiosk mode like a muted TV in a bar or an airport gate: two
     // speakers talk each slide through as roll-up speech-to-text, >> marking each change of speaker. Their lines are
@@ -2684,7 +2948,7 @@
       }
 
       if (capOn) capFrame();
-      slides[cur]?.tick?.(t);
+      if (!lobby) slides[cur]?.tick?.(t);
       requestAnimationFrame(frame);
     }
 
