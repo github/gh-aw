@@ -258,7 +258,7 @@ ROI, metrics, outcomes, backlog burndown, delivery speed, value
 - So the measure is results on the board, not just how busy the robots look?
 - Exactly. Outcomes are what show the value of agentic workflows, and teams can track them over time.
 
-### Turn Workflows into Factories {#workflows-process-factory}
+### A Factory of Factories {#workflows-process-factory}
 
 #### Notes
 
@@ -270,7 +270,7 @@ Processes create factories: the Repo Factory recipe gives a repository five agen
 
 #### Keywords
 
-Turn Workflows into Factories, A Factory of Factories, factory factory, processes create factories, Repo Factory, workflows, process, composition, blueprint, factory, roles, Researchers, Dispatcher, Reviewers, Finisher, Dreamer, Coder, coding agents, capacity, coding slots, concurrent pull requests, pull request flow, review loop, re-review, CI loop, iterate, weekdays, handoffs, recipe, bootstrap, Issue Monster, PR Sous Chef, maintainer gate
+A Factory of Factories, Workflows → Process → Factory, Turn Workflows into Factories, factory factory, processes create factories, Repo Factory, workflows, process, composition, blueprint, factory, roles, Researchers, Dispatcher, Reviewers, Finisher, Dreamer, Coder, coding agents, capacity, coding slots, concurrent pull requests, pull request flow, review loop, re-review, CI loop, iterate, weekdays, handoffs, recipe, bootstrap, Issue Monster, PR Sous Chef, maintainer gate
 
 #### Captions
 
