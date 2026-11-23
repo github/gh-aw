@@ -402,7 +402,7 @@
     CH.slice(1).forEach((c, i) => {
       const n = i + 1;
       const can = open(n);
-      const label = `Page ${c.page}: ${c.name}${can ? "" : " (choose a quest or write your intent first)"} (${n})`;
+      const label = `Page ${c.page}: ${c.name}${can ? "" : " (choose a quest or write your intent first)"}`;
       for (const b of [nodes[i], pips[i]]) {
         b.disabled = !can;
         b.classList.toggle("cur", n === cur);
@@ -410,7 +410,6 @@
         b.classList.toggle("done", st.seen.has(n) && n < cur);
         b.title = label;
         b.setAttribute("aria-label", label);
-        b.setAttribute("aria-keyshortcuts", String(n));
         if (n === cur) b.setAttribute("aria-current", "step");
         else b.removeAttribute("aria-current");
       }
@@ -892,7 +891,10 @@
       sfx?.step?.(fwd ? 1 : -1);
       setTimeout(() => {
         old.remove();
+        // re-appending moves the node, which drops focus: put it back
+        const f = pg.contains(document.activeElement) ? document.activeElement : null;
         if (fwd && pg.isConnected) book.append(pg);
+        f?.focus({ preventScroll: true });
         pageEl.classList.remove("in", "back");
         busy = false;
       }, 760);
@@ -932,6 +934,12 @@
     } else if ((e.key === "n" || e.key === "N") && cur === 7) {
       e.preventDefault();
       restart();
+    } else if ((e.key === "ArrowDown" || e.key === "ArrowUp") && e.target.closest?.(".wz-c")) {
+      // move between the visible choice cards (← and → turn pages)
+      e.preventDefault();
+      const cs = [...pg.querySelectorAll(".wz-c")].filter(b => !b.closest("[hidden]"));
+      const i = cs.indexOf(e.target.closest(".wz-c"));
+      cs[(i + (e.key === "ArrowDown" ? 1 : -1) + cs.length) % cs.length]?.focus();
     } else if (/^[1-9]$/.test(e.key) && cur > 0 && cur < 7) {
       e.preventDefault();
       pg.querySelector(`.wz-c[aria-keyshortcuts="${e.key}"]`)?.click();

@@ -713,6 +713,12 @@ test("walks the choose-your-own-workflow wizard from the dock to a generated pro
   await expect(dlg.locator(".wz-page .wz-h")).toHaveText(["Why do you set out?"]);
   await page.keyboard.press("ArrowRight");
   await expect(dlg.locator(".wz-page .wz-pno")).toHaveText(["PAGE 14"]);
+  // keyboard focus survives the page turn and Up/Down move between the choice cards
+  await expect(dlg.locator(".wz-page .wz-h")).toBeFocused();
+  const cards = dlg.locator(".wz-page .wz-c:visible");
+  await cards.first().focus();
+  await page.keyboard.press("ArrowDown");
+  await expect(cards.nth(1)).toBeFocused();
   await page.keyboard.press("1");
   await expect(dlg.locator(".wz-page .wz-h")).toHaveText(["When does your agent wake?"]);
   for (const no of [42, 58, 77]) {
