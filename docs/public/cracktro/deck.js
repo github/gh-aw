@@ -9064,7 +9064,8 @@
       ["e7", "M1100 184 V304", "p", ["≤ 3", "findings"], 1122, 236, "start"],
       ["e8", "M1136 340 H1350 V150 H1414", "p", ["stalled · failing"], 1243, 324, "middle"],
       ["e9", "M1450 184 V304", "p", ["bounded repair,", "≤ 2 rounds"], 1472, 236, "start"],
-      ["e10", "M1450 376 V570 H1330", "b", ["ready, or", "escalate"], 1472, 470, "start"],
+      ["e14", "M1430 376 V418 H1100 V380", "p", ["re-review"], 1265, 448, "middle"],
+      ["e10", "M1470 376 V570 H1330", "b", ["ready, or", "escalate"], 1492, 470, "start"],
       ["e11", "M1064 570 H788", "b", ["reviews & merges"], 926, 554, "middle"],
       ["e12", "M714 570 H290", "p day", ["observes runs · costs · outcomes"], 502, 554, "middle"],
       ["e13", "M50 536 V380", "p day", ["proposes one", "reversible change"], 72, 450, "start"],
@@ -9078,6 +9079,9 @@
       ["e5", "nPR"],
       ["e6", "nReview"],
       ["e7", "nFind"],
+      ["e8", "nFinish"],
+      ["e9", "nFix"],
+      ["e14", "nFind"],
       ["e8", "nFinish"],
       ["e9", "nFix"],
       ["e10", "nMaint"],
@@ -9144,7 +9148,7 @@
     slides.push({
       group: "process",
       notes:
-        "What: An illustrative Repo Factory, the recipe a coding agent follows to give a repository a small set of agentic workflows in five roles. Several Researchers file scoped issues, never pull requests. One Dispatcher admits issues into three shared coding slots on weekdays, so up to three pull request flows run at once. In each flow a coding agent opens the pull request, Reviewers leave at most three findings, Finisher makes bounded repairs or escalates, and a maintainer merges. Dreamer observes runs, costs and outcomes, then proposes one reversible change as a new issue.\nWhy: Handoffs go through issues and pull requests, and capacity is capped, so agents cannot flood the repository and people stay at the gates.\nWhen: Use it to bootstrap continuous improvement in a repository that already has CI and maintainers who review.",
+        "What: An illustrative Repo Factory, the recipe a coding agent follows to give a repository a small set of agentic workflows in five roles. Several Researchers file scoped issues, never pull requests. One Dispatcher admits issues into three shared coding slots on weekdays, so up to three pull request flows run at once. In each flow a coding agent opens the pull request, Reviewers leave at most three findings and Finisher repairs them, looping back for re-review for at most two rounds; then the pull request is ready or escalated, and a maintainer merges. Dreamer observes runs, costs and outcomes, then proposes one reversible change as a new issue.\nWhy: Handoffs go through issues and pull requests, and capacity is capped, so agents cannot flood the repository and people stay at the gates.\nWhen: Use it to bootstrap continuous improvement in a repository that already has CI and maintainers who review.",
       enter() {
         t0 = 0;
         cyc = -1;
