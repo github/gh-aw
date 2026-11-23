@@ -90,6 +90,7 @@ Use the task routes above first. This inventory is not required startup context.
 - `.github/aw/action-container-substitutions.md`
 - `.github/aw/agent-runtime-instructions.md`
 - `.github/aw/agentic-chat.md`
+- `.github/aw/agentic-engine.md`
 - `.github/aw/agentic-workflows-mcp.md`
 - `.github/aw/analyzing-runs.md`
 - `.github/aw/asciicharts.md`
