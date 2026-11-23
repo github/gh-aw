@@ -124,11 +124,11 @@ func applyRunBehavioralSignals(result *DownloadResult, runOutputDir string, verb
 		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to extract noops for run %d: %v", result.Run.DatabaseID, noopErr)))
 	}
 	result.Noops = noops
-	reportIncomplete, reportIncompleteErr := extractReportIncompleteFromRun(runOutputDir, result.Run, verbose, expName, expVariant)
+	incomplete, reportIncompleteErr := extractReportIncompleteFromRun(runOutputDir, result.Run, verbose, expName, expVariant)
 	if reportIncompleteErr != nil && verbose {
 		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to extract report_incomplete for run %d: %v", result.Run.DatabaseID, reportIncompleteErr)))
 	}
-	result.ReportIncomplete = reportIncomplete
+	result.Incomplete = incomplete
 	continuationRequests, continuationErr := extractContinuationRequestsFromRun(runOutputDir, result.Run, verbose, expName, expVariant)
 	if continuationErr != nil {
 		logsOrchestratorLog.Printf("Failed to extract continuation requests for run %d: %v", result.Run.DatabaseID, continuationErr)
