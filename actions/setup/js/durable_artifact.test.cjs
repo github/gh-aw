@@ -57,10 +57,10 @@ describe("durable artifact lineage", () => {
     expect(options.core.setOutput).toHaveBeenCalledWith("parent-run-id", "100");
   });
 
-  it("prefers the immediate aw_context caller, including a failed parent, over successful-run lookup", async () => {
+  it("prefers aw_context continuation_run_id, including a failed parent, over successful-run lookup", async () => {
     const options = fixture();
     options.parent.conclusion = "failure";
-    options.context.payload = { inputs: { aw_context: JSON.stringify({ run_id: "100", parent_run_id: "50" }) } };
+    options.context.payload = { inputs: { aw_context: JSON.stringify({ run_id: "300", parent_run_id: "50", continuation_run_id: "100" }) } };
     await selectCheckpoint(options);
     expect(options.github.rest.actions.listWorkflowRuns).not.toHaveBeenCalled();
     expect(options.github.rest.actions.getWorkflowRun).toHaveBeenLastCalledWith(expect.objectContaining({ run_id: "100" }));
@@ -70,7 +70,7 @@ describe("durable artifact lineage", () => {
   it("restores the latest published earlier attempt before reusing the inbound parent", async () => {
     const options = fixture();
     vi.stubEnv("GITHUB_RUN_ATTEMPT", "3");
-    options.context.payload = { inputs: { aw_context: '{"run_id":"100"}' } };
+    options.context.payload = { inputs: { aw_context: '{"continuation_run_id":"100"}' } };
     options.github.paginate.mockImplementation(async (_method, { run_id }) => {
       const name = options.core.setOutput.mock.calls.find(([key]) => key === "artifact-name")[1];
       return String(run_id) === "200" ? [1, 2, 3].map(attempt => ({ id: 900 + attempt, name: name.replace(/200-3$/, `200-${attempt}`), expired: false, expires_at: "2999-01-01T00:00:00Z" })) : [];
@@ -90,9 +90,9 @@ describe("durable artifact lineage", () => {
     expect(options.core.setOutput).toHaveBeenCalledWith("run-id", "100");
   });
 
-  it("accepts explicit parent_run_id from repository_dispatch context", async () => {
+  it("accepts continuation_run_id from repository_dispatch context", async () => {
     const options = fixture();
-    options.context.payload = { client_payload: { aw_context: { parent_run_id: "100" } } };
+    options.context.payload = { client_payload: { aw_context: { continuation_run_id: 100 } } };
     await selectCheckpoint(options);
     expect(options.github.rest.actions.listWorkflowRuns).not.toHaveBeenCalled();
     expect(options.core.setOutput).toHaveBeenCalledWith("run-id", "100");
@@ -100,7 +100,7 @@ describe("durable artifact lineage", () => {
 
   it.each(["branch", "workflow", "fork", "running"])("rejects an explicit %s-incompatible parent", async kind => {
     const options = fixture();
-    options.context.payload = { inputs: { aw_context: '{"run_id":"100"}' } };
+    options.context.payload = { inputs: { aw_context: '{"continuation_run_id":"100"}' } };
     if (kind === "branch") options.parent.head_branch = "main";
     if (kind === "workflow") options.parent.workflow_id = 43;
     if (kind === "fork") options.parent.head_repository.id = 2;
@@ -111,10 +111,35 @@ describe("durable artifact lineage", () => {
 
   it("fails rather than switching parents when an explicit checkpoint expired", async () => {
     const options = fixture();
-    options.context.payload = { inputs: { aw_context: '{"run_id":"100"}' } };
+    options.context.payload = { inputs: { aw_context: '{"continuation_run_id":"100"}' } };
     options.github.paginate.mockResolvedValue([]);
     await expect(selectCheckpoint(options)).rejects.toThrow("no unexpired checkpoint");
     expect(options.github.rest.actions.listWorkflowRuns).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["a router from another workflow and branch", { run_id: "45119214566", parent_run_id: "", workflow_id: "owner/repo/.github/workflows/agentic_commands.yml@refs/heads/main" }],
+    ["a same-workflow caller", { run_id: "100", parent_run_id: "100" }],
+  ])("starts fresh when aw_context from %s has no continuation_run_id", async (_name, awContext) => {
+    const options = fixture();
+    options.context.payload = { inputs: { aw_context: JSON.stringify(awContext) } };
+    await selectCheckpoint(options);
+    expect(options.github.rest.actions.getWorkflowRun).toHaveBeenCalledTimes(1);
+    expect(options.github.rest.actions.listWorkflowRuns).not.toHaveBeenCalled();
+    expect(options.github.paginate).not.toHaveBeenCalled();
+    expect(options.core.setOutput.mock.calls.some(([key]) => key === "artifact-id")).toBe(false);
+  });
+
+  it.each([
+    ["0", "positive integer"],
+    ["abc", "positive integer"],
+    [true, "positive integer"],
+    ["200", "current run"],
+  ])("rejects continuation_run_id %j", async (value, message) => {
+    const options = fixture();
+    options.context.payload = { inputs: { aw_context: JSON.stringify({ continuation_run_id: value }) } };
+    await expect(selectCheckpoint(options)).rejects.toThrow(message);
+    expect(options.github.paginate).not.toHaveBeenCalled();
   });
 
   it("starts fresh when the last successful run has no artifact, without using older runs", async () => {
