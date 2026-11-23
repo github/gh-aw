@@ -1202,8 +1202,9 @@ ran, reached a clean result. Rules apply in order:
    authentication and policy rejections, provider 5xx responses that the engine or
    AWF recorded for an agent request, and harness infrastructure failure classes.
    Then `skip` with `rate_limited` for such 429 responses and quota or rate-limit
-   categories and classes. A generic authentication or proxy-guard rejection beside
-   a confirmed limit belongs to the limit, not the platform. An incomplete report
+   categories and classes. A generic authentication or proxy-guard rejection, or a
+   transient API error such as an HTML challenge, beside a confirmed limit belongs
+   to the limit, not the platform. An incomplete report
    whose reason claims an infrastructure error is neither the agent's own report nor
    platform evidence, because runtimes use that reason for budgets and rate-limit
    waits too and the agent can file it. A run that succeeded is not re-examined for
@@ -2875,6 +2876,11 @@ Native IDs can collide, timestamps can be out of order, and a trace can contain 
 - Retained evidence-source restrictions and missing, invalid, or expired `Retry-After` behavior.
 - Clarified that valid provider waits are not capped by exponential backoff `max-delay-ms`, subject to the soft-timeout/shutdown-buffer budget and the 2147483647-millisecond timer bound.
 - Retained `rate_limit_wait_exceeded` reporting with the requested delay in seconds.
+- Retained serialization-format version 1.
+
+### Version 2.14.1 - Draft (2026-11-23)
+
+- Clarified that `routing.observation` treats a transient API error the harness retried, such as an HTML challenge, as infrastructure, except beside a confirmed limit, where it belongs to the limit like a generic authentication rejection (T-UAS-094).
 - Retained serialization-format version 1.
 
 ### Version 2.14.0 - Draft (2026-11-23)
