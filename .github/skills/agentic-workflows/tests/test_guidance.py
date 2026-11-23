@@ -43,6 +43,42 @@ def checklist(text):
 
 
 class GuidanceTests(unittest.TestCase):
+    def test_agentic_engine_selection_routes_survive_prefix_reads(self):
+        for name in (
+            "create-agentic-workflow.md", "designer.md",
+            "update-agentic-workflow.md", "configure-agentic-engine.md",
+            "syntax-engine.md",
+        ):
+            guide = ROOT / ".github/aw" / name
+            with self.subTest(guide=name):
+                self.assertIn("](agentic-engine.md)", guide.read_bytes()[:7500].decode("utf-8"))
+        for guide in (
+            ROOT / ".github/skills/agentic-workflows/SKILL.md",
+            ROOT / "pkg/cli/data/agentic_workflows_skill.md",
+        ):
+            with self.subTest(guide=guide):
+                self.assertIn(".github/aw/agentic-engine.md", guide.read_bytes()[:7500].decode("utf-8"))
+        skill = ROOT / ".github/skills/agentic-engine/SKILL.md"
+        self.assertIn("](../../aw/agentic-engine.md)", skill.read_text())
+
+    def test_agentic_engine_selection_contract(self):
+        guide = ROOT / ".github/aw/agentic-engine.md"
+        self.assertLessEqual(len(guide.read_bytes()), 7500)
+        contract = normalized(guide.read_text())
+        for required in (
+            "Copilot", "Claude", "Codex", "Pi", "Another harness",
+            "repository-root `preferences.md`", "explicit, inferred, or the Pi default",
+            "confirmed preferences over inferred ones", "corroborated active development usage",
+            "generic `AGENTS.md`", "not evidence for Codex or any single harness",
+            "no clear preference", "`engine: pi`", "compiler's default",
+            "Preserve an existing workflow's engine", "task-specific exception",
+            "Do not execute repository scripts or install tools",
+            "Never weaken required security controls", "Store no credentials",
+            "recommendation-only requests", "without writing files",
+        ):
+            with self.subTest(required=required):
+                self.assertIn(required, contract)
+
     def test_browser_decision_routes_survive_prefix_reads(self):
         route = "playwright.md#browser-decision-and-readiness"
         for name in (

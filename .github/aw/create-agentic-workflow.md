@@ -20,6 +20,8 @@ Read these required references in order before designing:
 6. [Safe outputs](safe-outputs.md)
 7. [Schema index](syntax.md)
 8. [MCP CLIs](mcp-clis.md)
+9. [Agentic engine selection](agentic-engine.md) — detect the developer's harness,
+   record the choice in `preferences.md`, and use Pi when no clear preference applies.
 
 If any required reference is missing or unreadable, stop and report its path;
 do not infer its guidance. In a proposed workflow, use `report_incomplete` when
@@ -29,6 +31,7 @@ Load the target repository's optional `.github/aw/instructions.md` overlay.
 
 Before generation, follow the [design checklist](create-agentic-workflow-design.md)
 and [output/validation contract](create-agentic-workflow-validation.md).
+For recommendations only, follow [evaluation guidance](create-agentic-workflow-evaluation.md).
 Load only matching topic references:
 
 - Maintenance: [maintainer.md](maintainer.md); docs agents/checks: [documentation-workflows.md](documentation-workflows.md).

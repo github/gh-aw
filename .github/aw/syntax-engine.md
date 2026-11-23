@@ -6,8 +6,19 @@ description: `engine:` frontmatter field detail for GitHub Agentic Workflows.
 
 See [syntax-agentic.md](syntax-agentic.md) for the full frontmatter field index.
 
+For engine choice, follow [agentic engine selection](agentic-engine.md).
+Honor developer harness preferences; explicitly choose Pi for new workflows
+without a clear preference or conflicting requirement. This authoring policy
+does not change the compiler default.
+Before configuring engine fields, load the relevant entries in the
+[field reference](#field-reference), including capability and security limits.
+
+<!-- instruction-prefix-end -->
+
+## Field Reference
+
 - **`engine:`** - AI processor configuration
-  - String format: `"copilot"` (current default), `"claude"`, `"codex"`, `"gemini"` (deprecated, see below), `"agy"` (experimental), or `"pi"`. Omit `engine:` when there is no engine preference or engine-specific requirement so the configured default remains in effect. If an explicit model requirement forces engine selection, try Copilot first.
+  - String format: `"copilot"` (current compiler default), `"claude"`, `"codex"`, `"gemini"` (deprecated, see below), `"agy"` (experimental), or `"pi"`. Follow [agentic engine selection](agentic-engine.md) for developer harness detection and `preferences.md`. For new workflows with no clear preference or conflicting requirement, explicitly select `engine: pi`; omitting `engine:` still uses the configured compiler default.
   - The experimental `opencode` engine is available through `imports: [shared/opencode.md]`; see [`smoke-opencode.md`](../workflows/smoke-opencode.md) for an example.
   - The experimental `deepseek-harness` engine is available through `imports: [shared/deepseek-harness.md]`; see [`smoke-deepseek-harness.md`](../workflows/smoke-deepseek-harness.md) for an example. It runs the developer-preview `dsh` headless profile with AWF provider routing and uses `provider/model` syntax.
   - The experimental `cursor` engine is available through `imports: [shared/cursor.md]`; see [`smoke-cursor.md`](../workflows/smoke-cursor.md) for an example. Requires the `CURSOR_API_KEY` secret. Cursor reads project rules from `.cursor/rules/*.mdc` and respects the root-level `.cursorignore` and `AGENTS.md`; both are protected in the manifest. Use `model: cursor/auto` or a specific model such as `cursor/claude-3-7-sonnet`.

@@ -54,6 +54,7 @@ Paths below are relative to `.github/skills/`; load only the matching `SKILL.md`
 | Task | Skill directory |
 |---|---|
 | Workflow create/update/debug/upgrade | `agentic-workflows` |
+| Choose an engine from developer harness preferences and task requirements | `agentic-engine` |
 | Engineering conventions and validation commands | `developer` |
 | Code organization, WASM stubs, string patterns | `developer-code-organization` |
 | Template injection, shell safety, supply chain | `developer-security` |

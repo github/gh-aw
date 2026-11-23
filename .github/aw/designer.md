@@ -19,6 +19,9 @@ Before tool selection, apply the
 success criteria and repository scripts/tests. Infer browser needs without a
 mandatory extra interview question; include supporting lifecycle permissions.
 
+Before choosing an engine, follow [agentic engine selection](agentic-engine.md)
+for repository harness detection, `preferences.md`, and the Pi fallback.
+
 Follow the [interview](#interview-framework), [decision mappings](#decision-heuristics),
 and [confirmation](#confirmation-format) before the [generation template](#generation-template).
 Apply the [validation checklist](#validation-checklist) and the
@@ -126,12 +129,11 @@ Map to:
 
 ### Phase 7: Engine (optional)
 
-Ask **"Any AI engine preference?"** only when the request contains ambiguous
-engine-specific hints.
-
-Omit `engine:` and let the configured default apply unless there's an explicit
-preference or a requirement the default can't satisfy — then map to `engine:`,
-trying Copilot first.
+Apply [agentic engine selection](agentic-engine.md) before asking questions.
+Honor explicit preferences; infer the developer's harness from repository
+evidence and saved `preferences.md`. Ask only when ambiguity affects feasibility
+or policy. With no clear preference or incompatible task requirement, select
+`engine: pi`. Record the choice during authorized generation, not the interview.
 
 ### Phase 7b: Skills, Plugins, LSP & Evals (optional)
 
