@@ -1,6 +1,6 @@
 # PR triage summary
 
-No eligible open pull requests authored by `app/github-copilot` were found in `github/gh-aw`.
+No eligible open pull requests authored by `app/github-copilot` were found in the latest persisted queue for `github/gh-aw`.
 
 - Open PRs scanned: 14
 - Cooldown-skipped: 11

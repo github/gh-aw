@@ -1,6 +1,6 @@
 {
-  "generated_at": "2026-11-22T12:21:31Z",
-  "run_id": "pr-triage-2026-11-22T12:21:31Z",
+  "generated_at": "2026-11-23T06:35:10Z",
+  "run_id": "pr-triage-2026-11-23T06:35:10Z",
   "source": "pr-triage",
   "open_copilot_prs": 0,
   "scanned_open_prs": 14,
@@ -103,8 +103,8 @@
     }
   ],
   "notes": [
-    "No open pull requests authored by app/github-copilot were found in github/gh-aw.",
-    "The current queue is composed of same-repo and bot-authored PRs, and none match the eligible author filter.",
+    "No eligible open pull requests authored by app/github-copilot were present in the repository's persisted triage state.",
+    "This environment does not provide GitHub MCP or authenticated GitHub API reads, so live PR verification is limited to the latest repo memory snapshot.",
     "No labels, comments, or batch assignments were created because the eligible queue is empty."
   ],
   "review_status": "triaged"
