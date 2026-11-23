@@ -103,6 +103,8 @@ gh-aw allows a literal `COPILOT_PROVIDER_BASE_URL` host automatically, so no
 `network.allowed` entry is needed. When the URL comes from
 `${{ vars.* }}` or `${{ secrets.* }}`, AWF v0.25.41 or later (the default) resolves it at
 runtime and allows exactly that host; avoid broad entries such as `services.ai.azure.com`.
+If `sandbox.agent.version` pins an older AWF, upgrade it or list the exact gateway
+host (for example, `YOUR_GATEWAY_HOST`) in `network.allowed`.
 
 Select `responses` only for an alias that exposes Responses; use `completions`
 for Chat Completions. If the gateway alias differs from the model ID, set

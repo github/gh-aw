@@ -1,45 +1,53 @@
 # ADR-80318: Rely on AWF Runtime Resolution for Expression-Valued BYOK Base URLs
 
 **Date**: 2026-11-23
-**Status**: Draft
+**Status**: Accepted
 
 ## Context
 
-An Azure AI Gateway BYOK pilot reported (F3) that `engine.env.COPILOT_PROVIDER_BASE_URL` set from `${{ vars.* }}` or `${{ secrets.* }}` was not added to the AWF firewall allowlist. Users worked around this by adding hosts to `network.allowed` by hand, often with broad entries such as `openai.azure.com`.
+An Azure AI Gateway BYOK pilot reported (finding F3) that `engine.env.COPILOT_PROVIDER_BASE_URL` set from `${{ vars.* }}` or `${{ secrets.* }}` was not added to the compile-time AWF firewall allowlist. The compiler adds only literal hosts. The docs told users to add the provider host to `network.allowed` by hand, which encouraged broad entries such as `openai.azure.com`.
 
-The compiler cannot allowlist a host it cannot read at compile time. Per the PR description, AWF v0.25.41 and later resolve `COPILOT_PROVIDER_BASE_URL` at runtime and allow exactly that `scheme://host`, for both the agent run and the threat-detection run. The pinned AWF default is v0.29.18. The AWF runtime behavior comes from the PR description and is not exercised by tests in this repository.
+AWF v0.25.41 and later already handle this at runtime. AWF derives the Copilot API target from the runtime value of `COPILOT_PROVIDER_BASE_URL` and adds exactly its `scheme://host` to the allowlist, for both the main agent run and the threat-detection run. `OPENAI_BASE_URL` and `ANTHROPIC_BASE_URL` are passed to the AWF API proxy as target hosts and are also resolved at runtime. The default pinned AWF version is v0.29.18.
 
 Forces:
 
-- Broad `network.allowed` entries widen the egress policy beyond the configured provider host.
-- Existing workflows with expression-valued URLs already work on the default AWF and must not start failing compilation.
-- Workflows that pin an AWF version older than v0.25.41 are blocked at runtime, and nothing at compile time signals that.
+- Broad `network.allowed` entries widen egress beyond the configured provider host.
+- Workflows with expression-valued URLs, such as the `smoke-copilot-aoai-*` workflows, already work on the default AWF and must keep compiling.
+- A workflow that pins AWF below v0.25.41 has its model requests blocked at runtime, and nothing at compile time reported this.
+- A host known only at runtime cannot be compared with `network.allowed` entries at compile time.
 
 ## Decision
 
-Rely on AWF runtime host resolution for expression-valued `COPILOT_PROVIDER_BASE_URL` on AWF v0.25.41 or later. Do not add compile-time allowlisting for expressions. Concretely:
+Rely on AWF runtime host resolution for expression-valued BYOK base URLs. Fix the docs and add a narrow compile-time diagnostic for the case AWF cannot handle.
 
-- Docs (`engines/copilot.md`, `glossary.md`, `azure-ai-gateway.md`, `auth.mdx`) state that the provider host is allowed at runtime, warn against broad `network.allowed` entries, and note the AWF v0.25.41 minimum.
-- `pkg/constants/version_constants.go` adds `AWFCopilotProviderHostAllowlistMinVersion = "v0.25.41"`.
-- `pkg/workflow/byok_provider_host_validation.go` adds `byokProviderHostAllowlistGap` and `validateBYOKProviderHostAllowlist`. It is called from `validateCoreToolConfiguration` in `pkg/workflow/compiler_validators.go`.
-- The validator warns, or fails in strict mode, only when all four hold: the base URL is an expression; the firewall is enabled; the pinned AWF version is below v0.25.41; and `network.allowed` has no custom literal domain.
+- The docs (including `reference/engines/copilot.md`) state that AWF allows exactly the runtime provider host for both runs, warn against broad `network.allowed` entries, and state the AWF v0.25.41 minimum.
+- `pkg/constants/version_constants.go` defines `AWFCopilotProviderHostAllowlistMinVersion = "v0.25.41"`.
+- `pkg/workflow/byok_provider_host_validation.go` reports a diagnostic only when all three hold:
+  1. `engine.env.COPILOT_PROVIDER_BASE_URL` contains a `${{ … }}` expression;
+  2. the firewall is enabled; and
+  3. the effective AWF version is older than v0.25.41.
+- The diagnostic is a warning by default and an error in strict mode. It recommends removing the `sandbox.agent.version` pin or raising it to v0.25.41 or later.
+- `network.allowed` entries do not suppress the diagnostic, because the compiler cannot verify that any entry covers a host known only at runtime. An earlier revision suppressed the diagnostic when any custom domain was present. Review changed this.
 
 ## Alternatives Considered
 
-- **Keep the manual guidance and tell users to add the provider host to `network.allowed`.** Rejected. This is the status quo that produced the broad entries reported by the pilot.
-- **Fail compilation for every expression-valued base URL.** Rejected. It would break working workflows in this repository and push users toward broader allowlists. The narrow check is expected to leave `make recompile` lock-file output unchanged.
-- **Allowlist the provider host at compile time.** Rejected. The compiler sees only the expression, and it can allowlist only literal hosts.
+- **Keep telling users to add the provider host to `network.allowed`.** Rejected. This guidance produced the broad entries the pilot reported.
+- **Fail compilation for every expression-valued base URL.** Rejected. It would break working workflows such as `smoke-copilot-aoai-*` and push users toward broader allowlists.
+- **Resolve the provider host at compile time.** Rejected. The compiler cannot read secret values, so this is impossible.
+- **Add a new runtime allowlisting mechanism in gh-aw.** Rejected. AWF already does this.
+- **Suppress the diagnostic when `network.allowed` has any custom domain.** Rejected. The compiler cannot verify that an unrelated domain covers the runtime host, so the suppression is unsound.
 
 ## Consequences
 
 Positive:
 
-- Users no longer need broad `network.allowed` entries, so egress stays limited to the exact configured provider host.
-- Workflows on the default AWF get no new warnings and no lock-file changes.
+- Users no longer need broad `network.allowed` entries. Egress stays limited to the exact configured provider host.
+- Workflows on the default AWF get no new diagnostics, and compiled lock files do not change.
 - Workflows that pin AWF below v0.25.41 get a compile-time signal instead of a silent runtime block.
 
 Negative:
 
-- Workflows that pin AWF below v0.25.41 still compile with only a warning in non-strict mode, and their model requests stay blocked until the pin is raised or the host is added to `network.allowed`.
-- The validator depends on `AWFCopilotProviderHostAllowlistMinVersion`, which must track AWF releases.
-- Known gaps remain and are out of scope: `gemini_engine.go` allowlists `GEMINI_API_BASE_URL` even when it is an expression; `GH_AW_ENGINE_API_HOSTS` receives the raw expression; and AWF does not mark a secret-derived host as sensitive, so the hostname may appear in AWF logs.
+- In strict mode, workflows that pin AWF below v0.25.41 must upgrade AWF, even if they already list the exact provider host in `network.allowed`.
+- `AWFCopilotProviderHostAllowlistMinVersion` must stay correct as AWF changes.
+- AWF does not mark a secret-derived Copilot target host as sensitive, so the hostname may appear in AWF logs. This is tracked as follow-up work.
+- The connector inference path (#80315) is handled separately and is not affected by this decision.
