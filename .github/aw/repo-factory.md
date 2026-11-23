@@ -65,9 +65,11 @@ mandatory within Researchers.
   choose eligible/deduplicated issues, prioritize repository value and assign the
   selected backend. Weekdays by default; max **three** active assignments/PRs,
   including pending assignments without PRs.
-- **Reviewers:** ready-for-review and follow-up events; adapt Matt Pocock Skills
-  Reviewer to prefetch diffs/context, select repo skills and produce bounded,
-  nonduplicative findings.
+- **Reviewers:** ready-for-review and follow-up events. Example:
+  [Matt Pocock Skills Reviewer](../workflows/mattpocock-skills-reviewer.md)
+  prefetches diffs/context, selects relevant skills and gives bounded,
+  nonduplicative feedback. For ADR checks, see
+  [Design Decision Gate](../workflows/design-decision-gate.md).
 - **Finisher:** adapt PR Sous-Chef; deterministically filter stalled PRs, failed
   checks and unresolved feedback, then coordinate bounded repairs without
   bypassing protections or capacity.

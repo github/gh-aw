@@ -336,6 +336,7 @@ examples. Token workflows are provenance-managed from `githubnext/agentic-ops`.
 | Source | Reuse |
 | --- | --- |
 | [Matt Pocock Skills Reviewer](https://github.com/github/gh-aw/blob/main/.github/workflows/mattpocock-skills-reviewer.md) | Diff-first review, selective pinned skills, cached PR context, bounded feedback |
+| [Design Decision Gate](https://github.com/github/gh-aw/blob/main/.github/workflows/design-decision-gate.md) | Architecture review: flag missing ADRs and changes that diverge from approved decisions |
 | [PR Sous-Chef](https://github.com/github/gh-aw/blob/main/.github/workflows/pr-sous-chef.md) | Deterministic prefilter, stalled PR detection, work/state fingerprints, coding follow-up |
 | [Issue Monster](https://github.com/github/gh-aw/blob/main/.github/workflows/issue-monster.md) | Eligible issue selection, CI checks, topic/retry deduplication, scoped assignment |
 | [Test-improver pattern](https://github.com/githubnext/agentics/blob/main/docs/test-improver.md) and [Code Simplifier](https://github.com/githubnext/agentics/blob/main/docs/code-simplifier.md) | Repository-specific discovery; use issue-only Researcher outputs |
