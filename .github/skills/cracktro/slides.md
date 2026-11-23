@@ -952,6 +952,27 @@ slop, nits, small PRs, velocity, cleanup, iterate
 - And who tidies up the slop left behind?
 - Agentic reviewers and daily improvers handle the cleanup, so velocity stays high and the code keeps improving.
 
+### Repo Factory {#repo-factory}
+
+#### Notes
+
+illustrative
+
+#### Summary
+
+A Repo Factory gives a repository five agentic roles that hand work along through issues and pull requests: several Researchers file issues, one Dispatcher admits them into a few shared weekday coding slots, and each slot runs its own pull request flow in which a coding agent, Reviewers and a Finisher bring the change to a maintainer, and a Dreamer turns measured outcomes into one proposed change at a time.
+
+#### Keywords
+
+Repo Factory, factory, roles, Researchers, Dispatcher, Reviewers, Finisher, Dreamer, coding agents, capacity, coding slots, concurrent pull requests, pull request flow, weekdays, handoffs, recipe, bootstrap, Issue Monster, PR Sous Chef, maintainer gate
+
+#### Captions
+
+- Tonight, a tour of the Repo Factory, five agent roles working one repository together.
+- Several Researchers file issues, and one Dispatcher starts up to three pull requests at once, one per shared coding slot.
+- Each pull request runs its own flow: a coding agent writes it, Reviewers and a Finisher bring it to a maintainer, who still decides the merge.
+- And a Dreamer watches the outcomes, then proposes one reversible change as a new issue, so the factory improves itself.
+
 ### Dreaming {#dreaming}
 
 #### Notes

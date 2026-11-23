@@ -495,6 +495,18 @@
   .pnt-m .dhm-tl .v { fill: #f0f6fc; font: 600 14px var(--mono); text-anchor: middle; }
   .pnt-m .dhm-tl .lg { fill: #9198a1; font: 500 14px var(--mono); }
   .rpa-svg { left: 150px; top: 300px; width: 1620px; height: 648px; }
+  .rf-svg { left: 150px; top: 300px; width: 1620px; height: 648px; }
+  .rf-slot { fill: #0d1117; stroke: #9198a1; stroke-width: 2; transition: fill .4s, stroke .4s; }
+  .rf-slot.busy { fill: #ab7df84d; stroke: #ab7df8; }
+  .rf-slots.on .rf-slot { stroke: #ab7df8; } .rf-slots.on .rf-slot:not(.busy) { fill: #ab7df8; }
+  .rf-slots rect.rf-slot { filter: none; }
+  .rf-cap { fill: #9198a1; font: 600 17px var(--mono); letter-spacing: .08em; text-anchor: middle; }
+  .rf-zone { fill: #9198a1; font: 600 17px var(--mono); letter-spacing: .2em; }
+  .rf-pr { fill: #100f1c; stroke: #ab7df8; stroke-opacity: .35; stroke-width: 2; stroke-dasharray: 10 8; transition: fill .5s, stroke-opacity .5s; }
+  .rf-pr.on { fill: #15122a; stroke-opacity: .85; }
+  .rf-prt { fill: #ab7df8; }
+  .rf-pr.rf-ghost { fill: #0d1117; stroke-opacity: .2; }
+  .rf-ghost-a { fill: #0d1117; stroke: #ab7df8; stroke-opacity: .35; stroke-width: 2; }
   .rpa-code { opacity: .6; transition: opacity .4s; } .rpa-code.on { opacity: 1; }
   .rpa-code .card { fill: #0d1117e8; stroke: #3d444d; stroke-width: 2; transition: stroke .4s; }
   .rpa-code.on .card { stroke: #ab7df8; filter: drop-shadow(0 0 10px #8957e566); }
@@ -9020,6 +9032,162 @@
         panel,
         svg
       ),
+    });
+  }
+
+  // Repo Factory: five roles share one issue-to-merge loop: several Researchers file issues, one Dispatcher starts concurrent pull request flows in three weekday coding slots, where a coding agent, Reviewers and Finisher drive each to a maintainer, and Dreamer turns outcomes into one proposed change
+  {
+    const AG = pickAgent();
+    resetIndex();
+    const VW = 1700,
+      VH = 680;
+    const ico = (n, x, y, sz, fill = "#f0f6fc") => `<g transform="translate(${x - sz / 2},${y - sz / 2}) scale(${sz / (n === "merge" ? 16 : 24)})" fill="${fill}">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</g>`;
+    const agent = (id, x, y, w, label) => `<g class="fm-task" id="${id}"><g class="fm-pill"><rect x="${x}" y="${y - 25}" width="${w}" height="50" rx="25"/><text x="${x + 18 + w / 2}" y="${y + 8}">${label}</text></g>
+      <circle cx="${x}" cy="${y}" r="34" ${agDisc(AG)}/>${ico(AG, x, y + 1, 38, agFg(AG))}</g>`;
+    const dev = (id, x, y) => `<g class="fm-task mra-dev" id="${id}"><g class="fm-pill b"><rect x="${x}" y="${y - 25}" width="220" height="50" rx="25"/><text x="${x + 18 + 110}" y="${y + 8}">Maintainer</text></g>
+      <circle cx="${x}" cy="${y}" r="34" fill="#0d1117" stroke="#4493f8" stroke-width="3"/><image href="assets/avatars/mona.jpg" x="${x - 31}" y="${y - 31}" width="62" height="62" clip-path="url(#rfClip)"/></g>`;
+    const box = (id, x, y, icon) => `<g class="fm-out" id="${id}"><rect x="${x - 36}" y="${y - 34}" width="72" height="68" rx="14"/>${ico(icon, x, y, 34)}</g>`;
+    // three shared coding slots: two already busy, the third fills when Dispatcher admits the issue
+    const slots = (id, x, y) => {
+      let s = `<g class="fm-out rf-slots" id="${id}">`;
+      [0, 1, 2].forEach(i => (s += `<rect class="rf-slot${i < 2 ? " busy" : ""}" x="${x - 70 + i * 50}" y="${y - 26}" width="40" height="52" rx="8"/>`));
+      return s + `<text class="rf-cap" x="${x}" y="${y + 58}">3 shared slots</text><text class="rf-cap" x="${x}" y="${y + 82}">weekdays · UTC</text></g>`;
+    };
+    // [edge id, path, color, label, lx, ly, anchor]
+    const EDGES = [
+      ["e1", "M50 184 V304", "p", ["files scoped", "issues"], 72, 236, "start"],
+      ["e2", "M86 340 H300 V150 H364", "p", ["eligible issue"], 190, 324, "middle"],
+      ["e3", "M400 184 V310", "p", ["reserves", "a slot"], 422, 236, "start"],
+      ["e4", "M476 340 H650 V150 H714", "p", ["starts PRs"], 563, 324, "middle"],
+      ["e5", "M750 184 V304", "p", ["opens", "pull request"], 772, 236, "start"],
+      ["e6", "M786 340 H1000 V150 H1064", "p", ["ready for review"], 893, 324, "middle"],
+      ["e7", "M1100 184 V304", "p", ["≤ 3", "findings"], 1122, 236, "start"],
+      ["e8", "M1136 340 H1350 V150 H1414", "p", ["stalled · failing"], 1243, 324, "middle"],
+      ["e9", "M1450 184 V304", "p", ["bounded repair,", "≤ 2 rounds"], 1472, 236, "start"],
+      ["e10", "M1450 376 V570 H1330", "b", ["ready, or", "escalate"], 1472, 470, "start"],
+      ["e11", "M1064 570 H788", "b", ["reviews & merges"], 926, 554, "middle"],
+      ["e12", "M714 570 H290", "p day", ["observes runs · costs · outcomes"], 502, 554, "middle"],
+      ["e13", "M50 536 V380", "p day", ["proposes one", "reversible change"], 72, 450, "start"],
+    ];
+    // the work item's journey: [edge, node lit on arrival, duration]
+    const SEQ = [
+      ["e1", "nIssue"],
+      ["e2", "nDispatch"],
+      ["e3", "nSlots"],
+      ["e4", "nCoder"],
+      ["e5", "nPR"],
+      ["e6", "nReview"],
+      ["e7", "nFind"],
+      ["e8", "nFinish"],
+      ["e9", "nFix"],
+      ["e10", "nMaint"],
+      ["e11", "nMerge"],
+      ["e12", "nDreamer", 1500],
+      ["e13", "nIssue", 1500],
+    ];
+    const LANE = { nResearch: 0, nIssue: 0, nDispatch: 1, nSlots: 1, nCoder: 2, nPR: 2, nReview: 3, nFind: 3, nFinish: 4, nFix: 4 };
+    let g = `<defs><clipPath id="rfClip" clipPathUnits="objectBoundingBox"><circle cx=".5" cy=".5" r=".5"/></clipPath>
+      <marker id="rfP" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#ab7df8"/></marker>
+      <marker id="rfB" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#4493f8"/></marker></defs>`;
+    // code, review and finish run as one pull request flow per coding slot; the ghost frames behind are the concurrent ones
+    [2, 1].forEach(i => (g += `<rect class="rf-pr rf-ghost" x="${682 + i * 10}" y="${78 - i * 12}" width="986" height="544" rx="26"/>`));
+    g += `<rect class="rf-pr" id="rfPR" x="682" y="78" width="986" height="544" rx="26"/><text class="rf-zone rf-prt" x="1692" y="660" text-anchor="end">CONCURRENT PR FLOWS · ONE PER SLOT</text>`;
+    g += `<rect class="fm-lane" x="-20" y="0" width="${VW + 20}" height="60"/>`;
+    [
+      [-20, 350, "RESEARCH"],
+      [350, 700, "DISPATCH"],
+      [700, 1050, "CODE"],
+      [1050, 1400, "REVIEW"],
+      [1400, VW, "FINISH"],
+    ].forEach(([x0, x1, t], i) => {
+      g += `<text class="fm-lane-t mra-lane" id="rfLane${i}" x="${(x0 + x1) / 2}" y="40">${t}</text>`;
+      if (i) g += `<line class="fm-div" x1="${x0}" y1="0" x2="${x0}" y2="440"/>`;
+    });
+    g += `<line class="fm-div rf-gate" x1="-20" y1="470" x2="${VW}" y2="470"/><text class="rf-zone" x="-20" y="660">HUMAN GATE · DREAMER LEARNS</text>`;
+    for (const [id, d, c, lab, lx, ly, an] of EDGES) {
+      g += `<path class="fm-wire ${c}" id="${id}" d="${d}" marker-end="url(#rf${c.startsWith("p") ? "P" : "B"})"/>`;
+      g += `<text class="mra-l ${c}" x="${lx}" y="${ly}" text-anchor="${an}">${lab.map((l, k) => `<tspan x="${lx}" dy="${k ? 26 : 0}">${l}</tspan>`).join("")}</text>`;
+    }
+    // several researchers, one dispatcher: ghost cards stacked behind Researchers
+    [2, 1].forEach(i => (g += `<g class="rf-ghost-a"><rect x="${50 + i * 6}" y="${125 - i * 13}" width="230" height="50" rx="25"/><circle cx="${50 + i * 6}" cy="${150 - i * 13}" r="34"/></g>`));
+    g += agent("nResearch", 50, 150, 230, "Researchers") + agent("nDispatch", 400, 150, 230, "Dispatcher") + agent("nCoder", 750, 150, 230, "Coding agent");
+    g += agent("nReview", 1100, 150, 230, "Reviewers") + agent("nFinish", 1450, 150, 210, "Finisher") + agent("nDreamer", 50, 570, 230, "Dreamer");
+    g += box("nIssue", 50, 340, "issue") + slots("nSlots", 400, 340) + box("nPR", 750, 340, "pr") + box("nFind", 1100, 340, "comment") + box("nFix", 1450, 340, "tasklist") + box("nMerge", 750, 570, "merge");
+    g += dev("nMaint", 1100, 570);
+    g += `<circle class="fm-dot mra-dot" r="8"/>`;
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("class", "fm-svg rf-svg");
+    svg.setAttribute("viewBox", `0 0 ${VW} ${VH}`);
+    svg.style.setProperty("--c", "#ab7df8");
+    svg.innerHTML = g;
+    const $ = id => svg.querySelector("#" + id),
+      dot = svg.querySelector(".mra-dot");
+    const ease = u => (u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2);
+    const STEP = 950,
+      START = 700,
+      HOLD = 900,
+      T = [];
+    let END = START;
+    for (const s of SEQ) {
+      T.push(END);
+      END += s[2] || STEP;
+    }
+    const CYC = END + HOLD;
+    let t0 = 0,
+      cyc = -1,
+      popK = -1;
+    const light = nid => {
+      $(nid).classList.add("on");
+      if (nid in LANE) $("rfLane" + LANE[nid]).classList.add("on");
+      if (nid === "nCoder") $("rfPR").classList.add("on");
+    };
+    slides.push({
+      group: "process",
+      notes:
+        "What: An illustrative Repo Factory, the recipe a coding agent follows to give a repository a small set of agentic workflows in five roles. Several Researchers file scoped issues, never pull requests. One Dispatcher admits issues into three shared coding slots on weekdays, so up to three pull request flows run at once. In each flow a coding agent opens the pull request, Reviewers leave at most three findings, Finisher makes bounded repairs or escalates, and a maintainer merges. Dreamer observes runs, costs and outcomes, then proposes one reversible change as a new issue.\nWhy: Handoffs go through issues and pull requests, and capacity is capped, so agents cannot flood the repository and people stay at the gates.\nWhen: Use it to bootstrap continuous improvement in a repository that already has CI and maintainers who review.",
+      enter() {
+        t0 = 0;
+        cyc = -1;
+      },
+      tick(t) {
+        if (!t0) t0 = t;
+        const e = t - t0,
+          c = Math.floor(e / CYC),
+          u = e % CYC;
+        if (c !== cyc) {
+          cyc = c;
+          svg.querySelectorAll(".on, .hot").forEach(x => x.classList.remove("on", "hot"));
+          light("nResearch");
+          popK = -1;
+        }
+        svg.querySelectorAll(".fm-wire.hot").forEach(w => w.classList.remove("hot"));
+        if (u < START || u >= END) {
+          dot.style.opacity = 0;
+          return;
+        }
+        let k = 0;
+        while (k + 1 < SEQ.length && T[k + 1] <= u) k++;
+        const [eid, nid, dur = STEP] = SEQ[k],
+          f = (u - T[k]) / dur,
+          p = $(eid),
+          n = p.getTotalLength(),
+          q = p.getPointAtLength(n * ease(Math.min(1, f / 0.8)));
+        p.classList.add("hot");
+        if (dot.style.opacity !== "1") sfx.pop(0);
+        dot.style.opacity = 1;
+        dot.setAttribute("cx", q.x);
+        dot.setAttribute("cy", q.y);
+        dot.setAttribute("fill", p.classList.contains("b") ? "#4493f8" : "#ab7df8");
+        for (let j = 0; j < k; j++) light(SEQ[j][1]);
+        if (f >= 0.8) {
+          if (popK !== k) {
+            popK = k;
+            sfx.pop(k);
+          }
+          light(nid);
+        }
+      },
+      el: h("section", { class: "slide" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Researchers · Dispatcher · Reviewers · Finisher · Dreamer"), h("h2", {}, letters("Repo "), letters("Factory", "l-grad"))), svg),
     });
   }
 
@@ -24963,6 +25131,11 @@
       "duplicate-code-detector",
       "Add agentic workflow that uses Serena MCP docker … to analyze the changes in commits to main and detect duplicated code.",
       "Add agentic workflow that uses Serena MCP docker (using container feature) to analyze the changes in commits to main and detect duplicated code.",
+    ],
+    "Repo Factory": [
+      "repo-factory",
+      "create a factory that researches this repo daily, dispatches issues to coding agents, reviews and finishes PRs, and dreams up improvements",
+      "create a factory that researches this repository every day, files scoped issues, dispatches up to three at a time to coding agents on weekdays, reviews and finishes the pull requests, and lets a Dreamer propose one reversible improvement at a time for a maintainer to approve.",
     ],
     "Merge fast, unslop daily": [
       "jsweep",
