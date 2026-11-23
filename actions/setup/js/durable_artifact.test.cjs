@@ -142,6 +142,20 @@ describe("durable artifact lineage", () => {
     expect(options.github.paginate).not.toHaveBeenCalled();
   });
 
+  it("rejects numeric continuation_run_id values rounded during JSON parsing", async () => {
+    const options = fixture();
+    options.context.payload = { inputs: { aw_context: '{"continuation_run_id":9007199254740993}' } };
+    await expect(selectCheckpoint(options)).rejects.toThrow("positive integer");
+    expect(options.github.rest.actions.getWorkflowRun).toHaveBeenCalledTimes(1);
+  });
+
+  it("passes large string continuation_run_id values to the API without rounding", async () => {
+    const options = fixture();
+    options.context.payload = { inputs: { aw_context: '{"continuation_run_id":"9007199254740993"}' } };
+    await selectCheckpoint(options).catch(() => {});
+    expect(options.github.rest.actions.getWorkflowRun).toHaveBeenCalledWith(expect.objectContaining({ run_id: "9007199254740993" }));
+  });
+
   it("starts fresh when the last successful run has no artifact, without using older runs", async () => {
     const options = fixture();
     options.github.paginate.mockResolvedValue([]);

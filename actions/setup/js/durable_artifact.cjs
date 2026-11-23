@@ -78,7 +78,7 @@ async function selectCheckpoint({ github, context, core }) {
   if (rawContext && !inbound) throw new Error("Durable continuation requires a valid aw_context object");
   const rawParent = inbound?.continuation_run_id;
   const explicitParent = rawParent === undefined || rawParent === null || rawParent === "" ? undefined : String(rawParent);
-  if (explicitParent !== undefined && (!["string", "number"].includes(typeof rawParent) || !/^[1-9]\d*$/.test(explicitParent))) {
+  if (explicitParent !== undefined && (!["string", "number"].includes(typeof rawParent) || (typeof rawParent === "number" && !Number.isSafeInteger(rawParent)) || !/^[1-9]\d*$/.test(explicitParent))) {
     throw new Error("aw_context continuation_run_id must be a positive integer");
   }
   if (explicitParent === String(current.id)) throw new Error("aw_context continuation_run_id must not reference the current run");
