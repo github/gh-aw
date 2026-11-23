@@ -109,7 +109,8 @@ CC button in the kiosk dock) turns them off or on, and the choice holds for late
 about each slide rolls in as captions at the bottom of the screen, and each slide stays up until its
 conversation ends. C starts kiosk mode if needed, and captions end with it; while it runs, Escape stops it before it
 hides notes. V (or the voice button beside CC in the kiosk dock) reads the same conversation aloud
-with the browser's built-in speech synthesis, alternating two voices (or two pitches), and holds each slide until
+from a pre-recorded two-anchor track (one small Opus file per slide, used only while it matches the slide's captions;
+otherwise the browser's built-in speech synthesis, alternating two voices or two pitches), and holds each slide until
 its last line is spoken (at most 60 s past the slide's dwell); voice is off by default, starts kiosk mode if needed, ends with it, and the choice holds for
 later kiosk runs. Where the browser has no speech synthesis the voice button is disabled. A manual move restarts the countdown, and an open
 dialog holds the current slide. The slide map button (or G) opens a full-screen grid of
