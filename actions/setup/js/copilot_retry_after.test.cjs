@@ -173,6 +173,7 @@ process.exitCode = 1;`
 
   it.each([
     ["stderr", "1", "2000", "", 0, 2, "rate_limit_error"],
+    ["stderr", "1", "2000", "", 0, 2, "rate_limit_error", "github", false],
     ["session.error", "1", "2000", "", 0, 2, "rate_limit_error"],
     ["stderr:session.error", "1", "2000", "", 0, 2, "rate_limit_error"],
     ["error", "1", "1000", "", 0, 2, "rate_limit_error"],
@@ -198,7 +199,7 @@ process.exitCode = 1;`
     ["stderr:assistant.message", "245", "1", "", 0, 2, "partial_execution"],
     ["stderr:tool.execution_complete", "245", "1", "", 0, 2, "partial_execution"],
     ["invocation-cap", "245", "300000", "", 1, 1, "invocation_cap_exceeded"],
-  ])("%s Retry-After=%s with cap=%s and timeout=%s", (source, retryAfter, maxDelay, timeout, exitCode, attempts, failureClass, provider = "github") => {
+  ])("%s Retry-After=%s with cap=%s and timeout=%s (case %#)", (source, retryAfter, maxDelay, timeout, exitCode, attempts, failureClass, provider = "github", established = true) => {
     const directory = fs.mkdtempSync(path.join(os.tmpdir(), "copilot-retry-after-"));
     const callsPath = path.join(directory, "calls.jsonl");
     const stubPath = path.join(directory, "stub.cjs");
@@ -232,6 +233,7 @@ process.exitCode = 1;`
 const callsPath = ${JSON.stringify(callsPath)};
 fs.appendFileSync(callsPath, JSON.stringify({ time: Date.now(), args: process.argv.slice(2) }) + "\\n");
 if (fs.readFileSync(callsPath, "utf8").trim().split("\\n").length === 1) {
+  if (${established}) console.log(JSON.stringify({ type: "session.start", data: { sessionId: process.argv[process.argv.indexOf("--session-id") + 1] } }));
   console.${source.startsWith("stderr") || source === "invocation-cap" ? "error" : "log"}(${plainStderr ? JSON.stringify(message) : `JSON.stringify({ type: ${JSON.stringify(eventType)}, data: { message: ${JSON.stringify(message)} } })`});
   process.exitCode = 1;
 }`
@@ -272,10 +274,15 @@ if (fs.readFileSync(callsPath, "utf8").trim().split("\\n").length === 1) {
       if (failureClass === "rate_limit_error") {
         expect(calls[1].time - calls[0].time).toBeGreaterThanOrEqual(1000);
         expect(telemetry.attempt_results[1].backoff_ms).toBe(1000);
-        if (source === "stderr:incomplete-tool-call-stream") {
-          expect(calls[1].args).not.toContain("--continue");
+        expect(calls[0].args).toContain("--session-id");
+        expect(calls[1].args).toContain("--session-id");
+        expect(calls[1].args).not.toContain("--continue");
+        const firstSessionId = calls[0].args[calls[0].args.indexOf("--session-id") + 1];
+        const retrySessionId = calls[1].args[calls[1].args.indexOf("--session-id") + 1];
+        if (!established || source === "stderr:incomplete-tool-call-stream") {
+          expect(retrySessionId).not.toBe(firstSessionId);
         } else {
-          expect(calls[1].args).toContain("--continue");
+          expect(retrySessionId).toBe(firstSessionId);
         }
       }
       if (failureClass === "rate_limit_wait_exceeded") {
