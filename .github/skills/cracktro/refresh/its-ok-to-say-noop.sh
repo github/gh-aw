@@ -4,14 +4,24 @@
 # saves `gh aw audit <id> --json --artifacts agent` per run, then aggregates only those audit JSONs
 # (noops, missing_tools, missing_data, report_incomplete). Prints one JSON object on stdout.
 # Usage: its-ok-to-say-noop.sh START END [JOBS]   (UTC dates, inclusive; default 8 parallel audits)
-# Env: GH_AW (audit command, default "gh aw"), REPO (default github/gh-aw), OUT (audit cache dir),
-#      SAMPLE (runs to audit, evenly spaced over the window by run ID; default 1000, 0 = all).
+# Env: GH_AW (audit command, default "gh aw"), REPO (default github/gh-aw),
+#      OUT (private audit cache dir you own; default a fresh mktemp dir, so pass OUT to reuse audits on rerun),
+#      SAMPLE (runs to audit, evenly spaced over the window by run ID; default 1000, 0 = all),
+#      ALLOW_PARTIAL (1 = print results even when some audits failed; default fails).
 set -euo pipefail
 START="${1:?START date YYYY-MM-DD}"; END="${2:?END date YYYY-MM-DD}"; JOBS="${3:-8}"
 REPO="${REPO:-github/gh-aw}"
 GH_AW="${GH_AW:-gh aw}"
-OUT="${OUT:-${TMPDIR:-/tmp}/nop-audit}"
 SAMPLE="${SAMPLE:-1000}"
+umask 077
+if [ -z "${OUT:-}" ]; then
+  OUT="$(mktemp -d "${TMPDIR:-/tmp}/nop-audit.XXXXXX")"
+  echo "audit cache: $OUT" >&2
+else
+  mkdir -p "$OUT"
+fi
+if [ -L "$OUT" ] || [ ! -O "$OUT" ]; then echo "OUT must be a directory you own, not a symlink: $OUT" >&2; exit 1; fi
+chmod 700 "$OUT"
 mkdir -p "$OUT/json"
 ALL="$OUT/runs-all.tsv"; IDS="$OUT/runs.tsv"
 
@@ -28,20 +38,31 @@ sort -un "$ALL" | awk -v n="$SAMPLE" '{ id[NR] = $1 } END { if (n <= 0 || n >= N
 
 export GH_AW REPO OUT
 # One run per audit call (several IDs switch audit to diff mode). Saved JSON is reused on rerun.
+# A failed audit keeps its stderr in $OUT/json/<id>.err and exits non-zero.
 # shellcheck disable=SC2016
 xargs -P "$JOBS" -I{} sh -c \
-  'j="$OUT/json/$1.json"; [ -s "$j" ] || { $GH_AW audit "$1" --repo "$REPO" --json --artifacts agent --no-baseline -o "$OUT" > "$j.tmp" 2>/dev/null && mv "$j.tmp" "$j"; rm -f "$j.tmp"; }' _ {} < "$IDS"
+  'j="$OUT/json/$1.json"; [ -s "$j" ] && exit 0
+   if $GH_AW audit "$1" --repo "$REPO" --json --artifacts agent --no-baseline -o "$OUT" > "$j.tmp" 2> "$OUT/json/$1.err" && [ -s "$j.tmp" ]; then
+     mv "$j.tmp" "$j"; rm -f "$OUT/json/$1.err"
+   else rm -f "$j.tmp"; exit 1; fi' _ {} < "$IDS" || true
+
+MISSING="$OUT/missing.txt"
+while read -r id; do [ -s "$OUT/json/$id.json" ] || echo "$id"; done < "$IDS" > "$MISSING"
+if [ -s "$MISSING" ]; then
+  echo "$(wc -l < "$MISSING" | tr -d ' ') sampled audits failed (IDs in $MISSING, stderr in $OUT/json/<id>.err); rerun with the same OUT to retry." >&2
+  [ "${ALLOW_PARTIAL:-0}" = 1 ] || exit 1
+fi
 
 while read -r id; do
-  [ -s "$OUT/json/$id.json" ] && cat "$OUT/json/$id.json"
-done < "$IDS" | jq -s --arg s "$START" --arg e "$END" --arg snap "$(date -u +%F)" --argjson listed "$(sort -u "$ALL" | wc -l)" --argjson sampled "$(wc -l < "$IDS")" '
+  if [ -s "$OUT/json/$id.json" ]; then cat "$OUT/json/$id.json"; fi
+done < "$IDS" | jq -s --arg s "$START" --arg e "$END" --arg snap "$(date -u +%F)" --argjson listed "$(sort -u "$ALL" | wc -l)" --argjson sampled "$(wc -l < "$IDS")" --argjson missing "$(wc -l < "$MISSING")" '
   def kinds: {noop:"noops", missing_tool:"missing_tools", missing_data:"missing_data", report_incomplete:"report_incomplete"};
   map(. as $r | {w:.overview.workflow_name, agent:((.metrics.turns // 0) > 0),
                  n:(kinds | map_values(($r[.] // []) | length))}) as $a
   | ($a | map(select(.agent))) as $g
   | {
     window: {start:$s, end:$e}, snapshot:$snap,
-    runs: $listed, sampled: $sampled, audited: ($a|length), agent_runs: ($g|length),
+    runs: $listed, sampled: $sampled, audited: ($a|length), missing: $missing, agent_runs: ($g|length),
     runs_with: (kinds | with_entries(.key as $k | .value = ($g | map(select(.n[$k] > 0)) | length))),
     items: (kinds | with_entries(.key as $k | .value = ([$g[].n[$k]] | add // 0))),
     quiet: ($g | map(select(.n.noop > 0 and .n.missing_tool == 0 and .n.missing_data == 0 and .n.report_incomplete == 0)) | length),

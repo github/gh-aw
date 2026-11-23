@@ -27,7 +27,7 @@ Recompute with `its-ok-to-say-noop.sh` (wraps `gh aw audit`), then patch `deck.j
 ## 2. Window & snapshot
 
 - Seven complete UTC days ending the day before the snapshot (run `created` date). Snapshot = the day you run the script (`snapshot` field, UTC).
-- Roll forward by passing new `START END`. Each audit JSON is saved as `$OUT/json/<id>.json`; reruns skip saved runs.
+- Roll forward by passing new `START END`. Each audit JSON is saved as `$OUT/json/<id>.json`; reruns with the same `OUT` skip saved runs.
 
 ## 3. Sources
 
@@ -38,8 +38,12 @@ Recompute with `its-ok-to-say-noop.sh` (wraps `gh aw audit`), then patch `deck.j
 ## 4. Queries
 
 ```bash
-GH_AW="gh aw" .github/skills/cracktro/refresh/its-ok-to-say-noop.sh 2026-11-15 2026-11-21 12 > "$TMPDIR/nop.json"
+OUT="$(mktemp -d "$TMPDIR/nop-audit.XXXXXX")"
+GH_AW="gh aw" OUT="$OUT" .github/skills/cracktro/refresh/its-ok-to-say-noop.sh 2026-11-15 2026-11-21 12 > "$TMPDIR/nop.json"
 ```
+
+- `OUT`: audit cache. Unset, the helper creates a fresh private `mktemp -d` dir (printed on stderr), so pass `OUT` to reuse audits across reruns. A supplied `OUT` must be a directory you own (not a symlink); it is set to mode 700.
+- Failed audits: stderr stays in `$OUT/json/<id>.err`, IDs in `$OUT/missing.txt`, and the helper exits non-zero without output. Rerun with the same `OUT` to retry only those. `ALLOW_PARTIAL=1` prints anyway with `missing` > 0; never publish such a result.
 
 - `GH_AW`: audit command (`gh aw`, or a local build: `go build -o "$TMPDIR/gh-aw-bin" ./cmd/gh-aw`; `$TMPDIR/gh-aw` may already be a directory). Needs `gh` auth, `jq`, `xargs`. `SAMPLE` (default 1000) audits evenly spaced runs by run ID; about 200 audits/min at 16 jobs. A week is ~7,000 runs.
 - Listing is per workflow: the repo-wide runs list caps filtered results at 1,000, under one day here.
@@ -48,7 +52,7 @@ GH_AW="gh aw" .github/skills/cracktro/refresh/its-ok-to-say-noop.sh 2026-11-15 2
 Output shape:
 
 ```json
-{ "window": {"start","end"}, "snapshot", "runs", "sampled", "audited", "agent_runs",
+{ "window": {"start","end"}, "snapshot", "runs", "sampled", "audited", "missing", "agent_runs",
   "runs_with": {"noop","missing_tool","missing_data","report_incomplete"},
   "items": {…same keys…}, "quiet", "top_noop": [{"w","n"}] }
 ```
@@ -87,6 +91,7 @@ cd docs && npx playwright test tests/talk.spec.ts
 ## 7. Pitfalls
 
 - **Truncated listing:** never use the repo-wide `actions/runs?created=` list; it silently stops at 1,000.
+- **Partial sample:** rate limits or transient errors fail single audits; the helper stops rather than shrink the denominator. Publish only with `missing: 0`.
 - **Diff mode:** `gh aw audit` with several IDs diffs them against the first; the helper audits one run per call.
 - **Audit version:** `report_incomplete` in the audit JSON needs a gh-aw build that includes it; older builds omit the field and report 0.
 - **No `safe_output_summary`:** with `--artifacts agent` the audit JSON leaves it null; count from the per-type arrays instead.

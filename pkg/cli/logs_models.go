@@ -350,9 +350,10 @@ type RunAnalysis struct {
 // - If the CLI version in the summary doesn't match the current version, the run is reprocessed
 // - This ensures that bug fixes and improvements in log parsing are automatically applied
 type RunSummary struct {
-	CLIVersion  string    `json:"cli_version"`  // CLI version used to process this run
-	RunID       int64     `json:"run_id"`       // Workflow run database ID
-	ProcessedAt time.Time `json:"processed_at"` // When this summary was created
+	SchemaVersion int       `json:"schema_version"` // Run summary schema version (cache invalidation key)
+	CLIVersion    string    `json:"cli_version"`    // CLI version used to process this run
+	RunID         int64     `json:"run_id"`         // Workflow run database ID
+	ProcessedAt   time.Time `json:"processed_at"`   // When this summary was created
 	RunAnalysis
 	PolicyAnalysis *PolicyAnalysis `json:"policy_analysis,omitempty"` // Firewall policy rule attribution
 	ArtifactsList  []string        `json:"artifacts_list"`            // List of downloaded artifact files

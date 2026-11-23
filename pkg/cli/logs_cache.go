@@ -18,6 +18,10 @@ import (
 
 var logsCacheLog = logger.New("cli:logs_cache")
 
+// runSummarySchemaVersion invalidates cached run summaries whose shape predates
+// newly derived fields (e.g. report_incomplete) even when cli_version matches.
+const runSummarySchemaVersion = 1
+
 // loadRunSummary attempts to load a run summary from disk
 // Returns the summary and a boolean indicating if it was successfully loaded and is valid
 func loadRunSummary(outputDir string, verbose bool) (*RunSummary, bool) {
@@ -56,6 +60,14 @@ func loadRunSummary(outputDir string, verbose bool) (*RunSummary, bool) {
 		logsCacheLog.Printf("CLI version mismatch: cached=%s, current=%s", summary.CLIVersion, currentVersion)
 		if verbose {
 			fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Run summary version mismatch (cached: %s, current: %s), will reprocess", summary.CLIVersion, currentVersion)))
+		}
+		return nil, false
+	}
+
+	if summary.SchemaVersion != runSummarySchemaVersion {
+		logsCacheLog.Printf("Run summary schema mismatch: cached=%d, current=%d", summary.SchemaVersion, runSummarySchemaVersion)
+		if verbose {
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Run summary schema mismatch (cached: %d, current: %d), will reprocess", summary.SchemaVersion, runSummarySchemaVersion)))
 		}
 		return nil, false
 	}
@@ -166,8 +178,11 @@ func saveRunSummary(outputDir string, summary *RunSummary, verbose bool) error {
 	logsCacheLog.Printf("Saving run summary to cache: dir=%s, run_id=%d", outputDir, summary.RunID)
 	summaryPath := filepath.Join(outputDir, runSummaryFileName)
 
+	stamped := *summary
+	stamped.SchemaVersion = runSummarySchemaVersion
+
 	// Marshal to JSON with indentation for readability
-	data, err := json.MarshalIndent(summary, "", "  ")
+	data, err := json.MarshalIndent(&stamped, "", "  ")
 	if err != nil {
 		logsCacheLog.Printf("Failed to marshal run summary: %v", err)
 		return fmt.Errorf("failed to marshal run summary: %w", err)

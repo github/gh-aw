@@ -872,15 +872,23 @@ test.describe("agentic engineering slides", () => {
   });
 
   test("replaces an invented output with an honest noop or report", async ({ page }) => {
-    const errors = await open(page, "It’s ok to say no(op)", 23_800);
+    const errors = await open(page, "It’s ok to say no(op)", 1_000);
     for (const text of ["noop", "report_missing_tool", "report_missing_data", "report_incomplete"]) {
       await expect(page.locator(".nop-side")).toContainText(text);
     }
-    await expect(page.locator(".nop-step span.on")).toHaveCount(4);
-    await expect(page.locator(".nop-bad")).toHaveClass(/\bdone\b/);
-    await expect(page.locator(".nop-bad")).toContainText("✕ hides failure");
-    await expect(page.locator(".nop-good")).toContainText("report_incomplete");
-    await expect(page.locator(".nop-row.on")).toHaveText(/report_incomplete/);
+    // The scenarios cycle; sample the fourth scenario's final state atomically instead of at a fixed delay.
+    await expect
+      .poll(
+        () =>
+          page.evaluate(() => ({
+            steps: document.querySelectorAll(".nop-step span.on").length,
+            bad: document.querySelector(".nop-bad.done")?.textContent?.includes("✕ hides failure") ?? false,
+            good: document.querySelector(".nop-good")?.textContent?.includes("report_incomplete") ?? false,
+            row: document.querySelector(".nop-row.on")?.textContent?.includes("report_incomplete") ?? false,
+          })),
+        { timeout: 40_000, intervals: [250] }
+      )
+      .toEqual({ steps: 4, bad: true, good: true, row: true });
     await expect(page.locator(".nop-row em")).toHaveCount(4);
     await expect(page.locator(".nop-cap")).toContainText(/MEASURED · gh aw audit .* snapshot .* illustrative/);
     expect(errors).toEqual([]);
