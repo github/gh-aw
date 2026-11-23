@@ -247,6 +247,12 @@ func (c *Compiler) collectEngineVersionsForMetadata(data *WorkflowData) map[stri
 			detectionEngineID = strings.TrimSpace(detectionConfig.ID)
 		}
 		activeEngineIDs[detectionEngineID] = struct{}{}
+		// When both jobs use Copilot, keep the main default unless the detector pins a version.
+		if detectionEngineID == string(constants.CopilotEngine) && detectionEngineID != mainEngineID &&
+			isFeatureEnabled(constants.GHAWDetectionFeatureFlag, data) {
+			detectionData := buildExternalDetectorWorkflowData(data, detectionEngineID)
+			versions[detectionEngineID] = getDefaultCopilotCLIVersion(detectionData)
+		}
 		applyMetadataEngineVersionOverrides(versions, detectionConfig, detectionEngineID)
 	}
 
