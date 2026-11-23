@@ -85,7 +85,7 @@
   },
   {
     "name": "ledger_append",
-    "description": "Submit a custom record or a typed operation to a configured Git-backed ledger. Supported built-in types: counter, log, set, table. For map ledgers, use ledger_map_put or ledger_map_delete instead. Use `record` only for custom ledgers; for counter, log, set, and table ledgers send `operation` plus `value` (or `key`/`patch`/`name`/`amount`) and no `record`. `record` and `value` must be real JSON objects, never JSON-encoded strings. Persistence follows trusted validation.",
+    "description": "Submit a custom record or a typed operation to a configured Git-backed ledger. Supported built-in types: counter, log, set, table. For map ledgers, use ledger_map_put or ledger_map_delete instead. Use `record` only for custom ledgers; it must be a JSON object. For built-in ledgers send `operation` plus `value` (or `key`/`patch`/`name`/`amount`) and no `record`. Match `value` to the configured ledger type/schema; pass an object when required (including table `insert`/`upsert`), not a JSON-encoded string. Persistence follows trusted validation.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -97,7 +97,11 @@
           "enum": ["append", "add", "remove", "put", "delete", "insert", "update", "upsert", "increment", "decrement"],
           "description": "Built-in ledger operation (allowed operations depend on its configured type)."
         },
-        "value": { "type": ["object", "array", "string", "number", "boolean", "null"], "x-preserve-blank": true, "description": "Value for append, add, remove, put, insert, or upsert. For log and table ledgers this is normally a JSON object: pass `{\"head_sha\":\"abc\",\"finding_count\":1}`, never a JSON-encoded string such as `\"{\\\"head_sha\\\":...}\"` (rejected with 'value must be a object')." },
+        "value": {
+          "type": ["object", "array", "string", "number", "boolean", "null"],
+          "x-preserve-blank": true,
+          "description": "Value for append, add, remove, put, insert, or upsert. For a log ledger whose configured schema requires an object, or a table `insert`/`upsert`, pass a JSON object such as `{\"head_sha\":\"abc\",\"finding_count\":1}` directly, not a JSON-encoded string such as `\"{\\\"head_sha\\\":...}\"`; in these cases the string is rejected with `value must be a object`. Other ledger types/schema may accept scalar values."
+        },
         "key": { "type": "string", "description": "String key for put, delete, or update." },
         "patch": { "type": "object", "description": "Shallow object merge patch for table update." },
         "name": { "type": "string", "description": "Counter name." },
