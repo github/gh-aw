@@ -29,15 +29,16 @@ func TestCompilerLintPrivilegedCodeDiagnostics(t *testing.T) {
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
+			data := &WorkflowData{Tools: map[string]any{"github": map[string]any{"min-integrity": "approved"}}}
 			compiler := NewCompiler(WithLint(true))
-			require.NoError(t, compiler.lintCompiledWorkflow(&WorkflowData{}, tt.source, "test.md"))
+			require.NoError(t, compiler.lintCompiledWorkflow(data, tt.source, "test.md"))
 			require.Equal(t, 1, compiler.GetWarningCount(), "default compiler lint must report the new warning")
 			replacement := "allow-unsafe-pr-checkout: false"
 			if tt.name == "cross-run execution" {
 				replacement = "cat incoming/run.sh"
 			}
 			compiler = NewCompiler(WithLint(true))
-			require.NoError(t, compiler.lintCompiledWorkflow(&WorkflowData{}, strings.ReplaceAll(tt.source, tt.safe, replacement), "test.md"))
+			require.NoError(t, compiler.lintCompiledWorkflow(data, strings.ReplaceAll(tt.source, tt.safe, replacement), "test.md"))
 			require.Zero(t, compiler.GetWarningCount(), "safe base configuration and data-only consumers remain accepted")
 			compiler = NewCompiler(WithLint(false))
 			require.NoError(t, compiler.lintCompiledWorkflow(&WorkflowData{}, tt.source, "test.md"))

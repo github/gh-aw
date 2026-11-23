@@ -44,6 +44,7 @@ import (
 	"github.com/github/gh-aw/pkg/linters/goroutinemissingrecover"
 	"github.com/github/gh-aw/pkg/linters/goroutineresourceleak"
 	"github.com/github/gh-aw/pkg/linters/hardcodedfilepath"
+	"github.com/github/gh-aw/pkg/linters/hasprefixdotdotpathescape"
 	"github.com/github/gh-aw/pkg/linters/httpclientnotimeout"
 	"github.com/github/gh-aw/pkg/linters/httpnoctx"
 	"github.com/github/gh-aw/pkg/linters/httprespbodyclose"
@@ -127,7 +128,7 @@ type docAnalyzer struct {
 }
 
 // documentedAnalyzers returns the analyzer subpackages documented in the README
-// "Public API > Subpackages" table. The README documents 100 analyzer
+// "Public API > Subpackages" table. The README documents 102 analyzer
 // subpackages (the non-analyzer `internal` helper subpackage is excluded because
 // it exposes no Analyzer).
 //
@@ -135,7 +136,7 @@ type docAnalyzer struct {
 //
 //	appendbytestring, appendoneelement, blankassigncomma, blankassignedcleanuperror, bufferresetbeforereuse, bufioscannererunchecked, bytesbufferstring, bytescomparestring, closeerrorunchecked, contextcancelnotdeferred, ctxbackground, deferinloop, deferrerrorunchecked, errorfwrapv, excessivefuncparams, errormessage, errorsnewerrorstring,
 //	errortypeassertion, errstringmatch, execcommandoutputerrdiscard, execcommandwithoutcontext, fileclosenotdeferred, filepathwalkpreferwalkdir, fmterrorfnoverbs, formatintitoa, fprintferrorunchecked, fprintlnsprintf,
-//	generatedyamlheredoc, globwalkignorederror, goroutinemissingrecover, goroutineresourceleak, hardcodedfilepath, httpclientnotimeout, httpnoctx, httprespbodyclose, httpstatuscode, ignoredlocalerror, ioutildeprecated, jsondecodertrailingdataunchecked, jsonmarshalignoredeerror, jsonunmarshalbytesconversion, largefunc, lenstringsplit, lenstringzero,
+//	generatedyamlheredoc, globwalkignorederror, goroutinemissingrecover, goroutineresourceleak, hardcodedfilepath, hasprefixdotdotpathescape, httpclientnotimeout, httpnoctx, httprespbodyclose, httpstatuscode, ignoredlocalerror, ioutildeprecated, jsondecodertrailingdataunchecked, jsonmarshalignoredeerror, jsonunmarshalbytesconversion, largefunc, lenstringsplit, lenstringzero,
 //	logfatallibrary, manualmutexunlock, manualpathconcat, mapclearloop, mapdeletecheck, nilctxpassed, osexitinlibrary, osgetenvlibrary, osisnotexist, osopenreadallpreferreadfile, osremoveuncheckedcleanup, osstatignoredeerrorderef, ossetenvlibrary, packagelevelmutableslicemap, panic-in-library-code, prefercutprefix, rawloginlib,
 //	readerstringconv, reflectdeepequalusage, regexpcompileinfunction, regexpdynamicpattern, seenmapbool, slicemakezerolength, sortbasicslices, sortslice, splitindexzero, splitlines-on-newline, sprintferrdot, sprintferrorsnew, sprintfbool, sprintfint, ssljson,
 //	strconvparseignorederror, stringbytesroundtrip, stringreplaceminusone, stringsconcatloop, stringscountcontains, stringsindexcontains, stringsindexhasprefix, stringsjoinone, stringssplitfirst,
@@ -176,6 +177,7 @@ func documentedAnalyzers() []docAnalyzer {
 		{"goroutinemissingrecover", goroutinemissingrecover.Analyzer},
 		{"goroutineresourceleak", goroutineresourceleak.Analyzer},
 		{"hardcodedfilepath", hardcodedfilepath.Analyzer},
+		{"hasprefixdotdotpathescape", hasprefixdotdotpathescape.Analyzer},
 		{"httpclientnotimeout", httpclientnotimeout.Analyzer},
 		{"httpnoctx", httpnoctx.Analyzer},
 		{"httprespbodyclose", httprespbodyclose.Analyzer},

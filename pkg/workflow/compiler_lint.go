@@ -42,13 +42,7 @@ func (c *Compiler) lintCompiledWorkflow(data *WorkflowData, content, sourcePath 
 		failures = append(failures, checkoutErr)
 	}
 	for _, diagnostic := range diagnostics {
-		_, exemptCheckout := checkouts[diagnostic.Path]
-		if diagnostic.RuleID == "artipacked" && diagnostic.Severity == workflowlint.Warning && exemptCheckout {
-			continue
-		}
-		if diagnostic.Severity == workflowlint.Warning && (diagnostic.RuleID == "secret-leak" ||
-			diagnostic.RuleID == "grader-file-io" || diagnostic.RuleID == "environment-file-injection" ||
-			diagnostic.RuleID == "template-injection" && strings.HasPrefix(diagnostic.Message, "Incomplete template-injection output-flow analysis:")) {
+		if c.omitCompilerLintWarning(data, diagnostic, checkouts) {
 			continue
 		}
 		message := fmt.Sprintf("[%s] %s at %s (script line %d)",
@@ -78,7 +72,31 @@ func (c *Compiler) lintCompiledWorkflow(data *WorkflowData, content, sourcePath 
 	return nil
 }
 
+func (c *Compiler) omitCompilerLintWarning(data *WorkflowData, diagnostic workflowlint.Diagnostic, checkouts map[string]struct{}) bool {
+	if diagnostic.Severity != workflowlint.Warning {
+		return false
+	}
+	// Deduplicate CTR-008 only when validation emitted the equivalent warning.
+	if diagnostic.RuleID == "dangerous-triggers" && diagnostic.ThreatRuleID == "CTR-008" &&
+		data.pullRequestTargetWarned {
+		return true
+	}
+	_, exemptCheckout := checkouts[diagnostic.Path]
+	return diagnostic.RuleID == "artipacked" && exemptCheckout ||
+		diagnostic.RuleID == "secret-leak" || diagnostic.RuleID == "grader-file-io" ||
+		diagnostic.RuleID == "environment-file-injection" ||
+		diagnostic.RuleID == "template-injection" && strings.HasPrefix(diagnostic.Message, "Incomplete template-injection output-flow analysis:")
+}
+
 func (c *Compiler) compilerLintInput(data *WorkflowData, graph *actions.Workflow, sourcePath string) workflowlint.Input {
+	resolvedTools := data.Tools
+	if _, disabled := data.ExplicitlyDisabledTools["github"]; disabled {
+		resolvedTools = maps.Clone(resolvedTools)
+		if resolvedTools == nil {
+			resolvedTools = make(map[string]any)
+		}
+		resolvedTools["github"] = false
+	}
 	generatedActionRefs := compilerGeneratedActionRefs(data)
 	// An explicit --action-tag is a caller-selected reference override. Do not
 	// let compiler ownership downgrade mutable fallback refs; callers must opt in
@@ -88,6 +106,7 @@ func (c *Compiler) compilerLintInput(data *WorkflowData, graph *actions.Workflow
 	}
 	return workflowlint.Input{
 		Workflow: graph, Document: c.lintPolicyDocument(data), AuthoredJobs: data.Jobs, SourcePath: sourcePath,
+		ResolvedTools: resolvedTools, ResolvedRoles: c.dryRunWorkflowData(data).Roles,
 		AllowActionRefs: c.allowActionRefs, SafeOutputJobs: safeOutputLintJobs(data), GeneratedActionRefs: generatedActionRefs,
 	}
 }
