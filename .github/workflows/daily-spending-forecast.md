@@ -19,8 +19,10 @@ imports:
   - shared/trending-charts-simple.md
   - shared/reporting.md
 tools:
+  cli-proxy: true
   github:
     mode: local
+    toolsets: [repos, issues, actions]
   agentic-workflows: true
 steps:
   - name: Build gh-aw from source
@@ -122,17 +124,34 @@ The structured initial command output is in
    samples, outliers, inconsistent date windows, implausible run frequencies, missing
    workflows, and confidence intervals that are too broad to support a reliable budget.
    Do not invent missing values.
-3. If the prepared output is incomplete or suspicious, rerun
-   `$GITHUB_WORKSPACE/gh-aw forecast` with targeted arguments (including `--eval` when
-   backtesting would clarify accuracy). If sample collection still fails — especially
-   when `sampled_runs` is zero for all workflows or artifact downloads fail — you MUST
-   use the `agentic-workflows` MCP server to inspect recent runs and usage artifacts
-   and derive observed/projected AIC directly from that evidence.
+3. If the prepared output is incomplete or suspicious, first use the mounted
+   `agenticworkflows` CLI: run `agenticworkflows --help`, then the selected read
+   command's `--help` for its actual schema. Use `logs` or `audit` to inspect recent
+   runs and usage artifacts and derive spending only from returned evidence.
+   Do not call tool-search/discovery functions or invent MCP tools. Do not use
+   `mcp-inspect`, start servers, dispatch workflows, or change credentials.
+   GitHub reads may also use the mounted `github` CLI (`github --help`, then the
+   selected command's `--help`), which calls the configured read-only MCP server
+   through its existing integrity policy. Shell `gh` is not authenticated.
+   The runner's `$GITHUB_WORKSPACE/gh-aw forecast` uses a step-scoped token that is
+   not available in the agent sandbox; do not rerun that binary as an authenticated
+   recovery path. If supported reads fail or cannot establish sample coverage,
+   report the evidence as unavailable, not zero spending or a reliable projection,
+   and finish with `report_incomplete` after publishing the operational report.
    Preserve any additional structured output in the spending forecast directory so it
    is included in the artifact, but do not persist process stdout or stderr logs. Limit
    follow-up to the evidence needed to resolve or document the discrepancy.
 4. Calculate historical spending from `run_samples[].aic` and clearly distinguish
    observed spending from projected spending.
+
+Before writing output, read the complete [Terminology](#terminology),
+[Charts](#charts), and [Report](#report) sections below for percentile definitions,
+chart scripts, paths, upload procedure and report format. Save `report.md` in the
+spending forecast directory and create at most one issue with the same body.
+If evidence remains insufficient, publish diagnostics without fabricated
+projections and call `report_incomplete`. Do not treat missing samples as zero.
+
+<!-- instruction-prefix-end -->
 
 ## Terminology
 

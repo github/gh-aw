@@ -74,7 +74,8 @@ func appendCustomMCPServerIfEligible(servers []string, toolName string, toolValu
 // when tools.cli-proxy is true.
 //
 // Returns nil when no servers are eligible for mounting.
-// The GitHub MCP server is excluded (handled differently).
+// GitHub is included for explicit Codex CLI proxy workflows and active Copilot
+// mounts; other engines retain their native GitHub MCP configuration.
 func getMCPCLIServerNames(data *WorkflowData) []string { //nolint:largefunc // Existing CLI proxy selection handles all supported tool sources.
 	if data == nil {
 		return nil
@@ -118,6 +119,14 @@ func getMCPCLIServerNames(data *WorkflowData) []string { //nolint:largefunc // E
 				servers = append(servers, name)
 			}
 		}
+	}
+
+	// Codex CLI proxy workflows need the GitHub wrapper advertised and excluded
+	// from native MCP discovery, just like their other CLI-mounted servers.
+	if data.ParsedTools != nil && data.ParsedTools.CLIProxy &&
+		data.EngineConfig != nil && data.EngineConfig.ID == string(constants.CodexEngine) &&
+		data.Tools["github"] != false && hasGitHubTool(data.ParsedTools) && !isGitHubCLIModeEnabled(data) {
+		servers = append(servers, constants.GitHubMCPServerID.String())
 	}
 
 	// Infrastructure servers (safeoutputs, mcpscripts) are always CLI-mounted when
