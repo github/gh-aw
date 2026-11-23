@@ -353,9 +353,11 @@ function* responseErrors(output) {
       }
       continue;
     }
-    const end = record.type === "invalid" && !record.rawLine.trimStart().startsWith("{") ? htmlResponseEnd(lines, index, false) : null;
+    // Parsed transcript records must use native diagnostic attribution, never raw text.
+    const isPlainText = record.type === "invalid" && !record.rawLine.trimStart().startsWith("{");
+    const end = isPlainText ? htmlResponseEnd(lines, index, false) : null;
     yield {
-      authentication: AUTHENTICATION_FAILED_PATTERNS.some(pattern => pattern.test(record.rawLine)),
+      authentication: isPlainText && AUTHENTICATION_FAILED_PATTERNS.some(pattern => pattern.test(record.rawLine)),
       html: end !== null,
       endOffset: end === null ? offset : offset + lines.slice(index + 1, end + 1).reduce((sum, line) => sum + line.length, 0),
     };

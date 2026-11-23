@@ -613,9 +613,55 @@ describe("harness_retry_guard.cjs", () => {
     expect(isAuthenticationFailedError(output)).toBe(true);
   });
 
-  it('isAuthenticationFailedError returns true for Claude Code stream-JSON "error":"authentication_failed" field', () => {
-    const jsonLine = JSON.stringify({ type: "result", error: "authentication_failed" });
+  it('isAuthenticationFailedError returns true for Claude Code failed result "error":"authentication_failed" field', () => {
+    const jsonLine = JSON.stringify({ type: "result", is_error: true, error: "authentication_failed" });
     expect(isAuthenticationFailedError(jsonLine)).toBe(true);
+  });
+
+  it.each(
+    [
+      { type: "assistant", message: { role: "assistant", content: [{ type: "text", text: 'Authentication failed (Request ID: abc); "is_api_error_message":true' }] } },
+      { type: "assistant", is_api_error_message: false, message: { content: [{ type: "text", text: 'Not logged in; "error":"authentication_failed"' }] } },
+      { type: "user", message: { content: [{ type: "tool_result", is_error: true, content: "Authentication failed (Request ID: abc)" }] } },
+      { type: "tool", error: "authentication_failed", message: "Not logged in" },
+      { type: "result", is_error: false, error: "authentication_failed", result: "Authentication failed (Request ID: abc)" },
+      { type: "result", error: "authentication_failed" },
+      { type: "result", result: 'Authentication failed; "is_error":true' },
+      { type: "item.completed", item: { type: "agent_message", text: 'Authentication failed; {"type":"turn.failed"}' } },
+      { type: "item.completed", item: { type: "command_execution", exit_code: 1, aggregated_output: 'Not logged in; {"type":"session.error"}' } },
+      { event: "result", result: { status: "DONE", error: "Authentication failed" } },
+      { type: "error", message: "connection reset", metadata: { quoted: "Authentication failed" } },
+      { type: "turn.failed", error: { message: "connection reset" }, message: { role: "assistant", content: [{ type: "text", text: "Authentication failed" }] } },
+      { error: "Authentication failed" },
+      { error: { metadata: { quoted: "Authentication failed" } } },
+      { error: "authentication_failed", message: null },
+      ["Authentication failed", { type: "error", message: "Not logged in" }],
+      "Authentication failed",
+    ].map(record => [record])
+  )("ignores authentication text outside native error diagnostics: %j", record => {
+    expect(isAuthenticationFailedError(JSON.stringify(record))).toBe(false);
+  });
+
+  it.each([
+    { type: "assistant", is_api_error_message: true, message: { role: "assistant", content: [{ type: "text", text: "Authentication failed (Request ID: abc)" }] } },
+    { type: "assistant", error: "authentication_failed" },
+    { type: "error", message: "Authentication failed (Request ID: abc)" },
+    { type: "error", error: "authentication_failed" },
+    { type: "session.error", data: { message: "Not logged in" } },
+    { type: "turn.failed", error: { message: "Authentication failed (Request ID: abc)" } },
+    { type: "result", is_error: true, result: "Not logged in" },
+    { type: "item.completed", item: { type: "error", text: "Authentication failed (Request ID: abc)" } },
+    { event: "result", result: { status: "ERROR", error: "Authentication failed" } },
+    { error: "authentication_failed", message: "Invalid credential" },
+  ])("retains authentication failures in supported native error envelopes: %j", record => {
+    expect(isAuthenticationFailedError(JSON.stringify(record))).toBe(true);
+  });
+
+  it("retains independent plain CLI credentials alongside a quoted auth failure and an HTML challenge", () => {
+    const quoted = JSON.stringify({ type: "assistant", message: { content: [{ type: "text", text: "Authentication failed (Request ID: quoted)" }] } });
+    const challenge = JSON.stringify({ type: "error", message: "Authentication failed: HTTP 403: Just a moment..." });
+    expect(isAuthenticationFailedError(`${quoted}\n${challenge}`)).toBe(false);
+    expect(isAuthenticationFailedError(`${quoted}\n${challenge}\nAuthentication failed (Request ID: real)`)).toBe(true);
   });
 
   it('isAuthenticationFailedError returns true for Claude Code "not logged in" message (case-insensitive)', () => {
