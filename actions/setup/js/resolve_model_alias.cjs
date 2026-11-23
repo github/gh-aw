@@ -486,8 +486,6 @@ function isExplicitModelId(modelId) {
  * - when no `/reflect` catalogue can exist on this run (`noCatalog`, set when AWF is
  *   disabled), an explicit overlay id or a version-shaped built-in alias matching
  *   its provider pattern passes through as exact; other aliases fail with catalog_unavailable.
- * - `catalogOptional` (an explicit BYOK provider that may expose no `/models` route) applies
- *   the same pass-through when the catalogue for the model's scope is empty.
  *
  * `resolvedModel` keeps the configured form: a provider-prefixed alias resolves to a
  * provider-prefixed id, a provider-scoped bare alias resolves to a bare id, and an
@@ -501,7 +499,6 @@ function isExplicitModelId(modelId) {
  *   provider?: string,
  *   preserveAuto?: boolean,
  *   noCatalog?: boolean,
- *   catalogOptional?: boolean,
  *   logger?: (msg: string) => void,
  *   logPrefix?: string,
  * }} options
@@ -548,10 +545,6 @@ function resolveConfiguredModel(options) {
   if (isLiveModelId(aliasKey, catalog)) {
     // A live exact id wins over an alias with the same name (for example gpt-5-mini).
     logger(`${logPrefix}: '${configuredModel}' is a live model id${scope ? ` (provider=${scope})` : ""}; not resolving it as an alias`);
-    return exact;
-  }
-  if (catalog.length === 0 && options.catalogOptional && (isExplicitModelId(aliasKey) || isNativeModelId)) {
-    logger(`${logPrefix}: no live catalogue for the explicit provider; '${configuredModel}' is an explicit model id${scope ? ` (provider=${scope})` : ""}; passing it through as exact`);
     return exact;
   }
   if (catalog.length === 0) {
@@ -649,6 +642,22 @@ async function resolveConfiguredModelWithRefresh(options) {
  * workflow defines and imports no aliases.
  */
 const MODEL_ALIASES_ENV_VAR = "GH_AW_MODEL_ALIASES";
+
+/**
+ * Environment variable the compiler sets to "false" on engine steps when the workflow sets
+ * `engine.model-catalog: false`: configured models are passed to the engine verbatim,
+ * without alias resolution or a live model-catalogue lookup.
+ */
+const MODEL_CATALOG_ENV_VAR = "GH_AW_MODEL_CATALOG";
+
+/**
+ * Whether the workflow disabled live model-catalogue resolution (`engine.model-catalog: false`).
+ * @param {NodeJS.ProcessEnv} [env]
+ * @returns {boolean}
+ */
+function isModelCatalogDisabled(env = process.env) {
+  return String(env[MODEL_CATALOG_ENV_VAR] || "").trim() === "false";
+}
 
 /** @type {Record<string, string[]>|null|undefined} */
 let builtinModelAliases;
@@ -764,6 +773,9 @@ function recordModelResolution(record, env = process.env) {
  * `noCatalog` defaults to true when AWF is disabled (`AWF_REFLECT_ENABLED` is not "1")
  * and neither `/reflect` data nor a catalogue is supplied.
  *
+ * When the workflow sets `engine.model-catalog: false` (`GH_AW_MODEL_CATALOG=false`), the
+ * configured model is used verbatim: no alias is resolved and no catalogue is required.
+ *
  * @param {Omit<Parameters<typeof resolveConfiguredModel>[0], "aliasMap"> & {
  *   aliasMap?: Record<string, string[]>|null,
  *   engine: string,
@@ -780,7 +792,9 @@ async function resolveEngineModel(options) {
   const env = options.env || process.env;
   const role = options.role || "main";
   const configuredModel = String(options.configuredModel || "").trim();
-  const aliasMap = options.aliasMap !== undefined ? options.aliasMap : loadModelAliasMap({ reflectData: options.reflectData, env });
+  const catalogDisabled = isModelCatalogDisabled(env);
+  if (catalogDisabled) logger(`model resolution: engine=${options.engine} role=${role} engine.model-catalog is false; using '${configuredModel}' verbatim`);
+  const aliasMap = catalogDisabled ? null : options.aliasMap !== undefined ? options.aliasMap : loadModelAliasMap({ reflectData: options.reflectData, env });
   // Without AWF no /reflect catalogue can exist; an explicit catalogue or /reflect data overrides.
   const noCatalog = options.noCatalog ?? (env.AWF_REFLECT_ENABLED !== "1" && !options.reflectData && !Array.isArray(options.catalog));
   const record = (/** @type {any} */ fields) => {
@@ -814,6 +828,8 @@ module.exports = {
   loadModelAliasMap,
   mergeParams,
   MODEL_ALIASES_ENV_VAR,
+  MODEL_CATALOG_ENV_VAR,
+  isModelCatalogDisabled,
   MODEL_RESOLUTION_RECORD_PATH,
   ModelAliasResolutionError,
   normalizeForCopilotCLI,

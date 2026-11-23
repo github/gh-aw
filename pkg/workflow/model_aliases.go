@@ -321,7 +321,21 @@ func applyModelAliasOverridesEnv(env map[string]string, envVar string, data *Wor
 	env[envVar] = string(aliases)
 }
 
-// applyModelAliasesEnv sets modelAliasesEnvVar to the workflow-defined and imported aliases.
+// modelCatalogEnvVar is set to "false" when the workflow sets `engine.model-catalog: false`
+// (see MODEL_CATALOG_ENV_VAR in resolve_model_alias.cjs): the harness then passes the
+// configured model verbatim instead of resolving it against the live model catalogue.
+const modelCatalogEnvVar = "GH_AW_MODEL_CATALOG"
+
+// applyModelAliasesEnv sets modelAliasesEnvVar to the workflow-defined and imported aliases,
+// and modelCatalogEnvVar when the workflow disables live model-catalogue resolution.
 func applyModelAliasesEnv(env map[string]string, data *WorkflowData) {
 	applyModelAliasOverridesEnv(env, modelAliasesEnvVar, data)
+	applyModelCatalogEnv(env, data)
+}
+
+// applyModelCatalogEnv sets modelCatalogEnvVar to "false" for `engine.model-catalog: false`.
+func applyModelCatalogEnv(env map[string]string, data *WorkflowData) {
+	if data != nil && data.EngineConfig != nil && data.EngineConfig.ModelCatalogDisabled {
+		env[modelCatalogEnvVar] = "false"
+	}
 }

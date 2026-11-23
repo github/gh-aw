@@ -438,6 +438,18 @@ func TestModelAliasesEnvWithoutAWF(t *testing.T) {
 	assert.Contains(t, lock, `"opus":["anthropic/claude-opus-4-7"]`, "the workflow's opus pin must reach the harness without AWF")
 }
 
+// TestModelCatalogEnv verifies that `engine.model-catalog: false` reaches every engine harness
+// as GH_AW_MODEL_CATALOG=false, and that the variable is absent by default.
+func TestModelCatalogEnv(t *testing.T) {
+	for _, engine := range []string{"copilot", "claude", "codex", "pi"} {
+		lock, _ := compileModelAliasWorkflow(t, "engine:\n  id: "+engine+"\n  model-catalog: false\nmodel: gpt-5-mini\n")
+		assert.Contains(t, lock, "GH_AW_MODEL_CATALOG: false", "engine %s: model-catalog: false must reach the harness", engine)
+
+		lock, _ = compileModelAliasWorkflow(t, "engine: "+engine+"\n")
+		assert.NotContains(t, lock, "GH_AW_MODEL_CATALOG", "engine %s: the catalogue is required by default", engine)
+	}
+}
+
 // TestImportedModelAliasValidation verifies that imported alias maps get the same V-MAF key
 // and entry checks as the main workflow's.
 func TestImportedModelAliasValidation(t *testing.T) {

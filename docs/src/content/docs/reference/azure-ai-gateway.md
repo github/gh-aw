@@ -21,6 +21,7 @@ and explicitly select its inference profile:
 engine:
   id: copilot
   model: gpt-5.2
+  model-catalog: false
   inference:
     connector: azure-ai-gateway
     profile: responses
@@ -59,6 +60,9 @@ credential is used; there is no credential fallback.
 
 Use the protocol the deployed alias supports. `engine.model` supplies Copilot
 model metadata; `engine.inference.model` is the exact approved wire alias.
+The gateway has no `/models` route, so set `engine.model-catalog: false` to pass
+`engine.model` verbatim; otherwise a model ID that is also a gh-aw alias, such as
+`gpt-5.2`, fails with `catalog_unavailable`.
 Native provider/auth/env overrides, routing, model fallback and Copilot SDK
 mode cannot be combined with connector inference. A threat detector that
 inherits the main engine cannot override its engine or model configuration.
@@ -88,6 +92,7 @@ key stored as a GitHub Actions secret:
 engine:
   id: copilot
   model: <published-model-id>
+  model-catalog: false
   env:
     COPILOT_PROVIDER_BASE_URL: https://YOUR_GATEWAY_HOST/default/models/openai/v1
     COPILOT_PROVIDER_TYPE: openai

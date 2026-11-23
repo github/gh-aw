@@ -5,6 +5,7 @@ on: workflow_dispatch
 engine:
   id: copilot
   model: gpt-5.2
+  model-catalog: false
   inference:
     connector: azure-ai-gateway
     profile: responses

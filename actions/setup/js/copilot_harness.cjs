@@ -513,23 +513,6 @@ function loadAwfConfigData() {
 }
 
 /**
- * Whether Copilot CLI is pointed at an explicit BYOK provider (`COPILOT_PROVIDER_BASE_URL`
- * from engine.env or an inference connector) rather than a gh-aw api-proxy gateway. Such
- * providers may expose no `/models` route, so no live catalogue can resolve built-in aliases.
- * @param {NodeJS.ProcessEnv} env
- * @returns {boolean}
- */
-function hasExplicitCopilotProvider(env) {
-  const baseUrl = String(env.COPILOT_PROVIDER_BASE_URL || "").trim();
-  if (!baseUrl) return false;
-  try {
-    return new URL(baseUrl).hostname !== "api-proxy";
-  } catch {
-    return true;
-  }
-}
-
-/**
  * Resolve gh-aw model aliases (e.g. "small") to concrete Copilot CLI model ids.
  *
  * When the configured model is a known alias but the awf-reflect model catalog is
@@ -566,9 +549,6 @@ async function applyCopilotModelAliasResolution(options) {
       aliasMap: aliasMap ?? loadModelAliasMap({ reflectData: options.awfReflectData }),
       reflectData: options.awfReflectData,
       refetchReflectData: options.refetchReflectData,
-      // CLI-mode BYOK: a model id that is also a built-in alias (e.g. gpt-5-mini) passes
-      // through when the explicit provider has no catalogue, instead of failing catalog_unavailable.
-      catalogOptional: !isCopilotSDKEnabled() && hasExplicitCopilotProvider(process.env),
       logPrefix: "copilot model alias resolution",
       normalize: r => normalizeForCopilotCLI(r.resolvedModel),
       logger,
