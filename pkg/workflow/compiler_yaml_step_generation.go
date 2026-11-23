@@ -241,14 +241,7 @@ func (c *Compiler) generateSetupStepWithArtifactClientCondition(data *WorkflowDa
 	otlpAuthTokenStepID := getOTLPAuthTokenStepID(data)
 	artifactClientCondition = strings.TrimSpace(artifactClientCondition)
 
-	setupEngineID := ""
-	if data != nil {
-		if data.EngineConfig != nil && data.EngineConfig.ID != "" {
-			setupEngineID = data.EngineConfig.ID
-		} else if data.AI != "" {
-			setupEngineID = data.AI
-		}
-	}
+	setupEngineID := ResolveEngineID(data)
 
 	// Script mode: run the setup.sh script directly
 	if c.actionMode.IsScript() {
@@ -285,6 +278,9 @@ func (c *Compiler) generateSetupStepWithArtifactClientCondition(data *WorkflowDa
 			}
 			if setupEngineID != "" {
 				setupLines = append(setupLines, fmt.Sprintf("          GH_AW_INFO_ENGINE_ID: %q\n", setupEngineID))
+			}
+			if provider := resolveBYOKGenAIProviderName(data); provider != "" {
+				setupLines = append(setupLines, fmt.Sprintf("          GH_AW_INFO_GENAI_PROVIDER: %q\n", provider))
 			}
 			if hasWorkflowCallOrDispatchTrigger(data.On) {
 				setupLines = append(setupLines, "          GH_AW_SETUP_AW_CONTEXT: ${{ inputs.aw_context }}\n")
@@ -353,6 +349,9 @@ func (c *Compiler) generateSetupStepWithArtifactClientCondition(data *WorkflowDa
 	if setupEngineID != "" {
 		setupLines = append(setupLines, fmt.Sprintf("          GH_AW_INFO_ENGINE_ID: %q\n", setupEngineID))
 	}
+	if provider := resolveBYOKGenAIProviderName(data); provider != "" {
+		setupLines = append(setupLines, fmt.Sprintf("          GH_AW_INFO_GENAI_PROVIDER: %q\n", provider))
+	}
 	if hasWorkflowCallOrDispatchTrigger(data.On) {
 		setupLines = append(setupLines, "          GH_AW_SETUP_AW_CONTEXT: ${{ inputs.aw_context }}\n")
 	}
@@ -390,8 +389,11 @@ func (c *Compiler) generateSetRuntimePathsStep() []string {
 // The step is guarded by `if: always()` so it runs even if prior steps fail, ensuring
 // trace spans are exported and temporary files are cleaned up in all cases.
 //
+// Unlike the action-mode post step, this separate step does not inherit the setup step env,
+// so engine and GenAI provider attribution must be passed explicitly for jobs without aw_info.json.
+//
 // Only call this in script mode (c.actionMode.IsScript()).
-func (c *Compiler) generateScriptModeCleanupStep() string {
+func (c *Compiler) generateScriptModeCleanupStep(data *WorkflowData) string {
 	compilerYamlStepGenerationLog.Print("Generating script-mode cleanup step")
 	var step strings.Builder
 	step.WriteString("      - name: Clean Scripts\n")
@@ -402,5 +404,11 @@ func (c *Compiler) generateScriptModeCleanupStep() string {
 	step.WriteString("          GH_AW_ACTIONS_SOURCE_DIR: " + scriptModeActionsSourcePath() + "\n")
 	step.WriteString("          INPUT_DESTINATION: " + SetupActionDestination + "\n")
 	step.WriteString("          INPUT_JOB_NAME: ${{ github.job }}\n")
+	if engineID := ResolveEngineID(data); engineID != "" {
+		fmt.Fprintf(&step, "          GH_AW_INFO_ENGINE_ID: %q\n", engineID)
+	}
+	if provider := resolveBYOKGenAIProviderName(data); provider != "" {
+		fmt.Fprintf(&step, "          GH_AW_INFO_GENAI_PROVIDER: %q\n", provider)
+	}
 	return step.String()
 }

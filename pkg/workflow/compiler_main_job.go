@@ -74,7 +74,7 @@ func (c *Compiler) buildMainJob(data *WorkflowData, activationJobCreated bool) (
 
 	if c.actionMode.IsScript() {
 		compilerMainJobLog.Print("Adding script-mode cleanup step")
-		steps = append(steps, c.generateScriptModeCleanupStep())
+		steps = append(steps, c.generateScriptModeCleanupStep(data))
 	}
 
 	cacheMode := ""

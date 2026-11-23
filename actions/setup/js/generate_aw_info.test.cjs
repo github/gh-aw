@@ -160,6 +160,15 @@ describe("generate_aw_info.cjs", () => {
     global.github = originalGithub;
   });
 
+  it("records the BYOK GenAI provider only when configured", async () => {
+    await main(mockCore, mockContext);
+    expect(JSON.parse(fs.readFileSync(awInfoPath, "utf8"))).not.toHaveProperty("genai_provider");
+
+    process.env.GH_AW_INFO_GENAI_PROVIDER = "azure.ai.openai";
+    await main(mockCore, mockContext);
+    expect(JSON.parse(fs.readFileSync(awInfoPath, "utf8")).genai_provider).toBe("azure.ai.openai");
+  });
+
   it("should write aw_info.json with values from env vars and context", async () => {
     vi.stubEnv("GITHUB_RUN_ATTEMPT", "1");
     await main(mockCore, mockContext);

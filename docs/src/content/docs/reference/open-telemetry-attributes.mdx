@@ -143,7 +143,7 @@ These attributes carry model, token, and stop-reason data on built-in agent span
     </tr>
   </thead>
   <tbody>
-    <tr><td><code>gen_ai.provider.name</code></td><td>Current GenAI provider name, for example <code>github</code>, <code>anthropic</code>, or <code>openai</code>.</td></tr>
+    <tr><td><code>gen_ai.provider.name</code></td><td>Current GenAI provider name, for example <code>github</code>, <code>anthropic</code>, or <code>openai</code>. Copilot BYOK runs report the configured provider, such as <code>azure.ai.openai</code> for Azure endpoints.</td></tr>
     <tr><td><code>gen_ai.system</code></td><td>Deprecated by OpenTelemetry and superseded by <code>gen_ai.provider.name</code>. gh-aw retains this compatibility attribute by default; it is not deprecated by gh-aw in this version.</td></tr>
     <tr><td><code>gh-aw.engine.id</code></td><td>Raw gh-aw engine identifier.</td></tr>
     <tr><td><code>gen_ai.request.model</code></td><td>Requested model name.</td></tr>
