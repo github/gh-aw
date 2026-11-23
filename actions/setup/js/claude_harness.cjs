@@ -36,6 +36,7 @@
 
 "use strict";
 
+const { mergeTerminalRetryAfterMs } = require("./copilot_retry_after.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { isGitHubProviderCybersecurityPolicyRejection } = require("./github_provider_policy_rejection.cjs");
 const fs = require("fs");
@@ -672,11 +673,7 @@ async function main() {
         onStdoutLine: line => {
           observeDurableSession(durableSession, "claude", line);
           if (isRateLimitError(classifiableOutput(line))) nativeTerminalRateLimitError = true;
-          const { isGitHubRetryAfterProvider, parseTerminalRetryAfterMs } = require("./copilot_retry_after.cjs");
-          if (isGitHubRetryAfterProvider(process.env.GH_AW_LLM_PROVIDER)) {
-            const delay = parseTerminalRetryAfterMs(line, "claude");
-            if (delay != null) retryAfterMs = Math.max(retryAfterMs ?? 0, delay);
-          }
+          retryAfterMs = mergeTerminalRetryAfterMs(retryAfterMs, line, "claude");
         },
         onStderrLine: line => {
           if (isRateLimitError(line)) nativeTerminalRateLimitError = true;

@@ -1935,6 +1935,7 @@ jobs:
           GH_AW_PROMPT: /tmp/gh-aw/aw-prompts/prompt.txt
           GH_AW_PYTHON_PACKAGES: /tmp/gh-aw/agent/aider-python/site-packages
           GH_AW_SAFE_OUTPUTS: ${{ steps.set-runtime-paths.outputs.GH_AW_SAFE_OUTPUTS }}
+          GH_AW_TIMEOUT_MINUTES: 10
           GH_TOKEN: ${{ secrets.GH_AW_GITHUB_TOKEN || github.token }}
           GITHUB_COPILOT_BASE_URL: http://api-proxy:10002
           GITHUB_WORKSPACE: ${{ github.workspace }}

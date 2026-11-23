@@ -93,7 +93,8 @@ describe("claude_harness.cjs", () => {
   it.each([
     ["1", "2000", 2, "rate_limit_error", true],
     ["245", "60000", 1, "rate_limit_wait_exceeded", true],
-    ["245", "60000", 2, null, false],
+    ["1", "2000", 2, "rate_limit_error", false],
+    ["245", "60000", 1, "rate_limit_wait_exceeded", false],
   ])("honors Retry-After=%s within cap=%s, attempts=%i, class=%s, GitHub=%s", (delay, cap, attempts, failureClass, github) => {
     const { result, calls, harnessRetry } = runHarnessWithStub({
       extraEnv: { GH_AW_SAFE_OUTPUTS: "", GH_AW_HARNESS_MAX_RETRIES: "1", GH_AW_HARNESS_MAX_DELAY_MS: cap, GH_AW_LLM_PROVIDER: github ? "github" : "anthropic", ...(github ? { ANTHROPIC_MODEL: "claude-sonnet-5" } : {}) },
@@ -113,7 +114,7 @@ describe("claude_harness.cjs", () => {
     expect(calls).toHaveLength(attempts);
     if (failureClass) expect(harnessRetry.attempt_results[0].failure_classes).toEqual([failureClass]);
     else expect(harnessRetry.attempt_results[0].failure_classes || []).not.toContain("rate_limit_wait_exceeded");
-    if (attempts === 2) expect(harnessRetry.attempt_results[1].backoff_ms).toBe(github ? 1000 : 1);
+    if (attempts === 2) expect(harnessRetry.attempt_results[1].backoff_ms).toBe(1000);
   });
 
   it("does not use stderr Retry-After as timing evidence", () => {

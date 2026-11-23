@@ -57,14 +57,15 @@ func (e *AgyEngine) buildExecutionCommand(workflowData *WorkflowData, logFile, e
 
 func (e *AgyEngine) buildExecutionEnv(workflowData *WorkflowData, firewallEnabled bool) map[string]string {
 	env := map[string]string{
-		"GH_AW_PROMPT":         constants.AwPromptsFile,
-		"GITHUB_WORKSPACE":     "${{ github.workspace }}",
-		"GITHUB_STEP_SUMMARY":  AgentStepSummaryPath,
-		"NO_PROXY":             constants.AWFNoProxyHosts,
-		"RUNNER_TEMP":          "${{ runner.temp }}",
-		"GH_AW_AGY_MODEL":      constants.AgyDefaultModel,
-		"GH_AW_ENGINE_VERSION": string(constants.DefaultAgyVersion),
-		"GEMINI_API_KEY":       "${{ secrets.GEMINI_API_KEY }}",
+		"GH_AW_PROMPT":          constants.AwPromptsFile,
+		"GITHUB_WORKSPACE":      "${{ github.workspace }}",
+		"GITHUB_STEP_SUMMARY":   AgentStepSummaryPath,
+		"GH_AW_TIMEOUT_MINUTES": resolveStepTimeoutValue(workflowData),
+		"NO_PROXY":              constants.AWFNoProxyHosts,
+		"RUNNER_TEMP":           "${{ runner.temp }}",
+		"GH_AW_AGY_MODEL":       constants.AgyDefaultModel,
+		"GH_AW_ENGINE_VERSION":  string(constants.DefaultAgyVersion),
+		"GEMINI_API_KEY":        "${{ secrets.GEMINI_API_KEY }}",
 	}
 	if firewallEnabled {
 		env["AWF_REFLECT_ENABLED"] = "1"

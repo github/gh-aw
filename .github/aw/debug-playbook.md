@@ -74,7 +74,7 @@ Prose != native error.
 | `model_policy_violation`, `content_filter`|Provider/proxy reason; endpoint mismatch separately.|Correct request within policy; no credential swap/bypass.|
 | `awf_api_proxy_blocking_requests`|Specific budget/policy/filter guard.|Address guard; blocking alone != authentication failure.|
 | `capi_quota_exceeded_error`|Native 429; exhausted retries.|Respect quota/reset; no retry storm.|
-| `rate_limit_wait_exceeded`, `rate_limit_error`|429/provider, usable `Retry-After`, harness retries, `max-delay-ms`, timeout.|GitHub models (Copilot/Claude/Codex): wait within both bounds or defer. Preserve other providers' policy and terminal quota/proxy guards. No unauthorized redispatch.|
+| `rate_limit_wait_exceeded`, `rate_limit_error`|429/provider, usable `Retry-After`, harness retries, `max-delay-ms`, timeout.|All providers incl. BYOK and all built-in harnesses (Pi/Gemini/Agy/behavior-defined retry only 429/transient, never after safe outputs): wait within both bounds or stop. Preserve terminal quota/proxy guards. No unauthorized redispatch.|
 | `capi_server_error`, `engine_outage`, `infrastructure_error`|Exhausted native 5xx/infrastructure timeline.|Report cause; bounded backoff, no unapproved redispatch.|
 | `agentic_engine_timeout`|Step/SDK budget vs post-result `watchdogFired=true`.|Fix genuine stall; post-result watchdog alone != timeout.|
 | `sandbox_runtime_crash`|Exit/signal, resources, runtime revision.|Fix crash/resources; retain redacted diagnostic/version.|
