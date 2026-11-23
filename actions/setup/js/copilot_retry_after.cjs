@@ -157,4 +157,17 @@ function parseTerminalRetryAfterMs(line, engine) {
   }
 }
 
-module.exports = { hasCopilotResponseStatus, isGitHubRetryAfterProvider, parseCopilotRetryAfterMs, parseTerminalRetryAfterMs };
+/**
+ * Fold one stdout line into the longest provider-requested HTTP 429 wait seen so far.
+ * Applies to every inference provider, including BYOK endpoints.
+ * @param {number | null} current
+ * @param {string} line
+ * @param {"claude" | "codex"} engine
+ * @returns {number | null}
+ */
+function mergeTerminalRetryAfterMs(current, line, engine) {
+  const delay = parseTerminalRetryAfterMs(line, engine);
+  return delay == null ? current : Math.max(current ?? 0, delay);
+}
+
+module.exports = { hasCopilotResponseStatus, isGitHubRetryAfterProvider, mergeTerminalRetryAfterMs, parseCopilotRetryAfterMs, parseTerminalRetryAfterMs };

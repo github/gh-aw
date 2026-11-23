@@ -7,7 +7,7 @@ import os from "node:os";
 import path from "node:path";
 
 const require = createRequire(import.meta.url);
-const { isGitHubRetryAfterProvider, parseCopilotRetryAfterMs, parseTerminalRetryAfterMs } = require("./copilot_retry_after.cjs");
+const { isGitHubRetryAfterProvider, mergeTerminalRetryAfterMs, parseCopilotRetryAfterMs, parseTerminalRetryAfterMs } = require("./copilot_retry_after.cjs");
 const { normalizeHarnessRetryRecord } = require("./harness_retry_record.cjs");
 const harnessPath = require.resolve("./copilot_harness.cjs");
 const now = Date.parse("Wed, 11 Nov 2026 08:43:00 GMT");
@@ -23,6 +23,14 @@ describe("Copilot Retry-After parsing", () => {
     ["", false],
   ])("recognizes GitHub provider %s", (provider, expected) => {
     expect(isGitHubRetryAfterProvider(provider)).toBe(expected);
+  });
+
+  it("keeps the longest terminal Retry-After across lines and ignores non-terminal lines", () => {
+    const terminal = delay => JSON.stringify({ type: "error", error: { status: 429, headers: { "retry-after": String(delay) } } });
+    let delay = mergeTerminalRetryAfterMs(null, terminal(257), "codex");
+    delay = mergeTerminalRetryAfterMs(delay, terminal(5), "codex");
+    delay = mergeTerminalRetryAfterMs(delay, JSON.stringify({ type: "item.completed", item: { output: "HTTP 429\nRetry-After: 999" } }), "codex");
+    expect(delay).toBe(257000);
   });
 
   it.each([

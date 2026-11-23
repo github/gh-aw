@@ -32,6 +32,7 @@
 
 "use strict";
 
+const { mergeTerminalRetryAfterMs } = require("./copilot_retry_after.cjs");
 const { iterateJsonl, JsonlParser } = require("./jsonl_helpers.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { isGitHubProviderCybersecurityPolicyRejection } = require("./github_provider_policy_rejection.cjs");
@@ -1147,9 +1148,7 @@ async function main() {
           if (!event) return;
           if (event.type === "thread.started" && typeof event.thread_id === "string") lastThreadId = event.thread_id;
           if (event.type === "turn.failed" || event.type === "error") recordTerminalError(line);
-          const { parseTerminalRetryAfterMs } = require("./copilot_retry_after.cjs");
-          const delay = parseTerminalRetryAfterMs(line, "codex");
-          if (delay != null) retryAfterMs = Math.max(retryAfterMs ?? 0, delay);
+          retryAfterMs = mergeTerminalRetryAfterMs(retryAfterMs, line, "codex");
         },
         onStdoutLinePrefix: prefix => {
           const event = mcpWatchdog.observePrefix(prefix);
