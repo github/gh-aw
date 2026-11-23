@@ -24,6 +24,22 @@ type ResolvedConnectorInference struct {
 	Selection ConnectorInferenceSelection
 	Env       map[string]string
 	Auth      *EngineAuthConfig
+	// AllowedDomains are the firewall hosts the selected profile requires.
+	AllowedDomains []string
+}
+
+// connectorInferenceAllowedDomains returns firewall hosts required by selected connector inference profiles.
+func connectorInferenceAllowedDomains(data *WorkflowData) []string {
+	if data == nil {
+		return nil
+	}
+	var domains []string
+	for _, alias := range sliceutil.SortedKeys(data.Connectors) {
+		if config := data.Connectors[alias]; config != nil && config.Inference != nil {
+			domains = append(domains, config.Inference.AllowedDomains...)
+		}
+	}
+	return domains
 }
 
 func consumeConnectorInferenceSelection(frontmatter, registrations map[string]any) error {
@@ -62,7 +78,7 @@ func consumeConnectorInferenceSelection(frontmatter, registrations map[string]an
 	return nil
 }
 
-func resolveConnectorInference(alias string, registration ConnectorRegistration, frontmatter map[string]any) (*ResolvedConnectorInference, error) {
+func resolveConnectorInference(alias string, registration ConnectorRegistration) (*ResolvedConnectorInference, error) {
 	if err := validateConnectorAzureOIDC(alias, registration); err != nil {
 		return nil, err
 	}
@@ -90,19 +106,8 @@ func resolveConnectorInference(alias string, registration ConnectorRegistration,
 	if err != nil || endpoint.Hostname() == "" {
 		return nil, errors.New("inference endpoint must reference a declared HTTPS origin")
 	}
-	approved := false
-	if network, ok := frontmatter["network"].(map[string]any); ok {
-		switch allowed := network["allowed"].(type) {
-		case []any:
-			approved = slices.Contains(allowed, any(endpoint.Hostname()))
-		case []string:
-			approved = slices.Contains(allowed, endpoint.Hostname())
-		}
-	}
-	if !approved {
-		return nil, fmt.Errorf("inference endpoint requires explicit network.allowed host %q; importing is not network approval", endpoint.Hostname())
-	}
-	result := &ResolvedConnectorInference{Selection: *selection, Env: map[string]string{
+	// Selecting the profile approves egress to its endpoint; importing alone does not.
+	result := &ResolvedConnectorInference{Selection: *selection, AllowedDomains: []string{endpoint.Hostname()}, Env: map[string]string{
 		"COPILOT_PROVIDER_BASE_URL": strings.TrimSuffix(endpoint.String(), "/") + profile.Path,
 		"COPILOT_PROVIDER_TYPE":     "openai",
 		"COPILOT_PROVIDER_MODEL_ID": selection.Model,
@@ -117,6 +122,7 @@ func resolveConnectorInference(alias string, registration ConnectorRegistration,
 	}
 	if azure := registration.AzureOIDC[profile.Credential]; azure != nil {
 		result.Auth = azure.engineAuth()
+		result.AllowedDomains = append(result.AllowedDomains, azure.loginHost())
 	} else {
 		result.Env["COPILOT_PROVIDER_API_KEY"] = "${{ secrets." + registration.Credentials[profile.Credential].Secret + " }}"
 	}

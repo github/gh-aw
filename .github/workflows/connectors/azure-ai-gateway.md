@@ -75,9 +75,9 @@ import-schema:
     <credential name="entra" phase="inference">Configure an Entra application's federated identity to trust the GitHub Actions issuer, exact repository branch or environment subject, and api://AzureADTokenExchange audience. Grant the application's service principal runtime access to the approved gateway model assets. Bind azure-tenant-id and azure-client-id; the scope is https://ai.gateway.azure.com/.default. The workflow must grant id-token: write. The existing AWF inference proxy exchanges and refreshes tokens outside the agent; this requires the existing engine OIDC firewall/version safeguards. No stored gateway key is used by this profile.</credential>
     <credential name="gateway-key" phase="inference">Obtain a gateway API key through the gateway operator and store it as the Actions secret named by key-secret (default AZURE_AI_GATEWAY_KEY). Rotate it externally. Gateway keys use Authorization: Bearer, not the Azure OpenAI api-key header, and may grant broader access than the workflow's exact model selection. No Entra exchange or OIDC permission is needed by a key profile.</credential>
   </credentials>
-  <inputs>gateway-host identifies the exact public-cloud SDK endpoint. models grants exact wire aliases. The remaining bindings configure credential routes, not secret values. Importing selects nothing. The consumer must select engine.inference with connector, profile and model and explicitly approve the hostname in network.allowed. engine.model supplies Copilot model metadata and can differ from the granted wire alias.</inputs>
+  <inputs>gateway-host identifies the exact public-cloud SDK endpoint. models grants exact wire aliases. The remaining bindings configure credential routes, not secret values. Importing selects nothing. The consumer must select engine.inference with connector, profile and model; the compiler then adds that profile's hostname (and login.microsoftonline.com for the Entra profiles) to the firewall allowlist. engine.model supplies Copilot model metadata and can differ from the granted wire alias.</inputs>
   <limits>Only the Copilot engine and OpenAI-compatible Responses or Chat Completions are supported initially. Use responses or responses-key only when the alias supports Responses; completions or completions-key selects Chat Completions. This declaration does not cover custom endpoint paths, sovereign deployments, Anthropic Messages, embeddings, model discovery, routing or fallback. Configure MCP separately. Compile/setup do not verify token validity, model compatibility, pricing, context limits, RBAC or output quality. Do not retry with another credential after denial.</limits>
-  <privacy>Gateway inference receives workflow prompts, selected context and tool results. Staging suppresses the GitHub effect, not inference, disclosure or Azure charges. Review that disclosure before any execution. The connector adds no network approval, readers, writer credentials or ingress.</privacy>
+  <privacy>Gateway inference receives workflow prompts, selected context and tool results. Staging suppresses the GitHub effect, not inference, disclosure or Azure charges. Review that disclosure before any execution. Only the selected inference profile adds network approval; the connector adds no readers, writer credentials or ingress.</privacy>
   <consumer>
     <frontmatter><![CDATA[
 name: Azure AI Gateway deployment checklist
@@ -93,7 +93,7 @@ permissions:
   contents: read
   id-token: write
 network:
-  allowed: [defaults, example.ai.gateway.azure.com, login.microsoftonline.com]
+  allowed: [defaults]
 imports:
   - uses: ".github/workflows/connectors/azure-ai-gateway.md"
     with:

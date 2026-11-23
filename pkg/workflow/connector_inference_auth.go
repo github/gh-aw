@@ -22,6 +22,18 @@ func (azure *ConnectorAzureOIDC) engineAuth() *EngineAuthConfig {
 	}
 }
 
+// loginHost returns the Entra authority host for the configured Azure cloud.
+func (azure *ConnectorAzureOIDC) loginHost() string {
+	switch azure.Cloud {
+	case "usgovernment":
+		return "login.microsoftonline.us"
+	case "china":
+		return "login.chinacloudapi.cn"
+	default:
+		return "login.microsoftonline.com"
+	}
+}
+
 func validateConnectorAzureOIDC(alias string, registration ConnectorRegistration) error {
 	for name, azure := range registration.AzureOIDC {
 		if registration.Spec == nil {

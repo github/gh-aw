@@ -41,8 +41,10 @@ and [runtime boundaries](#validation-and-runtime-boundaries).
 Declaration: `.github/workflows/connectors/azure-ai-gateway.md`.
 
 Select `engine.inference: {connector: azure-ai-gateway, profile: responses,
-model: deployment-checklist}` to route Copilot inference through an explicitly
-approved gateway endpoint and wire model alias. Importing selects nothing.
+model: deployment-checklist}` to route Copilot inference through the selected
+gateway endpoint and approved wire model alias. Selection adds that endpoint
+host (and the Entra login host for OIDC profiles) to the firewall allowlist.
+Importing selects nothing and approves no network access.
 This capability configures the workflow's inference transport; it exposes no
 callable reader, MCP method or provider writer.
 
