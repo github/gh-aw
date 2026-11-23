@@ -269,11 +269,26 @@ func TestBuiltInSourcePolicyRulesCLI(t *testing.T) {
 func TestDangerousTriggersIntegrityCLI(t *testing.T) {
 	t.Parallel()
 	for _, trigger := range []string{"issue_comment", "pull_request_review", "pull_request_review_comment"} {
-		for _, threshold := range []string{"none", "approved"} {
+		for _, policy := range []struct {
+			name, roles, threshold string
+			warning                bool
+		}{
+			{"default roles", "", "none", false},
+			{"trusted roles", ", roles: [admin, maintain, write]", "none", false},
+			{"all roles", ", roles: all", "none", true},
+			{"read role", ", roles: read", "none", true},
+			{"triage role", ", roles: [write, triage]", "unapproved", true},
+			{"approved", ", roles: all", "approved", false},
+			{"unknown filtering", ", roles: all", "", false},
+		} {
 			for _, extension := range []string{".md", ".lock.yml"} {
-				t.Run(trigger+"/"+threshold+extension, func(t *testing.T) {
+				t.Run(trigger+"/"+policy.name+extension, func(t *testing.T) {
 					dir := t.TempDir()
-					source := "---\non: {" + trigger + ": null}\ntools: {github: {min-integrity: " + threshold + "}}\n---\nReview.\n"
+					threshold := ""
+					if policy.threshold != "" {
+						threshold = "min-integrity: " + policy.threshold
+					}
+					source := "---\non: {" + trigger + ": null" + policy.roles + "}\ntools: {github: {" + threshold + "}}\n---\nReview.\n"
 					require.NoError(t, os.WriteFile(filepath.Join(dir, "test.md"), []byte(source), 0o600))
 					file := filepath.Join(dir, "test"+extension)
 					if extension != ".md" {
@@ -288,7 +303,7 @@ func TestDangerousTriggersIntegrityCLI(t *testing.T) {
 					require.NoError(t, cmd.Execute())
 					var diagnostics []workflowLintDiagnostic
 					require.NoError(t, json.NewDecoder(&output).Decode(&diagnostics))
-					if threshold == "approved" {
+					if !policy.warning {
 						require.Empty(t, diagnostics)
 					} else {
 						require.Len(t, diagnostics, 1)

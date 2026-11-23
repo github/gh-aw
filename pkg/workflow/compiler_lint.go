@@ -106,7 +106,7 @@ func (c *Compiler) compilerLintInput(data *WorkflowData, graph *actions.Workflow
 	}
 	return workflowlint.Input{
 		Workflow: graph, Document: c.lintPolicyDocument(data), AuthoredJobs: data.Jobs, SourcePath: sourcePath,
-		ResolvedTools:   resolvedTools,
+		ResolvedTools: resolvedTools, ResolvedRoles: data.Roles,
 		AllowActionRefs: c.allowActionRefs, SafeOutputJobs: safeOutputLintJobs(data), GeneratedActionRefs: generatedActionRefs,
 	}
 }

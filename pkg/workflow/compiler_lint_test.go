@@ -53,13 +53,17 @@ func TestCompilerLintDangerousTriggers(t *testing.T) {
 	for _, tt := range []struct {
 		name, trigger, policy string
 		resolved              map[string]any
+		roles                 []string
 		warnings              int
 	}{
-		{name: "comment unknown policy", trigger: "issue_comment", warnings: 1},
-		{name: "comment none", trigger: "issue_comment", resolved: map[string]any{"github": map[string]any{"min-integrity": "none"}}, warnings: 1},
-		{name: "comment approved import", trigger: "issue_comment", resolved: map[string]any{"github": map[string]any{"min-integrity": "approved"}}},
-		{name: "review comment unknown policy", trigger: "pull_request_review_comment", warnings: 1},
-		{name: "review comment approved import", trigger: "pull_request_review_comment", resolved: map[string]any{"github": map[string]any{"min-integrity": "approved"}}},
+		{name: "comment unknown policy", trigger: "issue_comment", roles: []string{"all"}},
+		{name: "comment none with trusted defaults", trigger: "issue_comment", resolved: map[string]any{"github": map[string]any{"min-integrity": "none"}}},
+		{name: "comment none with trusted resolved roles", trigger: "issue_comment", resolved: map[string]any{"github": map[string]any{"min-integrity": "none"}}, roles: []string{"write"}},
+		{name: "comment none with broadened roles", trigger: "issue_comment", resolved: map[string]any{"github": map[string]any{"min-integrity": "none"}}, roles: []string{"all"}, warnings: 1},
+		{name: "comment approved import", trigger: "issue_comment", resolved: map[string]any{"github": map[string]any{"min-integrity": "approved"}}, roles: []string{"all"}},
+		{name: "review comment unknown policy", trigger: "pull_request_review_comment", roles: []string{"all"}},
+		{name: "review comment weak policy", trigger: "pull_request_review_comment", resolved: map[string]any{"github": map[string]any{"min-integrity": "unapproved"}}, roles: []string{"write", "triage"}, warnings: 1},
+		{name: "review comment approved import", trigger: "pull_request_review_comment", resolved: map[string]any{"github": map[string]any{"min-integrity": "approved"}}, roles: []string{"read"}},
 		{name: "comment disabled GitHub", trigger: "issue_comment"},
 		{name: "safe event", trigger: "workflow_dispatch"},
 		{name: "nonstrict target advisory", trigger: "pull_request_target", policy: "strict: false\n", warnings: 1},
@@ -73,7 +77,7 @@ func TestCompilerLintDangerousTriggers(t *testing.T) {
 			}
 			document, err := aw.Parse("---\n" + tt.policy + authored + "checkout: false\n---\nReview.\n")
 			require.NoError(t, err)
-			data := &WorkflowData{SourceDocument: document, RawFrontmatter: document.Frontmatter, Tools: tt.resolved}
+			data := &WorkflowData{SourceDocument: document, RawFrontmatter: document.Frontmatter, Tools: tt.resolved, Roles: tt.roles}
 			if tt.name == "comment disabled GitHub" {
 				data.ExplicitlyDisabledTools = map[string]struct{}{"github": {}}
 			}
@@ -91,28 +95,33 @@ func TestCompilerLintDangerousTriggers(t *testing.T) {
 func TestCompilerLintDangerousTriggersImportedFiltering(t *testing.T) {
 	t.Parallel()
 	for _, trigger := range []string{"issue_comment", "pull_request_review_comment", "slash_command"} {
-		t.Run(trigger, func(t *testing.T) {
-			dir := t.TempDir()
-			source := filepath.Join(dir, "review.md")
-			shared := filepath.Join(dir, "shared.md")
-			on := "on: {" + trigger + ": {types: [created]}}\n"
-			warnings := 1
-			if trigger == "slash_command" {
-				on = "on: {slash_command: review}\n"
-				warnings = 2
-			}
-			require.NoError(t, os.WriteFile(source, []byte("---\n"+on+"imports: [shared.md]\ncheckout: false\ntools: {bash: [echo]}\n---\nReview.\n"), 0o600))
-			counts := make(map[string]int)
-			for _, threshold := range []string{"none", "approved"} {
-				require.NoError(t, os.WriteFile(shared, []byte("---\ntools: {github: {min-integrity: "+threshold+"}}\n---\n"), 0o600))
-				compiler := NewCompiler(WithLint(true))
-				compiler.gitRoot = dir
-				compiler.SetSkipValidation(true)
-				require.NoError(t, compiler.CompileWorkflow(source))
-				counts[threshold] = compiler.GetWarningCount()
-			}
-			require.Equal(t, counts["approved"]+warnings, counts["none"], "only the weak-filtering trigger warnings differ")
-		})
+		for _, roles := range []string{"", ", roles: all"} {
+			t.Run(trigger+roles, func(t *testing.T) {
+				dir := t.TempDir()
+				source := filepath.Join(dir, "review.md")
+				shared := filepath.Join(dir, "shared.md")
+				on := "on: {" + trigger + ": {types: [created]}" + roles + "}\n"
+				warnings := 1
+				if trigger == "slash_command" {
+					on = "on: {slash_command: review" + roles + "}\n"
+					warnings = 2
+				}
+				if roles == "" {
+					warnings = 0
+				}
+				require.NoError(t, os.WriteFile(source, []byte("---\n"+on+"imports: [shared.md]\ncheckout: false\ntools: {bash: [echo]}\nsafe-outputs: {add-comment: {}, threat-detection: true}\n---\nReview.\n"), 0o600))
+				counts := make(map[string]int)
+				for _, threshold := range []string{"none", "approved"} {
+					require.NoError(t, os.WriteFile(shared, []byte("---\ntools: {github: {min-integrity: "+threshold+"}}\n---\n"), 0o600))
+					compiler := NewCompiler(WithLint(true))
+					compiler.gitRoot = dir
+					compiler.SetSkipValidation(true)
+					require.NoError(t, compiler.CompileWorkflow(source))
+					counts[threshold] = compiler.GetWarningCount()
+				}
+				require.Equal(t, counts["approved"]+warnings, counts["none"], "only the weak-filtering trigger warnings differ")
+			})
+		}
 	}
 }
 

@@ -36,9 +36,10 @@ func builtInRuleContracts() map[string]ruleContract {
 	return map[string]ruleContract{
 		"dangerous-triggers": {
 			targets: ActionsAST | AWAST, severity: Warning, threatRuleID: "CTR-039",
-			unsafe: "on: {issue_comment: {types: [created]}}\n" + contractJob + contractSafeSteps,
-			safe:   "on: workflow_dispatch\n" + contractJob + contractSafeSteps,
-			path:   "on.issue_comment",
+			findingThreatRuleID: "CTR-008",
+			unsafe:              "on: {pull_request_target: {types: [opened]}}\n" + contractJob + contractSafeSteps,
+			safe:                "on: workflow_dispatch\n" + contractJob + contractSafeSteps,
+			path:                "on.pull_request_target",
 		},
 		"unpinned-images": {
 			targets: ActionsAST | AWAST, severity: Warning,

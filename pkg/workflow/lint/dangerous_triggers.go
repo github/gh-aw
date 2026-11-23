@@ -8,7 +8,7 @@ import (
 
 func DangerousTriggersRule() Rule {
 	return Rule{
-		ID: "dangerous-triggers", Description: "Review events that untrusted contributors can trigger with repository privileges",
+		ID: "dangerous-triggers", Description: "Review privileged target events and comment events with broadened admission and weak integrity filtering",
 		ThreatRuleID: "CTR-039", FindingThreatRuleIDs: []string{"CTR-008"},
 		Severity: Warning, Targets: ActionsAST | AWAST, Check: checkDangerousTriggers,
 	}
@@ -56,22 +56,67 @@ func checkDangerousTriggers(ctx context.Context, input Input) ([]Diagnostic, err
 		if err != nil {
 			return diagnostics, err
 		}
-		if filtering == "" {
+		untrusted, err := commentTriggerAdmitsUntrustedActors(ctx, input)
+		if err != nil {
+			return diagnostics, err
+		}
+		if filtering == "" || !untrusted {
 			continue
 		}
 		diagnostics = append(diagnostics, Diagnostic{Path: path,
-			Message: fmt.Sprintf("%s can deliver untrusted comment or review content with %s; configure tools.github.min-integrity: approved or merged to filter untrusted GitHub tool content. Credential access depends on the event and job configuration: retain actor authorization, keep comment text out of executable expressions, and do not execute untrusted PR code with privileged credentials. Review an explicit GitHub Actions event allowlist in Evaluate mode before enforcement", name, filtering),
+			Message: fmt.Sprintf("%s can deliver untrusted comment or review content from actors outside trusted repository roles with %s; restrict on.roles to admin, maintainer, or write, or configure tools.github.min-integrity: approved or merged. Credential access depends on the event and job configuration: keep comment text out of executable expressions and do not execute untrusted PR code with privileged credentials. Review an explicit GitHub Actions event allowlist in Evaluate mode before enforcement", name, filtering),
 		})
 	}
 	return diagnostics, nil
 }
 
+func commentTriggerAdmitsUntrustedActors(ctx context.Context, input Input) (bool, error) {
+	roles := input.ResolvedRoles
+	if roles == nil {
+		if input.Document == nil {
+			return true, nil
+		}
+		on, mapping := input.Document.Frontmatter["on"].(map[string]any)
+		if !mapping {
+			return false, nil
+		}
+		raw, specified := on["roles"]
+		if !specified {
+			return false, nil
+		}
+		if role, scalar := raw.(string); scalar {
+			roles = []string{role}
+		} else {
+			var err error
+			roles, err = policyStrings(ctx, raw, "on.roles")
+			if err != nil {
+				return false, err
+			}
+		}
+	}
+	untrusted := false
+	for _, role := range roles {
+		if err := ctx.Err(); err != nil {
+			return false, err
+		}
+		switch role {
+		case "admin", "maintainer", "maintain", "write":
+		case "triage", "read", "all":
+			untrusted = true
+		default:
+			return false, errors.New("dangerous-triggers requires on.roles to contain recognized repository roles")
+		}
+	}
+	return untrusted, nil
+}
+
 // This correlates tool-input exposure, not event admission or arbitrary scripts.
+// Missing policy is unknown: public-repository defaults and imports may filter it.
 func commentIntegrityFiltering(input Input) (string, error) {
 	tools := input.ResolvedTools
 	if tools == nil {
 		if input.Document == nil {
-			return "unknown GitHub integrity filtering (no AW tool policy)", nil
+			return "", nil
 		}
 		var err error
 		tools, err = policyMapping(input.Document.Frontmatter["tools"], "tools")
@@ -79,11 +124,8 @@ func commentIntegrityFiltering(input Input) (string, error) {
 			return "", err
 		}
 	}
-	if enabled, literal := tools["github"].(bool); literal {
-		if !enabled {
-			return "", nil
-		}
-		return "no explicit GitHub integrity threshold", nil
+	if _, literal := tools["github"].(bool); literal {
+		return "", nil
 	}
 	github, err := policyMapping(tools["github"], "tools.github")
 	if err != nil {
@@ -100,7 +142,7 @@ func commentIntegrityFiltering(input Input) (string, error) {
 	}
 	value, exists := github["min-integrity"]
 	if !exists {
-		return "no explicit GitHub integrity threshold (visibility-dependent defaults and unresolved imports are not verified)", nil
+		return "", nil
 	}
 	switch value {
 	case "approved", "merged":

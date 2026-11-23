@@ -57,6 +57,9 @@ type Input struct {
 	// ResolvedTools supplies compiler-resolved tool declarations, including imports.
 	// Standalone AW lint uses authored tools instead.
 	ResolvedTools map[string]any
+	// ResolvedRoles supplies the compiler's effective actor-admission roles.
+	// Standalone AW lint uses on.roles and its trusted defaults instead.
+	ResolvedRoles []string
 	JavaScript    *taint.JavaScriptOptions
 	// AllowActionRefs permits well-formed mutable references as warnings.
 	// Malformed references remain errors regardless of this compiler allowance.
