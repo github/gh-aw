@@ -9,6 +9,7 @@ const { validateContextVariables } = require("./validate_context_variables.cjs")
 const validateLockdownRequirements = require("./validate_lockdown_requirements.cjs");
 const { writeMergedModelsJSON } = require("./merge_frontmatter_models.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
+const { genAiServerAddress } = require("./genai_endpoint.cjs");
 const { ERR_CONFIG, ERR_SYSTEM } = require("./error_codes.cjs");
 const { buildWorkflowCallId, normalizeLegacyWorkQueueContext, normalizeWorkQueueContext, resolveWorkQueueRuntime, readInboundAwContext } = require("./aw_context.cjs");
 const { normalizeWebhookContext } = require("./webhook_context.cjs");
@@ -159,6 +160,8 @@ async function main(core, ctx, githubClient) {
   const genAiProvider = (process.env.GH_AW_INFO_GENAI_PROVIDER || "").trim();
   if (genAiProvider) {
     awInfo.genai_provider = genAiProvider;
+    const serverAddress = genAiServerAddress(process.env.GH_AW_INFO_GENAI_ENDPOINT);
+    if (serverAddress) awInfo.genai_server_address = serverAddress;
   }
 
   const frontmatterSource = process.env.GH_AW_INFO_FRONTMATTER_SOURCE || "";

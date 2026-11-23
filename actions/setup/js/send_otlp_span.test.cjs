@@ -2341,7 +2341,7 @@ describe("sendJobSetupSpan", () => {
 
       readFileSpy.mockImplementation(filePath => {
         if (filePath === "/tmp/gh-aw/aw_info.json") {
-          return JSON.stringify({ engine_id: "copilot", genai_provider: "azure.ai.openai" });
+          return JSON.stringify({ engine_id: "copilot", genai_provider: "azure.ai.openai", genai_server_address: "example.ai.gateway.azure.com" });
         }
         throw Object.assign(new Error("ENOENT"), { code: "ENOENT" });
       });
@@ -2352,6 +2352,7 @@ describe("sendJobSetupSpan", () => {
       const span = body.resourceSpans[0].scopeSpans[0].spans[0];
       const attrs = Object.fromEntries(span.attributes.map(a => [a.key, a.value.stringValue ?? a.value.intValue ?? a.value.boolValue]));
       expect(attrs["gen_ai.provider.name"]).toBe("azure.ai.openai");
+      expect(attrs["server.address"]).toBe("example.ai.gateway.azure.com");
       expect(attrs["gen_ai.system"]).toBe("az.ai.openai");
       expect(attrs["gh-aw.engine.id"]).toBe("copilot");
     });
@@ -3056,6 +3057,7 @@ describe("sendJobConclusionSpan", () => {
         "gen_ai.usage.cache_write.input_tokens": 2,
       });
       expect(agentAttrs).not.toHaveProperty("gen_ai.system");
+      expect(agentAttrs).not.toHaveProperty("server.address");
       expect(agentAttrs).not.toHaveProperty("gen_ai.workflow.name");
       expect(agentAttrs).not.toHaveProperty("gen_ai.usage.cache_creation.input_tokens");
       expect(agentAttrs).not.toHaveProperty("gen_ai.usage.total_tokens");
@@ -3065,6 +3067,42 @@ describe("sendJobConclusionSpan", () => {
       const resource = Object.fromEntries(agentPayload.resourceSpans[0].resource.attributes.map(attr => [attr.key, attr.value.stringValue]));
       expect(resource["deployment.environment.name"]).toBe("production");
       expect(resource).not.toHaveProperty("deployment.environment");
+    });
+
+    it.each(["", "gen_ai_v1"])("reports the BYOK endpoint host on run spans with opt-in %s", async optIn => {
+      vi.stubEnv("OTEL_SEMCONV_STABILITY_OPT_IN", optIn);
+      vi.stubEnv("GH_AW_INFO_GENAI_PROVIDER", "azure.ai.openai");
+      const endpoint = new URL("https://gw.azure-api.net:8443/v1?key=private#fragment");
+      endpoint.username = "user";
+      endpoint.password = "placeholder";
+      vi.stubEnv("GH_AW_INFO_GENAI_ENDPOINT", endpoint.href);
+
+      await sendJobSetupSpan();
+      await sendJobConclusionSpan("gh-aw.agent.conclusion", { startMs });
+
+      expect(fetchMock.mock.calls).toHaveLength(3);
+      for (const [, options] of fetchMock.mock.calls) {
+        const span = JSON.parse(options.body).resourceSpans[0].scopeSpans[0].spans[0];
+        const attrs = Object.fromEntries(span.attributes.map(attr => [attr.key, attr.value.stringValue]));
+        expect(attrs["gen_ai.provider.name"]).toBe("azure.ai.openai");
+        expect(attrs["server.address"]).toBe("gw.azure-api.net");
+        expect(options.body).not.toContain("placeholder");
+        expect(options.body).not.toContain("key=private");
+      }
+    });
+
+    it("omits the endpoint host when no BYOK provider is configured", async () => {
+      vi.stubEnv("GH_AW_INFO_GENAI_ENDPOINT", "https://gw.example.com/v1");
+
+      await sendJobSetupSpan();
+      await sendJobConclusionSpan("gh-aw.agent.conclusion", { startMs });
+
+      expect(fetchMock.mock.calls).toHaveLength(3);
+      for (const [, options] of fetchMock.mock.calls) {
+        const span = JSON.parse(options.body).resourceSpans[0].scopeSpans[0].spans[0];
+        const attrs = Object.fromEntries(span.attributes.map(attr => [attr.key, attr.value.stringValue]));
+        expect(attrs).not.toHaveProperty("server.address");
+      }
     });
 
     it.each([

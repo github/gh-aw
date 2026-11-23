@@ -411,6 +411,8 @@ test "$(release_artifact_sha256 github/gh-aw-firewall v0.29.17 checksums.txt)" =
   "f56a82090eb65c9afba912c43fb2aa08de2ca54f8776f27a3fb851bbac21fa92"
 test "$(release_artifact_sha256 github/gh-aw-firewall v0.29.18 checksums.txt)" = \
   "bd7b3b0ed6d7a29d5711e1b7ce066e229c2a38577be0c363da899ef17b036b86"
+test "$(release_artifact_sha256 github/gh-aw-firewall v0.29.20 checksums.txt)" = \
+  "344d3c3dda4c1ee5cbd2ce9090ad2e5fc3482770494efd07f32565f8bb218cfd"
 for version in v0.29.10 0.29.10; do
   test "$(release_artifact_sha256 github/gh-aw-firewall "$version" checksums.txt)" = \
     "a60c61e67aad4810e9a4f52ae26d3b2a58a7cf190aff66aeb338238b7b0e1467"
