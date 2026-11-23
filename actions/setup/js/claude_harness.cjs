@@ -74,7 +74,7 @@ const {
 } = require("./awf_reflect.cjs");
 const { emitMissingToolPermissionIssue, emitInfrastructureIncomplete, hasExpectedSafeOutputs, hasNoopInSafeOutputs } = require("./safeoutputs_cli.cjs");
 const { countPermissionDeniedIssues, hasNumerousPermissionDeniedIssues, extractDeniedCommands, buildMissingToolPermissionIssuePayload } = require("./permission_denied_helpers.cjs");
-const { createOutputPatternMatcher, emitSoftTimeoutSignal, isAuthenticationFailedError } = require("./harness_retry_guard.cjs");
+const { createOutputPatternMatcher, emitSoftTimeoutSignal, isAuthenticationFailedError, isHTMLResponseError } = require("./harness_retry_guard.cjs");
 const { isCrashSignalExitCode, crashSignalNameForExitCode } = require("./harness_crash_signals.cjs");
 const { MODEL_NOT_SUPPORTED_PATTERN: INVALID_MODEL_ERROR_PATTERN } = require("./detect_agent_errors.cjs");
 const { applyModelFallback, normalizeClaudeModel } = require("./model_fallback.cjs");
@@ -591,7 +591,8 @@ async function main() {
   let continueDisabledPermanently = false;
   let startupRetriesUsed = 0;
   // Tracks whether the *active session* (the run currently being resumed via --continue)
-  // has ever produced an assistant response. This must persist across attempts — a later
+  // has ever produced an assistant response. Progress means successful model/tool work,
+  // not session creation, user messages, or error diagnostics. This must persist across attempts — a later
   // --continue attempt can fail during its own startup (e.g. connection refused before it
   // emits anything) even though earlier attempts in the same session already made progress.
   // Reset only when a genuinely fresh run begins (see below), never on a --continue attempt.
@@ -671,6 +672,7 @@ async function main() {
       const isOverloaded = isOverloadedError(classifierOutput);
       const isRateLimit = isRateLimitError(classifierOutput);
       const isAuthenticationFailed = isAuthenticationFailedError(classifierOutput);
+      const isTransientHTMLResponse = isHTMLResponseError(classifierOutput);
       const isMaxTurns = isMaxTurnsExit(classifierOutput);
       const isNoDeferredMarker = isNoDeferredMarkerError(classifierOutput);
       const isInvalidModel = isInvalidModelError(classifierOutput);
@@ -689,6 +691,7 @@ async function main() {
         overloaded_error: isOverloaded,
         rate_limit_error: isRateLimit,
         authentication_failed: isAuthenticationFailed,
+        transient_error: isTransientHTMLResponse,
         max_turns: isMaxTurns,
         no_deferred_marker: isNoDeferredMarker,
         invalid_model: isInvalidModel,
@@ -749,7 +752,7 @@ async function main() {
         return { action: "retry" };
       }
 
-      if (attempt === 0 && isAuthenticationFailed) {
+      if (attempt === 0 && isAuthenticationFailed && !sessionHasProgress) {
         log(`attempt ${attempt + 1}: authentication failed — not retrying (first-attempt auth failure is non-retryable)`);
         return { action: "stop" };
       }
@@ -827,7 +830,7 @@ async function main() {
           isNoDeferredMarker,
           continueDisabledPermanently,
         });
-        const reason = isOverloaded ? "overloaded_error (transient)" : isRateLimit ? "rate_limit_error (transient)" : "partial execution";
+        const reason = isTransientHTMLResponse ? "HTML API response (transient)" : isOverloaded ? "overloaded_error (transient)" : isRateLimit ? "rate_limit_error (transient)" : "partial execution";
         useContinueOnRetry = retryWithContinue;
         const retryMode = retryWithContinue ? `--resume ${sessionId}` : "fresh run (session resume disabled permanently)";
         log(`attempt ${attempt + 1}: ${reason} — will retry with ${retryMode} (attempt ${attempt + 2}/${maxRetries + 1})`);

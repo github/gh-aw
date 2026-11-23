@@ -99,6 +99,18 @@ describe("Generated session schemas", () => {
     expect(validateSession(jsonl([header, unified({ type: "vendor.progress", data: { arbitrary: { body: false } } })]))).toBe(2);
   });
 
+  it.each(["harness", "startup"])("validates normalized transient_error reasons in %s attempts and retry summaries", layer => {
+    const attempt = { attempt: 1, exitCode: 1, failureClasses: ["transient_error"], reason: "transient_error" };
+    const event = normalizeUnifiedSessionEvent({ type: "harness.attempt", data: { ...attempt, layer } });
+    const retry = normalizeUnifiedSessionEvent({
+      type: "harness.retry",
+      data: { attempts: layer === "harness" ? 1 : 0, exitCode: 1, attemptResults: layer === "harness" ? [attempt] : [], ...(layer === "startup" ? { startupAttemptResults: [attempt] } : {}) },
+    });
+    expect(event.data.reason).toBe("transient_error");
+    expect(validateSession(jsonl([header, unified(event), unified(retry)]))).toBe(3);
+    expect(() => validateSession(jsonl([header, unified({ ...event, data: { ...event.data, reason: "unrecognized_error" } })]))).toThrow("Invalid session event");
+  });
+
   it("requires boolean output truncation in canonical and unified completions", () => {
     for (const outputTruncated of [true, false]) {
       const event = { type: "tool.execution_complete", data: { output: "preview\n", outputTruncated } };
