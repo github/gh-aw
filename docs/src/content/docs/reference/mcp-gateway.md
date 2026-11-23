@@ -1268,7 +1268,7 @@ HTTP MCP servers MAY configure upstream authentication using the `auth` field. W
 
 #### 7.6.1 GitHub Actions OIDC
 
-When `auth.type` is `"github-oidc"`, the gateway acquires short-lived JWTs from the GitHub Actions OIDC endpoint. This requires the workflow to have `permissions: { id-token: write }`.
+When `auth.type` is `"github-oidc"` and `provider` is omitted, the gateway acquires short-lived JWTs from the GitHub Actions OIDC endpoint and sends them directly to the MCP server. This requires the workflow to have `permissions: { id-token: write }`.
 
 **Configuration**:
 
@@ -1380,6 +1380,27 @@ This allows combining OIDC auth with non-auth headers:
 - `auth` is only valid on HTTP servers (`type: "http"`). Stdio servers with `auth` MUST be rejected with a validation error.
 - `auth.type` is required when `auth` is present. Empty type MUST be rejected.
 - Unsupported `auth.type` values MUST be rejected with a descriptive error.
+
+#### 7.6.4 Microsoft Entra Federation
+
+Set workflow frontmatter `auth.provider: azure` to exchange the GitHub assertion
+for an Entra token instead of forwarding it directly. This requires MCP gateway
+v0.5.12 or newer, or an explicitly configured custom build supporting Azure
+federation.
+
+| Frontmatter field | Gateway JSON field | Description |
+|---|---|---|
+| `provider` | `provider` | `azure` |
+| `azure-tenant-id` | `azureTenantId` | Required Entra tenant ID |
+| `azure-client-id` | `azureClientId` | Required federated application client ID |
+| `azure-scope` | `azureScope` | Entra token scope; defaults to `https://cognitiveservices.azure.com/.default` |
+| `azure-cloud` | `azureCloud` | `public` (default), `usgovernment`, or `china` |
+| `audience` | `audience` | GitHub assertion audience; defaults to `api://AzureADTokenExchange` |
+
+Tenant, client, scope, and audience accept Actions expressions. The gateway owns
+token exchange and refresh; credentials are not passed to the agent.
+See [Azure AI Gateway](/gh-aw/reference/azure-ai-gateway/) for setup and the
+gateway-specific scope.
 
 ---
 

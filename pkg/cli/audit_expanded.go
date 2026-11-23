@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"slices"
@@ -300,7 +301,11 @@ func readHarnessRoutingOutcomeArtifact(logsPath string) *sessionModelRoutingOutc
 	if err != nil {
 		return nil
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			auditExpandedLog.Printf("Failed to close routing outcome artifact %s: %v", path, err)
+		}
+	}()
 	content, err := io.ReadAll(io.LimitReader(file, (64<<10)+1))
 	if err != nil || len(content) > 64<<10 {
 		return nil
@@ -387,11 +392,11 @@ func findAgentStdioLogPath(logsPath string) string {
 	}
 
 	var found string
-	walkErr := filepath.Walk(logsPath, func(path string, info os.FileInfo, err error) error {
-		if err != nil || info == nil || info.IsDir() {
+	walkErr := filepath.WalkDir(logsPath, func(path string, d fs.DirEntry, err error) error {
+		if err != nil || d == nil || d.IsDir() {
 			return nil
 		}
-		if info.Name() == "agent-stdio.log" {
+		if d.Name() == "agent-stdio.log" {
 			found = path
 			return filepath.SkipAll
 		}

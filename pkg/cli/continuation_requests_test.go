@@ -183,7 +183,7 @@ func TestContinuationRequestsAuditAndLogs(t *testing.T) {
 	require.NoError(t, renderContinuationRequests(&output, requests))
 	assert.Contains(t, output.String(), "intent only")
 	output.Reset()
-	renderLogsTSVToWriter(&output, data)
+	require.NoError(t, renderLogsTSVToWriter(&output, data))
 	assert.Contains(t, output.String(), "continuation_requests=1")
 	assert.Less(t, strings.Index(output.String(), "# 1 runs"), strings.Index(output.String(), "continuation_requests=1"))
 	assert.Greater(t, strings.Index(output.String(), "continuation_requests=1"), strings.Index(output.String(), "run_id\t"))

@@ -149,6 +149,10 @@ func buildThreatDetectionWorkflowData(data *WorkflowData, engineID string) *Work
 	if ResolveEngineID(data) == engineID {
 		detectionData.SandboxConfig.Agent.Targets = cloneAgentAPITargets(data)
 		detectionData.ModelMappings = data.ModelMappings
+		if usesConnectorInference(data) {
+			disabled := TemplatableBool("false")
+			detectionData.SandboxConfig.Agent.ModelFallback = &disabled
+		}
 	} else {
 		detectionData.ModelMappings = MergeImportedModelAliases(nil, nil)
 	}

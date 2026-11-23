@@ -1909,12 +1909,22 @@ function loadReportIncompleteMessages(items) {
  * @param {{collectorEmptyOutputCause?: string, rootDir?: string, runId?: number}} [options]
  * @returns {ReportBlock[]}
  */
-function buildReportIncompleteContext(items, { collectorEmptyOutputCause, rootDir, runId } = {}) {
+function buildReportIncompleteContext(items, options = {}) {
+  const { signal, reasons, evidence } = buildReportIncompleteParts(items, options);
+  return [...signal, ...reasons, ...evidence];
+}
+
+/**
+ * @param {Array<any> | undefined} items
+ * @param {{collectorEmptyOutputCause?: string, rootDir?: string, runId?: number}} options
+ * @returns {{signal: ReportBlock[], reasons: ReportBlock[], evidence: ReportBlock[]}}
+ */
+function buildReportIncompleteParts(items, { collectorEmptyOutputCause, rootDir, runId }) {
   const trustedCollectorCause = typeof collectorEmptyOutputCause === "string" && Object.hasOwn(EMPTY_OUTPUT_CAUSES, collectorEmptyOutputCause) ? collectorEmptyOutputCause : undefined;
   const messages = loadReportIncompleteMessages(items).filter(message => message.reason !== trustedCollectorCause);
 
   if (messages.length === 0 && !trustedCollectorCause) {
-    return [];
+    return { signal: [], reasons: [], evidence: [] };
   }
 
   if (messages.length > 0) {
@@ -1922,33 +1932,31 @@ function buildReportIncompleteContext(items, { collectorEmptyOutputCause, rootDi
   }
 
   const missingTerminalSignal = trustedCollectorCause === "missing_terminal_safe_output" && messages.length === 0;
-  const context = missingTerminalSignal
+  const signal = missingTerminalSignal
     ? nodes.warning("Completion Signal Missing", [nodes.text("No terminal safe output was recorded, so completion is unconfirmed; whether the requested work finished is unknown.")])
     : nodes.warning("Task Could Not Be Completed", [nodes.text("The workflow recorded a "), nodes.code("report_incomplete"), nodes.text(" signal: the task was not completed or completion could not be confirmed.")]);
-  if (messages.length > 0) {
-    context.push(
-      nodes.list(messages.map(message => [nodes.paragraph([nodes.strong([nodes.text("Reported reason (agent-declared, unverified):")]), nodes.text(" "), nodes.code(redactAndBoundDiagnostics(message.reason, { maxLength: 1000 }))])]))
-    );
-  }
+  const reasons = messages.length
+    ? [nodes.list(messages.map(message => [nodes.paragraph([nodes.strong([nodes.text("Reported reason (agent-declared, unverified):")]), nodes.text(" "), nodes.code(redactAndBoundDiagnostics(message.reason, { maxLength: 1000 }))])]))]
+    : [];
+  /** @type {ReportBlock[]} */
+  const evidence = [];
   // Rebuild collector diagnostics from runtime evidence, never from message text.
   if (trustedCollectorCause) {
     const outcome = buildEmptyOutputOutcome(trustedCollectorCause === "invalid_safe_outputs" ? ["validation_failed"] : [], rootDir);
-    if (outcome.details) context.push(...renderErrorDetails(outcome.details));
+    if (outcome.details) evidence.push(...renderErrorDetails(outcome.details));
   } else {
-    context.push(...renderErrorDetails(["Completion signal: agent reported incomplete", ...buildCompletionEvidence(rootDir)].join("\n")));
+    evidence.push(...renderErrorDetails(["Completion signal: agent reported incomplete", ...buildCompletionEvidence(rootDir)].join("\n")));
   }
-  context.push(
+  evidence.push(
     nodes.paragraph([
-      nodes.text(
-        "This run needs a follow-up: the agent reported that it could not finish. A successful agent job only confirms a clean process exit, not that the requested work was completed. Treat the agent-declared reason as a lead, not a confirmed root cause; agent diagnostic details are excluded, so compare the note with the runtime evidence below."
-      ),
+      nodes.text("A successful agent job only confirms a clean process exit, not that the requested work was completed. Treat any agent-declared reason as a lead, not a confirmed root cause; agent diagnostic details are excluded."),
     ])
   );
   if (typeof runId === "number" && Number.isSafeInteger(runId) && runId > 0) {
-    context.push(nodes.paragraph([nodes.text("For a runtime-focused investigation, run "), nodes.code(`gh aw audit ${runId}`), nodes.text(".")]));
+    evidence.push(nodes.paragraph([nodes.text("For a runtime-focused investigation, run "), nodes.code(`gh aw audit ${runId}`), nodes.text(".")]));
   }
 
-  return context;
+  return { signal, reasons, evidence };
 }
 
 /**
@@ -4728,7 +4736,18 @@ async function main() {
         !(isCancelledEmptyOutput && item?.type === "report_incomplete" && item.reason === collectorEmptyOutputCause)
     );
     const hasReportedIncomplete = hasReportIncomplete && reportItems.some(item => item?.type === "report_incomplete");
-    const reportIncompleteContext = buildReportIncompleteContext(reportItems, { collectorEmptyOutputCause: emptyOutputCause, rootDir: path.dirname(getAgentStdioLogPath()), runId: context.runId });
+    const {
+      signal: incompleteSignal,
+      reasons: incompleteReasons,
+      evidence: incompleteEvidence,
+    } = buildReportIncompleteParts(reportItems, {
+      collectorEmptyOutputCause: emptyOutputCause,
+      rootDir: path.dirname(getAgentStdioLogPath()),
+      runId: context.runId,
+    });
+    const approvedIncompleteReasons =
+      agentOutputResult.success && !failureDiagnostics.secretRedactionFailed && process.env.GH_AW_DETECTION_ACCEPTED === "true" && process.env.GH_AW_DETECTION_CONCLUSION === "success" ? incompleteReasons : [];
+    const reportIncompleteContext = [...incompleteSignal, ...approvedIncompleteReasons, ...incompleteEvidence];
     if (hasReportedIncomplete && reportIncompleteContext.length > 0 && !failureDiagnostics.secretRedactionFailed) {
       try {
         const summary = renderSizedReport({ type: "report", title: "Incomplete result", children: reportIncompleteContext, agentTainted: false }).body;
@@ -5367,7 +5386,9 @@ async function main() {
               ? buildWarningAlertLine("Tool Denial Limit Exceeded", "The runtime recorded a tool-denial limit signal; agent text is excluded.")
               : ""
             : toolDenialsExceededContext,
-          report_incomplete_context: reportIncompleteContext,
+          report_incomplete_context: incompleteSignal,
+          agent_report_context: approvedIncompleteReasons,
+          completion_evidence_context: incompleteEvidence,
           failure_diagnostics_context: failureDiagnosticsContext,
           missing_safe_outputs_context: missingSafeOutputsContext,
           engine_failure_context: needsFailureDiagnostics ? "" : engineFailureContext,

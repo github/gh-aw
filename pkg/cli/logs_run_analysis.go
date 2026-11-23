@@ -124,7 +124,11 @@ func applyRunBehavioralSignals(result *DownloadResult, runOutputDir string, verb
 		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to extract noops for run %d: %v", result.Run.DatabaseID, noopErr)))
 	}
 	result.Noops = noops
-	result.ContinuationRequests, _ = extractContinuationRequestsFromRun(runOutputDir, result.Run, verbose, expName, expVariant)
+	continuationRequests, continuationErr := extractContinuationRequestsFromRun(runOutputDir, result.Run, verbose, expName, expVariant)
+	if continuationErr != nil {
+		logsOrchestratorLog.Printf("Failed to extract continuation requests for run %d: %v", result.Run.DatabaseID, continuationErr)
+	}
+	result.ContinuationRequests = continuationRequests
 
 	mcpFailures, mcpErr := extractMCPFailuresFromRun(runOutputDir, result.Run, verbose, expName, expVariant)
 	if mcpErr != nil && verbose {

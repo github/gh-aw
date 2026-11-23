@@ -239,13 +239,21 @@ func TestHealthRevisionRollbackDoesNotMergeHistoricalCohorts(t *testing.T) {
 
 func TestHealthSummaryKeepsSparseAndSameNameWorkflowsSeparate(t *testing.T) {
 	runs, collection := healthRevisionFixture()
-	collection.workflows = []GitHubWorkflow{{Name: "Example", Path: ".github/workflows/example.lock.yml"},
-		{Name: "Example", Path: ".github/workflows/other.lock.yml"}}
-	reports := calculateHealthWorkflowReports(runs, HealthConfig{Threshold: 80, RepoOverride: "org/repo", collection: collection})
-	require.Len(t, reports, 2)
-	summary := CalculateHealthSummary(reports, "current", 80)
-	assert.Equal(t, 1, summary.HealthyWorkflows)
-	assert.Equal(t, 1, summary.InsufficientWorkflows)
+	target := GitHubWorkflow{Name: "Example", Path: ".github/workflows/example.lock.yml"}
+	other := GitHubWorkflow{Name: "Example", Path: ".github/workflows/other.lock.yml"}
+	config := HealthConfig{Full: true, Threshold: 80, collection: collection}
+	evidence := calculateCurrentWorkflowHealth(target.Name, runs, config)
+	empty := calculateCurrentWorkflowHealth(other.Name, nil, config)
+	empty.WorkflowPath = other.Path
+	report := makeHealthFleetReport(&healthFleetState{
+		Workflows: []GitHubWorkflow{target, other},
+		Verified:  map[string]healthFleetWorkflowEvidence{target.Path: {Health: evidence}, other.Path: {Health: empty}},
+	}, config)
+	require.Len(t, report.Details.Workflows, 2)
+	assert.Equal(t, target.Path, report.Details.Workflows[0].WorkflowPath)
+	assert.Equal(t, other.Path, report.Details.Workflows[1].WorkflowPath)
+	assert.Equal(t, 1, report.StatusCounts["recovery_observed"])
+	assert.Equal(t, 1, report.StatusCounts["no_recent_runs"])
 }
 
 func TestHealthNewlyPushedRevisionHasNoCurrentEvidence(t *testing.T) {

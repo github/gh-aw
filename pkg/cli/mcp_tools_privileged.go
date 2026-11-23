@@ -655,11 +655,10 @@ func newAuditToolHandler(execCmd execCmdFunc, actor string, validateActor bool) 
 
 		// The audit command outputs JSON to stdout when --json flag is used.
 		// If the command fails, we need to provide detailed error information.
-		outputStr := string(stdout)
-
 		if execErr != nil {
-			return buildAuditErrorResult(execErr, outputStr, runItems)
+			return buildAuditErrorResult(execErr, stdout, runItems)
 		}
+		outputStr := string(stdout)
 
 		notifyProgress(ctx, req, 100, 100, "Audit complete")
 
@@ -696,12 +695,20 @@ func runMCPAuditSubprocess(ctx context.Context, responseDeadline time.Time, exec
 	stdout, err := cmd.Output()
 	if err != nil {
 		if ctx.Err() != nil {
-			err = &mcpStageError{stage: "audit", err: ctx.Err()}
-		} else if errors.Is(err, exec.ErrWaitDelay) {
-			err = &mcpStageError{stage: "pipe_drain", err: err}
+			return stdout, &mcpStageError{stage: "audit", err: ctx.Err()}
 		}
+		if errors.Is(err, exec.ErrWaitDelay) {
+			return stdout, &mcpStageError{stage: "pipe_drain", err: err}
+		}
+		// The *exec.ExitError (with Stderr) is returned unchanged: buildAuditErrorResult
+		// extracts the user-facing message from it without leaking debug log lines.
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) {
+			mcpLog.Printf("Audit subprocess exited with code %d (stderr: %d bytes)", exitErr.ExitCode(), len(exitErr.Stderr))
+		}
+		return stdout, err
 	}
-	return stdout, err
+	return stdout, nil
 }
 
 // resolveAuditRunItems resolves the list of run IDs/URLs to pass to the audit
@@ -781,7 +788,7 @@ func buildAuditCommandArgs(args auditArgs, runItems []string) []string {
 // error envelope instead of an MCP protocol error so callers always receive
 // consistent JSON and the run IDs are always present. Timeouts are tool errors;
 // other failures retain the existing graceful JSON error envelope.
-func buildAuditErrorResult(err error, outputStr string, runItems []string) (*mcp.CallToolResult, any, error) {
+func buildAuditErrorResult(err error, stdout []byte, runItems []string) (*mcp.CallToolResult, any, error) {
 	// Try to get stderr for message extraction
 	var stderr string
 	var exitErr *exec.ExitError
@@ -790,7 +797,7 @@ func buildAuditErrorResult(err error, outputStr string, runItems []string) (*mcp
 	}
 
 	mcpLog.Printf("Audit command exited with error: %v (stdout length: %d, stderr length: %d)",
-		err, len(outputStr), len(stderr))
+		err, len(stdout), len(stderr))
 
 	// Extract the user-facing message from stderr, filtering out debug log lines
 	// (e.g. "workflow:script_registry Creating new script registry +151ns")
@@ -812,7 +819,7 @@ func buildAuditErrorResult(err error, outputStr string, runItems []string) (*mcp
 			"Use the 'logs' tool to list recent run IDs",
 		},
 	}
-	report, partial := decodeAuditReport(outputStr)
+	report, partial := decodeAuditReport(stdout)
 	if partial != nil && partial["partial"] == true && partial["complete"] == false {
 		errorEnvelope["partial"] = true
 		errorEnvelope["complete"] = false
@@ -857,9 +864,9 @@ func summarizeMCPAuditPartialResults(partial map[string]any) map[string]any {
 	return summary
 }
 
-func decodeAuditReport(outputStr string) (any, map[string]any) {
+func decodeAuditReport(stdout []byte) (any, map[string]any) {
 	var report any
-	if json.Unmarshal([]byte(outputStr), &report) != nil {
+	if json.Unmarshal(stdout, &report) != nil {
 		return nil, nil
 	}
 	partial, ok := report.(map[string]any)

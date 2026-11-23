@@ -331,7 +331,7 @@ async function getRunAIC(artifactClient, runId, token, owner, repo, run, inspect
   let artifacts;
   try {
     ({ artifacts } = await artifactClient.listArtifacts({
-      latest: true,
+      latest: false,
       findBy: {
         token,
         workflowRunId: runId,
@@ -343,6 +343,9 @@ async function getRunAIC(artifactClient, runId, token, owner, repo, run, inspect
     logDailyGuardrail("Artifact discovery failed", { runId, operation: "listArtifacts", error: getErrorMessage(error), hint: "Check Actions read permissions, artifact retention, and GitHub API availability." });
     throw error;
   }
+  // Artifact IDs do not follow upload order across reruns. Use creation time
+  // for the usage archive and its producers, then verify their job timestamps.
+  artifacts = artifacts.toSorted((a, b) => (b?.createdAt?.getTime() || 0) - (a?.createdAt?.getTime() || 0));
   const artifactSummaries = artifacts.map(item => ({ id: item?.id ?? null, name: item?.name || "", expired: !!item?.expired }));
   logDailyGuardrail("Listed workflow artifacts", {
     runId,

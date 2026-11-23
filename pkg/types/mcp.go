@@ -28,11 +28,15 @@ type BaseMCPServerConfig struct {
 
 // MCPAuthConfig represents upstream authentication configuration for an HTTP MCP server.
 // When configured, the gateway dynamically acquires tokens and injects them as Authorization
-// headers on every outgoing request. Currently only GitHub Actions OIDC is supported.
+// headers on every outgoing request.
 type MCPAuthConfig struct {
 	// Type is the authentication type. Currently only "github-oidc" is supported.
 	Type string `json:"type" yaml:"type"`
-	// Audience is the intended audience (aud claim) for the OIDC token.
-	// If omitted, defaults to the server's url field.
-	Audience string `json:"audience,omitempty" yaml:"audience,omitempty"`
+	// Audience defaults to the server URL for direct OIDC or Azure's exchange audience.
+	Audience      string `json:"audience,omitempty" yaml:"audience,omitempty"`
+	Provider      string `json:"provider,omitempty" yaml:"provider,omitempty"`
+	AzureTenantID string `json:"azure-tenant-id,omitempty" yaml:"azure-tenant-id,omitempty"`
+	AzureClientID string `json:"azure-client-id,omitempty" yaml:"azure-client-id,omitempty"`
+	AzureScope    string `json:"azure-scope,omitempty" yaml:"azure-scope,omitempty"`
+	AzureCloud    string `json:"azure-cloud,omitempty" yaml:"azure-cloud,omitempty"`
 }

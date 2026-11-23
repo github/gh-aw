@@ -673,65 +673,69 @@ func buildRunData(pr ProcessedRun, processedRuns []ProcessedRun, localRepo strin
 func newRunData(pr ProcessedRun, engineInfo runEngineInfo, chainMetrics SafeOutputChainMetrics, comparison *AuditComparisonData, failureKind string, gitHubAPICalls int) RunData {
 	run := pr.Run
 	runData := RunData{
-		RunID:                      run.DatabaseID,
-		Number:                     run.Number,
-		WorkflowName:               run.WorkflowName,
-		WorkflowPath:               run.WorkflowPath,
-		Agent:                      engineInfo.engineID,
-		Engine:                     engineInfo.engineName,
-		EngineID:                   engineInfo.engineID,
-		Status:                     run.Status,
-		Conclusion:                 run.Conclusion,
-		Classification:             deriveRunClassification(comparison),
-		FailureKind:                failureKind,
-		TokenUsage:                 run.TokenUsage,
-		AmbientContext:             runAmbientContext(pr),
-		WorkingSet:                 pr.WorkingSet,
-		WSRF:                       wsrfDisplayValue(pr.WorkingSet),
-		Friction:                   pr.Friction,
-		FrictionAIC:                frictionDisplayValue(pr.Friction),
-		ActionMinutes:              run.ActionMinutes,
-		Turns:                      run.Turns,
-		ErrorCount:                 run.ErrorCount,
-		WarningCount:               run.WarningCount,
-		MissingToolCount:           run.MissingToolCount,
-		MissingDataCount:           run.MissingDataCount,
-		ContinuationRequestCount:   continuationRequestCount(pr.ContinuationRequests),
-		ContinuationRequests:       pr.ContinuationRequests,
-		SafeItemsCount:             run.SafeItemsCount,
-		ManifestEntryCount:         chainMetrics.ManifestEntryCount,
-		TemporaryIDMapStatus:       chainMetrics.TemporaryIDMapStatus,
-		TemporaryIDMappings:        chainMetrics.TemporaryIDMappings,
-		ChainedTargetCount:         chainMetrics.ChainedTargetCount,
-		ChainedFollowupActionCount: chainMetrics.ChainedFollowupActionCount,
-		DelegatedTempTargetCount:   chainMetrics.DelegatedTempTargetCount,
-		ClosedTempTargetCount:      chainMetrics.ClosedTempTargetCount,
-		CreatedAt:                  run.CreatedAt,
-		StartedAt:                  run.StartedAt,
-		UpdatedAt:                  run.UpdatedAt,
-		URL:                        run.URL,
-		LogsPath:                   run.LogsPath,
-		AuditPath:                  existingAuditPath(run.LogsPath),
-		Event:                      run.Event,
-		Branch:                     run.HeadBranch,
-		HeadSHA:                    run.HeadSha,
-		DisplayTitle:               run.DisplayTitle,
-		Comparison:                 comparison,
-		TaskDomain:                 pr.TaskDomain,
-		BehaviorFingerprint:        pr.BehaviorFingerprint,
-		AgenticAssessments:         pr.AgenticAssessments,
-		AwContext:                  engineInfo.awContext,
-		TokenUsageSummary:          pr.TokenUsage,
-		GitHubAPICalls:             gitHubAPICalls,
-		Experiments:                extractExperimentData(run.LogsPath),
-		Graders:                    extractGradersData(run.LogsPath),
-		SafeOutputs:                pr.SafeOutputs,
-		WorkQueue:                  pr.WorkQueue,
+		RunID:                    run.DatabaseID,
+		Number:                   run.Number,
+		WorkflowName:             run.WorkflowName,
+		WorkflowPath:             run.WorkflowPath,
+		Agent:                    engineInfo.engineID,
+		Engine:                   engineInfo.engineName,
+		EngineID:                 engineInfo.engineID,
+		Status:                   run.Status,
+		Conclusion:               run.Conclusion,
+		Classification:           deriveRunClassification(comparison),
+		FailureKind:              failureKind,
+		TokenUsage:               run.TokenUsage,
+		AmbientContext:           runAmbientContext(pr),
+		WorkingSet:               pr.WorkingSet,
+		WSRF:                     wsrfDisplayValue(pr.WorkingSet),
+		Friction:                 pr.Friction,
+		FrictionAIC:              frictionDisplayValue(pr.Friction),
+		ActionMinutes:            run.ActionMinutes,
+		Turns:                    run.Turns,
+		ErrorCount:               run.ErrorCount,
+		WarningCount:             run.WarningCount,
+		MissingToolCount:         run.MissingToolCount,
+		MissingDataCount:         run.MissingDataCount,
+		ContinuationRequestCount: continuationRequestCount(pr.ContinuationRequests),
+		ContinuationRequests:     pr.ContinuationRequests,
+		SafeItemsCount:           run.SafeItemsCount,
+		CreatedAt:                run.CreatedAt,
+		StartedAt:                run.StartedAt,
+		UpdatedAt:                run.UpdatedAt,
+		URL:                      run.URL,
+		LogsPath:                 run.LogsPath,
+		AuditPath:                existingAuditPath(run.LogsPath),
+		Event:                    run.Event,
+		Branch:                   run.HeadBranch,
+		HeadSHA:                  run.HeadSha,
+		DisplayTitle:             run.DisplayTitle,
+		Comparison:               comparison,
+		TaskDomain:               pr.TaskDomain,
+		BehaviorFingerprint:      pr.BehaviorFingerprint,
+		AgenticAssessments:       pr.AgenticAssessments,
+		AwContext:                engineInfo.awContext,
+		TokenUsageSummary:        pr.TokenUsage,
+		GitHubAPICalls:           gitHubAPICalls,
+		Experiments:              extractExperimentData(run.LogsPath),
+		Graders:                  extractGradersData(run.LogsPath),
+		SafeOutputs:              pr.SafeOutputs,
+		WorkQueue:                pr.WorkQueue,
 	}
+	applySafeOutputChainMetricsToRunData(&runData, chainMetrics)
 	applyRunExecutionEvidence(&runData, pr)
 	applyModelAttributionToRunData(&runData, resolveEffectiveModelAttribution(pr.Run.LogsPath, engineInfo.awInfo, pr.ModelRouting, pr.TokenUsage))
 	applyGitHubMetadataToRunData(&runData, run)
 	return runData
+}
+
+func applySafeOutputChainMetricsToRunData(runData *RunData, chainMetrics SafeOutputChainMetrics) {
+	runData.ManifestEntryCount = chainMetrics.ManifestEntryCount
+	runData.TemporaryIDMapStatus = chainMetrics.TemporaryIDMapStatus
+	runData.TemporaryIDMappings = chainMetrics.TemporaryIDMappings
+	runData.ChainedTargetCount = chainMetrics.ChainedTargetCount
+	runData.ChainedFollowupActionCount = chainMetrics.ChainedFollowupActionCount
+	runData.DelegatedTempTargetCount = chainMetrics.DelegatedTempTargetCount
+	runData.ClosedTempTargetCount = chainMetrics.ClosedTempTargetCount
 }
 
 func applyModelAttributionToRunData(runData *RunData, attribution effectiveModelAttribution) {
@@ -788,17 +792,34 @@ func buildLogsDataWithCollectionCoverage(processedRuns []ProcessedRun, outputDir
 	addRunExecutionSummary(&summary, runs)
 
 	episodes, edges := buildEpisodeData(runs, processedRuns)
+	countEpisodeSummary(&summary, episodes)
+
+	data := buildLogsSections(processedRuns)
+	data.Summary = summary
+	data.Runs = runs
+	addContinuationRequestSummary(&data)
+	data.FailureClusters = annotateFailureClusters(data.Runs)
+	data.FailureInvestigation = buildFailureInvestigation(data.Runs, data.FailureClusters)
+	data.Episodes = episodes
+	data.Edges = edges
+	data.Continuation = continuation
+	applyLogsCollectionCoverage(&data, collection)
+	data.LogsLocation, _ = filepath.Abs(outputDir)
+	return data
+}
+
+func countEpisodeSummary(summary *LogsSummary, episodes []EpisodeData) {
 	for _, episode := range episodes {
 		summary.TotalEpisodes++
 		if episode.Confidence == "high" {
 			summary.HighConfidenceEpisodes++
 		}
 	}
+}
 
-	data := buildLogsSections(processedRuns)
-	data.Summary = summary
-	data.Runs = runs
-	for _, run := range runs {
+// addContinuationRequestSummary aggregates per-run continuation requests into data.
+func addContinuationRequestSummary(data *LogsData) {
+	for _, run := range data.Runs {
 		if run.ContinuationRequestCount == nil {
 			data.Summary.ContinuationRequestsUnavailableRuns++
 			continue
@@ -812,14 +833,6 @@ func buildLogsDataWithCollectionCoverage(processedRuns []ProcessedRun, outputDir
 			data.Summary.ContinuationRequestedRuns++
 		}
 	}
-	data.FailureClusters = annotateFailureClusters(data.Runs)
-	data.FailureInvestigation = buildFailureInvestigation(data.Runs, data.FailureClusters)
-	data.Episodes = episodes
-	data.Edges = edges
-	data.Continuation = continuation
-	applyLogsCollectionCoverage(&data, collection)
-	data.LogsLocation, _ = filepath.Abs(outputDir)
-	return data
 }
 
 // buildLogsSections builds the cross-run analysis sections of the logs report.

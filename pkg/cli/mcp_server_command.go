@@ -160,7 +160,14 @@ func runMCPServer(ctx context.Context, port int, cmdPath string, validateActor b
 			mcpLog.Printf("Failed to clean up private logs cache: %v", err)
 		}
 	}()
-	server := createMCPServer(cmdPath, actor, validateActor, allowWriteTools, manifestCacheFile, mcpServerEnv, logsCache)
+	healthCheckpoints := &healthMCPCheckpoints{}
+	defer func() {
+		if err := healthCheckpoints.close(); err != nil {
+			mcpLog.Printf("Failed to clean up health checkpoints: %v", err)
+		}
+	}()
+	server := createMCPServer(cmdPath, actor, validateActor, allowWriteTools, manifestCacheFile, mcpServerEnv,
+		mcpServerCaches{logs: logsCache, healthCheckpoints: healthCheckpoints})
 
 	if port > 0 {
 		// Run HTTP server with SSE transport

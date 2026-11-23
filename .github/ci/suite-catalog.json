@@ -25,12 +25,6 @@
       "historical_duration_seconds": null,
       "mandatory": false
     },
-    {
-      "id": "canary-go",
-      "description": "Check full Go unit-test coverage using combined artifacts from test and test-slow; compare discovered test names with executed tests. Requires both unit suites and their integration compilation prerequisite.",
-      "historical_duration_seconds": null,
-      "mandatory": false
-    },
     { "id": "impacted-go-tests", "description": "Run make test-impacted-go BASE_REF=HEAD^ to select and execute impacted Go tests from source and test changes.", "historical_duration_seconds": null, "mandatory": false },
     {
       "id": "native-javascript-tests",

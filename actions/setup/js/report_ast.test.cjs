@@ -46,6 +46,18 @@ describe("report AST", () => {
     expect(parseReportMarkdown(body, { agentTainted: false })).toEqual(children);
   });
 
+  it("renders an alert directly inside details as a labeled blockquote", () => {
+    const input = report([
+      {
+        type: "details",
+        summary: "Runtime evidence",
+        children: [{ type: "alert", kind: "WARNING", children: [paragraph("First finding"), paragraph("Second finding")] }],
+      },
+    ]);
+
+    expect(renderReport(input, { warnOnNestedAlerts: false }).body).toBe("<details>\n<summary>Runtime evidence</summary>\n\n> **Warning:**\n>\n> First finding\n>\n> Second finding\n\n</details>\n");
+  });
+
   it("preserves compact marker identities and substitutes metadata scalars without parsing their contents", () => {
     const children = parseReportMarkdown("<!-- gh-aw-work-issue:{work_id} -->", { context: { work_id: "work_123" }, allowMetadata: true, agentTainted: false });
     expect(children).toEqual([{ type: "xml_marker", name: "gh-aw-work-issue", value: "work_123", compact: true, agentTainted: false }]);
@@ -751,11 +763,28 @@ describe("report Markdown import boundary", () => {
       "</details>",
     ].join("\n");
     const { body } = renderReport(report(parseReportMarkdown(markdown)));
-    expect(body).toContain("> [!WARNING]\n> **Missing tool:** `github.read`");
+    expect(body).toContain("> **Warning:**\n>\n> **Missing tool:** `github.read`");
     expect(body).toContain("- First\n  \n  - Nested\n- Second");
     expect(body).toContain("| `gh` | *missing* |");
     expect(body).toContain("````text\n</details>\n```\n````");
     expect(body.endsWith("\n</details>\n")).toBe(true);
+  });
+
+  it.each([
+    ["- > [!TIP]\n  > List content", "- > **Tip:**"],
+    ["> Outer quote\n>\n> > [!TIP]\n> > Quote content", "> > **Tip:**"],
+    ["> [!NOTE]\n> > [!TIP]\n> > Alert content", "> > **Tip:**"],
+  ])("warns when rendering a nested alert in %s", (markdown, expected) => {
+    const warning = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      const { body } = renderReport(report(parseReportMarkdown(markdown)));
+      expect(body).toContain(expected);
+      expect(body).not.toContain("[!TIP]");
+      expect(body).toContain("content");
+      expect(warning).toHaveBeenCalledExactlyOnceWith(expect.stringContaining("Nested alerts (TIP)"));
+    } finally {
+      warning.mockRestore();
+    }
   });
 
   it("does not promote diagnostic headings to report sections or permit arbitrary HTML", () => {

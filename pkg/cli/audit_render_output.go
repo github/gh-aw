@@ -24,31 +24,9 @@ func renderAuditReport(ctx context.Context, processedRun ProcessedRun, metrics L
 	runOutputDir := opts.OutputDir
 	auditLog.Printf("Rendering audit report for run %d (noBaseline=%t, group=%t)", runID, opts.NoBaseline, opts.Group)
 	processedRun.Run.SafeItemsCount = len(resolveCreatedItems(runOutputDir, processedRun.SafeOutputs))
-	auditData, ok := loadCachedAuditData(runOutputDir, processedRun.Run, auditCacheSourceFull)
-	if ok {
-		// A cached entry always carries the default (baseline) comparison, so drop it
-		// when the caller opted out of baseline comparison.
-		if opts.NoBaseline {
-			auditData.Comparison = noBaselineComparison()
-		}
-	} else {
-		var err error
-		auditData, err = buildRenderedAuditDataFromCache(ctx, processedRun, metrics, mcpToolUsage, runOutputDir, opts)
-		if err != nil {
-			return err
-		}
-		if err := ctx.Err(); err != nil {
-			return err
-		}
-		auditData.CacheSource = auditCacheSourceFull
-		auditData.SchemaVersion = auditSchemaVersion
-		// Never persist an opt-out result: it would be reused as the full cache entry
-		// by a later default audit and suppress its baseline comparison.
-		if !opts.NoBaseline {
-			if err := writeAuditData(runOutputDir, auditData); err != nil {
-				return err
-			}
-		}
+	auditData, err := loadOrBuildAuditData(ctx, processedRun, metrics, mcpToolUsage, runOutputDir, opts)
+	if err != nil {
+		return err
 	}
 	if auditData.Ledger == nil {
 		auditData.Ledger = processedRun.Ledger
@@ -78,6 +56,36 @@ func renderAuditReport(ctx context.Context, processedRun ProcessedRun, metrics L
 		}
 	}
 	return renderPreparedAuditReport(ctx, auditData, opts)
+}
+
+// loadOrBuildAuditData returns the cached full audit data for the run, or builds
+// and persists it (unless baseline comparison was opted out).
+func loadOrBuildAuditData(ctx context.Context, processedRun ProcessedRun, metrics LogMetrics, mcpToolUsage *MCPToolUsageData, runOutputDir string, opts AuditOptions) (AuditData, error) {
+	if auditData, ok := loadCachedAuditData(runOutputDir, processedRun.Run, auditCacheSourceFull); ok {
+		// A cached entry always carries the default (baseline) comparison, so drop it
+		// when the caller opted out of baseline comparison.
+		if opts.NoBaseline {
+			auditData.Comparison = noBaselineComparison()
+		}
+		return auditData, nil
+	}
+	auditData, err := buildRenderedAuditDataFromCache(ctx, processedRun, metrics, mcpToolUsage, runOutputDir, opts)
+	if err != nil {
+		return auditData, err
+	}
+	if err := ctx.Err(); err != nil {
+		return auditData, err
+	}
+	auditData.CacheSource = auditCacheSourceFull
+	auditData.SchemaVersion = auditSchemaVersion
+	// Never persist an opt-out result: it would be reused as the full cache entry
+	// by a later default audit and suppress its baseline comparison.
+	if !opts.NoBaseline {
+		if err := writeAuditData(runOutputDir, auditData); err != nil {
+			return auditData, err
+		}
+	}
+	return auditData, nil
 }
 
 func renderPreparedAuditReport(ctx context.Context, auditData AuditData, opts AuditOptions) error {

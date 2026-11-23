@@ -111,6 +111,7 @@ async function fixture(t, options = {}) {
         assert.ok(!args.includes("all"));
         if (args[1] === "health") {
           if (options.healthTimeout) throw timeoutError();
+          assert.ok(args.includes("--full"));
           assert.equal(args[args.indexOf("--repo") + 1], "example/repo");
           const start = args[args.indexOf("--start-date") + 1];
           const end = args[args.indexOf("--end-date") + 1];
@@ -119,24 +120,26 @@ async function fixture(t, options = {}) {
           const recent = runs.filter(r => Date.parse(r.created_at) >= Date.parse(start) && Date.parse(r.created_at) <= Date.parse(end) && r.path.endsWith(".lock.yml"));
           clock.time = new Date(Date.parse(clock.time) + (options.healthElapsedMs || 0)).toISOString();
           return JSON.stringify({
-            collection: {
+            schema_version: 1,
+            coverage: {
               partial: false,
-              failure_listing_complete: true,
-              failure_pass_complete: true,
-              potential_issues: recent
-                .filter(r => r.conclusion === "failure")
-                .map(r => ({
-                  workflow_path: r.path,
-                  representative_run_id: r.id,
-                  representative_status: options.representativeStatus || "revision_checked",
-                })),
-              ...options.healthCollection,
+              inventory_complete: true,
+              verification_complete: true,
+              ...options.healthCoverage,
             },
-            workflows: recent.map(r => ({
-              workflow_path: r.path,
-              intentional_failure: options.intentional,
-              revisions: [{ current: { run_ids: options.representativeStatus === "superseded" ? [] : [r.id] } }],
-            })),
+            details: {
+              failure_representatives: recent.filter(r => r.conclusion === "failure" && !options.representativeStatus).map(r => ({ workflow_path: r.path, run_id: r.id })),
+              workflows: recent.map(r => ({
+                workflow_path: r.path,
+                intentional_failure: options.intentional,
+                revisions: [
+                  {
+                    status: options.representativeStatus === "revision_unknown" ? "revision_unknown" : "failures_observed",
+                    current: { run_ids: options.representativeStatus === "superseded" ? [] : [r.id] },
+                  },
+                ],
+              })),
+            },
           });
         }
         if (args[1] === "logs") {
@@ -311,9 +314,9 @@ test("PR pagination includes human and draft PRs on subsequent pages", async t =
 });
 
 for (const [name, options] of [
-  ["health API error", { healthCollection: { partial: true, reason: "api_error" } }],
-  ["incomplete request-budget discovery", { healthCollection: { partial: true, reason: "request_budget", failure_listing_complete: true, failure_pass_complete: false } }],
-  ["missing health completeness", { healthCollection: { partial: undefined } }],
+  ["health API error", { healthCoverage: { partial: true, reason: "api_error" } }],
+  ["incomplete request-budget discovery", { healthCoverage: { partial: true, reason: "request_budget", verification_complete: false } }],
+  ["missing health completeness", { healthCoverage: { partial: undefined } }],
   ["incomplete PR pagination", { prOverflow: true }],
   ["PR access denied", { prError: true }],
   ["partial logs query", { runs: [run(42)], partial: true }],
@@ -388,7 +391,7 @@ for (const [name, age] of [
       backlog: [],
       pending: [42],
     };
-    const f = await fixture(t, { state, healthCollection: { partial: true, reason: "api_error" } });
+    const f = await fixture(t, { state, healthCoverage: { partial: true, reason: "api_error" } });
     await assert.rejects(f.execute(), /checkpoint|scope/);
     assert.deepEqual(JSON.parse(fs.readFileSync(path.join(f.cache, "checkpoint.json"))), state);
     assert.equal(f.outputs.has_new_failures, "false");
@@ -661,32 +664,19 @@ for (const status of ["superseded", "jobless", "unverified", "revision_unknown"]
   });
 }
 
-test("bounded health inventory keeps verified failures actionable and reports partial coverage", async t => {
+test("missing job-step details keep revision-verified failures actionable", async t => {
   const f = await fixture(t, {
     runs: [run(42)],
-    healthCollection: { partial: true, reason: "failure_listing_limit", failure_listing_complete: false, failure_pass_complete: false },
+    healthCoverage: { partial: true, reason: "job_evidence_incomplete" },
   });
   await f.execute();
   assert.equal(f.outputs.has_new_failures, "true");
   const manifest = JSON.parse(fs.readFileSync(path.join(f.data, "manifest.json")));
   assert.equal(manifest.discovery.partial, true);
-  assert.equal(manifest.discovery.reason, "failure_listing_limit");
+  assert.equal(manifest.discovery.reason, "job_evidence_incomplete");
 });
 
-for (const reason of ["time_budget", "request_budget"]) {
-  test(`${reason} after failure passes does not block a verified failure inventory`, async t => {
-    const f = await fixture(t, {
-      runs: [run(42)],
-      healthCollection: { partial: true, reason },
-    });
-    await f.execute();
-    assert.equal(f.outputs.has_new_failures, "true");
-    assert.equal(JSON.parse(fs.readFileSync(path.join(f.data, "manifest.json"))).evidence_complete, true);
-    assert.equal(fs.existsSync(path.join(f.cache, "health-retry.json")), false);
-  });
-}
-
-for (const incomplete of ["failure_listing_complete", "failure_pass_complete"]) {
+for (const incomplete of ["inventory_complete", "verification_complete"]) {
   test(`timed-out ${incomplete} defers and retries without losing checkpoint state`, async t => {
     const options = { runs: [run(42)] };
     const f = await fixture(t, options);
@@ -695,7 +685,7 @@ for (const incomplete of ["failure_listing_complete", "failure_pass_complete"]) 
     const previous = JSON.parse(checkpoint);
     const reportFile = path.join(f.cache, previous.backlog[0].report_file);
     const report = fs.readFileSync(reportFile, "utf8");
-    options.healthCollection = { partial: true, reason: "time_budget", [incomplete]: false };
+    options.healthCoverage = { partial: true, reason: "time_budget", [incomplete]: false };
     f.calls.length = 0;
     for (const [timeout, nextTimeout] of [
       [300, 600],
@@ -712,11 +702,11 @@ for (const incomplete of ["failure_listing_complete", "failure_pass_complete"]) 
       const manifest = JSON.parse(fs.readFileSync(path.join(f.data, "manifest.json")));
       assert.equal(manifest.complete, false);
       assert.equal(manifest.evidence_complete, false);
-      assert.equal(JSON.parse(fs.readFileSync(path.join(f.data, "health.json"))).collection[incomplete], false);
+      assert.equal(JSON.parse(fs.readFileSync(path.join(f.data, "health.json"))).coverage[incomplete], false);
     }
     assert.equal(f.calls.filter(call => call[1] === "logs" || call[0] === "tracked" || call[0] === "prs").length, 0);
     assert.match(f.warnings.at(-1), /maximum was reached.*unverified/);
-    options.healthCollection = undefined;
+    options.healthCoverage = undefined;
     await f.execute();
     assert.equal(fs.existsSync(path.join(f.cache, "health-retry.json")), false);
     assert.deepEqual(JSON.parse(fs.readFileSync(path.join(f.cache, "checkpoint.json"))).seen, previous.seen);
@@ -730,7 +720,7 @@ for (const incomplete of ["failure_listing_complete", "failure_pass_complete"]) 
 test("deferred bootstrap resumes validated initial state without fabricating a successful checkpoint", async t => {
   const options = {
     runs: [run(42)],
-    healthCollection: { partial: true, reason: "time_budget", failure_pass_complete: false },
+    healthCoverage: { partial: true, reason: "time_budget", verification_complete: false },
   };
   const f = await fixture(t, options);
   await f.execute();
@@ -738,7 +728,7 @@ test("deferred bootstrap resumes validated initial state without fabricating a s
   const retry = JSON.parse(fs.readFileSync(path.join(f.cache, "health-retry.json")));
   assert.equal(retry.initial_state.checkpoint, new Date(Date.parse(now) - 3600000).toISOString());
   options.previousRun = "success";
-  options.healthCollection = undefined;
+  options.healthCoverage = undefined;
   f.calls.length = 0;
   await f.execute();
   assert.equal(f.calls.filter(call => call[0] === "prior-history").length, 0);
@@ -748,12 +738,12 @@ test("deferred bootstrap resumes validated initial state without fabricating a s
 });
 
 test("retry cannot conceal a later API error or advance its saved checkpoint", async t => {
-  const options = { healthCollection: { partial: true, reason: "time_budget", failure_pass_complete: false } };
+  const options = { healthCoverage: { partial: true, reason: "time_budget", verification_complete: false } };
   const f = await fixture(t, options);
   await f.execute();
   const retry = fs.readFileSync(path.join(f.cache, "health-retry.json"), "utf8");
-  options.healthCollection = { partial: true, reason: "api_error" };
-  await assert.rejects(f.execute(), /Incomplete or invalid health discovery/);
+  options.healthCoverage = { partial: true, reason: "api_error" };
+  await assert.rejects(f.execute(), /Incomplete health discovery/);
   assert.equal(fs.readFileSync(path.join(f.cache, "health-retry.json"), "utf8"), retry);
   assert.equal(fs.existsSync(path.join(f.cache, "checkpoint.json")), false);
   assert.equal(f.outputs.has_new_failures, "false");

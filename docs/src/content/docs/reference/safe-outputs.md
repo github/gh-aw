@@ -2432,6 +2432,8 @@ Supports GitHub Actions expressions. Use this to prevent concurrent safe output 
 
 Customize notifications using template variables and Markdown. Import from shared workflows (local overrides imported).
 
+GitHub alerts such as `> [!WARNING]` belong at the top level, not inside `<details>`, lists, or blockquotes. Compilation warns about nested alerts in configured templates. The report renderer preserves their content as labeled blockquotes.
+
 ```yaml wrap
 safe-outputs:
   messages:

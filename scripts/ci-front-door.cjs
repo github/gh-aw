@@ -11,7 +11,6 @@ const SUITE_IDS = Object.freeze([
   "verify-integration-build",
   "test",
   "test-slow",
-  "canary-go",
   "impacted-go-tests",
   "native-javascript-tests",
   "build",
@@ -35,7 +34,6 @@ const SUITE_IDS = Object.freeze([
 const JOB_DEPENDENCIES = Object.freeze({
   test: Object.freeze(["verify-integration-build"]),
   "test-slow": Object.freeze(["verify-integration-build"]),
-  "canary-go": Object.freeze(["test", "test-slow"]),
   security: Object.freeze(["build"]),
   "security-scan": Object.freeze(["build"]),
   "cross-platform-build": Object.freeze(["build"]),

@@ -885,6 +885,21 @@ it("counts carried-forward agent usage and rerun detection once after a failed-o
   expect(f.list).toHaveBeenCalledWith(expect.objectContaining({ filter: "all" }));
 });
 
+it("counts measured usage from a successful rerun whose artifacts have lower IDs", async () => {
+  const f = evaluate({ "agent_usage.jsonl": '{"aic":2}' }, [job("agent", { conclusion: "failure" }), job("agent", { id: 10, run_attempt: 2, started_at: later, completed_at: later })], { attempt: 2, runStarted: later });
+  const earlierArtifacts = [
+    { id: 400, name: "usage", createdAt: new Date(time) },
+    { id: 300, name: "agent", createdAt: new Date(time) },
+  ];
+  f.client.listArtifacts.mockImplementation(async ({ latest }) => ({
+    artifacts: latest ? earlierArtifacts : [...earlierArtifacts, { id: 200, name: "usage", createdAt: new Date("2025-01-01T12:31:00Z") }, { id: 100, name: "agent", createdAt: new Date(later) }],
+  }));
+
+  await expect(f.result).resolves.toBe(2);
+  expect(f.client.downloadArtifact).toHaveBeenCalledExactlyOnceWith(200, expect.any(Object));
+  expect(global.core.warning).not.toHaveBeenCalled();
+});
+
 it("T-AIC-DG-026 counts verified prior usage when a runner-assigned agent rerun is cancelled without a producer artifact", async () => {
   const f = evaluate(
     { "agent_usage.jsonl": '{"aic":2}' },

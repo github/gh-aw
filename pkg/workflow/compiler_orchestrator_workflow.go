@@ -64,6 +64,9 @@ func (c *Compiler) ParseWorkflowFile(markdownPath string) (*WorkflowData, error)
 	if err := c.populateWorkflowBuildContext(ctx); err != nil {
 		return nil, err
 	}
+	if err := c.validateConnectorInferenceConsumers(ctx.workflowData); err != nil {
+		return nil, c.formatEngineSetupError(ctx, err)
+	}
 	orchestratorWorkflowLog.Printf("Workflow file parsing completed successfully: %s", markdownPath)
 	return ctx.workflowData, nil
 }
@@ -139,6 +142,9 @@ func (c *Compiler) setupWorkflowBuildContext(ctx *workflowBuildContext) error {
 			"Enable the AWF sandbox:\n\nsandbox:\n  agent:\n    id: awf"))
 	}
 	if err := c.validateResolvedEngineEnvSecrets(ctx); err != nil {
+		return c.formatEngineSetupError(ctx, err)
+	}
+	if err := validateResolvedConnectorInference(ctx.workflowData, connectorConfigs, engineSetup.importsResult.MergedEnvSources); err != nil {
 		return c.formatEngineSetupError(ctx, err)
 	}
 	ctx.workflowData.WorkflowID = GetWorkflowIDFromPath(ctx.cleanPath)

@@ -5,56 +5,53 @@ description: Create or extend a declaration-only third-party connector, with nar
 
 # Create a Connector
 
-Use this skill when adding a provider or extending its declarative capabilities.
-For consumption/setup only, use [the connector guide](../../aw/connectors.md).
+Use for new providers or declarative capabilities. For consumption/setup, use
+[the connector guide](../../aw/connectors.md).
 
 ## Load the contract, not a catalog
 
-Read the [connector specification](../../../docs/src/content/docs/specs/connector-specification.md)
-and only the closest declaration in `.github/workflows/connectors/`.
-Use its `docs` references and matching `connector-documentation` XML, not a
-product name, old native handler, or guessed OAuth scope as API evidence.
-Read the [authoring guide](../../aw/connectors.md#author-or-extend-a-declaration)
-for advanced policies. No remote skill discovery is needed.
+Read the [specification](../../../docs/src/content/docs/specs/connector-specification.md),
+closest declaration in `.github/workflows/connectors/`, its `docs` references
+and matching `connector-documentation` XML. Product names, old handlers and
+guessed scopes are not API evidence. Read the
+[authoring guide](../../aw/connectors.md#author-or-extend-a-declaration) for
+advanced policies. Do not discover skills remotely.
 
-Confirm one useful consumer scenario, exact authorized resources, needed
-read evidence, desired effect, credential route, and any trigger evidence.
-If the provider's API or authorization details are unavailable, mark that
-capability unsupported instead of inventing an endpoint, scope, or tool.
+Establish one scenario, exact resources, read evidence, effect, credential route
+and trigger evidence. Mark capabilities unsupported when API/auth details are
+unavailable; never invent endpoints, scopes or tools.
 
 ## Create the smallest source
 
-Create `.github/workflows/connectors/<id>.md` with `connectors.<id>` and ordinary
-`import-schema`. Start from section 9 of the specification or the closest
-existing provider. Its synthetic API is an offline shape example, never a
-real provider or live-test target.
+Create `.github/workflows/connectors/<id>.md` with `connectors.<id>` and
+`import-schema`. Start from a nearby declaration or specification section 9;
+its synthetic API is offline-only, never a live target.
 
 | Need | Declare |
 | --- | --- |
-| Bounded REST/fixed GraphQL read | `tools.<read>` with exact `tool`, typed `inputs`, fixed request, minimal checked projection. |
-| Hosted streamable-HTTP MCP read | `mcp-servers.<registration>` with fixed URL, `readOnly: true`, exact native `tools` schemas and grants. |
-| Provider mutation | `safe-outputs.<operation>` with a distinct safe-output credential and exact resource checks. |
-| Native event | `triggers.<name>` with fixed `resourceOrigins`, verification profile, evidence predicates, normalization and grants; no ingress deployment. |
-| Resource content/context | A selected reader. Do not add public `context` or automatic hydration. |
+| Workflow inference | `inference.<profile>`: fixed endpoint/path/protocol, inference credential, model grants. Select `engine.inference`; follow specification 5.4. Never use a reader. |
+| REST/fixed GraphQL read | `tools.<read>`: exact `tool`, typed inputs, fixed request, minimal checked projection. |
+| Hosted HTTP MCP read | `mcp-servers.<registration>`: fixed URL, `readOnly: true`, exact native schemas/grants. |
+| Provider mutation | `safe-outputs.<operation>`: distinct writer credential, exact resource checks. |
+| Native event | `triggers.<name>`: fixed `resourceOrigins`, verification profile, predicates, normalization and grants; no ingress deployment. |
+| Content/context | A selected reader; no public `context` or automatic hydration. |
 
-Set `experimental: true` for a new unproven contract. Add literal official
-HTTPS `docs` URLs actually consulted. Expose resource arrays and secret NAMES
-through `import-schema`; tokens never belong in `with`, source, or prompts.
-Describe every import binding and give resource arrays explicit string item
-types. Put declaration metadata, endpoints, credentials, resources, triggers,
-readers, hosted MCP registrations, and safe outputs in that order. Put input
-type/required before its constraints. Reuse provider-local anchors for identical
-primitive schemas without combining independent grants or credential phases.
-Preserve quoted import substitutions and define anchors before their aliases.
-Keep merge keys before explicit overrides and verify nested aliases with the
-actual compiler and bundled runtime, not only a generic YAML parser.
-Use `token`, scoped `github-app`, or audience-bound `github-oidc` only when that
-route is valid for the actual provider. Neither GitHub route exchanges tokens.
+Set `experimental: true` for new contracts. Add consulted official HTTPS `docs`.
+Expose resource arrays and secret NAMES through `import-schema`; never put tokens
+in `with`, source or prompts.
+Describe bindings; type resource-array items explicitly as strings. Order:
+metadata, endpoints, credentials, resources, inference, triggers, readers, hosted
+MCP, safe outputs. Put input type/required before constraints. Reuse anchors only
+for identical primitives, not independent grants/phases. Preserve scalar quoting,
+anchor-before-alias and merge-before-override order. Verify nested aliases with
+the compiler and bundled runtime, not only a YAML parser.
+Use supported `token`, scoped `github-app` or audience-bound `github-oidc` routes;
+neither GitHub route exchanges tokens. Inference-only `azure-oidc` delegates
+Entra exchange to the native engine (specification 5.4).
 
-Bound every string and response. Request placeholders take safe individual
-segments. New local readers use kebab-case selectors and unprefixed snake_case
-`tool` names; preserve existing advertised names and exact hosted native MCP
-names rather than renaming them for style. Query/body values use
+Bound strings/responses; request placeholders take single safe segments.
+New readers use kebab-case selectors and unprefixed snake_case `tool` names.
+Preserve existing and exact hosted native names. Query/body values use
 `input`, `literal`, `object`, or `array`.
 Resource inputs are required strings checked against exact grants before secrets.
 Correlate the returned ID with the requested ID, not merely some allowed ID.
@@ -65,54 +62,46 @@ retain protected attribution and sizing. Do not sanitize IDs as body text.
 Use `body-plain-compact` only for APIs whose documented representation collapses
 consecutive ASCII spaces and newlines, so exact echoed-text checks stay intact.
 
-Do not add per-provider runtime code, checkout/build/install hooks, dynamic
-URLs/queries/scripts, automatic pagination, arbitrary patches, credential
-fallbacks, or grants derived from responses. If the shared contract cannot
-express a required behavior, report the gap; extend reusable infrastructure
-only when the task explicitly includes that implementation.
+No provider runtime code, checkout/build/install hooks, dynamic URLs/queries/scripts,
+automatic pagination, arbitrary patches, credential fallbacks or response-derived
+grants. Report unexpressible behavior; extend shared infrastructure only when
+explicitly requested.
 
 ## Supply a complete consumer and documentation
 
-Enclose the entire Markdown body in one XML/HTML comment containing a matching
-`connector-documentation` XML block with purpose, acquisition/renewal instructions,
-phase credential names/scopes, input/grant contracts, evidence/privacy limits,
-and complete consumer YAML/prompt elements. Never include secret values or
-double-hyphen sequences or nested comments. Do not embed Markdown frontmatter
-delimiters inside it or leave usage instructions outside the comment: the body
-is otherwise a system prompt. Full-source security scans still apply; do not
-add exemptions for documentation. Keep credential-format details in import input
-metadata and reference the inputs from the comment. Documentation is stripped
-from prompts, not executed as setup.
+Enclose the whole body in one XML/HTML comment with matching
+`connector-documentation`: purpose, acquisition/renewal, phase names/scopes,
+input/grant contracts, evidence/privacy limits and complete consumer YAML/prompt.
+No secret values, double-hyphen sequences, nested comments or frontmatter
+delimiters inside it. No instructions outside: the body becomes a system prompt.
+Keep credential formats in import metadata; reference inputs from the comment.
+Full-source scans still apply without exemptions. Documentation is stripped
+from prompts, never executed as setup.
 
-Create a minimal consumer with normal `uses`/`with`, `workflow_dispatch`,
-explicit network approval, one reader and one `staged: true`, `max: 1` effect.
+Create a consumer with `uses`/`with`, `workflow_dispatch`, explicit network
+approval, one reader and one `staged: true`, `max: 1` effect. For inference-only
+connectors, select an inference profile instead of a reader. Import-only must
+not change engine routing, credentials, permissions or network. Test model grants,
+unsupported protocols/engines and native/imported override conflicts. Exclude
+inference credentials from reader/effect plans. Validate inference by compiling,
+not with `connector test --phase inference` or live offline-test calls.
 For HTTP MCP prefer `{registration: [exactNativeTool]}` over the whole profile.
 Specimen grants must match in YAML and prompt. Say what the read does NOT prove
 and never claim staged delivery. Importing alone must select nothing.
 
-In this repository, add a source-only fixture to
-`pkg/cli/workflows/<id>-golden.md`, following the existing golden harness.
-Wire the new fixture into its provider scenario/CLI compilation matrix; do not
-install goldens under `.github/workflows/` or commit fixture lock files.
-Update the human connector reference with honest setup and evidence limits.
+Add `pkg/cli/workflows/<id>-golden.md` to the scenario/CLI compilation matrix.
+Never install goldens under `.github/workflows/` or commit fixture locks.
+Document setup and evidence limits in the human reference.
 
 ## Validate offline first
 
-Use a connector-capable compiler and the matching bundled runtime:
-
-```bash
-gh aw connector <id> setup --file .github/workflows/connectors/<id>.md
-gh aw compile <consumer> --strict --no-emit
-gh aw connector <id> test --phase safe-output --capability <operation> \
-  --file .github/workflows/connectors/<id>.md \
-  --input 'resources=["approved-id"]' \
-  --args '{"resource-id":"approved-id","text":"Offline conformance example"}' \
-  --node-runtime actions/setup/js/connector_runtime.cjs
-```
-
-The last command is a shape illustration: replace input, argument, and operation
-names with the actual declaration's schema. `--input name=JSON` binds an import
-input; `--grant collection=JSON-array` replaces a declared resource grant.
+Use a connector-capable compiler and matching bundled runtime. Run `connector
+<id> setup`, `compile <consumer> --strict --no-emit`, and applicable `connector
+<id> test --phase safe-output --capability NAME`, all through `gh aw`.
+Use `--file` for the declaration, `--args` for schema-valid JSON arguments, and
+`--node-runtime actions/setup/js/connector_runtime.cjs` for runtime parity.
+`--input name=JSON` binds an import input;
+`--grant collection=JSON-array` replaces a declared resource grant.
 Annotated safe-output text requires the matching Node runtime and dependencies.
 Setup and safe-output tests read no credentials and perform no provider writes.
 An agent-phase test DOES contact the provider; do not run it as offline validation.

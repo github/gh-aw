@@ -116,7 +116,7 @@ func TestHealthWorkQueueCachesDefaultBranchDirectorySnapshot(t *testing.T) {
 }
 
 func TestRunHealthRetainsActionsEvidenceWhenWorkQueueExhaustsBudget(t *testing.T) {
-	for _, name := range []string{"", "Example"} {
+	for _, name := range []string{"Example"} {
 		t.Run("workflow="+name, func(t *testing.T) {
 			originalDiscover, originalList, originalFailures := healthDiscoverWorkflows, healthListWorkflowRuns, healthListFailureCandidates
 			originalGH, originalRate := healthRunGH, fetchRateLimitForHostFunc

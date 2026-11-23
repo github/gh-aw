@@ -255,14 +255,13 @@ func TestHealthLowQuotaAndSecondaryLimitProducePartialJSON(t *testing.T) {
 				return []GitHubWorkflow{{ID: 1, Name: "Example", Path: ".github/workflows/example.lock.yml", State: "active"}}, nil
 			}
 			output := captureAuditGroupStdout(t, func() {
-				require.NoError(t, runHealth(context.Background(), HealthConfig{Days: 7, Threshold: 80, JSONOutput: true, RepoOverride: "org/repo"}))
+				require.NoError(t, runHealth(context.Background(), HealthConfig{WorkflowName: "example", Days: 7, Threshold: 80, JSONOutput: true, RepoOverride: "org/repo"}))
 			})
-			var report HealthSummary
+			var report WorkflowHealth
 			require.NoError(t, json.Unmarshal([]byte(output), &report))
 			assert.True(t, report.Collection.Partial)
 			assert.Equal(t, "rate_limit", report.Collection.Reason)
-			assert.Equal(t, 1, report.InsufficientWorkflows)
-			assert.Zero(t, report.HealthyWorkflows)
+			assert.True(t, isHealthEvidenceInsufficient(report.Status))
 		})
 	}
 }
@@ -499,15 +498,12 @@ func TestHealthCurrentSnapshotFromGitHubMetadata(t *testing.T) {
 				}
 			}
 			output := captureAuditGroupStdout(t, func() {
-				require.NoError(t, runHealth(context.Background(), HealthConfig{Days: 7, Threshold: 80, JSONOutput: true, RepoOverride: "org/repo"}))
+				require.NoError(t, runHealth(context.Background(), HealthConfig{WorkflowName: "example", Days: 7, Threshold: 80, JSONOutput: true, RepoOverride: "org/repo"}))
 			})
-			var report HealthSummary
-			require.NoError(t, json.Unmarshal([]byte(output), &report))
-			require.Len(t, report.Workflows, 1)
-			health := report.Workflows[0]
+			var health WorkflowHealth
+			require.NoError(t, json.Unmarshal([]byte(output), &health))
 			if unexecuted {
 				assert.Equal(t, "no_current_revision_runs", health.Status)
-				assert.Zero(t, report.HealthyWorkflows)
 			} else {
 				assert.Equal(t, "recovery_observed", health.Status)
 				assert.Equal(t, 5, health.TotalRuns)
@@ -515,8 +511,8 @@ func TestHealthCurrentSnapshotFromGitHubMetadata(t *testing.T) {
 				assert.Equal(t, strings.Repeat("d", 40), health.Revisions[0].Previous.SourceSHA)
 				assert.NotEqual(t, health.Revisions[0].Previous.SourceSHA, health.Revisions[0].Current.SourceSHA)
 			}
-			assert.Empty(t, report.FailureClusters)
-			assert.False(t, report.Collection.Partial)
+			assert.Empty(t, health.FailureClusters)
+			assert.False(t, health.Collection.Partial)
 			assert.LessOrEqual(t, requests-queueRequests, 14, "superseded sources do not need lock metadata lookups")
 		})
 	}

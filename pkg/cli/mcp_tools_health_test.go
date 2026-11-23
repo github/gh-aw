@@ -8,6 +8,7 @@ import (
 	"maps"
 	"os/exec"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/modelcontextprotocol/go-sdk/jsonrpc"
@@ -16,26 +17,71 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestHealthToolFleetResume(t *testing.T) {
+	t.Parallel()
+	var checkpoint string
+	calls := 0
+	mockExec := func(ctx context.Context, args ...string) *exec.Cmd {
+		calls++
+		var path string
+		for _, arg := range args {
+			if value, ok := strings.CutPrefix(arg, "--checkpoint="); ok {
+				path = value
+			}
+		}
+		output := `{"schema_version":1,"coverage":{"partial":false}}`
+		if calls == 1 {
+			checkpoint = path
+			output = `{"schema_version":1,"coverage":{"partial":true},"next_action":{"type":"resume","checkpoint":"/server/private"}}`
+		}
+		assert.NotEmpty(t, path)
+		assert.Equal(t, checkpoint, path)
+		return mockCommandWithOutput(output, "")(ctx, args...)
+	}
+	server := mcp.NewServer(&mcp.Implementation{Name: "test"}, nil)
+	registerHealthTool(server, mockExec)
+	client := connectInMemory(t, server)
+	result, err := client.CallTool(t.Context(), &mcp.CallToolParams{Name: "health", Arguments: map[string]any{}})
+	require.NoError(t, err)
+	data, err := json.Marshal(result.StructuredContent)
+	require.NoError(t, err)
+	var report healthFleetReport
+	require.NoError(t, json.Unmarshal(data, &report))
+	require.True(t, report.Coverage.Partial)
+	require.NotNil(t, report.NextAction)
+	require.NotContains(t, report.NextAction.Checkpoint, "/")
+	require.NotEmpty(t, report.NextAction.Checkpoint)
+	args := map[string]any{"resume": report.NextAction.Checkpoint}
+	other := connectInMemory(t, server)
+	_, err = other.CallTool(t.Context(), &mcp.CallToolParams{Name: "health", Arguments: args})
+	require.Error(t, err)
+	result, err = client.CallTool(t.Context(), &mcp.CallToolParams{Name: "health", Arguments: args})
+	require.NoError(t, err)
+	require.NotNil(t, result.StructuredContent)
+	require.Equal(t, 2, calls)
+}
+
 func TestHealthToolArguments(t *testing.T) {
 	t.Parallel()
+	const fleetJSON = `{"schema_version":1,"coverage":{"partial":false}}`
 	for _, tt := range []struct {
 		name    string
 		options map[string]any
 		flags   []string
 		output  string
 	}{
-		{"defaults", map[string]any{}, []string{"health", "--json"}, `{"total_workflows":0}`},
+		{"full fleet", map[string]any{"full": true}, []string{"health", "--json", "--full"}, fleetJSON},
 		{"workflow", map[string]any{"workflow_name": "daily"}, []string{"health", "--json", "--", "daily"}, `{"workflow_name":"daily"}`},
 		{"options", map[string]any{
 			"workflow_name": "./-daily.md", "days": 30, "threshold": 90.5,
 			"end_date": "-1h", "repo": "owner/repo", "logs_dir": "/tmp/existing cache",
 		}, []string{"health", "--json", "--days=30", "--threshold=90.5", "--end-date=-1h", "--repo=owner/repo", "--logs-dir=/tmp/existing cache", "--", "./-daily.md"}, `{"total_runs":2}`},
 		{"date range", map[string]any{"start_date": "-24h", "end_date": "2026-10-19"},
-			[]string{"health", "--json", "--start-date=-24h", "--end-date=2026-10-19"}, `{"total_workflows":1}`},
-		{"zero threshold", map[string]any{"threshold": 0}, []string{"health", "--json", "--threshold=0"}, `{}`},
-		{"timeout", map[string]any{"timeout": "30s"}, []string{"health", "--json", "--timeout=30s"}, `{"collection":{"partial":true,"reason":"time_budget"}}`},
-		{"unlimited", map[string]any{"timeout": "0"}, []string{"health", "--json", "--timeout=0"}, `{}`},
-		{"flag-like value", map[string]any{"repo": "--help"}, []string{"health", "--json", "--repo=--help"}, `{}`},
+			[]string{"health", "--json", "--start-date=-24h", "--end-date=2026-10-19"}, fleetJSON},
+		{"zero threshold", map[string]any{"threshold": 0}, []string{"health", "--json", "--threshold=0"}, fleetJSON},
+		{"timeout", map[string]any{"timeout": "30s"}, []string{"health", "--json", "--timeout=30s"}, `{"schema_version":1,"coverage":{"partial":true,"reason":"time_budget"}}`},
+		{"unlimited", map[string]any{"timeout": "0"}, []string{"health", "--json", "--timeout=0"}, fleetJSON},
+		{"flag-like value", map[string]any{"repo": "--help"}, []string{"health", "--json", "--repo=--help"}, fleetJSON},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
@@ -51,7 +97,14 @@ func TestHealthToolArguments(t *testing.T) {
 			result, err := session.CallTool(context.Background(), &mcp.CallToolParams{Name: "health", Arguments: tt.options})
 			require.NoError(t, err)
 			require.False(t, result.IsError)
-			assert.Equal(t, tt.output, extractTextResult(t, result))
+			if tt.options["workflow_name"] == nil {
+				require.NotNil(t, result.StructuredContent)
+				require.Len(t, captured, len(tt.flags)+1)
+				assert.True(t, strings.HasPrefix(captured[len(tt.flags)], "--checkpoint="))
+				captured = captured[:len(tt.flags)]
+			} else {
+				assert.Equal(t, tt.output, extractTextResult(t, result))
+			}
 			assert.Equal(t, tt.flags, captured)
 		})
 	}
@@ -65,6 +118,8 @@ func TestHealthToolRejectsInvalidArguments(t *testing.T) {
 		{"days": "30"},
 		{"threshold": "80"},
 		{"unknown": true},
+		{"workflow_name": "daily", "full": true},
+		{"workflow_name": "daily", "resume": "token"},
 		{"timeout": "-1s"},
 		{"timeout": "invalid"},
 		{"timeout": 30},
@@ -109,7 +164,7 @@ func TestHealthToolErrors(t *testing.T) {
 			server := mcp.NewServer(&mcp.Implementation{Name: "test"}, nil)
 			registerHealthTool(server, tt.exec)
 			session := connectInMemory(t, server)
-			_, err := session.CallTool(context.Background(), &mcp.CallToolParams{Name: "health", Arguments: map[string]any{}})
+			_, err := session.CallTool(context.Background(), &mcp.CallToolParams{Name: "health", Arguments: map[string]any{"workflow_name": "daily"}})
 			var rpcErr *jsonrpc.Error
 			require.ErrorAs(t, err, &rpcErr)
 			assert.Equal(t, int64(jsonrpc.CodeInternalError), rpcErr.Code)

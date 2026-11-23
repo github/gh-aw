@@ -85,6 +85,9 @@ func developmentConnectorCredentialRows(registration workflow.ConnectorRegistrat
 		if oidc := registration.OIDCTokens[name]; oidc != nil {
 			row.Route, row.Reference = "GitHub OIDC", connectorConsoleText(oidc.Audience)
 		}
+		if azure := registration.AzureOIDC[name]; azure != nil {
+			row.Route, row.Reference = "Azure OIDC", connectorConsoleText(azure.ClientID)
+		}
 		rows = append(rows, row)
 	}
 	if phase == "" || phase == "safe-output" {
@@ -137,6 +140,11 @@ func writeConnectorCredentialGuidance(text *strings.Builder, registration workfl
 			fmt.Fprintf(text, "  Configure provider trust for GitHub Actions OIDC and exact audience %q.\n", row.Reference) //nolint:fprintferrorunchecked // strings.Builder cannot fail.
 			text.WriteString("  The workflow's selected phase needs id-token: write. No static token secret provisions this route.\n")
 			text.WriteString("  Local read tests cannot acquire GitHub Actions identity; a token environment fallback is not accepted.\n")
+		case "Azure OIDC":
+			azure := registration.AzureOIDC[row.Credential]
+			fmt.Fprintf(text, "  Entra tenant: %s; application client: %s; scope: %s.\n", connectorConsoleText(azure.TenantID), row.Reference, connectorConsoleText(azure.Scope)) //nolint:fprintferrorunchecked // strings.Builder cannot fail.
+			text.WriteString("  Configure GitHub Actions federation and exact model runtime RBAC; grant id-token: write.\n")
+			text.WriteString("  The existing AWF inference proxy exchanges and refreshes tokens outside the agent. No static token fallback.\n")
 		}
 	}
 }
@@ -192,6 +200,15 @@ func writeConnectorDevelopmentCapabilities(text *strings.Builder, registration w
 	}
 	if registration.Spec == nil {
 		return
+	}
+	if phase == "" || phase == "inference" {
+		for _, name := range slices.Sorted(maps.Keys(registration.Spec.Inference)) {
+			profile := registration.Spec.Inference[name]
+			fmt.Fprintf(text, "  inference %s (%s); select engine.inference with connector, profile and an exact model from resources.%s.\n", name, profile.Protocol, profile.Models) //nolint:fprintferrorunchecked // strings.Builder cannot fail.
+		}
+		if len(registration.Spec.Inference) != 0 {
+			text.WriteString("  Inference is compiler configuration, not a callable tool. Validate a consumer with gh aw compile --strict --no-emit.\n")
+		}
 	}
 	for _, name := range slices.Sorted(maps.Keys(registration.Spec.MCP)) {
 		op := registration.Spec.MCP[name]

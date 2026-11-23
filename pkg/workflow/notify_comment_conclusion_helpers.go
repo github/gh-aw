@@ -359,6 +359,9 @@ func (c *Compiler) buildAgentFailureCoreVars(data *WorkflowData, mainJobName str
 	if IsDetectionJobEnabled(data.SafeOutputs) {
 		envVars = append(envVars, fmt.Sprintf("          GH_AW_THREAT_DETECTION_AIC: ${{ needs.%s.outputs.aic }}\n", constants.DetectionJobName))
 		envVars = append(envVars, fmt.Sprintf("          GH_AW_DETECTION_JOB_RESULT: ${{ needs.%s.result }}\n", constants.DetectionJobName))
+		envVars = append(envVars, fmt.Sprintf("          GH_AW_DETECTION_ACCEPTED: ${{ %s }}\n", RenderCondition(buildDetectionAcceptedCondition())))
+		envVars = append(envVars, fmt.Sprintf("          GH_AW_DETECTION_CONCLUSION: ${{ needs.%s.outputs.detection_conclusion }}\n", constants.DetectionJobName))
+		envVars = append(envVars, fmt.Sprintf("          GH_AW_DETECTION_REASON: ${{ needs.%s.outputs.detection_reason }}\n", constants.DetectionJobName))
 	}
 	if data.Evals != nil && data.Evals.HasEvals() {
 		envVars = append(envVars, fmt.Sprintf("          GH_AW_EVALS_AIC: ${{ needs.%s.outputs.aic }}\n", constants.EvalsJobName))

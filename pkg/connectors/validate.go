@@ -35,13 +35,16 @@ func (s *ConnectorSpec) Validate() error {
 	if err := s.validateTriggers(); err != nil {
 		return err
 	}
+	if err := s.validateInference(); err != nil {
+		return err
+	}
 	return s.validateOperations()
 }
 
 func (s *ConnectorSpec) validateCredentials() error {
 	for name, credential := range s.Credentials {
-		if !namePattern.MatchString(name) || (credential.Phase != "agent" && credential.Phase != "safe-output" && credential.Phase != "context") {
-			return fmt.Errorf("credential %q requires phase agent, safe-output or context", name)
+		if !namePattern.MatchString(name) || (credential.Phase != "agent" && credential.Phase != "safe-output" && credential.Phase != "context" && credential.Phase != "inference") {
+			return fmt.Errorf("credential %q requires phase agent, safe-output, context or inference", name)
 		}
 		if credential.Header != "Authorization" && credential.Header != "X-API-Key" && credential.Header != "PRIVATE-TOKEN" {
 			return fmt.Errorf("credential %q has unsupported authentication header", name)
@@ -121,7 +124,7 @@ func (s *ConnectorSpec) validateOperations() error {
 	if err := s.validateCreatedResources(); err != nil {
 		return err
 	}
-	if len(s.Triggers)+len(s.MCP)+len(s.HTTPMCP)+len(s.SafeOutputs)+len(s.Context) == 0 {
+	if len(s.Triggers)+len(s.MCP)+len(s.HTTPMCP)+len(s.SafeOutputs)+len(s.Context)+len(s.Inference) == 0 {
 		return errors.New("connector must declare at least one capability")
 	}
 	return nil

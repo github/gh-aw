@@ -200,7 +200,7 @@
         },
         "auth": {
           "type": "object",
-          "description": "Upstream authentication configuration for the HTTP MCP server. When configured, the gateway dynamically acquires tokens and injects them as Authorization headers on every outgoing request to this server. Currently only GitHub Actions OIDC is supported.",
+          "description": "Upstream HTTP MCP authentication using direct GitHub OIDC or Azure Entra token exchange.",
           "properties": {
             "type": {
               "type": "string",
@@ -209,11 +209,37 @@
             },
             "audience": {
               "type": "string",
-              "description": "The intended audience for the OIDC token (the 'aud' claim). If omitted, defaults to the server's url field.",
+              "description": "GitHub assertion audience. Defaults to the server URL for direct OIDC or api://AzureADTokenExchange for Azure.",
               "format": "uri"
+            },
+            "provider": {
+              "type": "string",
+              "enum": ["azure"]
+            },
+            "azureTenantId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "azureClientId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "azureScope": {
+              "type": "string",
+              "minLength": 1
+            },
+            "azureCloud": {
+              "type": "string",
+              "enum": ["public", "usgovernment", "china"]
             }
           },
           "required": ["type"],
+          "allOf": [
+            {
+              "if": { "required": ["provider"], "properties": { "provider": { "const": "azure" } } },
+              "then": { "required": ["azureTenantId", "azureClientId"] }
+            }
+          ],
           "additionalProperties": false
         }
       },
