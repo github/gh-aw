@@ -1,5 +1,5 @@
 // GitHub Agentic Workflows — a zero-dependency, all-JavaScript slide deck.
-// Open index.html directly in a browser. Keys: ← → space, Home/End, F fullscreen, N notes.
+// Open index.html directly in a browser. Keys: ← → slides, Space/Backspace in-slide steps, Home/End, F fullscreen, N notes.
 (() => {
   const W = 1920,
     H = 1080;
@@ -5047,7 +5047,7 @@
     const cards = SC.map((s, i) =>
       h(
         "button",
-        { class: "atk-card", type: "button", "aria-pressed": "false", "aria-keyshortcuts": "ArrowLeft ArrowRight", title: `${s.t} (← → step through scenarios)`, onclick: () => i !== sc && (done.add(sc), setScenario(i), sfx.step()) },
+        { class: "atk-card", type: "button", "aria-pressed": "false", "aria-keyshortcuts": "Space Backspace", title: `${s.t} (Space/Backspace step through scenarios)`, onclick: () => i !== sc && (done.add(sc), setScenario(i), sfx.step()) },
         h("b", {}, i + 1),
         h("span", { class: "h4" }, s.t),
         h("span", { class: "p" }, s.d)
@@ -5126,7 +5126,7 @@
     const self = {
       group: "security",
       notes:
-        "What: Five simulated attacks, stepped with the arrow keys and mapped to the OWASP Top 10 lists for LLM and agentic applications: malware injection, encoded-secret theft, an image-link leak, hidden text for the next agent, and repository deletion. Each is stopped by a different layer, from integrity filtering and read-only tokens to the firewall and threat detection.\nWhy: No single defence is enough; overlapping layers catch what one misses, and the compiler rejects risky configurations.\nWhen: Use it to review a threat model. By default threat detection warns; strict mode blocks every safe output.",
+        "What: Five simulated attacks, stepped with Space and mapped to the OWASP Top 10 lists for LLM and agentic applications: malware injection, encoded-secret theft, an image-link leak, hidden text for the next agent, and repository deletion. Each is stopped by a different layer, from integrity filtering and read-only tokens to the firewall and threat detection.\nWhy: No single defence is enough; overlapping layers catch what one misses, and the compiler rejects risky configurations.\nWhen: Use it to review a threat model. By default threat detection warns; strict mode blocks every safe output.",
       enter(dir) {
         done = new Set();
         setScenario(dir < 0 ? SC.length - 1 : 0);
@@ -9399,7 +9399,7 @@
       group: "cost",
       experimental: "model: router",
       notes:
-        "What: Five illustrative ways to cut the cost of a daily pull request summary, stepped with the right arrow: run weekly; fetch data in a plain gh step; cap spend with AI-credit limits and optional central admission; fan work out to a sub-agent on a smaller model; and, experimental, model: router. AIC means AI credits; about 2,800 to 110 AIC a week is illustrative, not usage or billing data.\nWhy: Every run costs credits; frequency, input, limits and model each trade against freshness or quality.\nWhen: Walk through these in order before you tune prompts.",
+        "What: Five illustrative ways to cut the cost of a daily pull request summary, stepped with Space: run weekly; fetch data in a plain gh step; cap spend with AI-credit limits and optional central admission; fan work out to a sub-agent on a smaller model; and, experimental, model: router. AIC means AI credits; about 2,800 to 110 AIC a week is illustrative, not usage or billing data.\nWhy: Every run costs credits; frequency, input, limits and model each trade against freshness or quality.\nWhen: Walk through these in order before you tune prompts.",
       enter() {
         t0 = last = spawn = 0;
         pk = [];
@@ -16068,7 +16068,7 @@
     const cards = RAI.map(([name, ic, how, ctl], i) =>
       h(
         "button",
-        { class: "rai-card", type: "button", "--i": i, "aria-pressed": "false", "aria-keyshortcuts": "ArrowLeft ArrowRight", title: `${name} (← → step through principles)`, onclick: () => (focus(f === i ? -1 : i), sfx.step()) },
+        { class: "rai-card", type: "button", "--i": i, "aria-pressed": "false", "aria-keyshortcuts": "Space Backspace", title: `${name} (Space/Backspace step through principles)`, onclick: () => (focus(f === i ? -1 : i), sfx.step()) },
         h("span", { class: "rai-n" }, String(i + 1).padStart(2, "0")),
         h("span", { class: "rai-hd" }, h("span", { innerHTML: `<svg viewBox="0 0 24 24" aria-hidden="true">${ICON[ic].map(d => `<path d="${d}"/>`).join("")}</svg>` }).firstChild, h("span", { class: "rai-nm" }, name)),
         h("span", { class: "rai-p" }, how),
@@ -16097,7 +16097,7 @@
     slides.push({
       group: "security",
       notes:
-        "What: Six responsible AI principles, each paired with gh-aw controls that support them; the arrow keys step through them. Reliability, privacy and accountability come from the sandbox, read-only token, safe outputs and approval gates; transparency from AI-generated footers, reviewable lock files and audits.\nWhy: Principles help only when they become defaults you can inspect. These are safeguards, not guarantees: nothing here certifies that an output is accurate or fair.\nWhen: Before rollout, name who a workflow affects, trial it in staged mode on representative, multilingual and adversarial inputs, and keep a person on impactful writes.",
+        "What: Six responsible AI principles, each paired with gh-aw controls that support them; Space steps through them. Reliability, privacy and accountability come from the sandbox, read-only token, safe outputs and approval gates; transparency from AI-generated footers, reviewable lock files and audits.\nWhy: Principles help only when they become defaults you can inspect. These are safeguards, not guarantees: nothing here certifies that an output is accurate or fair.\nWhen: Before rollout, name who a workflow affects, trial it in staged mode on representative, multilingual and adversarial inputs, and keep a person on impactful writes.",
       enter(dir) {
         focus(dir < 0 ? RAI.length - 1 : -1);
       },
@@ -24460,7 +24460,7 @@
     const tabs = PROCS.map((p, i) =>
       h(
         "button",
-        { class: "pm-tab", type: "button", "aria-pressed": "false", "aria-keyshortcuts": "ArrowLeft ArrowRight", title: `${p.tab[0]} (← → switch process)`, onclick: () => (pick(i), sfx.step()) },
+        { class: "pm-tab", type: "button", "aria-pressed": "false", "aria-keyshortcuts": "Space Backspace", title: `${p.tab[0]} (Space/Backspace switch process)`, onclick: () => (pick(i), sfx.step()) },
         h("i", {}, String(i + 1)),
         h("div", {}, h("b", {}, p.tab[0]), h("em", {}, p.tab[1]))
       )

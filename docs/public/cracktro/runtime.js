@@ -659,8 +659,8 @@
     };
     const lineStartBtn = arrowBtn("First slide of the band", "Shift+Home", "Shift+Home", "M5 5v14M13 6l-6 6 6 6M20 6l-6 6 6 6", () => lineStart());
     const bandPrevBtn = arrowBtn("Previous band", "PgUp or Shift+↑", "PageUp Shift+ArrowUp", "M6 5v14M18 6l-7 6 7 6", () => band(-1));
-    const prevBtn = arrowBtn("Previous slide", "←", "ArrowLeft Backspace", "M15 5l-7 7 7 7", () => prev());
-    const nextBtn = arrowBtn("Next slide", "→", "ArrowRight Space Enter", "M9 5l7 7-7 7", () => next());
+    const prevBtn = arrowBtn("Previous slide", "←", "ArrowLeft", "M15 5l-7 7 7 7", () => prev());
+    const nextBtn = arrowBtn("Next slide", "→", "ArrowRight", "M9 5l7 7-7 7", () => next());
     const bandNextBtn = arrowBtn("Next band", "PgDn or Shift+↓", "PageDown Shift+ArrowDown", "M18 5v14M6 6l7 6-7 6", () => band(1));
     const arrows = h("div", { class: "arrows" }, lineStartBtn, bandPrevBtn, prevBtn, nextBtn, bandNextBtn);
     // Column button (dock): shown on a column's head and its examples. On the head it is lit with a bouncing
@@ -1193,20 +1193,18 @@
       vnb.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="${back ? "M12 19V5M5 12l7-7 7 7" : "M12 5v14M5 12l7 7 7-7"}"/></svg><span class="vnb-t">${at ? `${at}/${N}` : N}</span>`;
       vnb._nav = back ? () => go(slides.indexOf(col)) : () => vstep(1);
     }
+    // Left/Right, the dock arrows and swipes always change slide; Space/Enter and Backspace run the slide's
+    // in-slide steps (onNext/onPrev) first and change slide only when none is left.
     const next = () => {
-        if (slides[cur].onNext?.()) (sfx.touch(), sfx.step(1));
-        else {
-          const i = nextTop(cur);
-          if (i != null) go(i);
-        }
+        const i = nextTop(cur);
+        if (i != null) go(i);
       },
       prev = () => {
-        if (slides[cur].onPrev?.()) (sfx.touch(), sfx.step(-1));
-        else {
-          const i = prevTop(cur);
-          if (i != null) go(i);
-        }
-      };
+        const i = prevTop(cur);
+        if (i != null) go(i);
+      },
+      stepNext = () => (slides[cur].onNext?.() ? (sfx.touch(), sfx.step(1)) : next()),
+      stepPrev = () => (slides[cur].onPrev?.() ? (sfx.touch(), sfx.step(-1)) : prev());
 
     let jumpBuf = "",
       jumpT = null;
@@ -1246,12 +1244,15 @@
         go(+typed - 1);
         return;
       }
-      if (["ArrowRight", " ", "Enter"].includes(e.key)) {
+      if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
         e.preventDefault();
-        next();
-      } else if (["ArrowLeft", "Backspace"].includes(e.key)) {
+        (e.key === "ArrowRight" ? next : prev)();
+      } else if (e.key === " " || e.key === "Enter") {
         e.preventDefault();
-        prev();
+        stepNext();
+      } else if (e.key === "Backspace") {
+        e.preventDefault();
+        stepPrev();
       } else if (e.key === "PageDown" || e.key === "PageUp") {
         e.preventDefault();
         band(e.key === "PageDown" ? 1 : -1);
@@ -1682,8 +1683,9 @@
       [
         "Move",
         [
-          [["→", "Space", "Enter"], "Next slide"],
-          [["←", "Backspace"], "Previous slide"],
+          [["←", "→"], "Previous or next slide"],
+          [["Space", "Enter"], "Next step in the slide, then next slide"],
+          [["Backspace"], "Previous step in the slide, then previous slide"],
           [["↑", "↓"], "Up or down a column, or to the next band; keeps your place in the line"],
           [["Shift+↑", "Shift+↓", "PgUp", "PgDn"], "Previous or next band"],
           [["U"], "Back to the pattern of an example"],
@@ -1770,9 +1772,9 @@
       "←": "prev",
       "↑": "up",
       "↓": "down",
-      Space: "next",
-      Enter: "next",
-      Backspace: "prev",
+      Space: "step",
+      Enter: "step",
+      Backspace: "back",
       PgUp: "band",
       PgDn: "band",
       Home: "first",

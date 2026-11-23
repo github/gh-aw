@@ -998,12 +998,12 @@ test("steps the cost guardrails slide from execution controls to admission", asy
   await expect(slide.locator(".cg-status b")).toHaveText(/EVENTS|THROTTLE/);
   const expected = ["CHECKED|RUNNING", "NOTICE", "HARD STOP", "BLOCKED", "APPROVED", "DENIED"];
   for (const label of expected) {
-    await page.keyboard.press("ArrowRight");
+    await page.keyboard.press("Space");
     await expect(slide.locator(".cg-status b")).toHaveText(new RegExp(label), { timeout: 6000 });
   }
   await expect(slide.locator(".cg-run em")).toHaveText("ALLOWANCE 250");
   await expect(slide.locator(".cg-mode.on b")).toHaveText("ADMIT");
-  await page.keyboard.press("ArrowLeft");
+  await page.keyboard.press("Backspace");
   await expect(slide.locator(".cg-status b")).toHaveText("ADMISSION");
   await expect(page.locator(".slide.active h2")).toHaveText("Cost guardrails");
   expect(errors).toEqual([]);
@@ -1016,13 +1016,13 @@ test("steps the budget steering slide from the 80% notice to a submitted pull re
   const slide = page.locator(".slide.active");
   await expect(slide.locator("h2")).toHaveText("Budget steering");
   await expect(slide.locator(".bst-lamp.on")).toHaveCount(0);
-  await page.keyboard.press("ArrowRight");
+  await page.keyboard.press("Space");
   await expect(slide.locator(".bst-lamp.on")).toHaveCount(1);
   await expect(slide.locator(".bst-m.nt .big b")).toHaveText("402 / 500", { timeout: 8000 });
-  await page.keyboard.press("ArrowRight");
+  await page.keyboard.press("Space");
   await expect(slide.locator(".bst-m.ok")).toContainText("create_pull_request", { timeout: 15000 });
   await expect(slide.locator(".bst-lamp.on")).toHaveCount(2);
-  await page.keyboard.press("ArrowLeft");
+  await page.keyboard.press("Backspace");
   await expect(slide.locator(".bst-m.ok")).toHaveCount(0);
   await expect(page.locator(".slide.active h2")).toHaveText("Budget steering");
   expect(errors).toEqual([]);
@@ -1052,10 +1052,10 @@ test("splits inline skills and agents, defers context and preserves step navigat
   });
   expect(layout).toEqual({ separated: true, captionClear: true, contained: true, labelsFit: true });
 
-  await page.keyboard.press("ArrowRight");
+  await page.keyboard.press("Space");
   await expect(diagram).toHaveClass(/\bs1\b/);
   await expect(slide.locator(".isa-blk.skill").first()).toHaveAttribute("transform", /translate\(556\.0 /);
-  await page.keyboard.press("ArrowRight");
+  await page.keyboard.press("Space");
   await expect(slide.locator(".isa-take")).toHaveClass(/on/, { timeout: 10_000 });
   await expect(slide.locator(".isa-ml.aft.sm.on")).toHaveCount(2);
   const context = await slide.evaluate(el => {
@@ -1069,15 +1069,15 @@ test("splits inline skills and agents, defers context and preserves step navigat
   expect(context.first).toBeLessThan(context.last);
   expect(context.last).toBeLessThan(context.monolith);
 
-  await page.keyboard.press("ArrowLeft");
+  await page.keyboard.press("Backspace");
   await expect(diagram).not.toHaveClass(/\bs2\b/);
   await expect(slide.locator(".isa-take")).not.toHaveClass(/on/);
-  await page.keyboard.press("ArrowLeft");
+  await page.keyboard.press("Backspace");
   await expect(diagram).not.toHaveClass(/\bs1\b/);
   await expect(slide.locator(".isa-blk.core")).toHaveAttribute("transform", /translate\(36\.0 /);
-  await page.keyboard.press("ArrowRight");
-  await page.keyboard.press("ArrowRight");
-  await page.keyboard.press("ArrowRight");
+  await page.keyboard.press("Space");
+  await page.keyboard.press("Space");
+  await page.keyboard.press("Space");
   await expect(page.locator(".slide.active h2")).toHaveText("Audit & Optimize");
   await page.keyboard.press("ArrowLeft");
   await expect(slide).toHaveClass(/active/);
@@ -1376,10 +1376,15 @@ test.describe("reusable runtime", () => {
     const { errors } = await open(page, "/gh-aw/cracktro/tiny.html");
     await expect(heading(page)).toHaveText("Hello");
     await page.keyboard.press("x");
+    // Left/Right change slide without running in-slide steps; Space runs a step first
     await page.keyboard.press("ArrowRight");
+    await expect(page).toHaveURL(/#part-one$/);
+    await page.keyboard.press("ArrowLeft");
     await expect(page).toHaveURL(/#hello$/);
-    expect(await page.evaluate(() => (window as unknown as { hooks: string[] }).hooks)).toEqual(["enter:1", "key:Hello notes", "step"]);
-    await page.keyboard.press("ArrowRight");
+    await page.keyboard.press("Space");
+    await expect(page).toHaveURL(/#hello$/);
+    expect(await page.evaluate(() => (window as unknown as { hooks: string[] }).hooks)).toEqual(["enter:1", "key:Hello notes", "enter:-1", "step"]);
+    await page.keyboard.press("Space");
     await expect(page).toHaveURL(/#part-one$/);
     await page.evaluate(() => (location.hash = "#beta"));
     await expect(heading(page)).toHaveText("Beta");

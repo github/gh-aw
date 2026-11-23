@@ -69,7 +69,7 @@ After each edit:
 1. `node --check` each edited `docs/public/cracktro/*.js`.
 2. `location.reload()`, wait, screenshot.
 3. Jump: click `[aria-label="Slide N"]` or set the hash.
-4. Keys: dispatch on `window`: `dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowRight'}))`.
+4. Keys: dispatch on `window`: `dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowRight'}))` changes slide; `key:' '` (Space) runs in-slide steps.
 5. Transitions: read `getComputedStyle(el).transform` ~200 ms after a move.
 
 Screenshots are always 16:9; never capture the whole page (the canvas panel has any shape, fixed size). Capture the stage: `screenshot_page` with `selector: ".stage"` and `scroll_into_view_if_needed: false` (scaled 1920x1080 frame, no chrome). Check chrome (buttons, dots, minimap) in a separate full-page capture.
@@ -120,6 +120,6 @@ slides.push({
   el: h("section", { class: "slide" }, ...),
   enter(dir) {},          // reset per-slide state; dir = 1 forward, -1 back
   tick(t) {},             // called every frame, ONLY for the current slide
-  onNext() {}, onPrev() {}, onKey(e) {}, // return true to consume (in-slide steps)
+  onNext() {}, onPrev() {}, onKey(e) {}, // return true to consume (in-slide steps; Space/Enter/Backspace, never ←/→)
 });
 ```
