@@ -129,10 +129,11 @@ the slide map: picking one adds `&tour=<name>` to the hash, a pill shows the tou
 and position, navigation skips the other slides, and × (or X) leaves the tour. Examples
 in a pattern's column only appear together with their pattern. "Design a view"
 in the slide map lets you tick slides or whole bands and copy a link that
-encodes the selection as `&view=<base64url>`. The share dock button (or S) opens a dialog that
+encodes the selection as `view=<base64url>`. The share dock button (or S) opens a dialog that
 builds a deep link: start at the current slide or the first, all slides, the current view or a tour, plus
-kiosk, sound, captions and voice (`&kiosk=1&sound=1&cc=1&voice=0`; captions and voice only with kiosk).
-The launch options apply once and then leave the hash. Sound takes effect on load; a kiosk link opens a
+kiosk, sound, captions and voice (`?slide=<id>&kiosk=1&sound=1&cc=1&voice=0`; captions and voice only with kiosk).
+Shared links use query parameters because social sites such as LinkedIn drop `#` fragments; on load they move
+into the hash. The launch options apply once and then leave the hash. Sound takes effect on load; a kiosk link opens a
 lobby with a Start button whose click is the gesture browsers require to turn on sound, start the
 animations and go fullscreen in kiosk mode; Escape or "Browse the slides instead" leaves the lobby
 for manual navigation. Clicks never change slides.

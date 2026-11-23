@@ -1597,7 +1597,7 @@ test.describe("reusable runtime", () => {
     await expect(bar).toContainText("3 of 5 slides");
     await bar.getByRole("textbox", { name: "View title" }).fill("Part and outro");
     const link = await bar.getByRole("textbox", { name: "Link to this view" }).inputValue();
-    const payload = link.match(/#part-one&view=([\w-]+)$/)![1];
+    const payload = link.match(/[?&]slide=part-one&view=([\w-]+)$/)![1];
     // whole bands travel by group (slides added to them later join the view), the rest by slide id
     expect(JSON.parse(Buffer.from(payload, "base64url").toString())).toEqual({ t: "Part and outro", b: ["outro"], s: ["part-one", "alpha"] });
 
@@ -1820,7 +1820,7 @@ test.describe("reusable runtime", () => {
     await expect(dialog).toBeVisible();
     const link = dialog.locator("input[readonly]");
     const cc = dialog.getByRole("checkbox", { name: /Captions/ });
-    await expect(link).toHaveValue(/#alpha&sound=0$/);
+    await expect(link).toHaveValue(/[?&]slide=alpha&sound=0$/);
     // captions and voice only apply to kiosk links
     await expect(cc).toBeDisabled();
     await dialog.getByRole("checkbox", { name: /Kiosk/ }).check();
@@ -1830,11 +1830,13 @@ test.describe("reusable runtime", () => {
     // voice is offered only where the browser can speak; keep it off so the rotation is not held
     const voice = dialog.getByRole("checkbox", { name: /Voice/ });
     if (await voice.isEnabled()) await voice.uncheck();
-    await expect(link).toHaveValue(/#alpha&kiosk=1&sound=1&cc=1(&voice=0)?$/);
+    await expect(link).toHaveValue(/[?&]slide=alpha&kiosk=1&sound=1&cc=1(&voice=0)?$/);
     await dialog.getByRole("checkbox", { name: /Start at this slide/ }).uncheck();
-    await expect(link).toHaveValue(/#kiosk=1&sound=1&cc=1(&voice=0)?$/);
+    await expect(link).toHaveValue(/&kiosk=1&sound=1&cc=1(&voice=0)?$/);
     await dialog.getByRole("checkbox", { name: /Start at this slide/ }).check();
     const url = await link.inputValue();
+    // query parameters, not a #fragment: social sites such as LinkedIn drop fragments from posted links
+    expect(url).not.toContain("#");
 
     // a fresh page waits in the lobby, paused and chrome-free, until the Start gesture
     await page.goto("about:blank");
