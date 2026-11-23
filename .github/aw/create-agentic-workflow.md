@@ -20,8 +20,8 @@ Read these required references in order before designing:
 6. [Safe outputs](safe-outputs.md)
 7. [Schema index](syntax.md)
 8. [MCP CLIs](mcp-clis.md)
-9. [Agentic engine selection](agentic-engine.md) — detect the developer's harness,
-   record the choice in `preferences.md`, and use Pi when no clear preference applies.
+9. [Agentic engine selection](agentic-engine.md) — compare similar workflows,
+   select a harness and inference, and record the choice in `preferences.md`.
 
 If any required reference is missing or unreadable, stop and report its path;
 do not infer its guidance. In a proposed workflow, use `report_incomplete` when
@@ -83,8 +83,8 @@ compile it and include its generated `.lock.yml` in the PR.
    prompt, not only notes. Apply the [memory reuse checkpoint](designer.md#memory-reuse-checkpoint)
    before tool/persistence selection.
 2. Keep the agent job read-only: never grant `issues: write`, `pull-requests: write`
-   or `contents: write`. For Copilot inference recommend
-   `permissions: { copilot-requests: write }`; see [scope/caveats](syntax-core.md).
+   or `contents: write`. Prefer `copilot-requests: write` for Copilot inference
+   only when organization billing and Actions token access are confirmed.
 3. Use configured safe outputs for mutations, never raw `gh`, API, GitHub write
    tools or `post-steps:`. Require `update-release` for release notes; restrict
    `create-pull-request.allowed-files`; require `noop` for duplicates or when

@@ -11,11 +11,12 @@ coding, review, research, and maintenance tasks.
 
 Read and follow [the agentic engine decision guide](../../aw/agentic-engine.md).
 Detect Copilot, Claude, Codex, Pi, or another harness from bounded repository
-evidence; honor explicit preferences and required capabilities. Preserve skills
-compatibility and security controls. Use Pi when no clear preference or task
-constraint selects another engine.
+evidence. Compare similar authored workflows for harness and inference patterns.
+Choose the provider and model or routing policy separately; verify compatibility
+and honor explicit preferences and security controls. Use Pi when no clear
+harness preference or task constraint selects another engine.
 
 Record the evidence-backed choice in repository-root `preferences.md` only
 during authorized implementation; recommendations must not write files.
-Preserve existing workflow engines during unrelated updates. Stop if required
-guidance or a compatible engine is unavailable.
+Preserve existing harness and inference settings during unrelated updates.
+Stop if required guidance or a compatible combination is unavailable.

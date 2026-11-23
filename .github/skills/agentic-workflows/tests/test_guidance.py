@@ -63,18 +63,39 @@ class GuidanceTests(unittest.TestCase):
 
     def test_agentic_engine_selection_contract(self):
         guide = ROOT / ".github/aw/agentic-engine.md"
-        self.assertLessEqual(len(guide.read_bytes()), 7500)
-        contract = normalized(guide.read_text())
+        prefix, marker, _ = guide.read_bytes().partition(b"<!-- instruction-prefix-end -->")
+        self.assertTrue(marker)
+        self.assertLessEqual(len(prefix) + len(marker), 7500)
+        contract = normalized(prefix.decode("utf-8"))
         for required in (
             "Copilot", "Claude", "Codex", "Pi", "Another harness",
             "repository-root `preferences.md`", "explicit, inferred, or the Pi default",
             "confirmed preferences over inferred ones", "corroborated active development usage",
             "generic `AGENTS.md`", "not evidence for Codex or any single harness",
             "no clear preference", "`engine: pi`", "compiler's default",
-            "Preserve an existing workflow's engine", "task-specific exception",
+            "Preserve an existing workflow's engine and inference", "task-specific exception",
             "Do not execute repository scripts or install tools",
             "Never weaken required security controls", "Store no credentials",
             "recommendation-only requests", "without writing files",
+        ):
+            with self.subTest(required=required):
+                self.assertIn(required, contract)
+
+    def test_inference_selection_contract_survives_prefix_reads(self):
+        guide = ROOT / ".github/aw/agentic-engine.md"
+        contract = normalized(guide.read_text().split("<!-- instruction-prefix-end -->")[0])
+        for required in (
+            "up to three similar repository-owned workflow sources",
+            "distinguish explicit settings from inherited defaults",
+            "If no clearer inference choice applies",
+            "`permissions.copilot-requests: write`",
+            "organization-owned repository has centralized Copilot billing and Actions token access",
+            "not available for personal repositories",
+            "If ineligible, omit that permission",
+            "if already authorized, list Actions secret names",
+            "Match only documented provider secret names",
+            "Never read or log secret values",
+            "mark credential availability unknown",
         ):
             with self.subTest(required=required):
                 self.assertIn(required, contract)

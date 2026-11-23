@@ -19,8 +19,8 @@ Before tool selection, apply the
 success criteria and repository scripts/tests. Infer browser needs without a
 mandatory extra interview question; include supporting lifecycle permissions.
 
-Before choosing an engine, follow [agentic engine selection](agentic-engine.md)
-for repository harness detection, `preferences.md`, and the Pi fallback.
+Before choosing a harness and inference, follow
+[agentic engine selection](agentic-engine.md) and compare similar workflows.
 
 Follow the [interview](#interview-framework), [decision mappings](#decision-heuristics),
 and [confirmation](#confirmation-format) before the [generation template](#generation-template).
@@ -127,13 +127,14 @@ Map to:
 - `secrets:` / `env:` wiring for integration tokens
 - GHES/GHEC settings such as `engine.api-target` and `aw.json` `ghes: true` (when applicable)
 
-### Phase 7: Engine (optional)
+### Phase 7: Harness and inference
 
 Apply [agentic engine selection](agentic-engine.md) before asking questions.
 Honor explicit preferences; infer the developer's harness from repository
-evidence and saved `preferences.md`. Ask only when ambiguity affects feasibility
-or policy. With no clear preference or incompatible task requirement, select
-`engine: pi`. Record the choice during authorized generation, not the interview.
+evidence and saved `preferences.md`. Confirm the provider and model or routing
+separately. Ask only when ambiguity affects feasibility or policy. Choose
+`engine: pi` if no clear harness preference applies and Pi meets all requirements.
+Record the choice during authorized generation, not the interview.
 
 ### Phase 7b: Skills, Plugins, LSP & Evals (optional)
 
@@ -180,7 +181,8 @@ Use this exact structure:
 📋 Proposed workflow:
 - Name: <workflow-id>
 - Trigger: <event + key options>
-- Engine: <explicit engine or default (omitted)>
+- Harness: <selected engine ID>
+- Inference: <provider, model or routing policy, and authentication mode>
 - Tools: <tool summary>
 - Safe outputs: <list or none>
 - Network: <allowed summary>
@@ -208,6 +210,11 @@ permissions:
   contents: read
   issues: read
   pull-requests: read
+  # copilot-requests: write  # Only for confirmed organization-billed Copilot inference
+engine:
+  id: <selected harness>
+  # model-provider: <selected provider, only when supported and needed>
+# model: <selected model or routing policy, if explicitly configured>
 tools:
   github:
     mode: gh-proxy
@@ -263,7 +270,7 @@ Before final output, run this internal self-check:
 - [ ] `intent:` is a concise outcome, and the selected architecture follows the augmented IntentSpec
 - [ ] Prompt instructs agent to call `noop` when no action is needed
 - [ ] Prompt states applicability, required effects, and inverse/no-op conditions
-- [ ] Unnecessary defaults are omitted (for example `engine: copilot`)
+- [ ] Selected harness is explicit; inference settings match the confirmed plan
 - [ ] If reading GitHub data, `steps:` pre-fetches compact JSON (DataOps)
 - [ ] `tools.github.mode` is `gh-proxy` unless broader MCP toolsets are explicitly needed
 - [ ] Only required toolsets are listed (avoid blanket toolset lists)

@@ -121,7 +121,7 @@ permissions:
 When this permission is present, gh-aw automatically uses the GitHub Actions token for Copilot inference. Any value set for `COPILOT_GITHUB_TOKEN` or `GH_AW_GITHUB_TOKEN` is **ignored** for inference — those tokens are not passed to the Copilot engine.
 
 > [!NOTE]
-> `copilot-requests: write` requires that your organization has a Copilot subscription and that centralized billing is enabled. If the Actions token does not have Copilot access, the workflow will fail at the inference step — configure `COPILOT_GITHUB_TOKEN` instead.
+> `copilot-requests: write` requires an organization-owned repository, a Copilot subscription with centralized billing enabled, and an Actions token with Copilot access. It is not available in personal repositories. If organization billing is unavailable, omit the permission and use `COPILOT_GITHUB_TOKEN` if PAT-based Copilot inference is approved.
 
 **Why this is preferred**:
 

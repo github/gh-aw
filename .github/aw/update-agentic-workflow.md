@@ -27,8 +27,8 @@ Load these additional files only when relevant:
 - [documentation-workflows.md](documentation-workflows.md) for documentation agents, required docs checks, and post-merge page/index upkeep
 - [agent-runtime-instructions.md](agent-runtime-instructions.md) for changes involving Docker, Cloud Hypervisor, ARC DinD, or self-hosted runners
 - [skills.md](skills.md) when the user asks to add specific skills or agent plugins
-- [agentic-engine.md](agentic-engine.md) when changing engines; honor developer
-  harness preferences and preserve the engine during unrelated updates
+- [agentic-engine.md](agentic-engine.md) when changing harness or inference;
+  preserve both during unrelated updates
 - [operational-value-designer](../skills/operational-value-designer/SKILL.md) when updating graders, their evidence contract, or legacy evaluator syntax
 
 ## Scope
