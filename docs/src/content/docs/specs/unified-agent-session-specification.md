@@ -1198,26 +1198,30 @@ ran, reached a clean result. Rules apply in order:
    cancelled, including an attempt classed as cancelled or timed out.
 2. For a run that did not succeed, `skip` with `infrastructure` for platform
    failures: startup failures, interrupted harness attempts, crash signals, engine
-   outages and timeouts, an incomplete report the engine runtime filed for an
-   infrastructure error, a safe-output gateway that registered no tools,
+   outages and timeouts, a safe-output gateway that registered no tools,
    authentication and policy rejections, provider 5xx responses that the engine or
    AWF recorded for an agent request, and harness infrastructure failure classes.
    Then `skip` with `rate_limited` for such 429 responses and quota or rate-limit
    categories and classes. A generic authentication or proxy-guard rejection beside
-   a confirmed limit belongs to the limit, not the platform. A run that succeeded is
-   not re-examined for transient errors it recovered from.
+   a confirmed limit belongs to the limit, not the platform. An incomplete report
+   whose reason claims an infrastructure error is neither the agent's own report nor
+   platform evidence, because runtimes use that reason for budgets and rate-limit
+   waits too and the agent can file it. A run that succeeded is not re-examined for
+   transient errors it recovered from.
 3. `skip` with `pair_mismatch` when an agent request ran another model or effort,
    and `skip` with `unknown_evidence` when the requests cannot be attributed.
 4. `skip` with `unknown_evidence` when threat detection flagged the output.
 5. `success` for a run that succeeded.
 6. `failure` when the agent reported that it could not finish or exhausted its
-   prompt, a content filter blocked a response in the main conversation, the
-   selected pair reached a step, token, credit, or tool-denial limit (with or
-   without output), or the validator rejected its outputs or found no terminal
-   output.
+   prompt, the main conversation recorded a refusal or content filter and the run
+   left no terminal output, the selected pair reached a step, token, credit, or
+   tool-denial limit (with or without output), or the validator rejected its
+   outputs or found no terminal output.
 7. Otherwise `skip` with `unknown_evidence`, including an agent job that failed
    after valid terminal output, and a run whose threat detection could not reach a
-   result.
+   result: a warning or failure conclusion, a detector failure, or a failed or
+   cancelled detection job. As in the published `detection.result`, only the
+   conclusion's own result supplies a reason.
 
 The verdict is evidence of validated terminal completion, not of answer quality.
 It uses only engine-neutral evidence (AWF's records, the job results, harness and

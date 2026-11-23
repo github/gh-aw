@@ -22,6 +22,8 @@ const { isDurableSessionRecord } = require("./durable_session_record.cjs");
 const { buildWorkflowCallId } = require("./aw_context.cjs");
 
 const SESSION_FILE_FORMAT_VERSION = 1;
+// The conclusion's sanitized detection result; only it carries a trusted conclusion reason.
+const DETECTION_RESULT_PATH = "usage/detection/detection_result.json";
 
 /** @param {any} data @returns {boolean} */
 function isModelEndpointMismatchData(data) {
@@ -108,7 +110,7 @@ function mergeSessionSources(sources, engine) {
           native.index >= 0
             ? native.index
             : (source.indices?.[index] ?? index);
-        if (event.type === "detection.result" && source.path !== "usage/detection/detection_result.json") {
+        if (event.type === "detection.result" && source.path !== DETECTION_RESULT_PATH) {
           delete normalized.data.reason;
         }
         return {
@@ -211,9 +213,14 @@ function observeRoutedRun(sources, subAgentModels, output) {
     startupFailed: !attempt && startup?.outcome === "failure",
     execution: { categories: Array.isArray(execution?.categories) ? execution.categories : [], errorCodes: Array.isArray(execution?.errorCodes) ? execution.errorCodes : [] },
     proxyStatuses: run.statuses,
-    contentFiltered: eventsOf("agent", "agent", "assistant.refusal").some(event => event.data?.reason === "content_filter" && !isNestedSessionEvent(event)),
+    refused: eventsOf("agent", "agent", "assistant.refusal").some(event => !isNestedSessionEvent(event)),
     output: summarizeAgentOutput(output),
-    detection: detectionVerdict(eventsOf("detection", undefined, "detection.result").map(event => event.data)),
+    // As in the published session, only the conclusion's own detection result carries a reason.
+    detection: detectionVerdict(
+      sources
+        .filter(source => source.component === "detection")
+        .flatMap(source => source.events.filter(event => event.type === "detection.result").map(event => (source.path === DETECTION_RESULT_PATH ? event.data : { ...event.data, reason: undefined })))
+    ),
   });
 }
 

@@ -23,7 +23,7 @@ const { attributeRequest, routedRequests } = require("./routing_analytics.cjs");
  * @property {boolean} startupFailed
  * @property {{categories: string[], errorCodes: Array<string | number>}} execution
  * @property {number[]} proxyStatuses HTTP statuses AWF recorded for the agent's failed requests
- * @property {boolean} contentFiltered a content filter blocked a response in the main conversation
+ * @property {boolean} refused the main conversation recorded a refusal or content filter
  * @property {AgentOutputSummary | undefined} output
  * @property {"clean" | "threat" | "inconclusive"} detection
  */
@@ -118,7 +118,8 @@ function routedRun({ tokenUsage, routing, upstreamErrors = [], subAgentModels })
     routed: routing.some(record => isRecord(record) && record.stage === "selection"),
     started: counts.main + counts.subagent + counts.deviated + counts.unattributed > 0,
     pair: counts.deviated > 0 ? "mismatch" : counts.main > 0 && counts.unattributed === 0 ? "match" : "unknown",
-    statuses: upstreamErrors.flatMap(record => (isRecord(record) && !classifier.has(record.request_id) && Number.isInteger(record.status) ? [record.status] : [])),
+    // Only requests attributed to the agent; a failed classifier call may have no other record.
+    statuses: upstreamErrors.flatMap(record => (isRecord(record) && seen.has(record.request_id) && Number.isInteger(record.status) ? [record.status] : [])),
   };
 }
 
@@ -133,13 +134,14 @@ function summarizeAgentOutput(value) {
   // The collector adds one report_incomplete of its own when no terminal output was found.
   const collectorCause = typeof value.collectorFailureCause === "string" ? value.collectorFailureCause : typeof value.collectorEmptyOutputCause === "string" ? "unknown" : undefined;
   const reports = value.items.filter(item => isRecord(item) && item.type === "report_incomplete");
-  // Engine runtimes file their own report when the provider fails.
-  const platformReports = reports.filter(item => item.reason === "infrastructure_error").length;
+  // Runtimes file this reason for provider failures, budgets and long rate-limit waits, and
+  // the agent can file it too, so such a report is neither the agent's own nor platform evidence.
+  const claimedInfrastructure = reports.filter(item => item.reason === "infrastructure_error").length;
   return {
     terminal: types.filter(type => type && !NON_TERMINAL_OUTPUTS.has(type)),
     errors: value.errors.length,
-    agentIncomplete: reports.length - platformReports > (collectorCause === undefined ? 0 : 1),
-    infrastructure: platformReports > 0 || typeof value.collectorInfrastructureCause === "string",
+    agentIncomplete: reports.length - claimedInfrastructure > (collectorCause === undefined ? 0 : 1),
+    infrastructure: typeof value.collectorInfrastructureCause === "string",
     ...(collectorCause === undefined ? {} : { failureCause: collectorCause }),
   };
 }
@@ -153,7 +155,7 @@ function summarizeAgentOutput(value) {
 function detectionVerdict(results) {
   const records = results.filter(isRecord);
   if (records.some(result => result.reason === "threat_detected" || THREAT_FLAGS.some(key => result[key] === true))) return "threat";
-  const inconclusive = records.some(result => INCONCLUSIVE_DETECTION_REASONS.has(result.reason) || ["failure", "cancelled"].includes(result.job_result ?? result.jobResult));
+  const inconclusive = records.some(result => INCONCLUSIVE_DETECTION_REASONS.has(result.reason) || ["failure", "warning"].includes(result.conclusion) || ["failure", "cancelled"].includes(result.job_result ?? result.jobResult));
   return inconclusive ? "inconclusive" : "clean";
 }
 
@@ -194,7 +196,9 @@ function rateLimited(e) {
 
 /** @param {RunEvidence} e */
 function behavioralFailure(e) {
-  return e.output?.agentIncomplete === true || e.output?.failureCause === "prompt_exhaustion" || e.contentFiltered || e.execution.errorCodes.includes("content_filter") || limitReached(e);
+  // A refusal ends the task only when the run left no terminal output; one the agent recovered from is not its result.
+  const refusedTask = (e.refused || e.execution.errorCodes.includes("content_filter")) && !(e.output && e.output.terminal.length > 0);
+  return e.output?.agentIncomplete === true || e.output?.failureCause === "prompt_exhaustion" || refusedTask || limitReached(e);
 }
 
 /**
