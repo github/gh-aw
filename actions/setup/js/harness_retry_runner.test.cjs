@@ -105,6 +105,9 @@ describe("harness_retry_runner.cjs", () => {
   it.each([
     [5, 10, null, 2, "rate_limit_error"],
     [11, 10, null, 2, "rate_limit_error"],
+    [60000, 10, null, 2, "rate_limit_error"],
+    [60001, 100000, null, 1, "rate_limit_wait_exceeded"],
+    [1728000000, 100000, null, 1, "rate_limit_wait_exceeded"],
     [257000, 60000, 600000, 2, "rate_limit_error"],
     [2147483648, 60000, null, 1, "rate_limit_wait_exceeded"],
     [1000, 2000, 500, 1, "rate_limit_wait_exceeded"],

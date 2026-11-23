@@ -1572,8 +1572,9 @@ expanding those evidence sources. A valid numeric-seconds value or a valid
 non-expired HTTP-date value MUST determine the requested wait duration. The
 harness MUST wait for that duration regardless of the configured exponential
 backoff `max-delay-ms` limit, unless the wait reaches the remaining soft-timeout
-budget, including the shutdown buffer, or exceeds the maximum timer delay of
-2147483647 milliseconds. In either case, the attempt MUST terminate with the
+budget, including the shutdown buffer, exceeds the maximum timer delay of
+2147483647 milliseconds, or exceeds 60000 milliseconds when no valid soft timeout
+is available. In these cases, the attempt MUST terminate with the
 allowlisted failure identifier `rate_limit_wait_exceeded` and report the requested
 retry delay in seconds. Missing, invalid, or expired `Retry-After` values MUST
 preserve the existing retry behavior.
@@ -2876,6 +2877,7 @@ Native IDs can collide, timestamps can be out of order, and a trace can contain 
 - Retained evidence-source restrictions and missing, invalid, or expired `Retry-After` behavior.
 - Clarified that valid provider waits are not capped by exponential backoff `max-delay-ms`, subject to the soft-timeout/shutdown-buffer budget and the 2147483647-millisecond timer bound.
 - Retained `rate_limit_wait_exceeded` reporting with the requested delay in seconds.
+- Bounded provider waits to 60000 milliseconds when no valid soft timeout is available.
 - Retained serialization-format version 1.
 
 ### Version 2.14.1 - Draft (2026-11-23)

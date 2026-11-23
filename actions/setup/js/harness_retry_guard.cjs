@@ -8,6 +8,7 @@ const { fetchAWFReflect } = require("./awf_reflect.cjs");
 // Stop retrying this long before the step hard timeout so the harness can emit
 // structured safe-output diagnostics instead of being terminated by Actions.
 const SOFT_TIMEOUT_BUFFER_MS = 90 * 1000;
+const NO_TIMEOUT_RETRY_AFTER_LIMIT_MS = 60 * 1000;
 
 const errorPatterns = require("./harness_error_patterns.cjs");
 
@@ -62,7 +63,7 @@ async function observeInvocationBudget({ guard, attempt, nativeTerminalRateLimit
  * Enforce provider waits once, after engine-local retry vetoes have been applied.
  * @param {{
  *   attempt: number, result: import("./harness_retry_runner.cjs").HarnessAttemptResult,
- *   maxDelayMs: number, softTimeoutGuard: { softDeadlineMs: number } | null,
+ *   softTimeoutGuard: { softDeadlineMs: number } | null,
  *   harnessName: string, log: (message: string) => void, terminal?: boolean,
  * }} options
  * @returns {import("./harness_retry_runner.cjs").HarnessFailureDecision | null}
@@ -73,8 +74,9 @@ function resolveRetryAfterDecision({ attempt, result, softTimeoutGuard, harnessN
   const invalidWait = !Number.isSafeInteger(wait) || wait < 0;
   const exceedsTimerLimit = wait > 2147483647;
   const exceedsTimeout = softTimeoutGuard && Date.now() + wait >= softTimeoutGuard.softDeadlineMs;
-  if (invalidWait || exceedsTimerLimit || exceedsTimeout) {
-    const reason = invalidWait ? "a valid nonnegative timer delay" : exceedsTimerLimit ? "maximum timer delay (2147483647ms)" : "remaining job timeout budget";
+  const exceedsFallbackLimit = !softTimeoutGuard && wait > NO_TIMEOUT_RETRY_AFTER_LIMIT_MS;
+  if (invalidWait || exceedsTimerLimit || exceedsTimeout || exceedsFallbackLimit) {
+    const reason = invalidWait ? "a valid nonnegative timer delay" : exceedsTimerLimit ? "maximum timer delay (2147483647ms)" : exceedsTimeout ? "remaining job timeout budget" : "no-timeout fallback limit (60000ms)";
     result.failureClasses = ["rate_limit_wait_exceeded"];
     log(`attempt ${attempt + 1}: failureClass=rate_limit_wait_exceeded — HTTP 429 rate limited, retry after ${wait / 1000} s; Retry-After=${wait}ms exceeds ${reason}; not retrying`);
     emitInfrastructureIncomplete(`${harnessName} HTTP 429 rate limited, retry after ${wait / 1000} s. Retry-After wait exceeds ${reason}. Stopping rather than retrying inside the rate-limit window.`, { logger: log });

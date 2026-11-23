@@ -46,7 +46,7 @@ describe("harness_retry_guard.cjs", () => {
     it.each([0, 100, 257000, 2147483647])("accepts bounded timer waits beyond the backoff cap: %s", retryAfterMs => {
       const log = vi.fn();
       const result = { exitCode: 1, output: "", hasOutput: true, retryAfterMs };
-      expect(resolveRetryAfterDecision({ result, attempt: 0, maxDelayMs: 10, softTimeoutGuard: null, harnessName: "Test", log })).toEqual({ action: "retry", nextDelayMs: retryAfterMs });
+      expect(resolveRetryAfterDecision({ result, attempt: 0, softTimeoutGuard: { softDeadlineMs: Date.now() + 2147493647 }, harnessName: "Test", log })).toEqual({ action: "retry", nextDelayMs: retryAfterMs });
       expect(result.failureClasses).toEqual(["rate_limit_error"]);
       expect(log).toHaveBeenCalledTimes(1);
     });
@@ -54,20 +54,20 @@ describe("harness_retry_guard.cjs", () => {
     it("does not report a retry or alter failure classes on an exhausted attempt", () => {
       const log = vi.fn();
       const result = { exitCode: 1, output: "", hasOutput: true, retryAfterMs: 100, failureClasses: ["partial_execution"] };
-      expect(resolveRetryAfterDecision({ result, attempt: 3, maxDelayMs: 100, softTimeoutGuard: null, harnessName: "Test", log, terminal: true })).toBeNull();
+      expect(resolveRetryAfterDecision({ result, attempt: 3, softTimeoutGuard: null, harnessName: "Test", log, terminal: true })).toBeNull();
       expect(result.failureClasses).toEqual(["partial_execution"]);
       expect(log).not.toHaveBeenCalled();
     });
 
     it("still rejects excessive waits on an exhausted attempt", () => {
       const result = { exitCode: 1, output: "", hasOutput: true, retryAfterMs: 2147483648 };
-      expect(resolveRetryAfterDecision({ result, attempt: 3, maxDelayMs: 100, softTimeoutGuard: null, harnessName: "Test", log: vi.fn(), terminal: true })).toEqual({ action: "stop" });
+      expect(resolveRetryAfterDecision({ result, attempt: 3, softTimeoutGuard: null, harnessName: "Test", log: vi.fn(), terminal: true })).toEqual({ action: "stop" });
       expect(result.failureClasses).toEqual(["rate_limit_wait_exceeded"]);
     });
 
     it.each([-1, NaN, Infinity, 0.5, 2147483648])("rejects invalid or overflowing waits: %s", retryAfterMs => {
       const result = { exitCode: 1, output: "", hasOutput: true, retryAfterMs };
-      expect(resolveRetryAfterDecision({ result, attempt: 0, maxDelayMs: Number.MAX_SAFE_INTEGER, softTimeoutGuard: null, harnessName: "Test", log: () => {} })).toEqual({ action: "stop" });
+      expect(resolveRetryAfterDecision({ result, attempt: 0, softTimeoutGuard: null, harnessName: "Test", log: () => {} })).toEqual({ action: "stop" });
       expect(result.failureClasses).toEqual(["rate_limit_wait_exceeded"]);
     });
 
@@ -76,10 +76,38 @@ describe("harness_retry_guard.cjs", () => {
       try {
         const result = { exitCode: 1, output: "", hasOutput: true, retryAfterMs: 10 };
         const log = vi.fn();
-        expect(resolveRetryAfterDecision({ result, attempt: 0, maxDelayMs: 10, softTimeoutGuard: { softDeadlineMs: 110 }, harnessName: "Test", log })).toEqual({ action: "stop" });
+        expect(resolveRetryAfterDecision({ result, attempt: 0, softTimeoutGuard: { softDeadlineMs: 110 }, harnessName: "Test", log })).toEqual({ action: "stop" });
         expect(log.mock.calls.flat().join("\n")).toContain("rate limited, retry after 0.01 s");
       } finally {
         now.mockRestore();
+      }
+    });
+
+    it.each([undefined, "", "invalid", "0"])("bounds waits when timeout is unset or invalid: %s", timeout => {
+      const softTimeoutGuard = buildSoftTimeoutGuard(Date.now(), { GH_AW_TIMEOUT_MINUTES: timeout });
+      expect(softTimeoutGuard).toBeNull();
+      const log = vi.fn();
+      const result = { exitCode: 1, output: "", hasOutput: true, retryAfterMs: 60001 };
+      expect(resolveRetryAfterDecision({ result, attempt: 0, softTimeoutGuard, harnessName: "Test", log })).toEqual({ action: "stop" });
+      expect(result.failureClasses).toEqual(["rate_limit_wait_exceeded"]);
+      expect(log.mock.calls.flat().join("\n")).toContain("no-timeout fallback limit (60000ms)");
+      expect(log.mock.calls.flat().join("\n")).toContain("retry after 60.001 s");
+    });
+
+    it("allows a wait at the no-timeout fallback limit", () => {
+      const result = { exitCode: 1, output: "", hasOutput: true, retryAfterMs: 60000 };
+      expect(resolveRetryAfterDecision({ result, attempt: 0, softTimeoutGuard: null, harnessName: "Test", log: vi.fn() })).toEqual({ action: "retry", nextDelayMs: 60000 });
+    });
+
+    it("emits a structured fallback diagnostic even on the last attempt", () => {
+      vi.stubEnv("GH_AW_SAFE_OUTPUTS", "/tmp/safeoutputs.jsonl");
+      const exec = vi.spyOn(require("node:child_process"), "execFileSync").mockReturnValue("");
+      try {
+        const result = { exitCode: 1, output: "", hasOutput: true, retryAfterMs: 257000 };
+        expect(resolveRetryAfterDecision({ result, attempt: 3, softTimeoutGuard: null, harnessName: "Test", log: vi.fn(), terminal: true })).toEqual({ action: "stop" });
+        expect(exec).toHaveBeenCalledWith(expect.any(String), expect.arrayContaining(["report_incomplete", "--reason", "infrastructure_error", "--details", expect.stringContaining("retry after 257 s")]), expect.any(Object));
+      } finally {
+        exec.mockRestore();
       }
     });
   });
