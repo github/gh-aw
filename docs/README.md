@@ -85,7 +85,10 @@ worked examples: a lit ↓ button with the example count appears in the toolbar,
 Up/Down walk down the column and back (past either end they switch bands, as
 they do on slides without a column), U goes back to the pattern, and Left/Right from an example return to
 the main line. Typing a slide number then Enter jumps to that slide, like clicking its dot. Home/End jump to the first/last slide, F for fullscreen, the notes toolbar button (or N) toggles speaker notes,
-and M to toggle sound. G opens the slide map, whose bottom section is a keyboard manual: a full
+and M to toggle sound. W (or the book button in the toolbar) opens a choose-your-own-workflow wizard: a
+gamebook replay of the gh-aw wizard whose chapters pick a quest, trigger, outputs, extras and engine, then
+copy a workflow generator prompt (in the wizard, Left/Right turn pages, Up/Down move between choices, 1-9
+pick one, R rolls the die, Esc closes). G opens the slide map, whose bottom section is a keyboard manual: a full
 keyboard with the shortcut keys lit and combos joined by arcs, a phone that loops every touch gesture
 (point at one to play it alone), then a list of every shortcut. Notes explain what the slide shows, why the feature exists,
 and when to use it for technical audiences new to AW; notes written as `Label: text` lines
