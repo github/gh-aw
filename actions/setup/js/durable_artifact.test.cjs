@@ -134,6 +134,8 @@ describe("durable artifact lineage", () => {
     ["0", "positive integer"],
     ["abc", "positive integer"],
     [true, "positive integer"],
+    [null, "positive integer"],
+    ["", "positive integer"],
     ["200", "current run"],
   ])("rejects continuation_run_id %j", async (value, message) => {
     const options = fixture();
