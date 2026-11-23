@@ -1909,6 +1909,28 @@ test.describe("reusable runtime", () => {
     expect(errors).toEqual([]);
   });
 
+  test("moves the captions below the slide when a tall window leaves room under the stage", async ({ page }) => {
+    await page.clock.install();
+    await fakeFullscreen(page);
+    await page.setViewportSize({ width: 960, height: 540 });
+    const { errors } = await open(page, "/gh-aw/cracktro/tiny.html?cc&fs=none#hello");
+    await page.keyboard.press("k");
+    await page.clock.runFor(8000);
+    const box = page.locator(".cc-box");
+    const stageBottom = async () => {
+      const s = (await page.locator(".stage").boundingBox())!;
+      return s.y + s.height;
+    };
+    // 16:9: no letterbox, so the captions stay over the bottom of the slide
+    expect((await box.boundingBox())!.y).toBeLessThan(await stageBottom());
+    // a tall window: the captions drop entirely below the slide
+    await page.setViewportSize({ width: 960, height: 900 });
+    await expect.poll(async () => (await box.boundingBox())!.y).toBeGreaterThanOrEqual(await stageBottom());
+    const b = (await box.boundingBox())!;
+    expect(b.y + b.height).toBeLessThanOrEqual(900);
+    expect(errors).toEqual([]);
+  });
+
   test("reads the caption lines aloud with browser speech synthesis and holds the kiosk slide until they end", async ({ page }) => {
     await page.clock.install();
     await fakeFullscreen(page);

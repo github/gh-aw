@@ -198,7 +198,7 @@
   body.kiosk.nav-idle :is(.ksb, .snd):not(:focus-visible) { opacity: 0; }
   body.light.kiosk :is(.ksb, .snd) { color: #1f2328; border-color: #1f2328; }
   /* closed captioning (CC): kiosk mode with the muted-TV captions of a bar or an airport gate. Two speakers talk each
-     slide through as roll-up speech-to-text, uppercase in black boxes over the bottom of the ${W}x${H} frame. */
+     slide through as roll-up speech-to-text, uppercase in black boxes over the bottom of the ${W}x${H} frame, or below it in a tall window's letterbox (fit). */
   .ccb { display: none; }
   body.kiosk .ccb { display: block; right: calc(104px + var(--sr)); opacity: 1; color: #f0f6fc; border-color: #f0f6fc; transition: opacity .4s, color .2s, border-color .2s; }
   body.kiosk.nav-idle .ccb:not(:focus-visible) { opacity: 0; }
@@ -978,6 +978,10 @@
     const fit = () => {
       const s = Math.min(innerWidth / W, innerHeight / H);
       ccF.style.transform = stage.style.transform = `scale(${s}) translate(-50%, -50%)`;
+      // Captions sit 72px above the stage bottom; a letterbox below the stage (in stage px) lets them move down, off
+      // the slide when it fits three rows (~176px) plus 16px, easing to 24px from the window bottom.
+      const below = Math.max(0, (innerHeight / s - H) / 2);
+      ccRows.style.bottom = `${Math.max(-192, 72 - below - Math.min(48, below))}px`;
       document.body.classList.toggle("compact-nav", dotsWidth > innerWidth - (wzBtn ? 310 : 270));
     };
     addEventListener("resize", fit);
