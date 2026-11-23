@@ -259,7 +259,7 @@ func (cm *CheckoutManager) generateActivationCheckoutStep(repository, ref, token
 	var sb strings.Builder
 
 	if fullCheckout {
-		sb.WriteString("      - name: Checkout repository for base branch snapshot\n")
+		sb.WriteString("      - name: Checkout base repository snapshot\n")
 	} else {
 		sb.WriteString("      - name: Checkout .github and .agents folders\n")
 	}

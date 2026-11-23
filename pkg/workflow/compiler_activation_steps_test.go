@@ -185,13 +185,13 @@ func TestActivationStepsAddRepositoryAndOutputSteps(t *testing.T) {
 		t.Cleanup(func() { isReleaseBuild = originalIsRelease })
 
 		compiler := newActivationStepsTestCompiler("v1.2.3")
-		ctx := newActivationBuildContext(&WorkflowData{}, false, "", "test.lock.yml")
+		ctx := newActivationBuildContext(&WorkflowData{Permissions: "contents: read"}, false, "", "test.lock.yml")
 
 		err := compiler.addActivationRepositoryAndOutputSteps(ctx)
 
 		require.NoError(t, err)
 		steps := strings.Join(ctx.steps, "")
-		assert.Contains(t, steps, "Checkout repository for base branch snapshot")
+		assert.Contains(t, steps, "Checkout base repository snapshot")
 		assert.Contains(t, steps, "Check workflow lock file")
 		assert.Contains(t, steps, "Check compile-agentic version")
 		assert.Equal(t, `""`, ctx.outputs["comment_id"])
@@ -218,12 +218,12 @@ func TestActivationStepsAddCheckoutAndBaseRestoreStep(t *testing.T) {
 	compiler := newActivationStepsTestCompiler("")
 
 	t.Run("adds checkout and save-base steps", func(t *testing.T) {
-		ctx := newActivationStepsTestContext(&WorkflowData{})
+		ctx := newActivationStepsTestContext(&WorkflowData{Permissions: "contents: read"})
 
 		compiler.addActivationCheckoutAndBaseRestoreStep(ctx)
 
 		steps := strings.Join(ctx.steps, "")
-		assert.Contains(t, steps, "Checkout repository for base branch snapshot")
+		assert.Contains(t, steps, "Checkout base repository snapshot")
 		assert.Contains(t, steps, "Save agent config folders for base branch restoration")
 		assert.Contains(t, steps, "save_base_github_folders.sh")
 		assert.NotContains(t, steps, "GH_AW_STAGE_COPILOT_SDK_AGENTS")

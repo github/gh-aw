@@ -153,7 +153,7 @@ test("save: external skill targets are materialized; internal links and modes su
   assert.equal(execution.stdout.trim(), "ok");
 });
 
-test("save: materializes skills linked outside agent folders before PR checkout", t => {
+test("save and restore: materializes skills linked outside agent folders", t => {
   const f = fixture(t);
   f.write("skills/mui-renovate-fix/SKILL.md", "trusted base skill");
   fs.mkdirSync(path.join(f.workspace, ".agents/skills"), { recursive: true });

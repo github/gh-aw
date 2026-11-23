@@ -45,6 +45,11 @@ func isPRCheckoutDisabled(data *WorkflowData) bool {
 	return false
 }
 
+func shouldRestoreAgentConfigFolders(data *WorkflowData, engine CodingAgentEngine) bool {
+	return ShouldGeneratePRCheckoutStep(data) ||
+		(dynamicWorkflowsEnabled(engine, data.EngineConfig) && canRestoreAgentConfigFolders(data))
+}
+
 // The activation snapshot belongs to the workflow repository. Do not copy it
 // into a different repository checked out at the workspace root.
 func canRestoreAgentConfigFolders(data *WorkflowData) bool {

@@ -341,7 +341,7 @@ strict: false
 	activationJobSection := lockContentStr[activationJobStart:activationJobEnd]
 
 	// Verify activation can snapshot all symlink targets without explicit contents: read permission.
-	checkoutParts := strings.SplitN(activationJobSection, "name: Checkout repository for base branch snapshot", 2)
+	checkoutParts := strings.SplitN(activationJobSection, "name: Checkout base repository snapshot", 2)
 	if len(checkoutParts) != 2 {
 		t.Error("Activation job should contain the base snapshot checkout step")
 		t.Logf("Activation job section:\n%s", activationJobSection)

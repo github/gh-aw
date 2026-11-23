@@ -2,7 +2,9 @@ package workflow
 
 import (
 	"fmt"
+	"io/fs"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -412,7 +414,10 @@ func (c *Compiler) generateCheckoutGitHubFolderForActivation(data *WorkflowData,
 	//
 	// Inlined imports normally need no callee checkout. The SDK still needs it
 	// to stage repository agents from the workflow repository, not the caller.
-	extraPaths := c.activationSparseCheckoutExtraPaths(data)
+	var extraPaths []string
+	if !fullCheckout {
+		extraPaths = c.activationSparseCheckoutExtraPaths(data)
+	}
 
 	cm := NewCheckoutManager(nil)
 	activationToken := c.resolveActivationToken(data)
@@ -671,67 +676,144 @@ func injectIfConditionAfterName(step, condition string) string {
 	return strings.Join(newLines, "\n")
 }
 
-// resolveSymlinkExtraPaths inspects well-known .github sub-paths that are commonly
-// symlinked (e.g. .github/agents -> ../.ai/agents). When a path is a symlink, the
-// resolved target directory (relative to the repo root) is appended to extraPaths so
-// that the sparse-checkout step fetches the target files, not just the dangling symlink
-// blob. Symlink targets that escape the repository root are silently ignored to prevent
-// path traversal. Already-present paths are not duplicated.
-// repoRoot must be an absolute path to the repository root; when empty, the function is a no-op.
+// resolveSymlinkExtraPaths includes repository-confined symlink targets found in
+// the sparse checkout paths. The compile-time tree may differ from the runtime ref.
 func resolveSymlinkExtraPaths(repoRoot string, extraPaths []string) []string {
 	if repoRoot == "" {
 		return extraPaths
 	}
-	candidates := []string{
-		activationSymlinkAgentDir,
-		activationSymlinkSkillDir,
-		activationSymlinkPromptDir,
+	scan := activationSymlinkScan{
+		repoRoot: repoRoot,
+		extra:    extraPaths,
+		existing: make(map[string]struct{}, len(extraPaths)),
+		visited:  make(map[string]struct{}),
+		pending:  []string{filepath.Join(repoRoot, ".github"), filepath.Join(repoRoot, ".agents")},
 	}
-	existing := make(map[string]struct{}, len(extraPaths))
 	for _, p := range extraPaths {
-		existing[p] = struct{}{}
+		scan.pending = append(scan.pending, filepath.Join(repoRoot, p))
+		scan.existing[p] = struct{}{}
 	}
-	for _, candidate := range candidates {
-		absCandidate := filepath.Join(repoRoot, candidate)
-		info, err := os.Lstat(absCandidate)
-		if err != nil || info.Mode()&os.ModeSymlink == 0 {
-			continue // not a symlink or doesn't exist
+	scan.loadCheckoutFiles()
+	for len(scan.pending) > 0 {
+		candidates := scan.pending
+		scan.pending = nil
+		for _, candidate := range candidates {
+			scan.walk(candidate)
 		}
-		target, err := os.Readlink(absCandidate)
-		if err != nil {
-			continue
-		}
-		// Resolve target to an absolute path.
-		// When the symlink target is absolute (e.g. /etc/passwd), use it directly.
-		// When relative, resolve it against the directory that contains the symlink.
-		var absResolved string
-		if filepath.IsAbs(target) {
-			absResolved = filepath.Clean(target)
-		} else {
-			absResolved = filepath.Clean(filepath.Join(filepath.Dir(absCandidate), target))
-		}
-		rel, err := filepath.Rel(repoRoot, absResolved)
-		if err != nil {
-			continue
-		}
-		// Reject paths that escape the repository root using a segment-aware check.
-		// strings.HasPrefix would incorrectly reject names like "..foo".
-		firstSeg := rel
-		if i := strings.IndexByte(rel, filepath.Separator); i >= 0 {
-			firstSeg = rel[:i]
-		}
-		if firstSeg == ".." {
-			compilerActivationJobLog.Printf("Ignoring symlink %s -> %s: resolved path %q escapes the repository root", candidate, target, rel)
-			continue
-		}
-		// Normalize to forward slashes for use in YAML sparse-checkout paths.
-		rel = filepath.ToSlash(rel)
-		if _, alreadyPresent := existing[rel]; alreadyPresent {
-			continue
-		}
-		compilerActivationJobLog.Printf("Symlink detected: %s -> %s (adding %s to sparse checkout)", candidate, target, rel)
-		extraPaths = append(extraPaths, rel)
-		existing[rel] = struct{}{}
 	}
-	return extraPaths
+	return scan.extra
+}
+
+type activationSymlinkScan struct {
+	repoRoot      string
+	extra         []string
+	pending       []string
+	existing      map[string]struct{}
+	visited       map[string]struct{}
+	checkoutFiles map[string]struct{}
+	checkoutDirs  map[string]struct{}
+}
+
+func (s *activationSymlinkScan) loadCheckoutFiles() {
+	cmd := exec.Command("git", "-C", s.repoRoot, "ls-files", "-z", "--cached", "--others", "--exclude-standard")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		compilerActivationJobLog.Printf("Cannot list checkout files: %v: %s", err, output)
+		return
+	}
+	s.checkoutFiles = make(map[string]struct{})
+	s.checkoutDirs = map[string]struct{}{s.repoRoot: {}}
+	for name := range strings.SplitSeq(string(output), "\x00") {
+		if name == "" {
+			continue
+		}
+		p := filepath.Join(s.repoRoot, filepath.FromSlash(name))
+		s.checkoutFiles[p] = struct{}{}
+		for dir := filepath.Dir(p); dir != s.repoRoot && dir != filepath.Dir(dir); dir = filepath.Dir(dir) {
+			s.checkoutDirs[dir] = struct{}{}
+		}
+	}
+}
+
+func (s *activationSymlinkScan) insideRoot(p string) bool {
+	rel, err := filepath.Rel(s.repoRoot, p)
+	return err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
+}
+
+func (s *activationSymlinkScan) walk(candidate string) {
+	candidate = filepath.Clean(candidate)
+	if !s.insideRoot(candidate) {
+		return
+	}
+	if resolved, err := filepath.EvalSymlinks(candidate); err != nil || !s.insideRoot(resolved) {
+		return
+	}
+	if _, ok := s.visited[candidate]; ok {
+		return
+	}
+	s.visited[candidate] = struct{}{}
+	if err := filepath.WalkDir(candidate, s.visit); err != nil {
+		compilerActivationJobLog.Printf("Cannot scan sparse checkout path %s: %v", candidate, err)
+	}
+}
+
+func (s *activationSymlinkScan) visit(p string, entry fs.DirEntry, walkErr error) error {
+	if walkErr != nil {
+		compilerActivationJobLog.Printf("Cannot inspect sparse checkout path %s: %v", p, walkErr)
+		return nil
+	}
+	if entry.IsDir() && p == filepath.Join(s.repoRoot, ".git") {
+		return filepath.SkipDir
+	}
+	if entry.IsDir() && s.checkoutDirs != nil {
+		if _, ok := s.checkoutDirs[p]; !ok {
+			return filepath.SkipDir
+		}
+	}
+	if entry.IsDir() && s.checkoutFiles == nil && entry.Name() == "node_modules" {
+		return filepath.SkipDir
+	}
+	if entry.Type()&os.ModeSymlink == 0 {
+		return nil
+	}
+	if s.checkoutFiles != nil {
+		if _, ok := s.checkoutFiles[p]; !ok {
+			return nil
+		}
+	}
+	s.addTarget(p)
+	return nil
+}
+
+func (s *activationSymlinkScan) addTarget(p string) {
+	target, err := os.Readlink(p)
+	if err != nil {
+		return
+	}
+	if !filepath.IsAbs(target) {
+		target = filepath.Join(filepath.Dir(p), target)
+	}
+	target = filepath.Clean(target)
+	resolved, err := filepath.EvalSymlinks(target)
+	if !s.insideRoot(target) || (err == nil && !s.insideRoot(resolved)) {
+		return
+	}
+	if err == nil {
+		s.pending = append(s.pending, target)
+	}
+	if info, err := os.Stat(target); err == nil && !info.IsDir() {
+		target = filepath.Dir(target)
+	}
+	rel, err := filepath.Rel(s.repoRoot, target)
+	if err != nil {
+		return
+	}
+	rel = filepath.ToSlash(rel)
+	if strings.ContainsAny(rel, "\r\n") {
+		return
+	}
+	if _, ok := s.existing[rel]; !ok {
+		s.extra = append(s.extra, rel)
+		s.existing[rel] = struct{}{}
+	}
 }

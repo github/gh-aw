@@ -4,6 +4,7 @@ package workflow
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -99,17 +100,21 @@ func TestActivationSnapshotCheckoutIncludesSymlinkTargets(t *testing.T) {
 		wantFull    bool
 		wantRepoRef bool
 	}{
-		{name: "default snapshot", data: &WorkflowData{Name: "test", AI: "claude"}, wantFull: true},
+		{name: "default snapshot", data: &WorkflowData{Name: "test", AI: "claude", Permissions: "contents: read"}, wantFull: true},
 		{name: "no snapshot", data: &WorkflowData{Name: "test", AI: "claude", CheckoutConfigs: []*CheckoutConfig{{PullRequest: &disabled}}, EngineConfig: &EngineConfig{ID: "claude", DynamicWorkflows: &disabled}}},
+		{name: "checkout disabled", data: &WorkflowData{Name: "test", AI: "claude", Permissions: "contents: read", CheckoutDisabled: true}},
+		{name: "pull request target", data: &WorkflowData{Name: "test", AI: "claude", Permissions: "contents: read", IsPullRequestTarget: true}},
+		{name: "no contents permission", data: &WorkflowData{Name: "test", AI: "claude", Permissions: "issues: read"}},
+		{name: "different root repository", data: &WorkflowData{Name: "test", AI: "claude", Permissions: "contents: read", CheckoutConfigs: []*CheckoutConfig{{Repository: "other/repo"}}}},
 		{name: "reusable workflow", data: &WorkflowData{Name: "test", AI: "claude", On: `"on":
-  workflow_call:`}, wantFull: true, wantRepoRef: true},
+  workflow_call:`, Permissions: "contents: read"}, wantFull: true, wantRepoRef: true},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			job, err := NewCompiler().buildActivationJob(tt.data, false, "", "test.lock.yml")
 			require.NoError(t, err)
 			steps := strings.Join(job.Steps, "")
 			if tt.wantFull {
-				checkout := extractWorkflowStepByName(t, steps, "Checkout repository for base branch snapshot")
+				checkout := extractWorkflowStepByName(t, steps, "Checkout base repository snapshot")
 				assert.NotContains(t, checkout, "sparse-checkout:")
 				assert.Contains(t, checkout, "persist-credentials: false")
 				assert.Contains(t, checkout, "fetch-depth: 1")
@@ -1483,6 +1488,54 @@ func TestInjectIfConditionAfterName(t *testing.T) {
 // TestResolveSymlinkExtraPaths verifies that symlinks under .github/ are resolved and
 // their targets appended to the extraPaths list, while non-symlinks and escape paths are ignored.
 func TestResolveSymlinkExtraPaths(t *testing.T) {
+	t.Run("ignored local dependencies do not affect sparse checkout", func(t *testing.T) {
+		dir := t.TempDir()
+		cmd := exec.Command("git", "init", "-q", dir)
+		require.NoError(t, cmd.Run())
+		require.NoError(t, os.WriteFile(filepath.Join(dir, ".gitignore"), []byte("node_modules/\n"), 0o644))
+		require.NoError(t, os.MkdirAll(filepath.Join(dir, ".agents", "skills"), 0o755))
+		require.NoError(t, os.Symlink("../../skills/example", filepath.Join(dir, ".agents", "skills", "example")))
+		require.NoError(t, os.MkdirAll(filepath.Join(dir, "actions", "setup", "node_modules", ".bin"), 0o755))
+		require.NoError(t, os.Symlink("../tool/bin", filepath.Join(dir, "actions", "setup", "node_modules", ".bin", "tool")))
+		result := resolveSymlinkExtraPaths(dir, []string{"actions/setup"})
+		assert.Contains(t, result, "skills/example")
+		assert.NotContains(t, result, "actions/setup/node_modules/tool/bin")
+	})
+
+	t.Run("nested symlinks in sparse folders", func(t *testing.T) {
+		dir := t.TempDir()
+		require.NoError(t, os.MkdirAll(filepath.Join(dir, ".agents", "skills"), 0o755))
+		require.NoError(t, os.MkdirAll(filepath.Join(dir, "skills", "example"), 0o755))
+		require.NoError(t, os.Symlink("../../skills/example", filepath.Join(dir, ".agents", "skills", "example")))
+		assert.Contains(t, resolveSymlinkExtraPaths(dir, nil), "skills/example")
+	})
+
+	t.Run("dangling target is included but newline paths are rejected", func(t *testing.T) {
+		dir := t.TempDir()
+		require.NoError(t, os.MkdirAll(filepath.Join(dir, ".agents", "skills"), 0o755))
+		require.NoError(t, os.Symlink("../../skills/missing", filepath.Join(dir, ".agents", "skills", "missing")))
+		require.NoError(t, os.Symlink("../../skills/line\nbreak", filepath.Join(dir, ".agents", "skills", "unsafe")))
+		result := resolveSymlinkExtraPaths(dir, nil)
+		assert.Contains(t, result, "skills/missing")
+		assert.NotContains(t, result, "skills/line\nbreak")
+	})
+
+	t.Run("nested symlink chains stay inside the repository", func(t *testing.T) {
+		dir := t.TempDir()
+		external := t.TempDir()
+		require.NoError(t, os.MkdirAll(filepath.Join(dir, ".agents", "skills"), 0o755))
+		require.NoError(t, os.MkdirAll(filepath.Join(dir, "skills", "example"), 0o755))
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "skills", "example", "SKILL.md"), []byte("skill"), 0o644))
+		require.NoError(t, os.Symlink("../../skills/example", filepath.Join(dir, ".agents", "skills", "example")))
+		require.NoError(t, os.Symlink("example/SKILL.md", filepath.Join(dir, "skills", "linked.md")))
+		require.NoError(t, os.Symlink(external, filepath.Join(dir, "skills", "outside")))
+		require.NoError(t, os.Symlink("../../skills/outside", filepath.Join(dir, ".agents", "skills", "outside")))
+		result := resolveSymlinkExtraPaths(dir, []string{"skills"})
+		assert.Contains(t, result, "skills/example")
+		assert.NotContains(t, result, filepath.ToSlash(external))
+		assert.NotContains(t, result, "skills/outside")
+	})
+
 	t.Run("symlink .github/agents resolved to inner path", func(t *testing.T) {
 		dir := t.TempDir()
 		// Create the symlink target directory so Lstat sees the symlink, not a dangling one.

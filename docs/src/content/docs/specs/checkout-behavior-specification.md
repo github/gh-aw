@@ -303,7 +303,7 @@ This avoids blobless partial-clone behavior that would require later authenticat
 
 ### 5.3 Activation Symlink Handling
 
-Activation sparse checkout path expansion MUST detect symlinks for known `.github` subpaths and include resolved in-repo targets.  
+Activation sparse checkout path expansion MUST detect tracked or non-ignored symlinks under sparse checkout paths in the compile-time tree and include in-repo targets. The runtime ref can differ from the compile-time tree.
 Resolved targets escaping repository root MUST be rejected.
 
 ### 5.4 Submodules and Credential Cleanup

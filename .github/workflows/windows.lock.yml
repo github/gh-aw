@@ -333,22 +333,13 @@ jobs:
           echo "::error::COPILOT_GITHUB_TOKEN must be configured in the CALLER repository's secrets."
           echo "::error::For cross-repo workflow_call, secrets must be set in the repository that triggers the workflow."
           echo "::error::See: https://github.github.com/gh-aw/patterns/central-repo-ops/#cross-repo-setup"
-      - name: Checkout .github and .agents folders
+      - name: Checkout base repository snapshot
         if: steps.resolve-host-repo.outputs.target_repo == github.repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
           repository: ${{ steps.resolve-host-repo.outputs.target_repo }}
           ref: ${{ steps.resolve-host-repo.outputs.target_checkout_ref }}
-          sparse-checkout: |
-            .github
-            .agents
-            actions/setup
-            .claude
-            .codex
-            .gemini
-            .pi
-          sparse-checkout-cone-mode: true
           fetch-depth: 1
       - name: Save agent config folders for base branch restoration
         env:

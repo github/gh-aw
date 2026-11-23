@@ -280,7 +280,7 @@ jobs:
 	}
 	activationJobNameIdx := indexInNonCommentLinesInSection(activationSection, "job-name: ${{ github.job }}")
 	activationPreStepIdx := indexInNonCommentLinesInSection(activationSection, "- name: Activation run pre-step")
-	activationCheckoutIdx := indexInNonCommentLinesInSection(activationSection, "- name: Checkout repository for base branch snapshot")
+	activationCheckoutIdx := indexInNonCommentLinesInSection(activationSection, "- name: Checkout base repository snapshot")
 	if activationJobNameIdx == -1 || activationPreStepIdx == -1 || activationCheckoutIdx == -1 {
 		t.Fatalf("Expected setup body, pre-step, and repository checkout in activation section:\n%s", activationSection)
 	}
