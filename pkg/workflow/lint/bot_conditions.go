@@ -135,10 +135,10 @@ func spoofableBotGate(node actionlint.ExprNode, positive bool) (string, bool) {
 		// In a conjunction, an author check in the sibling operand guards the
 		// gate; one beside the bot check in the same disjunction does not.
 		conjunction := (node.Kind == actionlint.LogicalOpNodeKindAnd) == positive
-		if actor, found := spoofableBotGate(node.Left, positive); found && !(conjunction && botAuthorGuard(node.Right)) {
+		if actor, found := spoofableBotGate(node.Left, positive); found && (!conjunction || !botAuthorGuard(node.Right)) {
 			return actor, true
 		}
-		if actor, found := spoofableBotGate(node.Right, positive); found && !(conjunction && botAuthorGuard(node.Left)) {
+		if actor, found := spoofableBotGate(node.Right, positive); found && (!conjunction || !botAuthorGuard(node.Left)) {
 			return actor, true
 		}
 		return "", false
