@@ -163,124 +163,29 @@ Invoke the `pr-triage` agent and capture its JSON response.
 Use the returned `change_type`, `recommended_skills`, `high_impact_files`, and `key_signals`.
 Apply the recommended skills in Step 4, prioritising the listed `high_impact_files`.
 
-**Fallback — never fail the review because of triage.** If the `pr-triage` call errors, times out, returns empty output, or returns text you cannot parse as the documented JSON shape, do **not** retry more than once and do **not** abort. Log one line noting that triage was unavailable, then apply the same classification logic described in the `pr-triage` agent definition (see the `change_type` categories and skill mapping below) directly against `/tmp/gh-aw/agent/pr-meta.json` and `/tmp/gh-aw/agent/pr-diff.patch`. For `high_impact_files`, fall back to the non-generated changed files with the largest `additions + deletions` in `pr-meta.json`, most-changed first, and treat `key_signals` as empty. Continue with Step 4 as normal, and mention in the Step 6 review body that skill selection used the fallback heuristic.
+**Fallback — never fail because of triage.** If the `pr-triage` call errors, times out, returns empty output, or returns unparseable text, do not retry more than once or abort. Load `triage-fallback` and continue with its fallback selection.
 
 ### Step 4: Review Using Selected Skills
 
-Focus your skill application on the `high_impact_files` from Step 3 (from `pr-triage`, or from the fallback heuristic when triage was unavailable).
-
-Apply the skill(s) to review the changed lines. For each issue you find:
-
-- **Identify the file and line number** in the diff
-- **Explain the issue** in terms of the skill's principles (e.g. missing test coverage per `/tdd`, unclear abstraction per `/codebase-design`)
-- **Provide a concrete suggestion** — what to do differently and why
-- **Keep it actionable** — the author should know exactly what to change
-
-Focus areas by skill:
-
-**`/diagnosing-bugs` guidance:**
-- Is the bug fix accompanied by a regression test?
-- Is the root cause properly addressed, or only the symptom?
-- Are error paths instrumented to surface future regressions?
-
-**`/tdd` guidance:**
-- Are there failing tests written before the implementation?
-- Do tests cover edge cases and boundary conditions?
-- Are test names descriptive — do they read as specifications?
-- Is test structure clear: Arrange / Act / Assert?
-
-**`/codebase-design` guidance:**
-- Does the change fit the broader architecture?
-- Are new abstractions consistent with existing patterns?
-- Could this change make the codebase harder to navigate?
-
-**`/improve-codebase-architecture` guidance:**
-- Are modules deep (simple interfaces, rich behaviour)?
-- Is the domain language used consistently?
-- Are there opportunities to simplify by removing layers?
-
-**`/grill-with-docs` guidance:**
-- Are new concepts named using the project's existing vocabulary?
-- Is the change clearly explained in the PR description?
-- Should a `CONTEXT.md` or ADR be updated?
+Load `review-guidance`. Review changed lines in selected high-impact files only; post findings only when they are specific and actionable.
 
 ### Step 5: Post Inline Review Comments
 
-For each issue found, create a review comment using the `safeoutputs` CLI from bash; do not call it as a native tool. Include `pull_request_number` in the JSON payload and send it on stdin:
-
-```bash
-printf '%s' '{"path":"path/to/file.ts","line":42,"pull_request_number":123,"body":"**[/tdd]** Missing edge case: `value` is `null` — add a test to prevent this regression.\n\n<details>\n<summary>💡 Suggested test</summary>\n\n```ts\nit(\u0027returns default when value is null\u0027, () => {\n  expect(fn(null)).toBe(defaultValue);\n});\n```\n\nMissing edge case tests are a common source of regressions.\n\n</details>\n\n@copilot please address this."}' | safeoutputs create_pull_request_review_comment .
-```
-
-Guidelines:
-- Encode every apostrophe in JSON string values as `\u0027` before wrapping the JSON in shell single quotes. Use only valid JSON escapes, never shell double quotes, and encode control characters (for example, newlines as `\n`) instead of including them raw.
-- Prefix each comment with the skill name in brackets: `**[/diagnosing-bugs]**`, `**[/tdd]**`, etc.
-- Keep the **immediately visible text brief** (1–2 sentences): state the issue and its impact
-- Wrap code examples, detailed explanations, and multi-step suggestions in `<details><summary>💡 …</summary>` blocks
-- Be specific: file path, line number, exact issue
-- Limit to the **10 most impactful** issues
-- End each inline comment with `@copilot please address this.` to prompt follow-up action
+Load `review-publication` before queuing comments. Post no more than 10 inline comments.
 
 ### Step 6: Submit the Overall Review
 
-Submit an overall review using the `safeoutputs` CLI from bash (do not call it as a native tool). Include `pull_request_number` and send the JSON payload on stdin:
+Use `review-publication` to submit exactly one overall review after queuing required comments. Choose `APPROVE`, `COMMENT`, or `REQUEST_CHANGES` based on findings.
 
-```bash
-printf '%s' '{"pull_request_number":123,"event":"COMMENT","body":"Review summary"}' | safeoutputs submit_pull_request_review .
-```
-
-Follow the same JSON/shell encoding rules as Step 5: encode apostrophes as `\u0027`, use only valid JSON escapes, never shell double quotes, and do not include raw control characters.
-
-- **`APPROVE`** — Changes are solid; only minor suggestions
-- **`REQUEST_CHANGES`** — There are important issues that should be addressed
-- **`COMMENT`** — Observations only; no blocking issues
-- If you choose **`APPROVE`**, submit the approval review first. Only add `create_check_run` when you have a concrete success summary that helps the author or merge queue; skip it otherwise.
-
-The review body should apply progressive disclosure — keep the immediately visible portion brief and collapse details:
-
-**Example review body:**
-
-```markdown
-### Skills-Based Review 🧠
-
-Applied **`/tdd`** and **`/codebase-design`** — requesting changes on test coverage gaps.
-
-<details>
-<summary>📋 Key Themes & Highlights</summary>
-
-#### Key Themes
-
-- **Test coverage gaps**: 3 new functions lack edge case tests
-- **Naming inconsistency**: New module uses different vocabulary from existing code
-
-#### Positive Highlights
-
-- ✅ Clean separation of concerns in the new module
-- ✅ Good use of early returns throughout
-
-</details>
-```
 
 ### Step 7: Post a Summary Comment (optional)
 
-If the review is complex or the overall findings are significant, post a single `add-comment` with a concise summary for the author. Apply progressive disclosure: one-line outcome visible, details in `<details>` blocks.
-Use `###` or lower for any headers — never `#` or `##`.
-Include `@copilot please address the review comments above.` at the end of the comment body to prompt follow-up action.
+For complex reviews only, post one concise summary comment using `###` or lower headings and progressive disclosure.
 
 ### Scope Rules
 
-- **Review changed lines only** — do not critique unchanged code
-- **Prioritise impact** — security > correctness > maintainability > style
-- **Maximum 10 inline comments** — pick the highest-value issues
-- **Skip auto-generated files** — lock files, generated code, build artifacts
-- **Be constructive** — suggest improvements, not just problems
-
-### Tone
-
-- Professional and collegial — not grumpy, not sycophantic
-- Reference skills by name so the author can learn more
-- Celebrate good decisions as well as flagging problems
-- Keep comments concise: aim for 2–4 sentences per comment
+- Review changed lines only; prioritize security, correctness, maintainability, then style, and skip generated files.
+- Keep comments professional, constructive, and concise.
 
 Now begin your review! 🧠
 ## agent: `pr-triage`
@@ -339,3 +244,41 @@ Return JSON only (no markdown) in this exact shape:
   ]
 }
 ```
+
+## skill: `triage-fallback`
+---
+description: Select review skills when the pr-triage agent fails.
+---
+Read `/tmp/gh-aw/agent/pr-meta.json` and `/tmp/gh-aw/agent/pr-diff.patch`. Classify the change using the `change_type` categories and skill mapping in the `pr-triage` agent definition. Rank non-generated changed files by `additions + deletions`, most-changed first, and treat `key_signals` as empty. Log that triage was unavailable and mention in the overall review that skills were selected by this fallback. Continue normally.
+
+## skill: `review-guidance`
+---
+description: Apply selected engineering skills to changed lines.
+---
+Focus on Step 3's high-impact files. For each finding, identify its changed line, explain the concrete risk, and suggest an actionable fix.
+
+- `/diagnosing-bugs`: check regression tests, root-cause fixes, and useful error-path evidence.
+- `/tdd`: check edge cases, boundary tests, descriptive names, and clear Arrange/Act/Assert structure.
+- `/codebase-design`: check architectural fit, consistent abstractions, and navigability.
+- `/improve-codebase-architecture`: check module depth, domain language, and simplification opportunities.
+- `/grill-with-docs`: check terminology, the PR explanation, and whether context docs or an ADR need updating.
+
+## skill: `review-publication`
+---
+description: Format and submit inline comments and one overall pull request review.
+---
+Use `safeoutputs` from bash, not as a native tool. For each inline comment, include `pull_request_number` and send a JSON payload on stdin. The command shape is:
+
+```bash
+printf '%s' '{"path":"path/to/file.ts","line":42,"pull_request_number":123,"body":"**[/tdd]** Specific issue and fix."}' | safeoutputs create_pull_request_review_comment .
+```
+
+Encode apostrophes in JSON strings as `\u0027`; use valid JSON escapes for newlines and other control characters, never shell double quotes. Prefix the brief visible finding with the relevant skill name, use a `<details>` block for longer examples, and end with `@copilot please address this.` Keep at most 10 high-impact comments.
+
+Submit exactly one overall review using the same JSON/shell rules:
+
+```bash
+printf '%s' '{"pull_request_number":123,"event":"COMMENT","body":"Review summary"}' | safeoutputs submit_pull_request_review .
+```
+
+Use `APPROVE` only for solid changes with minor suggestions, `REQUEST_CHANGES` for important issues, and `COMMENT` for observations. Keep the visible review summary brief with details collapsed. Submit approvals before any optional `create_check_run`, and create a check only when its success summary is useful.

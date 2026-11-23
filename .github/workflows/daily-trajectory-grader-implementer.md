@@ -28,28 +28,89 @@ engine:
   copilot-sdk: true
 skip-if-decision:
   - >-
-    Do @.github/workflows/shared/graders/README.md and
-    @/tmp/gh-aw/agent/trajectory-grader-files.txt conclusively establish that
-    all 25 catalog graders are Implemented and every catalog ID already has
-    its shared fragment, leaving no net-new grader to implement? Abstain if
-    catalog statuses and files disagree or any eligible Not started entry remains.
+    Does @/tmp/gh-aw/agent/trajectory-grader-selection.txt report
+    state=complete and catalog_entries=25? Abstain if the selection report is
+    missing, malformed, or reports any other state.
 strict: true
 timeout-minutes: 25
 
 steps:
-  - name: Collect existing grader fragment inventory
+  - name: Prepare trajectory grader selection
     run: |
       set -euo pipefail
       mkdir -p /tmp/gh-aw/agent
-      find .github/workflows/shared/graders -maxdepth 1 -type f -name "*.md" \
-        | sort > /tmp/gh-aw/agent/trajectory-grader-files.txt
+      python3 - <<'PY'
+      from pathlib import Path
+      import re
+
+      graders = Path(".github/workflows/shared/graders")
+      rows = []
+      tier = ""
+      for line in (graders / "README.md").read_text(encoding="utf-8").splitlines():
+          heading = re.match(r"^## (Tier \d+) —", line)
+          if heading:
+              tier = heading.group(1)
+              continue
+          row = re.match(r"^\|\s*(\d+)\s*\|\s*`([^`]+)`\s*\|\s*([^|]+)\|\s*([^|]+)\|$", line)
+          if row:
+              rank, grader_id, requirement, status = row.groups()
+              rows.append({
+                  "rank": rank.strip(),
+                  "id": grader_id.strip(),
+                  "requirement": requirement.strip(),
+                  "status": status.strip(),
+                  "tier": tier,
+              })
+
+      fragment_ids = {
+          path.stem for path in graders.glob("*.md")
+          if path.name not in {"README.md", "trajectory-ir.md"}
+      }
+      ids = [row["id"] for row in rows]
+      inconsistent = [
+          row["id"] for row in rows
+          if row["status"] not in {"Implemented", "Not started"}
+          or (row["status"] == "Implemented") != (row["id"] in fragment_ids)
+      ]
+      candidates = [
+          row for row in rows
+          if row["status"] == "Not started" and row["id"] not in fragment_ids
+      ]
+
+      if len(rows) != 25 or len(set(ids)) != len(ids):
+          state = "unknown"
+      elif inconsistent:
+          state = "inconsistent"
+      elif candidates:
+          state = "ready"
+      else:
+          state = "complete"
+
+      report = [
+          f"state={state}",
+          f"catalog_entries={len(rows)}",
+          f"fragment_count={len(fragment_ids)}",
+      ]
+      if candidates:
+          selected = candidates[0]
+          report.extend([
+              f"next_id={selected['id']}",
+              f"next_rank={selected['rank']}",
+              f"next_tier={selected['tier']}",
+              f"next_requirement={selected['requirement']}",
+          ])
+      if inconsistent:
+          report.append("inconsistent_ids=" + ",".join(inconsistent))
+      Path("/tmp/gh-aw/agent/trajectory-grader-selection.txt").write_text(
+          "\n".join(report) + "\n", encoding="utf-8"
+      )
+      PY
 
 tools:
   bash:
+    - "cat .github/workflows/shared/graders/README.md"
+    - "cat .github/workflows/shared/graders/trajectory-ir.md"
     - "find .github/workflows/shared/graders -maxdepth 1 -type f -name \"*.md\" | sort"
-    - "cat .github/workflows/shared/graders/*.md"
-    - "cat .github/workflows/shared/aw-logs-24h-fetch-prompt.md"
-    - "find .github/workflows/shared -maxdepth 1 -type f -name \"*.md\" | sort"
   edit:
 
 safe-outputs:
@@ -74,8 +135,8 @@ evals:
 
 # Daily Trajectory Grader Implementer
 
-The AWF decision gate checks the catalog against the prepared fragment inventory
-and may skip when all 25 graders are implemented. Inconsistent evidence still runs.
+The setup step prepares a compact selection report. The AWF decision gate skips
+only when it confirms all 25 catalog entries are implemented and have fragments.
 
 You are a deterministic-grader engineer. Your mission is to ship exactly one
 new grader per run from the ranked catalog in
@@ -83,31 +144,26 @@ new grader per run from the ranked catalog in
 agentic workflow component file, without touching any other part of the
 repository.
 
-## Step 1 — Read the catalog and the IR contract
+## Step 1 — Read the prepared selection and IR contract
 
-1. Read `.github/workflows/shared/graders/README.md` in full.
-2. Read `.github/workflows/shared/graders/trajectory-ir.md` in
-   full — every grader you write MUST be expressed as a projection over
+1. Read `/tmp/gh-aw/agent/trajectory-grader-selection.txt`.
+2. Read `.github/workflows/shared/graders/trajectory-ir.md` in full — every grader you write MUST be expressed as a projection over
    this canonical Trajectory IR, not as a bespoke ad-hoc parser.
-3. List the existing grader files with
-   `find .github/workflows/shared/graders -maxdepth 1 -type f -name "*.md" | sort`.
-   `README.md` and `trajectory-ir.md` are not graders.
 
 ## Step 2 — Select the next grader
 
-Walk the catalog **tier-first, then rank-within-tier**: all of Tier 1
-top-to-bottom, then all of Tier 2, then all of Tier 3, exactly as the
-three tables are ordered in the README (ranks are not contiguous within a
-tier — do not simply sort by rank number 1 through 25). Select the first
-grader ID that:
+When the report says `state=ready`, use its `next_id`, `next_rank`,
+`next_tier`, and `next_requirement`; the setup step has selected the first
+eligible grader in catalog order. Do not reread the catalog or grader fragments.
 
-- does **not** already have a `shared/graders/<id>.md` file, and
-- is marked `Not started` in the catalog table.
+If the report says `state=complete`, call `noop` with reason
+"all 25 catalog graders implemented" and stop.
 
-If every grader already has a file and the table shows all 25 as
-`Implemented`, call `noop` with reason "all 25 catalog graders implemented"
-and stop. Do not re-implement or "improve" an existing grader file in this
-workflow — one net-new grader per run only.
+If the report says `state=inconsistent` or `state=unknown`, inspect the catalog
+and fragment inventory with the allowed commands and apply the original
+tier-first selection rule. If the evidence cannot establish a valid candidate,
+call `noop` with a clear reason. Never re-implement or improve an existing
+grader; implement at most one net-new grader per run.
 
 ## Step 3 — Configure the built-in grader as a shared fragment
 
