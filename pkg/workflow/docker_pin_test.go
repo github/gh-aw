@@ -499,6 +499,11 @@ func TestResolveMCPGatewayContainerImagePreservesDigest(t *testing.T) {
 		require.Contains(t, pin.PinnedImage, "@sha256:")
 		assert.Equal(t, pin.PinnedImage, resolveMCPGatewayContainerImage(constants.DefaultGhAwNodeImage, nil))
 	})
+	t.Run("default gateway reviewed digest", func(t *testing.T) {
+		image := string(constants.DefaultMCPGatewayContainer) + ":" + string(constants.DefaultMCPGatewayVersion)
+		assert.Equal(t, image+"@sha256:716b41d53a20660e945c351c08140380430d65d98d3263596e45114c29fa7a43",
+			resolveMCPGatewayContainerImage(image, nil))
+	})
 	t.Run("mapped digest", func(t *testing.T) {
 		data := &WorkflowData{ContainerPinMappings: map[string]string{image: pinned}}
 		assert.Equal(t, pinned, resolveMCPGatewayContainerImage(image, data))
