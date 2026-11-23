@@ -234,6 +234,9 @@ func (c *Compiler) collectEngineVersionsForMetadata(data *WorkflowData) map[stri
 	if mainEngineID == "" {
 		mainEngineID = string(constants.DefaultEngine)
 	}
+	if mainEngineID == string(constants.CopilotEngine) {
+		versions[mainEngineID] = getDefaultCopilotCLIVersion(data)
+	}
 	activeEngineIDs := map[string]struct{}{mainEngineID: {}}
 
 	applyMetadataEngineVersionOverrides(versions, data.EngineConfig, mainEngineID)

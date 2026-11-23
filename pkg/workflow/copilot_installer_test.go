@@ -37,9 +37,11 @@ func TestCopilotSDKCompanionCLIPin(t *testing.T) {
 				lines = append(lines, step...)
 			}
 			require.Contains(t, strings.Join(lines, "\n"), `install_copilot_cli.sh" `+tt.wantPin+" --")
-			registry := NewCompiler().engineRegistry
+			compiler := NewCompiler()
+			registry := compiler.engineRegistry
 			require.Equal(t, tt.wantVersion, getInstallationVersion(data, engine, registry))
 			require.Equal(t, tt.wantVersion, getVersionForSetup(data, registry))
+			require.Equal(t, tt.wantVersion, compiler.collectEngineVersionsForMetadata(data)["copilot"])
 		})
 	}
 }
