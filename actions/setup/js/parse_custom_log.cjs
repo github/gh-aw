@@ -14,9 +14,10 @@ const main = createEngineLogParser({
  * Parses custom engine log content by attempting multiple parser strategies
  * @param {string} logContent - The raw log content as a string
  * @param {string} [engine=""] - Explicitly selected behavior-defined engine
+ * @param {{render?: boolean}} [options]
  * @returns {{markdown: string, mcpFailures: string[], maxTurnsHit: boolean, logEntries: Array}} Result with formatted markdown content, MCP failure list, max-turns status, and parsed log entries
  */
-function parseCustomLog(logContent, engine = "") {
+function parseCustomLog(logContent, engine = "", options = {}) {
   if (engine) {
     const parsed = require("./engine_log_parser.cjs").parseBehaviorLog(logContent, engine);
     if (parsed) return parsed;
@@ -55,7 +56,7 @@ function parseCustomLog(logContent, engine = "") {
   );
   if (claudeSignature) {
     const claudeModule = require("./parse_claude_log.cjs");
-    const claudeResult = claudeModule.parseClaudeLog(logContent);
+    const claudeResult = claudeModule.parseClaudeLog(logContent, options);
 
     // If we got meaningful results from Claude parser, use them
     if (claudeResult && claudeResult.logEntries && claudeResult.logEntries.length > 0) {
@@ -72,7 +73,7 @@ function parseCustomLog(logContent, engine = "") {
   const codexSignature =
     codexModule.isCodexJsonlFormat([], entries) || /^(?:OpenAI Codex\b|model:\s+\S|thinking\s*$|tool\s+\w+\.\w+\(|ERROR:\s+\S)|ToolCall:\s+\w+__\w+|^\[.*?\]\s+(?:tool\s+\w+\.\w+\(|exec\s+bash\s+-lc\s+')/m.test(logContent);
   if (codexSignature) {
-    const codexResult = codexModule.parseCodexLog(logContent, entries);
+    const codexResult = codexModule.parseCodexLog(logContent, entries, options);
 
     // Check if we got meaningful content
     if (codexResult && codexResult.logEntries.length > 0) {
