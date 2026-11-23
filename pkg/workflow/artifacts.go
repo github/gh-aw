@@ -51,30 +51,7 @@ func buildArtifactDownloadSteps(config ArtifactDownloadConfig, pinAction func(st
 		steps = append(steps, fmt.Sprintf("        if: %s\n", config.IfCondition))
 		artifactsLog.Printf("Added conditional: %s", config.IfCondition)
 	}
-	continueOnError := true
-	if config.ContinueOnError != nil {
-		continueOnError = *config.ContinueOnError
-	}
-	if continueOnError {
-		steps = append(steps, "        continue-on-error: true\n")
-	}
-	downloadAction := pinAction("actions/download-artifact")
-	steps = append(steps, fmt.Sprintf("        uses: %s\n", downloadAction))
-	steps = append(steps, "        with:\n")
-	if config.FallbackArtifact != "" {
-		if downloadArtifactSupportsPattern(downloadAction) {
-			// Match both artifacts with a single brace-expanded pattern and merge their contents into
-			// the download path. The primary artifact may be missing when its (best-effort) upload
-			// failed; the fallback artifact then supplies the critical files.
-			steps = append(steps, fmt.Sprintf("          pattern: \"{%s,%s}\"\n", config.ArtifactName, config.FallbackArtifact))
-			steps = append(steps, "          merge-multiple: true\n")
-		} else {
-			steps = append(steps, fmt.Sprintf("          name: %s\n", config.ArtifactName))
-		}
-	} else {
-		steps = append(steps, fmt.Sprintf("          name: %s\n", config.ArtifactName))
-	}
-	steps = append(steps, fmt.Sprintf("          path: %s\n", config.DownloadPath))
+	steps = append(steps, buildArtifactDownloadInputs(config, pinAction)...)
 
 	// Add environment variable setup if requested
 	if config.SetupEnvStep {
@@ -99,6 +76,35 @@ func buildArtifactDownloadSteps(config ArtifactDownloadConfig, pinAction func(st
 		steps = append(steps, "          fi\n")
 	}
 
+	return steps
+}
+
+func buildArtifactDownloadInputs(config ArtifactDownloadConfig, pinAction func(string) string) []string {
+	var steps []string
+	continueOnError := true
+	if config.ContinueOnError != nil {
+		continueOnError = *config.ContinueOnError
+	}
+	if continueOnError {
+		steps = append(steps, "        continue-on-error: true\n")
+	}
+	downloadAction := pinAction("actions/download-artifact")
+	steps = append(steps, fmt.Sprintf("        uses: %s\n", downloadAction))
+	steps = append(steps, "        with:\n")
+	if config.FallbackArtifact != "" {
+		if downloadArtifactSupportsPattern(downloadAction) {
+			// Match both artifacts with a single brace-expanded pattern and merge their contents into
+			// the download path. The primary artifact may be missing when its (best-effort) upload
+			// failed; the fallback artifact then supplies the critical files.
+			steps = append(steps, fmt.Sprintf("          pattern: \"{%s,%s}\"\n", config.ArtifactName, config.FallbackArtifact))
+			steps = append(steps, "          merge-multiple: true\n")
+		} else {
+			steps = append(steps, fmt.Sprintf("          name: %s\n", config.ArtifactName))
+		}
+	} else {
+		steps = append(steps, fmt.Sprintf("          name: %s\n", config.ArtifactName))
+	}
+	steps = append(steps, fmt.Sprintf("          path: %s\n", config.DownloadPath))
 	return steps
 }
 
