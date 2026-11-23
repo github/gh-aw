@@ -7211,7 +7211,7 @@
           light(nid);
         }
       },
-      el: h("section", { class: "slide" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Processes create factories"), h("h2", { class: "pf-h" }, letters("Turn Workflows into "), letters("Factories", "l-grad"))), svg),
+      el: h("section", { class: "slide" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "A Factory of Factories"), h("h2", { class: "pf-h" }, letters("Turn Workflows into "), letters("Factories", "l-grad"))), svg),
     });
   }
   // Repo widget: repo octicon, name and star count. Shows the snapshot default; on the published https page it
