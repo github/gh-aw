@@ -25188,7 +25188,7 @@
     platform: ["Agentic Workflows", "AI-Powered workflows for GitHub"],
     security: ["Security", "Assume the agent is compromised"],
     process: ["Human agent processes", "Engineer processes, not code"],
-    cost: ["FinOps", "Debug, spend less, route smarter", "cost-optimization"],
+    cost: ["FinOps", "More value, less tokens", "cost-optimization"],
     engineering: ["Agentic Engineering", "Skip, remember, chain, measure"],
     enterprise: ["Enterprise", "Any agent, any provider, any scale"],
     cao: ["Central Agentic Ops", "CAO · gh cao · research prototype"],
