@@ -712,7 +712,7 @@ jobs:
 
 ### BYOK (Bring Your Own Key)
 
-A Copilot engine mode that routes AI requests to an external LLM provider (such as OpenAI, Anthropic, or a self-hosted Ollama/vLLM instance) instead of the default GitHub Copilot backend. Activated by setting `COPILOT_PROVIDER_BASE_URL` in `engine.env`. The three BYOK credential variables (`COPILOT_PROVIDER_BASE_URL`, `COPILOT_PROVIDER_API_KEY`, `COPILOT_PROVIDER_BEARER_TOKEN`) accept `${{ secrets.* }}` references under strict mode and are never exposed to the agent container. gh-aw automatically adds the provider hostname to the AWF allow-list when it can resolve a literal BYOK URL, and otherwise reuses the concrete provider hostname from `network.allowed` for the threat-detection Copilot step. Use `COPILOT_MODEL` to specify the target model. See [AI Engines Reference](/gh-aw/reference/engines/copilot/#copilot-bring-your-own-key-byok-mode).
+A Copilot engine mode that routes AI requests to an external LLM provider (such as OpenAI, Anthropic, or a self-hosted Ollama/vLLM instance) instead of the default GitHub Copilot backend. Activated by setting `COPILOT_PROVIDER_BASE_URL` in `engine.env`. The three BYOK credential variables (`COPILOT_PROVIDER_BASE_URL`, `COPILOT_PROVIDER_API_KEY`, `COPILOT_PROVIDER_BEARER_TOKEN`) accept `${{ secrets.* }}` references under strict mode and are never exposed to the agent container. The provider hostname is allowed automatically: gh-aw adds literal BYOK URLs at compile time, and AWF v0.25.41+ resolves `${{ secrets.* }}`/`${{ vars.* }}` values at runtime and allows exactly that host. Use `COPILOT_MODEL` to specify the target model. See [AI Engines Reference](/gh-aw/reference/engines/copilot/#copilot-bring-your-own-key-byok-mode).
 
 ### Cron Schedule
 

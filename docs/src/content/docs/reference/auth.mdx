@@ -555,7 +555,7 @@ The `ANTHROPIC_API_KEY` secret is missing, expired, or invalid. Verify the key i
 
 **`401 Unauthorized` or `403 Forbidden` (Codex)**
 
-The `OPENAI_API_KEY` (or `CODEX_API_KEY`) secret is missing, expired, or has insufficient quota. Verify the key at https://platform.openai.com/api-keys. If using a custom endpoint, confirm `OPENAI_BASE_URL` points to a reachable host and that the host is listed under `network.allowed`.
+The `OPENAI_API_KEY` (or `CODEX_API_KEY`) secret is missing, expired, or has insufficient quota. Verify the key at https://platform.openai.com/api-keys. If using a custom endpoint, confirm `OPENAI_BASE_URL` points to a reachable host. The firewall allows the configured host automatically (including `${{ vars.* }}`/`${{ secrets.* }}` values resolved at runtime), so broad `network.allowed` entries are unnecessary. If `sandbox.agent.version` pins an older AWF version, list the exact host in `network.allowed`.
 
 **`401 Unauthorized` (Gemini)**
 
