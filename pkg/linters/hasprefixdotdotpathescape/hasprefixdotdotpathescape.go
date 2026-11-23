@@ -96,7 +96,7 @@ func isPathLikeName(name string) bool {
 	runes := []rune(name)
 	start := 0
 	for i := 1; i < len(runes); i++ {
-		current, previous := runes[i], runes[i-1]
+		current, previous := runes[i], runes[i-1] //nolint:uncheckedsliceindex // The loop bounds both indexes.
 		if !unicode.IsLetter(current) && !unicode.IsDigit(current) {
 			if isPathNameComponent(runes[start:i]) {
 				return true
@@ -107,7 +107,7 @@ func isPathLikeName(name string) bool {
 				return true
 			}
 			start = i
-		} else if unicode.IsUpper(previous) && unicode.IsUpper(current) && i+1 < len(runes) && unicode.IsLower(runes[i+1]) {
+		} else if unicode.IsUpper(previous) && unicode.IsUpper(current) && i+1 < len(runes) && unicode.IsLower(runes[i+1]) { //nolint:uncheckedsliceindex // The condition checks i+1 is in range.
 			if isPathNameComponent(runes[start:i]) {
 				return true
 			}
