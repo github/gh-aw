@@ -1,5 +1,6 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
+const { spawnSync } = require("node:child_process");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
@@ -543,6 +544,24 @@ test("github-script entry point revalidates live evidence and previews short def
     },
   };
   await withPlanArtifact(value, () => publish({ github: previewGithub([issue(1), issue(2)]), context: { repo: { owner: "github", repo: "gh-aw" }, runId: 123 }, core }));
+});
+
+test("validator CLI rejects an incremental draft until all eligible issues are covered", async () => {
+  const draft = { ...plan(cluster([1])), shortfall_reason: "Only one finding has enough evidence for an assignment." };
+  await withPlanArtifact(draft, ({ dir, planFile }) => {
+    const corpusFile = path.join(dir, "corpus.json");
+    fs.writeFileSync(corpusFile, JSON.stringify(buildCorpus(repo, [issue(1), issue(2)], [], cutoff)));
+    const validate = () => spawnSync(process.execPath, [require.resolve("./aw_issue_clustering_publish.cjs"), "--repo", repo, "--corpus", corpusFile, "--plan", planFile], { encoding: "utf8", timeout: 5000 });
+    const partial = validate();
+    assert.equal(partial.status, 1, partial.error?.message);
+    assert.match(partial.stderr, /Every eligible AW issue must be clustered or explicitly deferred/);
+
+    draft.deferred.push({ number: 2, reason: "The linked report does not establish a current failure." });
+    fs.writeFileSync(planFile, JSON.stringify(draft));
+    const complete = validate();
+    assert.equal(complete.status, 0, complete.error?.message ?? complete.stderr);
+    assert.match(complete.stdout, /Validated 1 clusters; complete coverage of 2 AW issues/);
+  });
 });
 
 test("450-source plans larger than 10 KB publish from artifacts with full deferral reasons", async () => {
