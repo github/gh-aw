@@ -100,6 +100,7 @@ func TestConcludeThreatDetectionScript_RecordedVerdict(t *testing.T) {
 		{name: "last terminal line clears stale classification", log: "THREAT_DETECTION_STATUS: reason=invalid_report_exhausted exit=2\nTHREAT_DETECTION_STATUS:\n", reason: "agent_failure"},
 		{name: "mismatched companion", verdict: strings.Replace(cleanDetectionVerdict, "[]", `["legacy explanation"]`, 1), full: `{"prompt_injection":true,"secret_leak":false,"malicious_patch":false,"reasons":["discarded companion details"]}`, diagnostic: "legacy explanation"},
 		{name: "compatible companion and structured warning", verdict: strings.TrimSuffix(cleanDetectionVerdict, "}") + `,"warnings":[{"field":"patch","code":"ERR_VALIDATION","message":"partial inspection"}]}`, full: strings.Replace(cleanDetectionVerdict, "[]", `["full explanation\r\n::notice::just reason text\n##[warning] inert"]`, 1), diagnostic: "full explanation"},
+		{name: "command delimiters in diagnostics", verdict: strings.Replace(cleanDetectionVerdict, "[]", `["prefix ::stop-commands::token"]`, 1), diagnostic: `prefix :\:`},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			dir := t.TempDir()
@@ -133,6 +134,7 @@ func TestConcludeThreatDetectionScript_RecordedVerdict(t *testing.T) {
 					require.NotContains(t, got.log, "discarded companion details")
 					require.NotContains(t, got.log, "untrusted-log-text")
 					require.NotContains(t, got.log, "##[")
+					require.NotContains(t, got.log, "::stop-commands::")
 					for line := range strings.SplitSeq(got.log, "\n") {
 						require.False(t, strings.HasPrefix(strings.TrimSpace(line), "::notice::"), "unexpected command: %s", line)
 					}
@@ -143,6 +145,29 @@ func TestConcludeThreatDetectionScript_RecordedVerdict(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestConcludeThreatDetectionScript_V053Fixtures(t *testing.T) {
+	script := stageConclusionScript(t)
+	dir := t.TempDir()
+	fixtures := filepath.Join("testdata", "threat-detect-v053")
+	for _, file := range []string{"detection_result.json", "detection_result_full.json", "invalid.log"} {
+		data, err := os.ReadFile(filepath.Join(fixtures, file))
+		require.NoError(t, err)
+		writeConclusionInput(t, filepath.Join(dir, file), string(data))
+	}
+	result := filepath.Join(dir, "detection_result.json")
+	got := runConclusion(t, "bash", []string{script, result})
+	require.Equal(t, 1, got.exit, got.log)
+	require.Equal(t, "threat_detected", got.outputs["reason"])
+	require.Equal(t, "secret_leak", got.outputs["threat_kinds"])
+	require.Contains(t, got.log, "private producer explanation")
+	require.Contains(t, got.log, "field=prompt_import_tree code=ERR_VALIDATION")
+	require.NoError(t, os.Remove(result))
+	got = runConclusion(t, "bash", []string{script, result}, "DETECTION_LOG_FILE="+filepath.Join(dir, "invalid.log"))
+	require.Equal(t, 0, got.exit, got.log)
+	require.Equal(t, "warning", got.outputs["conclusion"])
+	require.Equal(t, "parse_error", got.outputs["reason"])
 }
 
 // Use the pinned detector built from its release source, without requiring a
@@ -263,6 +288,38 @@ func TestConcludeThreatDetectionScript_HostOutcomes(t *testing.T) {
 			require.Empty(t, got.env, "early wrapper outcomes historically do not export variables")
 			require.Contains(t, got.summary, tc.summary)
 			require.NotContains(t, got.log, "Threat detection verdict")
+		})
+	}
+}
+
+func TestConcludeThreatDetectionScript_MissingNode(t *testing.T) {
+	script := stageConclusionScript(t)
+	result := filepath.Join(t.TempDir(), "detection_result.json")
+	for _, tc := range []struct {
+		name, verdict, conclusion, reason string
+		exit                              int
+		env                               []string
+	}{
+		{"skipped", "", "skipped", "", 0, []string{"RUN_DETECTION=false", "THREAT_DETECT_INSTALL_OUTCOME=skipped"}},
+		{"install failure warn", "", "warning", "agent_failure", 0, []string{"AWF_INSTALL_OUTCOME=failure"}},
+		{"install failure strict", "", "failure", "agent_failure", 1, []string{"AWF_INSTALL_OUTCOME=failure", "GH_AW_DETECTION_CONTINUE_ON_ERROR=false"}},
+		{"quota", "", "warning", "github_api_quota_exhausted", 0, []string{"AWF_INSTALL_OUTCOME=failure", "GH_AW_GITHUB_API_QUOTA_BLOCKED=remaining=0"}},
+		{"missing verdict", "", "warning", "agent_failure", 0, nil},
+		{"unreadable verdict", cleanDetectionVerdict, "failure", "agent_failure", 1, nil},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			_ = os.Remove(result)
+			if tc.verdict != "" {
+				writeConclusionInput(t, result, tc.verdict)
+			}
+			env := append([]string{"PATH="}, tc.env...)
+			got := runConclusion(t, "/bin/bash", []string{script, result}, env...)
+			require.Equal(t, tc.exit, got.exit, got.log)
+			require.Equal(t, tc.conclusion, got.outputs["conclusion"])
+			require.Equal(t, tc.reason, got.outputs["reason"])
+			if tc.name == "quota" {
+				require.Contains(t, got.summary, "GitHub API quota exhausted")
+			}
 		})
 	}
 }

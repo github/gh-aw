@@ -101,7 +101,10 @@ function readFailureStatus(file) {
 }
 
 function safeLine(text) {
-  return text.replaceAll("##[", "##\\[").replace(/[\p{Cc}\u2028\u2029]/gu, char => `\\u${char.charCodeAt(0).toString(16).padStart(4, "0")}`);
+  return text
+    .replaceAll("::", ":\\:")
+    .replaceAll("##[", "##\\[")
+    .replace(/[\p{Cc}\u2028\u2029]/gu, char => `\\u${char.charCodeAt(0).toString(16).padStart(4, "0")}`);
 }
 
 function annotate(level, message) {
