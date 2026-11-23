@@ -217,6 +217,8 @@ function eventDetail(event) {
       return fields(data, ["stage", "routed", "outcome", "selectedModel", "selectedEffort", "router"]);
     case "model_routing.outcome":
       return fields(data, ["status", "wireModel", "effectiveEndpoint", "selectedEndpoint", "effort", "appliedEffort", "failureCode"]);
+    case "routing.observation":
+      return fields(data, ["outcome", "reason"]);
     case "model.inventory":
       return fields(data, ["endpoints", "modelsFetchComplete"]);
     case "model_endpoint.mismatch":
