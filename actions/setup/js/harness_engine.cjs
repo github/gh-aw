@@ -52,6 +52,8 @@ const { parseMaxAICreditsExceededFromAuditLog } = require("./ai_credits_context.
 /**
  * Create the engine-agnostic retry runtime: shared retry configuration, soft deadline,
  * retry telemetry and safe-outputs offsets around {@link runHarnessRetryLoop}.
+ * `softDeadlineStart: "run"` restarts the driver clock and soft deadline when `run()` enters
+ * the retry loop, so pre-flight time does not count against the retry budget.
  * @param {{
  *   harnessName: string,
  *   log: (message: string) => void,
@@ -59,6 +61,7 @@ const { parseMaxAICreditsExceededFromAuditLog } = require("./ai_credits_context.
  *   resolveRetryConfig?: (env: NodeJS.ProcessEnv, log: (message: string) => void) => HarnessRetryConfig,
  *   safeOutputsOffset?: (safeOutputsPath: string) => number,
  *   driverStartTime?: number,
+ *   softDeadlineStart?: "harness" | "run",
  * }} options
  */
 function createHarnessRuntime(options) {
@@ -66,9 +69,13 @@ function createHarnessRuntime(options) {
   const env = options.env ?? process.env;
   const retryConfig = (options.resolveRetryConfig ?? resolveSharedRetryConfig)(env, log);
   const safeOutputsOffset = options.safeOutputsOffset ?? getSafeOutputsByteOffset;
-  // The soft deadline includes pre-flight time; the same deadline is checked between and during attempts.
-  const driverStartTime = options.driverStartTime ?? Date.now();
+  // The same deadline is checked between and during attempts; engines keep a reference to this guard.
+  let driverStartTime = options.driverStartTime ?? Date.now();
   const softTimeoutGuard = buildSoftTimeoutGuard(driverStartTime, env);
+  const restartDriverClock = () => {
+    driverStartTime = Date.now();
+    if (softTimeoutGuard) Object.assign(softTimeoutGuard, buildSoftTimeoutGuard(driverStartTime, env));
+  };
   const safeOutputsPath = env.GH_AW_SAFE_OUTPUTS || "";
 
   /**
@@ -102,8 +109,9 @@ function createHarnessRuntime(options) {
    * before it started; the offset is also recorded on the attempt result.
    * @param {HarnessRunOptions & { maxRetries?: number }} runOptions
    */
-  const run = runOptions =>
-    runHarnessRetryLoop({
+  const run = runOptions => {
+    if (options.softDeadlineStart === "run") restartDriverClock();
+    return runHarnessRetryLoop({
       telemetryPath: resolveHarnessRetryTelemetryPath(env),
       maxRetries: runOptions.maxRetries ?? retryConfig.maxRetries,
       initialDelayMs: retryConfig.initialDelayMs,
@@ -122,8 +130,22 @@ function createHarnessRuntime(options) {
       },
       handleFailure: runOptions.handleFailure,
     });
+  };
 
-  return { harnessName, log, env, retryConfig, safeOutputsPath, driverStartTime, softTimeoutGuard, snapshotSafeOutputs, postResultWatchdog, attemptWroteTerminalSafeOutput, run };
+  return {
+    harnessName,
+    log,
+    env,
+    retryConfig,
+    safeOutputsPath,
+    get driverStartTime() {
+      return driverStartTime;
+    },
+    softTimeoutGuard,
+    postResultWatchdog,
+    attemptWroteTerminalSafeOutput,
+    run,
+  };
 }
 
 /**
@@ -138,6 +160,7 @@ function createHarnessRuntime(options) {
  *   argv?: string[],
  *   resolveRetryConfig?: (env: NodeJS.ProcessEnv, log: (message: string) => void) => HarnessRetryConfig,
  *   safeOutputsOffset?: (safeOutputsPath: string) => number,
+ *   softDeadlineStart?: "harness" | "run",
  *   exit?: (code: number) => void,
  * }} options
  */
@@ -160,6 +183,9 @@ function startEngineHarness(options) {
 
   return {
     ...runtime,
+    get driverStartTime() {
+      return runtime.driverStartTime;
+    },
     engine,
     command,
     args,

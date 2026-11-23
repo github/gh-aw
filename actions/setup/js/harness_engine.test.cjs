@@ -118,6 +118,59 @@ describe("harness_engine", () => {
     });
   });
 
+  describe("soft deadline clock", () => {
+    const HARNESS_START = Date.parse("2026-01-01T00:00:00Z");
+    // GH_AW_TIMEOUT_MINUTES=2 leaves a 30s soft budget after the 90s reserve.
+    const SOFT_BUDGET_MS = 30_000;
+    const PREFLIGHT_MS = SOFT_BUDGET_MS + 1_000;
+
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(HARNESS_START);
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    /** @param {"harness" | "run"} [softDeadlineStart] */
+    const startAndRunAfterPreflight = async softDeadlineStart => {
+      const harness = startEngineHarness({
+        engine: "demo",
+        harnessName: "Demo harness",
+        log,
+        env: { ...process.env, GH_AW_TIMEOUT_MINUTES: "2" },
+        argv: ["node", "demo_harness.cjs", "agent"],
+        resolveRetryConfig: FIXED_RETRY_CONFIG,
+        softDeadlineStart,
+      });
+      if (!harness) throw new Error("expected harness");
+      const guard = harness.softTimeoutGuard;
+      vi.setSystemTime(HARNESS_START + PREFLIGHT_MS);
+      const runAttempt = vi.fn(async () => ({ exitCode: 0, output: "ok", hasOutput: true }));
+      const outcome = await harness.run({ runAttempt, handleFailure: () => ({ action: "stop" }) });
+      return { harness, guard, runAttempt, outcome };
+    };
+
+    it("counts pre-flight time against the soft deadline by default", async () => {
+      const { guard, runAttempt, outcome } = await startAndRunAfterPreflight();
+      expect(guard?.softDeadlineMs).toBe(HARNESS_START + SOFT_BUDGET_MS);
+      expect(runAttempt).not.toHaveBeenCalled();
+      expect(outcome).toMatchObject({ exitCode: 1, attempts: 0 });
+      expect(logs).toContain("soft-timeout guard reached before attempt 1: timeoutMinutes=2 bufferMs=90000");
+    });
+
+    it("restarts the soft deadline and driver clock at retry-loop entry for softDeadlineStart=run", async () => {
+      const { harness, guard, runAttempt, outcome } = await startAndRunAfterPreflight("run");
+      expect(harness.softTimeoutGuard).toBe(guard);
+      expect(guard?.softDeadlineMs).toBe(HARNESS_START + PREFLIGHT_MS + SOFT_BUDGET_MS);
+      expect(harness.driverStartTime).toBe(HARNESS_START + PREFLIGHT_MS);
+      expect(runAttempt).toHaveBeenCalledTimes(1);
+      expect(outcome).toMatchObject({ exitCode: 0, attempts: 1 });
+      expect(logs.some(message => message.startsWith("soft-timeout guard reached"))).toBe(false);
+    });
+  });
+
   describe("resolveNonRetryableGuardDecision", () => {
     /** @param {string} output @param {object} [extra] */
     const decide = (output, extra = {}) => resolveNonRetryableGuardDecision({ attempt: 0, result: { exitCode: 1, output, hasOutput: true }, log, safeOutputsPath: "", ...extra });

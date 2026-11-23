@@ -61,7 +61,7 @@ const os = require("os");
 const path = require("path");
 const crypto = require("crypto");
 const { getPromptPath, renderTemplateFromFile } = require("./messages_core.cjs");
-const { runProcess, sleep, isCopilotSDKEnabled, buildCopilotSDKEnv, MIN_POST_RESULT_WATCHDOG_TIMEOUT_MS, DEFAULT_POST_RESULT_WATCHDOG_IDLE_TIMEOUT_MS } = require("./process_runner.cjs");
+const { runProcess, sleep, isCopilotSDKEnabled, buildCopilotSDKEnv } = require("./process_runner.cjs");
 const { buildCopilotSDKServerArgs, getCopilotSDKServerPort, startCopilotSDKServer, stopCopilotSDKServer, waitForCopilotSDKServer } = require("./copilot_sdk_sidecar.cjs");
 const { resolveRetryConfig: resolveSharedRetryConfig } = require("./harness_retry_config.cjs");
 const { hasCopilotResponseStatus, parseCopilotRetryAfterMs } = require("./copilot_retry_after.cjs");
@@ -1725,7 +1725,7 @@ function resolvePromptFileInput(args) {
  * Main entry point: run copilot with retry logic for partially-executed sessions.
  */
 async function main() {
-  const harness = startEngineHarness({ engine: "copilot", harnessName: "Copilot harness", log, resolveRetryConfig });
+  const harness = startEngineHarness({ engine: "copilot", harnessName: "Copilot harness", log, resolveRetryConfig, softDeadlineStart: "run" });
   if (!harness) return;
   const { command, args, safeOutputsPath, softTimeoutGuard } = harness;
   const { maxRetries, maxDelayMs } = harness.retryConfig;
@@ -2236,6 +2236,7 @@ async function main() {
           const isWorkflowToolPermissionDenied = hasWorkflowToolPermissionDenial(result.exitCode);
           const nonRetryableGuard = detectNonRetryableHarnessGuard(result.output);
           const isContentFiltered = isCopilotContentFilterError(result.output, copilotSDKMode ? primaryProviderName : process.env.GH_AW_LLM_PROVIDER || "github");
+          // No `result`: classifyCopilotFailure derives invocation_cap_exceeded from the guard and sets failureClasses below.
           await observeInvocationBudget({ guard: nonRetryableGuard, nativeTerminalRateLimitError: result.nativeTerminalRateLimitError === true, attempt, log });
           const isInvocationCapExceeded = nonRetryableGuard.maxRunsExceeded;
           const tokenCount = extractTokenCountFromOutput(result.output);

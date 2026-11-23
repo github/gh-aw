@@ -490,7 +490,7 @@ function applyClaudeSettingsEnv(args, env = process.env, reflectData, resolvedMo
  */
 async function main() {
   // Claude inspects safe outputs strictly: an unreadable file fails the attempt instead of disabling attempt-scoped checks.
-  const harness = startEngineHarness({ engine: "claude", harnessName: "Claude harness", log, resolveRetryConfig, safeOutputsOffset: claudeSafeOutputsOffset });
+  const harness = startEngineHarness({ engine: "claude", harnessName: "Claude harness", log, resolveRetryConfig, safeOutputsOffset: claudeSafeOutputsOffset, softDeadlineStart: "run" });
   if (!harness) return;
   const { command, args, safeOutputsPath, softTimeoutGuard } = harness;
   const { maxRetries, initialDelayMs } = harness.retryConfig;
