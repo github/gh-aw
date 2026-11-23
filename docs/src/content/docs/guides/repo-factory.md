@@ -145,15 +145,21 @@ Default capacity is **three active coding work items**, not three new PRs per ru
 Count the union of pending assignments, reservations, in-flight native runs and
 open coding PRs, including drafts. An assignment and its linked PR occupy one
 slot; an assignment without a PR still occupies a slot. Include known coding
-producers outside the factory. Incomplete pagination, unknown assignment state,
-or missing required CI evidence blocks new admission.
+producers outside the factory. Even fully paginated GitHub MCP reads and
+pre-agent `gh` calls can omit outside contributors' fork PRs under
+`min-integrity: approved`. Require an authorized, read-only capacity check with
+complete pagination and visibility across all coding producers. Limit the check
+to metadata and keep the agent's integrity policy unchanged. Pause admission if
+visibility, coding state, or required CI evidence is incomplete.
 
 Dispatcher is the only factory role admitting new issue-to-PR work. Serialize
-coding admission and repair requests with one repository-wide Actions concurrency
-group and `cancel-in-progress: false`, covering the run through safe-output
-completion. Reread capacity inside the serialized run. Keep a trusted issue-linked
-reservation while remote assignment or PR delivery is pending; use verified
-terminal state to release it. Reconcile a delivered PR with its reservation
+coding admission and repair requests with one shared repository-wide Actions
+workflow-level concurrency group. Set `cancel-in-progress: false` and explicitly
+set `queue: max` so newer triggers do not replace the only pending run; custom
+groups do not inherit that queue setting. Hold the group through safe-output
+completion and reread capacity inside the serialized run. Keep a trusted
+issue-linked reservation while remote assignment or PR delivery is pending; use
+verified terminal state to release it. Reconcile a delivered PR with its reservation
 without double counting. A cancelled workflow does not prove Cloud Agent stopped.
 Reservations must come from trusted workflow identity/delivery metadata, not an
 arbitrary issue comment. Use existing safe outputs for coordination mutations.
@@ -208,6 +214,11 @@ using the established engine. Publish through
 `safe-outputs.push-to-pull-request-branch`. Restrict `allowed-files` and set
 **`exclude-lock-yml: true`** on both.
 
+`create-pull-request` defaults to drafts. Assign an authorized maintainer to mark
+completed native PRs ready for review and verify the `ready_for_review` event
+starts the reviewer workflow. A draft still occupies a coding slot but does not
+pass the PR Sous-Chef prefilter.
+
 The exclusion drops compiled `.github/workflows/*.lock.yml`, not all workflow
 YAML. If workflow Markdown changes, an authorized maintainer must run
 `gh aw compile` and commit regenerated locks before merge. Other workflow YAML
@@ -230,8 +241,8 @@ and revisions; include failures and no-ops, not just successful runs.
 Use [run analysis](https://github.com/github/gh-aw/blob/main/.github/aw/analyzing-runs.md),
 [optimization](https://github.com/github/gh-aw/blob/main/optimize.md),
 [debugging](https://github.com/github/gh-aw/blob/main/debug.md),
-[debugging reference](https://github.github.com/gh-aw/troubleshooting/debugging/),
-[audits](https://github.github.com/gh-aw/reference/audit/), recorded token/AIC usage and
+[debugging reference](/gh-aw/troubleshooting/debugging/),
+[audits](/gh-aw/reference/audit/), recorded token/AIC usage and
 [OpenTelemetry](/gh-aw/reference/open-telemetry/) evidence. Compare ordered tool-call
 sequences, parent/child relationships, repeated reads, wasted context retrieval,
 tool failures and subagent fan-out—not only aggregate tokens. Check run identity
@@ -242,16 +253,17 @@ Correlate the full issue-to-merge lifecycle only through supported identifiers
 (issue number, assignment, run ID, PR number/head SHA, review, checks, and merge
 state). Prefer deterministic groups using structured execution metadata, outcomes,
 failures, and graders. Use semantic clustering only when deterministic categories
-cannot answer the question. Follow the established `gh aw health`, `gh aw audit`,
-and `gh aw audit-diff` procedures. Enable the supported MCP integration with
+cannot answer the question. Use `gh aw health` for health, `gh aw audit <run>` for
+one run, and `gh aw audit <base> <compare>...` for comparisons. Enable MCP with
 `tools: { agentic-workflows: true }`; see the
-[MCP reference](https://github.github.com/gh-aw/reference/gh-aw-as-mcp-server/).
-It exposes `status`, `logs`, `audit`, `checks`, and `compile`. Pass multiple run
-IDs to `audit` for comparison. Use `status` for workflow inspection and work-queue
-information only when a configured tool exposes it. `gh aw health` and
-`gh aw audit-diff` are CLI commands, not MCP tool names.
-Routine Dreamer access should be read-only; MCP `compile` is disabled by default,
-and enabling write tools also exposes other mutations.
+[MCP reference](/gh-aw/reference/gh-aw-as-mcp-server/).
+Use `health` for health, `audit` for a single run, `audit-diff` for comparisons,
+`logs` and `checks` for run evidence, `status` for workflow status, and
+`work-queue` for queue inspection.
+
+Keep routine Dreamer access read-only. By default, MCP `compile` validates with
+`--no-emit --no-check-update --read-only`. Emitting lock files, applying fixes,
+dry-run compilation, and external scanners require explicit write-tool opt-in.
 
 Record the hypothesis, baseline/candidate revisions, eligible cohort, metric
 definitions, sample window, results, uncertainty and decision in a linked issue
