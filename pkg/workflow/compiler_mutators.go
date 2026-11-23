@@ -242,6 +242,11 @@ func (c *Compiler) GetWarningCount() int {
 	return c.warningCount
 }
 
+// GetDiagnostics returns a copy of the structured compiler diagnostics.
+func (c *Compiler) GetDiagnostics() []CompilerDiagnostic {
+	return append([]CompilerDiagnostic(nil), c.diagnostics...)
+}
+
 // ResetWarningCount resets the warning counter to zero
 func (c *Compiler) ResetWarningCount() {
 	c.warningCount = 0

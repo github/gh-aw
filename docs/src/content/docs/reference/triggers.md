@@ -772,6 +772,8 @@ on: weekly on monday
 
 A pre-activation check runs the query against the current repository. If matches reach or exceed the threshold (default `max: 1`), the workflow is skipped. All standard GitHub search qualifiers are supported (`is:`, `label:`, `in:title`, `author:`, etc.).
 
+To spare the search API's low rate limit, simple single-repository queries are evaluated with GraphQL or REST list endpoints instead. A query qualifies when it uses only `is:`/`type:`/`state:` (`issue`, `pr`, `open`, `closed`, `merged`), `label:` (no comma lists), `author:`, `assignee:`, `mentions:`, `sort:`, and one `repo:`. The check reads current rate limits, prefers GraphQL, then REST, then search, demotes any API with less than 10% quota remaining, and falls back to the next API on error. Free text, negations, `in:`, `org:`, and other qualifiers always use the search API.
+
 Use `scope: none` to remove the automatic repo qualifier and search org-wide. For cross-repo or org-wide searches that need elevated permissions, configure `github-token` or `github-app` at the top-level `on:` section — the same token is shared across all skip-if checks and the activation job:
 
 ```yaml wrap

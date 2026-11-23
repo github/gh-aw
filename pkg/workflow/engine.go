@@ -47,7 +47,7 @@ func toEngineEnvValueString(value any) (string, bool) {
 type EngineConfig struct {
 	ID                 string
 	Version            string
-	Cooldown           *int // Minimum release age in days; nil defaults to 3, zero disables it outside strict mode.
+	Cooldown           *int // Minimum release age in days; nil defaults to 3, zero disables it.
 	cooldownError      error
 	ChecksumsSHA256    string      // Trusted release checksum-manifest digest (Copilot CLI only)
 	LLMProvider        LLMProvider // Inference provider override for this engine (engine.provider / engine.model-provider)
@@ -920,7 +920,7 @@ func (c *Compiler) extractEngineConfigFromJSON(engineJSON string) (*EngineConfig
 
 	_, config, model := c.ExtractEngineConfig(tempFrontmatter)
 	// Strict policy is validated after merging, using the main workflow's mode.
-	if err := validateEngineCooldown(config, false); err != nil {
+	if err := validateEngineCooldown(config); err != nil {
 		return nil, "", err
 	}
 	return config, model, nil

@@ -7,7 +7,7 @@ sidebar:
 
 # GitHub Actions Compiler Threat Detection Specification
 
-**Version**: 1.0.107
+**Version**: 1.0.108
 **Status**: Candidate Recommendation  
 **Latest Version**: https://github.com/github/gh-aw/blob/main/specs/compiler-threat-detection-spec.md  
 **Editors**: GitHub Next (GitHub, Inc.)
@@ -32,7 +32,7 @@ Each version maps to the minimum compatible binary. A version change MUST update
 
 | Versions | Minimum gh-aw |
 |---|---:|
-| `1.0.60`–`1.0.107` | Unreleased |
+| `1.0.60`–`1.0.108` | Unreleased |
 | `1.0.44`–`1.0.59` | Unreleased |
 | `1.0.40`–`1.0.43` | `v0.87.9` |
 | `1.0.39` | `v0.87.9` |
@@ -60,6 +60,7 @@ The following implementation snapshot complements the detailed mapping in Sectio
 | Local-only runtime imports | `pkg/workflow/runtime_import_validation.go`, `actions/setup/js/runtime_import.cjs` | `pkg/workflow/runtime_import_target_policy_test.go`, `actions/setup/js/runtime_import_target_policy.test.cjs` | 2026-11-04 |
 | Fork admission and checkout expansion | `pkg/workflow/filters.go`, `pkg/workflow/checkout_manager.go` | `pkg/workflow/filters_forks_test.go`, `pkg/workflow/checkout_multi_test.go` | 2026-11-04 |
 | CTR-032 publisher provenance | `pkg/workflow/compiler_safe_outputs_steps.go`, `actions/setup/js/execution_provenance.cjs` | `pkg/workflow/safe_outputs_job_identity_test.go`, `actions/setup/js/execution_provenance.test.cjs` | 2026-11-04 |
+| Compile-time engine release cooldown | `pkg/workflow/engine_release_cooldown.go`, `pkg/workflow/engine_installation_packages.go` | `pkg/workflow/engine_release_cooldown_test.go` | 2026-11-23 |
 
 ## 3. Threat Model Overview
 
@@ -909,6 +910,29 @@ Generated MCP logs reports can contain sensitive workflow data and MUST be store
 | OTLP default opt-out | `pkg/workflow/observability_otlp.go`: `isOTLPDisabled`, `injectOTLPConfig` | `TestCompileOTLPOptOut`, `TestNormalizeFrontmatterConfigOTLPDisabled` in `pkg/workflow/observability_otlp_test.go` |
 
 These are existing-behavior mappings within CTR-017 and the host-side MCP boundary. No new `CTR-*` rule or compliance-test identifier is introduced.
+
+### 7.17 Compile-Time Engine Release Cooldown Lookups
+
+For a literal semantic `engine.version` with a nonzero `engine.cooldown`, the compiler queries public release metadata on the compiling host and MUST reject the workflow when the release is younger than the cooldown. This applies to the main engine and the threat-detection engine. The lookup is a host-side network boundary and MUST:
+
+- Query only fixed public endpoints: `api.github.com/repos/github/copilot-cli/releases/tags/v<version>` for Copilot, or `registry.npmjs.org/<package>` for npm-installed engines. Package names MUST come from shared compiler constants or behavior-defined installation metadata and match `engineReleasePackagePattern`.
+- Send no credentials, ignore `GH_HOST` and npm registry configuration, reject redirects, and time out after 5 seconds.
+- Accept only a matching non-draft tag or package name with a past timestamp. npm packuments are streamed so that only `name` and `time[version]` are retained.
+- Cache only publication times, in memory for 5 minutes, and never persist them or the policy decision.
+- Skip the lookup during editor, offline, and Wasm compilation, and never block on it outside the context deadline.
+
+A failed or skipped lookup fails open. The compiler emits one warning per release, recorded as a structured diagnostic that Wasm callers also receive, and compilation succeeds. Literal Copilot installs emit `--cooldown-days 0`, so runners need no enterprise-scoped token for public metadata. **Residual risk:** when the lookup does not complete, a young literal Copilot release installs without any age check, and authors must verify the release age manually. Dynamic Copilot versions keep the runtime check, which fails closed. npm engines keep npm's `min-release-age` enforcement at runtime.
+
+| Boundary | Implementation | Regression Evidence |
+|---|---|---|
+| Endpoint, package, and redirect restrictions | `pkg/workflow/engine_release_cooldown.go`: `engineReleaseTarget`, `fetchEngineReleaseTime` | `TestEngineReleaseCooldownNetworkSafety`, `TestEngineReleaseCooldownResolvedTargets` |
+| Metadata validation and npm streaming | `parseEngineReleaseTime`, `parseNPMReleaseTime` | `TestEngineReleaseCooldownMetadata`, `TestEngineReleaseCooldownNPMStreamingMetadata` |
+| Cache scope and lock release during lookup | `engineReleaseMetadata` | `TestEngineReleaseCooldownCachePolicyAndExpiry`, `TestEngineReleaseCooldownCacheDoesNotSerializeLookups` |
+| Skipped lookups and fail-open warning | `warnEngineReleaseCooldown`, `cmd/gh-aw-wasm/main.go` | `TestEngineReleaseCooldownSkippedLookups`, `TestEngineReleaseCooldownWarningCoversAllApplicableSettings` |
+| Detector parity with the installer | `validateEngineReleaseCooldowns` | `TestEngineReleaseCooldownDetection`, `TestEngineReleaseCooldownInlineDetectorResetsCopilotSDK` |
+| Copilot runtime policy | `pkg/workflow/copilot_installer.go` | `TestCopilotLiteralCooldownRuntimePolicy`, `TestCompileEngineReleaseCooldownLiteral` |
+
+This is an existing-behavior supply-chain mapping. No new `CTR-*` rule or compliance-test identifier is introduced.
 
 ## 8. Compliance Testing
 

@@ -25,6 +25,21 @@ func TestSafeOutputAuthorizationSerializationFailsClosed(t *testing.T) {
 	require.Error(t, err, "invalid local authorization must survive extraction as a compilation error")
 }
 
+func TestSafeOutputAuthorizationFingerprintDoesNotExposeConfiguration(t *testing.T) {
+	config := authorizationTestConfig(t, map[string]any{
+		"create-issue": map[string]any{"authorization": authorizationTestAuthority("https://authority.example/a")},
+	})
+	implementation := map[string]any{"credential": "${{ secrets.EXAMPLE_TOKEN }}"}
+	encoded, err := authorizationGateConfig(config, "create_issue", "job", implementation, nil, "")
+	require.NoError(t, err)
+	require.NotContains(t, encoded, "${{ secrets.EXAMPLE_TOKEN }}")
+
+	var gate map[string]any
+	require.NoError(t, json.Unmarshal([]byte(encoded), &gate))
+	require.Equal(t, "188dec00605d5d6ef26e62137bd6085b659e2d011baa7439d377632f2764ee69", gate["implementation"])
+	require.Regexp(t, `^[a-f0-9]{64}$`, gate["implementation"])
+}
+
 func TestSafeOutputAuthorizationWorkflowLaunchBoundary(t *testing.T) {
 	for _, staged := range []bool{false, true} {
 		config := authorizationTestConfig(t, map[string]any{

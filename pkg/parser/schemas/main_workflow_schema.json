@@ -2362,7 +2362,7 @@
               "oneOf": [
                 {
                   "type": "string",
-                  "description": "GitHub search query string to check before running workflow (implies max=1). If the search returns any results, the workflow will be skipped. Query is automatically scoped to the current repository. Example: 'is:issue is:open label:bug'"
+                  "description": "GitHub search query string to check before running workflow (implies max=1). If the search returns any results, the workflow will be skipped. Query is automatically scoped to the current repository. Simple queries using only is:/type:/state:, label:, author:, assignee:, mentions:, and sort: qualifiers are evaluated via GraphQL/REST instead of the rate-limited search API; free text, in:, negation, and comma label lists require search. Example: 'is:issue is:open label:bug'"
                 },
                 {
                   "type": "object",
@@ -2402,7 +2402,7 @@
               "oneOf": [
                 {
                   "type": "string",
-                  "description": "GitHub search query string to check before running workflow (implies min=1). If the search returns no results, the workflow will be skipped. Query is automatically scoped to the current repository. Example: 'is:pr is:open label:ready-to-deploy'"
+                  "description": "GitHub search query string to check before running workflow (implies min=1). If the search returns no results, the workflow will be skipped. Query is automatically scoped to the current repository. Simple queries using only is:/type:/state:, label:, author:, assignee:, mentions:, and sort: qualifiers are evaluated via GraphQL/REST instead of the rate-limited search API; free text, in:, negation, and comma label lists require search. Example: 'is:pr is:open label:ready-to-deploy'"
                 },
                 {
                   "type": "object",
@@ -15836,7 +15836,7 @@
               "type": "integer",
               "minimum": 0,
               "default": 3,
-              "description": "Minimum release age in days for compiler-managed engine installs. Zero disables the cooldown only outside strict mode."
+              "description": "Minimum release age in days for compiler-managed engine installs. Zero disables the cooldown, including in strict mode."
             },
             "model": {
               "type": "string",
@@ -16265,7 +16265,7 @@
               "type": "integer",
               "minimum": 0,
               "default": 3,
-              "description": "Minimum release age in days for compiler-managed engine installs. Zero disables the cooldown only outside strict mode."
+              "description": "Minimum release age in days for compiler-managed engine installs. Zero disables the cooldown, including in strict mode."
             },
             "runtime": {
               "type": "object",

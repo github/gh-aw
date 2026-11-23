@@ -34,7 +34,7 @@ Workflow specifications:
   - Version can be tag, branch, or SHA (for remote workflows)
 
 The -n flag allows you to specify a custom name for the workflow file (not allowed when adding multiple workflows at once).
-The --dir flag allows you to specify the workflow directory (default: .github/workflows).
+The --dir flag allows you to specify the workflow directory (default: $GH_AW_WORKFLOWS_DIR or .github/workflows).
 The --create-pull-request flag creates a pull request with the workflow changes.
 The --force flag overwrites existing workflow files.
 When a package contains .github/workflows/aw.json, its project settings are

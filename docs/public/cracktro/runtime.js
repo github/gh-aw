@@ -85,8 +85,8 @@
   body.light .dots button { background: #1f232833; }
   body.light .dots button.hd { background: transparent; box-shadow: inset 0 0 0 2px #1f232859; }
   body.light .dots button.on { background: #1f2328; box-shadow: none; }
-  body.light .snd, body.light .fzb, body.light .smb, body.light .ntb, body.light .ksb, body.light .ccb, body.light .wzb, body.light .arrows button { border-color: #9ea7b3; background: #e6eaefcc; color: #424a53; }
-  body.light .snd:hover, body.light .fzb:hover, body.light .smb:hover, body.light .ntb:hover, body.light .ksb:hover, body.light .ccb:hover, body.light .wzb:hover, body.light .arrows button:hover { color: #1f2328; border-color: #818b98; }
+  body.light .snd, body.light .fzb, body.light .smb, body.light .ntb, body.light .ksb, body.light .ccb, body.light .vcb, body.light .wzb, body.light .arrows button { border-color: #9ea7b3; background: #e6eaefcc; color: #424a53; }
+  body.light .snd:hover, body.light .fzb:hover, body.light .smb:hover, body.light .ntb:hover, body.light .ksb:hover, body.light .ccb:hover, body.light .vcb:hover, body.light .wzb:hover, body.light .arrows button:hover { color: #1f2328; border-color: #818b98; }
   /* research prototype badge on every gh cao slide (top right, clear of the chrome) */
   .proto { position: absolute; right: 110px; top: 76px; display: flex; align-items: center; gap: 14px; padding: 12px 22px; border: 2px dashed #e3b341; border-radius: 999px; background: #0d1117cc; font: 600 20px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: #e3b341; z-index: 5; }
   .proto i { width: 12px; height: 12px; border-radius: 50%; background: #e3b341; box-shadow: 0 0 12px #e3b341; animation: proto-blink 1.6s ease-in-out infinite; }
@@ -174,10 +174,10 @@
   body.compact-nav.nav-idle :is(.arrows, .vnb, .snd, .fzb, .smb, .ntb, .ksb, .wzb, .tourp) { opacity: .4; }
   body.compact-nav.nav-idle :is(.arrows:has(:focus-visible), .vnb:focus-visible, .snd:focus-visible, .fzb:focus-visible, .smb:focus-visible, .ntb:focus-visible, .ksb:focus-visible, .wzb:focus-visible, .tourp:has(:focus-visible)) { opacity: 1; }
   @media (prefers-reduced-motion: reduce) { body.compact-nav :is(.arrows, .vnb, .snd, .fzb, .smb, .ntb, .ksb, .wzb, .tourp) { transition: none; } }
-  .snd, .fzb, .smb, .ntb, .ksb, .ccb, .wzb { position: fixed; right: calc(24px + var(--sr)); bottom: calc(10px + var(--sb)); width: 34px; height: 34px; padding: 6px; border: 1px solid #3d444d; border-radius: 8px;
+  .snd, .fzb, .smb, .ntb, .ksb, .ccb, .vcb, .wzb { position: fixed; right: calc(24px + var(--sr)); bottom: calc(10px + var(--sb)); width: 34px; height: 34px; padding: 6px; border: 1px solid #3d444d; border-radius: 8px;
     background: #151b23cc; color: #9198a1; cursor: pointer; z-index: 5; transition: color .2s, border-color .2s, background .2s; }
-  .snd:hover, .fzb:hover, .smb:hover, .ntb:hover, .ksb:hover, .ccb:hover, .wzb:hover { color: #f0f6fc; border-color: #9198a1; }
-  .snd svg, .fzb svg, .smb svg, .ntb svg, .ksb svg, .ccb svg, .wzb svg { width: 100%; height: 100%; display: block; }
+  .snd:hover, .fzb:hover, .smb:hover, .ntb:hover, .ksb:hover, .ccb:hover, .vcb:hover, .wzb:hover { color: #f0f6fc; border-color: #9198a1; }
+  .snd svg, .fzb svg, .smb svg, .ntb svg, .ksb svg, .ccb svg, .vcb svg, .wzb svg { width: 100%; height: 100%; display: block; }
   .fzb { right: calc(64px + var(--sr)); }
   .smb { right: calc(104px + var(--sr)); }
   .ntb { right: calc(144px + var(--sr)); }
@@ -202,6 +202,14 @@
   body.kiosk.nav-idle .ccb:not(:focus-visible) { opacity: 0; }
   body.light.kiosk .ccb { color: #1f2328; border-color: #1f2328; }
   .ccb[aria-pressed="true"] { box-shadow: inset 0 -3px currentColor; }
+  /* voice (V): kiosk mode reads each slide's caption lines aloud with the browser's own speech synthesis; the button
+     sits beside CC in the kiosk dock and stays disabled where the browser has no speech synthesis */
+  .vcb { display: none; }
+  body.kiosk .vcb { display: block; right: calc(64px + var(--sr)); opacity: 1; color: #f0f6fc; border-color: #f0f6fc; transition: opacity .4s, color .2s, border-color .2s; }
+  body.kiosk.nav-idle .vcb:not(:focus-visible) { opacity: 0; }
+  body.light.kiosk .vcb { color: #1f2328; border-color: #1f2328; }
+  .vcb[aria-pressed="true"] { box-shadow: inset 0 -3px currentColor; }
+  body.kiosk .vcb:disabled { opacity: .35; cursor: not-allowed; }
   .cc { position: fixed; inset: 0; z-index: 4; pointer-events: none; overflow: hidden; display: none; }
   body.cc-on .cc { display: block; }
   .cc-f { position: absolute; left: 50%; top: 50%; width: ${W}px; height: ${H}px; transform-origin: 0 0; }
@@ -820,6 +828,22 @@
     });
     ccb.innerHTML =
       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="3"/><path d="M10.5 10a2.5 2.5 0 1 0 0 4M17.5 10a2.5 2.5 0 1 0 0 4"/></svg>';
+    // voice (V): text-to-speech of the caption lines in kiosk mode, only where the browser supports speech synthesis
+    /** @type {any} */
+    const TTS = typeof window.speechSynthesis?.speak === "function" && typeof window.SpeechSynthesisUtterance === "function" ? window.speechSynthesis : null;
+    const vcb = h("button", {
+      class: "vcb",
+      type: "button",
+      "aria-pressed": "false",
+      "aria-keyshortcuts": "V",
+      onclick: e => {
+        e.stopPropagation();
+        toggleVoice();
+      },
+    });
+    vcb.disabled = !TTS;
+    vcb.innerHTML =
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M17 6.5a4 4 0 0 1 0 5M19.5 4a7.5 7.5 0 0 1 0 10"/></svg>';
     // tour pill (top right, only during a tour): the tour title and position open the map; × shows every slide again
     const tourT = h("span", { class: "tourp-t" }),
       tourN = h("span", { class: "tourp-n" });
@@ -869,7 +893,10 @@
     // kiosk mode starts captioned; turning CC off keeps it off for later kiosk runs until it is turned back on
     let capOn = false,
       capPref = true;
-    document.body.append(canvas, wash, gridc, stage, ccEl, progress, dots, arrows, vnb, ksb, ccb, ...(wzBtn ? [wzBtn] : []), notesBtn, smBtn, fzBtn, ...(config.sound ? [snd] : []), notes, tourP);
+    // voice is opt-in; once turned on it holds for later kiosk runs until it is turned off
+    let voiceOn = false,
+      voicePref = false;
+    document.body.append(canvas, wash, gridc, stage, ccEl, progress, dots, arrows, vnb, ksb, ccb, vcb, ...(wzBtn ? [wzBtn] : []), notesBtn, smBtn, fzBtn, ...(config.sound ? [snd] : []), notes, tourP);
     // the pressed state (sound on) and the struck-out icon (.off) always follow the sound service
     const paintSound = () => {
       snd.classList.toggle("off", !!sfx.muted);
@@ -924,7 +951,7 @@
     // still rotate in the window. Escape, K, the button or leaving fullscreen stop it; a manual move restarts the
     // countdown. One timer at a time, cleared on every re-arm and stop.
     const KIOSK_MS = Math.max(1000, Number(config.kioskInterval) || 15000);
-    /** @type {{ t: ReturnType<typeof setTimeout> | null, full: boolean, entered: boolean } | null} */
+    /** @type {{ t: ReturnType<typeof setTimeout> | null, hold: number, full: boolean, entered: boolean } | null} */
     let kiosk = null;
     /** @type {any} */
     const doc = document;
@@ -941,17 +968,25 @@
       }
       return cur;
     };
-    const kioskArm = () => {
+    /** @param {number} [ms] */
+    const kioskArm = ms => {
       if (!kiosk) return;
       clearTimeout(kiosk.t);
+      // a fresh countdown (new slide, manual move, toggle) restarts the voice hold; only the 500 ms re-polls keep it
+      if (ms == null) kiosk.hold = 0;
       kiosk.t = setTimeout(
         () => {
           if (!kiosk) return;
+          // hold the slide while its voice is still speaking, for at most VOICE_HOLD_MS past the dwell (see "voice" below)
+          if (voiceBusy()) {
+            if (!kiosk.hold) kiosk.hold = performance.now();
+            if (performance.now() - kiosk.hold < VOICE_HOLD_MS) return kioskArm(500);
+          }
           // hold the slide while any dialog (search, map, a deck's own modal) is open
           if (!document.querySelector("dialog[open], [aria-modal='true']")) go(kioskNext());
           kioskArm();
         },
-        capOn ? Math.max(KIOSK_MS, capDwell(cur)) : KIOSK_MS
+        ms ?? (capOn ? Math.max(KIOSK_MS, capDwell(cur)) : KIOSK_MS)
       );
     };
     const paintKiosk = () => {
@@ -970,7 +1005,7 @@
       on = !!on;
       if (on === !!kiosk) return on;
       if (on) {
-        kiosk = { t: null, full: !!fsEl(), entered: false };
+        kiosk = { t: null, hold: 0, full: !!fsEl(), entered: false };
         const k = kiosk;
         if (config.sound && !sfx.muted) sfx.unlock?.();
         const de = doc.documentElement,
@@ -989,11 +1024,13 @@
         }
         kioskArm();
         if (capPref) setCap(true);
+        if (voicePref) setVoice(true);
       } else {
         const k = kiosk;
         clearTimeout(k.t);
         kiosk = null;
         if (capOn) setCap(false);
+        if (voiceOn) setVoice(false);
         // leave the fullscreen kiosk mode asked for, not one the presenter already had
         if (k.entered && fsEl()) exitFs();
       }
@@ -1136,6 +1173,7 @@
       slides[n].enter?.(dir);
       chrome(n);
       if (capOn) capEnter();
+      if (voiceOn) voiceEnter();
       kioskArm();
     }
     // progress, dots, dock buttons, notes and hash for slide n (also refreshed when a tour starts or ends)
@@ -1306,6 +1344,7 @@
       else if (e.key === "f" || e.key === "F") toggleFullscreen();
       else if ((e.key === "k" || e.key === "K") && !e.repeat && !target.closest?.("input, textarea, select, [contenteditable]")) setKiosk(!kiosk);
       else if ((e.key === "c" || e.key === "C") && !e.repeat && !target.closest?.("input, textarea, select, [contenteditable]")) toggleCap();
+      else if ((e.key === "v" || e.key === "V") && !e.repeat && !target.closest?.("input, textarea, select, [contenteditable]")) toggleVoice();
       else if (e.key === "Escape" && kiosk && !e.defaultPrevented) {
         e.preventDefault();
         setKiosk(false);
@@ -1748,7 +1787,7 @@
       ],
       [
         "Show",
-        [[["N"], "Speaker notes"], [["F"], "Fullscreen"], [["K"], "Kiosk: auto-advance (Esc stops)"], [["C"], "Closed captioning (CC) in kiosk mode"], ...SOUND_KEYS, [["X"], "Leave the tour or view"], [["Esc"], "Close notes or dialogs"]],
+        [[["N"], "Speaker notes"], [["F"], "Fullscreen"], [["K"], "Kiosk: auto-advance (Esc stops)"], [["C"], "Closed captioning (CC) in kiosk mode"], [["V"], "Voice: read captions aloud in kiosk mode"], ...SOUND_KEYS, [["X"], "Leave the tour or view"], [["Esc"], "Close notes or dialogs"]],
       ],
       [
         "Slide map",
@@ -1833,6 +1872,7 @@
       F: "full",
       K: "kiosk",
       C: "CC",
+      V: "voice",
       M: "sound",
       X: "leave",
       Esc: "close",
@@ -2409,6 +2449,94 @@
     const toggleCap = () => setCap((capPref = !capOn));
     paintCap();
 
+    // ---------- voice ----------
+    // V (or the voice button in the kiosk dock) reads each slide's caption lines aloud with the browser's native
+    // speech synthesis (no network, no audio files: only voices with localService are used, never the unspecified
+    // browser default, so a browser with no local voice, or one still loading its list, stays silent), alternating two
+    // voices (or two pitches) for the two speakers.
+    // Without speechSynthesis the button stays disabled and V does nothing. Voice starts kiosk mode if needed, ends with
+    // it, and holds a kiosk slide until its last line is spoken: at most VOICE_HOLD_MS past the dwell, timed from the
+    // dwell's end and restarted with every new countdown, so a stalled engine never freezes the rotation. The first
+    // utterance is spoken inside the V or K gesture that turned it on.
+    const VOICE_HOLD_MS = 60000;
+    /** @type {{ done: boolean } | null} */
+    let vc = null;
+    // Web Speech only tunes voice, rate, pitch and volume (no styles; browsers ignore SSML), so a relaxed sports-anchor
+    // read comes from ranking voices (natural/neural first, warm broadcast-style names next, novelty and robotic voices
+    // never), a touch lower pitch and an unhurried rate; each caption line is its own utterance, so lines get a beat.
+    const VOICE_RATE = 0.98,
+      VOICE_PITCH = 0.92;
+    const VOICE_NOVELTY = /\b(albert|bad news|bahh|bells|boing|bubbles|cellos|wobble|deranged|good news|hysterical|jester|junior|organ|princess|superstar|trinoids|whisper|zarvox)\b/i,
+      VOICE_ROBOTIC = /\b(eddy|flo|grandma|grandpa|reed|rocko|sandy|shelley|fred|ralph|kathy|espeak)\b/i,
+      VOICE_NATURAL = /natural|neural|premium|enhanced|studio/i,
+      VOICE_ANCHOR = /\b(andrew|guy|davis|brian|christopher|eric|roger|steffan|aria|jenny|ava|emma|michelle|evan|nathan|tom|alex|aaron|samantha|allison|zoe|daniel)\b/i;
+    const voiceScore = (/** @type {SpeechSynthesisVoice} */ v) =>
+      (VOICE_NATURAL.test(v.name) ? 4 : 0) + (VOICE_ANCHOR.test(v.name) ? 2 : 0) + (VOICE_ROBOTIC.test(v.name) ? -3 : 0);
+    const voicePick = () => {
+      const all = (TTS.getVoices?.() || []).filter(v => v.localService && !VOICE_NOVELTY.test(v.name)),
+        lang = (document.documentElement.lang || navigator.language || "en").slice(0, 2).toLowerCase(),
+        mine = all.filter(v => String(v.lang || "").toLowerCase().startsWith(lang)),
+        pool = (mine.length ? mine : all).map((v, i) => ({ v, s: voiceScore(v) * 100 - i })).sort((a, b) => b.s - a.s).map(x => x.v),
+        first = pool[0] || null;
+      return [first, pool[1] || first];
+    };
+    let voiceWait = false;
+    function voiceEnter() {
+      if (!TTS) return;
+      TTS.cancel();
+      const s = { done: false };
+      vc = s;
+      const lines = capLines(cur).map(String).filter(Boolean),
+        voices = voicePick();
+      if (!lines.length) return void (s.done = true);
+      if (!voices[0]) {
+        // no local voice: release the slide; voices load asynchronously, so speak this slide once they arrive
+        s.done = true;
+        if (!voiceWait && !(TTS.getVoices?.() || []).length && TTS.addEventListener) {
+          voiceWait = true;
+          TTS.addEventListener("voiceschanged", () => ((voiceWait = false), voiceOn && vc === s && voiceEnter()), { once: true });
+        }
+        return;
+      }
+      lines.forEach((line, turn) => {
+        const u = new SpeechSynthesisUtterance(line);
+        const v = voices[turn % 2];
+        u.voice = v;
+        u.lang = v.lang;
+        // one voice for both speakers: a lower and a higher pitch tell them apart
+        u.pitch = voices[0] === voices[1] && turn % 2 ? VOICE_PITCH + 0.2 : VOICE_PITCH;
+        u.rate = VOICE_RATE;
+        if (turn === lines.length - 1) u.onend = u.onerror = () => (s.done = true);
+        TTS.speak(u);
+      });
+    }
+    const voiceBusy = () => !!(vc && !vc.done);
+    const paintVoice = () => {
+      const lbl = !TTS ? "Voice is not supported in this browser" : voiceOn ? "Turn off the voice" : "Turn on the voice: read captions aloud";
+      vcb.setAttribute("aria-pressed", String(voiceOn));
+      vcb.setAttribute("aria-label", TTS ? `${lbl} (V)` : lbl);
+      vcb.title = TTS ? `${lbl} (V)` : lbl;
+    };
+    function setVoice(on) {
+      on = !!on && !!TTS;
+      if (on === voiceOn) return on;
+      voiceOn = on;
+      if (on) {
+        if (!kiosk) setKiosk(true);
+        voiceEnter();
+      } else {
+        vc = null;
+        TTS?.cancel();
+      }
+      paintVoice();
+      kioskArm();
+      return on;
+    }
+    const toggleVoice = () => {
+      if (TTS) setVoice((voicePref = !voiceOn));
+    };
+    paintVoice();
+
     // ---------- animated background ----------
     const ctx = canvas.getContext("2d");
     const hex = c => [1, 3, 5].map(i => parseInt(c.slice(i, i + 2), 16));
@@ -2517,7 +2645,7 @@
       setView(v);
       if (v) go(firstVis());
     };
-    return { slides, rows, go, next, prev, band, current: () => cur, tour, tours: () => Object.keys(TOURS), kiosk: on => setKiosk(on ?? !kiosk), captions: on => setCap((capPref = on ?? !capOn)) };
+    return { slides, rows, go, next, prev, band, current: () => cur, tour, tours: () => Object.keys(TOURS), kiosk: on => setKiosk(on ?? !kiosk), captions: on => setCap((capPref = on ?? !capOn)), voice: on => setVoice((voicePref = (on ?? !voiceOn) && !!TTS)) };
   }
 
   window.CracktroDeck = { h, letters, resetIndex, create };
