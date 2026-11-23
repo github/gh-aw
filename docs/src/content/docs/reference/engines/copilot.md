@@ -23,7 +23,7 @@ Copilot supports `engine.agent`, custom harnesses, `max-continuations`, bare mod
 
 Sandboxed CLI sessions derive URL approvals from finalized AWF network rules, including `network_allowed` additions. Domain rules cover apex/subdomains and HTTP/HTTPS unless restricted by protocol/port. These approvals do not grant shell access or bypass the firewall.
 
-Copilot resolves [model aliases](/gh-aw/reference/engines/#model-aliases) before launch, except for the main model when an explicit BYOK provider is configured. Exact IDs pass through unchanged; unavailable IDs fail the first inference request.
+Copilot resolves [model aliases](/gh-aw/reference/engines/#model-aliases) before launch. Exact IDs pass through unchanged; unavailable IDs fail the first inference request.
 
 ### Dynamic workflows
 
@@ -95,8 +95,6 @@ Set `COPILOT_PROVIDER_BASE_URL` in `engine.env` to activate BYOK mode. The crede
 | `COPILOT_PROVIDER_WIRE_MODEL` | Optional | Alternative to `COPILOT_PROVIDER_MODEL_ID` for overriding the wire model |
 | `COPILOT_PROVIDER_MAX_PROMPT_TOKENS` | Optional | Override the maximum prompt token limit (otherwise resolved from model catalog) |
 | `COPILOT_PROVIDER_MAX_OUTPUT_TOKENS` | Optional | Override the maximum output token limit |
-
-With a nonempty `COPILOT_PROVIDER_BASE_URL`, the main model (`engine.model` or `COPILOT_MODEL`) bypasses gh-aw alias resolution and is passed through unchanged, even when it matches a built-in alias such as `gpt-5-mini`. Use the provider's model or deployment name; no `/models` route is required for alias resolution.
 
 **Example:**
 

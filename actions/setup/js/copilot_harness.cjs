@@ -520,13 +520,6 @@ async function applyCopilotModelAliasResolution(options) {
     return configuredModel;
   }
 
-  // Explicit BYOK endpoints use provider-specific model ids and may not expose /models.
-  if (process.env.COPILOT_PROVIDER_BASE_URL?.trim()) {
-    logger(`copilot model alias resolution: explicit BYOK provider; using '${configuredModel}' verbatim`);
-    recordModelResolution({ engine: "copilot", role: "main", configured_model: configuredModel, resolved_model: configuredModel, provider: null, status: "exact", cause: null });
-    return configuredModel;
-  }
-
   const awfConfig = loadAwfConfigData();
   const aliasMap = awfConfig?.apiProxy?.models;
 
