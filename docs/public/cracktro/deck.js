@@ -313,7 +313,7 @@
   .active .tp-mona svg { animation: tp-l 1s cubic-bezier(.2,.9,.25,1) both .3s, tp-bob 3.2s ease-in-out infinite 1.3s; }
   .tp:is(.fadeout, .leaving) .tp-mona svg { animation: tp-lo .55s cubic-bezier(.6,0,.85,.3) both !important; }
   @keyframes tp-bob { 50% { transform: translateY(-14px); } }
-  /* guide style (gd-): explainer examples under Turn Intent to Workflow (dark only; add body.light overrides if a guide slide moves to a light band); title block top-left, one board that loops a process, a mono caption */
+  /* guide style (gd-): explainer examples under Turn Intent to Workflows (dark only; add body.light overrides if a guide slide moves to a light band); title block top-left, one board that loops a process, a mono caption */
   .gd-head { position: absolute; left: 110px; top: 100px; width: 1700px; }
   .gd-head h2 { margin: 18px 0 0; font-size: 72px; line-height: 1.04; font-variation-settings: "wght" 560, "wdth" 100; letter-spacing: -.02em; color: #f0f6fc; }
   .gd-head h2 em { font-style: normal; color: #4493f8; }
@@ -520,37 +520,6 @@
   .rpa-scan { opacity: 0; } .rpa-scan line { stroke: #c297ff; stroke-width: 3; filter: drop-shadow(0 0 8px #ab7df8); }
   .fm-wire.day { stroke-dasharray: 10 8; }
   .rpa-day text { fill: #ab7df8; font: 600 19px var(--mono); letter-spacing: .12em; }
-  /* Workflows → Process → Factory: one camera zooming out from a workflow to a process to a factory */
-  .wpf .slide-head h2 { font-size: 100px; }
-  .wpf-steps { position: absolute; left: 110px; top: 272px; display: flex; align-items: center; gap: 18px; font: 600 22px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: #656c76; }
-  .wpf-steps span { padding: 12px 22px; border-radius: 99px; border: 2px solid #3d444d; transition: color .4s, border-color .4s, background .4s, box-shadow .4s; }
-  .wpf-steps span.done { color: #9198a1; border-color: #3d444d; }
-  .wpf-steps span.on { color: #f0f6fc; border-color: #ab7df8; background: #ab7df824; box-shadow: 0 0 22px #ab7df840; }
-  .wpf-steps i { font-style: normal; color: #656c76; }
-  .wpf-svg { position: absolute; left: 110px; top: 350px; width: 1700px; height: 561px; font-family: "Mona Sans"; }
-  .wpf-n, .wpf-w, .wpf-x, .wpf-dot, .wpf-lbl { transition: opacity .7s; }
-  .wpf-n { opacity: .5; } .wpf-n.on { opacity: 1; }
-  .wpf-n rect { fill: #0d1117; stroke: #9198a1; stroke-width: 2; transition: stroke .3s; }
-  .wpf-n.on rect { stroke: #c297ff; filter: drop-shadow(0 0 10px #ab7df8); }
-  .wpf-n.ag.on circle { filter: drop-shadow(0 0 12px #ab7df8); }
-  .wpf-w { stroke: #ab7df8; stroke-width: 2; opacity: .6; }
-  .wpf-x { fill: none; stroke: #79c0ff; stroke-width: 2; stroke-dasharray: 7 6; opacity: .8; }
-  .wpf-dot { fill: #c297ff; filter: drop-shadow(0 0 6px #ab7df8); }
-  .wpf-n.dev circle { fill: #0d1117; stroke: #4493f8; stroke-width: 3; } .wpf-n.dev.on circle { filter: drop-shadow(0 0 12px #4493f8); }
-  .wpf-w { fill: none; }
-  .wpf-bp { opacity: 0; transition: opacity .9s; } .wpf-svg[data-step="2"] .wpf-bp { opacity: 1; }
-  .wpf-bp .fr { fill: none; stroke: #79c0ff; stroke-opacity: .55; stroke-width: 2; } .wpf-bp .fr.t { stroke-width: 1; stroke-opacity: .35; }
-  .wpf-bp .dv { stroke: #79c0ff; stroke-opacity: .45; stroke-dasharray: 10 8; }
-  .wpf-bp text { fill: #79c0ff; font: 600 14px var(--mono); letter-spacing: .12em; } .wpf-bp .bay { font-size: 15px; }
-  .wpf-bp .ln { fill: #9198a1; font-size: 12px; } .wpf-bp .gate { font-size: 13px; text-anchor: middle; letter-spacing: .06em; }
-  .wpf-bp .tb rect { fill: #0d1117cc; stroke: #79c0ff; stroke-opacity: .6; } .wpf-bp .tb line { stroke: #79c0ff; stroke-opacity: .4; } .wpf-bp .tb .k { fill: #f0f6fc; }
-  .wpf-lbl { opacity: 0; } .wpf-lbl .a { fill: #f0f6fc; font: 700 16px "Mona Sans"; text-anchor: middle; } .wpf-lbl .b { fill: #9198a1; font: 500 11px var(--mono); text-anchor: middle; }
-  .wpf-svg[data-step="0"] .wpf-lbl { opacity: 1; }
-  .wpf-svg:not([data-step="2"]) .wpf-x { opacity: 0; }
-  .wpf-svg:not([data-step="2"]) [data-r]:not([data-r="1"]) { opacity: .08; }
-  .wpf-cap { position: absolute; left: 110px; right: 110px; top: 944px; font: 600 34px/1.2 "Mona Sans"; color: #f0f6fc; text-align: center; }
-  .wpf-cap.swap { animation: wpf-in .7s cubic-bezier(.2,.9,.2,1) both; }
-  @keyframes wpf-in { from { opacity: 0; transform: translateY(14px); } }
   .du-card { fill: #0d1117d9; stroke: #3d444d; stroke-width: 2; }
   .du-t { fill: #9198a1; font: 600 14px var(--mono); letter-spacing: .1em; }
   .du-n { fill: #f0f6fc; font: 800 38px "Mona Sans"; text-anchor: middle; }
@@ -4228,7 +4197,7 @@
     });
   }
 
-  // Turn Intent to Workflow: prompt → markdown → issue (from the gh-aw hero)
+  // Turn Intent to Workflows: prompt → markdown → issue (from the gh-aw hero)
   {
     resetIndex();
     const PROMPT = "Create a daily agent that removes code duplication";
@@ -4318,6 +4287,7 @@
     };
     slides.push({
       group: "platform",
+      id: "turn-intent-to-workflow",
       key: "intent",
       notes:
         "What: A plain-language request to a coding agent becomes a Markdown workflow. gh aw compile, a deterministic Go compiler with no AI involved, turns it into a hardened .lock.yml with pinned actions, a firewall and safe-output jobs; a later run opens a pull request removing duplicated code. This mirrors the gh-aw home page.\nWhy: Same Markdown in, same YAML out, so the result is reviewable and diffable like any other code.\nWhen: Start here when you can describe a recurring job clearly; the animation's one-minute path is illustrative, not a setup guarantee.",
@@ -4396,7 +4366,7 @@
       el: h(
         "section",
         { class: "slide pfx" },
-        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "How it works"), h("h2", { class: "pf-h" }, letters("Turn Intent to "), letters("Workflow", "l-grad"))),
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "How it works"), h("h2", { class: "pf-h" }, letters("Turn Intent to "), letters("Workflows", "l-grad"))),
         tta,
         links,
         tags,
@@ -4445,7 +4415,7 @@
     return `<g class="${cls}" transform="translate(${(x - size / 2).toFixed(1)} ${(y - size / 2).toFixed(1)}) scale(${(size / n).toFixed(4)})">${d.map(p => `<path d="${p}"/>`).join("")}</g>`;
   };
 
-  // Turn Workflow to Value: a synthetic twelve-week dashboard (backlog burndown, quality, delivery)
+  // Turn Workflows to Value: a synthetic twelve-week dashboard (backlog burndown, quality, delivery)
   {
     resetIndex();
     const N = 12,
@@ -4556,6 +4526,7 @@
       done = false;
     slides.push({
       group: "platform",
+      id: "turn-workflow-to-value",
       notes:
         "What: An illustrative dashboard with synthetic data for a sample repository twelve weeks after enabling agentic workflows: backlog burndown, rising test coverage, fewer escaped bugs, shorter pull request lead time, more deploys.\nWhy: Outcomes, not run counts, show whether automation helps. These numbers are not measured and imply no savings; they show the kind of signals worth tracking. gh-aw's own measured history comes later, in the AW factory band.\nWhen: Pick a few outcome metrics like these before rollout, so you have a baseline to compare against.",
       enter() {
@@ -4599,7 +4570,7 @@
       el: h(
         "section",
         { class: "slide tv" },
-        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Why it matters"), h("h2", { class: "pf-h" }, letters("Turn Workflow to "), letters("Value", "l-grad"))),
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Why it matters"), h("h2", { class: "pf-h" }, letters("Turn Workflows to "), letters("Value", "l-grad"))),
         h("div", { class: "tv-live" }, "acme/app · week ", wk, " / 12"),
         h("div", { class: "tv-kpis" }, kpis),
         h("div", { class: "tv-panels" }, panels),
@@ -7028,267 +6999,166 @@
     ],
   };
 
-  // Workflows → Process → Factory: zoom out from one workflow (issue → agent → PR) to a process (workflows in sequence) to a factory (processes feeding each other)
+  // Turn Workflows into Factories: processes create factories; the Repo Factory recipe builds one where five roles share one issue-to-merge loop: several Researchers file issues, one Dispatcher starts concurrent pull request flows in three weekday coding slots, where a Coder, Reviewers and Finisher drive each to a maintainer, and Dreamer turns outcomes into one proposed change
   {
+    const AG = pickAgent();
     resetIndex();
+    const VW = 1700,
+      VH = 680;
     const ico = (n, x, y, sz, fill = "#f0f6fc") => `<g transform="translate(${x - sz / 2},${y - sz / 2}) scale(${sz / (n === "merge" ? 16 : 24)})" fill="${fill}">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</g>`;
-    // Each line is one process: GitHub artifacts, agents on any harness ("@claude") and developer gates ("dev:mona").
-    // Line 1 stays straight on a 220 grid for the workflow and process zooms; the others are laid out like a plant floor.
-    const LINES = [
-      [
-        ["calendar", 380, 88],
-        ["@claude", 580, 88],
-        ["issue", 780, 88],
-        ["dev:ducky", 980, 128, "triages"],
-        ["@codex", 1180, 128],
-        ["pr", 1380, 128],
-        ["@pi", 1580, 88],
-        ["comment", 1800, 88],
-      ],
-      [
-        ["issue", 120, 250],
-        ["@copilot", 340, 250],
-        ["pr", 560, 250],
-        ["@claude", 780, 250],
-        ["comment", 1000, 250],
-        ["@codex", 1220, 250],
-        ["pr", 1440, 250],
-        ["dev:mona", 1660, 250, "approves"],
-        ["merge", 1860, 350],
-      ],
-      [
-        ["discussion", 170, 430],
-        ["@agy", 370, 430],
-        ["tasklist", 570, 480],
-        ["@copilot", 770, 480],
-        ["issue", 980, 420],
-        ["dev:mona", 1180, 420, "steers"],
-        ["@claude", 1380, 480],
-        ["pr", 1600, 480],
-      ],
-      [
-        ["calendar", 330, 590],
-        ["@codex", 530, 590],
-        ["file", 740, 590],
-        ["@pi", 950, 590],
-        ["pr", 1160, 590],
-        ["dev:ducky", 1380, 590, "reviews"],
-        ["@agy", 1600, 590],
-        ["package", 1820, 590],
-      ],
-    ];
-    // [line, node] → [line, node]: an output of one process triggers a step of another
-    const CROSS = [
-      [0, 2, 1, 3],
-      [0, 5, 1, 5],
-      [1, 4, 2, 5],
-      [2, 2, 3, 1],
-      [2, 7, 1, 8],
-      [3, 4, 2, 6],
-    ];
-    // camera per step [x, y, w, h], all at the svg's 2000:660 aspect
-    const CAM = [
-      [40, 168, 600, 198],
-      [40, 6, 1480, 488],
-      [0, 0, 2000, 660],
-    ];
-    const STEPS = [
-      ["Workflow", "A workflow goes from an issue, to an agent, to a pull request."],
-      ["Process", "A process sequences workflows: each output triggers the next."],
-      ["Factory", "A factory runs processes on any harness, with developers at the gates."],
-    ];
-    const LBL = [
-      [0, "Issue", "the trigger"],
-      [1, "Agent", "any harness, in Actions"],
-      [2, "PR", "safe output"],
-    ];
-    // elbow route between two nodes, as polyline points
-    const route = ([, x1, y1], [, x2, y2]) => {
-      const m = (x1 + x2) / 2;
-      return y1 === y2
-        ? [
-            [x1, y1],
-            [x2, y2],
-          ]
-        : [
-            [x1, y1],
-            [m, y1],
-            [m, y2],
-            [x2, y2],
-          ];
+    const agent = (id, x, y, w, label) => `<g class="fm-task" id="${id}"><g class="fm-pill"><rect x="${x}" y="${y - 25}" width="${w}" height="50" rx="25"/><text x="${x + 18 + w / 2}" y="${y + 8}">${label}</text></g>
+      <circle cx="${x}" cy="${y}" r="34" ${agDisc(AG)}/>${ico(AG, x, y + 1, 38, agFg(AG))}</g>`;
+    const dev = (id, x, y) => `<g class="fm-task mra-dev" id="${id}"><g class="fm-pill b"><rect x="${x}" y="${y - 25}" width="220" height="50" rx="25"/><text x="${x + 18 + 110}" y="${y + 8}">Maintainer</text></g>
+      <circle cx="${x}" cy="${y}" r="34" fill="#0d1117" stroke="#4493f8" stroke-width="3"/><image href="assets/avatars/mona.jpg" x="${x - 31}" y="${y - 31}" width="62" height="62" clip-path="url(#rfClip)"/></g>`;
+    const box = (id, x, y, icon) => `<g class="fm-out" id="${id}"><rect x="${x - 36}" y="${y - 34}" width="72" height="68" rx="14"/>${ico(icon, x, y, 34)}</g>`;
+    // three shared coding slots: two already busy, the third fills when Dispatcher admits the issue
+    const slots = (id, x, y) => {
+      let s = `<g class="fm-out rf-slots" id="${id}">`;
+      [0, 1, 2].forEach(i => (s += `<rect class="rf-slot${i < 2 ? " busy" : ""}" x="${x - 70 + i * 50}" y="${y - 26}" width="40" height="52" rx="8"/>`));
+      return s + `<text class="rf-cap" x="${x}" y="${y + 58}">3 shared slots</text><text class="rf-cap" x="${x}" y="${y + 82}">weekdays · UTC</text></g>`;
     };
-    const along = (pts, f) => {
-      const seg = pts.slice(1).map((q, i) => Math.abs(q[0] - pts[i][0]) + Math.abs(q[1] - pts[i][1]));
-      let d = f * seg.reduce((x, y) => x + y, 0),
-        i = 0;
-      while (i < seg.length - 1 && d > seg[i]) d -= seg[i++];
-      const u = seg[i] ? d / seg[i] : 0;
-      return [pts[i][0] + (pts[i + 1][0] - pts[i][0]) * u, pts[i][1] + (pts[i + 1][1] - pts[i][1]) * u];
-    };
-    const BP = "#79c0ff";
-    let g = `<defs><marker id="wpfP" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#ab7df8"/></marker>
-      <marker id="wpfB" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="${BP}"/></marker>
-      <pattern id="wpfGrid" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" fill="none" stroke="${BP}" stroke-opacity=".13"/></pattern>
-      <pattern id="wpfGrid5" width="200" height="200" patternUnits="userSpaceOnUse"><path d="M200 0H0V200" fill="none" stroke="${BP}" stroke-opacity=".22"/></pattern>
-      <clipPath id="wpfClip" clipPathUnits="objectBoundingBox"><circle cx=".5" cy=".5" r=".5"/></clipPath></defs>`;
-    // blueprint sheet, shown only once the camera reaches the whole factory
-    g += `<g class="wpf-bp"><rect width="2000" height="660" fill="#0d1a2e99"/><rect width="2000" height="660" fill="url(#wpfGrid)"/><rect width="2000" height="660" fill="url(#wpfGrid5)"/>
-      <rect class="fr" x="8" y="8" width="1984" height="644"/><rect class="fr t" x="16" y="16" width="1968" height="628"/>
-      ${[690, 1290].map(x => `<line class="dv" x1="${x}" y1="16" x2="${x}" y2="644"/>`).join("")}
-      ${[
-        [30, "BAY A · INTAKE"],
-        [706, "BAY B · BUILD"],
-        [1306, "BAY C · REVIEW &amp; SHIP"],
-      ]
-        .map(([x, t]) => `<text class="bay" x="${x}" y="40">${t}</text>`)
-        .join("")}
-      ${LINES.map((l, r) => `<text class="ln" x="${l[0][1] - 36}" y="${l[0][2] - 46}">LINE ${r + 1}</text>`).join("")}
-      <g class="tb"><rect x="30" y="532" width="250" height="104"/><line x1="30" y1="566" x2="280" y2="566"/><line x1="30" y1="600" x2="280" y2="600"/>
-      <text class="k" x="42" y="555">AGENTIC FACTORY</text><text x="42" y="589">DWG 01 · REV A · NTS</text><text x="42" y="623">4 LINES · 5 HARNESSES</text></g>`;
-    LINES.forEach(l => l.forEach(([k, x, y, t]) => t && (g += `<text class="gate" x="${x}" y="${y + 58}">${t}</text>`)));
-    g += `</g>`;
-    for (const [r1, c1, r2, c2] of CROSS) {
-      const [, x1, y1] = LINES[r1][c1],
-        [, x2, y2] = LINES[r2][c2],
-        sg = y2 > y1 ? 1 : -1,
-        sy = y1 + sg * 36,
-        ty = y2 - sg * 40,
-        my = (sy + ty) / 2;
-      g += `<path class="wpf-x" d="M${x1 + 14} ${sy} C${x1 + 14} ${my} ${x2} ${my} ${x2} ${ty}" marker-end="url(#wpfB)"/>`;
+    // [edge id, path, color, label, lx, ly, anchor]
+    const EDGES = [
+      ["e1", "M50 184 V304", "p", ["files scoped", "issues"], 72, 236, "start"],
+      ["e2", "M86 340 H300 V150 H364", "p", ["eligible issue"], 190, 324, "middle"],
+      ["e3", "M400 184 V310", "p", ["reserves", "a slot"], 422, 236, "start"],
+      ["e4", "M476 340 H650 V150 H714", "p", ["starts PRs"], 563, 324, "middle"],
+      ["e5", "M750 184 V304", "p", ["opens", "pull request"], 772, 236, "start"],
+      ["e6", "M786 340 H1000 V150 H1064", "p", ["ready for review"], 893, 324, "middle"],
+      ["e7", "M1100 184 V304", "p", ["≤ 3", "findings"], 1122, 236, "start"],
+      ["e8", "M1136 340 H1350 V150 H1414", "p", ["stalled · failing"], 1243, 324, "middle"],
+      ["e9", "M1450 184 V304", "p", ["bounded repair,", "≤ 2 rounds"], 1472, 236, "start"],
+      ["e14", "M1430 376 V418 H1100 V380", "p", ["re-review"], 1265, 448, "middle"],
+      ["e10", "M1470 376 V570 H1330", "b", ["ready, or", "escalate"], 1492, 470, "start"],
+      ["e11", "M1064 570 H788", "b", ["reviews & merges"], 926, 554, "middle"],
+      ["e12", "M714 570 H290", "p day", ["observes runs · costs · outcomes"], 502, 554, "middle"],
+      ["e13", "M50 536 V380", "p day", ["proposes one", "reversible change"], 72, 450, "start"],
+    ];
+    // the work item's journey: [edge, node lit on arrival, duration]
+    const SEQ = [
+      ["e1", "nIssue"],
+      ["e2", "nDispatch"],
+      ["e3", "nSlots"],
+      ["e4", "nCoder"],
+      ["e5", "nPR"],
+      ["e6", "nReview"],
+      ["e7", "nFind"],
+      ["e8", "nFinish"],
+      ["e9", "nFix"],
+      ["e14", "nFind"],
+      ["e8", "nFinish"],
+      ["e9", "nFix"],
+      ["e10", "nMaint"],
+      ["e11", "nMerge"],
+      ["e12", "nDreamer", 1500],
+      ["e13", "nIssue", 1500],
+    ];
+    const LANE = { nResearch: 0, nIssue: 0, nDispatch: 1, nSlots: 1, nCoder: 2, nPR: 2, nReview: 3, nFind: 3, nFinish: 4, nFix: 4 };
+    let g = `<defs><clipPath id="rfClip" clipPathUnits="objectBoundingBox"><circle cx=".5" cy=".5" r=".5"/></clipPath>
+      <marker id="rfP" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#ab7df8"/></marker>
+      <marker id="rfB" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#4493f8"/></marker></defs>`;
+    // code, review and finish run as one pull request flow per coding slot; the ghost frames behind are the concurrent ones
+    [2, 1].forEach(i => (g += `<rect class="rf-pr rf-ghost" x="${682 + i * 10}" y="${78 - i * 12}" width="986" height="544" rx="26"/>`));
+    g += `<rect class="rf-pr" id="rfPR" x="682" y="78" width="986" height="544" rx="26"/><text class="rf-zone rf-prt" x="1692" y="660" text-anchor="end">CONCURRENT PR FLOWS · ONE PER SLOT</text>`;
+    g += `<rect class="fm-lane" x="-20" y="0" width="${VW + 20}" height="60"/>`;
+    [
+      [-20, 350, "RESEARCH"],
+      [350, 700, "DISPATCH"],
+      [700, 1050, "CODE"],
+      [1050, 1400, "REVIEW"],
+      [1400, VW, "FINISH"],
+    ].forEach(([x0, x1, t], i) => {
+      g += `<text class="fm-lane-t mra-lane" id="rfLane${i}" x="${(x0 + x1) / 2}" y="40">${t}</text>`;
+      if (i) g += `<line class="fm-div" x1="${x0}" y1="0" x2="${x0}" y2="440"/>`;
+    });
+    g += `<line class="fm-div rf-gate" x1="-20" y1="470" x2="${VW}" y2="470"/><text class="rf-zone" x="-20" y="660">HUMAN GATE · DREAMER LEARNS</text>`;
+    for (const [id, d, c, lab, lx, ly, an] of EDGES) {
+      g += `<path class="fm-wire ${c}" id="${id}" d="${d}" marker-end="url(#rf${c.startsWith("p") ? "P" : "B"})"/>`;
+      g += `<text class="mra-l ${c}" x="${lx}" y="${ly}" text-anchor="${an}">${lab.map((l, k) => `<tspan x="${lx}" dy="${k ? 26 : 0}">${l}</tspan>`).join("")}</text>`;
     }
-    const PATHS = LINES.map(l => l.slice(1).map((n, c) => route(l[c], n)));
-    LINES.forEach((l, r) =>
-      PATHS[r].forEach(pts => {
-        const q = pts.map(p => p.slice()),
-          n = q.length - 1;
-        q[0][0] += 40;
-        q[n][0] -= 42;
-        g += `<polyline class="wpf-w" data-r="${r}" points="${q.map(p => p.join(",")).join(" ")}" marker-end="url(#wpfP)"/>`;
-      })
-    );
-    LINES.forEach((l, r) =>
-      l.forEach(([k, x, y]) => {
-        if (k[0] === "@") {
-          const a = k.slice(1);
-          g += `<g class="wpf-n ag" data-r="${r}"><circle cx="${x}" cy="${y}" r="34" ${agDisc(a)}/>${ico(a, x, y + 1, 38, agFg(a))}</g>`;
-        } else if (k.startsWith("dev:"))
-          g += `<g class="wpf-n dev" data-r="${r}"><circle cx="${x}" cy="${y}" r="36"/><image href="assets/avatars/${k.slice(4)}.jpg" x="${x - 32}" y="${y - 32}" width="64" height="64" clip-path="url(#wpfClip)"/></g>`;
-        else g += `<g class="wpf-n" data-r="${r}"><rect x="${x - 36}" y="${y - 34}" width="72" height="68" rx="14"/>${ico(k, x, y, 34)}</g>`;
-      })
-    );
-    g += LINES.map((l, r) => `<circle class="wpf-dot" data-r="${r}" r="9" cx="${l[0][1]}" cy="${l[0][2]}"/>`).join("");
-    g += `<g class="wpf-lbl">${LBL.map(([c, a, b]) => `<text class="a" x="${LINES[1][c][1]}" y="${LINES[1][c][2] + 60}">${a}</text><text class="b" x="${LINES[1][c][1]}" y="${LINES[1][c][2] + 78}">${b}</text>`).join("")}</g>`;
+    // several researchers, one dispatcher: ghost cards stacked behind Researchers
+    [2, 1].forEach(i => (g += `<g class="rf-ghost-a"><rect x="${50 + i * 6}" y="${125 - i * 13}" width="230" height="50" rx="25"/><circle cx="${50 + i * 6}" cy="${150 - i * 13}" r="34"/></g>`));
+    g += agent("nResearch", 50, 150, 230, "Researchers") + agent("nDispatch", 400, 150, 230, "Dispatcher") + agent("nCoder", 750, 150, 230, "Coder");
+    g += agent("nReview", 1100, 150, 230, "Reviewers") + agent("nFinish", 1450, 150, 210, "Finisher") + agent("nDreamer", 50, 570, 230, "Dreamer");
+    // concurrent pull requests: ghost cards stacked behind each per-PR artifact
+    [750, 1100, 1450].forEach(x => [2, 1].forEach(i => (g += `<rect class="rf-ghost-a" x="${x - 36 + i * 6}" y="${306 - i * 13}" width="72" height="68" rx="14"/>`)));
+    g += box("nIssue", 50, 340, "issue") + slots("nSlots", 400, 340) + box("nPR", 750, 340, "pr") + box("nFind", 1100, 340, "comment") + box("nFix", 1450, 340, "tasklist") + box("nMerge", 750, 570, "merge");
+    g += dev("nMaint", 1100, 570);
+    g += `<circle class="fm-dot mra-dot" r="8"/>`;
     const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-    svg.setAttribute("class", "wpf-svg");
+    svg.setAttribute("class", "fm-svg rf-svg");
+    svg.setAttribute("viewBox", `0 0 ${VW} ${VH}`);
+    svg.style.setProperty("--c", "#ab7df8");
     svg.innerHTML = g;
-    const nodes = LINES.map((_, r) => [...svg.querySelectorAll(`.wpf-n[data-r="${r}"]`)]),
-      dots = [...svg.querySelectorAll(".wpf-dot")],
-      lit = LINES.map(l => l.map(() => false));
-    const chips = STEPS.map(([t]) => h("span", {}, t)),
-      cap = h("div", { class: "wpf-cap" });
+    const $ = id => svg.querySelector("#" + id),
+      dot = svg.querySelector(".mra-dot");
     const ease = u => (u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2);
-    const STEP = 640,
+    const STEP = 950,
+      START = 700,
       HOLD = 900,
-      PHASE = [0.35, 0, 0.6, 0.2];
-    let step = 0,
-      t0 = 0,
-      cam = null,
-      vb = CAM[0].slice(),
+      T = [];
+    let END = START;
+    for (const s of SEQ) {
+      T.push(END);
+      END += s[2] || STEP;
+    }
+    const CYC = END + HOLD;
+    let t0 = 0,
+      cyc = -1,
       popK = -1;
-    const view = () => svg.setAttribute("viewBox", vb.map(n => n.toFixed(1)).join(" "));
-    const setStep = (s, snap) => {
-      step = s;
-      svg.dataset.step = s;
-      if (snap) {
-        vb = CAM[s].slice();
-        cam = null;
-        view();
-      } else cam = { from: vb.slice(), ts: 0 };
-      chips.forEach((c, i) => {
-        c.classList.toggle("on", i === s);
-        c.classList.toggle("done", i < s);
-      });
-      cap.textContent = STEPS[s][1];
-      cap.classList.remove("swap");
-      void cap.offsetWidth;
-      cap.classList.add("swap");
-      t0 = 0;
-      popK = -1;
-      nodes.forEach((row, r) =>
-        row.forEach((n, c) => {
-          n.classList.remove("on");
-          lit[r][c] = false;
-        })
-      );
+    const light = nid => {
+      $(nid).classList.add("on");
+      if (nid in LANE) $("rfLane" + LANE[nid]).classList.add("on");
+      if (nid === "nCoder") $("rfPR").classList.add("on");
     };
     slides.push({
       group: "platform",
       id: "workflows-process-factory",
       notes:
-        "What: An illustrative zoom-out in three steps. A workflow is one hop: an issue starts an agent, and the agent opens a pull request through safe outputs. Sequence workflows so each output triggers the next and you have a process. Run many processes that feed each other, each step on whichever harness fits it, with developers triaging, steering, reviewing and approving at the gates, and you have a factory.\nWhy: Every factory is made of processes, and every process is made of small, guarded workflows, so you build and improve the factory one workflow at a time while people keep the decisions.\nWhen: Start with one workflow, then wire its output into the next. Press the right arrow to zoom out a level.",
-      enter(dir) {
-        setStep(dir < 0 ? 2 : 0, true);
-      },
-      onNext() {
-        if (step >= 2) return false;
-        setStep(step + 1);
-        sfx.step();
-        return true;
-      },
-      onPrev() {
-        if (step <= 0) return false;
-        setStep(step - 1);
-        sfx.step();
-        return true;
+        "What: An illustrative factory: processes create factories. The Repo Factory recipe is the process a coding agent follows to give a repository a small set of agentic workflows in five roles. Several Researchers file scoped issues, never pull requests. One Dispatcher admits issues into three shared coding slots on weekdays, so up to three pull request flows run at once. In each flow a Coder opens the pull request, Reviewers leave at most three findings and Finisher repairs them, looping back for re-review for at most two rounds; then the pull request is ready or escalated, and a maintainer merges. Dreamer observes runs, costs and outcomes, then proposes one reversible change as a new issue.\nWhy: Handoffs go through issues and pull requests, and capacity is capped, so agents cannot flood the repository and people stay at the gates.\nWhen: Use it to bootstrap continuous improvement in a repository that already has CI and maintainers who review.",
+      enter() {
+        t0 = 0;
+        cyc = -1;
       },
       tick(t) {
-        if (cam) {
-          if (!cam.ts) cam.ts = t;
-          const p = Math.min(1, (t - cam.ts) / 1100),
-            e = ease(p);
-          vb = cam.from.map((a, i) => a + (CAM[step][i] - a) * e);
-          view();
-          if (p >= 1) cam = null;
-        }
         if (!t0) t0 = t;
-        LINES.forEach((l, r) => {
-          const d = dots[r];
-          if (step < 2 && r !== 1) return void (d.style.opacity = 0);
-          const cmax = step < 2 ? [2, 6][step] : l.length - 1,
-            RUN = cmax * STEP,
-            CYC = RUN + HOLD,
-            u = (t - t0 + (step === 2 ? PHASE[r] * CYC : 0)) % CYC,
-            k = Math.min(cmax - 1, Math.floor(u / STEP)),
-            f = u >= RUN ? 1 : ease(Math.min(1, (u - k * STEP) / STEP / 0.8)),
-            [x, y] = along(PATHS[r][k], f);
-          d.setAttribute("cx", x.toFixed(1));
-          d.setAttribute("cy", y.toFixed(1));
-          d.style.opacity = u < RUN ? 1 : 0;
-          for (let c = 0; c < l.length; c++) {
-            const on = c <= cmax && (c <= k || (c === k + 1 && f > 0.95));
-            if (on !== lit[r][c]) {
-              lit[r][c] = on;
-              nodes[r][c].classList.toggle("on", on);
-            }
-          }
-          if (r === 1 && u < RUN && k !== popK) {
+        const e = t - t0,
+          c = Math.floor(e / CYC),
+          u = e % CYC;
+        if (c !== cyc) {
+          cyc = c;
+          svg.querySelectorAll(".on, .hot").forEach(x => x.classList.remove("on", "hot"));
+          light("nResearch");
+          popK = -1;
+        }
+        svg.querySelectorAll(".fm-wire.hot").forEach(w => w.classList.remove("hot"));
+        if (u < START || u >= END) {
+          dot.style.opacity = 0;
+          return;
+        }
+        let k = 0;
+        while (k + 1 < SEQ.length && T[k + 1] <= u) k++;
+        const [eid, nid, dur = STEP] = SEQ[k],
+          f = (u - T[k]) / dur,
+          p = $(eid),
+          n = p.getTotalLength(),
+          q = p.getPointAtLength(n * ease(Math.min(1, f / 0.8)));
+        p.classList.add("hot");
+        if (dot.style.opacity !== "1") sfx.pop(0);
+        dot.style.opacity = 1;
+        dot.setAttribute("cx", q.x);
+        dot.setAttribute("cy", q.y);
+        dot.setAttribute("fill", p.classList.contains("b") ? "#4493f8" : "#ab7df8");
+        for (let j = 0; j < k; j++) light(SEQ[j][1]);
+        if (f >= 0.8) {
+          if (popK !== k) {
             popK = k;
             sfx.pop(k);
           }
-        });
+          light(nid);
+        }
       },
-      el: h(
-        "section",
-        { class: "slide wpf" },
-        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Every factory is made of processes"), h("h2", {}, letters("Workflows → Process → "), letters("Factory", "l-grad"))),
-        h(
-          "div",
-          { class: "wpf-steps" },
-          chips.flatMap((c, i) => (i ? [h("i", {}, "→"), c] : [c]))
-        ),
-        svg,
-        cap
-      ),
+      el: h("section", { class: "slide" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Processes create factories"), h("h2", { class: "pf-h" }, letters("Turn Workflows into "), letters("Factories", "l-grad"))), svg),
     });
   }
   // Repo widget: repo octicon, name and star count. Shows the snapshot default; on the published https page it
@@ -9032,168 +8902,6 @@
         panel,
         svg
       ),
-    });
-  }
-
-  // Factory Factory: processes create factories; the Repo Factory recipe builds one where five roles share one issue-to-merge loop: several Researchers file issues, one Dispatcher starts concurrent pull request flows in three weekday coding slots, where a Coder, Reviewers and Finisher drive each to a maintainer, and Dreamer turns outcomes into one proposed change
-  {
-    const AG = pickAgent();
-    resetIndex();
-    const VW = 1700,
-      VH = 680;
-    const ico = (n, x, y, sz, fill = "#f0f6fc") => `<g transform="translate(${x - sz / 2},${y - sz / 2}) scale(${sz / (n === "merge" ? 16 : 24)})" fill="${fill}">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</g>`;
-    const agent = (id, x, y, w, label) => `<g class="fm-task" id="${id}"><g class="fm-pill"><rect x="${x}" y="${y - 25}" width="${w}" height="50" rx="25"/><text x="${x + 18 + w / 2}" y="${y + 8}">${label}</text></g>
-      <circle cx="${x}" cy="${y}" r="34" ${agDisc(AG)}/>${ico(AG, x, y + 1, 38, agFg(AG))}</g>`;
-    const dev = (id, x, y) => `<g class="fm-task mra-dev" id="${id}"><g class="fm-pill b"><rect x="${x}" y="${y - 25}" width="220" height="50" rx="25"/><text x="${x + 18 + 110}" y="${y + 8}">Maintainer</text></g>
-      <circle cx="${x}" cy="${y}" r="34" fill="#0d1117" stroke="#4493f8" stroke-width="3"/><image href="assets/avatars/mona.jpg" x="${x - 31}" y="${y - 31}" width="62" height="62" clip-path="url(#rfClip)"/></g>`;
-    const box = (id, x, y, icon) => `<g class="fm-out" id="${id}"><rect x="${x - 36}" y="${y - 34}" width="72" height="68" rx="14"/>${ico(icon, x, y, 34)}</g>`;
-    // three shared coding slots: two already busy, the third fills when Dispatcher admits the issue
-    const slots = (id, x, y) => {
-      let s = `<g class="fm-out rf-slots" id="${id}">`;
-      [0, 1, 2].forEach(i => (s += `<rect class="rf-slot${i < 2 ? " busy" : ""}" x="${x - 70 + i * 50}" y="${y - 26}" width="40" height="52" rx="8"/>`));
-      return s + `<text class="rf-cap" x="${x}" y="${y + 58}">3 shared slots</text><text class="rf-cap" x="${x}" y="${y + 82}">weekdays · UTC</text></g>`;
-    };
-    // [edge id, path, color, label, lx, ly, anchor]
-    const EDGES = [
-      ["e1", "M50 184 V304", "p", ["files scoped", "issues"], 72, 236, "start"],
-      ["e2", "M86 340 H300 V150 H364", "p", ["eligible issue"], 190, 324, "middle"],
-      ["e3", "M400 184 V310", "p", ["reserves", "a slot"], 422, 236, "start"],
-      ["e4", "M476 340 H650 V150 H714", "p", ["starts PRs"], 563, 324, "middle"],
-      ["e5", "M750 184 V304", "p", ["opens", "pull request"], 772, 236, "start"],
-      ["e6", "M786 340 H1000 V150 H1064", "p", ["ready for review"], 893, 324, "middle"],
-      ["e7", "M1100 184 V304", "p", ["≤ 3", "findings"], 1122, 236, "start"],
-      ["e8", "M1136 340 H1350 V150 H1414", "p", ["stalled · failing"], 1243, 324, "middle"],
-      ["e9", "M1450 184 V304", "p", ["bounded repair,", "≤ 2 rounds"], 1472, 236, "start"],
-      ["e14", "M1430 376 V418 H1100 V380", "p", ["re-review"], 1265, 448, "middle"],
-      ["e10", "M1470 376 V570 H1330", "b", ["ready, or", "escalate"], 1492, 470, "start"],
-      ["e11", "M1064 570 H788", "b", ["reviews & merges"], 926, 554, "middle"],
-      ["e12", "M714 570 H290", "p day", ["observes runs · costs · outcomes"], 502, 554, "middle"],
-      ["e13", "M50 536 V380", "p day", ["proposes one", "reversible change"], 72, 450, "start"],
-    ];
-    // the work item's journey: [edge, node lit on arrival, duration]
-    const SEQ = [
-      ["e1", "nIssue"],
-      ["e2", "nDispatch"],
-      ["e3", "nSlots"],
-      ["e4", "nCoder"],
-      ["e5", "nPR"],
-      ["e6", "nReview"],
-      ["e7", "nFind"],
-      ["e8", "nFinish"],
-      ["e9", "nFix"],
-      ["e14", "nFind"],
-      ["e8", "nFinish"],
-      ["e9", "nFix"],
-      ["e10", "nMaint"],
-      ["e11", "nMerge"],
-      ["e12", "nDreamer", 1500],
-      ["e13", "nIssue", 1500],
-    ];
-    const LANE = { nResearch: 0, nIssue: 0, nDispatch: 1, nSlots: 1, nCoder: 2, nPR: 2, nReview: 3, nFind: 3, nFinish: 4, nFix: 4 };
-    let g = `<defs><clipPath id="rfClip" clipPathUnits="objectBoundingBox"><circle cx=".5" cy=".5" r=".5"/></clipPath>
-      <marker id="rfP" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#ab7df8"/></marker>
-      <marker id="rfB" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#4493f8"/></marker></defs>`;
-    // code, review and finish run as one pull request flow per coding slot; the ghost frames behind are the concurrent ones
-    [2, 1].forEach(i => (g += `<rect class="rf-pr rf-ghost" x="${682 + i * 10}" y="${78 - i * 12}" width="986" height="544" rx="26"/>`));
-    g += `<rect class="rf-pr" id="rfPR" x="682" y="78" width="986" height="544" rx="26"/><text class="rf-zone rf-prt" x="1692" y="660" text-anchor="end">CONCURRENT PR FLOWS · ONE PER SLOT</text>`;
-    g += `<rect class="fm-lane" x="-20" y="0" width="${VW + 20}" height="60"/>`;
-    [
-      [-20, 350, "RESEARCH"],
-      [350, 700, "DISPATCH"],
-      [700, 1050, "CODE"],
-      [1050, 1400, "REVIEW"],
-      [1400, VW, "FINISH"],
-    ].forEach(([x0, x1, t], i) => {
-      g += `<text class="fm-lane-t mra-lane" id="rfLane${i}" x="${(x0 + x1) / 2}" y="40">${t}</text>`;
-      if (i) g += `<line class="fm-div" x1="${x0}" y1="0" x2="${x0}" y2="440"/>`;
-    });
-    g += `<line class="fm-div rf-gate" x1="-20" y1="470" x2="${VW}" y2="470"/><text class="rf-zone" x="-20" y="660">HUMAN GATE · DREAMER LEARNS</text>`;
-    for (const [id, d, c, lab, lx, ly, an] of EDGES) {
-      g += `<path class="fm-wire ${c}" id="${id}" d="${d}" marker-end="url(#rf${c.startsWith("p") ? "P" : "B"})"/>`;
-      g += `<text class="mra-l ${c}" x="${lx}" y="${ly}" text-anchor="${an}">${lab.map((l, k) => `<tspan x="${lx}" dy="${k ? 26 : 0}">${l}</tspan>`).join("")}</text>`;
-    }
-    // several researchers, one dispatcher: ghost cards stacked behind Researchers
-    [2, 1].forEach(i => (g += `<g class="rf-ghost-a"><rect x="${50 + i * 6}" y="${125 - i * 13}" width="230" height="50" rx="25"/><circle cx="${50 + i * 6}" cy="${150 - i * 13}" r="34"/></g>`));
-    g += agent("nResearch", 50, 150, 230, "Researchers") + agent("nDispatch", 400, 150, 230, "Dispatcher") + agent("nCoder", 750, 150, 230, "Coder");
-    g += agent("nReview", 1100, 150, 230, "Reviewers") + agent("nFinish", 1450, 150, 210, "Finisher") + agent("nDreamer", 50, 570, 230, "Dreamer");
-    // concurrent pull requests: ghost cards stacked behind each per-PR artifact
-    [750, 1100, 1450].forEach(x => [2, 1].forEach(i => (g += `<rect class="rf-ghost-a" x="${x - 36 + i * 6}" y="${306 - i * 13}" width="72" height="68" rx="14"/>`)));
-    g += box("nIssue", 50, 340, "issue") + slots("nSlots", 400, 340) + box("nPR", 750, 340, "pr") + box("nFind", 1100, 340, "comment") + box("nFix", 1450, 340, "tasklist") + box("nMerge", 750, 570, "merge");
-    g += dev("nMaint", 1100, 570);
-    g += `<circle class="fm-dot mra-dot" r="8"/>`;
-    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-    svg.setAttribute("class", "fm-svg rf-svg");
-    svg.setAttribute("viewBox", `0 0 ${VW} ${VH}`);
-    svg.style.setProperty("--c", "#ab7df8");
-    svg.innerHTML = g;
-    const $ = id => svg.querySelector("#" + id),
-      dot = svg.querySelector(".mra-dot");
-    const ease = u => (u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2);
-    const STEP = 950,
-      START = 700,
-      HOLD = 900,
-      T = [];
-    let END = START;
-    for (const s of SEQ) {
-      T.push(END);
-      END += s[2] || STEP;
-    }
-    const CYC = END + HOLD;
-    let t0 = 0,
-      cyc = -1,
-      popK = -1;
-    const light = nid => {
-      $(nid).classList.add("on");
-      if (nid in LANE) $("rfLane" + LANE[nid]).classList.add("on");
-      if (nid === "nCoder") $("rfPR").classList.add("on");
-    };
-    slides.push({
-      group: "process",
-      notes:
-        "What: An illustrative Factory Factory: processes create factories. The Repo Factory recipe is the process a coding agent follows to give a repository a small set of agentic workflows in five roles. Several Researchers file scoped issues, never pull requests. One Dispatcher admits issues into three shared coding slots on weekdays, so up to three pull request flows run at once. In each flow a Coder opens the pull request, Reviewers leave at most three findings and Finisher repairs them, looping back for re-review for at most two rounds; then the pull request is ready or escalated, and a maintainer merges. Dreamer observes runs, costs and outcomes, then proposes one reversible change as a new issue.\nWhy: Handoffs go through issues and pull requests, and capacity is capped, so agents cannot flood the repository and people stay at the gates.\nWhen: Use it to bootstrap continuous improvement in a repository that already has CI and maintainers who review.",
-      enter() {
-        t0 = 0;
-        cyc = -1;
-      },
-      tick(t) {
-        if (!t0) t0 = t;
-        const e = t - t0,
-          c = Math.floor(e / CYC),
-          u = e % CYC;
-        if (c !== cyc) {
-          cyc = c;
-          svg.querySelectorAll(".on, .hot").forEach(x => x.classList.remove("on", "hot"));
-          light("nResearch");
-          popK = -1;
-        }
-        svg.querySelectorAll(".fm-wire.hot").forEach(w => w.classList.remove("hot"));
-        if (u < START || u >= END) {
-          dot.style.opacity = 0;
-          return;
-        }
-        let k = 0;
-        while (k + 1 < SEQ.length && T[k + 1] <= u) k++;
-        const [eid, nid, dur = STEP] = SEQ[k],
-          f = (u - T[k]) / dur,
-          p = $(eid),
-          n = p.getTotalLength(),
-          q = p.getPointAtLength(n * ease(Math.min(1, f / 0.8)));
-        p.classList.add("hot");
-        if (dot.style.opacity !== "1") sfx.pop(0);
-        dot.style.opacity = 1;
-        dot.setAttribute("cx", q.x);
-        dot.setAttribute("cy", q.y);
-        dot.setAttribute("fill", p.classList.contains("b") ? "#4493f8" : "#ab7df8");
-        for (let j = 0; j < k; j++) light(SEQ[j][1]);
-        if (f >= 0.8) {
-          if (popK !== k) {
-            popK = k;
-            sfx.pop(k);
-          }
-          light(nid);
-        }
-      },
-      el: h("section", { class: "slide" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Processes create factories"), h("h2", {}, letters("Factory "), letters("Factory", "l-grad"))), svg),
     });
   }
 
@@ -14661,7 +14369,7 @@
     });
   }
 
-  // Turn Intent into Value: Turn Intent to Workflow's cards again, on gh-aw's Schema Feature Coverage workflow: a design agent extracts only the phrases that define value from its Markdown and turns them into one deterministic value function, frozen before any results
+  // Turn Intent into Value: Turn Intent to Workflows's cards again, on gh-aw's Schema Feature Coverage workflow: a design agent extracts only the phrases that define value from its Markdown and turns them into one deterministic value function, frozen before any results
   {
     resetIndex();
     // the pieces that define value: [chip, colour, how the agent reads it]
@@ -25138,7 +24846,7 @@
       "Add agentic workflow that uses Serena MCP docker … to analyze the changes in commits to main and detect duplicated code.",
       "Add agentic workflow that uses Serena MCP docker (using container feature) to analyze the changes in commits to main and detect duplicated code.",
     ],
-    "Factory Factory": [
+    "Turn Workflows into Factories": [
       "repo-factory",
       "create a factory that researches this repo daily, dispatches issues to coding agents, reviews and finishes PRs, and dreams up improvements",
       "create a factory that researches this repository every day, files scoped issues, dispatches up to three at a time to coding agents on weekdays, reviews and finishes the pull requests, and lets a Dreamer propose one reversible improvement at a time for a maintainer to approve.",
