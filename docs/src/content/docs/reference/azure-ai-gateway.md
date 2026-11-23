@@ -97,14 +97,10 @@ engine:
     COPILOT_PROVIDER_TYPE: openai
     COPILOT_PROVIDER_WIRE_API: responses
     COPILOT_PROVIDER_API_KEY: ${{ secrets.AZURE_AI_GATEWAY_KEY }}
-network:
-  allowed:
-    - defaults
-    - YOUR_GATEWAY_HOST
 ```
 
-gh-aw allows a literal `COPILOT_PROVIDER_BASE_URL` host automatically, so the
-`network.allowed` entry above is optional. When the URL comes from
+gh-aw allows a literal `COPILOT_PROVIDER_BASE_URL` host automatically, so no
+`network.allowed` entry is needed. When the URL comes from
 `${{ vars.* }}` or `${{ secrets.* }}`, AWF resolves it at runtime and allows
 exactly that host; avoid broad entries such as `services.ai.azure.com`.
 
