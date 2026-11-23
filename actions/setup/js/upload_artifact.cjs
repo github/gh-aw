@@ -43,6 +43,7 @@ const { globPatternToRegex } = require("./glob_pattern_helpers.cjs");
 const { ERR_VALIDATION, ERR_SYSTEM } = require("./error_codes.cjs");
 const { isTemporaryId, normalizeTemporaryId } = require("./temporary_id.cjs");
 const { lstatGuard } = require("./symlink_guard.cjs");
+const { copyFileExclusive, directoriesHaveSameContents } = require("./staging_conflicts.cjs");
 const { digestArtifactFiles, handlerAuthorizationRequired, requireAuthorization } = require("./safe_output_authorization_gate.cjs");
 const { canonicalDigest } = require("./safe_output_authorization.cjs");
 const {
@@ -259,11 +260,6 @@ function copySingleFileToStaging(sourcePath, destRelPath) {
     return { error: `filenames beginning with "-" are not allowed: ${destRelPath}` };
   }
   const destPath = path.join(stagingDirectory(), destRelPath);
-  // Never overwrite a file that is already staged — the pre-staged version takes precedence.
-  if (fs.existsSync(destPath)) {
-    core.info(`Skipping auto-copy for ${destRelPath}: already exists in staging directory`);
-    return { error: null };
-  }
   const stat = lstatGuard(sourcePath);
   if (stat === null) {
     return { error: `symlinks are not allowed: ${sourcePath}` };
@@ -278,8 +274,15 @@ function copySingleFileToStaging(sourcePath, destRelPath) {
     throw new Error(`${ERR_SYSTEM}: Failed to create directory ${path.dirname(destPath)}: ${getErrorMessage(err)}`, { cause: err });
   }
   try {
-    fs.copyFileSync(sourcePath, destPath);
-    fs.chmodSync(destPath, 0o600);
+    const copyResult = copyFileExclusive(sourcePath, destPath);
+    if (copyResult === "conflict") {
+      return { error: `staging name conflict for ${destRelPath}; rename the file or use a distinct path` };
+    }
+    if (copyResult === "identical") {
+      core.info(`Skipping auto-copy for ${destRelPath}: identical file already exists in staging directory`);
+    } else {
+      fs.chmodSync(destPath, 0o600);
+    }
   } catch (err) {
     throw new Error(`${ERR_SYSTEM}: Failed to copy file ${sourcePath} to ${destPath}: ${getErrorMessage(err)}`, { cause: err });
   }
@@ -296,6 +299,43 @@ function copySingleFileToStaging(sourcePath, destRelPath) {
  */
 function copyDirectoryToStaging(sourceDir, destRelDir) {
   let copiedCount = 0;
+  const destDir = path.join(stagingDirectory(), destRelDir);
+  if (fs.existsSync(destDir)) {
+    const validateDirectorySourcePaths = dir => {
+      let entries;
+      try {
+        entries = fs.readdirSync(dir, { withFileTypes: true });
+      } catch (err) {
+        return `failed to read directory ${dir}: ${getErrorMessage(err)}`;
+      }
+      for (const entry of entries) {
+        if (!entry.isDirectory() && !entry.isFile()) continue;
+        const sourcePath = path.join(dir, entry.name);
+        let canonicalSourcePath;
+        try {
+          canonicalSourcePath = fs.realpathSync(sourcePath);
+        } catch (err) {
+          return `failed to resolve canonical path for ${sourcePath}: ${getErrorMessage(err)}`;
+        }
+        const sensitiveError = validateSourcePath(canonicalSourcePath);
+        if (sensitiveError) return sensitiveError;
+        if (entry.isDirectory()) {
+          const nestedError = validateDirectorySourcePaths(sourcePath);
+          if (nestedError) return nestedError;
+        }
+      }
+      return null;
+    };
+    const validationError = validateDirectorySourcePaths(sourceDir);
+    if (validationError) return { copiedCount, error: validationError };
+    try {
+      if (!directoriesHaveSameContents(sourceDir, destDir)) {
+        return { copiedCount, error: `staging name conflict for ${destRelDir}; rename the directory or use a distinct path` };
+      }
+    } catch (err) {
+      return { copiedCount, error: `failed to compare directory ${sourceDir} with staging directory ${destDir}: ${getErrorMessage(err)}` };
+    }
+  }
   const entries = fs.readdirSync(sourceDir, { withFileTypes: true });
   for (const entry of entries) {
     const srcFull = path.join(sourceDir, entry.name);

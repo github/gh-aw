@@ -801,18 +801,40 @@ describe("upload_artifact.cjs", () => {
       expect(content).toBe("staged version");
     });
 
-    it("does not overwrite pre-staged file when auto-copying from absolute path", async () => {
+    it("rejects a conflicting pre-staged file when auto-copying from absolute path", async () => {
       writeStaging("data.json", "original staged");
       writeWorkspace("data.json", "workspace version");
       const absFile = path.join(WORKSPACE_DIR, "data.json");
 
       const results = await runHandler(buildConfig(), [{ type: "upload_artifact", path: absFile }]);
 
-      expect(results[0].success).toBe(true);
-      // The pre-staged file must not be overwritten.
+      expect(results[0].success).toBe(false);
+      expect(results[0].error).toContain("staging name conflict for data.json");
       const content = fs.readFileSync(path.join(STAGING_DIR, "data.json"), "utf8");
       expect(content).toBe("original staged");
-      expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("already exists in staging"));
+      expect(mockArtifactClient.uploadArtifact).not.toHaveBeenCalled();
+    });
+
+    it("accepts identical pre-staged content when auto-copying from absolute path", async () => {
+      writeStaging("data.json", "same content");
+      writeWorkspace("data.json", "same content");
+
+      const results = await runHandler(buildConfig(), [{ type: "upload_artifact", path: path.join(WORKSPACE_DIR, "data.json") }]);
+
+      expect(results[0].success).toBe(true);
+      expect(mockArtifactClient.uploadArtifact).toHaveBeenCalledOnce();
+    });
+
+    it("rejects directory basename collisions with different contents", async () => {
+      writeStaging("output/staged.txt", "staged content");
+      writeWorkspace("output/workspace.txt", "workspace content");
+
+      const results = await runHandler(buildConfig(), [{ type: "upload_artifact", path: path.join(WORKSPACE_DIR, "output") }]);
+
+      expect(results[0].success).toBe(false);
+      expect(results[0].error).toContain("staging name conflict for output");
+      expect(fs.existsSync(path.join(STAGING_DIR, "output/workspace.txt"))).toBe(false);
+      expect(mockArtifactClient.uploadArtifact).not.toHaveBeenCalled();
     });
 
     it("rejects symlinks during auto-copy from absolute path", async () => {
@@ -944,11 +966,15 @@ describe("upload_artifact.cjs", () => {
       fs.mkdirSync(gitDir, { recursive: true });
       fs.writeFileSync(path.join(gitDir, "config"), "[core]\n  repositoryformatversion = 0\n");
       fs.writeFileSync(path.join(srcDir, "readme.md"), "hello");
+      writeStaging("project/.git/config", "[core]\n  repositoryformatversion = 0\n");
+      writeStaging("project/readme.md", "hello");
+      const open = vi.spyOn(fs, "openSync");
 
       await runHandler(buildConfig(), [{ type: "upload_artifact", path: srcDir }]);
 
       expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("sensitive repository metadata"));
       expect(mockArtifactClient.uploadArtifact).not.toHaveBeenCalled();
+      expect(open).not.toHaveBeenCalled();
     });
 
     it("allows a path within GITHUB_WORKSPACE", async () => {
