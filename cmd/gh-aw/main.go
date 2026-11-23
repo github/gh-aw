@@ -1006,6 +1006,45 @@ func addCommandsToRoot(cmds commandSet) {
 	)
 }
 
+func commandTreePaths(root *cobra.Command) []string {
+	var paths []string
+	var visit func(*cobra.Command, string)
+	visit = func(parent *cobra.Command, parentPath string) {
+		for _, child := range parent.Commands() {
+			if child.Hidden || child.IsAdditionalHelpTopicCommand() {
+				continue
+			}
+			path := child.Name()
+			if parentPath != "" {
+				path = parentPath + " " + path
+			}
+			paths = append(paths, path)
+			visit(child, path)
+		}
+	}
+	visit(root, "")
+	sort.Strings(paths)
+	return paths
+}
+
+func commandTreeCommand() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:    "__command-tree",
+		Hidden: true,
+		Args:   cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			for _, path := range commandTreePaths(cmd.Root()) {
+				if _, err := fmt.Fprintln(cmd.OutOrStdout(), path); err != nil {
+					return err
+				}
+			}
+			return nil
+		},
+	}
+	cmd.SetOut(os.Stdout)
+	return cmd
+}
+
 func fixSubCommandHelpFlags() {
 	var fix func(cmd *cobra.Command)
 	fix = func(cmd *cobra.Command) {
@@ -1033,6 +1072,7 @@ func init() {
 	configureOtherCommandFlags()
 	assignCommandGroups(cmds)
 	addCommandsToRoot(cmds)
+	rootCmd.AddCommand(commandTreeCommand())
 	fixSubCommandHelpFlags()
 }
 

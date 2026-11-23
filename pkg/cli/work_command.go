@@ -61,7 +61,7 @@ func NewWorkCommandWithNativeDeliveryHost(host *workqueue.NativeDeliveryHost) *c
 		},
 		RunE: func(cmd *cobra.Command, _ []string) error { return cmd.Help() },
 	}
-	root.PersistentFlags().StringP("repo", "r", "", "Target repository (owner/repo format)")
+	root.PersistentFlags().StringP("repo", "r", "", "Target repository ([HOST/]owner/repo format). Defaults to current repository")
 	root.PersistentFlags().String("branch", workqueue.DefaultBranch, workQueueBranchDescription)
 	root.PersistentFlags().String("storage", "git", "Queue storage (git only)")
 	root.PersistentFlags().String("request-id", "", "Stable publication handle, or committed request to inspect with explain/trace")
