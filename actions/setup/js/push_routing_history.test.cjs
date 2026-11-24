@@ -969,10 +969,10 @@ describe("push_routing_history saves", () => {
     expect(finalState.unresolved_run_ids).toBeUndefined();
   });
 
-  it("does not advance coverage when an older gap below the unfiltered first page remains missing", async () => {
+  it("tracks an older missing run below the unfiltered first page as unresolved so later runs keep reconciling", async () => {
     const remote = bareRemote();
     await save(remote, 100, "success");
-    // #100 and #103..#205 exist (#101 is PR, #102 is omitted from all pages): #205 must not skip #102.
+    // #100 and #103..#205 exist (#101 is PR, #102 is omitted from all pages): #205 tracks #102 in unresolved_runs instead of skipping it.
     const runs = [
       { id: 9205, run_number: 205, status: "completed", conclusion: "success", head_branch: "main", event: "schedule", run_attempt: 1 },
       ...Array.from({ length: 102 }, (_, i) => {
@@ -991,7 +991,60 @@ describe("push_routing_history saves", () => {
       { id: 9100, run_number: 100, status: "completed", conclusion: "success", head_branch: "main", event: "schedule", run_attempt: 1 },
     ];
     await save(remote, 205, "success", { github: fakeGitHub(remote, { runs }) });
-    expect(remoteState(remote)).toMatchObject({ last_run: 205, reconciled_through: 100, unresolved_runs: [] });
+    expect(remoteState(remote)).toMatchObject({ last_run: 205, reconciled_through: 205, unresolved_runs: [102] });
+  });
+
+  it("rotates direct unresolved run-ID lookups across saves when more than ten tracked runs are missing", async () => {
+    const remote = bareRemote();
+    const unresolvedRuns = Array.from({ length: 11 }, (_, i) => i + 1);
+    const unresolvedRunIds = Object.fromEntries(unresolvedRuns.map(n => [String(n), String(9000 + n)]));
+    seedHistory(
+      remote,
+      {
+        ...emptyState("triage"),
+        generation: { hash: GENERATION, since_run: 1 },
+        last_run: 900,
+        reconciled_through: 900,
+        unresolved_runs: unresolvedRuns,
+        unresolved_run_ids: unresolvedRunIds,
+        unexplained: 0,
+      },
+      []
+    );
+    const agent = { name: "agent", conclusion: "failure", started_at: "2026-11-24T09:00:00Z" };
+    const writer = conclusion => ({ name: "push_routing_history", conclusion, started_at: "2026-11-24T09:10:00Z" });
+    const runsById = Object.fromEntries(
+      unresolvedRuns.map(n => [
+        9000 + n,
+        {
+          id: 9000 + n,
+          run_number: n,
+          status: n === 11 ? "completed" : "in_progress",
+          conclusion: n === 11 ? "failure" : null,
+          head_branch: "main",
+          event: "schedule",
+          run_attempt: 1,
+        },
+      ])
+    );
+    const recentRuns = Array.from({ length: 100 }, (_, i) => ({
+      id: 9900 - i,
+      run_number: 900 - i,
+      status: "completed",
+      conclusion: "success",
+      head_branch: "main",
+      event: "schedule",
+      run_attempt: 1,
+    }));
+    const github = fakeGitHub(remote, { runs: recentRuns, runsById, jobs: { 9011: [agent, writer("failure")] } });
+
+    // Across two consecutive saves, rotation ensures the 11th run (#11) receives a direct lookup and is charged.
+    await save(remote, 901, "success", { github });
+    recentRuns.unshift({ id: 9901, run_number: 901, status: "completed", conclusion: "success", head_branch: "main", event: "schedule", run_attempt: 1 });
+    await save(remote, 902, "success", { github });
+    expect(github.calls.runs).toContain(9011);
+    expect(remoteState(remote)).toMatchObject({ reconciled_through: 902, unexplained: 1 });
+    expect(remoteState(remote).unresolved_runs).not.toContain(11);
   });
 
   it("resolves a retained older-generation failed save without charging it to the new generation", async () => {
@@ -1132,7 +1185,7 @@ describe("push_routing_history saves", () => {
     expect(remoteState(remote)).toMatchObject({ generation: { hash: NEW_GENERATION, since_run: 101 }, reconciled_through: 101, unexplained: 1 });
   });
 
-  it("holds reconciled_through across an uncorroborated gap and retains transiently absent unresolved runs", async () => {
+  it("tracks uncorroborated gaps in unresolved_runs without stalling later failure accounting, and retains transiently absent unresolved runs", async () => {
     const remote = bareRemote();
     await save(remote, 100, "success");
     const agent = { name: "agent", conclusion: "failure", started_at: "2026-11-24T09:00:00Z" };
@@ -1140,11 +1193,11 @@ describe("push_routing_history saves", () => {
     const run100 = { id: 9100, run_number: 100, status: "completed", conclusion: "success", head_branch: "main", event: "schedule", run_attempt: 1 };
     const run102 = { id: 9102, run_number: 102, status: "completed", conclusion: "success", head_branch: "main", event: "schedule", run_attempt: 1 };
 
-    // 1. Listing omits #101 between #100 and #102: do not advance reconciled_through past 100.
+    // 1. Listing omits #101 between #100 and #102: record #101 as unresolved rather than marking it reconciled or stalling.
     await save(remote, 102, "success", { github: fakeGitHub(remote, { runs: [run102, run100] }) });
-    expect(remoteState(remote)).toMatchObject({ last_run: 102, reconciled_through: 100, unresolved_runs: [], unexplained: 0 });
+    expect(remoteState(remote)).toMatchObject({ last_run: 102, reconciled_through: 102, unresolved_runs: [101], unexplained: 0 });
 
-    // 2. When #101 reappears as a failed save on #103 (with #104 still active? No, #103 sees #101), #101 is charged.
+    // 2. When #101 reappears as a failed save on #103, #101 is charged and cleared from unresolved_runs.
     const run101 = { id: 9101, run_number: 101, status: "completed", conclusion: "failure", head_branch: "main", event: "schedule", run_attempt: 1 };
     await save(remote, 103, "success", { github: fakeGitHub(remote, { runs: [run102, run101, run100], jobs: { 9101: [agent, writer("failure")] } }) });
     expect(remoteState(remote)).toMatchObject({ last_run: 103, reconciled_through: 103, unresolved_runs: [], unexplained: 1 });

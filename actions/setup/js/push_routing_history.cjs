@@ -23,7 +23,7 @@ const { execGitSync } = require("./git_helpers.cjs");
 const { readJsonlFile } = require("./jsonl_helpers.cjs");
 const { pushRepoMemoryChangesWithRetry } = require("./push_repo_memory.cjs");
 const { attributeRequest, routedRequests } = require("./routing_analytics.cjs");
-const { BOUNDS, applyRun, emptyState, trimRuns } = require("./routing_history.cjs");
+const { BOUNDS, applyRun, emptyState, legacyReconciliationFloor, trimRuns } = require("./routing_history.cjs");
 
 /** @typedef {import("./routing_history.cjs").HistoryState} HistoryState */
 
@@ -378,8 +378,10 @@ async function fetchStreamWindow(fetchPage, targetRunNumber, maxRunNumber, maxPa
   /** @type {number | null} */
   let newestTooOld = null;
   let oldestTooNew = 1;
+  // Allow enough bounded binary-search probes to locate floorPage before applying the upward chunk budget.
+  const searchBudget = Math.max(maxPages, Math.ceil(Math.log2(lastPage)) + 2);
 
-  while (lo <= hi && calls < maxPages) {
+  while (lo <= hi && calls < searchBudget) {
     const mid = Math.floor((lo + hi) / 2);
     const entry = await load(mid);
     if (entry.batch.length === 0) {
@@ -409,6 +411,8 @@ async function fetchStreamWindow(fetchPage, targetRunNumber, maxRunNumber, maxPa
     return { items: [...pages.values()].flatMap(p => p.batch), reachedFloor: false, maxVerified: targetRunNumber - 1 };
   }
 
+  // Reserve at least one upward chunk fetch after binary search locates floorPage so large backlogs keep advancing.
+  const walkBudget = Math.max(maxPages, calls + 1);
   let newestPage = floorPage;
   while (newestPage > 1) {
     const prevPage = newestPage - 1;
@@ -416,7 +420,7 @@ async function fetchStreamWindow(fetchPage, targetRunNumber, maxRunNumber, maxPa
       newestPage = prevPage;
       continue;
     }
-    if (calls >= maxPages) break;
+    if (calls >= walkBudget) break;
     const entry = await load(prevPage);
     if (entry.batch.length === 0) break;
     newestPage = prevPage;
@@ -483,10 +487,7 @@ async function listRuns({ githubClient, owner, repo, workflowFile, workflowPath 
     return { listing: [], reconciliation: { verified: true, unresolved: [], resolved: [] } };
   }
 
-  // Legacy state.json has no verified coverage: match applyRun's fence so evicted runs are not re-charged.
-  const runsTrimmed = runs.length >= BOUNDS.runs_lines || (runs.length > 0 && runs.reduce((total, entry) => total + Buffer.byteLength(JSON.stringify(entry), "utf8") + 1, 0) >= BOUNDS.runs_bytes - 1024);
-  const oldestRetained = runs.length > 0 ? runs.reduce((min, entry) => Math.min(min, entry.number), Infinity) : 0;
-  const legacyFloor = runsTrimmed && oldestRetained > 0 ? Math.max(state.generation.since_run, oldestRetained - 1) : state.generation.since_run;
+  const legacyFloor = legacyReconciliationFloor(state, runs);
   const baseReconciled = typeof state.reconciled_through === "number" ? state.reconciled_through : legacyFloor;
   const floor = Math.max(baseReconciled, state.reset_after_run || 0);
   // Leave tracked unresolved runs at or above this writer's number for a later writer to handle.
@@ -531,6 +532,8 @@ async function listRuns({ githubClient, owner, repo, workflowFile, workflowPath 
   }
   const hasIntervalGap = verified && knownInInterval.size < expectedIntervalCount;
 
+  /** @type {number[]} */
+  const unresolvedGaps = [];
   if (hasIntervalGap) {
     const sortedKnown = [...knownInInterval].sort((a, b) => a - b);
     let earliestGap = floor + 1;
@@ -559,33 +562,45 @@ async function listRuns({ githubClient, owner, repo, workflowFile, workflowPath 
         for (const num of writtenNumbers) if (num > floor && num <= verifiedUpper) covered.add(num);
         for (const num of eligibleByNumber.keys()) if (num > floor && num <= verifiedUpper) covered.add(num);
         for (const num of ineligibleNumbers) if (num > floor && num <= verifiedUpper) covered.add(num);
-        if (covered.size < Math.max(0, verifiedUpper - floor)) verified = false;
+        const missingCount = Math.max(0, verifiedUpper - floor) - covered.size;
+        if (missingCount > BOUNDS.unresolved_runs) {
+          verified = false;
+        } else if (missingCount > 0) {
+          // Track unexplained gaps as bounded unresolved obligations so transient omissions still
+          // reconcile when they reappear and permanently deleted runs do not halt later failure accounting.
+          for (let num = floor + 1; num <= verifiedUpper; num++) {
+            if (!covered.has(num)) unresolvedGaps.push(num);
+          }
+        }
       }
     }
   }
 
   /** @type {Set<number>} */
   const resolved = new Set();
-  // Resolve tracked unresolved runs that fell past the listing windows via bounded direct run-ID lookups.
+  // Resolve tracked unresolved runs that fell past the listing windows via bounded direct run-ID lookups,
+  // rotating the starting index across saves so every tracked run receives a turn.
   const stillMissingUnresolved = missingUnresolved.filter(num => !eligibleByNumber.has(num) && !ineligibleNumbers.has(num));
-  let directLookups = 0;
-  for (const num of stillMissingUnresolved) {
-    if (directLookups >= MAX_DIRECT_UNRESOLVED_LOOKUPS) break;
-    const storedId = storedUnresolvedIds[String(num)];
-    if (!storedId || typeof githubClient?.rest?.actions?.getWorkflowRun !== "function") continue;
-    directLookups += 1;
-    try {
-      const { data: run } = await githubClient.rest.actions.getWorkflowRun({ owner, repo, run_id: Number(storedId) || storedId });
-      if (run && Number.isInteger(run.run_number)) {
-        if (!isEligibleRun(run, defaultBranch)) {
-          ineligibleNumbers.add(num);
-        } else {
-          eligibleByNumber.set(num, run);
+  const lookupCandidates = stillMissingUnresolved.filter(num => Boolean(storedUnresolvedIds[String(num)]));
+  if (lookupCandidates.length > 0 && typeof githubClient?.rest?.actions?.getWorkflowRun === "function") {
+    const startOffset = (runNumber * MAX_DIRECT_UNRESOLVED_LOOKUPS) % lookupCandidates.length;
+    const countToCheck = Math.min(MAX_DIRECT_UNRESOLVED_LOOKUPS, lookupCandidates.length);
+    for (let i = 0; i < countToCheck; i++) {
+      const num = lookupCandidates[(startOffset + i) % lookupCandidates.length];
+      const storedId = storedUnresolvedIds[String(num)];
+      try {
+        const { data: run } = await githubClient.rest.actions.getWorkflowRun({ owner, repo, run_id: Number(storedId) || storedId });
+        if (run && Number.isInteger(run.run_number)) {
+          if (!isEligibleRun(run, defaultBranch)) {
+            ineligibleNumbers.add(num);
+          } else {
+            eligibleByNumber.set(num, run);
+          }
         }
+      } catch (error) {
+        // A confirmed 404 proves the tracked run was deleted; any other error leaves it unresolved.
+        if (/** @type {any} */ error?.status === 404) resolved.add(num);
       }
-    } catch (error) {
-      // A confirmed 404 proves the tracked run was deleted; any other error leaves it unresolved.
-      if (/** @type {any} */ error?.status === 404) resolved.add(num);
     }
   }
 
@@ -610,7 +625,7 @@ async function listRuns({ githubClient, owner, repo, workflowFile, workflowPath 
   const reconciliationCeiling = verified ? (fullCatchUp ? runNumber : verifiedUpper) : floor;
   const listing = [];
   /** @type {Set<number>} */
-  const unresolved = new Set();
+  const unresolved = new Set(verified ? unresolvedGaps : []);
   /** @type {Record<string, string>} */
   const unresolvedIds = {};
 

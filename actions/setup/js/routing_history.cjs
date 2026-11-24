@@ -334,6 +334,23 @@ function trimRuns(runs, overrides = {}) {
 }
 
 /**
+ * Bootstrap a legacy state.json (lacking `reconciled_through`) from its generation fence when
+ * `runs.jsonl` has not evicted earlier lines, or from just below the oldest retained line when
+ * eviction occurred so previously charged evicted runs are not re-charged while newer unverified
+ * runs stay in scope.
+ * @param {HistoryState} state
+ * @param {RunLine[]} runs
+ * @param {Partial<typeof BOUNDS>} [overrides]
+ */
+function legacyReconciliationFloor(state, runs, overrides = {}) {
+  const bounds = { ...BOUNDS, ...overrides };
+  if (!state.generation) return 0;
+  const runsTrimmed = runs.length >= bounds.runs_lines || (runs.length > 0 && runs.reduce((total, entry) => total + sizeOf(entry) + 1, 0) >= bounds.runs_bytes - 1024);
+  const oldestRetained = runs.length > 0 ? runs.reduce((min, entry) => Math.min(min, entry.number), Infinity) : 0;
+  return runsTrimmed && oldestRetained > 0 ? Math.max(state.generation.since_run, oldestRetained - 1) : state.generation.since_run;
+}
+
+/**
  * Apply one finished run. Returns the new state and the lines to append to runs.jsonl; the
  * inputs are not modified.
  * @param {HistoryState} input
@@ -384,12 +401,7 @@ function applyRun(input, runs, run, options = {}) {
 
   const hasReconciliation =
     (run.reconciliation !== undefined && run.reconciliation !== null) || typeof input.reconciled_through === "number" || Array.isArray(input.unresolved_runs) || (input.unresolved_run_ids !== undefined && input.unresolved_run_ids !== null);
-  // Legacy state.json has no verified coverage: bootstrap from its generation fence when runs.jsonl
-  // has not evicted earlier lines, or from just below the oldest retained line when eviction occurred
-  // so previously charged evicted runs are never re-charged while newer unverified runs stay in scope.
-  const runsTrimmed = runs.length >= bounds.runs_lines || (runs.length > 0 && runs.reduce((total, entry) => total + sizeOf(entry) + 1, 0) >= bounds.runs_bytes - 1024);
-  const oldestRetained = runs.length > 0 ? runs.reduce((min, entry) => Math.min(min, entry.number), Infinity) : 0;
-  const legacyFloor = state.generation ? (runsTrimmed && oldestRetained > 0 ? Math.max(state.generation.since_run, oldestRetained - 1) : state.generation.since_run) : 0;
+  const legacyFloor = legacyReconciliationFloor(state, runs, bounds);
   const prevReconciled = Math.max(typeof state.reconciled_through === "number" ? state.reconciled_through : legacyFloor, state.reset_after_run);
   const prevUnresolved = new Set((Array.isArray(state.unresolved_runs) ? state.unresolved_runs : []).filter(n => Number.isInteger(n) && n > state.reset_after_run));
   /** @type {Record<string, string>} */
@@ -614,6 +626,7 @@ module.exports = {
   averages,
   counts,
   emptyState,
+  legacyReconciliationFloor,
   memory,
   rate,
   receiptBound,
