@@ -15,6 +15,9 @@ const LEDGER_BYTES = 64 * 1024 * 1024;
 const CHECKPOINT_AFTER_LINES = 512;
 // Upper bound of the configurable pending_limit; replay enforces it per pool.
 const MAX_PENDING_WORK = 4096;
+// A Checkpoint keeps at most this many request IDs, the most recent of the log it
+// folds, so request_reused deduplicates a request through at least the next epoch.
+const RETAINED_REQUESTS = 4096;
 
 function boundedBytes(value, limit, name) {
   if (canonicalBytes(value) > limit) throw queueError("resource_limit", `${name} exceeds ${limit} canonical bytes`);
@@ -37,6 +40,7 @@ module.exports = {
   OPERATIONS_PER_COMMIT,
   PAYLOAD_BYTES,
   PREDECESSORS,
+  RETAINED_REQUESTS,
   boundedBytes,
   observationRefreshBudget,
 };

@@ -6,7 +6,7 @@ const path = require("node:path");
 const { spawn } = require("node:child_process");
 const { createHash } = require("node:crypto");
 const { registerQueueLedgerClient } = require("../../actions/setup/js/work_queue_git_transport.cjs");
-const { ASSIGNMENT_BYTES, CHECKPOINT_AFTER_LINES, GRAPH_NODES, LEDGER_BYTES, MAX_PENDING_WORK, OPERATIONS_PER_COMMIT } = require("../../actions/setup/js/work_queue_limits.cjs");
+const { ASSIGNMENT_BYTES, CHECKPOINT_AFTER_LINES, GRAPH_NODES, LEDGER_BYTES, MAX_PENDING_WORK, OPERATIONS_PER_COMMIT, RETAINED_REQUESTS } = require("../../actions/setup/js/work_queue_limits.cjs");
 const { actorFromContext, validatePolicyEnv, workerWorkflow } = require("../../actions/setup/js/work_queue_policy.cjs");
 
 const REPOSITORY = "local/queue";
@@ -26,6 +26,7 @@ const PROTOCOL_LIMITS = Object.freeze({
   pending_work: MAX_PENDING_WORK,
   assignment_bytes: ASSIGNMENT_BYTES,
   checkpoint_after_lines: CHECKPOINT_AFTER_LINES,
+  retained_requests: RETAINED_REQUESTS,
   claims_per_dispatch: 1,
 });
 const METHODS = {

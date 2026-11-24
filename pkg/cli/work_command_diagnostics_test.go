@@ -230,7 +230,7 @@ func TestWorkQueueDiagnosticInspectionAndRows(t *testing.T) {
 	require.Nil(t, current.Claim, "released Work has no current Claim")
 }
 
-func TestWorkQueueDiagnosticCheckpointPreservesDiagnostics(t *testing.T) {
+func TestWorkQueueDiagnosticCheckpointPreservesLiveDiagnostics(t *testing.T) {
 	log, ids := workQueueMixedFixture(t)
 	state := log.state()
 	checkpoint, err := workqueue.CheckpointCommit(state, workQueueTestAdmin, 99000)
@@ -238,13 +238,16 @@ func TestWorkQueueDiagnosticCheckpointPreservesDiagnostics(t *testing.T) {
 	restored, err := workqueue.Replay([]workqueue.QueueCommit{checkpoint})
 	require.NoError(t, err)
 
+	// Live Work, its Claims and Dispatches are inspected exactly as before.
 	before, after := workQueueStats(state, "work-queue"), workQueueStats(restored, "work-queue")
-	require.Equal(t, before.ClaimsByState, after.ClaimsByState)
-	require.Equal(t, before.DispatchesByState, after.DispatchesByState)
-	require.Equal(t, before.WorkCancellationReasons, after.WorkCancellationReasons)
-	require.Equal(t, before.ClaimCancellationReasons, after.ClaimCancellationReasons)
-	require.Equal(t, before.Pools, after.Pools)
-	for _, key := range []string{"done", "running", "waiting", "dropped"} {
+	require.Len(t, after.Pools, 1)
+	pool, folded := before.Pools[0], after.Pools[0]
+	require.Equal(t, map[string]int{"available": 1, "cancelled": 0, "claimed": 1, "completed": 0}, folded.WorkByState)
+	require.Equal(t, pool.OpenDispatches, folded.OpenDispatches)
+	require.Equal(t, pool.Eligible, folded.Eligible)
+	require.Equal(t, pool.NextEligible, folded.NextEligible)
+	require.Equal(t, before.ClaimsByState["open"], after.ClaimsByState["open"])
+	for _, key := range []string{"running", "waiting"} {
 		row := workQueueRow{Kind: "work", ID: ids[key], WorkID: ids[key]}
 		original, err := workQueueInspect(state, "work-queue", row)
 		require.NoError(t, err)
@@ -254,6 +257,15 @@ func TestWorkQueueDiagnosticCheckpointPreservesDiagnostics(t *testing.T) {
 		require.Equal(t, original.Claim, compacted.Claim, key)
 		require.Equal(t, original.Dispatch, compacted.Dispatch, key)
 	}
+	// Terminal Work with no live dependent folds away with its settled Claim and closed Dispatch;
+	// its history stays in the checkpoint's Git parent.
+	for _, key := range []string{"done", "dropped"} {
+		_, err := workQueueInspect(restored, "work-queue", workQueueRow{Kind: "work", ID: ids[key], WorkID: ids[key]})
+		require.ErrorContains(t, err, "work_missing", key)
+	}
+	require.NotContains(t, restored.Dispatches, ids["done_dispatch"])
+	require.Equal(t, map[string]int{"open": 1, "completed": 0, "cancelled": 0}, after.ClaimsByState)
+	require.Equal(t, 1, before.ClaimsByState["completed"])
 }
 
 func TestWorkQueueDiagnosticCommandsAreReadOnly(t *testing.T) {

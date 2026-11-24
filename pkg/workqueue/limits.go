@@ -13,6 +13,9 @@ const (
 	CheckpointAfterLines = 512
 	// MaxPendingWork bounds available plus claimed Work per pool during replay.
 	MaxPendingWork = 4096
+	// RetainedRequests bounds the request IDs a Checkpoint keeps: the most recent of
+	// the log it folds, so request_reused deduplicates through at least the next epoch.
+	RetainedRequests = 4096
 	// CASAttempts bounds publication; each failed compare-and-swap re-reads the
 	// ledger before retrying and the re-read is the only backoff.
 	CASAttempts = 8

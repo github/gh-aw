@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"maps"
 	"net/http"
 	"os/exec"
 	"strings"
@@ -361,12 +362,24 @@ func TestWorkCommandCurrentProtocolWithoutCheckout(t *testing.T) {
 	require.Equal(t, priorState.Tip, checkpoint.PriorTip)
 	require.Equal(t, priorHead, strings.TrimSpace(queue.run(t, "", "rev-parse", queue.head(t)+"^")), "checkpoint dropped the prior log from Git history")
 	after := workClearRead(t, queue)
-	for _, pair := range [][2]any{{priorState.Works, after.Works}, {priorState.Claims, after.Claims}, {priorState.Dispatches, after.Dispatches}} {
+	// The cancelled Work has no dependent: it folds away with its Claims and their Dispatches;
+	// everything else is restored unchanged.
+	require.Equal(t, "cancelled", priorState.Works[id].State)
+	works, claims, dispatches := maps.Clone(priorState.Works), maps.Clone(priorState.Claims), maps.Clone(priorState.Dispatches)
+	delete(works, id)
+	for claimID, claim := range priorState.Claims {
+		if claim.WorkID == id {
+			delete(claims, claimID)
+			delete(dispatches, claim.DispatchID)
+		}
+	}
+	require.Len(t, works, 2)
+	for _, pair := range [][2]any{{works, after.Works}, {claims, after.Claims}, {dispatches, after.Dispatches}} {
 		expected, err := json.Marshal(pair[0])
 		require.NoError(t, err)
 		actual, err := json.Marshal(pair[1])
 		require.NoError(t, err)
-		require.JSONEq(t, string(expected), string(actual), "checkpoint changed queue state")
+		require.JSONEq(t, string(expected), string(actual), "checkpoint kept or changed the wrong records")
 	}
 	unchanged(func() {
 		require.Equal(t, false, run("", "compact")["checkpointed"])

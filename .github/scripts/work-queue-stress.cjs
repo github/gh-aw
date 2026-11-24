@@ -7,7 +7,7 @@ const path = require("node:path");
 const { performance } = require("node:perf_hooks");
 const { Worker } = require("node:worker_threads");
 const { AT, LocalGitHub, OWNER, PROTOCOL_LIMITS, REPO, dispatchParameters, queueActor, stressPolicy } = require("./work-queue-stress-git.cjs");
-const { projectionDigest } = require("./work-queue-stress-retained.cjs");
+const { assertBoundedCheckpoint, projectionDigest } = require("./work-queue-stress-retained.cjs");
 const { nodeId } = require("../../actions/setup/js/work_queue_graph.cjs");
 const { normalizeSubmitParameters } = require("../../actions/setup/js/work_queue_intents.cjs");
 const { appendCommit, applyCommit, buildCommit, newRequest, newState, replayTransactions, serializeTransactionLog } = require("../../actions/setup/js/work_queue_replay.cjs");
@@ -247,13 +247,13 @@ async function coldAndCheckpoint(host, branch, policy) {
   const checkpointStart = performance.now();
   const published = await publishWorkQueueCheckpoint({ ...args, actor: queueActor("administrator"), now: () => AT });
   assert.equal(published.checkpointed, true);
+  assert.equal(projectionDigest(published.state), digest, "the checkpoint folded a different head");
   const restored = await readWorkQueueLog(args);
   const checkpointMs = performance.now() - checkpointStart;
   assert.equal(restored.transactions.length, 1);
-  assert.equal(restored.transactions[0].operations[0].kind, "Checkpoint");
-  assert.equal(projectionDigest(restored.state), digest, "checkpoint changed queue semantics");
-  assert.equal(restored.state.requests.size, cold.state.requests.size + 1);
-  for (const request of cold.state.requests) assert.ok(restored.state.requests.has(request), "checkpoint lost a committed request");
+  // The root line keeps the live set, what it reads and the request window; settled Work folds away.
+  const bounded = assertBoundedCheckpoint(published.state, restored.transactions[0]);
+  assert.equal(bounded.bytes, Buffer.byteLength(restored.contents));
   const parameters = dispatchParameters(policy, "default", 1);
   const selectionStart = performance.now();
   const selection = planDispatch(restored.state, parameters, newRequest("dispatch_next", queueActor("dispatcher", "1"), parameters).id);
@@ -261,12 +261,14 @@ async function coldAndCheckpoint(host, branch, policy) {
     history: cold.state,
     state: restored.state,
     ledger_bytes: Buffer.byteLength(stored),
-    checkpoint_bytes: Buffer.byteLength(restored.contents),
+    checkpoint_bytes: bounded.bytes,
+    checkpoint_requests: bounded.requests,
+    checkpoint_works: bounded.works,
     cold_replay_ms: coldReplayMs,
     checkpoint_ms: checkpointMs,
     selection_ms: performance.now() - selectionStart,
     selection_reason: selection.reason,
-    checkpoint: "production Checkpoint root line; entity projection and request set preserved; prior log kept in Git history",
+    checkpoint: "production Checkpoint root line keeping the live set, what it reads and the request window; folded history stays in Git",
   };
 }
 
@@ -385,6 +387,8 @@ async function runSimulator(input = {}) {
             completed: 0,
             ledger_bytes: cold.ledger_bytes,
             checkpoint_bytes: cold.checkpoint_bytes,
+            checkpoint_requests: cold.checkpoint_requests,
+            checkpoint_works: cold.checkpoint_works,
             cold_replay_ms: cold.cold_replay_ms,
             checkpoint_ms: cold.checkpoint_ms,
             selection_ms: cold.selection_ms,
@@ -467,6 +471,8 @@ async function runSimulator(input = {}) {
           completed: cold.history.stats.completed,
           ledger_bytes: cold.ledger_bytes,
           checkpoint_bytes: cold.checkpoint_bytes,
+          checkpoint_requests: cold.checkpoint_requests,
+          checkpoint_works: cold.checkpoint_works,
           cold_replay_ms: cold.cold_replay_ms,
           checkpoint_ms: cold.checkpoint_ms,
           selection_ms: cold.selection_ms,
@@ -614,22 +620,25 @@ checkpointed and fsck-verified before their refs are retired and unreachable obj
 Saturation: one queue; reports the first real admission refusal (the compiled
 pending_limit) and the unattempted remainder, then proves replay enforces the same
 ceiling. No claims/completions are fabricated or protocol limits raised.
-Retained: --items is historical Work requested; each accepted Work retains one
-cancelled Claim. Bounded fixture batches use production submit/scheduler/release planners
-and are applied once through replay, then the complete ledger is cold-validated from real
-Git and checkpointed. Independent retained branches default to 10000 historical Work each
+Retained: --items is historical Work requested; each accepted Work has one cancelled
+Claim. Bounded fixture batches use production submit/scheduler/release planners and are
+applied once through replay onto the real Git head. Whenever the log passes
+CHECKPOINT_AFTER_LINES the epoch is persisted and checkpointed by production maintenance;
+each checkpoint must keep exactly the live set, what it reads and the newest
+RETAINED_REQUESTS request IDs. The tail epoch is cold-validated from real Git and
+checkpointed. Independent retained branches default to 10000 historical Work each
 (--history-queue-items). Eight live probe Work per history branch and a 16-item concurrent
 full-store smoke are reported separately. Completed history fixtures are retired/pruned.
 An actual ledger-bound refusal stops construction; no ceilings change.
 --history-items counts historical Work PLUS Claims, selects retained mode, and
-defaults to one history ledger (100000 means 50000 Work plus 50000 Claims).
+defaults to one history queue (100000 means 50000 Work plus 50000 Claims).
 It does not include live probes or worker smoke. Explicit --history-queue-items
 can still bound/shard that entity target. Per 128 historical Work the fixture commits
 submit, one dispatch_next, and one prelaunch launch_failed release per Dispatch.
 History: --mode history --items 100000 is the CI-facing combined-entity form
-(50000 historical Work + 50000 Claims in one ledger by default). It additionally
-checks that large Git ledger concurrently in 2..4 worker threads using real cold
-reads, deterministic selection and checkpoint round trips. Use --workers 2 for
+(50000 historical Work + 50000 Claims on one queue across checkpoint epochs by default).
+It additionally checks the final Git ledger concurrently in 2..4 worker threads using
+real cold reads, deterministic selection and checkpoint round trips. Use --workers 2 for
 bounded CI memory. Newly completed worker Work is reported separately.
 
 Options: --items 1..10000000, --workers 2..32, --queue-items 2..256,

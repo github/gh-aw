@@ -30,7 +30,7 @@ type projectionRecord struct {
 	WorkCreators map[string]Actor                `json:"work_creators"`
 }
 
-// SerializeProjection returns the canonical checkpoint `state` object of a projection.
+// SerializeProjection returns a projection in the canonical checkpoint `state` format.
 func SerializeProjection(state Projection) ([]byte, error) {
 	// An empty projection still serializes its requests as [], never null.
 	requests := slices.AppendSeq(make([]string, 0, len(state.Requests)), maps.Keys(state.Requests))
@@ -40,6 +40,59 @@ func SerializeProjection(state Projection) ([]byte, error) {
 		record = projectionRecord{Repository: state.Repository, Tip: state.Tip, Commits: state.Commits, Works: map[string]*WorkState{}, Claims: map[string]*ClaimState{}, Dispatches: map[string]*DispatchState{}, Observations: map[string]ObservationOperation{}, Requests: requests, WorkCreators: map[string]Actor{}}
 	}
 	return CanonicalValue(record)
+}
+
+func terminalWork(work *WorkState) bool {
+	return work.State == "completed" || work.State == "cancelled"
+}
+
+// checkpointProjection is the part of a projection a Checkpoint carries: what a future
+// valid commit can still read. Non-terminal Work keeps its `work` predecessors (their
+// effects feed result_refs); a terminal Work stays only as such a predecessor or while its
+// backing Issue awaits the projector's terminal IssueComment. Claims, Dispatches, creators
+// and gate Observations follow the retained Work. Requests keep the dedupe window: the most
+// recent RetainedRequests of the log being folded, never the previous checkpoint's inherited ones.
+func checkpointProjection(state Projection) Projection {
+	folded := NewProjection()
+	folded.Repository, folded.Tip, folded.Commits = state.Repository, state.Tip, state.Commits
+	for id, work := range state.Works {
+		if !terminalWork(work) {
+			folded.Works[id] = work
+			for _, edge := range work.DependsOn {
+				if edge.Kind == "work" {
+					folded.Works[edge.WorkID] = state.Works[edge.WorkID]
+				}
+			}
+		} else if work.BackingIssue != nil && work.IssueComment == "" {
+			folded.Works[id] = work
+		}
+	}
+	for id, work := range folded.Works {
+		folded.WorkCreators[id] = state.WorkCreators[id]
+		for _, edge := range work.DependsOn {
+			if edge.Kind == "work" {
+				continue
+			}
+			key := GateKey(*edge.Resource, edge.Condition)
+			if observation, ok := state.Observations[key]; ok {
+				folded.Observations[key] = observation
+			}
+		}
+	}
+	for id, claim := range state.Claims {
+		if _, retained := folded.Works[claim.WorkID]; retained {
+			folded.Claims[id] = claim
+		}
+	}
+	for id, dispatch := range state.Dispatches {
+		if _, retained := folded.Claims[dispatch.Claims[0]]; retained {
+			folded.Dispatches[id] = dispatch
+		}
+	}
+	for _, commit := range state.Transactions[max(0, len(state.Transactions)-RetainedRequests):] {
+		folded.Requests[commit.Request.ID] = struct{}{}
+	}
+	return folded
 }
 
 func sortedKeys(record object) []string {
@@ -159,6 +212,9 @@ func checkpointRequests(value any) ([]string, error) {
 		}
 		seen[string(key)] = struct{}{}
 	}
+	if len(requests) > RetainedRequests {
+		return nil, queueError("checkpoint_invalid", "checkpoint requests exceed the %d retained request window", RetainedRequests)
+	}
 	ids := make([]string, 0, len(requests))
 	for _, id := range requests {
 		text, err := identity(id, "checkpoint request")
@@ -254,6 +310,17 @@ func restoreWorks(state *Projection, works object, commits int64) error {
 			return checkpointInvalid("checkpoint Work record is malformed")
 		}
 		state.Works[id] = &work
+	}
+	// A retained non-terminal Work still reads its predecessors; a terminal one never will.
+	for _, work := range state.Works {
+		if terminalWork(work) {
+			continue
+		}
+		for _, edge := range work.DependsOn {
+			if _, present := state.Works[edge.WorkID]; edge.Kind == "work" && !present {
+				return checkpointInvalid("a checkpoint keeps every predecessor of non-terminal Work")
+			}
+		}
 	}
 	return nil
 }
@@ -411,7 +478,7 @@ func CheckpointCommit(state Projection, actor Actor, at int64) (QueueCommit, err
 	if err != nil {
 		return QueueCommit{}, err
 	}
-	snapshot, err := SerializeProjection(state)
+	snapshot, err := SerializeProjection(checkpointProjection(state))
 	if err != nil {
 		return QueueCommit{}, err
 	}

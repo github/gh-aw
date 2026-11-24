@@ -320,9 +320,19 @@ Only conversion and checkpoint failures fail maintenance. A run released while s
 
 ## 14. Checkpoint
 
-A checkpoint replaces the file content with one root line (`previous: null`) whose request is `checkpoint {prior_tip}` and whose only operation is `Checkpoint{prior_tip, state}`. The Git commit's parent is the previous head, so the folded history stays reachable. `state` is the canonical projection: `repository`, `tip` (equal to `prior_tip`), `commits`, `works`, `claims`, `dispatches`, `observations`, `requests` (sorted), and `work_creators`.
+A checkpoint replaces the file content with one root line (`previous: null`) whose request is `checkpoint {prior_tip}` and whose only operation is `Checkpoint{prior_tip, state}`. The Git commit's parent is the previous head, so the folded history stays reachable. `state` has the canonical projection fields `repository`, `tip` (equal to `prior_tip`), `commits`, `works`, `claims`, `dispatches`, `observations`, `requests` (sorted), and `work_creators`, but it carries only what a later valid commit can still read. Its size depends on the live set and the request window, not on how many Work have ever been submitted.
 
-Restoring a checkpoint MUST validate every record and cross-reference (`checkpoint_invalid`): open Claims and `claimed` Work agree, completed Work carries its completion and effects, cancelled Work carries its reason, only bound or closed Dispatches carry a run, every Dispatch's `claims` holds exactly one Claim whose `dispatch_id` names it back (so no second Claim may point at a Dispatch), its pool and profile match that Claim's Work, a Dispatch is non-closed exactly when its Claim is open, and every Work has a creator. A grouped Dispatch is rejected, never split or truncated. Work `continuation` and observation `approved_by` are validated with the same rules as their operations. Replay continues with the following lines; the checkpoint's own request ID joins `requests` and `commits` increases by one.
+The builder MUST fold the projection as follows:
+
+1. **Work.** Keep every `available` and `claimed` Work, and each Work named by one of their `work` dependencies, because its completion and effects feed `result_refs`. Also keep a `completed` or `cancelled` Work that has a `backing_issue` but no `issue_comment`, because the Issue projection's terminal `IssueComment` still names it. Drop every other terminal Work. A kept terminal Work can name a dropped predecessor, since nothing reads it again.
+2. **Claims and Dispatches.** Keep every Claim of a kept Work and the Dispatch whose sole Claim it is. Drop the rest. A dropped Work is terminal, so its Claims are settled and their Dispatches closed.
+3. **`work_creators`.** Keep the entries of kept Work.
+4. **`observations`.** Keep the Observation of each external gate (`issue` or `pull_request` edge) of a kept Work. Observations are read only through a Work's gate edges, by eligibility and by the approval check on `Claim`. A later Work naming a dropped gate is `external_unobserved` until a dispatcher observes it again, the same as a gate that was never observed.
+5. **`requests`.** Keep only the request IDs committed in the log being folded: its lines from line 1, including a previous checkpoint's own request, but not the `requests` that checkpoint inherited. Cap them at the most recent `RETAINED_REQUESTS` by log order. Every request therefore stays deduplicated (`request_reused`) for the rest of its own checkpoint interval and the whole next one, or for 4096 commits when an interval is longer. That outlasts a publisher's bounded compare-and-swap retry loop. An older retry is no longer recognized. A committed request whose commit was folded stays known to `committedRequest` (returning `null`) only while it is inside the window.
+
+A dropped Work ID is unknown to later commits. Resubmitting the same graph and node creates new Work, which runs again. Submitting Work that depends on a dropped Work fails with `dependency_invalid`, like any missing predecessor. `WorkCancellation`, `IssueLink`, and `IssueComment` naming a dropped Work fail with `work_missing`. The one-Work-per-backing-Issue and one-successor-per-approval-Issue rules hold among retained Work. Graph vertex counts and the one-pool-per-graph rule also count only retained Work. Inspect folded records in the checkpoint commit's Git parent.
+
+Restoring a checkpoint MUST validate every record and cross-reference (`checkpoint_invalid`): open Claims and `claimed` Work agree, completed Work carries its completion and effects, cancelled Work carries its reason, only bound or closed Dispatches carry a run, every Dispatch's `claims` holds exactly one Claim whose `dispatch_id` names it back (so no second Claim may point at a Dispatch), its pool and profile match that Claim's Work, a Dispatch is non-closed exactly when its Claim is open, and every Work has a creator. Every Claim must name a present Work. Every `work` predecessor of a non-terminal Work must be present. `requests` must be unique and must hold at most `RETAINED_REQUESTS` IDs. Restore is strict about missing records that are read and permissive about extra terminal records: a checkpoint that keeps an unneeded terminal Work is valid. A grouped Dispatch is rejected, never split or truncated. Work `continuation` and observation `approved_by` are validated with the same rules as their operations. Replay continues with the following lines; the checkpoint's own request ID joins `requests` and `commits` increases by one.
 
 ## 15. Conversion from version 3
 
@@ -362,6 +372,7 @@ Comments carry `<!-- gh-aw-work-queue:<work_id>:<state> -->` markers and are not
 | `LEDGER_BYTES` | 67108864 | Ledger file size |
 | `CHECKPOINT_AFTER_LINES` | 512 | Lines before maintenance checkpoints |
 | `MAX_PENDING_WORK` | 4096 | Pending Work per pool in replay; upper bound of `pending_limit` |
+| `RETAINED_REQUESTS` | 4096 | Request IDs a checkpoint keeps (the deduplication window) |
 
 These are protocol constants, not configuration. Publication makes at most 8 compare-and-swap attempts.
 
@@ -372,7 +383,7 @@ These are protocol constants, not configuration. Publication makes at most 8 com
 | `unsupported_protocol` | A line or head is not version 4 |
 | `ledger_invalid` | Malformed envelope, chain, identity, or log framing |
 | `request_invalid` | Unknown field, kind, or operation outside its request kind |
-| `request_reused` | Request ID already committed |
+| `request_reused` | Request ID already committed in the ledger or inside the checkpoint's request window ([section 14](#14-checkpoint)) |
 | `actor_unauthorized` | Worker genesis or foreign repository |
 | `unauthorized_operation` | Role not permitted for the operation |
 | `reason_invalid` | Reason outside its enum |

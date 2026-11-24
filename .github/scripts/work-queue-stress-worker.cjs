@@ -202,8 +202,8 @@ async function historyCheck(job) {
   }
   const selectionMs = performance.now() - selectionStarted;
   const checkpointStarted = performance.now();
-  // Serialize and strictly re-read the checkpoint line, exactly as it would be persisted.
-  const checkpointBytes = verifiedCheckpoint(cold.state, queueActor("administrator"), digest);
+  // Serialize and strictly re-read the checkpoint line as persisted; it must be bounded.
+  const checkpoint = verifiedCheckpoint(cold.state, queueActor("administrator"));
   counters.history_checks++;
   return {
     worker: workerData.index,
@@ -214,7 +214,8 @@ async function historyCheck(job) {
     projection_sha256: digest,
     cold_replay_ms: coldReplayMs,
     ten_batch_plans_ms: selectionMs,
-    checkpoint_bytes: checkpointBytes,
+    checkpoint_bytes: checkpoint.bytes,
+    checkpoint_requests: checkpoint.requests,
     checkpoint_ms: performance.now() - checkpointStarted,
     elapsed_ms: performance.now() - started,
   };

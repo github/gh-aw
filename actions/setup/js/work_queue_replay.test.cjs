@@ -5,12 +5,15 @@ const require = createRequire(import.meta.url);
 const h = require("./work_queue_test_helpers.cjs");
 const { canonical } = require("./work_queue_codec.cjs");
 const { publishWorkQueueRequest } = require("./work_queue_store.cjs");
-const { LEDGER_BYTES } = require("./work_queue_limits.cjs");
+const { LEDGER_BYTES, RETAINED_REQUESTS } = require("./work_queue_limits.cjs");
+const { assignmentForDispatch } = require("./work_queue_scheduler.cjs");
+const { gateKey } = require("./work_queue_graph.cjs");
 const {
   applyCommit,
   appendCommit,
   buildCommit,
   checkpointCommit,
+  cloneState,
   newRequest,
   parseTransactionLog,
   parseTransactionRecords,
@@ -263,19 +266,23 @@ describe("v4 lifecycle transitions", () => {
 });
 
 describe("v4 checkpoints", () => {
-  it("restores an equivalent projection and continues numbering positions", () => {
+  it("restores the pruned projection and continues numbering positions", () => {
     const { log, dispatch } = bound();
     const state = replayTransactions(h.finish(log, dispatch, h.workerActor("7")));
     const checkpoint = checkpointCommit(state, h.reconciler, 5);
     expect(checkpoint).toMatchObject({ previous: null, request: { kind: "checkpoint", parameters: { prior_tip: state.tip } } });
     const restored = replayTransactions([checkpoint]);
-    const before = serializeProjection(state);
-    const after = serializeProjection(restored);
-    for (const field of ["repository", "works", "claims", "dispatches", "observations", "work_creators"]) expect(canonical(after[field])).toBe(canonical(before[field]));
+    // Completed a has no dependent: it folds away with its Claim, Dispatch and creator.
+    expect([...restored.works.keys()]).toEqual([b.work_id]);
+    expect([restored.claims.size, restored.dispatches.size, [...restored.workCreators.keys()]]).toEqual([0, 0, [b.work_id]]);
+    expect(canonical(restored.works.get(b.work_id))).toBe(canonical(state.works.get(b.work_id)));
     expect(restored).toMatchObject({ tip: checkpoint.id, commits: state.commits + 1 });
-    expect([...restored.requests]).toEqual(expect.arrayContaining([...state.requests, checkpoint.request.id]));
+    expect([...restored.requests].sort()).toEqual([...state.requests, checkpoint.request.id].sort());
     const next = h.submit([checkpoint], [h.work("c")], { ...h.producer, run_id: "11" });
     expect(replayTransactions(next).works.get(h.work("c").work_id).position).toEqual({ commit: state.commits + 1, operation: 0 });
+    // A folded Work identity is unknown: resubmitting it is a new execution, depending on it a missing predecessor.
+    expect(replayTransactions(h.submit([checkpoint], [a], { ...h.producer, run_id: "12" })).works.get(a.work_id)).toMatchObject({ state: "available", attempts: 0 });
+    fails(() => h.submit([checkpoint], [h.work("d", { depends_on: [{ kind: "work", work_id: a.work_id }] })], { ...h.producer, run_id: "13" }), "dependency_invalid");
     fails(() => replayTransactions(next.slice(1)), "ledger_invalid");
     fails(() => replayTransactions([...log, checkpoint]), "checkpoint_invalid");
     expect(replayTransactionLog(h.ledgerText(next)).tip).toBe(next.at(-1).id);
@@ -298,8 +305,10 @@ describe("v4 checkpoints", () => {
     fails(() => restoreCheckpointState(tamper(state => (Object.values(state.dispatches)[0].launch.run_id = "8"))), "checkpoint_invalid");
     fails(() => restoreCheckpointState(tamper(state => (Object.values(state.dispatches)[0].launch.revision = "main"))), "checkpoint_invalid");
     fails(() => restoreCheckpointState(tamper(state => (state.extra = true))), "checkpoint_invalid");
-    // One Claim per Dispatch, checked on the raw checkpoint for settled Claims too.
-    const finished = checkpointCommit(replayTransactions(h.finish(log, Object.keys(checkpoint.operations[0].state.dispatches)[0], h.workerActor("7"))), h.reconciler, 5);
+    // One Claim per Dispatch, checked on the raw checkpoint for settled Claims too: a's
+    // dependent keeps a, so its completed Claim stays in the checkpoint.
+    const dependent = h.submit(log, [h.work("after-a", { depends_on: [{ kind: "work", work_id: a.work_id }] })], { ...h.producer, run_id: "11" });
+    const finished = checkpointCommit(replayTransactions(h.finish(dependent, Object.keys(checkpoint.operations[0].state.dispatches)[0], h.workerActor("7"))), h.reconciler, 5);
     const tamperFinished = mutate => {
       const copy = structuredClone(finished);
       mutate(copy.operations[0].state);
@@ -313,6 +322,138 @@ describe("v4 checkpoints", () => {
     fails(() => restoreCheckpointState(tamper(state => (Object.values(state.dispatches)[0].state = "closed"))), "checkpoint_invalid");
     fails(() => restoreCheckpointState(tamper(state => (Object.values(state.dispatches)[0].pool = "other"))), "checkpoint_invalid");
     fails(() => restoreCheckpointState({ ...checkpoint, actor: h.producer }), "request_invalid");
+  });
+
+  it("keeps exactly the records a later commit reads", () => {
+    const issue = number => ({ kind: "issue", host: "github.com", repository: "owner/repo", repository_id: "1", resource_id: String(number), number: String(number) });
+    const waiting = resource => ({ kind: "Observation", observation_id: `o-${resource.number}`, resource, condition: "completed", state: "waiting" });
+    const x = h.work("x");
+    const y = h.work("y", { depends_on: [{ kind: "work", work_id: x.work_id }] });
+    const z = h.work("z", { depends_on: [{ kind: "work", work_id: y.work_id }] });
+    const gated = h.work("gated", { depends_on: [{ kind: "issue", resource: issue(71), condition: "completed" }] });
+    const lost = h.work("lost", { depends_on: [{ kind: "issue", resource: issue(72), condition: "completed" }] });
+    const backed = h.work("backed");
+    const run = (log, dispatch, id) => h.finish(h.bind(h.launch(log, dispatch, true, h.dispatcher, id), dispatch, h.workerActor(id)), dispatch, h.workerActor(id), {}, [{ kind: "create_issue", work: id }]);
+    let step = h.dispatchNext(h.submit([], [x, y, z, gated, lost, backed]), {}, h.dispatcher, [waiting(issue(71)), waiting(issue(72))]);
+    const [dispatchX, dispatchBacked] = step.decision.dispatches;
+    let log = run(run(step.log, dispatchX, "7"), dispatchBacked, "8");
+    log = h.commit(log, h.projector, "issue_link", { operations: [{ kind: "IssueLink", work_id: backed.work_id, resource: issue(73) }] }, [{ kind: "IssueLink", work_id: backed.work_id, resource: issue(73) }]);
+    step = h.dispatchNext(log, {}, { ...h.dispatcher, run_id: "101" });
+    const [dispatchY] = step.decision.dispatches;
+    log = run(step.log, dispatchY, "9");
+    log = h.commit(log, h.producer, "cancel_work", { work_ids: [lost.work_id], reason: "operator" }, [{ kind: "WorkCancellation", work_id: lost.work_id, reason: "operator" }]);
+    const full = replayTransactions(log);
+    const checkpoint = checkpointCommit(full, h.reconciler, 5);
+    const snapshot = checkpoint.operations[0].state;
+    const keys = records =>
+      Object.values(records)
+        .map(work => work.node_key)
+        .sort();
+    // z reads its predecessor y; y's own predecessor x is never read again. Cancelled `lost`
+    // and its gate go; `backed` waits for the projector's terminal IssueComment.
+    expect(keys(snapshot.works)).toEqual(["backed", "gated", "y", "z"]);
+    expect(Object.keys(snapshot.work_creators).sort()).toEqual([backed, gated, y, z].map(work => work.work_id).sort());
+    expect(
+      Object.values(snapshot.claims)
+        .map(claim => claim.dispatch_id)
+        .sort()
+    ).toEqual([dispatchBacked, dispatchY].sort());
+    expect(Object.keys(snapshot.dispatches).sort()).toEqual([dispatchBacked, dispatchY].sort());
+    expect(Object.keys(snapshot.observations)).toEqual([gateKey(issue(71), "completed")]);
+    for (const [id, work] of Object.entries(snapshot.works)) expect(canonical(work)).toBe(canonical(full.works.get(id)));
+
+    // The retained predecessor still feeds the successor's result_refs after the checkpoint.
+    step = h.dispatchNext([checkpoint], {}, { ...h.dispatcher, run_id: "102" });
+    const [dispatchZ] = step.decision.dispatches;
+    expect(assignmentForDispatch(replayTransactions(step.log), dispatchZ).claims[0].result_refs).toEqual([
+      { work_id: y.work_id, result_commit_id: full.works.get(y.work_id).completion_id, descriptor: [{ kind: "create_issue", work: "9" }] },
+    ]);
+    // The projector can still record the terminal comment; the next checkpoint then drops `backed`.
+    const comment = { kind: "IssueComment", work_id: backed.work_id, comment_id: "IC_9" };
+    const commented = h.commit(step.log, h.projector, "issue_link", { operations: [comment] }, [comment]);
+    const second = checkpointCommit(replayTransactions(commented), h.reconciler, 6).operations[0].state;
+    expect(keys(second.works)).toEqual(["gated", "y", "z"]);
+    // The window holds this epoch's requests (the first checkpoint's own included), none inherited.
+    expect(second.requests).toEqual(commented.map(commit => commit.request.id).sort());
+  });
+
+  it("accepts pruned checkpoints and rejects missing records that are read", () => {
+    const x = h.work("x");
+    const y = h.work("y", { depends_on: [{ kind: "work", work_id: x.work_id }] });
+    const z = h.work("z", { depends_on: [{ kind: "work", work_id: y.work_id }] });
+    let step = h.dispatchNext(h.submit([], [x, y, z]));
+    let log = h.finish(h.bind(h.launch(step.log, step.decision.dispatches[0], true, h.dispatcher, "7"), step.decision.dispatches[0], h.workerActor("7")), step.decision.dispatches[0], h.workerActor("7"));
+    step = h.dispatchNext(log, {}, { ...h.dispatcher, run_id: "101" });
+    const dispatchY = step.decision.dispatches[0];
+    log = h.finish(h.bind(h.launch(step.log, dispatchY, true, h.dispatcher, "8"), dispatchY, h.workerActor("8")), dispatchY, h.workerActor("8"));
+    const full = serializeProjection(replayTransactions(log));
+    const checkpoint = checkpointCommit(replayTransactions(log), h.reconciler, 5);
+    const tamper = mutate => {
+      const copy = structuredClone(checkpoint);
+      mutate(copy.operations[0].state);
+      return copy;
+    };
+    const [claimX] = Object.values(full.claims).filter(claim => claim.work_id === x.work_id);
+    // y (terminal) names its dropped predecessor x: accepted, never read.
+    expect(Object.keys(checkpoint.operations[0].state.works).sort()).toEqual([y.work_id, z.work_id].sort());
+    // Extra terminal records are permitted; restore is strict only about what is read.
+    expect(
+      replayTransactions([tamper(state => Object.assign(state, { works: { ...state.works, [x.work_id]: full.works[x.work_id] }, work_creators: { ...state.work_creators, [x.work_id]: full.work_creators[x.work_id] } }))]).works.get(x.work_id)
+        .state
+    ).toBe("completed");
+    // Non-terminal z still reads y.
+    const withoutY = state => {
+      delete state.works[y.work_id];
+      delete state.work_creators[y.work_id];
+      for (const claim of Object.values(state.claims)) {
+        delete state.claims[claim.claim_id];
+        delete state.dispatches[claim.dispatch_id];
+      }
+    };
+    fails(() => restoreCheckpointState(tamper(withoutY)), "checkpoint_invalid");
+    // A Claim (and its Dispatch) naming the dropped Work.
+    fails(() => restoreCheckpointState(tamper(state => Object.assign(state.claims, { [claimX.claim_id]: claimX }) && Object.assign(state.dispatches, { [claimX.dispatch_id]: full.dispatches[claimX.dispatch_id] }))), "checkpoint_invalid");
+    // More request IDs than the window.
+    const requests = Array.from({ length: RETAINED_REQUESTS + 1 }, (_, index) => `request:${index.toString(16).padStart(64, "0")}`).sort();
+    fails(() => restoreCheckpointState(tamper(state => (state.requests = requests))), "checkpoint_invalid");
+    expect(restoreCheckpointState(tamper(state => (state.requests = requests.slice(1)))).requests.size).toBe(RETAINED_REQUESTS + 1);
+  });
+
+  it("deduplicates requests through the window and folds older ones", () => {
+    // w is cancelled and kept as the predecessor of waiting z; each producer run then
+    // re-sends an idempotent cancellation, so the log outgrows the request window.
+    const w = h.work("w");
+    const z = h.work("z", { depends_on: [{ kind: "work", work_id: w.work_id }] });
+    const log = h.commit(h.submit([], [w, z]), h.producer, "cancel_work", { work_ids: [w.work_id], reason: "operator" }, [{ kind: "WorkCancellation", work_id: w.work_id, reason: "operator" }]);
+    const state = replayTransactions(log);
+    const cancel = (target, run) => {
+      const actor = { ...h.producer, run_id: String(run) };
+      const commit = buildCommit(target, actor, newRequest("cancel_work", actor, { work_ids: [w.work_id], reason: "operator" }), [{ kind: "WorkCancellation", work_id: w.work_id, reason: "operator" }], 1);
+      applyCommit(target, commit);
+      return commit;
+    };
+    const oldest = cancel(state, 1000);
+    for (let run = 1001; run < 1000 + RETAINED_REQUESTS + 8; run++) cancel(state, run);
+    const checkpoint = checkpointCommit(state, h.reconciler, 5);
+    const { requests } = checkpoint.operations[0].state;
+    expect(requests).toEqual(
+      state.transactions
+        .slice(-RETAINED_REQUESTS)
+        .map(commit => commit.request.id)
+        .sort()
+    );
+    expect(requests).not.toContain(oldest.request.id);
+    // Inside the window a lost-ack retry is still request_reused; a folded request commits afresh.
+    const restored = replayTransactions([checkpoint]);
+    const newest = 1000 + RETAINED_REQUESTS + 7;
+    fails(() => cancel(cloneState(restored), newest), "request_reused");
+    expect(cancel(cloneState(restored), 1000).request.id).toBe(oldest.request.id);
+    // The next checkpoint folds only its own epoch, so the previous epoch's requests leave the window.
+    const next = cancel(restored, 9000);
+    const second = checkpointCommit(restored, h.reconciler, 6);
+    expect(second.operations[0].state.requests).toEqual([checkpoint.request.id, next.request.id].sort());
+    fails(() => cancel(cloneState(restored), newest), "request_reused");
+    cancel(replayTransactions([second]), newest);
   });
 
   it("replays the same checkpoint objects repeatedly without changing the checkpoint", () => {

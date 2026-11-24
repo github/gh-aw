@@ -4,9 +4,9 @@ import { createRequire } from "node:module";
 const require = createRequire(import.meta.url);
 const h = require("./work_queue_test_helpers.cjs");
 const { LEDGER_BYTES } = require("./work_queue_limits.cjs");
-const { parseTransactionLog, replayTransactions } = require("./work_queue_replay.cjs");
+const { parseTransactionLog, replayTransactionLog, replayTransactions } = require("./work_queue_replay.cjs");
 const { planDispatch } = require("./work_queue_scheduler.cjs");
-const { CAS_ATTEMPTS, ledgerProtocol, publishWorkQueueCheckpoint, publishWorkQueueRequest, readWorkQueueLog, writeQueueContent } = require("./work_queue_store.cjs");
+const { CAS_ATTEMPTS, ledgerProtocol, publishWorkQueueCheckpoint, publishWorkQueueRequest, readQueueContentsAtSHA, readWorkQueueLog, writeQueueContent } = require("./work_queue_store.cjs");
 
 const target = fake => ({ githubClient: fake.githubClient, owner: "owner", repo: "repo" });
 const submitA = { kind: "submit", parameters: { work_ids: [h.work("a").work_id] } };
@@ -137,8 +137,10 @@ describe("checkpoints", () => {
     expect(fake.commits.get(fake.refs.get("work-queue")).parents).toEqual([head]);
     const lines = fake.contents().trimEnd().split("\n");
     expect(lines).toHaveLength(1);
+    // The completed Work folds away; its history stays reachable through the checkpoint's Git parent.
     const restored = (await readWorkQueueLog(target(fake))).state;
-    expect(restored.works.get(h.work("a").work_id).state).toBe("completed");
+    expect(restored.works.has(h.work("a").work_id)).toBe(false);
+    expect(replayTransactionLog((await readQueueContentsAtSHA(target(fake), head)).contents).works.get(h.work("a").work_id).state).toBe("completed");
     expect(await publishWorkQueueCheckpoint({ ...target(fake), actor: h.reconciler, minimumLines: 0 })).toMatchObject({ checkpointed: false });
   });
 });

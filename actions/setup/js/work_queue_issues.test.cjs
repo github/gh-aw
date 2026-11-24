@@ -1,8 +1,8 @@
 // @ts-check
 import { describe, expect, it } from "vitest";
 import { projectIssues } from "./work_queue_issues.cjs";
-import { replayTransactions } from "./work_queue_replay.cjs";
-import { bind, dispatchNext, fakeQueueGitHub, finish, launch, ledgerText, submit, work } from "./work_queue_test_helpers.cjs";
+import { checkpointCommit, replayTransactions } from "./work_queue_replay.cjs";
+import { bind, dispatchNext, fakeQueueGitHub, finish, launch, ledgerText, reconciler, submit, work } from "./work_queue_test_helpers.cjs";
 
 const context = { repo: { owner: "owner", repo: "repo" }, runId: 100, runAttempt: 1 };
 const policy = {
@@ -106,6 +106,22 @@ describe("projectIssues", () => {
     expect(issue.comments.at(-1).body).toContain(`<!-- gh-aw-work-queue:${work("a").work_id}:completed -->`);
     expect(await project()).toEqual({ created: 0, commented: 0, closed: 0, warnings: [] });
     expect(issue.comments).toHaveLength(2);
+  });
+
+  it("still closes a completed Work's Issue as completed when a checkpoint lands first", async () => {
+    const { issues, queue, log, state, project } = setup();
+    await project();
+    const { log: claimed, decision } = dispatchNext(log());
+    const dispatchId = decision.dispatches[0];
+    // The reconciler checkpoints before it projects: the completed Work awaits its terminal comment.
+    queue.install(ledgerText([checkpointCommit(replayTransactions(finish(bind(launch(claimed, dispatchId), dispatchId), dispatchId)), reconciler, 1)]));
+    expect(state().works.get(work("a").work_id)?.state).toBe("completed");
+    expect(await project()).toMatchObject({ commented: 1, closed: 1, warnings: [] });
+    expect(issues.get(1).comments.at(-1).body).toContain(`<!-- gh-aw-work-queue:${work("a").work_id}:completed -->`);
+    // Once that comment is recorded, the next checkpoint folds the Work; its closed Issue is not orphaned.
+    queue.install(ledgerText([checkpointCommit(state(), reconciler, 2)]));
+    expect(state().works.size).toBe(0);
+    expect(await project()).toEqual({ created: 0, commented: 0, closed: 0, warnings: [] });
   });
 
   it("closes an orphaned labelled Issue whose Work is absent from the ledger", async () => {

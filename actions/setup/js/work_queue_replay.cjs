@@ -5,7 +5,7 @@ const { iterateLines, iterateJsonlEvents } = require("./jsonl_helpers.cjs");
 
 const { createHash } = require("node:crypto");
 const { canonical, closed, digest, identity, integer, parseStrictJSON, queueError, utf8Compare } = require("./work_queue_codec.cjs");
-const { EFFECTS_BYTES, LEDGER_BYTES, OPERATIONS_PER_COMMIT, boundedBytes } = require("./work_queue_limits.cjs");
+const { EFFECTS_BYTES, LEDGER_BYTES, OPERATIONS_PER_COMMIT, RETAINED_REQUESTS, boundedBytes } = require("./work_queue_limits.cjs");
 const { PROFILE_WORKFLOW, decimal, validateActor } = require("./work_queue_policy.cjs");
 const {
   ISSUE_CONDITIONS,
@@ -602,7 +602,7 @@ function isCheckpointCommit(commit) {
   return Array.isArray(commit?.operations) && commit.operations[0]?.kind === "Checkpoint";
 }
 
-/** Serialize the projection as the canonical checkpoint `state` object. */
+/** Serialize a projection in the canonical checkpoint `state` format. */
 function serializeProjection(state) {
   return {
     repository: state.repository,
@@ -614,6 +614,49 @@ function serializeProjection(state) {
     observations: Object.fromEntries(state.observations),
     requests: [...state.requests].sort(utf8Compare),
     work_creators: Object.fromEntries(state.workCreators),
+  };
+}
+
+function terminalWork(work) {
+  return work.state === "completed" || work.state === "cancelled";
+}
+
+/**
+ * The part of a projection a Checkpoint carries: what a future valid commit can still read.
+ * Non-terminal Work keeps its `work` predecessors (their effects feed result_refs); a terminal
+ * Work stays only as such a predecessor or while its backing Issue awaits the projector's
+ * terminal IssueComment. Claims, Dispatches, creators and gate Observations follow the
+ * retained Work. Requests keep the dedupe window: the most recent RETAINED_REQUESTS of the
+ * log being folded, never the previous checkpoint's inherited ones.
+ */
+function checkpointProjection(state) {
+  const works = new Map();
+  for (const work of state.works.values()) {
+    if (!terminalWork(work)) {
+      works.set(work.work_id, work);
+      for (const edge of work.depends_on) if (edge.kind === "work") works.set(edge.work_id, state.works.get(edge.work_id));
+    } else if (work.backing_issue && work.issue_comment === undefined) works.set(work.work_id, work);
+  }
+  const observations = new Map();
+  for (const work of works.values()) {
+    for (const edge of work.depends_on) {
+      if (edge.kind === "work") continue;
+      const key = gateKey(edge.resource, edge.condition);
+      const observation = state.observations.get(key);
+      if (observation) observations.set(key, observation);
+    }
+  }
+  const claims = new Map([...state.claims].filter(([, claim]) => works.has(claim.work_id)));
+  return {
+    repository: state.repository,
+    tip: state.tip,
+    commits: state.commits,
+    works,
+    claims,
+    dispatches: new Map([...state.dispatches].filter(([, dispatch]) => claims.has(dispatch.claims[0]))),
+    observations,
+    requests: state.transactions.slice(-RETAINED_REQUESTS).map(commit => commit.request.id),
+    workCreators: new Map([...works.keys()].map(id => [id, state.workCreators.get(id)])),
   };
 }
 
@@ -641,6 +684,7 @@ function restoreCheckpointState(commit) {
   if (!Number.isSafeInteger(snapshot.commits) || snapshot.commits < 1) throw invalid("checkpoint requires its commit ordinal");
   for (const field of ["works", "claims", "dispatches", "observations", "work_creators"]) if (!plainObject(snapshot[field])) throw invalid(`checkpoint ${field} must be an object`);
   if (!Array.isArray(snapshot.requests) || new Set(snapshot.requests).size !== snapshot.requests.length) throw invalid("checkpoint requests must be unique");
+  if (snapshot.requests.length > RETAINED_REQUESTS) throw invalid(`checkpoint requests exceed the ${RETAINED_REQUESTS} retained request window`);
   for (const id of snapshot.requests) identity(id, "checkpoint request");
   const state = newState();
   state.repository = snapshot.repository;
@@ -658,6 +702,10 @@ function restoreCheckpointState(commit) {
     if ((record.state === "completed") !== Object.hasOwn(record, "completion_id") || (record.state === "completed") !== Object.hasOwn(record, "effects")) throw invalid("completed Work carries its completion");
     if ((record.state === "cancelled") !== Object.hasOwn(record, "cancellation_reason")) throw invalid("cancelled Work carries its reason");
     state.works.set(id, { ...record });
+  }
+  // A retained non-terminal Work still reads its predecessors; a terminal one never will.
+  for (const work of state.works.values()) {
+    if (!terminalWork(work) && work.depends_on.some(edge => edge.kind === "work" && !state.works.has(edge.work_id))) throw invalid("a checkpoint keeps every predecessor of non-terminal Work");
   }
   for (const [id, record] of Object.entries(snapshot.claims)) {
     closed(record, CLAIM_RECORD_REQUIRED, CLAIM_RECORD_OPTIONAL, "checkpoint Claim", "checkpoint_invalid");
@@ -790,7 +838,7 @@ function buildCommit(state, actor, request, operations, at = Date.now()) {
 }
 
 /**
- * A checkpoint commit replaces the whole log: it is a root carrying the projection.
+ * A checkpoint commit replaces the whole log: it is a root carrying `checkpointProjection`.
  * @param {QueueState} state
  * @param {QueueActor} actor
  * @param {number} [at]
@@ -800,7 +848,15 @@ function checkpointCommit(state, actor, at = Date.now()) {
   if (!state.tip) throw queueError("checkpoint_invalid", "an empty queue has nothing to checkpoint");
   const request = newRequest("checkpoint", actor, { prior_tip: state.tip });
   // The snapshot must not alias live records that later appends to `state` mutate in place.
-  const commit = { version: PROTOCOL_VERSION, id: commitId(null, request.id), previous: null, request, actor, at, operations: [{ kind: "Checkpoint", prior_tip: state.tip, state: structuredClone(serializeProjection(state)) }] };
+  const commit = {
+    version: PROTOCOL_VERSION,
+    id: commitId(null, request.id),
+    previous: null,
+    request,
+    actor,
+    at,
+    operations: [{ kind: "Checkpoint", prior_tip: state.tip, state: structuredClone(serializeProjection(checkpointProjection(state))) }],
+  };
   restoreCheckpointState(/** @type {QueueCommit} */ commit);
   return /** @type {QueueCommit} */ commit;
 }

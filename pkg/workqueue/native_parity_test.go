@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"os/exec"
 	"sort"
+	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -22,7 +24,9 @@ type parityInput struct {
 	Transactions []any               `json:"transactions"`
 	Parameters   *DispatchParameters `json:"parameters,omitempty"`
 	RequestID    string              `json:"request_id,omitempty"`
-	label        string
+	// Checkpoint, when set, also builds the replayed projection's Checkpoint commit as this actor.
+	Checkpoint *Actor `json:"checkpoint,omitempty"`
+	label      string
 }
 
 func goReplayCommand(t *testing.T, input parityInput) string {
@@ -47,6 +51,11 @@ func goReplayCommand(t *testing.T, input parityInput) string {
 		decision, err := PlanDispatch(state, *input.Parameters, input.RequestID)
 		require.NoError(t, err)
 		output["decision"] = decision
+	}
+	if input.Checkpoint != nil {
+		checkpoint, err := CheckpointCommit(state, *input.Checkpoint, 1)
+		require.NoError(t, err)
+		output["checkpoint"] = checkpoint
 	}
 	data, err := CanonicalValue(output)
 	require.NoError(t, err)
@@ -213,18 +222,25 @@ func TestNativeParityWithJavaScript(t *testing.T) {
 		}
 	}
 	// One Claim per Dispatch is a replay rule: a grouped grant and a grouped or inconsistent
-	// checkpoint fail with the same literal code in both engines.
-	rules := groupedDispatchCases(t, commits, checkpoint)
+	// checkpoint fail with the same literal code in both engines. Checkpoint pruning builds
+	// byte-identical checkpoints and restores (or rejects) them alike.
+	rules := append(groupedDispatchCases(t, commits, checkpoint), pruningCases(t)...)
 	for _, rule := range rules {
 		inputs = append(inputs, rule.input)
 	}
 	t.Logf("differential cases: %d", len(inputs))
 	expected := jsReplayCommands(t, inputs)
 	for index, rule := range rules {
+		js, native := expected[len(inputs)-len(rules)+index], goReplayCommand(t, rule.input)
+		if rule.code == "" {
+			require.False(t, strings.HasPrefix(js, `{"error"`), "js: %s: %s", rule.input.label, js)
+			require.False(t, strings.HasPrefix(native, `{"error"`), "go: %s: %s", rule.input.label, native)
+			continue
+		}
 		want, err := canonicalGeneric(map[string]any{"error": rule.code})
 		require.NoError(t, err)
-		require.Equal(t, string(want), expected[len(inputs)-len(rules)+index], "js: %s", rule.input.label)
-		require.Equal(t, string(want), goReplayCommand(t, rule.input), "go: %s", rule.input.label)
+		require.Equal(t, string(want), js, "js: %s", rule.input.label)
+		require.Equal(t, string(want), native, "go: %s", rule.input.label)
 	}
 	mismatches := 0
 	for index, input := range inputs {
@@ -239,6 +255,8 @@ func TestNativeParityWithJavaScript(t *testing.T) {
 	require.Zero(t, mismatches, "%d of %d differential cases differ", mismatches, len(inputs))
 }
 
+// groupedDispatchCase is one input with the literal error code both engines must return,
+// or "" when both must accept it.
 type groupedDispatchCase struct {
 	input parityInput
 	code  string
@@ -293,4 +311,222 @@ func claimsByState(t *testing.T, claims map[string]any, state string) map[string
 	}
 	require.FailNow(t, "checkpoint has no Claim in state "+state)
 	return nil
+}
+
+var testProjector = Actor{Role: "projector", Repository: testRepository, Workflow: ".github/workflows/dispatcher.lock.yml", RunID: "100", RunAttempt: 1}
+
+func genericCommits(t *testing.T, commits ...QueueCommit) []any {
+	t.Helper()
+	values := make([]any, len(commits))
+	for index, commit := range commits {
+		value, err := genericValue(commit)
+		require.NoError(t, err)
+		values[index] = value
+	}
+	return values
+}
+
+func checkpointStateOf(t *testing.T, commit QueueCommit) object {
+	t.Helper()
+	return genericCommits(t, commit)[0].(object)["operations"].([]any)[0].(object)["state"].(object)
+}
+
+func issueResource(number string) Resource {
+	return Resource{Kind: "issue", Host: "github.com", Repository: testRepository, RepositoryID: "1", ResourceID: number, Number: number}
+}
+
+// pruningLedger holds a completed chain x -> y -> z with z waiting on y, a cancelled Work
+// gated on Issue 72, a waiting Work gated on Issue 71, and a completed Work whose backing
+// Issue 73 still awaits the projector's terminal comment.
+func pruningLedger(t *testing.T) ([]QueueCommit, map[string]WorkDefinition) {
+	t.Helper()
+	gate := func(number string) func(*WorkDefinition) {
+		resource := issueResource(number)
+		return func(work *WorkDefinition) {
+			work.DependsOn = []Dependency{{Kind: "issue", Resource: &resource, Condition: "completed"}}
+		}
+	}
+	after := func(parent WorkDefinition) func(*WorkDefinition) {
+		return func(work *WorkDefinition) { work.DependsOn = []Dependency{{Kind: "work", WorkID: parent.WorkID}} }
+	}
+	works := map[string]WorkDefinition{"x": testWork(t, "x", nil), "gated": testWork(t, "gated", gate("71")), "lost": testWork(t, "lost", gate("72")), "backed": testWork(t, "backed", nil)}
+	works["y"] = testWork(t, "y", after(works["x"]))
+	works["z"] = testWork(t, "z", after(works["y"]))
+	parameters := testDispatchParameters(nil)
+	grant := func(log []QueueCommit, actor Actor, values ...any) ([]QueueCommit, []string) {
+		state, err := Replay(log)
+		require.NoError(t, err)
+		request, err := NewRequest("dispatch_next", actor, parameters)
+		require.NoError(t, err)
+		decision, err := PlanDispatch(state, parameters, request.ID)
+		require.NoError(t, err)
+		for _, operation := range decision.Operations {
+			values = append(values, operation)
+		}
+		return appendTestCommit(t, log, actor, "dispatch_next", parameters, mustOps(t, values...)), decision.Dispatches
+	}
+	run := func(log []QueueCommit, dispatchID, runID string) []QueueCommit {
+		log = testBind(t, testLaunch(t, log, dispatchID, runID), dispatchID, testWorker(runID, 1))
+		return appendTestCommit(t, log, testWorker(runID, 1), "finish", DispatchIDParameters{DispatchID: dispatchID}, testFinishOperations(t, log, dispatchID))
+	}
+	waiting := func(number string) ObservationOperation {
+		return ObservationOperation{Kind: "Observation", ObservationID: "o-" + number, Resource: issueResource(number), Condition: "completed", State: "waiting"}
+	}
+	// Dispatcher runs 101 and 102 grant here; run 100 stays free for a grant after the checkpoint.
+	first, second := testDispatcher, testDispatcher
+	first.RunID, second.RunID = "101", "102"
+	log, dispatches := grant(testSubmit(t, nil, works["x"], works["y"], works["z"], works["gated"], works["lost"], works["backed"]), first, waiting("71"), waiting("72"))
+	require.Len(t, dispatches, 2)
+	log = run(run(log, dispatches[0], "7"), dispatches[1], "8")
+	link := mustOps(t, IssueLinkOperation{Kind: "IssueLink", WorkID: works["backed"].WorkID, Resource: issueResource("73")})
+	log = appendTestCommit(t, log, testProjector, "issue_link", IssueLinkParameters{Operations: link}, link)
+	log, dispatches = grant(log, second)
+	require.Len(t, dispatches, 1)
+	log = run(log, dispatches[0], "9")
+	lost := works["lost"].WorkID
+	log = appendTestCommit(t, log, testProducer, "cancel_work", CancelWorkParameters{WorkIDs: []string{lost}, Reason: "operator"}, mustOps(t, WorkCancellationOperation{Kind: "WorkCancellation", WorkID: lost, Reason: "operator"}))
+	return log, works
+}
+
+// windowLedger cancels w, kept as the predecessor of waiting Work, then re-sends that
+// idempotent cancellation from RetainedRequests+8 producer runs; it returns the first and
+// last re-sent commits.
+func windowLedger(t *testing.T) ([]QueueCommit, QueueCommit, QueueCommit) {
+	t.Helper()
+	w := testWork(t, "w", nil)
+	dependent := testWork(t, "after-w", func(work *WorkDefinition) { work.DependsOn = []Dependency{{Kind: "work", WorkID: w.WorkID}} })
+	parameters := CancelWorkParameters{WorkIDs: []string{w.WorkID}, Reason: "operator"}
+	cancel := mustOps(t, WorkCancellationOperation{Kind: "WorkCancellation", WorkID: w.WorkID, Reason: "operator"})
+	log := appendTestCommit(t, testSubmit(t, nil, w, dependent), testProducer, "cancel_work", parameters, cancel)
+	state, err := Replay(log)
+	require.NoError(t, err)
+	for run := range RetainedRequests + 8 {
+		actor := testProducer
+		actor.RunID = strconv.Itoa(1000 + run)
+		request, err := NewRequest("cancel_work", actor, parameters)
+		require.NoError(t, err)
+		commit := BuildCommit(state, actor, request, cancel, 1)
+		value, err := genericValue(commit)
+		require.NoError(t, err)
+		require.NoError(t, state.applyCommitValue(value))
+		log = append(log, commit)
+	}
+	return log, log[2], log[len(log)-1]
+}
+
+// pruningCases checks the Checkpoint fold in both engines: byte-identical checkpoints of the
+// pruning and window ledgers, the same restored projection and decision, and the same
+// literal verdict for pruned shapes restore must accept or reject.
+func pruningCases(t *testing.T) []groupedDispatchCase {
+	t.Helper()
+	log, works := pruningLedger(t)
+	state, err := Replay(log)
+	require.NoError(t, err)
+	built, err := CheckpointCommit(state, testReconciler, 1)
+	require.NoError(t, err)
+	snapshot := checkpointStateOf(t, built)
+	// Only what a later commit reads survives: z, its predecessor y (whose own predecessor x
+	// is never read again), gated Work with its gate, and the Work awaiting its Issue comment.
+	retained := []string{works["y"].WorkID, works["z"].WorkID, works["gated"].WorkID, works["backed"].WorkID}
+	sort.Strings(retained)
+	require.Equal(t, retained, sortedKeys(snapshot["works"].(object)))
+	require.Equal(t, retained, sortedKeys(snapshot["work_creators"].(object)))
+	require.Equal(t, []string{GateKey(issueResource("71"), "completed")}, sortedKeys(snapshot["observations"].(object)))
+	require.Len(t, snapshot["claims"], 2)
+	require.Len(t, snapshot["dispatches"], 2)
+
+	// The restored predecessor feeds the successor's result_refs.
+	parameters := testDispatchParameters(nil)
+	granted, decision := testDispatchNext(t, []QueueCommit{built}, parameters)
+	require.Len(t, decision.Dispatches, 1)
+	grantedState, err := Replay(granted)
+	require.NoError(t, err)
+	assignment, err := AssignmentForDispatch(grantedState, decision.Dispatches[0])
+	require.NoError(t, err)
+	require.Equal(t, works["z"].WorkID, assignment.Claims[0].WorkID)
+	require.Equal(t, works["y"].WorkID, assignment.Claims[0].ResultRefs[0].WorkID)
+
+	// Once the projector records the terminal comment, the next checkpoint drops `backed`.
+	comment := mustOps(t, IssueCommentOperation{Kind: "IssueComment", WorkID: works["backed"].WorkID, CommentID: "IC_9"})
+	commented := appendTestCommit(t, []QueueCommit{built}, testProjector, "issue_link", IssueLinkParameters{Operations: comment}, comment)
+	commentedState, err := Replay(commented)
+	require.NoError(t, err)
+	next, err := CheckpointCommit(commentedState, testReconciler, 1)
+	require.NoError(t, err)
+	require.Len(t, checkpointStateOf(t, next)["works"], 3)
+	// Its window is this epoch's requests, the first checkpoint's own included, none inherited.
+	epoch := []any{built.Request.ID, commented[1].Request.ID}
+	sort.Slice(epoch, func(i, j int) bool { return epoch[i].(string) < epoch[j].(string) })
+	require.Equal(t, epoch, checkpointStateOf(t, next)["requests"])
+
+	full := genericCommits(t, built)[0]
+	fullData, err := SerializeProjection(state)
+	require.NoError(t, err)
+	decoded, err := decodeStrict(fullData)
+	require.NoError(t, err)
+	folded := decoded.(object)
+	checkpoint := full.(object)
+	section := func(state object, name string) object { return state[name].(object) }
+	tamper := func(label, code string, change func(state object)) groupedDispatchCase {
+		mutated := deepCopy(checkpoint).(object)
+		change(mutated["operations"].([]any)[0].(object)["state"].(object))
+		return groupedDispatchCase{parityInput{Transactions: []any{mutated}, label: label}, code}
+	}
+	x, y := works["x"].WorkID, works["y"].WorkID
+	requests := func(count int) []any {
+		ids := make([]any, count)
+		for index := range ids {
+			ids[index] = fmt.Sprintf("request:%064x", index)
+		}
+		return ids
+	}
+	cases := []groupedDispatchCase{
+		{parityInput{Transactions: genericCommits(t, log...), Checkpoint: &testReconciler, label: "checkpoint of the pruning ledger"}, ""},
+		{parityInput{Transactions: []any{checkpoint}, Parameters: &parameters, RequestID: "request:pruned", label: "restored pruned checkpoint"}, ""},
+		{parityInput{Transactions: genericCommits(t, commented...), Checkpoint: &testReconciler, label: "checkpoint after the terminal Issue comment"}, ""},
+		tamper("extra terminal Work", "", func(state object) {
+			section(state, "works")[x] = deepCopy(section(folded, "works")[x])
+			section(state, "work_creators")[x] = deepCopy(section(folded, "work_creators")[x])
+		}),
+		tamper("missing predecessor of non-terminal Work", "checkpoint_invalid", func(state object) {
+			delete(section(state, "works"), y)
+			delete(section(state, "work_creators"), y)
+			for id, claim := range section(state, "claims") {
+				if claim.(object)["work_id"] == y {
+					delete(section(state, "claims"), id)
+					delete(section(state, "dispatches"), claim.(object)["dispatch_id"].(string))
+				}
+			}
+		}),
+		tamper("Claim naming a dropped Work", "checkpoint_invalid", func(state object) {
+			for id, claim := range section(folded, "claims") {
+				if dispatch := claim.(object)["dispatch_id"].(string); claim.(object)["work_id"] == x {
+					section(state, "claims")[id] = deepCopy(claim)
+					section(state, "dispatches")[dispatch] = deepCopy(section(folded, "dispatches")[dispatch])
+				}
+			}
+		}),
+		tamper("requests at the window", "", func(state object) { state["requests"] = requests(RetainedRequests) }),
+		tamper("requests over the window", "checkpoint_invalid", func(state object) { state["requests"] = requests(RetainedRequests + 1) }),
+	}
+
+	windowLog, oldest, newest := windowLedger(t)
+	windowState, err := Replay(windowLog)
+	require.NoError(t, err)
+	windowCheckpoint, err := CheckpointCommit(windowState, testReconciler, 1)
+	require.NoError(t, err)
+	window := checkpointStateOf(t, windowCheckpoint)["requests"].([]any)
+	require.Len(t, window, RetainedRequests)
+	require.NotContains(t, window, oldest.Request.ID)
+	require.Contains(t, window, newest.Request.ID)
+	restored, err := Replay([]QueueCommit{windowCheckpoint})
+	require.NoError(t, err)
+	resend := func(original QueueCommit) []any {
+		return genericCommits(t, windowCheckpoint, BuildCommit(restored, original.Actor, original.Request, original.Operations, 1))
+	}
+	return append(cases,
+		groupedDispatchCase{parityInput{Transactions: genericCommits(t, windowLog...), Checkpoint: &testReconciler, label: "checkpoint of a log past the request window"}, ""},
+		groupedDispatchCase{parityInput{Transactions: resend(newest), label: "retry of a request inside the window"}, "request_reused"},
+		groupedDispatchCase{parityInput{Transactions: resend(oldest), label: "request folded out of the window"}, ""},
+	)
 }

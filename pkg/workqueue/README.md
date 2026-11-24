@@ -60,6 +60,7 @@ For the full queue behavior and operator configuration, see the [work-queue refe
 | `LedgerBytes` | 64 MiB | Maximum ledger size. |
 | `CheckpointAfterLines` | 512 | Maintenance checkpoint threshold. |
 | `MaxPendingWork` | 4096 | Maximum available plus claimed Work per pool. |
+| `RetainedRequests` | 4096 | Request IDs a Checkpoint keeps for `request_reused` deduplication. |
 | `CASAttempts` | 8 | Maximum compare-and-swap publication attempts. |
 | `Roles` | variable | Closed actor roles. |
 | `ClaimCancellationReasons`, `WorkCancellationReasons`, `ReleaseReasons` | variable | Closed reason sets. |
@@ -77,8 +78,8 @@ For the full queue behavior and operator configuration, see the [work-queue refe
 | `AppendCommit` | `func AppendCommit(state Projection, commit QueueCommit) (Projection, error)` | Applies one commit to a cloned projection. |
 | `ValidateCommit` | `func ValidateCommit(commit QueueCommit) error` | Validates commit shape and identity. |
 | `LedgerProtocol` | `func LedgerProtocol(data []byte) int` | Reports the head line's protocol version. |
-| `SerializeProjection` | `func SerializeProjection(state Projection) ([]byte, error)` | Serializes a projection for a Checkpoint. |
-| `CheckpointCommit` | `func CheckpointCommit(state Projection, actor Actor, at int64) (QueueCommit, error)` | Builds a root Checkpoint commit. |
+| `SerializeProjection` | `func SerializeProjection(state Projection) ([]byte, error)` | Serializes a projection in the Checkpoint `state` format, unpruned. |
+| `CheckpointCommit` | `func CheckpointCommit(state Projection, actor Actor, at int64) (QueueCommit, error)` | Builds a root Checkpoint commit that carries only records a later commit can read: live Work, its predecessors, terminal Work awaiting its Issue comment, their Claims, Dispatches, creators and gate Observations, and the newest `RetainedRequests` request IDs of the folded log. |
 | `Projection.Clone` | `func (state Projection) Clone() Projection` | Deep-copies a projection. |
 | `Projection.CommittedRequest` | `func (state Projection) CommittedRequest(requestID string) (*QueueCommit, bool)` | Finds the commit for a request id. |
 | `Projection.OpenClaim` | `func (state Projection) OpenClaim(dispatch *DispatchState) *ClaimState` | Returns a dispatch's sole Claim while open, or nil once settled. |

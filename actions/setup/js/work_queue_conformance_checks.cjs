@@ -4,7 +4,7 @@ const assert = require("node:assert/strict");
 const fixtures = require("./work_queue_conformance_fixtures.json");
 const { canonical, identity, parseStrictJSON } = require("./work_queue_codec.cjs");
 const { decimal } = require("./work_queue_policy.cjs");
-const { appendCommit, buildCommit, newRequest, parseTransactionLog, replayTransactions, serializeProjection, serializeTransactionLog, validateOperation } = require("./work_queue_replay.cjs");
+const { appendCommit, buildCommit, checkpointCommit, newRequest, parseTransactionLog, replayTransactions, serializeProjection, serializeTransactionLog, validateOperation } = require("./work_queue_replay.cjs");
 const { assignmentForDispatch, claimIdentity, planDispatch } = require("./work_queue_scheduler.cjs");
 const { buildFixtures } = require("./work_queue_conformance_fixture_generator.cjs");
 const h = require("./work_queue_test_helpers.cjs");
@@ -69,18 +69,34 @@ function checkLedger(ledger) {
   assert.equal(canonical(assignmentForDispatch(state, ledger.assignment.dispatch_id)), canonical(ledger.assignment));
 }
 
-function checkCheckpoint(ledger) {
-  assert.equal(canonical(serializeProjection(replayTransactions([ledger.checkpoint.commit]))), canonical(ledger.checkpoint.projection));
-  const folded = serializeProjection(replayTransactions(ledger.commits));
+/**
+ * The checkpoint restores to its own projection and carries the folded records unchanged,
+ * minus exactly the named Work no later commit reads, with its Claims, Dispatches, creator
+ * and the gate Observations only it referenced.
+ */
+function checkCheckpoint(ledger, { dropped, observations }) {
   const restored = ledger.checkpoint.projection;
-  for (const field of ["repository", "works", "claims", "dispatches", "observations", "work_creators"]) assert.equal(canonical(restored[field]), canonical(folded[field]));
+  assert.equal(canonical(serializeProjection(replayTransactions([ledger.checkpoint.commit]))), canonical(restored));
+  const folded = serializeProjection(replayTransactions(ledger.commits));
+  const gone = new Set(Object.values(folded.works).flatMap(work => (dropped.includes(work.node_key) ? [work.work_id] : [])));
+  assert.equal(gone.size, dropped.length);
+  const kept = (records, workOf) => Object.fromEntries(Object.entries(records).filter(([id, record]) => !gone.has(workOf(record, id))));
+  assert.equal(restored.repository, folded.repository);
+  assert.equal(canonical(restored.works), canonical(kept(folded.works, work => work.work_id)));
+  assert.equal(canonical(restored.claims), canonical(kept(folded.claims, claim => claim.work_id)));
+  assert.equal(canonical(restored.dispatches), canonical(kept(folded.dispatches, dispatch => folded.claims[dispatch.claims[0]].work_id)));
+  assert.equal(canonical(restored.work_creators), canonical(kept(folded.work_creators, (_, id) => id)));
+  assert.equal(Object.keys(restored.observations).length, observations);
+  for (const [key, observation] of Object.entries(restored.observations)) assert.equal(canonical(observation), canonical(folded.observations[key]));
+  // Below the window bound the checkpoint keeps every request of the folded log.
+  assert.deepEqual(ledger.checkpoint.commit.operations[0].state.requests, folded.requests);
 }
 
 function registerTests({ describe, it }) {
   describe("shared v4 queue conformance fixtures", () => {
     it("regenerates the shared lifecycle fixture byte for byte", () => assert.equal(canonical(buildFixtures()), canonical(sharedPrefix)));
     it("replays every prefix of the shared lifecycle ledger", () => checkLedger(sharedPrefix));
-    it("restores the shared checkpoint to the same projection", () => checkCheckpoint(sharedPrefix));
+    it("restores the shared checkpoint to the pruned projection", () => checkCheckpoint(sharedPrefix, { dropped: ["c"], observations: 0 }));
     for (const rejection of sharedPrefix.rejections)
       it(`shared rejection: ${rejection.name}`, () =>
         assert.throws(
@@ -89,7 +105,7 @@ function registerTests({ describe, it }) {
         ));
     const continuation = sharedPrefix.continuation;
     it("replays every prefix of the shared continuation ledger", () => checkLedger(continuation));
-    it("restores the shared continuation checkpoint to the same projection", () => checkCheckpoint(continuation));
+    it("restores the shared continuation checkpoint to the pruned projection", () => checkCheckpoint(continuation, { dropped: ["p"], observations: 1 }));
     for (const rejection of continuation.rejections)
       it(`shared continuation rejection: ${rejection.name}`, () =>
         assert.throws(
@@ -140,14 +156,16 @@ function registerTests({ describe, it }) {
 }
 
 /**
- * Differential harness for the Go engine: stdin `{transactions, parameters?, request_id?}`,
- * stdout canonical `{state, canonical, decision?}` or `{error}` when replay rejects.
+ * Differential harness for the Go engine: stdin `{transactions, parameters?, request_id?, checkpoint?}`,
+ * stdout canonical `{state, canonical, decision?, checkpoint?}` or `{error}` when replay rejects;
+ * `checkpoint` names the actor that builds the replayed projection's Checkpoint commit.
  */
 function replayCommand(input) {
   try {
     const state = replayTransactions(input.transactions);
     const output = { state: serializeProjection(state), canonical: serializeTransactionLog(input.transactions) };
     if (input.parameters) output.decision = planDispatch(state, input.parameters, input.request_id);
+    if (input.checkpoint) output.checkpoint = checkpointCommit(state, input.checkpoint, 1);
     return output;
   } catch (error) {
     const code = errorCode(error);

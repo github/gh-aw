@@ -56,7 +56,8 @@ function readProfile(directory, profile, outcome) {
 function workload(entry) {
   const report = entry.report;
   if (!report) return "Not measured";
-  if (entry.name === "history") return `${number(report.retained_history_entities)} retained entities (${number(report.seeded_cancelled_work)} Work + ${number(report.seeded_claims)} Claims)`;
+  if (entry.name === "history")
+    return `${number(report.history_entities)} historical entities (${number(report.seeded_cancelled_work)} Work + ${number(report.seeded_claims)} Claims) across ${number(report.checkpoint_epochs)} checkpoint epochs`;
   if (entry.name === "lifecycle") return `${number(report.completed)} completed / ${number(report.requested)} requested Work`;
   return `${number(report.submitted)} admitted / ${number(report.requested)} requested Work`;
 }
@@ -65,7 +66,7 @@ function throughput(entry) {
   const report = entry.report;
   if (!report?.ok || entry.status !== "Passed") return "Not measured";
   if (entry.name === "saturation") return "Not a completion benchmark";
-  const count = entry.name === "history" ? report.retained_history_entities : report.completed;
+  const count = entry.name === "history" ? report.history_entities : report.completed;
   if (!measured(count) || !measured(report.elapsed_ms) || report.elapsed_ms === 0) return "Not measured";
   return `${number(count / (report.elapsed_ms / 1000), 2)} ${entry.name === "history" ? "entities" : "Work"}/s`;
 }
@@ -84,7 +85,7 @@ function renderSummary(entries, invariantsOutcome) {
       entry => `| ${entry.label} | ${entry.status}${entry.report?.saturation ? " (admission limit reached)" : ""} | ${workload(entry)} | ${duration(entry.report?.elapsed_ms)} | ${throughput(entry)} | ${bytes(entry.report?.max_rss_bytes)} |`
     ),
     "",
-    "History throughput measures retained Work + Claim fixture validation, including setup and separate live smoke; it is **not worker completion throughput**. Lifecycle throughput includes Git publication, scheduling, simulated Actions, Result verification and cleanup across bounded branches. Peak RSS includes Node worker threads, excludes Git subprocesses, and is a process-lifetime high-water mark.",
+    "History throughput measures historical Work + Claim fixture building, epoch checkpoints and validation, including setup and separate live smoke; it is **not worker completion throughput**. Lifecycle throughput includes Git publication, scheduling, simulated Actions, Result verification and cleanup across bounded branches. Peak RSS includes Node worker threads, excludes Git subprocesses, and is a process-lifetime high-water mark.",
     "",
     "Full JSON metrics, invariant output and this report are in the `work-queue-stress-results` artifact.",
     "",
@@ -98,11 +99,16 @@ function renderSummary(entries, invariantsOutcome) {
     if (!Array.isArray(report?.queues) || !report.queues.length || !report.queues.every(queue => measured(queue[key]))) return undefined;
     return report.queues.reduce((sum, queue) => sum + queue[key], 0);
   };
-  const largestLedger = report => {
-    const maximum = report?.max_queue_ledger_bytes ?? report?.ledger_bytes;
-    if (measured(maximum)) return maximum;
-    if (!Array.isArray(report?.queues) || !report.queues.length || !report.queues.every(queue => measured(queue.ledger_bytes))) return undefined;
-    return report.queues.reduce((largest, queue) => Math.max(largest, queue.ledger_bytes), 0);
+  const largest = (report, reportKey, queueKey) => {
+    if (measured(report?.[reportKey])) return report[reportKey];
+    if (!Array.isArray(report?.queues) || !report.queues.length || !report.queues.every(queue => measured(queue[queueKey]))) return undefined;
+    return report.queues.reduce((maximum, queue) => Math.max(maximum, queue[queueKey]), 0);
+  };
+  const largestLedger = report => (measured(report?.max_queue_ledger_bytes) ? report.max_queue_ledger_bytes : largest(report, "max_ledger_bytes", "ledger_bytes"));
+  const largestCheckpoint = report => {
+    const size = largest(report, "max_checkpoint_bytes", "checkpoint_bytes");
+    const requests = largest(report, "max_checkpoint_requests", "checkpoint_requests");
+    return measured(size) && measured(requests) ? `${bytes(size)} / ${number(requests)} requests` : "Not measured";
   };
   const metrics = [
     ["Workers", report => number(report?.workers)],
@@ -115,6 +121,8 @@ function renderSummary(entries, invariantsOutcome) {
     ["Fixture validation", report => duration(report?.fixture_validation_ms)],
     ["Batch planning", report => (measured(report?.ten_batch_plans_ms) ? `${duration(report.ten_batch_plans_ms)} / ${number(report.batch_plan_count ?? 10)} plans` : "Not measured")],
     ["Checkpoint", report => duration(report?.checkpoint_ms ?? sumTiming(report, "checkpoint_ms"))],
+    ["Checkpoint epochs", report => number(report?.checkpoint_epochs)],
+    ["Largest checkpoint", largestCheckpoint],
     ["Git commands", report => number(report?.git_api_metrics?.git_commands)],
     ["Simulated API calls", report => number(report?.git_api_metrics?.api_calls)],
     ["CAS conflicts", report => number(report?.git_api_metrics?.cas_conflicts)],

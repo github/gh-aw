@@ -123,6 +123,8 @@ Recovery is driven by GitHub run state, never by elapsed time:
 
 Maintenance runs in `agentics-maintenance.yml`. It also converts a protocol version 3 ledger, writes a checkpoint when the log exceeds 512 lines, and runs the Issue projection. A run that starts after its Dispatch was released finds no open Claim and exits without effects.
 
+A checkpoint keeps the live queue and drops finished history. That bounds the ledger by the work in flight, not by how much work the queue has ever run. Completed and cancelled Work stays in the checkpoint only while available or claimed Work depends on it, or while its backing Issue still needs its final comment. Their Claims and Dispatches stay with it. Request IDs stay deduplicated for at least one more checkpoint interval, up to the most recent 4096. After that, a dropped Work ID is unknown: resubmitting the same graph node creates new Work that runs again, and new Work that depends on a dropped Work is rejected with `dependency_invalid`. `gh aw work-queue` commands show only the retained records. The checkpoint commit's Git parent still holds the full history (`git log work-queue`).
+
 ### Version 3 ledgers
 
 The first dispatcher, producer, administrator, or maintenance job that reads a version 3 head converts it. The converter keeps `available` Work whose pool and worker profile are still configured, in their original order, and writes it as administrator `migrate` commits into a new log whose Git parent is the version 3 head. Claimed, completed, and cancelled version 3 Work is not carried; the old log stays in Git history. Workers, observers, and projectors fail with `unsupported_protocol` until conversion has run.
@@ -187,7 +189,7 @@ gh aw work-queue --repo OWNER/REPO [--branch QUEUE_BRANCH] [--json] COMMAND
 | `cancel-work --work-id ID[,ID...] [--reason REASON]` | Cancel `available` Work (default reason `operator`). Claimed Work must be released first. |
 | `release --dispatch-id ID [--reason REASON]` | Release a non-closed Dispatch (default reason `operator`); its Work returns to the pool or is cancelled with `attempts_exhausted`. |
 | `clear [--dry-run]` | Release every open Dispatch and cancel all `available` Work; see below. |
-| `compact [--min-lines N]` | Replace the log with one checkpoint commit when it has more than N lines (default 1). |
+| `compact [--min-lines N]` | Replace the log with one checkpoint commit when it has more than N lines (default 1). Finished Work that nothing still reads is dropped from the queue state; see [Recovery](#recovery). |
 | `dispatch DISPATCHER [--dry-run] [--wait]` | Run a dispatcher workflow on the default branch; `--wait` waits for the dispatcher only. |
 
 Resubmitting an existing Work ID is a no-op, so retrying a submission is safe. `release` and `cancel-work` do not stop running workflow runs: a late worker finds its Claims closed and cannot complete them.

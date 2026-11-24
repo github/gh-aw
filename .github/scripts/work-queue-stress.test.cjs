@@ -5,7 +5,7 @@ const fs = require("node:fs/promises");
 const path = require("node:path");
 const { test } = require("node:test");
 const { LocalGitHub, parseArgs, policyFor, runSimulator } = require("./work-queue-stress.cjs");
-const { JSON_ARRAY_MEMBERS, projectionDigest, serializedCheckpoint, verifiedCheckpoint } = require("./work-queue-stress-retained.cjs");
+const { PROBES, appendHistoryBatch, assertBoundedCheckpoint, retainedPolicy, verifiedCheckpoint } = require("./work-queue-stress-retained.cjs");
 const { AT, LAUNCH_REF, OWNER, PROTOCOL_LIMITS, REPO, WORKFLOW, dispatchParameters, queueActor } = require("./work-queue-stress-git.cjs");
 const { canonical } = require("../../actions/setup/js/work_queue_codec.cjs");
 const { normalizeSubmitParameters } = require("../../actions/setup/js/work_queue_intents.cjs");
@@ -22,23 +22,54 @@ function assertProtocolLimits(limits) {
   assert.equal(limits.pending_work, 4096);
   assert.equal(limits.graph_nodes, 4096);
   assert.equal(limits.claims_per_dispatch, 1);
+  assert.equal(limits.checkpoint_after_lines, 512);
+  assert.equal(limits.retained_requests, 4096);
 }
 
-test("history checkpoint names the request-retention cap instead of failing opaquely", () => {
-  const policy = policyFor(2);
+test("a checkpoint never retains more than RETAINED_REQUESTS request IDs and keeps every live record", { timeout: 60000 }, () => {
+  const policy = retainedPolicy();
   const producer = queueActor("producer");
   const administrator = queueActor("administrator");
-  const works = normalizeSubmitParameters({ nodes: [{ graph_id: "retention", node_key: "only", payload: { item: 0 } }] }, policy);
-  const state = replayTransactions([buildCommit(newState(), producer, newRequest("submit", producer, { work_ids: works.map(work => work.work_id) }), works, AT)]);
-  const digest = projectionDigest(state);
-  assert.ok(verifiedCheckpoint(state, administrator, digest) > 0, "a small queue checkpoints and restores");
-  // A Checkpoint carries every committed request ID; one past the codec's array cap cannot be written.
-  while (state.requests.size < JSON_ARRAY_MEMBERS) state.requests.add(`request:retained-${state.requests.size}`);
-  assert.ok(serializedCheckpoint(state, administrator).length > 0, "exactly the cap still checkpoints");
-  state.requests.add("request:one-too-many");
+  const probes = normalizeSubmitParameters({ nodes: Array.from({ length: PROBES }, (_, index) => ({ graph_id: "window-probes", node_key: `p${index}`, pool: "probe", payload: { probe: index } })) }, policy);
+  const state = replayTransactions([buildCommit(newState(), producer, newRequest("submit", producer, { work_ids: probes.map(work => work.work_id) }), probes, AT)]);
+  // One unfolded log longer than the request window: 1 + 33 * 130 commits.
+  for (let batch = 0; batch < 33; batch++) appendHistoryBatch(state, policy, "window", batch, 128);
+  assert.equal(state.transactions.length, 4291);
+  assert.ok(state.requests.size > 4096);
+  const bounded = verifiedCheckpoint(state, administrator);
+  assert.deepEqual({ requests: bounded.requests, works: bounded.works, claims: bounded.claims }, { requests: 4096, works: PROBES, claims: 0 }, "only the live probes and the newest 4096 requests survive");
+  const checkpoint = checkpointCommit(state, administrator, AT);
+  const tampered = mutate => {
+    const commit = structuredClone(checkpoint);
+    mutate(commit.operations[0].state);
+    return commit;
+  };
+  // Production restore refuses a window past the bound.
   assert.throws(
-    () => serializedCheckpoint(state, administrator),
-    error => error.code === "checkpoint_request_retention" && error.retained_requests === JSON_ARRAY_MEMBERS + 1 && /16385 committed request IDs.*16384-member JSON array cap/.test(error.message)
+    () => replayTransactions([tampered(snapshot => snapshot.requests.push("request:one-too-many"))]),
+    error => error.code === "checkpoint_invalid"
+  );
+  // The harness oracle refuses a stale window and a lost live Work, which restore cannot see.
+  const oldest = state.transactions[0].request.id;
+  assert.throws(
+    () =>
+      assertBoundedCheckpoint(
+        state,
+        tampered(snapshot => snapshot.requests.splice(0, 1, oldest))
+      ),
+    /request window/
+  );
+  const [probe] = probes;
+  assert.throws(
+    () =>
+      assertBoundedCheckpoint(
+        state,
+        tampered(snapshot => {
+          delete snapshot.works[probe.work_id];
+          delete snapshot.work_creators[probe.work_id];
+        })
+      ),
+    /lost live Work/
   );
 });
 
@@ -247,6 +278,8 @@ test("two publishers complete real-Git lifecycle with CAS races, lost response, 
   assert.ok(report.queues[0].cold_replay_ms > 0);
   assert.ok(report.queues[0].ledger_bytes > 0);
   assert.ok(report.queues[0].checkpoint_bytes > 0);
+  assert.equal(report.queues[0].checkpoint_works, 0, "the checkpoint folds every completed Work");
+  assert.equal(report.queues[0].checkpoint_requests, report.queues[0].transactions, "a short log keeps its whole request window");
   assertProtocolLimits(report.limits);
 });
 
@@ -318,7 +351,8 @@ test("retained mode validates real Work/Claim history and separates fixture scal
   assert.equal(report.cancelled, 128);
   assert.equal(report.probe_work, 8);
   assert.equal(report.retained_entities, 264);
-  assert.equal(report.retained_history_entities, 256);
+  assert.equal(report.history_entities, 256);
+  assert.equal(report.checkpoint_epochs, 0, "131 lines never pass CHECKPOINT_AFTER_LINES");
   assert.equal(report.requested_history_entities, 256);
   assert.equal(report.fixture_batch, 128);
   assert.equal(report.transactions, 131, "probe genesis, then submit, dispatch_next and one launch release per Dispatch for 128 historical Work");
@@ -327,7 +361,8 @@ test("retained mode validates real Work/Claim history and separates fixture scal
   assert.equal(report.queues[1].retained_entities, 264);
   assert.equal(report.selected_probe_claims, 8);
   assert.equal(report.historical_reservations, 128, "one Dispatch per historical Claim");
-  assert.equal(report.checkpoint_retained_requests, report.transactions, "a Checkpoint retains every committed request ID");
+  assert.equal(report.checkpoint_requests, report.transactions, "the final checkpoint keeps the whole short request window");
+  assert.equal(report.max_checkpoint_works, 8, "the final checkpoint keeps only the live probes");
   assert.equal(report.fixture_native_posts, 0);
   assert.equal(report.checkpoint_persisted, true);
   assert.ok(report.checkpoint_bytes > 0);
@@ -369,17 +404,26 @@ test("retained shards count validated histories separately and run worker smoke 
   assert.equal(report.saturation, null);
 });
 
-test("history mode counts combined entities and cold-checks the large fixture in multiple worker threads", { timeout: 120000 }, async () => {
-  const report = await runSimulator({ mode: "history", items: 256, workers: 2, seed: 29, timeoutSeconds: 90 });
+test("history mode builds lifetime history across checkpoint epochs and cold-checks it in multiple worker threads", { timeout: 120000 }, async () => {
+  const report = await runSimulator({ mode: "history", items: 1280, workers: 2, seed: 29, timeoutSeconds: 90 });
   assert.equal(report.ok, true);
   assert.equal(report.mode, "history");
-  assert.equal(report.requested, 256);
-  assert.equal(report.requested_history_work, 128);
-  assert.equal(report.retained_history_entities, 256);
-  assert.equal(report.seeded_cancelled_work, 128);
-  assert.equal(report.seeded_claims, 128);
+  assert.equal(report.requested, 1280);
+  assert.equal(report.requested_history_work, 640);
+  assert.equal(report.history_entities, 1280);
+  assert.equal(report.seeded_cancelled_work, 640);
+  assert.equal(report.seeded_claims, 640);
   assert.equal(report.completed, 0);
   assert.equal(report.new_worker_completions, 16);
+  // Genesis plus four 130-line batches passes 512 lines once; the fifth batch is the unfolded tail.
+  assert.equal(report.checkpoint_epochs, 1);
+  assert.equal(report.tail_history_work, 128);
+  assert.equal(report.transactions, 131, "checkpoint root plus one tail batch");
+  assert.equal(report.retained_entities, 264, "live probes plus the tail epoch");
+  assert.equal(report.max_checkpoint_works, 8, "every checkpoint keeps only the live probes");
+  assert.equal(report.max_checkpoint_requests, 521, "the epoch checkpoint keeps its whole 521-request log");
+  assert.ok(report.max_checkpoint_requests <= report.limits.retained_requests);
+  assert.ok(report.max_ledger_bytes > report.ledger_bytes, "the folded epoch was larger than the tail");
   assert.equal(report.history_validation_workers, 2);
   assert.equal(report.history_worker_verifications.length, 2);
   for (const verification of report.history_worker_verifications) {
@@ -390,6 +434,7 @@ test("history mode counts combined entities and cold-checks the large fixture in
     assert.equal(verification.ledger_bytes, report.ledger_bytes);
     assert.ok(verification.checkpoint_ms > 0);
     assert.equal(verification.checkpoint_bytes, report.checkpoint_bytes);
+    assert.equal(verification.checkpoint_requests, report.checkpoint_requests);
   }
 });
 

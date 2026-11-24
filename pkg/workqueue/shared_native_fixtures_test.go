@@ -105,10 +105,12 @@ func TestSharedNativeConformanceFixtures(t *testing.T) {
 	require.Equal(t, Version, fixture.Version)
 	require.NotEmpty(t, fixture.Continuation.Commits)
 
+	// Each shared checkpoint folds exactly one Work no later commit reads.
+	dropped := map[string]string{"lifecycle": "c", "continuation": "p"}
 	for name, ledger := range map[string]ledgerFixture{"lifecycle": fixture.ledgerFixture, "continuation": fixture.Continuation} {
 		t.Run(name+" canonical wire", func(t *testing.T) { checkCanonicalWire(t, ledger) })
 		t.Run(name+" every prefix", func(t *testing.T) { checkLedgerPrefixes(t, ledger, fixture.NextParameters, fixture.NextRequestID) })
-		t.Run(name+" checkpoint", func(t *testing.T) { checkLedgerCheckpoint(t, ledger) })
+		t.Run(name+" checkpoint", func(t *testing.T) { checkLedgerCheckpoint(t, ledger, dropped[name]) })
 		for _, rejection := range ledger.Rejections {
 			t.Run(name+" rejection "+rejection.Name, func(t *testing.T) {
 				base := len(ledger.Commits)
@@ -177,19 +179,28 @@ func checkLedgerPrefixes(t *testing.T, ledger ledgerFixture, next DispatchParame
 	require.Equal(t, canonicalJSON(t, ledger.Assignment), string(data))
 }
 
-func checkLedgerCheckpoint(t *testing.T, ledger ledgerFixture) {
+func checkLedgerCheckpoint(t *testing.T, ledger ledgerFixture, dropped string) {
 	t.Helper()
 	restored, err := ReplayRaw([]json.RawMessage{ledger.Checkpoint.Commit})
 	require.NoError(t, err)
 	require.Equal(t, canonicalJSON(t, ledger.Checkpoint.Projection), serializedProjection(t, restored))
 	folded, err := ReplayRaw(ledger.Commits)
 	require.NoError(t, err)
-	var left, right map[string]json.RawMessage
-	require.NoError(t, json.Unmarshal(ledger.Checkpoint.Projection, &left))
-	require.NoError(t, json.Unmarshal([]byte(serializedProjection(t, folded)), &right))
-	for _, field := range []string{"repository", "works", "claims", "dispatches", "observations", "work_creators"} {
-		require.Equal(t, canonicalJSON(t, left[field]), canonicalJSON(t, right[field]), field)
+	// Every folded Work but the dropped one is restored unchanged, with its Claims and Dispatches.
+	for id, work := range folded.Works {
+		kept, retained := restored.Works[id]
+		require.Equal(t, work.NodeKey != dropped, retained, work.NodeKey)
+		if retained {
+			require.Equal(t, *work, *kept, work.NodeKey)
+		}
 	}
+	require.Len(t, restored.Works, len(folded.Works)-1)
+	for id, claim := range folded.Claims {
+		_, retained := restored.Claims[id]
+		_, dispatched := restored.Dispatches[claim.DispatchID]
+		require.Equal(t, folded.Works[claim.WorkID].NodeKey != dropped, retained && dispatched, id)
+	}
+	require.Len(t, restored.WorkCreators, len(restored.Works))
 	// The Go checkpoint builder reproduces the shared checkpoint projection.
 	var commit QueueCommit
 	require.NoError(t, json.Unmarshal(ledger.Checkpoint.Commit, &commit))
