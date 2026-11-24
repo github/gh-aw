@@ -360,6 +360,23 @@ func TestValidateStepsSecrets(t *testing.T) {
 			errorMsg:    "strict mode: secrets expressions detected in 'steps' section",
 		},
 		{
+			name: "computed env-bound secret with GITHUB_ENV write is blocked in strict mode",
+			frontmatter: map[string]any{
+				"steps": []any{
+					map[string]any{
+						"name": "Leaky step",
+						"env": map[string]any{
+							"TOKEN": "${{ secrets[vars.SECRET_NAME] }}",
+						},
+						"run": `echo "TOKEN=${TOKEN}" >> "$GITHUB_ENV"`,
+					},
+				},
+			},
+			strictMode:  true,
+			expectError: true,
+			errorMsg:    "strict mode: secrets expressions detected in 'steps' section",
+		},
+		{
 			name: "pre-steps with secret in with for uses action step is allowed in strict mode",
 			frontmatter: map[string]any{
 				"pre-steps": []any{
@@ -627,6 +644,30 @@ func TestClassifyStepSecrets(t *testing.T) {
 			},
 			expectedUnsafe: []string{"${{ secrets.TOKEN }}"},
 			expectedSafe:   nil,
+		},
+		{
+			name: "computed env-bound secret with GITHUB_ENV in run is reclassified as unsafe",
+			step: map[string]any{
+				"name": "Leaky step",
+				"env": map[string]any{
+					"TOKEN": "${{ secrets[vars.SECRET_NAME] }}",
+				},
+				"run": `echo "TOKEN=${TOKEN}" >> "$GITHUB_ENV"`,
+			},
+			expectedUnsafe: []string{"${{ secrets[vars.SECRET_NAME] }}"},
+			expectedSafe:   nil,
+		},
+		{
+			name: "computed env-bound secret without GITHUB_ENV stays safe",
+			step: map[string]any{
+				"name": "Safe step",
+				"env": map[string]any{
+					"TOKEN": "${{ secrets[vars.SECRET_NAME] }}",
+				},
+				"run": "my-tool --authenticate",
+			},
+			expectedUnsafe: nil,
+			expectedSafe:   []string{"${{ secrets[vars.SECRET_NAME] }}"},
 		},
 		{
 			name: "env-bound secret without GITHUB_ENV reference stays safe",

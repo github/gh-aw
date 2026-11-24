@@ -227,6 +227,10 @@ func (c *Compiler) generateWorkflowBody(yaml *strings.Builder, data *WorkflowDat
 
 func (c *Compiler) generateYAML(data *WorkflowData, markdownPath string) (string, []string, []string, error) { //nolint:largefunc // Existing workflow YAML assembly keeps generation steps in order.
 	compilerYamlLog.Printf("Generating YAML for workflow: %s", data.Name)
+	data.dynamicSecretReferences = CollectDynamicSecretReferences(data.FrontmatterYAML)
+	if len(data.dynamicSecretReferences) > 0 && hasWorkflowCallTrigger(data.On) && len(workflowCallSecretNames(data.On)) == 0 {
+		return "", nil, nil, errors.New("computed secret selection in a workflow_call requires explicitly declared on.workflow_call.secrets names to bound the secret inventory")
+	}
 
 	repoConfig, err := c.loadRepoConfig()
 	if err != nil {
@@ -303,7 +307,10 @@ func (c *Compiler) generateYAML(data *WorkflowData, markdownPath string) (string
 	}
 	// Appending failures can replace a slice's backing array; generatedActionRefs
 	// is a shared map and needs no copy-back.
-	defer func() { sourceData.ActionResolutionFailures = data.ActionResolutionFailures }()
+	defer func() {
+		sourceData.ActionResolutionFailures = data.ActionResolutionFailures
+		sourceData.dynamicSecretReferences = data.dynamicSecretReferences
+	}()
 
 	// Build all jobs and validate dependencies
 	if err := c.buildJobsAndValidate(data, markdownPath); err != nil {
@@ -348,6 +355,17 @@ func (c *Compiler) generateYAML(data *WorkflowData, markdownPath string) (string
 	// These are returned to the caller so they can be used for safe update enforcement
 	// without requiring a second scan of the full YAML content.
 	secrets := CollectSecretReferences(bodyContent)
+	data.dynamicSecretReferences = append(data.dynamicSecretReferences, CollectDynamicSecretReferences(bodyContent)...)
+	slices.Sort(data.dynamicSecretReferences)
+	data.dynamicSecretReferences = slices.Compact(data.dynamicSecretReferences)
+	if len(data.dynamicSecretReferences) > 0 && hasWorkflowCallTrigger(data.On) && len(workflowCallSecretNames(data.On)) == 0 {
+		return "", nil, nil, errors.New("computed secret selection in a workflow_call requires explicitly declared on.workflow_call.secrets names to bound the secret inventory")
+	}
+	if hasWorkflowCallTrigger(data.On) {
+		secrets = append(secrets, workflowCallSecretNames(data.On)...)
+		slices.Sort(secrets)
+		secrets = slices.Compact(secrets)
+	}
 
 	// If this workflow has a workflow_call trigger, inject on.workflow_call.secrets:
 	// declarations so callers can map secrets explicitly instead of using secrets: inherit.

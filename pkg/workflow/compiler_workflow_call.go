@@ -227,6 +227,31 @@ type workflowCallSecretEntry struct {
 	Required bool `yaml:"required"`
 }
 
+func workflowCallSecretNames(onSection string) []string {
+	var onData map[string]any
+	if err := yaml.Unmarshal([]byte(onSection), &onData); err != nil {
+		return nil
+	}
+	on, ok := onData["on"].(map[string]any)
+	if !ok {
+		return nil
+	}
+	workflowCall, ok := on["workflow_call"].(map[string]any)
+	if !ok {
+		return nil
+	}
+	secrets, ok := workflowCall["secrets"].(map[string]any)
+	if !ok {
+		return nil
+	}
+	names := make([]string, 0, len(secrets))
+	for name := range secrets {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names
+}
+
 // injectWorkflowCallSecretsSection adds on.workflow_call.secrets declarations for secrets
 // used by the workflow, so that callers can pass them explicitly instead of using
 // secrets: inherit. GITHUB_TOKEN is excluded because it is automatically provided by
