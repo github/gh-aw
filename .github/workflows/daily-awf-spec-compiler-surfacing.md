@@ -10,6 +10,8 @@ permissions:
   contents: read
   issues: read
   pull-requests: read
+checkout:
+  fetch-depth: 0
 tracker-id: daily-awf-spec-compiler-surfacing
 model: copilot/gpt-6-sol
 engine:
