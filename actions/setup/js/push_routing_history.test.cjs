@@ -497,10 +497,10 @@ describe("push_routing_history saves", () => {
     ]);
     expect(remoteState(remote).unexplained).toBe(0);
 
-    // Once recorded as no_agent, subsequent saves do not re-query their jobs.
+    // Once reconciled at #54, subsequent saves do not re-query any of #51..#53's jobs.
     const nextGitHub = fakeGitHub(remote, { runs, jobs });
     await save(remote, 55, "success", { github: nextGitHub });
-    expect(nextGitHub.calls.jobs).toEqual([9051]);
+    expect(nextGitHub.calls.jobs).toEqual([]);
   });
 
   it("charges a failed save from a pull_request_target run, and never a run whose history job succeeded", async () => {
