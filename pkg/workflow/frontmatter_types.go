@@ -19,7 +19,7 @@ type RunnerConfig struct {
 	// Topology identifies the runner execution topology.
 	// Supported values: "arc-dind" (ARC with Docker-in-Docker sidecar).
 	Topology RunnerTopology `json:"topology,omitempty" yaml:"topology,omitempty"`
-	// Installation selects the privilege used to install Copilot and threat-detect.
+	// Installation selects the privilege used to install the Copilot CLI.
 	Installation string `json:"installation,omitempty" yaml:"installation,omitempty"`
 }
 

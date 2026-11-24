@@ -1,4 +1,4 @@
-# gh-aw-metadata: {"schema_version":"v4","frontmatter_hash":"495802db570d5ed7b0f7dfc69f61921f1f72bf83e6158374de076ed2d8171e53","body_hash":"06e99839be933bb5d693f53865142da2814720567fdba6bc40b0ab82d8279b38","strict":true,"agent_id":"copilot","engine_versions":{"copilot":"1.0.103"}}
+# gh-aw-metadata: {"schema_version":"v4","frontmatter_hash":"2d86359a409c04a37121340ec753b50c639c3d2917b7471101eaf8954f0e3285","body_hash":"813a4bb5ecba0bfe0f9092e400ccda9b1c0b3755a20f63bc993c805b15e5a12b","strict":true,"agent_id":"copilot","engine_versions":{"copilot":"1.0.103"}}
 # gh-aw-manifest: {"version":1,"secrets":["COPILOT_GITHUB_TOKEN","GH_AW_GITHUB_MCP_SERVER_TOKEN","GH_AW_GITHUB_TOKEN","GH_AW_OTEL_GRAFANA_AUTHORIZATION","GH_AW_OTEL_GRAFANA_ENDPOINT","GH_AW_OTEL_SENTRY_AUTHORIZATION","GH_AW_OTEL_SENTRY_ENDPOINT","GITHUB_TOKEN"],"actions":[{"repo":"actions/cache/restore","sha":"55cc8345863c7cc4c66a329aec7e433d2d1c52a9","version":"v6.1.0"},{"repo":"actions/cache/save","sha":"55cc8345863c7cc4c66a329aec7e433d2d1c52a9","version":"v6.1.0"},{"repo":"actions/checkout","sha":"3d3c42e5aac5ba805825da76410c181273ba90b1","version":"v7.0.1"},{"repo":"actions/download-artifact","sha":"9000827ccba6bdab643e8b6fd33ac0654aef8333","version":"v8.0.2"},{"repo":"actions/github-script","sha":"3a2844b7e9c422d3c10d287c895573f7108da1b3","version":"v9.0.0"},{"repo":"actions/setup-go","sha":"b7ad1dad31e06c5925ef5d2fc7ad053ef454303e","version":"v7.0.0"},{"repo":"actions/setup-go","sha":"d8cbb8045d7f43706b9177cceb36c1f91a6644d5","version":"v7.1.0"},{"repo":"actions/setup-node","sha":"949feb2413d6458794dcd2491c4babbbce0c15c1","version":"v7.1.0"},{"repo":"actions/upload-artifact","sha":"cf430e030ddbb5b0abf93d22962f4752f3646cd9","version":"v7.0.2"},{"repo":"docker/build-push-action","sha":"c3c9e263c25d99ce0380d002d59b67737d91b0dc","version":"v7.4.0"},{"repo":"docker/setup-buildx-action","sha":"f87e5991a6d7451dcb8d9637bfbc97413f497069","version":"v4.4.1"}],"containers":[{"image":"ghcr.io/github/gh-aw-firewall/agent:0.29.20","digest":"sha256:b9cd8d7d1a9c2693e5d91db035a678fb1ea8d87ce691e08ec091b327e5e8ba75","pinned_image":"ghcr.io/github/gh-aw-firewall/agent:0.29.20@sha256:b9cd8d7d1a9c2693e5d91db035a678fb1ea8d87ce691e08ec091b327e5e8ba75"},{"image":"ghcr.io/github/gh-aw-firewall/api-proxy:0.29.20","digest":"sha256:fc6c1eff686514d26ff90ae1398e0f6e3dcad8d2e43d11b16df312c1e72c0ace","pinned_image":"ghcr.io/github/gh-aw-firewall/api-proxy:0.29.20@sha256:fc6c1eff686514d26ff90ae1398e0f6e3dcad8d2e43d11b16df312c1e72c0ace"},{"image":"ghcr.io/github/gh-aw-firewall/cli-proxy:0.29.20","digest":"sha256:743396030b149763880978f35ad679fe02b1c0be6697b01fbf6d43f4ac2ae081","pinned_image":"ghcr.io/github/gh-aw-firewall/cli-proxy:0.29.20@sha256:743396030b149763880978f35ad679fe02b1c0be6697b01fbf6d43f4ac2ae081"},{"image":"ghcr.io/github/gh-aw-firewall/squid:0.29.20","digest":"sha256:1c4a4a12fcea206a81d656cb1f73847420a2c041d02ab51235364079a1e31d71","pinned_image":"ghcr.io/github/gh-aw-firewall/squid:0.29.20@sha256:1c4a4a12fcea206a81d656cb1f73847420a2c041d02ab51235364079a1e31d71"},{"image":"ghcr.io/github/gh-aw-mcpg:v0.5.14","digest":"sha256:716b41d53a20660e945c351c08140380430d65d98d3263596e45114c29fa7a43","pinned_image":"ghcr.io/github/gh-aw-mcpg:v0.5.14@sha256:716b41d53a20660e945c351c08140380430d65d98d3263596e45114c29fa7a43"},{"image":"ghcr.io/github/gh-aw-node","digest":"sha256:8735428c2d4e602f90781ba0c571c400e8ff93c7ee1508a75d71f87e34e415cc","pinned_image":"ghcr.io/github/gh-aw-node@sha256:8735428c2d4e602f90781ba0c571c400e8ff93c7ee1508a75d71f87e34e415cc"},{"image":"ghcr.io/github/github-mcp-server:v2.2.0","digest":"sha256:040c4e99810076035eb1d9beb4b4a96fcf589c43cefed6ff51a46a553eb4e174","pinned_image":"ghcr.io/github/github-mcp-server:v2.2.0@sha256:040c4e99810076035eb1d9beb4b4a96fcf589c43cefed6ff51a46a553eb4e174"},{"image":"ghcr.io/oraios/serena:1.7.0","digest":"sha256:6c9459e4246a39c9deaa4f23fb05a526ac6e237b24c8e84a927a098fa1ab6730","pinned_image":"ghcr.io/oraios/serena:1.7.0@sha256:6c9459e4246a39c9deaa4f23fb05a526ac6e237b24c8e84a927a098fa1ab6730"}],"mcp_servers":[{"name":"agenticworkflows","tools":["*"]},{"name":"mcpscripts","tools":["github-discussion-query","github-issue-query","github-pr-query"]},{"name":"safeoutputs","tools":["add_comment","add_labels","create_check_run","create_discussion","create_issue","create_pull_request_review_comment","dispatch_workflow","haiku_printer","noop","remove_labels","reply_to_pull_request_review_comment","report_incomplete","report_missing_data","report_missing_tool","send_slack_message","set_issue_type","submit_pull_request_review","upload_artifact"]},{"name":"serena","tools":["*"]},{"name":"web-fetch","tools":["web_fetch"]}],"threat_detection":{"mode":"enabled"},"admission":true,"agent_metadata":{"023cae43432cf1b38695":{"model":"\u0024{{ experiments.subagent_model }}"},"03cbf8931deff21d5116":{"name":"Agentic Workflows"},"4943cffeebb6706aa8bc":{"name":"Squad"},"9ea639558df913e650e4":{"name":"technical-doc-writer"},"a17c6c62ffcd7401f40f":{"name":"adr-writer"},"ad6ff0fe9219fbfa5ccc":{"name":"grumpy-reviewer","tools":["read","search"]},"e0c35a96dedfb29cb9b1":{"name":"w3c-specification-writer"}},"metadata_refs":{"artifact:4943cffeebb6706aa8bc":{"/tools":"/manifest/mcp_servers/0/tools"}}}
 # This file was automatically generated by gh-aw. DO NOT EDIT. To debug this workflow, load the skill at https://github.com/github/gh-aw/blob/main/debug.md
 #
@@ -35,6 +35,7 @@
 #     - shared/mcp/serena-go.md
 #     - shared/otlp.md
 #     - shared/token-telemetry-check.md
+#     - shared/check-detection-verdict.md
 #     - shared/smoke-test-brevity.md
 #     - shared/playwright-title-test.md
 #     - shared/session-artifact-check.md
@@ -192,7 +193,7 @@ jobs:
           GH_AW_DEFAULT_ADMISSION_URL: ${{ vars.GH_AW_DEFAULT_ADMISSION_URL }}
           GH_AW_DEFAULT_ADMISSION_AUDIENCE: ${{ vars.GH_AW_DEFAULT_ADMISSION_AUDIENCE }}
           GH_AW_DEFAULT_ADMISSION_ON_OUTAGE: ${{ vars.GH_AW_DEFAULT_ADMISSION_ON_OUTAGE }}
-          GH_AW_ADMISSION_WORKFLOW_HASH: "495802db570d5ed7b0f7dfc69f61921f1f72bf83e6158374de076ed2d8171e53:06e99839be933bb5d693f53865142da2814720567fdba6bc40b0ab82d8279b38"
+          GH_AW_ADMISSION_WORKFLOW_HASH: "2d86359a409c04a37121340ec753b50c639c3d2917b7471101eaf8954f0e3285:813a4bb5ecba0bfe0f9092e400ccda9b1c0b3755a20f63bc993c805b15e5a12b"
           GH_AW_INFO_WORKFLOW_ID: ${{ job.workflow_ref }}
           GITHUB_ACTOR: ${{ github.actor }}
           GITHUB_TRIGGERING_ACTOR: ${{ github.triggering_actor }}
@@ -223,7 +224,7 @@ jobs:
           GH_AW_EXPERIMENT_SPEC: '{"caveman":{"variants":["yes","no"]},"subagent_model":{"variants":["small","large"]}}'
           GH_AW_EXPERIMENT_STATE_FILE: /tmp/gh-aw/experiments/state.jsonl
           GH_AW_EXPERIMENT_STATE_DIR: /tmp/gh-aw/experiments
-          GH_AW_HARNESS_VERSION: 495802db570d5ed7b0f7dfc69f61921f1f72bf83e6158374de076ed2d8171e53:06e99839be933bb5d693f53865142da2814720567fdba6bc40b0ab82d8279b38
+          GH_AW_HARNESS_VERSION: 2d86359a409c04a37121340ec753b50c639c3d2917b7471101eaf8954f0e3285:813a4bb5ecba0bfe0f9092e400ccda9b1c0b3755a20f63bc993c805b15e5a12b
         with:
           script: |
             const path = require('path');
@@ -268,7 +269,6 @@ jobs:
           GH_AW_INFO_FRONTMATTER_EMOJI: "🧪"
           GH_AW_COMPILED_STRICT: "true"
           GH_AW_INFO_MODEL_COSTS: '{"providers":{"anthropic":{"models":{"my-custom-claude":{"cost":{"cache_read":"3e-07","cache_write":"3.75e-06","input":"3e-06","output":"1.5e-05"}}}}}}'
-          GH_AW_INFO_FEATURES: '{"gh-aw-detection":false}'
           GH_AW_INFO_SUB_AGENT_MODELS: "[{\"model\":\"${{ steps.pick-experiment.outputs.subagent_model }}\",\"name\":\"file-summarizer\",\"patterns\":[\"github-copilot/*haiku*\",\"anthropic/*haiku*\",\"github-copilot/gpt-5*mini*\",\"openai/gpt-5*mini*\",\"github-copilot/gpt-5*nano*\",\"openai/gpt-5*nano*\",\"github-copilot/gemini-*flash*lite*\",\"google/gemini-*flash*lite*\",\"gemini/gemini-*flash*lite*\",\"github-copilot/*sonnet*\",\"anthropic/*sonnet*\",\"github-copilot/gpt-6*\",\"openai/gpt-6*\",\"github-copilot/gpt-5*pro*\",\"openai/gpt-5*pro*\",\"github-copilot/gpt-5*\",\"openai/gpt-5*\",\"github-copilot/gemini-*pro*\",\"google/gemini-*pro*\",\"gemini/gemini-*pro*\"]}]"
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
@@ -462,7 +462,7 @@ jobs:
           GH_AW_OTLP_LOGS_ENABLED: ""
           GH_AW_OTLP_LOGS_MAX_BYTES: ""
           GH_AW_PROMPT: ${{ runner.temp }}/gh-aw/aw-prompts/prompt.txt
-          GH_AW_PROMPT_CONFIG: "{\"items\":[{\"content_env\":\"GH_AW_PROMPT_CONTENT_0000\"},{\"file\":\"xpia.md\"},{\"file\":\"temp_folder_prompt.md\"},{\"file\":\"markdown.md\"},{\"file\":\"playwright_prompt.md\"},{\"file\":\"playwright_awf_prompt.md\"},{\"file\":\"cache_memory_prompt.md\"},{\"file\":\"safe_outputs_mcp_transport_prompt.md\"},{\"file\":\"safe_outputs_prompt.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0001\"},{\"file\":\"safe_outputs_comment_memory.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0002\"},{\"file\":\"mcp_cli_tools_with_safeoutputs_prompt.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0003\"},{\"file\":\"cli_proxy_with_safeoutputs_prompt.md\"},{\"file\":\"pr_context_prompt.md\",\"condition_env\":\"GH_AW_INCLUDE_PR_CONTEXT\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0004\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0005\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0006\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0007\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0008\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0009\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0010\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0011\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0012\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0013\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0014\"},{\"author_file\":\".github/workflows/smoke-copilot.md\"}],\"system_item_count\":17,\"author_expressions\":{\"experiments.caveman\":\"GH_AW_EXPERIMENTS_CAVEMAN\",\"experiments.subagent_model\":\"GH_AW_EXPERIMENTS_SUBAGENT_MODEL\",\"github.event.repository.default_branch\":\"GH_AW_GITHUB_EVENT_REPOSITORY_DEFAULT_BRANCH\",\"github.repository\":\"GH_AW_GITHUB_REPOSITORY\",\"github.run_id\":\"GH_AW_GITHUB_RUN_ID\",\"github.server_url\":\"GH_AW_GITHUB_SERVER_URL\",\"github.workspace\":\"GH_AW_GITHUB_WORKSPACE\"}}"
+          GH_AW_PROMPT_CONFIG: "{\"items\":[{\"content_env\":\"GH_AW_PROMPT_CONTENT_0000\"},{\"file\":\"xpia.md\"},{\"file\":\"temp_folder_prompt.md\"},{\"file\":\"markdown.md\"},{\"file\":\"playwright_prompt.md\"},{\"file\":\"playwright_awf_prompt.md\"},{\"file\":\"cache_memory_prompt.md\"},{\"file\":\"safe_outputs_mcp_transport_prompt.md\"},{\"file\":\"safe_outputs_prompt.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0001\"},{\"file\":\"safe_outputs_comment_memory.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0002\"},{\"file\":\"mcp_cli_tools_with_safeoutputs_prompt.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0003\"},{\"file\":\"cli_proxy_with_safeoutputs_prompt.md\"},{\"file\":\"pr_context_prompt.md\",\"condition_env\":\"GH_AW_INCLUDE_PR_CONTEXT\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0004\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0005\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0006\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0007\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0008\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0009\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0010\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0011\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0012\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0013\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0014\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0015\"},{\"author_file\":\".github/workflows/smoke-copilot.md\"}],\"system_item_count\":17,\"author_expressions\":{\"experiments.caveman\":\"GH_AW_EXPERIMENTS_CAVEMAN\",\"experiments.subagent_model\":\"GH_AW_EXPERIMENTS_SUBAGENT_MODEL\",\"github.event.repository.default_branch\":\"GH_AW_GITHUB_EVENT_REPOSITORY_DEFAULT_BRANCH\",\"github.repository\":\"GH_AW_GITHUB_REPOSITORY\",\"github.run_id\":\"GH_AW_GITHUB_RUN_ID\",\"github.server_url\":\"GH_AW_GITHUB_SERVER_URL\",\"github.workspace\":\"GH_AW_GITHUB_WORKSPACE\"}}"
           GH_AW_PROMPT_CONTENT_0000: |
             <system>
           GH_AW_PROMPT_CONTENT_0001: |
@@ -489,14 +489,16 @@ jobs:
           GH_AW_PROMPT_CONTENT_0011: |
             {{#runtime-import .github/workflows/shared/token-telemetry-check.md}}
           GH_AW_PROMPT_CONTENT_0012: |
-            {{#runtime-import .github/workflows/shared/smoke-test-brevity.md}}
+            {{#runtime-import .github/workflows/shared/check-detection-verdict.md}}
           GH_AW_PROMPT_CONTENT_0013: |
-            {{#runtime-import .github/workflows/shared/playwright-title-test.md}}
+            {{#runtime-import .github/workflows/shared/smoke-test-brevity.md}}
           GH_AW_PROMPT_CONTENT_0014: |
+            {{#runtime-import .github/workflows/shared/playwright-title-test.md}}
+          GH_AW_PROMPT_CONTENT_0015: |
             ## Serena Code Analysis
 
             Serena is enabled for **["go"]** in `__GH_AW_GITHUB_WORKSPACE__`. Start by calling `activate_project` with that workspace path, then prefer Serena semantic tools for symbol lookup, references, docs, diagnostics, and structured edits.
-          GH_AW_PROMPT_ENV: "[\"GH_AW_ACTIONS_DIR\",\"GH_AW_EXPERIMENTS_CAVEMAN\",\"GH_AW_EXPERIMENTS_SUBAGENT_MODEL\",\"GH_AW_EXPR_76DF9333\",\"GH_AW_EXPR_77C1A4D2\",\"GH_AW_EXPR_7C248226\",\"GH_AW_EXPR_C19C384F\",\"GH_AW_GITHUB_ACTOR\",\"GH_AW_GITHUB_EVENT_REPOSITORY_DEFAULT_BRANCH\",\"GH_AW_GITHUB_REPOSITORY\",\"GH_AW_GITHUB_RUN_ID\",\"GH_AW_GITHUB_SERVER_URL\",\"GH_AW_GITHUB_WORKSPACE\",\"GH_AW_INCLUDE_PR_CONTEXT\",\"GH_AW_PROMPT\",\"GH_AW_PROMPT_CONFIG\",\"GH_AW_PROMPT_CONTENT_0000\",\"GH_AW_PROMPT_CONTENT_0001\",\"GH_AW_PROMPT_CONTENT_0002\",\"GH_AW_PROMPT_CONTENT_0003\",\"GH_AW_PROMPT_CONTENT_0004\",\"GH_AW_PROMPT_CONTENT_0005\",\"GH_AW_PROMPT_CONTENT_0006\",\"GH_AW_PROMPT_CONTENT_0007\",\"GH_AW_PROMPT_CONTENT_0008\",\"GH_AW_PROMPT_CONTENT_0009\",\"GH_AW_PROMPT_CONTENT_0010\",\"GH_AW_PROMPT_CONTENT_0011\",\"GH_AW_PROMPT_CONTENT_0012\",\"GH_AW_PROMPT_CONTENT_0013\",\"GH_AW_PROMPT_CONTENT_0014\",\"GH_AW_SAFE_OUTPUTS\"]"
+          GH_AW_PROMPT_ENV: "[\"GH_AW_ACTIONS_DIR\",\"GH_AW_EXPERIMENTS_CAVEMAN\",\"GH_AW_EXPERIMENTS_SUBAGENT_MODEL\",\"GH_AW_EXPR_76DF9333\",\"GH_AW_EXPR_77C1A4D2\",\"GH_AW_EXPR_7C248226\",\"GH_AW_EXPR_C19C384F\",\"GH_AW_GITHUB_ACTOR\",\"GH_AW_GITHUB_EVENT_REPOSITORY_DEFAULT_BRANCH\",\"GH_AW_GITHUB_REPOSITORY\",\"GH_AW_GITHUB_RUN_ID\",\"GH_AW_GITHUB_SERVER_URL\",\"GH_AW_GITHUB_WORKSPACE\",\"GH_AW_INCLUDE_PR_CONTEXT\",\"GH_AW_PROMPT\",\"GH_AW_PROMPT_CONFIG\",\"GH_AW_PROMPT_CONTENT_0000\",\"GH_AW_PROMPT_CONTENT_0001\",\"GH_AW_PROMPT_CONTENT_0002\",\"GH_AW_PROMPT_CONTENT_0003\",\"GH_AW_PROMPT_CONTENT_0004\",\"GH_AW_PROMPT_CONTENT_0005\",\"GH_AW_PROMPT_CONTENT_0006\",\"GH_AW_PROMPT_CONTENT_0007\",\"GH_AW_PROMPT_CONTENT_0008\",\"GH_AW_PROMPT_CONTENT_0009\",\"GH_AW_PROMPT_CONTENT_0010\",\"GH_AW_PROMPT_CONTENT_0011\",\"GH_AW_PROMPT_CONTENT_0012\",\"GH_AW_PROMPT_CONTENT_0013\",\"GH_AW_PROMPT_CONTENT_0014\",\"GH_AW_PROMPT_CONTENT_0015\",\"GH_AW_SAFE_OUTPUTS\"]"
           GH_AW_SAFE_OUTPUTS: ${{ runner.temp }}/gh-aw/safeoutputs/outputs.jsonl
           OTEL_EXPORTER_OTLP_ENDPOINT: ""
           OTEL_EXPORTER_OTLP_HEADERS: ""
@@ -3192,6 +3194,36 @@ jobs:
           if-no-files-found: ignore
           retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
 
+  check_detection_verdict:
+    name: check_detection_verdict
+    needs:
+      - agent
+      - detection
+    if: "${{ needs.detection.result == 'success' && needs.detection.outputs.detection_success == 'true' && (always() && needs.agent.result == 'success') }}"
+    runs-on: ubuntu-latest
+    # Permissions for the check_detection_verdict job (workflow permissions default to none).
+    permissions: {}
+    steps:
+      - name: Configure GH_HOST for enterprise compatibility
+        id: ghes-host-config
+        shell: bash
+        run: | # zizmor: ignore[github-env] - GITHUB_SERVER_URL is set by GitHub Actions, not user input.
+          # Derive GH_HOST from GITHUB_SERVER_URL so the gh CLI targets the correct
+          # GitHub instance (GHES/GHEC). On github.com this is a harmless no-op.
+          GH_HOST="${GITHUB_SERVER_URL#https://}"
+          GH_HOST="${GH_HOST#http://}"
+          echo "GH_HOST=${GH_HOST}" >> "$GITHUB_ENV"
+      - name: Require a recorded verdict from the sandbox
+        run: |
+          if [[ "$RUN_DETECTION" != true || "$CONCLUSION" != success || "$SUCCESS" != true ]]; then
+            echo "::error::The smoke run did not produce a clean verdict accepted by the host."
+            exit 1
+          fi
+        env:
+          CONCLUSION: ${{ needs.detection.outputs.detection_conclusion }}
+          RUN_DETECTION: ${{ needs.detection.outputs.run_detection }}
+          SUCCESS: ${{ needs.detection.outputs.detection_success }}
+
   check_token_telemetry:
     name: check_token_telemetry
     needs:
@@ -3271,6 +3303,7 @@ jobs:
     needs:
       - activation
       - agent
+      - check_detection_verdict
       - check_token_telemetry
       - detection
       - evals
@@ -3298,9 +3331,9 @@ jobs:
       cancel-in-progress: false
       queue: max
     env:
-      GH_AW_JOB_DISPLAY_NAMES: "{\"activation\":\"activation\",\"agent\":\"agent\",\"check_token_telemetry\":\"check_token_telemetry\",\"conclusion\":\"conclusion\",\"detection\":\"detection\",\"evals\":\"evals\",\"pre_activation\":\"pre_activation\",\"push_evals_state\":\"push_evals_state\",\"push_experiments_state\":\"push_experiments_state\",\"safe_outputs\":\"safe_outputs\",\"send_slack_message\":\"send_slack_message\",\"update_cache_memory\":\"update_cache_memory\"}"
-      GH_AW_JOB_RESULTS: "{\"activation\":{\"result\":\"${{ needs.activation.result }}\"},\"agent\":{\"result\":\"${{ needs.agent.result }}\"},\"check_token_telemetry\":{\"result\":\"${{ needs.check_token_telemetry.result }}\"},\"detection\":{\"result\":\"${{ needs.detection.result }}\"},\"evals\":{\"result\":\"${{ needs.evals.result }}\"},\"push_evals_state\":{\"result\":\"${{ needs.push_evals_state.result }}\"},\"push_experiments_state\":{\"result\":\"${{ needs.push_experiments_state.result }}\"},\"safe_outputs\":{\"result\":\"${{ needs.safe_outputs.result }}\"},\"send_slack_message\":{\"result\":\"${{ needs.send_slack_message.result }}\"},\"update_cache_memory\":{\"result\":\"${{ needs.update_cache_memory.result }}\"}}"
-      GH_AW_JOB_TIMING_ELIGIBLE: "{\"activation\":true,\"agent\":true,\"check_token_telemetry\":true,\"conclusion\":true,\"detection\":true,\"evals\":true,\"pre_activation\":true,\"push_evals_state\":true,\"push_experiments_state\":true,\"safe_outputs\":true,\"send_slack_message\":true,\"update_cache_memory\":true}"
+      GH_AW_JOB_DISPLAY_NAMES: "{\"activation\":\"activation\",\"agent\":\"agent\",\"check_detection_verdict\":\"check_detection_verdict\",\"check_token_telemetry\":\"check_token_telemetry\",\"conclusion\":\"conclusion\",\"detection\":\"detection\",\"evals\":\"evals\",\"pre_activation\":\"pre_activation\",\"push_evals_state\":\"push_evals_state\",\"push_experiments_state\":\"push_experiments_state\",\"safe_outputs\":\"safe_outputs\",\"send_slack_message\":\"send_slack_message\",\"update_cache_memory\":\"update_cache_memory\"}"
+      GH_AW_JOB_RESULTS: "{\"activation\":{\"result\":\"${{ needs.activation.result }}\"},\"agent\":{\"result\":\"${{ needs.agent.result }}\"},\"check_detection_verdict\":{\"result\":\"${{ needs.check_detection_verdict.result }}\"},\"check_token_telemetry\":{\"result\":\"${{ needs.check_token_telemetry.result }}\"},\"detection\":{\"result\":\"${{ needs.detection.result }}\"},\"evals\":{\"result\":\"${{ needs.evals.result }}\"},\"push_evals_state\":{\"result\":\"${{ needs.push_evals_state.result }}\"},\"push_experiments_state\":{\"result\":\"${{ needs.push_experiments_state.result }}\"},\"safe_outputs\":{\"result\":\"${{ needs.safe_outputs.result }}\"},\"send_slack_message\":{\"result\":\"${{ needs.send_slack_message.result }}\"},\"update_cache_memory\":{\"result\":\"${{ needs.update_cache_memory.result }}\"}}"
+      GH_AW_JOB_TIMING_ELIGIBLE: "{\"activation\":true,\"agent\":true,\"check_detection_verdict\":true,\"check_token_telemetry\":true,\"conclusion\":true,\"detection\":true,\"evals\":true,\"pre_activation\":true,\"push_evals_state\":true,\"push_experiments_state\":true,\"safe_outputs\":true,\"send_slack_message\":true,\"update_cache_memory\":true}"
       GH_AW_RUNTIME_FEATURES: ${{ vars.GH_AW_RUNTIME_FEATURES }}
     outputs:
       incomplete_count: ${{ steps.report_incomplete.outputs.incomplete_count }}
@@ -3741,7 +3774,7 @@ jobs:
           GH_AW_DEFAULT_ADMISSION_URL: ${{ vars.GH_AW_DEFAULT_ADMISSION_URL }}
           GH_AW_DEFAULT_ADMISSION_AUDIENCE: ${{ vars.GH_AW_DEFAULT_ADMISSION_AUDIENCE }}
           GH_AW_DEFAULT_ADMISSION_ON_OUTAGE: ${{ vars.GH_AW_DEFAULT_ADMISSION_ON_OUTAGE }}
-          GH_AW_ADMISSION_WORKFLOW_HASH: "495802db570d5ed7b0f7dfc69f61921f1f72bf83e6158374de076ed2d8171e53:06e99839be933bb5d693f53865142da2814720567fdba6bc40b0ab82d8279b38"
+          GH_AW_ADMISSION_WORKFLOW_HASH: "2d86359a409c04a37121340ec753b50c639c3d2917b7471101eaf8954f0e3285:813a4bb5ecba0bfe0f9092e400ccda9b1c0b3755a20f63bc993c805b15e5a12b"
           GH_AW_INFO_WORKFLOW_ID: ${{ job.workflow_ref }}
           GITHUB_ACTOR: ${{ github.actor }}
           GITHUB_TRIGGERING_ACTOR: ${{ github.triggering_actor }}
@@ -3836,6 +3869,11 @@ jobs:
         with:
           persist-credentials: false
       # --- Threat Detection ---
+      - name: Reset threat detection staging
+        id: detection_staging_reset
+        if: always()
+        run: |
+          rm -rf /tmp/gh-aw/threat-detection /tmp/gh-aw/threat-detection-inputs
       - name: Initialize detection execution evidence
         run: |
           mkdir -p "/tmp/gh-aw/threat-detection"
@@ -3871,33 +3909,13 @@ jobs:
           rm -f "$HOME/.copilot/mcp-config.json"
           rm -f "$GITHUB_WORKSPACE/.gemini/settings.json"
       - name: Prepare threat detection files
+        id: detection_prepare
         if: always() && steps.detection_guard.outputs.run_detection == 'true'
         run: |
           bash "${RUNNER_TEMP}/gh-aw/actions/prepare_threat_detection_files.sh"
-      - name: Setup threat detection
-        id: detection_setup
-        if: always() && steps.detection_guard.outputs.run_detection == 'true'
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-        env:
-          WORKFLOW_NAME: "Smoke Copilot"
-          WORKFLOW_DESCRIPTION: "Smoke Copilot"
-          HAS_PATCH: ${{ needs.agent.outputs.has_patch }}
-          GH_AW_DETECTION_CONTINUE_ON_ERROR: "true"
-        with:
-          script: |
-            const path = require('path');
-            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
-            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
-            setupGlobals(core, github, context, exec, io, getOctokit);
-            const { main } = require(path.join(actionsDir, 'setup_threat_detection.cjs'));
-            await main();
-      - name: Ensure threat-detection directory and log
-        if: always() && steps.detection_guard.outputs.run_detection == 'true'
-        run: |
-          mkdir -p /tmp/gh-aw/threat-detection
-          touch /tmp/gh-aw/threat-detection/detection.log
-          rm -f /tmp/gh-aw/step-summary.md
-          touch /tmp/gh-aw/step-summary.md
+      - name: Install AWF binary
+        id: detection_awf_install
+        run: bash "${RUNNER_TEMP}/gh-aw/actions/install_awf_binary.sh" v0.29.20 --rootless
       - name: Setup Node.js
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
@@ -3909,90 +3927,12 @@ jobs:
           GH_HOST: github.com
           GITHUB_TOKEN: ${{ github.token }}
           GH_AW_COPILOT_MIN_VERSION: 1.0.35
-      - name: Install AWF binary
-        run: bash "${RUNNER_TEMP}/gh-aw/actions/install_awf_binary.sh" v0.29.20 --rootless
-      - name: Execute GitHub Copilot CLI
-        if: always() && steps.detection_guard.outputs.run_detection == 'true' && steps.detection_setup.outcome == 'success' && steps.detection_setup.outputs.ready == 'true'
-        continue-on-error: true
+      - name: Execute threat detection with AWF
         id: detection_agentic_execution
-        # Copilot CLI tool arguments (sorted):
-        # --allow-tool shell
+        if: always() && steps.detection_guard.outputs.run_detection == 'true' && steps.detection_staging_reset.outcome == 'success' && steps.detection_prepare.outcome == 'success' && steps.detection_awf_install.outcome == 'success'
+        continue-on-error: true
         timeout-minutes: 10
-        run: |
-          set -o pipefail
-          printf '%s' "$(date +%s%3N)" > /tmp/gh-aw/agent_cli_start_ms.txt
-          gh_aw_exit_code=0
-          trap 'gh_aw_exit_code=$?; mkdir -p /tmp/gh-aw >/dev/null 2>&1 || true; printf "%s" "$gh_aw_exit_code" > /tmp/gh-aw/agent_execution_exit_code.txt || true; rm -f "$HOME/.copilot/settings.json"; if [ "$gh_aw_exit_code" -ne 0 ]; then echo "::error::Agent execution exited with code $gh_aw_exit_code"; fi' EXIT
-          mkdir -p "$HOME/.copilot"
-          printf '%s' '{"builtInAgents":{"rubberDuck":false},"enabledFeatureFlags":{"EXTENSIONS":false}}' > "$HOME/.copilot/settings.json"
-          export XDG_CONFIG_HOME="$HOME"
-          GH_AW_COPILOT_SRC="$(command -v copilot 2>/dev/null || true)"
-          if [ -z "$GH_AW_COPILOT_SRC" ] || [ ! -x "$GH_AW_COPILOT_SRC" ]; then
-            echo "GitHub Copilot CLI executable not found on PATH after installation" >&2
-            exit 127
-          fi
-          GH_AW_COPILOT_BIN="${RUNNER_TEMP}/gh-aw/bin/copilot"
-          mkdir -p "${RUNNER_TEMP}/gh-aw/bin"
-          if [ "$GH_AW_COPILOT_SRC" != "$GH_AW_COPILOT_BIN" ]; then
-            cp "$GH_AW_COPILOT_SRC" "$GH_AW_COPILOT_BIN"
-          fi
-          chmod 755 "$GH_AW_COPILOT_BIN"
-
-          touch /tmp/gh-aw/step-summary.md
-          GH_AW_NODE_BIN=$(command -v node 2>/dev/null || true)
-          export GH_AW_NODE_BIN
-          export COPILOT_API_KEY="$COPILOT_DUMMY_BYOK"
-          (umask 177 && touch /tmp/gh-aw/threat-detection/detection.log)
-          GH_AW_MAX_AI_CREDITS="${GH_AW_MAX_AI_CREDITS:-400}"
-          if [[ ! "$GH_AW_MAX_AI_CREDITS" =~ ^(-1|[0-9]+)$ ]]; then
-            GH_AW_MAX_AI_CREDITS="400"
-          fi
-
-          if [[ "${GH_AW_ADMISSION_RESULT:-}" == "admitted" && -n "${GH_AW_ADMISSION_MAX_AI_CREDITS:-}" ]]; then
-            if [[ ! "$GH_AW_ADMISSION_MAX_AI_CREDITS" =~ ^[1-9][0-9]{0,9}$ ]] || (( GH_AW_ADMISSION_MAX_AI_CREDITS > 2147483647 )); then
-              echo "ERR_ADMISSION: Invalid runtime admission allowance." >&2
-              exit 1
-            fi
-            GH_AW_MAX_AI_CREDITS="$GH_AW_ADMISSION_MAX_AI_CREDITS"
-            echo "Admission allowance applied (value withheld)."
-          else
-            echo "No component admission allowance; retaining existing budget policy (value withheld)."
-          fi
-          unset GH_AW_ADMISSION_RESULT GH_AW_ADMISSION_MAX_AI_CREDITS
-          printf '%s\n' "{\"\$schema\":\"https://github.com/github/gh-aw-firewall/releases/download/v0.29.20/awf-config.schema.json\",\"network\":{\"allowDomains\":[\"api.business.githubcopilot.com\",\"api.enterprise.githubcopilot.com\",\"api.github.com\",\"api.githubcopilot.com\",\"api.individual.githubcopilot.com\",\"github.com\",\"host.docker.internal\",\"registry.npmjs.org\"]},\"apiProxy\":{\"enabled\":true,\"enableTokenSteering\":true,\"maxRuns\":500,\"maxAiCredits\":${GH_AW_MAX_AI_CREDITS},\"maxCacheMisses\":5,\"modelFallback\":{\"enabled\":false},\"fallbackModels\":[\"gpt-5.6-luna\",\"claude-sonnet-5\"],\"providers\":{\"anthropic\":{\"models\":{\"my-custom-claude\":{\"cost\":{\"cache_read\":\"3e-07\",\"cache_write\":\"3.75e-06\",\"input\":\"3e-06\",\"output\":\"1.5e-05\"}}}}},\"models\":{\"agent\":[\"sonnet-6x\",\"gpt-6\",\"gpt-5.4\",\"gpt-5.5\",\"gpt-5.6\",\"gpt-5.3\",\"gemini-pro\",\"any\"],\"antigravity\":[\"copilot/antigravity*\",\"google/antigravity*\",\"gemini/antigravity*\"],\"any\":[\"copilot/*\",\"anthropic/*\",\"openai/*\",\"google/*\",\"gemini/*\"],\"auto\":[\"copilot/auto\",\"large\"],\"claude\":[\"agent\"],\"codex\":[\"agent\"],\"coding\":[\"copilot/gpt-5*codex*\",\"openai/gpt-5*codex*\",\"gpt-5-codex\",\"kimi\"],\"computer-use\":[\"copilot/*computer-use*\",\"google/*computer-use*\",\"gemini/*computer-use*\",\"openai/*computer-use*\"],\"copilot\":[\"agent\"],\"deep-research\":[\"copilot/deep-research*\",\"copilot/o3-deep-research*\",\"copilot/o4-mini-deep-research*\",\"google/deep-research*\",\"gemini/deep-research*\",\"openai/o3-deep-research*\",\"openai/o4-mini-deep-research*\"],\"detection\":[\"small\",\"copilot/gpt-*-luna\",\"openai/gpt-*-luna\",\"small-agent\",\"agent\"],\"evals\":[\"copilot/gpt-6-luna-decisions\"],\"fable\":[\"copilot/*fable*\",\"anthropic/*fable*\"],\"gemini\":[\"agent\"],\"gemini-3-flash\":[\"copilot/gemini-3*flash*\",\"google/gemini-3*flash*\",\"gemini/gemini-3*flash*\"],\"gemini-3-pro\":[\"copilot/gemini-3*pro*\",\"google/gemini-3*pro*\",\"google/nano-banana*\",\"gemini/gemini-3*pro*\"],\"gemini-3.1-flash\":[\"copilot/gemini-3.1*flash*\",\"google/gemini-3.1*flash*\",\"gemini/gemini-3.1*flash*\"],\"gemini-3.1-pro\":[\"copilot/gemini-3.1*pro*\",\"google/gemini-3.1*pro*\",\"gemini/gemini-3.1*pro*\"],\"gemini-3.5-flash\":[\"copilot/gemini-3.5*flash*\",\"google/gemini-3.5*flash*\",\"gemini/gemini-3.5*flash*\"],\"gemini-3.6-flash\":[\"copilot/gemini-3.6*flash*\",\"google/gemini-3.6*flash*\",\"gemini/gemini-3.6*flash*\"],\"gemini-3.7-flash\":[\"copilot/gemini-3.7*flash*\",\"google/gemini-3.7*flash*\",\"gemini/gemini-3.7*flash*\"],\"gemini-3.8-flash\":[\"copilot/gemini-3.8*flash*\",\"google/gemini-3.8*flash*\",\"gemini/gemini-3.8*flash*\"],\"gemini-flash\":[\"copilot/gemini-*flash*\",\"google/gemini-*flash*\",\"gemini/gemini-*flash*\"],\"gemini-flash-lite\":[\"copilot/gemini-*flash*lite*\",\"google/gemini-*flash*lite*\",\"gemini/gemini-*flash*lite*\"],\"gemini-omni\":[\"copilot/gemini-omni*\",\"google/gemini-omni*\",\"gemini/gemini-omni*\"],\"gemini-pro\":[\"copilot/gemini-*pro*\",\"google/gemini-*pro*\",\"gemini/gemini-*pro*\"],\"gemma\":[\"copilot/gemma*\",\"google/gemma*\",\"gemini/gemma*\"],\"gpt-5\":[\"copilot/gpt-5*\",\"openai/gpt-5*\"],\"gpt-5-codex\":[\"copilot/gpt-5*codex*\",\"openai/gpt-5*codex*\"],\"gpt-5-mini\":[\"copilot/gpt-5*mini*\",\"openai/gpt-5*mini*\"],\"gpt-5-nano\":[\"copilot/gpt-5*nano*\",\"openai/gpt-5*nano*\"],\"gpt-5-pro\":[\"copilot/gpt-5*pro*\",\"openai/gpt-5*pro*\"],\"gpt-5.1\":[\"copilot/gpt-5.1*\",\"openai/gpt-5.1*\"],\"gpt-5.2\":[\"copilot/gpt-5.2*\",\"openai/gpt-5.2*\"],\"gpt-5.3\":[\"copilot/gpt-5.3*\",\"openai/gpt-5.3*\"],\"gpt-5.4\":[\"copilot/gpt-5.4*\",\"openai/gpt-5.4*\"],\"gpt-5.5\":[\"copilot/gpt-5.5*\",\"openai/gpt-5.5*\"],\"gpt-5.6\":[\"copilot/gpt-5.6*\",\"openai/gpt-5.6*\"],\"gpt-6\":[\"copilot/gpt-6*\",\"openai/gpt-6*\"],\"grok\":[\"copilot/*grok*\",\"openai/*grok*\"],\"haiku\":[\"copilot/*haiku*\",\"anthropic/*haiku*\"],\"image-generation\":[\"copilot/gpt-image*\",\"openai/gpt-image*\",\"openai/chatgpt-image*\",\"copilot/gemini-*image*\",\"google/gemini-*image*\",\"gemini/gemini-*image*\",\"google/imagen*\"],\"kimi\":[\"copilot/kimi*\",\"openai/kimi*\"],\"kiwi\":[\"copilot/kiwi*\",\"openai/kiwi*\"],\"large\":[\"sonnet\",\"gpt-6\",\"gpt-5-pro\",\"gpt-5\",\"gemini-pro\"],\"lyria\":[\"google/lyria*\",\"gemini/lyria*\",\"copilot/lyria*\"],\"mai-code\":[\"copilot/MAI-Code*\",\"copilot/mai-code*\",\"openai/MAI-Code*\"],\"mini\":[\"haiku\",\"gpt-5-mini\",\"gpt-5-nano\",\"gemini-flash-lite\"],\"nano-banana\":[\"copilot/nano-banana*\",\"google/nano-banana*\",\"gemini/nano-banana*\"],\"opus\":[\"copilot/*opus*\",\"anthropic/*opus*\"],\"opusplan\":[\"opus?effort=high\"],\"raptor-mini\":[\"copilot/raptor*\",\"openai/raptor*\"],\"reasoning\":[\"copilot/o1*\",\"copilot/o3*\",\"copilot/o4*\",\"openai/o1*\",\"openai/o3*\",\"openai/o4*\"],\"robotics\":[\"copilot/*robotics*\",\"google/*robotics*\",\"gemini/*robotics*\"],\"small\":[\"mini\"],\"small-agent\":[\"haiku\",\"gpt-5-mini\",\"gemini-flash\"],\"sonnet\":[\"copilot/*sonnet*\",\"anthropic/*sonnet*\"],\"sonnet-6x\":[\"copilot/*sonnet-4.5*\",\"copilot/*sonnet-4.6*\",\"copilot/*sonnet-5*\",\"copilot/*sonnet-4-5-*\",\"anthropic/*sonnet-4-5-*\",\"copilot/*sonnet-4-6*\",\"anthropic/*sonnet-4-6*\",\"anthropic/*sonnet-5*\"],\"summarization\":[\"haiku\",\"gpt-5-mini\",\"gemini-flash-lite\",\"mini\"],\"veo\":[\"google/veo*\",\"gemini/veo*\"],\"vision\":[\"copilot/gemini-*image*\",\"google/gemini-*image*\",\"gemini/gemini-*image*\",\"copilot/gemini-*flash*\",\"google/gemini-*flash*\",\"gemini/gemini-*flash*\"]}},\"container\":{\"imageTag\":\"0.29.20,squid=sha256:1c4a4a12fcea206a81d656cb1f73847420a2c041d02ab51235364079a1e31d71,agent=sha256:b9cd8d7d1a9c2693e5d91db035a678fb1ea8d87ce691e08ec091b327e5e8ba75,api-proxy=sha256:fc6c1eff686514d26ff90ae1398e0f6e3dcad8d2e43d11b16df312c1e72c0ace,cli-proxy=sha256:743396030b149763880978f35ad679fe02b1c0be6697b01fbf6d43f4ac2ae081\",\"agentTimeout\":10},\"logging\":{\"proxyLogsDir\":\"/tmp/gh-aw/sandbox/firewall/logs\",\"auditDir\":\"/tmp/gh-aw/sandbox/firewall/audit\"}}" > "${RUNNER_TEMP}/gh-aw/awf-config.json"
-          cp "${RUNNER_TEMP}/gh-aw/awf-config.json" /tmp/gh-aw/awf-config.json
-          export GH_AW_MODELS_JSON_PATH="/tmp/gh-aw/models.json"
-          GH_AW_DOCKER_HOST=""
-          if [[ "${DOCKER_HOST:-}" =~ ^tcp:// ]]; then
-            GH_AW_DOCKER_HOST="${DOCKER_HOST}"
-          fi
-          if [[ "${DOCKER_HOST:-}" =~ ^tcp:// ]]; then
-            _GH_AW_CHROOT_JSON=$(jq -c --arg src "${RUNNER_TEMP}/gh-aw" --arg user "$(id -un)" --argjson uid "$(id -u)" --argjson gid "$(id -g)" --arg home "${RUNNER_TEMP}/gh-aw/home" '.chroot={"binariesSourcePath":$src,"identity":{"user":$user,"uid":$uid,"gid":$gid,"home":$home}}' "${RUNNER_TEMP}/gh-aw/awf-config.json") || { echo "chroot config patch failed" >&2; exit 1; }
-            printf '%s\n' "$_GH_AW_CHROOT_JSON" > "${RUNNER_TEMP}/gh-aw/awf-config.json"
-          fi
-          GH_AW_TOOL_CACHE_MOUNT=""
-          GH_AW_TOOL_CACHE="${RUNNER_TOOL_CACHE:?RUNNER_TOOL_CACHE must be set}"
-          if [ -d "$GH_AW_TOOL_CACHE" ]; then
-            if [[ "$GH_AW_TOOL_CACHE" != /opt/* ]]; then
-              GH_AW_TOOL_CACHE_MOUNT="$GH_AW_TOOL_CACHE:$GH_AW_TOOL_CACHE:ro"
-            fi
-          fi
-          # shellcheck disable=SC1003,SC2016,SC2086
-          mkdir -p "/tmp/gh-aw/threat-detection"
-          evidence_tmp="/tmp/gh-aw/threat-detection/execution.json.tmp"
-          printf '{"version":1,"component":"detection","run_id":%s,"run_attempt":%s,"state":"started"}\n' "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" > "$evidence_tmp"
-          mv "$evidence_tmp" "/tmp/gh-aw/threat-detection/execution.json"
-          export GH_AW_AWF_EXECUTION_COMPONENT="detection"
-          export GH_AW_AWF_EXECUTION_EVIDENCE_FILE="/tmp/gh-aw/threat-detection/execution.json"
-          GH_AW_AWF_ENGINE_NAME=copilot \
-          GH_AW_AWF_HARNESS_MARKER='[copilot-harness]' \
-          GH_AW_AWF_LOG_FILE=/tmp/gh-aw/threat-detection/detection.log \
-          GH_AW_AWF_ATTEMPT_LOG_NAME=copilot \
-          bash "${RUNNER_TEMP}/gh-aw/actions/run_awf_with_startup_retries.sh" -- \
-            awf --config "${RUNNER_TEMP}/gh-aw/awf-config.json" --container-workdir "${GITHUB_WORKSPACE}" --mount "${RUNNER_TEMP}/gh-aw:${RUNNER_TEMP}/gh-aw:ro" --mount "${RUNNER_TEMP}/gh-aw:/host${RUNNER_TEMP}/gh-aw:ro" ${GH_AW_TOOL_CACHE_MOUNT:+--mount "$GH_AW_TOOL_CACHE_MOUNT"} ${GH_AW_DOCKER_HOST:+--docker-host "$GH_AW_DOCKER_HOST"} --env-all --exclude-env ACTIONS_ID_TOKEN_REQUEST_TOKEN --exclude-env ACTIONS_ID_TOKEN_REQUEST_URL --exclude-env COPILOT_GITHUB_TOKEN --exclude-env GH_AW_OTLP_ALL_HEADERS --exclude-env GH_AW_OTLP_ENDPOINTS --exclude-env GH_AW_RUNTIME_TMP_DIR --exclude-env GH_AW_RUNTIME_TMP_ID --exclude-env OTEL_EXPORTER_OTLP_ENDPOINT --exclude-env OTEL_EXPORTER_OTLP_HEADERS --exclude-env TMPDIR --mount /tmp/gh-aw:/tmp/gh-aw:rw --log-level info --session-state-dir /tmp/gh-aw/sandbox/agent/session-state --skip-pull \
-            -- /bin/bash -c 'set +o histexpand; : "${RUNNER_TOOL_CACHE:?RUNNER_TOOL_CACHE must be set}"; GH_AW_TOOL_CACHE="$RUNNER_TOOL_CACHE"; GH_AW_TOOL_BINS="$(find "$GH_AW_TOOL_CACHE" -maxdepth 5 -type d -name bin 2>/dev/null | tr "\n" ":")"; GH_AW_TOOL_BINS="${GH_AW_TOOL_BINS%:}"; export PATH="$PATH${GH_AW_TOOL_BINS:+:}$GH_AW_TOOL_BINS"; [ -n "$GOROOT" ] && export PATH="$GOROOT/bin:$PATH" || true; [ -n "$ERLANG_HOME" ] && export PATH="$ERLANG_HOME/bin:$PATH" || true && GH_AW_NODE_EXEC="${GH_AW_NODE_BIN:-}"; if [ -z "$GH_AW_NODE_EXEC" ] || [ ! -x "$GH_AW_NODE_EXEC" ]; then GH_AW_NODE_EXEC="$(command -v node 2>/dev/null || true)"; fi; if [ -z "$GH_AW_NODE_EXEC" ]; then echo "node runtime missing on this runner — check runtimes.node in workflow YAML" >&2; exit 127; fi; GH_AW_NPM_GLOBAL_ROOT="$(npm root -g 2>/dev/null || true)"; if [ -n "$GH_AW_NPM_GLOBAL_ROOT" ]; then export NODE_PATH="${GH_AW_NPM_GLOBAL_ROOT}${NODE_PATH:+:${NODE_PATH}}"; fi; "$GH_AW_NODE_EXEC" "${RUNNER_TEMP}/gh-aw/actions/copilot_harness.cjs" "${RUNNER_TEMP}/gh-aw/bin/copilot" --add-dir /tmp/gh-aw/ --log-level all --log-dir /tmp/gh-aw/sandbox/agent/logs/ --disable-builtin-mcps --no-ask-user --allow-tool shell --deny-tool workflow --no-custom-instructions --add-dir "${GITHUB_WORKSPACE}" --prompt-file /tmp/gh-aw/aw-prompts/prompt.txt'
         env:
-          GITHUB_STEP_SUMMARY: /tmp/gh-aw/step-summary.md
           AWF_REFLECT_ENABLED: 1
           COPILOT_AGENT_RUNNER_TYPE: STANDALONE
           COPILOT_DUMMY_BYOK: dummy-byok-key-for-offline-mode
@@ -4016,6 +3956,7 @@ jobs:
           GITHUB_HEAD_REF: ${{ github.head_ref }}
           GITHUB_REF_NAME: ${{ github.ref_name }}
           GITHUB_SERVER_URL: ${{ github.server_url }}
+          GITHUB_STEP_SUMMARY: /tmp/gh-aw/agent-step-summary.md
           GITHUB_WORKSPACE: ${{ github.workspace }}
           GIT_AUTHOR_EMAIL: github-actions[bot]@users.noreply.github.com
           GIT_AUTHOR_NAME: github-actions[bot]
@@ -4023,6 +3964,71 @@ jobs:
           GIT_COMMITTER_NAME: github-actions[bot]
           RUNNER_TEMP: ${{ runner.temp }}
           TRACEPARENT: ${{ env.GITHUB_AW_OTEL_TRACE_ID != '' && env.GITHUB_AW_OTEL_PARENT_SPAN_ID != '' && format('00-{0}-{1}-01', env.GITHUB_AW_OTEL_TRACE_ID, env.GITHUB_AW_OTEL_PARENT_SPAN_ID) || '' }}
+          WORKFLOW_NAME: "Smoke Copilot"
+          WORKFLOW_DESCRIPTION: "Smoke Copilot"
+          HAS_PATCH: ${{ needs.agent.outputs.has_patch }}
+          GH_AW_DETECTION_CONTINUE_ON_ERROR: "true"
+          GH_AW_DETECTION_INPUT_DIR: "/tmp/gh-aw/threat-detection-inputs"
+        run: |
+          mkdir -p "/tmp/gh-aw/threat-detection"
+          evidence_tmp="/tmp/gh-aw/threat-detection/execution.json.tmp"
+          printf '{"version":1,"component":"detection","run_id":%s,"run_attempt":%s,"state":"started"}\n' "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" > "$evidence_tmp"
+          mv "$evidence_tmp" "/tmp/gh-aw/threat-detection/execution.json"
+          export GH_AW_AWF_EXECUTION_COMPONENT="detection"
+          export GH_AW_AWF_EXECUTION_EVIDENCE_FILE="/tmp/gh-aw/threat-detection/execution.json"
+          set -o pipefail
+          printf '%s' "$(date +%s%3N)" > /tmp/gh-aw/agent_cli_start_ms.txt
+          GH_AW_COPILOT_SRC="$(command -v copilot 2>/dev/null || true)"
+          if [ -z "$GH_AW_COPILOT_SRC" ] || [ ! -x "$GH_AW_COPILOT_SRC" ]; then
+            echo "GitHub Copilot CLI executable not found on PATH after installation" >&2
+            exit 127
+          fi
+          GH_AW_COPILOT_BIN="${RUNNER_TEMP}/gh-aw/bin/copilot"
+          mkdir -p "${RUNNER_TEMP}/gh-aw/bin"
+          if [ "$GH_AW_COPILOT_SRC" != "$GH_AW_COPILOT_BIN" ]; then
+            cp "$GH_AW_COPILOT_SRC" "$GH_AW_COPILOT_BIN"
+          fi
+          chmod 755 "$GH_AW_COPILOT_BIN"
+
+          "${GH_AW_NODE:-node}" "${RUNNER_TEMP}/gh-aw/actions/stage_threat_detection_runtime.cjs" copilot || exit 1
+          (umask 177 && touch /tmp/gh-aw/threat-detection/detection.log)
+          GH_AW_MAX_AI_CREDITS="${GH_AW_MAX_AI_CREDITS:-400}"
+          if [[ ! "$GH_AW_MAX_AI_CREDITS" =~ ^(-1|[0-9]+)$ ]]; then
+            GH_AW_MAX_AI_CREDITS="400"
+          fi
+
+          if [[ "${GH_AW_ADMISSION_RESULT:-}" == "admitted" && -n "${GH_AW_ADMISSION_MAX_AI_CREDITS:-}" ]]; then
+            if [[ ! "$GH_AW_ADMISSION_MAX_AI_CREDITS" =~ ^[1-9][0-9]{0,9}$ ]] || (( GH_AW_ADMISSION_MAX_AI_CREDITS > 2147483647 )); then
+              echo "ERR_ADMISSION: Invalid runtime admission allowance." >&2
+              exit 1
+            fi
+            GH_AW_MAX_AI_CREDITS="$GH_AW_ADMISSION_MAX_AI_CREDITS"
+            echo "Admission allowance applied (value withheld)."
+          else
+            echo "No component admission allowance; retaining existing budget policy (value withheld)."
+          fi
+          unset GH_AW_ADMISSION_RESULT GH_AW_ADMISSION_MAX_AI_CREDITS
+          printf '%s\n' "{\"\$schema\":\"https://github.com/github/gh-aw-firewall/releases/download/v0.29.20/awf-config.schema.json\",\"network\":{\"allowDomains\":[\"api.npms.io\",\"bun.sh\",\"cdn.jsdelivr.net\",\"cdn.playwright.dev\",\"deb.nodesource.com\",\"deno.land\",\"esm.sh\",\"get.pnpm.io\",\"go.dev\",\"golang.org\",\"googleapis.deno.dev\",\"googlechromelabs.github.io\",\"goproxy.io\",\"jsr.io\",\"nodejs.org\",\"npm.pkg.github.com\",\"npmjs.com\",\"npmjs.org\",\"packagefeedproxy.microsoft.io\",\"pkg.go.dev\",\"playwright.download.prss.microsoft.com\",\"proxy.golang.org\",\"registry.bower.io\",\"registry.npmjs.com\",\"registry.npmjs.org\",\"registry.yarnpkg.com\",\"repo.yarnpkg.com\",\"skimdb.npmjs.com\",\"storage.googleapis.com\",\"sum.golang.org\",\"www.npmjs.com\",\"www.npmjs.org\",\"yarnpkg.com\"]},\"apiProxy\":{\"enabled\":true,\"enableTokenSteering\":true,\"maxRuns\":500,\"maxAiCredits\":${GH_AW_MAX_AI_CREDITS},\"maxCacheMisses\":5,\"modelFallback\":{\"enabled\":false},\"fallbackModels\":[\"gpt-5.6-luna\",\"claude-sonnet-5\"],\"providers\":{\"anthropic\":{\"models\":{\"my-custom-claude\":{\"cost\":{\"cache_read\":\"3e-07\",\"cache_write\":\"3.75e-06\",\"input\":\"3e-06\",\"output\":\"1.5e-05\"}}}}},\"models\":{\"agent\":[\"sonnet-6x\",\"gpt-6\",\"gpt-5.4\",\"gpt-5.5\",\"gpt-5.6\",\"gpt-5.3\",\"gemini-pro\",\"any\"],\"antigravity\":[\"copilot/antigravity*\",\"google/antigravity*\",\"gemini/antigravity*\"],\"any\":[\"copilot/*\",\"anthropic/*\",\"openai/*\",\"google/*\",\"gemini/*\"],\"auto\":[\"copilot/auto\",\"large\"],\"claude\":[\"agent\"],\"codex\":[\"agent\"],\"coding\":[\"copilot/gpt-5*codex*\",\"openai/gpt-5*codex*\",\"gpt-5-codex\",\"kimi\"],\"computer-use\":[\"copilot/*computer-use*\",\"google/*computer-use*\",\"gemini/*computer-use*\",\"openai/*computer-use*\"],\"copilot\":[\"agent\"],\"deep-research\":[\"copilot/deep-research*\",\"copilot/o3-deep-research*\",\"copilot/o4-mini-deep-research*\",\"google/deep-research*\",\"gemini/deep-research*\",\"openai/o3-deep-research*\",\"openai/o4-mini-deep-research*\"],\"detection\":[\"small\",\"copilot/gpt-*-luna\",\"openai/gpt-*-luna\",\"small-agent\",\"agent\"],\"evals\":[\"copilot/gpt-6-luna-decisions\"],\"fable\":[\"copilot/*fable*\",\"anthropic/*fable*\"],\"gemini\":[\"agent\"],\"gemini-3-flash\":[\"copilot/gemini-3*flash*\",\"google/gemini-3*flash*\",\"gemini/gemini-3*flash*\"],\"gemini-3-pro\":[\"copilot/gemini-3*pro*\",\"google/gemini-3*pro*\",\"google/nano-banana*\",\"gemini/gemini-3*pro*\"],\"gemini-3.1-flash\":[\"copilot/gemini-3.1*flash*\",\"google/gemini-3.1*flash*\",\"gemini/gemini-3.1*flash*\"],\"gemini-3.1-pro\":[\"copilot/gemini-3.1*pro*\",\"google/gemini-3.1*pro*\",\"gemini/gemini-3.1*pro*\"],\"gemini-3.5-flash\":[\"copilot/gemini-3.5*flash*\",\"google/gemini-3.5*flash*\",\"gemini/gemini-3.5*flash*\"],\"gemini-3.6-flash\":[\"copilot/gemini-3.6*flash*\",\"google/gemini-3.6*flash*\",\"gemini/gemini-3.6*flash*\"],\"gemini-3.7-flash\":[\"copilot/gemini-3.7*flash*\",\"google/gemini-3.7*flash*\",\"gemini/gemini-3.7*flash*\"],\"gemini-3.8-flash\":[\"copilot/gemini-3.8*flash*\",\"google/gemini-3.8*flash*\",\"gemini/gemini-3.8*flash*\"],\"gemini-flash\":[\"copilot/gemini-*flash*\",\"google/gemini-*flash*\",\"gemini/gemini-*flash*\"],\"gemini-flash-lite\":[\"copilot/gemini-*flash*lite*\",\"google/gemini-*flash*lite*\",\"gemini/gemini-*flash*lite*\"],\"gemini-omni\":[\"copilot/gemini-omni*\",\"google/gemini-omni*\",\"gemini/gemini-omni*\"],\"gemini-pro\":[\"copilot/gemini-*pro*\",\"google/gemini-*pro*\",\"gemini/gemini-*pro*\"],\"gemma\":[\"copilot/gemma*\",\"google/gemma*\",\"gemini/gemma*\"],\"gpt-5\":[\"copilot/gpt-5*\",\"openai/gpt-5*\"],\"gpt-5-codex\":[\"copilot/gpt-5*codex*\",\"openai/gpt-5*codex*\"],\"gpt-5-mini\":[\"copilot/gpt-5*mini*\",\"openai/gpt-5*mini*\"],\"gpt-5-nano\":[\"copilot/gpt-5*nano*\",\"openai/gpt-5*nano*\"],\"gpt-5-pro\":[\"copilot/gpt-5*pro*\",\"openai/gpt-5*pro*\"],\"gpt-5.1\":[\"copilot/gpt-5.1*\",\"openai/gpt-5.1*\"],\"gpt-5.2\":[\"copilot/gpt-5.2*\",\"openai/gpt-5.2*\"],\"gpt-5.3\":[\"copilot/gpt-5.3*\",\"openai/gpt-5.3*\"],\"gpt-5.4\":[\"copilot/gpt-5.4*\",\"openai/gpt-5.4*\"],\"gpt-5.5\":[\"copilot/gpt-5.5*\",\"openai/gpt-5.5*\"],\"gpt-5.6\":[\"copilot/gpt-5.6*\",\"openai/gpt-5.6*\"],\"gpt-6\":[\"copilot/gpt-6*\",\"openai/gpt-6*\"],\"grok\":[\"copilot/*grok*\",\"openai/*grok*\"],\"haiku\":[\"copilot/*haiku*\",\"anthropic/*haiku*\"],\"image-generation\":[\"copilot/gpt-image*\",\"openai/gpt-image*\",\"openai/chatgpt-image*\",\"copilot/gemini-*image*\",\"google/gemini-*image*\",\"gemini/gemini-*image*\",\"google/imagen*\"],\"kimi\":[\"copilot/kimi*\",\"openai/kimi*\"],\"kiwi\":[\"copilot/kiwi*\",\"openai/kiwi*\"],\"large\":[\"sonnet\",\"gpt-6\",\"gpt-5-pro\",\"gpt-5\",\"gemini-pro\"],\"lyria\":[\"google/lyria*\",\"gemini/lyria*\",\"copilot/lyria*\"],\"mai-code\":[\"copilot/MAI-Code*\",\"copilot/mai-code*\",\"openai/MAI-Code*\"],\"mini\":[\"haiku\",\"gpt-5-mini\",\"gpt-5-nano\",\"gemini-flash-lite\"],\"nano-banana\":[\"copilot/nano-banana*\",\"google/nano-banana*\",\"gemini/nano-banana*\"],\"opus\":[\"copilot/*opus*\",\"anthropic/*opus*\"],\"opusplan\":[\"opus?effort=high\"],\"raptor-mini\":[\"copilot/raptor*\",\"openai/raptor*\"],\"reasoning\":[\"copilot/o1*\",\"copilot/o3*\",\"copilot/o4*\",\"openai/o1*\",\"openai/o3*\",\"openai/o4*\"],\"robotics\":[\"copilot/*robotics*\",\"google/*robotics*\",\"gemini/*robotics*\"],\"small\":[\"mini\"],\"small-agent\":[\"haiku\",\"gpt-5-mini\",\"gemini-flash\"],\"sonnet\":[\"copilot/*sonnet*\",\"anthropic/*sonnet*\"],\"sonnet-6x\":[\"copilot/*sonnet-4.5*\",\"copilot/*sonnet-4.6*\",\"copilot/*sonnet-5*\",\"copilot/*sonnet-4-5-*\",\"anthropic/*sonnet-4-5-*\",\"copilot/*sonnet-4-6*\",\"anthropic/*sonnet-4-6*\",\"anthropic/*sonnet-5*\"],\"summarization\":[\"haiku\",\"gpt-5-mini\",\"gemini-flash-lite\",\"mini\"],\"veo\":[\"google/veo*\",\"gemini/veo*\"],\"vision\":[\"copilot/gemini-*image*\",\"google/gemini-*image*\",\"gemini/gemini-*image*\",\"copilot/gemini-*flash*\",\"google/gemini-*flash*\",\"gemini/gemini-*flash*\"]}},\"container\":{\"imageTag\":\"0.29.20,squid=sha256:1c4a4a12fcea206a81d656cb1f73847420a2c041d02ab51235364079a1e31d71,agent=sha256:b9cd8d7d1a9c2693e5d91db035a678fb1ea8d87ce691e08ec091b327e5e8ba75,api-proxy=sha256:fc6c1eff686514d26ff90ae1398e0f6e3dcad8d2e43d11b16df312c1e72c0ace,cli-proxy=sha256:743396030b149763880978f35ad679fe02b1c0be6697b01fbf6d43f4ac2ae081\",\"agentTimeout\":10},\"logging\":{\"proxyLogsDir\":\"/tmp/gh-aw/sandbox/firewall/logs\",\"auditDir\":\"/tmp/gh-aw/sandbox/firewall/audit\"}}" > "${RUNNER_TEMP}/gh-aw/awf-config.json"
+          cp "${RUNNER_TEMP}/gh-aw/awf-config.json" /tmp/gh-aw/awf-config.json
+          export GH_AW_MODELS_JSON_PATH="/tmp/gh-aw/models.json"
+          GH_AW_DOCKER_HOST=""
+          if [[ "${DOCKER_HOST:-}" =~ ^tcp:// ]]; then
+            GH_AW_DOCKER_HOST="${DOCKER_HOST}"
+          fi
+          if [[ "${DOCKER_HOST:-}" =~ ^tcp:// ]]; then
+            _GH_AW_CHROOT_JSON=$(jq -c --arg src "${RUNNER_TEMP}/gh-aw" --arg user "$(id -un)" --argjson uid "$(id -u)" --argjson gid "$(id -g)" --arg home "${RUNNER_TEMP}/gh-aw/home" '.chroot={"binariesSourcePath":$src,"identity":{"user":$user,"uid":$uid,"gid":$gid,"home":$home}}' "${RUNNER_TEMP}/gh-aw/awf-config.json") || { echo "chroot config patch failed" >&2; exit 1; }
+            printf '%s\n' "$_GH_AW_CHROOT_JSON" > "${RUNNER_TEMP}/gh-aw/awf-config.json"
+          fi
+          GH_AW_TOOL_CACHE_MOUNT=""
+          GH_AW_TOOL_CACHE="${RUNNER_TOOL_CACHE:?RUNNER_TOOL_CACHE must be set}"
+          if [ -d "$GH_AW_TOOL_CACHE" ]; then
+            if [[ "$GH_AW_TOOL_CACHE" != /opt/* ]]; then
+              GH_AW_TOOL_CACHE_MOUNT="$GH_AW_TOOL_CACHE:$GH_AW_TOOL_CACHE:ro"
+            fi
+          fi
+          # shellcheck disable=SC1003,SC2016,SC2086
+          awf --config "${RUNNER_TEMP}/gh-aw/awf-config.json" --container-workdir "${GITHUB_WORKSPACE}" --mount "${RUNNER_TEMP}/gh-aw:${RUNNER_TEMP}/gh-aw:ro" --mount "${RUNNER_TEMP}/gh-aw:/host${RUNNER_TEMP}/gh-aw:ro" ${GH_AW_TOOL_CACHE_MOUNT:+--mount "$GH_AW_TOOL_CACHE_MOUNT"} ${GH_AW_DOCKER_HOST:+--docker-host "$GH_AW_DOCKER_HOST"} --env-all --exclude-env ACTIONS_ID_TOKEN_REQUEST_TOKEN --exclude-env ACTIONS_ID_TOKEN_REQUEST_URL --exclude-env COPILOT_GITHUB_TOKEN --exclude-env GH_AW_OTLP_ALL_HEADERS --exclude-env GH_AW_OTLP_ENDPOINTS --exclude-env GH_AW_RUNTIME_TMP_DIR --exclude-env GH_AW_RUNTIME_TMP_ID --exclude-env OTEL_EXPORTER_OTLP_ENDPOINT --exclude-env OTEL_EXPORTER_OTLP_HEADERS --exclude-env TMPDIR --mount /tmp/gh-aw:/tmp/gh-aw:rw --mount /tmp/gh-aw/threat-detection-inputs:/tmp/gh-aw/threat-detection-inputs:ro --mount /tmp/gh-aw/threat-detection:/tmp/gh-aw/threat-detection:rw --log-level info --session-state-dir /tmp/gh-aw/sandbox/agent/session-state --skip-pull \
+            -- /bin/bash -c 'set +o histexpand; export PATH="${RUNNER_TEMP}/gh-aw/bin:$PATH" && : "${RUNNER_TOOL_CACHE:?RUNNER_TOOL_CACHE must be set}"; GH_AW_TOOL_CACHE="$RUNNER_TOOL_CACHE"; GH_AW_TOOL_BINS="$(find "$GH_AW_TOOL_CACHE" -maxdepth 5 -type d -name bin 2>/dev/null | tr "\n" ":")"; GH_AW_TOOL_BINS="${GH_AW_TOOL_BINS%:}"; export PATH="$PATH${GH_AW_TOOL_BINS:+:}$GH_AW_TOOL_BINS"; [ -n "$GOROOT" ] && export PATH="$GOROOT/bin:$PATH" || true; [ -n "$ERLANG_HOME" ] && export PATH="$ERLANG_HOME/bin:$PATH" || true && "${RUNNER_TEMP}/gh-aw/threat-detection-runtime/node" "${RUNNER_TEMP}/gh-aw/actions/detect_threats.cjs" --launch-config "${RUNNER_TEMP}/gh-aw/threat-detection-runtime/launch.json" --output /tmp/gh-aw/threat-detection/detection_result.json /tmp/gh-aw/threat-detection-inputs' 2>&1 | tee -a /tmp/gh-aw/threat-detection/detection.log
       - name: Copy detection firewall logs
         if: always() && steps.detection_guard.outputs.run_detection == 'true'
         continue-on-error: true
@@ -4089,13 +4095,6 @@ jobs:
             const { main } = require(path.join(actionsDir, 'redact_secrets.cjs'));
             const { persistDetectionMasks } = require(path.join(actionsDir, 'detection_mask_state.cjs'));
             await main({ additionalDirectories: ["/tmp/gh-aw/threat-detection/sandbox/firewall"], persistDetectionMasks });
-      - name: Echo detection step summary
-        if: always() && steps.detection_guard.outputs.run_detection == 'true' && steps.redact_detection_logs.outcome == 'success' && steps.redact_detection_artifacts.outcome == 'success'
-        continue-on-error: true
-        run: |
-          if [ -s /tmp/gh-aw/step-summary.md ]; then
-            cat /tmp/gh-aw/step-summary.md
-          fi
       - name: Render detection log
         if: always() && steps.detection_guard.outputs.run_detection == 'true' && steps.redact_detection_logs.outcome == 'success' && steps.redact_detection_artifacts.outcome == 'success'
         continue-on-error: true
@@ -4108,13 +4107,13 @@ jobs:
             setupGlobals(core, github, context, exec, io, getOctokit);
             const { main } = require(path.join(actionsDir, 'render_detection_log.cjs'));
             await main();
-      - name: Upload threat detection log
-        if: always() && steps.detection_guard.outputs.run_detection == 'true' && steps.redact_detection_logs.outcome == 'success' && steps.redact_detection_artifacts.outcome == 'success'
+      - name: Upload threat detection artifact
+        if: always() && steps.detection_guard.outputs.run_detection == 'true' && steps.redact_detection_logs.outcome == 'success' && steps.redact_detection_artifacts.outcome == 'success' && steps.detection_staging_reset.outcome == 'success'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: detection
           path: |
-            /tmp/gh-aw/threat-detection/detection.log
+            /tmp/gh-aw/threat-detection/detection_result.json
             /tmp/gh-aw/threat-detection/execution.json
             /tmp/gh-aw/threat-detection/detection_usage.json
             /tmp/gh-aw/threat-detection/detection_usage.jsonl
@@ -4123,39 +4122,17 @@ jobs:
             /tmp/gh-aw/threat-detection/sandbox/firewall/audit/
           if-no-files-found: ignore
           retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
-      - name: Parse and conclude threat detection
+      - name: Conclude threat detection
         id: detection_conclusion
         if: always() && steps.detection_guard.outputs.run_detection == 'false' || (always() && steps.detection_guard.outputs.run_detection == 'true' && steps.redact_detection_logs.outcome == 'success' && steps.redact_detection_artifacts.outcome == 'success')
-        continue-on-error: true
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           RUN_DETECTION: ${{ steps.detection_guard.outputs.run_detection }}
           DETECTION_AGENTIC_EXECUTION_OUTCOME: ${{ steps.detection_agentic_execution.outcome }}
+          DETECTION_RESET_OUTCOME: ${{ steps.detection_staging_reset.outcome }}
+          AWF_INSTALL_OUTCOME: ${{ steps.detection_awf_install.outcome }}
           GH_AW_DETECTION_CONTINUE_ON_ERROR: "true"
-        with:
-          script: |
-            try {
-              const path = require('path');
-              const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
-              const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
-              setupGlobals(core, github, context, exec, io, getOctokit);
-              const { main } = require(path.join(actionsDir, 'parse_threat_detection_results.cjs'));
-              await main();
-            } catch (loadErr) {
-              const continueOnError = process.env.GH_AW_DETECTION_CONTINUE_ON_ERROR !== 'false';
-              const msg = 'ERR_SYSTEM: \u274C Unexpected error loading threat detection module: ' + (loadErr && loadErr.message ? loadErr.message : String(loadErr));
-              core.error(msg);
-              core.setOutput('reason', 'parse_error');
-              if (continueOnError) {
-                core.warning('\u26A0\uFE0F ' + msg);
-                core.setOutput('conclusion', 'warning');
-                core.setOutput('success', 'false');
-              } else {
-                core.setOutput('conclusion', 'failure');
-                core.setOutput('success', 'false');
-                core.setFailed(msg);
-              }
-            }
+        run: |
+          bash "${RUNNER_TEMP}/gh-aw/actions/conclude_threat_detection.sh" /tmp/gh-aw/threat-detection/detection_result.json
       - name: Upload skipped detection execution evidence
         if: always() && steps.detection_guard.outputs.run_detection == 'false'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

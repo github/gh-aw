@@ -29,7 +29,6 @@ func TestDefaultCLIMCPVersions(t *testing.T) {
 		{"Router", DefaultRouterVersion, "0.1.3"},
 		{"Router image release", AWFRouterReleaseImageMinVersion, "v0.28.62"},
 		{"MCP Gateway", DefaultMCPGatewayVersion, "v0.5.14"},
-		{"Threat Detect", DefaultThreatDetectVersion, "v0.5.3"},
 	}
 
 	for _, tt := range tests {
@@ -49,34 +48,6 @@ func TestDefaultCopilotChecksumsSHA256(t *testing.T) {
 	const expected = "26cd3e4b32cde498e4961fb4d48e7b85d7859fc69af1a645a19201fdd577bdb2"
 	if DefaultCopilotChecksumsSHA256 != expected {
 		t.Fatalf("DefaultCopilotChecksumsSHA256 = %q, want the reviewed v1.0.103 manifest digest %q", DefaultCopilotChecksumsSHA256, expected)
-	}
-}
-
-func TestDefaultThreatDetectReleasePins(t *testing.T) {
-	t.Parallel()
-
-	if DefaultThreatDetectVersion != "v0.5.3" {
-		t.Fatalf("DefaultThreatDetectVersion = %q, want v0.5.3; update the version and reviewed digest table together", DefaultThreatDetectVersion)
-	}
-
-	expectedDigests := map[string]string{
-		"threat-detect-linux-amd64":  "7cfab3bd02717968a0584ddd3790cff22550059e36d6f656c4f35e9d27851009",
-		"threat-detect-linux-arm64":  "6f355949af98e7b5527a958ac11431bd7867db45c0191b94c3a205c662181cc6",
-		"threat-detect-darwin-x64":   "e0b606fb321a8b3d67f57c4bca7aac7e02976c0cf30c675032a7599b7225ff93",
-		"threat-detect-darwin-arm64": "2600ba84538d50e91926268b2b7c59ae9443e1ae6f709673cacb05e167ddb0e9",
-	}
-	if len(DefaultThreatDetectSHA256) != len(expectedDigests) {
-		t.Fatalf("DefaultThreatDetectSHA256 has %d entries, want the complete %d-asset release matrix", len(DefaultThreatDetectSHA256), len(expectedDigests))
-	}
-	for asset, want := range expectedDigests {
-		got, ok := DefaultThreatDetectSHA256[asset]
-		if !ok {
-			t.Errorf("DefaultThreatDetectSHA256 is missing %q", asset)
-			continue
-		}
-		if got != want {
-			t.Errorf("DefaultThreatDetectSHA256[%q] = %q, want the reviewed v0.5.3 digest %q; update the version and reviewed digest table together", asset, got, want)
-		}
 	}
 }
 

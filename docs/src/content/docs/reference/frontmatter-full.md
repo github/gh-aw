@@ -2345,9 +2345,9 @@ runner:
   # (optional)
   topology: "arc-dind"
 
-  # Installation privilege for Copilot CLI and threat-detect in the agent and
-  # detection jobs. Rootless installs to ~/.local/bin without sudo. Defaults to
-  # rootless for arc-dind and privileged (/usr/local/bin via sudo) otherwise.
+  # Installation privilege for Copilot CLI in the agent and detection jobs. Rootless
+  # installs to the job-scoped $RUNNER_TEMP/gh-aw/bin without sudo. Defaults to
+  # rootless for arc-dind or when sudo is unavailable to a non-root runner.
   # Privileged is not supported with arc-dind. Does not change AWF runtime
   # privileges or enable split-filesystem handling.
   # (optional)
@@ -23647,12 +23647,6 @@ safe-outputs:
 
     # Format 1: string
     ca-cert: "example-value"
-
-    # Optional HTTPS base URL for a mirror of pinned threat-detect release assets. The
-    # compiler appends the pinned release tag and asset name; compiler-supplied
-    # SHA-256 digests remain authoritative.
-    # (optional)
-    artifact-base-url: "example-value"
 
     # When true (default), detection failures produce warnings and allow safe outputs
     # to proceed with a caution notice and 'needs-review' label. When false, detection

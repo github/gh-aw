@@ -54,7 +54,7 @@ safe-outputs:
 }
 
 // TestCustomEngineThreatDetectionFallsBackToBuiltinEngine verifies that a workflow using a
-// custom engine does not emit `threat-detect --engine <custom-id>`, which the detection
+// custom engine does not emit `stage_threat_detection_runtime.cjs\" <custom-id>`, which the detection
 // binary rejects with a config_error at runtime.
 func TestCustomEngineThreatDetectionFallsBackToBuiltinEngine(t *testing.T) {
 	workflowPath := writeCustomEngineWorkflow(t, "")
@@ -67,9 +67,9 @@ func TestCustomEngineThreatDetectionFallsBackToBuiltinEngine(t *testing.T) {
 
 	detectionSection := extractJobSection(string(lockContent), "detection")
 	require.NotEmpty(t, detectionSection, "detection job should be generated")
-	assert.NotContains(t, detectionSection, "--engine harness-engine",
+	assert.NotContains(t, detectionSection, "stage_threat_detection_runtime.cjs\" harness-engine",
 		"detection must not run with the custom engine id")
-	assert.Contains(t, detectionSection, "--engine "+defaultThreatDetectionEngineID,
+	assert.Contains(t, detectionSection, "stage_threat_detection_runtime.cjs\" "+defaultThreatDetectionEngineID,
 		"detection must fall back to the default built-in engine")
 }
 
@@ -86,7 +86,7 @@ func TestCustomEngineDetectionEngineFrontmatter(t *testing.T) {
 
 	detectionSection := extractJobSection(string(lockContent), "detection")
 	require.NotEmpty(t, detectionSection, "detection job should be generated")
-	assert.Contains(t, detectionSection, "--engine claude",
+	assert.Contains(t, detectionSection, "stage_threat_detection_runtime.cjs\" claude",
 		"detection must use the engine declared by the engine definition")
 }
 

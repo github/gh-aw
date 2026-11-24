@@ -2,11 +2,11 @@
 package workflow
 
 import (
-	"encoding/json"
 	"maps"
 	"strings"
 
 	"github.com/github/gh-aw/pkg/constants"
+	"github.com/github/gh-aw/pkg/jsonutil"
 	"github.com/github/gh-aw/pkg/logger"
 	"github.com/github/gh-aw/pkg/workflow/compilerenv"
 )
@@ -51,7 +51,7 @@ func isThreatDetectionExplicitlyDisabledInConfigs(configs []string) bool {
 			continue
 		}
 		var config map[string]any
-		if err := json.Unmarshal([]byte(configJSON), &config); err != nil {
+		if err := jsonutil.UnmarshalString(configJSON, &config); err != nil {
 			continue
 		}
 		if tdVal, exists := config["threat-detection"]; exists {
@@ -181,12 +181,10 @@ func buildExternalDetectorWorkflowData(data *WorkflowData, engineID string) *Wor
 		auth := *data.EngineConfig.Auth
 		d.EngineConfig.Auth = &auth
 	}
-	// threat-detect currently resolves the selected engine by its standard
-	// executable name and has no custom-command option. Keep the standard
-	// Copilot CLI installed for external detection rather than propagating a
-	// command that threat-detect cannot consume.
+	// Keep the standard Copilot CLI for detection, even if the primary agent
+	// runs a custom command.
 	if engineID == "copilot" && d.EngineConfig.Command != "" {
-		threatLog.Printf("Ignoring custom Copilot command for external detector; threat-detect requires the standard Copilot CLI")
+		threatLog.Printf("Ignoring custom Copilot command for detection; using the standard Copilot CLI")
 		d.EngineConfig.Command = ""
 	}
 	if engineID == "codex" && NewCodexEngine().ResolveLLMProvider(d) != LLMProviderGitHub {

@@ -78,14 +78,10 @@ safe-outputs:
 ```
 
 The `features.gh-aw-detection` flag controls the detection implementation, not
-whether threat detection runs. The external `threat-detect` implementation is
-the default; set `features.gh-aw-detection: false` to select the legacy inline
-engine implementation. Compiled workflows embed the reviewed detector release
-tag and per-architecture SHA-256 digests. Installation verifies the downloaded
-binary against those compiler-controlled pins instead of a runtime checksum file.
-If installation does not complete verification, the detection job neither runs nor
-concludes with a detector binary: analysis is skipped and the conclusion is reported
-as an `agent_failure` (a warning in warn mode, a hard failure in strict mode).
+whether threat detection runs. By default, the sandbox runs the JavaScript
+detector bundled with the setup action, and the host reads its staged verdict.
+There is no separate detector release to download. Set
+`features.gh-aw-detection: false` to select the legacy inline engine.
 
 > [!NOTE]
 > When a workflow explicitly sets `threat-detection: false`, that setting takes precedence over any imported fragments. Imported shared workflows that configure safe outputs without a `threat-detection` key will not re-enable threat detection in the importing workflow.
@@ -117,7 +113,6 @@ safe-outputs:
 | `engine` | string/object/false | AI engine config (`"copilot"`, full config object, or `false` for no AI) |
 | `ca-cert` | string/false | Absolute host path to a CA certificate for the detection API proxy. Inherits `sandbox.agent.ca-cert` when unset or empty and the detection engine matches the agent engine; set to `false` to disable inheritance. Requires AWF v0.28.10 or later. |
 | `runs-on` | string/array/object | Runner for the detection job (default: GitHub-hosted `ubuntu-latest`; does not inherit the workflow `runs-on`) |
-| `artifact-base-url` | string | HTTPS base URL for a mirror of the pinned detector release assets. The compiler appends the pinned release tag and asset name; the embedded digest cannot be overridden. |
 | `steps` | array | Additional GitHub Actions steps to run **before** AI analysis (pre-steps) |
 | `post-steps` | array | Additional GitHub Actions steps to run **after** AI analysis (post-steps) |
 | `max-ai-credits` | integer | AI Credits cap for the detection run, independent of the main agent budget. Defaults to `400` when unset, with runtime override via `vars.GH_AW_DEFAULT_DETECTION_MAX_AI_CREDITS`. Accepts plain integers; `-1` disables the detection budget. |
@@ -164,61 +159,6 @@ safe-outputs:
 ```
 
 AWF versions before v0.28.10 silently omit `apiProxy.caCert` from the configuration instead of failing compilation. The custom certificate is therefore not used, and connections that require it may fail TLS verification.
-
-### Use an artifact mirror
-
-Set `artifact-base-url` when detector binaries must be downloaded through an
-approved HTTPS mirror:
-
-```yaml wrap
-safe-outputs:
-  create-issue:
-  threat-detection:
-    artifact-base-url: https://artifacts.example.com/gh-aw-threat-detection/releases/download
-```
-
-The configured URL is the base of this required layout:
-
-```text
-<artifact-base-url>/<version>/threat-detect-linux-amd64
-<artifact-base-url>/<version>/threat-detect-linux-arm64
-```
-
-For example, the current `v0.5.2` pin resolves the amd64 asset to
-`https://artifacts.example.com/gh-aw-threat-detection/releases/download/v0.5.2/threat-detect-linux-amd64`.
-
-The mirrored bytes must exactly match the SHA-256 digests embedded by the
-compiler. The mirror changes only the source of the bytes; it cannot override
-the release tag or expected digest. The mirror must be reachable from the
-threat-detection runner. `artifact-base-url` currently has no documented
-authentication mechanism, so use a runner-accessible HTTPS endpoint that does
-not require credentials.
-
-Update the mirror contents whenever a gh-aw release changes the pinned detector
-version or digests. Populate the new `<version>` directory with both Linux assets
-before compiling workflows that use the new gh-aw release.
-
-### Maintain detector release pins
-
-Review the promoted `gh-aw-threat-detection` release, then run the updater from
-the gh-aw repository root:
-
-```bash
-make update-threat-detect-pins THREAT_DETECT_VERSION=<version>
-```
-
-For example, `<version>` is `v0.5.2` for the current pin. The updater downloads
-the release `checksums.txt` and all four Linux and Darwin assets. It rejects
-malformed, missing, duplicate, or unexpected manifest entries, verifies every
-download against the manifest, and atomically updates
-`DefaultThreatDetectVersion` with the complete `DefaultThreatDetectSHA256`
-matrix and synchronizes the reviewed-literal compiler test. It does not update
-source files if any validation fails.
-
-The make target also runs `make fmt` and `make recompile` so the generated
-workflow locks carry the new Linux digests. Review
-`pkg/constants/version_constants.go`, `pkg/constants/version_constants_test.go`,
-and the generated lock-file diff in the same pull request.
 
 ## Detection Budget
 

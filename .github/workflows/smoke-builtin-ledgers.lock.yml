@@ -2205,6 +2205,7 @@ jobs:
           rm -f "$HOME/.copilot/mcp-config.json"
           rm -f "$GITHUB_WORKSPACE/.gemini/settings.json"
       - name: Prepare threat detection files
+        id: detection_prepare
         if: always() && steps.detection_guard.outputs.run_detection == 'true'
         run: |
           bash "${RUNNER_TEMP}/gh-aw/actions/prepare_threat_detection_files.sh"

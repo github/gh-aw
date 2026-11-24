@@ -40,6 +40,7 @@ imports:
   - shared/mcp/serena-go.md
   - shared/otlp.md
   - shared/token-telemetry-check.md
+  - shared/check-detection-verdict.md
   - shared/smoke-test-brevity.md
   - shared/playwright-title-test.md
   - uses: shared/session-artifact-check.md
@@ -172,8 +173,6 @@ timeout-minutes: 8
 experiments:
   caveman: [yes, no]
   subagent_model: [small, large]
-features:
-  gh-aw-detection: false
 evals:
   - id: sandboxed_web_fetch
     question: Did the web-fetch MCP server return GitHub homepage content without using the shell or a browser?

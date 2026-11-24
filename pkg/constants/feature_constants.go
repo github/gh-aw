@@ -91,10 +91,8 @@ const (
 	//	features:
 	//	  dangerously-allow-pull-request-target-forks-all: true
 	DangerouslyAllowPullRequestTargetForksAllFeatureFlag FeatureFlag = "dangerously-allow-pull-request-target-forks-all"
-	// GHAWDetectionFeatureFlag controls the external threat-detect binary detection path.
-	// The external detector is enabled by default. Set this flag to false to use
-	// the legacy inline engine execution path.
-	// The binary version is resolved at runtime via DefaultThreatDetectVersion in version_constants.go.
+	// GHAWDetectionFeatureFlag selects the bundled JavaScript detector by default.
+	// Set it to false to use the legacy inline engine.
 	//
 	// Workflow frontmatter usage:
 	//

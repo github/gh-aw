@@ -19,18 +19,18 @@ func usesArcDindDetectionMount(data *WorkflowData) bool {
 	return agent != nil && slices.Contains(agent.Mounts, threatDetectionRWMount)
 }
 
-func buildResetArcDindDetectionResultsStep(data *WorkflowData) []string {
-	if !isArcDindTopology(data) {
-		return nil
-	}
-	return []string{
-		"      - name: Reset ARC/DinD threat detection staging\n",
+func buildResetDetectionResultsStep(data *WorkflowData) []string {
+	steps := []string{
+		"      - name: Reset threat detection staging\n",
 		"        id: detection_staging_reset\n",
 		"        if: always()\n",
-		"        continue-on-error: true\n",
 		"        run: |\n",
-		"          bash \"${RUNNER_TEMP}/gh-aw/actions/stage_threat_detection_arc_dind.sh\" reset\n",
+		"          rm -rf /tmp/gh-aw/threat-detection /tmp/gh-aw/threat-detection-inputs\n",
 	}
+	if isArcDindTopology(data) {
+		steps = append(steps, "          bash \"${RUNNER_TEMP}/gh-aw/actions/stage_threat_detection_arc_dind.sh\" reset\n")
+	}
+	return steps
 }
 
 func buildCollectArcDindDetectionResultsStep(data *WorkflowData) []string {
@@ -39,7 +39,8 @@ func buildCollectArcDindDetectionResultsStep(data *WorkflowData) []string {
 	}
 	return []string{
 		"      - name: Collect ARC/DinD threat detection results\n",
-		"        if: always() && steps.threat_detect_install.outcome == 'success' && steps.detection_agentic_execution.outcome != 'skipped'\n",
+		"        id: detection_collect\n",
+		"        if: always() && steps.detection_staging_reset.outcome == 'success' && (steps.detection_agentic_execution.outcome == 'success' || steps.detection_agentic_execution.outcome == 'failure')\n",
 		"        continue-on-error: true\n",
 		"        run: |\n",
 		"          bash \"${RUNNER_TEMP}/gh-aw/actions/stage_threat_detection_arc_dind.sh\" collect\n",

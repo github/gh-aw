@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set +o histexpand
 
-# Shared privilege selection for Copilot and threat-detect installation.
+# Privilege selection for Copilot CLI installation.
 # An explicit --rootless always wins; otherwise use root or passwordless sudo
 # when available, falling back to a job-scoped directory on the runner.
 configure_install_privileges() {

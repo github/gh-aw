@@ -349,22 +349,6 @@ const DefaultMCPSDKVersion Version = "1.30.0"
 // DefaultGitHubScriptVersion is the default version of the actions/github-script action
 const DefaultGitHubScriptVersion Version = "v9"
 
-// DefaultThreatDetectVersion and DefaultThreatDetectSHA256 are the reviewed
-// gh-aw-threat-detection release pins used by the default external threat-detection
-// path and when `features: gh-aw-detection: true` enables the external detector.
-// Treat the version and complete digest table as one review unit whenever updating
-// the detector release.
-const DefaultThreatDetectVersion Version = "v0.5.3"
-
-const DefaultThreatDetectArtifactBaseURL = "https://github.com/github/gh-aw-threat-detection/releases/download"
-
-var DefaultThreatDetectSHA256 = map[string]string{
-	"threat-detect-linux-amd64":  "7cfab3bd02717968a0584ddd3790cff22550059e36d6f656c4f35e9d27851009",
-	"threat-detect-linux-arm64":  "6f355949af98e7b5527a958ac11431bd7867db45c0191b94c3a205c662181cc6",
-	"threat-detect-darwin-x64":   "e0b606fb321a8b3d67f57c4bca7aac7e02976c0cf30c675032a7599b7225ff93",
-	"threat-detect-darwin-arm64": "2600ba84538d50e91926268b2b7c59ae9443e1ae6f709673cacb05e167ddb0e9",
-}
-
 // GhSkillsMinVersion is the minimum gh CLI version required for frontmatter skill support
 // (installing gh extensions via `gh extension install`). Workflows that install frontmatter
 // skills must have at least this version of gh installed before running skill install steps.

@@ -22,11 +22,12 @@ func TestThreatDetectionExecutionRequiresPreparedInputs(t *testing.T) {
 					SafeOutputs: &SafeOutputsConfig{ThreatDetection: &ThreatDetectionConfig{}},
 				}
 				steps := strings.Join(NewCompiler().buildDetectionJobSteps(data), "")
-				setup := extractWorkflowStepByName(t, steps, "Setup threat detection")
-				assert.Contains(t, setup, "id: detection_setup")
-				assert.Contains(t, setup, "if: "+detectionStepCondition)
-				assert.Contains(t, setup, "setup_threat_detection.cjs")
-
+				if external {
+					assert.NotContains(t, steps, "setup_threat_detection.cjs")
+				} else {
+					setup := extractWorkflowStepByName(t, steps, "Setup threat detection")
+					assert.Contains(t, setup, "setup_threat_detection.cjs")
+				}
 				// Inspect the execution step itself, not a condition elsewhere in the job.
 				stepID := "id: detection_agentic_execution"
 				executionPos := strings.Index(steps, stepID)
@@ -38,7 +39,11 @@ func TestThreatDetectionExecutionRequiresPreparedInputs(t *testing.T) {
 				if next := strings.Index(execution[1:], "\n      - name:"); next >= 0 {
 					execution = execution[:next+1]
 				}
-				assert.Contains(t, execution, "if: "+detectionExecutionCondition)
+				if external {
+					assert.Contains(t, execution, "steps.detection_prepare.outcome == 'success'")
+				} else {
+					assert.Contains(t, execution, "if: "+detectionExecutionCondition)
+				}
 				assert.Contains(t, steps, "if: always()\n", "conclusion and evidence must remain available after setup fails")
 			})
 		}
@@ -484,86 +489,4 @@ func TestPrepareDetectionFilesStepInvokesSetupScript(t *testing.T) {
 	if !strings.Contains(joined, `bash "${RUNNER_TEMP}/gh-aw/actions/prepare_threat_detection_files.sh"`) {
 		t.Error("Expected prepare step to invoke prepare_threat_detection_files.sh")
 	}
-}
-
-func TestBuildInstallThreatDetectStepEmbedsReviewedPins(t *testing.T) {
-	compiler := NewCompiler()
-	data := &WorkflowData{
-		SafeOutputs: &SafeOutputsConfig{
-			ThreatDetection: &ThreatDetectionConfig{},
-		},
-	}
-
-	step := strings.Join(compiler.buildInstallThreatDetectStep(data), "")
-	for _, expected := range []string{
-		"id: threat_detect_install",
-		string(constants.DefaultThreatDetectVersion),
-		constants.DefaultThreatDetectArtifactBaseURL,
-		"--sha256-amd64 " + constants.DefaultThreatDetectSHA256["threat-detect-linux-amd64"],
-		"--sha256-arm64 " + constants.DefaultThreatDetectSHA256["threat-detect-linux-arm64"],
-	} {
-		if !strings.Contains(step, expected) {
-			t.Errorf("install step does not contain %q:\n%s", expected, step)
-		}
-	}
-}
-
-func TestBuildInstallThreatDetectStepUsesArtifactMirror(t *testing.T) {
-	compiler := NewCompiler()
-	data := &WorkflowData{
-		SafeOutputs: &SafeOutputsConfig{
-			ThreatDetection: &ThreatDetectionConfig{
-				ArtifactBaseURL: "https://artifacts.example.com/threat-detect/releases/download",
-			},
-		},
-	}
-
-	step := strings.Join(compiler.buildInstallThreatDetectStep(data), "")
-	if !strings.Contains(step, "--artifact-base-url https://artifacts.example.com/threat-detect/releases/download") {
-		t.Errorf("install step does not contain configured artifact mirror:\n%s", step)
-	}
-	for _, asset := range []string{"threat-detect-linux-amd64", "threat-detect-linux-arm64"} {
-		if !strings.Contains(step, constants.DefaultThreatDetectSHA256[asset]) {
-			t.Errorf("mirror install step does not retain compiler pin for %s:\n%s", asset, step)
-		}
-	}
-}
-
-func TestSetupThreatDetectionPromptSummarySuppressedOnExternalPath(t *testing.T) {
-	// The setup step renders a prompt that the external detector never uses (threat-detect
-	// renders and publishes its own prompt), so its step summary write must be suppressed to
-	// avoid two different prompt blocks in a single detection run.
-	compiler := NewCompiler()
-
-	newData := func(features map[string]any) *WorkflowData {
-		return &WorkflowData{
-			AI:   "copilot",
-			Name: "Test Workflow",
-			SafeOutputs: &SafeOutputsConfig{
-				ThreatDetection: &ThreatDetectionConfig{},
-			},
-			Features: features,
-			SandboxConfig: &SandboxConfig{
-				Agent: &AgentSandboxConfig{
-					Type: SandboxTypeAWF,
-				},
-			},
-		}
-	}
-
-	t.Run("external detector path sets the suppression flag", func(t *testing.T) {
-		data := newData(map[string]any{string(constants.GHAWDetectionFeatureFlag): true})
-		joined := strings.Join(compiler.buildThreatDetectionAnalysisStep(data), "")
-		if !strings.Contains(joined, `GH_AW_DETECTION_SKIP_PROMPT_SUMMARY: "true"`) {
-			t.Errorf("expected GH_AW_DETECTION_SKIP_PROMPT_SUMMARY on the external detector path\ngot:\n%s", joined)
-		}
-	})
-
-	t.Run("inline path does not set the suppression flag", func(t *testing.T) {
-		data := newData(map[string]any{string(constants.GHAWDetectionFeatureFlag): false})
-		joined := strings.Join(compiler.buildThreatDetectionAnalysisStep(data), "")
-		if strings.Contains(joined, "GH_AW_DETECTION_SKIP_PROMPT_SUMMARY") {
-			t.Errorf("did not expect GH_AW_DETECTION_SKIP_PROMPT_SUMMARY on the inline path\ngot:\n%s", joined)
-		}
-	})
 }

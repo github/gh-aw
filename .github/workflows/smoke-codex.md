@@ -34,6 +34,7 @@ imports:
   - shared/trufflehog.md
   - shared/otlp.md
   - shared/token-telemetry-check.md
+  - shared/check-detection-verdict.md
   - shared/smoke-test-brevity.md
   - shared/playwright-title-test.md
 network:
@@ -99,8 +100,6 @@ timeout-minutes: 15
 checkout:
   - fetch-depth: 2
     current: true
-features:
-  gh-aw-detection: false
 sandbox:
   agent:
     id: awf

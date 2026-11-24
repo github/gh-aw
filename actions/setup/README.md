@@ -11,8 +11,12 @@ The action copies runtime `.cjs` JavaScript files (excluding tests) from the `js
 ### Sandboxed threat detector
 
 `detect_threats.cjs` is the sandbox-side producer for `conclude_threat_detection.cjs`.
-It is bundled but not yet selected by the workflow compiler. The host passes a
-trusted launch descriptor separately from the agent's staged artifacts:
+Compiled workflows run this bundled detector in the sandbox by default. The
+host passes a trusted launch descriptor separately from the agent's staged
+artifacts, then reads the staged verdict with `conclude_threat_detection.cjs`.
+Set `features.gh-aw-detection: false` to use the legacy inline engine instead.
+
+Example sandbox invocation:
 
 ```sh
 node detect_threats.cjs --launch-config launch.json \

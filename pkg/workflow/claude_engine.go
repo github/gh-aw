@@ -492,11 +492,9 @@ func (e *ClaudeEngine) buildClaudeCommandEnv(workflowData *WorkflowData) map[str
 		// Limit Claude CLI internal retries so terminal errors such as
 		// 403 ai_credits_limit_exceeded are surfaced quickly to the harness.
 		// The outer harness already owns the full retry/backoff loop for 429/529.
-		// The external threat-detection path (threat-detect --engine claude) has no
-		// harness retry wrapper, so we leave CLI retries at their default there.
+		// Detection retains the CLI's default retry behavior.
 		env["CLAUDE_CODE_MAX_RETRIES"] = "0"
 	} else if settings := claudeDetectionSettings(workflowData); settings != "" {
-		// The external threat-detect binary builds its own Claude Code arguments, so
 		// claude_harness.cjs adds --settings from this variable when none is present.
 		env[claudeSettingsEnvVar] = settings
 	}

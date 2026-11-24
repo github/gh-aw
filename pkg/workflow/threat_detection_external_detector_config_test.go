@@ -202,7 +202,7 @@ func TestThreatDetectionDoesNotInheritProviderSettingsAcrossEngineIDs(t *testing
 				}
 			}
 			if name == "external" {
-				if !strings.Contains(steps, "--engine codex") {
+				if !strings.Contains(steps, "stage_threat_detection_runtime.cjs\" codex") {
 					t.Error("external detector must use the provider-matched Codex engine")
 				}
 			}

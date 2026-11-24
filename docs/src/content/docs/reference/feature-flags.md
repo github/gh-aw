@@ -102,9 +102,9 @@ features:
   awf-diagnostic-logs: true
 ```
 
-## External Threat Detection (`features.gh-aw-detection`)
+## Bundled Threat Detection (`features.gh-aw-detection`)
 
-Threat detection uses the stable external `threat-detect` binary by default.
+Threat detection uses the JavaScript detector bundled with the setup action by default.
 Enabling `gh-aw-detection` does not emit an experimental-feature warning. Set
 `features.gh-aw-detection: false` to use the legacy inline engine path.
 

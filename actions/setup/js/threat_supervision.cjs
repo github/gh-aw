@@ -34,6 +34,7 @@ except OSError as exc:
     sys.exit(1)
 try:
     pidfd = os.pidfd_open(engine.pid)
+    os.write(3, b"started")
     select.select([3, pidfd], [], [])
     code = engine.poll()
 finally:
@@ -137,7 +138,11 @@ function supervise({ launch, args, env, prompt, sink, timeoutMs, signal }) {
       const lines = stdout();
       const cancelled = reason === "cancelled";
       const timedOut = reason === "timeout" || (!cancelled && launch.convention === "claude" && maxTurns(lines));
-      if (spawnError) error ??= Object.assign(new Error(`engine launch failed: ${spawnError}`), { code: spawnError });
+      // Only the trusted subreaper owns fd 3. AWF needs the startup marker
+      // on nonzero exits too (a finding exits 1); never relay engine output.
+      if (spawnError === "started") {
+        if (["copilot", "claude", "codex"].includes(launch.convention)) process.stderr.write(`[${launch.convention}-harness] Detection harness started\n`);
+      } else if (spawnError) error ??= Object.assign(new Error(`engine launch failed: ${spawnError}`), { code: spawnError });
       if (timedOut || cancelled) error ??= new Error(timedOut ? "engine timed out" : "engine cancelled");
       if (!reason && exitCode !== 0 && !resultReady(sink)) error ??= new Error(`engine exited with ${exitSignal || `code ${exitCode}`}`);
       resolve({ timedOut, cancelled, exitCode, error });

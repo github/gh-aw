@@ -603,7 +603,6 @@ test-scripts: build test-workflow-tool-contracts test-agent-local-settings test-
 	bash scripts/design-decision-gate-prefetch_test.sh
 	bash scripts/check-workflow-drift_test.sh ./$(BINARY_NAME)
 	bash scripts/check-cgo-cjs-workflow-purity_test.sh
-	bash scripts/update-threat-detect-pins_test.sh
 	bash scripts/update-release-pins_test.sh
 	bash scripts/update-copilot-version_test.sh
 	bash scripts/check-go-toolchain_test.sh
@@ -622,7 +621,6 @@ test-scripts: build test-workflow-tool-contracts test-agent-local-settings test-
 	bash actions/setup/sh/download_docker_images_local_test.sh
 	bash actions/setup/sh/install_awf_binary_test.sh
 	bash actions/setup/sh/install_gh_cli_test.sh
-	bash actions/setup/sh/install_threat_detect_binary_test.sh
 	bash actions/setup/sh/release_integrity_test.sh
 	bash .github/scripts/install_tla_runtime_test.sh
 	bash actions/setup/sh/runtime_trust_inventory_test.sh
@@ -1478,23 +1476,6 @@ update: build
 	$(MAKE) sync-install-script-hashes
 	$(MAKE) build
 
-# Update the reviewed threat-detect release pins and generated workflows
-.PHONY: update-threat-detect-pins
-update-threat-detect-pins:
-	@if [ -z "$(THREAT_DETECT_VERSION)" ]; then \
-		echo "Usage: make update-threat-detect-pins THREAT_DETECT_VERSION=v0.5.2"; \
-		exit 1; \
-	fi
-	@if ! printf '%s\n' "$(THREAT_DETECT_VERSION)" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$$'; then \
-		echo "Error: THREAT_DETECT_VERSION must be a semantic release tag such as v0.5.2"; \
-		echo "Usage: make update-threat-detect-pins THREAT_DETECT_VERSION=v0.5.2"; \
-		exit 1; \
-	fi
-	bash scripts/update-threat-detect-pins.sh "$(THREAT_DETECT_VERSION)"
-	$(MAKE) fmt
-	$(MAKE) recompile
-	@echo "✓ Threat-detect pins updated; review pkg/constants/version_constants.go, pkg/constants/version_constants_test.go, and generated workflow locks together."
-
 # Run development server
 .PHONY: dev
 dev: build
@@ -1660,7 +1641,6 @@ help:
 	@echo "  check-stale-compat - Guard: detect when compat.json max-agent is out of sync with DefaultCopilotVersion"
 	@echo "  sync-install-script-hashes - Update install-gh-aw.sh SHA and SHA256 constants in pkg/cli/copilot_setup.go (runs automatically during update)"
 	@echo "  update           - Update GitHub Actions and workflows, sync action pins, and rebuild binary"
-	@echo "  update-threat-detect-pins - Update reviewed threat-detect pins; set THREAT_DETECT_VERSION=vX.Y.Z"
 	@echo "  fix              - Apply automatic codemod-style fixes to workflow files (depends on build)"
 	@echo "  recompile        - Recompile all workflow files (runs init, depends on build)"
 	@echo "  merge-main       - Format, merge main, recompile workflows, and format again"
