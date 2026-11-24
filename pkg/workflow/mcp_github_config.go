@@ -64,7 +64,7 @@ package workflow
 import (
 	"fmt"
 	"maps"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -101,7 +101,7 @@ func dynamicEnclaveGitHubGuardRepos(workflowData *WorkflowData) []string {
 	for _, owner := range enclave.Dynamic.AllowedOwners {
 		add(owner + "/*") //nolint:manualpathconcat // GitHub owner/repo guard patterns are not filesystem paths.
 	}
-	sort.Strings(repos)
+	slices.Sort(repos)
 	return repos
 }
 
