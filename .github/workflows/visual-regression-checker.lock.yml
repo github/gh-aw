@@ -716,7 +716,7 @@ jobs:
         shell: bash
         run: bash "${RUNNER_TEMP}/gh-aw/actions/install_copilot_sdk.sh" node b9ed386dd39a36f13439d7d93a4af97c71e19530e5e5af124271b26b63f14022
       - name: Install Playwright CLI
-        run: npm install -g @playwright/cli@0.1.24
+        run: npm install -g @playwright/cli@0.1.25
         env:
           NPM_CONFIG_MIN_RELEASE_AGE: '3'
         timeout-minutes: 10
