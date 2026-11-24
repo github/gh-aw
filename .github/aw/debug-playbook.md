@@ -245,7 +245,14 @@ or bypass profiles/effect scope.
 | `ERR_WORK_QUEUE_CLAIM_SCOPE`, `claim_scope_invalid`, `claim_ineffective`, `work_queue_claim_handle_required`|Claim open, handle, dispatch bound to this run+attempt.|Use original `claim_handle`; no effects after Claim closes.|
 | `dispatch_missing`, `dispatch_state_conflict`, `run_binding_conflict`, `work_queue_assignment_unknown`|Dispatch state; bound workflow/run/attempt.|Rerun only the bound run; else `release`.|
 | `work_queue_effect_scope_denied` (E004)|Target repo vs profile `effect_scope`.|Target the worker's repository.|
-| `issue_binding_conflict`|One Work per Issue; immutable link.|Never adopt another Work's Issue.|
+| `issue_binding_conflict`, `issue_binding_invalid`|One Work per Issue; immutable link; closure event carries an Issue.|Never adopt another Work's Issue; ignore Pull Request events.|
+| `approval_required`|Issue-routed continuation's approval Observation state.|Wait for `ready` approval; never claim or fabricate it.|
+| `continuation_receipt_missing`, `continuation_authorization_scope_changed`|Accepted receipt; admitted digest vs planned successor.|Re-request the continuation; never alter an admitted successor.|
+| `continuation_route_failed`, `continuation_writes_prohibited`|Route error code; Work `effect_contract` write scope.|Fix the route cause; prohibited writes create no approval Issue.|
+| `continuation_dispatch_rejected`, `continuation_dispatch_outcome_unknown`, `continuation_inbound_invalid`|Dispatch HTTP status; inbound `gh_aw_continuation` shape/depth.|Fix workflow/permissions; unknown outcome is never retried blindly; reread state.|
+| `work_queue_worker_not_allowlisted`, `work_queue_worker_dispatch_unsupported`, `work_queue_profile_not_approved`|Pool worker profiles vs compiled `dispatch-workflow` allowlist; role.|Mark worker, allowlist it, recompile; only dispatchers publish `dispatch_next`.|
+| `work_queue_control_claim_not_authorized`, `external_admission_unverified`|Open Claim bound to this run; dependency resolver and read credentials.|Submit child Work only while Claim is open; fix reference or credentials.|
+| `work_queue_graph_limit`, `work_queue_intent_invalid`, `work_queue_dispatch_budget_exceeded`|Node count; staged intent shape; `max_dispatches` vs run budget.|Split graph; fix intent; lower `max_dispatches` or raise budget.|
 
 ## Unmapped codes
 

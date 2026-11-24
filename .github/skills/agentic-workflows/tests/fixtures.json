@@ -237,7 +237,6 @@
     { "id": "protected_file", "code": "POLICY_FILE_PROTECTION_DENIED", "section": "Completion and safe-output errors", "required": "Respect intentional skip" },
     { "id": "call_cap", "code": "invocation_cap_exceeded", "section": "Agent, model, and proxy classifications", "required": "exhausted run cannot recover" },
     { "id": "threat", "code": "threat_detected", "section": "Audit findings", "next_guide": "debug-security-review.md" },
-    { "id": "projection", "code": "projection_rate_pending", "section": "Work-queue codes", "required": "pending for terminal failure" },
     { "id": "warning_then_failure", "code": "model_availability_unknown", "section": "Audit findings", "required": "do not declare removal" }
   ],
   "misplaced_versions": {
