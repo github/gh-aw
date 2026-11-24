@@ -60,9 +60,9 @@ Workflows using the following **read** operations from GitHub require [Additiona
 - **Read from projects**
 - **GitHub tools remote mode**
 
-Workflows using the following features of [Safe Outputs](/gh-aw/reference/safe-outputs/) require additional authentication, via either a secret containing a PAT or GitHub App:
+Workflows using the following features of [Safe Outputs](/gh-aw/reference/safe-outputs/) require additional authentication. Use a PAT or GitHub App unless noted otherwise:
 - [**Safe outputs writing cross-repo**](/gh-aw/reference/safe-outputs/#cross-repository-operations)
-- [**Safe outputs assigning Copilot coding agent to issues/PRs**](/gh-aw/reference/copilot-cloud-agent/)
+- [**Safe outputs assigning Copilot coding agent to issues/PRs**](/gh-aw/reference/copilot-cloud-agent/) — **PAT required; GitHub App tokens are not supported.** Configure `github-token:` under `assign-to-agent` or at the `safe-outputs` level, or set the `GH_AW_AGENT_TOKEN` secret. Without an explicit token, resolution tries `GH_AW_AGENT_TOKEN || GH_AW_GITHUB_TOKEN || GITHUB_TOKEN`. See the [Copilot Cloud Agent authentication caution](/gh-aw/reference/copilot-cloud-agent/#using-a-github-app).
 - [**Safe outputs updating GitHub Projects**](/gh-aw/patterns/project-ops/#project-token-authentication)
 - [**Safe outputs triggering CI on PRs**](/gh-aw/reference/triggering-ci/)
 
@@ -575,7 +575,7 @@ Possible endpoint, account, model, or policy mismatch; this error alone does not
 
 For enhanced security with short-lived tokens, you may configure a GitHub App instead of using PATs.
 
-This does not apply to `COPILOT_GITHUB_TOKEN`, which must currently be a PAT. A single GitHub App can be used for all other GitHub authentication needs in GitHub Agentic Workflows, including tool authentication and safe outputs.
+This does not apply to `COPILOT_GITHUB_TOKEN`, which must currently be a PAT. A single GitHub App can be used for other GitHub authentication needs in GitHub Agentic Workflows, including tool authentication and safe outputs that support GitHub App tokens.
 
 After creating your app, configure it in your workflow:
 
