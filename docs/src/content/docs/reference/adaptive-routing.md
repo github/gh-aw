@@ -68,7 +68,7 @@ The agent never sees or writes the history. The branch is not checked out for th
 
 ## The added job and permission
 
-Opting in adds one job, `push_routing_history`. It runs after `conclusion` whenever the agent job ran, with `contents: write` to save the history and `actions: read` to list the workflow's runs. It has no concurrency group. When several runs finish together, each save is committed only on the branch head it read; if another run saved first, the save reads the newer files and applies its run again, so every run lands once. If the save still cannot land, the job fails and the run shows the failure. The agent job, its prompt and its permissions are unchanged.
+Opting in adds one job, `push_routing_history`. It runs after `conclusion` whenever the agent job ran, with `contents: write` to save the history and `actions: read` to list the workflow's runs. It has no concurrency group. When several runs finish together, each save is committed only on the branch head it read; if another run saved first, the save reads the newer files and applies its run again, so every run lands once. If the save still cannot land, the job fails and the run shows the failure. Dry-run compilations (`--dry-run`) omit `push_routing_history` completely so dry-run executions are neither recorded nor charged as `unsaved`. The agent job, its prompt and its permissions are unchanged.
 
 ## Branch rulesets
 
@@ -93,4 +93,4 @@ gh aw routing status issue-triage
 - Observe mode only records evidence; it never changes which model runs and makes no recommendation.
 - A history belongs to one workflow file in one repository; renaming the file starts a new history. Reusable workflows (`on: workflow_call`) cannot take part, because each caller numbers its own runs.
 - A run that ends before the agent job starts, or whose usage artifact was never published, is not recorded by its own save.
-- A save that fails is charged as `unsaved` by a later save that finds the run among the workflow's 100 newest runs on the default branch, or its 100 newest runs started by `pull_request_target`.
+- A failed or cancelled run whose agent ran and whose `push_routing_history` job did not succeed (whether it failed, was cancelled, timed out, or was skipped) is charged as `unsaved` by a later save that finds the run among the workflow's 100 newest runs on the default branch, or its 100 newest runs started by `pull_request_target`.

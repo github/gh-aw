@@ -348,10 +348,10 @@ async function listRuns({ githubClient, owner, repo, workflowFile, defaultBranch
       listed.agent_ran = jobs.some((/** @type {any} */ job) => job?.name === "agent" && job.conclusion !== "skipped" && Boolean(job.started_at));
       const writer = jobs.find((/** @type {any} */ job) => job?.name === WRITER_JOB);
       // A run that failed before any job was created (jobs.length === 0) is recorded as no_agent.
-      // When jobs exist, nothing is owed by a run compiled while adaptive routing was off (no
-      // history job), a dry run (job disabled though the agent ran), or a run whose job succeeded:
-      // it saved the run, or declined it, as for a pull request into another branch.
-      if (jobs.length > 0 && (!writer || writer.conclusion === "success" || (writer.conclusion === "skipped" && listed.agent_ran))) continue;
+      // When jobs exist, nothing is owed by a run compiled while adaptive routing was off or for a
+      // dry run (both omit the history job), or by a run whose history job succeeded: it saved the
+      // run, or declined it, as for a pull request into another branch.
+      if (jobs.length > 0 && (!writer || writer.conclusion === "success")) continue;
     }
     listing.push(listed);
   }

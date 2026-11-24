@@ -431,19 +431,41 @@ describe("push_routing_history saves", () => {
     expect(remoteRuns(remote).map(line => line.number)).toEqual([5]);
   });
 
-  it("does not charge failed runs compiled without the history job, or with it disabled for a dry run", async () => {
+  it("does not charge failed or cancelled runs compiled without the history job, such as dry runs", async () => {
     const remote = bareRemote();
     await save(remote, 50, "success");
-    const run = number => ({ id: 9000 + number, run_number: number, status: "completed", conclusion: "failure", head_branch: "main", event: "schedule", run_attempt: 1 });
+    const run = (number, conclusion = "failure") => ({ id: 9000 + number, run_number: number, status: "completed", conclusion, head_branch: "main", event: "schedule", run_attempt: 1 });
     const agent = { name: "agent", conclusion: "failure", started_at: "2026-11-24T09:00:00Z" };
     const github = fakeGitHub(remote, {
-      runs: [run(52), run(51)],
-      // Run 51 ran while the repository default was off; run 52 came from a dry-run compilation.
-      jobs: { 9051: [agent], 9052: [agent, { name: "push_routing_history", conclusion: "skipped", started_at: null }] },
+      runs: [run(52, "cancelled"), run(51, "failure")],
+      // Run 51 ran while adaptive routing was off; run 52 came from a dry-run compilation, which omits push_routing_history.
+      jobs: { 9051: [agent], 9052: [{ name: "agent", conclusion: "cancelled", started_at: "2026-11-24T09:00:00Z" }] },
     });
     await save(remote, 53, "success", { github });
     expect(remoteRuns(remote).map(line => line.number)).toEqual([50, 53]);
     expect(remoteState(remote).unexplained).toBe(0);
+  });
+
+  it("charges real cancelled runs whose agent started when push_routing_history ended cancelled or skipped", async () => {
+    const remote = bareRemote();
+    await save(remote, 50, "success");
+    const run = (number, conclusion = "cancelled") => ({ id: 9000 + number, run_number: number, status: "completed", conclusion, head_branch: "main", event: "schedule", run_attempt: 1 });
+    const agent = { name: "agent", conclusion: "cancelled", started_at: "2026-11-24T09:00:00Z" };
+    const github = fakeGitHub(remote, {
+      runs: [run(52), run(51)],
+      jobs: {
+        9051: [agent, { name: "push_routing_history", conclusion: "cancelled", started_at: "2026-11-24T09:10:00Z" }],
+        9052: [agent, { name: "push_routing_history", conclusion: "skipped", started_at: null }],
+      },
+    });
+    await save(remote, 53, "success", { github });
+    expect(remoteRuns(remote).map(({ number, note, counted }) => ({ number, note, counted }))).toEqual([
+      { number: 50, note: null, counted: true },
+      { number: 51, note: "unsaved", counted: false },
+      { number: 52, note: "unsaved", counted: false },
+      { number: 53, note: null, counted: true },
+    ]);
+    expect(remoteState(remote).unexplained).toBe(2);
   });
 
   it("records zero-job startup failures as no_agent without charging unexplained, while ignoring pre-opt-in runs", async () => {
