@@ -200,6 +200,7 @@ func extractSecretsFromStepValue(value any) []string {
 		for _, expr := range ExtractSecretsFromValue(v) {
 			refs = append(refs, expr)
 		}
+		refs = append(refs, ExtractDynamicSecretReferencesFromValue(v)...)
 	case map[string]any:
 		for _, fieldValue := range v {
 			refs = append(refs, extractSecretsFromStepValue(fieldValue)...)

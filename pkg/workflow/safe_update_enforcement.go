@@ -48,6 +48,7 @@ type PullRequestEventTransition struct {
 type SafeUpdateOptions struct {
 	Manifest                *GHAWManifest
 	SecretNames             []string
+	DynamicSecretReferences []string
 	ActionRefs              []string
 	CurrentRedirect         string
 	PullRequestTransition   PullRequestEventTransition
@@ -84,12 +85,13 @@ func EnforceSafeUpdate(options SafeUpdateOptions) error {
 	}
 
 	secretViolations := collectSecretViolations(options.Manifest, options.SecretNames)
+	dynamicSecretViolations := collectDynamicSecretViolations(options.Manifest, options.DynamicSecretReferences)
 	addedActions, removedActions := collectActionViolations(options.Manifest, options.ActionRefs)
 	addedRedirect, removedRedirect := collectRedirectViolations(options.Manifest, options.CurrentRedirect)
 	memoryValidationScriptChanges := collectMemoryValidationScriptChanges(options.Manifest, options.MemoryValidationScripts)
 	pullRequestTargetEscalation := hasPullRequestTargetEscalation(options.PullRequestTransition.OldHasPullRequest, options.PullRequestTransition.OldHasPullRequestTarget, options.PullRequestTransition.CurrentHasPullRequest, options.PullRequestTransition.CurrentHasPullRequestTarget)
 
-	if len(secretViolations) == 0 && len(addedActions) == 0 && len(removedActions) == 0 && addedRedirect == "" && removedRedirect == "" && len(memoryValidationScriptChanges) == 0 && !pullRequestTargetEscalation {
+	if len(secretViolations) == 0 && len(dynamicSecretViolations) == 0 && len(addedActions) == 0 && len(removedActions) == 0 && addedRedirect == "" && removedRedirect == "" && len(memoryValidationScriptChanges) == 0 && !pullRequestTargetEscalation {
 		safeUpdateLog.Printf("Safe update check passed (%d secret(s), %d action(s) verified)",
 			len(options.SecretNames), len(options.ActionRefs))
 		return nil
@@ -121,7 +123,7 @@ func EnforceSafeUpdate(options SafeUpdateOptions) error {
 		safeUpdateLog.Print("Safe update violation: pull_request event converted to pull_request_target")
 	}
 
-	return buildSafeUpdateError(secretViolations, addedActions, removedActions, addedRedirect, removedRedirect, pullRequestTargetEscalation, memoryValidationScriptChanges)
+	return buildSafeUpdateError(secretViolations, addedActions, removedActions, addedRedirect, removedRedirect, pullRequestTargetEscalation, memoryValidationScriptChanges, dynamicSecretViolations)
 }
 
 func hasPullRequestTargetEscalation(oldHasPullRequest bool, oldHasPullRequestTarget bool, currentHasPullRequest bool, currentHasPullRequestTarget bool) bool {
@@ -190,6 +192,20 @@ func collectSecretViolations(manifest *GHAWManifest, secretNames []string) []str
 		violations = append(violations, full)
 	}
 	sort.Strings(violations)
+	return violations
+}
+
+func collectDynamicSecretViolations(manifest *GHAWManifest, references []string) []string {
+	known := make(map[string]struct{}, len(manifest.DynamicSecretReferences))
+	for _, reference := range manifest.DynamicSecretReferences {
+		known[reference] = struct{}{}
+	}
+	var violations []string
+	for _, reference := range normalizeDynamicSecretReferences(references) {
+		if !setutil.Contains(known, reference) {
+			violations = append(violations, reference)
+		}
+	}
 	return violations
 }
 
@@ -328,13 +344,21 @@ func collectMemoryValidationScriptChanges(manifest *GHAWManifest, current []GHAW
 
 // buildSafeUpdateError creates a clear, structured error message that names the
 // offending secrets, actions, and redirects and tells the user how to remediate.
-func buildSafeUpdateError(secretViolations, addedActions, removedActions []string, addedRedirect, removedRedirect string, hasPullRequestTargetEscalation bool, memoryValidationScriptChanges []string) error {
+func buildSafeUpdateError(secretViolations, addedActions, removedActions []string, addedRedirect, removedRedirect string, hasPullRequestTargetEscalation bool, memoryValidationScriptChanges []string, dynamicSecretViolations ...[]string) error {
 	var sb strings.Builder
 	sb.WriteString("safe update mode detected unapproved changes\n")
+	var computedSecretViolations []string
+	if len(dynamicSecretViolations) > 0 {
+		computedSecretViolations = dynamicSecretViolations[0]
+	}
 
 	if len(secretViolations) > 0 {
 		sb.WriteString("\nNew restricted secret(s):\n  - ")
 		sb.WriteString(strings.Join(secretViolations, "\n  - "))
+	}
+	if len(computedSecretViolations) > 0 {
+		sb.WriteString("\nNew computed secret selector(s) (SHA-256):\n  - ")
+		sb.WriteString(strings.Join(computedSecretViolations, "\n  - "))
 	}
 	if len(addedActions) > 0 {
 		sb.WriteString("\nNew unapproved action(s):\n  - ")

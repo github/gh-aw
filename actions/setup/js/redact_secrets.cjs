@@ -748,6 +748,11 @@ async function main({ prepareForCustomMasking = false, additionalDirectories = [
         secretValues.push(secretValue.trim());
       }
     }
+    for (const [name, value] of Object.entries(process.env)) {
+      if (name.startsWith("GH_AW_DYNAMIC_SECRET_VALUE_") && value && value.trim() !== "") {
+        secretValues.push(value.trim());
+      }
+    }
 
     // Extract MCP gateway bearer tokens from known config files and add them to
     // the redaction list.  The gateway token has no fixed prefix so it cannot be

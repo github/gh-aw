@@ -3,6 +3,7 @@ package workflow
 import (
 	"fmt"
 	"maps"
+	"slices"
 	"strings"
 	"unicode/utf8"
 
@@ -71,12 +72,26 @@ func CollectSecretReferences(yamlContent string) []string {
 		rest = rest[end:]
 	}
 
+	for name := range ExtractSecretsFromValue(yamlContent) {
+		if name == strings.ToUpper(name) {
+			secretsMap[name] = struct{}{}
+		}
+	}
+
 	// Convert map to sorted slice for consistent ordering
 	secrets := sliceutil.SortedKeys(secretsMap)
 
 	secretMaskingLog.Printf("Found %d unique secret reference(s) in workflow", len(secrets))
 
 	return secrets
+}
+
+func CollectDynamicSecretReferences(yamlContent string) []string {
+	references := make(map[string]struct{})
+	for _, reference := range ExtractDynamicSecretReferencesFromValue(yamlContent) {
+		references[reference] = struct{}{}
+	}
+	return sliceutil.SortedKeys(references)
 }
 
 // CollectActionReferences extracts all external GitHub Action references from the workflow YAML.
@@ -139,6 +154,12 @@ func actionReferenceFromLine(line string) (string, bool) {
 func (c *Compiler) generateSecretRedactionStep(yaml *strings.Builder, yamlContent string, data *WorkflowData, stagedDurableFiles bool) {
 	// Extract secret references from the generated YAML
 	secretReferences := CollectSecretReferences(yamlContent)
+	secretReferences = append(secretReferences, workflowCallSecretNames(data.On)...)
+	secretReferences = sliceutil.Deduplicate(secretReferences)
+	dynamicSecretReferences := CollectDynamicSecretReferences(yamlContent)
+	dynamicSecretReferences = append(dynamicSecretReferences, data.dynamicSecretReferences...)
+	slices.Sort(dynamicSecretReferences)
+	dynamicSecretReferences = slices.Compact(dynamicSecretReferences)
 
 	// Always record that we're adding a secret redaction step, even if no secrets found
 	// This is important for validation to ensure the step ordering is correct
@@ -153,14 +174,16 @@ func (c *Compiler) generateSecretRedactionStep(yaml *strings.Builder, yamlConten
 	durableCopilot := stagedDurableFiles && data.durableExecutionPlan != nil && data.EngineConfig != nil && data.EngineConfig.ID == "copilot"
 	writeSecretRedactionScript(yaml, data, durableCopilot)
 
-	if durableCopilot || len(secretReferences) > 0 {
+	if durableCopilot || len(secretReferences) > 0 || len(dynamicSecretReferences) > 0 {
 		yaml.WriteString("        env:\n")
 	}
 	if durableCopilot {
 		generateCopilotCheckpointRedactionEnv(yaml, data)
 	}
 	if len(secretReferences) > 0 {
-		writeSecretRedactionEnvironment(yaml, secretReferences)
+		writeSecretRedactionEnvironment(yaml, secretReferences, dynamicSecretReferences)
+	} else if len(dynamicSecretReferences) > 0 {
+		writeSecretRedactionEnvironment(yaml, nil, dynamicSecretReferences)
 	}
 
 	// Inject custom secret masking steps if configured
@@ -195,16 +218,21 @@ func writeSecretRedactionScript(yaml *strings.Builder, data *WorkflowData, durab
 	yaml.WriteString("            await main();\n")
 }
 
-func writeSecretRedactionEnvironment(yaml *strings.Builder, secretReferences []string) {
+func writeSecretRedactionEnvironment(yaml *strings.Builder, secretReferences, dynamicSecretReferences []string) {
 	escapedRefs := make([]string, 0, len(secretReferences))
 	for _, ref := range secretReferences {
 		escapedRefs = append(escapedRefs, escapeSingleQuoteBackslash(ref))
 	}
-	yaml.WriteString("          GH_AW_SECRET_NAMES: '" + strings.Join(escapedRefs, ",") + "'\n")
+	if len(escapedRefs) > 0 {
+		yaml.WriteString("          GH_AW_SECRET_NAMES: '" + strings.Join(escapedRefs, ",") + "'\n")
+	}
 
 	for _, secretName := range secretReferences {
 		escapedSecretName := escapeSingleQuoteBackslash(secretName)
 		yaml.WriteString("          SECRET_" + escapedSecretName + ": ${{ secrets." + secretName + " }}\n")
+	}
+	for index, reference := range dynamicSecretReferences {
+		fmt.Fprintf(yaml, "          GH_AW_DYNAMIC_SECRET_VALUE_%d: %q\n", index, reference) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
 	}
 }
 

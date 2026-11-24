@@ -482,6 +482,23 @@ func TestCompilerLintPreservesThreatSuppressions(t *testing.T) {
 			require.ErrorContains(t, err, "[template-injection]")
 		}
 	}
+
+}
+
+func TestCompilerLintCTR017SuppressionDoesNotHideOverprovisionedSecrets(t *testing.T) {
+	t.Parallel()
+	expires := time.Now().UTC().AddDate(0, 0, 1).Format("2006-01-02")
+	document, err := aw.Parse("---\nstrict: true\non: workflow_dispatch\n---\nReview.\n")
+	require.NoError(t, err)
+	data := &WorkflowData{SourceDocument: document, RawFrontmatter: document.Frontmatter, ParsedFrontmatter: &FrontmatterConfig{
+		ThreatDetectionSuppressions: []ThreatDetectionSuppression{{
+			Rule: "CTR-017", Reason: "Reviewed secret leak", Expires: expires,
+		}},
+	}}
+	content := "jobs:\n  call:\n    uses: octo/shared/.github/workflows/deploy.yml@0123456789abcdef0123456789abcdef01234567\n    secrets: inherit\n"
+
+	err = NewCompiler(WithLint(true)).lintCompiledWorkflow(data, content, "test.md")
+	require.ErrorContains(t, err, "[overprovisioned-secrets]")
 }
 
 func TestCompilerLintWarningsRemainAdvisory(t *testing.T) {
