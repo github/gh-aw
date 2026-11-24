@@ -658,10 +658,10 @@ async function listRuns({ githubClient, owner, repo, workflowFile, workflowPath 
       listed.agent_ran = jobs.some((/** @type {any} */ job) => job?.name === "agent" && job.conclusion !== "skipped" && Boolean(job.started_at));
       const writer = jobs.find((/** @type {any} */ job) => job?.name === WRITER_JOB);
       // A run that failed before any job was created (jobs.length === 0) is recorded as no_agent.
-      // When jobs exist, nothing is owed by a run compiled while adaptive routing was off (no
-      // history job), a dry run (job disabled though the agent ran), or a run whose job succeeded:
-      // it saved the run, or declined it, as for a pull request into another branch.
-      if (jobs.length > 0 && (!writer || writer.conclusion === "success" || (writer.conclusion === "skipped" && listed.agent_ran))) include = false;
+      // When jobs exist, nothing is owed by a run compiled while adaptive routing was off or for a
+      // dry run (both omit the history job), or by a run whose history job succeeded: it saved the
+      // run, or declined it, as for a pull request into another branch.
+      if (jobs.length > 0 && (!writer || writer.conclusion === "success")) include = false;
       // Only trust head_sha for non-pull_request_target runs on the default branch; pull_request_target's
       // REST head_sha is the PR head rather than the base commit that supplied the workflow definition.
       if (include && listed.agent_ran && num <= effectiveSinceRun && run.event !== "pull_request_target" && run.head_branch === defaultBranch && typeof run.head_sha === "string" && run.head_sha) {

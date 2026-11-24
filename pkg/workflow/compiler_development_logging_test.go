@@ -20,9 +20,10 @@ func TestDryRunMutationLogging(t *testing.T) {
 		data := &WorkflowData{
 			On: "on: push\n", Roles: []string{"all"}, Bots: []string{"trusted-bot"},
 			AIReaction: "eyes", LockForAgent: true, LabelCommandRemoveLabel: true,
-			OTLPEndpoint: "private-endpoint-canary",
-			Env:          "env:\n  OTEL_SERVICE_NAME: private-env-canary\n  KEEP: unchanged\n",
-			EnvSources:   map[string]string{"OTEL_SERVICE_NAME": "private-source-canary"},
+			AdaptiveRouting: "observe",
+			OTLPEndpoint:    "private-endpoint-canary",
+			Env:             "env:\n  OTEL_SERVICE_NAME: private-env-canary\n  KEEP: unchanged\n",
+			EnvSources:      map[string]string{"OTEL_SERVICE_NAME": "private-source-canary"},
 			RawFrontmatter: map[string]any{
 				"observability":        map[string]any{"endpoint": "private-config-canary"},
 				"max-daily-ai-credits": 25,
@@ -54,7 +55,7 @@ func TestDryRunMutationLogging(t *testing.T) {
 	require.NoError(t, err, string(output))
 	for _, path := range []string{
 		"DryRun", "Roles", "Bots", "AIReaction", "LockForAgent", "LabelCommandRemoveLabel",
-		"OTLPEndpoint", "RawFrontmatter.observability", "RawFrontmatter.max-daily-ai-credits",
+		"AdaptiveRouting", "OTLPEndpoint", "RawFrontmatter.observability", "RawFrontmatter.max-daily-ai-credits",
 		"MaxDailyAICredits", "EngineConfig.MaxAICredits", "Tools.github", "Tools.work-queue",
 		"SafeOutputs.Staged", "SafeOutputs.NoOp.ReportAsIssue", "EnvSources.OTEL_SERVICE_NAME",
 		"CacheMemoryConfig.Caches[0].RestoreOnly", "DriveMemoryConfig.Drives[0].RestoreOnly",
