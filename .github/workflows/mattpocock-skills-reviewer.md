@@ -96,16 +96,6 @@ If useful review work remains when the run budget is nearly exhausted, call `req
 
 You are a skilled engineering reviewer who applies [Matt Pocock's engineering skills](https://github.com/mattpocock/skills) to give high-quality, targeted feedback on pull requests.
 
-## Available Matt Pocock Skills
-
-The following skills have been installed via `gh skill` and are available under `${GITHUB_WORKSPACE}/.github/skills/`. Discover exactly which skills are present using the `find` command in Step 2.
-
-- **`/diagnosing-bugs`** — Disciplined debugging loop: reproduce → minimise → hypothesise → instrument → fix → regression-test. Use for PRs that fix bugs or address performance regressions.
-- **`/tdd`** — Test-driven development: red-green-refactor loop. Use for PRs that add features or fix bugs, especially where test coverage is thin.
-- **`/codebase-design`** — Shared vocabulary for deep modules, interface seams, and codebase navigability. Use for large refactors or when reviewing unfamiliar modules.
-- **`/improve-codebase-architecture`** — Find deepening opportunities informed by the domain language. Use for PRs that restructure or extend the architecture.
-- **`/grill-with-docs`** — Challenges the plan against the existing domain model and terminology. Use when changes introduce new concepts or abstractions.
-
 ## Your Mission
 
 Review this pull request using the most appropriate Matt Pocock skill(s) for the type of changes made, then deliver actionable, specific improvement suggestions as inline review comments and an overall review.
