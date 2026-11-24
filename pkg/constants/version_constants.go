@@ -32,7 +32,7 @@ func (v Version) IsValid() bool {
 type ModelName string
 
 // DefaultClaudeCodeVersion is the default version of the Claude Code CLI.
-const DefaultClaudeCodeVersion Version = "2.1.325"
+const DefaultClaudeCodeVersion Version = "2.1.331"
 
 // DefaultCopilotVersion is the default version of the GitHub Copilot CLI.
 //
@@ -66,7 +66,7 @@ const DefaultCopilotSDKNPMCLIVersion Version = "1.0.113"
 const DefaultCopilotSDKNPMCLIChecksumsSHA256 = "854036b59b745d4f4b44a169327ffc0eab007f39e74b3dc3670f4d609a6c1072"
 
 // DefaultCodexVersion is the default version of the OpenAI Codex CLI
-const DefaultCodexVersion Version = "0.169.0"
+const DefaultCodexVersion Version = "0.171.0"
 
 // DefaultGeminiVersion is the default version of the Google Gemini CLI
 const DefaultGeminiVersion Version = "0.64.0"
@@ -76,7 +76,7 @@ const DefaultAgyVersion Version = "1.3.6"
 const AgyDefaultModel = "gemini-3.8-flash-medium"
 
 // DefaultPiVersion is the default version of the Pi CLI
-const DefaultPiVersion Version = "1.5.2"
+const DefaultPiVersion Version = "1.6.0"
 
 // DefaultGitHubMCPServerVersion is the default version of the GitHub MCP server Docker image
 const DefaultGitHubMCPServerVersion Version = "v2.2.0"
@@ -341,7 +341,7 @@ const MCPGDynamicRepositoryDelegationMinVersion Version = "v0.4.19"
 // Used when tools.playwright is enabled.
 // Keep this version outside the default 3-day npm release-age cooldown window enforced by
 // generated Playwright CLI install steps. See TestDefaultPlaywrightCLIVersionOutsideCooldownWindow.
-const DefaultPlaywrightCLIVersion Version = "0.1.24"
+const DefaultPlaywrightCLIVersion Version = "0.1.25"
 
 // DefaultMCPSDKVersion is the default version of the @modelcontextprotocol/sdk package
 const DefaultMCPSDKVersion Version = "1.30.0"
