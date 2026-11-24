@@ -249,6 +249,21 @@ const mockCore = {
         });
       }),
       describe("rendering accepted agent explanations", () => {
+        it("keeps agent content tainted under framework-authored section labels", () => {
+          const children = eval(`(() => {
+            ${notifyCommentScript}
+            const children = [];
+            appendAgentReports(children, [{ type: "noop", message: "No changes needed." }]);
+            return children;
+          })()`);
+
+          expect(children).toMatchObject([
+            { type: "heading", level: 2, agentTainted: false, children: [{ type: "text", value: "Agent messages", agentTainted: false }] },
+            { type: "paragraph", agentTainted: false, children: [{ type: "strong", agentTainted: false }] },
+            { type: "paragraph", agentTainted: true, children: [{ type: "text", value: "No changes needed.", agentTainted: true }] },
+          ]);
+        });
+
         async function renderAcceptedExplanations(items, noopCommentBody) {
           const fixtureDir = fs.mkdtempSync(path.join(process.cwd(), "gh-aw-explanation-rendering-"));
           try {
