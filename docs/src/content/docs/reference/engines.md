@@ -64,7 +64,7 @@ engine:
 | `id` | Built-in ID, or the ID of an [imported definition](/gh-aw/reference/third-party-agent/). |
 | `model` | Exact model ID, alias, or provider-prefixed selection; may also be top-level `model`. |
 | `version` | Override the compiler-pinned CLI version. |
-| `cooldown` | Minimum release age in nonnegative integer days; defaults to `3`. Explicit `0` is rejected in strict mode. |
+| `cooldown` | Minimum release age in nonnegative integer days; defaults to `3`. Explicit `0` disables cooldown, including in strict mode. |
 | <span id="engine-environment-variables">`env`</span> | Engine-only runtime values; use top-level `env` for all steps. [Scope and precedence](/gh-aw/reference/environment-variables/) apply. |
 | <span id="engine-command-line-arguments">`args`</span> | Ordered native CLI arguments placed before the prompt. Agy rejects it. |
 | <span id="custom-engine-command">`command`</span> | Replacement executable that skips the engine installer, not AWF installation. Provision it in setup steps; Agy checks the verified version, and Copilot checksum pins cannot be combined with it. |
@@ -131,7 +131,7 @@ Versions may use Actions expressions, passed through environment variables rathe
 
 ### Engine release-age cooldown
 
-Compiler-managed engine installs use a **3-day** minimum release age by default, except for Copilot's bundled default version described below. Configure a different age with `engine.cooldown`:
+Compiler-managed engine installs use a **3-day** minimum release age by default. Configure a different age with `engine.cooldown`:
 
 ```aw
 engine:
@@ -139,11 +139,15 @@ engine:
   cooldown: 7
 ```
 
-The value must be a nonnegative integer number of days; booleans, strings, durations, and expressions are rejected. `cooldown: 0` disables the check only with `strict: false`. Omitting the field keeps the default.
+The value must be a nonnegative integer number of days; booleans, strings, durations, and expressions are rejected. `cooldown: 0` disables metadata lookups, warnings, and release-age enforcement, including in strict mode. Omitting the field keeps the default.
+
+Literal versions, including compiler defaults, are checked during compilation: Copilot uses public GitHub release publication times; Claude, Codex, Pi, Gemini, and behavior-defined npm engines use public npm publication times. A release younger than the configured cooldown fails compilation. Metadata requests are unauthenticated, reject redirects, and have time and response-size limits. Publication times and lookup failures are cached for five minutes within the compiler process across workflows; each workflow's cooldown is evaluated against the cached timestamp, not a cached pass/fail decision.
+
+If metadata is unavailable or invalid, compilation continues with one warning per release per compiler instance asking for manual release-age validation before running. Offline authorization verification and in-memory editor compilation do not fetch or cache metadata and use the same warning behavior. Recompiling in a new compiler process retries failed lookups.
 
 Claude, Codex, Pi, Gemini, and behavior-defined npm installs pass the age to npm via `NPM_CONFIG_MIN_RELEASE_AGE`, including microVM staging. npm enforces it with its built-in `min-release-age` setting, so runtime overrides need npm **11.10.0 or later**.
 
-Copilot's installer skips the release-age check when the version being installed matches its baked-in `DEFAULT_COPILOT_VERSION`, with or without a leading `v`. This reviewed default is synchronized with the compiler default; the exemption applies to both cached and downloaded installs, even with a longer configured cooldown. With cooldown enabled, other installed versions require GitHub release publication metadata before cache activation or download; missing or invalid metadata fails the install. An uncached `latest` request also remains subject to the cooldown. The exemption does not change checksum verification or pin requirements.
+Copilot literal releases do not repeat the release-age lookup at runtime. This avoids using an enterprise-scoped runner token for public release-age metadata. **Tradeoff:** when the compile-time lookup cannot complete (network failure, or offline, editor, or wasm compilation), the compiler only warns and the literal release installs with no runtime cooldown check, so verify the release age manually. Dynamic versions (Actions expressions or release tags such as `latest`) retain the runtime cooldown before cache activation or download; missing or invalid metadata fails installation. The installer's reviewed default-version exemption still applies to dynamic resolutions. Checksum verification and pin requirements are unchanged.
 
 The policy does not cover shell installers, `engine.command` executables, pre-agent steps, or extensions. Runtime dependency cooldowns use `runtimes.<id>.cooldown` (a boolean). Imported definitions that set `behaviors.installation.cooldown` are ignored; set `engine.cooldown` in the workflow instead.
 
@@ -196,12 +200,12 @@ The built-in Copilot, Claude, and Codex harnesses accept:
 | `max-retries` | `3` | Retries after the initial attempt; `0` disables. |
 | `initial-delay-ms` | `5000` | First retry delay. |
 | `backoff-multiplier` | `2` | Exponential delay multiplier. |
-| `max-delay-ms` | `60000` | Delay cap. |
+| `max-delay-ms` | `60000` | Exponential backoff cap; does not cap provider `Retry-After` waits. |
 | `watchdog-timeout` | `120` | Post-result idle timeout; literal integers are seconds. |
 
 All accept integers or Actions expressions. A watchdog expression must already be in milliseconds. Explicit `engine.env.GH_AW_HARNESS_*` values override these fields; see [runtime tuning variables](/gh-aw/reference/environment-variables/#harness-settings-and-runtime-tuning-variables).
 
-For every inference provider, including BYOK endpoints such as Azure AI Gateway, the Copilot, Claude, and Codex harnesses wait at least the duration of a valid HTTP 429 `Retry-After` header (seconds or HTTP-date) before a permitted retry. Claude and Codex use headers from structured terminal errors on stdout; other output does not provide retry timing. If the wait exceeds `max-delay-ms` or the remaining step timeout budget (including the harness's shutdown buffer), they stop immediately with failure class `rate_limit_wait_exceeded` instead of retrying early. For example, a 245-second wait requires `max-delay-ms: 245000` and sufficient time remaining. Missing or invalid headers keep the existing retry policy, and terminal guards still apply. This does not enable model fallback on HTTP 429.
+For every inference provider, including BYOK endpoints such as Azure AI Gateway, the Copilot, Claude, and Codex harnesses wait at least the duration of a valid HTTP 429 `Retry-After` header (seconds or HTTP-date) before a permitted retry. Claude and Codex use headers from structured terminal errors on stdout; other output does not provide retry timing. Provider waits are not limited by `max-delay-ms`. If the wait reaches the remaining step timeout budget (including the harness's shutdown buffer) or exceeds the maximum timer delay (2147483647 milliseconds), they stop immediately with failure class `rate_limit_wait_exceeded` and the requested delay instead of retrying early. If the timeout is unset or invalid, waits exceeding 60 seconds are rejected as a fallback. For example, a 257-second wait is honored with the default backoff settings when sufficient time remains. Missing or invalid headers keep the existing retry policy, and terminal guards still apply. This does not enable model fallback on HTTP 429.
 
 Pi, Gemini, Agy, and behavior-defined engines use the same retry loop with a conservative failure policy. They retry only HTTP 429 or rate-limit errors and transient failures (HTTP 5xx, connection resets, or timeouts) found in the last 8 KB of a failed attempt's output, where terminal errors appear. They apply the same `Retry-After` bounds to a `Retry-After` header in that output tail when it accompanies an HTTP 429 or rate-limit error; a `Retry-After` header alone does not trigger a retry. They stop without retrying on authentication or guard failures, unrecognized failures, `noop`, or any failed attempt that recorded safe outputs. Retries are disabled when `GH_AW_SAFE_OUTPUTS` is unset, because safe-output side effects cannot be observed. Pi resumes a durable session when one exists; other engines start a fresh attempt. Agy rejects `engine.harness`, so it always uses the defaults.
 

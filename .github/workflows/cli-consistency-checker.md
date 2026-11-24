@@ -38,37 +38,33 @@ pre-agent-steps:
     run: |
       set -euo pipefail
       cd /home/runner/work/gh-aw/gh-aw
+
       make build
 
       output_dir="/tmp/gh-aw/agent/help-output"
       mkdir -p "${output_dir}"
-      # shellcheck disable=SC2016  # awk program uses $1 as an awk field variable, not a shell variable
-      extract_commands='
-        /^[[:space:]]+[[:alnum:]_-]+([[:space:]]|$)/ {
-          cmd=$1
-          gsub(/:$/, "", cmd)
-          if (cmd != "" && cmd != "Commands") print cmd
-        }
-      '
+      rm -f "${output_dir}"/*.txt
 
       ./gh-aw --help > "${output_dir}/main.txt" 2>&1
-      mapfile -t top_commands < <(awk "${extract_commands}" "${output_dir}/main.txt" | sort -u)
-      if [ ${#top_commands[@]} -eq 0 ]; then
-        echo "No top-level commands were parsed from ./gh-aw --help output" >&2
+      command_tree="/tmp/gh-aw/agent/command-tree.txt"
+      ./gh-aw __command-tree > "${command_tree}"
+      mapfile -t command_paths < "${command_tree}"
+      if [ ${#command_paths[@]} -eq 0 ]; then
+        echo "No commands were listed by the Cobra command tree" >&2
         exit 1
       fi
 
-      for cmd in "${top_commands[@]}"; do
-        if ! ./gh-aw "$cmd" --help > "${output_dir}/${cmd}.txt" 2>&1; then
-          echo "warning: failed to collect help for '${cmd}'" >&2
-          continue
+      for i in "${!command_paths[@]}"; do
+        command_path="${command_paths[i]}"
+        if [[ ! "${command_path}" =~ ^[A-Za-z0-9][A-Za-z0-9_-]*(\ [A-Za-z0-9][A-Za-z0-9_-]*)*$ ]]; then
+          echo "Invalid command path in Cobra command tree" >&2
+          exit 1
         fi
-        mapfile -t subcommands < <(awk "${extract_commands}" "${output_dir}/${cmd}.txt" | sort -u)
-        for sub in "${subcommands[@]}"; do
-          if ! ./gh-aw "$cmd" "$sub" --help > "${output_dir}/${cmd}-${sub}.txt" 2>&1; then
-            echo "warning: failed to collect help for '${cmd} ${sub}'" >&2
-          fi
-        done
+        read -r -a command_parts <<< "${command_path}"
+        help_file="${output_dir}/command-${i}.txt"
+        if ! ./gh-aw "${command_parts[@]}" --help > "${help_file}" 2>&1; then
+          echo "warning: failed to collect help for '${command_path}'" >&2
+        fi
       done
 
       shopt -s nullglob
@@ -113,7 +109,7 @@ Treat all CLI output as trusted data since it comes from the repository's own co
 
 ## Critical Requirement
 
-**Use real CLI output as source of truth**. All help output is pre-collected by `pre-agent-steps` in `/tmp/gh-aw/agent/all-help.txt`; treat this file as the authoritative source for CLI behavior.
+**Use real CLI output as source of truth**. All help output is pre-collected by `pre-agent-steps` in `/tmp/gh-aw/agent/all-help.txt`; command paths come from the Cobra command tree, not parsed help text.
 
 ## Step 1: Load Pre-Collected Help Output
 

@@ -20,6 +20,7 @@ const { loadTemporaryIdMapFromFile, replaceTemporaryIdReferencesInPatch } = requ
 // Matches .jsonl in any letter case, like the persistence filters do.
 const JSONL_MERGE_ATTRIBUTE = "*.[jJ][sS][oO][nN][lL] merge=union";
 const JSONL_PATH_PATTERN = /\.jsonl$/i;
+const ADAPTIVE_ROUTING_BRANCH_ROOT = "memory/adaptive-routing";
 
 function setOutput(name, value) {
   if (typeof core.setOutput === "function") core.setOutput(name, value);
@@ -386,6 +387,9 @@ function planRepoMemoryReplay({ files, baseCommit, workspaceDir }) {
  * @param {string} [opts.originUrlForPush]
  * @param {string} [opts.repoUrlForRetry]
  * @param {() => void} [opts.validateBeforePush]
+ * @param {(context: {remoteHead: string}) => (boolean | Promise<boolean>)} [opts.reapply] For gh-aw's own state writers, not agent memory:
+ *   when the branch head moved, check out the newest head and call this to rebuild and commit the change from the newest files,
+ *   instead of rebasing with this run's copy winning. It returns false when there is nothing left to commit.
  * @returns {Promise<string | undefined | false>} Remote commit, unchanged replay, or failure.
  */
 async function pushRepoMemoryChangesWithRetry({
@@ -404,6 +408,7 @@ async function pushRepoMemoryChangesWithRetry({
   originUrlForPush,
   repoUrlForRetry,
   validateBeforePush,
+  reapply,
 }) {
   const retryUrl = repoUrlForRetry || `https://${serverHost}/${targetRepo}.git`;
 
@@ -442,9 +447,9 @@ async function pushRepoMemoryChangesWithRetry({
         baseRef: currentBaseRef,
         cwd: workspaceDir,
         gitAuthEnv: getGitAuthEnv(ghToken),
-        allowGitPushFallback: !validateBeforePush,
+        allowGitPushFallback: !validateBeforePush && !reapply,
         // Commit only on the head this save was built on; a moved branch is
-        // rebased below with the JSONL union policy and retried.
+        // rebased below with the JSONL union policy, or re-applied, and retried.
         requireBaseRefMatch: true,
       });
       core.info(commit ? `Successfully pushed changes to ${branchName} branch` : `No changes left to push to ${branchName} branch`);
@@ -477,14 +482,25 @@ async function pushRepoMemoryChangesWithRetry({
             currentBaseRef = remoteHead;
             core.info(`Refreshed baseRef for retry: ${currentBaseRef}`);
             try {
-              reconcileRepoMemoryRetry({
-                workspaceDir,
-                branchName,
-                repoUrl: retryUrl,
-                previousBaseRef,
-                remoteHead,
-                gitAuthEnv: getGitAuthEnv(ghToken),
-              });
+              if (reapply) {
+                // A clean textual merge of a derived state file can still be wrong, so rebuild
+                // the change from the newest files whether or not the files conflict.
+                execGitSync(["fetch", retryUrl, `refs/heads/${branchName}`], { cwd: workspaceDir, env: { ...process.env, ...getGitAuthEnv(ghToken) }, stdio: "pipe", suppressLogs: true });
+                execGitSync(["reset", "--hard", remoteHead], { cwd: workspaceDir, stdio: "pipe" });
+                if (!(await reapply({ remoteHead }))) {
+                  core.info(`No changes left to push to ${branchName} branch`);
+                  return undefined;
+                }
+              } else {
+                reconcileRepoMemoryRetry({
+                  workspaceDir,
+                  branchName,
+                  repoUrl: retryUrl,
+                  previousBaseRef,
+                  remoteHead,
+                  gitAuthEnv: getGitAuthEnv(ghToken),
+                });
+              }
             } catch (reconcileError) {
               await setPushRepoMemoryFailure(`Failed to reconcile repo-memory changes onto refreshed head before retry: ${getErrorMessage(reconcileError)}`);
               return false;
@@ -739,6 +755,12 @@ async function main() {
   }
   if (isKnownWikiBranch && !isWikiRepo) {
     await setPushRepoMemoryFailure(`ERR_VALIDATION: Branch name "${branchName}" is only valid for wiki repositories (TARGET_REPO must end with ".wiki", got "${targetRepo}")`);
+    return;
+  }
+  // Adaptive routing histories are written only by push_routing_history and gh aw routing reset; the
+  // compiler rejects literal branch names there, and this catches expressions that resolve to one.
+  if (branchName === ADAPTIVE_ROUTING_BRANCH_ROOT || branchName.startsWith(`${ADAPTIVE_ROUTING_BRANCH_ROOT}/`)) {
+    await setPushRepoMemoryFailure(`ERR_VALIDATION: Branch "${branchName}" is reserved for adaptive routing histories; repo-memory cannot write it`);
     return;
   }
 

@@ -55,6 +55,32 @@ func ExtractSecretsFromValue(value string) map[string]string {
 	return secrets
 }
 
+func ExtractDynamicSecretReferencesFromValue(value string) []string {
+	spans, err := actionslanguageservice.ExtractExpressions(value)
+	if err != nil {
+		secretLog.Printf("Cannot scan complete expression value: %v", err)
+	}
+	references := make(map[string]struct{})
+	for _, span := range spans {
+		expression, err := actionslanguageservice.ParseSyntax(span.Content)
+		if err != nil || expression == nil {
+			continue
+		}
+		actionslanguageservice.Walk(expression, func(node *actionslanguageservice.Expression) bool {
+			if node.Kind != "index" || node.Child(1).Kind == "literal" || node.Child(1).Kind == "star" {
+				return true
+			}
+			path, ok := actionslanguageservice.Reference(node.Child(0))
+			if !ok || len(path) != 1 || !strings.EqualFold(path[0], "secrets") {
+				return true
+			}
+			references["${{ "+span.Content[node.Start:node.End]+" }}"] = struct{}{}
+			return true
+		})
+	}
+	return sliceutil.SortedKeys(references)
+}
+
 func ExtractSecretsFromMap(values map[string]string) map[string]string {
 	result := make(map[string]string)
 	for _, value := range values {

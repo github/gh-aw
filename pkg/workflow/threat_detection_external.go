@@ -865,15 +865,8 @@ func (c *Compiler) buildUploadDetectionArtifactStep(data *WorkflowData) []string
 	return steps
 }
 
-// buildExternalDetectorConcludeStep creates the conclude step for the external
-// threat-detect binary. It runs `threat-detect conclude --result-file ...` which reads
-// the structured detection_result.json and sets the detection_conclusion/detection_reason/
-// detection_success step outputs, preserving the same gate contract as the inline
-// parse_threat_detection_results.cjs path. Outputs (not env vars) are used exclusively;
-// downstream jobs consume these via needs.detection.outputs.* expressions.
-// The step ID (detection_conclusion) and env vars (RUN_DETECTION, DETECTION_AGENTIC_EXECUTION_OUTCOME,
-// GH_AW_DETECTION_CONTINUE_ON_ERROR) match the inline conclude step; THREAT_DETECT_INSTALL_OUTCOME is
-// additionally passed because only the external path installs a pinned binary.
+// buildExternalDetectorConcludeStep reads the external detector's recorded
+// verdict on the host. Downstream jobs consume its outputs via needs.detection.
 func (c *Compiler) buildExternalDetectorConcludeStep(data *WorkflowData) []string {
 	// Determine continue-on-error mode (same logic as buildDetectionConclusionStep).
 	continueOnError := true
@@ -889,12 +882,8 @@ func (c *Compiler) buildExternalDetectorConcludeStep(data *WorkflowData) []strin
 		"        if: " + detectionConclusionCondition + "\n",
 	}
 
-	if continueOnErrorExpr != nil {
-		steps = append(steps, fmt.Sprintf("        continue-on-error: %s\n", *continueOnErrorExpr))
-	} else if continueOnError {
-		steps = append(steps, "        continue-on-error: true\n")
-	}
-
+	// The reader applies warn mode itself; a step-level override would also
+	// swallow failures to record the conclusion.
 	var coeEnvLine string
 	if continueOnErrorExpr != nil {
 		coeEnvLine = fmt.Sprintf("          GH_AW_DETECTION_CONTINUE_ON_ERROR: %s\n", *continueOnErrorExpr)
@@ -906,16 +895,13 @@ func (c *Compiler) buildExternalDetectorConcludeStep(data *WorkflowData) []strin
 		"        env:\n",
 		"          RUN_DETECTION: ${{ steps.detection_guard.outputs.run_detection }}\n",
 		"          DETECTION_AGENTIC_EXECUTION_OUTCOME: ${{ steps.detection_agentic_execution.outcome }}\n",
-		// The conclude script must never invoke a detector that was not installed
-		// under compiler-pinned digest verification: on a failed install the binary on
-		// PATH is absent, unverified, or the install script's fail-closed placeholder.
-		// The placeholder cannot set conclusion outputs itself, so the script emits the
-		// agent_failure conclusion from this outcome instead.
+		// A failed verified install means no detector could run. The host reader
+		// reports this outcome rather than looking for a verdict.
 		"          THREAT_DETECT_INSTALL_OUTCOME: ${{ steps.threat_detect_install.outcome }}\n",
 	}...)
 	if c.hasExternalDetectorAWFInstallStep(data) {
 		// A failed AWF install (for example a GitHub API quota stop during attestation
-		// verification) is reported explicitly instead of as a missing-binary error.
+		// verification) is reported explicitly instead of as a missing verdict.
 		steps = append(steps, "          AWF_INSTALL_OUTCOME: ${{ steps."+detectionAWFInstallStepID+".outcome }}\n")
 	}
 	steps = append(steps, []string{

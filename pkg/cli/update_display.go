@@ -76,7 +76,8 @@ func compactUpdateFailureReason(message string) string {
 		return "GitHub API rate limit exceeded"
 	}
 
-	line := strings.TrimSpace(strings.SplitN(message, "\n", 2)[0])
+	firstLine, _, _ := strings.Cut(message, "\n")
+	line := strings.TrimSpace(firstLine)
 	if line == "" {
 		return "Unknown update error"
 	}

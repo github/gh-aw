@@ -2,7 +2,7 @@
 
 "use strict";
 
-const { iterateJsonl } = require("./jsonl_helpers.cjs");
+const { iterateJsonl, iterateJsonlEvents, iterateLines } = require("./jsonl_helpers.cjs");
 const { BUILT_IN_PATTERNS } = require("./redact_secrets.cjs");
 const { collectAddMaskedValues, redactMaskedValues } = require("./add_mask_redaction.cjs");
 
@@ -221,6 +221,159 @@ function parseAPIProxyGuardRejection(output) {
 //   - "not logged in" — Claude Code message when no credentials are available
 const AUTHENTICATION_FAILED_PATTERNS = [/Authentication failed(?:\s*\(Request ID:[^)]+\))?/i, /"error"\s*:\s*"authentication_failed"/i, /not logged in/i];
 
+const HTML_ERROR_BODY_PATTERN = /\bJust a moment\.{3}|\bcf-chl\b|\bchallenge-platform\b|<!doctype[ \t]+html\b|<html[\s>]/i;
+const API_ERROR_CONTEXT_PATTERN =
+  /\b(?:API error|failed to authenticate|authentication failed|authentication_failed|HTTP(?:\/\d(?:\.\d)?)?[ \t]+[45]\d\d|unexpected status[ \t]+[45]\d\d|[45]\d\d[ \t]+(?:Forbidden|Unauthorized|Bad Gateway|Service Unavailable))\b/i;
+
+const HTTP_RESPONSE_CONTEXT_PATTERN = /\b(?:API error|HTTP(?:\/\d(?:\.\d)?)?[ \t]+[45]\d\d|unexpected status[ \t]+[45]\d\d|[45]\d\d[ \t]+(?:Forbidden|Unauthorized|Bad Gateway|Service Unavailable))\b/i;
+const HTTP_HEADER_PATTERN = /^\s*[a-z][a-z0-9-]*:[ \t]*[^\r\n]*\s*$/i;
+const HTML_BODY_START_PATTERN = /^\s*(?:<!doctype\b|<html\b|Just a moment\.{3}|cf-chl\b|challenge-platform\b|\/cdn-cgi\/challenge-platform\b)/i;
+
+/**
+ * Select only native error payloads. Ordinary items and successful results cannot
+ * lend error attribution to quoted challenge text.
+ * @param {any} event
+ * @returns {any}
+ */
+function nativeResponseDiagnostic(event) {
+  if (!event || typeof event !== "object" || Array.isArray(event)) return undefined;
+  if (event.type === "assistant" && (event.is_api_error_message === true || event.error === "authentication_failed")) return selectNativeErrorDiagnostic(event);
+  if (event.type === "result" && event.is_error === true) return selectNativeErrorDiagnostic(event);
+  if (["error", "session.error", "turn.failed"].includes(event.type)) return selectNativeErrorDiagnostic(event.type === "session.error" ? (event.data ?? event) : event);
+  if (/^item\./.test(event.type ?? "") && event.item?.type === "error") return selectNativeErrorDiagnostic({ ...event.item, message: event.item.message ?? event.item.text });
+  if (event.event === "result" && event.result?.status === "ERROR") return selectNativeErrorDiagnostic(event.result);
+  if (!event.type && event.error != null) {
+    const hasNativeStructure = [event, event.error].some(
+      diagnostic =>
+        diagnostic &&
+        typeof diagnostic === "object" &&
+        !Array.isArray(diagnostic) &&
+        (typeof diagnostic.message === "string" ||
+          diagnostic.message?.role === "assistant" ||
+          typeof diagnostic.errorMessage === "string" ||
+          diagnostic.is_api_error_message === true ||
+          (diagnostic.is_error === true && (typeof diagnostic.result === "string" || (diagnostic.result && typeof diagnostic.result === "object") || Array.isArray(diagnostic.errors))))
+    );
+    if (hasNativeStructure) return selectNativeErrorDiagnostic(event);
+  }
+  return undefined;
+}
+
+/**
+ * Keep sibling diagnostics separate, while retaining an error identifier alongside
+ * its own message. Embedded JSON has already been decoded by the diagnostic selector.
+ * @param {any} value
+ * @param {string} [prefix]
+ * @returns {Generator<string>}
+ */
+function* responseDiagnosticTexts(value, prefix = "") {
+  if (typeof value === "string") {
+    yield prefix + value;
+    return;
+  }
+  if (Array.isArray(value)) {
+    for (const child of value) yield* responseDiagnosticTexts(child, prefix);
+    return;
+  }
+  if (!value || typeof value !== "object") return;
+  const errorIsCode = typeof value.error === "string" && /^[a-z][a-z0-9_]*$/i.test(value.error);
+  const codes = {};
+  for (const [key, child] of Object.entries(value)) {
+    if (!["message", "errorMessage", "result", "errors"].includes(key) && (key !== "error" || errorIsCode) && (typeof child === "string" || typeof child === "number" || typeof child === "boolean")) codes[key] = child;
+  }
+  const context = prefix + (Object.keys(codes).length ? JSON.stringify(codes) + " " : "");
+  let hasMessage = false;
+  for (const key of ["message", "errorMessage", "result", "errors", "error"]) {
+    if (value[key] === undefined || (key === "error" && errorIsCode)) continue;
+    hasMessage = true;
+    yield* responseDiagnosticTexts(value[key], context);
+  }
+  if (!hasMessage && context) yield context;
+}
+
+/**
+ * Return the end of one HTML response, never crossing a separate error or JSON
+ * record. Header association is bounded; the body can exceed the retry-signal tail.
+ * @param {string[]} lines
+ * @param {number} index
+ * @param {boolean} native
+ * @returns {number | null}
+ */
+function htmlResponseEnd(lines, index, native) {
+  const line = lines[index];
+  let body = index;
+  if (!(HTML_ERROR_BODY_PATTERN.test(line) && (native || API_ERROR_CONTEXT_PATTERN.test(line)))) {
+    if (!HTTP_RESPONSE_CONTEXT_PATTERN.test(line) && !(native && API_ERROR_CONTEXT_PATTERN.test(line))) return null;
+    let headerChars = 0;
+    for (body = index + 1; body < lines.length && body <= index + 16; body++) {
+      if (API_ERROR_CONTEXT_PATTERN.test(lines[body]) || lines[body].trimStart().startsWith("{")) return null;
+      if (HTML_BODY_START_PATTERN.test(lines[body])) break;
+      headerChars += lines[body].length;
+      if (headerChars > 8192) return null;
+      if (lines[body].trim() && !HTTP_HEADER_PATTERN.test(lines[body])) return null;
+    }
+    if (body >= lines.length || body > index + 16) return null;
+  }
+  // Only a completed HTML document owns arbitrary following body text.
+  if (!/<!doctype[ \t]+html\b|<html[\s>]/i.test(lines[body]) || /<\/html\s*>/i.test(lines[body])) return body;
+  let end = body;
+  let bodyChars = lines[body].length;
+  while (end + 1 < lines.length && bodyChars < 256 * 1024) {
+    const next = lines[end + 1];
+    if (API_ERROR_CONTEXT_PATTERN.test(next) || AUTHENTICATION_FAILED_PATTERNS.some(pattern => pattern.test(next)) || next.trimStart().startsWith("{")) break;
+    bodyChars += next.length;
+    end++;
+    if (/<\/html\s*>/i.test(next)) return end;
+  }
+  return body;
+}
+
+/**
+ * Decode JSONL once per input, then inspect independent diagnostics and bounded
+ * plain HTTP response blocks without restarting the JSONL parser per line.
+ * @param {string} output
+ * @returns {Generator<{ authentication: boolean, html: boolean, endOffset: number }>}
+ */
+function* responseErrors(output) {
+  const records = [...iterateJsonlEvents(output)];
+  const lines = records.map(record => record.rawLine);
+  let offset = 0;
+  for (let index = 0; index < records.length; index++) {
+    const record = records[index];
+    offset += record.rawLine.length;
+    const diagnostic = record.type === "json" ? nativeResponseDiagnostic(record.value) : undefined;
+    if (diagnostic !== undefined) {
+      for (const text of responseDiagnosticTexts(diagnostic)) {
+        const diagnosticLines = [...iterateLines(text)];
+        for (let lineIndex = 0; lineIndex < diagnosticLines.length; lineIndex++) {
+          const end = htmlResponseEnd(diagnosticLines, lineIndex, true);
+          yield { authentication: AUTHENTICATION_FAILED_PATTERNS.some(pattern => pattern.test(diagnosticLines[lineIndex])), html: end !== null, endOffset: offset };
+          if (end !== null) lineIndex = end;
+        }
+      }
+      continue;
+    }
+    // Parsed transcript records must use native diagnostic attribution, never raw text.
+    const isPlainText = record.type === "invalid" && !record.rawLine.trimStart().startsWith("{");
+    const end = isPlainText ? htmlResponseEnd(lines, index, false) : null;
+    yield {
+      authentication: isPlainText && AUTHENTICATION_FAILED_PATTERNS.some(pattern => pattern.test(record.rawLine)),
+      html: end !== null,
+      endOffset: end === null ? offset : offset + lines.slice(index + 1, end + 1).reduce((sum, line) => sum + line.length, 0),
+    };
+    if (end !== null) {
+      while (index < end) offset += records[++index].rawLine.length;
+    }
+  }
+}
+
+/** @param {string} output @param {{tailChars?: number}} [options] */
+function isHTMLResponseError(output, options = {}) {
+  const tailStart = options.tailChars === undefined ? 0 : Math.max(0, output.length - options.tailChars);
+  for (const error of responseErrors(output)) if (error.html && error.endOffset > tailStart) return true;
+  return false;
+}
+
 /**
  * @param {unknown} output
  * @returns {boolean}
@@ -236,8 +389,9 @@ function isMaxRunsExceededError(output) {
  * @returns {boolean}
  */
 function isAuthenticationFailedError(output) {
-  const safeOutput = typeof output === "string" ? output : "";
-  return AUTHENTICATION_FAILED_PATTERNS.some(pattern => pattern.test(safeOutput));
+  if (typeof output !== "string") return false;
+  for (const error of responseErrors(output)) if (error.authentication && !error.html) return true;
+  return false;
 }
 
 /**
@@ -341,6 +495,7 @@ module.exports = {
   AUTHENTICATION_FAILED_PATTERNS,
   isMaxRunsExceededError,
   isAuthenticationFailedError,
+  isHTMLResponseError,
   MODEL_ENDPOINT_MISMATCH_PATTERN,
   parseModelEndpointMismatch,
   parseAPIProxyGuardRejection,

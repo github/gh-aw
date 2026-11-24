@@ -26,6 +26,10 @@ The unreleased 1.0.81 merge-policy mapping also covers ambiguous check producers
 
 | Version | Change |
 |---|---|
+| 1.0.111 | Mapping-only: adds Section 7.18 for the `adaptive-routing: observe` history writer (#80583): reserved `memory/adaptive-routing/` namespace, job-scoped `contents: write`/`actions: read`, fixed compiler-derived routing identity fields, unified-session verdict sourcing, and test-mapped eligibility behavior. No new `CTR-*` rule or `T-CTR-*` test ID. |
+| 1.0.110 | Clarifies CTR-017 whole-context secrets exposure and maps `overprovisioned-secrets` diagnostics to it. Literal and dynamic single-secret selection remain distinct from serializing or projecting all secrets; selector expressions are still inspected for nested whole-context exposure. Preserves strict/non-strict severity, local inheritance warnings, the compiler-generated call-workflow fallback exception, and independent credential-placement and disclosure controls. Regression evidence covers the repository-to-secret-name mapping in both Actions and AW ASTs. No new threat identifier, permission, runtime behavior, or lock-file compatibility change. |
+| 1.0.109 | Adds CTR-039/T-CTR-054 for comment/review triggers and AW command shorthands, requiring broadened effective actor admission (`all`, `read`, or `triage`) together with explicit weak GitHub integrity filtering or lockdown overriding configured guard fields. Trusted/default roles, approved/merged filtering without lockdown override, and explicit GitHub disablement suppress comment findings; unknown policy, string shorthand, and bare lockdown do not establish weak filtering. Compiler lint uses effective roles (including dry-run overrides), resolved tools, and AW-origin suppression paths, retaining centralized commands beside dispatch graphs. CTR-008 deduplication requires actual validator warning emission. This single unreleased entry incorporates review refinements; external event policies, generated triggers, permissions, runtime authorization, checkout, and template-injection controls are unchanged. |
+| 1.0.108 | Mapping-only: adds Section 7.17 for compile-time engine release cooldown lookups (fixed public endpoints, no credentials or redirects, streamed npm metadata, in-memory cache, fail-open warning diagnostics) and the residual risk that literal Copilot installs skip the runtime age check. No new `CTR-*` rule or `T-CTR-*` test ID. |
 | 1.0.107 | Mapping-only: adds Section 7.16 for loopback-only pre-agent DIFC proxy binding, `Origin` header rejection without wildcard CORS in the HTTP MCP server runner, the owner-private MCP logs report cache, and the `observability.otlp: false` default opt-out. No new `CTR-*` rule or `T-CTR-*` test ID. |
 | 1.0.106 | Mapping-only: adds Section 7.15 for inert embedding of authored activation markdown metadata (`inertJSON`, chunked `printf` transport) as a CTR-006 data-transport boundary. No new `CTR-*` rule or `T-CTR-*` test ID. |
 | 1.0.105 | Mapping-only: adds Sections 7.12–7.14 for the experimental token-broker credential boundary, protected safe-output authorization baseline verification (`validate --authorization-policy`), and host runtime temp-variable exclusion with hardened source-download Git. No new `CTR-*` rule or `T-CTR-*` test ID. |
@@ -114,6 +118,17 @@ The unreleased 1.0.81 merge-policy mapping also covers ambiguous check producers
 | 1.0.7–1.0.0 | Established CTR-001–015, conformance model, and daily reconciliation. |
 
 ## Mapping Audits
+
+### Mapping Audit (2026-11-24)
+
+Reviewed the only compiler-relevant commit in the last two days: #80583 (adaptive-routing observe mode).
+
+Findings and disposition:
+
+- Adaptive routing history writer (#80583): already implemented in `pkg/workflow/adaptive_routing.go` (reserved `memory/adaptive-routing/` branch validation, job-scoped `contents: write` + `actions: read`, quoted compiler-derived routing identity fields, and unified-session verdict sourcing) with tests in `adaptive_routing_test.go`. Section 7.18 maps only the eligibility cases asserted by regression tests: fixed/non-routed models, `workflow_call`, and missing repo-memory; the repository-default skip is tested for fixed/non-routed models and `workflow_call`. Added the mapping and bumped to 1.0.111. No new `CTR-*` rule; the agent job and all other jobs are asserted unchanged by `TestAdaptiveRoutingObserveAddsOnlyTheWriterJob`.
+- No `threat-detection-suppress` annotations were reviewed beyond the prior audit's finding, so no suppression SLA action applies.
+- Steering issue #80597 had no comments.
+- Go tests could not be executed (the Go 1.27.4 toolchain download failed offline). Only specification and changelog text changed; no implementation was modified. Code-scanning alerts were not retrieved separately.
 
 ### Mapping Audit (2026-11-22)
 

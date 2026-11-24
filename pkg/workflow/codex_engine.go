@@ -175,7 +175,7 @@ func (e *CodexEngine) GetInstallationSteps(workflowData *WorkflowData) []GitHubA
 	}
 
 	steps := BuildStandardNpmEngineInstallSteps(
-		"@openai/codex",
+		codexNpmPackageName,
 		string(constants.DefaultCodexVersion),
 		"Install Codex CLI",
 		"codex",
@@ -211,7 +211,7 @@ func generateCodexMicroVMCLIInstallStep(workflowData *WorkflowData) GitHubAction
 		version = workflowData.EngineConfig.Version
 	}
 	return GenerateMicroVMNpmCLIInstallStep(
-		"@openai/codex",
+		codexNpmPackageName,
 		version,
 		"Install Codex CLI in microVM path",
 		"codex",

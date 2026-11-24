@@ -57,6 +57,11 @@ The YAML frontmatter supports these fields:
 
     - Query is automatically scoped to the current repository (use `scope: none` for cross-repo queries)
     - Use to gate workflows on preconditions (e.g., only run if open PRs exist)
+  - **Efficient skip-if queries**: prefer the subset evaluated via GraphQL/REST instead of the rate-limited search API (30 req/min):
+    - Allowed: `is:`/`type:`/`state:` (`issue`, `pr`, `open`, `closed`, `merged`), `label:` (one or more, AND), `author:`, `assignee:`, `mentions:` (plain logins), `sort:`
+    - Must stay scoped to one repository (default scope; not `scope: none`)
+    - Falls back to search: free text, `in:title`/`in:body`, negation (`-label:`), comma label lists (`label:a,b`), `org:`, `@me`, other qualifiers
+    - Prefer a marker label (`is:issue is:open label:my-workflow`) over title/body text matching when designing dedup gates
   - **`skip-if-check-failing:`** - Skip workflow execution when CI checks are failing on the triggering ref (boolean or object)
     - Boolean format: `skip-if-check-failing: true` (skip if any check is failing or pending)
     - Object format with filtering:

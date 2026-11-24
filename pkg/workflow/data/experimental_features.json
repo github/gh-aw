@@ -46,7 +46,7 @@
       "name": "Durable execution",
       "compiler_warning": "engine.durable",
       "docs": ["/reference/engines/"],
-      "cracktro": [{ "slide": "Durable execution", "badge": "engine.durable" }]
+      "cracktro": [{ "slide": "Durable execution", "badge": "request-continuation" }]
     },
     {
       "id": "gateway-dispatch",

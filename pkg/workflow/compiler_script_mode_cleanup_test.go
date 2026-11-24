@@ -30,8 +30,10 @@ func TestScriptModeUnlockCleanupCarriesGenAIAttribution(t *testing.T) {
 	byok := findCleanupStep(t, &EngineConfig{ID: "copilot", Env: map[string]string{"COPILOT_PROVIDER_BASE_URL": "https://example.ai.gateway.azure.com/default/models/openai/v1"}})
 	assert.Contains(t, byok, `GH_AW_INFO_ENGINE_ID: "copilot"`)
 	assert.Contains(t, byok, `GH_AW_INFO_GENAI_PROVIDER: "azure.ai.openai"`)
+	assert.Contains(t, byok, `GH_AW_INFO_GENAI_ENDPOINT: "https://example.ai.gateway.azure.com/default/models/openai/v1"`)
 
 	github := findCleanupStep(t, &EngineConfig{ID: "copilot"})
 	assert.Contains(t, github, `GH_AW_INFO_ENGINE_ID: "copilot"`)
 	assert.NotContains(t, github, "GH_AW_INFO_GENAI_PROVIDER")
+	assert.NotContains(t, github, "GH_AW_INFO_GENAI_ENDPOINT")
 }

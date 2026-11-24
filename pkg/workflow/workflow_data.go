@@ -82,6 +82,7 @@ type WorkflowData struct {
 	IncludedFiles                  []string             // list of files included via @include directives (rendered as comment in lock file)
 	ImportInputs                   map[string]any       // input values from imports with inputs (for github.aw.inputs.* substitution)
 	On                             string
+	pullRequestTargetWarned        bool // Per-workflow CTR-008 validation warning used to deduplicate compiler lint
 	AdmissionEnabled               bool // Effective compile-time setting for admission steps
 	TokenBrokerEnabled             bool // True when at least one token-broker capability is enabled
 	TokenBrokerCopilotRequest      bool // Use the broker for Copilot inference authentication in supported jobs
@@ -183,6 +184,7 @@ type WorkflowData struct {
 	DriveMemoryConfig              *DriveMemoryConfig              // parsed drive-memory configuration
 	CommentMemoryConfig            *CommentMemoryConfig            // parsed tools.comment-memory configuration
 	RepoMemoryConfig               *RepoMemoryConfig               // parsed repo-memory configuration
+	AdaptiveRouting                string                          // "observe" when push_routing_history records the run in the routing history, else ""
 	Runtimes                       map[string]any                  // runtime version overrides from frontmatter
 	ToolsTimeout                   string                          // timeout for tool/MCP operations: numeric string (seconds) or GitHub Actions expression (empty = use engine default)
 	ToolsStartupTimeout            string                          // timeout for MCP server startup: numeric string (seconds) or GitHub Actions expression (empty = use engine default)
@@ -248,6 +250,7 @@ type WorkflowData struct {
 	DefaultAiCreditsPricing        *AiCreditsPricingConfig         // fallback per-token pricing from frontmatter models.default-ai-credits-pricing; used by AWF API proxy for unrecognized models
 	ActionPinMappings              map[string]string               // action-pin redirect table from aw.json action_pins: maps "owner/repo@version" → "owner/repo@version"
 	generatedActionRefs            map[string]struct{}             // compiler-owned references, including tag fallbacks when SHA resolution is unavailable
+	dynamicSecretReferences        []string                        // computed secret selectors tracked for redaction and safe updates
 	ActionPinPrefixes              map[string]string               // repository-prefix redirects from aw.json action_pin_prefixes
 	ActionPinSourceVersions        map[string]string               // inline labels for frontmatter steps already pinned by SHA
 	ContainerPinMappings           map[string]string               // container-pin redirect table from aw.json container_pins: maps source image → replacement image

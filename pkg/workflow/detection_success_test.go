@@ -460,6 +460,8 @@ on: workflow_dispatch
 permissions:
   contents: read
 engine: claude
+features:
+  gh-aw-detection: false
 safe-outputs:
   create-issue:
 ---
@@ -477,6 +479,8 @@ on: workflow_dispatch
 permissions:
   contents: read
 engine: claude
+features:
+  gh-aw-detection: false
 safe-outputs:
   create-issue:
   threat-detection:
@@ -496,6 +500,8 @@ on: workflow_dispatch
 permissions:
   contents: read
 engine: claude
+features:
+  gh-aw-detection: false
 safe-outputs:
   create-issue:
   threat-detection:

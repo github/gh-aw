@@ -1,6 +1,7 @@
 import { test, expect, type Page } from "@playwright/test";
-import { readFileSync, readdirSync } from "node:fs";
-import { injectSlideMetadata, loadSlides, parseSlides, renderCaptions, serializeJsonLd, slideParts } from "../src/lib/cracktro/slides.js";
+import { createHash } from "node:crypto";
+import { readFileSync, readdirSync, statSync } from "node:fs";
+import { captionHash, injectSlideMetadata, loadSlides, parseSlides, renderCaptions, serializeJsonLd, slideParts } from "../src/lib/cracktro/slides.js";
 
 // The ordered slide list lives in .github/skills/cracktro/slides.md; a slide's number is its position, its link the stable #id.
 const SLIDES = loadSlides();
@@ -739,7 +740,7 @@ test("ships local assets with the docs and links to the talk from the footer", a
   await page.locator(".site-footer").getByRole("link", { name: "Interactive talk", exact: true }).click();
   await expect(page).toHaveURL(new RegExp(`/gh-aw/cracktro/#${SLIDES[0].id}$`));
 
-  const assets = ["runtime.js", "captions.js", "wizard-data.js", "wizard.js", "deck.js", "fonts/MonaspaceNeonVF.woff", "fonts/Monaspace-LICENSE.txt", "../fonts/MonaSansVF.woff2"];
+  const assets = ["runtime.js", "captions.js", "voice/index.js", "voice/finale.webm", "wizard-data.js", "wizard.js", "deck.js", "fonts/MonaspaceNeonVF.woff", "fonts/Monaspace-LICENSE.txt", "../fonts/MonaSansVF.woff2"];
   for (const asset of assets) {
     const response = await request.get(`/gh-aw/cracktro/${asset}`);
     expect(response.ok(), asset).toBe(true);
@@ -763,6 +764,25 @@ test("generates the kiosk closed captions from slides.md, in deck order, as one 
   const source = renderCaptions(hostile);
   expect(source).not.toMatch(/<\/script|\u2028/);
   expect(run(source)).toEqual({ a: ["</script>\u2028x", '`${x}` & "q"'] });
+});
+
+test("keeps the recorded voice track in sync with slides.md and voice.json", () => {
+  const scope: { CracktroVoice?: { config: string; slides: Record<string, [string, number]> } } = {};
+  new Function("window", readFileSync(new URL("../public/cracktro/voice/index.js", import.meta.url), "utf8"))(scope);
+  const voice = scope.CracktroVoice!;
+  // stale entries mean captions or voice.json changed: node .github/skills/cracktro-voice/voice.mjs build
+  const config = JSON.parse(readFileSync(new URL("../../.github/skills/cracktro-voice/voice.json", import.meta.url), "utf8"));
+  expect(voice.config).toBe(createHash("sha256").update(JSON.stringify(config)).digest("hex").slice(0, 12));
+  expect(Object.keys(voice.slides)).toEqual(SLIDES.map(slide => slide.id));
+  const files = readdirSync(new URL("../public/cracktro/voice/", import.meta.url)).sort();
+  expect(files).toEqual(["index.js", ...SLIDES.map(slide => `${slide.id}.webm`)].sort());
+  for (const slide of SLIDES) {
+    const [hash, duration] = voice.slides[slide.id];
+    expect(hash, slide.id).toBe(captionHash(slide.captions));
+    expect(duration, slide.id).toBeGreaterThan(0);
+    // 32 kbps mono Opus: well under 400 KiB per spoken minute
+    expect(statSync(new URL(`../public/cracktro/voice/${slide.id}.webm`, import.meta.url)).size / (duration / 60), slide.id).toBeLessThan(400 * 1024);
+  }
 });
 
 test("publishes a social card for link previews", async ({ page, request }) => {
@@ -1392,6 +1412,9 @@ const TINY_DECK = `<!doctype html><html lang="en"><head><meta charset="utf-8"><t
           },
         }
       : undefined,
+    voice: query.has("vt")
+      ? { base: "voice/tiny-", slides: { hello: [query.get("vt") === "stale" ? "00000000" : "${captionHash(["Good evening, the top story.", "Thanks, glad to be here."])}", 3] } }
+      : undefined,
     sound,
   });
 </script></body></html>`;
@@ -1574,7 +1597,7 @@ test.describe("reusable runtime", () => {
     await expect(bar).toContainText("3 of 5 slides");
     await bar.getByRole("textbox", { name: "View title" }).fill("Part and outro");
     const link = await bar.getByRole("textbox", { name: "Link to this view" }).inputValue();
-    const payload = link.match(/#part-one&view=([\w-]+)$/)![1];
+    const payload = link.match(/[?&]slide=part-one&view=([\w-]+)$/)![1];
     // whole bands travel by group (slides added to them later join the view), the rest by slide id
     expect(JSON.parse(Buffer.from(payload, "base64url").toString())).toEqual({ t: "Part and outro", b: ["outro"], s: ["part-one", "alpha"] });
 
@@ -1788,6 +1811,66 @@ test.describe("reusable runtime", () => {
     expect(errors).toEqual([]);
   });
 
+  test("shares a deep link whose kiosk lobby starts sound, captions and fullscreen kiosk from one click", async ({ page }) => {
+    await page.clock.install();
+    await fakeFullscreen(page);
+    const { errors } = await open(page, "/gh-aw/cracktro/tiny.html?sound=off&cc&fs=grant#alpha");
+    await page.keyboard.press("s");
+    const dialog = page.locator("dialog.shr");
+    await expect(dialog).toBeVisible();
+    const link = dialog.locator("input[readonly]");
+    const cc = dialog.getByRole("checkbox", { name: /Captions/ });
+    await expect(link).toHaveValue(/[?&]slide=alpha&sound=0$/);
+    // captions and voice only apply to kiosk links
+    await expect(cc).toBeDisabled();
+    await dialog.getByRole("checkbox", { name: /Kiosk/ }).check();
+    await dialog.getByRole("checkbox", { name: /Sound/ }).check();
+    await expect(cc).toBeEnabled();
+    await cc.check();
+    // voice is offered only where the browser can speak; keep it off so the rotation is not held
+    const voice = dialog.getByRole("checkbox", { name: /Voice/ });
+    if (await voice.isEnabled()) await voice.uncheck();
+    await expect(link).toHaveValue(/[?&]slide=alpha&kiosk=1&sound=1&cc=1(&voice=0)?$/);
+    await dialog.getByRole("checkbox", { name: /Start at this slide/ }).uncheck();
+    await expect(link).toHaveValue(/&kiosk=1&sound=1&cc=1(&voice=0)?$/);
+    await dialog.getByRole("checkbox", { name: /Start at this slide/ }).check();
+    const url = await link.inputValue();
+    // query parameters, not a #fragment: social sites such as LinkedIn drop fragments from posted links
+    expect(url).not.toContain("#");
+
+    // a fresh page waits in the lobby, paused and chrome-free, until the Start gesture
+    await page.goto("about:blank");
+    await page.goto(url);
+    const lobby = page.locator(".lby");
+    await expect(lobby).toBeVisible();
+    await expect(lobby).toContainText("sound on");
+    await expect(heading(page)).toHaveText("Alpha");
+    await expect(page).toHaveURL(/#alpha$/);
+    await expect(page.locator("body")).toHaveClass(/\blobby\b/);
+    await expect(page.locator(".dots")).toBeHidden();
+    await page.clock.runFor(2 * KIOSK_MS);
+    await expect(heading(page)).toHaveText("Alpha");
+    expect(await fsCalls(page)).toEqual([]);
+    await lobby.getByRole("button", { name: "Start" }).click();
+    await expect(lobby).toBeHidden();
+    await expect(page.locator("body")).toHaveClass(/\bkiosk\b/);
+    await expect(page.locator("body")).toHaveClass(/\bcc-on\b/);
+    await expect(page.getByRole("button", { name: "Toggle sound (M)", exact: true })).toHaveAttribute("aria-pressed", "true");
+    expect(await fsCalls(page)).toEqual(["request"]);
+    expect(await page.evaluate(() => (window as unknown as { hooks: string[] }).hooks)).toContain("unlock");
+    await page.clock.runFor(KIOSK_MS);
+    await expect(heading(page)).toHaveText("Beta");
+
+    // Escape leaves the lobby for manual browsing
+    await page.goto(url.replace("#alpha", "#hello"));
+    await expect(lobby).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(lobby).toBeHidden();
+    await expect(page.locator("body")).not.toHaveClass(/\b(kiosk|lobby)\b/);
+    await expect(page.locator(".dots")).toBeVisible();
+    expect(errors).toEqual([]);
+  });
+
   test("starts kiosk mode with closed captions on, toggles them from the CC button or C, and ends them with kiosk mode", async ({ page }) => {
     await page.clock.install();
     await fakeFullscreen(page);
@@ -1823,6 +1906,228 @@ test.describe("reusable runtime", () => {
     await page.keyboard.press("Escape");
     await expect(page.locator("body")).not.toHaveClass(/\bkiosk\b/);
     await expect(page.locator("body")).not.toHaveClass(/\bcc-on\b/);
+    expect(errors).toEqual([]);
+  });
+
+  test("moves the captions below the slide when a tall window leaves room under the stage", async ({ page }) => {
+    await page.clock.install();
+    await fakeFullscreen(page);
+    await page.setViewportSize({ width: 960, height: 540 });
+    const { errors } = await open(page, "/gh-aw/cracktro/tiny.html?cc&fs=none#hello");
+    await page.keyboard.press("k");
+    await page.clock.runFor(8000);
+    const box = page.locator(".cc-box");
+    const stageBottom = async () => {
+      const s = (await page.locator(".stage").boundingBox())!;
+      return s.y + s.height;
+    };
+    // 16:9: no letterbox, so the captions stay over the bottom of the slide
+    expect((await box.boundingBox())!.y).toBeLessThan(await stageBottom());
+    // a tall window: the captions drop entirely below the slide
+    await page.setViewportSize({ width: 960, height: 900 });
+    await expect.poll(async () => (await box.boundingBox())!.y).toBeGreaterThanOrEqual(await stageBottom());
+    const b = (await box.boundingBox())!;
+    expect(b.y + b.height).toBeLessThanOrEqual(900);
+    expect(errors).toEqual([]);
+  });
+
+  test("reads the caption lines aloud with browser speech synthesis and holds the kiosk slide until they end", async ({ page }) => {
+    await page.clock.install();
+    await fakeFullscreen(page);
+    // a fake engine: speaks one utterance at a time for 15 s each, so two lines outlast the 15 s kiosk dwell
+    await page.addInitScript(() => {
+      const w = window as unknown as { spoken: string[]; voices: string[]; speechSynthesis: unknown; SpeechSynthesisUtterance: unknown };
+      w.spoken = [];
+      w.voices = [];
+      // fake voices are plain objects, which the native voice setter rejects, so the utterance keeps its own
+      class Utterance extends SpeechSynthesisUtterance {}
+      const picked = new WeakMap<object, unknown>();
+      Object.defineProperty(Utterance.prototype, "voice", {
+        get() {
+          return picked.get(this) ?? null;
+        },
+        set(v) {
+          picked.set(this, v);
+        },
+      });
+      w.SpeechSynthesisUtterance = Utterance;
+      let queue: SpeechSynthesisUtterance[] = [];
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const run = () => {
+        const u = queue[0];
+        if (!u) return;
+        w.spoken.push(u.text);
+        w.voices.push((u.voice as { name: string } | null)?.name ?? "");
+        timer = setTimeout(() => {
+          queue.shift();
+          u.dispatchEvent(new Event("end"));
+          run();
+        }, 15000);
+      };
+      Object.defineProperty(window, "speechSynthesis", {
+        configurable: true,
+        value: {
+          // only local voices are used: the remote voice ranks higher but would need the network
+          getVoices: () => [
+            { name: "Remote Natural Online", lang: "en-US", localService: false },
+            { name: "Local Alex", lang: "en-US", localService: true },
+          ],
+          speak: (u: SpeechSynthesisUtterance) => queue.push(u) === 1 && run(),
+          cancel: () => {
+            clearTimeout(timer);
+            queue = [];
+          },
+        },
+      });
+    });
+    const { errors } = await open(page, "/gh-aw/cracktro/tiny.html?cc&fs=none#hello");
+    const voice = page.locator(".vcb");
+    const spoken = () => page.evaluate(() => (window as unknown as { spoken: string[] }).spoken);
+    await expect(voice).toBeHidden();
+    // voice is off by default: kiosk mode alone starts silent
+    await page.keyboard.press("k");
+    await expect(page.locator("body")).toHaveClass(/\bkiosk\b/);
+    await expect(voice).toHaveAttribute("aria-pressed", "false");
+    expect(await spoken()).toEqual([]);
+    await page.keyboard.press("Escape");
+    await expect(page.locator("body")).not.toHaveClass(/\bkiosk\b/);
+    // V starts kiosk mode with the voice on and speaks the slide's first line from that gesture
+    await page.keyboard.press("v");
+    await expect(page.locator("body")).toHaveClass(/\bkiosk\b/);
+    await expect(voice).toBeVisible();
+    await expect(voice).toBeEnabled();
+    await expect(voice).toHaveAttribute("aria-pressed", "true");
+    await expect(voice).toHaveAttribute("title", "Turn off the voice (V)");
+    expect(await spoken()).toEqual(["Good evening, the top story."]);
+    // the slide waits past its dwell until the second line ends (30 s)
+    await page.clock.runFor(20000);
+    await expect(heading(page)).toHaveText("Hello");
+    expect(await spoken()).toEqual(["Good evening, the top story.", "Thanks, glad to be here."]);
+    expect(await page.evaluate(() => (window as unknown as { voices: string[] }).voices)).toEqual(["Local Alex", "Local Alex"]);
+    await page.clock.runFor(11000);
+    await expect(heading(page)).not.toHaveText("Hello");
+    // the button turns it off without leaving kiosk mode; Escape ends kiosk mode, and the choice holds for the next run
+    await voice.click();
+    await expect(voice).toHaveAttribute("aria-pressed", "false");
+    await expect(page.locator("body")).toHaveClass(/\bkiosk\b/);
+    await page.keyboard.press("v");
+    await expect(voice).toHaveAttribute("aria-pressed", "true");
+    await page.keyboard.press("Escape");
+    await expect(page.locator("body")).not.toHaveClass(/\bkiosk\b/);
+    await expect(voice).toHaveAttribute("aria-pressed", "false");
+    await page.keyboard.press("k");
+    await expect(voice).toHaveAttribute("aria-pressed", "true");
+    expect(errors).toEqual([]);
+  });
+
+  test("plays the recorded voice file of a slide whose captions match, else falls back to speech synthesis", async ({ page }) => {
+    await page.clock.install();
+    await fakeFullscreen(page);
+    type Fake = { played: [string, number][]; spoken: string[]; audio: { currentTime: number; paused: boolean; onended: () => void } };
+    await page.addInitScript(() => {
+      const w = window as unknown as Record<string, unknown> & { played: [string, number][]; spoken: string[] };
+      w.played = [];
+      w.spoken = [];
+      // a fake media element: records where each play starts; the test ends it through onended
+      class FakeAudio {
+        preload = "";
+        readyState = 1;
+        paused = true;
+        currentTime = 0;
+        onended: (() => void) | null = null;
+        onerror: (() => void) | null = null;
+        src = "";
+        canPlayType = (type: string) => (/opus/.test(type) ? "probably" : "");
+        getAttribute = (name: string) => (name === "src" ? this.src : null);
+        addEventListener() {}
+        play() {
+          this.paused = false;
+          w.played.push([this.src, this.currentTime]);
+          w.audio = this;
+          return Promise.resolve();
+        }
+        pause() {
+          this.paused = true;
+        }
+      }
+      w.Audio = FakeAudio;
+      class Utterance extends SpeechSynthesisUtterance {}
+      Object.defineProperty(Utterance.prototype, "voice", { get: () => null, set() {} });
+      w.SpeechSynthesisUtterance = Utterance;
+      Object.defineProperty(window, "speechSynthesis", {
+        configurable: true,
+        value: { getVoices: () => [{ name: "Local Alex", lang: "en-US", localService: true }], speak: (u: SpeechSynthesisUtterance) => w.spoken.push(u.text), cancel: () => {} },
+      });
+    });
+    const state = () => page.evaluate(() => (({ played, spoken }) => ({ played, spoken }))(window as unknown as Fake));
+    const { errors } = await open(page, "/gh-aw/cracktro/tiny.html?cc&vt&fs=none#hello");
+    await page.keyboard.press("v");
+    await expect(page.locator(".vcb")).toHaveAttribute("aria-pressed", "true");
+    expect(await state()).toEqual({ played: [["voice/tiny-hello.webm", 0]], spoken: [] });
+    // the slide holds past its dwell until the file ends
+    await page.clock.runFor(20000);
+    await expect(heading(page)).toHaveText("Hello");
+    await page.evaluate(() => {
+      const a = (window as unknown as Fake).audio;
+      a.paused = true;
+      a.onended();
+    });
+    await page.clock.runFor(1000);
+    await expect(heading(page)).not.toHaveText("Hello");
+    // captions edited since the track was generated: never play stale audio, speak the live lines instead
+    await page.goto("/gh-aw/cracktro/tiny.html?cc&vt=stale&fs=none#hello");
+    await page.keyboard.press("v");
+    await expect(page.locator(".vcb")).toHaveAttribute("aria-pressed", "true");
+    expect(await state()).toEqual({ played: [], spoken: ["Good evening, the top story.", "Thanks, glad to be here."] });
+    expect(errors).toEqual([]);
+  });
+
+  test("releases a kiosk slide whose voice never ends 60 s after its dwell, not after its entry", async ({ page }) => {
+    await page.clock.install();
+    await fakeFullscreen(page);
+    // a stalled engine: accepts utterances but never fires end or error
+    await page.addInitScript(() => {
+      // fake voices are plain objects, which the native voice setter rejects, so the utterance keeps its own
+      class Utterance extends SpeechSynthesisUtterance {}
+      const picked = new WeakMap<object, unknown>();
+      Object.defineProperty(Utterance.prototype, "voice", {
+        get() {
+          return picked.get(this) ?? null;
+        },
+        set(v) {
+          picked.set(this, v);
+        },
+      });
+      (window as unknown as { SpeechSynthesisUtterance: unknown }).SpeechSynthesisUtterance = Utterance;
+      Object.defineProperty(window, "speechSynthesis", {
+        configurable: true,
+        value: { getVoices: () => [{ name: "Local Alex", lang: "en-US", localService: true }], speak: () => {}, cancel: () => {} },
+      });
+    });
+    const { errors } = await open(page, "/gh-aw/cracktro/tiny.html?cc&fs=none#hello");
+    await page.keyboard.press("v");
+    await expect(page.locator("body")).toHaveClass(/\bkiosk\b/);
+    // dwell (15 s) plus most of the hold: still on the slide well past 60 s from entry
+    await page.clock.runFor(15000 + 59000);
+    await expect(heading(page)).toHaveText("Hello");
+    await page.clock.runFor(2000);
+    await expect(heading(page)).not.toHaveText("Hello");
+    expect(errors).toEqual([]);
+  });
+
+  test("disables the voice button where the browser has no speech synthesis", async ({ page }) => {
+    await page.clock.install();
+    await fakeFullscreen(page);
+    await page.addInitScript(() => Object.defineProperty(window, "speechSynthesis", { configurable: true, value: undefined }));
+    const { errors } = await open(page, "/gh-aw/cracktro/tiny.html?cc&fs=none#hello");
+    const voice = page.locator(".vcb");
+    await page.keyboard.press("v");
+    await expect(page.locator("body")).not.toHaveClass(/\bkiosk\b/);
+    await page.keyboard.press("k");
+    await expect(voice).toBeVisible();
+    await expect(voice).toBeDisabled();
+    await expect(voice).toHaveAttribute("aria-pressed", "false");
+    await expect(voice).toHaveAttribute("title", "Voice is not supported in this browser");
     expect(errors).toEqual([]);
   });
 

@@ -329,6 +329,19 @@ async function main() {
         continue;
       }
 
+      if (fixture.name === "basic-copilot") {
+        const releaseWarning = (result.warnings ?? []).find(warning => warning?.level === "warning" && warning?.path === fixture.filename && warning?.message?.includes("validate the release age manually"));
+        if (!releaseWarning) {
+          console.log("FAIL (missing structured release-age warning)");
+          failures.push({
+            name: fixture.name,
+            error: "Wasm response did not include the structured manual release-age warning",
+          });
+          failed++;
+          continue;
+        }
+      }
+
       const wasmYaml = result.yaml;
 
       if (UPDATE_MODE) {

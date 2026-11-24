@@ -16,11 +16,12 @@ import (
 // secrets context instead of the named secrets a job or step actually needs.
 func OverprovisionedSecretsRule() Rule {
 	return Rule{
-		ID:          "overprovisioned-secrets",
-		Description: "Detect secrets: inherit and expressions that materialize the whole secrets context",
-		Severity:    Error,
-		Targets:     ActionsAST | AWAST,
-		Check:       checkOverprovisionedSecrets,
+		ID:           "overprovisioned-secrets",
+		ThreatRuleID: "CTR-017",
+		Description:  "Detect secrets: inherit and expressions that materialize the whole secrets context",
+		Severity:     Error,
+		Targets:      ActionsAST | AWAST,
+		Check:        checkOverprovisionedSecrets,
 	}
 }
 
@@ -93,19 +94,7 @@ func overprovisionedSecretsDiagnostics(ctx context.Context, input Input) ([]Diag
 	}
 
 	blocks, err := aw.ExecutionBlocks(ctx, input.Document)
-	failures := []error{err}
-	// engine.env and sandbox.agent.env are copied into the agent execution step
-	// environment but are not execution blocks.
-	if input.Document != nil {
-		if engine, ok := input.Document.Frontmatter["engine"].(map[string]any); ok {
-			failures = append(failures, walkExpressionScalars(ctx, engine["env"], "engine.env", visit))
-		}
-		if sandbox, ok := input.Document.Frontmatter["sandbox"].(map[string]any); ok {
-			if agent, ok := sandbox["agent"].(map[string]any); ok {
-				failures = append(failures, walkExpressionScalars(ctx, agent["env"], "sandbox.agent.env", visit))
-			}
-		}
-	}
+	failures := []error{err, walkOverprovisionedSecretsEnv(ctx, input.Document, visit)}
 	for _, block := range blocks {
 		if secrets, ok := block.Fields["secrets"].(string); ok && strings.EqualFold(strings.TrimSpace(secrets), "inherit") {
 			if uses, ok := block.Fields["uses"].(string); ok {
@@ -122,6 +111,23 @@ func overprovisionedSecretsDiagnostics(ctx context.Context, input Input) ([]Diag
 		}
 	}
 	return diagnostics, errors.Join(failures...)
+}
+
+func walkOverprovisionedSecretsEnv(ctx context.Context, document *aw.Document, visit func(string, string) error) error {
+	// engine.env and sandbox.agent.env are copied into the agent execution step
+	// environment but are not execution blocks.
+	var failures []error
+	if document != nil {
+		if engine, ok := document.Frontmatter["engine"].(map[string]any); ok {
+			failures = append(failures, walkExpressionScalars(ctx, engine["env"], "engine.env", visit))
+		}
+		if sandbox, ok := document.Frontmatter["sandbox"].(map[string]any); ok {
+			if agent, ok := sandbox["agent"].(map[string]any); ok {
+				failures = append(failures, walkExpressionScalars(ctx, agent["env"], "sandbox.agent.env", visit))
+			}
+		}
+	}
+	return errors.Join(failures...)
 }
 
 // isCompilerCallWorkflowFallback reports whether job has the exact shape of a
@@ -174,7 +180,8 @@ func inheritDiagnostic(path, uses string) Diagnostic {
 }
 
 // materializesSecretsContext reports whether node evaluates the secrets
-// context as a whole: any reference other than secrets.NAME or secrets['NAME'].
+// context as a whole rather than selecting one property. Dynamic indexes select
+// one secret too, but their expressions are still visited for whole-context use.
 func materializesSecretsContext(node actionlint.ExprNode) bool {
 	found := false
 	actionlint.VisitExprNode(node, func(child, parent actionlint.ExprNode, entering bool) {
@@ -191,7 +198,7 @@ func materializesSecretsContext(node actionlint.ExprNode) bool {
 				return
 			}
 		case *actionlint.IndexAccessNode:
-			if _, literal := parent.Index.(*actionlint.StringNode); literal && parent.Operand == child {
+			if parent.Operand == child {
 				return
 			}
 		}

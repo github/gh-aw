@@ -35,6 +35,7 @@
 const { mergeTerminalRetryAfterMs } = require("./copilot_retry_after.cjs");
 const { iterateJsonl, JsonlParser } = require("./jsonl_helpers.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
+const { sessionToolSuccess } = require("./agent_session.cjs");
 const { isGitHubProviderCybersecurityPolicyRejection } = require("./github_provider_policy_rejection.cjs");
 const fs = require("fs");
 const { openDurableSession, observeDurableSession } = require("./durable_native_session.cjs");
@@ -61,7 +62,7 @@ const {
 } = require("./awf_reflect.cjs");
 const { emitInfrastructureIncomplete, emitMissingToolPermissionIssue, hasExpectedSafeOutputs, hasNoopInSafeOutputs } = require("./safeoutputs_cli.cjs");
 const { countPermissionDeniedIssues, hasNumerousPermissionDeniedIssues, extractDeniedCommands, buildMissingToolPermissionIssuePayload } = require("./permission_denied_helpers.cjs");
-const { createOutputPatternMatcher, emitSoftTimeoutSignal, isAuthenticationFailedError } = require("./harness_retry_guard.cjs");
+const { createOutputPatternMatcher, emitSoftTimeoutSignal, isAuthenticationFailedError, isHTMLResponseError } = require("./harness_retry_guard.cjs");
 const { MODEL_NOT_SUPPORTED_PATTERN: INVALID_MODEL_ERROR_PATTERN } = require("./detect_agent_errors.cjs");
 const { resolveRetryConfig } = require("./harness_retry_config.cjs");
 const { stopForPermissionDenied } = require("./harness_failure_handling.cjs");
@@ -108,6 +109,20 @@ const SERVER_ERROR_PATTERN = /InternalServerError|ServiceUnavailableError|500 In
 // (e.g. `"code": "empty_array"` on `messages[N].content`), so an identical fresh run produces
 // an identical rejection: retrying only re-bills the turns that succeeded before the failure point.
 const INVALID_REQUEST_ERROR_PATTERN = /invalid_request_(?:error|body)/i;
+
+function isCodexSessionProgress(event) {
+  // Cross-engine progress means confirmed successful main-session model/tool work,
+  // not session creation, user input, diagnostics, or subagent activity.
+  if (event?.parent_thread_id || event?.parentId || event?.agentId) return false;
+  if (event?.type === "turn.completed") return true;
+  if (event?.type !== "item.completed") return false;
+  const item = event.item;
+  if (!item || sessionToolSuccess(item) === false || sessionToolSuccess(item.result ?? {}) === false || ["declined", "pending", "in_progress"].includes(item.status) || (typeof item.exit_code === "number" && item.exit_code !== 0))
+    return false;
+  if (item.type === "agent_message" || item.type === "reasoning") return true;
+  if (!["mcp_tool_call", "command_execution", "file_change", "web_search"].includes(item.type)) return false;
+  return item.success === true || ["completed", "succeeded", "success"].includes(item.status) || item.exit_code === 0 || (item.type === "web_search" && item.status === undefined);
+}
 
 function resolveMCPServerToolTimeouts(config, runtimeToolTimeoutSeconds) {
   const configuredServers = config.defaults?.mcp_servers && typeof config.defaults.mcp_servers === "object" ? config.defaults.mcp_servers : {};
@@ -1064,6 +1079,7 @@ async function main() {
   const serverToolTimeouts = resolveMCPServerToolTimeouts(loadCompiledConfig(), configuredToolTimeout);
   const durableSession = openDurableSession("codex");
   let lastThreadId = durableSession?.id || "";
+  let sessionHasProgress = false;
   /** @type {string[] | null} */
   let resumeArgs = lastThreadId ? buildCodexResumeArgs(resolvedArgs, lastThreadId) : null;
   if (lastThreadId && !resumeArgs) throw new Error("Cannot resume the restored durable Codex session with these arguments");
@@ -1109,6 +1125,7 @@ async function main() {
           const event = mcpWatchdog.observe(line);
           if (!event) return;
           if (event.type === "thread.started" && typeof event.thread_id === "string") lastThreadId = event.thread_id;
+          if ((!event.thread_id || event.thread_id === lastThreadId) && isCodexSessionProgress(event)) sessionHasProgress = true;
           if (event.type === "turn.failed" || event.type === "error") recordTerminalError(line);
           retryAfterMs = mergeTerminalRetryAfterMs(retryAfterMs, line, "codex");
         },
@@ -1181,6 +1198,7 @@ async function main() {
       const isCybersecurityPolicyRejection = isGitHubProviderCybersecurityPolicyRejection(result.output, process.env.GH_AW_LLM_PROVIDER, "codex");
       const isTokenPerMinuteRateLimit = isTokenPerMinuteRateLimitError(result.output);
       const isAuthenticationFailed = isAuthenticationFailedError(result.output);
+      const isTransientHTMLResponse = isHTMLResponseError(result.output);
       const isMissingApiKey = isMissingApiKeyError(result.output);
       const isServer = isServerError(result.output);
       const isInvalidModel = isInvalidModelError(result.output);
@@ -1194,6 +1212,7 @@ async function main() {
         rate_limit_error: isRateLimit,
         token_per_minute_rate_limit: isTokenPerMinuteRateLimit,
         authentication_failed: isAuthenticationFailed,
+        transient_error: isTransientHTMLResponse,
         missing_api_key: isMissingApiKey,
         server_error: isServer,
         invalid_model: isInvalidModel,
@@ -1245,7 +1264,7 @@ async function main() {
       });
       if (guardDecision) return guardDecision;
 
-      if (attempt === 0 && isAuthenticationFailed) {
+      if (attempt === 0 && isAuthenticationFailed && !sessionHasProgress) {
         log(`attempt ${attempt + 1}: authentication failed — not retrying (first-attempt auth failure is non-retryable)`);
         return { action: "stop" };
       }
@@ -1296,7 +1315,7 @@ async function main() {
         return { action: "stop" };
       }
 
-      const isTransient = isRateLimit || isServer;
+      const isTransient = isRateLimit || isServer || isTransientHTMLResponse;
       // An interrupted run may already have staged irreversible work. Neither a fresh
       // prompt nor a model continuation can guarantee that those outputs are not repeated.
       if (safeOutputsPath && hasExpectedSafeOutputs(safeOutputsPath, { logger: log })) {
@@ -1306,7 +1325,7 @@ async function main() {
       }
       if (attempt < MAX_RETRIES && (result.hasOutput || isTransient)) {
         resumeArgs = lastThreadId ? buildCodexResumeArgs(resolvedArgs, lastThreadId) : null;
-        const reason = isRateLimit ? "rate_limit_exceeded (transient)" : isServer ? "server_error (transient)" : "partial execution";
+        const reason = isRateLimit ? "rate_limit_exceeded (transient)" : isServer ? "server_error (transient)" : isTransientHTMLResponse ? "HTML API response (transient)" : "partial execution";
         log(`attempt ${attempt + 1}: ${reason} — will retry as ${resumeArgs ? `resume ${lastThreadId}` : "fresh run"} (attempt ${attempt + 2}/${MAX_RETRIES + 1})`);
         return { action: "retry" };
       }
@@ -1335,6 +1354,7 @@ if (typeof module !== "undefined" && module.exports) {
     isRateLimitError,
     isTokenPerMinuteRateLimitError,
     isAuthenticationFailedError,
+    isCodexSessionProgress,
     isMissingApiKeyError,
     isServerError,
     isInvalidModelError,

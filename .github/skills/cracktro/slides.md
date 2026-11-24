@@ -32,7 +32,7 @@ sandbox, firewall, read-only token
 - **Notes** (optional): `illustrative` when the speaker notes must match `/illustrative|synthetic|simulated/i`; omit the field otherwise.
 - **Summary**: one public sentence with the slide's executive takeaway. Start band headers with `Band header (<band>):`. Describe the durable point, not measured counts or dates that age. No URLs, handles or slide numbers.
 - **Keywords**: comma-separated public search terms a viewer might type for this slide: synonyms, acronyms, feature and option names, pattern names. Prefer terms absent from the Heading and Summary; each must be accurate for the slide. No URLs, handles or slide numbers.
-- **Captions**: the kiosk closed captions (C): a short two-speaker TV news conversation retelling the Summary, one `- ` list item per turn, at least two turns, alternating speakers (each turn a sentence or two). Public, plain text: no URLs, handles, slide numbers, real people or mascot names.
+- **Captions**: the kiosk closed captions (C), also spoken by the voice (V): a short conversation between the two hosts in `../cracktro-voice/personas.md` (a GitHub developer-relations show: Host, then Builder) retelling the Summary, one `- ` list item per turn, at least two turns, alternating speakers (each turn a sentence or two). Public, plain text: no URLs, handles, slide numbers, real people or mascot names.
 
 A field's lines join with spaces, so long text may wrap. `docs/src/lib/cracktro/slides.js` parses this file and fails, with the line number, on a malformed slide title, an invalid Id, an unknown, repeated, missing or out-of-order field, an empty Heading, Summary, keyword or caption turn, fewer than two caption turns, an unknown Notes value or a duplicate. The docs build injects every slide into the talk page's JSON-LD (`hasPart`: position, name, description, keywords, `#<id>` URL); the deck's fuzzy search (`/`) reads keywords from there, and `docs/tests/talk.spec.ts` checks the deck's ids, headings and that metadata against this list. The build and dev server also generate `cracktro/captions.js` (`window.CracktroCaptions`) from the Captions fields; it is never committed, so the plain `python3 -m http.server` preview has no captions and kiosk CC falls back to each slide's notes.
 
@@ -52,7 +52,7 @@ gh-aw, intro, overview, title, coding agents, GitHub Actions, markdown
 
 #### Captions
 
-- Good evening, tonight's top story: GitHub Agentic Workflows, and what they mean for your repositories.
+- Hi everyone, and welcome! Today we're looking at GitHub Agentic Workflows, and what they mean for your repositories.
 - Put simply, these are coding agents that run inside GitHub Actions, written in plain Markdown.
 - Coding agents loose in the pipeline? That sounds a little adventurous for a weeknight.
 - That is the twist. They come with guardrails built in, so teams stay firmly in control.
@@ -69,9 +69,9 @@ platform, basics, what is gh-aw, introduction, why
 
 #### Captions
 
-- Coming up next, our Agentic Workflows segment, starting with the basics.
+- Up next, the Agentic Workflows section, starting with the basics.
 - We will cover what agentic workflows are, how teams write them, and why they pay off.
-- Stay with us, the newcomers' guide starts right after this.
+- If you're new here, the newcomers' guide starts right after this.
 
 ### CI/CD meetsContinuous AI {#ci-cd-meets-continuous-ai}
 
@@ -89,7 +89,7 @@ pipeline, CI, CD, runners, checks, logs, continuous integration
 
 #### Captions
 
-- From the pipeline desk tonight: AI is moving into the same pipelines teams already run.
+- Let's start with pipelines: AI is moving into the same pipelines teams already run.
 - Right, the agentic steps run inside existing GitHub Actions pipelines, on the same runners as everything else.
 - So nobody has to learn a whole new system to watch these agents work?
 - Exactly. Same runners, same logs, same checks. The agent just becomes another step you can see.
@@ -110,7 +110,7 @@ definition, category, GitHub Next, triage, docs, fault analysis, auditable
 
 #### Captions
 
-- A new term is making the rounds tonight: Continuous AI. What exactly are we talking about?
+- You may have heard a new term: Continuous AI. What exactly are we talking about?
 - It is named after CI/CD. Any automated AI that supports software collaboration, like docs, triage and fault analysis.
 - And who holds the remote control when that AI is running around the clock?
 - The team does. It stays auditable, triggered by events, and under the team's control at every step.
@@ -131,7 +131,7 @@ frontmatter, front matter, triggers, tools, permissions, prompt, file structure,
 
 #### Captions
 
-- Let's pop the hood tonight and look at what a single workflow actually contains.
+- Let's pop the hood and look at what a single workflow actually contains.
 - It is just one Markdown file. The front matter declares triggers, tools, permissions, steps and safe outputs.
 - And the rest of the page, the part below the front matter, what does that do?
 - The body is the agent prompt. Settings up top, plain language instructions underneath, all in one file.
@@ -152,7 +152,7 @@ runners, OIDC, Entra ID, Vault, GitHub Apps, marketplace, reusable workflows, cu
 
 #### Captions
 
-- Good news for platform teams tonight: your existing CI investment is not going anywhere.
+- Good news for platform teams: your existing CI investment is not going anywhere.
 - Agentic workflows compile to plain GitHub Actions, so environments, runners, GitHub Apps and marketplace actions all carry over.
 - What about the identity plumbing, things like Entra ID and Vault OIDC, or custom jobs?
 - All reused, along with reusable workflow calls. Every piece of your Actions infrastructure keeps doing its job.
@@ -169,7 +169,7 @@ compile, lock file, gh aw compile, natural language, authoring, create workflow
 
 #### Captions
 
-- Tonight's how-to story: turning a sentence of intent into a working workflow.
+- Time for a how-to: turning a sentence of intent into a working workflow.
 - You describe the job in plain language, and an agent writes the Markdown workflow for you.
 - Then what? Does that Markdown just run as is, straight off the page?
 - Not quite. gh aw compile deterministically turns it into a hardened Actions lock file, and that is what runs.
@@ -232,7 +232,7 @@ Agent Persona Explorer, personas, evaluation, scoring, prefix probe, 8000 bytes,
 
 #### Captions
 
-- Our next story: personas put the guide to the test every single day.
+- Next up: personas put the guide to the test every single day.
 - An explorer agent role-plays many kinds of users and scores each answer on five dimensions.
 - What happens when an answer falls short?
 - It checks what fits in the first eight thousand bytes, files the gaps, and an agent fixes the guidance.
@@ -253,7 +253,7 @@ ROI, metrics, outcomes, backlog burndown, delivery speed, value
 
 #### Captions
 
-- The money question tonight: are these agentic workflows actually worth it for a team?
+- Now the question every team asks: are these agentic workflows actually worth it?
 - The answer comes from tracking outcomes, things like backlog burndown, quality and delivery speed.
 - So the measure is results on the board, not just how busy the robots look?
 - Exactly. Outcomes are what show the value of agentic workflows, and teams can track them over time.
@@ -293,9 +293,9 @@ guardrails, threat model, compromised agent, defense in depth
 
 #### Captions
 
-- Coming up next, our Security segment, and it starts with a sobering rule.
+- Up next, the Security section, and it starts with a sobering rule.
 - The guiding rule here is simple: design every workflow as if the agent is already compromised.
-- Assume the worst, then build defenses in layers. Stay with us for the details.
+- Assume the worst, then build defenses in layers. Let's walk through the details.
 
 ### Agentic attacks {#agentic-attacks}
 
@@ -313,7 +313,7 @@ prompt injection, exfiltration, secrets, destructive commands, threats, attack
 
 #### Captions
 
-- From the security desk tonight: the threats facing AI agents, and how they are being stopped.
+- Let's talk security: the threats facing AI agents, and how they are being stopped.
 - The common attacks range from prompt injection to secret exfiltration and destructive commands.
 - That is quite a lineup. Is there one single wall that blocks all of them?
 - No single wall. Each attack is stopped by one or more layered defenses working together.
@@ -351,7 +351,7 @@ trust, min-integrity, untrusted input, public repo, MCP gateway, author associat
 
 #### Captions
 
-- A developing story on public repositories: what happens to malicious comments on a pull request?
+- Here's a question we hear a lot about public repositories: what happens to malicious comments on a pull request?
 - They never reach the agent. The MCP gateway rates each item by how trusted its author is.
 - So a stranger's sneaky comment just quietly disappears before the model reads it?
 - Right. Anything below the configured minimum integrity is dropped before the model ever sees it.
@@ -372,7 +372,7 @@ credentials, micro-VM, API proxy, egress, no secrets, isolation
 
 #### Captions
 
-- Tonight on the security beat: agents that carry no secrets at all.
+- Here's one of my favorite security ideas: agents that carry no secrets at all.
 - The agent runs in an isolated sandbox, here the experimental micro-VM runtime, and holds no credentials.
 - Then where do the keys live, if the agent is not holding them?
 - Every key stays on the host, behind the MCP gateway, the API proxy and the egress firewall.
@@ -393,7 +393,7 @@ pinned actions, SHA pinning, static analysis, least privilege, secret scan, expr
 
 #### Captions
 
-- From the supply chain desk: checks that happen before a workflow ever runs.
+- On to the supply chain: checks that happen before a workflow ever runs.
 - The compiler applies layered static checks, including trigger admission, expression safety and pinned actions.
 - Pinned actions, expression safety. Is there more on that checklist before launch?
 - Yes, least privilege and secret scans too. All of it is checked before any workflow runs.
@@ -414,7 +414,7 @@ normalization, rewrite, agent-generated code, gh aw lint, lint rules, action-pin
 
 #### Captions
 
-- Here is a story about cleaning up after the robots: the compiler fixing agent-written workflows.
+- This one is about cleaning up after the robots: the compiler fixing agent-written workflows.
 - gh aw lint flags unsafe patterns agents often write, like tag-pinned actions and expressions inside shell commands.
 - Flagging is helpful, but does anything actually get fixed, or just reported?
 - The compiler rewrites them into commit SHA pins, environment variables and detection-gated jobs, so the lock file lints clean.
@@ -435,7 +435,7 @@ writes, threat detection, safe-outputs, scoped jobs, permissions, proposals, YAM
 
 #### Captions
 
-- Tonight we explain safe outputs, the system that decides what an agent is allowed to change.
+- Let's unpack safe outputs, the system that decides what an agent is allowed to change.
 - It starts in the front matter: each allowed write is a typed entry, with limits like max, labels and target.
 - Agents only propose writes. Threat detection then reviews each proposal before anything happens.
 - So who actually presses the button once a proposal is cleared?
@@ -457,7 +457,7 @@ extensibility, custom safe outputs, safe-outputs.scripts, safe-outputs.jobs, saf
 
 #### Captions
 
-- Safe outputs are not a closed list. Tonight: how teams extend what an agent may change.
+- Safe outputs are not a closed list. Here's how teams extend what an agent may change.
 - Built-in handlers cover the common GitHub writes, such as issues, pull requests, comments and labels.
 - And when a team needs something gh-aw does not ship, like a chat notification?
 - A safe script adds a little JavaScript that runs once per call, with no secrets.
@@ -479,7 +479,7 @@ TLA+, TLC, formal methods, invariants, model checking, verification, counterexam
 
 #### Captions
 
-- From the formal methods desk: the workflow security story is now being mathematically checked.
+- Now for some formal methods: the workflow security model is being mathematically checked.
 - A bounded TLA+ model of the compiled workflow lets TLC check every job schedule against security invariants.
 - How do you know the checker itself is catching real problems and not just nodding along?
 - Seeded faults must break exactly one invariant, and witness traces prove that validated writes still happen.
@@ -500,7 +500,7 @@ private repos, enclave, data leak, schema, isolation, experimental
 
 #### Captions
 
-- An experimental story tonight about keeping private data private: need-to-know enclaves.
+- Something experimental now, about keeping private data private: need-to-know enclaves.
 - Single-use, isolated enclave agents read private repositories and return only schema-constrained values.
 - So they peek at the private material, but only hand back a tightly shaped answer?
 - Exactly, and that means private data cannot leak into public replies. Still experimental, but promising.
@@ -521,7 +521,7 @@ red team, firewall escape, pentest, adversarial, security testing
 
 #### Captions
 
-- Our security desk has an unusual hire tonight: an agent paid to break out.
+- The security team has an unusual teammate: an agent whose job is to break out.
 - A daily red-team agent keeps trying new ways to escape the agent firewall.
 - And when it actually succeeds? That sounds like bad news for someone.
 - It is good news, really. Each escape it finds gets turned into a fix for the firewall.
@@ -555,7 +555,7 @@ factory, mindset, processes, intent
 
 #### Captions
 
-- A bold message from the factory floor tonight: stop manually translating intent into code.
+- Here's a bold idea from the factory floor: stop manually translating intent into code.
 - It is a mindset shift. Engineer the processes that create trusted features, instead of hand-writing every change.
 - So the craft moves from writing the code to designing the factory that builds it?
 - That is the factory mindset in a nutshell. Build trusted processes, and let them turn intent into features.
@@ -572,9 +572,9 @@ patterns, ops, human in the loop, collaboration, processes
 
 #### Captions
 
-- Coming up next, our Human agent processes segment.
+- Up next, the Human agent processes section.
 - The theme is engineering processes, not code, using patterns that pair people with agents.
-- We will walk through those patterns, with worked examples along the way. Stay with us.
+- We will walk through those patterns, with worked examples along the way.
 
 ### Event-driven Hand-offs {#event-driven-hand-offs}
 
@@ -592,7 +592,7 @@ IssueOps, DailyOps, ReviewOps, LabelOps, events, handoff
 
 #### Captions
 
-- Tonight we look at hand-offs, the moments where work passes between people and agents.
+- Let's look at hand-offs, the moments where work passes between people and agents.
 - There are event-driven patterns for it, such as IssueOps, DailyOps, ReviewOps and LabelOps.
 - And in all of those patterns, who gets the final say on what happens?
 - Agents do the work, people make the decisions. That split is the heart of every pattern.
@@ -613,7 +613,7 @@ slash command, ChatOps, label command, triggers, reaction, comment command
 
 #### Captions
 
-- On the chat front tonight: calling an agent with a simple slash command or label.
+- Over in chat: calling an agent with a simple slash command or label.
 - These are synthetic triggers. One front matter line compiles into the real issue, comment and pull request events.
 - What keeps random folks from setting the agent off by accident in a busy thread?
 - A first-word guard and a role check, plus a reaction and status comment. People call it exactly when they want it.
@@ -634,7 +634,7 @@ labels, states, transitions, replace-label, triage, workflow states
 
 #### Captions
 
-- A story about labels tonight, and how they are quietly becoming state machines.
+- Let's talk labels, and how they are quietly becoming state machines.
 - Labels become the states of a process. Replace-label swaps one state for the next.
 - Can an agent just jump straight to whatever label it likes along the way?
 - No. Allowed-transitions limits agents to declared edges, and people with triage role drive the human steps without push access.
@@ -655,7 +655,7 @@ ReviewOps, code review, PR review, reviewers, ready for review
 
 #### Captions
 
-- Code review, squared: tonight's story on reviewers that review before the humans do.
+- Code review, squared: reviewers that review before the humans do.
 - Marking a pull request ready starts agentic reviewers, and Copilot is nudged to fix what they find.
 - So by the time a human opens it, most of the nitpicks are already handled?
 - That is the goal. The human reviewer sees a clean pull request and can focus on what matters.
@@ -676,7 +676,7 @@ simplicity, complexity, lean, review bot, ship, code review
 
 #### Captions
 
-- Meet a reviewer with a single obsession tonight: unnecessary complexity in your pull requests.
+- Meet a reviewer with a single obsession: unnecessary complexity in your pull requests.
 - It is read-only. It posts one-line findings showing the lines each one saves, and says ship when nothing is left to cut.
 - Does it actually find much, or does it just nag everybody about tidiness?
 - Measured on gh-aw, most ready pull requests are already lean, and most of its findings get acted on.
@@ -697,7 +697,7 @@ cookie, queue, scheduler, assign, Copilot, backlog
 
 #### Captions
 
-- A sweet story tonight: meet Issue Monster, a scheduler that loves cookie issues.
+- Here's a sweet one: meet Issue Monster, a scheduler that loves cookie issues.
 - Agents file their follow-ups into a cookie-labelled issue queue, and a scheduler keeps watch over it.
 - Does the monster wake up an expensive agent every single time it checks that queue?
 - No. It runs cheap deterministic gates first, and only wakes an agent to assign the best few issues to Copilot.
@@ -718,7 +718,7 @@ ADR, architecture decision record, design, docs, decisions
 
 #### Captions
 
-- From the architecture desk: making sure big design decisions do not go unrecorded.
+- On the architecture side: making sure big design decisions do not go unrecorded.
 - When a ready pull request carries an architecture decision with no record, an agent drafts an ADR.
 - Does the agent just publish that record on its own, or do people step in?
 - People finalize and merge it with the code, and later agents read it to learn why things work that way.
@@ -739,7 +739,7 @@ stale PRs, nudge, CI failures, review comments, idle pull requests
 
 #### Captions
 
-- In the kitchen tonight: PR Sous Chef, keeping idle pull requests from going cold.
+- Into the kitchen: PR Sous Chef, keeping idle pull requests from going cold.
 - It regularly finds pull requests with work waiting, like unresolved review comments or failing CI.
 - And then what, does it take over the stove and cook the fix itself?
 - It nudges Copilot to pick the work back up, while humans still review and merge.
@@ -760,7 +760,7 @@ IssueOps, debug, bug reports, anonymized, contributors, planning
 
 #### Captions
 
-- A community story tonight: how contributor bug reports are turning into clear statements of intent.
+- A community favorite: how contributor bug reports are turning into clear statements of intent.
 - Contributors run a debug agent on their own failures, then file anonymized issues that state intent.
 - What happens to those issues once they land with the maintainers?
 - Maintainers plan them and assign them to Copilot, so a contributor's failure becomes a tracked fix.
@@ -802,7 +802,7 @@ maintenance, triage, stale, backlog, assistant, maintainer
 
 #### Captions
 
-- For overworked maintainers tonight, some relief: a repository assistant on a schedule.
+- For overworked maintainers, some relief: a repository assistant on a schedule.
 - Repo Assist picks maintenance tasks like triage and stale pull requests, all on its own schedule.
 - Does anyone check its homework, or does it just ship whatever it likes?
 - A maintainer reviews every result, and the backlogs shrink. Help, with a human still signing off.
@@ -823,7 +823,7 @@ performance, benchmarks, regressions, perf, ResearchPlanAssignOps
 
 #### Captions
 
-- On the performance beat tonight: research, assign, observe, a loop that keeps speed in check.
+- On performance: research, assign, observe, a loop that keeps speed in check.
 - A daily benchmark agent files performance regressions, and Copilot works on fixing them.
 - How does anyone know a fix actually made things faster again?
 - The next run observes the result, which closes the loop. Measure, fix, and measure again.
@@ -844,7 +844,7 @@ vulnerabilities, security bugs, falsification, bug hunt
 
 #### Captions
 
-- From the security desk: a bug hunter that tries hard to prove itself wrong.
+- Back to security: a bug hunter that tries hard to prove itself wrong.
 - A daily agent hunts for vulnerabilities in deterministically scoped, rotating files across the codebase.
 - And every lead it turns up gets filed as an issue right away?
 - No. It discards every lead it can falsify, files only the survivors, and Copilot fixes those.
@@ -865,7 +865,7 @@ observability, telemetry, OpenTelemetry, OTel, DevOps, instrumentation
 
 #### Captions
 
-- Tonight's observability story: an agent that reads live telemetry and reports what is missing.
+- Let's talk observability: an agent that reads live telemetry and reports what is missing.
 - An expert DevOps agent read telemetry through observability MCP servers and found instrumentation gaps.
 - Did it dump a huge list of problems on the team all at once?
 - It filed the most important gap each day, steadily growing OpenTelemetry support.
@@ -886,7 +886,7 @@ debug logging, DEBUG, DEBUG_COLORS, stderr, namespaces, logger, Go Logger, troub
 
 #### Captions
 
-- Tonight we ask: what does an agent use as its debugger? The answer may surprise you.
+- Here's a fun question: what does an agent use as its debugger? The answer may surprise you.
 - Namespaced debug logging. A DEBUG-scoped rerun turns a silent failure into stderr evidence of branch and state.
 - And who keeps adding those log calls as the code keeps changing?
 - A daily Go Logger workflow adds side-effect-free log calls through small, reviewed pull requests.
@@ -907,7 +907,7 @@ refactoring, misplaced code, intent, functions, code organization
 
 #### Captions
 
-- Closing out tonight's segment: semantic clustering, sorting code by what it means, not how it looks.
+- To round out this set: semantic clustering, sorting code by what it means, not how it looks.
 - Grouping functions by intent rather than by text exposes misplaced code that duplicate detection misses.
 - So it finds the function that wandered into the wrong neighborhood?
 - Exactly, and then Copilot moves it to where it belongs. Tidier code, organized by purpose.
@@ -928,7 +928,7 @@ Go, golang, dependencies, modules, releases, upgrades
 
 #### Captions
 
-- From the dependency desk tonight: an agent that is a genuine fan of your Go modules.
+- On dependencies: an agent that is a genuine fan of your Go modules.
 - Every day it compares each Go dependency's new releases with how your code actually uses it.
 - So it reads release notes so the team does not have to?
 - Exactly, and it files review issues that Copilot then turns into fixes. Upgrades stop piling up.
@@ -970,7 +970,7 @@ mining, optimization, prompts, skills, linters, self-improvement, meta
 
 #### Captions
 
-- Our science correspondent reports agents are now dreaming. Yes, you heard that right.
+- This one sounds like science fiction: agents are now dreaming. Yes, you heard that right.
 - Dreaming agents mine the activity between people and agents, like review threads, sessions and failed runs.
 - And what do they do with all those memories?
 - They use them to design and optimize agentic workflows, prompts, skills and linters. The system improves itself.
@@ -991,7 +991,7 @@ linters, review corrections, static analysis, go vet, analyzers
 
 #### Captions
 
-- Tired of leaving the same review comment again and again? This next story is for you.
+- Tired of leaving the same review comment again and again? This next one is for you.
 - Recurring review corrections get mined and turned into Go linters, the kind of static analyzers go vet runs.
 - So the reviewer's pet peeve becomes a rule?
 - Right. The linter is refined through review, then applied across the whole repository automatically.
@@ -1012,7 +1012,7 @@ strategy cache, code analysis, exploration, exploitation, linters
 
 #### Captions
 
-- Tonight, a code-analysis agent that keeps notes on what works.
+- Next, a code-analysis agent that keeps notes on what works.
 - It runs daily with a strategy cache, balancing proven strategies against exploring brand new ones.
 - Reuse what works, but keep looking. Sounds like a good life motto.
 - And it pays off, because every pattern it finds becomes a linter that guards the code from then on.
@@ -1054,7 +1054,7 @@ SpecOps, specifications, tests, requirements, enforcer
 
 #### Captions
 
-- In testing news, specifications are finally keeping up with the code.
+- On testing: specifications are finally keeping up with the code.
 - Agents keep specs current from human intent and from code changes, so the document never goes stale.
 - A living spec. But does anyone check the code against it?
 - An enforcer agent does, turning the specification into tests that guard the next change.
@@ -1096,7 +1096,7 @@ TLA+, compare-and-swap, git log, DAG, mutants, witnesses, formal
 
 #### Captions
 
-- Our formal methods beat continues with a work queue, fully modeled.
+- More formal methods now, with a work queue, fully modeled.
 - The queue is specified as TLA+ modules covering lifecycle, compare-and-swap publication on a git log, DAG and external gates.
 - How do they know the model is actually catching problems?
 - Deliberate mutants must fail, and expected witnesses must be reached. The model has to prove it has teeth.
@@ -1117,7 +1117,7 @@ documentation, docs, newcomer, unbloat, self-healing, tutorials
 
 #### Captions
 
-- Good news for anyone who has ever been lost in a tutorial: docs that heal themselves.
+- If you've ever been lost in a tutorial, you'll like this: docs that heal themselves.
 - Small agents update, simplify and test the documentation the way a newcomer would actually read it.
 - And what happens at the spots where a newcomer would get stuck?
 - They fix the gaps, then teach the updater new rules so the same gap does not come back.
@@ -1159,7 +1159,7 @@ audits, issues, docs auditor, defects, reports, follow-through
 
 #### Captions
 
-- An investigation into audit reports, and which findings actually get fixed.
+- Let's dig into audit reports, and which findings actually get fixed.
 - Docs auditor agents file their findings as issues. The ones handed to Copilot as one checkable defect get fixed.
 - And the big rolling reports nobody is assigned to?
 - They mostly expire. Lesson learned: make each finding a single checkable defect with a clear owner.
@@ -1180,9 +1180,9 @@ personas, role-play, evals, prompt truncation, scoring, guidance
 
 #### Captions
 
-- Role-play hits the newsroom. An agent is pretending to be your software users.
+- Time for some role-play. An agent is pretending to be your software users.
 - Daily, it plays personas asking the workflow-authoring agent for automations, then scores the answers it gets.
-- Scoring answers is one thing. Is there a twist to this story?
+- Scoring answers is one thing. Is there a twist here?
 - It re-runs one on a truncated guidance prefix to find rules the cut hides. Copilot moves them up, and the next run re-scores.
 
 ### Speech To Agent {#speech-to-agent}
@@ -1222,7 +1222,7 @@ product managers, product, habits, artifacts, non-engineers
 
 #### Captions
 
-- Not an engineer? Stay with us, because this story is for product managers.
+- Not an engineer? Stick around, because this one is for product managers.
 - Agentic workflows serve PMs too. An existing team habit triggers an agent, no new process required.
 - And what does the PM get out of it?
 - The agent leaves an artifact, and a human makes the decision. Agents prepare, people decide.
@@ -1243,7 +1243,7 @@ trust, review, process, confidence, skim
 
 #### Captions
 
-- A provocative headline tonight: if every pull request needs deep human review, you do not trust your process.
+- Here's a spicy take: if every pull request needs deep human review, you do not trust your process.
 - The fix is not more reviewing. It is better checks, agent reviewers and tests.
 - So we keep improving the process until what, exactly?
 - Until a quick skim is enough. Build confidence into the process, and trust it.
@@ -1260,9 +1260,9 @@ FinOps, cost optimization, cost, spend, tokens, budget, savings
 
 #### Captions
 
-- Coming up next, our FinOps segment. Stay with us.
+- Up next, the FinOps section.
 - We will look at how to get more value from agents while spending fewer tokens.
-- Keep your wallets handy, folks. Stay with us.
+- Keep your wallets handy, folks.
 
 ### Cost management {#cost-management}
 
@@ -1301,7 +1301,7 @@ rate limit, budget, limits, admission, runaway, throttle, max-ai-credits
 
 #### Captions
 
-- From the finance desk: how to stop a runaway agent before it runs up the bill.
+- On cost: how to stop a runaway agent before it runs up the bill.
 - Guardrails are layered. Execution controls, including an experimental user rate limit, throttle events first.
 - And if throttling alone is not enough to stop it?
 - A daily budget blocks runs before activation, per-run limits hard-stop a run, and optional central admission approves or denies each run.
@@ -1343,7 +1343,7 @@ router, cheapest model, reasoning effort, model selection, experimental
 
 #### Captions
 
-- Experimental news now: a router that shops for models on your behalf.
+- Something experimental now: a router that shops for models on your behalf.
 - With model set to router, each run gets the cheapest model and reasoning effort good enough for its task and stakes.
 - Cheap is great, but can we see why it chose what it chose?
 - Yes. Audit shows the reasoning behind each choice, so savings never become a mystery.
@@ -1385,7 +1385,7 @@ gh-proxy, cli-proxy, jq, bash, context window, MCP tools, tokens
 
 #### Captions
 
-- A head-to-head matchup tonight: CLI versus MCP, and your context window is the prize.
+- A head-to-head matchup: CLI versus MCP, and your context window is the prize.
 - A fat MCP call, like listing code scanning alerts, pours every field of every alert into context.
 - That sounds expensive. So what is the alternative approach?
 - With gh-proxy and cli-proxy, the agent saves the full response to a file and pipes out only the answer with jq.
@@ -1406,7 +1406,7 @@ skills, sub-agents, smaller models, delegation, prompt size
 
 #### Captions
 
-- Prompts getting too long? Here is a tip from the engineering desk.
+- Prompts getting too long? Here is an engineering tip.
 - Defer detailed instructions into inline skills, and delegate focused work to agents running on smaller models.
 - Does anyone actually work this way in practice?
 - Real workflow examples show both patterns in use. Smaller prompts, smaller models, same results.
@@ -1427,7 +1427,7 @@ audit, optimization, health, cost, tuning, failing workflow
 
 #### Captions
 
-- Tonight, a health agent that checks up on other workflows.
+- Next, a health agent that checks up on other workflows.
 - It spots a failing or costly workflow, then audits its unified session through the agentic-workflows skill.
 - A doctor for workflows, then. And what is the treatment?
 - It tunes the workflow, so the next run is cheaper. Diagnosis and cure in one loop.
@@ -1444,9 +1444,9 @@ engineering, memory, handoffs, search, measurement
 
 #### Captions
 
-- Coming up next, our Agentic Engineering segment. Stay with us.
+- Up next, the Agentic Engineering section.
 - We cover skipping needless runs, and giving agents memory, hand-offs, expiry, search and measurement.
-- The nuts and bolts of agents that work well together. Stay tuned.
+- The nuts and bolts of agents that work well together.
 
 ### Agents that debug agents {#agents-that-debug-agents}
 
@@ -1485,7 +1485,7 @@ engines, Copilot, Claude, Codex, Gemini, models, providers
 
 #### Captions
 
-- Switching agents used to mean a rewrite. Not anymore, our analyst reports.
+- Switching agents used to mean a rewrite. Not anymore.
 - One Markdown workflow switches its coding agent and model provider with just two front matter lines.
 - And the safety guardrails? Do they survive the switch?
 - They stay exactly the same. Any agent, any provider, one set of guardrails.
@@ -1506,7 +1506,7 @@ skip, gates, noop, skip-if, pre-activation, cheap checks
 
 #### Captions
 
-- Our top money-saving tip tonight is a simple one: do not run the agent.
+- My top money-saving tip is a simple one: do not run the agent.
 - The cheapest agent call is the one never made. Cheap deterministic gates, from triggers to noop short-circuits, run first.
 - And what if those cheap gates cannot decide on their own?
 - Only then, if necessary, an experimental model-based skip decision steps in. Cheap checks first, agents last.
@@ -1527,7 +1527,7 @@ noop, no-op, hallucination, report_missing_tool, report_missing_data, report_inc
 
 #### Captions
 
-- Tonight, a lesson in honesty: sometimes the best thing an agent can do is nothing at all.
+- Here's a lesson in honesty: sometimes the best thing an agent can do is nothing at all.
 - When there is nothing to do, the agent calls the noop safe output instead of inventing an issue or a fake finding.
 - And when a run hits a wall, say a missing tool, missing data or a crashed server?
 - It reports exactly that, missing tool, missing data or incomplete, instead of faking a result. Silence never counts as a noop.
@@ -1586,7 +1586,7 @@ memory, cache-memory, repo-memory, persistence, state
 
 #### Captions
 
-- Can agents remember things between runs? Our analyst has the details.
+- Can agents remember things between runs? Let's get into the details.
 - Configured memories are restored read-only into each run, so the agent starts with what it knew before.
 - Read-only, you say? Then who saves the new memories afterward?
 - Trusted jobs persist cache, repository, comment and ledger memory after the run. The agent never writes directly.
@@ -1607,7 +1607,7 @@ ledger, SQLite, append-only, branch, history, state
 
 #### Captions
 
-- Next up on the engineering desk, agent memory that keeps its receipts.
+- Next up, agent memory that keeps its receipts.
 - Ledgers keep append-only records on their own branch. Agents read a disposable SQLite projection of them.
 - So can an agent quietly rewrite that history, then?
 - No. Agents only request changes, and trusted jobs validate and append them. History stays intact.
@@ -1620,18 +1620,18 @@ illustrative
 
 #### Summary
 
-Experimental: durable execution checkpoints the agent's native session, even after a failed step, so a rerun resumes the session instead of starting over.
+Experimental: when the agent calls the request-continuation safe output with hints, its native session is checkpointed and the next run is dispatched, which restores the session and continues instead of starting over.
 
 #### Keywords
 
-resume, checkpoint, rerun, session, retry, experimental
+request-continuation, request_continuation, safe outputs, durable, resume, checkpoint, continuation, hints, dispatch, aw_context, chain, max, session, experimental
 
 #### Captions
 
 - Experimental, and very welcome: agents that pick up where they left off.
-- Durable execution checkpoints the agent's native session, even after a failed step.
-- So a rerun does not start from scratch?
-- Right, a rerun resumes the session instead of starting over. Less wasted work, less waiting.
+- When the work outgrows one run, the agent requests continuation and leaves hints for its successor.
+- So the next run does not start from scratch?
+- Right, it restores the session, reads the hints and carries on. No request, no checkpoint: the chain stops.
 
 ### Agents Trigger Agents {#agents-trigger-agents}
 
@@ -1649,7 +1649,7 @@ dispatch, workflow_dispatch, chaining, orchestration, call workflow
 
 #### Captions
 
-- Chain reaction tonight: agents are now triggering other agents.
+- Chain reaction: agents are now triggering other agents.
 - They chain through safe-output dispatches, with typed inputs and completion signals passed along.
 - Does that mean one giant run doing everything?
 - No, each agent runs inside its own workflow run. Orchestration without one big tangle.
@@ -1712,7 +1712,7 @@ imports, shared components, includes, modules, reuse
 
 #### Captions
 
-- From the reuse desk tonight: agentic workflows can share building blocks instead of copying them around.
+- On reuse: agentic workflows can share building blocks instead of copying them around.
 - Right. Shared Markdown components are written and reviewed once, then imported by path or from another repository at a ref.
 - And what does the compiler do with all those pieces?
 - It merges and hashes them, so teams reuse trusted parts and know exactly what went into each workflow.
@@ -1733,7 +1733,7 @@ skills, SKILL.md, pinned, sub-agent, triage, review comments
 
 #### Captions
 
-- Our next story is about skills, and how agents pick the right ones for the job.
+- Next, let's talk about skills, and how agents pick the right ones for the job.
 - Skills are declared in front matter, pinned to a commit and installed before the agent even starts.
 - So how does the agent know which skills fit a given pull request?
 - A triage sub-agent picks the fitting ones, and every review comment cites the skill it applied.
@@ -1813,7 +1813,7 @@ attribution, pull request, acceptance, merge window, outcome measurement, surviv
 
 #### Captions
 
-- Still in the experimental corner, tonight we follow a single workflow pull request along its timeline.
+- Still in the experimental corner, let's follow a single workflow pull request along its timeline.
 - It earns attributed value only after it is delivered and a person actually accepts it.
 - That sounds strict. What else has to happen?
 - Equal windows around the merge must show the outcome change, and its files must survive the whole window.
@@ -1847,9 +1847,9 @@ enterprise, scale, organization, governance, admins
 
 #### Captions
 
-- Coming up next, stay with us for our Enterprise segment.
+- Up next, the Enterprise section.
 - This one is about running agentic workflows with any agent, any provider, at any scale.
-- Stay with us, admins, this segment is for you.
+- Admins, this section is for you.
 
 ### Infrastructure as code {#infrastructure-as-code}
 
@@ -1867,7 +1867,7 @@ YAML, IaC, runners, actions, enterprise controls, compile
 
 #### Captions
 
-- Enterprise news: agentic workflows are infrastructure as code at heart.
+- For enterprises: agentic workflows are infrastructure as code at heart.
 - They compile to plain Actions YAML, so they run on any runner and reuse the Actions ecosystem.
 - What about the controls enterprises already depend on?
 - Those stay in place, and the agent keeps running behind the firewall.
@@ -1888,7 +1888,7 @@ OTel, OTLP, traces, telemetry, observability, collector
 
 #### Captions
 
-- On the observability beat, agentic workflows speak OpenTelemetry.
+- On observability, agentic workflows speak OpenTelemetry.
 - They export traces to collectors you run yourself, not to someone else's backend.
 - Is that something teams configure workflow by workflow, then?
 - Either per workflow or as an organization default, whichever fits your team.
@@ -1909,7 +1909,7 @@ traces, spans, OpenTelemetry, cross-repo, cost, observability
 
 #### Captions
 
-- Tracing a task from start to finish, our next story follows one shared trace.
+- Tracing a task from start to finish, let's follow one shared trace.
 - That trace covers workflow runs and jobs, agent sessions, tool calls, retries and dispatched runs in other repositories.
 - And can you see what each step cost?
 - Yes, outcomes and cost are recorded on every span, so nothing hides in the gaps.
@@ -1930,7 +1930,7 @@ policy, variables, organization, protected environments, defaults, admins
 
 #### Captions
 
-- Governance now, and the headline is that it stays GitHub-native.
+- Governance now, and the big idea is that it stays GitHub-native.
 - Defaults and policy variables can be set at enterprise, organization or repository scope.
 - And who actually enforces those rules once they are set?
 - GitHub controls do, such as protected environments, the same tools admins already trust.
@@ -1972,7 +1972,7 @@ GitHub App, tokens, installation token, scoped, permissions, least privilege
 
 #### Captions
 
-- Turning to the security desk: how agentic workflows handle permissions with a GitHub App.
+- Back to security: how agentic workflows handle permissions with a GitHub App.
 - The app is installed on selected repositories and mints short-lived, scoped tokens.
 - So does the agent get to write with those tokens?
 - No. The agent stays read-only, and writes are left to trusted safe-output jobs in each repository.
@@ -2014,7 +2014,7 @@ OIDC, credentials, broker, short-lived, secrets, identity
 
 #### Captions
 
-- From the security desk, an experimental way to keep long-lived secrets out of repositories.
+- On security, an experimental way to keep long-lived secrets out of repositories.
 - A deployment-owned broker verifies a job's OIDC identity before handing out anything.
 - And what does the job get back once it checks out?
 - A short-lived credential, so no long-lived secret has to be stored in the repository.
@@ -2035,7 +2035,7 @@ squad, team, pairing, SDLC, AI agents, onboarding
 
 #### Captions
 
-- A different kind of team story now: help that arrives with the task.
+- A different kind of team pattern now: help that arrives with the task.
 - Each task comes with its own squad of human-led AI agents that join the developer's repository.
 - So do those agents simply take over the work entirely?
 - They pair with the developer, then step back and leave their decisions behind.
@@ -2056,7 +2056,7 @@ third-party, integrations, Slack, Jira, connectors, services
 
 #### Captions
 
-- Integration news tonight: experimental connectors for your favorite third-party services.
+- On integrations: experimental connectors for your favorite third-party services.
 - A connector declares everything a third-party service offers, all in one place.
 - Does every workflow get all of that access?
 - No, a workflow imports the connector and selects only the reads and writes it needs.
@@ -2094,9 +2094,9 @@ CAO, gh cao, central, fleet, operations, research prototype
 
 #### Captions
 
-- Coming up next, our Central Agentic Ops segment.
+- Up next, the Central Agentic Ops section.
 - It covers gh cao, a research prototype for operating agentic workflows across many repositories.
-- Think fleet operations at a whole new level. Stay tuned.
+- Think fleet operations at a whole new level.
 
 ### Hyperscale Agentics {#hyperscale-agentics}
 
@@ -2114,7 +2114,7 @@ scale, fleet, telemetry, operations database, data lake
 
 #### Captions
 
-- Research prototype news now, from the world of hyperscale agentics.
+- Here's a research prototype from the world of hyperscale agentics.
 - At enterprise scale, every agent run reports into telemetry, an operations database and a session data lake.
 - So how does anyone keep track of that many runs?
 - You manage fleets from aggregates, not by staring at individual runs.
@@ -2135,7 +2135,7 @@ campaigns, rollout, control repo, fleet, organization
 
 #### Captions
 
-- Rolling out change across a whole enterprise is our next research prototype story.
+- Next research prototype: rolling out change across a whole enterprise.
 - A control repository installs and tracks campaigns across the enterprise's repositories.
 - And what exactly do those campaigns carry out to repositories?
 - Agentic processes, rolled out consistently instead of set up one repository at a time.
@@ -2198,7 +2198,7 @@ data lake, sessions, redaction, analytics, storage
 
 #### Captions
 
-- Where do run sessions go after the run? Our research prototype desk reports.
+- Where do run sessions go after the run? Here's a research prototype that answers that.
 - With opt-in, redacted run sessions land in an immutable, queryable data lake.
 - Is that the same place the dashboards use?
 - No, it is kept separate from the dashboard store by design.
@@ -2219,7 +2219,7 @@ dashboard, query language, MCP, operations, costliest workflows
 
 #### Captions
 
-- Agents analyzing operations data is our next research prototype story.
+- Another research prototype: agents analyzing operations data.
 - They query it through a constrained dashboard language and a read-only MCP server.
 - And what are those agents looking for in all that data?
 - The costliest workflows, so they can find them and optimize them.
@@ -2236,9 +2236,9 @@ dogfooding, factory, history, how gh-aw is built
 
 #### Captions
 
-- Coming up next, stay tuned for our AW factory segment.
+- Up next, the AW factory section.
 - It shows how gh-aw builds itself with agentic workflows, from measured project history to agent changes landing as pull requests.
-- A behind-the-scenes look at the factory floor. Stay with us.
+- A behind-the-scenes look at the factory floor.
 
 ### First commit to GA {#first-commit-to-ga}
 
@@ -2307,7 +2307,7 @@ create-pull-request, patch, signed commits, git push, safe output
 
 #### Captions
 
-- Back on the security desk, how an agent's commits safely become a pull request.
+- Back to security, and how an agent's commits safely become a pull request.
 - The create-pull-request safe output turns local commits into a pull request through scanning and file policy checks.
 - And can reviewers trust the pushes that come out of it?
 - They are signed, and if a pull request cannot be created, it falls back to opening issues.
@@ -2345,7 +2345,7 @@ finale, ending, closing, processes not prompts, control repo, thanks
 
 #### Captions
 
-- And that brings us to tonight's final story: GitHub Agentic Workflows.
+- And that brings us to the wrap-up: GitHub Agentic Workflows.
 - A control repository coordinates small, guarded agentic processes across many repositories.
-- If viewers remember one thing, what should it be?
-- Processes, not prompts. Thanks for watching, and good night from all of us.
+- If folks remember one thing, what should it be?
+- Processes, not prompts. Thanks for joining us, and happy building!

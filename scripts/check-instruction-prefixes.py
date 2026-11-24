@@ -35,19 +35,37 @@ ENTRY_POINTS = (
 def inspect(path):
     data = path.read_bytes()
     data.decode("utf-8")
-    markers = list(re.finditer(rb"(?m)^" + re.escape(MARKER) + rb"\r?$", data))
+    prompt = data
     errors = []
+    is_workflow = any(
+        path.parts[index : index + 2] == (".github", "workflows")
+        for index in range(len(path.parts) - 1)
+    )
+    frontmatter = re.match(rb"\A(?:\xef\xbb\xbf)?---[ \t]*\r?\n", data) if is_workflow else None
+    if frontmatter:
+        closing = re.search(rb"(?m)^---[ \t]*\r?$", data[frontmatter.end() :])
+        if closing is None:
+            prompt = b""
+            errors.append("close YAML frontmatter before the contract ends")
+        else:
+            body_start = frontmatter.end() + closing.end()
+            if data[body_start : body_start + 2] == b"\r\n":
+                body_start += 2
+            elif data[body_start : body_start + 1] == b"\n":
+                body_start += 1
+            prompt = data[body_start:]
+    markers = list(re.finditer(rb"(?m)^" + re.escape(MARKER) + rb"\r?$", prompt))
     if len(markers) > 1:
         errors.append("use exactly one instruction-prefix-end marker")
-    end = markers[0].end() if markers else len(data)
+    end = markers[0].end() if markers else len(prompt)
     if end > CONTRACT_BYTES:
         errors.append(
             f"contract ends at byte {end}; limit is {CONTRACT_BYTES}. "
             "Compress it or move optional detail after an early instruction-prefix-end marker"
         )
-    contract = data[:end].decode("utf-8")
+    contract = prompt[:end].decode("utf-8")
     lines = contract.splitlines()
-    if lines and lines[0] == "---" and "---" not in lines[1:]:
+    if not is_workflow and lines and lines[0] == "---" and "---" not in lines[1:]:
         errors.append("close YAML frontmatter before the contract ends")
     fence = None
     for line in lines:
@@ -64,8 +82,8 @@ def inspect(path):
     return {
         "path": str(path),
         "total_bytes": len(data),
-        "visible_bytes": min(len(data), QUERY_BYTES),
-        "omitted_bytes": max(0, len(data) - QUERY_BYTES),
+        "visible_bytes": min(len(prompt), QUERY_BYTES),
+        "omitted_bytes": max(0, len(prompt) - QUERY_BYTES),
         "contract_bytes": end,
         "errors": errors,
     }

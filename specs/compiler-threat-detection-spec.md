@@ -7,7 +7,7 @@ sidebar:
 
 # GitHub Actions Compiler Threat Detection Specification
 
-**Version**: 1.0.107
+**Version**: 1.0.111
 **Status**: Candidate Recommendation  
 **Latest Version**: https://github.com/github/gh-aw/blob/main/specs/compiler-threat-detection-spec.md  
 **Editors**: GitHub Next (GitHub, Inc.)
@@ -32,7 +32,7 @@ Each version maps to the minimum compatible binary. A version change MUST update
 
 | Versions | Minimum gh-aw |
 |---|---:|
-| `1.0.60`–`1.0.107` | Unreleased |
+| `1.0.60`–`1.0.111` | Unreleased |
 | `1.0.44`–`1.0.59` | Unreleased |
 | `1.0.40`–`1.0.43` | `v0.87.9` |
 | `1.0.39` | `v0.87.9` |
@@ -60,6 +60,7 @@ The following implementation snapshot complements the detailed mapping in Sectio
 | Local-only runtime imports | `pkg/workflow/runtime_import_validation.go`, `actions/setup/js/runtime_import.cjs` | `pkg/workflow/runtime_import_target_policy_test.go`, `actions/setup/js/runtime_import_target_policy.test.cjs` | 2026-11-04 |
 | Fork admission and checkout expansion | `pkg/workflow/filters.go`, `pkg/workflow/checkout_manager.go` | `pkg/workflow/filters_forks_test.go`, `pkg/workflow/checkout_multi_test.go` | 2026-11-04 |
 | CTR-032 publisher provenance | `pkg/workflow/compiler_safe_outputs_steps.go`, `actions/setup/js/execution_provenance.cjs` | `pkg/workflow/safe_outputs_job_identity_test.go`, `actions/setup/js/execution_provenance.test.cjs` | 2026-11-04 |
+| Compile-time engine release cooldown | `pkg/workflow/engine_release_cooldown.go`, `pkg/workflow/engine_installation_packages.go` | `pkg/workflow/engine_release_cooldown_test.go` | 2026-11-23 |
 
 ## 3. Threat Model Overview
 
@@ -86,6 +87,8 @@ The [November 2026 Depi Security Codex disclosure](https://depi.security/blog/20
 - Cache-memory namespaces and publication gates (Section 5.1.3) do not stop a stolen runtime token from writing cache entries directly.
 
 Workflows that publish packages or hold `id-token: write` SHOULD NOT restore caches that untrusted-trigger workflows on the same repository can write. Agent jobs SHOULD NOT hold `id-token: write`.
+
+The [Alpha-Omega dangerous-trigger guidance](https://alpha-omega.dev/blog/de-fanging-dangerous-triggers-in-github-actions-across-an-organization/) recommends explicit GitHub Actions event allowlists, especially excluding `pull_request_target` and `issue_comment` when unnecessary. Both can be triggered by untrusted contributors in the base repository context; comment interpolation and privileged execution of PR code can expose credentials or compromise releases. CTR-008 retains its independent role and checkout enforcement. CTR-039 adds advisory comment-trigger coverage, including AW command shorthands. GitHub organization/repository event policies are external controls: operators SHOULD evaluate an explicit allowlist before enforcing it. Compilation cannot inspect or attest those policies, and a local warning or its suppression does not authorize execution.
 
 Compiler-controlled bootstrap code uses independently provisioned release digests and HTTPS-only redirects as mapped in [security architecture §6.8](security-architecture-spec.md#68-transport-trust-and-bootstrap-integrity). The trusted setup action authenticates AWF and Copilot checksum manifests before consuming asset digests; threat-detect uses compiler-supplied asset digests, and Docker Compose uses compiler-supplied per-architecture digests. Release builds enforce the actual Go toolchain floor independently of `go.mod`. These are bootstrap/runtime controls, not a new `CTR-*` rejection of workflow network declarations. Broader executable-download enforcement remains a candidate under §5.3 until all engine/package-manager paths have independent authentication and deployment evidence. Compilation cannot attest arbitrary runner, proxy, MCP, or container trust stores; runtime inventory is diagnostic evidence, not conformance proof.
 
@@ -245,6 +248,8 @@ Each rule has a stable `CTR-*` ID, threat class, trigger, compiler action, diagn
   Compiler-generated universal-consumer Copilot credentials MUST remain provider-scoped; OpenAI-compatible client placeholders MUST follow the startup/sandbox boundary in Section 7.6. This is a generated-configuration requirement, not an additional authored-source lint diagnostic.
 
   Compiler-generated agent step-summary publication MUST execute only when the workflow's secret-masking success condition succeeds, while retaining `always()` semantics for prior-step outcomes. The redaction implementation MUST fail closed on permission-denied scan errors and summary-symlink unlink failures. The summary publisher MUST use the shared Linux descriptor-relative, no-follow guarded reader; accept only isolated regular files no larger than 10 MiB; preserve missing and empty files as no-ops; and fail closed for unsupported, replaced, symlinked, or non-regular files. These controls MUST NOT weaken existing secret-redaction, publication, or failure-gating obligations.
+
+  The `overprovisioned-secrets` Actions/AW lint rule MUST report expressions that expose the whole `secrets` context, including `toJSON(secrets)` and wildcard projections. Literal and dynamic property selection, such as `secrets.NAME`, `secrets['NAME']`, or `secrets[fromJSON(vars.MAP)[github.repository]]`, MUST NOT by itself be classified as whole-context exposure. Selector expressions MUST still be inspected: `secrets[fromJSON(toJSON(secrets))[github.repository]]` MUST be reported. Whole-context findings and authored remote reusable-workflow `secrets: inherit` MUST be errors under strict AW policy and warnings for non-strict AW or Actions-only inputs. Authored local reusable-workflow inheritance MUST remain a warning; the existing compiler-generated call-workflow fallback exception remains unchanged. Accepting single-secret selection MUST NOT establish selector trust, authorize disclosure, or weaken independent credential-placement, prompt-binding, and secret-leak controls.
 - **CTR-018 Version Integrity Bypass**: Warn, or reject in strict mode, for `check-for-updates: false`.
 - **CTR-019 Cache-Memory Integrity Enforcement**: When detection is enabled, separate agent cache access from cache-memory publication and require successful agent and detection jobs plus explicit detector acceptance before publication, subject to the compatibility boundaries in Section 5.1.3.
 - **CTR-020 Conditional Import Security**: Reject `imports` entries containing `if`.
@@ -265,6 +270,13 @@ Each rule has a stable `CTR-*` ID, threat class, trigger, compiler action, diagn
 - **CTR-036 Safe-Output Environment File Mutation**: Writes from authored safe-output steps to `GITHUB_ENV` or `GITHUB_PATH`, in `run` scripts or via `core.exportVariable`/`core.addPath` in `actions/github-script`, persist into later handler steps that hold write tokens. The Actions/AW linter MUST report them; step-level `env` and `GITHUB_OUTPUT` remain accepted.
 - **CTR-037 Safe-Output Credential-Persisting Checkout**: An authored safe-output `actions/checkout` step that omits `persist-credentials: false` replaces the workspace and git credentials prepared for handlers. The Actions/AW linter MUST report it.
 - **CTR-038 Safe-Output Handler Input Tampering**: Handlers apply agent output and patch files under `/tmp/gh-aw` (including `GH_AW_AGENT_OUTPUT`, `GH_AW_SAFE_OUTPUTS`, and `RUNNER_TEMP`/`runner.temp` `gh-aw` paths) after threat detection. The Actions/AW linter MUST report authored `run` scripts that redirect into, `tee`, edit in place, remove, truncate, move, or copy onto those paths.
+- **CTR-039 Privileged Comment Trigger Exposure**:
+  - **Scope**: The default Actions/AW `dangerous-triggers` linter and lint-enabled compiler MUST correlate `issue_comment`, `pull_request_review`, and `pull_request_review_comment`, including AW `slash_command` and `command` shorthands, with actor admission and `tools.github` integrity filtering in strict and non-strict mode. Analysis MUST retain authored centralized command triggers alongside generated `workflow_dispatch` without duplicating inline command expansions.
+  - **Actor admission**: AW comment findings MUST require both broadened effective `on.roles` (`all`, `read`, or `triage`) and weak filtering. Omitted roles use the protected `admin`, `maintainer`, and `write` defaults; these defaults and explicit trusted-only roles, including `maintain`, MUST suppress the comment finding. Compiler analysis MUST use resolved tools and effective roles, including imports and dry-run admission overrides (retain only `admin`, `maintainer`, or `maintain`; default to `admin`, `maintainer` if none remain). Standalone AW analysis MUST NOT infer imported policy or repository visibility; standalone Actions MUST NOT inherit gh-aw role defaults without AW policy.
+  - **Integrity filtering**: Weak filtering means explicit `min-integrity: none` or `unapproved`, or `lockdown: true` overriding configured guard-policy fields (`allowed-repos`, legacy `repos`, `min-integrity`, `blocked-users`, `trusted-users`, or `approval-labels`). Explicit `approved` or `merged` without that override, or `tools.github: false`, MUST suppress the comment finding. Missing thresholds, unresolved imports, absent tool policy, string GitHub shorthand, and bare lockdown without configured guard fields MUST remain unknown, not evidence of weak filtering: public repositories can apply approved filtering automatically. Explicit thresholds MUST be validated before considering lockdown overrides. `integrity-proxy: false` MUST NOT be treated as disabling MCP gateway filtering.
+  - **Diagnostics**: Malformed modeled roles and tool policy MUST fail explicitly without reproducing values. Concise diagnostics with structured hints or a rule-reference link MUST cover trusted role admission, approved/merged filtering, data-only comment handling, trusted code execution, and external event-allowlist review. Lockdown remediation MUST require disabling lockdown before approved/merged policy takes effect. AW-backed findings MUST use authored AW origin paths so field-scoped suppressions apply in compilation and companion-lock lint; graph-only findings MUST retain Actions paths.
+  - **Independent target warning**: The rule MUST report `pull_request_target` as a CTR-008 advisory warning on standalone Actions and AW inputs, including non-strict AW. Literal AW `on.pull_request_target.acknowledge-risk: true` suppresses only that trigger warning. Compilation MUST deduplicate it only when the equivalent validator warning was actually emitted, not merely because strict mode or an AW document is present. The validator's emission marker MUST reset on entry and be set only after a successful warning write; warning-write errors MUST remain explicit.
+  - **Non-changes**: Checkout disablement and target-risk acknowledgment MUST NOT suppress an applicable comment warning. Integrity filtering controls GitHub tool inputs, not event admission, raw scripts, or checkout safety; trusted actor admission does not attest unrelated tool-content integrity. Credential availability depends on event and job configuration, so review triggers MUST NOT be described as unconditionally granting fork PRs write tokens or secrets. These diagnostics MUST NOT change generated triggers, permissions, runtime authorization, or independent rejection controls. Field-scoped suppression and lint disablement remain available; neither proves safety nor changes GitHub event policy.
 
 CTR-035 through CTR-038 are lint-only guards against accidental misuse by trusted authored steps; they are not a sandbox. Findings MUST be errors under strict mode and warnings otherwise, and MUST NOT include script values.
 
@@ -523,6 +535,7 @@ Every active rule MUST map to implementation and test coverage. References are p
 | CTR-036 Safe-Output Environment File Mutation | `pkg/workflow/lint/safe_output_credentials.go` | `pkg/workflow/lint/safe_output_credentials_test.go`, `pkg/workflow/lint/rule_contract_test.go` |
 | CTR-037 Safe-Output Credential-Persisting Checkout | `pkg/workflow/lint/safe_output_credentials.go` | `pkg/workflow/lint/safe_output_credentials_test.go`, `pkg/workflow/lint/rule_contract_test.go` |
 | CTR-038 Safe-Output Handler Input Tampering | `pkg/workflow/lint/safe_output_credentials.go` | `pkg/workflow/lint/safe_output_credentials_test.go`, `pkg/workflow/lint/rule_contract_test.go` |
+| CTR-039 Privileged Comment Trigger Exposure | `pkg/workflow/lint/dangerous_triggers.go`, `pkg/workflow/compiler_lint.go` | `pkg/workflow/lint/dangerous_triggers_test.go`, `pkg/workflow/compiler_lint_test.go`, `pkg/workflow/lint/rule_contract_test.go` |
 
 ### 7.2 Mapping Audit History
 
@@ -569,6 +582,7 @@ Rules with a known compiler threat mapping MUST declare its `CTR-*` ID in `Rule.
 | CTR-014 | `install-scripts` | Authored Node runtime configuration does not explicitly enable dependency install hooks. Does not infer imported runtime configuration or arbitrary package-install commands. | `pkg/workflow/lint/runtime_policy.go`, `policy_conversions_test.go`, `source_policy_test.go` |
 | CTR-015 | `allowed-labels` | Authored issue, discussion, discussion-update, and pull-request creation label allowlists do not contain a bare wildcard. Required-label names remain literal; narrower allowed-label patterns are accepted. | `pkg/workflow/lint/output_policy.go`, `policy_conversions_test.go` |
 | CTR-017 | `secret-leak` | Symbolic secrets do not reach modeled disclosure sinks through expression, environment, output, shell, file, or explicitly configured JavaScript flows. Coverage warnings identify unmodeled paths; JavaScript analysis requires an explicit native compiler and source configuration. | `pkg/workflow/lint/secrets.go`, `pkg/workflow/taint/`, `pkg/workflow/taint/taint_test.go`, `pkg/workflow/taint/javascript_test.go` |
+| CTR-017 | `overprovisioned-secrets` | Whole-context secrets exposure and authored remote `secrets: inherit` produce errors under strict AW policy, otherwise warnings; local inheritance warns. Literal or dynamic single-property selection is not whole-context exposure, but whole-context references inside selectors remain reported. The compiler-generated call-workflow fallback exemption requires its existing provenance and shape checks. Selector trust and independent disclosure controls are not inferred. | `pkg/workflow/lint/overprovisioned_secrets.go`, `overprovisioned_secrets_test.go`: `TestOverprovisionedSecretsSelectors`, Actions/AW inheritance and severity cases, compiler-fallback provenance, and cancellation; `rule_contract_test.go` verifies mapping and read-only contracts. |
 | CTR-017 | `otlp-secret-leak` | Secret-tainted values do not reach authored OTLP span/resource attribute maps or Actions environment bindings named `GH_AW_OTLP_ATTRIBUTES` and `OTEL_RESOURCE_ATTRIBUTES`. Actions AST analysis follows modeled environment bindings; AW-only analysis checks direct secret references. Diagnostics are value-free. Hard-coded credentials, arbitrary runtime values, and unresolved external inputs are not inferred, and the linter does not prove collector trust or compiler rejection. | `pkg/workflow/lint/otlp_secret_leak.go`, `otlp_secret_leak_test.go`; `pkg/workflow/taint/workflow.go` |
 | CTR-018 | `version-check` | An authored AW document does not explicitly disable version integrity checking. | `pkg/workflow/lint/source_policy.go`, `source_policy_test.go` |
 | CTR-020 | `conditional-import` | Authored AW configuration import entries do not contain `if`; runtime prompt conditionals are unaffected. | `pkg/workflow/lint/source_policy.go`, `source_policy_test.go` |
@@ -581,6 +595,7 @@ Rules with a known compiler threat mapping MUST declare its `CTR-*` ID in `Rule.
 | CTR-036 | `safe-output-credentials` | Authored safe-output `run` and `actions/github-script` steps do not write `GITHUB_ENV`/`GITHUB_PATH` or call `core.exportVariable`/`core.addPath`. | `pkg/workflow/lint/safe_output_credentials.go`, `safe_output_credentials_test.go` |
 | CTR-037 | `safe-output-credentials` | Authored safe-output `actions/checkout` steps set literal `persist-credentials: false`. | `pkg/workflow/lint/safe_output_credentials.go`, `safe_output_credentials_test.go` |
 | CTR-038 | `safe-output-credentials` | Authored safe-output `run` scripts do not modify handler inputs under `/tmp/gh-aw`, `GH_AW_AGENT_OUTPUT`, `GH_AW_SAFE_OUTPUTS`, or the runner-temp `gh-aw` directory. Lexical only; does not follow variables or subprocesses. | `pkg/workflow/lint/safe_output_credentials.go`, `safe_output_credentials_test.go` |
+| CTR-008, CTR-039 | `dangerous-triggers` | Advisory target-trigger warnings and comment-trigger warnings correlated with effective actor admission and GitHub integrity filtering, including AW commands, compiler-resolved roles/tools, and AW-origin suppressions. Trusted roles, approved/merged filtering without lockdown override, or explicit GitHub disablement suppress only comment exposure; unknown filtering alone is not a finding. Literal AW target-risk acknowledgment suppresses only CTR-008; compiler deduplication requires actual validator emission. Does not attest tool-content integrity, code safety, or external event-policy enforcement. | `pkg/workflow/lint/dangerous_triggers.go`, `dangerous_triggers_test.go`; `pkg/workflow/compiler_lint.go`, `compiler_lint_test.go` |
 
 `pkg/workflow/lint/repository_workflows_test.go` applies the registered checks to repository lock files and companion AW documents. `pkg/workflow/lint/rule_contract_test.go` requires positive and negative fixtures for every registered rule and supported AST, including strict/non-strict AW severity, read-only inputs, and repeatable diagnostics. `pkg/cli/lint_workflow_test.go` exercises default execution and preserves diagnostics from independent rules even when another rule fails.
 
@@ -910,6 +925,46 @@ Generated MCP logs reports can contain sensitive workflow data and MUST be store
 
 These are existing-behavior mappings within CTR-017 and the host-side MCP boundary. No new `CTR-*` rule or compliance-test identifier is introduced.
 
+### 7.17 Compile-Time Engine Release Cooldown Lookups
+
+For a literal semantic `engine.version` with a nonzero `engine.cooldown`, the compiler queries public release metadata on the compiling host and MUST reject the workflow when the release is younger than the cooldown. This applies to the main engine and the threat-detection engine. The lookup is a host-side network boundary and MUST:
+
+- Query only fixed public endpoints: `api.github.com/repos/github/copilot-cli/releases/tags/v<version>` for Copilot, or `registry.npmjs.org/<package>` for npm-installed engines. Package names MUST come from shared compiler constants or behavior-defined installation metadata and match `engineReleasePackagePattern`.
+- Send no credentials, ignore `GH_HOST` and npm registry configuration, reject redirects, and time out after 5 seconds.
+- Accept only a matching non-draft tag or package name with a past timestamp. npm packuments are streamed so that only `name` and `time[version]` are retained.
+- Cache only publication times, in memory for 5 minutes, and never persist them or the policy decision.
+- Skip the lookup during editor, offline, and Wasm compilation, and never block on it outside the context deadline.
+
+A failed or skipped lookup fails open. The compiler emits one warning per release, recorded as a structured diagnostic that Wasm callers also receive, and compilation succeeds. Literal Copilot installs emit `--cooldown-days 0`, so runners need no enterprise-scoped token for public metadata. **Residual risk:** when the lookup does not complete, a young literal Copilot release installs without any age check, and authors must verify the release age manually. Dynamic Copilot versions keep the runtime check, which fails closed. npm engines keep npm's `min-release-age` enforcement at runtime.
+
+| Boundary | Implementation | Regression Evidence |
+|---|---|---|
+| Endpoint, package, and redirect restrictions | `pkg/workflow/engine_release_cooldown.go`: `engineReleaseTarget`, `fetchEngineReleaseTime` | `TestEngineReleaseCooldownNetworkSafety`, `TestEngineReleaseCooldownResolvedTargets` |
+| Metadata validation and npm streaming | `parseEngineReleaseTime`, `parseNPMReleaseTime` | `TestEngineReleaseCooldownMetadata`, `TestEngineReleaseCooldownNPMStreamingMetadata` |
+| Cache scope and lock release during lookup | `engineReleaseMetadata` | `TestEngineReleaseCooldownCachePolicyAndExpiry`, `TestEngineReleaseCooldownCacheDoesNotSerializeLookups` |
+| Skipped lookups and fail-open warning | `warnEngineReleaseCooldown`, `cmd/gh-aw-wasm/main.go` | `TestEngineReleaseCooldownSkippedLookups`, `TestEngineReleaseCooldownWarningCoversAllApplicableSettings` |
+| Detector parity with the installer | `validateEngineReleaseCooldowns` | `TestEngineReleaseCooldownDetection`, `TestEngineReleaseCooldownInlineDetectorResetsCopilotSDK` |
+| Copilot runtime policy | `pkg/workflow/copilot_installer.go` | `TestCopilotLiteralCooldownRuntimePolicy`, `TestCompileEngineReleaseCooldownLiteral` |
+
+This is an existing-behavior supply-chain mapping. No new `CTR-*` rule or compliance-test identifier is introduced.
+
+### 7.18 Adaptive Routing History Writer
+
+`adaptive-routing: observe` adds a post-conclusion `push_routing_history` job that records routed-run evidence on `memory/adaptive-routing/<workflow>` without changing the model that runs. The compiler MUST keep that history outside agent control:
+
+- Reject any `tools.repo-memory` branch equal to or inside `memory/adaptive-routing`, so the agent can never edit its own record.
+- Grant `contents: write` and `actions: read` only to the writer job, never to the agent or other jobs; the job MUST depend on `activation`, `agent`, and `conclusion` and MUST NOT run when the agent was skipped.
+- Emit the routing identity fields (workflow ID, definition hash, mode, engine, and goal) only as fixed, quoted compiler-derived values. Other runtime bindings, including a dynamically selected routing level, token/session-file bindings, and sub-agent declarations, are outside this requirement. The verdict MUST come from the unified session artifact, not from agent-written files.
+- Reject explicit use for the tested ineligible cases: a fixed or non-routed primary model, `workflow_call`, and missing `tools.repo-memory`. A repository default silently skips the fixed/non-routed model and `workflow_call` cases covered by regression tests. Workflows that do not opt in compile unchanged.
+
+| Boundary | Implementation | Regression Evidence |
+|---|---|---|
+| Reserved history namespace | `pkg/workflow/adaptive_routing.go`: `validateRepoMemoryBranchesNotReserved` | `TestRepoMemoryCannotWriteTheRoutingHistories` |
+| Writer job permissions, ordering, and environment | `addPushRoutingHistoryJob`, `buildPushRoutingHistorySteps` | `TestAdaptiveRoutingObserveAddsOnlyTheWriterJob` |
+| Eligibility and opt-in precedence | `resolveAdaptiveRoutingSetting`, `adaptiveRoutingIneligibility`, `applyAdaptiveRouting` | `TestAdaptiveRoutingSettingPrecedence`, `TestAdaptiveRoutingFromAnImport`, `TestAdaptiveRoutingIneligibleWorkflows` (fixed/non-routed models, `workflow_call`, and missing repo-memory; default skips for fixed/non-routed models and `workflow_call`) |
+
+This is an existing-behavior mapping. The writer's `contents: write` is a deliberate, job-scoped grant; the history records routing evidence only and does not authorize model selection changes. No new `CTR-*` rule or compliance-test identifier is introduced.
+
 ## 8. Compliance Testing
 
 Each active rule MUST have at least one deterministic test that covers its primary trigger and stable diagnostic. Rule additions MUST add tests in the same change set; deprecated-rule tests become `[DEPRECATED]`.
@@ -955,6 +1010,7 @@ Each active rule MUST have at least one deterministic test that covers its prima
 | **T-CTR-051** | CTR-036 Safe-Output Environment File Mutation | An authored safe-output step writes `GITHUB_ENV`/`GITHUB_PATH` or calls `core.exportVariable`/`core.addPath` | Report the script field; error under strict mode, warning otherwise | `CTR-036` |
 | **T-CTR-052** | CTR-037 Safe-Output Credential-Persisting Checkout | An authored safe-output `actions/checkout` step omits `persist-credentials: false` | Report the checkout step; error under strict mode, warning otherwise | `CTR-037` |
 | **T-CTR-053** | CTR-038 Safe-Output Handler Input Tampering | An authored safe-output `run` script writes, edits, removes, truncates, moves, or copies onto `/tmp/gh-aw` handler inputs | Report the `run` field; error under strict mode, warning otherwise | `CTR-038` |
+| **T-CTR-054** | CTR-039 Privileged Comment Trigger Exposure | Comment/review triggers or inline/centralized AW commands with default, trusted, broadened, imported, dry-run, or malformed roles and weak, absent, strong, disabled, shorthand, imported, malformed, bare-lockdown, or guard-overridden GitHub policy; AW-only, graph-only, and companion inputs | Warn for broadened AW admission plus weak filtering; preserve trusted/default/dry-run roles, approved/merged filtering without lockdown override, explicit tool disablement, unknown-policy abstention, safe triggers, AW-origin suppression, lint opt-out, command coverage without duplicates, independent CTR-008 controls, and emission-based deduplication including bypass, reuse, and warning-write failures | `CTR-039` |
 
 The core tests exercise their catalog trigger and assert the expected rejection, warning, rewrite, or runtime-safe output.
 
