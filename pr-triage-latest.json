@@ -1,11 +1,11 @@
 {
-  "generated_at": "2026-11-23T18:23:29Z",
-  "run_id": "pr-triage-2026-11-23T18:23:29Z",
+  "generated_at": "2026-11-24T00:38:04Z",
+  "run_id": "pr-triage-2026-11-24T00:38:04Z",
   "source": "pr-triage",
   "open_copilot_prs": 0,
-  "scanned_open_prs": 14,
+  "scanned_open_prs": 9,
   "eligible_total": 0,
-  "cooldown_skipped": 14,
+  "cooldown_skipped": 9,
   "category_counts": {
     "docs": 0,
     "test": 0,
@@ -36,58 +36,40 @@
   "batches": [],
   "skipped_prs": [
     {
-      "number": 80484,
-      "title": "[testify-expert] Improve Test Quality: pkg/cli/mcp_server_http_test.go",
-      "author": "github-actions[bot]",
-      "updated_at": "2026-11-23T18:15:08Z"
+      "number": 80581,
+      "title": "Fix dynamic secret selection false positives in strict linting",
+      "author": "pelikhan",
+      "updated_at": "2026-11-24T00:14:07Z"
     },
     {
-      "number": 80482,
-      "title": "Add analyzer for overbroad parent-path prefix checks",
+      "number": 80556,
+      "title": "Reduce ambient context in agentic workflows",
       "author": "gh-aw-bot",
-      "updated_at": "2026-11-23T18:15:59Z"
+      "updated_at": "2026-11-23T21:58:48Z"
     },
     {
-      "number": 80480,
-      "title": "cracktro: add kiosk voice mode (V) using browser speech synthesis",
-      "author": "pelikhan",
-      "updated_at": "2026-11-23T18:13:52Z"
-    },
-    {
-      "number": 80479,
-      "title": "Route simple skip-if queries through GraphQL/REST to spare the search API",
-      "author": "pelikhan",
-      "updated_at": "2026-11-23T18:15:54Z"
-    },
-    {
-      "number": 80476,
-      "title": "Check literal engine cooldowns at compile time and allow zero days",
-      "author": "pelikhan",
-      "updated_at": "2026-11-23T17:59:32Z"
-    },
-    {
-      "number": 80471,
-      "title": "Add integrity-aware warnings for comment and review triggers",
-      "author": "pelikhan",
-      "updated_at": "2026-11-23T18:13:23Z"
-    },
-    {
-      "number": 80468,
-      "title": "Record whether a routed run's result counts",
+      "number": 80583,
+      "title": "Record routed runs in an adaptive routing history (observe mode)",
       "author": "rabeckett",
-      "updated_at": "2026-11-23T18:18:31Z"
+      "updated_at": "2026-11-24T00:00:00Z"
     },
     {
-      "number": 80464,
-      "title": "Align CLI help text and command collection",
-      "author": "gh-aw-bot",
-      "updated_at": "2026-11-23T18:13:26Z"
+      "number": 80582,
+      "title": "Port sandboxed threat detection and eligibility checks to JavaScript",
+      "author": "davidslater",
+      "updated_at": "2026-11-24T00:00:00Z"
     },
     {
-      "number": 80463,
-      "title": "Split exec command output linter into focused files",
-      "author": "gh-aw-bot",
-      "updated_at": "2026-11-23T18:07:35Z"
+      "number": 80579,
+      "title": "[model-inventory] Model alias inventory update - 2026-11-23",
+      "author": "github-actions[bot]",
+      "updated_at": "2026-11-23T20:31:16Z"
+    },
+    {
+      "number": 79748,
+      "title": "Replace work-queue protocol v3 with time-free v4",
+      "author": "elefthei",
+      "updated_at": "2026-11-20T00:00:00Z"
     },
     {
       "number": 80395,
@@ -99,31 +81,19 @@
       "number": 80390,
       "title": "Fix activation snapshots for symlinked agent configuration",
       "author": "pelikhan",
-      "updated_at": "2026-11-23T17:37:03Z"
+      "updated_at": "2026-11-23T17:37:00Z"
     },
     {
       "number": 80016,
       "title": "Investigate code-scanning dispatcher queue policy mismatch",
       "author": "gh-aw-bot",
       "updated_at": "2026-11-22T16:01:03Z"
-    },
-    {
-      "number": 79748,
-      "title": "Replace work-queue protocol v3 with time-free v4",
-      "author": "elefthei",
-      "updated_at": "2026-11-23T10:04:41Z"
-    },
-    {
-      "number": 79612,
-      "title": "Port host-side threat detection conclusion to JavaScript",
-      "author": "davidslater",
-      "updated_at": "2026-11-23T18:00:51Z"
     }
   ],
   "notes": [
     "No open pull requests authored by app/github-copilot were present in the current repository queue after filtering.",
-    "All visible open PRs were rejected by the author gate or the 1-hour cooldown policy and therefore no PR comments or labels were emitted.",
-    "The next scheduled run should re-check once a qualifying app/github-copilot PR remains open beyond the cooldown window."
+    "The current queue was excluded by the author gate and the 1-hour cooldown check, so no PR labels or review comments were emitted.",
+    "A follow-up run will re-check once a qualifying app/github-copilot PR remains open beyond the cooldown window."
   ],
   "review_status": "triaged"
 }

@@ -1,9 +1,24 @@
 ### Executive Summary
 
 - Eligible open `app/github-copilot` PRs: 0
-- Open PRs scanned: 11
-- PRs skipped by the 1h cooldown: 11
-- Recommended action: none; no agent-authored PRs are currently eligible for review.
+- Open PRs scanned: 9
+- PRs skipped by the 1h cooldown or author gate: 9
+- Recommended action: none; no eligible agent-authored PRs require review at this time.
+
+<details>
+<summary>Open PRs excluded from triage</summary>
+
+- #80581 — Fix dynamic secret selection false positives in strict linting
+- #80556 — Reduce ambient context in agentic workflows
+- #80583 — Record routed runs in an adaptive routing history (observe mode)
+- #80582 — Port sandboxed threat detection and eligibility checks to JavaScript
+- #80579 — [model-inventory] Model alias inventory update - 2026-11-23
+- #79748 — Replace work-queue protocol v3 with time-free v4
+- #80395 — Set OpenCode GPT-5.6 Luna reasoning effort to none
+- #80390 — Fix activation snapshots for symlinked agent configuration
+- #80016 — Investigate code-scanning dispatcher queue policy mismatch
+
+</details>
 
 ### Distribution
 
@@ -55,6 +70,7 @@
 
 ### Key trends and next actions
 
-- The current open queue contains 11 PRs, but none are authored by `app/github-copilot`.
-- Every open PR was excluded by the eligibility gate or the 1h cooldown window.
-- Re-run triage once an eligible agent-authored PR appears or after the repository queue refreshes.
+- There are no open PRs authored by `app/github-copilot` in the current repository queue.
+- The visible open PRs are human-authored or bot-authored, and the 1-hour cooldown removes the remaining agent-authored submissions from consideration.
+- Re-run this triage once a qualifying `app/github-copilot` PR survives the cooldown window.
+
