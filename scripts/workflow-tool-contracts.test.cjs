@@ -90,6 +90,23 @@ test("Tidy separates permitted formatting from exact permitted status inspection
   }
 });
 
+test("Specification librarian has full audit history without widening the indexing checkout", () => {
+  const source = workflowSource("spec-librarian");
+  assert.match(source, /checkout:\s*\n\s+fetch-depth: 0/);
+  assert.match(source, /## Phase 2: Staleness Detection/);
+
+  const lock = workflowLock("spec-librarian");
+  const checkout = lock.jobs.agent.steps.find(step => step.name === "Checkout repository (gh-aw default)");
+  assert.ok(checkout, "Missing agent repository checkout");
+  assert.equal(checkout.with["fetch-depth"], 0);
+  assert.equal(checkout.with["persist-credentials"], false);
+
+  const indexingCheckout = lock.jobs.pageindex.steps.find(step => step.uses?.startsWith("actions/checkout@"));
+  assert.ok(indexingCheckout, "Missing PageIndex checkout");
+  assert.equal(indexingCheckout.with["fetch-depth"], 1);
+  assert.equal(indexingCheckout.with["persist-credentials"], false);
+});
+
 test("Daily Graft uses full history and fails closed on unusable graph analysis", () => {
   const workflows = path.join(__dirname, "..", ".github", "workflows");
   const source = fs.readFileSync(path.join(workflows, "daily-graft-intelligence.md"), "utf8");

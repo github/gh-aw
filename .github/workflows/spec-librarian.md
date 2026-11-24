@@ -12,6 +12,8 @@ network:
   allowed:
   - defaults
   - github
+checkout:
+  fetch-depth: 0
 imports:
 - shared/reporting.md
 - uses: shared/skip-if-issue-open.md
