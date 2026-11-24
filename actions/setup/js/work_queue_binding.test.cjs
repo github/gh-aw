@@ -10,7 +10,9 @@ const policy = attempts => ({
   version: 4,
   pending_limit: 10,
   issues: false,
-  pools: { default: { concurrency: 1, per_account_limit: 0, max_attempts: attempts, default_profile: "worker", profiles: { worker: { workflow: h.WORKER_WORKFLOW, effect_scope: "owner/repo" } } } },
+  effect_scope: "owner/repo",
+  workers: ["worker"],
+  pools: { default: { concurrency: 1, per_account_limit: 0, max_attempts: attempts } },
 });
 
 function claimed() {

@@ -43,24 +43,31 @@ func (state Projection) EligibleWork(pool string, profiles map[string]DispatchPr
 	return eligible
 }
 
-// PoolOccupancy counts non-closed Dispatches and open Claims per fairness key of one pool.
+// PoolOccupancy counts the pool's occupied slots and open Claims per fairness key. Each
+// open Claim holds exactly one non-closed Dispatch, so one pass over open Claims gives both.
 func (state Projection) PoolOccupancy(pool string) (int, map[string]int) {
-	dispatches := 0
+	occupied := 0
 	accounts := map[string]int{}
-	for _, dispatch := range state.Dispatches {
-		if dispatch.Pool == pool && dispatch.State != "closed" {
-			dispatches++
-		}
-	}
 	for _, claim := range state.Claims {
 		if claim.State != "open" {
 			continue
 		}
 		if work := state.Works[claim.WorkID]; work.Pool == pool {
+			occupied++
 			accounts[work.FairnessKey]++
 		}
 	}
-	return dispatches, accounts
+	return occupied, accounts
+}
+
+// hasAvailableWork reports whether the pool holds any available Work, eligible or not.
+func (state Projection) hasAvailableWork(pool string) bool {
+	for _, work := range state.Works {
+		if work.Pool == pool && work.State == "available" {
+			return true
+		}
+	}
+	return false
 }
 
 // PlanDispatch plans the Claims of one dispatch_next request without mutating state.
@@ -86,7 +93,7 @@ func PlanDispatch(state Projection, parameters DispatchParameters, requestID str
 	switch {
 	case len(eligible) > 0:
 		decision.Reason = "prefix_complete"
-	case slices.ContainsFunc(sortedWorks(state), func(work *WorkState) bool { return work.Pool == parameters.Pool && work.State == "available" }):
+	case state.hasAvailableWork(parameters.Pool):
 		decision.Reason = "no_eligible_work"
 	default:
 		decision.Reason = "no_work"
@@ -117,15 +124,6 @@ func PlanDispatch(state Projection, parameters DispatchParameters, requestID str
 	return decision, nil
 }
 
-func sortedWorks(state Projection) []*WorkState {
-	works := make([]*WorkState, 0, len(state.Works))
-	for _, work := range state.Works {
-		works = append(works, work)
-	}
-	slices.SortFunc(works, func(a, b *WorkState) int { return FIFOCompare(a.Position, b.Position) })
-	return works
-}
-
 // AssignmentForDispatch returns the worker's view of a Dispatch: its open Claims
 // with payloads and predecessor effects.
 func AssignmentForDispatch(state Projection, dispatchID string) (Assignment, error) {
@@ -138,14 +136,16 @@ func AssignmentForDispatch(state Projection, dispatchID string) (Assignment, err
 
 func (state Projection) assignmentOnly(dispatch *DispatchState) (Assignment, error) {
 	assignment := Assignment{DispatchID: dispatch.DispatchID, Claims: []AssignmentClaim{}}
-	for _, claim := range state.OpenClaims(dispatch) {
-		work := state.Works[claim.WorkID]
-		refs, err := state.resultReferences(work)
-		if err != nil {
-			return Assignment{}, err
-		}
-		assignment.Claims = append(assignment.Claims, AssignmentClaim{Handle: claim.Handle, ClaimID: claim.ClaimID, WorkID: work.WorkID, Work: work.Payload, ResultRefs: refs, Continuation: work.Continuation})
+	claim := state.OpenClaim(dispatch)
+	if claim == nil {
+		return assignment, nil
 	}
+	work := state.Works[claim.WorkID]
+	refs, err := state.resultReferences(work)
+	if err != nil {
+		return Assignment{}, err
+	}
+	assignment.Claims = append(assignment.Claims, AssignmentClaim{Handle: claim.Handle, ClaimID: claim.ClaimID, WorkID: work.WorkID, Work: work.Payload, ResultRefs: refs, Continuation: work.Continuation})
 	return assignment, nil
 }
 

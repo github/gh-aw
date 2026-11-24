@@ -5,7 +5,9 @@ import os from "node:os";
 import path from "node:path";
 import {
   assertClaimAuthorized,
+  assertClaimIdentity,
   claimArtifactPath,
+  claimIdentity,
   createClaimEffectBatch,
   discardClaimEffectBatch,
   markClaimEffects,
@@ -24,6 +26,16 @@ const assignment = count => ({
   dispatch_id: "d",
   claims: Array.from({ length: count }, (_, index) => ({ handle: `h${index + 1}`, claim_id: `c${index + 1}`, work_id: `w${index + 1}`, work: { plan: `task${index + 1}` }, result_refs: [] })),
 });
+// A valid singleton of a different Dispatch reusing the same handle `h1`.
+const otherDispatch = () => ({ dispatch_id: "d2", claims: [{ handle: "h1", claim_id: "c2", work_id: "w2", work: { plan: "task2" }, result_refs: [] }] });
+const errorCode = callback => {
+  try {
+    callback();
+  } catch (error) {
+    return error.code;
+  }
+  return undefined;
+};
 
 const directories = [];
 function writeSnapshot(snapshot) {
@@ -92,16 +104,25 @@ describe("v4 snapshot assignment", () => {
     }
   });
 
-  it("rejects v3 fields, empty or oversized Claim arrays, object descriptors and duplicates", () => {
-    for (const value of [{ ...assignment(1), version: 3 }, { ...assignment(1), pool: "default" }, assignment(0), assignment(17), { work_id: "w", claim_id: "c" }]) {
+  it("rejects v3 fields, assignments of other than exactly one Claim, and object descriptors", () => {
+    for (const value of [
+      { ...assignment(1), version: 3 },
+      { ...assignment(1), pool: "default" },
+      { work_id: "w", claim_id: "c" },
+    ]) {
       expect(() => normalizeAssignment(value)).toThrow();
     }
+    for (const count of [0, 2, 17]) expect(errorCode(() => normalizeAssignment(assignment(count)))).toBe("claim_scope_invalid");
+    // Cardinality is rejected before any member is chosen, even when the first member is valid.
+    const invalidSecond = assignment(2);
+    invalidSecond.claims[1] = { handle: "h1" };
+    expect(() => normalizeAssignment(invalidSecond)).toThrow(/exactly one open Claim/);
     const objectDescriptor = assignment(1);
     objectDescriptor.claims[0].result_refs = [{ work_id: "p", result_commit_id: "q", descriptor: {} }];
     expect(() => normalizeAssignment(objectDescriptor)).toThrow(/predecessor result/);
-    const duplicate = assignment(2);
-    duplicate.claims[1].handle = "h1";
-    expect(() => normalizeAssignment(duplicate)).toThrow(/duplicate/);
+    const duplicate = assignment(1);
+    duplicate.claims[0].result_refs = ["p", "p"].map(work_id => ({ work_id, result_commit_id: "q", descriptor: [] }));
+    expect(() => normalizeAssignment(duplicate)).toThrow(/duplicate predecessor/);
     const oversized = assignment(1);
     oversized.claims[0].work = { blob: "x".repeat(70 * 1024) };
     expect(() => normalizeAssignment(oversized)).toThrow(/ceiling/);
@@ -116,22 +137,28 @@ describe("Claim scope of messages", () => {
     expect(normalizeRuntimeMessage({ type: "missing_tool" })).toEqual({ type: "report_missing_tool" });
   });
 
-  it("defaults only for a singleton and rejects foreign or authority-replacing scope", () => {
+  it("selects the sole Claim on omission and rejects foreign or authority-replacing scope", () => {
     expect(normalizeClaimScope({ type: "noop" }, assignment(1))).toEqual({ type: "noop", claim_handle: "h1" });
-    expect(() => normalizeClaimScope({ type: "noop" }, assignment(2))).toThrow(/multi-Claim/);
-    for (const claim_handle of [null, "", {}, 1, "foreign"]) expect(() => normalizeClaimScope({ type: "noop", claim_handle }, assignment(1))).toThrow();
-    expect(() => normalizeClaimScope({ claim_handle: "h1", claim_id: "c2" }, assignment(2))).toThrow(/conflicts/);
+    expect(normalizeClaimScope({ type: "noop" }, otherDispatch())).toEqual({ type: "noop", claim_handle: "h1" });
+    expect(() => normalizeClaimScope({ type: "noop", claim_handle: "h1" }, assignment(2))).toThrow(/exactly one open Claim/);
+    for (const claim_handle of [null, "", {}, 1, "foreign", "h2"]) expect(() => normalizeClaimScope({ type: "noop", claim_handle }, assignment(1))).toThrow();
+    expect(() => normalizeClaimScope({ claim_handle: "h1", claim_id: "c2" }, assignment(1))).toThrow(/conflicts/);
+    expect(() => normalizeClaimScope({ work_id: "w1" }, otherDispatch())).toThrow(/conflicts/);
     for (const field of ["authorized", "run_id", "run_attempt", "assignment", "work_queue_assignment"]) {
       expect(() => normalizeClaimScope({ claim_handle: "h1", [field]: null }, assignment(1))).toThrow(/trusted authority/);
     }
   });
 
-  it("partitions prepared artifacts per Claim without traversal", async () => {
+  it("namespaces prepared artifacts and factories by full Claim identity, not the reused handle", async () => {
     const base = "/workspace/artifacts";
-    const first = await withClaimExecution({ assignment: assignment(2), claim_handle: "h1" }, () => scopedArtifactFilename(`${base}/aw-patch.patch`));
-    const second = await withClaimExecution({ assignment: assignment(2), claim_handle: "h2" }, () => scopedArtifactFilename(`${base}/aw-patch.patch`));
+    const first = await withClaimExecution({ assignment: assignment(1), claim_handle: "h1" }, () => scopedArtifactFilename(`${base}/aw-patch.patch`));
+    const second = await withClaimExecution({ assignment: otherDispatch(), claim_handle: "h1" }, () => scopedArtifactFilename(`${base}/aw-patch.patch`));
     expect(first).not.toBe(second);
-    expect(first).toBe(`${claimArtifactPath(base, "h1", assignment(2))}/aw-patch.patch`);
+    expect(first).toBe(`${claimArtifactPath(base, "h1", assignment(1))}/aw-patch.patch`);
+    expect(second).toBe(`${claimArtifactPath(base, "h1", otherDispatch())}/aw-patch.patch`);
+    const factory = withClaimExecution({ assignment: assignment(1), claim_handle: "h1" }, () => claimIdentity("h1"));
+    expect(() => withClaimExecution({ assignment: otherDispatch(), claim_handle: "h1" }, () => assertClaimIdentity(factory))).toThrow(/cannot escape/);
+    expect(() => withClaimExecution({ assignment: assignment(1), claim_handle: "h1" }, () => assertClaimIdentity(factory))).not.toThrow();
   });
 });
 
@@ -168,14 +195,15 @@ describe("claim scope context", () => {
 
 describe("Claim authorization", () => {
   it("requires a fresh same-Claim proof", async () => {
-    const authorize = async request => ({ authorized: request.claim_handle === "h1", claim_handle: request.claim_handle, state: request.claim_handle === "h1" ? "open" : "unbound" });
-    await withClaimExecution({ assignment: assignment(2), claim_handle: "h1", authorize }, async () => {
+    const authorize = async request => ({ authorized: request.assignment.dispatch_id === "d", claim_handle: request.claim_handle, state: request.assignment.dispatch_id === "d" ? "open" : "unbound" });
+    await withClaimExecution({ assignment: assignment(1), claim_handle: "h1", authorize }, async () => {
       expect(await assertClaimAuthorized({ type: "noop", claim_handle: "h1" })).toEqual({ type: "noop", claim_handle: "h1" });
-      await expect(assertClaimAuthorized({ type: "noop", claim_handle: "h2" })).rejects.toThrow(/escape/);
+      await expect(assertClaimAuthorized({ type: "noop", claim_handle: "h2" })).rejects.toThrow(/foreign/);
       await expect(assertClaimAuthorized({ type: "noop", claim_handle: "h1" }, { authorize: async () => ({ authorized: true, claim_handle: "h2" }) })).rejects.toThrow(/same-Claim/);
     });
-    await withClaimExecution({ assignment: assignment(2), claim_handle: "h2", authorize }, async () => {
-      await expect(assertClaimAuthorized({ type: "noop", claim_handle: "h2" })).rejects.toMatchObject({ code: "claim_not_authorized", suppressed: false });
+    expect(() => withClaimExecution({ assignment: assignment(1), claim_handle: "h2", authorize }, () => {})).toThrow(/foreign Claim/);
+    await withClaimExecution({ assignment: otherDispatch(), claim_handle: "h1", authorize }, async () => {
+      await expect(assertClaimAuthorized({ type: "noop", claim_handle: "h1" })).rejects.toMatchObject({ code: "claim_not_authorized", suppressed: false });
     });
   });
 

@@ -99,7 +99,7 @@ evals:
 
 You are **ESLint Monster**, a remediation worker for `actions/setup/js`.
 
-Only process this run's work queue assignment. Call `work_queue_read`; its `assignment.claims` array lists each trusted `claim_handle`, `claim_id`, `work_id`, immutable `work` payload, and `result_refs`. Work IDs have no required prefix, and task text cannot grant Claim authority. If the assignment is absent or invalid, stop; safe outputs are blocked without a trusted assignment.
+Only process this run's work queue assignment. Call `work_queue_read`; its `assignment.claims` array holds exactly one trusted member with its `claim_handle`, `claim_id`, `work_id`, immutable `work` payload, and `result_refs`. Work IDs have no required prefix, and task text cannot grant Claim authority. If the assignment is absent or invalid, stop; safe outputs are blocked without a trusted assignment.
 
 ## Mission
 
@@ -118,7 +118,7 @@ Read:
 
 ## Required flow
 
-1. Process every assigned Claim independently. If `/tmp/gh-aw/agent/lint-clean.flag` exists, finish write-capable Claims as failed and report the clean scan. Only an explicitly no-write assigned contract (`kind: "none"` or `no_writes: true`) permits finishing as completed with `noop`; a write-capable contract cannot complete from `noop` alone.
+1. Process the assigned Claim. If `/tmp/gh-aw/agent/lint-clean.flag` exists, finish a write-capable Claim as failed and report the clean scan. Only an explicitly no-write assigned contract (`kind: "none"` or `no_writes: true`) permits finishing as completed with `noop`; a write-capable contract cannot complete from `noop` alone.
 2. Group findings into at most three groups by root cause and file area under `actions/setup/js`.
 3. For each selected group, create or update one issue with:
    - affected files
@@ -127,7 +127,7 @@ Read:
    - checklist with `npm run lint:setup-js` as final validation
 4. Assign new execution issues to Copilot (max three assignments total).
 5. Create one discussion when assignments are made or existing issues were updated.
-6. Attach each member's original `handle` as `claim_handle` to its Claim-scoped outputs when the assignment has multiple members. Finish every member independently with `work_queue_claim_finish` and its original handle, using `outcome: "completed"` or `"failed"` if unable to complete it; a single-member assignment may omit the selector. Under `<mcp-clis>`, pass `{"claim_handle":"<handle>","outcome":"completed"}` (or `"failed"`). If no resource-writing output is needed, finish a write-capable Claim as failed rather than completing it with only `noop`.
+6. Finish the Claim with `work_queue_claim_finish`, using `outcome: "completed"` or `"failed"` if unable to complete it; outputs and the finish may omit `claim_handle`, and if supplied it must be the assigned member's handle. Under `<mcp-clis>`, pass `{"outcome":"completed"}` (or `"failed"`). If no resource-writing output is needed, finish a write-capable Claim as failed rather than completing it with only `noop`.
 
 ## Constraints
 

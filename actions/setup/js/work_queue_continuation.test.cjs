@@ -26,7 +26,7 @@ const { continuationChild, gateKey } = require("./work_queue_graph.cjs");
 const { loadWorkQueueSnapshot, readWorkQueueState } = require("./work_queue_mcp_server.cjs");
 const { createApprovalIssue, messageDigest, workqueueReceipt } = require("./request_continuation_routes.cjs");
 const { VERSION } = require("./safe_output_authorization.cjs");
-const { matchContinuations, parseContinuationReceipts, readContinuationConfig } = require("./work_queue_continuation.cjs");
+const { matchContinuation, parseContinuationReceipt, readContinuationConfig } = require("./work_queue_continuation.cjs");
 
 const WORKER_REF = `owner/repo/${h.WORKER_WORKFLOW}@refs/heads/main`;
 const DISPATCHER_REF = "owner/repo/.github/workflows/dispatcher.lock.yml@refs/heads/main";
@@ -122,7 +122,7 @@ async function runManager(queue, { directory, intents, effects, context, policy:
   vi.stubEnv("GH_AW_WORK_QUEUE_SNAPSHOT", snapshot);
   vi.stubEnv("GH_AW_WORK_QUEUE_EFFECTS", effects);
   vi.stubEnv("GH_AW_WORK_QUEUE_FINISH_INTENT", intents);
-  vi.stubEnv("GH_AW_WORK_QUEUE_POLICY", h.policyEnvText(compiled));
+  vi.stubEnv("GH_AW_WORK_QUEUE_POLICY", JSON.stringify(compiled));
   vi.stubEnv("GITHUB_REPOSITORY", "owner/repo");
   vi.stubEnv("GITHUB_RUN_ID", String(context.runId));
   vi.stubEnv("GITHUB_RUN_ATTEMPT", String(context.runAttempt));
@@ -324,77 +324,55 @@ describe("workqueue continuation end to end", () => {
     expect(continuationWorks(ledgerState(queue))).toHaveLength(2);
   });
 
-  it("routes each Claim's own request through the real manager into its own successor", async () => {
-    // The scheduler emits one Claim per Dispatch; the protocol also admits a Dispatch grouping
-    // compatible Claims of one dispatch_next commit, which is the multi-Claim worker case.
+  it("routes each Dispatch's own request through the real manager into its own successor", async () => {
+    // One dispatch_next grants both Work in distinct Dispatches, each run by its own worker.
     const submitted = h.submit([], [h.work("n1", { payload: TASK }), h.work("n2", { payload: TASK })]);
-    const parameters = { pool: "default", max_claims: 2, max_dispatches: 2, concurrency: 16, per_account_limit: 0, profiles: h.PROFILES };
-    const planned = h.dispatchNext(submitted, parameters).log.at(-1).operations;
-    const dispatchId = planned[0].dispatch_id;
-    const grouped = planned.map((operation, index) => ({ ...operation, dispatch_id: dispatchId, handle: `h${index + 1}` }));
-    let log = h.commit(submitted, h.dispatcher, "dispatch_next", parameters, grouped);
-    log = h.bind(h.launch(log, dispatchId), dispatchId, h.workerActor("200", 1));
+    const planned = h.dispatchNext(submitted, { max_claims: 2, max_dispatches: 2 });
+    expect(new Set(planned.decision.dispatches).size).toBe(2);
+    let log = planned.log;
+    const runs = ["200", "201"];
+    for (const [index, dispatchId] of planned.decision.dispatches.entries()) log = h.bind(h.launch(log, dispatchId, true, h.dispatcher, runs[index]), dispatchId, h.workerActor(runs[index], 1));
     const fake = h.fakeQueueGitHub(h.ledgerText(log));
-    const assignment = assignmentForDispatch(replayTransactionLog(h.ledgerText(log)), dispatchId);
-    const queue = { fake, dispatchId, githubClient: fake.githubClient, context: workerContext(dispatchId, "200", 1), assignment, policy: workerPolicy() };
-    expect(assignment.claims.map(claim => claim.handle)).toEqual(["h1", "h2"]);
-    const items = [
-      { type: "request_continuation", message: "Second Claim work", claim_handle: "h2" },
-      { type: "request_continuation", message: "First Claim work", claim_handle: "h1" },
-    ];
-    const { result, managed } = await runFinish(queue, { items, outcomes: { h1: "completed", h2: "completed" }, manager: {} });
-    expect(managed.result.settlements.map(settlement => [settlement.claim_handle, settlement.success])).toEqual([
-      ["h1", true],
-      ["h2", true],
-    ]);
-    expect(managed.receipts).toEqual([
-      { claim_handle: "h1", claim_id: assignment.claims[0].claim_id, message_sha256: messageDigest("First Claim work"), status: "ready" },
-      { claim_handle: "h2", claim_id: assignment.claims[1].claim_id, message_sha256: messageDigest("Second Claim work"), status: "ready" },
-    ]);
-    expect(result).toMatchObject({
-      committed: true,
-      continuations: [
-        { claim_handle: "h1", status: "admitted" },
-        { claim_handle: "h2", status: "admitted" },
-      ],
-    });
-    const operations = lastCommit(queue).operations;
-    expect(operations.map(operation => operation.kind)).toEqual(["Completion", "Work", "Completion", "Work"]);
-    for (const [index, member] of assignment.claims.entries()) {
-      const [completion, child] = operations.slice(index * 2, index * 2 + 2);
-      expect(completion).toMatchObject({ kind: "Completion", claim_handle: member.handle, work_id: member.work_id });
-      expect(child).toMatchObject({ depends_on: [{ kind: "work", work_id: member.work_id }], continuation: { route: "workqueue", message: index === 0 ? "First Claim work" : "Second Claim work", remaining: 0 } });
+    const messages = ["First Dispatch work", "Second Dispatch work"];
+    for (const [index, dispatchId] of planned.decision.dispatches.entries()) {
+      const assignment = assignmentForDispatch(replayTransactionLog(fake.contents()), dispatchId);
+      const [member] = assignment.claims;
+      const queue = { fake, dispatchId, githubClient: fake.githubClient, context: workerContext(dispatchId, runs[index], 1), assignment, policy: workerPolicy() };
+      const { result, managed } = await runFinish(queue, { items: [{ type: "request_continuation", message: messages[index], claim_handle: member.handle }], manager: {} });
+      expect(managed.receipts).toEqual([{ claim_handle: member.handle, claim_id: member.claim_id, message_sha256: messageDigest(messages[index]), status: "ready" }]);
+      expect(result).toMatchObject({ committed: true, continuations: [{ claim_handle: member.handle, status: "admitted" }] });
+      const operations = lastCommit(queue).operations;
+      expect(operations.map(operation => operation.kind)).toEqual(["Completion", "Work"]);
+      expect(operations[0]).toMatchObject({ kind: "Completion", dispatch_id: dispatchId, claim_id: member.claim_id, work_id: member.work_id });
+      expect(operations[1]).toMatchObject({ depends_on: [{ kind: "work", work_id: member.work_id }], continuation: { route: "workqueue", message: messages[index], remaining: 0 } });
     }
   });
 
-  it("binds requests to their own Claim handle", async () => {
+  it("binds the request and its receipt to the sole Claim", async () => {
     const queue = workerQueue({ works: [h.work("n1", { payload: TASK })] });
     const before = queue.fake.contents();
     await expect(runFinish(queue, { items: [{ type: "request_continuation", message: MESSAGE, claim_handle: "h2" }], receipts: [readyReceipt(queue.assignment)] })).rejects.toThrow(/continuation_request_invalid/);
     expect(queue.fake.contents()).toBe(before);
 
-    const claims = [
-      { handle: "h1", claim_id: "c1" },
-      { handle: "h2", claim_id: "c2" },
-    ];
-    const requests = new Map([
-      ["h1", { message: "one", message_sha256: messageDigest("one"), index: 0 }],
-      ["h2", { message: "two", message_sha256: messageDigest("two"), index: 1 }],
-    ]);
-    const intents = new Map([
-      ["h1", "completed"],
-      ["h2", "completed"],
-    ]);
+    const claim = { handle: "h7", claim_id: "c7" };
+    const request = { message: "one", message_sha256: messageDigest("one"), index: 3, claim_handle: "h7" };
     const config = { route: "workqueue", maxDepth: 1 };
-    const receipt = (handle, claimId, message) => ({ claim_handle: handle, claim_id: claimId, message_sha256: messageDigest(message), status: "ready" });
-    expect(() => matchContinuations({ config, requests, intents, claims, receipts: [receipt("h1", "c1", "two"), receipt("h2", "c2", "two")] })).toThrow(/digest/);
-    expect(() => matchContinuations({ config, requests, intents, claims, receipts: [receipt("h1", "c2", "one")] })).toThrow(/original Claim/);
-    const matched = matchContinuations({ config, requests, intents, claims, receipts: [receipt("h1", "c1", "one"), receipt("h2", "c2", "two")] });
-    expect([...matched].map(([handle, entry]) => [handle, entry?.message])).toEqual([
-      ["h1", "one"],
-      ["h2", "two"],
-    ]);
-    expect(matchContinuations({ config, requests, intents, claims, receipts: [receipt("h2", "c2", "two")] }).get("h1")).toBeNull();
+    const receipt = (overrides = {}) => ({ claim_handle: "h7", claim_id: "c7", message_sha256: messageDigest("one"), status: "ready", ...overrides });
+    expect(matchContinuation({ config, request, receipt: receipt(), intent: "completed", claim })).toEqual({ message: "one", message_sha256: messageDigest("one"), index: 3, receipt: receipt() });
+    expect(matchContinuation({ config, request, receipt: undefined, intent: "completed", claim })).toBeNull();
+    expect(matchContinuation({ config, request: null, receipt: undefined, intent: "completed", claim })).toBeUndefined();
+    expect(matchContinuation({ config, request, receipt: receipt(), intent: "failed", claim })).toBeUndefined();
+    for (const [bad, pattern] of [
+      [{ claim_handle: "h1" }, /original Claim/],
+      [{ claim_id: "c1" }, /original Claim/],
+      [{ message_sha256: messageDigest("two") }, /digest/],
+      [{ issue: APPROVAL }, /route/],
+    ]) {
+      // A supplied receipt is validated even when a failed finish then suppresses the request.
+      for (const intent of ["completed", "failed"]) expect(() => matchContinuation({ config, request, receipt: receipt(bad), intent, claim })).toThrow(pattern);
+    }
+    // A receipt alone never admits.
+    expect(() => matchContinuation({ config, request: null, receipt: receipt(), intent: "completed", claim })).toThrow(/original Claim/);
   });
 
   it("suppresses the request of a failed or missing finish", async () => {
@@ -413,6 +391,8 @@ describe("workqueue continuation end to end", () => {
       { name: "unset receipts", receipts: null, code: "continuation_receipt_missing" },
       { name: "hash mismatch", receipts: assignment => [{ ...readyReceipt(assignment), message_sha256: messageDigest("Audit page 9") }], code: "continuation_receipt_mismatch" },
       { name: "foreign Claim ID", receipts: assignment => [{ ...readyReceipt(assignment), claim_id: "c_foreign" }], code: "continuation_receipt_mismatch" },
+      { name: "foreign Claim handle", receipts: assignment => [{ ...readyReceipt(assignment), claim_handle: "h2" }], code: "continuation_receipt_mismatch" },
+      { name: "duplicate receipts", receipts: assignment => [readyReceipt(assignment), readyReceipt(assignment)], code: "continuation_receipt_invalid" },
       { name: "route mismatch", receipts: assignment => [{ ...readyReceipt(assignment), issue: APPROVAL }], code: "continuation_receipt_mismatch" },
     ];
     for (const entry of cases) {
@@ -451,7 +431,7 @@ describe("workqueue continuation end to end", () => {
     expect(rerun.fake.contents()).toBe(before);
   });
 
-  it("rejects an oversized Unicode successor and a profile removed from the pool", async () => {
+  it("rejects an oversized Unicode successor and a worker or pool removed from the policy", async () => {
     const big = { task: "é".repeat(7000) };
     const message = "ü".repeat(1200);
     const queue = workerQueue({ works: [h.work("n1", { payload: big })] });
@@ -460,28 +440,34 @@ describe("workqueue continuation end to end", () => {
     await expect(runFinish(queue, { items: [{ type: "request_continuation", message }], receipts: [receipt] })).rejects.toMatchObject({ code: expect.stringMatching(/resource_limit|assignment_limit/) });
     expect(queue.fake.contents()).toBe(before);
 
-    const moved = workerQueue({ works: [h.work("n1", { payload: TASK })] });
-    const profiles = { other: { workflow: h.WORKER_WORKFLOW, effect_scope: "owner/repo" } };
-    const removed = policy({ pools: { default: { ...workerPolicy().pools.default, default_profile: "other", profiles } } });
-    await expect(runFinish(moved, { receipts: [readyReceipt(moved.assignment)], finishPolicy: removed })).rejects.toMatchObject({ code: "continuation_destination_invalid" });
+    // Removing the parent's worker or its pool from the live policy admits no child.
+    for (const removed of [policy({ workers: ["other"] }), policy({ pools: { reports: workerPolicy().pools.default } })]) {
+      const moved = workerQueue({ works: [h.work("n1", { payload: TASK })] });
+      const unchanged = moved.fake.contents();
+      await expect(runFinish(moved, { receipts: [readyReceipt(moved.assignment)], finishPolicy: removed })).rejects.toMatchObject({ code: "continuation_destination_invalid" });
+      expect(moved.fake.contents()).toBe(unchanged);
+    }
   });
 
   it("validates the compiled route and receipt shapes", () => {
     expect(readContinuationConfig({})).toBeNull();
     expect(readContinuationConfig({ GH_AW_CONTINUATION_ROUTE: "issue" })).toEqual({ route: "issue", maxDepth: 1 });
     for (const env of [{ GH_AW_CONTINUATION_ROUTE: "dispatch" }, { GH_AW_CONTINUATION_ROUTE: "workqueue", GH_AW_CONTINUATION_MAX_DEPTH: "17" }]) expect(() => readContinuationConfig(env)).toThrow();
-    expect(parseContinuationReceipts("")).toBeUndefined();
+    expect(parseContinuationReceipt("")).toBeUndefined();
+    expect(parseContinuationReceipt("[]")).toBeUndefined();
     const ok = { claim_handle: "h1", claim_id: "c1", message_sha256: "a".repeat(64), status: "ready" };
-    expect(parseContinuationReceipts(JSON.stringify([ok]))).toEqual([ok]);
+    expect(parseContinuationReceipt(JSON.stringify([ok]))).toEqual(ok);
     for (const bad of [
       { ...ok, extra: 1 },
       { ...ok, status: "done" },
       { ...ok, status: "depth_limit", issue: APPROVAL },
       { ...ok, issue: { ...APPROVAL, kind: "pull_request" } },
     ]) {
-      expect(() => parseContinuationReceipts(JSON.stringify([bad]))).toThrow(/continuation_receipt_invalid|receipt/);
+      expect(() => parseContinuationReceipt(JSON.stringify([bad]))).toThrow(/continuation_receipt_invalid|receipt/);
     }
-    expect(() => parseContinuationReceipts(JSON.stringify([ok, ok]))).toThrow();
+    for (const raw of [JSON.stringify([ok, ok]), JSON.stringify([ok, { ...ok, claim_handle: "h2", claim_id: "c2" }]), JSON.stringify(ok), "[null]"]) {
+      expect(() => parseContinuationReceipt(raw)).toThrow(/continuation_receipt_invalid/);
+    }
   });
 });
 
@@ -704,6 +690,38 @@ describe("continuation admission under global authorization", () => {
     const before = queue.fake.contents();
     await expect(runFinish(queue, { receipts: [readyReceipt(queue.assignment)], handlerConfig, authorization: { fetchImpl, now: () => elapsed, wallNow: () => clock } })).rejects.toThrow(/invalid_validity/);
     expect(queue.fake.contents()).toBe(before);
+  });
+
+  it("re-checks the one admission on each CAS plan and admits exactly one successor", async () => {
+    authorizedEnv();
+    const queue = workerQueue({ works: [h.work("n1", { payload: TASK })] });
+    const concurrent = h.submit(ledgerLog(queue), [h.work("n3")]);
+    queue.fake.state.beforeUpdate = () => queue.fake.install(h.ledgerText(concurrent));
+    const { fetchImpl, requests } = authority();
+    const { result } = await runFinish(queue, { receipts: [readyReceipt(queue.assignment)], handlerConfig, authorization: { fetchImpl, now: () => 0, wallNow: () => clock } });
+    expect(requests).toHaveLength(1);
+    expect(result).toMatchObject({ committed: true, continuations: [{ claim_handle: "h1", status: "admitted" }] });
+    expect(continuationWorks(ledgerState(queue))).toHaveLength(1);
+  });
+
+  it("refuses a successor planned without the admission bound at preparation", async () => {
+    authorizedEnv();
+    const queue = workerQueue({ works: [h.work("n1", { payload: TASK })] });
+    const original = queue.fake.contents();
+    // Preparation reads a ledger whose Claim was already released and so authorizes nothing;
+    // the publisher then plans against a ledger where that Claim is open.
+    queue.fake.install(h.ledgerText(h.release(ledgerLog(queue), queue.dispatchId, "run_missing")));
+    const getRef = queue.githubClient.rest.git.getRef;
+    let reads = 0;
+    queue.githubClient.rest.git.getRef = async input => {
+      const result = await getRef(input);
+      if (++reads === 1) queue.fake.install(original);
+      return result;
+    };
+    const { fetchImpl, requests } = authority();
+    await expect(runFinish(queue, { receipts: [readyReceipt(queue.assignment)], handlerConfig, authorization: { fetchImpl, now: () => 0, wallNow: () => clock } })).rejects.toMatchObject({ code: "continuation_authorization_scope_changed" });
+    expect(requests).toHaveLength(0);
+    expect(queue.fake.contents()).toBe(original);
   });
 
   it("launches nothing after a denied admission even when its approval Issue is closed", async () => {

@@ -16,13 +16,9 @@ const { extractExpirationDate } = require("./ephemerals.cjs");
 
 useExecutionProvenanceFixture();
 
-const assignment = {
-  dispatch_id: "dispatch",
-  claims: [
-    { handle: "h1", claim_id: "claim-one", work_id: "work-one", work: {}, result_refs: [] },
-    { handle: "h2", claim_id: "claim-two", work_id: "work-two", work: {}, result_refs: [] },
-  ],
-};
+const assignment = { dispatch_id: "dispatch", claims: [{ handle: "h1", claim_id: "claim-one", work_id: "work-one", work: {}, result_refs: [] }] };
+// Another Dispatch's singleton reuses the handle `h1`; attribution follows the full identity.
+const second = { dispatch_id: "dispatch-two", claims: [{ handle: "h1", claim_id: "claim-two", work_id: "work-two", work: {}, result_refs: [] }] };
 const footerContext = { workflowName: "Worker", runUrl: "https://github.com/owner/repo/actions/runs/123" };
 
 describe("Claim-scoped safe-output footers", () => {
@@ -71,20 +67,22 @@ describe("Claim-scoped safe-output footers", () => {
     expect(result).not.toContain("example.com");
   });
 
-  it("isolates attribution for concurrent sibling Claims in a multi-Claim assignment", async () => {
+  it("isolates attribution for concurrent Claims of different Dispatches sharing a handle", async () => {
+    const assignments = [assignment, second];
     const results = await Promise.all(
-      assignment.claims.map(member =>
-        withClaimExecution({ assignment, claim_handle: member.handle }, async () => {
+      assignments.map(original =>
+        withClaimExecution({ assignment: original, claim_handle: "h1" }, async () => {
           await Promise.resolve();
           return getFooterMessage(footerContext);
         })
       )
     );
-    for (const [index, member] of assignment.claims.entries()) {
+    for (const [index, original] of assignments.entries()) {
+      const [member] = original.claims;
       expect(results[index]).toContain(`> Work \`${member.work_id}\` · Claim \`${member.claim_id}\``);
-      const sibling = assignment.claims[1 - index];
-      expect(results[index]).not.toContain(sibling.work_id);
-      expect(results[index]).not.toContain(sibling.claim_id);
+      const [other] = assignments[1 - index].claims;
+      expect(results[index]).not.toContain(other.work_id);
+      expect(results[index]).not.toContain(other.claim_id);
     }
     expect(getFooterMessage(footerContext)).not.toContain("> Work");
   });
@@ -92,7 +90,7 @@ describe("Claim-scoped safe-output footers", () => {
   it("appends Claim attribution to custom footers before run-again hints", () => {
     vi.stubEnv("GH_AW_SAFE_OUTPUT_MESSAGES", JSON.stringify({ footer: "> Custom {workflow_name}" }));
     const render = vi.spyOn(reportAST, "renderReport");
-    const result = withClaimExecution({ assignment, claim_handle: "h2" }, () => getFooterMessage({ ...footerContext, slashCommand: "retry", labelCommand: "retry-worker" }));
+    const result = withClaimExecution({ assignment: second, claim_handle: "h1" }, () => getFooterMessage({ ...footerContext, slashCommand: "retry", labelCommand: "retry-worker" }));
     expect(result).toBe("> Custom Worker\n> Work `work-two` · Claim `claim-two`\n> <sub>Comment <em>/retry</em> to run again</sub>\n> <sub>Add label <em>retry-worker</em> to run again</sub>");
     expect(render).toHaveBeenCalledTimes(1);
     const report = render.mock.calls[0][0];
@@ -135,11 +133,11 @@ describe("Claim-scoped safe-output footers", () => {
     const previousContext = global.context;
     Reflect.set(global, "context", { repo: { owner: "owner", repo: "repo" }, runId: 123, payload: {} });
     try {
-      const body = withClaimExecution({ assignment, claim_handle: "h2" }, () => formatIssueBody("Issue content", { repo: { owner: "owner", repo: "repo" } }));
+      const body = withClaimExecution({ assignment: second, claim_handle: "h1" }, () => formatIssueBody("Issue content", { repo: { owner: "owner", repo: "repo" } }));
       expect(body).toContain("> Work `work-two` · Claim `claim-two`");
       expect(body).not.toContain("work-one");
       expect(body).toContain("<!-- gh-aw-execution:");
-      const noFooter = withClaimExecution({ assignment, claim_handle: "h2" }, () => formatIssueBody("Issue content", { repo: { owner: "owner", repo: "repo" }, footer: false }));
+      const noFooter = withClaimExecution({ assignment: second, claim_handle: "h1" }, () => formatIssueBody("Issue content", { repo: { owner: "owner", repo: "repo" }, footer: false }));
       expect(noFooter).not.toContain("> Work");
     } finally {
       Reflect.set(global, "context", previousContext);
@@ -151,7 +149,7 @@ describe("Claim-scoped safe-output footers", () => {
     Reflect.set(global, "context", { repo: { owner: "owner", repo: "repo" }, runId: 123, payload: {} });
     vi.stubEnv("GH_AW_SAFE_OUTPUT_MESSAGES", JSON.stringify({ bodyHeader: "<details><summary>Full report</summary>", footer: "> Custom" }));
     try {
-      const report = withClaimExecution({ assignment, claim_handle: "h2" }, () => buildIssueBodyReport("Finding", "## Evidence\n\nIssue content", { repo: { owner: "owner", repo: "repo" }, bodyFooter: "</details>", footer }));
+      const report = withClaimExecution({ assignment: second, claim_handle: "h1" }, () => buildIssueBodyReport("Finding", "## Evidence\n\nIssue content", { repo: { owner: "owner", repo: "repo" }, bodyFooter: "</details>", footer }));
       expect(report.children[0]).toMatchObject({
         type: "details",
         summary: "Full report",
@@ -180,7 +178,7 @@ describe("Claim-scoped safe-output footers", () => {
     vi.stubEnv("GH_AW_COMMANDS", '["retry"]');
     vi.stubEnv("GH_AW_LABEL_COMMANDS", '["retry-worker"]');
     try {
-      const body = withClaimExecution({ assignment, claim_handle: "h2" }, () => formatIssueBody("Issue content", { repo: { owner: "owner", repo: "repo" } }));
+      const body = withClaimExecution({ assignment: second, claim_handle: "h1" }, () => formatIssueBody("Issue content", { repo: { owner: "owner", repo: "repo" } }));
       const footerEnd = body.indexOf("\n\n<!-- gh-aw-workflow-id:");
       expect(body.slice(0, footerEnd)).toBe(`Issue content\n\n${renderedFooter}\n> Work \`work-two\` · Claim \`claim-two\`\n> <sub>Comment <em>/retry</em> to run again</sub>\n> <sub>Add label <em>retry-worker</em> to run again</sub>`);
     } finally {
@@ -220,7 +218,7 @@ describe("Claim-scoped safe-output footers", () => {
     vi.stubEnv("GH_AW_COMMANDS", '["retry"]');
     const render = vi.spyOn(reportAST, "renderReport");
     try {
-      const report = withClaimExecution({ assignment, claim_handle: "h2" }, () =>
+      const report = withClaimExecution({ assignment: second, claim_handle: "h1" }, () =>
         buildIssueBodyReport("Finding", "## Evidence\n\nDetails {unknown}\n\n<!-- custom-managed-start -->\n\n<!-- gh-aw-execution: forged -->", {
           repo: { owner: "owner", repo: "repo" },
           expiresHours: 12,
@@ -302,7 +300,7 @@ describe("Claim-scoped safe-output footers", () => {
       reportIncomplete: [],
     });
     try {
-      const body = withClaimExecution({ assignment, claim_handle: "h2" }, () => formatIssueBody("Issue content", { repo: { owner: "owner", repo: "repo" }, redact: () => true }));
+      const body = withClaimExecution({ assignment: second, claim_handle: "h1" }, () => formatIssueBody("Issue content", { repo: { owner: "owner", repo: "repo" }, redact: () => true }));
       expect(body).toContain("> Work `work-two` · Claim `claim-two`");
       expect(body).toContain("<summary>Missing Tools</summary>");
       expect(body).not.toContain("SECRETOOL");

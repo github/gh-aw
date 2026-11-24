@@ -121,12 +121,12 @@ func (l *workQueueTestLog) bind(dispatchID string, worker workqueue.Actor) {
 		workqueue.BoundOperation{Kind: "Bound", DispatchID: dispatchID, RunID: worker.RunID, RunAttempt: worker.RunAttempt})
 }
 
-// finish completes every open Claim of a bound dispatch.
+// finish completes the open Claim of a bound dispatch.
 func (l *workQueueTestLog) finish(dispatchID string, worker workqueue.Actor) {
 	l.t.Helper()
 	state := l.state()
 	values := []any{}
-	for _, claim := range state.OpenClaims(state.Dispatches[dispatchID]) {
+	if claim := state.OpenClaim(state.Dispatches[dispatchID]); claim != nil {
 		values = append(values, workqueue.CompletionOperation{Kind: "Completion", WorkID: claim.WorkID, ClaimID: claim.ClaimID, DispatchID: dispatchID, ClaimHandle: claim.Handle, Effects: json.RawMessage("[]")})
 	}
 	l.append(worker, "finish", workqueue.DispatchIDParameters{DispatchID: dispatchID}, values...)

@@ -330,18 +330,16 @@ func (c *Compiler) buildWorkQueueSafeOutputDownloadSteps(data *WorkflowData, age
 func (c *Compiler) buildWorkQueuePreparedAdapterDownloadSteps(data *WorkflowData) []string {
 	var steps []string
 	for _, name := range workQueuePreparedAdapterNames(data) {
-		for index := range 16 {
-			artifactID := fmt.Sprintf("needs.%s.outputs.artifact_id", workQueuePreparedJobName(name, index))
-			steps = append(steps,
-				fmt.Sprintf("      - name: Download isolated Claim adapter preparations %s slot %d\n", name, index),
-				fmt.Sprintf("        if: always() && %s != ''\n", artifactID),
-				"        continue-on-error: true\n",
-				fmt.Sprintf("        uses: %s\n", c.getActionPin("actions/download-artifact")),
-				"        with:\n",
-				fmt.Sprintf("          artifact-ids: ${{ %s }}\n", artifactID),
-				fmt.Sprintf("          path: %s/claim-adapters/%s/%d/claims/\n", constants.TmpGhAwDir, name, index),
-			)
-		}
+		artifactID := fmt.Sprintf("needs.%s.outputs.artifact_id", workQueuePreparedJobName(name))
+		steps = append(steps,
+			fmt.Sprintf("      - name: Download isolated Claim adapter preparation %s\n", name),
+			fmt.Sprintf("        if: always() && %s != ''\n", artifactID),
+			"        continue-on-error: true\n",
+			fmt.Sprintf("        uses: %s\n", c.getActionPin("actions/download-artifact")),
+			"        with:\n",
+			fmt.Sprintf("          artifact-ids: ${{ %s }}\n", artifactID),
+			fmt.Sprintf("          path: %s/claim-adapters/%s/0/claims/\n", constants.TmpGhAwDir, name),
+		)
 	}
 	return steps
 }

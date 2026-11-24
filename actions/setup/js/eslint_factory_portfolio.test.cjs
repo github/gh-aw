@@ -2,11 +2,11 @@
 import { describe, expect, it } from "vitest";
 import fs from "node:fs";
 import { createRequire } from "node:module";
-import { ESLINT_WORKERS, buildESLintFactoryPlan, buildESLintFactoryPolicy } from "./eslint_factory_portfolio.cjs";
+import { ESLINT_WORKERS, buildESLintFactoryPlan } from "./eslint_factory_portfolio.cjs";
 import { normalizeSubmitParameters } from "./work_queue_intents.cjs";
 import { replayTransactions } from "./work_queue_replay.cjs";
 import { frozenResourceScope } from "./work_queue_resource_scope.cjs";
-import { readWorkQueuePolicyEnv, validatePolicyEnv } from "./work_queue_policy.cjs";
+import { policyAllowsWorker, readWorkQueuePolicyEnv, workerWorkflow } from "./work_queue_policy.cjs";
 import { checkFileProtection, checkFileProtectionPostApply } from "./manifest_file_helpers.cjs";
 
 const require = createRequire(import.meta.url);
@@ -14,7 +14,7 @@ const h = require("./work_queue_test_helpers.cjs");
 const repository = "owner/repo";
 const planOptions = { date: "2026-10-08", repository, repositoryId: "7" };
 const settings = JSON.parse(fs.readFileSync(new URL("../../../.github/workflows/aw.json", import.meta.url), "utf8")).work_queue;
-const policyOptions = { repository, settings };
+const compiledPolicy = h.compiledDispatcherPolicy("eslint-factory-dispatcher", repository);
 
 /** Admit the plan's new Work (existing Work IDs are idempotent no-ops). */
 function admit(log, plan, policy) {
@@ -23,10 +23,10 @@ function admit(log, plan, policy) {
   return fresh.length ? h.submit(log, fresh, { ...h.producer, run_id: String(10 + log.length) }) : log;
 }
 
-/** Commit the plan's dispatch_next with the compiled pool limits. */
+/** Commit the plan's dispatch_next with the compiled pool limits, launching only the factory workers. */
 function dispatch(log, plan, policy, runId = "15") {
   const pool = policy.pools[plan.dispatch.pool];
-  const profiles = Object.fromEntries(Object.entries(pool.profiles).map(([name, profile]) => [name, { workflow: profile.workflow }]));
+  const profiles = Object.fromEntries(ESLINT_WORKERS.map(worker => [worker, { workflow: workerWorkflow(worker) }]));
   return h.dispatchNext(log, { ...plan.dispatch, concurrency: pool.concurrency, per_account_limit: pool.per_account_limit, profiles }, { ...h.dispatcher, run_id: runId }).log;
 }
 
@@ -86,15 +86,13 @@ describe("ESLint factory producer and dispatcher", () => {
   it("requires canonical repository identity and routes every worker through the default pool", () => {
     for (const repositoryId of ["0", "007", "github-actions[bot]"]) expect(() => buildESLintFactoryPlan({ ...planOptions, repositoryId })).toThrow(/identity/);
     expect(() => buildESLintFactoryPlan({ ...planOptions, repository: "not-a-repo" })).toThrow();
-    expect(() => buildESLintFactoryPolicy({ ...policyOptions, repository: "not-a-repo" })).toThrow();
-    const policy = buildESLintFactoryPolicy(policyOptions);
-    expect(validatePolicyEnv(policy)).toEqual(policy);
-    expect(policy.pools.default).toMatchObject({ concurrency: settings.concurrency, max_attempts: 3 });
-    for (const profile of ESLINT_WORKERS) expect(policy.pools.default.profiles[profile]).toEqual({ workflow: `.github/workflows/${profile}.lock.yml`, effect_scope: repository });
+    expect(compiledPolicy.pools.default).toMatchObject({ concurrency: settings.concurrency, max_attempts: 3 });
+    for (const worker of ESLINT_WORKERS) expect(policyAllowsWorker(compiledPolicy, "default", worker), worker).toBe(true);
+    expect(compiledPolicy.effect_scope).toBe(repository);
   });
 
   it("admits three tasks once per UTC day, then claims three singleton dispatches", () => {
-    const policy = buildESLintFactoryPolicy(policyOptions);
+    const policy = compiledPolicy;
     const plan = buildESLintFactoryPlan(planOptions);
     let log = admit([], plan, policy);
     const original = [...replayTransactions(log).works.values()];
@@ -135,7 +133,8 @@ describe("ESLint factory producer and dispatcher", () => {
       const policy = readWorkQueuePolicyEnv(environment);
       expect(policy).toMatchObject({ version: 4, pending_limit: settings.pending_limit });
       expect(policy.pools.default.concurrency).toBe(settings.concurrency);
-      for (const worker of ESLINT_WORKERS) expect(policy.pools.default.profiles[worker]).toEqual({ workflow: `.github/workflows/${worker}.lock.yml`, effect_scope: repository });
+      for (const worker of ESLINT_WORKERS) expect(policyAllowsWorker(policy, "default", worker), worker).toBe(true);
+      expect(policy.effect_scope).toBe(repository);
     }
     expect(source).toContain("github-token: ${{ secrets.GITHUB_TOKEN }}");
     expect(source).not.toMatch(/secrets\.(?!GITHUB_TOKEN\b)/);

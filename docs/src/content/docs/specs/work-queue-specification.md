@@ -153,7 +153,7 @@ Replay produces:
 | `repository`, `tip`, `commits` | Queue repository, last commit ID, and commit ordinal (including history folded into a checkpoint) |
 | `works` | Work definition plus `state`, `position {commit, operation}`, `attempts`, and when applicable `claim_id`, `completion_id`, `effects`, `cancellation_reason`, `cancellation_commit_id`, `backing_issue`, `issue_comment` |
 | `claims` | `claim_id`, `work_id`, `dispatch_id`, `handle`, `state` (`open`, `completed`, `cancelled`), `commit_id`, `request_id`, and when applicable `terminal_commit_id`, `cancellation_reason`, `effects`, `issue_comment` |
-| `dispatches` | `dispatch_id`, `request_id`, `commit_id`, `pool`, `worker_profile`, `workflow`, `state` (`reserved`, `started`, `bound`, `closed`), `launch` (`{run_id, revision}` of the launched run, or null), `run` (`{run_id, run_attempt}` or null), `claims` |
+| `dispatches` | `dispatch_id`, `request_id`, `commit_id`, `pool`, `worker_profile`, `workflow`, `state` (`reserved`, `started`, `bound`, `closed`), `launch` (`{run_id, revision}` of the launched run, or null), `run` (`{run_id, run_attempt}` or null), `claims` (a one-element array naming the Dispatch's sole Claim) |
 | `observations` | Latest Observation per gate key `canonical({host, repository_id, resource_id, kind, condition})` |
 | `requests`, `work_creators` | Committed request IDs and the actor that created each Work |
 
@@ -167,13 +167,13 @@ Operations apply in order within a commit; a commit applies atomically or fails 
 | --- | --- | --- |
 | `Work` | If `work_id` exists: no-op. Otherwise graph admission: Work predecessors exist in the same graph and pool or the same commit (`dependency_invalid`), no cycle (`dependency_cycle`), one pool per graph and unique node keys per commit (`graph_invalid`), one Work per backing Issue (`issue_binding_conflict`), at most `GRAPH_NODES` Work and gate vertices per graph and `MAX_PENDING_WORK` pending Work per pool (`resource_limit`). | Work `available`, `attempts` 0. |
 | `Observation` | — | Replace the observation of its gate key. |
-| `Claim` | Work exists (`work_missing`), is `available` and unowned (`ownership_conflict`); `claim_id` unused (`claim_conflict`); Work profile in request `profiles` (`request_invalid`); an existing `dispatch_id` belongs to the same commit, pool, and profile (`dispatch_state_conflict`) with a unique handle (`claim_conflict`); an `issue` continuation's `approved` gate has a `ready` observation in the projection at that operation (`approval_required`). Replay does not re-plan the selection. | Claim `open`; Work `claimed` with `claim_id`; Dispatch created `reserved` with `workflow = profiles[worker_profile].workflow`, or extended. |
+| `Claim` | Work exists (`work_missing`), is `available` and unowned (`ownership_conflict`); `claim_id` unused (`claim_conflict`); Work profile in request `profiles` (`request_invalid`); `dispatch_id` unused, because a Dispatch carries exactly one Claim (`dispatch_state_conflict`); an `issue` continuation's `approved` gate has a `ready` observation in the projection at that operation (`approval_required`). Replay does not re-plan the selection. Several Claims of one request use distinct Dispatches. | Claim `open`; Work `claimed` with `claim_id`; Dispatch created `reserved` with `claims = [claim_id]` and `workflow = profiles[worker_profile].workflow`. |
 | `Dispatch` | `state` is `"started"`, `run_id` a canonical positive integer, `revision` a 40- or 64-digit lowercase hex commit (`request_invalid`); Dispatch exists (`dispatch_missing`) and is `reserved` (`dispatch_state_conflict`). | Dispatch `started`, `launch = {run_id, revision}`. |
 | `Bound` | Dispatch is `started` or `bound` with an open Claim (`dispatch_state_conflict`); `actor.workflow = dispatch.workflow`, `actor.run_id = run_id`, `actor.run_attempt = run_attempt`, and `run_id = dispatch.launch.run_id` (`run_binding_conflict`). If already bound: the same run and attempt is a no-op, the same run with a higher attempt rebinds, anything else fails (`run_binding_conflict`). | Dispatch `bound`, `run` set. |
-| `Completion` | Claim exists (`claim_missing`) and is `open` (`claim_ineffective`); `work_id`, `dispatch_id`, `claim_handle` match the Claim and the Dispatch is bound to the actor's workflow, run, and attempt (`claim_scope_invalid`). | Claim and Work `completed`; `effects` stored on both; `work.completion_id` = commit ID; Dispatch `closed` when no Claim is open. |
-| `ClaimCancellation` | Claim names the Work (`claim_scope_invalid`). Already `cancelled`: no-op. Otherwise `open` (`claim_ineffective`) and the Work's current Claim (`ownership_conflict`); a worker actor must be the bound run (`claim_scope_invalid`). | Claim `cancelled` with reason; Work `available`, `attempts + 1`, `claim_id` removed; Dispatch `closed` when no Claim is open. |
+| `Completion` | Claim exists (`claim_missing`) and is `open` (`claim_ineffective`); `work_id`, `dispatch_id`, `claim_handle` match the Claim and the Dispatch is bound to the actor's workflow, run, and attempt (`claim_scope_invalid`). | Claim and Work `completed`; `effects` stored on both; `work.completion_id` = commit ID; Dispatch `closed`, retaining its `launch` and `run`. |
+| `ClaimCancellation` | Claim names the Work (`claim_scope_invalid`). Already `cancelled`: no-op. Otherwise `open` (`claim_ineffective`) and the Work's current Claim (`ownership_conflict`); a worker actor must be the bound run (`claim_scope_invalid`). | Claim `cancelled` with reason; Work `available`, `attempts + 1`, `claim_id` removed; its Dispatch `closed`. |
 | `WorkCancellation` | Work exists (`work_missing`) and is not `completed` (`work_terminal`). Already `cancelled`: no-op with the same reason, else `work_terminal`. `claimed` Work fails (`ownership_conflict`). A `claim_id` MUST name a cancelled Claim of this Work (`claim_scope_invalid`). | Work `cancelled`, `cancellation_reason`, `cancellation_commit_id`. |
-| `Release` | Dispatch exists and is not `closed` (`dispatch_state_conflict`). | Every open Claim of the Dispatch is cancelled with the Release reason (as `ClaimCancellation`); Dispatch `closed`. |
+| `Release` | Dispatch exists and is not `closed` (`dispatch_state_conflict`). | The Dispatch's open Claim is cancelled with the Release reason (as `ClaimCancellation`); Dispatch `closed`. |
 | `Checkpoint` | Only as the sole operation of line 1 (`checkpoint_invalid`). | See [section 14](#14-checkpoint). |
 | `IssueLink` | Work exists; optional Claim belongs to it (`claim_scope_invalid`). The Work has no other backing Issue and the Issue backs no other Work (`issue_binding_conflict`); the same binding is a no-op. | `work.backing_issue` set. |
 | `IssueComment` | Work (and optional Claim) exists; an existing different `issue_comment` fails (`issue_binding_conflict`); the same value is a no-op. | `issue_comment` set on the Claim, or on the Work without `claim_id`. |
@@ -207,13 +207,13 @@ The compiler emits `GH_AW_WORK_QUEUE_POLICY` (chunked when large) to every queue
  "pools":{"default":{"concurrency":3,"per_account_limit":0,"max_attempts":3}}}
 ```
 
-The object is closed. `pending_limit` 1–4,096; `effect_scope` is `owner/repo`; `workers` lists 1–256 approved worker workflow IDs, sorted and unique; per pool `concurrency` 1–4,096, `per_account_limit` 0–4,096 (0 is unlimited) and `max_attempts` 1–16. Every pool routes to every worker, so the runtime expands each worker ID `<id>` into the profile `<id>` with workflow `.github/workflows/<id>.lock.yml` and the shared `effect_scope`; a pool's `default_profile` is the first worker ID. `issues` is `false` or `{label, title_prefix, orphaned_after_days?}`. Invalid environments fail with `policy_invalid`. The environment is derived from `.github/workflows/aw.json` `work_queue` and the workflows declaring `tools.work-queue.worker: true`; see [repository scheduling settings](/gh-aw/reference/work-queue/#repository-scheduling-settings).
+The object is closed. `pending_limit` 1–4,096; `effect_scope` is `owner/repo`; `workers` lists 1–256 approved worker workflow IDs, sorted and unique, each with a workflow path `.github/workflows/<id>.lock.yml` of at most 256 bytes; per pool `concurrency` 1–4,096, `per_account_limit` 0–4,096 (0 is unlimited) and `max_attempts` 1–16. Every pool routes to every worker: worker profile `<id>` runs `.github/workflows/<id>.lock.yml` and its effects stay within the shared `effect_scope`. `issues` is `false` or `{label, title_prefix, orphaned_after_days?}`. Invalid environments fail with `policy_invalid`. The environment is derived from `.github/workflows/aw.json` `work_queue` and the workflows declaring `tools.work-queue.worker: true`; see [repository scheduling settings](/gh-aw/reference/work-queue/#repository-scheduling-settings).
 
 ## 10. Submission
 
 A producer, dispatcher, administrator, or worker publishes `submit` with `work_ids` and the new `Work` operations. Existing Work IDs are omitted from the operations; when every ID exists, nothing is committed. Before publishing, the publisher MUST check that the pool's `available` plus `claimed` Work, plus the new Work, does not exceed `pending_limit` (`work_queue_pending_limit`).
 
-Staged agent submissions default `graph_id` to the canonical payload digest, `node_key` to `root`, `pool` to `default`, `priority` to 3, `fairness_key` to `""`, and `worker_profile` to the pool's `default_profile`; a profile not configured for the pool fails with `work_queue_profile_not_approved`. A worker MAY submit child Work only while its bound Claim is open; omitted graph, pool, priority, fairness key, and same-pool profile are inherited from the Claim's Work. Issue and pull request references without numeric IDs are resolved before publication (`external_admission_unverified` on failure).
+Staged agent submissions default `graph_id` to the canonical payload digest, `node_key` to `root`, `pool` to `default`, `priority` to 3, `fairness_key` to `""`, and `worker_profile` to the first approved worker ID; a profile the pool does not route to fails with `work_queue_profile_not_approved`. A worker MAY submit child Work only while its bound Claim is open; omitted graph, pool, priority, fairness key, and same-pool profile are inherited from the Claim's Work. Issue and pull request references without numeric IDs are resolved before publication (`external_admission_unverified` on failure).
 
 ## 11. Scheduling and launch
 
@@ -274,31 +274,31 @@ The snapshot `/tmp/gh-aw/work-queue.snapshot.json` is:
    "continuation":{"route":"workqueue","message":"…","remaining":0}}]}}
 ```
 
-`work` is the Work payload. `result_refs` list the Work predecessors, with the commit that completed each and its recorded `effects` as `descriptor`. `continuation` is present only for a continuation successor; it is untrusted remaining-work context, and the worker still finishes its own Claim explicitly. `worker` is `null` for other roles and for a settled worker.
+`worker.claims` holds exactly one member; readers MUST reject a snapshot with zero or several members (`claim_scope_invalid`) before selecting it. `work` is the Work payload. `result_refs` list the Work predecessors, with the commit that completed each and its recorded `effects` as `descriptor`. `continuation` is present only for a continuation successor; it is untrusted remaining-work context, and the worker still finishes its own Claim explicitly. `worker` is `null` for other roles and for a settled worker.
 
 ### 12.2 Finish intents
 
-The agent stages one line per Claim in `work-queue.finish.jsonl`:
+The agent stages one line for its Claim in `work-queue.finish.jsonl`; `claim_handle` MAY be omitted and otherwise MUST equal the member's handle:
 
 ```json
 {"version":4,"claim_handle":"h1","outcome":"completed"}
 ```
 
-`outcome` is `completed` or `failed`. A missing intent means `failed`; conflicting outcomes for one handle are invalid, and an invalid file fails every Claim.
+`outcome` is `completed` or `failed`. A missing intent means `failed`; conflicting outcomes are invalid, and an invalid file fails the Claim.
 
 ### 12.3 Effects
 
-A Claim-scoped safe output MAY be applied only when its Claim is `open`, its Dispatch is `bound` to the current run and attempt, the Claim's finish intent is `completed`, and every target repository equals the profile's `effect_scope`. Otherwise it MUST be rejected (`E004`, `work_queue_effect_scope_denied`) or suppressed. Each applied effect appends `{"claim_handle","kind","resource"}` to `/tmp/gh-aw/work-queue.effects.jsonl`.
+A Claim-scoped safe output MAY be applied only when its Claim is `open`, its Dispatch is `bound` to the current run and attempt, the Claim's finish intent is `completed`, and every target repository equals the profile's `effect_scope`. Otherwise it MUST be rejected (`E004`, `work_queue_effect_scope_denied`) or suppressed. Each applied effect appends `{"claim_handle","kind","resource"}` to `/tmp/gh-aw/work-queue.effects.jsonl`. Each configured prepared or script Claim adapter compiles to exactly one isolated, read-only preparation job (`work_queue_prepare_<name>_0`), whose artifact the trusted job downloads by its exact artifact ID; it prepares the sole member or stays inactive.
 
 ### 12.4 Finish
 
-After safe outputs are processed, the worker publishes one `finish` commit for its Dispatch. For each open Claim:
+After safe outputs are processed, the worker publishes one `finish` commit for its Dispatch. If its Claim is open:
 
 - `completed`: `Completion` with that handle's effects, or `[]` with a warning when they exceed `EFFECTS_BYTES`;
 - `completed` with an accepted continuation request: that `Completion` immediately followed by its successor `Work` ([section 8.2](#82-continuation-successors)); if the successor cannot be admitted the finish fails and never falls back to a bare `Completion`;
 - otherwise: `ClaimCancellation{reason:"worker_failed"}` plus the attempts rule.
 
-The step output `work_queue_outcome` is `completed` when every Claim of the Dispatch is completed, else `failed`. Effects are applied before the commit; if the job stops in between, the Claim is later released and the next attempt MAY repeat the effects (at-least-once).
+The step output `work_queue_outcome` is `completed` when the Dispatch's Claim is completed, else `failed`. Effects are applied before the commit; if the job stops in between, the Claim is later released and the next attempt MAY repeat the effects (at-least-once).
 
 ### 12.5 Termination
 
@@ -322,7 +322,7 @@ Only conversion and checkpoint failures fail maintenance. A run released while s
 
 A checkpoint replaces the file content with one root line (`previous: null`) whose request is `checkpoint {prior_tip}` and whose only operation is `Checkpoint{prior_tip, state}`. The Git commit's parent is the previous head, so the folded history stays reachable. `state` is the canonical projection: `repository`, `tip` (equal to `prior_tip`), `commits`, `works`, `claims`, `dispatches`, `observations`, `requests` (sorted), and `work_creators`.
 
-Restoring a checkpoint MUST validate every record and cross-reference (`checkpoint_invalid`): open Claims and `claimed` Work agree, completed Work carries its completion and effects, cancelled Work carries its reason, only bound or closed Dispatches carry a run, non-closed Dispatches have an open Claim, and every Work has a creator. Work `continuation` and observation `approved_by` are validated with the same rules as their operations. Replay continues with the following lines; the checkpoint's own request ID joins `requests` and `commits` increases by one.
+Restoring a checkpoint MUST validate every record and cross-reference (`checkpoint_invalid`): open Claims and `claimed` Work agree, completed Work carries its completion and effects, cancelled Work carries its reason, only bound or closed Dispatches carry a run, every Dispatch's `claims` holds exactly one Claim whose `dispatch_id` names it back (so no second Claim may point at a Dispatch), its pool and profile match that Claim's Work, a Dispatch is non-closed exactly when its Claim is open, and every Work has a creator. A grouped Dispatch is rejected, never split or truncated. Work `continuation` and observation `approved_by` are validated with the same rules as their operations. Replay continues with the following lines; the checkpoint's own request ID joins `requests` and `commits` increases by one.
 
 ## 15. Conversion from version 3
 
@@ -408,7 +408,7 @@ The JavaScript and Go implementations MUST produce identical results for the sha
 
 ## 20. Formal model
 
-[`WorkQueueV4.tla`](https://github.com/github/gh-aw/blob/main/specs/work-queue/WorkQueueV4.tla) models submission, planning, launch, bind, completion (optionally admitting one previously absent continuation successor in the same commit), failure, termination, maintenance release, and re-runs without clocks. TLC checks, within the bounds in its [README](https://github.com/github/gh-aw/blob/main/specs/work-queue/README.md), that each Work has at most one open Claim, a completed Claim was completed by the run attempt its Dispatch is bound to, non-closed Dispatches never exceed `concurrency`, attempts never decrease or exceed `max_attempts`, terminal Work never changes, and every submitted Work eventually completes or is cancelled under fair scheduling, maintenance, and run progress. Approval gates are abstracted; the shared fixtures cover the approval rule.
+[`WorkQueueV4.tla`](https://github.com/github/gh-aw/blob/main/specs/work-queue/WorkQueueV4.tla) models each Dispatch slot as one attempt carrying exactly one Claim, and covers submission, planning, launch, bind, completion (optionally admitting one previously absent continuation successor in the same commit), failure, termination, maintenance release, and re-runs without clocks. TLC checks, within the bounds in its [README](https://github.com/github/gh-aw/blob/main/specs/work-queue/README.md), that each Work has at most one open Claim, a completed Claim was completed by the run attempt its Dispatch is bound to, non-closed Dispatches never exceed `concurrency`, attempts never decrease or exceed `max_attempts`, terminal Work never changes, and every submitted Work eventually completes or is cancelled under fair scheduling, maintenance, and run progress. Approval gates are abstracted; the shared fixtures cover the approval rule.
 
 ## 21. Guarantees and non-guarantees
 

@@ -5,14 +5,9 @@ const { WORKER_REVISION, WORKER_WORKFLOW, bind, dispatchNext, dispatcher, fakeQu
 const { replayTransactions } = require("./work_queue_replay.cjs");
 const { assignmentForDispatch } = require("./work_queue_scheduler.cjs");
 
-/** Compiled v4 policy env for pool "default" / profile "worker". */
+/** Compiled v4 policy env: pool "default" routes to worker "worker". */
 function workerPolicy({ maxAttempts = 3, effectScope = repository } = {}) {
-  return {
-    version: 4,
-    pending_limit: 30,
-    issues: false,
-    pools: { default: { concurrency: 16, per_account_limit: 0, max_attempts: maxAttempts, default_profile: "worker", profiles: { worker: { workflow: WORKER_WORKFLOW, effect_scope: effectScope } } } },
-  };
+  return { version: 4, pending_limit: 30, issues: false, effect_scope: effectScope, workers: ["worker"], pools: { default: { concurrency: 16, per_account_limit: 0, max_attempts: maxAttempts } } };
 }
 
 /** The worker job's Actions context for one run attempt of a Dispatch, checked out at the launched revision. */

@@ -97,14 +97,16 @@ describe("dispatch_workflow handler factory", () => {
         version: 4,
         pending_limit: 30,
         issues: false,
-        pools: { default: { concurrency: 1, per_account_limit: 0, max_attempts: 3, default_profile: "worker", profiles: { worker: { workflow: h.WORKER_WORKFLOW, effect_scope: "owner/repo" } } } },
+        effect_scope: "owner/repo",
+        workers: ["worker"],
+        pools: { default: { concurrency: 1, per_account_limit: 0, max_attempts: 3 } },
       };
       try {
         global.github = publisher;
         global.context = { repo: { owner: "owner", repo: "repo" }, runId: 100, runAttempt: 1, payload: {}, ref: "refs/heads/main" };
         vi.stubEnv("GH_AW_WORK_QUEUE_ENABLED", "true");
         vi.stubEnv("GH_AW_WORK_QUEUE_ROLE", "dispatcher");
-        vi.stubEnv("GH_AW_WORK_QUEUE_POLICY", h.policyEnvText(policy));
+        vi.stubEnv("GH_AW_WORK_QUEUE_POLICY", JSON.stringify(policy));
         vi.stubEnv("GITHUB_WORKFLOW_REF", "owner/repo/.github/workflows/dispatcher.lock.yml@refs/heads/main");
         const config = { workflows: ["worker"], workflow_files: { worker: ".lock.yml" }, work_queue_enabled: true, work_queue_workflows: ["worker"], aw_context_workflows: ["worker"], "target-ref": "refs/heads/main" };
         const message = { type: "work_queue_dispatch_next", intent_id: "direct", pool: "default", max_claims: 1, max_dispatches: 1 };

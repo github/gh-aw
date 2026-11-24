@@ -6,7 +6,7 @@ const { iterateLines, iterateJsonlEvents } = require("./jsonl_helpers.cjs");
 const fs = require("fs");
 const path = require("path");
 const { canonical, closed, digest, identity, integer, parseStrictJSON, queueError } = require("./work_queue_codec.cjs");
-const { poolEnv } = require("./work_queue_policy.cjs");
+const { policyAllowsWorker, poolEnv } = require("./work_queue_policy.cjs");
 const { nodeId } = require("./work_queue_graph.cjs");
 const { OPERATIONS_PER_COMMIT } = require("./work_queue_limits.cjs");
 
@@ -154,7 +154,7 @@ function normalizeDispatchParameters(parameters) {
 /**
  * Build v4 Work operations from a staged submission. Defaults: graph_id = payload
  * digest, node_key "root", pool "default", priority 3, fairness_key "", profile =
- * the pool's default_profile. Replay validates the result structurally.
+ * the first approved worker. Replay validates the result structurally.
  * @param {{nodes: Array<Record<string, any>>}} parameters
  * @param {import("./work_queue_policy.cjs").PolicyEnv} policy
  * @returns {Array<Record<string, any>>}
@@ -167,9 +167,9 @@ function normalizeSubmitParameters(parameters, policy) {
     const graphId = node.graph_id ?? digest(node.payload);
     const nodeKey = node.node_key ?? "root";
     const poolName = node.pool ?? "default";
-    const pool = poolEnv(policy, poolName);
-    const profile = node.worker_profile ?? pool.default_profile;
-    if (!Object.hasOwn(pool.profiles, profile)) throw queueError("work_queue_profile_not_approved", `worker profile ${profile} is not configured for pool ${poolName}`);
+    poolEnv(policy, poolName);
+    const profile = node.worker_profile ?? policy.workers[0];
+    if (!policyAllowsWorker(policy, poolName, profile)) throw queueError("work_queue_profile_not_approved", `worker profile ${profile} is not configured for pool ${poolName}`);
     const workId = nodeId(graphId, nodeKey);
     if (node.work_id !== undefined && node.work_id !== workId) throw queueError("work_identity_invalid", "work_id must bind graph_id/node_key");
     return {

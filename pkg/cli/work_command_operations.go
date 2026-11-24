@@ -55,11 +55,10 @@ func workReleaseOperations(state workqueue.Projection, dispatchID, reason string
 		return []workqueue.Operation{}, nil
 	}
 	values := []any{workqueue.ReleaseOperation{Kind: "Release", DispatchID: dispatchID, Reason: reason}}
-	for _, claim := range state.OpenClaims(dispatch) {
-		work := state.Works[claim.WorkID]
-		if work.Attempts+1 >= maxAttempts(work.Pool) {
-			values = append(values, workqueue.WorkCancellationOperation{Kind: "WorkCancellation", WorkID: work.WorkID, Reason: "attempts_exhausted", ClaimID: claim.ClaimID})
-		}
+	// A non-closed Dispatch holds its open Claim; Release cancels it.
+	claim := state.OpenClaim(dispatch)
+	if work := state.Works[claim.WorkID]; work.Attempts+1 >= maxAttempts(work.Pool) {
+		values = append(values, workqueue.WorkCancellationOperation{Kind: "WorkCancellation", WorkID: work.WorkID, Reason: "attempts_exhausted", ClaimID: claim.ClaimID})
 	}
 	operations := make([]workqueue.Operation, 0, len(values))
 	for _, value := range values {

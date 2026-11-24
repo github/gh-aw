@@ -115,6 +115,8 @@ describe("work queue MCP server", () => {
       { ...test.envelope, role: "administrator" },
       { ...test.envelope, role: "dispatcher" },
       { ...test.envelope, worker: { ...test.envelope.worker, version: 4 } },
+      { ...test.envelope, worker: { ...test.envelope.worker, claims: [] } },
+      { ...test.envelope, worker: { ...test.envelope.worker, claims: [test.envelope.worker.claims[0], { ...test.envelope.worker.claims[0], handle: "h2", claim_id: "other-claim", work_id: "other-work" }] } },
       { ...test.envelope, origin: null },
     ])
       expect(() => parseSnapshotEnvelope(JSON.stringify(invalid))).toThrow();

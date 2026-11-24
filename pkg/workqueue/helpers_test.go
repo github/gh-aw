@@ -125,7 +125,7 @@ func testFinishOperations(t *testing.T, log []QueueCommit, dispatchID string) []
 	state, err := Replay(log)
 	require.NoError(t, err)
 	values := []any{}
-	for _, claim := range state.OpenClaims(state.Dispatches[dispatchID]) {
+	if claim := state.OpenClaim(state.Dispatches[dispatchID]); claim != nil {
 		values = append(values, CompletionOperation{Kind: "Completion", WorkID: claim.WorkID, ClaimID: claim.ClaimID, DispatchID: dispatchID, ClaimHandle: claim.Handle, Effects: json.RawMessage("[]")})
 	}
 	return mustOps(t, values...)

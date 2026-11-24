@@ -286,6 +286,8 @@ func restoreClaims(state *Projection, claims, dispatches object) error {
 	return nil
 }
 
+// restoreDispatches restores Dispatches and checks, on the raw records, that every
+// Dispatch carries exactly one Claim linking back to it, so two Claims can never share one.
 func restoreDispatches(state *Projection, dispatches object) error {
 	for _, id := range sortedKeys(dispatches) {
 		record, err := closed(dispatches[id], dispatchFields, nil, "checkpoint Dispatch", "checkpoint_invalid")
@@ -298,22 +300,25 @@ func restoreDispatches(state *Projection, dispatches object) error {
 		recordState, stateNamed := record["state"].(string)
 		members, isArray := record["claims"].([]any)
 		workflow, workflowNamed := record["workflow"].(string)
-		if record["dispatch_id"] != id || !stateNamed || !slices.Contains(dispatchStates, recordState) || !isArray || len(members) == 0 || !workflowNamed || !profileWorkflowPattern.MatchString(workflow) {
+		if record["dispatch_id"] != id || !stateNamed || !slices.Contains(dispatchStates, recordState) || !isArray || !workflowNamed || !profileWorkflowPattern.MatchString(workflow) {
 			return checkpointInvalid("checkpoint Dispatch record is inconsistent")
 		}
-		names := make([]string, 0, len(members))
-		for _, member := range members {
-			name, isName := member.(string)
-			if claim := state.Claims[name]; !isName || claim == nil || claim.DispatchID != id {
-				return checkpointInvalid("checkpoint Dispatch members are inconsistent")
-			}
-			names = append(names, name)
+		if len(members) != 1 {
+			return checkpointInvalid("a checkpoint Dispatch carries exactly one Claim")
+		}
+		name, isName := members[0].(string) //nolint:uncheckedsliceindex // len(members) == 1 is checked above
+		claim := state.Claims[name]
+		if !isName || claim == nil || claim.DispatchID != id {
+			return checkpointInvalid("checkpoint Dispatch members are inconsistent")
+		}
+		if work := state.Works[claim.WorkID]; record["pool"] != work.Pool || record["worker_profile"] != work.WorkerProfile {
+			return checkpointInvalid("a checkpoint Dispatch must match its Work's pool and profile")
 		}
 		if err := validateDispatchExecution(record, recordState); err != nil {
 			return err
 		}
-		if recordState != "closed" && !slices.ContainsFunc(names, func(name string) bool { return state.Claims[name].State == "open" }) {
-			return checkpointInvalid("settled Dispatches must be closed")
+		if (recordState != "closed") != (claim.State == "open") {
+			return checkpointInvalid("a checkpoint Dispatch is closed exactly when its Claim is settled")
 		}
 		var dispatch DispatchState
 		if err := decodeInto(record, &dispatch); err != nil {
@@ -321,6 +326,11 @@ func restoreDispatches(state *Projection, dispatches object) error {
 		}
 		state.Dispatches[id] = &dispatch
 		state.dispatchOrder = append(state.dispatchOrder, id)
+	}
+	for _, claim := range state.Claims {
+		if dispatch := state.Dispatches[claim.DispatchID]; dispatch == nil || dispatch.Claims[0] != claim.ClaimID {
+			return checkpointInvalid("checkpoint Claims must each own their Dispatch")
+		}
 	}
 	return nil
 }

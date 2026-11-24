@@ -14,17 +14,18 @@ const BASE_TREE = "b".repeat(40);
 const hash = value => crypto.createHash("sha1").update(value).digest("hex");
 const blobHash = value => hash(Buffer.concat([Buffer.from(`blob ${Buffer.byteLength(value)}\0`), Buffer.from(value)]));
 
-function assigned(dispatch = "dispatch", count = 2) {
+function member(dispatch, handle = "h1") {
   return {
-    dispatch_id: dispatch,
-    claims: ["h1", "h2"].slice(0, count).map(handle => ({
-      handle,
-      claim_id: `${dispatch}-claim-${handle}`,
-      work_id: `${dispatch}-work-${handle}`,
-      work: { effect_contract: { version: 1, outputs: [{ type: "code", min: 1, max: 1 }] } },
-      result_refs: [],
-    })),
+    handle,
+    claim_id: `${dispatch}-claim-${handle}`,
+    work_id: `${dispatch}-work-${handle}`,
+    work: { effect_contract: { version: 1, outputs: [{ type: "code", min: 1, max: 1 }] } },
+    result_refs: [],
   };
+}
+
+function assigned(dispatch = "dispatch") {
+  return { dispatch_id: dispatch, claims: [member(dispatch)] };
 }
 
 function configured(pullRequest = true) {
@@ -136,41 +137,79 @@ async function prepare(root, assignment, handle, adapter, message, github) {
 
 function registerTests({ describe, it }) {
   describe("immutable per-Claim prepared code delivery", () => {
-    for (const count of [1, 2]) {
-      it(`prepares and delivers every member of an original ${count}-Claim assignment`, async () => {
-        const root = require("./work_queue_effect_test_helpers.cjs").temporaryDirectory("claim-code-matrix");
-        const assignment = assigned("dispatch", count);
-        const adapter = configured(false);
-        const host = native();
-        const inputs = assignment.claims.map(member => ({ type: "code", ...(count === 1 ? {} : { claim_handle: member.handle }), files: [{ path: `${member.handle}.txt`, content: member.work_id }] }));
-        const authorize = async request => {
-          assert.equal(request.assignment.claims.length, count);
-          assert.equal(request.assignment.dispatch_id, assignment.dispatch_id);
-          return { claim_handle: request.claim_handle, authorized: true };
-        };
-        const results = [];
-        try {
-          for (const [index, member] of assignment.claims.entries()) {
-            const prepared = await prepareAdapterContext({ assignment, adapter, index, type: "code", messages: inputs, authorize, artifactRoot: root });
-            assert.deepEqual(prepared.messages, [{ ...inputs[index], claim_handle: member.handle }]);
-            fs.writeFileSync(prepared.outputFile, JSON.stringify({ version: 3, claim_handle: member.handle, type: "code", messages: [{ input: prepared.messages[0], payload: { files: inputs[index].files } }] }));
-            const effects = [];
-            await withClaimExecution({ assignment, claim_handle: member.handle, authorize, effects }, async () => {
-              const handler = await createClaimAdapterHandler({ adapter, filename: prepared.outputFile, github: host.github });
-              if (count > 1) await assert.rejects(handler({ type: "code", files: inputs[index].files }), /claim_handle is required/);
-              const result = await handler(inputs[index]);
-              results.push(result);
-              assert.equal(result.success, true);
-            });
-          }
-          assert.equal(host.refs.size, count);
-          assert.equal(new Set(results.map(result => result.branch)).size, count);
-          assert.equal(host.pulls.size, 0);
-        } finally {
-          fs.rmSync(root, { recursive: true, force: true });
+    it("rejects an original 2-Claim assignment before authorization, preparation or native effects", async () => {
+      const root = require("./work_queue_effect_test_helpers.cjs").temporaryDirectory("claim-code-two-member");
+      const assignment = { dispatch_id: "dispatch", claims: [member("dispatch", "h1"), member("dispatch", "h2")] };
+      const adapter = configured(false);
+      const host = native();
+      const authorizations = [];
+      const authorize = async request => {
+        authorizations.push(request);
+        return { claim_handle: request.claim_handle, authorized: true };
+      };
+      const messages = assignment.claims.map(entry => ({ type: "code", claim_handle: entry.handle, files: [{ path: `${entry.handle}.txt`, content: entry.work_id }] }));
+      try {
+        for (const index of [0, 1]) {
+          await assert.rejects(prepareAdapterContext({ assignment, adapter, index, type: "code", messages, authorize, artifactRoot: root, github: host.github }), /exactly one open Claim/);
         }
-      });
-    }
+        assert.throws(() => withClaimExecution({ assignment, claim_handle: "h1", authorize }, () => assert.fail("two-member assignment must not execute")), /exactly one open Claim/);
+        assert.throws(() => preparedAdapterPath(root, "h1", "code", assignment), /exactly one open Claim/);
+        assert.deepEqual(authorizations, []);
+        assert.deepEqual(host.writes, []);
+        assert.equal(host.refs.size, 0);
+        assert.equal(fs.existsSync(path.join(root, "claims")), false);
+      } finally {
+        fs.rmSync(root, { recursive: true, force: true });
+      }
+    });
+
+    it("prepares and delivers two singleton dispatches independently under the reused handle h1", async () => {
+      const root = require("./work_queue_effect_test_helpers.cjs").temporaryDirectory("claim-code-matrix");
+      const assignments = [assigned("dispatch-a"), assigned("dispatch-b")];
+      const adapter = configured(false);
+      const host = native();
+      const authorize = async request => {
+        assert.equal(request.assignment.claims.length, 1);
+        assert.ok(assignments.some(entry => entry.dispatch_id === request.assignment.dispatch_id));
+        return { claim_handle: request.claim_handle, authorized: true };
+      };
+      const results = [];
+      const handlers = [];
+      const outputFiles = new Set();
+      try {
+        for (const assignment of assignments) {
+          const [entry] = assignment.claims;
+          const input = { type: "code", files: [{ path: `${assignment.dispatch_id}.txt`, content: entry.work_id }] };
+          const foreign = { type: "code", claim_handle: "h2", files: [{ path: "foreign.txt", content: "foreign" }] };
+          const prepared = await prepareAdapterContext({ assignment, adapter, index: 0, type: "code", messages: [foreign, input], authorize, artifactRoot: root });
+          assert.deepEqual(prepared.messages, [{ ...input, claim_handle: "h1" }]);
+          assert.equal(prepared.outputFile, preparedAdapterPath(root, "h1", "code", assignment));
+          outputFiles.add(prepared.outputFile);
+          fs.writeFileSync(prepared.outputFile, JSON.stringify({ version: 3, claim_handle: "h1", type: "code", messages: [{ input: prepared.messages[0], payload: { files: input.files } }] }));
+          const effects = [];
+          await withClaimExecution({ assignment, claim_handle: "h1", authorize, effects }, async () => {
+            const handler = await createClaimAdapterHandler({ adapter, filename: prepared.outputFile, github: host.github });
+            handlers.push(handler);
+            await assert.rejects(handler({ ...input, claim_handle: "h2" }), /foreign/);
+            const result = await handler(input);
+            results.push(result);
+            assert.equal(result.success, true);
+            assert.ok(effects.length > 0);
+          });
+        }
+        assert.equal(outputFiles.size, 2);
+        assert.equal(host.refs.size, 2);
+        assert.equal(new Set(results.map(result => result.branch)).size, 2);
+        assert.equal(host.pulls.size, 0);
+        const writes = host.writes.length;
+        await withClaimExecution({ assignment: assignments[1], claim_handle: "h1", authorize }, async () => {
+          await assert.rejects(handlers[0]({ type: "code", files: [{ path: "escape.txt", content: "escape" }] }), /original immutable Claim identity/);
+        });
+        assert.equal(host.writes.length, writes);
+      } finally {
+        fs.rmSync(root, { recursive: true, force: true });
+      }
+    });
 
     it("writes exact tree, parent, branch and PR fields without a shared writer checkout", async () => {
       const root = require("./work_queue_effect_test_helpers.cjs").temporaryDirectory("claim-code");
@@ -216,23 +255,24 @@ function registerTests({ describe, it }) {
       }
     });
 
-    it("isolates failed and valid sibling code effects and persistent branch-only deliveries", async () => {
+    it("isolates failed and valid code effects of two singleton dispatches and persistent branch-only deliveries", async () => {
       const root = require("./work_queue_effect_test_helpers.cjs").temporaryDirectory("claim-code");
-      const assignment = assigned();
+      const failed = assigned("dispatch-a");
+      const valid = assigned("dispatch-b");
       const host = native();
       let cancelled = false;
-      const authorize = async request => ({ claim_handle: request.claim_handle, authorized: request.claim_handle !== "h1" || !cancelled });
+      const authorize = async request => ({ claim_handle: request.claim_handle, authorized: request.assignment.dispatch_id !== failed.dispatch_id || !cancelled });
       const adapter = configured(false);
       try {
-        for (const handle of ["h1", "h2"]) {
-          const message = { type: "code", claim_handle: handle, files: [{ path: "state.json", content: `{"claim":"${handle}"}` }] };
+        for (const assignment of [failed, valid]) {
+          const message = { type: "code", claim_handle: "h1", files: [{ path: "state.json", content: `{"dispatch":"${assignment.dispatch_id}"}` }] };
           const effects = [];
-          await withClaimExecution({ assignment, claim_handle: handle, authorize, effects }, async () => {
-            const handler = await prepare(root, assignment, handle, adapter, message, host.github);
+          await withClaimExecution({ assignment, claim_handle: "h1", authorize, effects }, async () => {
+            const handler = await prepare(root, assignment, "h1", adapter, message, host.github);
             host.state.afterBlob = () => {
-              if (handle === "h1") cancelled = true;
+              if (assignment === failed) cancelled = true;
             };
-            if (handle === "h1") {
+            if (assignment === failed) {
               await assert.rejects(handler(message), /not open/);
               assert.deepEqual(host.writes, ["blob"]);
             } else {

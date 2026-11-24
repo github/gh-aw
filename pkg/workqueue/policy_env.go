@@ -24,9 +24,9 @@ var (
 // take effect on the next run that carries them.
 //
 // Every pool routes to every approved worker, so the environment lists each worker
-// once instead of repeating a profile map per pool. The runtime expands worker ID
-// <id> to the profile <id> with workflow .github/workflows/<id>.lock.yml and
-// EffectScope; a pool's default profile is the first (smallest) worker ID.
+// once instead of repeating a profile map per pool. Worker profile <id> runs
+// .github/workflows/<id>.lock.yml within EffectScope; submissions default to the
+// first (smallest) worker ID.
 type PolicyEnv struct {
 	Version      int
 	PendingLimit int

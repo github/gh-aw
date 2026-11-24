@@ -9,15 +9,10 @@ const { wrapClaimEffectClient } = require("./work_queue_effect_client.cjs");
 const scanning = require("./work_queue_code_scanning.cjs");
 const coverage = require("./work_queue_code_coverage.cjs");
 
-function assigned(type) {
-  return {
-    dispatch_id: "dispatch",
-    claims: ["h1", "h2"].map(handle => {
-      /** @type {Record<string, unknown>} */
-      const effect_contract = { version: 1, outputs: [{ type, min: 1, max: 1 }] };
-      return { handle, claim_id: `claim:${handle}`, work_id: `work:${handle}`, work: { effect_contract }, result_refs: [] };
-    }),
-  };
+function assigned(type, dispatch = "dispatch") {
+  /** @type {Record<string, unknown>} */
+  const effect_contract = { version: 1, outputs: [{ type, min: 1, max: 1 }] };
+  return { dispatch_id: dispatch, claims: [{ handle: "h1", claim_id: `claim:${dispatch}`, work_id: `work:${dispatch}`, work: { effect_contract }, result_refs: [] }] };
 }
 
 async function nativeEnvironment(callback) {
@@ -34,23 +29,26 @@ async function nativeEnvironment(callback) {
 
 function registerTests({ describe, it }) {
   describe("trusted standalone native Claim adapters", () => {
-    it("rejects symlinked Claim roots and parent directories rather than consuming a sibling artifact", async () => {
+    it("rejects symlinked Claim roots and parent directories rather than consuming another Dispatch's artifact", async () => {
       const root = require("./work_queue_effect_test_helpers.cjs").temporaryDirectory("queue-isolation");
       const assignment = assigned("noop");
+      // A concurrent Dispatch reusing handle h1 owns a different full-identity namespace.
       const first = claimArtifactPath(root, "h1", assignment);
-      const sibling = claimArtifactPath(root, "h2", assignment);
+      const other = claimArtifactPath(root, "h1", assigned("noop", "other-dispatch"));
+      assert.notEqual(first, other);
       try {
         fs.mkdirSync(first, { recursive: true });
-        fs.mkdirSync(sibling, { recursive: true });
+        fs.mkdirSync(other, { recursive: true });
         fs.writeFileSync(path.join(first, "own.json"), "{}");
-        fs.writeFileSync(path.join(sibling, "sibling.json"), "{}");
+        fs.writeFileSync(path.join(other, "other.json"), "{}");
         await withClaimExecution({ assignment, claim_handle: "h1" }, async () => {
           assertClaimArtifactFile(path.join(first, "own.json"), first);
-          fs.symlinkSync(sibling, path.join(first, "redirect"));
-          assert.throws(() => assertClaimArtifactFile(path.join(first, "redirect", "sibling.json"), first), /escapes|redirects/);
+          assert.throws(() => assertClaimArtifactFile(path.join(other, "other.json"), other), /outside its original Claim namespace/);
+          fs.symlinkSync(other, path.join(first, "redirect"));
+          assert.throws(() => assertClaimArtifactFile(path.join(first, "redirect", "other.json"), first), /escapes|redirects/);
           fs.rmSync(first, { recursive: true });
-          fs.symlinkSync(sibling, first);
-          assert.throws(() => assertClaimArtifactFile(path.join(first, "sibling.json"), first), /redirects/);
+          fs.symlinkSync(other, first);
+          assert.throws(() => assertClaimArtifactFile(path.join(first, "other.json"), first), /redirects/);
         });
       } finally {
         fs.rmSync(root, { recursive: true, force: true });
@@ -110,7 +108,7 @@ function registerTests({ describe, it }) {
           assert.equal(result.sarif_id, "upload-1");
           assert.equal(report.runs[0].results[0].message.text, "Scoped finding");
           await assert.rejects(handler({ ...message, repo: "foreign/repo" }), /conflicts/);
-          await assert.rejects(handler({ ...message, claim_handle: "h2" }), /cannot escape/);
+          await assert.rejects(handler({ ...message, claim_handle: "h2" }), /foreign/);
         });
         const next = structuredClone(assignment);
         next.dispatch_id = "next-dispatch";

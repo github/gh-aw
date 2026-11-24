@@ -73,8 +73,8 @@ function sortValue(work, key) {
 }
 
 /**
- * A worker's Claims live only in its activation snapshot (the dispatch input
- * carries just the Dispatch ID), so the read view is how the agent learns them.
+ * A worker's Claim lives only in its activation snapshot (the dispatch input
+ * carries just the Dispatch ID), so the read view is how the agent learns it.
  */
 function assignmentView(snapshot) {
   if (!snapshot.worker) return null;
@@ -183,19 +183,15 @@ function createWorkQueueStateTool(snapshot) {
   };
 }
 
-/** A worker may only name a Claim handle of its own assignment. */
+/** A worker may only name the Claim handle of its own assignment; omission selects it. */
 function assignedHandle(snapshot, handle) {
   if (!snapshot.worker) {
     if (handle !== undefined) throw new Error("work_queue_claim_scope_invalid");
     return undefined;
   }
-  const handles = snapshot.worker.claims.map(claim => claim.handle);
-  if (handle === undefined) {
-    if (handles.length !== 1) throw new Error("work_queue_claim_handle_required");
-    return handles[0];
-  }
-  if (!handles.includes(handle)) throw new Error("work_queue_claim_scope_invalid");
-  return handle;
+  const assigned = snapshot.worker.claims[0].handle;
+  if (handle !== undefined && handle !== assigned) throw new Error("work_queue_claim_scope_invalid");
+  return assigned;
 }
 
 function stageControlIntent(snapshot, kind, parameters, claimHandle, options) {
@@ -215,7 +211,7 @@ function createWorkQueueFinishTool(snapshot, options = {}) {
   return {
     name: "work_queue_claim_finish",
     description:
-      "Stage the outcome of one assigned Claim: completed (default) authorizes its safe-output effects; failed returns the Work to the queue. A missing outcome counts as failed. Only a one-Claim assignment may omit claim_handle. Staging is not completion.",
+      "Stage the outcome of the assigned Claim: completed (default) authorizes its safe-output effects; failed returns the Work to the queue. A missing outcome counts as failed. claim_handle may be omitted; if supplied it must be the assigned handle. Staging is not completion.",
     inputSchema: { type: "object", properties: { claim_handle: { type: "string", minLength: 1, maxLength: 256 }, outcome: { enum: ["completed", "failed"] } }, additionalProperties: false },
     handler: args => {
       closed(args, [], ["claim_handle", "outcome"], "work_queue_claim_finish");

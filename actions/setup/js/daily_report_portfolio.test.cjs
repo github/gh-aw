@@ -2,18 +2,17 @@
 import { describe, expect, it } from "vitest";
 import fs from "node:fs";
 import { createRequire } from "node:module";
-import { DAILY_REPORTS, FIXED_DAILY_REPORTS, WEEKLY_REPORTS, REPORT_PROFILES, REPORTS_PER_DAY, REPORT_POOL, reportsForDay, buildDailyReportPlan, buildDailyReportPolicy } from "./daily_report_portfolio.cjs";
+import { DAILY_REPORTS, FIXED_DAILY_REPORTS, WEEKLY_REPORTS, REPORT_PROFILES, REPORTS_PER_DAY, REPORT_POOL, reportsForDay, buildDailyReportPlan } from "./daily_report_portfolio.cjs";
 import { normalizeSubmitParameters } from "./work_queue_intents.cjs";
 import { replayTransactions } from "./work_queue_replay.cjs";
-import { validatePolicyEnv } from "./work_queue_policy.cjs";
+import { policyAllowsWorker, workerWorkflow } from "./work_queue_policy.cjs";
 import { frozenResourceScope } from "./work_queue_resource_scope.cjs";
 import { readDocumentMetadata } from "../../../scripts/markdown_metadata_test_adapter.cjs";
 
 const require = createRequire(import.meta.url);
 const h = require("./work_queue_test_helpers.cjs");
 const repository = "owner/repo";
-const settings = JSON.parse(fs.readFileSync(new URL("../../../.github/workflows/aw.json", import.meta.url), "utf8")).work_queue;
-const policyOptions = { repository, settings };
+const policy = h.compiledDispatcherPolicy("daily-report-dispatcher", repository);
 const planOptions = { repository, repositoryId: "7", date: "2026-10-07" };
 const source = name => fs.readFileSync(new URL(`../../../.github/workflows/${name}.md`, import.meta.url), "utf8");
 
@@ -24,10 +23,10 @@ function admit(log, plan, policy) {
   return fresh.length ? h.submit(log, fresh, { ...h.producer, run_id: String(10 + log.length) }) : log;
 }
 
-/** Commit the plan's dispatch_next with the compiled pool limits. */
+/** Commit the plan's dispatch_next with the compiled pool limits, launching only report workers. */
 function dispatch(log, plan, policy, runId = "15") {
   const pool = policy.pools[plan.dispatch.pool];
-  const profiles = Object.fromEntries(Object.entries(pool.profiles).map(([name, profile]) => [name, { workflow: profile.workflow }]));
+  const profiles = Object.fromEntries(REPORT_PROFILES.map(profile => [profile, { workflow: workerWorkflow(profile) }]));
   return h.dispatchNext(log, { ...plan.dispatch, concurrency: pool.concurrency, per_account_limit: pool.per_account_limit, profiles }, { ...h.dispatcher, run_id: runId }).log;
 }
 
@@ -98,17 +97,13 @@ describe("bounded daily and weekly discussion-report portfolio", () => {
   });
 
   it("uses shared scheduling and all thirteen AW worker routes without enrollment", () => {
-    const policy = buildDailyReportPolicy(policyOptions);
-    expect(validatePolicyEnv(policy)).toEqual(policy);
-    const pool = policy.pools[REPORT_POOL];
-    expect(pool).toMatchObject({ concurrency: 3, per_account_limit: 1, max_attempts: 3 });
-    expect(Object.keys(pool.profiles).sort()).toEqual([...REPORT_PROFILES].sort());
-    for (const profile of REPORT_PROFILES) expect(pool.profiles[profile]).toEqual({ workflow: `.github/workflows/${profile}.lock.yml`, effect_scope: repository });
-    expect(() => buildDailyReportPolicy({ ...policyOptions, repository: "not-a-repository" })).toThrow();
+    expect(policy.pools[REPORT_POOL]).toEqual({ concurrency: 3, per_account_limit: 1, max_attempts: 3 });
+    for (const profile of REPORT_PROFILES) expect(policyAllowsWorker(policy, REPORT_POOL, profile), profile).toBe(true);
+    expect(policy.effect_scope).toBe(repository);
+    expect(() => buildDailyReportPlan({ ...planOptions, repository: "not-a-repository" })).toThrow();
   });
 
   it("records idempotent daily Work and three singleton Claims in the ledger", () => {
-    const policy = buildDailyReportPolicy(policyOptions);
     const plan = buildDailyReportPlan(planOptions);
     let log = admit([], plan, policy);
     const originalWork = [...replayTransactions(log).works.values()];
@@ -135,7 +130,6 @@ describe("bounded daily and weekly discussion-report portfolio", () => {
   });
 
   it.each(["2026-10-10", "2026-10-11"])("admits weekly reports idempotently with exactly one required discussion on %s", date => {
-    const policy = buildDailyReportPolicy(policyOptions);
     const plan = buildDailyReportPlan({ ...planOptions, date });
     const log = admit(admit([], plan, policy), plan, policy);
     expect(replayTransactions(log).works.size).toBe(3);

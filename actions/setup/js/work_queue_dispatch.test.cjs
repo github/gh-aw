@@ -9,19 +9,14 @@ const require = createRequire(import.meta.url);
 const h = require("./work_queue_test_helpers.cjs");
 const { replayTransactionLog } = require("./work_queue_replay.cjs");
 const { main, dispatchQueueIntent, launchDispatch, refreshObservations } = require("./work_queue_dispatch.cjs");
+const { normalizeSubmitParameters } = require("./work_queue_intents.cjs");
 const { continuationChild } = require("./work_queue_graph.cjs");
 
 const DISPATCHER_REF = "owner/repo/.github/workflows/dispatcher.lock.yml@refs/heads/main";
 const WORKER_REF = "owner/repo/.github/workflows/worker.lock.yml@refs/heads/main";
 
 function policy(overrides = {}) {
-  return {
-    version: 4,
-    pending_limit: 30,
-    issues: false,
-    pools: { default: { concurrency: 3, per_account_limit: 0, max_attempts: 3, default_profile: "worker", profiles: { worker: { workflow: h.WORKER_WORKFLOW, effect_scope: "owner/repo" } } } },
-    ...overrides,
-  };
+  return { version: 4, pending_limit: 30, issues: false, effect_scope: "owner/repo", workers: ["worker"], pools: { default: { concurrency: 3, per_account_limit: 0, max_attempts: 3 } }, ...overrides };
 }
 
 function fakeCore() {
@@ -97,40 +92,49 @@ describe("dispatcher controls", () => {
     expect(works.map(node => state.works.get(node.work_id).state)).toEqual(["claimed", "claimed", "claimed", "available"]);
   });
 
-  it("grants Claims only for profiles in the compiled dispatch-workflow allowlist", async () => {
-    const pools = {
-      default: {
-        concurrency: 3,
-        per_account_limit: 0,
-        max_attempts: 3,
-        default_profile: "worker",
-        profiles: { worker: { workflow: h.WORKER_WORKFLOW, effect_scope: "owner/repo" }, other: { workflow: ".github/workflows/other.lock.yml", effect_scope: "owner/repo" } },
+  it.each([
+    ["complete", text => ({ GH_AW_WORK_QUEUE_POLICY: text })],
+    ["chunked", text => ({ GH_AW_WORK_QUEUE_POLICY_PARTS: "2", GH_AW_WORK_QUEUE_POLICY_0: text.slice(0, 40), GH_AW_WORK_QUEUE_POLICY_1: text.slice(40) })],
+  ])("grants Claims only for workers in the compiled dispatch-workflow allowlist (%s policy env)", async (_, transport) => {
+    const compiled = policy({ workers: ["alpha", "beta"], pools: { default: { concurrency: 3, per_account_limit: 0, max_attempts: 3 }, reports: { concurrency: 1, per_account_limit: 1, max_attempts: 2 } } });
+    // Submission defaults to the first approved worker, alpha; only beta is on this dispatcher's allowlist.
+    const [foreign, own] = normalizeSubmitParameters(
+      {
+        nodes: [
+          { node_key: "foreign", pool: "reports", priority: 1, payload: {} },
+          { node_key: "own", pool: "reports", worker_profile: "beta", payload: {} },
+        ],
       },
-    };
-    const foreign = h.work("foreign", { worker_profile: "other", priority: 1 });
-    const own = h.work("own");
+      compiled
+    );
+    expect(foreign.worker_profile).toBe("alpha");
     const fake = h.fakeQueueGitHub(h.ledgerText(h.submit([], [foreign, own])));
     const actions = h.fakeActions();
     const post = vi.spyOn(actions.actions, "createWorkflowDispatch");
-    const receipt = await dispatchQueueIntent({
-      githubClient: fake.githubClient,
-      dispatchClient: dispatchClient(undefined, actions),
-      context: dispatcherContext,
-      core: fakeCore(),
-      policy: policy({ pools }),
-      config: CONFIG,
-      remainingDispatches: 2,
-      message: { intent_id: "dispatch", pool: "default", max_claims: 2, max_dispatches: 2 },
-    });
-
-    expect(receipt).toMatchObject({ status: "committed", dispatches: 1, launches: [{ state: "started" }] });
-    expect(post.mock.calls.map(([parameters]) => parameters.workflow_id)).toEqual(["worker.lock.yml"]);
+    const environment = transport(JSON.stringify(compiled));
+    Object.assign(process.env, environment);
+    try {
+      const receipt = await dispatchQueueIntent({
+        githubClient: fake.githubClient,
+        dispatchClient: dispatchClient(undefined, actions),
+        context: dispatcherContext,
+        core: fakeCore(),
+        config: { workflows: ["alpha", "beta"], work_queue_workflows: ["beta"], workflow_files: { alpha: ".lock.yml", beta: ".lock.yml" } },
+        remainingDispatches: 2,
+        message: { intent_id: "dispatch", pool: "reports", max_claims: 2, max_dispatches: 2 },
+      });
+      expect(receipt).toMatchObject({ status: "committed", dispatches: 1, launches: [{ state: "started" }] });
+    } finally {
+      for (const key of Object.keys(environment)) delete process.env[key];
+    }
+    expect(post.mock.calls.map(([parameters]) => parameters.workflow_id)).toEqual(["beta.lock.yml"]);
     const state = stateOf(fake);
-    // The higher-priority Work of the non-allowlisted profile is never claimed.
+    // The higher-priority Work of the non-allowlisted worker is never claimed.
     expect(state.works.get(foreign.work_id)).toMatchObject({ state: "available", attempts: 0 });
     expect(state.works.get(own.work_id).state).toBe("claimed");
+    // The request pins only beta's workflow and the reports pool's own limits.
     const request = state.transactions.find(commit => commit.request.kind === "dispatch_next").request;
-    expect(Object.keys(request.parameters.profiles)).toEqual(["worker"]);
+    expect(request.parameters).toEqual({ pool: "reports", max_claims: 2, max_dispatches: 2, concurrency: 1, per_account_limit: 1, profiles: { beta: { workflow: ".github/workflows/beta.lock.yml" } } });
   });
 
   it("blocks a dispatch whose pool has no allowlisted profile without claiming or launching", async () => {

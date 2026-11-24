@@ -10,8 +10,7 @@ const { ASSIGNMENT_BYTES, PREDECESSORS } = require("./work_queue_limits.cjs");
 const { ERR_WORK_QUEUE_CLAIM_SCOPE } = require("./error_codes.cjs");
 const { validateContinuation } = require("./work_queue_graph.cjs");
 
-const MAX_ASSIGNMENT_CLAIMS = 16;
-// The snapshot assignment carries every Claim's payload plus predecessor effects.
+// The snapshot assignment carries its Claim's payload plus predecessor effects.
 const MAX_ASSIGNMENT_BYTES = ASSIGNMENT_BYTES + 16 * 1024;
 const RUNTIME_ROLES = ["observer", "dispatcher", "worker"];
 // Proof states that suppress a Claim's outputs instead of failing them.
@@ -44,61 +43,43 @@ function freeze(value) {
 
 /**
  * Validate the snapshot assignment `{dispatch_id, claims:[{handle, claim_id, work_id, work, result_refs, continuation?}]}`
- * produced by `assignmentForDispatch` (open Claims only).
+ * produced by `assignmentForDispatch`: a ledger Dispatch owns exactly one open Claim.
  */
 function normalizeAssignment(value) {
-  if (!object(value) || !Array.isArray(value.claims) || value.claims.length < 1 || value.claims.length > MAX_ASSIGNMENT_CLAIMS) {
-    throw scopeError("work queue assignment requires an array of 1 to 16 open Claims");
-  }
+  if (!object(value) || !Array.isArray(value.claims) || value.claims.length !== 1) throw scopeError("work queue assignment requires exactly one open Claim");
   if (canonicalBytes(value) > MAX_ASSIGNMENT_BYTES) throw scopeError("assignment exceeds its bounded host-input ceiling");
   if (Object.keys(value).some(field => !["dispatch_id", "claims"].includes(field)) || !own(value, "dispatch_id")) throw scopeError("assignment fields must be exactly dispatch_id and claims");
   identifier(value.dispatch_id, "dispatch_id");
-  const handles = new Set();
-  const claims = new Set();
-  const works = new Set();
-  for (const member of value.claims) {
-    if (!object(member) || !object(member.work) || !Array.isArray(member.result_refs) || member.result_refs.length > PREDECESSORS) throw scopeError("each Claim must include its Work payload and bounded predecessor results");
-    if (Object.keys(member).some(field => !["handle", "claim_id", "work_id", "work", "result_refs", "continuation"].includes(field))) throw scopeError("unknown assignment Claim field");
-    if (own(member, "continuation")) {
-      try {
-        validateContinuation(member.continuation);
-      } catch {
-        throw scopeError("invalid assignment continuation");
-      }
+  const [member] = value.claims;
+  if (!object(member) || !object(member.work) || !Array.isArray(member.result_refs) || member.result_refs.length > PREDECESSORS) throw scopeError("the Claim must include its Work payload and bounded predecessor results");
+  if (Object.keys(member).some(field => !["handle", "claim_id", "work_id", "work", "result_refs", "continuation"].includes(field))) throw scopeError("unknown assignment Claim field");
+  if (own(member, "continuation")) {
+    try {
+      validateContinuation(member.continuation);
+    } catch {
+      throw scopeError("invalid assignment continuation");
     }
-    identifier(member.handle, "handle");
-    identifier(member.claim_id, "claim_id");
-    identifier(member.work_id, "work_id");
-    const dependencies = new Set();
-    for (const reference of member.result_refs) {
-      if (!object(reference) || !Array.isArray(reference.descriptor) || Object.keys(reference).length !== 3 || !own(reference, "work_id") || !own(reference, "result_commit_id")) {
-        throw scopeError("invalid predecessor result reference");
-      }
-      identifier(reference.work_id, "result work_id");
-      identifier(reference.result_commit_id, "result_commit_id");
-      if (dependencies.has(reference.work_id)) throw scopeError("duplicate predecessor result reference");
-      dependencies.add(reference.work_id);
+  }
+  identifier(member.handle, "handle");
+  identifier(member.claim_id, "claim_id");
+  identifier(member.work_id, "work_id");
+  const dependencies = new Set();
+  for (const reference of member.result_refs) {
+    if (!object(reference) || !Array.isArray(reference.descriptor) || Object.keys(reference).length !== 3 || !own(reference, "work_id") || !own(reference, "result_commit_id")) {
+      throw scopeError("invalid predecessor result reference");
     }
-    if (handles.has(member.handle) || claims.has(member.claim_id) || works.has(member.work_id)) throw scopeError("duplicate assignment handle, Claim, or Work");
-    handles.add(member.handle);
-    claims.add(member.claim_id);
-    works.add(member.work_id);
+    identifier(reference.work_id, "result work_id");
+    identifier(reference.result_commit_id, "result_commit_id");
+    if (dependencies.has(reference.work_id)) throw scopeError("duplicate predecessor result reference");
+    dependencies.add(reference.work_id);
   }
   return freeze(JSON.parse(JSON.stringify(value)));
 }
 
 function normalizeClaimScope(message, assignment) {
   if (!object(message)) throw scopeError("safe-output message must be an object");
-  const original = normalizeAssignment(assignment);
-  let handle;
-  if (own(message, "claim_handle")) {
-    handle = identifier(message.claim_handle, "claim_handle");
-  } else {
-    if (original.claims.length !== 1) throw scopeError("claim_handle is required for a multi-Claim assignment", "claim_scope_required");
-    handle = original.claims[0].handle;
-  }
-  const member = original.claims.find(claim => claim.handle === handle);
-  if (!member) throw scopeError("claim_handle is foreign to this assignment");
+  const [member] = normalizeAssignment(assignment).claims;
+  if (own(message, "claim_handle") && identifier(message.claim_handle, "claim_handle") !== member.handle) throw scopeError("claim_handle is foreign to this assignment");
   for (const field of ["claim_id", "work_id"]) {
     if (own(message, field) && message[field] !== member[field]) throw scopeError(`explicit ${field} conflicts with claim_handle`);
   }
@@ -153,7 +134,7 @@ function readClaimScopeContext() {
   if (role !== "worker" && value !== null) throw scopeError("nonworkers cannot carry a Claim assignment");
   if (role === "observer" && configuredRole !== "observer") throw scopeError("ordinary observer outputs require an explicit protected compiler role");
   if (role === "observer") return null;
-  // A settled worker (every Claim already closed) has no assignment and no outputs.
+  // A settled worker (its Claim already closed) has no assignment and no outputs.
   if (!value) return { assignment: null, snapshot };
   const assignment = normalizeAssignment(value);
   const payload = runEventPayload();
@@ -210,8 +191,7 @@ async function assertClaimAuthorized(message, options = {}) {
       console.log("🎭 Staged Mode Preview — blocking resource effects for read-only Claim preview");
       throw scopeError("read-only Claim preview cannot perform resource effects");
     }
-    const member = scope.assignment.claims.find(claim => claim.handle === normalized.claim_handle);
-    if (writesProhibited(member.work)) throw scopeError("Work effect_contract prohibits resource writes");
+    if (writesProhibited(scope.assignment.claims[0].work)) throw scopeError("Work effect_contract prohibits resource writes");
     if (options.resource === undefined) throw scopeError("resource effects require an independently resolved target");
   }
   const authorize = options.authorize || execution?.authorize || require("./finish_work_queue_claim.cjs").authorizeWorkerClaim;
@@ -250,7 +230,7 @@ async function assertClaimAuthorized(message, options = {}) {
 
 function withClaimExecution(scope, callback) {
   const assignment = normalizeAssignment(scope.assignment);
-  if (!assignment.claims.some(claim => claim.handle === scope.claim_handle)) throw scopeError("execution context has a foreign Claim");
+  if (assignment.claims[0].handle !== scope.claim_handle) throw scopeError("execution context has a foreign Claim");
   const existing = claimExecution.getStore();
   if (existing && (existing.claim_handle !== scope.claim_handle || canonical(existing.assignment) !== canonical(assignment))) {
     throw scopeError("nested execution cannot replace its original assignment or Claim context");
@@ -262,8 +242,8 @@ function claimIdentity(handle, suppliedAssignment) {
   identifier(handle, "claim_handle");
   const assignment = suppliedAssignment === undefined ? currentClaimAssignment() || readClaimScopeContext()?.assignment : normalizeAssignment(suppliedAssignment);
   if (!assignment) throw scopeError("Claim identity requires its original assignment");
-  const member = assignment.claims.find(claim => claim.handle === handle);
-  if (!member) throw scopeError("Claim identity is foreign to its original assignment");
+  const [member] = assignment.claims;
+  if (member.handle !== handle) throw scopeError("Claim identity is foreign to its original assignment");
   return Object.freeze({ dispatch_id: assignment.dispatch_id, claim_id: member.claim_id, work_id: member.work_id, claim_handle: member.handle });
 }
 
@@ -421,7 +401,6 @@ function scopedArtifactFilename(filename) {
 }
 
 module.exports = {
-  MAX_ASSIGNMENT_CLAIMS,
   normalizeAssignment,
   normalizeClaimScope,
   normalizeRuntimeMessage,

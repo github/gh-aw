@@ -43,7 +43,7 @@ async function main(config = {}, githubClient = null) {
  */
 function routedHandler(descriptor, config, githubClient) {
   let accepted = 0;
-  /** @type {ReturnType<typeof routes.bindRoutedRequests> | undefined} */
+  /** @type {ReturnType<typeof routes.bindRoutedRequest> | undefined} */
   let bound;
   const noHandoff = (/** @type {string} */ reasonCode, /** @type {string} */ reason) => {
     core.warning(`request_continuation: ${reason}`);
@@ -55,10 +55,10 @@ function routedHandler(descriptor, config, githubClient) {
     if (typeof message?.message !== "string" || !message.message.trim()) return { success: false, error: "Missing required field: message" };
     const handle = currentClaimHandle();
     const assignment = handle ? currentClaimAssignment() : null;
-    bound ??= routes.bindRoutedRequests({ assignment });
+    bound ??= routes.bindRoutedRequest({ assignment });
     if (!bound.ok) return noHandoff(bound.reason, "agent output is not bound to this run attempt or its collection is not clean; no handoff");
-    const request = bound.requests.get(handle ?? "");
-    if (!request || request.message !== message.message) return noHandoff("continuation_request_unbound", "request is not bound to the verified agent output; no handoff");
+    const request = bound.request;
+    if (!request || request.message !== message.message || (request.claim_handle ?? null) !== (handle ?? null)) return noHandoff("continuation_request_unbound", "request is not bound to the verified agent output; no handoff");
     accepted++;
     const client = githubClient || global.github;
 
@@ -67,8 +67,8 @@ function routedHandler(descriptor, config, githubClient) {
       return routes.dispatchContinuation({ client, context: global.context, descriptor, request, staged: isStagedMode(config), coreApi: core });
     }
     if (!handle || !assignment) return { success: false, route: descriptor.route, error: `The ${descriptor.route} route requires an assignment-bound worker Claim` };
-    const member = assignment.claims.find(claim => claim.handle === handle);
-    if (!member) return { success: false, route: descriptor.route, error: "Claim is foreign to this assignment" };
+    // The bound request names this assignment's sole member.
+    const [member] = assignment.claims;
     try {
       if (descriptor.route === "workqueue") {
         const receipt = routes.workqueueReceipt({ member, request, maxDepth: descriptor.max_depth });

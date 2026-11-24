@@ -251,7 +251,7 @@ Events go to stderr with sanitized counts, flags, and error categories, not payl
 
 ### Diagnostic artifacts
 
-The `safe_outputs` job exposes `work_queue_outcome` (`completed` when every Claim completed, otherwise `failed`). When trusted queue controls run, `safe_outputs.outputs.work_queue_requests` contains their receipt:
+The `safe_outputs` job exposes `work_queue_outcome` (`completed` when the Dispatch's Claim completed, otherwise `failed`). When trusted queue controls run, `safe_outputs.outputs.work_queue_requests` contains their receipt:
 
 ```json
 {
@@ -275,4 +275,4 @@ The `safe_outputs` job exposes `work_queue_outcome` (`completed` when every Clai
 
 A launch with `state: "launch_failed"` carries a `reason` and returned its Work to the pool. The controls step fails only when a receipt is `blocked` or a dispatcher staged no intents.
 
-The activation snapshot `/tmp/gh-aw/work-queue.snapshot.json` contains the ledger at activation and, for a worker, `worker.claims[]` with `handle`, `claim_id`, `work_id`, the Work payload as `work`, and predecessor `result_refs`. Claim audit files live under `/tmp/gh-aw/claims/<identity-hash>/` and contain executed operations and structured errors, not raw handler output. Writers redact configured secrets and built-in credential patterns; redaction does not anonymize repository names, IDs, URLs, or unknown secrets.
+The activation snapshot `/tmp/gh-aw/work-queue.snapshot.json` contains the ledger at activation and, for a worker, `worker.claims` with exactly one member carrying `handle`, `claim_id`, `work_id`, the Work payload as `work`, and predecessor `result_refs`. Claim audit files live under `/tmp/gh-aw/claims/<identity-hash>/` and contain executed operations and structured errors, not raw handler output. Writers redact configured secrets and built-in credential patterns; redaction does not anonymize repository names, IDs, URLs, or unknown secrets.

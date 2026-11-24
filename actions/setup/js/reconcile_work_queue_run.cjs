@@ -6,7 +6,7 @@ const { posix } = require("node:path");
 const { canonical } = require("./work_queue_codec.cjs");
 const { CHECKPOINT_AFTER_LINES } = require("./work_queue_limits.cjs");
 const { actorFromContext, readWorkQueuePolicyEnv } = require("./work_queue_policy.cjs");
-const { openClaims } = require("./work_queue_replay.cjs");
+const { openClaim } = require("./work_queue_replay.cjs");
 const { publishWorkQueueCheckpoint } = require("./work_queue_store.cjs");
 const { loadQueue } = require("./work_queue_binding.cjs");
 const { API_VERSION } = require("./work_queue_native.cjs");
@@ -70,7 +70,7 @@ async function main(options = {}) {
   const runId = String(context.runId);
   const owned = state => {
     const dispatch = state.dispatches.get(dispatchId);
-    if (!dispatch || dispatch.state === "closed" || openClaims(state, dispatch).length === 0) return false;
+    if (!dispatch || !openClaim(state, dispatch)) return false;
     // A reserved Dispatch names no launched run yet, so no worker run can own it.
     const ownRun = dispatch.state === "bound" ? dispatch.run : dispatch.launch;
     return !!ownRun && ownRun.run_id === runId;
@@ -196,7 +196,7 @@ async function maintenance(options = {}) {
   const latest = await loadQueue({ ...configured, role: "reconciler" });
   const released = [];
   for (const dispatch of latest.state.dispatches.values()) {
-    if (dispatch.state === "closed" || !openClaims(latest.state, dispatch).length) continue;
+    if (!openClaim(latest.state, dispatch)) continue;
     // The judged run evidence; every compare-and-swap attempt re-checks it against the latest head.
     const observed = canonical({ state: dispatch.state, run: dispatch.run, launch: dispatch.launch ?? null });
     let reason;
@@ -210,7 +210,7 @@ async function maintenance(options = {}) {
     if (!reason) continue;
     const unchanged = state => {
       const current = state.dispatches.get(dispatch.dispatch_id);
-      if (!current || openClaims(state, current).length === 0) return false;
+      if (!current || !openClaim(state, current)) return false;
       const stale = canonical({ state: current.state, run: current.run, launch: current.launch ?? null }) !== observed;
       if (stale) log.debug("maintenance.release.stale");
       return !stale;

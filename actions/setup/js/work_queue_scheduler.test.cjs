@@ -6,7 +6,7 @@ const require = createRequire(import.meta.url);
 const h = require("./work_queue_test_helpers.cjs");
 const { canonical } = require("./work_queue_codec.cjs");
 const { replayTransactions, serializeProjection } = require("./work_queue_replay.cjs");
-const { assignmentForDispatch, assignmentsForRequest, claimIdentity, planDispatch, selectionOnly, validateDispatchParameters } = require("./work_queue_scheduler.cjs");
+const { assignmentForDispatch, claimIdentity, planDispatch, validateDispatchParameters } = require("./work_queue_scheduler.cjs");
 
 describe("priority-FIFO planning", () => {
   it("derives Claim and Dispatch identities from the request and Work only", () => {
@@ -17,7 +17,9 @@ describe("priority-FIFO planning", () => {
     const first = planDispatch(state, h.dispatchParameters(), "request:x");
     expect(planDispatch(state, h.dispatchParameters(), "request:x")).toEqual(first);
     expect(canonical(serializeProjection(state))).toBe(before);
-    expect(selectionOnly(first)).toEqual({ reason: "prefix_complete", work_ids: [h.work("a").work_id, h.work("b").work_id] });
+    expect(first.reason).toBe("prefix_complete");
+    expect(first.operations.map(operation => operation.work_id)).toEqual([h.work("a").work_id, h.work("b").work_id]);
+    expect(new Set(first.dispatches).size).toBe(2);
   });
 
   it("counts concurrency per pool", () => {
@@ -55,7 +57,6 @@ describe("worker assignments", () => {
         { handle: "h1", claim_id: state.dispatches.get(dispatch).claims[0], work_id: b.work_id, work: b.payload, result_refs: [{ work_id: a.work_id, result_commit_id: state.works.get(a.work_id).completion_id, descriptor: effects }] },
       ],
     });
-    expect(assignmentsForRequest(state, state.dispatches.get(dispatch).request_id)).toEqual([assignmentForDispatch(state, dispatch)]);
     expect(() => assignmentForDispatch(state, "d_missing")).toThrow(expect.objectContaining({ code: "dispatch_missing" }));
   });
 });

@@ -10,11 +10,11 @@ const crypto = require("crypto");
 
 const { parseStrictJSON, queueError } = require("./work_queue_codec.cjs");
 const { continuationChild, validateResource } = require("./work_queue_graph.cjs");
+const { policyAllowsWorker } = require("./work_queue_policy.cjs");
 
 const ROUTES = ["workqueue", "issue"];
 const STATUSES = ["ready", "depth_limit"];
 const RECEIPT_FIELDS = ["claim_handle", "claim_id", "message_sha256", "status"];
-const MAX_RECEIPTS = 16;
 const MAX_RECEIPTS_BYTES = 64 * 1024;
 const SHA256 = /^[a-f0-9]{64}$/;
 const ADMIT = "request_continuation:admit";
@@ -50,11 +50,12 @@ function readContinuationConfig(env = process.env) {
 }
 
 /**
- * Parse the manager's `work_queue_continuations` step output. Unset → undefined.
+ * Parse the manager's `work_queue_continuations` step output: a bounded JSON array
+ * of at most one receipt. Unset, empty or `[]` → undefined.
  * @param {string | undefined} raw
- * @returns {ContinuationReceipt[] | undefined}
+ * @returns {ContinuationReceipt | undefined}
  */
-function parseContinuationReceipts(raw) {
+function parseContinuationReceipt(raw) {
   if (raw === undefined || raw === "") return undefined;
   let value;
   try {
@@ -62,73 +63,64 @@ function parseContinuationReceipts(raw) {
   } catch {
     throw invalid("continuation_receipt_invalid", "work_queue_continuations is not bounded JSON");
   }
-  if (!Array.isArray(value) || value.length > MAX_RECEIPTS) throw invalid("continuation_receipt_invalid", "work_queue_continuations must be an array of at most 16 receipts");
-  const handles = new Set();
-  return value.map(receipt => {
-    if (!receipt || typeof receipt !== "object" || Array.isArray(receipt)) throw invalid("continuation_receipt_invalid", "receipt must be an object");
-    const keys = Object.keys(receipt);
-    if (keys.some(key => !RECEIPT_FIELDS.includes(key) && key !== "issue") || RECEIPT_FIELDS.some(key => !Object.hasOwn(receipt, key))) throw invalid("continuation_receipt_invalid", "receipt fields are closed");
-    if (typeof receipt.claim_handle !== "string" || !receipt.claim_handle || typeof receipt.claim_id !== "string" || !receipt.claim_id) throw invalid("continuation_receipt_invalid", "receipt Claim identity is invalid");
-    if (typeof receipt.message_sha256 !== "string" || !SHA256.test(receipt.message_sha256) || !STATUSES.includes(receipt.status)) throw invalid("continuation_receipt_invalid", "receipt digest or status is invalid");
-    if (handles.has(receipt.claim_handle)) throw invalid("continuation_receipt_invalid", "duplicate receipt for one Claim");
-    handles.add(receipt.claim_handle);
-    if (Object.hasOwn(receipt, "issue")) {
-      if (receipt.status !== "ready") throw invalid("continuation_receipt_invalid", "only a ready receipt carries an approval Issue");
-      try {
-        if (validateResource(receipt.issue).kind !== "issue") throw new Error("kind");
-      } catch {
-        throw invalid("continuation_receipt_invalid", "receipt approval Issue is invalid");
-      }
+  if (!Array.isArray(value) || value.length > 1) throw invalid("continuation_receipt_invalid", "work_queue_continuations must be an array of at most one receipt");
+  const [receipt] = value;
+  if (receipt === undefined) return undefined;
+  if (!receipt || typeof receipt !== "object" || Array.isArray(receipt)) throw invalid("continuation_receipt_invalid", "receipt must be an object");
+  const keys = Object.keys(receipt);
+  if (keys.some(key => !RECEIPT_FIELDS.includes(key) && key !== "issue") || RECEIPT_FIELDS.some(key => !Object.hasOwn(receipt, key))) throw invalid("continuation_receipt_invalid", "receipt fields are closed");
+  if (typeof receipt.claim_handle !== "string" || !receipt.claim_handle || typeof receipt.claim_id !== "string" || !receipt.claim_id) throw invalid("continuation_receipt_invalid", "receipt Claim identity is invalid");
+  if (typeof receipt.message_sha256 !== "string" || !SHA256.test(receipt.message_sha256) || !STATUSES.includes(receipt.status)) throw invalid("continuation_receipt_invalid", "receipt digest or status is invalid");
+  if (Object.hasOwn(receipt, "issue")) {
+    if (receipt.status !== "ready") throw invalid("continuation_receipt_invalid", "only a ready receipt carries an approval Issue");
+    try {
+      if (validateResource(receipt.issue).kind !== "issue") throw new Error("kind");
+    } catch {
+      throw invalid("continuation_receipt_invalid", "receipt approval Issue is invalid");
     }
-    return receipt;
-  });
+  }
+  return receipt;
 }
 
 /**
- * Read the producing attempt's requests through the bound evidence. A run with no
- * evidence and no agent output has no requests (`available:false`); output bytes
+ * Read the producing attempt's one request through the bound evidence. A run with no
+ * evidence and no agent output has no request (`available:false`); output bytes
  * without matching evidence are an error, never an unbound replay.
- * @param {{env?: NodeJS.ProcessEnv, context: any, claims: Array<{handle: string, claim_id: string, work_id: string}>}} options
+ * @param {{env?: NodeJS.ProcessEnv, context: any, claim: {handle: string}}} options
  */
-function readContinuationRequests({ env = process.env, context, claims }) {
+function readContinuationRequest({ env = process.env, context, claim }) {
   const raw = env.GH_AW_CONTINUATION_EVIDENCE;
   const filename = env.GH_AW_AGENT_OUTPUT;
   if (raw === undefined || raw === "") {
     const present = typeof filename === "string" && filename !== "" && fs.existsSync(filename) && fs.statSync(filename).size > 0;
     if (present) throw invalid("continuation_evidence_invalid", "agent output exists without its bound continuation evidence");
-    return { available: false, evidence: undefined, requests: new Map() };
+    return { available: false, evidence: undefined, request: null };
   }
-  const { collectRoutedRequests, parseContinuationEvidence, readBoundAgentOutput } = routes();
+  const { collectRoutedRequest, parseContinuationEvidence, readBoundAgentOutput } = routes();
   const evidence = parseContinuationEvidence(raw);
   const { output } = readBoundAgentOutput({ path: filename, evidence: raw, context });
-  /** @type {Map<string, {message: string, message_sha256: string, index: number, claim_handle?: string}>} */
-  const requests = collectRoutedRequests(output.items, { assignment: { claims } });
-  return { available: true, evidence, requests };
+  return { available: true, evidence, request: collectRoutedRequest(output.items, { assignment: { claims: [claim] } }) };
 }
 
 /**
- * Match receipts to requests one-to-one (handle, message digest, original Claim ID,
- * route). Keys are the handles of completed Claims that requested a continuation;
- * a `null` value marks a request without an accepted receipt, which the finish
- * planner rejects while that Claim is still open.
- * @param {{config: ContinuationConfig, requests: Map<string, any>, receipts: ContinuationReceipt[] | undefined, intents: Map<string, string>, claims: Array<{handle: string, claim_id: string}>}} options
- * @returns {Map<string, ContinuationEntry | null>}
+ * Match the receipt to this Claim's request (handle, original Claim ID, message
+ * digest, route). A supplied receipt is validated even when the request is then
+ * suppressed by a failed or missing finish; a receipt alone never admits.
+ * @param {{config: ContinuationConfig, request: {message: string, message_sha256: string, index: number, claim_handle?: string} | null, receipt: ContinuationReceipt | undefined, intent: string | undefined, claim: {handle: string, claim_id: string}}} options
+ * @returns {ContinuationEntry | null | undefined} the matched entry of a completed request,
+ *   `null` for a completed request without a receipt, `undefined` for no actionable request
  */
-function matchContinuations({ config, requests, receipts, intents, claims }) {
-  const { messageDigest } = routes();
-  /** @type {Map<string, ContinuationEntry | null>} */
-  const entries = new Map();
-  for (const receipt of receipts ?? []) {
-    const request = requests.get(receipt.claim_handle);
-    const member = claims.find(claim => claim.handle === receipt.claim_handle);
-    if (!request || !member || member.claim_id !== receipt.claim_id) throw invalid("continuation_receipt_mismatch", "receipt does not match a request of its original Claim");
-    if (request.message_sha256 !== receipt.message_sha256 || messageDigest(request.message) !== receipt.message_sha256) throw invalid("continuation_receipt_mismatch", "receipt message digest does not match the bound request");
+function matchContinuation({ config, request, receipt, intent, claim }) {
+  if (receipt) {
+    if (!request || request.claim_handle !== claim.handle || receipt.claim_handle !== claim.handle || receipt.claim_id !== claim.claim_id) {
+      throw invalid("continuation_receipt_mismatch", "receipt does not match a request of its original Claim");
+    }
+    if (request.message_sha256 !== receipt.message_sha256 || routes().messageDigest(request.message) !== receipt.message_sha256) throw invalid("continuation_receipt_mismatch", "receipt message digest does not match the bound request");
     if (config.route === "issue" ? receipt.status !== "ready" || !receipt.issue : Object.hasOwn(receipt, "issue")) throw invalid("continuation_receipt_mismatch", `receipt does not match the compiled ${config.route} route`);
-    // A failed or missing finish suppresses its Claim's request.
-    if (intents.get(receipt.claim_handle) === "completed") entries.set(receipt.claim_handle, { message: request.message, message_sha256: request.message_sha256, index: request.index, receipt });
   }
-  for (const handle of requests.keys()) if (intents.get(handle) === "completed" && !entries.has(handle)) entries.set(handle, null);
-  return entries;
+  // A failed or missing finish suppresses the request.
+  if (!request || intent !== "completed") return undefined;
+  return receipt ? { message: request.message, message_sha256: request.message_sha256, index: request.index, receipt } : null;
 }
 
 /**
@@ -151,26 +143,8 @@ function continuationOperations(state, claim, entry, config, policy) {
     remaining = available - 1;
   }
   if (!policy) throw invalid("policy_missing", "continuation admission requires the compiled work queue policy");
-  if (!policy.pools?.[parent.pool]?.profiles?.[parent.worker_profile]) throw invalid("continuation_destination_invalid", `profile ${parent.worker_profile} is no longer in pool ${parent.pool}`);
+  if (!policyAllowsWorker(policy, parent.pool, parent.worker_profile)) throw invalid("continuation_destination_invalid", `worker ${parent.worker_profile} or pool ${parent.pool} is no longer approved`);
   return [continuationChild(parent, { route: config.route, message: entry.message, remaining }, config.route === "issue" ? entry.receipt.issue : undefined)];
-}
-
-/**
- * Pending Work per pool after applying a finish commit's operations; throws when a
- * pool carrying a successor would exceed its compiled pending_limit.
- */
-function assertContinuationPending(state, operations, policy) {
-  const pools = new Set(operations.filter(operation => operation.kind === "Work").map(operation => operation.pool));
-  if (!pools.size) return;
-  const pending = new Map();
-  for (const work of state.works.values()) if (pools.has(work.pool) && (work.state === "available" || work.state === "claimed")) pending.set(work.pool, (pending.get(work.pool) ?? 0) + 1);
-  for (const operation of operations) {
-    const pool = operation.kind === "Work" ? operation.pool : state.works.get(operation.work_id)?.pool;
-    if (!pools.has(pool)) continue;
-    if (operation.kind === "Work") pending.set(pool, (pending.get(pool) ?? 0) + 1);
-    else if (operation.kind === "Completion" || operation.kind === "WorkCancellation") pending.set(pool, (pending.get(pool) ?? 0) - 1);
-  }
-  for (const [pool, count] of pending) if (count > policy.pending_limit) throw invalid("work_queue_pending_limit", `pool ${pool} would exceed its pending_limit of ${policy.pending_limit}`);
 }
 
 /** Handler-manager configuration of this workflow (for the global `authorization`). */
@@ -246,13 +220,12 @@ module.exports = {
   ADMIT,
   admissionInputs,
   admissionRequirement,
-  assertContinuationPending,
   authorizationProtocol,
   authorizeAdmission,
   continuationOperations,
-  matchContinuations,
-  parseContinuationReceipts,
+  matchContinuation,
+  parseContinuationReceipt,
   readContinuationConfig,
-  readContinuationRequests,
+  readContinuationRequest,
   readHandlerConfig,
 };

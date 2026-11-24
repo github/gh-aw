@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -98,6 +99,32 @@ func TestAWQueueSharedSchedulingAndGlobalIssues(t *testing.T) {
 	require.Equal(t, 2, policy.Pools["reports"].Concurrency)
 	require.Equal(t, 1, policy.Pools["reports"].PerAccountLimit)
 	require.Len(t, policy.Pools, 2)
+}
+
+// TestAWQueueDocumentedSettings compiles the first aw.json example of each work-queue
+// guide through the real repository configuration path.
+func TestAWQueueDocumentedSettings(t *testing.T) {
+	example := regexp.MustCompile("(?s)```json title=\"\\.github/workflows/aw\\.json\"\n(.*?)\n```")
+	for _, tc := range []struct {
+		doc          string
+		concurrency  int
+		pendingLimit int
+	}{
+		{doc: "patterns/workqueue-ops.md", concurrency: 1, pendingLimit: 4096},
+		{doc: "reference/work-queue.md", concurrency: 3, pendingLimit: 30},
+	} {
+		t.Run(tc.doc, func(t *testing.T) {
+			source, err := os.ReadFile(filepath.Join("..", "..", "docs", "src", "content", "docs", filepath.FromSlash(tc.doc)))
+			require.NoError(t, err)
+			match := example.FindSubmatch(source)
+			require.NotNil(t, match, "documented aw.json example")
+			c, path := awQueueCompilerFixture(t, string(match[1]))
+			policy := compileAWQueuePolicy(t, c, awQueueDispatcherFixture(), path)
+			require.Equal(t, tc.pendingLimit, policy.PendingLimit)
+			require.Nil(t, policy.Issues)
+			require.Equal(t, map[string]workqueue.PoolEnv{"default": {Concurrency: tc.concurrency, PerAccountLimit: 0, MaxAttempts: 3}}, policy.Pools)
+		})
+	}
 }
 
 func TestAWQueueConfigErrorsDoNotFallBackToDefaults(t *testing.T) {

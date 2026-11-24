@@ -3,8 +3,7 @@ import { describe, expect, it } from "vitest";
 const fs = require("node:fs");
 const path = require("node:path");
 const limits = require("./work_queue_limits.cjs");
-const { ROLES, validatePolicyEnv } = require("./work_queue_policy.cjs");
-const { buildPolicyEnv } = require("./work_queue_settings.cjs");
+const { ROLES } = require("./work_queue_policy.cjs");
 const { CLAIM_CANCELLATION_REASONS, OP_FIELDS, OP_ROLES, PROTOCOL_VERSION, RELEASE_REASONS, REQUEST_KINDS, WORK_CANCELLATION_REASONS } = require("./work_queue_replay.cjs");
 const repositoryRoot = path.resolve(__dirname, "../../..");
 const deploymentPath = "docs/src/content/docs/patterns/workqueue-ops.md";
@@ -43,29 +42,6 @@ describe("work-queue v4 documentation", () => {
     expect(queue).toContain("worker: true");
     expect(queue).not.toMatch(/\bstorage:/);
     expect(queue).not.toMatch(/version-3|installed/i);
-  });
-
-  it("compiles the documented aw.json examples into valid v4 policy environments", () => {
-    const example = file => {
-      const match = readRepositoryFile(file).match(/```json title="\.github\/workflows\/aw\.json"\n([\s\S]*?)\n```/);
-      expect(match, file).not.toBeNull();
-      return JSON.parse(match[1]).work_queue;
-    };
-
-    const minimal = buildPolicyEnv({ repository: "github/gh-aw", workflows: ["queue-worker"], settings: example(deploymentPath) });
-    expect(validatePolicyEnv(minimal)).toBe(minimal);
-    expect(minimal.pools.default).toEqual({
-      concurrency: 1,
-      per_account_limit: 0,
-      max_attempts: 3,
-      default_profile: "queue-worker",
-      profiles: { "queue-worker": { workflow: ".github/workflows/queue-worker.lock.yml", effect_scope: "github/gh-aw" } },
-    });
-
-    const scheduling = buildPolicyEnv({ repository: "github/gh-aw", workflows: ["eslint-refiner"], settings: example(referencePath) });
-    expect(validatePolicyEnv(scheduling)).toBe(scheduling);
-    expect(scheduling).toMatchObject({ version: 4, pending_limit: 30, issues: false });
-    expect(scheduling.pools.default).toMatchObject({ concurrency: 3, per_account_limit: 0, max_attempts: 3 });
   });
 
   it("keeps the specification tables in sync with the v4 replay contract", () => {

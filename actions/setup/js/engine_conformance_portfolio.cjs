@@ -1,8 +1,6 @@
 // @ts-check
 "use strict";
 
-const { buildPolicyEnv } = require("./work_queue_settings.cjs");
-
 const ENGINES = Object.freeze(["agy", "aider", "claude", "codex", "copilot", "crush", "cursor", "deepseek-harness", "gemini", "goose", "kiro", "langgraph", "mini-swe-agent", "opencode", "pi", "pydantic-ai"]);
 const SUPPORTED = Object.freeze(["claude", "codex", "copilot", "pi"]);
 const POOL = "engine-conformance";
@@ -83,17 +81,4 @@ function buildEngineConformancePlan({ date, repository, repositoryId, changedPat
   };
 }
 
-/** @param {{repository: string, settings?: object}} options */
-function buildEngineConformancePolicy({ repository, settings }) {
-  assertRepository(repository);
-  return buildPolicyEnv({ repository, workflows: ENGINES.map(engine => `engine-conformance-${engine}`), settings });
-}
-
-module.exports = { ENGINES, SUPPORTED, POOL, DAILY_LIMIT, changedEngines, buildEngineConformancePlan, buildEngineConformancePolicy };
-
-if (require.main === module) {
-  const [command, repository, ...extra] = process.argv.slice(2);
-  if (command !== "policy" || extra.length || !repository) throw new Error("Usage: node engine_conformance_portfolio.cjs policy OWNER/REPO");
-  const { readPortfolioSettings } = require("./work_queue_portfolio_config.cjs");
-  process.stdout.write(JSON.stringify(buildEngineConformancePolicy({ repository, settings: readPortfolioSettings() }), null, 2) + "\n");
-}
+module.exports = { ENGINES, SUPPORTED, POOL, DAILY_LIMIT, changedEngines, buildEngineConformancePlan };

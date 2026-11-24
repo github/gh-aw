@@ -3,7 +3,8 @@ import { describe, expect, it } from "vitest";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { BATCH, CLUSTER_SIZE, POOL, WORKER, alertFingerprint, buildCodeScanningPlan, buildCodeScanningPolicy, clusterKey, hasUncoveredAlert, listOpenPullFiles, selectAssignedCluster } from "./code_scanning_portfolio.cjs";
+import { BATCH, CLUSTER_SIZE, POOL, WORKER, alertFingerprint, buildCodeScanningPlan, clusterKey, hasUncoveredAlert, listOpenPullFiles, selectAssignedCluster } from "./code_scanning_portfolio.cjs";
+import { policyAllowsWorker, workerWorkflow } from "./work_queue_policy.cjs";
 import { normalizeSubmitParameters, stagePlanIntents } from "./work_queue_intents.cjs";
 import { replayTransactions } from "./work_queue_replay.cjs";
 import { assignmentForDispatch } from "./work_queue_scheduler.cjs";
@@ -16,7 +17,7 @@ const require = createRequire(import.meta.url);
 const h = require("./work_queue_test_helpers.cjs");
 const repository = "owner/repo";
 const repositoryId = "7";
-const settings = JSON.parse(fs.readFileSync(new URL("../../../.github/workflows/aw.json", import.meta.url), "utf8")).work_queue;
+const compiledPolicy = h.compiledDispatcherPolicy("code-scanning-dispatcher", repository);
 
 /**
  * @param {number} number
@@ -51,7 +52,7 @@ function pull(number, { title = "Unrelated PR", body = "", files = [] }) {
 function ledger() {
   /** @type {any[]} */
   let log = [];
-  const policy = buildCodeScanningPolicy({ repository, settings });
+  const policy = compiledPolicy;
   const state = () => replayTransactions(log);
   return {
     policy,
@@ -65,7 +66,8 @@ function ledger() {
     /** @param {{pool: string, max_claims: number, max_dispatches: number}} request */
     dispatch: request => {
       const pool = policy.pools[request.pool];
-      const profiles = Object.fromEntries(Object.entries(pool.profiles).map(([name, profile]) => [name, { workflow: profile.workflow }]));
+      // The dispatcher may launch only this portfolio's worker.
+      const profiles = { [WORKER]: { workflow: workerWorkflow(WORKER) } };
       log = h.dispatchNext(log, { ...request, concurrency: pool.concurrency, per_account_limit: pool.per_account_limit, profiles }).log;
     },
     /** @param {string} work_id */
@@ -232,7 +234,8 @@ describe("code scanning work-queue portfolio", () => {
   it("grants three Claims from the dedicated pool and projects each worker's cluster without covered alerts", () => {
     const queue = ledger();
     expect(queue.policy.pools[POOL]).toMatchObject({ concurrency: 3, max_attempts: 3 });
-    expect(queue.policy.pools[POOL].profiles[WORKER]).toEqual({ workflow: `.github/workflows/${WORKER}.lock.yml`, effect_scope: repository });
+    expect(policyAllowsWorker(queue.policy, POOL, WORKER)).toBe(true);
+    expect(queue.policy.effect_scope).toBe(repository);
     const first = plan(backlog);
     queue.submit(first.nodes);
     queue.dispatch(first.dispatch);

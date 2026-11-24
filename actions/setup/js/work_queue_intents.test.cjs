@@ -29,15 +29,9 @@ const policy = {
   version: 4,
   pending_limit: 30,
   issues: false,
-  pools: {
-    default: {
-      concurrency: 1,
-      per_account_limit: 0,
-      max_attempts: 3,
-      default_profile: "worker",
-      profiles: { worker: { workflow: ".github/workflows/worker.lock.yml", effect_scope: "owner/repo" }, other: { workflow: ".github/workflows/other.lock.yml", effect_scope: "owner/repo" } },
-    },
-  },
+  effect_scope: "owner/repo",
+  workers: ["alpha", "beta"],
+  pools: { default: { concurrency: 1, per_account_limit: 0, max_attempts: 3 }, reports: { concurrency: 2, per_account_limit: 1, max_attempts: 2 } },
 };
 function filename(name = "intents.jsonl") {
   const directory = fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()), "gh-aw-queue-intents-"));
@@ -160,11 +154,12 @@ describe("intent normalization", () => {
 
   it("builds v4 Work operations with policy defaults", () => {
     const [work] = normalizeSubmitParameters({ nodes: [{ graph_id: "g", node_key: "n", payload: { plan: "stored" } }] }, policy);
-    expect(work).toEqual({ kind: "Work", work_id: nodeId("g", "n"), graph_id: "g", node_key: "n", pool: "default", priority: 3, fairness_key: "", worker_profile: "worker", payload: { plan: "stored" }, depends_on: [] });
-    expect(normalizeSubmitParameters({ nodes: [{ payload: {}, worker_profile: "other" }] }, policy)[0].worker_profile).toBe("other");
+    // The default worker is the first approved worker ID.
+    expect(work).toEqual({ kind: "Work", work_id: nodeId("g", "n"), graph_id: "g", node_key: "n", pool: "default", priority: 3, fairness_key: "", worker_profile: "alpha", payload: { plan: "stored" }, depends_on: [] });
+    expect(normalizeSubmitParameters({ nodes: [{ payload: {}, worker_profile: "beta", pool: "reports" }] }, policy)[0]).toMatchObject({ worker_profile: "beta", pool: "reports" });
+    expect(() => normalizeSubmitParameters({ nodes: [{ payload: {}, worker_profile: "missing" }] }, policy)).toThrow(expect.objectContaining({ code: "work_queue_profile_not_approved" }));
+    expect(() => normalizeSubmitParameters({ nodes: [{ payload: {}, pool: "missing" }] }, policy)).toThrow(expect.objectContaining({ code: "pool_invalid" }));
     for (const node of [
-      { payload: {}, worker_profile: "missing" },
-      { payload: {}, pool: "missing" },
       { payload: {}, expires_at: 1 },
       { payload: {}, execution_ref: "a".repeat(40) },
       { payload: {}, work_id: "forged" },

@@ -124,39 +124,32 @@ function routedRequestError(item, { collected = false } = {}) {
 }
 
 /**
- * Bind each collected request to its scope: the Claim handle for workers (a single
- * Claim may omit it), "" for ordinary sources. At most one request per scope.
- * Only `assignment.claims[].handle` is consulted.
+ * The one collected request of this scope, bound to the sole Claim handle for a
+ * worker (omission selects it) and unscoped for an ordinary source. A second
+ * request or a foreign selector is invalid. Only `assignment.claims[0].handle` is consulted.
  * @param {any[]} items
  * @param {{assignment?: {claims: Array<{handle: string}>} | null}} [options]
- * @returns {Map<string, {message: string, message_sha256: string, index: number, claim_handle?: string}>}
+ * @returns {{message: string, message_sha256: string, index: number, claim_handle?: string} | null}
  */
-function collectRoutedRequests(items, { assignment = null } = {}) {
+function collectRoutedRequest(items, { assignment = null } = {}) {
   if (!Array.isArray(items)) throw routeError("continuation_request_invalid");
-  const handles = assignment ? assignment.claims.map(claim => claim.handle) : null;
-  if (handles && (!handles.length || handles.some(handle => typeof handle !== "string" || !handle))) throw routeError("continuation_request_invalid");
-  /** @type {Map<string, {message: string, message_sha256: string, index: number, claim_handle?: string}>} */
-  const requests = new Map();
+  /** @type {string | null} */
+  let handle = null;
+  if (assignment) {
+    if (!Array.isArray(assignment.claims) || assignment.claims.length !== 1) throw routeError("continuation_request_invalid");
+    handle = assignment.claims[0]?.handle;
+    if (typeof handle !== "string" || !handle) throw routeError("continuation_request_invalid");
+  }
+  /** @type {{message: string, message_sha256: string, index: number, claim_handle?: string} | null} */
+  let request = null;
   for (const [index, item] of items.entries()) {
     if (!plainObject(item) || typeof item.type !== "string" || item.type.replace(/-/g, "_") !== "request_continuation") continue;
     if (routedRequestError(item, { collected: true })) throw routeError("continuation_request_invalid");
-    let scope = "";
-    if (handles) {
-      if (Object.hasOwn(item, "claim_handle")) {
-        if (typeof item.claim_handle !== "string" || !handles.includes(item.claim_handle)) throw routeError("continuation_request_invalid");
-        scope = item.claim_handle;
-      } else if (handles.length === 1) {
-        scope = handles[0];
-      } else {
-        throw routeError("continuation_request_invalid");
-      }
-    } else if (Object.hasOwn(item, "claim_handle")) {
-      throw routeError("continuation_request_invalid");
-    }
-    if (requests.has(scope)) throw routeError("continuation_request_invalid");
-    requests.set(scope, { message: item.message, message_sha256: messageDigest(item.message), index, ...(handles ? { claim_handle: scope } : {}) });
+    if (Object.hasOwn(item, "claim_handle") && (handle === null || item.claim_handle !== handle)) throw routeError("continuation_request_invalid");
+    if (request) throw routeError("continuation_request_invalid");
+    request = { message: item.message, message_sha256: messageDigest(item.message), index, ...(handle === null ? {} : { claim_handle: handle }) };
   }
-  return requests;
+  return request;
 }
 
 /**
@@ -233,18 +226,18 @@ function normalizeRouteConfig(descriptor) {
 }
 
 /**
- * Bind the requests of this run attempt's verified agent output.
+ * Bind the one request of this run attempt's verified agent output.
  * @param {{assignment?: {claims: Array<{handle: string}>} | null, context?: any, path?: string, evidence?: unknown}} [options]
- * @returns {{ok: true, requests: ReturnType<typeof collectRoutedRequests>, sha256: string} | {ok: false, reason: string}}
+ * @returns {{ok: true, request: ReturnType<typeof collectRoutedRequest>, sha256: string} | {ok: false, reason: string}}
  */
-function bindRoutedRequests(options = {}) {
+function bindRoutedRequest(options = {}) {
   try {
     const { output, sha256 } = readBoundAgentOutput({
       path: options.path ?? process.env.GH_AW_AGENT_OUTPUT,
       evidence: options.evidence ?? process.env.GH_AW_CONTINUATION_EVIDENCE,
       context: options.context ?? global.context,
     });
-    return { ok: true, requests: collectRoutedRequests(output.items, { assignment: options.assignment ?? null }), sha256 };
+    return { ok: true, request: collectRoutedRequest(output.items, { assignment: options.assignment ?? null }), sha256 };
   } catch (error) {
     return { ok: false, reason: error && typeof error === "object" && "code" in error ? String(error.code) : "continuation_evidence_invalid" };
   }
@@ -477,9 +470,9 @@ module.exports = {
   approvalIssueReport,
   assertContinuationBudget,
   availableDepth,
-  bindRoutedRequests,
+  bindRoutedRequest,
   buildDispatchInputs,
-  collectRoutedRequests,
+  collectRoutedRequest,
   continuationSummary,
   createApprovalIssue,
   dispatchContinuation,

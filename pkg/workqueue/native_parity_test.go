@@ -212,8 +212,20 @@ func TestNativeParityWithJavaScript(t *testing.T) {
 			}
 		}
 	}
+	// One Claim per Dispatch is a replay rule: a grouped grant and a grouped or inconsistent
+	// checkpoint fail with the same literal code in both engines.
+	rules := groupedDispatchCases(t, commits, checkpoint)
+	for _, rule := range rules {
+		inputs = append(inputs, rule.input)
+	}
 	t.Logf("differential cases: %d", len(inputs))
 	expected := jsReplayCommands(t, inputs)
+	for index, rule := range rules {
+		want, err := canonicalGeneric(map[string]any{"error": rule.code})
+		require.NoError(t, err)
+		require.Equal(t, string(want), expected[len(inputs)-len(rules)+index], "js: %s", rule.input.label)
+		require.Equal(t, string(want), goReplayCommand(t, rule.input), "go: %s", rule.input.label)
+	}
 	mismatches := 0
 	for index, input := range inputs {
 		actual := goReplayCommand(t, input)
@@ -225,4 +237,60 @@ func TestNativeParityWithJavaScript(t *testing.T) {
 		}
 	}
 	require.Zero(t, mismatches, "%d of %d differential cases differ", mismatches, len(inputs))
+}
+
+type groupedDispatchCase struct {
+	input parityInput
+	code  string
+}
+
+// groupedDispatchCases derives, from the first grant (two Work, two Dispatches, both "h1")
+// and the shared root checkpoint, inputs that group Claims under one Dispatch.
+func groupedDispatchCases(t *testing.T, commits []any, checkpoint any) []groupedDispatchCase {
+	t.Helper()
+	grant := deepCopy(commits[1]).(map[string]any)
+	operations := grant["operations"].([]any)
+	first, second := operations[1].(map[string]any), operations[2].(map[string]any)
+	require.Equal(t, "Claim", first["kind"])
+	require.Equal(t, "Claim", second["kind"])
+	second["dispatch_id"], second["handle"] = first["dispatch_id"], "h2"
+	cases := []groupedDispatchCase{{parityInput{Transactions: []any{commits[0], grant}, label: "grouped grant"}, "dispatch_state_conflict"}}
+	mutations := []struct {
+		label  string
+		change func(claims, dispatches map[string]any)
+	}{
+		{"two listed members", func(claims, dispatches map[string]any) {
+			a, b := claimsByState(t, claims, "completed"), claimsByState(t, claims, "cancelled")
+			dispatch := dispatches[a["dispatch_id"].(string)].(map[string]any)
+			dispatch["claims"] = []any{a["claim_id"], b["claim_id"]}
+		}},
+		{"hidden second Claim", func(claims, dispatches map[string]any) {
+			a, b := claimsByState(t, claims, "completed"), claimsByState(t, claims, "cancelled")
+			delete(dispatches, b["dispatch_id"].(string))
+			b["dispatch_id"] = a["dispatch_id"]
+		}},
+		{"closed Dispatch with open Claim", func(claims, dispatches map[string]any) {
+			open := claimsByState(t, claims, "open")
+			dispatches[open["dispatch_id"].(string)].(map[string]any)["state"] = "closed"
+		}},
+	}
+	for _, mutation := range mutations {
+		mutated := deepCopy(checkpoint).(map[string]any)
+		state := mutated["operations"].([]any)[0].(map[string]any)["state"].(map[string]any)
+		mutation.change(state["claims"].(map[string]any), state["dispatches"].(map[string]any))
+		cases = append(cases, groupedDispatchCase{parityInput{Transactions: []any{mutated}, label: mutation.label}, "checkpoint_invalid"})
+	}
+	return cases
+}
+
+// claimsByState returns the first checkpoint Claim, in key order, in the given state.
+func claimsByState(t *testing.T, claims map[string]any, state string) map[string]any {
+	t.Helper()
+	for _, id := range sortedKeys(claims) {
+		if claim := claims[id].(map[string]any); claim["state"] == state {
+			return claim
+		}
+	}
+	require.FailNow(t, "checkpoint has no Claim in state "+state)
+	return nil
 }

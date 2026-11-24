@@ -320,7 +320,7 @@ function cloneState(state) {
   copy.commits = state.commits;
   copy.works = new Map([...state.works].map(([id, work]) => [id, { ...work }]));
   copy.claims = new Map([...state.claims].map(([id, claim]) => [id, { ...claim }]));
-  copy.dispatches = new Map([...state.dispatches].map(([id, dispatch]) => [id, { ...dispatch, claims: [...dispatch.claims] }]));
+  copy.dispatches = new Map([...state.dispatches].map(([id, dispatch]) => [id, { ...dispatch, claims: [dispatch.claims[0]] }]));
   copy.observations = new Map(state.observations);
   copy.requests = new Set(state.requests);
   copy.workCreators = new Map(state.workCreators);
@@ -358,10 +358,6 @@ function boundToActor(dispatch, actor) {
   return dispatch.state === "bound" && actor.workflow === dispatch.workflow && actor.run_id === dispatch.run.run_id && actor.run_attempt === dispatch.run.run_attempt;
 }
 
-function closeIfSettled(state, dispatch) {
-  if (dispatch.claims.every(id => state.claims.get(id).state !== "open")) dispatch.state = "closed";
-}
-
 function cancelClaim(state, claim, why, commit) {
   const work = state.works.get(claim.work_id);
   claim.state = "cancelled";
@@ -380,26 +376,20 @@ function applyClaim(state, operation, commit) {
   if (!Object.hasOwn(profiles, work.worker_profile)) throw queueError("request_invalid", "dispatch_next parameters omit the Work's worker profile");
   const approval = approvalGate(work);
   if (approval && state.observations.get(gateKey(approval.resource, approval.condition))?.state !== "ready") throw queueError("approval_required", "an issue-routed continuation needs its ready approval");
-  let dispatch = state.dispatches.get(operation.dispatch_id);
-  if (dispatch) {
-    if (dispatch.commit_id !== commit.id || dispatch.pool !== work.pool || dispatch.worker_profile !== work.worker_profile) throw queueError("dispatch_state_conflict", "a Dispatch groups compatible Claims of one commit");
-    if (dispatch.claims.some(id => state.claims.get(id).handle === operation.handle)) throw queueError("claim_conflict", "Claim handle is not unique within its Dispatch");
-  } else {
-    dispatch = {
-      dispatch_id: operation.dispatch_id,
-      request_id: commit.request.id,
-      commit_id: commit.id,
-      pool: work.pool,
-      worker_profile: work.worker_profile,
-      workflow: profiles[work.worker_profile].workflow,
-      state: "reserved",
-      run: null,
-      launch: null,
-      claims: [],
-    };
-    state.dispatches.set(dispatch.dispatch_id, dispatch);
-  }
-  dispatch.claims.push(operation.claim_id);
+  if (state.dispatches.has(operation.dispatch_id)) throw queueError("dispatch_state_conflict", "a Dispatch carries exactly one Claim");
+  const dispatch = {
+    dispatch_id: operation.dispatch_id,
+    request_id: commit.request.id,
+    commit_id: commit.id,
+    pool: work.pool,
+    worker_profile: work.worker_profile,
+    workflow: profiles[work.worker_profile].workflow,
+    state: "reserved",
+    run: null,
+    launch: null,
+    claims: [operation.claim_id],
+  };
+  state.dispatches.set(dispatch.dispatch_id, dispatch);
   state.claims.set(operation.claim_id, { claim_id: operation.claim_id, work_id: work.work_id, dispatch_id: dispatch.dispatch_id, handle: operation.handle, state: "open", commit_id: commit.id, request_id: commit.request.id });
   work.claim_id = operation.claim_id;
   setWorkState(state, work, "claimed");
@@ -407,7 +397,8 @@ function applyClaim(state, operation, commit) {
 
 function applyBound(state, operation, commit) {
   const dispatch = requireDispatch(state, operation.dispatch_id);
-  if (!["started", "bound"].includes(dispatch.state) || !dispatch.claims.some(id => state.claims.get(id).state === "open")) throw queueError("dispatch_state_conflict", "only a started Dispatch with open Claims can bind a run");
+  // A started or bound Dispatch still holds its open Claim: settling the Claim closes it.
+  if (!["started", "bound"].includes(dispatch.state)) throw queueError("dispatch_state_conflict", "only a started Dispatch with an open Claim can bind a run");
   const actor = commit.actor;
   if (actor.workflow !== dispatch.workflow || actor.run_id !== operation.run_id || actor.run_attempt !== operation.run_attempt) throw queueError("run_binding_conflict", "a worker may bind only its own run of the dispatched workflow");
   // Only the run the dispatcher recorded launching may receive the Dispatch's Claims.
@@ -433,7 +424,7 @@ function applyCompletion(state, operation, commit) {
   work.effects = operation.effects;
   work.completion_id = commit.id;
   setWorkState(state, work, "completed");
-  closeIfSettled(state, dispatch);
+  dispatch.state = "closed";
 }
 
 function applyClaimCancellation(state, operation, commit) {
@@ -446,7 +437,7 @@ function applyClaimCancellation(state, operation, commit) {
   const dispatch = state.dispatches.get(claim.dispatch_id);
   if (commit.actor.role === "worker" && !boundToActor(dispatch, commit.actor)) throw queueError("claim_scope_invalid", "ClaimCancellation is outside the bound run's Claim scope");
   cancelClaim(state, claim, operation.reason, commit);
-  closeIfSettled(state, dispatch);
+  dispatch.state = "closed";
 }
 
 function applyWorkCancellation(state, operation, commit) {
@@ -469,10 +460,7 @@ function applyWorkCancellation(state, operation, commit) {
 function applyRelease(state, operation, commit) {
   const dispatch = requireDispatch(state, operation.dispatch_id);
   if (dispatch.state === "closed") throw queueError("dispatch_state_conflict", "Dispatch is already closed");
-  for (const id of dispatch.claims) {
-    const claim = state.claims.get(id);
-    if (claim.state === "open") cancelClaim(state, claim, operation.reason, commit);
-  }
+  cancelClaim(state, state.claims.get(dispatch.claims[0]), operation.reason, commit);
   dispatch.state = "closed";
 }
 
@@ -684,8 +672,12 @@ function restoreCheckpointState(commit) {
   for (const [id, record] of Object.entries(snapshot.dispatches)) {
     closed(record, DISPATCH_RECORD_FIELDS, [], "checkpoint Dispatch", "checkpoint_invalid");
     for (const field of ["request_id", "commit_id", "pool", "worker_profile"]) identity(record[field], field);
-    if (record.dispatch_id !== id || !DISPATCH_STATES.includes(record.state) || !Array.isArray(record.claims) || !record.claims.length || !PROFILE_WORKFLOW.test(record.workflow)) throw invalid("checkpoint Dispatch record is inconsistent");
-    if (record.claims.some(claim => state.claims.get(claim)?.dispatch_id !== id)) throw invalid("checkpoint Dispatch members are inconsistent");
+    if (record.dispatch_id !== id || !DISPATCH_STATES.includes(record.state) || !Array.isArray(record.claims) || !PROFILE_WORKFLOW.test(record.workflow)) throw invalid("checkpoint Dispatch record is inconsistent");
+    if (record.claims.length !== 1) throw invalid("a checkpoint Dispatch carries exactly one Claim");
+    const claim = state.claims.get(record.claims[0]);
+    if (typeof record.claims[0] !== "string" || claim?.dispatch_id !== id) throw invalid("checkpoint Dispatch members are inconsistent");
+    const work = state.works.get(claim.work_id);
+    if (record.pool !== work.pool || record.worker_profile !== work.worker_profile) throw invalid("a checkpoint Dispatch must match its Work's pool and profile");
     if (record.run !== null) {
       closed(record.run, ["run_id", "run_attempt"], [], "checkpoint run", "checkpoint_invalid");
       decimal(record.run.run_id, "checkpoint run ID", "checkpoint_invalid");
@@ -699,9 +691,11 @@ function restoreCheckpointState(commit) {
     }
     if ((record.state === "reserved") !== (record.launch === null) && record.state !== "closed") throw invalid("only started or bound Dispatches carry their launch");
     if (record.run !== null && record.launch?.run_id !== record.run.run_id) throw invalid("a bound run must be the launched run");
-    if (record.state !== "closed" && record.claims.every(claim => state.claims.get(claim).state !== "open")) throw invalid("settled Dispatches must be closed");
-    state.dispatches.set(id, { ...record, claims: [...record.claims] });
+    if ((record.state !== "closed") !== (claim.state === "open")) throw invalid("a checkpoint Dispatch is closed exactly when its Claim is settled");
+    state.dispatches.set(id, { ...record, claims: [claim.claim_id] });
   }
+  // Every Claim, settled or open, must be its Dispatch's sole member, so no two Claims share one.
+  for (const claim of state.claims.values()) if (state.dispatches.get(claim.dispatch_id)?.claims[0] !== claim.claim_id) throw invalid("checkpoint Claims must each own their Dispatch");
   for (const [key, observation] of Object.entries(snapshot.observations)) {
     validateOperation(observation);
     if (observation.kind !== "Observation" || gateKey(observation.resource, observation.condition) !== key) throw invalid("checkpoint Observation key is inconsistent");
@@ -811,9 +805,10 @@ function checkpointCommit(state, actor, at = Date.now()) {
   return /** @type {QueueCommit} */ commit;
 }
 
-/** Open Claims of a Dispatch, in assignment order. */
-function openClaims(state, dispatch) {
-  return dispatch.claims.map(id => state.claims.get(id)).filter(claim => claim.state === "open");
+/** A Dispatch's sole Claim while it is open, otherwise `undefined`. */
+function openClaim(state, dispatch) {
+  const claim = state.claims.get(dispatch.claims[0]);
+  return claim?.state === "open" ? claim : undefined;
 }
 
 /** The committed transaction that carried a request, when still in the log. */
@@ -840,7 +835,7 @@ module.exports = {
   committedRequest,
   newRequest,
   newState,
-  openClaims,
+  openClaim,
   parseTransactionLog,
   parseTransactionRecords,
   projectStats,

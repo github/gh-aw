@@ -2,16 +2,16 @@
 import { describe, expect, it } from "vitest";
 import fs from "node:fs";
 import { createRequire } from "node:module";
-import { ENGINES, SUPPORTED, POOL, changedEngines, buildEngineConformancePlan, buildEngineConformancePolicy } from "./engine_conformance_portfolio.cjs";
-import { validatePolicyEnv } from "./work_queue_policy.cjs";
+import { ENGINES, SUPPORTED, POOL, changedEngines, buildEngineConformancePlan } from "./engine_conformance_portfolio.cjs";
+import { policyAllowsWorker, workerWorkflow } from "./work_queue_policy.cjs";
 import { normalizeSubmitParameters } from "./work_queue_intents.cjs";
 import { replayTransactions } from "./work_queue_replay.cjs";
 
 const require = createRequire(import.meta.url);
 const h = require("./work_queue_test_helpers.cjs");
 const options = { repository: "owner/repo", repositoryId: "7", date: "2026-10-09" };
-const settings = JSON.parse(fs.readFileSync(new URL("../../../.github/workflows/aw.json", import.meta.url), "utf8")).work_queue;
-const policyOptions = { repository: options.repository, settings };
+const workers = ENGINES.map(engine => `engine-conformance-${engine}`);
+const policy = h.compiledDispatcherPolicy("engine-conformance-dispatcher", options.repository);
 
 describe("engine conformance queue portfolio", () => {
   it("selects supported engines first, recent changes next and eventually covers every engine", () => {
@@ -42,16 +42,15 @@ describe("engine conformance queue portfolio", () => {
 
   it("binds three idempotent, no-write tasks to the compiled pool with a bounded dispatch", () => {
     const plan = buildEngineConformancePlan(options);
-    const policy = buildEngineConformancePolicy(policyOptions);
-    expect(validatePolicyEnv(policy)).toEqual(policy);
-    expect(Object.keys(policy.pools[POOL].profiles).sort()).toEqual(ENGINES.map(engine => `engine-conformance-${engine}`).sort());
+    for (const worker of workers) expect(policyAllowsWorker(policy, POOL, worker), worker).toBe(true);
     expect(policy.pools[POOL]).toMatchObject({ concurrency: 3, per_account_limit: 1 });
     expect(plan.dispatch).toEqual({ pool: POOL, max_claims: 3, max_dispatches: 3 });
     expect(plan.nodes.every(node => node.payload.effect_contract.kind === "none" && node.worker_profile === `engine-conformance-${node.payload.engine}`)).toBe(true);
     const works = normalizeSubmitParameters({ nodes: plan.nodes }, policy);
     expect(normalizeSubmitParameters({ nodes: plan.nodes }, policy)).toEqual(works);
     const pool = policy.pools[POOL];
-    const profiles = Object.fromEntries(Object.entries(pool.profiles).map(([name, profile]) => [name, { workflow: profile.workflow }]));
+    // The dispatcher may launch only the engine conformance workers.
+    const profiles = Object.fromEntries(workers.map(worker => [worker, { workflow: workerWorkflow(worker) }]));
     const planned = h.dispatchNext(h.submit([], works), { ...plan.dispatch, concurrency: pool.concurrency, per_account_limit: pool.per_account_limit, profiles });
     const state = replayTransactions(planned.log);
     expect(state.works.size).toBe(3);
@@ -95,6 +94,6 @@ describe("engine conformance queue portfolio", () => {
       expect(compiled(`engine-conformance-${engine}`)).toContain("name: Terminate work queue worker");
       expect(compiled(`engine-conformance-${engine}`)).toContain('\\"report-as-issue\\":\\"false\\"');
     }
-    expect(() => buildEngineConformancePolicy({ ...policyOptions, repository: "not-a-repository" })).toThrow();
+    expect(() => buildEngineConformancePlan({ ...options, repository: "not-a-repository" })).toThrow();
   });
 });

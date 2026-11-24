@@ -2,14 +2,16 @@
 import { describe, expect, it } from "vitest";
 import { projectIssues } from "./work_queue_issues.cjs";
 import { replayTransactions } from "./work_queue_replay.cjs";
-import { bind, dispatchNext, fakeQueueGitHub, finish, launch, ledgerText, submit, work, WORKER_WORKFLOW } from "./work_queue_test_helpers.cjs";
+import { bind, dispatchNext, fakeQueueGitHub, finish, launch, ledgerText, submit, work } from "./work_queue_test_helpers.cjs";
 
 const context = { repo: { owner: "owner", repo: "repo" }, runId: 100, runAttempt: 1 };
 const policy = {
   version: 4,
   pending_limit: 30,
   issues: { label: "work", title_prefix: "[work queue]" },
-  pools: { default: { concurrency: 16, per_account_limit: 0, max_attempts: 3, default_profile: "worker", profiles: { worker: { workflow: WORKER_WORKFLOW, effect_scope: "owner/repo" } } } },
+  effect_scope: "owner/repo",
+  workers: ["worker"],
+  pools: { default: { concurrency: 16, per_account_limit: 0, max_attempts: 3 } },
 };
 
 /** In-memory Issues REST API on top of the fake queue client. */

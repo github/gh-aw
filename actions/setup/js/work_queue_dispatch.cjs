@@ -4,10 +4,10 @@
 const log = require("./work_queue_logging.cjs").createWorkQueueLogger("dispatch");
 const { queueControlErrorCode } = require("./work_queue_logging.cjs");
 const { canonical, closed, integer, queueError } = require("./work_queue_codec.cjs");
-const { poolEnv, readWorkQueuePolicyEnv } = require("./work_queue_policy.cjs");
+const { poolEnv, readWorkQueuePolicyEnv, workerWorkflow } = require("./work_queue_policy.cjs");
 const { approvalGate, gateKey } = require("./work_queue_graph.cjs");
 const { observationRefreshBudget } = require("./work_queue_limits.cjs");
-const { cloneState, openClaims } = require("./work_queue_replay.cjs");
+const { cloneState, openClaim } = require("./work_queue_replay.cjs");
 const { fifoCompare, planDispatch } = require("./work_queue_scheduler.cjs");
 const { loadQueue, publishRequest, releaseOperations } = require("./work_queue_binding.cjs");
 const { normalizeDispatchParameters, normalizeSubmitParameters, readStagedIntentBatch, validatePreparedPlanIntentBatch } = require("./work_queue_intents.cjs");
@@ -52,7 +52,7 @@ function queueTarget(options, role) {
 /** The Work of a worker run's own open Claim; its children inherit its graph and pool. */
 function workerParent(state, runtime, context) {
   const dispatch = state.dispatches.get(runtime.assignment?.dispatch_id);
-  const claim = dispatch?.state === "bound" && dispatch.run.run_id === String(context.runId) ? openClaims(state, dispatch)[0] : undefined;
+  const claim = dispatch?.state === "bound" && dispatch.run.run_id === String(context.runId) ? openClaim(state, dispatch) : undefined;
   if (!claim) throw queueError("work_queue_control_claim_not_authorized", "a worker submits child Work only while its bound Claim is open");
   return state.works.get(claim.work_id);
 }
@@ -260,17 +260,18 @@ async function dispatchQueueIntent(options) {
   if (normalized.max_dispatches > options.remainingDispatches) throw queueError("work_queue_dispatch_budget_exceeded", "dispatch request exceeds the run's dispatch budget");
   const policy = requirePolicy(options);
   const pool = poolEnv(policy, normalized.pool);
-  // Claims go only to profiles this dispatcher is compiled to launch; replay pins them to the request.
+  // Claims go only to workers this dispatcher is compiled to launch; replay pins them to the request.
   const allowed = allowedWorkerWorkflows(options.config);
-  const profiles = Object.entries(pool.profiles).filter(([, profile]) => allowed.has(profile.workflow));
-  if (!profiles.length) throw queueError("work_queue_worker_not_allowlisted", `pool ${normalized.pool} has no worker profile in this dispatcher's dispatch-workflow allowlist`);
-  log.debug("dispatch.profiles.allowlisted", { profiles: profiles.length, excluded: Object.keys(pool.profiles).length - profiles.length });
-  const parameters = {
-    ...normalized,
-    concurrency: pool.concurrency,
-    per_account_limit: pool.per_account_limit,
-    profiles: Object.fromEntries(profiles.map(([name, profile]) => [name, { workflow: profile.workflow }])),
-  };
+  /** @type {Record<string, {workflow: string}>} */
+  const profiles = {};
+  for (const worker of policy.workers) {
+    const workflow = workerWorkflow(worker);
+    if (allowed.has(workflow)) profiles[worker] = { workflow };
+  }
+  const eligible = Object.keys(profiles).length;
+  if (!eligible) throw queueError("work_queue_worker_not_allowlisted", `pool ${normalized.pool} has no worker profile in this dispatcher's dispatch-workflow allowlist`);
+  log.debug("dispatch.profiles.allowlisted", { profiles: eligible, excluded: policy.workers.length - eligible });
+  const parameters = { ...normalized, concurrency: pool.concurrency, per_account_limit: pool.per_account_limit, profiles };
   const receiptBase = intentId === undefined ? {} : { intent_id: intentId };
   if (staged(options)) return { ...receiptBase, status: "committed", dispatches: 0, launches: [] };
   const latest = await loadQueue({ ...queueTarget(options, "dispatcher"), policy });

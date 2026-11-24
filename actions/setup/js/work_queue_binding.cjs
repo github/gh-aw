@@ -3,7 +3,7 @@
 
 const { queueError } = require("./work_queue_codec.cjs");
 const { actorFromContext, readWorkQueuePolicyEnv } = require("./work_queue_policy.cjs");
-const { openClaims } = require("./work_queue_replay.cjs");
+const { openClaim } = require("./work_queue_replay.cjs");
 const { publishWorkQueueRequest, readWorkQueueLog } = require("./work_queue_store.cjs");
 
 // Roles whose jobs may write the ledger convert a v3 head before reading it.
@@ -67,8 +67,8 @@ function exhaustedCancellation(state, claim, policy) {
 }
 
 /**
- * Operations releasing a non-closed Dispatch: Release (replay cancels every open Claim)
- * plus the attempts rule for each affected Work. [] when there is nothing to release.
+ * Operations releasing a non-closed Dispatch: Release (replay cancels its open Claim)
+ * plus the attempts rule for that Work. [] when there is nothing to release.
  * @param {any} state
  * @param {string} dispatchId
  * @param {string} reason
@@ -76,8 +76,9 @@ function exhaustedCancellation(state, claim, policy) {
  */
 function releaseOperations(state, dispatchId, reason, policy) {
   const dispatch = state.dispatches.get(dispatchId);
-  if (!dispatch || dispatch.state === "closed") return [];
-  return [{ kind: "Release", dispatch_id: dispatchId, reason }, ...openClaims(state, dispatch).flatMap(claim => exhaustedCancellation(state, claim, policy))];
+  const claim = dispatch && openClaim(state, dispatch);
+  if (!claim) return [];
+  return [{ kind: "Release", dispatch_id: dispatchId, reason }, ...exhaustedCancellation(state, claim, policy)];
 }
 
 module.exports = { CONVERTING_ROLES, exhaustedCancellation, loadQueue, maxAttempts, publishRequest, releaseOperations };

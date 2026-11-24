@@ -2,7 +2,7 @@
 "use strict";
 const fs = require("fs");
 const path = require("path");
-const { serializeTransactionLog, openClaims } = require("./work_queue_replay.cjs");
+const { serializeTransactionLog, openClaim } = require("./work_queue_replay.cjs");
 const { actorFromContext } = require("./work_queue_policy.cjs");
 const { MAX_SNAPSHOT_PARSE_BYTES, canonical, queueError } = require("./work_queue_codec.cjs");
 const { resolveWorkQueueRuntime } = require("./aw_context.cjs");
@@ -24,7 +24,7 @@ const LAUNCH_WAIT = { attempts: 6, delayMs: 5000 };
  */
 function bindOperations(state, dispatchId, run) {
   const dispatch = state.dispatches.get(dispatchId);
-  if (!dispatch || !openClaims(state, dispatch).length) return [];
+  if (!dispatch || !openClaim(state, dispatch)) return [];
   if (dispatch.state === "bound" && dispatch.run.run_id === run.run_id && dispatch.run.run_attempt === run.run_attempt) return [];
   return [{ kind: "Bound", dispatch_id: dispatchId, run_id: run.run_id, run_attempt: run.run_attempt }];
 }
@@ -87,7 +87,7 @@ async function main(options = {}) {
     if (!latest.state.dispatches.has(dispatchId)) throw queueError("work_queue_assignment_unknown", `Dispatch ${dispatchId} is not in the work queue ledger`);
     latest = await awaitRecordedLaunch(load, latest, dispatchId, options.launchWait ?? LAUNCH_WAIT, options.sleep ?? (ms => new Promise(resolve => setTimeout(resolve, ms))));
     const dispatch = latest.state.dispatches.get(dispatchId);
-    if (openClaims(latest.state, dispatch).length) {
+    if (openClaim(latest.state, dispatch)) {
       await verifyRunProvenance(githubClient, context, dispatch);
       if (!isStagedMode(options.config)) {
         const run = { run_id: String(context.runId), run_attempt: Number(context.runAttempt ?? 1) };

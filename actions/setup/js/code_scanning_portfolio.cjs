@@ -1,7 +1,6 @@
 // @ts-check
 "use strict";
 
-const { buildPolicyEnv } = require("./work_queue_settings.cjs");
 const { canonicalBytes, digest } = require("./work_queue_codec.cjs");
 const { PAYLOAD_BYTES } = require("./work_queue_limits.cjs");
 
@@ -348,17 +347,4 @@ function selectAssignedCluster({ assignment, pulls, repository }) {
   return { claim_handle: handle, cluster_key: work.cluster_key, tool: String(work.tool ?? ""), ai_scan: work.ai_scan === true, rule_id: String(work.rule_id ?? ""), alerts: selected, covered_alerts: covered };
 }
 
-/** @param {{repository: string, settings?: object}} options */
-function buildCodeScanningPolicy({ repository, settings }) {
-  assertRepository(repository);
-  return buildPolicyEnv({ repository, workflows: [WORKER], settings });
-}
-
-module.exports = { POOL, WORKER, BATCH, CLUSTER_SIZE, alertFingerprint, clusterKey, buildCodeScanningPlan, buildCodeScanningPolicy, hasUncoveredAlert, listOpenPullFiles, selectAssignedCluster };
-
-if (require.main === module) {
-  const [command, repository, ...extra] = process.argv.slice(2);
-  if (command !== "policy" || extra.length || !repository) throw new Error("Usage: node code_scanning_portfolio.cjs policy OWNER/REPO");
-  const { readPortfolioSettings } = require("./work_queue_portfolio_config.cjs");
-  process.stdout.write(JSON.stringify(buildCodeScanningPolicy({ repository, settings: readPortfolioSettings() }), null, 2) + "\n");
-}
+module.exports = { POOL, WORKER, BATCH, CLUSTER_SIZE, alertFingerprint, clusterKey, buildCodeScanningPlan, hasUncoveredAlert, listOpenPullFiles, selectAssignedCluster };

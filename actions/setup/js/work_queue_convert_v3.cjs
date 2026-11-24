@@ -154,9 +154,10 @@ function v4WorkOperations(tracked, policy, warn) {
   for (const entry of tracked.values()) {
     if (entry.state === "claimed") warn(`v3 Work ${entry.work.work_id} skipped: it is still claimed by a v3 run that cannot finish into the v4 log`);
   }
+  const workers = new Set(policy.workers);
   const carried = new Map();
   for (const { work } of pending) {
-    if (!policy.pools[work.pool]?.profiles?.[work.worker_profile]) {
+    if (!Object.hasOwn(policy.pools, work.pool) || !workers.has(work.worker_profile)) {
       warn(`v3 Work ${work.work_id} skipped: pool ${work.pool} / profile ${work.worker_profile} is not configured`);
       continue;
     }

@@ -640,7 +640,6 @@ func (state Projection) Clone() Projection {
 	}
 	for id, dispatch := range state.Dispatches {
 		value := *dispatch
-		value.Claims = slices.Clone(dispatch.Claims)
 		if dispatch.Run != nil {
 			run := *dispatch.Run
 			value.Run = &run
@@ -685,15 +684,12 @@ func (state Projection) CommittedRequest(requestID string) (*QueueCommit, bool) 
 	return nil, true
 }
 
-// OpenClaims returns the open Claims of a Dispatch in assignment order.
-func (state Projection) OpenClaims(dispatch *DispatchState) []*ClaimState {
-	claims := []*ClaimState{}
-	for _, id := range dispatch.Claims {
-		if claim := state.Claims[id]; claim != nil && claim.State == "open" {
-			claims = append(claims, claim)
-		}
+// OpenClaim returns a Dispatch's sole Claim while it is open, or nil once settled.
+func (state Projection) OpenClaim(dispatch *DispatchState) *ClaimState {
+	if claim := state.Claims[dispatch.Claims[0]]; claim != nil && claim.State == "open" {
+		return claim
 	}
-	return claims
+	return nil
 }
 
 // DispatchOrder returns Dispatch identities in creation order.

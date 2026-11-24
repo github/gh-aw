@@ -25,14 +25,15 @@ observation ages, and the commit `at` field is not modelled.
 | Variable | Values |
 |---|---|
 | `work[w]` | `none → available → claimed → completed`, or back to `available`, or `cancelled`; `attempts`, FIFO `pos`, current `claim` |
-| `claim[d]` | `open → completed \| cancelled`; the run attempt that completed it |
-| `dispatch[d]` | `reserved → started → bound → closed`; whether the launch was attempted; the bound run attempt |
+| `attempt[d]` | `unused → reserved → started → bound → completed \| cancelled` (`reserved`, `started` and `bound` mean the Claim is open and its Dispatch is not closed; `completed` and `cancelled` mean the Claim is settled and the Dispatch closed); the Work; whether the launch was attempted; the bound run attempt; the run attempt that completed it |
 | `run[d]` | `none → queued → activation → agent → finishing → completed`; run attempt (re-runs keep the run id) |
 
-The scheduler emits one Claim per Dispatch, so a Claim is identified by its
-Dispatch slot. A worker run is started by the `workflow_dispatch` of one
-Dispatch and carries only that `dispatch_id`, so a run is also identified by
-its Dispatch slot.
+Replay accepts exactly one Claim per Dispatch, so a Claim and the Dispatch
+that launched it form one attempt identified by its Dispatch slot. A worker
+run is started by the `workflow_dispatch` of one Dispatch and carries only
+that `dispatch_id`, so a run is also identified by its Dispatch slot. The run
+stays a separate variable: GitHub can queue, re-run or complete it
+independently of what the ledger recorded.
 
 | Action | Protocol step |
 |---|---|

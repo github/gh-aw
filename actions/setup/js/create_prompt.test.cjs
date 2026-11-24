@@ -340,8 +340,8 @@ describe("create_prompt", () => {
       expect(envelope).not.toBeNull();
       expect(JSON.parse(envelope[1])).toEqual({ work_queue_assignment: assignment });
       expect(user.match(/<work-claim>/g)).toHaveLength(1);
-      expect(user).toContain("call work_queue_read to load each open Claim's claim_handle and Work payload");
-      expect(user).toContain('call work_queue_claim_finish with outcome "completed" and its claim_handle');
+      expect(user).toContain("call work_queue_read to load its Claim's claim_handle and Work payload");
+      expect(user).toContain('call work_queue_claim_finish with outcome "completed"');
       expect(user).toContain('outcome "failed"');
       expect(user).not.toContain("keep_open");
       expect(user).toContain("are not applied.\n</work-claim>\nOriginal prompt\n");

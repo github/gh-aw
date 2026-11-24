@@ -11,7 +11,9 @@ const POLICY = {
   version: 4,
   pending_limit: 4096,
   issues: false,
-  pools: { default: { concurrency: 16, per_account_limit: 0, max_attempts: 3, default_profile: "worker", profiles: { worker: { workflow: h.WORKER_WORKFLOW, effect_scope: "owner/repo" } } } },
+  effect_scope: "owner/repo",
+  workers: ["worker"],
+  pools: { default: { concurrency: 16, per_account_limit: 0, max_attempts: 3 } },
 };
 
 function fakeCore() {

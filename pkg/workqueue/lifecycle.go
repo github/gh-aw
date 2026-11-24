@@ -1,9 +1,6 @@
 package workqueue
 
-import (
-	"encoding/json"
-	"slices"
-)
+import "encoding/json"
 
 func (state *Projection) applyOperation(kind string, operation Operation, commit QueueCommit, ordinal, index int) error {
 	switch kind {
@@ -85,15 +82,6 @@ func boundToActor(dispatch *DispatchState, actor Actor) bool {
 	return dispatch.State == "bound" && actor.Workflow == dispatch.Workflow && actor.RunID == dispatch.Run.RunID && actor.RunAttempt == dispatch.Run.RunAttempt
 }
 
-func (state *Projection) closeIfSettled(dispatch *DispatchState) {
-	for _, id := range dispatch.Claims {
-		if state.Claims[id].State == "open" {
-			return
-		}
-	}
-	dispatch.State = "closed"
-}
-
 func (state *Projection) cancelClaim(claim *ClaimState, reason string, commit QueueCommit) {
 	work := state.Works[claim.WorkID]
 	claim.State = "cancelled"
@@ -128,20 +116,12 @@ func (state *Projection) applyClaim(operation ClaimOperation, commit QueueCommit
 			return queueError("approval_required", "an issue-routed continuation needs its ready approval")
 		}
 	}
-	dispatch := state.Dispatches[operation.DispatchID]
-	if dispatch != nil {
-		if dispatch.CommitID != commit.ID || dispatch.Pool != work.Pool || dispatch.WorkerProfile != work.WorkerProfile {
-			return queueError("dispatch_state_conflict", "a Dispatch groups compatible Claims of one commit")
-		}
-		if slices.ContainsFunc(dispatch.Claims, func(id string) bool { return state.Claims[id].Handle == operation.Handle }) {
-			return queueError("claim_conflict", "Claim handle is not unique within its Dispatch")
-		}
-	} else {
-		dispatch = &DispatchState{DispatchID: operation.DispatchID, RequestID: commit.Request.ID, CommitID: commit.ID, Pool: work.Pool, WorkerProfile: work.WorkerProfile, Workflow: profile.Workflow, State: "reserved", Claims: []string{}}
-		state.Dispatches[dispatch.DispatchID] = dispatch
-		state.dispatchOrder = append(state.dispatchOrder, dispatch.DispatchID)
+	if _, exists := state.Dispatches[operation.DispatchID]; exists {
+		return queueError("dispatch_state_conflict", "a Dispatch carries exactly one Claim")
 	}
-	dispatch.Claims = append(dispatch.Claims, operation.ClaimID)
+	dispatch := &DispatchState{DispatchID: operation.DispatchID, RequestID: commit.Request.ID, CommitID: commit.ID, Pool: work.Pool, WorkerProfile: work.WorkerProfile, Workflow: profile.Workflow, State: "reserved", Claims: [1]string{operation.ClaimID}}
+	state.Dispatches[dispatch.DispatchID] = dispatch
+	state.dispatchOrder = append(state.dispatchOrder, dispatch.DispatchID)
 	state.Claims[operation.ClaimID] = &ClaimState{ClaimID: operation.ClaimID, WorkID: work.WorkID, DispatchID: dispatch.DispatchID, Handle: operation.Handle, State: "open", CommitID: commit.ID, RequestID: commit.Request.ID}
 	work.ClaimID = operation.ClaimID
 	state.setWorkState(work, "claimed")
@@ -166,8 +146,9 @@ func (state *Projection) applyBound(operation BoundOperation, commit QueueCommit
 	if err != nil {
 		return err
 	}
-	if (dispatch.State != "started" && dispatch.State != "bound") || len(state.OpenClaims(dispatch)) == 0 {
-		return queueError("dispatch_state_conflict", "only a started Dispatch with open Claims can bind a run")
+	// A started or bound Dispatch still holds its open Claim: settling the Claim closes it.
+	if dispatch.State != "started" && dispatch.State != "bound" {
+		return queueError("dispatch_state_conflict", "only a started Dispatch with an open Claim can bind a run")
 	}
 	actor := commit.Actor
 	if actor.Workflow != dispatch.Workflow || actor.RunID != operation.RunID || actor.RunAttempt != operation.RunAttempt {
@@ -209,7 +190,7 @@ func (state *Projection) applyCompletion(operation CompletionOperation, commit Q
 	work.Effects = operation.Effects
 	work.CompletionID = commit.ID
 	state.setWorkState(work, "completed")
-	state.closeIfSettled(dispatch)
+	dispatch.State = "closed"
 	return nil
 }
 
@@ -235,7 +216,7 @@ func (state *Projection) applyClaimCancellation(operation ClaimCancellationOpera
 		return queueError("claim_scope_invalid", "ClaimCancellation is outside the bound run's Claim scope")
 	}
 	state.cancelClaim(claim, operation.Reason, commit)
-	state.closeIfSettled(dispatch)
+	dispatch.State = "closed"
 	return nil
 }
 
@@ -275,11 +256,7 @@ func (state *Projection) applyRelease(operation ReleaseOperation, commit QueueCo
 	if dispatch.State == "closed" {
 		return queueError("dispatch_state_conflict", "Dispatch is already closed")
 	}
-	for _, id := range dispatch.Claims {
-		if claim := state.Claims[id]; claim.State == "open" {
-			state.cancelClaim(claim, operation.Reason, commit)
-		}
-	}
+	state.cancelClaim(state.Claims[dispatch.Claims[0]], operation.Reason, commit)
 	dispatch.State = "closed"
 	return nil
 }

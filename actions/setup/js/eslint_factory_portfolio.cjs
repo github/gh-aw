@@ -1,8 +1,6 @@
 // @ts-check
 "use strict";
 
-const { buildPolicyEnv } = require("./work_queue_settings.cjs");
-
 const ESLINT_WORKERS = Object.freeze(["eslint-miner", "eslint-refiner", "eslint-monster"]);
 
 /** @param {string} profile */
@@ -51,17 +49,4 @@ function buildESLintFactoryPlan({ date, repository, repositoryId }) {
   };
 }
 
-/** @param {{repository: string, settings?: object}} options */
-function buildESLintFactoryPolicy({ repository, settings }) {
-  assertRepository(repository);
-  return buildPolicyEnv({ repository, workflows: [...ESLINT_WORKERS], settings });
-}
-
-module.exports = { ESLINT_WORKERS, buildESLintFactoryPlan, buildESLintFactoryPolicy };
-
-if (require.main === module) {
-  const [command, repository, ...extra] = process.argv.slice(2);
-  if (command !== "policy" || extra.length || !repository) throw new Error("Usage: node eslint_factory_portfolio.cjs policy OWNER/REPO");
-  const { readPortfolioSettings } = require("./work_queue_portfolio_config.cjs");
-  process.stdout.write(JSON.stringify(buildESLintFactoryPolicy({ repository, settings: readPortfolioSettings() }), null, 2) + "\n");
-}
+module.exports = { ESLINT_WORKERS, buildESLintFactoryPlan };

@@ -7,7 +7,6 @@ const require = createRequire(import.meta.url);
 const h = require("./work_queue_test_helpers.cjs");
 const { canonical } = require("./work_queue_codec.cjs");
 const { parseTransactionLog, replayTransactions } = require("./work_queue_replay.cjs");
-const { buildPolicyEnv } = require("./work_queue_settings.cjs");
 const { convertV3Contents, convertV3Ledger } = require("./work_queue_convert_v3.cjs");
 const { loadQueue } = require("./work_queue_binding.cjs");
 const { dependencyStatus, nodeId } = require("./work_queue_graph.cjs");
@@ -17,10 +16,16 @@ const v3 = fs.readFileSync(path.join(import.meta.dirname, "fixtures/work_queue_v
 const v3State = JSON.parse(v3).operations[0].state;
 const administrator = { role: "administrator", repository: "github/gh-aw", workflow: ".github/workflows/agentics-maintenance.yml", run_id: "77", run_attempt: 1 };
 const available = Object.values(v3State.works).filter(work => work.state === "available");
-const workers = [...new Set(Object.values(v3State.works).map(work => work.worker_profile))];
+const workers = [...new Set(Object.values(v3State.works).map(work => work.worker_profile))].sort();
+const POOLS = {
+  default: { concurrency: 16, per_account_limit: 0, max_attempts: 3 },
+  "smoke-work-queue": { concurrency: 3, per_account_limit: 0, max_attempts: 3 },
+  "daily-reports": { concurrency: 16, per_account_limit: 0, max_attempts: 3 },
+  "engine-conformance": { concurrency: 16, per_account_limit: 0, max_attempts: 3 },
+};
 
-function policy(workflows = workers) {
-  return buildPolicyEnv({ repository: "github/gh-aw", workflows, settings: { pools: { "smoke-work-queue": { concurrency: 3 }, "daily-reports": {}, "engine-conformance": {} } } });
+function policy(approved = workers, pools = POOLS) {
+  return { version: 4, pending_limit: 4096, issues: false, effect_scope: "github/gh-aw", workers: approved, pools };
 }
 
 const checkpointId = JSON.parse(v3).id;
@@ -73,8 +78,19 @@ describe("v3 to v4 conversion", () => {
     const warnings = [];
     const { state } = convertV3Contents(v3, administrator, policy(workers.filter(name => name !== "deep-report")), message => warnings.push(message), 1);
     const skipped = available.filter(work => work.worker_profile === "deep-report").length;
+    expect(skipped).toBeGreaterThan(0);
     expect(state.works.size).toBe(72 - skipped);
     expect(warnings).toHaveLength(skipped);
+    expect(warnings.every(warning => warning.endsWith("/ profile deep-report is not configured"))).toBe(true);
+
+    const { "daily-reports": _removed, ...remaining } = POOLS;
+    const unpooled = [];
+    const pooled = convertV3Contents(v3, administrator, policy(workers, remaining), message => unpooled.push(message), 1).state;
+    const dropped = available.filter(work => work.pool === "daily-reports");
+    expect(dropped.length).toBeGreaterThan(0);
+    expect(pooled.works.size).toBe(72 - dropped.length);
+    expect(unpooled).toHaveLength(dropped.length);
+    expect(unpooled).toEqual(expect.arrayContaining(dropped.map(work => expect.stringContaining(`v3 Work ${work.work_id} skipped: pool daily-reports`))));
   });
 
   it("applies ownership events of v3 lines after the checkpoint", () => {

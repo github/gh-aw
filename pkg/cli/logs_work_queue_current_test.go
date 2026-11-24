@@ -193,6 +193,7 @@ func TestWorkQueueCurrentSnapshotRejectsMalformed(t *testing.T) {
 		"fork", "truncated", "duplicate-key", "missing-worker-field", "empty-sha", "wrong-handle", "wrong-claim",
 		"foreign-run", "rerun", "unbound", "empty-ledger", "foreign-repository", "unknown-origin-field",
 		"unknown-assignment-field", "observer-with-assignment", "dispatcher-with-assignment",
+		"no-members", "two-members", "repeated-member",
 	} {
 		t.Run(scenario, func(t *testing.T) {
 			envelope, fixture := logsWQWorkerFixture(t)
@@ -241,6 +242,16 @@ func TestWorkQueueCurrentSnapshotRejectsMalformed(t *testing.T) {
 				envelope["origin"] = map[string]any{"role": "worker", "repository": workQueueTestRepository, "secret": "not-exportable"}
 			case "unknown-assignment-field":
 				envelope["worker"] = map[string]any{"dispatch_id": fixture.dispatchID, "claims": fixture.assignment.Claims, "extra": true}
+			case "no-members":
+				envelope["worker"] = map[string]any{"dispatch_id": fixture.dispatchID, "claims": []any{}}
+			case "two-members":
+				other := fixture.assignment.Claims[0]
+				other.Handle, other.ClaimID = "h2", "c_other"
+				fixture.assignment.Claims = append(fixture.assignment.Claims, other)
+				envelope["worker"] = fixture.assignment
+			case "repeated-member":
+				fixture.assignment.Claims = append(fixture.assignment.Claims, fixture.assignment.Claims[0])
+				envelope["worker"] = fixture.assignment
 			case "observer-with-assignment", "dispatcher-with-assignment":
 				role, _, _ := strings.Cut(scenario, "-")
 				fixture.worker.Role = role

@@ -81,7 +81,7 @@ For the full queue behavior and operator configuration, see the [work-queue refe
 | `CheckpointCommit` | `func CheckpointCommit(state Projection, actor Actor, at int64) (QueueCommit, error)` | Builds a root Checkpoint commit. |
 | `Projection.Clone` | `func (state Projection) Clone() Projection` | Deep-copies a projection. |
 | `Projection.CommittedRequest` | `func (state Projection) CommittedRequest(requestID string) (*QueueCommit, bool)` | Finds the commit for a request id. |
-| `Projection.OpenClaims` | `func (state Projection) OpenClaims(dispatch *DispatchState) []*ClaimState` | Lists a dispatch's open Claims. |
+| `Projection.OpenClaim` | `func (state Projection) OpenClaim(dispatch *DispatchState) *ClaimState` | Returns a dispatch's sole Claim while open, or nil once settled. |
 | `Projection.DispatchOrder` | `func (state Projection) DispatchOrder() []string` | Lists dispatch ids in commit order. |
 | `Projection.DependencyStatus` | `func (state Projection) DependencyStatus(work *WorkState) (bool, string)` | Reports whether a Work's dependencies are satisfied. |
 
@@ -112,7 +112,7 @@ For the full queue behavior and operator configuration, see the [work-queue refe
 | `ClaimIdentity` | `func ClaimIdentity(requestID, workID string) (claimID, dispatchID, handle string)` | Derives Claim, dispatch, and handle ids. |
 | `PlanDispatch` | `func PlanDispatch(state Projection, parameters DispatchParameters, requestID string) (Decision, error)` | Plans a priority-FIFO `dispatch_next` selection. |
 | `Projection.EligibleWork` | `func (state Projection) EligibleWork(pool string, profiles map[string]DispatchProfile) []*WorkState` | Lists eligible Work in scheduling order. |
-| `Projection.PoolOccupancy` | `func (state Projection) PoolOccupancy(pool string) (int, map[string]int)` | Counts non-closed dispatches and open Claims per fairness key. |
+| `Projection.PoolOccupancy` | `func (state Projection) PoolOccupancy(pool string) (int, map[string]int)` | Counts occupied slots (open Claims) and open Claims per fairness key. |
 | `AssignmentForDispatch` | `func AssignmentForDispatch(state Projection, dispatchID string) (Assignment, error)` | Builds a worker assignment. |
 | `AssignmentsForRequest` | `func AssignmentsForRequest(state Projection, requestID string) ([]Assignment, error)` | Builds assignments for a committed request. |
 

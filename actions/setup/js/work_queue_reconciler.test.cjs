@@ -12,7 +12,9 @@ const policy = maxAttempts => ({
   version: 4,
   pending_limit: 30,
   issues: false,
-  pools: { default: { concurrency: 1, per_account_limit: 0, max_attempts: maxAttempts, default_profile: "worker", profiles: { worker: { workflow: h.WORKER_WORKFLOW, effect_scope: "owner/repo" } } } },
+  effect_scope: "owner/repo",
+  workers: ["worker"],
+  pools: { default: { concurrency: 1, per_account_limit: 0, max_attempts: maxAttempts } },
 });
 
 let saved;

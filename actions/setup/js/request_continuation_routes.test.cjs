@@ -421,18 +421,19 @@ describe("routed request validation", () => {
     expect(routes.routedRequestError({ type: "request_continuation", message: "m", timestamp: "t" }, { collected: true })).toBeNull();
   });
 
-  it("binds requests to scopes", () => {
-    const one = { claims: [{ handle: "h1" }] };
-    const two = { claims: [{ handle: "h1" }, { handle: "h2" }] };
-    expect([...routes.collectRoutedRequests([request("a")], { assignment: one }).keys()]).toEqual(["h1"]);
-    const both = routes.collectRoutedRequests([request("a", { claim_handle: "h2" }), request("b", { claim_handle: "h1" })], { assignment: two });
-    expect(both.get("h1")).toMatchObject({ message: "b", index: 1, message_sha256: sha256("b") });
-    expect(both.get("h2")).toMatchObject({ message: "a", index: 0 });
-    expect(() => routes.collectRoutedRequests([request("a")], { assignment: two })).toThrow("continuation_request_invalid");
-    expect(() => routes.collectRoutedRequests([request("a", { claim_handle: "h9" })], { assignment: two })).toThrow("continuation_request_invalid");
-    expect(() => routes.collectRoutedRequests([request("a"), request("b")], { assignment: one })).toThrow("continuation_request_invalid");
-    expect(() => routes.collectRoutedRequests([request("a", { claim_handle: "h1" })])).toThrow("continuation_request_invalid");
-    expect([...routes.collectRoutedRequests([request("a"), { type: "noop", message: "x" }]).keys()]).toEqual([""]);
+  it("binds the one request to its scope", () => {
+    const one = { claims: [{ handle: "h7" }] };
+    expect(routes.collectRoutedRequest([request("a")], { assignment: one })).toEqual({ message: "a", message_sha256: sha256("a"), index: 0, claim_handle: "h7" });
+    expect(routes.collectRoutedRequest([{ type: "noop", message: "x" }, request("b", { claim_handle: "h7" })], { assignment: one })).toMatchObject({ index: 1, claim_handle: "h7" });
+    expect(routes.collectRoutedRequest([{ type: "noop", message: "x" }], { assignment: one })).toBeNull();
+    for (const assignment of [{ claims: [] }, { claims: [{ handle: "h1" }, { handle: "h2" }] }, { claims: [{ handle: "" }] }]) {
+      expect(() => routes.collectRoutedRequest([], { assignment })).toThrow("continuation_request_invalid");
+    }
+    expect(() => routes.collectRoutedRequest([request("a", { claim_handle: "h1" })], { assignment: one })).toThrow("continuation_request_invalid");
+    expect(() => routes.collectRoutedRequest([request("a"), request("b")], { assignment: one })).toThrow("continuation_request_invalid");
+    // An ordinary source accepts one unscoped request and rejects a Claim selector.
+    expect(() => routes.collectRoutedRequest([request("a", { claim_handle: "h1" })])).toThrow("continuation_request_invalid");
+    expect(routes.collectRoutedRequest([request("a"), { type: "noop", message: "x" }])).toEqual({ message: "a", message_sha256: sha256("a"), index: 0 });
   });
 
   it("computes the automatic hop budget", () => {
@@ -508,17 +509,14 @@ describe("worker manager receipts", () => {
     expect(output("work_queue_continuations")).toEqual([]);
   });
 
-  it("keeps multi-Claim requests on their own Claims in assignment order", async () => {
-    activate({ claims: [{}, {}], items: [request("Second Claim work", { claim_handle: "h2" }), request("First Claim work", { claim_handle: "h1" })] });
+  it("binds an omitted handle to a non-h1 sole Claim", async () => {
+    activate({ claims: [{ handle: "h7" }], items: [request("Audit page 2")] });
     await manager.main({ authorize: vi.fn(authorized) });
-    expect(output("work_queue_continuations")).toEqual([
-      { claim_handle: "h1", claim_id: "c1", message_sha256: sha256("First Claim work"), status: "ready" },
-      { claim_handle: "h2", claim_id: "c2", message_sha256: sha256("Second Claim work"), status: "ready" },
-    ]);
+    expect(output("work_queue_continuations")).toEqual([{ claim_handle: "h7", claim_id: "c1", message_sha256: sha256("Audit page 2"), status: "ready" }]);
   });
 
-  it("emits no receipts when a multi-Claim request omits its handle", async () => {
-    activate({ claims: [{}, {}], items: [request("Unscoped")] });
+  it("emits no receipts when a request names a foreign Claim handle", async () => {
+    activate({ items: [request("Foreign", { claim_handle: "h2" })] });
     await manager.main({ authorize: vi.fn(authorized) });
     expect(output("work_queue_continuations")).toBeUndefined();
   });

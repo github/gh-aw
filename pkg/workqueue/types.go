@@ -268,7 +268,8 @@ type DispatchState struct {
 	State         string        `json:"state"`
 	Run           *RunBinding   `json:"run"`
 	Launch        *LaunchRecord `json:"launch"`
-	Claims        []string      `json:"claims"`
+	// Claims holds the Dispatch's sole Claim: one Claim per Dispatch is a replay rule.
+	Claims [1]string `json:"claims"`
 }
 
 type Stats struct {

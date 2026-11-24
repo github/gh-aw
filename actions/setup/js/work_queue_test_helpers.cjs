@@ -222,18 +222,24 @@ function fakeQueueGitHub(initialContents = undefined, { branch = "work-queue", r
 }
 
 /**
- * The compiled GH_AW_WORK_QUEUE_POLICY text for an in-memory policy. The compiled form lists
- * workers once, so every pool must share one profile set; the round trip rejects a fixture
- * the compiler could not emit.
- * @param {import("./work_queue_policy.cjs").PolicyEnv} policy
+ * The policy a checked-in dispatcher lock compiles into its trusted controls step, with
+ * `${{ github.repository }}` bound to `repository` and decoded by the real runtime reader.
+ * @param {string} name dispatcher workflow ID
+ * @param {string} repository
+ * @returns {import("./work_queue_policy.cjs").PolicyEnv}
  */
-function policyEnvText(policy) {
-  const [first] = Object.values(policy.pools);
-  const workers = Object.keys(first.profiles).sort();
-  const pools = Object.fromEntries(Object.entries(policy.pools).map(([name, pool]) => [name, { concurrency: pool.concurrency, per_account_limit: pool.per_account_limit, max_attempts: pool.max_attempts }]));
-  const text = JSON.stringify({ version: policy.version, pending_limit: policy.pending_limit, issues: policy.issues, effect_scope: first.profiles[workers[0]].effect_scope, workers, pools });
-  if (canonical(readWorkQueuePolicyEnv({ GH_AW_WORK_QUEUE_POLICY: text })) !== canonical(policy)) throw new Error("policy fixture is not expressible as a compiled policy environment");
-  return text;
+function compiledDispatcherPolicy(name, repository) {
+  // Loaded here, not at import: the repository-level adapter provisions a Go tool.
+  const repositoryRoot = require("node:path").join(__dirname, "../../..");
+  const { readDocumentMetadata } = require(require("node:path").join(repositoryRoot, "scripts/markdown_metadata_test_adapter.cjs"));
+  const source = require("node:fs").readFileSync(require("node:path").join(repositoryRoot, `.github/workflows/${name}.lock.yml`), "utf8");
+  const steps = readDocumentMetadata(source).value?.jobs?.safe_outputs?.steps ?? [];
+  const controls = steps.find(step => step?.id === "work_queue_controls");
+  if (!controls?.env) throw new Error(`${name}.lock.yml has no work_queue_controls step`);
+  const environment = Object.fromEntries(Object.entries(controls.env).map(([key, value]) => [key, typeof value === "string" ? value.replaceAll("${{ github.repository }}", repository) : value]));
+  const policy = readWorkQueuePolicyEnv(environment);
+  if (!policy) throw new Error(`${name}.lock.yml compiles no work queue policy`);
+  return policy;
 }
 
 module.exports = {
@@ -243,6 +249,7 @@ module.exports = {
   administrator,
   bind,
   commit,
+  compiledDispatcherPolicy,
   dispatchNext,
   dispatchParameters,
   dispatcher,
@@ -251,7 +258,6 @@ module.exports = {
   finish,
   launch,
   ledgerText,
-  policyEnvText,
   producer,
   projector,
   reconciler,

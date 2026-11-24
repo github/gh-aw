@@ -14,10 +14,10 @@ const adapter = {
   request: { method: "POST", route: "/repos/{owner}/{repo}/check-runs", permission: "checks" },
 };
 
-function fixture(proof = request => ({ claim_handle: request.claim_handle, authorized: true, state: "open" })) {
+function fixture(proof = request => ({ claim_handle: request.claim_handle, authorized: true, state: "open" }), dispatch = "dispatch") {
   const assignment = {
-    dispatch_id: "dispatch",
-    claims: ["h1", "h2"].map(handle => ({ handle, claim_id: `claim-${handle}`, work_id: `work-${handle}`, work: {}, result_refs: [] })),
+    dispatch_id: dispatch,
+    claims: [{ handle: "h1", claim_id: `claim-${dispatch}`, work_id: `work-${dispatch}`, work: {}, result_refs: [] }],
   };
   const calls = [];
   const github = {
@@ -50,6 +50,30 @@ describe("REST adapter effects", () => {
       const handler = rest.createRestEffectHandler(adapter, f.github);
       await expect(handler({ type: "custom", claim_handle: "h1", repo: "other/repo", name: "x", revision: "a" })).rejects.toThrow(/conflicts/);
       await expect(handler({ type: "custom", claim_handle: "h1", name: "x", revision: "a" })).rejects.toThrow(/cancelled/);
+    });
+    expect(f.calls).toEqual([]);
+  });
+
+  it("rejects a two-member assignment, foreign handles, and cross-Dispatch handler reuse before writing", async () => {
+    const f = fixture();
+    const other = fixture(undefined, "other-dispatch");
+    const twoMember = { dispatch_id: "both", claims: [f.assignment.claims[0], { ...other.assignment.claims[0], handle: "h2" }] };
+    let entered = false;
+    expect(() =>
+      scope.withClaimExecution({ assignment: twoMember, claim_handle: "h1", authorize: f.authorize }, () => {
+        entered = true;
+        rest.createRestEffectHandler(adapter, f.github);
+      })
+    ).toThrow(/exactly one open Claim/);
+    expect(entered).toBe(false);
+    const fields = { ...adapter.expected, name: "Exact check", head_sha: "a".repeat(40) };
+    const handler = await scope.withClaimExecution({ assignment: f.assignment, claim_handle: "h1", authorize: f.authorize }, async () => {
+      const created = rest.createRestEffectHandler(adapter, f.github);
+      await expect(created({ type: "custom", claim_handle: "h2", ...fields })).rejects.toThrow(/foreign/);
+      return created;
+    });
+    await scope.withClaimExecution({ assignment: other.assignment, claim_handle: "h1", authorize: other.authorize }, async () => {
+      await expect(handler({ type: "custom", claim_handle: "h1", ...fields })).rejects.toThrow(/cannot escape/);
     });
     expect(f.calls).toEqual([]);
   });

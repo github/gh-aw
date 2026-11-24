@@ -4,6 +4,7 @@ import { createRequire } from "node:module";
 const require = createRequire(import.meta.url);
 const h = require("./work_queue_test_helpers.cjs");
 const { canonical } = require("./work_queue_codec.cjs");
+const { publishWorkQueueRequest } = require("./work_queue_store.cjs");
 const { LEDGER_BYTES } = require("./work_queue_limits.cjs");
 const {
   applyCommit,
@@ -124,6 +125,26 @@ describe("v4 lifecycle transitions", () => {
     const again = { ...claim, claim_id: "c_again", dispatch_id: "d_again" };
     fails(() => replayTransactions(raw(planned.log, { ...h.dispatcher, run_id: "101" }, "dispatch_next", h.dispatchParameters(), [again])), "ownership_conflict");
     fails(() => replayTransactions(raw(h.submit([], [a]), h.dispatcher, "dispatch_next", h.dispatchParameters({ profiles: { other: { workflow: ".github/workflows/other.lock.yml" } } }), [{ ...claim }])), "request_invalid");
+  });
+
+  it("grants distinct Dispatches, including reused or custom handles, but never groups Claims", async () => {
+    const parameters = h.dispatchParameters();
+    const submitted = h.submit([], [a, b]);
+    const [first, second] = h.dispatchNext(submitted, { concurrency: 2 }).decision.operations;
+    // Two grants in one request: both "h1" in different Dispatches, or a handle the scheduler never mints.
+    const custom = { ...second, handle: "worker-b" };
+    const granted = replayTransactions(raw(submitted, h.dispatcher, "dispatch_next", parameters, [first, custom]));
+    expect(granted.claims.get(custom.claim_id)).toMatchObject({ handle: "worker-b", dispatch_id: custom.dispatch_id });
+    expect(replayTransactions(raw(submitted, h.dispatcher, "dispatch_next", parameters, [first, second])).dispatches.size).toBe(2);
+    const grouped = [first, { ...second, dispatch_id: first.dispatch_id, handle: "h2" }];
+    fails(() => replayTransactions(raw(submitted, h.dispatcher, "dispatch_next", parameters, grouped)), "dispatch_state_conflict");
+    // A publisher planning the grouped grant leaves the ref and ledger unchanged.
+    const fake = h.fakeQueueGitHub(h.ledgerText(submitted));
+    const before = { ref: (await fake.githubClient.rest.git.getRef({ ref: "heads/work-queue" })).data.object.sha, contents: fake.contents() };
+    const request = { kind: "dispatch_next", parameters };
+    await expect(publishWorkQueueRequest({ githubClient: fake.githubClient, owner: "owner", repo: "repo", actor: h.dispatcher, request, operationsFor: () => grouped })).rejects.toMatchObject({ code: "dispatch_state_conflict" });
+    expect((await fake.githubClient.rest.git.getRef({ ref: "heads/work-queue" })).data.object.sha).toBe(before.ref);
+    expect(fake.contents()).toBe(before.contents);
   });
 
   it("starts only reserved Dispatches and binds only the launched run, rebinding a later attempt", () => {
@@ -277,6 +298,20 @@ describe("v4 checkpoints", () => {
     fails(() => restoreCheckpointState(tamper(state => (Object.values(state.dispatches)[0].launch.run_id = "8"))), "checkpoint_invalid");
     fails(() => restoreCheckpointState(tamper(state => (Object.values(state.dispatches)[0].launch.revision = "main"))), "checkpoint_invalid");
     fails(() => restoreCheckpointState(tamper(state => (state.extra = true))), "checkpoint_invalid");
+    // One Claim per Dispatch, checked on the raw checkpoint for settled Claims too.
+    const finished = checkpointCommit(replayTransactions(h.finish(log, Object.keys(checkpoint.operations[0].state.dispatches)[0], h.workerActor("7"))), h.reconciler, 5);
+    const tamperFinished = mutate => {
+      const copy = structuredClone(finished);
+      mutate(copy.operations[0].state);
+      return copy;
+    };
+    const [completed] = Object.values(finished.operations[0].state.claims);
+    const extra = { ...completed, claim_id: "c_hidden", work_id: b.work_id, state: "cancelled", cancellation_reason: "worker_failed", terminal_commit_id: completed.terminal_commit_id };
+    delete extra.effects;
+    fails(() => restoreCheckpointState(tamperFinished(state => (state.dispatches[completed.dispatch_id].claims = [completed.claim_id, completed.claim_id]))), "checkpoint_invalid");
+    fails(() => restoreCheckpointState(tamperFinished(state => (state.claims.c_hidden = extra))), "checkpoint_invalid");
+    fails(() => restoreCheckpointState(tamper(state => (Object.values(state.dispatches)[0].state = "closed"))), "checkpoint_invalid");
+    fails(() => restoreCheckpointState(tamper(state => (Object.values(state.dispatches)[0].pool = "other"))), "checkpoint_invalid");
     fails(() => restoreCheckpointState({ ...checkpoint, actor: h.producer }), "request_invalid");
   });
 

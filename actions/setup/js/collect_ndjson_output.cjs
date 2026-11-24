@@ -315,7 +315,8 @@ async function main() {
           core.info(`[INGESTION] Line ${i + 1}: Ignoring probing noop message (does not count against the noop budget): ${JSON.stringify(item.message)}`);
           continue;
         }
-        const typeCount = parsedItems.filter(existing => existing.type === itemType && (!queueScope || (existing.claim_handle === item.claim_handle && !existing._claimScopeError))).length;
+        // Every accepted queue item belongs to the one assigned Claim; rejected records never count.
+        const typeCount = parsedItems.filter(existing => existing.type === itemType && (!queueScope || !existing._claimScopeError)).length;
         const maxAllowed = getMaxAllowedForType(itemType, expectedOutputTypes);
         if (typeCount >= maxAllowed) {
           rejectItem(`Line ${i + 1}: Too many items of type '${itemType}'. Maximum allowed: ${maxAllowed}.`);
@@ -390,23 +391,21 @@ async function main() {
       core.warning("Validation errors found:");
       errors.forEach(error => core.warning(`  - ${error}`));
     }
+    const handle = claimHandle || assignment?.claims[0].handle;
     for (const itemType of Object.keys(expectedOutputTypes)) {
       const minRequired = getMinRequiredForType(itemType, expectedOutputTypes);
       if (minRequired > 0) {
-        const handles = claimHandle ? [claimHandle] : assignment ? assignment.claims.map(member => member.handle) : [undefined];
-        for (const handle of handles) {
-          const actualCount = parsedItems.filter(item => item.type === itemType && (!queueScope || (!item._claimScopeError && item.claim_handle === handle))).length;
-          if (actualCount < minRequired) {
-            const message = `Too few items of type '${itemType}'. Minimum required: ${minRequired}, found: ${actualCount}.`;
-            errors.push(handle ? `Claim '${handle}': ${message}` : message);
-            if (handle) {
-              parsedItems.push({
-                type: itemType,
-                claim_handle: handle,
-                _claimScopeError: message,
-                _claimScopeErrorCode: "claim_scope_invalid",
-              });
-            }
+        const actualCount = parsedItems.filter(item => item.type === itemType && (!queueScope || !item._claimScopeError)).length;
+        if (actualCount < minRequired) {
+          const message = `Too few items of type '${itemType}'. Minimum required: ${minRequired}, found: ${actualCount}.`;
+          errors.push(handle ? `Claim '${handle}': ${message}` : message);
+          if (handle) {
+            parsedItems.push({
+              type: itemType,
+              claim_handle: handle,
+              _claimScopeError: message,
+              _claimScopeErrorCode: "claim_scope_invalid",
+            });
           }
         }
       }

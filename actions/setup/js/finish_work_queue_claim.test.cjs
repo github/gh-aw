@@ -137,12 +137,12 @@ describe("finish step", () => {
 
 describe("finishOperations with routed continuations", () => {
   const message = "Audit page 2";
-  function plan(queue, { status = "ready", route = "workqueue", maxDepth = 1, outcome = "completed", entry = undefined, policy = queue.policy } = {}) {
+  function plan(queue, { status = "ready", route = "workqueue", maxDepth = 1, outcome = "completed", entry = undefined, requested = true, policy = queue.policy } = {}) {
     const state = replayTransactions(queue.log);
     const claim = queue.assignment.claims[0];
     const receipt = { claim_handle: "h1", claim_id: claim.claim_id, message_sha256: messageDigest(message), status };
-    const entries = new Map([["h1", entry === undefined ? { message, message_sha256: receipt.message_sha256, index: 0, receipt } : entry]]);
-    return { state, claim, operations: () => finishOperations(state, queue.dispatchId, new Map([["h1", outcome]]), new Map(), policy, { config: { route, maxDepth }, entries }) };
+    const continuations = { config: { route, maxDepth }, entry: !requested ? undefined : entry === undefined ? { message, message_sha256: receipt.message_sha256, index: 0, receipt } : entry };
+    return { state, claim, operations: () => finishOperations(state, queue.dispatchId, new Map([["h1", outcome]]), new Map(), policy, continuations) };
   }
 
   it("places the successor immediately after its parent's Completion", () => {
@@ -165,6 +165,31 @@ describe("finishOperations with routed continuations", () => {
     expect(() => plan(workerQueue(), { entry: null }).operations()).toThrow(/without an accepted receipt/);
   });
 
+  it("completes without a successor when nothing was requested or the depth is exhausted", () => {
+    expect(
+      plan(workerQueue(), { requested: false })
+        .operations()
+        .map(operation => operation.kind)
+    ).toEqual(["Completion"]);
+    const queue = workerQueue();
+    const { state, claim } = plan(queue);
+    const parent = state.works.get(claim.work_id);
+    parent.continuation = { route: "workqueue", message, remaining: 0 };
+    const receipt = { claim_handle: "h1", claim_id: claim.claim_id, message_sha256: messageDigest(message), status: "depth_limit" };
+    const operations = finishOperations(state, queue.dispatchId, new Map([["h1", "completed"]]), new Map(), queue.policy, {
+      config: { route: "workqueue", maxDepth: 1 },
+      entry: { message, message_sha256: receipt.message_sha256, index: 0, receipt },
+    });
+    expect(operations.map(operation => operation.kind)).toEqual(["Completion"]);
+  });
+
+  it("plans nothing for a settled Claim", () => {
+    const queue = workerQueue();
+    const { state, claim, operations } = plan(queue);
+    state.claims.get(claim.claim_id).state = "completed";
+    expect(operations()).toEqual([]);
+  });
+
   it("emits only the cancellation for a failed finish", () => {
     const queue = workerQueue();
     expect(
@@ -176,6 +201,7 @@ describe("finishOperations with routed continuations", () => {
 
   it("enforces pending_limit on the net transition", () => {
     expect(plan(workerQueue(), { policy: { ...workerPolicy(), pending_limit: 1 } }).operations()).toHaveLength(2);
+    expect(plan(workerQueue({ count: 2 }), { policy: { ...workerPolicy(), pending_limit: 2 } }).operations()).toHaveLength(2);
     expect(() => plan(workerQueue({ count: 2 }), { policy: { ...workerPolicy(), pending_limit: 1 } }).operations()).toThrow(/pending_limit/);
   });
 });
@@ -213,6 +239,18 @@ describe("authorizeWorkerClaim", () => {
     await expect(authorize(queue, { resource: { repository: "other/repo" } })).rejects.toMatchObject({ code: "E004" });
     await expect(authorize(queue, { message: { type: "add_comment", claim_handle: "h1", repo: "other/repo" } })).rejects.toMatchObject({ code: "E004" });
     await expect(authorize(queue, { policy: workerPolicy({ effectScope: "other/repo" }), resource: { repository: "owner/repo" } })).rejects.toMatchObject({ code: "E004" });
+  });
+
+  it("rejects with E004 once the Dispatch's worker or pool leaves the live policy", async () => {
+    const { queue } = setup();
+    const before = queue.fake.contents();
+    for (const policy of [
+      { ...workerPolicy(), workers: ["other"] },
+      { ...workerPolicy(), pools: { reports: workerPolicy().pools.default } },
+    ]) {
+      await expect(authorize(queue, { policy, resource: { repository: "owner/repo" } })).rejects.toMatchObject({ code: "E004" });
+    }
+    expect(queue.fake.contents()).toBe(before);
   });
 
   it("suppresses a Claim that is no longer open", async () => {

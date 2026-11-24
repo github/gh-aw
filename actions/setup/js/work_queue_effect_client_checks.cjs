@@ -8,13 +8,48 @@ const { appendClaimEffects, wrapClaimEffectClient, withClaimEffectClients } = re
 const { assertGitPushAuthorized, gitPushRepository } = require("./work_queue_git_effects.cjs");
 const { readJsonlFile } = require("./jsonl_helpers.cjs");
 
-const assignment = {
-  dispatch_id: "d",
-  claims: ["h1", "h2"].map(handle => ({ handle, claim_id: `c:${handle}`, work_id: `w:${handle}`, work: {}, result_refs: [] })),
-};
+function singletonAssignment(dispatch_id, claim_id, work_id) {
+  return { dispatch_id, claims: [{ handle: "h1", claim_id, work_id, work: {}, result_refs: [] }] };
+}
+
+// One Claim per Dispatch: two concurrent dispatches may both use the local handle `h1`.
+const assignment = singletonAssignment("d", "c:h1", "w:h1");
+const otherAssignment = singletonAssignment("another-dispatch", "c:other", "w:other");
 
 function registerTests({ describe, it }) {
   describe("fresh per-request Claim effect boundaries", () => {
+    it("rejects a two-member assignment before any client, authorization or API call", async () => {
+      let writes = 0;
+      let checks = 0;
+      let ran = false;
+      const source = {
+        rest: {
+          issues: {
+            update: async (/** @type {unknown} */ _request) => {
+              writes++;
+            },
+          },
+        },
+      };
+      const authorize = async request => {
+        checks++;
+        return { authorized: true, claim_handle: request.claim_handle };
+      };
+      const twoMember = { dispatch_id: "d", claims: [...assignment.claims, { handle: "h2", claim_id: "c:h2", work_id: "w:h2", work: {}, result_refs: [] }] };
+      assert.throws(
+        () =>
+          withClaimExecution({ assignment: twoMember, claim_handle: "h1", authorize }, async () => {
+            ran = true;
+            await wrapClaimEffectClient(source, { claim_handle: "h1", authorize }).rest.issues.update({ owner: "owner", repo: "repo", issue_number: 1 });
+          }),
+        /exactly one open Claim/
+      );
+      assert.throws(() => claimArtifactPath("artifacts", "h1", twoMember), /exactly one open Claim/);
+      assert.equal(ran, false);
+      assert.equal(checks, 0);
+      assert.equal(writes, 0);
+    });
+
     it("rejects a client reused under another dispatch with the same local handle before any API call", async () => {
       let writes = 0;
       const source = {
@@ -368,41 +403,43 @@ function registerTests({ describe, it }) {
       delete require.cache[modulePath];
       try {
         const { main } = require(modulePath);
-        const effects = [];
+        const effectsByDispatch = [];
         const authorize = async request => {
           assert.equal(request.requireCompletion, true);
           if (request.resource !== undefined) assert.deepEqual(request.resource, { repository: "owner/repo", host: "github.com", repository_id: "7", run_id: "123" });
           return { authorized: true, claim_handle: request.claim_handle };
         };
         let firstHandler;
-        for (const handle of ["h1", "h2"]) {
-          const root = claimArtifactPath(path.join(directory, "gh-aw", "safeoutputs", "upload-artifacts"), handle, assignment);
+        for (const current of [assignment, otherAssignment]) {
+          const root = claimArtifactPath(path.join(directory, "gh-aw", "safeoutputs", "upload-artifacts"), "h1", current);
           fs.mkdirSync(root, { recursive: true });
-          fs.writeFileSync(path.join(root, "same.txt"), handle);
-          await withClaimExecution({ assignment, claim_handle: handle, authorize, effects }, async () => {
+          fs.writeFileSync(path.join(root, "same.txt"), current.dispatch_id);
+          const effects = [];
+          effectsByDispatch.push(effects);
+          await withClaimExecution({ assignment: current, claim_handle: "h1", authorize, effects }, async () => {
             const handler = await main();
-            if (handle === "h1") firstHandler = handler;
-            const result = await handler({ type: "upload_artifact", claim_handle: handle, path: "same.txt", temporary_id: "aw_same" });
+            if (current === assignment) firstHandler = handler;
+            const result = await handler({ type: "upload_artifact", claim_handle: "h1", path: "same.txt", temporary_id: "aw_same" });
             assert.equal(result.success, true, result.error);
           });
         }
         assert.deepEqual(
           uploads.map(upload => upload.content),
-          ["h1", "h2"]
+          [assignment.dispatch_id, otherAssignment.dispatch_id]
         );
         assert.notEqual(uploads[0].name, uploads[1].name);
         assert.notEqual(uploads[0].root, uploads[1].root);
         assert.equal(new Set(outputs.map(([key]) => key)).size, outputs.length);
-        for (const handle of ["h1", "h2"]) {
-          const resolver = JSON.parse(fs.readFileSync(path.join(claimArtifactPath(directory, handle, assignment), "artifact-resolver.json"), "utf8"));
-          assert.equal(resolver.aw_same, uploads[handle === "h1" ? 0 : 1].name);
-        }
+        [assignment, otherAssignment].forEach((current, index) => {
+          const resolver = JSON.parse(fs.readFileSync(path.join(claimArtifactPath(directory, "h1", current), "artifact-resolver.json"), "utf8"));
+          assert.equal(resolver.aw_same, uploads[index].name);
+        });
         assert.deepEqual(
-          effects.map(effect => effect.claim_handle),
-          ["h1", "h2"]
+          effectsByDispatch.map(effects => effects.map(effect => effect.claim_handle)),
+          [["h1"], ["h1"]]
         );
-        await withClaimExecution({ assignment, claim_handle: "h2", authorize }, async () => {
-          await assert.rejects(firstHandler({ type: "upload_artifact", claim_handle: "h2", path: "same.txt" }), /original Claim/);
+        await withClaimExecution({ assignment: otherAssignment, claim_handle: "h1", authorize }, async () => {
+          await assert.rejects(firstHandler({ type: "upload_artifact", claim_handle: "h1", path: "same.txt" }), /original immutable Claim identity/);
         });
         let checks = 0;
         const cancelling = async request => {
@@ -426,7 +463,7 @@ function registerTests({ describe, it }) {
       }
     });
 
-    it("rejects cross-Claim client reuse and restores ordinary client factories", async () => {
+    it("rejects client reuse under another dispatch's Claim and restores ordinary client factories", async () => {
       const source = { rest: { issues: { create: async () => ({ ok: true }) } } };
       const authorize = async request => ({ authorized: true, claim_handle: request.claim_handle });
       const oldGithub = global.github;
@@ -444,8 +481,8 @@ function registerTests({ describe, it }) {
         );
         assert.equal(global.github, source);
         assert.equal(global.getOctokit, factory);
-        await withClaimExecution({ assignment, claim_handle: "h2", authorize }, async () => {
-          assert.throws(() => captured.rest.issues.create({ owner: "owner", repo: "repo" }), /escape/);
+        await withClaimExecution({ assignment: otherAssignment, claim_handle: "h1", authorize }, async () => {
+          assert.throws(() => captured.rest.issues.create({ owner: "owner", repo: "repo" }), /original immutable Claim identity/);
         });
       } finally {
         global.github = oldGithub;

@@ -67,12 +67,12 @@ safe-outputs:
 
 # README check worker
 
-Process only the claims in your work queue assignment.
-For each Claim, read its work.task and inspect the repository README.
+Process only the Claim in your work queue assignment.
+Read its work.task and inspect the repository README.
 Do not modify repository resources.
-Report your findings with noop, using the Claim's handle as claim_handle.
-Then call work_queue_claim_finish with that claim_handle and outcome "completed".
-If the task cannot be completed, finish that Claim with outcome "failed".
+Report your findings with noop.
+Then call work_queue_claim_finish with outcome "completed".
+If the task cannot be completed, finish the Claim with outcome "failed".
 ```
 
 Create the dispatcher with an explicit worker allowlist and a one-dispatch limit:

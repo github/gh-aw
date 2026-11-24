@@ -147,7 +147,7 @@ function prepareMemorySnapshot(message, config, options = {}) {
   }
   const assignment = normalizeAssignment(original);
   const normalized = normalizeClaimScope(message, assignment);
-  const member = assignment.claims.find(claim => claim.handle === normalized.claim_handle);
+  const [member] = assignment.claims;
   const memory = normalized.memory;
   assertJSONData(memory);
   validateMemoryValue(memory, config.schema);

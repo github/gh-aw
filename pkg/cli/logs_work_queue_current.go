@@ -172,7 +172,8 @@ func replayCurrentWorkQueueSnapshot(data []byte) (currentWorkQueueEnvelope, work
 }
 
 // currentWorkQueueAssignmentReceipt checks a worker snapshot against its captured
-// ledger: the Dispatch exists and is bound to the snapshot's own run.
+// ledger: the Dispatch exists, is bound to the snapshot's own run and its assignment
+// carries exactly the Dispatch's one Claim.
 func currentWorkQueueAssignmentReceipt(state workqueue.Projection, assignment workqueue.Assignment, origin workqueue.Actor) (*WorkQueueAssignmentReceipt, error) {
 	dispatch := state.Dispatches[assignment.DispatchID]
 	if dispatch == nil {
@@ -181,15 +182,16 @@ func currentWorkQueueAssignmentReceipt(state workqueue.Projection, assignment wo
 	if dispatch.Run == nil || dispatch.Run.RunID != origin.RunID || dispatch.Run.RunAttempt != origin.RunAttempt {
 		return nil, errors.New("current snapshot origin differs from the Dispatch's bound run")
 	}
-	receipt := &WorkQueueAssignmentReceipt{DispatchID: dispatch.DispatchID, State: dispatch.State, Run: dispatch.Run, Claims: []WorkQueueClaimReceipt{}}
-	for _, member := range assignment.Claims {
-		claim := state.Claims[member.ClaimID]
-		if claim == nil || claim.DispatchID != dispatch.DispatchID || claim.WorkID != member.WorkID || claim.Handle != member.Handle {
-			return nil, errors.New("current snapshot assignment differs from its captured ledger")
-		}
-		receipt.Claims = append(receipt.Claims, WorkQueueClaimReceipt{Handle: claim.Handle, ClaimID: claim.ClaimID, WorkID: claim.WorkID, State: claim.State})
+	if len(assignment.Claims) != 1 {
+		return nil, errors.New("current snapshot worker assignment must carry exactly one Claim")
 	}
-	return receipt, nil
+	member := assignment.Claims[0] //nolint:uncheckedsliceindex // len(assignment.Claims) == 1 is checked above
+	claim := state.Claims[member.ClaimID]
+	if claim == nil || claim.DispatchID != dispatch.DispatchID || claim.WorkID != member.WorkID || claim.Handle != member.Handle {
+		return nil, errors.New("current snapshot assignment differs from its captured ledger")
+	}
+	claims := []WorkQueueClaimReceipt{{Handle: claim.Handle, ClaimID: claim.ClaimID, WorkID: claim.WorkID, State: claim.State}}
+	return &WorkQueueAssignmentReceipt{DispatchID: dispatch.DispatchID, State: dispatch.State, Run: dispatch.Run, Claims: claims}, nil
 }
 
 // readCurrentWorkQueueFinishIntents reads staged `{"version":4,"claim_handle","outcome"}` lines.
