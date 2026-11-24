@@ -498,7 +498,8 @@ func scanMarkdownLinkSecurity(match []string, lineNo int) []SecurityFinding {
 
 	lowerURL := strings.ToLower(strings.TrimSpace(linkURL))
 	if strings.HasPrefix(lowerURL, "javascript:") || strings.HasPrefix(lowerURL, "vbscript:") || strings.HasPrefix(lowerURL, "data:") {
-		addFinding("markdown link uses dangerous protocol: " + strings.SplitN(lowerURL, ":", 2)[0])
+		protocol, _, _ := strings.Cut(lowerURL, ":")
+		addFinding("markdown link uses dangerous protocol: " + protocol)
 	}
 
 	return findings

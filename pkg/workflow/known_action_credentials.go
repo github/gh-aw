@@ -133,7 +133,8 @@ func DetectKnownCredentialLeakingActions(steps []any) map[string]struct {
 		}
 
 		// Strip inline comment annotations (e.g., "actions/checkout@v4 # pinned")
-		uses = strings.TrimSpace(strings.SplitN(uses, " #", 2)[0])
+		uses, _, _ = strings.Cut(uses, " #")
+		uses = strings.TrimSpace(uses)
 		// Strip the @version suffix
 		actionRef, _, _ := strings.Cut(uses, "@")
 
