@@ -26,7 +26,10 @@ func run(pass *analysis.Pass) (any, error) {
 	}
 
 	return analyzerutil.Preorder(pass, []ast.Node{(*ast.CallExpr)(nil)}, func(n ast.Node) {
-		call := n.(*ast.CallExpr)
+		call, ok := n.(*ast.CallExpr)
+		if !ok {
+			return
+		}
 		fn, ok := astutil.CalledOSFunc(pass, call, "WriteFile", "OpenFile", "MkdirAll")
 		if !ok {
 			return
@@ -35,12 +38,12 @@ func run(pass *analysis.Pass) (any, error) {
 		if fn.Name() == "MkdirAll" {
 			modeIndex = 1
 		}
-		if len(call.Args) != modeIndex+1 || !isPublicPerm(pass, call.Args[modeIndex]) {
+		if len(call.Args) != modeIndex+1 || !isPublicPerm(pass, call.Args[modeIndex]) { //nolint:uncheckedsliceindex // modeIndex is 1 or 2 and the argument count is checked
 			return
 		}
-		sensitive := containsSensitive(pass, call.Args[0])
+		sensitive := containsSensitive(pass, call.Args[0]) //nolint:uncheckedsliceindex // the argument count is checked above
 		if fn.Name() == "WriteFile" {
-			sensitive = sensitive || containsSensitive(pass, call.Args[1])
+			sensitive = sensitive || containsSensitive(pass, call.Args[1]) //nolint:uncheckedsliceindex // the argument count is checked above
 		}
 		if !sensitive {
 			return
