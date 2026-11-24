@@ -41,7 +41,7 @@ def inspect(path):
         path.parts[index : index + 2] == (".github", "workflows")
         for index in range(len(path.parts) - 1)
     )
-    frontmatter = re.match(rb"\A---[ \t]*\r?\n", data) if is_workflow else None
+    frontmatter = re.match(rb"\A(?:\xef\xbb\xbf)?---[ \t]*\r?\n", data) if is_workflow else None
     if frontmatter:
         closing = re.search(rb"(?m)^---[ \t]*\r?$", data[frontmatter.end() :])
         if closing is None:

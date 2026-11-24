@@ -160,14 +160,15 @@ Use the inline skill guidance below by default. Only read a skill file when the 
 ### Step 3: Identify Change Type and Select Skills
 
 Invoke the `pr-triage` agent and capture its JSON response.
-Use the returned `change_type`, `recommended_skills`, `high_impact_files`, and `key_signals`.
+Validate that the response is a JSON object with `change_type` set to one of the listed categories, `recommended_skills` and `key_signals` as arrays, and `high_impact_files` as an array of objects with `path` and `reason`. If parsing fails or any required field is missing or has the wrong shape, treat triage as invalid and load `triage-fallback`.
+Use the validated `change_type`, `recommended_skills`, `high_impact_files`, and `key_signals`.
 Apply the recommended skills in Step 4, prioritising the listed `high_impact_files`.
 
 **Fallback — never fail because of triage.** If the `pr-triage` call errors, times out, returns empty output, or returns unparseable text, do not retry more than once or abort. Load `triage-fallback` and continue with its fallback selection.
 
 ### Step 4: Review Using Selected Skills
 
-Load `review-guidance`. Review changed lines in selected high-impact files only; post findings only when they are specific and actionable.
+Load `review-guidance`. Start with the listed high-impact files, then review changed lines in all remaining changed files; post findings only when they are specific and actionable.
 
 ### Step 5: Post Inline Review Comments
 
