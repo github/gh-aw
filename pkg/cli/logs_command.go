@@ -712,7 +712,7 @@ func addLogsCommandFlags(logsCmd *cobra.Command, validArtifactSets string) {
 	logsCmd.Flags().Bool("parse", false, "Run JavaScript parsers on agent logs and firewall logs, writing Markdown to log.md and firewall.md")
 	logsCmd.Flags().Bool("audit", false, "Generate audit.json in each workflow run cache directory (comparisons use downloaded runs only)")
 	addJSONFlag(logsCmd)
-	logsCmd.Flags().Int("timeout", 0, "Total download timeout in integer minutes across all targets (use a plain number such as 10; 0 = no timeout)")
+	addMinuteTimeoutFlag(logsCmd, 0, "Total download timeout across all targets in minutes or a whole-minute duration (e.g. 10 or 10m; 0 = no timeout)")
 	logsCmd.Flags().Int("timeout-seconds", 0, "Download timeout in seconds (0 = use --timeout)")
 	_ = logsCmd.Flags().MarkHidden("timeout-seconds")
 	logsCmd.Flags().Int("max-github-api-rate-limit", 0, "Maximum used GitHub core API requests before pausing one target or stopping multiple targets (positive = absolute, negative = reserve from API limit; e.g. 12000 or -2000)")

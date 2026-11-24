@@ -26,7 +26,7 @@ func NewEditCommand() *cobra.Command {
 
 The workflow-id may be a workflow name, a Markdown filename, or a path. Changes are
 validated before writing. Workflows managed by a source: declaration can be edited
-locally; by default, future updates will merge in those local changes (use --no-merge to override).
+locally; by default, future updates will merge in those local changes (use gh aw update --no-merge to replace them with the upstream version).
 
 Edits that change nothing leave the workflow untouched. When frontmatter does change it is
 re-serialized, so YAML comments, key ordering, and quoting styles are not preserved.
