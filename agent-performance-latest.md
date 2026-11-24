@@ -1,4 +1,10 @@
-# Agent Performance Analyzer - Latest Run (2026-11-23)
+# Agent Performance Analyzer - Latest Run (2026-11-24)
+
+## 2026-11-24 run (noop)
+- Data basis: unchanged. `latest.json` and `daily/2026-11-23.json` are partial (2.9h, 40 runs, 34 executed, 26.5% success). Not scored. Last complete snapshot is still `daily/2026-11-17.json`.
+- Partial snapshot conflicts with live data. pr-sous-chef shows 1/10 in the partial snapshot, but the last 100 live runs (2026-11-23 to 11-24) are all `success` (38 on 11-23, 62 on 11-24). Treat the partial 26.5% rate as a collector artifact, not a regression.
+- Squad (18) and Agentic Commands (18) `action_required` are all `pull_request_review_comment` events from the Copilot actor. Squad run 45390305644 has 0 jobs, so these are approval/command gating, not agent failures. Excluded from AR.
+- Decision: noop. Weekly discussion filed 2026-11-22; next due 2026-11-29. No new issue, since open items are already on record.
 
 ## 2026-11-23 run (noop)
 - Data basis: unchanged. Last complete scored snapshot is `metrics/daily/2026-11-17.json`. `metrics/daily/2026-11-23.json` is partial (2.9h coverage, 2026-11-22T02:41Z to 2026-11-23T02:49Z; log collection hit the 60s deadline after 40 runs). `daily/2026-11-22.json` and `latest.json` are also partial and not scored.
