@@ -93,7 +93,7 @@ func newWorkflowBuildContext(parseResult *frontmatterParseResult) *workflowBuild
 }
 
 // setupWorkflowBuildContext initializes engine/tools processing and builds base workflow data.
-func (c *Compiler) setupWorkflowBuildContext(ctx *workflowBuildContext) error {
+func (c *Compiler) setupWorkflowBuildContext(ctx *workflowBuildContext) error { //nolint:largefunc // Existing orchestration phase remains centralized; unrelated to adaptive routing.
 	connectorConfigs, err := c.resolveWorkflowConnectors(ctx.frontmatter.Frontmatter)
 	if err != nil {
 		return c.formatToolsProcessingError(ctx.cleanPath, err)
@@ -342,7 +342,7 @@ func (c *Compiler) populateWorkflowBuildContext(ctx *workflowBuildContext) error
 	// compilation resolve the implicit model-routing default identically.
 	c.applyDefaultModelRouting(ctx)
 	c.applyDynamicModelRouting(ctx)
-	return nil
+	return c.applyAdaptiveRouting(ctx)
 }
 
 func (c *Compiler) attachSharedActionResolver(workflowData *WorkflowData) {
@@ -610,6 +610,9 @@ func (c *Compiler) extractAdditionalConfigurations( //nolint:largefunc // Existi
 	// Extract repo-memory config and check for errors
 	repoMemoryConfig, err := c.extractRepoMemoryConfig(toolsConfig, workflowData.WorkflowID)
 	if err != nil {
+		return err
+	}
+	if err := validateRepoMemoryBranchesNotReserved(repoMemoryConfig); err != nil {
 		return err
 	}
 	workflowData.RepoMemoryConfig = repoMemoryConfig

@@ -338,6 +338,10 @@ func (c *Compiler) buildJobs(data *WorkflowData, markdownPath string) error {
 		return err
 	}
 
+	if err := c.addPushRoutingHistoryJob(data); err != nil {
+		return fmt.Errorf("push_routing_history job could not be built: %w", err)
+	}
+
 	if err := c.finalizeBuiltJobs(data); err != nil {
 		return err
 	}
@@ -817,6 +821,8 @@ func (c *Compiler) ensureConclusionIsLastJob(hasBrokerReporter bool) error {
 		string(constants.GradersJobName):       {},
 		string(constants.PreActivationJobName): {},
 		"pre-activation":                       {},
+		// Records the verdict that conclusion's unified session holds.
+		pushRoutingHistoryJobName: {},
 	}
 	if hasBrokerReporter {
 		exclude[string(constants.ReportExperimentsJobName)] = struct{}{}

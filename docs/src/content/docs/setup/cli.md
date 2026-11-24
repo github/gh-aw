@@ -1298,6 +1298,18 @@ gh aw experiments analyze my-workflow --repo owner/repo  # Analyze experiments i
 
 **Options:** all `experiments` commands accept `--repo/-r`, `--json/-j`
 
+#### `routing`
+
+Show or reset what [adaptive routing](/gh-aw/reference/adaptive-routing/) has recorded on `memory/adaptive-routing/*` branches. `routing status` lists every routing history, or shows one workflow's evidence: for each model and effort, its runs, expected and hopeful success rates, average credits, streak, tests and suspension, and why recent runs did not count. `routing reset` starts a workflow's history afresh in one commit that lands only if no run saved in the meantime; it keeps `runs.jsonl`, never deletes the branch, and needs write access.
+
+```bash wrap
+gh aw routing status                       # List routing histories
+gh aw routing status issue-triage --json   # Show one workflow's evidence as JSON
+gh aw routing reset issue-triage           # Start that workflow's history afresh
+```
+
+**Options:** `routing status` accepts `--repo/-r` and `--json/-j`; `routing reset` accepts `--repo/-r`
+
 ### Management
 
 #### `enable`
