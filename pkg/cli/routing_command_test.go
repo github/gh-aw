@@ -122,6 +122,27 @@ func TestRoutingCommandsRefuseMissingHistoriesAndBadIDs(t *testing.T) {
 	assert.Empty(t, api.commits)
 }
 
+func TestRoutingStatusReadsABranchWhoseFirstSaveNeverLanded(t *testing.T) {
+	// The writer creates the branch from an empty root commit before its first save.
+	api := &fakeRoutingAPI{heads: map[string]string{"memory/adaptive-routing/triage": "root01"}}
+	var out bytes.Buffer
+	require.NoError(t, runRoutingStatus(context.Background(), api, "triage", &out, true))
+	var status RoutingStatus
+	require.NoError(t, json.Unmarshal(out.Bytes(), &status))
+	assert.Empty(t, status.Scopes)
+	assert.Zero(t, status.Recent.Runs)
+
+	out.Reset()
+	require.NoError(t, runRoutingList(context.Background(), api, &out, true))
+	assert.JSONEq(t, `[{"workflow": "triage", "branch": "memory/adaptive-routing/triage", "scopes": 0, "pairs": 0, "last_run": 0, "unexplained": 0, "updated_at": ""}]`, out.String())
+}
+
+func TestRoutingStatusListReportsHistoriesItCannotRead(t *testing.T) {
+	api := exampleRoutingAPI()
+	api.files["abc123:state.json"] = `{"v": 3, "workflow": "pr-sous-chef"}`
+	require.ErrorContains(t, runRoutingList(context.Background(), api, &bytes.Buffer{}, true), "memory/adaptive-routing/pr-sous-chef: state.json is not a version 2 routing history")
+}
+
 func TestRoutingResetCommitsWhatTheWriterWould(t *testing.T) {
 	// The reducer's reset vector pins the state gh aw routing reset writes.
 	data, err := os.ReadFile(filepath.Join("..", "..", "actions", "setup", "js", "fixtures", "routing-history", "aw2-reducer.json"))

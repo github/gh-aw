@@ -155,17 +155,24 @@ func TestAdaptiveRoutingFromAnImport(t *testing.T) {
 func TestAdaptiveRoutingIneligibleWorkflows(t *testing.T) {
 	tests := []struct {
 		name        string
+		on          string
 		frontmatter string
 		reason      string
 	}{
 		{name: "fixed model", frontmatter: "model: gpt-5.4\n", reason: "its primary model is not chosen by model routing"},
 		{name: "routing turned off", frontmatter: "model-routing: false\n", reason: "its primary model is not chosen by model routing"},
+		// Each caller numbers its own runs, so their runs cannot share one history.
+		{name: "reusable workflow", on: " workflow_call", reason: "reusable workflows (on: workflow_call) are not supported"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			explicit := compileAdaptiveRouting(t, adaptiveRoutingSource(" workflow_dispatch", tt.frontmatter+"adaptive-routing: observe\n"), "", nil)
+			on := tt.on
+			if on == "" {
+				on = " workflow_dispatch"
+			}
+			explicit := compileAdaptiveRouting(t, adaptiveRoutingSource(on, tt.frontmatter+"adaptive-routing: observe\n"), "", nil)
 			require.ErrorContains(t, explicit.err, tt.reason)
-			defaulted := compileAdaptiveRouting(t, adaptiveRoutingSource(" workflow_dispatch", tt.frontmatter), `{"adaptive_routing": "observe"}`, nil)
+			defaulted := compileAdaptiveRouting(t, adaptiveRoutingSource(on, tt.frontmatter), `{"adaptive_routing": "observe"}`, nil)
 			require.NoError(t, defaulted.err, "a repository default skips the workflow silently")
 			assert.NotContains(t, defaulted.lock, pushRoutingHistoryJobName)
 		})

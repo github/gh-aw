@@ -20,6 +20,7 @@ const { loadTemporaryIdMapFromFile, replaceTemporaryIdReferencesInPatch } = requ
 // Matches .jsonl in any letter case, like the persistence filters do.
 const JSONL_MERGE_ATTRIBUTE = "*.[jJ][sS][oO][nN][lL] merge=union";
 const JSONL_PATH_PATTERN = /\.jsonl$/i;
+const ADAPTIVE_ROUTING_BRANCH_ROOT = "memory/adaptive-routing";
 
 function setOutput(name, value) {
   if (typeof core.setOutput === "function") core.setOutput(name, value);
@@ -754,6 +755,12 @@ async function main() {
   }
   if (isKnownWikiBranch && !isWikiRepo) {
     await setPushRepoMemoryFailure(`ERR_VALIDATION: Branch name "${branchName}" is only valid for wiki repositories (TARGET_REPO must end with ".wiki", got "${targetRepo}")`);
+    return;
+  }
+  // Adaptive routing histories are written only by push_routing_history and gh aw routing reset; the
+  // compiler rejects literal branch names there, and this catches expressions that resolve to one.
+  if (branchName === ADAPTIVE_ROUTING_BRANCH_ROOT || branchName.startsWith(`${ADAPTIVE_ROUTING_BRANCH_ROOT}/`)) {
+    await setPushRepoMemoryFailure(`ERR_VALIDATION: Branch "${branchName}" is reserved for adaptive routing histories; repo-memory cannot write it`);
     return;
   }
 

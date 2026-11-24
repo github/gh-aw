@@ -270,6 +270,10 @@ func routingBranch(workflowID string) (string, error) {
 
 func readRoutingState(ctx context.Context, api routingAPI, head, workflowID string) (*routingHistoryState, error) {
 	data, err := api.ReadFile(ctx, head, "state.json")
+	if errors.Is(err, os.ErrNotExist) {
+		// The writer creates the branch before its first save lands, so the branch can exist empty.
+		return &routingHistoryState{V: 2, Workflow: workflowID, Scopes: map[string]*routingHistoryScope{}}, nil
+	}
 	if err != nil {
 		return nil, fmt.Errorf("could not read state.json: %w", err)
 	}
@@ -463,14 +467,20 @@ func runRoutingList(ctx context.Context, api routingAPI, out io.Writer, jsonOutp
 	entries := []RoutingHistoryListEntry{}
 	for _, branch := range branches {
 		workflowID := strings.TrimPrefix(branch, routingHistoryBranchPrefix)
-		head, err := api.BranchHead(ctx, branch)
-		if err != nil || head == "" {
+		if _, err := routingBranch(workflowID); err != nil {
+			routingLog.Printf("Skipping %s: not a workflow's history branch", branch)
 			continue
+		}
+		head, err := api.BranchHead(ctx, branch)
+		if err != nil {
+			return err
+		}
+		if head == "" {
+			continue // deleted since it was listed
 		}
 		state, err := readRoutingState(ctx, api, head, workflowID)
 		if err != nil {
-			routingLog.Printf("Skipping %s: %v", branch, err)
-			continue
+			return fmt.Errorf("%s: %w", branch, err)
 		}
 		entry := RoutingHistoryListEntry{Workflow: workflowID, Branch: branch, Scopes: len(state.Scopes), LastRun: state.LastRun, Unexplained: state.Unexplained}
 		for _, scope := range state.Scopes {

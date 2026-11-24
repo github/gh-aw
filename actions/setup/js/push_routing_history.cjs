@@ -33,6 +33,8 @@ const RUNS_FILE = "runs.jsonl";
 const DEFAULT_SESSION_FILE = "/tmp/gh-aw/usage/aw_session.jsonl";
 const EMPTY_TREE = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
 const CLASSIFIER_PURPOSE = "routing_classification";
+// The job that runs this script, as the jobs API names it.
+const WRITER_JOB = "push_routing_history";
 const LEVELS = new Set(["economy", "balanced", "robust"]);
 const MODES = new Set(["observe"]);
 const SAVED_CONCLUSIONS = new Set(["success", "skipped", "neutral"]);
@@ -300,7 +302,8 @@ async function checkoutHistoryBranch({ githubClient, owner, repo, branch, worksp
  * Completed runs on the newest page that the history may need to charge because their own save
  * never landed (contract 5): first attempts from the default branch, judged by their first attempt,
  * above both fences and not yet written. Only those that did not succeed need a jobs call, to tell
- * an agent that ran from one that never started.
+ * an agent that ran from one that never started, and a run whose history job was compiled in and
+ * enabled from one that had none.
  * @param {{githubClient: any, owner: string, repo: string, workflowFile: string, defaultBranch: string, runId: string, state: HistoryState, runs: any[], generation: string}} options
  */
 async function listRuns({ githubClient, owner, repo, workflowFile, defaultBranch, runId, state, runs, generation }) {
@@ -326,6 +329,10 @@ async function listRuns({ githubClient, owner, repo, workflowFile, defaultBranch
     if (!SAVED_CONCLUSIONS.has(listed.conclusion)) {
       const jobs = await githubClient.paginate(githubClient.rest.actions.listJobsForWorkflowRunAttempt, { owner, repo, run_id: run.id, attempt_number: 1, per_page: 100 });
       listed.agent_ran = jobs.some((/** @type {any} */ job) => job?.name === "agent" && job.conclusion !== "skipped" && Boolean(job.started_at));
+      const writer = jobs.find((/** @type {any} */ job) => job?.name === WRITER_JOB);
+      // A run compiled while adaptive routing was off has no history job, and a dry run's is disabled
+      // even though its agent ran: neither run owes the history a line.
+      if (!writer || (writer.conclusion === "skipped" && listed.agent_ran)) continue;
     }
     listing.push(listed);
   }

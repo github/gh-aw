@@ -99,6 +99,15 @@ if [ -z "$BRANCH_NAME" ]; then
   exit 1
 fi
 
+# Adaptive routing histories are written only by push_routing_history and gh aw routing reset,
+# so an agent's memory must never check one out, even through a branch-name expression.
+case "$BRANCH_NAME" in
+  memory/adaptive-routing | memory/adaptive-routing/*)
+    echo "ERROR: Branch $BRANCH_NAME is reserved for adaptive routing histories; repo-memory cannot use it"
+    exit 1
+    ;;
+esac
+
 if [ -z "$TARGET_REPO" ]; then
   echo "ERROR: TARGET_REPO environment variable is required"
   exit 1

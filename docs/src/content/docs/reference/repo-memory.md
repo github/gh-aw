@@ -89,7 +89,7 @@ tools:
 
 `branch-prefix` changes the default `memory` prefix and must be 4-32 alphanumeric, hyphen, or underscore characters; it cannot be `copilot`. `allowed-extensions` limits which file types can be stored, `format-json: true` pretty-prints `.json` files before commit, `validation.json-schemas` declares mandatory per-file JSON/JSONL validation, `validation.script` runs an optional custom JavaScript domain validator, and `max-patch-size` caps the total diff size for one push (default 10KB, max 1MB) to prevent oversized updates.
 
-Branches under `memory/adaptive-routing/` are reserved for [adaptive routing](/gh-aw/reference/adaptive-routing/) histories, which only gh-aw writes, so a repo-memory entry whose branch is `memory/adaptive-routing` or under it fails to compile. Adaptive routing itself requires `tools.repo-memory`.
+Branches under `memory/adaptive-routing/` are reserved for [adaptive routing](/gh-aw/reference/adaptive-routing/) histories, which only gh-aw writes, so a repo-memory entry whose branch is `memory/adaptive-routing` or under it fails to compile, and a branch-name expression that resolves to one fails the clone and the save at run time. Adaptive routing itself requires `tools.repo-memory`.
 
 ## GitHub App authentication
 

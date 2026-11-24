@@ -44,7 +44,7 @@ A workflow's own value wins, including `adaptive-routing: false`, then the first
 
 ## Which workflows take part
 
-A workflow takes part when its main agent's model is chosen by AWF model routing on a Copilot, Claude, or Codex engine: `model: router`, a fixed level such as `router/balanced`, the [default routing](/gh-aw/reference/model-routing/#default-routing-for-workflows-without-a-model) for workflows without a model, or a model expression that resolves to a router value. It must also enable `tools.repo-memory`, and it must not be a work-queue worker or run [experiments](/gh-aw/reference/experiments/). A workflow that sets `adaptive-routing: observe` itself, or through an import, fails to compile with the reason when it does not qualify; the repository default skips such workflows silently.
+A workflow takes part when its main agent's model is chosen by AWF model routing on a Copilot, Claude, or Codex engine: `model: router`, a fixed level such as `router/balanced`, the [default routing](/gh-aw/reference/model-routing/#default-routing-for-workflows-without-a-model) for workflows without a model, or a model expression that resolves to a router value. It must also enable `tools.repo-memory`, and it must not be a work-queue worker, a reusable workflow (`on: workflow_call`), or run [experiments](/gh-aw/reference/experiments/). A workflow that sets `adaptive-routing: observe` itself, or through an import, fails to compile with the reason when it does not qualify; the repository default skips such workflows silently.
 
 At run time, gh-aw records only the first attempt of a run whose workflow definition comes from the default branch, so re-runs and pull request runs are not recorded. Every first attempt is recorded once the agent job has run, whether the run succeeded or failed.
 
@@ -64,7 +64,7 @@ A run counts as a success or a failure only when the verdict says its result was
 
 Each workflow's history lives on its own branch, `memory/adaptive-routing/<workflow>`, named after the lock file without `.lock.yml`, so renaming the workflow file starts a new history. The first save creates the branch from its own root commit, and every commit is made through the GitHub API, which signs it. gh-aw never force-pushes or deletes the branch.
 
-The agent never sees or writes the history. The branch is not checked out for the agent and is not in its prompt, and no repo-memory entry may use a branch under `memory/adaptive-routing/`, so the agent's own memory can never reach it.
+The agent never sees or writes the history. The branch is not checked out for the agent and is not in its prompt, and no repo-memory entry may use a branch under `memory/adaptive-routing/`, whether it names one directly or through an expression that resolves to one at run time, so the agent's own memory can never reach it.
 
 ## The added job and permission
 
@@ -91,5 +91,6 @@ gh aw routing status issue-triage
 ## Limits
 
 - Observe mode only records evidence; it never changes which model runs and makes no recommendation.
-- A history belongs to one workflow file in one repository; renaming the file starts a new history.
+- A history belongs to one workflow file in one repository; renaming the file starts a new history. Reusable workflows (`on: workflow_call`) cannot take part, because each caller numbers its own runs.
 - A run that ends before the agent job starts, or whose usage artifact was never published, is not recorded by its own save.
+- A save that fails is charged as `unsaved` by a later save that finds the run among the workflow's 100 newest runs on the default branch. Runs that `pull_request_target` started are listed under the pull request's branch, so their failed saves are not charged.

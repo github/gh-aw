@@ -1752,6 +1752,22 @@ describe("push_repo_memory.cjs - shell injection security tests", () => {
       expect(mockExecGitSync).not.toHaveBeenCalled();
     });
 
+    it("should refuse an adaptive routing history branch, as an expression could resolve to one", async () => {
+      process.env.BRANCH_NAME = "memory/adaptive-routing/triage";
+      process.env.TARGET_REPO = "test-owner/test-repo";
+
+      mockFs.existsSync.mockReturnValue(false);
+
+      vi.doMock("fs", () => mockFs);
+      vi.doMock("./git_helpers.cjs", () => ({ execGitSync: mockExecGitSync }));
+
+      const { main } = await import("./push_repo_memory.cjs");
+      await main();
+
+      expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("reserved for adaptive routing histories"));
+      expect(mockExecGitSync).not.toHaveBeenCalled();
+    });
+
     it("should accept custom branch-prefix branches like campaigns/metrics", () => {
       // The Go compiler supports custom branch-prefix values (e.g. "campaigns") so
       // generated branch names like "campaigns/metrics" must pass validation.

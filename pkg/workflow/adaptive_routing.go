@@ -88,6 +88,9 @@ func adaptiveRoutingIneligibility(data *WorkflowData) string {
 	if len(data.Experiments) > 0 {
 		return "workflows that run experiments are not supported"
 	}
+	if hasWorkflowCallTrigger(data.On) {
+		return "reusable workflows (on: workflow_call) are not supported, because each caller numbers its own runs"
+	}
 	if id := data.WorkflowID; len(id) > 100 || strings.HasSuffix(id, ".lock") || !adaptiveRoutingWorkflowIDPattern.MatchString(id) {
 		return fmt.Sprintf("the workflow ID %q cannot name a history branch", id)
 	}
@@ -192,11 +195,12 @@ func (c *Compiler) buildPushRoutingHistorySteps(data *WorkflowData) []string {
 	step.WriteString("        uses: " + getCachedActionPin("actions/github-script", data) + "\n")
 	step.WriteString("        env:\n")
 	step.WriteString("          GH_TOKEN: ${{ github.token }}\n")
-	step.WriteString("          GH_AW_ROUTING_WORKFLOW: " + data.WorkflowID + "\n")
+	// Quoted, so a workflow ID such as null or 1e3 stays a string.
+	fmt.Fprintf(&step, "          GH_AW_ROUTING_WORKFLOW: %q\n", data.WorkflowID)                          //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
 	fmt.Fprintf(&step, "          GH_AW_ROUTING_GENERATION: %q\n", data.FrontmatterHash+":"+data.BodyHash) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
-	step.WriteString("          GH_AW_ROUTING_MODE: " + data.AdaptiveRouting + "\n")
-	step.WriteString("          GH_AW_ROUTING_ENGINE: " + engineID + "\n")
-	step.WriteString("          GH_AW_ROUTING_GOAL: " + data.EngineConfig.ModelRouting.Goal + "\n")
+	fmt.Fprintf(&step, "          GH_AW_ROUTING_MODE: %q\n", data.AdaptiveRouting)                         //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
+	fmt.Fprintf(&step, "          GH_AW_ROUTING_ENGINE: %q\n", engineID)                                   //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
+	fmt.Fprintf(&step, "          GH_AW_ROUTING_GOAL: %q\n", data.EngineConfig.ModelRouting.Goal)          //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
 	// A level chosen at run time keeps its own records; otherwise levels share them.
 	if isModelRoutingDynamic(data) {
 		step.WriteString("          GH_AW_ROUTING_LEVEL: ${{ " + modelRoutingModeDownstream + " }}\n")
