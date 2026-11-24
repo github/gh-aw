@@ -660,18 +660,8 @@ func deriveSafeOutputsGuardPolicyFromGitHub(githubTool map[string]any) map[strin
 		return nil
 	}
 
-	seen := make(map[string]bool, len(acceptList))
-	deduplicated := acceptList[:0]
-	for _, entry := range acceptList {
-		if !seen[entry] {
-			seen[entry] = true
-			deduplicated = append(deduplicated, entry)
-		}
-	}
-	acceptList = deduplicated
-
 	writeSink := map[string]any{
-		"accept":          acceptList,
+		"accept":          deduplicateAcceptEntries(acceptList),
 		"sink-visibility": sinkVisibilityRuntimeExpr,
 	}
 
@@ -679,6 +669,18 @@ func deriveSafeOutputsGuardPolicyFromGitHub(githubTool map[string]any) map[strin
 	return map[string]any{
 		"write-sink": writeSink,
 	}
+}
+
+func deduplicateAcceptEntries(entries []string) []string {
+	seen := make(map[string]struct{}, len(entries))
+	deduplicated := entries[:0]
+	for _, entry := range entries {
+		if _, ok := seen[entry]; !ok {
+			seen[entry] = struct{}{}
+			deduplicated = append(deduplicated, entry)
+		}
+	}
+	return deduplicated
 }
 
 // transformRepoPattern transforms a repos pattern to the corresponding accept pattern.
