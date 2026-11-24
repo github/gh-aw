@@ -9,6 +9,7 @@ import { expectExecutionProvenance, useExecutionProvenanceFixture } from "./test
 useExecutionProvenanceFixture();
 import {
   main,
+  logSafeOutputReplayHint,
   loadConfig,
   loadHandlers,
   normalizeInvocationInputs,
@@ -460,6 +461,34 @@ describe("Safe Output Handler Manager", () => {
         expect(report.failures).toEqual([{ type: "custom_fail", error: "script failure" }]);
       });
 
+      it("logs the replay hint only for rate-limited runs with no applied outputs", async () => {
+        process.env.GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG = "{}";
+        process.env.GH_AW_SAFE_OUTPUT_SCRIPTS = JSON.stringify({ custom_rate_limited: "custom_rate_limited_handler.cjs" });
+        global.context = { runId: 45285172830, serverUrl: "https://github.com", repo: { owner: "github", repo: "gh-aw" } };
+        global.github = {
+          rest: { rateLimit: { get: vi.fn().mockResolvedValue({ data: { resources: { core: { remaining: 5000, limit: 5000, reset: Math.floor(Date.now() / 1000) + 60 } } } }) } },
+          graphql: vi.fn(),
+        };
+        const scriptDir = "/tmp/gh-aw/actions";
+        fs.mkdirSync(scriptDir, { recursive: true });
+        fs.writeFileSync(
+          `${scriptDir}/custom_rate_limited_handler.cjs`,
+          `module.exports = { main: async () => async message => message.fail ? ({ success: false, error: "E010 RATE_LIMIT_EXCEEDED: update failed\\nRetryable: true" }) : ({ success: true }) };`
+        );
+        const outputFile = "/tmp/gh-aw/custom-rate-limited-agent-output.json";
+        process.env.GH_AW_AGENT_OUTPUT = outputFile;
+        const replayHint = expect.stringContaining("gh workflow run agentics-maintenance.yml");
+
+        fs.writeFileSync(outputFile, JSON.stringify({ items: [{ type: "custom_rate_limited", fail: true }] }));
+        await main();
+        expect(global.core.info).toHaveBeenCalledWith(replayHint);
+
+        global.core.info.mockClear();
+        fs.writeFileSync(outputFile, JSON.stringify({ items: [{ type: "custom_rate_limited" }] }));
+        await main();
+        expect(global.core.info).not.toHaveBeenCalledWith(replayHint);
+      });
+
       it("writes safe-output-errors.json when main hits the catch path", async () => {
         delete process.env.GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG;
 
@@ -623,6 +652,57 @@ describe("Safe Output Handler Manager", () => {
     it("should throw error if environment variable contains invalid JSON", () => {
       process.env.GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG = "not json";
       expect(() => loadConfig()).toThrow("Failed to parse GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG");
+    });
+  });
+
+  describe("logSafeOutputReplayHint", () => {
+    const rateLimited = { type: "update_release", success: false, error: "E010 RATE_LIMIT_EXCEEDED: update release failed\n\nOriginal error: boom\nRetryable: true" };
+    const replayCommand = expect.stringContaining("gh workflow run agentics-maintenance.yml");
+
+    beforeEach(() => {
+      vi.stubEnv("GITHUB_REPOSITORY", "");
+      vi.stubEnv("GITHUB_SERVER_URL", "");
+      global.context = { runId: 45285172830, serverUrl: "https://github.com", repo: { owner: "github", repo: "gh-aw" } };
+    });
+
+    afterEach(() => {
+      vi.unstubAllEnvs();
+    });
+
+    it("logs a replay command when every failure is rate limited and nothing was applied", () => {
+      logSafeOutputReplayHint([rateLimited]);
+
+      expect(global.core.info).toHaveBeenCalledWith(expect.stringContaining("gh workflow run agentics-maintenance.yml --repo github/gh-aw -f operation=safe_outputs -f run_url=https://github.com/github/gh-aw/actions/runs/45285172830"));
+    });
+
+    it("includes the host in the repository selector for GitHub Enterprise Server", () => {
+      global.context.serverUrl = "https://ghes.example.com";
+
+      logSafeOutputReplayHint([rateLimited]);
+
+      expect(global.core.info).toHaveBeenCalledWith(expect.stringContaining("--repo ghes.example.com/github/gh-aw -f operation=safe_outputs -f run_url=https://ghes.example.com/github/gh-aw/actions/runs/45285172830"));
+    });
+
+    it.each([
+      ["a non-retryable failure", [{ type: "create_issue", success: false, error: "ERR_API: create failed\nRetryable: false" }]],
+      ["a classified dependency failure", [{ ...rateLimited, errorCode: "safe_output_dependency_failed" }]],
+      ["a mix of rate-limited and permanent failures", [rateLimited, { type: "add_comment", success: false, error: "Not Found" }]],
+      ["a partially applied run", [rateLimited, { type: "add_comment", success: true }]],
+    ])("skips the hint for %s", (_name, results) => {
+      logSafeOutputReplayHint(results);
+
+      expect(global.core.info).not.toHaveBeenCalledWith(replayCommand);
+    });
+
+    it.each([
+      ["run ID", { serverUrl: "https://github.com", repo: { owner: "github", repo: "gh-aw" } }],
+      ["repository", { runId: 45285172830, serverUrl: "https://github.com", repo: { owner: "", repo: "" } }],
+    ])("skips the hint when the %s is unknown", (_name, ctx) => {
+      global.context = ctx;
+
+      logSafeOutputReplayHint([rateLimited]);
+
+      expect(global.core.info).not.toHaveBeenCalledWith(replayCommand);
     });
   });
 
