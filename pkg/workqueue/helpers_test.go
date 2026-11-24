@@ -109,10 +109,16 @@ func testDispatchNext(t *testing.T, log []QueueCommit, parameters DispatchParame
 // testRevision is the head revision of every launched test worker run.
 const testRevision = "cccccccccccccccccccccccccccccccccccccccc"
 
-// testLaunch records the dispatcher's launch of worker run runID for a Dispatch.
+// testLaunch records the launch of worker run runID for a Dispatch by the dispatcher
+// attempt that reserved it, the only actor replay lets record it.
 func testLaunch(t *testing.T, log []QueueCommit, dispatchID, runID string) []QueueCommit {
 	t.Helper()
-	return appendTestCommit(t, log, testDispatcher, "launch", DispatchIDParameters{DispatchID: dispatchID}, mustOps(t, DispatchOperation{Kind: "Dispatch", DispatchID: dispatchID, State: "started", RunID: runID, Revision: testRevision}))
+	state, err := Replay(log)
+	require.NoError(t, err)
+	require.Contains(t, state.Dispatches, dispatchID)
+	actor := testDispatcher
+	actor.RunID, actor.RunAttempt = state.Dispatches[dispatchID].ReservedBy.RunID, state.Dispatches[dispatchID].ReservedBy.RunAttempt
+	return appendTestCommit(t, log, actor, "launch", DispatchIDParameters{DispatchID: dispatchID}, mustOps(t, DispatchOperation{Kind: "Dispatch", DispatchID: dispatchID, State: "started", RunID: runID, Revision: testRevision}))
 }
 
 func testBind(t *testing.T, log []QueueCommit, dispatchID string, worker Actor) []QueueCommit {

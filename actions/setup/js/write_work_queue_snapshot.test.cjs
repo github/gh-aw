@@ -97,13 +97,11 @@ describe("worker activation snapshot", () => {
 });
 
 describe("worker launch provenance", () => {
-  const noWait = { launchWait: { attempts: 2, delayMs: 0 }, sleep: async () => undefined };
-
   /** Run activation for `context` and assert it neither bound the Dispatch nor wrote a snapshot. */
   async function refused(queue, context, extra = {}) {
     const file = snapshotPath();
     const before = await ledger(queue.githubClient);
-    await expect(main({ githubClient: queue.githubClient, context, core: core(), role: "worker", snapshotPath: file, ...noWait, ...extra })).rejects.toMatchObject({ code: "work_queue_launch_unverified" });
+    await expect(main({ githubClient: queue.githubClient, context, core: core(), role: "worker", snapshotPath: file, ...extra })).rejects.toMatchObject({ code: "work_queue_launch_unverified" });
     expect(fs.existsSync(file)).toBe(false);
     const after = await ledger(queue.githubClient);
     expect(after.sha).toBe(before.sha);
@@ -112,7 +110,7 @@ describe("worker launch provenance", () => {
 
   it("binds the exact run the dispatcher launched and records it", async () => {
     const queue = worker();
-    const snapshot = await main({ githubClient: queue.githubClient, context: queue.context, core: core(), role: "worker", snapshotPath: snapshotPath(), ...noWait });
+    const snapshot = await main({ githubClient: queue.githubClient, context: queue.context, core: core(), role: "worker", snapshotPath: snapshotPath() });
     expect(snapshot.worker).toEqual(queue.assignment);
     expect((await ledger(queue.githubClient)).state.dispatches.get(queue.dispatchId)).toMatchObject({ state: "bound", run: { run_id: "200", run_attempt: 1 }, launch: { run_id: "200", revision: WORKER_REVISION } });
   });
@@ -147,22 +145,23 @@ describe("worker launch provenance", () => {
     await refused(queue, queue.context, { config: { staged: true } });
   });
 
-  it("binds nothing and exposes no Claims while the launch is unrecorded, then binds once it lands", async () => {
+  it("fails at once, without waiting for the ledger, while the launch is unrecorded; a run activated after it lands binds", async () => {
     const log = submit([], [work("n1")]);
     const planned = dispatchNext(log, { max_claims: 1, max_dispatches: 1 });
     const dispatchId = planned.decision.dispatches[0];
     const fake = fakeQueueGitHub(ledgerText(planned.log));
     fake.runs.set("200", workflowRun("200"));
     vi.stubEnv("GITHUB_WORKFLOW_REF", worker().workflowRef);
+    const getRef = vi.spyOn(fake.githubClient.rest.git, "getRef");
     const file = snapshotPath();
-    await expect(main({ githubClient: fake.githubClient, context: workerContext(dispatchId), core: core(), role: "worker", snapshotPath: file, ...noWait })).rejects.toMatchObject({ code: "work_queue_launch_unverified" });
+    await expect(main({ githubClient: fake.githubClient, context: workerContext(dispatchId), core: core(), role: "worker", snapshotPath: file })).rejects.toMatchObject({ code: "work_queue_launch_unverified" });
+    // One ledger read: no polling for the dispatcher's launch record.
+    expect(getRef).toHaveBeenCalledTimes(1);
     expect(fs.existsSync(file)).toBe(false);
     expect((await ledger(fake.githubClient)).state.dispatches.get(dispatchId).state).toBe("reserved");
 
-    // The dispatcher records the launch while the worker waits.
-    const sleep = vi.fn(async () => fake.install(ledgerText(launch(planned.log, dispatchId))));
-    const snapshot = await main({ githubClient: fake.githubClient, context: workerContext(dispatchId), core: core(), role: "worker", snapshotPath: snapshotPath(), launchWait: { attempts: 3, delayMs: 0 }, sleep });
-    expect(sleep).toHaveBeenCalledTimes(1);
+    fake.install(ledgerText(launch(planned.log, dispatchId)));
+    const snapshot = await main({ githubClient: fake.githubClient, context: workerContext(dispatchId), core: core(), role: "worker", snapshotPath: snapshotPath() });
     expect(snapshot.worker?.dispatch_id).toBe(dispatchId);
     expect((await ledger(fake.githubClient)).state.dispatches.get(dispatchId)).toMatchObject({ state: "bound", run: { run_id: "200" } });
   });
@@ -171,7 +170,7 @@ describe("worker launch provenance", () => {
     const queue = worker();
     queue.fake.runs.delete("200");
     const file = snapshotPath();
-    await expect(main({ githubClient: queue.githubClient, context: queue.context, core: core(), role: "worker", snapshotPath: file, ...noWait })).rejects.toMatchObject({ status: 404 });
+    await expect(main({ githubClient: queue.githubClient, context: queue.context, core: core(), role: "worker", snapshotPath: file })).rejects.toMatchObject({ status: 404 });
     expect(fs.existsSync(file)).toBe(false);
     expect((await ledger(queue.githubClient)).transactions.some(commit => commit.request.kind === "bind")).toBe(false);
   });

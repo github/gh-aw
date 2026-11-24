@@ -61,8 +61,14 @@ function dispatchNext(log, overrides = {}, actor = dispatcher, observations = []
   return { log: [...log, next], decision };
 }
 
+/** The dispatcher attempt that reserved a Dispatch: the only actor replay lets record its launch. */
+function reservingDispatcher(log, dispatchId) {
+  const reservedBy = replayTransactions(log).dispatches.get(dispatchId)?.reserved_by;
+  return reservedBy ? { ...dispatcher, ...reservedBy } : dispatcher;
+}
+
 /** Record a launch: `Dispatch{started}` naming the launched run (default: workerActor()'s run "200"), or a launch_failed Release. */
-function launch(log, dispatchId, started = true, actor = dispatcher, runId = "200", revision = WORKER_REVISION) {
+function launch(log, dispatchId, started = true, actor = reservingDispatcher(log, dispatchId), runId = "200", revision = WORKER_REVISION) {
   return commit(
     log,
     actor,

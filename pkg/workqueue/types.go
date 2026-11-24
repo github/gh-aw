@@ -259,15 +259,18 @@ type LaunchRecord struct {
 }
 
 type DispatchState struct {
-	DispatchID    string        `json:"dispatch_id"`
-	RequestID     string        `json:"request_id"`
-	CommitID      string        `json:"commit_id"`
-	Pool          string        `json:"pool"`
-	WorkerProfile string        `json:"worker_profile"`
-	Workflow      string        `json:"workflow"`
-	State         string        `json:"state"`
-	Run           *RunBinding   `json:"run"`
-	Launch        *LaunchRecord `json:"launch"`
+	DispatchID    string `json:"dispatch_id"`
+	RequestID     string `json:"request_id"`
+	CommitID      string `json:"commit_id"`
+	Pool          string `json:"pool"`
+	WorkerProfile string `json:"worker_profile"`
+	Workflow      string `json:"workflow"`
+	// ReservedBy is the dispatcher run attempt whose dispatch_next reserved the Dispatch;
+	// only it records the launch, so maintenance judges a reserved Dispatch by its state.
+	ReservedBy RunBinding    `json:"reserved_by"`
+	State      string        `json:"state"`
+	Run        *RunBinding   `json:"run"`
+	Launch     *LaunchRecord `json:"launch"`
 	// Claims holds the Dispatch's sole Claim: one Claim per Dispatch is a replay rule.
 	Claims [1]string `json:"claims"`
 }

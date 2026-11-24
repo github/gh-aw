@@ -223,8 +223,9 @@ func TestNativeParityWithJavaScript(t *testing.T) {
 	}
 	// One Claim per Dispatch is a replay rule: a grouped grant and a grouped or inconsistent
 	// checkpoint fail with the same literal code in both engines. Checkpoint pruning builds
-	// byte-identical checkpoints and restores (or rejects) them alike.
-	rules := append(groupedDispatchCases(t, commits, checkpoint), pruningCases(t)...)
+	// byte-identical checkpoints and restores (or rejects) them alike. A Dispatch records the
+	// dispatcher attempt that reserved it, and only that attempt records its launch.
+	rules := append(append(groupedDispatchCases(t, commits, checkpoint), pruningCases(t)...), reservedByCases(t, checkpoint)...)
 	for _, rule := range rules {
 		inputs = append(inputs, rule.input)
 	}
@@ -297,6 +298,65 @@ func groupedDispatchCases(t *testing.T, commits []any, checkpoint any) []grouped
 		state := mutated["operations"].([]any)[0].(map[string]any)["state"].(map[string]any)
 		mutation.change(state["claims"].(map[string]any), state["dispatches"].(map[string]any))
 		cases = append(cases, groupedDispatchCase{parityInput{Transactions: []any{mutated}, label: mutation.label}, "checkpoint_invalid"})
+	}
+	return cases
+}
+
+// reservedByCases checks the reserving dispatcher attempt in both engines: only a run attempt
+// reserves a Dispatch, only that attempt records its launch, and a checkpoint Dispatch keeps a
+// well-formed reserved_by.
+func reservedByCases(t *testing.T, checkpoint any) []groupedDispatchCase {
+	t.Helper()
+	log, decision := testDispatchNext(t, testSubmit(t, nil, testWork(t, "a", nil)), testDispatchParameters(nil))
+	require.Len(t, decision.Dispatches, 1)
+	dispatchID := decision.Dispatches[0]
+	started := mustOps(t, DispatchOperation{Kind: "Dispatch", DispatchID: dispatchID, State: "started", RunID: "200", Revision: testRevision})
+	rerun := testDispatcher
+	rerun.RunAttempt = 2
+	otherAttempt := buildTestCommit(t, log, rerun, "launch", DispatchIDParameters{DispatchID: dispatchID}, started)
+
+	submitted := testSubmit(t, nil, testWork(t, "a", nil))
+	state, err := Replay(submitted)
+	require.NoError(t, err)
+	parameters := testDispatchParameters(nil)
+	request, err := NewRequest("dispatch_next", testAdministrator, parameters)
+	require.NoError(t, err)
+	plan, err := PlanDispatch(state, parameters, request.ID)
+	require.NoError(t, err)
+	values := []any{}
+	for _, operation := range plan.Operations {
+		values = append(values, operation)
+	}
+	runless := BuildCommit(state, testAdministrator, request, mustOps(t, values...), 1)
+
+	cases := []groupedDispatchCase{
+		{parityInput{Transactions: genericCommits(t, testLaunch(t, log, dispatchID, "200")...), label: "launch by the reserving attempt"}, ""},
+		{parityInput{Transactions: genericCommits(t, append(log, otherAttempt)...), label: "launch by another dispatcher attempt"}, "actor_unauthorized"},
+		{parityInput{Transactions: genericCommits(t, append(submitted, runless)...), label: "reservation by an actor without a run"}, "actor_unauthorized"},
+	}
+	mutations := []struct {
+		label, code string
+		value       any
+	}{
+		{"missing reserved_by", "checkpoint_invalid", deleteSentinel},
+		{"null reserved_by", "checkpoint_invalid", nil},
+		{"reserved_by with an extra field", "checkpoint_invalid", map[string]any{"run_id": "100", "run_attempt": json.Number("1"), "workflow": "x"}},
+		{"reserved_by without its attempt", "checkpoint_invalid", map[string]any{"run_id": "100"}},
+		{"reserved_by with a non-decimal run", "checkpoint_invalid", map[string]any{"run_id": "run-100", "run_attempt": json.Number("1")}},
+		{"reserved_by with attempt zero", "ledger_invalid", map[string]any{"run_id": "100", "run_attempt": json.Number("0")}},
+	}
+	for _, mutation := range mutations {
+		mutated := deepCopy(checkpoint).(map[string]any)
+		dispatches := mutated["operations"].([]any)[0].(map[string]any)["state"].(map[string]any)["dispatches"].(map[string]any)
+		for _, id := range sortedKeys(dispatches) {
+			dispatch := dispatches[id].(map[string]any)
+			if mutation.value == deleteSentinel {
+				delete(dispatch, "reserved_by")
+			} else {
+				dispatch["reserved_by"] = mutation.value
+			}
+		}
+		cases = append(cases, groupedDispatchCase{parityInput{Transactions: []any{mutated}, label: mutation.label}, mutation.code})
 	}
 	return cases
 }

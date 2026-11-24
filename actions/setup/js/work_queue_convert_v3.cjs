@@ -21,18 +21,17 @@ function abort(message) {
  * Replay the Work ownership of a whole v3 log: from its Checkpoint when line 1 is one,
  * otherwise from the v3 genesis. Every line must parse and extend the previous line's
  * commit, and every Work event must name known Work; otherwise the conversion aborts
- * rather than writing a v4 log that silently omits pending Work. Only this module reads v3 fields.
+ * rather than writing a v4 log that silently omits pending Work. Only this module reads v3
+ * fields. No time is read: neither a commit's `at` nor a v3 deadline excludes available Work.
  * @param {string[]} lines
- * @param {number} at conversion time; v3 Work whose deadline passed counts as expired
  * @returns {Map<string, V3Entry>}
  */
-function replayV3Work(lines, at) {
+function replayV3Work(lines) {
   /** @type {Map<string, V3Entry>} */
   const tracked = new Map();
   if (!lines.length) throw abort("the v3 log is empty");
   let ordinal = 0;
   let previous = null;
-  let watermark = at;
   let start = 0;
   const first = parseV3Commit(lines[0], 1);
   if (first.operations?.[0]?.kind === "Checkpoint") {
@@ -45,7 +44,6 @@ function replayV3Work(lines, at) {
       tracked.set(work.work_id, { work, state: work.state, barrier: work.barrier ?? "none", order: [work.position?.commit ?? 0, work.position?.operation ?? 0] });
     }
     ordinal = Math.max(0, ...[...tracked.values()].map(entry => entry.order[0])) + 1;
-    if (Number.isSafeInteger(snapshot.last_at)) watermark = Math.max(watermark, snapshot.last_at);
     previous = first.id;
     start = 1;
   }
@@ -53,14 +51,9 @@ function replayV3Work(lines, at) {
     const commit = index === 0 ? first : parseV3Commit(lines[index], index + 1);
     if (commit.previous !== previous) throw abort(index === 0 ? "line 1 is neither the v3 genesis nor a v3 Checkpoint" : `line ${index + 1} does not extend the previous v3 commit`);
     if (!Array.isArray(commit.operations)) throw abort(`line ${index + 1} has no operations`);
-    if (Number.isSafeInteger(commit.at)) watermark = Math.max(watermark, commit.at);
     for (const [position, operation] of commit.operations.entries()) applyV3Operation(tracked, operation, [ordinal, position], index + 1);
     previous = commit.id;
     ordinal++;
-  }
-  // v3 replay cancels available Work at its deadline (work_queue_expiration.cjs in v3).
-  for (const entry of tracked.values()) {
-    if (entry.state === "available" && entry.work.expires_at !== undefined && watermark >= entry.work.expires_at && !["pending", "failed"].includes(entry.barrier)) entry.state = "cancelled";
   }
   return tracked;
 }
@@ -215,11 +208,11 @@ function v4WorkOperations(tracked, policy, warn) {
  * @param {import("./work_queue_policy.cjs").QueueActor} actor administrator actor
  * @param {import("./work_queue_policy.cjs").PolicyEnv} policy
  * @param {(message: string) => void} warn
- * @param {number} at
+ * @param {number} at informational commit time stamped on the migrate commits; never read
  */
 function convertV3Contents(contents, actor, policy, warn, at) {
   const lines = contents.split("\n").filter(line => line.length);
-  const operations = v4WorkOperations(replayV3Work(lines, at), policy, warn);
+  const operations = v4WorkOperations(replayV3Work(lines), policy, warn);
   let state = newState();
   const commits = [];
   for (let offset = 0; offset < operations.length; offset += OPERATIONS_PER_COMMIT) {

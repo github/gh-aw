@@ -154,10 +154,11 @@ function issueReceipt(assignment, message = MESSAGE, issue = APPROVAL) {
 
 /** Dispatch, launch and bind the next available Work to a worker run; returns that run's view. */
 function nextWorker(queue, runId) {
-  const planned = h.dispatchNext(ledgerLog(queue), { max_claims: 1, max_dispatches: 1 }, { ...h.dispatcher, run_id: String(dispatcherRun++) });
+  const dispatcher = { ...h.dispatcher, run_id: String(dispatcherRun++) };
+  const planned = h.dispatchNext(ledgerLog(queue), { max_claims: 1, max_dispatches: 1 }, dispatcher);
   const dispatchId = planned.decision.dispatches[0];
   if (!dispatchId) return null;
-  const log = h.bind(h.launch(planned.log, dispatchId, true, h.dispatcher, runId), dispatchId, h.workerActor(runId, 1));
+  const log = h.bind(h.launch(planned.log, dispatchId, true, dispatcher, runId), dispatchId, h.workerActor(runId, 1));
   queue.fake.install(h.ledgerText(log));
   return { ...queue, dispatchId, context: workerContext(dispatchId, runId, 1), assignment: assignmentForDispatch(replayTransactionLog(h.ledgerText(log)), dispatchId) };
 }

@@ -333,14 +333,15 @@ describe("v4 checkpoints", () => {
     const gated = h.work("gated", { depends_on: [{ kind: "issue", resource: issue(71), condition: "completed" }] });
     const lost = h.work("lost", { depends_on: [{ kind: "issue", resource: issue(72), condition: "completed" }] });
     const backed = h.work("backed");
-    const run = (log, dispatch, id) => h.finish(h.bind(h.launch(log, dispatch, true, h.dispatcher, id), dispatch, h.workerActor(id)), dispatch, h.workerActor(id), {}, [{ kind: "create_issue", work: id }]);
+    const run = (log, dispatch, id, dispatcher = h.dispatcher) => h.finish(h.bind(h.launch(log, dispatch, true, dispatcher, id), dispatch, h.workerActor(id)), dispatch, h.workerActor(id), {}, [{ kind: "create_issue", work: id }]);
     let step = h.dispatchNext(h.submit([], [x, y, z, gated, lost, backed]), {}, h.dispatcher, [waiting(issue(71)), waiting(issue(72))]);
     const [dispatchX, dispatchBacked] = step.decision.dispatches;
     let log = run(run(step.log, dispatchX, "7"), dispatchBacked, "8");
     log = h.commit(log, h.projector, "issue_link", { operations: [{ kind: "IssueLink", work_id: backed.work_id, resource: issue(73) }] }, [{ kind: "IssueLink", work_id: backed.work_id, resource: issue(73) }]);
-    step = h.dispatchNext(log, {}, { ...h.dispatcher, run_id: "101" });
+    const secondDispatcher = { ...h.dispatcher, run_id: "101" };
+    step = h.dispatchNext(log, {}, secondDispatcher);
     const [dispatchY] = step.decision.dispatches;
-    log = run(step.log, dispatchY, "9");
+    log = run(step.log, dispatchY, "9", secondDispatcher);
     log = h.commit(log, h.producer, "cancel_work", { work_ids: [lost.work_id], reason: "operator" }, [{ kind: "WorkCancellation", work_id: lost.work_id, reason: "operator" }]);
     const full = replayTransactions(log);
     const checkpoint = checkpointCommit(full, h.reconciler, 5);
@@ -383,9 +384,10 @@ describe("v4 checkpoints", () => {
     const z = h.work("z", { depends_on: [{ kind: "work", work_id: y.work_id }] });
     let step = h.dispatchNext(h.submit([], [x, y, z]));
     let log = h.finish(h.bind(h.launch(step.log, step.decision.dispatches[0], true, h.dispatcher, "7"), step.decision.dispatches[0], h.workerActor("7")), step.decision.dispatches[0], h.workerActor("7"));
-    step = h.dispatchNext(log, {}, { ...h.dispatcher, run_id: "101" });
+    const secondDispatcher = { ...h.dispatcher, run_id: "101" };
+    step = h.dispatchNext(log, {}, secondDispatcher);
     const dispatchY = step.decision.dispatches[0];
-    log = h.finish(h.bind(h.launch(step.log, dispatchY, true, h.dispatcher, "8"), dispatchY, h.workerActor("8")), dispatchY, h.workerActor("8"));
+    log = h.finish(h.bind(h.launch(step.log, dispatchY, true, secondDispatcher, "8"), dispatchY, h.workerActor("8")), dispatchY, h.workerActor("8"));
     const full = serializeProjection(replayTransactions(log));
     const checkpoint = checkpointCommit(replayTransactions(log), h.reconciler, 5);
     const tamper = mutate => {

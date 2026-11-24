@@ -108,7 +108,7 @@ describe("v3 to v4 conversion", () => {
     expect(state.works.get(nodeId(first.graph_id, "late"))).toMatchObject({ state: "available", node_key: "late" });
   });
 
-  it("replays a v3 ledger without a checkpoint from its genesis and carries its pending Work", async () => {
+  it("replays a v3 ledger without a checkpoint from its genesis and carries its pending Work, even past its v3 deadline", async () => {
     const [base] = available;
     const [pending, done, retried, cancelled, expired] = ["pending", "done", "retried", "cancelled", "expired"].map(key => v3Work(base, key));
     const contents = chain(
@@ -126,13 +126,14 @@ describe("v3 to v4 conversion", () => {
     );
     const warnings = [];
     const { state } = convertV3Contents(contents, administrator, policy(), message => warnings.push(message), 1795099500000);
-    expect([...state.works.keys()]).toEqual([pending.work_id, retried.work_id]);
+    // Conversion reads no time: Work whose v3 deadline passed is carried, without the deadline.
+    expect([...state.works.keys()]).toEqual([pending.work_id, retried.work_id, expired.work_id]);
     expect(state.works.get(pending.work_id)).toMatchObject({ state: "available", priority: 1 });
-    expect(warnings).toEqual([]);
+    expect(warnings).toEqual([`v3 Work ${expired.work_id} carried without its deadline: v4 Work does not expire`]);
 
     const fake = h.fakeQueueGitHub(contents, { repository: "github/gh-aw" });
-    expect(await convertV3Ledger(options(fake))).toMatchObject({ converted: true, carried: 2 });
-    expect(replayTransactions(parseTransactionLog(fake.contents())).stats.available).toBe(2);
+    expect(await convertV3Ledger(options(fake))).toMatchObject({ converted: true, carried: 3 });
+    expect(replayTransactions(parseTransactionLog(fake.contents())).stats.available).toBe(3);
   });
 
   it.each([

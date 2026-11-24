@@ -1797,6 +1797,10 @@
         "pool": "default",
         "worker_profile": "worker",
         "workflow": ".github/workflows/worker.lock.yml",
+        "reserved_by": {
+          "run_id": "101",
+          "run_attempt": 1
+        },
         "state": "closed",
         "run": {
           "run_id": "7",
@@ -1815,6 +1819,10 @@
         "pool": "default",
         "worker_profile": "worker",
         "workflow": ".github/workflows/worker.lock.yml",
+        "reserved_by": {
+          "run_id": "101",
+          "run_attempt": 1
+        },
         "state": "closed",
         "run": null,
         "launch": null,
@@ -1827,6 +1835,10 @@
         "pool": "default",
         "worker_profile": "worker",
         "workflow": ".github/workflows/worker.lock.yml",
+        "reserved_by": {
+          "run_id": "102",
+          "run_attempt": 1
+        },
         "state": "closed",
         "run": {
           "run_id": "8",
@@ -1845,6 +1857,10 @@
         "pool": "default",
         "worker_profile": "worker",
         "workflow": ".github/workflows/worker.lock.yml",
+        "reserved_by": {
+          "run_id": "102",
+          "run_attempt": 1
+        },
         "state": "closed",
         "run": null,
         "launch": null,
@@ -1857,6 +1873,10 @@
         "pool": "default",
         "worker_profile": "worker",
         "workflow": ".github/workflows/worker.lock.yml",
+        "reserved_by": {
+          "run_id": "103",
+          "run_attempt": 1
+        },
         "state": "closed",
         "run": {
           "run_id": "9",
@@ -1875,6 +1895,10 @@
         "pool": "default",
         "worker_profile": "worker",
         "workflow": ".github/workflows/worker.lock.yml",
+        "reserved_by": {
+          "run_id": "104",
+          "run_attempt": 1
+        },
         "state": "reserved",
         "run": null,
         "launch": null,
@@ -2184,6 +2208,10 @@
                 "pool": "default",
                 "worker_profile": "worker",
                 "workflow": ".github/workflows/worker.lock.yml",
+                "reserved_by": {
+                  "run_id": "101",
+                  "run_attempt": 1
+                },
                 "state": "closed",
                 "run": {
                   "run_id": "7",
@@ -2202,6 +2230,10 @@
                 "pool": "default",
                 "worker_profile": "worker",
                 "workflow": ".github/workflows/worker.lock.yml",
+                "reserved_by": {
+                  "run_id": "101",
+                  "run_attempt": 1
+                },
                 "state": "closed",
                 "run": null,
                 "launch": null,
@@ -2214,6 +2246,10 @@
                 "pool": "default",
                 "worker_profile": "worker",
                 "workflow": ".github/workflows/worker.lock.yml",
+                "reserved_by": {
+                  "run_id": "102",
+                  "run_attempt": 1
+                },
                 "state": "closed",
                 "run": {
                   "run_id": "8",
@@ -2232,6 +2268,10 @@
                 "pool": "default",
                 "worker_profile": "worker",
                 "workflow": ".github/workflows/worker.lock.yml",
+                "reserved_by": {
+                  "run_id": "103",
+                  "run_attempt": 1
+                },
                 "state": "closed",
                 "run": {
                   "run_id": "9",
@@ -2250,6 +2290,10 @@
                 "pool": "default",
                 "worker_profile": "worker",
                 "workflow": ".github/workflows/worker.lock.yml",
+                "reserved_by": {
+                  "run_id": "104",
+                  "run_attempt": 1
+                },
                 "state": "reserved",
                 "run": null,
                 "launch": null,
@@ -2487,6 +2531,10 @@
           "pool": "default",
           "worker_profile": "worker",
           "workflow": ".github/workflows/worker.lock.yml",
+          "reserved_by": {
+            "run_id": "101",
+            "run_attempt": 1
+          },
           "state": "closed",
           "run": {
             "run_id": "7",
@@ -2505,6 +2553,10 @@
           "pool": "default",
           "worker_profile": "worker",
           "workflow": ".github/workflows/worker.lock.yml",
+          "reserved_by": {
+            "run_id": "101",
+            "run_attempt": 1
+          },
           "state": "closed",
           "run": null,
           "launch": null,
@@ -2517,6 +2569,10 @@
           "pool": "default",
           "worker_profile": "worker",
           "workflow": ".github/workflows/worker.lock.yml",
+          "reserved_by": {
+            "run_id": "102",
+            "run_attempt": 1
+          },
           "state": "closed",
           "run": {
             "run_id": "8",
@@ -2535,6 +2591,10 @@
           "pool": "default",
           "worker_profile": "worker",
           "workflow": ".github/workflows/worker.lock.yml",
+          "reserved_by": {
+            "run_id": "103",
+            "run_attempt": 1
+          },
           "state": "closed",
           "run": {
             "run_id": "9",
@@ -2553,6 +2613,10 @@
           "pool": "default",
           "worker_profile": "worker",
           "workflow": ".github/workflows/worker.lock.yml",
+          "reserved_by": {
+            "run_id": "104",
+            "run_attempt": 1
+          },
           "state": "reserved",
           "run": null,
           "launch": null,
@@ -5045,6 +5109,10 @@
           "pool": "default",
           "worker_profile": "worker",
           "workflow": ".github/workflows/worker.lock.yml",
+          "reserved_by": {
+            "run_id": "201",
+            "run_attempt": 1
+          },
           "state": "closed",
           "run": {
             "run_id": "21",
@@ -5063,6 +5131,10 @@
           "pool": "default",
           "worker_profile": "worker",
           "workflow": ".github/workflows/worker.lock.yml",
+          "reserved_by": {
+            "run_id": "202",
+            "run_attempt": 1
+          },
           "state": "closed",
           "run": {
             "run_id": "22",
@@ -5081,6 +5153,10 @@
           "pool": "default",
           "worker_profile": "worker",
           "workflow": ".github/workflows/worker.lock.yml",
+          "reserved_by": {
+            "run_id": "204",
+            "run_attempt": 1
+          },
           "state": "reserved",
           "run": null,
           "launch": null,
@@ -5328,6 +5404,10 @@
                   "pool": "default",
                   "worker_profile": "worker",
                   "workflow": ".github/workflows/worker.lock.yml",
+                  "reserved_by": {
+                    "run_id": "202",
+                    "run_attempt": 1
+                  },
                   "state": "closed",
                   "run": {
                     "run_id": "22",
@@ -5346,6 +5426,10 @@
                   "pool": "default",
                   "worker_profile": "worker",
                   "workflow": ".github/workflows/worker.lock.yml",
+                  "reserved_by": {
+                    "run_id": "204",
+                    "run_attempt": 1
+                  },
                   "state": "reserved",
                   "run": null,
                   "launch": null,
@@ -5537,6 +5621,10 @@
             "pool": "default",
             "worker_profile": "worker",
             "workflow": ".github/workflows/worker.lock.yml",
+            "reserved_by": {
+              "run_id": "202",
+              "run_attempt": 1
+            },
             "state": "closed",
             "run": {
               "run_id": "22",
@@ -5555,6 +5643,10 @@
             "pool": "default",
             "worker_profile": "worker",
             "workflow": ".github/workflows/worker.lock.yml",
+            "reserved_by": {
+              "run_id": "204",
+              "run_attempt": 1
+            },
             "state": "reserved",
             "run": null,
             "launch": null,

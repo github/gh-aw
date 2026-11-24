@@ -113,11 +113,13 @@ async function lifecycle(job) {
   const initial = await read(job.branch);
   const reserved = initial.state.dispatches.get(dispatchId);
   if (reserved.state !== "reserved") return { skipped: true };
-  // Dispatcher: POST the worker launch, read back the created run, then record it.
+  // Dispatcher: POST the worker launch, read back the created run, then record it as the
+  // dispatcher attempt that reserved the Dispatch, the only actor replay lets record it.
   const destination = { owner: OWNER, repo: REPO, workflow: reserved.workflow };
   const response = await postQueueDispatch(githubClient, { ...destination, ref: LAUNCH_REF }, { work_queue_assignment: JSON.stringify({ version: 4, dispatch_id: dispatchId }) });
   const evidence = await launchedRunEvidence(githubClient, destination, response);
-  const launched = await publish(job.branch, queueActor("dispatcher"), "launch", { dispatch_id: dispatchId }, state =>
+  const launcher = queueActor("dispatcher", reserved.reserved_by.run_id, reserved.reserved_by.run_attempt);
+  const launched = await publish(job.branch, launcher, "launch", { dispatch_id: dispatchId }, state =>
     state.dispatches.get(dispatchId)?.state === "reserved" ? [{ kind: "Dispatch", dispatch_id: dispatchId, state: "started", run_id: evidence.run_id, revision: evidence.revision }] : []
   );
   if (launched.state.dispatches.get(dispatchId).launch?.run_id !== evidence.run_id) return refuseDuplicateRun(job, launched.state, evidence.run_id);

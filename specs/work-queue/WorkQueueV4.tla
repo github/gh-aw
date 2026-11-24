@@ -12,6 +12,7 @@
 (*   Attempt   unused -> reserved -> started -> bound                      *)
 (*               -> completed | cancelled                                  *)
 (*   Run       queued -> in_progress -> completed (rerun: next attempt)    *)
+(*   Reserver  launching -> running -> completed (dispatcher run attempt) *)
 (*                                                                         *)
 (* Replay accepts exactly one Claim per Dispatch, so a Claim and the      *)
 (* Dispatch that launched it are one attempt, identified by its Dispatch  *)
@@ -20,8 +21,11 @@
 (* Dispatch is closed. A worker run is started by the workflow_dispatch   *)
 (* of exactly one Dispatch and carries that dispatch_id in its input, so  *)
 (* a run is also identified by its Dispatch slot; GitHub re-runs keep the *)
-(* run id and increment the run attempt. Nothing reads a clock: there are *)
-(* no deadlines, expiry, backoff or observation ages.                      *)
+(* run id and increment the run attempt. Each Dispatch records the        *)
+(* dispatcher run attempt that reserved it (reserved_by); only that       *)
+(* attempt can record its launch, so maintenance judges a reserved        *)
+(* Dispatch by that attempt's status alone. Nothing reads a clock: there  *)
+(* are no deadlines, grace periods, expiry, backoff or observation ages.   *)
 (***************************************************************************)
 EXTENDS Naturals, FiniteSets
 
@@ -45,8 +49,8 @@ ASSUME /\ NoWork \notin Works
 D == 1..DispatchSlots
 NoDispatch == 0
 
-VARIABLES work, attempt, run
-vars == <<work, attempt, run>>
+VARIABLES work, attempt, run, dispatcher
+vars == <<work, attempt, run, dispatcher>>
 
 WorkStates == {"none", "available", "claimed", "completed", "cancelled"}
 \* Phase of one attempt (one Claim in its own Dispatch):
@@ -66,26 +70,37 @@ OpenPhases == {"reserved", "started", "bound"}
 \*   completed                  status completed
 RunPhases == {"none", "queued", "activation", "agent", "finishing", "completed"}
 InProgress == {"activation", "agent", "finishing"}
+\* The dispatcher run attempt that reserved the Dispatch (reserved_by: the
+\* run id and run attempt of its dispatch_next commit's actor). A re-run of
+\* the dispatcher is a new attempt with new request and dispatch ids, so it
+\* never launches this Dispatch:
+\*   none                       no dispatcher reserved the slot yet
+\*   launching                  in progress; the launch of this Dispatch (POST
+\*                              and launch commit) is still ahead
+\*   running                    in progress; the launch is decided: recorded,
+\*                              released (launch_failed) or its commit lost
+\*   completed                  status completed, or the attempt is gone (404)
+DispatcherPhases == {"none", "launching", "running", "completed"}
 
 TypeOK ==
     /\ work \in [Works -> [state : WorkStates,
                            attempts : 0..MaxAttempts,
                            pos : 0..Cardinality(Works),
                            claim : D \cup {NoDispatch}]]
-    \* launched: the launch was attempted (kept on the closed attempt);
     \* bound: the run attempt recorded by bind; by: the run attempt that
     \* recorded Completion.
     /\ attempt \in [D -> [work : Works \cup {NoWork},
                           phase : AttemptPhases,
-                          launched : BOOLEAN,
                           bound : 0..MaxRunAttempts,
                           by : 0..MaxRunAttempts]]
     /\ run \in [D -> [phase : RunPhases, attempt : 0..MaxRunAttempts]]
+    /\ dispatcher \in [D -> DispatcherPhases]
 
 Init ==
     /\ work = [w \in Works |-> [state |-> "none", attempts |-> 0, pos |-> 0, claim |-> NoDispatch]]
-    /\ attempt = [d \in D |-> [work |-> NoWork, phase |-> "unused", launched |-> FALSE, bound |-> 0, by |-> 0]]
+    /\ attempt = [d \in D |-> [work |-> NoWork, phase |-> "unused", bound |-> 0, by |-> 0]]
     /\ run = [d \in D |-> [phase |-> "none", attempt |-> 0]]
+    /\ dispatcher = [d \in D |-> "none"]
 
 -----------------------------------------------------------------------------
 (* Helpers *)
@@ -106,7 +121,7 @@ BoundToRun(d) == attempt[d].phase = "bound" /\ attempt[d].bound = run[d].attempt
 CancelClaim(d) ==
     LET w == attempt[d].work
         exhausted == work[w].attempts + 1 >= MaxAttempts
-    IN  /\ attempt' = [attempt EXCEPT ![d].phase = "cancelled", ![d].launched = TRUE]
+    IN  /\ attempt' = [attempt EXCEPT ![d].phase = "cancelled"]
         /\ work' = [work EXCEPT ![w].attempts = @ + 1,
                                 ![w].claim = NoDispatch,
                                 ![w].state = IF exhausted THEN "cancelled" ELSE "available"]
@@ -119,12 +134,16 @@ Submit(w) ==
     /\ work[w].state = "none"
     /\ work' = [work EXCEPT ![w].state = "available",
                             ![w].pos = Cardinality({x \in Works : work[x].state # "none"}) + 1]
-    /\ UNCHANGED <<attempt, run>>
+    /\ UNCHANGED <<attempt, run, dispatcher>>
 
 (* Dispatcher *)
 
 \* dispatch_next: one Claim in a fresh reserved Dispatch for the FIFO head,
-\* while non-closed pool Dispatches stay below the compiled concurrency.
+\* while non-closed pool Dispatches stay below the compiled concurrency. The
+\* Dispatch records the dispatcher attempt that reserved it, which then has
+\* to launch it. One attempt may reserve several Dispatches; modelling one
+\* attempt per slot lets them end independently, which includes ending
+\* together.
 Plan ==
     /\ Available # {}
     /\ Cardinality(OpenDispatches) < Concurrency
@@ -132,66 +151,84 @@ Plan ==
         /\ attempt[d].phase = "unused"
         /\ \A e \in D : attempt[e].phase = "unused" => d <= e
         /\ LET w == Head IN
-           /\ attempt' = [attempt EXCEPT ![d] = [work |-> w, phase |-> "reserved", launched |-> FALSE, bound |-> 0, by |-> 0]]
+           /\ attempt' = [attempt EXCEPT ![d] = [work |-> w, phase |-> "reserved", bound |-> 0, by |-> 0]]
            /\ work' = [work EXCEPT ![w].state = "claimed", ![w].claim = d]
+        /\ dispatcher' = [dispatcher EXCEPT ![d] = "launching"]
     /\ UNCHANGED run
 
-\* workflow_dispatch POST succeeded and the dispatcher read back the created
-\* run: GitHub queues run attempt 1. The launch commit
-\* [Dispatch{started, run_id, revision}] names exactly that run (the run of
-\* slot d), applies only to a still reserved Dispatch and may be lost (CAS
-\* exhausted, job killed); the Dispatch then stays reserved and no run can
-\* bind it. A POST whose run cannot be identified or verified is LaunchFail.
+\* The reserving dispatcher attempt, still in progress, POSTed
+\* workflow_dispatch and read back the created run: GitHub queues run
+\* attempt 1. The launch commit [Dispatch{started, run_id, revision}] names
+\* exactly that run (the run of slot d), applies only to a still reserved
+\* Dispatch and may be lost (CAS exhausted, job killed); the Dispatch then
+\* stays reserved and no run can bind it. A POST whose run cannot be
+\* identified or verified is LaunchFail.
 LaunchOK(d) ==
     /\ attempt[d].phase = "reserved"
-    /\ ~attempt[d].launched
+    /\ dispatcher[d] = "launching"
     /\ run' = [run EXCEPT ![d] = [phase |-> "queued", attempt |-> 1]]
-    /\ \/ attempt' = [attempt EXCEPT ![d].phase = "started", ![d].launched = TRUE]
-       \/ attempt' = [attempt EXCEPT ![d].launched = TRUE]
+    /\ dispatcher' = [dispatcher EXCEPT ![d] = "running"]
+    /\ \/ attempt' = [attempt EXCEPT ![d].phase = "started"]
+       \/ UNCHANGED attempt
     /\ UNCHANGED work
 
-\* workflow_dispatch POST failed, or returned no verifiable run: launch commit
-\* [Release{launch_failed}] (+ attempts rule), or the commit is lost and the
-\* Dispatch stays reserved. An ambiguous failure (transport error, 5xx) or an
-\* unverified launch may still have queued a run; it can never bind.
+\* The reserving dispatcher attempt's workflow_dispatch POST failed, or
+\* returned no verifiable run: launch commit [Release{launch_failed}]
+\* (+ attempts rule), or the commit is lost and the Dispatch stays reserved.
+\* An ambiguous failure (transport error, 5xx) or an unverified launch may
+\* still have queued a run; it can never bind.
 LaunchFail(d) ==
     /\ attempt[d].phase = "reserved"
-    /\ ~attempt[d].launched
+    /\ dispatcher[d] = "launching"
+    /\ dispatcher' = [dispatcher EXCEPT ![d] = "running"]
     /\ \/ CancelClaim(d)
-       \/ /\ attempt' = [attempt EXCEPT ![d].launched = TRUE]
-          /\ UNCHANGED work
+       \/ UNCHANGED <<work, attempt>>
     /\ \/ UNCHANGED run
        \/ run' = [run EXCEPT ![d] = [phase |-> "queued", attempt |-> 1]]
 
 (* GitHub run environment *)
 
+\* The reserving dispatcher attempt completes, is cancelled or crashes at any
+\* point, before or after its launch. Only a reserved Dispatch is judged by
+\* that attempt; once the Dispatch left reserved nothing reads dispatcher[d],
+\* so its later end, which would change nothing else, is not modelled.
+DispatcherEnd(d) ==
+    /\ attempt[d].phase = "reserved"
+    /\ dispatcher[d] \in {"launching", "running"}
+    /\ dispatcher' = [dispatcher EXCEPT ![d] = "completed"]
+    /\ UNCHANGED <<work, attempt, run>>
+
 RunStart(d) ==
     /\ run[d].phase = "queued"
     /\ run' = [run EXCEPT ![d].phase = "activation"]
-    /\ UNCHANGED <<work, attempt>>
+    /\ UNCHANGED <<work, attempt, dispatcher>>
 
 \* A run may stop at any point without its conclusion job (cancellation,
 \* runner loss, crash).
 RunComplete(d) ==
     /\ run[d].phase \in InProgress
     /\ run' = [run EXCEPT ![d].phase = "completed"]
-    /\ UNCHANGED <<work, attempt>>
+    /\ UNCHANGED <<work, attempt, dispatcher>>
 
 \* A maintainer re-runs a completed run: same run id, next run attempt.
 Rerun(d) ==
     /\ run[d].phase = "completed"
     /\ run[d].attempt < MaxRunAttempts
     /\ run' = [run EXCEPT ![d] = [phase |-> "queued", attempt |-> @.attempt + 1]]
-    /\ UNCHANGED <<work, attempt>>
+    /\ UNCHANGED <<work, attempt, dispatcher>>
 
 (* Worker run *)
 
 \* Activation job: bind commit [Bound{dispatch_id, run_id, run_attempt}].
 \* Allowed only once the dispatcher recorded the launch of this run (started)
 \* or for its later attempts (bound); both phases have an open Claim, and the
-\* same attempt is an idempotent no-op. A run without a recorded launch, or
-\* without an open Claim, receives no Claim: agent and safe_outputs jobs are
-\* skipped and only the conclusion job remains.
+\* same attempt is an idempotent no-op. A run without a recorded launch
+\* (reserved: LAUNCH_UNVERIFIED at once, with no waiting), or without an open
+\* Claim, receives no Claim: agent and safe_outputs jobs are skipped and only
+\* the conclusion job remains. If the launch commit lands after such an
+\* activation, the conclusion job finds a started Dispatch naming this run
+\* and releases it (Terminate): the same ledger steps as LaunchOK followed by
+\* a run that stops before Bind, so the launch is modelled as one step.
 Bind(d) ==
     /\ run[d].phase = "activation"
     /\ IF /\ attempt[d].phase \in {"started", "bound"}
@@ -200,7 +237,7 @@ Bind(d) ==
             /\ run' = [run EXCEPT ![d].phase = "agent"]
        ELSE /\ run' = [run EXCEPT ![d].phase = "finishing"]
             /\ UNCHANGED attempt
-    /\ UNCHANGED work
+    /\ UNCHANGED <<work, dispatcher>>
 
 \* Finish step, outcome completed: Completion is accepted only for an open
 \* Claim whose Dispatch is bound to this run attempt (else claim_scope_invalid
@@ -223,6 +260,7 @@ Complete(d) ==
                     /\ work' = [completed EXCEPT ![c].state = "available",
                                                  ![c].pos = Cardinality({x \in Works : work[x].state # "none"}) + 1]
        ELSE UNCHANGED <<work, attempt>>
+    /\ UNCHANGED dispatcher
 
 \* Finish step, outcome failed: ClaimCancellation{worker_failed} (+ attempts rule).
 Fail(d) ==
@@ -231,32 +269,37 @@ Fail(d) ==
     /\ IF BoundToRun(d)
        THEN CancelClaim(d)
        ELSE UNCHANGED <<work, attempt>>
+    /\ UNCHANGED dispatcher
 
 \* Conclusion job "Terminate work queue worker" (if: always(); it also runs
 \* when activation or the agent failed), after which the run completes:
 \* Release{worker_terminated} when the Dispatch still has an open Claim and
 \* records this run: launched as this run (started) or bound to it. A
 \* reserved Dispatch records no launched run, so no worker run releases it;
-\* maintenance does.
+\* maintenance does once its dispatcher attempt completed.
 Terminate(d) ==
     /\ run[d].phase \in InProgress
     /\ run' = [run EXCEPT ![d].phase = "completed"]
     /\ IF attempt[d].phase \in {"started", "bound"}
        THEN CancelClaim(d)
        ELSE UNCHANGED <<work, attempt>>
+    /\ UNCHANGED dispatcher
 
 (* Maintenance (reconciler) *)
 
-\* bound: the bound run is completed -> Release{run_terminal}.
-\* reserved/started: no queued/in_progress run lists the dispatch_id ->
-\* Release{run_missing}. A just-queued run may be missing from the listing,
-\* so a queued run does not protect an unbound Dispatch; the late run then
-\* finds no open Claim at bind and settles.
+\* started/bound: judged by the recorded run id. Once that run is completed
+\* -> Release{run_terminal} (a deleted run, 404, is run_missing); a queued or
+\* in-progress run keeps the Dispatch open.
+\* reserved: judged only by the dispatcher attempt that reserved it. While
+\* that attempt is in progress it may still record the launch, so the
+\* Dispatch stays open; once it completed -> Release{run_terminal} (404:
+\* run_missing). Only that attempt can record a launch, so no run can bind
+\* the Dispatch any more; a run it POSTed meets a closed Dispatch at bind.
 MaintainRelease(d) ==
-    /\ \/ attempt[d].phase = "bound" /\ run[d].phase = "completed"
-       \/ attempt[d].phase \in {"reserved", "started"} /\ run[d].phase \notin InProgress
+    /\ \/ attempt[d].phase \in {"started", "bound"} /\ run[d].phase = "completed"
+       \/ attempt[d].phase = "reserved" /\ dispatcher[d] = "completed"
     /\ CancelClaim(d)
-    /\ UNCHANGED run
+    /\ UNCHANGED <<run, dispatcher>>
 
 -----------------------------------------------------------------------------
 
@@ -264,18 +307,21 @@ Next ==
     \/ \E w \in Works : Submit(w)
     \/ Plan
     \/ \E d \in D :
-        \/ LaunchOK(d) \/ LaunchFail(d)
+        \/ LaunchOK(d) \/ LaunchFail(d) \/ DispatcherEnd(d)
         \/ RunStart(d) \/ RunComplete(d) \/ Rerun(d)
         \/ Bind(d) \/ Complete(d) \/ Fail(d) \/ Terminate(d)
         \/ MaintainRelease(d)
 
 \* Scheduled dispatcher planning, scheduled maintenance and GitHub run
-\* progress are weakly fair. Launch, worker steps and re-runs are not: a
-\* worker may crash at any point, and maintenance recovers its Claims.
+\* progress are weakly fair; GitHub ends every dispatcher run attempt (job
+\* timeout at the latest), so DispatcherEnd is weakly fair too. Launch,
+\* worker steps and re-runs are not: a dispatcher or worker may crash at any
+\* point, and maintenance recovers its Claim.
 Fairness ==
     /\ WF_vars(Plan)
     /\ \A d \in D : WF_vars(MaintainRelease(d))
     /\ \A d \in D : WF_vars(RunStart(d)) /\ WF_vars(RunComplete(d))
+    /\ \A d \in D : WF_vars(DispatcherEnd(d))
 
 Spec == Init /\ [][Next]_vars /\ Fairness
 
@@ -318,6 +364,17 @@ AttemptsMonotone == [][\A w \in Works : work'[w].attempts >= work[w].attempts]_v
 \* Terminal Work (completed or cancelled) never changes state again.
 NoReopenCompleted ==
     [][\A w \in Works : work[w].state \in {"completed", "cancelled"} => work'[w].state = work[w].state]_vars
+
+\* A reserved Dispatch is released only by the dispatcher attempt that
+\* reserved it, in the step that decides its launch (Release{launch_failed}),
+\* or after that attempt completed: maintenance never releases a Dispatch
+\* whose launch may still be recorded, and no worker run releases a Dispatch
+\* that records no launch.
+ReservedReleaseAwaitsDispatcher ==
+    [][\A d \in D :
+        (attempt[d].phase = "reserved" /\ attempt'[d].phase = "cancelled")
+            => \/ dispatcher[d] = "completed"
+               \/ dispatcher[d] = "launching" /\ dispatcher'[d] = "running"]_vars
 
 (* Liveness *)
 

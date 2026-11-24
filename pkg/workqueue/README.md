@@ -30,8 +30,8 @@ For the full queue behavior and operator configuration, see the [work-queue refe
 | `Projection` | struct | State derived by replaying the ledger: Work, Claims, Dispatches, Observations, committed requests, and `Stats`. |
 | `WorkState` | struct | Work definition plus state, position, attempts, Completion effects, and cancellation data. |
 | `ClaimState` | struct | One Claim: ids, handle, state, terminal commit, cancellation reason, and effects. |
-| `DispatchState` | struct | One dispatch: pool, profile, workflow, state, run binding, and Claims. |
-| `RunBinding` | struct | Run id and attempt bound to a dispatch. |
+| `DispatchState` | struct | One dispatch: pool, profile, workflow, reserving dispatcher attempt (`ReservedBy`), state, launch, run binding, and its sole Claim. |
+| `RunBinding` | struct | Run id and attempt: the run bound to a dispatch, or the dispatcher attempt that reserved it. |
 | `Stats` | struct | Aggregate counts of Work by state, Claims, Dispatches, transactions, and graph nodes. |
 | `Decision` | struct | Planned `dispatch_next` Claims, dispatch ids, and plan reason. |
 | `Assignment`, `AssignmentClaim`, `ResultReference` | struct | Worker view of one dispatch, its Claims, and predecessor effects. |
@@ -155,7 +155,7 @@ fmt.Println(state.Repository, state.Stats.Work)
 
 The ledger is the durable source of truth; `Projection` is derived state. Replay revalidates every commit, role, and transition instead of trusting a supplied snapshot, and never reads the informational `At` field. Request ids are content hashes, so retrying the same intent is idempotent and a request found on re-read is reported as `Recovered`.
 
-Scheduling is priority then FIFO, bounded by pool concurrency and an optional per-account limit. `PlanDispatch` produces a plan without mutating the projection; replay does not re-plan selection. A Claim owns one attempt; a Completion records the applied effects, and a cancelled Claim returns its Work to the pool. Configuration lives in the compiled policy environment, so changing `aw.json` needs no ledger change. The protocol has no clocks: no deadlines, expiry, or backoff.
+Scheduling is priority then FIFO, bounded by pool concurrency and an optional per-account limit. `PlanDispatch` produces a plan without mutating the projection; replay does not re-plan selection. A Claim owns one attempt; a Completion records the applied effects, and a cancelled Claim returns its Work to the pool. Configuration lives in the compiled policy environment, so changing `aw.json` needs no ledger change. The protocol has no clocks: no deadlines, expiry, or backoff. A Dispatch records the dispatcher run attempt that reserved it (`reserved_by`), and only that attempt may record its launch, so recovery of an unlaunched Dispatch depends on that attempt's run state, not on elapsed time.
 
 ## Dependencies
 

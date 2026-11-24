@@ -108,10 +108,15 @@ func (l *workQueueTestLog) dispatch(maxClaims int) []string {
 	return decision.Dispatches
 }
 
-// launch records the dispatcher's launch of worker run runID for a Dispatch.
+// launch records the launch of worker run runID for a Dispatch by the dispatcher attempt
+// that reserved it, the only actor replay lets record it.
 func (l *workQueueTestLog) launch(dispatchID, runID string) {
 	l.t.Helper()
-	l.append(workQueueTestDispatcher, "launch", workqueue.DispatchIDParameters{DispatchID: dispatchID},
+	dispatch := l.state().Dispatches[dispatchID]
+	require.NotNil(l.t, dispatch)
+	dispatcher := workQueueTestDispatcher
+	dispatcher.RunID, dispatcher.RunAttempt = dispatch.ReservedBy.RunID, dispatch.ReservedBy.RunAttempt
+	l.append(dispatcher, "launch", workqueue.DispatchIDParameters{DispatchID: dispatchID},
 		workqueue.DispatchOperation{Kind: "Dispatch", DispatchID: dispatchID, State: "started", RunID: runID, Revision: strings.Repeat("c", 40)})
 }
 

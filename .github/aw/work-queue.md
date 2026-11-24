@@ -92,8 +92,11 @@ Empty dispatcher intents fail the controls step; only `blocked` receipts fail it
   PR edges for `merged` observations refreshed by the dispatcher.
 - No clocks: no expiry, backoff or deadlines. Recovery uses run state only.
 - Worker conclusion releases its open Claims (`worker_terminated`).
-  Maintenance releases Dispatches whose bound run completed (`run_terminal`) or
-  whose run is missing (`run_missing`), and checkpoints logs over 512 lines.
+  Maintenance releases Dispatches whose bound or launched run completed
+  (`run_terminal`) or is missing (`run_missing`), and a Dispatch with no
+  recorded launch once the dispatcher attempt that reserved it (`reserved_by`)
+  completed or is missing; it also checkpoints logs over 512 lines.
+- A worker whose Dispatch has no recorded launch fails activation at once.
 - Each cancelled Claim adds one attempt; at `max_attempts` the Work is
   cancelled `attempts_exhausted`. Do not raise limits to hide failing Work.
 

@@ -119,7 +119,11 @@ func (state *Projection) applyClaim(operation ClaimOperation, commit QueueCommit
 	if _, exists := state.Dispatches[operation.DispatchID]; exists {
 		return queueError("dispatch_state_conflict", "a Dispatch carries exactly one Claim")
 	}
-	dispatch := &DispatchState{DispatchID: operation.DispatchID, RequestID: commit.Request.ID, CommitID: commit.ID, Pool: work.Pool, WorkerProfile: work.WorkerProfile, Workflow: profile.Workflow, State: "reserved", Claims: [1]string{operation.ClaimID}}
+	// Maintenance judges a reserved Dispatch only by the state of the dispatcher attempt that reserved it.
+	if commit.Actor.RunID == "" {
+		return queueError("actor_unauthorized", "only a workflow run attempt can reserve a Dispatch")
+	}
+	dispatch := &DispatchState{DispatchID: operation.DispatchID, RequestID: commit.Request.ID, CommitID: commit.ID, Pool: work.Pool, WorkerProfile: work.WorkerProfile, Workflow: profile.Workflow, ReservedBy: RunBinding{RunID: commit.Actor.RunID, RunAttempt: commit.Actor.RunAttempt}, State: "reserved", Claims: [1]string{operation.ClaimID}}
 	state.Dispatches[dispatch.DispatchID] = dispatch
 	state.dispatchOrder = append(state.dispatchOrder, dispatch.DispatchID)
 	state.Claims[operation.ClaimID] = &ClaimState{ClaimID: operation.ClaimID, WorkID: work.WorkID, DispatchID: dispatch.DispatchID, Handle: operation.Handle, State: "open", CommitID: commit.ID, RequestID: commit.Request.ID}
@@ -128,13 +132,16 @@ func (state *Projection) applyClaim(operation ClaimOperation, commit QueueCommit
 	return nil
 }
 
-func (state *Projection) applyDispatch(operation DispatchOperation, _ QueueCommit) error {
+func (state *Projection) applyDispatch(operation DispatchOperation, commit QueueCommit) error {
 	dispatch, err := state.requireDispatch(operation.DispatchID)
 	if err != nil {
 		return err
 	}
 	if dispatch.State != "reserved" {
 		return queueError("dispatch_state_conflict", "only a reserved Dispatch can start")
+	}
+	if commit.Actor.RunID != dispatch.ReservedBy.RunID || commit.Actor.RunAttempt != dispatch.ReservedBy.RunAttempt {
+		return queueError("actor_unauthorized", "only the dispatcher attempt that reserved a Dispatch records its launch")
 	}
 	dispatch.State = "started"
 	dispatch.Launch = &LaunchRecord{RunID: operation.RunID, Revision: operation.Revision}

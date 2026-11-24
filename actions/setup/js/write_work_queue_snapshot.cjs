@@ -12,8 +12,6 @@ const { LAUNCH_UNVERIFIED, readWorkflowRun, verifyLaunchedRun } = require("./wor
 const { isStagedMode } = require("./safe_output_helpers.cjs");
 
 const SNAPSHOT_PATH = "/tmp/gh-aw/work-queue.snapshot.json";
-// The dispatcher records a launch right after its POST; a fast worker waits for that record.
-const LAUNCH_WAIT = { attempts: 6, delayMs: 5000 };
 
 /**
  * Bound operations for this run: none when the Dispatch has no open Claim or is
@@ -27,24 +25,6 @@ function bindOperations(state, dispatchId, run) {
   if (!dispatch || !openClaim(state, dispatch)) return [];
   if (dispatch.state === "bound" && dispatch.run.run_id === run.run_id && dispatch.run.run_attempt === run.run_attempt) return [];
   return [{ kind: "Bound", dispatch_id: dispatchId, run_id: run.run_id, run_attempt: run.run_attempt }];
-}
-
-/**
- * Reload the ledger until the dispatcher has recorded its launch of the Dispatch (or the
- * Dispatch closed), within a bounded wait.
- * @param {() => Promise<any>} load
- * @param {any} latest
- * @param {string} dispatchId
- * @param {{attempts: number, delayMs: number}} wait
- * @param {(ms: number) => Promise<unknown>} sleep
- */
-async function awaitRecordedLaunch(load, latest, dispatchId, wait, sleep) {
-  for (let attempt = 1; latest.state.dispatches.get(dispatchId)?.state === "reserved"; attempt++) {
-    if (attempt >= wait.attempts) throw queueError(LAUNCH_UNVERIFIED, `Dispatch ${dispatchId} has no recorded launch; this run cannot bind it`);
-    await sleep(wait.delayMs);
-    latest = await load();
-  }
-  return latest;
 }
 
 /**
@@ -77,22 +57,22 @@ async function main(options = {}) {
   const outputPath = options.snapshotPath || process.env.GH_AW_WORK_QUEUE_SNAPSHOT || SNAPSHOT_PATH;
   const runtime = resolveWorkQueueRuntime(context.payload, { role: options.role, requireAssignment: options.requireAssignment });
   const target = { githubClient, context, core: coreApi, ...(options.branch === undefined ? {} : { branch: options.branch }) };
-  const load = () => loadQueue({ ...target, role: runtime.role });
-  let latest = await load();
+  let latest = await loadQueue({ ...target, role: runtime.role });
   /** @type {ReturnType<typeof assignmentForDispatch> | null} */
   let worker = null;
   let settled = false;
   if (runtime.role === "worker") {
     const dispatchId = runtime.assignment.dispatch_id;
-    if (!latest.state.dispatches.has(dispatchId)) throw queueError("work_queue_assignment_unknown", `Dispatch ${dispatchId} is not in the work queue ledger`);
-    latest = await awaitRecordedLaunch(load, latest, dispatchId, options.launchWait ?? LAUNCH_WAIT, options.sleep ?? (ms => new Promise(resolve => setTimeout(resolve, ms))));
     const dispatch = latest.state.dispatches.get(dispatchId);
+    if (!dispatch) throw queueError("work_queue_assignment_unknown", `Dispatch ${dispatchId} is not in the work queue ledger`);
+    // The dispatcher records the launch right after its POST; a run without that record fails at once.
+    if (dispatch.state === "reserved") throw queueError(LAUNCH_UNVERIFIED, `Dispatch ${dispatchId} has no recorded launch; this run cannot bind it`);
     if (openClaim(latest.state, dispatch)) {
       await verifyRunProvenance(githubClient, context, dispatch);
       if (!isStagedMode(options.config)) {
         const run = { run_id: String(context.runId), run_attempt: Number(context.runAttempt ?? 1) };
         const published = await publishRequest({ ...target, role: "worker", kind: "bind", parameters: { dispatch_id: dispatchId }, operationsFor: state => bindOperations(state, dispatchId, run) });
-        if (published.committed) latest = await load();
+        if (published.committed) latest = await loadQueue({ ...target, role: runtime.role });
       }
     }
     const assignment = assignmentForDispatch(latest.state, dispatchId);
@@ -122,4 +102,4 @@ async function main(options = {}) {
   return snapshot;
 }
 
-module.exports = { LAUNCH_WAIT, SNAPSHOT_PATH, bindOperations, main };
+module.exports = { SNAPSHOT_PATH, bindOperations, main };

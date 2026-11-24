@@ -5,7 +5,7 @@ import { createRequire } from "node:module";
 const require = createRequire(import.meta.url);
 const h = require("./work_queue_test_helpers.cjs");
 const { applyCommit, buildCommit, checkpointCommit, newRequest, newState, replayTransactionLog, replayTransactions } = require("./work_queue_replay.cjs");
-const { UNBOUND_GRACE_MS, main, maintenance } = require("./reconcile_work_queue_run.cjs");
+const { main, maintenance } = require("./reconcile_work_queue_run.cjs");
 
 const POLICY = {
   version: 4,
@@ -98,25 +98,39 @@ describe("worker termination", () => {
 
 describe("maintenance", () => {
   const context = { repo: { owner: "owner", repo: "repo" }, runId: 300, runAttempt: 1, payload: {} };
-  // Ledger commits built by the helpers are stamped at 1 ms.
-  const RESERVED_AT = 1;
   beforeEach(() => {
     process.env.GITHUB_WORKFLOW_REF = "owner/repo/.github/workflows/agentics-maintenance.yml@refs/heads/main";
   });
 
-  const unrelated = count => Array.from({ length: count }, (_, index) => ({ id: 1000 + index, display_title: "gh-aw work-queue unrelated", status: "in_progress" }));
-  /** listWorkflowRuns over fixed pages of a created-window listing. */
-  const listing = (pages, total = pages.flat().length) => vi.fn(async ({ page }) => ({ data: { total_count: total, workflow_runs: pages[page - 1] ?? [] } }));
-  const run = (dispatchId, status) => ({ id: 77, display_title: `gh-aw work-queue ${dispatchId}`, status });
+  /** getWorkflowRunAttempt over fixed `run/attempt` statuses; any other attempt answers 404. */
+  const attempts = statuses =>
+    vi.fn(async ({ run_id, attempt_number }) => {
+      const status = statuses[`${run_id}/${attempt_number}`];
+      if (!status) throw Object.assign(new Error("Not Found"), { status: 404 });
+      return { data: { id: run_id, run_attempt: attempt_number, status } };
+    });
 
-  async function runMaintenance(fake, actions, now = RESERVED_AT + UNBOUND_GRACE_MS) {
+  async function runMaintenance(fake, actions) {
     fake.githubClient.rest.actions = actions;
     const core = fakeCore();
-    const result = await maintenance({ githubClient: fake.githubClient, context, core, policy: POLICY, now: () => now });
+    const result = await maintenance({ githubClient: fake.githubClient, context, core, policy: POLICY });
     return { result, core, state: replayTransactionLog(fake.contents()) };
   }
 
-  it("judges a launched or bound Dispatch by its exact run, without listing runs", async () => {
+  /** One reservation per dispatcher attempt of run 100, in attempt order. */
+  function reservedByAttempts(count) {
+    const nodes = Array.from({ length: count }, (_, index) => h.work(`n${index}`));
+    let log = h.submit([], nodes);
+    const dispatches = [];
+    for (let attempt = 1; attempt <= count; attempt++) {
+      const step = h.dispatchNext(log, { max_claims: 1, max_dispatches: 1 }, { ...h.dispatcher, run_attempt: attempt });
+      log = step.log;
+      dispatches.push(...step.decision.dispatches);
+    }
+    return { log, nodes, dispatches };
+  }
+
+  it("judges a launched or bound Dispatch by its exact run, never by the dispatcher attempt", async () => {
     const { log, nodes, dispatches } = dispatched(["bound", "lost", "done", "running"]);
     let ledger = h.bind(h.launch(log, dispatches[0], true, h.dispatcher, "7"), dispatches[0], h.workerActor("7", 1));
     ledger = h.launch(ledger, dispatches[1], true, h.dispatcher, "8");
@@ -128,9 +142,9 @@ describe("maintenance", () => {
       if (!runs[run_id]) throw Object.assign(new Error("Not Found"), { status: 404 });
       return { data: { id: run_id, status: runs[run_id] } };
     });
-    const listWorkflowRuns = vi.fn();
+    const getWorkflowRunAttempt = vi.fn();
 
-    const { result, state } = await runMaintenance(fake, { getWorkflowRun, listWorkflowRuns });
+    const { result, state } = await runMaintenance(fake, { getWorkflowRun, getWorkflowRunAttempt });
 
     expect(result.released).toEqual([
       { dispatch_id: dispatches[0], reason: "run_terminal" },
@@ -139,106 +153,79 @@ describe("maintenance", () => {
     ]);
     expect(result.checkpointed).toBe(false);
     expect(getWorkflowRun.mock.calls.map(([request]) => request.run_id)).toEqual([7, 8, 9, 10]);
-    expect(listWorkflowRuns).not.toHaveBeenCalled();
+    expect(getWorkflowRunAttempt).not.toHaveBeenCalled();
     expect(nodes.map(node => state.works.get(node.work_id).state)).toEqual(["available", "available", "available", "claimed"]);
     expect(state.dispatches.get(dispatches[3]).state).toBe("started");
   });
 
-  it("keeps a reservation open while its launch may still be in flight", async () => {
+  it("keeps a reservation open while the dispatcher attempt that reserved it still runs", async () => {
     const { log, nodes, dispatches } = dispatched(["a"]);
     const fake = h.fakeQueueGitHub(h.ledgerText(log));
     const before = fake.contents();
-    const listWorkflowRuns = listing([[]]);
+    const getWorkflowRunAttempt = attempts({ "100/1": "in_progress" });
+    const getWorkflowRun = vi.fn();
 
-    const { result, state } = await runMaintenance(fake, { listWorkflowRuns }, RESERVED_AT + UNBOUND_GRACE_MS - 1);
+    const { result, state } = await runMaintenance(fake, { getWorkflowRun, getWorkflowRunAttempt });
 
     expect(result.released).toEqual([]);
-    expect(listWorkflowRuns).not.toHaveBeenCalled();
+    expect(getWorkflowRunAttempt).toHaveBeenCalledTimes(1);
+    expect(getWorkflowRunAttempt).toHaveBeenCalledWith(expect.objectContaining({ owner: "owner", repo: "repo", run_id: 100, attempt_number: 1 }));
+    expect(getWorkflowRun).not.toHaveBeenCalled();
     expect(fake.contents()).toBe(before);
     expect(state.works.get(nodes[0].work_id)).toMatchObject({ state: "claimed", attempts: 0 });
-    expect(state.dispatches.get(dispatches[0]).state).toBe("reserved");
+    expect(state.dispatches.get(dispatches[0])).toMatchObject({ state: "reserved", reserved_by: { run_id: "100", run_attempt: 1 } });
   });
 
-  it("finds a stale reservation's run beyond the second page of the listing", async () => {
-    const { log, dispatches } = dispatched(["a"]);
+  it("releases a reservation once the dispatcher attempt that reserved it completed or is gone", async () => {
+    const { log, nodes, dispatches } = reservedByAttempts(3);
     const fake = h.fakeQueueGitHub(h.ledgerText(log));
-    const before = fake.contents();
-    const listWorkflowRuns = listing([unrelated(100), unrelated(100), [run(dispatches[0], "queued")]]);
+    // Attempt 1 completed (its launch record never landed), attempt 2 is gone, attempt 3 still runs.
+    const getWorkflowRunAttempt = attempts({ "100/1": "completed", "100/3": "queued" });
 
-    const { result } = await runMaintenance(fake, { listWorkflowRuns });
+    const { result, state } = await runMaintenance(fake, { getWorkflowRunAttempt });
 
-    expect(result.released).toEqual([]);
-    expect(listWorkflowRuns).toHaveBeenCalledTimes(3);
-    expect(fake.contents()).toBe(before);
-  });
-
-  it("keeps a stale reservation open when the run listing is incomplete", async () => {
-    const { log, dispatches } = dispatched(["a"]);
-    const fake = h.fakeQueueGitHub(h.ledgerText(log));
-    const before = fake.contents();
-    const listWorkflowRuns = listing(
-      Array.from({ length: 10 }, () => unrelated(100)),
-      1500
-    );
-
-    const { result, core, state } = await runMaintenance(fake, { listWorkflowRuns });
-
-    expect(result.released).toEqual([]);
-    expect(fake.contents()).toBe(before);
-    expect(state.dispatches.get(dispatches[0]).state).toBe("reserved");
-    expect(core.warning).toHaveBeenCalledWith(expect.stringContaining("could not list every worker run"));
-  });
-
-  it("keeps a stale reservation open when 1,000 listed runs leave the listing unfinished", async () => {
-    const { log } = dispatched(["a"]);
-    const fake = h.fakeQueueGitHub(h.ledgerText(log));
-    const before = fake.contents();
-    // No total_count: only the full tenth page shows that the listing goes on.
-    const listWorkflowRuns = listing(
-      Array.from({ length: 11 }, () => unrelated(100)),
-      null
-    );
-
-    const { result, core } = await runMaintenance(fake, { listWorkflowRuns });
-
-    expect(result.released).toEqual([]);
-    expect(listWorkflowRuns).toHaveBeenCalledTimes(10);
-    expect(fake.contents()).toBe(before);
-    expect(core.warning).toHaveBeenCalledWith(expect.stringContaining("could not list every worker run"));
-  });
-
-  it("releases a stale reservation on a complete listing of runs created since it", async () => {
-    const { log, nodes, dispatches } = dispatched(["missing", "finished"]);
-    const fake = h.fakeQueueGitHub(h.ledgerText(log));
-    const listWorkflowRuns = listing([[...unrelated(3), run(dispatches[1], "completed")]]);
-
-    const { result, state } = await runMaintenance(fake, { listWorkflowRuns });
-
-    expect(result.released).toEqual([
-      { dispatch_id: dispatches[0], reason: "run_missing" },
-      { dispatch_id: dispatches[1], reason: "run_terminal" },
+    expect(getWorkflowRunAttempt.mock.calls.map(([request]) => [request.run_id, request.attempt_number])).toEqual([
+      [100, 1],
+      [100, 2],
+      [100, 3],
     ]);
-    for (const [request] of listWorkflowRuns.mock.calls) {
-      expect(request).toMatchObject({ workflow_id: "worker.lock.yml", event: "workflow_dispatch", created: ">=1970-01-01T00:00:00Z", per_page: 100, page: 1 });
-      expect(request).not.toHaveProperty("status");
-    }
-    expect(nodes.map(node => state.works.get(node.work_id))).toEqual([expect.objectContaining({ state: "available", attempts: 1 }), expect.objectContaining({ state: "available", attempts: 1 })]);
+    expect(result.released).toEqual([
+      { dispatch_id: dispatches[0], reason: "run_terminal" },
+      { dispatch_id: dispatches[1], reason: "run_missing" },
+    ]);
+    expect(nodes.map(node => state.works.get(node.work_id))).toEqual([
+      expect.objectContaining({ state: "available", attempts: 1 }),
+      expect.objectContaining({ state: "available", attempts: 1 }),
+      expect.objectContaining({ state: "claimed", attempts: 0 }),
+    ]);
+    expect(state.dispatches.get(dispatches[2]).state).toBe("reserved");
   });
 
-  it("measures a checkpointed reservation from the Checkpoint and lists the run lifetime", async () => {
+  it("judges a checkpointed reservation by the dispatcher attempt its Checkpoint records", async () => {
     const { log, dispatches } = dispatched(["a"]);
-    const checkpointAt = Date.UTC(2026, 10, 1);
-    const fake = h.fakeQueueGitHub(h.ledgerText([checkpointCommit(replayTransactions(log), h.reconciler, checkpointAt)]));
+    const fake = h.fakeQueueGitHub(h.ledgerText([checkpointCommit(replayTransactions(log), h.reconciler, 1)]));
     const before = fake.contents();
-    const young = listing([[]]);
-    expect((await runMaintenance(fake, { listWorkflowRuns: young }, checkpointAt + UNBOUND_GRACE_MS - 1)).result.released).toEqual([]);
-    expect(young).not.toHaveBeenCalled();
-    expect(fake.contents()).toBe(before);
+    expect(JSON.parse(before).operations[0].state.dispatches[dispatches[0]].reserved_by).toEqual({ run_id: "100", run_attempt: 1 });
 
-    const now = checkpointAt + UNBOUND_GRACE_MS;
-    const stale = listing([[]]);
-    expect((await runMaintenance(fake, { listWorkflowRuns: stale }, now)).result.released).toEqual([{ dispatch_id: dispatches[0], reason: "run_missing" }]);
-    expect(stale).toHaveBeenCalledWith(expect.objectContaining({ created: `>=${new Date(now - 35 * 24 * 60 * 60 * 1000).toISOString().replace(/\.\d{3}Z$/, "Z")}` }));
+    expect((await runMaintenance(fake, { getWorkflowRunAttempt: attempts({ "100/1": "in_progress" }) })).result.released).toEqual([]);
+    expect(fake.contents()).toBe(before);
+    expect((await runMaintenance(fake, { getWorkflowRunAttempt: attempts({ "100/1": "completed" }) })).result.released).toEqual([{ dispatch_id: dispatches[0], reason: "run_terminal" }]);
+  });
+
+  it("does not release a reservation whose launch lands between the attempt lookup and the release commit", async () => {
+    const { log, nodes, dispatches } = dispatched(["a"]);
+    const fake = h.fakeQueueGitHub(h.ledgerText(log));
+    // The reserving attempt records its launch just before it completes.
+    const launched = h.ledgerText(h.launch(log, dispatches[0]));
+    fake.state.beforeUpdate = () => fake.install(launched);
+
+    const { result, state } = await runMaintenance(fake, { getWorkflowRunAttempt: attempts({ "100/1": "completed" }) });
+
+    expect(fake.state.updates).toBe(1);
+    expect(result.released).toEqual([]);
+    expect(fake.contents()).toBe(launched);
+    expect(state.dispatches.get(dispatches[0]).state).toBe("started");
+    expect(state.works.get(nodes[0].work_id)).toMatchObject({ state: "claimed", attempts: 0 });
   });
 
   it("does not release a Dispatch whose worker binds between the run lookup and the release commit", async () => {

@@ -15,7 +15,7 @@ var (
 	workRecordOptional  = append(slices.Clone(workOptional), "claim_id", "completion_id", "effects", "cancellation_reason", "cancellation_commit_id", "issue_comment")
 	claimRecordRequired = []string{"claim_id", "work_id", "dispatch_id", "handle", "state", "commit_id", "request_id"}
 	claimRecordOptional = []string{"terminal_commit_id", "cancellation_reason", "effects", "issue_comment"}
-	dispatchFields      = []string{"dispatch_id", "request_id", "commit_id", "pool", "worker_profile", "workflow", "state", "run", "launch", "claims"}
+	dispatchFields      = []string{"dispatch_id", "request_id", "commit_id", "pool", "worker_profile", "workflow", "reserved_by", "state", "run", "launch", "claims"}
 )
 
 type projectionRecord struct {
@@ -402,10 +402,20 @@ func restoreDispatches(state *Projection, dispatches object) error {
 	return nil
 }
 
-// validateDispatchExecution checks a checkpoint Dispatch's bound run and recorded launch:
-// only bound Dispatches carry a run, only started or bound ones carry their launch, and a
-// bound run is the launched run.
+// validateDispatchExecution checks a checkpoint Dispatch's reserving dispatcher attempt, bound
+// run and recorded launch: only bound Dispatches carry a run, only started or bound ones carry
+// their launch, and a bound run is the launched run.
 func validateDispatchExecution(record object, recordState string) error {
+	reservedBy, err := closed(record["reserved_by"], []string{"run_id", "run_attempt"}, nil, "checkpoint reserved_by", "checkpoint_invalid")
+	if err != nil {
+		return err
+	}
+	if _, err := decimal(reservedBy["run_id"], "checkpoint reserving run ID", "checkpoint_invalid"); err != nil {
+		return err
+	}
+	if _, err := integer(reservedBy["run_attempt"], 1, 4096, "checkpoint reserving run attempt"); err != nil {
+		return err
+	}
 	var runID, launchRunID any
 	if record["run"] != nil {
 		run, err := closed(record["run"], []string{"run_id", "run_attempt"}, nil, "checkpoint run", "checkpoint_invalid")
