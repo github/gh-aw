@@ -39,6 +39,7 @@ Container digest resolution uses registry metadata only (`docker buildx imagetoo
 |-------|------|---------|-------------|
 | `lock_file_logo` | boolean | `true` | Include the ASCII logo in generated workflow headers, including companion workflows. Set to `false` to omit only the logo. |
 | `issue_label` | string | `"agentic-workflows"` | Label used to create and find gh-aw's own issues, including detection trackers, failure issues, and maintenance reports. |
+| `adaptive_routing` | `"observe"` or `false` | `false` | Record every eligible routed workflow's runs in its [adaptive routing](/gh-aw/reference/adaptive-routing/) history. Workflows that cannot take part are skipped; a workflow's own `adaptive-routing` value, or one from an import, wins. |
 
 ```json title=".github/workflows/aw.json"
 {
@@ -329,7 +330,7 @@ Pre-activation runs gating checks sequentially before any AI execution. Any fail
 
 The optional `--actionlint`, `--zizmor`, and `--poutine` scanners prefer local
 binaries on `PATH` when their versions meet the pinned Docker image versions
-(actionlint ≥ 1.7.12, zizmor ≥ 1.32.0, poutine ≥ 1.1.6). Missing, older, or
+(actionlint ≥ 1.7.12, zizmor ≥ 1.33.1, poutine ≥ 1.1.6). Missing, older, or
 unrecognized versions fall back to Docker. Local actionlint uses shellcheck and
 pyflakes from `PATH` when those integrations are enabled; it does not install them.
 

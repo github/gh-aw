@@ -95,6 +95,7 @@ func (c *Compiler) generateManifestHeader(yaml *strings.Builder, data *WorkflowD
 	// The manifest records safe-update inventory and normalized webhook declarations
 	// for CAO discovery without interpreting generated workflow steps.
 	manifest := NewGHAWManifest(secrets, actions, data.ActionResolutionFailures, data.DockerImagePins, data.Redirect, data.Skills, data.Plugins, data.RawFrontmatter["on"])
+	manifest.DynamicSecretReferences = normalizeDynamicSecretReferences(data.dynamicSecretReferences)
 	metadata := data.compiledMarkdownMetadata
 	if metadata == nil {
 		metadata = c.collectMarkdownMetadata(data)

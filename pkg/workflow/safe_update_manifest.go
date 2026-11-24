@@ -85,6 +85,7 @@ type GHAWManifestWorkQueue struct {
 type GHAWManifest struct {
 	Version                     int                                  `json:"version"`
 	Secrets                     []string                             `json:"secrets"`
+	DynamicSecretReferences     []string                             `json:"dynamic_secret_references,omitempty"`
 	Actions                     []GHAWManifestAction                 `json:"actions"`
 	Skills                      []string                             `json:"skills,omitempty"`                    // frontmatter skill specs (owner/repo@sha or owner/repo/skill/path@sha), sorted
 	Plugins                     []string                             `json:"plugins,omitempty"`                   // frontmatter plugin specs (owner/repository[/path]@sha), sorted
@@ -161,6 +162,19 @@ func NewGHAWManifest(secretNames []string, actionRefs []string, failures []GHAWM
 		HasPullRequestTarget: hasPRTarget,
 		AgentMetadata:        map[string]json.RawMessage{},
 	}
+}
+
+func normalizeDynamicSecretReferences(references []string) []string {
+	hashed := make([]string, 0, len(references))
+	for _, reference := range references {
+		reference = strings.TrimSpace(reference)
+		if reference == "" {
+			continue
+		}
+		hash := sha256.Sum256([]byte(reference))
+		hashed = append(hashed, "sha256:"+hex.EncodeToString(hash[:]))
+	}
+	return normalizeManifestSpecs(hashed)
 }
 
 func normalizeManifestSpecs(specs []string) []string {

@@ -7,7 +7,7 @@ sidebar:
 
 # GitHub Actions Compiler Threat Detection Specification
 
-**Version**: 1.0.109
+**Version**: 1.0.111
 **Status**: Candidate Recommendation  
 **Latest Version**: https://github.com/github/gh-aw/blob/main/specs/compiler-threat-detection-spec.md  
 **Editors**: GitHub Next (GitHub, Inc.)
@@ -32,7 +32,7 @@ Each version maps to the minimum compatible binary. A version change MUST update
 
 | Versions | Minimum gh-aw |
 |---|---:|
-| `1.0.60`–`1.0.109` | Unreleased |
+| `1.0.60`–`1.0.111` | Unreleased |
 | `1.0.44`–`1.0.59` | Unreleased |
 | `1.0.40`–`1.0.43` | `v0.87.9` |
 | `1.0.39` | `v0.87.9` |
@@ -248,6 +248,8 @@ Each rule has a stable `CTR-*` ID, threat class, trigger, compiler action, diagn
   Compiler-generated universal-consumer Copilot credentials MUST remain provider-scoped; OpenAI-compatible client placeholders MUST follow the startup/sandbox boundary in Section 7.6. This is a generated-configuration requirement, not an additional authored-source lint diagnostic.
 
   Compiler-generated agent step-summary publication MUST execute only when the workflow's secret-masking success condition succeeds, while retaining `always()` semantics for prior-step outcomes. The redaction implementation MUST fail closed on permission-denied scan errors and summary-symlink unlink failures. The summary publisher MUST use the shared Linux descriptor-relative, no-follow guarded reader; accept only isolated regular files no larger than 10 MiB; preserve missing and empty files as no-ops; and fail closed for unsupported, replaced, symlinked, or non-regular files. These controls MUST NOT weaken existing secret-redaction, publication, or failure-gating obligations.
+
+  The `overprovisioned-secrets` Actions/AW lint rule MUST report expressions that expose the whole `secrets` context, including `toJSON(secrets)` and wildcard projections. Literal and dynamic property selection, such as `secrets.NAME`, `secrets['NAME']`, or `secrets[fromJSON(vars.MAP)[github.repository]]`, MUST NOT by itself be classified as whole-context exposure. Selector expressions MUST still be inspected: `secrets[fromJSON(toJSON(secrets))[github.repository]]` MUST be reported. Whole-context findings and authored remote reusable-workflow `secrets: inherit` MUST be errors under strict AW policy and warnings for non-strict AW or Actions-only inputs. Authored local reusable-workflow inheritance MUST remain a warning; the existing compiler-generated call-workflow fallback exception remains unchanged. Accepting single-secret selection MUST NOT establish selector trust, authorize disclosure, or weaken independent credential-placement, prompt-binding, and secret-leak controls.
 - **CTR-018 Version Integrity Bypass**: Warn, or reject in strict mode, for `check-for-updates: false`.
 - **CTR-019 Cache-Memory Integrity Enforcement**: When detection is enabled, separate agent cache access from cache-memory publication and require successful agent and detection jobs plus explicit detector acceptance before publication, subject to the compatibility boundaries in Section 5.1.3.
 - **CTR-020 Conditional Import Security**: Reject `imports` entries containing `if`.
@@ -580,6 +582,7 @@ Rules with a known compiler threat mapping MUST declare its `CTR-*` ID in `Rule.
 | CTR-014 | `install-scripts` | Authored Node runtime configuration does not explicitly enable dependency install hooks. Does not infer imported runtime configuration or arbitrary package-install commands. | `pkg/workflow/lint/runtime_policy.go`, `policy_conversions_test.go`, `source_policy_test.go` |
 | CTR-015 | `allowed-labels` | Authored issue, discussion, discussion-update, and pull-request creation label allowlists do not contain a bare wildcard. Required-label names remain literal; narrower allowed-label patterns are accepted. | `pkg/workflow/lint/output_policy.go`, `policy_conversions_test.go` |
 | CTR-017 | `secret-leak` | Symbolic secrets do not reach modeled disclosure sinks through expression, environment, output, shell, file, or explicitly configured JavaScript flows. Coverage warnings identify unmodeled paths; JavaScript analysis requires an explicit native compiler and source configuration. | `pkg/workflow/lint/secrets.go`, `pkg/workflow/taint/`, `pkg/workflow/taint/taint_test.go`, `pkg/workflow/taint/javascript_test.go` |
+| CTR-017 | `overprovisioned-secrets` | Whole-context secrets exposure and authored remote `secrets: inherit` produce errors under strict AW policy, otherwise warnings; local inheritance warns. Literal or dynamic single-property selection is not whole-context exposure, but whole-context references inside selectors remain reported. The compiler-generated call-workflow fallback exemption requires its existing provenance and shape checks. Selector trust and independent disclosure controls are not inferred. | `pkg/workflow/lint/overprovisioned_secrets.go`, `overprovisioned_secrets_test.go`: `TestOverprovisionedSecretsSelectors`, Actions/AW inheritance and severity cases, compiler-fallback provenance, and cancellation; `rule_contract_test.go` verifies mapping and read-only contracts. |
 | CTR-017 | `otlp-secret-leak` | Secret-tainted values do not reach authored OTLP span/resource attribute maps or Actions environment bindings named `GH_AW_OTLP_ATTRIBUTES` and `OTEL_RESOURCE_ATTRIBUTES`. Actions AST analysis follows modeled environment bindings; AW-only analysis checks direct secret references. Diagnostics are value-free. Hard-coded credentials, arbitrary runtime values, and unresolved external inputs are not inferred, and the linter does not prove collector trust or compiler rejection. | `pkg/workflow/lint/otlp_secret_leak.go`, `otlp_secret_leak_test.go`; `pkg/workflow/taint/workflow.go` |
 | CTR-018 | `version-check` | An authored AW document does not explicitly disable version integrity checking. | `pkg/workflow/lint/source_policy.go`, `source_policy_test.go` |
 | CTR-020 | `conditional-import` | Authored AW configuration import entries do not contain `if`; runtime prompt conditionals are unaffected. | `pkg/workflow/lint/source_policy.go`, `source_policy_test.go` |
@@ -944,6 +947,23 @@ A failed or skipped lookup fails open. The compiler emits one warning per releas
 | Copilot runtime policy | `pkg/workflow/copilot_installer.go` | `TestCopilotLiteralCooldownRuntimePolicy`, `TestCompileEngineReleaseCooldownLiteral` |
 
 This is an existing-behavior supply-chain mapping. No new `CTR-*` rule or compliance-test identifier is introduced.
+
+### 7.18 Adaptive Routing History Writer
+
+`adaptive-routing: observe` adds a post-conclusion `push_routing_history` job that records routed-run evidence on `memory/adaptive-routing/<workflow>` without changing the model that runs. The compiler MUST keep that history outside agent control:
+
+- Reject any `tools.repo-memory` branch equal to or inside `memory/adaptive-routing`, so the agent can never edit its own record.
+- Grant `contents: write` and `actions: read` only to the writer job, never to the agent or other jobs; the job MUST depend on `activation`, `agent`, and `conclusion` and MUST NOT run when the agent was skipped.
+- Emit the routing identity fields (workflow ID, definition hash, mode, engine, and goal) only as fixed, quoted compiler-derived values. Other runtime bindings, including a dynamically selected routing level, token/session-file bindings, and sub-agent declarations, are outside this requirement. The verdict MUST come from the unified session artifact, not from agent-written files.
+- Reject explicit use for the tested ineligible cases: a fixed or non-routed primary model, `workflow_call`, and missing `tools.repo-memory`. A repository default silently skips the fixed/non-routed model and `workflow_call` cases covered by regression tests. Workflows that do not opt in compile unchanged.
+
+| Boundary | Implementation | Regression Evidence |
+|---|---|---|
+| Reserved history namespace | `pkg/workflow/adaptive_routing.go`: `validateRepoMemoryBranchesNotReserved` | `TestRepoMemoryCannotWriteTheRoutingHistories` |
+| Writer job permissions, ordering, and environment | `addPushRoutingHistoryJob`, `buildPushRoutingHistorySteps` | `TestAdaptiveRoutingObserveAddsOnlyTheWriterJob` |
+| Eligibility and opt-in precedence | `resolveAdaptiveRoutingSetting`, `adaptiveRoutingIneligibility`, `applyAdaptiveRouting` | `TestAdaptiveRoutingSettingPrecedence`, `TestAdaptiveRoutingFromAnImport`, `TestAdaptiveRoutingIneligibleWorkflows` (fixed/non-routed models, `workflow_call`, and missing repo-memory; default skips for fixed/non-routed models and `workflow_call`) |
+
+This is an existing-behavior mapping. The writer's `contents: write` is a deliberate, job-scoped grant; the history records routing evidence only and does not authorize model selection changes. No new `CTR-*` rule or compliance-test identifier is introduced.
 
 ## 8. Compliance Testing
 

@@ -109,6 +109,8 @@ Run `gh aw audit <run-url>` and look at **Model Routing**. Compare the level you
 
 If the router found no eligible model, use `gh aw audit <run-url> --models` to see which models were available for that run, then check whether your engine, shortlist, or policy ruled them out. Widen the shortlist if appropriate; the router won't pick a model outside it.
 
+To keep a running record of which model and effort each run used, whether it completed its task, and what it cost, add [`adaptive-routing: observe`](/gh-aw/reference/adaptive-routing/). It never changes which model runs.
+
 <span id="migrate-nested-routing"></span>
 
 Updating an existing workflow after a compiler warning? See [Migrate routing settings](/gh-aw/setup/working-with-workflows/#migrate-routing-settings).

@@ -449,7 +449,7 @@ gh aw compile --actions-lock               # Update the standard Actions depende
 gh aw compile --purge                      # Remove orphaned .lock.yml files
 ```
 
-For `--zizmor` and `--poutine`, compilation automatically uses a binary on `PATH` when its version is at least 1.32.0 or 1.1.6, respectively. The version is checked with `zizmor --version` or `poutine version --disable-version-check`. If the binary is missing, too old, or its version cannot be determined, the scanner uses the pinned Docker image instead. Other Docker-based checks still require Docker.
+For `--zizmor` and `--poutine`, compilation automatically uses a binary on `PATH` when its version is at least 1.33.1 or 1.1.6, respectively. The version is checked with `zizmor --version` or `poutine version --disable-version-check`. If the binary is missing, too old, or its version cannot be determined, the scanner uses the pinned Docker image instead. Other Docker-based checks still require Docker.
 
 If the repository root contains an [`aw.yml` manifest](/gh-aw/reference/aw-yml-package-manifest/), `gh aw compile` validates it before compiling workflows.
 
@@ -1297,6 +1297,18 @@ gh aw experiments analyze my-workflow --repo owner/repo  # Analyze experiments i
 ```
 
 **Options:** all `experiments` commands accept `--repo/-r`, `--json/-j`
+
+#### `routing`
+
+Show or reset what [adaptive routing](/gh-aw/reference/adaptive-routing/) has recorded on `memory/adaptive-routing/*` branches. `routing status` lists every routing history, or shows one workflow's evidence: for each model and effort, its runs, expected and hopeful success rates, average credits, streak, tests and suspension, and why recent runs did not count. `routing reset` starts a workflow's history afresh in one commit that lands only if no run saved in the meantime; it keeps `runs.jsonl`, never deletes the branch, and needs write access.
+
+```bash wrap
+gh aw routing status                       # List routing histories
+gh aw routing status issue-triage --json   # Show one workflow's evidence as JSON
+gh aw routing reset issue-triage           # Start that workflow's history afresh
+```
+
+**Options:** `routing status` accepts `--repo/-r` and `--json/-j`; `routing reset` accepts `--repo/-r`
 
 ### Management
 

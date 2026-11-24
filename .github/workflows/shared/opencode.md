@@ -177,7 +177,7 @@ engine:
           providers: {
             "awf-proxy": {
               name: "GitHub Agentic Workflows",
-              package: isAnthropic ? "@opencode/ai/providers/anthropic" : "@opencode/ai/providers/openai-compatible",
+              package: isAnthropic ? "@opencode/ai/providers/anthropic" : provider === "openai" ? "@opencode/ai/providers/openai-compatible/responses" : "@opencode/ai/providers/openai-compatible",
               settings: { baseURL, apiKey },
               models: Object.fromEntries(roster.map(entry => [entry, { name: entry }])),
             },
@@ -375,7 +375,10 @@ a fixed proxy address. It passes the model through `--model`, supplies the
 prompt on stdin, and requests JSONL events. `run --standalone` starts a private,
 short-lived server so the run cannot reuse a background service with different
 configuration or credentials. Provider credentials remain in AWF;
-only a placeholder key reaches the agent. `engine.max-turns` limits completed
+only a placeholder key reaches the agent. OpenAI and Codex providers use the
+bundled Responses adapter so reasoning models can call tools; GitHub retains
+the Chat Completions adapter, and Anthropic retains its native adapter.
+`engine.max-turns` limits completed
 model steps, and a tool-calling turn at the limit fails explicitly. Before each
 empty-run continuation, the harness reconciles completed steps and configures
 OpenCode with only the remaining cumulative step budget.

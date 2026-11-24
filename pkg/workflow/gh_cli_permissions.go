@@ -509,7 +509,7 @@ func inferExplicitReadOnlyGHScript(script string, permissions compiledGHCLIPermi
 }
 
 func explicitReadOnlyGHAPIEndpoint(endpoint string, permissions compiledGHCLIPermissions) ([]PermissionScope, bool) {
-	path := strings.SplitN(strings.Trim(strings.TrimPrefix(endpoint, "/"), "/"), "?", 2)[0] //nolint:uncheckedsliceindex // SplitN always returns at least one element.
+	path, _, _ := strings.Cut(strings.Trim(strings.TrimPrefix(endpoint, "/"), "/"), "?")
 	segments := strings.Split(path, "/")
 	if len(segments) >= 4 && strings.EqualFold(segments[0], "repos") && strings.EqualFold(segments[3], "actions") {
 		switch {

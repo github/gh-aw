@@ -156,6 +156,7 @@ function parseSubagentModelsJson(value) {
  *   },
  *   toolConfig?: import("./copilot_sdk_tool_config.cjs").CopilotSDKToolConfig,
  *   mcpServers?: Record<string, import("@microsoft/copilot-sdk").MCPServerConfig>,
+ *   mcpOnly?: boolean,
  *   webFetchOptions?: {fetchImpl?: typeof fetch, timeoutMs?: number, maxRedirects?: number},
  *   coreLogger?: import("./copilot_sdk_permissions.cjs").CopilotSDKCoreLogger,
  *   sdkModule?: {
@@ -202,6 +203,7 @@ async function runCopilotSDKSession({
   permissionConfig,
   toolConfig,
   mcpServers,
+  mcpOnly = false,
   webFetchOptions,
   coreLogger,
   sdkModule,
@@ -394,6 +396,7 @@ async function runCopilotSDKSession({
       logger: log,
       onDenied: requestSummary => recordToolDenial(`permission denied: ${requestSummary}`),
       workspaceRoot: workingDirectory,
+      mcpOnly,
     });
     const toolCallBudget = buildCopilotSDKToolCallBudget(toolConfig?.maxToolCalls, event => {
       writeDriverEvent(event.exhausted ? "guard.tool_call_budget_exceeded" : "guard.tool_call_budget_debit", event);
@@ -415,7 +418,7 @@ async function runCopilotSDKSession({
     // the harness could not resolve is absent from the map and inherits the session model.
     const resolvedSubagentModels = parseSubagentModelsJson(process.env.GH_AW_COPILOT_SDK_SUBAGENT_MODELS);
     const unavailableModels = [];
-    const customAgents = loadCopilotSDKCustomAgents(agentsBaseDir, log).map(agent => {
+    const customAgents = (mcpOnly ? [] : loadCopilotSDKCustomAgents(agentsBaseDir, log)).map(agent => {
       if (!agent.model || agent.model.trim().toLowerCase() === "inherited") return { ...agent, model: sessionModel || undefined };
       if (Object.prototype.hasOwnProperty.call(resolvedSubagentModels, agent.name)) {
         const resolved = resolvedSubagentModels[agent.name];
@@ -458,7 +461,7 @@ async function runCopilotSDKSession({
       ...(mcpServers === undefined ? {} : { mcp: { servers: mcpServers } }),
       permissions: { onRequest: onPermissionRequest },
       ...(toolCallBudget ? { hooks: { handlers: { onPreToolUse: toolCallBudget.onPreToolUse } } } : {}),
-      tools: buildCopilotSDKSessionToolConfig(toolConfig, sdk, webFetchOptions),
+      tools: buildCopilotSDKSessionToolConfig(toolConfig, sdk, { ...webFetchOptions, mcpOnly }),
     };
     log(`creating session with model="${sessionConfig.model || "(none)"}" providers=${providers?.length ?? 0} models=${providerModels?.length ?? 0}`);
     session = restoredSessionId

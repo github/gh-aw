@@ -15,9 +15,12 @@ SPEC.loader.exec_module(CHECKER)
 
 
 class InstructionPrefixTests(unittest.TestCase):
-    def check_bytes(self, data):
+    def check_bytes(self, data, workflow=False):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "instructions.md"
+            if workflow:
+                path = Path(directory) / ".github" / "workflows" / "workflow.md"
+                path.parent.mkdir(parents=True)
             path.write_bytes(data)
             return CHECKER.inspect(path)
 
@@ -28,7 +31,7 @@ class InstructionPrefixTests(unittest.TestCase):
                 self.assertEqual(result["total_bytes"], size)
                 self.assertEqual(not result["errors"], accepted)
 
-    def test_marker_must_end_within_budget_including_metadata(self):
+    def test_marker_must_end_within_budget_including_instruction_metadata(self):
         for end, accepted in ((7500, True), (7501, False)):
             with self.subTest(end=end):
                 metadata = b"---\ndescription: test\n---\n"
@@ -39,6 +42,27 @@ class InstructionPrefixTests(unittest.TestCase):
                 self.assertEqual(result["visible_bytes"], 8000)
                 self.assertEqual(result["omitted_bytes"], len(data) - 8000)
                 self.assertEqual(not result["errors"], accepted)
+
+    def test_workflow_frontmatter_does_not_consume_prompt_budget(self):
+        metadata = b"---\n" + b"description: metadata\n" * 1000 + b"---\n"
+        body = b"x" * (7500 - len(CHECKER.MARKER) - 1)
+        body += b"\n" + CHECKER.MARKER + b"\n" + b"optional detail\n" * 1000
+        result = self.check_bytes(metadata + body, workflow=True)
+        self.assertGreater(result["total_bytes"], 8000)
+        self.assertEqual(result["contract_bytes"], 7500)
+        self.assertEqual(result["visible_bytes"], 8000)
+        self.assertEqual(result["omitted_bytes"], len(body) - 8000)
+        self.assertFalse(result["errors"])
+
+    def test_workflow_frontmatter_with_utf8_bom_does_not_consume_prompt_budget(self):
+        metadata = b"\xef\xbb\xbf---\n" + b"description: metadata\n" * 1000 + b"---\n"
+        body = b"short"
+        result = self.check_bytes(metadata + body, workflow=True)
+        self.assertEqual(result["total_bytes"], len(metadata) + len(body))
+        self.assertEqual(result["contract_bytes"], len(body))
+        self.assertEqual(result["visible_bytes"], len(body))
+        self.assertEqual(result["omitted_bytes"], 0)
+        self.assertFalse(result["errors"])
 
     def test_marker_inside_code_example_does_not_hide_required_tail(self):
         result = self.check_bytes(b"```markdown\n" + CHECKER.MARKER + b"\n```\n" + b"x" * 8000)

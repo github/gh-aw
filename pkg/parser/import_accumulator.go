@@ -94,6 +94,7 @@ type importAccumulator struct {
 	mergedMaxTurnCacheMisses string
 	mergedMaxAICredits       string
 	mergedMaxDailyAICredits  string
+	mergedAdaptiveRouting    string
 	mergedConcurrency        string
 	mergedJobDiscriminator   string
 	// Union of excluded-env lists from all imported files (deduplicated).
@@ -211,6 +212,7 @@ func (acc *importAccumulator) populateImportsResultScalars(result *ImportsResult
 	result.MergedMaxTurnCacheMisses = acc.mergedMaxTurnCacheMisses
 	result.MergedMaxAICredits = acc.mergedMaxAICredits
 	result.MergedMaxDailyAICredits = acc.mergedMaxDailyAICredits
+	result.MergedAdaptiveRouting = acc.mergedAdaptiveRouting
 	result.MergedConcurrency = acc.mergedConcurrency
 	result.MergedJobDiscriminator = acc.mergedJobDiscriminator
 	result.MergedExcludedEnv = acc.excludedEnv

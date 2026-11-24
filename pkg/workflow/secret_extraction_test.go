@@ -217,6 +217,13 @@ func TestSharedExtractSecretsFromValue(t *testing.T) {
 	}
 }
 
+func TestExtractDynamicSecretReferencesFromValue(t *testing.T) {
+	value := "${{ vars.MODE == 'pat' && secrets[fromJSON(vars.SECRET_MAP || '{}')[github.repository]] || '' }}"
+	assert.Equal(t, []string{
+		"${{ secrets[fromJSON(vars.SECRET_MAP || '{}')[github.repository]] }}",
+	}, ExtractDynamicSecretReferencesFromValue(value))
+}
+
 // TestSharedExtractSecretsFromMap tests the shared ExtractSecretsFromMap utility function
 func TestSharedExtractSecretsFromMap(t *testing.T) {
 	tests := []struct {

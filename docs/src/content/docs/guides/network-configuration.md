@@ -95,55 +95,20 @@ See [Network Permissions - Protocol-Specific Filtering](/gh-aw/reference/network
 
 ## Strict Mode and Ecosystem Identifiers
 
-Workflows use [strict mode](/gh-aw/reference/frontmatter/#strict-mode-strict) by default, which enforces ecosystem identifiers instead of individual domains for security. This applies to all engines.
+Workflows use [strict mode](/gh-aw/reference/frontmatter/#strict-mode-strict) by default. Listing an individual domain that belongs to a known ecosystem (such as `pypi.org`) produces an informational recommendation to use its ecosystem identifier (such as `python`); it does not reject the domain. Custom hostnames are also allowed while strict mode is enabled. Only the catch-all wildcard `*` is rejected; supported wildcard domain patterns are described in [Wildcard Domain Patterns](/gh-aw/reference/network/#wildcard-domain-patterns).
 
-````yaml
-# ❌ Rejected in strict mode
+See [Strict Mode Validation](/gh-aw/reference/network/#strict-mode-validation) for details.
+
+````yaml wrap
+strict: true
 network:
   allowed:
-    - "pypi.org"       # Error: use 'python' ecosystem instead
-    - "npmjs.org"      # Error: use 'node' ecosystem instead
-
-# ✅ Accepted in strict mode
-network:
-  allowed:
-    - python           # Ecosystem identifier
-    - node             # Ecosystem identifier
+    - defaults
+    - python
+    - "api.internal.example.com"  # Custom hostname
 ````
 
-### Error Messages
-
-When strict mode rejects a domain that belongs to a known ecosystem, the error message suggests the ecosystem identifier:
-
-````text
-error: strict mode: network domains must be from known ecosystems (e.g., 'defaults',
-'python', 'node') for all engines in strict mode. Custom domains are not allowed for
-security. Did you mean: 'pypi.org' belongs to ecosystem 'python'?
-````
-
-When strict mode rejects a custom domain:
-
-````text
-error: strict mode: network domains must be from known ecosystems (e.g., 'defaults',
-'python', 'node') for all engines in strict mode. Custom domains are not allowed for
-security. Set 'strict: false' to use custom domains.
-````
-
-### Using Custom Domains
-
-To use custom domains (domains not in known ecosystems), disable strict mode:
-
-````yaml
----
-strict: false    # Required for custom domains
-network:
-  allowed:
-    - python           # Ecosystem identifier
-    - "api.example.com"  # Custom domain (only allowed with strict: false)
----
-````
-
-**Security Note**: Custom domains bypass ecosystem validation. Only disable strict mode when necessary and ensure you trust the custom domains you allow.
+**Security Note:** Custom domains bypass ecosystem validation, so review each hostname before adding it to `network.allowed`.
 
 ## Security Best Practices
 

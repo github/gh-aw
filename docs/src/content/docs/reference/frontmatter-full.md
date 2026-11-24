@@ -26025,6 +26025,22 @@ model-routing:
   allowed-models: []
     # Array of strings
 
+# Record each run of a routed workflow in its adaptive routing history on the
+# memory/adaptive-routing/<workflow> branch. observe keeps the ordinary router
+# pick and records the selected model and effort, whether the run completed its
+# task, and what it cost; false turns it off, including a repository default from
+# aw.json. Requires model routing on a Copilot, Claude, or Codex engine and
+# tools.repo-memory.
+# (optional)
+# Accepted formats:
+
+# Format 1: Record every eligible run without changing which model runs.
+adaptive-routing: "observe"
+
+# Format 2: false turns adaptive routing off. true is reserved for live adaptive
+# routing, which is not available yet.
+adaptive-routing: false
+
 # Graders over the unified session, including reserved operational-value
 # JavaScript. Fast built-ins run in conclusion; executable custom graders run only
 # in the separate graders job.

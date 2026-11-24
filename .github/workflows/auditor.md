@@ -287,8 +287,10 @@ jobs:
               await core.summary.addRaw(message + ' Partial diagnostics are in auditor-collection/health.json.').write();
               return;
             }
+            // The historic boundary probe cap does not invalidate revision-checked current cohorts.
             if (!verified || (discovery.partial !== false &&
-                !(discovery.partial === true && discovery.reason === 'job_evidence_incomplete'))) {
+                !(discovery.partial === true &&
+                  ['job_evidence_incomplete', 'revision_boundary_incomplete'].includes(discovery.reason)))) {
               throw new Error('Incomplete health discovery; checkpoint unchanged: ' + JSON.stringify(discovery));
             }
             const currentPaths = new Map(workflows.filter(w => !w.intentional_failure &&
