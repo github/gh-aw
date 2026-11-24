@@ -152,7 +152,7 @@ func validateRepoMemoryBranchesNotReserved(config *RepoMemoryConfig) error {
 // and writes through repo-memory's save loop with its own contents: write token.
 // No concurrency group: the save loop converges concurrent writers itself.
 func (c *Compiler) addPushRoutingHistoryJob(data *WorkflowData) error {
-	if data.AdaptiveRouting == "" {
+	if data.AdaptiveRouting == "" || data.DryRun || c.dryRun {
 		return nil
 	}
 	if _, exists := c.jobManager.GetJob(string(constants.ConclusionJobName)); !exists {

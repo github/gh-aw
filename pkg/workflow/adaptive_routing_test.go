@@ -212,3 +212,70 @@ func TestLoadRepoConfig_AdaptiveRouting(t *testing.T) {
 	_, err = LoadRepoConfig(root)
 	require.Error(t, err, "live adaptive routing has no repository default yet")
 }
+
+func TestAdaptiveRoutingDryRunOmitsWriterJob(t *testing.T) {
+	root := t.TempDir()
+	workflowPath := filepath.Join(root, ".github", "workflows", "triage.md")
+	require.NoError(t, os.MkdirAll(filepath.Dir(workflowPath), 0o755))
+	require.NoError(t, os.WriteFile(workflowPath, []byte(adaptiveRoutingSource(" workflow_dispatch", "adaptive-routing: observe\n")), 0o600))
+
+	compiler := NewCompiler(WithNoEmit(true))
+	compiler.gitRoot = root
+	for _, dryRun := range []bool{true, false} {
+		compiler.SetDryRun(dryRun)
+		var (
+			data *WorkflowData
+			lock string
+			err  error
+		)
+		testutil.CaptureStderr(t, func() {
+			data, err = compiler.ParseWorkflowFile(workflowPath)
+			if err == nil {
+				lock, err = compiler.CompileToYAML(data, workflowPath)
+			}
+		})
+		require.NoError(t, err)
+		assert.Equal(t, "observe", data.AdaptiveRouting, "dry-run compilation must not mutate parsed WorkflowData")
+		jobs := lockJobs(t, lock)
+		if dryRun {
+			assert.NotContains(t, jobs, pushRoutingHistoryJobName, "dry-run compilation must omit push_routing_history rather than leaving a skipped job")
+			assert.NotContains(t, lock, pushRoutingHistoryJobName)
+		} else {
+			assert.Contains(t, jobs, pushRoutingHistoryJobName, "normal compilation after dry-run must restore push_routing_history")
+		}
+	}
+
+	// Repository-default opt-in via aw.json is also omitted under --dry-run.
+	defaultRoot := t.TempDir()
+	writeAWJSON(t, defaultRoot, `{"adaptive_routing": "observe"}`)
+	defaultPath := filepath.Join(defaultRoot, ".github", "workflows", "triage.md")
+	require.NoError(t, os.MkdirAll(filepath.Dir(defaultPath), 0o755))
+	require.NoError(t, os.WriteFile(defaultPath, []byte(adaptiveRoutingSource(" workflow_dispatch", "")), 0o600))
+	defaultCompiler := NewCompiler(WithNoEmit(true))
+	defaultCompiler.gitRoot = defaultRoot
+	defaultCompiler.SetDryRun(true)
+	var (
+		defaultData *WorkflowData
+		defaultLock string
+		err         error
+	)
+	testutil.CaptureStderr(t, func() {
+		defaultData, err = defaultCompiler.ParseWorkflowFile(defaultPath)
+		if err == nil {
+			defaultLock, err = defaultCompiler.CompileToYAML(defaultData, defaultPath)
+		}
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "observe", defaultData.AdaptiveRouting)
+	assert.NotContains(t, lockJobs(t, defaultLock), pushRoutingHistoryJobName)
+
+	// Validation of ineligible explicit adaptive-routing settings still runs under --dry-run.
+	invalidPath := filepath.Join(root, ".github", "workflows", "invalid.md")
+	invalidSource := strings.Replace(adaptiveRoutingSource(" workflow_dispatch", "adaptive-routing: observe\n"), "tools:\n  repo-memory: true\n", "", 1)
+	require.NoError(t, os.WriteFile(invalidPath, []byte(invalidSource), 0o600))
+	compiler.SetDryRun(true)
+	testutil.CaptureStderr(t, func() {
+		_, err = compiler.ParseWorkflowFile(invalidPath)
+	})
+	require.ErrorContains(t, err, "adaptive routing requires tools.repo-memory")
+}
