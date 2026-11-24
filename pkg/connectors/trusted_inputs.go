@@ -36,7 +36,7 @@ func (s *ConnectorSpec) validateTrustedInputs(name string, op Operation, phase s
 			op.CreatedResources[input] != "" || (source.Secret == "") == (source.Value == "") {
 			return fmt.Errorf("trusted input %q requires one secret name or literal and a required resource-constrained string input", input)
 		}
-		if source.Secret != "" && (!secretPattern.MatchString(source.Secret) || strings.HasPrefix(source.Secret, "GITHUB_")) {
+		if source.Secret != "" && (!secretPattern.MatchString(source.Secret) || strings.HasPrefix(source.Secret, "GITHUB_") || strings.HasPrefix(source.Secret, "GH_AW_CONNECTOR_APP_")) {
 			return fmt.Errorf("trusted input %q requires a non-reserved secret name", input)
 		}
 		if strings.Contains(source.Value, "${") || len(source.Value) > 1024 {

@@ -850,11 +850,21 @@ function secret(env, name, credential = true) {
   assert(typeof value === "string" && value !== "" && (!credential || !/[\r\n]/u.test(value)), credential ? "Connector credential resolution failed" : "Trusted connector input is unavailable");
   return value;
 }
-function authenticate(plan, name, phase, headers, env) {
+async function authenticate(plan, name, phase, headers, env) {
   const credential = plan.spec.credentials[name];
   const ref = plan.connection.credentials[name];
   assert(credential?.phase === phase && ref, "Connector credential phase mismatch");
   const prefix = { bearer: "Bearer ", token: "token ", basic: "Basic ", raw: "" }[credential.scheme];
+  const socketKey = "GH_AW_CONNECTOR_CREDENTIAL_SOCKET_" + ref.secret;
+  if (own(env, socketKey)) {
+    assert(["agent", "safe-output"].includes(phase) && credential.scheme === "bearer" && credential.header === "Authorization" && !own(env, "GH_AW_CONNECTOR_SECRET_" + ref.secret), "Invalid connector broker credential route");
+    try {
+      setHeader(headers, credential.header, prefix + (await require("./connector_credential_broker.cjs").readToken(env[socketKey])));
+      return;
+    } catch {
+      return fail("Connector broker credential resolution failed");
+    }
+  }
   setHeader(headers, credential.header, prefix + secret(env, ref.secret));
 }
 function lookup(document, pointer) {
@@ -1075,9 +1085,9 @@ async function runOperation(plan, op, capability, name, args, allowed, env, fetc
     request.init.body = binaryBody;
     request.init.headers["Content-Type"] = "application/octet-stream";
   }
-  authenticate(plan, op.credential, capability === "mcp" ? "agent" : capability === "preflight" ? "safe-output" : capability, request.init.headers, env);
   const attempts = op.retry?.maxAttempts || 1;
   for (let attempt = 0; attempt < attempts; attempt++) {
+    await authenticate(plan, op.credential, capability === "mcp" ? "agent" : capability === "preflight" ? "safe-output" : capability, request.init.headers, env);
     assert(deadline > Date.now(), "Connector retries exceeded the bounded execution window");
     let result;
     try {
@@ -1364,7 +1374,7 @@ async function callMCP(encoded, registration, tool, args, options = {}) {
       const headers = { ...server.headers, "Content-Type": "application/json", Accept: "application/json, text/event-stream" };
       if (session) headers["Mcp-Session-Id"] = session;
       if (method !== "initialize") headers["MCP-Protocol-Version"] = protocol;
-      authenticate(plan, server.credential, "agent", headers, env);
+      await authenticate(plan, server.credential, "agent", headers, env);
       const message = { jsonrpc: "2.0", method, params };
       if (id !== undefined) message["id"] = id;
       const { text, response } = await boundedHTTP(fetchImpl, endpoint, { method: "POST", headers, body: goJSON(message) }, server.maxResponseBytes, id);

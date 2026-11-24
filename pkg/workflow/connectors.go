@@ -47,6 +47,7 @@ type WorkflowConnector struct {
 	Alias             string
 	GitHubApps        map[string]*ConnectorGitHubApp
 	OIDCTokens        map[string]*ConnectorGitHubOIDC
+	AzureOIDC         map[string]*ConnectorAzureOIDC
 	Inference         *ResolvedConnectorInference
 }
 
@@ -147,16 +148,8 @@ func (c *Compiler) resolveWorkflowConnectors(frontmatter map[string]any) (map[st
 		if err != nil {
 			return nil, fmt.Errorf("connectors.%s: %w", alias, err)
 		}
-		if len(registration.GitHubApps)+len(registration.OIDCTokens)+len(registration.AzureOIDC) != 0 {
-			if registration.Spec == nil {
-				return nil, errors.New("connector github-app requires an inline declaration")
-			}
-			if err := validateConnectorGitHubApps(alias, registration); err != nil {
-				return nil, fmt.Errorf("connectors.%s: %w", alias, err)
-			}
-			if err := validateConnectorOIDC(alias, registration); err != nil {
-				return nil, fmt.Errorf("connectors.%s: %w", alias, err)
-			}
+		if err := validateConnectorIdentityRoutes(alias, registration); err != nil {
+			return nil, fmt.Errorf("connectors.%s: %w", alias, err)
 		}
 		service, err := loadWorkflowConnectorService(c.gitRoot, registration)
 		if err != nil {
@@ -181,6 +174,7 @@ func (c *Compiler) resolveWorkflowConnectors(frontmatter map[string]any) (map[st
 		resolved[alias] = config
 		config.Alias, config.GitHubApps = alias, registration.GitHubApps
 		config.OIDCTokens = registration.OIDCTokens
+		config.AzureOIDC = registration.AzureOIDC
 		config.Experimental = registration.Experimental
 		config.Docs = registration.Docs
 		config.SafeOutputOptions = registration.SafeOutputOptions
@@ -191,6 +185,19 @@ func (c *Compiler) resolveWorkflowConnectors(frontmatter map[string]any) (map[st
 		}
 	}
 	return resolved, nil
+}
+
+func validateConnectorIdentityRoutes(alias string, registration ConnectorRegistration) error {
+	if len(registration.GitHubApps)+len(registration.OIDCTokens)+len(registration.AzureOIDC) == 0 {
+		return nil
+	}
+	if registration.Spec == nil {
+		return errors.New("connector github-app requires an inline declaration")
+	}
+	if err := validateConnectorGitHubApps(alias, registration); err != nil {
+		return err
+	}
+	return validateConnectorOIDC(alias, registration)
 }
 
 func loadWorkflowConnectorService(root string, registration ConnectorRegistration) (*connectors.Service, error) {

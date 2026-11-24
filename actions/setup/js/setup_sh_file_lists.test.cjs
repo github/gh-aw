@@ -157,7 +157,7 @@ describe("setup.sh bundled connector execution", () => {
     ["MCP_SCRIPTS_FILES", mcpScriptsFiles],
     ["SAFE_OUTPUTS_FILES", safeOutputsFiles],
   ])("deploys the connector host and its local dependencies in %s", (_name, files) => {
-    for (const file of ["connector_runtime.cjs", "connector_regex.cjs", "connector_effect_bindings.cjs"]) {
+    for (const file of ["connector_runtime.cjs", "connector_regex.cjs", "connector_effect_bindings.cjs", "connector_azure_oidc.cjs", "connector_credential_broker.cjs"]) {
       expect(files).toContain(file);
       expect(existsSync(resolve(__dirname, file))).toBe(true);
     }

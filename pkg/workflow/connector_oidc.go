@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/sliceutil"
 )
 
@@ -108,19 +109,23 @@ func (c *Compiler) connectorOIDCSteps(data *WorkflowData, phase string) []string
 }
 
 func (c *Compiler) ensureConnectorOIDCJobPermissions(data *WorkflowData) {
-	for _, job := range c.jobManager.GetAllJobs() {
-		for _, config := range data.Connectors {
-			for name := range config.OIDCTokens {
-				stepID := "id: " + connectorAppStepID(connectorAppSecret(config.Alias, name)) + "\n"
-				for _, step := range job.Steps {
-					if !strings.Contains(step, stepID) {
-						continue
-					}
-					permissions := NewPermissionsParser(job.Permissions).ToPermissions()
-					permissions.Set(PermissionIdToken, PermissionWrite)
-					job.Permissions = permissions.RenderToYAML()
-				}
-			}
+	for jobName, job := range c.jobManager.GetAllJobs() {
+		phase := "agent"
+		switch jobName {
+		case string(constants.AgentJobName):
+		case string(constants.SafeOutputsJobName):
+			phase = "safe-output"
+		default:
+			continue
 		}
+		cleanup := c.connectorAzureBrokerSteps(data, phase, true)
+		job.Steps = append(job.Steps, cleanup...)
+		if (phase != "agent" || !usesConnectorInferenceOIDC(data)) &&
+			len(c.connectorOIDCSteps(data, phase))+len(cleanup) == 0 {
+			continue
+		}
+		permissions := NewPermissionsParser(job.Permissions).ToPermissions()
+		permissions.Set(PermissionIdToken, PermissionWrite)
+		job.Permissions = permissions.RenderToYAML()
 	}
 }

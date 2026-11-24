@@ -14947,7 +14947,7 @@
       }
     },
     "connectorAzureOIDC": {
-      "description": "Inference-only Azure Entra federation through the existing AWF engine transport. Scope is explicit; no Azure OpenAI default is assumed.",
+      "description": "Phase-specific Azure Entra federation. Inference uses the AWF engine transport. Agent readers and live safe outputs use a runner-owned broker; tenant and client IDs must be UUIDs or standalone vars references, with a single literal resource /.default scope.",
       "type": "object",
       "additionalProperties": false,
       "required": ["azure-tenant-id", "azure-client-id", "azure-scope"],

@@ -219,7 +219,10 @@ func (c *Compiler) buildDetectionJob(data *WorkflowData) (*Job, error) { //nolin
 	if brokeredInference {
 		perms.Set(PermissionIdToken, PermissionWrite)
 	}
-	if detectionAuthData.EngineConfig != nil &&
+	// A custom-steps-only detector does not execute the selected connector profile,
+	// even though detectionAuthData contains the inherited engine configuration.
+	connectorEngineDisabled := data.SafeOutputs.ThreatDetection.EngineDisabled && usesConnectorInferenceOIDC(data)
+	if !connectorEngineDisabled && detectionAuthData.EngineConfig != nil &&
 		detectionAuthData.EngineConfig.Auth != nil &&
 		detectionAuthData.EngineConfig.Auth.Type == "github-oidc" {
 		if !awfSupportsExcludeEnv(getFirewallConfig(detectionAuthData)) {

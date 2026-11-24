@@ -26,7 +26,8 @@
 //  7. GitHub MCP toolset permission alignment — validates that the workflow's
 //     declared permissions cover the read/write requirements of all enabled toolsets.
 //  8. id-token: write permission enforcement — rejects workflows that use OIDC auth
-//     (engine, HTTP MCP server, or OTLP) without `permissions.id-token: write`.
+//     (native engine, HTTP MCP server, or OTLP) without `permissions.id-token: write`.
+//     Selected connector inference instead grants this permission on the executing jobs.
 //  9. HTTP MCP OIDC AWF version gate — rejects legacy firewall.version pins when an
 //     HTTP MCP server uses `auth.type: github-oidc`, because --exclude-env (required
 //     to keep Actions OIDC credentials out of the agent container) is only available
@@ -301,7 +302,7 @@ func validateOIDCPermissions(workflowData *WorkflowData, workflowPermissions *Pe
 	requiresIDTokenWrite := false
 	errorPrefix := ""
 
-	if workflowData.EngineConfig != nil && workflowData.EngineConfig.Auth != nil && workflowData.EngineConfig.Auth.Type == "github-oidc" {
+	if workflowData.EngineConfig != nil && workflowData.EngineConfig.Auth != nil && workflowData.EngineConfig.Auth.Type == "github-oidc" && !usesConnectorInferenceOIDC(workflowData) {
 		requiresIDTokenWrite = true
 		errorPrefix = "engine.auth.type: github-oidc"
 	}

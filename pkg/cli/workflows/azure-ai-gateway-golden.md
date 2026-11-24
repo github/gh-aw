@@ -12,7 +12,6 @@ engine:
 strict: true
 permissions:
   contents: read
-  id-token: write
 imports:
   - uses: ".github/workflows/connectors/azure-ai-gateway.md"
     with:

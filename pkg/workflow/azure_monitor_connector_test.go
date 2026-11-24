@@ -32,6 +32,64 @@ func azureMonitorPlan(t *testing.T) *connectors.Plan {
 	return plan
 }
 
+// Exercise the published federated reader with the environment produced by
+// the compiler. Substitute a local socket for the gateway's read-only mount.
+func TestAzureMonitorOIDC(t *testing.T) {
+	compiler, path := prepareConnectorScenario(t, connectorCompilerScenario{provider: "azure-monitor"}, false, func(consumer, _ map[string]any) {
+		consumer["tools"].(map[string]any)["azure-monitor"] = []any{"get-activity-count-federated"}
+	})
+	data, err := compiler.ParseWorkflowFile(path)
+	require.NoError(t, err)
+	config := data.Connectors["azure-monitor"]
+	env, err := connectorEnv(config.Agent, config)
+	require.NoError(t, err)
+	socketKey := connectorAzureSocketPrefix + connectorAppSecret(config.Alias, "federated-reader")
+	require.Contains(t, env, socketKey)
+	require.Len(t, env, 2, "federation must not provision the stored-token reader")
+	payload, err := json.Marshal(map[string]any{"env": env, "key": socketKey, "workspace": monitorWorkspace, "response": monitorResponse})
+	require.NoError(t, err)
+	runtime, err := filepath.Abs("../../actions/setup/js/connector_runtime.cjs")
+	require.NoError(t, err)
+	command := exec.CommandContext(t.Context(), "node", "--unhandled-rejections=strict", "-e", `
+const assert = require("node:assert/strict");
+const {once} = require("node:events");
+const fs = require("node:fs");
+const net = require("node:net");
+const {join} = require("node:path");
+const {executeConnector} = require(process.argv[1]);
+const {env, key, workspace, response} = JSON.parse(fs.readFileSync(0, "utf8"));
+(async () => {
+  const dir = fs.mkdtempSync(join(require("node:os").tmpdir(), "monitor-"));
+  env[key] = join(dir, "token.sock");
+  let requests = 0, connections = 0;
+  const server = net.createServer(s => { connections++; s.end("synthetic-access"); });
+  try {
+    server.listen(env[key]);
+    await once(server, "listening");
+    const read = id => executeConnector(env.GH_AW_CONNECTOR_PLAN, "mcp", "get-activity-count-federated",
+      {"workspace-id": id}, {env, fetchImpl: async (target, init) => {
+        requests++;
+        assert.equal(new URL(target).origin, "https://api.loganalytics.azure.com");
+        assert.equal(new Headers(init.headers).get("authorization"), ["Bearer", "synthetic-access"].join(" "));
+        return new Response(response);
+      }});
+    await assert.rejects(read("aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee"));
+    assert.equal(connections, 0);
+    const result = await read(workspace);
+    assert.deepEqual({...result.data}, {"event-count": 42});
+    assert.equal(requests, 1);
+    assert.equal(connections, 1);
+  } finally {
+    server.close();
+    fs.rmSync(dir, {recursive:true, force:true});
+  }
+})();`, runtime)
+	command.Env = []string{"PATH=" + os.Getenv("PATH"), "TMPDIR=" + os.TempDir()}
+	command.Stdin = strings.NewReader(string(payload))
+	output, err := command.CombinedOutput()
+	require.NoError(t, err, "%s", output)
+}
+
 func azureMonitorInvalidArguments() []map[string]any {
 	return []map[string]any{
 		{},

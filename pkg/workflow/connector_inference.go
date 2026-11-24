@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/github/gh-aw/pkg/connectors"
+	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/sliceutil"
 )
 
@@ -220,9 +221,32 @@ func usesConnectorInference(data *WorkflowData) bool {
 	return false
 }
 
+// Only a selected profile whose Azure auth survived import merging can generate
+// an id-token grant. Importing the declaration alone does not grant authority.
+func usesConnectorInferenceOIDC(data *WorkflowData) bool {
+	if data == nil || data.EngineConfig == nil || data.EngineConfig.Auth == nil {
+		return false
+	}
+	auth := data.EngineConfig.Auth
+	if auth.Type != "github-oidc" || auth.Provider != "azure" {
+		return false
+	}
+	for _, connector := range data.Connectors {
+		if connector != nil && connector.Inference != nil && connector.Inference.Auth != nil && *connector.Inference.Auth == *auth {
+			return true
+		}
+	}
+	return false
+}
+
 func (c *Compiler) validateConnectorInferenceConsumers(data *WorkflowData) error {
 	if !usesConnectorInference(data) {
 		return nil
+	}
+	if usesConnectorInferenceOIDC(data) {
+		if !isFirewallEnabled(data) || !awfSupportsExcludeEnv(getFirewallConfig(data)) {
+			return fmt.Errorf("connector inference using Azure OIDC requires an enabled AWF sandbox at version %s or newer to exclude Actions OIDC credentials", constants.AWFExcludeEnvMinVersion)
+		}
 	}
 	if agent := getAgentConfig(data); agent != nil {
 		if agent.ModelFallback != nil && *agent.ModelFallback != "false" {

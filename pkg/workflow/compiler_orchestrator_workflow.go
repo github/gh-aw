@@ -64,9 +64,6 @@ func (c *Compiler) ParseWorkflowFile(markdownPath string) (*WorkflowData, error)
 	if err := c.populateWorkflowBuildContext(ctx); err != nil {
 		return nil, err
 	}
-	if err := c.validateConnectorInferenceConsumers(ctx.workflowData); err != nil {
-		return nil, c.formatEngineSetupError(ctx, err)
-	}
 	orchestratorWorkflowLog.Printf("Workflow file parsing completed successfully: %s", markdownPath)
 	return ctx.workflowData, nil
 }
@@ -338,11 +335,20 @@ func (c *Compiler) populateWorkflowBuildContext(ctx *workflowBuildContext) error
 	if err := validateModelRoutingRuntimeCompatibility(ctx.workflowData); err != nil {
 		return c.formatEngineSetupError(ctx, err)
 	}
+	if err := c.validateConnectorAzureBoundary(ctx.workflowData); err != nil {
+		return c.formatEngineSetupError(ctx, err)
+	}
 	// Shared by every parse entry point so file, string, document, and Wasm
 	// compilation resolve the implicit model-routing default identically.
 	c.applyDefaultModelRouting(ctx)
 	c.applyDynamicModelRouting(ctx)
-	return c.applyAdaptiveRouting(ctx)
+	if err := c.applyAdaptiveRouting(ctx); err != nil {
+		return err
+	}
+	if err := c.validateConnectorInferenceConsumers(ctx.workflowData); err != nil {
+		return c.formatEngineSetupError(ctx, err)
+	}
+	return nil
 }
 
 func (c *Compiler) attachSharedActionResolver(workflowData *WorkflowData) {

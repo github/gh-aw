@@ -222,11 +222,24 @@ requests to the approved provider endpoint. Client-credentials federation
 does not implement delegated user login or create role assignments.
 
 For `agent` and `safe-output`, the host MUST bind acquisition and renewal to
-the selected credential and phase. A staged writer MUST NOT request either
+the selected credential and phase. Tenant and client IDs MUST be UUIDs or
+standalone Actions `vars` references resolving to UUIDs; the scope MUST be a
+single literal resource `/.default` scope. The compiler MUST derive
+`id-token: write` for jobs that require the selected exchange, not unselected
+phases. A staged writer MUST NOT request either
 token. The host MUST NOT forward assertions or token-request credentials to
 the agent or provider, persist access tokens in plans or outputs, or use a
 failed exchange or authorization denial to select another route. Renewal
 uses a fresh exchange, not a stored refresh token or replay of a denied call.
+A potentially live federated writer (including conditional staging) MUST
+have a literal `safe-outputs.environment` name exclusive to the `safe_outputs`
+job. The compiler MUST keep `conclusion` and `pre_activation` outside that
+environment and reject `--environment` overrides, case-insensitive name
+collisions, and dynamic job environment names that preclude proving isolation.
+Statically staged-only writers require no such environment. The operator MUST
+protect the writer environment and restrict its separate application's
+federated credential to the exact environment subject. Client IDs alone do
+not isolate identities when their federated subject rules overlap.
 
 Inference credentials MUST use a stored token-name reference or `azure-oidc`,
 never a GitHub App or direct GitHub OIDC route. The Azure route lowers to existing
@@ -234,8 +247,9 @@ never a GitHub App or direct GitHub OIDC route. The Azure route lowers to existi
 tokens in connector tool setup. Its tenant, client and scope are bounded to 2048
 bytes and MAY reference Actions variables or secrets; they MUST NOT contain
 token values. Its audience defaults to the existing Azure engine exchange
-audience. The scope has no implicit Azure OpenAI default. The existing engine
-OIDC permission, firewall and version requirements continue to apply.
+audience. The scope has no implicit Azure OpenAI default. Selection supplies
+the inference job's `id-token: write`; existing native engine firewall and
+version requirements continue to apply.
 
 Resource-constrained arguments MUST be required strings, or nonempty bounded
 string arrays on hosted HTTP MCP tools. Each string MUST match an exact authored
@@ -1014,7 +1028,7 @@ sections 4–8; this specification defines no new public error-code registry.
 
 ### Version 1.4.0 (Experimental Working Draft) — 2026-11-24
 
-- Extended `azure-oidc` to agent and safe-output credentials, with trusted-host exchange and renewal. Existing inference and stored-token routes are unchanged.
+- Extended `azure-oidc` to agent and safe-output credentials, with trusted-host exchange and renewal. Connector selection derives the job's OIDC permission, including for inference. Existing inference transport and stored-token routes are unchanged.
 
 ### Version 1.3.0 (Experimental Working Draft) — 2026-11-23
 

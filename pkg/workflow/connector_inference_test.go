@@ -10,6 +10,7 @@ import (
 
 	"github.com/github/gh-aw/pkg/connectors"
 	"github.com/stretchr/testify/require"
+	"go.yaml.in/yaml/v3"
 )
 
 var azureAIGatewayScenario = connectorCompilerScenario{"azure-ai-gateway", nil, "", "create-issue"}
@@ -38,9 +39,7 @@ func TestAzureAIGatewayInferenceCompilation(t *testing.T) {
 			key := strings.HasSuffix(profile, "-key")
 			compiler, path := prepareConnectorScenario(t, azureAIGatewayScenario, false, func(consumer, _ map[string]any) {
 				consumer["engine"].(map[string]any)["inference"].(map[string]any)["profile"] = profile
-				if key {
-					delete(consumer["permissions"].(map[string]any), "id-token")
-				}
+				delete(consumer["permissions"].(map[string]any), "id-token")
 			})
 			data, err := compiler.ParseWorkflowFile(path)
 			require.NoError(t, err)
@@ -302,23 +301,74 @@ func inferenceSelection(frontmatter map[string]any) map[string]any {
 	return frontmatter["engine"].(map[string]any)["inference"].(map[string]any)
 }
 
-func TestConnectorInferenceUsesExistingOIDCGates(t *testing.T) {
-	for _, mode := range []string{"missing permission", "old firewall"} {
-		t.Run(mode, func(t *testing.T) {
-			compiler, path := prepareConnectorScenario(t, azureAIGatewayScenario, false, func(f, _ map[string]any) {
-				if mode == "missing permission" {
+func TestConnectorInferenceOIDCPermissionScope(t *testing.T) {
+	for _, tc := range []struct {
+		name              string
+		detector          any
+		inheritsInference bool
+	}{
+		{"inherited", true, true},
+		{"different engine", map[string]any{"engine": "claude"}, false},
+		{"custom steps only", map[string]any{"engine": false, "steps": []any{map[string]any{"run": "echo scanned"}}}, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			// Compare with stored-key inference so independent grants (such as
+			// admission OIDC) are not mistaken for connector-inference grants.
+			var baseline map[string]string
+			for _, profile := range []string{"responses-key", "responses"} {
+				compiler, path := prepareConnectorScenario(t, azureAIGatewayScenario, false, func(f, _ map[string]any) {
 					delete(f["permissions"].(map[string]any), "id-token")
-				} else {
+					inferenceSelection(f)["profile"] = profile
+					f["safe-outputs"].(map[string]any)["threat-detection"] = tc.detector
+				})
+				data, err := compiler.ParseWorkflowFile(path)
+				require.NoError(t, err)
+				output, err := compiler.CompileToYAML(data, path)
+				require.NoError(t, err)
+				var lock struct {
+					Permissions map[string]string `yaml:"permissions"`
+					Jobs        map[string]struct {
+						Permissions map[string]string `yaml:"permissions"`
+					} `yaml:"jobs"`
+				}
+				require.NoError(t, yaml.Unmarshal([]byte(output), &lock))
+				require.NotContains(t, lock.Permissions, "id-token")
+				require.Contains(t, lock.Jobs, "detection")
+				grants := map[string]string{}
+				for name, job := range lock.Jobs {
+					grants[name] = job.Permissions["id-token"]
+				}
+				if profile == "responses-key" {
+					require.NotEqual(t, "write", grants["agent"])
+					require.NotEqual(t, "write", grants["detection"])
+					baseline = grants
+					continue
+				}
+				baseline["agent"] = "write"
+				if tc.inheritsInference {
+					baseline["detection"] = "write"
+				}
+				require.Equal(t, baseline, grants)
+			}
+		})
+	}
+}
+
+func TestConnectorInferenceOIDCSafetyGates(t *testing.T) {
+	for _, tc := range []struct{ mode, want string }{
+		{"old firewall", "v0.25.3"},
+		{"dry-run", "cannot safely execute connector inference"},
+	} {
+		t.Run(tc.mode, func(t *testing.T) {
+			compiler, path := prepareConnectorScenario(t, azureAIGatewayScenario, false, func(f, _ map[string]any) {
+				delete(f["permissions"].(map[string]any), "id-token")
+				if tc.mode == "old firewall" {
+					f["safe-outputs"].(map[string]any)["threat-detection"] = false
 					f["sandbox"] = map[string]any{"agent": map[string]any{"version": "v0.25.2"}}
 				}
 			})
-			err := compiler.CompileWorkflow(path)
-			require.Error(t, err)
-			if mode == "missing permission" {
-				require.Contains(t, err.Error(), "id-token")
-			} else {
-				require.Contains(t, err.Error(), "v0.25.3")
-			}
+			compiler.SetDryRun(tc.mode == "dry-run")
+			require.ErrorContains(t, compiler.CompileWorkflow(path), tc.want)
 		})
 	}
 }

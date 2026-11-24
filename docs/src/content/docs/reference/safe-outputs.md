@@ -2189,7 +2189,9 @@ See [Using a GitHub App for Authentication](/gh-aw/reference/auth/#using-a-githu
 
 ### Environment Protection (`environment:`)
 
-Specifies the deployment environment for all compiler-generated safe-output jobs (`safe_outputs`, `conclusion`, `pre_activation`, custom safe-jobs). This makes environment-scoped secrets accessible in those jobs — for example, GitHub App credentials stored as environment secrets.
+Normally specifies the deployment environment for all compiler-generated safe-output jobs (`safe_outputs`, `conclusion`, `pre_activation`, custom safe-jobs). This makes environment-scoped secrets accessible in those jobs — for example, GitHub App credentials stored as environment secrets.
+
+A potentially live [`azure-oidc` connector writer](/gh-aw/reference/connectors/#microsoft-entra-workload-identity-federation) requires a literal environment name reserved for `safe_outputs`. The compiler keeps `conclusion` and `pre_activation` outside it; other jobs cannot name that environment or select one dynamically. A global `--environment` override is not supported in this case.
 
 The top-level `environment:` field is automatically propagated to all safe-output jobs. Use `safe-outputs.environment:` to override this independently:
 

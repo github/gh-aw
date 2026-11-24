@@ -836,19 +836,13 @@ func (c *Compiler) buildSafeOutputsJobFromParts(
 	}
 	concurrency := c.indentYAMLLines(concurrencyConfig, "    ")
 
-	const defaultSafeOutputsTimeoutMinutes = 45
-	timeoutMinutes := defaultSafeOutputsTimeoutMinutes
-	if data.SafeOutputs.TimeoutMinutes > 0 {
-		timeoutMinutes = data.SafeOutputs.TimeoutMinutes
-	}
-
 	job := &Job{
 		Name:           "safe_outputs",
 		If:             RenderCondition(jobCondition),
 		RunsOn:         c.formatFrameworkJobRunsOn(data),
 		Environment:    c.indentYAMLLines(resolveSafeOutputsEnvironment(data), "    "),
 		Permissions:    permissions.RenderToYAML(),
-		TimeoutMinutes: timeoutMinutes,
+		TimeoutMinutes: safeOutputsJobTimeoutMinutes(data),
 		Concurrency:    concurrency,
 		Env:            jobEnv,
 		Steps:          steps,

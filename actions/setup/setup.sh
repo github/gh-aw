@@ -278,6 +278,8 @@ debug_log "Copying mcp-scripts files to ${MCP_SCRIPTS_DEST}"
 create_dir "${MCP_SCRIPTS_DEST}"
 
 MCP_SCRIPTS_FILES=(
+  "connector_credential_broker.cjs"
+  "connector_azure_oidc.cjs"
   "mcp_scripts_bootstrap.cjs"
   "mcp_scripts_config_loader.cjs"
   "mcp_scripts_mcp_server.cjs"
@@ -441,6 +443,8 @@ create_dir "${SAFE_OUTPUTS_DEST}"
 create_dir "${SAFE_OUTPUTS_DEST}/work-queue"
 
 SAFE_OUTPUTS_FILES=(
+  "connector_credential_broker.cjs"
+  "connector_azure_oidc.cjs"
   "connector_runtime.cjs"
   "connector_regex.cjs"
   "connector_effect_bindings.cjs"

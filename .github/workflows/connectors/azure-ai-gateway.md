@@ -73,7 +73,7 @@ import-schema:
 <connector-documentation id="azure-ai-gateway" version="1">
   <purpose>Configure the workflow's Copilot inference through Azure AI Gateway. This is not a callable inference tool, MCP registration, model discovery service, or provider mutation.</purpose>
   <credentials>
-    <credential name="entra" phase="inference">Configure an Entra application's federated identity to trust the GitHub Actions issuer, exact repository branch or environment subject, and api://AzureADTokenExchange audience. Grant the application's service principal runtime access to the approved gateway model assets. Bind azure-tenant-id and azure-client-id; the scope is https://ai.gateway.azure.com/.default. The workflow must grant id-token: write. The existing AWF inference proxy exchanges and refreshes tokens outside the agent; this requires the existing engine OIDC firewall/version safeguards. No stored gateway key is used by this profile.</credential>
+    <credential name="entra" phase="inference">Configure an Entra application's federated identity to trust the GitHub Actions issuer, exact repository branch or environment subject, and api://AzureADTokenExchange audience. Grant the application's service principal runtime access to the approved gateway model assets. Bind azure-tenant-id and azure-client-id; the scope is https://ai.gateway.azure.com/.default. Selection grants id-token: write to the inference job. The existing AWF inference proxy exchanges and refreshes tokens outside the agent; this requires the existing engine OIDC firewall/version safeguards. No stored gateway key is used by this profile.</credential>
     <credential name="gateway-key" phase="inference">Obtain a gateway API key through the gateway operator and store it as the Actions secret named by key-secret (default AZURE_AI_GATEWAY_KEY). Rotate it externally. Gateway keys use Authorization: Bearer, not the Azure OpenAI api-key header, and may grant broader access than the workflow's exact model selection. No Entra exchange or OIDC permission is needed by a key profile.</credential>
   </credentials>
   <inputs>gateway-host identifies the exact public-cloud SDK endpoint. models grants exact wire aliases. The remaining bindings configure credential routes, not secret values. Importing selects nothing. The consumer must select engine.inference with connector, profile and model; the compiler then adds that profile's hostname (and login.microsoftonline.com for the Entra profiles) to the firewall allowlist. engine.model supplies Copilot model metadata and can differ from the granted wire alias. The gateway has no /models route, so the profiles set engine.model-catalog: false and engine.model is passed through verbatim instead of being resolved as a gh-aw alias.</inputs>
@@ -92,7 +92,6 @@ engine:
     model: deployment-checklist
 permissions:
   contents: read
-  id-token: write
 imports:
   - uses: ".github/workflows/connectors/azure-ai-gateway.md"
     with:

@@ -5,7 +5,7 @@ description: Create or extend a declaration-only third-party connector, with nar
 
 # Create a Connector
 
-Use for new providers or declarative capabilities. For consumption/setup, use
+For new providers or capabilities. For setup, use
 [the connector guide](../../aw/connectors.md).
 
 ## Load the contract, not a catalog
@@ -45,9 +45,9 @@ MCP, safe outputs. Put input type/required before constraints. Reuse anchors onl
 for identical primitives, not independent grants/phases. Preserve scalar quoting,
 anchor-before-alias and merge-before-override order. Verify nested aliases with
 the compiler and bundled runtime, not only a YAML parser.
-Use supported `token`, scoped `github-app` or audience-bound `github-oidc` routes;
-neither GitHub route exchanges tokens. Inference-only `azure-oidc` delegates
-Entra exchange to the native engine (specification 5.4).
+Choose one: `token`, scoped `github-app`, direct `github-oidc`, or app-only
+`azure-oidc` (specification 4). Live writers need a separate client and exclusive
+literal `safe-outputs.environment`. Trust only its subject. Inference: see 5.4.
 
 Bound strings/responses; request placeholders take single safe segments.
 New readers use kebab-case selectors and unprefixed snake_case `tool` names.

@@ -11,6 +11,13 @@ import (
 
 var jobTimeoutsLog = logger.New("workflow:job_timeouts")
 
+func safeOutputsJobTimeoutMinutes(data *WorkflowData) int {
+	if data.SafeOutputs.TimeoutMinutes > 0 {
+		return data.SafeOutputs.TimeoutMinutes
+	}
+	return 45
+}
+
 // resolveAgentJobTimeoutValue returns the timeout-minutes value emitted on the
 // generated agent job. The agent job bounds every step of the job (setup,
 // agentic execution and teardown), so it is resolved independently from the

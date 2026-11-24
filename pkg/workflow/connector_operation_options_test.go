@@ -393,7 +393,7 @@ func TestConnectorOperationOptionsAgentCannotOverrideStaging(t *testing.T) {
 	helpers, err := filepath.Abs("../../actions/setup/js/safe_output_helpers.cjs")
 	require.NoError(t, err)
 	source := generateSafeOutputScriptContent("tracker-add-comment", &SafeScriptConfig{
-		Script: connectorSafeOutputScript("PLAN", "add-comment", "PREFIX_", []string{"WRITER"}, false, false),
+		Script: connectorSafeOutputScript("PLAN", "add-comment", "PREFIX_", []string{"WRITER"}, false, false, nil),
 	})
 	for _, global := range []bool{false, true} {
 		t.Run(fmt.Sprintf("global-%t", global), func(t *testing.T) {

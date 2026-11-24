@@ -2,6 +2,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { createRequire } from "node:module";
 import { createHash, createHmac } from "node:crypto";
 import { spawnSync } from "node:child_process";
+import { once } from "node:events";
+import { resolve } from "node:path";
 import { Readable, Writable } from "node:stream";
 
 const require = createRequire(import.meta.url);
@@ -203,6 +205,47 @@ describe("compiler-frozen connector snapshots", () => {
 });
 
 describe("typed authority and credential-free staging", () => {
+  it.skipIf(process.platform === "win32")("resolves reader and writer bearer credentials via the broker only after grants and staging", async () => {
+    const socket = resolve(`.az-${process.pid}.sock`);
+    const getToken = vi.fn(async () => "broker-fixture");
+    const server = require("./connector_credential_broker.cjs").serve(socket, getToken);
+    await once(server, "listening");
+    try {
+      const options = { env: { GH_AW_CONNECTOR_CREDENTIAL_SOCKET_TEST_TOKEN: socket }, fetchImpl: vi.fn(async () => jsonResponse()) };
+      await execute(document(), undefined, { ...options, staged: true });
+      await expect(execute(document("agent"), { record: "unapproved" }, options, "mcp")).rejects.toThrow();
+      expect(getToken).not.toHaveBeenCalled();
+      expect(options.fetchImpl).not.toHaveBeenCalled();
+      await execute(document(), undefined, options);
+      await execute(document("agent"), undefined, options, "mcp");
+      expect(getToken).toHaveBeenCalledTimes(2);
+      expect(options.fetchImpl).toHaveBeenCalledTimes(2);
+      for (const [, request] of options.fetchImpl.mock.calls) expect(request.headers.Authorization).toBe(["Bearer", "broker-fixture"].join(" "));
+      // Capture the values at dispatch (the request object is reused across retries).
+      const sent = [];
+      getToken.mockResolvedValueOnce("before-renewal").mockResolvedValueOnce("after-renewal");
+      const retry = { maxAttempts: 2, backoffMs: 1, retryOn: [503] };
+      await execute(
+        document("agent", { retry }),
+        undefined,
+        {
+          ...options,
+          fetchImpl: async (_url, request) => {
+            sent.push(Object.entries(request.headers).filter(([key]) => key.toLowerCase() === "authorization"));
+            return jsonResponse({}, sent.length === 1 ? 503 : 200);
+          },
+        },
+        "mcp"
+      );
+      expect(sent).toEqual(["before-renewal", "after-renewal"].map(value => [["Authorization", ["Bearer", value].join(" ")]]));
+      await expect(execute(document(), undefined, { ...options, env: { ...env, ...options.env } })).rejects.toThrow("Invalid connector broker credential route");
+      getToken.mockRejectedValueOnce(new Error("sensitive detail"));
+      await expect(execute(document(), undefined, options)).rejects.toThrow(/^Connector broker credential resolution failed$/);
+      expect(options.fetchImpl).toHaveBeenCalledTimes(2);
+    } finally {
+      await new Promise(resolve => server.close(resolve));
+    }
+  });
   it("returns an explicit Go-compatible safe-output intent without reading secrets or making requests", async () => {
     const doc = document();
     const fetchImpl = vi.fn();
