@@ -30,6 +30,7 @@ type buildMaintenanceWorkflowYAMLOptions struct {
 	copilotOrgBilling   bool // all Copilot workflows use copilot-requests: write (GITHUB_TOKEN); COPILOT_GITHUB_TOKEN is not required
 	compactionLedgers   []LedgerConfig
 	hasWorkQueue        bool
+	workQueuePolicy     string
 	hasCacheMemory      bool
 	hasSteering         bool
 	noLogo              bool

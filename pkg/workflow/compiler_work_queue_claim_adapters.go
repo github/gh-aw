@@ -5,15 +5,16 @@ import (
 	"fmt"
 	"maps"
 	"slices"
-	"strconv"
 	"strings"
 
 	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/stringutil"
 )
 
-func workQueuePreparedJobName(name string, index int) string {
-	return fmt.Sprintf("work_queue_prepare_%s_%d", name, index)
+// workQueuePreparedJobName names an adapter's sole preparer. The `_0` suffix is the
+// published slot-zero identifier of the singleton Claim assignment.
+func workQueuePreparedJobName(name string) string {
+	return "work_queue_prepare_" + name + "_0"
 }
 
 func (c *Compiler) buildWorkQueuePreparedAdapterJobs(data *WorkflowData, threatDetectionEnabled bool) ([]string, error) {
@@ -24,23 +25,21 @@ func (c *Compiler) buildWorkQueuePreparedAdapterJobs(data *WorkflowData, threatD
 		if err != nil {
 			return nil, err
 		}
-		for index := range 16 {
-			job, err := c.buildWorkQueuePreparedAdapterJob(data, name, index, configuration, threatDetectionEnabled)
-			if err != nil {
-				return nil, err
-			}
-			if err := c.jobManager.AddJob(job); err != nil {
-				return nil, err
-			}
-			jobs = append(jobs, job.Name)
+		job, err := c.buildWorkQueuePreparedAdapterJob(data, name, configuration, threatDetectionEnabled)
+		if err != nil {
+			return nil, err
 		}
+		if err := c.jobManager.AddJob(job); err != nil {
+			return nil, err
+		}
+		jobs = append(jobs, job.Name)
 	}
 	return jobs, nil
 }
 
-func (c *Compiler) buildWorkQueuePreparedAdapterJob(data *WorkflowData, name string, index int, configuration []byte, threatDetectionEnabled bool) (*Job, error) {
-	job := c.newWorkQueuePreparedAdapterJob(data, name, index, threatDetectionEnabled)
-	steps := c.buildWorkQueuePreparedAdapterSetup(data, name, index, configuration)
+func (c *Compiler) buildWorkQueuePreparedAdapterJob(data *WorkflowData, name string, configuration []byte, threatDetectionEnabled bool) (*Job, error) {
+	job := c.newWorkQueuePreparedAdapterJob(data, name, threatDetectionEnabled)
+	steps := c.buildWorkQueuePreparedAdapterSetup(data, name, configuration)
 	customSteps := workQueuePreparedCustomJobSteps(data, name, job)
 	if actionSteps := workQueuePreparedCustomActionSteps(data, name); actionSteps != nil {
 		customSteps = actionSteps
@@ -70,7 +69,7 @@ func (c *Compiler) buildWorkQueuePreparedAdapterJob(data *WorkflowData, name str
 	}
 	steps = append(steps, authorizationSteps...)
 	steps = append(steps, rendered...)
-	job.Steps = c.finishWorkQueuePreparedAdapterSteps(data, name, index, steps)
+	job.Steps = c.finishWorkQueuePreparedAdapterSteps(data, name, steps)
 	if data.SafeOutputs.AuthorizationRequirements[name] != nil {
 		job.Steps = append(job.Steps, c.buildAuthorizationEvidenceUploadStep(data, job.Name)...)
 	}
@@ -122,8 +121,8 @@ func (c *Compiler) buildWorkQueuePreparedAuthorization(data *WorkflowData, name 
 	})
 }
 
-func (c *Compiler) newWorkQueuePreparedAdapterJob(data *WorkflowData, name string, index int, threatDetectionEnabled bool) *Job {
-	jobName := workQueuePreparedJobName(name, index)
+func (c *Compiler) newWorkQueuePreparedAdapterJob(data *WorkflowData, name string, threatDetectionEnabled bool) *Job {
+	jobName := workQueuePreparedJobName(name)
 	job := &Job{
 		Name: jobName, RunsOn: c.formatFrameworkJobRunsOn(data),
 		Needs:          []string{string(constants.AgentJobName), string(constants.ActivationJobName)},
@@ -148,7 +147,7 @@ func (c *Compiler) newWorkQueuePreparedAdapterJob(data *WorkflowData, name strin
 	return job
 }
 
-func (c *Compiler) buildWorkQueuePreparedAdapterSetup(data *WorkflowData, name string, index int, configuration []byte) []string {
+func (c *Compiler) buildWorkQueuePreparedAdapterSetup(data *WorkflowData, name string, configuration []byte) []string {
 	preparationData := *data
 	preparationData.RawFrontmatter = nil
 	preparationData.ParsedFrontmatter = nil
@@ -171,7 +170,7 @@ func (c *Compiler) buildWorkQueuePreparedAdapterSetup(data *WorkflowData, name s
 		"          GH_AW_AGENT_OUTPUT: ${{ steps.setup-agent-output-env.outputs.GH_AW_AGENT_OUTPUT }}\n",
 		fmt.Sprintf("          GH_AW_CLAIM_ADAPTER_TYPE: %q\n", name),
 		fmt.Sprintf("          GH_AW_CLAIM_ADAPTER_CONFIG: %q\n", string(configuration)),
-		fmt.Sprintf("          GH_AW_CLAIM_ADAPTER_INDEX: %q\n", strconv.Itoa(index)),
+		"          GH_AW_CLAIM_ADAPTER_INDEX: \"0\"\n",
 		"        with:\n",
 		"          script: |\n",
 		"            const { setupGlobals } = require('${{ runner.temp }}/gh-aw/actions/setup_globals.cjs');\n",
@@ -282,7 +281,7 @@ func (c *Compiler) renderWorkQueuePreparedCustomSteps(data *WorkflowData, name s
 	return steps, nil
 }
 
-func (c *Compiler) finishWorkQueuePreparedAdapterSteps(data *WorkflowData, name string, index int, steps []string) []string {
+func (c *Compiler) finishWorkQueuePreparedAdapterSteps(data *WorkflowData, name string, steps []string) []string {
 	var redaction strings.Builder
 	c.generateTrackedSecretRedactionStep(&redaction, strings.Join(steps, ""), data, false)
 	steps = append(steps, redaction.String())
@@ -292,7 +291,7 @@ func (c *Compiler) finishWorkQueuePreparedAdapterSteps(data *WorkflowData, name 
 		"        if: always() && steps.claim_adapter_context.outputs.active == 'true' && "+secretRedactionSuccessCondition(data)+"\n",
 		fmt.Sprintf("        uses: %s\n", c.getActionPin("actions/upload-artifact")),
 		"        with:\n",
-		fmt.Sprintf("          name: work-queue-claim-adapter-%s-%d\n", name, index),
+		fmt.Sprintf("          name: work-queue-claim-adapter-%s-0\n", name),
 		fmt.Sprintf("          path: %s/claims/\n", constants.TmpGhAwDir),
 		"          if-no-files-found: error\n",
 	)

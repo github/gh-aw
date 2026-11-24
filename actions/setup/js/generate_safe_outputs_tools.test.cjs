@@ -200,13 +200,7 @@ describe("generate_safe_outputs_tools", () => {
     runScript();
     const tools = JSON.parse(fs.readFileSync(outputPath, "utf8"));
     const assignment = count => ({
-      version: 3,
       dispatch_id: "dispatch",
-      request_id: "request",
-      commit_id: "commit",
-      policy_epoch: "policy",
-      pool: "pool",
-      worker_profile: "worker",
       claims: Array.from({ length: count }, (_, index) => ({ handle: `h${index + 1}`, claim_id: `c${index + 1}`, work_id: `w${index + 1}`, work: {}, result_refs: [] })),
     });
     expect(tools.map(tool => tool.name)).toEqual(["create_issue", "custom_job"]);
@@ -220,17 +214,14 @@ describe("generate_safe_outputs_tools", () => {
       for (const claim_handle of ["", " ", "\t", null]) {
         const normalized = normalizeSafeOutputToolArguments(tool.name, { claim_handle }, undefined, tool.inputSchema);
         expect(normalized).toHaveProperty("claim_handle", claim_handle);
-        for (const count of [1, 2]) {
-          expect(() => normalizeClaimScope(normalized, assignment(count))).toThrow();
-        }
+        expect(() => normalizeClaimScope(normalized, assignment(1))).toThrow();
       }
       const selected = normalizeSafeOutputToolArguments(tool.name, { claim_handle: "h1" }, undefined, tool.inputSchema);
-      for (const count of [1, 2]) {
-        expect(normalizeClaimScope(selected, assignment(count)).claim_handle).toBe("h1");
-      }
+      expect(normalizeClaimScope(selected, assignment(1)).claim_handle).toBe("h1");
+      expect(() => normalizeClaimScope(normalizeSafeOutputToolArguments(tool.name, { claim_handle: "h2" }, undefined, tool.inputSchema), assignment(1))).toThrow(/foreign/);
       const omitted = normalizeSafeOutputToolArguments(tool.name, {}, undefined, tool.inputSchema);
       expect(normalizeClaimScope(omitted, assignment(1)).claim_handle).toBe("h1");
-      expect(() => normalizeClaimScope(omitted, assignment(2))).toThrow(/original multi-Claim/);
+      expect(() => normalizeClaimScope(omitted, assignment(2))).toThrow(/exactly one open Claim/);
     }
     const custom = tools.find(tool => tool.name === "custom_job");
     expect(normalizeSafeOutputToolArguments(custom.name, { count: "", claim_handle: "h1" }, undefined, custom.inputSchema)).toEqual({ claim_handle: "h1" });

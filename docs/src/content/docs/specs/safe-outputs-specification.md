@@ -8,9 +8,9 @@ sidebar:
 
 # Safe Outputs MCP Gateway Specification
 
-**Version**: 1.31.1<br>
+**Version**: 1.32.0<br>
 **Status**: Working Draft<br>
-**Publication Date**: 2026-11-23<br>
+**Publication Date**: 2026-11-24<br>
 **Editor**: GitHub Agentic Workflows Team<br>
 **This Version**: [safe-outputs-specification](/gh-aw/specs/safe-outputs-specification/)<br>
 **Latest Published Version**: This document
@@ -37,6 +37,7 @@ This specification follows World Wide Web Consortium (W3C) formatting convention
 6. [Universal Feature Interpretation](#6-universal-feature-interpretation)
 7. [Safe Output Type Definitions](#7-safe-output-type-definitions)
 8. [Protocol Exchange Patterns](#8-protocol-exchange-patterns)
+   - [Request-Continuation Routes](#85-request-continuation-routes)
 9. [Content Integrity Mechanisms](#9-content-integrity-mechanisms)
 10. [Execution Guarantees](#10-execution-guarantees)
 11. [Cache Memory Integrity](#11-cache-memory-integrity)
@@ -7265,6 +7266,59 @@ output types retain their declared input and publication constraints.
 - Ignore empty lines
 - Validate `type` field presence
 
+### 8.5 Request-Continuation Routes
+
+A workflow MAY opt in to routed `request_continuation` handling by configuring
+`safe-outputs.request-continuation.route` as `workqueue`, `issue`, or
+`dispatch`. An advisory `request-continuation` request without a route remains
+advisory and MUST retain its existing behavior.
+
+A routed request MUST produce at most one continuation per producing run
+attempt. Publication MUST be authorized only when `continuation_evidence` is
+bound to the producing artifact and run attempt, and the required evidence
+collection is clean. Missing, ambiguous, or non-clean evidence MUST prevent
+routed publication.
+
+The continuation message MUST be valid UTF-8 and no more than 16,384 UTF-8
+bytes. For `workqueue` and `dispatch`, `max-depth` MUST be an integer from 1
+through 16; when omitted, it defaults to 1. A route MUST NOT create a
+continuation beyond the configured depth. The `issue` route MUST NOT accept
+`max-depth`; each approval releases one successor without an automatic hop
+budget.
+
+#### 8.5.1 Workqueue route
+
+For `route: workqueue`, the request MUST target an assignment-bound queue
+worker. The worker's finish commit MUST record the parent's `Completion` and
+one dependent successor Work in the same ledger commit. The successor MUST
+inherit the parent's graph, pool, priority, fairness key, worker profile, and
+payload, and MUST receive the continuation message as
+`assignment.claims[i].continuation`.
+
+The route MUST NOT admit more than one successor for the routed request.
+
+#### 8.5.2 Issue route
+
+For `route: issue`, the request MUST target a queue worker. The publisher MUST
+open exactly one approval Issue in the queue repository for the successor. The
+successor MUST remain unschedulable until that exact approval Issue is closed
+with completed status by a user authorized to write, maintain, or administer
+the repository. Each approval MUST release exactly one successor.
+
+#### 8.5.3 Dispatch route
+
+For `route: dispatch`, the processor MUST dispatch the named compiled local
+workflow on the repository's default branch. The dispatch MUST carry the
+bounded `gh_aw_continuation` input, and the receiving workflow MUST declare
+that string input. The processor MUST NOT dispatch a pull-request head or any
+other uncompiled PR-head workflow.
+
+If the dispatch POST outcome is uncertain, the processor MUST report the
+outcome as unknown and MUST NOT resend the dispatch automatically.
+
+Inbound continuation data MUST be treated as untrusted and MUST be sanitized
+before exposure to prompts or tools.
+
 ---
 
 ## 9. Content Integrity Mechanisms
@@ -8445,6 +8499,13 @@ This specification revision aligns with directly relevant `CHANGELOG.md` entries
 - **v0.40.1**: append-only status comment behavior was documented for smoke workflow execution.
 - **Earlier changelog entry**: status comments were decoupled from default AI reaction behavior; explicit `on.status-comment` configuration is required when status comments are desired.
 - **Earlier changelog entry**: `command` trigger was renamed to `slash_command` with deprecation compatibility.
+
+**Version 1.32.0** (2026-11-24):
+
+- **Added**: Section 8.5, "Request-Continuation Routes," defining opt-in
+  `workqueue`, `issue`, and `dispatch` routing, evidence binding, depth and
+  message bounds, approval gating, default-branch dispatch, untrusted-input
+  sanitization, and unknown-outcome handling.
 
 **Version 1.31.1** (2026-11-23):
 

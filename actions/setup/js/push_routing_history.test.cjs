@@ -9,7 +9,7 @@ const req = require;
 const fixtures = req("./fixtures/routing_analytics_runs.cjs");
 const { readJsonlFile } = req("./jsonl_helpers.cjs");
 const { applyRun, emptyState, trimRuns } = req("./routing_history.cjs");
-const { ineligibility, main, readConfig, sessionEvidence } = req("./push_routing_history.cjs");
+const { ineligibility, main, readConfig, runCost, sessionEvidence } = req("./push_routing_history.cjs");
 
 const BRANCH = "memory/adaptive-routing/triage";
 const GENERATION = `${"a".repeat(64)}:${"b".repeat(64)}`;
@@ -182,24 +182,37 @@ describe("push_routing_history evidence", () => {
     expect(sessionEvidence(fixtureSession("39147795806", { includeCache: false })).cost.tokens).toEqual([94950, 70857, 0, 750, null]);
   });
 
-  it("counts input without cache as AWF's meter does, inferring whether input includes cache when the record does not say", () => {
+  it("counts input without cache as AWF's meter does, using record.provider for Anthropic and OpenAI and the heuristic for Copilot", () => {
     const firewall = (type, data) => ({ type, data, provenance: { component: "firewall", phase: "agent" } });
-    const tokens = (...usages) =>
+    const tokensFor = (provider, ...usages) =>
       sessionEvidence([
-        firewall("firewall.model_routing", { stage: "selection", selectedProvider: "copilot", wireModel: "model-a", selectedEffort: "high" }),
+        firewall("firewall.model_routing", { stage: "selection", selectedProvider: provider || "copilot", wireModel: "model-a", selectedEffort: "high" }),
         ...usages.flatMap((usage, index) => [
           firewall("firewall.model_routing", { stage: "request", requestId: `r${index}`, routed: "as_selected", requestedModel: "model-a" }),
-          firewall("firewall.token_usage", { requestId: `r${index}`, provider: "copilot", aic: 1, usage }),
+          firewall("firewall.token_usage", { requestId: `r${index}`, ...(provider !== undefined ? { provider } : {}), aic: 1, usage }),
         ]),
       ]).cost.tokens;
     const uncached = { inputTokens: 23197, cacheReadInputTokens: 0, cacheCreationInputTokens: 0, outputTokens: 400 };
     // Input that covers the cache can include it; input smaller than the cache cannot.
     const covering = { inputTokens: 23799, cacheReadInputTokens: 23194, cacheCreationInputTokens: 0, outputTokens: 45 };
     const smaller = { inputTokens: 382, cacheReadInputTokens: 19712, cacheCreationInputTokens: 0, outputTokens: 69 };
-    expect(tokens(uncached, covering, smaller)).toEqual([24184, 42906, 0, 514, null]);
-    // AWF's flag wins over the inference.
-    expect(tokens({ ...covering, inputTokensIncludeCache: false })).toEqual([23799, 23194, 0, 45, null]);
-    expect(tokens({ ...smaller, inputTokensIncludeCache: true })).toEqual([0, 19712, 0, 69, null]);
+    const coldAnthropic = { inputTokens: 20000, cacheReadInputTokens: 0, cacheCreationInputTokens: 15000, outputTokens: 300 };
+
+    // Copilot (and other/missing providers) keep the input >= cached heuristic unless the flag is set.
+    expect(tokensFor("copilot", uncached, covering, smaller)).toEqual([24184, 42906, 0, 514, null]);
+    expect(tokensFor("copilot", { ...covering, inputTokensIncludeCache: false })).toEqual([23799, 23194, 0, 45, null]);
+    expect(tokensFor("copilot", { ...smaller, inputTokensIncludeCache: true })).toEqual([0, 19712, 0, 69, null]);
+    expect(tokensFor("gemini", covering, smaller)).toEqual([987, 42906, 0, 114, null]);
+    expect(tokensFor(undefined, covering, smaller)).toEqual([987, 42906, 0, 114, null]);
+
+    // Anthropic input tokens are additive even when input >= cacheWrite, unless AWF explicitly sets the flag.
+    expect(tokensFor("anthropic", coldAnthropic)).toEqual([20000, 0, 15000, 300, null]);
+    expect(tokensFor("anthropic", { ...coldAnthropic, inputTokensIncludeCache: true })).toEqual([5000, 0, 15000, 300, null]);
+
+    // OpenAI input tokens include cached tokens (clamped at 0 when smaller), unless AWF explicitly sets the flag.
+    expect(tokensFor("openai", covering)).toEqual([605, 23194, 0, 45, null]);
+    expect(tokensFor("openai", smaller)).toEqual([0, 19712, 0, 69, null]);
+    expect(tokensFor("openai", { ...covering, inputTokensIncludeCache: false })).toEqual([23799, 23194, 0, 45, null]);
   });
 
   it("has no verdict for a run AWF did not route, and no pair to count a verdict for without a selection", () => {
@@ -234,6 +247,23 @@ describe("push_routing_history evidence", () => {
       firewall("firewall.token_usage", { requestId: "r1", provider: "anthropic", usage: { inputTokens: 1, outputTokens: 2 } }),
     ];
     expect(sessionEvidence(events)).toEqual({ observation: null, pair: "anthropic/model-b@none", cost: { credits: null, model_credits: null, tokens: null } });
+  });
+
+  it("emits null model_credits when an unpriced sub-agent makes total credits null, while preserving main tokens", () => {
+    const routing = [
+      { stage: "selection", selectedProvider: "copilot", wireModel: "model-a", selectedEffort: "high" },
+      { stage: "request", request_id: "r-main", routed: "as_selected", requested_model: "model-a" },
+      { stage: "request", request_id: "r-sub", routed: "deviated", requested_model: "sub-model" },
+    ];
+    const usage = [
+      { requestId: "r-main", provider: "copilot", aic: 30, usage: { inputTokens: 1000, cacheReadInputTokens: 400, cacheCreationInputTokens: 0, outputTokens: 200 } },
+      { requestId: "r-sub", provider: "copilot", usage: { inputTokens: 500, cacheReadInputTokens: 0, cacheCreationInputTokens: 0, outputTokens: 100 } },
+    ];
+    expect(runCost(usage, routing, ["sub-model"])).toEqual({
+      credits: null,
+      model_credits: null,
+      tokens: [600, 400, 0, 200, null],
+    });
   });
 });
 
@@ -414,6 +444,30 @@ describe("push_routing_history saves", () => {
     await save(remote, 53, "success", { github });
     expect(remoteRuns(remote).map(line => line.number)).toEqual([50, 53]);
     expect(remoteState(remote).unexplained).toBe(0);
+  });
+
+  it("records zero-job startup failures as no_agent without charging unexplained, while ignoring pre-opt-in runs", async () => {
+    const remote = bareRemote();
+    await save(remote, 50, "success");
+    const run = (number, conclusion = "failure") => ({ id: 9000 + number, run_number: number, status: "completed", conclusion, head_branch: "main", event: "schedule", run_attempt: 1 });
+    const agent = { name: "agent", conclusion: "failure", started_at: "2026-11-24T09:00:00Z" };
+    const runs = [run(53, "startup_failure"), run(52, "failure"), run(51, "failure")];
+    const jobs = { 9051: [agent], 9052: [], 9053: [] };
+    const github = fakeGitHub(remote, { runs, jobs });
+    await save(remote, 54, "success", { github });
+
+    expect(remoteRuns(remote).map(({ number, attempt, outcome, note, counted }) => ({ number, attempt, outcome, note, counted }))).toEqual([
+      { number: 50, attempt: 1, outcome: "success", note: null, counted: true },
+      { number: 52, attempt: 1, outcome: null, note: "no_agent", counted: false },
+      { number: 53, attempt: 1, outcome: null, note: "no_agent", counted: false },
+      { number: 54, attempt: 1, outcome: "success", note: null, counted: true },
+    ]);
+    expect(remoteState(remote).unexplained).toBe(0);
+
+    // Once recorded as no_agent, subsequent saves do not re-query their jobs.
+    const nextGitHub = fakeGitHub(remote, { runs, jobs });
+    await save(remote, 55, "success", { github: nextGitHub });
+    expect(nextGitHub.calls.jobs).toEqual([9051]);
   });
 
   it("charges a failed save from a pull_request_target run, and never a run whose history job succeeded", async () => {

@@ -91,8 +91,9 @@ function rate(wins, losses, hopeful) {
 
 /**
  * A pair's average cost over its entries, oldest first: the first known cost sets it and each
- * later one moves it by 0.9 x old + 0.1 x new. An entry with a cost but no model share counts
- * all of it as the model's.
+ * later one moves it by 0.9 x old + 0.1 x new. `model_credits` is averaged over the exact same
+ * entries that have a known total cost, falling back to total cost when the model share is null,
+ * so `0 <= model_credits <= credits` holds even for legacy partial-bill entries.
  * @param {HistoryEntry[]} entries
  */
 function averages(entries) {
@@ -103,13 +104,12 @@ function averages(entries) {
   let bills = 0;
   for (const entry of entries) {
     const cost = entry[3];
-    let model = entry[4];
     if (cost !== null) {
       credits = credits === null ? cost : 0.9 * credits + 0.1 * cost;
       bills += 1;
-      if (model === null) model = cost;
+      const model = entry[4] ?? cost;
+      modelCredits = modelCredits === null ? model : 0.9 * modelCredits + 0.1 * model;
     }
-    if (model !== null) modelCredits = modelCredits === null ? model : 0.9 * modelCredits + 0.1 * model;
   }
   return { credits, modelCredits, bills };
 }
@@ -163,6 +163,16 @@ function receiptBound(receipt, run) {
 }
 
 /**
+ * The base model of a pair: everything before `@` (or the whole string if no `@` is present).
+ * A suspension covers every effort of its base.
+ * @param {string} pairName
+ */
+function baseOf(pairName) {
+  const at = pairName.lastIndexOf("@");
+  return at >= 0 ? pairName.slice(0, at) : pairName;
+}
+
+/**
  * Fold one outcome into a pair, as the bandit's record() does. Returns whether it counted.
  * @param {HistoryState} state
  * @param {ScopeRecord} scope
@@ -195,6 +205,45 @@ function recordOutcome(state, scope, pairName, ok, at, cost, events) {
     if (scope.last_success_seq > suspended.since_seq) {
       pair.history = [...pair.history.slice(pair.history.length - pending), entry()];
       pair.suspended = null;
+      pair.streak = 0;
+      events.push([pairName, "broken"]);
+      return true;
+    }
+    return false;
+  }
+  // A suspension covers every effort of its base model, so another effort of a suspended base
+  // settles the suspended sibling(s) when it runs (e.g. after the original effort left the rank).
+  const targetBase = baseOf(pairName);
+  /** @type {Array<{ record: PairRecord, suspended: Suspension }>} */
+  const siblings = [];
+  for (const [name, candidate] of Object.entries(scope.pairs)) {
+    if (name !== pairName && candidate.suspended !== null && baseOf(name) === targetBase) {
+      siblings.push({ record: candidate, suspended: candidate.suspended });
+    }
+  }
+  if (siblings.length > 0) {
+    if (ok) {
+      for (const { record, suspended: siblingSuspended } of siblings) {
+        const pending = Math.min(siblingSuspended.pending, record.history.length);
+        record.history = record.history.slice(0, record.history.length - pending);
+        record.suspended = null;
+        record.streak = 0;
+      }
+      pair.history.push(entry());
+      pair.streak = 0;
+      scope.last_success_seq = state.seq;
+      events.push([pairName, "back"]);
+      return true;
+    }
+    const dueSiblings = siblings.filter(({ suspended: siblingSuspended }) => scope.last_success_seq > siblingSuspended.since_seq);
+    if (dueSiblings.length > 0) {
+      for (const { record, suspended: siblingSuspended } of dueSiblings) {
+        const pending = Math.min(siblingSuspended.pending, record.history.length);
+        record.history = record.history.slice(record.history.length - pending);
+        record.suspended = null;
+        record.streak = 0;
+      }
+      pair.history.push(entry());
       pair.streak = 0;
       events.push([pairName, "broken"]);
       return true;
@@ -438,6 +487,7 @@ module.exports = {
   BOUNDS,
   NOTES,
   applyRun,
+  averages,
   counts,
   emptyState,
   memory,

@@ -35,13 +35,9 @@ type workQueueReplayArtifact struct {
 }
 
 type workQueueReplayPrediction struct {
-	Reason      string                      `json:"reason"`
-	Assignments []workQueueReplayAssignment `json:"assignments"`
-}
-
-type workQueueReplayAssignment struct {
-	WorkerProfile string   `json:"worker_profile"`
-	WorkIDs       []string `json:"work_ids"`
+	Reason     string   `json:"reason"`
+	WorkIDs    []string `json:"work_ids"`
+	Dispatches []string `json:"dispatches"`
 }
 
 func workReplayArtifact(cmd *cobra.Command, runID int64, file string) error {
@@ -50,17 +46,12 @@ func workReplayArtifact(cmd *cobra.Command, runID int64, file string) error {
 		(cmd.Flags().Changed("file") && file == "") {
 		return errors.New("artifact_replay_invalid: choose one snapshot source: a positive Actions run ID or a downloaded snapshot file. Example: replay --run-id 38645334879, or replay --file /path/to/work-queue.snapshot.json")
 	}
-	if cmd.Flags().Changed("branch") || cmd.Flags().Changed("request-id") {
-		return errors.New("artifact_replay_invalid: artifact replay is read-only and cannot use --branch or --request-id. Remove those flags; omit --run-id and --file to replay the live ledger instead")
+	if cmd.Flags().Changed("branch") {
+		return errors.New("artifact_replay_invalid: artifact replay is read-only and cannot use --branch. Omit --run-id and --file to replay the live ledger instead")
 	}
 	pool, _ := cmd.Flags().GetString("pool")
-	if pool == "" && (cmd.Flags().Changed("pool") || cmd.Flags().Changed("max-claims") || cmd.Flags().Changed("max-dispatches")) {
-		return errors.New("artifact_replay_invalid: a scheduling prediction requires a pool name. Example: replay --run-id 38645334879 --pool default --max-claims 3 --max-dispatches 3")
-	}
-	maxClaims, _ := cmd.Flags().GetInt("max-claims")
-	maxDispatches, _ := cmd.Flags().GetInt("max-dispatches")
-	if maxClaims <= 0 || maxDispatches <= 0 {
-		return errors.New("artifact_replay_invalid: --max-claims and --max-dispatches should be positive integers. Example: --pool default --max-claims 3 --max-dispatches 3")
+	if pool == "" && (cmd.Flags().Changed("pool") || cmd.Flags().Changed("max-claims") || cmd.Flags().Changed("max-dispatches") || cmd.Flags().Changed("concurrency")) {
+		return errors.New("artifact_replay_invalid: a scheduling prediction requires a pool name. Example: replay --run-id 38645334879 --pool default --max-claims 3 --max-dispatches 3 --concurrency 3")
 	}
 	repository, _ := cmd.Flags().GetString("repo")
 	var data []byte
@@ -80,18 +71,17 @@ func workReplayArtifact(cmd *cobra.Command, runID int64, file string) error {
 	if err != nil {
 		return err
 	}
-	envelope, state, role, err := replayCurrentWorkQueueSnapshot(data)
+	envelope, state, err := replayCurrentWorkQueueSnapshot(data)
 	if err != nil {
 		return fmt.Errorf("artifact replay could not validate the captured ledger; use the original work-queue.snapshot.json from the activation artifact without editing it: %w", err)
 	}
 	if envelope.Worker != nil {
-		if _, err := currentWorkQueueAssignmentReceipt(state, *envelope.Worker, *envelope.Origin); err != nil {
+		if _, err := currentWorkQueueAssignmentReceipt(state, *envelope.Worker, envelope.Origin); err != nil {
 			return err
 		}
 	}
-	if (repository != "" && !strings.EqualFold(envelope.Origin.Repository, repository)) ||
-		(state.Policy != nil && !strings.EqualFold(envelope.Origin.Repository, state.Repository)) {
-		return errors.New("artifact_replay_invalid: the snapshot belongs to a different repository than --repo or its ledger. Use the repository that produced the artifact; do not edit its origin")
+	if repository != "" && !strings.EqualFold(envelope.Origin.Repository, repository) {
+		return errors.New("artifact_replay_invalid: the snapshot belongs to a different repository than --repo. Use the repository that produced the artifact; do not edit its origin")
 	}
 	if run != nil {
 		workflow, _, _ := strings.Cut(run.Path, "@")
@@ -100,10 +90,25 @@ func workReplayArtifact(cmd *cobra.Command, runID int64, file string) error {
 			return errors.New("artifact_replay_invalid: the snapshot's run, attempt, or workflow differs from the requested Actions run. Use the original matching activation artifact; do not edit its origin")
 		}
 	}
-	return printWorkQueueArtifactReplay(cmd, envelope, state, role)
+	return printWorkQueueArtifactReplay(cmd, envelope, state)
 }
 
-func printWorkQueueArtifactReplay(cmd *cobra.Command, envelope currentWorkQueueEnvelope, state workqueue.Projection, role string) error {
+// workQueuePredictionParameters routes every worker profile that pool Work names;
+// the compiled routes and concurrency are not part of the ledger.
+func workQueuePredictionParameters(cmd *cobra.Command, state workqueue.Projection, pool string) workqueue.DispatchParameters {
+	maxClaims, _ := cmd.Flags().GetInt("max-claims")
+	maxDispatches, _ := cmd.Flags().GetInt("max-dispatches")
+	concurrency, _ := cmd.Flags().GetInt("concurrency")
+	profiles := map[string]workqueue.DispatchProfile{}
+	for _, work := range state.Works {
+		if work.Pool == pool {
+			profiles[work.WorkerProfile] = workqueue.DispatchProfile{Workflow: logsWorkflowsPathSegment + work.WorkerProfile + ".lock.yml"}
+		}
+	}
+	return workqueue.DispatchParameters{Pool: pool, MaxClaims: maxClaims, MaxDispatches: maxDispatches, Concurrency: concurrency, Profiles: profiles}
+}
+
+func printWorkQueueArtifactReplay(cmd *cobra.Command, envelope currentWorkQueueEnvelope, state workqueue.Projection) error {
 	result := struct {
 		Status     string                     `json:"status"`
 		Repository string                     `json:"repository"`
@@ -111,31 +116,25 @@ func printWorkQueueArtifactReplay(cmd *cobra.Command, envelope currentWorkQueueE
 		Role       string                     `json:"role"`
 		SHA        *string                    `json:"sha"`
 		Tip        string                     `json:"tip"`
-		CapturedAt int64                      `json:"captured_at"`
 		Stats      workqueue.Stats            `json:"stats"`
 		Prediction *workQueueReplayPrediction `json:"prediction,omitempty"`
 	}{
 		Status: "artifact_replay", Repository: envelope.Origin.Repository, RunID: envelope.Origin.RunID,
-		Role: role, SHA: envelope.SHA, Tip: state.Tip, CapturedAt: *envelope.CapturedAt, Stats: state.Stats,
+		Role: envelope.Role, SHA: envelope.SHA, Tip: state.Tip, Stats: state.Stats,
 	}
 	human := fmt.Sprintf("Artifact replay: %d transactions, %d Work, %d Claims; no writes or launches", state.Stats.Transactions, state.Stats.Work, state.Stats.Claims)
-	pool, _ := cmd.Flags().GetString("pool")
-	if pool != "" {
-		if state.Policy == nil {
-			return errors.New("artifact_replay_invalid: this snapshot has no installed queue policy for scheduling. Omit --pool to inspect the ledger, or choose a run captured after policy installation")
-		}
-		maxClaims, _ := cmd.Flags().GetInt("max-claims")
-		maxDispatches, _ := cmd.Flags().GetInt("max-dispatches")
-		decision, err := workqueue.PlanDispatch(state, workqueue.DispatchParameters{
-			Pool: pool, MaxClaims: maxClaims, MaxDispatches: maxDispatches, MaxBytes: state.Policy.Limits.AssignmentBytes,
-		}, "artifact_prediction", "artifact_prediction_commit", *envelope.CapturedAt)
+	if pool, _ := cmd.Flags().GetString("pool"); pool != "" {
+		decision, err := workqueue.PlanDispatch(state, workQueuePredictionParameters(cmd, state, pool), "request:artifact_prediction")
 		if err != nil {
-			return fmt.Errorf("artifact replay could not predict scheduling; use a pool and budgets allowed by the captured queue policy: %w", currentWorkQueueDiagnosticError("prediction", err))
+			return fmt.Errorf("artifact replay could not predict scheduling; use positive budgets (max-claims/max-dispatches 1..256, concurrency 1..4096): %w", currentWorkQueueDiagnosticError("prediction", err))
 		}
-		prediction := workQueueCompactPrediction(decision)
+		prediction := workQueueReplayPrediction{Reason: decision.Reason, WorkIDs: []string{}, Dispatches: decision.Dispatches}
+		for _, operation := range decision.Operations {
+			prediction.WorkIDs = append(prediction.WorkIDs, operation.WorkID)
+		}
 		result.Prediction = &prediction
-		human += fmt.Sprintf("\nCaptured scheduling prediction: %s, %d assignments; no live dependency refresh, credential validation, or grant",
-			decision.Reason, len(decision.Assignments))
+		human += fmt.Sprintf("\nCaptured scheduling prediction: %s, %d dispatches; no live dependency refresh or launch",
+			decision.Reason, len(decision.Dispatches))
 	}
 	return workPrint(cmd, result, human)
 }

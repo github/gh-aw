@@ -7,15 +7,15 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
-	"slices"
 
-	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/logger"
-	"github.com/github/gh-aw/pkg/parser"
 	"github.com/github/gh-aw/pkg/workqueue"
 )
 
 var workQueueRepoConfigLog = logger.New("workflow:work_queue_repo_config")
+
+// workQueueRepositoryTemplate is bound by Actions at run time; worker effects stay in the run's repository.
+const workQueueRepositoryTemplate = "${{ github.repository }}"
 
 func (c *Compiler) applyRepositoryWorkQueueOptions(data *WorkflowData) error {
 	if !isWorkQueueEnabled(data) || data.workQueueRepoIssuesConfigured {
@@ -31,9 +31,6 @@ func (c *Compiler) applyRepositoryWorkQueueOptions(data *WorkflowData) error {
 	if len(config.WorkQueue) == 0 {
 		c.warnLegacyWorkQueueIssues(data)
 		return nil
-	}
-	if _, local := data.RawFrontmatter["work-queue-policy"]; local {
-		return fmt.Errorf("work-queue-policy conflicts with %s work_queue; move global queue configuration to aw.json and retain AW dispatch targets in the workflow", RepoConfigFileName)
 	}
 	var fields map[string]json.RawMessage
 	if err := json.Unmarshal(config.WorkQueue, &fields); err != nil {
@@ -78,114 +75,101 @@ func (c *Compiler) warnLegacyWorkQueueIssues(data *WorkflowData) {
 	}
 }
 
+// configureAWWorkQueue compiles the v4 policy environment for queue participants
+// from aw.json scheduling settings and the worker workflows in the same directory.
 func (c *Compiler) configureAWWorkQueue(data *WorkflowData, markdownPath string) error {
-	if !isWorkQueueEnabled(data) || !isWorkQueueParticipant(data) {
+	if !isWorkQueueEnabled(data) || !isWorkQueueParticipant(data) || data.WorkQueuePolicy == nil {
 		return nil
-	}
-	if err := configureWorkQueueWorkerContract(data, markdownPath, c.getSharedImportCache()); err != nil {
-		return err
 	}
 	config, err := c.loadRepoConfig()
 	if err != nil {
 		return fmt.Errorf("work-queue: cannot resolve scheduling from %s: %w", RepoConfigFileName, err)
 	}
-	workQueueRepoConfigLog.Printf("Configuring AW work queue: path=%s", markdownPath)
-	if hasWorkQueuePolicyProposal(data) {
-		workQueueRepoConfigLog.Print("Legacy work-queue-policy proposal present; skipping aw.json scheduling")
-		if len(config.WorkQueue) > 0 {
-			return fmt.Errorf("work-queue-policy conflicts with %s work_queue; move scheduling to work_queue and keep worker targets in safe-outputs.dispatch-workflow.workflows", RepoConfigFileName)
-		}
-		fmt.Fprintln(os.Stderr, formatCompilerMessage(markdownPath, "warning", "work-queue-policy is deprecated; move scheduling to .github/workflows/aw.json work_queue and use AW dispatch targets instead of producer or worker identities"))
-		c.IncrementWarningCount()
-		return nil
-	}
 	settings, err := workqueue.ParseSettings(config.WorkQueue)
 	if err != nil {
 		return fmt.Errorf("%s: %w", RepoConfigFileName, err)
 	}
-	policy := data.WorkQueuePolicy.Policy
-	policy.Authorization = "aw"
-	policy.Producers = map[string]workqueue.ProducerRule{}
-	profiles, err := approvedAWQueueProfiles(markdownPath, isWorkQueueWorker(data), c.getSharedImportCache())
+	workers, err := discoverWorkQueueWorkers(markdownPath, isWorkQueueWorker(data))
 	if err != nil {
 		return err
 	}
-	if isWorkQueueWorker(data) {
-		name := GetWorkflowIDFromPath(markdownPath)
-		profile := profiles[name]
-		profile.LogicalContract = data.WorkQueuePolicy.WorkerContract
-		profiles[name] = profile
-	}
-	pool := policy.Pools["default"]
-	pool.Profiles = profiles
-	pool.DefaultProfile = slices.Min(slices.Collect(maps.Keys(profiles)))
-	policy.Pools["default"] = pool
-	policy, err = settings.Apply(policy)
-	if err != nil {
-		return fmt.Errorf("%s work_queue: %w", RepoConfigFileName, err)
-	}
-	data.WorkQueuePolicy.Policy = policy
-	return workqueue.ValidatePolicy(bindWorkQueuePolicyValidationTemplates(policy))
-}
-
-func configureWorkQueueWorkerContract(data *WorkflowData, markdownPath string, cache *parser.ImportCache) error {
-	if !isWorkQueueWorker(data) {
-		return nil
-	}
-	var contract string
-	var err error
-	if data.RawMarkdown != "" {
-		source := data.RawMarkdown
-		if data.FrontmatterYAML != "" {
-			source = "---\n" + data.FrontmatterYAML + "\n---\n" + source
-		}
-		contract, err = workQueueLogicalContractFromContentWithCache(markdownPath, source, cache)
-	} else {
-		contract, err = workQueueLogicalContractWithCache(markdownPath, cache)
-	}
-	if err != nil {
+	workQueueRepoConfigLog.Printf("Configuring work queue policy: path=%s, workers=%d", markdownPath, len(workers))
+	if err := c.configureWorkQueueApprovalReads(data, markdownPath, workers); err != nil {
 		return err
 	}
-	data.WorkQueuePolicy.WorkerContract = contract
+	env, err := workqueue.BuildPolicyEnv(settings, workQueueRepositoryTemplate, workers)
+	if err != nil {
+		return fmt.Errorf("%s %w", RepoConfigFileName, err)
+	}
+	env.Issues = nil
+	if issues := workQueueIssuesConfig(data); issues != nil {
+		env.Issues = &workqueue.IssuesEnv{Label: issues.Label, TitlePrefix: issues.TitlePrefix, OrphanedAfterDays: issues.OrphanedAfterDays}
+	}
+	if err := workqueue.ValidatePolicyEnv(bindWorkQueuePolicyValidationRepository(env)); err != nil {
+		return fmt.Errorf("work-queue: invalid compiled policy: %w", err)
+	}
+	encoded, err := json.Marshal(env)
+	if err != nil {
+		return fmt.Errorf("work-queue: encode compiled policy: %w", err)
+	}
+	data.WorkQueuePolicy.PolicyJSON = string(encoded)
 	return nil
 }
 
-func approvedAWQueueProfiles(markdownPath string, worker bool, cache *parser.ImportCache) (map[string]workqueue.WorkerProfile, error) {
+// configureWorkQueueApprovalReads remembers, for a dispatcher whose schedulable worker
+// profiles include an effective issue continuation route, that dependency refresh must
+// read approval Issues. Only the dispatcher's safe-output read grant changes.
+func (c *Compiler) configureWorkQueueApprovalReads(data *WorkflowData, markdownPath string, workers []string) error {
+	if workQueueRuntimeRole(data) != "dispatcher" || data.SafeOutputs == nil {
+		return nil
+	}
+	for _, worker := range workers {
+		path := filepath.Join(filepath.Dir(markdownPath), worker+".md")
+		route, err := c.workQueueWorkerContinuationRoute(path)
+		if err != nil {
+			return fmt.Errorf("work-queue: resolve request-continuation route of worker %s: %w", worker, err)
+		}
+		if route == RequestContinuationRouteIssue {
+			workQueueRepoConfigLog.Printf("Worker %s uses issue-gated continuations; dispatcher reads approval Issues", worker)
+			data.SafeOutputs.workQueueApprovalReads = true
+			return nil
+		}
+	}
+	return nil
+}
+
+// bindWorkQueuePolicyValidationRepository binds the run-time repository
+// template on a copy so the closed policy shape can be validated at compile time.
+func bindWorkQueuePolicyValidationRepository(env workqueue.PolicyEnv) workqueue.PolicyEnv {
+	if env.EffectScope == workQueueRepositoryTemplate {
+		env.EffectScope = "owner/repo"
+	}
+	return env
+}
+
+// discoverWorkQueueWorkers returns the workflow IDs in the workflow's directory
+// that declare tools.work-queue.worker: true, including the compiled workflow itself.
+func discoverWorkQueueWorkers(markdownPath string, worker bool) ([]string, error) {
 	paths, err := filepath.Glob(filepath.Join(filepath.Dir(markdownPath), "*.md"))
 	if err != nil {
-		return nil, fmt.Errorf("work-queue: discover AW workers: %w", err)
+		return nil, fmt.Errorf("work-queue: discover workers: %w", err)
 	}
-	profiles := map[string]workqueue.WorkerProfile{}
-	template := workqueue.DefaultPolicy("1", "${{ github.repository }}").Pools["default"].Profiles["default"]
-	template.Principal = ""
-	template.Ref = "${{ github.sha }}"
+	var workers []string
 	for _, path := range paths {
 		declared, err := mdHasWorkQueueWorker(path)
 		if err != nil {
-			return nil, fmt.Errorf("work-queue: inspect AW worker %s: %w", path, err)
+			return nil, fmt.Errorf("work-queue: inspect worker %s: %w", path, err)
 		}
-		if !declared {
-			continue
+		if declared {
+			workers = append(workers, GetWorkflowIDFromPath(path))
 		}
-		name := GetWorkflowIDFromPath(path)
-		profile := template
-		profile.Workflow = constants.WorkflowsDirSlash + name + ".lock.yml"
-		profile.LogicalContract, err = workQueueLogicalContractWithCache(path, cache)
-		if err != nil {
-			return nil, err
-		}
-		profiles[name] = profile
 	}
 	if worker {
-		name := GetWorkflowIDFromPath(markdownPath)
-		if _, found := profiles[name]; !found {
-			template.Workflow = constants.WorkflowsDirSlash + name + ".lock.yml"
-			profiles[name] = template
-		}
+		workers = append(workers, GetWorkflowIDFromPath(markdownPath))
 	}
-	workQueueRepoConfigLog.Printf("Discovered %d AW worker profile(s) from %d markdown file(s)", len(profiles), len(paths))
-	if len(profiles) == 0 {
-		return nil, errors.New("work-queue: declare at least one AW worker with tools.work-queue.worker: true and approve it in safe-outputs.dispatch-workflow.workflows")
+	workQueueRepoConfigLog.Printf("Discovered %d worker(s) from %d markdown file(s)", len(workers), len(paths))
+	if len(workers) == 0 {
+		return nil, errors.New("work-queue: declare at least one worker with tools.work-queue.worker: true and approve it in safe-outputs.dispatch-workflow.workflows")
 	}
-	return profiles, nil
+	return workers, nil
 }

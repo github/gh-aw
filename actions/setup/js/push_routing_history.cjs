@@ -158,20 +158,22 @@ const count = value => (typeof value === "number" && Number.isFinite(value) && v
 /**
  * One main request's counts as contract 4 defines them: input excluding cache, cache read, cache
  * write and output. AWF's records keep each provider's own input count, which includes cache for
- * some responses and not others. The record's flag says which when AWF provides it. Otherwise an
- * input count smaller than the cache cannot include it, and any other count is taken to include it,
- * which undercounts only a request whose new input exceeds its cached input.
+ * some responses and not others. The record's flag says which when AWF provides it. Otherwise
+ * Anthropic counts exclude cache, OpenAI counts include cache, and for Copilot (or any other
+ * provider) an input count smaller than the cache cannot include it while any other count is taken
+ * to include it, which undercounts only a request whose new input exceeds its cached input.
  * @param {Record<string, any>} used the record's usage
+ * @param {unknown} [provider] the record's provider
  * @returns {number[] | null}
  */
-function requestTokens(used) {
+function requestTokens(used, provider) {
   const input = count(used.inputTokens);
   const cacheRead = count(used.cacheReadInputTokens);
   const cacheWrite = count(used.cacheCreationInputTokens);
   const output = count(used.outputTokens);
   if (input === null || cacheRead === null || cacheWrite === null || output === null) return null;
   const cached = cacheRead + cacheWrite;
-  const includesCache = typeof used.inputTokensIncludeCache === "boolean" ? used.inputTokensIncludeCache : input >= cached;
+  const includesCache = typeof used.inputTokensIncludeCache === "boolean" ? used.inputTokensIncludeCache : provider === "anthropic" ? false : provider === "openai" ? true : input >= cached;
   // As AWF's credit meter reads an input count that includes cache.
   return [includesCache ? Math.max(0, input - cached) : input, cacheRead, cacheWrite, output];
 }
@@ -179,7 +181,9 @@ function requestTokens(used) {
 /**
  * The run's cost from AWF's records (contract 4): `credits` over every agent request except the
  * router's classifier call, and `model_credits` and token counts over the main conversation's
- * requests. Each is null when a request it covers lacks a price or a count.
+ * requests. `credits` is null when any covered request lacks a price, `model_credits` is null
+ * whenever `credits` is null or there are no main requests, and `tokens` is null when a main
+ * request lacks a count.
  * @param {Record<string, any>[]} usage firewall.token_usage data
  * @param {Record<string, any>[]} routing firewall.model_routing data with raw request fields
  * @param {unknown} subAgentModels
@@ -211,7 +215,7 @@ function runCost(usage, routing, subAgentModels) {
     main++;
     modelCredits = modelCredits === null || aic === null ? null : modelCredits + aic;
     const used = isRecord(record.usage) ? record.usage : {};
-    const counts = requestTokens(used);
+    const counts = requestTokens(used, record.provider);
     if (tokens === null || counts === null) {
       tokens = null;
       continue;
@@ -222,9 +226,10 @@ function runCost(usage, routing, subAgentModels) {
     reasoning = reasoning === null || reasoned === null ? null : reasoning + reasoned;
   }
   const round = (/** @type {number | null} */ value) => (value === null ? null : Number(value.toFixed(6)));
+  const totalCredits = requests > 0 ? round(credits) : null;
   return {
-    credits: requests > 0 ? round(credits) : null,
-    model_credits: main > 0 ? round(modelCredits) : null,
+    credits: totalCredits,
+    model_credits: totalCredits !== null && main > 0 ? round(modelCredits) : null,
     tokens: main > 0 && tokens !== null ? [...tokens, reasoning] : null,
   };
 }
@@ -342,10 +347,11 @@ async function listRuns({ githubClient, owner, repo, workflowFile, defaultBranch
       const jobs = await githubClient.paginate(githubClient.rest.actions.listJobsForWorkflowRunAttempt, { owner, repo, run_id: run.id, attempt_number: 1, per_page: 100 });
       listed.agent_ran = jobs.some((/** @type {any} */ job) => job?.name === "agent" && job.conclusion !== "skipped" && Boolean(job.started_at));
       const writer = jobs.find((/** @type {any} */ job) => job?.name === WRITER_JOB);
-      // Nothing is owed by a run compiled while adaptive routing was off (no history job), a dry run
-      // (job disabled though the agent ran), or a run whose job succeeded: it saved the run, or
-      // declined it, as for a pull request into another branch.
-      if (!writer || writer.conclusion === "success" || (writer.conclusion === "skipped" && listed.agent_ran)) continue;
+      // A run that failed before any job was created (jobs.length === 0) is recorded as no_agent.
+      // When jobs exist, nothing is owed by a run compiled while adaptive routing was off (no
+      // history job), a dry run (job disabled though the agent ran), or a run whose job succeeded:
+      // it saved the run, or declined it, as for a pull request into another branch.
+      if (jobs.length > 0 && (!writer || writer.conclusion === "success" || (writer.conclusion === "skipped" && listed.agent_ran))) continue;
     }
     listing.push(listed);
   }

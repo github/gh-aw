@@ -4,10 +4,12 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 
 	"github.com/github/gh-aw/pkg/testutil"
+	"github.com/github/gh-aw/pkg/workqueue"
 	"github.com/stretchr/testify/require"
 )
 
@@ -37,36 +39,38 @@ func awQueueDispatcherFixture() *WorkflowData {
 	}
 }
 
-func TestAWQueueDefaultOnlyCompilerBootstrap(t *testing.T) {
+func compileAWQueuePolicy(t *testing.T, c *Compiler, data *WorkflowData, path string) workqueue.PolicyEnv {
+	t.Helper()
+	require.NoError(t, c.applyRepositoryWorkQueueOptions(data))
+	require.NoError(t, validateWorkQueueConfiguration(data))
+	require.NoError(t, c.configureAWWorkQueue(data, path))
+	require.NoError(t, c.validateWorkQueueTargets(data, path))
+	policy, err := workqueue.ParsePolicyEnv([]byte(strings.ReplaceAll(data.WorkQueuePolicy.PolicyJSON, "${{ github.repository }}", "owner/repo")))
+	require.NoError(t, err)
+	return policy
+}
+
+func TestAWQueueDefaultOnlyCompilerPolicy(t *testing.T) {
 	for _, config := range []string{"", "{}", `{"work_queue":{}}`} {
 		t.Run(config, func(t *testing.T) {
 			c, path := awQueueCompilerFixture(t, config)
 			data := awQueueDispatcherFixture()
 			require.NoError(t, c.applyRepositoryWorkQueueOptions(data))
-			require.NoError(t, c.applyRepositoryWorkQueueOptions(data))
-			require.NoError(t, validateWorkQueueConfiguration(data))
-			require.NoError(t, c.configureAWWorkQueue(data, path))
-			require.NoError(t, c.validateWorkQueueTargets(data, path))
-			policy := data.WorkQueuePolicy.Policy
-			require.Equal(t, "aw", policy.Authorization)
-			require.Empty(t, policy.Producers)
-			require.Equal(t, 4096, policy.Limits.PendingNodes)
+			policy := compileAWQueuePolicy(t, c, data, path)
+			require.Equal(t, 4, policy.Version)
+			require.Equal(t, 4096, policy.PendingLimit)
+			require.Nil(t, policy.Issues)
 			pool := policy.Pools["default"]
-			require.Equal(t, 16, pool.LogicalLimit)
-			require.Equal(t, 16, pool.NativeLimit)
-			require.Equal(t, 3, pool.Retry.MaxAttempts)
-			require.Equal(t, int64(30000), pool.Retry.BackoffMS)
-			for _, name := range []string{"alpha", "beta"} {
-				profile := pool.Profiles[name]
-				require.Equal(t, ".github/workflows/"+name+".lock.yml", profile.Workflow)
-				require.Equal(t, "${{ github.sha }}", profile.Ref)
-				require.Len(t, profile.LogicalContract, 64)
-				require.Empty(t, profile.Principal)
-				require.Equal(t, 1, profile.MaxClaims)
-			}
+			require.Equal(t, 16, pool.Concurrency)
+			require.Equal(t, 0, pool.PerAccountLimit)
+			require.Equal(t, 3, pool.MaxAttempts)
+			require.Equal(t, []string{"alpha", "beta"}, policy.Workers)
+			require.Equal(t, "owner/repo", policy.EffectScope)
+			require.Contains(t, data.WorkQueuePolicy.PolicyJSON, `"effect_scope":"${{ github.repository }}"`)
+			require.NotContains(t, data.WorkQueuePolicy.PolicyJSON, `"profiles"`, "workers are listed once, not per pool")
 			env := strings.Join(workQueuePolicyEnvironment(data), "")
 			require.Contains(t, env, "GH_AW_WORK_QUEUE_POLICY:")
-			require.NotContains(t, env, "github.actor_id")
+			require.NotContains(t, env, "GH_AW_WORK_QUEUE_ISSUES")
 			steps, err := c.buildWorkQueueControlProcessingStep(data)
 			require.NoError(t, err)
 			var controls map[string]any
@@ -79,22 +83,48 @@ func TestAWQueueDefaultOnlyCompilerBootstrap(t *testing.T) {
 				require.NoError(t, json.Unmarshal([]byte(encoded), &controls))
 			}
 			require.Equal(t, []any{"beta"}, controls["work_queue_workflows"])
+			require.NotContains(t, controls, "work_queue_dispatch_credential")
 		})
 	}
 }
 
 func TestAWQueueSharedSchedulingAndGlobalIssues(t *testing.T) {
-	c, path := awQueueCompilerFixture(t, `{"work_queue":{"concurrency":3,"pending_limit":30,"retry":{"max_attempts":2,"backoff_seconds":45},"pools":{"default":{},"reports":{"concurrency":2,"per_account_limit":1}},"issues":{"label":"cookie","orphaned_after_days":7}}}`)
+	c, path := awQueueCompilerFixture(t, `{"work_queue":{"concurrency":3,"pending_limit":30,"retry":{"max_attempts":2},"pools":{"default":{},"reports":{"concurrency":2,"per_account_limit":1}},"issues":{"label":"cookie","orphaned_after_days":7}}}`)
 	data := awQueueDispatcherFixture()
-	require.NoError(t, c.applyRepositoryWorkQueueOptions(data))
-	require.NoError(t, validateWorkQueueConfiguration(data))
-	require.NoError(t, c.configureAWWorkQueue(data, path))
-	require.JSONEq(t, `{"label":"cookie","orphaned_after_days":7}`, data.WorkQueuePolicy.IssuesJSON)
-	require.Equal(t, 30, data.WorkQueuePolicy.Policy.Limits.PendingNodes)
-	require.Equal(t, 3, data.WorkQueuePolicy.Policy.Pools["default"].LogicalLimit)
-	require.Equal(t, 2, data.WorkQueuePolicy.Policy.Pools["reports"].LogicalLimit)
-	require.Equal(t, data.WorkQueuePolicy.Policy.Pools["default"].Profiles, data.WorkQueuePolicy.Policy.Pools["reports"].Profiles)
-	require.Contains(t, strings.Join(workQueuePolicyEnvironment(data), ""), "GH_AW_WORK_QUEUE_ISSUES:")
+	policy := compileAWQueuePolicy(t, c, data, path)
+	require.Equal(t, &workqueue.IssuesEnv{Label: "cookie", TitlePrefix: "[work queue]", OrphanedAfterDays: 7}, policy.Issues)
+	require.Equal(t, 30, policy.PendingLimit)
+	require.Equal(t, 3, policy.Pools["default"].Concurrency)
+	require.Equal(t, 2, policy.Pools["default"].MaxAttempts)
+	require.Equal(t, 2, policy.Pools["reports"].Concurrency)
+	require.Equal(t, 1, policy.Pools["reports"].PerAccountLimit)
+	require.Len(t, policy.Pools, 2)
+}
+
+// TestAWQueueDocumentedSettings compiles the first aw.json example of each work-queue
+// guide through the real repository configuration path.
+func TestAWQueueDocumentedSettings(t *testing.T) {
+	example := regexp.MustCompile("(?s)```json title=\"\\.github/workflows/aw\\.json\"\n(.*?)\n```")
+	for _, tc := range []struct {
+		doc          string
+		concurrency  int
+		pendingLimit int
+	}{
+		{doc: "patterns/workqueue-ops.md", concurrency: 1, pendingLimit: 4096},
+		{doc: "reference/work-queue.md", concurrency: 3, pendingLimit: 30},
+	} {
+		t.Run(tc.doc, func(t *testing.T) {
+			source, err := os.ReadFile(filepath.Join("..", "..", "docs", "src", "content", "docs", filepath.FromSlash(tc.doc)))
+			require.NoError(t, err)
+			match := example.FindSubmatch(source)
+			require.NotNil(t, match, "documented aw.json example")
+			c, path := awQueueCompilerFixture(t, string(match[1]))
+			policy := compileAWQueuePolicy(t, c, awQueueDispatcherFixture(), path)
+			require.Equal(t, tc.pendingLimit, policy.PendingLimit)
+			require.Nil(t, policy.Issues)
+			require.Equal(t, map[string]workqueue.PoolEnv{"default": {Concurrency: tc.concurrency, PerAccountLimit: 0, MaxAttempts: 3}}, policy.Pools)
+		})
+	}
 }
 
 func TestAWQueueConfigErrorsDoNotFallBackToDefaults(t *testing.T) {
@@ -103,7 +133,8 @@ func TestAWQueueConfigErrorsDoNotFallBackToDefaults(t *testing.T) {
 		`{"work_queue":{"pending_limit":1.5}}`, `{"work_queue":{"producers":{}}}`,
 		`{"work_queue":{"issues":{"label":" "}}}`, `{"work_queue":{"issues":{"label":"${{ inputs.label }}"}}}`,
 		`{"work_queue":{"issues":{"orphaned_after_days":0}}}`, `{"work_queue":{"issues":{"orphaned_after_days":3651}}}`,
-		`{"work_queue":{"retry":{"backoff_seconds":0}}}`,
+		`{"work_queue":{"retry":{"backoff_seconds":30}}}`, `{"work_queue":{"accounting_weights":{"":1}}}`,
+		`{"work_queue":{"mode":"strict-priority"}}`,
 	} {
 		t.Run(config, func(t *testing.T) {
 			c, _ := awQueueCompilerFixture(t, config)
@@ -119,13 +150,6 @@ func TestAWQueueRejectsGlobalAndWorkflowIssueDefinitions(t *testing.T) {
 	require.ErrorContains(t, c.applyRepositoryWorkQueueOptions(data), "conflicts")
 }
 
-func TestAWQueueRejectsGlobalAndWorkflowPolicyDefinitions(t *testing.T) {
-	c, _ := awQueueCompilerFixture(t, `{"work_queue":{}}`)
-	data := awQueueDispatcherFixture()
-	data.RawFrontmatter["work-queue-policy"] = map[string]any{"mode": "weighted-priority"}
-	require.ErrorContains(t, c.applyRepositoryWorkQueueOptions(data), "conflicts")
-}
-
 func TestAWQueueInvalidConfigDoesNotWarnAboutDefaults(t *testing.T) {
 	c, _ := awQueueCompilerFixture(t, `{"work_queue":{"concurrency":0}}`)
 	stderr := testutil.CaptureStderr(t, func() {
@@ -135,11 +159,22 @@ func TestAWQueueInvalidConfigDoesNotWarnAboutDefaults(t *testing.T) {
 	require.NotContains(t, stderr, "continue with defaults")
 }
 
-func TestAWQueueWorkerConsumesInstalledPolicyWithoutProposal(t *testing.T) {
-	c, path := awQueueCompilerFixture(t, "{}")
+func TestAWQueueWorkerCarriesCompiledPolicy(t *testing.T) {
+	c, path := awQueueCompilerFixture(t, `{"work_queue":{"pools":{"default":{"concurrency":2}}}}`)
 	data := &WorkflowData{Tools: map[string]any{"work-queue": map[string]any{"worker": true}}}
-	require.NoError(t, validateWorkQueueConfiguration(data))
-	require.NoError(t, c.configureAWWorkQueue(data, filepath.Join(filepath.Dir(path), "alpha.md")))
-	require.NotContains(t, strings.Join(workQueuePolicyEnvironment(data), ""), "GH_AW_WORK_QUEUE_POLICY:")
-	require.Contains(t, strings.Join(workQueuePolicyEnvironment(data), ""), "GH_AW_WORK_QUEUE_CONTRACT:")
+	policy := compileAWQueuePolicy(t, c, data, filepath.Join(filepath.Dir(path), "alpha.md"))
+	require.Equal(t, 2, policy.Pools["default"].Concurrency)
+	require.Contains(t, policy.Workers, "alpha")
+	env := strings.Join(workQueuePolicyEnvironment(data), "")
+	require.Contains(t, env, "GH_AW_WORK_QUEUE_POLICY:")
+	require.NotContains(t, env, "GH_AW_WORK_QUEUE_CONTRACT")
+}
+
+func TestAWQueueRepositoryPolicyPrefersIssueProjection(t *testing.T) {
+	plain := &WorkflowData{WorkQueuePolicy: &WorkQueuePolicyConfig{PolicyJSON: `{"plain":true}`}}
+	issues := &WorkflowData{Tools: map[string]any{"work-queue": map[string]any{"issues": true}}, WorkQueuePolicy: &WorkQueuePolicyConfig{PolicyJSON: `{"issues":true}`}}
+	observer := &WorkflowData{WorkQueuePolicy: &WorkQueuePolicyConfig{}}
+	require.Empty(t, workQueueRepositoryPolicyJSON([]*WorkflowData{nil, observer}))
+	require.JSONEq(t, `{"plain":true}`, workQueueRepositoryPolicyJSON([]*WorkflowData{observer, plain}))
+	require.JSONEq(t, `{"issues":true}`, workQueueRepositoryPolicyJSON([]*WorkflowData{plain, issues}))
 }

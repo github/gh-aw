@@ -13,7 +13,6 @@ test("work-queue pattern provides deployment and links to the technical referenc
 
   await page.goto("/gh-aw/reference/work-queue/");
   await expect(page.locator(".sl-markdown-content").getByRole("link", { name: "minimal deployment example" })).toHaveAttribute("href", "/gh-aw/patterns/workqueue-ops/#deploy-a-native-queue");
-  await expect(page.locator("#projector-grants")).toHaveText("Projector grants");
 });
 
 test("retired work-queue guide redirects to the pattern deployment section", async ({ page }) => {

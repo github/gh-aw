@@ -159,8 +159,6 @@ These settings independently request the `github-app` broker capability; neither
 > [!CAUTION]
 > Custom steps, jobs, and actions in a brokered job run with that job's full credential authority. This includes `pre-steps`, `steps`, `pre-agent-steps`, `post-steps`, `jobs`, and `safe-outputs.steps`. `safe-outputs.jobs` do not inherit broker authentication; they use their own configured credentials. These steps can read the brokered token. They can also use the job-wide `id-token: write` permission to request their own credentials from the broker. Cleanup only limits use after the job ends. Review this code whenever it changes. Pin third-party actions to full commit SHAs. Never let agent output or untrusted input choose code, actions, refs, or target repositories. Keep code that does not need credentials in separate jobs without `id-token: write`. See [security considerations](/gh-aw/specs/token-broker-specification/#appendix-c-security-and-privacy-considerations-normative).
 
-Work queue dispatch cannot use a brokered installation token because the broker response does not provide a verified App identity binding. Configure `safe-outputs.dispatch-workflow.github-app` or `safe-outputs.dispatch-workflow.github-token` explicitly. Dispatches without a verifiable binding are blocked before queue publication or launch.
-
 ### Imports (`imports:`)
 
 Share and reuse workflow components across multiple workflows. The `imports:` field in frontmatter (or `{{#import ...}}` in markdown) composes shared tools, steps, MCP servers, and prompts from other workflow files.

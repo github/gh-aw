@@ -5,27 +5,13 @@ const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
 const zlib = require("zlib");
-const {
-  currentClaimHandle,
-  assertClaimAuthorized,
-  claimArtifactPath,
-  assertClaimArtifactFile,
-  claimIdentity,
-  assertClaimIdentity,
-  receiptMatchesClaim,
-  withClaimResourceEffects,
-  createClaimResourceVerification,
-  withClaimResourceVerification,
-  claimDeliveryReceipt,
-  durableReceipt,
-} = require("./work_queue_claim_scope.cjs");
+const { currentClaimHandle, assertClaimAuthorized, claimArtifactPath, assertClaimArtifactFile, claimIdentity, assertClaimIdentity, withClaimResourceEffects, markClaimEffects } = require("./work_queue_claim_scope.cjs");
 const { resolveRepositoryTarget, canonicalResourceTarget } = require("./work_queue_effect_resource.cjs");
 const { wrapClaimEffectClient } = require("./work_queue_effect_client.cjs");
 const { isStagedMode } = require("./safe_output_helpers.cjs");
 const { authorizeHandlerInvocation } = require("./safe_output_authorization_gate.cjs");
-const privateReceipts = new WeakMap();
 
-/** @param {{ "target-ref"?: string, "coverage-dir"?: string, max?: number, "wait-for-processing-timeout"?: number, staged?: boolean }} [config] @param {import("./types/work-queue-native-client").ClaimNativeClient} [suppliedClient] */
+/** @param {{ "target-ref"?: string, "coverage-dir"?: string, max?: number, staged?: boolean }} [config] @param {import("./types/work-queue-native-client").ClaimNativeClient} [suppliedClient] */
 async function main(config = {}, suppliedClient) {
   const handle = currentClaimHandle();
   if (!handle) throw new Error(`${SAFE_OUTPUT_E001}: Queue coverage requires a Claim factory`);
@@ -107,60 +93,14 @@ async function main(config = {}, suppliedClient) {
       })
     );
     if (!data || typeof data !== "object" || !("id" in data) || typeof data.id !== "string" || !/^[A-Za-z0-9_-]{1,256}$/.test(data.id)) throw new Error("Queue coverage has no exact service upload receipt");
-    const result = { success: true, report_id: data.id, repo: repository, ref, commit_sha: revision, sha256 };
-    privateReceipts.set(result, { ...factoryIdentity, repository, ref, revision, path: message.file, language: message.language, label, sha256, report_id: data.id, timeout: config["wait-for-processing-timeout"] ?? 160, authorityResource });
-    return result;
+    // One status read, no polling: still-processing uploads are recorded as unverified.
+    const { data: statusData } = await request("GET /repos/{owner}/{repo}/code-coverage/reports/{report_id}", { owner, repo, report_id: data.id });
+    // prettier-ignore
+    const status = /** @type {{processing_status?: string, errors?: unknown[] | null} | null | undefined} */ (statusData);
+    if (status?.processing_status === "pending" || status?.processing_status === "processing") markClaimEffects("code_coverage", { status: "unverified" });
+    else if (status?.processing_status !== "succeeded" || status.errors?.length) throw new Error(`Queue coverage report ${data.id} failed processing`);
+    return { success: true, report_id: data.id, repo: repository, ref, commit_sha: revision, sha256 };
   };
 }
 
-async function verifyCodeCoverageDelivery(options) {
-  const receipt = claimDeliveryReceipt(options, "code_coverage", privateReceipts);
-  return verifyCodeCoverageReceipt(options, receipt);
-}
-
-function validCodeCoverageReceipt(receipt, claim) {
-  return (
-    receiptMatchesClaim(receipt, claim) &&
-    ["repository", "revision", "ref", "path", "language", "label", "report_id"].every(key => typeof receipt[key] === "string" && receipt[key].length > 0) &&
-    /^[A-Za-z0-9_-]+\/[A-Za-z0-9._-]+$/.test(receipt.repository) &&
-    /^[a-f0-9]{64}$/.test(receipt.sha256) &&
-    /^[A-Za-z0-9_-]{1,256}$/.test(receipt.report_id) &&
-    Number.isSafeInteger(receipt.timeout) &&
-    receipt.timeout >= 0 &&
-    receipt.timeout <= 600 &&
-    receipt.authorityResource?.repository === receipt.repository &&
-    receipt.authorityResource.ref === receipt.ref &&
-    receipt.authorityResource.path === receipt.path
-  );
-}
-
-function durableCodeCoverageReceipt(result, claim) {
-  const receipt = result && privateReceipts.get(result);
-  if (!validCodeCoverageReceipt(receipt, claim)) return null;
-  return durableReceipt(receipt);
-}
-
-async function verifyCodeCoverageReceipt(options, receipt) {
-  const { claim, github } = options;
-  if (!validCodeCoverageReceipt(receipt, claim)) return { verified: false };
-  const [owner, repo] = receipt.repository.split("/");
-  const deadline = Date.now() + receipt.timeout * 1000;
-  let status;
-  do {
-    status = (await github.request("GET /repos/{owner}/{repo}/code-coverage/reports/{report_id}", { owner, repo, report_id: receipt.report_id })).data;
-    if (!["pending", "processing"].includes(status.processing_status)) break;
-    if (Date.now() >= deadline) return { verified: false };
-    await new Promise(resolve => setTimeout(resolve, Math.min(2000, deadline - Date.now())));
-  } while (Date.now() <= deadline);
-  if (status.processing_status !== "succeeded" || status.errors?.length) return { verified: false };
-  const proof = createClaimResourceVerification({
-    verified: true,
-    claim_handle: claim.handle,
-    resource: { kind: "code_coverage", repository: receipt.repository, id: receipt.report_id, ref: receipt.ref, commit_sha: receipt.revision, label: receipt.label, sha256: receipt.sha256 },
-    authority_resource: await resolveRepositoryTarget(github, receipt.authorityResource),
-    evidence: { source: "github_code_coverage_api", report_id: receipt.report_id, processing_status: "succeeded", request_sha256: receipt.sha256, language: receipt.language },
-  });
-  return withClaimResourceVerification(proof, () => proof, { authorize: options.authorize, context: options.context, github });
-}
-
-module.exports = { main, verifyCodeCoverageDelivery, durableCodeCoverageReceipt };
+module.exports = { main };

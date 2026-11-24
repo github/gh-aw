@@ -3,115 +3,75 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import fs from "fs";
 import path from "path";
 import os from "node:os";
+import { createRequire } from "node:module";
 import { main, renderSummary } from "./work_queue_summary.cjs";
-import { serializeTransactionLog } from "./work_queue_replay.cjs";
-import { queueFixture } from "./work_queue_lifecycle.test_helpers.cjs";
+
+const require = createRequire(import.meta.url);
+const h = require("./work_queue_test_helpers.cjs");
+const { replayTransactions } = require("./work_queue_replay.cjs");
+const { assignmentForDispatch } = require("./work_queue_scheduler.cjs");
 
 const directories = [];
 afterEach(() => {
   for (const directory of directories.splice(0)) fs.rmSync(directory, { recursive: true, force: true });
 });
-function snapshotFile(fixture) {
+
+/** A bound worker dispatch of Work "a" plus available Work "b". */
+function boundLedger() {
+  const planned = h.dispatchNext(h.submit([], [h.work("a"), h.work("b")]), { max_claims: 1, max_dispatches: 1 });
+  const dispatchId = planned.decision.dispatches[0];
+  const log = h.bind(h.launch(planned.log, dispatchId), dispatchId, h.workerActor("200", 1));
+  return { log, dispatchId, assignment: assignmentForDispatch(replayTransactions(log), dispatchId) };
+}
+
+function snapshotFile(log, assignment) {
   const directory = fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()), "gh-aw-queue-summary-"));
   directories.push(directory);
   const filename = path.join(directory, "snapshot.json");
-  fs.writeFileSync(filename, JSON.stringify({ version: 3, sha: "activation", worker: fixture.assignment, origin: fixture.dispatcher, captured_at: fixture.at, transactionLog: serializeTransactionLog(fixture.transactions) }));
+  fs.writeFileSync(filename, JSON.stringify({ version: 4, sha: "activation", transactionLog: h.ledgerText(log), origin: h.workerActor("200", 1), role: "worker", worker: assignment }));
   return filename;
 }
-function finish(fixture, handle, outcome) {
-  fixture.append("finish", { dispatch_id: fixture.assignment.dispatch_id, claim_handle: handle, outcome }, { ...fixture.workerActor, dispatch_id: fixture.assignment.dispatch_id, claim_handle: handle });
-}
 
-describe("fair DAG queue lifecycle summaries", () => {
-  it("summarizes genuine observer absence without calling an empty authoritative ledger valid", async () => {
-    const fixture = queueFixture({ granted: false });
-    const snapshotPath = snapshotFile(fixture);
-    fs.writeFileSync(snapshotPath, JSON.stringify({ version: 3, sha: null, worker: null, origin: fixture.dispatcher, role: "observer", captured_at: fixture.at, transactionLog: "" }));
-    const addRaw = vi.fn(() => ({ write: async () => {} }));
-    await main({ snapshotPath, githubClient: fixture.githubClient, context: fixture.dispatcherContext, readWorkQueueLog: async () => ({ sha: null, transactions: [] }), core: { summary: { addRaw }, warning: vi.fn() } });
-    expect(addRaw).toHaveBeenCalledWith(expect.stringContaining("0 Work nodes; 0 new checked commits"));
-    expect(addRaw).toHaveBeenCalledWith(expect.stringContaining("read-only queue observer"));
-    await expect(
-      main({ snapshotPath, githubClient: fixture.githubClient, context: fixture.dispatcherContext, readWorkQueueLog: async () => ({ sha: "existing", transactions: [] }), core: { summary: { addRaw }, warning: vi.fn() } })
-    ).rejects.toThrow(/summarize/);
+const context = { repo: { owner: "owner", repo: "repo" } };
+
+describe("work queue activity summary", () => {
+  it("describes observers and settled worker assignments", () => {
+    const { log } = boundLedger();
+    const state = replayTransactions(log);
+    expect(renderSummary({ projection: state, worker: null, role: "observer" }, state)).toContain("read-only queue observer");
+    expect(renderSummary({ projection: state, worker: null, role: "worker" }, state)).toContain("already settled at activation");
   });
 
-  it("summarizes genuine dispatcher absence but rejects an existing policyless ledger", async () => {
-    const fixture = queueFixture({ granted: false });
-    const snapshotPath = snapshotFile(fixture);
-    fs.writeFileSync(snapshotPath, JSON.stringify({ version: 3, sha: null, worker: null, origin: fixture.dispatcher, role: "dispatcher", captured_at: fixture.at, transactionLog: "" }));
-    const addRaw = vi.fn(() => ({ write: async () => {} }));
-    const options = { snapshotPath, githubClient: fixture.githubClient, context: fixture.dispatcherContext, core: { summary: { addRaw }, warning: vi.fn() } };
-    await main({ ...options, readWorkQueueLog: async () => ({ sha: null, transactions: [] }) });
-    expect(addRaw).toHaveBeenCalledWith(expect.stringContaining("0 Work nodes; 0 new checked commits"));
-    await expect(main({ ...options, readWorkQueueLog: async () => ({ sha: "existing", transactions: [] }) })).rejects.toThrow(/summarize/);
-  });
-
-  it("distinguishes observer reports from unassigned queue-control authority", () => {
-    const fixture = queueFixture({ granted: false });
-    const summary = renderSummary({ projection: fixture.state, worker: null, role: "observer" }, fixture.state);
-    expect(summary).toContain("read-only queue observer");
-    expect(summary).toContain("Queue mutations and worker Claim effects are unavailable");
-    expect(summary).toContain("ordinary configured outputs retain their normal authorization");
-    expect(summary).not.toContain("Queue-control intents");
-  });
-
-  it("distinguishes independent mixed outcomes, pending delivery and retained native reservation", () => {
-    const fixture = queueFixture({ bound: true });
-    const snapshot = { projection: fixture.state, worker: fixture.assignment };
-    finish(fixture, "h1", "completed");
-    finish(fixture, "h2", "cancelled");
-    finish(fixture, "h3", "completed");
-    const summary = renderSummary(snapshot, fixture.state);
-    expect(summary).toContain("completed_with_cancellations");
-    expect(summary).toContain("2 completed, 1 cancelled, 0 unsettled");
-    expect(summary).toContain("Native reservation: **retained**");
-    expect(summary).toContain("Completion does not imply verified delivery");
-    expect(summary).toContain("| Completion | 2 |");
-    expect(summary).toContain("| ClaimCancellation | 1 |");
-    expect(summary).not.toContain("stored task");
-    expect(summary).not.toContain(fixture.assignment.claims[0].work_id);
+  it("counts operations committed since activation and the assigned Claim outcomes", () => {
+    const { log, dispatchId, assignment } = boundLedger();
+    const before = replayTransactions(log);
+    const after = replayTransactions(h.finish(log, dispatchId, h.workerActor("200", 1)));
+    const summary = renderSummary({ projection: before, worker: assignment, role: "worker" }, after);
+    expect(summary).toContain("2 Work nodes; 1 new commits since activation; 0 open dispatches");
+    expect(summary).toContain("| Completion | 1 |");
+    expect(summary).toContain("Assigned dispatch: 1 completed, 0 cancelled, 0 open Claims; dispatch **closed**.");
+    expect(summary).not.toContain("task");
     expect(summary).toMatch(/<\/details>\n\n\n$/);
   });
 
-  it("labels started/unbound reservations as unresolved, never stopped or empty", () => {
-    const fixture = queueFixture({ started: true });
-    const summary = renderSummary({ projection: fixture.state, worker: fixture.assignment }, fixture.state);
-    expect(summary).toContain("1 outstanding native reservations (1 unbound or unresolved)");
-    expect(summary).toContain("Assigned group: **pending**");
-  });
-
-  it("writes a read-only progressive summary from the current canonical ledger", async () => {
-    const fixture = queueFixture({ bound: true });
-    const snapshotPath = snapshotFile(fixture);
-    finish(fixture, "h1", "completed");
+  it("writes the summary from the current ledger", async () => {
+    const { log, dispatchId, assignment } = boundLedger();
+    const snapshotPath = snapshotFile(log, assignment);
+    const fake = h.fakeQueueGitHub(h.ledgerText(h.finish(log, dispatchId, h.workerActor("200", 1))));
     const addRaw = vi.fn(() => ({ write: async () => {} }));
-    await main({ snapshotPath, githubClient: fixture.githubClient, context: fixture.workerContext, readWorkQueueLog: fixture.readWorkQueueLog, core: { summary: { addRaw }, warning: vi.fn() } });
-    expect(addRaw).toHaveBeenCalledWith(expect.stringContaining("<details>"));
-    expect(addRaw).toHaveBeenCalledWith(expect.stringContaining("1 new checked commits"));
-    expect(addRaw).toHaveBeenCalledWith(expect.stringContaining("Work nodes"));
-    expect(addRaw).toHaveBeenCalledWith(expect.stringContaining(fixture.assignment.claims[0].work_id.slice(0, 12)));
+    await main({ snapshotPath, githubClient: fake.githubClient, context, core: { summary: { addRaw }, warning: vi.fn() } });
+    expect(addRaw.mock.calls[0][0]).toContain("1 new commits since activation");
     expect(addRaw.mock.calls[0][0]).toContain("</details>\n\n\n<details>");
-    expect(addRaw.mock.calls[0][0]).toMatch(/<\/details>\n\n\n$/);
   });
 
-  it("reports ledger validation failure without inventing a successful state", async () => {
-    const fixture = queueFixture({ bound: true });
-    const snapshotPath = snapshotFile(fixture);
+  it("reports ledger read failure without inventing a state", async () => {
+    const { log, assignment } = boundLedger();
     const addRaw = vi.fn(() => ({ write: async () => {} }));
-    await expect(
-      main({
-        snapshotPath,
-        context: fixture.workerContext,
-        githubClient: fixture.githubClient,
-        readWorkQueueLog: async () => {
-          throw new Error("private data");
-        },
-        core: { warning: vi.fn(), summary: { addRaw } },
-      })
-    ).rejects.toThrow(/summarize/);
-    expect(addRaw).toHaveBeenCalledWith(expect.stringContaining("no successful queue state is inferred"));
+    const readWorkQueueLog = async () => {
+      throw new Error("private data");
+    };
+    await expect(main({ snapshotPath: snapshotFile(log, assignment), context, githubClient: {}, readWorkQueueLog, core: { warning: vi.fn(), summary: { addRaw } } })).rejects.toThrow(/summarize/);
+    expect(addRaw.mock.calls[0][0]).toContain("no queue state is inferred");
     expect(addRaw.mock.calls[0][0]).not.toContain("private data");
-    expect(addRaw.mock.calls[0][0]).toMatch(/<\/details>\n\n\n$/);
   });
 });

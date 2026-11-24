@@ -294,8 +294,8 @@ func TestRenderWorkQueueObserverMCPIsReadOnly(t *testing.T) {
 					t.Fatalf("observer MCP must not expose %s: %s", denied, rendered)
 				}
 			}
-			if format == "json" && !strings.Contains(rendered, `"tools": ["work_queue_read", "work_queue_explain"]`) {
-				t.Fatalf("observer must advertise only read/explain: %s", rendered)
+			if format == "json" && !strings.Contains(rendered, `"tools": ["work_queue_read"]`) {
+				t.Fatalf("observer must advertise only work_queue_read: %s", rendered)
 			}
 		})
 	}
@@ -354,25 +354,18 @@ func TestRenderWorkQueueMCPEnvironmentLoadsEnterpriseSnapshot(t *testing.T) {
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const helpers = require("../../actions/setup/js/work_queue_test_helpers.cjs");
-const queue = require("../../actions/setup/js/work_queue_replay.cjs");
-const { defaultPolicy } = require("../../actions/setup/js/work_queue_policy.cjs");
-const { newWork } = require("../../actions/setup/js/work_queue_graph.cjs");
 const { loadWorkQueueSnapshot, createWorkQueueTools } = require("../../actions/setup/js/work_queue_mcp_server.cjs");
 const resource = { kind: "issue", host: "contoso.example", repository: "owner/repo", repository_id: "1", resource_id: "2", number: "3" };
-const ref = "0".repeat(40);
-const policy = defaultPolicy({ repository: "owner/repo", principal: "1001" });
-policy.projectors = [{ principal: "1001", workflow: helpers.dispatcher.workflow, ref, pools: ["default"], repositories: ["owner/repo"] }];
-const work = { ...newWork({}, "enterprise", "subject", "default", policy, 1), subject: resource, depends_on: [{ kind: "issue", resource, condition: "closed" }] };
-const transactions = [helpers.genesis(policy)];
-transactions.push(helpers.commit("genesis", "enterprise-submit", "submit", helpers.dispatcher, { nodes: [work] }, [work], 1));
-transactions.push(helpers.operationCommit(transactions, "enterprise-link", "issue_link", [{ kind: "IssueLink", work_id: work.work_id, resource, projector_ref: ref }], { ...helpers.dispatcher, role: "projector" }));
-fs.writeFileSync(process.argv[1], JSON.stringify({ version: 3, sha: "activation-head", captured_at: 10, origin: helpers.dispatcher, worker: null, role: "observer", transactionLog: queue.serializeTransactionLog(transactions) }));
+const work = helpers.work("enterprise", { subject: resource, depends_on: [{ kind: "issue", resource, condition: "closed" }] });
+const link = [{ kind: "IssueLink", work_id: work.work_id, resource }];
+const log = helpers.commit(helpers.submit([], [work]), helpers.projector, "issue_link", { operations: link }, link);
+fs.writeFileSync(process.argv[1], JSON.stringify({ version: 4, sha: "activation-head", origin: helpers.dispatcher, role: "observer", worker: null, transactionLog: helpers.ledgerText(log) }));
 const snapshot = loadWorkQueueSnapshot(process.argv[1]);
 const actual = snapshot.projection.works.get(work.work_id);
 assert.deepEqual({ ...actual.subject }, resource);
 assert.deepEqual({ ...actual.depends_on[0].resource }, resource);
-assert.deepEqual({ ...actual.issue_link }, resource);
-assert.deepEqual(createWorkQueueTools(snapshot).map(tool => tool.name), ["work_queue_read", "work_queue_explain"]);
+assert.deepEqual({ ...actual.backing_issue }, resource);
+assert.deepEqual(createWorkQueueTools(snapshot).map(tool => tool.name), ["work_queue_read"]);
 process.env.GITHUB_SERVER_URL = "https://another.example";
 assert.throws(() => loadWorkQueueSnapshot(process.argv[1]), /resource_unauthorized/);
 `
@@ -397,8 +390,8 @@ func TestWorkQueueMCPIsRegisteredInManifest(t *testing.T) {
 	if len(servers) != 1 || servers[0].Name != "work-queue" {
 		t.Fatalf("expected queue server in manifest, got %#v", servers)
 	}
-	if len(servers[0].Tools) != 2 || strings.Join(servers[0].Tools, ",") != "work_queue_explain,work_queue_read" {
-		t.Fatalf("expected only observer read/explain tools, got %#v", servers[0].Tools)
+	if len(servers[0].Tools) != 1 || servers[0].Tools[0] != "work_queue_read" {
+		t.Fatalf("expected only the observer read tool, got %#v", servers[0].Tools)
 	}
 	for _, participant := range []*WorkflowData{
 		{Tools: map[string]any{"work-queue": map[string]any{"worker": true}}},
@@ -407,7 +400,7 @@ func TestWorkQueueMCPIsRegisteredInManifest(t *testing.T) {
 		servers := collectMCPServersForManifest(participant)
 		found := false
 		for _, server := range servers {
-			if server.Name == "work-queue" && len(server.Tools) == 5 {
+			if server.Name == "work-queue" && len(server.Tools) == 4 {
 				found = true
 			}
 		}

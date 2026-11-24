@@ -190,6 +190,15 @@ func computePermissionsForSafeOutputs(safeOutputs *SafeOutputsConfig, excludePer
 	if dispatchRepositoryPermissions := computeDispatchRepositoryPermissions(safeOutputs, excludePerHandlerApps); dispatchRepositoryPermissions != nil {
 		permissions.Merge(dispatchRepositoryPermissions)
 	}
+	if routePermissions := computeRequestContinuationRoutePermissions(safeOutputs, excludePerHandlerApps); routePermissions != nil {
+		permissions.Merge(routePermissions)
+	}
+	if safeOutputs.workQueueApprovalReads {
+		// Dispatchers read approval Issues through the own-repository dependency client.
+		if level, exists := permissions.Get(PermissionIssues); !exists || level == PermissionNone {
+			permissions.Set(PermissionIssues, PermissionRead)
+		}
+	}
 
 	// NoOp and MissingTool don't require write permissions beyond what's already included
 	// They only need to comment if add-comment is already configured
