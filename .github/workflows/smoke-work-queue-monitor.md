@@ -80,8 +80,7 @@ Read `/tmp/gh-aw/agent/smoke-cycle.json` with `cat` first. A trusted step wrote
 it from Actions API data and the bounded activation snapshot before you started.
 It walks the six most recent dispatcher runs from newest to oldest and selects
 the first completed run that did not succeed, whose evidence is missing or
-unreadable, or whose granted Claims have no worker still pending or running. A
-successful run that granted no Claims (for example, a full pool) is skipped.
+unreadable, or whose granted Claims have no worker still pending or running.
 Dispatch is FIFO, so a dispatcher may claim older Work than it submitted.
 `queue.claims` lists the Claims that dispatcher attempt itself granted, each
 with its own terminal state, cancellation reason and bound worker attempt;

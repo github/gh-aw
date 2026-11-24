@@ -17,6 +17,18 @@ async function repositoryId(githubClient, repo) {
 }
 
 /**
+ * Numeric account id of the token's principal, which authors every projector write
+ * (GraphQL `viewer`: REST `GET /user` rejects installation tokens).
+ * @param {any} githubClient
+ * @returns {Promise<string>}
+ */
+async function writerId(githubClient) {
+  const id = (await githubClient.graphql("query { viewer { databaseId } }"))?.viewer?.databaseId;
+  if (!Number.isSafeInteger(id) || id <= 0) throw new Error("projector identity is unverified");
+  return String(id);
+}
+
+/**
  * Queue resource for a REST Issue.
  * @param {{id: number|string, number: number|string}} issue
  * @param {string} repository owner/repo
@@ -50,9 +62,10 @@ async function getIssue(githubClient, repo, number) {
 }
 
 /**
- * The last RECENT_COMMENTS comments `{id, body}` of an Issue with `total` comments.
+ * The last RECENT_COMMENTS comments `{id, body, author}` of an Issue with `total` comments;
+ * `author` is the commenter's numeric account id ("" when absent).
  * @param {any} githubClient @param {{owner: string, repo: string}} repo @param {number} number @param {number} total
- * @returns {Promise<Array<{id: string, body: string}>>}
+ * @returns {Promise<Array<{id: string, body: string, author: string}>>}
  */
 async function recentComments(githubClient, repo, number, total) {
   if (!total) return [];
@@ -61,7 +74,7 @@ async function recentComments(githubClient, repo, number, total) {
   const comments = [];
   for (const page of pages) {
     const { data } = await githubClient.rest.issues.listComments({ ...repo, issue_number: number, per_page: RECENT_COMMENTS, page });
-    for (const comment of data) comments.push({ id: String(comment.id), body: typeof comment.body === "string" ? comment.body : "" });
+    for (const comment of data) comments.push({ id: String(comment.id), body: typeof comment.body === "string" ? comment.body : "", author: comment.user?.id == null ? "" : String(comment.user.id) });
   }
   return comments.slice(-RECENT_COMMENTS);
 }
@@ -77,4 +90,4 @@ async function listLabelledOpenIssues(githubClient, repo, label) {
   return issues;
 }
 
-module.exports = { RECENT_COMMENTS, addComment, closeIssue, createIssue, getIssue, issueResource, listLabelledOpenIssues, recentComments, repositoryId };
+module.exports = { RECENT_COMMENTS, addComment, closeIssue, createIssue, getIssue, issueResource, listLabelledOpenIssues, recentComments, repositoryId, writerId };

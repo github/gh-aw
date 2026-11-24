@@ -50,7 +50,9 @@ tools:
 create/adopt one labelled Issue per pending Work (immutable `IssueLink`),
 comment when a Claim binds, comment and close on completion/cancellation, close
 labelled Issues whose Work is absent. Projection is best-effort (≤50 Work/run),
-never fails a job, and is idempotent via comment markers.
+never fails a job, and is idempotent via markers in Issues and comments authored
+by the projector's own token principal; other authors' markers are ignored.
+Backing Issues of another repository are not projected.
 Closing a backing Issue cancels its `available` Work (`related_issue_closed`)
 through generated `.github/workflows/agentic-workqueue.yml`.
 See [backing Issue reference](../../docs/src/content/docs/reference/work-queue.md#backing-issues).

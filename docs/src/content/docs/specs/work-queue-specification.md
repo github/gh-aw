@@ -352,12 +352,14 @@ Claims, Dispatches, completed and cancelled Work, and request history of version
 
 When `issues` is configured, a `projector` publishes best-effort `issue_link` commits, each carrying the operations of one Issue mutation. Per run it handles at most 50 Work of the configured pools in FIFO order:
 
-- `available` or `claimed` Work without `backing_issue`: create an Issue titled with `title_prefix` and labelled `label`, or adopt an open labelled Issue carrying the Work's marker, then publish `IssueLink`.
+- `available` or `claimed` Work without `backing_issue`: create an Issue titled with `title_prefix` and labelled `label`, or adopt an open labelled Issue that the projector's principal authored and that carries the Work's marker, then publish `IssueLink`.
 - A claimed Work whose open Claim has no `issue_comment` and whose Dispatch is `bound`: comment and publish `IssueComment{claim_id}`.
 - `completed` or `cancelled` Work without `issue_comment`: comment, close the Issue if open, and publish `IssueComment`.
-- An open labelled Issue whose marked Work is absent from the ledger: comment and close it.
+- An open labelled Issue that the projector's principal authored and whose marked Work is absent from the ledger: comment and close it.
 
-Comments carry `<!-- gh-aw-work-queue:<work_id>:<state> -->` markers and are not repeated when the marker is among recent comments. Projection failures MUST NOT fail the calling job. Closing a backing Issue of `available` Work publishes `cancel_work` with `[WorkCancellation{reason:"related_issue_closed"}]`; other Work states are unchanged.
+The projector's principal is the account of its token (GraphQL `viewer.databaseId`); markers are editable text, so an Issue or comment by any other account MUST NOT be adopted, reused, or closed for its marker. If the principal cannot be verified, nothing is reused. The projector writes only Issues of its own repository: Work whose `backing_issue.repository_id` differs is skipped without counting toward the 50, and a backing Issue's live `id` must equal its `resource_id`.
+
+Comments carry `<!-- gh-aw-work-queue:<work_id>:<state> -->` markers and are not repeated when the marker is among the principal's recent comments. Projection failures MUST NOT fail the calling job. Closing a backing Issue of `available` Work publishes `cancel_work` with `[WorkCancellation{reason:"related_issue_closed"}]`; other Work states are unchanged.
 
 ## 17. Limits
 

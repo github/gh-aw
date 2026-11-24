@@ -149,12 +149,12 @@ The first dispatcher, producer, administrator, or maintenance job that reads a v
 
 The projection is best-effort and never fails a job. It runs after dispatcher controls, worker finish and termination, and maintenance, and handles at most 50 Work per run, oldest first:
 
-- `available` or `claimed` Work without a backing Issue gets a new labelled Issue (or adopts a labelled Issue carrying its marker), bound by an immutable `IssueLink`.
+- `available` or `claimed` Work without a backing Issue gets a new labelled Issue (or adopts a labelled Issue the projector created that carries its marker), bound by an immutable `IssueLink`.
 - A Claim whose Dispatch is bound gets one comment on the Work's Issue.
 - `completed` or `cancelled` Work gets a final comment and its Issue is closed.
-- A labelled open Issue whose marked Work is absent from the ledger is commented on and closed.
+- A labelled open Issue the projector created whose marked Work is absent from the ledger is commented on and closed.
 
-Comments carry `<!-- gh-aw-work-queue:… -->` markers so a repeated projection does not duplicate them. Submitted Work can also name an existing Issue in `backing_issue`:
+Comments carry `<!-- gh-aw-work-queue:… -->` markers so a repeated projection does not duplicate them. Only Issues and comments authored by the projector token's own account count: copying a marker into another Issue or comment has no effect. Submitted Work can also name an existing Issue in `backing_issue`; the projection comments on and closes it only when it is in the queue's repository:
 
 ```json
 {
