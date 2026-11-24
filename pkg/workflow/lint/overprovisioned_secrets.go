@@ -16,11 +16,12 @@ import (
 // secrets context instead of the named secrets a job or step actually needs.
 func OverprovisionedSecretsRule() Rule {
 	return Rule{
-		ID:          "overprovisioned-secrets",
-		Description: "Detect secrets: inherit and expressions that materialize the whole secrets context",
-		Severity:    Error,
-		Targets:     ActionsAST | AWAST,
-		Check:       checkOverprovisionedSecrets,
+		ID:           "overprovisioned-secrets",
+		ThreatRuleID: "CTR-017",
+		Description:  "Detect secrets: inherit and expressions that materialize the whole secrets context",
+		Severity:     Error,
+		Targets:      ActionsAST | AWAST,
+		Check:        checkOverprovisionedSecrets,
 	}
 }
 
