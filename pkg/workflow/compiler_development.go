@@ -47,6 +47,7 @@ func (c *Compiler) dryRunWorkflowData(data *WorkflowData) *WorkflowData {
 	result.LockForAgent = false
 	result.LabelCommandRemoveLabel = false
 	result.ReportBlockedVersionDisabled = true
+	result.AdaptiveRouting = ""
 	result.Tools = maps.Clone(data.Tools)
 	if _, exists := result.Tools["work-queue"]; exists {
 		result.Tools["work-queue"] = false
@@ -70,23 +71,27 @@ func (c *Compiler) dryRunWorkflowData(data *WorkflowData) *WorkflowData {
 		}
 		result.ParsedTools = &tools
 	}
-	if data.CacheMemoryConfig != nil {
-		config := *data.CacheMemoryConfig
+	setDryRunMemoryRestoreOnly(&result, data)
+	return &result
+}
+
+func setDryRunMemoryRestoreOnly(result, original *WorkflowData) {
+	if original.CacheMemoryConfig != nil {
+		config := *original.CacheMemoryConfig
 		config.Caches = sliceutil.Map(config.Caches, func(cache CacheMemoryEntry) CacheMemoryEntry {
 			cache.RestoreOnly = true
 			return cache
 		})
 		result.CacheMemoryConfig = &config
 	}
-	if data.DriveMemoryConfig != nil {
-		config := *data.DriveMemoryConfig
+	if original.DriveMemoryConfig != nil {
+		config := *original.DriveMemoryConfig
 		config.Drives = sliceutil.Map(config.Drives, func(drive DriveMemoryEntry) DriveMemoryEntry {
 			drive.RestoreOnly = true
 			return drive
 		})
 		result.DriveMemoryConfig = &config
 	}
-	return &result
 }
 
 func (c *Compiler) dryRunConclusionData(data *WorkflowData) *WorkflowData {
