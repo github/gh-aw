@@ -91,8 +91,9 @@ function rate(wins, losses, hopeful) {
 
 /**
  * A pair's average cost over its entries, oldest first: the first known cost sets it and each
- * later one moves it by 0.9 x old + 0.1 x new. An entry with a cost but no model share counts
- * all of it as the model's.
+ * later one moves it by 0.9 x old + 0.1 x new. `model_credits` is averaged over the exact same
+ * entries that have a known total cost, falling back to total cost when the model share is null,
+ * so `0 <= model_credits <= credits` holds even for legacy partial-bill entries.
  * @param {HistoryEntry[]} entries
  */
 function averages(entries) {
@@ -103,13 +104,12 @@ function averages(entries) {
   let bills = 0;
   for (const entry of entries) {
     const cost = entry[3];
-    let model = entry[4];
     if (cost !== null) {
       credits = credits === null ? cost : 0.9 * credits + 0.1 * cost;
       bills += 1;
-      if (model === null) model = cost;
+      const model = entry[4] ?? cost;
+      modelCredits = modelCredits === null ? model : 0.9 * modelCredits + 0.1 * model;
     }
-    if (model !== null) modelCredits = modelCredits === null ? model : 0.9 * modelCredits + 0.1 * model;
   }
   return { credits, modelCredits, bills };
 }
@@ -438,6 +438,7 @@ module.exports = {
   BOUNDS,
   NOTES,
   applyRun,
+  averages,
   counts,
   emptyState,
   memory,
