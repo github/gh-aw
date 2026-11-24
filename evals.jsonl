@@ -132,3 +132,5 @@
 {"id":"fixes_proposed_or_noop","question":"Were fixes proposed in a PR or issue, or was noop used when no linting violations were found?","answer":"UNKNOWN","model":"gpt-6-luna","timestamp":"2026-11-20T07:20:56.406Z","runid":"44693623270"}
 {"id":"elixir_snippets_linted","question":"Did the agent use Credo to lint Elixir snippets found in repository markdown files?","answer":"NO","model":"gpt-6-luna","timestamp":"2026-11-23T07:25:01.314Z","runid":"45130072946"}
 {"id":"fixes_proposed_or_noop","question":"Were fixes proposed in a PR or issue, or was noop used when no linting violations were found?","answer":"YES","model":"gpt-6-luna","timestamp":"2026-11-23T07:25:01.314Z","runid":"45130072946"}
+{"id":"elixir_snippets_linted","question":"Did the agent use Credo to lint Elixir snippets found in repository markdown files?","answer":"NO","model":"gpt-6-luna","timestamp":"2026-11-24T07:22:13.515Z","runid":"45346584887"}
+{"id":"fixes_proposed_or_noop","question":"Were fixes proposed in a PR or issue, or was noop used when no linting violations were found?","answer":"YES","model":"gpt-6-luna","timestamp":"2026-11-24T07:22:13.515Z","runid":"45346584887"}
