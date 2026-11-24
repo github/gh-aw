@@ -93,19 +93,7 @@ func overprovisionedSecretsDiagnostics(ctx context.Context, input Input) ([]Diag
 	}
 
 	blocks, err := aw.ExecutionBlocks(ctx, input.Document)
-	failures := []error{err}
-	// engine.env and sandbox.agent.env are copied into the agent execution step
-	// environment but are not execution blocks.
-	if input.Document != nil {
-		if engine, ok := input.Document.Frontmatter["engine"].(map[string]any); ok {
-			failures = append(failures, walkExpressionScalars(ctx, engine["env"], "engine.env", visit))
-		}
-		if sandbox, ok := input.Document.Frontmatter["sandbox"].(map[string]any); ok {
-			if agent, ok := sandbox["agent"].(map[string]any); ok {
-				failures = append(failures, walkExpressionScalars(ctx, agent["env"], "sandbox.agent.env", visit))
-			}
-		}
-	}
+	failures := []error{err, walkOverprovisionedSecretsEnv(ctx, input.Document, visit)}
 	for _, block := range blocks {
 		if secrets, ok := block.Fields["secrets"].(string); ok && strings.EqualFold(strings.TrimSpace(secrets), "inherit") {
 			if uses, ok := block.Fields["uses"].(string); ok {
@@ -122,6 +110,23 @@ func overprovisionedSecretsDiagnostics(ctx context.Context, input Input) ([]Diag
 		}
 	}
 	return diagnostics, errors.Join(failures...)
+}
+
+func walkOverprovisionedSecretsEnv(ctx context.Context, document *aw.Document, visit func(string, string) error) error {
+	// engine.env and sandbox.agent.env are copied into the agent execution step
+	// environment but are not execution blocks.
+	var failures []error
+	if document != nil {
+		if engine, ok := document.Frontmatter["engine"].(map[string]any); ok {
+			failures = append(failures, walkExpressionScalars(ctx, engine["env"], "engine.env", visit))
+		}
+		if sandbox, ok := document.Frontmatter["sandbox"].(map[string]any); ok {
+			if agent, ok := sandbox["agent"].(map[string]any); ok {
+				failures = append(failures, walkExpressionScalars(ctx, agent["env"], "sandbox.agent.env", visit))
+			}
+		}
+	}
+	return errors.Join(failures...)
 }
 
 // isCompilerCallWorkflowFallback reports whether job has the exact shape of a
