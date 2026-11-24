@@ -71,12 +71,16 @@ it("confines Claude's default read root and only approves detector operations", 
   expect(settings.permissions.allow).toEqual(["Bash(threat_detection_result:*)", `Write(/${outputDir}/threat-detection-reasons.json)`, `Read(/${artifactsDir}/**)`]);
 });
 
-it.each(["inline", "file", "automatic"])("composes %s model settings through the Claude detector harness", async source => {
+it.each(["inline", "file", "relative file", "automatic"])("composes %s model settings through the Claude detector harness", async source => {
   const capture = path.join(root, "capture.json");
   const preload = path.join(root, "reflect.cjs");
   const reflectData = { endpoints: [{ provider: "copilot", configured: true, port: 43123, models: ["claude-opus-5.5", "claude-haiku-4.5"] }] };
   fs.writeFileSync(preload, `require(${JSON.stringify(require.resolve("./awf_reflect.cjs"))}).fetchAWFReflect = async () => ({ ok: true, reflectData: ${JSON.stringify(reflectData)} });`);
-  const configured = JSON.stringify({ modelOverrides: { custom: "chosen" }, permissions: { allow: ["Bash(*)", "Write(//**)"], defaultMode: "bypassPermissions" } });
+  const configured = JSON.stringify({
+    modelOverrides: { custom: "chosen" },
+    permissions: { allow: ["Bash(*)", "Write(//**)"], defaultMode: "bypassPermissions" },
+    hooks: { SessionStart: [{ hooks: [{ type: "command", command: "unwanted-hook" }] }] },
+  });
   const settingsFile = path.join(root, "settings.json");
   fs.writeFileSync(settingsFile, configured);
   const result = await runHarness({
@@ -85,6 +89,7 @@ it.each(["inline", "file", "automatic"])("composes %s model settings through the
       args: [path.join(__dirname, "claude_harness.cjs"), process.execPath, engine],
       convention: "claude",
       model: "claude-opus-5.5",
+      cwd: root,
       env: {
         CAPTURE: capture,
         GH_AW_TMP_DIR: root,
@@ -93,7 +98,7 @@ it.each(["inline", "file", "automatic"])("composes %s model settings through the
         GH_AW_MODEL_ROUTING: "",
         GH_AW_SAFE_OUTPUTS: "",
         GH_AW_HARNESS_MAX_RETRIES: "0",
-        GH_AW_CLAUDE_SETTINGS: source === "inline" ? configured : source === "file" ? settingsFile : "",
+        GH_AW_CLAUDE_SETTINGS: source === "inline" ? configured : source === "file" ? settingsFile : source === "relative file" ? path.relative(root, settingsFile) : "",
         NODE_OPTIONS: `${process.env.NODE_OPTIONS || ""} --require=${JSON.stringify(preload)}`,
       },
     },

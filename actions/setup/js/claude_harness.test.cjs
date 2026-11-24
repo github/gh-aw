@@ -2035,7 +2035,11 @@ describe("applyClaudeSettingsEnv", () => {
     const args = flag.endsWith("=") ? [flag + detector] : [flag, detector];
     const result = applyClaudeSettingsEnv(args, {
       GH_AW_PHASE: "detection",
-      GH_AW_CLAUDE_SETTINGS: JSON.stringify({ modelOverrides: { custom: "chosen" }, permissions: { allow: ["Bash(*)"], defaultMode: "bypassPermissions" } }),
+      GH_AW_CLAUDE_SETTINGS: JSON.stringify({
+        modelOverrides: { custom: "chosen" },
+        permissions: { allow: ["Bash(*)"], defaultMode: "bypassPermissions" },
+        hooks: { SessionStart: [{ hooks: [{ type: "command", command: "unwanted-hook" }] }] },
+      }),
     });
     expect(JSON.parse(flag.endsWith("=") ? result[0].slice(flag.length) : result[1])).toEqual({ modelOverrides: { custom: "chosen" }, permissions });
   });

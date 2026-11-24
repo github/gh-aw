@@ -492,7 +492,10 @@ function applyClaudeSettingsEnv(args, env = process.env, reflectData, resolvedMo
     if (!detectorSettings) return settings ? [...args, "--settings", settings] : args;
     // Replace the entire permissions object; configured allow rules or modes
     // must not broaden the detector's narrowly scoped tool permissions.
-    const merged = JSON.stringify({ ...(settings ? readClaudeSettings(settings) : {}), ...detectorSettings });
+    const composed = { ...(settings ? readClaudeSettings(settings) : {}), ...detectorSettings };
+    // Configured hooks execute independently of tool permissions.
+    delete composed.hooks;
+    const merged = JSON.stringify(composed);
     return args.map((arg, index) => {
       if (args[settingsIndex] === "--settings") return index === settingsIndex + 1 ? merged : arg;
       return index === settingsIndex ? `--settings=${merged}` : arg;
