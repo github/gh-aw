@@ -697,6 +697,29 @@ func TestAppendProcessedWorkflowRunsPreservesNewestPrefixOnCancellation(t *testi
 	startedMu.Unlock()
 }
 
+func TestProcessWorkflowRunBatchDeadlineDuringLastChunk(t *testing.T) {
+	originalProcess := processConcurrentRunDownload
+	t.Cleanup(func() { processConcurrentRunDownload = originalProcess })
+
+	ctx, cancel := context.WithTimeout(context.Background(), 250*time.Millisecond)
+	defer cancel()
+	processConcurrentRunDownload = func(ctx context.Context, run WorkflowRun, _ concurrentRunDownloadParams, _ *atomic.Int64, _ *console.ProgressBar) (DownloadResult, error) {
+		<-ctx.Done()
+		return DownloadResult{RunAnalysis: RunAnalysis{Run: run}, Skipped: true, Error: ctx.Err()}, nil
+	}
+
+	runs, count, consumed, timedOut, _ := processWorkflowRunBatch(ctx, workflowRunBatch{
+		runs: []WorkflowRun{{DatabaseID: 42, WorkflowPath: ".github/workflows/example.lock.yml"}},
+	}, nil, processWorkflowRunBatchOptions{count: 1, maxConcurrentDownloads: 1})
+	assert.Empty(t, runs)
+	assert.Zero(t, count)
+	assert.False(t, consumed)
+	assert.True(t, timedOut)
+	continuation := buildContinuationIfNeeded(runs, timedOut, false, false, false, continuationOptions{previousBeforeRunID: 43})
+	require.NotNil(t, continuation)
+	assert.Equal(t, int64(43), continuation.BeforeRunID)
+}
+
 func TestConcurrentRunDownloadsRecoverWorkerPanic(t *testing.T) {
 	original := processConcurrentRunDownload
 	t.Cleanup(func() { processConcurrentRunDownload = original })
