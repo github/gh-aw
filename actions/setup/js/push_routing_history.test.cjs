@@ -479,6 +479,30 @@ describe("push_routing_history saves", () => {
     expect(remoteState(remote).unexplained).toBe(0);
   });
 
+  it("records zero-job startup failures as no_agent without charging unexplained, while ignoring pre-opt-in runs", async () => {
+    const remote = bareRemote();
+    await save(remote, 50, "success");
+    const run = (number, conclusion = "failure") => ({ id: 9000 + number, run_number: number, status: "completed", conclusion, head_branch: "main", event: "schedule", run_attempt: 1 });
+    const agent = { name: "agent", conclusion: "failure", started_at: "2026-11-24T09:00:00Z" };
+    const runs = [run(53, "startup_failure"), run(52, "failure"), run(51, "failure")];
+    const jobs = { 9051: [agent], 9052: [], 9053: [] };
+    const github = fakeGitHub(remote, { runs, jobs });
+    await save(remote, 54, "success", { github });
+
+    expect(remoteRuns(remote).map(({ number, attempt, outcome, note, counted }) => ({ number, attempt, outcome, note, counted }))).toEqual([
+      { number: 50, attempt: 1, outcome: "success", note: null, counted: true },
+      { number: 52, attempt: 1, outcome: null, note: "no_agent", counted: false },
+      { number: 53, attempt: 1, outcome: null, note: "no_agent", counted: false },
+      { number: 54, attempt: 1, outcome: "success", note: null, counted: true },
+    ]);
+    expect(remoteState(remote).unexplained).toBe(0);
+
+    // Once recorded as no_agent, subsequent saves do not re-query their jobs.
+    const nextGitHub = fakeGitHub(remote, { runs, jobs });
+    await save(remote, 55, "success", { github: nextGitHub });
+    expect(nextGitHub.calls.jobs).toEqual([9051]);
+  });
+
   it("charges a failed save from a pull_request_target run, and never a run whose history job succeeded", async () => {
     const remote = bareRemote();
     await save(remote, 50, "success");
