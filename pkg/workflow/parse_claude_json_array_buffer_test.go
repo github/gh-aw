@@ -7,6 +7,25 @@ import (
 	"testing"
 )
 
+func TestParseClaudeArrayRecords(t *testing.T) {
+	first := `[{"type":"first","id":"a"}]`
+	second := `[{"type":"second"}]`
+	want := []map[string]any{{"type": "first", "id": "a"}, {"type": "second"}}
+	for name, log := range map[string]string{
+		"array records":  " \t" + first + "\r\n\n[]\n" + second + "\n",
+		"adjacent lines": first + "\n" + second,
+		"single array":   "[\n{\"type\":\"first\",\"id\":\"a\"},\n{\"type\":\"second\"}\n]",
+		"mixed recovery": first + "\n[bad]\nnot JSON\n" + `{"type":"second"}`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			got := NewClaudeEngine().parseClaudeLogEntries(log, false)
+			if !reflect.DeepEqual(got, want) {
+				t.Fatalf("got %#v, want %#v", got, want)
+			}
+		})
+	}
+}
+
 func TestParseClaudeJSONArrayBuffer(t *testing.T) {
 	tests := []struct {
 		name string

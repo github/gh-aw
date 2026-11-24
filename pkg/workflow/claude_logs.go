@@ -135,16 +135,38 @@ func (e *ClaudeEngine) extractClaudeResultMetrics(line string) LogMetrics {
 }
 
 func (e *ClaudeEngine) parseClaudeLogEntries(logContent string, verbose bool) []map[string]any {
+	// Array records can be pretty-printed or separated by newlines. Reuse
+	// one decoder rather than retrying the whole log one line at a time.
+	input := strings.TrimLeft(logContent, " \t\r\n")
 	var logEntries []map[string]any
-	if err := json.Unmarshal([]byte(logContent), &logEntries); err == nil {
-		return logEntries
-	} else {
-		claudeLogsLog.Print("JSON array parse failed, trying JSONL format")
-		if verbose {
-			fmt.Fprintf(os.Stderr, "Failed to parse Claude log as JSON array, trying JSONL format: %v\n", err)
+	if strings.HasPrefix(input, "[") {
+		decoder := json.NewDecoder(strings.NewReader(input))
+		logContent = input
+		var batch []map[string]any
+		for strings.HasPrefix(logContent, "[") {
+			if err := decoder.Decode(&batch); err != nil {
+				break
+			}
+			tail := strings.TrimLeft(input[decoder.InputOffset():], " \t\r")
+			if tail == "" {
+				if len(logEntries) == 0 {
+					return batch
+				}
+				return append(logEntries, batch...)
+			}
+			if tail[0] != '\n' {
+				break
+			}
+			// Resume mixed-format recovery at the first unconsumed line.
+			logEntries = append(logEntries, batch...)
+			clear(batch) // Decode must not reuse maps already saved in logEntries.
+			logContent = strings.TrimLeft(tail, " \t\r\n")
+			if logContent == "" {
+				return logEntries
+			}
 		}
 	}
-	logEntries = e.parseClaudeMixedLogEntries(logContent, verbose)
+	logEntries = e.parseClaudeMixedLogEntries(logContent, verbose, logEntries)
 	if len(logEntries) == 0 {
 		if verbose {
 			fmt.Fprintf(os.Stderr, "No valid JSON entries found in Claude log\n")
@@ -157,8 +179,7 @@ func (e *ClaudeEngine) parseClaudeLogEntries(logContent string, verbose bool) []
 	return logEntries
 }
 
-func (e *ClaudeEngine) parseClaudeMixedLogEntries(logContent string, verbose bool) []map[string]any {
-	var logEntries []map[string]any
+func (e *ClaudeEngine) parseClaudeMixedLogEntries(logContent string, verbose bool, logEntries []map[string]any) []map[string]any {
 	lines := strings.Split(logContent, "\n")
 	for i := 0; i < len(lines); i++ {
 		if i < 0 || i >= len(lines) {
