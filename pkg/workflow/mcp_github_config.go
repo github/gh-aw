@@ -71,6 +71,7 @@ import (
 	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/logger"
 	"github.com/github/gh-aw/pkg/setutil"
+	"github.com/github/gh-aw/pkg/sliceutil"
 	"github.com/github/gh-aw/pkg/typeutil"
 )
 
@@ -212,7 +213,7 @@ func writeSinkAcceptLabelsForRepos(repos []string) []string {
 	for _, repo := range repos {
 		accept = append(accept, transformRepoPattern(repo))
 	}
-	return accept
+	return sliceutil.Deduplicate(accept)
 }
 
 func writeSinkGuardPolicy(accept []string) map[string]any {
@@ -661,7 +662,7 @@ func deriveSafeOutputsGuardPolicyFromGitHub(githubTool map[string]any) map[strin
 	}
 
 	writeSink := map[string]any{
-		"accept":          deduplicateAcceptEntries(acceptList),
+		"accept":          sliceutil.Deduplicate(acceptList),
 		"sink-visibility": sinkVisibilityRuntimeExpr,
 	}
 
@@ -669,18 +670,6 @@ func deriveSafeOutputsGuardPolicyFromGitHub(githubTool map[string]any) map[strin
 	return map[string]any{
 		"write-sink": writeSink,
 	}
-}
-
-func deduplicateAcceptEntries(entries []string) []string {
-	seen := make(map[string]struct{}, len(entries))
-	deduplicated := entries[:0]
-	for _, entry := range entries {
-		if _, ok := seen[entry]; !ok {
-			seen[entry] = struct{}{}
-			deduplicated = append(deduplicated, entry)
-		}
-	}
-	return deduplicated
 }
 
 // transformRepoPattern transforms a repos pattern to the corresponding accept pattern.
