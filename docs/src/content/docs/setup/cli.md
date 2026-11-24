@@ -37,8 +37,8 @@ The `--timeout` flag uses different formats depending on the command:
 | `value` | Positive Go duration | `5m` | `--timeout 10m` | Rejected |
 | `connector test` | Go duration greater than zero and at most `20s` | `20s` | `--timeout 10s` | Rejected |
 | `logs episode` | Go duration | `5m` | `--timeout 10m` | Rejected |
-| `logs`, `forecast` | Integer minutes | `0` | `--timeout 5` | No timeout |
-| `trial` | Integer minutes | `30` | `--timeout 10` | No timeout |
+| `logs`, `forecast` | Integer minutes or whole-minute duration | `0` | `--timeout 5` or `--timeout 5m` | No timeout |
+| `trial` | Integer minutes or whole-minute duration | `30` | `--timeout 10` or `--timeout 10m` | No timeout |
 
 ## Utility and advanced commands
 
@@ -582,7 +582,7 @@ gh aw trial ./workflow.md --dry-run                # Preview without executing
 
 Unlike `run --repo/-r`, `trial` has no `--repo/-r`: `--logical-repo/-l` sets the simulated `github.repository` context, while `--host-repo` selects where the trial actually runs. `--json/-j` is available for trial output.
 
-`--timeout` sets the execution timeout in integer minutes (default: `30`; `0` disables the timeout). For example, use `--timeout 10`, not `--timeout 10m`.
+`--timeout` sets the execution timeout in minutes (default: `30`; `0` disables the timeout). Both `--timeout 10` and `--timeout 10m` are accepted. Durations must resolve to whole minutes; sub-minute values such as `30s` are rejected.
 
 By default, the host repository is retained after the trial. Specify
 `--delete-host-repo-after` to delete it when the trial completes, including an existing
@@ -809,7 +809,7 @@ gh aw logs --runtime cloud-hypervisor                    # Filter to runs using 
 
 `logs` defaults `--artifacts` to `usage` for faster, compact downloads. When usage lacks `aw_info.json`, metadata is fetched from the compact `info` artifact before falling back to legacy activation artifacts. The `--last` flag is an alias for `--count/-c`.
 `--dry-run` selects only dry-run runs; `--no-dry-run` excludes them. These flags are mutually exclusive and work with workflow targets or `--stdin`. Older valid metadata without `dry_run` counts as a normal run; missing or malformed `aw_info.json` is excluded when either filter is active. Unified sessions preserve the flag as `workflow.info.data.dryRun`, and audit engine configuration exposes `dry_run`.
-When multiple targets run concurrently, `--count` limits the combined number of workflow runs and `--timeout` limits the total wall-clock download time across all targets. `--timeout` accepts integer minutes (for example, `--timeout 10`); the default `0` disables the timeout.
+When multiple targets run concurrently, `--count` limits the combined number of workflow runs and `--timeout` limits the total wall-clock download time across all targets. `--timeout` accepts integer minutes or whole-minute durations (for example, `--timeout 10` or `--timeout 10m`); the default `0` disables the timeout.
 `--retained` refreshes due retained deliveries without discovering or downloading runs. It requires `--adoption` and `--repo`; `--count` limits delivery checks.
 
 `--evals` and `--graders` each pull in a matching artifact set automatically: `--evals` includes results from `evals.jsonl`, `--graders` includes deterministic grader results and their artifacts. `--audit` generates `audit.json` in each downloaded run's cache directory (comparisons use only the runs downloaded in that invocation). `--ignore-workflow-runs` excludes specific run IDs (or `slug/ID` values, where the slug is informational and matching uses the numeric ID) from an otherwise matching set.
@@ -898,6 +898,9 @@ gh aw logs episode 1234567890 --repo owner/repo \
 | `--timeout` | `5m` | Collection deadline, expressed as a duration. |
 | `--output/-o` | `.github/aw/logs` | Compact artifacts, isolated by host, repository, run, attempt, and immutable artifact ID. |
 | `--json/-j` | Disabled | Standard logs JSON plus `episode_retrieval` bounds, counters, stop reasons, and evidence gaps. |
+| `--delivery` | Disabled | Report safe-output delivery for episode members. |
+| `--adoption` | Disabled | Refresh adoption for episode members within the remaining retrieval bounds. |
+| `--adoption-dir` | None | Write outcome JSONL observations to this directory. Requires `--adoption`. |
 | `--view` | `summary` | Display `summary` or recorded `hops`; JSON includes both views' data. |
 | `--refresh` | Disabled | Recollect instead of reading the cached episode snapshot; immutable artifact downloads are still reused. |
 
@@ -1282,7 +1285,7 @@ gh aw forecast --eval                       # Backtest forecast quality against 
 
 The `--days` flag accepts only `7` or `30` (default: `30`). Other values produce an error.
 
-`--timeout` gracefully stops computation after the specified number of integer minutes (for example, `--timeout 10`). The default `0` disables the timeout.
+`--timeout` gracefully stops computation after the specified number of minutes or whole-minute duration (for example, `--timeout 10` or `--timeout 10m`). The default `0` disables the timeout.
 
 #### `experiments`
 
