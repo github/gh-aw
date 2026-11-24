@@ -473,3 +473,60 @@ func TestInjectWorkflowCallSecretsSection(t *testing.T) {
 		})
 	}
 }
+
+func TestWorkflowCallDynamicSecretSelectionRequiresExplicitBoundedNames(t *testing.T) {
+	t.Parallel()
+	directory := testutil.TempDir(t, "workflow-call-dynamic-secret-test")
+	workflow := `---
+on:
+  workflow_call:
+engine: copilot
+steps:
+  - name: Use computed secret
+    env:
+      SELECTED_SECRET: "${{ secrets[vars.SECRET_NAME] }}"
+    run: echo "using secret"
+---
+Run the workflow.
+`
+	path := filepath.Join(directory, "dynamic-secret.md")
+	require.NoError(t, os.WriteFile(path, []byte(workflow), 0644))
+	compiler := NewCompiler()
+	data, err := compiler.ParseWorkflowFile(path)
+	require.NoError(t, err)
+
+	_, _, _, err = compiler.generateYAML(data, path)
+	require.ErrorContains(t, err, "explicitly declared on.workflow_call.secrets names")
+}
+
+func TestWorkflowCallDynamicSecretSelectionIsInventoriedAndRedacted(t *testing.T) {
+	t.Parallel()
+	directory := testutil.TempDir(t, "workflow-call-dynamic-secret-inventory-test")
+	workflow := `---
+on:
+  workflow_call:
+    secrets:
+      DEPLOY_TOKEN:
+        required: false
+engine: copilot
+steps:
+  - name: Use computed secret
+    env:
+      SELECTED_SECRET: "${{ secrets[vars.SECRET_NAME] }}"
+    run: echo "using secret"
+---
+Run the workflow.
+`
+	path := filepath.Join(directory, "dynamic-secret.md")
+	require.NoError(t, os.WriteFile(path, []byte(workflow), 0644))
+	compiler := NewCompiler()
+	data, err := compiler.ParseWorkflowFile(path)
+	require.NoError(t, err)
+
+	yamlOutput, secrets, _, err := compiler.generateYAML(data, path)
+	require.NoError(t, err)
+	require.Contains(t, secrets, "DEPLOY_TOKEN")
+	require.Contains(t, yamlOutput, `GH_AW_DYNAMIC_SECRET_VALUE_0: "${{ secrets[vars.SECRET_NAME] }}"`)
+	require.Contains(t, yamlOutput, "SECRET_DEPLOY_TOKEN: ${{ secrets.DEPLOY_TOKEN }}")
+	require.Contains(t, yamlOutput, `"dynamic_secret_references":["sha256:`)
+}

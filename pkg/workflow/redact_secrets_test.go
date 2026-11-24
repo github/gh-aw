@@ -28,6 +28,12 @@ func TestCollectSecretReferences(t *testing.T) {
 			expected: []string{"GITHUB_TOKEN"},
 		},
 		{
+			name: "Static bracket secret reference",
+			yaml: `env:
+  TOKEN: ${{ secrets['MY_TOKEN'] }}`,
+			expected: []string{"MY_TOKEN"},
+		},
+		{
 			name: "Multiple secret references",
 			yaml: `env:
   GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
@@ -392,7 +398,7 @@ func TestSecretRedactionEmitsEnvMappingWithWorkflowSecrets(t *testing.T) {
 	var builder strings.Builder
 	compiler := NewCompiler()
 
-	compiler.generateSecretRedactionStep(&builder, "${{ secrets.MY_TOKEN }}", &WorkflowData{}, false)
+	compiler.generateSecretRedactionStep(&builder, "${{ secrets.MY_TOKEN }} and ${{ secrets[vars.SECRET_NAME] }}", &WorkflowData{}, false)
 
 	steps := parseGeneratedSteps(t, builder.String())
 	if len(steps) != 1 {
@@ -407,6 +413,9 @@ func TestSecretRedactionEmitsEnvMappingWithWorkflowSecrets(t *testing.T) {
 	}
 	if _, ok := env["SECRET_MY_TOKEN"]; !ok {
 		t.Errorf("Expected the secret value to be passed as SECRET_MY_TOKEN, got %#v", env)
+	}
+	if env["GH_AW_DYNAMIC_SECRET_VALUE_0"] != "${{ secrets[vars.SECRET_NAME] }}" {
+		t.Errorf("Expected the computed secret value to be passed for redaction, got %#v", env["GH_AW_DYNAMIC_SECRET_VALUE_0"])
 	}
 }
 

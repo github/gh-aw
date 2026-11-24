@@ -688,6 +688,7 @@ func (c *Compiler) CompileWorkflowData(workflowData *WorkflowData, markdownPath 
 		if enforceErr := EnforceSafeUpdate(SafeUpdateOptions{
 			Manifest:                oldManifest,
 			SecretNames:             bodySecrets,
+			DynamicSecretReferences: workflowData.dynamicSecretReferences,
 			ActionRefs:              bodyActions,
 			CurrentRedirect:         workflowData.Redirect,
 			PullRequestTransition:   prTransition,

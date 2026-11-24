@@ -53,7 +53,8 @@ func (c *Compiler) lintCompiledWorkflow(data *WorkflowData, content, sourcePath 
 			if data.ParsedFrontmatter != nil {
 				suppressions = data.ParsedFrontmatter.ThreatDetectionSuppressions
 			}
-			if isThreatDetectionRuleSuppressed(suppressions, diagnostic.ThreatRuleID, time.Now()) {
+			if diagnostic.RuleID != "overprovisioned-secrets" &&
+				isThreatDetectionRuleSuppressed(suppressions, diagnostic.ThreatRuleID, time.Now()) {
 				continue
 			}
 		}

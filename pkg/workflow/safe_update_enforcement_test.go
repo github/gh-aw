@@ -529,6 +529,26 @@ func TestMemoryValidationScriptChangesRequireSafeUpdateReview(t *testing.T) {
 	require.ErrorContains(t, err, "repo-memory:removed (removed)")
 }
 
+func TestEnforceSafeUpdateTracksDynamicSecretSelectors(t *testing.T) {
+	first := "${{ secrets[vars.SECRET_NAME] }}"
+	changed := "${{ secrets[inputs.secret_name] }}"
+	manifest := &GHAWManifest{
+		DynamicSecretReferences: normalizeDynamicSecretReferences([]string{first}),
+	}
+
+	require.NoError(t, EnforceSafeUpdate(SafeUpdateOptions{
+		Manifest:                manifest,
+		DynamicSecretReferences: []string{first},
+	}))
+	err := EnforceSafeUpdate(SafeUpdateOptions{
+		Manifest:                manifest,
+		DynamicSecretReferences: []string{first, changed},
+	})
+	require.ErrorContains(t, err, "New computed secret selector(s)")
+	require.Contains(t, err.Error(), normalizeDynamicSecretReferences([]string{changed})[0])
+	require.NotContains(t, err.Error(), changed)
+}
+
 func TestExtractPullRequestEventPresence(t *testing.T) {
 	t.Run("from on field map", func(t *testing.T) {
 		hasPR, hasPRTarget := extractPullRequestEventPresenceFromOnField(map[string]any{

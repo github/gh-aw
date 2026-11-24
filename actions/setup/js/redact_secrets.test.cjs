@@ -31,6 +31,22 @@ const { persistDetectionMasks } = require("./detection_mask_state.cjs");
 const redactScript = fs.readFileSync(path.join(__dirname, "redact_secrets.cjs"), "utf8");
 describe("redact_secrets.cjs", () => {
   let tempDir, ambientPathsSpy;
+  it("redacts dynamically selected secret values from artifacts", async () => {
+    const { main } = require("./redact_secrets.cjs");
+    const secret = "synthetic-dynamic-secret-value";
+    vi.stubEnv("GH_AW_DYNAMIC_SECRET_VALUE_0", secret);
+    const directory = path.join(process.env.RUNNER_TEMP, "gh-aw");
+    fs.mkdirSync(directory, { recursive: true });
+    const file = path.join(directory, "dynamic-secret.json");
+    fs.writeFileSync(file, JSON.stringify({ token: secret }));
+
+    await main();
+
+    expect(fs.readFileSync(file, "utf8")).not.toContain(secret);
+    expect(JSON.parse(fs.readFileSync(file, "utf8"))).toEqual({ token: "***REDACTED***" });
+    expect(mockCore.setFailed).not.toHaveBeenCalled();
+  });
+
   it("sanitizes detection results, copied firewall logs and late-created accounting files", async () => {
     const { main } = require("./redact_secrets.cjs");
     const secret = "synthetic-detection-private-value";
