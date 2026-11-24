@@ -46,17 +46,20 @@ export function parseTrace(log) {
   });
 }
 
+// Profile of Work k (1-based), as Factory.tla's Profile(k).
+const profileOf = (k, c) => (c.Worker === "mixed" ? (k === 1 ? "miner" : "monster") : c.Worker);
+
 export function violations(s, c) {
   const failed = [];
   const check = (name, condition) => {
     if (!condition) failed.push(name);
   };
   const member = k => s.birth.includes(k + 1);
-  const profile = k => (c.Worker === "mixed" ? (k === 0 ? "miner" : "monster") : c.Worker);
   check("TypeOK", s.phase.length === 2 && s.proposed.every(n => Number.isInteger(n) && n >= -1 && n <= c.OutputMax));
   check("ImmutableMembership", JSON.stringify(s.original) === JSON.stringify(s.birth));
-  check("HomogeneousBatch", s.birth.length < 2 || profile(0) === profile(1));
+  check("SingleClaimDispatch", s.birth.length <= 1);
   check("PolicyRequired", s.original.length === 0 || c.Installed);
+  check("BranchProvisioning", s.admitted.length > 0 === s.queueBranch);
   check(
     "ScopedIntents",
     s.proposed.every((n, k) => n < 0 || s.scoped[k])
@@ -79,7 +82,7 @@ export function violations(s, c) {
   const reached = {
     "warning-clean": s.scan === "warnings" && s.lintClean,
     "completion-only": s.phase.some((p, k) => member(k) && p === "completed" && !s.verified[k]),
-    "six-outputs": s.birth.length === 2 && s.applied.every(n => n === 3),
+    "three-outputs": s.applied.some((n, k) => member(k) && n === 3),
     "quality-not-gate": s.quality === "failed" && s.phase.some((p, k) => member(k) && p === "result"),
     "tool-failure": s.scan === "toolFailed" && !s.lintClean,
     result: s.phase.some((p, k) => member(k) && p === "result" && s.verified[k]),
@@ -103,6 +106,7 @@ export function successors(s, c) {
       add(t => {
         t.phase[k] = "queued";
         t.admitted = [...s.admitted, k + 1].sort((a, b) => a - b);
+        t.queueBranch = true;
       });
     if (!s.original.includes(k + 1)) continue;
     if (s.phase[k] === "claimed") add(t => (t.phase[k] = "completed"));
@@ -110,11 +114,12 @@ export function successors(s, c) {
     if (s.proposed[k] === -1 && ["claimed", "completed"].includes(s.phase[k])) {
       for (let n = 0; n <= c.OutputMax; n++) {
         if (c.NoWrites && n !== 0) continue;
-        for (const explicit of [false, true]) {
-          if (!explicit && s.original.length !== 1 && c.Fault !== "scope") continue;
+        for (const selector of ["omitted", "own", "foreign"]) {
+          if (selector === "omitted" && s.original.length !== 1) continue;
+          if (selector === "foreign" && c.Fault !== "scope") continue;
           add(t => {
             t.proposed[k] = n;
-            t.scoped[k] = explicit || s.birth.length === 1;
+            t.scoped[k] = selector !== "foreign";
           });
         }
       }
@@ -129,9 +134,9 @@ export function successors(s, c) {
     if (s.phase[k] === "completed" && !s.verified[k] && s.applied[k] === s.proposed[k] && s.proposed[k] >= 0 && (s.proposed[k] >= c.OutputMin || c.NoWrites || c.Fault === "cardinality")) add(t => (t.verified[k] = true));
     if (s.phase[k] === "completed" && (s.verified[k] || c.Fault === "result")) add(t => (t.phase[k] = "result"));
   }
-  if (!s.requested && (c.Installed || c.Fault === "policy")) {
+  if (!s.requested && s.queueBranch && (c.Installed || c.Fault === "policy")) {
     const eligible = [1, 2].filter(k => s.phase[k - 1] === "queued");
-    const prefix = c.Batch && eligible.length === 2 && (c.Worker !== "mixed" || c.Fault === "mixed") ? eligible : eligible.slice(0, 1);
+    const prefix = c.Fault === "group" && eligible.length === 2 ? eligible : eligible.slice(0, 1);
     add(t => {
       t.original = [...prefix];
       t.birth = [...prefix];
@@ -139,7 +144,7 @@ export function successors(s, c) {
       for (const k of prefix) t.phase[k - 1] = "claimed";
     });
   }
-  if (s.original.length && c.Worker === "monster" && s.scan === "unrun") {
+  if (s.original.some(k => profileOf(k, c) === "monster") && s.scan === "unrun") {
     for (const scan of ["clean", "warnings", "errors", "installFailed", "buildFailed", "toolFailed"]) {
       add(t => {
         t.scan = scan;
@@ -150,7 +155,7 @@ export function successors(s, c) {
   if (s.original.length && s.quality === "unchecked") {
     for (const quality of ["passed", "failed"]) add(t => (t.quality = quality));
   }
-  if (c.Fault === "membership" && s.original.length === 2 && s.original.some(k => s.phase[k - 1] === "cancelled")) add(t => (t.original = s.original.filter(k => s.phase[k - 1] !== "cancelled")));
+  if (c.Fault === "membership" && s.original.length >= 1 && s.original.some(k => s.phase[k - 1] === "cancelled")) add(t => (t.original = s.original.filter(k => s.phase[k - 1] !== "cancelled")));
   return next;
 }
 
@@ -159,6 +164,7 @@ export function validateTrace(trace, entry) {
   assert.deepEqual(trace[0].state, {
     phase: ["absent", "absent"],
     admitted: [],
+    queueBranch: false,
     original: [],
     birth: [],
     requested: false,

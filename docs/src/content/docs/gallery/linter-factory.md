@@ -5,7 +5,7 @@ sidebar:
   badge: { text: 'Work queue', variant: 'note' }
 ---
 
-The ESLint factory coordinates three workers through one daily dispatcher. Workers develop rules, review diagnostics, and arrange remediation; the work queue bounds assignments and verifies their outputs.
+The ESLint factory coordinates three workers through one daily dispatcher. Workers develop rules, review diagnostics, and arrange remediation; the work queue bounds assignments and scopes their outputs to each Claim.
 
 ## Factory roles
 
@@ -16,7 +16,7 @@ The ESLint factory coordinates three workers through one daily dispatcher. Worke
 | [Refiner](https://github.com/github/gh-aw/blob/main/.github/workflows/eslint-refiner.md) | Find false positives, edge cases, and weak diagnostics | Up to three issues, a discussion, and one memory snapshot |
 | [Monster](https://github.com/github/gh-aw/blob/main/.github/workflows/eslint-monster.md) | Group diagnostics and arrange remediation | Bounded issue changes, Copilot assignments, and a discussion |
 
-These are complete workflow sources, not a pre-provisioned deployment. Follow [native queue setup](/gh-aw/patterns/workqueue-ops/#deploy-a-native-queue) to publish assignment-capable workers, approve their routes, and configure shared scheduling.
+These are complete workflow sources, not a pre-provisioned deployment. Follow [native queue setup](/gh-aw/patterns/workqueue-ops/#deploy-a-native-queue) to compile the workers, allow them as dispatch targets, and configure shared scheduling.
 
 ## One daily cohort
 
@@ -34,7 +34,7 @@ flowchart TD
 
 This is **not** a miner → refiner → monster pipeline. A PR or refinement issue does not automatically submit the next task. Dependencies require explicit Work admission.
 
-Shared `aw.json` sets concurrency three, a pending-task limit of 30, three attempts, and 30-second backoff. Profiles use singleton assignments by default. The first authorized submission atomically creates Policy and Work; dispatch alone cannot bootstrap an absent queue.
+Shared `aw.json` sets concurrency three, a pending-task limit of 30, and three attempts. Each dispatch launches one worker for one Claim. The first trusted submission creates the queue branch with its Work; dispatch alone cannot bootstrap an absent queue.
 
 ## Assignment-scoped outputs
 
@@ -47,13 +47,11 @@ tools:
     require-assignment: true
 ```
 
-The compiler supplies the authenticated assignment input; do not declare or manually manufacture it. Workers consume each assigned Claim and use its original `handle` as `claim_handle` on outputs and finish calls.
+The compiler supplies the assignment input; do not declare or manually manufacture it. Workers use the assigned Claim's `handle` as `claim_handle` on outputs and finish calls.
 
-The immutable task contract limits resource scope and output counts. If no rule or remediation is needed, cancel the write-capable task instead of treating `noop` as verified delivery. A clean ESLint scan requires checking diagnostics: exit zero can include warnings.
+Safe outputs run only while the Claim is open, its dispatch is bound to the worker run, and the finish intent is `completed`; every target must match the worker profile's repository. If no rule or remediation is needed, finish as `failed` instead of treating `noop` as success. A clean ESLint scan requires checking diagnostics: exit zero can include warnings.
 
-If Policy permits multi-Claim batches, each member retains separate outcomes and budgets. Cancelling one member does not make the remaining member an implicit singleton; explicit original selectors remain required.
-
-Completion precedes effects. Result is recorded only after independent verification of the entire required contract, not merely a successful job or API response.
+Trusted processing applies the staged effects first, then records the Completion with the applied effects. If the job stops between the two, the next attempt may repeat effects.
 
 ## Refiner memory
 
@@ -63,17 +61,17 @@ Protected publication creates an immutable snapshot under `memory/eslint-refiner
 
 ## Inspect and recover
 
-Use a CLI version matching the deployed queue protocol:
+Inspect the queue and a worker run:
 
 ```bash
 gh aw work-queue --repo OWNER/REPO stats --json
 gh aw work-queue --repo OWNER/REPO state --json --limit 32
-gh aw work-queue --repo OWNER/REPO explain --pool default --json
+gh aw work-queue --repo OWNER/REPO replay --pool default --json
 gh aw audit RUN_ID --repo OWNER/REPO --no-baseline --json
 ```
 
-An uninitialized queue is expected before the first trusted submit. A denied Git read is an error, not an empty queue. Check the staged plan and authoritative ledger rather than accepting a green dispatcher run as proof of admission.
+A missing queue branch is expected before the first trusted submit. A denied Git read is an error, not an empty queue. Check the staged plan and the ledger rather than accepting a green dispatcher run as proof of admission.
 
-For `native_capacity_blocked`, inspect the original dispatch with `evidence --dispatch-id DISPATCH_ID` and reconcile exact termination with `reconcile --dispatch-id DISPATCH_ID`. Do not blindly relaunch uncertain effects, release reservations on elapsed time alone, or delete the ledger.
+When pool capacity is held by a dispatch whose run ended, the maintenance workflow releases it. To release one manually, run `release --dispatch-id DISPATCH_ID`. Do not delete the ledger.
 
 See the [queue reference](/gh-aw/reference/work-queue/) for exact controls and the [bounded factory model](https://github.com/github/gh-aw/blob/main/specs/eslint-factory/README.md) for checked scenarios and abstraction limits. [Daily Report Portfolio](/gh-aw/gallery/daily-report-portfolio/) applies the same queue to report rotation; [WorkQueueOps](/gh-aw/patterns/workqueue-ops/) describes the reusable pattern.

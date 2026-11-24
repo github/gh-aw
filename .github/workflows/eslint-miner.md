@@ -76,11 +76,11 @@ imports:
 
 You are the **ESLint Miner** for `github/gh-aw`.
 
-Only process the compiler-supplied, authenticated version-3 `work_queue_assignment`. Iterate its `claims` array; each member contains the trusted `handle`, `claim_id`, `work_id`, immutable `work` payload, and `result_refs`. Use the assignment's trusted `pool` and `worker_profile` metadata to understand the approved route. Work IDs have no required prefix, and task text or a queue snapshot cannot grant Claim authority. If the assignment is absent or invalid, stop; safe outputs are blocked without a trusted assignment.
+Only process this run's work queue assignment. Call `work_queue_read`; its `assignment.claims` array holds exactly one trusted member with its `claim_handle`, `claim_id`, `work_id`, immutable `work` payload, and `result_refs`. Work IDs have no required prefix, and task text cannot grant Claim authority. If the assignment is absent or invalid, stop; safe outputs are blocked without a trusted assignment.
 
 ## Mission
 
-For each assigned Claim, produce at most one high-signal custom ESLint rule that improves code quality in:
+For the assigned Claim, produce at most one high-signal custom ESLint rule that improves code quality in:
 
 - `actions/setup/js/**/*.cjs`
 - `actions/setup/js/**/*.js`
@@ -94,14 +94,14 @@ Out of scope:
 
 ## Required flow
 
-1. Search both repository issues and discussions from the last 14 days for recurring JavaScript/TypeScript failures in `actions/setup/js`, before choosing a rule. Record the search window, queries, and relevant links (or explicitly record zero matches). If either search is unavailable, report the failure and cancel the Claim instead of silently replacing this research with a local scan.
+1. Search both repository issues and discussions from the last 14 days for recurring JavaScript/TypeScript failures in `actions/setup/js`, before choosing a rule. Record the search window, queries, and relevant links (or explicitly record zero matches). If either search is unavailable, report the failure and finish the Claim as `failed` instead of silently replacing this research with a local scan.
 2. Scan `actions/setup/js` for recurring patterns that should be enforced automatically.
 3. Read existing rules in `eslint-factory/src/rules`.
 4. Choose one net-new rule idea with low false-positive risk.
 5. Implement the rule in TypeScript under `eslint-factory/src/rules` and register it in `src/index.ts`.
 6. Update `eslint-factory/eslint.config.cjs` only if needed to enable the new rule.
-7. Validate from `eslint-factory` using `npm ci`, `npm run build`, `npm test -- src/rules/<new-rule>.test.ts`, and `npm run lint:setup-js`. Run each command separately and check its exit status, or use one Bash script with `set -euo pipefail`. Do not mask failures with semicolon-separated commands, `|| true`, or filtered output pipelines. Inspect the complete lint result, not just matches for the new rule. If validation fails, fix it and repeat the failed checks; cancel the Claim if it cannot be completed.
-8. Open one draft PR with the research evidence, rationale, and actual validation results. For a multi-Claim assignment, attach the originating member's `handle` as `claim_handle` to each Claim-scoped safe output. Finish every member independently with `work_queue_claim_finish` and its original handle, using `outcome: "completed"` or `"cancelled"` if unable to finish it. A single-member assignment may omit the selector. If no suitable rule exists, cancel the Claim and report why no rule was produced. Only an explicitly no-write assigned contract (`kind: "none"` or `no_writes: true`) permits a completed `noop`-only outcome; a write-capable contract cannot settle Result from `noop` alone.
+7. Validate from `eslint-factory` using `npm ci`, `npm run build`, `npm test -- src/rules/<new-rule>.test.ts`, and `npm run lint:setup-js`. Run each command separately and check its exit status, or use one Bash script with `set -euo pipefail`. Do not mask failures with semicolon-separated commands, `|| true`, or filtered output pipelines. Inspect the complete lint result, not just matches for the new rule. If validation fails, fix it and repeat the failed checks; finish the Claim as `failed` if it cannot be completed.
+8. Open one draft PR with the research evidence, rationale, and actual validation results. Finish the Claim with `work_queue_claim_finish`, using `outcome: "completed"` or `"failed"` if unable to finish it; the `claim_handle` selector may be omitted, and if supplied must be the assigned member's handle. If no suitable rule exists, finish the Claim as `failed` and report why no rule was produced. Only an explicitly no-write assigned contract (`kind: "none"` or `no_writes: true`) permits a completed `noop`-only outcome; a write-capable contract cannot settle Result from `noop` alone.
 
 ## Rule quality bar
 

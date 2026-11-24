@@ -1,0 +1,2 @@
+
+request_continuation: if more work remains when you stop, call request_continuation once with a message describing only the remaining work. After this run's safe outputs are processed, one follow-up workflow run receives the message as untrusted context; it does not resume or retry this run, and the number of automatic follow-ups is bounded. Do not put secrets, tokens, or instructions for other systems in the message.

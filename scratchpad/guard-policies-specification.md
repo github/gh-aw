@@ -156,7 +156,8 @@ When GitHub guard policies are configured, the compiler automatically derives a 
 - **MUST derive a `write-sink` guard policy** for the safe-outputs MCP server whenever a GitHub guard policy (`allowed-repos` or `min-integrity`) is present in the workflow frontmatter. The derived policy MUST be applied before the workflow is executed.
 - **MUST map `allowed-repos: "all"` or `allowed-repos: "public"` to `accept: ["*"]`**, allowing all safe output operations. Implementations MUST NOT restrict the write-sink scope when the GitHub guard policy already permits all repositories.
 - **MUST transform each repository pattern** in an `allowed-repos` array to a `private:`-prefixed accept entry. Owner-wildcard patterns (`owner/*`) MUST be transformed to `private:owner` (the trailing `/*` is stripped). Prefix-wildcard patterns (`owner/prefix*`) MUST be transformed to `private:owner/prefix*` (the prefix is preserved). Exact repository patterns (`owner/repo`) MUST be transformed to `private:owner/repo`.
-- **MUST NOT include duplicate accept entries** in the derived `write-sink` policy. If multiple input patterns resolve to the same `private:` value, the implementation MUST deduplicate before emitting the accept list.
+- **MUST NOT include duplicate accept entries** in the derived `write-sink` policy. If multiple input patterns resolve to the same `private:` value, the implementation MUST deduplicate before emitting the accept list, preserving first-seen order.
+- **MUST emit `sink-visibility: "${GH_AW_SINK_VISIBILITY}"`** in the derived `write-sink` policy. The environment variable supplies the destination repository visibility at runtime.
 - **SHOULD log a debug-level message** when a guard policy is derived, identifying the source GitHub `allowed-repos` value and the resulting accept list. This assists operators in diagnosing unexpected policy behavior.
 - **MUST return `nil`** (no derived policy) when no GitHub guard policy fields are present on the tool configuration. The absence of a guard policy MUST NOT be treated as an implicit `accept: ["*"]` — the decision to omit the policy is intentional and MUST be preserved.
 
@@ -181,7 +182,8 @@ Generates safeoutputs guard-policy:
 ```json
 {
   "write-sink": {
-    "accept": ["*"]
+    "accept": ["*"],
+    "sink-visibility": "${GH_AW_SINK_VISIBILITY}"
   }
 }
 ```
@@ -204,7 +206,8 @@ Generates safeoutputs guard-policy:
     "accept": [
       "private:github",
       "private:microsoft/copilot"
-    ]
+    ],
+    "sink-visibility": "${GH_AW_SINK_VISIBILITY}"
   }
 }
 ```
@@ -590,7 +593,7 @@ covered by `pkg/workflow/tools_validation_test.go`.
 |---|---|---|
 | GP-05 through GP-08 | Deriving the safe-outputs `write-sink` policy from GitHub guard policy | `pkg/workflow/mcp_github_config.go` (`deriveSafeOutputsGuardPolicyFromGitHub`) |
 | GP-06 scalar mapping | `"all"` / `"public"` → `accept: ["*"]` mapping | `pkg/workflow/mcp_github_config.go` (`deriveSafeOutputsGuardPolicyFromGitHub`) |
-| GP-07 pattern transformation | Array patterns → `private:`-prefixed accept entries | `pkg/workflow/mcp_github_config.go` (`normalizeGitHubRepositoryInReposScope`) |
+| GP-07 pattern transformation | Array patterns → deduplicated `private:`-prefixed accept entries | `pkg/workflow/mcp_github_config.go` (`deriveSafeOutputsGuardPolicyFromGitHub`) |
 | GP-05 through GP-08 tests | Derivation tests including nil-return, scalar, and array cases | `pkg/workflow/safeoutputs_guard_policy_test.go` (`TestDeriveSafeOutputsGuardPolicyFromGitHub`) |
 
 ### Legacy `repos` Field Migration

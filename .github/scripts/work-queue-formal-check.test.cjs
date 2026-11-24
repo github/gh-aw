@@ -11,11 +11,7 @@ const { TLC_SHA256, classify, checkpointBundle, runVerification, readFileDescrip
 
 const SUCCESS = "Model checking completed. No error has been found.\n42 states generated, 21 distinct states found, 0 states left on queue.\nThe depth of the complete state graph search is 7.\n";
 const INVARIANT_FALSE = "Error: The invariant of DAGValidity is equal to FALSE\n";
-const CONFIGS = [
-  { config: "WorkQueue", moduleName: "WorkQueue" },
-  { config: "FairDAGGitHub", moduleName: "FairWorkQueue" },
-  { config: "QueueOrdering", moduleName: "WorkQueue" },
-];
+const CONFIGS = [{ config: "WorkQueueV4", moduleName: "WorkQueueV4" }];
 
 function fixture(t, config = CONFIGS[0].config) {
   const dir = fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()), "gh-aw-work-queue-formal-test-"));

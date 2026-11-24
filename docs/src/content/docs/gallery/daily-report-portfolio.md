@@ -42,24 +42,24 @@ flowchart LR
     Planner["Trusted UTC planner"] --> Work["Three date-keyed tasks"]
     Work --> Queue["Fair queue scheduler"]
     Queue --> Workers["Assigned report workers"]
-    Workers --> Verify["Publish and verify Discussions"]
+    Workers --> Publish["Publish Discussions and finish Claims"]
 ```
 
 The preparation step stages submission and dispatch intents. The agent reads the plan and queue snapshot; it must not submit again, choose winners, or call ordinary dispatch tools.
 
 ## Dispatch and publication
 
-The dispatcher requests pool `daily-reports` with `max_claims: 3` and `max_dispatches: 3`. Equal-weight profiles use singleton assignments. These are ceilings: older work, pauses, or occupied capacity can delay today's reports. Three admitted tasks do not guarantee three launches or Discussions.
+The dispatcher requests pool `daily-reports` with `max_claims: 3` and `max_dispatches: 3`. Each dispatch launches one worker for one Claim. These are ceilings: older or higher-priority Work, the pool's concurrency, or its per-account limit can delay today's reports. Three admitted tasks do not guarantee three launches or Discussions.
 
-Each worker reads the original assignment's `work.report_date` and `work.report_profile`, stages its Discussion with the original `claim_handle`, then finishes that Claim. A required report needs independently verified delivery before the queue records Result.
+Each worker reads the assignment's `work.report_date` and `work.report_profile`, stages its Discussion with the original `claim_handle`, then finishes that Claim as `completed`. Trusted processing applies the staged outputs and then records the Completion.
 
-If there is no qualifying data, the worker stages a scoped `noop` and finishes as `cancelled`, not completed. Only effects declared in the immutable contract are allowed. DeepReport additionally permits bounded issues, comments, and diagnostic artifacts; these do not replace its required Discussion. Its cache history is separate from queue authority, and legacy Git memory is not automatically migrated.
+If there is no qualifying data, the worker stages a scoped `noop` or `report_incomplete` and finishes as `failed`, not completed. A failed Claim returns its Work to the pool until `retry.max_attempts` is exhausted. DeepReport additionally permits bounded issues, comments, and diagnostic artifacts; these do not replace its required Discussion. Its cache history is separate from queue authority, and legacy Git memory is not automatically migrated.
 
 ## Deploy and inspect
 
-Follow the [native queue deployment sequence](/gh-aw/patterns/workqueue-ops/#deploy-a-native-queue), using the linked portfolio sources. Merge the `daily-reports` pool into shared `aw.json`; preserve other pools. The first authorized submission creates Policy and Work together.
+Follow the [native queue deployment sequence](/gh-aw/patterns/workqueue-ops/#deploy-a-native-queue), using the linked portfolio sources. Merge the `daily-reports` pool into shared `aw.json`; preserve other pools. The first trusted submission creates the queue branch with its Work.
 
-For an installed portfolio, drain existing Claims before changing Policy or worker revisions. Resume on a date not already admitted by the old planner. The 30-pending-task limit rejects excess admission rather than hiding an unlimited backlog.
+Scheduling settings in `aw.json` take effect on the next run after recompilation; no ledger change is needed. Resume on a date not already admitted by the old planner. The 30-pending-task limit rejects excess admission rather than hiding an unlimited backlog.
 
 ```bash
 gh aw work-queue --repo OWNER/REPO state
@@ -67,6 +67,6 @@ gh aw work-queue --repo OWNER/REPO tui
 gh aw work-queue --repo OWNER/REPO replay --json
 ```
 
-Use the [queue reference](/gh-aw/reference/work-queue/) for scheduling, cancellation, reconciliation, and [diagnostic artifacts](/gh-aw/reference/work-queue/#diagnostic-artifacts). Unknown launches retain reservations until exact evidence permits release; rerunning effects is not recovery.
+Use the [queue reference](/gh-aw/reference/work-queue/) for scheduling, cancellation, and [diagnostic artifacts](/gh-aw/reference/work-queue/#diagnostic-artifacts). Maintenance releases dispatches whose runs ended without finishing; rerunning effects is not recovery.
 
 For a write-capable factory with memory snapshots, see [Linter Factory](/gh-aw/gallery/linter-factory/). The reusable orchestration pattern is [WorkQueueOps](/gh-aw/patterns/workqueue-ops/).

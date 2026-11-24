@@ -29,11 +29,9 @@ For persistent snapshots, use a matching `safe-outputs.scripts` or custom
 preparation job and `safe-outputs.claim-adapters` with `effect-type: git_tree`.
 Pin an existing native base commit, a fixed target repository and a separate
 branch prefix. Credential-free preparation emits declared file content; the
-trusted handler creates an immutable Claim branch and independently verifies
-its commit, complete tree and blobs. The installed Work must freeze a positive
-numeric repository target and permit the output, intersecting the approved
-profile, Subject and every worker-created ancestor. Preparation and restored
-history are not authority or delivery proof.
+trusted handler creates an immutable Claim branch from the pinned base. The
+target repository must equal the worker profile's `effect_scope`. Preparation
+and restored history are not authority.
 
 The repository's
 [ESLint Refiner workflow](https://github.com/github/gh-aw/blob/main/.github/workflows/eslint-refiner.md)

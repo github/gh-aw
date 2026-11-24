@@ -5,7 +5,10 @@ import path from "node:path";
 import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
-const { queueFixture } = require("./work_queue_lifecycle.test_helpers.cjs");
+/** A v4 snapshot assignment of `count` Claims. */
+function queueFixture({ count }) {
+  return { assignment: { dispatch_id: "d1", claims: Array.from({ length: count }, (_, index) => ({ handle: `h${index + 1}`, claim_id: `c${index + 1}`, work_id: `w${index + 1}`, work: {}, result_refs: [] })) } };
+}
 const { temporaryDirectory } = require("./work_queue_effect_test_helpers.cjs");
 const claimScope = require("./work_queue_claim_scope.cjs");
 const constants = require("./constants.cjs");
@@ -215,178 +218,173 @@ describe("safe-output ingestion queue compatibility", () => {
     });
   });
 
-  for (const claims of [1, 2]) {
-    describe(`${claims}-Claim ingestion`, () => {
-      it("attributes empty-output minimum failures to every original member", async () => {
-        await fixture({ claims, config: { noop: { min: 1, max: 2 } } }, async test => {
-          const output = await test.collect("");
-          assert.deepEqual(
-            output.items.map(item => item.claim_handle),
-            test.assignment.claims.map(member => member.handle)
-          );
-          assert.ok(output.items.every(item => /Minimum required: 1, found: 0/.test(item._claimScopeError)));
-          assert.equal(output.errors.length, claims);
-          assert.ok(output.errors.every((error, index) => error.includes(test.assignment.claims[index].handle)));
-        });
-      });
-
-      it("does not count invalid output toward a member's minimum", async () => {
-        await fixture({ claims, config: { create_issue: { min: 1, max: 2 } } }, async test => {
-          const output = await test.collect(test.assignment.claims.map(member => ({ type: "create_issue", title: "missing body", claim_handle: member.handle })));
-          assert.equal(output.items.length, claims * 2);
-          for (const member of test.assignment.claims) {
-            const rejected = output.items.filter(item => item.claim_handle === member.handle);
-            assert.equal(rejected.length, 2);
-            assert.ok(rejected.every(item => item._claimScopeError));
-            assert.match(rejected[1]._claimScopeError, /Minimum required: 1, found: 0/);
-          }
-        });
-      });
-
-      it("preserves real private execution for collection and loading after ambient changes", async () => {
-        await fixture({ claims, privateExecution: true, handle: claims === 1 ? "h1" : "h2", config: { noop: { min: 1, max: 2 } } }, async test => {
-          const selected = test.assignment.claims[claims - 1].handle;
-          const output = await test.collect([{ type: "noop", message: "completed", ...(claims === 1 ? {} : { claim_handle: selected }) }]);
-          assert.deepEqual(output.errors, []);
-          assert.deepEqual(output.items, [{ type: "noop", message: "completed", claim_handle: selected }]);
-          assert.deepEqual(test.load([...output.items, { type: "noop", message: "foreign", claim_handle: "foreign" }]), { success: true, items: output.items });
-          assert.equal(test.load('{"items":[],"items":[]}').success, false);
-          if (claims > 1) {
-            const ambiguous = await test.collect([{ type: "noop", message: "missing selector" }]);
-            assert.equal(ambiguous.items[0]._claimScopeErrorCode, "claim_scope_required");
-            assert.equal(ambiguous.items[1].claim_handle, selected);
-            assert.match(ambiguous.items[1]._claimScopeError, /Minimum required: 1, found: 0/);
-          }
-        });
-      });
-
-      it("keeps valid member outputs independently scoped", async () => {
-        await fixture({ claims }, async test => {
-          const messages = test.assignment.claims.map((member, index) => ({
-            type: "create_issue",
-            title: `issue ${index}`,
-            body: `body ${index}`,
-            ...(claims === 1 ? {} : { claim_handle: member.handle }),
-          }));
-          const output = await test.collect(messages);
-          assert.deepEqual(output.errors, []);
-          assert.deepEqual(
-            output.items.map(item => item.claim_handle),
-            test.assignment.claims.map(member => member.handle)
-          );
-          assert.equal(output.items.length, claims);
-          assert.equal(test.normalizationCalls, claims);
-        });
-      });
-
-      it("rejects repair-only JSON instead of relaxing queue parsing", async () => {
-        await fixture({ claims }, async test => {
-          const output = await test.collect('{"type":"noop","message":"bad",}');
-          assert.equal(output.items.length, 1);
-          assert.ok(output.items[0]._claimScopeError);
-          assert.equal(output.items[0].type, "invalid");
-          assert.equal(test.failures.length, 0);
-        });
-      });
-
-      it("retains explicitly scoped noops even when their text looks like a probe", async () => {
-        await fixture({ claims }, async test => {
-          const output = await test.collect(test.assignment.claims.map(member => ({ type: "noop", message: "probe", claim_handle: member.handle })));
-          assert.equal(output.items.length, claims);
-          assert.deepEqual(output.errors, []);
-          assert.ok(output.items.every(item => item.message === "probe" && !item._claimScopeError));
-        });
-      });
-
-      it("does not infer successful output or discover legacy patches when empty", async () => {
-        await fixture({ claims, patches: ["aw-existing.patch"] }, async test => {
-          const output = await test.collect("");
-          assert.deepEqual(output.items, []);
-          assert.equal(test.outputs.get("has_patch"), "false");
-        });
-      });
-
-      it("requires trusted standalone selection even for a singleton", async () => {
-        await fixture({ claims }, test => {
-          assert.match(test.load([{ type: "noop", message: "unselected" }]).error, /trusted per-Claim execution context/);
-        });
-      });
-
-      it("preserves the complete immutable batch for explicit partitioning", async () => {
-        await fixture({ claims }, test => {
-          const messages = test.assignment.claims.map(member => ({ type: "noop", message: member.handle, claim_handle: member.handle }));
-          const result = test.load(messages, { partitioning: true });
-          assert.equal(result.success, true);
-          assert.deepEqual(result.items, messages);
-        });
+  describe("Claim ingestion", () => {
+    it("attributes an empty-output minimum failure to the sole Claim", async () => {
+      await fixture({ claims: 1, config: { noop: { min: 1, max: 2 } } }, async test => {
+        const output = await test.collect("");
+        assert.deepEqual(
+          output.items.map(item => item.claim_handle),
+          ["h1"]
+        );
+        assert.match(output.items[0]._claimScopeError, /Minimum required: 1, found: 0/);
+        assert.equal(output.errors.length, 1);
+        assert.ok(output.errors[0].includes("h1"));
       });
     });
-  }
 
-  it("enforces maxima per Claim without charging rejected messages to a sibling", async () => {
-    await fixture({ claims: 2 }, async test => {
-      const [first, second] = test.assignment.claims;
+    it("does not count invalid or foreign output toward the Claim's minimum", async () => {
+      await fixture({ claims: 1, config: { create_issue: { min: 1, max: 2 } } }, async test => {
+        const output = await test.collect([
+          { type: "create_issue", title: "missing body", claim_handle: "h1" },
+          { type: "create_issue", title: "foreign", body: "body", claim_handle: "h2" },
+        ]);
+        assert.equal(output.items.length, 3);
+        assert.ok(output.items.every(item => item._claimScopeError));
+        assert.equal(output.items[1].claim_handle, "h2");
+        assert.equal(output.items[2].claim_handle, "h1");
+        assert.match(output.items[2]._claimScopeError, /Minimum required: 1, found: 0/);
+      });
+    });
+
+    it("preserves real private execution for collection and loading after ambient changes", async () => {
+      await fixture({ claims: 1, privateExecution: true, handle: "h1", config: { noop: { min: 1, max: 2 } } }, async test => {
+        const output = await test.collect([{ type: "noop", message: "completed" }]);
+        assert.deepEqual(output.errors, []);
+        assert.deepEqual(output.items, [{ type: "noop", message: "completed", claim_handle: "h1" }]);
+        assert.deepEqual(test.load([...output.items, { type: "noop", message: "foreign", claim_handle: "foreign" }]), { success: true, items: output.items });
+        assert.equal(test.load('{"items":[],"items":[]}').success, false);
+        const conflicting = await test.collect([{ type: "noop", message: "conflicting selector", claim_handle: "h2" }]);
+        assert.equal(conflicting.items[0]._claimScopeErrorCode, "claim_scope_invalid");
+        assert.equal(conflicting.items[1].claim_handle, "h1");
+        assert.match(conflicting.items[1]._claimScopeError, /Minimum required: 1, found: 0/);
+      });
+    });
+
+    it("scopes every valid output of one Claim to its handle", async () => {
+      await fixture({ claims: 1, config: { create_issue: { max: 2 } } }, async test => {
+        const output = await test.collect([
+          { type: "create_issue", title: "issue 0", body: "body 0" },
+          { type: "create_issue", title: "issue 1", body: "body 1", claim_handle: "h1" },
+        ]);
+        assert.deepEqual(output.errors, []);
+        assert.deepEqual(
+          output.items.map(item => item.claim_handle),
+          ["h1", "h1"]
+        );
+        assert.equal(test.normalizationCalls, 2);
+      });
+    });
+
+    it("rejects repair-only JSON instead of relaxing queue parsing", async () => {
+      await fixture({ claims: 1 }, async test => {
+        const output = await test.collect('{"type":"noop","message":"bad",}');
+        assert.equal(output.items.length, 1);
+        assert.ok(output.items[0]._claimScopeError);
+        assert.equal(output.items[0].type, "invalid");
+        assert.equal(test.failures.length, 0);
+      });
+    });
+
+    it("retains explicitly scoped noops even when their text looks like a probe", async () => {
+      await fixture({ claims: 1 }, async test => {
+        const output = await test.collect([{ type: "noop", message: "probe", claim_handle: "h1" }]);
+        assert.equal(output.items.length, 1);
+        assert.deepEqual(output.errors, []);
+        assert.ok(output.items.every(item => item.message === "probe" && !item._claimScopeError));
+      });
+    });
+
+    it("does not infer successful output or discover legacy patches when empty", async () => {
+      await fixture({ claims: 1, patches: ["aw-existing.patch"] }, async test => {
+        const output = await test.collect("");
+        assert.deepEqual(output.items, []);
+        assert.equal(test.outputs.get("has_patch"), "false");
+      });
+    });
+
+    it("requires trusted standalone selection even for a singleton", async () => {
+      await fixture({ claims: 1 }, test => {
+        assert.match(test.load([{ type: "noop", message: "unselected" }]).error, /trusted per-Claim execution context/);
+      });
+    });
+
+    it("preserves the complete batch, including rejected records, for the trusted manager read", async () => {
+      await fixture({ claims: 1 }, test => {
+        const messages = [
+          { type: "noop", message: "own", claim_handle: "h1" },
+          { type: "noop", message: "foreign", claim_handle: "h2" },
+        ];
+        const result = test.load(messages, { partitioning: true });
+        assert.equal(result.success, true);
+        assert.equal(result.items.length, 2);
+        assert.deepEqual(result.items[0], messages[0]);
+        assert.equal(result.items[1].claim_handle, "h2");
+        assert.equal(result.items[1]._claimScopeErrorCode, "claim_scope_invalid");
+      });
+    });
+  });
+
+  it("enforces maxima for the Claim without charging rejected messages", async () => {
+    await fixture({ claims: 1, config: { create_issue: { max: 2 } } }, async test => {
       const output = await test.collect([
-        { type: "create_issue", title: "first", body: "first", claim_handle: first.handle },
-        { type: "create_issue", title: "over limit", body: "extra", claim_handle: first.handle },
-        { type: "create_issue", title: "second", body: "second", claim_handle: second.handle },
+        { type: "create_issue", title: "foreign", body: "foreign", claim_handle: "h2" },
+        { type: "create_issue", title: "invalid", claim_handle: "h1" },
+        { type: "create_issue", title: "first", body: "first", claim_handle: "h1" },
+        { type: "create_issue", title: "second", body: "second" },
+        { type: "create_issue", title: "over limit", body: "extra" },
       ]);
       assert.deepEqual(
         output.items.filter(item => !item._claimScopeError).map(item => item.title),
         ["first", "second"]
       );
-      assert.equal(output.items[1].claim_handle, first.handle);
-      assert.match(output.items[1]._claimScopeError, /Too many items/);
+      assert.equal(output.items[4].claim_handle, "h1");
+      assert.match(output.items[4]._claimScopeError, /Too many items/);
     });
   });
 
-  it("does not let a valid sibling satisfy another Claim's minimum", async () => {
-    await fixture({ claims: 2, config: { noop: { min: 1, max: 2 } } }, async test => {
-      const [first, second] = test.assignment.claims;
-      const valid = { type: "noop", message: "completed", claim_handle: first.handle };
-      const output = await test.collect([valid]);
-      assert.deepEqual(output.items[0], valid);
-      assert.equal(output.items[1].claim_handle, second.handle);
-      assert.match(output.items[1]._claimScopeError, /Minimum required: 1, found: 0/);
-      assert.equal(output.errors.length, 1);
-      assert.ok(output.errors[0].includes(second.handle));
-      assert.deepEqual(test.load(output.items, { partitioning: true }).items, output.items);
-    });
-  });
-
-  it("rejects missing and foreign multi-Claim selectors without dropping valid members", async () => {
+  it("rejects a multi-member assignment before accepting any output", async () => {
     await fixture({ claims: 2 }, async test => {
       const output = await test.collect([
+        { type: "noop", message: "first", claim_handle: "h1" },
         { type: "noop", message: "missing" },
+      ]);
+      assert.equal(output.items.length, 2);
+      assert.ok(output.items.every(item => /exactly one open Claim/.test(item._claimScopeError) && item._claimScopeErrorCode === "claim_scope_invalid"));
+    });
+  });
+
+  it("rejects foreign and malformed selectors without dropping valid output", async () => {
+    await fixture({ claims: 1, config: { noop: { max: 2 } } }, async test => {
+      const output = await test.collect([
         { type: "noop", message: "foreign", claim_handle: "foreign" },
+        { type: "noop", message: "conflicting", claim_handle: "h2" },
         ...[null, 7, {}].map(claim_handle => ({ type: "noop", message: "malformed", claim_handle })),
-        ...test.assignment.claims.map(member => ({ type: "noop", message: member.handle, claim_handle: member.handle })),
+        { type: "noop", message: "omitted" },
       ]);
       assert.equal(output.items.filter(item => item._claimScopeError).length, 5);
       assert.deepEqual(
-        output.items.filter(item => !item._claimScopeError).map(item => item.claim_handle),
-        test.assignment.claims.map(member => member.handle)
+        output.items.filter(item => !item._claimScopeError),
+        [{ type: "noop", message: "omitted", claim_handle: "h1" }]
       );
     });
   });
 
-  it("loads only the selected Claim while preserving its originally multi-member assignment", async () => {
-    await fixture({ claims: 2, handle: "h2" }, test => {
+  it("loads only the selected Claim's messages", async () => {
+    await fixture({ claims: 1, handle: "h1" }, test => {
       const messages = [
         { type: "noop", message: "no selector" },
-        { type: "noop", message: "other member", claim_handle: "h1" },
+        { type: "noop", message: "other", claim_handle: "h2" },
         { type: "noop", message: "foreign", claim_handle: "foreign" },
-        { type: "noop", message: "selected", claim_handle: "h2" },
+        { type: "noop", message: "selected", claim_handle: "h1" },
       ];
-      assert.deepEqual(test.load(messages), { success: true, items: [messages[3]] });
-      assert.equal(test.assignment.claims.length, 2);
+      assert.deepEqual(test.load(messages), { success: true, items: [{ ...messages[0], claim_handle: "h1" }, messages[3]] });
     });
   });
 
   it("retains selected-Claim loading and strict parsing when runtime flags are disabled", async () => {
-    await fixture({ claims: 2, handle: "h2", runtimeScopeDisabled: true }, test => {
-      const selected = { type: "noop", message: "selected", claim_handle: "h2" };
-      assert.deepEqual(test.load([{ type: "noop", message: "other", claim_handle: "h1" }, selected]), { success: true, items: [selected] });
+    await fixture({ claims: 1, handle: "h1", runtimeScopeDisabled: true }, test => {
+      const selected = { type: "noop", message: "selected", claim_handle: "h1" };
+      assert.deepEqual(test.load([{ type: "noop", message: "other", claim_handle: "h2" }, selected]), { success: true, items: [selected] });
       assert.equal(test.load('{"items":[],"items":[]}').success, false);
     });
   });

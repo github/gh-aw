@@ -110,11 +110,14 @@ describe("live no_agent exploration accounting", () => {
     return { state: first.state, runs: first.lines };
   }
 
-  it("updates last_role for bound serve and ordinary receipts without switching incumbent or counting", () => {
+  it.each([
+    ["serve", CHALLENGER],
+    ["ordinary", INCUMBENT],
+  ])("updates last_role for bound %s receipt without switching incumbent or counting", (role, incumbentAfter) => {
     const { state, runs } = baseLiveState();
     state.scopes[SCOPE].last_role = "test";
 
-    const serveResult = applyRun(state, runs, {
+    const result = applyRun(state, runs, {
       workflow: "pr-sous-chef",
       run: { id: "45000000002", number: 2, attempt: 1 },
       at: "2026-11-02T00:00:00Z",
@@ -130,45 +133,17 @@ describe("live no_agent exploration accounting", () => {
         generation: GENERATION,
         mode: "live",
         scope: SCOPE,
-        role: "serve",
+        role,
         selected: CHALLENGER,
-        incumbent: { before: INCUMBENT, after: CHALLENGER },
+        incumbent: { before: INCUMBENT, after: incumbentAfter },
       },
       prepare: { explore_allowed: true },
     });
-    expect(serveResult.state.scopes[SCOPE].last_role).toBe("serve");
-    expect(serveResult.state.scopes[SCOPE].incumbent).toBe(INCUMBENT);
-    expect(serveResult.state.scopes[SCOPE].pairs[CHALLENGER]).toBeUndefined();
-    expect(serveResult.state.unexplained).toBe(0);
-    expect(serveResult.lines).toMatchObject([{ note: "no_agent", role: "serve", pair: CHALLENGER, outcome: null, counted: false }]);
-
-    const ordinaryResult = applyRun(state, runs, {
-      workflow: "pr-sous-chef",
-      run: { id: "45000000003", number: 3, attempt: 1 },
-      at: "2026-11-03T00:00:00Z",
-      generation: GENERATION,
-      mode: "live",
-      scope: SCOPE,
-      observation: null,
-      pair: CHALLENGER,
-      cost: null,
-      receipt: {
-        workflow: "pr-sous-chef",
-        run: { id: "45000000003", attempt: 1 },
-        generation: GENERATION,
-        mode: "live",
-        scope: SCOPE,
-        role: "ordinary",
-        selected: CHALLENGER,
-        incumbent: { before: INCUMBENT, after: INCUMBENT },
-      },
-      prepare: { explore_allowed: true },
-    });
-    expect(ordinaryResult.state.scopes[SCOPE].last_role).toBe("ordinary");
-    expect(ordinaryResult.state.scopes[SCOPE].incumbent).toBe(INCUMBENT);
-    expect(ordinaryResult.state.scopes[SCOPE].pairs[CHALLENGER]).toBeUndefined();
-    expect(ordinaryResult.state.unexplained).toBe(0);
-    expect(ordinaryResult.lines).toMatchObject([{ note: "no_agent", role: "ordinary", pair: CHALLENGER, outcome: null, counted: false }]);
+    expect(result.state.scopes[SCOPE].last_role).toBe(role);
+    expect(result.state.scopes[SCOPE].incumbent).toBe(INCUMBENT);
+    expect(result.state.scopes[SCOPE].pairs[CHALLENGER]).toBeUndefined();
+    expect(result.state.unexplained).toBe(0);
+    expect(result.lines).toMatchObject([{ note: "no_agent", role, pair: CHALLENGER, outcome: null, counted: false }]);
   });
 
   it("respects the scope bound on live no_agent while leaving scopes untouched in observe mode", () => {
@@ -347,5 +322,131 @@ describe("live no_agent exploration accounting", () => {
     const serialized = JSON.parse(JSON.stringify(result.lines[0]));
     expect(Object.hasOwn(serialized, "role")).toBe(true);
     expect(serialized).toMatchObject({ note: "no_agent", role: null, pair: CHALLENGER, counted: false });
+  });
+});
+
+describe("sibling-effort suspension settlement", () => {
+  const scopeKey = "copilot/cost/shared";
+  const gen = "9f2c41d0";
+  const makeRun = (number, at, pair, outcome, role = "probe") => ({
+    workflow: "pr-sous-chef",
+    run: { id: String(45_000_000_000 + number), number, attempt: 1 },
+    at,
+    generation: gen,
+    mode: "live",
+    scope: scopeKey,
+    observation: { outcome },
+    pair,
+    cost: { credits: 10.0, model_credits: 10.0, tokens: null },
+    receipt: {
+      workflow: "pr-sous-chef",
+      run: { id: String(45_000_000_000 + number), attempt: 1 },
+      generation: gen,
+      mode: "live",
+      scope: scopeKey,
+      role,
+      selected: pair,
+      incumbent: { before: "github-copilot/model-b@high", after: "github-copilot/model-b@high" },
+    },
+    prepare: { explore_allowed: true },
+  });
+
+  const makeSuspendedPair = (history, sinceSeq, pending, seen) => ({
+    history,
+    credits: 10.0,
+    model_credits: 10.0,
+    bills: history.length,
+    streak: pending,
+    tests: history.length,
+    suspended: { since_seq: sinceSeq, pending },
+    seen,
+    summary: null,
+  });
+
+  it("preserves prior successes on restore and drops them on confirmed break, emitting settlement events", () => {
+    const baseState = {
+      ...emptyState("pr-sous-chef"),
+      seq: 6,
+      generation: { hash: gen, since_run: 1 },
+      last_run: 6,
+      scopes: {
+        [scopeKey]: {
+          incumbent: "github-copilot/model-b@high",
+          last_role: "serve",
+          last_success_seq: 6,
+          pairs: {
+            "github-copilot/model-a@low": makeSuspendedPair(
+              [
+                [1, "2026-11-01T00:00:00Z", true, 10.0, 10.0, null],
+                [2, "2026-11-02T00:00:00Z", true, 10.0, 10.0, null],
+                [3, "2026-11-03T00:00:00Z", false, 10.0, 10.0, null],
+                [4, "2026-11-04T00:00:00Z", false, 10.0, 10.0, null],
+                [5, "2026-11-05T00:00:00Z", false, 10.0, 10.0, null],
+              ],
+              5,
+              3,
+              "2026-11-05T00:00:00Z"
+            ),
+          },
+        },
+      },
+    };
+
+    const okEvents = [];
+    const okResult = applyRun(baseState, [], makeRun(7, "2026-11-07T00:00:00Z", "github-copilot/model-a@high", "success"), { events: okEvents });
+    const okScope = okResult.state.scopes[scopeKey];
+    expect(okEvents).toEqual([["github-copilot/model-a@high", "back"]]);
+    expect(okScope.last_success_seq).toBe(7);
+    expect(okScope.pairs["github-copilot/model-a@low"].suspended).toBeNull();
+    expect(okScope.pairs["github-copilot/model-a@low"].streak).toBe(0);
+    expect(okScope.pairs["github-copilot/model-a@low"].history.map(e => e[0])).toEqual([1, 2]);
+    expect(okScope.pairs["github-copilot/model-a@high"].history.map(e => [e[0], e[2]])).toEqual([[7, true]]);
+
+    const failEvents = [];
+    const failResult = applyRun(baseState, [], makeRun(7, "2026-11-07T00:00:00Z", "github-copilot/model-a@high", "failure"), { events: failEvents });
+    const failScope = failResult.state.scopes[scopeKey];
+    expect(failEvents).toEqual([["github-copilot/model-a@high", "broken"]]);
+    expect(failScope.last_success_seq).toBe(6);
+    expect(failScope.pairs["github-copilot/model-a@low"].suspended).toBeNull();
+    expect(failScope.pairs["github-copilot/model-a@low"].streak).toBe(0);
+    expect(failScope.pairs["github-copilot/model-a@low"].history.map(e => e[0])).toEqual([3, 4, 5]);
+    expect(failScope.pairs["github-copilot/model-a@high"].history.map(e => [e[0], e[2]])).toEqual([[7, false]]);
+    expect(failScope.pairs["github-copilot/model-a@high"].streak).toBe(0);
+  });
+
+  it("settles only due same-base siblings on failure and never touches other providers or model prefixes", () => {
+    const state = {
+      ...emptyState("pr-sous-chef"),
+      seq: 10,
+      generation: { hash: gen, since_run: 1 },
+      last_run: 10,
+      scopes: {
+        [scopeKey]: {
+          incumbent: "github-copilot/model-b@high",
+          last_role: "serve",
+          last_success_seq: 6,
+          pairs: {
+            "github-copilot/model-a@low": makeSuspendedPair([[3, "2026-11-03T00:00:00Z", false, 10.0, 10.0, null]], 5, 3, "2026-11-03T00:00:00Z"),
+            "github-copilot/model-a@medium": makeSuspendedPair([[8, "2026-11-04T00:00:00Z", false, 10.0, 10.0, null]], 8, 1, "2026-11-04T00:00:00Z"),
+            "openai/model-a@low": makeSuspendedPair([[4, "2026-11-03T00:00:00Z", false, 10.0, 10.0, null]], 4, 1, "2026-11-03T00:00:00Z"),
+            "github-copilot/model-a-mini@low": makeSuspendedPair([[5, "2026-11-03T00:00:00Z", false, 10.0, 10.0, null]], 5, 1, "2026-11-03T00:00:00Z"),
+          },
+        },
+      },
+    };
+
+    const failResult = applyRun(state, [], makeRun(11, "2026-11-08T00:00:00Z", "github-copilot/model-a@high", "failure"));
+    const failPairs = failResult.state.scopes[scopeKey].pairs;
+    expect(failPairs["github-copilot/model-a@low"].suspended).toBeNull();
+    expect(failPairs["github-copilot/model-a@medium"].suspended).toEqual({ since_seq: 8, pending: 1 });
+    expect(failPairs["openai/model-a@low"].suspended).toEqual({ since_seq: 4, pending: 1 });
+    expect(failPairs["github-copilot/model-a-mini@low"].suspended).toEqual({ since_seq: 5, pending: 1 });
+
+    const okResult = applyRun(state, [], makeRun(11, "2026-11-08T00:00:00Z", "github-copilot/model-a@high", "success"));
+    const okPairs = okResult.state.scopes[scopeKey].pairs;
+    expect(okPairs["github-copilot/model-a@low"].suspended).toBeNull();
+    expect(okPairs["github-copilot/model-a@medium"].suspended).toBeNull();
+    expect(okPairs["openai/model-a@low"].suspended).toEqual({ since_seq: 4, pending: 1 });
+    expect(okPairs["github-copilot/model-a-mini@low"].suspended).toEqual({ since_seq: 5, pending: 1 });
   });
 });

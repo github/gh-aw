@@ -6,6 +6,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { closed, integer, parseStrictJSON, validString } = require("./work_queue_codec.cjs");
 const { normalizeAssignment, normalizeClaimScope } = require("./work_queue_claim_scope.cjs");
+const { ASSIGNMENT_BYTES } = require("./work_queue_limits.cjs");
 
 const TYPES = new Set(["object", "array", "string", "number", "integer", "boolean", "null"]);
 const KEYWORDS = ["type", "description", "properties", "required", "additionalProperties", "items", "enum", "minimum", "maximum", "minLength", "maxLength", "minItems", "maxItems"];
@@ -146,7 +147,7 @@ function prepareMemorySnapshot(message, config, options = {}) {
   }
   const assignment = normalizeAssignment(original);
   const normalized = normalizeClaimScope(message, assignment);
-  const member = assignment.claims.find(claim => claim.handle === normalized.claim_handle);
+  const [member] = assignment.claims;
   const memory = normalized.memory;
   assertJSONData(memory);
   validateMemoryValue(memory, config.schema);
@@ -157,16 +158,19 @@ function prepareMemorySnapshot(message, config, options = {}) {
   return { files: [{ path: config.path, content }] };
 }
 
+// The snapshot assignment bound (ASSIGNMENT_BYTES + 16 KiB) plus a trailing newline.
+const MAX_ASSIGNMENT_FILE_BYTES = ASSIGNMENT_BYTES + 16 * 1024 + 1;
+
 function readMemoryAssignment(filename) {
   let content;
   try {
     const stat = fs.lstatSync(filename);
-    if (!stat.isFile() || stat.nlink !== 1 || stat.size > 48 * 1024 + 1) throw new Error("Original assignment is not a bounded regular file");
+    if (!stat.isFile() || stat.nlink !== 1 || stat.size > MAX_ASSIGNMENT_FILE_BYTES) throw new Error("Original assignment is not a bounded regular file");
     content = fs.readFileSync(filename);
   } catch (error) {
     throw new Error("Memory preparation requires a readable bounded regular original assignment file", { cause: error });
   }
-  return parseStrictJSON(new TextDecoder("utf-8", { fatal: true }).decode(content), { maxBytes: 48 * 1024 + 1 });
+  return parseStrictJSON(new TextDecoder("utf-8", { fatal: true }).decode(content), { maxBytes: MAX_ASSIGNMENT_FILE_BYTES });
 }
 
 module.exports = { prepareMemorySnapshot, validateMemorySchema, validateMemoryValue };

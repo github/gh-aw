@@ -7,7 +7,6 @@ import fs from "node:fs";
 
 const require = createRequire(import.meta.url);
 const { setupGlobals } = require("./setup_globals.cjs");
-const { queueAuthenticationScope } = require("./work_queue_auth_cache.cjs");
 const GLOBAL_NAMES = ["core", "github", "context", "exec", "io", "getOctokit", "runtimeFeatures", "hasRuntimeFeature", "getRuntimeFeatureValue"];
 const savedGlobals = new Map(GLOBAL_NAMES.map(name => [name, Object.getOwnPropertyDescriptor(global, name)]));
 
@@ -75,19 +74,6 @@ describe("setupGlobals API version", () => {
     const client = global.getOctokit("handler-token", { request: { fetch } });
     await client.rest.issues.update({ owner: "owner", repo: "repo", issue_number: 50, title: "Failure" });
     expect(fetch.mock.calls[0][1].headers["x-github-api-version"]).toBe("2026-03-10");
-  });
-
-  it("registers only constructed string-token clients, not the injected client or custom auth strategies", async () => {
-    setupClient();
-    expect(await queueAuthenticationScope(global.github)).toBeUndefined();
-    const client = global.getOctokit("handler-token");
-    const scope = await queueAuthenticationScope(client);
-    expect(scope).toBeDefined();
-    expect(await queueAuthenticationScope(client)).toBe(scope);
-    const dynamic = global.getOctokit("handler-token", {
-      authStrategy: () => Object.assign(async () => ({ type: "token", token: "dynamic-token" }), { hook: () => {} }),
-    });
-    expect(await queueAuthenticationScope(dynamic)).toBeUndefined();
   });
 
   it.each(["X-GitHub-Api-Version", "x-github-api-version", "X-GITHUB-API-VERSION"])("preserves an explicit %s header on per-handler clients", async header => {

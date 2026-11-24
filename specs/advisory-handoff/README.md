@@ -9,6 +9,8 @@ This model describes the maintainer-driven handoff to a temporary private GitHub
 3. Run `gh aw advisory inspect <GHSA-ID> --print-patch` in a private terminal and type `yes` to review the untrusted patch and the destination. The flag requires terminal stdin and stdout. Omit it for metadata and the digest in scripts or CI. The digest identifies the handoff; it does not attest that the fix passed tests.
 4. Run `gh aw advisory transfer <GHSA-ID> --approve <digest>`. Transfer verifies the handoff again and attempts to create only the destination branch. Open the PR from the advisory page. If transfer warns about base drift, check whether the branch already exists before rebasing and retesting.
 
+Recording requires an existing temporary private advisory fork unless `--create-fork` is supplied. If the fork is missing, the error hints to use `advisory record --create-fork` or create it in GitHub.
+
 ## Model boundary
 
 `sideReady` represents the verified side repository. Each GHSA has independent fork, record, review, transfer, and branch state. `ClaimFork` persists the local marker; `SendForkRequest` and `ProvisionFork` separate requesting the fork from its appearance. Retrying an identical record is a stuttering step.

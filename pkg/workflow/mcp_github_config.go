@@ -64,13 +64,14 @@ package workflow
 import (
 	"fmt"
 	"maps"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 
 	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/logger"
 	"github.com/github/gh-aw/pkg/setutil"
+	"github.com/github/gh-aw/pkg/sliceutil"
 	"github.com/github/gh-aw/pkg/typeutil"
 )
 
@@ -100,7 +101,7 @@ func dynamicEnclaveGitHubGuardRepos(workflowData *WorkflowData) []string {
 	for _, owner := range enclave.Dynamic.AllowedOwners {
 		add(owner + "/*") //nolint:manualpathconcat // GitHub owner/repo guard patterns are not filesystem paths.
 	}
-	sort.Strings(repos)
+	slices.Sort(repos)
 	return repos
 }
 
@@ -212,7 +213,7 @@ func writeSinkAcceptLabelsForRepos(repos []string) []string {
 	for _, repo := range repos {
 		accept = append(accept, transformRepoPattern(repo))
 	}
-	return accept
+	return sliceutil.Deduplicate(accept)
 }
 
 func writeSinkGuardPolicy(accept []string) map[string]any {
@@ -661,7 +662,7 @@ func deriveSafeOutputsGuardPolicyFromGitHub(githubTool map[string]any) map[strin
 	}
 
 	writeSink := map[string]any{
-		"accept":          acceptList,
+		"accept":          sliceutil.Deduplicate(acceptList),
 		"sink-visibility": sinkVisibilityRuntimeExpr,
 	}
 
