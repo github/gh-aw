@@ -253,7 +253,7 @@ func (e *PiEngine) GetInstallationSteps(workflowData *WorkflowData) []GitHubActi
 		steps = BuildNpmEngineInstallStepsWithAWF(npmSteps, workflowData)
 		steps = append(steps, GitHubActionStep{
 			"      - name: Record Pi package location",
-			"        run: |",
+			"        run: | # zizmor: ignore[github-env] - value is derived from npm root -g and a constant package name, not user input.",
 			`          GH_AW_PI_PACKAGE_ROOT="$(npm root -g)/` + piNpmPackageName + `"`,
 			`          printf 'GH_AW_PI_PACKAGE_ROOT=%s\n' "$GH_AW_PI_PACKAGE_ROOT" >> "$GITHUB_ENV"`,
 		})
