@@ -6,6 +6,7 @@ import (
 	"go/constant"
 	"go/token"
 	"go/types"
+	"regexp"
 	"strings"
 	"unicode"
 
@@ -18,6 +19,8 @@ import (
 )
 
 const analyzerName = "writefilepublicpermsensitive"
+
+var camelCaseBoundary = regexp.MustCompile(`([\p{Ll}\p{Nd}])(\p{Lu})|(\p{Lu})(\p{Lu}\p{Ll})`)
 
 var Analyzer = analyzerutil.New(analyzerName, "reports FilePermPublic on potentially sensitive paths or content", run)
 
@@ -156,33 +159,13 @@ func containsSensitive(pass *analysis.Pass, expr ast.Expr) bool {
 }
 
 func containsSensitiveTerm(value string, terms map[string]struct{}) bool {
-	runes := []rune(value)
-	var segment strings.Builder
-	matchSegment := func() bool {
-		if segment.Len() == 0 {
-			return false
+	value = camelCaseBoundary.ReplaceAllString(value, "$1$3 $2$4")
+	for _, segment := range strings.FieldsFunc(value, func(r rune) bool {
+		return !unicode.IsLetter(r) && !unicode.IsDigit(r)
+	}) {
+		if _, found := terms[strings.ToLower(segment)]; found {
+			return true
 		}
-		_, found := terms[segment.String()]
-		segment.Reset()
-		return found
 	}
-	for i, r := range runes {
-		if !unicode.IsLetter(r) && !unicode.IsDigit(r) {
-			if matchSegment() {
-				return true
-			}
-			continue
-		}
-		if unicode.IsUpper(r) && segment.Len() > 0 {
-			prev := runes[i-1]
-			nextIsLower := i+1 < len(runes) && unicode.IsLower(runes[i+1])
-			if unicode.IsLower(prev) || unicode.IsDigit(prev) || (unicode.IsUpper(prev) && nextIsLower) {
-				if matchSegment() {
-					return true
-				}
-			}
-		}
-		segment.WriteRune(unicode.ToLower(r))
-	}
-	return matchSegment()
+	return false
 }
