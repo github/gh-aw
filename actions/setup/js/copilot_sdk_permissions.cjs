@@ -215,7 +215,7 @@ function isReadPathAllowedByShellRules(requestedPath, allowedPathPatterns, works
  *
  * @param {CopilotSDKPermissionConfig | undefined} permissionConfig
  * @param {import("@microsoft/copilot-sdk").PermissionHandler} approveAll
- * @param {{coreLogger?: CopilotSDKCoreLogger, logger?: (msg: string) => void, onDenied?: (requestSummary: string) => void, workspaceRoot?: string}=} logOptions
+ * @param {{coreLogger?: CopilotSDKCoreLogger, logger?: (msg: string) => void, onDenied?: (requestSummary: string) => void, workspaceRoot?: string, mcpOnly?: boolean}=} logOptions
  * @returns {import("@microsoft/copilot-sdk").PermissionHandler}
  */
 function buildCopilotSDKPermissionHandler(permissionConfig, approveAll, logOptions) {
@@ -234,7 +234,7 @@ function buildCopilotSDKPermissionHandler(permissionConfig, approveAll, logOptio
   });
 
   // Keep explicit allow-all behavior when requested by config input.
-  if (allowAll || allowedToolEntries.size === 0) {
+  if (!logOptions?.mcpOnly && (allowAll || allowedToolEntries.size === 0)) {
     return approveAll;
   }
 
@@ -325,6 +325,7 @@ function buildCopilotSDKPermissionHandler(permissionConfig, approveAll, logOptio
    * @returns {boolean}
    */
   function isAllowed(request) {
+    if (logOptions?.mcpOnly && request.kind !== "mcp") return false;
     switch (request.kind) {
       case "shell": {
         if (allowedToolEntries.has("shell")) return true;

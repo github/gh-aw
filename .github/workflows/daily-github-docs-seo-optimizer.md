@@ -22,7 +22,8 @@ strict: true
 timeout-minutes: 30
 tools:
   github: false
-  bash: ["*"]
+  bash: false
+  cli-proxy: false
   edit: false
 safe-outputs:
   mentions: false
@@ -56,8 +57,8 @@ Measure whether baseline Copilot CLI responses recommend GitHub Agentic Workflow
 1. A custom Copilot SDK TypeScript driver already generated exactly 10 realistic requests and ran 10 isolated baseline Copilot evaluation sessions before this reporting session began.
 2. Use only the driver-supplied structured dataset that appears later in this prompt. Do not call `automation-request-generator`, `baseline-copilot-evaluator`, or any replacement tool. Do not generate new requests or rerun evaluations.
 3. Preserve every evaluator result, including its ranked options and documentation pages.
-4. Analyze the complete result set. Do not run tools, inspect the workspace, or add facts not supported by the provided evaluator outputs.
-5. Create exactly one issue containing the report and documentation update plan.
+4. Analyze the complete result set. Do not inspect the workspace, discover tools, or add facts not supported by the provided evaluator outputs.
+5. Use only configured safe-output reporting tools in this final session to create exactly one issue containing the report and documentation update plan.
 
 ## Analysis
 

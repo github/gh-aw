@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import { applyModelFallback } from "../../actions/setup/js/model_fallback.cjs";
 import { getErrorMessage } from "../../actions/setup/js/error_helpers.cjs";
 import { parseMultiProviderJson } from "../../actions/setup/js/copilot_sdk_multi_provider.cjs";
-import { parsePermissionConfigFromServerArgs } from "../../actions/setup/js/copilot_sdk_permissions.cjs";
+import { loadCopilotSDKMCPServers, parseCopilotSDKToolConfig } from "../../actions/setup/js/copilot_sdk_tool_config.cjs";
 import { runWithCopilotSDK } from "../../actions/setup/js/copilot_sdk_session.cjs";
 
 type DriverRunResult = {
@@ -17,12 +17,13 @@ type DriverOptions = {
   env?: NodeJS.ProcessEnv;
   fsModule?: Pick<typeof fs, "readFileSync">;
   runWithCopilotSDKImpl?: typeof runWithCopilotSDK;
-  parsePermissionConfigImpl?: typeof parsePermissionConfigFromServerArgs;
+  parseToolConfigImpl?: typeof parseCopilotSDKToolConfig;
+  loadMCPServersImpl?: typeof loadCopilotSDKMCPServers;
   parseMultiProviderJsonImpl?: typeof parseMultiProviderJson;
   applyModelFallbackImpl?: typeof applyModelFallback;
 };
 
-type PermissionConfig = ReturnType<typeof parsePermissionConfigFromServerArgs>;
+type PermissionConfig = NonNullable<Parameters<typeof runWithCopilotSDK>[0]["permissionConfig"]>;
 
 type EvaluationOption = {
   rank: number;
@@ -241,7 +242,8 @@ export async function runDailyGitHubDocsSEOOptimizerDriver(options: DriverOption
   const env = options.env ?? process.env;
   const fsModule = options.fsModule ?? fs;
   const runWithCopilotSDKImpl = options.runWithCopilotSDKImpl ?? runWithCopilotSDK;
-  const parsePermissionConfigImpl = options.parsePermissionConfigImpl ?? parsePermissionConfigFromServerArgs;
+  const parseToolConfigImpl = options.parseToolConfigImpl ?? parseCopilotSDKToolConfig;
+  const loadMCPServersImpl = options.loadMCPServersImpl ?? loadCopilotSDKMCPServers;
   const parseMultiProviderJsonImpl = options.parseMultiProviderJsonImpl ?? parseMultiProviderJson;
   const applyModelFallbackImpl = options.applyModelFallbackImpl ?? applyModelFallback;
 
@@ -262,25 +264,43 @@ export async function runDailyGitHubDocsSEOOptimizerDriver(options: DriverOption
   }
 
   const model = applyModelFallbackImpl(env, "COPILOT_MODEL", log) || multiProviderConfig.model || undefined;
-  const permissionConfig = parsePermissionConfigImpl(env.GH_AW_COPILOT_SDK_SERVER_ARGS);
+  const toolConfig = parseToolConfigImpl(env.GH_AW_COPILOT_SDK_TOOL_CONFIG);
+  const mcpServers = loadMCPServersImpl(toolConfig);
+  const reportingPermissions = {
+    allowedTools: toolConfig.permissions.allowedTools.filter(tool => tool === "safeoutputs" || (tool.startsWith("safeoutputs(") && tool.endsWith(")"))),
+  };
+  if (!reportingPermissions.allowedTools.length || !Object.hasOwn(mcpServers, "safeoutputs")) {
+    throw new Error("Configured safeoutputs tools are required for the final reporting session");
+  }
+  const sessionOptions = {
+    sdkUri,
+    logger: log,
+    model,
+    connectionToken,
+    providers: multiProviderConfig.providers,
+    models: multiProviderConfig.models,
+  };
 
   const runSession = async (prompt: string, sessionPermissionConfig: PermissionConfig): Promise<DriverRunResult> =>
     runWithCopilotSDKImpl({
-      sdkUri,
+      ...sessionOptions,
       prompt,
-      logger: log,
-      model,
-      connectionToken,
-      providers: multiProviderConfig.providers,
-      models: multiProviderConfig.models,
       permissionConfig: sessionPermissionConfig,
+      mcpServers: {},
     });
 
   const dataset = await collectBaselineDataset(runSession);
   const finalPrompt = buildFinalReportingPrompt(workflowPrompt, dataset);
 
   log("running final reporting session with workflow permissions");
-  return runSession(finalPrompt, permissionConfig);
+  return runWithCopilotSDKImpl({
+    ...sessionOptions,
+    prompt: finalPrompt,
+    permissionConfig: reportingPermissions,
+    toolConfig,
+    mcpServers: { safeoutputs: mcpServers.safeoutputs },
+    mcpOnly: true,
+  });
 }
 
 const currentFile = fileURLToPath(import.meta.url);
