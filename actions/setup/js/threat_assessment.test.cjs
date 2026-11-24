@@ -30,6 +30,9 @@ describe("pinned static analysis", () => {
     expect(result.template).toBe(marker + "\nWorkflow {{actor}}");
     expect(analyzeScaffolding(marker + " extra\nbody", template).section).toBe("");
     expect(analyzeScaffolding("body\n" + template, "").section).toBe("");
+    const unmarked = "<system>Instructions from the workflow author</system>";
+    expect(analyzeScaffolding(unmarked, "").section).toBe("");
+    expect(analyzeScaffolding(marker, unmarked)).toEqual({ template: unmarked, section: "" });
     expect(analyzeScaffolding("<system>" + "é".repeat(65536) + "</system>", "").section).toBe("");
   });
 });

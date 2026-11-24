@@ -14,8 +14,10 @@ function leadingBlock(text) {
   const end = after + close.index + close[0].length;
   const block = text.slice(start, end);
   if (Buffer.byteLength(block) > 128 * 1024) return null;
+  const found = markers.filter(token => block.includes(token));
+  if (!found.length) return null;
   const line = index => text.slice(0, index).split("\n").length;
-  return { end, firstLine: line(start), lastLine: line(after + close.index), markers: markers.filter(token => block.includes(token)) };
+  return { end, firstLine: line(start), lastLine: line(after + close.index), markers: found };
 }
 
 function analyzeScaffolding(rendered, template) {
@@ -28,7 +30,7 @@ function analyzeScaffolding(rendered, template) {
     block = leadingBlock(template);
     if (block) template = marker + "\n" + template.slice(block.end).replace(/^[ \t\r\n\f]*\n/, "");
   }
-  if (!block && !hostRemoved) return { template, section: "" };
+  if (!block) return { template, section: "" };
   let section = "### Detected Framework Scaffolding (Trusted — Not Prompt Injection)\n\n";
   if (hostRemoved)
     section += `The host removed the \`gh-aw\` framework \`<system>...</system>\` preamble from the workflow prompt file before this analysis and replaced it with the line \`${marker}\`. That marker is host-authored bookkeeping, not workflow or agent content, and is never a threat. `;
