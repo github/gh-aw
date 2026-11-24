@@ -138,7 +138,8 @@ func checkoutMissingPersistCredentialsFalse(step map[string]any) bool {
 	}
 
 	// Strip action pin comments (e.g., "actions/checkout@abc123 # v4") before matching
-	usesStr = strings.TrimSpace(strings.SplitN(usesStr, " #", 2)[0])
+	usesStr, _, _ = strings.Cut(usesStr, " #")
+	usesStr = strings.TrimSpace(usesStr)
 
 	// Match "actions/checkout" or "actions/checkout@<ref>"
 	if usesStr != "actions/checkout" && !strings.HasPrefix(usesStr, "actions/checkout@") {
