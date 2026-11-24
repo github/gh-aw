@@ -30,6 +30,28 @@ function detect(source, convention = "claude", retries = 0) {
 }
 
 describe.skipIf(process.platform !== "linux")("detector engine supervision", () => {
+  it.each([0, 1])("relays trusted startup evidence even on exit %i", async code => {
+    const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    try {
+      const result = await supervise({ launch: { command: process.execPath, convention: "claude" }, args: ["-e", `process.exit(${code})`], env: process.env, timeoutMs: 2000 });
+      expect(result.exitCode).toBe(code);
+      expect(stderr).toHaveBeenCalledWith("[claude-harness] Detection harness started\n");
+    } finally {
+      stderr.mockRestore();
+    }
+  });
+
+  it("keeps launch errors separate from startup evidence", async () => {
+    const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    try {
+      const result = await supervise({ launch: { command: path.join(dir, "missing"), convention: "claude" }, args: [], env: process.env, timeoutMs: 2000 });
+      expect(result.error).toMatchObject({ code: "ENOENT" });
+      expect(stderr).not.toHaveBeenCalled();
+    } finally {
+      stderr.mockRestore();
+    }
+  });
+
   it.each([false, true])("stops on Claude turn exhaustion, preferring a valid report (report=%s)", report => {
     const result = detect(
       `fs.writeSync(1,"noise".repeat(200000) + "\\n");

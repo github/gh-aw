@@ -54,8 +54,7 @@ safe-outputs:
 }
 
 // TestCustomEngineThreatDetectionFallsBackToBuiltinEngine verifies that a workflow using a
-// custom engine does not emit `stage_threat_detection_runtime.cjs\" <custom-id>`, which the detection
-// binary rejects with a config_error at runtime.
+// custom engine stages the detection runtime with the built-in engine id, not the custom one.
 func TestCustomEngineThreatDetectionFallsBackToBuiltinEngine(t *testing.T) {
 	workflowPath := writeCustomEngineWorkflow(t, "")
 

@@ -70,3 +70,48 @@ it("confines Claude's default read root and only approves detector operations", 
   const settings = JSON.parse(values(seen.args, "--settings")[0]);
   expect(settings.permissions.allow).toEqual(["Bash(threat_detection_result:*)", `Write(/${outputDir}/threat-detection-reasons.json)`, `Read(/${artifactsDir}/**)`]);
 });
+
+it.each(["inline", "file", "automatic"])("composes %s model settings through the Claude detector harness", async source => {
+  const capture = path.join(root, "capture.json");
+  const preload = path.join(root, "reflect.cjs");
+  const reflectData = { endpoints: [{ provider: "copilot", configured: true, port: 43123, models: ["claude-opus-5.5", "claude-haiku-4.5"] }] };
+  fs.writeFileSync(preload, `require(${JSON.stringify(require.resolve("./awf_reflect.cjs"))}).fetchAWFReflect = async () => ({ ok: true, reflectData: ${JSON.stringify(reflectData)} });`);
+  const configured = JSON.stringify({ modelOverrides: { custom: "chosen" }, permissions: { allow: ["Bash(*)", "Write(//**)"], defaultMode: "bypassPermissions" } });
+  const settingsFile = path.join(root, "settings.json");
+  fs.writeFileSync(settingsFile, configured);
+  const result = await runHarness({
+    launch: {
+      command: process.execPath,
+      args: [path.join(__dirname, "claude_harness.cjs"), process.execPath, engine],
+      convention: "claude",
+      model: "claude-opus-5.5",
+      env: {
+        CAPTURE: capture,
+        GH_AW_TMP_DIR: root,
+        GH_AW_AWF_CONFIG_PATH: path.join(root, "missing-awf-config.json"),
+        GH_AW_LLM_PROVIDER: "github",
+        GH_AW_MODEL_ROUTING: "",
+        GH_AW_SAFE_OUTPUTS: "",
+        GH_AW_HARNESS_MAX_RETRIES: "0",
+        GH_AW_CLAUDE_SETTINGS: source === "inline" ? configured : source === "file" ? settingsFile : "",
+        NODE_OPTIONS: `${process.env.NODE_OPTIONS || ""} --require=${JSON.stringify(preload)}`,
+      },
+    },
+    prompt: "detector instructions",
+    sink,
+    artifactsDir,
+    timeoutMs: 5000,
+  });
+  expect(result.error).toBeNull();
+  const seen = JSON.parse(fs.readFileSync(capture, "utf8"));
+  expect(values(seen.args, "--settings")).toHaveLength(1);
+  expect(JSON.parse(values(seen.args, "--settings")[0])).toEqual({
+    modelOverrides: source === "automatic" ? { "claude-opus-5-5": "claude-opus-5.5", "claude-haiku-4-5": "claude-haiku-4.5" } : { custom: "chosen" },
+    permissions: { allow: ["Bash(threat_detection_result:*)", `Write(/${outputDir}/threat-detection-reasons.json)`, `Read(/${artifactsDir}/**)`] },
+  });
+  expect(values(seen.args, "--permission-mode")).toEqual(["dontAsk"]);
+  expect(values(seen.args, "--tools")).toEqual(["Bash,Read,Write"]);
+  expect(values(seen.args, "--setting-sources")).toEqual([""]);
+  expect(seen.cwd).toBe(outputDir);
+  expect(seen.prompt).toContain("detector instructions");
+});

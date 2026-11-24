@@ -30,11 +30,11 @@ if select.select([3], [], [], 0)[0]:
 try:
     engine = subprocess.Popen(sys.argv[1:], close_fds=True, start_new_session=True)
 except OSError as exc:
-    os.write(3, errno.errorcode.get(exc.errno, "EIO").encode())
+    os.write(3, b"error:" + errno.errorcode.get(exc.errno, "EIO").encode() + b"\\n")
     sys.exit(1)
 try:
     pidfd = os.pidfd_open(engine.pid)
-    os.write(3, b"started")
+    os.write(3, b"started\\n")
     select.select([3, pidfd], [], [])
     code = engine.poll()
 finally:
@@ -109,6 +109,8 @@ function supervise({ launch, args, env, prompt, sink, timeoutMs, signal }) {
     if (!(control instanceof Duplex)) throw new Error("Detector control pipe is unavailable");
     const stdout = capture(child.stdout);
     child.stderr.resume(); // Drain without publishing model-authored or secret-bearing bytes.
+    let controlBuffer = "";
+    let startedSeen = false;
     let spawnError = "";
     let reason;
     /** @type {Error|null} */
@@ -123,7 +125,16 @@ function supervise({ launch, args, env, prompt, sink, timeoutMs, signal }) {
     const poll = sink ? setInterval(() => resultReady(sink) && stop("reported"), 250) : undefined;
     signal?.addEventListener("abort", abort, { once: true });
     if (signal?.aborted) abort();
-    control.on("data", chunk => (spawnError += chunk));
+    control.on("data", chunk => {
+      controlBuffer += chunk;
+      let newline;
+      while ((newline = controlBuffer.indexOf("\n")) !== -1) {
+        const message = controlBuffer.slice(0, newline);
+        controlBuffer = controlBuffer.slice(newline + 1);
+        if (message === "started") startedSeen = true;
+        else if (message.startsWith("error:")) spawnError = message.slice("error:".length);
+      }
+    });
     const pipeError = err => {
       if (err.code !== "EPIPE" && err.code !== "ECONNRESET") error ??= err;
     };
@@ -140,9 +151,10 @@ function supervise({ launch, args, env, prompt, sink, timeoutMs, signal }) {
       const timedOut = reason === "timeout" || (!cancelled && launch.convention === "claude" && maxTurns(lines));
       // Only the trusted subreaper owns fd 3. AWF needs the startup marker
       // on nonzero exits too (a finding exits 1); never relay engine output.
-      if (spawnError === "started") {
+      if (startedSeen) {
         if (["copilot", "claude", "codex"].includes(launch.convention)) process.stderr.write(`[${launch.convention}-harness] Detection harness started\n`);
-      } else if (spawnError) error ??= Object.assign(new Error(`engine launch failed: ${spawnError}`), { code: spawnError });
+      }
+      if (spawnError) error ??= Object.assign(new Error(`engine launch failed: ${spawnError}`), { code: spawnError });
       if (timedOut || cancelled) error ??= new Error(timedOut ? "engine timed out" : "engine cancelled");
       if (!reason && exitCode !== 0 && !resultReady(sink)) error ??= new Error(`engine exited with ${exitSignal || `code ${exitCode}`}`);
       resolve({ timedOut, cancelled, exitCode, error });

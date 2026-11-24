@@ -462,8 +462,22 @@ function removeClaudeRoutingOverrides(args) {
 }
 
 /**
+ * @param {string} settings
+ * @returns {Record<string, any>}
+ */
+function readClaudeSettings(settings) {
+  try {
+    const value = JSON.parse(settings.trim().startsWith("{") ? settings : fs.readFileSync(settings, "utf8"));
+    if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Expected settings object");
+    return value;
+  } catch {
+    throw new Error("Cannot compose Claude detection settings: expected a JSON object or a readable JSON settings file");
+  }
+}
+
+/**
  * Preserve user settings, otherwise supply Copilot Claude ID mappings from the live
- * inventory and resolved models. This also covers the external detector's CLI args.
+ * inventory and resolved models. Detector-owned settings take precedence during detection.
  * @param {string[]} args
  * @param {NodeJS.ProcessEnv} [env]
  * @param {any} [reflectData]
@@ -471,10 +485,22 @@ function removeClaudeRoutingOverrides(args) {
  * @returns {string[]}
  */
 function applyClaudeSettingsEnv(args, env = process.env, reflectData, resolvedModels = []) {
-  if (args.some(arg => arg === "--settings" || arg.startsWith("--settings="))) return args;
+  const settingsIndex = args.findIndex(arg => arg === "--settings" || arg.startsWith("--settings="));
+  if (settingsIndex >= 0 && !isDetectionPhase(env.GH_AW_PHASE)) return args;
+  const detectorSettings = settingsIndex >= 0 ? readClaudeSettings(args[settingsIndex] === "--settings" ? args[settingsIndex + 1] : args[settingsIndex].slice("--settings=".length)) : null;
+  const applySettings = settings => {
+    if (!detectorSettings) return settings ? [...args, "--settings", settings] : args;
+    // Replace the entire permissions object; configured allow rules or modes
+    // must not broaden the detector's narrowly scoped tool permissions.
+    const merged = JSON.stringify({ ...(settings ? readClaudeSettings(settings) : {}), ...detectorSettings });
+    return args.map((arg, index) => {
+      if (args[settingsIndex] === "--settings") return index === settingsIndex + 1 ? merged : arg;
+      return index === settingsIndex ? `--settings=${merged}` : arg;
+    });
+  };
   const settings = (env.GH_AW_CLAUDE_SETTINGS || "").trim();
-  if (settings) return [...args, "--settings", settings];
-  if (!REFLECT_PROVIDER_ALIASES.github.has(normalizeReflectProviderName(env.GH_AW_LLM_PROVIDER, "anthropic"))) return args;
+  if (settings) return applySettings(settings);
+  if (!REFLECT_PROVIDER_ALIASES.github.has(normalizeReflectProviderName(env.GH_AW_LLM_PROVIDER, "anthropic"))) return applySettings("");
   const endpoints = reflectData?.endpoints?.filter(endpoint => endpoint?.configured === true && REFLECT_PROVIDER_ALIASES.github.has(normalizeReflectProviderName(endpoint.provider))) || [];
   /** @type {Record<string, string>} */
   const modelOverrides = {};
@@ -482,7 +508,7 @@ function applyClaudeSettingsEnv(args, env = process.env, reflectData, resolvedMo
     const id = splitModelIdentifier(value).base.replace(/^(?:copilot|github-copilot|github)\//, "");
     if (id.startsWith("claude-") && id.includes(".")) modelOverrides[id.replaceAll(".", "-")] = id;
   }
-  return Object.keys(modelOverrides).length ? [...args, "--settings", JSON.stringify({ modelOverrides })] : args;
+  return applySettings(Object.keys(modelOverrides).length ? JSON.stringify({ modelOverrides }) : "");
 }
 
 /**

@@ -2022,11 +2022,26 @@ describe("applyClaudeSettingsEnv", () => {
     expect(JSON.parse(result[2])).toEqual({ modelOverrides: { "claude-haiku-4-5": "claude-haiku-4.5", "claude-opus-5-5": "claude-opus-5.5", "claude-sonnet-5-5": "claude-sonnet-5.5" } });
   });
 
-  it("does not override explicit inline, file-based, or detector settings with live metadata", () => {
+  it("does not override explicit inline or file-based agent settings with live metadata", () => {
     const env = { GH_AW_LLM_PROVIDER: "github", ANTHROPIC_MODEL: "claude-opus-5.5" };
     for (const args of [["--settings", '{"modelOverrides":{"custom":"chosen"}}'], ["--settings=custom-settings.json"]]) expect(applyClaudeSettingsEnv(args, env)).toEqual(args);
     expect(applyClaudeSettingsEnv(["--print"], { ...env, GH_AW_CLAUDE_SETTINGS: "custom-settings.json" })).toEqual(["--print", "--settings", "custom-settings.json"]);
     expect(applyClaudeSettingsEnv(["--print"], { ...env, GH_AW_LLM_PROVIDER: "anthropic" })).toEqual(["--print"]);
+  });
+
+  it.each(["--settings", "--settings="])("composes detector permissions with configured settings using %s", flag => {
+    const permissions = { allow: ["Bash(threat_detection_result:*)"] };
+    const detector = JSON.stringify({ permissions });
+    const args = flag.endsWith("=") ? [flag + detector] : [flag, detector];
+    const result = applyClaudeSettingsEnv(args, {
+      GH_AW_PHASE: "detection",
+      GH_AW_CLAUDE_SETTINGS: JSON.stringify({ modelOverrides: { custom: "chosen" }, permissions: { allow: ["Bash(*)"], defaultMode: "bypassPermissions" } }),
+    });
+    expect(JSON.parse(flag.endsWith("=") ? result[0].slice(flag.length) : result[1])).toEqual({ modelOverrides: { custom: "chosen" }, permissions });
+  });
+
+  it.each(['{"private-value":', "missing-settings-file.json"])("fails closed on invalid configured detector settings", settings => {
+    expect(() => applyClaudeSettingsEnv(["--settings", '{"permissions":{"allow":[]}}'], { GH_AW_PHASE: "detection", GH_AW_CLAUDE_SETTINGS: settings })).toThrow("Cannot compose Claude detection settings");
   });
 });
 
