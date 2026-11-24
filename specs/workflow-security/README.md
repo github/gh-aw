@@ -833,6 +833,10 @@ failed/stopped workflows are terminal; no liveness or fairness theorem is made.
 The compile-only seed uses fictitious credentials and a fake dependency.
 Never dispatch it. Compile a copy into a new temporary directory:
 
+The expected checkout-token and GitHub App safe-output counts in the header of
+`fixtures/cross-repo.md` are parsed and asserted by `check.py` against the
+compiled lock. Update the counts when the fixture's expected bindings change.
+
 ```bash
 make build
 mkdir /tmp/workflow-security-source
