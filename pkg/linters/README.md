@@ -109,6 +109,7 @@ The method names mentioned in analyzer descriptions (such as `Err`, `Flush`, `Re
 - `walkdirignoredeerror` — reports `filepath.Walk` and `filepath.WalkDir` calls where the error return is discarded, hiding traversal failures. The analyzer lives in `walk-dir-ignored-error`.
 - `wgdonenotdeferred` — reports non-deferred `sync.WaitGroup.Done()` calls that can deadlock on panics or early returns.
 - `writebytestring` — reports `w.Write([]byte(s))` calls where `s` is a string, which can be replaced with `io.WriteString` to avoid an unnecessary `[]byte` allocation.
+- `writefilepublicpermsensitive` — reports `os.WriteFile`, `os.OpenFile`, and `os.MkdirAll` calls using `constants.FilePermPublic` when a path or written content expression contains a case-insensitive sensitive term (`token`, `secret`, `key`, `credential`, `password`, `auth`, `env`, or `lock`) in an identifier or constant string. This is a heuristic, not data-flow analysis; review findings and use a restricted file or directory mode where appropriate. Existing files are not made private by changing their creation mode.
 - `internal` — shared helper packages for analyzers (file checks, `nolint` handling, and coverage-aware perf gating).
 
 Analyzer leaf packages expose one analyzer each and are specified centrally in this README rather than through repetitive per-analyzer READMEs. The shared helper packages under `internal/` are documented in [`internal/README.md`](internal/README.md); they are implementation details, not separately supported public APIs.
@@ -295,6 +296,7 @@ environment variable and gates findings on the recorded execution hit count for 
 | `walkfuncerrshadow` | Custom `go/analysis` analyzer that flags `filepath.Walk`/`filepath.WalkDir` callbacks whose `err` parameter shadows an outer `err` variable assigned from the walk call |
 | `wgdonenotdeferred` | Custom `go/analysis` analyzer that flags non-deferred `sync.WaitGroup.Done()` calls |
 | `writebytestring` | Custom `go/analysis` analyzer that flags `w.Write([]byte(s))` calls where `s` is a string that can be replaced with `io.WriteString` |
+| `writefilepublicpermsensitive` | Custom `go/analysis` analyzer that flags `FilePermPublic` on potentially sensitive paths or content |
 | `internal` | Shared helper subpackages used by analyzers (`internal/filecheck`, `internal/nolint`, `internal/resourcetracker`) |
 
 ### Namespace exports
@@ -467,6 +469,7 @@ _ = typeassertionnil.Analyzer
 - `github.com/github/gh-aw/pkg/linters/walkfuncerrshadow` — walk-func-err-shadow analyzer subpackage
 - `github.com/github/gh-aw/pkg/linters/wgdonenotdeferred` — wg-done-not-deferred analyzer subpackage
 - `github.com/github/gh-aw/pkg/linters/writebytestring` — write-byte-string analyzer subpackage
+- `github.com/github/gh-aw/pkg/linters/writefilepublicpermsensitive` — sensitive public permission analyzer subpackage
 
 **Transitive / Internal helpers**:
 - `github.com/github/gh-aw/pkg/linters/internal/filecheck` — shared file-path filtering helpers used by multiple analyzers
