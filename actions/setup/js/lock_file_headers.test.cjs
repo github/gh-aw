@@ -2,8 +2,7 @@ const { Readable } = require("node:stream");
 const { readLockFileHeaders, parseLockFileHeaders } = require("./lock_file_headers.cjs");
 
 describe("shared JSON lock headers", () => {
-  it("preserves the work-queue reader interface and ignores workflow YAML", async () => {
-    expect(require("./work_queue_provisioning.cjs").readLockFileHeaders).toBe(readLockFileHeaders);
+  it("reads JSON headers and ignores workflow YAML", async () => {
     const content = '# gh-aw-metadata: {"name":"worker"}\n# gh-aw-manifest: {"version":1}\n# generated\ninvalid: [yaml\n';
     expect(await readLockFileHeaders(Readable.from([content]))).toEqual(parseLockFileHeaders(content.split("\n")));
   });

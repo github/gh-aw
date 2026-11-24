@@ -1,787 +1,508 @@
 package workqueue
 
 import (
-	"bytes"
-	"compress/flate"
-	"encoding/base64"
 	"encoding/json"
-	"io"
-	"math/big"
-	"regexp"
+	"maps"
 	"slices"
 )
 
-var checkpointDigestPattern = regexp.MustCompile(`^[a-f0-9]{64}$`)
+var (
+	checkpointFields    = []string{"repository", "tip", "commits", "works", "claims", "dispatches", "observations", "requests", "work_creators"}
+	workStates          = []string{"available", "claimed", "completed", "cancelled"}
+	claimStates         = []string{"open", "completed", "cancelled"}
+	dispatchStates      = []string{"reserved", "started", "bound", "closed"}
+	workRecordRequired  = append(slices.Clone(workRequired), "state", "position", "attempts")
+	workRecordOptional  = append(slices.Clone(workOptional), "claim_id", "completion_id", "effects", "cancellation_reason", "cancellation_commit_id", "issue_comment")
+	claimRecordRequired = []string{"claim_id", "work_id", "dispatch_id", "handle", "state", "commit_id", "request_id"}
+	claimRecordOptional = []string{"terminal_commit_id", "cancellation_reason", "effects", "issue_comment"}
+	dispatchFields      = []string{"dispatch_id", "request_id", "commit_id", "pool", "worker_profile", "workflow", "reserved_by", "state", "run", "launch", "claims"}
+)
 
-type checkpointReceipt struct {
-	ID                 string             `json:"id"`
-	Previous           *string            `json:"previous"`
-	RequestID          string             `json:"request_id"`
-	Kind               string             `json:"kind"`
-	PriorTip           string             `json:"prior_tip,omitempty"`
-	Fingerprint        string             `json:"fingerprint"`
-	ParametersDigest   string             `json:"parameters_digest"`
-	DispatchParameters json.RawMessage    `json:"dispatch_parameters,omitempty"`
-	Actor              Actor              `json:"actor"`
-	PolicyEpoch        string             `json:"policy_epoch"`
-	At                 int64              `json:"at"`
-	Events             []Operation        `json:"events"`
-	ClaimExplanations  []ClaimExplanation `json:"claim_explanations"`
+type projectionRecord struct {
+	Repository   string                          `json:"repository"`
+	Tip          string                          `json:"tip"`
+	Commits      int                             `json:"commits"`
+	Works        map[string]*WorkState           `json:"works"`
+	Claims       map[string]*ClaimState          `json:"claims"`
+	Dispatches   map[string]*DispatchState       `json:"dispatches"`
+	Observations map[string]ObservationOperation `json:"observations"`
+	Requests     []string                        `json:"requests"`
+	WorkCreators map[string]Actor                `json:"work_creators"`
 }
 
-type checkpointSnapshot struct {
-	Projection
-	Requests         []checkpointReceipt     `json:"requests"`
-	SeenEpochs       map[string]bool         `json:"seen_epochs"`
-	SeenGenerations  map[string]bool         `json:"seen_generations"`
-	ObservationIDs   map[string]*Observation `json:"observation_ids"`
-	TerminalBarriers map[string]Operation    `json:"terminal_barriers"`
-	Cancellations    map[string]Operation    `json:"cancellations"`
-	DeliveryEvidence map[string]Operation    `json:"delivery_evidence,omitempty"`
-	CompletionTimes  map[string]int64        `json:"completion_times"`
-	LastAt           int64                   `json:"last_at"`
+// SerializeProjection returns a projection in the canonical checkpoint `state` format.
+func SerializeProjection(state Projection) ([]byte, error) {
+	// An empty projection still serializes its requests as [], never null.
+	requests := slices.AppendSeq(make([]string, 0, len(state.Requests)), maps.Keys(state.Requests))
+	slices.Sort(requests)
+	record := projectionRecord{Repository: state.Repository, Tip: state.Tip, Commits: state.Commits, Works: state.Works, Claims: state.Claims, Dispatches: state.Dispatches, Observations: state.Observations, Requests: requests, WorkCreators: state.WorkCreators}
+	if record.Works == nil {
+		record = projectionRecord{Repository: state.Repository, Tip: state.Tip, Commits: state.Commits, Works: map[string]*WorkState{}, Claims: map[string]*ClaimState{}, Dispatches: map[string]*DispatchState{}, Observations: map[string]ObservationOperation{}, Requests: requests, WorkCreators: map[string]Actor{}}
+	}
+	return CanonicalValue(record)
 }
 
-func checkpointTraceOperation(operation Operation) (Operation, error) {
-	return checkpointTraceOperationWithPolicyHistory(operation, false)
+func terminalWork(work *WorkState) bool {
+	return work.State == "completed" || work.State == "cancelled"
 }
 
-func checkpointTraceOperationWithPolicyHistory(operation Operation, omitPolicyHistory bool) (Operation, error) {
-	if kind, err := operationKind(operation); err == nil && (kind == "Deployment" || !omitPolicyHistory && (kind == "Policy" || kind == "PoolInstall")) {
-		return Canonical(operation)
-	}
-	event, err := traceEventForOperation(operation)
-	if err != nil {
-		return nil, err
-	}
-	data, err := json.Marshal(event)
-	if err != nil {
-		return nil, err
-	}
-	fields := map[string]json.RawMessage{}
-	if err := json.Unmarshal(data, &fields); err != nil {
-		return nil, err
-	}
-	for _, field := range []string{"position", "commit_id", "previous", "request_id", "request_kind", "policy_epoch", "at", "actor", "pool", "worker_profile", "profile"} {
-		delete(fields, field)
-	}
-	data, err = json.Marshal(fields)
-	if err != nil {
-		return nil, err
-	}
-	return Canonical(data)
-}
-
-func encodeCheckpointSnapshot(snapshot checkpointSnapshot) ([]byte, error) {
-	logical, err := canonicalValue(snapshot)
-	if err != nil {
-		return nil, err
-	}
-	fields := map[string]json.RawMessage{}
-	if err := json.Unmarshal(logical, &fields); err != nil {
-		return nil, err
-	}
-	requests := fields["requests"]
-	delete(fields, "requests")
-	var compressed bytes.Buffer
-	writer, err := flate.NewWriter(&compressed, flate.DefaultCompression)
-	if err != nil {
-		return nil, err
-	}
-	if _, err := writer.Write(requests); err != nil {
-		return nil, err
-	}
-	if err := writer.Close(); err != nil {
-		return nil, err
-	}
-	fields["requests_compressed"], err = json.Marshal(base64.StdEncoding.EncodeToString(compressed.Bytes()))
-	if err != nil {
-		return nil, err
-	}
-	wire, err := json.Marshal(fields)
-	if err != nil {
-		return nil, err
-	}
-	return Canonical(wire)
-}
-
-func decodeCheckpointSnapshot(data []byte) (checkpointSnapshot, []byte, error) {
-	invalid := func() (checkpointSnapshot, []byte, error) {
-		return checkpointSnapshot{}, nil, queueError("checkpoint_invalid", "checkpoint state does not bind a valid prior projection")
-	}
-	canonicalInput, err := Canonical(data)
-	if err != nil || !bytes.Equal(canonicalInput, data) {
-		return invalid()
-	}
-	fields := map[string]json.RawMessage{}
-	if err := json.Unmarshal(data, &fields); err != nil {
-		return invalid()
-	}
-	var encoded string
-	compressed, ok := fields["requests_compressed"]
-	if !ok || json.Unmarshal(compressed, &encoded) != nil {
-		return invalid()
-	}
-	decoded, err := base64.StdEncoding.DecodeString(encoded)
-	if err != nil {
-		return invalid()
-	}
-	reader := flate.NewReader(bytes.NewReader(decoded))
-	requests, err := io.ReadAll(io.LimitReader(reader, (64<<20)+1))
-	closeErr := reader.Close()
-	if err != nil || closeErr != nil || len(requests) > 64<<20 {
-		return invalid()
-	}
-	canonicalRequests, err := Canonical(requests)
-	if err != nil || !bytes.Equal(canonicalRequests, requests) {
-		return invalid()
-	}
-	if _, ok := fields["requests"]; ok {
-		return invalid()
-	}
-	delete(fields, "requests_compressed")
-	fields["requests"] = requests
-	logicalJSON, err := json.Marshal(fields)
-	if err != nil {
-		return invalid()
-	}
-	logical, err := Canonical(logicalJSON)
-	if err != nil {
-		return invalid()
-	}
-	var snapshot checkpointSnapshot
-	decoder := json.NewDecoder(bytes.NewReader(logical))
-	decoder.DisallowUnknownFields()
-	if decoder.Decode(&snapshot) != nil {
-		return invalid()
-	}
-	return snapshot, logical, nil
-}
-
-func checkpointState(ordered []QueueCommit, state Projection, lastAt int64) (checkpointSnapshot, error) { //nolint:largefunc // Checkpoint construction stays in one validation sequence.
-	snapshot := checkpointSnapshot{
-		Projection: state, Requests: []checkpointReceipt{},
-		SeenEpochs: state.SeenEpochs, SeenGenerations: state.SeenGenerations,
-		ObservationIDs: state.ObservationIDs, TerminalBarriers: state.TerminalBarriers,
-		Cancellations: state.Cancellations, CompletionTimes: map[string]int64{}, LastAt: lastAt,
-	}
-	if len(state.DeliveryEvidence) > 0 {
-		snapshot.DeliveryEvidence = state.DeliveryEvidence
-	}
+// checkpointProjection is the part of a projection a Checkpoint carries: what a future
+// valid commit can still read. Non-terminal Work keeps its `work` predecessors (their
+// effects feed result_refs); a terminal Work stays only as such a predecessor or while its
+// backing Issue awaits the projector's terminal IssueComment. Claims, Dispatches, creators
+// and gate Observations follow the retained Work. Requests keep the dedupe window: the most
+// recent RetainedRequests of the log being folded, never the previous checkpoint's inherited ones.
+func checkpointProjection(state Projection) Projection {
+	folded := NewProjection()
+	folded.Repository, folded.Tip, folded.Commits = state.Repository, state.Tip, state.Commits
 	for id, work := range state.Works {
-		if work.CompletionID != "" {
-			snapshot.CompletionTimes[id] = work.completionAt
+		if !terminalWork(work) {
+			folded.Works[id] = work
+			for _, edge := range work.DependsOn {
+				if edge.Kind == "work" {
+					folded.Works[edge.WorkID] = state.Works[edge.WorkID]
+				}
+			}
+		} else if work.BackingIssue != nil && work.IssueComment == "" {
+			folded.Works[id] = work
 		}
 	}
-	priorReceipts := make(map[string]checkpointReceipt, len(state.CheckpointReceipts))
-	for _, receipt := range state.CheckpointReceipts {
-		priorReceipts[receipt.RequestID] = receipt
-	}
-	commits := make(map[string]QueueCommit, len(ordered))
-	for _, commit := range ordered {
-		commits[commit.Request.ID] = commit
-	}
-	for _, id := range state.RequestOrder {
-		commit, ok := state.Requests[id]
-		if !ok {
-			return checkpointSnapshot{}, queueError("checkpoint_invalid", "request order omits a committed identity")
-		}
-		claims := []Operation{}
-		for _, operation := range commit.Operations {
-			kind, err := operationKind(operation)
-			if err != nil {
-				return checkpointSnapshot{}, err
-			}
-			if kind == "Claim" {
-				claims = append(claims, operation)
-			}
-		}
-		parametersDigest := ""
-		var dispatchParameters json.RawMessage
-		priorTip := ""
-		claimExplanations := []ClaimExplanation{}
-		events := []Operation{}
-		if previous, ok := priorReceipts[id]; ok {
-			parametersDigest = previous.ParametersDigest
-			dispatchParameters = previous.DispatchParameters
-			priorTip = previous.PriorTip
-			events = previous.Events
-			claimExplanations = previous.ClaimExplanations
-			for index, explanation := range claimExplanations {
-				if current, ok := state.ClaimExplanations[explanation.ClaimID]; ok {
-					current.Tip = state.Tip
-					claimExplanations[index] = current
-				}
-			}
-		} else if original, ok := commits[id]; ok {
-			if original.Request.Kind == "checkpoint" {
-				var checkpoint CheckpointOperation
-				if len(original.Operations) != 1 || json.Unmarshal(original.Operations[0], &checkpoint) != nil { //nolint:uncheckedsliceindex // len is checked in the same condition
-					return checkpointSnapshot{}, queueError("checkpoint_invalid", "checkpoint receipt omits its prior tip")
-				}
-				priorTip = checkpoint.PriorTip
-			}
-			for _, operation := range original.Operations {
-				event, err := checkpointTraceOperation(operation)
-				if err != nil {
-					return checkpointSnapshot{}, err
-				}
-				events = append(events, event)
-			}
-			for _, operation := range claims {
-				var claim ClaimOperation
-				if err := json.Unmarshal(operation, &claim); err != nil {
-					return checkpointSnapshot{}, err
-				}
-				explanation, ok := state.ClaimExplanations[claim.ClaimID]
-				if !ok {
-					return checkpointSnapshot{}, queueError("checkpoint_invalid", "claim inspection provenance is missing")
-				}
-				claimExplanations = append(claimExplanations, explanation)
-			}
-		}
-		if parametersDigest == "" {
-			parameters, err := Canonical(commit.Request.Parameters)
-			if err != nil {
-				return checkpointSnapshot{}, err
-			}
-			parametersDigest = hashBytes(parameters)
-			if commit.Request.Kind == "dispatch_next" {
-				dispatchParameters = commit.Request.Parameters
-			}
-		}
-		snapshot.Requests = append(snapshot.Requests, checkpointReceipt{
-			ID: commit.ID, Previous: commit.Previous, RequestID: id, Kind: commit.Request.Kind,
-			PriorTip:    priorTip,
-			Fingerprint: commit.Request.Fingerprint, ParametersDigest: parametersDigest,
-			DispatchParameters: dispatchParameters, Actor: commit.Actor,
-			PolicyEpoch: commit.PolicyEpoch, At: commit.At, Events: events,
-			ClaimExplanations: claimExplanations,
-		})
-	}
-	if _, err := immutableWorkCreators(state); err != nil {
-		return checkpointSnapshot{}, err
-	}
-	return snapshot, nil
-}
-
-func omitCheckpointPolicyHistory(snapshot checkpointSnapshot, priorReceipts []checkpointReceipt) (checkpointSnapshot, error) {
-	priorRequests := make(map[string]struct{}, len(priorReceipts))
-	for _, receipt := range priorReceipts {
-		priorRequests[receipt.RequestID] = struct{}{}
-	}
-	requests := make([]checkpointReceipt, 0, len(snapshot.Requests))
-	for _, receipt := range snapshot.Requests {
-		if _, prior := priorRequests[receipt.RequestID]; !prior {
-			events := make([]Operation, 0, len(receipt.Events))
-			for _, operation := range receipt.Events {
-				kind, err := operationKind(operation)
-				if err != nil {
-					return checkpointSnapshot{}, err
-				}
-				if kind == "Policy" || kind == "PoolInstall" {
-					operation, err = checkpointTraceOperationWithPolicyHistory(operation, true)
-					if err != nil {
-						return checkpointSnapshot{}, err
-					}
-				}
-				events = append(events, operation)
-			}
-			receipt.Events = events
-		}
-		requests = append(requests, receipt)
-	}
-	snapshot.Requests = requests
-	return snapshot, nil
-}
-
-// CompactCheckpoint constructs a minimal state checkpoint from validated
-// history; priorGitSHA names the Git commit containing the prior ledger.
-func CompactCheckpoint(commits []QueueCommit, priorGitSHA string, actor Actor, at int64) ([]QueueCommit, error) {
-	return compactCheckpoint(commits, priorGitSHA, actor, at, false)
-}
-
-// reconstructCheckpoint verifies both current derivation and the historical
-// final-timestamp derivation. Legacy writers could not admit deadline-bearing
-// Work, so that compatibility path must never authorize expiration history.
-func reconstructCheckpoint(commits []QueueCommit, priorGitSHA string, actor Actor, at int64, expectedStateSHA string) ([]QueueCommit, error) {
-	return reconstructCheckpointForHost(commits, priorGitSHA, actor, at, expectedStateSHA, "")
-}
-
-func reconstructCheckpointForHost(commits []QueueCommit, priorGitSHA string, actor Actor, at int64, expectedStateSHA, host string) ([]QueueCommit, error) {
-	for _, omitPolicyHistory := range []bool{false, true} {
-		for _, legacy := range []bool{false, true} {
-			checkpoint, err := compactCheckpointForHostWithPolicyHistory(commits, priorGitSHA, actor, at, legacy, host, omitPolicyHistory)
-			if err != nil {
+	for id, work := range folded.Works {
+		folded.WorkCreators[id] = state.WorkCreators[id]
+		for _, edge := range work.DependsOn {
+			if edge.Kind == "work" {
 				continue
 			}
-			for _, commit := range checkpoint {
-				op, err := decodeCheckpointOperation(commit)
-				if err == nil && op.StateSHA256 == expectedStateSHA {
-					return checkpoint, nil
-				}
-			}
-		}
-	}
-	return nil, queueError("checkpoint_invalid", "checkpoint does not match its Git parent history")
-}
-
-func compactCheckpoint(commits []QueueCommit, priorGitSHA string, actor Actor, at int64, legacy bool) ([]QueueCommit, error) {
-	return compactCheckpointForHost(commits, priorGitSHA, actor, at, legacy, "")
-}
-
-func compactCheckpointForHost(commits []QueueCommit, priorGitSHA string, actor Actor, at int64, legacy bool, host string) ([]QueueCommit, error) {
-	return compactCheckpointForHostWithPolicyHistory(commits, priorGitSHA, actor, at, legacy, host, false)
-}
-
-func compactCheckpointForHostWithPolicyHistory(commits []QueueCommit, priorGitSHA string, actor Actor, at int64, legacy bool, host string, omitPolicyHistory bool) ([]QueueCommit, error) {
-	if !revisionPattern.MatchString(priorGitSHA) || actor.Role != "administrator" {
-		return nil, queueError("checkpoint_invalid", "checkpoint requires an administrator and a prior Git commit SHA")
-	}
-	state, err := ReplayForHost(commits, host)
-	if err != nil {
-		return nil, err
-	}
-	ordered, err := causalOrder(commits)
-	if err != nil {
-		return nil, err
-	}
-	lastAt := state.timeWatermark
-	if legacy {
-		for _, work := range state.Works {
-			if work.ExpiresAt != nil {
-				return nil, queueError("checkpoint_invalid", "deadline-bearing history requires the committed time watermark")
-			}
-		}
-		for _, commit := range ordered {
-			lastAt = commit.At
-		}
-	}
-	if actor.Repository != state.Repository || at < lastAt || at > MaxTimestamp {
-		return nil, queueError("checkpoint_invalid", "checkpoint repository or time is invalid")
-	}
-	data, err := Serialize(commits)
-	if err != nil {
-		return nil, err
-	}
-	snapshot, err := checkpointState(ordered, state, lastAt)
-	if err != nil {
-		return nil, err
-	}
-	if omitPolicyHistory {
-		snapshot, err = omitCheckpointPolicyHistory(snapshot, state.CheckpointReceipts)
-		if err != nil {
-			return nil, err
-		}
-	}
-	return encodeCheckpointForHost(snapshot, state, data, priorGitSHA, actor, at, host)
-}
-
-func encodeCheckpointForHost(snapshot checkpointSnapshot, state Projection, data []byte, priorGitSHA string, actor Actor, at int64, host string) ([]QueueCommit, error) {
-	logicalSnapshotData, err := canonicalValue(snapshot)
-	if err != nil {
-		return nil, err
-	}
-	snapshotData, err := encodeCheckpointSnapshot(snapshot)
-	if err != nil {
-		return nil, err
-	}
-	parameters := CheckpointParameters{
-		PriorGitSHA: priorGitSHA, PriorTip: state.Tip,
-		HistorySHA256: hashBytes(data), StateSHA256: hashBytes(logicalSnapshotData),
-	}
-	op, err := Op(CheckpointOperation{
-		Kind: "Checkpoint", PriorGitSHA: priorGitSHA, PriorTip: state.Tip,
-		HistorySHA256: parameters.HistorySHA256, StateSHA256: parameters.StateSHA256,
-		State: snapshotData,
-	})
-	if err != nil {
-		return nil, err
-	}
-	id := "checkpoint_" + hashBytes([]byte(state.Tip+"\n"+priorGitSHA))
-	request, err := NewRequest(id, "checkpoint", actor, parameters)
-	if err != nil {
-		return nil, err
-	}
-	checkpoint := QueueCommit{
-		Version: Version, ID: "q_" + hashBytes([]byte(id)), Previous: nil,
-		Request: request, Actor: actor, PolicyEpoch: state.PolicyEpoch, At: at,
-		Operations: []Operation{op},
-	}
-	if _, err := ReplayForHost([]QueueCommit{checkpoint}, host); err != nil {
-		return nil, err
-	}
-	return []QueueCommit{checkpoint}, nil
-}
-
-func restoreCheckpointForHost(commit QueueCommit, host string) (Projection, error) { //nolint:largefunc // Checkpoint restoration stays in one validation sequence.
-	invalid := func() (Projection, error) {
-		return Projection{}, queueError("checkpoint_invalid", "checkpoint state does not bind a valid prior projection")
-	}
-	if commit.Previous != nil || commit.Actor.Role != "administrator" ||
-		len(commit.Operations) != 1 || commit.Request.Kind != "checkpoint" {
-		return invalid()
-	}
-	var op CheckpointOperation
-	if err := json.Unmarshal(commit.Operations[0], &op); err != nil || //nolint:uncheckedsliceindex // len is checked above
-		op.Kind != "Checkpoint" || !revisionPattern.MatchString(op.PriorGitSHA) {
-		return invalid()
-	}
-	if err := validateRequest(commit); err != nil {
-		return invalid()
-	}
-	snapshot, data, err := decodeCheckpointSnapshot(op.State)
-	if err != nil || hashBytes(data) != op.StateSHA256 ||
-		snapshot.Tip != op.PriorTip || snapshot.Repository != commit.Actor.Repository ||
-		snapshot.PolicyEpoch != commit.PolicyEpoch || snapshot.Policy == nil ||
-		commit.At < snapshot.LastAt {
-		return invalid()
-	}
-	if err := validatePolicyForHost(*snapshot.Policy, host); err != nil {
-		return invalid()
-	}
-	state := snapshot.Projection
-	state.resourceHost = host
-	state.timeWatermark = snapshot.LastAt
-	if err := validateDeploymentCheckpoint(state, snapshot.Requests); err != nil {
-		return invalid()
-	}
-	if state.Works == nil || state.Claims == nil || state.Dispatches == nil ||
-		state.Observations == nil || state.Clocks == nil || state.ObservationWrites == nil ||
-		snapshot.ObservationIDs == nil || snapshot.TerminalBarriers == nil ||
-		snapshot.Cancellations == nil ||
-		len(snapshot.Requests) != state.Stats.Transactions ||
-		state.Stats.Work != len(state.Works) || state.Stats.Claims != len(state.Claims) {
-		return invalid()
-	}
-	state.Requests = map[string]QueueCommit{}
-	state.RequestOrder = []string{}
-	state.WorkCreators = map[string]Actor{}
-	state.ClaimExplanations = map[string]ClaimExplanation{}
-	commitIDs := map[string]struct{}{}
-	state.SeenEpochs, state.SeenGenerations = snapshot.SeenEpochs, snapshot.SeenGenerations
-	state.ObservationIDs, state.TerminalBarriers, state.Cancellations = snapshot.ObservationIDs, snapshot.TerminalBarriers, snapshot.Cancellations
-	state.DeliveryEvidence = snapshot.DeliveryEvidence
-	if state.DeliveryEvidence == nil {
-		state.DeliveryEvidence = map[string]Operation{}
-	}
-	if !state.SeenEpochs[state.PolicyEpoch] || !state.SeenGenerations[state.CredentialGeneration] {
-		return invalid()
-	}
-	for _, receipt := range snapshot.Requests {
-		if _, seen := commitIDs[receipt.ID]; seen {
-			return invalid()
-		}
-		if receipt.ID == "" || receipt.RequestID == "" || !checkpointDigestPattern.MatchString(receipt.Fingerprint) ||
-			!checkpointDigestPattern.MatchString(receipt.ParametersDigest) ||
-			receipt.Actor.Repository != state.Repository || receipt.Kind == "" ||
-			receipt.At < 0 || receipt.At > MaxTimestamp || receipt.PolicyEpoch == "" ||
-			state.Requests[receipt.RequestID].ID != "" ||
-			validateActorOrigin(receipt.Actor) != nil || validateRequestRole(receipt.Actor, receipt.Kind) != nil {
-			return invalid()
-		}
-		commitIDs[receipt.ID] = struct{}{}
-		claims := []Operation{}
-		for _, operation := range receipt.Events {
-			kind, err := operationKind(operation)
-			if err != nil {
-				return invalid()
-			}
-			if kind == "Work" {
-				var work WorkDefinition
-				if json.Unmarshal(operation, &work) != nil || work.WorkID == "" || state.Works[work.WorkID] == nil {
-					return invalid()
-				}
-				state.WorkCreators[work.WorkID] = receipt.Actor
-			}
-			if kind == "Claim" {
-				claims = append(claims, operation)
-			}
-		}
-		for _, operation := range claims {
-			if kind, err := operationKind(operation); err != nil || kind != "Claim" {
-				return invalid()
-			}
-		}
-		if len(receipt.ClaimExplanations) != len(claims) || receipt.Events == nil {
-			return invalid()
-		}
-		for index, operation := range claims {
-			var claim ClaimOperation
-			if json.Unmarshal(operation, &claim) != nil {
-				return invalid()
-			}
-			explanation := receipt.ClaimExplanations[index] //nolint:uncheckedsliceindex // len is checked above
-			if explanation.ClaimID != claim.ClaimID || explanation.CommitID != receipt.ID ||
-				explanation.RequestID != receipt.RequestID || explanation.WorkID != claim.WorkID {
-				return invalid()
-			}
-			state.ClaimExplanations[claim.ClaimID] = explanation
-		}
-		parameters := json.RawMessage("null")
-		if receipt.Kind == "dispatch_next" {
-			if len(receipt.DispatchParameters) == 0 {
-				return invalid()
-			}
-			parameters = receipt.DispatchParameters
-		} else if len(receipt.DispatchParameters) > 0 {
-			return invalid()
-		}
-		state.Requests[receipt.RequestID] = QueueCommit{
-			Version: Version, ID: receipt.ID, Previous: receipt.Previous, Request: Request{
-				ID: receipt.RequestID, Kind: receipt.Kind,
-				Fingerprint: receipt.Fingerprint, Parameters: parameters,
-			}, Actor: receipt.Actor, PolicyEpoch: receipt.PolicyEpoch,
-			At: receipt.At, Operations: receipt.Events,
-		}
-		state.RequestOrder = append(state.RequestOrder, receipt.RequestID)
-		state.timeWatermark = max(state.timeWatermark, receipt.At)
-	}
-	if len(state.WorkCreators) != len(state.Works) {
-		return invalid()
-	}
-	for id, work := range state.Works {
-		if work.Position.Commit < 0 || work.Position.Commit >= len(snapshot.Requests) {
-			return invalid()
-		}
-		receipt := snapshot.Requests[work.Position.Commit]
-		creator, ok := state.WorkCreators[id]
-		if !ok || receipt.Kind != "submit" || !sameJSON(creator, receipt.Actor) {
-			return invalid()
-		}
-	}
-	for index, receipt := range snapshot.Requests {
-		if receipt.Kind != "submit" {
-			continue
-		}
-		nodes := map[int]WorkDefinition{}
-		for _, work := range state.Works {
-			if work.Position.Commit == index {
-				nodes[work.Position.Operation] = work.WorkDefinition
-			}
-		}
-		if len(nodes) == 0 {
-			return invalid()
-		}
-		ordered := make([]WorkDefinition, len(nodes))
-		firstOperation := 0
-		if index == 0 && receipt.Previous == nil && isPolicyOperation(receipt.Events) {
-			firstOperation = 1
-		}
-		for offset := range ordered {
-			node, ok := nodes[offset+firstOperation]
-			if !ok {
-				return invalid()
-			}
-			ordered[offset] = node
-		}
-		parameters, err := canonicalValue(SubmitParameters{Nodes: ordered})
-		if err != nil {
-			return invalid()
-		}
-		commit := state.Requests[receipt.RequestID]
-		commit.Request.Parameters = parameters
-		state.Requests[receipt.RequestID] = commit
-	}
-	for _, receipt := range snapshot.Requests {
-		if receipt.Kind == "submit" || receipt.Kind == "dispatch_next" {
-			parameters := state.Requests[receipt.RequestID].Request.Parameters
-			canonical, err := Canonical(parameters)
-			if err != nil || hashBytes(canonical) != receipt.ParametersDigest {
-				return invalid()
-			}
-			fingerprint, err := Fingerprint(receipt.Actor, receipt.Kind, parameters)
-			if err != nil || fingerprint != receipt.Fingerprint {
-				return invalid()
-			}
-		}
-	}
-	state.CheckpointReceipts = snapshot.Requests
-	for id, work := range state.Works {
-		if work == nil || work.WorkID != id || work.Position.Commit < 0 ||
-			work.Position.Commit >= len(snapshot.Requests) || work.Attempts < 0 {
-			return invalid()
-		}
-		creator, ok := state.WorkCreators[id]
-		if !ok || creator.Repository != state.Repository || validateActorOrigin(creator) != nil {
-			return invalid()
-		}
-		if snapshot.Requests[work.Position.Commit].Kind != "submit" ||
-			(work.State == "claimed" && (work.ClaimID == "" ||
-				state.Claims[work.ClaimID] == nil ||
-				state.Claims[work.ClaimID].State != "open")) {
-			return invalid()
-		}
-		if work.State != "completed" && work.State != "cancelled" {
-			pool, ok := state.Policy.Pools[work.Pool]
-			if !ok || pool.Profiles[work.WorkerProfile].Workflow == "" ||
-				work.Attempts > pool.Retry.MaxAttempts {
-				return invalid()
-			}
-		}
-		if work.CompletionID != "" {
-			at, ok := snapshot.CompletionTimes[id]
-			if !ok || at < 0 || at > MaxTimestamp {
-				return invalid()
-			}
-			work.completionAt = at
-		}
-	}
-	type retainedCompletion struct {
-		Kind        string `json:"kind"`
-		ClaimID     string `json:"claim_id"`
-		DispatchID  string `json:"dispatch_id"`
-		ClaimHandle string `json:"claim_handle"`
-		KeepOpen    bool   `json:"keep_open"`
-	}
-	completions := map[string]retainedCompletion{}
-	completionCommits := map[string]string{}
-	for _, receipt := range snapshot.Requests {
-		for _, event := range receipt.Events {
-			var completion retainedCompletion
-			if json.Unmarshal(event, &completion) != nil {
-				return invalid()
-			}
-			if completion.Kind == "Completion" {
-				if _, exists := completions[completion.ClaimID]; exists {
-					return invalid()
-				}
-				parameters, err := canonicalValue(FinishParameters{
-					DispatchID: completion.DispatchID, ClaimHandle: completion.ClaimHandle,
-					Outcome: "completed", KeepOpen: completion.KeepOpen,
-				})
-				fingerprint, fingerprintErr := Fingerprint(receipt.Actor, "finish", parameters)
-				if err != nil || fingerprintErr != nil || receipt.Kind != "finish" || fingerprint != receipt.Fingerprint {
-					return invalid()
-				}
-				completions[completion.ClaimID] = completion
-				completionCommits[completion.ClaimID] = receipt.ID
+			key := GateKey(*edge.Resource, edge.Condition)
+			if observation, ok := state.Observations[key]; ok {
+				folded.Observations[key] = observation
 			}
 		}
 	}
 	for id, claim := range state.Claims {
-		if claim == nil || claim.ClaimID != id || state.Works[claim.WorkID] == nil ||
-			state.Dispatches[claim.DispatchID] == nil {
-			return invalid()
-		}
-		completion, completionFound := completions[id]
-		if completionFound && (claim.KeepOpen != completion.KeepOpen || claim.TerminalCommitID != completionCommits[id]) {
-			return invalid()
-		}
-		if claim.KeepOpen {
-			if !completionFound || claim.State != "completed" ||
-				!slices.Contains([]string{"pending", "verified", "failed"}, claim.Barrier) {
-				return invalid()
-			}
-			if claim.Barrier == "pending" {
-				work := state.Works[claim.WorkID]
-				if work.ClaimID != id || work.Barrier != "pending" || work.CompletionID != claim.TerminalCommitID {
-					return invalid()
-				}
-			} else {
-				var terminal struct {
-					Kind         string `json:"kind"`
-					ClaimID      string `json:"claim_id"`
-					CompletionID string `json:"completion_id"`
-				}
-				if json.Unmarshal(state.TerminalBarriers[id], &terminal) != nil || terminal.ClaimID != id ||
-					terminal.CompletionID != claim.TerminalCommitID ||
-					(claim.Barrier == "verified" && terminal.Kind != "Result") ||
-					(claim.Barrier == "failed" && terminal.Kind != "DeliveryFailure") {
-					return invalid()
-				}
-			}
-		}
-	}
-	if err := state.validateDeliveryEvidenceCheckpoint(); err != nil {
-		return invalid()
-	}
-	type checkpointStart struct {
-		principal string
-		actor     Actor
-	}
-	starts := map[string]checkpointStart{}
-	for _, receipt := range snapshot.Requests {
-		for _, event := range receipt.Events {
-			var start dispatchLifecycle
-			if json.Unmarshal(event, &start) == nil && start.DispatchID != "" && start.State == "started" && start.CredentialPrincipal != "" {
-				if _, exists := starts[start.DispatchID]; exists {
-					return invalid()
-				}
-				starts[start.DispatchID] = checkpointStart{principal: start.CredentialPrincipal, actor: receipt.Actor}
-			}
+		if _, retained := folded.Works[claim.WorkID]; retained {
+			folded.Claims[id] = claim
 		}
 	}
 	for id, dispatch := range state.Dispatches {
-		if dispatch == nil || dispatch.DispatchID != id ||
-			state.Requests[dispatch.RequestID].ID != dispatch.CommitID {
-			return invalid()
-		}
-		if dispatch.Profile.Principal != "" && dispatch.CredentialPrincipal == "" {
-			continue
-		}
-		if dispatch.Profile.Principal != "" && !decimalIdentity(dispatch.Profile.Principal) ||
-			dispatch.CredentialPrincipal != "" && !decimalIdentity(dispatch.CredentialPrincipal) ||
-			dispatch.Profile.Principal != "" && dispatch.CredentialPrincipal != "" &&
-				dispatch.Profile.Principal != dispatch.CredentialPrincipal ||
-			dispatch.Run != nil && dispatch.Run.Principal != DispatchPrincipal(dispatch) {
-			return invalid()
-		}
-		if dispatch.State == "reserved" {
-			if dispatch.Sender != nil || dispatch.CredentialPrincipal != "" || dispatch.Run != nil {
-				return invalid()
-			}
-			continue
-		}
-		if !decimalIdentity(DispatchPrincipal(dispatch)) || dispatch.Sender == nil {
-			return invalid()
-		}
-		start, found := starts[id]
-		if !found || start.principal != dispatch.CredentialPrincipal || !sameJSON(start.actor, dispatch.Sender) {
-			return invalid()
+		if _, retained := folded.Claims[dispatch.Claims[0]]; retained {
+			folded.Dispatches[id] = dispatch
 		}
 	}
-	for _, clocks := range state.Clocks {
-		for _, clock := range append([]Clock{clocks.Classes}, valuesClocks(clocks.Keys)...) {
-			value, ok := new(big.Int).SetString(clock.V, 10)
-			if !ok || value.Sign() < 0 || value.String() != clock.V {
-				return invalid()
-			}
-			for _, pass := range clock.Pass {
-				value, ok := new(big.Int).SetString(pass, 10)
-				if !ok || value.Sign() < 0 || value.String() != pass {
-					return invalid()
-				}
-			}
-		}
+	for _, commit := range state.Transactions[max(0, len(state.Transactions)-RetainedRequests):] {
+		folded.Requests[commit.Request.ID] = struct{}{}
 	}
-	if _, used := state.Requests[commit.Request.ID]; used {
-		return invalid()
+	return folded
+}
+
+func sortedKeys(record object) []string {
+	return slices.Sorted(maps.Keys(record))
+}
+
+func checkpointInvalid(message string) error {
+	return queueError("checkpoint_invalid", "%s", message)
+}
+
+// checkpointSnapshot is the validated top level of a checkpoint `state` object.
+type checkpointSnapshot struct {
+	commits  int64
+	requests []string
+	sections map[string]object
+}
+
+// soleOperation returns the only operation of a commit; ok is false unless there is exactly one.
+func soleOperation(operations []operationRecord) (operationRecord, bool) {
+	if len(operations) > 0 {
+		return operations[0], len(operations) == 1
 	}
-	state.Tip = commit.ID
-	state.Requests[commit.Request.ID] = commit
-	state.RequestOrder = append(state.RequestOrder, commit.Request.ID)
-	size, err := canonicalValue(commit)
+	return operationRecord{}, false
+}
+
+// restoreCheckpointValue validates a root Checkpoint commit and restores its projection.
+func restoreCheckpointValue(value any) (Projection, error) {
+	record, err := validateCommitRecord(value)
 	if err != nil {
-		return invalid()
+		return Projection{}, err
 	}
-	state.LedgerBytes = int64(len(size) + 1)
-	if state.LedgerBytes+remainingHeadroom(state) > state.Policy.Limits.LedgerBytes+state.Policy.Limits.RecoveryBytes {
-		return invalid()
+	commit := record.commit
+	operation, sole := soleOperation(record.operations)
+	if commit.Previous != nil || commit.Request.Kind != "checkpoint" || !sole {
+		return Projection{}, checkpointInvalid("a checkpoint must be the sole operation of a root commit")
 	}
-	state.advanceExpiration(commit.At)
+	snapshot, err := readCheckpointSnapshot(commit, operation.value)
+	if err != nil {
+		return Projection{}, err
+	}
+	state := NewProjection()
+	state.Repository = commit.Actor.Repository
+	if err := restoreWorks(&state, snapshot.sections["works"], snapshot.commits); err != nil {
+		return Projection{}, err
+	}
+	dispatches := snapshot.sections["dispatches"]
+	if err := restoreClaims(&state, snapshot.sections["claims"], dispatches); err != nil {
+		return Projection{}, err
+	}
+	if err := restoreDispatches(&state, dispatches); err != nil {
+		return Projection{}, err
+	}
+	if err := restoreObservations(&state, snapshot.sections["observations"]); err != nil {
+		return Projection{}, err
+	}
+	if err := restoreWorkCreators(&state, snapshot.sections["work_creators"]); err != nil {
+		return Projection{}, err
+	}
+	for _, id := range snapshot.requests {
+		state.Requests[id] = struct{}{}
+	}
+	state.Requests[commit.Request.ID] = struct{}{}
+	state.Tip = commit.ID
+	state.Commits = int(snapshot.commits) + 1
+	state.Transactions = []QueueCommit{commit}
 	return state, nil
 }
 
-func valuesClocks(clocks map[int]Clock) []Clock {
-	keys := make([]int, 0, len(clocks))
-	for key := range clocks {
-		keys = append(keys, key)
+// readCheckpointSnapshot validates the top level of a Checkpoint operation's state
+// against its commit: repository, prior tip, commit ordinal, sections and requests.
+func readCheckpointSnapshot(commit QueueCommit, operation object) (checkpointSnapshot, error) {
+	snapshot, err := closed(operation["state"], checkpointFields, nil, "checkpoint state", "checkpoint_invalid")
+	if err != nil {
+		return checkpointSnapshot{}, err
 	}
-	slices.Sort(keys)
-	result := make([]Clock, 0, len(keys))
-	for _, key := range keys {
-		result = append(result, clocks[key])
+	parameters, err := decodeParameters[CheckpointParameters](commit.Request)
+	if err != nil {
+		return checkpointSnapshot{}, checkpointInvalid("checkpoint parameters are malformed")
 	}
-	return result
+	if snapshot["repository"] != commit.Actor.Repository || snapshot["tip"] != operation["prior_tip"] || parameters.PriorTip != operation["prior_tip"] {
+		return checkpointSnapshot{}, checkpointInvalid("checkpoint does not bind its repository and prior tip")
+	}
+	commitsValue, isNumber := snapshot["commits"].(json.Number)
+	commits, parseErr := commitsValue.Int64()
+	if !isNumber || parseErr != nil || commits < 1 {
+		return checkpointSnapshot{}, checkpointInvalid("checkpoint requires its commit ordinal")
+	}
+	sections := make(map[string]object, 5)
+	for _, field := range []string{"works", "claims", "dispatches", "observations", "work_creators"} {
+		section, ok := snapshot[field].(map[string]any)
+		if !ok {
+			return checkpointSnapshot{}, checkpointInvalid("checkpoint " + field + " must be an object")
+		}
+		sections[field] = section
+	}
+	requests, err := checkpointRequests(snapshot["requests"])
+	if err != nil {
+		return checkpointSnapshot{}, err
+	}
+	return checkpointSnapshot{commits: commits, requests: requests, sections: sections}, nil
+}
+
+// checkpointRequests validates the unique committed request identities of a checkpoint.
+func checkpointRequests(value any) ([]string, error) {
+	requests, isArray := value.([]any)
+	if !isArray {
+		return nil, checkpointInvalid("checkpoint requests must be unique")
+	}
+	seen := map[string]struct{}{}
+	for _, id := range requests {
+		key, err := canonicalGeneric(id)
+		if err != nil {
+			return nil, err
+		}
+		if _, duplicate := seen[string(key)]; duplicate {
+			return nil, checkpointInvalid("checkpoint requests must be unique")
+		}
+		seen[string(key)] = struct{}{}
+	}
+	if len(requests) > RetainedRequests {
+		return nil, queueError("checkpoint_invalid", "checkpoint requests exceed the %d retained request window", RetainedRequests)
+	}
+	ids := make([]string, 0, len(requests))
+	for _, id := range requests {
+		text, err := identity(id, "checkpoint request")
+		if err != nil {
+			return nil, err
+		}
+		ids = append(ids, text)
+	}
+	return ids, nil
+}
+
+func restoreObservations(state *Projection, observations object) error {
+	for _, key := range sortedKeys(observations) {
+		observation, err := validateOperationValue(observations[key])
+		if err != nil {
+			return err
+		}
+		var typed ObservationOperation
+		if observation.kind != "Observation" || decodeInto(observation.value, &typed) != nil || GateKey(typed.Resource, typed.Condition) != key {
+			return checkpointInvalid("checkpoint Observation key is inconsistent")
+		}
+		state.Observations[key] = typed
+	}
+	return nil
+}
+
+func restoreWorkCreators(state *Projection, creators object) error {
+	for _, id := range sortedKeys(creators) {
+		if _, ok := state.Works[id]; !ok {
+			return checkpointInvalid("checkpoint Work creator names missing Work")
+		}
+		actor, _, err := validateActorValue(creators[id])
+		if err != nil {
+			return err
+		}
+		var typed Actor
+		if err := decodeInto(actor, &typed); err != nil {
+			return checkpointInvalid("checkpoint Work creator is invalid")
+		}
+		state.WorkCreators[id] = typed
+	}
+	if len(state.WorkCreators) != len(state.Works) {
+		return checkpointInvalid("every checkpoint Work requires its creator")
+	}
+	return nil
+}
+
+func restoreWorks(state *Projection, works object, commits int64) error {
+	for _, id := range sortedKeys(works) {
+		record, err := closed(works[id], workRecordRequired, workRecordOptional, "checkpoint Work", "checkpoint_invalid")
+		if err != nil {
+			return err
+		}
+		if err := validateRecordFields(record, []string{"claim_id", "completion_id", "cancellation_commit_id", "issue_comment"}, WorkCancellationReasons, "Work"); err != nil {
+			return err
+		}
+		definition := object{}
+		for _, field := range append(slices.Clone(workRequired), workOptional...) {
+			if has(record, field) {
+				definition[field] = record[field]
+			}
+		}
+		if _, err := validateWorkValue(definition); err != nil {
+			return err
+		}
+		position, err := closed(record["position"], []string{"commit", "operation"}, nil, "checkpoint Work position", "checkpoint_invalid")
+		if err != nil {
+			return err
+		}
+		recordState, isString := record["state"].(string)
+		attempts, isNumber := record["attempts"].(json.Number)
+		attemptCount, parseErr := attempts.Int64()
+		if record["work_id"] != id || !isString || !slices.Contains(workStates, recordState) || !isNumber || parseErr != nil || attemptCount < 0 {
+			return checkpointInvalid("checkpoint Work record is inconsistent")
+		}
+		if _, err := integer(position["commit"], 0, commits-1, "Work position commit"); err != nil {
+			return err
+		}
+		if _, err := integer(position["operation"], 0, OperationsPerCommit-1, "Work position operation"); err != nil {
+			return err
+		}
+		if (recordState == "claimed") != has(record, "claim_id") && recordState != "completed" {
+			return checkpointInvalid("only claimed or completed Work names a Claim")
+		}
+		if (recordState == "completed") != has(record, "completion_id") || (recordState == "completed") != has(record, "effects") {
+			return checkpointInvalid("completed Work carries its completion")
+		}
+		if (recordState == "cancelled") != has(record, "cancellation_reason") {
+			return checkpointInvalid("cancelled Work carries its reason")
+		}
+		var work WorkState
+		if err := decodeInto(record, &work); err != nil {
+			return checkpointInvalid("checkpoint Work record is malformed")
+		}
+		state.Works[id] = &work
+	}
+	// A retained non-terminal Work still reads its predecessors; a terminal one never will.
+	for _, work := range state.Works {
+		if terminalWork(work) {
+			continue
+		}
+		for _, edge := range work.DependsOn {
+			if _, present := state.Works[edge.WorkID]; edge.Kind == "work" && !present {
+				return checkpointInvalid("a checkpoint keeps every predecessor of non-terminal Work")
+			}
+		}
+	}
+	return nil
+}
+
+func restoreClaims(state *Projection, claims, dispatches object) error {
+	for _, id := range sortedKeys(claims) {
+		record, err := closed(claims[id], claimRecordRequired, claimRecordOptional, "checkpoint Claim", "checkpoint_invalid")
+		if err != nil {
+			return err
+		}
+		if err := validateRecordFields(record, []string{"handle", "commit_id", "request_id", "terminal_commit_id", "issue_comment"}, ClaimCancellationReasons, "Claim"); err != nil {
+			return err
+		}
+		workID, workNamed := record["work_id"].(string)
+		dispatchID, dispatchNamed := record["dispatch_id"].(string)
+		recordState, stateNamed := record["state"].(string)
+		work := state.Works[workID]
+		if record["claim_id"] != id || !workNamed || !dispatchNamed || !stateNamed || !slices.Contains(claimStates, recordState) || work == nil || !plainObject(dispatches[dispatchID]) {
+			return checkpointInvalid("checkpoint Claim record is inconsistent")
+		}
+		if (recordState == "open") != (work.State == "claimed" && work.ClaimID == id) {
+			return checkpointInvalid("open Claims and claimed Work must agree")
+		}
+		var claim ClaimState
+		if err := decodeInto(record, &claim); err != nil {
+			return checkpointInvalid("checkpoint Claim record is malformed")
+		}
+		state.Claims[id] = &claim
+	}
+	return nil
+}
+
+// restoreDispatches restores Dispatches and checks, on the raw records, that every
+// Dispatch carries exactly one Claim linking back to it, so two Claims can never share one.
+func restoreDispatches(state *Projection, dispatches object) error {
+	for _, id := range sortedKeys(dispatches) {
+		record, err := closed(dispatches[id], dispatchFields, nil, "checkpoint Dispatch", "checkpoint_invalid")
+		if err != nil {
+			return err
+		}
+		if err := validateRecordFields(record, []string{"request_id", "commit_id", "pool", "worker_profile"}, nil, "Dispatch"); err != nil {
+			return err
+		}
+		recordState, stateNamed := record["state"].(string)
+		members, isArray := record["claims"].([]any)
+		workflow, workflowNamed := record["workflow"].(string)
+		if record["dispatch_id"] != id || !stateNamed || !slices.Contains(dispatchStates, recordState) || !isArray || !workflowNamed || !profileWorkflowPattern.MatchString(workflow) {
+			return checkpointInvalid("checkpoint Dispatch record is inconsistent")
+		}
+		if len(members) != 1 {
+			return checkpointInvalid("a checkpoint Dispatch carries exactly one Claim")
+		}
+		name, isName := members[0].(string) //nolint:uncheckedsliceindex // len(members) == 1 is checked above
+		claim := state.Claims[name]
+		if !isName || claim == nil || claim.DispatchID != id {
+			return checkpointInvalid("checkpoint Dispatch members are inconsistent")
+		}
+		if work := state.Works[claim.WorkID]; record["pool"] != work.Pool || record["worker_profile"] != work.WorkerProfile {
+			return checkpointInvalid("a checkpoint Dispatch must match its Work's pool and profile")
+		}
+		if err := validateDispatchExecution(record, recordState); err != nil {
+			return err
+		}
+		if (recordState != "closed") != (claim.State == "open") {
+			return checkpointInvalid("a checkpoint Dispatch is closed exactly when its Claim is settled")
+		}
+		var dispatch DispatchState
+		if err := decodeInto(record, &dispatch); err != nil {
+			return checkpointInvalid("checkpoint Dispatch record is malformed")
+		}
+		state.Dispatches[id] = &dispatch
+		state.dispatchOrder = append(state.dispatchOrder, id)
+	}
+	for _, claim := range state.Claims {
+		if dispatch := state.Dispatches[claim.DispatchID]; dispatch == nil || dispatch.Claims[0] != claim.ClaimID {
+			return checkpointInvalid("checkpoint Claims must each own their Dispatch")
+		}
+	}
+	return nil
+}
+
+// validateDispatchExecution checks a checkpoint Dispatch's reserving dispatcher attempt, bound
+// run and recorded launch: only bound Dispatches carry a run, only started or bound ones carry
+// their launch, and a bound run is the launched run.
+func validateDispatchExecution(record object, recordState string) error {
+	reservedBy, err := closed(record["reserved_by"], []string{"run_id", "run_attempt"}, nil, "checkpoint reserved_by", "checkpoint_invalid")
+	if err != nil {
+		return err
+	}
+	if _, err := decimal(reservedBy["run_id"], "checkpoint reserving run ID", "checkpoint_invalid"); err != nil {
+		return err
+	}
+	if _, err := integer(reservedBy["run_attempt"], 1, 4096, "checkpoint reserving run attempt"); err != nil {
+		return err
+	}
+	var runID, launchRunID any
+	if record["run"] != nil {
+		run, err := closed(record["run"], []string{"run_id", "run_attempt"}, nil, "checkpoint run", "checkpoint_invalid")
+		if err != nil {
+			return err
+		}
+		if _, err := decimal(run["run_id"], "checkpoint run ID", "checkpoint_invalid"); err != nil {
+			return err
+		}
+		if _, err := integer(run["run_attempt"], 1, 4096, "checkpoint run attempt"); err != nil {
+			return err
+		}
+		runID = run["run_id"]
+	}
+	if (recordState == "bound") != (record["run"] != nil) && recordState != "closed" {
+		return checkpointInvalid("only bound Dispatches carry a run")
+	}
+	if record["launch"] != nil {
+		launch, err := closed(record["launch"], []string{"run_id", "revision"}, nil, "checkpoint launch", "checkpoint_invalid")
+		if err != nil {
+			return err
+		}
+		if _, err := decimal(launch["run_id"], "checkpoint launched run ID", "checkpoint_invalid"); err != nil {
+			return err
+		}
+		if revision, named := launch["revision"].(string); !named || !revisionPattern.MatchString(revision) {
+			return checkpointInvalid("checkpoint launch revision is malformed")
+		}
+		launchRunID = launch["run_id"]
+	}
+	if (recordState == "reserved") != (record["launch"] == nil) && recordState != "closed" {
+		return checkpointInvalid("only started or bound Dispatches carry their launch")
+	}
+	if runID != nil && launchRunID != runID {
+		return checkpointInvalid("a bound run must be the launched run")
+	}
+	return nil
+}
+
+// validateRecordFields checks identity fields, the cancellation reason and recorded
+// effects of one checkpoint record.
+func validateRecordFields(record object, identities, reasons []string, name string) error {
+	for _, field := range identities {
+		if has(record, field) {
+			if _, err := identity(record[field], field); err != nil {
+				return err
+			}
+		}
+	}
+	if has(record, "cancellation_reason") {
+		if _, err := oneOf(record["cancellation_reason"], reasons, name); err != nil {
+			return err
+		}
+	}
+	if has(record, "effects") {
+		effects, isArray := record["effects"].([]any)
+		if !isArray || slices.ContainsFunc(effects, func(effect any) bool { return !plainObject(effect) }) {
+			return checkpointInvalid("checkpoint effects must be an array of objects")
+		}
+	}
+	return nil
+}
+
+// CheckpointCommit builds the root commit that replaces the whole log with the projection.
+func CheckpointCommit(state Projection, actor Actor, at int64) (QueueCommit, error) {
+	if state.Tip == "" {
+		return QueueCommit{}, checkpointInvalid("an empty queue has nothing to checkpoint")
+	}
+	request, err := NewRequest("checkpoint", actor, CheckpointParameters{PriorTip: state.Tip})
+	if err != nil {
+		return QueueCommit{}, err
+	}
+	snapshot, err := SerializeProjection(checkpointProjection(state))
+	if err != nil {
+		return QueueCommit{}, err
+	}
+	operation, err := Op(CheckpointOperation{Kind: "Checkpoint", PriorTip: state.Tip, State: snapshot})
+	if err != nil {
+		return QueueCommit{}, err
+	}
+	commit := QueueCommit{Version: Version, ID: CommitID(nil, request.ID), Request: request, Actor: actor, At: at, Operations: []Operation{operation}}
+	value, err := genericValue(commit)
+	if err != nil {
+		return QueueCommit{}, err
+	}
+	if _, err := restoreCheckpointValue(value); err != nil {
+		return QueueCommit{}, err
+	}
+	return commit, nil
 }

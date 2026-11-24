@@ -1,5 +1,5 @@
-# gh-aw-metadata: {"schema_version":"v4","frontmatter_hash":"bb41eaec2fe6faf5f80670fb053560ba374903d69c90c068005220f3efc45094","body_hash":"4fde0a1a705023207b9c52bd8354d77ec01e437cf891e63c15d550479ecdd410","strict":true,"agent_id":"copilot","engine_versions":{"copilot":"1.0.113","copilot-sdk":"2.0.0"},"agent_image_runner":"aw-gpu-runner-T4"}
-# gh-aw-manifest: {"version":1,"secrets":["COPILOT_GITHUB_TOKEN","GH_AW_GITHUB_MCP_SERVER_TOKEN","GH_AW_GITHUB_TOKEN","GH_AW_OTEL_GRAFANA_AUTHORIZATION","GH_AW_OTEL_GRAFANA_ENDPOINT","GH_AW_OTEL_SENTRY_AUTHORIZATION","GH_AW_OTEL_SENTRY_ENDPOINT","GITHUB_TOKEN"],"actions":[{"repo":"actions/cache/restore","sha":"55cc8345863c7cc4c66a329aec7e433d2d1c52a9","version":"v6.1.0"},{"repo":"actions/cache/save","sha":"55cc8345863c7cc4c66a329aec7e433d2d1c52a9","version":"v6.1.0"},{"repo":"actions/checkout","sha":"3d3c42e5aac5ba805825da76410c181273ba90b1","version":"v7.0.1"},{"repo":"actions/download-artifact","sha":"9000827ccba6bdab643e8b6fd33ac0654aef8333","version":"v8.0.2"},{"repo":"actions/github-script","sha":"3a2844b7e9c422d3c10d287c895573f7108da1b3","version":"v9.0.0"},{"repo":"actions/setup-node","sha":"949feb2413d6458794dcd2491c4babbbce0c15c1","version":"v7.1.0"},{"repo":"actions/setup-python","sha":"6d4fd22b20465ccc0f7354476588e8df7c9ca0e0","version":"v7.1.0"},{"repo":"actions/upload-artifact","sha":"cf430e030ddbb5b0abf93d22962f4752f3646cd9","version":"v7.0.2"},{"repo":"astral-sh/setup-uv","sha":"68559e99cc807c1eb7e9238fd43a15bba460eec2","version":"v10.3.3"}],"containers":[{"image":"ghcr.io/github/gh-aw-firewall/agent:0.29.20","digest":"sha256:b9cd8d7d1a9c2693e5d91db035a678fb1ea8d87ce691e08ec091b327e5e8ba75","pinned_image":"ghcr.io/github/gh-aw-firewall/agent:0.29.20@sha256:b9cd8d7d1a9c2693e5d91db035a678fb1ea8d87ce691e08ec091b327e5e8ba75"},{"image":"ghcr.io/github/gh-aw-firewall/api-proxy:0.29.20","digest":"sha256:fc6c1eff686514d26ff90ae1398e0f6e3dcad8d2e43d11b16df312c1e72c0ace","pinned_image":"ghcr.io/github/gh-aw-firewall/api-proxy:0.29.20@sha256:fc6c1eff686514d26ff90ae1398e0f6e3dcad8d2e43d11b16df312c1e72c0ace"},{"image":"ghcr.io/github/gh-aw-firewall/cli-proxy:0.29.20","digest":"sha256:743396030b149763880978f35ad679fe02b1c0be6697b01fbf6d43f4ac2ae081","pinned_image":"ghcr.io/github/gh-aw-firewall/cli-proxy:0.29.20@sha256:743396030b149763880978f35ad679fe02b1c0be6697b01fbf6d43f4ac2ae081"},{"image":"ghcr.io/github/gh-aw-firewall/squid:0.29.20","digest":"sha256:1c4a4a12fcea206a81d656cb1f73847420a2c041d02ab51235364079a1e31d71","pinned_image":"ghcr.io/github/gh-aw-firewall/squid:0.29.20@sha256:1c4a4a12fcea206a81d656cb1f73847420a2c041d02ab51235364079a1e31d71"},{"image":"ghcr.io/github/gh-aw-mcpg:v0.5.14","digest":"sha256:716b41d53a20660e945c351c08140380430d65d98d3263596e45114c29fa7a43","pinned_image":"ghcr.io/github/gh-aw-mcpg:v0.5.14@sha256:716b41d53a20660e945c351c08140380430d65d98d3263596e45114c29fa7a43"},{"image":"ghcr.io/github/gh-aw-node","digest":"sha256:8735428c2d4e602f90781ba0c571c400e8ff93c7ee1508a75d71f87e34e415cc","pinned_image":"ghcr.io/github/gh-aw-node@sha256:8735428c2d4e602f90781ba0c571c400e8ff93c7ee1508a75d71f87e34e415cc"},{"image":"ghcr.io/github/github-mcp-server:v2.2.0","digest":"sha256:040c4e99810076035eb1d9beb4b4a96fcf589c43cefed6ff51a46a553eb4e174","pinned_image":"ghcr.io/github/github-mcp-server:v2.2.0@sha256:040c4e99810076035eb1d9beb4b4a96fcf589c43cefed6ff51a46a553eb4e174"}],"mcp_servers":[{"name":"safeoutputs","tools":["create_discussion","noop","report_incomplete","report_missing_data","report_missing_tool","upload_asset"]},{"name":"work-queue","tools":["work_queue_claim_finish","work_queue_dispatch_next","work_queue_explain","work_queue_read","work_queue_submit"]}],"threat_detection":{"mode":"enabled"},"admission":true,"work_queue":{"worker":true,"logical_contract":"1943ac70d2da08d22175e96ec1f758d25d08dfa7ad257c9d738d90a581f6b8d9"},"agent_metadata":{"03cbf8931deff21d5116":{"name":"Agentic Workflows"},"4943cffeebb6706aa8bc":{"name":"Squad","tools":["*"]},"9ea639558df913e650e4":{"name":"technical-doc-writer"},"a17c6c62ffcd7401f40f":{"name":"adr-writer"},"ad6ff0fe9219fbfa5ccc":{"name":"grumpy-reviewer","tools":["read","search"]},"e0c35a96dedfb29cb9b1":{"name":"w3c-specification-writer"}}}
+# gh-aw-metadata: {"schema_version":"v4","frontmatter_hash":"bb41eaec2fe6faf5f80670fb053560ba374903d69c90c068005220f3efc45094","body_hash":"3d038dd9f657f32c0ebcf6a41ee810dde89e198b0032dba0977d4ab96b42b14d","strict":true,"agent_id":"copilot","engine_versions":{"copilot":"1.0.113","copilot-sdk":"2.0.0"},"agent_image_runner":"aw-gpu-runner-T4"}
+# gh-aw-manifest: {"version":1,"secrets":["COPILOT_GITHUB_TOKEN","GH_AW_GITHUB_MCP_SERVER_TOKEN","GH_AW_GITHUB_TOKEN","GH_AW_OTEL_GRAFANA_AUTHORIZATION","GH_AW_OTEL_GRAFANA_ENDPOINT","GH_AW_OTEL_SENTRY_AUTHORIZATION","GH_AW_OTEL_SENTRY_ENDPOINT","GITHUB_TOKEN"],"actions":[{"repo":"actions/cache/restore","sha":"55cc8345863c7cc4c66a329aec7e433d2d1c52a9","version":"v6.1.0"},{"repo":"actions/cache/save","sha":"55cc8345863c7cc4c66a329aec7e433d2d1c52a9","version":"v6.1.0"},{"repo":"actions/checkout","sha":"3d3c42e5aac5ba805825da76410c181273ba90b1","version":"v7.0.1"},{"repo":"actions/download-artifact","sha":"9000827ccba6bdab643e8b6fd33ac0654aef8333","version":"v8.0.2"},{"repo":"actions/github-script","sha":"3a2844b7e9c422d3c10d287c895573f7108da1b3","version":"v9.0.0"},{"repo":"actions/setup-node","sha":"949feb2413d6458794dcd2491c4babbbce0c15c1","version":"v7.1.0"},{"repo":"actions/setup-python","sha":"6d4fd22b20465ccc0f7354476588e8df7c9ca0e0","version":"v7.1.0"},{"repo":"actions/upload-artifact","sha":"cf430e030ddbb5b0abf93d22962f4752f3646cd9","version":"v7.0.2"},{"repo":"astral-sh/setup-uv","sha":"68559e99cc807c1eb7e9238fd43a15bba460eec2","version":"v10.3.3"}],"containers":[{"image":"ghcr.io/github/gh-aw-firewall/agent:0.29.20","digest":"sha256:b9cd8d7d1a9c2693e5d91db035a678fb1ea8d87ce691e08ec091b327e5e8ba75","pinned_image":"ghcr.io/github/gh-aw-firewall/agent:0.29.20@sha256:b9cd8d7d1a9c2693e5d91db035a678fb1ea8d87ce691e08ec091b327e5e8ba75"},{"image":"ghcr.io/github/gh-aw-firewall/api-proxy:0.29.20","digest":"sha256:fc6c1eff686514d26ff90ae1398e0f6e3dcad8d2e43d11b16df312c1e72c0ace","pinned_image":"ghcr.io/github/gh-aw-firewall/api-proxy:0.29.20@sha256:fc6c1eff686514d26ff90ae1398e0f6e3dcad8d2e43d11b16df312c1e72c0ace"},{"image":"ghcr.io/github/gh-aw-firewall/cli-proxy:0.29.20","digest":"sha256:743396030b149763880978f35ad679fe02b1c0be6697b01fbf6d43f4ac2ae081","pinned_image":"ghcr.io/github/gh-aw-firewall/cli-proxy:0.29.20@sha256:743396030b149763880978f35ad679fe02b1c0be6697b01fbf6d43f4ac2ae081"},{"image":"ghcr.io/github/gh-aw-firewall/squid:0.29.20","digest":"sha256:1c4a4a12fcea206a81d656cb1f73847420a2c041d02ab51235364079a1e31d71","pinned_image":"ghcr.io/github/gh-aw-firewall/squid:0.29.20@sha256:1c4a4a12fcea206a81d656cb1f73847420a2c041d02ab51235364079a1e31d71"},{"image":"ghcr.io/github/gh-aw-mcpg:v0.5.14","digest":"sha256:716b41d53a20660e945c351c08140380430d65d98d3263596e45114c29fa7a43","pinned_image":"ghcr.io/github/gh-aw-mcpg:v0.5.14@sha256:716b41d53a20660e945c351c08140380430d65d98d3263596e45114c29fa7a43"},{"image":"ghcr.io/github/gh-aw-node","digest":"sha256:8735428c2d4e602f90781ba0c571c400e8ff93c7ee1508a75d71f87e34e415cc","pinned_image":"ghcr.io/github/gh-aw-node@sha256:8735428c2d4e602f90781ba0c571c400e8ff93c7ee1508a75d71f87e34e415cc"},{"image":"ghcr.io/github/github-mcp-server:v2.2.0","digest":"sha256:040c4e99810076035eb1d9beb4b4a96fcf589c43cefed6ff51a46a553eb4e174","pinned_image":"ghcr.io/github/github-mcp-server:v2.2.0@sha256:040c4e99810076035eb1d9beb4b4a96fcf589c43cefed6ff51a46a553eb4e174"}],"mcp_servers":[{"name":"safeoutputs","tools":["create_discussion","noop","report_incomplete","report_missing_data","report_missing_tool","upload_asset"]},{"name":"work-queue","tools":["work_queue_claim_finish","work_queue_dispatch_next","work_queue_read","work_queue_submit"]}],"threat_detection":{"mode":"enabled"},"admission":true,"work_queue":{"worker":true},"agent_metadata":{"03cbf8931deff21d5116":{"name":"Agentic Workflows"},"4943cffeebb6706aa8bc":{"name":"Squad","tools":["*"]},"9ea639558df913e650e4":{"name":"technical-doc-writer"},"a17c6c62ffcd7401f40f":{"name":"adr-writer"},"ad6ff0fe9219fbfa5ccc":{"name":"grumpy-reviewer","tools":["read","search"]},"e0c35a96dedfb29cb9b1":{"name":"w3c-specification-writer"}}}
 # This file was automatically generated by gh-aw. DO NOT EDIT. To debug this workflow, load the skill at https://github.com/github/gh-aw/blob/main/debug.md
 #
 #    ___                   _   _
@@ -114,7 +114,6 @@ jobs:
       actions: read # Read workflow runs and artifacts for workflow context.
       contents: write # Create or update repository contents.
       id-token: write # Request an OIDC token for authenticated services.
-      issues: write # Create or update issues and comments.
     env:
       GH_AW_MAX_DAILY_AI_CREDITS: "10000"
       GH_AW_RUNTIME_FEATURES: ${{ vars.GH_AW_RUNTIME_FEATURES }}
@@ -143,7 +142,7 @@ jobs:
       setup-span-id: ${{ steps.setup.outputs.span-id }}
       setup-trace-id: ${{ steps.setup.outputs.trace-id }}
       stale_lock_file_failed: ${{ steps.check-lock-file.outputs.stale_lock_file_failed == 'true' }}
-      work_queue_origin: ${{ steps.work_queue_snapshot.outputs.work_queue_origin }}
+      work_queue_assignment_settled: ${{ steps.work_queue_snapshot.outputs.work_queue_assignment_settled }}
     steps:
       - name: Checkout actions folder
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -176,7 +175,7 @@ jobs:
           GH_AW_DEFAULT_ADMISSION_URL: ${{ vars.GH_AW_DEFAULT_ADMISSION_URL }}
           GH_AW_DEFAULT_ADMISSION_AUDIENCE: ${{ vars.GH_AW_DEFAULT_ADMISSION_AUDIENCE }}
           GH_AW_DEFAULT_ADMISSION_ON_OUTAGE: ${{ vars.GH_AW_DEFAULT_ADMISSION_ON_OUTAGE }}
-          GH_AW_ADMISSION_WORKFLOW_HASH: "bb41eaec2fe6faf5f80670fb053560ba374903d69c90c068005220f3efc45094:4fde0a1a705023207b9c52bd8354d77ec01e437cf891e63c15d550479ecdd410"
+          GH_AW_ADMISSION_WORKFLOW_HASH: "bb41eaec2fe6faf5f80670fb053560ba374903d69c90c068005220f3efc45094:3d038dd9f657f32c0ebcf6a41ee810dde89e198b0032dba0977d4ab96b42b14d"
           GH_AW_INFO_WORKFLOW_ID: ${{ job.workflow_ref }}
           GITHUB_ACTOR: ${{ github.actor }}
           GITHUB_TRIGGERING_ACTOR: ${{ github.triggering_actor }}
@@ -207,7 +206,7 @@ jobs:
           GH_AW_EXPERIMENT_SPEC: '{"output_format":{"variants":["collapsible","inline","ste"],"description":"Test whether hiding report details behind a \u003cdetails\u003e block, presenting them inline, or writing in Simplified Technical English (STE) affects discussion engagement","hypothesis":"H0: no change in discussion engagement score. H1: inline format produces ≥20% higher reactions+replies by making charts and recommendations immediately visible; ste format improves engagement via clearer, simpler language.","metric":"discussion_engagement_score","secondary_metrics":["output_length_chars","run_duration_ms","eval:output_format_adherence"],"guardrail_metrics":[{"name":"empty_output_rate","threshold":"==0"}],"min_samples":30,"weight":[34,33,33],"issue":30573,"start_date":"2026-05-07","analysis_type":"mann_whitney","tags":["output","readability","engagement"]}}'
           GH_AW_EXPERIMENT_STATE_FILE: /tmp/gh-aw/experiments/state.jsonl
           GH_AW_EXPERIMENT_STATE_DIR: /tmp/gh-aw/experiments
-          GH_AW_HARNESS_VERSION: bb41eaec2fe6faf5f80670fb053560ba374903d69c90c068005220f3efc45094:4fde0a1a705023207b9c52bd8354d77ec01e437cf891e63c15d550479ecdd410
+          GH_AW_HARNESS_VERSION: bb41eaec2fe6faf5f80670fb053560ba374903d69c90c068005220f3efc45094:3d038dd9f657f32c0ebcf6a41ee810dde89e198b0032dba0977d4ab96b42b14d
         with:
           script: |
             const path = require('path');
@@ -564,11 +563,8 @@ jobs:
         env:
           GH_AW_WORK_QUEUE_ENABLED: "true"
           GH_AW_WORK_QUEUE_ROLE: "worker"
-          GH_AW_WORK_QUEUE_ISSUES: "{\"label\":\"work\",\"orphaned_after_days\":30}"
-          GH_AW_WORK_QUEUE_CHECKED_TRANSPORT: "graphql"
-          GH_AW_WORK_QUEUE_CONTRACT: "1943ac70d2da08d22175e96ec1f758d25d08dfa7ad257c9d738d90a581f6b8d9"
+          GH_AW_WORK_QUEUE_POLICY: "{\"version\":4,\"pending_limit\":30,\"issues\":{\"label\":\"work\",\"title_prefix\":\"[work queue]\",\"orphaned_after_days\":30},\"effect_scope\":\"${{ github.repository }}\",\"workers\":[\"artifacts-summary\",\"code-scanning-fixer-worker\",\"daily-compiler-quality\",\"daily-evals-report\",\"daily-firewall-report\",\"daily-issues-report\",\"daily-observability-report\",\"daily-regulatory\",\"daily-repo-chronicle\",\"daily-secrets-analysis\",\"daily-team-evolution-insights\",\"daily-token-consumption-report\",\"deep-report\",\"engine-conformance-agy\",\"engine-conformance-aider\",\"engine-conformance-claude\",\"engine-conformance-codex\",\"engine-conformance-copilot\",\"engine-conformance-crush\",\"engine-conformance-cursor\",\"engine-conformance-deepseek-harness\",\"engine-conformance-factory\",\"engine-conformance-gemini\",\"engine-conformance-goose\",\"engine-conformance-kiro\",\"engine-conformance-langgraph\",\"engine-conformance-mini-swe-agent\",\"engine-conformance-opencode\",\"engine-conformance-pi\",\"engine-conformance-pydantic-ai\",\"eslint-miner\",\"eslint-monster\",\"eslint-refiner\",\"repo-tree-map\",\"smoke-work-queue-worker\"],\"pools\":{\"code-scanning\":{\"concurrency\":3,\"per_account_limit\":0,\"max_attempts\":3},\"daily-reports\":{\"concurrency\":3,\"per_account_limit\":1,\"max_attempts\":3},\"default\":{\"concurrency\":3,\"per_account_limit\":0,\"max_attempts\":3},\"engine-conformance\":{\"concurrency\":3,\"per_account_limit\":1,\"max_attempts\":3},\"smoke-work-queue\":{\"concurrency\":3,\"per_account_limit\":0,\"max_attempts\":3}}}"
         with:
-          github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |
             const path = require('path');
             const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
@@ -629,7 +625,8 @@ jobs:
     name: agent
     needs: activation
     if: >
-      needs.activation.outputs.daily_ai_credits_exceeded != 'true' && needs.activation.outputs.daily_ai_credits_guardrail_status != 'quota_blocked'
+      (needs.activation.outputs.daily_ai_credits_exceeded != 'true' && needs.activation.outputs.daily_ai_credits_guardrail_status != 'quota_blocked') &&
+      needs.activation.outputs.work_queue_assignment_settled != 'true'
     runs-on: aw-gpu-runner-T4
     # Permissions for the agent job (workflow permissions default to none).
     permissions:
@@ -661,7 +658,6 @@ jobs:
       GH_AW_TARGET_REPO_SLUG: ""
       GH_AW_WORKFLOW_ID_SANITIZED: dailyissuesreport
       GH_AW_WORK_QUEUE_ENABLED: "true"
-      GH_AW_WORK_QUEUE_INTENT_ORIGIN: "${{ needs.activation.outputs.work_queue_origin }}"
       GH_AW_WORK_QUEUE_ROLE: "worker"
     outputs:
       agentic_engine_timeout: ${{ steps.detect-agent-errors.outputs.agentic_engine_timeout || 'false' }}
@@ -690,7 +686,6 @@ jobs:
       setup-trace-id: ${{ steps.setup.outputs.trace-id }}
       shell_expansion_guard_rejected: ${{ steps.detect-agent-errors.outputs.shell_expansion_guard_rejected || 'false' }}
       unknown_model_ai_credits: ${{ steps.parse-mcp-gateway.outputs.unknown_model_ai_credits || 'false' }}
-      work_queue_origin: ${{ steps.work_queue_intent_origin.outputs.work_queue_origin }}
     steps:
       - name: Checkout actions folder
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -781,17 +776,6 @@ jobs:
         with:
           name: activation
           path: /tmp/gh-aw
-      - name: Capture authenticated work queue intent origin
-        id: work_queue_intent_origin
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-        with:
-          script: |
-            const path = require('path');
-            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
-            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
-            setupGlobals(core, github, context, exec, io, getOctokit);
-            const { main } = require(path.join(actionsDir, 'capture_work_queue_intent_origin.cjs'));
-            await main();
       # Cache memory file share configuration from frontmatter processed below
       - name: Create cache-memory directory
         run: bash "${RUNNER_TEMP}/gh-aw/actions/create_cache_memory_dir.sh"
@@ -1254,7 +1238,7 @@ jobs:
 
           mkdir -p "$HOME/.copilot"
           GH_AW_NODE=$(which node 2>/dev/null || command -v node 2>/dev/null || echo node)
-          cat << GH_AW_MCP_CONFIG_d2d61abe3c3bb9aa_EOF | "$GH_AW_NODE" "${RUNNER_TEMP}/gh-aw/actions/start_mcp_gateway.cjs"
+          cat << GH_AW_MCP_CONFIG_90e32e3b150fcbcd_EOF | "$GH_AW_NODE" "${RUNNER_TEMP}/gh-aw/actions/start_mcp_gateway.cjs"
           {
             "mcpServers": {
               "safeoutputs": {
@@ -1307,7 +1291,7 @@ jobs:
               },
               "work-queue": {
                 "type": "stdio",
-                "tools": ["work_queue_read", "work_queue_explain", "work_queue_submit", "work_queue_dispatch_next", "work_queue_claim_finish"],
+                "tools": ["work_queue_read", "work_queue_submit", "work_queue_dispatch_next", "work_queue_claim_finish"],
                 "container": "ghcr.io/github/gh-aw-node@sha256:8735428c2d4e602f90781ba0c571c400e8ff93c7ee1508a75d71f87e34e415cc",
                 "mounts": ["${RUNNER_TEMP}/gh-aw:${RUNNER_TEMP}/gh-aw:ro", "/tmp/gh-aw/work-queue.snapshot.json:/tmp/gh-aw/work-queue.snapshot.json:ro", "${RUNNER_TEMP}/gh-aw/safeoutputs/work-queue:${RUNNER_TEMP}/gh-aw/safeoutputs/work-queue:rw"],
                 "env": {
@@ -1332,7 +1316,7 @@ jobs:
               }
             }
           }
-          GH_AW_MCP_CONFIG_d2d61abe3c3bb9aa_EOF
+          GH_AW_MCP_CONFIG_90e32e3b150fcbcd_EOF
       - name: Mount MCP servers as CLIs
         id: mount-mcp-clis
         continue-on-error: true
@@ -1979,34 +1963,14 @@ jobs:
         env:
           GH_AW_WORK_QUEUE_ENABLED: "true"
           GH_AW_WORK_QUEUE_ROLE: "worker"
-          GH_AW_WORK_QUEUE_ISSUES: "{\"label\":\"work\",\"orphaned_after_days\":30}"
-          GH_AW_WORK_QUEUE_CHECKED_TRANSPORT: "graphql"
-          GH_AW_WORK_QUEUE_CONTRACT: "1943ac70d2da08d22175e96ec1f758d25d08dfa7ad257c9d738d90a581f6b8d9"
-        with:
-          script: |
-            const path = require('path');
-            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
-            const { main } = require(path.join(actionsDir, 'reconcile_work_queue_run.cjs'));
-            await main({ core, githubClient: github, context });
-      - name: Project this run's work queue Issues
-        id: work_queue_issues
-        if: always()
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-        env:
-          GH_AW_WORK_QUEUE_ENABLED: "true"
-          GH_AW_WORK_QUEUE_ROLE: "worker"
-          GH_AW_WORK_QUEUE_ISSUES: "{\"label\":\"work\",\"orphaned_after_days\":30}"
-          GH_AW_WORK_QUEUE_CHECKED_TRANSPORT: "graphql"
-          GH_AW_WORK_QUEUE_CONTRACT: "1943ac70d2da08d22175e96ec1f758d25d08dfa7ad257c9d738d90a581f6b8d9"
-          GH_AW_WORK_QUEUE_JOB_RESULTS: ${{ toJSON(needs) }}
+          GH_AW_WORK_QUEUE_POLICY: "{\"version\":4,\"pending_limit\":30,\"issues\":{\"label\":\"work\",\"title_prefix\":\"[work queue]\",\"orphaned_after_days\":30},\"effect_scope\":\"${{ github.repository }}\",\"workers\":[\"artifacts-summary\",\"code-scanning-fixer-worker\",\"daily-compiler-quality\",\"daily-evals-report\",\"daily-firewall-report\",\"daily-issues-report\",\"daily-observability-report\",\"daily-regulatory\",\"daily-repo-chronicle\",\"daily-secrets-analysis\",\"daily-team-evolution-insights\",\"daily-token-consumption-report\",\"deep-report\",\"engine-conformance-agy\",\"engine-conformance-aider\",\"engine-conformance-claude\",\"engine-conformance-codex\",\"engine-conformance-copilot\",\"engine-conformance-crush\",\"engine-conformance-cursor\",\"engine-conformance-deepseek-harness\",\"engine-conformance-factory\",\"engine-conformance-gemini\",\"engine-conformance-goose\",\"engine-conformance-kiro\",\"engine-conformance-langgraph\",\"engine-conformance-mini-swe-agent\",\"engine-conformance-opencode\",\"engine-conformance-pi\",\"engine-conformance-pydantic-ai\",\"eslint-miner\",\"eslint-monster\",\"eslint-refiner\",\"repo-tree-map\",\"smoke-work-queue-worker\"],\"pools\":{\"code-scanning\":{\"concurrency\":3,\"per_account_limit\":0,\"max_attempts\":3},\"daily-reports\":{\"concurrency\":3,\"per_account_limit\":1,\"max_attempts\":3},\"default\":{\"concurrency\":3,\"per_account_limit\":0,\"max_attempts\":3},\"engine-conformance\":{\"concurrency\":3,\"per_account_limit\":1,\"max_attempts\":3},\"smoke-work-queue\":{\"concurrency\":3,\"per_account_limit\":0,\"max_attempts\":3}}}"
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |
             const path = require('path');
             const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
-            const { main } = require(path.join(actionsDir, 'work_queue_issues.cjs'));
-            const result = await main({ core, githubClient: github, context });
-            if (result.pending?.length) core.warning('Work queue is committed; Issue synchronization remains pending. Inspect the exact terminal request before using work-queue sync-issues --request-id.');
+            const { main } = require(path.join(actionsDir, 'reconcile_work_queue_run.cjs'));
+            await main({ core, githubClient: github, context });
       - name: Download activation artifact for work queue summary
         if: always()
         continue-on-error: true
@@ -2163,7 +2127,7 @@ jobs:
           GH_AW_DEFAULT_ADMISSION_URL: ${{ vars.GH_AW_DEFAULT_ADMISSION_URL }}
           GH_AW_DEFAULT_ADMISSION_AUDIENCE: ${{ vars.GH_AW_DEFAULT_ADMISSION_AUDIENCE }}
           GH_AW_DEFAULT_ADMISSION_ON_OUTAGE: ${{ vars.GH_AW_DEFAULT_ADMISSION_ON_OUTAGE }}
-          GH_AW_ADMISSION_WORKFLOW_HASH: "bb41eaec2fe6faf5f80670fb053560ba374903d69c90c068005220f3efc45094:4fde0a1a705023207b9c52bd8354d77ec01e437cf891e63c15d550479ecdd410"
+          GH_AW_ADMISSION_WORKFLOW_HASH: "bb41eaec2fe6faf5f80670fb053560ba374903d69c90c068005220f3efc45094:3d038dd9f657f32c0ebcf6a41ee810dde89e198b0032dba0977d4ab96b42b14d"
           GH_AW_INFO_WORKFLOW_ID: ${{ job.workflow_ref }}
           GITHUB_ACTOR: ${{ github.actor }}
           GITHUB_TRIGGERING_ACTOR: ${{ github.triggering_actor }}
@@ -2910,7 +2874,9 @@ jobs:
       - activation
       - agent
       - detection
-    if: (!cancelled()) && needs.agent.result != 'skipped' && needs.detection.result == 'success'
+    if: >
+      (!cancelled()) && needs.agent.result != 'skipped' && needs.activation.outputs.work_queue_assignment_settled != 'true' &&
+      needs.detection.result == 'success'
     runs-on: ubuntu-slim
     # Permissions for the safe_outputs job (workflow permissions default to none).
     permissions:
@@ -2943,7 +2909,6 @@ jobs:
       GH_AW_WORKFLOW_NAME: "Daily Issues Report Generator"
       GH_AW_WORKFLOW_SOURCE_URL: "${{ github.server_url }}/${{ github.repository }}/blob/${{ github.ref_name }}/.github/workflows/daily-issues-report.md"
       GH_AW_WORK_QUEUE_ENABLED: "true"
-      GH_AW_WORK_QUEUE_INTENT_ORIGIN: "${{ needs.agent.outputs.work_queue_origin }}"
       GH_AW_WORK_QUEUE_ROLE: "worker"
       GH_AW_WORK_QUEUE_SNAPSHOT: "/tmp/gh-aw/work-queue.snapshot.json"
     outputs:
@@ -2960,7 +2925,7 @@ jobs:
       process_safe_outputs_items_warnings: ${{ steps.process_safe_outputs.outputs.items_warnings }}
       process_safe_outputs_processed_count: ${{ steps.process_safe_outputs.outputs.processed_count }}
       process_safe_outputs_status: ${{ steps.process_safe_outputs.outputs.status }}
-      work_queue_outcome: ${{ steps.process_safe_outputs.outputs.work_queue_outcome }}
+      work_queue_outcome: ${{ steps.work_queue_finish.outputs.work_queue_outcome }}
       work_queue_requests: ${{ steps.work_queue_controls.outputs.work_queue_requests }}
     steps:
       - name: Checkout actions folder
@@ -3018,37 +2983,17 @@ jobs:
         with:
           name: safe-outputs-assets
           path: /tmp/gh-aw/safeoutputs/assets
-      - name: Reconcile work queue claim
-        id: work_queue_claim_reconciliation
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-        env:
-          GH_AW_WORK_QUEUE_ENABLED: "true"
-          GH_AW_WORK_QUEUE_ROLE: "worker"
-          GH_AW_WORK_QUEUE_ISSUES: "{\"label\":\"work\",\"orphaned_after_days\":30}"
-          GH_AW_WORK_QUEUE_CHECKED_TRANSPORT: "graphql"
-          GH_AW_WORK_QUEUE_CONTRACT: "1943ac70d2da08d22175e96ec1f758d25d08dfa7ad257c9d738d90a581f6b8d9"
-          GH_AW_WORK_QUEUE_FINISH_INTENT: /tmp/gh-aw/work-queue.finish.jsonl
-        with:
-          script: |
-            const path = require('path');
-            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
-            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
-            setupGlobals(core, github, context, exec, io, getOctokit);
-            const { main } = require(path.join(actionsDir, 'finish_work_queue_claim.cjs'));
-            await main({ core, github, context, requireAssignment: true });
       - name: Process trusted work queue controls
         id: work_queue_controls
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           GH_AW_WORK_QUEUE_ENABLED: "true"
           GH_AW_WORK_QUEUE_ROLE: "worker"
-          GH_AW_WORK_QUEUE_ISSUES: "{\"label\":\"work\",\"orphaned_after_days\":30}"
-          GH_AW_WORK_QUEUE_CHECKED_TRANSPORT: "graphql"
-          GH_AW_WORK_QUEUE_CONTRACT: "1943ac70d2da08d22175e96ec1f758d25d08dfa7ad257c9d738d90a581f6b8d9"
+          GH_AW_WORK_QUEUE_POLICY: "{\"version\":4,\"pending_limit\":30,\"issues\":{\"label\":\"work\",\"title_prefix\":\"[work queue]\",\"orphaned_after_days\":30},\"effect_scope\":\"${{ github.repository }}\",\"workers\":[\"artifacts-summary\",\"code-scanning-fixer-worker\",\"daily-compiler-quality\",\"daily-evals-report\",\"daily-firewall-report\",\"daily-issues-report\",\"daily-observability-report\",\"daily-regulatory\",\"daily-repo-chronicle\",\"daily-secrets-analysis\",\"daily-team-evolution-insights\",\"daily-token-consumption-report\",\"deep-report\",\"engine-conformance-agy\",\"engine-conformance-aider\",\"engine-conformance-claude\",\"engine-conformance-codex\",\"engine-conformance-copilot\",\"engine-conformance-crush\",\"engine-conformance-cursor\",\"engine-conformance-deepseek-harness\",\"engine-conformance-factory\",\"engine-conformance-gemini\",\"engine-conformance-goose\",\"engine-conformance-kiro\",\"engine-conformance-langgraph\",\"engine-conformance-mini-swe-agent\",\"engine-conformance-opencode\",\"engine-conformance-pi\",\"engine-conformance-pydantic-ai\",\"eslint-miner\",\"eslint-monster\",\"eslint-refiner\",\"repo-tree-map\",\"smoke-work-queue-worker\"],\"pools\":{\"code-scanning\":{\"concurrency\":3,\"per_account_limit\":0,\"max_attempts\":3},\"daily-reports\":{\"concurrency\":3,\"per_account_limit\":1,\"max_attempts\":3},\"default\":{\"concurrency\":3,\"per_account_limit\":0,\"max_attempts\":3},\"engine-conformance\":{\"concurrency\":3,\"per_account_limit\":1,\"max_attempts\":3},\"smoke-work-queue\":{\"concurrency\":3,\"per_account_limit\":0,\"max_attempts\":3}}}"
           GH_AW_GITHUB_TOKEN_SOURCE: ${{ secrets.GH_AW_GITHUB_TOKEN != '' && 'pat' || 'github_actions' }}
           GH_AW_WORK_QUEUE_TOKEN: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           GH_AW_WORK_QUEUE_INTENTS: /tmp/gh-aw/work-queue.intents.jsonl
-          GH_AW_WORK_QUEUE_CONTROL_CONFIG: "{\"aw_context_workflows\":null,\"github-token\":\"${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}\",\"work_queue_dispatch_credential\":{\"kind\":\"${{ secrets.GH_AW_GITHUB_TOKEN != '' && 'authenticated' || 'github_token' }}\"},\"work_queue_enabled\":true,\"work_queue_workflows\":null}"
+          GH_AW_WORK_QUEUE_CONTROL_CONFIG: "{\"aw_context_workflows\":null,\"work_queue_enabled\":true,\"work_queue_workflows\":null}"
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |
@@ -3073,7 +3018,8 @@ jobs:
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           GH_AW_JOB_CHECK_RUN_ID: ${{ job.check_run_id }}
-          GH_AW_CLAIM_FOOTER_LINKS: ${{ steps.work_queue_claim_reconciliation.outputs.claim_footer_links }}
+          GH_AW_WORK_QUEUE_EFFECTS: /tmp/gh-aw/work-queue.effects.jsonl
+          GH_AW_WORK_QUEUE_POLICY: "{\"version\":4,\"pending_limit\":30,\"issues\":{\"label\":\"work\",\"title_prefix\":\"[work queue]\",\"orphaned_after_days\":30},\"effect_scope\":\"${{ github.repository }}\",\"workers\":[\"artifacts-summary\",\"code-scanning-fixer-worker\",\"daily-compiler-quality\",\"daily-evals-report\",\"daily-firewall-report\",\"daily-issues-report\",\"daily-observability-report\",\"daily-regulatory\",\"daily-repo-chronicle\",\"daily-secrets-analysis\",\"daily-team-evolution-insights\",\"daily-token-consumption-report\",\"deep-report\",\"engine-conformance-agy\",\"engine-conformance-aider\",\"engine-conformance-claude\",\"engine-conformance-codex\",\"engine-conformance-copilot\",\"engine-conformance-crush\",\"engine-conformance-cursor\",\"engine-conformance-deepseek-harness\",\"engine-conformance-factory\",\"engine-conformance-gemini\",\"engine-conformance-goose\",\"engine-conformance-kiro\",\"engine-conformance-langgraph\",\"engine-conformance-mini-swe-agent\",\"engine-conformance-opencode\",\"engine-conformance-pi\",\"engine-conformance-pydantic-ai\",\"eslint-miner\",\"eslint-monster\",\"eslint-refiner\",\"repo-tree-map\",\"smoke-work-queue-worker\"],\"pools\":{\"code-scanning\":{\"concurrency\":3,\"per_account_limit\":0,\"max_attempts\":3},\"daily-reports\":{\"concurrency\":3,\"per_account_limit\":1,\"max_attempts\":3},\"default\":{\"concurrency\":3,\"per_account_limit\":0,\"max_attempts\":3},\"engine-conformance\":{\"concurrency\":3,\"per_account_limit\":1,\"max_attempts\":3},\"smoke-work-queue\":{\"concurrency\":3,\"per_account_limit\":0,\"max_attempts\":3}}}"
           GH_AW_AGENT_OUTPUT: ${{ steps.setup-agent-output-env.outputs.GH_AW_AGENT_OUTPUT }}
           GH_AW_COMMENT_ID: ${{ needs.activation.outputs.comment_id }}
           GH_AW_MENTIONS_GITHUB_TOKEN: ${{ github.token }}
@@ -3091,6 +3037,23 @@ jobs:
             setupGlobals(core, github, context, exec, io, getOctokit, process.env.GH_AW_GITHUB_TOKEN_SOURCE);
             const { main } = require(path.join(actionsDir, 'process_safe_outputs.cjs'));
             await main();
+      - name: Finish work queue claim
+        id: work_queue_finish
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          GH_AW_WORK_QUEUE_ENABLED: "true"
+          GH_AW_WORK_QUEUE_ROLE: "worker"
+          GH_AW_WORK_QUEUE_POLICY: "{\"version\":4,\"pending_limit\":30,\"issues\":{\"label\":\"work\",\"title_prefix\":\"[work queue]\",\"orphaned_after_days\":30},\"effect_scope\":\"${{ github.repository }}\",\"workers\":[\"artifacts-summary\",\"code-scanning-fixer-worker\",\"daily-compiler-quality\",\"daily-evals-report\",\"daily-firewall-report\",\"daily-issues-report\",\"daily-observability-report\",\"daily-regulatory\",\"daily-repo-chronicle\",\"daily-secrets-analysis\",\"daily-team-evolution-insights\",\"daily-token-consumption-report\",\"deep-report\",\"engine-conformance-agy\",\"engine-conformance-aider\",\"engine-conformance-claude\",\"engine-conformance-codex\",\"engine-conformance-copilot\",\"engine-conformance-crush\",\"engine-conformance-cursor\",\"engine-conformance-deepseek-harness\",\"engine-conformance-factory\",\"engine-conformance-gemini\",\"engine-conformance-goose\",\"engine-conformance-kiro\",\"engine-conformance-langgraph\",\"engine-conformance-mini-swe-agent\",\"engine-conformance-opencode\",\"engine-conformance-pi\",\"engine-conformance-pydantic-ai\",\"eslint-miner\",\"eslint-monster\",\"eslint-refiner\",\"repo-tree-map\",\"smoke-work-queue-worker\"],\"pools\":{\"code-scanning\":{\"concurrency\":3,\"per_account_limit\":0,\"max_attempts\":3},\"daily-reports\":{\"concurrency\":3,\"per_account_limit\":1,\"max_attempts\":3},\"default\":{\"concurrency\":3,\"per_account_limit\":0,\"max_attempts\":3},\"engine-conformance\":{\"concurrency\":3,\"per_account_limit\":1,\"max_attempts\":3},\"smoke-work-queue\":{\"concurrency\":3,\"per_account_limit\":0,\"max_attempts\":3}}}"
+          GH_AW_WORK_QUEUE_FINISH_INTENT: /tmp/gh-aw/work-queue.finish.jsonl
+          GH_AW_WORK_QUEUE_EFFECTS: /tmp/gh-aw/work-queue.effects.jsonl
+        with:
+          script: |
+            const path = require('path');
+            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
+            setupGlobals(core, github, context, exec, io, getOctokit);
+            const { main } = require(path.join(actionsDir, 'finish_work_queue_claim.cjs'));
+            await main({ core, github, context, requireAssignment: true });
       - name: Redact secrets in logs
         id: redact_secrets
         if: always()

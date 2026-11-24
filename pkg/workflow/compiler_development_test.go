@@ -298,12 +298,12 @@ Debug generated delegated workflow jobs.
 				assert.Empty(t, compiled.Jobs["conclusion"]["outputs"])
 				if !enabled {
 					assert.Contains(t, string(content), "Snapshot work queue state")
-					assert.Contains(t, string(content), "Reconcile work queue claim")
+					assert.Contains(t, string(content), "Finish work queue claim")
 				}
 			}
 			if enabled {
 				assert.NotContains(t, string(content), "Snapshot work queue state")
-				assert.NotContains(t, string(content), "Reconcile work queue claim")
+				assert.NotContains(t, string(content), "Finish work queue claim")
 				assert.NotContains(t, compiled.Jobs, "work_queue_claim")
 				assert.NotContains(t, string(content), "inputs.work_queue_assignment")
 			} else if source == queueSource {
