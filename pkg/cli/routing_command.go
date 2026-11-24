@@ -518,7 +518,7 @@ func runRoutingList(ctx context.Context, api routingAPI, out io.Writer, jsonOutp
 }
 
 // resetRoutingState fences every run up to latestRun, empties the scopes and lets exploration
-// resume, as the writer's resetState does.
+// resume, as the reducer's reset vector (aw2-reducer.json) defines.
 func resetRoutingState(state routingHistoryState, latestRun int64, at string) routingHistoryState {
 	state.ResetAfterRun = latestRun
 	state.Scopes = map[string]*routingHistoryScope{}

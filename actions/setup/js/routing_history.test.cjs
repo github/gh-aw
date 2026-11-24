@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 const req = require;
 const vectors = req("./fixtures/routing-history/aw2-reducer.json");
-const { applyRun, emptyState, resetState, trimRuns } = req("./routing_history.cjs");
+const { applyRun, emptyState, trimRuns } = req("./routing_history.cjs");
 
 // Numbers agree to a relative tolerance of 1e-9 (vectors.arithmetic); everything else exactly.
 function expectSame(actual, expected, path = "state") {
@@ -52,11 +52,6 @@ describe("routing history oracle vectors", () => {
     expectSame(result.lines, vector.expect.lines, "lines");
     if (vector.expect.runs) expectSame(trimRuns([...vector.runs, ...result.lines], vector.bounds), vector.expect.runs, "runs");
     expect(vector.state).toEqual(before);
-  });
-
-  it("resets as gh aw routing reset does", () => {
-    const vector = vectors.cases.find(candidate => candidate.name === "reset");
-    expectSame(resetState(vector.state, vector.reset.latest_run, vector.reset.at), vector.expect.state);
   });
 });
 

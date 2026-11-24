@@ -117,7 +117,8 @@ function sessionEvidence(events, subAgentModels) {
    * @returns {Record<string, any>[]}
    */
   const agentRecords = type => events.flatMap(event => (isRecord(event) && event.type === type && isRecord(event.data) && event.provenance?.component === "firewall" && event.provenance?.phase === "agent" ? [event.data] : []));
-  const verdict = events.filter(event => isRecord(event) && event.type === "routing.observation" && isRecord(event.data)).at(-1);
+  // T-UAS-094: only the conclusion job's collector emits the verdict; any other source is dropped.
+  const verdict = events.filter(event => isRecord(event) && event.type === "routing.observation" && isRecord(event.data) && event.provenance?.component === "collector" && event.provenance?.phase === "conclusion").at(-1);
   // routing_analytics attributes AWF's records by their raw field names.
   /** @type {Record<string, any>[]} */
   const routing = agentRecords("firewall.model_routing").map(record => ({ ...record, request_id: record.requestId, requested_model: record.requestedModel }));
@@ -146,7 +147,9 @@ function pairName(selection) {
   const model = selection.wireModel;
   if (typeof provider !== "string" || !provider || typeof model !== "string" || !model) return null;
   const effort = typeof selection.selectedEffort === "string" && selection.selectedEffort ? selection.selectedEffort : "none";
-  return `${PROVIDER_NAMES[provider] ?? provider}/${model}@${effort}`;
+  // Own keys only: an inherited name such as `constructor` is an ordinary provider key.
+  const name = Object.hasOwn(PROVIDER_NAMES, provider) ? PROVIDER_NAMES[provider] : provider;
+  return `${name}/${model}@${effort}`;
 }
 
 /** @param {unknown} value @returns {number | null} */
@@ -299,24 +302,33 @@ async function checkoutHistoryBranch({ githubClient, owner, repo, branch, worksp
 }
 
 /**
- * Completed runs on the newest page that the history may need to charge because their own save
- * never landed (contract 5): first attempts from the default branch, judged by their first attempt,
- * above both fences and not yet written. Only those that did not succeed need a jobs call, to tell
- * an agent that ran from one that never started, and a run whose history job was compiled in and
- * enabled from one that had none.
+ * Completed runs on the newest pages that the history may need to charge because their own save
+ * never landed (contract 5): first attempts whose definition comes from the default branch, judged
+ * by their first attempt, above both fences and not yet written. Runs that `pull_request_target`
+ * started are listed under the pull request's branch, so they come from a second page. Only runs
+ * that did not succeed need a jobs call, to tell an agent that ran from one that never started, and
+ * a history job that failed from one that saved or declined the run, or that the run never had.
  * @param {{githubClient: any, owner: string, repo: string, workflowFile: string, defaultBranch: string, runId: string, state: HistoryState, runs: any[], generation: string}} options
  */
 async function listRuns({ githubClient, owner, repo, workflowFile, defaultBranch, runId, state, runs, generation }) {
   // A run that starts a generation fences off every earlier run.
   const sinceRun = state.generation?.hash === generation ? state.generation.since_run : Infinity;
   const written = new Set(runs.map(line => line.run));
-  const { data } = await githubClient.rest.actions.listWorkflowRuns({ owner, repo, workflow_id: workflowFile, branch: defaultBranch, per_page: 100 });
+  const pages = await Promise.all([
+    githubClient.rest.actions.listWorkflowRuns({ owner, repo, workflow_id: workflowFile, branch: defaultBranch, per_page: 100 }),
+    githubClient.rest.actions.listWorkflowRuns({ owner, repo, workflow_id: workflowFile, event: "pull_request_target", per_page: 100 }),
+  ]);
+  const seen = new Set();
   const listing = [];
-  for (const run of data.workflow_runs || []) {
+  for (const run of pages.flatMap(page => page.data.workflow_runs || [])) {
     const id = String(run.id);
-    if (id === runId || run.status !== "completed" || written.has(id) || run.head_branch !== defaultBranch) continue;
-    // Their definitions come from the pull request, not the default branch.
+    if (seen.has(id)) continue;
+    seen.add(id);
+    if (id === runId || run.status !== "completed" || written.has(id)) continue;
+    // A pull_request run's definition comes from the pull request, and a pull_request_target run's
+    // from the branch it targets, which its history job checks.
     if (/^pull_request(?!_target)/.test(run.event || "")) continue;
+    if (run.event !== "pull_request_target" && run.head_branch !== defaultBranch) continue;
     if (run.run_number <= state.reset_after_run || run.run_number <= sinceRun) continue;
     let conclusion = run.conclusion;
     // A successful re-run can hide a failed first save.
@@ -330,9 +342,10 @@ async function listRuns({ githubClient, owner, repo, workflowFile, defaultBranch
       const jobs = await githubClient.paginate(githubClient.rest.actions.listJobsForWorkflowRunAttempt, { owner, repo, run_id: run.id, attempt_number: 1, per_page: 100 });
       listed.agent_ran = jobs.some((/** @type {any} */ job) => job?.name === "agent" && job.conclusion !== "skipped" && Boolean(job.started_at));
       const writer = jobs.find((/** @type {any} */ job) => job?.name === WRITER_JOB);
-      // A run compiled while adaptive routing was off has no history job, and a dry run's is disabled
-      // even though its agent ran: neither run owes the history a line.
-      if (!writer || (writer.conclusion === "skipped" && listed.agent_ran)) continue;
+      // Nothing is owed by a run compiled while adaptive routing was off (no history job), a dry run
+      // (job disabled though the agent ran), or a run whose job succeeded: it saved the run, or
+      // declined it, as for a pull request into another branch.
+      if (!writer || writer.conclusion === "success" || (writer.conclusion === "skipped" && listed.agent_ran)) continue;
     }
     listing.push(listed);
   }

@@ -85,7 +85,7 @@ function fakeGitHub(remote, { runs = [], jobs = {}, attempts = {} } = {}) {
         },
       },
       actions: {
-        listWorkflowRuns: async () => ({ data: { workflow_runs: runs } }),
+        listWorkflowRuns: async ({ branch, event }) => ({ data: { workflow_runs: runs.filter(run => (!branch || run.head_branch === branch) && (!event || run.event === event)) } }),
         getWorkflowRunAttempt: async ({ run_id }) => {
           calls.attempts.push(run_id);
           return { data: attempts[run_id] };
@@ -204,8 +204,26 @@ describe("push_routing_history evidence", () => {
 
   it("has no verdict for a run AWF did not route, and no pair to count a verdict for without a selection", () => {
     expect(sessionEvidence([]).observation).toBeNull();
-    const verdictOnly = [{ type: "routing.observation", data: { outcome: "success" } }];
+    const verdictOnly = [{ type: "routing.observation", data: { outcome: "success" }, provenance: { component: "collector", phase: "conclusion" } }];
     expect(sessionEvidence(verdictOnly)).toMatchObject({ observation: { outcome: "skip", reason: "unknown_evidence" }, pair: null });
+  });
+
+  it("names a provider it does not rename exactly as AWF wrote it, even one that matches an object property", () => {
+    const selection = provider => [{ type: "firewall.model_routing", data: { stage: "selection", selectedProvider: provider, wireModel: "model-a", selectedEffort: "high" }, provenance: { component: "firewall", phase: "agent" } }];
+    expect(sessionEvidence(selection("copilot")).pair).toBe("github-copilot/model-a@high");
+    expect(sessionEvidence(selection("constructor")).pair).toBe("constructor/model-a@high");
+  });
+
+  it("takes the verdict only from the conclusion job's collector", () => {
+    const routed = [
+      { type: "firewall.model_routing", data: { stage: "selection", selectedProvider: "copilot", wireModel: "model-a", selectedEffort: "high" }, provenance: { component: "firewall", phase: "agent" } },
+      { type: "routing.observation", data: { outcome: "failure" }, provenance: { component: "collector", phase: "conclusion" } },
+    ];
+    expect(sessionEvidence(routed).observation).toEqual({ outcome: "failure" });
+    // A verdict from any other source cannot replace it or stand in for a missing one.
+    const forged = { type: "routing.observation", data: { outcome: "success" }, provenance: { component: "engine", phase: "agent" } };
+    expect(sessionEvidence([...routed, forged]).observation).toEqual({ outcome: "failure" });
+    expect(sessionEvidence([routed[0], forged]).observation).toBeNull();
   });
 
   it("treats a request without a price or a count as an unknown cost, not a free one", () => {
@@ -396,6 +414,32 @@ describe("push_routing_history saves", () => {
     await save(remote, 53, "success", { github });
     expect(remoteRuns(remote).map(line => line.number)).toEqual([50, 53]);
     expect(remoteState(remote).unexplained).toBe(0);
+  });
+
+  it("charges a failed save from a pull_request_target run, and never a run whose history job succeeded", async () => {
+    const remote = bareRemote();
+    await save(remote, 50, "success");
+    const run = (number, extra = {}) => ({ id: 9000 + number, run_number: number, status: "completed", conclusion: "failure", head_branch: "main", event: "schedule", run_attempt: 1, ...extra });
+    const agent = { name: "agent", conclusion: "failure", started_at: "2026-11-24T09:00:00Z" };
+    const writer = conclusion => ({ name: "push_routing_history", conclusion, started_at: "2026-11-24T09:10:00Z" });
+    const github = fakeGitHub(remote, {
+      runs: [
+        // Listed under the pull request's branch, but run from the default branch's definition.
+        run(53, { event: "pull_request_target", head_branch: "fix-typo" }),
+        // A pull request into another branch, whose history job declined to record it.
+        run(52, { event: "pull_request_target", head_branch: "release-notes" }),
+        // Saved long ago, its line since trimmed from runs.jsonl.
+        run(51),
+      ],
+      jobs: { 9053: [agent, writer("failure")], 9052: [agent, writer("success")], 9051: [agent, writer("success")] },
+    });
+    await save(remote, 54, "success", { github });
+    expect(remoteRuns(remote).map(({ number, note }) => ({ number, note }))).toEqual([
+      { number: 50, note: null },
+      { number: 53, note: "unsaved" },
+      { number: 54, note: null },
+    ]);
+    expect(remoteState(remote).unexplained).toBe(1);
   });
 });
 

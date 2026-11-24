@@ -93,4 +93,4 @@ gh aw routing status issue-triage
 - Observe mode only records evidence; it never changes which model runs and makes no recommendation.
 - A history belongs to one workflow file in one repository; renaming the file starts a new history. Reusable workflows (`on: workflow_call`) cannot take part, because each caller numbers its own runs.
 - A run that ends before the agent job starts, or whose usage artifact was never published, is not recorded by its own save.
-- A save that fails is charged as `unsaved` by a later save that finds the run among the workflow's 100 newest runs on the default branch. Runs that `pull_request_target` started are listed under the pull request's branch, so their failed saves are not charged.
+- A save that fails is charged as `unsaved` by a later save that finds the run among the workflow's 100 newest runs on the default branch, or its 100 newest runs started by `pull_request_target`.

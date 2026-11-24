@@ -434,18 +434,6 @@ function applyRun(input, runs, run, options = {}) {
   return finish();
 }
 
-/**
- * `gh aw routing reset`: fence off every run up to the latest one, empty the scopes and let
- * exploration resume. runs.jsonl is kept.
- * @param {HistoryState} input
- * @param {number} latestRun
- * @param {string} at
- * @returns {HistoryState}
- */
-function resetState(input, latestRun, at) {
-  return { ...structuredClone(input), reset_after_run: latestRun, scopes: {}, unexplained: 0, updated: { run: null, at } };
-}
-
 module.exports = {
   BOUNDS,
   NOTES,
@@ -455,6 +443,5 @@ module.exports = {
   memory,
   rate,
   receiptBound,
-  resetState,
   trimRuns,
 };
