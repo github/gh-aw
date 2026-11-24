@@ -120,6 +120,9 @@ function getRunFailureStatusText(agentConclusion, assignToAgentErrorCount, safeO
  * @param {Array<{type?: string, message?: unknown, reason?: unknown} | null>} items
  */
 function appendAgentReports(children, items) {
+  const maxReports = 50;
+  let reportCount = 0;
+  let omitted = false;
   /** @type {import("./report_ast.cjs").ReportBlock[]} */
   const reports = [];
   for (const item of items) {
@@ -159,13 +162,21 @@ function appendAgentReports(children, items) {
       const blocks = parseReportMarkdown(sanitizeContent(text), { agentTainted: true });
       if (!blocks.length) continue;
       normalizeReport({ type: "report", title: "Workflow status", children: blocks });
+      if (reportCount === maxReports) {
+        omitted = true;
+        break;
+      }
       reports.push({ type: "paragraph", children: [{ type: "strong", children: [{ type: "text", value: summary, agentTainted: false }], agentTainted: false }], agentTainted: false }, ...blocks);
+      reportCount++;
     } catch {
       core.warning("Omitting an invalid agent explanation from the completion comment");
     }
   }
   if (reports.length) {
     children.push({ type: "heading", level: 2, children: [{ type: "text", value: "Agent messages", agentTainted: false }], agentTainted: false }, ...reports);
+    if (omitted) {
+      children.push({ type: "paragraph", children: [{ type: "text", value: "Additional agent messages omitted.", agentTainted: false }], agentTainted: false });
+    }
   }
 }
 
