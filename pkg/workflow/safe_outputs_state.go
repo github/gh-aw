@@ -173,7 +173,8 @@ func hasNonBuiltinSafeOutputsEnabled(safeOutputs *SafeOutputsConfig) bool { //no
 		safeOutputs.DispatchRepository != nil ||
 		safeOutputs.CallWorkflow != nil ||
 		safeOutputs.SetIssueType != nil ||
-		safeOutputs.SetIssueField != nil // non-builtin safe output field
+		safeOutputs.SetIssueField != nil || // non-builtin safe output field
+		isRoutedRequestContinuation(safeOutputs) // a routed continuation hands off work
 }
 
 // HasSafeOutputsEnabled checks if any safe-outputs are enabled

@@ -1,5 +1,8 @@
 # ADR-68348: Dispatch queue launches through verified SHA-derived lightweight tags
 
+> [!NOTE]
+> Superseded by work queue protocol v4 ([specification](../src/content/docs/specs/work-queue-specification.md)): v4 removed immutable worker revisions and SHA-derived tags; workers launch at the configured target ref.
+
 **Date**: 2026-10-13
 **Status**: Draft
 **Deciders**: Unknown (draft generated from PR #68348)

@@ -48,7 +48,7 @@ test("actual build, library scan commands, precheck and native Claim boundaries"
     facts => (facts.scanProbes.warning.status = 1),
     facts => (facts.coverage.ts = true),
     facts => (facts.precheck.warning.flag = false),
-    facts => (facts.defaultProfileMax = 16),
+    facts => (facts.claimsPerDispatch = [2, 1]),
     facts => (facts.monsterAssignmentMax = 2),
     facts => (facts.requiredAssignments[0] = false),
     facts => (facts.memoryAdapter.base = "b".repeat(40)),

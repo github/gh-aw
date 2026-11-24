@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -14,50 +15,30 @@ import (
 	"time"
 
 	"github.com/github/gh-aw/pkg/console"
+	"github.com/github/gh-aw/pkg/workqueue"
 )
 
-var workQueueControlSummaryPattern = regexp.MustCompile(`^Work queue controls: [0-9]{1,9} checked requests; [0-9]{1,9} blocked intents$`)
+var workQueueControlSummaryPattern = regexp.MustCompile(`^Work queue controls: [a-z_]{1,32}; [0-9]{1,9} receipts$`)
 
 const (
-	workQueueSnapshotFile       = "work-queue.snapshot.json"
-	workQueueFinishFile         = "work-queue.finish.jsonl"
-	legacyWorkQueueSnapshotFile = "dispatch-work-coordinator.snapshot.json"
-	legacyWorkQueueFinishFile   = "dispatch-work-coordinator.finish.jsonl"
-	workQueueTransactionVersion = 2
-	// Historical diagnostic wire bound; independent of the current engine.
-	historicalMaxEnqueued int64 = 9007199254740991
+	workQueueSnapshotFile = "work-queue.snapshot.json"
+	workQueueFinishFile   = "work-queue.finish.jsonl"
 )
 
 // WorkQueueReport separates activation-time queue facts and agent intent
 // from the operations observed in this run's workflow job logs.
 type WorkQueueReport struct {
 	Snapshot      *WorkQueueSnapshot       `json:"snapshot,omitempty"`
-	FinishIntent  string                   `json:"finish_intent,omitempty"`
 	FinishIntents []WorkQueueFinishReceipt `json:"finish_intents,omitempty"`
 	Operations    []WorkQueueOperation     `json:"operations,omitempty"`
 }
 
+// WorkQueueSnapshot is a captured activation snapshot. Snapshots of other
+// protocol versions report only their version; they are not replayed.
 type WorkQueueSnapshot struct {
-	Version      int                       `json:"version"`
-	SHA          *string                   `json:"sha"`
-	Worker       *WorkQueueWorker          `json:"worker"`
-	Transactions []WorkQueueTransaction    `json:"transactions"`
-	Current      *WorkQueueCurrentSnapshot `json:"current,omitempty"`
-}
-
-type WorkQueueWorker struct {
-	WorkID  string `json:"work_id"`
-	ClaimID string `json:"claim_id"`
-}
-
-// These fields decode the historical runtime protocol, not the current engine.
-type WorkQueueTransaction struct {
-	Version  int     `json:"version"`
-	Kind     string  `json:"kind"`
-	Work     string  `json:"work"`
-	Claim    *string `json:"claim"`
-	Attempt  *string `json:"attempt"`
-	Enqueued *int64  `json:"enqueued,omitempty"`
+	Version int                       `json:"version"`
+	SHA     *string                   `json:"sha"`
+	Current *WorkQueueCurrentSnapshot `json:"current,omitempty"`
 }
 
 type WorkQueueOperation struct {
@@ -68,198 +49,40 @@ type WorkQueueOperation struct {
 
 func extractWorkQueueReport(runDir string) (*WorkQueueReport, error) {
 	report := &WorkQueueReport{}
-	snapshotPath, err := workQueueArtifactPath(runDir, workQueueSnapshotFile, legacyWorkQueueSnapshotFile)
-	if err != nil {
-		return nil, err
-	}
-	data, err := readBoundedWorkQueueArtifact(snapshotPath, 162<<20)
+	data, err := readBoundedWorkQueueArtifact(filepath.Join(runDir, workQueueSnapshotFile), 162<<20)
 	if err == nil {
 		report.Snapshot, err = parseWorkQueueSnapshot(data)
 	}
-	if err != nil && !os.IsNotExist(err) {
+	if err != nil && !errors.Is(err, fs.ErrNotExist) {
 		return nil, fmt.Errorf("failed to read work queue snapshot: %w", err)
 	}
-
-	finishPath, err := workQueueArtifactPath(runDir, workQueueFinishFile, legacyWorkQueueFinishFile)
-	if err != nil {
-		return nil, err
-	}
-	if report.Snapshot != nil && report.Snapshot.Version == 3 {
-		report.FinishIntents, err = readCurrentWorkQueueFinishIntents(finishPath, report.Snapshot.Current)
-	} else {
-		report.FinishIntent, err = readWorkQueueFinishIntent(finishPath)
-	}
-	if err != nil {
-		return nil, err
+	if report.Snapshot != nil && report.Snapshot.Current != nil {
+		report.FinishIntents, err = readCurrentWorkQueueFinishIntents(filepath.Join(runDir, workQueueFinishFile), report.Snapshot.Current)
+		if err != nil {
+			return nil, err
+		}
 	}
 	report.Operations, err = extractWorkQueueOperations(filepath.Join(runDir, "workflow-logs"))
 	if err != nil {
 		return nil, err
 	}
-	if report.Snapshot == nil && report.FinishIntent == "" && len(report.FinishIntents) == 0 && len(report.Operations) == 0 {
+	if report.Snapshot == nil && len(report.FinishIntents) == 0 && len(report.Operations) == 0 {
 		return nil, nil
 	}
 	return report, nil
 }
 
-func workQueueArtifactPath(runDir, current, legacy string) (string, error) {
-	path := filepath.Join(runDir, current)
-	if _, err := os.Stat(path); err != nil {
-		if os.IsNotExist(err) {
-			return filepath.Join(runDir, legacy), nil
-		}
-		return "", fmt.Errorf("failed to inspect work queue artifact: %w", err)
-	}
-	return path, nil
-}
-
 func parseWorkQueueSnapshot(data []byte) (*WorkQueueSnapshot, error) {
-	var fields map[string]json.RawMessage
-	if err := json.Unmarshal(data, &fields); err != nil {
+	var header struct {
+		Version int `json:"version"`
+	}
+	if err := json.Unmarshal(data, &header); err != nil {
 		return nil, err
 	}
-	if string(fields["version"]) == "3" {
-		return parseCurrentWorkQueueSnapshot(data)
+	if header.Version != workqueue.Version {
+		return &WorkQueueSnapshot{Version: header.Version}, nil
 	}
-	for _, field := range []string{"version", "sha", "worker", "transactionLog"} {
-		if _, present := fields[field]; !present {
-			return nil, fmt.Errorf("work queue snapshot is missing %q", field)
-		}
-	}
-	var snapshot struct {
-		Version        int              `json:"version"`
-		SHA            *string          `json:"sha"`
-		Worker         *WorkQueueWorker `json:"worker"`
-		TransactionLog *string          `json:"transactionLog"`
-	}
-	if err := json.Unmarshal(data, &snapshot); err != nil {
-		return nil, err
-	}
-	if snapshot.Version != 2 || snapshot.TransactionLog == nil ||
-		(snapshot.SHA != nil && *snapshot.SHA == "") ||
-		(snapshot.Worker != nil && (snapshot.Worker.WorkID == "" || snapshot.Worker.ClaimID == "")) {
-		return nil, errors.New("invalid work queue snapshot")
-	}
-	transactions := make([]WorkQueueTransaction, 0)
-	for i, line := range strings.Split(*snapshot.TransactionLog, "\n") {
-		if strings.TrimSpace(line) == "" {
-			continue
-		}
-		transaction, err := parseWorkQueueTransaction([]byte(line))
-		if err != nil {
-			return nil, fmt.Errorf("transaction line %d: %w", i+1, err)
-		}
-		transactions = append(transactions, transaction)
-	}
-	return &WorkQueueSnapshot{
-		Version: snapshot.Version, SHA: snapshot.SHA, Worker: snapshot.Worker, Transactions: transactions,
-	}, nil
-}
-
-func parseWorkQueueTransaction(data []byte) (WorkQueueTransaction, error) {
-	var tx WorkQueueTransaction
-	var fields map[string]json.RawMessage
-	if err := json.Unmarshal(data, &fields); err != nil {
-		return tx, err
-	}
-	if fields == nil {
-		return tx, errors.New("transaction must be a JSON object")
-	}
-	// Read-only historical diagnostics. This decoder never supplies operational
-	// replay or publication; Version below is a reporting normalization only.
-	_, hasVersion := fields["version"]
-	version := 0
-	if hasVersion {
-		if strings.TrimSpace(string(fields["version"])) == "null" {
-			return tx, errors.New("invalid transaction version")
-		}
-		if err := json.Unmarshal(fields["version"], &version); err != nil {
-			return tx, err
-		}
-	}
-	if version < 0 || version > workQueueTransactionVersion {
-		return tx, errors.New("unsupported work queue transaction version")
-	}
-	expectedFields := 4
-	if hasVersion {
-		expectedFields++
-	}
-	_, hasEnqueued := fields["enqueued"]
-	if hasEnqueued {
-		if version < workQueueTransactionVersion {
-			return tx, errors.New("historical transaction must not contain enqueue metadata")
-		}
-		expectedFields++
-	}
-	if len(fields) != expectedFields || fields["kind"] == nil || fields["work"] == nil || fields["claim"] == nil || fields["attempt"] == nil {
-		return tx, errors.New("transaction must contain version, kind, work, claim, and attempt")
-	}
-	if err := json.Unmarshal(data, &tx); err != nil {
-		return tx, err
-	}
-	if hasEnqueued && (tx.Kind != "Work" || tx.Enqueued == nil || *tx.Enqueued < 0 || *tx.Enqueued > historicalMaxEnqueued) {
-		return tx, errors.New("invalid Work enqueue time")
-	}
-	if tx.Work == "" ||
-		(tx.Claim != nil && *tx.Claim == "") || (tx.Attempt != nil && *tx.Attempt == "") {
-		return tx, errors.New("invalid transaction version or identifiers")
-	}
-	if !validHistoricalWorkQueueTransaction(tx) {
-		return tx, fmt.Errorf("invalid %q transaction", tx.Kind)
-	}
-	tx.Version = workQueueTransactionVersion
-	return tx, nil
-}
-
-func validHistoricalWorkQueueTransaction(tx WorkQueueTransaction) bool {
-	switch tx.Kind {
-	case "Work", "WorkCancellation":
-		return tx.Claim == nil && tx.Attempt == nil
-	case "Claim", "ClaimCancellation":
-		return tx.Claim != nil && tx.Attempt == nil
-	case "Completion":
-		return tx.Claim != nil && tx.Attempt != nil
-	default:
-		return false
-	}
-}
-
-func readWorkQueueFinishIntent(path string) (outcome string, err error) {
-	file, err := os.Open(path)
-	if os.IsNotExist(err) {
-		return "", nil
-	}
-	if err != nil {
-		return "", fmt.Errorf("failed to read work queue finish intent: %w", err)
-	}
-	defer func() {
-		if closeErr := file.Close(); closeErr != nil {
-			err = errors.Join(err, errors.New("could not close the work queue finish intent artifact"))
-		}
-	}()
-
-	scanner := bufio.NewScanner(file)
-	for line := 1; scanner.Scan(); line++ {
-		if strings.TrimSpace(scanner.Text()) == "" {
-			continue
-		}
-		var intent map[string]string
-		if err := json.Unmarshal(scanner.Bytes(), &intent); err != nil {
-			return "", fmt.Errorf("finish intent line %d: %w", line, err)
-		}
-		value := intent["outcome"]
-		if len(intent) != 1 || !slices.Contains([]string{"completed", "cancelled"}, value) {
-			return "", fmt.Errorf("invalid finish intent at line %d", line)
-		}
-		if outcome != "" && outcome != value {
-			return "", errors.New("conflicting work queue finish intents")
-		}
-		outcome = value
-	}
-	if err := scanner.Err(); err != nil {
-		return "", fmt.Errorf("failed to scan work queue finish intents: %w", err)
-	}
-	return outcome, nil
+	return parseCurrentWorkQueueSnapshot(data)
 }
 
 func extractWorkQueueOperations(logDir string) ([]WorkQueueOperation, error) {
@@ -269,7 +92,7 @@ func extractWorkQueueOperations(logDir string) ([]WorkQueueOperation, error) {
 	var operations []WorkQueueOperation
 	seen := make(map[string]struct{})
 	err := filepath.WalkDir(logDir, func(path string, entry os.DirEntry, walkErr error) error {
-		if os.IsNotExist(walkErr) && path == logDir {
+		if errors.Is(walkErr, fs.ErrNotExist) && path == logDir {
 			return nil
 		}
 		if walkErr != nil {
@@ -319,24 +142,12 @@ func readWorkQueueStepLog(path, source string, seen map[string]struct{}) (operat
 		}
 		message = strings.TrimSpace(message)
 		if strings.HasPrefix(message, "Work queue controls:") {
-			_, step, found := strings.Cut(filepath.Base(source), "_")
-			if !found || step != "Process trusted work queue controls.txt" ||
-				!isWorkQueueStepLog(strings.TrimPrefix(filepath.ToSlash(source), "workflow-logs/")) ||
+			// Only the trusted controls step may report control summaries.
+			if _, step, found := strings.Cut(filepath.Base(source), "_"); !found || step != "Process trusted work queue controls.txt" ||
 				!workQueueControlSummaryPattern.MatchString(message) {
 				continue
 			}
-		}
-		if !strings.HasPrefix(message, "Work queue: ") &&
-			!strings.HasPrefix(message, "Work queue activation: ") &&
-			!strings.HasPrefix(message, "Work queue finish: ") &&
-			!strings.HasPrefix(message, "Work queue delivery: ") &&
-			!strings.HasPrefix(message, "Work queue reconciliation: ") &&
-			!workQueueControlSummaryPattern.MatchString(message) &&
-			!strings.HasPrefix(message, "Work queue claim reconciliation") &&
-			!strings.HasPrefix(message, "Captured work queue snapshot (") &&
-			!strings.HasPrefix(message, "Dispatch coordinator: ") &&
-			!strings.HasPrefix(message, "Dispatch work claim reconciliation") &&
-			!strings.HasPrefix(message, "Captured dispatch coordinator snapshot (") {
+		} else if !strings.HasPrefix(message, "Work queue activation: ") && !strings.HasPrefix(message, "Work queue finish: ") {
 			continue
 		}
 		key := timestamp + "\n" + message
@@ -394,11 +205,6 @@ func mergeWorkQueueReport(report **WorkQueueReport, extracted *WorkQueueReport) 
 		(*report).Snapshot = extracted.Snapshot
 		changed = true
 	}
-
-	if (*report).FinishIntent != extracted.FinishIntent {
-		(*report).FinishIntent = extracted.FinishIntent
-		changed = true
-	}
 	if !slices.Equal((*report).FinishIntents, extracted.FinishIntents) {
 		(*report).FinishIntents = extracted.FinishIntents
 		changed = true
@@ -410,46 +216,42 @@ func mergeWorkQueueReport(report **WorkQueueReport, extracted *WorkQueueReport) 
 	return changed
 }
 
-func equalWorkQueueReceiptPointers[T comparable](left, right *T) bool {
+// equalWorkQueuePointers compares pointed-to values; nil equals only nil.
+func equalWorkQueuePointers[T comparable](left, right *T) bool {
 	if left == nil || right == nil {
 		return left == right
 	}
 	return *left == *right
 }
 
+// equalWorkQueueSlices compares elements and keeps nil distinct from empty,
+// matching what a cached report round-trips to.
+func equalWorkQueueSlices[S ~[]E, E comparable](left, right S) bool {
+	return (left == nil) == (right == nil) && slices.Equal(left, right)
+}
+
 func equalWorkQueueSnapshots(left, right *WorkQueueSnapshot) bool {
 	if left == nil || right == nil {
 		return left == right
 	}
-	return left.Version == right.Version &&
-		equalWorkQueueReceiptPointers(left.SHA, right.SHA) &&
-		equalWorkQueueReceiptPointers(left.Worker, right.Worker) &&
-		(left.Transactions == nil) == (right.Transactions == nil) &&
-		slices.EqualFunc(left.Transactions, right.Transactions, func(a, b WorkQueueTransaction) bool {
-			return a.Version == b.Version && a.Kind == b.Kind && a.Work == b.Work &&
-				equalWorkQueueReceiptPointers(a.Claim, b.Claim) &&
-				equalWorkQueueReceiptPointers(a.Attempt, b.Attempt) &&
-				equalWorkQueueReceiptPointers(a.Enqueued, b.Enqueued)
-		}) && equalCurrentWorkQueueSnapshots(left.Current, right.Current)
+	return left.Version == right.Version && equalWorkQueuePointers(left.SHA, right.SHA) &&
+		equalCurrentWorkQueueSnapshots(left.Current, right.Current)
 }
 
 func equalCurrentWorkQueueSnapshots(left, right *WorkQueueCurrentSnapshot) bool {
 	if left == nil || right == nil {
 		return left == right
 	}
-	leftValue, rightValue := *left, *right
-	leftValue.Assignment, rightValue.Assignment = nil, nil
-	leftValue.Diagnostics, rightValue.Diagnostics = nil, nil
-	if leftValue != rightValue || !equalWorkQueueDiagnostics(left.Diagnostics, right.Diagnostics) {
+	if left.Role != right.Role || left.Tip != right.Tip || left.CommitCount != right.CommitCount ||
+		!equalWorkQueueDiagnostics(left.Diagnostics, right.Diagnostics) {
 		return false
 	}
 	a, b := left.Assignment, right.Assignment
 	if a == nil || b == nil {
 		return a == b
 	}
-	return a.DispatchID == b.DispatchID && a.RequestID == b.RequestID && a.CommitID == b.CommitID &&
-		a.State == b.State && a.Released == b.Released && (a.Claims == nil) == (b.Claims == nil) &&
-		slices.Equal(a.Claims, b.Claims)
+	return a.DispatchID == b.DispatchID && a.State == b.State && equalWorkQueuePointers(a.Run, b.Run) &&
+		equalWorkQueueSlices(a.Claims, b.Claims)
 }
 
 func isWorkQueueStepLog(source string) bool {
@@ -457,14 +259,7 @@ func isWorkQueueStepLog(source string) bool {
 	if len(parts) != 2 {
 		return false
 	}
-	var job, file string
-	for _, part := range parts {
-		if job == "" {
-			job = part
-		} else {
-			file = part
-		}
-	}
+	job, file := parts[0], parts[1] //nolint:uncheckedsliceindex // length checked above.
 	number, name, found := strings.Cut(file, "_")
 	if !found || number == "" || strings.Trim(number, "0123456789") != "" {
 		return false
@@ -474,11 +269,11 @@ func isWorkQueueStepLog(source string) bool {
 		return job == base || strings.HasSuffix(job, " _ "+base)
 	}
 	switch name {
-	case "Snapshot work queue state.txt", "Snapshot dispatch coordinator state.txt":
+	case "Snapshot work queue state.txt":
 		return jobMatches("activation")
-	case "Reconcile work queue claim.txt", "Reconcile dispatch work claim.txt", "Process trusted work queue controls.txt", "Process Safe Outputs.txt":
+	case "Finish work queue claim.txt", "Process trusted work queue controls.txt", "Process Safe Outputs.txt":
 		return jobMatches("safe_outputs")
-	case "Collect work queue intents.txt", "Copy work queue claim finish intent.txt", "Copy dispatch claim finish intent.txt":
+	case "Collect work queue intents.txt", "Copy work queue claim finish intent.txt":
 		return jobMatches("agent")
 	default:
 		return false

@@ -12,12 +12,12 @@ import (
 
 var workClearConfirmAction = console.ConfirmAction
 
-func workConfirmClear(cmd *cobra.Command, branch workqueue.Branch, state workqueue.Projection, targets []string, hard bool) error {
-	preview := workClearPreview(branch, state, targets, hard)
+func workConfirmClear(cmd *cobra.Command, branch workqueue.Branch, state workqueue.Projection, dispatches, works []string) error {
+	preview := workClearPreview(branch, state, dispatches, works)
 	if _, err := fmt.Fprintln(cmd.ErrOrStderr(), preview); err != nil {
 		return fmt.Errorf("clear_preview_failed: queue unchanged: %w", err)
 	}
-	confirmed, err := workClearConfirmAction("Apply this queue clear?", "Yes, clear this snapshot", "No, keep queue")
+	confirmed, err := workClearConfirmAction("Apply this queue clear?", "Yes, clear the queue", "No, keep queue")
 	if err != nil {
 		return fmt.Errorf("clear_confirmation_failed: queue unchanged: %w", err)
 	}
@@ -27,40 +27,20 @@ func workConfirmClear(cmd *cobra.Command, branch workqueue.Branch, state workque
 	return nil
 }
 
-func workClearPreview(branch workqueue.Branch, state workqueue.Projection, targets []string, hard bool) string {
+func workClearPreview(branch workqueue.Branch, state workqueue.Projection, dispatches, works []string) string {
 	lines := []string{
 		fmt.Sprintf("Queue clear preview: repository=%s branch=%s\nSnapshot: %s",
 			workQueueText(branch.Remote), workQueueText(branch.Name), workQueueText(state.Tip)),
-		fmt.Sprintf("Work: %d; available: %d; claimed: %d; completed: %d; cancelled: %d\nAdmission paused: %t; grants paused: %t",
-			state.Stats.Work, state.Stats.Available, state.Stats.Claimed, state.Stats.Completed, state.Stats.Cancelled,
-			state.AdmissionPaused, state.GrantsPaused),
+		fmt.Sprintf("Work: %d; available: %d; claimed: %d; completed: %d; cancelled: %d; open dispatches: %d",
+			state.Stats.Work, state.Stats.Available, state.Stats.Claimed, state.Stats.Completed, state.Stats.Cancelled, state.Stats.Dispatches),
+		fmt.Sprintf("Release %d dispatches, then cancel %d Work (reason operator).\nRunning workflows are not stopped; completed Work and history are retained.", len(dispatches), len(works)),
 	}
-	reservations := 0
-	for _, dispatch := range state.Dispatches {
-		if !dispatch.Released {
-			reservations++
-		}
+	for _, id := range dispatches {
+		dispatch := state.Dispatches[id]
+		lines = append(lines, fmt.Sprintf("RELEASE %s state=%s workflow=%s", workQueueText(id), dispatch.State, workQueueText(dispatch.Workflow)))
 	}
-	lines = append(lines, fmt.Sprintf("Claims: %d; unreleased native reservations: %d", len(state.Claims), reservations))
-	selected := make(map[string]struct{}, len(targets))
-	for _, id := range targets {
-		selected[id] = struct{}{}
-	}
-	if hard {
-		lines = append(lines, "HARD RESET: remove all Work and reset identities and fairness debt.\nOld identities may be resubmitted and settled effects may repeat. Git ancestry is retained.")
-	} else {
-		lines = append(lines, fmt.Sprintf("Cancel %d selected Work; retain pending deliveries, history and identities.\nNative runs are not stopped or released. Admission and grants remain unchanged.", len(targets)))
-	}
-	for _, work := range workQueueOrderedWork(state, workQueueFilter{}) {
-		action := "RETAIN"
-		_, cancel := selected[work.WorkID]
-		if hard {
-			action = "REMOVE"
-		} else if cancel {
-			action = "CANCEL"
-		}
-		lines = append(lines, fmt.Sprintf("%s %s state=%s delivery=%s claim=%s", action,
-			workQueueText(work.WorkID), workQueueText(work.State), workQueueText(work.Barrier), workQueueText(work.ClaimID)))
+	for _, id := range works {
+		lines = append(lines, fmt.Sprintf("CANCEL %s state=%s", workQueueText(id), state.Works[id].State))
 	}
 	return strings.Join(lines, "\n")
 }

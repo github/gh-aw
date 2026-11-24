@@ -2,153 +2,72 @@ package cli
 
 import (
 	"bytes"
-	"encoding/base64"
 	"encoding/json"
-	"io"
-	"net/http"
-	"strings"
+	"os"
+	"path/filepath"
 	"testing"
 
-	"github.com/github/gh-aw/pkg/workqueue"
+	"github.com/github/gh-aw/pkg/workflow"
+	"github.com/stretchr/testify/require"
 )
 
-func TestWorkCommandPolicyFromConfig(t *testing.T) {
-	for _, scenario := range []string{"absent", "drained", "active", "not administrator", "invalid settings"} {
-		t.Run(scenario, func(t *testing.T) {
-			t.Setenv("GH_TOKEN", "test-token")
+// workSettingsCheckout makes the working directory a checkout whose aw.json
+// holds config; an empty config leaves aw.json absent.
+func workSettingsCheckout(t *testing.T, config string) {
+	t.Helper()
+	root := t.TempDir()
+	require.NoError(t, os.Mkdir(filepath.Join(root, ".git"), 0o700))
+	if config != "" {
+		path := filepath.Join(root, workflow.RepoConfigFileName)
+		require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o700))
+		require.NoError(t, os.WriteFile(path, []byte(config), 0o600))
+	}
+	t.Chdir(root)
+}
+
+func TestWorkReleaseUsesConfiguredMaxAttempts(t *testing.T) {
+	for _, tc := range []struct {
+		name, config string
+		exhausted    bool
+	}{
+		{name: "absent configuration defaults to three attempts"},
+		{name: "work_queue section omitted", config: `{}`},
+		{name: "global retry", config: `{"work_queue":{"retry":{"max_attempts":1}}}`, exhausted: true},
+		{name: "pool inherits global retry", config: `{"work_queue":{"retry":{"max_attempts":1},"pools":{"default":{"concurrency":2}}}}`, exhausted: true},
+		{name: "pool retry overrides global", config: `{"work_queue":{"retry":{"max_attempts":1},"pools":{"default":{"retry":{"max_attempts":2}}}}}`},
+		{name: "other pool retry does not apply", config: `{"work_queue":{"pools":{"other":{"retry":{"max_attempts":1}}}}}`},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
 			t.Setenv("GH_HOST", "github.com")
-			const repository = "owner/repo"
-			actor := workqueue.Actor{Role: "administrator", Principal: "1001", Repository: repository}
-			legacy := workqueue.DefaultPolicy(actor.Principal, repository)
-			genesis, err := workqueue.Genesis(actor, legacy, "legacy", "legacy", 1000)
-			if err != nil {
-				t.Fatal(err)
-			}
-			commits := []workqueue.QueueCommit{genesis}
-			if scenario == "active" {
-				node, err := workqueue.NewWork([]byte(`{"task":"active"}`), "active", "root", "default", legacy, 1000)
-				if err != nil {
-					t.Fatal(err)
-				}
-				request, _ := workqueue.NewRequest("active", "submit", actor, workqueue.SubmitParameters{Nodes: []workqueue.WorkDefinition{node}})
-				commits, _, _, err = workqueue.BuildCandidate(commits, actor, request, 2000)
-				if err != nil {
-					t.Fatal(err)
-				}
-			}
-			data, err := workqueue.Serialize(commits)
-			if err != nil {
-				t.Fatal(err)
-			}
-			ledger := string(data)
-			initial := ledger
-			if scenario == "absent" {
-				initial = ""
-			}
-			queue := newWorkQueueGitRemote(t, initial)
-			writes, configReads := 0, 0
-			original := http.DefaultTransport
-			t.Cleanup(func() { http.DefaultTransport = original })
-			http.DefaultTransport = workAPIRoundTripper(func(r *http.Request) (*http.Response, error) {
-				if r.Header.Get("Authorization") != "token test-token" {
-					t.Error("configuration update was not authenticated")
-				}
-				status := http.StatusOK
-				var result any
-				path := strings.TrimPrefix(r.URL.Path, "/repos/"+repository+"/")
-				file := func(name, content string) any {
-					return map[string]any{"type": "file", "path": name, "encoding": "base64", "content": base64.StdEncoding.EncodeToString([]byte(content))}
-				}
-				if r.Method != http.MethodGet {
-					writes++
-				}
-				switch {
-				case r.Method == http.MethodGet && r.URL.Path == "/user":
-					result = map[string]any{"id": 1001}
-				case r.Method == http.MethodGet && r.URL.Path == "/repos/"+repository:
-					result = map[string]any{"full_name": repository, "default_branch": "main", "permissions": map[string]bool{"push": true, "admin": scenario != "not administrator"}}
-				case r.Method == http.MethodGet && path == "git/ref/heads/main":
-					result = map[string]any{"ref": "refs/heads/main", "object": map[string]string{"sha": strings.Repeat("f", 40)}}
-				case r.Method == http.MethodGet && path == "contents/.github/workflows/aw.json":
-					configReads++
-					if r.URL.Query().Get("ref") != strings.Repeat("f", 40) {
-						t.Error("configuration refresh read a moving/ambient ref")
-					}
-					content := `{"work_queue":{"concurrency":2,"pending_limit":42}}`
-					if scenario == "invalid settings" {
-						content = `{"work_queue":{"concurrency":0}}`
-					}
-					result = file(".github/workflows/aw.json", content)
-				case r.Method == http.MethodGet && path == "contents/.github/workflows":
-					result = []map[string]string{{"type": "file", "path": ".github/workflows/reviewer.md"}}
-				case r.Method == http.MethodGet && path == "contents/.github/workflows/reviewer.md":
-					result = file(".github/workflows/reviewer.md", "---\ntools:\n  work-queue:\n    worker: true\n---\nWorker")
-				case r.Method == http.MethodGet && path == "contents/.github/workflows/reviewer.lock.yml":
-					result = file(".github/workflows/reviewer.lock.yml", "on:\n  workflow_dispatch:\n    inputs:\n      work_queue_assignment:\n        type: string\n")
-				case r.Method == http.MethodGet && path == "actions/workflows/reviewer.lock.yml":
-					result = map[string]string{"path": ".github/workflows/reviewer.lock.yml", "state": "active"}
-				default:
-					t.Errorf("unexpected configuration-update API %s %s", r.Method, r.URL.Path)
-					status, result = http.StatusNotFound, map[string]string{"message": "Not Found"}
-				}
-				encoded, err := json.Marshal(result)
-				if err != nil {
-					return nil, err
-				}
-				return &http.Response{StatusCode: status, Header: http.Header{"Content-Type": {"application/json"}},
-					Body: io.NopCloser(bytes.NewReader(encoded)), Request: r}, nil
-			})
+			t.Setenv("GH_TOKEN", "test-token")
+			workSettingsCheckout(t, tc.config)
+			log, ids := workQueueMixedFixture(t)
+			queue := newWorkQueueGitRemote(t, log.jsonl())
+
 			cmd := NewWorkCommand()
 			var output bytes.Buffer
 			cmd.SetOut(&output)
 			cmd.SetErr(&output)
-			cmd.SetArgs([]string{"--repo", repository, "--json", "policy", "--from-config", "--epoch", "configured", "--request-id", "configured"})
-			err = cmd.Execute()
-			ledger = queue.read(t)
-			writes += queue.pushes(t)
-			expected := map[string]string{"absent": "queue_missing", "active": "policy_not_quiescent", "not administrator": "actor_unauthorized", "invalid settings": "work_queue.concurrency"}
-			if scenario != "drained" {
-				if err == nil || !strings.Contains(err.Error(), expected[scenario]) || writes != 0 || ledger != initial {
-					t.Fatalf("unsafe config update was accepted or changed authority: %v writes=%d", err, writes)
-				}
-				if (scenario == "absent" || scenario == "not administrator") && configReads != 0 {
-					t.Fatal("nonseeding unauthorized update discovered configuration")
-				}
-				return
+			cmd.SetArgs([]string{"--repo", workQueueTestRepository, "--json", "release", "--dispatch-id", ids["running_dispatch"]})
+			require.NoError(t, cmd.Execute(), output.String())
+			var summary map[string]any
+			require.NoError(t, json.Unmarshal(output.Bytes(), &summary))
+			want := 1
+			if tc.exhausted {
+				want = 2
 			}
-			if err != nil {
-				t.Fatalf("drained configuration update failed: %v (%s)", err, output.String())
-			}
-			next, err := workqueue.Parse([]byte(ledger))
-			if err != nil || len(next) != 2 {
-				t.Fatal("configuration update did not append to historical queue")
-			}
-			state, err := workqueue.Replay(next)
-			if err != nil || state.PolicyEpoch != "configured" || state.Policy.Authorization != "aw" ||
-				state.Policy.Pools["default"].NativeLimit != 2 || state.Policy.Limits.PendingNodes != 42 ||
-				next[1].Actor.Principal != "1001" || next[1].Request.ID != "configured" {
-				t.Fatalf("configuration update lost authenticated identity or scheduling: %v", err)
-			}
-			prior, _ := json.Marshal(next[0])
-			originalGenesis, _ := json.Marshal(genesis)
-			if !bytes.Equal(prior, originalGenesis) {
-				t.Fatal("configuration update rewrote historical legacy Policy")
+			require.Equal(t, true, summary["committed"])
+			require.InDelta(t, want, summary["operations"], 0)
+			require.Equal(t, 1, queue.pushes(t))
+
+			work := workClearRead(t, queue).Works[ids["running"]]
+			require.Equal(t, 1, work.Attempts)
+			if tc.exhausted {
+				require.Equal(t, "cancelled", work.State)
+				require.Equal(t, "attempts_exhausted", work.CancellationReason)
+			} else {
+				require.Equal(t, "available", work.State)
 			}
 		})
-	}
-}
-
-func TestWorkCommandPolicyFromConfigClosedFlags(t *testing.T) {
-	for _, arguments := range [][]string{
-		{"policy", "--from-config"},
-		{"policy", "--from-config", "--epoch", "next", "--file", "-"},
-	} {
-		cmd := NewWorkCommand()
-		cmd.SetOut(io.Discard)
-		cmd.SetErr(io.Discard)
-		cmd.SetArgs(append([]string{"--repo", "github/gh-aw"}, arguments...))
-		if err := cmd.Execute(); err == nil || (!strings.Contains(err.Error(), "--epoch") && !strings.Contains(err.Error(), "mutually exclusive")) {
-			t.Fatalf("invalid policy configuration selectors were accepted: %v", err)
-		}
 	}
 }

@@ -46,7 +46,8 @@ func TestWorkQueueESLintRefinerPersistentSnapshotCompilation(t *testing.T) {
 	result := string(compiled)
 	require.Contains(t, result, `GH_AW_WORK_QUEUE_ROLE: "worker"`)
 	require.Contains(t, result, "work_queue_prepare_persist_eslint_memory_0:")
-	require.Contains(t, result, "work_queue_prepare_persist_eslint_memory_15:")
+	require.Equal(t, 1, strings.Count(result, "\n  work_queue_prepare_persist_eslint_memory_0:"))
+	require.NotRegexp(t, `work_queue_prepare_persist_eslint_memory_([1-9]|1[0-5])\b`, result)
 	require.Contains(t, result, "work_queue_prepare_claim_script.cjs")
 	require.Contains(t, result, "work_queue_memory.cjs")
 	var compiledWorkflow map[string]any

@@ -36,7 +36,6 @@ pre-agent-steps:
       const crypto = require("node:crypto");
       const fs = require("node:fs");
       const path = require("node:path");
-      const { normalizeAssignment } = require(path.join(process.env.GH_AW_ACTIONS_DIR, "work_queue_claim_scope.cjs"));
       const engine = process.env.CONFORMANCE_ENGINE;
       if (!/^[a-z][a-z0-9-]*$/.test(engine || "")) throw new Error("Invalid conformance engine ID");
       const event = JSON.parse(fs.readFileSync(process.env.GITHUB_EVENT_PATH, "utf8"));
@@ -44,10 +43,13 @@ pre-agent-steps:
       let claimHandle;
       if (process.env.GH_AW_WORK_QUEUE_ENABLED === "true") {
         assert.equal(process.env.GH_AW_WORK_QUEUE_ROLE, "worker", "Conformance requires the compiler-provided worker role");
-        const assignment = normalizeAssignment(JSON.parse(rawAssignment));
-        assert.equal(assignment.claims.length, 1, "Conformance requires exactly one original Claim");
-        assert.equal(assignment.worker_profile, `engine-conformance-${engine}`);
+        assert.equal(JSON.parse(rawAssignment).version, 4, "Conformance requires a v4 dispatch assignment");
+        const assignment = JSON.parse(fs.readFileSync(process.env.GH_AW_WORK_QUEUE_SNAPSHOT || "/tmp/gh-aw/work-queue.snapshot.json", "utf8")).worker;
+        assert.ok(assignment, "Conformance requires an open Claim assignment");
+        assert.equal(assignment.dispatch_id, JSON.parse(rawAssignment).dispatch_id);
+        assert.equal(assignment.claims.length, 1, "Conformance requires exactly one Claim");
         const claim = assignment.claims[0];
+        assert.match(claim.handle, /^[A-Za-z0-9_-]{1,256}$/, "Conformance requires a Claim handle");
         assert.equal(claim.work.engine, engine);
         assert.deepEqual(claim.work.effect_contract, { kind: "none" });
         claimHandle = claim.handle;

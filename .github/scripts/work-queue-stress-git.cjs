@@ -6,16 +6,57 @@ const path = require("node:path");
 const { spawn } = require("node:child_process");
 const { createHash } = require("node:crypto");
 const { registerQueueLedgerClient } = require("../../actions/setup/js/work_queue_git_transport.cjs");
+const { ASSIGNMENT_BYTES, CHECKPOINT_AFTER_LINES, GRAPH_NODES, LEDGER_BYTES, MAX_PENDING_WORK, OPERATIONS_PER_COMMIT, RETAINED_REQUESTS } = require("../../actions/setup/js/work_queue_limits.cjs");
+const { actorFromContext, validatePolicyEnv, workerWorkflow } = require("../../actions/setup/js/work_queue_policy.cjs");
 
 const REPOSITORY = "local/queue";
-const PRINCIPAL = "1001";
-const WORKFLOW = ".github/workflows/worker.lock.yml";
+const [OWNER, REPO] = REPOSITORY.split("/");
+// The one approved worker ID; its compiled lock file is the launched workflow.
+const WORKER_ID = "worker";
+const WORKFLOW = workerWorkflow(WORKER_ID);
 const PUBLISHER_WORKFLOW = ".github/workflows/publisher.lock.yml";
+// Workers launch at the branch ref, like a dispatcher's GITHUB_REF; v4 pins the resolved revision.
+const LAUNCH_REF = "refs/heads/main";
+const AT = 1800000000000;
+// v4 wire-format constants the stress profiles run against; none is raised for the harness.
+const PROTOCOL_LIMITS = Object.freeze({
+  ledger_bytes: LEDGER_BYTES,
+  operations: OPERATIONS_PER_COMMIT,
+  graph_nodes: GRAPH_NODES,
+  pending_work: MAX_PENDING_WORK,
+  assignment_bytes: ASSIGNMENT_BYTES,
+  checkpoint_after_lines: CHECKPOINT_AFTER_LINES,
+  retained_requests: RETAINED_REQUESTS,
+  claims_per_dispatch: 1,
+});
 const METHODS = {
-  repos: ["get", "getContent"],
+  repos: ["get"],
   git: ["getRef", "getCommit", "getTree", "getBlob", "createBlob", "createTree", "createCommit", "createRef", "updateRef"],
-  actions: ["getWorkflow", "getWorkflowRun", "getWorkflowRunAttempt", "createWorkflowDispatch"],
+  actions: ["getWorkflowRun", "createWorkflowDispatch"],
 };
+
+/**
+ * A publishing actor built from a job context the way production jobs build it. v4 needs
+ * no API proof of the actor: write access to the queue branch is the only authority.
+ */
+function queueActor(role, runId = "100", runAttempt = 1, workflow = role === "worker" ? WORKFLOW : PUBLISHER_WORKFLOW) {
+  return actorFromContext({ repo: { owner: OWNER, repo: REPO }, runId, runAttempt }, role, { GITHUB_WORKFLOW_REF: `${REPOSITORY}/${workflow}@${LAUNCH_REF}` });
+}
+
+/**
+ * The compiled-policy shape a dispatcher lock carries in GH_AW_WORK_QUEUE_POLICY, checked by the
+ * production validator. Only scheduling preferences are configurable; protocol bounds are constants.
+ * @param {Record<string, {concurrency: number, per_account_limit: number, max_attempts: number}>} pools
+ */
+function stressPolicy(pools) {
+  return validatePolicyEnv({ version: 4, pending_limit: MAX_PENDING_WORK, issues: false, effect_scope: REPOSITORY, workers: [WORKER_ID], pools });
+}
+
+/** dispatch_next parameters as dispatchQueueIntent derives them from the policy pool and allowlist. */
+function dispatchParameters(policy, pool, maxClaims) {
+  const { concurrency, per_account_limit } = policy.pools[pool];
+  return { pool, max_claims: maxClaims, max_dispatches: maxClaims, concurrency, per_account_limit, profiles: { [WORKER_ID]: { workflow: WORKFLOW } } };
+}
 
 function clientFor(call) {
   const client = { rest: Object.fromEntries(Object.entries(METHODS).map(([group, names]) => [group, Object.fromEntries(names.map(name => [name, args => call(`${group}.${name}`, args)]))])) };
@@ -38,7 +79,7 @@ class LocalGitHub {
     this.abort = new AbortController();
     this.sequence = 0;
     this.runs = new Map();
-    this.originalRuns = new Map();
+    // dispatch ID -> every worker run POSTed for it; only the recorded launch may bind.
     this.launches = new Map();
     this.receipts = new Map();
     this.faults = new Map();
@@ -93,50 +134,38 @@ class LocalGitHub {
   async initialize() {
     await fs.mkdir(this.directory, { recursive: true });
     await this.git(["init", "--bare", "--quiet", "--initial-branch=main", this.directory]);
-    const workflow = `# gh-aw-manifest: ${JSON.stringify({ work_queue: { worker: true, logical_contract: "b".repeat(64) } })}\nname: Local worker\non:\n  workflow_dispatch:\n    inputs:\n      work_queue_assignment:\n        type: string\n        required: true\njobs:\n  worker:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo local-only\n`;
+    const workflow = `name: Local worker\non:\n  workflow_dispatch:\n    inputs:\n      work_queue_assignment:\n        type: string\n        required: true\njobs:\n  worker:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo local-only\n`;
     const blob = (await this.git(["hash-object", "-w", "--stdin"], workflow)).toString().trim();
     const workflows = (await this.git(["mktree"], `100644 blob ${blob}\tworker.lock.yml\n100644 blob ${blob}\tpublisher.lock.yml\n`)).toString().trim();
     const github = (await this.git(["mktree"], `040000 tree ${workflows}\tworkflows\n`)).toString().trim();
     const tree = (await this.git(["mktree"], `040000 tree ${github}\t.github\n`)).toString().trim();
     this.ref = (await this.git(["commit-tree", tree], "Local immutable workflow revision\n")).toString().trim();
-    await this.git(["update-ref", "refs/heads/main", this.ref]);
-    const publisher = this.run("100", PUBLISHER_WORKFLOW, "schedule");
-    this.runs.set("100", publisher);
-    this.originalRuns.set("100", structuredClone(publisher));
+    await this.git(["update-ref", LAUNCH_REF, this.ref]);
+    this.runs.set("100", this.run("100", PUBLISHER_WORKFLOW, "schedule", this.ref));
     return this;
   }
 
-  run(id, workflow, event, assignment) {
+  run(id, workflow, event, revision, dispatchId = undefined) {
     return {
-      id,
+      id: Number(id),
       run_attempt: 1,
       repository: { full_name: REPOSITORY, id: 7 },
-      workflow_id: workflow === WORKFLOW ? 10 : 11,
       path: workflow,
       event,
-      head_sha: this.ref,
-      actor: { id: PRINCIPAL },
-      triggering_actor: { id: PRINCIPAL },
-      display_title: assignment ? `local work-queue ${assignment.dispatch_id}` : "local publisher",
+      head_sha: revision,
+      display_title: dispatchId ? `local work-queue ${dispatchId}` : "local publisher",
       status: "in_progress",
       conclusion: null,
       created_at: "2026-10-08T00:00:00Z",
-      ...(assignment ? { assignment: structuredClone(assignment) } : {}),
+      ...(dispatchId ? { dispatch_id: dispatchId } : {}),
     };
   }
 
+  /** The job context a run sees: its repository, run attempt and checked-out revision. */
   nativeContext(runId = "100", attempt = 1) {
     const run = this.runs.get(String(runId));
     assert.ok(run, "unknown simulated native run");
-    return {
-      repo: { owner: "local", repo: "queue" },
-      runId: run.id,
-      runAttempt: attempt,
-      actorId: PRINCIPAL,
-      sha: this.ref,
-      eventName: run.event,
-      payload: { repository: { id: 7 } },
-    };
+    return { repo: { owner: OWNER, repo: REPO }, runId: String(run.id), runAttempt: attempt, sha: run.head_sha, eventName: run.event };
   }
 
   armFaults(branch) {
@@ -164,7 +193,7 @@ class LocalGitHub {
   }
 
   async reference(ref) {
-    assert.match(ref, /^refs\/(?:heads\/[A-Za-z0-9/_-]+|tags\/gh-aw\/work-queue\/[a-f0-9]{40,64})$/);
+    assert.match(ref, /^refs\/heads\/[A-Za-z0-9/_-]+$/);
     try {
       return (await this.git(["show-ref", "--verify", "--hash", ref])).toString().trim();
     } catch (error) {
@@ -192,12 +221,6 @@ class LocalGitHub {
     switch (method) {
       case "repos.get":
         return data({ full_name: REPOSITORY, id: 7, default_branch: "main", size: 1, permissions: { pull: true } });
-      case "repos.getContent": {
-        assert.equal(args.ref, this.ref, "workflow content must use real immutable revision");
-        assert.ok([WORKFLOW, PUBLISHER_WORKFLOW].includes(args.path));
-        const contents = await this.git(["show", `${args.ref}:${args.path}`]);
-        return data({ type: "file", path: args.path, encoding: "base64", content: contents.toString("base64"), size: contents.length });
-      }
       case "git.getRef": {
         const ref = `refs/${args.ref}`;
         const sha = await this.reference(ref);
@@ -240,7 +263,7 @@ class LocalGitHub {
         return data({ sha });
       }
       case "git.createRef": {
-        assert.match(args.ref, /^refs\/(?:heads\/[A-Za-z0-9/_-]+|tags\/gh-aw\/work-queue\/[a-f0-9]{40,64})$/);
+        assert.match(args.ref, /^refs\/heads\/[A-Za-z0-9/_-]+$/);
         const branch = args.ref.replace(/^refs\/heads\//, "");
         await this.barrier(branch, meta);
         const fault = this.faults.get(branch);
@@ -300,58 +323,63 @@ class LocalGitHub {
           }
         }
       }
-      case "actions.getWorkflow":
-        assert.ok([WORKFLOW, path.basename(WORKFLOW)].includes(args.workflow_id));
-        return data({ id: 10, path: WORKFLOW, state: "active" });
-      case "actions.getWorkflowRun":
-      case "actions.getWorkflowRunAttempt": {
-        const attemptRead = method.endsWith("Attempt");
-        if (attemptRead && args.attempt_number !== 1) throw apiError(404, "only original simulated attempt exists");
-        const run = (attemptRead ? this.originalRuns : this.runs).get(String(args.run_id));
+      case "actions.getWorkflowRun": {
+        const run = this.runs.get(String(args.run_id));
         if (!run) throw apiError(404, "native run not found");
         return data(structuredClone(run));
       }
       case "actions.createWorkflowDispatch": {
-        assert.match(args.ref, /^refs\/tags\/gh-aw\/work-queue\/[a-f0-9]{40,64}$/);
-        assert.equal(await this.reference(args.ref), this.ref, "workflow dispatch must resolve to the approved immutable commit");
+        // v4 launches at a branch ref; the created run carries the revision it resolved to.
+        assert.equal(args.ref, LAUNCH_REF);
+        const revision = await this.reference(args.ref);
+        assert.equal(revision, this.ref, "workflow dispatch must resolve to the local workflow revision");
         assert.equal(args.workflow_id, path.basename(WORKFLOW));
+        assert.equal(args.return_run_details, true, "a v4 launch asks GitHub for the created run");
         assert.equal(args.headers["X-GitHub-Api-Version"], "2026-03-10");
         assert.equal(args.request.retries, 0);
-        const assignment = JSON.parse(args.inputs.work_queue_assignment);
-        const count = (this.launches.get(assignment.dispatch_id)?.count || 0) + 1;
-        assert.equal(count, 1, "duplicate native POST for immutable assignment");
+        const input = JSON.parse(args.inputs.work_queue_assignment);
+        assert.deepEqual(Object.keys(input).sort(), ["dispatch_id", "version"]);
+        assert.equal(input.version, 4);
         const id = String(1000 + this.metrics.native_posts);
-        const run = this.run(id, WORKFLOW, "workflow_dispatch", assignment);
-        this.runs.set(id, run);
-        this.originalRuns.set(id, structuredClone(run));
-        this.launches.set(assignment.dispatch_id, { count, run_id: id, assignment });
+        this.runs.set(id, this.run(id, WORKFLOW, "workflow_dispatch", revision, input.dispatch_id));
+        // A dispatcher that POSTs twice creates two real runs; only its recorded launch may bind.
+        const launch = this.launches.get(input.dispatch_id) ?? { count: 0, run_ids: [] };
+        launch.count++;
+        launch.run_ids.push(id);
+        this.launches.set(input.dispatch_id, launch);
         this.metrics.native_posts++;
-        return data({ workflow_run_id: id, run_url: `https://api.github.com/repos/${REPOSITORY}/actions/runs/${id}`, html_url: `https://github.com/${REPOSITORY}/actions/runs/${id}` });
+        return data({ workflow_run_id: Number(id), run_url: `https://api.github.com/repos/${REPOSITORY}/actions/runs/${id}`, html_url: `https://github.com/${REPOSITORY}/actions/runs/${id}` });
       }
       case "sim.nativeContext":
         return this.nativeContext(args.run_id);
-      case "sim.lookupLaunch":
-        return structuredClone(this.launches.get(args.dispatch_id) || null);
       case "sim.receipt": {
+        // The worker's simulated no-op effect; its receipt is what the Completion records.
         const run = this.runs.get(args.run_id);
-        assert.equal(run.run_attempt, 1);
-        const member = run.assignment.claims.find(member => member.handle === args.handle);
-        assert.equal(member?.work_id, args.work_id);
-        assert.equal(run.assignment.dispatch_id, args.dispatch_id);
-        const record = { ...args, effect: "none", descriptor: { local_noop: args.work_id } };
+        assert.equal(run?.status, "in_progress", "only a live worker run delivers effects");
+        assert.equal(run.dispatch_id, args.dispatch_id);
+        const record = { run_id: args.run_id, dispatch_id: args.dispatch_id, claim_id: args.claim_id, work_id: args.work_id, handle: args.handle, effect: "none" };
         const receipt = `local_receipt:${createHash("sha256").update(JSON.stringify(record)).digest("hex")}`;
         this.receipts.set(receipt, record);
-        return { receipt, descriptor: record.descriptor };
+        return { receipt };
       }
       case "sim.completeRun": {
         const run = this.runs.get(args.run_id);
-        assert.ok(run?.assignment);
-        for (const member of run.assignment.claims) assert.ok([...this.receipts.values()].some(record => record.run_id === run.id && record.work_id === member.work_id));
+        assert.ok(run?.dispatch_id);
+        assert.ok(
+          [...this.receipts.values()].some(record => record.run_id === args.run_id),
+          "a successful worker run delivered its effect"
+        );
         run.status = "completed";
         run.conclusion = "success";
-        this.originalRuns.get(args.run_id).status = "completed";
-        this.originalRuns.get(args.run_id).conclusion = "success";
         return { completed: true };
+      }
+      case "sim.cancelRun": {
+        const run = this.runs.get(args.run_id);
+        assert.ok(run?.dispatch_id);
+        assert.ok(![...this.receipts.values()].some(record => record.run_id === args.run_id), "a refused duplicate run must not deliver effects");
+        run.status = "completed";
+        run.conclusion = "cancelled";
+        return { cancelled: true };
       }
       default:
         throw new Error(`unsupported local API method: ${method}`);
@@ -370,4 +398,4 @@ class LocalGitHub {
   }
 }
 
-module.exports = { LocalGitHub, clientFor, REPOSITORY, PRINCIPAL, WORKFLOW, PUBLISHER_WORKFLOW };
+module.exports = { AT, LAUNCH_REF, LocalGitHub, OWNER, PROTOCOL_LIMITS, PUBLISHER_WORKFLOW, REPO, REPOSITORY, WORKER_ID, WORKFLOW, clientFor, dispatchParameters, queueActor, stressPolicy };

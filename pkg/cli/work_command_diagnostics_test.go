@@ -5,470 +5,321 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
-	"reflect"
-	"strings"
 	"testing"
-	"time"
 
 	"github.com/github/gh-aw/pkg/workqueue"
+	"github.com/stretchr/testify/require"
 )
-
-func workDiagnosticsFixture(t *testing.T) (workqueue.Projection, []workqueue.QueueCommit, []string) {
-	t.Helper()
-	state, commits, ids := workOperatorFixture(t, true)
-	var dispatch *workqueue.DispatchState
-	for _, candidate := range state.Dispatches {
-		dispatch = candidate
-	}
-	actor := workqueue.Actor{Role: "dispatcher", Principal: "1001", Repository: "owner/repo",
-		Workflow: ".github/workflows/dispatcher.lock.yml", RunID: "101", RunAttempt: 1}
-	appendRequest := func(id, kind string, parameters any, at int64) {
-		t.Helper()
-		request, err := workqueue.NewRequest(id, kind, actor, parameters)
-		if err != nil {
-			t.Fatal(err)
-		}
-		commits, _, _, err = workqueue.BuildCandidate(commits, actor, request, at)
-		if err != nil {
-			t.Fatal(err)
-		}
-	}
-	operations := func(value any) workqueue.OperationsParameters {
-		return workqueue.OperationsParameters{Operations: []workqueue.Operation{mustWorkQueueOperation(t, value)}}
-	}
-	appendRequest("start", "dispatch", operations(map[string]any{
-		"kind": "Dispatch", "dispatch_id": dispatch.DispatchID, "state": "started", "sender": actor,
-	}), 4000)
-	binding := workqueue.RunBinding{
-		RunID: "202", RunAttempt: 1, Repository: actor.Repository, Workflow: dispatch.Profile.Workflow,
-		Ref: dispatch.Profile.Ref, Principal: actor.Principal, Event: "workflow_dispatch",
-	}
-	evidence := workqueue.Evidence{
-		Kind: "reconciliation", Source: "github_api", Repository: binding.Repository, Workflow: binding.Workflow,
-		Ref: binding.Ref, Principal: binding.Principal, RunID: binding.RunID, RunAttempt: 1, CheckedAt: 5000,
-	}
-	actor.Role, actor.Workflow, actor.RunID, actor.RunAttempt = "reconciler", "", "", 0
-	appendRequest("bind", "dispatch", operations(map[string]any{
-		"kind": "Dispatch", "dispatch_id": dispatch.DispatchID, "state": "bound", "run": binding, "evidence": evidence,
-	}), 5000)
-	actor.Role, actor.Workflow, actor.RunID, actor.RunAttempt = "worker", binding.Workflow, binding.RunID, 1
-	actor.DispatchID = dispatch.DispatchID
-	for index, member := range dispatch.Claims {
-		actor.ClaimHandle = member.Handle
-		outcome := "completed"
-		if index == 2 {
-			outcome = "cancelled"
-		}
-		appendRequest("finish-"+member.Handle, "finish", workqueue.FinishParameters{
-			DispatchID: dispatch.DispatchID, ClaimHandle: member.Handle, Outcome: outcome,
-		}, 6000)
-	}
-	state, err := workqueue.Replay(commits)
-	if err != nil {
-		t.Fatal(err)
-	}
-	actor = workqueue.Actor{Role: "reconciler", Principal: "1001", Repository: "owner/repo"}
-	evidence.Kind, evidence.Source, evidence.Receipt = "delivery", "verified_receipts", "RECEIPT-MUST-STAY-PRIVATE"
-	appendRequest("result", "result", operations(map[string]any{
-		"kind": "Result", "work_id": ids[0], "claim_id": state.Works[ids[0]].ClaimID,
-		"completion_id": state.Works[ids[0]].CompletionID,
-		"descriptor":    map[string]any{"detail": "RESULT-MUST-STAY-PRIVATE"}, "evidence": evidence,
-	}), 7000)
-	evidence.Kind, evidence.Source, evidence.Status, evidence.Conclusion = "terminal_run", "github_api", "completed", "failure"
-	evidence.CheckedAt, evidence.Attempts, evidence.Effects = 400000, 5, "unknown"
-	appendRequest("delivery-failed", "delivery_failure", operations(map[string]any{
-		"kind": "DeliveryFailure", "work_id": ids[1], "claim_id": state.Works[ids[1]].ClaimID,
-		"completion_id": state.Works[ids[1]].CompletionID, "reason": "verification_exhausted",
-		"disposition": "unknown", "evidence": evidence,
-	}), 400000)
-	state, err = workqueue.Replay(commits)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return state, commits, ids
-}
 
 func assertWorkDiagnosticsPrivate(t *testing.T, value any) {
 	t.Helper()
 	data, err := json.Marshal(value)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, forbidden := range []string{"PAYLOAD-MUST", "SECRET-MUST", "RESULT-MUST", "RECEIPT-MUST", `"payload"`, `"descriptor"`, `"parameters"`} {
-		if bytes.Contains(data, []byte(forbidden)) {
-			t.Fatalf("diagnostics exposed %s", forbidden)
-		}
+	require.NoError(t, err)
+	for _, forbidden := range []string{"PAYLOAD-MUST", "SECRET-MUST", `"payload"`, `"parameters"`, `"task"`} {
+		require.NotContains(t, string(data), forbidden, "diagnostics exposed %s", forbidden)
 	}
 }
 
-func TestWorkQueueDiagnosticStatsSeparateDeliveryAndReservations(t *testing.T) {
-	state, _, _ := workDiagnosticsFixture(t)
-	before, err := json.Marshal(state)
-	if err != nil {
-		t.Fatal(err)
-	}
-	report, err := workQueueStatsAt(state, "work-queue", 500000)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if report.Completed != 2 || report.ClaimsByState["open"] != 0 || report.ClaimsByState["completed"] != 2 ||
-		report.ClaimsByState["cancelled"] != 1 || report.Dispatches != 1 || report.NativeReservations != 1 || report.DispatchesTotal != 1 ||
-		report.DispatchesByState["bound"] != 1 || report.ReservationsByState["bound"] != 1 {
-		t.Fatalf("ownership and native reservation counts were conflated: %+v", report)
-	}
-	if report.DeliveryByState["verified"] != 1 || report.DeliveryByState["failed"] != 1 || report.DeliveryByState["pending"] != 0 {
-		t.Fatalf("Completion was treated as verified Result: %+v", report.DeliveryByState)
-	}
-	if report.DeliveryFailureReasons["verification_exhausted"] != 1 || report.ClaimCancellationReasons["worker_cancelled"] != 1 {
-		t.Fatalf("failure/cancellation reasons are missing: %+v", report)
-	}
-	pool := report.Pools[0]
-	if pool.WorkByState["completed"] != 2 || pool.ClaimsByState["completed"] != 2 || pool.NativeReservations != 1 ||
-		!pool.PolicyInstalled || pool.LogicalLimit != state.Policy.Pools["default"].LogicalLimit || pool.MaxAttempts != 3 ||
-		pool.WorkByState["available"] != 1 || len(pool.Prediction.Assignments) != 1 {
-		t.Fatalf("pool diagnostics are incomplete: %+v", pool)
-	}
-	if report.Activity.Operations["Completion"] != 2 || report.Activity.Operations["Result"] != 1 ||
-		report.Activity.Operations["DeliveryFailure"] != 1 || report.Activity.LastAt == nil || *report.Activity.LastAt != 400000 {
-		t.Fatalf("activity did not count committed lifecycle operations: %+v", report.Activity)
-	}
+func TestWorkQueueDiagnosticStatsCountLedgerStates(t *testing.T) {
+	log, ids := workQueueMixedFixture(t)
+	state := log.state()
+	before, err := workqueue.SerializeProjection(state)
+	require.NoError(t, err)
+
+	report := workQueueStats(state, "work-queue")
+	require.Equal(t, workqueue.Stats{Work: 4, Available: 1, Claimed: 1, Completed: 1, Cancelled: 1, Claims: 2, Dispatches: 1, Transactions: 9, Nodes: 4}, report.Stats)
+	require.Equal(t, workQueueSnapshot{Status: "committed_snapshot", Tip: state.Tip, Repository: workQueueTestRepository, Branch: "work-queue"}, report.workQueueSnapshot)
+	require.Equal(t, map[string]int{"open": 1, "completed": 1, "cancelled": 0}, report.ClaimsByState)
+	require.Equal(t, map[string]int{"reserved": 0, "started": 0, "bound": 1, "closed": 1}, report.DispatchesByState)
+	require.Equal(t, map[string]int{"operator": 1}, report.WorkCancellationReasons)
+	require.Empty(t, report.ClaimCancellationReasons)
+	require.Equal(t, []workQueuePoolStats{{
+		Pool: "default", WorkByState: map[string]int{"available": 1, "claimed": 1, "completed": 1, "cancelled": 1},
+		ClaimsByState: map[string]int{"open": 1, "completed": 1, "cancelled": 0}, OpenDispatches: 1,
+		Eligible: 1, Blocked: map[string]int{}, NextEligible: []string{ids["waiting"]},
+	}}, report.Pools)
 	assertWorkDiagnosticsPrivate(t, report)
-	after, err := json.Marshal(state)
-	if err != nil || !bytes.Equal(before, after) {
-		t.Fatal("stats prediction mutated the authoritative projection")
-	}
+	after, err := workqueue.SerializeProjection(state)
+	require.NoError(t, err)
+	require.Equal(t, before, after, "stats mutated the projection")
+
 	text := workQueueStatsText(report)
-	if !strings.Contains(text, "verified=1 failed=1") || !strings.Contains(text, "not live Actions status") {
-		t.Fatalf("human stats hide delivery/evidence distinctions: %s", text)
+	for _, expected := range []string{
+		"Work: 4; available: 1; claimed: 1; completed: 1; cancelled: 1; Claims: 2; open dispatches: 1; graph nodes: 4",
+		"Claims: open=1 completed=1 cancelled=0 | dispatches: reserved=0 started=0 bound=1 closed=1",
+		"Tip: " + workQueueText(state.Tip) + " | transactions: 9",
+		"Work cancellations: operator=1",
+		"pool: default available=1 eligible=1 claimed=1 open_dispatches=1 next=" + ids["waiting"],
+		"not live Actions status",
+	} {
+		require.Contains(t, text, expected)
 	}
+	require.NotContains(t, text, "Claim cancellations")
+
+	log.release(ids["running_dispatch"], "run_missing")
+	report = workQueueStats(log.state(), "work-queue")
+	require.Equal(t, map[string]int{"run_missing": 1}, report.ClaimCancellationReasons)
+	require.Equal(t, map[string]int{"reserved": 0, "started": 0, "bound": 0, "closed": 2}, report.DispatchesByState)
+	require.Equal(t, 2, report.Pools[0].Eligible)
+	require.Equal(t, []string{ids["running"], ids["waiting"]}, report.Pools[0].NextEligible, "released Work keeps its FIFO position")
+	require.Contains(t, workQueueStatsText(report), "Claim cancellations: run_missing=1")
 }
 
-func TestWorkQueueDiagnosticStatsEligibilityAgesAndEmptyQueue(t *testing.T) {
-	state, _, ids := workOperatorFixture(t, false)
-	work := state.Works[ids[0]]
-	work.RetryNotBefore = 10000
-	work.Enqueued = 0
-	report, err := workQueueStatsAt(state, "alternate", 5000)
-	if err != nil {
-		t.Fatal(err)
+func TestWorkQueueDiagnosticStatsEligibilityAndBlockedReasons(t *testing.T) {
+	t.Setenv("GITHUB_SERVER_URL", "")
+	log := newWorkQueueTestLog(t)
+	priority := func(value int) func(*workqueue.WorkDefinition) {
+		return func(work *workqueue.WorkDefinition) { work.Priority = value }
 	}
+	gate := func(kind, id string) *workqueue.Resource {
+		return &workqueue.Resource{Kind: kind, Host: "github.com", Repository: workQueueTestRepository, RepositoryID: "1", ResourceID: id, Number: id}
+	}
+	late, first, second, third := log.work("late", priority(5)), log.work("first", nil), log.work("second", nil), log.work("third", nil)
+	urgent := log.work("urgent", priority(1))
+	doomed := log.work("doomed", nil)
+	elsewhere := log.work("elsewhere", func(work *workqueue.WorkDefinition) { work.GraphID, work.Pool, work.Priority = "elsewhere", "other", 1 })
+	child := log.work("child", func(work *workqueue.WorkDefinition) {
+		work.DependsOn = []workqueue.Dependency{{Kind: "work", WorkID: first.WorkID}}
+	})
+	orphan := log.work("orphan", func(work *workqueue.WorkDefinition) {
+		work.DependsOn = []workqueue.Dependency{{Kind: "work", WorkID: doomed.WorkID}}
+	})
+	unobserved := log.work("unobserved", func(work *workqueue.WorkDefinition) {
+		work.DependsOn = []workqueue.Dependency{{Kind: "issue", Resource: gate("issue", "11"), Condition: "completed"}}
+	})
+	waiting := log.work("gated", func(work *workqueue.WorkDefinition) {
+		work.DependsOn = []workqueue.Dependency{{Kind: "pull_request", Resource: gate("pull_request", "12"), Condition: "merged"}}
+	})
+	log.submit(late, first, second, third, urgent, doomed, elsewhere, child, orphan, unobserved, waiting)
+	log.cancel(doomed.WorkID)
+	log.append(workQueueTestDispatcher, "dispatch_next", workqueue.DispatchParameters{Pool: "default", MaxClaims: 1, MaxDispatches: 1, Concurrency: 1,
+		Profiles: map[string]workqueue.DispatchProfile{"worker": {Workflow: workQueueTestWorkerWorkflow}}},
+		workqueue.ObservationOperation{Kind: "Observation", ObservationID: "o1", Resource: *gate("pull_request", "12"), Condition: "merged", State: "waiting"})
+	state := log.state()
+
+	report := workQueueStats(state, "alternate")
+	require.Equal(t, "alternate", report.Branch)
+	require.Len(t, report.Pools, 2)
 	pool := report.Pools[0]
-	if report.Branch != "alternate" || report.Tip != state.Tip || report.PolicyMode != state.Policy.Mode ||
-		pool.SchedulingEligible != 2 || pool.IneligibleReasons["retry_delayed"] != 1 ||
-		pool.OldestAvailable == nil || pool.OldestAvailable.AdmittedAt != 2000 || pool.OldestAvailable.AgeMS != 3000 ||
-		len(pool.Prediction.Assignments) != 1 {
-		t.Fatalf("readiness or admission time diagnostics are incorrect: %+v", report)
-	}
-	assertWorkDiagnosticsPrivate(t, report)
-	state.GrantsPaused = true
-	report, err = workQueueStatsAt(state, "work-queue", 5000)
-	if err != nil || report.Pools[0].SchedulingEligible != 0 || report.Pools[0].Prediction.Reason != "grants_paused" {
-		t.Fatal("paused grants still predict a Claim")
-	}
-	state.GrantsPaused, state.RequestOrder = false, nil
-	report, err = workQueueStatsAt(state, "work-queue", 5000)
-	if err != nil || report.Pools[0].UnknownAge != 3 || report.Pools[0].OldestAvailable != nil {
-		t.Fatal("missing trusted admission time was replaced with client enqueue time")
-	}
-	empty, err := workQueueStatsAt(workqueue.Projection{}, "work-queue", 5000)
-	if err != nil || empty.Pools == nil || empty.ClaimsByState["open"] != 0 || empty.Activity.LastAt != nil {
-		t.Fatal("empty queue diagnostics were unavailable or fabricated activity")
-	}
-}
+	require.Equal(t, "default", pool.Pool)
+	require.Equal(t, 9, pool.WorkByState["available"])
+	require.Equal(t, 1, pool.WorkByState["cancelled"])
+	require.Equal(t, 5, pool.Eligible)
+	require.Equal(t, []string{urgent.WorkID, first.WorkID, second.WorkID}, pool.NextEligible, "priority first, then FIFO, capped at three")
+	require.Equal(t, map[string]int{"dependency_pending": 1, "dependency_failed": 1, "external_unobserved": 1, "external_waiting": 1}, pool.Blocked)
+	require.Equal(t, "other", report.Pools[1].Pool)
+	require.Equal(t, []string{elsewhere.WorkID}, report.Pools[1].NextEligible)
+	text := workQueueStatsText(report)
+	require.Contains(t, text, "blocked=dependency_failed=1,dependency_pending=1,external_unobserved=1,external_waiting=1")
+	require.Contains(t, text, "pool: other available=1 eligible=1 claimed=0 open_dispatches=0 next="+elsewhere.WorkID)
 
-func TestWorkQueueInspectionHandlesMissingAndUninstalledPolicy(t *testing.T) {
-	state := workqueue.Projection{
-		Works: map[string]*workqueue.WorkState{
-			"w1": {
-				WorkDefinition: workqueue.WorkDefinition{WorkID: "w1", Pool: "retired", NodeKey: "node"},
-				State:          "available",
-			},
-		},
+	for _, test := range []struct {
+		work      workqueue.WorkDefinition
+		reason    string
+		reference string
+	}{
+		{urgent, "ready", "None"},
+		{child, "dependency_pending", "Work " + workQueueText(first.WorkID) + ": available"},
+		{orphan, "dependency_failed", "Work " + workQueueText(doomed.WorkID) + ": cancelled"},
+		{unobserved, "external_unobserved", "requires completed (observed unobserved)"},
+		{waiting, "external_waiting", "requires merged (observed waiting)"},
+		{doomed, "state_cancelled", "None"},
+	} {
+		inspection, err := workQueueInspect(state, "work-queue", workQueueRow{Kind: "work", ID: test.work.WorkID, WorkID: test.work.WorkID})
+		require.NoError(t, err)
+		require.Equal(t, test.reason, inspection.Work.Reason, test.work.NodeKey)
+		require.Equal(t, test.reason == "ready", inspection.Work.Ready, test.work.NodeKey)
+		require.Contains(t, inspection.Details, "scheduling: "+test.reason)
+		require.Contains(t, inspection.Details, test.reference)
 	}
-	inspection, err := workQueueInspectAt(state, "work-queue",
-		workQueueRow{Kind: "work", ID: "w1", WorkID: "w1"}, 5000)
-	if err != nil || inspection.Scheduling.Reason != "pool_not_installed" || inspection.Work.MaxAttempts != nil {
-		t.Fatalf("inspection did not tolerate missing Policy: %+v %v", inspection, err)
-	}
-	report, err := workQueueStatsAt(state, "work-queue", 5000)
-	if err != nil || report.Pools[0].IneligibleReasons["pool_not_installed"] != 1 {
-		t.Fatalf("stats did not classify a Work without Policy: %+v %v", report, err)
-	}
-	_, err = workQueueInspectAt(state, "work-queue",
-		workQueueRow{Kind: "work", ID: "missing", WorkID: "missing"}, 5000)
-	if err == nil || !strings.Contains(err.Error(), "work_missing") {
-		t.Fatalf("missing Work did not return work_missing: %v", err)
-	}
-}
 
-func TestWorkQueueDiagnosticStatsHistoricalRetainedDelivery(t *testing.T) {
-	state, _, ids := workDiagnosticsFixture(t)
-	claim := state.Claims[state.Works[ids[0]].ClaimID]
-	claim.KeepOpen, claim.Barrier = true, "verified"
-	work := state.Works[ids[0]]
-	work.State, work.ClaimID, work.Barrier = "available", "", "none"
-	work.CompletionID, work.ResultCommitID, work.Result = "", "", nil
-	report, err := workQueueStatsAt(state, "work-queue", 500000)
-	if err != nil || report.DeliveryByState["verified"] != 1 {
-		t.Fatal("historical keep-open delivery disappeared when Work became available")
-	}
-	claim.Barrier, work.Barrier, work.ClaimID = "pending", "pending", claim.ClaimID
-	report, err = workQueueStatsAt(state, "work-queue", 500000)
-	if err != nil || report.DeliveryByState["pending"] != 1 || report.Pools[0].IneligibleReasons["delivery_pending"] != 1 {
-		t.Fatal("retained pending delivery was treated as eligible Work")
-	}
-	failed := state.Works[ids[1]]
-	state.TerminalBarriers[failed.ClaimID] = state.TerminalBarriers[failed.WorkID]
-	report, err = workQueueStatsAt(state, "work-queue", 500000)
-	if err != nil || report.DeliveryFailureReasons["verification_exhausted"] != 1 {
-		t.Fatal("Work/Claim barrier indexes double-counted one failed delivery")
-	}
-}
-
-func TestWorkQueueDiagnosticActivityWindow(t *testing.T) {
-	at := int64(48 * time.Hour / time.Millisecond)
-	since := at - int64(24*time.Hour/time.Millisecond)
-	state := workqueue.Projection{Requests: map[string]workqueue.QueueCommit{}}
-	for id, timestamp := range map[string]int64{"before": since - 1, "start": since, "end": at, "future": at + 1} {
-		state.Requests[id] = workqueue.QueueCommit{ID: id, Request: workqueue.Request{ID: id}, At: timestamp, Operations: []workqueue.Operation{
-			mustWorkQueueOperation(t, map[string]any{"kind": "Checkpoint"}),
-		}}
-	}
-	state.RequestOrder = []string{"before", "start", "end", "future"}
-	activity, err := workQueueActivityAt(state, at)
-	if err != nil || activity.Since != since || activity.Until != at || activity.Transactions != 2 ||
-		activity.Operations["Checkpoint"] != 2 || activity.LastCommitID != "end" {
-		t.Fatalf("activity window includes future/old transactions: %+v %v", activity, err)
-	}
-	state.RequestOrder = []string{"older", "newer"}
-	state.Requests = map[string]workqueue.QueueCommit{
-		"older": {ID: "z-older", Request: workqueue.Request{ID: "older"}, At: at, Operations: []workqueue.Operation{
-			mustWorkQueueOperation(t, map[string]any{"kind": "Checkpoint"}),
-		}},
-		"newer": {ID: "a-newer", Request: workqueue.Request{ID: "newer"}, At: at, Operations: []workqueue.Operation{
-			mustWorkQueueOperation(t, map[string]any{"kind": "Checkpoint"}),
-		}},
-	}
-	activity, err = workQueueActivityAt(state, at)
-	if err != nil || activity.LastCommitID != "a-newer" {
-		t.Fatalf("equal-timestamp commits ignored ledger order: %+v %v", activity, err)
-	}
-	state.Requests["invalid"] = workqueue.QueueCommit{At: at, Operations: []workqueue.Operation{json.RawMessage(`invalid`)}}
-	if _, err := workQueueActivityAt(state, at); err == nil {
-		t.Fatal("malformed activity was silently ignored")
-	}
-}
-
-func TestWorkQueueDiagnosticCheckpointProvenance(t *testing.T) {
-	state, commits, ids := workDiagnosticsFixture(t)
-	checkpoint, err := workqueue.CompactCheckpoint(commits, strings.Repeat("a", 40),
-		workqueue.Actor{Role: "administrator", Principal: "1001", Repository: "owner/repo"}, 500000)
-	if err != nil {
-		t.Fatal(err)
-	}
-	restored, err := workqueue.Replay(checkpoint)
-	if err != nil {
-		t.Fatal(err)
-	}
-	before, err := workQueueStatsAt(state, "work-queue", 600000)
-	if err != nil {
-		t.Fatal(err)
-	}
-	after, err := workQueueStatsAt(restored, "work-queue", 600000)
-	if err != nil || !reflect.DeepEqual(before.ClaimsByState, after.ClaimsByState) ||
-		!reflect.DeepEqual(before.DeliveryByState, after.DeliveryByState) ||
-		!reflect.DeepEqual(before.DeliveryFailureReasons, after.DeliveryFailureReasons) ||
-		after.Activity.Operations["Completion"] != before.Activity.Operations["Completion"] ||
-		after.Activity.Operations["Result"] != before.Activity.Operations["Result"] {
-		t.Fatalf("compaction lost outcome/activity provenance: %v", err)
-	}
-	inspection, err := workQueueInspectAt(restored, "work-queue",
-		workQueueRow{Kind: "work", ID: ids[1], WorkID: ids[1]}, 600000)
-	if err != nil || inspection.Work.AdmittedAt == nil || *inspection.Work.AdmittedAt != 2000 ||
-		inspection.Claim.GrantedAt == nil || *inspection.Claim.GrantedAt != 3000 ||
-		inspection.Claim.DeliveryFailureReason != "verification_exhausted" {
-		t.Fatalf("compaction lost structured inspection provenance: %v", err)
-	}
-	assertWorkDiagnosticsPrivate(t, inspection)
+	empty := workQueueStats(workqueue.NewProjection(), "work-queue")
+	require.NotNil(t, empty.Pools)
+	require.Empty(t, empty.Pools)
+	require.Equal(t, map[string]int{"open": 0, "completed": 0, "cancelled": 0}, empty.ClaimsByState)
+	require.Contains(t, workQueueStatsText(empty), "Work: 0; available: 0")
 }
 
 func TestWorkQueueDiagnosticInspectionAndRows(t *testing.T) {
-	state, _, ids := workDiagnosticsFixture(t)
-	work := state.Works[ids[1]]
-	result, err := workQueueInspectAt(state, "alternate", workQueueRow{Kind: "work", ID: work.WorkID, WorkID: work.WorkID}, 500000)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if result.Work.NodeKey != "analyze" || result.Work.Delivery != "failed" || result.Work.MaxAttempts == nil || *result.Work.MaxAttempts != 3 ||
-		result.Work.AdmittedAt == nil || *result.Work.AdmittedAt != 2000 || result.Scheduling.Reason != "ownership_completed" ||
-		result.Claim.DeliveryFailureReason != "verification_exhausted" || result.Claim.Disposition != "unknown" ||
-		result.Claim.GrantedAt == nil || *result.Claim.GrantedAt != 3000 ||
-		result.Claim.TerminalAt == nil || *result.Claim.TerminalAt != 6000 {
-		t.Fatalf("structured inspection lost delivery/attempt provenance: %+v", result)
-	}
-	if result.Dispatch.Run == nil || result.Dispatch.Run.RunID != "202" || !result.Dispatch.ReservationRetained ||
-		len(result.Dispatch.Claims) != 3 || result.Work.DependsOn == nil || result.Branch != "alternate" {
-		t.Fatalf("structured inspection lost original assignment/run binding: %+v", result.Dispatch)
-	}
-	assertWorkDiagnosticsPrivate(t, result)
-	work.ClaimID = ""
-	historical, err := workQueueInspectAt(state, "work-queue", workQueueRow{
-		Kind: "claim", ID: result.Claim.ClaimID, WorkID: work.WorkID,
-	}, 500000)
-	if err != nil || historical.Claim.Current || historical.Claim.DeliveryFailureReason != "verification_exhausted" {
-		t.Fatal("historical Claim inspection used only current Work ownership")
-	}
+	log, ids := workQueueMixedFixture(t)
+	state := log.state()
+
+	running, err := workQueueInspect(state, "alternate", workQueueRow{Kind: "work", ID: ids["running"], WorkID: ids["running"]})
+	require.NoError(t, err)
+	require.Equal(t, "alternate", running.Branch)
+	require.Equal(t, "claimed", running.Work.State)
+	require.False(t, running.Work.Ready)
+	require.Equal(t, "state_claimed", running.Work.Reason)
+	require.NotNil(t, running.Work.DependsOn)
+	require.NotNil(t, running.Claim)
+	require.True(t, running.Claim.Current)
+	require.Equal(t, "open", running.Claim.State)
+	require.Equal(t, "h1", running.Claim.Handle)
+	require.Equal(t, ids["running_dispatch"], running.Claim.DispatchID)
+	require.NotNil(t, running.Dispatch)
+	require.Equal(t, "bound", running.Dispatch.State)
+	require.Equal(t, &workqueue.RunBinding{RunID: "202", RunAttempt: 1}, running.Dispatch.Run)
+	require.Equal(t, workQueueTestWorkerWorkflow, running.Dispatch.Workflow)
+	require.Equal(t, "worker", running.Dispatch.WorkerProfile)
+	require.Equal(t, []workQueueAssignmentMember{{ClaimID: running.Claim.ClaimID, WorkID: ids["running"], Handle: "h1", State: "open"}}, running.Dispatch.Claims)
+	require.Contains(t, running.Details, "Run: "+workQueueText("202")+" attempt 1")
+	require.Contains(t, running.Details, "Workflow: "+workQueueText(workQueueTestWorkerWorkflow))
+	assertWorkDiagnosticsPrivate(t, running)
+
+	done, err := workQueueInspect(state, "work-queue", workQueueRow{Kind: "work", ID: ids["done"], WorkID: ids["done"]})
+	require.NoError(t, err)
+	require.Equal(t, "completed", done.Work.State)
+	require.NotEmpty(t, done.Work.CompletionID)
+	require.JSONEq(t, "[]", string(done.Work.Effects))
+	require.Equal(t, "completed", done.Claim.State)
+	require.Equal(t, done.Work.CompletionID, done.Claim.TerminalCommitID)
+	require.Equal(t, "closed", done.Dispatch.State)
+
+	dropped, err := workQueueInspect(state, "work-queue", workQueueRow{Kind: "work", ID: ids["dropped"], WorkID: ids["dropped"]})
+	require.NoError(t, err)
+	require.Equal(t, "operator", dropped.Work.CancellationReason)
+	require.NotEmpty(t, dropped.Work.CancellationCommitID)
+	require.Nil(t, dropped.Claim)
+	require.Nil(t, dropped.Dispatch)
+
+	graph, err := workQueueInspect(state, "work-queue", workQueueRow{Kind: "graph", ID: "graph", GraphID: "graph"})
+	require.NoError(t, err)
+	require.Nil(t, graph.Work)
+	require.Contains(t, graph.Details, "Select a Work or Claim")
+	_, err = workQueueInspect(state, "work-queue", workQueueRow{Kind: "work", ID: "missing", WorkID: "missing"})
+	require.ErrorContains(t, err, "work_missing")
+	_, err = workQueueInspect(state, "work-queue", workQueueRow{Kind: "claim", ID: "missing", WorkID: ids["running"]})
+	require.ErrorContains(t, err, "claim_missing")
+
 	rows := workQueueRows(state, workQueueFilter{}, nil)
 	for _, row := range rows {
 		switch row.Kind {
 		case "work":
-			if row.Pool != "default" || row.WorkerProfile != "default" || row.NodeKey == "" || row.Attempts == nil ||
-				*row.Attempts != 1 || row.AdmittedAt == nil || row.RetryNotBefore == nil {
-				t.Fatalf("Work row requires parsing display text: %+v", row)
-			}
+			require.Equal(t, "default", row.Pool)
+			require.Equal(t, "worker", row.WorkerProfile)
+			require.NotEmpty(t, row.NodeKey)
+			require.NotNil(t, row.Attempts)
 		case "claim":
-			if row.Run == nil || row.Run.RunID != "202" || row.ReservationRetained == nil ||
-				!*row.ReservationRetained || row.GrantedAt == nil || *row.GrantedAt != 3000 || row.Pool != "default" {
-				t.Fatalf("Claim row lacks worker metadata: %+v", row)
+			require.Equal(t, "default", row.Pool)
+			require.Equal(t, "h1", row.Handle)
+			if row.WorkID == ids["running"] {
+				require.Equal(t, "bound", row.DispatchState)
+				require.Equal(t, &workqueue.RunBinding{RunID: "202", RunAttempt: 1}, row.Run)
+				require.Contains(t, row.Text, "run="+workQueueText("202/1"))
 			}
 		}
 	}
 	assertWorkDiagnosticsPrivate(t, rows)
+
+	// A released Claim stays inspectable as history; its Work returns to the pool.
+	log.release(ids["running_dispatch"], "operator")
+	state = log.state()
+	historical, err := workQueueInspect(state, "work-queue", workQueueRow{Kind: "claim", ID: running.Claim.ClaimID, WorkID: ids["running"]})
+	require.NoError(t, err)
+	require.False(t, historical.Claim.Current)
+	require.Equal(t, "cancelled", historical.Claim.State)
+	require.Equal(t, "operator", historical.Claim.CancellationReason)
+	require.NotEmpty(t, historical.Claim.TerminalCommitID)
+	require.Equal(t, "closed", historical.Dispatch.State)
+	require.Equal(t, "available", historical.Work.State)
+	require.Equal(t, 1, historical.Work.Attempts)
+	require.True(t, historical.Work.Ready)
+	require.Empty(t, historical.Work.ClaimID)
+	current, err := workQueueInspect(state, "work-queue", workQueueRow{Kind: "work", ID: ids["running"], WorkID: ids["running"]})
+	require.NoError(t, err)
+	require.Nil(t, current.Claim, "released Work has no current Claim")
 }
 
-func TestWorkQueueDiagnosticRetiredPoolHistory(t *testing.T) {
-	_, commits, ids := workOperatorFixture(t, false)
-	actor := workqueue.Actor{Role: "administrator", Principal: "1001", Repository: "owner/repo"}
-	var cancellations []workqueue.Operation
-	for _, id := range ids {
-		cancellations = append(cancellations, mustWorkQueueOperation(t, map[string]any{
-			"kind": "WorkCancellation", "work_id": id, "reason": "operator_cancelled",
-		}))
+func TestWorkQueueDiagnosticCheckpointPreservesLiveDiagnostics(t *testing.T) {
+	log, ids := workQueueMixedFixture(t)
+	state := log.state()
+	checkpoint, err := workqueue.CheckpointCommit(state, workQueueTestAdmin, 99000)
+	require.NoError(t, err)
+	restored, err := workqueue.Replay([]workqueue.QueueCommit{checkpoint})
+	require.NoError(t, err)
+
+	// Live Work, its Claims and Dispatches are inspected exactly as before.
+	before, after := workQueueStats(state, "work-queue"), workQueueStats(restored, "work-queue")
+	require.Len(t, after.Pools, 1)
+	pool, folded := before.Pools[0], after.Pools[0]
+	require.Equal(t, map[string]int{"available": 1, "cancelled": 0, "claimed": 1, "completed": 0}, folded.WorkByState)
+	require.Equal(t, pool.OpenDispatches, folded.OpenDispatches)
+	require.Equal(t, pool.Eligible, folded.Eligible)
+	require.Equal(t, pool.NextEligible, folded.NextEligible)
+	require.Equal(t, before.ClaimsByState["open"], after.ClaimsByState["open"])
+	for _, key := range []string{"running", "waiting"} {
+		row := workQueueRow{Kind: "work", ID: ids[key], WorkID: ids[key]}
+		original, err := workQueueInspect(state, "work-queue", row)
+		require.NoError(t, err)
+		compacted, err := workQueueInspect(restored, "work-queue", row)
+		require.NoError(t, err)
+		require.Equal(t, original.Work, compacted.Work, key)
+		require.Equal(t, original.Claim, compacted.Claim, key)
+		require.Equal(t, original.Dispatch, compacted.Dispatch, key)
 	}
-	request, err := workqueue.NewRequest("cancel-all", "cancel_work", actor, workqueue.OperationsParameters{Operations: cancellations})
-	if err != nil {
-		t.Fatal(err)
+	// Terminal Work with no live dependent folds away with its settled Claim and closed Dispatch;
+	// its history stays in the checkpoint's Git parent.
+	for _, key := range []string{"done", "dropped"} {
+		_, err := workQueueInspect(restored, "work-queue", workQueueRow{Kind: "work", ID: ids[key], WorkID: ids[key]})
+		require.ErrorContains(t, err, "work_missing", key)
 	}
-	commits, _, _, err = workqueue.BuildCandidate(commits, actor, request, 3000)
-	if err != nil {
-		t.Fatal(err)
-	}
-	policy := workqueue.DefaultPolicy(actor.Principal, actor.Repository)
-	policy.Pools["replacement"] = policy.Pools["default"]
-	delete(policy.Pools, "default")
-	rule := policy.Producers[actor.Principal]
-	rule.Pools = []string{"replacement"}
-	policy.Producers[actor.Principal] = rule
-	request, err = workqueue.NewRequest("retire-pool", "policy", actor, workqueue.OperationsParameters{Operations: []workqueue.Operation{
-		mustWorkQueueOperation(t, map[string]any{"kind": "Policy", "epoch": "replacement", "policy": policy}),
-	}})
-	if err != nil {
-		t.Fatal(err)
-	}
-	commits, _, _, err = workqueue.BuildCandidate(commits, actor, request, 4000)
-	if err != nil {
-		t.Fatal(err)
-	}
-	state, err := workqueue.Replay(commits)
-	if err != nil {
-		t.Fatal(err)
-	}
-	state.Works[ids[0]].State = "available"
-	report, err := workQueueStatsAt(state, "work-queue", 5000)
-	if err != nil || len(report.Pools) != 2 || report.Pools[0].Pool != "default" || report.Pools[0].PolicyInstalled ||
-		report.Pools[0].WorkByState["available"] != 1 || report.Pools[0].WorkByState["cancelled"] != 2 ||
-		report.Pools[0].SchedulingEligible != 0 || report.Pools[0].IneligibleReasons["pool_not_installed"] != 1 ||
-		report.Pools[0].Prediction.Reason != "pool_not_installed" ||
-		!report.Pools[1].PolicyInstalled {
-		t.Fatalf("retired pool Work was lost or treated as schedulable: %+v %v", report, err)
-	}
-	inspection, err := workQueueInspectAt(state, "work-queue", workQueueRow{Kind: "work", ID: ids[0], WorkID: ids[0]}, 5000)
-	if err != nil || inspection.Work.MaxAttempts != nil || inspection.Scheduling.Reason != "pool_not_installed" {
-		t.Fatalf("retired Work inspection invented a current retry policy: %+v %v", inspection, err)
-	}
-	assertWorkDiagnosticsPrivate(t, report)
-	assertWorkDiagnosticsPrivate(t, inspection)
+	require.NotContains(t, restored.Dispatches, ids["done_dispatch"])
+	require.Equal(t, map[string]int{"open": 1, "completed": 0, "cancelled": 0}, after.ClaimsByState)
+	require.Equal(t, 1, before.ClaimsByState["completed"])
 }
 
-func TestWorkQueueDiagnosticRetainedDispatchFromHistoricalPool(t *testing.T) {
-	state, _, _ := workOperatorFixture(t, false)
-	state.Works = map[string]*workqueue.WorkState{}
-	state.Claims = map[string]*workqueue.ClaimState{}
-	state.Dispatches = map[string]*workqueue.DispatchState{
-		"historical": {
-			Assignment: workqueue.Assignment{DispatchID: "historical", Pool: "retired"},
-			State:      "bound",
-		},
-	}
-	report, err := workQueueStatsAt(state, "work-queue", 5000)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, pool := range report.Pools {
-		if pool.Pool == "retired" {
-			if pool.PolicyInstalled || pool.NativeReservations != 1 {
-				t.Fatalf("retired dispatch history was not retained: %+v", pool)
-			}
-			return
-		}
-	}
-	t.Fatal("historical dispatch pool was omitted from stats")
-}
-
-func TestWorkQueueDiagnosticCommandsReadOnlyAndLegacyFields(t *testing.T) {
+func TestWorkQueueDiagnosticCommandsAreReadOnly(t *testing.T) {
 	t.Setenv("GH_HOST", "github.com")
 	t.Setenv("GH_TOKEN", "test-token")
-	state, commits, ids := workDiagnosticsFixture(t)
-	data, err := workqueue.Serialize(commits)
-	if err != nil {
-		t.Fatal(err)
-	}
-	queue := newWorkQueueGitRemote(t, string(data))
+	log, ids := workQueueMixedFixture(t)
+	state := log.state()
+	data := log.jsonl()
+	queue := newWorkQueueGitRemote(t, data)
 	original := http.DefaultTransport
 	t.Cleanup(func() { http.DefaultTransport = original })
 	http.DefaultTransport = workAPIRoundTripper(func(r *http.Request) (*http.Response, error) {
-		t.Fatalf("diagnostic command unexpectedly contacted Actions/API: %s %s", r.Method, r.URL.Path)
+		t.Fatalf("diagnostic command unexpectedly contacted the API: %s %s", r.Method, r.URL.Path)
 		return nil, nil
 	})
-	for _, args := range [][]string{{"stats"}, {"state", "--limit", "2"}, {"inspect", "--work-id", ids[1]}} {
+	claimID := state.Works[ids["running"]].ClaimID
+	for _, args := range [][]string{{"stats"}, {"state", "--limit", "2"}, {"inspect", "--work-id", ids["running"]}, {"inspect", "--claim-id", claimID}} {
 		command := NewWorkCommand()
 		var output bytes.Buffer
 		command.SetOut(&output)
 		command.SetErr(io.Discard)
-		command.SetArgs(append([]string{"--repo", "owner/repo", "--json"}, args...))
-		if err := command.Execute(); err != nil {
-			t.Fatalf("%v failed: %v (%s)", args, err, output.String())
-		}
+		command.SetArgs(append([]string{"--repo", workQueueTestRepository, "--json"}, args...))
+		require.NoError(t, command.Execute(), "%v: %s", args, output.String())
 		var result map[string]json.RawMessage
-		if err := json.Unmarshal(output.Bytes(), &result); err != nil {
-			t.Fatal(err)
+		require.NoError(t, json.Unmarshal(output.Bytes(), &result))
+		for _, required := range []string{"status", "tip", "repository", "branch"} {
+			require.Contains(t, result, required, "%v omitted snapshot field", args)
 		}
-		for _, required := range []string{"status", "tip", "repository", "branch", "evaluated_at", "policy_epoch"} {
-			if _, ok := result[required]; !ok {
-				t.Fatalf("%v omitted snapshot field %s", args, required)
-			}
-		}
+		require.JSONEq(t, `"`+state.Tip+`"`, string(result["tip"]))
 		switch args[0] {
 		case "stats":
-			var legacy workqueue.Stats
-			if err := json.Unmarshal(output.Bytes(), &legacy); err != nil || !reflect.DeepEqual(legacy, state.Stats) {
-				t.Fatal("additive stats broke existing root counters")
-			}
+			var counters workqueue.Stats
+			require.NoError(t, json.Unmarshal(output.Bytes(), &counters))
+			require.Equal(t, state.Stats, counters, "stats JSON keeps the root counters")
 		case "inspect":
-			for _, required := range []string{"selection", "details", "work", "claim", "dispatch", "scheduling"} {
-				if _, ok := result[required]; !ok {
-					t.Fatalf("inspection omitted %s", required)
-				}
+			for _, required := range []string{"selection", "details", "work", "claim", "dispatch"} {
+				require.Contains(t, result, required)
 			}
 		case "state":
 			var page workQueuePage
-			if err := json.Unmarshal(output.Bytes(), &page); err != nil || page.NextOffset == nil || *page.NextOffset != 2 {
-				t.Fatal("structured row metadata broke pagination")
-			}
+			require.NoError(t, json.Unmarshal(output.Bytes(), &page))
+			require.Len(t, page.Rows, 2)
+			require.NotNil(t, page.NextOffset)
+			require.Equal(t, 2, *page.NextOffset)
 		}
 		assertWorkDiagnosticsPrivate(t, result)
 	}
-	if queue.pushes(t) != 0 || queue.read(t) != string(data) {
-		t.Fatal("read-only diagnostics changed queue state")
-	}
+	command := NewWorkCommand()
+	var output bytes.Buffer
+	command.SetOut(&output)
+	command.SetErr(io.Discard)
+	command.SetArgs([]string{"--repo", workQueueTestRepository, "stats"})
+	require.NoError(t, command.Execute())
+	require.Contains(t, output.String(), "Work: 4; available: 1")
+	require.Zero(t, queue.pushes(t))
+	require.Equal(t, data, queue.read(t), "read-only diagnostics changed queue state")
 }

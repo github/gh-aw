@@ -25,7 +25,7 @@ type HealthWorkQueue struct {
 	Stats     *workQueueStatsReport `json:"stats,omitempty"`
 }
 
-var healthReadWorkQueue = func(ctx context.Context, branch workqueue.Branch) ([]workqueue.QueueCommit, error) {
+var healthReadWorkQueue = func(ctx context.Context, branch workqueue.Branch) (workqueue.Snapshot, error) {
 	return branch.Read(ctx)
 }
 
@@ -109,16 +109,8 @@ func collectHealthWorkQueue(collection *HealthCollection) {
 	}
 	report.Stats = stats
 	report.Status = "observed"
-	if stats.AdmissionPaused {
-		report.Warnings = append(report.Warnings, "work-queue admission is paused")
-	}
-	if stats.GrantsPaused {
-		report.Warnings = append(report.Warnings, "work-queue grants are paused")
-	}
-	if stats.DeliveryByState["failed"] > 0 {
-		report.Warnings = append(report.Warnings, "work-queue has failed deliveries; completion does not establish verified delivery")
-	}
-	if stats.AdmissionPaused || stats.GrantsPaused || stats.DeliveryByState["failed"] > 0 {
+	if exhausted := stats.WorkCancellationReasons["attempts_exhausted"]; exhausted > 0 {
+		report.Warnings = append(report.Warnings, fmt.Sprintf("work-queue cancelled %d Work after exhausting worker attempts", exhausted))
 		report.Status = "attention_required"
 	}
 }
@@ -151,7 +143,7 @@ func readHealthWorkQueueStats(repository string, collection *HealthCollection) (
 	ctx, cancel := context.WithTimeout(collection.context(), 30*time.Second)
 	defer cancel()
 	branch := workqueue.Branch{Remote: repository, Name: workqueue.DefaultBranch, Host: collection.Host}
-	commits, err := healthReadWorkQueue(ctx, branch)
+	snapshot, err := healthReadWorkQueue(ctx, branch)
 	if budgetErr := checkHealthTimeBudget(collection); budgetErr != nil {
 		return nil, budgetErr
 	}
@@ -162,21 +154,14 @@ func readHealthWorkQueueStats(repository string, collection *HealthCollection) (
 		}
 		return nil, fmt.Errorf("cannot read work-queue ledger: %w", healthWorkQueueAccessError(err))
 	}
-	at := time.Now().UnixMilli()
-	state, err := workqueue.ReplayAtForHost(commits, at, collection.Host)
-	if err != nil {
-		return nil, currentWorkQueueDiagnosticError("ledger", err)
-	}
-	if state.Policy == nil {
-		return nil, errors.New("work-queue has no installed policy")
+	state := snapshot.State
+	if snapshot.Head == "" || len(state.Transactions) == 0 {
+		return nil, errors.New("work-queue ledger is empty; the first dispatcher run creates it")
 	}
 	if !strings.EqualFold(state.Repository, repository) {
 		return nil, errors.New("work-queue ledger repository differs from the health target")
 	}
-	stats, err := workQueueStatsAt(state, branch.Name, at)
-	if err != nil {
-		return nil, currentWorkQueueDiagnosticError("diagnostics", err)
-	}
+	stats := workQueueStats(state, branch.Name)
 	return &stats, nil
 }
 
@@ -248,16 +233,6 @@ func renderHealthWorkQueue(w io.Writer, report *HealthWorkQueue) error {
 	if report.Stats != nil {
 		if _, err := fmt.Fprintln(w, workQueueStatsText(*report.Stats)); err != nil {
 			return err
-		}
-		for _, pool := range report.Stats.Pools {
-			if _, err := io.WriteString(w, workQueuePoolDiagnosticsText(pool)); err != nil {
-				return err
-			}
-		}
-		if reasons := workQueueReasonCounts(report.Stats.DeliveryFailureReasons); reasons != "" {
-			if _, err := fmt.Fprintf(w, "Delivery failures: %s\n", reasons); err != nil {
-				return err
-			}
 		}
 	}
 	for _, warning := range report.Warnings {

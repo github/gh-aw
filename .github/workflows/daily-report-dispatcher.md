@@ -83,15 +83,16 @@ additional candidates or admission identities.
 3. The staged dispatch request contains the exact `plan.dispatch`:
    `{"pool":"daily-reports","max_claims":3,"max_dispatches":3}`.
    Do not select winning Work IDs, workflows or revisions from the snapshot.
-   The trusted scheduler selects the eligible fair prefix against fresh state
-   and records its Claims and reservations in `work-queue.jsonl`.
+   The trusted scheduler selects eligible Work in priority, then FIFO order
+   against fresh state and records its Claims and dispatches in
+   `work-queue.jsonl`.
 
 Use only the advertised work-queue MCP tools (or their `work-queue` CLI wrapper).
 Do not call ordinary `dispatch_workflow` or target-specific dispatch tools.
-The allowlist approves routes; the installed Policy pins actual immutable
-revisions, singleton assignments and resource scope. AW handles authorization
-and binds the actual native run to each Claim. Scheduling overrides, including
-the `daily-reports` pool and equal-weight report keys, live in the shared
+The allowlist approves routes; the compiled queue policy pins worker profiles,
+one Claim per dispatch and resource scope. AW handles authorization and binds
+the worker run to each dispatch. Scheduling overrides, including the
+`daily-reports` pool and its per-account limit, live in the shared
 `.github/workflows/aw.json` `work_queue` section.
 
 This workflow runs daily around 12:00 UTC, away from the observed 10:00 UTC

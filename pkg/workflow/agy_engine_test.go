@@ -356,7 +356,10 @@ func TestAgyProductionConformancePermissionsAreBoundedAndScoped(t *testing.T) {
 				}
 				if entry.id == "engine-conformance-agy" {
 					switch name {
-					case "activation", "conclusion":
+					case "activation":
+						// v4 binding writes only the queue branch; Issue projection runs later.
+						allowedPermissions = map[string]string{"actions": "read", "contents": "write", "id-token": "write"}
+					case "conclusion":
 						allowedPermissions = map[string]string{"actions": "read", "contents": "write", "issues": "write", "id-token": "write"}
 					case "safe_outputs":
 						allowedPermissions = map[string]string{"actions": "write", "contents": "write", "issues": "write"}

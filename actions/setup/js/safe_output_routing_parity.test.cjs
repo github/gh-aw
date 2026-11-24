@@ -26,10 +26,7 @@ const { main: actionFactory } = require("./safe_output_action_handler.cjs");
 const { withClaimEffectClients } = require("./work_queue_effect_client.cjs");
 const { createRestEffectHandler } = require("./work_queue_rest_adapter.cjs");
 const { createGraphqlEffectHandler } = require("./work_queue_graphql_adapter.cjs");
-const { validateStoredAssignment } = require("./work_queue_binding.cjs");
-const { queueFixture } = require("./work_queue_lifecycle.test_helpers.cjs");
-const { readDeliveryControlInventory } = require("./work_queue_delivery.cjs");
-const { serializeTransactionLog } = require("./work_queue_replay.cjs");
+const { workerPolicy, workerQueue } = require("./work_queue_worker.test_helpers.cjs");
 
 const processorConfig = { itemType: "noop", configKey: "noop", displayName: "Noop", itemTypeName: "noop", supportsIssue: true, envVars: {} };
 const preview = { title: "Preview", description: "Preview", renderItem: item => item.message };
@@ -38,16 +35,12 @@ let oldEnv;
 let oldGlobals;
 
 function assignment(count = 1) {
-  return {
-    version: 3,
-    dispatch_id: "dispatch",
-    request_id: "request",
-    commit_id: "commit",
-    policy_epoch: "policy",
-    pool: "default",
-    worker_profile: "default",
-    claims: Array.from({ length: count }, (_, index) => ({ handle: `h${index + 1}`, claim_id: `c${index + 1}`, work_id: `w${index + 1}`, work: {}, result_refs: [] })),
-  };
+  return { dispatch_id: "dispatch", claims: Array.from({ length: count }, (_, index) => ({ handle: `h${index + 1}`, claim_id: `c${index + 1}`, work_id: `w${index + 1}`, work: {}, result_refs: [] })) };
+}
+
+/** A valid singleton of another Dispatch that reuses the local handle `h1`. */
+function otherDispatch() {
+  return { dispatch_id: "dispatch-2", claims: [{ handle: "h1", claim_id: "c2", work_id: "w2", work: {}, result_refs: [] }] };
 }
 
 function writeOutput(items) {
@@ -56,29 +49,19 @@ function writeOutput(items) {
 }
 
 function activate(count, items, options = {}) {
-  const fixture = queueFixture({ count, bound: true, ...options });
+  const value = assignment(count);
+  for (const member of value.claims) Object.assign(member.work, options.work);
   process.env.GH_AW_WORK_QUEUE_ENABLED = "true";
   process.env.GH_AW_WORK_QUEUE_ROLE = "worker";
   process.env.GH_AW_WORK_QUEUE_SNAPSHOT = path.join(root, "snapshot.json");
-  fs.writeFileSync(
-    process.env.GH_AW_WORK_QUEUE_SNAPSHOT,
-    JSON.stringify({ version: 3, sha: "head", transactionLog: serializeTransactionLog(fixture.transactions), captured_at: fixture.at, origin: fixture.workerActor, worker: fixture.assignment, role: "worker" })
-  );
-  global.context = fixture.workerContext;
-  writeOutput(items(fixture.assignment.claims));
-  return fixture;
+  fs.writeFileSync(process.env.GH_AW_WORK_QUEUE_SNAPSHOT, JSON.stringify({ version: 4, sha: "head", transactionLog: "", origin: { role: "worker", repository: "owner/repo" }, worker: value, role: "worker" }));
+  global.context = { repo: { owner: "owner", repo: "repo" }, runId: 42, runAttempt: 1, payload: { inputs: { work_queue_assignment: JSON.stringify({ version: 4, dispatch_id: value.dispatch_id }) } } };
+  writeOutput(items(value.claims));
+  return { assignment: value };
 }
 
 function managerOptions(overrides = {}) {
-  return {
-    authorize: vi.fn(authorize),
-    controlIntentPath: path.join(root, "missing-intents.jsonl"),
-    deliveryArtifactRoot: path.join(root, "delivery"),
-    // An untrusted inventory cannot manufacture a verified delivery or Result.
-    readControlInventory: async () => ({ controls: [] }),
-    finalizeResults: vi.fn(async () => ({ claims: {} })),
-    ...overrides,
-  };
+  return { authorize: vi.fn(authorize), ...overrides };
 }
 
 beforeEach(() => {
@@ -206,167 +189,72 @@ describe("disabled safe-output behavioral parity", () => {
 });
 
 describe("real immutable Claim routing", () => {
-  it.each([false, true])("reuses the selected queue transport for initial and bounded delivery readback with explicit client=%s", async explicitClient => {
-    const fixture = activate(2, () => []);
-    for (const member of fixture.assignment.claims) {
-      fixture.append("finish", { dispatch_id: fixture.assignment.dispatch_id, claim_handle: member.handle, outcome: "completed" }, { ...fixture.workerActor, dispatch_id: fixture.assignment.dispatch_id, claim_handle: member.handle });
-    }
-    global.github = fixture.githubClient;
-    const queueClient = explicitClient ? { ...fixture.githubClient } : fixture.githubClient;
-    const store = require("./work_queue_store.cjs");
-    const reads = vi.spyOn(store, "readWorkQueueLog").mockImplementation(async parameters => {
-      expect(parameters.githubClient).toBe(queueClient);
-      return fixture.readWorkQueueLog();
-    });
-    process.env.GITHUB_WORKFLOW_REF = `owner/repo/.github/workflows/worker.lock.yml@${"a".repeat(40)}`;
-    const { finalizeWorkerResults } = require("./finish_work_queue_claim.cjs");
-    const result = await manager.main({
-      ...(explicitClient ? { queueClient } : {}),
-      controlIntentPath: path.join(root, "missing-intents.jsonl"),
-      finalizeResults: options => finalizeWorkerResults({ ...options, publishWorkQueueRequest: fixture.publishWorkQueueRequest, now: fixture.at }),
-    });
-    expect(result.settlements.map(settlement => settlement.delivery.verification)).toEqual(["verified", "verified"]);
-    expect(fixture.assignment.claims.map(member => fixture.state.works.get(member.work_id).barrier)).toEqual(["verified", "verified"]);
-    expect(reads).toHaveBeenCalled();
+  it("applies a completed Claim's effects through the real authorizer and records them for the finish step", async () => {
+    const queue = workerQueue();
+    process.env.GH_AW_WORK_QUEUE_ENABLED = "true";
+    process.env.GH_AW_WORK_QUEUE_ROLE = "worker";
+    process.env.GH_AW_WORK_QUEUE_POLICY = JSON.stringify(workerPolicy());
+    process.env.GH_AW_WORK_QUEUE_SNAPSHOT = path.join(root, "bound-snapshot.json");
+    process.env.GH_AW_WORK_QUEUE_FINISH_INTENT = path.join(root, "bound-finish.jsonl");
+    process.env.GH_AW_WORK_QUEUE_EFFECTS = path.join(root, "bound-effects.jsonl");
+    fs.rmSync(process.env.GH_AW_WORK_QUEUE_EFFECTS, { force: true });
+    fs.writeFileSync(process.env.GH_AW_WORK_QUEUE_SNAPSHOT, JSON.stringify({ version: 4, sha: "head", transactionLog: "", origin: { role: "worker", repository: "owner/repo" }, role: "worker", worker: queue.assignment }));
+    process.env.GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG = JSON.stringify({ create_issue: { max: 1, footer: false } });
+    global.context = { ...queue.context, eventName: "workflow_dispatch" };
+    global.github.rest.repos = { get: vi.fn(async () => ({ data: { full_name: "owner/repo", id: 7 } })) };
+    global.github.rest.issues = { create: vi.fn(async args => ({ data: { ...args, id: 19, number: 19, html_url: "https://github.com/owner/repo/issues/19" } })) };
+    writeOutput([{ type: "create_issue", title: "Scoped", body: "Body" }]);
+
+    let result = await manager.main({ queueClient: queue.githubClient });
+    expect(result.settlements[0]).toMatchObject({ success: true, suppressed: true, state: "failed" });
+    expect(global.github.rest.issues.create).not.toHaveBeenCalled();
+
+    fs.writeFileSync(process.env.GH_AW_WORK_QUEUE_FINISH_INTENT, `${JSON.stringify({ version: 4, claim_handle: "h1", outcome: "completed" })}\n`);
+    result = await manager.main({ queueClient: queue.githubClient });
+    expect(result.settlements[0], JSON.stringify(global.core.setFailed.mock.calls)).toMatchObject({ claim_handle: "h1", success: true });
+    expect(global.github.rest.issues.create).toHaveBeenCalledTimes(1);
+    const lines = fs
+      .readFileSync(process.env.GH_AW_WORK_QUEUE_EFFECTS, "utf8")
+      .trim()
+      .split("\n")
+      .map(line => JSON.parse(line));
+    expect(lines).toEqual([{ claim_handle: "h1", kind: "create_issue", resource: { repository: "owner/repo", number: 19, id: "19" } }]);
     expect(global.core.setFailed).not.toHaveBeenCalled();
   });
 
-  it.each([...["create_discussion", "create_pull_request"].flatMap(type => [false, true].map(tampered => [type, tampered, false])), ["create_discussion", false, true]])(
-    "independently verifies the real %s handler and manager without masking tampered=%s or labelFailure=%s",
-    async (type, tampered, labelFailure) => {
-      const pending = tampered || labelFailure;
-      const labelNames = type === "create_discussion" ? ["report", "x".repeat(64)] : ["report"];
-      const fixture = activate(1, () => [{ type, title: "Required report", body: "Report body", labels: ["report"] }], {
-        workDefaults: {
-          payload: {
-            effect_contract: { version: 1, outputs: [{ type, min: 1, max: 1 }] },
-            resource_scope: { version: 1, resources: [{ host: "github.com", repository: "owner/repo", repository_id: "7" }] },
-          },
-        },
-      });
-      const member = fixture.assignment.claims[0];
-      fixture.append("finish", { dispatch_id: fixture.assignment.dispatch_id, claim_handle: member.handle, outcome: "completed" }, { ...fixture.workerActor, dispatch_id: fixture.assignment.dispatch_id, claim_handle: member.handle });
-      const snapshot = JSON.parse(fs.readFileSync(process.env.GH_AW_WORK_QUEUE_SNAPSHOT, "utf8"));
-      snapshot.transactionLog = serializeTransactionLog(fixture.transactions);
-      fs.writeFileSync(process.env.GH_AW_WORK_QUEUE_SNAPSHOT, JSON.stringify(snapshot));
-      global.github = fixture.githubClient;
-      global.github.rest.rateLimit = { get: vi.fn(async () => ({ data: { resources: { core: { remaining: 5000, limit: 5000 } } } })) };
-      const tree = "b".repeat(40);
-      const commit = "c".repeat(40);
-      const base = "d".repeat(40);
-      global.exec = {
-        exec: vi.fn(async () => 0),
-        getExecOutput: vi.fn(async (_command, args) => ({ exitCode: 0, stdout: args.at(-1) === "HEAD^{tree}" ? tree : args.at(-1) === "refs/remotes/origin/main^{commit}" ? base : "", stderr: "" })),
-      };
-      global.core.startGroup = vi.fn();
-      global.core.endGroup = vi.fn();
-      Object.assign(global.github.rest.git, {
-        getRef: vi.fn(async ({ ref }) => ({ data: { ref: `refs/${ref}`, object: { type: "commit", sha: commit } } })),
-        getCommit: vi.fn(async () => ({ data: { sha: commit, tree: { sha: tree }, parents: [{ sha: base }] } })),
-        getTree: vi.fn(async () => ({ data: { sha: tree, tree: [], truncated: false } })),
-      });
-      global.github.rest.repos.compareCommits = vi.fn(async () => ({ data: { base_commit: { sha: base }, merge_base_commit: { sha: base }, status: "ahead", ahead_by: 1, behind_by: 0 } }));
-      let native;
-      global.github.rest.pulls = {
-        create: vi.fn(async parameters => {
-          native = {
-            ...parameters,
-            id: 190,
-            node_id: "PR_19",
-            number: 19,
-            html_url: "https://github.com/owner/repo/pull/19",
-            state: "open",
-            labels: [],
-            assignees: [],
-            head: { sha: commit, ref: parameters.head, repo: { full_name: "owner/repo", id: 7 } },
-            base: { sha: base, ref: "main", repo: { full_name: "owner/repo", id: 7 } },
-          };
-          return { data: native };
-        }),
-        get: vi.fn(async () => ({ data: { ...native, body: tampered ? "Changed after publication" : native.body } })),
-      };
-      global.github.rest.issues = {
-        get: vi.fn(async () => ({ data: { id: 191, number: 19, labels: native.labels, assignees: [], pull_request: { url: "https://api.github.com/repos/owner/repo/pulls/19" } } })),
-        addLabels: vi.fn(async () => {
-          native.labels = labelNames.map(name => ({ name }));
-          return { data: native.labels };
-        }),
-      };
-      global.github.graphql = vi.fn(async (query, variables) => {
-        if (query.includes("WorkQueueEffectTargets")) {
-          return {
-            nodes: variables.ids.map(id =>
-              id === "R_7"
-                ? { __typename: "Repository", id, databaseId: 7, nameWithOwner: "owner/repo" }
-                : { __typename: id === "D_19" ? "Discussion" : id.startsWith("L_") ? "Label" : "DiscussionCategory", id, ...(id === "D_19" ? { number: 19 } : {}), repository: { nameWithOwner: "owner/repo", databaseId: 7 } }
-            ),
-          };
-        }
-        if (query.includes("discussionCategories")) return { repository: { id: "R_7", discussionCategories: { nodes: [{ id: "C_1", name: "Reports", slug: "reports" }] } } };
-        if (query.includes("after: $cursor")) return { repository: { labels: { nodes: labelNames.map((name, index) => ({ id: `L_${index + 1}`, name })), pageInfo: { hasNextPage: false } } } };
-        if (query.includes("addLabelsToLabelable")) {
-          if (labelFailure) throw new Error("Injected native label API unavailable");
-          native.labels.nodes = labelNames.map(name => ({ name }));
-          return { addLabelsToLabelable: { labelable: { id: native.id, labels: native.labels } } };
-        }
-        if (query.includes("mutation")) {
-          native = {
-            __typename: "Discussion",
-            id: "D_19",
-            number: 19,
-            url: "https://github.com/owner/repo/discussions/19",
-            title: variables.title,
-            body: variables.body,
-            repository: { id: "R_7", databaseId: 7, nameWithOwner: "owner/repo" },
-            category: { id: "C_1" },
-            labels: { nodes: [], pageInfo: { hasNextPage: false } },
-          };
-          return { createDiscussion: { discussion: native } };
-        }
-        return { node: { ...native, body: tampered ? "Changed after publication" : native.body } };
-      });
-      process.env.GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG = JSON.stringify({
-        [type]: { category: "Reports", footer: false, fallback_to_issue: false, allow_empty: true, base_branch: "main", labels: type === "create_discussion" ? [" report ", "x".repeat(70)] : [" report "] },
-      });
-      const runtime = {
-        assignment: fixture.assignment,
-        context: fixture.workerContext,
-        githubClient: fixture.githubClient,
-        workflowRef: `owner/repo/.github/workflows/worker.lock.yml@${"a".repeat(40)}`,
-        readWorkQueueLog: fixture.readWorkQueueLog,
-      };
-      const { authorizeWorkerClaim, finalizeWorkerResults } = require("./finish_work_queue_claim.cjs");
-      const { readDeliveryControlInventory } = require("./work_queue_delivery.cjs");
-      const result = await manager.main(
-        managerOptions({
-          authorize: request => authorizeWorkerClaim({ ...runtime, ...request }),
-          readControlInventory: () => readDeliveryControlInventory({ ...runtime, claim_handle: member.handle }),
-          finalizeResults: options => finalizeWorkerResults({ ...options, ...runtime, publishWorkQueueRequest: fixture.publishWorkQueueRequest, now: fixture.at }),
-        })
-      );
-      expect(result.settlements[0].success, JSON.stringify(global.core.setFailed.mock.calls)).toBe(true);
-      if (type === "create_discussion") expect(native.labels.nodes, JSON.stringify(global.core.warning.mock.calls)).toHaveLength(labelFailure ? 0 : labelNames.length);
-      expect(result.settlements[0].delivery.verification, result.settlements[0].delivery.reason).toBe(pending ? "unknown" : "verified");
-      expect(global.core.setOutput).toHaveBeenCalledWith("work_queue_outcome", pending ? "delivery_pending" : "completed");
-      if (pending) expect(global.core.setFailed).toHaveBeenCalledWith(expect.stringContaining("Claim deliveries remain unverified"));
-      else expect(global.core.setFailed).not.toHaveBeenCalled();
-      expect(fixture.state.works.get(member.work_id).barrier).toBe(pending ? "pending" : "verified");
-    }
-  );
+  it.each([
+    ["worker", { ...workerPolicy(), workers: ["other"] }],
+    ["pool", { ...workerPolicy(), pools: { reports: workerPolicy().pools.default } }],
+  ])("denies a completed Claim's effects with E004 once its %s leaves the live policy", async (_, policy) => {
+    const queue = workerQueue();
+    process.env.GH_AW_WORK_QUEUE_ENABLED = "true";
+    process.env.GH_AW_WORK_QUEUE_ROLE = "worker";
+    process.env.GH_AW_WORK_QUEUE_POLICY = JSON.stringify(policy);
+    process.env.GH_AW_WORK_QUEUE_SNAPSHOT = path.join(root, "removed-snapshot.json");
+    process.env.GH_AW_WORK_QUEUE_FINISH_INTENT = path.join(root, "removed-finish.jsonl");
+    process.env.GH_AW_WORK_QUEUE_EFFECTS = path.join(root, "removed-effects.jsonl");
+    fs.rmSync(process.env.GH_AW_WORK_QUEUE_EFFECTS, { force: true });
+    fs.writeFileSync(process.env.GH_AW_WORK_QUEUE_SNAPSHOT, JSON.stringify({ version: 4, sha: "head", transactionLog: "", origin: { role: "worker", repository: "owner/repo" }, role: "worker", worker: queue.assignment }));
+    fs.writeFileSync(process.env.GH_AW_WORK_QUEUE_FINISH_INTENT, `${JSON.stringify({ version: 4, claim_handle: "h1", outcome: "completed" })}\n`);
+    process.env.GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG = JSON.stringify({ create_issue: { max: 1, footer: false } });
+    global.context = { ...queue.context, eventName: "workflow_dispatch" };
+    global.github.rest.repos = { get: vi.fn(async () => ({ data: { full_name: "owner/repo", id: 7 } })) };
+    global.github.rest.issues = { create: vi.fn() };
+    writeOutput([{ type: "create_issue", title: "Scoped", body: "Body" }]);
+
+    const result = await manager.main({ queueClient: queue.githubClient });
+    expect(global.github.rest.issues.create).not.toHaveBeenCalled();
+    expect(fs.existsSync(process.env.GH_AW_WORK_QUEUE_EFFECTS) ? fs.readFileSync(process.env.GH_AW_WORK_QUEUE_EFFECTS, "utf8") : "").toBe("");
+    expect(global.core.setFailed).toHaveBeenCalled();
+    // authorizeWorkerClaim's E004 denial (work_queue_effect_scope_denied) settles the Claim unsuccessfully.
+    expect(result.settlements).toEqual([{ claim_handle: "h1", success: false, error: "work_queue_effect_scope_denied" }]);
+  });
 
   it("allows only noop safe outputs for a genuinely absent dispatcher queue", () => {
     process.env.GH_AW_WORK_QUEUE_ENABLED = "true";
     process.env.GH_AW_WORK_QUEUE_ROLE = "dispatcher";
     process.env.GH_AW_WORK_QUEUE_SNAPSHOT = path.join(root, "absent-dispatcher-snapshot.json");
-    const snapshot = {
-      version: 3,
-      sha: null,
-      transactionLog: "",
-      captured_at: 0,
-      origin: {},
-      worker: null,
-      role: "dispatcher",
-    };
+    const snapshot = { version: 4, sha: null, transactionLog: "", origin: { role: "dispatcher", repository: "owner/repo" }, worker: null, role: "dispatcher" };
     fs.writeFileSync(process.env.GH_AW_WORK_QUEUE_SNAPSHOT, JSON.stringify(snapshot));
     const outputFile = path.join(root, "absent-dispatcher-output.jsonl");
     fs.writeFileSync(outputFile, "");
@@ -378,14 +266,13 @@ describe("real immutable Claim routing", () => {
       expect(() => append({ type })).toThrow(/unassigned dispatcher/);
     }
     fs.writeFileSync(process.env.GH_AW_WORK_QUEUE_SNAPSHOT, JSON.stringify({ ...snapshot, sha: "existing" }));
-    expect(() => append({ type: "noop", message: "Policyless ledger" })).toThrow(/policy_missing/);
+    expect(() => append({ type: "noop", message: "Existing queue" })).toThrow(/unassigned dispatcher/);
     expect(fs.readFileSync(outputFile, "utf8").trim().split("\n")).toHaveLength(1);
   });
 
-  it.each([1, 2])("cannot disable an already trusted %i-Claim execution by changing ambient enablement or role", async count => {
-    const fixture = activate(count, () => []);
+  it("cannot disable an already trusted Claim execution by changing ambient enablement or role", async () => {
+    const fixture = activate(1, () => []);
     const handle = fixture.assignment.claims[0].handle;
-    const otherHandle = fixture.assignment.claims[1]?.handle || "foreign";
     const denied = vi.fn(request => ({ authorized: false, claim_handle: request.claim_handle }));
     const append = vi.fn();
     await scope.withClaimExecution({ assignment: fixture.assignment, claim_handle: handle, authorize: denied }, async () => {
@@ -399,10 +286,12 @@ describe("real immutable Claim routing", () => {
         process.env.GH_AW_WORK_QUEUE_ROLE = role;
         if (enabled === "false") expect(scope.readClaimScopeContext()).toBeNull();
         expect(scope.currentClaimHandle()).toBe(handle);
-        await expect(scope.assertClaimAuthorized({ type: "noop", ...(count === 1 ? {} : { claim_handle: handle }) })).rejects.toThrow(/not available/);
-        expect(() => scope.normalizeRuntimeMessage({ type: "noop", claim_handle: otherHandle })).toThrow(/foreign|escape/);
-        expect(() => put({ claim_handle: otherHandle, key: "foreign", value: "rejected" })).toThrow(/foreign|escape/);
-        expect(put({ ...(count === 1 ? {} : { claim_handle: handle }), key: role, value: "selected" }).isError).not.toBe(true);
+        await expect(scope.assertClaimAuthorized({ type: "noop" })).rejects.toThrow(/not authorized/);
+        for (const otherHandle of ["h2", "foreign"]) {
+          expect(() => scope.normalizeRuntimeMessage({ type: "noop", claim_handle: otherHandle })).toThrow(/foreign|escape/);
+          expect(() => put({ claim_handle: otherHandle, key: "foreign", value: "rejected" })).toThrow(/foreign|escape/);
+        }
+        expect(put({ key: role, value: "selected" }).isError).not.toBe(true);
       }
     });
     expect(denied).toHaveBeenCalledTimes(2);
@@ -411,22 +300,70 @@ describe("real immutable Claim routing", () => {
     expect(global.getOctokit).not.toHaveBeenCalled();
   });
 
-  it.each([1, 2])("runs the manager's original %i-Claim assignment with independently scoped noops and artifacts", async count => {
-    const fixture = activate(count, members => members.map(member => ({ type: "noop", message: member.handle, ...(count === 1 ? {} : { claim_handle: member.handle }) })));
+  it.each([false, true])("runs the manager's single Claim pass (explicit handle: %s)", async explicit => {
+    const fixture = activate(1, members => [
+      { type: "noop", message: "first", ...(explicit ? { claim_handle: members[0].handle } : {}) },
+      { type: "noop", message: "second" },
+    ]);
+    process.env.GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG = JSON.stringify({ noop: { max: 2 } });
     const options = managerOptions();
     const result = await manager.main(options);
     expect(result.rejected).toEqual([]);
-    expect(result.settlements).toHaveLength(count);
-    for (const [index, settlement] of result.settlements.entries()) {
-      expect(settlement).toMatchObject({ claim_handle: fixture.assignment.claims[index].handle, success: true });
-      expect(settlement.delivery.verification).toBe("unknown");
-      const directory = scope.claimArtifactPath(options.deliveryArtifactRoot, settlement.claim_handle, fixture.assignment);
-      expect(fs.existsSync(path.join(directory, "delivery-receipt.json"))).toBe(false);
-    }
-    expect(options.finalizeResults).toHaveBeenCalledTimes(1);
-    expect(global.core.setOutput).toHaveBeenCalledWith("work_queue_outcome", "delivery_pending");
-    expect(global.core.setFailed).toHaveBeenCalledWith(expect.stringContaining("Claim deliveries remain unverified"));
+    expect(result.settlements).toEqual([expect.objectContaining({ claim_handle: fixture.assignment.claims[0].handle, success: true })]);
+    expect(JSON.parse(global.core.setOutput.mock.calls.find(([key]) => key === "claim_results")[1])).toEqual({ settlements: result.settlements });
+    expect(global.core.setFailed).not.toHaveBeenCalled();
     expect(global.getOctokit).not.toHaveBeenCalled();
+  });
+
+  it("rejects a two-member snapshot before any handler, credential, authorization or artifact write", async () => {
+    activate(2, members => members.map(member => ({ type: "create_issue", title: member.handle, body: "Body", claim_handle: member.handle })));
+    process.env.GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG = JSON.stringify({ create_issue: { max: 2, footer: false, "github-token": "private-test-token" } });
+    process.env.GH_AW_WORK_QUEUE_EFFECTS = path.join(root, "grouped-effects.jsonl");
+    fs.rmSync(process.env.GH_AW_WORK_QUEUE_EFFECTS, { force: true });
+    const createIssue = require("./create_issue.cjs");
+    const createIssueFactory = vi.spyOn(createIssue, "main");
+    const manifestRoot = path.dirname(constants.MANIFEST_FILE_PATH);
+    const before = fs.existsSync(manifestRoot) ? fs.readdirSync(manifestRoot) : [];
+    const options = managerOptions();
+    await expect(manager.main(options)).rejects.toThrow(/exactly one open Claim/);
+    expect(createIssueFactory).not.toHaveBeenCalled();
+    expect(options.authorize).not.toHaveBeenCalled();
+    expect(global.getOctokit).not.toHaveBeenCalled();
+    expect(global.core.setOutput).not.toHaveBeenCalled();
+    expect(fs.existsSync(process.env.GH_AW_WORK_QUEUE_EFFECTS)).toBe(false);
+    expect(fs.existsSync(manifestRoot) ? fs.readdirSync(manifestRoot) : []).toEqual(before);
+  });
+
+  it("binds an accepted message to its original record index and the complete batch digest after rejecting a foreign one", async () => {
+    const items = [
+      { type: "create_issue", title: "Foreign", body: "Body", claim_handle: "h2" },
+      { type: "create_issue", title: "Scoped", body: "Body" },
+    ];
+    activate(1, () => items);
+    Object.assign(process.env, {
+      GITHUB_WORKFLOW_REF: "owner/repo/.github/workflows/test.yml@refs/heads/main",
+      GITHUB_WORKFLOW_SHA: "a".repeat(40),
+      GH_AW_AUTHORIZATION_WORKFLOW_HASH: "b".repeat(64),
+      GH_AW_SAFE_OUTPUTS_STAGED: "false",
+      GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: JSON.stringify({ create_issue: { max: 1, footer: false, authorization: { endpoint: "https://authority.example/authorize", audience: "safe-outputs", source: "local" } } }),
+    });
+    global.github.rest.issues = { create: vi.fn() };
+    const protocol = require("./safe_output_authorization.cjs");
+    const prepare = vi.spyOn(protocol, "prepareInvocation");
+    vi.spyOn(protocol, "recordAuthorizationOutcome").mockReturnValue({ evidenceRecorded: true });
+    vi.spyOn(protocol, "authorizePreparedInvocation").mockImplementation(async () => {
+      throw new protocol.SafeOutputAuthorizationError("denied", { state: "denied", reason_code: "denied" });
+    });
+    const result = await manager.main(managerOptions());
+    expect(result.rejected).toEqual([expect.objectContaining({ type: "create_issue", claim_handle: "h2", errorCode: "claim_scope_invalid" })]);
+    expect(prepare).toHaveBeenCalledTimes(1);
+    // The digest covers the complete loaded batch, including the rejected record that precedes it.
+    const loaded = require("./load_agent_output.cjs").loadAgentOutput({ partitioning: true }).items;
+    expect(loaded).toHaveLength(2);
+    expect(prepare.mock.calls[0][0]).toMatchObject({ batchDigest: protocol.canonicalDigest(loaded), recordIndex: 1 });
+    expect(prepare.mock.calls[0][0].batchDigest).not.toBe(protocol.canonicalDigest([loaded[1]]));
+    expect(global.github.rest.issues.create).not.toHaveBeenCalled();
+    expect(global.core.setFailed).toHaveBeenCalledWith("1 safe-output message(s) have invalid Claim scope");
   });
 
   it("refuses an undeclared output type before loading or running its handler", async () => {
@@ -434,83 +371,20 @@ describe("real immutable Claim routing", () => {
     const createIssue = require("./create_issue.cjs");
     const createIssueHandler = vi.fn();
     const createIssueFactory = vi.spyOn(createIssue, "main").mockResolvedValue(createIssueHandler);
-    const fixture = activate(1, () => [{ type: "create_issue", title: "Undeclared", body: "Must not be created" }], { configureWork: work => (work.payload.effect_contract = { version: 1, outputs: [{ type: "noop", min: 0, max: 1 }] }) });
-    const member = fixture.assignment.claims[0];
-    fixture.append("finish", { dispatch_id: fixture.assignment.dispatch_id, claim_handle: member.handle, outcome: "completed" }, { ...fixture.workerActor, dispatch_id: fixture.assignment.dispatch_id, claim_handle: member.handle });
-    global.github = fixture.githubClient;
-    const options = managerOptions({
-      queueClient: fixture.githubClient,
-      readControlInventory: () =>
-        readDeliveryControlInventory({
-          assignment: fixture.assignment,
-          claim_handle: "h1",
-          githubClient: fixture.githubClient,
-          queueClient: fixture.githubClient,
-          context: fixture.workerContext,
-          core: global.core,
-          workflowRef: `owner/repo/.github/workflows/worker.lock.yml@${"a".repeat(40)}`,
-          readWorkQueueLog: fixture.readWorkQueueLog,
-        }),
-      finalizeResults: vi.fn(async () => ({ claims: { h1: { state: "pending", reason: "terminal_evidence_required" } } })),
-    });
+    activate(1, () => [{ type: "create_issue", title: "Undeclared", body: "Must not be created" }], { work: { effect_contract: { version: 1, outputs: [{ type: "noop", min: 0, max: 1 }] } } });
+    const options = managerOptions();
 
     const result = await manager.main(options);
 
     expect(createIssueFactory).not.toHaveBeenCalled();
     expect(createIssueHandler).not.toHaveBeenCalled();
+    expect(options.authorize).not.toHaveBeenCalled();
     expect(result.settlements[0]).toMatchObject({ success: false, error: expect.stringMatching(/Undeclared output type\(s\).*create_issue/) });
-    const worker = scope.readClaimScopeContext().assignment;
-    const directory = scope.claimArtifactPath(root, "h1", worker);
-    const report = JSON.parse(fs.readFileSync(path.join(directory, manifest.CLAIM_DELIVERY_ERRORS_FILE_NAME), "utf8"));
-    expect(report.failures[0].error).toBe("Undeclared output type in immutable effect_contract");
-    expect(global.core.setOutput).toHaveBeenCalledWith("work_queue_outcome", "delivery_pending");
-  });
-  it.each(["pending", "delivery_failed"])("fails an otherwise successful output pass with a %s delivery without suppressing its verified sibling", async state => {
-    const fixture = activate(2, members => members.map(member => ({ type: "noop", message: member.handle, claim_handle: member.handle })));
-    await scope.withClaimExecution({ assignment: fixture.assignment, claim_handle: "h1", authorize }, () => manifest.writeSafeOutputErrorReport({ message: "Original handler failure" }));
-    const options = managerOptions({
-      finalizeResults: vi.fn(async () => ({ claims: { h1: { state, attempts: 0 }, h2: { state: "result" } } })),
-    });
-    const result = await manager.main(options);
-    expect(result.settlements).toHaveLength(2);
-    expect(result.settlements.every(settlement => settlement.success)).toBe(true);
-    expect(global.core.setOutput).toHaveBeenCalledWith("work_queue_outcome", "delivery_pending");
-    expect(global.core.setFailed).toHaveBeenCalledWith(expect.stringContaining("Claim deliveries remain unverified"));
-    const worker = scope.readClaimScopeContext().assignment;
-    const directory = scope.claimArtifactPath(root, "h1", worker);
-    const report = JSON.parse(fs.readFileSync(path.join(directory, manifest.CLAIM_DELIVERY_ERRORS_FILE_NAME), "utf8"));
-    expect(report).toMatchObject({
-      claim_handle: "h1",
-      errorCode: "claim_delivery_unverified",
-      message: `Claim delivery state: ${state}; effects: unknown; attempts: 0`,
-      failures: [{ type: "claim_delivery", errorCode: state === "delivery_failed" ? "delivery_failed" : "verification_unresolved" }],
-    });
-    expect(fs.statSync(path.join(directory, manifest.CLAIM_DELIVERY_ERRORS_FILE_NAME)).mode & 0o777).toBe(0o600);
-    expect(JSON.parse(fs.readFileSync(path.join(directory, "safe-output-errors.json"), "utf8")).message).toBe("Original handler failure");
-  });
-
-  it("preserves the trusted finalizer's verifier reason in Claim diagnostics", async () => {
-    activate(1, () => [{ type: "noop", message: "h1" }]);
-    await manager.main(
-      managerOptions({
-        finalizeResults: vi.fn(async () => ({ claims: { h1: { state: "pending", reason: "terminal_evidence_required", verifier: "recheck_receipt_rejected" } } })),
-      })
-    );
-    const worker = scope.readClaimScopeContext().assignment;
-    const directory = scope.claimArtifactPath(root, "h1", worker);
-    const report = JSON.parse(fs.readFileSync(path.join(directory, manifest.CLAIM_DELIVERY_ERRORS_FILE_NAME), "utf8"));
-    expect(report.failures[0]).toMatchObject({ errorCode: "terminal_evidence_required", verifier: "recheck_receipt_rejected" });
-  });
-
-  it.each(["result", "cancelled"])("does not fail independently settled %s Claims", async state => {
-    activate(2, members => members.map(member => ({ type: "noop", message: member.handle, claim_handle: member.handle })));
-    await manager.main(managerOptions({ finalizeResults: vi.fn(async () => ({ claims: { h1: { state }, h2: { state: "result" } } })) }));
-    expect(global.core.setFailed).not.toHaveBeenCalled();
-    expect(global.core.setOutput).toHaveBeenCalledWith("work_queue_outcome", state === "result" ? "completed" : "completed_with_cancellations");
+    expect(global.core.setFailed).toHaveBeenCalledWith("The Claim-scoped safe-output pass failed");
   });
 
   it("redacts every persisted Claim diagnostic before JSON encoding and keeps files private", async () => {
-    const original = assignment(2);
+    const original = assignment(1);
     const handle = original.claims[0].handle;
     const base = path.join(root, "privacy");
     const secret = 'private"\\credential\nsecond-line';
@@ -547,7 +421,7 @@ describe("real immutable Claim routing", () => {
       expect(fs.statSync(filename).mode & 0o777).toBe(0o600);
       expect(fs.existsSync(path.join(base, file))).toBe(false);
     }
-    expect(fs.existsSync(scope.claimArtifactPath(base, original.claims[1].handle, original))).toBe(false);
+    expect(fs.existsSync(scope.claimArtifactPath(base, handle, otherDispatch()))).toBe(false);
     expect(temporaryIds.aw_example.repo).toBe(`owner/${secret}`);
     expect(temporaryIds[secret].value).toBe(token);
   });
@@ -589,68 +463,69 @@ describe("real immutable Claim routing", () => {
     expect(core.warning.mock.calls.flat().join("\n")).not.toContain(metadata.secret);
   });
 
-  it("rejects omitted, malformed, foreign and conflicting selectors without shrinking original multi-Claim membership", async () => {
-    const fixture = activate(2, members => [
-      { type: "noop", message: "missing selector" },
+  it("rejects malformed, foreign and conflicting selectors while the Claim's valid output proceeds", async () => {
+    const fixture = activate(1, members => [
       { type: "noop", message: "malformed", claim_handle: null },
       { type: "noop", message: "foreign", claim_handle: "foreign" },
-      { type: "noop", message: "conflict", claim_handle: members[0].handle, claim_id: members[1].claim_id },
-      { type: "noop", message: "valid sibling", claim_handle: members[1].handle },
+      { type: "noop", message: "conflicting handle", claim_handle: "h2" },
+      { type: "noop", message: "conflict", claim_handle: members[0].handle, claim_id: "c2" },
+      { type: "noop", message: "valid omitted selector" },
     ]);
     const result = await manager.main(managerOptions());
     expect(result.rejected).toHaveLength(4);
-    expect(result.settlements).toHaveLength(2);
-    expect(result.settlements[1]).toMatchObject({ claim_handle: fixture.assignment.claims[1].handle, success: true });
+    expect(result.settlements).toEqual([expect.objectContaining({ claim_handle: fixture.assignment.claims[0].handle, success: true })]);
+    expect(global.core.setOutput).toHaveBeenCalledWith("claim_scope_errors", JSON.stringify(result.rejected));
     expect(global.core.setFailed).toHaveBeenCalledWith("4 safe-output message(s) have invalid Claim scope");
   });
 
-  it.each(["cancelled", "result", "not-completed"])("does not provision credentials or handlers for a %s Claim and still processes its sibling", async state => {
-    const fixture = activate(2, members => members.map(member => ({ type: "noop", message: member.handle, claim_handle: member.handle })));
+  it.each([
+    ["cancelled", true],
+    ["completed", true],
+    ["failed", true],
+    ["unbound", false],
+  ])("does not provision credentials or handlers for a %s Claim", async (state, suppressed) => {
+    activate(1, members => members.map(member => ({ type: "noop", message: member.handle })));
     process.env.GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG = JSON.stringify({ noop: { "github-token": "private-test-token" } });
-    const rejected = fixture.assignment.claims[0].handle;
     const options = managerOptions({
-      authorize: vi.fn(request => ({ claim_handle: request.claim_handle, authorized: request.claim_handle !== rejected, ...(request.claim_handle === rejected ? { state, suppressed: state !== "not-completed" } : {}) })),
+      authorize: vi.fn(request => ({ claim_handle: request.claim_handle, authorized: false, state, ...(suppressed ? { suppressed } : {}) })),
     });
     const result = await manager.main(options);
-    expect(result.settlements[0].success).toBe(state !== "not-completed");
-    expect(result.settlements[1].success).toBe(true);
-    expect(global.getOctokit).toHaveBeenCalledTimes(1);
-    expect(options.authorize.mock.calls.findIndex(([request]) => request.claim_handle === rejected)).toBe(0);
+    expect(result.settlements).toEqual([expect.objectContaining({ claim_handle: "h1", success: suppressed, ...(suppressed ? { suppressed: true, state } : {}) })]);
+    expect(global.getOctokit).not.toHaveBeenCalled();
+    expect(options.authorize).toHaveBeenCalledTimes(1);
+    expect(global.core.setFailed).toHaveBeenCalledTimes(suppressed ? 0 : 1);
   });
 
-  it("keeps staged Claims read-only, permits pre-Completion preview, and never invokes terminal reconciliation", async () => {
-    activate(2, members => members.map(member => ({ type: "noop", message: member.handle, claim_handle: member.handle })));
+  it("keeps a staged Claim read-only and authorizes its preview before finish", async () => {
+    activate(1, members => members.map(member => ({ type: "noop", message: member.handle })));
     process.env.GH_AW_SAFE_OUTPUTS_STAGED = "true";
     process.env.GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG = "invalid configuration must not be loaded";
     const options = managerOptions();
     const result = await manager.main(options);
-    expect(result.settlements.every(settlement => settlement.delivery.verification === "staged_preview")).toBe(true);
+    expect(result.settlements).toEqual([expect.objectContaining({ success: true, messages: [{ type: "noop", message: "h1", claim_handle: "h1" }] })]);
     expect(options.authorize.mock.calls.every(([request]) => request.requireCompletion === false)).toBe(true);
-    expect(options.finalizeResults).not.toHaveBeenCalled();
     expect(global.getOctokit).not.toHaveBeenCalled();
     expect(global.core.setFailed).not.toHaveBeenCalled();
   });
 
   it("scopes MCP limits and review state, including run_id on the actual approve_workflow_run tool", () => {
-    const fixture = activate(2, () => []);
+    activate(1, () => []);
     const append = vi.fn();
     const handlers = createHandlers({ debug() {} }, append, { approve_workflow_run: { max: 1 } });
     const approve = handlers.defaultHandler("approve_workflow_run");
-    for (const member of fixture.assignment.claims) {
-      approve({ claim_handle: member.handle, run_id: "99" });
-      expect(() => approve({ claim_handle: member.handle, run_id: "100" })).toThrow(/limit reached/);
-    }
-    expect(append.mock.calls.map(([entry]) => entry)).toEqual(fixture.assignment.claims.map(member => ({ type: "approve_workflow_run", claim_handle: member.handle, run_id: "99", output_id: outputId })));
-    expect(() => approve({ run_id: "99" })).toThrow(/multi-Claim/);
-    expect(() => handlers.defaultHandler("noop")({ claim_handle: fixture.assignment.claims[0].handle, run_id: "99" })).toThrow(/trusted authority/);
-    handlers.createPullRequestReviewCommentHandler({ claim_handle: fixture.assignment.claims[0].handle, body: "First Claim review", path: "file.js", line: 1 });
-    expect(() => handlers.submitPullRequestReviewHandler({ claim_handle: fixture.assignment.claims[1].handle })).toThrow(/contentless review/);
-    handlers.submitPullRequestReviewHandler({ claim_handle: fixture.assignment.claims[0].handle });
-    expect(() => handlers.submitPullRequestReviewHandler({ claim_handle: fixture.assignment.claims[0].handle })).toThrow(/contentless review/);
+    expect(() => approve({ claim_handle: "h2", run_id: "99" })).toThrow(/foreign/);
+    approve({ run_id: "99" });
+    expect(() => approve({ claim_handle: "h1", run_id: "100" })).toThrow(/limit reached/);
+    expect(append.mock.calls.map(([entry]) => entry)).toEqual([{ type: "approve_workflow_run", claim_handle: "h1", run_id: "99", output_id: outputId }]);
+    expect(() => handlers.defaultHandler("noop")({ claim_handle: "h1", run_id: "99" })).toThrow(/trusted authority/);
+    expect(() => handlers.submitPullRequestReviewHandler({ claim_handle: "h1" })).toThrow(/contentless review/);
+    handlers.createPullRequestReviewCommentHandler({ claim_handle: "h1", body: "Claim review", path: "file.js", line: 1 });
+    handlers.submitPullRequestReviewHandler({ claim_handle: "h1" });
+    expect(() => handlers.submitPullRequestReviewHandler({ claim_handle: "h1" })).toThrow(/contentless review/);
   });
 
-  it("gives direct ledger_append and built-in ledger tools the correct Claim and independent limits", () => {
-    const original = activate(2, () => []).assignment;
+  it("gives direct ledger_append and built-in ledger tools the Claim's handle and shared limits", () => {
+    activate(1, () => []);
     const append = vi.fn();
     const handlers = createHandlers({ debug() {} }, append, {
       ledger_append: {
@@ -661,14 +536,11 @@ describe("real immutable Claim routing", () => {
         ],
       },
     });
-    for (const member of original.claims) {
-      const message = { claim_handle: member.handle, ledger: "history", operation: "append", value: member.handle };
-      expect(handlers.ledgerAgentAppendHandler(message).isError).not.toBe(true);
-      expect(() => handlers.ledgerAgentAppendHandler(message)).toThrow(/limit reached/);
-      expect(() => handlers.ledgerBuiltinHandler("map", "put")({ claim_handle: member.handle, ledger: "cache", key: "key", value: "value" })).toThrow(/limit reached/);
-    }
-    expect(append.mock.calls.map(([entry]) => entry.claim_handle)).toEqual(original.claims.map(member => member.handle));
-    expect(() => handlers.ledgerAgentAppendHandler({ ledger: "history", operation: "append", value: "Ambiguous" })).toThrow(/multi-Claim/);
+    expect(() => handlers.ledgerAgentAppendHandler({ claim_handle: "h2", ledger: "history", operation: "append", value: "foreign" })).toThrow(/foreign/);
+    expect(handlers.ledgerAgentAppendHandler({ ledger: "history", operation: "append", value: "h1" }).isError).not.toBe(true);
+    expect(() => handlers.ledgerAgentAppendHandler({ claim_handle: "h1", ledger: "history", operation: "append", value: "again" })).toThrow(/limit reached/);
+    expect(() => handlers.ledgerBuiltinHandler("map", "put")({ ledger: "cache", key: "key", value: "value" })).toThrow(/limit reached/);
+    expect(append.mock.calls.map(([entry]) => entry.claim_handle)).toEqual(["h1"]);
   });
 
   it("normalizes singleton MCP append scope and strips queue fields only from scoped action inputs", async () => {
@@ -737,7 +609,7 @@ describe("real immutable Claim routing", () => {
       const handlers = await manager.loadHandlers(config, undefined, []);
       expect(handlers.has("create_issue")).toBe(true);
       expect(global.getOctokit).not.toHaveBeenCalled();
-      await expect(handlers.get("create_issue")({ type: "create_issue", title: "Rejected" })).rejects.toThrow(/not available/);
+      await expect(handlers.get("create_issue")({ type: "create_issue", title: "Rejected" })).rejects.toThrow(/not authorized/);
       expect(global.getOctokit).not.toHaveBeenCalled();
     });
   });
@@ -758,21 +630,21 @@ describe("real immutable Claim routing", () => {
     });
   });
 
-  it("isolates real handler budgets, API effect receipts, temporary IDs and errors across Claims", async () => {
-    const original = assignment(2);
+  it("isolates real handler budgets, API effect receipts, temporary IDs and errors across Dispatches sharing a handle", async () => {
+    const originals = [assignment(1), otherDispatch()];
     global.github.rest.repos = { get: vi.fn(async () => ({ data: { full_name: "owner/repo", id: 7 } })) };
     global.github.rest.issues = { create: vi.fn(async args => ({ data: { ...args, id: 19, number: 19, html_url: "https://github.com/owner/repo/issues/19" } })) };
     const source = global.github;
     const effects = [[], []];
     const results = [];
-    for (const [index, member] of original.claims.entries()) {
+    for (const [index, original] of originals.entries()) {
       results.push(
-        await scope.withClaimExecution({ assignment: original, claim_handle: member.handle, authorize, effects: effects[index] }, () =>
-          withClaimEffectClients({ claim_handle: member.handle, authorize, authorizeGithub: source }, async () => {
+        await scope.withClaimExecution({ assignment: original, claim_handle: "h1", authorize, effects: effects[index] }, () =>
+          withClaimEffectClients({ claim_handle: "h1", authorize, authorizeGithub: source }, async () => {
             const handlers = await manager.loadHandlers({ create_issue: { max: 1, footer: false } }, undefined, []);
             return manager.processMessages(handlers, [
-              { type: "create_issue", title: "Scoped", body: "Body", temporary_id: "aw_shared", claim_handle: member.handle },
-              { type: "create_issue", title: "Over budget", body: "Body", claim_handle: member.handle },
+              { type: "create_issue", title: "Scoped", body: "Body", temporary_id: "aw_shared", claim_handle: "h1" },
+              { type: "create_issue", title: "Over budget", body: "Body", claim_handle: "h1" },
             ]);
           })
         )
@@ -782,33 +654,34 @@ describe("real immutable Claim routing", () => {
     expect(results.every(result => result.results[0].success && !result.results[1].success)).toBe(true);
     expect(results.map(result => result.temporaryIdMap.aw_shared.number)).toEqual([19, 19]);
     expect(effects.map(entries => entries.length)).toEqual([1, 1]);
-    expect(effects.map(entries => entries[0].claim_handle)).toEqual(["h1", "h2"]);
+    expect(effects.map(entries => [entries[0].dispatch_id, entries[0].claim_id, entries[0].claim_handle])).toEqual([
+      ["dispatch", "c1", "h1"],
+      ["dispatch-2", "c2", "h1"],
+    ]);
     expect(global.github).toBe(source);
   });
 
-  it("contains a failed native API effect to its Claim while the actual manager executes a sibling", async () => {
-    const fixture = activate(2, members => members.map((member, index) => ({ type: "create_issue", claim_handle: member.handle, title: index === 0 ? "First" : "Second", body: "Body" })), {
-      configureWork: work => (work.payload.effect_contract = { version: 1, outputs: [{ type: "create_issue", min: 1, max: 1 }] }),
+  it("fails the Claim's pass on a native API failure while independently valid outputs of the same Claim run", async () => {
+    const fixture = activate(1, () => ["First", "Second"].map(title => ({ type: "create_issue", title, body: "Body" })), {
+      work: { effect_contract: { version: 1, outputs: [{ type: "create_issue", min: 1, max: 2 }] } },
     });
-    process.env.GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG = JSON.stringify({ create_issue: { max: 1, footer: false } });
+    process.env.GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG = JSON.stringify({ create_issue: { max: 2, footer: false } });
     global.github.rest.repos = { get: vi.fn(async () => ({ data: { full_name: "owner/repo", id: 7 } })) };
     global.github.rest.issues = {
       create: vi.fn(async args => {
-        if (args.title === "First") throw Object.assign(new Error("First Claim API failure"), { status: 422 });
+        if (args.title === "First") throw Object.assign(new Error("First output API failure"), { status: 422 });
         return { data: { ...args, id: 19, number: 19, html_url: "https://github.com/owner/repo/issues/19" } };
       }),
     };
     const create = global.github.rest.issues.create;
     const result = await manager.main(managerOptions());
     expect(create).toHaveBeenCalledTimes(2);
-    expect(result.settlements[0]).toMatchObject({ claim_handle: fixture.assignment.claims[0].handle, success: false });
-    expect(result.settlements[1]).toMatchObject({ claim_handle: fixture.assignment.claims[1].handle, success: true });
-    expect(result.settlements.every(settlement => settlement.delivery.verification === "unknown")).toBe(true);
-    expect(global.core.setFailed).toHaveBeenCalledWith("One or more Claim-scoped safe-output passes failed; independently valid siblings were reconciled");
+    expect(result.settlements).toEqual([expect.objectContaining({ claim_handle: fixture.assignment.claims[0].handle, success: false })]);
+    expect(global.core.setFailed).toHaveBeenCalledWith("The Claim-scoped safe-output pass failed");
   });
 
   it("never allows manifest filename spelling or retained logger state to escape its original Claim", async () => {
-    const original = assignment(2);
+    const original = assignment(1);
     const filename = path.join(root, "ordinary", "claims", "items.jsonl");
     let logger;
     await scope.withClaimExecution({ assignment: original, claim_handle: "h1" }, () => {
@@ -820,20 +693,10 @@ describe("real immutable Claim routing", () => {
       logger({ type: "create_issue", number: 1 });
       expect(JSON.parse(fs.readFileSync(destination, "utf8")).claim_handle).toBe("h1");
     });
-    await scope.withClaimExecution({ assignment: original, claim_handle: "h2" }, () => {
+    // Another Dispatch's Claim reuses `h1`; the logger stays bound to its full original identity.
+    await scope.withClaimExecution({ assignment: otherDispatch(), claim_handle: "h1" }, () => {
       expect(() => logger({ type: "create_issue", number: 2 })).toThrow(/original immutable Claim identity/);
     });
-  });
-
-  it("rejects mutated stored membership before native worker binding can be borrowed", () => {
-    const fixture = queueFixture({ count: 2, bound: true });
-    const state = fixture.readWorkQueueLog;
-    expect(typeof state).toBe("function");
-    const projection = require("./work_queue_replay.cjs").replayTransactions(fixture.transactions);
-    expect(validateStoredAssignment(projection, fixture.assignment).assignment).toEqual(fixture.assignment);
-    const narrowed = structuredClone(fixture.assignment);
-    narrowed.claims.pop();
-    expect(() => validateStoredAssignment(projection, narrowed)).toThrow(/assignment_mismatch/);
   });
 });
 

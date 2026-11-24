@@ -1,9 +1,9 @@
 ------------------------------ MODULE Factory ------------------------------
 EXTENDS Integers, FiniteSets, Sequences, TLC
 
-CONSTANTS Worker, Batch, Installed, NoWrites, OutputMin, OutputMax, Fault, Witness
+CONSTANTS Worker, Installed, NoWrites, OutputMin, OutputMax, Fault, Witness
 ASSUME /\ Worker \in {"miner", "refiner", "monster", "mixed"}
-       /\ Batch \in BOOLEAN /\ Installed \in BOOLEAN /\ NoWrites \in BOOLEAN
+       /\ Installed \in BOOLEAN /\ NoWrites \in BOOLEAN
        /\ OutputMin \in 0..OutputMax /\ OutputMax \in 1..3
 
 Works == {1, 2}
@@ -36,9 +36,10 @@ Admit(k) ==
 
 Eligible == {k \in Works : phase[k] = "queued"}
 PrefixHead == IF 1 \in Eligible THEN 1 ELSE 2
+\* v4: a Dispatch carries exactly one Claim. The "group" fault puts both
+\* eligible Works into this activation's Dispatch.
 AssignmentProjection == IF Eligible = {} THEN {}
-          ELSE IF Batch /\ Eligible = Works
-                  /\ (Profile(1) = Profile(2) \/ Fault = "mixed")
+          ELSE IF Fault = "group" /\ Eligible = Works
                THEN Works ELSE {PrefixHead}
 
 \* Two equal-priority, dependency-ready Works; queue arbitration is abstracted.
@@ -54,7 +55,8 @@ Dispatch ==
                  scan, lintClean, quality>>
 
 Precheck(s) ==
-  /\ Worker = "monster" /\ original # {} /\ scan = "unrun"
+  /\ \E k \in original : Profile(k) = "monster"
+  /\ scan = "unrun"
   /\ s \in {"clean", "warnings", "errors", "installFailed", "buildFailed", "toolFailed"}
   /\ scan' = s
   /\ lintClean' = (s = "clean" \/ (s = "warnings" /\ Fault # "warning"))
@@ -68,16 +70,18 @@ Quality(q) ==
   /\ UNCHANGED <<phase, admitted, queueBranch, original, birth, requested, proposed, scoped, applied,
                  completedAtWrite, verified, scan, lintClean>>
 
-\* An explicit original handle is modeled as TRUE. An implicit selector is
-\* legal only for the original singleton, not the currently unfinished subset.
-Stage(k, n, explicit) ==
+\* The selector is omitted (it resolves to the one member), the member's own
+\* handle, or a foreign handle; the scope boundary rejects a foreign one.
+\* Omission is unambiguous only for a singleton original assignment.
+Stage(k, n, selector) ==
   /\ k \in original /\ phase[k] \in {"claimed", "completed"}
   /\ proposed[k] = -1 /\ n \in 0..OutputMax
   /\ (~NoWrites \/ n = 0)
-  /\ explicit \in BOOLEAN
-  /\ explicit \/ Cardinality(original) = 1 \/ Fault = "scope"
+  /\ selector \in {"omitted", "own", "foreign"}
+  /\ selector # "omitted" \/ Cardinality(original) = 1
+  /\ selector # "foreign" \/ Fault = "scope"
   /\ proposed' = [proposed EXCEPT ![k] = n]
-  /\ scoped' = [scoped EXCEPT ![k] = explicit \/ Cardinality(birth) = 1]
+  /\ scoped' = [scoped EXCEPT ![k] = selector # "foreign"]
   /\ UNCHANGED <<phase, admitted, queueBranch, original, birth, requested, applied,
                  completedAtWrite, verified, scan, lintClean, quality>>
 
@@ -122,8 +126,10 @@ Result(k) ==
   /\ UNCHANGED <<admitted, queueBranch, original, birth, requested, proposed, scoped, applied,
                  completedAtWrite, verified, scan, lintClean, quality>>
 
+\* A settled Dispatch's current assignment is empty; authority must keep using
+\* the original membership instead of re-reading it.
 Shrink ==
-  /\ Fault = "membership" /\ Cardinality(original) = 2
+  /\ Fault = "membership" /\ original # {}
   /\ \E k \in original : phase[k] = "cancelled"
   /\ original' = {k \in original : phase[k] # "cancelled"}
   /\ UNCHANGED <<phase, admitted, queueBranch, birth, requested, proposed, scoped, applied,
@@ -134,7 +140,7 @@ Next ==
   \/ Dispatch \/ Shrink
   \/ \E s \in {"clean", "warnings", "errors", "installFailed", "buildFailed", "toolFailed"} : Precheck(s)
   \/ \E q \in {"passed", "failed"} : Quality(q)
-  \/ \E k \in Works, n \in 0..OutputMax, explicit \in BOOLEAN : Stage(k, n, explicit)
+  \/ \E k \in Works, n \in 0..OutputMax, selector \in {"omitted", "own", "foreign"} : Stage(k, n, selector)
 Spec == Init /\ [][Next]_vars
 
 TypeOK ==
@@ -147,7 +153,7 @@ TypeOK ==
   /\ scan \in {"unrun", "clean", "warnings", "errors", "installFailed", "buildFailed", "toolFailed"}
   /\ lintClean \in BOOLEAN /\ quality \in {"unchecked", "passed", "failed"}
 ImmutableMembership == original = birth
-HomogeneousBatch == \A a, b \in birth : Profile(a) = Profile(b)
+SingleClaimDispatch == Cardinality(birth) <= 1
 PolicyRequired == original # {} => Installed
 BranchProvisioning == (admitted # {}) <=> queueBranch
 ScopedIntents == \A k \in Works : proposed[k] >= 0 => scoped[k]
@@ -162,7 +168,7 @@ BoundedAssignment == Cardinality(birth) <= 3
 WitnessReached ==
   CASE Witness = "warning-clean" -> scan = "warnings" /\ lintClean
     [] Witness = "completion-only" -> \E k \in birth : phase[k] = "completed" /\ ~verified[k]
-    [] Witness = "six-outputs" -> birth = Works /\ applied = <<3, 3>>
+    [] Witness = "three-outputs" -> \E k \in birth : applied[k] = 3
     [] Witness = "quality-not-gate" -> quality = "failed" /\ (\E k \in birth : phase[k] = "result")
     [] Witness = "tool-failure" -> scan = "toolFailed" /\ ~lintClean
     [] Witness = "result" -> \E k \in birth : phase[k] = "result" /\ verified[k]

@@ -127,9 +127,9 @@ test-race:
 # Test impacted Go unit tests first for faster feedback (target budget: ~30s)
 .PHONY: test-unit
 test-unit:
-	@echo "Running impacted Go unit tests first (time budget: $(TEST_UNIT_MAX_SECONDS)s)..."; \
-	$(MAKE) --no-print-directory test-impacted-go CI_COVERAGE_ENABLED=0 GO_IMPACTED_TEST_MAX_SECONDS=$(TEST_UNIT_MAX_SECONDS) GO_IMPACTED_TEST_FALLBACK_MODE=$(TEST_UNIT_IMPACTED_FALLBACK_MODE) GO_IMPACTED_TEST_SAMPLE_PER_PACKAGE=$(GO_IMPACTED_TEST_SAMPLE_PER_PACKAGE); \
-	if [ "$(TEST_UNIT_RUN_FULL)" = "1" ]; then \
+	@echo "Running impacted Go unit tests first (time budget: $(TEST_UNIT_MAX_SECONDS)s)..."
+	@$(MAKE) --no-print-directory test-impacted-go CI_COVERAGE_ENABLED=0 GO_IMPACTED_TEST_MAX_SECONDS=$(TEST_UNIT_MAX_SECONDS) GO_IMPACTED_TEST_FALLBACK_MODE=$(TEST_UNIT_IMPACTED_FALLBACK_MODE) GO_IMPACTED_TEST_SAMPLE_PER_PACKAGE=$(GO_IMPACTED_TEST_SAMPLE_PER_PACKAGE)
+	@if [ "$(TEST_UNIT_RUN_FULL)" = "1" ]; then \
 		echo "TEST_UNIT_RUN_FULL=1 set; running full Go unit test suite after impacted tests."; \
 		$(MAKE) --no-print-directory test-unit-all; \
 	fi
@@ -516,7 +516,14 @@ test-impacted-go:
 		echo "No impacted timing data available; running up to $$SAMPLE_PER_PACKAGE sampled top-level tests per impacted package."; \
 		printf '%s\n' "$$CHANGED_GO_PACKAGES" | while IFS= read -r pkg; do \
 			[ -z "$$pkg" ] && continue; \
-			TEST_PATTERN=$$(go test -list '^Test' "$$pkg" 2>/dev/null | head -n "$$SAMPLE_PER_PACKAGE" | paste -sd'|' -); \
+			TEST_LIST=$$(go test -list '^Test' "$$pkg"); \
+			TEST_LIST_STATUS=$$?; \
+			if [ "$$TEST_LIST_STATUS" -ne 0 ]; then \
+				printf '%s\n' "$$TEST_LIST" >&2; \
+				echo "Failed to list top-level tests in $$pkg (go test -list exit $$TEST_LIST_STATUS); not treating it as a package without tests." >&2; \
+				exit 1; \
+			fi; \
+			TEST_PATTERN=$$(printf '%s\n' "$$TEST_LIST" | awk '/^Test[^[:space:]]*$$/' | head -n "$$SAMPLE_PER_PACKAGE" | paste -sd'|' -); \
 			if [ -z "$$TEST_PATTERN" ]; then \
 				echo "No top-level tests discovered in $$pkg; skipping sampled run for this package."; \
 				continue; \

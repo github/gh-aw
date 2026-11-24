@@ -39,7 +39,7 @@ safe-outputs:
 Read the issue and add a comment with your findings.
 ```
 
-In these two sections, an empty `token-broker:` means `true`; use `false` to disable it. Do not combine an enabled section's broker with that section's `github-token` or `github-app`. Handler-specific credentials can still override the safe-output default. `safe-outputs.jobs` do not inherit it. Work-queue dispatch requires an explicit dispatch credential; a brokered token does not establish the verified App identity needed for dispatch.
+In these two sections, an empty `token-broker:` means `true`; use `false` to disable it. Do not combine an enabled section's broker with that section's `github-token` or `github-app`. Handler-specific credentials can still override the safe-output default. `safe-outputs.jobs` do not inherit it.
 
 Configure the complete HTTPS exchange endpoint in the `GH_AW_TOKEN_BROKER_URL` Actions secret, available only to enrolled repositories. A repository secret takes precedence over an organization secret. Actions variables are not used. Enabling a capability without a usable endpoint or after a failed exchange fails the affected operation; it does not fall back to another credential.
 

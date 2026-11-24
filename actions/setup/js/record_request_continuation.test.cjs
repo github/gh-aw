@@ -43,4 +43,26 @@ describe("record_request_continuation", () => {
     expect(written.items[1]).toEqual(source.items[1]);
     expect(JSON.stringify(global.core.info.mock.calls)).not.toContain("Follow-up work");
   });
+
+  it("only records metadata for a routed workflow and never routes", async () => {
+    process.env.GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG = JSON.stringify({ request_continuation: { max: 1, route: "dispatch", max_depth: 2, workflow: "summarize", workflow_file: "summarize.lock.yml" } });
+    global.github = new Proxy(
+      {},
+      {
+        get: () => {
+          throw new Error("No GitHub calls allowed");
+        },
+      }
+    );
+    try {
+      fs.writeFileSync(outputPath, JSON.stringify({ items: [{ type: "request_continuation", message: "Summarize page 2" }], errors: [] }));
+      await main();
+      const written = JSON.parse(fs.readFileSync(outputPath, "utf8"));
+      expect(Number.isNaN(Date.parse(written.items[0].timestamp))).toBe(false);
+      expect(global.core.info).toHaveBeenCalledWith(expect.stringContaining("continuation not confirmed"));
+    } finally {
+      delete process.env.GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG;
+      delete global.github;
+    }
+  });
 });

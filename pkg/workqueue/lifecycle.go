@@ -1,676 +1,322 @@
 package workqueue
 
-import (
-	"encoding/json"
-	"slices"
-)
+import "encoding/json"
 
-func (state Projection) scopedClaim(actor Actor, dispatchID, handle string) (*ClaimState, error) {
-	if dispatchID == "" {
-		dispatchID = actor.DispatchID
-	}
-	if handle == "" {
-		handle = actor.ClaimHandle
-	}
-	if actor.Role != "worker" || actor.DispatchID != dispatchID || actor.ClaimHandle != handle ||
-		actor.RunID == "" || actor.RunAttempt != 1 {
-		return nil, queueError("claim_scope_invalid", "worker context does not name an original assignment member")
-	}
-	dispatch := state.Dispatches[dispatchID]
-	if dispatch != nil && dispatch.PolicyEpoch != state.PolicyEpoch {
-		return nil, queueError("claim_ineffective", "Claim belongs to a retired Policy epoch")
-	}
-	if dispatch == nil || dispatch.Released || dispatch.Run == nil || dispatch.State != "bound" ||
-		dispatch.Run.RunID != actor.RunID || dispatch.Run.RunAttempt != actor.RunAttempt ||
-		dispatch.Run.Principal != actor.Principal || dispatch.Run.Repository != actor.Repository ||
-		dispatch.Run.Workflow != actor.Workflow {
-		return nil, queueError("run_binding_conflict", "worker context does not match durable native binding")
-	}
-	for _, member := range dispatch.Claims {
-		if member.Handle == handle {
-			return state.Claims[member.ClaimID], nil
+func (state *Projection) applyOperation(kind string, operation Operation, commit QueueCommit, ordinal, index int) error {
+	switch kind {
+	case "Work":
+		var work WorkDefinition
+		if err := json.Unmarshal(operation, &work); err != nil {
+			return err
 		}
+		if _, exists := state.Works[work.WorkID]; exists {
+			return nil
+		}
+		record := &WorkState{WorkDefinition: work, State: "available", Position: Position{Commit: ordinal, Operation: index}}
+		state.Works[work.WorkID] = record
+		state.WorkCreators[work.WorkID] = commit.Actor
+		if state.admission != nil {
+			state.admission.add(record)
+		}
+		return nil
+	case "Observation":
+		var observation ObservationOperation
+		if err := json.Unmarshal(operation, &observation); err != nil {
+			return err
+		}
+		state.Observations[GateKey(observation.Resource, observation.Condition)] = observation
+		return nil
+	case "Claim":
+		return decodeAndApply(operation, commit, state.applyClaim)
+	case "Dispatch":
+		return decodeAndApply(operation, commit, state.applyDispatch)
+	case "Bound":
+		return decodeAndApply(operation, commit, state.applyBound)
+	case "Completion":
+		return decodeAndApply(operation, commit, state.applyCompletion)
+	case "ClaimCancellation":
+		return decodeAndApply(operation, commit, state.applyClaimCancellation)
+	case "WorkCancellation":
+		return decodeAndApply(operation, commit, state.applyWorkCancellation)
+	case "Release":
+		return decodeAndApply(operation, commit, state.applyRelease)
+	case "IssueLink":
+		return decodeAndApply(operation, commit, state.applyIssueLink)
+	case "IssueComment":
+		return decodeAndApply(operation, commit, state.applyIssueComment)
 	}
-	return nil, queueError("claim_scope_invalid", "foreign Claim handle")
+	return queueError("checkpoint_invalid", "a Checkpoint must be the sole first line of the log")
 }
 
-func NormalizeClaimHandle(assignment Assignment, selector *string) (string, error) {
-	data, err := canonicalValue(assignment)
-	if err != nil {
-		return "", err
+func decodeAndApply[T any](operation Operation, commit QueueCommit, apply func(T, QueueCommit) error) error {
+	var typed T
+	if err := json.Unmarshal(operation, &typed); err != nil {
+		return err
 	}
-	if _, err := ParseAssignment(data); err != nil {
-		return "", err
-	}
-	if assignment.Version != Version || len(assignment.Claims) == 0 ||
-		len(assignment.Claims) > MaxClaimsPerDispatch || assignment.DispatchID == "" ||
-		assignment.RequestID == "" || assignment.CommitID == "" || assignment.PolicyEpoch == "" {
-		return "", queueError("assignment_invalid", "immutable assignment provenance is required")
-	}
-	if selector == nil {
-		if len(assignment.Claims) != 1 {
-			return "", queueError("claim_scope_required", "multi-Claim assignment requires an explicit handle")
-		}
-		for _, member := range assignment.Claims {
-			return member.Handle, nil
-		}
-		return "", queueError("assignment_invalid", "immutable assignment provenance is required")
-	}
-	if *selector == "" {
-		return "", queueError("claim_scope_invalid", "selector must be a nonempty original handle")
-	}
-	for _, member := range assignment.Claims {
-		if member.Handle == *selector {
-			return *selector, nil
-		}
-	}
-	return "", queueError("claim_scope_invalid", "selector is not in the immutable assignment")
+	return apply(typed, commit)
 }
 
-func ValidateAssignment(state Projection, assignment Assignment) error {
-	dispatch := state.Dispatches[assignment.DispatchID]
-	if dispatch == nil || !sameJSON(dispatch.Assignment, assignment) {
-		return queueError("assignment_invalid", "assignment does not match admission commit")
+func (state *Projection) requireWork(id string) (*WorkState, error) {
+	if work := state.Works[id]; work != nil {
+		return work, nil
 	}
-	return nil
+	return nil, queueError("work_missing", "operation references missing Work")
 }
 
-func (state Projection) completedWorkerScope(actor Actor) (*ClaimState, *WorkState, error) {
-	claim, err := state.scopedClaim(actor, actor.DispatchID, actor.ClaimHandle)
-	if err != nil {
-		return nil, nil, err
+func (state *Projection) requireClaim(id string) (*ClaimState, error) {
+	if claim := state.Claims[id]; claim != nil {
+		return claim, nil
 	}
-	if claim == nil {
-		return nil, nil, queueError("claim_scope_invalid", "original assignment member has no retained Claim")
+	return nil, queueError("claim_missing", "operation references a missing Claim")
+}
+
+func (state *Projection) requireDispatch(id string) (*DispatchState, error) {
+	if dispatch := state.Dispatches[id]; dispatch != nil {
+		return dispatch, nil
 	}
+	return nil, queueError("dispatch_missing", "operation references a missing Dispatch")
+}
+
+// boundToActor reports whether a worker actor is the run attempt bound to dispatch.
+func boundToActor(dispatch *DispatchState, actor Actor) bool {
+	return dispatch.State == "bound" && actor.Workflow == dispatch.Workflow && actor.RunID == dispatch.Run.RunID && actor.RunAttempt == dispatch.Run.RunAttempt
+}
+
+func (state *Projection) cancelClaim(claim *ClaimState, reason string, commit QueueCommit) {
 	work := state.Works[claim.WorkID]
-	if work == nil || claim.State != "completed" || (work.State != "completed" && !claim.KeepOpen) ||
-		work.ClaimID != claim.ClaimID || work.Barrier == "failed" {
-		return nil, nil, queueError("claim_effects_unauthorized", "this Claim has no verified Completion")
-	}
-	return claim, work, nil
-}
-
-func (state Projection) workerContinuationScope(actor Actor) (*ClaimState, *WorkState, error) {
-	claim, work, err := state.completedWorkerScope(actor)
-	if err != nil {
-		return nil, nil, err
-	}
-	if work.Barrier != "pending" {
-		return nil, nil, queueError("claim_effects_unauthorized", "a terminal delivery barrier cannot authorize new queue controls")
-	}
-	return claim, work, nil
-}
-
-func AuthorizeEffect(state Projection, actor Actor, target EffectResource) error {
-	claim, work, err := state.completedWorkerScope(actor)
-	if err != nil {
-		return err
-	}
-	if work.Barrier != "pending" {
-		return queueError("claim_effects_unauthorized", "a terminal delivery barrier cannot authorize effects again")
-	}
-	return authorizeEffectResource(state, claim, work, target)
-}
-
-func authorizeWorkerQueueRequest(state Projection, actor Actor, request Request) error {
-	if actor.Role != "worker" ||
-		(request.Kind != "submit" && request.Kind != "dispatch_next" && request.Kind != "observe") {
-		return nil
-	}
-	_, parent, err := state.workerContinuationScope(actor)
-	if err != nil {
-		return err
-	}
-	switch request.Kind {
-	case "submit":
-		var params SubmitParameters
-		if err := json.Unmarshal(request.Parameters, &params); err != nil {
-			return err
-		}
-		for _, node := range params.Nodes {
-			if err := state.validateSubmissionEntitlement(actor, node); err != nil {
-				return err
-			}
-		}
-	case "dispatch_next":
-		var params DispatchParameters
-		if err := json.Unmarshal(request.Parameters, &params); err != nil {
-			return err
-		}
-		if params.Pool != parent.Pool {
-			return queueError("claim_scope_invalid", "worker dispatch control is restricted to its parent's pool")
-		}
-	case "observe":
-		var params OperationsParameters
-		if err := json.Unmarshal(request.Parameters, &params); err != nil {
-			return err
-		}
-		for _, operation := range params.Operations {
-			var observation Observation
-			if err := json.Unmarshal(operation, &observation); err != nil {
-				return err
-			}
-			if err := validateResourceForHost(observation.Resource, state.Policy.Pools[parent.Pool], state.resourceHost); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
-}
-
-func evidenceFits(state Projection, dispatch *DispatchState, evidence Evidence, at int64) error {
-	profile := dispatch.Profile
-	principal := DispatchPrincipal(dispatch)
-	if evidence.Repository == "" || evidence.Repository != state.Requests[dispatch.RequestID].Actor.Repository ||
-		evidence.Workflow != profile.Workflow || evidence.Ref != profile.Ref ||
-		!decimalIdentity(evidence.Principal) ||
-		(principal != "" && evidence.Principal != principal) ||
-		(principal == "" && (state.Policy.Authorization != "aw" || dispatch.State != "reserved" || evidence.Kind != "prelaunch")) ||
-		evidence.CheckedAt > at ||
-		evidence.CheckedAt < 0 {
-		return queueError("evidence_invalid", "evidence does not match approved execution scope")
-	}
-	data, _ := canonicalValue(evidence)
-	if int64(len(data)) > state.Policy.Limits.EvidenceBytes {
-		return queueError("evidence_limit", "lifecycle evidence exceeds policy limit")
-	}
-	return nil
-}
-
-func terminalEvidence(state Projection, dispatch *DispatchState, evidence Evidence, at int64) error {
-	if err := evidenceFits(state, dispatch, evidence, at); err != nil {
-		return err
-	}
-	if dispatch.Run == nil || evidence.Kind != "terminal_run" || evidence.Source != "github_api" ||
-		evidence.RunID != dispatch.Run.RunID || evidence.RunAttempt != 1 ||
-		evidence.Status != "completed" || evidence.Conclusion == "" {
-		return queueError("terminal_evidence_required", "exact native run/attempt terminal evidence is required")
-	}
-	return nil
-}
-
-func releaseEvidence(state Projection, dispatch *DispatchState, evidence Evidence, at int64, actor Actor) error {
-	if err := evidenceFits(state, dispatch, evidence, at); err != nil {
-		return err
-	}
-	if evidence.Kind == "worker_termination" {
-		if dispatch.State != "bound" || dispatch.Run == nil || evidence.Source != "github_api" ||
-			evidence.RunID != dispatch.Run.RunID || evidence.RunAttempt != 1 || evidence.Receipt == "" ||
-			evidence.Status != "" || evidence.Conclusion != "" || actor.Role != "reconciler" ||
-			actor.RunID != dispatch.Run.RunID || actor.RunAttempt != 1 ||
-			actor.Repository != evidence.Repository || actor.Workflow != evidence.Workflow ||
-			actor.Principal != evidence.Principal {
-			return queueError("evidence_invalid", "worker termination requires the original worker's trusted finalizer and verified job quiescence")
-		}
-		return nil
-	}
-	if dispatch.State == "reserved" {
-		if evidence.Kind != "prelaunch" || evidence.Source != "trusted_publisher" {
-			return queueError("nonlaunch_evidence_required", "prelaunch release must race start through CAS")
-		}
-		return nil
-	}
-	if dispatch.State == "rejected" {
-		if evidence.Kind != "nonlaunch" || evidence.Source != "github_api" {
-			return queueError("nonlaunch_evidence_required", "definitive rejection required")
-		}
-		return nil
-	}
-	return terminalEvidence(state, dispatch, evidence, at)
-}
-
-func (state Projection) applyCompletion(op Operation, commit QueueCommit) error {
-	var completion struct {
-		Kind        string `json:"kind"`
-		WorkID      string `json:"work_id"`
-		ClaimID     string `json:"claim_id"`
-		DispatchID  string `json:"dispatch_id"`
-		ClaimHandle string `json:"claim_handle"`
-		RunID       string `json:"run_id"`
-		RunAttempt  int    `json:"run_attempt"`
-		KeepOpen    bool   `json:"keep_open"`
-	}
-	if err := json.Unmarshal(op, &completion); err != nil {
-		return err
-	}
-	claim, err := state.scopedClaim(commit.Actor, completion.DispatchID, completion.ClaimHandle)
-	if err != nil {
-		return err
-	}
-	if claim.ClaimID != completion.ClaimID || claim.WorkID != completion.WorkID ||
-		completion.RunID != commit.Actor.RunID || completion.RunAttempt != 1 {
-		return queueError("claim_scope_invalid", "Completion changes assignment/run identity")
-	}
-	var params FinishParameters
-	if err := json.Unmarshal(commit.Request.Parameters, &params); err != nil {
-		return err
-	}
-	if params.DispatchID != completion.DispatchID || params.ClaimHandle != completion.ClaimHandle ||
-		params.Outcome != "completed" || params.KeepOpen != completion.KeepOpen {
-		return queueError("request_invalid", "Completion differs from finish intent")
-	}
-	work := state.Works[claim.WorkID]
-	if claim.State == "completed" {
-		if claim.KeepOpen != completion.KeepOpen {
-			return queueError("completion_conflict", "keep_open differs from durable Completion")
-		}
-		return nil
-	}
-	if claim.State != "open" || work.State != "claimed" || work.ClaimID != claim.ClaimID {
-		return queueError("ownership_terminal", "only effective open Claim can complete Work")
-	}
-	claim.State = "completed"
-	delete(state.TerminalBarriers, work.WorkID)
-	claim.TerminalCommitID = commit.ID
-	claim.KeepOpen = completion.KeepOpen
-	if claim.KeepOpen {
-		claim.Barrier = "pending"
-	}
-	work.State, work.Barrier, work.CompletionID = "completed", "pending", commit.ID
-	if completion.KeepOpen {
-		work.State = "available"
-	}
-	work.completionAt = commit.At
-	return nil
-}
-
-func (state Projection) cancelClaim(op Operation, commit QueueCommit) error {
-	var cancellation struct {
-		Kind           string `json:"kind"`
-		WorkID         string `json:"work_id"`
-		ClaimID        string `json:"claim_id"`
-		Reason         string `json:"reason"`
-		RetryNotBefore int64  `json:"retry_not_before"`
-	}
-	if err := json.Unmarshal(op, &cancellation); err != nil {
-		return err
-	}
-	claim := state.Claims[cancellation.ClaimID]
-	if claim == nil || claim.WorkID != cancellation.WorkID {
-		return queueError("claim_missing", "cancellation references missing Claim")
-	}
-	if commit.Actor.Role == "worker" {
-		scoped, err := state.scopedClaim(commit.Actor, claim.DispatchID, claim.Handle)
-		if err != nil || scoped == nil || scoped.ClaimID != claim.ClaimID {
-			return queueError("claim_scope_invalid", "worker may cancel only its scoped Claim")
-		}
-		var params FinishParameters
-		if err := json.Unmarshal(commit.Request.Parameters, &params); err != nil {
-			return err
-		}
-		if params.DispatchID != claim.DispatchID || params.ClaimHandle != claim.Handle || params.Outcome != "cancelled" {
-			return queueError("request_invalid", "cancellation differs from finish intent")
-		}
-	}
-	if claim.State == "cancelled" {
-		if claim.CancellationReason != cancellation.Reason || claim.RetryNotBefore != cancellation.RetryNotBefore {
-			return queueError("cancellation_conflict", "Claim cancellation reason and retry boundary are immutable")
-		}
-		return nil
-	}
-	work := state.Works[claim.WorkID]
-	if claim.State != "open" || work.State != "claimed" || work.ClaimID != claim.ClaimID {
-		return queueError("ownership_terminal", "cannot cancel completed/frozen ownership")
-	}
-	pool := state.Policy.Pools[work.Pool]
-	backoffOrigin, err := state.cancellationBackoffOrigin(claim, commit)
-	if err != nil {
-		return err
-	}
-	if cancellation.RetryNotBefore < backoffOrigin ||
-		cancellation.RetryNotBefore-backoffOrigin < pool.Retry.BackoffMS {
-		return queueError("retry_invalid", "retry must preserve trusted minimum backoff")
-	}
 	claim.State = "cancelled"
 	claim.TerminalCommitID = commit.ID
-	claim.CancellationReason, claim.RetryNotBefore = cancellation.Reason, cancellation.RetryNotBefore
-	work.State, work.ClaimID = "available", ""
-	work.RetryNotBefore = cancellation.RetryNotBefore
-	return nil
+	claim.CancellationReason = reason
+	work.Attempts++
+	work.ClaimID = ""
+	state.setWorkState(work, "available")
 }
 
-func (state Projection) cancellationBackoffOrigin(claim *ClaimState, commit QueueCommit) (int64, error) {
-	if commit.Request.Kind == "release" {
-		for _, operation := range commit.Operations {
-			kind, err := operationKind(operation)
-			if err != nil {
-				return 0, err
-			}
-			if kind == "Release" {
-				var release struct {
-					DispatchID string   `json:"dispatch_id"`
-					Evidence   Evidence `json:"evidence"`
-				}
-				if err := json.Unmarshal(operation, &release); err != nil {
-					return 0, err
-				}
-				if release.DispatchID != claim.DispatchID {
-					continue
-				}
-				if err := releaseEvidence(state, state.Dispatches[claim.DispatchID], release.Evidence, commit.At, commit.Actor); err != nil {
-					return 0, err
-				}
-				return release.Evidence.CheckedAt, nil
-			}
-		}
-	}
-	return commit.At, nil
-}
-
-func (state Projection) cancelWork(op Operation, commit QueueCommit) error {
-	var cancellation struct {
-		WorkID  string `json:"work_id"`
-		Reason  string `json:"reason"`
-		ClaimID string `json:"claim_id"`
-	}
-	if err := json.Unmarshal(op, &cancellation); err != nil {
+func (state *Projection) applyClaim(operation ClaimOperation, commit QueueCommit) error {
+	work, err := state.requireWork(operation.WorkID)
+	if err != nil {
 		return err
-	}
-	work := state.Works[cancellation.WorkID]
-	if work == nil {
-		return queueError("work_missing", "cancellation references missing Work")
-	}
-	if work.State == "completed" || work.Barrier == "pending" {
-		return queueError("ownership_terminal", "completed Work cannot be cancelled")
-	}
-	if cancellation.ClaimID != "" {
-		claim := state.Claims[cancellation.ClaimID]
-		if claim == nil || claim.WorkID != work.WorkID || work.ClaimID != claim.ClaimID ||
-			(work.State != "claimed" || claim.State != "open") &&
-				(work.State != "cancelled" || claim.State != "cancelled" || claim.TerminalCommitID != work.CancellationCommitID) {
-			return queueError("claim_scope_invalid", "selected Claim is no longer this Work's current owner; refresh state")
-		}
-	}
-	if commit.Actor.Role == "producer" && !state.allowedProducer(commit.Actor, work.WorkDefinition) {
-		return queueError("admission_unauthorized", "producer cannot cancel another accounting scope")
-	}
-	if commit.Actor.Role == "worker" {
-		claim, err := state.scopedClaim(commit.Actor, "", "")
-		if err != nil || claim == nil || claim.WorkID != work.WorkID || claim.State != "cancelled" ||
-			!slices.Contains([]string{"available", "cancelled"}, work.State) ||
-			work.Attempts < state.Policy.Pools[work.Pool].Retry.MaxAttempts ||
-			commit.Request.Kind != "finish" || cancellation.Reason != "attempts_exhausted" {
-			return queueError("ownership_unauthorized", "worker may terminally cancel only its exhausted scoped retry")
-		}
-		var parameters FinishParameters
-		if err := json.Unmarshal(commit.Request.Parameters, &parameters); err != nil ||
-			parameters.Outcome != "cancelled" || parameters.DispatchID != claim.DispatchID ||
-			parameters.ClaimHandle != claim.Handle {
-			return queueError("request_invalid", "exhausted Work closure must match the cancelled original finish scope")
-		}
-	}
-	if work.State == "cancelled" {
-		if work.CancellationReason != cancellation.Reason || work.CancellationClaimID != cancellation.ClaimID {
-			return queueError("cancellation_conflict", "Work terminal cancellation reason is immutable")
-		}
-		return nil
-	}
-
-	if work.ClaimID != "" {
-		claim := state.Claims[work.ClaimID]
-		if claim.State == "open" {
-			claim.State = "cancelled"
-			claim.TerminalCommitID = commit.ID
-			claim.CancellationReason = cancellation.Reason
-		}
-	}
-	work.State = "cancelled"
-	work.CancellationReason, work.CancellationCommitID = cancellation.Reason, commit.ID
-	work.CancellationClaimID = cancellation.ClaimID
-	return nil
-}
-
-func (state Projection) reprioritizeWork(op Operation) error {
-	var change struct {
-		WorkID           string `json:"work_id"`
-		Priority         int    `json:"priority"`
-		ExpectedPriority int    `json:"expected_priority"`
-	}
-	if err := json.Unmarshal(op, &change); err != nil {
-		return err
-	}
-	work := state.Works[change.WorkID]
-	if work == nil {
-		return queueError("work_missing", "priority change references missing Work")
 	}
 	if work.State != "available" || work.ClaimID != "" {
-		return queueError("ownership_terminal", "reprioritization requires available Work; immutable assignments cannot change")
+		return queueError("ownership_conflict", "only available Work can be claimed")
 	}
-	if work.SchedulingPriority() != change.ExpectedPriority {
-		return queueError("priority_conflict", "priority changed since selection; refresh state")
+	if _, exists := state.Claims[operation.ClaimID]; exists {
+		return queueError("claim_conflict", "Claim identity already exists")
 	}
-	work.EffectivePriority = change.Priority
+	parameters, err := decodeParameters[DispatchParameters](commit.Request)
+	if err != nil {
+		return err
+	}
+	profile, routed := parameters.Profiles[work.WorkerProfile]
+	if !routed {
+		return queueError("request_invalid", "dispatch_next parameters omit the Work's worker profile")
+	}
+	if approval := approvalGate(work.WorkDefinition); approval != nil {
+		if observation, ok := state.Observations[GateKey(*approval.Resource, approval.Condition)]; !ok || observation.State != "ready" {
+			return queueError("approval_required", "an issue-routed continuation needs its ready approval")
+		}
+	}
+	if _, exists := state.Dispatches[operation.DispatchID]; exists {
+		return queueError("dispatch_state_conflict", "a Dispatch carries exactly one Claim")
+	}
+	// Maintenance judges a reserved Dispatch only by the state of the dispatcher attempt that reserved it.
+	if commit.Actor.RunID == "" {
+		return queueError("actor_unauthorized", "only a workflow run attempt can reserve a Dispatch")
+	}
+	dispatch := &DispatchState{DispatchID: operation.DispatchID, RequestID: commit.Request.ID, CommitID: commit.ID, Pool: work.Pool, WorkerProfile: work.WorkerProfile, Workflow: profile.Workflow, ReservedBy: RunBinding{RunID: commit.Actor.RunID, RunAttempt: commit.Actor.RunAttempt}, State: "reserved", Claims: [1]string{operation.ClaimID}}
+	state.Dispatches[dispatch.DispatchID] = dispatch
+	state.dispatchOrder = append(state.dispatchOrder, dispatch.DispatchID)
+	state.Claims[operation.ClaimID] = &ClaimState{ClaimID: operation.ClaimID, WorkID: work.WorkID, DispatchID: dispatch.DispatchID, Handle: operation.Handle, State: "open", CommitID: commit.ID, RequestID: commit.Request.ID}
+	work.ClaimID = operation.ClaimID
+	state.setWorkState(work, "claimed")
 	return nil
 }
 
-type dispatchLifecycle struct {
-	DispatchID          string      `json:"dispatch_id"`
-	State               string      `json:"state"`
-	Sender              *Actor      `json:"sender"`
-	CredentialPrincipal string      `json:"credential_principal"`
-	Run                 *RunBinding `json:"run"`
-	Evidence            *Evidence   `json:"evidence"`
-	Reason              string      `json:"reason"`
-}
-
-func (state Projection) applyDispatch(op Operation, commit QueueCommit) error {
-	var lifecycle dispatchLifecycle
-	if err := json.Unmarshal(op, &lifecycle); err != nil {
+func (state *Projection) applyDispatch(operation DispatchOperation, commit QueueCommit) error {
+	dispatch, err := state.requireDispatch(operation.DispatchID)
+	if err != nil {
 		return err
 	}
-	dispatch := state.Dispatches[lifecycle.DispatchID]
-	if dispatch == nil || dispatch.Released {
-		return queueError("dispatch_invalid", "missing or released native reservation")
+	if dispatch.State != "reserved" {
+		return queueError("dispatch_state_conflict", "only a reserved Dispatch can start")
 	}
-	if dispatch.LifecycleWrites >= state.Policy.Pools[dispatch.Pool].Reconciliation.MaxAttempts+4 {
-		return queueError("reconciliation_limit", "finite lifecycle-write budget exhausted; preserve reservation")
+	if commit.Actor.RunID != dispatch.ReservedBy.RunID || commit.Actor.RunAttempt != dispatch.ReservedBy.RunAttempt {
+		return queueError("actor_unauthorized", "only the dispatcher attempt that reserved a Dispatch records its launch")
 	}
-	if err := state.applyDispatchState(dispatch, lifecycle, commit); err != nil {
-		return err
-	}
-	dispatch.LifecycleWrites++
+	dispatch.State = "started"
+	dispatch.Launch = &LaunchRecord{RunID: operation.RunID, Revision: operation.Revision}
 	return nil
 }
 
-func (state Projection) applyDispatchState(dispatch *DispatchState, lifecycle dispatchLifecycle, commit QueueCommit) error {
-	if lifecycle.State != "started" && lifecycle.CredentialPrincipal != "" {
-		return queueError("run_binding_conflict", "dispatch credential principal is immutable after launch")
+func (state *Projection) applyBound(operation BoundOperation, commit QueueCommit) error {
+	dispatch, err := state.requireDispatch(operation.DispatchID)
+	if err != nil {
+		return err
 	}
-	switch lifecycle.State {
-	case "started":
-		if state.GrantsPaused {
-			return queueError("grants_paused", "new launch markers are paused")
-		}
-		if commit.Actor.Role != "dispatcher" || dispatch.State != "reserved" ||
-			lifecycle.Sender == nil || !sameJSON(lifecycle.Sender, commit.Actor) ||
-			commit.Actor.Workflow == "" || !decimalIdentity(commit.Actor.RunID) ||
-			commit.Actor.RunAttempt < 1 || lifecycle.Run != nil || lifecycle.Evidence != nil {
-			return queueError("launch_started", "only one authenticated sender may record a start marker")
-		}
-		if dispatch.Profile.Principal == "" {
-			if state.Policy.Authorization != "aw" || !decimalIdentity(lifecycle.CredentialPrincipal) {
-				return queueError("run_binding_conflict", "AW launch requires the selected credential principal")
-			}
-		} else if lifecycle.CredentialPrincipal != "" && lifecycle.CredentialPrincipal != dispatch.Profile.Principal {
-			return queueError("run_binding_conflict", "selected credential principal differs from approved profile")
-		}
-		dispatch.State, dispatch.Sender = "started", lifecycle.Sender
-		dispatch.CredentialPrincipal = lifecycle.CredentialPrincipal
-	case "bound":
-		return state.bindDispatch(dispatch, lifecycle, commit)
-	case "uncertain", "unresolved":
-		if dispatch.Run != nil || !slices.Contains([]string{"started", "uncertain", "unresolved"}, dispatch.State) ||
-			lifecycle.Reason == "" {
-			return queueError("dispatch_invalid", "uncertainty requires an unbound launch marker")
-		}
-		if lifecycle.State == "unresolved" {
-			if lifecycle.Evidence == nil || lifecycle.Evidence.Kind != "reconciliation" ||
-				lifecycle.Evidence.Attempts < state.Policy.Pools[dispatch.Pool].Reconciliation.MaxAttempts {
-				return queueError("reconciliation_invalid", "unresolved requires bounded reconciliation exhaustion")
-			}
-			if err := evidenceFits(state, dispatch, *lifecycle.Evidence, commit.At); err != nil {
-				return err
-			}
-		}
-		dispatch.State, dispatch.Reason = lifecycle.State, lifecycle.Reason
-	case "rejected":
-		if dispatch.Run != nil || lifecycle.Evidence == nil ||
-			lifecycle.Evidence.Kind != "nonlaunch" || lifecycle.Evidence.Source != "github_api" {
-			return queueError("nonlaunch_evidence_required", "rejection needs definitive nonlaunch evidence")
-		}
-		if err := evidenceFits(state, dispatch, *lifecycle.Evidence, commit.At); err != nil {
-			return err
-		}
-		dispatch.State, dispatch.Reason = "rejected", lifecycle.Reason
-	default:
-		return queueError("dispatch_invalid", "unknown lifecycle state")
+	// A started or bound Dispatch still holds its open Claim: settling the Claim closes it.
+	if dispatch.State != "started" && dispatch.State != "bound" {
+		return queueError("dispatch_state_conflict", "only a started Dispatch with an open Claim can bind a run")
 	}
+	actor := commit.Actor
+	if actor.Workflow != dispatch.Workflow || actor.RunID != operation.RunID || actor.RunAttempt != operation.RunAttempt {
+		return queueError("run_binding_conflict", "a worker may bind only its own run of the dispatched workflow")
+	}
+	// Only the run the dispatcher recorded launching may receive the Dispatch's Claims.
+	if operation.RunID != dispatch.Launch.RunID {
+		return queueError("run_binding_conflict", "a worker may bind only the run its dispatcher launched")
+	}
+	if dispatch.State == "bound" {
+		if dispatch.Run.RunID != operation.RunID || operation.RunAttempt < dispatch.Run.RunAttempt {
+			return queueError("run_binding_conflict", "the Dispatch is bound to another run")
+		}
+		if operation.RunAttempt == dispatch.Run.RunAttempt {
+			return nil
+		}
+	}
+	dispatch.State = "bound"
+	dispatch.Run = &RunBinding{RunID: operation.RunID, RunAttempt: operation.RunAttempt}
 	return nil
 }
 
-func (state Projection) bindDispatch(dispatch *DispatchState, lifecycle dispatchLifecycle, commit QueueCommit) error {
-	profile := dispatch.Profile
-	if lifecycle.Run == nil || lifecycle.Evidence == nil ||
-		!slices.Contains([]string{"started", "uncertain", "unresolved", "bound"}, dispatch.State) {
-		return queueError("run_binding_conflict", "binding requires a start marker and authenticated evidence")
-	}
-	run := lifecycle.Run
-	if !decimalIdentity(run.RunID) || run.RunAttempt != 1 || run.Event != "workflow_dispatch" ||
-		run.Repository != commit.Actor.Repository || run.Workflow != profile.Workflow ||
-		run.Ref != profile.Ref || !decimalIdentity(run.Principal) || run.Principal != DispatchPrincipal(dispatch) {
-		return queueError("run_binding_conflict", "native run does not match immutable approved target")
-	}
-	if err := evidenceFits(state, dispatch, *lifecycle.Evidence, commit.At); err != nil {
+func (state *Projection) applyCompletion(operation CompletionOperation, commit QueueCommit) error {
+	claim, err := state.requireClaim(operation.ClaimID)
+	if err != nil {
 		return err
 	}
-	if lifecycle.Evidence.RunID != run.RunID || lifecycle.Evidence.RunAttempt != 1 ||
-		!slices.Contains([]string{"github_api", "trusted_activation"}, lifecycle.Evidence.Source) {
-		return queueError("evidence_invalid", "binding lacks authenticated exact run provenance")
+	if claim.State != "open" {
+		return queueError("claim_ineffective", "only an open Claim can complete")
 	}
-	if commit.Actor.Role == "worker" &&
-		(commit.Actor.RunID != run.RunID || commit.Actor.RunAttempt != 1 ||
-			commit.Actor.DispatchID != dispatch.DispatchID || commit.Actor.Principal != run.Principal ||
-			commit.Actor.Workflow != run.Workflow) {
-		return queueError("run_binding_conflict", "activation context does not match the actual worker run")
+	dispatch := state.Dispatches[claim.DispatchID]
+	if operation.WorkID != claim.WorkID || operation.DispatchID != claim.DispatchID || operation.ClaimHandle != claim.Handle || !boundToActor(dispatch, commit.Actor) {
+		return queueError("claim_scope_invalid", "Completion is outside the bound run's Claim scope")
 	}
-	if dispatch.Run != nil && !sameJSON(dispatch.Run, run) {
-		return queueError("run_binding_conflict", "assignment already bound to another run")
-	}
-	for id, other := range state.Dispatches {
-		if id != dispatch.DispatchID && other.Run != nil && other.Run.RunID == run.RunID {
-			return queueError("run_binding_conflict", "native run is already assigned to another dispatch")
-		}
-	}
-	dispatch.State, dispatch.Run = "bound", run
+	work := state.Works[claim.WorkID]
+	claim.State = "completed"
+	claim.TerminalCommitID = commit.ID
+	claim.Effects = operation.Effects
+	work.Effects = operation.Effects
+	work.CompletionID = commit.ID
+	state.setWorkState(work, "completed")
+	dispatch.State = "closed"
 	return nil
 }
 
-func (state Projection) release(op Operation, commit QueueCommit) error {
-	var release struct {
-		DispatchID string   `json:"dispatch_id"`
-		Evidence   Evidence `json:"evidence"`
-	}
-	if err := json.Unmarshal(op, &release); err != nil {
+func (state *Projection) applyClaimCancellation(operation ClaimCancellationOperation, commit QueueCommit) error {
+	claim, err := state.requireClaim(operation.ClaimID)
+	if err != nil {
 		return err
 	}
-	dispatch := state.Dispatches[release.DispatchID]
-	if dispatch == nil {
-		return queueError("dispatch_missing", "release references missing reservation")
+	if claim.WorkID != operation.WorkID {
+		return queueError("claim_scope_invalid", "ClaimCancellation names another Work")
 	}
-	if dispatch.Released {
+	if claim.State == "cancelled" {
 		return nil
 	}
-	if err := releaseEvidence(state, dispatch, release.Evidence, commit.At, commit.Actor); err != nil {
-		return err
+	if claim.State != "open" {
+		return queueError("claim_ineffective", "only an open Claim can be cancelled")
 	}
-	for _, member := range dispatch.Claims {
-		if state.Claims[member.ClaimID].State == "open" {
-			return queueError("release_open_claims", "close only still-open Claims before native release")
-		}
+	if state.Works[claim.WorkID].ClaimID != claim.ClaimID {
+		return queueError("ownership_conflict", "Claim is not its Work's current owner")
 	}
-	dispatch.Released = true
+	dispatch := state.Dispatches[claim.DispatchID]
+	if commit.Actor.Role == "worker" && !boundToActor(dispatch, commit.Actor) {
+		return queueError("claim_scope_invalid", "ClaimCancellation is outside the bound run's Claim scope")
+	}
+	state.cancelClaim(claim, operation.Reason, commit)
+	dispatch.State = "closed"
 	return nil
 }
 
-func (state Projection) settleResult(op Operation, commit QueueCommit, failed bool) error {
-	var result struct {
-		WorkID       string          `json:"work_id"`
-		ClaimID      string          `json:"claim_id"`
-		CompletionID string          `json:"completion_id"`
-		Descriptor   json.RawMessage `json:"descriptor"`
-		Reason       string          `json:"reason"`
-		Disposition  string          `json:"disposition"`
-		Evidence     Evidence        `json:"evidence"`
-	}
-	if err := json.Unmarshal(op, &result); err != nil {
+func (state *Projection) applyWorkCancellation(operation WorkCancellationOperation, commit QueueCommit) error {
+	work, err := state.requireWork(operation.WorkID)
+	if err != nil {
 		return err
 	}
-	if previous := state.TerminalBarriers[result.ClaimID]; previous != nil {
-		if sameJSON(previous, op) {
+	switch work.State {
+	case "completed":
+		return queueError("work_terminal", "completed Work cannot be cancelled")
+	case "cancelled":
+		if work.CancellationReason == operation.Reason {
 			return nil
 		}
-		return queueError("delivery_barrier_conflict", "Result and DeliveryFailure are immutable and exclusive")
+		return queueError("work_terminal", "cancelled Work keeps its original reason")
+	case "claimed":
+		return queueError("ownership_conflict", "release the Dispatch before cancelling claimed Work")
 	}
-	work := state.Works[result.WorkID]
-	claim := state.Claims[result.ClaimID]
-	if work == nil || claim == nil || claim.State != "completed" || (work.State != "completed" && !claim.KeepOpen) || work.ClaimID != result.ClaimID ||
-		work.CompletionID != result.CompletionID {
-		return queueError("result_invalid", "barrier must reference exact completed ownership")
-	}
-	dispatch := state.Dispatches[state.Claims[result.ClaimID].DispatchID]
-	if err := evidenceFits(state, dispatch, result.Evidence, commit.At); err != nil {
-		return err
-	}
-	if work.Barrier != "pending" {
-		if !failed && work.Barrier == "verified" && sameJSON(work.Result, result.Descriptor) ||
-			failed && work.Barrier == "failed" && work.Disposition == result.Disposition {
-			return nil
+	if operation.ClaimID != "" {
+		claim := state.Claims[operation.ClaimID]
+		if claim == nil || claim.WorkID != work.WorkID || claim.State != "cancelled" {
+			return queueError("claim_scope_invalid", "WorkCancellation must name this Work's cancelled Claim")
 		}
-		return queueError("delivery_barrier_conflict", "Result and DeliveryFailure are immutable and exclusive")
 	}
-	if failed {
-		return state.settleFailedDelivery(work, claim, dispatch, result.Disposition, result.Evidence, commit.At)
-	}
-	return state.settleVerifiedDelivery(work, claim, dispatch, result.Descriptor, result.Evidence, commit)
-}
-
-func (state Projection) settleFailedDelivery(work *WorkState, claim *ClaimState, dispatch *DispatchState, disposition string, evidence Evidence, at int64) error {
-	if err := terminalEvidence(state, dispatch, evidence, at); err != nil {
-		return err
-	}
-	recovery := state.Policy.Pools[work.Pool].Reconciliation
-	if !deliveryVerificationExhausted(work, recovery, evidence.Attempts, at) {
-		return queueError("reconciliation_pending", "delivery failure requires exhausted bounded verification")
-	}
-	effects := evidence.Effects
-	if effects == "" {
-		effects = "unknown"
-	}
-	if disposition != effects || disposition == "none" && evidence.Receipt == "" {
-		return queueError("evidence_invalid", "failure disposition must match evidence; none requires positive no-effects proof")
-	}
-	work.Barrier, work.Disposition = "failed", disposition
-	if claim.KeepOpen {
-		claim.Barrier = "failed"
-	}
+	work.CancellationReason = operation.Reason
+	work.CancellationCommitID = commit.ID
+	state.setWorkState(work, "cancelled")
 	return nil
 }
 
-func (state Projection) settleVerifiedDelivery(work *WorkState, claim *ClaimState, dispatch *DispatchState, descriptor json.RawMessage, evidence Evidence, commit QueueCommit) error {
-	data, err := Canonical(descriptor)
-	if err != nil || int64(len(data)) > state.Policy.Limits.ResultBytes ||
-		evidence.Kind != "delivery" || evidence.Source != "verified_receipts" ||
-		evidence.Receipt == "" || dispatch.Run == nil ||
-		evidence.RunID != dispatch.Run.RunID || evidence.RunAttempt != 1 {
-		return queueError("delivery_evidence_required", "Result requires scoped verified delivery receipts")
+func (state *Projection) applyRelease(operation ReleaseOperation, commit QueueCommit) error {
+	dispatch, err := state.requireDispatch(operation.DispatchID)
+	if err != nil {
+		return err
 	}
-	work.Barrier, work.Result, work.ResultCommitID = "verified", data, commit.ID
-	if claim.KeepOpen {
-		claim.Barrier = "verified"
-		work.ClaimID, work.Barrier, work.CompletionID, work.ResultCommitID = "", "none", "", ""
-		work.Result, work.Disposition, work.completionAt = nil, "", 0
-		work.Attempts, work.RetryNotBefore = 0, 0
+	if dispatch.State == "closed" {
+		return queueError("dispatch_state_conflict", "Dispatch is already closed")
 	}
+	state.cancelClaim(state.Claims[dispatch.Claims[0]], operation.Reason, commit)
+	dispatch.State = "closed"
+	return nil
+}
+
+func (state *Projection) applyIssueLink(operation IssueLinkOperation, _ QueueCommit) error {
+	work, err := state.requireWork(operation.WorkID)
+	if err != nil {
+		return err
+	}
+	if operation.ClaimID != "" {
+		if claim := state.Claims[operation.ClaimID]; claim == nil || claim.WorkID != work.WorkID {
+			return queueError("claim_scope_invalid", "IssueLink Claim belongs to another Work")
+		}
+	}
+	key := issueKey(operation.Resource)
+	if work.BackingIssue != nil {
+		if issueKey(*work.BackingIssue) == key {
+			return nil
+		}
+		return queueError("issue_binding_conflict", "Work already has a backing Issue")
+	}
+	index := state.admissionIndex()
+	if owner, ok := index.issues[key]; ok && owner != work.WorkID {
+		return queueError("issue_binding_conflict", "one Work per backing Issue")
+	}
+	resource := operation.Resource
+	work.BackingIssue = &resource
+	index.issues[key] = work.WorkID
+	return nil
+}
+
+func (state *Projection) applyIssueComment(operation IssueCommentOperation, _ QueueCommit) error {
+	work, err := state.requireWork(operation.WorkID)
+	if err != nil {
+		return err
+	}
+	target := &work.IssueComment
+	if operation.ClaimID != "" {
+		claim, err := state.requireClaim(operation.ClaimID)
+		if err != nil {
+			return err
+		}
+		if claim.WorkID != work.WorkID {
+			return queueError("claim_scope_invalid", "IssueComment Claim belongs to another Work")
+		}
+		target = &claim.IssueComment
+	}
+	if *target != "" {
+		if *target == operation.CommentID {
+			return nil
+		}
+		return queueError("issue_binding_conflict", "Issue comment binding is immutable")
+	}
+	*target = operation.CommentID
 	return nil
 }
