@@ -270,7 +270,7 @@ function loadCopilotSDKMCPServers(config, configPath) {
  *   BuiltInTools?: typeof import("@microsoft/copilot-sdk").BuiltInTools,
  *   defineTool?: typeof import("@microsoft/copilot-sdk").defineTool,
  * }} sdk
- * @param {{fetchImpl?: typeof fetch, timeoutMs?: number, maxRedirects?: number}} [options]
+ * @param {{fetchImpl?: typeof fetch, timeoutMs?: number, maxRedirects?: number, mcpOnly?: boolean}} [options]
  * @returns {import("@microsoft/copilot-sdk").CreateSessionOptions["tools"]}
  */
 function buildCopilotSDKSessionToolConfig(config, sdk, options = {}) {
@@ -281,6 +281,10 @@ function buildCopilotSDKSessionToolConfig(config, sdk, options = {}) {
   }
 
   const availableTools = new sdk.ToolSet();
+  if (options.mcpOnly) {
+    if (config.capabilities.mcp) availableTools.addMcp("*");
+    return { availableTools, definitions: [] };
+  }
   availableTools.addBuiltIn(sdk.BuiltInTools.Isolated.filter(name => name !== "ask_user" && !COPILOT_SDK_WORKFLOW_BUILTIN_TOOLS.includes(name)));
   availableTools.addBuiltIn(COPILOT_SDK_NEUTRAL_BUILTIN_TOOLS);
   if (config.capabilities.bash) availableTools.addBuiltIn(COPILOT_SDK_SHELL_BUILTIN_TOOLS);

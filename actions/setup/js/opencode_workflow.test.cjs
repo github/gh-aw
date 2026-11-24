@@ -96,8 +96,9 @@ describe("OpenCode shared workflow harness", () => {
   it.each([
     ["copilot/auto", "github", "@opencode/ai/providers/openai-compatible"],
     ["anthropic/claude-sonnet-4-5", "anthropic", "@opencode/ai/providers/anthropic"],
-    ["openai/gpt-5", "openai", "@opencode/ai/providers/openai-compatible"],
-    ["codex/gpt-5", "openai", "@opencode/ai/providers/openai-compatible"],
+    ["openai/gpt-5", "openai", "@opencode/ai/providers/openai-compatible/responses"],
+    ["codex/gpt-5", "openai", "@opencode/ai/providers/openai-compatible/responses"],
+    ["openai/gpt-6-luna", "openai", "@opencode/ai/providers/openai-compatible/responses"],
   ])("routes %s through its selected provider with an explicit model", async (model, provider, sdk) => {
     const result = await harness({ env: { OPENCODE_MODEL: model, GH_AW_LLM_PROVIDER: provider } });
     expect(result.process.exitCode).toBeUndefined();

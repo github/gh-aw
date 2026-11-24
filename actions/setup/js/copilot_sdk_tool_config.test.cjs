@@ -442,6 +442,12 @@ require.cache[sdkPath] = sdk;`
 });
 
 describe("buildCopilotSDKSessionToolConfig", () => {
+  it("exposes only MCP tools in opt-in MCP-only sessions", () => {
+    const config = buildCopilotSDKSessionToolConfig(validToolConfig(), fakeSDKTools, { mcpOnly: true });
+    expect(config.availableTools.toArray()).toEqual(["mcp:*"]);
+    expect(config.definitions).toEqual([]);
+  });
+
   it("keeps neutral and isolated controls while excluding ask_user and the bash family", () => {
     const config = buildCopilotSDKSessionToolConfig(validToolConfig(), fakeSDKTools);
     expect(config.availableTools.toArray()).toEqual([
@@ -534,6 +540,14 @@ describe("buildCopilotSDKSessionToolConfig", () => {
 });
 
 describe("workflow permission scope", () => {
+  it.each([{ allowAllTools: true }, { allowedTools: [] }, undefined])("does not fall back to unrestricted approval in MCP-only mode: %j", permissionConfig => {
+    const approveAll = vi.fn(() => ({ kind: "approve-once" }));
+    const handler = buildCopilotSDKPermissionHandler(permissionConfig, approveAll, { mcpOnly: true });
+    expect(handler({ kind: "read", path: "AGENTS.md" }).kind).toBe("reject");
+    expect(handler({ kind: "mcp", serverName: "safeoutputs", toolName: "create_issue" }).kind).toBe("reject");
+    expect(approveAll).not.toHaveBeenCalled();
+  });
+
   it("keeps managed workflow approvals and unrelated MCP/custom tools denied", () => {
     const handler = buildCopilotSDKPermissionHandler({ allowedTools: ["read", "workflow"] }, () => ({ kind: "approve-once" }));
     expect(handler({ kind: "workflow", name: "review", operation: "run" })).toEqual({ kind: "approve-once" });
@@ -555,6 +569,60 @@ describe("runWithCopilotSDK compiler-owned catalog", () => {
   afterEach(() => {
     vi.unstubAllEnvs();
     rmSync(workspace, { recursive: true, force: true });
+  });
+
+  it("enforces MCP-only visibility and permissions without loading repository agents", async () => {
+    const createSession = vi.fn().mockResolvedValue({
+      sessionId: "mcp-only-reporting",
+      on: () => {},
+      sendAndWait: vi.fn().mockResolvedValue({ data: { content: "ok" } }),
+      disconnect: vi.fn().mockResolvedValue(undefined),
+    });
+    class FakeCopilotClient {
+      start = vi.fn().mockResolvedValue(undefined);
+      createSession = createSession;
+      stop = vi.fn().mockResolvedValue(undefined);
+    }
+    const toolConfig = validToolConfig({
+      capabilities: { bash: true, edit: true, dynamicWorkflows: true },
+      permissions: { allowedTools: ["read", "shell", "write", "web_fetch", "workflow", "safeoutputs(create_issue)"] },
+      explicitlyDisabledTools: [],
+    });
+    const mcpServers = { safeoutputs: { type: "http", url: "http://gateway.invalid/mcp/safeoutputs", tools: ["create_issue"] } };
+    const result = await runWithCopilotSDK({
+      sdkUri: "http://sidecar.invalid",
+      prompt: "Report the supplied dataset",
+      logger: () => {},
+      permissionConfig: toolConfig.permissions,
+      toolConfig,
+      mcpServers,
+      mcpOnly: true,
+      sdkModule: {
+        ...fakeSDKTools,
+        CopilotClient: FakeCopilotClient,
+        RuntimeConnection: { forTcp: vi.fn(() => ({})) },
+        approveAll: () => ({ kind: "approve-once" }),
+      },
+    });
+    expect(result.exitCode).toBe(0);
+    const session = createSession.mock.calls[0][0];
+    expect(session.tools.availableTools.toArray()).toEqual(["mcp:*"]);
+    expect(session.tools.definitions).toEqual([]);
+    expect(session.agents.definitions).toEqual([]);
+    expect(session.mcp.servers).toEqual(mcpServers);
+    for (const request of [
+      { kind: "read", path: join(workspace, "private.txt") },
+      { kind: "shell", fullCommandText: "git status" },
+      { kind: "write", fileName: "report.md" },
+      { kind: "url", url: "https://example.invalid" },
+      { kind: "custom-tool", toolName: "web_fetch" },
+      { kind: "workflow", name: "other", operation: "run" },
+      { kind: "mcp", serverName: "github", toolName: "issue_write" },
+      { kind: "mcp", serverName: "safeoutputs", toolName: "noop" },
+    ]) {
+      expect(session.permissions.onRequest(request).kind).toBe("reject");
+    }
+    expect(session.permissions.onRequest({ kind: "mcp", serverName: "safeoutputs", toolName: "create_issue" }).kind).toBe("approve-once");
   });
 
   it.each([true, false])("wires workflow visibility and approvals into the session when enabled=%s", async enabled => {

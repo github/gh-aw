@@ -171,10 +171,13 @@ func (c *Compiler) addActivationRepositoryAndOutputSteps(ctx *activationJobBuild
 
 func (c *Compiler) addActivationCheckoutAndBaseRestoreStep(ctx *activationJobBuildContext) {
 	data := ctx.data
-	checkoutSteps := c.generateCheckoutGitHubFolderForActivation(data)
-	ctx.steps = append(ctx.steps, checkoutSteps...)
 	stageCopilotSDKAgents := data.EngineConfig != nil && data.EngineConfig.CopilotSDK
-	if len(checkoutSteps) > 0 && (!isPRCheckoutDisabled(data) || dynamicWorkflowsEnabled(ctx.engine, data.EngineConfig) || stageCopilotSDKAgents) {
+	saveBase := shouldRestoreAgentConfigFolders(data, ctx.engine) || stageCopilotSDKAgents
+	// Symlink targets may be anywhere in the trusted repository, including outside
+	// sparse checkout paths. Fetch them during checkout, before credentials are removed.
+	checkoutSteps := c.generateCheckoutGitHubFolderForActivation(data, saveBase)
+	ctx.steps = append(ctx.steps, checkoutSteps...)
+	if len(checkoutSteps) > 0 && saveBase {
 		compilerActivationJobLog.Print("Adding step to save agent config folders for base branch restoration")
 		folders, files := resolveAgentManifestPaths(c.engineRegistry, data)
 		ctx.steps = append(ctx.steps, generateSaveBaseGitHubFoldersStep(
