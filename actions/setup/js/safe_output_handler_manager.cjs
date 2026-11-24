@@ -12,6 +12,7 @@
 const { loadAgentOutput } = require("./load_agent_output.cjs");
 const { normalizeSafeOutputConfig } = require("./safe_output_names.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
+const { isRateLimitError } = require("./error_recovery.cjs");
 const { getStalePullRequestReason } = require("./pr_lifecycle.cjs");
 const { ERR_CONFIG, ERR_PARSE, ERR_SYSTEM, ERR_VALIDATION, SAFE_OUTPUT_E007, SAFE_OUTPUT_E099 } = require("./error_codes.cjs");
 const { classifySafeOutputResult, computeSafeOutputsStatus, isFailedProcessingResult } = require("./safe_outputs_status.cjs");
@@ -2697,19 +2698,74 @@ function recordSafeOutputFailure(report, filePath) {
 }
 
 /**
- * Log a command that replays this run's safe outputs through the Agentic Maintenance workflow.
- * Skipped when the run ID is unknown.
+ * Whether a fatal failure is a rate-limit failure that exhausted its retries.
+ * Rate-limited requests are rejected before any side effect is applied, so replaying them is safe.
+ * Manager-classified failures (dependency, budget, threat, claim) carry an errorCode and are never replayable.
+ * @param {any} result
+ * @returns {boolean}
  */
-function logSafeOutputReplayHint() {
+function isReplayableSafeOutputFailure(result) {
+  if (result?.errorCode || result?.result?.operation_outcome === "indeterminate") {
+    return false;
+  }
+  const error = typeof result?.error === "string" ? result.error : "";
+  return /^Retryable: true$/m.test(error) && (/\bRATE_LIMIT_EXCEEDED\b/.test(error) || isRateLimitError(error));
+}
+
+/**
+ * Resolve the `[HOST/]OWNER/REPO` selector and run URL for the current run.
+ * @param {any} ctx
+ * @returns {{repoSelector: string, runUrl: string} | null}
+ */
+function resolveReplayTarget(ctx) {
+  let repo;
+  try {
+    repo = ctx.repo;
+  } catch {
+    repo = undefined;
+  }
+  const [envOwner = "", envRepo = ""] = (process.env.GITHUB_REPOSITORY || "").split("/");
+  const owner = repo?.owner || envOwner;
+  const name = repo?.repo || envRepo;
+  if (!owner || !name) {
+    return null;
+  }
+  const serverUrl = ctx.serverUrl || process.env.GITHUB_SERVER_URL || "https://github.com";
+  let host;
+  try {
+    host = new URL(serverUrl).host;
+  } catch {
+    return null;
+  }
+  const repoSelector = host === "github.com" ? `${owner}/${name}` : `${host}/${owner}/${name}`;
+  return { repoSelector, runUrl: buildWorkflowRunUrl({ ...ctx, serverUrl }, { owner, repo: name }) };
+}
+
+/**
+ * Log a command that replays this run's safe outputs through the Agentic Maintenance workflow.
+ * Replay re-applies every safe output in the run, so the hint is only logged when every fatal
+ * failure is a rate-limit failure and no output was applied (or delegated to another job).
+ * @param {Array<any>} results - Processing results for this run
+ */
+function logSafeOutputReplayHint(results) {
   const ctx = typeof context === "undefined" ? undefined : context;
-  if (!ctx?.runId) {
+  if (!ctx?.runId || !Array.isArray(results)) {
     return;
   }
-  const runUrl = buildWorkflowRunUrl(ctx, ctx.repo);
-  const repoSlug = runUrl.split("/").slice(-5, -3).join("/");
+  const { fatalFailures } = partitionFailureResults(results);
+  if (fatalFailures.length === 0 || !fatalFailures.every(isReplayableSafeOutputFailure)) {
+    return;
+  }
+  if (results.some(r => ["success", "warning", "delegated"].includes(classifySafeOutputResult(r)))) {
+    return;
+  }
+  const target = resolveReplayTarget(ctx);
+  if (!target) {
+    return;
+  }
   core.info(
-    `If the failure was transient (for example, a rate limit), replay this run's safe outputs with:\n` +
-      `  gh workflow run agentics-maintenance.yml --repo ${repoSlug} -f operation=safe_outputs -f run_url=${runUrl}\n` +
+    `The failure was a transient rate limit and no safe output was applied. Replay this run's safe outputs with:\n` +
+      `  gh workflow run agentics-maintenance.yml --repo ${target.repoSelector} -f operation=safe_outputs -f run_url=${target.runUrl}\n` +
       `Requires the Agentic Maintenance workflow. See https://github.github.com/gh-aw/reference/safe-outputs/#replaying-safe-outputs`
   );
 }
@@ -3193,7 +3249,7 @@ async function main(options = {}) {
 
     if (failureCount > 0) {
       core.warning(`${failureCount} message(s) failed to process`);
-      logSafeOutputReplayHint();
+      logSafeOutputReplayHint(processingResult.results);
       const failedItemLines = fatalFailures.map(r => `  - ${r.type}: ${r.error || "Unknown error"}`);
       const failedItems = failedItemLines.join("\n");
       failedOutputsMessage = `${failureCount} safe output(s) failed:\n${failedItems}`;
