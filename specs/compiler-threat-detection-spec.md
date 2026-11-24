@@ -7,7 +7,7 @@ sidebar:
 
 # GitHub Actions Compiler Threat Detection Specification
 
-**Version**: 1.0.109
+**Version**: 1.0.110
 **Status**: Candidate Recommendation  
 **Latest Version**: https://github.com/github/gh-aw/blob/main/specs/compiler-threat-detection-spec.md  
 **Editors**: GitHub Next (GitHub, Inc.)
@@ -32,7 +32,7 @@ Each version maps to the minimum compatible binary. A version change MUST update
 
 | Versions | Minimum gh-aw |
 |---|---:|
-| `1.0.60`–`1.0.109` | Unreleased |
+| `1.0.60`–`1.0.110` | Unreleased |
 | `1.0.44`–`1.0.59` | Unreleased |
 | `1.0.40`–`1.0.43` | `v0.87.9` |
 | `1.0.39` | `v0.87.9` |
@@ -944,6 +944,23 @@ A failed or skipped lookup fails open. The compiler emits one warning per releas
 | Copilot runtime policy | `pkg/workflow/copilot_installer.go` | `TestCopilotLiteralCooldownRuntimePolicy`, `TestCompileEngineReleaseCooldownLiteral` |
 
 This is an existing-behavior supply-chain mapping. No new `CTR-*` rule or compliance-test identifier is introduced.
+
+### 7.18 Adaptive Routing History Writer
+
+`adaptive-routing: observe` adds a post-conclusion `push_routing_history` job that records routed-run evidence on `memory/adaptive-routing/<workflow>` without changing the model that runs. The compiler MUST keep that history outside agent control:
+
+- Reject any `tools.repo-memory` branch equal to or inside `memory/adaptive-routing`, so the agent can never edit its own record.
+- Grant `contents: write` and `actions: read` only to the writer job, never to the agent or other jobs; the job MUST depend on `activation`, `agent`, and `conclusion` and MUST NOT run when the agent was skipped.
+- Emit only fixed, quoted compiler-derived environment values (workflow ID, definition hash, mode, engine, goal) and read the verdict from the unified session artifact, not from agent-written files.
+- Reject explicit use for unsupported workflows (non-routed models, unsupported engines, work-queue workers, experiments, `workflow_call`, workflow IDs that cannot name a ref, or missing repo-memory); a repository default skips them silently. Workflows that do not opt in compile unchanged.
+
+| Boundary | Implementation | Regression Evidence |
+|---|---|---|
+| Reserved history namespace | `pkg/workflow/adaptive_routing.go`: `validateRepoMemoryBranchesNotReserved` | `TestRepoMemoryCannotWriteTheRoutingHistories` |
+| Writer job permissions, ordering, and environment | `addPushRoutingHistoryJob`, `buildPushRoutingHistorySteps` | `TestAdaptiveRoutingObserveAddsOnlyTheWriterJob` |
+| Eligibility and opt-in precedence | `resolveAdaptiveRoutingSetting`, `adaptiveRoutingIneligibility`, `applyAdaptiveRouting` | `TestAdaptiveRoutingSettingPrecedence`, `TestAdaptiveRoutingFromAnImport`, `TestAdaptiveRoutingIneligibleWorkflows` |
+
+This is an existing-behavior mapping. The writer's `contents: write` is a deliberate, job-scoped grant; the history records routing evidence only and does not authorize model selection changes. No new `CTR-*` rule or compliance-test identifier is introduced.
 
 ## 8. Compliance Testing
 
