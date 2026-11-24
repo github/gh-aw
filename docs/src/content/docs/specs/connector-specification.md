@@ -8,9 +8,9 @@ sidebar:
 
 # Connector Specification
 
-**Version**: 1.3.0<br>
+**Version**: 1.4.0<br>
 **Status**: Experimental Working Draft<br>
-**Publication Date**: 2026-11-23<br>
+**Publication Date**: 2026-11-24<br>
 **Editor**: GitHub Agentic Workflows Team
 
 ## Abstract
@@ -26,10 +26,9 @@ TLA+ models of selected authority boundaries.
 
 This Experimental Working Draft is maintained by the GitHub Agentic Workflows
 project through repository review. It is not a W3C Recommendation or evidence
-of provider certification. Version 1.3.0 adds the optional
-`model-catalog: false` inference-profile declaration and its corresponding
-consumer engine constraint, while retaining the existing inference transport
-and authority boundaries. Publication does not establish provider authorization
+of provider certification. Version 1.4.0 extends Entra workload identity
+federation to selected reads and safe outputs without changing existing token
+routes or inference transport. Publication does not establish provider authorization
 or operational trigger ingress.
 
 ## Table of Contents
@@ -208,12 +207,26 @@ grants. The runtime MUST use only the selected phase's host-owned resolver.
 | `token: {secret: NAME}` | A stored secret-name reference. `secret: NAME` is the legacy shorthand. Names MUST be valid and MUST NOT impersonate reserved minted-token references. |
 | `github-app` | Explicit client ID/private-key reference, installation scope, and bounded permissions. An explicit owner requires exact repositories. Agent-phase permissions MUST NOT include `write`; missing credentials MUST NOT be ignored. |
 | `github-oidc: {audience: ...}` | A nonempty bounded literal audience; requires Authorization/bearer and phase-specific GitHub OIDC plumbing. |
-| `azure-oidc` | Inference-only Entra exchange using required `azure-tenant-id`, `azure-client-id`, and explicit `azure-scope`, plus optional `audience` and `azure-cloud` (`public`, `usgovernment`, `china`). Requires Authorization/bearer and the existing engine OIDC permission, firewall and version gates. |
+| `azure-oidc` | Entra workload identity federation. Requires `Authorization`/`bearer`, `azure-tenant-id`, `azure-client-id`, and explicit `azure-scope`. `audience` selects the GitHub assertion audience (default `api://AzureADTokenExchange`); `azure-cloud` selects the authority (`public` by default, `usgovernment`, or `china`). |
 
 Exactly one source route MUST be used for an executable credential. GitHub App
 tokens are GitHub installation tokens; GitHub OIDC produces an identity JWT.
-Neither route implements a provider-token exchange. Provider consent,
-installation, token renewal, audience acceptance, and ACLs remain external.
+Neither GitHub route implements a provider-token exchange. Provider consent,
+installation, audience acceptance, and ACLs remain external.
+
+An `azure-oidc` credential identifies one application and one provider token
+scope; the assertion audience is NOT the provider scope. The trusted host
+MUST exchange the GitHub assertion only at the selected cloud's Entra
+authority for that tenant. Only the resulting access token may authenticate
+requests to the approved provider endpoint. Client-credentials federation
+does not implement delegated user login or create role assignments.
+
+For `agent` and `safe-output`, the host MUST bind acquisition and renewal to
+the selected credential and phase. A staged writer MUST NOT request either
+token. The host MUST NOT forward assertions or token-request credentials to
+the agent or provider, persist access tokens in plans or outputs, or use a
+failed exchange or authorization denial to select another route. Renewal
+uses a fresh exchange, not a stored refresh token or replay of a denied call.
 
 Inference credentials MUST use a stored token-name reference or `azure-oidc`,
 never a GitHub App or direct GitHub OIDC route. The Azure route lowers to existing
@@ -221,8 +234,8 @@ never a GitHub App or direct GitHub OIDC route. The Azure route lowers to existi
 tokens in connector tool setup. Its tenant, client and scope are bounded to 2048
 bytes and MAY reference Actions variables or secrets; they MUST NOT contain
 token values. Its audience defaults to the existing Azure engine exchange
-audience. The scope has no implicit Azure OpenAI default. Other phase routes
-retain their existing behavior.
+audience. The scope has no implicit Azure OpenAI default. The existing engine
+OIDC permission, firewall and version requirements continue to apply.
 
 Resource-constrained arguments MUST be required strings, or nonempty bounded
 string arrays on hosted HTTP MCP tools. Each string MUST match an exact authored
@@ -726,6 +739,7 @@ class; it is not sufficient by itself to certify a complete implementation.
 | **C-TRG-001**: Trigger fixture projection MUST NOT establish operational ingress; missing/ambiguous required evidence MUST NOT authorize a match (section 8). | Compiler, execution host | **T-CON-008** | Project matching, nonmatching, incomplete, and ambiguous fixtures with Go/Node predicate parity. Only complete matching evidence projects; fixture results remain `operational: false`. |
 | **C-INF-001**: Inference binding MUST require explicit main-workflow selection, a known profile, exact wire-model grant, selected-profile hostname approval, compatible engine metadata and no conflicting native/imported override (section 5.4). | Compiler | **T-CON-009** | Compile import-only and valid key/OIDC consumers for both protocols. Verify only the selected profile's hosts are allowed. Reject unknown profiles, ungranted/dynamic aliases, unsupported engines, conflicting overrides and missing selected OIDC prerequisites. Import-only emits no inference binding. |
 | **C-INF-002**: Inference configuration and credentials MUST remain outside reader/effect plans; the selected native engine transport MUST retain the fixed SDK base, protocol, model and credential route (sections 4, 5.4). | Compiler, execution host | **T-CON-010** | Inspect compiled native engine settings and Go/Node-decoded reader/effect plans. Only the engine receives inference configuration. Setup reads zero secret values; inference test execution rejects. Native authentication-denial evidence must be reported separately from compilation or symbolic model checks. |
+| **C-FED-001**: Entra access tokens MUST be acquired and renewed only for a selected live phase, without credential fallback (section 4). | Compiler, execution host | **T-CON-011** | Inspect import-only, reader-only, writer-only and staged consumers. Mock assertion and exchange endpoints and advance the clock; verify the audience, tenant, client and scope, reacquisition before use after expiry, and failure without credential fallback or mutation replay. |
 
 ### 10.2 Compliance testing procedure
 
@@ -997,6 +1011,10 @@ separate redaction and privacy controls. Errors are described semantically in
 sections 4–8; this specification defines no new public error-code registry.
 
 ## 14. Change Log
+
+### Version 1.4.0 (Experimental Working Draft) — 2026-11-24
+
+- Extended `azure-oidc` to agent and safe-output credentials, with trusted-host exchange and renewal. Existing inference and stored-token routes are unchanged.
 
 ### Version 1.3.0 (Experimental Working Draft) — 2026-11-23
 
