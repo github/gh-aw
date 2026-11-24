@@ -11,7 +11,7 @@ permissions:
   issues: read
   pull-requests: read
 checkout:
-  fetch-depth: 0
+  fetch-depth: 200
 tracker-id: daily-awf-spec-compiler-surfacing
 model: copilot/gpt-6-sol
 engine:
