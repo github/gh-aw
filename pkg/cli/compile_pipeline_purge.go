@@ -2,10 +2,11 @@ package cli
 
 import (
 	"fmt"
-	"github.com/github/gh-aw/pkg/console"
-	"github.com/github/gh-aw/pkg/stringutil"
 	"os"
 	"path/filepath"
+
+	"github.com/github/gh-aw/pkg/console"
+	"github.com/github/gh-aw/pkg/stringutil"
 )
 
 // purgeTrackingData holds data needed for purge operations

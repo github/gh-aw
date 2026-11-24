@@ -3,11 +3,12 @@ package cli
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
+
 	"github.com/github/gh-aw/pkg/console"
 	"github.com/github/gh-aw/pkg/gitutil"
 	"github.com/github/gh-aw/pkg/workflow"
-	"os"
-	"path/filepath"
 )
 
 // runPostProcessing runs post-processing for specific files compilation

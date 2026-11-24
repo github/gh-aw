@@ -2,8 +2,9 @@ package cli
 
 import (
 	"context"
-	"github.com/github/gh-aw/pkg/workflow"
 	"path/filepath"
+
+	"github.com/github/gh-aw/pkg/workflow"
 )
 
 // Batch tool entry points are exposed as package-level function variables so

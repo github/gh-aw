@@ -3,11 +3,12 @@ package cli
 import (
 	"cmp"
 	"fmt"
-	"github.com/github/gh-aw/pkg/console"
-	"github.com/github/gh-aw/pkg/workflow"
 	"os"
 	"slices"
 	"strings"
+
+	"github.com/github/gh-aw/pkg/console"
+	"github.com/github/gh-aw/pkg/workflow"
 )
 
 func (stage *compilePipelineStage) reportDirectoryNotices() error {
