@@ -1,23 +1,23 @@
 {
-  "last_run_date": "2026-11-23",
+  "last_run_date": "2026-11-24",
   "last_window": {
-    "start": "2026-11-22T07:55:53Z",
-    "end": "2026-11-23T07:55:53Z"
+    "start": "2026-11-23T07:55:43Z",
+    "end": "2026-11-24T07:55:43Z"
   },
   "observed_window": {
-    "coverage": "280 cached records 2026-11-23T00:05:45Z through 07:54:10Z, count-limited; no fleet refetch",
-    "missing_start": "2026-11-22T07:55:53Z",
-    "continuation_end": "2026-11-23T00:00:57Z",
-    "continuation_before_run_id": 45086743502
+    "coverage": "290 cached records 2026-11-23T20:47:35Z through 2026-11-24T07:54:23Z, count-limited; no fleet refetch",
+    "missing_start": "2026-11-23T07:55:43Z",
+    "continuation_end": "2026-11-23T20:46:06Z",
+    "continuation_before_run_id": 45263010467
   },
   "key_themes": [
-    "Eight Auditor collection failures and skipped agents; four followed PR 80224 merge, no causal conclusion.",
-    "Five queue-control failures across three workflows; P1 tracker expired despite renewed failures.",
-    "Simulator memory validation and publication failed; two dispatched smoke runs also failed state restoration without proven shared cause."
+    "PR 79748 review findings followed by author-reported correction and review request; five-workflow fan-out had mixed results.",
+    "Queue control and snapshot failures continue across multiple workflows; common cause and dispatch acceptance unknown.",
+    "Auditor collection succeeded in last two cached runs after eight failures, but agent was skipped in all 11."
   ],
   "carry_forward_questions": [
-    "Why did Auditor collections fail and what changed after PR 80224?",
-    "Were queue dispatches accepted and was expired P1 tracker replaced?",
-    "Do simulator and dispatched smoke state failures have independent causes?"
+    "Did the five requested reviews complete and validate the claimed correction?",
+    "Why do queue control and snapshot steps fail, and did a current tracker replace expired 80001?",
+    "Do Auditor collection successes persist, and why is its agent skipped?"
   ]
 }
