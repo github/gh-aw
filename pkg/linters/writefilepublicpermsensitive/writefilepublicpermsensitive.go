@@ -4,8 +4,10 @@ package writefilepublicpermsensitive
 import (
 	"go/ast"
 	"go/constant"
+	"go/token"
 	"go/types"
 	"strings"
+	"unicode"
 
 	"golang.org/x/tools/go/analysis"
 
@@ -41,6 +43,9 @@ func run(pass *analysis.Pass) (any, error) {
 		if len(call.Args) != modeIndex+1 || !isPublicPerm(pass, call.Args[modeIndex]) { //nolint:uncheckedsliceindex // modeIndex is 1 or 2 and the argument count is checked
 			return
 		}
+		if fn.Name() == "OpenFile" && !openFileCreatesFile(pass, call.Args[1], fn) { //nolint:uncheckedsliceindex // OpenFile has at least three arguments
+			return
+		}
 		sensitive := containsSensitive(pass, call.Args[0]) //nolint:uncheckedsliceindex // the argument count is checked above
 		if fn.Name() == "WriteFile" {
 			sensitive = sensitive || containsSensitive(pass, call.Args[1]) //nolint:uncheckedsliceindex // the argument count is checked above
@@ -61,41 +66,86 @@ func run(pass *analysis.Pass) (any, error) {
 }
 
 func isPublicPerm(pass *analysis.Pass, expr ast.Expr) bool {
-	var ident *ast.Ident
-	switch expr := astutil.UnwrapParenExpr(expr).(type) {
-	case *ast.Ident:
-		ident = expr
-	case *ast.SelectorExpr:
-		ident = expr.Sel
-	default:
+	foundPublicPerm := false
+	ast.Inspect(expr, func(n ast.Node) bool {
+		ident, ok := n.(*ast.Ident)
+		if !ok {
+			return true
+		}
+		obj, ok := pass.TypesInfo.ObjectOf(ident).(*types.Const)
+		if ok && obj.Name() == "FilePermPublic" && obj.Pkg() != nil && obj.Pkg().Path() == "github.com/github/gh-aw/pkg/constants" {
+			foundPublicPerm = true
+		}
+		return true
+	})
+	if !foundPublicPerm {
 		return false
 	}
-	obj, ok := pass.TypesInfo.ObjectOf(ident).(*types.Const)
-	return ok && obj.Name() == "FilePermPublic" && obj.Pkg() != nil && obj.Pkg().Path() == "github.com/github/gh-aw/pkg/constants"
+
+	value := pass.TypesInfo.Types[expr].Value
+	if value == nil {
+		return true
+	}
+	mode, ok := constant.Int64Val(constant.ToInt(value))
+	return !ok || mode&0007 != 0
+}
+
+func openFileCreatesFile(pass *analysis.Pass, flags ast.Expr, fn *types.Func) bool {
+	value := pass.TypesInfo.Types[flags].Value
+	if value == nil || fn.Pkg() == nil {
+		return true
+	}
+	create, ok := fn.Pkg().Scope().Lookup("O_CREATE").(*types.Const)
+	if !ok {
+		return true
+	}
+	flagsValue := constant.ToInt(value)
+	createValue := constant.ToInt(create.Val())
+	if flagsValue.Kind() != constant.Int || createValue.Kind() != constant.Int {
+		return true
+	}
+	return constant.Sign(constant.BinaryOp(flagsValue, token.AND, createValue)) != 0
 }
 
 func containsSensitive(pass *analysis.Pass, expr ast.Expr) bool {
-	terms := []string{"token", "secret", "key", "credential", "password", "auth", "env", "lock"}
-	match := func(s string) bool {
-		s = strings.ToLower(s)
-		for _, term := range terms {
-			if strings.Contains(s, term) {
+	ignored := make(map[*ast.Ident]struct{})
+	ast.Inspect(expr, func(n ast.Node) bool {
+		switch n := n.(type) {
+		case *ast.CallExpr:
+			ast.Inspect(n.Fun, func(funNode ast.Node) bool {
+				if ident, ok := funNode.(*ast.Ident); ok {
+					ignored[ident] = struct{}{}
+				}
 				return true
-			}
+			})
+		case *ast.SelectorExpr:
+			ignored[n.Sel] = struct{}{}
 		}
-		return false
+		return true
+	})
+
+	terms := map[string]struct{}{
+		"token": {}, "tokens": {},
+		"secret": {}, "secrets": {},
+		"key": {}, "keys": {},
+		"credential": {}, "credentials": {},
+		"password": {}, "passwords": {},
+		"auth": {}, "authentication": {}, "authorization": {},
+		"env": {},
 	}
 	found := false
 	ast.Inspect(expr, func(n ast.Node) bool {
 		if found || n == nil {
 			return false
 		}
-		if ident, ok := n.(*ast.Ident); ok && match(ident.Name) {
-			found = true
-			return false
+		if ident, ok := n.(*ast.Ident); ok {
+			if _, skip := ignored[ident]; !skip && containsSensitiveTerm(ident.Name, terms) {
+				found = true
+				return false
+			}
 		}
 		if e, ok := n.(ast.Expr); ok {
-			if value := pass.TypesInfo.Types[e].Value; value != nil && value.Kind() == constant.String && match(constant.StringVal(value)) {
+			if value := pass.TypesInfo.Types[e].Value; value != nil && value.Kind() == constant.String && containsSensitiveTerm(constant.StringVal(value), terms) {
 				found = true
 				return false
 			}
@@ -103,4 +153,36 @@ func containsSensitive(pass *analysis.Pass, expr ast.Expr) bool {
 		return true
 	})
 	return found
+}
+
+func containsSensitiveTerm(value string, terms map[string]struct{}) bool {
+	runes := []rune(value)
+	var segment strings.Builder
+	matchSegment := func() bool {
+		if segment.Len() == 0 {
+			return false
+		}
+		_, found := terms[segment.String()]
+		segment.Reset()
+		return found
+	}
+	for i, r := range runes {
+		if !unicode.IsLetter(r) && !unicode.IsDigit(r) {
+			if matchSegment() {
+				return true
+			}
+			continue
+		}
+		if unicode.IsUpper(r) && segment.Len() > 0 {
+			prev := runes[i-1]
+			nextIsLower := i+1 < len(runes) && unicode.IsLower(runes[i+1])
+			if unicode.IsLower(prev) || unicode.IsDigit(prev) || (unicode.IsUpper(prev) && nextIsLower) {
+				if matchSegment() {
+					return true
+				}
+			}
+		}
+		segment.WriteRune(unicode.ToLower(r))
+	}
+	return matchSegment()
 }
