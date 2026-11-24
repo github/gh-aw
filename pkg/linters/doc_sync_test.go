@@ -68,6 +68,7 @@ var notYetEnforced = map[string]string{
 	"typeassertionokdiscarded":         "existing production violations need remediation before enforcement; nolint suppression already works",
 	"unchecked_deferredclose":          "existing deferred Close() findings need remediation before CI enforcement",
 	"uncheckedsliceindex":              "existing production violations need remediation before enforcement; nolint suppression already works",
+	"writefilepublicpermsensitive":     "new permission analyzer needs an enforcement-readiness audit before CI enables it",
 	"walkdirignoredeerror":             "existing discarded WalkDir errors in audit_threat_detection.go and model_routing.go need remediation before CI enforcement",
 }
 

@@ -1,6 +1,6 @@
 // Package linters is a namespace for gh-aw's custom Go analysis linters.
 //
-// All 102 active analyzers:
+// All 103 active analyzers:
 //
 //   - appendbytestring — flags append(b, []byte(s)...) calls where s is a string that can be simplified to append(b, s...)
 //   - appendoneelement — flags append(s, []T{x}...) calls where a single-element slice literal is spread and can be simplified to append(s, x)
@@ -104,6 +104,7 @@
 //   - walkfuncerrshadow — flags filepath.Walk/WalkDir callbacks whose err parameter shadows an outer err variable assigned from the walk call
 //   - wgdonenotdeferred — flags non-deferred sync.WaitGroup.Done() calls
 //   - writebytestring — flags w.Write([]byte(s)) calls where s is a string that can be replaced with io.WriteString(w, s)
+//   - writefilepublicpermsensitive — flags os.WriteFile/OpenFile/MkdirAll calls using FilePermPublic for sensitive-looking paths or content
 //
 // The package also exposes a compatibility alias (ErrorMessageAnalyzer) that
 // points to the errormessage subpackage analyzer.

@@ -105,6 +105,7 @@ import (
 	"github.com/github/gh-aw/pkg/linters/walkfuncerrshadow"
 	"github.com/github/gh-aw/pkg/linters/wgdonenotdeferred"
 	"github.com/github/gh-aw/pkg/linters/writebytestring"
+	writefilepublicpermsensitive "github.com/github/gh-aw/pkg/linters/writefilepublicperm-sensitive"
 )
 
 // All returns all registered custom analysis linters.
@@ -219,4 +220,5 @@ var allAnalyzers = []*analysis.Analyzer{
 	walkfuncerrshadow.Analyzer,
 	wgdonenotdeferred.Analyzer,
 	writebytestring.Analyzer,
+	writefilepublicpermsensitive.Analyzer,
 }
