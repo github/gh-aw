@@ -95,19 +95,19 @@ func TestIntegerMinuteTimeoutFlagsExplainUnits(t *testing.T) {
 		{
 			name:        "logs",
 			cmd:         NewLogsCommand(),
-			want:        "Total download timeout in integer minutes across all targets (use a plain number such as 10; 0 = no timeout)",
+			want:        "Total download timeout across all targets in minutes or a whole-minute duration (e.g. 10 or 10m; 0 = no timeout)",
 			wantDefault: "0",
 		},
 		{
 			name:        "forecast",
 			cmd:         NewForecastCommand(),
-			want:        "Gracefully stop forecast computation after this many integer minutes (use a plain number such as 10; 0 = no timeout)",
+			want:        "Gracefully stop forecast computation after this many minutes or a whole-minute duration (e.g. 10 or 10m; 0 = no timeout)",
 			wantDefault: "0",
 		},
 		{
 			name:        "trial",
 			cmd:         NewTrialCommand(func(string) error { return nil }),
-			want:        "Execution timeout in integer minutes (use a plain number such as 10; 0 = no timeout)",
+			want:        "Execution timeout in minutes or a whole-minute duration (e.g. 10 or 10m; 0 = no timeout)",
 			wantDefault: "30",
 		},
 	}
