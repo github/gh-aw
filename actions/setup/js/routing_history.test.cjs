@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 const req = require;
 const vectors = req("./fixtures/routing-history/aw2-reducer.json");
-const { applyRun, emptyState, trimRuns } = req("./routing_history.cjs");
+const { applyRun, averages, emptyState, trimRuns } = req("./routing_history.cjs");
 
 // Numbers agree to a relative tolerance of 1e-9 (vectors.arithmetic); everything else exactly.
 function expectSame(actual, expected, path = "state") {
@@ -68,5 +68,12 @@ describe("routing history state", () => {
       scopes: {},
       updated: null,
     });
+  });
+
+  it("ignores standalone model_credits on legacy entries whose total credits are null", () => {
+    const partial = [1, "2026-11-01T00:00:00Z", true, null, 30.0, [40000, 300000, 0, 9000, null]];
+    const full = [2, "2026-11-02T00:00:00Z", true, 10.0, 10.0, null];
+    expect(averages([partial])).toEqual({ credits: null, modelCredits: null, bills: 0 });
+    expect(averages([partial, full])).toEqual({ credits: 10.0, modelCredits: 10.0, bills: 1 });
   });
 });
