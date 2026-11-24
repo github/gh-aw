@@ -1,7 +1,7 @@
 package cli
 
 import (
-	"fmt"
+	"errors"
 	"strconv"
 	"time"
 
@@ -20,7 +20,7 @@ func (v minuteTimeoutValue) Set(value string) error {
 	}
 	duration, err := time.ParseDuration(value)
 	if err != nil || duration%time.Minute != 0 {
-		return fmt.Errorf("must be an integer number of minutes or a whole-minute duration like \"5m\" or \"1h\"")
+		return errors.New("must be an integer number of minutes or a whole-minute duration like \"5m\" or \"1h\"")
 	}
 	return v.Value.Set(strconv.FormatInt(int64(duration/time.Minute), 10))
 }
