@@ -158,20 +158,22 @@ const count = value => (typeof value === "number" && Number.isFinite(value) && v
 /**
  * One main request's counts as contract 4 defines them: input excluding cache, cache read, cache
  * write and output. AWF's records keep each provider's own input count, which includes cache for
- * some responses and not others. The record's flag says which when AWF provides it. Otherwise an
- * input count smaller than the cache cannot include it, and any other count is taken to include it,
- * which undercounts only a request whose new input exceeds its cached input.
+ * some responses and not others. The record's flag says which when AWF provides it. Otherwise
+ * Anthropic counts exclude cache, OpenAI counts include cache, and for Copilot (or any other
+ * provider) an input count smaller than the cache cannot include it while any other count is taken
+ * to include it, which undercounts only a request whose new input exceeds its cached input.
  * @param {Record<string, any>} used the record's usage
+ * @param {unknown} [provider] the record's provider
  * @returns {number[] | null}
  */
-function requestTokens(used) {
+function requestTokens(used, provider) {
   const input = count(used.inputTokens);
   const cacheRead = count(used.cacheReadInputTokens);
   const cacheWrite = count(used.cacheCreationInputTokens);
   const output = count(used.outputTokens);
   if (input === null || cacheRead === null || cacheWrite === null || output === null) return null;
   const cached = cacheRead + cacheWrite;
-  const includesCache = typeof used.inputTokensIncludeCache === "boolean" ? used.inputTokensIncludeCache : input >= cached;
+  const includesCache = typeof used.inputTokensIncludeCache === "boolean" ? used.inputTokensIncludeCache : provider === "anthropic" ? false : provider === "openai" ? true : input >= cached;
   // As AWF's credit meter reads an input count that includes cache.
   return [includesCache ? Math.max(0, input - cached) : input, cacheRead, cacheWrite, output];
 }
@@ -213,7 +215,7 @@ function runCost(usage, routing, subAgentModels) {
     main++;
     modelCredits = modelCredits === null || aic === null ? null : modelCredits + aic;
     const used = isRecord(record.usage) ? record.usage : {};
-    const counts = requestTokens(used);
+    const counts = requestTokens(used, record.provider);
     if (tokens === null || counts === null) {
       tokens = null;
       continue;
