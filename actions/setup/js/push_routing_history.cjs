@@ -153,8 +153,9 @@ const count = value => (typeof value === "number" && Number.isFinite(value) && v
 /**
  * One main request's counts as contract 4 defines them: input excluding cache, cache read, cache
  * write and output. AWF's records keep each provider's own input count, which includes cache for
- * some responses and not others, so the uncached input is known only when the record says which,
- * or when the request read and wrote no cache. Otherwise the counts are unknown.
+ * some responses and not others. The record's flag says which when AWF provides it. Otherwise an
+ * input count smaller than the cache cannot include it, and any other count is taken to include it,
+ * which undercounts only a request whose new input exceeds its cached input.
  * @param {Record<string, any>} used the record's usage
  * @returns {number[] | null}
  */
@@ -165,10 +166,9 @@ function requestTokens(used) {
   const output = count(used.outputTokens);
   if (input === null || cacheRead === null || cacheWrite === null || output === null) return null;
   const cached = cacheRead + cacheWrite;
+  const includesCache = typeof used.inputTokensIncludeCache === "boolean" ? used.inputTokensIncludeCache : input >= cached;
   // As AWF's credit meter reads an input count that includes cache.
-  if (used.inputTokensIncludeCache === true) return [Math.max(0, input - cached), cacheRead, cacheWrite, output];
-  if (used.inputTokensIncludeCache === false || cached === 0) return [input, cacheRead, cacheWrite, output];
-  return null;
+  return [includesCache ? Math.max(0, input - cached) : input, cacheRead, cacheWrite, output];
 }
 
 /**

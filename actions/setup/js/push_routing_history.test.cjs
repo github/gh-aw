@@ -107,7 +107,7 @@ function sessionFile(name, outcome, { model = "model-a", aic = 2 } = {}) {
   const events = [
     firewall("firewall.model_routing", { stage: "selection", selectedProvider: "copilot", wireModel: model, selectedEffort: "high" }),
     firewall("firewall.model_routing", { stage: "request", requestId: "r1", routed: "as_selected", requestedModel: model }),
-    firewall("firewall.token_usage", { requestId: "r1", provider: "copilot", aic, usage: { inputTokens: 100, cacheReadInputTokens: 900, cacheCreationInputTokens: 0, outputTokens: 50, inputTokensIncludeCache: false } }),
+    firewall("firewall.token_usage", { requestId: "r1", provider: "copilot", aic, usage: { inputTokens: 100, cacheReadInputTokens: 900, cacheCreationInputTokens: 0, outputTokens: 50 } }),
   ];
   if (outcome) events.unshift({ type: "routing.observation", data: outcome === "skip" ? { outcome, reason: "infrastructure" } : { outcome }, provenance: { component: "collector", phase: "conclusion" } });
   const file = path.join(root, `${name}.jsonl`);
@@ -168,21 +168,21 @@ describe("push_routing_history evidence", () => {
     expect(sessionEvidence(events, fixtures.awInfo("39508154330").sub_agent_models)).toEqual({
       observation: { outcome: "success" },
       pair: "github-copilot/gpt-5.6-luna@max",
-      cost: { credits: 3.180764, model_credits: 0.652539, tokens: null },
+      cost: { credits: 3.180764, model_credits: 0.652539, tokens: [12, 56302, 19159, 506, null] },
     });
   });
 
-  it("derives run 39147795806's pair and cost, with token counts only once AWF's records say whether input includes cache", () => {
-    // Its later requests report input that includes the cache read, such as 23,799 with 23,194 cached.
+  it("derives run 39147795806's pair and cost, counting only new input where its records' input includes the cache", () => {
+    // Its later requests log input that includes the cache read, such as 23,799 with 23,194 cached.
     expect(sessionEvidence(fixtureSession("39147795806"))).toEqual({
       observation: { outcome: "success" },
       pair: "github-copilot/gpt-5.6-luna@max",
-      cost: { credits: 0.713574, model_credits: 0.713574, tokens: null },
+      cost: { credits: 0.713574, model_credits: 0.713574, tokens: [24093, 70857, 0, 750, null] },
     });
-    expect(sessionEvidence(fixtureSession("39147795806", { includeCache: true })).cost.tokens).toEqual([24093, 70857, 0, 750, null]);
+    expect(sessionEvidence(fixtureSession("39147795806", { includeCache: false })).cost.tokens).toEqual([94950, 70857, 0, 750, null]);
   });
 
-  it("counts input without cache as AWF's meter does, and no tokens when a request's input may include cache", () => {
+  it("counts input without cache as AWF's meter does, inferring whether input includes cache when the record does not say", () => {
     const firewall = (type, data) => ({ type, data, provenance: { component: "firewall", phase: "agent" } });
     const tokens = (...usages) =>
       sessionEvidence([
@@ -193,12 +193,13 @@ describe("push_routing_history evidence", () => {
         ]),
       ]).cost.tokens;
     const uncached = { inputTokens: 23197, cacheReadInputTokens: 0, cacheCreationInputTokens: 0, outputTokens: 400 };
-    const inclusive = { inputTokens: 23799, cacheReadInputTokens: 23194, cacheCreationInputTokens: 0, outputTokens: 45, inputTokensIncludeCache: true };
-    const exclusive = { inputTokens: 382, cacheReadInputTokens: 19712, cacheCreationInputTokens: 0, outputTokens: 69, inputTokensIncludeCache: false };
-    const unflagged = { inputTokens: 382, cacheReadInputTokens: 19712, cacheCreationInputTokens: 0, outputTokens: 69 };
-    expect(tokens(inclusive)).toEqual([605, 23194, 0, 45, null]);
-    expect(tokens(uncached, inclusive, exclusive)).toEqual([24184, 42906, 0, 514, null]);
-    expect(tokens(uncached, unflagged)).toBeNull();
+    // Input that covers the cache can include it; input smaller than the cache cannot.
+    const covering = { inputTokens: 23799, cacheReadInputTokens: 23194, cacheCreationInputTokens: 0, outputTokens: 45 };
+    const smaller = { inputTokens: 382, cacheReadInputTokens: 19712, cacheCreationInputTokens: 0, outputTokens: 69 };
+    expect(tokens(uncached, covering, smaller)).toEqual([24184, 42906, 0, 514, null]);
+    // AWF's flag wins over the inference.
+    expect(tokens({ ...covering, inputTokensIncludeCache: false })).toEqual([23799, 23194, 0, 45, null]);
+    expect(tokens({ ...smaller, inputTokensIncludeCache: true })).toEqual([0, 19712, 0, 69, null]);
   });
 
   it("has no verdict for a run AWF did not route, and no pair to count a verdict for without a selection", () => {
