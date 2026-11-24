@@ -54,11 +54,18 @@ it.each(["copilot", "claude", "codex"])("uses resolved argv with the %s conventi
   const observed = JSON.parse(fs.readFileSync(capture));
   expect(observed).toMatchObject({ turns: "7", prompt, mode: 0o600, reasons, stale: false, eligible: ["false", "true", "false"] });
   expect(observed.args[0]).toBe("one arg with spaces");
-  if (convention === "codex") expect(observed.args.slice(1, 6)).toEqual(["exec", "-c", "model=fixture-model", "-c", "model_provider=fixture-proxy"]);
+  if (convention === "codex") {
+    expect(observed.args.slice(1, 6)).toEqual(["exec", "-c", "model=fixture-model", "-c", "model_provider=fixture-proxy"]);
+    expect(observed.args).not.toContain("--dangerously-bypass-approvals-and-sandbox");
+    expect(observed.args[observed.args.indexOf("--sandbox") + 1]).toBe("workspace-write");
+    expect(observed.args[observed.args.indexOf("--add-dir") + 1]).toBe(path.dirname(sink));
+  }
   if (convention === "claude") expect(observed.args.slice(-6, -2)).toEqual(["--model", "fixture-model", "--max-turns", "7"]);
   if (convention === "copilot") {
     expect(observed.model).toBe("fixture-model");
     expect(observed.args).toContain("--disable-builtin-mcps");
+    expect(observed.args).not.toContain("--allow-all-tools");
+    expect(observed.args.flatMap((arg, i) => (arg === "--allow-tool" ? [observed.args[i + 1]] : []))).toEqual(["write", "shell(threat_detection_result:*)"]);
   }
   expect(fs.existsSync(observed.file)).toBe(false);
   expect(fs.existsSync(capture + ".wrong")).toBe(false);

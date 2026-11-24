@@ -41,7 +41,7 @@ function launchArgs(launch, env, promptFile, sink, maxTurns) {
   const direct = launch.mode === "direct";
   switch (convention) {
     case "copilot": {
-      args.push("--add-dir", path.dirname(promptFile), "--log-level", "all", "--disable-builtin-mcps", "--no-ask-user", "--allow-all-tools");
+      args.push("--add-dir", path.dirname(promptFile), "--log-level", "all", "--disable-builtin-mcps", "--no-ask-user", "--allow-tool", "write", "--allow-tool", "shell(threat_detection_result:*)");
       if (sink) args.push("--add-dir", path.dirname(sink));
       if (env.GITHUB_WORKSPACE) args.push("--add-dir", env.GITHUB_WORKSPACE);
       if (model) env.COPILOT_MODEL = model;
@@ -62,7 +62,8 @@ function launchArgs(launch, env, promptFile, sink, maxTurns) {
       args.push("exec");
       if (model) args.push("-c", `model=${model}`);
       if (provider) args.push("-c", `model_provider=${provider}`);
-      args.push("-c", "web_search=disabled", "-c", "fetch=disabled", "--dangerously-bypass-approvals-and-sandbox", "--skip-git-repo-check");
+      args.push("-c", "web_search=disabled", "-c", "fetch=disabled", "--sandbox", "workspace-write", "--skip-git-repo-check");
+      if (sink) args.push("--add-dir", path.dirname(sink));
       if (direct) args.push("--", "-");
       break;
     default:
