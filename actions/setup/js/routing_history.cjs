@@ -144,14 +144,21 @@ function editScope(scope) {
   }
 }
 
+/** @param {unknown} value */
+function isPairOrNull(value) {
+  return value === null || (typeof value === "string" && value.length > 0);
+}
+
 /**
  * Whether a selection receipt belongs to this run: the same workflow, run, attempt, generation,
- * mode and scope, and the pair AWF's own selection record names.
+ * mode and scope, a valid role and incumbent object, and the pair AWF's own selection record names.
  * @param {Record<string, any> | null | undefined} receipt
  * @param {RunEvidence} run
  */
 function receiptBound(receipt, run) {
   const validRole = run.mode === "live" ? LIVE_ROLES.has(receipt?.role) : receipt?.role === "observe";
+  const inc = receipt?.incumbent;
+  const validIncumbent = run.mode !== "live" || (!!inc && typeof inc === "object" && !Array.isArray(inc) && isPairOrNull(inc.before) && isPairOrNull(inc.after));
   return (
     !!receipt &&
     receipt.workflow === run.workflow &&
@@ -161,6 +168,7 @@ function receiptBound(receipt, run) {
     receipt.mode === run.mode &&
     receipt.scope === run.scope &&
     validRole &&
+    validIncumbent &&
     typeof receipt.selected === "string" &&
     receipt.selected.length > 0 &&
     receipt.selected === run.pair

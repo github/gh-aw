@@ -323,6 +323,42 @@ describe("live no_agent exploration accounting", () => {
     expect(Object.hasOwn(serialized, "role")).toBe(true);
     expect(serialized).toMatchObject({ note: "no_agent", role: null, pair: CHALLENGER, counted: false });
   });
+
+  it.each([
+    ["missing incumbent", undefined],
+    ["null incumbent", null],
+    ["malformed incumbent fields", { before: 123, after: INCUMBENT }],
+  ])("treats live receipt with %s as unbound on live no_agent", (_label, badIncumbent) => {
+    const { state, runs } = baseLiveState();
+    const receipt = {
+      workflow: "pr-sous-chef",
+      run: { id: "45000000005", attempt: 1 },
+      generation: GENERATION,
+      mode: "live",
+      scope: SCOPE,
+      role: "serve",
+      selected: CHALLENGER,
+      ...(badIncumbent !== undefined ? { incumbent: badIncumbent } : {}),
+    };
+
+    const result = applyRun(state, runs, {
+      workflow: "pr-sous-chef",
+      run: { id: "45000000005", number: 5, attempt: 1 },
+      at: "2026-11-05T00:00:00Z",
+      generation: GENERATION,
+      mode: "live",
+      scope: SCOPE,
+      observation: null,
+      pair: CHALLENGER,
+      cost: null,
+      receipt,
+      prepare: { explore_allowed: true },
+    });
+
+    expect(result.state.unexplained).toBe(1);
+    expect(result.state.scopes[SCOPE].last_role).toBe("test");
+    expect(result.lines).toMatchObject([{ note: "no_agent", role: null, pair: CHALLENGER, counted: false }]);
+  });
 });
 
 describe("sibling-effort suspension settlement", () => {
