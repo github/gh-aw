@@ -114,14 +114,12 @@ function renderSummary(entries, invariantsOutcome) {
     ["Fixture generation", report => duration(report?.fixture_generation_ms)],
     ["Fixture validation", report => duration(report?.fixture_validation_ms)],
     ["Batch planning", report => (measured(report?.ten_batch_plans_ms) ? `${duration(report.ten_batch_plans_ms)} / ${number(report.batch_plan_count ?? 10)} plans` : "Not measured")],
-    ["Canonicalization", report => duration(report?.canonicalization_ms)],
-    ["Recovery reserve used", report => bytes(report?.recovery_bytes_used)],
+    ["Checkpoint", report => duration(report?.checkpoint_ms ?? sumTiming(report, "checkpoint_ms"))],
     ["Git commands", report => number(report?.git_api_metrics?.git_commands)],
     ["Simulated API calls", report => number(report?.git_api_metrics?.api_calls)],
     ["CAS conflicts", report => number(report?.git_api_metrics?.cas_conflicts)],
     ["Lost successful responses injected", report => number(report?.git_api_metrics?.lost_success_responses)],
     ["Recovered publications", report => number(report?.publisher_metrics?.recovered_publications)],
-    ["Publisher retry sleeps", report => number(report?.publisher_metrics?.retry_sleeps)],
     ["Simulated native POSTs", report => number(report?.git_api_metrics?.native_posts)],
     ["Verified Results", report => number(report?.verified_results)],
   ];
@@ -147,9 +145,9 @@ function renderSummary(entries, invariantsOutcome) {
       );
     }
     if (report.history_worker_verifications?.length) {
-      lines.push("| History worker | Cold replay | 10 batch plans | Canonicalization | Total |", "| --- | --- | --- | --- | --- |");
+      lines.push("| History worker | Cold replay | 10 batch plans | Checkpoint | Total |", "| --- | --- | --- | --- | --- |");
       for (const worker of report.history_worker_verifications)
-        lines.push(`| ${number(worker.worker)} | ${duration(worker.cold_replay_ms)} | ${duration(worker.ten_batch_plans_ms)} | ${duration(worker.canonicalization_ms)} | ${duration(worker.elapsed_ms)} |`);
+        lines.push(`| ${number(worker.worker)} | ${duration(worker.cold_replay_ms)} | ${duration(worker.ten_batch_plans_ms)} | ${duration(worker.checkpoint_ms)} | ${duration(worker.elapsed_ms)} |`);
       lines.push("");
     }
   }

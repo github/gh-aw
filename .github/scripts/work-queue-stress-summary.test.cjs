@@ -30,8 +30,8 @@ function fixture(t) {
       seeded_claims: 50000,
       cold_git_read_replay_ms: 1200,
       ten_batch_plans_ms: 25,
-      canonicalization_ms: 300,
-      history_worker_verifications: [{ worker: 0, cold_replay_ms: 1400, ten_batch_plans_ms: 30, canonicalization_ms: 400, elapsed_ms: 1900 }],
+      checkpoint_ms: 300,
+      history_worker_verifications: [{ worker: 0, cold_replay_ms: 1400, ten_batch_plans_ms: 30, checkpoint_ms: 400, elapsed_ms: 1900 }],
       lifecycle_smoke: { completed: 16, elapsed_ms: 1000, git_api_metrics: { cas_conflicts: 2, lost_success_responses: 1 } },
     },
     lifecycle: {
@@ -44,7 +44,14 @@ function fixture(t) {
       publisher_metrics: { recovered_publications: 5 },
       queues: [{ ledger_bytes: 1024, cold_replay_ms: 10, selection_ms: 2 }],
     },
-    saturation: { ...common, mode: "saturation", requested: 100000, submitted: 256, completed: 0, saturation: { code: "ledger_limit", message: "Recovery headroom exhausted", attempted: 512, refused_batch: 256, not_attempted: 99488 } },
+    saturation: {
+      ...common,
+      mode: "saturation",
+      requested: 100000,
+      submitted: 4096,
+      completed: 0,
+      saturation: { code: "work_queue_pending_limit", message: "pool default would exceed 4096", attempted: 4352, refused_batch: 256, not_attempted: 95648 },
+    },
   };
   const save = (name, report) => fs.writeFileSync(path.join(directory, `${name}.json`), JSON.stringify(report));
   for (const [name, report] of Object.entries(reports)) save(name, report);
@@ -59,13 +66,14 @@ test("summary reports correctly labelled performance metrics with collapsed diag
   assert.match(summary, /Simulator invariants: \*\*Passed\*\*/);
   assert.match(summary, /100,000 retained entities \(50,000 Work \+ 50,000 Claims\).*2\.00 s.*50,000\.00 entities\/s.*128\.00 MiB/);
   assert.match(summary, /1,024 completed \/ 1,024 requested Work.*4\.00 s.*256\.00 Work\/s/);
-  assert.match(summary, /Admission saturation \| Passed \(admission limit reached\).*256 admitted \/ 100,000 requested Work.*Not a completion benchmark/);
+  assert.match(summary, /Admission saturation \| Passed \(admission limit reached\).*4,096 admitted \/ 100,000 requested Work.*Not a completion benchmark/);
   assert.match(summary, /not worker completion throughput/);
-  assert.match(summary, /Attempted: 512 Work; refused batch: 256 Work; not attempted: 99,488 Work/);
+  assert.match(summary, /Attempted: 4,352 Work; refused batch: 256 Work; not attempted: 95,648 Work/);
   assert.match(summary, /excludes Git subprocesses/);
   assert.ok(summary.indexOf("<details>") > summary.indexOf("| Admission saturation"));
   assert.ok(summary.indexOf("| CAS conflicts | 3 | 3 | 3 |") > summary.indexOf("<details>"));
   assert.match(summary, /\| Batch planning \| 25\.0 ms \/ 10 plans/);
+  assert.match(summary, /\| Checkpoint \| 300\.0 ms \|/);
   assert.match(summary, /\| 0 \| 1\.40 s \| 30\.0 ms \| 400\.0 ms \| 1\.90 s \|/);
   assert.match(summary, /Separate live smoke: 16 completed Work/);
   assert.match(summary, /excluded from the history fixture's Git counters/);
@@ -195,6 +203,7 @@ test("real simulator JSON supplies history, worker throughput and admission metr
   assert.match(summary, /64 retained entities \(32 Work \+ 32 Claims\)/);
   assert.match(summary, /16 completed \/ 16 requested Work.*[\d,.]+ Work\/s/);
   assert.match(summary, /\| Batch planning \| [\d,.]+ (ms|s) \/ 10 plans/);
-  assert.match(summary, /256 admitted \/ 100,000 requested Work/);
+  assert.match(summary, /4,096 admitted \/ 100,000 requested Work/);
+  assert.match(summary, /\| Checkpoint \| [\d,.]+ (ms|s) \|/);
   assert.doesNotMatch(summary, /NaN|Infinity|undefined/);
 });

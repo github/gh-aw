@@ -6,136 +6,130 @@ const path = require("node:path");
 const { createHash } = require("node:crypto");
 const { performance } = require("node:perf_hooks");
 const { setImmediate: yieldTurn } = require("node:timers/promises");
-const { LocalGitHub, PRINCIPAL, REPOSITORY, PUBLISHER_WORKFLOW } = require("./work-queue-stress-git.cjs");
+const { AT, LocalGitHub, OWNER, PROTOCOL_LIMITS, REPO, dispatchParameters, queueActor, stressPolicy } = require("./work-queue-stress-git.cjs");
 const { canonical, canonicalBytes, utf8Compare } = require("../../actions/setup/js/work_queue_codec.cjs");
-const { actorFromContext, defaultPolicy } = require("../../actions/setup/js/work_queue_policy.cjs");
-const { newWork } = require("../../actions/setup/js/work_queue_graph.cjs");
-const { checkLedgerBudget, DEFAULT_LIMITS } = require("../../actions/setup/js/work_queue_limits.cjs");
-const { authenticatePublisher } = require("../../actions/setup/js/work_queue_native.cjs");
-const { publishWorkQueueRequest, readWorkQueueLog } = require("../../actions/setup/js/work_queue_store.cjs");
-const { applyScheduledClaim, planDispatch, planNext } = require("../../actions/setup/js/work_queue_scheduler.cjs");
-const { compactTransactions, generateRequestOperations, newRequest, newState, replayTransactions, serializeProjection, serializeTransactionLog, validateCommit } = require("../../actions/setup/js/work_queue_replay.cjs");
+const { LEDGER_BYTES } = require("../../actions/setup/js/work_queue_limits.cjs");
+const { normalizeSubmitParameters } = require("../../actions/setup/js/work_queue_intents.cjs");
+const { releaseOperations } = require("../../actions/setup/js/work_queue_binding.cjs");
+const { publishWorkQueueCheckpoint, publishWorkQueueRequest, readWorkQueueLog } = require("../../actions/setup/js/work_queue_store.cjs");
+const { planDispatch } = require("../../actions/setup/js/work_queue_scheduler.cjs");
+const { applyCommit, buildCommit, checkpointCommit, newRequest, replayTransactionLog, replayTransactions, serializeProjection, serializeTransactionLog } = require("../../actions/setup/js/work_queue_replay.cjs");
 
-const AT = 1800000000000;
 const PROBES = 8;
 const BATCH = 128;
+const ENTITY_FIELDS = ["works", "claims", "dispatches", "observations", "work_creators"];
 
-// Hash projection records individually: a single giant projection JSON string
-// unnecessarily multiplies the live memory for a near-64-MiB fixture.
+/**
+ * Digest of the queue's entities, record by record (one giant JSON string multiplies live
+ * memory for a near-64-MiB fixture). Log position (tip, commit ordinal, request set) is
+ * excluded, so a checkpoint restore of the same projection has the same digest.
+ */
 function projectionDigest(state) {
   const hash = createHash("sha256");
   const projection = serializeProjection(state);
-  for (const field of Object.keys(projection).sort(utf8Compare)) {
+  hash.update(`repository\n${canonical(projection.repository)}\n`);
+  for (const field of ENTITY_FIELDS) {
     hash.update(`${field}\n`);
     const value = projection[field];
-    if (["works", "claims", "dispatches", "observations", "requests", "clocks", "observation_writes"].includes(field)) {
-      for (const key of Object.keys(value).sort(utf8Compare)) hash.update(`${canonical(key)}:${canonical(value[key])}\n`);
-    } else hash.update(`${canonical(value)}\n`);
+    for (const key of Object.keys(value).sort(utf8Compare)) hash.update(`${canonical(key)}:${canonical(value[key])}\n`);
   }
   return hash.digest("hex");
 }
 
-function checkedFixtureCommit(state, id, kind, actor, parameters, operations, admission) {
-  const request = newRequest(id, kind, actor, parameters);
-  const commit = { version: 3, id: `history-${id}`, previous: state.tip, request, actor, policy_epoch: state.policy_epoch, at: AT, operations };
-  validateCommit(commit);
-  const bytes = canonicalBytes(commit) + 1;
-  checkLedgerBudget(state, bytes, admission);
-  state.ledgerBytes += bytes;
-  state.tip = commit.id;
-  return commit;
+// Both v4 codecs bound every JSON array; a Checkpoint's `requests` array holds every committed request ID.
+const JSON_ARRAY_MEMBERS = 16384;
+
+/**
+ * The one root line a Checkpoint of `state` would write. A queue whose lifetime request
+ * count exceeds the codec's array cap cannot be checkpointed at all; name that cause.
+ */
+function serializedCheckpoint(state, actor) {
+  const commit = checkpointCommit(state, actor, AT);
+  try {
+    return `${canonical(commit)}\n`;
+  } catch (error) {
+    // The line lists the requests committed so far; its own request joins the set on restore.
+    const requests = state.requests.size;
+    if (error?.code !== "resource_limit" || requests <= JSON_ARRAY_MEMBERS) throw error;
+    throw Object.assign(
+      new Error(
+        `checkpoint_request_retention: a v4 Checkpoint retains all ${requests} committed request IDs in one array, ` +
+          `above the ${JSON_ARRAY_MEMBERS}-member JSON array cap of both codecs (${error.message}); this queue can no longer be checkpointed`
+      ),
+      { code: "checkpoint_request_retention", retained_requests: requests }
+    );
+  }
 }
 
-async function buildRetainedHistory(genesis, requested, checkDeadline = () => {}) {
-  const policy = genesis.state.policy;
-  const actors = {
-    administrator: { role: "administrator", repository: REPOSITORY, principal: PRINCIPAL },
-    producer: { role: "producer", repository: REPOSITORY, principal: PRINCIPAL },
-    reconciler: { role: "reconciler", repository: REPOSITORY, principal: PRINCIPAL },
-  };
-  const transactions = [...genesis.transactions];
+/** Checkpoint bytes, restored through the strict reader, must reproduce the projection digest. */
+function verifiedCheckpoint(state, actor, digest) {
+  const line = serializedCheckpoint(state, actor);
+  assert.equal(projectionDigest(replayTransactionLog(line)), digest, "checkpoint restore changed the projection");
+  return Buffer.byteLength(line);
+}
+
+function retainedPolicy() {
+  // One attempt per historical Work: its prelaunch launch_failed Release exhausts it.
+  return stressPolicy({ default: { concurrency: 256, per_account_limit: 0, max_attempts: 1 }, probe: { concurrency: 16, per_account_limit: 0, max_attempts: 3 } });
+}
+
+/**
+ * Append retained history to the genesis projection in place. Every commit is built by
+ * production planners (submit normalization, planDispatch, releaseOperations) and applied
+ * once through production replay; per 128 Work: submit, dispatch_next (one Claim per
+ * Dispatch) and one dispatcher launch commit per Dispatch recording its prelaunch failure.
+ * The first batch that would exceed the ledger bound is rolled back and reported.
+ */
+async function buildRetainedHistory(genesis, requested, policy, checkDeadline = () => {}) {
+  let state = genesis.state;
+  let ledgerBytes = Buffer.byteLength(genesis.contents);
   const prefix = genesis.branch;
-  const probeWorks = [...genesis.state.works.values()];
-  const probeNodes = genesis.transactions[0].request.parameters.nodes;
-  assert.equal(probeWorks.length, PROBES);
-  let tip = genesis.state.tip;
-  let ledgerBytes = genesis.state.ledgerBytes;
-  let clocks = new Map();
+  const producer = queueActor("producer");
   let accepted = 0;
+  let batch = 0;
   let saturation = null;
-
-  function boundedState() {
-    const state = newState();
-    Object.assign(state, { repository: REPOSITORY, policy, policy_epoch: genesis.state.policy_epoch, tip, ledgerBytes, clocks: new Map(clocks) });
-    for (const work of probeWorks) state.works.set(work.work_id, structuredClone(work));
-    return state;
-  }
-
-  // Fixture construction is intentionally not a publisher benchmark. Every
-  // historical request/Claim is subsequently checked by a complete cold replay.
   while (accepted < requested) {
     checkDeadline();
     const count = Math.min(BATCH, requested - accepted);
-    const state = boundedState();
-    const ordinal = transactions.length;
-    const nodes = Array.from({ length: count }, (_, index) => newWork({}, `${prefix}-g${Math.floor(accepted / BATCH)}`, `n${index}`, "default", policy, AT));
-    try {
-      const submitId = `${prefix}:s${accepted}`;
-      const submitRequest = newRequest(submitId, "submit", actors.producer, { nodes });
-      const submit = generateRequestOperations(state, submitRequest, actors.producer, AT, `history-${submitId}`);
-      for (const [index, node] of nodes.entries()) state.works.set(node.work_id, { ...node, state: "available", position: { commit: ordinal, operation: index }, attempts: 0, retry_not_before: 0, barrier: "none" });
-      const submission = checkedFixtureCommit(state, submitId, "submit", actors.producer, submitRequest.parameters, submit.operations, true);
-
-      const grantId = `${prefix}:c${accepted}`;
-      const parameters = { pool: "default", max_claims: count, max_dispatches: 16, max_bytes: DEFAULT_LIMITS.assignment_bytes };
-      const grantRequest = newRequest(grantId, "dispatch_next", actors.administrator, parameters);
-      const granted = generateRequestOperations(state, grantRequest, actors.administrator, AT, `history-${grantId}`);
-      assert.equal(granted.operations.length, count);
-      const grantCommit = { id: `history-${grantId}`, request: grantRequest };
-      for (const operation of granted.operations) applyScheduledClaim(state, operation, planNext(state, "default", AT), grantCommit);
-      const grant = checkedFixtureCommit(state, grantId, "dispatch_next", actors.administrator, parameters, granted.operations, true);
-
-      const cancellations = nodes.map(node => ({ kind: "WorkCancellation", work_id: node.work_id, reason: "fixture_cancelled" }));
-      const releases = [...state.dispatches.values()].map(dispatch => ({
-        kind: "Release",
-        dispatch_id: dispatch.dispatch_id,
-        evidence: {
-          kind: "prelaunch",
-          source: "trusted_publisher",
-          repository: REPOSITORY,
-          workflow: dispatch.profile.workflow,
-          ref: dispatch.profile.ref,
-          principal: dispatch.profile.principal,
-          checked_at: AT,
-        },
-      }));
-      // Only a bounded budget projection is updated here. No unchecked public
-      // queue state is exported; replay validates each terminal operation later.
-      for (const node of nodes) state.works.get(node.work_id).state = "cancelled";
-      for (const claim of state.claims.values()) claim.state = "cancelled";
-      const cancellationRequest = newRequest(`${prefix}:x${accepted}`, "cancel_work", actors.administrator, { operations: cancellations });
-      const cancelled = checkedFixtureCommit(state, cancellationRequest.id, "cancel_work", actors.administrator, cancellationRequest.parameters, cancellations, false);
-      for (const dispatch of state.dispatches.values()) dispatch.released = true;
-      const operations = releases;
-      const releaseRequest = newRequest(`${prefix}:r${accepted}`, "release", actors.reconciler, { operations });
-      const closure = checkedFixtureCommit(state, releaseRequest.id, "release", actors.reconciler, releaseRequest.parameters, operations, false);
-      transactions.push(submission, grant, cancelled, closure);
-      tip = state.tip;
-      ledgerBytes = state.ledgerBytes;
-      clocks = state.clocks;
-      accepted += count;
-    } catch (error) {
-      if (error.code !== "ledger_limit") throw error;
-      saturation = { code: error.code, message: error.message, accepted_history_work: accepted, refused_batch: count, requested_history_work: requested, unconstructed_history_work: requested - accepted };
+    const committed = state.transactions.length;
+    const before = ledgerBytes;
+    const append = (actor, request, operations) => {
+      const commit = buildCommit(state, actor, request, operations, AT);
+      applyCommit(state, commit);
+      ledgerBytes += canonicalBytes(commit) + 1;
+    };
+    const works = normalizeSubmitParameters({ nodes: Array.from({ length: count }, (_, index) => ({ graph_id: `${prefix}-g${batch}`, node_key: `n${index}`, payload: {} })) }, policy);
+    append(producer, newRequest("submit", producer, { work_ids: works.map(work => work.work_id) }), works);
+    // Each grant is its own dispatcher run; identical parameters from one run are one request.
+    const dispatcher = queueActor("dispatcher", String(1000 + batch));
+    const parameters = dispatchParameters(policy, "default", count);
+    const grant = newRequest("dispatch_next", dispatcher, parameters);
+    const decision = planDispatch(state, parameters, grant.id);
+    assert.equal(decision.operations.length, count, "historical batch must be granted in full");
+    append(dispatcher, grant, decision.operations);
+    for (const dispatchId of decision.dispatches) append(dispatcher, newRequest("launch", dispatcher, { dispatch_id: dispatchId }), releaseOperations(state, dispatchId, "launch_failed", policy));
+    if (ledgerBytes > LEDGER_BYTES) {
+      saturation = {
+        code: "ledger_limit",
+        message: `the next ${count} historical Work would exceed the ${LEDGER_BYTES}-byte ledger bound`,
+        accepted_history_work: accepted,
+        refused_batch: count,
+        requested_history_work: requested,
+        unconstructed_history_work: requested - accepted,
+      };
+      state = replayTransactions(state.transactions.slice(0, committed));
+      ledgerBytes = before;
       break;
     }
-    if (accepted % (BATCH * 8) === 0) await yieldTurn();
+    accepted += count;
+    batch++;
+    if (batch % 8 === 0) await yieldTurn();
   }
-  return { transactions, ledgerBytes, accepted, saturation, probeNodes };
+  return { transactions: state.transactions, ledgerBytes, accepted, saturation };
 }
 
 async function persistFixture(host, branch, current, content, message) {
-  const common = { owner: "local", repo: "queue" };
+  const common = { owner: OWNER, repo: REPO };
   const git = host.client.rest.git;
   const blob = await git.createBlob({ ...common, content, encoding: "utf-8" });
   const tree = await git.createTree({ ...common, base_tree: current.treeSha, tree: [{ path: "work-queue.jsonl", type: "blob", mode: "100644", sha: blob.data.sha }] });
@@ -167,7 +161,7 @@ async function runSingleRetainedSimulator(options) {
     history_branch_count: 1,
     planned_history_branch_count: 1,
     history_queue_item_bound: options.historyQueueItems,
-    limits: { ...DEFAULT_LIMITS, profile_max_claims: 16 },
+    limits: PROTOCOL_LIMITS,
     scope: "cold-validated bounded retained fixture scale, NOT 100000 completed Work or 100000 live/pending Work",
     fixture_batch: BATCH,
     saturation: null,
@@ -190,29 +184,20 @@ async function runSingleRetainedSimulator(options) {
         });
     checkDeadline();
     await host.initialize();
-    const policy = defaultPolicy({ repository: REPOSITORY, principal: PRINCIPAL, ref: host.ref });
-    policy.pools.default.profiles.default.max_claims = 16;
-    policy.pools.default.logical_limit = 256;
-    policy.pools.default.native_limit = 16;
-    policy.pools.probe = structuredClone(policy.pools.default);
-    policy.pools.probe.logical_limit = 16;
-    policy.pools.probe.native_limit = 1;
-    policy.producers[PRINCIPAL].pools.push("probe");
-    const producer = await authenticatePublisher({ githubClient: host.client, context: host.nativeContext(), role: "producer", workflowRef: `${REPOSITORY}/${PUBLISHER_WORKFLOW}@${host.ref}` });
-    assert.equal(actorFromContext(producer).principal, PRINCIPAL);
+    const policy = retainedPolicy();
     const branch = `retained-${options.seed}-${options.historyShard || 0}`;
-    const args = { githubClient: host.client, owner: "local", repo: "queue", branch };
-    const nodes = Array.from({ length: PROBES }, (_, index) => newWork({ probe: index }, `${branch}-probes`, `p${index}`, "probe", policy, AT));
+    const args = { githubClient: host.client, owner: OWNER, repo: REPO, branch };
+    const probes = normalizeSubmitParameters({ nodes: Array.from({ length: PROBES }, (_, index) => ({ graph_id: `${branch}-probes`, node_key: `p${index}`, pool: "probe", payload: { probe: index } })) }, policy);
     await publishWorkQueueRequest({
       ...args,
-      context: producer,
-      policyProposal: policy,
+      actor: queueActor("producer"),
+      request: { kind: "submit", parameters: { work_ids: probes.map(work => work.work_id) } },
+      operationsFor: state => probes.filter(work => !state.works.has(work.work_id)),
       now: () => AT,
-      request: newRequest(`${branch}:probes`, "submit", actorFromContext(producer), { nodes }),
     });
     const genesis = await readWorkQueueLog(args);
     const generatedAt = performance.now();
-    const fixture = await buildRetainedHistory(genesis, options.items, checkDeadline);
+    const fixture = await buildRetainedHistory(genesis, options.items, policy, checkDeadline);
     report.fixture_generation_ms = performance.now() - generatedAt;
     report.submitted = fixture.accepted;
     report.claimed = fixture.accepted;
@@ -220,20 +205,18 @@ async function runSingleRetainedSimulator(options) {
     report.saturation = fixture.saturation;
     checkDeadline();
     const replayAt = performance.now();
-    let state = replayTransactions(fixture.transactions);
-    report.fixture_validation_ms = performance.now() - replayAt;
-    assert.equal(state.ledgerBytes, fixture.ledgerBytes);
     let content = serializeTransactionLog(fixture.transactions);
+    report.fixture_validation_ms = performance.now() - replayAt;
     assert.equal(Buffer.byteLength(content), fixture.ledgerBytes);
     await persistFixture(host, branch, genesis, content, "Persist checked large retained stress fixture");
     fixture.transactions = [];
     content = null;
-    state = null;
     checkDeadline();
     const coldAt = performance.now();
     let cold = await readWorkQueueLog(args);
     report.cold_git_read_replay_ms = performance.now() - coldAt;
     const digest = projectionDigest(cold.state);
+    assert.equal(projectionDigest(replayTransactions(cold.transactions)), digest, "replaying the same commits twice changed the projection");
     report.retained_entities = cold.state.works.size + cold.state.claims.size;
     report.retained_history_entities = 2 * fixture.accepted;
     assert.equal(cold.state.works.size, fixture.accepted + PROBES);
@@ -243,24 +226,28 @@ async function runSingleRetainedSimulator(options) {
     assert.equal(cold.state.stats.completed, 0);
     for (const claim of cold.state.claims.values()) assert.equal(claim.state, "cancelled");
     for (const dispatch of cold.state.dispatches.values()) {
-      assert.equal(dispatch.released, true);
-      assert.ok(dispatch.claims.length <= 16);
+      assert.equal(dispatch.state, "closed");
+      assert.equal(dispatch.launch, null, "a prelaunch release records no launch");
+      assert.equal(dispatch.claims.length, 1);
     }
+    for (const work of cold.state.works.values()) if (work.pool === "default") assert.equal(work.cancellation_reason, "attempts_exhausted");
+    const probeParameters = dispatchParameters(policy, "probe", PROBES);
+    const probeRequest = newRequest("dispatch_next", queueActor("dispatcher", "1"), probeParameters).id;
     const planAt = performance.now();
     let selected;
     for (let index = 0; index < 10; index++) {
-      const plan = planDispatch(cold.state, { pool: "probe", max_claims: PROBES, max_dispatches: 1, max_bytes: DEFAULT_LIMITS.assignment_bytes }, { requestId: "retained-probe", commitId: "retained-probe-commit", at: AT });
+      const plan = planDispatch(cold.state, probeParameters, probeRequest);
       assert.equal(plan.operations.length, PROBES);
       const current = canonical(plan.operations);
-      if (selected) assert.equal(current, selected, "large retained-history planning changed immutable prefix");
+      if (selected) assert.equal(current, selected, "large retained-history planning changed its deterministic prefix");
       selected = current;
     }
     report.ten_batch_plans_ms = performance.now() - planAt;
     report.selected_probe_claims = PROBES;
-    report.ledger_bytes = cold.state.ledgerBytes;
-    report.recovery_bytes_used = Math.max(0, report.ledger_bytes - DEFAULT_LIMITS.ledger_bytes);
+    report.ledger_bytes = Buffer.byteLength(cold.contents);
     report.pending_work = cold.state.stats.available;
     report.transactions = cold.transactions.length;
+    report.checkpoint_retained_requests = cold.state.requests.size;
     report.historical_reservations = cold.state.dispatches.size;
     report.projection_sha256 = digest;
     if (options.verifyHistoryWorkers) {
@@ -278,6 +265,8 @@ async function runSingleRetainedSimulator(options) {
               branch,
               expected_work: fixture.accepted + PROBES,
               expected_claims: fixture.accepted,
+              probe_parameters: probeParameters,
+              probe_request_id: probeRequest,
             }))
           ),
           new Promise((_, reject) => {
@@ -295,20 +284,29 @@ async function runSingleRetainedSimulator(options) {
         await readers.close();
       }
     }
-    const compactAt = performance.now();
-    const compacted = compactTransactions([...cold.transactions, cold.transactions[0], cold.transactions.at(-1)]);
-    assert.equal(compacted.length, cold.transactions.length);
-    assert.equal(projectionDigest(replayTransactions(compacted)), digest);
-    content = serializeTransactionLog(compacted);
-    assert.equal(Buffer.byteLength(content), report.ledger_bytes);
-    await persistFixture(host, branch, cold, content, "Persist retained fixture safe canonicalization");
+    // A checkpoint replaces the log with one root line; Git history keeps the prior content.
+    const checkpointAt = performance.now();
+    const administrator = queueActor("administrator");
+    report.checkpoint_bytes = verifiedCheckpoint(cold.state, administrator, digest);
+    for (const verification of report.history_worker_verifications || []) assert.equal(verification.checkpoint_bytes, report.checkpoint_bytes, "history workers built a different checkpoint");
     cold = null;
-    content = null;
-    const reread = await readWorkQueueLog(args);
-    assert.equal(projectionDigest(reread.state), digest);
-    report.canonicalization_ms = performance.now() - compactAt;
-    report.canonicalization = "exact duplicate elimination only; no historical Work/Claim/request pruning";
-    report.fixture_generation_replays = 0;
+    try {
+      const published = await publishWorkQueueCheckpoint({ ...args, actor: administrator, now: () => AT });
+      assert.equal(published.checkpointed, true);
+      const restored = await readWorkQueueLog(args);
+      assert.equal(restored.transactions.length, 1);
+      assert.equal(Buffer.byteLength(restored.contents), report.checkpoint_bytes);
+      assert.equal(projectionDigest(restored.state), digest, "persisted checkpoint changed the projection");
+      report.checkpoint_persisted = true;
+    } catch (error) {
+      if (error.code !== "ledger_limit") throw error;
+      // The checkpoint is refused like any other oversized write; the log stays as it was.
+      assert.equal(projectionDigest((await readWorkQueueLog(args)).state), digest);
+      report.checkpoint_persisted = false;
+      report.checkpoint_refusal = error.code;
+    }
+    report.checkpoint_ms = performance.now() - checkpointAt;
+    report.checkpoint = "one root Checkpoint line restored to the same entity projection; no history rewritten in Git";
     report.fixture_native_posts = host.metrics.native_posts;
     report.queues = [
       ...report.lifecycle_smoke.queues.map(queue => ({ ...queue, kind: "concurrent-lifecycle-smoke" })),
@@ -324,12 +322,12 @@ async function runSingleRetainedSimulator(options) {
         retained_entities: report.retained_entities,
         retained_history_entities: report.retained_history_entities,
         ledger_bytes: report.ledger_bytes,
-        recovery_bytes_used: report.recovery_bytes_used,
+        checkpoint_bytes: report.checkpoint_bytes,
         cold_replay_ms: report.cold_git_read_replay_ms,
         fixture_generation_ms: report.fixture_generation_ms,
         fixture_validation_ms: report.fixture_validation_ms,
         ten_batch_plans_ms: report.ten_batch_plans_ms,
-        canonicalization_ms: report.canonicalization_ms,
+        checkpoint_ms: report.checkpoint_ms,
         projection_sha256: report.projection_sha256,
       },
     ];
@@ -339,6 +337,7 @@ async function runSingleRetainedSimulator(options) {
     report.ok = true;
     return report;
   } catch (error) {
+    if (error.code === "checkpoint_request_retention") report.checkpoint_refusal = error.code;
     error.report = report;
     throw error;
   } finally {
@@ -374,22 +373,20 @@ async function runRetainedSimulator(options) {
     history_branch_count: 0,
     planned_history_branch_count: historyBranches,
     history_queue_item_bound: options.historyQueueItems,
-    limits: { ...DEFAULT_LIMITS, profile_max_claims: 16 },
+    limits: PROTOCOL_LIMITS,
     scope: "independent bounded retained-history branches; NOT single-queue 100000 Work support or newly completed worker throughput",
-    retention: "one isolated local Git fixture per history branch; cold-verified/canonicalized/fsck-checked then removed; measurements retained",
+    retention: "one isolated local Git fixture per history branch; cold-verified/checkpointed/fsck-checked then removed; measurements retained",
     fixture_batch: BATCH,
-    fixture_generation_replays: 0,
     fixture_native_posts: 0,
     fixture_generation_ms: 0,
     fixture_validation_ms: 0,
     cold_git_read_replay_ms: 0,
     ten_batch_plans_ms: 0,
     batch_plan_count: 0,
-    canonicalization_ms: 0,
+    checkpoint_ms: 0,
     historical_reservations: 0,
     ledger_bytes_total: 0,
     max_queue_ledger_bytes: 0,
-    recovery_bytes_used: 0,
     pending_work: 0,
     saturation: null,
     git_api_metrics: {},
@@ -423,9 +420,8 @@ async function runRetainedSimulator(options) {
         "fixture_validation_ms",
         "cold_git_read_replay_ms",
         "ten_batch_plans_ms",
-        "canonicalization_ms",
+        "checkpoint_ms",
         "historical_reservations",
-        "recovery_bytes_used",
         "pending_work",
       ])
         report[key] += current[key];
@@ -465,4 +461,4 @@ async function runRetainedSimulator(options) {
   }
 }
 
-module.exports = { BATCH, PROBES, buildRetainedHistory, projectionDigest, runRetainedSimulator, runSingleRetainedSimulator };
+module.exports = { BATCH, JSON_ARRAY_MEMBERS, PROBES, buildRetainedHistory, projectionDigest, runRetainedSimulator, runSingleRetainedSimulator, serializedCheckpoint, verifiedCheckpoint };
