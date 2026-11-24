@@ -47,6 +47,7 @@
     "claude": ["agent"],
     "codex": ["agent"],
     "gemini": ["agent"],
+    "gemini-4": ["copilot/gemini-4*", "google/gemini-4*", "gemini/gemini-4*"],
     "gemini-3-pro": ["copilot/gemini-3*pro*", "google/gemini-3*pro*", "google/nano-banana*", "gemini/gemini-3*pro*"],
     "gemini-3-flash": ["copilot/gemini-3*flash*", "google/gemini-3*flash*", "gemini/gemini-3*flash*"],
     "gemini-3.1-pro": ["copilot/gemini-3.1*pro*", "google/gemini-3.1*pro*", "gemini/gemini-3.1*pro*"],
