@@ -96,7 +96,7 @@ Decision-model usage remains part of normal proxy accounting.
 
   Resolved at compile time — the compiler fetches `action.yml`, parses inputs, and exposes them as MCP tool parameters. The agent calls the action by its normalized name (dashes → underscores). Each action runs as an injected step in the safe-outputs job. Local actions (`./path/to/action`) are also supported.
 
-- `claim-adapters:` - Work-queue custom claim delivery adapters, each bound to one independently-verified effect (object)
+- `claim-adapters:` - Work-queue custom Claim effect adapters, each bound to one declared effect (object)
 
   ```yaml
   safe-outputs:
@@ -110,7 +110,7 @@ Decision-model usage remains part of normal proxy accounting.
           body: review_body
   ```
 
-  Binds a work-queue worker's Claim output to a trusted, independently verified effect: prepared/script claim handlers never receive write credentials directly, and the safe-outputs handler applies and verifies the effect afterward instead of trusting job success. `effect-type` selects a native builtin (`create_issue` … `replace_label`, restricted to that handler's own fields) or a generic `github_rest`/`git_tree`/`github_graphql` effect, each requiring its matching `request`/`verifier`, `git-tree`, or `graphql` sub-config. `field-map` maps declared effect fields to adapter-supplied source fields; `expected` fixes literal field values instead of mapping them; a field cannot use both. `verifier-id` names the immutable effect-contract verifier (defaults to the normalized adapter name) and must not collide with an enabled native verifier for the same effect. See [work-queue.md](work-queue.md) for the Claim lifecycle this binds into.
+  Binds a work-queue worker's Claim output to one trusted effect: prepared/script claim handlers never receive write credentials directly; the safe-outputs handler applies the effect only while the Claim is open and bound to the run, and records it in the Claim's Completion. `effect-type` selects a native builtin (`create_issue` … `replace_label`, restricted to that handler's own fields) or a generic `github_rest`/`git_tree`/`github_graphql` effect, each requiring its matching `request`, `git-tree`, or `graphql` sub-config. `field-map` maps declared effect fields to adapter-supplied source fields; `expected` fixes literal field values instead of mapping them; a field cannot use both. `verifier` and `verifier-id` are accepted for compatibility and ignored. See [work-queue.md](work-queue.md) for the Claim lifecycle this binds into.
 
 **Global Safe Output Configuration:**
 - `github-token:` - Custom GitHub token for all safe output jobs

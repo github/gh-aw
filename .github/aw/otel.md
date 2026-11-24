@@ -29,11 +29,11 @@ Resource attributes identify the service and workflow run, for example `service.
 | Work queue | `gh-aw.work_queue.*` |
 
 See the [OpenTelemetry attribute reference](../../docs/src/content/docs/reference/open-telemetry-attributes.mdx) for attribute descriptions and availability.
-For work-queue operation names and instrumentation availability, see [OpenTelemetry queue health](../../docs/src/content/docs/reference/work-queue.md#open-telemetry-queue-health).
+For work-queue operation names and instrumentation availability, see [OpenTelemetry queue health](../../docs/src/content/docs/reference/work-queue.md#opentelemetry-queue-health).
 
 AI credits (`gh-aw.aic`) and token usage belong to the span that owns the usage: usually the dedicated agent span, or the executing job's conclusion span when no dedicated agent span is emitted. A run can have other conclusion spans that do not own that usage. Deduplicate records by trace ID and span ID before aggregating mirrored data. Explicit numeric zero is a measured value; missing cost or token data is not zero.
 
-Work-queue attributes are point-in-time snapshots on operation spans. They are not counters and should not be summed across operations. Queue identifiers are hashed; treat remaining high-cardinality values as trace data rather than default metric dimensions.
+Work-queue spans carry projection counts (point-in-time, do not sum across operations) and per-operation publication/commit counts. Queue identifiers are hashed; treat remaining high-cardinality values as trace data rather than default metric dimensions.
 
 ## Export and local artifacts
 
@@ -86,7 +86,7 @@ Choose the owning span first, then the attribute. Missing attributes mean unknow
 | Outputs | `gh-aw.output.item_count`, `gh-aw.output.item_types` | Conclusion span |
 | Graders | `gh-aw.graders.count`, `passed`, `failed`, `errors`, `unavailable`, `other`; `grader.result` events | Conclusion span for the job that owns the results. Includes operational-value grader results |
 | Evals | `gh-aw.evals.count`, `yes`, `no`, `unknown`; `eval.result` events; `gh-aw.evals.status` for not-evaluated | Evals job span |
-| Work queue | `gh-aw.work_queue.*` on `work_queue.<op>.run` spans | Point-in-time snapshots on operation spans. Do not sum |
+| Work queue | `gh-aw.work_queue.*` on `work_queue.read` and `work_queue.publish` spans | Projection counts are point-in-time; do not sum |
 | Adoption evaluation | No OTLP producer in this checkout | `gh-aw.adoption.*` is documented in the public reference. Spec §13 describes a downstream `gh-aw.adoption.evaluate` span; no `gh-aw.outcome.*` attribute exists in the spec or public reference |
 
 Use `gh-aw.run.attempt` and `github.run_id` to correlate spans from re-runs. Do not use identifiers, error messages, or URLs as metric dimensions.
@@ -129,7 +129,7 @@ Source evidence is limited to implementation and tests; this table lists emitter
 | Evals | `eval.result`, `eval.status` events; `gh-aw.evals.*` | `send_otlp_span.cjs` `buildEvalTelemetry` | Signals |
 | Experiments | `gh-aw.experiment.<name>`, `gh-aw.experiments` | `send_otlp_span.cjs` `buildExperimentAttributes` | Identity |
 | Admission | `gh-aw.admission`, `gh-aw.admission.http` (HTTP spans carry `traceparent`) | `actions/setup/js/check_admission.cjs` `main` | Signals |
-| Work queue | `work_queue.<op>.run`, where `<op>` is `read`, `compact`, `publish`, `dispatch`, `reconcile`, or `reconcile_dispatch` | `actions/setup/js/work_queue_telemetry.cjs` `observeQueueOperation` (via `otlp.cjs` `logSpan`) | Work-queue attributes |
+| Work queue | `work_queue.read`, `work_queue.publish` (nested operations fold into the outer span) | `actions/setup/js/work_queue_telemetry.cjs` `observeQueueOperation` (via `otlp.cjs` `logSpan`) | Work-queue attributes |
 | Custom spans | `<toolName>.run` | `actions/setup/js/otlp.cjs` `logSpan` | Signals |
 | Session logs | `otel.log` records in the `gh-aw.session` scope | `actions/setup/js/send_otlp_session_logs.cjs` `sendSessionLogs` | Signals |
 | Usage and firewall | `gh-aw.aic`, `gen_ai.usage.*`, `gh-aw.firewall.*`, `gh-aw.mcp.*` on the owning span | `send_otlp_span.cjs` `sendJobConclusionSpan` | Measurements |

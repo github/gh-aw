@@ -1,9 +1,6 @@
 // @ts-check
 "use strict";
 
-const { buildAWPolicy } = require("./work_queue_settings.cjs");
-const { validateDeliveryContract } = require("./work_queue_delivery.cjs");
-
 const DAILY_REPORTS = Object.freeze([
   "daily-compiler-quality",
   "daily-evals-report",
@@ -56,7 +53,7 @@ function reportContract(profile) {
   if (assetLimits[profile]) outputs.push({ type: "upload_asset", min: 0, max: assetLimits[profile] });
   if (profile === "daily-regulatory") outputs.push({ type: "close_discussion", min: 0, max: 1 });
   if (profile === "deep-report") outputs.push({ type: "create_issue", min: 0, max: 7 }, { type: "add_comment", min: 0, max: 3 }, { type: "upload_artifact", min: 0, max: 3 });
-  return validateDeliveryContract({ version: 1, outputs });
+  return { version: 1, outputs };
 }
 
 /** @param {{date: string, repository: string, repositoryId: string}} options */
@@ -88,17 +85,4 @@ function buildDailyReportPlan({ date, repository, repositoryId }) {
   };
 }
 
-/** @param {{repository: string, ref: string, settings?: object}} options */
-function buildDailyReportPolicy({ repository, ref, settings }) {
-  assertRepository(repository);
-  return buildAWPolicy({ repository, ref, workflows: [...REPORT_PROFILES], settings });
-}
-
-module.exports = { DAILY_REPORTS, FIXED_DAILY_REPORTS, WEEKLY_REPORTS, REPORT_PROFILES, REPORTS_PER_DAY, REPORT_POOL, reportsForDay, buildDailyReportPlan, buildDailyReportPolicy };
-
-if (require.main === module) {
-  const [command, repository, ref, ...extra] = process.argv.slice(2);
-  if (command !== "policy" || extra.length || !repository || !ref) throw new Error("Usage: node daily_report_portfolio.cjs policy OWNER/REPO IMMUTABLE_SHA");
-  const { readPortfolioSettings } = require("./work_queue_portfolio_config.cjs");
-  process.stdout.write(JSON.stringify(buildDailyReportPolicy({ repository, ref, settings: readPortfolioSettings() }), null, 2) + "\n");
-}
+module.exports = { DAILY_REPORTS, FIXED_DAILY_REPORTS, WEEKLY_REPORTS, REPORT_PROFILES, REPORTS_PER_DAY, REPORT_POOL, reportsForDay, buildDailyReportPlan };

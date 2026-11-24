@@ -1,19 +1,24 @@
 {
-  "version": 3,
-  "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$",
+  "version": 4,
+  "description": "Closed reason enums per operation kind. Validate the operation {kind, reason} plus its other required fields; invalid reasons fail with reason_invalid.",
+  "enums": {
+    "ClaimCancellation": ["worker_failed", "worker_terminated", "launch_failed", "run_terminal", "run_missing", "operator"],
+    "WorkCancellation": ["attempts_exhausted", "operator", "related_issue_closed", "worker_contract_obsolete"],
+    "Release": ["launch_failed", "worker_terminated", "run_terminal", "run_missing", "operator"]
+  },
   "cases": [
-    { "name": "single alphanumeric", "reason": "0", "valid": true },
-    { "name": "uppercase sanitized code", "reason": "Worker.Cancelled-V3:Retry_Exhausted", "valid": true },
-    { "name": "sanitized punctuation", "reason": "delivery.none:worker_cancelled-v3", "valid": true },
-    { "name": "maximum 128 ASCII characters", "reason": "abcdefghijklmnopabcdefghijklmnopabcdefghijklmnopabcdefghijklmnopabcdefghijklmnopabcdefghijklmnopabcdefghijklmnopabcdefghijklmnop", "valid": true },
-    { "name": "129 ASCII characters", "reason": "abcdefghijklmnopabcdefghijklmnopabcdefghijklmnopabcdefghijklmnopabcdefghijklmnopabcdefghijklmnopabcdefghijklmnopabcdefghijklmnopx", "valid": false },
-    { "name": "empty reason", "reason": "", "valid": false },
-    { "name": "leading punctuation", "reason": "_invalid", "valid": false },
-    { "name": "whitespace prose", "reason": "worker cancelled", "valid": false },
-    { "name": "embedded newline", "reason": "worker\ncancelled", "valid": false },
-    { "name": "terminal newline", "reason": "worker_cancelled\n", "valid": false },
-    { "name": "terminal carriage return", "reason": "worker_cancelled\r", "valid": false },
-    { "name": "credential-like slash", "reason": "owner/repo", "valid": false },
-    { "name": "non-ASCII text", "reason": "worker_é", "valid": false }
+    { "name": "worker failure cancels a Claim", "kind": "ClaimCancellation", "reason": "worker_failed", "valid": true },
+    { "name": "Release reasons expand into ClaimCancellation", "kind": "ClaimCancellation", "reason": "run_missing", "valid": true },
+    { "name": "operator release", "kind": "Release", "reason": "operator", "valid": true },
+    { "name": "launch failure release", "kind": "Release", "reason": "launch_failed", "valid": true },
+    { "name": "worker failure is not a Release reason", "kind": "Release", "reason": "worker_failed", "valid": false },
+    { "name": "exhausted attempts cancel Work", "kind": "WorkCancellation", "reason": "attempts_exhausted", "valid": true },
+    { "name": "closed related Issue cancels Work", "kind": "WorkCancellation", "reason": "related_issue_closed", "valid": true },
+    { "name": "obsolete worker contract", "kind": "WorkCancellation", "reason": "worker_contract_obsolete", "valid": true },
+    { "name": "time-based expiry no longer exists", "kind": "WorkCancellation", "reason": "work_expired", "valid": false },
+    { "name": "v3 delivery failure reasons are gone", "kind": "ClaimCancellation", "reason": "verification_exhausted", "valid": false },
+    { "name": "free-form sanitized codes are rejected", "kind": "ClaimCancellation", "reason": "Worker.Cancelled-V3:Retry_Exhausted", "valid": false },
+    { "name": "case matters", "kind": "Release", "reason": "Operator", "valid": false },
+    { "name": "empty reason", "kind": "WorkCancellation", "reason": "", "valid": false }
   ]
 }

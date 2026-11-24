@@ -5,7 +5,11 @@ import os from "node:os";
 import path from "node:path";
 import { prepareMemorySnapshot, validateMemorySchema } from "./work_queue_memory.cjs";
 import Ajv from "ajv";
-import { queueFixture } from "./work_queue_lifecycle.test_helpers.cjs";
+
+/** A v4 snapshot assignment of `count` Claims. */
+function queueFixture({ count }) {
+  return { assignment: { dispatch_id: "d1", claims: Array.from({ length: count }, (_, index) => ({ handle: `h${index + 1}`, claim_id: `c${index + 1}`, work_id: `w${index + 1}`, work: { plan: `task ${index + 1}` }, result_refs: [] })) } };
+}
 
 const schema = {
   type: "object",
@@ -72,12 +76,14 @@ describe("declarative Claim memory", () => {
     }
   });
 
-  it("prepares each original batch member independently and never infers a surviving singleton", () => {
-    const { assignment } = queueFixture({ count: 2 });
-    for (let index = 0; index < 2; index++) expect(prepare(memory(assignment, index), assignment, { claim_handle: assignment.claims[index].handle }).files[0].content).toContain(assignment.claims[index].work_id);
-    expect(() => prepare(memory(assignment), assignment)).toThrow(/multi-Claim/);
+  it("prepares only the sole Claim and rejects multi-member, foreign and conflicting input", () => {
+    const { assignment } = queueFixture({ count: 1 });
+    expect(prepare(memory(assignment), assignment).files[0].content).toContain("w1");
+    expect(prepare(memory(assignment), assignment, { claim_handle: "h1" }).files[0].content).toContain("w1");
+    const { assignment: grouped } = queueFixture({ count: 2 });
+    expect(() => prepare(memory(grouped, 1), grouped, { claim_handle: "h2" })).toThrow(/exactly one open Claim/);
     expect(() => prepare(memory(assignment), assignment, { claim_handle: "foreign" })).toThrow(/foreign/);
-    expect(() => prepare(memory(assignment, 1), assignment, { claim_handle: "h1" })).toThrow(/work_id conflicts/);
+    expect(() => prepare({ ...memory(assignment), work_id: "w2" }, assignment, { claim_handle: "h1" })).toThrow(/work_id conflicts/);
     expect(() => prepare(memory(assignment), assignment, { claim_handle: "h1", claim_id: "foreign" })).toThrow(/conflicts/);
     expect(() => prepare(memory(assignment), assignment, { claim_handle: "h1", authorized: true })).toThrow(/authority/);
   });
@@ -94,7 +100,7 @@ describe("declarative Claim memory", () => {
     fs.symlinkSync(filename, link);
     vi.stubEnv("GH_AW_CLAIM_ASSIGNMENT", link);
     expect(() => prepareMemorySnapshot({ memory: memory(assignment) }, config)).toThrow(/regular/);
-    fs.writeFileSync(filename, " ".repeat(48 * 1024 + 2));
+    fs.writeFileSync(filename, " ".repeat(64 * 1024 + 2));
     vi.stubEnv("GH_AW_CLAIM_ASSIGNMENT", filename);
     expect(() => prepareMemorySnapshot({ memory: memory(assignment) }, config)).toThrow(/bounded/);
     vi.stubEnv("GH_AW_CLAIM_ASSIGNMENT", "");

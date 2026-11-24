@@ -7,7 +7,11 @@ const { queueError } = require("./work_queue_codec.cjs");
 const MAX_OBJECT_BYTES = 80 * 1024 * 1024;
 const OID = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/;
 
-function createQueueGitObjectReader(args, env) {
+// A hung `git cat-file` must not hold a publication forever; this bounds one read's I/O.
+const READ_TIMEOUT_MS = 120000;
+
+/** @param {string[]} args @param {NodeJS.ProcessEnv} env @param {{timeoutMs?: number}} [options] */
+function createQueueGitObjectReader(args, env, { timeoutMs = READ_TIMEOUT_MS } = {}) {
   /** @type {import("node:child_process").ChildProcessByStdio<import("node:stream").Writable, import("node:stream").Readable, null> | undefined} */
   let child;
   let closed = false;
@@ -54,7 +58,7 @@ function createQueueGitObjectReader(args, env) {
       const timer = setTimeout(() => {
         rejectPending?.(failure());
         close();
-      }, 120000);
+      }, timeoutMs);
       /** @param {Error | undefined} error @param {Buffer} [value] */
       function finish(error, value = undefined) {
         clearTimeout(timer);

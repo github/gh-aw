@@ -2,12 +2,9 @@ package cli
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"slices"
-	"strings"
 	"time"
 
 	"charm.land/bubbles/v2/textinput"
@@ -20,12 +17,14 @@ import (
 
 type workQueueTUIService struct {
 	read    func() (workqueue.Projection, error)
-	publish func(string, string, workqueue.OperationsParameters) (workqueue.Publication, error)
+	publish func(kind string, parameters any, operationsFor workqueue.OperationsFor) (workqueue.Publication, error)
+	// maxAttempts resolves a pool's compiled max_attempts for release.
+	maxAttempts func(string) int
 }
 type workQueueLoaded struct {
 	state     *workqueue.Projection
 	err       error
-	requestID string
+	requests  []string
 	committed bool
 }
 type workQueueTick time.Time
@@ -43,10 +42,7 @@ type workQueueTUI struct {
 	editing, detailFocus, busy, publishing bool
 	width, height                          int
 	mode                                   string
-	targets                                []workOperatorTarget
-	pending                                workqueue.OperationsParameters
-	pendingKind                            string
-	priority                               int
+	targets                                []string
 	status, lastRequest                    string
 	readAt                                 time.Time
 }
@@ -96,8 +92,8 @@ func (m *workQueueTUI) rebuild(preferred string) {
 func (m *workQueueTUI) updateDetails() {
 	text := "No matching Work or Claims.\nPress / to search, r to refresh, ? for help."
 	if row, ok := m.current(); ok {
-		var err error
-		text, err = workQueueDetails(m.state, row, m.readAt.UnixMilli())
+		inspection, err := workQueueInspect(m.state, m.branch, row)
+		text = inspection.Details
 		if err != nil {
 			text = "Details unavailable: " + workQueueText(err.Error())
 		}
@@ -120,96 +116,101 @@ func (m *workQueueTUI) move(delta int) {
 	m.updateDetails()
 }
 
-func (m *workQueueTUI) actionTargets() ([]workOperatorTarget, error) {
+func (m *workQueueTUI) chosenRows() []workQueueRow {
 	chosen := []workQueueRow{}
 	for _, row := range m.selected {
 		chosen = append(chosen, row)
 	}
-	if row, ok := m.current(); ok && len(chosen) == 0 {
+	if row, ok := m.current(); ok && len(chosen) == 0 && row.Kind != "graph" {
 		chosen = append(chosen, row)
 	}
+	return chosen
+}
+
+// actionTargets resolves the selection to available Work IDs (cancel) or
+// non-closed Dispatch IDs (release) of the selected Claims or claimed Work.
+func (m *workQueueTUI) actionTargets(kind string) ([]string, error) {
+	chosen := m.chosenRows()
 	if len(chosen) == 0 {
 		return nil, errors.New("no Work or Claim selected")
 	}
-	byWork := map[string]workOperatorTarget{}
+	targets := []string{}
 	for _, row := range chosen {
 		work := m.state.Works[row.WorkID]
 		if work == nil {
 			return nil, errors.New("selected Work disappeared; clear selection and refresh")
 		}
-		target := workOperatorTarget{WorkID: work.WorkID}
-		if row.Kind == "claim" {
-			claim := m.state.Claims[row.ID]
-			if claim == nil || claim.State != "open" || work.State != "claimed" || work.ClaimID != claim.ClaimID {
-				return nil, errors.New("selected Claim is historical or terminal; select current ownership")
+		if kind == "cancel" {
+			if work.State != "available" {
+				return nil, errors.New("cancel applies to available Work only; release claimed Work's dispatch first")
 			}
-			target.ClaimID = claim.ClaimID
+			targets = append(targets, work.WorkID)
+			continue
 		}
-		if previous, ok := byWork[work.WorkID]; ok && previous.ClaimID != "" {
-			target = previous
+		claimID := work.ClaimID
+		if row.Kind == "claim" {
+			claimID = row.ID
 		}
-		byWork[work.WorkID] = target
+		claim := m.state.Claims[claimID]
+		if claim == nil || claim.State != "open" {
+			return nil, errors.New("release applies to open Claims; select claimed Work or its current Claim")
+		}
+		if dispatch := m.state.Dispatches[claim.DispatchID]; dispatch != nil && dispatch.State != "closed" {
+			targets = append(targets, dispatch.DispatchID)
+		}
 	}
-	if len(byWork) > 256 {
-		return nil, errors.New("select at most 256 distinct Work per action")
+	targets = slices.Compact(slices.Sorted(slices.Values(targets)))
+	if len(targets) > workqueue.OperationsPerCommit {
+		return nil, errors.New("select at most 256 targets per action")
 	}
-	targets := make([]workOperatorTarget, 0, len(byWork))
-	for _, target := range byWork {
-		targets = append(targets, target)
-	}
-	slices.SortFunc(targets, func(a, b workOperatorTarget) int { return strings.Compare(a.WorkID, b.WorkID) })
 	return targets, nil
 }
 func (m *workQueueTUI) openAction(kind string) {
-	targets, err := m.actionTargets()
+	targets, err := m.actionTargets(kind)
 	if err != nil {
 		m.status = "Error: " + workQueueText(err.Error())
 		return
 	}
-	for _, target := range targets {
-		work := m.state.Works[target.WorkID]
-		if kind == "priority" && work.State != "available" || kind == "cancel" && (work.State == "completed" || work.State == "cancelled") {
-			m.status = "Error: selection contains ineligible Work; inspect or refresh before changing it"
-			return
-		}
-	}
-	m.targets, m.mode, m.priority = targets, kind, 0
-	if kind == "cancel" {
-		m.prepareAction()
-	}
-}
-func (m *workQueueTUI) prepareAction() {
-	reason := "operator_cancelled"
-	if m.mode == "priority" {
-		reason = "operator_reprioritized"
-	}
-	params, kind, err := workOperatorIntent(m.state, slices.Clone(m.targets), reason, m.priority, "")
-	if err != nil {
-		m.status, m.mode = "Error: "+workQueueText(err.Error()), ""
-		return
-	}
-	m.pending, m.pendingKind = params, kind
+	m.targets, m.mode = targets, kind
 }
 func (m *workQueueTUI) confirm() tea.Cmd {
-	var token [16]byte
-	if _, err := rand.Read(token[:]); err != nil {
-		m.status = "Error: cannot create stable request ID: " + workQueueText(err.Error())
-		return nil
-	}
-	id := hex.EncodeToString(token[:])
-	m.lastRequest, m.busy, m.publishing, m.mode = id, true, true, ""
-	m.status = "Publishing checked action; request=" + id
-	service, params, kind := m.service, m.pending, m.pendingKind
+	m.busy, m.publishing = true, true
+	m.status = "Publishing checked action..."
+	service, kind, targets := m.service, m.mode, slices.Clone(m.targets)
+	m.mode = ""
 	return func() tea.Msg {
-		_, err := service.publish(id, kind, params)
+		requests := []string{}
+		publish := func(kind string, parameters any, operationsFor workqueue.OperationsFor) error {
+			published, err := service.publish(kind, parameters, operationsFor)
+			if err == nil && published.Committed {
+				requests = append(requests, published.Request.ID)
+			}
+			return err
+		}
+		var err error
+		if kind == "cancel" {
+			err = publish("cancel_work", workqueue.CancelWorkParameters{WorkIDs: targets, Reason: "operator"},
+				func(state workqueue.Projection, _ workqueue.Request) ([]workqueue.Operation, error) {
+					return workCancelOperations(state, targets, "operator")
+				})
+		} else {
+			for _, id := range targets {
+				if err = publish("release", workqueue.ReleaseParameters{DispatchID: id, Reason: "operator"},
+					func(state workqueue.Projection, _ workqueue.Request) ([]workqueue.Operation, error) {
+						return workReleaseOperations(state, id, "operator", service.maxAttempts)
+					}); err != nil {
+					break
+				}
+			}
+		}
 		if err != nil {
-			return workQueueLoaded{err: err, requestID: id}
+			return workQueueLoaded{err: err, requests: requests, committed: len(requests) > 0}
 		}
 		state, err := service.read()
 		if err != nil {
-			return workQueueLoaded{err: err, requestID: id, committed: true}
+			return workQueueLoaded{err: err, requests: requests, committed: true}
 		}
-		return workQueueLoaded{state: &state, requestID: id, committed: true}
+		return workQueueLoaded{state: &state, requests: requests, committed: true}
 	}
 }
 
@@ -230,19 +231,17 @@ func (m *workQueueTUI) loaded(msg workQueueLoaded) {
 		}
 	}
 	m.status = "Read-only committed snapshot; actions are revalidated through CAS"
-	if msg.requestID != "" {
-		m.lastRequest = msg.requestID
+	// Requests are in publication order; the last one is reported on exit.
+	for _, request := range msg.requests {
+		m.lastRequest = request
 	}
 	if msg.committed {
-		m.status = "Committed; native reservations/debt retained. request=" + msg.requestID
+		m.status = fmt.Sprintf("Committed %d requests; running workflows are not stopped", len(msg.requests))
 	}
 	if msg.err != nil {
 		m.status = "Error (view may be stale): " + workQueueText(msg.err.Error())
-		if msg.requestID != "" && !msg.committed {
-			m.status += "; acknowledgment may be uncertain: inspect request=" + msg.requestID + " before retrying"
-		}
 		if msg.committed {
-			m.status = "Committed request=" + msg.requestID + "; refresh failed: " + workQueueText(msg.err.Error())
+			m.status = fmt.Sprintf("Committed %d requests, then: %s", len(msg.requests), workQueueText(msg.err.Error()))
 		}
 	}
 }
@@ -271,39 +270,33 @@ func (m workQueueTUI) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 	return m, command
 }
 
-func workQueueService(ctx context.Context, branch workqueue.Branch, session *workqueue.LedgerSession) workQueueTUIService {
+func workQueueService(ctx context.Context, branch workqueue.Branch, actor workqueue.Actor) workQueueTUIService {
 	return workQueueTUIService{
 		read: func() (workqueue.Projection, error) {
 			ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 			defer cancel()
-			commits, err := session.Read(ctx)
+			snapshot, err := branch.Read(ctx)
 			if err != nil {
 				return workqueue.Projection{}, err
 			}
-			return workqueue.ReplayAt(commits, time.Now().UnixMilli())
+			if snapshot.State.Repository == "" {
+				snapshot.State.Repository = branch.Remote
+			}
+			return snapshot.State, nil
 		},
-		publish: func(id, kind string, params workqueue.OperationsParameters) (workqueue.Publication, error) {
+		publish: func(kind string, parameters any, operationsFor workqueue.OperationsFor) (workqueue.Publication, error) {
 			ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 			defer cancel()
-			actor, err := branch.Authenticate(ctx, "administrator")
-			if err != nil {
-				return workqueue.Publication{}, err
-			}
-			request, err := workqueue.NewRequest(id, kind, actor, params)
-			if err != nil {
-				return workqueue.Publication{}, err
-			}
-			return session.Publish(ctx, actor, request)
+			return branch.Publish(ctx, actor, kind, parameters, operationsFor)
 		},
+		maxAttempts: workMaxAttempts(),
 	}
 }
 func workTUICommand() *cobra.Command {
 	cmd := &cobra.Command{Use: "tui", Aliases: []string{"interactive"}, Short: "Keyboard-driven Work/Claim browser with live details and checked operator actions", Args: cobra.NoArgs}
 	cmd.RunE = func(cmd *cobra.Command, _ []string) error {
-		jsonOutput, _ := cmd.Flags().GetBool("json")
-		id, _ := cmd.Flags().GetString("request-id")
-		if jsonOutput || id != "" {
-			return errors.New("tui does not accept --json or --request-id; each action creates its own stable request ID")
+		if jsonOutput, _ := cmd.Flags().GetBool("json"); jsonOutput {
+			return errors.New("tui does not accept --json; use state --json or inspect for automation")
 		}
 		if !tty.IsStdinTerminal() || !tty.IsStdoutTerminal() {
 			return errors.New("tui requires interactive stdin/stdout terminals; use state --json or inspect for automation")
@@ -311,15 +304,10 @@ func workTUICommand() *cobra.Command {
 		branch := workBranch(cmd)
 		ctx, stop := context.WithCancel(cmd.Context())
 		defer stop()
-		session, err := branch.OpenLedgerSession(ctx)
-		if err != nil {
-			return err
-		}
-		defer session.Close()
-		model := newWorkQueueTUI(workQueueService(ctx, branch, session), branch.Name)
+		model := newWorkQueueTUI(workQueueService(ctx, branch, workActor(cmd)), branch.Name)
 		final, err := tea.NewProgram(model, tea.WithContext(ctx), tea.WithInput(cmd.InOrStdin()), tea.WithOutput(cmd.OutOrStdout())).Run()
 		if finished, ok := final.(workQueueTUI); ok && finished.lastRequest != "" {
-			if _, writeErr := fmt.Fprintf(cmd.OutOrStdout(), "Last operator request=%s; use explain --request-id to inspect its acknowledgment.\n", finished.lastRequest); writeErr != nil {
+			if _, writeErr := fmt.Fprintf(cmd.OutOrStdout(), "Last operator request=%s; use inspect to review its effect.\n", finished.lastRequest); writeErr != nil {
 				return writeErr
 			}
 		}
