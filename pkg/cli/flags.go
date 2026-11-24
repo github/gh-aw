@@ -1,6 +1,35 @@
 package cli
 
-import "github.com/spf13/cobra"
+import (
+	"fmt"
+	"strconv"
+	"time"
+
+	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
+)
+
+// minuteTimeoutValue preserves integer-minute flags while accepting whole-minute durations.
+type minuteTimeoutValue struct {
+	pflag.Value
+}
+
+func (v minuteTimeoutValue) Set(value string) error {
+	if _, err := strconv.Atoi(value); err == nil {
+		return v.Value.Set(value)
+	}
+	duration, err := time.ParseDuration(value)
+	if err != nil || duration%time.Minute != 0 {
+		return fmt.Errorf("must be an integer number of minutes or a whole-minute duration like \"5m\" or \"1h\"")
+	}
+	return v.Value.Set(strconv.FormatInt(int64(duration/time.Minute), 10))
+}
+
+func addMinuteTimeoutFlag(cmd *cobra.Command, defaultValue int, usage string) {
+	cmd.Flags().Int("timeout", defaultValue, usage)
+	flag := cmd.Flags().Lookup("timeout")
+	flag.Value = minuteTimeoutValue{Value: flag.Value}
+}
 
 const engineFlagHelpList = "copilot, claude, codex, gemini, pi, agy (experimental)"
 
