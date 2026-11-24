@@ -4,6 +4,7 @@ on:
   schedule:
   - cron: daily
   workflow_dispatch: null
+  skip-if-match: 'is:pr is:open in:body "gh-aw-tracker-id: step-name-alignment"'
 permissions:
   contents: read
   copilot-requests: write
@@ -13,12 +14,23 @@ network:
   allowed:
   - defaults
   - github
+  - go
 imports:
+- shared/app-config.md
 - shared/reporting.md
 - shared/otlp.md
 - shared/ai-coding-dictionary.md
 safe-outputs:
-  create-issue:
+  create-pull-request:
+    max: 1
+    draft: true
+    allow-workflows: true
+    fallback-as-issue: false
+    allowed-files:
+    - pkg/workflow/**/*.go
+    - pkg/workflow/testdata/**
+    - .github/workflows/**/*.md
+    - .github/workflows/**/*.lock.yml
     expires: 2d
     labels:
     - maintenance
@@ -45,7 +57,8 @@ steps:
     rm -f "$MANIFEST_JSONL"
     
     echo "Wrote $(jq 'length' "$MANIFEST_JSON") step records to $MANIFEST_JSON"
-description: Scans step names in .lock.yml files and aligns them with step intent and project glossary
+description: Fixes step names in their authored sources and opens a pull request with matching tests and regenerated workflows
+tracker-id: step-name-alignment
 emoji: 📋
 max-turns: 50
 model: router/economy
@@ -63,7 +76,17 @@ sandbox:
 name: Step Name Alignment
 timeout-minutes: 30
 tools:
+  edit:
   bash:
+  - rg*
+  - cat*
+  - sed -n*
+  - git diff*
+  - git status*
+  - make fmt
+  - make recompile
+  - make update-wasm-golden
+  - go test ./pkg/workflow*
   - yq*
   - find .github/workflows -name "*.lock.yml" -type f
   - cat docs/src/content/docs/reference/glossary.md
@@ -88,7 +111,7 @@ Maintain consistent, accurate, and descriptive step names by:
 2. Analyzing step names against their intent and context
 3. Comparing terminology with the project glossary
 4. Identifying inconsistencies, inaccuracies, or unclear names
-5. Creating issues with improvement suggestions when problems are found
+5. Fixing verified problems in authored sources and creating one pull request
 6. Using cache memory to track previous suggestions and stay consistent
 7. Normalizing AI-coding wording with the shared AI Coding Dictionary reference
 
@@ -100,17 +123,32 @@ Keep this run to the fewest turns possible:
 2. Read glossary once.
 3. Read `/tmp/gh-aw/agent/step-alignment-input.json` once and do a single-pass analysis.
 4. Spot-check only the top 3 highest-confidence candidates.
-5. Create at most 1 issue, batching related findings.
+5. Fix at most 3 high-confidence candidates and create at most 1 pull request, batching related changes.
 6. Update cache memory once, then stop.
 
-Do not iterate through low-priority style tweaks. Stop early when no high- or medium-priority issues are found.
+Do not iterate through low-priority style tweaks. Use `noop` when no novel, high- or medium-priority fix can be safely validated.
+
+## Mandatory Fix and Publication Contract
+
+- Preserve step behavior; change names only in authored `.github/workflows/**/*.md` or compiler Go sources under `pkg/workflow/`. Update exact-name lookups and test assertions together.
+- Never edit `.lock.yml` or golden fixtures manually. Regenerate them from the changed sources. Never edit provenance-managed workflows with `source:` frontmatter; skip those findings.
+- Keep agent GitHub access read-only. Publish only through `safe-outputs.create-pull-request`; never create an issue or push a branch with `gh`, git, or an API.
+- Before editing, check open PRs and both open and closed step-name-alignment issues, plus cache history. Skip duplicate findings and changes already covered by another PR; unrelated existing issues do not block novel fixes.
+- Read the repository's `AGENTS.md`. For Go changes, run `make fmt`, focused `go test ./pkg/workflow -run '<affected tests>'`, and `make update-wasm-golden` when compiler fixtures change. After Go or authored workflow changes, run `make recompile`. Verify the final diff contains only step-name changes, coupled lookups/tests, and their generated outputs; exclude unrelated regenerated files.
+- If validation fails, evidence is ambiguous, or a necessary change falls outside `allowed-files`, do not publish a PR. Report the blocker through the available diagnostic safe output. Missing cache on the first run is normal.
+- The single draft PR must contain actual file changes, the old/new names, rationale, affected source locations, and validation results. Link relevant existing issues without claiming unrelated findings are resolved.
+- Persist reviewed findings and created PR references in cache memory once. Use `noop` after successful analysis if no publishable change remains.
+
+<!-- instruction-prefix-end -->
 
 ## Available Tools
 
 You have access to:
 - **yq** - YAML query tool for extracting step names from .lock.yml files
 - **bash** - For file exploration and git operations
-- **GitHub tools** - For reading repository content and creating issues
+- **GitHub tools** - For reading repository content and checking existing issues and pull requests
+- **edit** - For updating authored sources and coupled tests
+- **safe-outputs** - For creating the pull request
 - **cache-memory** - To remember previous suggestions and maintain consistency
 - **Project glossary** - At `docs/src/content/docs/reference/glossary.md`
 
@@ -119,12 +157,12 @@ You have access to:
 ### 1. Load Cache Memory
 
 Check your cache-memory to see:
-- Previous step name issues you've created
+- Previous step name issues and pull requests
 - Naming patterns you've established
 - Step names you've already reviewed
 - Glossary terms you've referenced
 
-This ensures consistency across runs and avoids duplicate issues.
+This ensures consistency across runs and avoids duplicate work.
 
 Use the **cache-memory tool directly** for this step. Do not inspect `/tmp/gh-aw/cache-memory` with `ls`, `find`, or `cp`.
 
@@ -136,6 +174,7 @@ Use the **cache-memory tool directly** for this step. Do not inspect `/tmp/gh-aw
   "last_run": "2026-01-13T09:00:00Z",
   "reviewed_steps": ["Checkout actions folder", "Setup Scripts", ...],
   "created_issues": [123, 456, ...],
+  "created_pull_requests": [],
   "naming_patterns": {
     "checkout_pattern": "Checkout <target>",
     "setup_pattern": "Setup <component>",
@@ -289,10 +328,10 @@ Based on your analysis, categorize problems:
 
 ### 6. Check Against Previous Suggestions
 
-Before creating new issues:
+Before making changes:
 
 1. **Review cache memory** to see if you've already flagged similar issues
-2. **Avoid duplicate issues** - Don't create a new issue if one already exists
+2. **Avoid duplicate work** - Check open pull requests and existing open/closed issues; do not repeat fixes already proposed or completed
 3. **Check for patterns** - If you've established a naming pattern, apply it consistently
 4. **Update your cache** with new findings
 
@@ -306,30 +345,32 @@ gh search issues "repo:${GITHUB_REPOSITORY} is:issue gh-aw-workflow-id: step-nam
 gh issue list --repo "${GITHUB_REPOSITORY}" --state all --search "gh-aw-workflow-id: step-name-alignment"
 ```
 
-### 7. Create Issues for Problems Found
+### 7. Fix Problems and Create a Pull Request
 
-When you identify problems worth addressing, create issues using safe-outputs.
+For verified, novel findings, edit the authored source and coupled tests, then follow the mandatory validation contract above. Create one draft pull request using `safe-outputs.create-pull-request` only after validation succeeds.
 
-**Issue Title Format:**
+**Pull Request Title Format:**
 ```
 [step-names] Align step names in <workflow-name> with glossary/consistency
 ```
 
-**Issue Description Template (compact):**
+**Pull Request Description Template (compact):**
 ```markdown
-### Step Name Alignment Issues
-Found in: `.github/workflows/<workflow-name>.lock.yml`
+### Step Name Alignment Fixes
+Changed source: `<source path>`
 
 For each finding include:
 - Priority: High/Medium/Low
 - Current step name(s) and location
 - Why it conflicts with glossary/pattern/clarity
-- Suggested replacement name(s)
+- Implemented replacement name(s)
+- Coupled lookup/test updates and regeneration
+- Validation commands and results
 ```
 
 ### 8. Update Cache Memory
 
-After creating issues, update your cache-memory:
+After publishing a pull request or completing a no-op scan, update your cache-memory:
 
 ```json
 {
@@ -340,7 +381,8 @@ After creating issues, update your cache-memory:
     "Install GitHub Copilot CLI",
     ...
   ],
-  "created_issues": [789, ...],
+  "created_issues": [123, 456, ...],
+  "created_pull_requests": [789, ...],
   "naming_patterns": {
     "checkout_pattern": "Checkout <target>",
     "setup_pattern": "Setup <component>",
@@ -357,15 +399,15 @@ After creating issues, update your cache-memory:
   "recent_changes": [
     {
       "workflow": "glossary-maintainer.lock.yml",
-      "issues": ["Inconsistent Install pattern"],
-      "issue_number": 789
+      "findings": ["Inconsistent Install pattern"],
+      "pull_request_number": 789
     }
   ]
 }
 ```
 
 **Cache benefits:**
-- Prevents duplicate issues
+- Prevents duplicate work
 - Maintains consistent naming patterns
 - Tracks established conventions
 - Provides historical context
@@ -374,28 +416,28 @@ After creating issues, update your cache-memory:
 
 After completing your analysis, provide a brief summary:
 
-**If issues found:**
+**If fixes published:**
 - Number of workflows analyzed
 - Number of step names reviewed
-- Issues created (with numbers)
+- Pull request created (with number) and validation results
 - Key patterns identified
 - Top 3 most common problems
 
-**If no issues found:**
+**If no publishable fixes found:**
 - Confirm all workflows were scanned
 - Note that naming is consistent
 - Update cache with review timestamp
-- Exit gracefully without creating issues
+- Use `noop` without creating a pull request or issue
 
 ## Token Budget Guidelines
 
 To keep token consumption predictable:
 
 - **Limit scope**: Scan all lock files but identify at most the top **5 most impactful issues** internally. Skip minor style preferences.
-- **Limit issues created**: Create at most **2 GitHub issues per run**. Batch related findings into a single issue rather than one issue per finding.
+- **Limit pull requests created**: Create at most **1 pull request per run** with at most 3 verified fixes. Batch related changes rather than one PR per finding.
 - **Avoid redundant reads**: Load the glossary once; do not re-read it during analysis.
 - **Concise responses**: Keep internal reasoning brief. Spend turns on actions, not explanations.
-- **Early stop**: Once you have created your issues (or confirmed none are needed) and updated cache memory, stop immediately — do not produce a lengthy summary if no further action is required.
+- **Early stop**: Once you have created the pull request (or confirmed none is needed) and updated cache memory, stop immediately.
 - **Skip recently reviewed**: If cache memory shows a workflow was reviewed in the last 3 days, skip it in the current run to avoid re-scanning unchanged files.
 
 **Target tokens/run**: 300K–500K  
@@ -412,21 +454,21 @@ To keep token consumption predictable:
 - **Keep it concise** - Clear but not verbose
 - **Maintain consistency** - Similar steps should have similar names
 
-### When to Create Issues
+### When to Create a Pull Request
 
-**DO create issues for:**
+**DO fix verified problems such as:**
 - Terminology that conflicts with the glossary
 - Inconsistent naming patterns across workflows
 - Misleading or inaccurate step names
 - Unclear abbreviations or acronyms
 - Grammar or capitalization errors
 
-**DON'T create issues for:**
+**DON'T create a pull request for:**
 - Stylistic preferences without clear benefit
 - Names that are already clear and correct
 - Minor variations that don't affect understanding
 - Step names in workflow files you've already reviewed recently
-- Duplicate issues (check cache first)
+- Duplicate fixes (check cache and existing PRs first)
 
 ### Quality Standards
 
@@ -438,17 +480,17 @@ To keep token consumption predictable:
 
 ## Important Notes
 
-- **Source vs Compiled**: Step names come from `.md` source files and appear in `.lock.yml` compiled files. Issues should reference both.
+- **Source vs Compiled**: Step names come from authored `.md` files or Go compiler sources. Fix those sources and regenerate `.lock.yml` files; reference both in the PR.
 - **Glossary is authoritative**: When in doubt, defer to the official glossary
-- **Cache prevents duplicates**: Always check cache before creating issues
+- **Cache prevents duplicates**: Always check cache and existing PRs before editing
 - **Patterns matter**: Consistency is as important as correctness
 - **Context is key**: A step name that seems wrong might make sense in context
 - **Test carefully**: Verify your suggestions don't break workflows
 
 ## Exit Conditions
 
-- **Success**: Created 0-3 focused issues addressing real problems
-- **Success**: No issues found and cache updated with review timestamp  
+- **Success**: Created one validated draft pull request addressing up to 3 real problems
+- **Success**: No publishable fixes found, `noop` reported, and cache updated with review timestamp
 - **Failure**: Unable to read .lock.yml files or glossary
 - **Failure**: Cache memory corruption (create new cache)
 
