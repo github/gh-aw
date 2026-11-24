@@ -38,9 +38,10 @@ const INCONCLUSIVE_DETECTION_REASONS = new Set(["agent_failure", "parse_error", 
 // collector's driver_crash cause also covers unclassified nonzero exits, so a
 // crash counts only through its own evidence: a crash signal or an interrupted attempt.
 const INFRASTRUCTURE_FAILURE_CAUSES = new Set(["agent_startup_failure", "secret_redaction_failure", "engine_outage"]);
-// Beside a confirmed limit these labels are the model's: the generic labels a guard's budget rejection can arrive
-// wrapped in, and the transient API errors (HTML challenges) that harnesses labelled authentication_failed before.
-const YIELD_TO_LIMIT = new Set(["authentication_failed", "api_proxy_guard_rejected", "transient_error"]);
+// Beside a confirmed limit these labels yield to the model's limit: generic labels a guard's budget rejection can
+// arrive wrapped in, transient API errors (HTML challenges) that harnesses labelled authentication_failed before,
+// and model_policy_violation, which can coexist with confirmed behavioral limits in agent.execution.categories.
+const YIELD_TO_LIMIT = new Set(["authentication_failed", "api_proxy_guard_rejected", "model_policy_violation", "transient_error"]);
 const INFRASTRUCTURE_CATEGORIES = new Set([
   "agentic_engine_timeout",
   "authentication_failed",
@@ -50,7 +51,9 @@ const INFRASTRUCTURE_CATEGORIES = new Set([
   "inference_access_error",
   "mcp_policy_error",
   "missing_model_pricing_error",
+  "model_endpoint_mismatch_error",
   "model_not_supported_error",
+  "model_policy_violation",
   "sandbox_runtime_crash",
 ]);
 const INFRASTRUCTURE_CLASSES = new Set([
