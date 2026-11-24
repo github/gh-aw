@@ -48,9 +48,9 @@ func TestOverprovisionedSecretsActions(t *testing.T) {
 			want:   map[string]Severity{"jobs.call.secrets.all": Error},
 		},
 		{
-			name:   "dynamic index and whole context in run",
+			name:   "dynamic index selects one secret while whole context in run is blocked",
 			source: contractJob + "    steps:\n      - with: {value: '${{ " + "secrets" + "[inputs.name] }}'}\n        uses: actions/github-script@v8\n      - run: |\n          echo start\n          echo '${{ toJson(" + "secrets" + ") }}' | jq length\n",
-			want:   map[string]Severity{"jobs.check.steps[0].with.value": Error, "jobs.check.steps[1].run": Error},
+			want:   map[string]Severity{"jobs.check.steps[1].run": Error},
 		},
 		{
 			name:   "literal index and dereference are safe",
@@ -145,12 +145,73 @@ func TestOverprovisionedSecretsAuthored(t *testing.T) {
 		got[diagnostic.Path] = diagnostic.Severity
 	}
 	assert.Equal(t, map[string]Severity{
-		"jobs.remote.secrets":    Error,
-		"jobs.local.secrets":     Warning,
-		"steps[0].env.ALL":       Error,
-		"engine.env.ALL":         Error,
-		"sandbox.agent.env.PICK": Error,
+		"jobs.remote.secrets": Error,
+		"jobs.local.secrets":  Warning,
+		"steps[0].env.ALL":    Error,
+		"engine.env.ALL":      Error,
 	}, got)
+}
+
+func TestOverprovisionedSecretsSelectors(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name       string
+		expression string
+		blocked    bool
+	}{
+		{
+			name:       "repository mapping selects one secret",
+			expression: "vars.GH_AW_GITHUB_AUTH_MODE == 'pat' && secrets[fromJSON(vars.GH_AW_GITHUB_READ_PAT_REPOSITORIES || '{}')[github.repository]] || ''",
+		},
+		{
+			name:       "serialization of a selected secret",
+			expression: "toJSON(secrets[inputs.name])",
+		},
+		{
+			name:       "literal wildcard name selects one secret",
+			expression: "secrets['*']",
+		},
+		{
+			name:       "whole context inside selector",
+			expression: "secrets[fromJSON(toJSON(secrets))[github.repository]]",
+			blocked:    true,
+		},
+		{
+			name:       "whole context used as selector",
+			expression: "secrets[secrets]",
+			blocked:    true,
+		},
+		{
+			name:       "wildcard projection",
+			expression: "toJSON(secrets.*)",
+			blocked:    true,
+		},
+		{
+			name:       "whole context alongside selection",
+			expression: "format('{0}{1}', secrets[inputs.name], toJSON(secrets))",
+			blocked:    true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			field := "    env:\n      TOKEN: ${{ " + tt.expression + " }}\n"
+			workflow, err := actions.Parse([]byte(contractJob + field + contractSafeSteps))
+			require.NoError(t, err)
+			document, err := aw.Parse("---\non: issues\njobs:\n  check:\n    runs-on: ubuntu-latest\n" + field + contractSafeSteps + "---\nPrompt.\n")
+			require.NoError(t, err)
+			for _, input := range []Input{{Workflow: workflow, Document: document}, {Document: document}} {
+				diagnostics := runOverprovisionedSecrets(t, input)
+				if tt.blocked {
+					require.Len(t, diagnostics, 1)
+					assert.Equal(t, Error, diagnostics[0].Severity)
+					assert.Equal(t, "jobs.check.env.TOKEN", diagnostics[0].Path)
+				} else {
+					assert.Empty(t, diagnostics)
+				}
+			}
+		})
+	}
 }
 
 func TestOverprovisionedSecretsCancellation(t *testing.T) {

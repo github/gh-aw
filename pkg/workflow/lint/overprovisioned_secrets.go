@@ -174,7 +174,8 @@ func inheritDiagnostic(path, uses string) Diagnostic {
 }
 
 // materializesSecretsContext reports whether node evaluates the secrets
-// context as a whole: any reference other than secrets.NAME or secrets['NAME'].
+// context as a whole rather than selecting one property. Dynamic indexes select
+// one secret too, but their expressions are still visited for whole-context use.
 func materializesSecretsContext(node actionlint.ExprNode) bool {
 	found := false
 	actionlint.VisitExprNode(node, func(child, parent actionlint.ExprNode, entering bool) {
@@ -191,7 +192,7 @@ func materializesSecretsContext(node actionlint.ExprNode) bool {
 				return
 			}
 		case *actionlint.IndexAccessNode:
-			if _, literal := parent.Index.(*actionlint.StringNode); literal && parent.Operand == child {
+			if parent.Operand == child {
 				return
 			}
 		}
