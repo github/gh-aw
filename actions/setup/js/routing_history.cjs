@@ -29,6 +29,7 @@ const BOUNDS = Object.freeze({ history: MEMORY_RUNS, pairs: 32, scopes: 4, state
 
 /** Notes on runs.jsonl lines that did not count, besides the observation's skip reasons. */
 const NOTES = Object.freeze(["before_reset", "older_definition", "unsaved", "no_agent", "receipt_missing", "receipt_mismatch", "awaiting_success"]);
+const LIVE_ROLES = new Set(["serve", "test", "probe", "ordinary"]);
 
 /**
  * @typedef {[number, string, boolean, number | null, number | null, (number | null)[] | null]} HistoryEntry
@@ -150,6 +151,7 @@ function editScope(scope) {
  * @param {RunEvidence} run
  */
 function receiptBound(receipt, run) {
+  const validRole = run.mode === "live" ? LIVE_ROLES.has(receipt?.role) : receipt?.role === "observe";
   return (
     !!receipt &&
     receipt.workflow === run.workflow &&
@@ -158,6 +160,9 @@ function receiptBound(receipt, run) {
     receipt.generation === run.generation &&
     receipt.mode === run.mode &&
     receipt.scope === run.scope &&
+    validRole &&
+    typeof receipt.selected === "string" &&
+    receipt.selected.length > 0 &&
     receipt.selected === run.pair
   );
 }
@@ -365,7 +370,8 @@ function applyRun(input, runs, run, options = {}) {
     written.add(other.id);
   }
 
-  if (!run.observation) {
+  const live = run.mode === "live";
+  if (!run.observation && !live) {
     lines.push(own("no_agent"));
     return finish();
   }
@@ -388,8 +394,7 @@ function applyRun(input, runs, run, options = {}) {
   }
 
   const { receipt } = run;
-  const pairName = run.pair;
-  const live = run.mode === "live";
+  const pairName = run.pair ?? null;
   const bound = receiptBound(receipt, run);
   /** @type {string | null} */
   let role = null;
@@ -407,6 +412,10 @@ function applyRun(input, runs, run, options = {}) {
     const pair = scope.pairs[pairName] || (scope.pairs[pairName] = newPair(at));
     pair.tests += 1;
     pair.seen = at;
+  }
+  if (!run.observation) {
+    lines.push(own("no_agent", { role, pair: pairName }));
+    return finish();
   }
   if (live && bound && receipt) {
     const { before, after } = receipt.incumbent;
