@@ -27,7 +27,7 @@ backoff or observation ages, and the commit `at` field is not modelled.
 | `work[w]` | `none → available → claimed → completed`, or back to `available`, or `cancelled`; `attempts`, FIFO `pos`, current `claim` |
 | `attempt[d]` | `unused → reserved → started → bound → completed \| cancelled` (`reserved`, `started` and `bound` mean the Claim is open and its Dispatch is not closed; `completed` and `cancelled` mean the Claim is settled and the Dispatch closed); the Work; the bound run attempt; the run attempt that completed it |
 | `run[d]` | `none → queued → activation → agent → finishing → completed`; run attempt (re-runs keep the run id) |
-| `dispatcher[d]` | `none → launching → running → completed`: the dispatcher run attempt that reserved the Dispatch (`reserved_by`) has its launch still ahead, has decided it (recorded, released or commit lost), or has completed (or is gone); tracked while the Dispatch is `reserved`, since nothing reads it afterwards |
+| `dispatcher[d]` | `none` unless the Dispatch is `reserved`, since nothing reads it otherwise; while `reserved`, the dispatcher run attempt that reserved it (`reserved_by`) is `launching` (its launch is still ahead), `running` (it decided the launch but the commit was lost) or `completed` (or gone) |
 
 Replay accepts exactly one Claim per Dispatch, so a Claim and the Dispatch
 that launched it form one attempt identified by its Dispatch slot. A worker

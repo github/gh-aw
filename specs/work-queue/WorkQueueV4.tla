@@ -12,7 +12,8 @@
 (*   Attempt   unused -> reserved -> started -> bound                      *)
 (*               -> completed | cancelled                                  *)
 (*   Run       queued -> in_progress -> completed (rerun: next attempt)    *)
-(*   Reserver  launching -> running -> completed (dispatcher run attempt) *)
+(*   Reserver  launching -> running -> completed, while reserved           *)
+(*             (the dispatcher run attempt that reserved the Dispatch)     *)
 (*                                                                         *)
 (* Replay accepts exactly one Claim per Dispatch, so a Claim and the      *)
 (* Dispatch that launched it are one attempt, identified by its Dispatch  *)
@@ -73,12 +74,14 @@ InProgress == {"activation", "agent", "finishing"}
 \* The dispatcher run attempt that reserved the Dispatch (reserved_by: the
 \* run id and run attempt of its dispatch_next commit's actor). A re-run of
 \* the dispatcher is a new attempt with new request and dispatch ids, so it
-\* never launches this Dispatch:
-\*   none                       no dispatcher reserved the slot yet
+\* never launches this Dispatch. Only a reserved Dispatch is judged by that
+\* attempt, so the model tracks it exactly while the Dispatch is reserved:
+\*   none                       the Dispatch is not reserved (unused, or its
+\*                              launch was recorded, or it is closed)
 \*   launching                  in progress; the launch of this Dispatch (POST
 \*                              and launch commit) is still ahead
-\*   running                    in progress; the launch is decided: recorded,
-\*                              released (launch_failed) or its commit lost
+\*   running                    in progress; the launch is decided but its
+\*                              commit was lost, so the Dispatch stays reserved
 \*   completed                  status completed, or the attempt is gone (404)
 DispatcherPhases == {"none", "launching", "running", "completed"}
 
@@ -117,11 +120,13 @@ BoundToRun(d) == attempt[d].phase = "bound" /\ attempt[d].bound = run[d].attempt
 (* Cancel the open Claim of attempt d and close its Dispatch (Release /
    ClaimCancellation). The publisher appends WorkCancellation{attempts_exhausted}
    in the same commit when attempts + 1 >= max_attempts. A closed Dispatch is
-   never launched; the recorded bound run attempt is kept. *)
+   never launched; the recorded bound run attempt is kept, and the reserving
+   dispatcher attempt is no longer tracked. *)
 CancelClaim(d) ==
     LET w == attempt[d].work
         exhausted == work[w].attempts + 1 >= MaxAttempts
     IN  /\ attempt' = [attempt EXCEPT ![d].phase = "cancelled"]
+        /\ dispatcher' = [dispatcher EXCEPT ![d] = "none"]
         /\ work' = [work EXCEPT ![w].attempts = @ + 1,
                                 ![w].claim = NoDispatch,
                                 ![w].state = IF exhausted THEN "cancelled" ELSE "available"]
@@ -167,9 +172,10 @@ LaunchOK(d) ==
     /\ attempt[d].phase = "reserved"
     /\ dispatcher[d] = "launching"
     /\ run' = [run EXCEPT ![d] = [phase |-> "queued", attempt |-> 1]]
-    /\ dispatcher' = [dispatcher EXCEPT ![d] = "running"]
-    /\ \/ attempt' = [attempt EXCEPT ![d].phase = "started"]
-       \/ UNCHANGED attempt
+    /\ \/ /\ attempt' = [attempt EXCEPT ![d].phase = "started"]
+          /\ dispatcher' = [dispatcher EXCEPT ![d] = "none"]
+       \/ /\ dispatcher' = [dispatcher EXCEPT ![d] = "running"]
+          /\ UNCHANGED attempt
     /\ UNCHANGED work
 
 \* The reserving dispatcher attempt's workflow_dispatch POST failed, or
@@ -180,20 +186,19 @@ LaunchOK(d) ==
 LaunchFail(d) ==
     /\ attempt[d].phase = "reserved"
     /\ dispatcher[d] = "launching"
-    /\ dispatcher' = [dispatcher EXCEPT ![d] = "running"]
     /\ \/ CancelClaim(d)
-       \/ UNCHANGED <<work, attempt>>
+       \/ /\ dispatcher' = [dispatcher EXCEPT ![d] = "running"]
+          /\ UNCHANGED <<work, attempt>>
     /\ \/ UNCHANGED run
        \/ run' = [run EXCEPT ![d] = [phase |-> "queued", attempt |-> 1]]
 
 (* GitHub run environment *)
 
-\* The reserving dispatcher attempt completes, is cancelled or crashes at any
-\* point, before or after its launch. Only a reserved Dispatch is judged by
-\* that attempt; once the Dispatch left reserved nothing reads dispatcher[d],
-\* so its later end, which would change nothing else, is not modelled.
+\* The reserving dispatcher attempt of a reserved Dispatch completes, is
+\* cancelled or crashes at any point, before or after its launch. Once the
+\* Dispatch left reserved nothing reads that attempt (dispatcher[d] is none),
+\* so its later end is not modelled.
 DispatcherEnd(d) ==
-    /\ attempt[d].phase = "reserved"
     /\ dispatcher[d] \in {"launching", "running"}
     /\ dispatcher' = [dispatcher EXCEPT ![d] = "completed"]
     /\ UNCHANGED <<work, attempt, run>>
@@ -268,8 +273,7 @@ Fail(d) ==
     /\ run' = [run EXCEPT ![d].phase = "finishing"]
     /\ IF BoundToRun(d)
        THEN CancelClaim(d)
-       ELSE UNCHANGED <<work, attempt>>
-    /\ UNCHANGED dispatcher
+       ELSE UNCHANGED <<work, attempt, dispatcher>>
 
 \* Conclusion job "Terminate work queue worker" (if: always(); it also runs
 \* when activation or the agent failed), after which the run completes:
@@ -282,8 +286,7 @@ Terminate(d) ==
     /\ run' = [run EXCEPT ![d].phase = "completed"]
     /\ IF attempt[d].phase \in {"started", "bound"}
        THEN CancelClaim(d)
-       ELSE UNCHANGED <<work, attempt>>
-    /\ UNCHANGED dispatcher
+       ELSE UNCHANGED <<work, attempt, dispatcher>>
 
 (* Maintenance (reconciler) *)
 
@@ -299,7 +302,7 @@ MaintainRelease(d) ==
     /\ \/ attempt[d].phase \in {"started", "bound"} /\ run[d].phase = "completed"
        \/ attempt[d].phase = "reserved" /\ dispatcher[d] = "completed"
     /\ CancelClaim(d)
-    /\ UNCHANGED <<run, dispatcher>>
+    /\ UNCHANGED run
 
 -----------------------------------------------------------------------------
 
@@ -366,15 +369,14 @@ NoReopenCompleted ==
     [][\A w \in Works : work[w].state \in {"completed", "cancelled"} => work'[w].state = work[w].state]_vars
 
 \* A reserved Dispatch is released only by the dispatcher attempt that
-\* reserved it, in the step that decides its launch (Release{launch_failed}),
-\* or after that attempt completed: maintenance never releases a Dispatch
-\* whose launch may still be recorded, and no worker run releases a Dispatch
-\* that records no launch.
+\* reserved it, in the step that decides its launch (LaunchFail:
+\* Release{launch_failed}), or after that attempt completed: maintenance
+\* never releases a Dispatch whose launch may still be recorded, and no
+\* worker run releases a Dispatch that records no launch.
 ReservedReleaseAwaitsDispatcher ==
     [][\A d \in D :
         (attempt[d].phase = "reserved" /\ attempt'[d].phase = "cancelled")
-            => \/ dispatcher[d] = "completed"
-               \/ dispatcher[d] = "launching" /\ dispatcher'[d] = "running"]_vars
+            => dispatcher[d] = "completed" \/ LaunchFail(d)]_vars
 
 (* Liveness *)
 
