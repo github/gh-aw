@@ -4,6 +4,7 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -90,4 +91,15 @@ func TestCompilePipelineStageCancellation(t *testing.T) {
 	require.ErrorIs(t, stage.compile(ctx, []string{"test.md"}, true), context.Canceled)
 	assert.Zero(t, stats.Total)
 	assert.Empty(t, results)
+}
+
+func TestCompilationResultErrorPrecedence(t *testing.T) {
+	grantErr := errors.New("grant")
+	batchErr := errors.New("batch")
+	developmentErr := errors.New("development")
+	assert.ErrorIs(t, compilationResultError(1, grantErr, batchErr, developmentErr), grantErr)
+	assert.ErrorIs(t, compilationResultError(1, nil, batchErr, developmentErr), batchErr)
+	assert.EqualError(t, compilationResultError(1, nil, nil, developmentErr), "compilation failed")
+	assert.ErrorIs(t, compilationResultError(0, nil, nil, developmentErr), developmentErr)
+	assert.NoError(t, compilationResultError(0, nil, nil, nil))
 }

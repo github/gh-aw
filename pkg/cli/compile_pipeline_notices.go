@@ -10,6 +10,24 @@ import (
 	"strings"
 )
 
+func (stage *compilePipelineStage) reportDirectoryNotices() error {
+	displayCentralizedSlashCommandRecommendation(stage.compiler, stage.workflows, stage.config.JSONOutput)
+	warnings, err := appendDuplicateWorkflowNameWarnings(stage.workflows, stage.resultIndexes, stage.results)
+	if err != nil {
+		return err
+	}
+	if !stage.config.JSONOutput {
+		for _, warning := range warnings {
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(warning.Message))
+		}
+	}
+	stage.stats.Warnings = stage.compiler.GetWarningCount() + len(warnings)
+	displayBatchCompilationNotices(stage.compiler, stage.config)
+	displayScheduleWarnings(stage.compiler, stage.config.JSONOutput)
+	displaySafeUpdateWarnings(stage.compiler, stage.config.JSONOutput)
+	return nil
+}
+
 func writeMCPCompileProgress(progressPath string, results []ValidationResult) {
 	if progressPath == "" {
 		return

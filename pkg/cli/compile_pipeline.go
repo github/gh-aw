@@ -61,16 +61,16 @@ func compileSpecificFiles(
 	if err := stage.compile(ctx, config.MarkdownFiles, true); err != nil {
 		return stage.workflows, err
 	}
-	workflowDataList, compiledCount, errorCount := stage.workflows, stage.successes, stage.failures
-	compiledLockFiles := stage.compiledLockFiles
 	if config.DryRun {
 		stage.batch.workflowDir = config.dryRunWorkflowDir
 	}
 	strictGrantErr, batchToolErr := runBatchExternalTools(ctx, config, stage.batch, stats, validationResults)
+	return stage.finishSpecific(ctx, strictGrantErr, batchToolErr)
+}
 
-	if strictGrantErr != nil || batchToolErr != nil {
-		errorCount++
-	}
+func (stage *compilePipelineStage) finishSpecific(ctx context.Context, strictGrantErr, batchToolErr error) ([]*workflow.WorkflowData, error) {
+	compiler, config, stats, validationResults := stage.compiler, stage.config, stage.stats, stage.results
+	workflowDataList := stage.workflows
 
 	// Get warning count from compiler
 	stats.Warnings = compiler.GetWarningCount()
@@ -86,7 +86,7 @@ func compileSpecificFiles(
 
 	// Post-processing
 	if !config.NoEmit {
-		if err := runPostProcessing(ctx, compiler, workflowDataList, compiledLockFiles, config, compiledCount); err != nil {
+		if err := runPostProcessing(ctx, compiler, workflowDataList, stage.compiledLockFiles, config, stage.successes); err != nil {
 			return workflowDataList, err
 		}
 	}
@@ -98,20 +98,7 @@ func compileSpecificFiles(
 		return workflowDataList, err
 	}
 
-	// Return error if any compilations failed
-	// Don't return the detailed error message here since it's already printed in the summary
-	// Returning a simple error prevents duplication in the output
-	if errorCount > 0 {
-		if strictGrantErr != nil {
-			return workflowDataList, strictGrantErr
-		}
-		if batchToolErr != nil {
-			return workflowDataList, batchToolErr
-		}
-		return workflowDataList, errors.New("compilation failed")
-	}
-
-	return workflowDataList, developmentErr
+	return workflowDataList, compilationResultError(stage.failures, strictGrantErr, batchToolErr, developmentErr)
 }
 
 // compileAllFilesInDirectory compiles all workflow files in a directory
@@ -123,36 +110,9 @@ func compileAllFilesInDirectory(
 	stats *CompilationStats,
 	validationResults *[]ValidationResult,
 ) ([]*workflow.WorkflowData, error) {
-	// Find git root for consistent behavior
-	gitRoot, err := gitutil.FindGitRoot()
+	gitRoot, workflowsDir, mdFiles, err := findDirectoryWorkflows(workflowDir, config.Verbose)
 	if err != nil {
-		return nil, fmt.Errorf("compile without arguments requires being in a git repository: %w", err)
-	}
-	compileOrchestrationLog.Printf("Found git root: %s", gitRoot)
-
-	// Compile all markdown files in the specified workflow directory
-	workflowsDir := filepath.Join(gitRoot, workflowDir)
-	if _, err := os.Stat(workflowsDir); errors.Is(err, fs.ErrNotExist) {
-		return nil, fmt.Errorf("the %s directory does not exist in git root (%s)", workflowDir, gitRoot)
-	}
-
-	compileOrchestrationLog.Printf("Scanning for markdown files in %s", workflowsDir)
-	if config.Verbose {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Scanning for markdown files in "+workflowsDir))
-	}
-
-	// Find and filter markdown files (shared helper keeps logic in one place)
-	mdFiles, err := getMarkdownWorkflowFiles(workflowsDir)
-	if err != nil {
-		return nil, fmt.Errorf("failed to find markdown files: %w", err)
-	}
-	mdFiles, err = filterMarkdownFilesWithFrontmatter(mdFiles)
-	if err != nil {
-		return nil, fmt.Errorf("failed to filter markdown files: %w", err)
-	}
-
-	if len(mdFiles) == 0 {
-		return nil, fmt.Errorf("no workflow markdown files found in %s (workflow files must start with a frontmatter opener on the first line)", workflowsDir)
+		return nil, err
 	}
 	if err := prepareDryRunScannerBaseline(ctx, &config, mdFiles, workflowsDir, compiler); err != nil {
 		return nil, err
@@ -167,7 +127,6 @@ func compileAllFilesInDirectory(
 	compiler.SetBatchMode(batchMode)
 	compiler.SetQuiet(batchMode)
 
-	// Handle purge logic: collect existing files before compilation
 	var purgeData *purgeTrackingData
 	if config.Purge {
 		purgeData, err = collectPurgeData(workflowsDir, mdFiles, config.Verbose)
@@ -180,41 +139,59 @@ func compileAllFilesInDirectory(
 	if err := stage.compile(ctx, mdFiles, false); err != nil {
 		return stage.workflows, err
 	}
-	workflowDataList, successCount, errorCount := stage.workflows, stage.successes, stage.failures
-	workflowValidationResultIndexes := stage.resultIndexes
 	stage.batch.workflowDir = workflowsDir
 	if config.DryRun {
 		stage.batch.workflowDir = firstNonEmpty(config.dryRunWorkflowDir, workflowsDir)
 	}
 	strictGrantErr, batchToolErr := runBatchExternalTools(ctx, config, stage.batch, stats, validationResults)
+	return stage.finishDirectory(ctx, gitRoot, workflowsDir, mdFiles, purgeData, strictGrantErr, batchToolErr)
+}
 
+func findDirectoryWorkflows(workflowDir string, verbose bool) (string, string, []string, error) {
+	// Find git root for consistent behavior
+	gitRoot, err := gitutil.FindGitRoot()
+	if err != nil {
+		return "", "", nil, fmt.Errorf("compile without arguments requires being in a git repository: %w", err)
+	}
+	compileOrchestrationLog.Printf("Found git root: %s", gitRoot)
+
+	// Compile all markdown files in the specified workflow directory
+	workflowsDir := filepath.Join(gitRoot, workflowDir)
+	if _, err := os.Stat(workflowsDir); errors.Is(err, fs.ErrNotExist) {
+		return "", "", nil, fmt.Errorf("the %s directory does not exist in git root (%s)", workflowDir, gitRoot)
+	}
+
+	compileOrchestrationLog.Printf("Scanning for markdown files in %s", workflowsDir)
+	if verbose {
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Scanning for markdown files in "+workflowsDir))
+	}
+
+	// Find and filter markdown files (shared helper keeps logic in one place)
+	mdFiles, err := getMarkdownWorkflowFiles(workflowsDir)
+	if err != nil {
+		return "", "", nil, fmt.Errorf("failed to find markdown files: %w", err)
+	}
+	mdFiles, err = filterMarkdownFilesWithFrontmatter(mdFiles)
+	if err != nil {
+		return "", "", nil, fmt.Errorf("failed to filter markdown files: %w", err)
+	}
+
+	if len(mdFiles) == 0 {
+		return "", "", nil, fmt.Errorf("no workflow markdown files found in %s (workflow files must start with a frontmatter opener on the first line)", workflowsDir)
+	}
+	return gitRoot, workflowsDir, mdFiles, nil
+}
+
+func (stage *compilePipelineStage) finishDirectory(ctx context.Context, gitRoot, workflowsDir string, mdFiles []string, purgeData *purgeTrackingData, strictGrantErr, batchToolErr error) ([]*workflow.WorkflowData, error) {
+	compiler, config, stats, validationResults := stage.compiler, stage.config, stage.stats, stage.results
+	workflowDataList, successCount, errorCount := stage.workflows, stage.successes, stage.failures
 	if strictGrantErr != nil || batchToolErr != nil {
 		errorCount++
 	}
 
-	// Emit recommendation when many slash commands are present without centralized strategy.
-	displayCentralizedSlashCommandRecommendation(compiler, workflowDataList, config.JSONOutput)
-
-	duplicateNameWarnings, err := appendDuplicateWorkflowNameWarnings(workflowDataList, workflowValidationResultIndexes, validationResults)
-	if err != nil {
+	if err := stage.reportDirectoryNotices(); err != nil {
 		return workflowDataList, err
 	}
-	if !config.JSONOutput {
-		for _, warning := range duplicateNameWarnings {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(warning.Message))
-		}
-	}
-
-	// Get warning count from compiler
-	stats.Warnings = compiler.GetWarningCount() + len(duplicateNameWarnings)
-
-	displayBatchCompilationNotices(compiler, config)
-
-	// Display schedule warnings
-	displayScheduleWarnings(compiler, config.JSONOutput)
-
-	// Display safe update warnings (emitted as prompts for the calling agent)
-	displaySafeUpdateWarnings(compiler, config.JSONOutput)
 
 	if config.Verbose {
 		fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr(fmt.Sprintf("Successfully compiled %d out of %d workflow files", successCount, len(mdFiles))))
@@ -244,16 +221,18 @@ func compileAllFilesInDirectory(
 		return workflowDataList, err
 	}
 
-	// Return error if any compilations failed
-	if errorCount > 0 {
-		if strictGrantErr != nil {
-			return workflowDataList, strictGrantErr
-		}
-		if batchToolErr != nil {
-			return workflowDataList, batchToolErr
-		}
-		return workflowDataList, errors.New("compilation failed")
-	}
+	return workflowDataList, compilationResultError(stage.failures, strictGrantErr, batchToolErr, developmentErr)
+}
 
-	return workflowDataList, developmentErr
+func compilationResultError(failures int, strictGrantErr, batchToolErr, developmentErr error) error {
+	if strictGrantErr != nil {
+		return strictGrantErr
+	}
+	if batchToolErr != nil {
+		return batchToolErr
+	}
+	if failures > 0 {
+		return errors.New("compilation failed")
+	}
+	return developmentErr
 }
