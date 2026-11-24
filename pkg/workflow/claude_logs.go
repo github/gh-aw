@@ -3,9 +3,11 @@ package workflow
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 
+	"github.com/github/gh-aw/pkg/jsonutil"
 	"github.com/github/gh-aw/pkg/logger"
 	"github.com/github/gh-aw/pkg/typeutil"
 )
@@ -74,7 +76,7 @@ func (e *ClaudeEngine) isClaudeResultPayload(line string) bool {
 	}
 
 	var jsonData map[string]any
-	if err := json.Unmarshal([]byte(trimmed), &jsonData); err != nil {
+	if err := jsonutil.UnmarshalString(trimmed, &jsonData); err != nil {
 		return false
 	}
 
@@ -94,7 +96,7 @@ func (e *ClaudeEngine) extractClaudeResultMetrics(line string) LogMetrics {
 
 	trimmed := strings.TrimSpace(line)
 	var jsonData map[string]any
-	if err := json.Unmarshal([]byte(trimmed), &jsonData); err != nil {
+	if err := jsonutil.UnmarshalString(trimmed, &jsonData); err != nil {
 		return metrics
 	}
 
@@ -143,26 +145,23 @@ func (e *ClaudeEngine) parseClaudeLogEntries(logContent string, verbose bool) []
 		decoder := json.NewDecoder(strings.NewReader(input))
 		logContent = input
 		var batch []map[string]any
-		for strings.HasPrefix(logContent, "[") {
+		for {
 			if err := decoder.Decode(&batch); err != nil {
+				if err == io.EOF {
+					return logEntries
+				}
 				break
 			}
 			tail := strings.TrimLeft(input[decoder.InputOffset():], " \t\r")
-			if tail == "" {
-				if len(logEntries) == 0 {
-					return batch
-				}
-				return append(logEntries, batch...)
-			}
-			if tail[0] != '\n' {
+			if tail != "" && !strings.HasPrefix(tail, "\n") {
 				break
 			}
 			// Resume mixed-format recovery at the first unconsumed line.
 			logEntries = append(logEntries, batch...)
 			clear(batch) // Decode must not reuse maps already saved in logEntries.
 			logContent = strings.TrimLeft(tail, " \t\r\n")
-			if logContent == "" {
-				return logEntries
+			if logContent != "" && !strings.HasPrefix(logContent, "[") {
+				break
 			}
 		}
 	}
@@ -180,7 +179,7 @@ func (e *ClaudeEngine) parseClaudeLogEntries(logContent string, verbose bool) []
 }
 
 func (e *ClaudeEngine) parseClaudeMixedLogEntries(logContent string, verbose bool, logEntries []map[string]any) []map[string]any {
-	lines := strings.Split(logContent, "\n")
+	lines := strings.FieldsFunc(logContent, func(r rune) bool { return r == '\n' })
 	for i := 0; i < len(lines); i++ {
 		if i < 0 || i >= len(lines) {
 			break
@@ -227,7 +226,7 @@ func extractClaudeJSONArrayEntries(lines []string, start int) ([]map[string]any,
 
 func parseClaudeJSONArrayBuffer(buf string) []map[string]any {
 	var entries []map[string]any
-	if err := json.Unmarshal([]byte(buf), &entries); err == nil {
+	if err := jsonutil.UnmarshalString(buf, &entries); err == nil {
 		return entries
 	}
 	openIdx := strings.Index(buf, "[")
@@ -236,7 +235,7 @@ func parseClaudeJSONArrayBuffer(buf string) []map[string]any {
 		return nil
 	}
 	var subEntries []map[string]any
-	if err := json.Unmarshal([]byte(buf[openIdx:closeIdx+1]), &subEntries); err == nil {
+	if err := jsonutil.UnmarshalString(buf[openIdx:closeIdx+1], &subEntries); err == nil {
 		return subEntries
 	}
 	return nil
@@ -247,7 +246,7 @@ func parseClaudeJSONEntry(trimmedLine string, verbose bool) (map[string]any, boo
 		return nil, false
 	}
 	var jsonEntry map[string]any
-	if err := json.Unmarshal([]byte(trimmedLine), &jsonEntry); err != nil {
+	if err := jsonutil.UnmarshalString(trimmedLine, &jsonEntry); err != nil {
 		if verbose {
 			fmt.Fprintf(os.Stderr, "Skipping invalid JSON line: %s\n", trimmedLine)
 		}
