@@ -69,6 +69,7 @@ var notYetEnforced = map[string]string{
 	"unchecked_deferredclose":          "existing deferred Close() findings need remediation before CI enforcement",
 	"uncheckedsliceindex":              "existing production violations need remediation before enforcement; nolint suppression already works",
 	"walkdirignoredeerror":             "existing discarded WalkDir errors in audit_threat_detection.go and model_routing.go need remediation before CI enforcement",
+	"writefilepublicpermsensitive":     "heuristic findings need an enforcement-readiness audit before CI enables it",
 }
 
 // TestDocGo_CountMatchesBullets validates that the "All N active analyzers:"

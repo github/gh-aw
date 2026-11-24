@@ -998,7 +998,8 @@ golint:
 # Limit analyzed packages with: make golint-custom LINTER_PACKAGES="./pkg/console ./pkg/workflow"
 # Prefix with GOOS/GOARCH to analyze alternate build targets without cross-compiling the linter runner itself.
 MAX_LINES ?= 60
-LINTER_FLAGS ?=
+# Keep the heuristic analyzer out of default full-repository lint until audited.
+LINTER_FLAGS ?= -writefilepublicpermsensitive=false
 LINTER_PACKAGES ?= ./cmd/... ./pkg/...
 .PHONY: golint-custom
 golint-custom:

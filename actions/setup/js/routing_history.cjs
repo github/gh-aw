@@ -25,7 +25,7 @@ const STREAK_PROVEN = 5;
 const PROVEN_RUNS = 20;
 
 /** Contract 5's bounds. Sizes are UTF-8 bytes of JSON.stringify output. */
-const BOUNDS = Object.freeze({ history: MEMORY_RUNS, pairs: 32, scopes: 4, state_bytes: 512 * 1024, runs_lines: 500, runs_bytes: 512 * 1024 });
+const BOUNDS = Object.freeze({ history: MEMORY_RUNS, pairs: 32, scopes: 4, state_bytes: 512 * 1024, runs_lines: 500, runs_bytes: 512 * 1024, unresolved_runs: 200 });
 
 /** Notes on runs.jsonl lines that did not count, besides the observation's skip reasons. */
 const NOTES = Object.freeze(["before_reset", "older_definition", "unsaved", "no_agent", "receipt_missing", "receipt_mismatch", "awaiting_success"]);
@@ -36,11 +36,12 @@ const LIVE_ROLES = new Set(["serve", "test", "probe", "ordinary"]);
  * @typedef {{ since_seq: number, pending: number }} Suspension
  * @typedef {{ history: HistoryEntry[], credits: number | null, model_credits: number | null, bills: number, streak: number, tests: number, suspended: Suspension | null, seen: string, summary: { runs: number, rate: number, hopeful: number } | null }} PairRecord
  * @typedef {{ incumbent: string | null, last_role: string | null, last_success_seq: number, pairs: Record<string, PairRecord> }} ScopeRecord
- * @typedef {{ v: number, workflow: string, seq: number, generation: { hash: string, since_run: number } | null, reset_after_run: number, last_run: number, unexplained: number, scopes: Record<string, ScopeRecord>, updated: { run: string | null, at: string } | null }} HistoryState
+ * @typedef {{ v: number, workflow: string, seq: number, generation: { hash: string, since_run: number } | null, reset_after_run: number, last_run: number, reconciled_through?: number, unresolved_runs?: number[], unresolved_run_ids?: Record<string, string>, unexplained: number, scopes: Record<string, ScopeRecord>, updated: { run: string | null, at: string } | null }} HistoryState
  * @typedef {{ run: string, number: number, attempt: number | null, at: string, generation: string | null, scope: string | null, mode: string | null, role: string | null, pair: string | null, outcome: string | null, credits: number | null, counted: boolean, note: string | null }} RunLine
  * @typedef {{ credits?: number | null, model_credits?: number | null, tokens?: (number | null)[] | null }} RunCost
- * @typedef {{ id: string, number: number, conclusion: string, agent_ran?: boolean | null }} ListedRun
- * @typedef {{ workflow: string, run: { id: string, number: number, attempt: number }, at: string, generation: string, mode: string, scope: string, observation: { outcome: string, reason?: string } | null, pair: string | null, cost?: RunCost | null, receipt?: Record<string, any> | null, prepare?: { explore_allowed?: boolean } | null, listing?: ListedRun[] }} RunEvidence
+ * @typedef {{ id: string, number: number, conclusion: string, agent_ran?: boolean | null, generation?: string | null }} ListedRun
+ * @typedef {{ verified: boolean, ceiling?: number, unresolved?: number[], unresolved_ids?: Record<string, string>, resolved?: number[] }} ReconciliationCoverage
+ * @typedef {{ workflow: string, run: { id: string, number: number, attempt: number }, at: string, generation: string, mode: string, scope: string, observation: { outcome: string, reason?: string } | null, pair: string | null, cost?: RunCost | null, receipt?: Record<string, any> | null, prepare?: { explore_allowed?: boolean } | null, listing?: ListedRun[], reconciliation?: ReconciliationCoverage | null }} RunEvidence
  */
 
 /** @param {string} at */
@@ -346,6 +347,23 @@ function trimRuns(runs, overrides = {}) {
 }
 
 /**
+ * Bootstrap a legacy state.json (lacking `reconciled_through`) from its generation fence when
+ * `runs.jsonl` has not evicted earlier lines, or from just below the oldest retained line when
+ * eviction occurred so previously charged evicted runs are not re-charged while newer unverified
+ * runs stay in scope.
+ * @param {HistoryState} state
+ * @param {RunLine[]} runs
+ * @param {Partial<typeof BOUNDS>} [overrides]
+ */
+function legacyReconciliationFloor(state, runs, overrides = {}) {
+  const bounds = { ...BOUNDS, ...overrides };
+  if (!state.generation) return 0;
+  const runsTrimmed = runs.length >= bounds.runs_lines || (runs.length > 0 && runs.reduce((total, entry) => total + sizeOf(entry) + 1, 0) >= bounds.runs_bytes - 1024);
+  const oldestRetained = runs.length > 0 ? runs.reduce((min, entry) => Math.min(min, entry.number), Infinity) : 0;
+  return runsTrimmed && oldestRetained > 0 ? Math.max(state.generation.since_run, oldestRetained - 1) : state.generation.since_run;
+}
+
+/**
  * Apply one finished run. Returns the new state and the lines to append to runs.jsonl; the
  * inputs are not modified.
  * @param {HistoryState} input
@@ -394,17 +412,71 @@ function applyRun(input, runs, run, options = {}) {
     return { state, lines };
   };
 
+  const hasReconciliation =
+    (run.reconciliation !== undefined && run.reconciliation !== null) || typeof input.reconciled_through === "number" || Array.isArray(input.unresolved_runs) || (input.unresolved_run_ids !== undefined && input.unresolved_run_ids !== null);
+  const legacyFloor = legacyReconciliationFloor(state, runs, bounds);
+  const prevReconciled = Math.max(typeof state.reconciled_through === "number" ? state.reconciled_through : legacyFloor, state.reset_after_run);
+  const prevUnresolved = new Set((Array.isArray(state.unresolved_runs) ? state.unresolved_runs : []).filter(n => Number.isInteger(n) && n > state.reset_after_run));
+  /** @type {Record<string, string>} */
+  const knownUnresolvedIds = {};
+  if (state.unresolved_run_ids && typeof state.unresolved_run_ids === "object") {
+    for (const [key, value] of Object.entries(state.unresolved_run_ids)) {
+      if (typeof value === "string" && value) knownUnresolvedIds[key] = value;
+    }
+  }
+  if (run.reconciliation?.unresolved_ids && typeof run.reconciliation.unresolved_ids === "object") {
+    for (const [key, value] of Object.entries(run.reconciliation.unresolved_ids)) {
+      if (typeof value === "string" && value) knownUnresolvedIds[key] = value;
+    }
+  }
+
+  /** @param {number[]} kept */
+  const applyUnresolvedIds = kept => {
+    /** @type {Record<string, string>} */
+    const nextIds = {};
+    for (const num of kept) {
+      const idValue = knownUnresolvedIds[String(num)];
+      if (idValue) nextIds[String(num)] = idValue;
+    }
+    if (Object.keys(nextIds).length > 0) {
+      state.unresolved_run_ids = nextIds;
+    } else {
+      delete state.unresolved_run_ids;
+    }
+  };
+
+  /**
+   * Persist bounded reconciliation coverage without advancing `reconciled_through` on fenced-off runs,
+   * while clearing this run's own number if it was previously tracked as unresolved.
+   */
+  const preserveReconciliation = () => {
+    if (!hasReconciliation) return;
+    let ceiling = prevReconciled;
+    let kept = [...prevUnresolved].filter(n => n !== number && n <= ceiling).sort((a, b) => a - b);
+    if (kept.length > bounds.unresolved_runs) {
+      const cutoff = kept[bounds.unresolved_runs];
+      ceiling = Math.max(state.reset_after_run, Math.min(ceiling, cutoff - 1));
+      kept = kept.slice(0, bounds.unresolved_runs).filter(n => n <= ceiling);
+    }
+    state.reconciled_through = ceiling;
+    state.unresolved_runs = kept;
+    applyUnresolvedIds(kept);
+  };
+
   // Written before, perhaps on an attempt whose acknowledgment was lost.
   if (runs.some(entry => entry.run === id)) return { state, lines: [] };
   if (number <= state.reset_after_run) {
     lines.push(own("before_reset"));
+    preserveReconciliation();
     return finish();
   }
+  const firstHistoryWrite = state.generation === null;
   if (state.generation === null) {
     state.generation = { hash: run.generation, since_run: number };
   } else if (run.generation !== state.generation.hash) {
     if (number <= state.generation.since_run) {
       lines.push(own("older_definition"));
+      preserveReconciliation();
       return finish();
     }
     for (const scope of Object.values(state.scopes)) editScope(scope);
@@ -412,19 +484,83 @@ function applyRun(input, runs, run, options = {}) {
     state.generation = { hash: run.generation, since_run: number };
   }
 
+  // Compute the clamped reconciliation ceiling before charging newly covered runs so no charge
+  // lands above the persisted ceiling where runs.jsonl eviction could later duplicate it.
+  const verifiedScan = run.reconciliation?.verified === true;
+  let finalCeiling = prevReconciled;
+  /** @type {number[]} */
+  let finalUnresolved = [];
+  if (hasReconciliation) {
+    if (firstHistoryWrite) {
+      finalCeiling = Math.max(prevReconciled, number);
+      finalUnresolved = [];
+    } else {
+      const rec = run.reconciliation;
+      const requestedCeiling = verifiedScan ? Math.max(prevReconciled, typeof rec?.ceiling === "number" && Number.isInteger(rec.ceiling) ? Math.min(number, rec.ceiling) : number) : prevReconciled;
+      const writtenNumbers = new Set(runs.map(entry => entry.number));
+      writtenNumbers.add(number);
+      const resolved = new Set(Array.isArray(rec?.resolved) ? rec.resolved.filter(n => Number.isInteger(n) && n < number) : []);
+      for (const other of run.listing || []) {
+        if (other.number > state.reset_after_run && other.number < number && (prevUnresolved.has(other.number) || (verifiedScan && other.number <= requestedCeiling))) {
+          resolved.add(other.number);
+        }
+      }
+      const nextUnresolved = new Set([...prevUnresolved].filter(n => !resolved.has(n) && !writtenNumbers.has(n)));
+      let ceiling = requestedCeiling;
+      if (verifiedScan) {
+        for (const n of Array.isArray(rec?.unresolved) ? rec.unresolved : []) {
+          if (Number.isInteger(n) && n > state.reset_after_run && n < number && n <= ceiling && !writtenNumbers.has(n) && !resolved.has(n)) {
+            nextUnresolved.add(n);
+          }
+        }
+      }
+      let kept = [...nextUnresolved].filter(n => n <= ceiling).sort((a, b) => a - b);
+      // Bound unresolved_runs without falsely marking dropped runs as reconciled.
+      if (kept.length > bounds.unresolved_runs) {
+        const cutoff = kept[bounds.unresolved_runs];
+        ceiling = Math.max(state.reset_after_run, Math.min(ceiling, cutoff - 1));
+        kept = kept.slice(0, bounds.unresolved_runs).filter(n => n <= ceiling);
+      }
+      finalCeiling = ceiling;
+      finalUnresolved = kept;
+    }
+  }
+
   // Completed runs that wrote no line are charged after the fences, in the right generation.
   const written = new Set(runs.map(entry => entry.run));
   const sinceRun = state.generation.since_run;
-  for (const other of [...(run.listing || [])].sort((left, right) => left.number - right.number)) {
-    if (written.has(other.id) || other.id === id || other.number <= state.reset_after_run || other.number <= sinceRun) continue;
-    if (["success", "skipped", "neutral"].includes(other.conclusion)) continue;
-    if (other.agent_ran) {
-      lines.push(line("unsaved", { run: other.id, number: other.number, attempt: 1 }));
-      state.unexplained += 1;
-    } else {
-      lines.push(line("no_agent", { run: other.id, number: other.number, attempt: 1 }));
+  if (!hasReconciliation || !firstHistoryWrite) {
+    for (const other of [...(run.listing || [])].sort((left, right) => left.number - right.number)) {
+      if (written.has(other.id) || other.id === id || other.number <= state.reset_after_run) continue;
+      if (hasReconciliation) {
+        // Never let an older writer consume a newer run (which may belong to a later generation),
+        // and never charge a newly covered run above the final clamped ceiling.
+        if (other.number >= number) continue;
+        const tracked = prevUnresolved.has(other.number);
+        if (!tracked && (!verifiedScan || other.number <= prevReconciled || other.number > finalCeiling)) continue;
+      } else if (other.number <= sinceRun) {
+        continue;
+      }
+      if (["success", "skipped", "neutral"].includes(other.conclusion)) continue;
+      if (hasReconciliation && other.generation && other.generation !== state.generation.hash && other.number <= state.generation.since_run) {
+        lines.push(line("older_definition", { run: other.id, number: other.number, attempt: 1, generation: other.generation }));
+        written.add(other.id);
+        continue;
+      }
+      if (other.agent_ran) {
+        lines.push(line("unsaved", { run: other.id, number: other.number, attempt: 1 }));
+        state.unexplained += 1;
+      } else {
+        lines.push(line("no_agent", { run: other.id, number: other.number, attempt: 1 }));
+      }
+      written.add(other.id);
     }
-    written.add(other.id);
+  }
+
+  if (hasReconciliation) {
+    state.reconciled_through = finalCeiling;
+    state.unresolved_runs = finalUnresolved;
+    applyUnresolvedIds(finalUnresolved);
   }
 
   const live = run.mode === "live";
@@ -507,6 +643,7 @@ module.exports = {
   averages,
   counts,
   emptyState,
+  legacyReconciliationFloor,
   memory,
   rate,
   receiptBound,
