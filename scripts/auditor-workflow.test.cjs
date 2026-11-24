@@ -316,6 +316,8 @@ test("PR pagination includes human and draft PRs on subsequent pages", async t =
 for (const [name, options] of [
   ["health API error", { healthCoverage: { partial: true, reason: "api_error" } }],
   ["incomplete request-budget discovery", { healthCoverage: { partial: true, reason: "request_budget", verification_complete: false } }],
+  ["boundary cap with incomplete inventory", { healthCoverage: { partial: true, reason: "revision_boundary_incomplete", inventory_complete: false } }],
+  ["boundary cap with incomplete verification", { healthCoverage: { partial: true, reason: "revision_boundary_incomplete", verification_complete: false } }],
   ["missing health completeness", { healthCoverage: { partial: undefined } }],
   ["incomplete PR pagination", { prOverflow: true }],
   ["PR access denied", { prError: true }],
@@ -663,6 +665,33 @@ for (const status of ["superseded", "jobless", "unverified", "revision_unknown"]
     assert.equal(f.calls.filter(call => call[1] === "logs").length, 0);
   });
 }
+
+for (const status of ["superseded", "revision_unknown"]) {
+  test(`historic boundary cap does not make ${status} representatives actionable`, async t => {
+    const f = await fixture(t, {
+      runs: [run(42)],
+      representativeStatus: status,
+      healthCoverage: { partial: true, reason: "revision_boundary_incomplete", workflows_with_incomplete_revision_evidence: 2 },
+    });
+    await f.execute();
+    assert.equal(f.outputs.has_new_failures, "false");
+    assert.equal(f.calls.filter(call => call[1] === "logs").length, 0);
+  });
+}
+
+test("historic boundary probe cap keeps revision-verified current failures actionable", async t => {
+  const f = await fixture(t, {
+    runs: [run(42)],
+    healthCoverage: { partial: true, reason: "revision_boundary_incomplete", workflows_with_incomplete_revision_evidence: 2 },
+  });
+  await f.execute();
+  assert.equal(f.outputs.has_new_failures, "true");
+  const manifest = JSON.parse(fs.readFileSync(path.join(f.data, "manifest.json")));
+  assert.equal(manifest.discovery.partial, true);
+  assert.equal(manifest.discovery.reason, "revision_boundary_incomplete");
+  assert.equal(manifest.discovery.workflows_with_incomplete_revision_evidence, 2);
+  assert.ok(fs.existsSync(path.join(f.cache, "checkpoint.json")));
+});
 
 test("missing job-step details keep revision-verified failures actionable", async t => {
   const f = await fixture(t, {

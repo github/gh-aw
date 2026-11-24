@@ -9,7 +9,7 @@ The `checkout:` frontmatter field controls how `actions/checkout` runs in the ag
 
 By default, the agent checks out the workflow's repository with a shallow fetch (`fetch-depth: 1`). On `pull_request` events it also checks out the PR's selected commit (see [PR Revision Binding](#pr-revision-binding)). On `pull_request_target` events, automatic PR checkout is **disabled by default**, and `pull-request-floating-head` does not enable it. Most workflows need no `checkout:` configuration.
 
-Activation separately checks out workflow configuration to load runtime imports and skills. On `pull_request`, `pull_request_review`, and `pull_request_review_comment` events, this sparse checkout uses the PR **base SHA**. On other events it uses the normal activation ref. `checkout:` options do not override this activation checkout. For reusable `workflow_call` workflows, it uses the resolved callee SHA when no PR event is active, and skips cross-repository checkout if authentication may fall back to the caller's `GITHUB_TOKEN`.
+Activation separately checks out workflow configuration to load runtime imports and skills. When a base configuration restore or Copilot SDK agent staging needs a snapshot, it uses a full, shallow checkout so symlink targets anywhere in the repository are available; otherwise it uses a sparse checkout. Sparse checkout includes in-repository symlink targets found at compile time, which may differ from the runtime ref. On `pull_request`, `pull_request_review`, and `pull_request_review_comment` events, this checkout uses the PR **base SHA**. On other events it uses the normal activation ref. `checkout:` options do not override this activation checkout. For reusable `workflow_call` workflows, it uses the resolved callee SHA when no PR event is active, and skips cross-repository checkout if authentication may fall back to the caller's `GITHUB_TOKEN`.
 
 Use `checkout:` to check out additional branches or repositories, or set `checkout: false` for workflows that access code only through GitHub tools.
 
@@ -126,7 +126,7 @@ checkout:
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `pull-request` | boolean | Set `false` to disable automatic PR checkout and its base-config snapshot/restore steps. The normal repository checkout stays enabled. |
+| `pull-request` | boolean | Set `false` to disable automatic PR checkout and its associated base-config restore. Dynamic workflows or Copilot SDK staging can still require a snapshot. The normal repository checkout stays enabled. |
 | `pull-request-floating-head` | boolean | Select the current API head instead of event/review revision evidence. Defaults to `false`; literal boolean only. Applies workflow-wide. See [Allow Floating Head](#allow-floating-head). |
 | `repository` | string | Explicit repository in `owner/repo` format, or a newline-separated list with `multi: true`. Without `multi`, expressions must resolve to exactly one repository and need no allowlist. No wildcards. Defaults to the current repository. |
 | `repo` | string | Alias for `repository`; specify only one. |
@@ -265,7 +265,7 @@ For body-only review loops, a bot listed in `on.bots` can trigger PR checkout th
 
 ## Disabling the PR Branch Checkout
 
-To keep the normal repository checkout but suppress the "Checkout PR branch" step and its base-config snapshot and restore steps, set `pull-request: false`:
+To keep the normal repository checkout but suppress the "Checkout PR branch" step and its associated base-config restore, set `pull-request: false`:
 
 ```yaml wrap
 checkout:

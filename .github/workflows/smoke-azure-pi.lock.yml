@@ -260,12 +260,6 @@ jobs:
             .pi
           sparse-checkout-cone-mode: true
           fetch-depth: 1
-      - name: Save agent config folders for base branch restoration
-        env:
-          GH_AW_AGENT_FOLDERS: ".agents .github .pi"
-          GH_AW_AGENT_FILES: "AGENTS.MD AGENTS.md AGENTS.override.md CLAUDE.MD CLAUDE.md PI.md"
-        run: |
-          bash "${RUNNER_TEMP}/gh-aw/actions/save_base_github_folders.sh"
       - name: Check workflow lock file
         id: check-lock-file
         if: steps.daily-ai-credits-workflow-guardrail.outputs.daily_ai_credits_guardrail_status != 'quota_blocked'
