@@ -951,14 +951,14 @@ This is an existing-behavior supply-chain mapping. No new `CTR-*` rule or compli
 
 - Reject any `tools.repo-memory` branch equal to or inside `memory/adaptive-routing`, so the agent can never edit its own record.
 - Grant `contents: write` and `actions: read` only to the writer job, never to the agent or other jobs; the job MUST depend on `activation`, `agent`, and `conclusion` and MUST NOT run when the agent was skipped.
-- Emit only fixed, quoted compiler-derived environment values (workflow ID, definition hash, mode, engine, goal) and read the verdict from the unified session artifact, not from agent-written files.
-- Reject explicit use for unsupported workflows (non-routed models, unsupported engines, work-queue workers, experiments, `workflow_call`, workflow IDs that cannot name a ref, or missing repo-memory); a repository default skips them silently. Workflows that do not opt in compile unchanged.
+- Emit the routing identity fields (workflow ID, definition hash, mode, engine, and goal) only as fixed, quoted compiler-derived values. Other runtime bindings, including a dynamically selected routing level, token/session-file bindings, and sub-agent declarations, are outside this requirement. The verdict MUST come from the unified session artifact, not from agent-written files.
+- Reject explicit use for the tested ineligible cases: a fixed or non-routed primary model, `workflow_call`, and missing `tools.repo-memory`. A repository default silently skips the fixed/non-routed model and `workflow_call` cases covered by regression tests. Workflows that do not opt in compile unchanged.
 
 | Boundary | Implementation | Regression Evidence |
 |---|---|---|
 | Reserved history namespace | `pkg/workflow/adaptive_routing.go`: `validateRepoMemoryBranchesNotReserved` | `TestRepoMemoryCannotWriteTheRoutingHistories` |
 | Writer job permissions, ordering, and environment | `addPushRoutingHistoryJob`, `buildPushRoutingHistorySteps` | `TestAdaptiveRoutingObserveAddsOnlyTheWriterJob` |
-| Eligibility and opt-in precedence | `resolveAdaptiveRoutingSetting`, `adaptiveRoutingIneligibility`, `applyAdaptiveRouting` | `TestAdaptiveRoutingSettingPrecedence`, `TestAdaptiveRoutingFromAnImport`, `TestAdaptiveRoutingIneligibleWorkflows` |
+| Eligibility and opt-in precedence | `resolveAdaptiveRoutingSetting`, `adaptiveRoutingIneligibility`, `applyAdaptiveRouting` | `TestAdaptiveRoutingSettingPrecedence`, `TestAdaptiveRoutingFromAnImport`, `TestAdaptiveRoutingIneligibleWorkflows` (fixed/non-routed models, `workflow_call`, and missing repo-memory; default skips for fixed/non-routed models and `workflow_call`) |
 
 This is an existing-behavior mapping. The writer's `contents: write` is a deliberate, job-scoped grant; the history records routing evidence only and does not authorize model selection changes. No new `CTR-*` rule or compliance-test identifier is introduced.
 
