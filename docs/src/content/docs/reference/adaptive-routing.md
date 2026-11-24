@@ -58,7 +58,7 @@ After the run's `conclusion` job has published its unified session, the `push_ro
 
 A run counts as a success or a failure only when the verdict says its result was about the selected model. Otherwise its line explains why it did not count, for example `infrastructure`, `cancelled` or `rate_limited`, or `no_agent` when AWF did not route the run or its agent made no request. If a run's own save fails, the next save finds the run in the workflow's run list and records it as `unsaved`.
 
-`state.json` keeps, for each model and effort, its recent outcomes with their credits and token counts, its average cost, current streak and a summary of its success rate. Providers report a request's input count either with or without its cached tokens. When AWF's record does not say which, an input count smaller than the cached count is taken to exclude it and any other to include it, so a run's token counts are close but not always exact, while its credits are what AWF priced. Editing the workflow starts a new generation: earlier failures are forgiven and successes are kept, and a run of the older definition that finishes late does not count against the new one. Records are shared across routing levels unless the workflow chooses its level at run time, in which case each level keeps its own.
+`state.json` keeps, for each model and effort, its recent outcomes with their credits and token counts, its average cost, current streak and a summary of its success rate. It also tracks verified reconciliation coverage (`reconciled_through` and `unresolved_runs`) independently of `runs.jsonl`'s 500-line retention window and `last_run`, so an older run that ages out of `runs.jsonl` is never charged twice and an incomplete or failed run-list lookup never advances coverage past a gap. Providers report a request's input count either with or without its cached tokens. When AWF's record does not say which, an input count smaller than the cached count is taken to exclude it and any other to include it, so a run's token counts are close but not always exact, while its credits are what AWF priced. Editing the workflow starts a new generation: earlier failures are forgiven and successes are kept, a run of the older definition that finishes late does not count against the new one, and reconciliation continues from the previous verified floor so a failed save on the first run of a new definition is not dropped. Records are shared across routing levels unless the workflow chooses its level at run time, in which case each level keeps its own.
 
 ## The branch
 
@@ -86,11 +86,11 @@ The history keeps the model and effort, the verdict, the credits and the token c
 gh aw routing status issue-triage
 ```
 
-`gh aw routing reset <workflow>` starts a history afresh. It reads the workflow's latest run number and, in one commit that lands only if no run saved in the meantime, stops every run up to it from counting and empties the recorded evidence. It keeps `runs.jsonl` and never deletes the branch. It needs write access to the repository.
+`gh aw routing reset <workflow>` starts a history afresh. It reads the workflow's latest run number and, in one commit that lands only if no run saved in the meantime, stops every run up to it from counting, empties the recorded evidence, and clears reconciliation obligations at or below the reset point while preserving any obligations above it. It keeps `runs.jsonl` and never deletes the branch. It needs write access to the repository.
 
 ## Limits
 
 - Observe mode only records evidence; it never changes which model runs and makes no recommendation.
 - A history belongs to one workflow file in one repository; renaming the file starts a new history. Reusable workflows (`on: workflow_call`) cannot take part, because each caller numbers its own runs.
 - A run that ends before the agent job starts, or whose usage artifact was never published, is not recorded by its own save.
-- A save that fails is charged as `unsaved` by a later save that finds the run among the workflow's 100 newest runs on the default branch, or its 100 newest runs started by `pull_request_target`.
+- A save that fails is charged as `unsaved` by a later save as verified reconciliation coverage advances across the workflow's default-branch and `pull_request_target` run listings (and via direct lookup for tracked in-progress runs that age past the listing window).

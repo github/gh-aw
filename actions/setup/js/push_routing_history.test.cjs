@@ -67,12 +67,20 @@ function signedPush(remote, { lose = 0, fail = false } = {}) {
 
 const lsRemote = async (command, args, options) => ({ stdout: execFileSync(command, args, { cwd: options.cwd, encoding: "utf8" }), stderr: "", exitCode: 0 });
 
-function fakeGitHub(remote, { runs = [], jobs = {}, attempts = {} } = {}) {
-  const calls = { jobs: [], attempts: [] };
+function fakeGitHub(remote, { runs = [], jobs = {}, attempts = {}, contents = {}, runsById = {}, listWorkflowRuns } = {}) {
+  const calls = { jobs: [], attempts: [], lists: [], contents: [], runs: [] };
   const client = {
     calls,
     rest: {
-      repos: { get: async () => ({ data: { default_branch: "main" } }) },
+      repos: {
+        get: async () => ({ data: { default_branch: "main" } }),
+        getContent: async ({ path: filePath, ref }) => {
+          calls.contents.push({ path: filePath, ref });
+          const text = contents[`${ref}:${filePath}`] ?? contents[ref];
+          if (text === undefined) throw Object.assign(new Error("Not Found"), { status: 404 });
+          return { data: { content: Buffer.from(text, "utf8").toString("base64"), encoding: "base64" } };
+        },
+      },
       git: {
         createCommit: async ({ message, tree, parents }) => ({ data: { sha: git(remote, "commit-tree", tree, "-m", message, ...parents.flatMap(parent => ["-p", parent])), verification: { verified: true } } }),
         createRef: async ({ ref, sha }) => {
@@ -85,7 +93,20 @@ function fakeGitHub(remote, { runs = [], jobs = {}, attempts = {} } = {}) {
         },
       },
       actions: {
-        listWorkflowRuns: async ({ branch, event }) => ({ data: { workflow_runs: runs.filter(run => (!branch || run.head_branch === branch) && (!event || run.event === event)) } }),
+        listWorkflowRuns: async params => {
+          calls.lists.push(params);
+          if (listWorkflowRuns) return listWorkflowRuns(params);
+          const { branch, event, page = 1, per_page = 100 } = params;
+          const filtered = runs.filter(run => (!branch || run.head_branch === branch) && (!event || run.event === event));
+          const start = (page - 1) * per_page;
+          return { data: { total_count: filtered.length, workflow_runs: filtered.slice(start, start + per_page) } };
+        },
+        getWorkflowRun: async ({ run_id }) => {
+          calls.runs.push(run_id);
+          const found = runsById[run_id] ?? runs.find(run => String(run.id) === String(run_id));
+          if (!found) throw Object.assign(new Error("Not Found"), { status: 404 });
+          return { data: found };
+        },
         getWorkflowRunAttempt: async ({ run_id }) => {
           calls.attempts.push(run_id);
           return { data: attempts[run_id] };
@@ -117,14 +138,14 @@ function sessionFile(name, outcome, { model = "model-a", aic = 2 } = {}) {
 
 /** One run's push_routing_history job. */
 function save(remote, number, outcome, options = {}) {
-  const { github = fakeGitHub(remote), push = signedPush(remote), attempt = "1", ref = "refs/heads/main", sleepFn = async () => {}, session } = options;
+  const { github = fakeGitHub(remote), push = signedPush(remote), attempt = "1", ref = "refs/heads/main", sleepFn = async () => {}, session, generation = GENERATION } = options;
   const workspaceDir = fs.mkdtempSync(path.join(root, `run-${number}-`));
   return main({
     github,
     context: { repo: { owner: "octo", repo: "demo" }, runId: 9000 + number, runNumber: number, payload: { repository: { default_branch: "main" } } },
     env: {
       GH_AW_ROUTING_WORKFLOW: "triage",
-      GH_AW_ROUTING_GENERATION: GENERATION,
+      GH_AW_ROUTING_GENERATION: generation,
       GH_AW_ROUTING_MODE: "observe",
       GH_AW_ROUTING_ENGINE: "copilot",
       GH_AW_ROUTING_GOAL: "cost",
@@ -141,6 +162,18 @@ function save(remote, number, outcome, options = {}) {
     execGetExecOutput: lsRemote,
     sleepFn,
   });
+}
+
+function seedHistory(remote, state, runs) {
+  const dir = fs.mkdtempSync(path.join(root, "seed-"));
+  execFileSync("git", ["init", "--quiet", dir]);
+  git(dir, "config", "user.name", "seed");
+  git(dir, "config", "user.email", "seed@example.com");
+  fs.writeFileSync(path.join(dir, "state.json"), `${JSON.stringify(state)}\n`);
+  fs.writeFileSync(path.join(dir, "runs.jsonl"), runs.map(line => `${JSON.stringify(line)}\n`).join(""));
+  git(dir, "add", "--", "state.json", "runs.jsonl");
+  git(dir, "commit", "-m", "Seed history");
+  git(dir, "push", "--quiet", remote, `HEAD:refs/heads/${BRANCH}`);
 }
 
 describe("push_routing_history evidence", () => {
@@ -440,6 +473,648 @@ describe("push_routing_history saves", () => {
       { number: 54, note: null },
     ]);
     expect(remoteState(remote).unexplained).toBe(1);
+    expect(remoteState(remote).reconciled_through).toBe(54);
+    expect(remoteState(remote).unresolved_runs).toEqual([]);
+  });
+
+  it("neither re-charges nor re-queries an evicted pull_request_target run past the 500-line retention window", async () => {
+    const remote = bareRemote();
+    const state = {
+      ...emptyState("triage"),
+      generation: { hash: GENERATION, since_run: 1 },
+      last_run: 555,
+      reconciled_through: 555,
+      unresolved_runs: [],
+      unexplained: 1,
+    };
+    // Simulate runs.jsonl after #50 aged out of the 500-line window (retaining #56..#555).
+    const runs = Array.from({ length: 500 }, (_, i) => ({
+      run: String(9056 + i),
+      number: 56 + i,
+      attempt: 1,
+      at: "2026-11-24T09:00:00Z",
+      generation: GENERATION,
+      scope: "copilot/cost/shared",
+      mode: "observe",
+      role: "observe",
+      pair: PAIR,
+      outcome: "success",
+      credits: 2,
+      counted: true,
+      note: null,
+    }));
+    seedHistory(remote, state, runs);
+    const agent = { name: "agent", conclusion: "failure", started_at: "2026-11-24T08:00:00Z" };
+    const writer = conclusion => ({ name: "push_routing_history", conclusion, started_at: "2026-11-24T08:10:00Z" });
+    const github = fakeGitHub(remote, {
+      runs: [
+        // Both older pull_request_target runs remain on the 100-run pull_request_target page.
+        { id: 9050, run_number: 50, status: "completed", conclusion: "failure", head_branch: "pr-50", event: "pull_request_target", run_attempt: 1 },
+        { id: 9049, run_number: 49, status: "completed", conclusion: "failure", head_branch: "pr-49", event: "pull_request_target", run_attempt: 1 },
+        { id: 9555, run_number: 555, status: "completed", conclusion: "success", head_branch: "main", event: "schedule", run_attempt: 1 },
+      ],
+      jobs: { 9050: [agent, writer("failure")], 9049: [agent, writer("success")] },
+    });
+
+    await save(remote, 556, "success", { github });
+    expect(github.calls.jobs).toEqual([]);
+    expect(remoteState(remote).unexplained).toBe(1);
+    expect(remoteState(remote).reconciled_through).toBe(556);
+    expect(remoteRuns(remote).filter(line => line.number === 50)).toEqual([]);
+    expect(remoteRuns(remote).at(-1)).toMatchObject({ number: 556, counted: true, note: null });
+  });
+
+  it("refreshes listRuns on a same-generation reapply conflict and charges a run that failed in between", async () => {
+    const remote = bareRemote();
+    await save(remote, 100, "success");
+    const agent = { name: "agent", conclusion: "failure", started_at: "2026-11-24T09:00:00Z" };
+    const writer = conclusion => ({ name: "push_routing_history", conclusion, started_at: "2026-11-24T09:10:00Z" });
+    const run101 = { id: 9101, run_number: 101, status: "in_progress", conclusion: null, head_branch: "main", event: "schedule", run_attempt: 1 };
+    const apiRuns = [run101, { id: 9100, run_number: 100, status: "completed", conclusion: "success", head_branch: "main", event: "schedule", run_attempt: 1 }];
+    const github = fakeGitHub(remote, { runs: apiRuns, jobs: { 9101: [agent, writer("failure")] } });
+
+    const basePush = signedPush(remote);
+    let intercepted = false;
+    const conflictingPush = async args => {
+      if (!intercepted) {
+        intercepted = true;
+        // Another run (#103) saves first while #101 is still active, then #101 finishes and fails its save.
+        await save(remote, 103, "success", {
+          github: fakeGitHub(remote, {
+            runs: [{ id: 9102, run_number: 102, status: "in_progress", conclusion: null, head_branch: "main", event: "schedule", run_attempt: 1 }, { ...run101 }],
+          }),
+        });
+        run101.status = "completed";
+        run101.conclusion = "failure";
+      }
+      return basePush(args);
+    };
+
+    await save(remote, 102, "success", { github, push: conflictingPush });
+    expect(github.calls.lists.length).toBe(4);
+    expect(remoteRuns(remote).map(({ number, note }) => ({ number, note }))).toEqual([
+      { number: 100, note: null },
+      { number: 103, note: null },
+      { number: 101, note: "unsaved" },
+      { number: 102, note: null },
+    ]);
+    expect(remoteState(remote)).toMatchObject({ unexplained: 1, last_run: 103, reconciled_through: 103, unresolved_runs: [] });
+  });
+
+  it("refreshes listRuns on a generation-change conflict and charges a failed save on the new generation", async () => {
+    const remote = bareRemote();
+    const NEW_GENERATION = `${"c".repeat(64)}:${"d".repeat(64)}`;
+    await save(remote, 99, "success", { generation: GENERATION });
+    const agent = { name: "agent", conclusion: "failure", started_at: "2026-11-24T09:00:00Z" };
+    const writer = conclusion => ({ name: "push_routing_history", conclusion, started_at: "2026-11-24T09:10:00Z" });
+    const apiRuns = [{ id: 9099, run_number: 99, status: "completed", conclusion: "success", head_branch: "main", event: "schedule", run_attempt: 1 }];
+    const github = fakeGitHub(remote, { runs: apiRuns, jobs: { 9101: [agent, writer("failure")] } });
+
+    const basePush = signedPush(remote);
+    let intercepted = false;
+    const conflictingPush = async args => {
+      if (!intercepted) {
+        intercepted = true;
+        // Run #100 starts NEW_GENERATION first, and #101 fails its save before #102 retries.
+        await save(remote, 100, "success", { generation: NEW_GENERATION });
+        apiRuns.unshift({ id: 9101, run_number: 101, status: "completed", conclusion: "failure", head_branch: "main", event: "schedule", run_attempt: 1 });
+        apiRuns.unshift({ id: 9100, run_number: 100, status: "completed", conclusion: "success", head_branch: "main", event: "schedule", run_attempt: 1 });
+      }
+      return basePush(args);
+    };
+
+    await save(remote, 102, "success", { generation: NEW_GENERATION, github, push: conflictingPush });
+    expect(github.calls.lists.length).toBeGreaterThanOrEqual(4);
+    expect(remoteRuns(remote).map(({ number, note }) => ({ number, note }))).toEqual([
+      { number: 99, note: null },
+      { number: 100, note: null },
+      { number: 101, note: "unsaved" },
+      { number: 102, note: null },
+    ]);
+    expect(remoteState(remote)).toMatchObject({
+      generation: { hash: NEW_GENERATION, since_run: 100 },
+      unexplained: 1,
+      reconciled_through: 102,
+      unresolved_runs: [],
+    });
+  });
+
+  it("charges a failed save on the first run of a new generation rather than discarding it at since_run", async () => {
+    const remote = bareRemote();
+    const NEW_GENERATION = `${"c".repeat(64)}:${"d".repeat(64)}`;
+    seedHistory(
+      remote,
+      {
+        ...emptyState("triage"),
+        generation: { hash: GENERATION, since_run: 1 },
+        last_run: 99,
+        reconciled_through: 99,
+        unresolved_runs: [],
+        unexplained: 2,
+      },
+      []
+    );
+    const agent = { name: "agent", conclusion: "failure", started_at: "2026-11-24T09:00:00Z" };
+    const writer = conclusion => ({ name: "push_routing_history", conclusion, started_at: "2026-11-24T09:10:00Z" });
+    const github = fakeGitHub(remote, {
+      runs: [
+        { id: 9100, run_number: 100, status: "completed", conclusion: "failure", head_branch: "main", event: "schedule", run_attempt: 1 },
+        { id: 9099, run_number: 99, status: "completed", conclusion: "success", head_branch: "main", event: "schedule", run_attempt: 1 },
+      ],
+      jobs: { 9100: [agent, writer("failure")] },
+    });
+
+    await save(remote, 101, "success", { generation: NEW_GENERATION, github });
+    expect(remoteRuns(remote).map(({ number, note }) => ({ number, note }))).toEqual([
+      { number: 100, note: "unsaved" },
+      { number: 101, note: null },
+    ]);
+    expect(remoteState(remote)).toMatchObject({
+      generation: { hash: NEW_GENERATION, since_run: 101 },
+      unexplained: 1,
+      reconciled_through: 101,
+      unresolved_runs: [],
+    });
+  });
+
+  it("saves this run without advancing reconciled_through on a transient listRuns error or incomplete first page", async () => {
+    const remote = bareRemote();
+    await save(remote, 50, "success");
+
+    // 1. Transient API failure: save #52 without advancing reconciled_through past 50.
+    const failingGitHub = fakeGitHub(remote, {
+      listWorkflowRuns: async () => {
+        throw new Error("503 service unavailable");
+      },
+    });
+    await save(remote, 52, "success", { github: failingGitHub });
+    expect(global.core.warning).toHaveBeenCalledWith(expect.stringMatching(/503 service unavailable/));
+    expect(remoteState(remote)).toMatchObject({ last_run: 52, reconciled_through: 50, unresolved_runs: [] });
+
+    // 2. Truncated listing (total_count exceeds returned pages, leaving a gap #51..#60): save #160 without advancing reconciled_through.
+    const fullPageRuns = Array.from({ length: 100 }, (_, i) => ({
+      id: 9061 + i,
+      run_number: 61 + i,
+      status: "completed",
+      conclusion: "success",
+      head_branch: "main",
+      event: "schedule",
+      run_attempt: 1,
+    }));
+    const incompleteGitHub = fakeGitHub(remote, {
+      listWorkflowRuns: async ({ branch, event, page = 1 }) => {
+        if (event === "pull_request_target") return { data: { total_count: 0, workflow_runs: [] } };
+        if (branch === "main" && page === 1) return { data: { total_count: 160, workflow_runs: fullPageRuns } };
+        return { data: { total_count: 160, workflow_runs: [] } };
+      },
+    });
+    await save(remote, 160, "success", { github: incompleteGitHub });
+    expect(remoteState(remote)).toMatchObject({ last_run: 160, reconciled_through: 50, unresolved_runs: [] });
+  });
+
+  it("paginates across a multi-page burst to recover reconciliation coverage instead of stalling", async () => {
+    const remote = bareRemote();
+    await save(remote, 100, "success");
+    const agent = { name: "agent", conclusion: "failure", started_at: "2026-11-24T09:00:00Z" };
+    const writer = conclusion => ({ name: "push_routing_history", conclusion, started_at: "2026-11-24T09:10:00Z" });
+    // Complete newest-first history across 2 pages (#201 down to #100), with #200 failed.
+    const runs = Array.from({ length: 102 }, (_, i) => {
+      const number = 201 - i;
+      return {
+        id: 9000 + number,
+        run_number: number,
+        status: "completed",
+        conclusion: number === 200 ? "failure" : "success",
+        head_branch: "main",
+        event: "schedule",
+        run_attempt: 1,
+      };
+    });
+    const github = fakeGitHub(remote, { runs, jobs: { 9200: [agent, writer("failure")] } });
+
+    await save(remote, 201, "success", { github });
+    expect(remoteState(remote)).toMatchObject({ last_run: 201, reconciled_through: 201, unresolved_runs: [], unexplained: 1 });
+    expect(remoteRuns(remote).map(({ number, note }) => ({ number, note }))).toEqual([
+      { number: 100, note: null },
+      { number: 200, note: "unsaved" },
+      { number: 201, note: null },
+    ]);
+  });
+
+  it("tracks in-progress runs in unresolved_runs until they complete and reconciles them once finished", async () => {
+    const remote = bareRemote();
+    await save(remote, 50, "success");
+    const agent = { name: "agent", conclusion: "failure", started_at: "2026-11-24T09:00:00Z" };
+    const writer = conclusion => ({ name: "push_routing_history", conclusion, started_at: "2026-11-24T09:10:00Z" });
+    const run51 = { id: 9051, run_number: 51, status: "in_progress", conclusion: null, head_branch: "main", event: "schedule", run_attempt: 1 };
+
+    await save(remote, 52, "success", { github: fakeGitHub(remote, { runs: [run51] }) });
+    expect(remoteState(remote)).toMatchObject({ last_run: 52, reconciled_through: 52, unresolved_runs: [51], unexplained: 0 });
+
+    // Once #51 completes with a failed save, #53 charges #51 and clears unresolved_runs.
+    run51.status = "completed";
+    run51.conclusion = "failure";
+    await save(remote, 53, "success", { github: fakeGitHub(remote, { runs: [run51], jobs: { 9051: [agent, writer("failure")] } }) });
+    expect(remoteRuns(remote).map(({ number, note }) => ({ number, note }))).toEqual([
+      { number: 50, note: null },
+      { number: 52, note: null },
+      { number: 51, note: "unsaved" },
+      { number: 53, note: null },
+    ]);
+    expect(remoteState(remote)).toMatchObject({ last_run: 53, reconciled_through: 53, unresolved_runs: [], unexplained: 1 });
+  });
+
+  it("defers runs above reconciled_through on an incomplete scan so they cannot be double-charged after eviction", async () => {
+    const remote = bareRemote();
+    await save(remote, 50, "success");
+    const agent = { name: "agent", conclusion: "failure", started_at: "2026-11-24T09:00:00Z" };
+    const writer = conclusion => ({ name: "push_routing_history", conclusion, started_at: "2026-11-24T09:10:00Z" });
+    // Truncated default-branch listing (reports total_count 660, but page 2+ returns empty) leaves #51..#560 unverified.
+    const page1 = Array.from({ length: 100 }, (_, i) => ({
+      id: 9660 - i,
+      run_number: 660 - i,
+      status: "completed",
+      conclusion: "success",
+      head_branch: "main",
+      event: "schedule",
+      run_attempt: 1,
+    }));
+    const prtFailure = { id: 9051, run_number: 51, status: "completed", conclusion: "failure", head_branch: "pr-51", event: "pull_request_target", run_attempt: 1 };
+    const github = fakeGitHub(remote, {
+      jobs: { 9051: [agent, writer("failure")] },
+      listWorkflowRuns: async ({ branch, event, page = 1 }) => {
+        if (event === "pull_request_target") return { data: { total_count: 1, workflow_runs: page === 1 ? [prtFailure] : [] } };
+        if (branch === "main" && page === 1) return { data: { total_count: 660, workflow_runs: page1 } };
+        return { data: { total_count: 660, workflow_runs: [] } };
+      },
+    });
+
+    await save(remote, 661, "success", { github });
+    expect(github.calls.jobs).toEqual([]);
+    expect(remoteState(remote)).toMatchObject({ last_run: 661, reconciled_through: 50, unexplained: 0 });
+    expect(remoteRuns(remote).filter(line => line.number === 51)).toEqual([]);
+  });
+
+  it("advances across a >800-run backlog in verified chunks without stalling and charges a late failed save", async () => {
+    const remote = bareRemote();
+    await save(remote, 1, "success");
+    const agent = { name: "agent", conclusion: "failure", started_at: "2026-11-24T09:00:00Z" };
+    const writer = conclusion => ({ name: "push_routing_history", conclusion, started_at: "2026-11-24T09:10:00Z" });
+    // 1,005 runs (#1005 down to #1) with #1004 failed: exceeds MAX_LIST_PAGES=8 in one pass, so chunked backfill recovers in two saves.
+    const runs = Array.from({ length: 1005 }, (_, i) => {
+      const number = 1005 - i;
+      return {
+        id: 19000 + number,
+        run_number: number,
+        status: "completed",
+        conclusion: number === 1004 ? "failure" : "success",
+        head_branch: "main",
+        event: "schedule",
+        run_attempt: 1,
+      };
+    });
+    const github = fakeGitHub(remote, { runs, jobs: { 20004: [agent, writer("failure")] } });
+
+    await save(remote, 1005, "success", { github });
+    const mid = remoteState(remote);
+    expect(mid.reconciled_through).toBeGreaterThan(1);
+    expect(mid.reconciled_through).toBeLessThan(1004);
+    expect(mid.unexplained).toBe(0);
+
+    runs.unshift({ id: 20006, run_number: 1006, status: "completed", conclusion: "success", head_branch: "main", event: "schedule", run_attempt: 1 });
+    await save(remote, 1006, "success", { github });
+    expect(remoteState(remote)).toMatchObject({ last_run: 1006, reconciled_through: 1006, unresolved_runs: [], unexplained: 1 });
+    expect(remoteRuns(remote).filter(line => line.number === 1004)).toEqual([expect.objectContaining({ number: 1004, note: "unsaved" })]);
+  });
+
+  it("does not trust pull_request_target head_sha to suppress an unsaved failure straddling since_run", async () => {
+    const remote = bareRemote();
+    const NEW_GENERATION = `${"c".repeat(64)}:${"d".repeat(64)}`;
+    seedHistory(
+      remote,
+      {
+        ...emptyState("triage"),
+        generation: { hash: NEW_GENERATION, since_run: 101 },
+        last_run: 101,
+        reconciled_through: 101,
+        unresolved_runs: [100],
+        unresolved_run_ids: { "100": "9100" },
+        unexplained: 0,
+      },
+      []
+    );
+    const agent = { name: "agent", conclusion: "failure", started_at: "2026-11-24T09:00:00Z" };
+    const writer = conclusion => ({ name: "push_routing_history", conclusion, started_at: "2026-11-24T09:10:00Z" });
+    const github = fakeGitHub(remote, {
+      runs: [
+        { id: 9101, run_number: 101, status: "completed", conclusion: "success", head_branch: "main", event: "schedule", run_attempt: 1 },
+        // PR head still has the old generation lockfile, while pull_request_target actually executed NEW_GENERATION from main.
+        { id: 9100, run_number: 100, status: "completed", conclusion: "failure", head_branch: "fork-pr", event: "pull_request_target", run_attempt: 1, head_sha: "sha-pr-head" },
+      ],
+      jobs: { 9100: [agent, writer("failure")] },
+      contents: { "sha-pr-head:.github/workflows/triage.lock.yml": `env:\n  GH_AW_ROUTING_GENERATION: "${GENERATION}"\n` },
+    });
+
+    await save(remote, 102, "success", { generation: NEW_GENERATION, github });
+    expect(github.calls.contents).toEqual([]);
+    expect(remoteRuns(remote).map(({ number, note }) => ({ number, note }))).toEqual([
+      { number: 100, note: "unsaved" },
+      { number: 102, note: null },
+    ]);
+    expect(remoteState(remote)).toMatchObject({ unexplained: 1, reconciled_through: 102, unresolved_runs: [] });
+  });
+
+  it("does not re-charge an evicted legacy failure when upgrading a full 500-line runs.jsonl", async () => {
+    const remote = bareRemote();
+    const writtenRuns = Array.from({ length: 500 }, (_, i) => ({
+      run: String(9003 + i),
+      number: 3 + i,
+      attempt: 1,
+      at: "2026-11-24T09:00:00Z",
+      generation: GENERATION,
+      scope: "copilot/cost/shared",
+      mode: "observe",
+      role: "observe",
+      pair: PAIR,
+      outcome: "success",
+      credits: 2,
+      counted: true,
+      note: null,
+    }));
+    seedHistory(
+      remote,
+      {
+        ...emptyState("triage"),
+        generation: { hash: GENERATION, since_run: 1 },
+        last_run: 502,
+        unexplained: 1,
+      },
+      writtenRuns
+    );
+    const agent = { name: "agent", conclusion: "failure", started_at: "2026-11-24T09:00:00Z" };
+    const writer = conclusion => ({ name: "push_routing_history", conclusion, started_at: "2026-11-24T09:10:00Z" });
+    const apiRuns = Array.from({ length: 502 }, (_, i) => {
+      const number = 502 - i;
+      return {
+        id: 9000 + number,
+        run_number: number,
+        status: "completed",
+        conclusion: number === 2 ? "failure" : "success",
+        head_branch: number % 2 === 0 ? "pr-branch" : "main",
+        event: number % 2 === 0 ? "pull_request_target" : "schedule",
+        run_attempt: 1,
+      };
+    });
+    const github = fakeGitHub(remote, { runs: apiRuns, jobs: { 9002: [agent, writer("failure")] } });
+
+    await save(remote, 503, "success", { github });
+    expect(github.calls.jobs).toEqual([]);
+    expect(remoteState(remote)).toMatchObject({ last_run: 503, reconciled_through: 503, unexplained: 1, unresolved_runs: [] });
+    expect(remoteRuns(remote).filter(line => line.number === 2)).toEqual([]);
+  });
+
+  it("resolves a tracked unresolved run via direct run-ID lookup after it falls outside the listing window", async () => {
+    const remote = bareRemote();
+    seedHistory(
+      remote,
+      {
+        ...emptyState("triage"),
+        generation: { hash: GENERATION, since_run: 1 },
+        last_run: 900,
+        reconciled_through: 900,
+        unresolved_runs: [2],
+        unresolved_run_ids: { "2": "9002" },
+        unexplained: 0,
+      },
+      []
+    );
+    const agent = { name: "agent", conclusion: "failure", started_at: "2026-11-24T09:00:00Z" };
+    const writer = conclusion => ({ name: "push_routing_history", conclusion, started_at: "2026-11-24T09:10:00Z" });
+    // Page 1 only has #900..#801 (no #2); direct getWorkflowRun resolves #2 using stored run ID 9002.
+    const recentRuns = Array.from({ length: 100 }, (_, i) => ({
+      id: 9900 - i,
+      run_number: 900 - i,
+      status: "completed",
+      conclusion: "success",
+      head_branch: "main",
+      event: "schedule",
+      run_attempt: 1,
+    }));
+    const run2 = { id: 9002, run_number: 2, status: "completed", conclusion: "failure", head_branch: "main", event: "schedule", run_attempt: 1 };
+    const github = fakeGitHub(remote, { runs: recentRuns, runsById: { 9002: run2 }, jobs: { 9002: [agent, writer("failure")] } });
+
+    await save(remote, 901, "success", { github });
+    expect(github.calls.runs).toEqual([9002]);
+    expect(github.calls.jobs).toEqual([9002]);
+    expect(remoteRuns(remote).map(({ number, note }) => ({ number, note }))).toEqual([
+      { number: 2, note: "unsaved" },
+      { number: 901, note: null },
+    ]);
+    const finalState = remoteState(remote);
+    expect(finalState).toMatchObject({ reconciled_through: 901, unresolved_runs: [], unexplained: 1 });
+    expect(finalState.unresolved_run_ids).toBeUndefined();
+  });
+
+  it("does not advance coverage when an older gap below the unfiltered first page remains missing", async () => {
+    const remote = bareRemote();
+    await save(remote, 100, "success");
+    // #100 and #103..#205 exist (#101 is PR, #102 is omitted from all pages): #205 must not skip #102.
+    const runs = [
+      { id: 9205, run_number: 205, status: "completed", conclusion: "success", head_branch: "main", event: "schedule", run_attempt: 1 },
+      ...Array.from({ length: 102 }, (_, i) => {
+        const number = 204 - i;
+        return {
+          id: 9000 + number,
+          run_number: number,
+          status: "completed",
+          conclusion: "success",
+          head_branch: number % 2 === 0 ? "main" : "feature",
+          event: number % 2 === 0 ? "schedule" : "pull_request",
+          run_attempt: 1,
+        };
+      }),
+      { id: 9101, run_number: 101, status: "completed", conclusion: "success", head_branch: "feature", event: "pull_request", run_attempt: 1 },
+      { id: 9100, run_number: 100, status: "completed", conclusion: "success", head_branch: "main", event: "schedule", run_attempt: 1 },
+    ];
+    await save(remote, 205, "success", { github: fakeGitHub(remote, { runs }) });
+    expect(remoteState(remote)).toMatchObject({ last_run: 205, reconciled_through: 100, unresolved_runs: [] });
+  });
+
+  it("resolves a retained older-generation failed save without charging it to the new generation", async () => {
+    const remote = bareRemote();
+    const NEW_GENERATION = `${"c".repeat(64)}:${"d".repeat(64)}`;
+    seedHistory(
+      remote,
+      {
+        ...emptyState("triage"),
+        generation: { hash: NEW_GENERATION, since_run: 101 },
+        last_run: 101,
+        reconciled_through: 101,
+        unresolved_runs: [99],
+        unexplained: 0,
+      },
+      []
+    );
+    const agent = { name: "agent", conclusion: "failure", started_at: "2026-11-24T09:00:00Z" };
+    const writer = conclusion => ({ name: "push_routing_history", conclusion, started_at: "2026-11-24T09:10:00Z" });
+    const github = fakeGitHub(remote, {
+      runs: [
+        { id: 9101, run_number: 101, status: "completed", conclusion: "success", head_branch: "main", event: "schedule", run_attempt: 1, head_sha: "sha-gen2" },
+        { id: 9099, run_number: 99, status: "completed", conclusion: "failure", head_branch: "main", event: "schedule", run_attempt: 1, head_sha: "sha-gen1" },
+      ],
+      jobs: { 9099: [agent, writer("failure")] },
+      contents: {
+        "sha-gen1:.github/workflows/triage.lock.yml": `env:\n  GH_AW_ROUTING_GENERATION: "${GENERATION}"\n`,
+      },
+    });
+
+    await save(remote, 102, "success", { generation: NEW_GENERATION, github });
+    expect(remoteRuns(remote).map(({ number, note, generation }) => ({ number, note, generation }))).toEqual([
+      { number: 99, note: "older_definition", generation: GENERATION },
+      { number: 102, note: null, generation: NEW_GENERATION },
+    ]);
+    expect(remoteState(remote)).toMatchObject({ unexplained: 0, reconciled_through: 102, unresolved_runs: [] });
+  });
+
+  it("bootstraps legacy state without reconciled_through from its fence so unverified overlapping failures are still reconciled", async () => {
+    const remote = bareRemote();
+    const writtenRuns = Array.from({ length: 98 }, (_, i) => ({
+      run: String(9001 + i),
+      number: 1 + i,
+      attempt: 1,
+      at: "2026-11-24T09:00:00Z",
+      generation: GENERATION,
+      scope: "copilot/cost/shared",
+      mode: "observe",
+      role: "observe",
+      pair: PAIR,
+      outcome: "success",
+      credits: 2,
+      counted: true,
+      note: null,
+    }));
+    writtenRuns.push({
+      run: "9100",
+      number: 100,
+      attempt: 1,
+      at: "2026-11-24T09:05:00Z",
+      generation: GENERATION,
+      scope: "copilot/cost/shared",
+      mode: "observe",
+      role: "observe",
+      pair: PAIR,
+      outcome: "success",
+      credits: 2,
+      counted: true,
+      note: null,
+    });
+    seedHistory(
+      remote,
+      {
+        ...emptyState("triage"),
+        generation: { hash: GENERATION, since_run: 1 },
+        last_run: 100,
+      },
+      writtenRuns
+    );
+    const agent = { name: "agent", conclusion: "failure", started_at: "2026-11-24T09:00:00Z" };
+    const writer = conclusion => ({ name: "push_routing_history", conclusion, started_at: "2026-11-24T09:10:00Z" });
+    const apiRuns = Array.from({ length: 100 }, (_, i) => {
+      const number = 100 - i;
+      return {
+        id: 9000 + number,
+        run_number: number,
+        status: "completed",
+        conclusion: number === 99 ? "failure" : "success",
+        head_branch: "main",
+        event: "schedule",
+        run_attempt: 1,
+      };
+    });
+    const github = fakeGitHub(remote, { runs: apiRuns, jobs: { 9099: [agent, writer("failure")] } });
+
+    await save(remote, 101, "success", { github });
+    expect(github.calls.jobs).toEqual([9099]);
+    expect(remoteState(remote)).toMatchObject({ last_run: 101, reconciled_through: 101, unresolved_runs: [], unexplained: 1 });
+    expect(
+      remoteRuns(remote)
+        .slice(-2)
+        .map(({ number, note }) => ({ number, note }))
+    ).toEqual([
+      { number: 99, note: "unsaved" },
+      { number: 101, note: null },
+    ]);
+  });
+
+  it("does not let a delayed older-generation writer consume a new generation's first failed save", async () => {
+    const remote = bareRemote();
+    const NEW_GENERATION = `${"c".repeat(64)}:${"d".repeat(64)}`;
+    await save(remote, 98, "success", { generation: GENERATION });
+    const agent = { name: "agent", conclusion: "failure", started_at: "2026-11-24T09:00:00Z" };
+    const writer = conclusion => ({ name: "push_routing_history", conclusion, started_at: "2026-11-24T09:10:00Z" });
+    const run100 = { id: 9100, run_number: 100, status: "completed", conclusion: "failure", head_branch: "main", event: "schedule", run_attempt: 1 };
+
+    // #99 (old generation) finishes after #100 (new generation) failed: must ignore #100.
+    const gh99 = fakeGitHub(remote, {
+      runs: [run100, { id: 9098, run_number: 98, status: "completed", conclusion: "success", head_branch: "main", event: "schedule", run_attempt: 1 }],
+      jobs: { 9100: [agent, writer("failure")] },
+    });
+    await save(remote, 99, "success", { generation: GENERATION, github: gh99 });
+    expect(gh99.calls.jobs).toEqual([]);
+    expect(remoteState(remote)).toMatchObject({ generation: { hash: GENERATION, since_run: 98 }, reconciled_through: 99, unexplained: 0 });
+
+    // #101 (new generation) then transitions generation and charges #100 to NEW_GENERATION.
+    const gh101 = fakeGitHub(remote, {
+      runs: [run100, { id: 9099, run_number: 99, status: "completed", conclusion: "success", head_branch: "main", event: "schedule", run_attempt: 1 }],
+      jobs: { 9100: [agent, writer("failure")] },
+    });
+    await save(remote, 101, "success", { generation: NEW_GENERATION, github: gh101 });
+    expect(remoteRuns(remote).map(({ number, note }) => ({ number, note }))).toEqual([
+      { number: 98, note: null },
+      { number: 99, note: null },
+      { number: 100, note: "unsaved" },
+      { number: 101, note: null },
+    ]);
+    expect(remoteState(remote)).toMatchObject({ generation: { hash: NEW_GENERATION, since_run: 101 }, reconciled_through: 101, unexplained: 1 });
+  });
+
+  it("holds reconciled_through across an uncorroborated gap and retains transiently absent unresolved runs", async () => {
+    const remote = bareRemote();
+    await save(remote, 100, "success");
+    const agent = { name: "agent", conclusion: "failure", started_at: "2026-11-24T09:00:00Z" };
+    const writer = conclusion => ({ name: "push_routing_history", conclusion, started_at: "2026-11-24T09:10:00Z" });
+    const run100 = { id: 9100, run_number: 100, status: "completed", conclusion: "success", head_branch: "main", event: "schedule", run_attempt: 1 };
+    const run102 = { id: 9102, run_number: 102, status: "completed", conclusion: "success", head_branch: "main", event: "schedule", run_attempt: 1 };
+
+    // 1. Listing omits #101 between #100 and #102: do not advance reconciled_through past 100.
+    await save(remote, 102, "success", { github: fakeGitHub(remote, { runs: [run102, run100] }) });
+    expect(remoteState(remote)).toMatchObject({ last_run: 102, reconciled_through: 100, unresolved_runs: [], unexplained: 0 });
+
+    // 2. When #101 reappears as a failed save on #103 (with #104 still active? No, #103 sees #101), #101 is charged.
+    const run101 = { id: 9101, run_number: 101, status: "completed", conclusion: "failure", head_branch: "main", event: "schedule", run_attempt: 1 };
+    await save(remote, 103, "success", { github: fakeGitHub(remote, { runs: [run102, run101, run100], jobs: { 9101: [agent, writer("failure")] } }) });
+    expect(remoteState(remote)).toMatchObject({ last_run: 103, reconciled_through: 103, unresolved_runs: [], unexplained: 1 });
+
+    // 3. Track #104 as unresolved while #105 saves, then transiently omit #104 on #106: #104 must stay unresolved.
+    const run104 = { id: 9104, run_number: 104, status: "in_progress", conclusion: null, head_branch: "main", event: "schedule", run_attempt: 1 };
+    await save(remote, 105, "success", { github: fakeGitHub(remote, { runs: [run104] }) });
+    expect(remoteState(remote)).toMatchObject({ reconciled_through: 105, unresolved_runs: [104] });
+
+    const run105 = { id: 9105, run_number: 105, status: "completed", conclusion: "success", head_branch: "main", event: "schedule", run_attempt: 1 };
+    const gh106 = fakeGitHub(remote, { runs: [run105] });
+    // Simulate a transient API error on direct lookup while #104 is omitted from the listing: #104 must stay unresolved.
+    gh106.rest.actions.getWorkflowRun = async () => {
+      throw Object.assign(new Error("503 service unavailable"), { status: 503 });
+    };
+    await save(remote, 106, "success", { github: gh106 });
+    expect(remoteState(remote)).toMatchObject({ reconciled_through: 106, unresolved_runs: [104], unexplained: 1 });
+
+    // 4. Once #104 reappears completed as a failed save on #107, it is charged and removed from unresolved_runs.
+    run104.status = "completed";
+    run104.conclusion = "failure";
+    const run106 = { id: 9106, run_number: 106, status: "completed", conclusion: "success", head_branch: "main", event: "schedule", run_attempt: 1 };
+    await save(remote, 107, "success", { github: fakeGitHub(remote, { runs: [run106, run105, run104], jobs: { 9104: [agent, writer("failure")] } }) });
+    expect(remoteState(remote)).toMatchObject({ reconciled_through: 107, unresolved_runs: [], unexplained: 2 });
   });
 });
 

@@ -43,15 +43,18 @@ var routingWorkflowIDPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_-]*(?:
 
 // routingHistoryState is state.json, version 2. Fields keep the history's order.
 type routingHistoryState struct {
-	V             int                             `json:"v"`
-	Workflow      string                          `json:"workflow"`
-	Seq           int64                           `json:"seq"`
-	Generation    *routingGeneration              `json:"generation"`
-	ResetAfterRun int64                           `json:"reset_after_run"`
-	LastRun       int64                           `json:"last_run"`
-	Unexplained   int64                           `json:"unexplained"`
-	Scopes        map[string]*routingHistoryScope `json:"scopes"`
-	Updated       *routingUpdated                 `json:"updated"`
+	V                 int                             `json:"v"`
+	Workflow          string                          `json:"workflow"`
+	Seq               int64                           `json:"seq"`
+	Generation        *routingGeneration              `json:"generation"`
+	ResetAfterRun     int64                           `json:"reset_after_run"`
+	LastRun           int64                           `json:"last_run"`
+	ReconciledThrough *int64                          `json:"reconciled_through,omitempty"`
+	UnresolvedRuns    *[]int64                        `json:"unresolved_runs,omitempty"`
+	UnresolvedRunIDs  map[string]string               `json:"unresolved_run_ids,omitempty"`
+	Unexplained       int64                           `json:"unexplained"`
+	Scopes            map[string]*routingHistoryScope `json:"scopes"`
+	Updated           *routingUpdated                 `json:"updated"`
 }
 
 type routingGeneration struct {
@@ -111,18 +114,20 @@ type routingRunLine struct {
 
 // RoutingStatus is the JSON output of gh aw routing status <workflow>.
 type RoutingStatus struct {
-	Workflow       string               `json:"workflow"`
-	Branch         string               `json:"branch"`
-	Head           string               `json:"head"`
-	Generation     *routingGeneration   `json:"generation"`
-	LastRun        int64                `json:"last_run"`
-	ResetAfterRun  int64                `json:"reset_after_run"`
-	Unexplained    int64                `json:"unexplained"`
-	Updated        *routingUpdated      `json:"updated"`
-	Recommendation *string              `json:"recommendation"`
-	Note           string               `json:"note"`
-	Scopes         []RoutingScopeStatus `json:"scopes"`
-	Recent         RoutingRecentRuns    `json:"recent"`
+	Workflow          string               `json:"workflow"`
+	Branch            string               `json:"branch"`
+	Head              string               `json:"head"`
+	Generation        *routingGeneration   `json:"generation"`
+	LastRun           int64                `json:"last_run"`
+	ResetAfterRun     int64                `json:"reset_after_run"`
+	ReconciledThrough *int64               `json:"reconciled_through,omitempty"`
+	UnresolvedRuns    *[]int64             `json:"unresolved_runs,omitempty"`
+	Unexplained       int64                `json:"unexplained"`
+	Updated           *routingUpdated      `json:"updated"`
+	Recommendation    *string              `json:"recommendation"`
+	Note              string               `json:"note"`
+	Scopes            []RoutingScopeStatus `json:"scopes"`
+	Recent            RoutingRecentRuns    `json:"recent"`
 }
 
 // RoutingScopeStatus is one scope's evidence.
@@ -313,7 +318,8 @@ func readRoutingRuns(ctx context.Context, api routingAPI, head string) ([]routin
 func buildRoutingStatus(workflowID, branch, head string, state *routingHistoryState, lines []routingRunLine) RoutingStatus {
 	status := RoutingStatus{
 		Workflow: workflowID, Branch: branch, Head: head, Generation: state.Generation, LastRun: state.LastRun,
-		ResetAfterRun: state.ResetAfterRun, Unexplained: state.Unexplained, Updated: state.Updated,
+		ResetAfterRun: state.ResetAfterRun, ReconciledThrough: state.ReconciledThrough, UnresolvedRuns: state.UnresolvedRuns,
+		Unexplained: state.Unexplained, Updated: state.Updated,
 		Note: routingNoRecommendation, Scopes: []RoutingScopeStatus{},
 	}
 	for _, name := range slices.Sorted(maps.Keys(state.Scopes)) {
@@ -408,6 +414,13 @@ func printRoutingStatus(w io.Writer, status RoutingStatus) error {
 	}
 	if status.ResetAfterRun > 0 {
 		line("  Reset after: run ", strconv.FormatInt(status.ResetAfterRun, 10))
+	}
+	if status.ReconciledThrough != nil {
+		reconciled := "through run " + strconv.FormatInt(*status.ReconciledThrough, 10)
+		if status.UnresolvedRuns != nil && len(*status.UnresolvedRuns) > 0 {
+			reconciled += fmt.Sprintf(" (%d unresolved)", len(*status.UnresolvedRuns))
+		}
+		line("  Reconciled:  ", reconciled)
 	}
 	line("  Unexplained: ", strconv.FormatInt(status.Unexplained, 10))
 	line(console.FormatInfoMessage(status.Note))
@@ -518,9 +531,39 @@ func runRoutingList(ctx context.Context, api routingAPI, out io.Writer, jsonOutp
 }
 
 // resetRoutingState fences every run up to latestRun, empties the scopes and lets exploration
-// resume, as the reducer's reset vector (aw2-reducer.json) defines.
+// resume, as the reducer's reset vector (aw2-reducer.json) defines. Reconciliation coverage
+// fields are preserved, clearing only obligations at or below latestRun.
 func resetRoutingState(state routingHistoryState, latestRun int64, at string) routingHistoryState {
 	state.ResetAfterRun = latestRun
+	if state.ReconciledThrough != nil {
+		reconciled := max(*state.ReconciledThrough, latestRun)
+		state.ReconciledThrough = &reconciled
+	}
+	if state.UnresolvedRuns != nil {
+		kept := []int64{}
+		for _, runNum := range *state.UnresolvedRuns {
+			if runNum > latestRun {
+				kept = append(kept, runNum)
+			}
+		}
+		slices.Sort(kept)
+		kept = slices.Compact(kept)
+		state.UnresolvedRuns = &kept
+	}
+	if len(state.UnresolvedRunIDs) > 0 {
+		keptIDs := map[string]string{}
+		for key, runID := range state.UnresolvedRunIDs {
+			runNum, err := strconv.ParseInt(key, 10, 64)
+			if err == nil && runNum > latestRun && runID != "" {
+				keptIDs[key] = runID
+			}
+		}
+		if len(keptIDs) > 0 {
+			state.UnresolvedRunIDs = keptIDs
+		} else {
+			state.UnresolvedRunIDs = nil
+		}
+	}
 	state.Scopes = map[string]*routingHistoryScope{}
 	state.Unexplained = 0
 	state.Updated = &routingUpdated{Run: nil, At: at}
