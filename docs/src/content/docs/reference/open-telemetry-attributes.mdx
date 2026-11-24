@@ -370,10 +370,10 @@ Queue runtime helpers emit one span per outer ledger operation: `work_queue.read
     <tr><td><code>gh-aw.work_queue.error.type</code></td><td>string</td><td>Stable error code when the operation throws, such as <code>ledger_invalid</code>, <code>unsupported_protocol</code>, or <code>cas_exhausted</code>.</td></tr>
     <tr><td><code>gh-aw.work_queue.queue.id</code></td><td>string</td><td>SHA-256 of the lowercased owner, repository, and queue branch.</td></tr>
     <tr><td><code>gh-aw.work_queue.snapshot.present</code></td><td>boolean</td><td>Whether a replayed projection was observed.</td></tr>
-    <tr><td><code>gh-aw.work_queue.work.{total,available,claimed,completed,cancelled}</code></td><td>int</td><td>Work counts by state in the observed projection.</td></tr>
+    <tr><td><code>gh-aw.work_queue.work.&lt;state&gt;</code></td><td>int</td><td>Work counts by state in the observed projection: <code>total</code>, <code>available</code>, <code>claimed</code>, <code>completed</code>, <code>cancelled</code>.</td></tr>
     <tr><td><code>gh-aw.work_queue.claims.open</code></td><td>int</td><td>Open Claims in the observed projection.</td></tr>
-    <tr><td><code>gh-aw.work_queue.dispatches.{reserved,started,bound}</code></td><td>int</td><td>Non-closed dispatches by state.</td></tr>
-    <tr><td><code>gh-aw.work_queue.committed.{Work,Claim,Dispatch,Bound,Completion,ClaimCancellation,WorkCancellation,Release}</code></td><td>int</td><td>Committed operations of each kind.</td></tr>
+    <tr><td><code>gh-aw.work_queue.dispatches.&lt;state&gt;</code></td><td>int</td><td>Non-closed dispatches by state: <code>reserved</code>, <code>started</code>, <code>bound</code>.</td></tr>
+    <tr><td><code>gh-aw.work_queue.committed.&lt;kind&gt;</code></td><td>int</td><td>Committed operations of each kind: <code>Work</code>, <code>Claim</code>, <code>Dispatch</code>, <code>Bound</code>, <code>Completion</code>, <code>ClaimCancellation</code>, <code>WorkCancellation</code>, <code>Release</code>.</td></tr>
   </tbody>
 </table>
 

@@ -2784,12 +2784,12 @@ function undeclaredOutputTypes(work, messages, noWriteTypes = NO_WRITE_TYPES) {
  * Main entry point for the handler manager
  * This is called by the consolidated safe output step
  *
- * @param {{queueClient?: object, authorize?: (request: Record<string, unknown>) => unknown, activationCommentLinks?: string[]}} [options]
+ * @param {{queueClient?: object, authorize?: (request: Record<string, unknown>) => unknown, activationCommentLinks?: string[], messages?: object[]}} [options]
  */
 async function main(options = {}) {
   const activationCommentLinks = options.activationCommentLinks ?? [];
   const scope = readClaimScopeContext();
-  if (!scope) return runOutputBatch({}, activationCommentLinks);
+  if (!scope) return runOutputBatch(options, activationCommentLinks);
   if (!scope.assignment) {
     const output = loadAgentOutput({ partitioning: true });
     if (output.success && output.items.length) throw new Error("Unassigned queue dispatcher cannot execute worker safe outputs");

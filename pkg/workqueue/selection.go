@@ -148,20 +148,3 @@ func (state Projection) assignmentOnly(dispatch *DispatchState) (Assignment, err
 	assignment.Claims = append(assignment.Claims, AssignmentClaim{Handle: claim.Handle, ClaimID: claim.ClaimID, WorkID: work.WorkID, Work: work.Payload, ResultRefs: refs, Continuation: work.Continuation})
 	return assignment, nil
 }
-
-// AssignmentsForRequest returns the assignments of every Dispatch a request created.
-func AssignmentsForRequest(state Projection, requestID string) ([]Assignment, error) {
-	assignments := []Assignment{}
-	for _, id := range state.dispatchOrder {
-		dispatch := state.Dispatches[id]
-		if dispatch.RequestID != requestID {
-			continue
-		}
-		assignment, err := state.assignmentOnly(dispatch)
-		if err != nil {
-			return nil, err
-		}
-		assignments = append(assignments, assignment)
-	}
-	return assignments, nil
-}

@@ -114,7 +114,6 @@ For the full queue behavior and operator configuration, see the [work-queue refe
 | `Projection.EligibleWork` | `func (state Projection) EligibleWork(pool string, profiles map[string]DispatchProfile) []*WorkState` | Lists eligible Work in scheduling order. |
 | `Projection.PoolOccupancy` | `func (state Projection) PoolOccupancy(pool string) (int, map[string]int)` | Counts occupied slots (open Claims) and open Claims per fairness key. |
 | `AssignmentForDispatch` | `func AssignmentForDispatch(state Projection, dispatchID string) (Assignment, error)` | Builds a worker assignment. |
-| `AssignmentsForRequest` | `func AssignmentsForRequest(state Projection, requestID string) ([]Assignment, error)` | Builds assignments for a committed request. |
 
 ### Transport and Settings Functions
 
