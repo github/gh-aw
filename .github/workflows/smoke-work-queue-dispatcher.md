@@ -59,6 +59,47 @@ jobs:
           }
           assert.equal(new Set(receipt.launches.map(launch => launch.dispatch_id)).size, 3, "Smoke requires three distinct worker dispatches");
           JS
+  report_smoke_failure:
+    needs: [agent, safe_outputs, verify_smoke_dispatch]
+    # failure() is required: without a status function the implicit success() would skip this job.
+    # Reruns (run_attempt > 1) skip activation by design and fail verify structurally; do not alert on them.
+    if: failure() && needs.verify_smoke_dispatch.result == 'failure' && github.run_attempt == 1
+    runs-on: ubuntu-slim
+    timeout-minutes: 3
+    permissions:
+      issues: write
+    steps:
+      - name: Open smoke failure issue assigned to elefthei
+        uses: actions/github-script@v9.0.0
+        env:
+          SMOKE_AGENT_RESULT: ${{ needs.agent.result }}
+          SMOKE_SAFE_OUTPUTS_RESULT: ${{ needs.safe_outputs.result }}
+          SMOKE_VERIFY_RESULT: ${{ needs.verify_smoke_dispatch.result }}
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const runUrl = `${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}/attempts/${context.runAttempt ?? process.env.GITHUB_RUN_ATTEMPT}`;
+            const issue = await github.rest.issues.create({
+              owner,
+              repo,
+              title: `[WorkQueue Health] Smoke Work Queue Dispatcher failed - run ${context.runId}`,
+              body: [
+                "## Smoke Work Queue Dispatcher failure",
+                "",
+                `**Workflow run:** ${runUrl}`,
+                "",
+                "| Job | Result |",
+                "| --- | --- |",
+                `| agent | ${process.env.SMOKE_AGENT_RESULT} |`,
+                `| safe_outputs | ${process.env.SMOKE_SAFE_OUTPUTS_RESULT} |`,
+                `| verify_smoke_dispatch | ${process.env.SMOKE_VERIFY_RESULT} |`,
+                "",
+                "`verify_smoke_dispatch` requires a successful agent and safe_outputs job plus exactly three accepted `smoke-work-queue-worker` dispatches. Check the `verify_smoke_dispatch` log for the failed assertion, then the queue ledger and worker runs.",
+              ].join("\n"),
+              labels: ["automation", "testing", "backlog:run-alerts"],
+              assignees: ["elefthei"],
+            });
+            core.info(`Opened issue #${issue.data.number}`);
 steps:
   - name: Prepare synthetic work and bounded dispatch
     uses: actions/github-script@v9.0.0
@@ -125,7 +166,8 @@ run after recompilation. The dedicated pool has concurrency three. Fewer than
 three dispatches is a smoke failure; the companion `smoke-work-queue-monitor`
 workflow reports stuck or failed Work. Trusted dispatch verification rejects
 missing receipts and launches that were not accepted; an always-running
-downstream check also rejects skipped or failed jobs. The dispatcher does not
+downstream check also rejects skipped or failed jobs. A failed check opens a
+`[WorkQueue Health]` issue assigned to `elefthei`. The dispatcher does not
 wait for worker binding or completion.
 
 `effect_contract: {kind: "none"}` forbids Claim resource effects, not framework
