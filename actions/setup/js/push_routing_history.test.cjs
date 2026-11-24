@@ -9,7 +9,7 @@ const req = require;
 const fixtures = req("./fixtures/routing_analytics_runs.cjs");
 const { readJsonlFile } = req("./jsonl_helpers.cjs");
 const { applyRun, emptyState, trimRuns } = req("./routing_history.cjs");
-const { ineligibility, main, readConfig, sessionEvidence } = req("./push_routing_history.cjs");
+const { ineligibility, main, readConfig, runCost, sessionEvidence } = req("./push_routing_history.cjs");
 
 const BRANCH = "memory/adaptive-routing/triage";
 const GENERATION = `${"a".repeat(64)}:${"b".repeat(64)}`;
@@ -267,6 +267,23 @@ describe("push_routing_history evidence", () => {
       firewall("firewall.token_usage", { requestId: "r1", provider: "anthropic", usage: { inputTokens: 1, outputTokens: 2 } }),
     ];
     expect(sessionEvidence(events)).toEqual({ observation: null, pair: "anthropic/model-b@none", cost: { credits: null, model_credits: null, tokens: null } });
+  });
+
+  it("emits null model_credits when an unpriced sub-agent makes total credits null, while preserving main tokens", () => {
+    const routing = [
+      { stage: "selection", selectedProvider: "copilot", wireModel: "model-a", selectedEffort: "high" },
+      { stage: "request", request_id: "r-main", routed: "as_selected", requested_model: "model-a" },
+      { stage: "request", request_id: "r-sub", routed: "deviated", requested_model: "sub-model" },
+    ];
+    const usage = [
+      { requestId: "r-main", provider: "copilot", aic: 30, usage: { inputTokens: 1000, cacheReadInputTokens: 400, cacheCreationInputTokens: 0, outputTokens: 200 } },
+      { requestId: "r-sub", provider: "copilot", usage: { inputTokens: 500, cacheReadInputTokens: 0, cacheCreationInputTokens: 0, outputTokens: 100 } },
+    ];
+    expect(runCost(usage, routing, ["sub-model"])).toEqual({
+      credits: null,
+      model_credits: null,
+      tokens: [600, 400, 0, 200, null],
+    });
   });
 });
 

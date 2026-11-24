@@ -182,7 +182,9 @@ function requestTokens(used) {
 /**
  * The run's cost from AWF's records (contract 4): `credits` over every agent request except the
  * router's classifier call, and `model_credits` and token counts over the main conversation's
- * requests. Each is null when a request it covers lacks a price or a count.
+ * requests. `credits` is null when any covered request lacks a price, `model_credits` is null
+ * whenever `credits` is null or there are no main requests, and `tokens` is null when a main
+ * request lacks a count.
  * @param {Record<string, any>[]} usage firewall.token_usage data
  * @param {Record<string, any>[]} routing firewall.model_routing data with raw request fields
  * @param {unknown} subAgentModels
@@ -225,9 +227,10 @@ function runCost(usage, routing, subAgentModels) {
     reasoning = reasoning === null || reasoned === null ? null : reasoning + reasoned;
   }
   const round = (/** @type {number | null} */ value) => (value === null ? null : Number(value.toFixed(6)));
+  const totalCredits = requests > 0 ? round(credits) : null;
   return {
-    credits: requests > 0 ? round(credits) : null,
-    model_credits: main > 0 ? round(modelCredits) : null,
+    credits: totalCredits,
+    model_credits: totalCredits !== null && main > 0 ? round(modelCredits) : null,
     tokens: main > 0 && tokens !== null ? [...tokens, reasoning] : null,
   };
 }
