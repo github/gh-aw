@@ -665,6 +665,33 @@ function processFile(filePath, secretValues, maskedValues = [], prepareForCustom
     const redacted = genericResult.content;
     const totalRedactions = encodedResult.redactionCount + genericResult.redactionCount;
 
+    if (path.basename(filePath) === "detection_result.json" && path.basename(path.dirname(filePath)) === "threat-detection" && totalRedactions > 0) {
+      let before;
+      try {
+        before = JSON.parse(content);
+      } catch {
+        before = null;
+      }
+      const kinds = ["prompt_injection", "secret_leak", "malicious_patch"];
+      if (before && kinds.every(kind => typeof before[kind] === "boolean")) {
+        let after;
+        try {
+          after = JSON.parse(redacted);
+        } catch {
+          throw new Error(`${ERR_VALIDATION}: Redaction changed the detection verdict schema`);
+        }
+        const sameStructure = (a, b) => {
+          if (typeof a !== typeof b || (a === null) !== (b === null)) return false;
+          if (a === null) return true;
+          if (Array.isArray(a)) return Array.isArray(b) && a.length === b.length && a.every((value, index) => sameStructure(value, b[index]));
+          if (typeof a === "object") return !Array.isArray(b) && Object.keys(a).length === Object.keys(b).length && Object.keys(a).every(key => Object.hasOwn(b, key) && sameStructure(a[key], b[key]));
+          if (typeof a === "string") return b.trim() !== "";
+          return a === b;
+        };
+        if (!sameStructure(before, after)) throw new Error(`${ERR_VALIDATION}: Redaction changed the detection verdict schema`);
+      }
+    }
+
     if (totalRedactions > 0 || prepareForCustomMasking) {
       stage = "write";
       writeProcessedFile(filePath, redacted, totalRedactions > 0);
