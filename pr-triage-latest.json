@@ -1,11 +1,11 @@
 {
-  "generated_at": "2026-11-24T00:38:04Z",
-  "run_id": "pr-triage-2026-11-24T00:38:04Z",
+  "generated_at": "2026-11-24T12:27:06Z",
+  "run_id": "pr-triage-2026-11-24T12:27:06Z",
   "source": "pr-triage",
   "open_copilot_prs": 0,
-  "scanned_open_prs": 9,
+  "scanned_open_prs": 16,
   "eligible_total": 0,
-  "cooldown_skipped": 9,
+  "cooldown_skipped": 0,
   "category_counts": {
     "docs": 0,
     "test": 0,
@@ -36,63 +36,105 @@
   "batches": [],
   "skipped_prs": [
     {
-      "number": 80581,
-      "title": "Fix dynamic secret selection false positives in strict linting",
-      "author": "pelikhan",
-      "updated_at": "2026-11-24T00:14:07Z"
+      "number": 80701,
+      "title": "Bump actions/setup-java from 6.2.0 to 6.3.0",
+      "author": "dependabot[bot]",
+      "updated_at": "2026-11-24T10:35:55Z"
     },
     {
-      "number": 80556,
-      "title": "Reduce ambient context in agentic workflows",
+      "number": 80700,
+      "title": "Bump actions/setup-go from 7.0.0 to 7.1.0",
+      "author": "dependabot[bot]",
+      "updated_at": "2026-11-24T12:08:10Z"
+    },
+    {
+      "number": 80699,
+      "title": "Bump anyio from 4.15.1 to 4.16.0 in /.github/workflows",
+      "author": "dependabot[bot]",
+      "updated_at": "2026-11-24T10:31:18Z"
+    },
+    {
+      "number": 80698,
+      "title": "Bump charm.land/bubbletea/v2 from 2.1.1 to 2.1.2",
+      "author": "dependabot[bot]",
+      "updated_at": "2026-11-24T10:31:17Z"
+    },
+    {
+      "number": 80697,
+      "title": "Bump typing-inspection from 0.4.4 to 0.4.5 in /.github/workflows",
+      "author": "dependabot[bot]",
+      "updated_at": "2026-11-24T10:32:35Z"
+    },
+    {
+      "number": 80696,
+      "title": "Bump botocore from 1.44.5 to 1.44.9 in /.github/workflows",
+      "author": "dependabot[bot]",
+      "updated_at": "2026-11-24T10:33:14Z"
+    },
+    {
+      "number": 80695,
+      "title": "Bump github.com/charmbracelet/x/ansi from 0.11.9 to 0.11.10",
+      "author": "dependabot[bot]",
+      "updated_at": "2026-11-24T10:30:16Z"
+    },
+    {
+      "number": 80694,
+      "title": "Bump charm.land/bubbles/v2 from 2.2.1 to 2.2.2",
+      "author": "dependabot[bot]",
+      "updated_at": "2026-11-24T10:32:54Z"
+    },
+    {
+      "number": 80693,
+      "title": "Bump golang.org/x/tools from 0.52.0 to 0.53.0",
+      "author": "dependabot[bot]",
+      "updated_at": "2026-11-24T10:30:34Z"
+    },
+    {
+      "number": 80692,
+      "title": "Bump fonttools from 4.67.0 to 4.68.0 in /.github/workflows",
+      "author": "dependabot[bot]",
+      "updated_at": "2026-11-24T10:32:45Z"
+    },
+    {
+      "number": 80691,
+      "title": "Bump huggingface-hub from 1.33.0 to 2.4.0 in /.github/workflows",
+      "author": "dependabot[bot]",
+      "updated_at": "2026-11-24T10:30:38Z"
+    },
+    {
+      "number": 80684,
+      "title": "Migrate YAML v3 imports to the canonical module path",
       "author": "gh-aw-bot",
-      "updated_at": "2026-11-23T21:58:48Z"
-    },
-    {
-      "number": 80583,
-      "title": "Record routed runs in an adaptive routing history (observe mode)",
-      "author": "rabeckett",
-      "updated_at": "2026-11-24T00:00:00Z"
+      "updated_at": "2026-11-24T10:25:26Z"
     },
     {
       "number": 80582,
       "title": "Port sandboxed threat detection and eligibility checks to JavaScript",
       "author": "davidslater",
-      "updated_at": "2026-11-24T00:00:00Z"
-    },
-    {
-      "number": 80579,
-      "title": "[model-inventory] Model alias inventory update - 2026-11-23",
-      "author": "github-actions[bot]",
-      "updated_at": "2026-11-23T20:31:16Z"
-    },
-    {
-      "number": 79748,
-      "title": "Replace work-queue protocol v3 with time-free v4",
-      "author": "elefthei",
-      "updated_at": "2026-11-20T00:00:00Z"
+      "updated_at": "2026-11-24T00:59:53Z"
     },
     {
       "number": 80395,
       "title": "Set OpenCode GPT-5.6 Luna reasoning effort to none",
       "author": "pelikhan",
-      "updated_at": "2026-11-23T14:09:22Z"
-    },
-    {
-      "number": 80390,
-      "title": "Fix activation snapshots for symlinked agent configuration",
-      "author": "pelikhan",
-      "updated_at": "2026-11-23T17:37:00Z"
+      "updated_at": "2026-11-23T21:06:27Z"
     },
     {
       "number": 80016,
       "title": "Investigate code-scanning dispatcher queue policy mismatch",
       "author": "gh-aw-bot",
       "updated_at": "2026-11-22T16:01:03Z"
+    },
+    {
+      "number": 79748,
+      "title": "Replace work-queue protocol v3 with time-free v4",
+      "author": "elefthei",
+      "updated_at": "2026-11-24T09:18:45Z"
     }
   ],
   "notes": [
-    "No open pull requests authored by app/github-copilot were present in the current repository queue after filtering.",
-    "The current queue was excluded by the author gate and the 1-hour cooldown check, so no PR labels or review comments were emitted.",
+    "No open pull requests authored by app/github-copilot were present in the current repository queue.",
+    "All visible open PRs were excluded by the author gate, so no eligible PRs were available for labeling or review comments.",
     "A follow-up run will re-check once a qualifying app/github-copilot PR remains open beyond the cooldown window."
   ],
   "review_status": "triaged"
