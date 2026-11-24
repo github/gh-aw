@@ -221,7 +221,14 @@ describe("smoke work queue monitor collector", () => {
   const repo = { owner: "owner", repo: "repo" };
   const ATTEMPT_ROUTE = "GET /repos/{owner}/{repo}/actions/runs/{run_id}/attempts/{attempt_number}";
   const dispatcherActor = (runId, attempt = 1, workflow = SMOKE_DISPATCHER) => ({ role: "dispatcher", repository: helpers.repository, workflow, run_id: runId, run_attempt: attempt });
-  const runRow = (id, conclusion = "success", status = "completed", run_attempt = 1) => ({ id: Number(id), run_attempt, html_url: `https://github.com/owner/repo/actions/runs/${id}`, status, conclusion });
+  const runRow = (id, conclusion = "success", status = "completed", run_attempt = 1, run_started_at = undefined) => ({
+    id: Number(id),
+    run_attempt,
+    html_url: `https://github.com/owner/repo/actions/runs/${id}`,
+    status,
+    conclusion,
+    ...(run_started_at && { run_started_at }),
+  });
   const attemptRow = (id, attempt, conclusion = "success", status = "completed") => ({ id: Number(id), run_attempt: attempt, html_url: `https://github.com/owner/repo/actions/runs/${id}/attempts/${attempt}`, status, conclusion });
   const REQUEST_ID = "1B41:A4F74:930C3C:1DF33D1:6AD4920C";
   const denied = (requestId = REQUEST_ID) =>
@@ -233,13 +240,16 @@ describe("smoke work queue monitor collector", () => {
   const leaked = text => ["Bad credentials", "ghp_secret", "ghp_header_secret", "private response body"].filter(secret => text.includes(secret));
   const prefixes = claims => claims.map(claim => claim.claim_id.slice(0, 12)).sort();
 
-  /** A smoke ledger published one Git commit per append, as the store does. */
+  /** A smoke ledger published one Git commit per append, as the store does, a minute apart. */
   function smokeLedger() {
     const git = helpers.fakeQueueGitHub();
+    const dates = new Map();
+    let clock = Date.parse("2026-11-01T00:00:00Z");
     let log = [];
     const publish = next => {
       log = next;
-      git.install(helpers.ledgerText(log));
+      clock += 60_000;
+      dates.set(git.install(helpers.ledgerText(log)), new Date(clock).toISOString());
     };
     const append = step => {
       const next = step(log);
@@ -247,6 +257,9 @@ describe("smoke work queue monitor collector", () => {
     };
     return {
       git,
+      dates,
+      now: () => new Date(clock).toISOString(),
+      wait: ms => (clock += ms),
       withoutLastLine: () => helpers.ledgerText(log.slice(0, -1)),
       submit(runId) {
         const works = [1, 2, 3].map(index => helpers.work(`smoke-${index}`, { graph_id: `${POOL}:${runId}`, pool: POOL, worker_profile: PROFILE }));
@@ -273,9 +286,11 @@ describe("smoke work queue monitor collector", () => {
 
   // Dispatcher A's workers are terminated and its Claims released; dispatcher B then submits three
   // fresh items but, FIFO, claims and completes A's. Mirrors monitor run 44936660441.
-  function fifoIncident({ checkpoint = false, tamper = false } = {}) {
+  function fifoIncident({ checkpoint = false, tamper = false, checkpointsBefore = 0 } = {}) {
     const ledger = smokeLedger();
     const aWork = ledger.submit("1001");
+    for (let index = 0; index < checkpointsBefore; index++) ledger.checkpoint();
+    const checkpointed = ledger.now();
     const a = ledger.grant(dispatcherActor("1001"), 3, "500");
     a.forEach((claim, index) => {
       ledger.bind(claim.dispatch_id, `500${index + 1}`);
@@ -290,10 +305,10 @@ describe("smoke work queue monitor collector", () => {
       ledger.finish(claim.dispatch_id, `600${index + 1}`);
     });
     const attempts = new Map([...[5001, 5002, 5003].map(id => [`${id}/1`, attemptRow(id, 1, "failure")]), ...[6001, 6002, 6003].map(id => [`${id}/1`, attemptRow(id, 1)])]);
-    return { ledger, aWork, bWork, a, b, attempts };
+    return { ledger, aWork, bWork, a, b, attempts, checkpointed };
   }
 
-  async function monitor({ ledger, runs, attempts, latestRuns = {}, git = {}, loadSnapshot = undefined }) {
+  async function monitor({ ledger, runs, attempts, latestRuns = {}, git = {}, loadSnapshot = undefined, readState = projection => projection }) {
     const calls = [];
     const warnings = [];
     const github = {
@@ -312,7 +327,7 @@ describe("smoke work queue monitor collector", () => {
             let current = sha;
             for (let index = 1; index < page && current; index++) current = ledger.git.commits.get(current)?.parents[0];
             const entry = current ? ledger.git.commits.get(current) : undefined;
-            return { data: entry ? [{ sha: current, parents: entry.parents.map(parent => ({ sha: parent })) }] : [] };
+            return { data: entry ? [{ sha: current, commit: { committer: { date: ledger.dates.get(current) } }, parents: entry.parents.map(parent => ({ sha: parent })) }] : [] };
           },
         },
         git: { ...ledger.git.githubClient.rest.git, ...git },
@@ -331,7 +346,7 @@ describe("smoke work queue monitor collector", () => {
       context: { repo },
       core: { warning: message => warnings.push(message) },
       loadSnapshot: loadSnapshot ?? (() => ({ sha: head, projection: replayTransactionLog(ledger.git.contents()) })),
-      readStateAtSHA: async sha => replayTransactionLog((await readQueueContentsAtSHA({ githubClient: github, ...repo }, sha)).contents),
+      readStateAtSHA: async sha => readState(replayTransactionLog((await readQueueContentsAtSHA({ githubClient: github, ...repo }, sha)).contents)),
     });
     return { report, calls, warnings };
   }
@@ -518,6 +533,79 @@ describe("smoke work queue monitor collector", () => {
     expect(report.errors).toHaveLength(1);
     expect(report.errors[0]).toMatchObject({ operation: "read_claim_history", ...error });
     expect(leaked(JSON.stringify({ report, warnings }))).toEqual([]);
+  });
+
+  // Seven checkpoints precede the cycle: walking past them exhausts the six-segment history bound.
+  it("skips a dispatcher that provably granted nothing for an older healthy one", async () => {
+    const incident = fifoIncident({ checkpointsBefore: 7 });
+    incident.ledger.wait(10 * 60_000);
+    const started = incident.ledger.now();
+    incident.ledger.submit("1003");
+    const run = startedAt => runRow(1003, "success", "completed", 1, startedAt);
+    const { report, calls } = await monitor({ ...incident, runs: [run(started), runRow(1002)] });
+    expect(report.errors).toEqual([]);
+    expect(report.dispatcher.id).toBe(1002);
+    expect(report.healthy).toBe(true);
+    expect(report.queue.claims.map(claim => claim.claim_id_prefix).sort()).toEqual(prefixes(incident.b));
+    expect(calls.filter(call => call.op === "listCommits")).toHaveLength(1);
+
+    // Checkpoints are a minute apart. Starting within the clock-skew margin of the newest one, the
+    // walk continues to the first checkpoint more than five minutes older than the start.
+    const nearCheckpoint = new Date(Date.parse(incident.checkpointed) + 4 * 60_000).toISOString();
+    const near = await monitor({ ...incident, runs: [run(nearCheckpoint), runRow(1002)] });
+    expect(near.report.errors).toEqual([]);
+    expect(near.report.dispatcher.id).toBe(1002);
+    expect(near.calls.filter(call => call.op === "listCommits")).toHaveLength(3);
+
+    // Without a start nothing proves the absence of an older grant: the bounded walk reports
+    // exhausted history rather than zero grants.
+    const unproven = (await monitor({ ...incident, runs: [run(undefined), runRow(1002)] })).report;
+    expect(unproven.dispatcher.id).toBe(1003);
+    expect(unproven.healthy).toBe(false);
+    expect(unproven.errors).toEqual([expect.objectContaining({ operation: "read_claim_history", code: "HISTORY_EXHAUSTED" })]);
+  });
+
+  it("charges a failed history read only to the candidate whose walk needed it", async () => {
+    const incident = fifoIncident({ checkpoint: true });
+    incident.ledger.wait(10 * 60_000);
+    const started = incident.ledger.now();
+    incident.ledger.submit("1003");
+    const { getCommit } = incident.ledger.git.githubClient.rest.git;
+    let failures = 1;
+    const git = { getCommit: async params => (failures-- > 0 ? Promise.reject(denied()) : getCommit(params)) };
+    const { report } = await monitor({ ...incident, runs: [runRow(1003, "success", "completed", 1, started), runRow(1002)], git });
+    expect(report.dispatcher.id).toBe(1002);
+    expect(report.errors).toEqual([expect.objectContaining({ operation: "read_claim_history", status: 403 })]);
+    expect(failures).toBe(0);
+  });
+
+  it("reads Claims a later checkpoint pruned from the segment before it", async () => {
+    const plain = await monitor({ ...fifoIncident(), runs: [runRow(1002)] });
+    const incident = fifoIncident();
+    incident.ledger.checkpoint();
+    expect(replayTransactionLog(incident.ledger.git.contents()).claims.size).toBe(0);
+    const { report } = await monitor({ ...incident, runs: [runRow(1002)] });
+    expect(report.errors).toEqual([]);
+    expect(report.healthy).toBe(true);
+    expect(report.queue.claims).toEqual(plain.report.queue.claims);
+    expect(report.workers).toEqual(plain.report.workers);
+  });
+
+  it.each([
+    ["absent from the segment that granted it", { pruned: true }, (claims, id) => claims.delete(id), "CLAIM_RECORD_MISSING"],
+    ["absent from the snapshot that granted it", { pruned: false }, (claims, id) => claims.delete(id), "CLAIM_RECORD_MISSING"],
+    ["open although a checkpoint pruned it", { pruned: true }, (claims, id) => (claims.get(id).state = "open"), "CLAIM_RECORD_CONFLICT"],
+  ])("reports a granted Claim %s", async (_name, { pruned }, tamper, code) => {
+    const incident = fifoIncident();
+    if (pruned) incident.ledger.checkpoint();
+    const id = incident.b[0].claim_id;
+    const corrupt = projection => (tamper(projection.claims, id), projection);
+    const head = incident.ledger.git.refs.get("work-queue");
+    const snapshot = () => ({ sha: head, projection: (pruned ? projection => projection : corrupt)(replayTransactionLog(incident.ledger.git.contents())) });
+    const { report } = await monitor({ ...incident, runs: [runRow(1002)], loadSnapshot: snapshot, readState: pruned ? corrupt : undefined });
+    expect(report.dispatcher.id).toBe(1002);
+    expect(report.healthy).toBe(false);
+    expect(report.errors).toEqual([expect.objectContaining({ operation: "match_claim_records", code, category: "evidence" })]);
   });
 });
 

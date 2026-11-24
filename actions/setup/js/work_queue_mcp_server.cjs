@@ -13,6 +13,7 @@ const { eligibleWork, fifoCompare } = require("./work_queue_scheduler.cjs");
 const { MAX_PARSE_BYTES, MAX_SNAPSHOT_PARSE_BYTES, closed, identity, integer, parseStrictJSON, utf8Compare } = require("./work_queue_codec.cjs");
 const { INTENT_VERSION, normalizeDispatchParameters, stageFinishIntent, stageIntent, validateStagedNode } = require("./work_queue_intents.cjs");
 const { normalizeAssignment } = require("./work_queue_claim_scope.cjs");
+const { sanitizeContinuationMessage } = require("./request_continuation_routes.cjs");
 
 const DEFAULT_SNAPSHOT_PATH = "/tmp/gh-aw/work-queue.snapshot.json";
 const DEFAULT_FINISH_INTENT_PATH = path.join(process.env.RUNNER_TEMP || "/tmp", "gh-aw", "safeoutputs", "work-queue", "work-queue.finish.jsonl");
@@ -80,14 +81,15 @@ function assignmentView(snapshot) {
   if (!snapshot.worker) return null;
   return {
     dispatch_id: snapshot.worker.dispatch_id,
-    // A continuation is untrusted remaining-work context from the parent run, beside the unchanged payload.
+    // A continuation is untrusted remaining-work context from the parent run, beside the unchanged payload;
+    // the message is read back from the ledger, so it is sanitized again before reaching the agent.
     claims: snapshot.worker.claims.map(claim => ({
       claim_handle: claim.handle,
       claim_id: claim.claim_id,
       work_id: claim.work_id,
       work: claim.work,
       result_refs: claim.result_refs,
-      ...(claim.continuation ? { continuation: claim.continuation } : {}),
+      ...(claim.continuation ? { continuation: { ...claim.continuation, message: sanitizeContinuationMessage(claim.continuation.message) } } : {}),
     })),
   };
 }
@@ -279,6 +281,8 @@ function startWorkQueueServer(options = {}) {
 }
 
 if (require.main === module) {
+  // A standalone MCP process has no github-script `core`; the shim logs to stderr, keeping stdout for JSON-RPC.
+  require("./shim.cjs");
   try {
     startWorkQueueServer();
   } catch (error) {

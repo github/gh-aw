@@ -17,6 +17,9 @@ const ACTIVE_RUN_STATES = new Set(["queued", "in_progress", "waiting", "pending"
 const UNBOUND_DISPATCH_STATES = new Set(["reserved", "started"]);
 const MAX_CANDIDATES = 6;
 const MAX_ARCHIVED_SEGMENTS = 6;
+// Ledger Git commits and run start times are both stamped by GitHub; the margin absorbs
+// service clock skew and the Git date's whole-second resolution.
+const CLOCK_SKEW_MS = 5 * 60 * 1000;
 const LEDGER_PATH = "work-queue.jsonl";
 const FULL_SHA = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/;
 
@@ -54,6 +57,15 @@ function isCheckpoint(commit) {
 
 const runKey = (runId, attempt) => `${runId}/${attempt}`;
 
+/** Start of the listed attempt in epoch ms, or null when the run row does not say. */
+function attemptStart(run) {
+  for (const value of [run.run_started_at, run.created_at]) {
+    const time = typeof value === "string" ? Date.parse(value) : NaN;
+    if (Number.isFinite(time)) return time;
+  }
+  return null;
+}
+
 /**
  * @param {{github: any, context: any, core: any, loadSnapshot: () => {sha: string | null, projection: any}, readStateAtSHA: (sha: string) => Promise<any>}} options
  */
@@ -85,50 +97,74 @@ async function collectSmokeCycle({ github, context, core, loadSnapshot, readStat
     recordError(report.errors, "list_dispatcher_runs", error);
   }
 
+  // Ledger segments, newest first: the activation snapshot, then each log a checkpoint folded.
+  // A segment's `link` caches its checkpoint Git commit (date and parent) once read; a failed
+  // read caches nothing, so it belongs only to the candidate whose walk needed it.
+  const segments = snapshot ? [{ sha: snapshot.sha, projection: snapshot.projection, link: null }] : [];
+
   // Original dispatch_next grants of the listed dispatcher attempts, from the newest segment holding them.
   const candidates = new Set(runs.map(run => runKey(run.id, run.run_attempt)));
   const grants = new Map();
-  const indexGrants = projection => {
+  const indexGrants = segment => {
     const found = new Map();
-    for (const commit of projection.transactions) {
+    for (const commit of segments[segment].projection.transactions) {
       const { actor, request } = commit;
       if (request.kind !== "dispatch_next" || request.parameters.pool !== POOL) continue;
       if (actor.role !== "dispatcher" || actor.repository !== repository || actor.workflow !== DISPATCHER_WORKFLOW) continue;
       const key = runKey(actor.run_id, actor.run_attempt);
       if (!candidates.has(key) || grants.has(key)) continue;
       const claims = commit.operations.filter(operation => operation.kind === "Claim");
-      found.set(key, [...(found.get(key) ?? []), { commit_id: commit.id, request_id: request.id, claims }]);
+      found.set(key, [...(found.get(key) ?? []), { commit_id: commit.id, request_id: request.id, segment, claims }]);
     }
     for (const [key, list] of found) grants.set(key, list);
   };
-  if (snapshot) indexGrants(snapshot.projection);
+  if (snapshot) indexGrants(0);
 
-  // A checkpoint folds earlier grants into Claims that no longer name their actor; walk
-  // Git history from the captured SHA, one archived segment at a time, to recover them.
-  const history = { segment: snapshot, archived: 0, error: null };
-  const grantsFor = async key => {
-    while (!grants.has(key)) {
-      if (history.error) throw history.error;
-      const tail = history.segment;
-      const first = tail.projection.transactions[0];
+  /** The checkpoint Git commit that starts a segment: its committer date and sole parent. */
+  const linkOf = async segment => {
+    if (typeof segment.sha !== "string" || !FULL_SHA.test(segment.sha)) throw evidenceFailure("HISTORY_UNANCHORED");
+    const listed = (await github.rest.repos.listCommits({ owner, repo, sha: segment.sha, path: LEDGER_PATH, per_page: 1, page: segment.projection.transactions.length })).data;
+    const entry = Array.isArray(listed) && listed.length === 1 ? listed[0] : null;
+    const parents = entry?.parents;
+    if (!Array.isArray(parents) || parents.length !== 1 || typeof parents[0]?.sha !== "string" || !FULL_SHA.test(parents[0].sha)) throw evidenceFailure("HISTORY_UNANCHORED");
+    const date = entry.commit?.committer?.date;
+    const time = typeof date === "string" ? Date.parse(date) : NaN;
+    return { parent: parents[0].sha, time: Number.isFinite(time) ? time : null };
+  };
+
+  // A checkpoint folds earlier grants into Claims that no longer name their actor; walk Git
+  // history from the captured SHA, one archived segment at a time, to recover them. Every grant
+  // of an attempt is committed after that attempt starts, and every commit in an older segment is
+  // an ancestor of the checkpoint commit, so once a checkpoint predates the start no older
+  // segment can hold one: the attempt granted nothing (normal when the pool is full).
+  const grantsFor = async run => {
+    const key = runKey(run.id, run.run_attempt);
+    const started = attemptStart(run);
+    for (let index = 0; !grants.has(key); index++) {
+      const segment = segments[index];
+      const first = segment.projection.transactions[0];
       if (!isCheckpoint(first)) return [];
-      try {
-        if (history.archived >= MAX_ARCHIVED_SEGMENTS) throw evidenceFailure("HISTORY_EXHAUSTED");
-        history.archived += 1;
-        if (typeof tail.sha !== "string" || !FULL_SHA.test(tail.sha)) throw evidenceFailure("HISTORY_UNANCHORED");
-        const listed = (await github.rest.repos.listCommits({ owner, repo, sha: tail.sha, path: LEDGER_PATH, per_page: 1, page: tail.projection.transactions.length })).data;
-        const parents = Array.isArray(listed) && listed.length === 1 ? listed[0].parents : null;
-        if (!Array.isArray(parents) || parents.length !== 1 || typeof parents[0]?.sha !== "string" || !FULL_SHA.test(parents[0].sha)) throw evidenceFailure("HISTORY_UNANCHORED");
-        const projection = await readStateAtSHA(parents[0].sha);
-        if (projection.repository !== snapshot.projection.repository || projection.tip !== first.operations[0].prior_tip) throw evidenceFailure("HISTORY_UNANCHORED");
-        history.segment = { sha: parents[0].sha, projection };
-        indexGrants(projection);
-      } catch (error) {
-        history.error = error;
-        throw error;
-      }
+      segment.link ??= await linkOf(segment);
+      if (started !== null && segment.link.time !== null && segment.link.time < started - CLOCK_SKEW_MS) return [];
+      if (index + 1 < segments.length) continue;
+      if (segments.length > MAX_ARCHIVED_SEGMENTS) throw evidenceFailure("HISTORY_EXHAUSTED");
+      const projection = await readStateAtSHA(segment.link.parent);
+      if (projection.repository !== snapshot.projection.repository || projection.tip !== first.operations[0].prior_tip) throw evidenceFailure("HISTORY_UNANCHORED");
+      segments.push({ sha: segment.link.parent, projection, link: null });
+      indexGrants(segments.length - 1);
     }
     return grants.get(key);
+  };
+
+  // A checkpoint prunes terminal Work with its Claims and Dispatches. The newest segment still
+  // holding a granted Claim has its latest state; the grant's own segment always holds it.
+  const recordsOf = (claimId, through) => {
+    for (let index = 0; index <= through; index++) {
+      const { claims, dispatches } = segments[index].projection;
+      const claim = claims.get(claimId);
+      if (claim) return { claim, dispatch: dispatches.get(claim.dispatch_id), pruned: index > 0 };
+    }
+    return { claim: undefined, dispatch: undefined, pruned: false };
   };
 
   const attempts = new Map();
@@ -150,24 +186,22 @@ async function collectSmokeCycle({ github, context, core, loadSnapshot, readStat
     return entry.worker;
   };
 
-  // Claim states and bindings always come from the activation projection.
+  // Claim states and bindings come from the newest ledger segment holding the granted Claim.
   const evaluate = async run => {
     const result = { claims: [], workers: [], errors: [], grantCount: 0, distinct: 0, inFlight: false };
     if (!snapshot) return result;
     let granted;
     try {
-      granted = (await grantsFor(runKey(run.id, run.run_attempt))).flatMap(grant => grant.claims.map(operation => ({ grant, operation })));
+      granted = (await grantsFor(run)).flatMap(grant => grant.claims.map(operation => ({ grant, operation })));
     } catch (error) {
       recordError(result.errors, "read_claim_history", error);
       return result;
     }
     result.grantCount = granted.length;
-    const { claims, dispatches } = snapshot.projection;
     const seen = new Set();
     const workers = new Map();
     for (const { grant, operation } of granted) {
-      const claim = claims.get(operation.claim_id);
-      const dispatch = claim ? dispatches.get(claim.dispatch_id) : undefined;
+      const { claim, dispatch, pruned } = recordsOf(operation.claim_id, grant.segment);
       result.claims.push({
         claim_id_prefix: operation.claim_id.slice(0, 12),
         work_id_prefix: operation.work_id.slice(0, 12),
@@ -196,7 +230,8 @@ async function collectSmokeCycle({ github, context, core, loadSnapshot, readStat
         dispatch.claims.includes(operation.claim_id) &&
         dispatch.pool === POOL &&
         dispatch.workflow === WORKER_WORKFLOW;
-      if (!consistent) {
+      // Only terminal Work is pruned, so a Claim absent from the snapshot must be settled.
+      if (!consistent || (pruned && (claim.state === "open" || dispatch.state !== "closed"))) {
         recordError(result.errors, "match_claim_records", evidenceFailure("CLAIM_RECORD_CONFLICT"));
         continue;
       }
@@ -213,14 +248,15 @@ async function collectSmokeCycle({ github, context, core, loadSnapshot, readStat
     return result;
   };
 
-  // Newest first; a successful dispatcher whose sound evidence shows work still running yields to an older one.
+  // Newest first. A successful dispatcher that provably granted nothing (pool full), or whose sound
+  // evidence shows work still running, yields to an older one.
   let selected = null;
   let evidence = null;
   for (const run of runs) {
     if (run.status !== "completed") continue;
     const result = await evaluate(run);
-    const sound = snapshot && result.errors.length === 0 && result.grantCount === EXPECTED_CLAIMS;
-    if (run.conclusion === "success" && sound && result.inFlight) continue;
+    const sound = snapshot && result.errors.length === 0;
+    if (run.conclusion === "success" && sound && (result.grantCount === 0 || (result.grantCount === EXPECTED_CLAIMS && result.inFlight))) continue;
     selected = run;
     evidence = result;
     break;

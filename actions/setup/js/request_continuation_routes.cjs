@@ -202,6 +202,20 @@ function parseInboundDispatchContinuation(payload) {
 }
 
 /**
+ * IS-01 at delivery: a continuation message read back from a dispatch input or
+ * the queue ledger is untrusted, so it passes the same content sanitizer as the
+ * ingested request (control/ANSI removal, URL/protocol filtering, mention and
+ * template neutralization) before it reaches an agent's prompt or tool result.
+ * The bound is the routed limit; UTF-16 length never exceeds UTF-8 bytes, so a
+ * valid message is never truncated. Digests and receipts use the stored message.
+ * @param {string} message
+ * @returns {string}
+ */
+function sanitizeContinuationMessage(message) {
+  return require("./sanitize_content.cjs").sanitizeContent(message, { maxLength: MAX_ROUTED_MESSAGE_BYTES });
+}
+
+/**
  * The trusted routed descriptor from the handler-manager config, or null for the
  * advisory form.
  * @param {any} descriptor
@@ -483,6 +497,7 @@ module.exports = {
   readBoundAgentOutput,
   resolveDefaultBranch,
   routedRequestError,
+  sanitizeContinuationMessage,
   workqueueReceipt,
   writesProhibited,
 };
