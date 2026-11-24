@@ -135,7 +135,7 @@ func TestOverprovisionedSecretsAuthored(t *testing.T) {
 		"  local:\n    uses: ./.github/workflows/b.yml\n    secrets: inherit\n" +
 		"  named:\n    uses: octo/shared/.github/workflows/c.yml@main\n    secrets: {token: '${{ secrets.TOKEN }}'}\n" +
 		"engine:\n  id: copilot\n  env: {ALL: '${{ toJSON(SECRETS) }}'}\n" +
-		"sandbox:\n  agent:\n    env: {PICK: '${{ " + "Secrets" + "[inputs.name] }}', OK: '${{ secrets.TOKEN }}'}\n" +
+		"sandbox:\n  agent:\n    env: {PICK: '${{ " + "Secrets" + "[inputs.name] }}', OK: '${{ secrets.TOKEN }}', ALL: '${{ toJSON(secrets) }}'}\n" +
 		"steps:\n  - env: {ALL: '${{ toJSON(secrets) }}'}\n    run: ./setup.sh\n---\n" +
 		"Summarize ${{ github.event.issue.number }}.\n")
 	require.NoError(t, err)
@@ -145,10 +145,11 @@ func TestOverprovisionedSecretsAuthored(t *testing.T) {
 		got[diagnostic.Path] = diagnostic.Severity
 	}
 	assert.Equal(t, map[string]Severity{
-		"jobs.remote.secrets": Error,
-		"jobs.local.secrets":  Warning,
-		"steps[0].env.ALL":    Error,
-		"engine.env.ALL":      Error,
+		"jobs.remote.secrets":   Error,
+		"jobs.local.secrets":    Warning,
+		"steps[0].env.ALL":      Error,
+		"engine.env.ALL":        Error,
+		"sandbox.agent.env.ALL": Error,
 	}, got)
 }
 
