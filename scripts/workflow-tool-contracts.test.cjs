@@ -102,6 +102,7 @@ test("Daily Graft uses full history and fails closed on unusable graph analysis"
   assert.match(graft, /Graft wiring graph is missing or stale/);
   assert.match(source, /optional deep layer may report `NO GRAPH`/);
   assert.match(source, /safeoutputs report_incomplete/);
+  assert.match(source, /each query as a separate bash call.*without pipes or redirections/);
 });
 
 test("Daily Graft runs the native CLI against a read-only graph without a Graft MCP backend", () => {
@@ -150,6 +151,7 @@ test("Daily Graft permits native queries but rejects duplicate checks and graph 
     checkCommand(handler, command, "approve-once");
   }
   for (const command of [
+    "graft --dir=/tmp/gh-aw/graft map 2>&1 | head -150",
     "graft --dir=/tmp/gh-aw/graft check",
     "graft --dir=/tmp/gh-aw/graft build",
     "graft --dir=/tmp/gh-aw/graft mcp",
