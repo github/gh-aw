@@ -278,62 +278,27 @@ evals:
 
 # Test Quality Sentinel 🧪
 
-The AWF decision gate follows the act-vs-noop rubric before invocation.
-Behavioral changes, hard violations, and uncertain evidence preserve execution.
+The AWF decision gate applies the act-vs-noop rubric before invocation. Behavioral changes, hard violations, and uncertain evidence preserve execution.
 
-You are the Test Quality Sentinel. Analyze new and changed tests in this PR to produce a **Test Quality Score** (0–100) and flag tests that create false comfort without genuine behavioral coverage.
+Analyze added or modified Go and JavaScript tests in this PR. Produce a **Test Quality Score** (0–100) and flag tests that lack genuine behavioral coverage.
 
 - **Repository**: ${{ github.repository }}
 - **Pull Request**: #${{ github.event.pull_request.number }} — "${{ github.event.pull_request.title }}"
 - **Actor**: ${{ github.actor }}
 
-High test counts can create an illusion of safety. The real signal is whether tests cover behavioral contracts and design invariants — not just happy-path implementations.
+Review whether tests cover behavioral contracts and design invariants, not only happy-path implementation details.
 
-## Step 1: Load Pre-fetched PR Data and Identify Test Files
+## Step 1: Check evidence and scope
 
-First check whether `/tmp/gh-aw/agent/test-prefetch-unavailable.txt` exists. If it exists, the review could not run, so read the reason from that file and immediately call `report_incomplete` (never `noop`) with the reason:
+If `/tmp/gh-aw/agent/test-prefetch-unavailable.txt` exists, read its reason and immediately call `report_incomplete`. Never analyze fallback files, call `noop`, or post a report. Missing, stale, truncated, or oversized required evidence also requires `report_incomplete`, never approval or `noop`.
 
-```json
-{"report_incomplete": {"reason": "Test Quality Sentinel could not review tests because pre-fetch PR data was unavailable: <reason>"}}
-```
+Read `/tmp/gh-aw/agent/pr-meta.json`, `test-files.txt`, `test-diff.txt` (maximum 40 KB), `diff-numstat.txt`, `go-new-test-funcs.txt`, `go-modified-test-funcs.txt`, `js-new-test-funcs.txt`, `js-changed-test-files.txt`, `go-testmain-funcs.txt`, `go-goleak-entries.txt`, `missing-build-tags.txt`, `go-test-stats.txt`, and `js-test-stats.txt` from `/tmp/gh-aw/agent/`.
 
-Do not analyze the empty fallback files, post a report, or submit a review when this marker exists. `noop` means the review completed and found nothing to act on; unavailable input is an incomplete review, not a no-action result.
+Review only added or modified Go (`*_test.go`) and JavaScript (`*.test.cjs`, `*.test.js`) behavioral tests; note other languages without scoring. Use extracted signatures and stats as a guide, then read full test bodies in the diff. If no supported Go/JS test files changed, or only unsupported-language tests changed, call `noop` with the specific scope reason. If supported files changed but no behavioral tests changed, apply the infrastructure-only rule below; otherwise use `noop` only when there is no hard violation.
 
-PR data has already been fetched before the agent started. Read from:
+### Step 2: Review changed tests
 
-- `/tmp/gh-aw/agent/pr-meta.json` — PR metadata (files, additions, deletions, branch names)
-- `/tmp/gh-aw/agent/test-files.txt` — list of changed test files
-- `/tmp/gh-aw/agent/test-diff.txt` — complete diff for test files only _(40 KB maximum; missing, oversized, or stale evidence requires `report_incomplete`, never approval or `noop`)_
-- `/tmp/gh-aw/agent/diff-numstat.txt` — numstat for all changed files
-- `/tmp/gh-aw/agent/go-testmain-funcs.txt` — newly added `TestMain` infrastructure entries _(separate from behavioral tests)_
-- `/tmp/gh-aw/agent/go-goleak-entries.txt` — `goleak.VerifyTestMain` calls added in this PR _(goroutine-leak guard signal)_
-
-Then identify all **new and modified test files** in the diff:
-
-- **Go** *(analyzed)*: files ending in `_test.go` with `func Test*` functions; both `//go:build !integration` (unit) and `//go:build integration` files are analyzed
-- **JavaScript** *(analyzed)*: the primary format is `*.test.cjs` (co-located with source in `actions/setup/js/`); also `*.test.js` (scripts); test framework is **vitest** (not jest)
-- **Other languages** *(detected but not scored)*: Python (`test_*.py`, `*_test.py`), Rust (`#[test]` blocks). Note their presence in the report but exclude them from scoring.
-
-If **no test files were added or modified**, call `noop`:
-
-```json
-{"noop": {"message": "No test files were added or modified in this PR. Test Quality Sentinel skipped."}}
-```
-
-Otherwise, collect the list of changed test files and their diffs.
-
-### Step 2: Extract Test Functions
-
-For each changed test file, extract the individual test functions / test cases that were **added or modified** (not just context lines).
-
-For each test, collect:
-- **Test name / identifier**
-- **Test body** (assertions, setup, mocking calls)
-- **File path and approximate line number**
-
-New Go behavioral test function signatures (lines matching `+func Test*`, excluding `TestMain`) are pre-extracted to `/tmp/gh-aw/agent/go-new-test-funcs.txt`. Modified Go behavioral tests detected from hunk headers (`@@ ... func Test...`) are in `/tmp/gh-aw/agent/go-modified-test-funcs.txt`. New JavaScript test blocks (`it(`, `test(`, `describe(`) are in `/tmp/gh-aw/agent/js-new-test-funcs.txt`. Changed JS test files are in `/tmp/gh-aw/agent/js-changed-test-files.txt`. Use these as a starting point, then read `test-diff.txt` for full function bodies.
-
-**Infrastructure vs. behavioral**: `TestMain(m *testing.M)` entries in `go-testmain-funcs.txt` are test infrastructure, not behavioral test cases. Do not score them as test functions. Instead, note them separately in the report and credit any `goleak.VerifyTestMain` usage (see `go-goleak-entries.txt`) as a goroutine-leak design invariant.
+For each behavioral test, record its name, file, approximate line, design invariant (`behavioral_contract`, `implementation_detail`, `unknown`), value if deleted (`high_value`, `low_value`, `duplicated`), and type (`design_test`, `implementation_test`). Do not score `TestMain` as a behavioral test.
 
 If all of the following hold, this is an **infrastructure-only PR** — see the scoring guidance in Step 6:
 - `go-new-test-funcs.txt` is empty
@@ -342,121 +307,43 @@ If all of the following hold, this is an **infrastructure-only PR** — see the 
 - `js-changed-test-files.txt` is empty
 - `go-testmain-funcs.txt` is non-empty
 
-Also check `/tmp/gh-aw/agent/missing-build-tags.txt` — any newly added Go test files missing the mandatory `//go:build` tag on line 1 are listed there.
+### Step 3: Classify quality
 
-### Step 3: Structural Stats
+Use the Go/JS stats for assertions, errors, table-driven cases, and mocks. Count each Go `t.Run` row as a scenario; one valid error assertion earns edge-case credit. Flag happy-path-only tests, missing assertions, Go assertions without descriptive failure context, duplicate patterns shared by 3+ tests, JS mock-heavy tests without observable assertions, and test inflation (>2:1 added test lines to production lines from `diff-numstat.txt`). External-I/O/runtime mocks are acceptable. Go `gomock`, `testify/mock`, `.EXPECT()`, or `.On()` usage and new Go test files without a line-1 `//go:build !integration` or `//go:build integration` tag are hard violations.
 
-Read the pre-computed stats from the pre-fetch step:
+### Step 4: Apply the outcome rubric
 
-- Go: `cat /tmp/gh-aw/agent/go-test-stats.txt` — per-function counts: `assertions`, `errors`, `table_driven`, `forbidden_mocks`
-- JS: `cat /tmp/gh-aw/agent/js-test-stats.txt` — per-test counts: `assertions`, `errors`, `mocks`
+Treat `TestMain` with `goleak.VerifyTestMain(m)` as a package-level design invariant; note it positively and do not penalize missing traditional assertions.
 
-Use these counts directly in Step 4 classification. Accepted signals:
-- **Assertions**: Go (`assert.*`, `require.*`, `t.Error*`), JS (`expect(...).to*`)
-- **Error coverage**: explicit error assertions (`assert.Error`, `.toThrow`, `.rejects`, etc.)
-- **Table-driven credit (Go)**: credit each `t.Run(...)` subtest row; use `table_driven` count from stats
-- **Mocking policy**: external-I/O/runtime mocks are acceptable; `forbidden_mocks > 0` in Go stats is a hard violation
-- **Assertion-message policy (Go)**: flag assertions without descriptive failure context
+No behavioral tests changed and no hard violation: `noop`. A hard violation or implementation-test ratio `>30%`: report concrete evidence and request changes. Other red flags: report only evidenced concerns without escalation. Clean behavioral tests: report and approve; do not invent findings.
 
-### Step 4: AI Quality Review of Each Test
+## Step 5: Score quality
 
-For each new/modified test from Step 2, classify with this compact rubric:
-
-| Question | Classify as |
-|---|---|
-| **Design invariant** — what guarantee does the test enforce? | `behavioral_contract` / `implementation_detail` / `unknown` |
-| **Value if deleted** — what regression would escape? | `high_value` / `low_value` / `duplicated` |
-| **Contract vs implementation** — what does it mostly verify? | `design_test` / `implementation_test` |
-
-Red flags (mark **suspicious** when present):
-1. JS mock-heavy test with no observable behavior assertion (internal-call assertions only)
-2. Go mock libraries (`gomock`, `testify/mock`, `.EXPECT()`, `.On()`) — hard violation
-3. New Go `*_test.go` missing line-1 build tag (`//go:build !integration` or `//go:build integration`) — hard violation
-4. Happy-path only (no error/edge assertions)
-5. Test inflation (test:prod added lines > 2:1)
-6. Duplicated assertion patterns across 3+ tests
-7. No assertions
-8. Go assertion lacks descriptive failure context
-
-**Goroutine-leak guards**: `TestMain` with `goleak.VerifyTestMain(m)` enforces that no goroutines are leaked after each test run. Classify each such entry as `behavioral_contract`, `high_value`, `design_test` — this is a package-level design invariant that protects all future tests. Do not penalize its absence of traditional assertions. If `go-goleak-entries.txt` is non-empty, note it as a positive quality signal in the report.
-
-### Act-vs-noop rubric
-
-Decide whether there is a reviewable signal before drafting a report. Do not use `noop` to avoid reporting a concrete red flag, and do not manufacture a finding merely because a test changed.
-
-| Evidence after the scoped review | Required outcome |
-|---|---|
-| Pre-fetch unavailable (marker file exists) | Call `report_incomplete` immediately with the marker reason; never `noop`; do not post a report. |
-| No changed test files, or only unsupported-language tests | Call `noop` immediately with the specific scope reason; do not post a report. |
-| Recognized test files changed but no behavioral test case changed and no hard violation exists | Call `noop` with the specific scope reason; do not post a report. |
-| A hard violation exists, or the implementation-test ratio exceeds 30% | Act: include each concrete file, test, and evidence in the report, then request changes. |
-| A red flag exists but does not meet the failure threshold | Act: flag only the evidenced test in the report; do not escalate a speculative concern. |
-| Behavioral tests were reviewed and no red flags or violations exist | Act: report the clean result and approve; a clean review is not a reason to invent a finding. |
-
-Scope for this step:
-- Analyze only new/changed Go (`*_test.go`) and JavaScript (`*.test.cjs`, `*.test.js`) tests; note other languages without scoring.
-- Treat Go mocking with `gomock`, `testify/mock`, `.EXPECT()`, or `.On()` as a hard violation.
-- JavaScript vitest mocks for external I/O are acceptable unless business logic is mocked without output assertions.
-- Do not score `TestMain(m *testing.M)` entries as behavioral tests; they are infrastructure.
-
-## Step 5: Count Lines in Test Files vs. Production Files
-
-Calculate the test inflation ratio for each changed test file using the pre-fetched `/tmp/gh-aw/agent/diff-numstat.txt`.
-
-For each **Go and JavaScript** test file, find the corresponding production file and compare the ratio of lines added:
-
-- `foo_test.go` → `foo.go`
-- `foo.test.cjs` → `foo.cjs` (primary in `actions/setup/js/`)
-- `foo.test.js` → `foo.js` (used in `scripts/`)
-
-If the ratio of new lines added to the test file vs. the production file exceeds 2:1, flag it as potential **test inflation**. Inflation scoring does not apply to `TestMain`-only files (pure infrastructure).
-
-## Step 6: Calculate Test Quality Score
-
-Compute **Test Quality Score** (0–100):
+Compute the added-test/production added-line ratio for each changed Go/JS test using `diff-numstat.txt` (`foo_test.go` → `foo.go`; `foo.test.cjs` → `foo.cjs`; `foo.test.js` → `foo.js`). A ratio above 2:1 is inflation; ignore inflation for `TestMain`-only files.
 
 ```
-score = ((design_tests / total_new_tests) * 40) +
-        ((tests_with_edge_cases / total_new_tests) * 30) +
-        (20 - min(duplicate_clusters * 5, 20)) +
-        (0 if any inflation_ratio > 2:1 else 10)
-score = max(0, min(100, score))
+score = 40 * design_tests / total_new_tests
+      + 30 * tests_with_edge_cases / total_new_tests
+      + 20 - min(duplicate_clusters * 5, 20)
+      + (0 if any inflation_ratio > 2:1 else 10)
 ```
 
-Thresholds: `>=80 ✅ Excellent`, `60-79 ⚠️ Acceptable`, `40-59 🔶 Needs improvement`, `<40 ❌ Poor`.
+Clamp to 0–100. Labels: `>=80` Excellent, `60–79` Acceptable, `40–59` Needs improvement, `<40` Poor. If `go-new-test-funcs.txt`, `go-modified-test-funcs.txt`, `js-new-test-funcs.txt`, and `js-changed-test-files.txt` are empty and `go-testmain-funcs.txt` is non-empty, assign `N/A — Infrastructure`; do not apply the implementation ratio, but still flag hard violations. Note `goleak.VerifyTestMain` positively.
 
-**Infrastructure-only PRs**: If `go-new-test-funcs.txt`, `go-modified-test-funcs.txt`, `js-new-test-funcs.txt`, and `js-changed-test-files.txt` are all empty (no behavioral tests added/modified) and `go-testmain-funcs.txt` is non-empty (only `TestMain` infrastructure changed), skip the numeric score formula and assign **Score: N/A — Infrastructure**. Do not fail the PR on implementation ratio (there are no behavioral tests to evaluate). Still flag hard violations (missing build tags, go mock library usage). If `go-goleak-entries.txt` is non-empty, report it as a quality improvement and approve.
+A hard violation or `implementation_tests / total_new_tests > 0.30` requires `REQUEST_CHANGES`. Guideline violations always fail regardless of score.
 
-Fail if either condition is true:
-- `implementation_tests / total_new_tests > 0.30`
-- Any coding-guideline violation exists (Go mock library usage, or new Go test missing required build tag)
+## Step 6: Publish the result
 
-Guideline violations always force `REQUEST_CHANGES` regardless of numeric score.
+Read `test-report-templates`; post one report with `add-comment` (not bash; omit `item_number`). Do not comment for a `noop`. Analyze at most 50 tests, prioritizing new tests; disclose sampling. Keep flagged-test details to 2–3 sentences and wrap classification tables and findings in `<details>`.
 
-## Step 7: Post PR Comment with Results
+Then submit exactly one safe-output action:
 
-Read the `test-report-templates` skill and post the report using `add-comment` (not bash; omit `item_number` — runtime infers the PR). Use the standard template, or the infrastructure-only template when the PR contains only `TestMain`/setup changes.
+- No action: `{"noop":{"message":"No action needed: [scope reason]"}}`
+- Passing behavioral tests: `{"event":"APPROVE","body":"✅ Test Quality Sentinel: {SCORE}/100. {IMPL_PCT}% implementation tests (threshold: 30%)."}`
+- Passing infrastructure-only PR: `{"event":"APPROVE","body":"✅ Test Quality Sentinel: Infrastructure only. {GOLEAK_NOTE} No violations."}`
+- Failure: `{"event":"REQUEST_CHANGES","body":"❌ Test Quality Sentinel: {SCORE}/100. {FAIL_REASON} Review flagged tests in the comment above."}`
 
-## Step 8: Submit PR Review Based on Result
-
-After posting the comment, submit exactly one safe-output action based on the analysis outcome:
-- When no tests required action: `{"noop": {"message": "No action needed: [brief explanation]"}}`
-- When quality passes (`implementation_tests / total <= 30%` and no violations): `{"event": "APPROVE", "body": "✅ Test Quality Sentinel: {SCORE}/100. {IMPL_PCT}% implementation tests (threshold: 30%)."}`
-- When this is an infrastructure-only PR (only `TestMain` changes, no behavioral tests) with no violations: `{"event": "APPROVE", "body": "✅ Test Quality Sentinel: Infrastructure only. {GOLEAK_NOTE} No violations."}`
-- When quality fails (ratio `> 30%` **or** any guideline violation): `{"event": "REQUEST_CHANGES", "body": "❌ Test Quality Sentinel: {SCORE}/100. {FAIL_REASON} Review flagged tests in the comment above."}`
-
-## Guidelines
-
-Calibration rules:
-- **Edge-case credit is generous**: one valid error assertion is enough (`assert.Error`, `t.Fatalf` on error, `.toThrow`, `.rejects`, etc.)
-- **Table-driven tests**: count each row as a scenario; credit error/edge rows individually
-- **Behavioral credit is strict**: mark `design_test` only when assertions verify user-visible behavior
-- **Go assertion messages required**: flag assertions without descriptive failure context
-- **Duplicate detection threshold**: report duplicates only when 3+ tests share the same pattern with trivial constant changes
-- **Goroutine-leak guards**: `TestMain` with `goleak.VerifyTestMain` is a strong design invariant; in infrastructure-only PRs with no hard violations, approve and note it as a positive quality signal
-- **Infrastructure-only PRs**: PRs adding only `TestMain` and test setup infrastructure carry no behavioral test ratio and must not be failed on that basis; evaluate only hard violations (build tags, mock libraries)
-
-**Token Budget**: Analyze at most **50 test functions** per run. If more exist, prioritize newly added functions over modified ones; add a sampling note in the PR comment. Keep individual test analysis concise — 2–3 sentences per test in the flagged section. Always wrap the per-test classification table and flagged-test details in `<details>` tags.
+<!-- instruction-prefix-end -->
 
 ## skill: `test-report-templates`
 ---
