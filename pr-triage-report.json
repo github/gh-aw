@@ -1,9 +1,14 @@
 {
-  "generated_at": "2026-11-20T18:20:16Z",
-  "run_id": "pr-triage-2026-11-20T18:20:16Z",
-  "eligible_total": 0,
-  "open_copilot_prs": 0,
-  "cooldown_skipped": 0,
+  "generated_at": "2026-11-24T18:20:21Z",
+  "run_id": "pr-triage-2026-11-24T18:20:21Z",
+  "source": "pr-triage",
+  "summary": {
+    "eligible_open_copilot_prs": 0,
+    "open_prs_scanned": 16,
+    "excluded_by_author_gate": 16,
+    "cooldown_skipped": 0,
+    "recommended_action": "none"
+  },
   "category_counts": {
     "docs": 0,
     "test": 0,
@@ -30,10 +35,9 @@
     "defer": 0,
     "close": 0
   },
-  "selected_candidates": [],
-  "batches": [],
-  "notes": [
-    "No eligible app/github-copilot PRs were found in github/gh-aw at this time.",
-    "The triage queue is empty."
-  ]
+  "top_priority_prs": [],
+  "auto_merge_candidates": [],
+  "fast_track_items": [],
+  "batch_opportunities": [],
+  "close_candidates": []
 }
