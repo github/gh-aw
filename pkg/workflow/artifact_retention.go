@@ -10,7 +10,7 @@ import (
 
 	"github.com/github/gh-aw/pkg/actionpins"
 	"github.com/github/gh-aw/pkg/workflow/compilerenv"
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v3"
 )
 
 func artifactRetentionDays(config *RepoConfig, fallback string) string {

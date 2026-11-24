@@ -5,7 +5,7 @@ import (
 	"slices"
 	"strings"
 
-	yamlv3 "gopkg.in/yaml.v3"
+	yamlv3 "go.yaml.in/yaml/v3"
 )
 
 // MergeSequence appends unique source entries to a destination sequence, retaining

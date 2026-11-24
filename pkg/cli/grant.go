@@ -17,7 +17,7 @@ import (
 	"github.com/github/gh-aw/pkg/logger"
 	"github.com/github/gh-aw/pkg/scanfindings"
 	"github.com/github/gh-aw/pkg/workflow"
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v3"
 )
 
 var grantLog = logger.New("cli:grant")

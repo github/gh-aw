@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v3"
 )
 
 var agentRxHashedRequirement = regexp.MustCompile(`^[a-z0-9][a-z0-9.-]*==[0-9][a-zA-Z0-9.]* \\\n    --hash=sha256:[0-9a-f]{64}( \\\n    --hash=sha256:[0-9a-f]{64})*$`)

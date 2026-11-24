@@ -10,7 +10,7 @@ import (
 
 	"github.com/goccy/go-yaml"
 	"github.com/stretchr/testify/require"
-	yamlv3 "gopkg.in/yaml.v3"
+	yamlv3 "go.yaml.in/yaml/v3"
 )
 
 func TestDocumentPermissionComments(t *testing.T) {

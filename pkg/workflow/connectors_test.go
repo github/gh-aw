@@ -14,7 +14,7 @@ import (
 	"github.com/github/gh-aw/pkg/parser"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v3"
 )
 
 const connectorContextPath = "/tmp/gh-aw/connector-context.jsonl"

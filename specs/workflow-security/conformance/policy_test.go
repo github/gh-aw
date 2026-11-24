@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/github/gh-aw/pkg/workflow"
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v3"
 )
 
 func fixtureDocument(t *testing.T) document {

@@ -10,7 +10,7 @@ import (
 	"testing"
 
 	"github.com/github/gh-aw/pkg/constants"
-	yamlv3 "gopkg.in/yaml.v3"
+	yamlv3 "go.yaml.in/yaml/v3"
 )
 
 func TestConclusionWarnsWhenDetectionHasNoVerdict(t *testing.T) {

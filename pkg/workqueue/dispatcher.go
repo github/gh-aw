@@ -6,7 +6,7 @@ import (
 	"slices"
 
 	"github.com/github/gh-aw/pkg/parser"
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v3"
 )
 
 var dispatcherNamePattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$`)

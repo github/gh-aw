@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/github/gh-aw/pkg/types"
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v3"
 )
 
 func TestGitHubReposScopeUnmarshalYAML(t *testing.T) {

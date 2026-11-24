@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"strings"
 
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v3"
 )
 
 func (b Branch) verifiedDefaultReference(ctx context.Context) (string, string, error) {

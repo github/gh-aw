@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/github/gh-aw/pkg/parser"
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v3"
 )
 
 const repositorySettingsPath = workerWorkflowDirectory + "aw.json"

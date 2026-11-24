@@ -13,7 +13,7 @@ import (
 	"github.com/github/gh-aw/pkg/stringutil"
 	"github.com/github/gh-aw/pkg/testutil"
 	"github.com/github/gh-aw/pkg/workflow"
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v3"
 )
 
 // TestCompiledWorkflowGatesPackageRegistries compiles real workflows and asserts that the

@@ -745,7 +745,7 @@ pkg/workflow ── FrontmatterConfig (typed structs)
 - **Functional compiler options**: `CompilerOption` functions follow the standard Go functional-options pattern, keeping `NewCompiler` signature stable as options are added.
 - **Engine interface composition**: Rather than one monolithic `Engine` interface, capabilities are split into focused interfaces (`CapabilityProvider`, `WorkflowExecutor`, etc.) and combined via `CodingAgentEngine`. This prevents engines from being forced to implement unused methods.
 - **Content-addressed lock files**: Lock files are only written when the normalized YAML content changes (heredoc delimiters are normalized before comparison). This avoids unnecessary git churn.
-- **YAML 1.1/1.2 compatibility**: The package uses `goccy/go-yaml` for all GitHub Actions YAML generation to ensure compatibility with GitHub Actions' YAML parser.
+- **YAML 1.1/1.2 compatibility**: The package uses `goccy/go-yaml` for GitHub Actions YAML generation to ensure compatibility with GitHub Actions' YAML parser. Typed YAML decoding and node-tree parsing/editing use `go.yaml.in/yaml/v3`.
 
 ## Dependencies
 
@@ -777,6 +777,7 @@ pkg/workflow ── FrontmatterConfig (typed structs)
 
 **External**:
 - `github.com/goccy/go-yaml` — YAML 1.1/1.2 compatible marshaling
+- `go.yaml.in/yaml/v3` — typed YAML decoding and node-tree parsing/editing
 - `github.com/cli/go-gh/v2` — GitHub CLI API and repository integration
 - `github.com/santhosh-tekuri/jsonschema/v6` — JSON schema validation
 

@@ -15,7 +15,7 @@ import (
 	"github.com/github/gh-aw/pkg/stringutil"
 	"github.com/github/gh-aw/pkg/typeutil"
 	"github.com/github/gh-aw/pkg/workflow/compilerenv"
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v3"
 )
 
 var engineLog = logger.New("workflow:engine")
