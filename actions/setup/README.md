@@ -27,8 +27,19 @@ transport independently of the executable name. Optional `model`, `provider`,
 CLI that reads its prompt on stdin instead of a harness that takes `--prompt-file`.
 Never load this descriptor from model-authored artifacts.
 
+The detector converts supported Git bundles to diff text offline, in a
+disposable object store. Incremental bundles need their prerequisite objects
+in the local `$GITHUB_WORKSPACE` checkout; the detector never fetches them.
+An unreadable or over-limit bundle is an inspection warning, not evidence of
+a clean patch or a threat.
+
+On Linux the supervisor uses Python 3 and `/proc` to reap descendants owned
+by the attempt, including tools that start a separate process group.
+
 Only `detection_result.json` is publishable. The adjacent
 `detection_result_full.json` contains private reasons and must stay local.
+Both destinations are invalidated at the start of each assessment, so a
+failed rerun cannot publish an earlier verdict.
 The detector checks each attempt's private sink against the original artifact
 eligibility, even when the reporting command accepted it. Exit codes are 0
 (clean), 1 (finding), and 2 (no usable verdict); stderr ends with a

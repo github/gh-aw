@@ -76,6 +76,26 @@ describe.each(producers)("%s sandbox producer to host conclusion", producer => {
 });
 
 describe("result destinations", () => {
+  it("does not leave a stale conventional sidecar when full output is disabled", () => {
+    const root = fixture();
+    const stale = path.join(root, "result_full.json");
+    fs.writeFileSync(stale, '{"reasons":["from an earlier run"]}');
+    const child = run(root, process.execPath, [path.join(__dirname, "detect_threats.cjs"), "--launch-config", "launch.json", "--output", "result.json", "--full-output=", "artifacts"], { ...process.env, SCENARIO: "clean" });
+    expect(child.status).toBe(0);
+    expect(fs.existsSync(stale)).toBe(false);
+  });
+  it.each(["strict-warning", "timeout"])("invalidates both old results before %s", scenario => {
+    const root = fixture();
+    const files = ["result.json", "result_full.json"].map(file => path.join(root, file));
+    for (const file of files) fs.writeFileSync(file, '{"prompt_injection":false,"secret_leak":false,"malicious_patch":false,"reasons":[]}');
+    const child = run(root, process.execPath, [path.join(__dirname, "detect_threats.cjs"), "--launch-config", "launch.json", "--output", "result.json", "--engine-timeout", "150ms", "artifacts"], {
+      ...process.env,
+      SCENARIO: scenario,
+      GH_AW_DETECTION_CONTINUE_ON_WARNING: scenario === "strict-warning" ? "false" : "true",
+    });
+    expect(child.status).toBe(2);
+    for (const file of files) expect(fs.existsSync(file)).toBe(false);
+  });
   it("rejects aliased outputs before invoking the engine", () => {
     const root = fixture();
     fs.symlinkSync(root, path.join(root, "alias"));

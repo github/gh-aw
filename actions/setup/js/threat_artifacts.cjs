@@ -1,6 +1,10 @@
 // @ts-check
 const fs = require("node:fs");
 const path = require("node:path");
+const bundleReader = require("./threat_bundle_diff.cjs");
+const fileLimit = 512 * 1024;
+const preparationLimit = 1024 * 1024;
+const entryLimit = 256;
 
 const labels = {
   prompt: "aw-prompts/prompt.txt",
@@ -13,7 +17,7 @@ function uninspectable(what, reason) {
 }
 
 function warning(field, message) {
-  const chars = Array.from(message);
+  const chars = Array.from(message.slice(0, 4002));
   return { field, code: "ERR_VALIDATION", message: chars.length > 2000 ? chars.slice(0, 1999).join("") + "…" : message };
 }
 
@@ -28,7 +32,8 @@ function describe(stat) {
 
 // Never follow agent-staged symlinks or block opening special files. Inspect
 // the descriptor, not just the directory entry, before reading any bytes.
-function inspect(dir, relative, { probe = false, limit = Infinity } = {}) {
+/** @param {string} dir @param {string} relative @param {{probe?:boolean, limit?:number, budget?:{remaining:number}}} options */
+function inspect(dir, relative, { probe = false, limit = fileLimit, budget = undefined } = {}) {
   const file = path.join(dir, relative);
   let fd;
   try {
@@ -37,10 +42,11 @@ function inspect(dir, relative, { probe = false, limit = Infinity } = {}) {
     fd = fs.openSync(file, fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW | fs.constants.O_NONBLOCK);
     const stat = fs.fstatSync(fd);
     if (!stat.isFile()) throw new Error("not a regular file");
-    if (stat.size > limit) throw new Error(`${relative} exceeds ${limit}-byte limit`);
     let content = "";
     if (probe) fs.readSync(fd, Buffer.alloc(1), 0, 1, 0);
-    else if (Number.isFinite(limit)) {
+    else {
+      limit = Math.min(limit, budget?.remaining ?? limit);
+      if (stat.size > limit) throw new Error(`exceeds ${limit}-byte preparation limit`);
       const buffer = Buffer.alloc(limit + 1);
       let size = 0;
       while (size < buffer.length) {
@@ -48,9 +54,10 @@ function inspect(dir, relative, { probe = false, limit = Infinity } = {}) {
         if (!bytes) break;
         size += bytes;
       }
-      if (size > limit) throw new Error(`${relative} exceeds ${limit}-byte limit`);
+      if (budget) budget.remaining -= Math.min(limit, size);
+      if (size > limit) throw new Error(`exceeds ${limit}-byte preparation limit`);
       content = buffer.toString("utf8", 0, size);
-    } else content = fs.readFileSync(fd, "utf8");
+    }
     return { path: file, status: probe || content.trim() ? "ok" : "absent", size: stat.size, content, error: "" };
   } catch (err) {
     if (err.code === "ENOENT") return { path: "", status: "absent", size: 0, content: "", error: "" };
@@ -58,6 +65,21 @@ function inspect(dir, relative, { probe = false, limit = Infinity } = {}) {
   } finally {
     if (fd !== undefined) fs.closeSync(fd);
   }
+}
+
+// Bound enumeration itself, not just the number of matching entries retained.
+function listEntries(dir) {
+  const handle = fs.opendirSync(dir);
+  const names = [];
+  try {
+    for (let entry; (entry = handle.readSync());) {
+      if (names.length === entryLimit) throw new Error(`directory exceeds ${entryLimit}-entry preparation limit`);
+      names.push(entry.name);
+    }
+  } finally {
+    handle.closeSync();
+  }
+  return names.sort();
 }
 
 function readActivation(dir) {
@@ -114,14 +136,24 @@ function readCommentMemory(dir, warn) {
   const infos = [];
   const refused = [];
   try {
-    for (const name of fs.readdirSync(base).sort()) {
+    for (const name of listEntries(base)) {
       if (!name.endsWith(".md")) continue;
       const filename = path.join(base, name);
-      const entry = fs.lstatSync(filename);
-      if (entry.isFile()) {
-        files.push(filename);
-        infos.push(`${filename} (${entry.size} bytes)`);
-      } else refused.push(`${name} (${describe(entry)})`);
+      let entry;
+      try {
+        entry = fs.lstatSync(filename);
+      } catch {
+        refused.push(`${JSON.stringify(name)} (could not be inspected)`);
+        continue;
+      }
+      if (!entry.isFile()) {
+        refused.push(`${JSON.stringify(name)} (${describe(entry)})`);
+        continue;
+      }
+      files.push(filename);
+      const probe = inspect(dir, path.join("comment-memory", name), { probe: true });
+      if (probe.status !== "ok") refused.push(`${JSON.stringify(name)} (could not be read)`);
+      else infos.push(`${JSON.stringify(filename)} (${probe.size} bytes)`);
     }
   } catch (err) {
     warn("comment_memory", `Unable to read comment-memory directory at ${base}: ${err.message}`);
@@ -129,11 +161,8 @@ function readCommentMemory(dir, warn) {
   }
   if (refused.length) {
     const n = refused.length;
-    warn(
-      "comment_memory",
-      `Skipped ${n} comment-memory ${n === 1 ? "entry" : "entries"} in ${base} that ${n === 1 ? "is" : "are"} not regular files: ${refused.join(", ")}. Stage comment memory as real files: symlinks and special files are refused because they can resolve outside the artifacts directory.`
-    );
-    infos.push(uninspectable(files.length ? `${n} further comment-memory file(s) in ${base}` : `Every comment-memory file in ${base}`, "they are symlinks or special files rather than regular files, so they were refused"));
+    warn("comment_memory", `Skipped ${n} unreadable or non-regular comment-memory entries: ${refused.join(", ")}.`);
+    infos.push(uninspectable("The following comment-memory entries", `they could not be safely read: ${refused.join(", ")}`));
   }
   return { files, info: infos.join("\n") || info };
 }
@@ -142,16 +171,33 @@ function readPatches(dir, warn) {
   const infos = [];
   const unreadable = [];
   let readable = false;
-  const files = fs
-    .readdirSync(dir)
-    .sort()
-    .filter(name => name.startsWith("aw-") && (name.endsWith(".patch") || name.endsWith(".bundle")) && !fs.lstatSync(path.join(dir, name)).isDirectory());
+  const bundleDiffs = [];
+  let attempts = 0;
+  let files = [];
+  try {
+    files = listEntries(dir).filter(name => name.startsWith("aw-") && (name.endsWith(".patch") || name.endsWith(".bundle")) && !fs.lstatSync(path.join(dir, name)).isDirectory());
+  } catch (err) {
+    warn("patch", `Unable to list patch/bundle entries: ${err.message}`);
+    infos.push(uninspectable("Patch/bundle directory", "its entries could not be listed"));
+  }
   for (const name of files) {
     const file = inspect(dir, name, { probe: true });
-    if (!file.path || file.error) unreadable.push(`${path.join(dir, name)} (${file.error || "not found"})`);
+    if (!file.path || file.error) unreadable.push(`${JSON.stringify(path.join(dir, name))} (could not be read)`);
     else {
+      if (name.endsWith(".bundle")) {
+        if (++attempts > 4) {
+          unreadable.push(`${JSON.stringify(name)} (four-bundle preparation limit)`);
+          continue;
+        }
+        try {
+          bundleDiffs.push({ path: file.path, diff: bundleReader.readBundleDiff(file.path) });
+        } catch {
+          unreadable.push(`${JSON.stringify(name)} (offline diff unavailable)`);
+          continue;
+        }
+      }
       readable ||= file.size > 0;
-      infos.push(`${file.path} (${file.size} bytes, git-${name.endsWith(".patch") ? "patch" : "bundle"})`);
+      infos.push(`${JSON.stringify(file.path)} (${file.size} bytes, git-${name.endsWith(".patch") ? "patch" : "bundle"})`);
     }
   }
   if (unreadable.length) {
@@ -165,23 +211,26 @@ function readPatches(dir, warn) {
     warn("patch", `HAS_PATCH=true was set but no readable, non-empty aw-*.patch or aw-*.bundle file was found in ${dir}. Detection will run without patch context.`);
     if (!infos.length) infos.push(uninspectable("The patch produced by this run", `the agent job reported a patch (HAS_PATCH=true) but no patch or bundle file reached ${dir}`));
   }
-  return { files, readable, info: infos.join("\n") || "No patch or bundle file found" };
+  return { files, readable, bundleDiffs, info: infos.join("\n") || "No patch or bundle file found" };
 }
 
 function loadArtifacts(dir) {
   if (!dir || !fs.statSync(dir).isDirectory()) throw new Error(`Expected artifacts directory: ${dir}`);
+  dir = path.resolve(dir);
   const warnings = [];
   const warn = (field, message) => warnings.push(warning(field, message));
-  const inputs = Object.fromEntries(Object.entries(labels).map(([field, relative]) => [field, inspect(dir, relative)]));
+  const budget = { remaining: preparationLimit };
+  const inputs = Object.fromEntries(Object.entries(labels).map(([field, relative]) => [field, inspect(dir, relative, { budget })]));
   const prompt = inputs.prompt;
   if (!prompt.path) warn("prompt", `Missing detection context prompt at ${path.join(dir, labels.prompt)}. Ensure the agent artifact includes aw-prompts/prompt.txt. Detection will continue with fallback workflow context.`);
   else if (prompt.error)
     warn("prompt", `Detection context prompt at ${prompt.path} could not be read (${prompt.error}). Its contents were not examined; detection will continue with fallback workflow context. This failure is not itself evidence of a threat.`);
-  else if (!prompt.size) warn("prompt", `Detection context prompt at ${prompt.path} is empty. Detection will continue with fallback workflow context.`);
+  else if (prompt.status === "absent") warn("prompt", `Detection context prompt at ${prompt.path} is empty. Detection will continue with fallback workflow context.`);
 
-  const output = inspect(dir, "agent_output.json");
+  const output = inspect(dir, "agent_output.json", { budget });
   let validOutput = false;
-  if (!output.path || output.error) warn("agent_output", `Missing agent output file at ${path.join(dir, "agent_output.json")}. Detection will run without the agent's structured output.`);
+  if (output.error) warn("agent_output", `Agent output at ${output.path} could not be read: ${output.error}.`);
+  else if (!output.path) warn("agent_output", `Missing agent output file at ${path.join(dir, "agent_output.json")}. Detection will run without the agent's structured output.`);
   else if (!output.size) warn("agent_output", `Agent output file at ${output.path} is empty. Detection will run without the agent's structured output.`);
   else {
     try {
@@ -197,13 +246,21 @@ function loadArtifacts(dir) {
   return {
     inputs,
     outputSize: output.size,
-    outputPath: output.error || !output.path ? "No agent output file found" : output.path,
+    outputUnreadable: output.status === "unreadable",
+    outputPath: output.error ? uninspectable("Agent output", "it could not be read") : output.path || "No agent output file found",
     activation,
     patches,
     memory,
     warnings,
-    allPrimaryMissing: !prompt.size && !validOutput && !patches.readable,
+    allPrimaryMissing: prompt.status !== "ok" && !validOutput && !patches.readable,
   };
 }
 
-module.exports = { loadArtifacts, labels, uninspectable, warning };
+function readHostPrompt(file) {
+  const resolved = fs.realpathSync(file);
+  const input = inspect(path.dirname(resolved), path.basename(resolved));
+  if (!input.path || input.error) throw new Error(`Unable to read detector prompt option ${file}: ${input.error || "not found"}`);
+  return input.content;
+}
+
+module.exports = { loadArtifacts, labels, uninspectable, warning, readHostPrompt };

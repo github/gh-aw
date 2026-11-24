@@ -52,7 +52,7 @@ it.each(["copilot", "claude", "codex"])("uses resolved argv with the %s conventi
   );
   expect(result.error).toBeNull();
   const observed = JSON.parse(fs.readFileSync(capture));
-  expect(observed).toMatchObject({ turns: "7", prompt, mode: 0o600, reasons, stale: false, eligible: ["false", "true", "false"] });
+  expect(observed).toMatchObject({ turns: "7", prompt: expect.stringContaining(prompt), mode: 0o600, reasons, stale: false, eligible: ["false", "true", "false"] });
   expect(observed.args[0]).toBe("one arg with spaces");
   if (convention === "codex") {
     expect(observed.args.slice(1, 6)).toEqual(["exec", "-c", "model=fixture-model", "-c", "model_provider=fixture-proxy"]);
@@ -65,7 +65,7 @@ it.each(["copilot", "claude", "codex"])("uses resolved argv with the %s conventi
     expect(observed.model).toBe("fixture-model");
     expect(observed.args).toContain("--disable-builtin-mcps");
     expect(observed.args).not.toContain("--allow-all-tools");
-    expect(observed.args.flatMap((arg, i) => (arg === "--allow-tool" ? [observed.args[i + 1]] : []))).toEqual(["write", "shell(threat_detection_result:*)"]);
+    expect(observed.args.flatMap((arg, i) => (arg === "--allow-tool" ? [observed.args[i + 1]] : []))).toEqual([`write(${reasons})`, "shell(threat_detection_result:*)"]);
   }
   expect(fs.existsSync(observed.file)).toBe(false);
   expect(fs.existsSync(capture + ".wrong")).toBe(false);
@@ -77,7 +77,7 @@ it("streams a large direct CLI prompt and scrubs the inherited turn limit", asyn
   opts.launch.mode = "direct";
   expect((await runHarness(opts)).error).toBeNull();
   const observed = JSON.parse(fs.readFileSync(capture));
-  expect(observed.prompt).toBe(prompt);
+  expect(observed.prompt).toContain(prompt);
   expect(observed.args.at(-1)).toBe("-");
   expect(observed.args).not.toContain("--max-turns");
   expect(observed.turns).toBeUndefined();

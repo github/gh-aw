@@ -66,9 +66,15 @@ function parseOptions(args) {
   }
   const output = values.output ?? "";
   const { dir, name, ext } = path.parse(output);
+  const conventionalFull = output ? path.join(dir, `${name}_full${ext}`) : "";
+  const fullOutput = values["full-output"] ?? conventionalFull;
+  checkDestinations({ output, fullOutput });
+  // The host consumes the files even on a nonzero exit. Invalidate both
+  // before reading launch configuration or examining this run's artifacts.
+  for (const file of new Set([output, fullOutput, conventionalFull])) if (file) fs.rmSync(file, { force: true });
   const rawRetries = process.env.THREAT_DETECTION_RETRIES ?? "";
   return {
-    artifactsDir: positionals[0],
+    artifactsDir: path.resolve(positionals[0]),
     launch: readLaunch(values["launch-config"]),
     workflowName: values["workflow-name"],
     workflowDescription: values["workflow-description"],
@@ -79,7 +85,7 @@ function parseOptions(args) {
     timeoutMs: values["engine-timeout"] === undefined ? timeoutMs : durationMs(values["engine-timeout"]),
     maxTurns: intOption(values["max-turns"], envTurns()),
     output,
-    fullOutput: values["full-output"] ?? (output ? path.join(dir, `${name}_full${ext}`) : ""),
+    fullOutput,
   };
 }
 
@@ -129,7 +135,6 @@ function publish(opts, result, warnings) {
 }
 
 async function detect(opts, signal) {
-  checkDestinations(opts);
   const { prompt, eligibility, warnings } = prepareAssessment(opts);
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "threat-detect-"));
   let correction = "";
@@ -138,7 +143,7 @@ async function detect(opts, signal) {
       if (signal.aborted) return { reason: "cancelled", code: 2 };
       // A fresh path for every attempt: no stale or partially written verdict can carry forward.
       const sink = path.join(dir, `attempt-${i}.json`);
-      const run = await runHarness({ launch: opts.launch, sink, prompt: prompt + correction, eligibility, maxTurns: opts.maxTurns, timeoutMs: opts.timeoutMs, signal });
+      const run = await runHarness({ launch: opts.launch, artifactsDir: opts.artifactsDir, sink, prompt: prompt + correction, eligibility, maxTurns: opts.maxTurns, timeoutMs: opts.timeoutMs, signal });
       let result;
       try {
         // Always validate in this process, even if the deadline or an engine error just fired.

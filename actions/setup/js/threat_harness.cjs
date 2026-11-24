@@ -4,11 +4,8 @@
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const { spawn } = require("node:child_process");
-const { CATEGORIES, readSink } = require("./threat_report_result.cjs");
-// Poll for a structurally complete report, even an ineligible one. Eligibility
-// is enforced by the host after exit, not by letting the attempt time out.
-const ALL_ELIGIBLE = Object.fromEntries(CATEGORIES.map(key => [key, true]));
+const { CATEGORIES } = require("./threat_report_result.cjs");
+const { supervise } = require("./threat_supervision.cjs");
 
 function quote(value) {
   return "'" + value.replaceAll("'", "'\\''") + "'";
@@ -35,15 +32,21 @@ function provisionTool(dir, sink, eligibility, env) {
   }
 }
 
-function launchArgs(launch, env, promptFile, sink, maxTurns) {
+function launchArgs(launch, env, promptFile, artifactsDir, sink, maxTurns) {
   const args = [...(launch.args || [])];
   const { convention, model, provider } = launch;
   const direct = launch.mode === "direct";
   switch (convention) {
     case "copilot": {
-      args.push("--add-dir", path.dirname(promptFile), "--log-level", "all", "--disable-builtin-mcps", "--no-ask-user", "--allow-tool", "write", "--allow-tool", "shell(threat_detection_result:*)");
-      if (sink) args.push("--add-dir", path.dirname(sink));
-      if (env.GITHUB_WORKSPACE) args.push("--add-dir", env.GITHUB_WORKSPACE);
+      args.push("--log-level", "all", "--disable-builtin-mcps", "--no-ask-user");
+      if (artifactsDir) args.push("--add-dir", artifactsDir, "--allow-tool", `read(${artifactsDir}/**)`);
+      if (sink) {
+        args.push("--add-dir", path.dirname(sink), "--allow-tool", `write(${env.THREAT_DETECTION_REASONS_FILE})`, "--allow-tool", "shell(threat_detection_result:*)");
+        // The SDK harness independently adds GITHUB_WORKSPACE to its sidecar.
+        env.GITHUB_WORKSPACE = path.dirname(sink);
+        env.GH_AW_ENGINE_CWD = path.dirname(sink);
+      }
+      if (!direct) env.GH_AW_PROMPT = promptFile;
       if (model) env.COPILOT_MODEL = model;
       if (env.RUNNER_TEMP && !env.GH_AW_AWF_CONFIG_PATH && !fs.existsSync("/tmp/gh-aw/awf-config.json")) {
         const mounted = path.join(env.RUNNER_TEMP, "gh-aw", "awf-config.json");
@@ -53,7 +56,15 @@ function launchArgs(launch, env, promptFile, sink, maxTurns) {
     }
     case "claude":
       args.push("--print", "--verbose", "--output-format", "stream-json");
-      if (sink) args.push("--permission-mode", "acceptEdits", "--allowed-tools", "Bash,Write,Edit,Read,Read(/tmp/*),Read(/tmp/gh-aw/*)");
+      if (sink) {
+        // Claude's // prefix denotes a filesystem-absolute permission rule.
+        const allow = ["Bash(threat_detection_result:*)", `Write(/${env.THREAT_DETECTION_REASONS_FILE})`];
+        if (artifactsDir) {
+          allow.push(`Read(/${artifactsDir}/**)`);
+          args.push("--add-dir", artifactsDir);
+        }
+        args.push("--add-dir", path.dirname(sink), "--permission-mode", "dontAsk", "--tools", "Bash,Read,Write", "--setting-sources", "", "--strict-mcp-config", "--settings", JSON.stringify({ permissions: { allow } }));
+      }
       if (model) args.push("--model", model);
       if (maxTurns > 0) args.push("--max-turns", String(maxTurns));
       if (direct) args.push("-");
@@ -73,97 +84,6 @@ function launchArgs(launch, env, promptFile, sink, maxTurns) {
   return args;
 }
 
-function kill(pid, signal) {
-  try {
-    process.kill(pid, signal);
-  } catch (error) {
-    if (error.code !== "ESRCH") throw error;
-  }
-}
-
-// The built-in JS harnesses run their CLIs in *separate* process groups.
-// On Linux freeze the owned tree before terminating it so a nested group
-// isn't lost to reparenting when its harness exits.
-function stopTree(pid) {
-  if (!pid) return;
-  if (process.platform === "linux") {
-    const pending = [pid];
-    const visited = new Set();
-    while (pending.length) {
-      const current = pending.pop();
-      if (visited.has(current)) continue;
-      visited.add(current);
-      kill(current, "SIGSTOP");
-      const tasks = `/proc/${current}/task`;
-      try {
-        for (const tid of fs.readdirSync(tasks)) {
-          for (const child of fs.readFileSync(`${tasks}/${tid}/children`, "utf8").match(/\d+/g) || []) pending.push(Number(child));
-        }
-      } catch (error) {
-        // /proc can hide descendants. Still signal every discovered pid and
-        // the original group, rather than leaving a SIGSTOP'ed harness behind.
-        if (!["ENOENT", "ESRCH", "EACCES", "EPERM"].includes(error.code)) throw error;
-      }
-    }
-    for (const descendant of [...visited].reverse()) kill(descendant, "SIGKILL");
-  }
-  kill(-pid, "SIGKILL");
-}
-
-function resultReady(sink) {
-  try {
-    return Boolean(sink && readSink(sink, ALL_ELIGIBLE));
-  } catch {
-    return false;
-  }
-}
-
-function supervise({ launch, args, env, prompt, sink, timeoutMs, signal }) {
-  return new Promise(resolve => {
-    const child = spawn(launch.command, args, { env, cwd: launch.cwd, detached: true, stdio: ["pipe", "ignore", "ignore"] });
-    let timedOut = false;
-    let cancelled = false;
-    let stopped = false;
-    /** @type {Error|null} */
-    let error = null;
-    function stop(reason) {
-      if (stopped) return;
-      stopped = true;
-      timedOut = reason === "timeout";
-      cancelled = reason === "cancelled";
-      if (timedOut || cancelled) error = new Error(timedOut ? "engine timed out" : "engine cancelled");
-      stopTree(child.pid);
-    }
-    const abort = () => stop("cancelled");
-    const timer = timeoutMs > 0 ? setTimeout(() => stop("timeout"), timeoutMs) : undefined;
-    const poll = sink
-      ? setInterval(() => {
-          if (resultReady(sink)) stop("reported");
-        }, 250)
-      : undefined;
-    signal?.addEventListener("abort", abort, { once: true });
-    if (signal?.aborted) abort();
-    child.stdin.on(
-      "error",
-      /** @param {NodeJS.ErrnoException} err */ err => {
-        if (err.code !== "EPIPE" && err.code !== "ECONNRESET") error ??= err;
-      }
-    );
-    child.stdin.end(launch.mode === "direct" ? prompt : undefined);
-    child.once("error", err => {
-      error ??= err;
-    });
-    child.once("close", (exitCode, exitSignal) => {
-      clearTimeout(timer);
-      clearInterval(poll);
-      signal?.removeEventListener("abort", abort);
-      if (!stopped && child.pid) kill(-child.pid, "SIGKILL"); // residual tools in the owned group
-      if (!stopped && exitCode !== 0 && !resultReady(sink)) error ??= new Error(`engine exited with ${exitSignal || `code ${exitCode}`}`);
-      resolve({ timedOut, cancelled, exitCode, error });
-    });
-  });
-}
-
 /**
  * Run one detector attempt. launch.command + launch.args are the resolved
  * executable and argv prefix (e.g. node + [harnessPath, engineBinary]).
@@ -172,7 +92,7 @@ function supervise({ launch, args, env, prompt, sink, timeoutMs, signal }) {
  * The caller owns the sink and must validate it even on timeout/nonzero exit.
  * Subprocess output is untrusted; never forward it as workflow commands.
  */
-async function runHarness({ launch, prompt, sink, eligibility, maxTurns = 0, timeoutMs = 0, signal }) {
+async function runHarness({ launch, prompt, artifactsDir, sink, eligibility, maxTurns = 0, timeoutMs = 0, signal }) {
   if (signal?.aborted) return { timedOut: false, cancelled: true, exitCode: null, error: new Error("engine cancelled") };
   let dir;
   try {
@@ -181,15 +101,30 @@ async function runHarness({ launch, prompt, sink, eligibility, maxTurns = 0, tim
     if (launch.mode !== undefined && !["harness", "direct"].includes(launch.mode)) throw new Error("Expected launch.mode to be harness or direct");
     dir = fs.mkdtempSync(path.join(os.tmpdir(), "threat-harness-"));
     const env = { ...process.env, ...launch.env };
+    if (artifactsDir) {
+      artifactsDir = path.resolve(artifactsDir);
+      env.GH_AW_DETECTION_INPUT_DIR = artifactsDir;
+    } else delete env.GH_AW_DETECTION_INPUT_DIR;
+    env.GH_AW_PHASE = "detection";
+    if (sink) sink = path.resolve(sink);
+    // Permission rules use glob syntax. Never interpret metacharacters in a
+    // caller-supplied path as part of the detector's permission policy.
+    if (launch.convention !== "codex" && [artifactsDir, sink && path.dirname(sink)].some(root => root && /[*?[\]{}()\\,\r\n]/u.test(root))) throw new Error("Unsupported metacharacter in detector permission path");
     delete env.GH_AW_MAX_TURNS;
     if (maxTurns > 0) env.GH_AW_MAX_TURNS = String(maxTurns);
     if (sink) {
-      sink = path.resolve(sink);
       provisionTool(dir, sink, eligibility, env);
+      prompt = `Host-provided reasons file (literal path, JSON-encoded): ${JSON.stringify(env.THREAT_DETECTION_REASONS_FILE)}\n\n${prompt}`;
+      if (launch.convention === "claude") {
+        // Claude trusts its cwd for reads even without an explicit Read rule.
+        launch = { ...launch, cwd: path.dirname(sink) };
+        env.GITHUB_WORKSPACE = path.dirname(sink);
+        env.GH_AW_ENGINE_CWD = path.dirname(sink);
+      }
     }
     const promptFile = path.join(dir, "prompt.txt");
     if (launch.mode !== "direct") fs.writeFileSync(promptFile, prompt, { mode: 0o600, flag: "wx" });
-    const args = launchArgs(launch, env, promptFile, sink, maxTurns);
+    const args = launchArgs(launch, env, promptFile, artifactsDir, sink, maxTurns);
     return await supervise({ launch, args, env, prompt, sink, timeoutMs, signal });
   } catch (error) {
     return { timedOut: false, cancelled: false, exitCode: null, error };
