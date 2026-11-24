@@ -57,6 +57,9 @@ func processWorkflowRunBatch(
 		if opts.atifError != nil && *opts.atifError != nil {
 			return processedRuns, batchProcessed, false, false, storageLimitReached
 		}
+		if isDeadlineExceeded(activeCtx) {
+			return processedRuns, batchProcessed, false, true, storageLimitReached
+		}
 		if len(processedRuns) >= opts.count {
 			break
 		}

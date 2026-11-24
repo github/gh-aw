@@ -344,6 +344,7 @@ jobs:
             });
             for (const r of agentic) {
               if (!Number.isSafeInteger(r.id) || !Number.isInteger(r.run_attempt) ||
+                 !Number.isFinite(Date.parse(r.created_at)) ||
                  !Number.isFinite(Date.parse(r.updated_at))) throw new Error('Invalid run identity');
             }
             const eligible = agentic.filter(r => r.status === 'completed' && r.conclusion === 'failure');
@@ -406,7 +407,8 @@ jobs:
               const incomplete = report.partial === true || report.complete === false ||
                 (report.coverage_status && report.coverage_status !== 'complete') ||
                 (report.continuations || []).length;
-              if (!incomplete && /^Timeout reached\b/.test(report.continuation?.message || '')) {
+              if (!(report.continuations || []).length &&
+                  /^Timeout reached\b/.test(report.continuation?.message || '')) {
                 return {deferred: 'gh-aw logs timed out'};
               }
               if (incomplete || report.continuation) {
@@ -436,7 +438,8 @@ jobs:
               } else {
                 const result = cli(['aw', 'logs', (run.path || '').split('@')[0],
                   '--repo', repository, '--after-run-id', String(run.id - 1),
-                  '--before-run-id', String(run.id + 1), '--count', '1',
+                  '--before-run-id', String(run.id + 1), '--count', '2',
+                  '--end-date', new Date(Date.parse(run.created_at) + 1000).toISOString(),
                   '--artifacts', 'info,usage', '--json', '--verbose',
                   '--cached-jsonl', path.join(dir, `logs-${versionKey}.jsonl`),
                   '--output', path.join(dir, 'artifacts'), '--timeout', '2',
@@ -446,7 +449,6 @@ jobs:
                   continue;
                 }
                 report = result.report;
-                write(reportFile, {cli_version: cliVersion, report});
               }
               if (!Array.isArray(report.runs) || report.runs.length !== 1 ||
                   report.runs[0].run_id !== run.id || report.runs[0].status !== 'completed' ||
@@ -459,6 +461,9 @@ jobs:
                 if (!Array.isArray(report.failure_clusters) || !report.failure_clusters.length) {
                   throw new Error('Missing failure clustering evidence');
                 }
+              }
+              write(reportFile, {cli_version: cliVersion, report});
+              if (!report.runs[0].intentional_failure) {
                 if (!backlog.some(item => item.key === key)) {
                   backlog.push({key, run, report_file: path.relative(cache, reportFile)});
                 }
@@ -522,7 +527,8 @@ jobs:
               // Discovery/cache validation still shares the logs API ceiling.
               const auditResult = cli(['aw', 'logs', (member.run.path || '').split('@')[0],
                 '--repo', repository, '--after-run-id', String(member.run.id - 1),
-                '--before-run-id', String(member.run.id + 1), '--count', '1',
+                '--before-run-id', String(member.run.id + 1), '--count', '2',
+                '--end-date', new Date(Date.parse(member.run.created_at) + 1000).toISOString(),
                 '--artifacts', 'info,usage', '--audit', '--json', '--verbose',
                 '--cached-jsonl', path.join(dir, `logs-${versionKey}.jsonl`),
                 '--output', path.join(dir, 'artifacts'), '--timeout', '2',
@@ -773,7 +779,8 @@ warning, not a healthy verdict. A deferred first-ever sample retains its validat
 initial state separately so it can retry without resetting history. A successful
 collection removes retry state and restores the normal 300-second budget.
 Other partial reasons, malformed reports and evidence errors still fail closed.
-Logs and audits use `--count 1` and stop starting queries when they cannot fit
+Logs and audits bound the run-ID window to one run and use `--count 2` to avoid
+a count-limit continuation when a creation-time filter is present. They stop starting queries when they cannot fit
 (with subprocess slack) before an 18-minute script deadline, reserving time for
 artifact upload and cache saving within the 25-minute job (which also covers the
 source build). A per-run logs or audit query that times out
