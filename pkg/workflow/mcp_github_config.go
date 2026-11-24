@@ -660,6 +660,16 @@ func deriveSafeOutputsGuardPolicyFromGitHub(githubTool map[string]any) map[strin
 		return nil
 	}
 
+	seen := make(map[string]bool, len(acceptList))
+	deduplicated := acceptList[:0]
+	for _, entry := range acceptList {
+		if !seen[entry] {
+			seen[entry] = true
+			deduplicated = append(deduplicated, entry)
+		}
+	}
+	acceptList = deduplicated
+
 	writeSink := map[string]any{
 		"accept":          acceptList,
 		"sink-visibility": sinkVisibilityRuntimeExpr,
