@@ -15,7 +15,7 @@ type minuteTimeoutValue struct {
 }
 
 func (v minuteTimeoutValue) Set(value string) error {
-	if _, err := strconv.Atoi(value); err == nil {
+	if _, err := strconv.ParseInt(value, 0, 0); err == nil {
 		return v.Value.Set(value)
 	}
 	duration, err := time.ParseDuration(value)
