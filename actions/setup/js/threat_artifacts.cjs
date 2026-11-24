@@ -87,10 +87,13 @@ function readActivation(dir) {
   if (!input.path) return null;
   if (input.error) throw new Error(`Reading aw_info.json: ${input.error}`);
   // Preserve numeric IDs exactly as staged, including integers outside JS's
-  // safe range. The runtime's JSON reviver exposes the original scalar token.
+  // safe range. Validate before quoting numeric tokens, so malformed JSON
+  // cannot become valid and runtimes without reviver source context work.
   let raw;
   try {
-    raw = JSON.parse(input.content, (_key, value, context = { source: "" }) => (typeof value === "number" ? context.source : value));
+    JSON.parse(input.content);
+    const tokens = /"(?:[^"\\]|\\.)*"|-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?/g;
+    raw = JSON.parse(input.content.replace(tokens, token => (token.startsWith('"') ? token : JSON.stringify(token))));
   } catch {
     throw new Error("Unable to parse aw_info.json: invalid JSON");
   }

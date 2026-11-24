@@ -76,17 +76,6 @@ function capture(stream) {
   };
 }
 
-function logTail(lines) {
-  for (const line of lines.filter(Boolean).slice(-16)) {
-    const safe = line
-      .slice(0, 1024)
-      .replace(/:(?=:)/g, ":\\")
-      .replaceAll("##[", "##\\[")
-      .replace(/[\p{Cc}\p{Cf}\u2028\u2029]/gu, c => `\\u${c.codePointAt(0).toString(16).padStart(4, "0")}`);
-    process.stderr.write(`[engine] ${safe}\n`);
-  }
-}
-
 function maxTurns(lines) {
   for (let i = lines.length - 1; i >= 0; i--) {
     if (!lines[i].trimStart().startsWith("{")) continue;
@@ -118,7 +107,7 @@ function supervise({ launch, args, env, prompt, sink, timeoutMs, signal }) {
     const control = child.stdio[3];
     if (!(control instanceof Duplex)) throw new Error("Detector control pipe is unavailable");
     const stdout = capture(child.stdout);
-    const stderr = capture(child.stderr);
+    child.stderr.resume(); // Drain without publishing model-authored or secret-bearing bytes.
     let spawnError = "";
     let reason;
     /** @type {Error|null} */
@@ -146,8 +135,6 @@ function supervise({ launch, args, env, prompt, sink, timeoutMs, signal }) {
       clearInterval(poll);
       signal?.removeEventListener("abort", abort);
       const lines = stdout();
-      logTail(lines);
-      logTail(stderr());
       const cancelled = reason === "cancelled";
       const timedOut = reason === "timeout" || (!cancelled && launch.convention === "claude" && maxTurns(lines));
       if (spawnError) error ??= Object.assign(new Error(`engine launch failed: ${spawnError}`), { code: spawnError });

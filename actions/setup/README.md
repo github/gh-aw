@@ -35,6 +35,9 @@ a clean patch or a threat.
 
 On Linux the supervisor uses Python 3 and `/proc` to reap descendants owned
 by the attempt, including tools that start a separate process group.
+Engine output is not forwarded to Actions logs: it can contain private evidence.
+Codex runs with the private output directory as its writable workspace, not
+the repository; the general temporary directories are not granted for writing.
 
 Only `detection_result.json` is publishable. The adjacent
 `detection_result_full.json` contains private reasons and must stay local.

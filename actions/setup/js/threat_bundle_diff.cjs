@@ -41,8 +41,8 @@ function readBundleDiff(file, workspace = process.env.GITHUB_WORKSPACE) {
   if (!tips.size) throw new Error("Bundle has no heads to inspect");
   const repo = fs.mkdtempSync(path.join(os.tmpdir(), "threat-bundle-"));
   const env = { PATH: process.env.PATH, HOME: repo, GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_GLOBAL: "/dev/null", GIT_TERMINAL_PROMPT: "0", GIT_ALLOW_PROTOCOL: "", GIT_NO_LAZY_FETCH: "1", GIT_NO_REPLACE_OBJECTS: "1" };
-  function git(args, cwd = repo, input = undefined) {
-    const child = spawnSync("git", ["-c", "core.hooksPath=/dev/null", "-c", "gc.auto=0", ...args], { cwd, env, input, encoding: "utf8", timeout: 3000, killSignal: "SIGKILL", maxBuffer: maxDiff });
+  function git(args, input = undefined) {
+    const child = spawnSync("git", ["-c", "core.hooksPath=/dev/null", "-c", "gc.auto=0", ...args], { cwd: repo, env, input, encoding: "utf8", timeout: 3000, killSignal: "SIGKILL", maxBuffer: maxDiff });
     if (child.status !== 0 || child.error) throw new Error("Offline bundle inspection failed (missing prerequisite, invalid data, or resource limit)");
     return child.stdout;
   }
@@ -50,12 +50,12 @@ function readBundleDiff(file, workspace = process.env.GITHUB_WORKSPACE) {
     git(["init", "--bare", "--quiet", "--template="]);
     if (bases.size) {
       if (!workspace) throw new Error("Incremental bundle requires a local base checkout");
-      const objects = git(["rev-parse", "--path-format=absolute", "--git-path", "objects"], workspace).trimEnd();
+      const objects = path.join(fs.realpathSync(workspace), ".git", "objects");
       // Git reads prerequisites from this store; it writes new objects only into the disposable repo.
-      if (!path.isAbsolute(objects) || /[\r\n]/.test(objects)) throw new Error("Invalid local object directory");
+      if (fs.realpathSync(objects) !== objects || /[\r\n]/.test(objects) || fs.existsSync(path.join(objects, "info/alternates"))) throw new Error("Unsupported local object directory");
       fs.writeFileSync(path.join(repo, "objects/info/alternates"), `${objects}\n`, { flag: "wx" });
     }
-    git(["index-pack", "--stdin", "--fix-thin", "--strict", `--max-input-size=${maxBundle}`], repo, data.subarray(end + 2));
+    git(["index-pack", "--stdin", "--fix-thin", "--strict", `--max-input-size=${maxBundle}`], data.subarray(end + 2));
     return git(["log", "--no-color", "--no-ext-diff", "--no-textconv", "--no-renames", "--root", "--diff-merges=first-parent", "--format=commit %H%n%s", "-p", ...tips, "--not", ...bases, "--"]);
   } finally {
     fs.rmSync(repo, { recursive: true, force: true });

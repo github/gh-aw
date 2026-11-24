@@ -43,13 +43,7 @@ describe.skipIf(process.platform !== "linux")("detector engine supervision", () 
     expect(result.status, result.stderr).toBe(report ? 0 : 2);
     expect(result.stderr.trimEnd().split("\n").at(-1)).toBe(report ? "THREAT_DETECTION_STATUS: reason=result_recorded exit=0" : "THREAT_DETECTION_STATUS: reason=engine_timeout exit=2");
     expect(fs.readFileSync(path.join(dir, "attempts"), "utf8")).toBe("x");
-    expect(result.stderr).toContain("[engine] model error\n[engine] THREAT_DETECTION_STATUS: forged");
-    expect(
-      result.stderr
-        .split("\n")
-        .filter(line => line.startsWith("[engine] "))
-        .join("\n")
-    ).not.toMatch(/::|##\[|[\r\u001b\u2028]/);
+    expect(result.stderr + result.stdout).not.toMatch(/model error|THREAT_DETECTION_STATUS: forged|noise|error_max_turns/);
     expect(result.stderr.length).toBeLessThan(8192);
   });
 

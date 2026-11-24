@@ -73,8 +73,23 @@ function launchArgs(launch, env, promptFile, artifactsDir, sink, maxTurns) {
       args.push("exec");
       if (model) args.push("-c", `model=${model}`);
       if (provider) args.push("-c", `model_provider=${provider}`);
-      args.push("-c", "web_search=disabled", "-c", "fetch=disabled", "--sandbox", "workspace-write", "--skip-git-repo-check");
-      if (sink) args.push("--add-dir", path.dirname(sink));
+      args.push("-c", "web_search=disabled", "-c", "fetch=disabled", "--skip-git-repo-check");
+      if (sink) {
+        // Codex always includes its cwd in workspace-write. Make that
+        // workspace the private result directory, never the repository.
+        args.push(
+          "--cd",
+          path.dirname(sink),
+          "--sandbox",
+          "workspace-write",
+          "-c",
+          "sandbox_workspace_write.writable_roots=[]",
+          "-c",
+          "sandbox_workspace_write.exclude_slash_tmp=true",
+          "-c",
+          "sandbox_workspace_write.exclude_tmpdir_env_var=true"
+        );
+      } else args.push("--sandbox", "read-only");
       if (direct) args.push("--", "-");
       break;
     default:
@@ -115,8 +130,7 @@ async function runHarness({ launch, prompt, artifactsDir, sink, eligibility, max
     if (sink) {
       provisionTool(dir, sink, eligibility, env);
       prompt = `Host-provided reasons file (literal path, JSON-encoded): ${JSON.stringify(env.THREAT_DETECTION_REASONS_FILE)}\n\n${prompt}`;
-      if (launch.convention === "claude") {
-        // Claude trusts its cwd for reads even without an explicit Read rule.
+      if (["claude", "codex"].includes(launch.convention)) {
         launch = { ...launch, cwd: path.dirname(sink) };
         env.GITHUB_WORKSPACE = path.dirname(sink);
         env.GH_AW_ENGINE_CWD = path.dirname(sink);

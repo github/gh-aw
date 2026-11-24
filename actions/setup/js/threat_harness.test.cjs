@@ -38,7 +38,7 @@ it.each(["copilot", "claude", "codex"])("uses resolved argv with the %s conventi
     const args = process.argv.slice(2);
     const file = args[args.indexOf("--prompt-file")+1];
     fs.writeFileSync(env.CAPTURE, JSON.stringify({
-      args, file, prompt: fs.readFileSync(file, "utf8"), mode: fs.statSync(file).mode & 511,
+      args, file, cwd:process.cwd(), prompt: fs.readFileSync(file, "utf8"), mode: fs.statSync(file).mode & 511,
       model: env.COPILOT_MODEL, turns: env.GH_AW_MAX_TURNS, eligible: [env.THREAT_DETECTION_ELIGIBLE_PROMPT_INJECTION, env.THREAT_DETECTION_ELIGIBLE_SECRET_LEAK, env.THREAT_DETECTION_ELIGIBLE_MALICIOUS_PATCH],
       reasons: env.THREAT_DETECTION_REASONS_FILE, stale: fs.existsSync(env.THREAT_DETECTION_REASONS_FILE)
     }));
@@ -58,7 +58,10 @@ it.each(["copilot", "claude", "codex"])("uses resolved argv with the %s conventi
     expect(observed.args.slice(1, 6)).toEqual(["exec", "-c", "model=fixture-model", "-c", "model_provider=fixture-proxy"]);
     expect(observed.args).not.toContain("--dangerously-bypass-approvals-and-sandbox");
     expect(observed.args[observed.args.indexOf("--sandbox") + 1]).toBe("workspace-write");
-    expect(observed.args[observed.args.indexOf("--add-dir") + 1]).toBe(path.dirname(sink));
+    expect(observed.cwd).toBe(path.dirname(sink));
+    expect(observed.args[observed.args.indexOf("--cd") + 1]).toBe(observed.cwd);
+    expect(observed.args).not.toContain("--add-dir");
+    expect(observed.args).toEqual(expect.arrayContaining(["sandbox_workspace_write.writable_roots=[]", "sandbox_workspace_write.exclude_slash_tmp=true", "sandbox_workspace_write.exclude_tmpdir_env_var=true"]));
   }
   if (convention === "claude") expect(observed.args.slice(-6, -2)).toEqual(["--model", "fixture-model", "--max-turns", "7"]);
   if (convention === "copilot") {

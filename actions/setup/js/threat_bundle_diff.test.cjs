@@ -25,6 +25,8 @@ it("renders only the new commits in an incremental bundle without modifying the 
     const file = path.join(root, "aw-change.bundle");
     git("bundle", "create", file, `${base}..HEAD`);
     git("checkout", "--detach", "-q", base);
+    // A local Git command would try to parse this broken repository config.
+    fs.writeFileSync(path.join(checkout, ".git/config"), "[broken\n");
     const diff = readBundleDiff(file, checkout);
     expect(diff).toContain("+addition");
     expect(diff).toContain("new commit");
