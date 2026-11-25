@@ -285,7 +285,7 @@ func matchWorkflowByFilename(pattern string, listJSON []byte) ([]WorkflowStatus,
 	for _, w := range workflows {
 		filename := path.Base(w.Path)
 		if filename == pattern+".lock.yml" || filename == pattern+".md" {
-			return []WorkflowStatus{{Workflow: pattern}}, nil
+			return []WorkflowStatus{{WorkflowListItem: WorkflowListItem{Workflow: pattern}}}, nil
 		}
 	}
 	return nil, nil

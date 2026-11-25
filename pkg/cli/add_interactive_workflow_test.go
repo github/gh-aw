@@ -84,6 +84,7 @@ func TestMatchWorkflowByFilename(t *testing.T) {
 		{name: "duplicate matches return one status", input: `[{"path":"repo-status.lock.yml"},{"path":"repo-status.md"}]`, want: true},
 		{name: "escaped path", input: `[{"path":".github/workflows/repo\u002dstatus.lock.yml"}]`, want: true},
 		{name: "empty list", input: `[]`},
+		{name: "empty output", input: "", wantErr: true},
 		{name: "invalid json", input: `[{"path":"repo-status.lock.yml"},`, wantErr: true},
 		{name: "wrong json shape", input: `{"path":"repo-status.lock.yml"}`, wantErr: true},
 	}
@@ -98,7 +99,7 @@ func TestMatchWorkflowByFilename(t *testing.T) {
 			}
 			require.NoError(t, err)
 			if tt.want {
-				assert.Equal(t, []WorkflowStatus{{Workflow: "repo-status"}}, statuses)
+				assert.Equal(t, []WorkflowStatus{{WorkflowListItem: WorkflowListItem{Workflow: "repo-status"}}}, statuses)
 			} else {
 				assert.Nil(t, statuses)
 			}
