@@ -9,7 +9,7 @@ var createProjectStatusUpdateLog = logger.New("workflow:create_project_status_up
 // CreateProjectStatusUpdateConfig holds configuration for creating GitHub project status updates
 type CreateProjectStatusUpdateConfig struct {
 	BaseSafeOutputConfig `yaml:",inline"`
-	Project              string `yaml:"project,omitempty"` // Optional project URL for documentation; agent messages must still include it.
+	Project              string `yaml:"project,omitempty"` // Required by the schema; used for project/token setup, not as a handler fallback.
 }
 
 // parseCreateProjectStatusUpdateConfig handles create-project-status-update configuration

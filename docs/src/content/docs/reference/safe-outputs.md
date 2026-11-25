@@ -1085,7 +1085,7 @@ safe-outputs:
     github-token: ${{ secrets.GH_AW_WRITE_PROJECT_TOKEN }}
 ```
 
-Use `create-project-status-update: null` to enable this output with its defaults. In either form, agent output messages **must** explicitly include the `project` field; the configured URL is documentation only and is not used as a fallback. Often used by scheduled and orchestrator workflows to post run summaries.
+Use `create-project-status-update: null` to enable this output with its defaults. The configured URL sets up the project URL and token, but it does not fill the handler's `project` field; each agent output message **must** explicitly include its own `project` URL. Often used by scheduled and orchestrator workflows to post run summaries.
 
 #### Required Fields
 

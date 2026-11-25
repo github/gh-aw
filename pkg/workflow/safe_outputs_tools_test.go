@@ -218,7 +218,7 @@ func TestEnhanceToolDescription(t *testing.T) {
 			},
 			wantContains: []string{
 				"CONSTRAINTS:",
-				`Default project URL: "https://github.com/orgs/myorg/projects/99"`,
+				`Configured project URL for project/token setup; each status update still requires its own project field: "https://github.com/orgs/myorg/projects/99"`,
 			},
 		},
 		{
@@ -234,7 +234,7 @@ func TestEnhanceToolDescription(t *testing.T) {
 			wantContains: []string{
 				"CONSTRAINTS:",
 				"Maximum 8 status update(s)",
-				`Default project URL: "https://github.com/orgs/example/projects/50"`,
+				`Configured project URL for project/token setup; each status update still requires its own project field: "https://github.com/orgs/example/projects/50"`,
 			},
 		},
 		{
