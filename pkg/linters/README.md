@@ -100,6 +100,7 @@ The method names mentioned in analyzer descriptions (such as `Err`, `Flush`, `Re
 - `timenowsub` — reports `time.Now().Sub(t)` calls that should be simplified to `time.Since(t)`.
 - `tolowerequalfold` — reports case-insensitive string comparisons using `strings.ToLower`/`ToUpper` that should use `strings.EqualFold`.
 - `trimleftright` — reports `strings.TrimLeft`/`TrimRight` calls with a multi-character literal cutset where `TrimPrefix`/`TrimSuffix` was likely intended.
+- `trimspacestringbytes` — reports `strings.TrimSpace(string(b))` for byte slices and recommends considering `bytes.TrimSpace(b)`. Convert the result to `string` if needed; the returned slice aliases the input.
 - `typeassertionnil` — reports single-value type assertions to pointer types and recommends the two-value form.
 - `typeassertionokdiscarded` — reports two-value type assertions whose `ok` result is discarded.
 - `unchecked-deferred-close` (Go package `unchecked_deferredclose`) — reports deferred `Close()` calls that discard the returned error.
@@ -172,7 +173,7 @@ returning a channel does not transfer ownership.
 Micro-optimizations flagged by allocation/perf linters (e.g. `stringsconcatloop`, `appendoneelement`,
 `appendbytestring`, `bytesbufferstring`, `bytescomparestring`, `lenstringsplit`, `mapclearloop`,
 `readerstringconv`, `reflectdeepequalusage`, `seenmapbool`, `slicemakezerolength`, `sortslice`, `splitindexzero`, `stringssplitfirst`,
-`stringbytesroundtrip`, `stringsjoinone`, `tolowerequalfold`, and `writebytestring`) only matter on hot paths: applying them to code that tests never execute adds
+`stringbytesroundtrip`, `stringsjoinone`, `tolowerequalfold`, `trimspacestringbytes`, and `writebytestring`) only matter on hot paths: applying them to code that tests never execute adds
 churn without a measurable benefit. These linters consult the shared
 `pkg/linters/internal/coverage` package, which loads a Go coverage profile (produced by
 `go test -covermode=count -coverprofile=<path>`) referenced by the `GH_AW_LINT_COVERAGE_PROFILE`
@@ -286,6 +287,7 @@ environment variable and gates findings on the recorded execution hit count for 
 | `timenowsub` | Custom `go/analysis` analyzer that flags `time.Now().Sub(t)` calls that should use `time.Since(t)` |
 | `tolowerequalfold` | Custom `go/analysis` analyzer that flags case-insensitive comparisons via `strings.ToLower`/`ToUpper` that should use `strings.EqualFold` |
 | `trimleftright` | Custom `go/analysis` analyzer that flags `strings.TrimLeft`/`TrimRight` calls with a multi-character literal cutset where `TrimPrefix`/`TrimSuffix` was likely intended |
+| `trimspacestringbytes` | Custom `go/analysis` analyzer that reports `strings.TrimSpace(string(b))` for byte slices and recommends considering `bytes.TrimSpace(b)` |
 | `typeassertionnil` | Custom `go/analysis` analyzer that flags single-value type assertions to pointer types and recommends the two-value form |
 | `typeassertionokdiscarded` | Custom `go/analysis` analyzer that flags two-value type assertions whose `ok` result is discarded |
 | `unchecked-slice-index` (`uncheckedsliceindex`) | Custom `go/analysis` analyzer that reports slice and string indexes without proven bounds checks |
@@ -460,6 +462,7 @@ _ = typeassertionnil.Analyzer
 - `github.com/github/gh-aw/pkg/linters/timesleepnocontext` — time-sleep-no-context analyzer subpackage
 - `github.com/github/gh-aw/pkg/linters/tolowerequalfold` — to-lower-equal-fold analyzer subpackage
 - `github.com/github/gh-aw/pkg/linters/trimleftright` — trim-left-right analyzer subpackage
+- `github.com/github/gh-aw/pkg/linters/trimspacestringbytes` — trim-space-string-bytes analyzer subpackage
 - `github.com/github/gh-aw/pkg/linters/typeassertionnil` — type-assertion-nil analyzer subpackage
 - `github.com/github/gh-aw/pkg/linters/typeassertionokdiscarded` — type-assertion-ok-discarded analyzer subpackage
 - `github.com/github/gh-aw/pkg/linters/unchecked-slice-index` — unchecked-slice-index analyzer subpackage
