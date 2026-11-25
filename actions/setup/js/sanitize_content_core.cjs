@@ -1406,6 +1406,9 @@ const MAX_BOT_TRIGGER_REFERENCES = 10;
  * @returns {string} The string with excess bot triggers neutralized
  */
 function neutralizeBotTriggers(s, maxBotMentions = MAX_BOT_TRIGGER_REFERENCES) {
+  if (!Number.isSafeInteger(maxBotMentions) || maxBotMentions < 0) {
+    maxBotMentions = 0;
+  }
   const pattern = /\b(fixes?|closes?|resolves?|fix|close|resolve)\s+#(\w+)/gi;
   let count = 0;
   const wrapInCodeSpan = createRenderSafeCodeSpanWrapper(s);
@@ -1616,9 +1619,12 @@ function neutralizeGitHubReferences(s, allowedRepos) {
  * @returns {string} The truncated content
  */
 function applyTruncation(content, maxLength, maxLines) {
-  maxLength = maxLength || 524288;
+  if (typeof content !== "string" || !content) {
+    return "";
+  }
+  maxLength = Number.isSafeInteger(maxLength) && maxLength > 0 ? maxLength : 524288;
   const lines = content.split("\n");
-  maxLines = maxLines || 65000;
+  maxLines = Number.isSafeInteger(maxLines) && maxLines > 0 ? maxLines : 65000;
 
   // If content has too many lines, truncate by lines (primary limit)
   if (lines.length > maxLines) {

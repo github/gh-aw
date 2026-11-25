@@ -2112,6 +2112,40 @@ describe("sanitize_content.cjs", () => {
   });
 
   describe("content truncation", () => {
+    it("uses safe defaults for invalid length and line limits", async () => {
+      const { applyTruncation, sanitizeContentCore } = await import("./sanitize_content_core.cjs");
+      const content = "x".repeat(524289);
+      for (const limit of [0, -1, 1.5, NaN, Infinity, "100", {}, Number.MAX_SAFE_INTEGER + 1]) {
+        expect(applyTruncation(content, limit)).toBe("x".repeat(524288) + "\n[Content truncated due to length]");
+        expect(applyTruncation("a\nb", 100, limit)).toBe("a\nb");
+        expect(sanitizeContentCore("a\nb", limit, undefined, limit)).toBe("a\nb");
+      }
+      expect(applyTruncation(null)).toBe("");
+      expect(
+        applyTruncation({
+          toString: () => {
+            throw new Error("unexpected coercion");
+          },
+        })
+      ).toBe("");
+      expect(applyTruncation("a\nb\nc", 100, 2)).toBe("a\nb\n[Content truncated due to line count]");
+    });
+
+    it.each([{}, { allowedAliases: ["author"] }, { deferMentions: true }])("truncates before parsing content with options %o", options => {
+      const content = "x".repeat(100) + "&" + "amp;".repeat(40) + "commat;";
+      expect(sanitizeContent(content, { ...options, maxLength: 50 })).toBe("x".repeat(50) + "\n[Content truncated due to length]");
+    });
+
+    it.each([NaN, Infinity, -1, 1.5, "10", {}])("fails closed for invalid mention limits: %o", limit => {
+      expect(sanitizeContent("fixes #1", { maxBotMentions: limit })).toBe("`fixes #1`");
+      expect(sanitizeContent("@author", { allowedAliases: ["author"], maxMentions: limit })).toBe("`@author`");
+    });
+
+    it("preserves valid zero and positive mention limits", () => {
+      expect(sanitizeContent("fixes #1 fixes #2", { maxBotMentions: 1 })).toBe("fixes #1 `fixes #2`");
+      expect(sanitizeContent("@author", { allowedAliases: ["author"], maxMentions: 0 })).toBe("`@author`");
+    });
+
     it("should truncate content exceeding max length", () => {
       const longContent = "x".repeat(600000);
       const result = sanitizeContent(longContent);
