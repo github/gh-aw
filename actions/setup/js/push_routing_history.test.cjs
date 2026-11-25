@@ -106,7 +106,7 @@ function reconcilePagination(githubClient, floor, runNumber) {
 }
 
 function fakeGitHub(remote, { runs = [], jobs = {}, attempts = {}, contents = {}, runsById = {}, listWorkflowRuns } = {}) {
-  const calls = { jobs: [], attempts: [], lists: [], contents: [], runs: [] };
+  const calls = { jobs: [], jobParams: [], attempts: [], attemptParams: [], lists: [], contents: [], runs: [] };
   const client = {
     calls,
     rest: {
@@ -147,15 +147,17 @@ function fakeGitHub(remote, { runs = [], jobs = {}, attempts = {}, contents = {}
           if (!found) throw Object.assign(new Error("Not Found"), { status: 404 });
           return { data: found };
         },
-        getWorkflowRunAttempt: async ({ run_id }) => {
-          calls.attempts.push(run_id);
-          return { data: attempts[run_id] };
+        getWorkflowRunAttempt: async params => {
+          calls.attempts.push(params.run_id);
+          calls.attemptParams.push(params);
+          return { data: attempts[params.run_id] };
         },
         listJobsForWorkflowRunAttempt: async ({ run_id }) => ({ data: { jobs: jobs[run_id] || [] } }),
       },
     },
     paginate: async (method, params) => {
       calls.jobs.push(params.run_id);
+      calls.jobParams.push(params);
       return (await method(params)).data.jobs;
     },
   };
@@ -2110,6 +2112,160 @@ describe("push_routing_history saves", () => {
     await save(remote, 904, "success", { github });
     expect(github.calls.runs).toEqual(Array.from({ length: 20 }, (_, i) => 9001 + i));
     expect(remoteState(remote)).toMatchObject({ reconciled_through: 904, unresolved_lookup_cursor: 20 });
+  });
+
+  it("reconciles and charges a failed first attempt immediately while a re-run is still in progress", async () => {
+    const remote = bareRemote();
+    await save(remote, 50, "success");
+    const agent = { name: "agent", conclusion: "failure", started_at: "2026-11-24T09:00:00Z" };
+    const writer = conclusion => ({ name: "push_routing_history", conclusion, started_at: "2026-11-24T09:10:00Z" });
+    const run51 = { id: 9051, run_number: 51, status: "in_progress", conclusion: null, head_branch: "main", event: "schedule", run_attempt: 2 };
+    const github = fakeGitHub(remote, {
+      runs: [run51, { id: 9050, run_number: 50, status: "completed", conclusion: "success", head_branch: "main", event: "schedule", run_attempt: 1 }],
+      attempts: { 9051: { status: "completed", conclusion: "failure" } },
+      jobs: { 9051: [agent, writer("failure")] },
+    });
+
+    await save(remote, 52, "success", { github });
+    expect(github.calls.attempts).toEqual([9051]);
+    expect(github.calls.attemptParams).toEqual([expect.objectContaining({ run_id: 9051, attempt_number: 1 })]);
+    expect(github.calls.jobs).toEqual([9051]);
+    expect(github.calls.jobParams).toEqual([expect.objectContaining({ run_id: 9051, attempt_number: 1 })]);
+    expect(remoteRuns(remote).map(({ number, attempt, note }) => ({ number, attempt, note }))).toEqual([
+      { number: 50, attempt: 1, note: null },
+      { number: 51, attempt: 1, note: "unsaved" },
+      { number: 52, attempt: 1, note: null },
+    ]);
+    expect(remoteState(remote)).toMatchObject({ last_run: 52, reconciled_through: 52, unresolved_runs: [], unexplained: 1 });
+
+    // A later save while attempt 2 is still running (or once it succeeds) does not re-query or double-charge #51.
+    const nextGitHub = fakeGitHub(remote, {
+      runs: [
+        { id: 9052, run_number: 52, status: "completed", conclusion: "success", head_branch: "main", event: "schedule", run_attempt: 1 },
+        { ...run51, status: "completed", conclusion: "success" },
+      ],
+      attempts: { 9051: { status: "completed", conclusion: "failure" } },
+      jobs: { 9051: [agent, writer("failure")] },
+    });
+    await save(remote, 53, "success", { github: nextGitHub });
+    expect(nextGitHub.calls.attempts).toEqual([]);
+    expect(nextGitHub.calls.jobs).toEqual([]);
+    expect(remoteState(remote)).toMatchObject({ last_run: 53, reconciled_through: 53, unresolved_runs: [], unexplained: 1 });
+  });
+
+  it("handles active re-runs for tracked unresolved runs, saved first attempts, and incomplete first attempts", async () => {
+    const remote = bareRemote();
+    await save(remote, 50, "success");
+    const agent = { name: "agent", conclusion: "failure", started_at: "2026-11-24T09:00:00Z" };
+    const writer = conclusion => ({ name: "push_routing_history", conclusion, started_at: "2026-11-24T09:10:00Z" });
+
+    // #51 starts as an in-progress attempt 1 and is tracked in unresolved_runs by #52.
+    const run51 = { id: 9051, run_number: 51, status: "in_progress", conclusion: null, head_branch: "main", event: "schedule", run_attempt: 1 };
+    await save(remote, 52, "success", { github: fakeGitHub(remote, { runs: [run51] }) });
+    expect(remoteState(remote)).toMatchObject({ reconciled_through: 52, unresolved_runs: [51], unexplained: 0 });
+
+    // Before #55 saves:
+    // - #51 failed attempt 1 and is now re-running (attempt 2 in_progress): must reconcile and clear from unresolved_runs.
+    // - #53 succeeded attempt 1 and is re-running (attempt 2 in_progress): must reconcile without querying jobs or marking unresolved.
+    // - #54 reports run_attempt 2 in_progress, but attempt 1 itself is not yet completed: must stay in unresolved_runs without querying jobs.
+    const github = fakeGitHub(remote, {
+      runs: [
+        { id: 9054, run_number: 54, status: "in_progress", conclusion: null, head_branch: "main", event: "schedule", run_attempt: 2 },
+        { id: 9053, run_number: 53, status: "in_progress", conclusion: null, head_branch: "main", event: "schedule", run_attempt: 2 },
+        { id: 9052, run_number: 52, status: "completed", conclusion: "success", head_branch: "main", event: "schedule", run_attempt: 1 },
+        { id: 9051, run_number: 51, status: "in_progress", conclusion: null, head_branch: "main", event: "schedule", run_attempt: 2 },
+      ],
+      attempts: {
+        9051: { status: "completed", conclusion: "failure" },
+        9053: { status: "completed", conclusion: "success" },
+        9054: { status: "in_progress", conclusion: null },
+      },
+      jobs: { 9051: [agent, writer("failure")] },
+    });
+
+    await save(remote, 55, "success", { github });
+    expect(github.calls.attempts).toEqual([9051, 9053, 9054]);
+    expect(github.calls.jobs).toEqual([9051]);
+    expect(remoteRuns(remote).map(({ number, note }) => ({ number, note }))).toEqual([
+      { number: 50, note: null },
+      { number: 52, note: null },
+      { number: 51, note: "unsaved" },
+      { number: 55, note: null },
+    ]);
+    expect(remoteState(remote)).toMatchObject({
+      last_run: 55,
+      reconciled_through: 55,
+      unresolved_runs: [54],
+      unresolved_run_ids: { "54": "9054" },
+      unexplained: 1,
+    });
+  });
+
+  it("retains an active re-run as unresolved without discarding unrelated reconciliation when attempt-1 or job lookup fails transiently", async () => {
+    const remote = bareRemote();
+    await save(remote, 50, "success");
+    const agent = { name: "agent", conclusion: "failure", started_at: "2026-11-24T09:00:00Z" };
+    const writer = conclusion => ({ name: "push_routing_history", conclusion, started_at: "2026-11-24T09:10:00Z" });
+    const run50 = { id: 9050, run_number: 50, status: "completed", conclusion: "success", head_branch: "main", event: "schedule", run_attempt: 1 };
+    const run51 = { id: 9051, run_number: 51, status: "completed", conclusion: "failure", head_branch: "main", event: "schedule", run_attempt: 1 };
+    const run52 = { id: 9052, run_number: 52, status: "in_progress", conclusion: null, head_branch: "main", event: "schedule", run_attempt: 2 };
+
+    // 1. Attempt-1 lookup for active re-run #52 fails with 503: #51 must still be charged while #52 stays unresolved.
+    const gh53 = fakeGitHub(remote, { runs: [run52, run51, run50], jobs: { 9051: [agent, writer("failure")] } });
+    gh53.rest.actions.getWorkflowRunAttempt = async () => {
+      throw Object.assign(new Error("503 service unavailable"), { status: 503 });
+    };
+    await save(remote, 53, "success", { github: gh53 });
+    expect(remoteRuns(remote).map(({ number, note }) => ({ number, note }))).toEqual([
+      { number: 50, note: null },
+      { number: 51, note: "unsaved" },
+      { number: 53, note: null },
+    ]);
+    expect(remoteState(remote)).toMatchObject({
+      last_run: 53,
+      reconciled_through: 53,
+      unresolved_runs: [52],
+      unresolved_run_ids: { "52": "9052" },
+      unexplained: 1,
+    });
+
+    // 2. Attempt-1 lookup succeeds, but attempt-1 jobs lookup fails with 503: #52 remains unresolved for retry.
+    const run53 = { id: 9053, run_number: 53, status: "completed", conclusion: "success", head_branch: "main", event: "schedule", run_attempt: 1 };
+    const gh54 = fakeGitHub(remote, {
+      runs: [run53, run52, run51, run50],
+      attempts: { 9052: { status: "completed", conclusion: "failure" } },
+    });
+    gh54.paginate = async () => {
+      throw Object.assign(new Error("503 service unavailable"), { status: 503 });
+    };
+    await save(remote, 54, "success", { github: gh54 });
+    expect(remoteState(remote)).toMatchObject({
+      last_run: 54,
+      reconciled_through: 54,
+      unresolved_runs: [52],
+      unresolved_run_ids: { "52": "9052" },
+      unexplained: 1,
+    });
+
+    // 3. Once both lookups succeed, #52 is charged as unsaved and cleared from unresolved_runs.
+    const run54 = { id: 9054, run_number: 54, status: "completed", conclusion: "success", head_branch: "main", event: "schedule", run_attempt: 1 };
+    const gh55 = fakeGitHub(remote, {
+      runs: [run54, run53, run52, run51, run50],
+      attempts: { 9052: { status: "completed", conclusion: "failure" } },
+      jobs: { 9052: [agent, writer("failure")] },
+    });
+    await save(remote, 55, "success", { github: gh55 });
+    expect(remoteRuns(remote).map(({ number, note }) => ({ number, note }))).toEqual([
+      { number: 50, note: null },
+      { number: 51, note: "unsaved" },
+      { number: 53, note: null },
+      { number: 54, note: null },
+      { number: 52, note: "unsaved" },
+      { number: 55, note: null },
+    ]);
+    const finalState = remoteState(remote);
+    expect(finalState).toMatchObject({ last_run: 55, reconciled_through: 55, unresolved_runs: [], unexplained: 2 });
+    expect(finalState.unresolved_run_ids).toBeUndefined();
   });
 });
 

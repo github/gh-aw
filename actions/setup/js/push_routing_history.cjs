@@ -1007,18 +1007,19 @@ async function listRuns({ githubClient, owner, repo, workflowFile, workflowPath 
       if (isTrackedUnresolved) resolved.add(num);
       continue;
     }
-    if (run.status !== "completed") {
-      unresolved.add(num);
-      unresolvedIds[String(num)] = id;
-      continue;
-    }
     try {
-      let conclusion = run.conclusion;
-      // A successful re-run can hide a failed first save.
-      if ((run.run_attempt || 1) > 1)
-        ({
-          data: { conclusion },
-        } = await githubClient.rest.actions.getWorkflowRunAttempt({ owner, repo, run_id: run.id, attempt_number: 1 }));
+      let { status, conclusion } = run;
+      // The listing describes the latest attempt. Only the first attempt can owe a save.
+      if ((run.run_attempt || 1) > 1) {
+        const { data: firstAttempt } = await githubClient.rest.actions.getWorkflowRunAttempt({ owner, repo, run_id: run.id, attempt_number: 1 });
+        conclusion = firstAttempt.conclusion;
+        status = firstAttempt.status ?? (conclusion ? "completed" : null);
+      }
+      if (status !== "completed") {
+        unresolved.add(num);
+        unresolvedIds[String(num)] = id;
+        continue;
+      }
       /** @type {{id: string, number: number, conclusion: string, agent_ran?: boolean, generation?: string}} */
       const listed = { id, number: num, conclusion: conclusion || "unknown" };
       let include = true;
