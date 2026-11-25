@@ -12,7 +12,7 @@ import (
 // Side effects: acc.engines, acc.mergedEngineMCPToolTimeout,
 // acc.mergedEngineMCPSessionTimeout, acc.mergedEngineModel.
 func (acc *importAccumulator) extractEngineConfig(fm map[string]any, fullPath string) {
-	acc.extractTopLevelRouting(fm)
+	acc.extractTopLevelRouting(fm, fullPath)
 	if _, ok := fm["model"]; ok {
 		acc.engineModelChoiceDeclared = true
 	}
@@ -73,7 +73,7 @@ func (acc *importAccumulator) extractEngineConfig(fm map[string]any, fullPath st
 	}
 }
 
-func (acc *importAccumulator) extractTopLevelRouting(fm map[string]any) {
+func (acc *importAccumulator) extractTopLevelRouting(fm map[string]any, fullPath string) {
 	switch routing := fm["model-routing"].(type) {
 	case bool:
 		if !routing {
@@ -81,7 +81,10 @@ func (acc *importAccumulator) extractTopLevelRouting(fm map[string]any) {
 			acc.engineModelChoiceDeclared = true
 		}
 	case map[string]any:
-		acc.routerShortlists = append(acc.routerShortlists, parseStringSliceField(routing["allowed-models"], true))
+		if list, ok := routing["allowed-models"]; ok {
+			acc.routerShortlists = append(acc.routerShortlists, parseStringSliceField(list, true))
+		}
+		acc.extractFirstWinsJSONField(routing, fullPath, "learning", &acc.mergedRoutingLearning)
 	}
 }
 
@@ -125,7 +128,6 @@ func (acc *importAccumulator) extractConfigFields(fm map[string]any, fullPath st
 	acc.extractFirstWinsJSONField(fm, fullPath, "max-turn-cache-misses", &acc.mergedMaxTurnCacheMisses)
 	acc.extractFirstWinsJSONField(fm, fullPath, "max-ai-credits", &acc.mergedMaxAICredits)
 	acc.extractFirstWinsJSONField(fm, fullPath, "max-daily-ai-credits", &acc.mergedMaxDailyAICredits)
-	acc.extractFirstWinsJSONField(fm, fullPath, "adaptive-routing", &acc.mergedAdaptiveRouting)
 	acc.extractConcurrencyInImport(fm, fullPath)
 	acc.extractConcurrencyJobDiscriminator(fm, fullPath)
 	if acc.metadataDocs == "" {

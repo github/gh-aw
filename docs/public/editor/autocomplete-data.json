@@ -4408,6 +4408,20 @@
       "desc": "Default LLM model, overridden by nested engine.model.",
       "leaf": true
     },
+    "model-routing": {
+      "type": "boolean|object",
+      "desc": "Set false to disable implicit main-agent routing without pinning a model, or configure the main agent's router shortl...",
+      "children": {
+        "allowed-models": {
+          "desc": "For a literal router model value, specify at least one exact model name or gh-aw alias."
+        },
+        "learning": {
+          "type": "string|boolean",
+          "desc": "Use observe to record each eligible run's model, effort, outcome and cost without changing the router's pick.",
+          "enum": ["observe", false]
+        }
+      }
+    },
     "graders": {
       "type": "object",
       "desc": "Graders over the unified session, including reserved operational-value JavaScript."

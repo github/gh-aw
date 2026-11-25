@@ -1038,9 +1038,9 @@ models:
 
 An experimental feature that chooses a model and reasoning effort for the main agent on each run. Set `model: router` to let the task determine the level. Choose `router/economy`, `router/balanced`, or `router/robust` for a fixed level, or use `model-routing: false` to disable implicit routing without pinning a model. See [Model Routing](/gh-aw/reference/model-routing/).
 
-### Adaptive Routing (`adaptive-routing`)
+### Adaptive Routing (`model-routing.learning`)
 
-An experimental frontmatter field that records, for each eligible run of a routed workflow, which model and reasoning effort were used when available, whether the run completed its task, and what it cost. With `adaptive-routing: observe`, the router's pick is unchanged and each run is saved to routing history in [repo-memory](/gh-aw/reference/repo-memory/). A run that did not route or whose agent made no request is recorded as `no_agent` and does not count as a success or failure. Inspect results with `gh aw routing status`. See [Adaptive Routing](/gh-aw/reference/adaptive-routing/).
+Set `learning: observe` under `model-routing` to record the selected model and reasoning effort, the outcome and the cost of each eligible run in [repo-memory](/gh-aw/reference/repo-memory/). Observation does not change the router's pick. A run that did not route or whose agent made no request is recorded as `no_agent` and does not count as a success or failure. Inspect results with `gh aw routing status`. See [Adaptive Routing](/gh-aw/reference/adaptive-routing/).
 
 ### Default AI Credits Pricing (`models.default-ai-credits-pricing`)
 
