@@ -101,12 +101,7 @@ func unauthorizedExpressionsError(unauthorizedExpressions, multilineExpressions 
 		unauthorizedList.WriteString("\n")
 	}
 	if len(multilineExpressions) > 0 {
-		unauthorizedList.WriteString("expressions must not contain line breaks:\n")
-		for _, expr := range multilineExpressions {
-			unauthorizedList.WriteString("  - ")
-			unauthorizedList.WriteString(strconv.Quote(expr))
-			unauthorizedList.WriteString("\n")
-		}
+		unauthorizedList.WriteString(formatLineBreakExpressions(multilineExpressions))
 	}
 
 	if len(unauthorizedExpressions) == 0 {
@@ -145,6 +140,17 @@ func unauthorizedExpressionsError(unauthorizedExpressions, multilineExpressions 
 		unauthorizedList.String(),
 		suggestion,
 	)
+}
+
+func formatLineBreakExpressions(expressions []string) string {
+	var list strings.Builder
+	list.WriteString("expressions must not contain line breaks:\n")
+	for _, expr := range expressions {
+		list.WriteString("  - ")
+		list.WriteString(strconv.Quote(expr))
+		list.WriteString("\n")
+	}
+	return list.String()
 }
 
 // ExpressionValidationOptions contains the options for validating a single expression
