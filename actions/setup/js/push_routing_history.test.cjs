@@ -1524,10 +1524,10 @@ describe("push_routing_history saves", () => {
     expect(noCountResult.reconciliation.verified).toBe(false);
   });
 
-  it("keeps searching for a reachable floor: a tie straddling page 10, and a jump that lands past the target", async () => {
+  it("keeps searching for a reachable floor inside a tie straddling page 10", async () => {
     const agent = { name: "agent", conclusion: "failure", started_at: "2026-11-24T09:00:00Z" };
     const writer = conclusion => ({ name: "push_routing_history", conclusion, started_at: "2026-11-24T09:10:00Z" });
-    // 1. 300 newer runs, then 800 runs (#1200..#401) created in one second, then 400 older runs. The floor (#950)
+    // 300 newer runs, then 800 runs (#1200..#401) created in one second, then 400 older runs. The floor (#950)
     // is inside the tie on page 6, so the search reads all ten pages and then nine pages of a created window.
     const tieTime = runCreatedAt(800);
     const tied = [
@@ -1541,14 +1541,11 @@ describe("push_routing_history saves", () => {
     expect(tiedResult.reconciliation).not.toHaveProperty("ceiling");
     expect(tiedResult.listing.filter(item => item.conclusion === "failure").map(item => item.number)).toEqual([960]);
     expect(tiedGitHub.calls.lists.filter(call => call.branch === "main")).toHaveLength(19);
+  });
 
-    // 2. A sparse listing (run numbers 20 apart) whose page 10 starts a 1,200-run tie older than the target: page 1
-    // is far above the target (#37001), so the search reads page 10 first, sees it is past the target, and finds the
-    // floor on page 2 instead of stepping into a window it could never get past.
-    const sparse = [
-      ...Array.from({ length: 900 }, (_, i) => paginationRun(40000 - 20 * i, { conclusion: 40000 - 20 * i === 37600 ? "failure" : "success" })),
-      ...Array.from({ length: 1200 }, (_, i) => paginationRun(20000 - i, { created_at: runCreatedAt(19000) })),
-    ];
+  it.each(["tied", "distinct"])("reads the page-2 target after overshooting it on page 10 with %s timestamps", async timestamps => {
+    // Run numbers are 20 apart, so page 1 looks far from the target. Page 10 proves we overshot.
+    const sparse = [...Array.from({ length: 900 }, (_, i) => paginationRun(40000 - 20 * i)), ...Array.from({ length: 1200 }, (_, i) => paginationRun(20000 - i, { created_at: runCreatedAt(timestamps === "tied" ? 19000 : 20000 - i) }))];
     const sparseGitHub = fakeGitHub(null, { runs: sparse });
     const sparseStream = await fetchStreamWindow((page, created) => sparseGitHub.rest.actions.listWorkflowRuns({ branch: "main", page, ...(created ? { created } : {}) }), 37001, 40000);
     expect(sparseStream).toMatchObject({ reachedFloor: true, maxVerified: 40000 });

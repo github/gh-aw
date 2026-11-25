@@ -394,6 +394,7 @@ async function fetchStreamWindow(fetchPage, targetRunNumber, maxRunNumber) {
   const load = async (win, page) => {
     const cached = win.pages.get(page);
     if (cached) return cached;
+    if (calls >= MAX_LIST_CALLS) return null;
     calls += 1;
     const data = (await fetchPage(page, win.created))?.data;
     const runs = data?.workflow_runs;
@@ -429,13 +430,13 @@ async function fetchStreamWindow(fetchPage, targetRunNumber, maxRunNumber) {
     let page = 1;
     let entry = first;
     while (!holdsFloor(entry) && entry.full && page < lastPage) {
-      if (calls >= MAX_LIST_CALLS) return fail();
       page = jump ? lastPage : page + 1;
       const next = await load(win, page);
       if (!next) return fail();
       entry = next;
-      // The last page is already past the target, so read the pages it skipped in order.
-      if (jump && !holdsFloor(entry) && entry.maxNum < targetRunNumber) {
+      if (jump && entry.maxNum < targetRunNumber) {
+        // Look for a nearer floor, unless we already have one and cannot afford all the skipped pages.
+        if (holdsFloor(entry) && calls + lastPage - 2 > MAX_LIST_CALLS) break;
         jump = false;
         page = 1;
         entry = first;
