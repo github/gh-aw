@@ -135,7 +135,7 @@ func TestConnectorInferenceAllowsLearningOptOut(t *testing.T) {
 	data, err := compiler.ParseWorkflowFile(path)
 	require.NoError(t, err)
 	require.Equal(t, "gpt-5.2", data.Model)
-	require.Empty(t, data.AdaptiveRouting)
+	require.Empty(t, data.RoutingLearningMode)
 }
 
 func TestConnectorInferenceAutoAllowsSelectedProfileHosts(t *testing.T) {

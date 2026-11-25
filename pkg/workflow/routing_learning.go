@@ -18,67 +18,67 @@ import (
 	"github.com/github/gh-aw/pkg/logger"
 )
 
-var adaptiveRoutingLog = logger.New("workflow:adaptive_routing")
+var routingLearningLog = logger.New("workflow:routing_learning")
 
 const (
-	adaptiveRoutingObserve = "observe"
-	// adaptiveRoutingBranchRoot is reserved for the routing histories; no repo-memory
+	routingLearningObserve = "observe"
+	// routingHistoryBranchRoot is reserved for the routing histories; no repo-memory
 	// entry may write it, so the agent can never edit its own record.
-	adaptiveRoutingBranchRoot = "memory/adaptive-routing"
+	routingHistoryBranchRoot = "memory/adaptive-routing"
 )
 
 // The workflow ID names the history branch, so it must be a valid ref component.
-var adaptiveRoutingWorkflowIDPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_-]*(?:\.[A-Za-z0-9_-]+)*$`)
+var routingHistoryWorkflowIDPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_-]*(?:\.[A-Za-z0-9_-]+)*$`)
 
-// adaptiveRoutingSetting is the effective model-routing.learning value. explicit marks a value
+// routingLearningSetting is the effective model-routing.learning value. explicit marks a value
 // from the workflow or an import, where an unsupported workflow is an error; a
 // repository default skips such a workflow silently.
-type adaptiveRoutingSetting struct {
+type routingLearningSetting struct {
 	mode     string
 	explicit bool
 }
 
-// resolveAdaptiveRoutingSetting applies the precedence: the workflow's own value
+// resolveRoutingLearningSetting applies the precedence: the workflow's own value
 // (including false), then the first import that sets it, then aw.json, then off.
-func resolveAdaptiveRoutingSetting(frontmatter map[string]any, imported string, repoConfig *RepoConfig) (adaptiveRoutingSetting, error) {
+func resolveRoutingLearningSetting(frontmatter map[string]any, imported string, repoConfig *RepoConfig) (routingLearningSetting, error) {
 	value, ok := ExtractMapField(frontmatter, "model-routing")["learning"]
 	if !ok && imported != "" {
 		if err := decodeModelRoutingJSONDocument(imported, &value); err != nil {
-			return adaptiveRoutingSetting{}, fmt.Errorf("imported model-routing.learning value is not recognized: %w", err)
+			return routingLearningSetting{}, fmt.Errorf("imported model-routing.learning value is not recognized: %w", err)
 		}
 		ok = true
 	}
 	if !ok {
-		if repoConfig != nil && repoConfig.AdaptiveRouting == adaptiveRoutingObserve {
-			return adaptiveRoutingSetting{mode: adaptiveRoutingObserve}, nil
+		if repoConfig != nil && repoConfig.RoutingLearning == routingLearningObserve {
+			return routingLearningSetting{mode: routingLearningObserve}, nil
 		}
-		return adaptiveRoutingSetting{}, nil
+		return routingLearningSetting{}, nil
 	}
 	switch v := value.(type) {
 	case string:
-		if v == adaptiveRoutingObserve {
-			return adaptiveRoutingSetting{mode: v, explicit: true}, nil
+		if v == routingLearningObserve {
+			return routingLearningSetting{mode: v, explicit: true}, nil
 		}
 	case bool:
 		if !v {
-			return adaptiveRoutingSetting{explicit: true}, nil
+			return routingLearningSetting{explicit: true}, nil
 		}
 	}
-	return adaptiveRoutingSetting{}, NewValidationError("model-routing.learning", fmt.Sprint(value), "unsupported learning mode", "Use observe, or false to turn it off.")
+	return routingLearningSetting{}, NewValidationError("model-routing.learning", fmt.Sprint(value), "unsupported learning mode", "Use observe, or false to turn it off.")
 }
 
-// adaptiveRoutingIneligibility returns why the workflow cannot keep a routing history,
+// routingLearningIneligibility returns why the workflow cannot keep a routing history,
 // or "" when it can: its primary model must be chosen by AWF model routing on a
 // Copilot, Claude, or Codex engine, it must not be a work-queue worker or run
 // experiments, and it must enable repo-memory.
-func adaptiveRoutingIneligibility(data *WorkflowData) string {
+func routingLearningIneligibility(data *WorkflowData) string {
 	if !isModelRoutingEnabled(data) {
 		return "its primary model is not chosen by model routing"
 	}
 	switch strings.ToLower(data.EngineConfig.ID) {
 	case string(constants.CopilotEngine), string(constants.ClaudeEngine), string(constants.CodexEngine):
 	default:
-		return fmt.Sprintf("the %s engine is not supported; adaptive routing records Copilot, Claude, and Codex workflows", data.EngineConfig.ID)
+		return fmt.Sprintf("the %s engine is not supported; recording routing history requires Copilot, Claude, or Codex", data.EngineConfig.ID)
 	}
 	if isWorkQueueWorker(data) {
 		return "work-queue workers are not supported"
@@ -89,23 +89,23 @@ func adaptiveRoutingIneligibility(data *WorkflowData) string {
 	if hasWorkflowCallTrigger(data.On) {
 		return "reusable workflows (on: workflow_call) are not supported, because each caller numbers its own runs"
 	}
-	if id := data.WorkflowID; len(id) > 100 || strings.HasSuffix(id, ".lock") || !adaptiveRoutingWorkflowIDPattern.MatchString(id) {
+	if id := data.WorkflowID; len(id) > 100 || strings.HasSuffix(id, ".lock") || !routingHistoryWorkflowIDPattern.MatchString(id) {
 		return fmt.Sprintf("the workflow ID %q cannot name a history branch", id)
 	}
 	if data.RepoMemoryConfig == nil || len(data.RepoMemoryConfig.Memories) == 0 {
-		return "adaptive routing requires tools.repo-memory"
+		return "tools.repo-memory is required"
 	}
 	return ""
 }
 
-// applyAdaptiveRouting resolves model-routing.learning once the routing configuration and
+// applyRoutingLearning resolves model-routing.learning once the routing configuration and
 // repo-memory are final.
-func (c *Compiler) applyAdaptiveRouting(ctx *workflowBuildContext) error {
+func (c *Compiler) applyRoutingLearning(ctx *workflowBuildContext) error {
 	repoConfig, err := c.loadRepoConfig()
 	if err != nil {
 		repoConfig = nil
 	}
-	setting, err := resolveAdaptiveRoutingSetting(ctx.frontmatter.Frontmatter, ctx.engineSetup.importsResult.MergedAdaptiveRouting, repoConfig)
+	setting, err := resolveRoutingLearningSetting(ctx.frontmatter.Frontmatter, ctx.engineSetup.importsResult.MergedRoutingLearning, repoConfig)
 	if err != nil {
 		return formatCompilerError(ctx.cleanPath, "error", err.Error(), err)
 	}
@@ -113,17 +113,17 @@ func (c *Compiler) applyAdaptiveRouting(ctx *workflowBuildContext) error {
 		return nil
 	}
 	data := ctx.workflowData
-	if reason := adaptiveRoutingIneligibility(data); reason != "" {
+	if reason := routingLearningIneligibility(data); reason != "" {
 		if !setting.explicit {
-			adaptiveRoutingLog.Printf("Repository default model-routing.learning skipped for %s: %s", data.WorkflowID, reason)
+			routingLearningLog.Printf("Repository default model-routing.learning skipped for %s: %s", data.WorkflowID, reason)
 			return nil
 		}
-		err := NewValidationError("model-routing.learning", setting.mode, "this workflow cannot use adaptive routing: "+reason,
+		err := NewValidationError("model-routing.learning", setting.mode, "cannot record routing history: "+reason,
 			"Learning needs a router-selected primary model (for example model: router/balanced) on a Copilot, Claude, or Codex engine, and tools.repo-memory enabled. Remove learning or set it to false.")
 		return formatCompilerError(ctx.cleanPath, "error", err.Error(), err)
 	}
-	data.AdaptiveRouting = setting.mode
-	adaptiveRoutingLog.Printf("Adaptive routing %s enabled for %s", setting.mode, data.WorkflowID)
+	data.RoutingLearningMode = setting.mode
+	routingLearningLog.Printf("model-routing.learning set to %s for %s", setting.mode, data.WorkflowID)
 	return nil
 }
 
@@ -137,8 +137,8 @@ func validateRepoMemoryBranchesNotReserved(config *RepoMemoryConfig) error {
 		if memory.Wiki {
 			continue
 		}
-		if memory.BranchName == adaptiveRoutingBranchRoot || strings.HasPrefix(memory.BranchName, adaptiveRoutingBranchRoot+"/") {
-			return NewValidationError("tools.repo-memory.branch-name", memory.BranchName, adaptiveRoutingBranchRoot+"/ is reserved for adaptive routing histories",
+		if memory.BranchName == routingHistoryBranchRoot || strings.HasPrefix(memory.BranchName, routingHistoryBranchRoot+"/") {
+			return NewValidationError("tools.repo-memory.branch-name", memory.BranchName, routingHistoryBranchRoot+"/ is reserved for adaptive routing histories",
 				"Choose another branch name or branch-prefix for this repo-memory entry.")
 		}
 	}
@@ -150,7 +150,7 @@ func validateRepoMemoryBranchesNotReserved(config *RepoMemoryConfig) error {
 // and writes through repo-memory's save loop with its own contents: write token.
 // No concurrency group: the save loop converges concurrent writers itself.
 func (c *Compiler) addPushRoutingHistoryJob(data *WorkflowData) error {
-	if data.AdaptiveRouting == "" || data.DryRun || c.dryRun {
+	if data.RoutingLearningMode == "" || data.DryRun || c.dryRun {
 		return nil
 	}
 	if _, exists := c.jobManager.GetJob(string(constants.ConclusionJobName)); !exists {
@@ -196,7 +196,7 @@ func (c *Compiler) buildPushRoutingHistorySteps(data *WorkflowData) []string {
 	// Quoted, so a workflow ID such as null or 1e3 stays a string.
 	fmt.Fprintf(&step, "          GH_AW_ROUTING_WORKFLOW: %q\n", data.WorkflowID)                          //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
 	fmt.Fprintf(&step, "          GH_AW_ROUTING_GENERATION: %q\n", data.FrontmatterHash+":"+data.BodyHash) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
-	fmt.Fprintf(&step, "          GH_AW_ROUTING_MODE: %q\n", data.AdaptiveRouting)                         //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
+	fmt.Fprintf(&step, "          GH_AW_ROUTING_MODE: %q\n", data.RoutingLearningMode)                     //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
 	fmt.Fprintf(&step, "          GH_AW_ROUTING_ENGINE: %q\n", engineID)                                   //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
 	fmt.Fprintf(&step, "          GH_AW_ROUTING_GOAL: %q\n", data.EngineConfig.ModelRouting.Goal)          //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
 	// A level chosen at run time keeps its own records; otherwise levels share them.

@@ -15,21 +15,21 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// adaptiveRoutingSource is a routed Copilot workflow (the implicit cost/auto default)
+// routingLearningSource is a routed Copilot workflow (the implicit cost/auto default)
 // with repo-memory, triggered as on gives and with extra frontmatter.
-func adaptiveRoutingSource(on, extra string) string {
+func routingLearningSource(on, extra string) string {
 	return "---\non:" + on + "\npermissions:\n  contents: read\nengine: copilot\ntools:\n  repo-memory: true\n" + extra + "---\nTriage the newest issue.\n"
 }
 
-type adaptiveRoutingCompilation struct {
+type routingLearningCompilation struct {
 	lock string
 	data *WorkflowData
 	err  error
 }
 
-// compileAdaptiveRouting compiles source as .github/workflows/triage.md with an
+// compileRoutingLearning compiles source as .github/workflows/triage.md with an
 // optional aw.json and any other files.
-func compileAdaptiveRouting(t *testing.T, source, repoConfig string, files map[string]string) adaptiveRoutingCompilation {
+func compileRoutingLearning(t *testing.T, source, repoConfig string, files map[string]string) routingLearningCompilation {
 	t.Helper()
 	root := t.TempDir()
 	workflowPath := filepath.Join(root, ".github", "workflows", "triage.md")
@@ -45,7 +45,7 @@ func compileAdaptiveRouting(t *testing.T, source, repoConfig string, files map[s
 	}
 	compiler := NewCompiler(WithNoEmit(true))
 	compiler.gitRoot = root
-	var result adaptiveRoutingCompilation
+	var result routingLearningCompilation
 	testutil.CaptureStderr(t, func() {
 		result.data, result.err = compiler.ParseWorkflowFile(workflowPath)
 		if result.err == nil {
@@ -75,12 +75,12 @@ func stepEnv(t *testing.T, job map[string]any, id string) map[string]any {
 	return nil
 }
 
-func TestAdaptiveRoutingObserveAddsOnlyTheWriterJob(t *testing.T) {
-	off := compileAdaptiveRouting(t, adaptiveRoutingSource(" workflow_dispatch", ""), "", nil)
+func TestRoutingLearningObserveAddsOnlyTheWriterJob(t *testing.T) {
+	off := compileRoutingLearning(t, routingLearningSource(" workflow_dispatch", ""), "", nil)
 	require.NoError(t, off.err)
-	on := compileAdaptiveRouting(t, adaptiveRoutingSource(" workflow_dispatch", ""), `{"model_routing": {"learning": "observe"}}`, nil)
+	on := compileRoutingLearning(t, routingLearningSource(" workflow_dispatch", ""), `{"model_routing": {"learning": "observe"}}`, nil)
 	require.NoError(t, on.err)
-	require.Equal(t, "observe", on.data.AdaptiveRouting)
+	require.Equal(t, "observe", on.data.RoutingLearningMode)
 	require.NotContains(t, off.lock, "push_routing_history")
 
 	offJobs, onJobs := lockJobs(t, off.lock), lockJobs(t, on.lock)
@@ -110,47 +110,47 @@ func TestAdaptiveRoutingObserveAddsOnlyTheWriterJob(t *testing.T) {
 	assert.Equal(t, on.data.FrontmatterHash+":"+on.data.BodyHash, env["GH_AW_ROUTING_GENERATION"])
 }
 
-func TestAdaptiveRoutingRunTimeLevelHasItsOwnScope(t *testing.T) {
-	compiled := compileAdaptiveRouting(t, adaptiveRoutingSource("\n  workflow_dispatch:\n    inputs:\n      level:\n        type: string", "model: ${{ inputs.level }}\nmodel-routing:\n  learning: observe\n"), "", nil)
+func TestRoutingLearningRunTimeLevelHasItsOwnScope(t *testing.T) {
+	compiled := compileRoutingLearning(t, routingLearningSource("\n  workflow_dispatch:\n    inputs:\n      level:\n        type: string", "model: ${{ inputs.level }}\nmodel-routing:\n  learning: observe\n"), "", nil)
 	require.NoError(t, compiled.err)
 	require.True(t, isModelRoutingDynamic(compiled.data))
 	env := stepEnv(t, lockJobs(t, compiled.lock)[pushRoutingHistoryJobName], "push_routing_history")
 	assert.Equal(t, "${{ needs.activation.outputs.model-routing-mode }}", env["GH_AW_ROUTING_LEVEL"])
 }
 
-func TestAdaptiveRoutingSettingPrecedence(t *testing.T) {
-	observeDefault := &RepoConfig{AdaptiveRouting: "observe"}
+func TestRoutingLearningSettingPrecedence(t *testing.T) {
+	observeDefault := &RepoConfig{RoutingLearning: "observe"}
 	tests := []struct {
 		name        string
 		frontmatter map[string]any
 		imported    string
 		repo        *RepoConfig
-		want        adaptiveRoutingSetting
+		want        routingLearningSetting
 	}{
-		{name: "off by default", want: adaptiveRoutingSetting{}},
-		{name: "repository default", repo: observeDefault, want: adaptiveRoutingSetting{mode: "observe"}},
-		{name: "import beats the repository default", imported: "false", repo: observeDefault, want: adaptiveRoutingSetting{explicit: true}},
-		{name: "import opts in", imported: `"observe"`, want: adaptiveRoutingSetting{mode: "observe", explicit: true}},
-		{name: "workflow false beats an import", frontmatter: map[string]any{"model-routing": map[string]any{"learning": false}}, imported: `"observe"`, repo: observeDefault, want: adaptiveRoutingSetting{explicit: true}},
-		{name: "workflow opts in", frontmatter: map[string]any{"model-routing": map[string]any{"learning": "observe"}}, want: adaptiveRoutingSetting{mode: "observe", explicit: true}},
+		{name: "off by default", want: routingLearningSetting{}},
+		{name: "repository default", repo: observeDefault, want: routingLearningSetting{mode: "observe"}},
+		{name: "import beats the repository default", imported: "false", repo: observeDefault, want: routingLearningSetting{explicit: true}},
+		{name: "import opts in", imported: `"observe"`, want: routingLearningSetting{mode: "observe", explicit: true}},
+		{name: "workflow false beats an import", frontmatter: map[string]any{"model-routing": map[string]any{"learning": false}}, imported: `"observe"`, repo: observeDefault, want: routingLearningSetting{explicit: true}},
+		{name: "workflow opts in", frontmatter: map[string]any{"model-routing": map[string]any{"learning": "observe"}}, want: routingLearningSetting{mode: "observe", explicit: true}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := resolveAdaptiveRoutingSetting(tt.frontmatter, tt.imported, tt.repo)
+			got, err := resolveRoutingLearningSetting(tt.frontmatter, tt.imported, tt.repo)
 			require.NoError(t, err)
 			assert.Equal(t, tt.want, got)
 		})
 	}
 }
 
-func TestAdaptiveRoutingFromAnImport(t *testing.T) {
+func TestRoutingLearningFromAnImport(t *testing.T) {
 	shared := "---\nmodel-routing:\n  learning: observe\n---\nShared routing settings.\n"
-	compiled := compileAdaptiveRouting(t, adaptiveRoutingSource(" workflow_dispatch", "imports:\n  - shared/routing.md\n"), "", map[string]string{".github/workflows/shared/routing.md": shared})
+	compiled := compileRoutingLearning(t, routingLearningSource(" workflow_dispatch", "imports:\n  - shared/routing.md\n"), "", map[string]string{".github/workflows/shared/routing.md": shared})
 	require.NoError(t, compiled.err)
 	assert.Contains(t, lockJobs(t, compiled.lock), pushRoutingHistoryJobName)
 }
 
-func TestAdaptiveRoutingShortlistAndLearningCompose(t *testing.T) {
+func TestRoutingLearningComposesWithShortlist(t *testing.T) {
 	for _, tc := range []struct{ name, local, imported string }{
 		{"same block", "  allowed-models: [gpt-5.6-luna]\n  learning: observe\n", ""},
 		{"imported learning", "  allowed-models: [gpt-5.6-luna]\n", "  learning: observe\n"},
@@ -163,7 +163,7 @@ func TestAdaptiveRoutingShortlistAndLearningCompose(t *testing.T) {
 				config += "imports: [shared/routing.md]\n"
 				files = map[string]string{".github/workflows/shared/routing.md": "---\nmodel-routing:\n" + tc.imported + "---\n"}
 			}
-			got := compileAdaptiveRouting(t, adaptiveRoutingSource(" workflow_dispatch", config), "", files)
+			got := compileRoutingLearning(t, routingLearningSource(" workflow_dispatch", config), "", files)
 			require.NoError(t, got.err)
 			require.Equal(t, []string{"gpt-5.6-luna"}, got.data.EngineConfig.ModelRouting.AllowedModels)
 			require.Contains(t, lockJobs(t, got.lock), pushRoutingHistoryJobName)
@@ -171,14 +171,14 @@ func TestAdaptiveRoutingShortlistAndLearningCompose(t *testing.T) {
 	}
 }
 
-func TestAdaptiveRoutingLearningFalsePreservesImplicitRouting(t *testing.T) {
-	got := compileAdaptiveRouting(t, adaptiveRoutingSource(" workflow_dispatch", "model-routing:\n  learning: false\n"), `{"model_routing":{"learning":"observe"}}`, nil)
+func TestRoutingLearningFalsePreservesImplicitRouting(t *testing.T) {
+	got := compileRoutingLearning(t, routingLearningSource(" workflow_dispatch", "model-routing:\n  learning: false\n"), `{"model_routing":{"learning":"observe"}}`, nil)
 	require.NoError(t, got.err)
 	require.True(t, isModelRoutingEnabled(got.data))
 	require.NotContains(t, lockJobs(t, got.lock), pushRoutingHistoryJobName)
 }
 
-func TestAdaptiveRoutingIneligibleWorkflows(t *testing.T) {
+func TestRoutingLearningIneligibleWorkflows(t *testing.T) {
 	tests := []struct {
 		name        string
 		on          string
@@ -196,27 +196,26 @@ func TestAdaptiveRoutingIneligibleWorkflows(t *testing.T) {
 			if on == "" {
 				on = " workflow_dispatch"
 			}
-			explicit := compileAdaptiveRouting(t, adaptiveRoutingSource(on, tt.frontmatter+"imports: [shared/observe.md]\n"), "", map[string]string{
+			explicit := compileRoutingLearning(t, routingLearningSource(on, tt.frontmatter+"imports: [shared/observe.md]\n"), "", map[string]string{
 				".github/workflows/shared/observe.md": "---\nmodel-routing:\n  learning: observe\n---\n",
 			})
 			require.ErrorContains(t, explicit.err, tt.reason)
-			defaulted := compileAdaptiveRouting(t, adaptiveRoutingSource(on, tt.frontmatter), `{"model_routing": {"learning": "observe"}}`, nil)
+			defaulted := compileRoutingLearning(t, routingLearningSource(on, tt.frontmatter), `{"model_routing": {"learning": "observe"}}`, nil)
 			require.NoError(t, defaulted.err, "a repository default skips the workflow silently")
 			assert.NotContains(t, defaulted.lock, pushRoutingHistoryJobName)
 		})
 	}
 
-	withoutMemory := strings.Replace(adaptiveRoutingSource(" workflow_dispatch", "model-routing:\n  learning: observe\n"), "tools:\n  repo-memory: true\n", "", 1)
-	require.ErrorContains(t, compileAdaptiveRouting(t, withoutMemory, "", nil).err, "adaptive routing requires tools.repo-memory")
-
+	withoutMemory := strings.Replace(routingLearningSource(" workflow_dispatch", "model-routing:\n  learning: observe\n"), "tools:\n  repo-memory: true\n", "", 1)
+	require.ErrorContains(t, compileRoutingLearning(t, withoutMemory, "", nil).err, "tools.repo-memory is required")
 }
 
-func TestAdaptiveRoutingRejectsUnsupportedSyntax(t *testing.T) {
+func TestRoutingLearningRejectsUnsupportedSyntax(t *testing.T) {
 	for _, config := range []string{"adaptive-routing: observe", "model-routing: {learning: true}", "model-routing: {learning: live}", "model-routing: {learning: {mode: live, tests: shadow}}", "model-routing: {}"} {
 		t.Run(config, func(t *testing.T) {
-			got := compileAdaptiveRouting(t, adaptiveRoutingSource(" workflow_dispatch", config+"\n"), "", nil)
+			got := compileRoutingLearning(t, routingLearningSource(" workflow_dispatch", config+"\n"), "", nil)
 			require.Error(t, got.err)
-			imported := compileAdaptiveRouting(t, adaptiveRoutingSource(" workflow_dispatch", "imports: [shared/config.md]\n"), "", map[string]string{
+			imported := compileRoutingLearning(t, routingLearningSource(" workflow_dispatch", "imports: [shared/config.md]\n"), "", map[string]string{
 				".github/workflows/shared/config.md": "---\n" + config + "\n---\n",
 			})
 			require.Error(t, imported.err)
@@ -224,10 +223,10 @@ func TestAdaptiveRoutingRejectsUnsupportedSyntax(t *testing.T) {
 	}
 }
 
-func TestAdaptiveRoutingRejectsRemovedOptOutInMarkdownImport(t *testing.T) {
+func TestRoutingLearningRejectsRemovedOptOutInMarkdownImport(t *testing.T) {
 	// Ordinary Markdown imports allow unrelated frontmatter. Ignoring this old opt-out
 	// would let the repository default start recording the workflow instead.
-	got := compileAdaptiveRouting(t, adaptiveRoutingSource(" workflow_dispatch", "imports: [../prompts/triage.md]\n"), `{"model_routing":{"learning":"observe"}}`, map[string]string{
+	got := compileRoutingLearning(t, routingLearningSource(" workflow_dispatch", "imports: [../prompts/triage.md]\n"), `{"model_routing":{"learning":"observe"}}`, map[string]string{
 		".github/prompts/triage.md": "---\nadaptive-routing: false\n---\nTriage an issue.\n",
 	})
 	require.ErrorContains(t, got.err, "adaptive-routing")
@@ -239,22 +238,22 @@ func TestRepoMemoryCannotWriteTheRoutingHistories(t *testing.T) {
 		// The root itself would block every history branch.
 		"  repo-memory:\n    branch-name: memory/adaptive-routing\n",
 	} {
-		source := strings.Replace(adaptiveRoutingSource(" workflow_dispatch", ""), "  repo-memory: true\n", memory, 1)
-		require.ErrorContains(t, compileAdaptiveRouting(t, source, "", nil).err, "memory/adaptive-routing/ is reserved for adaptive routing histories")
+		source := strings.Replace(routingLearningSource(" workflow_dispatch", ""), "  repo-memory: true\n", memory, 1)
+		require.ErrorContains(t, compileRoutingLearning(t, source, "", nil).err, "memory/adaptive-routing/ is reserved for adaptive routing histories")
 	}
 }
 
-func TestLoadRepoConfig_AdaptiveRouting(t *testing.T) {
+func TestLoadRepoConfig_RoutingLearning(t *testing.T) {
 	root := t.TempDir()
 	writeAWJSON(t, root, `{"model_routing": {"learning": "observe"}}`)
 	config, err := LoadRepoConfig(root)
 	require.NoError(t, err)
-	assert.Equal(t, "observe", config.AdaptiveRouting)
+	assert.Equal(t, "observe", config.RoutingLearning)
 
 	writeAWJSON(t, root, `{"model_routing": {"learning": false}}`)
 	config, err = LoadRepoConfig(root)
 	require.NoError(t, err)
-	assert.Empty(t, config.AdaptiveRouting)
+	assert.Empty(t, config.RoutingLearning)
 
 	for _, invalid := range []string{`{"adaptive_routing":"observe"}`, `{"model_routing":{"learning":true}}`, `{"model_routing":{"learning":"live"}}`, `{"model_routing":{"allowed-models":["small"]}}`} {
 		writeAWJSON(t, root, invalid)
@@ -263,11 +262,11 @@ func TestLoadRepoConfig_AdaptiveRouting(t *testing.T) {
 	}
 }
 
-func TestAdaptiveRoutingDryRunOmitsWriterJob(t *testing.T) {
+func TestRoutingLearningDryRunOmitsWriterJob(t *testing.T) {
 	root := t.TempDir()
 	workflowPath := filepath.Join(root, ".github", "workflows", "triage.md")
 	require.NoError(t, os.MkdirAll(filepath.Dir(workflowPath), 0o755))
-	require.NoError(t, os.WriteFile(workflowPath, []byte(adaptiveRoutingSource(" workflow_dispatch", "model-routing:\n  learning: observe\n")), 0o600))
+	require.NoError(t, os.WriteFile(workflowPath, []byte(routingLearningSource(" workflow_dispatch", "model-routing:\n  learning: observe\n")), 0o600))
 
 	compiler := NewCompiler(WithNoEmit(true))
 	compiler.gitRoot = root
@@ -285,7 +284,7 @@ func TestAdaptiveRoutingDryRunOmitsWriterJob(t *testing.T) {
 			}
 		})
 		require.NoError(t, err)
-		assert.Equal(t, "observe", data.AdaptiveRouting, "dry-run compilation must not mutate parsed WorkflowData")
+		assert.Equal(t, "observe", data.RoutingLearningMode, "dry-run compilation must not mutate parsed WorkflowData")
 		jobs := lockJobs(t, lock)
 		if dryRun {
 			assert.NotContains(t, jobs, pushRoutingHistoryJobName, "dry-run compilation must omit push_routing_history rather than leaving a skipped job")
@@ -300,7 +299,7 @@ func TestAdaptiveRoutingDryRunOmitsWriterJob(t *testing.T) {
 	writeAWJSON(t, defaultRoot, `{"model_routing": {"learning": "observe"}}`)
 	defaultPath := filepath.Join(defaultRoot, ".github", "workflows", "triage.md")
 	require.NoError(t, os.MkdirAll(filepath.Dir(defaultPath), 0o755))
-	require.NoError(t, os.WriteFile(defaultPath, []byte(adaptiveRoutingSource(" workflow_dispatch", "")), 0o600))
+	require.NoError(t, os.WriteFile(defaultPath, []byte(routingLearningSource(" workflow_dispatch", "")), 0o600))
 	defaultCompiler := NewCompiler(WithNoEmit(true))
 	defaultCompiler.gitRoot = defaultRoot
 	defaultCompiler.SetDryRun(true)
@@ -316,16 +315,16 @@ func TestAdaptiveRoutingDryRunOmitsWriterJob(t *testing.T) {
 		}
 	})
 	require.NoError(t, err)
-	assert.Equal(t, "observe", defaultData.AdaptiveRouting)
+	assert.Equal(t, "observe", defaultData.RoutingLearningMode)
 	assert.NotContains(t, lockJobs(t, defaultLock), pushRoutingHistoryJobName)
 
 	// Validation of ineligible explicit learning settings still runs under --dry-run.
 	invalidPath := filepath.Join(root, ".github", "workflows", "invalid.md")
-	invalidSource := strings.Replace(adaptiveRoutingSource(" workflow_dispatch", "model-routing:\n  learning: observe\n"), "tools:\n  repo-memory: true\n", "", 1)
+	invalidSource := strings.Replace(routingLearningSource(" workflow_dispatch", "model-routing:\n  learning: observe\n"), "tools:\n  repo-memory: true\n", "", 1)
 	require.NoError(t, os.WriteFile(invalidPath, []byte(invalidSource), 0o600))
 	compiler.SetDryRun(true)
 	testutil.CaptureStderr(t, func() {
 		_, err = compiler.ParseWorkflowFile(invalidPath)
 	})
-	require.ErrorContains(t, err, "adaptive routing requires tools.repo-memory")
+	require.ErrorContains(t, err, "tools.repo-memory is required")
 }

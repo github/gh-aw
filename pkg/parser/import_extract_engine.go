@@ -84,7 +84,7 @@ func (acc *importAccumulator) extractTopLevelRouting(fm map[string]any, fullPath
 		if list, ok := routing["allowed-models"]; ok {
 			acc.routerShortlists = append(acc.routerShortlists, parseStringSliceField(list, true))
 		}
-		acc.extractFirstWinsJSONField(routing, fullPath, "learning", &acc.mergedAdaptiveRouting)
+		acc.extractFirstWinsJSONField(routing, fullPath, "learning", &acc.mergedRoutingLearning)
 	}
 }
 
