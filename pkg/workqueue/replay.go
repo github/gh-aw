@@ -305,16 +305,6 @@ func requireSameOperations(requested, committed any) error {
 	return nil
 }
 
-// ValidateCommit validates one typed commit structurally.
-func ValidateCommit(commit QueueCommit) error {
-	value, err := genericValue(commit)
-	if err != nil {
-		return err
-	}
-	_, err = validateCommitRecord(value)
-	return err
-}
-
 // NewProjection returns the empty queue projection.
 func NewProjection() Projection {
 	return Projection{
