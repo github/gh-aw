@@ -164,11 +164,7 @@ func validateConnectorAzureReaderHost(data *WorkflowData) error {
 		data.Container != "" || data.Services != "" {
 		return errHost
 	}
-	agentJob, _ := data.Jobs["agent"].(map[string]any)
-	_, setupSteps := agentJob["setup-steps"]
-	_, preSteps := agentJob["pre-steps"]
-	if data.PreSteps != "" || data.PreAgentSteps != "" || data.PostSteps != "" || data.CustomSteps != "" ||
-		setupSteps || preSteps || (data.SecretMasking != nil && len(data.SecretMasking.Steps) != 0) {
+	if connectorAzureReaderHasRunnerHooks(data) {
 		return errors.New("connector Azure OIDC readers cannot grant job credentials to authored runner steps")
 	}
 	if data.MCPScripts != nil && len(data.MCPScripts.Tools) != 0 {
@@ -193,6 +189,10 @@ func validateConnectorAzureReaderHost(data *WorkflowData) error {
 			return errHost
 		}
 	}
+	return validateConnectorAzureReaderTools(data)
+}
+
+func validateConnectorAzureReaderTools(data *WorkflowData) error {
 	for name, raw := range data.Tools {
 		if config := data.Connectors[name]; config != nil && config.Agent != nil {
 			adapter, err := connectorAgentAdapter(config)
@@ -223,4 +223,17 @@ func validateConnectorAzureReaderHost(data *WorkflowData) error {
 		}
 	}
 	return nil
+}
+
+func connectorAzureReaderHasRunnerHooks(data *WorkflowData) bool {
+	if data.PreSteps != "" || data.PreAgentSteps != "" || data.PostSteps != "" || data.CustomSteps != "" ||
+		(data.SecretMasking != nil && len(data.SecretMasking.Steps) != 0) {
+		return true
+	}
+	if agentJob, ok := data.Jobs["agent"].(map[string]any); ok {
+		_, setupSteps := agentJob["setup-steps"]
+		_, preSteps := agentJob["pre-steps"]
+		return setupSteps || preSteps
+	}
+	return false
 }

@@ -175,8 +175,7 @@ func (c *Compiler) resolveWorkflowConnectors(frontmatter map[string]any) (map[st
 		config.Alias, config.GitHubApps = alias, registration.GitHubApps
 		config.OIDCTokens = registration.OIDCTokens
 		config.AzureOIDC = registration.AzureOIDC
-		config.Experimental = registration.Experimental
-		config.Docs = registration.Docs
+		config.Experimental, config.Docs = registration.Experimental, registration.Docs
 		config.SafeOutputOptions = registration.SafeOutputOptions
 		for operation, options := range config.SafeOutputOptions {
 			if !slices.Contains(registration.SafeOutputs, operation) || options.Max < 1 || options.Max > connectorMaximumMax {
