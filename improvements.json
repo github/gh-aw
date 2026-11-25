@@ -1,6 +1,36 @@
 {
-  "last_updated": "2026-11-23",
+  "last_updated": "2026-11-25",
   "pending_tasks": [
+    {
+      "file": "docs/src/content/docs/reference/agent-runtimes.md",
+      "created": "2026-11-25",
+      "status": "pending",
+      "issue": "Line 80 says 'The microVM runtimes are experimental' but the heading (line 78), table (lines 24-25) and line 8 say preview. Line 138 lists nine NVX rejections as one prose sentence; Cloud Hypervisor (line 98) uses a bullet list for the same purpose. Proposed as Task 1 in the 2026-11-25 discussion. Docs-only change"
+    },
+    {
+      "file": "pkg/workflow/on_needs_validation.go",
+      "created": "2026-11-25",
+      "status": "pending",
+      "issue": "Lines 134 and 140 say 'Expected one of the workflow's custom jobs' but do not list them; the example hardcodes secrets_fetcher. customJobs is already built in validateOnNeedsTargets (lines 121-129). Proposed as Task 2 in the 2026-11-25 discussion. Test asserts substrings only, so safe to change. Run make fmt"
+    },
+    {
+      "file": ".github/workflows/test-quality-sentinel.md",
+      "created": "2026-11-25",
+      "status": "pending",
+      "issue": "Line 5 description says 'on every PR' but the trigger (line 8) is pull_request ready_for_review plus the /review slash command. Change description to name those triggers. Recompile to regenerate the lock file (derived)"
+    },
+    {
+      "file": "docs/src/content/docs/engines/gemini.md",
+      "created": "2026-11-25",
+      "status": "pending",
+      "issue": "Deprecation appears only in the NOTE at line 11, under Connect your account. Intro line 6 does not mention it. Move the deprecation sentence into the intro so it is read before setup steps"
+    },
+    {
+      "file": ".github/workflows/smoke-update-cross-repo-pr.md",
+      "created": "2026-11-25",
+      "status": "pending",
+      "issue": "run-failure (line 63) reads 'failed to update the cross-repo PR: {status}'; getRunFailureStatusText (notify_comment_error.cjs:102-114) defaults to 'failed', giving 'failed ... : failed'. Low priority. Owner mismatch entry above still applies"
+    },
     {
       "file": "docs/src/content/docs/reference/workflow-linters.md",
       "created": "2026-11-18",
@@ -53,7 +83,7 @@
       "file": "cmd/gh-aw/main.go",
       "created": "2026-11-12",
       "status": "pending",
-      "issue": "Compile help line 265 'Unlike gh aw upgrade...' sentence sits inside the action-mode section; move it next to the --fix flag description"
+      "issue": "Compile help line 265 'Unlike gh aw upgrade...' sentence sits inside the action-mode section; move it next to the --fix flag description. Still present in the 2026-11-25 compile help output"
     },
     {
       "file": "cmd/gh-aw/main.go",

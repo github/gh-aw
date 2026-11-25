@@ -1,0 +1,59 @@
+{
+  "date": "2026-11-25",
+  "run_id": "45636979816",
+  "files_analyzed": {
+    "documentation": [
+      "docs/src/content/docs/engines/gemini.md",
+      "docs/src/content/docs/reference/agent-runtimes.md"
+    ],
+    "cli": [
+      "gh aw compile",
+      "gh aw run"
+    ],
+    "messages": [
+      ".github/workflows/test-quality-sentinel.md",
+      ".github/workflows/smoke-update-cross-repo-pr.md"
+    ],
+    "validation": [
+      "pkg/workflow/on_needs_validation.go (test: pkg/workflow/on_needs_validation_test.go)"
+    ]
+  },
+  "overall_quality": "needs-work",
+  "quality_highlights": [
+    "run help: --repeat example states the arithmetic (--repeat 3 runs 4 times total), and --push states its refusal behavior when unrelated files are staged",
+    "on.needs validation: the prompt-reference error names the rule, the field path, and two remedies in one message (on_needs_validation.go:76)",
+    "agent-runtimes.md: 'Choose a runtime' table plus 'Use X only when...' guidance gives a clear decision path"
+  ],
+  "single_file_improvements": [
+    {
+      "file": "docs/src/content/docs/reference/agent-runtimes.md",
+      "priority": "high",
+      "issue": "Line 80 calls Cloud Hypervisor 'experimental' while the heading, table and intro say preview; line 138 lists nine NVX rejections as one prose sentence, unlike the bullet list used for Cloud Hypervisor at line 98"
+    },
+    {
+      "file": "pkg/workflow/on_needs_validation.go",
+      "priority": "high",
+      "issue": "Lines 134 and 140 tell users to choose from the workflow's custom jobs but do not list them; the example hardcodes secrets_fetcher"
+    },
+    {
+      "file": ".github/workflows/test-quality-sentinel.md",
+      "priority": "medium",
+      "issue": "Line 5 description says the workflow runs 'on every PR' but the trigger is pull_request ready_for_review (line 8) plus the /review slash command"
+    },
+    {
+      "file": "docs/src/content/docs/engines/gemini.md",
+      "priority": "medium",
+      "issue": "The deprecation status appears only in the NOTE at line 11; the intro at line 6 does not mention it"
+    }
+  ],
+  "tasks_proposed": [
+    "docs/src/content/docs/reference/agent-runtimes.md",
+    "pkg/workflow/on_needs_validation.go"
+  ],
+  "unverified": [
+    "gh aw run --approve: help text describes compile-time warnings. The flag is passed to collectWorkflowFiles (pkg/cli/run_workflow_execution.go:354); its effect on run was not traced",
+    "Gemini deprecation status is taken from the page note; not checked against product status",
+    "on.needs error rewording is a proposal; not compiled or tested"
+  ],
+  "caveats": "No repository files were edited and no workflows were compiled or dispatched. Tasks are proposals in the discussion. Pending items from prior runs were not re-verified unless noted."
+}
