@@ -7,6 +7,7 @@ package workflow
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/github/gh-aw/pkg/constants"
@@ -47,17 +48,16 @@ func validateMarkdownExpressionSafety(markdownContent string, allowEnv bool) err
 	expressionValidationLog.Printf("Found %d expressions to validate", len(matches))
 
 	var unauthorizedExpressions []string
+	var multilineExpressions []string
 
 	for _, match := range matches {
-		// Extract the expression content (everything between ${{ and }})
-		expression := strings.TrimSpace(match.Content)
-
-		// Reject expressions that span multiple lines (contain newlines)
-		if strings.Contains(match.Content, "\n") {
-			unauthorizedExpressions = append(unauthorizedExpressions, expression)
+		if strings.ContainsAny(match.Content, "\n\r\u2028\u2029") {
+			multilineExpressions = append(multilineExpressions, strings.Trim(match.Content, " \t"))
 			continue
 		}
 
+		// Extract the expression content (everything between ${{ and }})
+		expression := strings.TrimSpace(match.Content)
 		if err := validateSingleExpression(expression, ExpressionValidationOptions{
 			NeedsStepsRe:            NeedsStepsPattern,
 			InputsRe:                InputsPattern,
@@ -71,18 +71,21 @@ func validateMarkdownExpressionSafety(markdownContent string, allowEnv bool) err
 		}
 	}
 
-	if len(unauthorizedExpressions) > 0 {
-		return unauthorizedExpressionsError(unauthorizedExpressions, allowEnv)
+	if len(unauthorizedExpressions) > 0 || len(multilineExpressions) > 0 {
+		return unauthorizedExpressionsError(unauthorizedExpressions, multilineExpressions, allowEnv)
 	}
 
 	expressionValidationLog.Print("Expression safety validation passed")
 	return nil
 }
 
-func unauthorizedExpressionsError(unauthorizedExpressions []string, allowEnv bool) error {
-	expressionValidationLog.Printf("Expression safety validation failed: %d unauthorized expressions found", len(unauthorizedExpressions))
+func unauthorizedExpressionsError(unauthorizedExpressions, multilineExpressions []string, allowEnv bool) error {
+	total := len(unauthorizedExpressions) + len(multilineExpressions)
+	expressionValidationLog.Printf("Expression safety validation failed: %d unauthorized expressions found", total)
 	var unauthorizedList strings.Builder
-	unauthorizedList.WriteString("\n")
+	if len(unauthorizedExpressions) > 0 {
+		unauthorizedList.WriteString("expressions are not in the allowed list:\n")
+	}
 	for _, expr := range unauthorizedExpressions {
 		unauthorizedList.WriteString("  - ")
 		unauthorizedList.WriteString(expr)
@@ -96,6 +99,23 @@ func unauthorizedExpressionsError(unauthorizedExpressions []string, allowEnv boo
 		}
 
 		unauthorizedList.WriteString("\n")
+	}
+	if len(multilineExpressions) > 0 {
+		unauthorizedList.WriteString("expressions must not contain line breaks:\n")
+		for _, expr := range multilineExpressions {
+			unauthorizedList.WriteString("  - ")
+			unauthorizedList.WriteString(strconv.Quote(expr))
+			unauthorizedList.WriteString("\n")
+		}
+	}
+
+	if len(unauthorizedExpressions) == 0 {
+		return NewValidationError(
+			"expressions",
+			fmt.Sprintf("%d unauthorized expressions found", total),
+			unauthorizedList.String(),
+			"Remove line breaks from expressions.",
+		)
 	}
 
 	var allowedList strings.Builder
@@ -115,11 +135,15 @@ func unauthorizedExpressionsError(unauthorizedExpressions []string, allowEnv boo
 		allowedList.WriteString("  - env.*\n")
 	}
 
+	suggestion := fmt.Sprintf("Use only allowed expressions:%s\nFor more details, see the expression security documentation.", allowedList.String())
+	if len(multilineExpressions) > 0 {
+		suggestion = "Remove line breaks from expressions. " + suggestion
+	}
 	return NewValidationError(
 		"expressions",
-		fmt.Sprintf("%d unauthorized expressions found", len(unauthorizedExpressions)),
-		"expressions are not in the allowed list:"+unauthorizedList.String(),
-		fmt.Sprintf("Use only allowed expressions:%s\nFor more details, see the expression security documentation.", allowedList.String()),
+		fmt.Sprintf("%d unauthorized expressions found", total),
+		unauthorizedList.String(),
+		suggestion,
 	)
 }
 

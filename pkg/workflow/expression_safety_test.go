@@ -62,6 +62,51 @@ func TestGatewayEventsWrapperSafety(t *testing.T) {
 	}
 }
 
+func TestValidateExpressionSafetyLineTerminators(t *testing.T) {
+	tests := []struct {
+		name       string
+		expression string
+		escaped    string
+	}{
+		{"lf", "github.actor\n", `github.actor\n`},
+		{"cr", "github.actor\r", `github.actor\r`},
+		{"crlf", "github.actor\r\n", `github.actor\r\n`},
+		{"line_separator", "github.actor\u2028", `github.actor\u2028`},
+		{"paragraph_separator", "github.actor\u2029", `github.actor\u2029`},
+		{"leading", "\ngithub.actor", `\ngithub.actor`},
+		{"internal", "github.actor ==\r 'x'", `github.actor ==\r 'x'`},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			for _, validate := range []func(string) error{validateExpressionSafety, validateRuntimeImportExpressionSafety} {
+				err := validate("${{ " + tt.expression + " }}")
+				if err == nil {
+					t.Fatal("expected a line-break error")
+				}
+				if !strings.Contains(err.Error(), "expressions must not contain line breaks:") ||
+					!strings.Contains(err.Error(), tt.escaped) ||
+					strings.Contains(err.Error(), "expressions are not in the allowed list:") ||
+					strings.ContainsAny(err.Error(), "\r\u2028\u2029") {
+					t.Errorf("unexpected diagnostic: %q", err)
+				}
+			}
+		})
+	}
+
+	for _, content := range []string{"${{ github.actor }}", "${{ github.actor == 'x' }}", "text\n${{ github.actor }}"} {
+		if err := validateExpressionSafety(content); err != nil {
+			t.Errorf("single-line expression %q rejected: %v", content, err)
+		}
+	}
+	err := validateExpressionSafety("${{ github.actor\n}} ${{ secrets.TOKEN }}")
+	if err == nil || !strings.Contains(err.Error(), "expressions must not contain line breaks:") ||
+		!strings.Contains(err.Error(), `github.actor\n`) ||
+		!strings.Contains(err.Error(), "expressions are not in the allowed list:") ||
+		!strings.Contains(err.Error(), "secrets.TOKEN") {
+		t.Errorf("expected separate diagnostic sections, got: %v", err)
+	}
+}
+
 func TestValidateExpressionSafety(t *testing.T) {
 	tests := []struct {
 		name           string

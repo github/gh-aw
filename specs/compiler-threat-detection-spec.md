@@ -7,7 +7,7 @@ sidebar:
 
 # GitHub Actions Compiler Threat Detection Specification
 
-**Version**: 1.0.112
+**Version**: 1.0.113
 **Status**: Candidate Recommendation  
 **Latest Version**: https://github.com/github/gh-aw/blob/main/specs/compiler-threat-detection-spec.md  
 **Editors**: GitHub Next (GitHub, Inc.)
@@ -32,7 +32,7 @@ Each version maps to the minimum compatible binary. A version change MUST update
 
 | Versions | Minimum gh-aw |
 |---|---:|
-| `1.0.60`–`1.0.112` | Unreleased |
+| `1.0.60`–`1.0.113` | Unreleased |
 | `1.0.44`–`1.0.59` | Unreleased |
 | `1.0.40`–`1.0.43` | `v0.87.9` |
 | `1.0.39` | `v0.87.9` |
@@ -237,7 +237,7 @@ Each rule has a stable `CTR-*` ID, threat class, trigger, compiler action, diagn
 - **CTR-007 Markdown Content Security**: Detect unsafe external markdown, including obfuscation, scripts, and social engineering.
 - **CTR-008 Pull Request Target Safety**: For `pull_request_target`, strict mode MUST warn about elevated permissions and secret access unless `on.pull_request_target.acknowledge-risk` is `true`. This acknowledgment suppresses only that warning; it MUST NOT authorize a checkout or suppress checkout diagnostics. If `on.roles` is `all` or `read`, or a role list contains either value, the compiler MUST reject the workflow in strict mode regardless of checkout configuration, trigger-risk acknowledgment, or feature flags. In non-strict mode, this role combination MUST produce a security warning unless `features.dangerously-allow-roles-read-and-pull-request-target` is explicitly set to boolean `true`. This feature flag suppresses only the role-combination warning; it MUST NOT affect strict-mode rejection or other `pull_request_target` trigger and checkout diagnostics. An explicit `checkout: false` is accepted. Otherwise, every configured checkout MUST independently use either the supported base-repository/base-ref form or an exact, case-sensitive literal repository/ref pair in `on.pull_request_target.allowed-checkouts`. The allowlist path MUST reject expressions, wildcard refs, `refs/pull/...` refs, wiki checkouts, and omitted external refs. Neither the base-checkout nor allowlist path may accept any non-empty `fetch` value. An omitted checkout configuration is not equivalent to explicit `checkout: false`. In strict mode an unsafe checkout MUST be rejected; in non-strict mode it MUST produce a warning.
 - **CTR-009 Shell Expansion in Safe-Outputs**: Reject dangerous shell expansion in safe-output scripts.
-- **CTR-010 Expression Safety Allowlist**: Reject unauthorized or multiline GitHub Actions expressions.
+- **CTR-010 Expression Safety Allowlist**: Reject unauthorized GitHub Actions expressions and expressions containing any JavaScript line terminator (LF, CR, U+2028, or U+2029), including before or after expression content. Report line-break violations separately and render rejected expressions on one line.
 - **CTR-011 Network Firewall Configuration**: Reject missing firewall prerequisites and strict-mode wildcard domains.
 - **CTR-012 Safe-Outputs Wildcard Push Scope**: Warn for unconstrained wildcard PR-branch pushes.
 - **CTR-013 Argument Injection via Package/Image Names**: Reject hyphen-prefixed package and image names before subprocess use.
@@ -507,7 +507,7 @@ Every active rule MUST map to implementation and test coverage. References are p
 | CTR-007 Markdown Content Security | `markdown_security_scanner.go`, `pull_request_target_validation.go` | corresponding workflow and sanitizer tests |
 | CTR-008 Pull Request Target Safety | `pkg/workflow/pull_request_target_validation.go`, shared `pkg/workflow/checkoutpolicy/target.go`; AST subsets: `pkg/workflow/lint/pull_request_target_roles.go`, `pull_request_target_checkout.go` | `pkg/workflow/pull_request_target_validation_test.go`, `ast_threat_policy_test.go`, `pkg/workflow/checkoutpolicy/target_test.go`, `pkg/workflow/lint/threat_policy_test.go`, `pull_request_target_checkout_test.go`; `specs/workflow-security/PullRequestTargetCheckout.tla` |
 | CTR-009 Shell Expansion in Safe-Outputs | `pkg/workflow/safe_outputs_steps_shell_expansion_validation.go`, shared `pkg/workflow/shellpattern/expansion.go`; AST adapter: `pkg/workflow/lint/safe_output_shell_expansion.go` | `pkg/workflow/safe_outputs_steps_shell_expansion_validation_test.go`, `pkg/workflow/shellpattern/expansion_test.go`, `pkg/workflow/lint/threat_policy_test.go` |
-| CTR-010 Expression Safety Allowlist | safe-output shell/push validation, expression validation, firewall validation; AST prompt-form subset: `pkg/workflow/lint/prompt_expression.go` | corresponding workflow tests; `pkg/workflow/lint/prompt_expression_test.go`, `pkg/workflow/ast_threat_policy_test.go` |
+| CTR-010 Expression Safety Allowlist | `pkg/workflow/expression_safety_validation.go`, `actions/setup/js/runtime_import.cjs`; safe-output shell/push validation, firewall validation; AST prompt-form subset: `pkg/workflow/lint/prompt_expression.go` | `pkg/workflow/expression_safety_test.go`, `pkg/workflow/runtime_import_validation_test.go`, runtime import tests; `pkg/workflow/lint/prompt_expression_test.go`, `pkg/workflow/ast_threat_policy_test.go` |
 | CTR-011 Network Firewall Configuration | safe-output shell/push validation, expression validation, firewall validation; AST subsets: `pkg/workflow/lint/runtime_policy.go`, `firewall_ssl_bump.go` | corresponding workflow tests; `pkg/workflow/lint/source_policy_test.go`, `threat_policy_test.go` |
 | CTR-012 Safe-Outputs Wildcard Push Scope | safe-output shell/push validation, expression validation, firewall validation | corresponding workflow tests |
 | CTR-013 Argument Injection via Package/Image Names | name, install-script, and allowed-label validation | `argument_injection_test.go`, corresponding validation tests |
