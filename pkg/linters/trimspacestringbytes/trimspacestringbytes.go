@@ -31,8 +31,8 @@ func run(pass *analysis.Pass) (any, error) {
 	}
 
 	return analyzerutil.Preorder(pass, []ast.Node{(*ast.CallExpr)(nil)}, func(n ast.Node) {
-		call := n.(*ast.CallExpr)
-		if len(call.Args) != 1 || call.Ellipsis.IsValid() {
+		call, ok := n.(*ast.CallExpr)
+		if !ok || len(call.Args) != 1 || call.Ellipsis.IsValid() {
 			return
 		}
 		pkgPath, funcName, ok := astutil.PackageCall(pass, call)
