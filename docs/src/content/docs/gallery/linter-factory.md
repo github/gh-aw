@@ -20,9 +20,9 @@ These are complete workflow sources, not a pre-provisioned deployment. Follow [n
 
 ## One daily cohort
 
-A trusted preparation step reads the rule registry in `eslint-factory/src/index.ts` on the default branch and stages one miner task plus, for each of the day's three rotating rules, one refiner task and one monster task. Tasks are keyed by the original dispatcher run's UTC creation date and the rule ID, so scheduled/manual runs and reruns on that date reuse the same identities and payloads. A new day admits the next three rules; every registered rule recurs once per rotation.
+A trusted preparation step pins `eslint-factory/src/index.ts` to its latest commit before the cohort's UTC date and stages one miner task plus, for each of the day's three rotating rules, one refiner task and one monster task. Tasks are keyed by the original dispatcher run's UTC creation date and the rule ID, so scheduled/manual runs and reruns on that date reuse the same registry revision, identities, and payloads. A new day admits the next three rules; every registered rule recurs once per rotation.
 
-The dispatcher uses pool `eslint-factory` and requests at most seven Claims and seven dispatches. The agent reads and explains the prepared plan; it must not submit or dispatch it again. Older eligible tasks may run first.
+The dispatcher uses pool `eslint-factory` and requests up to 21 Claims/dispatches to leave room for the three allowed attempts of each seven-task cohort. It also makes a three-Claim request against the legacy `default` pool so pre-cutover ESLint Work can drain through compatible workers. The agent reads and explains the prepared plan; it must not submit or dispatch it again. Older eligible tasks may run first.
 
 ```mermaid
 flowchart TD
@@ -34,7 +34,9 @@ flowchart TD
 
 This is **not** a miner → refiner → monster pipeline. A PR or refinement issue does not automatically submit the next task. Dependencies require explicit Work admission.
 
-Shared `aw.json` gives pool `eslint-factory` concurrency seven, a pending-task limit of 30, and three attempts. Each dispatch launches one worker for one Claim. The first trusted submission creates the queue branch with its Work; dispatch alone cannot bootstrap an absent queue.
+Shared `aw.json` gives pool `eslint-factory` concurrency 21, a pending-task limit of 30, and three attempts. Each dispatch launches one worker for one Claim. The first trusted submission creates the queue branch with its Work; dispatch alone cannot bootstrap an absent queue.
+
+Each monster Work authorizes at most one issue and one Copilot assignment per Claim, so a cohort has a maximum of three successful assignments. This is a per-cohort bound, not a calendar-day cap: queued work from earlier cohorts may also be dispatched later.
 
 ## Assignment-scoped outputs
 

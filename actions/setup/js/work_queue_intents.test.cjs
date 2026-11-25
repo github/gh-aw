@@ -25,7 +25,7 @@ import { buildEngineConformancePlan } from "./engine_conformance_portfolio.cjs";
 import { main as collectIntents } from "./collect_work_queue_intents.cjs";
 
 // Portfolio builders ignore options they do not declare; the ESLint factory needs its rule registry.
-const planOptions = { date: "2026-10-08", repository: "owner/repo", repositoryId: "7", rules: ["no-throw-plain-object", "prefer-number-isnan", "require-fetch-timeout"] };
+const planOptions = { date: "2026-10-08", repository: "owner/repo", repositoryId: "7", registryRevision: "a".repeat(40), rules: ["no-throw-plain-object", "prefer-number-isnan", "require-fetch-timeout"] };
 
 const directories = [];
 const policy = {
@@ -73,12 +73,10 @@ describe("staged control intents", () => {
     const file = filename();
     const plan = buildPlan(planOptions);
     const staged = stagePlanIntents(file, plan);
-    expect(staged.map(intent => [intent.version, intent.kind])).toEqual([
-      [4, "submit"],
-      [4, "dispatch_next"],
-    ]);
+    expect(staged.map(intent => [intent.version, intent.kind])).toEqual([[4, "submit"], ...Array((plan.dispatches ?? [plan.dispatch]).length).fill([4, "dispatch_next"])]);
     expect(staged[0].parameters).toEqual({ nodes: plan.nodes });
     expect(staged[1].parameters).toEqual(plan.dispatch);
+    if (plan.dispatches) expect(staged.slice(1).map(intent => intent.parameters)).toEqual(plan.dispatches);
     expect(readStagedIntents(file)).toEqual(staged);
     expect(validatePreparedPlanIntentBatch(staged, [])).toBeNull();
     const original = fs.readFileSync(file, "utf8");
@@ -96,8 +94,9 @@ describe("staged control intents", () => {
       { ...plan, nodes: [] },
       { ...plan, nodes: [{ ...plan.nodes[0], payload: null }] },
       { ...plan, nodes: [{ ...plan.nodes[0], expires_at: 1 }] },
-      { ...plan, dispatch: { ...plan.dispatch, max_claims: 0 } },
-      { ...plan, dispatch: { ...plan.dispatch, pool: "other" } },
+      { ...plan, dispatches: [{ ...plan.dispatch, max_claims: 0 }] },
+      { ...plan, dispatches: [{ ...plan.dispatch, pool: "other" }] },
+      { ...plan, dispatches: [] },
     ]) {
       expect(() => stagePlanIntents(file, invalid)).toThrow();
       expect(fs.existsSync(file)).toBe(false);

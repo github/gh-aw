@@ -16,7 +16,7 @@ test("source-bound registration reads syntax, not matching rule-name strings", (
 test("workflow facts come from parsed frontmatter, not body examples", () => {
   const text = fs.readFileSync(path.join(root, ".github/workflows/eslint-monster.md"), "utf8");
   const parsed = workflow(text + "\n```yaml\nassign-to-agent:\n  max: 900\n```\n");
-  assert.equal(parsed.frontmatter["safe-outputs"]["assign-to-agent"].max, 3);
+  assert.equal(parsed.frontmatter["safe-outputs"]["assign-to-agent"].max, 1);
   assert.throws(() => workflow("---\nname: one\nname: two\n---\n"), /unambiguous/);
 });
 
@@ -50,6 +50,7 @@ test("actual build, library scan commands, precheck and native Claim boundaries"
     facts => (facts.precheck.warningOtherRule.flag = false),
     facts => (facts.claimsPerDispatch = [2, 1]),
     facts => (facts.monsterAssignmentMax = 2),
+    facts => (facts.monsterIssueMax = 2),
     facts => (facts.requiredAssignments[0] = false),
     facts => (facts.memoryAdapter.base = "b".repeat(40)),
     facts => facts.configRules.pop(),

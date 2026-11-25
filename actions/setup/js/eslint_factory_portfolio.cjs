@@ -81,11 +81,12 @@ function rulePlan(profile, rule) {
   return `Remediate only diagnostics reported by ${rule.config_id} in actions/setup/js for the immutable factory date (warnings count as diagnostics). ${SAFETY_CLAUSE}`;
 }
 
-/** @param {{date: string, repository: string, repositoryId: string, rules: string[]}} options */
-function buildESLintFactoryPlan({ date, repository, repositoryId, rules }) {
+/** @param {{date: string, repository: string, repositoryId: string, registryRevision: string, rules: string[]}} options */
+function buildESLintFactoryPlan({ date, repository, repositoryId, registryRevision, rules }) {
   assertRepository(repository);
   factoryDay(date);
   if (typeof repositoryId !== "string" || !/^[1-9][0-9]{0,255}$/.test(repositoryId)) throw new Error("ESLint repository ID must be a verified positive decimal identity");
+  if (typeof registryRevision !== "string" || !/^[0-9a-f]{40}$/i.test(registryRevision)) throw new Error("ESLint registry revision must be an immutable commit SHA");
   assertRules(rules);
   const cohort = rulesForDay(date, [...rules].sort());
   const resourceScope = () => ({ version: 1, resources: [{ host: "github.com", repository, repository_id: repositoryId }] });
@@ -101,7 +102,7 @@ function buildESLintFactoryPlan({ date, repository, repositoryId, rules }) {
     priority: 3,
     fairness_key: "",
     worker_profile: profile,
-    payload: { ...payload, factory_date: date, factory_profile: profile, resource_scope: resourceScope(), effect_contract: factoryContract(profile) },
+    payload: { ...payload, factory_date: date, factory_profile: profile, registry_revision: registryRevision, resource_scope: resourceScope(), effect_contract: factoryContract(profile) },
     depends_on: [],
   });
   const nodes = [node("eslint-miner", "eslint-miner", { plan: `Run this workflow's existing ESLint mission for the immutable factory date. ${SAFETY_CLAUSE}` })];
@@ -109,7 +110,9 @@ function buildESLintFactoryPlan({ date, repository, repositoryId, rules }) {
     const rule = { id, source: `eslint-factory/src/rules/${id}.ts`, test: `eslint-factory/src/rules/${id}.test.ts`, config_id: `gh-aw-custom/${id}` };
     for (const profile of RULE_WORKERS) nodes.push(node(`${profile}:${id}`, profile, { plan: rulePlan(profile, rule), rule }));
   }
-  return { version: 1, date, rules: cohort, nodes, dispatch: { pool: FACTORY_POOL, max_claims: nodes.length, max_dispatches: nodes.length } };
+  const dispatch = { pool: FACTORY_POOL, max_claims: 21, max_dispatches: 21 };
+  const legacyDispatch = { pool: "default", max_claims: 3, max_dispatches: 3 };
+  return { version: 1, date, registry_revision: registryRevision, rules: cohort, nodes, dispatch, legacy_dispatch: legacyDispatch, dispatches: [dispatch, legacyDispatch] };
 }
 
 module.exports = { ESLINT_WORKERS, RULE_WORKERS, FACTORY_POOL, RULES_PER_DAY, parseESLintRuleIds, rulesForDay, buildESLintFactoryPlan };

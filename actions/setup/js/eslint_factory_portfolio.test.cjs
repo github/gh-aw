@@ -11,10 +11,12 @@ import { checkFileProtection, checkFileProtectionPostApply } from "./manifest_fi
 
 const require = createRequire(import.meta.url);
 const h = require("./work_queue_test_helpers.cjs");
+const unixFormatter = require("../../../eslint-factory/unix-formatter.cjs");
 const repository = "owner/repo";
 const indexSource = fs.readFileSync(new URL("../../../eslint-factory/src/index.ts", import.meta.url), "utf8");
 const rules = parseESLintRuleIds(indexSource);
-const planOptions = { date: "2026-10-08", repository, repositoryId: "7", rules };
+const registryRevision = "a".repeat(40);
+const planOptions = { date: "2026-10-08", repository, repositoryId: "7", registryRevision, rules };
 const DAILY_NODES = 1 + 2 * RULES_PER_DAY;
 const settings = JSON.parse(fs.readFileSync(new URL("../../../.github/workflows/aw.json", import.meta.url), "utf8")).work_queue;
 const compiledPolicy = h.compiledDispatcherPolicy("eslint-factory-dispatcher", repository);
@@ -26,11 +28,13 @@ function admit(log, plan, policy) {
   return fresh.length ? h.submit(log, fresh, { ...h.producer, run_id: String(10 + log.length) }) : log;
 }
 
-/** Commit the plan's dispatch_next with the compiled pool limits, launching only the factory workers. */
+/** Commit the plan's dispatch_next requests with the compiled pool limits. */
 function dispatch(log, plan, policy, runId = "15") {
-  const pool = policy.pools[plan.dispatch.pool];
   const profiles = Object.fromEntries(ESLINT_WORKERS.map(worker => [worker, { workflow: workerWorkflow(worker) }]));
-  return h.dispatchNext(log, { ...plan.dispatch, concurrency: pool.concurrency, per_account_limit: pool.per_account_limit, profiles }, { ...h.dispatcher, run_id: runId }).log;
+  return (plan.dispatches ?? [plan.dispatch]).reduce((current, request, index) => {
+    const pool = policy.pools[request.pool];
+    return h.dispatchNext(current, { ...request, concurrency: pool.concurrency, per_account_limit: pool.per_account_limit, profiles }, { ...h.dispatcher, run_id: String(Number(runId) + index) }).log;
+  }, log);
 }
 
 /** Decoded GH_AW_WORK_QUEUE_POLICY environments (chunked or not) of a compiled lock file. */
@@ -54,10 +58,14 @@ describe("ESLint factory producer and dispatcher", () => {
       expect(node.payload.rule).toEqual({ id: rule, source: `eslint-factory/src/rules/${rule}.ts`, test: `eslint-factory/src/rules/${rule}.test.ts`, config_id: `gh-aw-custom/${rule}` });
       expect(node.payload.plan).toContain(node.worker_profile === "eslint-refiner" ? node.payload.rule.source : node.payload.rule.config_id);
     }
-    expect(plan.dispatch).toEqual({ pool: "eslint-factory", max_claims: 7, max_dispatches: 7 });
+    expect(plan.registry_revision).toBe(registryRevision);
+    expect(plan.dispatch).toEqual({ pool: "eslint-factory", max_claims: 21, max_dispatches: 21 });
+    expect(plan.legacy_dispatch).toEqual({ pool: "default", max_claims: 3, max_dispatches: 3 });
+    expect(plan.dispatches).toEqual([plan.dispatch, plan.legacy_dispatch]);
     expect(Buffer.byteLength(JSON.stringify(plan))).toBeLessThan(16384);
     for (const node of plan.nodes) {
       expect(node).toMatchObject({ graph_id: "eslint-factory-cohort:2026-10-08", priority: 3, fairness_key: "", pool: "eslint-factory", depends_on: [] });
+      expect(node.payload.registry_revision).toBe(registryRevision);
       expect(frozenResourceScope(node.payload)).toEqual({ version: 1, resources: [{ host: "github.com", repository, repository_id: "7" }] });
       expect(node.payload.effect_contract.version).toBe(1);
     }
@@ -70,12 +78,23 @@ describe("ESLint factory producer and dispatcher", () => {
   });
 
   it("parses the rule registry and rejects empty or repeated registrations", () => {
-    expect(rules).toHaveLength(74);
     expect(rules).toEqual([...rules].sort());
-    expect(rules).toContain("require-parseInt-radix");
+    const fixture = `rules: {
+    "no-throw-plain-object": noThrowPlainObjectRule,
+    "require-fetch-timeout": requireFetchTimeoutRule,
+  }`;
+    expect(parseESLintRuleIds(fixture)).toEqual(["no-throw-plain-object", "require-fetch-timeout"]);
     expect(() => parseESLintRuleIds("")).toThrow(/no rules/);
     const entry = '    "no-throw-plain-object": noThrowPlainObjectRule,\n';
     expect(() => parseESLintRuleIds(`rules: {\n${entry}${entry}}`)).toThrow(/repeats/);
+  });
+
+  it("keeps rule-less fatal parse errors out of the clean diagnostic gate", () => {
+    const formatted = unixFormatter([{ filePath: "src/broken.cjs", messages: [{ ruleId: null, severity: 2, fatal: true, message: "Unexpected token", line: 1 }] }]);
+    const source = fs.readFileSync(new URL("../../../.github/workflows/eslint-monster.md", import.meta.url), "utf8");
+    expect(formatted).toContain("[Error]\n");
+    expect(source).toContain("unscoped_error_count=$(grep -Ec ' \\[Error\\]$'");
+    expect(source).toContain('&& [ "${unscoped_error_count}" -eq 0 ]');
   });
 
   it("rotates every rule through the daily cohort", () => {
@@ -127,7 +146,7 @@ describe("ESLint factory producer and dispatcher", () => {
     for (const worker of ESLINT_WORKERS) expect(policyAllowsWorker(compiledPolicy, "eslint-factory", worker), worker).toBe(true);
   });
 
-  it("admits seven tasks once per UTC day, then claims seven singleton dispatches", () => {
+  it("admits seven tasks once per UTC day and preserves dispatch capacity for retries", () => {
     const policy = compiledPolicy;
     const plan = buildESLintFactoryPlan(planOptions);
     let log = admit([], plan, policy);
@@ -146,7 +165,39 @@ describe("ESLint factory producer and dispatcher", () => {
     log = dispatch(admit(log, tomorrow, policy), tomorrow, policy, "17");
     state = replayTransactions(log);
     expect(state.works.size).toBe(2 * DAILY_NODES);
-    expect(state.claims.size).toBe(DAILY_NODES);
+    expect(state.claims.size).toBe(2 * DAILY_NODES);
+  });
+
+  it("dispatches pre-cutover default-pool Work to compatible legacy ESLint workers", () => {
+    const legacy = normalizeSubmitParameters(
+      {
+        nodes: [
+          {
+            pool: "default",
+            worker_profile: "eslint-monster",
+            payload: {
+              plan: "legacy broad scan",
+              effect_contract: {
+                version: 1,
+                outputs: [
+                  { type: "create_issue", min: 0, max: 3 },
+                  { type: "assign_to_agent", min: 0, max: 3 },
+                ],
+              },
+            },
+          },
+        ],
+      },
+      compiledPolicy
+    );
+    const plan = buildESLintFactoryPlan(planOptions);
+    let log = h.submit([], legacy, { ...h.producer, run_id: "10" });
+    log = dispatch(log, plan, compiledPolicy, "15");
+    const state = replayTransactions(log);
+    const claimed = [...state.claims.values()].map(claim => state.works.get(claim.work_id)).filter(work => work.pool === "default");
+    expect(claimed).toHaveLength(1);
+    expect(claimed[0]).toMatchObject({ pool: "default", worker_profile: "eslint-monster", payload: { plan: "legacy broad scan" } });
+    expect(fs.readFileSync(new URL("../../../.github/workflows/eslint-monster.md", import.meta.url), "utf8")).toContain("legacy-unscoped");
   });
 
   it("wires trusted plan preparation, submission before dispatch, and immutable run dates", () => {
@@ -154,6 +205,8 @@ describe("ESLint factory producer and dispatcher", () => {
     expect(source).toContain("actions: read");
     expect(source).toContain("buildESLintFactoryPlan");
     expect(source).toContain("run.created_at");
+    expect(source).toContain("repos.listCommits");
+    expect(source).toContain("registryRevision");
     expect(source).toContain("cat /tmp/gh-aw/agent/eslint-factory-plan.json");
     expect(source).toContain("stagePlanIntents(");
     expect(source).toContain("shared/work-queue-staged-plan.md");
@@ -190,7 +243,7 @@ describe("ESLint factory producer and dispatcher", () => {
     expect(controls).toContain("GH_AW_WORK_QUEUE_TOKEN: ${{ secrets.GITHUB_TOKEN }}");
   });
 
-  it("executes the actual preparation step with only three metadata reads and no ambient filesystem or credentials", async () => {
+  it("reuses the immutable pre-date registry revision when the default branch changes", async () => {
     const source = fs.readFileSync(new URL("../../../.github/workflows/eslint-factory-dispatcher.md", import.meta.url), "utf8");
     const block = source.match(/      script: \|\n((?:        .*\n)+)/);
     expect(block).not.toBeNull();
@@ -199,6 +252,7 @@ describe("ESLint factory producer and dispatcher", () => {
     const calls = [];
     const files = new Map();
     const intents = [];
+    let liveRegistrySource = indexSource;
     const fakeRequire = name => {
       if (name === "node:fs")
         return {
@@ -231,18 +285,27 @@ describe("ESLint factory producer and dispatcher", () => {
             calls.push("repository");
             return { data: { full_name: repository, id: 7, default_branch: "main" } };
           },
+          listCommits: async parameters => {
+            expect(parameters).toEqual({ owner: "owner", repo: "repo", path: "eslint-factory/src/index.ts", sha: "main", until: "2026-10-07T23:59:59.999Z", per_page: 1 });
+            calls.push("registry-commit");
+            return { data: [{ sha: registryRevision }] };
+          },
           getContent: async parameters => {
-            expect(parameters).toEqual({ owner: "owner", repo: "repo", path: "eslint-factory/src/index.ts", ref: "main" });
+            expect(parameters).toEqual({ owner: "owner", repo: "repo", path: "eslint-factory/src/index.ts", ref: registryRevision });
             calls.push("registry");
-            return { data: { type: "file", encoding: "base64", content: Buffer.from(indexSource).toString("base64") } };
+            const source = parameters.ref === registryRevision ? indexSource : liveRegistrySource;
+            return { data: { type: "file", encoding: "base64", content: Buffer.from(source).toString("base64") } };
           },
         },
       },
     };
-    await new AsyncFunction("require", "github", "context", "process", "core", script)(fakeRequire, github, { repo: { owner: "owner", repo: "repo" }, runId: 15 }, { env: { RUNNER_TEMP: "/fixture" } }, { info: () => {} });
-    expect(calls).toEqual(["run", "repository", "registry"]);
+    const prepare = () => new AsyncFunction("require", "github", "context", "process", "core", script)(fakeRequire, github, { repo: { owner: "owner", repo: "repo" }, runId: 15 }, { env: { RUNNER_TEMP: "/fixture" } }, { info: () => {} });
+    await prepare();
+    liveRegistrySource = `${indexSource}\n    "new-rule": newRuleRule,`;
+    await prepare();
+    expect(calls).toEqual(["run", "repository", "registry-commit", "registry", "run", "repository", "registry-commit", "registry"]);
     expect(files.size).toBe(1);
     expect(JSON.parse(files.get("/tmp/gh-aw/agent/eslint-factory-plan.json"))).toEqual(buildESLintFactoryPlan(planOptions));
-    expect(intents).toEqual([buildESLintFactoryPlan(planOptions)]);
+    expect(intents).toEqual([buildESLintFactoryPlan(planOptions), buildESLintFactoryPlan(planOptions)]);
   });
 });

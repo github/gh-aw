@@ -104,20 +104,24 @@ function validateStagedNode(node) {
   return node;
 }
 
-/** Stage the deterministic submit + dispatch_next pair of a trusted plan. */
+/** Stage the deterministic submission and dispatch requests of a trusted plan. */
 function stagePlanIntents(filename, plan) {
   if (plan?.version !== 1 || !Array.isArray(plan.nodes) || plan.nodes.length < 1 || plan.nodes.length > OPERATIONS_PER_COMMIT) throw new Error("work_queue_plan_invalid");
-  normalizeDispatchParameters(plan.dispatch);
+  const dispatches = plan.dispatches ?? [plan.dispatch];
+  if (!Array.isArray(dispatches) || dispatches.length < 1 || dispatches.length > 4) throw new Error("work_queue_plan_invalid");
+  dispatches.forEach(normalizeDispatchParameters);
   for (const node of plan.nodes) {
     validateStagedNode(node);
-    if (identity(node.pool, "pool") !== plan.dispatch.pool) throw new Error("work_queue_plan_pool_mismatch");
   }
-  const parameters = [
-    { kind: "submit", parameters: { nodes: plan.nodes } },
-    { kind: "dispatch_next", parameters: plan.dispatch },
-  ];
+  const nodePools = new Set(plan.nodes.map(node => identity(node.pool, "pool")));
+  if ([...nodePools].some(pool => !dispatches.some(dispatch => dispatch.pool === pool))) throw new Error("work_queue_plan_pool_mismatch");
+  const parameters = [{ kind: "submit", parameters: { nodes: plan.nodes } }, ...dispatches.map(dispatch => ({ kind: "dispatch_next", parameters: dispatch }))];
   const id = digest(parameters);
-  const intents = parameters.map(intent => ({ version: INTENT_VERSION, intent_id: `plan:${id}:${intent.kind}`, ...intent }));
+  const intents = parameters.map((intent, index) => ({
+    version: INTENT_VERSION,
+    intent_id: `plan:${id}:${intent.kind}${intent.kind === "dispatch_next" && index > 1 ? `:${index}` : ""}`,
+    ...intent,
+  }));
   const previous = readStagedIntents(filename);
   if (previous.length > intents.length || previous.some((intent, index) => canonical(intent) !== canonical(intents[index]))) throw new Error("work_queue_plan_intents_conflict");
   for (const intent of intents) if (!previous.some(existing => existing.intent_id === intent.intent_id)) stageIntent(filename, intent);
@@ -128,14 +132,17 @@ function stagePlanIntents(filename, plan) {
 function validatePreparedPlanIntentBatch(intents, errors) {
   const hasPlanIntent = intents.some(intent => intent.intent_id.startsWith("plan:")) || errors.some(error => error.intent_id?.startsWith("plan:"));
   if (!hasPlanIntent) return null;
-  if (errors.length || intents.length !== 2) return "work_queue_plan_intent_batch_invalid";
-  const [submit, dispatch] = intents;
-  if (submit.kind !== "submit" || dispatch.kind !== "dispatch_next") return "work_queue_plan_intent_batch_invalid";
-  const batchId = digest([
-    { kind: "submit", parameters: submit.parameters },
-    { kind: "dispatch_next", parameters: dispatch.parameters },
-  ]);
-  if (submit.intent_id !== `plan:${batchId}:submit` || dispatch.intent_id !== `plan:${batchId}:dispatch_next`) return "work_queue_plan_intent_batch_invalid";
+  if (errors.length || intents.length < 2 || intents.length > 5) return "work_queue_plan_intent_batch_invalid";
+  const [submit, ...dispatches] = intents;
+  if (submit.kind !== "submit" || dispatches.some(intent => intent.kind !== "dispatch_next")) return "work_queue_plan_intent_batch_invalid";
+  const nodes = submit.parameters?.nodes;
+  if (!Array.isArray(nodes) || nodes.length === 0 || dispatches.some(intent => !intent.parameters || typeof intent.parameters.pool !== "string")) return "work_queue_plan_intent_batch_invalid";
+  const nodePools = new Set(nodes.map(node => node?.pool));
+  if ([...nodePools].some(pool => !dispatches.some(intent => intent.parameters.pool === pool))) return "work_queue_plan_intent_batch_invalid";
+  const parameters = [submit, ...dispatches].map(({ kind, parameters }) => ({ kind, parameters }));
+  const batchId = digest(parameters);
+  if (submit.intent_id !== `plan:${batchId}:submit`) return "work_queue_plan_intent_batch_invalid";
+  if (dispatches.some((dispatch, index) => dispatch.intent_id !== `plan:${batchId}:dispatch_next${index === 0 ? "" : `:${index + 1}`}`)) return "work_queue_plan_intent_batch_invalid";
   return null;
 }
 

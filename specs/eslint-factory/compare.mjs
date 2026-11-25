@@ -108,15 +108,16 @@ export function compareFacts(facts) {
   expect("README linked rule table covers registered rules", [...facts.readmeRuleLinks].sort(), facts.sourceRules);
   expect("README rule table targets existing sections", facts.readmeBrokenTargets, []);
   expect("compiled policy approves every ESLint worker in pool eslint-factory", facts.compiledPolicy.eslintWorkersApproved, [true, true, true]);
-  expect("compiled eslint-factory pool limits", facts.compiledPolicy.pool, { concurrency: 7, per_account_limit: 0, max_attempts: 3 });
+  expect("compiled eslint-factory pool limits", facts.compiledPolicy.pool, { concurrency: 21, per_account_limit: 0, max_attempts: 3 });
   expect("dispatcher allowlist routes every ESLint worker", facts.dispatchProfiles, ["eslint-miner", "eslint-monster", "eslint-refiner"]);
   expect("dispatcher cohort grants one Claim per Dispatch", facts.claimsPerDispatch, Array(7).fill(1));
   expect("replay rejects a grouped Dispatch", facts.runtimeProbes.groupedDispatchError, "dispatch_state_conflict");
   expect("snapshot assignment carries exactly one Claim", facts.runtimeProbes.assignmentClaimCount, 1);
   expect("dispatcher worker allowlist", facts.dispatchWorkers, ["eslint-miner", "eslint-monster", "eslint-refiner"]);
-  expect("dispatcher run dispatch budget", facts.dispatchMax, 7);
+  expect("dispatcher run dispatch budget", facts.dispatchMax, 24);
   expect("all workers require assignments", facts.requiredAssignments, [true, true, true]);
-  expect("monster assignment safe-output maximum", facts.monsterAssignmentMax, 3);
+  expect("monster issue safe-output maximum", facts.monsterIssueMax, 1);
+  expect("monster assignment safe-output maximum", facts.monsterAssignmentMax, 1);
   expect("refiner issue safe-output maximum", facts.refinerIssueMax, 3);
   expect("monster discussion safe-output maximum", facts.monsterDiscussionMax, 1);
   expect("hard HTTP response rule", facts.httpSeverity, "error");
@@ -141,8 +142,10 @@ export function compareFacts(facts) {
   expect("installation failure aborts precheck", facts.precheck.installFailed.status, 1);
   expect("monster precheck flag excludes build failure", facts.precheck.buildFailed.flag, false);
   expect("monster precheck flag excludes tooling failure", facts.precheck.toolFailed.flag, false);
-  expect("precheck fails without an assigned rule", facts.precheck.noRule.status !== 0, true);
-  expect("monster precheck flag excludes a missing assigned rule", facts.precheck.noRule.flag, false);
+  expect("precheck accepts legacy work without a rule", facts.precheck.noRule.status, 0);
+  expect("legacy work with diagnostics is not marked clean", facts.precheck.noRule.flag, false);
+  expect("rule-scoped work without a rule ID fails", facts.precheck.missingRuleFactory.status !== 0, true);
+  expect("fatal parse fixture is not marked clean", facts.precheck.fatalParse.flag, false);
   expect("memory adapter", facts.memoryAdapter, {
     mode: "script",
     effectType: "git_tree",
@@ -269,7 +272,7 @@ export async function analyze(artifacts) {
   const precheck = {};
   const warningLog = scanProbes.warning.stdout + scanProbes.warning.stderr;
   const errorLog = scanProbes.error.stdout + scanProbes.error.stderr;
-  for (const [name, ci, lint, log, rule] of [
+  for (const [name, ci, lint, log, rule, pool] of [
     ["warningRule", 0, scanProbes.warning.status, warningLog, "no-throw-plain-object"],
     ["warningOtherRule", 0, scanProbes.warning.status, warningLog, "require-fetch-timeout"],
     ["errorRule", 0, scanProbes.error.status, errorLog, "require-http-response-error-listener"],
@@ -277,14 +280,16 @@ export async function analyze(artifacts) {
     ["installFailed", 1, 0, "install unavailable", "no-throw-plain-object"],
     ["buildFailed", 0, 1, "tsc: build failed", "no-throw-plain-object"],
     ["toolFailed", 0, 2, "ESLint: tooling failure", "no-throw-plain-object"],
-    ["noRule", 0, 0, warningLog, undefined],
+    ["noRule", 0, 0, warningLog, undefined, "default"],
+    ["missingRuleFactory", 0, 0, warningLog, undefined, "eslint-factory"],
+    ["fatalParse", 0, 1, "src/broken.cjs:1:0: Unexpected token [Error]", "no-throw-plain-object"],
   ]) {
     const directory = mkdir(path.join(artifacts, "precheck", name));
     mkdir(path.join(directory, "eslint-factory"));
     mkdir(path.join(directory, ".github/skills"));
     const output = path.join(directory, "agent");
     const snapshot = path.join(directory, "work-queue.snapshot.json");
-    write(snapshot, JSON.stringify({ worker: { claims: [{ work: rule === undefined ? {} : { rule: { id: rule } } }] } }));
+    write(snapshot, JSON.stringify({ worker: { claims: [{ work: { pool: pool ?? "eslint-factory", ...(rule === undefined ? {} : { rule: { id: rule } }) } }] } }));
     const transformed = precheckSource.replaceAll("/tmp/gh-aw/work-queue.snapshot.json", snapshot).replaceAll("/tmp/gh-aw/agent", output);
     write(path.join(directory, "precheck.sh"), transformed);
     const result = run("bash", ["precheck.sh"], {
@@ -338,6 +343,7 @@ export async function analyze(artifacts) {
     dispatchMax: workflows["factory-dispatcher"].frontmatter["safe-outputs"]["dispatch-workflow"].max,
     requiredAssignments: ["miner", "refiner", "monster"].map(name => workflows[name].frontmatter.tools["work-queue"]["require-assignment"]),
     monsterAssignmentMax: workflows.monster.frontmatter["safe-outputs"]["assign-to-agent"].max,
+    monsterIssueMax: workflows.monster.frontmatter["safe-outputs"]["create-issue"].max,
     monsterDiscussionMax: workflows.monster.frontmatter["safe-outputs"]["create-discussion"].max,
     refinerIssueMax: workflows.refiner.frontmatter["safe-outputs"]["create-issue"].max,
     compiledPolicy: runtimeProbes.compiledPolicy,
@@ -355,14 +361,14 @@ export async function analyze(artifacts) {
   const mismatches = compareFacts(facts);
   const assumptions = [
     "The compiled dispatcher policy and control config are read from the checked-in lock with the repository bound to a fixture; queue-branch write access, immutable worker revisions, resource scope and credentials are externally provisioned; these four workflow sources do not install a miner->refiner->monster DAG.",
-    "The model admits exactly two root Works with satisfied dependencies/capacity and fixed equal-priority order, and permits at most one protected prefix request in a modeled run.",
+    "The model admits exactly two root Works with satisfied dependencies/capacity and fixed equal-priority order; it does not model the dispatcher's two staged pool requests or retry-capacity budget.",
     "v4 replay grants exactly one Claim per Dispatch. The actual planner grants the seven-node daily cohort (miner plus refiner/monster per rotating rule) as singleton Dispatches and replay rejects a grouped Dispatch; the finite model's Batch configurations are a legacy abstraction, not v4 behavior. The model projects the first compatible assignment of a request, not all native dispatches.",
-    "Dispatcher prompt obligations max_claims=7/max_dispatches=7 and at most one request are not inferred to be a runtime-enforced per-run request counter.",
+    "The dispatcher stages a 21-claim factory request plus a three-claim legacy drain within a native dispatch-workflow maximum of 24; the model does not prove a durable calendar-day assignment cap.",
     "Model Effect authority abstracts successful open-Claim/bound-run-attempt/compiled-worker-approval/effect_scope checks; local probes use an in-memory queue branch and do not exercise authentication, remote APIs or concurrency.",
     "Each modeled Claim projects one output family. Whole-contract Readback abstracts all other declared outputs, memory snapshots, resource receipts and durable queue-control inventory; no profile contract is supplied by these workflow sources.",
     "One Copilot assignment per monster Claim, quality/build/test/low-false-positive bars, nonduplicate issues, and final-action wording are agent obligations; one Claim per Dispatch does not imply run-wide worker caps.",
     "Completion is distinct from verified delivery and Result. The v4 runtime has no independent delivery verifier; collector cardinality and authorization probes do not establish native writes.",
-    "ESLint exit zero can include warnings; the monster pre-check is clean only when the assigned rule has no diagnostics of any severity. Scan coverage is CJS excluding tests, not generic JS/TS goals; npm ci/build/tool failure is not evidence of defect-free source.",
+    "ESLint exit zero can include warnings; the monster pre-check is clean only when the assigned rule has no diagnostics and no rule-less fatal error. Scan coverage is CJS excluding tests, not generic JS/TS goals; npm ci/build/tool failure is not evidence of defect-free source.",
     "No unbounded liveness, production refinement, AST-rule completeness, low false positives or comprehensive security guarantee is claimed.",
   ];
   const documentationFindings = [
@@ -456,7 +462,7 @@ async function probeRuntime(sourceFiles, artifacts, controlEnvironment, sourceRu
 
   // The dispatcher's staged cohort: submission resolves each node to an approved worker; an unapproved one is rejected.
   assert.deepEqual(parseESLintRuleIds(registrySource), [...sourceRules].sort(), "Dispatcher registry parser must agree with the TypeScript registration");
-  const plan = buildESLintFactoryPlan({ date: "2026-11-23", repository: queue.repository, repositoryId: "1", rules: sourceRules });
+  const plan = buildESLintFactoryPlan({ date: "2026-11-23", repository: queue.repository, repositoryId: "1", registryRevision: "a".repeat(40), rules: sourceRules });
   const works = normalizeSubmitParameters({ nodes: plan.nodes }, policy);
   assert.equal(
     errorCode(() => normalizeSubmitParameters({ nodes: [{ ...plan.nodes[0], worker_profile: "unapproved-worker" }] }, policy)),
