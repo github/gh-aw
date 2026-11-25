@@ -1,5 +1,5 @@
-# gh-aw-metadata: {"schema_version":"v4","frontmatter_hash":"e3cf60518627a03ab52ed77f68ddf57c16686b6f38f78693164f6dd1ba55b23f","body_hash":"efd546c1aa1281b861b0e68fa016964e1627dfea757ed5fdfd4df5ae6f1e6b3c","strict":true,"agent_id":"copilot","engine_versions":{"copilot":"1.0.103"}}
-# gh-aw-manifest: {"version":1,"secrets":["GH_AW_DEFAULT_OTLP_ENDPOINT","GH_AW_DEFAULT_OTLP_HEADERS","GH_AW_GITHUB_MCP_SERVER_TOKEN","GH_AW_GITHUB_TOKEN","GITHUB_TOKEN"],"actions":[{"repo":"actions/checkout","sha":"3d3c42e5aac5ba805825da76410c181273ba90b1","version":"v7.0.1"},{"repo":"actions/download-artifact","sha":"9000827ccba6bdab643e8b6fd33ac0654aef8333","version":"v8.0.2"},{"repo":"actions/github-script","sha":"3a2844b7e9c422d3c10d287c895573f7108da1b3","version":"v9.0.0"},{"repo":"actions/upload-artifact","sha":"cf430e030ddbb5b0abf93d22962f4752f3646cd9","version":"v7.0.2"}],"containers":[{"image":"ghcr.io/github/gh-aw-firewall/agent:0.29.20@sha256:b9cd8d7d1a9c2693e5d91db035a678fb1ea8d87ce691e08ec091b327e5e8ba75"},{"image":"ghcr.io/github/gh-aw-firewall/api-proxy:0.29.20@sha256:fc6c1eff686514d26ff90ae1398e0f6e3dcad8d2e43d11b16df312c1e72c0ace"},{"image":"ghcr.io/github/gh-aw-firewall/router:0.29.20@sha256:732c3741e866099c6c2095aad7c84a18266486563deb51d7cce723f9bfc48721"},{"image":"ghcr.io/github/gh-aw-firewall/squid:0.29.20@sha256:1c4a4a12fcea206a81d656cb1f73847420a2c041d02ab51235364079a1e31d71"},{"image":"ghcr.io/github/gh-aw-mcpg:v0.5.14","digest":"sha256:716b41d53a20660e945c351c08140380430d65d98d3263596e45114c29fa7a43","pinned_image":"ghcr.io/github/gh-aw-mcpg:v0.5.14@sha256:716b41d53a20660e945c351c08140380430d65d98d3263596e45114c29fa7a43"},{"image":"ghcr.io/github/gh-aw-node","digest":"sha256:8735428c2d4e602f90781ba0c571c400e8ff93c7ee1508a75d71f87e34e415cc","pinned_image":"ghcr.io/github/gh-aw-node@sha256:8735428c2d4e602f90781ba0c571c400e8ff93c7ee1508a75d71f87e34e415cc"},{"image":"ghcr.io/github/github-mcp-server:v2.2.0","digest":"sha256:040c4e99810076035eb1d9beb4b4a96fcf589c43cefed6ff51a46a553eb4e174","pinned_image":"ghcr.io/github/github-mcp-server:v2.2.0@sha256:040c4e99810076035eb1d9beb4b4a96fcf589c43cefed6ff51a46a553eb4e174"}],"mcp_servers":[{"name":"github","tools":["get_commit","get_file_contents","get_latest_release","get_me","get_pull_request","get_pull_request_comments","get_pull_request_diff","get_pull_request_files","get_pull_request_review_comments","get_pull_request_reviews","get_pull_request_status","get_release_by_tag","get_tag","issue_read","list_branches","list_commits","list_issue_types","list_issues","list_pull_requests","list_releases","list_starred_repositories","list_tags","pull_request_read","search_code","search_issues","search_pull_requests","search_repositories"]},{"name":"safeoutputs","tools":["create_issue","noop","report_incomplete","report_missing_data","report_missing_tool"]},{"name":"work-queue","tools":["work_queue_claim_finish","work_queue_dispatch_next","work_queue_read","work_queue_submit"]}],"threat_detection":{"mode":"disabled"},"admission":true,"work_queue":{"worker":true},"agent_metadata":{"03cbf8931deff21d5116":{"name":"Agentic Workflows"},"4943cffeebb6706aa8bc":{"name":"Squad","tools":["*"]},"9ea639558df913e650e4":{"name":"technical-doc-writer"},"a17c6c62ffcd7401f40f":{"name":"adr-writer"},"ad6ff0fe9219fbfa5ccc":{"name":"grumpy-reviewer","tools":["read","search"]},"e0c35a96dedfb29cb9b1":{"name":"w3c-specification-writer"}}}
+# gh-aw-metadata: {"schema_version":"v4","frontmatter_hash":"5de07f66c7c4dd04d5de3659cebe0bb8e695989a5be9d42705e2dbead7713539","body_hash":"0bc0866eddc900989682043d566cd3f9653df7fe773f5072e815979a2726b3a1","strict":true,"agent_id":"copilot","engine_versions":{"copilot":"1.0.103"}}
+# gh-aw-manifest: {"version":1,"secrets":["GH_AW_DEFAULT_OTLP_ENDPOINT","GH_AW_DEFAULT_OTLP_HEADERS","GH_AW_GITHUB_MCP_SERVER_TOKEN","GH_AW_GITHUB_TOKEN","GITHUB_TOKEN"],"actions":[{"repo":"actions/checkout","sha":"3d3c42e5aac5ba805825da76410c181273ba90b1","version":"v7.0.1"},{"repo":"actions/download-artifact","sha":"9000827ccba6bdab643e8b6fd33ac0654aef8333","version":"v8.0.2"},{"repo":"actions/github-script","sha":"3a2844b7e9c422d3c10d287c895573f7108da1b3","version":"v9.0.0"},{"repo":"actions/upload-artifact","sha":"cf430e030ddbb5b0abf93d22962f4752f3646cd9","version":"v7.0.2"}],"containers":[{"image":"ghcr.io/github/gh-aw-firewall/agent:0.29.20@sha256:b9cd8d7d1a9c2693e5d91db035a678fb1ea8d87ce691e08ec091b327e5e8ba75"},{"image":"ghcr.io/github/gh-aw-firewall/api-proxy:0.29.20@sha256:fc6c1eff686514d26ff90ae1398e0f6e3dcad8d2e43d11b16df312c1e72c0ace"},{"image":"ghcr.io/github/gh-aw-firewall/router:0.29.20@sha256:732c3741e866099c6c2095aad7c84a18266486563deb51d7cce723f9bfc48721"},{"image":"ghcr.io/github/gh-aw-firewall/squid:0.29.20@sha256:1c4a4a12fcea206a81d656cb1f73847420a2c041d02ab51235364079a1e31d71"},{"image":"ghcr.io/github/gh-aw-mcpg:v0.5.14","digest":"sha256:716b41d53a20660e945c351c08140380430d65d98d3263596e45114c29fa7a43","pinned_image":"ghcr.io/github/gh-aw-mcpg:v0.5.14@sha256:716b41d53a20660e945c351c08140380430d65d98d3263596e45114c29fa7a43"},{"image":"ghcr.io/github/gh-aw-node","digest":"sha256:8735428c2d4e602f90781ba0c571c400e8ff93c7ee1508a75d71f87e34e415cc","pinned_image":"ghcr.io/github/gh-aw-node@sha256:8735428c2d4e602f90781ba0c571c400e8ff93c7ee1508a75d71f87e34e415cc"},{"image":"ghcr.io/github/github-mcp-server:v2.2.0","digest":"sha256:040c4e99810076035eb1d9beb4b4a96fcf589c43cefed6ff51a46a553eb4e174","pinned_image":"ghcr.io/github/github-mcp-server:v2.2.0@sha256:040c4e99810076035eb1d9beb4b4a96fcf589c43cefed6ff51a46a553eb4e174"}],"mcp_servers":[{"name":"github","tools":["get_commit","get_file_contents","get_latest_release","get_me","get_pull_request","get_pull_request_comments","get_pull_request_diff","get_pull_request_files","get_pull_request_review_comments","get_pull_request_reviews","get_pull_request_status","get_release_by_tag","get_tag","issue_read","list_branches","list_commits","list_issue_types","list_issues","list_pull_requests","list_releases","list_starred_repositories","list_tags","pull_request_read","search_code","search_issues","search_pull_requests","search_repositories"]},{"name":"safeoutputs","tools":["noop","report_incomplete","report_missing_data","report_missing_tool","request_continuation"]},{"name":"work-queue","tools":["work_queue_claim_finish","work_queue_dispatch_next","work_queue_read","work_queue_submit"]}],"threat_detection":{"mode":"disabled"},"admission":true,"work_queue":{"worker":true},"agent_metadata":{"03cbf8931deff21d5116":{"name":"Agentic Workflows"},"4943cffeebb6706aa8bc":{"name":"Squad","tools":["*"]},"9ea639558df913e650e4":{"name":"technical-doc-writer"},"a17c6c62ffcd7401f40f":{"name":"adr-writer"},"ad6ff0fe9219fbfa5ccc":{"name":"grumpy-reviewer","tools":["read","search"]},"e0c35a96dedfb29cb9b1":{"name":"w3c-specification-writer"}}}
 # This file was automatically generated by gh-aw. DO NOT EDIT. To debug this workflow, load the skill at https://github.com/github/gh-aw/blob/main/debug.md
 #
 #    ___                   _   _
@@ -153,7 +153,7 @@ jobs:
           GH_AW_DEFAULT_ADMISSION_URL: ${{ vars.GH_AW_DEFAULT_ADMISSION_URL }}
           GH_AW_DEFAULT_ADMISSION_AUDIENCE: ${{ vars.GH_AW_DEFAULT_ADMISSION_AUDIENCE }}
           GH_AW_DEFAULT_ADMISSION_ON_OUTAGE: ${{ vars.GH_AW_DEFAULT_ADMISSION_ON_OUTAGE }}
-          GH_AW_ADMISSION_WORKFLOW_HASH: "e3cf60518627a03ab52ed77f68ddf57c16686b6f38f78693164f6dd1ba55b23f:efd546c1aa1281b861b0e68fa016964e1627dfea757ed5fdfd4df5ae6f1e6b3c"
+          GH_AW_ADMISSION_WORKFLOW_HASH: "5de07f66c7c4dd04d5de3659cebe0bb8e695989a5be9d42705e2dbead7713539:0bc0866eddc900989682043d566cd3f9653df7fe773f5072e815979a2726b3a1"
           GH_AW_INFO_WORKFLOW_ID: ${{ job.workflow_ref }}
           GITHUB_ACTOR: ${{ github.actor }}
           GITHUB_TRIGGERING_ACTOR: ${{ github.triggering_actor }}
@@ -315,12 +315,12 @@ jobs:
           GH_AW_OTLP_LOGS_ENABLED: ""
           GH_AW_OTLP_LOGS_MAX_BYTES: ""
           GH_AW_PROMPT: ${{ runner.temp }}/gh-aw/aw-prompts/prompt.txt
-          GH_AW_PROMPT_CONFIG: "{\"items\":[{\"content_env\":\"GH_AW_PROMPT_CONTENT_0000\"},{\"file\":\"xpia.md\"},{\"file\":\"temp_folder_prompt.md\"},{\"file\":\"markdown.md\"},{\"file\":\"safe_outputs_cli_only_transport_prompt.md\"},{\"file\":\"safe_outputs_prompt.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0001\"},{\"file\":\"safe_outputs_auto_create_issue.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0002\"},{\"file\":\"mcp_cli_tools_with_safeoutputs_prompt.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0003\"},{\"file\":\"github_mcp_cli_tools_prompt.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0004\"},{\"author_file\":\".github/workflows/smoke-work-queue-worker.md\"}],\"system_item_count\":13}"
+          GH_AW_PROMPT_CONFIG: "{\"items\":[{\"content_env\":\"GH_AW_PROMPT_CONTENT_0000\"},{\"file\":\"xpia.md\"},{\"file\":\"temp_folder_prompt.md\"},{\"file\":\"markdown.md\"},{\"file\":\"safe_outputs_cli_only_transport_prompt.md\"},{\"file\":\"safe_outputs_prompt.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0001\"},{\"file\":\"safe_outputs_request_continuation_queue.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0002\"},{\"file\":\"mcp_cli_tools_with_safeoutputs_prompt.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0003\"},{\"file\":\"github_mcp_cli_tools_prompt.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0004\"},{\"author_file\":\".github/workflows/smoke-work-queue-worker.md\"}],\"system_item_count\":13}"
           GH_AW_PROMPT_CONTENT_0000: |
             <system>
           GH_AW_PROMPT_CONTENT_0001: |
             <safe-output-tools>
-            Tools: create_issue, report_missing_tool, report_missing_data, report_incomplete, noop(max:2)
+            Tools: report_missing_tool, report_missing_data, report_incomplete, request_continuation, noop(max:2)
           GH_AW_PROMPT_CONTENT_0002: |
             </safe-output-tools>
           GH_AW_PROMPT_CONTENT_0003: "<github-context>\n{{#if __GH_AW_GITHUB_ACTOR__ }}\n- **actor**: __GH_AW_GITHUB_ACTOR__\n{{/if}}\n{{#if __GH_AW_GITHUB_REPOSITORY__ }}\n- **repository**: __GH_AW_GITHUB_REPOSITORY__\n{{/if}}\n{{#if __GH_AW_GITHUB_WORKSPACE__ }}\n- **workspace**: __GH_AW_GITHUB_WORKSPACE__\n{{/if}}\n{{#if __GH_AW_EXPR_7C248226__ }}\n- **issue-number**: #__GH_AW_EXPR_7C248226__\n{{/if}}\n{{#if __GH_AW_EXPR_C19C384F__ }}\n- **discussion-number**: #__GH_AW_EXPR_C19C384F__\n{{/if}}\n{{#if __GH_AW_EXPR_76DF9333__ }}\n- **pull-request-number**: #__GH_AW_EXPR_76DF9333__\n{{/if}}\n{{#if __GH_AW_EXPR_77C1A4D2__ }}\n- **comment-id**: __GH_AW_EXPR_77C1A4D2__\n{{/if}}\n{{#if __GH_AW_GITHUB_RUN_ID__ }}\n- **workflow-run-id**: __GH_AW_GITHUB_RUN_ID__\n{{/if}}\n</github-context>\n\n"
@@ -560,6 +560,7 @@ jobs:
       ambient_context: ${{ steps.parse-token-usage.outputs.ambient_context }}
       checkout_pr_invalidated: ${{ steps.checkout-pr.outputs.checkout_pr_invalidated || 'false' }}
       checkout_pr_success: ${{ steps.checkout-pr.outputs.checkout_pr_success || 'true' }}
+      continuation_evidence: ${{ steps.bind_continuation_evidence.outputs.continuation_evidence }}
       has_patch: ${{ steps.collect_output.outputs.has_patch }}
       http_400_response_error: ${{ steps.detect-agent-errors.outputs.http_400_response_error || 'false' }}
       inference_access_error: ${{ steps.detect-agent-errors.outputs.inference_access_error || 'false' }}
@@ -701,7 +702,7 @@ jobs:
           GH_AW_SKILL_DIR: ".github/skills"
         run: bash "${RUNNER_TEMP}/gh-aw/actions/restore_inline_skills.sh"
       - name: Validate synthetic smoke assignment
-        run: "set -euo pipefail\nnode <<'JS'\nconst assert = require(\"node:assert/strict\");\nconst fs = require(\"node:fs\");\nassert.equal(process.env.GH_AW_WORK_QUEUE_ROLE, \"worker\");\nconst event = JSON.parse(fs.readFileSync(process.env.GITHUB_EVENT_PATH, \"utf8\"));\nconst input = JSON.parse(event.inputs.work_queue_assignment);\nassert.deepEqual(Object.keys(input).sort(), [\"dispatch_id\", \"version\"]);\nassert.equal(input.version, 4);\nconst snapshot = JSON.parse(fs.readFileSync(\"/tmp/gh-aw/work-queue.snapshot.json\", \"utf8\"));\nassert.equal(snapshot.version, 4);\nconst assignment = snapshot.worker;\nassert.ok(assignment, \"Smoke worker requires an open assignment\");\nassert.equal(assignment.dispatch_id, input.dispatch_id);\nassert.equal(assignment.claims.length, 1, \"Smoke worker requires exactly one Claim\");\nconst work = assignment.claims[0].work;\nassert.equal(work.smoke, \"work-queue-v1\");\nassert.equal(work.task, \"Complete the synthetic work queue smoke task.\");\nassert.deepEqual(work.effect_contract, { kind: \"none\" });\nJS"
+        run: "set -euo pipefail\nnode <<'JS'\nconst assert = require(\"node:assert/strict\");\nconst fs = require(\"node:fs\");\nassert.equal(process.env.GH_AW_WORK_QUEUE_ROLE, \"worker\");\nconst event = JSON.parse(fs.readFileSync(process.env.GITHUB_EVENT_PATH, \"utf8\"));\nconst input = JSON.parse(event.inputs.work_queue_assignment);\nassert.deepEqual(Object.keys(input).sort(), [\"dispatch_id\", \"version\"]);\nassert.equal(input.version, 4);\nconst snapshot = JSON.parse(fs.readFileSync(\"/tmp/gh-aw/work-queue.snapshot.json\", \"utf8\"));\nassert.equal(snapshot.version, 4);\nconst assignment = snapshot.worker;\nassert.ok(assignment, \"Smoke worker requires an open assignment\");\nassert.equal(assignment.dispatch_id, input.dispatch_id);\nassert.equal(assignment.claims.length, 1, \"Smoke worker requires exactly one Claim\");\nconst work = assignment.claims[0].work;\nassert.equal(work.smoke, \"work-queue-v1\");\nassert.equal(work.task, \"Complete the synthetic work queue smoke task.\");\nassert.deepEqual(work.effect_contract, { kind: \"none\" });\nconst continuation = assignment.claims[0].continuation;\nif (continuation !== undefined) {\n  assert.deepEqual(Object.keys(continuation).sort(), [\"message\", \"remaining\", \"route\"]);\n  assert.equal(continuation.route, \"workqueue\", \"Smoke successors are queue-routed\");\n  assert.equal(continuation.remaining, 0, \"Smoke continuation depth is one hop\");\n  assert.match(continuation.message, /\\S/, \"Smoke continuation carries the parent's message\");\n}\nJS"
 
       - name: Download container images
         run: bash "${RUNNER_TEMP}/gh-aw/actions/download_docker_images.sh" ghcr.io/github/gh-aw-mcpg:v0.5.14@sha256:716b41d53a20660e945c351c08140380430d65d98d3263596e45114c29fa7a43 ghcr.io/github/gh-aw-node@sha256:8735428c2d4e602f90781ba0c571c400e8ff93c7ee1508a75d71f87e34e415cc ghcr.io/github/github-mcp-server:v2.2.0@sha256:040c4e99810076035eb1d9beb4b4a96fcf589c43cefed6ff51a46a553eb4e174 ghcr.io/github/gh-aw-firewall/agent:0.29.20@sha256:b9cd8d7d1a9c2693e5d91db035a678fb1ea8d87ce691e08ec091b327e5e8ba75 ghcr.io/github/gh-aw-firewall/api-proxy:0.29.20@sha256:fc6c1eff686514d26ff90ae1398e0f6e3dcad8d2e43d11b16df312c1e72c0ace ghcr.io/github/gh-aw-firewall/router:0.29.20@sha256:732c3741e866099c6c2095aad7c84a18266486563deb51d7cce723f9bfc48721 ghcr.io/github/gh-aw-firewall/squid:0.29.20@sha256:1c4a4a12fcea206a81d656cb1f73847420a2c041d02ab51235364079a1e31d71
@@ -715,7 +716,7 @@ jobs:
         env:
           GH_AW_FILE_ROOT: "${{ runner.temp }}/gh-aw"
           GH_AW_FILE_CONFIG: "{\"files\":[{\"path\":\"safeoutputs/config.json\",\"content_env\":\"GH_AW_SAFE_OUTPUTS_CONFIG\"}]}"
-          GH_AW_SAFE_OUTPUTS_CONFIG: "{\"create_issue\":{\"labels\":[\"smoke-work-queue-worker\"],\"max\":1,\"max_issue_artifact_size\":1048576,\"max_issue_artifacts\":10,\"title_prefix\":\"[smoke-work-queue-worker]\"},\"create_report_incomplete_issue\":{},\"noop\":{\"max\":2,\"report-as-issue\":\"false\"},\"report_incomplete\":{},\"report_missing_data\":{},\"report_missing_tool\":{}}"
+          GH_AW_SAFE_OUTPUTS_CONFIG: "{\"create_report_incomplete_issue\":{},\"noop\":{\"max\":2,\"report-as-issue\":\"false\"},\"report_incomplete\":{},\"report_missing_data\":{},\"report_missing_tool\":{},\"request_continuation\":{\"max\":1,\"route\":\"workqueue\"}}"
         with:
           script: |
             const path = require('path');
@@ -728,57 +729,13 @@ jobs:
         env:
           GH_AW_TOOLS_META_JSON: |
             {
-              "description_suffixes": {
-                "create_issue": " CONSTRAINTS: Maximum 1 issue(s) can be created. Title will be prefixed with \"[smoke-work-queue-worker]\". Labels [\"smoke-work-queue-worker\"] will be automatically added. Maximum 10 artifact(s) can be attached per issue. Maximum artifact body size: 1048576 UTF-8 bytes."
-              },
+              "description_suffixes": {},
               "repo_params": {},
               "dynamic_tools": [],
               "work_queue_scoped": true
             }
           GH_AW_VALIDATION_JSON: |
             {
-              "create_issue": {
-                "defaultMax": 1,
-                "fields": {
-                  "artifacts": {
-                    "type": "array"
-                  },
-                  "blocked_by": {},
-                  "body": {
-                    "required": true,
-                    "type": "string",
-                    "sanitize": true,
-                    "maxLength": 65000,
-                    "minLength": 20
-                  },
-                  "fields": {
-                    "type": "array"
-                  },
-                  "labels": {
-                    "type": "array",
-                    "itemType": "string",
-                    "itemSanitize": true,
-                    "itemMaxLength": 128
-                  },
-                  "parent": {
-                    "issueOrPRNumber": true
-                  },
-                  "repo": {
-                    "type": "string",
-                    "maxLength": 256
-                  },
-                  "temporary_id": {
-                    "type": "string"
-                  },
-                  "title": {
-                    "required": true,
-                    "type": "string",
-                    "sanitize": true,
-                    "maxLength": 128
-                  }
-                },
-                "collapseData": true
-              },
               "noop": {
                 "defaultMax": 2,
                 "fields": {
@@ -849,6 +806,17 @@ jobs:
                     "type": "string",
                     "sanitize": true,
                     "maxLength": 128
+                  }
+                }
+              },
+              "request_continuation": {
+                "defaultMax": 1,
+                "fields": {
+                  "message": {
+                    "required": true,
+                    "type": "string",
+                    "sanitize": true,
+                    "maxLength": 65000
                   }
                 }
               }
@@ -1390,7 +1358,7 @@ jobs:
           SMOKE_SAFE_OUTPUTS: ${{ steps.set-runtime-paths.outputs.GH_AW_SAFE_OUTPUTS }}
         if: always()
         name: Assert smoke Claim completion intent
-        run: "set -euo pipefail\nnode <<'JS'\nconst assert = require(\"node:assert/strict\");\nconst fs = require(\"node:fs\");\nconst path = require(\"node:path\");\nassert.equal(process.env.SMOKE_EXECUTION, \"success\", \"Smoke agent execution must succeed\");\nconst snapshot = JSON.parse(fs.readFileSync(\"/tmp/gh-aw/work-queue.snapshot.json\", \"utf8\"));\nconst handle = snapshot.worker.claims[0].handle;\nconst file = path.join(path.dirname(process.env.SMOKE_SAFE_OUTPUTS), \"work-queue/work-queue.finish.jsonl\");\nconst intents = fs.readFileSync(file, \"utf8\").split(\"\\n\").filter(Boolean).map(line => JSON.parse(line));\nassert.equal(intents.length, 1, \"Smoke worker must record exactly one finish intent\");\nassert.deepEqual(intents[0], { version: 4, claim_handle: handle, outcome: \"completed\" });\nJS"
+        run: "set -euo pipefail\nnode <<'JS'\nconst assert = require(\"node:assert/strict\");\nconst fs = require(\"node:fs\");\nconst path = require(\"node:path\");\nassert.equal(process.env.SMOKE_EXECUTION, \"success\", \"Smoke agent execution must succeed\");\nconst snapshot = JSON.parse(fs.readFileSync(\"/tmp/gh-aw/work-queue.snapshot.json\", \"utf8\"));\nconst handle = snapshot.worker.claims[0].handle;\nconst file = path.join(path.dirname(process.env.SMOKE_SAFE_OUTPUTS), \"work-queue/work-queue.finish.jsonl\");\nconst intents = fs.readFileSync(file, \"utf8\").split(\"\\n\").filter(Boolean).map(line => JSON.parse(line));\nassert.equal(intents.length, 1, \"Smoke worker must record exactly one finish intent\");\nassert.deepEqual(intents[0], { version: 4, claim_handle: handle, outcome: \"completed\" });\nconst outputs = fs.readFileSync(process.env.SMOKE_SAFE_OUTPUTS, \"utf8\").split(\"\\n\").filter(Boolean).map(line => JSON.parse(line));\nconst requests = outputs.filter(item => typeof item.type === \"string\" && item.type.replace(/-/g, \"_\") === \"request_continuation\");\nassert.equal(requests.length, 1, \"Smoke worker must request exactly one continuation\");\nassert.equal(requests[0].claim_handle, handle, \"Smoke continuation must name the assigned Claim\");\nassert.match(String(requests[0].message), /\\S/, \"Smoke continuation must carry a nonblank message\");\nJS"
 
       - name: Emit OTLP job conclusion before artifacts
         if: always() && env.GH_AW_OTEL_METRICS == 'true'
@@ -1416,6 +1384,44 @@ jobs:
             const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
             const { main } = require(path.join(actionsDir, 'validate_recovery_envelopes.cjs'));
             main({ core, additionalRoots: JSON.parse(process.env.GH_AW_RECOVERY_ADDITIONAL_ROOTS) });
+      - name: Bind continuation evidence
+        id: bind_continuation_evidence
+        if: always() && steps.redact_secrets.outcome == 'success' && steps.validate_recovery_envelopes.outcome == 'success' && steps.validate_final_recovery_envelopes.outcome == 'success'
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          GH_AW_CONTINUATION_AGENT_OUTPUT: /tmp/gh-aw/agent_output.json
+        with:
+          script: |
+            const path = require('path');
+            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const { main } = require(path.join(actionsDir, 'bind_continuation_evidence.cjs'));
+            await main({ core });
+      # Small dedicated copy of the agent output so safe-output processing
+      # survives a failed or timed-out upload of the larger agent artifact
+      - name: Upload agent output fallback artifact
+        if: always() && steps.redact_secrets.outcome == 'success' && steps.validate_recovery_envelopes.outcome == 'success' && steps.validate_final_recovery_envelopes.outcome == 'success'
+        continue-on-error: true
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: agent-output-fallback
+          path: |
+            /tmp/gh-aw/agent_output.json
+            /tmp/gh-aw/safeoutputs.jsonl
+            /tmp/gh-aw/agent_execution.json
+            /tmp/gh-aw/agent_execution_exit_code.txt
+            /tmp/gh-aw/agent_usage.jsonl
+            /tmp/gh-aw/agent_usage.json
+            /tmp/gh-aw/agent/harness_retry.json
+            /tmp/gh-aw/agent/model-endpoint-mismatch.json
+            /tmp/gh-aw/sandbox/firewall-audit-logs/api-proxy-logs/token-usage.jsonl
+            /tmp/gh-aw/sandbox/firewall-audit-logs/api-proxy-logs/model-routing.jsonl
+            /tmp/gh-aw/sandbox/firewall/logs/api-proxy-logs/token-usage.jsonl
+            /tmp/gh-aw/sandbox/firewall/logs/api-proxy-logs/model-routing.jsonl
+            /tmp/gh-aw/sandbox/firewall/audit/api-proxy-logs/token-usage.jsonl
+            /tmp/gh-aw/sandbox/firewall/audit/api-proxy-logs/model-routing.jsonl
+            /tmp/gh-aw/awf-resolved-config.json
+          if-no-files-found: ignore
+          retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
       - name: Upload agent artifacts
         if: always() && steps.redact_secrets.outcome == 'success' && steps.validate_recovery_envelopes.outcome == 'success' && steps.validate_final_recovery_envelopes.outcome == 'success'
         continue-on-error: true
@@ -1700,7 +1706,7 @@ jobs:
           GH_AW_DEFAULT_ADMISSION_URL: ${{ vars.GH_AW_DEFAULT_ADMISSION_URL }}
           GH_AW_DEFAULT_ADMISSION_AUDIENCE: ${{ vars.GH_AW_DEFAULT_ADMISSION_AUDIENCE }}
           GH_AW_DEFAULT_ADMISSION_ON_OUTAGE: ${{ vars.GH_AW_DEFAULT_ADMISSION_ON_OUTAGE }}
-          GH_AW_ADMISSION_WORKFLOW_HASH: "e3cf60518627a03ab52ed77f68ddf57c16686b6f38f78693164f6dd1ba55b23f:efd546c1aa1281b861b0e68fa016964e1627dfea757ed5fdfd4df5ae6f1e6b3c"
+          GH_AW_ADMISSION_WORKFLOW_HASH: "5de07f66c7c4dd04d5de3659cebe0bb8e695989a5be9d42705e2dbead7713539:0bc0866eddc900989682043d566cd3f9653df7fe773f5072e815979a2726b3a1"
           GH_AW_INFO_WORKFLOW_ID: ${{ job.workflow_ref }}
           GITHUB_ACTOR: ${{ github.actor }}
           GITHUB_TRIGGERING_ACTOR: ${{ github.triggering_actor }}
@@ -1751,8 +1757,6 @@ jobs:
       code_push_failure_errors: ${{ steps.process_safe_outputs.outputs.code_push_failure_errors }}
       create_discussion_error_count: ${{ steps.process_safe_outputs.outputs.create_discussion_error_count }}
       create_discussion_errors: ${{ steps.process_safe_outputs.outputs.create_discussion_errors }}
-      created_issue_number: ${{ steps.process_safe_outputs.outputs.created_issue_number }}
-      created_issue_url: ${{ steps.process_safe_outputs.outputs.created_issue_url }}
       process_safe_outputs_items_applied: ${{ steps.process_safe_outputs.outputs.items_applied }}
       process_safe_outputs_items_cancelled: ${{ steps.process_safe_outputs.outputs.items_cancelled }}
       process_safe_outputs_items_deferred: ${{ steps.process_safe_outputs.outputs.items_deferred }}
@@ -1849,6 +1853,7 @@ jobs:
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           GH_AW_JOB_CHECK_RUN_ID: ${{ job.check_run_id }}
+          GH_AW_CONTINUATION_EVIDENCE: ${{ needs.agent.outputs.continuation_evidence }}
           GH_AW_WORK_QUEUE_EFFECTS: /tmp/gh-aw/work-queue.effects.jsonl
           GH_AW_WORK_QUEUE_POLICY: "{\"version\":4,\"pending_limit\":30,\"issues\":{\"label\":\"work\",\"title_prefix\":\"[work queue]\",\"orphaned_after_days\":30},\"effect_scope\":\"${{ github.repository }}\",\"workers\":[\"artifacts-summary\",\"code-scanning-fixer-worker\",\"daily-compiler-quality\",\"daily-evals-report\",\"daily-firewall-report\",\"daily-issues-report\",\"daily-observability-report\",\"daily-regulatory\",\"daily-repo-chronicle\",\"daily-secrets-analysis\",\"daily-team-evolution-insights\",\"daily-token-consumption-report\",\"deep-report\",\"engine-conformance-agy\",\"engine-conformance-aider\",\"engine-conformance-claude\",\"engine-conformance-codex\",\"engine-conformance-copilot\",\"engine-conformance-crush\",\"engine-conformance-cursor\",\"engine-conformance-deepseek-harness\",\"engine-conformance-factory\",\"engine-conformance-gemini\",\"engine-conformance-goose\",\"engine-conformance-kiro\",\"engine-conformance-langgraph\",\"engine-conformance-mini-swe-agent\",\"engine-conformance-opencode\",\"engine-conformance-pi\",\"engine-conformance-pydantic-ai\",\"eslint-miner\",\"eslint-monster\",\"eslint-refiner\",\"repo-tree-map\",\"smoke-work-queue-worker\"],\"pools\":{\"code-scanning\":{\"concurrency\":3,\"per_account_limit\":0,\"max_attempts\":3},\"daily-reports\":{\"concurrency\":3,\"per_account_limit\":1,\"max_attempts\":3},\"default\":{\"concurrency\":3,\"per_account_limit\":0,\"max_attempts\":3},\"engine-conformance\":{\"concurrency\":3,\"per_account_limit\":1,\"max_attempts\":3},\"smoke-work-queue\":{\"concurrency\":3,\"per_account_limit\":0,\"max_attempts\":3}}}"
           GH_AW_AGENT_OUTPUT: ${{ steps.setup-agent-output-env.outputs.GH_AW_AGENT_OUTPUT }}
@@ -1856,7 +1861,7 @@ jobs:
           GH_AW_MENTIONS_GITHUB_TOKEN: ${{ github.token }}
           GITHUB_SERVER_URL: ${{ github.server_url }}
           GITHUB_API_URL: ${{ github.api_url }}
-          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"create_issue\":{\"labels\":[\"smoke-work-queue-worker\"],\"max\":1,\"max_issue_artifact_size\":1048576,\"max_issue_artifacts\":10,\"title_prefix\":\"[smoke-work-queue-worker]\"},\"create_report_incomplete_issue\":{},\"noop\":{\"max\":2,\"report-as-issue\":\"false\"},\"report_incomplete\":{},\"report_missing_data\":{},\"report_missing_tool\":{}}"
+          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"create_report_incomplete_issue\":{},\"noop\":{\"max\":2,\"report-as-issue\":\"false\"},\"report_incomplete\":{},\"report_missing_data\":{},\"report_missing_tool\":{},\"request_continuation\":{\"max\":1,\"max_depth\":1,\"route\":\"workqueue\"}}"
           GH_AW_GITHUB_TOKEN_SOURCE: ${{ secrets.GH_AW_GITHUB_TOKEN != '' && 'pat' || 'github_actions' }}
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
@@ -1876,6 +1881,12 @@ jobs:
           GH_AW_WORK_QUEUE_POLICY: "{\"version\":4,\"pending_limit\":30,\"issues\":{\"label\":\"work\",\"title_prefix\":\"[work queue]\",\"orphaned_after_days\":30},\"effect_scope\":\"${{ github.repository }}\",\"workers\":[\"artifacts-summary\",\"code-scanning-fixer-worker\",\"daily-compiler-quality\",\"daily-evals-report\",\"daily-firewall-report\",\"daily-issues-report\",\"daily-observability-report\",\"daily-regulatory\",\"daily-repo-chronicle\",\"daily-secrets-analysis\",\"daily-team-evolution-insights\",\"daily-token-consumption-report\",\"deep-report\",\"engine-conformance-agy\",\"engine-conformance-aider\",\"engine-conformance-claude\",\"engine-conformance-codex\",\"engine-conformance-copilot\",\"engine-conformance-crush\",\"engine-conformance-cursor\",\"engine-conformance-deepseek-harness\",\"engine-conformance-factory\",\"engine-conformance-gemini\",\"engine-conformance-goose\",\"engine-conformance-kiro\",\"engine-conformance-langgraph\",\"engine-conformance-mini-swe-agent\",\"engine-conformance-opencode\",\"engine-conformance-pi\",\"engine-conformance-pydantic-ai\",\"eslint-miner\",\"eslint-monster\",\"eslint-refiner\",\"repo-tree-map\",\"smoke-work-queue-worker\"],\"pools\":{\"code-scanning\":{\"concurrency\":3,\"per_account_limit\":0,\"max_attempts\":3},\"daily-reports\":{\"concurrency\":3,\"per_account_limit\":1,\"max_attempts\":3},\"default\":{\"concurrency\":3,\"per_account_limit\":0,\"max_attempts\":3},\"engine-conformance\":{\"concurrency\":3,\"per_account_limit\":1,\"max_attempts\":3},\"smoke-work-queue\":{\"concurrency\":3,\"per_account_limit\":0,\"max_attempts\":3}}}"
           GH_AW_WORK_QUEUE_FINISH_INTENT: /tmp/gh-aw/work-queue.finish.jsonl
           GH_AW_WORK_QUEUE_EFFECTS: /tmp/gh-aw/work-queue.effects.jsonl
+          GH_AW_WORK_QUEUE_CONTINUATIONS: ${{ steps.process_safe_outputs.outputs.work_queue_continuations }}
+          GH_AW_CONTINUATION_EVIDENCE: ${{ needs.agent.outputs.continuation_evidence }}
+          GH_AW_AGENT_OUTPUT: ${{ steps.setup-agent-output-env.outputs.GH_AW_AGENT_OUTPUT }}
+          GH_AW_CONTINUATION_ROUTE: "workqueue"
+          GH_AW_CONTINUATION_MAX_DEPTH: "1"
+          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"create_report_incomplete_issue\":{},\"noop\":{\"max\":2,\"report-as-issue\":\"false\"},\"report_incomplete\":{},\"report_missing_data\":{},\"report_missing_tool\":{},\"request_continuation\":{\"max\":1,\"max_depth\":1,\"route\":\"workqueue\"}}"
         with:
           script: |
             const path = require('path');
