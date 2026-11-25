@@ -1,6 +1,6 @@
 ---
 name: Smoke Work Queue Dispatcher
-description: Top the smoke pool up to three synthetic tasks every six hours and request three native smoke worker Claims
+description: Keep the smoke pool at three synthetic tasks every six hours and request three native smoke worker Claims
 intent: Detect failures in native work queue admission, dispatch, and worker completion without changing source content, allowing framework queue tracking mutations.
 on:
   schedule: every 6 hours
@@ -132,9 +132,9 @@ steps:
       script: |
         const fs = require("node:fs");
         const path = require("node:path");
-        const { stagePlanIntents } = require(path.join(process.env.RUNNER_TEMP, "gh-aw/actions/work_queue_intents.cjs"));
+        const { INTENT_VERSION, stageIntent, stagePlanIntents } = require(path.join(process.env.RUNNER_TEMP, "gh-aw/actions/work_queue_intents.cjs"));
         const { loadWorkQueueSnapshot, readWorkQueueState } = require(path.join(process.env.RUNNER_TEMP, "gh-aw/actions/work_queue_mcp_server.cjs"));
-        const node = node_key => ({
+        const node = (node_key, extra = {}) => ({
           graph_id: `smoke-work-queue:${context.runId}`,
           node_key,
           pool: "smoke-work-queue",
@@ -151,20 +151,22 @@ steps:
               }],
             },
             effect_contract: { kind: "none" },
+            ...extra,
           },
           depends_on: [],
         });
-        // Continuation successors of the previous cycle are already available; top the pool up to three so each cycle dispatches exactly three.
+        // Each dispatched Claim leaves at most one available Work behind (a successor or a retry), so the
+        // pool holds 0..3 available Work here. Top it up to three; when it is full, only dispatch.
         const available = readWorkQueueState(loadWorkQueueSnapshot(), { pool: "smoke-work-queue", limit: 1 }).counts.available ?? 0;
-        const roots = Math.max(1, 3 - available);
-        const plan = {
-          version: 1,
-          nodes: Array.from({ length: roots }, (_, index) => node(`smoke-${index + 1}`)),
-          dispatch: { pool: "smoke-work-queue", max_claims: 3, max_dispatches: 3 },
-        };
+        const roots = Math.max(0, 3 - available);
+        const dispatch = { pool: "smoke-work-queue", max_claims: 3, max_dispatches: 3 };
+        // smoke-1 fails its first attempt on purpose; its successors inherit the payload and do the same.
+        const plan = { version: 1, nodes: Array.from({ length: roots }, (_, index) => node(`smoke-${index + 1}`, index === 0 ? { smoke_mode: "fail-once" } : {})), dispatch };
         fs.mkdirSync("/tmp/gh-aw/agent", { recursive: true });
         fs.writeFileSync("/tmp/gh-aw/agent/smoke-work-queue-plan.json", JSON.stringify(plan));
-        stagePlanIntents(path.join(process.env.RUNNER_TEMP, "gh-aw/safeoutputs/work-queue/work-queue.intents.jsonl"), plan);
+        const intents = path.join(process.env.RUNNER_TEMP, "gh-aw/safeoutputs/work-queue/work-queue.intents.jsonl");
+        if (roots > 0) stagePlanIntents(intents, plan);
+        else stageIntent(intents, { version: INTENT_VERSION, intent_id: "smoke:dispatch_next", kind: "dispatch_next", parameters: dispatch });
         core.info(`Staged ${roots} synthetic Work (${available} already available) and one bounded smoke dispatch request for three Claims`);
 timeout-minutes: 10
 strict: true
@@ -176,17 +178,19 @@ Read `/tmp/gh-aw/agent/smoke-work-queue-plan.json`, then call `work_queue_read`
 with `{"pool":"smoke-work-queue","limit":8}`. An absent queue is empty. A tool
 error is a failure, not an empty backlog.
 
-The trusted preparation step stages one to three synthetic Work (`node_key`
-`smoke-1`…, identical payloads), enough to bring the pool's available smoke
-Work to three, followed by
-`{"pool":"smoke-work-queue","max_claims":3,"max_dispatches":3}`. Completed
-smoke Claims each admit one queue-routed continuation successor, so the pool
-usually already holds successors from the previous cycle. Explain the
-staged plan; do not submit again, choose a winner, dispatch directly, or emit
-`noop`. Work identity is stable for this activation, and whole-run reruns
-are disabled. The scheduler takes the oldest available smoke Work first, so it
-may select an older smoke task when recovering a backlog; never release
-capacity or modify other pools.
+The trusted preparation step stages zero to three synthetic Work (`node_key`
+`smoke-1`…, identical payloads except that `smoke-1` carries
+`smoke_mode: "fail-once"`), enough to bring the pool's available smoke Work to
+three, followed by `{"pool":"smoke-work-queue","max_claims":3,"max_dispatches":3}`;
+when the pool already holds three, it stages the dispatch request alone, so the
+plan file's `nodes` may be empty. Completed smoke Claims admit queue-routed
+continuation successors (two hops per root) and a failed fail-once attempt
+returns its Work for one retry, so the pool usually already holds Work from the
+previous cycle. Explain the staged plan; do not submit again, choose a winner,
+dispatch directly, or emit `noop`. Work identity is stable for this
+activation, and whole-run reruns are disabled. The scheduler takes the oldest
+available smoke Work first, so it may select an older smoke task when
+recovering a backlog; never release capacity or modify other pools.
 
 The assignment-only smoke worker checks the synthetic payload and finishes its
 original Claim without resource effects. A staged request is not a launch.

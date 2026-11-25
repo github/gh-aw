@@ -3,7 +3,7 @@ import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { createRequire } from "node:module";
 import os from "node:os";
 import path from "node:path";
-import { runInNewContext } from "node:vm";
+import { createContext, runInContext, runInNewContext } from "node:vm";
 import { describe, expect, it } from "vitest";
 import { readDocumentMetadata } from "../../../scripts/markdown_metadata_test_adapter.cjs";
 
@@ -30,47 +30,52 @@ function compiledPolicy(env) {
 function verification(name) {
   const workflow = readWorkflow(name);
   const job = workflow.jobs[`verify_smoke_${name === "worker" ? "completion" : "dispatch"}`];
-  const step = job.steps[0];
+  const step = job.steps.find(step => step.run);
   const script = step.run.match(/node <<'JS'\n([\s\S]*?)\nJS/)[1];
-  return { job, step, run: env => runInNewContext(script, { require: () => assert, process: { env } }) };
+  return {
+    job,
+    step,
+    run: (env, expected = { outcome: "completed" }) => runInNewContext(script, { require: name => (name === "node:fs" ? { readFileSync: () => JSON.stringify(expected) } : assert), process: { env } }),
+  };
 }
 
-function runWorkerAssignmentValidation(continuation) {
-  const worker = readWorkflow("worker");
-  const script = worker["pre-agent-steps"][0].run.match(/node <<'JS'\n([\s\S]*?)\nJS/)[1];
-  const dispatchId = `d_${"a".repeat(64)}_1`;
-  const assignment = {
-    version: 4,
-    dispatch_id: dispatchId,
-  };
-  const snapshot = {
-    version: 4,
-    worker: {
-      dispatch_id: dispatchId,
-      claims: [
-        {
-          work: {
-            smoke: "work-queue-v1",
-            task: "Complete the synthetic work queue smoke task.",
-            effect_contract: { kind: "none" },
-          },
-          ...(continuation === undefined ? {} : { continuation }),
-        },
-      ],
-    },
-  };
+/** The heredoc body of a worker pre-agent or post step. */
+function workerStepScript(kind) {
+  return readWorkflow("worker")[kind][0].run.match(/node <<'JS'\n([\s\S]*?)\nJS/)[1];
+}
+
+const SMOKE_PAYLOAD = { task: "Complete the synthetic work queue smoke task.", smoke: "work-queue-v1", effect_contract: { kind: "none" } };
+const FAIL_ONCE_PAYLOAD = { ...SMOKE_PAYLOAD, smoke_mode: "fail-once" };
+const smokeMessage = parent => `Smoke continuation of ${parent}: run the synthetic smoke task once more.`;
+/** A replayed Work record as loadWorkQueueSnapshot().projection.works holds it. */
+const workRecord = (work_id, overrides = {}) => ({ work_id, graph_id: "g", node_key: "smoke-2", state: "claimed", payload: SMOKE_PAYLOAD, depends_on: [], attempts: 0, ...overrides });
+
+/**
+ * Run the worker's trusted pre-agent step for `claim` against replayed `records`; returns the
+ * expectation it writes for the agent, post-step and verifier. Records are rebuilt in the
+ * script's realm so strict deep equality compares like with like.
+ */
+function runWorkerPreAgent(claim, records) {
   const files = {
-    "/event.json": JSON.stringify({ inputs: { work_queue_assignment: JSON.stringify(assignment) } }),
-    "/tmp/gh-aw/work-queue.snapshot.json": JSON.stringify(snapshot),
+    "/event": JSON.stringify({ inputs: { work_queue_assignment: '{"version":4,"dispatch_id":"d1"}' } }),
+    "/tmp/gh-aw/work-queue.snapshot.json": JSON.stringify({ version: 4, worker: { dispatch_id: "d1", claims: [claim] } }),
   };
-  return runInNewContext(script, {
+  const written = {};
+  const sandbox = createContext({
     require: name => {
       if (name === "node:assert/strict") return assert;
-      if (name === "node:fs") return { readFileSync: file => files[file] };
+      if (name === "node:path") return path;
+      if (name === "node:fs") return { readFileSync: file => files[file], writeFileSync: (file, text) => (written[file] = text), mkdirSync() {} };
+      if (name === "/tmp/gh-aw/actions/work_queue_mcp_server.cjs") return { loadWorkQueueSnapshot: () => ({ projection: { works } }) };
       throw new Error(`Unexpected module ${name}`);
     },
-    process: { env: { GH_AW_WORK_QUEUE_ROLE: "worker", GITHUB_EVENT_PATH: "/event.json" } },
+    process: { env: { GH_AW_WORK_QUEUE_ROLE: "worker", GITHUB_EVENT_PATH: "/event", RUNNER_TEMP: "/tmp" } },
+    console: { log() {} },
   });
+  const realmJSON = runInContext("JSON", sandbox);
+  const works = new Map(records.map(record => [record.work_id, realmJSON.parse(JSON.stringify(record))]));
+  runInContext(workerStepScript("pre-agent-steps"), sandbox);
+  return JSON.parse(written["/tmp/gh-aw/agent/smoke-work-queue-claim.json"]);
 }
 
 const successfulJobs = { SMOKE_ACTIVATION_RESULT: "success", SMOKE_AGENT_RESULT: "success", SMOKE_SAFE_OUTPUTS_RESULT: "success" };
@@ -95,16 +100,18 @@ describe("native work queue smoke verification", () => {
     [0, 3],
     [1, 2],
     [2, 1],
-    [3, 1],
-    [7, 1],
+    [3, 0],
+    [7, 0],
   ])("tops the smoke pool up to three Work and stages one bounded dispatch without reading an installed Policy: with %i available stages %i roots", (available, roots) => {
     const script = readWorkflow("dispatcher").steps[0].with.script;
     expect(script).not.toMatch(/logical_limit|native_limit|Policy/);
     const staged = [];
+    const direct = [];
+    const files = {};
     const require = name => {
-      if (name === "node:fs") return { mkdirSync() {}, writeFileSync() {} };
+      if (name === "node:fs") return { mkdirSync() {}, writeFileSync: (file, text) => (files[file] = text) };
       if (name === "node:path") return { join: (...parts) => parts.join("/") };
-      if (name.endsWith("work_queue_intents.cjs")) return { stagePlanIntents: (_filename, plan) => staged.push(plan) };
+      if (name.endsWith("work_queue_intents.cjs")) return { INTENT_VERSION: 4, stagePlanIntents: (_filename, plan) => staged.push(plan), stageIntent: (_filename, intent) => direct.push(intent) };
       if (name.endsWith("work_queue_mcp_server.cjs"))
         return {
           loadWorkQueueSnapshot: () => ({ role: "dispatcher" }),
@@ -122,10 +129,34 @@ describe("native work queue smoke verification", () => {
       context: { runId: "123", repo: { owner: "owner", repo: "repo" }, payload: { repository: { id: 456 } } },
       core: { info() {} },
     });
+    const dispatch = { pool: "smoke-work-queue", max_claims: 3, max_dispatches: 3 };
+    expect(JSON.parse(files["/tmp/gh-aw/agent/smoke-work-queue-plan.json"]).nodes).toHaveLength(roots);
+    if (roots === 0) {
+      expect(staged).toEqual([]);
+      expect(direct).toEqual([{ version: 4, intent_id: "smoke:dispatch_next", kind: "dispatch_next", parameters: dispatch }]);
+      // The bare intent must pass the trusted reader as an ordinary dispatch, not a broken plan batch.
+      const intents = requireSetup("./work_queue_intents.cjs");
+      const dir = mkdtempSync(path.join(os.tmpdir(), "smoke-dispatch-"));
+      try {
+        const file = path.join(dir, "work-queue.intents.jsonl");
+        intents.stageIntent(file, JSON.parse(JSON.stringify(direct[0])));
+        const batch = intents.readStagedIntentBatch(file);
+        expect(batch.errors).toEqual([]);
+        expect(intents.validatePreparedPlanIntentBatch(batch.intents, batch.errors)).toBeNull();
+        expect(intents.normalizeDispatchParameters(batch.intents[0].parameters)).toEqual(dispatch);
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+      return;
+    }
+    expect(direct).toEqual([]);
     expect(staged).toHaveLength(1);
-    expect(staged[0].nodes.map(node => node.node_key)).toEqual(Array.from({ length: roots }, (_, i) => `smoke-${i + 1}`));
-    expect(staged[0].nodes.every(node => node.graph_id === "smoke-work-queue:123" && node.payload.smoke === "work-queue-v1")).toBe(true);
-    expect(staged[0].dispatch).toEqual({ pool: "smoke-work-queue", max_claims: 3, max_dispatches: 3 });
+    const { nodes } = staged[0];
+    expect(nodes.map(node => node.node_key)).toEqual(Array.from({ length: roots }, (_, i) => `smoke-${i + 1}`));
+    expect(nodes.every(node => node.graph_id === "smoke-work-queue:123" && node.payload.smoke === "work-queue-v1")).toBe(true);
+    expect(nodes[0].payload.smoke_mode).toBe("fail-once");
+    expect(nodes.slice(1).every(node => !Object.hasOwn(node.payload, "smoke_mode"))).toBe(true);
+    expect(staged[0].dispatch).toEqual(dispatch);
   });
 
   it("compiles the smoke pool concurrency from aw.json into the dispatcher policy", () => {
@@ -193,13 +224,18 @@ describe("native work queue smoke verification", () => {
   });
 
   it("requires a committed Completion even if agent execution and safe outputs succeeded", () => {
-    const { step, run } = verification("worker");
+    const { job, step, run } = verification("worker");
+    expect(job.steps[0]).toMatchObject({ uses: expect.stringMatching(/^actions\/download-artifact@/), with: { name: "smoke-work-queue-claim" } });
+    expect(step.env.SMOKE_EXPECTED_CLAIM).toBe("${{ runner.temp }}/smoke/smoke-work-queue-claim.json");
     expect(step.env.SMOKE_QUEUE_OUTCOME).toBe("${{ needs.safe_outputs.outputs.work_queue_outcome }}");
     expect(() => run({ ...successfulJobs, SMOKE_QUEUE_OUTCOME: "completed" })).not.toThrow();
     for (const outcome of ["failed", "staged_preview", ""]) {
       expect(() => run({ ...successfulJobs, SMOKE_QUEUE_OUTCOME: outcome })).toThrow();
     }
     expect(() => run(successfulJobs)).toThrow();
+    // A planned fail-once attempt must commit exactly the failure it was told to.
+    expect(() => run({ ...successfulJobs, SMOKE_QUEUE_OUTCOME: "failed" }, { outcome: "failed" })).not.toThrow();
+    expect(() => run({ ...successfulJobs, SMOKE_QUEUE_OUTCOME: "completed" }, { outcome: "failed" })).toThrow();
   });
 
   it("requires trusted worker activation separately from a completed Claim", () => {
@@ -215,32 +251,94 @@ describe("native work queue smoke verification", () => {
     expect(pre).toContain("assert.equal(input.version, 4)");
     expect(pre).toContain("/tmp/gh-aw/work-queue.snapshot.json");
     expect(pre).toContain('assert.equal(work.smoke, "work-queue-v1")');
-    expect(pre).toContain('assert.equal(continuation.route, "workqueue"');
+    expect(pre).toContain('assert.equal(claim.continuation.route, "workqueue"');
+    expect(pre).toContain("Smoke continuation of ${parent}");
+    expect(pre).toContain("continuation:${claim.work_id}");
     expect(pre).not.toContain("normalizeAssignment");
     const post = worker["post-steps"][0].run;
-    expect(post).toContain('{ version: 4, claim_handle: handle, outcome: "completed" }');
+    expect(post).toContain("{ version: 4, claim_handle: handle, outcome: expected.outcome }");
     expect(post).toContain('item.type.replace(/-/g, "_") === "request_continuation"');
     expect(post).not.toContain("keep_open");
   });
 
-  it("accepts root and valid successor assignments", () => {
-    expect(() => runWorkerAssignmentValidation()).not.toThrow();
-    expect(() =>
-      runWorkerAssignmentValidation({
-        route: "workqueue",
-        remaining: 0,
-        message: "Smoke continuation: run the synthetic smoke task once more.",
-      })
-    ).not.toThrow();
-  });
+  describe("smoke worker trusted steps", () => {
+    const root = (work_id, payload = SMOKE_PAYLOAD) => ({ handle: "h1", claim_id: "c1", work_id, work: payload, result_refs: [] });
+    const hop = (parent, remaining) => ({ route: "workqueue", message: smokeMessage(parent), remaining });
+    const successor = (work_id, parent, continuation, overrides = {}) => ({
+      handle: "h1",
+      claim_id: "c1",
+      work_id,
+      work: SMOKE_PAYLOAD,
+      result_refs: [{ work_id: parent, result_commit_id: "c9", descriptor: [] }],
+      continuation,
+      ...overrides,
+    });
+    const child = (work_id, parent, continuation) => workRecord(work_id, { node_key: `continuation:${parent}`, depends_on: [{ kind: "work", work_id: parent }], continuation });
+    const completedParent = (work_id, overrides = {}) => workRecord(work_id, { state: "completed", completion_id: "c9", ...overrides });
 
-  it.each([
-    ["extra continuation fields", { route: "workqueue", remaining: 0, message: "Continue the smoke task.", extra: true }],
-    ["wrong route", { route: "other", remaining: 0, message: "Continue the smoke task." }],
-    ["remaining depth", { route: "workqueue", remaining: 1, message: "Continue the smoke task." }],
-    ["blank message", { route: "workqueue", remaining: 0, message: " \t" }],
-  ])("rejects successor assignments with %s", (_reason, continuation) => {
-    expect(() => runWorkerAssignmentValidation(continuation)).toThrow();
+    it("expects a plain root to complete with a message naming its Work", () => {
+      expect(runWorkerPreAgent(root("W"), [workRecord("W")])).toEqual({ work_id: "W", attempts: 0, outcome: "completed", message: smokeMessage("W") });
+    });
+
+    it("fails the first attempt of fail-once Work and completes its retry", () => {
+      const failOnce = workRecord("W", { node_key: "smoke-1", payload: FAIL_ONCE_PAYLOAD });
+      expect(runWorkerPreAgent(root("W", FAIL_ONCE_PAYLOAD), [failOnce]).outcome).toBe("failed");
+      const retry = { ...failOnce, attempts: 1 };
+      expect(runWorkerPreAgent(root("W", FAIL_ONCE_PAYLOAD), [retry])).toMatchObject({ attempts: 1, outcome: "completed" });
+      expect(() => runWorkerPreAgent(root("W", FAIL_ONCE_PAYLOAD), [retry, workRecord("S", { node_key: "continuation:W", state: "available" })])).toThrow(/must not have admitted a successor/);
+    });
+
+    it("rejects unknown smoke modes and roots the dispatcher did not stage", () => {
+      const odd = { ...SMOKE_PAYLOAD, smoke_mode: "fail-twice" };
+      expect(() => runWorkerPreAgent(root("W", odd), [workRecord("W", { payload: odd })])).toThrow(/Unknown smoke_mode/);
+      expect(() => runWorkerPreAgent(root("W"), [workRecord("W", { node_key: "smoke-4" })])).toThrow(/dispatcher-staged node/);
+    });
+
+    it("proves a first-hop successor's lineage from its completed root", () => {
+      const records = [completedParent("P", { node_key: "smoke-1" }), child("W", "P", hop("P", 1))];
+      expect(runWorkerPreAgent(successor("W", "P", hop("P", 1)), records)).toMatchObject({ outcome: "completed", message: smokeMessage("W") });
+      for (const [label, claim] of [
+        ["remaining 0", successor("W", "P", hop("P", 0))],
+        ["foreign message", successor("W", "P", { ...hop("P", 1), message: "other" })],
+        ["issue route", successor("W", "P", { ...hop("P", 1), route: "issue" })],
+        ["no predecessor", successor("W", "P", hop("P", 1), { result_refs: [] })],
+        ["stale result", successor("W", "P", hop("P", 1), { result_refs: [{ work_id: "P", result_commit_id: "c8", descriptor: [] }] })],
+      ]) {
+        expect(() => runWorkerPreAgent(claim, records), label).toThrow(assert.AssertionError);
+      }
+    });
+
+    it("counts depth down to zero on the second hop", () => {
+      const records = [completedParent("P", { node_key: "continuation:R", depends_on: [{ kind: "work", work_id: "R" }], continuation: hop("R", 1) })];
+      expect(runWorkerPreAgent(successor("W", "P", hop("P", 0)), [...records, child("W", "P", hop("P", 0))]).outcome).toBe("completed");
+      expect(() => runWorkerPreAgent(successor("W", "P", hop("P", 1)), [...records, child("W", "P", hop("P", 1))])).toThrow(/Depth counts down/);
+    });
+
+    function runPostStep({ outcome = "failed", expectedOutcome = "failed", requests = [smokeMessage("W")] } = {}) {
+      const files = {
+        "/tmp/gh-aw/work-queue.snapshot.json": JSON.stringify({ version: 4, worker: { dispatch_id: "d1", claims: [root("W")] } }),
+        "/tmp/gh-aw/agent/smoke-work-queue-claim.json": JSON.stringify({ work_id: "W", attempts: 0, outcome: expectedOutcome, message: smokeMessage("W") }),
+        "/so/work-queue/work-queue.finish.jsonl": `${JSON.stringify({ version: 4, claim_handle: "h1", outcome })}\n`,
+        "/so/safeoutputs.jsonl": requests.map(message => `${JSON.stringify({ type: "request_continuation", claim_handle: "h1", message })}\n`).join(""),
+      };
+      runInNewContext(workerStepScript("post-steps"), {
+        require: name => {
+          if (name === "node:assert/strict") return assert;
+          if (name === "node:path") return path;
+          if (name === "node:fs") return { readFileSync: file => files[file] };
+          throw new Error(`Unexpected module ${name}`);
+        },
+        process: { env: { SMOKE_EXECUTION: "success", SMOKE_SAFE_OUTPUTS: "/so/safeoutputs.jsonl" } },
+      });
+    }
+
+    it("holds the finish intent and continuation request to the ledger-derived expectation", () => {
+      expect(() => runPostStep()).not.toThrow();
+      expect(() => runPostStep({ outcome: "completed" })).toThrow();
+      expect(() => runPostStep({ requests: [`${smokeMessage("W")}!`] })).toThrow(/ledger-derived message/);
+      expect(() => runPostStep({ requests: [] })).toThrow(/exactly one continuation/);
+      expect(() => runPostStep({ requests: [smokeMessage("W"), smokeMessage("W")] })).toThrow(/exactly one continuation/);
+    });
   });
 
   it("publishes the dispatcher alert from a typed issue report", async () => {
@@ -303,7 +401,9 @@ describe("native work queue smoke verification", () => {
       const id = `verify_smoke_${name === "worker" ? "completion" : "dispatch"}`;
       expect(compiled.jobs[id].if).toBe("always()");
       expect(compiled.jobs[id].needs).toEqual(expect.arrayContaining(["agent", "safe_outputs"]));
-      expect(compiled.jobs[id].steps).toEqual(expect.arrayContaining(readWorkflow(name).jobs[id].steps));
+      // The compiler pins `uses:` tags to SHAs, so compare only the inline verifier scripts.
+      const runSteps = list => list.filter(step => step.run);
+      expect(runSteps(compiled.jobs[id].steps)).toEqual(expect.arrayContaining(runSteps(readWorkflow(name).jobs[id].steps)));
       expect(compiled.jobs.safe_outputs.outputs.work_queue_requests).toBe("${{ steps.work_queue_controls.outputs.work_queue_requests }}");
       const steps = compiled.jobs.safe_outputs.steps;
       const controls = steps.find(step => step.id === "work_queue_controls");
@@ -327,7 +427,9 @@ describe("native work queue smoke verification", () => {
         expect(steps[handler].env.GH_AW_WORK_QUEUE_EFFECTS).toBe("/tmp/gh-aw/work-queue.effects.jsonl");
         expect(compiled.jobs.safe_outputs.outputs.work_queue_outcome).toBe("${{ steps.work_queue_finish.outputs.work_queue_outcome }}");
         expect(steps[finish].env.GH_AW_CONTINUATION_ROUTE).toBe("workqueue");
-        expect(steps[finish].env.GH_AW_CONTINUATION_MAX_DEPTH).toBe("1");
+        expect(steps[finish].env.GH_AW_CONTINUATION_MAX_DEPTH).toBe("2");
+        expect(compiled.jobs.agent.steps.some(step => step.uses?.startsWith("actions/upload-artifact@") && step.with?.name === "smoke-work-queue-claim")).toBe(true);
+        expect(compiled.jobs[id].steps.some(step => step.uses?.startsWith("actions/download-artifact@") && step.with?.name === "smoke-work-queue-claim")).toBe(true);
         expect(compiled.jobs.agent.outputs.continuation_evidence).toBe("${{ steps.bind_continuation_evidence.outputs.continuation_evidence }}");
         const termination = compiled.jobs.conclusion.steps.find(step => step.id === "worker_termination");
         expect(compiledPolicy(termination.env).version).toBe(4);
@@ -379,8 +481,9 @@ describe("smoke work queue monitor collector", () => {
     return {
       git,
       withoutLastLine: () => helpers.ledgerText(log.slice(0, -1)),
+      // smoke-1 carries the dispatcher's fail-once mode, as staged in production.
       submit(runId) {
-        const works = [1, 2, 3].map(index => helpers.work(`smoke-${index}`, { graph_id: `${POOL}:${runId}`, pool: POOL, worker_profile: PROFILE }));
+        const works = [1, 2, 3].map(index => helpers.work(`smoke-${index}`, { graph_id: `${POOL}:${runId}`, pool: POOL, worker_profile: PROFILE, ...(index === 1 ? { payload: { task: "smoke-1", smoke_mode: "fail-once" } } : {}) }));
         append(current => helpers.submit(current, works, dispatcherActor(runId)));
         return works.map(node => node.work_id);
       },
@@ -396,7 +499,12 @@ describe("smoke work queue monitor collector", () => {
         return claims;
       },
       bind: (dispatchId, runId, attempt = 1) => append(current => helpers.bind(current, dispatchId, helpers.workerActor(runId, attempt, SMOKE_WORKER))),
-      finish: (dispatchId, runId, attempt = 1) => append(current => helpers.finish(current, dispatchId, helpers.workerActor(runId, attempt, SMOKE_WORKER))),
+      finish: (dispatchId, runId, attempt = 1, outcome = "completed") =>
+        append(current => {
+          const state = replayTransactions(current);
+          const outcomes = Object.fromEntries(state.dispatches.get(dispatchId).claims.map(id => [state.claims.get(id).handle, outcome]));
+          return helpers.finish(current, dispatchId, helpers.workerActor(runId, attempt, SMOKE_WORKER), outcomes);
+        }),
       release: (dispatchId, reason) => append(current => helpers.release(current, dispatchId, reason)),
       // Returns the folded tip: the Git commit the checkpoint's segment walks back to.
       checkpoint: () => {
@@ -499,6 +607,36 @@ describe("smoke work queue monitor collector", () => {
     expect(earlier.queue.claims.map(claim => claim.claim_id_prefix).sort()).toEqual(prefixes(a));
     expect(earlier.queue.claims.map(claim => [claim.state, claim.cancellation_reason, claim.dispatch_state])).toEqual(Array(3).fill(["cancelled", "worker_terminated", "closed"]));
     expect(aWork.map(id => projection.works.get(id).state)).toEqual(["completed", "completed", "completed"]);
+  });
+
+  it("accepts the fail-once smoke Work's first worker_failed Claim and nothing else", async () => {
+    const ledger = smokeLedger();
+    const [failOnce] = ledger.submit("1004");
+    const a = ledger.grant(dispatcherActor("1004"), 3, "800");
+    const attempts = new Map();
+    a.forEach((claim, index) => {
+      ledger.bind(claim.dispatch_id, `800${index + 1}`);
+      ledger.finish(claim.dispatch_id, `800${index + 1}`, 1, claim.work_id === failOnce ? "failed" : "completed");
+      attempts.set(`800${index + 1}/1`, attemptRow(8000 + index + 1, 1));
+    });
+    const first = (await monitor({ ledger, runs: [runRow(1004)], attempts })).report;
+    expect(first.healthy).toBe(true);
+    expect(first.errors).toEqual([]);
+    expect(first.queue.claims.filter(claim => claim.planned_failure)).toEqual([expect.objectContaining({ work_id_prefix: failOnce.slice(0, 12), state: "cancelled", cancellation_reason: "worker_failed", dispatch_state: "closed" })]);
+    // Next cycle, FIFO: the retry first, then the new smoke-1 and smoke-2. A second failure of the
+    // same Work and a plain Work's failure are both unplanned.
+    const [bFailOnce, bPlain] = ledger.submit("1005");
+    const b = ledger.grant(dispatcherActor("1005"), 3, "900");
+    expect(b.map(claim => claim.work_id)).toEqual([failOnce, bFailOnce, bPlain]);
+    b.forEach((claim, index) => {
+      ledger.bind(claim.dispatch_id, `900${index + 1}`);
+      ledger.finish(claim.dispatch_id, `900${index + 1}`, 1, "failed");
+      attempts.set(`900${index + 1}/1`, attemptRow(9000 + index + 1, 1));
+    });
+    const second = (await monitor({ ledger, runs: [runRow(1005)], attempts })).report;
+    expect(second.healthy).toBe(false);
+    expect(second.errors).toEqual([]);
+    expect(second.queue.claims.map(claim => claim.planned_failure)).toEqual([false, true, false]);
   });
 
   it("ignores other actors' grants and requires the bound attempt itself to succeed", async () => {

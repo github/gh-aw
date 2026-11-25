@@ -54,6 +54,15 @@ function isCheckpoint(commit) {
 
 const runKey = (runId, attempt) => `${runId}/${attempt}`;
 
+// The fail-once smoke Work fails its first attempt by design; only that one worker_failed Claim is healthy.
+function plannedFailure(claim, works, claims) {
+  if (claim.state !== "cancelled" || claim.cancellation_reason !== "worker_failed") return false;
+  if (works.get(claim.work_id)?.payload?.smoke_mode !== "fail-once") return false;
+  let failures = 0;
+  for (const other of claims.values()) if (other.work_id === claim.work_id && other.state === "cancelled" && other.cancellation_reason === "worker_failed") failures++;
+  return failures === 1;
+}
+
 /**
  * @param {{github: any, context: any, core: any, loadSnapshot: () => {sha: string | null, projection: any}, readStateAtSHA: (sha: string) => Promise<any>}} options
  */
@@ -141,11 +150,11 @@ async function collectSmokeCycle({ github, context, core, loadSnapshot, readStat
   // holding a granted Claim has its latest state; the grant's own segment always holds it.
   const recordsOf = (claimId, through) => {
     for (let index = 0; index <= through; index++) {
-      const { claims, dispatches } = segments[index].projection;
+      const { claims, dispatches, works } = segments[index].projection;
       const claim = claims.get(claimId);
-      if (claim) return { claim, dispatch: dispatches.get(claim.dispatch_id), pruned: index > 0 };
+      if (claim) return { claim, dispatch: dispatches.get(claim.dispatch_id), pruned: index > 0, planned: plannedFailure(claim, works, claims) };
     }
-    return { claim: undefined, dispatch: undefined, pruned: false };
+    return { claim: undefined, dispatch: undefined, pruned: false, planned: false };
   };
 
   const attempts = new Map();
@@ -182,13 +191,14 @@ async function collectSmokeCycle({ github, context, core, loadSnapshot, readStat
     const seen = new Set();
     const workers = new Map();
     for (const { grant, operation } of granted) {
-      const { claim, dispatch, pruned } = recordsOf(operation.claim_id, grant.segment);
+      const { claim, dispatch, pruned, planned } = recordsOf(operation.claim_id, grant.segment);
       result.claims.push({
         claim_id_prefix: operation.claim_id.slice(0, 12),
         work_id_prefix: operation.work_id.slice(0, 12),
         state: claim?.state ?? null,
         dispatch_state: dispatch?.state ?? null,
         cancellation_reason: claim?.cancellation_reason ?? null,
+        planned_failure: planned,
         run_id: dispatch?.run?.run_id ?? null,
         run_attempt: dispatch?.run?.run_attempt ?? null,
       });
@@ -258,7 +268,7 @@ async function collectSmokeCycle({ github, context, core, loadSnapshot, readStat
       runIds.size === EXPECTED_CLAIMS &&
       evidence.claims.every(claim => {
         const worker = claim.run_id ? workerOf.get(runKey(claim.run_id, claim.run_attempt)) : undefined;
-        return claim.state === "completed" && worker?.status === "completed" && worker.conclusion === "success";
+        return (claim.state === "completed" || claim.planned_failure) && worker?.status === "completed" && worker.conclusion === "success";
       });
   }
   return report;
