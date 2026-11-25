@@ -1,4 +1,5 @@
 // @ts-check
+// @safe-outputs-exempt SEC-005: "target_repo" is only a scalar aw_info.json field copied into read-only threat-detection context; it is never used to select a repository, make API calls, or perform cross-repo writes.
 const fs = require("node:fs");
 const path = require("node:path");
 const bundleReader = require("./threat_bundle_diff.cjs");
