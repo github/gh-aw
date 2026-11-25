@@ -23,6 +23,45 @@ func TestAuditCommandDescriptionsAreConsistent(t *testing.T) {
 	assert.Contains(t, cmd.Long, "remaining runs are compared against it", "audit help should document multi-run analysis mode")
 }
 
+func TestCLIHelpClarifiesToolsAndFilters(t *testing.T) {
+	t.Parallel()
+
+	assert.Contains(t, NewMCPServerCommand().Long, "  - audit-diff  - Compare workflow runs")
+	assert.Contains(t, NewCompletionCommand().Long, "Engine name completion for --engine flag ("+engineFlagHelpList+")")
+	assert.Contains(t, NewLogsCommand().Flags().Lookup("dry-run").Usage, "does not preview this command")
+	assert.Contains(t, NewDeployCommand(validateEngineStub).Long, "hidden --pr alias")
+	assert.Contains(t, NewEditCommand().Long, "typed bindings")
+
+	for _, cmd := range []*cobra.Command{NewLogsCommand(), NewForecastCommand(), NewTrialCommand(validateEngineStub)} {
+		assert.Contains(t, cmd.UsageString(), "--timeout minutes|duration")
+	}
+}
+
+func TestCLIValueAndExperimentsDocsOptions(t *testing.T) {
+	t.Parallel()
+	_, currentFile, _, ok := runtime.Caller(0)
+	require.True(t, ok)
+	content, err := os.ReadFile(filepath.Join(filepath.Dir(currentFile), "..", "..", "docs", "src", "content", "docs", "setup", "cli.md"))
+	require.NoError(t, err)
+	text := string(content)
+	for _, section := range []struct {
+		start string
+		end   string
+		flags []string
+	}{
+		{"#### `value`", "#### `graders`", []string{"--start", "--end", "--daily", "--ref", "--timeout", "--recipe", "--evidence", "--value-function", "--logs-dir", "--repo/-r", "--json/-j"}},
+		{"#### `experiments`", "#### `routing`", []string{"--adoption", "--repo/-r", "--json/-j"}},
+	} {
+		start := strings.Index(text, section.start)
+		require.NotEqual(t, -1, start)
+		end := strings.Index(text[start:], section.end)
+		require.NotEqual(t, -1, end)
+		for _, flag := range section.flags {
+			assert.Contains(t, text[start:start+end], "`"+flag+"`", section.start)
+		}
+	}
+}
+
 func TestCLICommandPathUsesExtensionPrefixWhenAttached(t *testing.T) {
 	root := &cobra.Command{Use: "gh aw"}
 	cmd := &cobra.Command{Use: "work-queue"}

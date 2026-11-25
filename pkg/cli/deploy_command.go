@@ -30,7 +30,7 @@ func NewDeployCommand(validateEngine func(string) error) *cobra.Command {
 		Short: "Deploy agentic workflows to a target repository using a pull request",
 		Long: `Deploy one or more workflows to a target repository by cloning the target repository, updating existing workflows, adding specified workflows, compiling lock files, and opening a pull request.
 
-The command clones the target repository, updates existing workflows from source, adds the specified workflows, recompiles lock files with purge enabled, and opens a pull request. This command always creates a pull request. The --create-pull-request and --pr flags are compatibility aliases and do not change this behavior; one is required with --auto-merge to explicitly enable auto-merge on the created pull request.`,
+The command clones the target repository, updates existing workflows from source, adds the specified workflows, recompiles lock files with purge enabled, and opens a pull request. This command always creates a pull request. The --create-pull-request flag and its hidden --pr alias do not change this behavior; one is required with --auto-merge to explicitly enable auto-merge on the created pull request.`,
 		Example: `  ` + string(constants.CLIExtensionPrefix) + ` deploy githubnext/agentics/ci-doctor --repo owner/repo
   ` + string(constants.CLIExtensionPrefix) + ` deploy githubnext/agentics/repo-assist githubnext/agentics/ci-doctor --repo owner/repo --force
   ` + string(constants.CLIExtensionPrefix) + ` deploy ./my-workflow.md --repo owner/repo
