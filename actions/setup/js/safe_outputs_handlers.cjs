@@ -2991,12 +2991,19 @@ function createHandlers(server, appendSafeOutput, config = {}) {
       const alreadyStaged = canonicalFilePath === canonicalStagingDir || canonicalFilePath.startsWith(canonicalStagingDir + path.sep);
       const destName = path.basename(filePath);
       const destPath = path.join(stagingDir, destName);
-      if (!alreadyStaged && !fs.existsSync(destPath)) {
+      if (!alreadyStaged) {
+        let copyResult;
         try {
-          fs.copyFileSync(filePath, destPath);
-          fs.chmodSync(destPath, 0o600);
+          copyResult = copyFileExclusive(filePath, destPath);
+          if (copyResult === "copied") fs.chmodSync(destPath, 0o600);
         } catch (err) {
           throw new Error(`${ERR_SYSTEM}: Failed to copy file ${filePath} to ${destPath}: ${getErrorMessage(err)}`, { cause: err });
+        }
+        if (copyResult === "conflict") {
+          throw {
+            code: -32602,
+            message: `${ERR_VALIDATION}: upload_code_coverage: staging name conflict for ${destName}; rename the file or use a distinct path`,
+          };
         }
       }
 

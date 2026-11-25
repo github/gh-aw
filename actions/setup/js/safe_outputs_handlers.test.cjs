@@ -1560,7 +1560,7 @@ describe("safe_outputs_handlers", () => {
       expect(() => handlers.uploadCodeCoverageHandler({ file: srcDir, language: "Go", label: "l" })).toThrow(expect.objectContaining({ message: expect.stringContaining("must be a regular file") }));
     });
 
-    it("should not overwrite existing staged file on duplicate call", () => {
+    it("should reject a changed file without overwriting the staged file", () => {
       const coverageDir = path.join(testWorkspaceDir, "coverage");
       fs.mkdirSync(coverageDir, { recursive: true });
       const srcFile = path.join(coverageDir, "cobertura.xml");
@@ -1572,8 +1572,34 @@ describe("safe_outputs_handlers", () => {
       expect(fs.readFileSync(stagedPath, "utf8")).toBe("original");
 
       fs.writeFileSync(srcFile, "updated");
-      handlers.uploadCodeCoverageHandler({ file: srcFile, language: "Go", label: "l" });
+      expect(() => handlers.uploadCodeCoverageHandler({ file: srcFile, language: "Go", label: "l" })).toThrow(expect.objectContaining({ code: -32602, message: expect.stringContaining("staging name conflict for cobertura.xml") }));
       expect(fs.readFileSync(stagedPath, "utf8")).toBe("original");
+      expect(mockAppendSafeOutput).toHaveBeenCalledTimes(1);
+    });
+
+    it("should reject different files with the same basename and accept identical retries", () => {
+      const firstDir = path.join(testWorkspaceDir, "coverage", "a");
+      const secondDir = path.join(testWorkspaceDir, "coverage", "b");
+      fs.mkdirSync(firstDir, { recursive: true });
+      fs.mkdirSync(secondDir, { recursive: true });
+      const firstFile = path.join(firstDir, "lcov.info");
+      const secondFile = path.join(secondDir, "lcov.info");
+      fs.writeFileSync(firstFile, "first");
+      fs.writeFileSync(secondFile, "second");
+
+      handlers.uploadCodeCoverageHandler({ file: "coverage/a/lcov.info", language: "Go", label: "l" });
+      expect(() => handlers.uploadCodeCoverageHandler({ file: "coverage/b/lcov.info", language: "Go", label: "l" })).toThrow(
+        expect.objectContaining({ code: -32602, message: expect.stringContaining("staging name conflict for lcov.info") })
+      );
+      const stagedPath = path.join(testStagingDir, "gh-aw", "safeoutputs", "upload-code-coverage", "lcov.info");
+      expect(fs.readFileSync(stagedPath, "utf8")).toBe("first");
+      expect(mockAppendSafeOutput).toHaveBeenCalledTimes(1);
+
+      fs.writeFileSync(secondFile, "first");
+      const result = handlers.uploadCodeCoverageHandler({ file: "coverage/b/lcov.info", language: "Go", label: "l" });
+      expect(JSON.parse(result.content[0].text).result).toBe("success");
+      expect(mockAppendSafeOutput).toHaveBeenCalledTimes(2);
+      expect(mockAppendSafeOutput).toHaveBeenLastCalledWith(expect.objectContaining({ file: "lcov.info" }));
     });
 
     it("should accept relative path already staged in upload-code-coverage staging directory", () => {
