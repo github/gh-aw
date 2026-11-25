@@ -11,7 +11,7 @@ metadata:
 
 <!-- agent-of-the-day-workflow: archivx-agentic-workflows-analyzer -->
 
-Every weekday, one agentic workflow takes the spotlight. Today's is a workflow that draws maps of the rest of the fleet. Archivx reads a week of runs, sketches how the workflows fit together, and proposes the picture as a pull request. Its latest scheduled run took 28.7 minutes and 86 turns. The diagram merged the same day, and the audit behind that run has plenty to say about how the work got done.
+The Agent of the Day series spotlights one agentic workflow every weekday. Today's featured workflow, Archivx, runs weekly on Mondays and draws maps of the rest of the fleet. It reads a week of runs, sketches how the workflows fit together, and proposes the picture as a pull request. Its latest scheduled run took 28.7 minutes and 86 turns. The diagram merged the same day, and the audit behind that run has plenty to say about how the work got done.
 
 ## Meet the blogger
 
