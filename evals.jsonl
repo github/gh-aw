@@ -1744,3 +1744,5 @@
 {"id":"pr_created_or_noop","question":"Did the agent create a pull request for a safe test change, or use noop when no safe change was available?","answer":"YES","model":"gpt-6-luna","timestamp":"2026-11-25T08:47:22.326Z","runid":"45576843041"}
 {"id":"tests_analyzed","question":"Did the agent analyze Go tests to identify a safe candidate for t.Parallel?","answer":"YES","model":"gpt-6-luna","timestamp":"2026-11-25T16:38:09.250Z","runid":"45654515061"}
 {"id":"pr_created_or_noop","question":"Did the agent create a pull request for a safe test change, or use noop when no safe change was available?","answer":"YES","model":"gpt-6-luna","timestamp":"2026-11-25T16:38:09.250Z","runid":"45654515061"}
+{"id":"tests_analyzed","question":"Did the agent analyze Go tests to identify a safe candidate for t.Parallel?","answer":"YES","model":"gpt-6-luna","timestamp":"2026-11-25T18:49:39.782Z","runid":"45675592821"}
+{"id":"pr_created_or_noop","question":"Did the agent create a pull request for a safe test change, or use noop when no safe change was available?","answer":"YES","model":"gpt-6-luna","timestamp":"2026-11-25T18:49:39.782Z","runid":"45675592821"}
