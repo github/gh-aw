@@ -44,7 +44,8 @@ const MAX_SEARCH_CALLS = 16;
 const MAX_LIST_CALLS = 24;
 const MAX_DIRECT_UNRESOLVED_LOOKUPS = 10;
 const MAX_BOUNDARY_CHECKS = 4;
-// Match contract 2's recent-gap window (5 minutes): gaps older than this in an atomic unfiltered page covering both sides are deleted runs.
+// Gaps whose higher listed neighbour is within 5 minutes of the scan can still reflect GitHub
+// Actions run-list lag; older gaps bracketed by an atomic unfiltered page are treated as deleted.
 const RECENT_GAP_MS = 5 * 60 * 1000;
 const LEVELS = new Set(["economy", "balanced", "robust"]);
 const MODES = new Set(["observe"]);
@@ -549,7 +550,7 @@ function indexRuns(items, reachedStart) {
 
 /**
  * Inspect whether `indexed` brackets an absent `[startNum, endNum]` range with a higher listed
- * neighbour strictly older than `RECENT_GAP_MS` (contract 2), returning the neighbours' creation
+ * neighbour strictly older than `RECENT_GAP_MS` (5 minutes), returning the neighbours' creation
  * seconds when confirmed or `null` otherwise.
  * @param {ReturnType<typeof indexRuns>} indexed
  * @param {number} startNum
@@ -831,8 +832,9 @@ async function listRuns({ githubClient, owner, repo, workflowFile, workflowPath 
     if (checkedBoundaries.has(boundaryKey)) return;
     checkedBoundaries.add(boundaryKey);
     boundaryChecks += 1;
+    let response;
     try {
-      const response = await githubClient.rest.actions.listWorkflowRuns({
+      response = await githubClient.rest.actions.listWorkflowRuns({
         owner,
         repo,
         workflow_id: workflowFile,
@@ -840,24 +842,26 @@ async function listRuns({ githubClient, owner, repo, workflowFile, workflowPath 
         per_page: perPage,
         page,
       });
-      const batch = response?.data?.workflow_runs;
-      const totalCount = response?.data?.total_count;
-      if (!Array.isArray(batch) || !Number.isSafeInteger(totalCount) || totalCount < 0) return;
-      const remaining = totalCount - (page - 1) * perPage;
-      if (remaining <= 0 || batch.length !== Math.min(perPage, remaining)) return;
-      const summary = pageSummary(batch, batch.length === remaining);
-      atomicPages.push({
-        ...indexRuns(batch, summary.last),
-        page,
-        created,
-        timed: summary.timed,
-        oldest: summary.oldest,
-        newest: summary.newest,
-      });
-      ingestRuns(batch);
-    } catch {
+    } catch (error) {
       // Leave unconfirmed boundary gaps unresolved on transient API errors.
+      core.warning(`Could not verify boundary gap ${startNum}-${endNum}: ${getErrorMessage(error)}`);
+      return;
     }
+    const batch = response?.data?.workflow_runs;
+    const totalCount = response?.data?.total_count;
+    if (!Array.isArray(batch) || !Number.isSafeInteger(totalCount) || totalCount < 0) return;
+    const remaining = totalCount - (page - 1) * perPage;
+    if (remaining <= 0 || batch.length !== Math.min(perPage, remaining)) return;
+    const summary = pageSummary(batch, batch.length === remaining);
+    atomicPages.push({
+      ...indexRuns(batch, summary.last),
+      page,
+      created,
+      timed: summary.timed,
+      oldest: summary.oldest,
+      newest: summary.newest,
+    });
+    ingestRuns(batch);
   };
 
   /** @type {(ReturnType<typeof indexRuns> & { reachedFloor: boolean, reachedTop: boolean, maxVerified: number, bottomTimed: boolean, settledFloor: number }) | null} */
