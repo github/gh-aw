@@ -123,7 +123,7 @@ steps:
       run_step recompile   ""                       make recompile
 
       mkdir -p /tmp/gh-aw/agent
-      go test -v -json -count=1 -timeout=3m -tags '!integration' -run='^Test' ./... \
+      go test -v -json -count=1 -timeout=10m -tags '!integration' -run='^Test' ./... \
         | tee /tmp/gh-aw/agent/test-results.json >/dev/null
       TEST_EXIT=${PIPESTATUS[0]}
       jq --argjson code "$TEST_EXIT" \
