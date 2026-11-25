@@ -94,6 +94,12 @@ func (c *Compiler) connectorAzureBrokerSteps(data *WorkflowData, phase string, t
 
 func (c *Compiler) validateConnectorAzureBoundary(data *WorkflowData) error {
 	readers, writers := map[string]struct{}{}, map[string]struct{}{}
+	if data.EngineConfig != nil && data.EngineConfig.Auth != nil {
+		auth := data.EngineConfig.Auth
+		if auth.Type == "github-oidc" && auth.Provider == "azure" {
+			readers[azureClientKey(auth.AzureClientID)] = struct{}{}
+		}
+	}
 	for _, config := range data.Connectors {
 		if config.Inference != nil && config.Inference.Auth != nil {
 			readers[azureClientKey(config.Inference.Auth.AzureClientID)] = struct{}{}
@@ -114,6 +120,9 @@ func (c *Compiler) validateConnectorAzureBoundary(data *WorkflowData) error {
 		if config.SafeOutputs != nil {
 			for _, secret := range config.SafeOutputs.Secrets() {
 				if azure := config.azureRoute(secret); azure != nil {
+					if _, _, live := connectorCredentialMintCondition(c, data, config, secret, "safe-output"); !live {
+						continue
+					}
 					writers[azureClientKey(azure.ClientID)] = struct{}{}
 				}
 			}
@@ -131,15 +140,39 @@ func azureClientKey(id string) string {
 	return strings.ToLower(strings.Join(strings.Fields(id), ""))
 }
 
+func (c *Compiler) validateConnectorAzureBrokerRunners(data *WorkflowData) error {
+	for _, phase := range []struct{ name, job string }{
+		{"agent", string(constants.AgentJobName)},
+		{"safe-output", string(constants.SafeOutputsJobName)},
+	} {
+		if len(c.connectorAzureBrokerSteps(data, phase.name, false)) == 0 {
+			continue
+		}
+		job, ok := c.jobManager.GetJob(phase.job)
+		if ok && strings.TrimSpace(strings.TrimPrefix(job.RunsOn, "runs-on:")) == "windows-latest" {
+			return fmt.Errorf("connector Azure OIDC %s requires a non-Windows runner; Windows WSL broker lifecycle is not supported", phase.name)
+		}
+	}
+	return nil
+}
+
 func validateConnectorAzureReaderHost(data *WorkflowData) error {
 	errHost := errors.New("connector Azure OIDC readers require a built-in sandboxed engine, standard AWF docker runtime and trusted MCP gateway (no custom host access)")
 	engine := data.EngineConfig
 	if !slices.Contains([]string{"copilot", "claude", "codex", "gemini", "pi"}, data.AI) ||
-		(engine != nil && (engine.IsInlineDefinition || engine.Command != "")) || !isFirewallEnabled(data) {
+		(engine != nil && (engine.IsInlineDefinition || engine.Command != "")) || !isFirewallEnabled(data) ||
+		data.Container != "" || data.Services != "" {
 		return errHost
 	}
-	if data.PreSteps != "" || data.PreAgentSteps != "" || data.PostSteps != "" || data.CustomSteps != "" {
+	agentJob, _ := data.Jobs["agent"].(map[string]any)
+	_, setupSteps := agentJob["setup-steps"]
+	_, preSteps := agentJob["pre-steps"]
+	if data.PreSteps != "" || data.PreAgentSteps != "" || data.PostSteps != "" || data.CustomSteps != "" ||
+		setupSteps || preSteps || (data.SecretMasking != nil && len(data.SecretMasking.Steps) != 0) {
 		return errors.New("connector Azure OIDC readers cannot grant job credentials to authored runner steps")
+	}
+	if data.MCPScripts != nil && len(data.MCPScripts.Tools) != 0 {
+		return errors.New("connector Azure OIDC readers cannot share a job with mcp-scripts")
 	}
 	firewall := getFirewallConfig(data)
 	if !awfSupportsExcludeEnv(firewall) {

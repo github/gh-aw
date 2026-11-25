@@ -3,6 +3,7 @@
 package workflow
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -352,6 +353,85 @@ func TestConnectorInferenceOIDCPermissionScope(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestConnectorInferenceOIDCAuthProvenance(t *testing.T) {
+	compiler, path := prepareConnectorScenario(t, azureAIGatewayScenario, false, func(f, _ map[string]any) {
+		delete(f["permissions"].(map[string]any), "id-token")
+	})
+	data, err := compiler.ParseWorkflowFile(path)
+	require.NoError(t, err)
+	require.True(t, usesConnectorInferenceOIDC(data))
+	require.NoError(t, validateOIDCPermissions(data, nil))
+
+	agentPermission := func(t *testing.T, data *WorkflowData) string {
+		t.Helper()
+		c := NewCompiler()
+		job := &Job{Name: "agent"}
+		require.NoError(t, c.jobManager.AddJob(job))
+		c.ensureConnectorOIDCJobPermissions(data)
+		return job.Permissions
+	}
+	require.Contains(t, agentPermission(t, data), "id-token: write")
+	auth := *data.EngineConfig.Auth
+	t.Run("equivalent authored auth is not connector auth", func(t *testing.T) {
+		copyData := *data
+		engine := *data.EngineConfig
+		copyData.EngineConfig = &engine
+		engine.Auth = &auth
+		require.False(t, usesConnectorInferenceOIDC(&copyData))
+		require.ErrorContains(t, validateOIDCPermissions(&copyData, nil), "requires permissions.id-token: write")
+		require.NotContains(t, agentPermission(t, &copyData), "id-token: write")
+	})
+	t.Run("unrelated connector cannot supply provenance", func(t *testing.T) {
+		copyData := *data
+		other := *data.Connectors[azureAIGatewayScenario.provider].Inference
+		other.Selection.Connector = "other"
+		copyData.Connectors = map[string]*WorkflowConnector{"other": {Inference: &other}}
+		require.False(t, usesConnectorInferenceOIDC(&copyData))
+		require.ErrorContains(t, validateOIDCPermissions(&copyData, nil), "requires permissions.id-token: write")
+	})
+	t.Run("matching auth without expansion cannot establish provenance", func(t *testing.T) {
+		inference := *data.Connectors[azureAIGatewayScenario.provider].Inference
+		inference.authExpanded = false
+		engine := *data.EngineConfig
+		engine.Auth = &auth
+		copyData := *data
+		copyData.EngineConfig = &engine
+		copyData.Connectors = map[string]*WorkflowConnector{inference.Selection.Connector: {Inference: &inference}}
+		require.NoError(t, validateResolvedConnectorInference(&copyData, copyData.Connectors, nil))
+		require.False(t, usesConnectorInferenceOIDC(&copyData))
+		require.ErrorContains(t, validateOIDCPermissions(&copyData, nil), "requires permissions.id-token: write")
+	})
+
+	encoded, err := json.Marshal(auth)
+	require.NoError(t, err)
+	var authored map[string]any
+	require.NoError(t, json.Unmarshal(encoded, &authored))
+	for key, value := range authored {
+		if value == "" {
+			delete(authored, key)
+		}
+	}
+	t.Run("matching authored override is rejected", func(t *testing.T) {
+		compiler, path := prepareConnectorScenario(t, azureAIGatewayScenario, false, func(f, _ map[string]any) {
+			f["engine"].(map[string]any)["auth"] = authored
+		})
+		_, err := compiler.ParseWorkflowFile(path)
+		require.ErrorContains(t, err, "engine.auth conflicts")
+	})
+	t.Run("matching imported override is rejected", func(t *testing.T) {
+		compiler, path := prepareConnectorScenario(t, azureAIGatewayScenario, false, func(f, _ map[string]any) {
+			f["imports"] = append(f["imports"].([]any), map[string]any{"uses": "shared/override.md"})
+		})
+		source, err := yaml.Marshal(map[string]any{"engine": map[string]any{"id": "copilot", "auth": authored}})
+		require.NoError(t, err)
+		file := filepath.Join(filepath.Dir(path), "shared", "override.md")
+		require.NoError(t, os.MkdirAll(filepath.Dir(file), 0700))
+		require.NoError(t, os.WriteFile(file, append(append([]byte("---\n"), source...), []byte("---\n")...), 0600))
+		_, err = compiler.ParseWorkflowFile(path)
+		require.ErrorContains(t, err, "multiple engine fields")
+	})
 }
 
 func TestConnectorInferenceOIDCSafetyGates(t *testing.T) {

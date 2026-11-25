@@ -418,9 +418,14 @@ For `phase: agent` and `phase: safe-output`, the trusted host exchanges and
 renews tokens outside the agent. Only a job using federation needs
 `id-token: write`; importing alone does not grant it. Staging a connector
 write performs no writer exchange, but does not suppress selected reads.
+Staging does not reduce the permissions of a selected reader application;
+grant its identity only the access appropriate for reads, even in previews.
 There is no stored-token fallback on exchange or authorization failure.
 Federated readers require a built-in sandboxed engine, the standard AWF Docker
-runtime with OIDC environment exclusion, and a trusted MCP gateway. Do not
+runtime with OIDC environment exclusion, and a trusted MCP gateway. They cannot
+share the agent job with job containers or services, authored runner steps,
+secret-masking steps, or MCP scripts. Connector reader and live writer brokers
+do not support `windows-latest` runners. Do not
 add the Entra authority to the agent's network allowlist for a connector
 read. `gh aw connector <id> setup` describes provisioning offline;
 `connector test` does not perform a local Entra exchange.
@@ -430,7 +435,10 @@ If a federated writer can run live, set `safe-outputs.environment` to a
 Conditional staging still requires it; a statically staged-only writer does
 not. The compiler keeps `conclusion` and `pre_activation` outside the writer
 environment and rejects a global `--environment` override, another job with
-the same name (case-insensitive), or a dynamic job environment name.
+the same name (case-insensitive), a dynamic job environment name, or a reusable
+workflow call whose nested environments cannot be verified. Safe-output features
+that inherit the writer environment, including asset and code-scanning uploads
+and custom safe jobs, must run in a separate workflow.
 
 Protect that GitHub environment, use a separate writer application, and trust only
 `repo:OWNER/REPO:environment:connector-publish` on the writer application.

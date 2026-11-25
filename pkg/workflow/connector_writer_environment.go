@@ -34,6 +34,9 @@ func (c *Compiler) reserveConnectorWriterEnvironment(data *WorkflowData) error {
 		return errors.New("live Azure connector writes require a dedicated literal safe-outputs.environment; do not use --environment")
 	}
 	for id, job := range c.jobManager.GetAllJobs() {
+		if job.Uses != "" {
+			return fmt.Errorf("job %s calls a reusable workflow whose nested environments cannot be verified; move the reusable workflow or the live Azure connector writer to a separate workflow", id)
+		}
 		switch id {
 		case string(constants.SafeOutputsJobName):
 			if !strings.EqualFold(jobEnvironmentName(job.Environment), name) {
@@ -47,7 +50,7 @@ func (c *Compiler) reserveConnectorWriterEnvironment(data *WorkflowData) error {
 		}
 		if env := jobEnvironmentName(job.Environment); strings.TrimSpace(job.Environment) != "" &&
 			(env == "" || ValidateEnvironmentOverride(env) != nil || strings.EqualFold(env, name)) {
-			return fmt.Errorf("job %s must not share or dynamically select the Azure connector writer's safe-outputs.environment", id)
+			return fmt.Errorf("job %s must not share or dynamically select the Azure connector writer's safe-outputs.environment; if this job inherits that environment, the combination is unsupported: move the job or its safe-output feature to a separate workflow", id)
 		}
 	}
 	return nil

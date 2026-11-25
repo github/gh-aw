@@ -22,9 +22,10 @@ type ConnectorInferenceSelection struct {
 
 // ResolvedConnectorInference is compiler-only. It is never a connector tool plan.
 type ResolvedConnectorInference struct {
-	Selection ConnectorInferenceSelection
-	Env       map[string]string
-	Auth      *EngineAuthConfig
+	Selection    ConnectorInferenceSelection
+	Env          map[string]string
+	Auth         *EngineAuthConfig
+	authExpanded bool
 	// AllowedDomains are the firewall hosts the selected profile requires.
 	AllowedDomains []string
 	// ModelCatalogDisabled mirrors the profile's `model-catalog: false`.
@@ -151,6 +152,7 @@ func validateConnectorInferenceProfiles(registration ConnectorRegistration) erro
 }
 
 func expandConnectorInference(frontmatter map[string]any, inference *ResolvedConnectorInference) error {
+	inference.authExpanded = false
 	engine, ok := frontmatter["engine"].(map[string]any)
 	if !ok || (engine["id"] != nil && engine["id"] != "copilot") {
 		return errors.New("engine.inference currently supports only the copilot engine")
@@ -198,6 +200,7 @@ func expandConnectorInference(frontmatter map[string]any, inference *ResolvedCon
 			}
 		}
 		engine["auth"] = auth
+		inference.authExpanded = true
 	}
 	engine["id"] = "copilot"
 	delete(engine, "inference")
@@ -221,22 +224,24 @@ func usesConnectorInference(data *WorkflowData) bool {
 	return false
 }
 
-// Only a selected profile whose Azure auth survived import merging can generate
-// an id-token grant. Importing the declaration alone does not grant authority.
+type connectorInferenceAuthProvenance struct {
+	inference *ResolvedConnectorInference
+	auth      *EngineAuthConfig
+}
+
+// Only the effective auth installed by the selected profile can generate a grant.
 func usesConnectorInferenceOIDC(data *WorkflowData) bool {
-	if data == nil || data.EngineConfig == nil || data.EngineConfig.Auth == nil {
+	if data == nil || data.EngineConfig == nil || data.connectorInferenceAuth == nil {
 		return false
 	}
 	auth := data.EngineConfig.Auth
-	if auth.Type != "github-oidc" || auth.Provider != "azure" {
+	provenance := data.connectorInferenceAuth
+	if auth == nil || auth != provenance.auth || auth.Type != "github-oidc" || auth.Provider != "azure" {
 		return false
 	}
-	for _, connector := range data.Connectors {
-		if connector != nil && connector.Inference != nil && connector.Inference.Auth != nil && *connector.Inference.Auth == *auth {
-			return true
-		}
-	}
-	return false
+	inference := provenance.inference
+	connector := data.Connectors[inference.Selection.Connector]
+	return connector != nil && connector.Inference == inference && inference.Auth != nil && *inference.Auth == *auth
 }
 
 func (c *Compiler) validateConnectorInferenceConsumers(data *WorkflowData) error {
@@ -272,7 +277,9 @@ func (c *Compiler) validateConnectorInferenceConsumers(data *WorkflowData) error
 }
 
 func validateResolvedConnectorInference(data *WorkflowData, configs map[string]*WorkflowConnector, importedEnvSources map[string]string) error {
-	for _, config := range configs {
+	data.connectorInferenceAuth = nil
+	var selected *ResolvedConnectorInference
+	for alias, config := range configs {
 		inference := config.Inference
 		if inference == nil {
 			continue
@@ -308,6 +315,12 @@ func validateResolvedConnectorInference(data *WorkflowData, configs map[string]*
 		if (engine.Auth == nil) != (inference.Auth == nil) || (engine.Auth != nil && *engine.Auth != *inference.Auth) {
 			return errors.New("imported engine.auth conflicts with connector-owned inference")
 		}
+		if inference.Auth != nil && inference.authExpanded && inference.Selection.Connector == alias {
+			selected = inference
+		}
+	}
+	if selected != nil {
+		data.connectorInferenceAuth = &connectorInferenceAuthProvenance{inference: selected, auth: data.EngineConfig.Auth}
 	}
 	return nil
 }

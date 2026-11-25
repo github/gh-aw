@@ -4,7 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { randomBytes } from "node:crypto";
 import { tokenSource, start } from "./connector_azure_oidc.cjs";
-import { stopBroker, readToken } from "./connector_credential_broker.cjs";
+import { startBroker, stopBroker, readToken } from "./connector_credential_broker.cjs";
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 
@@ -92,6 +92,42 @@ describe("trusted connector Entra exchange", () => {
       const fetchImpl = vi.fn().mockResolvedValueOnce(response);
       await expect(tokenSource(env, fetchImpl)()).rejects.toThrow("unavailable");
       expect(fetchImpl).toHaveBeenCalledTimes(1);
+    }
+  });
+
+  it.skipIf(process.platform === "win32").each([undefined, "/etc/company-ca.pem"])("passes only approved environment to the broker (extra CA: %s)", async extraCA => {
+    const root = path.resolve(".az-" + randomBytes(4).toString("hex"));
+    fs.mkdirSync(root, { mode: 0o700 });
+    const fixture = path.join(root, "broker.cjs");
+    const observed = path.join(root, "observed.json");
+    const output = path.join(root, "output");
+    fs.writeFileSync(fixture, `require("node:fs").writeFileSync(${JSON.stringify(observed)}, JSON.stringify({ env: process.env, execArgv: process.execArgv })); process.send("ready");`);
+    const job = {
+      RUNNER_TEMP: root,
+      GITHUB_OUTPUT: output,
+      RUNNER_TRACKING_ID: "job-a",
+      GH_AW_CONNECTOR_BROKER_TIMEOUT_MINUTES: "30",
+      ALLOWED: "allowed-value",
+      NODE_EXTRA_CA_CERTS: extraCA,
+      NODE_OPTIONS: "--require=nonexistent-preload",
+      NODE_PATH: "untrusted-modules",
+      UNRELATED_SECRET: "secret-value",
+    };
+    vi.stubEnv("PARENT_SECRET", "parent-secret");
+    vi.stubEnv("NODE_OPTIONS", "--require=nonexistent-parent-preload");
+    try {
+      const child = await startBroker(fixture, job, ["ALLOWED"]);
+      if (child.exitCode === null && child.signalCode === null) await once(child, "exit");
+      const result = JSON.parse(fs.readFileSync(observed, "utf8"));
+      expect(result.env).toEqual({
+        ALLOWED: "allowed-value",
+        RUNNER_TRACKING_ID: "job-a",
+        ...(extraCA === undefined ? {} : { NODE_EXTRA_CA_CERTS: extraCA }),
+      });
+      expect(result.execArgv).toEqual([]);
+    } finally {
+      vi.unstubAllEnvs();
+      fs.rmSync(root, { recursive: true, force: true });
     }
   });
 

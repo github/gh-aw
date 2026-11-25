@@ -107,7 +107,7 @@ async function startBroker(moduleFile, env, keys) {
     // Preserve runner job-end process tracking, but never inherit unrelated
     // secrets, Node preload flags, or step file-command handles.
     child = fork(moduleFile, ["serve", socketPath, String(deadline)], {
-      env: Object.fromEntries([...keys, "RUNNER_TRACKING_ID"].map(key => [key, env[key]])),
+      env: Object.fromEntries([...keys, "RUNNER_TRACKING_ID", "NODE_EXTRA_CA_CERTS"].map(key => [key, env[key]])),
       execArgv: [],
       detached: true,
       stdio: ["ignore", "ignore", "ignore", "ipc"],

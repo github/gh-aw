@@ -127,6 +127,12 @@ func TestConnectorAzureBrokerRejectsUnsafeRoutes(t *testing.T) {
 		{"host-access", "", "", "sandbox:\n  agent:\n    runtime: docker-sudo-iptables\n", "sandbox"},
 		{"sibling-mount", "", "", "mcp-servers:\n  sibling:\n    type: stdio\n    container: node:22-alpine\n    mounts: ['${RUNNER_TEMP}:/mount:ro']\n", "sibling"},
 		{"gateway-mount", "", "", "sandbox:\n  mcp:\n    mounts: ['${RUNNER_TEMP}:/mount:ro']\n", "trusted MCP gateway"},
+		{"container", "", "", "container: ubuntu:latest\n", "custom host access"},
+		{"services", "", "", "services:\n  redis:\n    image: redis:latest\n", "custom host access"},
+		{"setup-steps", "", "", "jobs:\n  agent:\n    setup-steps:\n      - run: echo setup\n", "authored runner steps"},
+		{"job-pre-steps", "", "", "jobs:\n  agent:\n    pre-steps:\n      - run: echo setup\n", "authored runner steps"},
+		{"secret-masking", "", "", "secret-masking:\n  steps:\n    - run: echo setup\n", "authored runner steps"},
+		{"mcp-scripts", "", "", "mcp-scripts:\n  example:\n    description: example\n    script: return 1;\n", "mcp-scripts"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			c, root := awConnectorCompiler(t)
@@ -156,4 +162,58 @@ func TestConnectorAzureWriterRequiresExclusiveEnvironment(t *testing.T) {
 			require.ErrorContains(t, err, tc.message)
 		})
 	}
+}
+
+func TestConnectorAzureWriterIdentityOnlyForLiveWrites(t *testing.T) {
+	const read = "tools:\n  tracker: [get-issue]\n"
+	for _, tc := range []struct {
+		name, selection string
+		forceStaged     bool
+		wantError       bool
+	}{
+		{"live", "safe-outputs:\n  environment: publish\n  tracker-add-comment:\n", false, true},
+		{"staged", "safe-outputs:\n  tracker-add-comment:\n    staged: true\n", false, false},
+		{"forced", "safe-outputs:\n  tracker-add-comment:\n", true, false},
+		{"conditional", "safe-outputs:\n  environment: publish\n  tracker-add-comment:\n    staged: ${{ inputs.stage }}\n", false, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			c, root := awConnectorCompiler(t)
+			c.forceStaged = tc.forceStaged
+			source := strings.ReplaceAll(connectorAzureSource(t), "vars.writer_ID", "vars.reader_ID")
+			_, err := c.ParseWorkflowString(awConnectorHeader+source+read+tc.selection+"---\nReview.\n", root+"/proof.md")
+			if tc.wantError {
+				require.ErrorContains(t, err, "separate client")
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestConnectorAzureBrokerRejectsWindows(t *testing.T) {
+	for _, tc := range []struct{ name, selection, phase string }{
+		{"reader", "runs-on: windows-latest\ntools:\n  tracker: [get-issue]\n", "agent"},
+		{"writer", "safe-outputs:\n  runs-on: windows-latest\n  environment: publish\n  tracker-add-comment:\n", "safe-output"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			c, root := awConnectorCompiler(t)
+			data, err := c.ParseWorkflowString(awConnectorHeader+connectorAzureSource(t)+tc.selection+"---\nReview.\n", root+"/proof.md")
+			require.NoError(t, err)
+			_, err = c.CompileToYAML(data, root+"/proof.md")
+			require.ErrorContains(t, err, "connector Azure OIDC "+tc.phase+" requires a non-Windows runner")
+		})
+	}
+}
+
+func TestConnectorAzureWriterRejectsNativeInferenceIdentity(t *testing.T) {
+	c, root := awConnectorCompiler(t)
+	selection := "safe-outputs:\n  environment: publish\n  tracker-add-comment:\n"
+	data, err := c.ParseWorkflowString(awConnectorHeader+connectorAzureSource(t)+selection+"---\nReview.\n", root+"/proof.md")
+	require.NoError(t, err)
+	data.EngineConfig.Auth = &EngineAuthConfig{
+		Type: "github-oidc", Provider: "azure", AzureClientID: "${{ vars.writer_ID }}",
+	}
+	require.ErrorContains(t, c.validateConnectorAzureBoundary(data), "separate client")
+	data.EngineConfig.Auth.AzureClientID = "${{ vars.other_ID }}"
+	require.NoError(t, c.validateConnectorAzureBoundary(data))
 }
