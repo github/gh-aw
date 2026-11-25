@@ -24,6 +24,9 @@ import { buildDailyReportPlan } from "./daily_report_portfolio.cjs";
 import { buildEngineConformancePlan } from "./engine_conformance_portfolio.cjs";
 import { main as collectIntents } from "./collect_work_queue_intents.cjs";
 
+// Portfolio builders ignore options they do not declare; the ESLint factory needs its rule registry.
+const planOptions = { date: "2026-10-08", repository: "owner/repo", repositoryId: "7", rules: ["no-throw-plain-object", "prefer-number-isnan", "require-fetch-timeout"] };
+
 const directories = [];
 const policy = {
   version: 4,
@@ -68,7 +71,7 @@ describe("staged control intents", () => {
 
   it.each([buildESLintFactoryPlan, buildDailyReportPlan, buildEngineConformancePlan])("stages the exact portfolio submission before dispatch", buildPlan => {
     const file = filename();
-    const plan = buildPlan({ date: "2026-10-08", repository: "owner/repo", repositoryId: "7" });
+    const plan = buildPlan(planOptions);
     const staged = stagePlanIntents(file, plan);
     expect(staged.map(intent => [intent.version, intent.kind])).toEqual([
       [4, "submit"],
@@ -85,7 +88,7 @@ describe("staged control intents", () => {
 
   it("rejects invalid or conflicting prepared plans without replacing staged work", () => {
     const file = filename();
-    const plan = buildESLintFactoryPlan({ date: "2026-10-08", repository: "owner/repo", repositoryId: "7" });
+    const plan = buildESLintFactoryPlan(planOptions);
     for (const invalid of [
       null,
       {},
@@ -108,7 +111,7 @@ describe("staged control intents", () => {
     const intentPath = filename("work-queue.intents.jsonl");
     const sourceDir = path.dirname(intentPath);
     const outputDir = path.join(sourceDir, "collected");
-    const staged = stagePlanIntents(intentPath, buildESLintFactoryPlan({ date: "2026-10-08", repository: "owner/repo", repositoryId: "7" }));
+    const staged = stagePlanIntents(intentPath, buildESLintFactoryPlan(planOptions));
     const core = {
       setFailed: message => {
         throw new Error(message);

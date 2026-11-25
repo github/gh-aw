@@ -76,11 +76,11 @@ export function violations(s, c) {
     "ResultCardinality",
     s.phase.every((p, k) => p !== "result" || c.NoWrites || (s.proposed[k] >= c.OutputMin && s.proposed[k] <= c.OutputMax))
   );
-  check("WarningExitZero", s.scan === "unrun" || s.lintClean === ["clean", "warnings"].includes(s.scan));
+  check("RuleDiagnosticsGate", s.scan === "unrun" || s.lintClean === (s.scan === "clean"));
   check("NoAutomaticDAG", JSON.stringify(s.admitted) === JSON.stringify([1, 2].filter(k => s.phase[k - 1] !== "absent")));
   check("BoundedAssignment", s.birth.length <= 3);
   const reached = {
-    "warning-clean": s.scan === "warnings" && s.lintClean,
+    "warning-actionable": s.scan === "warnings" && !s.lintClean,
     "completion-only": s.phase.some((p, k) => member(k) && p === "completed" && !s.verified[k]),
     "three-outputs": s.applied.some((n, k) => member(k) && n === 3),
     "quality-not-gate": s.quality === "failed" && s.phase.some((p, k) => member(k) && p === "result"),
@@ -148,7 +148,7 @@ export function successors(s, c) {
     for (const scan of ["clean", "warnings", "errors", "installFailed", "buildFailed", "toolFailed"]) {
       add(t => {
         t.scan = scan;
-        t.lintClean = scan === "clean" || (scan === "warnings" && c.Fault !== "warning");
+        t.lintClean = scan === "clean" || (scan === "warnings" && c.Fault === "warning");
       });
     }
   }

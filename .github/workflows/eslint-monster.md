@@ -2,7 +2,7 @@
 private: true
 emoji: "🧹"
 name: ESLint Monster
-description: Queue worker that runs the ESLint factory against actions/setup/js, groups findings, and launches up to three Copilot agent sessions to remediate them
+description: Queue worker that runs the ESLint factory against actions/setup/js, groups the assigned rule's findings, and launches one Copilot agent session to remediate them
 on:
   workflow_dispatch:
 permissions:
@@ -34,6 +34,10 @@ tools:
   bash:
     - "*"
 steps:
+  - name: Setup Node.js for the ESLint factory pre-check
+    uses: actions/setup-node@v7.1.0
+    with:
+      node-version: "24"
   - name: Run ESLint factory pre-check
     id: eslint_scan
     run: |
@@ -41,24 +45,23 @@ steps:
       mkdir -p /tmp/gh-aw/agent
       rm -f /tmp/gh-aw/agent/lint-clean.flag
       REPO_ROOT="$(pwd)"
+      RULE_ID="$(jq -er '.worker.claims[0].work.rule.id' /tmp/gh-aw/work-queue.snapshot.json)"
+      printf '%s\n' "${RULE_ID}" > /tmp/gh-aw/agent/eslint-rule-id.txt
+      find "${REPO_ROOT}/.github/skills" -maxdepth 6 -name 'SKILL.md' | sort > /tmp/gh-aw/agent/skill-index.txt
 
       cd eslint-factory
       npm ci > /tmp/gh-aw/agent/eslint-factory.log 2>&1
+      lint_exit=0
+      npm run lint:setup-js -- --format "$(pwd)/unix-formatter.cjs" >> /tmp/gh-aw/agent/eslint-factory.log 2>&1 || lint_exit=$?
 
-      if npm run lint:setup-js >> /tmp/gh-aw/agent/eslint-factory.log 2>&1; then
-        : > /tmp/gh-aw/agent/eslint-diagnostics.txt
-        : > /tmp/gh-aw/agent/skill-index.txt
+      grep -E '^[^:]+:[0-9]+:[0-9]+:' /tmp/gh-aw/agent/eslint-factory.log > /tmp/gh-aw/agent/eslint-all-diagnostics.txt || true
+      grep -F "/gh-aw-custom/${RULE_ID}]" /tmp/gh-aw/agent/eslint-all-diagnostics.txt > /tmp/gh-aw/agent/eslint-diagnostics.txt || true
+      rule_count=$(wc -l < /tmp/gh-aw/agent/eslint-diagnostics.txt | tr -d ' ')
+
+      # The scan ran when ESLint exited 0, or exited 1 with parsed findings; exit >= 2 or exit 1 without findings is a build/tool failure.
+      if { [ "${lint_exit}" -eq 0 ] || { [ "${lint_exit}" -eq 1 ] && [ -s /tmp/gh-aw/agent/eslint-all-diagnostics.txt ]; }; } && [ "${rule_count}" -eq 0 ]; then
         touch /tmp/gh-aw/agent/lint-clean.flag
-        exit 0
       fi
-
-      grep -E '^[^:]+:[0-9]+:[0-9]+:' /tmp/gh-aw/agent/eslint-factory.log > /tmp/gh-aw/agent/eslint-diagnostics.txt || true
-      diag_count=$(wc -l < /tmp/gh-aw/agent/eslint-diagnostics.txt | tr -d ' ')
-      if [ "${diag_count}" -eq 0 ]; then
-        grep -E '^[[:space:]]*[^[:space:]].*$' /tmp/gh-aw/agent/eslint-factory.log | head -n 80 > /tmp/gh-aw/agent/eslint-diagnostics.txt || true
-      fi
-
-      find "${REPO_ROOT}/.github/skills" -maxdepth 6 -name 'SKILL.md' | sort > /tmp/gh-aw/agent/skill-index.txt
 safe-outputs:
   create-issue:
     expires: 7d
@@ -103,29 +106,32 @@ Only process this run's work queue assignment. Call `work_queue_read`; its `assi
 
 ## Mission
 
-Use the pre-check output from the ESLint factory.
+Use the pre-check output from the ESLint factory. The Work assigns exactly one
+rule: `work.rule.id`, also written to `/tmp/gh-aw/agent/eslint-rule-id.txt`.
 
-- If lint is clean, do nothing.
-- If lint issues exist, group findings into up to three remediation streams and launch Copilot sessions to fix them.
+- If the assigned rule has no diagnostics, there is nothing to remediate.
+- Otherwise group that rule's diagnostics into at most three remediation streams and launch one Copilot session to fix them.
 
 ## Runtime inputs
 
 Read:
+- `/tmp/gh-aw/agent/eslint-rule-id.txt` (the assigned rule, equal to `work.rule.id`)
 - `/tmp/gh-aw/agent/eslint-factory.log`
-- `/tmp/gh-aw/agent/eslint-diagnostics.txt`
+- `/tmp/gh-aw/agent/eslint-diagnostics.txt` (diagnostics of the assigned rule only, warnings included)
+- `/tmp/gh-aw/agent/eslint-all-diagnostics.txt` (full scan of every rule, context only)
 - `/tmp/gh-aw/agent/skill-index.txt`
-- `/tmp/gh-aw/agent/lint-clean.flag`
+- `/tmp/gh-aw/agent/lint-clean.flag` (present only when the scan ran and the assigned rule has no diagnostics)
 
 ## Required flow
 
-1. Process the assigned Claim. If `/tmp/gh-aw/agent/lint-clean.flag` exists, finish a write-capable Claim as failed and report the clean scan. Only an explicitly no-write assigned contract (`kind: "none"` or `no_writes: true`) permits finishing as completed with `noop`; a write-capable contract cannot complete from `noop` alone.
-2. Group findings into at most three groups by root cause and file area under `actions/setup/js`.
+1. Process the assigned Claim. If `/tmp/gh-aw/agent/lint-clean.flag` exists, the assigned rule has no diagnostics: finish a write-capable Claim as failed and report the clean scan for that rule. Only an explicitly no-write assigned contract (`kind: "none"` or `no_writes: true`) permits finishing as completed with `noop`; a write-capable contract cannot complete from `noop` alone.
+2. Group the assigned rule's findings by file area under `actions/setup/js`, into at most three groups.
 3. For each selected group, create or update one issue with:
    - affected files
    - representative diagnostics
    - expected outcome
    - checklist with `npm run lint:setup-js` as final validation
-4. Assign new execution issues to Copilot (max three assignments total).
+4. Assign at most one new execution issue to Copilot (the Work's effect contract allows one assignment and one new issue per rule).
 5. Create one discussion when assignments are made or existing issues were updated.
 6. Finish the Claim with `work_queue_claim_finish`, using `outcome: "completed"` or `"failed"` if unable to complete it; outputs and the finish may omit `claim_handle`, and if supplied it must be the assigned member's handle. Under `<mcp-clis>`, pass `{"outcome":"completed"}` (or `"failed"`). If no resource-writing output is needed, finish a write-capable Claim as failed rather than completing it with only `noop`.
 
@@ -133,6 +139,7 @@ Read:
 
 - Keep all remediation work scoped to `actions/setup/js`.
 - Do not create duplicate issues for the same root-cause group.
-- Launch at most three total assignments.
+- Launch at most one assignment per Claim.
+- Do not act on diagnostics of other rules.
 - Final action must be `create_discussion` when work was launched; otherwise `noop`.
 - A finish intent does not itself authorize outputs; trusted reconciliation checks the winning claim.

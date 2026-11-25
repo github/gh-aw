@@ -24,7 +24,7 @@ safe-outputs:
   dispatch-workflow:
     workflows: [eslint-miner, eslint-refiner, eslint-monster]
     target-ref: ${{ github.event.repository.default_branch }}
-    max: 3
+    max: 7
   noop:
 steps:
   - name: Prepare the UTC ESLint factory cohort
@@ -33,19 +33,23 @@ steps:
       script: |
         const fs = require("node:fs");
         const path = require("node:path");
-        const { buildESLintFactoryPlan } = require(path.join(process.env.RUNNER_TEMP, "gh-aw/actions/eslint_factory_portfolio.cjs"));
+        const { buildESLintFactoryPlan, parseESLintRuleIds } = require(path.join(process.env.RUNNER_TEMP, "gh-aw/actions/eslint_factory_portfolio.cjs"));
         const { stagePlanIntents } = require(path.join(process.env.RUNNER_TEMP, "gh-aw/actions/work_queue_intents.cjs"));
         const { data: run } = await github.rest.actions.getWorkflowRun({ ...context.repo, run_id: context.runId });
         const { data: repository } = await github.rest.repos.get(context.repo);
+        const { data: registry } = await github.rest.repos.getContent({ ...context.repo, path: "eslint-factory/src/index.ts", ref: repository.default_branch });
+        if (registry.type !== "file" || registry.encoding !== "base64" || !registry.content) throw new Error("ESLint rule registry must be readable as a base64 file");
+        const rules = parseESLintRuleIds(Buffer.from(registry.content, "base64").toString("utf8"));
         const plan = buildESLintFactoryPlan({
           date: new Date(run.created_at).toISOString().slice(0, 10),
           repository: repository.full_name,
           repositoryId: String(repository.id),
+          rules,
         });
         fs.mkdirSync("/tmp/gh-aw/agent", { recursive: true });
         fs.writeFileSync("/tmp/gh-aw/agent/eslint-factory-plan.json", JSON.stringify(plan));
         stagePlanIntents(path.join(process.env.RUNNER_TEMP, "gh-aw/safeoutputs/work-queue/work-queue.intents.jsonl"), plan);
-        core.info(`ESLint factory cohort ${plan.date}: ${plan.nodes.length} tasks`);
+        core.info(`ESLint factory cohort ${plan.date}: ${plan.nodes.length} tasks for rules ${plan.rules.join(", ")}`);
 timeout-minutes: 15
 strict: true
 ---
@@ -53,12 +57,13 @@ strict: true
 # ESLint Factory Dispatcher
 
 Read `/tmp/gh-aw/agent/eslint-factory-plan.json`. The trusted preparation step
-defines one independent task for each approved worker: miner, refiner, and
-monster. Use the exact stored UTC date, nodes, profiles, contracts, and budgets.
+defines one miner task plus one refiner task and one monster task for each of
+the day's three rotating rules (`plan.rules`). Use the exact stored UTC date,
+nodes, profiles, contracts, and budgets.
 Do not invent additional tasks or broaden resource scopes.
 
 Read the activation snapshot first with `work_queue_read`, using
-`{"pool":"default","limit":32}`. A null `snapshot_sha` means the queue branch
+`{"pool":"eslint-factory","limit":32}`. A null `snapshot_sha` means the queue branch
 does not exist yet.
 Treat it as an empty backlog; the first trusted producer submission
 creates the branch with its Work. Surface read/tool errors explicitly; never
@@ -68,7 +73,7 @@ When `<mcp-clis>` advertises the wrappers, invoke their subcommands with one JSO
 argument through the shell tool:
 
 ```bash
-work-queue work_queue_read '{"pool":"default","limit":32}'
+work-queue work_queue_read '{"pool":"eslint-factory","limit":32}'
 ```
 
 Use the advertised MCP tools directly when wrappers are not available.
@@ -81,14 +86,14 @@ only. Date-keyed
 graph/node identities make repeated submissions on the same UTC day idempotent,
 including manual runs and reruns. Do not change stored task payloads on retries
 or replace admitted Work. AW authorizes trusted participants; the compiled queue
-policy controls scheduling for pool `default`, priority `3`, and accounting key
+policy controls scheduling for pool `eslint-factory`, priority `3`, and accounting key
 `""`. A failed admission is not permission to bypass scheduling bounds.
 Submission is a staged intent, not proof of durable admission.
 
 The following request is already staged from `plan.dispatch`:
 
 ```json
-{"pool":"default","max_claims":3,"max_dispatches":3}
+{"pool":"eslint-factory","max_claims":7,"max_dispatches":7}
 ```
 
 Keep the request within the compiled pool limits and this workflow's dispatch

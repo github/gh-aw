@@ -150,11 +150,11 @@ describe("work-queue v4 documentation", () => {
 
   it("treats genuine factory queue absence as an empty backlog", () => {
     const dispatcher = readRepositoryFile(".github/workflows/eslint-factory-dispatcher.md");
-    expect(dispatcher).toContain('work-queue work_queue_read \'{"pool":"default","limit":32}\'');
+    expect(dispatcher).toContain('work-queue work_queue_read \'{"pool":"eslint-factory","limit":32}\'');
     expect(dispatcher).toContain("Treat it as an empty backlog; the first trusted producer submission");
     expect(dispatcher).toContain("shared/work-queue-staged-plan.md");
     expect(readRepositoryFile(".github/workflows/shared/work-queue-staged-plan.md")).toContain("Trusted processing verifies the exact batch");
-    expect(dispatcher).toContain('{"pool":"default","max_claims":3,"max_dispatches":3}');
+    expect(dispatcher).toContain('{"pool":"eslint-factory","max_claims":7,"max_dispatches":7}');
     expect(dispatcher).toContain('`status: "staged"`');
     expect(dispatcher).toContain("an empty snapshot or a prediction of no eligible Work can be stale");
     expect(dispatcher).toContain("Do not call ordinary `dispatch_workflow`");

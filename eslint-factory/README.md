@@ -14,6 +14,8 @@ This project hosts custom ESLint linters for `/actions/setup/js`.
 - `npm run lint:setup-js` — build and lint all `../actions/setup/js/**/*.cjs` files.
 - `npm run lint:setup-js:changed` — build and lint `../actions/setup/js/*.cjs` files.
 
+Append `-- --format "$(pwd)/unix-formatter.cjs"` to either lint command for one `file:line:column: message [Error|Warning/rule]` line per diagnostic. ESLint 9 removed its built-in `unix` formatter; the monster pre-check uses this file to select the assigned rule's diagnostics.
+
 ## Factory lifecycle and formal validation
 
 The [bounded TLA+ model and executable code comparison](../specs/eslint-factory/README.md)
