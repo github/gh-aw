@@ -154,7 +154,7 @@ describe("work-queue v4 documentation", () => {
     expect(dispatcher).toContain("Treat it as an empty backlog; the first trusted producer submission");
     expect(dispatcher).toContain("shared/work-queue-staged-plan.md");
     expect(readRepositoryFile(".github/workflows/shared/work-queue-staged-plan.md")).toContain("Trusted processing verifies the exact batch");
-    expect(dispatcher).toContain('{"pool":"eslint-factory","max_claims":7,"max_dispatches":7}');
+    expect(dispatcher).toContain('{"pool":"eslint-factory","max_claims":21,"max_dispatches":21}');
     expect(dispatcher).toContain('`status: "staged"`');
     expect(dispatcher).toContain("an empty snapshot or a prediction of no eligible Work can be stale");
     expect(dispatcher).toContain("Do not call ordinary `dispatch_workflow`");
