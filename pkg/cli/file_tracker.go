@@ -77,10 +77,8 @@ func (ft *FileTracker) TrackModified(filePath string) {
 	if err != nil {
 		absPath = filePath
 	}
-	for _, created := range ft.CreatedFiles {
-		if created == absPath {
-			return
-		}
+	if slices.Contains(ft.CreatedFiles, absPath) {
+		return
 	}
 
 	// Store original content if not already stored

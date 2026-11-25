@@ -884,22 +884,25 @@ func fetchAllRemoteDependenciesWithOptions(ctx context.Context, content string, 
 		return fmt.Errorf("failed to fetch program dependency: %w", err)
 	}
 
+	// Manifest-managed imports must be refreshed even when programs and
+	// worker files are protected against overwriting existing local files.
+	forceImports := force || strict
 	fetchers := remoteDependencyFetchers{
 		includes: func() error {
 			return fetchAndSaveRemoteIncludesWithOptions(ctx, content, includesFetchOptions{
 				spec:      spec,
 				targetDir: targetDir,
 				verbose:   verbose,
-				force:     force,
+				force:     forceImports,
 				tracker:   tracker,
 				strict:    strict,
 			})
 		},
 		frontmatter: func() error {
-			return fetchAndSaveRemoteFrontmatterImportsWithOptions(ctx, content, spec, targetDir, verbose, force, tracker, strict)
+			return fetchAndSaveRemoteFrontmatterImportsWithOptions(ctx, content, spec, targetDir, verbose, forceImports, tracker, strict)
 		},
 		runtimeImports: func() error {
-			return fetchAndSaveRemoteRuntimeImports(ctx, content, spec, targetDir, verbose, force, tracker)
+			return fetchAndSaveRemoteRuntimeImports(ctx, content, spec, targetDir, verbose, forceImports, tracker)
 		},
 		dispatch: func() error {
 			return fetchAndSaveRemoteDispatchWorkflows(ctx, content, spec, targetDir, verbose, force, tracker)

@@ -1030,7 +1030,7 @@ func updateWorkflow(ctx context.Context, wf *workflowWithSource, opts UpdateWork
 			return err
 		}
 		if finalProgram != upstreamProgram {
-			return fmt.Errorf("locally modified program path cannot be fetched from the updated source")
+			return errors.New("locally modified program path cannot be fetched from the updated source")
 		}
 		dependencyTracker = NewFileTracker()
 		defer func() {

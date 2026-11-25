@@ -673,7 +673,7 @@ func updateManifestManagedWorkflow(ctx context.Context, update manifestManagedWo
 			return err
 		}
 		if finalProgram != upstreamProgram {
-			return fmt.Errorf("locally modified program path cannot be fetched from the updated source")
+			return errors.New("locally modified program path cannot be fetched from the updated source")
 		}
 		tracker = NewFileTracker()
 		defer func() {

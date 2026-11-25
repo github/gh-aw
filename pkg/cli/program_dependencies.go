@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -9,6 +10,7 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/github/gh-aw/pkg/constants"
@@ -106,7 +108,7 @@ func validateWorkerUpdate(ctx context.Context, targetDir, targetPath, remotePath
 	if err != nil {
 		return fmt.Errorf("cannot verify previous worker %q: %w", remotePath, err)
 	}
-	modified := string(previous) != string(local)
+	modified := !bytes.Equal(previous, local)
 	if strings.HasSuffix(remotePath, ".md") {
 		modified = hasLocalModifications(string(previous), string(local), baseline.repo+"/"+oldPath+"@"+baseline.ref, filepath.Dir(targetPath), false)
 	}
@@ -160,7 +162,7 @@ func fetchWorkflowProgram(ctx context.Context, content string, spec *WorkflowSpe
 			if readErr != nil {
 				return fmt.Errorf("cannot safely read existing program %q: %w", relativePath, readErr)
 			}
-			if string(local) != string(data) {
+			if !bytes.Equal(local, data) {
 				relativeRemote, relErr := filepath.Rel(filepath.FromSlash(baseline.latestDir), filepath.FromSlash(remotePath))
 				if relErr != nil || !filepath.IsLocal(relativeRemote) {
 					return fmt.Errorf("cannot determine previous source for program %q", relativePath)
@@ -171,7 +173,7 @@ func fetchWorkflowProgram(ctx context.Context, content string, spec *WorkflowSpe
 				}
 				oldPath := path.Join(baseline.sourceDir, filepath.ToSlash(relativeRemote))
 				previous, previousErr := downloader(ctx, oldParts[0], oldParts[1], oldPath, baseline.ref)
-				if previousErr != nil || string(local) != string(previous) {
+				if previousErr != nil || !bytes.Equal(local, previous) {
 					return fmt.Errorf("program %q has local changes or no available base; use --no-merge to overwrite", relativePath)
 				}
 			}
@@ -218,7 +220,7 @@ func writeWorkflowProgram(targetDir, relativePath string, data []byte, force boo
 	}
 	// Refuse symlinks, including dangling ones, before creating or replacing files.
 	current := ""
-	for _, part := range strings.Split(relativePath, string(filepath.Separator)) {
+	for part := range strings.SplitSeq(relativePath, string(filepath.Separator)) {
 		current = filepath.Join(current, part)
 		info, statErr := root.Lstat(current)
 		if statErr != nil && !errors.Is(statErr, fs.ErrNotExist) {
@@ -241,7 +243,7 @@ func writeWorkflowProgram(targetDir, relativePath string, data []byte, force boo
 		if err != nil {
 			return err
 		}
-		if string(existing) == string(data) {
+		if bytes.Equal(existing, data) {
 			return nil
 		}
 		if !force {
@@ -258,14 +260,7 @@ func writeWorkflowProgram(targetDir, relativePath string, data []byte, force boo
 			if err != nil {
 				return err
 			}
-			created := false
-			for _, tracked := range tracker.CreatedFiles {
-				if tracked == absPath {
-					created = true
-					break
-				}
-			}
-			if !created {
+			if !slices.Contains(tracker.CreatedFiles, absPath) {
 				tracker.TrackModified(fullPath)
 			}
 		} else {

@@ -202,7 +202,7 @@ func TestProgramPublisherBrokerCleanup(t *testing.T) {
 	require.NoError(t, err)
 	job := compiled.Jobs["agent"]
 	require.Equal(t, "write", job.Permissions["id-token"])
-	var program, cleanup int = -1, -1
+	program, cleanup := -1, -1
 	for i, step := range job.Steps {
 		if step.ID == "program" {
 			program = i
