@@ -81,7 +81,7 @@ func validateMarkdownExpressionSafety(markdownContent string, allowEnv bool) err
 
 func unauthorizedExpressionsError(unauthorizedExpressions, multilineExpressions []string, allowEnv bool) error {
 	total := len(unauthorizedExpressions) + len(multilineExpressions)
-	expressionValidationLog.Printf("Expression safety validation failed: %d unauthorized expressions found", total)
+	expressionValidationLog.Printf("Expression safety validation failed: %d invalid expressions found", total)
 	var unauthorizedList strings.Builder
 	if len(unauthorizedExpressions) > 0 {
 		unauthorizedList.WriteString("expressions are not in the allowed list:\n")
@@ -107,7 +107,7 @@ func unauthorizedExpressionsError(unauthorizedExpressions, multilineExpressions 
 	if len(unauthorizedExpressions) == 0 {
 		return NewValidationError(
 			"expressions",
-			fmt.Sprintf("%d unauthorized expressions found", total),
+			fmt.Sprintf("%d invalid expressions found", total),
 			unauthorizedList.String(),
 			"Remove line breaks from expressions.",
 		)
@@ -136,7 +136,7 @@ func unauthorizedExpressionsError(unauthorizedExpressions, multilineExpressions 
 	}
 	return NewValidationError(
 		"expressions",
-		fmt.Sprintf("%d unauthorized expressions found", total),
+		fmt.Sprintf("%d invalid expressions found", total),
 		unauthorizedList.String(),
 		suggestion,
 	)

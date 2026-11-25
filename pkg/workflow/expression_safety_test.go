@@ -84,6 +84,8 @@ func TestValidateExpressionSafetyLineTerminators(t *testing.T) {
 					t.Fatal("expected a line-break error")
 				}
 				if !strings.Contains(err.Error(), "expressions must not contain line breaks:") ||
+					!strings.Contains(err.Error(), "1 invalid expressions found") ||
+					strings.Contains(err.Error(), "unauthorized expressions found") ||
 					!strings.Contains(err.Error(), tt.escaped) ||
 					strings.Contains(err.Error(), "expressions are not in the allowed list:") ||
 					strings.ContainsAny(err.Error(), "\r\u2028\u2029") {
@@ -99,7 +101,9 @@ func TestValidateExpressionSafetyLineTerminators(t *testing.T) {
 		}
 	}
 	err := validateExpressionSafety("${{ github.actor\n}} ${{ secrets.TOKEN }}")
-	if err == nil || !strings.Contains(err.Error(), "expressions must not contain line breaks:") ||
+	if err == nil || !strings.Contains(err.Error(), "2 invalid expressions found") ||
+		strings.Contains(err.Error(), "unauthorized expressions found") ||
+		!strings.Contains(err.Error(), "expressions must not contain line breaks:") ||
 		!strings.Contains(err.Error(), `github.actor\n`) ||
 		!strings.Contains(err.Error(), "expressions are not in the allowed list:") ||
 		!strings.Contains(err.Error(), "secrets.TOKEN") {
