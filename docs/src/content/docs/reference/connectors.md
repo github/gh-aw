@@ -430,6 +430,11 @@ add the Entra authority to the agent's network allowlist for a connector
 read. `gh aw connector <id> setup` describes provisioning offline;
 `connector test` does not perform a local Entra exchange.
 
+Set `DEBUG=connector:credential-broker` in the workflow environment to record
+bounded broker lifecycle, cache, and exchange events. The stop step emits these
+diagnostics; they contain no tokens, identities, scopes, URLs, or provider errors.
+If teardown does not run, the events may be unavailable.
+
 If a federated writer can run live, set `safe-outputs.environment` to a
 **literal name reserved for the `safe_outputs` job**, such as `connector-publish`.
 Conditional staging still requires it; a statically staged-only writer does

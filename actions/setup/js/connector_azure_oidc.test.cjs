@@ -7,6 +7,7 @@ import { tokenSource, start } from "./connector_azure_oidc.cjs";
 import { startBroker, stopBroker, readToken } from "./connector_credential_broker.cjs";
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
+import os from "node:os";
 
 const env = {
   GH_AW_AZURE_TENANT_ID: "00000000-0000-0000-0000-000000000001",
@@ -66,6 +67,94 @@ describe("trusted connector Entra exchange", () => {
     await expect(get()).rejects.toThrow(/^Connector Azure credential unavailable;/);
     expect(await get()).toBe("access-4");
     expect(fetchImpl).toHaveBeenCalledTimes(8);
+  });
+
+  it("reports only fixed events for successful and failed exchanges", async () => {
+    let time = 0;
+    const debug = vi.fn();
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValueOnce(json({ value: "assertion-private" }))
+      .mockResolvedValueOnce(json(granted("private")))
+      .mockRejectedValueOnce(new Error("provider-private-diagnostic"));
+    const get = tokenSource(env, fetchImpl, () => time, debug);
+    expect(await Promise.all([get(), get()])).toEqual(["access-private", "access-private"]);
+    expect(await get()).toBe("access-private");
+    time += 3600 * 1000;
+    await expect(get()).rejects.toThrow("unavailable");
+    expect(debug.mock.calls.flat()).toEqual([
+      "token.renew.start",
+      "azure.assertion.start",
+      "token.renew.join",
+      "azure.assertion.success",
+      "azure.exchange.start",
+      "azure.exchange.success",
+      "token.renew.success",
+      "token.cache.hit",
+      "token.renew.start",
+      "azure.assertion.start",
+      "azure.exchange.failed",
+      "token.renew.failed",
+    ]);
+  });
+
+  it.skipIf(process.platform === "win32")("replays only approved detached broker debug events on stop", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "broker-test-"));
+    const fixture = path.join(root, "fixture.cjs");
+    const output = path.join(root, "output");
+    const broker = path.resolve("connector_credential_broker.cjs");
+    fs.writeFileSync(fixture, `const b = require(${JSON.stringify(broker)}); b.runBroker(process.argv[3], b.renewableToken(async () => ({ value: "access-private", expiresAt: Date.now() + 60000 })), Number(process.argv[4]));`);
+    const job = { RUNNER_TEMP: root, GITHUB_OUTPUT: output, RUNNER_TRACKING_ID: "job-a", GH_AW_CONNECTOR_BROKER_TIMEOUT_MINUTES: "30" };
+    vi.stubEnv("DEBUG", "connector:credential-broker");
+    const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    let child;
+    try {
+      child = await startBroker(fixture, job, []);
+      const directory = fs.readFileSync(output, "utf8").match(/^directory=(.+)\n$/u)[1];
+      expect(await readToken(path.join(directory, "token.sock"))).toBe("access-private");
+      expect(await readToken(path.join(directory, "token.sock"))).toBe("access-private");
+      fs.appendFileSync(path.join(directory, "debug.log"), "private-provider-response\n::warning::private-command\n");
+      const exited = once(child, "exit");
+      stopBroker({ ...job, GH_AW_CONNECTOR_BROKER_DIRECTORY: directory });
+      await exited;
+      child = undefined;
+      const logs = stderr.mock.calls.map(call => String(call[0])).join("");
+      for (const event of ["broker.started", "broker.ready", "broker.request", "token.renew.start", "token.renew.success", "token.cache.hit"]) expect(logs).toContain(event);
+      for (const secret of ["access-private", "private-provider-response", "::warning::", job.RUNNER_TRACKING_ID, directory]) expect(logs).not.toContain(secret);
+      expect(fs.existsSync(directory)).toBe(false);
+    } finally {
+      if (child) {
+        const exited = once(child, "exit");
+        child.kill();
+        await exited;
+      }
+      stderr.mockRestore();
+      vi.unstubAllEnvs();
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it.skipIf(process.platform === "win32")("removes debug files when the broker expires before teardown", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "broker-test-"));
+    const fixture = path.join(root, "fixture.cjs");
+    const output = path.join(root, "output");
+    const broker = path.resolve("connector_credential_broker.cjs");
+    fs.writeFileSync(fixture, `require(${JSON.stringify(broker)}).runBroker(process.argv[3], async () => "unused", Date.now() + 1000);`);
+    const job = { RUNNER_TEMP: root, GITHUB_OUTPUT: output, RUNNER_TRACKING_ID: "job-a", GH_AW_CONNECTOR_BROKER_TIMEOUT_MINUTES: "30" };
+    vi.stubEnv("DEBUG", "connector:credential-broker");
+    const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    try {
+      const child = await startBroker(fixture, job, []);
+      const directory = fs.readFileSync(output, "utf8").match(/^directory=(.+)\n$/u)[1];
+      await once(child, "exit");
+      expect(fs.existsSync(path.join(directory, "debug.log"))).toBe(true);
+      stopBroker({ ...job, GH_AW_CONNECTOR_BROKER_DIRECTORY: directory });
+      expect(fs.existsSync(directory)).toBe(false);
+    } finally {
+      stderr.mockRestore();
+      vi.unstubAllEnvs();
+      fs.rmSync(root, { recursive: true, force: true });
+    }
   });
 
   it.each([undefined, 0, -1, "Infinity", "", [100], [], null])("rejects malformed or absent expires_in (%j)", async expiry => {
