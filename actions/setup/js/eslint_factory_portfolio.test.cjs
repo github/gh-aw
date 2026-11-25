@@ -11,7 +11,6 @@ import { checkFileProtection, checkFileProtectionPostApply } from "./manifest_fi
 
 const require = createRequire(import.meta.url);
 const h = require("./work_queue_test_helpers.cjs");
-const unixFormatter = require("../../../eslint-factory/unix-formatter.cjs");
 const repository = "owner/repo";
 const indexSource = fs.readFileSync(new URL("../../../eslint-factory/src/index.ts", import.meta.url), "utf8");
 const rules = parseESLintRuleIds(indexSource);
@@ -90,11 +89,9 @@ describe("ESLint factory producer and dispatcher", () => {
   });
 
   it("keeps rule-less fatal parse errors out of the clean diagnostic gate", () => {
-    const formatted = unixFormatter([{ filePath: "src/broken.cjs", messages: [{ ruleId: null, severity: 2, fatal: true, message: "Unexpected token", line: 1 }] }]);
     const source = fs.readFileSync(new URL("../../../.github/workflows/eslint-monster.md", import.meta.url), "utf8");
-    expect(formatted).toContain("[Error]\n");
-    expect(source).toContain("unscoped_error_count=$(grep -Ec ' \\[Error\\]$'");
-    expect(source).toContain('&& [ "${unscoped_error_count}" -eq 0 ]');
+    expect(source).toContain("(.fatal == true) or (.ruleId == null and .severity == 2)");
+    expect(source).toContain('echo "ESLint scan encountered a fatal or rule-less error"');
   });
 
   it("rotates every rule through the daily cohort", () => {

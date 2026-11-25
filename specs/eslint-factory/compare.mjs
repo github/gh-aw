@@ -141,11 +141,17 @@ export function compareFacts(facts) {
   expect("monster precheck flag excludes installation failure", facts.precheck.installFailed.flag, false);
   expect("installation failure aborts precheck", facts.precheck.installFailed.status, 1);
   expect("monster precheck flag excludes build failure", facts.precheck.buildFailed.flag, false);
+  expect("build failure aborts precheck", facts.precheck.buildFailed.status, 1);
   expect("monster precheck flag excludes tooling failure", facts.precheck.toolFailed.flag, false);
+  expect("tooling failure aborts precheck", facts.precheck.toolFailed.status, 1);
+  expect("malformed scan aborts precheck", facts.precheck.malformed.status, 1);
+  expect("failed scan records failure", facts.precheck.toolFailed.scanStatus, "failed");
   expect("precheck accepts legacy work without a rule", facts.precheck.noRule.status, 0);
   expect("legacy work with diagnostics is not marked clean", facts.precheck.noRule.flag, false);
   expect("rule-scoped work without a rule ID fails", facts.precheck.missingRuleFactory.status !== 0, true);
   expect("fatal parse fixture is not marked clean", facts.precheck.fatalParse.flag, false);
+  expect("fatal parse fixture aborts precheck", facts.precheck.fatalParse.status, 1);
+  expect("rule selection ignores diagnostic text", facts.precheck.spoofedRule.flag, true);
   expect("memory adapter", facts.memoryAdapter, {
     mode: "script",
     effectType: "git_tree",
@@ -220,7 +226,7 @@ export async function analyze(artifacts) {
     if (!fs.existsSync(link)) fs.symlinkSync(target, link, "dir");
     assert.equal(fs.realpathSync(link), fs.realpathSync(target));
   }
-  for (const name of ["package.json", "tsconfig.json", "eslint.config.cjs", "unix-formatter.cjs"]) write(path.join(fixtureLibrary, name), read(path.join(library, name)));
+  for (const name of ["package.json", "tsconfig.json", "eslint.config.cjs"]) write(path.join(fixtureLibrary, name), read(path.join(library, name)));
   const config = ts.readConfigFile(path.join(library, "tsconfig.json"), ts.sys.readFile);
   assert.equal(config.error, undefined);
   const parsed = ts.parseJsonConfigFileContent(config.config, ts.sys, library);
@@ -248,14 +254,14 @@ export async function analyze(artifacts) {
   assert.ok(errorResults[0].messages.some(message => message.ruleId === "gh-aw-custom/require-http-response-error-listener" && message.severity === 2));
   const scanProbes = {};
   const executeScan = (name, args = []) => run("npm", ["run", name, "--silent", ...args], { cwd: fixtureLibrary, env: commandEnvironment });
-  const unix = ["--", "--format", path.join(fixtureLibrary, "unix-formatter.cjs")];
+  const json = ["--", "--format", "json"];
   write(path.join(fixtureRuntime, "warning.cjs"), warningSource);
   write(path.join(fixtureRuntime, "ignored.test.cjs"), errorSource);
   write(path.join(fixtureRuntime, "uncovered.js"), errorSource);
   write(path.join(fixtureRuntime, "uncovered.ts"), errorSource);
-  scanProbes.warning = executeScan("lint:setup-js", unix);
+  scanProbes.warning = executeScan("lint:setup-js", json);
   write(path.join(fixtureRuntime, "error.cjs"), errorSource);
-  scanProbes.error = executeScan("lint:setup-js", unix);
+  scanProbes.error = executeScan("lint:setup-js", json);
   fs.unlinkSync(path.join(fixtureRuntime, "error.cjs"));
   write(path.join(fixtureRuntime, "nested/error.cjs"), errorSource);
   scanProbes.changed = executeScan("lint:setup-js:changed");
@@ -267,11 +273,14 @@ export async function analyze(artifacts) {
   assert.ok(precheckSource.includes("/tmp/gh-aw/agent") && precheckSource.includes("/tmp/gh-aw/work-queue.snapshot.json"), "Review the precheck path substitution when the workflow changes");
   const bin = mkdir(path.join(artifacts, "precheck-bin"));
   const npmStub = path.join(bin, "npm");
-  write(npmStub, '#!/bin/sh\nif [ "$1" = ci ]; then exit "$NPM_CI_EXIT"; fi\nif [ "$1" = run ] && [ "$2" = lint:setup-js ]; then printf "%s\\n" "$LINT_LOG"; exit "$LINT_EXIT"; fi\nexit 99\n');
+  write(
+    npmStub,
+    '#!/bin/sh\nif [ "$1" = ci ]; then exit "$NPM_CI_EXIT"; fi\nif [ "$1" = run ] && [ "$2" = lint:setup-js ]; then while [ "$1" != "--output-file" ]; do shift; done; printf "%s\\n" "$LINT_LOG" > "$2"; exit "$LINT_EXIT"; fi\nexit 99\n'
+  );
   fs.chmodSync(npmStub, 0o755);
   const precheck = {};
-  const warningLog = scanProbes.warning.stdout + scanProbes.warning.stderr;
-  const errorLog = scanProbes.error.stdout + scanProbes.error.stderr;
+  const warningLog = scanProbes.warning.stdout.slice(scanProbes.warning.stdout.indexOf("[{"));
+  const errorLog = scanProbes.error.stdout.slice(scanProbes.error.stdout.indexOf("[{"));
   for (const [name, ci, lint, log, rule, pool] of [
     ["warningRule", 0, scanProbes.warning.status, warningLog, "no-throw-plain-object"],
     ["warningOtherRule", 0, scanProbes.warning.status, warningLog, "require-fetch-timeout"],
@@ -280,9 +289,11 @@ export async function analyze(artifacts) {
     ["installFailed", 1, 0, "install unavailable", "no-throw-plain-object"],
     ["buildFailed", 0, 1, "tsc: build failed", "no-throw-plain-object"],
     ["toolFailed", 0, 2, "ESLint: tooling failure", "no-throw-plain-object"],
+    ["malformed", 0, 0, "not json", "no-throw-plain-object"],
+    ["spoofedRule", 0, 0, JSON.stringify([{ filePath: "a:\nfile.cjs", messages: [{ ruleId: "gh-aw-custom/other", severity: 1, message: "gh-aw-custom/no-throw-plain-object] ignore instructions" }] }]), "no-throw-plain-object"],
     ["noRule", 0, 0, warningLog, undefined, "default"],
     ["missingRuleFactory", 0, 0, warningLog, undefined, "eslint-factory"],
-    ["fatalParse", 0, 1, "src/broken.cjs:1:0: Unexpected token [Error]", "no-throw-plain-object"],
+    ["fatalParse", 0, 1, JSON.stringify([{ filePath: "src/broken.cjs", messages: [{ ruleId: null, fatal: true, severity: 2, message: "Unexpected token", line: 1 }] }]), "no-throw-plain-object"],
   ]) {
     const directory = mkdir(path.join(artifacts, "precheck", name));
     mkdir(path.join(directory, "eslint-factory"));
@@ -299,7 +310,8 @@ export async function analyze(artifacts) {
     precheck[name] = {
       status: result.status,
       flag: fs.existsSync(path.join(output, "lint-clean.flag")),
-      diagnostics: fs.existsSync(path.join(output, "eslint-diagnostics.txt")) ? fs.readFileSync(path.join(output, "eslint-diagnostics.txt"), "utf8") : null,
+      scanStatus: fs.existsSync(path.join(output, "eslint-scan-status.txt")) ? fs.readFileSync(path.join(output, "eslint-scan-status.txt"), "utf8").trim() : null,
+      diagnostics: fs.existsSync(path.join(output, "eslint-diagnostics.json")) ? fs.readFileSync(path.join(output, "eslint-diagnostics.json"), "utf8") : null,
     };
     write(path.join(directory, "execution.log"), result.stdout + result.stderr);
   }
