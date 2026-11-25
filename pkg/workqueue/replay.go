@@ -640,7 +640,7 @@ func (state Projection) Clone() Projection {
 		value.Effects = slices.Clone(work.Effects)
 		value.DependsOn = slices.Clone(work.DependsOn)
 		for i := range value.DependsOn {
-			value.DependsOn[i].Resource = clonePointer(work.DependsOn[i].Resource)
+			value.DependsOn[i].Resource = clonePointer(value.DependsOn[i].Resource)
 		}
 		value.Subject = clonePointer(work.Subject)
 		value.BackingIssue = clonePointer(work.BackingIssue)
