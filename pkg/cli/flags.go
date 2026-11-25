@@ -26,7 +26,7 @@ func (v minuteTimeoutValue) Set(value string) error {
 }
 
 func addMinuteTimeoutFlag(cmd *cobra.Command, defaultValue int, usage string) {
-	cmd.Flags().Int("timeout", defaultValue, "`minutes|duration` "+usage)
+	cmd.Flags().Int("timeout", defaultValue, "Accepts `minutes|duration`. "+usage)
 	flag := cmd.Flags().Lookup("timeout")
 	flag.Value = minuteTimeoutValue{Value: flag.Value}
 }
