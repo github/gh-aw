@@ -3,7 +3,6 @@ package workflow
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"os"
 	"strings"
 
@@ -146,10 +145,7 @@ func (e *ClaudeEngine) parseClaudeLogEntries(logContent string, verbose bool) []
 		logContent = input
 		var batch []map[string]any
 		for {
-			if err := decoder.Decode(&batch); err != nil {
-				if err == io.EOF {
-					return logEntries
-				}
+			if err := decoder.Decode(&batch); err != nil { //nolint:jsondecodertrailingdataunchecked // Consecutive arrays are expected; mixed-format recovery handles trailing data.
 				break
 			}
 			tail := strings.TrimLeft(input[decoder.InputOffset():], " \t\r")
@@ -158,7 +154,7 @@ func (e *ClaudeEngine) parseClaudeLogEntries(logContent string, verbose bool) []
 			}
 			// Resume mixed-format recovery at the first unconsumed line.
 			logEntries = append(logEntries, batch...)
-			clear(batch) // Decode must not reuse maps already saved in logEntries.
+			clear(batch) // Nil slice elements so Decode cannot reuse maps saved in logEntries.
 			logContent = strings.TrimLeft(tail, " \t\r\n")
 			if logContent != "" && !strings.HasPrefix(logContent, "[") {
 				break

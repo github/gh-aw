@@ -26,6 +26,37 @@ func TestParseClaudeArrayRecords(t *testing.T) {
 	}
 }
 
+func TestParseClaudeArrayRecordsPreserveEarlierBatches(t *testing.T) {
+	log := `[{"id":"a","nested":{"value":"original"}},{"id":"b"}]` + "\n" +
+		`[{"id":"c"}]` + "\n" + `[{"id":"d"},{"id":"e"},{"id":"f"}]`
+	want := []map[string]any{
+		{"id": "a", "nested": map[string]any{"value": "original"}},
+		{"id": "b"}, {"id": "c"}, {"id": "d"}, {"id": "e"}, {"id": "f"},
+	}
+	got := NewClaudeEngine().parseClaudeLogEntries(log, false)
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %#v, want %#v", got, want)
+	}
+}
+
+func TestParseClaudeArrayRecordsVerbose(t *testing.T) {
+	for _, tt := range []struct {
+		log, want string
+	}{
+		{`[]`, "No valid JSON entries found in Claude log\n"},
+		{`[{"type":"first"}]`, "Extracted 1 JSON entries from mixed format Claude log\n"},
+	} {
+		t.Run(tt.log, func(t *testing.T) {
+			got := captureStderrOutput(t, func() {
+				NewClaudeEngine().parseClaudeLogEntries(tt.log, true)
+			})
+			if got != tt.want {
+				t.Fatalf("stderr = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestParseClaudeJSONArrayBuffer(t *testing.T) {
 	tests := []struct {
 		name string
