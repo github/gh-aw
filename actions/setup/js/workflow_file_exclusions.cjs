@@ -17,11 +17,8 @@ function isWorkflowYamlFile(file) {
  * @returns {string[]}
  */
 function getExcludedFiles(config) {
-  const patterns = Array.isArray(config.excluded_files) ? [...config.excluded_files] : [];
-  if (config.exclude_lock_yml === true && !patterns.includes(WORKFLOW_LOCK_PATTERN)) {
-    patterns.push(WORKFLOW_LOCK_PATTERN);
-  }
-  return patterns;
+  const patterns = Array.isArray(config.excluded_files) ? config.excluded_files : [];
+  return config.exclude_lock_yml === true && !patterns.includes(WORKFLOW_LOCK_PATTERN) ? [...patterns, WORKFLOW_LOCK_PATTERN] : [...patterns];
 }
 
 /**
