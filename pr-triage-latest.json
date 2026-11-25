@@ -1,6 +1,6 @@
 {
-  "generated_at": "2026-11-25T06:30:08.008149Z",
-  "run_id": "pr-triage-2026-11-25T06:30:08Z",
+  "generated_at": "2026-11-25T12:26:12Z",
+  "run_id": "pr-triage-2026-11-25T12:26:12Z",
   "source": "pr-triage",
   "open_copilot_prs": 0,
   "scanned_open_prs": 25,
@@ -214,7 +214,8 @@
   "notes": [
     "No open pull requests authored by app/github-copilot were present in the current repository queue.",
     "The current visible PRs are authored by human contributors or automation and were excluded by the author gate.",
-    "No eligible PRs remained to label or comment on after the author filter."
+    "No eligible PRs remained to label or comment on after the author filter.",
+    "Workflow outcome: no GitHub writes were necessary."
   ],
   "review_status": "triaged"
 }
