@@ -994,6 +994,7 @@ For **organization-level projects** that aggregate issues from multiple reposito
 ```yaml wrap
 safe-outputs:
   update-project:
+    project: "https://github.com/orgs/myorg/projects/42"
     github-token: ${{ secrets.GH_AW_WRITE_PROJECT_TOKEN }}
     allowed-repos: ["org/docs", "org/backend", "org/frontend"]
 ```
@@ -1046,6 +1047,7 @@ Project views can be created automatically by declaring them in the `views` arra
 ```yaml
 safe-outputs:
   update-project:
+    project: "https://github.com/orgs/myorg/projects/42"
     github-token: ${{ secrets.GH_AW_WRITE_PROJECT_TOKEN }}
     views:
       - name: "Sprint Board"        # required: view name
@@ -1083,7 +1085,7 @@ safe-outputs:
     github-token: ${{ secrets.GH_AW_WRITE_PROJECT_TOKEN }}
 ```
 
-Agent output messages **must** explicitly include the `project` field. Often used by scheduled and orchestrator workflows to post run summaries.
+Use `create-project-status-update: null` to enable this output with its defaults. In either form, agent output messages **must** explicitly include the `project` field; the configured URL is documentation only and is not used as a fallback. Often used by scheduled and orchestrator workflows to post run summaries.
 
 #### Required Fields
 
