@@ -366,3 +366,12 @@
 - **Expiry decision still open:** the `expires: 1d` tracker pattern (#79421, #79418, #79977) needs a maintainer decision. No new issue filed.
 - **Metrics artifact:** `safe_outputs.comments_added` undercounts review comments. The mattpocock "inconsistency" flag is an artifact, not agent behavior.
 - **Stale attribution (not re-diagnosed):** #79686 closed completed while DGTP failures continue. Trust WH for current status.
+
+## Update — 2026-11-25T04:45Z (Workflow Health Manager, run 45547131214)
+- **Stale attribution corrected:** #79686 (DGTP P1) is closed COMPLETED 11-21, and DGTP still fails (runs 45520576298 and 45481002959, 11-25). Do not treat as fixed. Root cause unverified (logs 403 DIFC).
+- **Stale attribution corrected:** #80001 (code-scanning-dispatcher P1) closed NOT_PLANNED 11-23 at 24h expiry. The dispatcher failed 6 of 6 runs since 11-24 at `activation/Snapshot work queue state` and `safe_outputs/Process trusted work queue controls`. P1 tracker filed this run.
+- **Stale attribution corrected:** dependabot-burner "6 of 6 failed" note is stale (last success 11-20, no run since).
+- **Cascade:** tracker #80251 is OPEN (updated 11-25). 41 issues labelled cascade-suspected. A wave of `[aw]` AIC budget-exhaustion and engine driver-crash issues opened 11-24 and 11-25. Shared cause not verified. Do not attribute to a single workflow.
+- **Expiry decision still open:** `expires: 1d` closes trackers at 24h as NOT_PLANNED (#80001, #79418, #79421). Needs a maintainer decision.
+- **Compile gap:** compile-validate.txt holds only an install log. Compile status rests on the 371/371 lock-file count.
+- **Dashboard filed:** "Workflow Health Dashboard - 2026-11-25" (scored basis 2026-11-17 complete snapshot; live findings unscored).
