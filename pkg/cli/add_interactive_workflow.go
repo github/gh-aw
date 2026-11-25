@@ -2,8 +2,10 @@ package cli
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
+	"path"
 	"strings"
 	"time"
 
@@ -253,21 +255,38 @@ func findWorkflowsByFilenamePattern(pattern, repoOverride string, verbose bool) 
 		fmt.Fprintf(os.Stderr, "Looking for workflow with filename containing: %s\n", pattern)
 	}
 
-	// Check if any workflow path contains the pattern
-	// The pattern is the workflow name (e.g., "daily-repo-status")
-	// The path is like ".github/workflows/daily-repo-status.lock.yml"
-	// We check if the path contains the pattern
-	if strings.Contains(string(output), pattern+".lock.yml") || strings.Contains(string(output), pattern+".md") {
+	statuses, err := matchWorkflowByFilename(pattern, output)
+	if err != nil {
+		return nil, err
+	}
+	if len(statuses) > 0 {
 		if verbose {
 			fmt.Fprintf(os.Stderr, "Workflow with filename '%s' found in workflow list\n", pattern)
 		}
 		addInteractiveLog.Printf("Workflow lookup by filename pattern=%q: found", pattern)
-		return []WorkflowStatus{{Workflow: pattern}}, nil
+		return statuses, nil
 	}
 
 	if verbose {
 		fmt.Fprintf(os.Stderr, "Workflow with filename '%s' NOT found in workflow list\n", pattern)
 	}
 	addInteractiveLog.Printf("Workflow lookup by filename pattern=%q: not found", pattern)
+	return nil, nil
+}
+
+func matchWorkflowByFilename(pattern string, listJSON []byte) ([]WorkflowStatus, error) {
+	var workflows []struct {
+		Path string `json:"path"`
+	}
+	if err := json.Unmarshal(listJSON, &workflows); err != nil {
+		return nil, fmt.Errorf("decode workflow list: %w", err)
+	}
+
+	for _, w := range workflows {
+		filename := path.Base(w.Path)
+		if filename == pattern+".lock.yml" || filename == pattern+".md" {
+			return []WorkflowStatus{{Workflow: pattern}}, nil
+		}
+	}
 	return nil, nil
 }
