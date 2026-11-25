@@ -2042,6 +2042,75 @@ describe("push_routing_history saves", () => {
     expect(remoteState(remote)).toMatchObject({ reconciled_through: 904, unresolved_lookup_cursor: 20 });
     expect(remoteState(remote).unresolved_runs).toContain(50);
   });
+
+  it("falls back to the newest uncovered ID-less obligation when the oldest exceeds the search call budget", async () => {
+    const agent = { name: "agent", conclusion: "failure", started_at: "2026-11-24T09:00:00Z" };
+    const writer = conclusion => ({ name: "push_routing_history", conclusion, started_at: "2026-11-24T09:10:00Z" });
+    // 10,000 runs with unresolved [50, 4500]: #50 lies beyond MAX_SEARCH_CALLS=16, while live failed
+    // #4500 is reachable via the fallback scan against the newest remaining uncovered obligation.
+    const runs = Array.from({ length: 10000 }, (_, i) => {
+      const number = 10000 - i;
+      return paginationRun(number, { conclusion: number === 4500 ? "failure" : "success" });
+    });
+    const github = fakeGitHub(null, { runs, jobs: { 13500: [agent, writer("failure")] } });
+    const { listing, reconciliation } = await listRuns({
+      githubClient: github,
+      owner: "octo",
+      repo: "demo",
+      workflowFile: "triage.lock.yml",
+      defaultBranch: "main",
+      runId: "19001",
+      runNumber: 10001,
+      state: { ...emptyState("triage"), generation: { hash: GENERATION, since_run: 1 }, last_run: 10000, reconciled_through: 10000, unresolved_runs: [50, 4500], unexplained: 0 },
+      runs: [],
+      generation: GENERATION,
+    });
+    expect(listing).toEqual([expect.objectContaining({ id: "13500", number: 4500, conclusion: "failure", agent_ran: true })]);
+    expect(reconciliation.resolved).toContain(4500);
+    expect(reconciliation.unresolved).toEqual([50]);
+  });
+
+  it("retains a failing run and still advances the direct-lookup cursor when per-run job enrichment throws", async () => {
+    const remote = bareRemote();
+    const trackedIds = Array.from({ length: 20 }, (_, i) => i + 1);
+    const unresolvedRunIds = Object.fromEntries(trackedIds.map(n => [String(n), String(9000 + n)]));
+    seedHistory(
+      remote,
+      {
+        ...emptyState("triage"),
+        generation: { hash: GENERATION, since_run: 1 },
+        last_run: 900,
+        reconciled_through: 900,
+        unresolved_runs: trackedIds,
+        unresolved_run_ids: unresolvedRunIds,
+        unexplained: 0,
+      },
+      []
+    );
+    const runsById = Object.fromEntries(trackedIds.map(n => [9000 + n, paginationRun(n, n === 3 ? { status: "completed", conclusion: "failure" } : { status: "in_progress", conclusion: null })]));
+    const recentRuns = Array.from({ length: 100 }, (_, i) => paginationRun(900 - i));
+    const github = fakeGitHub(remote, { runs: recentRuns, runsById });
+    const origJobs = github.rest.actions.listJobsForWorkflowRunAttempt;
+    github.rest.actions.listJobsForWorkflowRunAttempt = async params => {
+      if (params.run_id === 9003) throw Object.assign(new Error("500 internal error"), { status: 500 });
+      return origJobs(params);
+    };
+
+    // Save #902 checks IDs 1..10: #3's job lookup throws, but #3 stays unresolved with its ID and
+    // cursor advances to 10 so Save #904 still visits IDs 11..20 instead of starving them.
+    recentRuns.unshift(paginationRun(901, { head_branch: "pr-901", event: "pull_request" }));
+    await save(remote, 902, "success", { github });
+    expect(global.core.warning).toHaveBeenCalledWith(expect.stringMatching(/500 internal error/));
+    expect(github.calls.runs).toEqual(Array.from({ length: 10 }, (_, i) => 9001 + i));
+    expect(remoteState(remote)).toMatchObject({ reconciled_through: 902, unresolved_lookup_cursor: 10 });
+    expect(remoteState(remote).unresolved_runs).toContain(3);
+    expect(remoteState(remote).unresolved_run_ids["3"]).toBe("9003");
+
+    recentRuns.unshift(paginationRun(903, { head_branch: "pr-903", event: "pull_request" }), paginationRun(902));
+    await save(remote, 904, "success", { github });
+    expect(github.calls.runs).toEqual(Array.from({ length: 20 }, (_, i) => 9001 + i));
+    expect(remoteState(remote)).toMatchObject({ reconciled_through: 904, unresolved_lookup_cursor: 20 });
+  });
 });
 
 describe("routing history under concurrent writers", () => {

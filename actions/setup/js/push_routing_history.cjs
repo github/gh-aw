@@ -928,8 +928,18 @@ async function listRuns({ githubClient, owner, repo, workflowFile, workflowPath 
   const uncoveredUnindexed = unindexedMissing.filter(num => !scanCoversNumber(intervalUnfilteredScan, num));
   if (uncoveredUnindexed.length > 0) {
     try {
-      const unfilteredStream = await fetchStreamWindow(listPages({}), Math.min(...uncoveredUnindexed), upperNeeded);
+      const minTarget = Math.min(...uncoveredUnindexed);
+      const unfilteredStream = await fetchStreamWindow(listPages({}), minTarget, upperNeeded);
       recordUnfilteredStream(unfilteredStream);
+      // If the oldest uncovered obligation exceeds the search budget, retry once against the newest
+      // remaining uncovered obligation so an unreachable ancient entry cannot starve newer ones.
+      if (!unfilteredStream.reachedFloor && uncoveredUnindexed.length > 1) {
+        const remaining = uncoveredUnindexed.filter(num => num !== minTarget && !eligibleByNumber.has(num) && !ineligibleNumbers.has(num) && !resolved.has(num));
+        if (remaining.length > 0) {
+          const fallbackStream = await fetchStreamWindow(listPages({}), Math.max(...remaining), upperNeeded);
+          recordUnfilteredStream(fallbackStream);
+        }
+      }
     } catch (error) {
       core.warning(`Could not scan unfiltered runs for ID-less unresolved obligations: ${getErrorMessage(error)}`);
     }
@@ -1002,33 +1012,41 @@ async function listRuns({ githubClient, owner, repo, workflowFile, workflowPath 
       unresolvedIds[String(num)] = id;
       continue;
     }
-    let conclusion = run.conclusion;
-    // A successful re-run can hide a failed first save.
-    if ((run.run_attempt || 1) > 1)
-      ({
-        data: { conclusion },
-      } = await githubClient.rest.actions.getWorkflowRunAttempt({ owner, repo, run_id: run.id, attempt_number: 1 }));
-    /** @type {{id: string, number: number, conclusion: string, agent_ran?: boolean, generation?: string}} */
-    const listed = { id, number: num, conclusion: conclusion || "unknown" };
-    let include = true;
-    if (!SAVED_CONCLUSIONS.has(listed.conclusion)) {
-      const jobs = await githubClient.paginate(githubClient.rest.actions.listJobsForWorkflowRunAttempt, { owner, repo, run_id: run.id, attempt_number: 1, per_page: 100 });
-      listed.agent_ran = jobs.some((/** @type {any} */ job) => job?.name === "agent" && job.conclusion !== "skipped" && Boolean(job.started_at));
-      const writer = jobs.find((/** @type {any} */ job) => job?.name === WRITER_JOB);
-      // A run that failed before any job was created (jobs.length === 0) is recorded as no_agent.
-      // When jobs exist, nothing is owed by a run compiled while adaptive routing was off or for a
-      // dry run (both omit the history job), or by a run whose history job succeeded: it saved the
-      // run, or declined it, as for a pull request into another branch.
-      if (jobs.length > 0 && (!writer || writer.conclusion === "success")) include = false;
-      // Only trust head_sha for non-pull_request_target runs on the default branch; pull_request_target's
-      // REST head_sha is the PR head rather than the base commit that supplied the workflow definition.
-      if (include && listed.agent_ran && num <= effectiveSinceRun && run.event !== "pull_request_target" && run.head_branch === defaultBranch && typeof run.head_sha === "string" && run.head_sha) {
-        const runGeneration = await readRunGeneration({ githubClient, owner, repo, workflowPath, ref: run.head_sha });
-        if (runGeneration) listed.generation = runGeneration;
+    try {
+      let conclusion = run.conclusion;
+      // A successful re-run can hide a failed first save.
+      if ((run.run_attempt || 1) > 1)
+        ({
+          data: { conclusion },
+        } = await githubClient.rest.actions.getWorkflowRunAttempt({ owner, repo, run_id: run.id, attempt_number: 1 }));
+      /** @type {{id: string, number: number, conclusion: string, agent_ran?: boolean, generation?: string}} */
+      const listed = { id, number: num, conclusion: conclusion || "unknown" };
+      let include = true;
+      if (!SAVED_CONCLUSIONS.has(listed.conclusion)) {
+        const jobs = await githubClient.paginate(githubClient.rest.actions.listJobsForWorkflowRunAttempt, { owner, repo, run_id: run.id, attempt_number: 1, per_page: 100 });
+        listed.agent_ran = jobs.some((/** @type {any} */ job) => job?.name === "agent" && job.conclusion !== "skipped" && Boolean(job.started_at));
+        const writer = jobs.find((/** @type {any} */ job) => job?.name === WRITER_JOB);
+        // A run that failed before any job was created (jobs.length === 0) is recorded as no_agent.
+        // When jobs exist, nothing is owed by a run compiled while adaptive routing was off or for a
+        // dry run (both omit the history job), or by a run whose history job succeeded: it saved the
+        // run, or declined it, as for a pull request into another branch.
+        if (jobs.length > 0 && (!writer || writer.conclusion === "success")) include = false;
+        // Only trust head_sha for non-pull_request_target runs on the default branch; pull_request_target's
+        // REST head_sha is the PR head rather than the base commit that supplied the workflow definition.
+        if (include && listed.agent_ran && num <= effectiveSinceRun && run.event !== "pull_request_target" && run.head_branch === defaultBranch && typeof run.head_sha === "string" && run.head_sha) {
+          const runGeneration = await readRunGeneration({ githubClient, owner, repo, workflowPath, ref: run.head_sha });
+          if (runGeneration) listed.generation = runGeneration;
+        }
       }
+      if (include) listing.push(listed);
+      if (isTrackedUnresolved) resolved.add(num);
+    } catch (error) {
+      // Keep this run unresolved with its ID so a per-run API failure does not discard other
+      // resolved runs, verified interval coverage, or direct-lookup cursor progress.
+      core.warning(`Could not inspect earlier run ${num} (${id}): ${getErrorMessage(error)}`);
+      unresolved.add(num);
+      unresolvedIds[String(num)] = id;
     }
-    if (include) listing.push(listed);
-    if (isTrackedUnresolved) resolved.add(num);
   }
 
   for (const num of prevUnresolved) {
