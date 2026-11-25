@@ -17,7 +17,7 @@ permissions:
 tracker-id: update-astro
 model: router/economy
 engine:
-  id: codex
+  id: copilot
   model-provider: github
 strict: true
 
@@ -30,6 +30,9 @@ network:
   allowed:
     - defaults
     - node
+    - docs.astro.build
+    - github.com
+    - starlight.astro.build
 
 imports:
   - shared/pr-safe-output-defaults.md
