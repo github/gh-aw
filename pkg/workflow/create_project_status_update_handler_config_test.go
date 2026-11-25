@@ -81,6 +81,48 @@ Test workflow
 		"Expected max:5 in create_project_status_update handler config")
 }
 
+func TestCreateProjectStatusUpdateHandlerConfigDefaultsMaxToOne(t *testing.T) {
+	for _, test := range []struct {
+		name   string
+		config string
+	}{
+		{
+			name: "object configuration",
+			config: `create-project-status-update:
+    project: "https://github.com/orgs/test-org/projects/1"`,
+		},
+		{
+			name:   "null configuration",
+			config: "create-project-status-update: null",
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			tmpDir := testutil.TempDir(t, "handler-config-default-test")
+			testContent := `---
+name: Test Status Update Default
+on: workflow_dispatch
+engine: copilot
+safe-outputs:
+  ` + strings.ReplaceAll(test.config, "\n", "\n  ") + `
+---
+
+Test workflow
+`
+
+			mdFile := filepath.Join(tmpDir, "test-workflow.md")
+			require.NoError(t, os.WriteFile(mdFile, []byte(testContent), 0600))
+
+			compiler := NewCompiler()
+			require.NoError(t, compiler.CompileWorkflow(mdFile))
+
+			compiledContent, err := os.ReadFile(filepath.Join(tmpDir, "test-workflow.lock.yml"))
+			require.NoError(t, err)
+			handlerConfig := extractHandlerConfig(t, string(compiledContent))
+			require.InDelta(t, 1, handlerConfig["create_project_status_update"]["max"], 0)
+		})
+	}
+}
+
 // TestCreateProjectStatusUpdateHandlerConfigIncludesGitHubToken verifies that the github-token field
 // is properly passed to the handler config JSON (GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG)
 func TestCreateProjectStatusUpdateHandlerConfigIncludesGitHubToken(t *testing.T) {
