@@ -763,4 +763,38 @@ describe("verified reconciliation coverage", () => {
     expect(olderWriter.state.unexplained).toBe(0);
     expect(olderWriter.state.reconciled_through).toBe(99);
   });
+
+  it("persists unresolved_lookup_cursor while tracked IDs remain and removes it once cleared", () => {
+    const state = {
+      ...emptyState("triage"),
+      generation: { hash: GEN1, since_run: 1 },
+      last_run: 100,
+      reconciled_through: 100,
+      unresolved_runs: [50, 51],
+      unresolved_run_ids: { "50": "9050", "51": "9051" },
+    };
+    const step1 = applyRun(
+      state,
+      [],
+      makeRun(101, {
+        reconciliation: { verified: true, unresolved: [], resolved: [], unresolved_lookup_cursor: 50 },
+      })
+    );
+    expect(step1.state.unresolved_lookup_cursor).toBe(50);
+
+    // Preserves the cursor across an unverified save that runs no direct lookups.
+    const step2 = applyRun(step1.state, step1.lines, makeRun(102, { reconciliation: { verified: false } }));
+    expect(step2.state.unresolved_lookup_cursor).toBe(50);
+
+    // Clears the cursor once no tracked unresolved run IDs remain.
+    const step3 = applyRun(
+      step2.state,
+      [...step1.lines, ...step2.lines],
+      makeRun(103, {
+        reconciliation: { verified: true, unresolved: [], resolved: [50, 51], unresolved_lookup_cursor: 51 },
+      })
+    );
+    expect(step3.state.unresolved_run_ids).toBeUndefined();
+    expect(step3.state.unresolved_lookup_cursor).toBeUndefined();
+  });
 });
