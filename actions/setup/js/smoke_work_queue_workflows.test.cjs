@@ -35,6 +35,44 @@ function verification(name) {
   return { job, step, run: env => runInNewContext(script, { require: () => assert, process: { env } }) };
 }
 
+function runWorkerAssignmentValidation(continuation) {
+  const worker = readWorkflow("worker");
+  const script = worker["pre-agent-steps"][0].run.match(/node <<'JS'\n([\s\S]*?)\nJS/)[1];
+  const dispatchId = `d_${"a".repeat(64)}_1`;
+  const assignment = {
+    version: 4,
+    dispatch_id: dispatchId,
+  };
+  const snapshot = {
+    version: 4,
+    worker: {
+      dispatch_id: dispatchId,
+      claims: [
+        {
+          work: {
+            smoke: "work-queue-v1",
+            task: "Complete the synthetic work queue smoke task.",
+            effect_contract: { kind: "none" },
+          },
+          ...(continuation === undefined ? {} : { continuation }),
+        },
+      ],
+    },
+  };
+  const files = {
+    "/event.json": JSON.stringify({ inputs: { work_queue_assignment: JSON.stringify(assignment) } }),
+    "/tmp/gh-aw/work-queue.snapshot.json": JSON.stringify(snapshot),
+  };
+  return runInNewContext(script, {
+    require: name => {
+      if (name === "node:assert/strict") return assert;
+      if (name === "node:fs") return { readFileSync: file => files[file] };
+      throw new Error(`Unexpected module ${name}`);
+    },
+    process: { env: { GH_AW_WORK_QUEUE_ROLE: "worker", GITHUB_EVENT_PATH: "/event.json" } },
+  });
+}
+
 const successfulJobs = { SMOKE_ACTIVATION_RESULT: "success", SMOKE_AGENT_RESULT: "success", SMOKE_SAFE_OUTPUTS_RESULT: "success" };
 const dispatchId = index => `d_${String(index).repeat(64)}_1`;
 const startedLaunches = [1, 2, 3].map(index => ({ dispatch_id: dispatchId(index), state: "started" }));
@@ -183,6 +221,80 @@ describe("native work queue smoke verification", () => {
     expect(post).toContain('{ version: 4, claim_handle: handle, outcome: "completed" }');
     expect(post).toContain('item.type.replace(/-/g, "_") === "request_continuation"');
     expect(post).not.toContain("keep_open");
+  });
+
+  it("accepts root and valid successor assignments", () => {
+    expect(() => runWorkerAssignmentValidation()).not.toThrow();
+    expect(() =>
+      runWorkerAssignmentValidation({
+        route: "workqueue",
+        remaining: 0,
+        message: "Smoke continuation: run the synthetic smoke task once more.",
+      })
+    ).not.toThrow();
+  });
+
+  it.each([
+    ["extra continuation fields", { route: "workqueue", remaining: 0, message: "Continue the smoke task.", extra: true }],
+    ["wrong route", { route: "other", remaining: 0, message: "Continue the smoke task." }],
+    ["remaining depth", { route: "workqueue", remaining: 1, message: "Continue the smoke task." }],
+    ["blank message", { route: "workqueue", remaining: 0, message: " \t" }],
+  ])("rejects successor assignments with %s", (_reason, continuation) => {
+    expect(() => runWorkerAssignmentValidation(continuation)).toThrow();
+  });
+
+  it("publishes the dispatcher alert from a typed issue report", async () => {
+    const script = readWorkflow("dispatcher").jobs.report_smoke_failure.steps[0].with.script;
+    const issueReport = requireSetup("./issue_report.cjs");
+    let report;
+    const publications = [];
+    const github = {
+      rest: {
+        issues: {
+          create: async parameters => {
+            publications.push(parameters);
+            return { data: { number: 123 } };
+          },
+        },
+      },
+    };
+    const modules = {
+      ...issueReport,
+      createReportIssue: (client, parameters, typedReport) => {
+        report = typedReport;
+        return issueReport.createReportIssue(client, parameters, typedReport);
+      },
+    };
+    await runInNewContext(`(async () => {\n${script}\n})()`, {
+      require: name => {
+        if (name === "node:path") return path;
+        if (name.endsWith("issue_report.cjs")) return modules;
+        throw new Error(`Unexpected module ${name}`);
+      },
+      process: {
+        env: {
+          RUNNER_TEMP: "/tmp/runner",
+          SMOKE_AGENT_RESULT: "failure",
+          SMOKE_SAFE_OUTPUTS_RESULT: "success",
+          SMOKE_VERIFY_RESULT: "failure",
+        },
+      },
+      context: { repo: { owner: "github", repo: "gh-aw" }, serverUrl: "https://github.com", runId: 123, runAttempt: 1 },
+      github,
+      core: { info() {} },
+    });
+
+    expect(report.children.map(block => block.type)).toEqual(["heading", "paragraph", "table", "paragraph"]);
+    expect(report.children[1].children[1]).toMatchObject({
+      type: "link",
+      url: "https://github.com/github/gh-aw/actions/runs/123/attempts/1",
+    });
+    expect(report.children[2].rows[2]).toEqual([[{ type: "text", value: "verify_smoke_dispatch", agentTainted: false }], [{ type: "text", value: "failure", agentTainted: false }]]);
+    expect(publications).toHaveLength(1);
+    expect(publications[0]).toMatchObject({ owner: "github", repo: "gh-aw", assignees: ["elefthei"] });
+    expect(publications[0].body).toContain("## Smoke Work Queue Dispatcher failure");
+    expect(publications[0].body).toContain("[https://github.com/github/gh-aw/actions/runs/123/attempts/1](https://github.com/github/gh-aw/actions/runs/123/attempts/1)");
+    expect(publications[0].body).toContain("| Job | Result |");
   });
 
   it("compiles always-running verifiers, the finish step after Process Safe Outputs, and trusted receipt sources", () => {

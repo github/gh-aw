@@ -77,28 +77,53 @@ jobs:
           SMOKE_VERIFY_RESULT: ${{ needs.verify_smoke_dispatch.result }}
         with:
           script: |
+            const path = require("node:path");
+            const { buildIssueReport, createReportIssue } = require(path.join(process.env.RUNNER_TEMP, "gh-aw/actions/setup/js/issue_report.cjs"));
+            const text = value => ({ type: "text", value: String(value), agentTainted: false });
             const { owner, repo } = context.repo;
             const runUrl = `${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}/attempts/${context.runAttempt ?? process.env.GITHUB_RUN_ATTEMPT}`;
-            const issue = await github.rest.issues.create({
+            const title = `[WorkQueue Health] Smoke Work Queue Dispatcher failed - run ${context.runId}`;
+            const report = buildIssueReport(title, [
+              { type: "heading", level: 2, children: [text("Smoke Work Queue Dispatcher failure")], agentTainted: false },
+              {
+                type: "paragraph",
+                children: [
+                  text("Workflow run: "),
+                  { type: "link", url: runUrl, children: [text(runUrl)], agentTainted: false },
+                ],
+                agentTainted: false,
+              },
+              {
+                type: "table",
+                headers: [[text("Job")], [text("Result")]],
+                rows: [
+                  [[text("agent")], [text(process.env.SMOKE_AGENT_RESULT)]],
+                  [[text("safe_outputs")], [text(process.env.SMOKE_SAFE_OUTPUTS_RESULT)]],
+                  [[text("verify_smoke_dispatch")], [text(process.env.SMOKE_VERIFY_RESULT)]],
+                ],
+                agentTainted: false,
+              },
+              {
+                type: "paragraph",
+                children: [
+                  text("The "),
+                  { type: "code", value: "verify_smoke_dispatch", agentTainted: false },
+                  text(" check requires successful agent and safe_outputs jobs plus exactly three accepted "),
+                  { type: "code", value: "smoke-work-queue-worker", agentTainted: false },
+                  text(" dispatches. Check the "),
+                  { type: "code", value: "verify_smoke_dispatch", agentTainted: false },
+                  text(" log for the failed assertion, then inspect the queue ledger and worker runs."),
+                ],
+                agentTainted: false,
+              },
+            ], { agentTainted: false });
+            const issue = await createReportIssue(github, {
               owner,
               repo,
-              title: `[WorkQueue Health] Smoke Work Queue Dispatcher failed - run ${context.runId}`,
-              body: [
-                "## Smoke Work Queue Dispatcher failure",
-                "",
-                `**Workflow run:** ${runUrl}`,
-                "",
-                "| Job | Result |",
-                "| --- | --- |",
-                `| agent | ${process.env.SMOKE_AGENT_RESULT} |`,
-                `| safe_outputs | ${process.env.SMOKE_SAFE_OUTPUTS_RESULT} |`,
-                `| verify_smoke_dispatch | ${process.env.SMOKE_VERIFY_RESULT} |`,
-                "",
-                "`verify_smoke_dispatch` requires a successful agent and safe_outputs job plus exactly three accepted `smoke-work-queue-worker` dispatches. Check the `verify_smoke_dispatch` log for the failed assertion, then the queue ledger and worker runs.",
-              ].join("\n"),
+              title,
               labels: ["automation", "testing", "backlog:run-alerts"],
               assignees: ["elefthei"],
-            });
+            }, report);
             core.info(`Opened issue #${issue.data.number}`);
 steps:
   - name: Prepare synthetic work and bounded dispatch
