@@ -54,6 +54,9 @@ func TestDetectionRedactionOrderingAndGates(t *testing.T) {
 					"steps.redact_detection_artifacts.outcome":    "success",
 					"steps.detection_guard.outputs.run_detection": "true",
 				}
+				if external {
+					outcomes["steps.detection_staging_reset.outcome"] = "success"
+				}
 				consumers := 0
 				for i, step := range parsed.Steps {
 					positions[step.Name] = i
@@ -99,7 +102,9 @@ func TestDetectionRedactionOrderingAndGates(t *testing.T) {
 						continue
 					}
 					for property := range outcomes {
-						if !strings.HasSuffix(property, ".outcome") || (step.ID == "parse_detection_token_usage" && property == "steps.redact_detection_artifacts.outcome") {
+						if !strings.HasSuffix(property, ".outcome") ||
+							(step.ID == "parse_detection_token_usage" && property == "steps.redact_detection_artifacts.outcome") ||
+							(property == "steps.detection_staging_reset.outcome" && step.Name != "Upload threat detection artifact") {
 							continue
 						}
 						for _, outcome := range []string{"failure", "skipped", "cancelled", ""} {

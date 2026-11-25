@@ -3,6 +3,7 @@ package lint
 import (
 	"context"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -557,5 +558,50 @@ func TestCustomJobDetectionSharedFragments(t *testing.T) {
 			require.NoError(t, err)
 			assert.Empty(t, diagnostics)
 		})
+	}
+}
+
+func TestSmokeDetectionVerdictChecks(t *testing.T) {
+	source, err := os.ReadFile(filepath.Join("..", "..", "..", ".github", "workflows", "shared", "check-detection-verdict.md"))
+	require.NoError(t, err)
+	doc, err := aw.Parse(string(source))
+	require.NoError(t, err)
+	jobs := doc.Frontmatter["jobs"].(map[string]any)
+	status := jobs["check_detection_status"].(map[string]any)
+	verdict := jobs["check_detection_verdict"].(map[string]any)
+	assert.Equal(t, "status-only", status["detection-gate"])
+	assert.Equal(t, []any{"agent", "detection", "check_detection_verdict"}, status["needs"])
+	assert.Equal(t, "always() && needs.agent.result == 'success'", status["if"])
+	assert.Equal(t, "always() && needs.agent.result == 'success' && needs.detection.result == 'success'", verdict["if"])
+	assert.Equal(t, map[string]any{
+		"DETECTION_RESULT": "${{ needs.detection.result }}",
+		"VERDICT_RESULT":   "${{ needs.check_detection_verdict.result }}",
+	}, status["steps"].([]any)[0].(map[string]any)["env"])
+	assert.Equal(t, map[string]any{
+		"RUN_DETECTION": "${{ needs.detection.outputs.run_detection }}",
+		"CONCLUSION":    "${{ needs.detection.outputs.detection_conclusion }}",
+		"SUCCESS":       "${{ needs.detection.outputs.detection_success }}",
+	}, verdict["steps"].([]any)[0].(map[string]any)["env"])
+	for _, tt := range []struct {
+		job     map[string]any
+		env     []string
+		success bool
+	}{
+		{status, []string{"DETECTION_RESULT=success", "VERDICT_RESULT=success"}, true},
+		{status, []string{"DETECTION_RESULT=skipped", "VERDICT_RESULT=skipped"}, false},
+		{status, []string{"DETECTION_RESULT=failure", "VERDICT_RESULT=skipped"}, false},
+		{status, []string{"DETECTION_RESULT=success", "VERDICT_RESULT=skipped"}, false},
+		{status, []string{"DETECTION_RESULT=success", "VERDICT_RESULT=failure"}, false},
+		{verdict, []string{"RUN_DETECTION=true", "CONCLUSION=success", "SUCCESS=true"}, true},
+		{verdict, []string{"RUN_DETECTION=false", "CONCLUSION=success", "SUCCESS=true"}, false},
+		{verdict, []string{"RUN_DETECTION=true", "CONCLUSION=failure", "SUCCESS=true"}, false},
+		{verdict, []string{"RUN_DETECTION=true", "CONCLUSION=success", "SUCCESS=false"}, false},
+		{verdict, nil, false},
+	} {
+		step := tt.job["steps"].([]any)[0].(map[string]any)
+		cmd := exec.Command("bash", "-c", step["run"].(string))
+		cmd.Env = tt.env
+		err := cmd.Run()
+		assert.Equal(t, tt.success, err == nil, "env: %v", tt.env)
 	}
 }

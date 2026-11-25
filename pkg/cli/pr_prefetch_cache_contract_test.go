@@ -113,8 +113,8 @@ func TestTopReviewWorkflowsHaveHeadAwarePRDataCacheKeys(t *testing.T) {
 	assert.Contains(t, text, "test-data-head-sha.txt", "Test Quality Sentinel should persist cache head SHA marker")
 	assert.Contains(t, text, "set -uo pipefail", "Test Quality Sentinel prefetch should not hard-fail under errexit before the agent can report_incomplete")
 	assert.Contains(t, text, "test-prefetch-unavailable.txt", "Test Quality Sentinel should write a fallback marker when prefetch data is unavailable")
-	assert.Contains(t, text, `{"report_incomplete": {"reason": "Test Quality Sentinel could not review tests because pre-fetch PR data was unavailable: <reason>"}}`, "Test Quality Sentinel prompt should instruct the agent to report_incomplete with the fallback reason")
-	assert.Contains(t, text, "immediately call `report_incomplete` (never `noop`)", "Test Quality Sentinel prompt should forbid noop when prefetch data is unavailable")
+	assert.Contains(t, text, "read its reason and immediately call `report_incomplete`", "Test Quality Sentinel prompt should instruct the agent to report_incomplete with the fallback reason")
+	assert.Contains(t, text, "immediately call `report_incomplete`. Never analyze fallback files, call `noop`, or post a report.", "Test Quality Sentinel prompt should forbid noop when prefetch data is unavailable")
 }
 
 func TestSentinelPrefetchDiffEvidence(t *testing.T) {
