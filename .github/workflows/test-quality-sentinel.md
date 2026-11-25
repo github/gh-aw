@@ -290,7 +290,7 @@ Review whether tests cover behavioral contracts and design invariants, not only 
 
 ## Step 1: Check evidence and scope
 
-If `/tmp/gh-aw/agent/test-prefetch-unavailable.txt` exists, read its reason and immediately call `report_incomplete`. Never analyze fallback files, call `noop`, or post a report. Missing, stale, truncated, or oversized required evidence also requires `report_incomplete`, never approval or `noop`.
+If `/tmp/gh-aw/agent/test-prefetch-unavailable.txt` exists, read its reason and immediately call `report_incomplete` (never `noop`) with `{"report_incomplete": {"reason": "Test Quality Sentinel could not review tests because pre-fetch PR data was unavailable: <reason>"}}`. Never analyze fallback files or post a report. Missing, stale, truncated, or oversized required evidence also requires `report_incomplete`, never approval or `noop`.
 
 Read `/tmp/gh-aw/agent/pr-meta.json`, `test-files.txt`, `test-diff.txt` (maximum 40 KB), `diff-numstat.txt`, `go-new-test-funcs.txt`, `go-modified-test-funcs.txt`, `js-new-test-funcs.txt`, `js-changed-test-files.txt`, `go-testmain-funcs.txt`, `go-goleak-entries.txt`, `missing-build-tags.txt`, `go-test-stats.txt`, and `js-test-stats.txt` from `/tmp/gh-aw/agent/`.
 
