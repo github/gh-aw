@@ -36,7 +36,12 @@ const CLASSIFIER_PURPOSE = "routing_classification";
 // The job that runs this script, as the jobs API names it.
 const WRITER_JOB = "push_routing_history";
 const LIST_RUNS_PER_PAGE = 100;
-const MAX_LIST_PAGES = 8;
+// GitHub Actions lists only the newest 1,000 runs that match a query, so page 10 is the last readable page.
+const MAX_LIST_PAGE = 10;
+// Listing calls one stream may make in a save. New windows open only within the first MAX_SEARCH_CALLS,
+// which leaves calls to finish the search and walk back up.
+const MAX_SEARCH_CALLS = 16;
+const MAX_LIST_CALLS = 24;
 const MAX_DIRECT_UNRESOLVED_LOOKUPS = 10;
 const LEVELS = new Set(["economy", "balanced", "robust"]);
 const MODES = new Set(["observe"]);
@@ -309,131 +314,166 @@ async function checkoutHistoryBranch({ githubClient, owner, repo, branch, worksp
   throw new Error(`${ERR_API}: Could not check out ${branch}`);
 }
 
+/** A run's creation time in whole seconds, rounded up so `created: "<=..."` includes it, or null. */
+function createdSecond(run) {
+  const ms = typeof run?.created_at === "string" ? Date.parse(run.created_at) : NaN;
+  return Number.isFinite(ms) ? Math.ceil(ms / 1000) : null;
+}
+
 /**
- * Fetch a bounded contiguous window of newest-first workflow-runs pages covering `targetRunNumber`
- * upward toward `maxRunNumber`. In the common case page 1 reaches `targetRunNumber` (or the start
- * of the stream) in one call. When `targetRunNumber` lies more than `maxPages` pages back and
- * `total_count` is reported, binary-searches to the page covering `targetRunNumber` and walks
- * upward so large gaps advance in verified chunks without stalling.
- * @param {(page: number) => Promise<any>} fetchPage
+ * What the floor search needs to know about one listed page.
+ * @param {any[]} runs
+ * @param {boolean} last whether the page ends the listing
+ */
+function pageSummary(runs, last) {
+  let minNum = Infinity;
+  let maxNum = -Infinity;
+  let oldest = Infinity;
+  let newest = -Infinity;
+  let timed = true;
+  for (const run of runs) {
+    const second = createdSecond(run);
+    if (second === null) {
+      timed = false;
+    } else {
+      oldest = Math.min(oldest, second);
+      newest = Math.max(newest, second);
+    }
+    if (Number.isInteger(run?.run_number)) {
+      minNum = Math.min(minNum, run.run_number);
+      maxNum = Math.max(maxNum, run.run_number);
+    }
+  }
+  // Runs created in the same second are listed in any order, so the page's oldest second can
+  // continue on the next page. Every later run is older than the runs created after it.
+  let settled = Infinity;
+  for (const run of runs) {
+    if ((createdSecond(run) ?? -Infinity) > oldest && Number.isInteger(run?.run_number)) settled = Math.min(settled, run.run_number);
+  }
+  return { runs, last, full: runs.length === LIST_RUNS_PER_PAGE, timed, minNum, maxNum, oldest, newest, settled };
+}
+
+/** @param {any[]} runs */
+function uniqueRuns(runs) {
+  const seen = new Set();
+  return runs.filter(run => {
+    if (run?.id == null) return true;
+    if (seen.has(run.id)) return false;
+    seen.add(run.id);
+    return true;
+  });
+}
+
+/**
+ * Read one newest-first run listing from the page holding `targetRunNumber` back up toward
+ * `maxRunNumber`, within a bounded number of calls.
+ *
+ * GitHub Actions lists only the newest 1,000 runs that match a query (pages 1 to 10). When the
+ * target is older, the search continues in a window of the runs created no later than the oldest
+ * second on the previous window's page 10, and the walk back up re-reads each window in turn. A
+ * page holds the floor when `total_count` shows it ends the listing, or when it is full, every run
+ * on it has a creation time, and the runs created after its oldest second already reach the target.
+ * Pages are read in order when the target can be among a window's readable pages, which also
+ * covers the walk back up; otherwise the window's last readable page is read first, and the pages
+ * in between are read in order when it is already past the target. A listing without
+ * `total_count`, a short page above the floor, or a search that runs out of calls fails closed.
+ * @param {(page: number, created?: string) => Promise<any>} fetchPage
  * @param {number} targetRunNumber lowest run_number we must reach (inclusive)
  * @param {number} maxRunNumber highest run_number we need to verify (inclusive)
- * @param {number} [maxPages]
+ * @returns {Promise<{items: any[], reachedFloor: boolean, maxVerified: number}>}
  */
-async function fetchStreamWindow(fetchPage, targetRunNumber, maxRunNumber, maxPages = MAX_LIST_PAGES) {
-  /** @type {Map<number, { batch: any[], minNum: number, maxNum: number, reachedStart: boolean }>} */
-  const pages = new Map();
+async function fetchStreamWindow(fetchPage, targetRunNumber, maxRunNumber) {
+  /** @typedef {ReturnType<typeof pageSummary>} Page */
+  /** @typedef {{created: string | undefined, total: number | null, pages: Map<number, Page>, bottom: number}} RunWindow */
+  /** @type {RunWindow[]} */
+  const windows = [];
   let calls = 0;
-  /** @type {number | null} */
-  let totalCount = null;
 
-  /** @param {number} pageNum */
-  const load = async pageNum => {
-    const existing = pages.get(pageNum);
-    if (existing) return existing;
+  /** @param {RunWindow} win @param {number} page @returns {Promise<Page>} */
+  const load = async (win, page) => {
+    const cached = win.pages.get(page);
+    if (cached) return cached;
     calls += 1;
-    const response = await fetchPage(pageNum);
-    const batch = response?.data?.workflow_runs || [];
-    if (typeof response?.data?.total_count === "number") totalCount = response.data.total_count;
-    let minNum = Infinity;
-    let maxNum = -Infinity;
-    for (const item of batch) {
-      if (Number.isInteger(item?.run_number)) {
-        if (item.run_number < minNum) minNum = item.run_number;
-        if (item.run_number > maxNum) maxNum = item.run_number;
-      }
-    }
-    const reachedStart = typeof totalCount === "number" ? (pageNum - 1) * LIST_RUNS_PER_PAGE + batch.length >= totalCount : batch.length < LIST_RUNS_PER_PAGE;
-    const entry = { batch, minNum, maxNum, reachedStart };
-    pages.set(pageNum, entry);
+    const data = (await fetchPage(page, win.created))?.data;
+    const runs = Array.isArray(data?.workflow_runs) ? data.workflow_runs : [];
+    if (typeof data?.total_count === "number") win.total = data.total_count;
+    const last = win.total !== null && (page - 1) * LIST_RUNS_PER_PAGE + runs.length >= win.total;
+    const entry = pageSummary(runs, last);
+    win.pages.set(page, entry);
     return entry;
   };
+  /** @param {Page} entry */
+  const holdsFloor = entry => entry.last || (entry.full && entry.timed && entry.settled <= targetRunNumber);
+  const fail = () => ({ items: uniqueRuns(windows.flatMap(win => [...win.pages.values()].flatMap(entry => entry.runs))), reachedFloor: false, maxVerified: targetRunNumber - 1 });
 
-  const first = await load(1);
-  if (first.reachedStart || (first.batch.length > 0 && first.minNum <= targetRunNumber)) {
-    return { items: first.batch, reachedFloor: true, maxVerified: maxRunNumber };
-  }
-  if (first.batch.length === 0) {
-    return { items: [], reachedFloor: false, maxVerified: targetRunNumber - 1 };
-  }
-
-  const lastPage = typeof totalCount === "number" ? Math.ceil(totalCount / LIST_RUNS_PER_PAGE) : null;
-  if (lastPage === null || lastPage <= maxPages) {
-    const items = [...first.batch];
-    for (let pageNum = 2; pageNum <= maxPages; pageNum++) {
-      const entry = await load(pageNum);
-      items.push(...entry.batch);
-      if (entry.reachedStart || (entry.batch.length > 0 && entry.minNum <= targetRunNumber)) {
-        return { items, reachedFloor: true, maxVerified: maxRunNumber };
+  /** @type {number | null} */
+  let cutoff = null;
+  let floorPage = 1;
+  for (;;) {
+    if (calls >= MAX_SEARCH_CALLS) return fail();
+    /** @type {RunWindow} */
+    const win = { created: cutoff === null ? undefined : `<=${new Date(cutoff * 1000).toISOString().replace(/\.\d{3}Z$/, "Z")}`, total: null, pages: new Map(), bottom: 0 };
+    windows.push(win);
+    const first = await load(win, 1);
+    // A listing without total_count cannot show where it ends, and a later window repeats at least
+    // the runs from the second it was cut at.
+    if (win.total === null || (windows.length > 1 && first.runs.length === 0)) return fail();
+    const lastPage = Math.min(MAX_LIST_PAGE, Math.ceil(win.total / LIST_RUNS_PER_PAGE));
+    // Run numbers are unique, so a target this far below page 1 is likely past the readable pages.
+    let jump = first.minNum - targetRunNumber > (lastPage - 1) * LIST_RUNS_PER_PAGE;
+    let page = 1;
+    let entry = first;
+    while (!holdsFloor(entry) && entry.full && page < lastPage) {
+      if (calls >= MAX_LIST_CALLS) return fail();
+      page = jump ? lastPage : page + 1;
+      entry = await load(win, page);
+      // The last page is already past the target, so read the pages it skipped in order.
+      if (jump && !holdsFloor(entry) && entry.maxNum < targetRunNumber) {
+        jump = false;
+        page = 1;
+        entry = first;
       }
-      if (entry.batch.length === 0) break;
     }
-    return { items, reachedFloor: false, maxVerified: targetRunNumber - 1 };
-  }
-
-  let lo = 2;
-  let hi = lastPage;
-  /** @type {number | null} */
-  let floorPage = null;
-  /** @type {number | null} */
-  let newestTooOld = null;
-  let oldestTooNew = 1;
-  // Allow enough bounded binary-search probes to locate floorPage before applying the upward chunk budget.
-  const searchBudget = Math.max(maxPages, Math.ceil(Math.log2(lastPage)) + 2);
-
-  while (lo <= hi && calls < searchBudget) {
-    const mid = Math.floor((lo + hi) / 2);
-    const entry = await load(mid);
-    if (entry.batch.length === 0) {
-      return { items: [...pages.values()].flatMap(p => p.batch), reachedFloor: false, maxVerified: targetRunNumber - 1 };
-    }
-    if (entry.minNum <= targetRunNumber && entry.maxNum >= targetRunNumber) {
-      floorPage = mid;
+    if (holdsFloor(entry)) {
+      floorPage = page;
       break;
     }
-    if (entry.minNum > targetRunNumber) {
-      oldestTooNew = Math.max(oldestTooNew, mid);
-      if (entry.reachedStart) {
-        floorPage = mid;
-        break;
-      }
-      lo = mid + 1;
+    if (!entry.full || !entry.timed || page !== MAX_LIST_PAGE || (cutoff !== null && entry.oldest >= cutoff)) return fail();
+    win.bottom = page;
+    cutoff = entry.oldest;
+  }
+
+  /** @type {Page[]} */
+  const walked = [];
+  let w = windows.length - 1;
+  let page = floorPage;
+  for (;;) {
+    const win = windows[w];
+    if (!win.pages.has(page) && calls >= MAX_LIST_CALLS) break;
+    const entry = await load(win, page);
+    // Every page above the floor is full unless the listing lost runs between calls.
+    if (walked.length > 0 && !entry.full) return fail();
+    walked.push(entry);
+    if (page > 1) {
+      page -= 1;
+    } else if (w > 0) {
+      w -= 1;
+      page = windows[w].bottom;
     } else {
-      newestTooOld = newestTooOld === null ? mid : Math.min(newestTooOld, mid);
-      hi = mid - 1;
+      return { items: uniqueRuns(walked.flatMap(e => e.runs)), reachedFloor: true, maxVerified: maxRunNumber };
     }
   }
 
-  if (floorPage === null && newestTooOld !== null && newestTooOld === oldestTooNew + 1) {
-    floorPage = oldestTooNew;
+  // The unread page above can still hold runs created in the newest second read, so only runs
+  // created before it are verified.
+  const newest = walked[walked.length - 1].newest;
+  const items = uniqueRuns(walked.flatMap(e => e.runs));
+  let maxVerified = -Infinity;
+  for (const run of items) {
+    if ((createdSecond(run) ?? Infinity) < newest && Number.isInteger(run.run_number)) maxVerified = Math.max(maxVerified, run.run_number);
   }
-  if (floorPage === null) {
-    return { items: [...pages.values()].flatMap(p => p.batch), reachedFloor: false, maxVerified: targetRunNumber - 1 };
-  }
-
-  // Reserve at least one upward chunk fetch after binary search locates floorPage so large backlogs keep advancing.
-  const walkBudget = Math.max(maxPages, calls + 1);
-  let newestPage = floorPage;
-  while (newestPage > 1) {
-    const prevPage = newestPage - 1;
-    if (pages.has(prevPage)) {
-      newestPage = prevPage;
-      continue;
-    }
-    if (calls >= walkBudget) break;
-    const entry = await load(prevPage);
-    if (entry.batch.length === 0) break;
-    newestPage = prevPage;
-  }
-
-  const items = [];
-  for (let p = newestPage; p <= floorPage; p++) {
-    const entry = pages.get(p);
-    if (entry) items.push(...entry.batch);
-  }
-  const topEntry = pages.get(newestPage);
-  const maxVerified = newestPage === 1 ? maxRunNumber : Math.min(maxRunNumber, topEntry?.maxNum ?? targetRunNumber - 1);
-  return { items, reachedFloor: true, maxVerified };
+  if (maxVerified < targetRunNumber) return fail();
+  return { items, reachedFloor: true, maxVerified: Math.min(maxRunNumber, maxVerified) };
 }
 
 /**
@@ -498,10 +538,10 @@ async function listRuns({ githubClient, owner, repo, workflowFile, workflowPath 
   writtenNumbers.add(runNumber);
 
   const upperNeeded = Math.max(floor, runNumber - 1);
-  const [defaultStream, prtStream] = await Promise.all([
-    fetchStreamWindow(page => githubClient.rest.actions.listWorkflowRuns({ owner, repo, workflow_id: workflowFile, branch: defaultBranch, per_page: LIST_RUNS_PER_PAGE, page }), floor + 1, upperNeeded),
-    fetchStreamWindow(page => githubClient.rest.actions.listWorkflowRuns({ owner, repo, workflow_id: workflowFile, event: "pull_request_target", per_page: LIST_RUNS_PER_PAGE, page }), floor + 1, upperNeeded),
-  ]);
+  /** @param {Record<string, string>} filter */
+  const listPages = filter => (/** @type {number} */ page, /** @type {string | undefined} */ created) =>
+    githubClient.rest.actions.listWorkflowRuns({ owner, repo, workflow_id: workflowFile, ...filter, per_page: LIST_RUNS_PER_PAGE, page, ...(created ? { created } : {}) });
+  const [defaultStream, prtStream] = await Promise.all([fetchStreamWindow(listPages({ branch: defaultBranch }), floor + 1, upperNeeded), fetchStreamWindow(listPages({ event: "pull_request_target" }), floor + 1, upperNeeded)]);
 
   let verified = defaultStream.reachedFloor && prtStream.reachedFloor;
   let verifiedUpper = verified ? Math.min(upperNeeded, defaultStream.maxVerified, prtStream.maxVerified) : floor;
@@ -541,7 +581,7 @@ async function listRuns({ githubClient, owner, repo, workflowFile, workflowPath 
       if (num > earliestGap) break;
       earliestGap = num + 1;
     }
-    const unfilteredStream = await fetchStreamWindow(page => githubClient.rest.actions.listWorkflowRuns({ owner, repo, workflow_id: workflowFile, per_page: LIST_RUNS_PER_PAGE, page }), earliestGap, verifiedUpper);
+    const unfilteredStream = await fetchStreamWindow(listPages({}), earliestGap, verifiedUpper);
     for (const run of unfilteredStream.items) {
       const num = run.run_number;
       if (!Number.isInteger(num) || num <= state.reset_after_run || num >= runNumber) continue;
@@ -608,7 +648,7 @@ async function listRuns({ githubClient, owner, repo, workflowFile, workflowPath 
   // fall back to an unfiltered window search when we did not already run one.
   const unindexedMissing = stillMissingUnresolved.filter(num => !eligibleByNumber.has(num) && !ineligibleNumbers.has(num) && !resolved.has(num) && !storedUnresolvedIds[String(num)]);
   if (unindexedMissing.length > 0 && !hasIntervalGap) {
-    const unfilteredStream = await fetchStreamWindow(page => githubClient.rest.actions.listWorkflowRuns({ owner, repo, workflow_id: workflowFile, per_page: LIST_RUNS_PER_PAGE, page }), Math.min(...unindexedMissing), upperNeeded);
+    const unfilteredStream = await fetchStreamWindow(listPages({}), Math.min(...unindexedMissing), upperNeeded);
     for (const run of unfilteredStream.items) {
       const num = run.run_number;
       if (!Number.isInteger(num) || num <= state.reset_after_run || num >= runNumber) continue;
@@ -824,4 +864,4 @@ async function main(options = {}) {
   await core.summary.addRaw(`### Routing history\n\nRecorded run ${runId} in \`${config.branch}\` (${config.mode}): ${own?.pair ? `\`${own.pair}\`` : "no pair"}, ${own?.outcome ?? "no outcome"}, ${counted}.\n`).write();
 }
 
-module.exports = { checkoutHistoryBranch, ineligibility, listRuns, main, pairName, readConfig, readHistory, runCost, sessionEvidence };
+module.exports = { checkoutHistoryBranch, fetchStreamWindow, ineligibility, listRuns, main, pairName, readConfig, readHistory, runCost, sessionEvidence };
