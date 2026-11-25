@@ -174,8 +174,9 @@ export default defineConfig({
     "/patterns/trialops/": "/gh-aw/experimental/trial-ops/",
     "/patterns/workqueueops/": "/gh-aw/patterns/workqueue-ops/",
 
-    // Contributing → Troubleshooting
-    "/contributing/error-messages/": "/gh-aw/troubleshooting/error-messages/",
+    // Error message style guide
+    "/contributing/error-messages/": "/gh-aw/contributing/error-message-style-guide/",
+    "/troubleshooting/error-messages/": "/gh-aw/contributing/error-message-style-guide/",
 
     // Guides → new locations
     "/guides/deploy-work-queue/": "/gh-aw/patterns/workqueue-ops/#deploy-a-native-queue",

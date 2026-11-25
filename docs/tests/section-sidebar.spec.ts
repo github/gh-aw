@@ -30,6 +30,25 @@ function sidebarGroup(page: Page, label: string) {
   });
 }
 
+test("Troubleshooting links to runtime errors, not the contributor style guide", async ({ page }) => {
+  await page.goto("/gh-aw/introduction/overview/");
+  const group = sidebarGroup(page, "Troubleshooting");
+  await group.locator("summary").click();
+  await expect(group.getByRole("link", { name: "Error Messages", exact: true })).toHaveCount(0);
+  await group.getByRole("link", { name: "Common Issues", exact: true }).click();
+  await expect(page).toHaveURL(/\/gh-aw\/troubleshooting\/common-issues\/$/);
+  await expect(page.getByRole("cell", { name: /Error loading models: 400 Bad Request/ })).toBeVisible();
+});
+
+for (const oldPath of ["contributing/error-messages", "troubleshooting/error-messages"]) {
+  test(`${oldPath} redirects to the contributor style guide`, async ({ page }) => {
+    await page.goto(`/gh-aw/${oldPath}/#prefer-constructive-language`);
+    await expect(page).toHaveURL(/\/gh-aw\/contributing\/error-message-style-guide\/#prefer-constructive-language$/);
+    await expect(page.getByRole("heading", { name: "Error message style guide", exact: true })).toBeVisible();
+    await expect(page.locator("#prefer-constructive-language")).toBeVisible();
+  });
+}
+
 test("specification links show only their titles in the desktop sidebar and mobile menu", async ({ page }) => {
   const specRoute = "/gh-aw/specs/unified-agent-session-specification/";
   await page.goto("/gh-aw/introduction/overview/");

@@ -155,7 +155,7 @@ When a core team member implements your plan, the coding agent they use will:
 - **Follow code organization patterns** (see [scratchpad/code-organization.md](scratchpad/code-organization.md))
 - **Implement validation** following the architecture in [scratchpad/validation-architecture.md](scratchpad/validation-architecture.md)
 - **Use console formatting** from `pkg/console` for CLI output
-- **Write error messages** following the [Error Message Style Guide](.github/skills/error-messages/SKILL.md) and [docs guide](docs/src/content/docs/troubleshooting/error-messages.md)
+- **Write error messages** following the [Error Message Style Guide](.github/skills/error-messages/SKILL.md) and [docs guide](docs/src/content/docs/contributing/error-message-style-guide.md)
 - **Run the final quality gate**: `make agent-report-progress` (build, impacted tests, workflow drift, formatting, lint)
 - **Update documentation** for new features
 - **Create tests** for new functionality
