@@ -164,6 +164,37 @@ func TestConnectorAzureWriterRequiresExclusiveEnvironment(t *testing.T) {
 	}
 }
 
+func TestConnectorAzureWriterRejectsOtherJobEnvironments(t *testing.T) {
+	const write = "safe-outputs:\n  environment: publish\n  tracker-add-comment:\n"
+	for _, tc := range []struct {
+		name, job, want string
+	}{
+		{"same name", "environment: publish", "must not share"},
+		{"case insensitive", "environment: PUBLISH", "must not share"},
+		{"object name", "environment:\n      name: publish", "must not share"},
+		{"dynamic name", "environment: ${{ inputs.environment }}", "dynamically select"},
+		{"distinct name", "environment: test", ""},
+		{"no environment", "", ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			c, root := awConnectorCompiler(t)
+			jobs := "jobs:\n  other:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo ok\n"
+			if tc.job != "" {
+				jobs += "    " + tc.job + "\n"
+			}
+			data, err := c.ParseWorkflowString(awConnectorHeader+connectorAzureSource(t)+jobs+write+"---\nReview.\n", root+"/proof.md")
+			require.NoError(t, err)
+			_, err = c.CompileToYAML(data, root+"/proof.md")
+			if tc.want == "" {
+				require.NoError(t, err)
+			} else {
+				require.ErrorContains(t, err, "job other")
+				require.ErrorContains(t, err, tc.want)
+			}
+		})
+	}
+}
+
 func TestConnectorAzureWriterIdentityOnlyForLiveWrites(t *testing.T) {
 	const read = "tools:\n  tracker: [get-issue]\n"
 	for _, tc := range []struct {

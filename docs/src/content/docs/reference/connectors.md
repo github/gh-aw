@@ -442,10 +442,18 @@ and custom safe jobs, must run in a separate workflow.
 
 Protect that GitHub environment, use a separate writer application, and trust only
 `repo:OWNER/REPO:environment:connector-publish` on the writer application.
-Do not grant the agent job access to that environment. If both applications
-trust the same repository/branch subject, a job with OIDC access could request
-a token for either application by changing the client ID. Verify resolved IDs,
-federation rules, environment protection and provider ACLs outside compilation.
+The compiler checks only the workflow being compiled: another workflow that
+uses the same environment, passes its protection rules, and has `id-token: write`
+can obtain the same default environment subject and exchange it for the writer
+identity. Audit all workflows that can use the environment, restrict deployment
+branches and require reviewers, and limit the writer's Azure permissions. Where
+supported, bind federation to a workflow-specific custom OIDC subject or trusted
+broker and verify the Entra trust matches it.
+
+Do not grant the agent job access to that environment. If both applications trust
+the same repository/branch subject, a job with OIDC access could request a token
+for either application by changing the client ID. Verify resolved IDs, federation
+rules, environment protection and provider ACLs outside compilation.
 
 `phase: inference` continues to delegate exchange and renewal to the native
 engine, with its existing firewall and version requirements. Selecting a
