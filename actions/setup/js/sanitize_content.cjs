@@ -122,9 +122,6 @@ function sanitizeContent(content, maxLengthOrOptions) {
   // If allowed aliases are specified, we need custom mention filtering
   // We'll apply the same sanitization pipeline but with selective mention filtering
 
-  // Match the core path's early limit before processing untrusted content.
-  content = applyTruncation(content, maxLength, maxLines);
-
   // Build list of allowed domains (shared with core)
   const allowedDomains = buildAllowedDomains();
 

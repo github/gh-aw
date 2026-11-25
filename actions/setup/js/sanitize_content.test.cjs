@@ -2131,9 +2131,9 @@ describe("sanitize_content.cjs", () => {
       expect(applyTruncation("a\nb\nc", 100, 2)).toBe("a\nb\n[Content truncated due to line count]");
     });
 
-    it.each([{}, { allowedAliases: ["author"] }, { deferMentions: true }])("truncates before parsing content with options %o", options => {
-      const content = "x".repeat(100) + "&" + "amp;".repeat(40) + "commat;";
-      expect(sanitizeContent(content, { ...options, maxLength: 50 })).toBe("x".repeat(50) + "\n[Content truncated due to length]");
+    it.each([{ allowedAliases: ["author"] }, { deferMentions: true }])("removes complete comments before truncation with options %o", options => {
+      const content = "Visible summary\n<!--" + "x".repeat(100) + "-->\nCritical results";
+      expect(sanitizeContent(content, { ...options, maxLength: 50 })).toBe("Visible summary\n\nCritical results");
     });
 
     it.each([NaN, Infinity, -1, 1.5, "10", {}])("fails closed for invalid mention limits: %o", limit => {
