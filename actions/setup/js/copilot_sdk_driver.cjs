@@ -30,8 +30,10 @@
 "use strict";
 
 const fs = require("fs");
+const path = require("path");
 const { runWithCopilotSDK, extractPromptFromArgs, isCopilotSDKBareMode, resolveCopilotSDKWorkingDirectory } = require("./copilot_sdk_session.cjs");
 const { parsePermissionConfigFromServerArgs } = require("./copilot_sdk_permissions.cjs");
+const { createURLPermissionCheck, readAWFNetworkConfig } = require("./copilot_url_permissions.cjs");
 const { parseCopilotSDKToolConfig, loadCopilotSDKMCPServers } = require("./copilot_sdk_tool_config.cjs");
 const { parseMultiProviderJson, qualifyModelForMultiProvider } = require("./copilot_sdk_multi_provider.cjs");
 const { applyModelFallback } = require("./model_fallback.cjs");
@@ -128,6 +130,10 @@ async function main() {
   const mcpServers = loadCopilotSDKMCPServers(toolConfig);
   const permissionConfig = toolConfig.permissions;
   log(`permission config: ${permissionConfig.allowedTools.length} compiler-owned allow-tool entries`);
+  // URL approvals mirror the CLI engine's --allow-url flags derived from the AWF network config.
+  const awfConfigPath = process.env.GH_AW_AWF_CONFIG_PATH || "/tmp/gh-aw/awf-config.json";
+  const awfFallbackConfigPath = !process.env.GH_AW_AWF_CONFIG_PATH && process.env.RUNNER_TEMP ? path.join(process.env.RUNNER_TEMP, "gh-aw", "awf-config.json") : undefined;
+  const isURLAllowed = createURLPermissionCheck(readAWFNetworkConfig({ env: process.env, configPath: awfConfigPath, fallbackConfigPath: awfFallbackConfigPath }));
 
   // --- Run SDK session -------------------------------------------------
 
@@ -143,6 +149,7 @@ async function main() {
     permissionConfig,
     toolConfig,
     mcpServers,
+    isURLAllowed,
     workingDirectory: resolveCopilotSDKWorkingDirectory(),
     bare: isCopilotSDKBareMode(process.env.GH_AW_COPILOT_SDK_SERVER_ARGS, log),
   });

@@ -7,7 +7,8 @@ import path from "path";
 import { spawnSync } from "child_process";
 
 const require = createRequire(import.meta.url);
-const { domainURLPatterns, addCopilotURLPermissions } = require("./copilot_url_permissions.cjs");
+const { domainURLPatterns, addCopilotURLPermissions, readAWFNetworkConfig, createURLPermissionCheck } = require("./copilot_url_permissions.cjs");
+const { buildCopilotSDKPermissionHandler } = require("./copilot_sdk_permissions.cjs");
 const { main: updateNetworkAllowed } = require("./update_network_allowed.cjs");
 
 describe("Copilot URL permissions", () => {
@@ -221,5 +222,32 @@ describe("Copilot URL permissions", () => {
     expect(result.status, result.stderr).toBe(0);
     const args = JSON.parse(fs.readFileSync(argsPath, "utf8"));
     expect(args).toContain("https://shared.example.test");
+  });
+
+  describe("SDK URL approvals", () => {
+    const check = createURLPermissionCheck({ allowDomains: ["localhost", "github.com", "https://secure.example.com", "http://127.0.0.1:4173"], blockDomains: ["blocked.github.com"] });
+
+    it.each(["http://localhost:4321/gh-aw/", "https://api.github.com/repos", "https://github.com", "https://secure.example.com/x", "http://127.0.0.1:4173/"])("approves URLs inside the AWF allowlist: %s", url => {
+      expect(check(url)).toBe(true);
+    });
+
+    it.each(["https://blocked.github.com/", "https://evilgithub.com/", "http://secure.example.com/", "http://127.0.0.1:8080/", "ftp://github.com/", "file:///etc/passwd", "not a url", undefined])(
+      "denies URLs outside the allowlist, blocked, or unparseable: %s",
+      url => {
+        expect(check(url)).toBe(false);
+      }
+    );
+
+    it("denies every URL without an AWF network config", () => {
+      expect(createURLPermissionCheck(undefined)("https://github.com")).toBe(false);
+      expect(readAWFNetworkConfig({ env: {}, configPath: "/nonexistent" })).toBeUndefined();
+    });
+
+    it("approves a shell-triggered URL request only inside the network scope", () => {
+      const approveAll = () => ({ kind: "approve-once" });
+      const handler = buildCopilotSDKPermissionHandler({ allowedTools: ["shell(curl http://localhost:4321/gh-aw/:*)"] }, approveAll, { isURLAllowed: check });
+      expect(handler({ kind: "url", url: "http://localhost:4321/gh-aw/" })).toEqual({ kind: "approve-once" });
+      expect(handler({ kind: "url", url: "https://example.org/" })).toMatchObject({ kind: "reject" });
+    });
   });
 });
