@@ -118,6 +118,7 @@ func TestConnectorInferenceRejectsInvalidSelection(t *testing.T) {
 		{"SDK mode", func(f map[string]any) { f["engine"].(map[string]any)["copilot-sdk"] = true }, "cannot preserve the granted wire model"},
 		{"model catalogue", func(f map[string]any) { f["engine"].(map[string]any)["model-catalog"] = true }, "model-catalog: true conflicts"},
 	}
+
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			compiler, path := prepareConnectorScenario(t, azureAIGatewayScenario, false, func(f, _ map[string]any) { tc.change(f) })
@@ -125,6 +126,16 @@ func TestConnectorInferenceRejectsInvalidSelection(t *testing.T) {
 			require.ErrorContains(t, err, tc.error)
 		})
 	}
+}
+
+func TestConnectorInferenceAllowsLearningOptOut(t *testing.T) {
+	compiler, path := prepareConnectorScenario(t, azureAIGatewayScenario, false, func(f, _ map[string]any) {
+		f["model-routing"] = map[string]any{"learning": false}
+	})
+	data, err := compiler.ParseWorkflowFile(path)
+	require.NoError(t, err)
+	require.Equal(t, "gpt-5.2", data.Model)
+	require.Empty(t, data.AdaptiveRouting)
 }
 
 func TestConnectorInferenceAutoAllowsSelectedProfileHosts(t *testing.T) {

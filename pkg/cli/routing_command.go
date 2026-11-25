@@ -192,7 +192,7 @@ func NewRoutingCommand() *cobra.Command {
 		Short: "Show or reset what adaptive routing has recorded for a workflow",
 		Long: `Show or reset what adaptive routing has recorded for a workflow.
 
-A workflow with adaptive-routing: observe keeps its ordinary router pick, and each
+A workflow with learning: observe under model-routing keeps its ordinary router pick, and each
 run's model and effort, verdict and cost are recorded on its
 memory/adaptive-routing/<workflow> branch.
 
@@ -367,7 +367,7 @@ func runRoutingStatus(ctx context.Context, api routingAPI, workflowID string, ou
 		return err
 	}
 	if head == "" {
-		return fmt.Errorf("no routing history for %s: %s does not exist. Add adaptive-routing: observe to the workflow and let it run", workflowID, branch)
+		return fmt.Errorf("no routing history for %s: %s does not exist. Set learning: observe under model-routing in the workflow and let it run", workflowID, branch)
 	}
 	state, err := readRoutingState(ctx, api, head, workflowID)
 	if err != nil {

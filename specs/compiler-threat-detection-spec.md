@@ -950,7 +950,7 @@ This is an existing-behavior supply-chain mapping. No new `CTR-*` rule or compli
 
 ### 7.18 Adaptive Routing History Writer
 
-`adaptive-routing: observe` adds a post-conclusion `push_routing_history` job that records routed-run evidence on `memory/adaptive-routing/<workflow>` without changing the model that runs. The compiler MUST keep that history outside agent control:
+Setting `model-routing.learning` to `observe` adds a post-conclusion `push_routing_history` job that records routed-run evidence on `memory/adaptive-routing/<workflow>` without changing the model that runs. The compiler MUST keep that history outside agent control:
 
 - Reject any `tools.repo-memory` branch equal to or inside `memory/adaptive-routing`, so the agent can never edit its own record.
 - Grant `contents: write` and `actions: read` only to the writer job, never to the agent or other jobs; the job MUST depend on `activation`, `agent`, and `conclusion` and MUST NOT run when the agent was skipped.

@@ -166,7 +166,7 @@ type RepoConfig struct {
 	// Admission overrides admission step generation for all workflows when set.
 	Admission *bool
 
-	// AdaptiveRouting is the repository default for adaptive-routing: "observe", or "" when
+	// AdaptiveRouting is the repository default for model-routing.learning: "observe", or "" when
 	// unset or false. A workflow's own value or an imported one wins.
 	AdaptiveRouting string
 
@@ -307,7 +307,7 @@ func (r *RepoConfig) UnmarshalJSON(data []byte) error { //nolint:largefunc // Po
 	var raw struct {
 		ProtectedFiles           RepoProtectedFilesConfig      `json:"protected_files,omitzero"`
 		Admission                *bool                         `json:"admission,omitempty"`
-		AdaptiveRouting          any                           `json:"adaptive_routing,omitempty"`
+		ModelRouting             map[string]any                `json:"model_routing,omitempty"`
 		SafeOutputAuthorization  json.RawMessage               `json:"safe_output_authorization,omitempty"`
 		GatewayDispatch          bool                          `json:"gateway-dispatch,omitempty"`
 		Strict                   bool                          `json:"strict,omitempty"`
@@ -335,9 +335,7 @@ func (r *RepoConfig) UnmarshalJSON(data []byte) error { //nolint:largefunc // Po
 	r.GatewayDispatch = raw.GatewayDispatch
 	r.ProtectedFiles = raw.ProtectedFiles
 	r.Admission = raw.Admission
-	if mode, ok := raw.AdaptiveRouting.(string); ok {
-		r.AdaptiveRouting = mode
-	}
+	r.AdaptiveRouting = stringFromMap(raw.ModelRouting, "learning") // The schema also accepts false (off).
 	authorization, err := parseRepoSafeOutputAuthorization(raw.SafeOutputAuthorization)
 	if err != nil {
 		return err

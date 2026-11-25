@@ -1,4 +1,4 @@
-// This file implements adaptive-routing: observe. An eligible routed workflow keeps
+// This file implements model-routing.learning: observe. An eligible routed workflow keeps
 // its ordinary router pick, and a push_routing_history job, after the conclusion job
 // has published the run's unified session, records the run in the workflow's routing
 // history on memory/adaptive-routing/<workflow>
@@ -30,7 +30,7 @@ const (
 // The workflow ID names the history branch, so it must be a valid ref component.
 var adaptiveRoutingWorkflowIDPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_-]*(?:\.[A-Za-z0-9_-]+)*$`)
 
-// adaptiveRoutingSetting is the effective adaptive-routing value. explicit marks a value
+// adaptiveRoutingSetting is the effective model-routing.learning value. explicit marks a value
 // from the workflow or an import, where an unsupported workflow is an error; a
 // repository default skips such a workflow silently.
 type adaptiveRoutingSetting struct {
@@ -41,10 +41,10 @@ type adaptiveRoutingSetting struct {
 // resolveAdaptiveRoutingSetting applies the precedence: the workflow's own value
 // (including false), then the first import that sets it, then aw.json, then off.
 func resolveAdaptiveRoutingSetting(frontmatter map[string]any, imported string, repoConfig *RepoConfig) (adaptiveRoutingSetting, error) {
-	value, ok := frontmatter["adaptive-routing"]
+	value, ok := ExtractMapField(frontmatter, "model-routing")["learning"]
 	if !ok && imported != "" {
 		if err := decodeModelRoutingJSONDocument(imported, &value); err != nil {
-			return adaptiveRoutingSetting{}, fmt.Errorf("imported adaptive-routing value is not recognized: %w", err)
+			return adaptiveRoutingSetting{}, fmt.Errorf("imported model-routing.learning value is not recognized: %w", err)
 		}
 		ok = true
 	}
@@ -63,10 +63,8 @@ func resolveAdaptiveRoutingSetting(frontmatter map[string]any, imported string, 
 		if !v {
 			return adaptiveRoutingSetting{explicit: true}, nil
 		}
-		return adaptiveRoutingSetting{}, NewValidationError("adaptive-routing", "true", "live adaptive routing is not available yet; use observe",
-			"Set adaptive-routing: observe to record each run's routing evidence without changing which model runs.")
 	}
-	return adaptiveRoutingSetting{}, NewValidationError("adaptive-routing", fmt.Sprint(value), "unsupported adaptive-routing value", "Use observe, or false to turn it off.")
+	return adaptiveRoutingSetting{}, NewValidationError("model-routing.learning", fmt.Sprint(value), "unsupported learning mode", "Use observe, or false to turn it off.")
 }
 
 // adaptiveRoutingIneligibility returns why the workflow cannot keep a routing history,
@@ -100,7 +98,7 @@ func adaptiveRoutingIneligibility(data *WorkflowData) string {
 	return ""
 }
 
-// applyAdaptiveRouting resolves adaptive-routing once the routing configuration and
+// applyAdaptiveRouting resolves model-routing.learning once the routing configuration and
 // repo-memory are final.
 func (c *Compiler) applyAdaptiveRouting(ctx *workflowBuildContext) error {
 	repoConfig, err := c.loadRepoConfig()
@@ -117,11 +115,11 @@ func (c *Compiler) applyAdaptiveRouting(ctx *workflowBuildContext) error {
 	data := ctx.workflowData
 	if reason := adaptiveRoutingIneligibility(data); reason != "" {
 		if !setting.explicit {
-			adaptiveRoutingLog.Printf("Repository default adaptive-routing skipped for %s: %s", data.WorkflowID, reason)
+			adaptiveRoutingLog.Printf("Repository default model-routing.learning skipped for %s: %s", data.WorkflowID, reason)
 			return nil
 		}
-		err := NewValidationError("adaptive-routing", setting.mode, "this workflow cannot use adaptive routing: "+reason,
-			"Adaptive routing needs a router-selected primary model (for example model: router/balanced) on a Copilot, Claude, or Codex engine, and tools.repo-memory enabled. Remove adaptive-routing or set it to false.")
+		err := NewValidationError("model-routing.learning", setting.mode, "this workflow cannot use adaptive routing: "+reason,
+			"Learning needs a router-selected primary model (for example model: router/balanced) on a Copilot, Claude, or Codex engine, and tools.repo-memory enabled. Remove learning or set it to false.")
 		return formatCompilerError(ctx.cleanPath, "error", err.Error(), err)
 	}
 	data.AdaptiveRouting = setting.mode
@@ -156,10 +154,10 @@ func (c *Compiler) addPushRoutingHistoryJob(data *WorkflowData) error {
 		return nil
 	}
 	if _, exists := c.jobManager.GetJob(string(constants.ConclusionJobName)); !exists {
-		return errors.New("adaptive-routing requires the conclusion job, which publishes the run's unified session")
+		return errors.New("model-routing.learning requires the conclusion job, which publishes the run's unified session")
 	}
 	if !isSHA256Hex(data.FrontmatterHash) || !isSHA256Hex(data.BodyHash) {
-		return errors.New("adaptive-routing requires the workflow's frontmatter and body hashes, which identify its definition")
+		return errors.New("model-routing.learning requires the workflow's frontmatter and body hashes, which identify its definition")
 	}
 	permissions := NewPermissionsFromMap(map[PermissionScope]PermissionLevel{PermissionActions: PermissionRead, PermissionContents: PermissionWrite})
 	agentRan := BuildNotEquals(BuildPropertyAccess(fmt.Sprintf("needs.%s.result", constants.AgentJobName)), BuildStringLiteral("skipped"))

@@ -20,6 +20,8 @@ Forces:
 
 ## Decision
 
+The setting was renamed to [`model-routing.learning`](../src/content/docs/reference/adaptive-routing.md) before release. The decision below records the original spelling; the history format and writer are unchanged.
+
 Add an `adaptive-routing: observe` workflow setting, with a repository default in `.github/workflows/aw.json`, that:
 
 1. Keeps the router's ordinary pick unchanged. Observe mode never changes which model runs.

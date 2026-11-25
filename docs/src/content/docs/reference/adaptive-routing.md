@@ -5,13 +5,13 @@ sidebar:
   order: 606
 ---
 
-[Model routing](/gh-aw/reference/model-routing/) chooses a model and reasoning effort for each run from the task in front of it. Adaptive routing adds what the workflow itself has learned: which model and effort each run used, whether the run completed its task, and what it cost. With `adaptive-routing: observe`, the workflow keeps running the router's ordinary pick exactly as before, and gh-aw records every eligible run so that maintainers can see the evidence before anything changes.
+[Model routing](/gh-aw/reference/model-routing/) chooses a model and reasoning effort for each run from the task in front of it. Set `learning: observe` under `model-routing` to record which model and effort ran, whether the workflow completed its task, and what it cost. The router keeps making its ordinary pick.
 
 For example, if the router's pick for an issue triage workflow moves from model B to model A, observe mode keeps running A as today and records each run. A week later, `gh aw routing status` might show B with 40 runs, all successful, at 28 credits a run, and A with 9 runs, one of them a failure, at 12 credits a run. That is the evidence a later live mode would act on. Observe mode makes no recommendation of its own.
 
 ## Turn it on
 
-Add `adaptive-routing: observe` to a routed workflow that uses [repo-memory](/gh-aw/reference/repo-memory/):
+Add `learning: observe` to the top-level `model-routing` block of a routed workflow that uses [repo-memory](/gh-aw/reference/repo-memory/):
 
 ```aw wrap
 ---
@@ -23,9 +23,10 @@ permissions:
   issues: read
 engine: copilot
 model: router
+model-routing:
+  learning: observe
 tools:
   repo-memory: true
-adaptive-routing: observe
 safe-outputs:
   add-comment:
 ---
@@ -36,15 +37,17 @@ To turn it on for every eligible workflow in a repository, set the default in `.
 
 ```json title=".github/workflows/aw.json"
 {
-  "adaptive_routing": "observe"
+  "model_routing": { "learning": "observe" }
 }
 ```
 
-A workflow's own value wins, including `adaptive-routing: false`, then the first import that sets it, then the repository default. `true` is reserved for live adaptive routing, which is not available yet, and fails to compile.
+A workflow's own `learning` value wins, then the first import that sets `learning`, then the repository default. The default is off. Set `learning: false` to stop recording without disabling routing or deleting history. Only `observe` and `false` are supported.
+
+Learning does not enable routing or require a shortlist. If you also use `allowed-models`, declare the list once, alongside `learning` or in a separate import, and use a literal router model value as usual.
 
 ## Which workflows take part
 
-A workflow takes part when its main agent's model is chosen by AWF model routing on a Copilot, Claude, or Codex engine: `model: router`, a fixed level such as `router/balanced`, the [default routing](/gh-aw/reference/model-routing/#default-routing-for-workflows-without-a-model) for workflows without a model, or a model expression that resolves to a router value. It must also enable `tools.repo-memory`, and it must not be a work-queue worker, a reusable workflow (`on: workflow_call`), or run [experiments](/gh-aw/reference/experiments/). A workflow that sets `adaptive-routing: observe` itself, or through an import, fails to compile with the reason when it does not qualify; the repository default skips such workflows silently.
+A workflow takes part when its main agent's model is chosen by AWF model routing on a Copilot, Claude, or Codex engine: `model: router`, a fixed level such as `router/balanced`, the [default routing](/gh-aw/reference/model-routing/#default-routing-for-workflows-without-a-model) for workflows without a model, or a model expression that resolves to a router value. It must also enable `tools.repo-memory`, and it must not be a work-queue worker, a reusable workflow (`on: workflow_call`), or run [experiments](/gh-aw/reference/experiments/). A workflow that sets `learning: observe` itself, or through an import, fails to compile with the reason when it does not qualify; the repository default skips such workflows silently.
 
 At run time, gh-aw records only the first attempt of a run whose workflow definition comes from the default branch, so re-runs and pull request runs are not recorded. Every first attempt is recorded once the agent job has run, whether the run succeeded or failed.
 
