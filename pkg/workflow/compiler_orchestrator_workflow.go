@@ -767,6 +767,11 @@ func (c *Compiler) extractAdditionalConfigurations( //nolint:largefunc // Existi
 			workflowData.SafeOutputs.ThreatDetection = &ThreatDetectionConfig{}
 		}
 	}
+	// A program's outputs are not model-generated, so there is nothing to screen;
+	// validateProgramConfiguration already rejects an explicit threat-detection.
+	if workflowData.Program != "" && workflowData.SafeOutputs != nil {
+		workflowData.SafeOutputs.ThreatDetection = nil
+	}
 
 	// Auto-inject create-issues if safe-outputs is configured but has no non-builtin outputs.
 	// This ensures every workflow with safe-outputs has at least one meaningful action handler.

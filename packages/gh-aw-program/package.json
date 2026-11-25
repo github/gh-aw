@@ -1,0 +1,27 @@
+{
+  "name": "@github/gh-aw-program",
+  "version": "0.1.0",
+  "description": "Type declarations for gh-aw deterministic programs (engine: none). The runtime ships with the gh-aw setup action.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/github/gh-aw.git",
+    "directory": "packages/gh-aw-program"
+  },
+  "types": "index.d.ts",
+  "files": [
+    "index.d.ts"
+  ],
+  "peerDependencies": {
+    "@actions/core": ">=1.10.0",
+    "@actions/exec": ">=1.1.0",
+    "@actions/github": ">=6.0.0",
+    "@actions/io": ">=1.1.0"
+  },
+  "peerDependenciesMeta": {
+    "@actions/core": { "optional": true },
+    "@actions/exec": { "optional": true },
+    "@actions/github": { "optional": true },
+    "@actions/io": { "optional": true }
+  }
+}

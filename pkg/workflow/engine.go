@@ -867,6 +867,9 @@ func (c *Compiler) getAgenticEngine(engineSetting string) (CodingAgentEngine, er
 		engineLog.Printf("Using default engine: %s", defaultEngine.GetID())
 		return defaultEngine, nil
 	}
+	if isNoneEngineID(engineSetting) {
+		return noneEngine, nil
+	}
 
 	engineLog.Printf("Getting agentic engine for setting: %s", engineSetting)
 

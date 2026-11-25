@@ -190,7 +190,10 @@ func (c *Compiler) generateSummarySteps(yaml *strings.Builder, data *WorkflowDat
 
 	// Parse MCP gateway logs for GITHUB_STEP_SUMMARY.
 	// The MCP gateway is always enabled, even when agent sandbox is disabled.
-	c.generateMCPGatewayLogParsing(yaml, data)
+	// A program runs no MCP gateway, so there are no gateway logs to parse.
+	if !isNoneEngineID(engine.GetID()) {
+		c.generateMCPGatewayLogParsing(yaml, data)
+	}
 
 	// Add firewall log parsing for all firewall-enabled engines.
 	// This replaces the previous per-engine blocks (Copilot, Codex, Claude) and extends

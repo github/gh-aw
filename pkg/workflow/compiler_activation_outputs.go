@@ -313,6 +313,11 @@ func workQueueRuntimeRole(data *WorkflowData) string {
 	if data != nil && data.SafeOutputs != nil && data.SafeOutputs.DispatchWorkflow != nil && len(data.SafeOutputs.DispatchWorkflow.Workflows) > 0 {
 		return "dispatcher"
 	}
+	// A program with tools.work-queue publishes directly: it submits Work (and dispatches
+	// when it has approved dispatch targets), so it holds the dispatcher role.
+	if data != nil && data.Program != "" {
+		return "dispatcher"
+	}
 	return "observer"
 }
 

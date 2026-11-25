@@ -115,6 +115,12 @@ func messagesContainPreActivationRef(cfg *SafeOutputMessagesConfig) bool {
 // 2. Generates a "Setup JavaScript files" step to write them to /tmp/gh-aw/scripts/
 // 3. Each safe output step requires from the local filesystem
 func (c *Compiler) buildConsolidatedSafeOutputsJob(data *WorkflowData, mainJobName, markdownPath string) (*Job, []string, error) {
+	// Publisher programs commit and launch from the program job and cannot emit
+	// worker safe outputs (an unassigned dispatcher has no Claim), so there is nothing left to apply.
+	if isProgramPublisher(data) {
+		consolidatedSafeOutputsJobLog.Print("Program publisher commits queue controls itself, skipping consolidated job")
+		return nil, nil, nil
+	}
 	if data.SafeOutputs == nil {
 		if !isWorkQueueParticipant(data) {
 			consolidatedSafeOutputsJobLog.Print("No safe outputs configured, skipping consolidated job")
@@ -389,38 +395,20 @@ func (c *Compiler) buildWorkQueueFinishStep(data *WorkflowData) []string {
 }
 
 func (c *Compiler) buildWorkQueueControlProcessingStep(data *WorkflowData) ([]string, error) {
-	if !isWorkQueueParticipant(data) || data.WorkQueuePolicy == nil {
+	// Program publishers commit their controls directly from the program job.
+	if !isWorkQueueParticipant(data) || data.WorkQueuePolicy == nil || isProgramPublisher(data) {
 		return nil, nil
 	}
-	names := workQueueControlWorkflows(data)
-	config := map[string]any{"work_queue_enabled": true, "work_queue_workflows": names, "aw_context_workflows": names}
-	if data.SafeOutputs != nil && data.SafeOutputs.DispatchWorkflow != nil {
-		config = handlerRegistry["dispatch_workflow"](data.SafeOutputs)
-		config["work_queue_workflows"] = names
-		config["aw_context_workflows"] = names
-	}
-	config["work_queue_enabled"] = true
-	encoded, err := marshalSafeOutputsConfig(config)
+	env, configLine, err := c.workQueueControlEnvironment(data)
 	if err != nil {
-		return nil, fmt.Errorf("work-queue: serialize protected control configuration: %w", err)
+		return nil, err
 	}
 	steps := []string{
 		"      - name: Process trusted work queue controls\n",
 		"        id: work_queue_controls\n",
 		fmt.Sprintf("        uses: %s\n", c.getActionPin("actions/github-script")),
 	}
-	env := workQueuePolicyEnvironment(data)
-	var staged *TemplatableBool
-	if data.SafeOutputs != nil {
-		staged = data.SafeOutputs.Staged
-	}
-	if value := resolveSafeOutputsStagedValue(c.trialMode, staged); value != nil {
-		env = append(env, "          GH_AW_SAFE_OUTPUTS_STAGED: "+fmt.Sprintf("%q", *value)+"\n")
-	}
-	env = append(env, fmt.Sprintf("          GH_AW_GITHUB_TOKEN_SOURCE: %s\n", c.safeOutputGitHubTokenSource(data)))
-	env = append(env, fmt.Sprintf("          GH_AW_WORK_QUEUE_TOKEN: %s\n", resolveSafeOutputGitHubTokenForConfig(data, "", resolveSafeOutputGitHubToken, true)))
-	env = append(env, "          GH_AW_WORK_QUEUE_INTENTS: "+constants.WorkQueueIntentPath+"\n")
-	env = append(env, "          GH_AW_WORK_QUEUE_CONTROL_CONFIG: "+fmt.Sprintf("%q", string(encoded))+"\n")
+	env = append(env, "          GH_AW_WORK_QUEUE_INTENTS: "+constants.WorkQueueIntentPath+"\n", configLine)
 	steps = append(steps, env...)
 	assignmentRequirement := ""
 	if isWorkQueueWorker(data) {
@@ -436,6 +424,36 @@ func (c *Compiler) buildWorkQueueControlProcessingStep(data *WorkflowData) ([]st
 		"            const config = JSON.parse(process.env.GH_AW_WORK_QUEUE_CONTROL_CONFIG);\n",
 		"            await main({ core, github, context, config, maxDispatches: Number(process.env.GH_AW_WORK_QUEUE_DISPATCH_BUDGET || 1)"+assignmentRequirement+" });\n",
 	), nil
+}
+
+// workQueueControlEnvironment returns the env block of trusted queue controls (policy,
+// staged mode, token source and the queue publisher token) and, separately, the
+// GH_AW_WORK_QUEUE_CONTROL_CONFIG line carrying the protected dispatch configuration.
+// The controls step and program publishers share it so both commit with the same authority.
+func (c *Compiler) workQueueControlEnvironment(data *WorkflowData) ([]string, string, error) {
+	names := workQueueControlWorkflows(data)
+	config := map[string]any{"work_queue_enabled": true, "work_queue_workflows": names, "aw_context_workflows": names}
+	if data.SafeOutputs != nil && data.SafeOutputs.DispatchWorkflow != nil {
+		config = handlerRegistry["dispatch_workflow"](data.SafeOutputs)
+		config["work_queue_workflows"] = names
+		config["aw_context_workflows"] = names
+	}
+	config["work_queue_enabled"] = true
+	encoded, err := marshalSafeOutputsConfig(config)
+	if err != nil {
+		return nil, "", fmt.Errorf("work-queue: serialize protected control configuration: %w", err)
+	}
+	env := workQueuePolicyEnvironment(data)
+	var staged *TemplatableBool
+	if data.SafeOutputs != nil {
+		staged = data.SafeOutputs.Staged
+	}
+	if value := resolveSafeOutputsStagedValue(c.trialMode, staged); value != nil {
+		env = append(env, "          GH_AW_SAFE_OUTPUTS_STAGED: "+fmt.Sprintf("%q", *value)+"\n")
+	}
+	env = append(env, fmt.Sprintf("          GH_AW_GITHUB_TOKEN_SOURCE: %s\n", c.safeOutputGitHubTokenSource(data)))
+	env = append(env, fmt.Sprintf("          GH_AW_WORK_QUEUE_TOKEN: %s\n", resolveSafeOutputGitHubTokenForConfig(data, "", resolveSafeOutputGitHubToken, true)))
+	return env, "          GH_AW_WORK_QUEUE_CONTROL_CONFIG: " + fmt.Sprintf("%q", string(encoded)) + "\n", nil
 }
 
 func workQueueControlWorkflows(data *WorkflowData) []string {

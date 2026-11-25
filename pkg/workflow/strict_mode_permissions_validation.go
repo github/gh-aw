@@ -115,6 +115,10 @@ func (c *Compiler) validateStrictFirewall(engineID string, networkPermissions *N
 		strictModeValidationLog.Printf("Strict mode disabled, skipping firewall validation")
 		return nil
 	}
+	// engine: none runs no agent, so there is no agent sandbox or firewall to require.
+	if isNoneEngineID(engineID) {
+		return nil
+	}
 
 	// Check if sandbox.agent: false is set (explicitly disabled)
 	sandboxAgentDisabled := sandboxConfig != nil && sandboxConfig.Agent != nil && sandboxConfig.Agent.Disabled

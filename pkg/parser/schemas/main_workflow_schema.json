@@ -4854,6 +4854,13 @@
         }
       ]
     },
+    "program": {
+      "type": "string",
+      "maxLength": 256,
+      "pattern": "^[A-Za-z0-9_][A-Za-z0-9_.-]*(?:/[A-Za-z0-9_][A-Za-z0-9_.-]*)*\\.(?:ts|mts|cts|js|mjs|cjs)$",
+      "description": "Deterministic program run instead of an agent; requires engine: none. A TypeScript or JavaScript module path relative to the workflow's directory whose default export is an async function receiving the gh-aw program SDK. TypeScript runs through Node.js type stripping, so only erasable syntax is supported.",
+      "examples": ["dispatcher.ts", "programs/ci-outreach-dispatcher.ts"]
+    },
     "engine": {
       "description": "AI engine configuration that specifies which AI processor interprets and executes the markdown content of the workflow. Defaults to 'copilot'.",
       "default": "copilot",
@@ -15703,7 +15710,7 @@
       "oneOf": [
         {
           "type": "string",
-          "description": "Engine name: built-in ('claude', 'codex', 'copilot', 'gemini', 'pi') or a named catalog entry"
+          "description": "Engine name: built-in ('claude', 'codex', 'copilot', 'gemini', 'pi'), a named catalog entry, or 'none' to run the deterministic program named by the top-level program field instead of an agent"
         },
         {
           "type": "object",

@@ -182,6 +182,14 @@ func buildMainJobCoreOutputs(data *WorkflowData) map[string]string {
 		// setup-parent-span-id propagates the global setup parent span ID across jobs.
 		"setup-parent-span-id": "${{ steps.setup.outputs.parent-span-id || steps.setup.outputs.span-id }}",
 	}
+	if data.Program != "" {
+		// A program makes no inference calls and runs no usage parser: forward constant
+		// values so downstream consumers keep their declared inputs.
+		outputs["aic"] = `""`
+		outputs["ambient_context"] = `""`
+		outputs["ai_credits_rate_limit_error"] = `"false"`
+		outputs["unknown_model_ai_credits"] = `"false"`
+	}
 	if isModelRoutingEnabled(data) {
 		outputs["model"] = fmt.Sprintf("${{ steps.%s.outputs.model || needs.%s.outputs.model }}", constants.ParseTokenUsageStepID, constants.ActivationJobName)
 		outputs["model_effort"] = fmt.Sprintf("${{ steps.%s.outputs.model_effort }}", constants.ParseTokenUsageStepID)
@@ -251,7 +259,8 @@ func (c *Compiler) buildMainJobOutputs(data *WorkflowData) map[string]string {
 	}
 
 	// Add safe-output specific outputs if the workflow uses the safe-outputs feature
-	if data.SafeOutputs != nil {
+	// Publisher programs do not ingest safe outputs (see generateProgramRunSteps).
+	if data.SafeOutputs != nil && !isProgramPublisher(data) {
 		outputs["output"] = "${{ steps.collect_output.outputs.output }}"
 		outputs["output_types"] = "${{ steps.collect_output.outputs.output_types }}"
 		outputs["has_patch"] = "${{ steps.collect_output.outputs.has_patch }}"
@@ -394,6 +403,7 @@ func (c *Compiler) buildMainJobPermissions(data *WorkflowData) (string, error) {
 		perms.Set(PermissionActions, PermissionRead)
 		permissions = filterJobLevelPermissions(perms.RenderToYAML())
 	}
+	permissions = applyProgramPublisherPermissions(data, permissions)
 
 	agentAllScripts := collectAgentJobScripts(data)
 	if len(agentAllScripts) == 0 {

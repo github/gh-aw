@@ -419,7 +419,9 @@ async function main() {
     const hasTerminalOutput = parsedItems.some(item => !["report_missing_tool", "report_missing_data", "request_continuation"].includes(item.type));
     let failedFinalResult = false;
     let session = process.env.GH_AW_PROTECTED_SESSION_CAPTURE === "1" ? collectOutcomeSession(TMP_GH_AW_PATH) : undefined;
-    if (!queueScope && hasTerminalOutput) {
+    // A deterministic program has no agent session: emitting nothing is a complete run.
+    const programRun = process.env.GH_AW_PROGRAM_RUN === "true";
+    if (!queueScope && !programRun && hasTerminalOutput) {
       try {
         session ??= collectOutcomeSession(TMP_GH_AW_PATH);
         failedFinalResult = hasFailedFinalResult(session.events);
@@ -427,7 +429,7 @@ async function main() {
         core.warning("Runtime diagnostics could not be collected.");
       }
     }
-    if (!queueScope && (failedFinalResult || !hasTerminalOutput)) {
+    if (!queueScope && !programRun && (failedFinalResult || !hasTerminalOutput)) {
       const incompleteOutcome = buildEmptyOutputOutcome(errors, undefined, session);
       parsedItems.push(incompleteOutcome);
       collectorEmptyOutputCause = incompleteOutcome.reason;

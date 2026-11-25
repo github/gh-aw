@@ -30,6 +30,15 @@ func (c *Compiler) generateMainJobSteps(yaml *strings.Builder, data *WorkflowDat
 	}
 	needsGitConfig := needsCheckout || customStepsContainCheckout
 
+	// engine: none — the program replaces engine install, MCP setup and agent execution.
+	if data.Program != "" {
+		artifactPaths, logFileFull, err := c.generateProgramRunSteps(yaml, data)
+		if err != nil {
+			return err
+		}
+		return c.generatePostAgentCollectionAndUpload(yaml, data, noneEngine, artifactPaths, logFileFull, checkoutMgr)
+	}
+
 	// Phase 3: Engine installation, MCP setup, and pre-agent preparation
 	engine, err := c.generateEngineInstallAndPreAgentSteps(yaml, data, needsGitConfig)
 	if err != nil {

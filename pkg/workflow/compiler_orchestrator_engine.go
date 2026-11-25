@@ -52,6 +52,9 @@ func (c *Compiler) setupEngineAndImports(result *parser.FrontmatterResult, clean
 	}
 	engineSetting, engineConfig = c.applyEngineOverride(engineSetting, engineConfig)
 	engineSetting, engineConfig = c.injectBuiltinEngineImportIfNeeded(result.Frontmatter, engineSetting, engineConfig)
+	if err := validateProgramConfiguration(result.Frontmatter, engineSetting, markdownDir); err != nil {
+		return nil, err
+	}
 	if err := c.validateEarlyEngineSetting(result.Frontmatter, engineSetting, engineConfig); err != nil {
 		return nil, c.formatUnknownEngineError(result, cleanPath, content, err)
 	}

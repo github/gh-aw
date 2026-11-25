@@ -293,6 +293,15 @@ engine:
 
 See [Harness Retry and Post-result Watchdog Policy](/gh-aw/reference/engines/#harness-retry-and-post-result-watchdog-policy) for defaults, units, and the equivalent `GH_AW_HARNESS_*` environment variables.
 
+### Program (`program:`)
+
+With `engine: none`, runs a deterministic TypeScript or JavaScript program, relative to the workflow's directory, instead of an agent. See [Programs](/gh-aw/reference/programs/).
+
+```yaml wrap
+engine: none
+program: dispatcher.ts
+```
+
 <span id="model-routing-model-router-enginemodel-routing"></span>
 
 ### Model Routing

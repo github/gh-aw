@@ -212,8 +212,10 @@ func (c *Compiler) validateMainWorkflowFrontmatter(
 	result *parser.FrontmatterResult,
 	frontmatterForValidation map[string]any,
 ) error {
-	// For main workflows (with 'on' field), markdown content is required
-	if result.Markdown == "" {
+	// For main workflows (with 'on' field), markdown content is required; a program
+	// replaces the agent prompt, so its markdown body is optional documentation.
+	engineValue, _ := frontmatterForValidation["engine"].(string)
+	if result.Markdown == "" && extractProgram(frontmatterForValidation) == "" && !isNoneEngineID(engineValue) {
 		orchestratorFrontmatterLog.Print("No markdown content found for main workflow")
 		return errors.New("no markdown content found")
 	}

@@ -648,6 +648,10 @@ func (c *EngineCatalog) All() []*EngineDefinition {
 //  3. Returns a formatted validation error when no match is found
 func (c *EngineCatalog) Resolve(id string, config *EngineConfig) (*ResolvedEngineTarget, error) {
 	engineCatalogLog.Printf("Resolving engine: %s", id)
+	if isNoneEngineID(id) {
+		def := &EngineDefinition{ID: id, DisplayName: noneEngine.GetDisplayName(), Description: noneEngine.GetDescription(), RuntimeID: id}
+		return &ResolvedEngineTarget{Definition: def, Config: config, Runtime: noneEngine}, nil
+	}
 
 	// Exact catalog lookup
 	if def, ok := c.definitions[id]; ok {
