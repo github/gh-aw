@@ -376,7 +376,8 @@ function uniqueRuns(runs) {
  * Pages are read in order when the target can be among a window's readable pages, which also
  * covers the walk back up; otherwise the window's last readable page is read first, and the pages
  * in between are read in order when it is already past the target. A listing without
- * `total_count`, a short page above the floor, or a search that runs out of calls fails closed.
+ * a consistent `total_count` and the expected rows on each page, or a search that runs out of
+ * calls, fails closed.
  * @param {(page: number, created?: string) => Promise<any>} fetchPage
  * @param {number} targetRunNumber lowest run_number we must reach (inclusive)
  * @param {number} maxRunNumber highest run_number we need to verify (inclusive)
@@ -389,16 +390,20 @@ async function fetchStreamWindow(fetchPage, targetRunNumber, maxRunNumber) {
   const windows = [];
   let calls = 0;
 
-  /** @param {RunWindow} win @param {number} page @returns {Promise<Page>} */
+  /** @param {RunWindow} win @param {number} page @returns {Promise<Page | null>} */
   const load = async (win, page) => {
     const cached = win.pages.get(page);
     if (cached) return cached;
     calls += 1;
     const data = (await fetchPage(page, win.created))?.data;
-    const runs = Array.isArray(data?.workflow_runs) ? data.workflow_runs : [];
-    if (typeof data?.total_count === "number") win.total = data.total_count;
-    const last = win.total !== null && (page - 1) * LIST_RUNS_PER_PAGE + runs.length >= win.total;
-    const entry = pageSummary(runs, last);
+    const runs = data?.workflow_runs;
+    const total = data?.total_count;
+    // Changing counts can move a run onto a page we already cached. Retry on a later save.
+    if (!Array.isArray(runs) || !Number.isSafeInteger(total) || total < 0 || (win.total !== null && total !== win.total)) return null;
+    const remaining = total - (page - 1) * LIST_RUNS_PER_PAGE;
+    if (runs.length !== Math.min(LIST_RUNS_PER_PAGE, remaining)) return null;
+    win.total = total;
+    const entry = pageSummary(runs, runs.length === remaining);
     win.pages.set(page, entry);
     return entry;
   };
@@ -417,7 +422,7 @@ async function fetchStreamWindow(fetchPage, targetRunNumber, maxRunNumber) {
     const first = await load(win, 1);
     // A listing without total_count cannot show where it ends, and a later window repeats at least
     // the runs from the second it was cut at.
-    if (win.total === null || (windows.length > 1 && first.runs.length === 0)) return fail();
+    if (!first || win.total === null || (windows.length > 1 && first.runs.length === 0)) return fail();
     const lastPage = Math.min(MAX_LIST_PAGE, Math.ceil(win.total / LIST_RUNS_PER_PAGE));
     // Run numbers are unique, so a target this far below page 1 is likely past the readable pages.
     let jump = first.minNum - targetRunNumber > (lastPage - 1) * LIST_RUNS_PER_PAGE;
@@ -426,7 +431,9 @@ async function fetchStreamWindow(fetchPage, targetRunNumber, maxRunNumber) {
     while (!holdsFloor(entry) && entry.full && page < lastPage) {
       if (calls >= MAX_LIST_CALLS) return fail();
       page = jump ? lastPage : page + 1;
-      entry = await load(win, page);
+      const next = await load(win, page);
+      if (!next) return fail();
+      entry = next;
       // The last page is already past the target, so read the pages it skipped in order.
       if (jump && !holdsFloor(entry) && entry.maxNum < targetRunNumber) {
         jump = false;
@@ -452,7 +459,7 @@ async function fetchStreamWindow(fetchPage, targetRunNumber, maxRunNumber) {
     if (!win.pages.has(page) && calls >= MAX_LIST_CALLS) break;
     const entry = await load(win, page);
     // Every page above the floor is full unless the listing lost runs between calls.
-    if (walked.length > 0 && !entry.full) return fail();
+    if (!entry || (walked.length > 0 && !entry.full)) return fail();
     walked.push(entry);
     if (page > 1) {
       page -= 1;
