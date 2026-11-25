@@ -100,6 +100,7 @@ The method names mentioned in analyzer descriptions (such as `Err`, `Flush`, `Re
 - `timenowsub` — reports `time.Now().Sub(t)` calls that should be simplified to `time.Since(t)`.
 - `tolowerequalfold` — reports case-insensitive string comparisons using `strings.ToLower`/`ToUpper` that should use `strings.EqualFold`.
 - `trimleftright` — reports `strings.TrimLeft`/`TrimRight` calls with a multi-character literal cutset where `TrimPrefix`/`TrimSuffix` was likely intended.
+- `trimspace-string-bytes` (Go package `trimspacestringbytes`) — reports `strings.TrimSpace(string(b))` on a `[]byte` `b`; use `bytes.TrimSpace(b)` to avoid the intermediate string.
 - `typeassertionnil` — reports single-value type assertions to pointer types and recommends the two-value form.
 - `typeassertionokdiscarded` — reports two-value type assertions whose `ok` result is discarded.
 - `unchecked-deferred-close` (Go package `unchecked_deferredclose`) — reports deferred `Close()` calls that discard the returned error.
@@ -286,6 +287,7 @@ environment variable and gates findings on the recorded execution hit count for 
 | `timenowsub` | Custom `go/analysis` analyzer that flags `time.Now().Sub(t)` calls that should use `time.Since(t)` |
 | `tolowerequalfold` | Custom `go/analysis` analyzer that flags case-insensitive comparisons via `strings.ToLower`/`ToUpper` that should use `strings.EqualFold` |
 | `trimleftright` | Custom `go/analysis` analyzer that flags `strings.TrimLeft`/`TrimRight` calls with a multi-character literal cutset where `TrimPrefix`/`TrimSuffix` was likely intended |
+| `trimspace-string-bytes` | Custom `go/analysis` analyzer that flags `strings.TrimSpace(string(b))` on `[]byte` values; use `bytes.TrimSpace(b)` |
 | `typeassertionnil` | Custom `go/analysis` analyzer that flags single-value type assertions to pointer types and recommends the two-value form |
 | `typeassertionokdiscarded` | Custom `go/analysis` analyzer that flags two-value type assertions whose `ok` result is discarded |
 | `unchecked-slice-index` (`uncheckedsliceindex`) | Custom `go/analysis` analyzer that reports slice and string indexes without proven bounds checks |
@@ -344,6 +346,7 @@ import (
 	"github.com/github/gh-aw/pkg/linters/stringssplitfirst"
 	"github.com/github/gh-aw/pkg/linters/timesleepnocontext"
 	"github.com/github/gh-aw/pkg/linters/trimleftright"
+	"github.com/github/gh-aw/pkg/linters/trimspace-string-bytes"
 	"github.com/github/gh-aw/pkg/linters/typeassertionnil"
 )
 
@@ -382,6 +385,7 @@ _ = ssljson.Analyzer
 _ = stringssplitfirst.Analyzer
 _ = timesleepnocontext.Analyzer
 _ = trimleftright.Analyzer
+_ = trimspacestringbytes.Analyzer
 _ = typeassertionnil.Analyzer
 ```
 
@@ -460,6 +464,7 @@ _ = typeassertionnil.Analyzer
 - `github.com/github/gh-aw/pkg/linters/timesleepnocontext` — time-sleep-no-context analyzer subpackage
 - `github.com/github/gh-aw/pkg/linters/tolowerequalfold` — to-lower-equal-fold analyzer subpackage
 - `github.com/github/gh-aw/pkg/linters/trimleftright` — trim-left-right analyzer subpackage
+- `github.com/github/gh-aw/pkg/linters/trimspace-string-bytes` — trimspace-string-bytes analyzer subpackage
 - `github.com/github/gh-aw/pkg/linters/typeassertionnil` — type-assertion-nil analyzer subpackage
 - `github.com/github/gh-aw/pkg/linters/typeassertionokdiscarded` — type-assertion-ok-discarded analyzer subpackage
 - `github.com/github/gh-aw/pkg/linters/unchecked-slice-index` — unchecked-slice-index analyzer subpackage

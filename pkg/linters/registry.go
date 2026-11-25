@@ -95,6 +95,7 @@ import (
 	"github.com/github/gh-aw/pkg/linters/timesleepnocontext"
 	"github.com/github/gh-aw/pkg/linters/tolowerequalfold"
 	"github.com/github/gh-aw/pkg/linters/trimleftright"
+	trimspacestringbytes "github.com/github/gh-aw/pkg/linters/trimspace-string-bytes"
 	"github.com/github/gh-aw/pkg/linters/typeassertionnil"
 	"github.com/github/gh-aw/pkg/linters/typeassertionokdiscarded"
 	unchecked_deferredclose "github.com/github/gh-aw/pkg/linters/unchecked-deferred-close"
@@ -212,6 +213,7 @@ var allAnalyzers = []*analysis.Analyzer{
 	trimleftright.Analyzer,
 	typeassertionnil.Analyzer,
 	typeassertionokdiscarded.Analyzer,
+	trimspacestringbytes.Analyzer,
 	uncheckedsliceindex.Analyzer,
 	unchecked_deferredclose.Analyzer,
 	uncheckedtypeassertion.Analyzer,
