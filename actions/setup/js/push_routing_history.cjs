@@ -633,13 +633,14 @@ function overlappingPageParams(boundaryIndex) {
 
 /**
  * Find the page boundary straddled by an older-than-window gap `[startNum, endNum]` across
- * verified unfiltered scans (either a non-overlapping numeric gap or a shared same-second tie edge),
- * so one overlapping page within the same query window can observe both sides atomically.
+ * verified unfiltered scans (either a non-overlapping numeric gap or a same-second/edge tie,
+ * within one window or across a `created` window cutoff), returning the single-page query params
+ * needed to observe both sides atomically.
  * @param {number} startNum
  * @param {number} endNum
- * @param {Array<ReturnType<typeof indexRuns> & { reachedFloor: boolean, contiguousPages: Array<{ page: number, created: string | undefined, minNum: number, maxNum: number, reachedStart: boolean, timed: boolean, oldest: number, newest: number }> }>} scans
+ * @param {Array<ReturnType<typeof indexRuns> & { reachedFloor: boolean, contiguousPages: Array<{ page: number, created: string | undefined, batch: any[], minNum: number, maxNum: number, reachedStart: boolean, timed: boolean, oldest: number, newest: number }> }>} scans
  * @param {number} nowMs
- * @returns {{ created: string | undefined, index: number } | null}
+ * @returns {{ created: string | undefined, perPage: number, page: number } | null}
  */
 function findOldBoundaryGap(startNum, endNum, scans, nowMs) {
   for (const scan of scans) {
@@ -649,17 +650,27 @@ function findOldBoundaryGap(startNum, endNum, scans, nowMs) {
     for (let i = 0; i < scan.contiguousPages.length - 1; i++) {
       const newer = scan.contiguousPages[i];
       const older = scan.contiguousPages[i + 1];
-      if (newer.created !== older.created) continue;
       const numericGap = older.maxNum < startNum && endNum < newer.minNum;
       const bottomEdge = newer.timed && !newer.reachedStart && (gap.higherSec === newer.oldest || gap.lowerSec === newer.oldest);
       const topEdge = older.timed && (gap.higherSec === older.newest || gap.lowerSec === older.newest);
-      if (numericGap || bottomEdge || topEdge) {
-        return { created: newer.created, index: newer.page * LIST_RUNS_PER_PAGE };
+      if (!numericGap && !bottomEdge && !topEdge) continue;
+      if (newer.created === older.created) {
+        return { created: newer.created, ...overlappingPageParams(newer.page * LIST_RUNS_PER_PAGE) };
+      }
+      // Cross-window boundary: anchor one page-1 created query just above newer.oldest so both
+      // sides of the cutoff appear strictly inside one atomic page.
+      let anchorSec = Infinity;
+      for (const run of newer.batch) {
+        const sec = createdSecond(run);
+        if (sec !== null && sec > newer.oldest && sec < anchorSec) anchorSec = sec;
+      }
+      if (Number.isFinite(anchorSec)) {
+        return { created: `<=${new Date(anchorSec * 1000).toISOString().replace(/\.\d{3}Z$/, "Z")}`, perPage: LIST_RUNS_PER_PAGE, page: 1 };
       }
     }
     const lastPage = scan.contiguousPages.at(-1);
     if (scan.reachedStart && lastPage && !lastPage.reachedStart && endNum < lastPage.minNum) {
-      return { created: lastPage.created, index: lastPage.page * LIST_RUNS_PER_PAGE };
+      return { created: lastPage.created, ...overlappingPageParams(lastPage.page * LIST_RUNS_PER_PAGE) };
     }
   }
   return null;
@@ -768,7 +779,7 @@ async function listRuns({ githubClient, owner, repo, workflowFile, workflowPath 
 
   /** @type {number[]} */
   const unresolvedGaps = [];
-  /** @type {Array<ReturnType<typeof indexRuns> & { reachedFloor: boolean, reachedTop: boolean, maxVerified: number, bottomTimed: boolean, settledFloor: number, contiguousPages: Array<{ page: number, created: string | undefined, minNum: number, maxNum: number, reachedStart: boolean, timed: boolean, oldest: number, newest: number, settled: number }> }>} */
+  /** @type {Array<ReturnType<typeof indexRuns> & { reachedFloor: boolean, reachedTop: boolean, maxVerified: number, bottomTimed: boolean, settledFloor: number, contiguousPages: Array<{ page: number, created: string | undefined, batch: any[], minNum: number, maxNum: number, reachedStart: boolean, timed: boolean, oldest: number, newest: number, settled: number }> }>} */
   const unfilteredScans = [];
   /** @type {Array<ReturnType<typeof indexRuns> & { page: number, created: string | undefined, timed: boolean, oldest: number, newest: number }>} */
   const atomicPages = [];
@@ -815,17 +826,17 @@ async function listRuns({ githubClient, owner, repo, workflowFile, workflowPath 
     if (boundaryChecks >= MAX_BOUNDARY_CHECKS) return;
     const boundary = findOldBoundaryGap(startNum, endNum, unfilteredScans, nowMs);
     if (!boundary) return;
-    const boundaryKey = `${boundary.created || ""}:${boundary.index}`;
+    const { created, perPage, page } = boundary;
+    const boundaryKey = `${created || ""}:${perPage}:${page}`;
     if (checkedBoundaries.has(boundaryKey)) return;
     checkedBoundaries.add(boundaryKey);
     boundaryChecks += 1;
-    const { perPage, page } = overlappingPageParams(boundary.index);
     try {
       const response = await githubClient.rest.actions.listWorkflowRuns({
         owner,
         repo,
         workflow_id: workflowFile,
-        ...(boundary.created ? { created: boundary.created } : {}),
+        ...(created ? { created } : {}),
         per_page: perPage,
         page,
       });
@@ -838,7 +849,7 @@ async function listRuns({ githubClient, owner, repo, workflowFile, workflowPath 
       atomicPages.push({
         ...indexRuns(batch, summary.last),
         page,
-        created: boundary.created,
+        created,
         timed: summary.timed,
         oldest: summary.oldest,
         newest: summary.newest,

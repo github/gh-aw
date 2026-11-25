@@ -1864,6 +1864,20 @@ describe("push_routing_history saves", () => {
     expect(reconciliation.verified).toBe(true);
     expect(reconciliation.unresolved).toEqual([]);
     expect(reconciliation.ceiling).toBeGreaterThan(203);
+
+    // Also verify when the >200-run deleted gap sits directly on a cross-window created cutoff:
+    // #3500..#503 fills three 1,000-row windows so #503 is both the last row of window 2 and the
+    // first row of window 3 (created <= #503), while #302..#502 are deleted directly above floor #301.
+    const cutoffRuns = [];
+    for (let number = 3500; number >= 1; number--) {
+      if (number >= 302 && number <= 502) continue;
+      cutoffRuns.push(paginationRun(number));
+    }
+    const cutoffGh = fakeGitHub(null, { runs: cutoffRuns });
+    const cutoffRes = await reconcilePagination(cutoffGh, 301, 3501);
+    expect(cutoffRes.reconciliation.verified).toBe(true);
+    expect(cutoffRes.reconciliation.unresolved).toEqual([]);
+    expect(cutoffRes.reconciliation.ceiling).toBeGreaterThan(503);
   });
 
   it("clears an interval gap when the independent unindexed scan discovers it as an ineligible PR run", async () => {
