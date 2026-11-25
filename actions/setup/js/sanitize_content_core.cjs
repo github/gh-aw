@@ -1622,9 +1622,9 @@ function applyTruncation(content, maxLength, maxLines) {
   if (typeof content !== "string" || !content) {
     return "";
   }
-  maxLength = Number.isSafeInteger(maxLength) && maxLength > 0 ? maxLength : 524288;
+  maxLength = typeof maxLength === "number" && Number.isSafeInteger(maxLength) && maxLength > 0 ? maxLength : 524288;
   const lines = content.split("\n");
-  maxLines = Number.isSafeInteger(maxLines) && maxLines > 0 ? maxLines : 65000;
+  maxLines = typeof maxLines === "number" && Number.isSafeInteger(maxLines) && maxLines > 0 ? maxLines : 65000;
 
   // If content has too many lines, truncate by lines (primary limit)
   if (lines.length > maxLines) {
