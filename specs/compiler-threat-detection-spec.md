@@ -7,7 +7,7 @@ sidebar:
 
 # GitHub Actions Compiler Threat Detection Specification
 
-**Version**: 1.0.112
+**Version**: 1.0.113
 **Status**: Candidate Recommendation  
 **Latest Version**: https://github.com/github/gh-aw/blob/main/specs/compiler-threat-detection-spec.md  
 **Editors**: GitHub Next (GitHub, Inc.)
@@ -32,7 +32,7 @@ Each version maps to the minimum compatible binary. A version change MUST update
 
 | Versions | Minimum gh-aw |
 |---|---:|
-| `1.0.60`–`1.0.112` | Unreleased |
+| `1.0.60`–`1.0.113` | Unreleased |
 | `1.0.44`–`1.0.59` | Unreleased |
 | `1.0.40`–`1.0.43` | `v0.87.9` |
 | `1.0.39` | `v0.87.9` |

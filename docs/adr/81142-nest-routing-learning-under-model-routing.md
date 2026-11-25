@@ -1,7 +1,7 @@
 # ADR-81142: Nest Routing Learning Under model-routing
 
 **Date**: 2026-11-25
-**Status**: Draft
+**Status**: Accepted
 **Deciders**: rabeckett (PR author)
 **Related**: [PR #81142](https://github.com/github/gh-aw/pull/81142), [PR #80583](https://github.com/github/gh-aw/pull/80583), [ADR-80583](80583-adaptive-routing-observe-history.md)
 
@@ -9,12 +9,12 @@
 
 [ADR-80583](80583-adaptive-routing-observe-history.md) added observe mode for adaptive routing. Observe mode records each eligible routed run in a per-workflow history without changing which model runs. Its setting was a top-level workflow key, `adaptive-routing: observe`, with a repository default `adaptive_routing` in `.github/workflows/aw.json`.
 
-That key is unreleased. It did not appear in v1.4.0, the latest published prerelease.
+At the time of this decision, v1.4.0 was the latest published prerelease and predated the standalone key.
 
 Forces:
 
 - Model routing decides which model runs. Learning decides only whether a workflow records what happened. A top-level key beside `model:` reads as a second routing choice.
-- `model-routing` already holds routing settings (`allowed-models`) and follows an import precedence order. Learning needs the same order: the workflow's value, then the first import that sets it, then the repository default.
+- `model-routing` already holds `allowed-models`. A workflow may need to keep its shortlist while opting out of an imported or repository-wide learning setting. The two settings must resolve independently.
 - Only one spelling should ship, so the unreleased key should not survive as an alias.
 - Ordinary Markdown imports may contain unrelated frontmatter. If a removed `adaptive-routing: false` opt-out were ignored, the repository default could start recording a workflow that its author meant to exclude.
 
@@ -29,9 +29,9 @@ Forces:
 
 ## Alternatives Considered
 
-1. **Keep the top-level `adaptive-routing: observe` key from ADR-80583.** Rejected. Learning would stay outside the `model-routing` block that controls routing, and the two routing-related keys would need their own precedence rules.
+1. **Keep the top-level `adaptive-routing: observe` key from ADR-80583.** Rejected. It makes recording evidence look like an alternative way to choose a model, rather than an option on the routing already in use.
 2. **Accept both spellings during a transition.** Rejected. The top-level key never shipped in a published release, so there is no compatibility window to protect. Two spellings would also need a precedence rule between them.
-3. **Treat `learning` as a routing declaration that enables routing.** Rejected. Learning observes a choice made elsewhere. Enabling routing from it would change which model runs for workflows that did not opt into routing. The compiler therefore checks for a real model choice (`declaresTopLevelRoutingChoice`) and does not treat a learning-only block as one.
+3. **Treat `learning` as a routing declaration that enables routing.** Rejected. Learning observes a choice made elsewhere. Enabling routing from it could change which model runs when the author only wanted to record evidence.
 
 ## Consequences
 
@@ -39,14 +39,14 @@ Positive:
 
 - Routing and learning are declared in one block, and the documented example reads as a property of routing.
 - One spelling ships, and the repository default uses the same nesting.
-- Learning uses the same import precedence as the other `model-routing` settings.
+- An import can supply the shortlist while the workflow sets `learning: false`, or supply learning while the workflow declares its shortlist. A shortlist must still be declared only once.
 - A removed key in a Markdown import fails the build instead of silently enabling the repository default.
 
 Negative:
 
 - The change is breaking for any workflow that adopted `adaptive-routing` from main after ADR-80583. Those workflows must move to `model-routing.learning`.
 - The `model-routing` schema no longer requires `allowed-models`. The compiler must therefore distinguish a learning-only block from a shortlist, which adds a rule for readers to learn.
-- The import check for the removed key is a special case. It can be deleted once no supported workflow uses the key.
+- Ordinary Markdown imports need a targeted diagnostic for the removed key so an old opt-out cannot be silently lost.
 - Live routing, if it is added later, will need its own decision. `learning` accepts only `observe` and `false`.
 
-*Drafted by the Design Decision Gate from PR #81142 evidence. The PR author should review and complete it.*
+*ADR drafted by the Design Decision Gate and reviewed by the PR author.*
