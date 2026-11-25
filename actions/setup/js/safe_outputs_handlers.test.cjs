@@ -1588,9 +1588,7 @@ describe("safe_outputs_handlers", () => {
       fs.writeFileSync(secondFile, "second");
 
       handlers.uploadCodeCoverageHandler({ file: "coverage/a/lcov.info", language: "Go", label: "l" });
-      expect(() => handlers.uploadCodeCoverageHandler({ file: "coverage/b/lcov.info", language: "Go", label: "l" })).toThrow(
-        expect.objectContaining({ code: -32602, message: expect.stringContaining("staging name conflict for lcov.info") })
-      );
+      expect(() => handlers.uploadCodeCoverageHandler({ file: "coverage/b/lcov.info", language: "Go", label: "l" })).toThrow(expect.objectContaining({ code: -32602, message: expect.stringContaining("use a different file basename") }));
       const stagedPath = path.join(testStagingDir, "gh-aw", "safeoutputs", "upload-code-coverage", "lcov.info");
       expect(fs.readFileSync(stagedPath, "utf8")).toBe("first");
       expect(mockAppendSafeOutput).toHaveBeenCalledTimes(1);
@@ -1600,6 +1598,114 @@ describe("safe_outputs_handlers", () => {
       expect(JSON.parse(result.content[0].text).result).toBe("success");
       expect(mockAppendSafeOutput).toHaveBeenCalledTimes(2);
       expect(mockAppendSafeOutput).toHaveBeenLastCalledWith(expect.objectContaining({ file: "lcov.info" }));
+    });
+
+    it("should accept retries through symlinked coverage and staging parents", () => {
+      const coverageDir = path.join(testWorkspaceDir, "coverage");
+      const sourceDir = path.join(coverageDir, "reports");
+      fs.mkdirSync(sourceDir, { recursive: true });
+      fs.writeFileSync(path.join(sourceDir, "lcov.info"), "coverage");
+      fs.symlinkSync(sourceDir, path.join(coverageDir, "latest"), "dir");
+      const actualTemp = path.join(testStagingDir, "actual");
+      fs.mkdirSync(actualTemp, { recursive: true });
+      const aliasTemp = path.join(testStagingDir, "alias");
+      fs.symlinkSync(actualTemp, aliasTemp, "dir");
+      process.env.RUNNER_TEMP = aliasTemp;
+
+      handlers.uploadCodeCoverageHandler({ file: "coverage/latest/lcov.info" });
+      handlers.uploadCodeCoverageHandler({ file: "coverage/latest/lcov.info" });
+
+      expect(mockAppendSafeOutput).toHaveBeenCalledTimes(2);
+      expect(fs.readFileSync(path.join(actualTemp, "gh-aw", "safeoutputs", "upload-code-coverage", "lcov.info"), "utf8")).toBe("coverage");
+    });
+
+    it.each(["same", "different"])("should publish complete reports during overlapping %s uploads", kind => {
+      const firstFile = path.join(testWorkspaceDir, "coverage", "a", "lcov.info");
+      const secondFile = path.join(testWorkspaceDir, "coverage", "b", "lcov.info");
+      fs.mkdirSync(path.dirname(firstFile), { recursive: true });
+      fs.mkdirSync(path.dirname(secondFile), { recursive: true });
+      fs.writeFileSync(firstFile, "complete report");
+      fs.writeFileSync(secondFile, kind === "same" ? "complete report" : "");
+      const stagedPath = path.join(testStagingDir, "gh-aw", "safeoutputs", "upload-code-coverage", "lcov.info");
+      const originalCopy = fs.copyFileSync;
+      const copySpy = vi.spyOn(fs, "copyFileSync").mockImplementation((source, destination, flags) => {
+        if (source === firstFile) {
+          fs.writeFileSync(destination, "");
+          handlers.uploadCodeCoverageHandler({ file: secondFile });
+          expect(fs.readFileSync(stagedPath, "utf8")).toBe(kind === "same" ? "complete report" : "");
+          fs.unlinkSync(destination);
+        }
+        return originalCopy.call(fs, source, destination, flags);
+      });
+
+      try {
+        if (kind === "same") {
+          handlers.uploadCodeCoverageHandler({ file: firstFile });
+          expect(mockAppendSafeOutput).toHaveBeenCalledTimes(2);
+        } else {
+          expect(() => handlers.uploadCodeCoverageHandler({ file: firstFile })).toThrow(expect.objectContaining({ code: -32602, message: expect.stringContaining("staging name conflict") }));
+          expect(mockAppendSafeOutput).toHaveBeenCalledTimes(1);
+        }
+        expect(fs.readFileSync(stagedPath, "utf8")).toBe(kind === "same" ? "complete report" : "");
+        expect(fs.statSync(stagedPath).mode & 0o777).toBe(0o600);
+        expect(fs.readdirSync(path.dirname(stagedPath))).toEqual(["lcov.info"]);
+      } finally {
+        copySpy.mockRestore();
+      }
+    });
+
+    it.each(["copy", "chmod"])("should clean up after a failed %s and allow a retry", failure => {
+      const source = path.join(testWorkspaceDir, "coverage", "lcov.info");
+      fs.mkdirSync(path.dirname(source), { recursive: true });
+      fs.writeFileSync(source, "complete report");
+      const stagedDir = path.join(testStagingDir, "gh-aw", "safeoutputs", "upload-code-coverage");
+      const failureSpy =
+        failure === "copy"
+          ? vi.spyOn(fs, "copyFileSync").mockImplementation((_source, destination) => {
+              fs.writeFileSync(destination, "partial");
+              throw new Error("disk full");
+            })
+          : vi.spyOn(fs, "chmodSync").mockImplementation(() => {
+              throw new Error("disk full");
+            });
+      try {
+        expect(() => handlers.uploadCodeCoverageHandler({ file: source })).toThrow(/disk full/);
+        expect(fs.readdirSync(stagedDir)).toEqual([]);
+        expect(mockAppendSafeOutput).not.toHaveBeenCalled();
+      } finally {
+        failureSpy.mockRestore();
+      }
+      handlers.uploadCodeCoverageHandler({ file: source });
+      expect(fs.readFileSync(path.join(stagedDir, "lcov.info"), "utf8")).toBe("complete report");
+    });
+
+    it("should accept an identical retry while the publishing link is removed", () => {
+      const source = path.join(testWorkspaceDir, "coverage", "lcov.info");
+      fs.mkdirSync(path.dirname(source), { recursive: true });
+      fs.writeFileSync(source, "complete report");
+      const originalLink = fs.linkSync;
+      const originalRead = fs.readSync;
+      let publishingFile;
+      const readSpy = vi.spyOn(fs, "readSync").mockImplementation((...args) => {
+        if (publishingFile) {
+          fs.unlinkSync(publishingFile);
+          publishingFile = undefined;
+        }
+        return originalRead.call(fs, ...args);
+      });
+      const linkSpy = vi.spyOn(fs, "linkSync").mockImplementation((existing, destination) => {
+        originalLink.call(fs, existing, destination);
+        publishingFile = existing;
+        handlers.uploadCodeCoverageHandler({ file: source });
+      });
+      try {
+        handlers.uploadCodeCoverageHandler({ file: source });
+        expect(mockAppendSafeOutput).toHaveBeenCalledTimes(2);
+        expect(fs.readFileSync(path.join(testStagingDir, "gh-aw", "safeoutputs", "upload-code-coverage", "lcov.info"), "utf8")).toBe("complete report");
+      } finally {
+        linkSpy.mockRestore();
+        readSpy.mockRestore();
+      }
     });
 
     it("should accept relative path already staged in upload-code-coverage staging directory", () => {

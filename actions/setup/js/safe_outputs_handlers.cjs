@@ -2674,7 +2674,6 @@ function createHandlers(server, appendSafeOutput, config = {}) {
         let copyResult;
         try {
           copyResult = copyFileExclusive(srcPath, destPath);
-          if (copyResult === "copied") fs.chmodSync(destPath, 0o600);
         } catch (err) {
           throw new Error(`${ERR_SYSTEM}: Failed to copy file ${srcPath} to ${destPath}: ${getErrorMessage(err)}`, { cause: err });
         }
@@ -2842,7 +2841,6 @@ function createHandlers(server, appendSafeOutput, config = {}) {
           let copyResult;
           try {
             copyResult = copyFileExclusive(filePath, destPath);
-            if (copyResult === "copied") fs.chmodSync(destPath, 0o600);
           } catch (err) {
             throw new Error(`${ERR_SYSTEM}: Failed to copy file ${filePath} to ${destPath}: ${getErrorMessage(err)}`, { cause: err });
           }
@@ -2994,15 +2992,14 @@ function createHandlers(server, appendSafeOutput, config = {}) {
       if (!alreadyStaged) {
         let copyResult;
         try {
-          copyResult = copyFileExclusive(filePath, destPath);
-          if (copyResult === "copied") fs.chmodSync(destPath, 0o600);
+          copyResult = copyFileExclusive(canonicalFilePath, path.join(canonicalStagingDir, destName));
         } catch (err) {
           throw new Error(`${ERR_SYSTEM}: Failed to copy file ${filePath} to ${destPath}: ${getErrorMessage(err)}`, { cause: err });
         }
         if (copyResult === "conflict") {
           throw {
             code: -32602,
-            message: `${ERR_VALIDATION}: upload_code_coverage: staging name conflict for ${destName}; rename the file or use a distinct path`,
+            message: `${ERR_VALIDATION}: upload_code_coverage: staging name conflict for ${destName}; use a different file basename`,
           };
         }
       }
