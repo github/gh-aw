@@ -25,6 +25,11 @@ func TestPromptConditionSyntax(t *testing.T) {
 			lines:  []int{3},
 		},
 		{
+			name:   "CRLF input",
+			prompt: "{{#if condition}}\r\nSelected\r\n{{else}}\r\nFallback\r\n{{/if}}",
+			lines:  []int{3},
+		},
+		{
 			name:   "multiple bare fallback delimiters",
 			prompt: "{{#if condition}}\n{{else}}\n{{#if other}}\n{{ else }}\n{{/if}}\n{{/if}}",
 			lines:  []int{2, 4},
