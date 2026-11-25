@@ -631,29 +631,70 @@ func (state Projection) Clone() Projection {
 	copied := NewProjection()
 	copied.Repository, copied.Tip, copied.Commits, copied.Stats = state.Repository, state.Tip, state.Commits, state.Stats
 	for id, work := range state.Works {
+		if work == nil {
+			copied.Works[id] = nil
+			continue
+		}
 		value := *work
+		value.Payload = slices.Clone(work.Payload)
+		value.Effects = slices.Clone(work.Effects)
+		value.DependsOn = slices.Clone(work.DependsOn)
+		for i := range value.DependsOn {
+			value.DependsOn[i].Resource = clonePointer(work.DependsOn[i].Resource)
+		}
+		value.Subject = clonePointer(work.Subject)
+		value.BackingIssue = clonePointer(work.BackingIssue)
+		value.ReplacementOf = clonePointer(work.ReplacementOf)
+		value.Continuation = clonePointer(work.Continuation)
 		copied.Works[id] = &value
 	}
 	for id, claim := range state.Claims {
+		if claim == nil {
+			copied.Claims[id] = nil
+			continue
+		}
 		value := *claim
+		value.Effects = slices.Clone(claim.Effects)
 		copied.Claims[id] = &value
 	}
 	for id, dispatch := range state.Dispatches {
-		value := *dispatch
-		if dispatch.Run != nil {
-			run := *dispatch.Run
-			value.Run = &run
+		if dispatch == nil {
+			copied.Dispatches[id] = nil
+			continue
 		}
+		value := *dispatch
+		value.Run = clonePointer(dispatch.Run)
+		value.Launch = clonePointer(dispatch.Launch)
 		copied.Dispatches[id] = &value
 	}
-	maps.Copy(copied.Observations, state.Observations)
+	for id, observation := range state.Observations {
+		observation.Merged = clonePointer(observation.Merged)
+		copied.Observations[id] = observation
+	}
 	for id := range state.Requests {
 		copied.Requests[id] = struct{}{}
 	}
 	maps.Copy(copied.WorkCreators, state.WorkCreators)
 	copied.Transactions = slices.Clone(state.Transactions)
+	for i := range copied.Transactions {
+		transaction := &copied.Transactions[i]
+		transaction.Previous = clonePointer(transaction.Previous)
+		transaction.Request.Parameters = slices.Clone(transaction.Request.Parameters)
+		transaction.Operations = slices.Clone(transaction.Operations)
+		for j := range transaction.Operations {
+			transaction.Operations[j] = slices.Clone(transaction.Operations[j])
+		}
+	}
 	copied.dispatchOrder = slices.Clone(state.dispatchOrder)
 	return copied
+}
+
+func clonePointer[T any](value *T) *T {
+	if value == nil {
+		return nil
+	}
+	copied := *value
+	return &copied
 }
 
 // AppendCommit validates commit against a copy of state and returns the new projection.

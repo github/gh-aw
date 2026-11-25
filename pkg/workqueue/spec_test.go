@@ -145,38 +145,80 @@ func TestSpec_PublicAPI_NewProjection(t *testing.T) {
 func TestSpec_PublicAPI_ProjectionClone(t *testing.T) {
 	t.Parallel()
 
-	for _, name := range []string{"map membership", "Work state", "nested payload"} {
-		t.Run(name, func(t *testing.T) {
-			// SPEC_MISMATCH: Clone shares nested Work payload bytes with the
-			// original projection despite the README's deep-copy contract.
-			// Keep this regression assertion pending a contract correction.
-			if name == "nested payload" {
-				t.Skip("SPEC_MISMATCH: Projection.Clone does not deep-copy Work payload bytes")
-			}
-			original := workqueue.NewProjection()
-			original.Works = map[string]*workqueue.WorkState{
-				"fixture": {
-					WorkDefinition: workqueue.WorkDefinition{Payload: json.RawMessage(`{"target":"docs"}`)},
-					State:          "fixture state",
-				},
-			}
+	fixture := func() workqueue.Projection {
+		previous, merged := "previous", true
+		state := workqueue.NewProjection()
+		state.Works["fixture"] = &workqueue.WorkState{
+			WorkDefinition: workqueue.WorkDefinition{
+				Payload:       json.RawMessage(`{"target":"docs"}`),
+				DependsOn:     []workqueue.Dependency{{Resource: &workqueue.Resource{ResourceID: "dependency"}}},
+				Subject:       &workqueue.Resource{ResourceID: "subject"},
+				BackingIssue:  &workqueue.Resource{ResourceID: "issue"},
+				ReplacementOf: &workqueue.Replacement{WorkID: "replacement"},
+				Continuation:  &workqueue.WorkContinuation{Message: "remaining"},
+			},
+			State: "fixture state", Effects: json.RawMessage(`{"work":true}`),
+		}
+		state.Claims["fixture"] = &workqueue.ClaimState{Effects: json.RawMessage(`{"claim":true}`)}
+		state.Dispatches["fixture"] = &workqueue.DispatchState{
+			Run: &workqueue.RunBinding{RunID: "run"}, Launch: &workqueue.LaunchRecord{RunID: "launch"},
+		}
+		state.Observations["fixture"] = workqueue.ObservationOperation{Merged: &merged}
+		state.Requests["fixture"] = struct{}{}
+		state.WorkCreators["fixture"] = workqueue.Actor{Role: "creator"}
+		state.Transactions = []workqueue.QueueCommit{{
+			Previous: &previous, Request: workqueue.Request{Parameters: json.RawMessage(`{"request":true}`)},
+			Operations: []workqueue.Operation{json.RawMessage(`{"operation":true}`)},
+		}}
+		return state
+	}
+	for _, tt := range []struct {
+		name   string
+		mutate func(*workqueue.Projection)
+	}{
+		{"map membership", func(p *workqueue.Projection) { delete(p.Works, "fixture") }},
+		{"Work state", func(p *workqueue.Projection) { p.Works["fixture"].State = "changed" }},
+		{"nested payload", func(p *workqueue.Projection) { p.Works["fixture"].Payload[2] = 'T' }},
+		{"Work effects", func(p *workqueue.Projection) { p.Works["fixture"].Effects[2] = 'W' }},
+		{"dependency slice", func(p *workqueue.Projection) { p.Works["fixture"].DependsOn[0].Kind = "changed" }},
+		{"dependency resource", func(p *workqueue.Projection) { p.Works["fixture"].DependsOn[0].Resource.ResourceID = "changed" }},
+		{"subject", func(p *workqueue.Projection) { p.Works["fixture"].Subject.ResourceID = "changed" }},
+		{"backing issue", func(p *workqueue.Projection) { p.Works["fixture"].BackingIssue.ResourceID = "changed" }},
+		{"replacement", func(p *workqueue.Projection) { p.Works["fixture"].ReplacementOf.WorkID = "changed" }},
+		{"continuation", func(p *workqueue.Projection) { p.Works["fixture"].Continuation.Message = "changed" }},
+		{"claim effects", func(p *workqueue.Projection) { p.Claims["fixture"].Effects[2] = 'C' }},
+		{"dispatch run", func(p *workqueue.Projection) { p.Dispatches["fixture"].Run.RunID = "changed" }},
+		{"dispatch launch", func(p *workqueue.Projection) { p.Dispatches["fixture"].Launch.RunID = "changed" }},
+		{"observation merged", func(p *workqueue.Projection) { *p.Observations["fixture"].Merged = false }},
+		{"request map", func(p *workqueue.Projection) { delete(p.Requests, "fixture") }},
+		{"creator map", func(p *workqueue.Projection) { delete(p.WorkCreators, "fixture") }},
+		{"transaction previous", func(p *workqueue.Projection) { *p.Transactions[0].Previous = "changed" }},
+		{"transaction parameters", func(p *workqueue.Projection) { p.Transactions[0].Request.Parameters[2] = 'R' }},
+		{"transaction operations", func(p *workqueue.Projection) { p.Transactions[0].Operations[0][2] = 'O' }},
+		{"transaction operation slice", func(p *workqueue.Projection) { p.Transactions[0].Operations[0] = nil }},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			original, expected := fixture(), fixture()
 			cloned := original.Clone()
-			require.Equal(t, original.Works, cloned.Works, "Clone must initially preserve Work contents")
-			switch name {
-			case "map membership":
-				delete(cloned.Works, "fixture")
-			case "Work state":
-				cloned.Works["fixture"].State = "changed clone"
-			case "nested payload":
-				cloned.Works["fixture"].Payload[2] = 'T'
-			}
-			require.Contains(t, original.Works, "fixture", "clone changes must not remove original Work")
-			assert.Equal(t, "fixture state", original.Works["fixture"].State,
-				"clone changes must not mutate the original Work state")
-			assert.JSONEq(t, `{"target":"docs"}`, string(original.Works["fixture"].Payload),
-				"clone changes must not mutate the original nested payload")
+			require.Equal(t, original, cloned, "Clone must initially preserve projection contents")
+			tt.mutate(&cloned)
+			assert.NotEqual(t, expected, cloned, "the mutation must change the clone")
+			assert.Equal(t, expected, original, "clone changes must not mutate the original projection")
 		})
 	}
+
+	t.Run("nil and empty nested values", func(t *testing.T) {
+		original := workqueue.NewProjection()
+		original.Works["nil"] = nil
+		original.Claims["nil"] = nil
+		original.Dispatches["nil"] = nil
+		original.Works["empty"] = &workqueue.WorkState{
+			WorkDefinition: workqueue.WorkDefinition{Payload: json.RawMessage{}, DependsOn: []workqueue.Dependency{}},
+			Effects:        json.RawMessage{},
+		}
+		original.Transactions = []workqueue.QueueCommit{{Operations: []workqueue.Operation{nil, {}}}}
+		assert.Equal(t, original, original.Clone(), "Clone must preserve nil and empty nested values")
+	})
 }
 
 // TestSpec_PublicAPI_FIFOCompare tests README / Core Types and Graph and
