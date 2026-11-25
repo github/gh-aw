@@ -56,9 +56,15 @@ func checkUnquotedCommandAssignments(ctx context.Context, input Input) ([]Diagno
 	scripts := input.ResolvedMCPScripts
 	if scripts == nil && input.Document != nil {
 		scripts = make(map[string]string)
-		tools, _ := input.Document.Frontmatter["mcp-scripts"].(map[string]any)
+		tools, ok := input.Document.Frontmatter["mcp-scripts"].(map[string]any)
+		if !ok {
+			tools = nil
+		}
 		for name, value := range tools {
-			fields, _ := value.(map[string]any)
+			fields, ok := value.(map[string]any)
+			if !ok {
+				continue
+			}
 			if script, ok := fields["run"].(string); ok {
 				scripts[name] = script
 			}
@@ -96,15 +102,17 @@ func unquotedCommandAssignments(ctx context.Context, script, path string) ([]Dia
 			if assign.Value == nil || len(assign.Value.Parts) != 1 {
 				continue
 			}
-			literal, ok := assign.Value.Parts[0].(*syntax.Lit)
-			if !ok {
-				continue
-			}
-			if _, found := assignmentCommands[literal.Value]; found {
-				diagnostics = append(diagnostics, Diagnostic{
-					Path: path, Line: int(assign.Pos().Line()),
-					Message: "Unquoted assignment resembles a command invocation (ShellCheck SC2209); quote the literal or use $(command) to capture output",
-				})
+			for _, part := range assign.Value.Parts {
+				literal, ok := part.(*syntax.Lit)
+				if !ok {
+					continue
+				}
+				if _, found := assignmentCommands[literal.Value]; found {
+					diagnostics = append(diagnostics, Diagnostic{
+						Path: path, Line: int(assign.Pos().Line()),
+						Message: "Unquoted assignment resembles a command invocation (ShellCheck SC2209); quote the literal or use $(command) to capture output",
+					})
+				}
 			}
 		}
 		return true
