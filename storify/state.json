@@ -1,23 +1,17 @@
 {
-  "last_run_date": "2026-11-24",
-  "last_window": {
-    "start": "2026-11-23T07:55:43Z",
-    "end": "2026-11-24T07:55:43Z"
-  },
-  "observed_window": {
-    "coverage": "290 cached records 2026-11-23T20:47:35Z through 2026-11-24T07:54:23Z, count-limited; no fleet refetch",
-    "missing_start": "2026-11-23T07:55:43Z",
-    "continuation_end": "2026-11-23T20:46:06Z",
-    "continuation_before_run_id": 45263010467
+  "last_run_window": {
+    "start": "2026-11-24T07:53:02Z",
+    "end": "2026-11-25T07:53:02Z",
+    "coverage": "partial; count-limited cached records begin 2026-11-24T21:03:55Z; collector start 07:56:06Z"
   },
   "key_themes": [
-    "PR 79748 review findings followed by author-reported correction and review request; five-workflow fan-out had mixed results.",
-    "Queue control and snapshot failures continue across multiple workflows; common cause and dispatch acceptance unknown.",
-    "Auditor collection succeeded in last two cached runs after eight failures, but agent was skipped in all 11."
+    "Work queue control and acceptance outcomes mixed after v4 merge",
+    "Three shared-context smoke sets and recurring Agy failures",
+    "Simulator memory validation and publication failures recurred"
   ],
   "carry_forward_questions": [
-    "Did the five requested reviews complete and validate the claimed correction?",
-    "Why do queue control and snapshot steps fail, and did a current tracker replace expired 80001?",
-    "Do Auditor collection successes persist, and why is its agent skipped?"
+    "Why did trusted controls fail across dispatchers and why did smoke dispatch acceptance fail after an earlier success?",
+    "Do smoke retries and review follow-up yield a validated fix?",
+    "Why did simulator memory validation and push fail again?"
   ]
 }
