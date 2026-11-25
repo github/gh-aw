@@ -5,12 +5,14 @@ package taint_test
 import (
 	"context"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/rhysd/actionlint"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/github/gh-aw/pkg/workflow/actions"
 	"github.com/github/gh-aw/pkg/workflow/taint"
 )
 
@@ -163,6 +165,85 @@ func TestSpec_PublicAPI_AnalyzeText(t *testing.T) {
 			}
 			assert.ElementsMatch(t, tt.references, references,
 				"analysis should report sources selected by the rule and supplied bindings: %s", tt.name)
+		})
+	}
+}
+
+// TestSpec_PublicAPI_Analyze checks README / Overview and Public API:
+// symbolic configured sources reach the selected execution sinks without
+// evaluating expressions or executing the workflow's scripts.
+// SPEC_AMBIGUITY: Finding order, duplication, and exact path formatting are
+// unspecified. Check the selected symbolic reference and sink category only.
+func TestSpec_PublicAPI_Analyze(t *testing.T) {
+	t.Parallel()
+
+	for _, tt := range []struct {
+		name         string
+		run          string
+		selectSink   bool
+		wantFindings bool
+	}{
+		{"configured source and sink", "echo ${{ inputs.target }}\nexit 99", true, true},
+		{"unconfigured source", "echo ${{ inputs.configuration }}\nexit 99", true, false},
+		{"unselected sink", "echo ${{ inputs.target }}\nexit 99", false, false},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			content := "name: README specification\non: push\njobs:\n  readme:\n" +
+				"    runs-on: ubuntu-latest\n    steps:\n      - shell: bash\n        run: |\n          " +
+				strings.ReplaceAll(tt.run, "\n", "\n          ") + "\n"
+			input, err := actions.Parse([]byte(content))
+			require.NoError(t, err, "the fixture must be a parsed Actions workflow")
+			rule := taint.Rule{
+				ID:       "readme-symbolic-execution",
+				IsSource: func(reference string) bool { return reference == "inputs.target" },
+				IsSink: func(site taint.Site) bool {
+					return tt.selectSink && site.Kind == taint.ExecutableInterpolation
+				},
+			}
+			result, err := taint.Analyze(input, rule)
+			require.NoError(t, err, "scripts must be analyzed without executing exit 99")
+			if !tt.wantFindings {
+				assert.Empty(t, result.Findings, "findings require both a configured source and a selected sink")
+				return
+			}
+			require.NotEmpty(t, result.Findings, "the configured symbolic source must reach the selected execution sink")
+			for _, finding := range result.Findings {
+				assert.Equal(t, rule.ID, finding.RuleID, "findings must identify the supplied analysis rule")
+				assert.Equal(t, taint.ExecutableInterpolation, finding.Site.Kind,
+					"findings must identify the selected execution sink")
+				require.NotEmpty(t, finding.Sources, "findings must identify symbolic source references")
+				for _, source := range finding.Sources {
+					assert.Equal(t, "inputs.target", source.Reference,
+						"findings must identify the symbolic source without resolving its value")
+				}
+			}
+		})
+	}
+}
+
+// TestSpec_PublicAPI_ExpressionError checks README / Public API:
+// expression errors are value-safe and do not reproduce authored values.
+// SPEC_AMBIGUITY: Exact error wording is unspecified; check value omission.
+func TestSpec_PublicAPI_ExpressionError(t *testing.T) {
+	t.Parallel()
+
+	for _, text := range []string{
+		"${{ 'readme-value-marker' + }}",
+		"${{ 'readme-value-marker' && }}",
+	} {
+		t.Run(text, func(t *testing.T) {
+			t.Parallel()
+			rule := taint.Rule{
+				ID:       "readme-expression-error",
+				IsSource: func(reference string) bool { return reference == "inputs.target" },
+			}
+			_, err := taint.AnalyzeText(context.Background(), text, "authored.md", rule, nil)
+			require.Error(t, err, "an incomplete authored expression must report a parsing error")
+			var expressionError *taint.ExpressionError
+			require.ErrorAs(t, err, &expressionError, "authored expression errors must expose the documented error type")
+			assert.NotContains(t, err.Error(), "readme-value-marker",
+				"value-safe expression errors must not reproduce literal authored values")
 		})
 	}
 }
