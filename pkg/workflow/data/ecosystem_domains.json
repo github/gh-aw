@@ -186,7 +186,7 @@
       "download.opensuse.org",
       "cdn.redhat.com"
     ],
-    "local": ["127.0.0.1", "::1", "localhost"],
+    "local": ["127.0.0.1", "localhost"],
     "lua": ["luarocks.org", "www.luarocks.org"],
     "node": [
       "npmjs.org",
