@@ -1040,7 +1040,7 @@ An experimental feature that chooses a model and reasoning effort for the main a
 
 ### Adaptive Routing (`adaptive-routing`)
 
-An experimental frontmatter field that records, for each routed run, which model and reasoning effort were used, whether the run completed its task, and what it cost. With `adaptive-routing: observe`, the router's pick is unchanged and each run is saved to routing history in [repo-memory](/gh-aw/reference/repo-memory/). A run that did not route or whose agent made no request is recorded as `no_agent` and does not count as a success or failure. Inspect results with `gh aw routing status`. See [Adaptive Routing](/gh-aw/reference/adaptive-routing/).
+An experimental frontmatter field that records, for each eligible run of a routed workflow, which model and reasoning effort were used when available, whether the run completed its task, and what it cost. With `adaptive-routing: observe`, the router's pick is unchanged and each run is saved to routing history in [repo-memory](/gh-aw/reference/repo-memory/). A run that did not route or whose agent made no request is recorded as `no_agent` and does not count as a success or failure. Inspect results with `gh aw routing status`. See [Adaptive Routing](/gh-aw/reference/adaptive-routing/).
 
 ### Default AI Credits Pricing (`models.default-ai-credits-pricing`)
 
