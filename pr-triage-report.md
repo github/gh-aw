@@ -1,13 +1,24 @@
 ### Executive Summary
 
 - Eligible open `app/github-copilot` PRs: 0
-- Open PRs scanned: 16
-- PRs excluded by author gate or non-agent authors: 16
+- Open PRs scanned: 25
+- PRs excluded by author gate or non-agent authors: 25
 - Recommended action: none; no eligible agent-authored PRs require immediate review.
 
 <details>
 <summary>Open PRs excluded from triage</summary>
 
+- #80981 — [ca] chore: update Claude Code CLI to 2.1.327 (github-actions[bot])
+- #80976 — Fix Issue Arborist concise prompt rendering (pelikhan)
+- #80974 — Quote shared GitHub query commands (pelikhan)
+- #80966 — Investigate incomplete Astro dependency update (pelikhan)
+- #80965 — Reject all JavaScript line terminators in expression validation (pelikhan)
+- #80947 — [jsweep] Clean workflow_file_exclusions.cjs (github-actions[bot])
+- #80851 — feat: deterministic programs with engine: none (elefthei)
+- #80847 — Smoke work queue: exercise workqueue request-continuation and top up the pool (elefthei)
+- #80840 — ESLint factory: one refiner and monster Work per rotating rule (elefthei)
+- #80825 — Extend Azure OIDC to connector reads, remote MCP, and safe outputs (pelikhan)
+- #80815 — Run bundled JavaScript threat detection in compiled workflows (davidslater)
 - #80701 — Bump actions/setup-java from 6.2.0 to 6.3.0 (dependabot[bot])
 - #80700 — Bump actions/setup-go from 7.0.0 to 7.1.0 (dependabot[bot])
 - #80699 — Bump anyio from 4.15.1 to 4.16.0 in /.github/workflows (dependabot[bot])
@@ -20,10 +31,8 @@
 - #80692 — Bump fonttools from 4.67.0 to 4.68.0 in /.github/workflows (dependabot[bot])
 - #80691 — Bump huggingface-hub from 1.33.0 to 2.4.0 in /.github/workflows (dependabot[bot])
 - #80684 — Migrate YAML v3 imports to the canonical module path (gh-aw-bot)
-- #80582 — Port sandboxed threat detection and eligibility checks to JavaScript (davidslater)
 - #80395 — Set OpenCode GPT-5.6 Luna reasoning effort to none (pelikhan)
 - #80016 — Investigate code-scanning dispatcher queue policy mismatch (gh-aw-bot)
-- #79748 — Replace work-queue protocol v3 with time-free v4 (elefthei)
 
 </details>
 
