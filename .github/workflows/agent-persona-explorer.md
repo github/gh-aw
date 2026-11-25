@@ -214,7 +214,7 @@ Summarize the recommendation; do not include full YAML. For successful invocatio
 
 {{#if experiments.sub_agent_strategy_prefix_v1 == 'batch' }}
 Invoke the inline `persona-evaluator` Claude Code sub-agent once with all 3-4 selected scenarios. Require one recommendation per scenario, and then record and score each response using the structured template above.
-{{else}}
+{{#else}}
 Invoke the inline `persona-evaluator` Claude Code sub-agent once per selected scenario, presenting it as a request from that persona. Record and score each response using the structured template above.
 {{/if}}
 

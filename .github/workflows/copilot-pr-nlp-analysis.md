@@ -114,7 +114,7 @@ Generate a weekly NLP-based analysis report of Copilot-created PRs merged within
 ## Prompt Style Variant: concise
 
 Use compact instruction execution. Prioritize brevity, top findings, and direct recommendations. Keep narrative commentary short, highlight the 3-5 highest-signal insights, and avoid exhaustive detail unless it is needed to explain a material result or edge case.
-{{else}}
+{{#else}}
 ## Prompt Style Variant: structured
 
 Use explicit phase-based execution. Work through data loading, preprocessing, NLP analysis, visualization, report construction, and final verification in order. In the final discussion, preserve the required output sections and verify each success criterion with checklist-style constraints before posting.

@@ -127,7 +127,7 @@ Store today's date for use throughout the workflow. You will use the GitHub API'
 
 {{#if experiments.prefetch_strategy == 'eager'}}
 Read pre-fetched release data from `/tmp/gh-aw/agent/releases.json` (do not call `list_releases`).
-{{else}}
+{{#else}}
 Use the GitHub `list_releases` tool to fetch all releases in the repository. Look for any releases published in the past 7 days.
 {{/if}}
 
@@ -143,7 +143,7 @@ If there are no recent releases, still proceed — you will write about recent c
 
 {{#if experiments.prefetch_strategy == 'eager'}}
 Read pre-fetched merged PR data from `/tmp/gh-aw/agent/merged-prs.json` (do not call `list_pull_requests`).
-{{else}}
+{{#else}}
 Use the GitHub `list_pull_requests` tool to fetch pull requests that were **merged** in the past 7 days. Look at the merged PRs to understand what changed.
 {{/if}}
 
