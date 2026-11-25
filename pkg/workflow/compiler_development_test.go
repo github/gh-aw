@@ -37,14 +37,14 @@ func TestDryRunWorkflowMutationControls(t *testing.T) {
 	enabled := true
 	data := &WorkflowData{
 		AIReaction: "eyes", StatusComment: &enabled, LockForAgent: true, LabelCommandRemoveLabel: true,
-		AdaptiveRouting:   "observe",
-		Tools:             map[string]any{"work-queue": true, "github": true},
-		ParsedTools:       &Tools{GitHub: &GitHubToolConfig{}},
-		CacheMemoryConfig: &CacheMemoryConfig{Caches: []CacheMemoryEntry{{ID: "default"}}},
-		DriveMemoryConfig: &DriveMemoryConfig{Drives: []DriveMemoryEntry{{ID: "default"}}},
-		SafeOutputs:       &SafeOutputsConfig{CreateIssues: &CreateIssuesConfig{}},
-		Cache:             "cache:\n  key: example\n  path: example\n",
-		RunName:           workQueueWorkerRunName,
+		RoutingLearningMode: "observe",
+		Tools:               map[string]any{"work-queue": true, "github": true},
+		ParsedTools:         &Tools{GitHub: &GitHubToolConfig{}},
+		CacheMemoryConfig:   &CacheMemoryConfig{Caches: []CacheMemoryEntry{{ID: "default"}}},
+		DriveMemoryConfig:   &DriveMemoryConfig{Drives: []DriveMemoryEntry{{ID: "default"}}},
+		SafeOutputs:         &SafeOutputsConfig{CreateIssues: &CreateIssuesConfig{}},
+		Cache:               "cache:\n  key: example\n  path: example\n",
+		RunName:             workQueueWorkerRunName,
 	}
 	compiler := NewCompiler()
 	compiler.SetDryRun(true)
@@ -55,11 +55,11 @@ func TestDryRunWorkflowMutationControls(t *testing.T) {
 	assert.False(t, result.LockForAgent)
 	assert.False(t, result.LabelCommandRemoveLabel)
 	assert.True(t, result.ReportBlockedVersionDisabled)
-	assert.Empty(t, result.AdaptiveRouting)
+	assert.Empty(t, result.RoutingLearningMode)
 	assert.False(t, isWorkQueueEnabled(result))
 	assert.Empty(t, result.RunName)
 	assert.Equal(t, workQueueWorkerRunName, data.RunName)
-	assert.Equal(t, "observe", data.AdaptiveRouting)
+	assert.Equal(t, "observe", data.RoutingLearningMode)
 	assert.True(t, result.ParsedTools.GitHub.ReadOnly)
 	assert.True(t, templatableBoolIsTrue(result.SafeOutputs.Staged))
 	assert.True(t, result.CacheMemoryConfig.Caches[0].RestoreOnly)

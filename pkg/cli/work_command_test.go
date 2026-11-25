@@ -74,7 +74,7 @@ func TestWorkCommandPersistentOutputAndRepositoryFlags(t *testing.T) {
 	for _, tc := range []struct {
 		name, shorthand, usage string
 	}{
-		{"repo", "r", "Target repository (owner/repo format). Defaults to current repository"},
+		{"repo", "r", "Target repository (owner/repo format only; GHES host prefixes are not supported). Defaults to current repository"},
 		{"json", "j", "Output results in JSON format"},
 	} {
 		flag := command.PersistentFlags().Lookup(tc.name)

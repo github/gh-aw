@@ -78,23 +78,33 @@ func routerModelMode(field, model string) (string, error) {
 		"Use one of: "+validRouterModelValues()+".")
 }
 
+// Learning observes a choice made elsewhere; it is not itself a model choice.
+func declaresTopLevelRoutingChoice(frontmatter map[string]any) bool {
+	routing, exists := frontmatter["model-routing"]
+	if block, ok := routing.(map[string]any); ok {
+		_, exists = block["allowed-models"]
+	}
+	return exists
+}
+
 // A shortlist narrows one explicit model choice. Do not silently widen it by
 // combining two separately authored lists.
 func workflowRouterShortlist(frontmatter map[string]any, imported [][]string) ([]string, error) {
-	if block, ok := frontmatter["model-routing"].(map[string]any); ok {
+	block := ExtractMapField(frontmatter, "model-routing")
+	if _, ok := block["allowed-models"]; ok {
 		imported = append(imported, ParseStringArrayFromConfig(block, "allowed-models", modelRouterValueLog))
 	}
-	switch len(imported) {
-	case 0:
-		return nil, nil
-	case 1:
-		if len(imported[0]) > 0 {
-			return imported[0], nil
-		}
-		return nil, NewValidationError("model-routing.allowed-models", "", "the router shortlist is empty", "Specify at least one candidate model or alias.")
-	default:
-		return nil, NewValidationError("model-routing", "", "more than one top-level router shortlist is configured", "Declare model-routing once, in the workflow or in one of its imports.")
+	if len(imported) > 1 {
+		return nil, NewValidationError("model-routing.allowed-models", "", "more than one top-level router shortlist is configured", "Declare allowed-models once, in the workflow or in one of its imports.")
 	}
+	if len(imported) > 0 {
+		list := imported[0]
+		if len(list) == 0 {
+			return nil, NewValidationError("model-routing.allowed-models", "", "the router shortlist is empty", "Specify at least one candidate model or alias.")
+		}
+		return list, nil
+	}
+	return nil, nil
 }
 
 // applyRouterModelValue normalizes a main-agent router value into the engine's
@@ -103,7 +113,7 @@ func workflowRouterShortlist(frontmatter map[string]any, imported [][]string) ([
 func applyRouterModelValue(engineConfig *EngineConfig, model string, shortlist []string) (string, error) {
 	if !isReservedRouterModelName(model) {
 		if shortlist != nil {
-			return "", NewValidationError("model-routing", model, "a top-level router shortlist requires an explicit router model value", "Set model to "+validRouterModelValues()+" or remove model-routing.")
+			return "", NewValidationError("model-routing.allowed-models", model, "a top-level router shortlist requires an explicit router model value", "Set model to "+validRouterModelValues()+" or remove allowed-models.")
 		}
 		return model, nil
 	}

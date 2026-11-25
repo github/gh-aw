@@ -65,6 +65,48 @@ func TestGetWorkflowStatuses(t *testing.T) {
 	}
 }
 
+func TestMatchWorkflowByFilename(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		input   string
+		want    bool
+		wantErr bool
+	}{
+		{name: "exact lock filename", input: `[{"name":"Repository status","state":"active","path":".github/workflows/repo-status.lock.yml"}]`, want: true},
+		{name: "exact markdown filename", input: `[{"path":".github/workflows/repo-status.md"}]`, want: true},
+		{name: "longer filename", input: `[{"path":".github/workflows/daily-repo-status.lock.yml"}]`},
+		{name: "filename suffix", input: `[{"path":".github/workflows/repo-status.lock.yml.bak"}]`},
+		{name: "display name is not path", input: `[{"name":"repo-status.md","path":".github/workflows/other.lock.yml"}]`},
+		{name: "directory is not filename", input: `[{"path":"repo-status.lock.yml/other.lock.yml"}]`},
+		{name: "later matching workflow", input: `[{"path":"other.lock.yml"},{"path":"repo-status.lock.yml"}]`, want: true},
+		{name: "duplicate matches return one status", input: `[{"path":"repo-status.lock.yml"},{"path":"repo-status.md"}]`, want: true},
+		{name: "escaped path", input: `[{"path":".github/workflows/repo\u002dstatus.lock.yml"}]`, want: true},
+		{name: "empty list", input: `[]`},
+		{name: "empty output", input: "", wantErr: true},
+		{name: "invalid json", input: `[{"path":"repo-status.lock.yml"},`, wantErr: true},
+		{name: "wrong json shape", input: `{"path":"repo-status.lock.yml"}`, wantErr: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			statuses, err := matchWorkflowByFilename("repo-status", []byte(tt.input))
+			if tt.wantErr {
+				require.Error(t, err)
+				assert.Nil(t, statuses)
+				return
+			}
+			require.NoError(t, err)
+			if tt.want {
+				assert.Equal(t, []WorkflowStatus{{WorkflowListItem: WorkflowListItem{Workflow: "repo-status"}}}, statuses)
+			} else {
+				assert.Nil(t, statuses)
+			}
+		})
+	}
+}
+
 func TestCheckStatusAndOfferRun_ContextCancelled(t *testing.T) {
 	t.Parallel()
 	ctx, cancel := context.WithCancel(t.Context())

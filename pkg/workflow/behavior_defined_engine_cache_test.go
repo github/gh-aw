@@ -52,6 +52,35 @@ func TestParseEngineDefinitionFromJSON_ValidObject(t *testing.T) {
 	assert.Equal(t, "test-engine", def.RuntimeID)
 }
 
+func TestParseEngineDefinitionFromJSON_AuthMappingAndInvalidSchema(t *testing.T) {
+	def, err := parseEngineDefinitionFromJSON(`{"id":"test-engine","auth":{"type":"github-oidc"}}`)
+	require.NoError(t, err)
+	require.NotNil(t, def)
+	assert.Empty(t, def.Auth)
+
+	_, err = parseEngineDefinitionFromJSON(`{"id":"test-engine","auth":{"type":"other"}}`)
+	assert.Error(t, err)
+}
+
+func TestEngineDefinitionForm(t *testing.T) {
+	tests := []struct {
+		name string
+		def  *EngineDefinition
+		want bool
+	}{
+		{"nil", nil, false},
+		{"id only", &EngineDefinition{ID: "test"}, false},
+		{"metadata", &EngineDefinition{DisplayName: "Test"}, true},
+		{"provider", &EngineDefinition{Provider: ProviderSelection{Name: "test"}}, true},
+		{"model", &EngineDefinition{Models: ModelSelection{Default: "test"}}, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, isEngineDefinitionForm(tt.def))
+		})
+	}
+}
+
 func TestParseEngineDefinitionFromJSON_CacheHitReturnsCopy(t *testing.T) {
 	resetEngineDefinitionCacheForTest()
 	defer resetEngineDefinitionCacheForTest()
@@ -155,6 +184,63 @@ func TestDeepCopyEngineDefinition_BehaviorsAreIndependent(t *testing.T) {
 	require.NotNil(t, dst.Behaviors.Execution)
 	assert.Equal(t, "--model", dst.Behaviors.Execution.Args[0])
 	assert.Equal(t, "bar", dst.Behaviors.Execution.Env["FOO"])
+}
+
+func TestDeepCopyEngineDefinition_NestedFieldsAreIndependent(t *testing.T) {
+	cooldown := true
+	src := EngineDefinition{
+		Options: map[string]any{"nested": []any{map[string]any{"key": "value"}}},
+		Provider: ProviderSelection{
+			Auth:    &AuthDefinition{Secret: "API_KEY"},
+			Request: &RequestShape{Query: map[string]string{"q": "value"}, BodyInject: map[string]string{"body": "value"}},
+		},
+		Behaviors: &EngineBehaviorDefinition{
+			Manifest:     &EngineManifestDefinition{Files: []string{"file"}, PathPrefixes: []string{"prefix"}},
+			Network:      &EngineNetworkDefinition{Defaults: []string{"domain"}, ProviderDomains: map[string]string{"provider": "domain"}},
+			Installation: &EngineInstallationDefinition{Requirements: []EnginePythonRequirement{{Name: "package"}}},
+			ConfigFile:   &EngineConfigFileDefinition{Path: "config"},
+			MCP:          &EngineMCPDefinition{ConfigPath: "mcp"},
+			Durable: &EngineDurableDefinition{
+				Files:        []string{"durable"},
+				Installation: []EngineInstallationDefinition{{Cooldown: &cooldown}},
+				Execution:    &EngineExecutionDefinition{Args: []string{"arg"}, Env: map[string]string{"key": "value"}},
+			},
+		},
+	}
+	dst := deepCopyEngineDefinition(src)
+	assert.Equal(t, src, dst)
+
+	dst.Options["nested"].([]any)[0].(map[string]any)["key"] = "changed"
+	dst.Provider.Auth.Secret = "changed"
+	dst.Provider.Request.Query["q"] = "changed"
+	dst.Provider.Request.BodyInject["body"] = "changed"
+	dst.Behaviors.Manifest.Files[0] = "changed"
+	dst.Behaviors.Manifest.PathPrefixes[0] = "changed"
+	dst.Behaviors.Network.Defaults[0] = "changed"
+	dst.Behaviors.Network.ProviderDomains["provider"] = "changed"
+	dst.Behaviors.Installation.Requirements[0].Name = "changed"
+	dst.Behaviors.ConfigFile.Path = "changed"
+	dst.Behaviors.MCP.ConfigPath = "changed"
+	dst.Behaviors.Durable.Files[0] = "changed"
+	*dst.Behaviors.Durable.Installation[0].Cooldown = false
+	dst.Behaviors.Durable.Execution.Args[0] = "changed"
+	dst.Behaviors.Durable.Execution.Env["key"] = "changed"
+
+	assert.Equal(t, "value", src.Options["nested"].([]any)[0].(map[string]any)["key"])
+	assert.Equal(t, "API_KEY", src.Provider.Auth.Secret)
+	assert.Equal(t, "value", src.Provider.Request.Query["q"])
+	assert.Equal(t, "value", src.Provider.Request.BodyInject["body"])
+	assert.Equal(t, []string{"file"}, src.Behaviors.Manifest.Files)
+	assert.Equal(t, []string{"prefix"}, src.Behaviors.Manifest.PathPrefixes)
+	assert.Equal(t, []string{"domain"}, src.Behaviors.Network.Defaults)
+	assert.Equal(t, "domain", src.Behaviors.Network.ProviderDomains["provider"])
+	assert.Equal(t, "package", src.Behaviors.Installation.Requirements[0].Name)
+	assert.Equal(t, "config", src.Behaviors.ConfigFile.Path)
+	assert.Equal(t, "mcp", src.Behaviors.MCP.ConfigPath)
+	assert.Equal(t, []string{"durable"}, src.Behaviors.Durable.Files)
+	assert.True(t, *src.Behaviors.Durable.Installation[0].Cooldown)
+	assert.Equal(t, []string{"arg"}, src.Behaviors.Durable.Execution.Args)
+	assert.Equal(t, "value", src.Behaviors.Durable.Execution.Env["key"])
 }
 
 func TestDeepCopyAny_NestedMapAndSlice(t *testing.T) {

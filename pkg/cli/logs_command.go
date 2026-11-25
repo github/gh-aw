@@ -700,7 +700,7 @@ func addLogsCommandFlags(logsCmd *cobra.Command, validArtifactSets string) {
 	addRepoFlag(logsCmd)
 	logsCmd.Flags().Bool("tool-graph", false, "Generate Mermaid tool sequence graph from agent logs")
 	logsCmd.Flags().Bool("exclude-staged", false, "Exclude workflow runs that executed in staged mode (safe outputs previewed but not applied)")
-	logsCmd.Flags().Bool("dry-run", false, "Filter to only dry-run workflow runs")
+	logsCmd.Flags().Bool("dry-run", false, "Filter to only dry-run workflow runs; does not preview this command")
 	logsCmd.Flags().Bool("no-dry-run", false, "Exclude dry-run workflow runs (legacy metadata without dry_run counts as a normal run)")
 	logsCmd.MarkFlagsMutuallyExclusive("dry-run", "no-dry-run")
 	logsCmd.Flags().Bool("firewall", false, "Filter to only runs with firewall enabled")

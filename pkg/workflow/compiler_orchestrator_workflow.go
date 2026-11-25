@@ -90,7 +90,7 @@ func newWorkflowBuildContext(parseResult *frontmatterParseResult) *workflowBuild
 }
 
 // setupWorkflowBuildContext initializes engine/tools processing and builds base workflow data.
-func (c *Compiler) setupWorkflowBuildContext(ctx *workflowBuildContext) error { //nolint:largefunc // Existing orchestration phase remains centralized; unrelated to adaptive routing.
+func (c *Compiler) setupWorkflowBuildContext(ctx *workflowBuildContext) error { //nolint:largefunc // Existing orchestration phase remains centralized.
 	connectorConfigs, err := c.resolveWorkflowConnectors(ctx.frontmatter.Frontmatter)
 	if err != nil {
 		return c.formatToolsProcessingError(ctx.cleanPath, err)
@@ -342,7 +342,7 @@ func (c *Compiler) populateWorkflowBuildContext(ctx *workflowBuildContext) error
 	// compilation resolve the implicit model-routing default identically.
 	c.applyDefaultModelRouting(ctx)
 	c.applyDynamicModelRouting(ctx)
-	if err := c.applyAdaptiveRouting(ctx); err != nil {
+	if err := c.applyRoutingLearning(ctx); err != nil {
 		return err
 	}
 	if err := c.validateConnectorInferenceConsumers(ctx.workflowData); err != nil {

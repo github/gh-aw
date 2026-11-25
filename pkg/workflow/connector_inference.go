@@ -162,7 +162,7 @@ func expandConnectorInference(frontmatter map[string]any, inference *ResolvedCon
 			return fmt.Errorf("engine.%s conflicts with connector-owned inference configuration", field)
 		}
 	}
-	if _, exists := frontmatter["model-routing"]; exists {
+	if declaresTopLevelRoutingChoice(frontmatter) {
 		return errors.New("model-routing conflicts with connector inference model grants")
 	}
 	for _, raw := range []any{engine["env"], frontmatter["env"]} {

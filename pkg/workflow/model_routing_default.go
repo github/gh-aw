@@ -180,7 +180,7 @@ func declaresModelOrRoutingChoice(frontmatter map[string]any, model string, engi
 	if _, ok := frontmatter["model"]; ok {
 		return true
 	}
-	if _, ok := frontmatter["model-routing"]; ok {
+	if declaresTopLevelRoutingChoice(frontmatter) {
 		return true
 	}
 	if engineObj, ok := frontmatter["engine"].(map[string]any); ok && engineObjectDeclaresModelChoice(engineObj) {
