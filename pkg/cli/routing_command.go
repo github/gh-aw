@@ -43,18 +43,19 @@ var routingWorkflowIDPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_-]*(?:
 
 // routingHistoryState is state.json, version 2. Fields keep the history's order.
 type routingHistoryState struct {
-	V                 int                             `json:"v"`
-	Workflow          string                          `json:"workflow"`
-	Seq               int64                           `json:"seq"`
-	Generation        *routingGeneration              `json:"generation"`
-	ResetAfterRun     int64                           `json:"reset_after_run"`
-	LastRun           int64                           `json:"last_run"`
-	ReconciledThrough *int64                          `json:"reconciled_through,omitempty"`
-	UnresolvedRuns    *[]int64                        `json:"unresolved_runs,omitempty"`
-	UnresolvedRunIDs  map[string]string               `json:"unresolved_run_ids,omitempty"`
-	Unexplained       int64                           `json:"unexplained"`
-	Scopes            map[string]*routingHistoryScope `json:"scopes"`
-	Updated           *routingUpdated                 `json:"updated"`
+	V                      int                             `json:"v"`
+	Workflow               string                          `json:"workflow"`
+	Seq                    int64                           `json:"seq"`
+	Generation             *routingGeneration              `json:"generation"`
+	ResetAfterRun          int64                           `json:"reset_after_run"`
+	LastRun                int64                           `json:"last_run"`
+	ReconciledThrough      *int64                          `json:"reconciled_through,omitempty"`
+	UnresolvedRuns         *[]int64                        `json:"unresolved_runs,omitempty"`
+	UnresolvedRunIDs       map[string]string               `json:"unresolved_run_ids,omitempty"`
+	UnresolvedLookupCursor *int64                          `json:"unresolved_lookup_cursor,omitempty"`
+	Unexplained            int64                           `json:"unexplained"`
+	Scopes                 map[string]*routingHistoryScope `json:"scopes"`
+	Updated                *routingUpdated                 `json:"updated"`
 }
 
 type routingGeneration struct {
@@ -563,6 +564,9 @@ func resetRoutingState(state routingHistoryState, latestRun int64, at string) ro
 		} else {
 			state.UnresolvedRunIDs = nil
 		}
+	}
+	if len(state.UnresolvedRunIDs) == 0 || (state.UnresolvedLookupCursor != nil && *state.UnresolvedLookupCursor <= latestRun) {
+		state.UnresolvedLookupCursor = nil
 	}
 	state.Scopes = map[string]*routingHistoryScope{}
 	state.Unexplained = 0

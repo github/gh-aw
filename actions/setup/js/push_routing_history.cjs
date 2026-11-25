@@ -38,6 +38,9 @@ const WRITER_JOB = "push_routing_history";
 const LIST_RUNS_PER_PAGE = 100;
 const MAX_LIST_PAGES = 8;
 const MAX_DIRECT_UNRESOLVED_LOOKUPS = 10;
+const MAX_BOUNDARY_CHECKS = 4;
+// Match contract 2's recent-gap window (5 minutes): gaps older than this in an atomic unfiltered page covering both sides are deleted runs.
+const RECENT_GAP_MS = 5 * 60 * 1000;
 const LEVELS = new Set(["economy", "balanced", "robust"]);
 const MODES = new Set(["observe"]);
 const SAVED_CONCLUSIONS = new Set(["success", "skipped", "neutral"]);
@@ -321,7 +324,7 @@ async function checkoutHistoryBranch({ githubClient, owner, repo, branch, worksp
  * @param {number} [maxPages]
  */
 async function fetchStreamWindow(fetchPage, targetRunNumber, maxRunNumber, maxPages = MAX_LIST_PAGES) {
-  /** @type {Map<number, { batch: any[], minNum: number, maxNum: number, reachedStart: boolean }>} */
+  /** @type {Map<number, { page: number, batch: any[], minNum: number, maxNum: number, reachedStart: boolean }>} */
   const pages = new Map();
   let calls = 0;
   /** @type {number | null} */
@@ -344,31 +347,39 @@ async function fetchStreamWindow(fetchPage, targetRunNumber, maxRunNumber, maxPa
       }
     }
     const reachedStart = typeof totalCount === "number" ? (pageNum - 1) * LIST_RUNS_PER_PAGE + batch.length >= totalCount : batch.length < LIST_RUNS_PER_PAGE;
-    const entry = { batch, minNum, maxNum, reachedStart };
+    const entry = { page: pageNum, batch, minNum, maxNum, reachedStart };
     pages.set(pageNum, entry);
     return entry;
   };
 
   const first = await load(1);
   if (first.reachedStart || (first.batch.length > 0 && first.minNum <= targetRunNumber)) {
-    return { items: first.batch, reachedFloor: true, maxVerified: maxRunNumber };
+    return {
+      items: first.batch,
+      reachedFloor: true,
+      maxVerified: maxRunNumber,
+      reachedStart: first.reachedStart,
+      contiguousPages: first.batch.length > 0 ? [first] : [],
+    };
   }
   if (first.batch.length === 0) {
-    return { items: [], reachedFloor: false, maxVerified: targetRunNumber - 1 };
+    return { items: [], reachedFloor: false, maxVerified: targetRunNumber - 1, reachedStart: false, contiguousPages: [] };
   }
 
   const lastPage = typeof totalCount === "number" ? Math.ceil(totalCount / LIST_RUNS_PER_PAGE) : null;
   if (lastPage === null || lastPage <= maxPages) {
     const items = [...first.batch];
+    const contiguousPages = [first];
     for (let pageNum = 2; pageNum <= maxPages; pageNum++) {
       const entry = await load(pageNum);
       items.push(...entry.batch);
+      if (entry.batch.length > 0) contiguousPages.push(entry);
       if (entry.reachedStart || (entry.batch.length > 0 && entry.minNum <= targetRunNumber)) {
-        return { items, reachedFloor: true, maxVerified: maxRunNumber };
+        return { items, reachedFloor: true, maxVerified: maxRunNumber, reachedStart: entry.reachedStart, contiguousPages };
       }
       if (entry.batch.length === 0) break;
     }
-    return { items, reachedFloor: false, maxVerified: targetRunNumber - 1 };
+    return { items, reachedFloor: false, maxVerified: targetRunNumber - 1, reachedStart: false, contiguousPages: [] };
   }
 
   let lo = 2;
@@ -385,7 +396,7 @@ async function fetchStreamWindow(fetchPage, targetRunNumber, maxRunNumber, maxPa
     const mid = Math.floor((lo + hi) / 2);
     const entry = await load(mid);
     if (entry.batch.length === 0) {
-      return { items: [...pages.values()].flatMap(p => p.batch), reachedFloor: false, maxVerified: targetRunNumber - 1 };
+      return { items: [...pages.values()].flatMap(p => p.batch), reachedFloor: false, maxVerified: targetRunNumber - 1, reachedStart: false, contiguousPages: [] };
     }
     if (entry.minNum <= targetRunNumber && entry.maxNum >= targetRunNumber) {
       floorPage = mid;
@@ -405,10 +416,10 @@ async function fetchStreamWindow(fetchPage, targetRunNumber, maxRunNumber, maxPa
   }
 
   if (floorPage === null && newestTooOld !== null && newestTooOld === oldestTooNew + 1) {
-    floorPage = oldestTooNew;
+    floorPage = newestTooOld;
   }
   if (floorPage === null) {
-    return { items: [...pages.values()].flatMap(p => p.batch), reachedFloor: false, maxVerified: targetRunNumber - 1 };
+    return { items: [...pages.values()].flatMap(p => p.batch), reachedFloor: false, maxVerified: targetRunNumber - 1, reachedStart: false, contiguousPages: [] };
   }
 
   // Reserve at least one upward chunk fetch after binary search locates floorPage so large backlogs keep advancing.
@@ -427,13 +438,139 @@ async function fetchStreamWindow(fetchPage, targetRunNumber, maxRunNumber, maxPa
   }
 
   const items = [];
+  const contiguousPages = [];
   for (let p = newestPage; p <= floorPage; p++) {
     const entry = pages.get(p);
-    if (entry) items.push(...entry.batch);
+    if (entry) {
+      items.push(...entry.batch);
+      if (entry.batch.length > 0) contiguousPages.push(entry);
+    }
   }
   const topEntry = pages.get(newestPage);
+  const bottomEntry = pages.get(floorPage);
   const maxVerified = newestPage === 1 ? maxRunNumber : Math.min(maxRunNumber, topEntry?.maxNum ?? targetRunNumber - 1);
-  return { items, reachedFloor: true, maxVerified };
+  return {
+    items,
+    reachedFloor: true,
+    maxVerified,
+    reachedStart: bottomEntry?.reachedStart === true,
+    contiguousPages,
+  };
+}
+
+/**
+ * Deduplicate and sort unfiltered runs ascending by `run_number` for gap and boundary checks.
+ * @param {any[]} items
+ * @param {boolean} reachedStart
+ */
+function indexRuns(items, reachedStart) {
+  /** @type {Map<number, any>} */
+  const byNumber = new Map();
+  for (const item of items) {
+    if (Number.isInteger(item?.run_number) && !byNumber.has(item.run_number)) {
+      byNumber.set(item.run_number, item);
+    }
+  }
+  const sorted = [...byNumber.values()].sort((a, b) => a.run_number - b.run_number);
+  return {
+    reachedStart,
+    sorted,
+    minNum: sorted.length > 0 ? sorted[0].run_number : Infinity,
+    maxNum: sorted.length > 0 ? sorted[sorted.length - 1].run_number : -Infinity,
+  };
+}
+
+/**
+ * Whether `indexed` covers both sides of an absent `[startNum, endNum]` range and its higher
+ * listed neighbour was created strictly more than 5 minutes before `nowMs` (contract 2).
+ * @param {ReturnType<typeof indexRuns>} indexed
+ * @param {number} startNum
+ * @param {number} endNum
+ * @param {number} nowMs
+ */
+function hasConfirmedOldGap(indexed, startNum, endNum, nowMs) {
+  if (!indexed || indexed.sorted.length === 0) return false;
+  if (!indexed.reachedStart && !(indexed.minNum < startNum)) return false;
+  const higherIdx = indexed.sorted.findIndex(item => item.run_number > endNum);
+  if (higherIdx === -1) return false;
+  if (higherIdx > 0 && indexed.sorted[higherIdx - 1].run_number >= startNum) return false;
+  const neighbourCreatedMs = Date.parse(indexed.sorted[higherIdx].created_at);
+  return Number.isFinite(neighbourCreatedMs) && nowMs - neighbourCreatedMs > RECENT_GAP_MS;
+}
+
+/**
+ * Whether a verified unfiltered scan already covered both sides of `num`.
+ * @param {(ReturnType<typeof indexRuns> & { reachedFloor: boolean }) | null} scan
+ * @param {number} num
+ */
+function scanCoversNumber(scan, num) {
+  if (!scan || !scan.reachedFloor || scan.sorted.length === 0) return false;
+  return (scan.reachedStart || scan.minNum < num) && scan.maxNum > num;
+}
+
+/**
+ * An unseen gap `[startNum, endNum]` is confirmed deleted only when a single atomic unfiltered page
+ * covers both sides and its higher listed neighbour is older than `RECENT_GAP_MS`. Because every
+ * run on one page comes from one API response, mid-scan inserts or deletions cannot hide a run.
+ * @param {number} startNum
+ * @param {number} endNum
+ * @param {Array<ReturnType<typeof indexRuns>>} atomicPages
+ * @param {number} nowMs
+ */
+function isConfirmedDeletedGap(startNum, endNum, atomicPages, nowMs) {
+  return atomicPages.some(page => hasConfirmedOldGap(page, startNum, endNum, nowMs));
+}
+
+/**
+ * Choose an unfiltered `(perPage, page)` window (with `perPage < LIST_RUNS_PER_PAGE`) that places
+ * 0-based `boundaryIndex` near the center of one atomic page, giving ~33-49 rows of overlap on
+ * both sides without any timestamp filtering.
+ * @param {number} boundaryIndex
+ */
+function overlappingPageParams(boundaryIndex) {
+  let bestPerPage = 67;
+  let bestPage = Math.floor(boundaryIndex / bestPerPage) + 1;
+  let bestMargin = -1;
+  for (let perPage = 50; perPage < LIST_RUNS_PER_PAGE; perPage++) {
+    const page = Math.floor(boundaryIndex / perPage) + 1;
+    const start = (page - 1) * perPage;
+    const end = page * perPage - 1;
+    const margin = Math.min(boundaryIndex - start, end - boundaryIndex);
+    if (margin > bestMargin) {
+      bestMargin = margin;
+      bestPerPage = perPage;
+      bestPage = page;
+    }
+  }
+  return { perPage: bestPerPage, page: bestPage };
+}
+
+/**
+ * Find the 0-based unfiltered list index of a page boundary straddled by an older-than-window gap
+ * `[startNum, endNum]` across verified unfiltered scans, so one overlapping unfiltered page can
+ * observe both sides atomically.
+ * @param {number} startNum
+ * @param {number} endNum
+ * @param {Array<ReturnType<typeof indexRuns> & { reachedFloor: boolean, contiguousPages: Array<{ page: number, minNum: number, maxNum: number, reachedStart: boolean }> }>} scans
+ * @param {number} nowMs
+ * @returns {number | null}
+ */
+function findOldBoundaryGapIndex(startNum, endNum, scans, nowMs) {
+  for (const scan of scans) {
+    if (!scan?.reachedFloor || !hasConfirmedOldGap(scan, startNum, endNum, nowMs)) continue;
+    for (let i = 0; i < scan.contiguousPages.length - 1; i++) {
+      const newer = scan.contiguousPages[i];
+      const older = scan.contiguousPages[i + 1];
+      if (older.maxNum < startNum && endNum < newer.minNum) {
+        return newer.page * LIST_RUNS_PER_PAGE;
+      }
+    }
+    const lastPage = scan.contiguousPages.at(-1);
+    if (scan.reachedStart && lastPage && !lastPage.reachedStart && endNum < lastPage.minNum) {
+      return lastPage.page * LIST_RUNS_PER_PAGE;
+    }
+  }
+  return null;
 }
 
 /**
@@ -487,6 +624,7 @@ async function listRuns({ githubClient, owner, repo, workflowFile, workflowPath 
     return { listing: [], reconciliation: { verified: true, unresolved: [], resolved: [] } };
   }
 
+  const nowMs = Date.now();
   const legacyFloor = legacyReconciliationFloor(state, runs);
   const baseReconciled = typeof state.reconciled_through === "number" ? state.reconciled_through : legacyFloor;
   const floor = Math.max(baseReconciled, state.reset_after_run || 0);
@@ -511,15 +649,19 @@ async function listRuns({ githubClient, owner, repo, workflowFile, workflowPath 
   const eligibleByNumber = new Map();
   /** @type {Set<number>} */
   const ineligibleNumbers = new Set();
-  for (const run of [...defaultStream.items, ...prtStream.items]) {
-    const num = run.run_number;
-    if (!Number.isInteger(num) || num <= state.reset_after_run || num >= runNumber) continue;
-    if (!isEligibleRun(run, defaultBranch)) {
-      ineligibleNumbers.add(num);
-      continue;
+  /** @param {any[]} items */
+  const ingestRuns = items => {
+    for (const run of items) {
+      const num = run.run_number;
+      if (!Number.isInteger(num) || num <= state.reset_after_run || num >= runNumber) continue;
+      if (!isEligibleRun(run, defaultBranch)) {
+        ineligibleNumbers.add(num);
+        continue;
+      }
+      if (!eligibleByNumber.has(num)) eligibleByNumber.set(num, run);
     }
-    if (!eligibleByNumber.has(num)) eligibleByNumber.set(num, run);
-  }
+  };
+  ingestRuns([...defaultStream.items, ...prtStream.items]);
 
   const missingUnresolved = [...prevUnresolved].filter(num => !writtenNumbers.has(num) && !eligibleByNumber.has(num) && !ineligibleNumbers.has(num));
   const expectedIntervalCount = verified ? Math.max(0, verifiedUpper - floor) : 0;
@@ -534,6 +676,62 @@ async function listRuns({ githubClient, owner, repo, workflowFile, workflowPath 
 
   /** @type {number[]} */
   const unresolvedGaps = [];
+  /** @type {Array<ReturnType<typeof indexRuns> & { reachedFloor: boolean, contiguousPages: Array<{ page: number, minNum: number, maxNum: number, reachedStart: boolean }> }>} */
+  const unfilteredScans = [];
+  /** @type {Array<ReturnType<typeof indexRuns>>} */
+  const atomicPages = [];
+  /** @type {Set<number>} */
+  const checkedBoundaryIndices = new Set();
+  let boundaryChecks = 0;
+
+  /** @param {Awaited<ReturnType<typeof fetchStreamWindow>>} stream */
+  const recordUnfilteredStream = stream => {
+    const scan = { ...indexRuns(stream.items, stream.reachedStart), reachedFloor: stream.reachedFloor, contiguousPages: stream.contiguousPages };
+    unfilteredScans.push(scan);
+    for (const page of stream.contiguousPages) {
+      atomicPages.push(indexRuns(page.batch, page.reachedStart));
+    }
+    ingestRuns(stream.items);
+    return scan;
+  };
+
+  /**
+   * When an older-than-window gap straddles a page boundary across separate paginated requests,
+   * issue a bounded overlapping unfiltered request with a staggered `per_page` so both sides are
+   * observed atomically without timestamp filtering (recovering any shift-hidden run or confirming
+   * true deletion).
+   * @param {number} startNum
+   * @param {number} endNum
+   */
+  const verifyBoundaryGap = async (startNum, endNum) => {
+    if (isConfirmedDeletedGap(startNum, endNum, atomicPages, nowMs)) return;
+    if (boundaryChecks >= MAX_BOUNDARY_CHECKS) return;
+    const boundaryIndex = findOldBoundaryGapIndex(startNum, endNum, unfilteredScans, nowMs);
+    if (boundaryIndex === null || checkedBoundaryIndices.has(boundaryIndex)) return;
+    checkedBoundaryIndices.add(boundaryIndex);
+    boundaryChecks += 1;
+    const { perPage, page } = overlappingPageParams(boundaryIndex);
+    try {
+      const response = await githubClient.rest.actions.listWorkflowRuns({
+        owner,
+        repo,
+        workflow_id: workflowFile,
+        per_page: perPage,
+        page,
+      });
+      const batch = response?.data?.workflow_runs || [];
+      const totalCount = typeof response?.data?.total_count === "number" ? response.data.total_count : null;
+      const reachedStart = totalCount !== null ? (page - 1) * perPage + batch.length >= totalCount : batch.length < perPage;
+      atomicPages.push(indexRuns(batch, reachedStart));
+      ingestRuns(batch);
+    } catch {
+      // Leave unconfirmed boundary gaps unresolved on transient API errors.
+    }
+  };
+
+  /** @type {(ReturnType<typeof indexRuns> & { reachedFloor: boolean }) | null} */
+  let intervalUnfilteredScan = null;
+  let needsIntervalGapFinalization = false;
   if (hasIntervalGap) {
     const sortedKnown = [...knownInInterval].sort((a, b) => a - b);
     let earliestGap = floor + 1;
@@ -542,15 +740,7 @@ async function listRuns({ githubClient, owner, repo, workflowFile, workflowPath 
       earliestGap = num + 1;
     }
     const unfilteredStream = await fetchStreamWindow(page => githubClient.rest.actions.listWorkflowRuns({ owner, repo, workflow_id: workflowFile, per_page: LIST_RUNS_PER_PAGE, page }), earliestGap, verifiedUpper);
-    for (const run of unfilteredStream.items) {
-      const num = run.run_number;
-      if (!Number.isInteger(num) || num <= state.reset_after_run || num >= runNumber) continue;
-      if (!isEligibleRun(run, defaultBranch)) {
-        ineligibleNumbers.add(num);
-        continue;
-      }
-      if (!eligibleByNumber.has(num)) eligibleByNumber.set(num, run);
-    }
+    intervalUnfilteredScan = recordUnfilteredStream(unfilteredStream);
     if (!unfilteredStream.reachedFloor) {
       verified = false;
     } else {
@@ -558,35 +748,27 @@ async function listRuns({ githubClient, owner, repo, workflowFile, workflowPath 
       if (runNumber > floor + 1 && verifiedUpper <= floor) {
         verified = false;
       } else {
-        const covered = new Set();
-        for (const num of writtenNumbers) if (num > floor && num <= verifiedUpper) covered.add(num);
-        for (const num of eligibleByNumber.keys()) if (num > floor && num <= verifiedUpper) covered.add(num);
-        for (const num of ineligibleNumbers) if (num > floor && num <= verifiedUpper) covered.add(num);
-        const missingCount = Math.max(0, verifiedUpper - floor) - covered.size;
-        if (missingCount > BOUNDS.unresolved_runs) {
-          verified = false;
-        } else if (missingCount > 0) {
-          // Track unexplained gaps as bounded unresolved obligations so transient omissions still
-          // reconcile when they reappear and permanently deleted runs do not halt later failure accounting.
-          for (let num = floor + 1; num <= verifiedUpper; num++) {
-            if (!covered.has(num)) unresolvedGaps.push(num);
-          }
-        }
+        needsIntervalGapFinalization = true;
       }
     }
   }
 
   /** @type {Set<number>} */
   const resolved = new Set();
+  /** @type {number | undefined} */
+  let nextLookupCursor;
   // Resolve tracked unresolved runs that fell past the listing windows via bounded direct run-ID lookups,
-  // rotating the starting index across saves so every tracked run receives a turn.
+  // advancing a persisted run-number cursor across saves so every tracked ID gets checked without resonance.
   const stillMissingUnresolved = missingUnresolved.filter(num => !eligibleByNumber.has(num) && !ineligibleNumbers.has(num));
-  const lookupCandidates = stillMissingUnresolved.filter(num => Boolean(storedUnresolvedIds[String(num)]));
+  const lookupCandidates = stillMissingUnresolved.filter(num => Boolean(storedUnresolvedIds[String(num)])).sort((a, b) => a - b);
   if (lookupCandidates.length > 0 && typeof githubClient?.rest?.actions?.getWorkflowRun === "function") {
-    const startOffset = (runNumber * MAX_DIRECT_UNRESOLVED_LOOKUPS) % lookupCandidates.length;
+    const prevCursor = typeof state.unresolved_lookup_cursor === "number" && Number.isInteger(state.unresolved_lookup_cursor) && state.unresolved_lookup_cursor > 0 ? state.unresolved_lookup_cursor : 0;
+    const firstAfterCursor = lookupCandidates.findIndex(num => num > prevCursor);
+    const startIndex = firstAfterCursor === -1 ? 0 : firstAfterCursor;
     const countToCheck = Math.min(MAX_DIRECT_UNRESOLVED_LOOKUPS, lookupCandidates.length);
     for (let i = 0; i < countToCheck; i++) {
-      const num = lookupCandidates[(startOffset + i) % lookupCandidates.length];
+      const num = lookupCandidates[(startIndex + i) % lookupCandidates.length];
+      nextLookupCursor = num;
       const storedId = storedUnresolvedIds[String(num)];
       try {
         const { data: run } = await githubClient.rest.actions.getWorkflowRun({ owner, repo, run_id: Number(storedId) || storedId });
@@ -604,19 +786,60 @@ async function listRuns({ githubClient, owner, repo, workflowFile, workflowPath 
     }
   }
 
-  // If still missing unresolved runs without stored IDs (for example from a prior state before IDs were recorded),
-  // fall back to an unfiltered window search when we did not already run one.
+  // Give ID-less unresolved runs independent unfiltered scan coverage whenever they were not already
+  // covered by the interval-gap unfiltered scan. Isolate failures locally so an API error on a deep
+  // page does not discard completed direct-ID lookups, cursor rotation, or verified interval coverage.
   const unindexedMissing = stillMissingUnresolved.filter(num => !eligibleByNumber.has(num) && !ineligibleNumbers.has(num) && !resolved.has(num) && !storedUnresolvedIds[String(num)]);
-  if (unindexedMissing.length > 0 && !hasIntervalGap) {
-    const unfilteredStream = await fetchStreamWindow(page => githubClient.rest.actions.listWorkflowRuns({ owner, repo, workflow_id: workflowFile, per_page: LIST_RUNS_PER_PAGE, page }), Math.min(...unindexedMissing), upperNeeded);
-    for (const run of unfilteredStream.items) {
-      const num = run.run_number;
-      if (!Number.isInteger(num) || num <= state.reset_after_run || num >= runNumber) continue;
-      if (!isEligibleRun(run, defaultBranch)) {
-        ineligibleNumbers.add(num);
-        continue;
+  const uncoveredUnindexed = unindexedMissing.filter(num => !scanCoversNumber(intervalUnfilteredScan, num));
+  if (uncoveredUnindexed.length > 0) {
+    try {
+      const unfilteredStream = await fetchStreamWindow(page => githubClient.rest.actions.listWorkflowRuns({ owner, repo, workflow_id: workflowFile, per_page: LIST_RUNS_PER_PAGE, page }), Math.min(...uncoveredUnindexed), upperNeeded);
+      recordUnfilteredStream(unfilteredStream);
+    } catch (error) {
+      core.warning(`Could not scan unfiltered runs for ID-less unresolved obligations: ${getErrorMessage(error)}`);
+    }
+  }
+
+  /** @returns {Array<[number, number]>} */
+  const intervalGaps = () => {
+    /** @type {Set<number>} */
+    const covered = new Set();
+    for (const num of writtenNumbers) if (num > floor && num <= verifiedUpper) covered.add(num);
+    for (const num of eligibleByNumber.keys()) if (num > floor && num <= verifiedUpper) covered.add(num);
+    for (const num of ineligibleNumbers) if (num > floor && num <= verifiedUpper) covered.add(num);
+    /** @type {Array<[number, number]>} */
+    const gaps = [];
+    let prev = floor;
+    for (const next of [...[...covered].sort((a, b) => a - b), verifiedUpper + 1]) {
+      if (prev + 1 <= next - 1) gaps.push([prev + 1, next - 1]);
+      prev = next;
+    }
+    return gaps;
+  };
+
+  // Run bounded boundary checks after both unfiltered scans have been ingested so recovered runs
+  // (eligible or ineligible) are reflected before finalizing interval gaps and inspecting eligible runs.
+  if (needsIntervalGapFinalization) {
+    for (const [gapStart, gapEnd] of intervalGaps()) await verifyBoundaryGap(gapStart, gapEnd);
+  }
+  for (const num of unindexedMissing) {
+    if (eligibleByNumber.has(num) || ineligibleNumbers.has(num) || resolved.has(num)) continue;
+    await verifyBoundaryGap(num, num);
+  }
+  if (needsIntervalGapFinalization) {
+    for (const [gapStart, gapEnd] of intervalGaps()) {
+      if (isConfirmedDeletedGap(gapStart, gapEnd, atomicPages, nowMs)) continue;
+      if (unresolvedGaps.length + (gapEnd - gapStart + 1) > BOUNDS.unresolved_runs) {
+        if (gapStart - 1 > floor) {
+          // Clamp verifiedUpper below the overflowing gap so already-verified earlier coverage still advances.
+          verifiedUpper = gapStart - 1;
+        } else {
+          verified = false;
+          unresolvedGaps.length = 0;
+        }
+        break;
       }
-      if (!eligibleByNumber.has(num)) eligibleByNumber.set(num, run);
+      for (let num = gapStart; num <= gapEnd; num++) unresolvedGaps.push(num);
     }
   }
 
@@ -675,12 +898,15 @@ async function listRuns({ githubClient, owner, repo, workflowFile, workflowPath 
 
   for (const num of prevUnresolved) {
     if (eligibleByNumber.has(num) || resolved.has(num)) continue;
+    const storedId = storedUnresolvedIds[String(num)];
     if (writtenNumbers.has(num) || ineligibleNumbers.has(num)) {
       resolved.add(num);
+    } else if (!storedId && isConfirmedDeletedGap(num, num, atomicPages, nowMs)) {
+      // Expire confirmed old gap-only entries once a single atomic unfiltered page covering both sides shows them absent.
+      resolved.add(num);
     } else {
-      // Never drop a known unresolved run based on absence alone.
+      // Retain tracked entries that have a run ID (pending direct 404/completion) or unconfirmed/recent gaps.
       unresolved.add(num);
-      const storedId = storedUnresolvedIds[String(num)];
       if (storedId) unresolvedIds[String(num)] = storedId;
     }
   }
@@ -692,6 +918,7 @@ async function listRuns({ githubClient, owner, repo, workflowFile, workflowPath 
       ...(verified && !fullCatchUp ? { ceiling: reconciliationCeiling } : {}),
       unresolved: [...unresolved].sort((a, b) => a - b),
       ...(Object.keys(unresolvedIds).length > 0 ? { unresolved_ids: unresolvedIds } : {}),
+      ...(nextLookupCursor !== undefined ? { unresolved_lookup_cursor: nextLookupCursor } : {}),
       resolved: [...resolved].sort((a, b) => a - b),
     },
   };
