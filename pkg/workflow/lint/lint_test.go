@@ -30,7 +30,7 @@ func TestRuleRegistrationAndSelection(t *testing.T) {
 		"pull-request-target-checkout", "prompt-expression",
 		"gateway-dispatch-literals",
 		"artipacked", "cache-poisoning", "excessive-permissions", "obfuscation",
-		"bash-case-pattern", "unsound-contains",
+		"bash-case-pattern", "unquoted-command-assignment", "unsound-contains",
 		"privileged-checkout", "artifact-execution", "unpinned-images", "environment-file-injection",
 		"bot-conditions",
 		"insecure-commands",

@@ -9,8 +9,45 @@ import (
 	"time"
 
 	"github.com/github/gh-aw/pkg/workflow/aw"
+	workflowlint "github.com/github/gh-aw/pkg/workflow/lint"
 	"github.com/stretchr/testify/require"
 )
+
+func TestCompilerLintResolvedMCPShellScripts(t *testing.T) {
+	document, err := aw.Parse("---\nmcp-scripts:\n  local:\n    run: QUERY_COMMAND=pr\n---\nPrompt.\n")
+	require.NoError(t, err)
+	data := &WorkflowData{
+		SourceDocument: document,
+		MCPScripts: &MCPScriptsConfig{Tools: map[string]*MCPScriptToolConfig{
+			"imported": {Run: "QUERY_COMMAND=pr"},
+			"local":    {Run: `QUERY_COMMAND="pr"`},
+		}},
+	}
+	input := NewCompiler().compilerLintInput(data, nil, "test.md")
+	runner, err := workflowlint.Default().Select("unquoted-command-assignment")
+	require.NoError(t, err)
+	diagnostics, err := runner.Run(t.Context(), input)
+	require.NoError(t, err)
+	require.Len(t, diagnostics, 1)
+	require.Equal(t, "mcp-scripts.imported.run", diagnostics[0].Path)
+}
+
+func TestCompilerLintImportedMCPShellScripts(t *testing.T) {
+	dir := t.TempDir()
+	source := filepath.Join(dir, "workflow.md")
+	shared := filepath.Join(dir, "shared.md")
+	require.NoError(t, os.WriteFile(source, []byte("---\non: workflow_dispatch\nimports: [shared.md]\ncheckout: false\ntools: {github: false}\n---\nPrompt.\n"), 0o600))
+	counts := make(map[string]int)
+	for _, assignment := range []string{"QUERY_COMMAND=pr", `QUERY_COMMAND="pr"`} {
+		require.NoError(t, os.WriteFile(shared, []byte("---\nmcp-scripts:\n  query:\n    description: Query\n    run: '"+assignment+"'\n---\n"), 0o600))
+		compiler := NewCompiler(WithLint(true), WithNoEmit(true))
+		compiler.gitRoot = dir
+		compiler.SetSkipValidation(true)
+		require.NoError(t, compiler.CompileWorkflow(source))
+		counts[assignment] = compiler.GetWarningCount()
+	}
+	require.Equal(t, counts[`QUERY_COMMAND="pr"`]+1, counts["QUERY_COMMAND=pr"])
+}
 
 func TestCompilerLintEnabledAndOptOut(t *testing.T) {
 	t.Parallel()
