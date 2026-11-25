@@ -1788,7 +1788,7 @@ jobs:
                 }
               },
               "create_project_status_update": {
-                "defaultMax": 10,
+                "defaultMax": 1,
                 "fields": {
                   "body": {
                     "required": true,

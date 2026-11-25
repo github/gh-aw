@@ -7191,10 +7191,12 @@
               "additionalProperties": false,
               "examples": [
                 {
+                  "project": "https://github.com/orgs/myorg/projects/123",
                   "max": 15
                 },
                 {
                   "github-token": "${{ secrets.PROJECT_GITHUB_TOKEN }}",
+                  "project": "https://github.com/orgs/myorg/projects/123",
                   "max": 15
                 }
               ]
@@ -7370,7 +7372,7 @@
                 },
                 "project": {
                   "type": "string",
-                  "description": "Target project URL for status update operations. This is required in the configuration for documentation purposes. Agent messages MUST explicitly include the project field in their output - the configured value is not used as a fallback. Must be a valid GitHub Projects v2 URL.",
+                  "description": "Target project URL for status update operations. This is required in the configuration and selects project/token setup, but is not a fallback for agent messages, which MUST explicitly include the project field. Must be a valid GitHub Projects v2 URL.",
                   "pattern": "^https://github\\.com/(users|orgs)/([^/]+|<[A-Z_]+>)/projects/(\\d+|<[A-Z_]+>)$",
                   "examples": ["https://github.com/orgs/myorg/projects/123", "https://github.com/users/username/projects/456"]
                 },
@@ -7403,10 +7405,12 @@
               "additionalProperties": false,
               "examples": [
                 {
+                  "project": "https://github.com/orgs/myorg/projects/123",
                   "max": 1
                 },
                 {
                   "github-token": "${{ secrets.GH_AW_PROJECT_GITHUB_TOKEN }}",
+                  "project": "https://github.com/orgs/myorg/projects/123",
                   "max": 1
                 }
               ]

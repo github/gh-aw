@@ -31,7 +31,7 @@ locally; by default, future updates will merge in those local changes (use gh aw
 Edits that change nothing leave the workflow untouched. When frontmatter does change it is
 re-serialized, so YAML comments, key ordering, and quoting styles are not preserved.
 
-Connector imports use the same local/pinned imports and typed with bindings as other
+Connector imports use the same local/pinned imports and typed bindings as other
 shared workflows. Pass a YAML import object to --add-import for exact resource IDs
 and secret names, never secret values. Importing does not select capabilities:
 select narrow tools.<id> reads/native methods and staged safe-outputs separately.
