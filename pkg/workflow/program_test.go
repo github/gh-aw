@@ -3,9 +3,9 @@
 package workflow
 
 import (
+	"maps"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/goccy/go-yaml"
@@ -132,12 +132,10 @@ func TestProgramConfigurationErrors(t *testing.T) {
 	} {
 		t.Run(entry.name, func(t *testing.T) {
 			files := map[string]string{"w.md": entry.source}
-			for name, content := range entry.files {
-				files[name] = content
-			}
+			maps.Copy(files, entry.files)
 			_, err := compileProgramWorkflows(t, files, "w")
 			require.Error(t, err)
-			require.True(t, strings.Contains(err.Error(), entry.want), "error %q should contain %q", err.Error(), entry.want)
+			require.Contains(t, err.Error(), entry.want)
 		})
 	}
 }

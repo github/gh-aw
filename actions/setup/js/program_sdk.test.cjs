@@ -16,7 +16,7 @@ const { main: runProgram, resolveProgramPath } = require("./run_program.cjs");
 const POLICY = { version: 4, pending_limit: 30, issues: false, effect_scope: "owner/repo", workers: ["worker"], pools: { default: { concurrency: 3, per_account_limit: 0, max_attempts: 3 } } };
 const CONFIG = { max: 2, workflows: ["worker"], work_queue_workflows: ["worker"], workflow_files: { worker: ".lock.yml" } };
 const dispatcherContext = { repo: { owner: "owner", repo: "repo" }, runId: 100, runAttempt: 1, payload: {}, ref: "refs/heads/main" };
-const ENV_KEYS = ["GITHUB_WORKFLOW_REF", "GITHUB_REF", "GH_AW_WORK_QUEUE_ENABLED", "GH_AW_WORK_QUEUE_ROLE", "GH_AW_WORK_QUEUE_SNAPSHOT", "GH_AW_WORK_QUEUE_POLICY", "GH_AW_SAFE_OUTPUTS_STAGED"];
+const ENV_KEYS = ["GITHUB_EVENT_PATH", "GITHUB_WORKFLOW_REF", "GITHUB_REF", "GH_AW_WORK_QUEUE_ENABLED", "GH_AW_WORK_QUEUE_ROLE", "GH_AW_WORK_QUEUE_SNAPSHOT", "GH_AW_WORK_QUEUE_POLICY", "GH_AW_SAFE_OUTPUTS_STAGED"];
 
 function fakeCore() {
   return { info: vi.fn(), warning: vi.fn(), setOutput: vi.fn(), setFailed: vi.fn(), summary: { addRaw: vi.fn().mockReturnThis(), write: vi.fn(async () => undefined) } };
@@ -24,6 +24,7 @@ function fakeCore() {
 
 let directory;
 const savedEnv = {};
+const savedContext = global.context;
 
 beforeEach(() => {
   directory = fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()), "gh-aw-program-"));
@@ -37,6 +38,7 @@ afterEach(() => {
     if (value === undefined) delete process.env[key];
     else process.env[key] = value;
   }
+  global.context = savedContext;
 });
 
 function writeSnapshot(envelope) {
@@ -138,6 +140,8 @@ describe("worker programs", () => {
       RUNNER_TEMP: directory,
     };
     const context = { repo: { owner: "owner", repo: "repo" }, runId: 200, runAttempt: 1, payload: { inputs: { work_queue_assignment: JSON.stringify({ version: 4, dispatch_id: dispatchId }) } } };
+    // setupGlobals publishes the github-script context; Claim scoping reads the run's assignment from it.
+    global.context = context;
     return { env, context, assignment, safeOutputsPath: env.GH_AW_SAFE_OUTPUTS };
   }
 
