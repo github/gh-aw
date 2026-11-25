@@ -111,7 +111,7 @@ Analyze codebase daily: compute size, quality, health metrics. Track 7/30-day tr
 
 **Context**: Fresh clone (no git history). Fetch with `git fetch --unshallow` for churn metrics. Memory: `/tmp/gh-aw/repo-memory/default/`
 
-Before collecting metrics or drafting the discussion, use the `daily-metrics-and-report` skill for metric definitions, calculations, and the variant-specific report format.
+Before collecting metrics, calculating trends, drafting the discussion, or generating charts, use the `daily-metrics-and-report` skill for metric definitions, calculations, visualization, and the variant-specific report format.
 
 ## Data Storage
 
@@ -159,27 +159,6 @@ Before writing `history.jsonl`, run `python3 .github/scripts/prune_daily_code_me
 
 Append today's entry after pruning, then push via `push_repo_memory`.
 
-## Data Visualization with Python
-
-{{#if experiments.output_format == 'full_detail' }}
-Generate **6 high-quality charts** to visualize code metrics and trends using Python, matplotlib, and seaborn. All charts must be uploaded as assets and embedded in the discussion report.
-{{#else}}
-Generate **2 high-quality charts** focusing on the most actionable signals:
-{{/if}}
-
-### Required Charts
-
-Read `/tmp/gh-aw/agent/chart-specs.md` for the variant-appropriate list of required charts (pre-written by the setup step). All charts save to `/tmp/gh-aw/python/charts/<filename>`.
-
-### Python Script
-
-Use `figsize=(12, 7)` (see `python-dataviz.md` for full chart setup and upload pattern). Create a script that:
-
-1. Reads variant from `GH_AW_EXPERIMENTS_OUTPUT_FORMAT`
-2. Loads historical data from `/tmp/gh-aw/repo-memory/default/history.jsonl` and current metrics from `/tmp/gh-aw/python/data/current_metrics.json`
-3. Generates the required charts for the selected variant, saves to `/tmp/gh-aw/python/charts/`
-4. Uploads each chart via the `upload asset` safe-output tool and embeds the returned URLs in the discussion report
-
 ## Trend Calculation
 
 For each metric: current value, 7-day % change, 30-day % change, trend indicator (⬆️/➡️/⬇️)
@@ -206,6 +185,22 @@ For each metric: current value, 7-day % change, 30-day % change, trend indicator
 ---
 description: Metric definitions, calculation rules, quality scoring, and discussion format for daily code metrics.
 ---
+
+## Data Visualization with Python
+
+{{#if experiments.output_format == 'full_detail' }}
+Generate **6 high-quality charts** to visualize code metrics and trends using Python, matplotlib, and seaborn. Upload all charts as assets and embed them in the discussion report.
+{{#else}}
+Generate **2 high-quality charts** focused on the most actionable signals.
+{{/if}}
+
+### Required Charts
+
+Read `/tmp/gh-aw/agent/chart-specs.md` for the variant-appropriate charts (written by the setup step). Save all charts to `/tmp/gh-aw/python/charts/<filename>`.
+
+### Python Script
+
+Use `figsize=(12, 7)` (see `python-dataviz.md` for chart setup and upload pattern). Create a script that reads the variant from `GH_AW_EXPERIMENTS_OUTPUT_FORMAT`, loads historical data from `/tmp/gh-aw/repo-memory/default/history.jsonl` and current metrics from `/tmp/gh-aw/python/data/current_metrics.json`, generates the required charts, uploads each through the `upload asset` safe-output tool, and embeds returned URLs in the report.
 
 ### Metrics to Collect
 
