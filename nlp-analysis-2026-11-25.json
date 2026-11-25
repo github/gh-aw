@@ -1,0 +1,15 @@
+{
+  "date": "2026-11-25",
+  "prs": 112,
+  "messages": 112,
+  "total_copilot_prs": 722,
+  "avg": 0.015,
+  "median": 0.0,
+  "pos_pct": 41.1,
+  "neu_pct": 25.9,
+  "neg_pct": 33.0,
+  "top_topic": "output / safe",
+  "comment_data": false,
+  "window_start": "2026-11-18T10:20:19Z",
+  "run_id": "45593212325"
+}
