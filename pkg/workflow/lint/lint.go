@@ -302,6 +302,7 @@ func Default() *Runner {
 		GraderFileIORule(),
 		PullRequestTargetCheckoutRule(),
 		PromptExpressionRule(),
+		PromptConditionSyntaxRule(),
 		GatewayDispatchLiteralsRule(),
 		ArtipackedRule(),
 		CachePoisoningRule(),
