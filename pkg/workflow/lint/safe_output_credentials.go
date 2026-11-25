@@ -231,6 +231,9 @@ func safeOutputRedirectsToInput(ctx context.Context, script, path string) bool {
 	}
 	found := false
 	syntax.Walk(tree, func(node syntax.Node) bool {
+		if found {
+			return false
+		}
 		redirect, ok := node.(*syntax.Redirect)
 		if !ok || (redirect.Op != syntax.RdrOut && redirect.Op != syntax.AppOut &&
 			redirect.Op != syntax.RdrClob && redirect.Op != syntax.AppClob &&
