@@ -53,15 +53,29 @@ const dispatchReceipt = (overrides = {}) => ({
 const dispatchEnv = receipt => ({ ...successfulJobs, SMOKE_DISPATCH_RECEIPT: JSON.stringify(receipt) });
 
 describe("native work queue smoke verification", () => {
-  it("stages three smoke Work and one bounded dispatch without reading an installed Policy", () => {
+  it.each([
+    [0, 3],
+    [1, 2],
+    [2, 1],
+    [3, 1],
+    [7, 1],
+  ])("tops the smoke pool up to three Work and stages one bounded dispatch without reading an installed Policy: with %i available stages %i roots", (available, roots) => {
     const script = readWorkflow("dispatcher").steps[0].with.script;
-    expect(script).not.toContain("work_queue_mcp_server.cjs");
     expect(script).not.toMatch(/logical_limit|native_limit|Policy/);
     const staged = [];
     const require = name => {
       if (name === "node:fs") return { mkdirSync() {}, writeFileSync() {} };
       if (name === "node:path") return { join: (...parts) => parts.join("/") };
       if (name.endsWith("work_queue_intents.cjs")) return { stagePlanIntents: (_filename, plan) => staged.push(plan) };
+      if (name.endsWith("work_queue_mcp_server.cjs"))
+        return {
+          loadWorkQueueSnapshot: () => ({ role: "dispatcher" }),
+          readWorkQueueState: (snapshot, args) => {
+            expect(snapshot.role).toBe("dispatcher");
+            expect(args.pool).toBe("smoke-work-queue");
+            return { counts: available ? { available } : {} };
+          },
+        };
       throw new Error(`Unexpected module ${name}`);
     };
     runInNewContext(script, {
@@ -71,7 +85,7 @@ describe("native work queue smoke verification", () => {
       core: { info() {} },
     });
     expect(staged).toHaveLength(1);
-    expect(staged[0].nodes.map(node => node.node_key)).toEqual(["smoke-1", "smoke-2", "smoke-3"]);
+    expect(staged[0].nodes.map(node => node.node_key)).toEqual(Array.from({ length: roots }, (_, i) => `smoke-${i + 1}`));
     expect(staged[0].nodes.every(node => node.graph_id === "smoke-work-queue:123" && node.payload.smoke === "work-queue-v1")).toBe(true);
     expect(staged[0].dispatch).toEqual({ pool: "smoke-work-queue", max_claims: 3, max_dispatches: 3 });
   });
@@ -163,9 +177,11 @@ describe("native work queue smoke verification", () => {
     expect(pre).toContain("assert.equal(input.version, 4)");
     expect(pre).toContain("/tmp/gh-aw/work-queue.snapshot.json");
     expect(pre).toContain('assert.equal(work.smoke, "work-queue-v1")');
+    expect(pre).toContain('assert.equal(continuation.route, "workqueue"');
     expect(pre).not.toContain("normalizeAssignment");
     const post = worker["post-steps"][0].run;
     expect(post).toContain('{ version: 4, claim_handle: handle, outcome: "completed" }');
+    expect(post).toContain('item.type.replace(/-/g, "_") === "request_continuation"');
     expect(post).not.toContain("keep_open");
   });
 
@@ -198,6 +214,9 @@ describe("native work queue smoke verification", () => {
         expect(steps[finish].env.GH_AW_WORK_QUEUE_EFFECTS).toBe("/tmp/gh-aw/work-queue.effects.jsonl");
         expect(steps[handler].env.GH_AW_WORK_QUEUE_EFFECTS).toBe("/tmp/gh-aw/work-queue.effects.jsonl");
         expect(compiled.jobs.safe_outputs.outputs.work_queue_outcome).toBe("${{ steps.work_queue_finish.outputs.work_queue_outcome }}");
+        expect(steps[finish].env.GH_AW_CONTINUATION_ROUTE).toBe("workqueue");
+        expect(steps[finish].env.GH_AW_CONTINUATION_MAX_DEPTH).toBe("1");
+        expect(compiled.jobs.agent.outputs.continuation_evidence).toBe("${{ steps.bind_continuation_evidence.outputs.continuation_evidence }}");
         const termination = compiled.jobs.conclusion.steps.find(step => step.id === "worker_termination");
         expect(compiledPolicy(termination.env).version).toBe(4);
       } else {

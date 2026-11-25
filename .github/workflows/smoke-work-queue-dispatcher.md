@@ -1,6 +1,6 @@
 ---
 name: Smoke Work Queue Dispatcher
-description: Submit three synthetic tasks every six hours and request three native smoke worker Claims
+description: Top the smoke pool up to three synthetic tasks every six hours and request three native smoke worker Claims
 intent: Detect failures in native work queue admission, dispatch, and worker completion without changing source content, allowing framework queue tracking mutations.
 on:
   schedule: every 6 hours
@@ -108,6 +108,7 @@ steps:
         const fs = require("node:fs");
         const path = require("node:path");
         const { stagePlanIntents } = require(path.join(process.env.RUNNER_TEMP, "gh-aw/actions/work_queue_intents.cjs"));
+        const { loadWorkQueueSnapshot, readWorkQueueState } = require(path.join(process.env.RUNNER_TEMP, "gh-aw/actions/work_queue_mcp_server.cjs"));
         const node = node_key => ({
           graph_id: `smoke-work-queue:${context.runId}`,
           node_key,
@@ -128,15 +129,18 @@ steps:
           },
           depends_on: [],
         });
+        // Continuation successors of the previous cycle are already available; top the pool up to three so each cycle dispatches exactly three.
+        const available = readWorkQueueState(loadWorkQueueSnapshot(), { pool: "smoke-work-queue", limit: 1 }).counts.available ?? 0;
+        const roots = Math.max(1, 3 - available);
         const plan = {
           version: 1,
-          nodes: ["smoke-1", "smoke-2", "smoke-3"].map(node),
+          nodes: Array.from({ length: roots }, (_, index) => node(`smoke-${index + 1}`)),
           dispatch: { pool: "smoke-work-queue", max_claims: 3, max_dispatches: 3 },
         };
         fs.mkdirSync("/tmp/gh-aw/agent", { recursive: true });
         fs.writeFileSync("/tmp/gh-aw/agent/smoke-work-queue-plan.json", JSON.stringify(plan));
         stagePlanIntents(path.join(process.env.RUNNER_TEMP, "gh-aw/safeoutputs/work-queue/work-queue.intents.jsonl"), plan);
-        core.info("Staged three synthetic Work and one bounded smoke dispatch request for three Claims");
+        core.info(`Staged ${roots} synthetic Work (${available} already available) and one bounded smoke dispatch request for three Claims`);
 timeout-minutes: 10
 strict: true
 ---
@@ -147,9 +151,12 @@ Read `/tmp/gh-aw/agent/smoke-work-queue-plan.json`, then call `work_queue_read`
 with `{"pool":"smoke-work-queue","limit":8}`. An absent queue is empty. A tool
 error is a failure, not an empty backlog.
 
-The trusted preparation step stages exactly three synthetic Work (`node_key`
-`smoke-1`, `smoke-2`, `smoke-3`, identical payloads) followed by
-`{"pool":"smoke-work-queue","max_claims":3,"max_dispatches":3}`. Explain the
+The trusted preparation step stages one to three synthetic Work (`node_key`
+`smoke-1`…, identical payloads), enough to bring the pool's available smoke
+Work to three, followed by
+`{"pool":"smoke-work-queue","max_claims":3,"max_dispatches":3}`. Completed
+smoke Claims each admit one queue-routed continuation successor, so the pool
+usually already holds successors from the previous cycle. Explain the
 staged plan; do not submit again, choose a winner, dispatch directly, or emit
 `noop`. Work identity is stable for this activation, and whole-run reruns
 are disabled. The scheduler takes the oldest available smoke Work first, so it
