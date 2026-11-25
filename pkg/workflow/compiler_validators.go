@@ -327,6 +327,9 @@ func (c *Compiler) validateCoreToolConfiguration(workflowData *WorkflowData, mar
 	}
 	workflowLog.Printf("Validating cross-repo checkout paths")
 	c.deriveAndWarnCrossRepoCheckoutPaths(workflowData.CheckoutConfigs, markdownPath)
+	if err := c.validateProgramCheckout(workflowData); err != nil {
+		return formatCompilerError(markdownPath, "error", err.Error(), err)
+	}
 	c.warnCheckoutRefWithSteps(workflowData, markdownPath)
 	workflowLog.Printf("Validating push-to-pull-request-branch configuration")
 	c.validatePushToPullRequestBranchWarnings(workflowData.SafeOutputs, workflowData.CheckoutConfigs)

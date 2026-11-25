@@ -20,6 +20,9 @@ func (c *Compiler) prepareDryRunWorkflowData(data *WorkflowData) (*WorkflowData,
 	if !c.dryRun {
 		return data, nil
 	}
+	if data.Program != "" && isWorkQueueEnabled(data) {
+		return nil, errors.New("--dry-run does not support program workflows with tools.work-queue: queue context is unavailable in dry-run mode")
+	}
 	result := c.dryRunWorkflowData(data)
 	before := *result
 	before.RawFrontmatter = maps.Clone(result.RawFrontmatter)

@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path"
 	"path/filepath"
 	"regexp"
 	"slices"
@@ -103,17 +102,58 @@ func isProgramPublisher(data *WorkflowData) bool {
 	return data != nil && data.Program != "" && isWorkQueueEnabled(data) && !workQueueRequiresAssignment(data)
 }
 
+func validateProgramPublisher(data *WorkflowData) error {
+	if !isProgramPublisher(data) || data.SafeOutputs == nil {
+		return nil
+	}
+	outputs := data.SafeOutputs
+	if outputs.RequireAgentSuccess || len(outputs.Needs) > 0 {
+		return errors.New("program work-queue publishers do not support safe-outputs.require-agent-success or safe-outputs.needs: queue controls are committed during program execution")
+	}
+	if data.Environment != "" && outputs.Environment != "" && data.Environment != outputs.Environment {
+		return errors.New("program work-queue publishers cannot use conflicting environment and safe-outputs.environment values: the program and publisher credentials share one job")
+	}
+	return nil
+}
+
 // programRepositoryPath returns the program's path relative to the repository root:
 // the program is resolved next to the workflow markdown, normally .github/workflows/.
-func (c *Compiler) programRepositoryPath(data *WorkflowData) string {
-	normalized := filepath.ToSlash(c.markdownPath)
-	dir := ".github/workflows"
-	if index := strings.LastIndex(normalized, "/.github/"); index != -1 {
-		dir = path.Dir(normalized[index+1:])
-	} else if strings.HasPrefix(normalized, constants.GithubDir) {
-		dir = path.Dir(normalized)
+func (c *Compiler) programRepositoryPath(data *WorkflowData) (string, error) {
+	if c.gitRoot == "" || c.markdownPath == "" {
+		return "", errors.New("program: cannot resolve the program path without a repository root and workflow path")
 	}
-	return path.Join(dir, data.Program)
+	root, err := filepath.Abs(c.gitRoot)
+	if err != nil {
+		return "", fmt.Errorf("program: cannot resolve repository root: %w", err)
+	}
+	markdown, err := filepath.Abs(c.markdownPath)
+	if err != nil {
+		return "", fmt.Errorf("program: cannot resolve workflow path: %w", err)
+	}
+	program := filepath.Join(filepath.Dir(markdown), filepath.FromSlash(data.Program))
+	markdownRelative, err := filepath.Rel(root, markdown)
+	if err != nil || markdownRelative == ".." || strings.HasPrefix(markdownRelative, ".."+string(filepath.Separator)) || filepath.IsAbs(markdownRelative) {
+		return "", errors.New("program: workflow and program must be inside the repository root")
+	}
+	relative, err := filepath.Rel(root, program)
+	if err != nil || relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) || filepath.IsAbs(relative) {
+		return "", errors.New("program: workflow and program must be inside the repository root")
+	}
+	realRoot, err := filepath.EvalSymlinks(root)
+	if err != nil {
+		return "", fmt.Errorf("program: cannot resolve repository root: %w", err)
+	}
+	for _, source := range []string{markdown, program} {
+		resolved, err := filepath.EvalSymlinks(source)
+		if err != nil {
+			return "", fmt.Errorf("program: cannot resolve source path: %w", err)
+		}
+		rel, err := filepath.Rel(realRoot, resolved)
+		if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) || filepath.IsAbs(rel) {
+			return "", errors.New("program: workflow and program must be inside the repository root")
+		}
+	}
+	return filepath.ToSlash(relative), nil
 }
 
 // generateProgramRunSteps replaces engine installation, MCP setup and agent execution
@@ -162,6 +202,7 @@ func (c *Compiler) buildProgramStep(data *WorkflowData) ([]string, error) {
 		"      - name: Run program\n",
 		"        id: program\n",
 		fmt.Sprintf("        uses: %s\n", c.getActionPin("actions/github-script")),
+		"        timeout-minutes: "+resolveStepTimeoutValue(data)+"\n",
 	)
 	var env []string
 	if isProgramPublisher(data) {
@@ -176,7 +217,17 @@ func (c *Compiler) buildProgramStep(data *WorkflowData) ([]string, error) {
 	if len(env) == 0 || env[0] != "        env:\n" {
 		env = append([]string{"        env:\n"}, env...)
 	}
-	env = append(env, fmt.Sprintf("          GH_AW_PROGRAM: %q\n", c.programRepositoryPath(data)))
+	programPath, err := c.programRepositoryPath(data)
+	if err != nil {
+		return nil, err
+	}
+	env = append(env, fmt.Sprintf("          GH_AW_PROGRAM: %q\n", programPath))
+	if data.SafeOutputs != nil && !isProgramPublisher(data) {
+		env = append(env,
+			"          GH_AW_SAFE_OUTPUTS: ${{ steps.set-runtime-paths.outputs.GH_AW_SAFE_OUTPUTS }}\n",
+			"          GH_AW_SAFE_OUTPUTS_CONFIG_PATH: ${{ steps.set-runtime-paths.outputs.GH_AW_SAFE_OUTPUTS_CONFIG_PATH }}\n",
+		)
+	}
 	steps = append(steps, env...)
 	steps = append(steps, "        with:\n")
 	tokenSource := ""
@@ -189,19 +240,23 @@ func (c *Compiler) buildProgramStep(data *WorkflowData) ([]string, error) {
 		"            const { setupGlobals } = require('"+SetupActionDestination+"/setup_globals.cjs');\n",
 		"            setupGlobals(core, github, context, exec, io, getOctokit"+tokenSource+");\n",
 		"            const { main } = require('"+SetupActionDestination+"/run_program.cjs');\n",
-		"            await main({ core, github, context, exec, io, getOctokit });\n",
+		"            await main({ core, github, context, exec, io });\n",
 	), nil
 }
 
 // programPublisherPermissions returns the permissions a publisher program's credentials
 // need: contents write for the queue branch, actions write for worker launches, and
-// issues write when the Issue projection runs after committed controls.
+// issues access for projection or approval reads.
 func programPublisherPermissions(data *WorkflowData) *Permissions {
 	permissions := NewPermissions()
 	permissions.Set(PermissionContents, PermissionWrite)
-	permissions.Set(PermissionActions, PermissionWrite)
+	if len(workQueueControlWorkflows(data)) > 0 {
+		permissions.Set(PermissionActions, PermissionWrite)
+	}
 	if workQueueIssuesConfig(data) != nil {
 		permissions.Set(PermissionIssues, PermissionWrite)
+	} else if data.SafeOutputs != nil && data.SafeOutputs.workQueueApprovalReads {
+		permissions.Set(PermissionIssues, PermissionRead)
 	}
 	return permissions
 }
@@ -213,13 +268,27 @@ func (c *Compiler) programPublisherTokenSteps(data *WorkflowData) []string {
 	if !isProgramPublisher(data) || data.SafeOutputs == nil {
 		return nil
 	}
+	var steps []string
 	if usesTokenBrokerSafeOutputs(data) {
-		return c.buildGitHubBrokerTokenStep(data, "safe-outputs-app-token")
+		steps = append(steps, c.buildGitHubBrokerTokenStep(data, "safe-outputs-app-token")...)
+	} else if data.SafeOutputs.GitHubApp != nil {
+		steps = append(steps, c.buildGitHubAppTokenMintStepForRepository(string(constants.AgentJobName), data.SafeOutputs.GitHubApp, programPublisherPermissions(data), "", "")...)
 	}
-	if data.SafeOutputs.GitHubApp != nil {
-		return c.buildGitHubAppTokenMintStepForRepository(string(constants.AgentJobName), data.SafeOutputs.GitHubApp, programPublisherPermissions(data), "", "")
+	for _, handler := range safeOutputHandlers {
+		if handler.Key != "dispatch-workflow" || handler.PermissionBuilder == nil {
+			continue
+		}
+		app := getHandlerGitHubApp(data.SafeOutputs, handler.StructField)
+		if app == nil {
+			break
+		}
+		permissions := computeSafeOutputHandlerPermissions(data.SafeOutputs, handler)
+		if permissions != nil {
+			steps = append(steps, c.buildGitHubAppTokenMintStepForJob(string(constants.AgentJobName), app, permissions, "", "", "Generate GitHub App token (dispatch-workflow)", "dispatch-workflow-app-token")...)
+		}
+		break
 	}
-	return nil
+	return steps
 }
 
 // applyProgramPublisherPermissions grants the program job's GITHUB_TOKEN the publisher

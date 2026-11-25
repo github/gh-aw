@@ -13,7 +13,7 @@ import (
 
 var checkoutRefWarningLog = logger.New("workflow:checkout_ref_warning")
 
-// warnCheckoutRefWithSteps flags potentially untrusted code running before the sandbox.
+// warnCheckoutRefWithSteps flags potentially untrusted code running outside the sandbox.
 func (c *Compiler) warnCheckoutRefWithSteps(data *WorkflowData, markdownPath string) {
 	if !hasCheckoutRefWarningHostSteps(data) {
 		checkoutRefWarningLog.Print("No host steps or pre-agent-steps; skipping checkout ref warning check")
@@ -23,21 +23,39 @@ func (c *Compiler) warnCheckoutRefWithSteps(data *WorkflowData, markdownPath str
 	checkoutRefWarningLog.Printf("Checking %d checkout config(s) for untrusted refs before host steps", len(data.CheckoutConfigs))
 	checkoutMgr := NewCheckoutManager(data.CheckoutConfigs)
 	defaultCheckout := checkoutMgr.GetDefaultCheckoutOverride()
-	for _, entry := range checkoutMgr.ordered {
+	entries := checkoutMgr.ordered
+	if data.Program != "" && c.shouldAddCheckoutStep(data) && onSectionHasAnyTrigger(data.On, "pull_request") &&
+		(defaultCheckout == nil || defaultCheckout.ref == "") {
+		// actions/checkout defaults to the event's PR merge ref, which can contain
+		// changes from the pull request. Programs do not restore agent config.
+		implicitDefault := &resolvedCheckout{ref: "${{ github.ref }}"}
+		if defaultCheckout != nil {
+			*implicitDefault = *defaultCheckout
+			implicitDefault.ref = "${{ github.ref }}"
+		}
+		entries = append(append([]*resolvedCheckout(nil), entries...), implicitDefault)
+		defaultCheckout = implicitDefault
+	}
+	for _, entry := range entries {
 		if entry.isDefault() && (entry != defaultCheckout || !c.shouldAddCheckoutStep(data)) {
 			continue
 		}
 		if (entry.dataOnly && entry.key.path != "") || !checkoutRefMayBeUntrusted(entry.key.repository, entry.ref) {
 			continue
 		}
+		mitigation := "For PR-head work, use compiler-managed automatic PR checkout so trusted agent configuration is restored."
+		if data.Program != "" {
+			mitigation = "Programs execute from the checkout without agent-config restoration; select a trusted ref for program source."
+		}
 		msg := fmt.Sprintf(
-			"checkout step %q uses checkout.ref %q with an untrusted or unparseable expression, and host setup steps run after it. "+
-				"Imported or workflow-owned steps and pre-agent-steps execute outside the sandbox and may run checked-out code. "+
+			"checkout step %q uses checkout.ref %q with an untrusted or unparseable expression, and host code runs after it. "+
+				"Programs, imported or workflow-owned steps, and pre-agent-steps execute outside the sandbox and may run checked-out code. "+
 				"Keep the agent workspace and executable host tooling on a trusted ref, inspect untrusted refs only as data, and do not check them out or run their scripts on the host. "+
 				"A separate checkout consumed only as data may set data-only: true as a self-attested acknowledgement (not enforced isolation). "+
-				"For PR-head work, use compiler-managed automatic PR checkout so trusted agent configuration is restored.",
+				"%s",
 			checkoutStepName(entry.key),
 			entry.ref,
+			mitigation,
 		)
 		fmt.Fprintln(os.Stderr, formatCompilerMessage(markdownPath, "warning", msg))
 		c.IncrementWarningCount()
@@ -46,7 +64,7 @@ func (c *Compiler) warnCheckoutRefWithSteps(data *WorkflowData, markdownPath str
 }
 
 func hasCheckoutRefWarningHostSteps(data *WorkflowData) bool {
-	return hasCheckoutRefWarningSteps(data.CustomSteps, "steps") ||
+	return data.Program != "" || hasCheckoutRefWarningSteps(data.CustomSteps, "steps") ||
 		hasCheckoutRefWarningSteps(data.PreAgentSteps, "pre-agent-steps")
 }
 

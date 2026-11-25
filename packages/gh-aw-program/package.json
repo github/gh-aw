@@ -17,11 +17,5 @@
     "@actions/exec": ">=1.1.0",
     "@actions/github": ">=6.0.0",
     "@actions/io": ">=1.1.0"
-  },
-  "peerDependenciesMeta": {
-    "@actions/core": { "optional": true },
-    "@actions/exec": { "optional": true },
-    "@actions/github": { "optional": true },
-    "@actions/io": { "optional": true }
   }
 }

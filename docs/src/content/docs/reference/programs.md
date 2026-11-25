@@ -36,6 +36,8 @@ export default async function dispatch(aw: Program): Promise<void> {
 
 `program` is a path relative to the workflow's directory, at most 256 bytes, with plain segments (no `..` or hidden directories), ending in `.ts`, `.mts`, `.cts`, `.js`, `.mjs` or `.cjs`. The file must exist at compile time and is read from the checked-out repository at run time, so edits take effect without recompiling. The runner refuses a program that resolves outside the workspace, including through symlinks.
 
+When adding or updating a remote workflow, gh-aw fetches the program entry file at the workflow's resolved revision. It does not recursively fetch JavaScript or TypeScript imports; provide those files separately, for example as declared resources where supported.
+
 The module's default export is an async function receiving the program SDK. A thrown error fails the step and the run; the conclusion job reports it like an agent failure. The markdown body is optional and is not sent anywhere.
 
 TypeScript runs through Node.js type stripping in the github-script runtime (Node.js 24), so only erasable syntax is supported: no `enum`, `namespace` or constructor parameter properties, and type-only imports must use `import type`. Install the type declarations for editor support with `npm install --save-dev @github/gh-aw-program`; the runtime ships with the gh-aw setup action, so programs import nothing from the package at run time.
@@ -63,13 +65,18 @@ TypeScript runs through Node.js type stripping in the github-script runtime (Nod
 
 A program with `tools.work-queue: true` holds the dispatcher role and publishes directly. `submit` and `dispatchNext` commit through the same trusted controls the [Process trusted work queue controls](/gh-aw/reference/work-queue/#dispatch-and-launch) step uses and resolve to the control receipt; a blocked receipt rejects with `work_queue_control_blocked: <reason>`. Dispatches are bounded by `safe-outputs.dispatch-workflow.max` across the run and launch only the listed workers. Without `dispatch-workflow` targets the program can submit Work but `dispatchNext` fails with `work_queue_worker_not_allowlisted`, which makes it a producer. The compiler emits no `safe_outputs` job for these programs, and they cannot emit safe outputs. The step output `work_queue_requests` and the step summary carry the receipts.
 
+Direct publishers cannot use `safe-outputs.require-agent-success` or `safe-outputs.needs`: publication occurs before the program finishes. If both `environment` and `safe-outputs.environment` are set, they must match because publication happens in the program job.
+
 > [!CAUTION]
-> A publishing program runs in the job that holds the queue publisher token (`contents: write`) and the worker launch token (`actions: write`). Queue replay authorizes roles, not credentials: code in the program, including any subprocess or dependency it runs, can write the queue branch and launch workflows. Review programs and their dependencies like workflow code with write access.
+> A publishing program runs in the job that holds the queue publisher token (`contents: write`) and, when worker targets are configured, the worker launch token (`actions: write`). Queue replay authorizes roles, not credentials: code in the program, including any subprocess or dependency it runs, can write the queue branch and launch workflows. Review programs and their dependencies like workflow code with write access.
 
 A program with `tools.work-queue.worker: true` is a worker. It never receives queue credentials: `submit` and `claimFinish` stage intents, and safe outputs it emits are Claim-scoped. The `safe_outputs` job applies them, finishes the Claim and records its effects exactly as for an agent worker. A missing `claimFinish` fails the Claim.
 
 ## Restrictions
 
 `engine: none` requires `program:` and the reverse. The string form `engine: none` is the only accepted engine form. Agent configuration is a compile error: `tools` other than `work-queue`, `mcp-servers`, `mcp-scripts`, `network`, `sandbox`, `pre-agent-steps`, `imports`, `plugins`, `skills`, model and routing fields, turn and AI-credit budgets, `graders`, `evals` and `experiments`. Threat detection is disabled because program outputs are not model-generated; an explicit `safe-outputs.threat-detection` is rejected.
+
+Dry-run compilation does not support programs with `tools.work-queue`.
+Programs require the compiler-managed root checkout without sparse checkout or additional checkouts. They do not support `workflow_call`, because the caller's checkout may not contain the callee's program revision.
 
 `steps:` still run before the program, and `post-steps:` after it, in the same job. The program runs on the runner without the agent firewall, so it can start subprocesses and reach any network destination the runner can.

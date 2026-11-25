@@ -59,12 +59,19 @@ async function createWorkQueueClient(options) {
   let remaining = 0;
   let scratch;
   let sequence = 0;
+  let pending = Promise.resolve();
+  let finalization;
 
   if (publisher) {
     const config = env.GH_AW_WORK_QUEUE_CONTROL_CONFIG ? JSON.parse(env.GH_AW_WORK_QUEUE_CONTROL_CONFIG) : {};
+    let maxDispatches = env.GH_AW_WORK_QUEUE_DISPATCH_BUDGET ?? config.max ?? 1;
+    if (typeof maxDispatches === "string") {
+      if (!/^(?:0|[1-9][0-9]*)$/.test(maxDispatches)) throw new Error("work_queue_dispatch_budget_invalid");
+      maxDispatches = Number(maxDispatches);
+    }
+    remaining = require("./work_queue_dispatch.cjs").configuredDispatchBudget({ maxDispatches });
     const configure = options.configureControls || require("./work_queue_control_adapter.cjs").configureControls;
     controls = await configure({ core, github: options.github, context: options.context, getOctokit: options.getOctokit, config, env });
-    remaining = require("./work_queue_dispatch.cjs").configuredDispatchBudget({ config });
     scratch = fs.mkdtempSync(path.join(env.RUNNER_TEMP || os.tmpdir(), "gh-aw-program-"));
   }
 
@@ -81,10 +88,15 @@ async function createWorkQueueClient(options) {
    * @param {Record<string, unknown>} args
    */
   async function publish(name, args) {
-    toolOptions.intentPath = path.join(/** @type {string} */ scratch, `intent-${++sequence}.jsonl`);
+    const intentPath = path.join(/** @type {string} */ scratch, `intent-${++sequence}.jsonl`);
     try {
-      tool(name)(args);
-      const { intents, errors } = readStagedIntentBatch(toolOptions.intentPath);
+      toolOptions.intentPath = intentPath;
+      try {
+        tool(name)(args);
+      } finally {
+        delete toolOptions.intentPath;
+      }
+      const { intents, errors } = readStagedIntentBatch(intentPath);
       const processIntents = options.processIntents || require("./work_queue_dispatch.cjs").processParsedWorkQueueIntents;
       const result = await processIntents({ ...controls, maxDispatches: remaining }, intents, errors);
       remaining = result.remaining;
@@ -93,15 +105,22 @@ async function createWorkQueueClient(options) {
       if (blocked) throw new Error(`work_queue_control_blocked: ${blocked.reason}`);
       return result.receipts[0];
     } finally {
-      fs.rmSync(toolOptions.intentPath, { force: true });
-      delete toolOptions.intentPath;
+      fs.rmSync(intentPath, { force: true });
     }
   }
 
   /** @param {string} name @param {unknown} args */
   async function call(name, args) {
     const input = snapshotArgs(args, name);
-    if (publisher && (name === TOOL_NAMES.submit || name === TOOL_NAMES.dispatchNext)) return publish(name, input);
+    if (publisher && (name === TOOL_NAMES.submit || name === TOOL_NAMES.dispatchNext)) {
+      if (finalization) throw new Error("work_queue_publisher_finalized");
+      const operation = pending.then(() => publish(name, input));
+      pending = operation.then(
+        () => undefined,
+        () => undefined
+      );
+      return operation;
+    }
     return toolResult(tool(name)(input));
   }
 
@@ -115,12 +134,18 @@ async function createWorkQueueClient(options) {
     claimFinish: args => call(TOOL_NAMES.claimFinish, args),
   });
 
-  async function finalize() {
-    if (scratch) fs.rmSync(scratch, { recursive: true, force: true });
-    if (!publisher || !receipts.length) return;
-    const result = controlResult(receipts, remaining);
-    core.setOutput("work_queue_requests", JSON.stringify(result));
-    if (core.summary?.addRaw && core.summary?.write) await core.summary.addRaw(result.summary).write();
+  function finalize() {
+    if (!finalization)
+      finalization = (async () => {
+        await pending;
+        if (scratch) fs.rmSync(scratch, { recursive: true, force: true });
+        if (publisher && receipts.length) {
+          const result = controlResult(receipts, remaining);
+          core.setOutput("work_queue_requests", JSON.stringify(result));
+          if (core.summary?.addRaw && core.summary?.write) await core.summary.addRaw(result.summary).write();
+        }
+      })();
+    return finalization;
   }
 
   return { client, publisher, finalize };

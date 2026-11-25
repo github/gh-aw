@@ -253,8 +253,11 @@ func addWorkflowWithTracking(ctx context.Context, resolved *ResolvedWorkflow, tr
 	if err := trackAndWriteWorkflowFile(destFile, content, fileExists, opts, tracker); err != nil {
 		return err
 	}
-	compileAddedWorkflow(ctx, destFile, workflowSpec, githubWorkflowsDir, tracker, opts)
-	return nil
+	dependencySpec := *workflowSpec
+	if sourceInfo != nil && sourceInfo.CommitSHA != "" {
+		dependencySpec.Version = sourceInfo.CommitSHA
+	}
+	return compileAddedWorkflow(ctx, destFile, &dependencySpec, githubWorkflowsDir, tracker, opts)
 }
 
 func startAddInteractiveProgress(opts AddOptions, message string) func() {

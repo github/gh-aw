@@ -16,7 +16,17 @@ const { main: runProgram, resolveProgramPath } = require("./run_program.cjs");
 const POLICY = { version: 4, pending_limit: 30, issues: false, effect_scope: "owner/repo", workers: ["worker"], pools: { default: { concurrency: 3, per_account_limit: 0, max_attempts: 3 } } };
 const CONFIG = { max: 2, workflows: ["worker"], work_queue_workflows: ["worker"], workflow_files: { worker: ".lock.yml" } };
 const dispatcherContext = { repo: { owner: "owner", repo: "repo" }, runId: 100, runAttempt: 1, payload: {}, ref: "refs/heads/main" };
-const ENV_KEYS = ["GITHUB_EVENT_PATH", "GITHUB_WORKFLOW_REF", "GITHUB_REF", "GH_AW_WORK_QUEUE_ENABLED", "GH_AW_WORK_QUEUE_ROLE", "GH_AW_WORK_QUEUE_SNAPSHOT", "GH_AW_WORK_QUEUE_POLICY", "GH_AW_SAFE_OUTPUTS_STAGED"];
+const ENV_KEYS = [
+  "GITHUB_EVENT_PATH",
+  "GITHUB_WORKFLOW_REF",
+  "GITHUB_REF",
+  "GH_AW_WORK_QUEUE_ENABLED",
+  "GH_AW_WORK_QUEUE_ROLE",
+  "GH_AW_WORK_QUEUE_SNAPSHOT",
+  "GH_AW_WORK_QUEUE_POLICY",
+  "GH_AW_WORK_QUEUE_DISPATCH_BUDGET",
+  "GH_AW_SAFE_OUTPUTS_STAGED",
+];
 
 function fakeCore() {
   return { info: vi.fn(), warning: vi.fn(), setOutput: vi.fn(), setFailed: vi.fn(), summary: { addRaw: vi.fn().mockReturnThis(), write: vi.fn(async () => undefined) } };
@@ -48,7 +58,7 @@ function writeSnapshot(envelope) {
 }
 
 /** A dispatcher program SDK whose trusted controls publish to the in-memory queue. */
-async function publisherSdk(fake, core = fakeCore()) {
+async function publisherSdk(fake, core = fakeCore(), overrides = {}) {
   process.env.GITHUB_WORKFLOW_REF = "owner/repo/.github/workflows/dispatcher.lock.yml@refs/heads/main";
   process.env.GH_AW_WORK_QUEUE_ROLE = "dispatcher";
   const env = {
@@ -56,11 +66,13 @@ async function publisherSdk(fake, core = fakeCore()) {
     GH_AW_WORK_QUEUE_ROLE: "dispatcher",
     GH_AW_WORK_QUEUE_SNAPSHOT: writeSnapshot({ sha: null, transactionLog: "", role: "dispatcher", worker: null }),
     GH_AW_WORK_QUEUE_CONTROL_CONFIG: JSON.stringify(CONFIG),
+    GH_AW_WORK_QUEUE_DISPATCH_BUDGET: "2",
     GH_AW_SAFE_OUTPUTS: path.join(directory, "outputs.jsonl"),
     RUNNER_TEMP: directory,
+    ...overrides.env,
   };
   const configureControls = async options => ({ ...options, githubClient: fake.githubClient, dispatchClient: { rest: { actions: fake.githubClient.rest.actions } }, policy: POLICY });
-  const program = await createProgramSdk({ core, github: fake.githubClient, context: dispatcherContext, env, configureControls });
+  const program = await createProgramSdk({ core, github: fake.githubClient, context: dispatcherContext, env, configureControls, processIntents: overrides.processIntents });
   return { ...program, core, env };
 }
 
@@ -98,6 +110,123 @@ describe("publisher programs", () => {
 
     await expect(sdk.workQueue.dispatchNext({ pool: "default", max_claims: 1, max_dispatches: 1 })).rejects.toThrow("work_queue_control_blocked: work_queue_dispatch_budget_exceeded");
     expect(fake.posts).toHaveLength(2);
+  });
+
+  it("serializes concurrent dispatches against the shared budget", async () => {
+    const fake = h.fakeQueueGitHub();
+    const { sdk, finalize, core } = await publisherSdk(fake);
+    await sdk.workQueue.submit({ nodes: ["a", "b", "c"].map(key => ({ node_key: key, payload: { key } })) });
+    const results = await Promise.allSettled([sdk.workQueue.dispatchNext({ pool: "default", max_claims: 2, max_dispatches: 2 }), sdk.workQueue.dispatchNext({ pool: "default", max_claims: 1, max_dispatches: 1 })]);
+    expect(results[0]).toMatchObject({ status: "fulfilled", value: { dispatches: 2 } });
+    expect(results[1]).toMatchObject({ status: "rejected", reason: expect.objectContaining({ message: "work_queue_control_blocked: work_queue_dispatch_budget_exceeded" }) });
+    expect(fake.posts).toHaveLength(2);
+    await finalize();
+    expect(JSON.parse(core.setOutput.mock.calls[0][1])).toMatchObject({ remaining_dispatches: 0, status: "blocked" });
+  });
+
+  it("drains pending calls before cleanup and continues after a failure", async () => {
+    let release;
+    const gate = new Promise(resolve => {
+      release = resolve;
+    });
+    let entered;
+    const started = new Promise(resolve => {
+      entered = resolve;
+    });
+    const processIntents = vi.fn(async (_options, intents) => {
+      if (intents[0].parameters.nodes[0].node_key === "a") {
+        entered();
+        await gate;
+        throw new Error("first failed");
+      }
+      return { receipts: [{ status: "committed" }], remaining: 2 };
+    });
+    const { sdk, finalize, core } = await publisherSdk(h.fakeQueueGitHub(), fakeCore(), { processIntents });
+    const first = sdk.workQueue.submit({ nodes: [{ node_key: "a", payload: {} }] });
+    const firstResult = expect(first).rejects.toThrow("first failed");
+    const args = { nodes: [{ node_key: "b", payload: {} }] };
+    const second = sdk.workQueue.submit(args);
+    args.nodes[0].node_key = "changed";
+    await started;
+    const done = finalize();
+    expect(processIntents).toHaveBeenCalledTimes(1);
+    expect(core.setOutput).not.toHaveBeenCalled();
+    await expect(sdk.workQueue.submit({ nodes: [{ node_key: "c", payload: {} }] })).rejects.toThrow("work_queue_publisher_finalized");
+    release();
+    await firstResult;
+    await expect(second).resolves.toMatchObject({ status: "committed" });
+    await done;
+    expect(processIntents).toHaveBeenCalledTimes(2);
+    expect(processIntents.mock.calls[1][1][0].parameters.nodes[0].node_key).toBe("b");
+    expect(JSON.parse(core.setOutput.mock.calls[0][1]).receipts).toHaveLength(1);
+    expect(fs.readdirSync(directory).filter(name => name.startsWith("gh-aw-program-"))).toEqual([]);
+    await finalize();
+    expect(core.setOutput).toHaveBeenCalledTimes(1);
+  });
+
+  it("allows callers to catch rejected publications through promise chains", async () => {
+    const processIntents = vi.fn(async () => {
+      throw new Error("handled");
+    });
+    const { sdk, finalize } = await publisherSdk(h.fakeQueueGitHub(), fakeCore(), { processIntents });
+    await expect(
+      sdk.workQueue
+        .submit({ nodes: [{ node_key: "a", payload: {} }] })
+        .then(value => value)
+        .finally(() => {})
+        .catch(error => error.message)
+    ).resolves.toBe("handled");
+    await expect(finalize()).resolves.toBeUndefined();
+  });
+
+  it.each(["", " 1", "1 ", "01", "-1", "+1", "1.0", "1e2", "4097", "999999999999999999999999999999999999999"])("rejects invalid environment dispatch budget %j", async raw => {
+    await expect(publisherSdk(h.fakeQueueGitHub(), fakeCore(), { env: { GH_AW_WORK_QUEUE_DISPATCH_BUDGET: raw } })).rejects.toThrow();
+  });
+
+  it.each([
+    ["0", 0],
+    ["2", 2],
+    ["4096", 4096],
+    [undefined, 1],
+  ])("uses the supplied environment dispatch budget %j", async (raw, expected) => {
+    process.env.GH_AW_WORK_QUEUE_DISPATCH_BUDGET = "3";
+    const processIntents = vi.fn(async options => ({ receipts: [{ status: "committed" }], remaining: options.maxDispatches }));
+    const { sdk, finalize } = await publisherSdk(h.fakeQueueGitHub(), fakeCore(), { env: { GH_AW_WORK_QUEUE_CONTROL_CONFIG: "{}", GH_AW_WORK_QUEUE_DISPATCH_BUDGET: raw }, processIntents });
+    await sdk.workQueue.submit({ nodes: [{ node_key: "a", payload: {} }] });
+    expect(processIntents.mock.calls[0][0].maxDispatches).toBe(expected);
+    await finalize();
+  });
+
+  it("prefers the resolved environment budget over a templated config", async () => {
+    const processIntents = vi.fn(async options => ({ receipts: [{ status: "committed" }], remaining: options.maxDispatches }));
+    const { sdk, finalize } = await publisherSdk(h.fakeQueueGitHub(), fakeCore(), { env: { GH_AW_WORK_QUEUE_CONTROL_CONFIG: JSON.stringify({ max: "${{ inputs.budget }}" }), GH_AW_WORK_QUEUE_DISPATCH_BUDGET: "0" }, processIntents });
+    await sdk.workQueue.submit({ nodes: [{ node_key: "a", payload: {} }] });
+    expect(processIntents.mock.calls[0][0].maxDispatches).toBe(0);
+    await finalize();
+  });
+
+  it.each([
+    [0, 0],
+    ["2", 2],
+    [undefined, 1],
+  ])("falls back to config budget %j when the generated environment value is absent", async (max, expected) => {
+    const processIntents = vi.fn(async options => ({ receipts: [{ status: "committed" }], remaining: options.maxDispatches }));
+    const { sdk, finalize } = await publisherSdk(h.fakeQueueGitHub(), fakeCore(), {
+      env: { GH_AW_WORK_QUEUE_CONTROL_CONFIG: JSON.stringify({ max }), GH_AW_WORK_QUEUE_DISPATCH_BUDGET: undefined },
+      processIntents,
+    });
+    await sdk.workQueue.submit({ nodes: [{ node_key: "a", payload: {} }] });
+    expect(processIntents.mock.calls[0][0].maxDispatches).toBe(expected);
+    await finalize();
+  });
+
+  it("blocks dispatch when the environment budget is zero", async () => {
+    const fake = h.fakeQueueGitHub();
+    const { sdk, finalize } = await publisherSdk(fake, fakeCore(), { env: { GH_AW_WORK_QUEUE_DISPATCH_BUDGET: "0" } });
+    await sdk.workQueue.submit({ nodes: [{ node_key: "a", payload: {} }] });
+    await expect(sdk.workQueue.dispatchNext({ pool: "default", max_claims: 1, max_dispatches: 1 })).rejects.toThrow("work_queue_dispatch_budget_exceeded");
+    expect(fake.posts).toHaveLength(0);
+    await finalize();
   });
 
   it("reject invalid tool input before publishing", async () => {

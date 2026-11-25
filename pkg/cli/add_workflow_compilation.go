@@ -71,6 +71,7 @@ type trackedWorkflowCompileOptions struct {
 	tracker         *FileTracker
 	refreshStopTime bool
 	noGitattributes bool
+	approve         bool
 }
 
 // compileWorkflowWithTrackingAndOptions compiles a workflow, tracks generated files, and optionally refreshes stop time.
@@ -112,6 +113,7 @@ func compileWorkflowWithTrackingAndOptions(ctx context.Context, filePath string,
 	compiler.SetFileTracker(opts.tracker)
 	compiler.SetRefreshStopTime(opts.refreshStopTime)
 	compiler.SetQuiet(opts.quiet)
+	compiler.SetApprove(opts.approve)
 	if err := CompileWorkflowWithValidation(ctx, compiler, filePath, CompileValidationOptions{Verbose: opts.verbose, NoEmit: compiler.IsNoEmit()}); err != nil {
 		return err
 	}

@@ -775,7 +775,7 @@ func resolveLatestReleaseWithResult(ctx context.Context, deps workflowUpdateDeps
 }
 
 // updateWorkflow updates a single workflow from its source
-func updateWorkflow(ctx context.Context, wf *workflowWithSource, opts UpdateWorkflowsOptions) error { //nolint:largefunc
+func updateWorkflow(ctx context.Context, wf *workflowWithSource, opts UpdateWorkflowsOptions) (runErr error) { //nolint:largefunc
 	updateLog.Printf("Updating workflow: name=%s, source=%s, force=%v, noMerge=%v", wf.Name, wf.SourceSpec, opts.Force, opts.NoMerge)
 
 	if opts.Verbose {
@@ -1019,7 +1019,55 @@ func updateWorkflow(ctx context.Context, wf *workflowWithSource, opts UpdateWork
 		return fmt.Errorf("failed to read current workflow before update: %w", err)
 	}
 
+	var dependencyTracker *FileTracker
+	if !hasConflicts {
+		upstreamProgram, err := workflowProgramPath(string(newContent))
+		if err != nil {
+			return err
+		}
+		finalProgram, err := workflowProgramPath(finalContent)
+		if err != nil {
+			return err
+		}
+		if finalProgram != upstreamProgram {
+			return fmt.Errorf("locally modified program path cannot be fetched from the updated source")
+		}
+		dependencyTracker = NewFileTracker()
+		defer func() {
+			if runErr != nil {
+				if err := dependencyTracker.RollbackAllFiles(opts.Verbose); err != nil {
+					runErr = errors.Join(runErr, err)
+				}
+			}
+		}()
+		baseRef := currentRef
+		if len(resolvedLocation.redirectHistory) > 0 {
+			baseRef = initialSourceSpec.Ref
+			if IsCommitSHA(wf.SourceSHA) {
+				baseRef = wf.SourceSHA
+			}
+		}
+		ctx = withProgramUpdateBaseline(ctx, initialSourceSpec.Repo, initialSourceSpec.Path, sourceSpec.Path, baseRef, opts.NoMerge)
+		ctx = withProgramWorkersOnly(ctx)
+		dependencySpec := &WorkflowSpec{RepoSpec: RepoSpec{RepoSlug: sourceSpec.Repo, Version: latestRef}, WorkflowPath: sourceSpec.Path}
+		targetDir := filepath.Dir(wf.Path)
+		if err := fetchWorkflowProgram(ctx, string(newContent), dependencySpec, sourceSpec.Path, targetDir, filepath.Base(wf.Path), true, dependencyTracker, func(ctx context.Context, owner, repo, filePath, ref string) ([]byte, error) {
+			return downloadFileFromGitHubForHost(ctx, owner, repo, filePath, ref, dependencySpec.Host)
+		}); err != nil {
+			return fmt.Errorf("failed to update workflow dependencies: %w", err)
+		}
+		if err := fetchAndSaveRemoteDispatchWorkflows(ctx, string(newContent), dependencySpec, targetDir, opts.Verbose, true, dependencyTracker); err != nil {
+			return fmt.Errorf("failed to update workflow dependencies: %w", err)
+		}
+		if err := fetchAndSaveRemoteCallWorkflows(ctx, string(newContent), dependencySpec, targetDir, opts.Verbose, true, dependencyTracker); err != nil {
+			return fmt.Errorf("failed to update workflow dependencies: %w", err)
+		}
+	}
+
 	// Write updated content
+	if dependencyTracker != nil {
+		dependencyTracker.TrackModified(wf.Path)
+	}
 	if err := os.WriteFile(wf.Path, []byte(finalContent), constants.FilePermPublic); err != nil {
 		return fmt.Errorf("failed to write updated workflow: %w", err)
 	}
@@ -1027,12 +1075,27 @@ func updateWorkflow(ctx context.Context, wf *workflowWithSource, opts UpdateWork
 	if hasConflicts {
 		return fmt.Errorf("updated %s from %s to %s with merge conflicts; resolve the conflict markers before compiling", wf.Name, shortRef(currentRef), shortRef(latestRef))
 	}
+	if dependencyTracker != nil {
+		dependencySpec := &WorkflowSpec{RepoSpec: RepoSpec{RepoSlug: sourceSpec.Repo, Version: latestRef}, WorkflowPath: sourceSpec.Path}
+		if err := fetchAndSaveDispatchWorkflowsFromParsedFile(ctx, wf.Path, dependencySpec, filepath.Dir(wf.Path), opts.Verbose, true, dependencyTracker); err != nil {
+			_ = os.WriteFile(wf.Path, originalContent, constants.FilePermPublic)
+			return err
+		}
+		if err := fetchAndSaveCallWorkflowsFromParsedFile(ctx, wf.Path, dependencySpec, filepath.Dir(wf.Path), opts.Verbose, true, dependencyTracker); err != nil {
+			_ = os.WriteFile(wf.Path, originalContent, constants.FilePermPublic)
+			return err
+		}
+	}
 
 	updateLog.Printf("Successfully updated workflow %s from %s to %s", wf.Name, currentRef, latestRef)
 	fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(fmt.Sprintf("Updated %s from %s to %s", wf.Name, shortRef(currentRef), shortRef(latestRef))))
 
 	// Compile the updated workflow using the same path as the compile command.
 	if !opts.NoCompile {
+		if err := compileUpdatedProgramWorkers(ctx, wf.Path, dependencyTracker, opts); err != nil {
+			_ = os.WriteFile(wf.Path, originalContent, constants.FilePermPublic)
+			return err
+		}
 		updateLog.Printf("Compiling updated workflow: %s", wf.Name)
 		if err := compileWorkflowsForUpdate(ctx, []string{wf.Path}, opts.WorkflowsDir, opts.EngineOverride, opts.Verbose, opts.Approve); err != nil {
 			updateLog.Printf("Compilation failed for workflow %s: %v", wf.Name, err)

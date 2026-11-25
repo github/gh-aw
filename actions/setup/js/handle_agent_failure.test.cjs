@@ -1291,6 +1291,70 @@ describe("handle_agent_failure", () => {
       }
     });
 
+    it.each([
+      { engine: "none", conclusion: "success", items: [], report: false },
+      { engine: "none", conclusion: "success", items: null, report: true },
+      { engine: "none", conclusion: "success", rawOutput: "{invalid", report: true },
+      { engine: "none", conclusion: "success", rawOutput: '{"items":{}}', report: true },
+      { engine: "none", conclusion: "success", rawOutput: "", report: true },
+      { engine: "none", conclusion: "success", items: [], invalidQueue: true, report: true },
+      { engine: "copilot", conclusion: "success", items: [], report: true },
+      { engine: "", conclusion: "success", items: [], report: true },
+      { engine: "none", conclusion: "failure", items: [], report: true },
+      { engine: "none", conclusion: "failure", items: [{ type: "noop", message: "Done" }], report: true },
+      { engine: "none", conclusion: "success", items: [], checkoutFailure: true, report: true },
+    ])("handles program and agent empty outputs and failures: %j", async ({ engine, conclusion, items, rawOutput, invalidQueue, checkoutFailure, report }) => {
+      const output = path.join(tmpDir, "output.json");
+      if (rawOutput !== undefined) fs.writeFileSync(output, rawOutput);
+      else if (items) fs.writeFileSync(output, JSON.stringify({ items }));
+      vi.stubEnv("GH_AW_AGENT_OUTPUT", output);
+      vi.stubEnv("GH_AW_ENGINE_ID", engine);
+      vi.stubEnv("GH_AW_AGENT_CONCLUSION", conclusion);
+      vi.stubEnv("GH_AW_FAILURE_REPORT_AS_ISSUE", "true");
+      if (invalidQueue) {
+        const snapshot = path.join(tmpDir, "invalid-snapshot.json");
+        fs.writeFileSync(snapshot, "{invalid");
+        vi.stubEnv("GH_AW_WORK_QUEUE_ENABLED", "true");
+        vi.stubEnv("GH_AW_WORK_QUEUE_SNAPSHOT", snapshot);
+      }
+      if (checkoutFailure) vi.stubEnv("GH_AW_CHECKOUT_ERROR", "Checkout failed");
+      const create = vi.fn().mockResolvedValue({ data: { number: 101, html_url: "https://github.com/owner/repo/issues/101", node_id: "I_101" } });
+      global.github = {
+        rest: {
+          search: { issuesAndPullRequests: vi.fn(async () => ({ data: { total_count: 0, items: [] } })) },
+          issues: { create, createComment: vi.fn() },
+          pulls: { get: vi.fn() },
+          actions: { listJobsForWorkflowRun: vi.fn() },
+        },
+        paginate: vi.fn(async () => [{ name: "agent", conclusion, steps: [{ name: "Run program", conclusion }] }]),
+        graphql: vi.fn(),
+      };
+      const mkdir = fs.mkdirSync.bind(fs);
+      const write = fs.writeFileSync.bind(fs);
+      let failureCategories = "";
+      const mkdirSpy = vi.spyOn(fs, "mkdirSync").mockImplementation((dir, options) => (dir === "/tmp/gh-aw" ? undefined : mkdir(dir, options)));
+      const writeSpy = vi.spyOn(fs, "writeFileSync").mockImplementation((file, data, options) => {
+        if (file === "/tmp/gh-aw/failure_categories.json") {
+          failureCategories = String(data);
+          return;
+        }
+        return write(file, data, options);
+      });
+      try {
+        await main();
+        expect(create).toHaveBeenCalledTimes(report ? 1 : 0);
+        if (invalidQueue) expect(global.core.warning).toHaveBeenCalledWith(expect.stringContaining("Unable to read queue-scoped agent output"));
+        if (report) {
+          expect(failureCategories).toContain(conclusion === "failure" || checkoutFailure ? "agent_failure" : "missing_safe_outputs");
+        }
+        expect(global.core.setFailed).not.toHaveBeenCalled();
+      } finally {
+        mkdirSpy.mockRestore();
+        writeSpy.mockRestore();
+        vi.unstubAllEnvs();
+      }
+    });
+
     it("prepends caution callout to existing-issue comment body and includes it only once", async () => {
       /** @type {string} */
       let capturedCommentBody = "";
