@@ -184,7 +184,7 @@ describe("parsed prompt condition operands", () => {
     process.env.GH_AW_EXPERIMENTS_PROMPT_STYLE = variant;
     const output = await render(body);
     expect(output).toContain("issues-data/issues.json");
-    expect(output).toContain("link");
+    expect(output).toContain(variant === "concise" ? "Use `jq` to identify clusters of 5+ related issues" : "Analyze the last 100 open issues");
     expect(output.includes("## Process")).toBe(variant === "detailed");
     expect(output.includes("Your goal:")).toBe(variant === "concise");
     expect(output).not.toMatch(/\{\{#?(?:if|else)\b|\{\{\/if\}\}/);

@@ -25,6 +25,11 @@ func TestPromptConditionSyntax(t *testing.T) {
 			lines:  []int{3},
 		},
 		{
+			name:   "unprefixed else-if delimiters",
+			prompt: "{{#if condition}}\n{{else if other}}\n{{/if}}\n{{#if condition}}\n{{else-if other}}\n{{/if}}\n{{#if condition}}\n{{else_if other}}\n{{/if}}\n{{#if condition}}\n{{elseif other}}\n{{/if}}",
+			lines:  []int{2, 5, 8, 11},
+		},
+		{
 			name:   "CRLF input",
 			prompt: "{{#if condition}}\r\nSelected\r\n{{else}}\r\nFallback\r\n{{/if}}",
 			lines:  []int{3},
@@ -40,11 +45,19 @@ func TestPromptConditionSyntax(t *testing.T) {
 		},
 		{
 			name:   "supported conditional markers",
-			prompt: "{{#if condition}}\nSelected\n{{#elseif other}}\nOther\n{{#else}}\nFallback\n{{/if}}",
+			prompt: "{{#if condition}}\nSelected\n{{#elseif other}}\nOther\n{{#else-if third}}\nThird\n{{#else_if fourth}}\nFourth\n{{#else}}\nFallback\n{{/if}}",
 		},
 		{
 			name:   "inline code",
 			prompt: "`{{else}}`",
+		},
+		{
+			name:   "inline code after conditional opener",
+			prompt: "{{#if condition}}  `{{else}}`  {{/if}}",
+		},
+		{
+			name:   "multiline inline code",
+			prompt: "`{{#if literal}}\n{{else}}\n{{/if}}`",
 		},
 		{
 			name:   "fenced code",

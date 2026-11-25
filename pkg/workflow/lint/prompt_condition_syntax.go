@@ -20,14 +20,17 @@ func checkPromptConditionSyntax(ctx context.Context, input Input) ([]Diagnostic,
 	var fenceMarker byte
 	var fenceLength int
 	conditionalDepth := 0
+	codeSpanLength := 0
 	text := strings.ReplaceAll(strings.ReplaceAll(input.Document.Markdown, "\r\n", "\n"), "\r", "\n")
-	for lineNumber, line := range strings.SplitAfter(text, "\n") {
+	lines := strings.SplitAfter(text, "\n")
+	for lineNumber, line := range lines {
 		line = strings.TrimSuffix(strings.TrimSuffix(line, "\n"), "\r")
 		if err := ctx.Err(); err != nil {
 			return diagnostics, err
 		}
 		marker, length, rest, isFence := markdownFence(line)
 		if fenceMarker != 0 {
+			codeSpanLength = 0
 			if isFence && marker == fenceMarker && length >= fenceLength && strings.TrimSpace(rest) == "" {
 				fenceMarker = 0
 				fenceLength = 0
@@ -35,36 +38,56 @@ func checkPromptConditionSyntax(ctx context.Context, input Input) ([]Diagnostic,
 			continue
 		}
 		if isFence {
+			codeSpanLength = 0
 			fenceMarker = marker
 			fenceLength = length
 			continue
 		}
-		lineDiagnostics, depth, err := scanPromptConditionLine(ctx, line, lineNumber+1, conditionalDepth)
+		if strings.TrimSpace(line) == "" {
+			codeSpanLength = 0
+		}
+		lineDiagnostics, depth, nextCodeSpanLength, err := scanPromptConditionLine(ctx, line, lines[lineNumber+1:], lineNumber+1, conditionalDepth, codeSpanLength)
 		diagnostics = append(diagnostics, lineDiagnostics...)
 		if err != nil {
 			return diagnostics, err
 		}
 		conditionalDepth = depth
+		codeSpanLength = nextCodeSpanLength
 	}
 	return diagnostics, nil
 }
 
-func scanPromptConditionLine(ctx context.Context, line string, lineNumber int, conditionalDepth int) ([]Diagnostic, int, error) {
+func scanPromptConditionLine(ctx context.Context, line string, remainingLines []string, lineNumber int, conditionalDepth int, codeSpanLength int) ([]Diagnostic, int, int, error) {
 	var diagnostics []Diagnostic
-	for offset := 0; offset < len(line); {
-		if err := ctx.Err(); err != nil {
-			return diagnostics, conditionalDepth, err
+	offset := 0
+	if codeSpanLength > 0 {
+		end := matchingCodeDelimiter(line, 0, codeSpanLength)
+		if end < 0 {
+			return diagnostics, conditionalDepth, codeSpanLength, nil
 		}
-		if strings.HasPrefix(line[offset:], "`") {
-			length := delimiterLength(line[offset:], "`")
-			if end := matchingCodeDelimiter(line, offset+length, length); end >= 0 {
+		offset = end + codeSpanLength
+		codeSpanLength = 0
+	}
+	for offset < len(line) {
+		if err := ctx.Err(); err != nil {
+			return diagnostics, conditionalDepth, codeSpanLength, err
+		}
+		backtick := strings.IndexByte(line[offset:], '`')
+		start := strings.Index(line[offset:], "{{")
+		if backtick >= 0 && (start < 0 || backtick < start) {
+			backtick += offset
+			length := delimiterLength(line[backtick:], "`")
+			if end := matchingCodeDelimiter(line, backtick+length, length); end >= 0 {
 				offset = end + length
 				continue
 			}
-			offset += length
+			if hasMatchingCodeDelimiterAcrossLines(remainingLines, length) {
+				codeSpanLength = length
+				break
+			}
+			offset = backtick + length
 			continue
 		}
-		start := strings.Index(line[offset:], "{{")
 		if start < 0 {
 			break
 		}
@@ -76,10 +99,10 @@ func scanPromptConditionLine(ctx context.Context, line string, lineNumber int, c
 		}
 		end += start + 2
 		tag := strings.TrimSpace(line[start+2 : end])
-		if tag == "else" && conditionalDepth > 0 {
+		if isUnsupportedElseTag(tag) && conditionalDepth > 0 {
 			diagnostics = append(diagnostics, Diagnostic{
 				Path: "prompt", Line: lineNumber,
-				Message: "AW prompt conditionals use {{#else}} for the fallback branch; replace the unprefixed {{else}} delimiter",
+				Message: "AW prompt conditionals require a # prefix on fallback delimiters; use {{#else}} or {{#elseif}}",
 			})
 		}
 		if strings.HasPrefix(tag, "#if ") || strings.HasPrefix(tag, "#if\t") {
@@ -91,7 +114,38 @@ func scanPromptConditionLine(ctx context.Context, line string, lineNumber int, c
 		}
 		offset = end + 2
 	}
-	return diagnostics, conditionalDepth, nil
+	return diagnostics, conditionalDepth, codeSpanLength, nil
+}
+
+func isUnsupportedElseTag(tag string) bool {
+	fields := strings.Fields(tag)
+	if len(fields) == 0 {
+		return false
+	}
+	switch fields[0] {
+	case "else":
+		return true
+	case "elseif", "else-if", "else_if":
+		return len(fields) > 1
+	default:
+		return false
+	}
+}
+
+func hasMatchingCodeDelimiterAcrossLines(lines []string, length int) bool {
+	for _, line := range lines {
+		line = strings.TrimSuffix(strings.TrimSuffix(line, "\n"), "\r")
+		if strings.TrimSpace(line) == "" {
+			return false
+		}
+		if _, _, _, isFence := markdownFence(line); isFence {
+			return false
+		}
+		if matchingCodeDelimiter(line, 0, length) >= 0 {
+			return true
+		}
+	}
+	return false
 }
 
 func markdownFence(line string) (byte, int, string, bool) {
