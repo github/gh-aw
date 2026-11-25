@@ -94,12 +94,17 @@ func unquotedCommandAssignments(ctx context.Context, script, path string) ([]Dia
 		if ctx.Err() != nil {
 			return false
 		}
-		call, ok := node.(*syntax.CallExpr)
-		if !ok {
-			return true
+		var assignments []*syntax.Assign
+		switch node := node.(type) {
+		case *syntax.CallExpr:
+			if len(node.Args) == 0 {
+				assignments = node.Assigns
+			}
+		case *syntax.DeclClause:
+			assignments = node.Args
 		}
-		for _, assign := range call.Assigns {
-			if assign.Value == nil || len(assign.Value.Parts) != 1 {
+		for _, assign := range assignments {
+			if assign.Naked || assign.Value == nil || len(assign.Value.Parts) != 1 {
 				continue
 			}
 			for _, part := range assign.Value.Parts {

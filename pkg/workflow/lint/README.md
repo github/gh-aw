@@ -43,4 +43,7 @@ is the direct check used by the corresponding built-in rule.
 `unquoted-command-assignment` warns about bare assignments to a conservative
 set of common command names in POSIX shell steps and MCP shell scripts. Quote
 intentional literals, or use command substitution to capture command output.
+It checks standalone assignments and declaration builtins such as `local`,
+`export`, and `declare`, but not environment assignments before a command
+(for example, `x=pr echo ok`).
 It does not attempt to reproduce every ShellCheck SC2209 command name.

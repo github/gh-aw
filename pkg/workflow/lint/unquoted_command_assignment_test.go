@@ -1,3 +1,5 @@
+//go:build !integration
+
 package lint
 
 import (
@@ -17,7 +19,11 @@ func TestUnquotedCommandAssignment(t *testing.T) {
 	}{
 		{"bare command", "QUERY_COMMAND=pr", "bash", []int{1}},
 		{"multiple commands", "x=ls\ny=date z=grep", "sh", []int{1, 2}},
-		{"nested and prefix", "if true; then\nx=pr echo ok\nfi", "bash --noprofile -e {0}", []int{2}},
+		{"nested", "if true; then\nx=pr\nfi", "bash --noprofile -e {0}", []int{2}},
+		{"prefix", "x=pr echo ok\nx=ls y=pr env", "bash", nil},
+		{"declarations", "f() {\nlocal x=pr\n}\nexport y=ls\ndeclare -r z=grep\nreadonly a=date\ntypeset b=cat\nnameref c=pr", "bash", []int{2, 4, 5, 6, 7, 8}},
+		{"quoted declarations", "f() { local x='pr'; }\nexport y=\"ls\"\ndeclare z=\\pr", "bash", nil},
+		{"declarations without values", "export pr\ndeclare -p pr\nlocal ls", "bash", nil},
 		{"quoted", "x=\"pr\"\ny='ls'\nz=\\pr", "bash", nil},
 		{"other values", "x=issue\ny=not-a-command\nz=pr-suffix", "bash", nil},
 		{"substitution", "x=$(pr)\ny=$value\nz=${{ inputs.value }}", "bash", nil},
