@@ -276,8 +276,6 @@ function copySingleFileToStaging(sourcePath, destRelPath, destinationRoot = stag
     }
     if (copyResult === "identical") {
       core.info(`Skipping auto-copy for ${destRelPath}: identical file already exists in staging directory`);
-    } else {
-      fs.chmodSync(destPath, 0o600);
     }
   } catch (err) {
     throw new Error(`${ERR_SYSTEM}: Failed to copy file ${sourcePath} to ${destPath}: ${getErrorMessage(err)}`, { cause: err });
