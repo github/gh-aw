@@ -144,10 +144,13 @@ func TestRoutingLearningSettingPrecedence(t *testing.T) {
 }
 
 func TestRoutingLearningFromAnImport(t *testing.T) {
-	shared := "---\nmodel-routing:\n  learning: observe\n---\nShared routing settings.\n"
-	compiled := compileRoutingLearning(t, routingLearningSource(" workflow_dispatch", "imports:\n  - shared/routing.md\n"), "", map[string]string{".github/workflows/shared/routing.md": shared})
+	compiled := compileRoutingLearning(t, routingLearningSource(" workflow_dispatch", "imports: [shared/off.md, shared/observe.md]\n"), `{"model_routing":{"learning":"observe"}}`, map[string]string{
+		".github/workflows/shared/off.md":     "---\nmodel-routing:\n  learning: false\n---\nDo not record.\n",
+		".github/workflows/shared/observe.md": "---\nmodel-routing:\n  learning: observe\n---\nRecord the ordinary pick.\n",
+	})
 	require.NoError(t, compiled.err)
-	assert.Contains(t, lockJobs(t, compiled.lock), pushRoutingHistoryJobName)
+	assert.True(t, isModelRoutingEnabled(compiled.data))
+	assert.NotContains(t, lockJobs(t, compiled.lock), pushRoutingHistoryJobName, "the first import opts out despite the later opt-ins")
 }
 
 func TestRoutingLearningComposesWithShortlist(t *testing.T) {
@@ -211,14 +214,20 @@ func TestRoutingLearningIneligibleWorkflows(t *testing.T) {
 }
 
 func TestRoutingLearningRejectsUnsupportedSyntax(t *testing.T) {
-	for _, config := range []string{"adaptive-routing: observe", "model-routing: {learning: true}", "model-routing: {learning: live}", "model-routing: {learning: {mode: live, tests: shadow}}", "model-routing: {}"} {
-		t.Run(config, func(t *testing.T) {
-			got := compileRoutingLearning(t, routingLearningSource(" workflow_dispatch", config+"\n"), "", nil)
-			require.Error(t, got.err)
+	for _, tt := range []struct{ config, diagnostic string }{
+		{"adaptive-routing: observe", "Unknown property: adaptive-routing"},
+		{"model-routing: {learning: true}", "'learning': value must be one of"},
+		{"model-routing: {learning: live}", "'learning': value must be one of"},
+		{"model-routing: {learning: {mode: live, tests: shadow}}", "'learning': value must be one of"},
+		{"model-routing: {}", "minProperties: got 0, want 1"},
+	} {
+		t.Run(tt.config, func(t *testing.T) {
+			got := compileRoutingLearning(t, routingLearningSource(" workflow_dispatch", tt.config+"\n"), "", nil)
+			require.ErrorContains(t, got.err, tt.diagnostic)
 			imported := compileRoutingLearning(t, routingLearningSource(" workflow_dispatch", "imports: [shared/config.md]\n"), "", map[string]string{
-				".github/workflows/shared/config.md": "---\n" + config + "\n---\n",
+				".github/workflows/shared/config.md": "---\n" + tt.config + "\n---\n",
 			})
-			require.Error(t, imported.err)
+			require.ErrorContains(t, imported.err, tt.diagnostic)
 		})
 	}
 }
@@ -229,7 +238,7 @@ func TestRoutingLearningRejectsRemovedOptOutInMarkdownImport(t *testing.T) {
 	got := compileRoutingLearning(t, routingLearningSource(" workflow_dispatch", "imports: [../prompts/triage.md]\n"), `{"model_routing":{"learning":"observe"}}`, map[string]string{
 		".github/prompts/triage.md": "---\nadaptive-routing: false\n---\nTriage an issue.\n",
 	})
-	require.ErrorContains(t, got.err, "adaptive-routing")
+	require.ErrorContains(t, got.err, "adaptive-routing is no longer supported; set learning under model-routing instead")
 }
 
 func TestRepoMemoryCannotWriteTheRoutingHistories(t *testing.T) {

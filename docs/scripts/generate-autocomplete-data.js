@@ -98,7 +98,10 @@ function getType(node) {
     const unique = [...new Set(types.flat())];
     return unique.join("|") || "unknown";
   }
-  if (node.enum) return "string";
+  if (node.enum?.length) {
+    const types = node.enum.map(value => (value === null ? "null" : Array.isArray(value) ? "array" : typeof value));
+    return [...new Set(types)].join("|");
+  }
   return "unknown";
 }
 

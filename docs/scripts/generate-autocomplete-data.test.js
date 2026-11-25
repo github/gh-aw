@@ -24,6 +24,13 @@ test("graders autocomplete describes JavaScript-only operational value", () => {
   }
 });
 
+test("published model-routing data documents observe and the boolean opt-out", () => {
+  const generated = autocompleteData.root["model-routing"];
+  assert.deepEqual(publishedData.root["model-routing"], generated);
+  assert.equal(generated.children.learning.type, "string|boolean");
+  assert.deepEqual(generated.children.learning.enum, ["observe", false]);
+});
+
 test("other safe-output entries retain shallow completion data", () => {
   assert.equal(autocompleteData.root["safe-outputs"].children["create-pull-request"].children, undefined);
 });
