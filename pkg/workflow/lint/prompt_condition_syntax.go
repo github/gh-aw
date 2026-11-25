@@ -118,15 +118,21 @@ func scanPromptConditionLine(ctx context.Context, line string, remainingLines []
 }
 
 func isUnsupportedElseTag(tag string) bool {
-	fields := strings.Fields(tag)
-	if len(fields) == 0 {
-		return false
+	var firstField string
+	hasCondition := false
+	for field := range strings.FieldsSeq(tag) {
+		if firstField == "" {
+			firstField = field
+		} else {
+			hasCondition = true
+			break
+		}
 	}
-	switch fields[0] {
+	switch firstField {
 	case "else":
 		return true
 	case "elseif", "else-if", "else_if":
-		return len(fields) > 1
+		return hasCondition
 	default:
 		return false
 	}
