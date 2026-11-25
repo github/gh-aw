@@ -2060,6 +2060,14 @@
           "type": "string",
           "description": "Optional extended details or diagnostic context about the failure (max 65000 characters).",
           "maxLength": 65536
+        },
+        "secrecy": {
+          "type": "string",
+          "description": "Confidentiality level of the message content (e.g., \"public\", \"internal\", \"private\")."
+        },
+        "integrity": {
+          "type": "string",
+          "description": "Trustworthiness level of the message source (e.g., \"low\", \"medium\", \"high\")."
         }
       },
       "additionalProperties": false
