@@ -159,7 +159,7 @@ description: Agentic workflow specific frontmatter fields for GitHub Agentic Wor
     ```
 
 - **`observability:`** - Workflow observability and telemetry configuration (object)
-  - **`otlp:`** - Export OpenTelemetry spans to any OTLP-compatible backend (Honeycomb, Grafana Tempo, Sentry, etc.) (object)
+  - **`otlp:`** - Export OpenTelemetry spans to any OTLP-compatible backend (Honeycomb, Grafana Tempo, Sentry, etc.) (object), or set `false` in the main workflow to omit compiler-managed OTLP endpoint and credential variables, including settings from imports. Recompile after opting out; see the [OpenTelemetry reference](https://github.github.com/gh-aw/reference/open-telemetry/).
     - `endpoint:` - OTLP collector URL string, a `{url, headers}` object, or an array of them for concurrent multi-endpoint export. Static hostnames are added to the AWF firewall allowlist automatically. Supports GitHub Actions expressions.
     - `github-app:` - Optional runtime auth configuration.
       - Preferred: provide GitHub App credentials (`app-id`/`client-id` + `private-key`) to mint a token with `actions/create-github-app-token` before `actions/setup`.
