@@ -112,6 +112,9 @@ function sanitizeContent(content, maxLengthOrOptions) {
     maxLines = maxLengthOrOptions.maxLines;
     deferMentions = maxLengthOrOptions.deferMentions === true;
     allowedAliasesSeen = maxLengthOrOptions.allowedAliasesSeen;
+    if (maxMentions === 0) {
+      allowedAliasesSeen = undefined;
+    }
   }
 
   // If no allowed aliases specified, use core sanitization (which neutralizes all mentions)

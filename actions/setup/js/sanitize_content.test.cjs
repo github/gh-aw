@@ -2115,10 +2115,14 @@ describe("sanitize_content.cjs", () => {
     it("uses safe defaults for invalid length and line limits", async () => {
       const { applyTruncation, sanitizeContentCore } = await import("./sanitize_content_core.cjs");
       const content = "x".repeat(524289);
+      const manyLines = Array(65001).fill("x").join("\n");
       for (const limit of [0, -1, 1.5, NaN, Infinity, "100", {}, Number.MAX_SAFE_INTEGER + 1]) {
         expect(applyTruncation(content, limit)).toBe("x".repeat(524288) + "\n[Content truncated due to length]");
         expect(applyTruncation("a\nb", 100, limit)).toBe("a\nb");
         expect(sanitizeContentCore("a\nb", limit, undefined, limit)).toBe("a\nb");
+        const truncatedByLines = applyTruncation(manyLines, 1000000, limit);
+        expect(truncatedByLines).toContain("[Content truncated due to line count]");
+        expect(truncatedByLines.split("\n")).toHaveLength(65001);
       }
       expect(applyTruncation(null)).toBe("");
       expect(
@@ -2139,6 +2143,13 @@ describe("sanitize_content.cjs", () => {
     it.each([NaN, Infinity, -1, 1.5, "10", {}])("fails closed for invalid mention limits: %o", limit => {
       expect(sanitizeContent("fixes #1", { maxBotMentions: limit })).toBe("`fixes #1`");
       expect(sanitizeContent("@author", { allowedAliases: ["author"], maxMentions: limit })).toBe("`@author`");
+    });
+
+    it("fails closed for zero and invalid mention limits when alias history is pre-seeded", () => {
+      for (const limit of [0, NaN, -1, 1.5, "invalid", {}]) {
+        const allowedAliasesSeen = new Set(["author"]);
+        expect(sanitizeContent("@author", { allowedAliases: ["author"], maxMentions: limit, allowedAliasesSeen })).toBe("`@author`");
+      }
     });
 
     it("preserves valid zero and positive mention limits", () => {

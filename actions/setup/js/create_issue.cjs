@@ -794,7 +794,8 @@ async function main(config = {}) {
   // Create an authenticated GitHub client. Uses config["github-token"] when set
   // (for cross-repository operations), otherwise falls back to the step-level github.
   const githubClient = await createAuthenticatedGitHubClient(config);
-  const maxMentions = parseIntTemplatable(config.mentions?.max, 50);
+  const configuredMaxMentions = config.mentions?.max;
+  const maxMentions = configuredMaxMentions === undefined || configuredMaxMentions === null ? 50 : parseIntTemplatable(configuredMaxMentions, 0);
   let defaultMentionAliases = [];
   if (Array.isArray(config.allowedMentionAliases)) {
     defaultMentionAliases = config.allowedMentionAliases;
