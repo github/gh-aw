@@ -1736,12 +1736,18 @@ describe("push_routing_history saves", () => {
     expect(remoteState(remote)).toMatchObject({ last_run: 303, reconciled_through: 303, unresolved_runs: [], unexplained: 1 });
   });
 
-  it("expires a confirmed deleted run at a deep page boundary even when 100 runs above it share one timestamp", async () => {
+  it("expires a confirmed deleted run at a deep page boundary with a bounded same-second burst, and fails closed when a 100-run tie fills the page edge", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-11-25T16:00:00Z"));
-    const remote = bareRemote();
+    const baseMs = Date.parse("2026-11-25T00:00:00Z");
+    const burstTs = new Date(baseMs + 516 * 30_000).toISOString().replace(/\.\d{3}Z$/, "Z");
+
+    // 1. 30 runs (#531..#502) share burstTs right above deleted #501 at the page 4/5 boundary:
+    // the overlapping unfiltered page (per_page < 100) brackets the entire tie strictly inside its
+    // oldest/newest seconds and confirms #501 is deleted.
+    const remote1 = bareRemote();
     seedHistory(
-      remote,
+      remote1,
       {
         ...emptyState("triage"),
         generation: { hash: GENERATION, since_run: 1 },
@@ -1752,22 +1758,112 @@ describe("push_routing_history saves", () => {
       },
       []
     );
-    // 900 listed runs (#901..#1 with #501 deleted): page 4 ends at #502 and page 5 starts at #500,
-    // and #601..#502 all share the same created_at burst timestamp. The overlapping unfiltered page
-    // check bridges the page 4/5 boundary atomically and confirms #501 is deleted.
-    const baseMs = Date.parse("2026-11-25T00:00:00Z");
-    const burstTs = "2026-11-25T05:00:00Z";
-    const runs = [];
+    const runs30 = [];
     for (let number = 901; number >= 1; number--) {
       if (number === 501) continue;
-      const createdAt = number >= 502 && number <= 601 ? burstTs : new Date(baseMs + number * 30_000).toISOString().replace(/\.\d{3}Z$/, "Z");
-      runs.push(paginationRun(number, { created_at: createdAt }));
+      const createdAt = number >= 502 && number <= 531 ? burstTs : new Date(baseMs + number * 30_000).toISOString().replace(/\.\d{3}Z$/, "Z");
+      runs30.push(paginationRun(number, { created_at: createdAt }));
     }
-    const github = fakeGitHub(remote, { runs });
+    const gh30 = fakeGitHub(remote1, { runs: runs30 });
+    await save(remote1, 902, "success", { github: gh30 });
+    expect(gh30.calls.lists.some(params => !params.branch && !params.event && params.per_page < 100)).toBe(true);
+    expect(remoteState(remote1)).toMatchObject({ last_run: 902, reconciled_through: 902, unresolved_runs: [], unexplained: 0 });
 
-    await save(remote, 902, "success", { github });
+    // 2. When 100 runs (#601..#502) share burstTs, no single <=100-row page can bracket both sides
+    // of the tie, so the writer fails closed and retains #501 rather than risking a false deletion.
+    const burstTs100 = new Date(baseMs + 551 * 30_000).toISOString().replace(/\.\d{3}Z$/, "Z");
+    const runs100 = [];
+    for (let number = 901; number >= 1; number--) {
+      if (number === 501) continue;
+      const createdAt = number >= 502 && number <= 601 ? burstTs100 : new Date(baseMs + number * 30_000).toISOString().replace(/\.\d{3}Z$/, "Z");
+      runs100.push(paginationRun(number, { created_at: createdAt }));
+    }
+    const { reconciliation } = await listRuns({
+      githubClient: fakeGitHub(null, { runs: runs100 }),
+      owner: "octo",
+      repo: "demo",
+      workflowFile: "triage.lock.yml",
+      defaultBranch: "main",
+      runId: "9902",
+      runNumber: 902,
+      state: { ...emptyState("triage"), generation: { hash: GENERATION, since_run: 1 }, last_run: 901, reconciled_through: 901, unresolved_runs: [501], unexplained: 0 },
+      runs: [],
+      generation: GENERATION,
+    });
+    expect(reconciliation.unresolved).toEqual([501]);
+  });
+
+  it("does not drop a live failed run hidden by same-second tie reordering across a page edge", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-11-25T16:00:00Z"));
+    const remote = bareRemote();
+    seedHistory(
+      remote,
+      {
+        ...emptyState("triage"),
+        generation: { hash: GENERATION, since_run: 1 },
+        last_run: 1,
+        reconciled_through: 1,
+        unresolved_runs: [],
+        unexplained: 0,
+      },
+      []
+    );
+    const agent = { name: "agent", conclusion: "failure", started_at: "2026-11-25T09:00:00Z" };
+    const writer = conclusion => ({ name: "push_routing_history", conclusion, started_at: "2026-11-25T09:05:00Z" });
+    // Old runs #100, #101 (failed), #102 share tieTs at the page 1/2 edge of a 200-run listing.
+    // Reordering the tie between page 1 and page 2 puts both #102 and #100 on page 1 while omitting #101
+    // from both 100-row pages. Because #100 sits on page 1's oldest second, page 1 cannot expire #101,
+    // and the overlapping unfiltered page recovers and charges #101.
+    const baseMs = Date.parse("2026-11-25T00:00:00Z");
+    const tieTs = new Date(baseMs + 101 * 30_000).toISOString().replace(/\.\d{3}Z$/, "Z");
+    const canonical = Array.from({ length: 200 }, (_, i) => {
+      const number = 200 - i;
+      const createdAt = number >= 100 && number <= 102 ? tieTs : new Date(baseMs + number * 30_000).toISOString().replace(/\.\d{3}Z$/, "Z");
+      return paginationRun(number, { conclusion: number === 101 ? "failure" : "success", created_at: createdAt });
+    });
+    const run100 = canonical.find(r => r.run_number === 100);
+    const run101 = canonical.find(r => r.run_number === 101);
+    const run102 = canonical.find(r => r.run_number === 102);
+    const page1Order = canonical.map(r => (r.run_number === 101 ? run100 : r.run_number === 100 ? run101 : r));
+    const page2Order = canonical.map(r => (r.run_number === 102 ? run101 : r.run_number === 101 ? run102 : r));
+    const github = fakeGitHub(remote, {
+      jobs: { 9101: [agent, writer("failure")] },
+      listWorkflowRuns: async ({ branch, event, page = 1, per_page = 100 }) => {
+        if (event === "pull_request_target") return { data: { total_count: 0, workflow_runs: [] } };
+        const source = per_page === 100 && page === 1 ? page1Order : per_page === 100 && page === 2 ? page2Order : canonical;
+        const filtered = source.filter(run => (!branch || run.head_branch === branch) && (!event || run.event === event));
+        const start = (page - 1) * per_page;
+        return { data: { total_count: filtered.length, workflow_runs: filtered.slice(start, start + per_page) } };
+      },
+    });
+
+    await save(remote, 200, "success", { github });
     expect(github.calls.lists.some(params => !params.branch && !params.event && params.per_page < 100)).toBe(true);
-    expect(remoteState(remote)).toMatchObject({ last_run: 902, reconciled_through: 902, unresolved_runs: [], unexplained: 0 });
+    expect(github.calls.jobs).toEqual([9101]);
+    expect(remoteRuns(remote).map(({ number, note }) => ({ number, note }))).toEqual([
+      { number: 101, note: "unsaved" },
+      { number: 200, note: null },
+    ]);
+    expect(remoteState(remote)).toMatchObject({ last_run: 200, reconciled_through: 200, unresolved_runs: [], unexplained: 1 });
+  });
+
+  it("expires a >200-run deleted gap directly above the floor during a partial created-window walk", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-11-25T16:00:00Z"));
+    // 3,500-run history with #2..#202 (201 runs) deleted right above floor #1 and distinct timestamps.
+    // The walk stops before reaching window 0's page 1 (partial walk), yet one atomic page inside the
+    // created window strictly brackets #203 and #1, so coverage advances instead of stalling at #1.
+    const runs = [];
+    for (let number = 3500; number >= 1; number--) {
+      if (number >= 2 && number <= 202) continue;
+      runs.push(paginationRun(number));
+    }
+    const github = fakeGitHub(null, { runs });
+    const { reconciliation } = await reconcilePagination(github, 1, 3501);
+    expect(reconciliation.verified).toBe(true);
+    expect(reconciliation.unresolved).toEqual([]);
+    expect(reconciliation.ceiling).toBeGreaterThan(203);
   });
 
   it("clears an interval gap when the independent unindexed scan discovers it as an ineligible PR run", async () => {

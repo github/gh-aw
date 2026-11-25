@@ -384,7 +384,7 @@ function uniqueRuns(runs) {
  * @param {(page: number, created?: string) => Promise<any>} fetchPage
  * @param {number} targetRunNumber lowest run_number we must reach (inclusive)
  * @param {number} maxRunNumber highest run_number we need to verify (inclusive)
- * @returns {Promise<{items: any[], reachedFloor: boolean, maxVerified: number, reachedStart: boolean, reachedTop: boolean, contiguousPages: Array<{page: number, created: string | undefined, batch: any[], minNum: number, maxNum: number, reachedStart: boolean}>}>}
+ * @returns {Promise<{items: any[], reachedFloor: boolean, maxVerified: number, reachedStart: boolean, reachedTop: boolean, contiguousPages: Array<{page: number, created: string | undefined, batch: any[], minNum: number, maxNum: number, reachedStart: boolean, timed: boolean, oldest: number, newest: number, settled: number}>}>}
  */
 async function fetchStreamWindow(fetchPage, targetRunNumber, maxRunNumber) {
   /** @typedef {ReturnType<typeof pageSummary>} Page */
@@ -475,6 +475,10 @@ async function fetchStreamWindow(fetchPage, targetRunNumber, maxRunNumber) {
         minNum: entry.minNum,
         maxNum: entry.maxNum,
         reachedStart: entry.last,
+        timed: entry.timed,
+        oldest: entry.oldest,
+        newest: entry.newest,
+        settled: entry.settled,
       }));
   let w = windows.length - 1;
   let page = floorPage;
@@ -544,44 +548,63 @@ function indexRuns(items, reachedStart) {
 }
 
 /**
- * Whether `indexed` covers both sides of an absent `[startNum, endNum]` range and its higher
- * listed neighbour was created strictly more than 5 minutes before `nowMs` (contract 2).
+ * Inspect whether `indexed` brackets an absent `[startNum, endNum]` range with a higher listed
+ * neighbour strictly older than `RECENT_GAP_MS` (contract 2), returning the neighbours' creation
+ * seconds when confirmed or `null` otherwise.
  * @param {ReturnType<typeof indexRuns>} indexed
  * @param {number} startNum
  * @param {number} endNum
  * @param {number} nowMs
+ * @returns {{ higherSec: number, lowerSec: number | null } | null}
  */
-function hasConfirmedOldGap(indexed, startNum, endNum, nowMs) {
-  if (!indexed || indexed.sorted.length === 0) return false;
-  if (!indexed.reachedStart && !(indexed.minNum < startNum)) return false;
+function oldGapNeighbours(indexed, startNum, endNum, nowMs) {
+  if (!indexed || indexed.sorted.length === 0) return null;
+  if (!indexed.reachedStart && !(indexed.minNum < startNum)) return null;
   const higherIdx = indexed.sorted.findIndex(item => item.run_number > endNum);
-  if (higherIdx === -1) return false;
-  if (higherIdx > 0 && indexed.sorted[higherIdx - 1].run_number >= startNum) return false;
-  const neighbourCreatedMs = Date.parse(indexed.sorted[higherIdx].created_at);
-  return Number.isFinite(neighbourCreatedMs) && nowMs - neighbourCreatedMs > RECENT_GAP_MS;
+  if (higherIdx === -1) return null;
+  const lower = higherIdx > 0 ? indexed.sorted[higherIdx - 1] : null;
+  if (lower && lower.run_number >= startNum) return null;
+  const higher = indexed.sorted[higherIdx];
+  const neighbourCreatedMs = Date.parse(higher.created_at);
+  if (!Number.isFinite(neighbourCreatedMs) || nowMs - neighbourCreatedMs <= RECENT_GAP_MS) return null;
+  const higherSec = createdSecond(higher);
+  if (higherSec === null) return null;
+  return { higherSec, lowerSec: lower ? createdSecond(lower) : null };
 }
 
 /**
- * Whether a verified unfiltered scan already covered both sides of `num`.
- * @param {(ReturnType<typeof indexRuns> & { reachedFloor: boolean }) | null} scan
+ * Whether a verified unfiltered scan already covered both sides of `num` without an open
+ * same-second tie at its edges.
+ * @param {(ReturnType<typeof indexRuns> & { reachedFloor: boolean, reachedTop: boolean, maxVerified: number, bottomTimed: boolean, settledFloor: number }) | null} scan
  * @param {number} num
  */
 function scanCoversNumber(scan, num) {
   if (!scan || !scan.reachedFloor || scan.sorted.length === 0) return false;
-  return (scan.reachedStart || scan.minNum < num) && scan.maxNum > num;
+  const lowerCovered = scan.reachedStart || (scan.bottomTimed && scan.settledFloor < num);
+  const upperCovered = scan.reachedTop ? scan.maxNum > num : scan.maxVerified > num;
+  return lowerCovered && upperCovered;
 }
 
 /**
- * An unseen gap `[startNum, endNum]` is confirmed deleted only when a single atomic unfiltered page
- * covers both sides and its higher listed neighbour is older than `RECENT_GAP_MS`. Because every
- * run on one page comes from one API response, mid-scan inserts or deletions cannot hide a run.
+ * An unseen gap `[startNum, endNum]` is confirmed deleted only when a single atomic page brackets
+ * both sides, its higher listed neighbour is older than `RECENT_GAP_MS`, and neither neighbour sits
+ * on an open same-second page edge where tied runs could spill onto an adjacent page or across a
+ * `created` window cutoff.
  * @param {number} startNum
  * @param {number} endNum
- * @param {Array<ReturnType<typeof indexRuns>>} atomicPages
+ * @param {Array<ReturnType<typeof indexRuns> & { page: number, created: string | undefined, timed: boolean, oldest: number, newest: number }>} atomicPages
  * @param {number} nowMs
  */
 function isConfirmedDeletedGap(startNum, endNum, atomicPages, nowMs) {
-  return atomicPages.some(page => hasConfirmedOldGap(page, startNum, endNum, nowMs));
+  for (const page of atomicPages) {
+    const gap = oldGapNeighbours(page, startNum, endNum, nowMs);
+    if (!gap) continue;
+    const bottomSafe = page.reachedStart || (page.timed && gap.higherSec > page.oldest && gap.lowerSec !== null && gap.lowerSec > page.oldest);
+    if (!bottomSafe) continue;
+    const topSafe = (!page.created && page.page === 1) || (page.timed && gap.higherSec < page.newest && (gap.lowerSec === null || gap.lowerSec < page.newest));
+    if (topSafe) return true;
+  }
+  return false;
 }
 
 /**
@@ -610,26 +633,32 @@ function overlappingPageParams(boundaryIndex) {
 
 /**
  * Find the page boundary straddled by an older-than-window gap `[startNum, endNum]` across
- * verified unfiltered scans, so one overlapping page within the same query window can observe both
- * sides atomically.
+ * verified unfiltered scans (either a non-overlapping numeric gap or a shared same-second tie edge),
+ * so one overlapping page within the same query window can observe both sides atomically.
  * @param {number} startNum
  * @param {number} endNum
- * @param {Array<ReturnType<typeof indexRuns> & { reachedFloor: boolean, reachedTop: boolean, contiguousPages: Array<{ page: number, created: string | undefined, minNum: number, maxNum: number, reachedStart: boolean }> }>} scans
+ * @param {Array<ReturnType<typeof indexRuns> & { reachedFloor: boolean, contiguousPages: Array<{ page: number, created: string | undefined, minNum: number, maxNum: number, reachedStart: boolean, timed: boolean, oldest: number, newest: number }> }>} scans
  * @param {number} nowMs
  * @returns {{ created: string | undefined, index: number } | null}
  */
 function findOldBoundaryGap(startNum, endNum, scans, nowMs) {
   for (const scan of scans) {
-    if (!scan?.reachedFloor || !hasConfirmedOldGap(scan, startNum, endNum, nowMs)) continue;
+    if (!scan?.reachedFloor) continue;
+    const gap = oldGapNeighbours(scan, startNum, endNum, nowMs);
+    if (!gap) continue;
     for (let i = 0; i < scan.contiguousPages.length - 1; i++) {
       const newer = scan.contiguousPages[i];
       const older = scan.contiguousPages[i + 1];
-      if (newer.created === older.created && (!newer.created || scan.reachedTop) && older.maxNum < startNum && endNum < newer.minNum) {
+      if (newer.created !== older.created) continue;
+      const numericGap = older.maxNum < startNum && endNum < newer.minNum;
+      const bottomEdge = newer.timed && !newer.reachedStart && (gap.higherSec === newer.oldest || gap.lowerSec === newer.oldest);
+      const topEdge = older.timed && (gap.higherSec === older.newest || gap.lowerSec === older.newest);
+      if (numericGap || bottomEdge || topEdge) {
         return { created: newer.created, index: newer.page * LIST_RUNS_PER_PAGE };
       }
     }
     const lastPage = scan.contiguousPages.at(-1);
-    if (scan.reachedStart && lastPage && !lastPage.reachedStart && (!lastPage.created || scan.reachedTop) && endNum < lastPage.minNum) {
+    if (scan.reachedStart && lastPage && !lastPage.reachedStart && endNum < lastPage.minNum) {
       return { created: lastPage.created, index: lastPage.page * LIST_RUNS_PER_PAGE };
     }
   }
@@ -739,9 +768,9 @@ async function listRuns({ githubClient, owner, repo, workflowFile, workflowPath 
 
   /** @type {number[]} */
   const unresolvedGaps = [];
-  /** @type {Array<ReturnType<typeof indexRuns> & { reachedFloor: boolean, reachedTop: boolean, contiguousPages: Array<{ page: number, created: string | undefined, minNum: number, maxNum: number, reachedStart: boolean }> }>} */
+  /** @type {Array<ReturnType<typeof indexRuns> & { reachedFloor: boolean, reachedTop: boolean, maxVerified: number, bottomTimed: boolean, settledFloor: number, contiguousPages: Array<{ page: number, created: string | undefined, minNum: number, maxNum: number, reachedStart: boolean, timed: boolean, oldest: number, newest: number, settled: number }> }>} */
   const unfilteredScans = [];
-  /** @type {Array<ReturnType<typeof indexRuns>>} */
+  /** @type {Array<ReturnType<typeof indexRuns> & { page: number, created: string | undefined, timed: boolean, oldest: number, newest: number }>} */
   const atomicPages = [];
   /** @type {Set<string>} */
   const checkedBoundaries = new Set();
@@ -749,14 +778,26 @@ async function listRuns({ githubClient, owner, repo, workflowFile, workflowPath 
 
   /** @param {Awaited<ReturnType<typeof fetchStreamWindow>>} stream */
   const recordUnfilteredStream = stream => {
-    const scan = { ...indexRuns(stream.items, stream.reachedStart), reachedFloor: stream.reachedFloor, reachedTop: stream.reachedTop, contiguousPages: stream.contiguousPages };
+    const oldestPage = stream.contiguousPages.at(-1);
+    const scan = {
+      ...indexRuns(stream.items, stream.reachedStart),
+      reachedFloor: stream.reachedFloor,
+      reachedTop: stream.reachedTop,
+      maxVerified: stream.maxVerified,
+      bottomTimed: oldestPage?.timed === true,
+      settledFloor: oldestPage ? oldestPage.settled : Infinity,
+      contiguousPages: stream.contiguousPages,
+    };
     unfilteredScans.push(scan);
     for (const page of stream.contiguousPages) {
-      // Unfiltered window-0 pages are always atomic snapshots; created-filtered windows are safe
-      // once the walk reached top (meaning every newer window above their cutoff was ingested).
-      if (!page.created || stream.reachedTop) {
-        atomicPages.push(indexRuns(page.batch, page.reachedStart));
-      }
+      atomicPages.push({
+        ...indexRuns(page.batch, page.reachedStart),
+        page: page.page,
+        created: page.created,
+        timed: page.timed,
+        oldest: page.oldest,
+        newest: page.newest,
+      });
     }
     ingestRuns(stream.items);
     return scan;
@@ -793,14 +834,22 @@ async function listRuns({ githubClient, owner, repo, workflowFile, workflowPath 
       if (!Array.isArray(batch) || !Number.isSafeInteger(totalCount) || totalCount < 0) return;
       const remaining = totalCount - (page - 1) * perPage;
       if (remaining <= 0 || batch.length !== Math.min(perPage, remaining)) return;
-      atomicPages.push(indexRuns(batch, batch.length === remaining));
+      const summary = pageSummary(batch, batch.length === remaining);
+      atomicPages.push({
+        ...indexRuns(batch, summary.last),
+        page,
+        created: boundary.created,
+        timed: summary.timed,
+        oldest: summary.oldest,
+        newest: summary.newest,
+      });
       ingestRuns(batch);
     } catch {
       // Leave unconfirmed boundary gaps unresolved on transient API errors.
     }
   };
 
-  /** @type {(ReturnType<typeof indexRuns> & { reachedFloor: boolean }) | null} */
+  /** @type {(ReturnType<typeof indexRuns> & { reachedFloor: boolean, reachedTop: boolean, maxVerified: number, bottomTimed: boolean, settledFloor: number }) | null} */
   let intervalUnfilteredScan = null;
   let needsIntervalGapFinalization = false;
   if (hasIntervalGap) {
