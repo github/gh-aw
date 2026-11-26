@@ -277,6 +277,7 @@ experiments:
     weight: [50, 50]
 
 imports:
+  - shared/reporting.md
   - shared/otlp.md
 features:
   gh-aw-detection: true
