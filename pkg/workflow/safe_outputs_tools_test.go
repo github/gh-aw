@@ -441,6 +441,26 @@ func TestPushToPullRequestBranchMessageGuidance(t *testing.T) {
 	t.Fatal("push_to_pull_request_branch tool not found")
 }
 
+// TestTerminalSignalToolsAcceptMetadataFields guards against agents copying
+// secrecy/integrity from noop onto report_incomplete and being rejected with
+// "unknown field" (additionalProperties: false).
+func TestTerminalSignalToolsAcceptMetadataFields(t *testing.T) {
+	var tools []map[string]any
+	require.NoError(t, json.Unmarshal([]byte(safeOutputsToolsJSONContent), &tools))
+	found := map[string]bool{}
+	for _, tool := range tools {
+		name, _ := tool["name"].(string)
+		if name != "noop" && name != "report_incomplete" {
+			continue
+		}
+		found[name] = true
+		properties := tool["inputSchema"].(map[string]any)["properties"].(map[string]any)
+		assert.Contains(t, properties, "secrecy", "%s should accept secrecy metadata", name)
+		assert.Contains(t, properties, "integrity", "%s should accept integrity metadata", name)
+	}
+	assert.Len(t, found, 2, "noop and report_incomplete tools must both be present")
+}
+
 func TestLedgerAppendToolGuidance(t *testing.T) {
 	var tools []map[string]any
 	require.NoError(t, json.Unmarshal([]byte(safeOutputsToolsJSONContent), &tools))

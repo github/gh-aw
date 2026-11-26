@@ -5589,7 +5589,7 @@ or review bodies to returned or persisted decision evidence.
 - `required-title-prefix`: Title prefix the target MUST have for the operation to proceed
 - `target-repo`: Cross-repository target
 - `allowed-repos`: Cross-repository allowlist
-- `issue-intent`: Controls whether intent metadata is forwarded (default: enabled)
+- `issue-intent`: Experimental, disabled by default. Set `true` to forward intent metadata.
 - `unassign-first` (boolean, default: false): If true, unassigns all current assignees before assigning new ones. Useful for reassigning issues from one user to another.
 - `target`: `"triggering"` (default), `"*"`, or a fixed issue/pull request number
 
@@ -5764,7 +5764,7 @@ or review bodies to returned or persisted decision evidence.
 **Configuration Parameters**:
 
 - `max`: Operation limit (default: 5)
-- `issue-intent`: Controls whether intent metadata is forwarded (default: enabled)
+- `issue-intent`: Experimental, disabled by default. Set `true` to forward intent metadata.
 - `allowed`: Optional allowlist of issue type names
 - `target`: `"triggering"` (default), `"*"`, or a fixed issue number
 - `required-labels`: Labels that must all be present on the issue
@@ -5853,7 +5853,7 @@ or review bodies to returned or persisted decision evidence.
 **Configuration Parameters**:
 
 - `max`: Operation limit (default: 5)
-- `issue-intent`: Controls whether intent metadata is forwarded (default: enabled)
+- `issue-intent`: Experimental, disabled by default. Set `true` to forward intent metadata.
 - `allowed-fields`: Optional allowlist of custom issue field names
 - `target`: `"triggering"` (default), `"*"`, or a fixed issue number
 - `required-labels`: Labels that must all be present on the issue

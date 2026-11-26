@@ -38,7 +38,7 @@ Run [45138657416](https://github.com/github/gh-aw/actions/runs/45138657416) star
 
 ## What the audit flags
 
-Beyond the success marker, the audit raised six findings. Token usage was high at 8.78 million tokens, and the 86 turns were read as a sign of task complexity or unclear instructions. The audit also recorded an attempt to reach a blocked domain, `clients2.google.com`. It marked the execution profile as resource heavy for its task shape, and it rated agentic control as weak because the run showed signs of broad or weakly controlled behaviour.
+Beyond the success marker, the audit raised six findings. Token usage was high at 8.78 million tokens, and the 86 turns were read as a sign of task complexity or unclear instructions. The audit also recorded an attempt to reach a blocked domain, `clients2.google.com`. It marked the execution profile as resource heavy for its task shape, and it rated agentic control as weak because the run showed signs of broad or weakly controlled behavior.
 
 The most interesting finding is the last one. The audit estimates that about 96% of the run's turns were data gathering that could move into deterministic steps. The workflow already downloads its logs in a setup step, so the open question is what those turns were still gathering. That is an audit estimate, not a measurement, and it is worth checking in the next iteration.
 

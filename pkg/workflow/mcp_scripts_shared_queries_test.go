@@ -165,6 +165,10 @@ func TestSharedGitHubQueryBoundedRangesRetryAndSplit(t *testing.T) {
 			stub := `GH_CALLS=0
 DAY_ONE_CALLS=0
 gh() {
+  if [[ "$1" != "$EXPECTED_QUERY_COMMAND" || "$2" != "list" ]]; then
+    echo "unexpected gh command: $*" >&2
+    return 1
+  fi
   local search=""
   while [[ $# -gt 0 ]]; do
     if [[ "$1" == "--search" ]]; then
@@ -212,6 +216,7 @@ gh() {
 			cmd.Env = []string{
 				"PATH=" + os.Getenv("PATH"),
 				"GH_CALL_LOG=" + callLog,
+				"EXPECTED_QUERY_COMMAND=" + strings.TrimSuffix(strings.TrimPrefix(name, "github-"), "-query"),
 				"INPUT_STATE=all",
 				"INPUT_SINCE=2026-10-01T00:00:00Z",
 				"INPUT_UNTIL=2026-10-04T23:59:59Z",
