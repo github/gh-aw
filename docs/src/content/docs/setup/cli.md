@@ -40,6 +40,22 @@ The `--timeout` flag uses different formats depending on the command:
 | `logs`, `forecast` | Integer minutes or whole-minute duration | `0` | `--timeout 5` or `--timeout 5m` | No timeout |
 | `trial` | Integer minutes or whole-minute duration | `30` | `--timeout 10` or `--timeout 10m` | No timeout |
 
+### Dry-run flag meanings
+
+`--dry-run` is command-specific, not a universal no-write guarantee:
+
+| Command | Behavior |
+|---------|----------|
+| `compile` | Emits specially configured lock files for development testing; does not dispatch them. |
+| `edit` | Validates and prints changed workflow content without writing or compiling. |
+| `run` | Previews dispatch without triggering a run; preparation can still compile, enable, or push workflows. |
+| `logs` | Filters for dry-run workflow runs; does not preview log collection. |
+
+Other commands describe their own preview behavior in their help.
+
+> [!WARNING]
+> With `run --dry-run --enable-if-needed`, a disabled workflow is enabled on GitHub even though no run is dispatched. Restoration is attempted after preparation succeeds; an error during preparation can leave it enabled.
+
 ## Utility and advanced commands
 
 | Command | Description | When to use |
@@ -299,9 +315,10 @@ Create or update a repository secret (from stdin, flag, or environment variable)
 ```bash wrap
 gh aw secrets set MY_SECRET                                    # From stdin (current repo)
 gh aw secrets set MY_SECRET --repo myorg/myrepo                # Specify target repo
-gh aw secrets set MY_SECRET --value "secret123"                # From flag
 gh aw secrets set MY_SECRET --value-from-env MY_TOKEN          # From env var
 ```
+
+Avoid passing secret values with `--value`: command-line arguments can appear in shell history and process listings. Omit the flag to prompt securely or read from stdin.
 
 **Options:** `--repo/-r`, `--value`, `--value-from-env`, `--api-url`
 
@@ -610,6 +627,7 @@ gh aw run workflow --json                   # Output triggered workflow results 
 When `--json` is set, a JSON array of triggered workflow results is written to stdout.
 
 When `--push` is used, automatically recompiles outdated `.lock.yml` files, stages all transitive imports, and triggers workflow run after successful push. Without `--push`, warnings are displayed for missing or outdated lock files.
+`--approve` applies to safe-update checks during compilation with `--push`; it has no effect without `--push`. `--dry-run` skips dispatch, but preparation may still compile, enable, or push workflows.
 
 > [!NOTE]
 > Codespaces Permissions
@@ -1547,6 +1565,20 @@ gh aw connector linear setup --input 'reader-secret="LINEAR_DEV_READ_KEY"'
 **Test options:** `--phase` (`agent`, `context`, `safe-output`, or `trigger`), `--capability`, `--args` (JSON object; default `{}`), `--remote-tool` (exact hosted MCP method), `--native-event` (trigger discriminator), `--node-runtime` (trusted matching shared Node runtime; required for annotated safe-output content), `--timeout` (duration greater than zero and at most `20s`; default `20s`).
 
 See [Local setup and conformance](/gh-aw/reference/connectors/#local-setup-and-conformance) for complete test examples and provisioning limits. The separate plural `gh aw connectors` command validates and inspects raw connector definitions and runs compiler-frozen plans in trusted hosts; use `gh aw connectors --help` and subcommand help for those low-level options.
+
+#### `connectors`
+
+Inspect experimental raw connector documents or run compiler-frozen plans in trusted hosts:
+
+| Command | Behavior |
+|---------|----------|
+| `connectors validate <file>...` | Validate local connector definitions; `--json/-j` emits results as JSON. |
+| `connectors schema <kind>` | Print the structural schema for `ConnectorSpec`, `ConnectorConnection`, or `ConnectorBinding`. |
+| `connectors plan <binding>` | Validate a binding and print its frozen plan digest; `--root` sets the repository root for definition and connection paths. |
+| `connectors serve` | Serve a compiler-frozen read-only connector over stdio MCP. |
+| `connectors invoke <context\|safe-output> <operation>` | Execute a compiler-frozen operation with JSON arguments on stdin. |
+
+`invoke --allow-writes` authorizes a safe-output effect in the trusted host. `invoke --stage` validates and returns a safe-output intent without resolving credentials or making requests; it requires the `safe-output` phase and cannot be combined with `--allow-writes`. Serving and invocation require a compiler-frozen plan and appropriate host configuration.
 
 #### `mcp`
 
