@@ -38,6 +38,8 @@ safe-outputs:
     max: 5
     group: true
     labels: [cookie]
+    planning-status: Backlog
+    allowed-statuses: [Backlog]
   create-discussion:
     expires: 1d
     category: "audits"

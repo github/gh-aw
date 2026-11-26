@@ -219,6 +219,19 @@ func TestMarshalSafeOutputsConfigPreservesTemplatableExpressionOperators(t *test
 	assert.NotContains(t, string(configJSON), `\u0026`)
 }
 
+func TestSetIssueStatusTargetExpressionIsSerializedAsOneJSONValue(t *testing.T) {
+	config := issueHandlerRegistry["set_issue_status"](&SafeOutputsConfig{
+		SetIssueStatus: &SetIssueStatusConfig{
+			Target:     "${{ inputs.issue_target }}",
+			AllowClose: true,
+		},
+	})
+	configJSON, err := marshalSafeOutputsConfig(map[string]any{"set_issue_status": config})
+	require.NoError(t, err)
+	assert.Contains(t, string(configJSON), `"target":${{ toJSON(inputs.issue_target) }}`)
+	assert.Contains(t, string(configJSON), `"allow_close":true`)
+}
+
 func TestHandlerConfigCreateCheckRunTarget(t *testing.T) {
 	compiler := NewCompiler()
 

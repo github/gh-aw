@@ -36,10 +36,10 @@ const LIVE_ROLES = new Set(["serve", "test", "probe", "ordinary"]);
  * @typedef {{ since_seq: number, pending: number }} Suspension
  * @typedef {{ history: HistoryEntry[], credits: number | null, model_credits: number | null, bills: number, streak: number, tests: number, suspended: Suspension | null, seen: string, summary: { runs: number, rate: number, hopeful: number } | null }} PairRecord
  * @typedef {{ incumbent: string | null, last_role: string | null, last_success_seq: number, pairs: Record<string, PairRecord> }} ScopeRecord
- * @typedef {{ v: number, workflow: string, seq: number, generation: { hash: string, since_run: number } | null, reset_after_run: number, last_run: number, reconciled_through?: number, unresolved_runs?: number[], unresolved_run_ids?: Record<string, string>, unresolved_lookup_cursor?: number, unexplained: number, scopes: Record<string, ScopeRecord>, updated: { run: string | null, at: string } | null }} HistoryState
+ * @typedef {{ v: number, workflow: string, seq: number, generation: { hash: string, since_run: number } | null, reset_after_run: number, last_run: number, first_write_run?: number, reconciled_through?: number, unresolved_runs?: number[], unresolved_run_ids?: Record<string, string>, unresolved_lookup_cursor?: number, unexplained: number, scopes: Record<string, ScopeRecord>, updated: { run: string | null, at: string } | null }} HistoryState
  * @typedef {{ run: string, number: number, attempt: number | null, at: string, generation: string | null, scope: string | null, mode: string | null, role: string | null, pair: string | null, outcome: string | null, credits: number | null, counted: boolean, note: string | null }} RunLine
  * @typedef {{ credits?: number | null, model_credits?: number | null, tokens?: (number | null)[] | null }} RunCost
- * @typedef {{ id: string, number: number, conclusion: string, agent_ran?: boolean | null, generation?: string | null }} ListedRun
+ * @typedef {{ id: string, number: number, conclusion: string, agent_ran?: boolean | null, generation?: string | null, older_definition?: boolean }} ListedRun
  * @typedef {{ verified: boolean, ceiling?: number, unresolved?: number[], unresolved_ids?: Record<string, string>, unresolved_lookup_cursor?: number, resolved?: number[] }} ReconciliationCoverage
  * @typedef {{ workflow: string, run: { id: string, number: number, attempt: number }, at: string, generation: string, mode: string, scope: string, observation: { outcome: string, reason?: string } | null, pair: string | null, cost?: RunCost | null, receipt?: Record<string, any> | null, prepare?: { explore_allowed?: boolean } | null, listing?: ListedRun[], reconciliation?: ReconciliationCoverage | null }} RunEvidence
  */
@@ -488,7 +488,6 @@ function applyRun(input, runs, run, options = {}) {
     preserveReconciliation();
     return finish();
   }
-  const firstHistoryWrite = state.generation === null;
   if (state.generation === null) {
     state.generation = { hash: run.generation, since_run: number };
   } else if (run.generation !== state.generation.hash) {
@@ -509,74 +508,70 @@ function applyRun(input, runs, run, options = {}) {
   /** @type {number[]} */
   let finalUnresolved = [];
   if (hasReconciliation) {
-    if (firstHistoryWrite) {
-      finalCeiling = Math.max(prevReconciled, number);
-      finalUnresolved = [];
-    } else {
-      const rec = run.reconciliation;
-      const requestedCeiling = verifiedScan ? Math.max(prevReconciled, typeof rec?.ceiling === "number" && Number.isInteger(rec.ceiling) ? Math.min(number, rec.ceiling) : number) : prevReconciled;
-      const writtenNumbers = new Set(runs.map(entry => entry.number));
-      writtenNumbers.add(number);
-      const resolved = new Set(Array.isArray(rec?.resolved) ? rec.resolved.filter(n => Number.isInteger(n) && n < number) : []);
-      for (const other of run.listing || []) {
-        if (other.number > state.reset_after_run && other.number < number && (prevUnresolved.has(other.number) || (verifiedScan && other.number <= requestedCeiling))) {
-          resolved.add(other.number);
-        }
+    const rec = run.reconciliation;
+    const requestedCeiling = verifiedScan ? Math.max(prevReconciled, typeof rec?.ceiling === "number" && Number.isInteger(rec.ceiling) ? Math.min(number, rec.ceiling) : number) : prevReconciled;
+    const writtenNumbers = new Set(runs.map(entry => entry.number));
+    writtenNumbers.add(number);
+    const resolved = new Set(Array.isArray(rec?.resolved) ? rec.resolved.filter(n => Number.isInteger(n) && n < number) : []);
+    for (const other of run.listing || []) {
+      if (other.number > state.reset_after_run && other.number < number && (prevUnresolved.has(other.number) || (verifiedScan && other.number <= requestedCeiling))) {
+        resolved.add(other.number);
       }
-      const nextUnresolved = new Set([...prevUnresolved].filter(n => !resolved.has(n) && !writtenNumbers.has(n)));
-      let ceiling = requestedCeiling;
-      if (verifiedScan) {
-        for (const n of Array.isArray(rec?.unresolved) ? rec.unresolved : []) {
-          if (Number.isInteger(n) && n > state.reset_after_run && n < number && n <= ceiling && !writtenNumbers.has(n) && !resolved.has(n)) {
-            nextUnresolved.add(n);
-          }
-        }
-      }
-      let kept = [...nextUnresolved].filter(n => n <= ceiling).sort((a, b) => a - b);
-      // Bound unresolved_runs without falsely marking dropped runs as reconciled.
-      if (kept.length > bounds.unresolved_runs) {
-        const cutoff = kept[bounds.unresolved_runs];
-        ceiling = Math.max(state.reset_after_run, Math.min(ceiling, cutoff - 1));
-        kept = kept.slice(0, bounds.unresolved_runs).filter(n => n <= ceiling);
-      }
-      finalCeiling = ceiling;
-      finalUnresolved = kept;
     }
+    const nextUnresolved = new Set([...prevUnresolved].filter(n => !resolved.has(n) && !writtenNumbers.has(n)));
+    let ceiling = requestedCeiling;
+    if (verifiedScan) {
+      for (const n of Array.isArray(rec?.unresolved) ? rec.unresolved : []) {
+        if (Number.isInteger(n) && n > state.reset_after_run && n < number && n <= ceiling && !writtenNumbers.has(n) && !resolved.has(n)) {
+          nextUnresolved.add(n);
+        }
+      }
+    }
+    let kept = [...nextUnresolved].filter(n => n <= ceiling).sort((a, b) => a - b);
+    // Bound unresolved_runs without falsely marking dropped runs as reconciled.
+    if (kept.length > bounds.unresolved_runs) {
+      const cutoff = kept[bounds.unresolved_runs];
+      ceiling = Math.max(state.reset_after_run, Math.min(ceiling, cutoff - 1));
+      kept = kept.slice(0, bounds.unresolved_runs).filter(n => n <= ceiling);
+    }
+    finalCeiling = ceiling;
+    finalUnresolved = kept;
   }
 
   // Completed runs that wrote no line are charged after the fences, in the right generation.
   const written = new Set(runs.map(entry => entry.run));
   const sinceRun = state.generation.since_run;
-  if (!hasReconciliation || !firstHistoryWrite) {
-    for (const other of [...(run.listing || [])].sort((left, right) => left.number - right.number)) {
-      if (written.has(other.id) || other.id === id || other.number <= state.reset_after_run) continue;
-      if (hasReconciliation) {
-        // Never let an older writer consume a newer run (which may belong to a later generation),
-        // and never charge a newly covered run above the final clamped ceiling.
-        if (other.number >= number) continue;
-        const tracked = prevUnresolved.has(other.number);
-        if (!tracked && (!verifiedScan || other.number <= prevReconciled || other.number > finalCeiling)) continue;
-      } else if (other.number <= sinceRun) {
-        continue;
-      }
-      if (["success", "skipped", "neutral"].includes(other.conclusion)) continue;
-      if (hasReconciliation && other.generation && other.generation !== state.generation.hash && other.number <= state.generation.since_run) {
-        lines.push(line("older_definition", { run: other.id, number: other.number, attempt: 1, generation: other.generation }));
-        written.add(other.id);
-        continue;
-      }
-      if (other.agent_ran) {
-        lines.push(line("unsaved", { run: other.id, number: other.number, attempt: 1 }));
-        state.unexplained += 1;
-      } else {
-        lines.push(line("no_agent", { run: other.id, number: other.number, attempt: 1 }));
-      }
-      written.add(other.id);
+  for (const other of [...(run.listing || [])].sort((left, right) => left.number - right.number)) {
+    if (written.has(other.id) || other.id === id || other.number <= state.reset_after_run) continue;
+    if (hasReconciliation) {
+      // Never let an older writer consume a newer run (which may belong to a later generation),
+      // and never charge a newly covered run above the final clamped ceiling.
+      if (other.number >= number) continue;
+      const tracked = prevUnresolved.has(other.number);
+      if (!tracked && (!verifiedScan || other.number <= prevReconciled || other.number > finalCeiling)) continue;
+    } else if (other.number <= sinceRun) {
+      continue;
     }
+    if (["success", "skipped", "neutral"].includes(other.conclusion)) continue;
+    if (hasReconciliation && other.generation && (other.older_definition || (other.number <= sinceRun && other.generation !== state.generation.hash))) {
+      lines.push(line("older_definition", { run: other.id, number: other.number, attempt: 1, generation: other.generation }));
+      written.add(other.id);
+      continue;
+    }
+    if (other.agent_ran) {
+      lines.push(line("unsaved", { run: other.id, number: other.number, attempt: 1 }));
+      state.unexplained += 1;
+    } else {
+      lines.push(line("no_agent", { run: other.id, number: other.number, attempt: 1 }));
+    }
+    written.add(other.id);
   }
 
   if (hasReconciliation) {
     state.reconciled_through = finalCeiling;
+    if (input.generation === null && finalCeiling < number) state.first_write_run = number;
+    // A late writer can reach the first write while newer saved rows are still outside coverage.
+    if (state.first_write_run !== undefined && finalCeiling >= Math.max(number, state.last_run)) delete state.first_write_run;
     state.unresolved_runs = finalUnresolved;
     applyUnresolvedIds(finalUnresolved);
   }

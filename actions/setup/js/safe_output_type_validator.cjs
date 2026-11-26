@@ -230,6 +230,7 @@ function validateIssueIntentLabels(value, lineNum, itemType, fieldName, options)
 
 /**
  * @typedef {Object} FieldValidation
+ * @property {boolean} [stringOrInteger] - Native planning status name or positive integer ID
  * @property {boolean} [required] - Whether the field is required
  * @property {boolean} [allowEmpty] - Whether a required string may be explicitly empty
  * @property {string} [type] - Expected type: 'string', 'number', 'boolean', 'array'
@@ -483,6 +484,14 @@ function validateIssueNumberOrTemporaryId(value, fieldName, lineNum) {
  * @returns {{isValid: boolean, normalizedValue?: any, error?: string}}
  */
 function validateField(value, fieldName, validation, itemType, lineNum, options) {
+  if (validation.stringOrInteger) {
+    if (value === undefined && !validation.required) return { isValid: true };
+    if ((typeof value === "string" && value.trim().length > 0) || (Number.isSafeInteger(value) && value > 0)) {
+      return { isValid: true, normalizedValue: typeof value === "string" ? value.trim() : value };
+    }
+    return { isValid: false, error: `Line ${lineNum}: ${itemType} '${fieldName}' must be a non-empty string or positive integer ID` };
+  }
+
   if (isBlankOptionalField(value, validation, false, fieldName)) {
     return { isValid: true };
   }

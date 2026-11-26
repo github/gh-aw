@@ -67,6 +67,14 @@ const {
 const { appendClaimEffects, withClaimEffectClients } = require("./work_queue_effect_client.cjs");
 const { normalizeSafeOutputName } = require("./safe_output_names.cjs");
 const { createClaimAdapterHandler, preparedAdapterPath } = require("./work_queue_claim_adapters.cjs");
+
+/**
+ * @typedef {Function & {
+ *   getReviewTarget?: (message: any) => any,
+ *   validatePreview?: (...args: any[]) => Promise<any>
+ * }} SafeOutputHandler
+ */
+
 // Output types that never write resources; allowed for a Work whose effect_contract sets no_writes.
 const NO_WRITE_TYPES = new Set(["noop", "report_missing_tool", "report_missing_data", "missing_tool", "missing_data", "report_incomplete"]);
 const GITHUB_TOKEN_CONFIG_KEY = "github-token";
@@ -105,6 +113,7 @@ const HANDLER_MAP = {
   approve_workflow_run: "./approve_workflow_run.cjs",
   hide_comment: "./hide_comment.cjs",
   set_issue_type: "./set_issue_type.cjs",
+  set_issue_status: "./set_issue_status.cjs",
   set_issue_field: "./set_issue_field.cjs",
   add_reviewer: "./add_reviewer.cjs",
   assign_milestone: "./assign_milestone.cjs",
@@ -160,6 +169,7 @@ const TARGET_SELECTOR_KINDS = {
   add_comment: "issue_or_pull_request",
   update_issue: "issue",
   close_issue: "issue",
+  set_issue_status: "issue",
   update_pull_request: "pull_request",
   merge_pull_request: "pull_request",
   close_pull_request: "pull_request",
@@ -197,6 +207,7 @@ const TEMPORARY_TARGET_FIELDS_BY_TYPE = {
   replace_label: ["item_number", "issue_number", "pr_number", "pull_number"],
   set_issue_field: ["issue_number"],
   set_issue_type: ["issue_number"],
+  set_issue_status: ["issue_number"],
   submit_pull_request_review: ["pull_request_number"],
   update_issue: ["issue_number"],
   update_pull_request: ["pull_request_number"],
@@ -290,6 +301,7 @@ const THREAT_WARNING_ABORT_TYPES = new Set([
   "unassign_from_user",
   "hide_comment",
   "set_issue_type",
+  "set_issue_status",
   "set_issue_field",
   "create_project",
   "update_project",
@@ -424,6 +436,7 @@ const connectorBudgetsByHandlerMap = new WeakMap();
 const localDiagnosticHandlers = new WeakSet();
 const handlerConfigurations = new WeakMap();
 const authorizationBatchContexts = new WeakMap();
+const READ_ONLY_PREVIEW_VALIDATION_TYPES = new Set(["create_issue", "set_issue_status"]);
 
 function trustedDescriptor(config, type, /** @type {any} */ message = null) {
   const descriptor = config[type] || {};
@@ -658,7 +671,7 @@ async function loadHandlers(config, prReviewBufferRegistry, resolvedAllowedMenti
   for (const type of new Set([...Object.keys(HANDLER_MAP).filter(type => config[type]), ...scripts.keys(), ...actions.keys(), ...Object.keys(config.claim_adapters || {})])) {
     if (type === "upload_asset" && !currentClaimHandle()) continue;
     let executable;
-    /** @type {((...args: any[]) => Promise<any>) & {getReviewTarget?: (message: any) => any}} */
+    /** @type {SafeOutputHandler} */
     const handler = async (...args) => {
       const requirement = effectiveAuthorization(config, type, args[0]);
       if (requirement) {
@@ -680,6 +693,18 @@ async function loadHandlers(config, prReviewBufferRegistry, resolvedAllowedMenti
       }
       return executable(...args);
     };
+    if (READ_ONLY_PREVIEW_VALIDATION_TYPES.has(type)) {
+      handler.validatePreview = async (...args) => {
+        if (!executable) {
+          const initialized = await initializeHandlers(config, prReviewBufferRegistry, resolvedAllowedMentionAliases, activationCommentLinks, type);
+          executable = initialized.get(type);
+          if (!executable) throw new Error(`Handler initialization failed for "${type}"`);
+          Object.assign(handler, executable);
+        }
+        if (typeof executable.validatePreview === "function") return executable.validatePreview(...args);
+        return { success: true, staged: true, preview: true };
+      };
+    }
     if (type === "submit_pull_request_review") {
       handler.getReviewTarget = message => {
         const target = resolveTarget({ targetConfig: config[type].target || "triggering", item: message, context, itemType: "PR review", supportsPR: false, supportsIssue: false });
@@ -1367,7 +1392,9 @@ async function processMessages(messageHandlers, messages, onItemCreated = null, 
     const requirement = effectiveAuthorization(trustedConfig, type, message);
     if (stagedFor(type, message)) {
       if (authorizationConfigured || previewOnly(type, message)) authorizations.set(index, { state: "skipped_staged", reason_code: "skipped_staged" });
-      return previewOnly(type, message) ? { success: true, staged: true, preview: true } : handler(message, resolvedTemporaryIds, temporaryIdMap);
+      if (!previewOnly(type, message)) return handler(message, resolvedTemporaryIds, temporaryIdMap);
+      if (typeof handler.validatePreview === "function") return handler.validatePreview(message, resolvedTemporaryIds, temporaryIdMap);
+      return { success: true, staged: true, preview: true };
     }
     if (!requirement) {
       if (authorizationConfigured) authorizations.set(index, { state: descriptor.builtin === true && trustedConfig.authorization ? "exempt_builtin" : "not_configured" });
@@ -1727,7 +1754,25 @@ async function processMessages(messageHandlers, messages, onItemCreated = null, 
     if (stagedFor(messageType, message) && previewOnly(messageType, message)) {
       authorizations.set(i, { state: "skipped_staged", reason_code: "skipped_staged" });
       core.info(`Staged safe-output invocation preview: ${messageType}`);
-      results.push({ type: messageType, messageIndex: i, success: true, staged: true, result: { staged: true, preview: true } });
+      /** @type {SafeOutputHandler|undefined} */
+      const handler = messageHandlers.get(messageType);
+      /** @type {{success: boolean, staged?: boolean, preview?: boolean, error?: string}} */
+      let previewResult = { success: true, staged: true, preview: true };
+      try {
+        if (typeof handler?.validatePreview === "function") {
+          previewResult = await handler.validatePreview(message, Object.fromEntries(temporaryIdMap), temporaryIdMap);
+        }
+      } catch (error) {
+        previewResult = { success: false, error: getErrorMessage(error) };
+      }
+      results.push({
+        type: messageType,
+        messageIndex: i,
+        success: previewResult?.success !== false,
+        staged: true,
+        ...(previewResult?.success === false ? { error: previewResult.error || "Read-only preview validation failed" } : {}),
+        result: previewResult,
+      });
       return;
     }
 

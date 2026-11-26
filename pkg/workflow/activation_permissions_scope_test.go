@@ -279,9 +279,10 @@ engine: copilot
 	assert.Contains(t, activationJobSection, "discussions: write", "activation job should include discussions: write for discussion status comments")
 	assert.NotContains(t, activationJobSection, "issues: write", "activation job should not include issues: write when status-comment.issues is false and reactions are disabled")
 	assert.NotContains(t, activationJobSection, "pull-requests: write", "activation job should not include pull-requests: write when status-comment.issues is false and reactions are disabled")
-	assert.Contains(t, activationJobSection, "github.event_name == 'discussion'", "status comment condition should include discussion events when status-comment.issues is false")
-	assert.NotContains(t, activationJobSection, "github.event_name == 'issues'", "status comment condition should not include issue events when status-comment.issues is false")
-	assert.NotContains(t, activationJobSection, "github.event_name == 'issue_comment'", "status comment condition should not include issue_comment events when status-comment.issues is false")
+	statusCommentStep := extractWorkflowStepByName(t, activationJobSection, "Add comment with workflow run link")
+	assert.Contains(t, statusCommentStep, "github.event_name == 'discussion'", "status comment condition should include discussion events when status-comment.issues is false")
+	assert.NotContains(t, statusCommentStep, "github.event_name == 'issues'", "status comment condition should not include issue events when status-comment.issues is false")
+	assert.NotContains(t, statusCommentStep, "github.event_name == 'issue_comment'", "status comment condition should not include issue_comment events when status-comment.issues is false")
 }
 
 func TestAddActivationInteractionPermissionsMapFallbackRespectsStatusCommentIssuesToggle(t *testing.T) {
