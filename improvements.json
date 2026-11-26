@@ -1,6 +1,30 @@
 {
-  "last_updated": "2026-11-25",
+  "last_updated": "2026-11-26",
   "pending_tasks": [
+    {
+      "file": "docs/src/content/docs/reference/serena.md",
+      "created": "2026-11-26",
+      "status": "pending",
+      "issue": "Tool table (lines 106-108) lists get_symbol_definition, list_symbols_in_file, delete_symbol, find_files, get_project_structure and analyze_imports, none of which appear in .github/aw/serena-tool.md; activate_project (REQUIRED there) is missing. Go wrapper note omits that serena-go.md imports ./serena.md and needs go.mod and Docker. Best Practices is one dense paragraph. Proposed as Task 1 in the 2026-11-26 discussion. Docs-only change"
+    },
+    {
+      "file": "pkg/workflow/runner_topology_validation.go",
+      "created": "2026-11-26",
+      "status": "pending",
+      "issue": "Line 38 says 'set firewall.version' (legacy per permissions_compiler_validator.go:30); use network.firewall.version as the sibling validators do. Line 64 'remove sudo and privileged commands' overstates the detector, which matches only sudo and apt(-get) install. Line 65 should name runner.sysrootImage (documented in enterprise-configuration.md:66). No test asserts this wording. Proposed as Task 2 in the 2026-11-26 discussion. Maintainer to confirm the sysroot remedy"
+    },
+    {
+      "file": ".github/workflows/smoke-create-cross-repo-pr.md",
+      "created": "2026-11-26",
+      "status": "pending",
+      "issue": "Line 113 'PR update' should be 'PR creation'; line 80 'on a new branch' has no branch instruction; line 63 run-failure {status} repeats the smoke-update pattern. Owner mismatch (lines 30, 44 vs 76, 109) is the same as the smoke-update entry. Recompile to regenerate the lock file (derived)"
+    },
+    {
+      "file": ".github/workflows/archie.md",
+      "created": "2026-11-26",
+      "status": "pending",
+      "issue": "Lifecycle emoji are mixed: 📐 on run-started (line 43) and run-failure (line 45), 🎨 and ✅ on run-success (line 44). Low priority. Recompile to regenerate the lock file (derived)"
+    },
     {
       "file": "docs/src/content/docs/reference/agent-runtimes.md",
       "created": "2026-11-25",
