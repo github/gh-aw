@@ -75,6 +75,19 @@ func TestSmokeAndCoverageFailureContracts(t *testing.T) {
 			},
 		},
 		{
+			name: "daily-tlc-test-expert",
+			required: []string{
+				"  - shared/tla-plus.md",
+				"JAVA_BIN=/tmp/gh-aw/agent/tla-tools/jre/bin/java",
+				"TLA2TOOLS_JAR=/tmp/gh-aw/agent/tla-tools/tla2tools.jar",
+				"Check that Java is executable and the jar exists",
+				"$RUNNER_TEMP/gh-aw/safeoutputs/upload-artifacts/tlc-test-expert-evidence/",
+				"staging-relative path",
+				"`tlc-test-expert-evidence`",
+				"Leave the staged files for the safe-outputs job",
+			},
+		},
+		{
 			name: "shared/tla-plus",
 			required: []string{
 				`bash "$trusted/.github/scripts/install_tla_runtime.sh" /tmp/gh-aw/agent/tla-tools`,

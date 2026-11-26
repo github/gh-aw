@@ -10,6 +10,7 @@ permissions:
   pull-requests: read
   security-events: read
 imports:
+- shared/reporting.md
 - shared/pr-safe-output-defaults.md
 - uses: shared/daily-audit-base.md
   with:
