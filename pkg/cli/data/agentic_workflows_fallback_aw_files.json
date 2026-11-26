@@ -67,6 +67,7 @@
   "otel.md",
   "patterns.md",
   "playwright.md",
+  "pr-finisher.md",
   "pr-reviewer.md",
   "release-workflow.md",
   "repo-factory.md",
