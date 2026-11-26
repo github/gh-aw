@@ -37,6 +37,7 @@ tools:
     mode: gh-proxy
     toolsets: [default, issues, pull_requests, actions, discussions]
 imports:
+  - shared/reporting.md
   - shared/aw-logs-24h-fetch.md
   - uses: shared/daily-audit-base.md
     with:
