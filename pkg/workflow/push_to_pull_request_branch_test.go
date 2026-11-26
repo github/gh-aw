@@ -770,6 +770,7 @@ safe-outputs:
     target: "triggering"
     required-title-prefix: "[bot] "
     required-labels: ["automated"]
+    required-author: app/workflow-bot
 ---
 
 # Test Push to Branch with Title Prefix
@@ -802,6 +803,9 @@ This workflow validates PR title prefix.
 	// Verify that title prefix configuration is in handler config JSON (check for push_to_pull_request_branch config)
 	if !strings.Contains(lockContentStr, `push_to_pull_request_branch`) || !strings.Contains(lockContentStr, `title_prefix`) || !strings.Contains(lockContentStr, `[bot]`) {
 		t.Errorf("Generated workflow should contain title_prefix:[bot] configuration in handler config JSON")
+	}
+	if !strings.Contains(lockContentStr, `"required_author":"app/workflow-bot"`) {
+		t.Errorf("Generated workflow should contain required_author configuration in handler config JSON")
 	}
 }
 

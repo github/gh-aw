@@ -3794,6 +3794,31 @@ index 0000000..aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa4
   // ──────────────────────────────────────────────────────
 
   describe("title prefix and labels validation", () => {
+    it("should reject a PR opened by someone other than required_author", async () => {
+      mockGithub.rest.pulls.get.mockResolvedValue({
+        data: {
+          state: "open",
+          user: { login: "other-user" },
+          head: {
+            ref: "feature-branch",
+            repo: { full_name: "test-owner/test-repo", fork: false },
+          },
+          base: { repo: { full_name: "test-owner/test-repo" } },
+          title: "Test PR",
+          labels: [],
+        },
+      });
+
+      createPatchFile("should-reject-pr-with-wrong-author");
+      const module = await loadModule();
+      const handler = await module.main({ required_author: "workflow-bot" });
+      const result = await handler({ branch: "should-reject-pr-with-wrong-author" }, {});
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("author does not match required author");
+      expect(mockExec.exec.mock.calls.some(([, args]) => args?.[0] === "push")).toBe(false);
+    });
+
     it("should reject PR without required title prefix", async () => {
       mockGithub.rest.pulls.get.mockResolvedValue({
         data: {

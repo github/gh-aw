@@ -345,7 +345,8 @@ const main = createUpdateHandlerFactory({
   itemFilter: async (githubClient, repoParts, prNumber, config) => {
     const requiredLabels = Array.isArray(config.required_labels) ? config.required_labels : [];
     const requiredTitlePrefix = config.required_title_prefix || "";
-    return checkRequiredFilter(githubClient, repoParts, prNumber, requiredLabels, requiredTitlePrefix, "update_pull_request");
+    const requiredAuthor = config.required_author || "";
+    return checkRequiredFilter(githubClient, repoParts, prNumber, requiredLabels, requiredTitlePrefix, "update_pull_request", requiredAuthor);
   },
 });
 

@@ -14,7 +14,7 @@ const { withTransportIntegrity } = require("./transport_integrity.cjs");
 const { withExecutionTrace } = require("./safe_output_trace.cjs");
 const path = require("path");
 const { generateStagedPreview } = require("./staged_preview.cjs");
-const { isStagedMode } = require("./safe_output_helpers.cjs");
+const { isStagedMode, matchesRequiredAuthor } = require("./safe_output_helpers.cjs");
 const { pushSignedCommits } = require("./push_signed_commits.cjs");
 const { updateActivationCommentWithCommit, updateActivationComment } = require("./update_activation_comment.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
@@ -490,6 +490,7 @@ async function main(config = {}) {
   // Extract configuration from config parameter
   const target = config.target !== undefined && config.target !== null && config.target !== "" ? String(config.target) : "triggering";
   const titlePrefix = config.title_prefix || "";
+  const requiredAuthor = typeof config.required_author === "string" ? config.required_author.trim() : "";
   const rawRequiredLabels = config.required_labels ?? config.labels;
   const envLabels = rawRequiredLabels ? (Array.isArray(rawRequiredLabels) ? rawRequiredLabels : rawRequiredLabels.split(",")).map(label => String(label).trim()).filter(label => label) : [];
   const ifNoChanges = config.if_no_changes || "warn";
@@ -539,6 +540,9 @@ async function main(config = {}) {
   }
   if (titlePrefix) {
     core.info(`Title prefix: ${titlePrefix}`);
+  }
+  if (requiredAuthor) {
+    core.info(`Required author: ${requiredAuthor}`);
   }
   if (envLabels.length > 0) {
     core.info(`Required labels: ${envLabels.join(", ")}`);
@@ -953,6 +957,12 @@ async function main(config = {}) {
         pull_number: pullNumber,
       });
       pullRequest = response.data;
+      if (requiredAuthor && !matchesRequiredAuthor(pullRequest.user, requiredAuthor)) {
+        return {
+          success: false,
+          error: `Pull request author does not match required author "${requiredAuthor}"`,
+        };
+      }
       if (pullRequest.state === "closed") {
         trace("clos");
         const reason = `Pull request #${pullNumber} is closed; refusing to push to its branch`;

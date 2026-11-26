@@ -10760,6 +10760,11 @@
                   "type": "string",
                   "description": "Target for updates: 'triggering' (default), '*' (any PR), or explicit PR number"
                 },
+                "required-author": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Only update pull requests opened by this GitHub login, or app/<slug> for a GitHub App bot"
+                },
                 "title": {
                   "type": "boolean",
                   "description": "Allow updating pull request title - defaults to true, set to false to disable"
@@ -11066,6 +11071,11 @@
                 "required-title-prefix": {
                   "type": "string",
                   "description": "Required prefix for pull request title. Only pull requests with this prefix will be accepted."
+                },
+                "required-author": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Only push to pull requests opened by this GitHub login, or app/<slug> for a GitHub App bot"
                 },
                 "title-prefix": {
                   "type": "string",
