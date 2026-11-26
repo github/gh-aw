@@ -51,6 +51,27 @@ func TestHandlerRegistryDomainComposition(t *testing.T) {
 	}
 }
 
+func TestPullRequestRequiredAuthorExpressionsUseJSONTemplating(t *testing.T) {
+	const expression = "${{ inputs.required_author }}"
+	config := &SafeOutputsConfig{
+		PushToPullRequestBranch: &PushToPullRequestBranchConfig{RequiredAuthor: expression},
+		UpdatePullRequests:      &UpdatePullRequestsConfig{RequiredAuthor: expression},
+	}
+
+	for _, key := range []string{"push_to_pull_request_branch", "update_pull_request"} {
+		t.Run(key, func(t *testing.T) {
+			handlerConfig := pullRequestHandlerRegistry[key](config)
+			value, ok := handlerConfig["required_author"].(templatableJSONExpression)
+			if !ok {
+				t.Fatalf("required_author has type %T, want templatableJSONExpression", handlerConfig["required_author"])
+			}
+			if value.expr != "${{ toJSON(inputs.required_author) }}" {
+				t.Errorf("required_author expression = %q, want JSON-safe expression", value.expr)
+			}
+		})
+	}
+}
+
 func TestHandlerRegistryBuilders(t *testing.T) {
 	tests := []struct {
 		name string

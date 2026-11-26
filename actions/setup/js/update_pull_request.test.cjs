@@ -829,6 +829,23 @@ describe("update_pull_request.cjs - update_branch behavior", () => {
     expect(result.data._update_branch_stacks).toBe(false);
   });
 
+  it("should disable stacked PR stack-sync fallback when required_author is configured", () => {
+    const result = updatePRModule.buildPRUpdateData({ update_branch: true }, { required_author: "workflow-bot" });
+
+    expect(result.success).toBe(true);
+    expect(result.data._update_branch_stacks).toBe(false);
+  });
+
+  it.each(["", "   ", 42])("should reject invalid required_author values before fetching the PR: %p", async required_author => {
+    const handler = await updatePRModule.main({ required_author });
+
+    const result = await handler({ pull_request_number: 100, title: "Changed title" });
+
+    expect(result).toMatchObject({ success: false, error: "required_author must be a non-empty string when configured" });
+    expect(mockGithub.rest.issues.get).not.toHaveBeenCalled();
+    expect(mockGithub.rest.pulls.update).not.toHaveBeenCalled();
+  });
+
   it("should skip updates when the PR author does not match required_author", async () => {
     mockGithub.rest.issues.get.mockResolvedValue({
       data: {

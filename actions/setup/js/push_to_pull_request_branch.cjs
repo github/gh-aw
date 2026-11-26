@@ -490,7 +490,11 @@ async function main(config = {}) {
   // Extract configuration from config parameter
   const target = config.target !== undefined && config.target !== null && config.target !== "" ? String(config.target) : "triggering";
   const titlePrefix = config.title_prefix || "";
-  const requiredAuthor = typeof config.required_author === "string" ? config.required_author.trim() : "";
+  const hasRequiredAuthor = Object.prototype.hasOwnProperty.call(config, "required_author");
+  if (hasRequiredAuthor && (typeof config.required_author !== "string" || !config.required_author.trim())) {
+    return async () => ({ success: false, error: "required_author must be a non-empty string when configured" });
+  }
+  const requiredAuthor = hasRequiredAuthor ? config.required_author.trim() : "";
   const rawRequiredLabels = config.required_labels ?? config.labels;
   const envLabels = rawRequiredLabels ? (Array.isArray(rawRequiredLabels) ? rawRequiredLabels : rawRequiredLabels.split(",")).map(label => String(label).trim()).filter(label => label) : [];
   const ifNoChanges = config.if_no_changes || "warn";

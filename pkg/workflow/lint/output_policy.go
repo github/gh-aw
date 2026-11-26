@@ -86,12 +86,19 @@ func checkPushTarget(ctx context.Context, input Input) ([]Diagnostic, error) {
 	}
 	return []Diagnostic{{
 		Path:    "safe-outputs.push-to-pull-request-branch.target",
-		Message: "Wildcard pull-request pushes have no authored title or label constraint; configure required-title-prefix or required-labels",
+		Message: "Wildcard pull-request pushes have no author, title, or label constraint; configure required-author, required-title-prefix, or required-labels",
 	}}, nil
 }
 
 func pushPolicyConstraints(ctx context.Context, config map[string]any) (bool, error) {
 	constrained := false
+	if value, exists := config["required-author"]; exists {
+		text, ok := value.(string)
+		if !ok {
+			return false, fmt.Errorf("push-target requires a literal string at safe-outputs.push-to-pull-request-branch.required-author")
+		}
+		constrained = constrained || strings.TrimSpace(text) != ""
+	}
 	for _, key := range []string{"required-title-prefix", "title-prefix"} {
 		if value, exists := config[key]; exists {
 			text, ok := value.(string)

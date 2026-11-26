@@ -3819,6 +3819,17 @@ index 0000000..aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa4
       expect(mockExec.exec.mock.calls.some(([, args]) => args?.[0] === "push")).toBe(false);
     });
 
+    it.each(["", "   ", 42])("should reject invalid required_author values before fetching the PR: %p", async required_author => {
+      createPatchFile("invalid-required-author");
+      const module = await loadModule();
+      const handler = await module.main({ required_author });
+      const result = await handler({ branch: "invalid-required-author" }, {});
+
+      expect(result).toMatchObject({ success: false, error: "required_author must be a non-empty string when configured" });
+      expect(mockGithub.rest.pulls.get).not.toHaveBeenCalled();
+      expect(mockExec.exec.mock.calls.some(([, args]) => args?.[0] === "push")).toBe(false);
+    });
+
     it("should reject PR without required title prefix", async () => {
       mockGithub.rest.pulls.get.mockResolvedValue({
         data: {

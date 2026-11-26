@@ -1424,6 +1424,7 @@ func TestComputePermissionsForSafeOutputs_StagedReads(t *testing.T) {
 		{name: "no filters", config: map[string]any{}},
 		{name: "required labels", config: map[string]any{"required-labels": []any{"needs-triage"}}},
 		{name: "required title prefix", config: map[string]any{"required-title-prefix": "[triage]"}},
+		{name: "required author", config: map[string]any{"required-author": "workflow-bot"}},
 	}
 	for _, handler := range handlers {
 		for _, filter := range filters {
@@ -1450,6 +1451,10 @@ func TestComputePermissionsForSafeOutputs_StagedReads(t *testing.T) {
 					}
 					if title := field.Elem().FieldByName("RequiredTitlePrefix"); title.IsValid() && filter.config["required-title-prefix"] != nil {
 						title.SetString("[triage]")
+						filterConfigured = true
+					}
+					if author := field.Elem().FieldByName("RequiredAuthor"); author.IsValid() && filter.config["required-author"] != nil {
+						author.SetString("workflow-bot")
 						filterConfigured = true
 					}
 					expected := map[PermissionScope]PermissionLevel{}
