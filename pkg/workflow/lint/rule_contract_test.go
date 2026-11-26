@@ -89,6 +89,12 @@ func builtInRuleContracts() map[string]ruleContract {
 			safe:   contractJob + "    steps:\n      - run: 'matched=$(case \"$ref\" in ($pattern) echo yes ;; esac)'\n",
 			path:   "jobs.check.steps[0].run",
 		},
+		"unquoted-command-assignment": {
+			targets: ActionsAST | AWAST, severity: Warning,
+			unsafe: contractJob + "    steps:\n      - run: QUERY_COMMAND=pr\n",
+			safe:   contractJob + "    steps:\n      - run: 'QUERY_COMMAND=\"pr\"'\n",
+			path:   "jobs.check.steps[0].run",
+		},
 		"step-reference": {
 			targets: ActionsAST | AWAST, severity: Warning,
 			unsafe: contractJob + "    outputs: {value: '${{ steps.PRIVATE_VALUE.outputs.value }}'}\n" + contractSafeSteps,

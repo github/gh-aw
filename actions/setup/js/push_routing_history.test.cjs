@@ -9,7 +9,7 @@ const req = require;
 const fixtures = req("./fixtures/routing_analytics_runs.cjs");
 const { readJsonlFile } = req("./jsonl_helpers.cjs");
 const { applyRun, emptyState, trimRuns } = req("./routing_history.cjs");
-const { ineligibility, main, readConfig, runCost, sessionEvidence } = req("./push_routing_history.cjs");
+const { fetchStreamWindow, ineligibility, listRuns, main, readConfig, runCost, sessionEvidence } = req("./push_routing_history.cjs");
 
 const BRANCH = "memory/adaptive-routing/triage";
 const GENERATION = `${"a".repeat(64)}:${"b".repeat(64)}`;
@@ -67,8 +67,46 @@ function signedPush(remote, { lose = 0, fail = false } = {}) {
 
 const lsRemote = async (command, args, options) => ({ stdout: execFileSync(command, args, { cwd: options.cwd, encoding: "utf8" }), stderr: "", exitCode: 0 });
 
+function matchesCreatedFilter(createdAt, created) {
+  if (!created) return true;
+  const ts = Date.parse(createdAt);
+  if (!Number.isFinite(ts)) return false;
+  if (created.startsWith("<=")) return ts <= Date.parse(created.slice(2));
+  if (created.startsWith("<")) return ts < Date.parse(created.slice(1));
+  if (created.startsWith(">=")) return ts >= Date.parse(created.slice(2));
+  if (created.startsWith(">")) return ts > Date.parse(created.slice(1));
+  const rangeIdx = created.indexOf("..");
+  if (rangeIdx >= 0) {
+    const lo = Date.parse(created.slice(0, rangeIdx));
+    const hi = Date.parse(created.slice(rangeIdx + 2));
+    return ts >= lo && ts <= hi;
+  }
+  return ts === Date.parse(created);
+}
+
+const runCreatedAt = number => new Date(Date.parse("2026-11-01T00:00:00Z") + number * 60_000).toISOString().replace(/\.\d{3}Z$/, "Z");
+
+function paginationRun(number, overrides = {}) {
+  return { id: 9000 + number, run_number: number, created_at: runCreatedAt(number), status: "completed", conclusion: "success", head_branch: "main", event: "schedule", run_attempt: 1, ...overrides };
+}
+
+function reconcilePagination(githubClient, floor, runNumber) {
+  return listRuns({
+    githubClient,
+    owner: "octo",
+    repo: "repo",
+    workflowFile: "triage.lock.yml",
+    defaultBranch: "main",
+    runId: String(9000 + runNumber),
+    runNumber,
+    state: { ...emptyState("triage"), generation: { hash: GENERATION, since_run: 1 }, last_run: floor, reconciled_through: floor, unresolved_runs: [] },
+    runs: [],
+    generation: GENERATION,
+  });
+}
+
 function fakeGitHub(remote, { runs = [], jobs = {}, attempts = {}, contents = {}, runsById = {}, listWorkflowRuns } = {}) {
-  const calls = { jobs: [], attempts: [], lists: [], contents: [], runs: [] };
+  const calls = { jobs: [], jobParams: [], attempts: [], attemptParams: [], lists: [], contents: [], runs: [] };
   const client = {
     calls,
     rest: {
@@ -96,10 +134,12 @@ function fakeGitHub(remote, { runs = [], jobs = {}, attempts = {}, contents = {}
         listWorkflowRuns: async params => {
           calls.lists.push(params);
           if (listWorkflowRuns) return listWorkflowRuns(params);
-          const { branch, event, page = 1, per_page = 100 } = params;
-          const filtered = runs.filter(run => (!branch || run.head_branch === branch) && (!event || run.event === event));
+          const { branch, event, created, page = 1, per_page = 100 } = params;
+          const filtered = runs.filter(run => (!branch || run.head_branch === branch) && (!event || run.event === event) && matchesCreatedFilter(run.created_at, created));
           const start = (page - 1) * per_page;
-          return { data: { total_count: filtered.length, workflow_runs: filtered.slice(start, start + per_page) } };
+          // GitHub Actions caps paginated listWorkflowRuns results at 1,000 runs even when total_count is larger.
+          const capped = filtered.slice(0, 1000);
+          return { data: { total_count: filtered.length, workflow_runs: capped.slice(start, start + per_page) } };
         },
         getWorkflowRun: async ({ run_id }) => {
           calls.runs.push(run_id);
@@ -107,15 +147,17 @@ function fakeGitHub(remote, { runs = [], jobs = {}, attempts = {}, contents = {}
           if (!found) throw Object.assign(new Error("Not Found"), { status: 404 });
           return { data: found };
         },
-        getWorkflowRunAttempt: async ({ run_id }) => {
-          calls.attempts.push(run_id);
-          return { data: attempts[run_id] };
+        getWorkflowRunAttempt: async params => {
+          calls.attempts.push(params.run_id);
+          calls.attemptParams.push(params);
+          return { data: attempts[params.run_id] };
         },
         listJobsForWorkflowRunAttempt: async ({ run_id }) => ({ data: { jobs: jobs[run_id] || [] } }),
       },
     },
     paginate: async (method, params) => {
       calls.jobs.push(params.run_id);
+      calls.jobParams.push(params);
       return (await method(params)).data.jobs;
     },
   };
@@ -831,17 +873,18 @@ describe("push_routing_history saves", () => {
     expect(remoteRuns(remote).filter(line => line.number === 51)).toEqual([]);
   });
 
-  it("advances across a >800-run backlog in verified chunks without stalling and charges a late failed save", async () => {
+  it("catches up a backlog past GitHub's 1,000-run listing cap in one save and charges a late failed save", async () => {
     const remote = bareRemote();
     await save(remote, 1, "success");
     const agent = { name: "agent", conclusion: "failure", started_at: "2026-11-24T09:00:00Z" };
     const writer = conclusion => ({ name: "push_routing_history", conclusion, started_at: "2026-11-24T09:10:00Z" });
-    // 1,005 runs (#1005 down to #1) with #1004 failed: exceeds MAX_LIST_PAGES=8 in one pass, so chunked backfill recovers in two saves.
+    // 1,005 runs (#1005 down to #1) with #1004 failed: #2 lies past page 10, so the save reads a created window for the oldest runs.
     const runs = Array.from({ length: 1005 }, (_, i) => {
       const number = 1005 - i;
       return {
         id: 19000 + number,
         run_number: number,
+        created_at: runCreatedAt(number),
         status: "completed",
         conclusion: number === 1004 ? "failure" : "success",
         head_branch: "main",
@@ -852,14 +895,9 @@ describe("push_routing_history saves", () => {
     const github = fakeGitHub(remote, { runs, jobs: { 20004: [agent, writer("failure")] } });
 
     await save(remote, 1005, "success", { github });
-    const mid = remoteState(remote);
-    expect(mid.reconciled_through).toBeGreaterThan(1);
-    expect(mid.reconciled_through).toBeLessThan(1004);
-    expect(mid.unexplained).toBe(0);
-
-    runs.unshift({ id: 20006, run_number: 1006, status: "completed", conclusion: "success", head_branch: "main", event: "schedule", run_attempt: 1 });
-    await save(remote, 1006, "success", { github });
-    expect(remoteState(remote)).toMatchObject({ last_run: 1006, reconciled_through: 1006, unresolved_runs: [], unexplained: 1 });
+    expect(github.calls.lists.every(call => (call.page || 1) <= 10)).toBe(true);
+    expect(github.calls.lists.some(call => call.created === `<=${runCreatedAt(6)}`)).toBe(true);
+    expect(remoteState(remote)).toMatchObject({ last_run: 1005, reconciled_through: 1005, unresolved_runs: [], unexplained: 1 });
     expect(remoteRuns(remote).filter(line => line.number === 1004)).toEqual([expect.objectContaining({ number: 1004, note: "unsaved" })]);
   });
 
@@ -1244,6 +1282,990 @@ describe("push_routing_history saves", () => {
     const run106 = { id: 9106, run_number: 106, status: "completed", conclusion: "success", head_branch: "main", event: "schedule", run_attempt: 1 };
     await save(remote, 107, "success", { github: fakeGitHub(remote, { runs: [run106, run105, run104], jobs: { 9104: [agent, writer("failure")] } }) });
     expect(remoteState(remote)).toMatchObject({ reconciled_through: 107, unresolved_runs: [], unexplained: 2 });
+  });
+
+  it("reaches a floor on page 2 (and page 9) of a 5,000-run workflow without probing past GitHub's 1,000-result cap", async () => {
+    const remote = bareRemote();
+    const agent = { name: "agent", conclusion: "failure", started_at: "2026-11-24T09:00:00Z" };
+    const writer = conclusion => ({ name: "push_routing_history", conclusion, started_at: "2026-11-24T09:10:00Z" });
+    const runs = Array.from({ length: 5000 }, (_, i) => {
+      const number = 5000 - i;
+      return paginationRun(number, { conclusion: number === 4880 ? "failure" : "success" });
+    });
+
+    // 1. Floor is 150 runs behind (#4850, on page 2) with total_count = 5000 and pages > 10 returning [].
+    seedHistory(
+      remote,
+      {
+        ...emptyState("triage"),
+        generation: { hash: GENERATION, since_run: 1 },
+        last_run: 4850,
+        reconciled_through: 4850,
+        unresolved_runs: [],
+        unexplained: 0,
+      },
+      []
+    );
+    const githubPage2 = fakeGitHub(remote, { runs, jobs: { 13880: [agent, writer("failure")] } });
+    await save(remote, 5000, "success", { github: githubPage2 });
+
+    expect(githubPage2.calls.lists.every(call => (call.page || 1) <= 10)).toBe(true);
+    expect(remoteState(remote)).toMatchObject({ last_run: 5000, reconciled_through: 5000, unresolved_runs: [], unexplained: 1 });
+    expect(remoteRuns(remote).filter(line => line.number === 4880)).toEqual([expect.objectContaining({ number: 4880, note: "unsaved" })]);
+
+    // 2. Floor is 850 runs behind (#4150, on page 9) on the same 5,000-run workflow: pages 1 to 9 are read in order and the save catches up fully.
+    const githubPage9 = fakeGitHub(remote, { runs });
+    const res = await reconcilePagination(githubPage9, 4150, 5000);
+    expect(githubPage9.calls.lists.every(call => (call.page || 1) <= 10)).toBe(true);
+    expect(res.reconciliation.verified).toBe(true);
+    expect(res.reconciliation).not.toHaveProperty("ceiling");
+  });
+
+  it("uses bounded created windows to reconcile a 2,002-run backlog across GitHub's 1,000-result cap, including same-second boundary ties", async () => {
+    const remote = bareRemote();
+    seedHistory(
+      remote,
+      {
+        ...emptyState("triage"),
+        generation: { hash: GENERATION, since_run: 1 },
+        last_run: 1,
+        reconciled_through: 1,
+        unresolved_runs: [],
+        unexplained: 0,
+      },
+      []
+    );
+    const agent = { name: "agent", conclusion: "failure", started_at: "2026-11-24T09:00:00Z" };
+    const writer = conclusion => ({ name: "push_routing_history", conclusion, started_at: "2026-11-24T09:10:00Z" });
+    // 2,002 runs (#2002 down to #1) with a same-second timestamp tie spanning the 1,000-run boundary (#1004..#1001),
+    // and unsaved failures at #2 (past two 1,000-run caps), #1002 (at the same-second tie) and #2001 (recent).
+    const tieTime = runCreatedAt(1002);
+    const runs = Array.from({ length: 2002 }, (_, i) => {
+      const number = 2002 - i;
+      const createdAt = number >= 1001 && number <= 1004 ? tieTime : runCreatedAt(number);
+      return paginationRun(number, { created_at: createdAt, conclusion: [2, 1002, 2001].includes(number) ? "failure" : "success" });
+    });
+    const jobs = {
+      9002: [agent, writer("failure")],
+      10002: [agent, writer("failure")],
+      11001: [agent, writer("failure")],
+    };
+    const github = fakeGitHub(remote, { runs, jobs });
+
+    // One save steps through two created windows, past the tie at the first window's page 10, and catches up fully.
+    await save(remote, 2002, "success", { github });
+    expect(github.calls.lists.every(call => (call.page || 1) <= 10)).toBe(true);
+    expect(github.calls.lists.some(call => call.created === `<=${tieTime}`)).toBe(true);
+    expect(remoteState(remote)).toMatchObject({ last_run: 2002, reconciled_through: 2002, unresolved_runs: [], unexplained: 3 });
+    expect(
+      remoteRuns(remote)
+        .filter(line => line.note === "unsaved")
+        .map(line => line.number)
+    ).toEqual([2, 1002, 2001]);
+  });
+
+  it("advances a backlog deeper than one save's calls in verified chunks, never verifying past an unread same-second tie", async () => {
+    // 5,000 runs (#5000 down to #1) with failed saves at #3, #1520 and #4999. Runs #1501 to #1650 share one
+    // creation second and are listed lowest number first, so a walk that stops inside the tie has already seen
+    // #1650 but not #1520.
+    const tieTime = runCreatedAt(1575);
+    const runs = Array.from({ length: 5000 }, (_, i) => {
+      const number = 5000 - i;
+      return paginationRun(number, {
+        created_at: number >= 1501 && number <= 1650 ? tieTime : runCreatedAt(number),
+        conclusion: [3, 1520, 4999].includes(number) ? "failure" : "success",
+      });
+    });
+    const tie = runs.filter(run => run.created_at === tieTime).reverse();
+    runs.splice(runs.indexOf(tie[tie.length - 1]), tie.length, ...tie);
+    const github = fakeGitHub(null, { runs });
+    const list = github.rest.actions.listWorkflowRuns;
+    // Verified coverage never leaves a gap, so the unfiltered corroboration listing is never needed.
+    github.rest.actions.listWorkflowRuns = async params => {
+      if (!params.branch && !params.event) throw new Error("unfiltered corroboration listing was needed");
+      return list(params);
+    };
+
+    const charged = [];
+    const ceilings = [];
+    let reconciledThrough = 1;
+    for (let step = 0; step < 10; step++) {
+      const { listing, reconciliation } = await reconcilePagination(github, reconciledThrough, 5001);
+      expect(reconciliation).toMatchObject({ verified: true, unresolved: [] });
+      charged.push(...listing.filter(run => run.conclusion === "failure").map(run => run.number));
+      if (reconciliation.ceiling === undefined) break;
+      ceilings.push(reconciliation.ceiling);
+      expect(reconciliation.ceiling).toBeGreaterThan(reconciledThrough);
+      reconciledThrough = reconciliation.ceiling;
+    }
+
+    expect(ceilings.length).toBeGreaterThan(0);
+    expect(charged).toEqual([3, 1520, 4999]);
+    expect(github.calls.lists.every(call => (call.page || 1) <= 10)).toBe(true);
+  });
+
+  it.each([
+    { countCap: Infinity, firstCeiling: 3989 },
+    { countCap: 2500, firstCeiling: 5000 },
+  ])("recovers a run shifted into a cached page during the walk back up (count capped at $countCap)", async ({ countCap, firstCeiling }) => {
+    const remote = bareRemote();
+    seedHistory(remote, { ...emptyState("triage"), generation: { hash: GENERATION, since_run: 1 }, last_run: 3989, reconciled_through: 3989 }, []);
+    const runs = Array.from({ length: 5000 }, (_, i) => paginationRun(5000 - i, { conclusion: 5000 - i === 4101 ? "failure" : "success" }));
+    const jobs = {
+      13101: [
+        { name: "agent", conclusion: "failure", started_at: runCreatedAt(4101) },
+        { name: "push_routing_history", conclusion: "failure" },
+      ],
+    };
+    const github = fakeGitHub(remote, { runs, jobs });
+    const list = github.rest.actions.listWorkflowRuns;
+    let inserted = false;
+    github.rest.actions.listWorkflowRuns = async params => {
+      if (!inserted && params.branch === "main" && !params.created && params.page === 9) {
+        // Page 10 was cached before this insert. Run 4101 is now on that page, not on page 9.
+        runs.unshift(paginationRun(5001));
+        inserted = true;
+      }
+      const response = await list(params);
+      if (params.branch === "main" && !params.created) response.data.total_count = Math.min(countCap, response.data.total_count);
+      return response;
+    };
+
+    await save(remote, 5000, "success", { github });
+    expect(inserted).toBe(true);
+    // A changed count defers the save's coverage. With a capped count the unfiltered scan recovers the missing run.
+    expect(remoteState(remote).reconciled_through).toBe(firstCeiling);
+    await save(remote, 5002, "success", { github });
+    expect(remoteState(remote).reconciled_through).toBe(5002);
+    expect(remoteRuns(remote).filter(line => line.number === 4101)).toEqual([expect.objectContaining({ note: "unsaved" })]);
+  });
+
+  it("fails closed when a backlog exceeds the bounded call budget, stalls on identical timestamps, or lacks created_at past page 10", async () => {
+    const remote = bareRemote();
+
+    // 1. Backlog of 20,000 runs exceeds the bounded created-window search budget.
+    const deepRuns = Array.from({ length: 20000 }, (_, i) => paginationRun(20000 - i));
+    const deepGitHub = fakeGitHub(remote, { runs: deepRuns });
+    const deepResult = await reconcilePagination(deepGitHub, 1, 20000);
+    expect(deepResult.reconciliation.verified).toBe(false);
+    expect(deepGitHub.calls.lists.every(call => (call.page || 1) <= 10)).toBe(true);
+    expect(deepGitHub.calls.lists.length).toBeLessThanOrEqual(25);
+
+    // 2. More than 1,000 runs sharing one created_at timestamp cannot advance past that second without risking gaps.
+    const sameSecondRuns = Array.from({ length: 1500 }, (_, i) => paginationRun(1500 - i, { created_at: "2026-11-24T09:00:00Z" }));
+    const sameSecondGitHub = fakeGitHub(remote, { runs: sameSecondRuns });
+    const sameSecondResult = await reconcilePagination(sameSecondGitHub, 1, 1500);
+    expect(sameSecondResult.reconciliation.verified).toBe(false);
+    expect(sameSecondGitHub.calls.lists.every(call => (call.page || 1) <= 10)).toBe(true);
+
+    // 3. Runs past the 1,000-result cap without created_at fail closed instead of probing page 11.
+    const noTimestamps = Array.from({ length: 1200 }, (_, i) => paginationRun(1200 - i, { created_at: undefined }));
+    const noTimestampGitHub = fakeGitHub(remote, { runs: noTimestamps });
+    const noTimestampResult = await reconcilePagination(noTimestampGitHub, 1, 1200);
+    expect(noTimestampResult.reconciliation.verified).toBe(false);
+    expect(noTimestampGitHub.calls.lists.every(call => (call.page || 1) <= 10)).toBe(true);
+
+    // 3b. Missing created_at on even a single boundary row on page 10 must fail closed before
+    // crossing into a created window.
+    const oneMissingBoundaryTimestamp = Array.from({ length: 1200 }, (_, i) => {
+      const number = 1200 - i;
+      return paginationRun(number, { created_at: number === 201 ? undefined : runCreatedAt(number) });
+    });
+    const oneMissingWithCount = fakeGitHub(remote, { runs: oneMissingBoundaryTimestamp });
+    const oneMissingWithCountResult = await reconcilePagination(oneMissingWithCount, 1, 1200);
+    expect(oneMissingWithCountResult.reconciliation.verified).toBe(false);
+    expect(oneMissingWithCount.calls.lists.some(call => Boolean(call.created))).toBe(false);
+
+    // 4. A non-empty short/truncated page when total_count indicates more rows must fail closed.
+    const fullRuns = Array.from({ length: 5000 }, (_, i) => paginationRun(5000 - i));
+    const truncatedPageGitHub = fakeGitHub(remote, {
+      listWorkflowRuns: async ({ event, page = 1, per_page = 100 }) => {
+        if (event === "pull_request_target") return { data: { total_count: 0, workflow_runs: [] } };
+        const start = (page - 1) * per_page;
+        const slice = fullRuns.slice(0, 1000).slice(start, start + per_page);
+        // Drop one row from page 2 while still reporting total_count = 5000.
+        const batch = page === 2 ? slice.filter(run => run.run_number !== 4880) : slice;
+        return { data: { total_count: fullRuns.length, workflow_runs: batch } };
+      },
+    });
+    const truncatedResult = await reconcilePagination(truncatedPageGitHub, 4850, 5000);
+    expect(truncatedResult.reconciliation.verified).toBe(false);
+
+    // 5. A short page found on the walk back up fails closed. The floor (#3990) lies past page 10, so the
+    // search reads pages 1 and 10 and a created window, and the walk then meets a 99-row page 6.
+    const upwardTruncatedGitHub = fakeGitHub(remote, {
+      listWorkflowRuns: async ({ event, created, page = 1, per_page = 100 }) => {
+        if (event === "pull_request_target") return { data: { total_count: 0, workflow_runs: [] } };
+        const filtered = fullRuns.filter(run => matchesCreatedFilter(run.created_at, created));
+        const start = (page - 1) * per_page;
+        const slice = filtered.slice(0, 1000).slice(start, start + per_page);
+        return { data: { total_count: filtered.length, workflow_runs: !created && page === 6 ? slice.slice(0, 99) : slice } };
+      },
+    });
+    const upwardTruncatedResult = await reconcilePagination(upwardTruncatedGitHub, 3989, 5000);
+    expect(upwardTruncatedResult.reconciliation.verified).toBe(false);
+    expect(upwardTruncatedGitHub.calls.lists.filter(call => call.branch === "main").map(({ page, created }) => [page, created ?? null])).toEqual([
+      [1, null],
+      [10, null],
+      [1, `<=${runCreatedAt(4001)}`],
+      [9, null],
+      [8, null],
+      [7, null],
+      [6, null],
+    ]);
+
+    // 6. Without total_count a short page cannot show that the listing ended, so a 99-row page 1 with
+    // more runs behind it fails closed instead of being read as the whole listing.
+    const noCountGitHub = fakeGitHub(remote, {
+      listWorkflowRuns: async ({ event, page = 1 }) => {
+        if (event === "pull_request_target") return { data: { total_count: 0, workflow_runs: [] } };
+        return { data: { workflow_runs: page === 1 ? fullRuns.slice(0, 99) : fullRuns.slice(99, 199) } };
+      },
+    });
+    const noCountResult = await reconcilePagination(noCountGitHub, 4850, 5000);
+    expect(noCountResult.reconciliation.verified).toBe(false);
+  });
+
+  it("keeps searching for a reachable floor inside a tie straddling page 10", async () => {
+    const agent = { name: "agent", conclusion: "failure", started_at: "2026-11-24T09:00:00Z" };
+    const writer = conclusion => ({ name: "push_routing_history", conclusion, started_at: "2026-11-24T09:10:00Z" });
+    // 300 newer runs, then 800 runs (#1200..#401) created in one second, then 400 older runs. The floor (#950)
+    // is inside the tie on page 6, so the search reads all ten pages and then nine pages of a created window.
+    const tieTime = runCreatedAt(800);
+    const tied = [
+      ...Array.from({ length: 300 }, (_, i) => paginationRun(1500 - i)),
+      ...Array.from({ length: 800 }, (_, i) => paginationRun(1200 - i, { created_at: tieTime, conclusion: 1200 - i === 960 ? "failure" : "success" })),
+      ...Array.from({ length: 400 }, (_, i) => paginationRun(400 - i)),
+    ];
+    const tiedGitHub = fakeGitHub(null, { runs: tied, jobs: { 9960: [agent, writer("failure")] } });
+    const tiedResult = await reconcilePagination(tiedGitHub, 950, 1501);
+    expect(tiedResult.reconciliation).toMatchObject({ verified: true, unresolved: [] });
+    expect(tiedResult.reconciliation).not.toHaveProperty("ceiling");
+    expect(tiedResult.listing.filter(item => item.conclusion === "failure").map(item => item.number)).toEqual([960]);
+    expect(tiedGitHub.calls.lists.filter(call => call.branch === "main")).toHaveLength(19);
+  });
+
+  it.each(["tied", "distinct"])("reads the page-2 target after overshooting it on page 10 with %s timestamps", async timestamps => {
+    // Run numbers are 20 apart, so page 1 looks far from the target. Page 10 proves we overshot.
+    const sparse = [...Array.from({ length: 900 }, (_, i) => paginationRun(40000 - 20 * i)), ...Array.from({ length: 1200 }, (_, i) => paginationRun(20000 - i, { created_at: runCreatedAt(timestamps === "tied" ? 19000 : 20000 - i) }))];
+    const sparseGitHub = fakeGitHub(null, { runs: sparse });
+    const sparseStream = await fetchStreamWindow((page, created) => sparseGitHub.rest.actions.listWorkflowRuns({ branch: "main", page, ...(created ? { created } : {}) }), 37001, 40000);
+    expect(sparseStream).toMatchObject({ reachedFloor: true, maxVerified: 40000 });
+    expect(sparseStream.items.map(item => item.run_number)).toContain(37600);
+    expect(sparseGitHub.calls.lists.map(call => call.page)).toEqual([1, 10, 2]);
+  });
+
+  it("drains out-of-order same-second ties across page 10 and verifies upper ties", async () => {
+    const remote = bareRemote();
+    const agent = { name: "agent", conclusion: "failure", started_at: "2026-11-24T09:00:00Z" };
+    const writer = conclusion => ({ name: "push_routing_history", conclusion, started_at: "2026-11-24T09:10:00Z" });
+
+    // 1. 2,002 runs (#2002..#1) where 206 runs (#1100..#895) share one creation second T, ordered so
+    // #898 lands on row 1,000 (last row of page 10) while target #899 (a failed save) is pushed beyond
+    // the 1,000-run cap onto page 3 of the inclusive created<=T window.
+    const tieTime = runCreatedAt(1000);
+    const newerRuns = Array.from({ length: 902 }, (_, i) => paginationRun(2002 - i));
+    const tiedNumbers = [
+      ...Array.from({ length: 97 }, (_, i) => 1100 - i), // 97 rows (#1100..#1004)
+      898, // row 1,000 (last row of page 10): minNum <= 899 <= maxNum, hiding #899 past page 10!
+      ...Array.from({ length: 104 }, (_, i) => 1003 - i), // #1003..#900
+      897,
+      896,
+      895,
+      899, // row 206 of second T (lands on page 3 of created<=T)
+    ];
+    const tiedRuns = tiedNumbers.map(number => paginationRun(number, { created_at: tieTime, conclusion: number === 899 ? "failure" : "success" }));
+    const olderRuns = Array.from({ length: 894 }, (_, i) => paginationRun(894 - i));
+    const outOfOrderRuns = [...newerRuns, ...tiedRuns, ...olderRuns];
+    const tieGitHub = fakeGitHub(remote, { runs: outOfOrderRuns, jobs: { 9899: [agent, writer("failure")] } });
+    const tieResult = await reconcilePagination(tieGitHub, 898, 2002);
+    expect(tieGitHub.calls.lists.every(call => (call.page || 1) <= 10)).toBe(true);
+    expect(tieGitHub.calls.lists.some(call => call.created === `<=${tieTime}`)).toBe(true);
+    expect(tieResult.reconciliation.verified).toBe(true);
+    expect(tieResult.reconciliation).not.toHaveProperty("ceiling");
+    expect(tieResult.listing.filter(item => item.conclusion !== "success")).toEqual([expect.objectContaining({ id: "9899", number: 899, conclusion: "failure", agent_ran: true })]);
+
+    // 3. Removing created_at from a nonterminal page-10 floor boundary must fail closed rather than
+    // accepting page 10 without ruling out a same-second tie past row 1,000.
+    const missingPage10Timestamps = outOfOrderRuns.map((run, idx) => (idx >= 900 && idx < 1000 ? { ...run, created_at: undefined } : run));
+    const missingP10GitHub = fakeGitHub(remote, { runs: missingPage10Timestamps, jobs: { 9899: [agent, writer("failure")] } });
+    const missingP10Result = await reconcilePagination(missingP10GitHub, 898, 2002);
+    expect(missingP10Result.reconciliation.verified).toBe(false);
+
+    // 4. Upward walk must not stop early mid-tie when a high run_number (#600) appears on page 5
+    // of a 500-run same-second tie (#600..#101) while pages 1..4 hold lower-numbered tied runs.
+    const upperTieTime = runCreatedAt(500);
+    const upperTieNumbers = [
+      ...Array.from({ length: 400 }, (_, i) => 599 - i), // pages 1..4 (#599..#200)
+      600, // page 5 starts with #600 (>= maxRunNumber)
+      ...Array.from({ length: 99 }, (_, i) => 199 - i), // rest of page 5 (#199..#101)
+    ];
+    const upperTieRuns = [...upperTieNumbers.map(number => paginationRun(number, { created_at: upperTieTime, conclusion: number === 550 ? "failure" : "success" })), ...Array.from({ length: 100 }, (_, i) => paginationRun(100 - i))];
+    const upperTieGitHub = fakeGitHub(remote, { runs: upperTieRuns, jobs: { 9550: [agent, writer("failure")] } });
+    const upperTieResult = await reconcilePagination(upperTieGitHub, 1, 600);
+    expect(upperTieResult.reconciliation.verified).toBe(true);
+    expect(upperTieResult.reconciliation.unresolved).toEqual([]);
+    expect(upperTieResult.listing.filter(item => item.conclusion !== "success")).toEqual([expect.objectContaining({ id: "9550", number: 550, conclusion: "failure", agent_ran: true })]);
+
+    // 5. An 800-row same-second tie covering the floor (#4900..#4101) on a 5,000-run workflow is read
+    // page by page past the tie instead of stalling.
+    const largeFloorTieTime = runCreatedAt(4500);
+    const largeFloorTieRuns = Array.from({ length: 5000 }, (_, i) => {
+      const number = 5000 - i;
+      const createdAt = number >= 4101 && number <= 4900 ? largeFloorTieTime : runCreatedAt(number);
+      return paginationRun(number, { created_at: createdAt, conclusion: number === 4500 ? "failure" : "success" });
+    });
+    const largeFloorTieGitHub = fakeGitHub(remote, { runs: largeFloorTieRuns, jobs: { 13500: [agent, writer("failure")] } });
+    const largeFloorTieResult = await reconcilePagination(largeFloorTieGitHub, 4100, 5000);
+    expect(largeFloorTieGitHub.calls.lists.every(call => (call.page || 1) <= 10)).toBe(true);
+    expect(largeFloorTieResult.reconciliation.verified).toBe(true);
+    expect(largeFloorTieResult.reconciliation.unresolved).toEqual([]);
+    expect(largeFloorTieResult.listing.filter(item => item.conclusion !== "success")).toEqual([expect.objectContaining({ id: "13500", number: 4500, conclusion: "failure", agent_ran: true })]);
+  });
+
+  it("treats old missing run numbers as deleted while retaining recent gaps until they age past the 5-minute window", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-11-25T10:10:00Z"));
+    const remote = bareRemote();
+    await save(remote, 100, "success");
+
+    // #101 is missing with higher neighbour #102 created 10 minutes ago (> 5m): confirmed deleted, not persisted.
+    // #103 is missing with higher neighbour #104 created 2 minutes ago (<= 5m): recent gap, retained in unresolved_runs.
+    const runsAt104 = [paginationRun(104, { created_at: "2026-11-25T10:08:00Z" }), paginationRun(102, { created_at: "2026-11-25T10:00:00Z" }), paginationRun(100, { created_at: "2026-11-25T09:50:00Z" })];
+    await save(remote, 104, "success", { github: fakeGitHub(remote, { runs: runsAt104 }) });
+    expect(remoteState(remote)).toMatchObject({ last_run: 104, reconciled_through: 104, unresolved_runs: [103], unexplained: 0 });
+    expect(remoteState(remote).unresolved_run_ids).toBeUndefined();
+
+    // Advance past the 5-minute window (now #104 is 7 minutes old): #103 is still absent across both sides and expires.
+    vi.setSystemTime(new Date("2026-11-25T10:15:00Z"));
+    const runsAt105 = [paginationRun(105, { created_at: "2026-11-25T10:14:00Z" }), ...runsAt104];
+    await save(remote, 105, "success", { github: fakeGitHub(remote, { runs: runsAt105 }) });
+    expect(remoteState(remote)).toMatchObject({ last_run: 105, reconciled_through: 105, unresolved_runs: [], unexplained: 0 });
+  });
+
+  it("recovers an older ID-less unresolved run on unfiltered page 4 even when an unrelated PR run on page 1 triggers hasIntervalGap", async () => {
+    const remote = bareRemote();
+    seedHistory(
+      remote,
+      {
+        ...emptyState("triage"),
+        generation: { hash: GENERATION, since_run: 1 },
+        last_run: 399,
+        reconciled_through: 399,
+        unresolved_runs: [50],
+        unexplained: 0,
+      },
+      []
+    );
+    const agent = { name: "agent", conclusion: "failure", started_at: "2026-11-24T09:00:00Z" };
+    const writer = conclusion => ({ name: "push_routing_history", conclusion, started_at: "2026-11-24T09:10:00Z" });
+    // Build 400 runs (#400 down to #1): #400 is an off-branch pull_request run on page 1 (triggering hasIntervalGap),
+    // #200..#399 are 200 default-branch runs so defaultStream page 1 stops at #300 (never seeing #50),
+    // and #50 is a failed eligible run on unfiltered page 4 (index 350).
+    const runs = Array.from({ length: 400 }, (_, i) => {
+      const number = 400 - i;
+      if (number === 400) return paginationRun(400, { head_branch: "feature-pr", event: "pull_request" });
+      if (number === 50) return paginationRun(50, { conclusion: "failure" });
+      const isOffBranch = number > 50 && number < 200;
+      return paginationRun(number, { head_branch: isOffBranch ? "feature-pr" : "main", event: isOffBranch ? "pull_request" : "schedule" });
+    });
+    const github = fakeGitHub(remote, { runs, jobs: { 9050: [agent, writer("failure")] } });
+
+    await save(remote, 401, "success", { github });
+    expect(github.calls.lists.some(params => !params.branch && !params.event && params.page === 4)).toBe(true);
+    expect(github.calls.jobs).toEqual([9050]);
+    expect(remoteRuns(remote).map(({ number, note }) => ({ number, note }))).toEqual([
+      { number: 50, note: "unsaved" },
+      { number: 401, note: null },
+    ]);
+    expect(remoteState(remote)).toMatchObject({ last_run: 401, reconciled_through: 401, unresolved_runs: [], unexplained: 1 });
+  });
+
+  it("recovers a run shifted across a page boundary by a mid-scan deletion under a capped count even with clock skew", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-11-25T10:30:00Z"));
+    const remote = bareRemote();
+    seedHistory(
+      remote,
+      {
+        ...emptyState("triage"),
+        generation: { hash: GENERATION, since_run: 1 },
+        last_run: 302,
+        reconciled_through: 302,
+        unresolved_runs: [202],
+        unexplained: 0,
+      },
+      []
+    );
+    const agent = { name: "agent", conclusion: "failure", started_at: "2026-11-25T09:00:00Z" };
+    const writer = conclusion => ({ name: "push_routing_history", conclusion, started_at: "2026-11-25T09:05:00Z" });
+    // Build 302 runs (#302 down to #1) where #202 is an unsaved failed run at index 100 (first item of page 2),
+    // with created_at 7 seconds after #203 (clock skew). With a capped total_count (like GitHub's 2,500 cap),
+    // deleting #300 before unfiltered page 2 keeps total_count unchanged while shifting #202 onto page 1 so
+    // page 2 starts at #201. The overlapping unfiltered boundary check must recover #202 instead of dropping it.
+    const baseMs = Date.parse("2026-11-25T06:00:00Z");
+    const liveRuns = Array.from({ length: 302 }, (_, i) => {
+      const number = 302 - i;
+      const createdMs = number === 202 ? baseMs + 203 * 30_000 + 7_000 : baseMs + number * 30_000;
+      return paginationRun(number, {
+        conclusion: number === 202 ? "failure" : "success",
+        created_at: new Date(createdMs).toISOString().replace(/\.\d{3}Z$/, "Z"),
+      });
+    });
+    let deleted300 = false;
+    const github = fakeGitHub(remote, {
+      jobs: { 9202: [agent, writer("failure")] },
+      listWorkflowRuns: async ({ branch, event, page = 1, per_page = 100 }) => {
+        if (!branch && !event && per_page === 100 && page === 2 && !deleted300) {
+          deleted300 = true;
+          const idx = liveRuns.findIndex(r => r.run_number === 300);
+          if (idx >= 0) liveRuns.splice(idx, 1);
+        }
+        const filtered = liveRuns.filter(run => (!branch || run.head_branch === branch) && (!event || run.event === event));
+        const start = (page - 1) * per_page;
+        const total = event === "pull_request_target" ? 0 : 2500;
+        return { data: { total_count: total, workflow_runs: filtered.slice(start, start + per_page) } };
+      },
+    });
+
+    await save(remote, 303, "success", { github });
+    expect(github.calls.lists.some(params => !params.branch && !params.event && params.per_page < 100)).toBe(true);
+    expect(github.calls.jobs).toEqual([9202]);
+    expect(remoteRuns(remote).map(({ number, note }) => ({ number, note }))).toEqual([
+      { number: 202, note: "unsaved" },
+      { number: 303, note: null },
+    ]);
+    expect(remoteState(remote)).toMatchObject({ last_run: 303, reconciled_through: 303, unresolved_runs: [], unexplained: 1 });
+  });
+
+  it("expires a confirmed deleted run at a deep page boundary with a bounded same-second burst, and fails closed when a 100-run tie fills the page edge", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-11-25T16:00:00Z"));
+    const baseMs = Date.parse("2026-11-25T00:00:00Z");
+    const burstTs = new Date(baseMs + 516 * 30_000).toISOString().replace(/\.\d{3}Z$/, "Z");
+
+    // 1. 30 runs (#531..#502) share burstTs right above deleted #501 at the page 4/5 boundary:
+    // the overlapping unfiltered page (per_page < 100) brackets the entire tie strictly inside its
+    // oldest/newest seconds and confirms #501 is deleted.
+    const remote1 = bareRemote();
+    seedHistory(
+      remote1,
+      {
+        ...emptyState("triage"),
+        generation: { hash: GENERATION, since_run: 1 },
+        last_run: 901,
+        reconciled_through: 901,
+        unresolved_runs: [501],
+        unexplained: 0,
+      },
+      []
+    );
+    const runs30 = [];
+    for (let number = 901; number >= 1; number--) {
+      if (number === 501) continue;
+      const createdAt = number >= 502 && number <= 531 ? burstTs : new Date(baseMs + number * 30_000).toISOString().replace(/\.\d{3}Z$/, "Z");
+      runs30.push(paginationRun(number, { created_at: createdAt }));
+    }
+    const gh30 = fakeGitHub(remote1, { runs: runs30 });
+    await save(remote1, 902, "success", { github: gh30 });
+    expect(gh30.calls.lists.some(params => !params.branch && !params.event && params.per_page < 100)).toBe(true);
+    expect(remoteState(remote1)).toMatchObject({ last_run: 902, reconciled_through: 902, unresolved_runs: [], unexplained: 0 });
+
+    // 2. When 100 runs (#601..#502) share burstTs, no single <=100-row page can bracket both sides
+    // of the tie, so the writer fails closed and retains #501 rather than risking a false deletion.
+    const burstTs100 = new Date(baseMs + 551 * 30_000).toISOString().replace(/\.\d{3}Z$/, "Z");
+    const runs100 = [];
+    for (let number = 901; number >= 1; number--) {
+      if (number === 501) continue;
+      const createdAt = number >= 502 && number <= 601 ? burstTs100 : new Date(baseMs + number * 30_000).toISOString().replace(/\.\d{3}Z$/, "Z");
+      runs100.push(paginationRun(number, { created_at: createdAt }));
+    }
+    const { reconciliation } = await listRuns({
+      githubClient: fakeGitHub(null, { runs: runs100 }),
+      owner: "octo",
+      repo: "demo",
+      workflowFile: "triage.lock.yml",
+      defaultBranch: "main",
+      runId: "9902",
+      runNumber: 902,
+      state: { ...emptyState("triage"), generation: { hash: GENERATION, since_run: 1 }, last_run: 901, reconciled_through: 901, unresolved_runs: [501], unexplained: 0 },
+      runs: [],
+      generation: GENERATION,
+    });
+    expect(reconciliation.unresolved).toEqual([501]);
+  });
+
+  it("does not drop a live failed run hidden by same-second tie reordering across a page edge", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-11-25T16:00:00Z"));
+    const remote = bareRemote();
+    seedHistory(
+      remote,
+      {
+        ...emptyState("triage"),
+        generation: { hash: GENERATION, since_run: 1 },
+        last_run: 1,
+        reconciled_through: 1,
+        unresolved_runs: [],
+        unexplained: 0,
+      },
+      []
+    );
+    const agent = { name: "agent", conclusion: "failure", started_at: "2026-11-25T09:00:00Z" };
+    const writer = conclusion => ({ name: "push_routing_history", conclusion, started_at: "2026-11-25T09:05:00Z" });
+    // Old runs #100, #101 (failed), #102 share tieTs at the page 1/2 edge of a 200-run listing.
+    // Reordering the tie between page 1 and page 2 puts both #102 and #100 on page 1 while omitting #101
+    // from both 100-row pages. Because #100 sits on page 1's oldest second, page 1 cannot expire #101,
+    // and the overlapping unfiltered page recovers and charges #101.
+    const baseMs = Date.parse("2026-11-25T00:00:00Z");
+    const tieTs = new Date(baseMs + 101 * 30_000).toISOString().replace(/\.\d{3}Z$/, "Z");
+    const canonical = Array.from({ length: 200 }, (_, i) => {
+      const number = 200 - i;
+      const createdAt = number >= 100 && number <= 102 ? tieTs : new Date(baseMs + number * 30_000).toISOString().replace(/\.\d{3}Z$/, "Z");
+      return paginationRun(number, { conclusion: number === 101 ? "failure" : "success", created_at: createdAt });
+    });
+    const run100 = canonical.find(r => r.run_number === 100);
+    const run101 = canonical.find(r => r.run_number === 101);
+    const run102 = canonical.find(r => r.run_number === 102);
+    const page1Order = canonical.map(r => (r.run_number === 101 ? run100 : r.run_number === 100 ? run101 : r));
+    const page2Order = canonical.map(r => (r.run_number === 102 ? run101 : r.run_number === 101 ? run102 : r));
+    const github = fakeGitHub(remote, {
+      jobs: { 9101: [agent, writer("failure")] },
+      listWorkflowRuns: async ({ branch, event, page = 1, per_page = 100 }) => {
+        if (event === "pull_request_target") return { data: { total_count: 0, workflow_runs: [] } };
+        const source = per_page === 100 && page === 1 ? page1Order : per_page === 100 && page === 2 ? page2Order : canonical;
+        const filtered = source.filter(run => (!branch || run.head_branch === branch) && (!event || run.event === event));
+        const start = (page - 1) * per_page;
+        return { data: { total_count: filtered.length, workflow_runs: filtered.slice(start, start + per_page) } };
+      },
+    });
+
+    await save(remote, 200, "success", { github });
+    expect(github.calls.lists.some(params => !params.branch && !params.event && params.per_page < 100)).toBe(true);
+    expect(github.calls.jobs).toEqual([9101]);
+    expect(remoteRuns(remote).map(({ number, note }) => ({ number, note }))).toEqual([
+      { number: 101, note: "unsaved" },
+      { number: 200, note: null },
+    ]);
+    expect(remoteState(remote)).toMatchObject({ last_run: 200, reconciled_through: 200, unresolved_runs: [], unexplained: 1 });
+  });
+
+  it("expires a >200-run deleted gap directly above the floor during a partial created-window walk", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-11-25T16:00:00Z"));
+    // 3,500-run history with #2..#202 (201 runs) deleted right above floor #1 and distinct timestamps.
+    // The walk stops before reaching window 0's page 1 (partial walk), yet one atomic page inside the
+    // created window strictly brackets #203 and #1, so coverage advances instead of stalling at #1.
+    const runs = [];
+    for (let number = 3500; number >= 1; number--) {
+      if (number >= 2 && number <= 202) continue;
+      runs.push(paginationRun(number));
+    }
+    const github = fakeGitHub(null, { runs });
+    const { reconciliation } = await reconcilePagination(github, 1, 3501);
+    expect(reconciliation.verified).toBe(true);
+    expect(reconciliation.unresolved).toEqual([]);
+    expect(reconciliation.ceiling).toBeGreaterThan(203);
+
+    // Also verify when the >200-run deleted gap sits directly on a cross-window created cutoff:
+    // #3500..#503 fills three 1,000-row windows so #503 is both the last row of window 2 and the
+    // first row of window 3 (created <= #503), while #302..#502 are deleted directly above floor #301.
+    const cutoffRuns = [];
+    for (let number = 3500; number >= 1; number--) {
+      if (number >= 302 && number <= 502) continue;
+      cutoffRuns.push(paginationRun(number));
+    }
+    const cutoffGh = fakeGitHub(null, { runs: cutoffRuns });
+    const cutoffRes = await reconcilePagination(cutoffGh, 301, 3501);
+    expect(cutoffRes.reconciliation.verified).toBe(true);
+    expect(cutoffRes.reconciliation.unresolved).toEqual([]);
+    expect(cutoffRes.reconciliation.ceiling).toBeGreaterThan(503);
+  });
+
+  it("clears an interval gap when the independent unindexed scan discovers it as an ineligible PR run", async () => {
+    const remote = bareRemote();
+    seedHistory(
+      remote,
+      {
+        ...emptyState("triage"),
+        generation: { hash: GENERATION, since_run: 1 },
+        last_run: 500,
+        reconciled_through: 500,
+        unresolved_runs: [160],
+        unexplained: 0,
+      },
+      []
+    );
+    // 702 runs (#702..#1): off-branch PR run #502 starts at index 200 (first item of page 3).
+    // Under a capped total_count, deleting #650 right before the interval scan's unfiltered page 3 shifts #502
+    // onto page 2 (already fetched), hiding #502 from the interval scan. The independent scan for older ID-less
+    // obligation #160 then sees #502 on page 2 and marks it ineligible; #502 must not remain in unresolved_runs.
+    const liveRuns = Array.from({ length: 702 }, (_, i) => {
+      const number = 702 - i;
+      if (number === 502 || number === 160) return paginationRun(number, { head_branch: "feature-pr", event: "pull_request" });
+      return paginationRun(number);
+    });
+    let unfilteredPage3Calls = 0;
+    const github = fakeGitHub(remote, {
+      listWorkflowRuns: async ({ branch, event, page = 1, per_page = 100 }) => {
+        if (!branch && !event && per_page === 100 && page === 3) {
+          unfilteredPage3Calls += 1;
+          if (unfilteredPage3Calls === 1) {
+            const idx = liveRuns.findIndex(r => r.run_number === 650);
+            if (idx >= 0) liveRuns.splice(idx, 1);
+          }
+        }
+        const filtered = liveRuns.filter(run => (!branch || run.head_branch === branch) && (!event || run.event === event));
+        const start = (page - 1) * per_page;
+        const total = event === "pull_request_target" ? 0 : !branch && !event ? 2500 : filtered.length;
+        return { data: { total_count: total, workflow_runs: filtered.slice(start, start + per_page) } };
+      },
+    });
+
+    await save(remote, 703, "success", { github });
+    expect(unfilteredPage3Calls).toBe(2);
+    expect(remoteState(remote)).toMatchObject({ last_run: 703, reconciled_through: 703, unresolved_runs: [], unexplained: 0 });
+  });
+
+  it("visits all 20 tracked unresolved run IDs across consecutive even-numbered saves without modulo resonance", async () => {
+    const remote = bareRemote();
+    const unresolvedRuns = Array.from({ length: 20 }, (_, i) => i + 1);
+    const unresolvedRunIds = Object.fromEntries(unresolvedRuns.map(n => [String(n), String(9000 + n)]));
+    seedHistory(
+      remote,
+      {
+        ...emptyState("triage"),
+        generation: { hash: GENERATION, since_run: 1 },
+        last_run: 900,
+        reconciled_through: 900,
+        unresolved_runs: unresolvedRuns,
+        unresolved_run_ids: unresolvedRunIds,
+        unexplained: 0,
+      },
+      []
+    );
+    const runsById = Object.fromEntries(unresolvedRuns.map(n => [9000 + n, paginationRun(n, { status: "in_progress", conclusion: null })]));
+    const recentRuns = Array.from({ length: 100 }, (_, i) => paginationRun(900 - i));
+    const github = fakeGitHub(remote, { runs: recentRuns, runsById });
+
+    // Even-numbered writers #902 and #904 (odd numbers are off-branch PRs) must cover all 20 tracked IDs across two saves.
+    recentRuns.unshift(paginationRun(901, { head_branch: "pr-901", event: "pull_request" }));
+    await save(remote, 902, "success", { github });
+    expect(github.calls.runs).toEqual(Array.from({ length: 10 }, (_, i) => 9001 + i));
+    expect(remoteState(remote).unresolved_lookup_cursor).toBe(10);
+
+    recentRuns.unshift(paginationRun(903, { head_branch: "pr-903", event: "pull_request" }), paginationRun(902));
+    await save(remote, 904, "success", { github });
+    expect(github.calls.runs).toEqual(Array.from({ length: 20 }, (_, i) => 9001 + i));
+    expect(remoteState(remote).unresolved_lookup_cursor).toBe(20);
+  });
+
+  it("advances reconciled_through in chunks across saves when the boundary-check budget is exhausted before a >200-run boundary gap", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-11-25T16:00:00Z"));
+    const remote = bareRemote();
+    await save(remote, 1, "success");
+
+    // Build 6 pages of old listed runs (600 items) with 5 page-boundary deletion gaps:
+    // four single-run gaps at boundaries 1..4 and one 201-run gap at boundary 5. Save 1 spends its
+    // 4-check budget on the lowest 4 boundaries, clamps reconciled_through below the unchecked
+    // 201-run gap, and Save 2 finishes advancing to head.
+    const baseMs = Date.parse("2026-11-25T00:00:00Z");
+    const runs = [];
+    const ranges = [
+      [805, 706],
+      [504, 405],
+      [403, 304],
+      [302, 203],
+      [201, 102],
+      [100, 1],
+    ];
+    for (const [hi, lo] of ranges) {
+      for (let number = hi; number >= lo; number--) {
+        runs.push(paginationRun(number, { created_at: new Date(baseMs + number * 30_000).toISOString().replace(/\.\d{3}Z$/, "Z") }));
+      }
+    }
+    const github = fakeGitHub(remote, { runs });
+
+    await save(remote, 805, "success", { github });
+    const mid = remoteState(remote);
+    expect(mid.reconciled_through).toBe(504);
+    expect(mid.unresolved_runs).toEqual([]);
+
+    runs.unshift(paginationRun(806, { created_at: new Date(baseMs + 806 * 30_000).toISOString().replace(/\.\d{3}Z$/, "Z") }));
+    await save(remote, 806, "success", { github });
+    expect(remoteState(remote)).toMatchObject({ last_run: 806, reconciled_through: 806, unresolved_runs: [], unexplained: 0 });
+  });
+
+  it("preserves direct-lookup cursor rotation and verified interval coverage when an independent ID-less scan fails", async () => {
+    const remote = bareRemote();
+    const trackedIds = Array.from({ length: 20 }, (_, i) => i + 1);
+    const unresolvedRunIds = Object.fromEntries(trackedIds.map(n => [String(n), String(9000 + n)]));
+    seedHistory(
+      remote,
+      {
+        ...emptyState("triage"),
+        generation: { hash: GENERATION, since_run: 1 },
+        last_run: 900,
+        reconciled_through: 900,
+        unresolved_runs: [...trackedIds, 50],
+        unresolved_run_ids: unresolvedRunIds,
+        unexplained: 0,
+      },
+      []
+    );
+    const runsById = Object.fromEntries(trackedIds.map(n => [9000 + n, paginationRun(n, { status: "in_progress", conclusion: null })]));
+    const recentRuns = Array.from({ length: 100 }, (_, i) => paginationRun(900 - i));
+    const github = fakeGitHub(remote, {
+      runsById,
+      listWorkflowRuns: async ({ branch, event, page = 1, per_page = 100 }) => {
+        if (!branch && !event && page > 1) {
+          throw Object.assign(new Error("503 service unavailable"), { status: 503 });
+        }
+        const filtered = recentRuns.filter(run => (!branch || run.head_branch === branch) && (!event || run.event === event));
+        const start = (page - 1) * per_page;
+        return { data: { total_count: event === "pull_request_target" ? 0 : 900, workflow_runs: filtered.slice(start, start + per_page) } };
+      },
+    });
+
+    // Save #902: unfiltered page 2+ throws 503 during the independent scan for ID-less #50.
+    // Direct lookups 1..10, cursor 10, and verified interval coverage through 902 must still persist.
+    recentRuns.unshift(paginationRun(901, { head_branch: "pr-901", event: "pull_request" }));
+    await save(remote, 902, "success", { github });
+    expect(global.core.warning).toHaveBeenCalledWith(expect.stringMatching(/503 service unavailable/));
+    expect(github.calls.runs).toEqual(Array.from({ length: 10 }, (_, i) => 9001 + i));
+    expect(remoteState(remote)).toMatchObject({ reconciled_through: 902, unresolved_lookup_cursor: 10 });
+    expect(remoteState(remote).unresolved_runs).toContain(50);
+
+    // Save #904 advances direct lookups to 11..20 despite the same deep-page 503.
+    recentRuns.unshift(paginationRun(903, { head_branch: "pr-903", event: "pull_request" }), paginationRun(902));
+    await save(remote, 904, "success", { github });
+    expect(github.calls.runs).toEqual(Array.from({ length: 20 }, (_, i) => 9001 + i));
+    expect(remoteState(remote)).toMatchObject({ reconciled_through: 904, unresolved_lookup_cursor: 20 });
+    expect(remoteState(remote).unresolved_runs).toContain(50);
+  });
+
+  it("falls back to the newest uncovered ID-less obligation when the oldest exceeds the search call budget", async () => {
+    const agent = { name: "agent", conclusion: "failure", started_at: "2026-11-24T09:00:00Z" };
+    const writer = conclusion => ({ name: "push_routing_history", conclusion, started_at: "2026-11-24T09:10:00Z" });
+    // 10,000 runs with unresolved [50, 4500]: #50 lies beyond MAX_SEARCH_CALLS=16, while live failed
+    // #4500 is reachable via the fallback scan against the newest remaining uncovered obligation.
+    const runs = Array.from({ length: 10000 }, (_, i) => {
+      const number = 10000 - i;
+      return paginationRun(number, { conclusion: number === 4500 ? "failure" : "success" });
+    });
+    const github = fakeGitHub(null, { runs, jobs: { 13500: [agent, writer("failure")] } });
+    const { listing, reconciliation } = await listRuns({
+      githubClient: github,
+      owner: "octo",
+      repo: "demo",
+      workflowFile: "triage.lock.yml",
+      defaultBranch: "main",
+      runId: "19001",
+      runNumber: 10001,
+      state: { ...emptyState("triage"), generation: { hash: GENERATION, since_run: 1 }, last_run: 10000, reconciled_through: 10000, unresolved_runs: [50, 4500], unexplained: 0 },
+      runs: [],
+      generation: GENERATION,
+    });
+    expect(listing).toEqual([expect.objectContaining({ id: "13500", number: 4500, conclusion: "failure", agent_ran: true })]);
+    expect(reconciliation.resolved).toContain(4500);
+    expect(reconciliation.unresolved).toEqual([50]);
+  });
+
+  it("retains a failing run and still advances the direct-lookup cursor when per-run job enrichment throws", async () => {
+    const remote = bareRemote();
+    const trackedIds = Array.from({ length: 20 }, (_, i) => i + 1);
+    const unresolvedRunIds = Object.fromEntries(trackedIds.map(n => [String(n), String(9000 + n)]));
+    seedHistory(
+      remote,
+      {
+        ...emptyState("triage"),
+        generation: { hash: GENERATION, since_run: 1 },
+        last_run: 900,
+        reconciled_through: 900,
+        unresolved_runs: trackedIds,
+        unresolved_run_ids: unresolvedRunIds,
+        unexplained: 0,
+      },
+      []
+    );
+    const runsById = Object.fromEntries(trackedIds.map(n => [9000 + n, paginationRun(n, n === 3 ? { status: "completed", conclusion: "failure" } : { status: "in_progress", conclusion: null })]));
+    const recentRuns = Array.from({ length: 100 }, (_, i) => paginationRun(900 - i));
+    const github = fakeGitHub(remote, { runs: recentRuns, runsById });
+    const origJobs = github.rest.actions.listJobsForWorkflowRunAttempt;
+    github.rest.actions.listJobsForWorkflowRunAttempt = async params => {
+      if (params.run_id === 9003) throw Object.assign(new Error("500 internal error"), { status: 500 });
+      return origJobs(params);
+    };
+
+    // Save #902 checks IDs 1..10: #3's job lookup throws, but #3 stays unresolved with its ID and
+    // cursor advances to 10 so Save #904 still visits IDs 11..20 instead of starving them.
+    recentRuns.unshift(paginationRun(901, { head_branch: "pr-901", event: "pull_request" }));
+    await save(remote, 902, "success", { github });
+    expect(global.core.warning).toHaveBeenCalledWith(expect.stringMatching(/500 internal error/));
+    expect(github.calls.runs).toEqual(Array.from({ length: 10 }, (_, i) => 9001 + i));
+    expect(remoteState(remote)).toMatchObject({ reconciled_through: 902, unresolved_lookup_cursor: 10 });
+    expect(remoteState(remote).unresolved_runs).toContain(3);
+    expect(remoteState(remote).unresolved_run_ids["3"]).toBe("9003");
+
+    recentRuns.unshift(paginationRun(903, { head_branch: "pr-903", event: "pull_request" }), paginationRun(902));
+    await save(remote, 904, "success", { github });
+    expect(github.calls.runs).toEqual(Array.from({ length: 20 }, (_, i) => 9001 + i));
+    expect(remoteState(remote)).toMatchObject({ reconciled_through: 904, unresolved_lookup_cursor: 20 });
+  });
+
+  it("reconciles and charges a failed first attempt immediately while a re-run is still in progress", async () => {
+    const remote = bareRemote();
+    await save(remote, 50, "success");
+    const agent = { name: "agent", conclusion: "failure", started_at: "2026-11-24T09:00:00Z" };
+    const writer = conclusion => ({ name: "push_routing_history", conclusion, started_at: "2026-11-24T09:10:00Z" });
+    const run51 = { id: 9051, run_number: 51, status: "in_progress", conclusion: null, head_branch: "main", event: "schedule", run_attempt: 2 };
+    const github = fakeGitHub(remote, {
+      runs: [run51, { id: 9050, run_number: 50, status: "completed", conclusion: "success", head_branch: "main", event: "schedule", run_attempt: 1 }],
+      attempts: { 9051: { status: "completed", conclusion: "failure" } },
+      jobs: { 9051: [agent, writer("failure")] },
+    });
+
+    await save(remote, 52, "success", { github });
+    expect(github.calls.attempts).toEqual([9051]);
+    expect(github.calls.attemptParams).toEqual([expect.objectContaining({ run_id: 9051, attempt_number: 1 })]);
+    expect(github.calls.jobs).toEqual([9051]);
+    expect(github.calls.jobParams).toEqual([expect.objectContaining({ run_id: 9051, attempt_number: 1 })]);
+    expect(remoteRuns(remote).map(({ number, attempt, note }) => ({ number, attempt, note }))).toEqual([
+      { number: 50, attempt: 1, note: null },
+      { number: 51, attempt: 1, note: "unsaved" },
+      { number: 52, attempt: 1, note: null },
+    ]);
+    expect(remoteState(remote)).toMatchObject({ last_run: 52, reconciled_through: 52, unresolved_runs: [], unexplained: 1 });
+
+    // A later save while attempt 2 is still running (or once it succeeds) does not re-query or double-charge #51.
+    const nextGitHub = fakeGitHub(remote, {
+      runs: [
+        { id: 9052, run_number: 52, status: "completed", conclusion: "success", head_branch: "main", event: "schedule", run_attempt: 1 },
+        { ...run51, status: "completed", conclusion: "success" },
+      ],
+      attempts: { 9051: { status: "completed", conclusion: "failure" } },
+      jobs: { 9051: [agent, writer("failure")] },
+    });
+    await save(remote, 53, "success", { github: nextGitHub });
+    expect(nextGitHub.calls.attempts).toEqual([]);
+    expect(nextGitHub.calls.jobs).toEqual([]);
+    expect(remoteState(remote)).toMatchObject({ last_run: 53, reconciled_through: 53, unresolved_runs: [], unexplained: 1 });
+  });
+
+  it("handles active re-runs for tracked unresolved runs, saved first attempts, and incomplete first attempts", async () => {
+    const remote = bareRemote();
+    await save(remote, 50, "success");
+    const agent = { name: "agent", conclusion: "failure", started_at: "2026-11-24T09:00:00Z" };
+    const writer = conclusion => ({ name: "push_routing_history", conclusion, started_at: "2026-11-24T09:10:00Z" });
+
+    // #51 starts as an in-progress attempt 1 and is tracked in unresolved_runs by #52.
+    const run51 = { id: 9051, run_number: 51, status: "in_progress", conclusion: null, head_branch: "main", event: "schedule", run_attempt: 1 };
+    await save(remote, 52, "success", { github: fakeGitHub(remote, { runs: [run51] }) });
+    expect(remoteState(remote)).toMatchObject({ reconciled_through: 52, unresolved_runs: [51], unexplained: 0 });
+
+    // Before #55 saves:
+    // - #51 failed attempt 1 and is now re-running (attempt 2 in_progress): must reconcile and clear from unresolved_runs.
+    // - #53 succeeded attempt 1 and is re-running (attempt 2 in_progress): must reconcile without querying jobs or marking unresolved.
+    // - #54 reports run_attempt 2 in_progress, but attempt 1 itself is not yet completed: must stay in unresolved_runs without querying jobs.
+    const github = fakeGitHub(remote, {
+      runs: [
+        { id: 9054, run_number: 54, status: "in_progress", conclusion: null, head_branch: "main", event: "schedule", run_attempt: 2 },
+        { id: 9053, run_number: 53, status: "in_progress", conclusion: null, head_branch: "main", event: "schedule", run_attempt: 2 },
+        { id: 9052, run_number: 52, status: "completed", conclusion: "success", head_branch: "main", event: "schedule", run_attempt: 1 },
+        { id: 9051, run_number: 51, status: "in_progress", conclusion: null, head_branch: "main", event: "schedule", run_attempt: 2 },
+      ],
+      attempts: {
+        9051: { status: "completed", conclusion: "failure" },
+        9053: { status: "completed", conclusion: "success" },
+        9054: { status: "in_progress", conclusion: null },
+      },
+      jobs: { 9051: [agent, writer("failure")] },
+    });
+
+    await save(remote, 55, "success", { github });
+    expect(github.calls.attempts).toEqual([9051, 9053, 9054]);
+    expect(github.calls.jobs).toEqual([9051]);
+    expect(remoteRuns(remote).map(({ number, note }) => ({ number, note }))).toEqual([
+      { number: 50, note: null },
+      { number: 52, note: null },
+      { number: 51, note: "unsaved" },
+      { number: 55, note: null },
+    ]);
+    expect(remoteState(remote)).toMatchObject({
+      last_run: 55,
+      reconciled_through: 55,
+      unresolved_runs: [54],
+      unresolved_run_ids: { "54": "9054" },
+      unexplained: 1,
+    });
+  });
+
+  it("retains an active re-run as unresolved without discarding unrelated reconciliation when attempt-1 or job lookup fails transiently", async () => {
+    const remote = bareRemote();
+    await save(remote, 50, "success");
+    const agent = { name: "agent", conclusion: "failure", started_at: "2026-11-24T09:00:00Z" };
+    const writer = conclusion => ({ name: "push_routing_history", conclusion, started_at: "2026-11-24T09:10:00Z" });
+    const run50 = { id: 9050, run_number: 50, status: "completed", conclusion: "success", head_branch: "main", event: "schedule", run_attempt: 1 };
+    const run51 = { id: 9051, run_number: 51, status: "completed", conclusion: "failure", head_branch: "main", event: "schedule", run_attempt: 1 };
+    const run52 = { id: 9052, run_number: 52, status: "in_progress", conclusion: null, head_branch: "main", event: "schedule", run_attempt: 2 };
+
+    // 1. Attempt-1 lookup for active re-run #52 fails with 503: #51 must still be charged while #52 stays unresolved.
+    const gh53 = fakeGitHub(remote, { runs: [run52, run51, run50], jobs: { 9051: [agent, writer("failure")] } });
+    gh53.rest.actions.getWorkflowRunAttempt = async () => {
+      throw Object.assign(new Error("503 service unavailable"), { status: 503 });
+    };
+    await save(remote, 53, "success", { github: gh53 });
+    expect(remoteRuns(remote).map(({ number, note }) => ({ number, note }))).toEqual([
+      { number: 50, note: null },
+      { number: 51, note: "unsaved" },
+      { number: 53, note: null },
+    ]);
+    expect(remoteState(remote)).toMatchObject({
+      last_run: 53,
+      reconciled_through: 53,
+      unresolved_runs: [52],
+      unresolved_run_ids: { "52": "9052" },
+      unexplained: 1,
+    });
+
+    // 2. Attempt-1 lookup succeeds, but attempt-1 jobs lookup fails with 503: #52 remains unresolved for retry.
+    const run53 = { id: 9053, run_number: 53, status: "completed", conclusion: "success", head_branch: "main", event: "schedule", run_attempt: 1 };
+    const gh54 = fakeGitHub(remote, {
+      runs: [run53, run52, run51, run50],
+      attempts: { 9052: { status: "completed", conclusion: "failure" } },
+    });
+    gh54.paginate = async () => {
+      throw Object.assign(new Error("503 service unavailable"), { status: 503 });
+    };
+    await save(remote, 54, "success", { github: gh54 });
+    expect(remoteState(remote)).toMatchObject({
+      last_run: 54,
+      reconciled_through: 54,
+      unresolved_runs: [52],
+      unresolved_run_ids: { "52": "9052" },
+      unexplained: 1,
+    });
+
+    // 3. Once both lookups succeed, #52 is charged as unsaved and cleared from unresolved_runs.
+    const run54 = { id: 9054, run_number: 54, status: "completed", conclusion: "success", head_branch: "main", event: "schedule", run_attempt: 1 };
+    const gh55 = fakeGitHub(remote, {
+      runs: [run54, run53, run52, run51, run50],
+      attempts: { 9052: { status: "completed", conclusion: "failure" } },
+      jobs: { 9052: [agent, writer("failure")] },
+    });
+    await save(remote, 55, "success", { github: gh55 });
+    expect(remoteRuns(remote).map(({ number, note }) => ({ number, note }))).toEqual([
+      { number: 50, note: null },
+      { number: 51, note: "unsaved" },
+      { number: 53, note: null },
+      { number: 54, note: null },
+      { number: 52, note: "unsaved" },
+      { number: 55, note: null },
+    ]);
+    const finalState = remoteState(remote);
+    expect(finalState).toMatchObject({ last_run: 55, reconciled_through: 55, unresolved_runs: [], unexplained: 2 });
+    expect(finalState.unresolved_run_ids).toBeUndefined();
   });
 });
 

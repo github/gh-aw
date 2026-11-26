@@ -314,6 +314,7 @@ func TestUnzipFileWithLimits(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			destDir := t.TempDir()
 			err := unzipFileWithLimits(zipPath, destDir, false, tt.maxEntryCount, tt.maxTotalSize)
 			require.ErrorContains(t, err, tt.wantError)
@@ -371,6 +372,7 @@ func TestUnzipFileDirectoryLimit(t *testing.T) {
 
 	for _, directoryEntry := range []bool{false, true} {
 		t.Run(fmt.Sprintf("directory entries %t", directoryEntry), func(t *testing.T) {
+			t.Parallel()
 			zipPath := filepath.Join(t.TempDir(), "directories.zip")
 			archive, err := os.Create(zipPath)
 			require.NoError(t, err)
@@ -410,6 +412,7 @@ func TestExtractZipFileWithLimit(t *testing.T) {
 
 	for _, budget := range []uint64{0, 3, 4, 5, 6} {
 		t.Run(fmt.Sprintf("budget %d", budget), func(t *testing.T) {
+			t.Parallel()
 			destDir := t.TempDir()
 			written, err := extractZipFileWithLimit(reader.File[0], destDir, false, budget)
 			if budget < 5 {

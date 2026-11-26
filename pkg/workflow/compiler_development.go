@@ -47,7 +47,7 @@ func (c *Compiler) dryRunWorkflowData(data *WorkflowData) *WorkflowData {
 	result.LockForAgent = false
 	result.LabelCommandRemoveLabel = false
 	result.ReportBlockedVersionDisabled = true
-	result.AdaptiveRouting = ""
+	result.RoutingLearningMode = ""
 	result.Tools = maps.Clone(data.Tools)
 	if _, exists := result.Tools["work-queue"]; exists {
 		result.Tools["work-queue"] = false

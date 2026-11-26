@@ -262,19 +262,6 @@ func validateRequestValue(value any, actor object) (requestRecord, error) {
 	return requestRecord{id: id, kind: kind, parameters: parameters}, nil
 }
 
-// RequestID derives `request:` + sha256(canonical({actor, kind, parameters})).
-func RequestID(actor Actor, kind string, parameters any) (string, error) {
-	actorValue, err := genericValue(actor)
-	if err != nil {
-		return "", err
-	}
-	parameterValue, err := genericValue(parameters)
-	if err != nil {
-		return "", err
-	}
-	return requestIDValue(actorValue, kind, parameterValue)
-}
-
 // NewRequest canonicalizes parameters and returns a validated request bound to actor.
 func NewRequest(kind string, actor Actor, parameters any) (Request, error) {
 	actorValue, err := genericValue(actor)
@@ -314,11 +301,6 @@ func CommitID(previous *string, requestID string) string {
 		return "q_" + sha256Text(*previous+"\n"+requestID)
 	}
 	return "q_" + sha256Text(requestID)
-}
-
-// ProposedCommitID is the commit ID a request would receive appended to state.
-func ProposedCommitID(state Projection, request Request) string {
-	return CommitID(tipPointer(state.Tip), request.ID)
 }
 
 func tipPointer(tip string) *string {

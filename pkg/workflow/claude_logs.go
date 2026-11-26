@@ -6,6 +6,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/github/gh-aw/pkg/jsonutil"
 	"github.com/github/gh-aw/pkg/logger"
 	"github.com/github/gh-aw/pkg/typeutil"
 )
@@ -74,7 +75,7 @@ func (e *ClaudeEngine) isClaudeResultPayload(line string) bool {
 	}
 
 	var jsonData map[string]any
-	if err := json.Unmarshal([]byte(trimmed), &jsonData); err != nil {
+	if err := jsonutil.UnmarshalString(trimmed, &jsonData); err != nil {
 		return false
 	}
 
@@ -94,7 +95,7 @@ func (e *ClaudeEngine) extractClaudeResultMetrics(line string) LogMetrics {
 
 	trimmed := strings.TrimSpace(line)
 	var jsonData map[string]any
-	if err := json.Unmarshal([]byte(trimmed), &jsonData); err != nil {
+	if err := jsonutil.UnmarshalString(trimmed, &jsonData); err != nil {
 		return metrics
 	}
 
@@ -135,16 +136,32 @@ func (e *ClaudeEngine) extractClaudeResultMetrics(line string) LogMetrics {
 }
 
 func (e *ClaudeEngine) parseClaudeLogEntries(logContent string, verbose bool) []map[string]any {
+	// Array records can be pretty-printed or separated by newlines. Reuse
+	// one decoder rather than retrying the whole log one line at a time.
+	input := strings.TrimLeft(logContent, " \t\r\n")
 	var logEntries []map[string]any
-	if err := json.Unmarshal([]byte(logContent), &logEntries); err == nil {
-		return logEntries
-	} else {
-		claudeLogsLog.Print("JSON array parse failed, trying JSONL format")
-		if verbose {
-			fmt.Fprintf(os.Stderr, "Failed to parse Claude log as JSON array, trying JSONL format: %v\n", err)
+	if strings.HasPrefix(input, "[") {
+		decoder := json.NewDecoder(strings.NewReader(input))
+		logContent = input
+		var batch []map[string]any
+		for {
+			if err := decoder.Decode(&batch); err != nil { //nolint:jsondecodertrailingdataunchecked // Consecutive arrays are expected; mixed-format recovery handles trailing data.
+				break
+			}
+			tail := strings.TrimLeft(input[decoder.InputOffset():], " \t\r")
+			if tail != "" && !strings.HasPrefix(tail, "\n") {
+				break
+			}
+			// Resume mixed-format recovery at the first unconsumed line.
+			logEntries = append(logEntries, batch...)
+			clear(batch) // Nil slice elements so Decode cannot reuse maps saved in logEntries.
+			logContent = strings.TrimLeft(tail, " \t\r\n")
+			if logContent != "" && !strings.HasPrefix(logContent, "[") {
+				break
+			}
 		}
 	}
-	logEntries = e.parseClaudeMixedLogEntries(logContent, verbose)
+	logEntries = e.parseClaudeMixedLogEntries(logContent, verbose, logEntries)
 	if len(logEntries) == 0 {
 		if verbose {
 			fmt.Fprintf(os.Stderr, "No valid JSON entries found in Claude log\n")
@@ -157,9 +174,8 @@ func (e *ClaudeEngine) parseClaudeLogEntries(logContent string, verbose bool) []
 	return logEntries
 }
 
-func (e *ClaudeEngine) parseClaudeMixedLogEntries(logContent string, verbose bool) []map[string]any {
-	var logEntries []map[string]any
-	lines := strings.Split(logContent, "\n")
+func (e *ClaudeEngine) parseClaudeMixedLogEntries(logContent string, verbose bool, logEntries []map[string]any) []map[string]any {
+	lines := strings.FieldsFunc(logContent, func(r rune) bool { return r == '\n' })
 	for i := 0; i < len(lines); i++ {
 		if i < 0 || i >= len(lines) {
 			break
@@ -206,7 +222,7 @@ func extractClaudeJSONArrayEntries(lines []string, start int) ([]map[string]any,
 
 func parseClaudeJSONArrayBuffer(buf string) []map[string]any {
 	var entries []map[string]any
-	if err := json.Unmarshal([]byte(buf), &entries); err == nil {
+	if err := jsonutil.UnmarshalString(buf, &entries); err == nil {
 		return entries
 	}
 	openIdx := strings.Index(buf, "[")
@@ -215,7 +231,7 @@ func parseClaudeJSONArrayBuffer(buf string) []map[string]any {
 		return nil
 	}
 	var subEntries []map[string]any
-	if err := json.Unmarshal([]byte(buf[openIdx:closeIdx+1]), &subEntries); err == nil {
+	if err := jsonutil.UnmarshalString(buf[openIdx:closeIdx+1], &subEntries); err == nil {
 		return subEntries
 	}
 	return nil
@@ -226,7 +242,7 @@ func parseClaudeJSONEntry(trimmedLine string, verbose bool) (map[string]any, boo
 		return nil, false
 	}
 	var jsonEntry map[string]any
-	if err := json.Unmarshal([]byte(trimmedLine), &jsonEntry); err != nil {
+	if err := jsonutil.UnmarshalString(trimmedLine, &jsonEntry); err != nil {
 		if verbose {
 			fmt.Fprintf(os.Stderr, "Skipping invalid JSON line: %s\n", trimmedLine)
 		}

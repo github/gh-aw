@@ -1882,6 +1882,17 @@ describe("create_issue", () => {
       expect(createCall.body).toContain("`@someone-else`");
     });
 
+    it("should escape allowlisted mentions when the configured mention limit is invalid", async () => {
+      const handler = await main({
+        mentions: { allowTeamMembers: false, allowContext: false, allowed: ["copilot"], max: "invalid" },
+      });
+      await handler({ title: "Test Issue", body: "Please ask @copilot to review this." });
+
+      const createCall = mockGithub.rest.issues.create.mock.calls[0][0];
+      expect(createCall.body).toContain("`@copilot`");
+      expect(createCall.body).not.toMatch(/(?<![`])@copilot(?![`])/);
+    });
+
     it.each([
       ["copilot-swe-agent", "copilot"],
       ["org/team.name", "org/team.name"],
