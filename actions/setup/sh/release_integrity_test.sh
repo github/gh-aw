@@ -190,7 +190,7 @@ printf '%s\n' '{"draft":false,"tag_name":"v1.0.98","published_at":"2020-01-01T00
 for server in https://github.com https://example.ghe.com ''; do
   rm -f "$TEMP_DIR/curl.log"
   GITHUB_SERVER_URL="$server" GITHUB_TOKEN=workflow-test-token run_copilot 1.0.98 --rootless --cooldown-days 7
-  metadata_request="$(grep 'api.github.com/repos/github/copilot-cli/releases/' "$TEMP_DIR/curl.log")"
+  metadata_request="$(grep -F 'https://api.github.com/repos/github/copilot-cli/releases/tags/v1.0.98' "$TEMP_DIR/curl.log")"
   if [ "$server" = https://github.com ]; then
     [[ "$metadata_request" = *'Authorization:'* ]]
     [[ "$metadata_request" = *'workflow-test-token'* ]]
@@ -200,8 +200,9 @@ for server in https://github.com https://example.ghe.com ''; do
   fi
 done
 rm -f "$TEMP_DIR/curl.log"
-GITHUB_SERVER_URL=https://github.com GITHUB_TOKEN= run_copilot 1.0.98 --rootless --cooldown-days 7
-! grep 'api.github.com/repos/github/copilot-cli/releases/' "$TEMP_DIR/curl.log" | grep -q 'Authorization:'
+GITHUB_SERVER_URL=https://github.com GITHUB_TOKEN='' run_copilot 1.0.98 --rootless --cooldown-days 7
+metadata_request="$(grep -F 'https://api.github.com/repos/github/copilot-cli/releases/tags/v1.0.98' "$TEMP_DIR/curl.log")"
+[[ "$metadata_request" != *'Authorization:'* ]]
 echo "PASS: Copilot release-age checks authenticate only with github.com workflow tokens"
 
 printf '%s\n' '{"draft":false,"tag_name":"v1.0.98","published_at":"2999-01-01T00:00:00Z"}' >"$TEMP_DIR/release-metadata.json"

@@ -770,7 +770,7 @@ check_copilot_release_age() {
     fi
     endpoint="https://api.github.com/repos/${COPILOT_REPO}/releases/tags/v${version#v}"
   fi
-  if ! curl --proto '=https' --proto-redir '=https' "${auth_args[@]}" \
+  if ! curl --proto '=https' --proto-redir '=https' "${auth_args[@]+"${auth_args[@]}"}" \
     -H "Accept: application/vnd.github+json" -fsSL --connect-timeout 10 --max-time 30 \
     --retry 5 --retry-delay 2 --retry-max-time 60 --retry-all-errors -o "$metadata" "$endpoint"; then
     echo "ERROR: Cannot verify Copilot release age: GitHub release metadata is unavailable" >&2
