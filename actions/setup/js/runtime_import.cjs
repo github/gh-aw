@@ -210,8 +210,6 @@ const ALLOWED_EXPRESSIONS = [
  * @returns {boolean} - True if expression is safe
  */
 function isSafeExpression(expr) {
-  const trimmed = expr.trim();
-
   // Expressions containing line terminators are never safe.
   // A newline inside an expression can split the operator regex matching and
   // cause compound expressions like "safe == 'x' &\n 'payload' || 'default'"
@@ -222,6 +220,8 @@ function isSafeExpression(expr) {
   if (/[\n\r\u2028\u2029]/.test(expr)) {
     return false;
   }
+
+  const trimmed = expr.trim();
 
   // Block dangerous JavaScript built-in property names
   const DANGEROUS_PROPS = [
@@ -657,9 +657,13 @@ function processExpressionText(content, source, protectValue) {
     const fullMatch = match[0];
     const expr = match[1];
 
-    // Skip multiline expressions (security: prevent injection)
-    if (expr.includes("\n")) {
-      unsafeExpressions.push(expr.trim());
+    // Reject line terminators before trimming expression content.
+    if (/[\n\r\u2028\u2029]/.test(expr)) {
+      unsafeExpressions.push(
+        JSON.stringify(expr)
+          .replace(/\u2028/g, "\\u2028")
+          .replace(/\u2029/g, "\\u2029")
+      );
       continue;
     }
 
