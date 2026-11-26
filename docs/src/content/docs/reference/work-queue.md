@@ -94,7 +94,7 @@ For each new Dispatch the step sends one `workflow_dispatch` of the worker at th
 - Every safe output belongs to one Claim. A one-Claim assignment may omit `claim_handle`.
 - A safe output is applied only when its Claim is open, its Dispatch is bound to this run attempt, the Claim's finish outcome is `completed`, and every target repository equals the profile's effect scope. Otherwise the handler rejects it with `E004`.
 - Each applied effect is appended to `/tmp/gh-aw/work-queue.effects.jsonl`. The **Finish work queue claim** step, after **Process Safe Outputs**, publishes one `finish` commit: a Completion with those effects (dropped with a warning above 4,096 bytes) for `completed` Claims, and a `worker_failed` Claim cancellation for `failed` or missing outcomes.
-- Effects are applied before the `finish` commit. If the job stops between the two, maintenance releases the Dispatch and the next attempt can repeat the effects. Write idempotent workers.
+- Effects are applied before the `finish` commit. If the job stops between the two, maintenance releases the Dispatch and the next attempt can repeat the effects. Effects are at-least-once, not exactly-once: make worker effects idempotent or check for an existing effect before applying it.
 - A Work predecessor is satisfied by its Completion. Its recorded effects are passed to successors as `result_refs[].descriptor`.
 
 Beyond built-in safe outputs, declare `safe-outputs.claim-adapters` for Claim-scoped effects with custom handlers; adapters use the same authorization.
@@ -130,6 +130,10 @@ A checkpoint keeps the live queue and drops finished history. That bounds the le
 ### Version 3 ledgers
 
 The first dispatcher, producer, administrator, or maintenance job that reads a version 3 head converts it. The converter keeps `available` Work whose pool and worker profile are still configured, in their original order, and writes it as administrator `migrate` commits into a new log whose Git parent is the version 3 head. Claimed, completed, and cancelled version 3 Work is not carried; the old log stays in Git history. Workers, observers, and projectors fail with `unsupported_protocol` until conversion has run.
+
+Before upgrading a shared queue, pause queue activity and rehearse conversion on an isolated copy of the ledger using the intended pool and worker configuration. Compare the carried Work and conversion warnings with the original; dependencies and configuration can cause available Work to be skipped. Upgrade and recompile the workers, dispatchers, maintenance workflow, and operator CLI before resuming activity. Do not mix v3 and v4 participants on the converted ledger.
+
+Before enabling any `request-continuation` route, upgrade every reader of the shared ledger, including workers, dispatchers, maintenance, and the CLI, to a version that supports continuation. Earlier v4 readers reject a `finish` commit that includes successor Work.
 
 ## Backing Issues
 

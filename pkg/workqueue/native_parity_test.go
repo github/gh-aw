@@ -256,6 +256,68 @@ func TestNativeParityWithJavaScript(t *testing.T) {
 	require.Zero(t, mismatches, "%d of %d differential cases differ", mismatches, len(inputs))
 }
 
+func TestContinuationParityWithJavaScript(t *testing.T) {
+	var fixture prefixFixture
+	loadFixture(t, "canonical-prefix.json", &fixture)
+	ledger := fixture.Continuation
+	require.NotEmpty(t, ledger.Commits)
+
+	decode := func(record json.RawMessage) any {
+		t.Helper()
+		value, err := decodeStrict(record)
+		require.NoError(t, err)
+		return value
+	}
+	commits := make([]any, len(ledger.Commits))
+	finishWithWork := 0
+	for index, record := range ledger.Commits {
+		commits[index] = decode(record)
+		commit := commits[index].(map[string]any)
+		operations := commit["operations"].([]any)
+		if commit["request"].(map[string]any)["kind"] == "finish" && len(operations) == 2 &&
+			operations[0].(map[string]any)["kind"] == "Completion" && operations[1].(map[string]any)["kind"] == "Work" {
+			finishWithWork++
+		}
+	}
+	require.GreaterOrEqual(t, finishWithWork, 1)
+
+	parameters := fixture.NextParameters
+	var inputs []parityInput
+	var codes []string
+	for index := range commits {
+		inputs = append(inputs, parityInput{Transactions: commits[:index+1], Parameters: &parameters, RequestID: fixture.NextRequestID, label: fmt.Sprintf("prefix %d", index+1)})
+		codes = append(codes, "")
+	}
+	inputs = append(inputs, parityInput{Transactions: []any{decode(ledger.Checkpoint.Commit)}, label: "continuation checkpoint"})
+	codes = append(codes, "")
+	for _, rejection := range ledger.Rejections {
+		base := len(commits)
+		if rejection.Base != nil {
+			base = *rejection.Base
+		}
+		transactions := append([]any{}, commits[:base]...)
+		for _, record := range rejection.Extra {
+			transactions = append(transactions, decode(record))
+		}
+		transactions = append(transactions, decode(rejection.Commit))
+		inputs = append(inputs, parityInput{Transactions: transactions, label: rejection.Name})
+		codes = append(codes, rejection.Code)
+	}
+	require.NotEmpty(t, ledger.Rejections)
+	results := jsReplayCommands(t, inputs)
+	for index, input := range inputs {
+		actual := goReplayCommand(t, input)
+		require.Equal(t, results[index], actual, input.label)
+		if codes[index] == "" {
+			require.False(t, strings.HasPrefix(actual, `{"error"`), input.label)
+		} else {
+			want, err := canonicalGeneric(map[string]any{"error": codes[index]})
+			require.NoError(t, err)
+			require.Equal(t, string(want), actual, input.label)
+		}
+	}
+}
+
 // groupedDispatchCase is one input with the literal error code both engines must return,
 // or "" when both must accept it.
 type groupedDispatchCase struct {
