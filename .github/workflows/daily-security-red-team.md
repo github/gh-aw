@@ -613,7 +613,7 @@ Before proceeding to Phase 5, perform a **second-pass validation** of every find
 4. Remove false positives from `FINDINGS[]` and log them to `$CACHE_DIR/dismissed-findings-${TIMESTAMP}.json`.
 5. For "needs more investigation" items, run one additional targeted check (e.g., trace data flow or check call graph).
 6. Update `$CURRENT_SCAN` with `"re_evaluation_complete": true` and `"dismissed_count": <N>`.
-{{else}}
+{{#else}}
 <!-- single_pass: skip re-evaluation, proceed directly to Phase 5 -->
 {{/if}}
 

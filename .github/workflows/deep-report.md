@@ -328,7 +328,7 @@ Generate a **Simplified Technical English (STE) brief** with these sections only
 1. **🔍 Executive Summary** — 3 short sentences: overall health, top finding, urgent action.
 2. **🚨 Top 5 Findings** — Flat bullet list. Each bullet is one short sentence, most impactful first.
 3. **✅ Actionable Agentic Tasks** — Up to 7 evidence-backed items, each written as one short, direct instruction.
-{{else}}
+{{#else}}
 Generate an intelligence briefing with the following sections:
 
 ### 🔍 Executive Summary
