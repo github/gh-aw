@@ -11,6 +11,10 @@ namespace TokenBroker {
   @pattern("^[!-~]+$")
   scalar Credential extends string;
 
+  @doc("RFC 6750 Section 2.1 b64token grammar for OTLP only.")
+  @pattern("^[A-Za-z0-9._~+/-]+={0,}$")
+  scalar OtlpCredential extends string;
+
   @doc("Restricted RFC 3339 profile: valid Gregorian date, no leap seconds or hour 24.")
   @pattern("^[0-9]{4}-[0-9]{2}-[0-9]{2}[Tt](?:[01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](?:\\.[0-9]+)?(?:[Zz]|[+-](?:[01][0-9]|2[0-3]):[0-5][0-9])$")
   scalar Expiration extends string;
@@ -50,13 +54,13 @@ namespace TokenBroker {
 
   @doc("An approved absolute HTTPS OTLP/HTTP base URL. Format/pattern checks are partial; URL parsing, userinfo rejection, destination policy, and SSRF checks are normative in Section 3.1.")
   @format("uri")
-  @pattern("^https://[^\\s\\\\#]+$")
+  @pattern("^[Hh][Tt][Tt][Pp][Ss]://[^/@\\s\\x00-\\x1F\\x7F\\\\#]+(?:[/?][^\\s\\x00-\\x1F\\x7F\\\\#]*)?$")
   scalar CollectorEndpoint extends string;
 
-  @doc("Only an otlp exchange returns this exact three-member body; endpoint/token/expiry are one job-local pair. Expiration must cover the trusted job completion bound plus the safety margin in Section 6.4.")
+  @doc("Only an otlp exchange returns this exact three-member body; endpoint/token/expiry are one job-local pair. The token uses OtlpCredential, and expiration covers the trusted job completion bound plus the safety margin in Section 6.4.")
   model IssuedOtlpCredential {
     endpoint: CollectorEndpoint;
-    token: Credential;
+    token: OtlpCredential;
     expires_at: Expiration;
   }
 
@@ -68,7 +72,7 @@ namespace TokenBroker {
     ...ResponseHeaders;
     @statusCode status: 200;
     @header contentType: "application/json";
-    @doc("Select by request token_type: otlp requires IssuedOtlpCredential; all other types require IssuedCredential. Reject additional members; no response discriminator is added.")
+    @doc("The schema union cannot encode the request-dependent response shape. A conforming client MUST select the response model using the request token_type and reject any member set that does not match Section 4.3; T-TBR-021 verifies this for both mismatch directions.")
     @body body: IssuedCredential | IssuedOtlpCredential;
   }
 

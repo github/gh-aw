@@ -156,7 +156,6 @@ Use the task routes above first. This inventory is not required startup context.
 - `.github/aw/otel.md`
 - `.github/aw/patterns.md`
 - `.github/aw/playwright.md`
-- `.github/aw/pr-finisher.md`
 - `.github/aw/pr-reviewer.md`
 - `.github/aw/release-workflow.md`
 - `.github/aw/repo-factory.md`
