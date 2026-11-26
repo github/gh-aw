@@ -3,7 +3,11 @@
 
 /** @typedef {{run_number: number, event: string, head_branch: string | null, status: string, run_attempt?: number, conclusion?: string | null, first_attempt_conclusion?: string | null}} WorkflowRun */
 
-/** @param {Pick<WorkflowRun, "event" | "head_branch">} run @param {string} defaultBranch */
+/**
+ * GitHub lists pull_request_target runs under the PR branch even though their definition
+ * comes from the default branch. Other PR events do not qualify.
+ * @param {Pick<WorkflowRun, "event" | "head_branch">} run @param {string} defaultBranch
+ */
 function isEligibleRun(run, defaultBranch) {
   if (/^pull_request(?!_target)/.test(run.event || "")) return false;
   return run.event === "pull_request_target" || run.head_branch === defaultBranch;
@@ -17,8 +21,9 @@ function isSavedConclusion(conclusion) {
 /**
  * Pass null only for a known new history, not a failed state read. Pages are newest first;
  * active runs may supply first-attempt evidence but cannot prove a missing page was read.
- * Report both flags: a visible unsaved result takes precedence, but an incomplete listing
- * also invalidates the caller's turn and in-flight count.
+ * Either flag withholds a test. An incomplete listing also invalidates the turn and in-flight
+ * count. Without a verified floor in existing history, a failure cannot be classified as
+ * unsaved: only listingIncomplete is set. Otherwise a visible unsaved result takes precedence.
  * @param {{ state: Pick<import("./routing_history.cjs").HistoryState, "last_run" | "reconciled_through" | "reset_after_run" | "unresolved_runs"> | null, runNumber: number, defaultBranch: string, runs: WorkflowRun[], reachesStart: boolean, activeRuns?: WorkflowRun[] }} input
  */
 function checkRoutingSaveCoverage({ state, runNumber, defaultBranch, runs, reachesStart, activeRuns = [] }) {
