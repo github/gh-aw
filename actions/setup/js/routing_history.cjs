@@ -517,25 +517,25 @@ function applyRun(input, runs, run, options = {}) {
       if (other.number > state.reset_after_run && other.number < number && (prevUnresolved.has(other.number) || (verifiedScan && other.number <= requestedCeiling))) {
         resolved.add(other.number);
       }
-      const nextUnresolved = new Set([...prevUnresolved].filter(n => !resolved.has(n) && !writtenNumbers.has(n)));
-      let ceiling = requestedCeiling;
-      if (verifiedScan) {
-        for (const n of Array.isArray(rec?.unresolved) ? rec.unresolved : []) {
-          if (Number.isInteger(n) && n > state.reset_after_run && n < number && n <= ceiling && !writtenNumbers.has(n) && !resolved.has(n)) {
-            nextUnresolved.add(n);
-          }
+    }
+    const nextUnresolved = new Set([...prevUnresolved].filter(n => !resolved.has(n) && !writtenNumbers.has(n)));
+    let ceiling = requestedCeiling;
+    if (verifiedScan) {
+      for (const n of Array.isArray(rec?.unresolved) ? rec.unresolved : []) {
+        if (Number.isInteger(n) && n > state.reset_after_run && n < number && n <= ceiling && !writtenNumbers.has(n) && !resolved.has(n)) {
+          nextUnresolved.add(n);
         }
       }
-      let kept = [...nextUnresolved].filter(n => n <= ceiling).sort((a, b) => a - b);
-      // Bound unresolved_runs without falsely marking dropped runs as reconciled.
-      if (kept.length > bounds.unresolved_runs) {
-        const cutoff = kept[bounds.unresolved_runs];
-        ceiling = Math.max(state.reset_after_run, Math.min(ceiling, cutoff - 1));
-        kept = kept.slice(0, bounds.unresolved_runs).filter(n => n <= ceiling);
-      }
-      finalCeiling = ceiling;
-      finalUnresolved = kept;
     }
+    let kept = [...nextUnresolved].filter(n => n <= ceiling).sort((a, b) => a - b);
+    // Bound unresolved_runs without falsely marking dropped runs as reconciled.
+    if (kept.length > bounds.unresolved_runs) {
+      const cutoff = kept[bounds.unresolved_runs];
+      ceiling = Math.max(state.reset_after_run, Math.min(ceiling, cutoff - 1));
+      kept = kept.slice(0, bounds.unresolved_runs).filter(n => n <= ceiling);
+    }
+    finalCeiling = ceiling;
+    finalUnresolved = kept;
   }
 
   // Completed runs that wrote no line are charged after the fences, in the right generation.
