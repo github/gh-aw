@@ -488,6 +488,9 @@ describe("push_routing_history saves", () => {
       { name: "push_routing_history", conclusion: "failure" },
     ];
     const github = fakeGitHub(remote, { runs, jobs: { 9012: jobs, 9013: jobs }, contents: { original: `GH_AW_ROUTING_GENERATION: "${GENERATION}"` } });
+    const beforeReplay = remoteHead(remote);
+    await save(remote, 12, "success", { github });
+    expect(remoteHead(remote)).toBe(beforeReplay);
     await save(remote, 514, "success", { github, generation: `${"c".repeat(64)}:${"d".repeat(64)}` });
     expect(remoteState(remote)).toMatchObject({ last_run: 514, reconciled_through: 10, unexplained: 0 });
     await save(remote, 515, "success", { github, generation: GENERATION });
@@ -561,6 +564,29 @@ describe("push_routing_history saves", () => {
     await save(remote, 3, "success", { github, generation: GENERATION });
     expect(remoteState(remote)).toMatchObject({ reconciled_through: 3, unexplained: 0 });
     expect(remoteRuns(remote).filter(row => row.number === 1)).toMatchObject([{ note: "older_definition", counted: false }]);
+  });
+
+  it.each([true, false])("honors a verified edit between two early missing saves (all definitions available: %s)", async available => {
+    const remote = bareRemote();
+    const runs = [paginationRun(3), paginationRun(2, { head_sha: "edited", conclusion: "failure" }), paginationRun(1, { head_sha: "original", conclusion: "failure" })];
+    const failed = [
+      { name: "agent", started_at: runCreatedAt(1), conclusion: "success" },
+      { name: "push_routing_history", conclusion: "failure" },
+    ];
+    const contents = { original: `GH_AW_ROUTING_GENERATION: "${GENERATION}"` };
+    const edited = `GH_AW_ROUTING_GENERATION: "${"c".repeat(64)}:${"d".repeat(64)}"`;
+    if (available) contents.edited = edited;
+    const github = fakeGitHub(remote, { runs, jobs: { 9001: failed, 9002: failed }, contents });
+    await save(remote, 3, "success", { github });
+    expect(remoteState(remote)).toMatchObject({ reconciled_through: available ? 3 : 0, unexplained: 0 });
+    contents.edited = edited;
+    await save(remote, 4, "success", { github });
+    expect(remoteState(remote)).toMatchObject({ reconciled_through: 4, unexplained: 0 });
+    expect(
+      remoteRuns(remote)
+        .filter(row => row.note === "older_definition")
+        .map(row => row.number)
+    ).toEqual([1, 2]);
   });
 
   it("lands two saves that read the same state, re-applying the later one to the newer file", async () => {

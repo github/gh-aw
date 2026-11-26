@@ -1085,6 +1085,11 @@ async function listRuns({ githubClient, owner, repo, workflowFile, workflowPath 
     }
   }
 
+  // A later unchecked early run may reveal an intervening edit that forgives this loss.
+  if (reconciliationCeiling < firstWrite - 1) {
+    const pending = listing.find(run => run.number > floor && run.number < firstWrite && run.agent_ran && run.generation === generation);
+    if (pending) reconciliationCeiling = Math.min(reconciliationCeiling, pending.number - 1);
+  }
   return {
     listing,
     reconciliation: {
@@ -1152,7 +1157,7 @@ async function main(options = {}) {
   let recorded = [];
   /** @param {{state: HistoryState, runs: any[]}} history */
   const record = async history => {
-    if (history.runs.some(entry => entry.run === runId)) {
+    if (history.state.first_write_run === run.number || history.runs.some(entry => entry.run === runId)) {
       recorded = [];
       return false;
     }

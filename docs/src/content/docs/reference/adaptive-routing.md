@@ -69,6 +69,8 @@ The first save checks earlier runs too. If runs 10 and 11 ran the agent under th
 
 If Actions is unavailable, run 12 can still save its own result without advancing `reconciled_through`. Until coverage catches up with all saved runs, `first_write_run: 12` tells later writers where the history began, even if the workflow is edited. An old backlog, a missing run number, or a workflow revision that Actions cannot verify can leave early history unverified indefinitely. If run 12's row ages out during catch-up, a later writer leaves the remaining range unverified: a job may have failed after its save landed.
 
+An edit can also separate two early missing saves. If runs 10 and 12 use the same definition but run 11 is verified to have used a different one, run 10's loss is not charged to run 12's generation. If run 11 has not been checked yet, the writer waits before charging run 10.
+
 ## The branch
 
 Each workflow's history lives on its own branch, `memory/adaptive-routing/<workflow>`, named after the lock file without `.lock.yml`, so renaming the workflow file starts a new history. The first save creates the branch from its own root commit, and every commit is made through the GitHub API, which signs it. gh-aw never force-pushes or deletes the branch.

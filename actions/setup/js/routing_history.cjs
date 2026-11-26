@@ -541,6 +541,11 @@ function applyRun(input, runs, run, options = {}) {
   // Completed runs that wrote no line are charged after the fences, in the right generation.
   const written = new Set(runs.map(entry => entry.run));
   const sinceRun = state.generation.since_run;
+  const firstWrite = input.first_write_run ?? (input.generation === null ? number : 0);
+  let lastEarlyEdit = sinceRun > firstWrite ? firstWrite : 0;
+  for (const other of run.listing || []) {
+    if (other.number < firstWrite && other.generation && other.generation !== state.generation.hash) lastEarlyEdit = Math.max(lastEarlyEdit, other.number);
+  }
   for (const other of [...(run.listing || [])].sort((left, right) => left.number - right.number)) {
     if (written.has(other.id) || other.id === id || other.number <= state.reset_after_run) continue;
     if (hasReconciliation) {
@@ -554,8 +559,7 @@ function applyRun(input, runs, run, options = {}) {
     }
     if (["success", "skipped", "neutral"].includes(other.conclusion)) continue;
     // A rollback can restore the same hash without undoing the intervening edit's forgiveness.
-    const beforeInterveningEdit = input.first_write_run !== undefined && other.number < input.first_write_run && sinceRun > input.first_write_run;
-    if (hasReconciliation && other.generation && other.number <= sinceRun && (other.generation !== state.generation.hash || beforeInterveningEdit)) {
+    if (hasReconciliation && other.generation && other.number <= sinceRun && (other.generation !== state.generation.hash || other.number < lastEarlyEdit)) {
       lines.push(line("older_definition", { run: other.id, number: other.number, attempt: 1, generation: other.generation }));
       written.add(other.id);
       continue;
