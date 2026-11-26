@@ -596,6 +596,6 @@ func updateProjectConstraints(config *UpdateProjectConfig) []string {
 func createProjectStatusUpdateConstraints(config *CreateProjectStatusUpdateConfig) []string {
 	return buildConstraints(config, func(config *CreateProjectStatusUpdateConfig, constraints *[]string) {
 		appendMaxConstraint(constraints, config.Max, "Maximum %d status update(s) can be created.")
-		appendStringConstraint(constraints, config.Project, "Default project URL: %q.")
+		appendStringConstraint(constraints, config.Project, "Configured project URL for project/token setup; each status update still requires its own project field: %q.")
 	})
 }

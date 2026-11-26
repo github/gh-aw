@@ -227,7 +227,7 @@ var disableCmd = &cobra.Command{
 	Short: "Disable agentic workflows",
 	Long: `Disable one or more workflows by ID, or all workflows if no IDs are provided.
 
-Any in-progress runs will be canceled before disabling.
+Any in-progress runs will be cancelled before disabling.
 
 ` + cli.WorkflowIDExplanation,
 	Example: `  ` + string(constants.CLIExtensionPrefix) + ` disable                   # Disable all workflows
@@ -259,11 +259,11 @@ The --dependabot flag generates dependency manifests when dependencies are detec
   - Cannot be used with specific workflow files or custom --dir
   - Only processes workflows in the default .github/workflows directory
 
+Unlike gh aw upgrade, gh aw compile only applies codemods when you opt in with --fix.
+
 Action mode controls how gh-aw action scripts are referenced in compiled workflows.
 Three flags govern this. --gh-aw-ref is mutually exclusive with the other two;
 --action-tag and --action-mode may be combined (e.g. --action-mode action --action-tag v1.2.3):
-
-Unlike ` + "`gh aw upgrade`" + `, ` + "`gh aw compile`" + ` only applies codemods when you opt in with ` + "`--fix`" + `.
 
   --action-mode <mode>
     Explicit mode selection. Values:

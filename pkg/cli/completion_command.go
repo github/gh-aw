@@ -20,7 +20,7 @@ func NewCompletionCommand() *cobra.Command {
 Tab completion provides:
 - Command name completion (add, compile, run, etc.)
 - Workflow name completion for commands that accept workflow arguments
-- Engine name completion for --engine flag (copilot, claude, codex, gemini, pi)
+- Engine name completion for --engine flag (` + engineFlagHelpList + `)
 - Directory path completion for --dir flag
 - Helpful descriptions for workflows when available
 

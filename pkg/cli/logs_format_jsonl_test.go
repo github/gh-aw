@@ -32,6 +32,7 @@ func TestLogsJSONLFlags(t *testing.T) {
 		{args: []string{"--format", "jsonl", "--report-file", "report.md"}, conflict: true},
 	} {
 		t.Run(strings.Join(tt.args, " "), func(t *testing.T) {
+			t.Parallel()
 			cmd := NewLogsCommand()
 			require.NoError(t, cmd.ParseFlags(tt.args))
 			opts, err := loadCommonLogsOptions(cmd)
@@ -282,6 +283,7 @@ func TestLogsJSONLSummaryAndTerminalEvents(t *testing.T) {
 	t.Parallel()
 	for _, verbose := range []bool{false, true} {
 		t.Run(strconv.FormatBool(verbose), func(t *testing.T) {
+			t.Parallel()
 			var output bytes.Buffer
 			stream := newLogsJSONLStream(&output, verbose, true)
 			continuation := &ContinuationData{BeforeRunID: 123, Message: "Count limit reached"}

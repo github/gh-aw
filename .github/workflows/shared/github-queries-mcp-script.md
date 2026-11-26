@@ -142,7 +142,7 @@ mcp-scripts:
         SEARCH_START=$(date -u -d "$SINCE" '+%Y-%m-%d')
         SEARCH_END=$(date -u -d "$UNTIL" '+%Y-%m-%d')
         RANGE_LIMIT="${INPUT_LIMIT:-1000}"
-        QUERY_COMMAND=issue
+        QUERY_COMMAND="issue"
         MERGED_OUTPUT_FILE=$(mktemp)
         echo '[]' > "$MERGED_OUTPUT_FILE"
         collect_bounded_range "$SEARCH_START" "$SEARCH_END"
@@ -388,7 +388,7 @@ mcp-scripts:
         SEARCH_START=$(date -u -d "$SINCE" '+%Y-%m-%d')
         SEARCH_END=$(date -u -d "$UNTIL" '+%Y-%m-%d')
         RANGE_LIMIT="${INPUT_LIMIT:-1000}"
-        QUERY_COMMAND=pr
+        QUERY_COMMAND="pr"
         MERGED_OUTPUT_FILE=$(mktemp)
         echo '[]' > "$MERGED_OUTPUT_FILE"
         collect_bounded_range "$SEARCH_START" "$SEARCH_END"

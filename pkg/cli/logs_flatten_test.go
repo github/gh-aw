@@ -18,6 +18,7 @@ import (
 )
 
 func TestFlattenDownloadedAgentRoutingArtifacts(t *testing.T) {
+	t.Parallel()
 	for _, artifactName := range []string{"agent", "agent-artifacts", "abc123-agent"} {
 		t.Run(artifactName, func(t *testing.T) {
 			t.Parallel()

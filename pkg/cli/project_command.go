@@ -36,7 +36,7 @@ type ProjectConfig struct {
 func NewProjectCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "project",
-		Short: "Create and manage GitHub Projects V2 boards",
+		Short: "Create GitHub Projects V2 boards",
 		Long: `Create GitHub Projects V2 boards linked to repositories.
 
 GitHub Projects V2 provides kanban-style project boards for tracking issues,
