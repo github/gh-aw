@@ -428,6 +428,17 @@ function sanitizeUrlProtocols(s) {
  * @returns {string} The string with unknown domains redacted
  */
 function sanitizeUrlDomains(s, allowed) {
+  if (typeof s !== "string") {
+    return "";
+  }
+  if (!Array.isArray(allowed)) {
+    allowed = [];
+  }
+  allowed = allowed
+    .filter(domain => typeof domain === "string")
+    .map(domain => domain.trim().toLowerCase())
+    .filter(Boolean);
+
   // Strip userinfo (user:password@) from HTTPS URLs before any domain filtering
   // so that credentials are never passed to the allowlist check or preserved
   // in the output for an allowed domain. Protocol-relative URLs (//host/path)
@@ -1573,6 +1584,10 @@ function getCurrentRepoSlug() {
  * @returns {string} The string with unauthorized references neutralized
  */
 function neutralizeGitHubReferences(s, allowedRepos) {
+  if (typeof s !== "string") {
+    return "";
+  }
+
   // If no restrictions configured (null), allow all references
   if (allowedRepos === null) {
     return s;
@@ -1582,7 +1597,14 @@ function neutralizeGitHubReferences(s, allowedRepos) {
   const wrapInCodeSpan = createRenderSafeCodeSpanWrapper(s);
 
   // Expand the special "repo" keyword to the current repo slug and build a Set for isRepoAllowed()
-  const allowedSet = new Set(allowedRepos.map(r => (r === "repo" ? currentRepo : r)));
+  const allowedSet = new Set(
+    (Array.isArray(allowedRepos) ? allowedRepos : [])
+      .filter(repo => typeof repo === "string" && repo.trim())
+      .map(repo => {
+        const normalizedRepo = repo.trim().toLowerCase();
+        return normalizedRepo === "repo" ? currentRepo : normalizedRepo;
+      })
+  );
 
   return applyToNonCodeRegions(s, (segment, regionBefore = "", regionAfter = "") => {
     // Match #123 and owner/repo#456 outside matched code regions.
