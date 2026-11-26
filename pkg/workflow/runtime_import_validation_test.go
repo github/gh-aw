@@ -88,7 +88,7 @@ Body actor: ${{ github.actor }}`), 0644))
 			name:        "multiline expression in import",
 			markdown:    "{{#runtime-import ./shared/multiline.md}}",
 			expectError: true,
-			errorText:   "unauthorized expressions",
+			errorText:   "expressions must not contain line breaks",
 		},
 		{
 			name:        "multiple imports with one invalid",
