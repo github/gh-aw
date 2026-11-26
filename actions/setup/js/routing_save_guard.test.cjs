@@ -7,7 +7,7 @@ const run = (run_number, overrides = {}) => ({ run_number, event: "push", head_b
 const running = { status: "in_progress", conclusion: null };
 const failure = { conclusion: "failure" };
 const through = (n, unresolved_runs = []) => ({ last_run: n, reconciled_through: n, reset_after_run: 0, unresolved_runs });
-const check = (state, runs, extra = {}) => checkRoutingSaveCoverage({ state, runNumber: 11, defaultBranch: "main", runs, reachesStart: false, ...extra });
+const check = (state, runs, extra = {}) => checkRoutingSaveCoverage({ state, runNumber: 11, defaultBranch: "main", runs, pagesVerified: true, reachesStart: false, ...extra });
 const clear = { hasUnsaved: false, listingIncomplete: false };
 
 describe("live routing save coverage", () => {
@@ -30,6 +30,17 @@ describe("live routing save coverage", () => {
     expect(check(state, [run(13, failure), run(8)])).toEqual({ hasUnsaved: true, listingIncomplete: true });
   });
 
+  it("cannot infer page completeness from a low run number, including on a known new history", () => {
+    for (const state of [through(10), null]) {
+      expect(check(state, [run(11, running), run(10)], { pagesVerified: false })).toEqual({ ...clear, listingIncomplete: true });
+    }
+    expect(check(through(10), delayed, { pagesVerified: false })).toEqual({ hasUnsaved: true, listingIncomplete: true });
+  });
+
+  it.each([{}, "11", [9, null]])("withholds a test on malformed unresolved history (%j)", holes => {
+    expect(check({ ...through(10), unresolved_runs: holes }, delayed)).toEqual({ ...clear, listingIncomplete: true });
+  });
+
   it("does not use legacy last_run as verified coverage or mistake it for new history", () => {
     expect(check({ last_run: 12, reset_after_run: 0 }, delayed, { reachesStart: true })).toEqual({ ...clear, listingIncomplete: true });
     expect(check(null, [run(11, running)], { reachesStart: true })).toEqual(clear);
@@ -50,5 +61,13 @@ describe("live routing save coverage", () => {
     const runs = [run(14, running), run(13, { ...failure, event: "pull_request" }), run(12, { ...failure, head_branch: "topic" }), run(10)];
     expect(check(through(10), runs)).toEqual(clear);
     expect(check(through(10), [run(15, { ...failure, event: "pull_request_target", head_branch: "topic" }), ...runs])).toEqual({ ...clear, hasUnsaved: true });
+  });
+
+  it("combines first-attempt conclusions by run without letting a success erase an observed failure", () => {
+    const rerun = run(10, { ...running, run_attempt: 2 });
+    const success = { ...rerun, first_attempt_conclusion: "success" };
+    expect(check(through(9), [rerun, run(9)], { activeRuns: [success] })).toEqual(clear);
+    expect(check(through(9), [success, run(9)], { activeRuns: [rerun] })).toEqual(clear);
+    expect(check(through(9), [success, run(9)], { activeRuns: [{ ...rerun, first_attempt_conclusion: "failure" }] })).toEqual({ ...clear, hasUnsaved: true });
   });
 });
