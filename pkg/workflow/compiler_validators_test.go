@@ -62,7 +62,7 @@ func TestValidateExpressions(t *testing.T) {
 			name:          "unsafe expression in markdown",
 			markdown:      "# Hello\n\n${{ github.event.issue.body }}",
 			shouldError:   true,
-			errorContains: "unauthorized expressions found",
+			errorContains: "invalid expressions found",
 		},
 	}
 
