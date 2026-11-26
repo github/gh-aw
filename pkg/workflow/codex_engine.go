@@ -55,6 +55,7 @@ func NewCodexEngine() *CodexEngine {
 			capabilities: EngineCapabilities{
 				ToolsAllowlist:   true,
 				MCP:              true,
+				WebFetchFallback: true,
 				GitHubCLIProxy:   true,
 				MaxTurns:         true,  // AWF max-turns is supported for Codex runs
 				MaxContinuations: false, // Codex does not support --max-autopilot-continues-style continuation mode

@@ -24,7 +24,7 @@ require("./shim.cjs");
 
 const path = require("path");
 const fs = require("fs");
-const { runGatewayConversion, writeSecureOutput } = require("./convert_gateway_config_shared.cjs");
+const { runGatewayConversion, writeSecureOutput, addWebFetchMCPServer } = require("./convert_gateway_config_shared.cjs");
 const { buildConfig, serializeConfig, tomlValue, loadCompiledConfig, mergeConfig, expandConfigEnv, isTable, directToolCatalog } = require("./codex_config.cjs");
 const { TMP_GH_AW_PATH } = require("./constants.cjs");
 
@@ -159,7 +159,9 @@ function main() {
     },
     transformServer: (_name, entry) => entry,
     serialize: (servers, _context, urlPrefix) => {
-      return serializeConfig(buildConfig(servers, urlPrefix));
+      const config = buildConfig(servers, urlPrefix);
+      addWebFetchMCPServer(config.mcp_servers, entry => entry);
+      return serializeConfig(config);
     },
   });
 }

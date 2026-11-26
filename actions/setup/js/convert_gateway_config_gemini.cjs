@@ -31,7 +31,7 @@ require("./shim.cjs");
  */
 
 const path = require("path");
-const { rewriteUrl, normalizeGatewayEntry, runGatewayConversion } = require("./convert_gateway_config_shared.cjs");
+const { rewriteUrl, normalizeGatewayEntry, runGatewayConversion, addWebFetchMCPServer } = require("./convert_gateway_config_shared.cjs");
 
 /**
  * @param {Record<string, unknown>} entry
@@ -59,15 +59,18 @@ function main() {
     getTargetDomain: () => hostDomain,
     getUrlPrefix: ({ port }) => `http://${hostDomain}:${port}`,
     transformServer: (_name, entry, urlPrefix) => transformGeminiEntry(entry, urlPrefix),
-    serialize: servers =>
-      JSON.stringify(
+    serialize: servers => {
+      const mcpServers = { ...servers };
+      addWebFetchMCPServer(mcpServers, entry => entry);
+      return JSON.stringify(
         {
-          mcpServers: servers,
+          mcpServers,
           context: { includeDirectories: ["/tmp/"] },
         },
         null,
         2
-      ),
+      );
+    },
   });
 }
 

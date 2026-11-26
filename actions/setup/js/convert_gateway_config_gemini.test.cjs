@@ -97,6 +97,8 @@ describe("convert_gateway_config_gemini", () => {
         MCP_GATEWAY_PORT: process.env.MCP_GATEWAY_PORT,
         GITHUB_WORKSPACE: process.env.GITHUB_WORKSPACE,
         GH_AW_MCP_CLI_SERVERS: process.env.GH_AW_MCP_CLI_SERVERS,
+        GH_AW_WEB_FETCH_MCP: process.env.GH_AW_WEB_FETCH_MCP,
+        RUNNER_TEMP: process.env.RUNNER_TEMP,
       };
 
       process.env.MCP_GATEWAY_DOMAIN = "host.docker.internal";
@@ -104,6 +106,8 @@ describe("convert_gateway_config_gemini", () => {
       process.env.MCP_GATEWAY_HOST_DOMAIN = "localhost";
       process.env.GITHUB_WORKSPACE = workspace;
       process.env.GH_AW_MCP_CLI_SERVERS = "[]";
+      process.env.RUNNER_TEMP = tempDir;
+      delete process.env.GH_AW_WEB_FETCH_MCP;
     });
 
     afterEach(() => {
@@ -124,6 +128,16 @@ describe("convert_gateway_config_gemini", () => {
       writeFileSync(gatewayOutputFile, JSON.stringify({ mcpServers }));
       process.env.MCP_GATEWAY_OUTPUT = gatewayOutputFile;
     }
+
+    it("registers the local web-fetch server only when enabled", () => {
+      writeGatewayOutput({});
+      expect(JSON.parse(main()).mcpServers).not.toHaveProperty("web-fetch");
+      process.env.GH_AW_WEB_FETCH_MCP = "1";
+      expect(JSON.parse(main()).mcpServers["web-fetch"]).toEqual({
+        command: "node",
+        args: [join(tempDir, "gh-aw/actions/web_fetch_mcp_server.cjs")],
+      });
+    });
 
     /**
      * @param {unknown} payload - Raw payload to write to the gateway output

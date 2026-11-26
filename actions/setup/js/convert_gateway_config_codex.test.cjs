@@ -59,6 +59,7 @@ describe("convert_gateway_config_codex", () => {
         MCP_GATEWAY_DOMAIN: process.env.MCP_GATEWAY_DOMAIN,
         MCP_GATEWAY_PORT: process.env.MCP_GATEWAY_PORT,
         RUNNER_TEMP: process.env.RUNNER_TEMP,
+        GH_AW_WEB_FETCH_MCP: process.env.GH_AW_WEB_FETCH_MCP,
         GH_AW_MCP_CLI_SERVERS: process.env.GH_AW_MCP_CLI_SERVERS,
       };
       savedArgv = process.argv;
@@ -67,6 +68,7 @@ describe("convert_gateway_config_codex", () => {
       process.env.MCP_GATEWAY_PORT = "80";
       process.env.RUNNER_TEMP = tempDir;
       process.env.GH_AW_MCP_CLI_SERVERS = "[]";
+      delete process.env.GH_AW_WEB_FETCH_MCP;
     });
 
     afterEach(() => {
@@ -90,6 +92,17 @@ describe("convert_gateway_config_codex", () => {
       writeFileSync(gatewayOutputFile, JSON.stringify({ mcpServers }));
       process.env.MCP_GATEWAY_OUTPUT = gatewayOutputFile;
     }
+
+    it("registers the local web-fetch server only when enabled", () => {
+      writeGatewayOutput({});
+      expect(main()).not.toContain("[mcp_servers.web-fetch]");
+      process.env.GH_AW_WEB_FETCH_MCP = "1";
+      const output = main();
+      expect(output).toContain("[mcp_servers.web-fetch]");
+      expect(output).toContain('command = "node"');
+      expect(output).toContain(join(tempDir, "gh-aw/actions/web_fetch_mcp_server.cjs"));
+      expect(output).not.toContain("/mcp/web-fetch");
+    });
 
     it("reads the direct-tool catalog as a Buffer before decoding UTF-8", () => {
       const catalog = { models: [{ slug: "fixture-model", tool_mode: "code_mode_only", instructions: "\u00e9".repeat(70000) }] };
