@@ -716,35 +716,28 @@ function isEligibleRun(run, defaultBranch) {
  * @param {(created: string) => Promise<any>} probe newest unfiltered run at or before a timestamp
  * @param {number} floor
  * @param {number} nowMs
+ * @param {number} [low] earliest creation second to probe
  */
-async function findBootstrapChunk(probe, floor, nowMs) {
+async function findBootstrapChunk(probe, floor, nowMs, low = 0) {
   const span = MAX_LIST_PAGE * LIST_RUNS_PER_PAGE;
-  /** @param {number} after @param {number} low */
-  const findAfter = async (after, low) => {
-    let high = Math.ceil(nowMs / 1000);
-    /** @type {{second: number, number: number} | null} */
-    let firstAbove = null;
-    // Bisect whole seconds (at most 32 probes through 2106), not pages past the API's result cap.
-    while (low <= high) {
-      const second = Math.floor((low + high) / 2);
-      const { data } = await probe(`<=${new Date(second * 1000).toISOString()}`);
-      const items = data?.workflow_runs;
-      if (!Array.isArray(items) || !Number.isSafeInteger(data.total_count) || data.total_count < 0 || items.length !== Math.min(data.total_count, 1)) return null;
-      const number = items[0]?.run_number;
-      if (items.length && (!Number.isSafeInteger(number) || number < 1)) return null;
-      if (!items.length || number <= after) low = second + 1;
-      else if (number > after + span && data.total_count >= span) {
-        firstAbove = { second, number };
-        high = second - 1;
-      } else return { second, number };
-    }
-    return firstAbove;
-  };
-  const chunk = await findAfter(floor, 0);
-  if (!chunk || chunk.number <= floor + span) return chunk;
-  // A long deleted range needs a newer neighbour beyond its first surviving run: a run on
-  // the cutoff's open page edge cannot corroborate deletion. Do not relax the verifier.
-  return (await findAfter(chunk.number, chunk.second + 1)) ?? chunk;
+  let high = Math.ceil(nowMs / 1000);
+  /** @type {{second: number, number: number} | null} */
+  let firstAbove = null;
+  // Bisect whole seconds (at most 32 probes through 2106), not pages past the API's result cap.
+  while (low <= high) {
+    const second = Math.floor((low + high) / 2);
+    const { data } = await probe(`<=${new Date(second * 1000).toISOString()}`);
+    const items = data?.workflow_runs;
+    if (!Array.isArray(items) || !Number.isSafeInteger(data.total_count) || data.total_count < 0 || items.length !== Math.min(data.total_count, 1)) return null;
+    const number = items[0]?.run_number;
+    if (items.length && (!Number.isSafeInteger(number) || number < 1)) return null;
+    if (!items.length || number <= floor) low = second + 1;
+    else if (number > floor + span && data.total_count >= span) {
+      firstAbove = { second, number };
+      high = second - 1;
+    } else return { second, number };
+  }
+  return firstAbove;
 }
 
 /**
@@ -780,10 +773,12 @@ async function listRuns({ githubClient, owner, repo, workflowFile, workflowPath 
   let upperNeeded = Math.max(floor, runNumber - 1);
   /** @type {number | null} */
   let until = null;
+  /** @param {string} created */
+  const probe = created => githubClient.rest.actions.listWorkflowRuns({ owner, repo, workflow_id: workflowFile, created, page: 1, per_page: 1 });
   // A long-lived workflow may already have thousands of runs when learning is first enabled.
   // Start near the unverified floor rather than spending every save's budget searching back to it.
   if (floor < (state.generation?.since_run ?? runNumber) && upperNeeded - floor > MAX_LIST_PAGE * LIST_RUNS_PER_PAGE) {
-    const chunk = await findBootstrapChunk(created => githubClient.rest.actions.listWorkflowRuns({ owner, repo, workflow_id: workflowFile, created, page: 1, per_page: 1 }), floor, nowMs);
+    const chunk = await findBootstrapChunk(probe, floor, nowMs);
     if (chunk) {
       upperNeeded = Math.min(upperNeeded, chunk.number);
       until = chunk.second;
@@ -923,7 +918,10 @@ async function listRuns({ githubClient, owner, repo, workflowFile, workflowPath 
       if (num > earliestGap) break;
       earliestGap = num + 1;
     }
-    const unfilteredStream = await fetchStreamWindow(listPages({}), earliestGap, verifiedUpper, until);
+    // The first survivor after a deletion may itself be the chunk's last run. Let the
+    // unfiltered page bracket it without extending the coverage we are trying to verify.
+    const lookahead = until === null ? null : await findBootstrapChunk(probe, upperNeeded, nowMs, until + 1);
+    const unfilteredStream = await fetchStreamWindow(listPages({}), earliestGap, verifiedUpper, lookahead?.second ?? null);
     intervalUnfilteredScan = recordUnfilteredStream(unfilteredStream);
     if (!unfilteredStream.reachedFloor) {
       verified = false;
