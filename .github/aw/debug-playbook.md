@@ -241,11 +241,27 @@ or bypass profiles/effect scope.
 | `graph_invalid`, `work_identity_invalid`, `work_invalid`, `resource_invalid`|Graph/node identity, Work fields, resource refs.|Fix submission; keep admitted identity.|
 | `dependency_cycle`, `dependency_invalid`, `dependency_pending`, `observation_invalid`|DAG edges, predecessor state, Observation fields.|Fix graph; never fabricate completion.|
 | `resource_limit`, `assignment_limit`, `work_queue_pending_limit`|GRAPH_NODES/MAX_PENDING_WORK, 48 KiB assignment, `pending_limit`.|Wait for drain or batch; keep limits.|
+| `work_queue_graph_limit`|Nodes in the submitted graph.|Split the graph into bounded submissions.|
+| `work_queue_intent_invalid`|Staged queue intent shape and tool calls.|Correct the malformed intent; do not replay invalid input.|
+| `work_queue_dispatch_budget_exceeded`|Requested dispatches vs remaining run budget.|Reduce `max_dispatches` or adjust the safe-output dispatch maximum.|
+| `work_queue_profile_not_approved`|Worker profile vs pool policy.|Use a configured profile and recompile the workflow.|
+| `work_queue_worker_not_allowlisted`|Pool profiles vs dispatcher allowlist.|Add the worker to the dispatcher allowlist and recompile.|
+| `work_queue_worker_dispatch_unsupported`|Worker/dispatcher role and requested operation.|Run `dispatch_next` from a dispatcher; workers cannot claim Work.|
+| `work_queue_control_claim_not_authorized`|Open Claim and run binding.|Submit child Work only from the worker's bound, open Claim.|
+| `external_admission_unverified`|External dependency, subject, or backing Issue identity.|Correct the reference and verify dependency-read access.|
 | `ownership_conflict`, `claim_conflict`, `claim_missing`, `work_missing`, `work_terminal`|Work state/owner, Claim ID reuse.|Release before cancel; respect terminal Work.|
 | `ERR_WORK_QUEUE_CLAIM_SCOPE`, `claim_scope_invalid`, `claim_ineffective`, `work_queue_claim_handle_required`|Claim open, handle, dispatch bound to this run+attempt.|Use original `claim_handle`; no effects after Claim closes.|
 | `dispatch_missing`, `dispatch_state_conflict`, `run_binding_conflict`, `work_queue_assignment_unknown`|Dispatch state; bound workflow/run/attempt.|Rerun only the bound run; else `release`.|
 | `work_queue_effect_scope_denied` (E004)|Target repo vs profile `effect_scope`.|Target the worker's repository.|
-| `issue_binding_conflict`|One Work per Issue; immutable link.|Never adopt another Work's Issue.|
+| `issue_binding_conflict`, `issue_binding_invalid`|Unique Work-to-Issue binding; valid Issue-closed event.|Use the bound Issue and a valid closure event; never adopt another Work's Issue.|
+| `approval_required`|Issue continuation's approval observation.|Wait until the approval gate is ready before claiming the continuation.|
+| `continuation_receipt_missing`, `continuation_authorization_scope_changed`|Accepted receipt and authorized successor scope.|Provide the accepted receipt and keep the successor within its authorized scope.|
+| `continuation_writes_prohibited`|Work effect contract and requested continuation route.|Use a route permitted by the effect contract; do not create an approval Issue for prohibited writes.|
+| `continuation_route_failed`|Route result and its specific failure code.|Correct the route configuration or request before retrying.|
+| `continuation_dispatch_rejected`|Dispatch response and configured workflow/ref.|Correct the rejected dispatch configuration before retrying.|
+| `continuation_dispatch_outcome_unknown`|Dispatch transport result and any matching run.|Verify whether dispatch was accepted before any retry; the operation was not resent.|
+| `continuation_inbound_invalid`|Inbound continuation payload and schema.|Correct the malformed payload; it was not routed.|
+| `projection_rate_pending`|Projection rate-limit result and queue status.|Keep the projection pending for terminal failure evaluation; check again after the rate limit clears.|
 
 ## Unmapped codes
 
