@@ -649,6 +649,41 @@ describe("push_routing_history saves", () => {
     expect(github.calls.jobs).toEqual([9002]);
   });
 
+  it.each([false, true])("catches a moving backlog with a capped count and a late failed save (skewed timestamp: %s)", async skewed => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    const apiRuns = Array.from({ length: 10000 }, (_, i) => paginationRun(10000 - i, { conclusion: 10000 - i === 9000 ? "failure" : "success" }));
+    if (skewed) apiRuns.unshift({ ...apiRuns.splice(-2, 1)[0], created_at: runCreatedAt(10101) });
+    const github = fakeGitHub(null, {
+      runs: apiRuns,
+      jobs: {
+        18000: [
+          { name: "agent", started_at: runCreatedAt(9000), conclusion: "success" },
+          { name: "push_routing_history", conclusion: "failure" },
+        ],
+      },
+    });
+    const list = github.rest.actions.listWorkflowRuns;
+    github.rest.actions.listWorkflowRuns = async params => {
+      const result = await list(params);
+      result.data.total_count = Math.min(2500, result.data.total_count);
+      return result;
+    };
+    let state = emptyState("triage");
+    let rows = [];
+    for (let number = 10000; number < 10024; number++) {
+      vi.setSystemTime(new Date(skewed ? Date.parse("2026-11-19T00:00:00Z") : runCreatedAt(number)));
+      if (number > 10000) apiRuns.splice(skewed ? 1 : 0, 0, paginationRun(number));
+      const id = String(9000 + number);
+      const coverage = await listRuns({ githubClient: github, owner: "octo", repo: "demo", workflowFile: "triage.lock.yml", defaultBranch: "main", runId: id, runNumber: number, state, runs: rows, generation: GENERATION });
+      const saved = applyRun(state, rows, { workflow: "triage", generation: GENERATION, scope: "copilot/cost/shared", mode: "observe", run: { id, number, attempt: 1 }, at: runCreatedAt(number), observation: null, pair: null, ...coverage });
+      rows = trimRuns([...rows, ...saved.lines]);
+      state = saved.state;
+      if (state.reconciled_through === number) break;
+    }
+    expect(state.reconciled_through).toBe(state.last_run);
+    expect(rows.filter(row => row.note === "unsaved").map(row => row.number)).toEqual([9000]);
+  });
+
   it.each([10000, 15000])("continues past an early gap with %i run numbers without losing a later failed save", async size => {
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(new Date(runCreatedAt(size + 2)));
@@ -708,10 +743,10 @@ describe("push_routing_history saves", () => {
     expect(remoteState(remote).reconciled_through).toBe(1);
   });
 
-  it("keeps a failed first-write generation lookup unresolved until the old definition is verified", async () => {
+  it.each([undefined, "name: workflow without a routing marker"])("keeps an unavailable first-write generation unresolved until verified (initial content: %s)", async initial => {
     const remote = bareRemote();
     const previous = `${"c".repeat(64)}:${"d".repeat(64)}`;
-    const contents = {};
+    const contents = { old: initial };
     const runs = [paginationRun(2), paginationRun(1, { head_sha: "old", conclusion: "failure" })];
     const github = fakeGitHub(remote, {
       runs,

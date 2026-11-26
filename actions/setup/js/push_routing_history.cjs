@@ -747,7 +747,7 @@ function isEligibleRun(run, defaultBranch) {
 /**
  * Find a creation-time window ending within one listing's worth of run numbers above the floor.
  * This is only a search hint: the ordinary reconciliation scan still verifies every obligation.
- * @param {(created: string) => Promise<any>} probe newest unfiltered run at or before a timestamp
+ * @param {(created: string) => Promise<any>} probe newest unfiltered page at or before a timestamp
  * @param {number} floor
  * @param {number} nowMs
  */
@@ -757,14 +757,19 @@ async function findBootstrapChunk(probe, floor, nowMs) {
   let high = Math.ceil(nowMs / 1000);
   /** @type {{second: number, number: number} | null} */
   let firstAbove = null;
+  /** @type {{second: number, number: number} | null} */
+  let best = null;
   // Bisect whole seconds (at most 32 probes through 2106), not pages past the API's result cap.
   while (low <= high) {
     const second = Math.floor((low + high) / 2);
     const { data } = await probe(`<=${new Date(second * 1000).toISOString().replace(/\.\d{3}Z$/, "Z")}`);
     const items = data?.workflow_runs;
-    if (!Array.isArray(items) || !Number.isSafeInteger(data.total_count) || data.total_count < 0 || items.length !== Math.min(data.total_count, 1)) return null;
-    const number = items[0]?.run_number;
-    if (items.length && (!Number.isSafeInteger(number) || number < 1)) return null;
+    if (!Array.isArray(items) || !Number.isSafeInteger(data.total_count) || data.total_count < 0 || items.length !== Math.min(data.total_count, LIST_RUNS_PER_PAGE)) return best;
+    let number = 0;
+    for (const run of items) {
+      if (!Number.isSafeInteger(run?.run_number) || run.run_number < 1) return best;
+      number = Math.max(number, run.run_number);
+    }
     // At most `floor` rows can already be covered. A skewed low-numbered run at the
     // top cannot make an otherwise oversized prefix fit in one readable window.
     if (data.total_count > floor + span) high = second - 1;
@@ -772,9 +777,15 @@ async function findBootstrapChunk(probe, floor, nowMs) {
     else if (number > floor + span && data.total_count >= span) {
       firstAbove = { second, number };
       high = second - 1;
-    } else return { second, number };
+    } else {
+      // Prefer at least half a window of progress. Keep the best smaller candidate if
+      // no better cutoff exists, rather than letting one new run pace the entire backlog.
+      if (number - floor >= span / 2) return { second, number };
+      if (!best || number > best.number) best = { second, number };
+      low = second + 1;
+    }
   }
-  return firstAbove;
+  return best ?? firstAbove;
 }
 
 /**
@@ -814,10 +825,10 @@ async function listRuns({ githubClient, owner, repo, workflowFile, workflowPath 
   /** @type {number | null} */
   let until = null;
   /** @param {string} created */
-  const probe = created => githubClient.rest.actions.listWorkflowRuns({ owner, repo, workflow_id: workflowFile, created, page: 1, per_page: 1 });
+  const probe = created => githubClient.rest.actions.listWorkflowRuns({ owner, repo, workflow_id: workflowFile, created, page: 1, per_page: LIST_RUNS_PER_PAGE });
   // A long-lived workflow may already have thousands of runs when learning is first enabled.
   // Start near the unverified floor rather than spending every save's budget searching back to it.
-  if (floor < firstWrite && upperNeeded - floor > MAX_LIST_PAGE * LIST_RUNS_PER_PAGE) {
+  if (upperNeeded > floor && floor < firstWrite && firstWrite - state.reset_after_run > MAX_LIST_PAGE * LIST_RUNS_PER_PAGE) {
     const chunk = await findBootstrapChunk(probe, floor, nowMs);
     if (chunk) {
       upperNeeded = Math.min(upperNeeded, chunk.number, firstWrite);
