@@ -50,7 +50,7 @@ imports:
   - shared/reporting.md
 evals:
   - id: genuinely-unreferenced-defs
-    question: For reported unreferenced $defs entries, does the schema evidence show that each lacks a reference in the schema body? Return UNKNOWN when no such findings are reported.
+    question: For reported unreachable $defs entries, does the schema evidence show that each is unreachable from the schema body through local $ref links? Return UNKNOWN when no such findings are reported.
   - id: missing-required-accuracy
     question: For reported objects missing required, does each cited object define properties without a required field? Return UNKNOWN when no such findings are reported.
 ---
@@ -68,19 +68,28 @@ Find all `*.json` schema files under `pkg/parser/schemas/` and list them:
 find pkg/parser/schemas -name "*.json" | sort
 ```
 
-## Step 2 — Validate referenced `$defs` are used
+## Step 2 — Find unreachable `$defs`
 
-For the primary schema (`main_workflow_schema.json`), check that every definition declared in
-`$defs` is referenced at least once in the schema body:
+For the primary schema (`main_workflow_schema.json`), follow local `$ref` links from the schema
+body through referenced definitions. Report definitions not reachable by this closure, including
+isolated cycles. References to a nested path count as references to its enclosing definition.
 
 ```bash
 jq -r '
-  .["$defs"] | keys[] as $k |
-  if (tostring | test("\"\\($k)\"") | not) then $k else empty end
-' pkg/parser/schemas/main_workflow_schema.json 2>/dev/null || echo "File not found"
+  def refs:
+    [.. | objects | .["$ref"]? | strings | select(startswith("#/$defs/"))
+     | ltrimstr("#/$defs/") | split("/")[0] | gsub("~1"; "/") | gsub("~0"; "~")] | unique;
+  . as $schema | ($schema["$defs"] // {}) as $defs |
+  ($schema | del(.["$defs"]) | refs) as $initial |
+  (reduce range(0; $defs | length) as $i
+    ($initial; . as $reachable |
+     ($reachable + [$reachable[] | $defs[.]? | select(. != null) | refs[]]) | unique)
+  ) as $reachable |
+  ($defs | keys) - $reachable | .[]
+' pkg/parser/schemas/main_workflow_schema.json
 ```
 
-Report any unreferenced `$defs` entries.
+If the command fails, report the check as unavailable, not as zero findings.
 
 ## Step 3 — Check `required` completeness
 
@@ -88,10 +97,17 @@ For each object in the schema that has `properties`, verify whether a `required`
 present. List objects that define `properties` but have no `required` field — these may allow
 optional fields that should be mandatory.
 
+The output is an array of paths, including `[]` for the root object. Its length is the count.
+These are informational candidates, not necessarily errors; optional fields and conditional
+subschemas may legitimately omit `required`.
+
 ```bash
-jq '[.. | objects | select(has("properties") and (has("required") | not)) | path] | length' \
-  pkg/parser/schemas/main_workflow_schema.json 2>/dev/null || echo "0"
+jq '[if (type == "object" and has("properties") and (has("required") | not)) then [] else empty end,
+     paths(objects | select(has("properties") and (has("required") | not)))]' \
+  pkg/parser/schemas/main_workflow_schema.json
 ```
+
+If the command fails, report the check as unavailable, not as zero findings.
 
 ## Step 4 — Report
 
@@ -105,7 +121,9 @@ Use the `create_issue` safe-output tool to post the audit:
 - **Title**: `[schema-audit] Daily Schema Consistency Report — ${{ github.run_id }}`
 - **Body**:
   - `### Summary` with overall status: 🟢 (no issues) / 🟡 (minor) / 🔴 (action needed)
-  - `<details><summary><b>Full Findings</b></summary>` wrapping unreferenced `$defs` count and
-    names, and objects missing `required` arrays
+  - `<details><summary><b>Full Findings</b></summary>` wrapping unreachable `$defs` count and
+    names, and objects missing `required` arrays, with unavailable checks explicitly identified
 
-If all checks pass with no issues, call `noop` with `"Schema consistency audit passed — no issues found."`.
+Only call `noop` with `"Schema consistency audit passed — no issues found."` if all checks
+completed and found no issues. Do not treat missing `required` arrays as issues without evidence
+that a field must be mandatory.
