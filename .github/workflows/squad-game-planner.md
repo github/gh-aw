@@ -26,6 +26,8 @@ safe-outputs:
   create-issue:
     title-prefix: "[squad:plan] "
     labels: [squad:plan]
+    planning-status: Todo
+    allowed-statuses: [Todo]
     group: true
     max: 12
     expires: 1
