@@ -351,6 +351,12 @@ func builtInRuleContracts() map[string]ruleContract {
 			safePrompt:   "${{ github.repository }}",
 			path:         "prompt",
 		},
+		"prompt-condition-syntax": {
+			targets:      AWAST,
+			unsafePrompt: "{{#if condition}}\nSelected\n{{else}}\nFallback\n{{/if}}",
+			safePrompt:   "{{#if condition}}\nSelected\n{{#else}}\nFallback\n{{/if}}",
+			path:         "prompt",
+		},
 	}
 }
 

@@ -196,7 +196,7 @@ Use the runtime status from `/tmp/gh-aw/agent/dataflow/output/dataflow_runtime.j
 Keep the 50–100,000 character bound and 0.25 alphabetic-character ratio.
 Use current DataFlow operators from `dataflow.operators.general_text` for supported stages, skip `AlphaWordsFilter`, and fall back to Python where needed so the report can distinguish `mixed` from `fallback`.
 Compute retention_rate = output/input, upload `dataset_clean.jsonl` as artifact, and post a stats table (including execution mode and operators actually used) to a GitHub Discussion in category `audits`.
-{{else}}
+{{#else}}
 # DataFlow PR & Discussion Dataset Builder
 
 You are a data pipeline agent that uses [OpenDCAI/DataFlow](https://github.com/OpenDCAI/DataFlow) to process GitHub discussions and pull requests into high-quality, deduplicated datasets suitable for LLM training and analysis.

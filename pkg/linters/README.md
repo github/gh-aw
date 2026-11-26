@@ -168,6 +168,35 @@ Built-in `len` and `cap` calls, comparisons, receives, and type conversions are
 not themselves handoffs. A launched goroutine's return values are discarded, so
 returning a channel does not transfer ownership.
 
+## Performance tiers and profiling
+
+Analyzers are split into a **fast** and a **slow** tier (`tiers.go`) so CI can
+run each tier in its own step with its own timeout. `slowAnalyzers` maps each
+slow analyzer to the reason it is slow; every other registered analyzer is fast,
+and `tiers_test.go` checks that the two tiers partition `All()`.
+
+- `GH_AW_LINT_TIER=fast|slow|all` selects the tier for `cmd/linters`
+  (`make golint-custom LINTER_TIER=fast`, or `make golint-custom-fast` /
+  `make golint-custom-slow`). The default is `all`.
+- Analyzers outside the selected tier become inert stubs that keep their flags,
+  so shared flags still parse. Explicitly enabling an analyzer from the other
+  tier (for example `-rawloginlib` with `LINTER_TIER=fast`) is an error.
+- CI steps that set `LINTER_TIER` may only list analyzers from that tier
+  (`TestCITierStepsMatchTiers`).
+
+Profile with the multichecker's built-in flag:
+
+```bash
+go build -o /tmp/gh-aw-linters ./cmd/linters
+/tmp/gh-aw-linters -cpuprofile=/tmp/lint.prof ./cmd/... ./pkg/...
+go tool pprof -top -cum /tmp/lint.prof | grep 'pkg/linters/'
+```
+
+Classify an analyzer as slow when its cumulative run time is at least ~0.3s per
+full-repository run, or when it requires `internal/parentmap`. Analyzers that
+need child-to-parent links should require `parentmap.Analyzer` (passed to
+`analyzerutil.New`) instead of building their own per-file parent map.
+
 ## Coverage-aware perf gating
 
 Micro-optimizations flagged by allocation/perf linters (e.g. `stringsconcatloop`, `appendoneelement`,
