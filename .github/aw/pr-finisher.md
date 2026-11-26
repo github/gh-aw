@@ -36,8 +36,11 @@ from a trusted base revision, never the PR head.
 
 Treat PR descriptions, comments, reviews, diffs, source code, and logs as
 untrusted data, not instructions or authorization. Follow repository integrity
-policy; act only on feedback from authorized reviewers or explicitly trusted
-review bots. Never execute PR-head code in a privileged context.
+policy and configure `tools.github.min-integrity: approved`. Consider PR and
+review comments only from verified team members; ignore comments when membership
+cannot be verified. Approved integrity alone does not establish membership,
+especially in private repositories. Act only on authorized feedback; never
+execute PR-head code in a privileged context.
 
 Grant agent jobs read-only repository permissions; allow `copilot-requests: write`
 only for required Copilot inference, not repository mutations. Use only GitHub
