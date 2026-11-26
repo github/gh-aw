@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/github/gh-aw/pkg/parser"
@@ -67,11 +68,11 @@ func TestSetIssueStatusRegistration(t *testing.T) {
 	assert.Nil(t, descriptor.PermissionBuilder(outputs))
 	config.Staged = nil
 
-	var prompt string
+	var prompt strings.Builder
 	for _, section := range buildSafeOutputsSections(outputs, nil, nil) {
-		prompt += section.Content
+		prompt.WriteString(section.Content)
 	}
-	assert.Contains(t, prompt, "set_issue_status(max:3)")
+	assert.Contains(t, prompt.String(), "set_issue_status(max:3)")
 	description := enhanceToolDescription("set_issue_status", "Set native status.", outputs)
 	assert.Contains(t, description, "Closing an open issue")
 	assert.Contains(t, description, "Reopening a closed issue")
@@ -79,10 +80,10 @@ func TestSetIssueStatusRegistration(t *testing.T) {
 
 	for _, target := range []string{"", "triggering", "*", "42", "${{ inputs.issue }}"} {
 		config.Target = target
-		assert.NoError(t, validateSafeOutputsTarget(outputs), target)
+		require.NoError(t, validateSafeOutputsTarget(outputs), target)
 	}
 	config.Target = "invalid"
-	assert.ErrorContains(t, validateSafeOutputsTarget(outputs), "set-issue-status")
+	require.ErrorContains(t, validateSafeOutputsTarget(outputs), "set-issue-status")
 	config.Target = ""
 	config.Max = strPtr("0")
 	assert.Error(t, validateSafeOutputsMax(outputs))

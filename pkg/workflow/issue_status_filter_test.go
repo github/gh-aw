@@ -88,7 +88,7 @@ Process the captured issue transition.
 			t.Errorf("compiled workflow missing %q", expected)
 		}
 	}
-	for _, line := range strings.Split(lock, "\n") {
+	for line := range strings.SplitSeq(lock, "\n") {
 		if strings.HasPrefix(strings.TrimSpace(line), "status-ids:") || strings.HasPrefix(strings.TrimSpace(line), "status-categories:") {
 			t.Errorf("compiler-only status filter leaked into native trigger: %s", line)
 		}

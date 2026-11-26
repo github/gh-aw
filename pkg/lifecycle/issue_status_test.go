@@ -16,5 +16,5 @@ func TestIssueStatusLifecycleRule(t *testing.T) {
 	assert.True(t, rule.ValueEligible)
 	assert.True(t, rule.SurvivalRequired)
 	assert.Empty(t, rule.HumanDecision, "native status transitions do not imply suggestion approval")
-	assert.Equal(t, "set_issue_status", testDelivery(t, "set_issue_status").Identity.Type)
+	assert.Equal(t, "set_issue_status", testDelivery(t, "set_issue_status").Type)
 }
