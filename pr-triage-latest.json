@@ -1,9 +1,9 @@
 {
-  "generated_at": "2026-11-26T12:24:28Z",
-  "run_id": "pr-triage-2026-11-26T12:24:28Z",
+  "generated_at": "2026-11-26T18:20:34Z",
+  "run_id": "45874752294",
   "source": "pr-triage",
   "open_copilot_prs": 0,
-  "scanned_open_prs": 25,
+  "scanned_open_prs": 26,
   "eligible_total": 0,
   "cooldown_skipped": 0,
   "category_counts": {
