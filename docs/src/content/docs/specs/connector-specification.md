@@ -345,8 +345,10 @@ Initially only Copilot's existing OpenAI-compatible BYOK transport is supported.
 The compiler lowers the selected SDK base, protocol, alias and credential to
 `COPILOT_PROVIDER_*` and optional Azure `engine.auth`. `engine.model` remains
 the Copilot model metadata selection; the granted wire alias is preserved in
-`COPILOT_PROVIDER_MODEL_ID`. Model metadata MUST be explicit and literal, not
-a router value or expression. Unknown engines/protocols and conflicting native
+`COPILOT_PROVIDER_WIRE_MODEL`. `COPILOT_PROVIDER_MODEL_ID` MUST remain unset so
+that it defaults to `COPILOT_MODEL` for agent configuration and token limits.
+Model metadata MUST be explicit and literal, not a router value or expression.
+Unknown engines/protocols and conflicting native
 provider/auth/environment, routing, fallback or CLI overrides MUST fail rather
 than silently override either configuration. Imported engine settings MUST NOT
 override the resolved inference binding.
