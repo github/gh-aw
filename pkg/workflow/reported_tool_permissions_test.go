@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"unicode/utf8"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -106,7 +107,9 @@ func TestSighthoundFindingsReader(t *testing.T) {
 	if _, err := exec.LookPath("jq"); err != nil {
 		t.Skip("jq is required to exercise the Sighthound findings reader")
 	}
-	data, err := NewCompiler().ParseWorkflowFile(filepath.Join("..", "..", ".github", "workflows", "sighthound-security-scan.md"))
+	compiler := NewCompiler()
+	compiler.SetWorkflowIdentifier("sighthound-security-scan")
+	data, err := compiler.ParseWorkflowFile(filepath.Join("..", "..", ".github", "workflows", "sighthound-security-scan.md"))
 	require.NoError(t, err)
 	command := data.MCPScripts.Tools["read-sighthound-findings"].Run
 	const inputPath = "/tmp/gh-aw/agent/sighthound/actionable.json"
@@ -127,9 +130,9 @@ func TestSighthoundFindingsReader(t *testing.T) {
 			{"file": "low.go", "severity": "Low", "snippet": strings.Repeat("x", 11*1024*1024)},
 			{"file": "high.go", "severity": "High"},
 			{"file": "medium.go", "severity": "Medium"},
-			{"file": "critical1.go", "severity": "Critical", "description": strings.Repeat("y", 10000)},
+			{"file": "critical1.go", "severity": "Critical", "description": strings.Repeat("🧪", 3000)},
 			{"file": "info.go", "severity": "Info"},
-			{"file": "critical2.go", "severity": "critical", "snippet": strings.Repeat("z", 10000)},
+			{"file": "critical2.go", "severity": "critical", "snippet": strings.Repeat("🧪", 3000)},
 			{"file": "high2.go", "severity": "HIGH"},
 		}
 		output, err := run(t, findings)
@@ -141,8 +144,14 @@ func TestSighthoundFindingsReader(t *testing.T) {
 		for i, file := range []string{"critical1.go", "critical2.go", "high.go", "high2.go", "medium.go"} {
 			assert.Equal(t, file, result[i]["file"])
 		}
-		assert.Len(t, result[0]["description"], 4096)
-		assert.Len(t, result[1]["snippet"], 2048)
+		description, ok := result[0]["description"].(string)
+		require.True(t, ok)
+		assert.Equal(t, 4096, len(description))
+		assert.True(t, utf8.ValidString(description))
+		snippet, ok := result[1]["snippet"].(string)
+		require.True(t, ok)
+		assert.Equal(t, 2048, len(snippet))
+		assert.True(t, utf8.ValidString(snippet))
 	})
 	t.Run("empty", func(t *testing.T) {
 		output, err := run(t, []any{})

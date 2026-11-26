@@ -161,7 +161,21 @@ mcp-scripts:
             else error("Unknown finding severity")
             end
           end;
-        def text($limit): if type == "string" then .[:$limit] else null end;
+        def text($limit):
+          if type == "string" then
+            .[0:$limit] as $prefix
+            | ($prefix | explode
+               | reduce .[] as $codepoint
+                   ({bytes: 0, chars: 0};
+                    ($codepoint | [.] | implode | utf8bytelength) as $size
+                    | if .bytes + $size <= $limit then
+                        {bytes: (.bytes + $size), chars: (.chars + 1)}
+                      else .
+                      end)
+               | .chars) as $length
+            | $prefix[:$length]
+          else null
+          end;
         sort_by(-(.severity | rank))[:5] | map({
           file: ((.file // .path) | text(4096)),
           line: (if (.line | type) == "number" then .line else null end),
