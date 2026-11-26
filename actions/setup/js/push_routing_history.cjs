@@ -765,7 +765,10 @@ async function findBootstrapChunk(probe, floor, nowMs) {
     if (!Array.isArray(items) || !Number.isSafeInteger(data.total_count) || data.total_count < 0 || items.length !== Math.min(data.total_count, 1)) return null;
     const number = items[0]?.run_number;
     if (items.length && (!Number.isSafeInteger(number) || number < 1)) return null;
-    if (!items.length || number <= floor) low = second + 1;
+    // At most `floor` rows can already be covered. A skewed low-numbered run at the
+    // top cannot make an otherwise oversized prefix fit in one readable window.
+    if (data.total_count > floor + span) high = second - 1;
+    else if (!items.length || number <= floor) low = second + 1;
     else if (number > floor + span && data.total_count >= span) {
       firstAbove = { second, number };
       high = second - 1;

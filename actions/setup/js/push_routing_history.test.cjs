@@ -611,7 +611,7 @@ describe("push_routing_history saves", () => {
 
   it("recovers a failure outside the bootstrap cutoff instead of certifying its run number as deleted", async () => {
     vi.useFakeTimers({ toFake: ["Date"] });
-    vi.setSystemTime(new Date(runCreatedAt(10001)));
+    vi.setSystemTime(new Date("2026-11-19T00:00:00Z"));
     const runs = Array.from({ length: 10000 }, (_, i) => paginationRun(10000 - i));
     const skewed = runs.splice(-2, 1)[0];
     runs.unshift({ ...skewed, conclusion: "failure", created_at: runCreatedAt(10001) });
