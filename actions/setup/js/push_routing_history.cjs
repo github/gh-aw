@@ -718,26 +718,33 @@ function isEligibleRun(run, defaultBranch) {
  * @param {number} nowMs
  */
 async function findBootstrapChunk(probe, floor, nowMs) {
-  let low = 0;
-  let high = Math.ceil(nowMs / 1000);
-  /** @type {{second: number, number: number} | null} */
-  let firstAbove = null;
-  // Bisect whole seconds (at most 32 probes through 2106), not pages past the API's result cap.
-  while (low <= high) {
-    const second = Math.floor((low + high) / 2);
-    const { data } = await probe(`<=${new Date(second * 1000).toISOString()}`);
-    const items = data?.workflow_runs;
-    if (!Array.isArray(items) || !Number.isSafeInteger(data.total_count) || data.total_count < 0 || items.length !== Math.min(data.total_count, 1)) return null;
-    const number = items[0]?.run_number;
-    if (items.length && (!Number.isSafeInteger(number) || number < 1)) return null;
-    if (!items.length || number <= floor) low = second + 1;
-    else if (number > floor + MAX_LIST_PAGE * LIST_RUNS_PER_PAGE && data.total_count >= MAX_LIST_PAGE * LIST_RUNS_PER_PAGE) {
-      firstAbove = { second, number };
-      high = second - 1;
-    } else return { second, number };
-  }
-  // The first surviving run may itself follow a long deleted range. Let the scan verify that gap.
-  return firstAbove;
+  const span = MAX_LIST_PAGE * LIST_RUNS_PER_PAGE;
+  /** @param {number} after @param {number} low */
+  const findAfter = async (after, low) => {
+    let high = Math.ceil(nowMs / 1000);
+    /** @type {{second: number, number: number} | null} */
+    let firstAbove = null;
+    // Bisect whole seconds (at most 32 probes through 2106), not pages past the API's result cap.
+    while (low <= high) {
+      const second = Math.floor((low + high) / 2);
+      const { data } = await probe(`<=${new Date(second * 1000).toISOString()}`);
+      const items = data?.workflow_runs;
+      if (!Array.isArray(items) || !Number.isSafeInteger(data.total_count) || data.total_count < 0 || items.length !== Math.min(data.total_count, 1)) return null;
+      const number = items[0]?.run_number;
+      if (items.length && (!Number.isSafeInteger(number) || number < 1)) return null;
+      if (!items.length || number <= after) low = second + 1;
+      else if (number > after + span && data.total_count >= span) {
+        firstAbove = { second, number };
+        high = second - 1;
+      } else return { second, number };
+    }
+    return firstAbove;
+  };
+  const chunk = await findAfter(floor, 0);
+  if (!chunk || chunk.number <= floor + span) return chunk;
+  // A long deleted range needs a newer neighbour beyond its first surviving run: a run on
+  // the cutoff's open page edge cannot corroborate deletion. Do not relax the verifier.
+  return (await findAfter(chunk.number, chunk.second + 1)) ?? chunk;
 }
 
 /**

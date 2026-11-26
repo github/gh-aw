@@ -567,16 +567,21 @@ describe("push_routing_history saves", () => {
     expect(remoteState(remote)).toMatchObject({ last_run: 4, reconciled_through: 4, unexplained: 1 });
   });
 
-  it.each([1, 2001])("bootstraps beyond the listing budget when the first surviving run is #%i", async first => {
+  it.each([
+    { first: 1, gap: false },
+    { first: 1, gap: true },
+    { first: 2001, gap: true },
+  ])("bootstraps a 10,000-run workflow (first surviving run: $first, interior deletion: $gap)", async ({ first, gap }) => {
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(new Date(runCreatedAt(10101)));
-    const apiRuns = Array.from({ length: 10001 - first }, (_, i) => paginationRun(10000 - i));
+    const apiRuns = Array.from({ length: 10001 - first }, (_, i) => paginationRun(10000 - i)).filter(run => !gap || run.run_number <= 4000 || run.run_number > 7000);
     apiRuns.at(-2).conclusion = "failure";
+    apiRuns.find(run => run.run_number === 7001).conclusion = "failure";
     const failedSave = [
       { name: "agent", started_at: runCreatedAt(2), conclusion: "success" },
       { name: "push_routing_history", conclusion: "failure" },
     ];
-    const github = fakeGitHub(null, { runs: apiRuns, jobs: { [9001 + first]: failedSave, 19001: failedSave } });
+    const github = fakeGitHub(null, { runs: apiRuns, jobs: { [9001 + first]: failedSave, 16001: failedSave, 19001: failedSave } });
     let state = emptyState("triage");
     let rows = [];
     for (let number = 10000; number <= 10100; number++) {
@@ -595,9 +600,9 @@ describe("push_routing_history saves", () => {
       if (state.reconciled_through === number) break;
     }
     expect(state.reconciled_through).toBe(state.last_run);
-    expect(state).toMatchObject({ unexplained: 2, unresolved_runs: [] });
-    expect(rows.filter(row => row.note === "unsaved").map(row => row.number)).toEqual([first + 1, 10001]);
-    expect(github.calls.jobs).toEqual([9001 + first, 19001]);
+    expect(state).toMatchObject({ unexplained: 3, unresolved_runs: [] });
+    expect(rows.filter(row => row.note === "unsaved").map(row => row.number)).toEqual([first + 1, 7001, 10001]);
+    expect(github.calls.jobs).toEqual([9001 + first, 16001, 19001]);
     expect(github.calls.lists.every(call => call.page <= 10)).toBe(true);
   });
 
