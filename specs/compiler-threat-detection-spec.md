@@ -7,7 +7,7 @@ sidebar:
 
 # GitHub Actions Compiler Threat Detection Specification
 
-**Version**: 1.0.113
+**Version**: 1.0.114
 **Status**: Candidate Recommendation  
 **Latest Version**: https://github.com/github/gh-aw/blob/main/specs/compiler-threat-detection-spec.md  
 **Editors**: GitHub Next (GitHub, Inc.)
@@ -958,6 +958,7 @@ Setting `model-routing.learning` to `observe` adds a post-conclusion `push_routi
 - Reject explicit use for the tested ineligible cases: a fixed or non-routed primary model, `workflow_call`, and missing `tools.repo-memory`. A repository default silently skips the fixed/non-routed model and `workflow_call` cases covered by regression tests. Workflows that do not opt in compile unchanged.
 - `gh aw compile --dry-run` is an explicit compiler preview mode. It MUST validate `model-routing.learning` and check workflow eligibility without mutating the parsed `WorkflowData`. The emitted dry-run workflow MUST omit the compiler-managed `push_routing_history` job and its associated `contents: write` and `actions: read` permissions. A dry-run compilation MUST NOT charge the run as unsaved.
 - For a real run, when the agent has started and an existing `push_routing_history` writer concludes with anything other than success, including skipped or cancelled conclusions, the run MUST remain unsaved. The dry-run omission does not weaken this real-run accounting requirement.
+- This accounting MUST apply to eligible first attempts before the first successful history write as well. A writer MAY save its own observation without verifying the backlog, but MUST NOT advance coverage over unchecked early runs or charge a missing save as a model outcome.
 
 | Boundary | Implementation | Regression Evidence |
 |---|---|---|

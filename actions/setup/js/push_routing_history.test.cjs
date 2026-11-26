@@ -155,10 +155,11 @@ function fakeGitHub(remote, { runs = [], jobs = {}, attempts = {}, contents = {}
         listJobsForWorkflowRunAttempt: async ({ run_id }) => ({ data: { jobs: jobs[run_id] || [] } }),
       },
     },
-    paginate: async (method, params) => {
+    paginate: async (method, params, mapPage) => {
       calls.jobs.push(params.run_id);
       calls.jobParams.push(params);
-      return (await method(params)).data.jobs;
+      const jobs = (await method(params)).data.jobs;
+      return mapPage ? mapPage({ data: jobs, headers: {} }) : jobs;
     },
   };
   return client;
@@ -180,7 +181,15 @@ function sessionFile(name, outcome, { model = "model-a", aic = 2 } = {}) {
 
 /** One run's push_routing_history job. */
 function save(remote, number, outcome, options = {}) {
-  const { github = fakeGitHub(remote), push = signedPush(remote), attempt = "1", ref = "refs/heads/main", sleepFn = async () => {}, session, generation = GENERATION } = options;
+  const {
+    github = fakeGitHub(remote, { runs: Array.from({ length: number }, (_, i) => paginationRun(number - i)) }),
+    push = signedPush(remote),
+    attempt = "1",
+    ref = "refs/heads/main",
+    sleepFn = async () => {},
+    session,
+    generation = GENERATION,
+  } = options;
   const workspaceDir = fs.mkdtempSync(path.join(root, `run-${number}-`));
   return main({
     github,
@@ -372,6 +381,98 @@ describe("push_routing_history saves", () => {
     expect(state.scopes["copilot/cost/shared"].pairs[PAIR].history).toEqual([[1, expect.any(String), true, 2, 2, [100, 900, 0, 50, null]]]);
     // The branch starts from its own root commit, not from the repository's history.
     expect(git(remote, "rev-list", "--count", BRANCH)).toBe("2");
+  });
+
+  it.each(["new", "verified", "unavailable on first save"])("recovers earlier first attempts once with %s history", async start => {
+    const remote = bareRemote();
+    if (start === "verified") await save(remote, 9, "success");
+    const failed = [
+      { name: "agent", started_at: runCreatedAt(10), conclusion: "success" },
+      { name: "push_routing_history", conclusion: "failure" },
+    ];
+    const runs = Array.from({ length: 12 }, (_, i) => paginationRun(12 - i, { head_sha: "workflow-revision" }));
+    const github = fakeGitHub(remote, {
+      runs,
+      contents: { "workflow-revision": `GH_AW_ROUTING_GENERATION: "${GENERATION}"` },
+      attempts: { 9011: { status: "completed", conclusion: "failure" } },
+      jobs: { 9008: [failed[0]], 9010: failed, 9011: failed },
+    });
+    for (const n of [8, 10]) runs.find(run => run.run_number === n).conclusion = "failure";
+    Object.assign(
+      runs.find(run => run.run_number === 11),
+      { status: "in_progress", conclusion: null, run_attempt: 2 }
+    );
+    const unavailable = start === "unavailable on first save";
+    await save(remote, 12, "success", {
+      github: unavailable
+        ? fakeGitHub(remote, {
+            listWorkflowRuns: async () => {
+              throw new Error("Actions unavailable");
+            },
+          })
+        : github,
+    });
+    expect(remoteState(remote)).toMatchObject({ last_run: 12, reconciled_through: unavailable ? 0 : 12, unexplained: unavailable ? 0 : 2 });
+    await save(remote, 13, "success", { github });
+    expect(remoteState(remote)).toMatchObject({ last_run: 13, reconciled_through: 13, unexplained: 2 });
+    expect(remoteRuns(remote).filter(row => row.note === "unsaved")).toMatchObject([
+      { number: 10, attempt: 1, counted: false, outcome: null },
+      { number: 11, attempt: 1, counted: false, outcome: null },
+    ]);
+    expect(github.calls.attempts).toEqual([9011]);
+  });
+
+  it("leaves the cursor before an unverified early definition and retries without charging the wrong one", async () => {
+    const remote = bareRemote();
+    const runs = [paginationRun(2), paginationRun(1, { conclusion: "failure", head_sha: "before-edit" })];
+    const contents = {};
+    const github = fakeGitHub(remote, {
+      runs,
+      contents,
+      jobs: {
+        9001: [
+          { name: "agent", started_at: runCreatedAt(1), conclusion: "success" },
+          { name: "push_routing_history", conclusion: "failure" },
+        ],
+      },
+    });
+    await save(remote, 2, "success", { github });
+    expect(remoteState(remote)).toMatchObject({ reconciled_through: 0, last_run: 2, unexplained: 0 });
+    contents["before-edit"] = `GH_AW_ROUTING_GENERATION: "${"c".repeat(64)}:${"d".repeat(64)}"`;
+    await save(remote, 3, "success", { github });
+    expect(remoteState(remote)).toMatchObject({ reconciled_through: 3, unexplained: 0 });
+    expect(remoteRuns(remote).filter(row => row.number === 1)).toMatchObject([{ note: "older_definition", counted: false }]);
+  });
+
+  it("saves its own result and resumes at the first unfinished early inspection", async () => {
+    const remote = bareRemote();
+    const runs = Array.from({ length: 80 }, (_, i) => paginationRun(80 - i, { conclusion: "failure" }));
+    const github = fakeGitHub(remote, { runs });
+    let pages = 0;
+    github.paginate = async (_method, params, mapPage) => {
+      github.calls.jobs.push(params.run_id);
+      for (const headers of [{ link: '<https://api.github.com/next>; rel="next"' }, {}]) {
+        pages++;
+        mapPage({ data: [], headers });
+      }
+      return [];
+    };
+    await save(remote, 80, "success", { github });
+    expect(pages).toBe(64);
+    expect(remoteState(remote)).toMatchObject({ last_run: 80, reconciled_through: 32 });
+    github.calls.jobs.length = 0;
+    await save(remote, 81, "success", { github });
+    expect(github.calls.jobs[0]).toBe(9033);
+    expect(remoteState(remote)).toMatchObject({ last_run: 81, reconciled_through: 64 });
+  });
+
+  it("does not certify a deep backlog that the normal Actions listing cannot reach", async () => {
+    const remote = bareRemote();
+    const runs = Array.from({ length: 10000 }, (_, i) => paginationRun(10000 - i));
+    const github = fakeGitHub(remote, { runs });
+    await save(remote, 10000, "success", { github });
+    expect(remoteState(remote)).toMatchObject({ last_run: 10000, reconciled_through: 0 });
+    expect(github.calls.jobs).toEqual([]);
   });
 
   it("lands two saves that read the same state, re-applying the later one to the newer file", async () => {
