@@ -95,7 +95,7 @@ func pushPolicyConstraints(ctx context.Context, config map[string]any) (bool, er
 	if value, exists := config["required-author"]; exists {
 		text, ok := value.(string)
 		if !ok {
-			return false, fmt.Errorf("push-target requires a literal string at safe-outputs.push-to-pull-request-branch.required-author")
+			return false, errors.New("push-target requires a literal string at safe-outputs.push-to-pull-request-branch.required-author")
 		}
 		constrained = constrained || strings.TrimSpace(text) != ""
 	}
