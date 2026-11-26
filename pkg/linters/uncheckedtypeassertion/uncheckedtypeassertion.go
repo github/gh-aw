@@ -12,13 +12,14 @@ import (
 	"github.com/github/gh-aw/pkg/linters/internal/astutil"
 	"github.com/github/gh-aw/pkg/linters/internal/filecheck"
 	"github.com/github/gh-aw/pkg/linters/internal/nolint"
+	"github.com/github/gh-aw/pkg/linters/internal/parentmap"
 	"github.com/github/gh-aw/pkg/logger"
 )
 
 var pkgLog = logger.New("linters:uncheckedtypeassertion")
 
 // Analyzer is the unchecked-type-assertion analysis pass.
-var Analyzer = analyzerutil.New("uncheckedtypeassertion", "reports single-value type assertions that may panic if the dynamic type does not match", run)
+var Analyzer = analyzerutil.New("uncheckedtypeassertion", "reports single-value type assertions that may panic if the dynamic type does not match", run, parentmap.Analyzer)
 
 func run(pass *analysis.Pass) (any, error) {
 	pkgLog.Printf("analyzing package %s", pass.Pkg.Path())
@@ -27,10 +28,10 @@ func run(pass *analysis.Pass) (any, error) {
 		return nil, err
 	}
 
-	// Build a parent map for each file so we can detect the two-value form.
-	fileParents := make(map[*ast.File]map[ast.Node]ast.Node)
-	for _, f := range pass.Files {
-		fileParents[f] = astutil.BuildParentMap(f)
+	// Reuse the per-package parent maps shared by all parent-aware analyzers.
+	fileParents, err := parentmap.Of(pass)
+	if err != nil {
+		return nil, err
 	}
 
 	nodeFilter := []ast.Node{

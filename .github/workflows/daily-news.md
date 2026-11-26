@@ -376,7 +376,7 @@ Generate exactly **2 trend charts** (issues/PRs activity and commit activity) us
 `/tmp/gh-aw/agent/daily-news-data/`. Use Python (pandas + matplotlib/seaborn) to process the JSON
 files, produce PNGs at 300 DPI, upload them via `upload asset`, and embed them in the
 discussion under a `### 📈 Trend Analysis` section with a 2-3 sentence interpretation each.
-{{else}}
+{{#else}}
 ## 📊 Trend Charts Requirement
 
 **IMPORTANT**: Generate exactly 2 trend charts that showcase key metrics of the project. These charts should visualize trends over time to give the team insights into project health and activity patterns.
@@ -517,7 +517,7 @@ Read from the pre-downloaded files in `/tmp/gh-aw/agent/daily-news-data/` (`issu
 Write an upbeat, emoji-accented digest covering: top issues and PRs, notable commits,
 community engagement, productivity suggestions, and a closing haiku.
 Create a GitHub discussion titled "Daily Status - <today's date>".
-{{else}}
+{{#else}}
 **Data Sources** - Use the pre-downloaded files in `/tmp/gh-aw/agent/daily-news-data/`:
 - Include some or all of the following from the JSON files:
   * Recent issues activity (from `issues.json`)
