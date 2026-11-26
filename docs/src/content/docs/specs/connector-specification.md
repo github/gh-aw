@@ -231,6 +231,30 @@ token. The host MUST NOT forward assertions or token-request credentials to
 the agent or provider, persist access tokens in plans or outputs, or use a
 failed exchange or authorization denial to select another route. Renewal
 uses a fresh exchange, not a stored refresh token or replay of a denied call.
+
+For federated readers, the agent MUST NOT receive the OIDC request credentials,
+assertion, access token, or broker socket capability. The broker supplies a
+fixed credential to the trusted connector adapter; it is not an agent-callable
+token or command API. Only selected MCP read tools may invoke credentialed
+adapter operations, and their inputs, resource grants, and fixed destinations
+MUST be checked before credential use. Unselected tools and arbitrary commands
+MUST NOT execute with connector authority. Safe-output requests are intents:
+live effects run only in the separately authorized writer job, not in the agent
+or reader adapter.
+The compiler MUST reject agent-job host access that would bypass this boundary,
+including authored runner hooks, job containers or services, MCP scripts, and
+untrusted sibling MCP servers or gateway customization.
+
+These guarantees depend on an isolated sandbox, trusted runner, gateway, adapter,
+declarations, and provider. A process able to connect to the broker socket can
+retrieve its bearer token; the socket itself does not authorize individual
+operations. The provider receives the token and enforces the application's
+permissions. Remote MCP read-only declarations are not proof that the provider
+is read-only. Configure least-privilege provider roles and federation trust;
+other workflows with the same trusted OIDC subject are outside this compiler's
+per-workflow isolation check. Other independently granted agent tools or
+credentials are outside this connector-specific boundary.
+
 A potentially live federated writer (including conditional staging) MUST
 have a literal `safe-outputs.environment` name exclusive to the `safe_outputs`
 job. The compiler MUST keep `conclusion` and `pre_activation` outside that
@@ -754,6 +778,7 @@ class; it is not sufficient by itself to certify a complete implementation.
 | **C-INF-001**: Inference binding MUST require explicit main-workflow selection, a known profile, exact wire-model grant, selected-profile hostname approval, compatible engine metadata and no conflicting native/imported override (section 5.4). | Compiler | **T-CON-009** | Compile import-only and valid key/OIDC consumers for both protocols. Verify only the selected profile's hosts are allowed. Reject unknown profiles, ungranted/dynamic aliases, unsupported engines, conflicting overrides and missing selected OIDC prerequisites. Import-only emits no inference binding. |
 | **C-INF-002**: Inference configuration and credentials MUST remain outside reader/effect plans; the selected native engine transport MUST retain the fixed SDK base, protocol, model and credential route (sections 4, 5.4). | Compiler, execution host | **T-CON-010** | Inspect compiled native engine settings and Go/Node-decoded reader/effect plans. Only the engine receives inference configuration. Setup reads zero secret values; inference test execution rejects. Native authentication-denial evidence must be reported separately from compilation or symbolic model checks. |
 | **C-FED-001**: Entra access tokens MUST be acquired and renewed only for a selected live phase, without credential fallback (section 4). | Compiler, execution host | **T-CON-011** | Inspect import-only, reader-only, writer-only and staged consumers. Mock assertion and exchange endpoints and advance the clock; verify the audience, tenant, client and scope, reacquisition before use after expiry, and failure without credential fallback or mutation replay. |
+| **C-FED-002**: Federated reader authority MUST be accessible to the agent only through selected, validated MCP reads; broker and OIDC capabilities MUST remain outside the agent (section 4). | Compiler, execution host | **T-CON-012** | Inspect the generated sandbox and adapter mounts; reject runner hooks and untrusted host access. Attempt unselected tools, invalid inputs, and socket or OIDC access from the agent; verify no token or elevated request is available outside the selected surface. Verify selected reads remain usable. |
 
 ### 10.2 Compliance testing procedure
 
@@ -933,6 +958,42 @@ the executable examples in
 [`connector_specification_test.go`](https://github.com/github/gh-aw/blob/main/pkg/workflow/connector_specification_test.go);
 and bundled Node staging in
 [`connector_staging_parity_test.go`](https://github.com/github/gh-aw/blob/main/pkg/workflow/connector_staging_parity_test.go).
+
+#### Federated agent boundary model
+
+[`agent-boundary/AgentBoundary.tla`](https://github.com/github/gh-aw/blob/main/specs/connectors/agent-boundary/AgentBoundary.tla)
+models one adversarial attempt through MCP, a broker socket, Actions OIDC
+credentials, or runner access. It varies selected REST and remote reads,
+requested operation (including a writer and an arbitrary command), and input
+validity. `TokenIsolation` excludes token access by the agent;
+`SelectedMCPOnly` permits connector-authorized execution only for a selected,
+valid MCP read. The socket, OIDC, runner, and selection mutations deliberately
+remove individual boundary assumptions; `WitnessRead` checks that an approved
+read remains reachable. These model C-FED-002, not the implementation itself.
+
+The model assumes the sandbox, socket mounts, gateway, adapter, runner, provider,
+and Entra trust enforce the described boundary. It abstracts the token exchange,
+safe-output authorization, response contents, concrete inputs and provider side
+effects; it cannot prove isolation against a compromised host or provider, or
+establish that a remote tool is read-only. The main boundary model separately
+covers write authorization and staged effects.
+
+The current broker creates its socket under `RUNNER_TEMP` without checking all
+agent-visible host mounts. On a local-Docker self-hosted runner, a temp
+directory beneath an exposed mount such as `/tmp/gh-aw` can let the agent
+connect directly and obtain the token. Read-only bind mounts do not prevent
+socket connections. C-FED-002 therefore requires runtime mount-isolation
+enforcement; the model and existing unit tests do not establish it.
+
+To reproduce, replace the `cd` above with `cd "$repo/specs/connectors/agent-boundary"`
+and use `AgentBoundary.tla` and `AgentBoundary.cfg` in place of
+`ConnectorBoundary.tla` and `ConnectorBoundary.cfg`. With the pinned TLA+ Tools
+v1.7.4 and Java 17, one worker and seed 1, the secure configuration exhausts
+480 generated / 320 distinct states. The socket, OIDC and runner controls
+violate `TokenIsolation`; socket execution and selection controls violate
+`SelectedMCPOnly`.
+`WitnessRead` checks `Safety` and then violates `ProbeAbsent` with a selected
+read. As above, each expected violation must be checked by name and exit status.
 
 #### Inference binding model
 
