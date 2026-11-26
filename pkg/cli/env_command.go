@@ -191,7 +191,7 @@ Scope resolution:
 	}
 
 	cmd.Flags().StringVar(&scope, "scope", "", "Variable scope (repo|org|ent). Defaults to repo")
-	cmd.Flags().StringVarP(&repo, "repo", "r", "", "Target repository (owner/repo format only; GHES host prefixes are not supported). Defaults to current repository")
+	cmd.Flags().StringVarP(&repo, "repo", "r", "", repoNoHostUsage+". Defaults to current repository")
 	cmd.Flags().StringVar(&org, "org", "", "Target organization (required for --scope org unless inferable from --repo/current repo)")
 	cmd.Flags().StringVar(&enterprise, "enterprise", "", "Target enterprise slug (required for --scope ent)")
 	return cmd
@@ -234,7 +234,7 @@ Scope and flag behavior:
 	}
 
 	cmd.Flags().StringVar(&scope, "scope", "", "Variable scope (repo|org|ent)")
-	cmd.Flags().StringVarP(&repo, "repo", "r", "", "Target repository (owner/repo format only; GHES host prefixes are not supported). Defaults to current repository")
+	cmd.Flags().StringVarP(&repo, "repo", "r", "", repoNoHostUsage+". Defaults to current repository")
 	cmd.Flags().StringVar(&org, "org", "", "Target organization (required for --scope org unless inferable from --repo/current repo)")
 	cmd.Flags().StringVar(&enterprise, "enterprise", "", "Target enterprise slug (required for --scope ent)")
 	cmd.Flags().StringVar(&visibility, "visibility", defaultsVisibilityAll, "Visibility for newly created org or ent variables (all|private|selected)")

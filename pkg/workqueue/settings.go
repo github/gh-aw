@@ -145,19 +145,6 @@ func sortedSettingsKeys[T any](value map[string]T) []string {
 	return keys
 }
 
-// ParseRepositorySettings extracts only work_queue; other aw.json properties are
-// owned by the repository configuration parser.
-func ParseRepositorySettings(data []byte) (Settings, error) {
-	if data == nil {
-		return ParseSettings(nil)
-	}
-	object, err := settingsObject(data, "aw.json", nil)
-	if err != nil {
-		return Settings{}, fmt.Errorf("work_queue: cannot read scheduling configuration: %w", err)
-	}
-	return ParseSettings(object["work_queue"])
-}
-
 func validIdentity(value string, allowEmpty bool, maximum int) bool {
 	if (!allowEmpty && value == "") || len(value) > maximum || !utf8.ValidString(value) {
 		return false

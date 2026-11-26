@@ -75,6 +75,7 @@ const (
 	OTelAttrGenAiUsageTotalTokens                   = "gen_ai.usage.total_tokens"
 	OTelAttrGenAiTokenModality                      = "gen_ai.token.modality"
 	OTelAttrGenAiWorkflowName                       = "gen_ai.workflow.name"
+	OTelAttrServerAddress                           = "server.address"
 	OTelAttrVcsProviderName                         = "vcs.provider.name"
 	OTelAttrVcsRefHeadName                          = "vcs.ref.head.name"
 	OTelAttrVcsRefHeadRevision                      = "vcs.ref.head.revision"
@@ -281,6 +282,7 @@ var otelAttributeNamesByValue = map[string]string{
 	"gen_ai.usage.total_tokens":                    "gen_ai.usage.total_tokens",
 	"gen_ai.token.modality":                        "gen_ai.token.modality",
 	"gen_ai.workflow.name":                         "gen_ai.workflow.name",
+	"server.address":                               "server.address",
 	"vcs.provider.name":                            "vcs.provider.name",
 	"vcs.ref.head.name":                            "vcs.ref.head.name",
 	"vcs.ref.head.revision":                        "vcs.ref.head.revision",

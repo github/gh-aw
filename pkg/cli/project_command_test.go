@@ -20,7 +20,7 @@ func TestNewProjectCommand(t *testing.T) {
 	cmd := NewProjectCommand()
 	require.NotNil(t, cmd, "Command should be created")
 	assert.Equal(t, "project", cmd.Use, "Command name should be 'project'")
-	assert.Equal(t, "Create and manage GitHub Projects V2 boards", cmd.Short, "Short description should describe project creation and management")
+	assert.Equal(t, "Create GitHub Projects V2 boards", cmd.Short, "Short description should describe project creation")
 	assert.Contains(t, cmd.Long, "Create GitHub Projects V2 boards linked to repositories.", "Long description should describe creation behavior")
 	assert.NotEmpty(t, cmd.Commands(), "Command should have subcommands")
 }

@@ -1038,6 +1038,10 @@ models:
 
 An experimental feature that chooses a model and reasoning effort for the main agent on each run. Set `model: router` to let the task determine the level. Choose `router/economy`, `router/balanced`, or `router/robust` for a fixed level, or use `model-routing: false` to disable implicit routing without pinning a model. See [Model Routing](/gh-aw/reference/model-routing/).
 
+### Adaptive Routing (`model-routing.learning`)
+
+Set `learning: observe` under `model-routing` to record the selected model and reasoning effort, the outcome and the cost of each eligible run in [repo-memory](/gh-aw/reference/repo-memory/). Observation does not change the router's pick. A run that did not route or whose agent made no request is recorded as `no_agent` and does not count as a success or failure. Inspect results with `gh aw routing status`. See [Adaptive Routing](/gh-aw/reference/adaptive-routing/).
+
 ### Default AI Credits Pricing (`models.default-ai-credits-pricing`)
 
 A `models:` frontmatter field that provides a fallback per-token pricing rate (in $/1M tokens) for models not present in the AWF built-in pricing table. When the AWF API proxy encounters an unrecognized model — such as a self-hosted BYOK Ollama or vLLM instance — it normally rejects the request with HTTP 400 `unknown_model_ai_credits`. Setting `default-ai-credits-pricing` supplies `input` and `output` rates that the proxy uses instead, preventing the rejection. Set both to `0` for free or local models.

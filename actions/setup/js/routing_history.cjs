@@ -36,11 +36,11 @@ const LIVE_ROLES = new Set(["serve", "test", "probe", "ordinary"]);
  * @typedef {{ since_seq: number, pending: number }} Suspension
  * @typedef {{ history: HistoryEntry[], credits: number | null, model_credits: number | null, bills: number, streak: number, tests: number, suspended: Suspension | null, seen: string, summary: { runs: number, rate: number, hopeful: number } | null }} PairRecord
  * @typedef {{ incumbent: string | null, last_role: string | null, last_success_seq: number, pairs: Record<string, PairRecord> }} ScopeRecord
- * @typedef {{ v: number, workflow: string, seq: number, generation: { hash: string, since_run: number } | null, reset_after_run: number, last_run: number, reconciled_through?: number, unresolved_runs?: number[], unresolved_run_ids?: Record<string, string>, unexplained: number, scopes: Record<string, ScopeRecord>, updated: { run: string | null, at: string } | null }} HistoryState
+ * @typedef {{ v: number, workflow: string, seq: number, generation: { hash: string, since_run: number } | null, reset_after_run: number, last_run: number, reconciled_through?: number, unresolved_runs?: number[], unresolved_run_ids?: Record<string, string>, unresolved_lookup_cursor?: number, unexplained: number, scopes: Record<string, ScopeRecord>, updated: { run: string | null, at: string } | null }} HistoryState
  * @typedef {{ run: string, number: number, attempt: number | null, at: string, generation: string | null, scope: string | null, mode: string | null, role: string | null, pair: string | null, outcome: string | null, credits: number | null, counted: boolean, note: string | null }} RunLine
  * @typedef {{ credits?: number | null, model_credits?: number | null, tokens?: (number | null)[] | null }} RunCost
  * @typedef {{ id: string, number: number, conclusion: string, agent_ran?: boolean | null, generation?: string | null }} ListedRun
- * @typedef {{ verified: boolean, ceiling?: number, unresolved?: number[], unresolved_ids?: Record<string, string>, resolved?: number[] }} ReconciliationCoverage
+ * @typedef {{ verified: boolean, ceiling?: number, unresolved?: number[], unresolved_ids?: Record<string, string>, unresolved_lookup_cursor?: number, resolved?: number[] }} ReconciliationCoverage
  * @typedef {{ workflow: string, run: { id: string, number: number, attempt: number }, at: string, generation: string, mode: string, scope: string, observation: { outcome: string, reason?: string } | null, pair: string | null, cost?: RunCost | null, receipt?: Record<string, any> | null, prepare?: { explore_allowed?: boolean } | null, listing?: ListedRun[], reconciliation?: ReconciliationCoverage | null }} RunEvidence
  */
 
@@ -413,7 +413,11 @@ function applyRun(input, runs, run, options = {}) {
   };
 
   const hasReconciliation =
-    (run.reconciliation !== undefined && run.reconciliation !== null) || typeof input.reconciled_through === "number" || Array.isArray(input.unresolved_runs) || (input.unresolved_run_ids !== undefined && input.unresolved_run_ids !== null);
+    (run.reconciliation !== undefined && run.reconciliation !== null) ||
+    typeof input.reconciled_through === "number" ||
+    Array.isArray(input.unresolved_runs) ||
+    (input.unresolved_run_ids !== undefined && input.unresolved_run_ids !== null) ||
+    typeof input.unresolved_lookup_cursor === "number";
   const legacyFloor = legacyReconciliationFloor(state, runs, bounds);
   const prevReconciled = Math.max(typeof state.reconciled_through === "number" ? state.reconciled_through : legacyFloor, state.reset_after_run);
   const prevUnresolved = new Set((Array.isArray(state.unresolved_runs) ? state.unresolved_runs : []).filter(n => Number.isInteger(n) && n > state.reset_after_run));
@@ -429,6 +433,14 @@ function applyRun(input, runs, run, options = {}) {
       if (typeof value === "string" && value) knownUnresolvedIds[key] = value;
     }
   }
+  const recLookupCursor = run.reconciliation?.unresolved_lookup_cursor;
+  const prevLookupCursor = state.unresolved_lookup_cursor;
+  const nextLookupCursor =
+    typeof recLookupCursor === "number" && Number.isInteger(recLookupCursor) && recLookupCursor > 0
+      ? recLookupCursor
+      : typeof prevLookupCursor === "number" && Number.isInteger(prevLookupCursor) && prevLookupCursor > 0
+        ? prevLookupCursor
+        : null;
 
   /** @param {number[]} kept */
   const applyUnresolvedIds = kept => {
@@ -440,8 +452,14 @@ function applyRun(input, runs, run, options = {}) {
     }
     if (Object.keys(nextIds).length > 0) {
       state.unresolved_run_ids = nextIds;
+      if (nextLookupCursor !== null) {
+        state.unresolved_lookup_cursor = nextLookupCursor;
+      } else {
+        delete state.unresolved_lookup_cursor;
+      }
     } else {
       delete state.unresolved_run_ids;
+      delete state.unresolved_lookup_cursor;
     }
   };
 

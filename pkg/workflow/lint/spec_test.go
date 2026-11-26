@@ -165,6 +165,7 @@ func TestSpec_PublicAPI_DefaultBuiltInRules(t *testing.T) {
 		{"InstallScriptsRule", lint.InstallScriptsRule},
 		{"GatewayDispatchLiteralsRule", lint.GatewayDispatchLiteralsRule},
 		{"BashCasePatternRule", lint.BashCasePatternRule},
+		{"UnquotedCommandAssignmentRule", lint.UnquotedCommandAssignmentRule},
 		{"ObfuscationRule", lint.ObfuscationRule},
 		{"UnsoundContainsRule", lint.UnsoundContainsRule},
 		{"PermissionScopeRule", lint.PermissionScopeRule},

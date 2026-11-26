@@ -5,13 +5,13 @@ sidebar:
   order: 606
 ---
 
-[Model routing](/gh-aw/reference/model-routing/) chooses a model and reasoning effort for each run from the task in front of it. Adaptive routing adds what the workflow itself has learned: which model and effort each run used, whether the run completed its task, and what it cost. With `adaptive-routing: observe`, the workflow keeps running the router's ordinary pick exactly as before, and gh-aw records every eligible run so that maintainers can see the evidence before anything changes.
+[Model routing](/gh-aw/reference/model-routing/) chooses a model and reasoning effort for each run from the task in front of it. Set `learning: observe` under `model-routing` to record which model and effort ran, whether the workflow completed its task, and what it cost. The router keeps making its ordinary pick.
 
 For example, if the router's pick for an issue triage workflow moves from model B to model A, observe mode keeps running A as today and records each run. A week later, `gh aw routing status` might show B with 40 runs, all successful, at 28 credits a run, and A with 9 runs, one of them a failure, at 12 credits a run. That is the evidence a later live mode would act on. Observe mode makes no recommendation of its own.
 
 ## Turn it on
 
-Add `adaptive-routing: observe` to a routed workflow that uses [repo-memory](/gh-aw/reference/repo-memory/):
+Add `learning: observe` to the top-level `model-routing` block of a routed workflow that uses [repo-memory](/gh-aw/reference/repo-memory/):
 
 ```aw wrap
 ---
@@ -23,9 +23,10 @@ permissions:
   issues: read
 engine: copilot
 model: router
+model-routing:
+  learning: observe
 tools:
   repo-memory: true
-adaptive-routing: observe
 safe-outputs:
   add-comment:
 ---
@@ -36,15 +37,17 @@ To turn it on for every eligible workflow in a repository, set the default in `.
 
 ```json title=".github/workflows/aw.json"
 {
-  "adaptive_routing": "observe"
+  "model_routing": { "learning": "observe" }
 }
 ```
 
-A workflow's own value wins, including `adaptive-routing: false`, then the first import that sets it, then the repository default. `true` is reserved for live adaptive routing, which is not available yet, and fails to compile.
+A workflow's own `learning` value wins, then the first import that sets `learning`, then the repository default. The default is off. Set `learning: false` to stop recording without disabling routing or deleting history. Only `observe` and `false` are supported.
+
+Learning does not enable routing or require a shortlist. If you also use `allowed-models`, declare the list once, alongside `learning` or in a separate import, and use a literal router model value as usual.
 
 ## Which workflows take part
 
-A workflow takes part when its main agent's model is chosen by AWF model routing on a Copilot, Claude, or Codex engine: `model: router`, a fixed level such as `router/balanced`, the [default routing](/gh-aw/reference/model-routing/#default-routing-for-workflows-without-a-model) for workflows without a model, or a model expression that resolves to a router value. It must also enable `tools.repo-memory`, and it must not be a work-queue worker, a reusable workflow (`on: workflow_call`), or run [experiments](/gh-aw/reference/experiments/). A workflow that sets `adaptive-routing: observe` itself, or through an import, fails to compile with the reason when it does not qualify; the repository default skips such workflows silently.
+A workflow takes part when its main agent's model is chosen by AWF model routing on a Copilot, Claude, or Codex engine: `model: router`, a fixed level such as `router/balanced`, the [default routing](/gh-aw/reference/model-routing/#default-routing-for-workflows-without-a-model) for workflows without a model, or a model expression that resolves to a router value. It must also enable `tools.repo-memory`, and it must not be a work-queue worker, a reusable workflow (`on: workflow_call`), or run [experiments](/gh-aw/reference/experiments/). A workflow that sets `learning: observe` itself, or through an import, fails to compile with the reason when it does not qualify; the repository default skips such workflows silently.
 
 At run time, gh-aw records only the first attempt of a run whose workflow definition comes from the default branch, so re-runs and pull request runs are not recorded. Every first attempt is recorded once the agent job has run, whether the run succeeded or failed.
 
@@ -56,9 +59,11 @@ After the run's `conclusion` job has published its unified session, the `push_ro
 {"run": "44156334376", "number": 812, "attempt": 1, "at": "2026-11-19T17:02:40Z", "generation": "<definition hash>", "scope": "copilot/cost/shared", "mode": "observe", "role": "observe", "pair": "github-copilot/model-a@high", "outcome": "failure", "credits": 12.0, "counted": true, "note": null}
 ```
 
-A run counts as a success or a failure only when the verdict says its result was about the selected model. Otherwise its line explains why it did not count, for example `infrastructure`, `cancelled` or `rate_limited`, or `no_agent` when AWF did not route the run or its agent made no request. If a run's own save fails, the next save finds the run in the workflow's run list and records it as `unsaved`.
+A run counts as a success or a failure only when the verdict says its result was about the selected model. Otherwise its line explains why it did not count, for example `infrastructure`, `cancelled` or `rate_limited`, or `no_agent` when AWF did not route the run or its agent made no request. If a run's own save fails, the next save finds the run in the workflow's run list and records it as `unsaved`. If a re-run is already in progress, the writer checks the first attempt without waiting for the re-run to finish.
 
-`state.json` keeps, for each model and effort, its recent outcomes with their credits and token counts, its average cost, current streak and a summary of its success rate. It also tracks verified reconciliation coverage (`reconciled_through` and `unresolved_runs`) independently of `runs.jsonl`'s 500-line retention window and `last_run`, so an older run that ages out of `runs.jsonl` is never charged twice and an incomplete or failed run-list lookup never advances coverage past a gap. Providers report a request's input count either with or without its cached tokens. When AWF's record does not say which, Anthropic counts are treated as excluding cached tokens, OpenAI counts as including them, and for Copilot (or other providers) an input count smaller than the cached count is taken to exclude it and any other to include it, so a Copilot run's token counts are close but not always exact, while its credits are what AWF priced. Editing the workflow starts a new generation: earlier failures are forgiven and successes are kept, a run of the older definition that finishes late does not count against the new one, and reconciliation continues from the previous verified floor so a failed save on the first run of a new definition is not dropped. Records are shared across routing levels unless the workflow chooses its level at run time, in which case each level keeps its own.
+`state.json` keeps, for each model and effort, its recent outcomes with their credits and token counts, its average cost, current streak and a summary of its success rate. It also tracks verified reconciliation coverage (`reconciled_through` and `unresolved_runs`) independently of `runs.jsonl`'s 500-line retention window and `last_run`, so an older run that ages out of `runs.jsonl` is never charged twice and an incomplete or failed run-list lookup never advances coverage past a gap. When a run number is missing from the default-branch, `pull_request_target`, and unfiltered listings, it is kept in `unresolved_runs` only while its higher listed neighbor is recent (within 5 minutes of the scan, where GitHub's run list can still lag); once an unfiltered scan covering both sides confirms that the higher listed neighbor is older than 5 minutes and the run number is still absent, it is treated as a deleted run rather than persisting in `unresolved_runs`. Providers report a request's input count either with or without its cached tokens. When AWF's record does not say which, Anthropic counts are treated as excluding cached tokens, OpenAI counts as including them, and for Copilot (or other providers) an input count smaller than the cached count is taken to exclude it and any other to include it, so a Copilot run's token counts are close but not always exact, while its credits are what AWF priced. Editing the workflow starts a new generation: earlier failures are forgiven and successes are kept, a run of the older definition that finishes late does not count against the new one, and reconciliation continues from the previous verified floor so a failed save on the first run of a new definition is not dropped. Records are shared across routing levels unless the workflow chooses its level at run time, in which case each level keeps its own.
+
+`last_run` is the highest recorded run number, not proof that every preceding result was saved. For example, if run 12 saves while run 11 is still active, coverage can reach 12 with 11 listed in `unresolved_runs`. A missing entry in an Actions listing is not proof that 11 saved. Only the writer settles that obligation. Older histories without `reconciled_through` do not yet report verified coverage.
 
 ## The branch
 
@@ -88,9 +93,20 @@ gh aw routing status issue-triage
 
 `gh aw routing reset <workflow>` starts a history afresh. It reads the workflow's latest run number and, in one commit that lands only if no run saved in the meantime, stops every run up to it from counting, empties the recorded evidence, and clears reconciliation obligations at or below the reset point while preserving any obligations above it. It keeps `runs.jsonl` and never deletes the branch. It needs write access to the repository.
 
+## Verify an observe pilot
+
+For an unreleased build, record the full gh-aw commit SHA. Build the compiler from that commit, pass the same SHA to `compile --gh-aw-ref`, and check that the workflow lock uses `github/gh-aw/actions/setup@<SHA>` before running it. The flag pins the runtime actions; it does not change the compiler you invoked. For example, the [reviewed observe baseline](https://github.com/github/gh-aw/commit/7154b590ec1dda07344713fccefc8e2a4e2a3866) includes `model-routing.learning` and the writer fixes for pagination, deleted runs and active re-runs.
+
+Record the first opted-in Actions run ID, not the first successful save. For an [eligible workflow](#which-workflows-take-part), an observation is due when the first attempt uses the default-branch workflow definition, runs the agent and is not a dry run. Check that its `push_routing_history` job succeeded and its `run` ID appears once in `runs.jsonl`. If the opening run owed no save (for example, a `pull_request` run using a PR ref), record why and check the first eligible attempt without moving the pilot boundary.
+
+Record the history branch head when the last pilot writer finishes. Compare the eligible first attempts from Actions with the rows at that revision by run ID, checking for missing or duplicate rows. Use the writer result from attempt 1 even if the run was later re-run. If the snapshot does not cover the entire pilot, use [earlier branch revisions](#retention) to recover rows that rolled off, counting each appended row only once.
+
+A row with `note: "unsaved"` accounts for a failed save; it does not recover the observation. If two eligible writers failed before the first successful save and history shows neither ID, report both missing IDs. Zero `unsaved` rows in history does not prove that every observation was saved.
+
 ## Limits
 
 - Observe mode only records evidence; it never changes which model runs and makes no recommendation.
 - A history belongs to one workflow file in one repository; renaming the file starts a new history. Reusable workflows (`on: workflow_call`) cannot take part, because each caller numbers its own runs.
 - A run that ends before the agent job starts, or whose usage artifact was never published, is not recorded by its own save.
-- A failed or cancelled run whose agent ran and whose `push_routing_history` job did not succeed (whether it failed, was cancelled, timed out, or was skipped) is charged as `unsaved` by a later save as verified reconciliation coverage advances across the workflow's default-branch and `pull_request_target` run listings (and via direct lookup for tracked in-progress runs that age past the listing window).
+- A failed or cancelled run whose agent ran and whose `push_routing_history` job did not succeed (whether it failed, was cancelled, timed out, or was skipped) is charged as `unsaved` by a later save. The writer checks the workflow's default-branch and `pull_request_target` run listings, using creation-time windows to stay within GitHub Actions' 1,000-result limit per query. It can also look up a tracked in-progress run directly after it ages out of the listing window.
+- The writer can advance a backlog in verified chunks once it reaches the last saved reconciliation point. If it cannot reach that point within one save's request budget, it leaves coverage unchanged. The next save retries from the same point, so an exceptionally deep backlog can remain stalled.

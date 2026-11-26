@@ -116,7 +116,7 @@ func TestIntegerMinuteTimeoutFlagsExplainUnits(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			timeoutFlag := tt.cmd.Flags().Lookup("timeout")
 			require.NotNil(t, timeoutFlag, "%s command should register --timeout", tt.name)
-			assert.Equal(t, tt.want, timeoutFlag.Usage)
+			assert.Equal(t, "Accepts `minutes|duration`. "+tt.want, timeoutFlag.Usage)
 			assert.Equal(t, "int", timeoutFlag.Value.Type())
 			assert.Equal(t, tt.wantDefault, timeoutFlag.DefValue)
 		})
