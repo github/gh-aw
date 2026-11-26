@@ -105,7 +105,7 @@ evals:
 {{#if experiments.tool_verbosity == 'minimal_toolset' }}
 ## Tool Usage Constraint (minimal_toolset variant)
 
-For this run you are in the **minimal_toolset** experiment variant. Restrict your bash command usage exclusively to the following essential commands: `go`, `grep`, `jq`, `cat`, `mkdir`, `echo`, `wc`, `head`, `tail`. Do not invoke any other bash commands. Use these tools only when strictly necessary for SBOM parsing, dependency analysis, license detection, and cache-memory state management.
+For this run you are in the **minimal_toolset** experiment variant. Restrict your bash command usage exclusively to the following essential commands: `go`, `grep`, `jq`, `cat`, `mkdir`, `echo`, `wc`, `head`, `tail`, `curl`. Do not invoke any other bash commands. Use these tools only when strictly necessary for SBOM parsing, dependency analysis, license detection, research, and cache-memory state management.
 {{/if}}
 
 # GPL Dependency Cleaner (gpclean)
@@ -151,7 +151,7 @@ Use the repository's SBOM (Software Bill of Materials) to get accurate dependenc
    - Use the dependencies list from SBOM (`/tmp/gh-aw/agent/go-dependencies.txt`)
    - Find the first module NOT in `checked_modules` list
    - If all modules have been checked, reset `checked_modules` to empty array and start over
-   - Update state with selected module and save to cache-memory
+   - Do not add the selected module to `checked_modules` until its license analysis is complete
 
 5. **Focused analysis**: Analyze only the selected module and its transitive dependencies in this run
 
@@ -166,9 +166,9 @@ For the selected module:
 
 2. **Check licenses for module and ALL its transitive dependencies**:
    - Use `go mod download -json <module>` to get module info
-   - Check license on pkg.go.dev: `https://pkg.go.dev/<module-path>?tab=licenses`
-   - Use web-fetch to scrape license information
-   - Check the module's repository for LICENSE files
+   - Check the license for the selected version on pkg.go.dev: `https://pkg.go.dev/<module-path>@<version>?tab=licenses`
+   - If web-fetch is unavailable, fetch allowed HTTPS pages with `curl --fail --silent --show-error --location --max-redirs 3 --max-time 30 --proto '=https' --proto-redir '=https' '<url>'`. The network allowlist still applies to every redirect.
+   - Check the module's repository or downloaded module for LICENSE files as a separate source
 
 3. **Identify GPL-type licenses**:
    - GPL v2, GPL v3, LGPL, AGPL
@@ -184,7 +184,7 @@ For the selected module:
    - Update cache-memory state: add module to `checked_modules`
    - Call `noop` with a short message naming the module checked and stating no GPL dependency was found, then stop
 
-### Phase 2: Deep Research Using Web-Fetch
+### Phase 2: Deep Research
 
 When a GPL dependency is detected:
 
@@ -203,7 +203,7 @@ When a GPL dependency is detected:
    - Determine if the GPL module is actually used or just pulled in transitively
 
 3. **Research alternatives**:
-   - Use web-fetch to search for:
+   - Use GitHub search tools and allowed HTTPS pages to research:
      - "golang alternative to <direct-module>"
      - "<functionality> golang library MIT license"
      - Check pkg.go.dev for similar packages with MIT/Apache/BSD licenses
@@ -411,7 +411,7 @@ After creating the issue:
 
 ### Research Thoroughness
 
-- Use web-fetch extensively to research alternatives
+- Use GitHub search tools and allowed HTTPS pages to research alternatives
 - Check pkg.go.dev for download stats, last update, and community trust
 - Prefer well-maintained, popular alternatives (1K+ stars, recent updates)
 - Consider migration complexity when recommending options
@@ -447,11 +447,11 @@ After creating the issue:
 
 - If the SBOM file `/tmp/gh-aw/agent/sbom.json` is missing or corrupted, call `noop` explaining the error and stop (this should not happen as it's pre-downloaded in frontmatter)
 - If `go mod graph` fails, call `noop` explaining the error and stop
-- If license detection fails for a module, document it in the issue and recommend manual review
+- If a required license check cannot be completed, call `report_incomplete` with the affected modules and evidence gaps; do not mark the selected module checked or claim no GPL dependency was found
 - If no direct dependencies exist, call `noop` explaining that there was nothing to check and stop
 - If cache-memory state is corrupted, reinitialize it
 - If no GPL dependency is found for the selected module, call `noop` summarizing which module was checked and stop - do NOT leave the run without calling a safe output
-- **Always finish the run by either creating an issue (Phase 3) or calling `noop`** - never end the run silently, even if blocked by unexpected tool or environment errors
+- Finish completed analyses by creating an issue (Phase 3) or calling `noop`; report incomplete analyses with `report_incomplete` rather than a clean result
 
 ## Example Module Selection Flow
 
