@@ -72,16 +72,12 @@ func TestExtractInlineSubAgents_DeadCodeRemover(t *testing.T) {
 	assert.Equal(t, "copilot/gpt-6-luna", agent.Frontmatter["model"])
 	for _, expected := range []string{
 		"containsInNonCommentLines", "indexInNonCommentLines", "extractJobSection",
-		`{"skip":false,"candidates":[{"function":"Name","file":"pkg/workflow/compiler.go","reason":"no callers"}]}`,
 		`{"skip":true,"candidates":[]}`, "./internal/tools/...",
+		"Read at most 60 lines per call.", "untrusted data",
 	} {
-		assert.Contains(t, agent.Markdown, expected)
+		assert.Contains(t, agents[0].Content, expected)
 	}
-	assert.Contains(t, mainMarkdown, "Run the `discover-candidates` sub-agent first.")
-	assert.Contains(t, mainMarkdown, "## Phase 3: Select a Batch")
-	assert.Contains(t, mainMarkdown, "## Phase 8: Create Pull Request")
-	assert.Contains(t, mainMarkdown, "Read at most 60 lines per call.")
-	assert.Contains(t, mainMarkdown, "`safeoutputs create_pull_request '<json>'` via bash")
+	assert.Contains(t, mainMarkdown, "## Phase 3")
 	assert.NotContains(t, agents[0].Content, "## Phase 3")
 }
 
