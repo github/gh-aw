@@ -10,6 +10,7 @@ import (
 
 	"github.com/github/gh-aw/pkg/connectors"
 	"github.com/stretchr/testify/require"
+	"go.yaml.in/yaml/v3"
 )
 
 var azureAIGatewayScenario = connectorCompilerScenario{"azure-ai-gateway", nil, "", "create-issue"}
@@ -63,7 +64,7 @@ func TestAzureAIGatewayInferenceCompilation(t *testing.T) {
 			require.NoError(t, err)
 			require.Contains(t, output, "GH_AW_MODEL_CATALOG: false")
 			require.Contains(t, output, "COPILOT_MODEL: gpt-5.2")
-			require.Contains(t, output, "COPILOT_PROVIDER_WIRE_MODEL: deployment-checklist")
+			require.Contains(t, output, `COPILOT_PROVIDER_WIRE_MODEL: "deployment-checklist"`)
 			require.NotContains(t, output, "COPILOT_PROVIDER_MODEL_ID:")
 			agent, effects := connectorPhaseJobJSON(t, output)
 			require.NotContains(t, output, "GH_AW_CONNECTOR_PLAN")
@@ -89,6 +90,39 @@ func TestAzureAIGatewayInferenceCompilation(t *testing.T) {
 				require.Contains(t, output, "--exclude-env ACTIONS_ID_TOKEN_REQUEST_TOKEN")
 				require.NotContains(t, output, "secrets.AZURE_AI_GATEWAY_KEY")
 			}
+		})
+	}
+}
+
+func TestConnectorInferenceModelAliasYAMLRoundTrip(t *testing.T) {
+	for _, alias := range []string{"deployment # approved", "#alias", "true", "123", "[alias]", `alias "quoted" \path`} {
+		t.Run(alias, func(t *testing.T) {
+			compiler, path := prepareConnectorScenario(t, azureAIGatewayScenario, false, func(consumer, _ map[string]any) {
+				inferenceSelection(consumer)["model"] = alias
+				imports := consumer["imports"].([]any)
+				imports[0].(map[string]any)["with"].(map[string]any)["models"] = []any{alias}
+			})
+			data, err := compiler.ParseWorkflowFile(path)
+			require.NoError(t, err)
+			output, err := compiler.CompileToYAML(data, path)
+			require.NoError(t, err)
+
+			var workflow struct {
+				Jobs map[string]struct {
+					Steps []struct {
+						Env map[string]any `yaml:"env"`
+					} `yaml:"steps"`
+				} `yaml:"jobs"`
+			}
+			require.NoError(t, yaml.Unmarshal([]byte(output), &workflow))
+			found := false
+			for _, step := range workflow.Jobs["agent"].Steps {
+				if value, ok := step.Env["COPILOT_PROVIDER_WIRE_MODEL"]; ok {
+					require.Equal(t, alias, value)
+					found = true
+				}
+			}
+			require.True(t, found, "agent step must receive the approved wire model")
 		})
 	}
 }

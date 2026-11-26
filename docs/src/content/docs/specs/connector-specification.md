@@ -8,9 +8,9 @@ sidebar:
 
 # Connector Specification
 
-**Version**: 1.3.0<br>
+**Version**: 1.4.0<br>
 **Status**: Experimental Working Draft<br>
-**Publication Date**: 2026-11-23<br>
+**Publication Date**: 2026-11-26<br>
 **Editor**: GitHub Agentic Workflows Team
 
 ## Abstract
@@ -26,9 +26,8 @@ TLA+ models of selected authority boundaries.
 
 This Experimental Working Draft is maintained by the GitHub Agentic Workflows
 project through repository review. It is not a W3C Recommendation or evidence
-of provider certification. Version 1.3.0 adds the optional
-`model-catalog: false` inference-profile declaration and its corresponding
-consumer engine constraint, while retaining the existing inference transport
+of provider certification. Version 1.4.0 specifies the selected inference alias
+as the Copilot request wire model while retaining the existing inference transport
 and authority boundaries. Publication does not establish provider authorization
 or operational trigger ingress.
 
@@ -999,6 +998,11 @@ separate redaction and privacy controls. Errors are described semantically in
 sections 4–8; this specification defines no new public error-code registry.
 
 ## 14. Change Log
+
+### Version 1.4.0 (Experimental Working Draft) — 2026-11-26
+
+- Changed Copilot inference lowering to use `COPILOT_PROVIDER_WIRE_MODEL` for the granted request alias while leaving provider metadata to default to `COPILOT_MODEL`.
+- Preserved existing model catalog, exact grant, network approval, credential isolation, and native engine transport obligations.
 
 ### Version 1.3.0 (Experimental Working Draft) — 2026-11-23
 
