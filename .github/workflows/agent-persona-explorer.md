@@ -215,7 +215,7 @@ Summarize the recommendation; do not include full YAML. For successful invocatio
 
 {{#if experiments.sub_agent_strategy_prefix_v1 == 'batch' }}
 Invoke the inline `persona-evaluator` Claude Code sub-agent once with all 3-4 selected scenarios. Require one recommendation per scenario, and then record and score each response using the structured template above.
-{{else}}
+{{#else}}
 Invoke the inline `persona-evaluator` Claude Code sub-agent once per selected scenario, presenting it as a request from that persona. Record and score each response using the structured template above.
 {{/if}}
 
@@ -381,7 +381,7 @@ Store the structured records in `/tmp/gh-aw/cache-memory/agent-persona-explorer/
 **Update the exploration history**: After publishing the issue, update `/tmp/gh-aw/cache-memory/agent-persona-explorer/explored-personas.json`:
 - Add each persona for which at least one scenario invocation was attempted to `attempted`, even if it failed or was contaminated. Do not count selected personas with no invocation.
 - Add a persona to `explored` only if at least one of its scenarios was successfully evaluated with a clean canary. Do not add failed or contaminated invocations.
-- Keep both lists deduplicated and store as `{ "explored": ["Persona A"], "attempted": ["Persona A", "Persona B"] }`. Reset them only at the next selection when all nine personas have been attempted.
+- Keep both lists deduplicated and store as `{ "explored": ["Persona A"], "attempted": ["Persona A", "Persona B"] }`. If the updated list now contains all 9 personas, reset to an empty list at the next selection; otherwise preserve both lists.
 - If this was the initial baseline and all four scenario invocations succeeded, write `{ "completed": true, "scenario_ids": ["PM-1", "DS-1", "LC-1", "LC-2"] }` to `baseline-completed.json`. If any invocation failed, leave the marker absent so the exact baseline is retried next run.
 
 **Output Efficiency Guidelines:**

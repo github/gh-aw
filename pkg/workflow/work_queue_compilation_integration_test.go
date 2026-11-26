@@ -18,14 +18,15 @@ import (
 
 func TestWorkQueueDispatchTokenActualCompilation(t *testing.T) {
 	for _, entry := range []struct {
-		name     string
-		global   string
-		dispatch string
-		token    string
+		name       string
+		global     string
+		dispatch   string
+		token      string
+		queueToken string
 	}{
-		{"default", "", "", "${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}"},
-		{"default-explicit", "", "    github-token: ${{ secrets.GITHUB_TOKEN }}\n", "${{ secrets.GITHUB_TOKEN }}"},
-		{"pat", "  github-token: ${{ secrets.PUBLISHER_PAT }}\n", "    github-token: ${{ secrets.WORKER_PAT }}\n", "${{ secrets.WORKER_PAT }}"},
+		{"default", "", "", "", "${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}"},
+		{"default-explicit", "", "    github-token: ${{ secrets.GITHUB_TOKEN }}\n", "${{ secrets.GITHUB_TOKEN }}", "${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}"},
+		{"pat", "  github-token: ${{ secrets.PUBLISHER_PAT }}\n", "    github-token: ${{ secrets.WORKER_PAT }}\n", "${{ secrets.WORKER_PAT }}", "${{ secrets.PUBLISHER_PAT }}"},
 	} {
 		t.Run(entry.name, func(t *testing.T) {
 			dir := testutil.TempDir(t, "work-queue-dispatch-token-")
@@ -58,7 +59,12 @@ func TestWorkQueueDispatchTokenActualCompilation(t *testing.T) {
 					controls = index
 					var config map[string]any
 					require.NoError(t, json.Unmarshal([]byte(step.Env["GH_AW_WORK_QUEUE_CONTROL_CONFIG"]), &config))
-					require.Equal(t, entry.token, config["github-token"])
+					if entry.token == "" {
+						require.NotContains(t, config, "github-token")
+					} else {
+						require.Equal(t, entry.token, config["github-token"])
+					}
+					require.Equal(t, entry.queueToken, step.Env["GH_AW_WORK_QUEUE_TOKEN"])
 					require.NotContains(t, config, "work_queue_dispatch_credential")
 					require.NotEmpty(t, step.With["github-token"])
 					if entry.name == "pat" {
@@ -73,7 +79,11 @@ func TestWorkQueueDispatchTokenActualCompilation(t *testing.T) {
 					var config map[string]any
 					require.NoError(t, json.Unmarshal([]byte(step.Env["GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG"]), &config))
 					dispatch := config["dispatch_workflow"].(map[string]any)
-					require.Equal(t, entry.token, dispatch["github-token"])
+					if entry.token == "" {
+						require.NotContains(t, dispatch, "github-token")
+					} else {
+						require.Equal(t, entry.token, dispatch["github-token"])
+					}
 					require.NotContains(t, dispatch, "work_queue_dispatch_credential")
 				}
 			}

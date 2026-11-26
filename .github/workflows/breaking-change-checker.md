@@ -337,7 +337,7 @@ Do not replace an incomplete signal with `noop`, and do not mutate old reports.
 
 {{#if experiments.tone_variant == 'urgent' }}
 Use an urgent but evidence-based tone. Use phrases like "high compatibility risk", "immediate maintainer action recommended", and "user-facing impact likely" when supported by evidence. Emphasize user impact, compatibility risk, and the need for immediate maintainer review while keeping all claims tied to observed code changes.
-{{else}}
+{{#else}}
 Use a neutral engineering tone. Prefer phrasing like "potential compatibility concern", "review recommended", and "migration guidance provided". Emphasize factual compatibility analysis, concrete evidence, and migration guidance without urgency-heavy wording.
 {{/if}}
 
@@ -355,7 +355,7 @@ Use a neutral engineering tone. Prefer phrasing like "potential compatibility co
 - **Coverage Ledger**: [commits/PRs/files enumerated, reviewed, excluded with reasons, and remaining identifiers]
 {{#if experiments.tone_variant == 'urgent' }}
 - **Status**: ⚠️ Requires Immediate Review
-{{else}}
+{{#else}}
 - **Status**: Review Recommended
 {{/if}}
 
@@ -401,7 +401,7 @@ Complete the following items to address these breaking changes:
 
 {{#if experiments.tone_variant == 'urgent' }}
 [Prioritized migration steps, version bump guidance, explicit owner action items, and a short statement of end-user risk.]
-{{else}}
+{{#else}}
 [Migration steps, version bump guidance, and action items - always visible]
 {{/if}}
 

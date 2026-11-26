@@ -151,5 +151,5 @@ If your error isn't listed:
 1. Re-run with `gh aw compile --verbose`
 2. Search this page (Ctrl+F / Cmd+F) for keywords from the error
 3. Use an agent with the [debug.md prompt](https://raw.githubusercontent.com/github/gh-aw/main/debug.md) to investigate failing runs
-4. Review [workflow patterns](/gh-aw/patterns/issue-ops/) and [Common Issues](/gh-aw/troubleshooting/common-issues/)
+4. Review [workflow patterns](/gh-aw/patterns/issue-ops/), [Common Issues](/gh-aw/troubleshooting/common-issues/), and [Troubleshooting auth errors](/gh-aw/reference/auth/#troubleshooting-auth-errors)
 5. [Report the issue on GitHub](https://github.com/github/gh-aw/issues)

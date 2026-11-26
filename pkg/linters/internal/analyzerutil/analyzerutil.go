@@ -15,18 +15,20 @@ import (
 const repositoryURL = "https://github.com/github/gh-aw/tree/main/pkg/linters/"
 
 // New creates an analyzer with the standard linter dependencies and URL.
-func New(name, doc string, run func(*analysis.Pass) (any, error)) *analysis.Analyzer {
-	return NewAtPath(name, doc, name, run)
+// Additional shared fact/result analyzers (for example parentmap.Analyzer)
+// can be listed in requires.
+func New(name, doc string, run func(*analysis.Pass) (any, error), requires ...*analysis.Analyzer) *analysis.Analyzer {
+	return NewAtPath(name, doc, name, run, requires...)
 }
 
 // NewAtPath creates an analyzer with the standard linter dependencies and URL
 // for packagePath.
-func NewAtPath(name, doc, packagePath string, run func(*analysis.Pass) (any, error)) *analysis.Analyzer {
+func NewAtPath(name, doc, packagePath string, run func(*analysis.Pass) (any, error), requires ...*analysis.Analyzer) *analysis.Analyzer {
 	return &analysis.Analyzer{
 		Name:     name,
 		Doc:      doc,
 		URL:      repositoryURL + packagePath,
-		Requires: []*analysis.Analyzer{inspect.Analyzer, nolint.Analyzer, filecheck.Analyzer},
+		Requires: append([]*analysis.Analyzer{inspect.Analyzer, nolint.Analyzer, filecheck.Analyzer}, requires...),
 		Run:      run,
 	}
 }

@@ -119,7 +119,7 @@ Run the following project operations against `https://github.com/orgs/github/pro
 5. Update PR github/gh-aw#14477 to Status: In Progress
 6. Update issue github/gh-aw#14478 to Status: In Progress
 7. Post a project status update with a markdown checklist of all operations performed.
-{{else if experiments.prompt_style_test == "step_by_step" }}
+{{#elseif experiments.prompt_style_test == "step_by_step" }}
 Execute each step in order:
 
 1. `update_project` — draft_issue, title="Test *draft issue* for `smoke-project`", temporary_id=draft-1, Status=Todo, Priority=High
@@ -129,7 +129,7 @@ Execute each step in order:
 5. `update_project` — pull_request github/gh-aw#14477, Status=In Progress
 6. `update_project` — issue github/gh-aw#14478, Status=In Progress
 7. `create_project_status_update` — post a markdown pass/fail checklist covering all 6 operations above
-{{else}}
+{{#else}}
 1. **Add items**: Create items in the project using different content types:
 
    a. **Draft Issue Creation**:
