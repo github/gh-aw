@@ -1,15 +1,5 @@
 [
   {
-    "date": "2026-10-12",
-    "workflow_name": "Contribution Check",
-    "workflow_file": "contribution-check",
-    "total_aic_analyzed": 42.196,
-    "runs_audited": 1,
-    "recommendations_count": 4,
-    "subagent_candidates": 0,
-    "estimated_aic_savings_per_run": 20
-  },
-  {
     "date": "2026-10-14",
     "workflow_name": "Matt Pocock Skills Reviewer",
     "workflow_file": "mattpocock-skills-reviewer",
@@ -298,5 +288,15 @@
     "recommendations_count": 4,
     "subagent_candidates": 0,
     "estimated_aic_savings_per_run": 2.7
+  },
+  {
+    "date": "2026-11-26",
+    "workflow_name": "Dead Code Removal Agent",
+    "workflow_file": "dead-code-remover",
+    "total_aic_analyzed": 32.78,
+    "runs_audited": 1,
+    "recommendations_count": 5,
+    "subagent_candidates": 1,
+    "estimated_aic_savings_per_run": 12
   }
 ]
