@@ -394,6 +394,11 @@ func writeMCPGatewayExports(yaml *strings.Builder, opts writeMCPGatewayExportsOp
 	yaml.WriteString("          export GH_AW_ENGINE=\"" + engine.GetID() + "\"\n")
 	if usesWebFetchMCPForEngine(engine, workflowData) {
 		yaml.WriteString("          export GH_AW_WEB_FETCH_MCP=1\n")
+		if isNVXRuntime(workflowData) {
+			yaml.WriteString("          export GH_AW_WEB_FETCH_MCP_NVX=1\n")
+		} else {
+			yaml.WriteString("          export GH_AW_WEB_FETCH_MCP_NVX=0\n")
+		}
 	}
 	if adapterProvider, ok := engine.(MCPConfigAdapterProvider); ok {
 		if adapterFilename := adapterProvider.GetMCPConfigAdapterFilename(); adapterFilename != "" {

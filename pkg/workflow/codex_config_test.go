@@ -99,6 +99,28 @@ process.stdout.write(serializeConfig(buildConfig({github: {headers: {Authorizati
 	assert.Equal(t, "Bearer \"quoted\"\\token", headers["Authorization"])
 }
 
+func TestCodexWebFetchNativeConfigDefaults(t *testing.T) {
+	data := &WorkflowData{
+		Tools:               map[string]any{"web-fetch": nil},
+		SandboxConfig:       &SandboxConfig{Agent: &AgentSandboxConfig{ID: "awf"}},
+		ToolsTimeout:        "90",
+		ToolsStartupTimeout: "180",
+		EngineConfig:        &EngineConfig{ID: "codex", Config: "[mcp_servers.web-fetch]\ntool_timeout_sec = 240\n"},
+	}
+	config, err := NewCodexEngine().buildNativeConfig(data, nil)
+	require.NoError(t, err)
+	server := config.Defaults["mcp_servers"].(map[string]any)["web-fetch"].(map[string]any)
+	assert.Equal(t, 90, server["tool_timeout_sec"])
+	assert.Equal(t, 180, server["startup_timeout_sec"])
+	assert.Contains(t, config.Overrides["mcp_servers"], "web-fetch")
+
+	data.Tools["web-fetch"] = false
+	data.EngineConfig.Config = ""
+	config, err = NewCodexEngine().buildNativeConfig(data, nil)
+	require.NoError(t, err)
+	assert.NotContains(t, config.Defaults["mcp_servers"], "web-fetch")
+}
+
 func TestCodexStandaloneWebSearchProvider(t *testing.T) {
 	for _, test := range []struct {
 		name     string
