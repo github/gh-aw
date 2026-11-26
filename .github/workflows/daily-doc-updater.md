@@ -14,6 +14,7 @@ network:
   - defaults
   - github
 imports:
+- shared/reporting.md
 - shared/pr-safe-output-defaults.md
 - shared/github-guard-policy.md
 - shared/ai-coding-dictionary.md

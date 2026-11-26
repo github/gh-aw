@@ -100,13 +100,13 @@ steps:
           # Pattern matches both regular functions (^func Name) and receiver methods (^func (r *T) Name)
           FUNC_DATA=$(awk '/^func /{if(start>0 && name!="") printf "%s\t%d\n", name, NR-start; name=$0; start=NR} END{if(start>0 && name!="") printf "%s\t%d\n", name, NR-start+1}' "$FILE" 2>/dev/null | head -50 || true)
           # Export count and names (top-level exported identifiers start with uppercase)
-          EXPORT_COUNT=$(grep -cE "^func [A-Z]|^type [A-Z]|^var [A-Z]|^const [A-Z]" "$FILE" 2>/dev/null || echo 0)
+          EXPORT_COUNT=$(grep -cE "^func [A-Z]|^type [A-Z]|^var [A-Z]|^const [A-Z]" "$FILE" 2>/dev/null || true)
           EXPORT_NAMES=$(grep -nE "^func [A-Z]|^type [A-Z]|^var [A-Z]|^const [A-Z]" "$FILE" 2>/dev/null | head -20 || true)
         else
           # JS/CJS/MJS: capture named functions, arrow functions, and class methods
           FUNC_DATA=$(grep -nE "^function |^const [a-zA-Z_$][a-zA-Z0-9_$]* = (function|\(|async \(|async function)|^(export (default )?function|export const [a-zA-Z_$][a-zA-Z0-9_$]* =)|^[a-zA-Z_$][a-zA-Z0-9_$]*\s*\([^)]*\)\s*\{" "$FILE" 2>/dev/null | head -50 || true)
-          CJS_COUNT=$(grep -cE "^module\.exports|^exports\." "$FILE" 2>/dev/null || echo 0)
-          ESM_COUNT=$(grep -cE "^export " "$FILE" 2>/dev/null || echo 0)
+          CJS_COUNT=$(grep -cE "^module\.exports|^exports\." "$FILE" 2>/dev/null || true)
+          ESM_COUNT=$(grep -cE "^export " "$FILE" 2>/dev/null || true)
           EXPORT_COUNT=$((CJS_COUNT + ESM_COUNT))
           EXPORT_NAMES=$(grep -nE "^export |^module\.exports|^exports\." "$FILE" 2>/dev/null | head -20 || true)
         fi
