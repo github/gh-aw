@@ -148,3 +148,5 @@
 {"id":"prioritized_plan_reported","question":"Did the agent report a prioritized plan with actionable specification work items?","answer":"YES","model":"gpt-6-luna","timestamp":"2026-11-24T16:05:18.083Z","runid":"45430439162"}
 {"id":"specifications_analyzed","question":"Did the agent analyze repository specifications using the SPDD planning process?","answer":"YES","model":"gpt-6-luna","timestamp":"2026-11-25T16:01:22.978Z","runid":"45649306447"}
 {"id":"prioritized_plan_reported","question":"Did the agent report a prioritized plan with actionable specification work items?","answer":"YES","model":"gpt-6-luna","timestamp":"2026-11-25T16:01:22.978Z","runid":"45649306447"}
+{"id":"specifications_analyzed","question":"Did the agent analyze repository specifications using the SPDD planning process?","answer":"UNKNOWN","model":"gpt-6-luna","timestamp":"2026-11-26T16:01:20.598Z","runid":"45853307805"}
+{"id":"prioritized_plan_reported","question":"Did the agent report a prioritized plan with actionable specification work items?","answer":"NO","model":"gpt-6-luna","timestamp":"2026-11-26T16:01:20.598Z","runid":"45853307805"}
