@@ -95,7 +95,7 @@ Navigate to `https://githubnext.com/projects/agentic-workflows/` using Playwrigh
 - Any YAML/Markdown workflow code snippets pass `gh aw compile --no-emit --validate`
 
 Create a discussion in the **Audits** category titled `[audit] Agentic Workflows blog audit - PASSED` (or `FAILED`). Include a summary table of each check with pass/fail status and the values observed. For failures, add suggested remediation steps.
-{{else}}
+{{#else}}
 ## Audit Process
 
 ### Phase 1: Navigate and Capture Blog Content

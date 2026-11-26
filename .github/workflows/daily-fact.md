@@ -104,7 +104,7 @@ Mine recent activity from the repository to find interesting facts. Focus on:
 
 {{#if experiments.reasoning_depth == 'multi_candidate'}}
 - **Multi-candidate deliberation**: Before writing, identify exactly **3 distinct candidate facts** (one PR, one issue or release, one contributor or pattern). For each candidate write one sentence on why it is interesting today. Then score each candidate 1–5 on: (a) timeliness, (b) intrinsic poetic potential. Select the highest-scoring candidate and write the verse for that one only.
-{{else}}
+{{#else}}
 - **Favor recent updates** but include variety - pick something interesting, not just the most recent
 {{/if}}
 - **Be specific**: Include PR numbers, issue references, or release tags when relevant

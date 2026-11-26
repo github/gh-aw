@@ -27,7 +27,7 @@ constructors:
 
 | Policy area | Rule constructors |
 |-------------|-------------------|
-| Expressions and disclosure | `TemplateInjectionRule`, `PromptExpressionRule`, `SecretLeakRule`, `OTLPSecretLeakRule`, `OverprovisionedSecretsRule` |
+| Expressions and disclosure | `TemplateInjectionRule`, `PromptExpressionRule`, `PromptConditionSyntaxRule`, `SecretLeakRule`, `OTLPSecretLeakRule`, `OverprovisionedSecretsRule` |
 | Actions and workflow integrity | `ActionPinRule`, `VersionCheckRule`, `JobTimeoutRule`, `NeedsConsistencyRule`, `StepReferenceRule`, `WorkflowRunScopeRule`, `ConditionalImportRule`, `PrivateToPublicRule`, `InstallScriptsRule`, `GatewayDispatchLiteralsRule`, `BashCasePatternRule`, `UnquotedCommandAssignmentRule`, `ObfuscationRule`, `UnsoundContainsRule`, `RemoteScriptExecutionRule` |
 | Permissions, jobs, and checkout | `PermissionScopeRule`, `ExcessivePermissionsRule`, `CustomJobDetectionRule`, `PrivilegedCheckoutRule`, `CheckoutModeRule`, `ForkAssociationRule`, `PullRequestTargetRolesRule`, `UntrustedRolesDetectionRule`, `PullRequestTargetCheckoutRule`, `BotConditionsRule` |
 | Network, tools, images, and sandbox | `NetworkScopeRule`, `PushTargetRule`, `AllowedLabelsRule`, `ToolScopeRule`, `ImageArgumentRule`, `UnpinnedImagesRule`, `SandboxConfigRule`, `FirewallSSLBumpRule` |
