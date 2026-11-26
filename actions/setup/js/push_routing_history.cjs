@@ -24,6 +24,7 @@ const { readJsonlFile } = require("./jsonl_helpers.cjs");
 const { pushRepoMemoryChangesWithRetry } = require("./push_repo_memory.cjs");
 const { attributeRequest, routedRequests } = require("./routing_analytics.cjs");
 const { BOUNDS, applyRun, emptyState, legacyReconciliationFloor, trimRuns } = require("./routing_history.cjs");
+const { isEligibleRun, isSavedConclusion } = require("./routing_save_guard.cjs");
 
 /** @typedef {import("./routing_history.cjs").HistoryState} HistoryState */
 
@@ -49,7 +50,6 @@ const MAX_BOUNDARY_CHECKS = 4;
 const RECENT_GAP_MS = 5 * 60 * 1000;
 const LEVELS = new Set(["economy", "balanced", "robust"]);
 const MODES = new Set(["observe"]);
-const SAVED_CONCLUSIONS = new Set(["success", "skipped", "neutral"]);
 const OUTCOMES = new Set(["success", "failure", "skip"]);
 const SKIP_REASONS = new Set(["cancelled", "infrastructure", "rate_limited", "pair_mismatch", "unknown_evidence"]);
 // AWF's provider keys, written as contract 1 names them.
@@ -698,18 +698,6 @@ async function readRunGeneration({ githubClient, owner, repo, workflowPath, ref 
 }
 
 /**
- * Whether a workflow run's definition comes from the default branch (matching AW-3's eligibility
- * rule): pull_request* except pull_request_target are ineligible; pull_request_target is eligible
- * regardless of head_branch; every other event is eligible only on defaultBranch.
- * @param {any} run
- * @param {string} defaultBranch
- */
-function isEligibleRun(run, defaultBranch) {
-  if (/^pull_request(?!_target)/.test(run.event || "")) return false;
-  return run.event === "pull_request_target" || run.head_branch === defaultBranch;
-}
-
-/**
  * Completed runs on the newest pages that the history may need to charge because their own save
  * never landed (contract 5): first attempts strictly earlier than `runNumber` whose definition
  * comes from the default branch, judged by their first attempt, not yet reconciled
@@ -1023,7 +1011,7 @@ async function listRuns({ githubClient, owner, repo, workflowFile, workflowPath 
       /** @type {{id: string, number: number, conclusion: string, agent_ran?: boolean, generation?: string}} */
       const listed = { id, number: num, conclusion: conclusion || "unknown" };
       let include = true;
-      if (!SAVED_CONCLUSIONS.has(listed.conclusion)) {
+      if (!isSavedConclusion(listed.conclusion)) {
         const jobs = await githubClient.paginate(githubClient.rest.actions.listJobsForWorkflowRunAttempt, { owner, repo, run_id: run.id, attempt_number: 1, per_page: 100 });
         listed.agent_ran = jobs.some((/** @type {any} */ job) => job?.name === "agent" && job.conclusion !== "skipped" && Boolean(job.started_at));
         const writer = jobs.find((/** @type {any} */ job) => job?.name === WRITER_JOB);
