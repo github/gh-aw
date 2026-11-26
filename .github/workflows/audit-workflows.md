@@ -171,7 +171,7 @@ Output is saved to: /tmp/gh-aw/aw-mcp/logs
 2. **Clustering phase**: group recurring failure signatures and map them to known issues vs. novel anomalies.
 3. **Recommendation phase**: derive the smallest actionable set of fixes, each linked to evidence.
 4. **Synthesis phase**: combine phase outputs into one final audit report and ledger record.
-{{else}}
+{{#else}}
 **Analyze**: Review logs for:
 - Missing tools (patterns, frequency, legitimacy)
 - Errors (tool execution, MCP failures, auth, timeouts, resources)
@@ -181,7 +181,7 @@ Output is saved to: /tmp/gh-aw/aw-mcp/logs
 
 {{#if experiments.audit_decomposition == 'phased_sub_agents'}}
 Before writing the final report, verify that each recommendation cites at least one concrete log or trend signal and that recurring issues are deduplicated across phases.
-{{else}}
+{{#else}}
 Before writing the final report, verify recommendations are concrete and evidence-based.
 {{/if}}
 
