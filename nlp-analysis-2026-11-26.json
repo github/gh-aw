@@ -1,0 +1,15 @@
+{
+  "date": "2026-11-26",
+  "prs": 118,
+  "messages": 0,
+  "total_copilot_prs": 732,
+  "avg": 0.003,
+  "median": 0.0,
+  "pos_pct": 38.1,
+  "neu_pct": 29.7,
+  "neg_pct": 32.2,
+  "top_topic": "logs / evidence / json",
+  "comment_data": false,
+  "window_start": "2026-11-19T10:21:55Z",
+  "run_id": "45799563777"
+}
