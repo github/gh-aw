@@ -98,14 +98,24 @@ describe("trusted connector Entra exchange", () => {
     ]);
   });
 
-  it.skipIf(process.platform === "win32")("replays only approved detached broker debug events on stop", async () => {
+  it.skipIf(process.platform === "win32").each([
+    ["DEBUG", "connector:credential-broker", true],
+    ["RUNNER_DEBUG", "1", true],
+    ["ACTIONS_RUNNER_DEBUG", "true", true],
+    ["RUNNER_DEBUG", "0", false],
+    ["ACTIONS_RUNNER_DEBUG", "false", false],
+    ["DEBUG", "unrelated:*", false],
+  ])("replays only approved detached broker debug events with %s=%s", async (debugKey, debugValue, enabled) => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "broker-test-"));
     const fixture = path.join(root, "fixture.cjs");
     const output = path.join(root, "output");
     const broker = path.resolve("connector_credential_broker.cjs");
     fs.writeFileSync(fixture, `const b = require(${JSON.stringify(broker)}); b.runBroker(process.argv[3], b.renewableToken(async () => ({ value: "access-private", expiresAt: Date.now() + 60000 })), Number(process.argv[4]));`);
     const job = { RUNNER_TEMP: root, GITHUB_OUTPUT: output, RUNNER_TRACKING_ID: "job-a", GH_AW_CONNECTOR_BROKER_TIMEOUT_MINUTES: "30" };
-    vi.stubEnv("DEBUG", "connector:credential-broker");
+    vi.stubEnv("DEBUG", "");
+    vi.stubEnv("RUNNER_DEBUG", "");
+    vi.stubEnv("ACTIONS_RUNNER_DEBUG", "");
+    vi.stubEnv(debugKey, debugValue);
     const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
     let child;
     try {
@@ -113,13 +123,18 @@ describe("trusted connector Entra exchange", () => {
       const directory = fs.readFileSync(output, "utf8").match(/^directory=(.+)\n$/u)[1];
       expect(await readToken(path.join(directory, "token.sock"))).toBe("access-private");
       expect(await readToken(path.join(directory, "token.sock"))).toBe("access-private");
-      fs.appendFileSync(path.join(directory, "debug.log"), "private-provider-response\n::warning::private-command\n");
+      const debugFile = path.join(directory, "token-broker.log");
+      expect(fs.existsSync(debugFile)).toBe(enabled);
+      if (enabled) fs.appendFileSync(debugFile, "private-provider-response\n::warning::private-command\n");
       const exited = once(child, "exit");
       stopBroker({ ...job, GH_AW_CONNECTOR_BROKER_DIRECTORY: directory });
       await exited;
       child = undefined;
       const logs = stderr.mock.calls.map(call => String(call[0])).join("");
-      for (const event of ["broker.started", "broker.ready", "broker.request", "token.renew.start", "token.renew.success", "token.cache.hit"]) expect(logs).toContain(event);
+      for (const event of ["broker.started", "broker.ready", "broker.request", "token.renew.start", "token.renew.success", "token.cache.hit"]) {
+        if (enabled) expect(logs).toContain(event);
+        else expect(logs).not.toContain(event);
+      }
       for (const secret of ["access-private", "private-provider-response", "::warning::", job.RUNNER_TRACKING_ID, directory]) expect(logs).not.toContain(secret);
       expect(fs.existsSync(directory)).toBe(false);
     } finally {
@@ -147,7 +162,7 @@ describe("trusted connector Entra exchange", () => {
       const child = await startBroker(fixture, job, []);
       const directory = fs.readFileSync(output, "utf8").match(/^directory=(.+)\n$/u)[1];
       await once(child, "exit");
-      expect(fs.existsSync(path.join(directory, "debug.log"))).toBe(true);
+      expect(fs.existsSync(path.join(directory, "token-broker.log"))).toBe(true);
       stopBroker({ ...job, GH_AW_CONNECTOR_BROKER_DIRECTORY: directory });
       expect(fs.existsSync(directory)).toBe(false);
     } finally {

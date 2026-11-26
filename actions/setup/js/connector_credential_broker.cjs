@@ -9,6 +9,7 @@ const { createLogger, debugEnabled } = require("./mcp_logger.cjs");
 
 const limit = 64 * 1024;
 const timeout = 11000;
+const debugFileName = "token-broker.log";
 const failure = () => new Error("Connector credential broker unavailable");
 const validBearer = value => typeof value === "string" && value.length > 0 && value.length <= limit && /^[A-Za-z0-9._~+/-]+=*$/u.test(value) && !/\s/u.test(value);
 const log = createLogger("connector:credential-broker");
@@ -28,6 +29,10 @@ const events = new Set([
   "azure.exchange.failed",
 ]);
 let debugCount = 0;
+
+function brokerDebugEnabled() {
+  return process.env.RUNNER_DEBUG === "1" || process.env.ACTIONS_RUNNER_DEBUG === "true" || debugEnabled("connector:credential-broker");
+}
 
 function brokerDebug(event) {
   if (process.env.GH_AW_CONNECTOR_BROKER_DEBUG !== "1" || !events.has(event) || debugCount++ >= 256) return;
@@ -128,7 +133,7 @@ function stopBroker(env) {
   const stat = fs.lstatSync(dir, { throwIfNoEntry: false });
   if (!stat) return; // A prior stop or deadline already retired the capability.
   if (!stat.isDirectory() || (stat.mode & 0o077) !== 0 || stat.uid !== process.getuid?.()) throw failure();
-  const debugFile = path.join(dir, "debug.log");
+  const debugFile = path.join(dir, debugFileName);
   try {
     const fd = fs.openSync(debugFile, fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW | fs.constants.O_NONBLOCK);
     try {
@@ -176,8 +181,8 @@ async function startBroker(moduleFile, env, keys) {
   let debugFD;
   try {
     if (Buffer.byteLength(socketPath) > 103) throw failure();
-    const debug = debugEnabled("connector:credential-broker");
-    if (debug) debugFD = fs.openSync(path.join(dir, "debug.log"), "wx", 0o600);
+    const debug = brokerDebugEnabled();
+    if (debug) debugFD = fs.openSync(path.join(dir, debugFileName), "wx", 0o600);
     // Preserve runner job-end process tracking, but never inherit unrelated
     // secrets, Node preload flags, or step file-command handles.
     child = fork(moduleFile, ["serve", socketPath, String(deadline)], {
@@ -208,7 +213,7 @@ async function startBroker(moduleFile, env, keys) {
       });
     });
     fs.appendFileSync(env.GITHUB_OUTPUT, `directory=${dir}\n`);
-    log.debug("broker.started");
+    if (debug) log.diagnostic("broker.started");
     proc.disconnect();
     proc.unref();
     return proc;
@@ -217,12 +222,12 @@ async function startBroker(moduleFile, env, keys) {
     child?.kill();
     try {
       fs.rmSync(socketPath, { force: true });
-      fs.rmSync(path.join(dir, "debug.log"), { force: true });
+      fs.rmSync(path.join(dir, debugFileName), { force: true });
       fs.rmdirSync(dir);
     } catch {
       /* Child cleanup may have already run. */
     }
-    log.debug("broker.start.failed");
+    if (brokerDebugEnabled()) log.diagnostic("broker.start.failed");
     throw failure();
   }
 }
