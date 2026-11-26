@@ -723,8 +723,8 @@ function isEligibleRun(run, defaultBranch) {
  * @returns {Promise<{listing: any[], reconciliation: import("./routing_history.cjs").ReconciliationCoverage}>}
  */
 async function listRuns({ githubClient, owner, repo, workflowFile, workflowPath = "", defaultBranch, runId, runNumber, state, runs, generation }) {
-  // A brand-new history has no prior generation to reconcile, and fenced-off runs only record themselves.
-  if (state.generation === null || runNumber <= state.reset_after_run || (state.generation.hash !== generation && runNumber <= state.generation.since_run)) {
+  // At or immediately after the reset fence there are no earlier obligations to inspect.
+  if (runNumber <= state.reset_after_run + 1 || (state.generation && state.generation.hash !== generation && runNumber <= state.generation.since_run)) {
     return { listing: [], reconciliation: { verified: true, unresolved: [], resolved: [] } };
   }
 
@@ -988,7 +988,7 @@ async function listRuns({ githubClient, owner, repo, workflowFile, workflowPath 
     }
   }
 
-  const effectiveSinceRun = state.generation.hash === generation ? state.generation.since_run : runNumber;
+  const effectiveSinceRun = state.generation?.hash === generation ? state.generation.since_run : runNumber;
   const fullCatchUp = verified && (runNumber <= floor + 1 || verifiedUpper >= runNumber - 1);
   const reconciliationCeiling = verified ? (fullCatchUp ? runNumber : verifiedUpper) : floor;
   const listing = [];

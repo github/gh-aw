@@ -488,7 +488,6 @@ function applyRun(input, runs, run, options = {}) {
     preserveReconciliation();
     return finish();
   }
-  const firstHistoryWrite = state.generation === null;
   if (state.generation === null) {
     state.generation = { hash: run.generation, since_run: number };
   } else if (run.generation !== state.generation.hash) {
@@ -509,19 +508,14 @@ function applyRun(input, runs, run, options = {}) {
   /** @type {number[]} */
   let finalUnresolved = [];
   if (hasReconciliation) {
-    if (firstHistoryWrite) {
-      finalCeiling = Math.max(prevReconciled, number);
-      finalUnresolved = [];
-    } else {
-      const rec = run.reconciliation;
-      const requestedCeiling = verifiedScan ? Math.max(prevReconciled, typeof rec?.ceiling === "number" && Number.isInteger(rec.ceiling) ? Math.min(number, rec.ceiling) : number) : prevReconciled;
-      const writtenNumbers = new Set(runs.map(entry => entry.number));
-      writtenNumbers.add(number);
-      const resolved = new Set(Array.isArray(rec?.resolved) ? rec.resolved.filter(n => Number.isInteger(n) && n < number) : []);
-      for (const other of run.listing || []) {
-        if (other.number > state.reset_after_run && other.number < number && (prevUnresolved.has(other.number) || (verifiedScan && other.number <= requestedCeiling))) {
-          resolved.add(other.number);
-        }
+    const rec = run.reconciliation;
+    const requestedCeiling = verifiedScan ? Math.max(prevReconciled, typeof rec?.ceiling === "number" && Number.isInteger(rec.ceiling) ? Math.min(number, rec.ceiling) : number) : prevReconciled;
+    const writtenNumbers = new Set(runs.map(entry => entry.number));
+    writtenNumbers.add(number);
+    const resolved = new Set(Array.isArray(rec?.resolved) ? rec.resolved.filter(n => Number.isInteger(n) && n < number) : []);
+    for (const other of run.listing || []) {
+      if (other.number > state.reset_after_run && other.number < number && (prevUnresolved.has(other.number) || (verifiedScan && other.number <= requestedCeiling))) {
+        resolved.add(other.number);
       }
       const nextUnresolved = new Set([...prevUnresolved].filter(n => !resolved.has(n) && !writtenNumbers.has(n)));
       let ceiling = requestedCeiling;
@@ -547,32 +541,30 @@ function applyRun(input, runs, run, options = {}) {
   // Completed runs that wrote no line are charged after the fences, in the right generation.
   const written = new Set(runs.map(entry => entry.run));
   const sinceRun = state.generation.since_run;
-  if (!hasReconciliation || !firstHistoryWrite) {
-    for (const other of [...(run.listing || [])].sort((left, right) => left.number - right.number)) {
-      if (written.has(other.id) || other.id === id || other.number <= state.reset_after_run) continue;
-      if (hasReconciliation) {
-        // Never let an older writer consume a newer run (which may belong to a later generation),
-        // and never charge a newly covered run above the final clamped ceiling.
-        if (other.number >= number) continue;
-        const tracked = prevUnresolved.has(other.number);
-        if (!tracked && (!verifiedScan || other.number <= prevReconciled || other.number > finalCeiling)) continue;
-      } else if (other.number <= sinceRun) {
-        continue;
-      }
-      if (["success", "skipped", "neutral"].includes(other.conclusion)) continue;
-      if (hasReconciliation && other.generation && other.generation !== state.generation.hash && other.number <= state.generation.since_run) {
-        lines.push(line("older_definition", { run: other.id, number: other.number, attempt: 1, generation: other.generation }));
-        written.add(other.id);
-        continue;
-      }
-      if (other.agent_ran) {
-        lines.push(line("unsaved", { run: other.id, number: other.number, attempt: 1 }));
-        state.unexplained += 1;
-      } else {
-        lines.push(line("no_agent", { run: other.id, number: other.number, attempt: 1 }));
-      }
-      written.add(other.id);
+  for (const other of [...(run.listing || [])].sort((left, right) => left.number - right.number)) {
+    if (written.has(other.id) || other.id === id || other.number <= state.reset_after_run) continue;
+    if (hasReconciliation) {
+      // Never let an older writer consume a newer run (which may belong to a later generation),
+      // and never charge a newly covered run above the final clamped ceiling.
+      if (other.number >= number) continue;
+      const tracked = prevUnresolved.has(other.number);
+      if (!tracked && (!verifiedScan || other.number <= prevReconciled || other.number > finalCeiling)) continue;
+    } else if (other.number <= sinceRun) {
+      continue;
     }
+    if (["success", "skipped", "neutral"].includes(other.conclusion)) continue;
+    if (hasReconciliation && other.generation && other.generation !== state.generation.hash && other.number <= state.generation.since_run) {
+      lines.push(line("older_definition", { run: other.id, number: other.number, attempt: 1, generation: other.generation }));
+      written.add(other.id);
+      continue;
+    }
+    if (other.agent_ran) {
+      lines.push(line("unsaved", { run: other.id, number: other.number, attempt: 1 }));
+      state.unexplained += 1;
+    } else {
+      lines.push(line("no_agent", { run: other.id, number: other.number, attempt: 1 }));
+    }
+    written.add(other.id);
   }
 
   if (hasReconciliation) {
