@@ -112,17 +112,33 @@ func buildFileAccessModel(ctx context.Context, input Input) (*fileAccessModel, e
 	}
 
 	// FAL-M5: memory mounts. Compiler-resolved tools include imports.
+	if err := model.applyMemory(input, pending); err != nil {
+		return nil, err
+	}
+
+	// FAL-M6: protected files. Imports may add a permissive PR writer.
+	if !pending {
+		if err := model.applyProtectedFiles(ctx, prWriters); err != nil {
+			return nil, err
+		}
+	}
+	return model, nil
+}
+
+// applyMemory records configured cache-memory and repo-memory mounts.
+func (model *fileAccessModel) applyMemory(input Input, pending bool) error {
 	tools := input.ResolvedTools
 	memoryPending := false
+	var err error
 	if tools == nil {
-		if tools, err = policyMapping(frontmatter["tools"], "tools"); err != nil {
-			return nil, err
+		if tools, err = policyMapping(input.Document.Frontmatter["tools"], "tools"); err != nil {
+			return err
 		}
 		memoryPending = pending
 	}
 	model.cacheMemory, model.cacheMemoryKnown, err = cacheMemoryIDs(tools["cache-memory"], memoryPending)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	switch value, exists := tools["repo-memory"]; {
 	case exists && value != false:
@@ -132,26 +148,31 @@ func buildFileAccessModel(ctx context.Context, input Input) (*fileAccessModel, e
 	default:
 		model.repoMemory = stateDisabled
 	}
+	return nil
+}
 
-	// FAL-M6: protected files. Imports may add a permissive PR writer.
-	if !pending && len(prWriters) > 0 {
-		model.protectedBlocked = true
-		for _, writer := range prWriters {
-			policy, exclude, err := protectedFilesPolicy(ctx, writer.config, "safe-outputs."+writer.name+".protected-files")
-			if err != nil {
-				return nil, err
-			}
-			if policy != "blocked" {
-				model.protectedBlocked = false
-				break
-			}
-			model.protectedExclude = append(model.protectedExclude, exclude...)
-			if model.protectedSource == "" {
-				model.protectedSource = "safe-outputs." + writer.name + ".protected-files"
-			}
+// applyProtectedFiles records whether every pull-request writer blocks protected files.
+func (model *fileAccessModel) applyProtectedFiles(ctx context.Context, prWriters []pullRequestWriter) error {
+	if len(prWriters) == 0 {
+		return nil
+	}
+	model.protectedBlocked = true
+	for _, writer := range prWriters {
+		source := "safe-outputs." + writer.name + ".protected-files"
+		policy, exclude, err := protectedFilesPolicy(ctx, writer.config, source)
+		if err != nil {
+			return err
+		}
+		if policy != "blocked" {
+			model.protectedBlocked = false
+			return nil
+		}
+		model.protectedExclude = append(model.protectedExclude, exclude...)
+		if model.protectedSource == "" {
+			model.protectedSource = source
 		}
 	}
-	return model, nil
+	return nil
 }
 
 func fileAccessEngine(frontmatter map[string]any) string {
@@ -222,9 +243,9 @@ func protectedFilesPolicy(ctx context.Context, config any, location string) (str
 	case string:
 		return value, nil, nil
 	case map[string]any:
-		policy, _ := value["policy"].(string)
-		if policy == "" {
-			policy = "request-review"
+		policy := "request-review"
+		if authored, ok := value["policy"].(string); ok && authored != "" {
+			policy = authored
 		}
 		var exclude []string
 		if raw, exists := value["exclude"]; exists && raw != nil {
@@ -331,14 +352,12 @@ func shellCommandWrites(command string) bool {
 	if command == "*" || command == ":*" {
 		return true
 	}
-	fields := strings.Fields(command)
-	if len(fields) == 0 {
-		return false
-	}
-	stem := strings.TrimSuffix(fields[0], ":*")
+	head, rest, _ := strings.Cut(command, " ")
+	stem := strings.TrimSuffix(head, ":*")
 	if stem == "git" {
 		// Only unrestricted Git or git apply writes arbitrary content.
-		return len(fields) == 1 || strings.HasPrefix(fields[1], "*") || strings.HasPrefix(fields[1], "apply")
+		rest = strings.TrimSpace(rest)
+		return rest == "" || strings.HasPrefix(rest, "*") || strings.HasPrefix(rest, "apply")
 	}
 	return slices.Contains(writeCapableCommands, stem)
 }
@@ -434,13 +453,13 @@ func protectedFile(target, engine string, exclude []string) bool {
 		}
 	}
 	base := path.Base(relative)
-	segments := strings.Split(relative, "/")
+	top, _, nested := strings.Cut(relative, "/")
 	switch {
 	case slices.Contains(protectedManifests, base):
 		return true
-	case len(segments) == 1 && slices.Contains(protectedTopLevelDocs, base):
+	case !nested && slices.Contains(protectedTopLevelDocs, base):
 		return true
-	case len(segments) > 1 && strings.HasPrefix(segments[0], "."):
+	case nested && strings.HasPrefix(top, "."):
 		// Covers .github/, .agents/, .githooks/, .husky/, .claude/ and .codex/.
 		return true
 	}

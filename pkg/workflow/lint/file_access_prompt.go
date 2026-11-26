@@ -24,6 +24,13 @@ type fileAccessInstruction struct {
 	repoMemory     bool
 }
 
+const (
+	// fileAccessRuntimeRoot is the agent runtime directory that holds memory mounts.
+	fileAccessRuntimeRoot = "/tmp/gh-aw/"
+	// fileAccessDockerSocket is the host Docker socket hidden by the agent sandbox.
+	fileAccessDockerSocket = "/var/run/docker.sock"
+)
+
 var (
 	fileAccessWriteVerb = regexp.MustCompile(`(?i)(?:^|\b(?:then|and)\s+|,\s+)(?:(?:please|you\s+(?:must|should|will)|must|then|finally|also|next|always|now)[\s,]+)*(?:create|write|edit|modify|update|save|append|overwrite|store|install)\b`)
 	fileAccessNoun      = regexp.MustCompile(`(?i)\b(?:files?|director(?:y|ies)|folders?)\b`)
@@ -32,10 +39,10 @@ var (
 	// fileAccessDaemonless lists Docker CLI commands that query registries without the socket.
 	fileAccessDaemonless   = regexp.MustCompile(`(?i)\bdocker\s+manifest\b`)
 	fileAccessIllustration = regexp.MustCompile(`(?i)\b(?:such\s+as|e\.g\b|for\s+example|for\s+instance)`)
-	fileAccessMemoryDir    = regexp.MustCompile(`/tmp/gh-aw/(?:cache-memory(?:-[A-Za-z0-9_-]+)?|repo-memory\b)`)
+	fileAccessMemoryDir    = regexp.MustCompile(fileAccessRuntimeRoot + `(?:cache-memory(?:-[A-Za-z0-9_-]+)?|repo-memory\b)`)
 	fileAccessBlockStart   = regexp.MustCompile(`^\s*(?:#{1,6}\s|[-*+]\s|\d+[.)]\s|\|)`)
-	fileAccessCacheDir     = regexp.MustCompile(`/tmp/gh-aw/cache-memory(-[A-Za-z0-9_-]+)?`)
-	fileAccessRepoDir      = regexp.MustCompile(`/tmp/gh-aw/repo-memory\b`)
+	fileAccessCacheDir     = regexp.MustCompile(fileAccessRuntimeRoot + `cache-memory(-[A-Za-z0-9_-]+)?`)
+	fileAccessRepoDir      = regexp.MustCompile(fileAccessRuntimeRoot + `repo-memory\b`)
 	fileAccessSentence     = regexp.MustCompile(`[.!?;]\s+`)
 	fileAccessListLead     = regexp.MustCompile(`^\s*(?:>\s*)*(?:[-*+]|\d+[.)])?\s*(?:\[[ xX]\]\s*)?`)
 )
@@ -54,11 +61,13 @@ func fileAccessInstructions(ctx context.Context, markdown string) ([]fileAccessI
 		instructions = append(instructions, block.instructions()...)
 		block = proseBlock{}
 	}
-	for index, line := range strings.Split(text, "\n") {
+	lineNumber := 0
+	for line := range strings.Lines(text) {
 		if err := ctx.Err(); err != nil {
 			return instructions, err
 		}
-		lineNumber := index + 1
+		line = strings.TrimSuffix(line, "\n")
+		lineNumber++
 		marker, length, rest, isFence := markdownFence(line)
 		if fenceMarker != 0 {
 			if isFence && marker == fenceMarker && length >= fenceLength && strings.TrimSpace(rest) == "" {
@@ -119,7 +128,11 @@ func (block *proseBlock) lineAt(offset int) int {
 	if !found {
 		index--
 	}
-	return block.lines[max(index, 0)]
+	index = max(index, 0)
+	if index >= 0 && index < len(block.lines) {
+		return block.lines[index]
+	}
+	return 0
 }
 
 func (block *proseBlock) instructions() []fileAccessInstruction {
@@ -130,10 +143,13 @@ func (block *proseBlock) instructions() []fileAccessInstruction {
 	var instructions []fileAccessInstruction
 	offset := 0
 	for _, bounds := range append(fileAccessSentence.FindAllStringIndex(text, -1), []int{len(text), len(text)}) {
-		sentence := text[offset:bounds[0]]
+		if len(bounds) != 2 {
+			continue
+		}
+		sentence := text[offset:bounds[0]] //nolint:uncheckedsliceindex // Index pairs are checked above.
 		start := offset + len(sentence) - len(strings.TrimLeft(sentence, " \t"))
 		instructions = append(instructions, proseInstructions(sentence, start, block)...)
-		offset = bounds[1]
+		offset = bounds[1] //nolint:uncheckedsliceindex // Index pairs are checked above.
 	}
 	return instructions
 }
@@ -167,13 +183,17 @@ func proseInstructions(sentence string, start int, block *proseBlock) []fileAcce
 	var instructions []fileAccessInstruction
 	seen := make(map[string]struct{})
 	for _, match := range fileAccessMemoryDir.FindAllStringIndex(sentence, -1) {
-		line := block.lineAt(start + match[0])
-		key := fmt.Sprintf("%d:%s", line, sentence[match[0]:match[1]])
+		if len(match) != 2 {
+			continue
+		}
+		matchStart, matchEnd := match[0], match[1] //nolint:uncheckedsliceindex // Index pairs are checked above.
+		line := block.lineAt(start + matchStart)
+		key := fmt.Sprintf("%d:%s", line, sentence[matchStart:matchEnd])
 		if _, duplicate := seen[key]; duplicate {
 			continue
 		}
 		seen[key] = struct{}{}
-		if instruction, ok := memoryInstruction(sentence[match[0]:match[1]], line); ok {
+		if instruction, ok := memoryInstruction(sentence[matchStart:matchEnd], line); ok {
 			instructions = append(instructions, instruction)
 		}
 	}
@@ -185,7 +205,7 @@ func proseInstructions(sentence string, start int, block *proseBlock) []fileAcce
 		instruction.targets = writeTargets(paths)
 	}
 	instruction.docker = fileAccessDocker.MatchString(sentence) && !fileAccessDaemonless.MatchString(sentence) ||
-		strings.Contains(sentence, "/var/run/docker.sock")
+		strings.Contains(sentence, fileAccessDockerSocket)
 	if instruction.write || instruction.docker {
 		instructions = append(instructions, instruction)
 	}
@@ -199,14 +219,15 @@ func shellFenceInstruction(line string, lineNumber int) (fileAccessInstruction, 
 	command = strings.TrimSpace(strings.TrimPrefix(command, "$"))
 	command = strings.TrimSpace(strings.TrimPrefix(command, "sudo "))
 	instruction.docker = (strings.HasPrefix(command, "docker ") || strings.HasPrefix(command, "docker-compose ")) &&
-		!fileAccessDaemonless.MatchString(command) || strings.Contains(command, "/var/run/docker.sock")
+		!fileAccessDaemonless.MatchString(command) || strings.Contains(command, fileAccessDockerSocket)
 	return instruction, instruction.docker || len(instruction.cacheMemoryIDs) > 0 || instruction.repoMemory
 }
 
 func memoryInstruction(line string, lineNumber int) (fileAccessInstruction, bool) {
 	instruction := fileAccessInstruction{line: lineNumber}
-	for _, match := range fileAccessCacheDir.FindAllStringSubmatch(line, -1) {
-		id := strings.TrimRight(strings.TrimPrefix(match[1], "-"), "-_")
+	for _, match := range fileAccessCacheDir.FindAllString(line, -1) {
+		suffix := strings.TrimPrefix(match, fileAccessRuntimeRoot+"cache-memory")
+		id := strings.TrimRight(strings.TrimPrefix(suffix, "-"), "-_")
 		if id == "" {
 			id = "default"
 		}
@@ -230,13 +251,13 @@ func promptPathTokens(sentence string) []promptPath {
 	var paths []promptPath
 	previous := ""
 	inCode := false
-	for _, part := range strings.Split(sentence, "`") {
+	for part := range strings.SplitSeq(sentence, "`") {
 		if inCode && strings.Contains(part, "{{") {
 			// Expression code spans hold values, not paths.
 			inCode = !inCode
 			continue
 		}
-		for _, word := range strings.Fields(part) {
+		for word := range strings.FieldsSeq(part) {
 			token := strings.TrimRight(strings.TrimLeft(word, `("'[<`), `)"'.,:;!?]>`)
 			if pathToken(token, inCode) {
 				paths = append(paths, promptPath{value: token, previous: previous})
@@ -264,7 +285,7 @@ func pathToken(token string, inCode bool) bool {
 	}
 	extension := path.Ext(token)
 	base := strings.TrimSuffix(token, extension)
-	return len(extension) > 1 && unicode.IsLetter(rune(extension[1])) && len(base) >= 2
+	return strings.IndexFunc(strings.TrimPrefix(extension, "."), unicode.IsLetter) == 0 && len(base) >= 2
 }
 
 // writeTargets prefers paths introduced by a destination preposition.
@@ -278,5 +299,5 @@ func writeTargets(paths []promptPath) []string {
 			return []string{candidate.value}
 		}
 	}
-	return []string{paths[0].value}
+	return []string{paths[0].value} //nolint:uncheckedsliceindex // Empty paths return above.
 }

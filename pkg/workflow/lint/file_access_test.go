@@ -224,7 +224,7 @@ func TestFileAccessSpecTraceability(t *testing.T) {
 	}
 	require.NotEmpty(t, ids)
 	for _, id := range ids {
-		assert.True(t, strings.Contains(string(tests), `"`+id+" "), "spec requirement %s has no test case", id)
+		assert.Contains(t, string(tests), `"`+id+" ", "spec requirement %s has no test case", id)
 	}
 	cases := regexp.MustCompile(`(?m)^\| (C\d+) \|`).FindAllStringSubmatch(string(spec), -1)
 	require.NotEmpty(t, cases)

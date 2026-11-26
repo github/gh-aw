@@ -7,9 +7,9 @@ sidebar:
 
 # File-Access Lint Specification
 
-**Version**: 0.1.0  
-**Status**: Working Draft  
-**Date**: 2026-11-26  
+**Version**: 0.1.0<br>
+**Status**: Working Draft<br>
+**Date**: 2026-11-26<br>
 **Last Updated**: 2026-11-26<br>
 **Editors**: GitHub gh-aw Team
 
