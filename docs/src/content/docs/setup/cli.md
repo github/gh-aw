@@ -53,6 +53,9 @@ The `--timeout` flag uses different formats depending on the command:
 
 Other commands describe their own preview behavior in their help.
 
+> [!WARNING]
+> With `run --dry-run --enable-if-needed`, a disabled workflow is enabled on GitHub even though no run is dispatched. Restoration is attempted after preparation succeeds; an error during preparation can leave it enabled.
+
 ## Utility and advanced commands
 
 | Command | Description | When to use |

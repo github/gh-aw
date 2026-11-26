@@ -121,7 +121,7 @@ The command will:
 
 	addRepoFlag(cmd)
 	cmd.Flags().Bool("auto-merge", false, "Enable auto-merge on the created pull request (requires --create-pull-request)")
-	cmd.Flags().Bool("create-pull-request", false, "Explicitly opt in to pull request creation for --auto-merge (transfer always creates a pull request)")
+	cmd.Flags().Bool("create-pull-request", false, "Required with --auto-merge; transfer always creates a pull request")
 	addPRMessageFlag(cmd)
 	cmd.Flags().Bool("pr", false, "Alias for --create-pull-request")
 	_ = cmd.Flags().MarkHidden("pr")

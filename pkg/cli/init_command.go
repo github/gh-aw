@@ -61,7 +61,7 @@ With --completions flag:
 - Provides instructions for enabling completions in your shell
 
 After running this command, you can:
-- Add workflows from the catalog with: ` + string(constants.CLIExtensionPrefix) + ` add githubnext/agentics/ci-doctor
+- Add workflows from the catalog with: ` + string(constants.CLIExtensionPrefix) + ` add <owner>/<repo>/<workflow>
 - Create new workflows from scratch with: ` + string(constants.CLIExtensionPrefix) + ` new <workflow-name>`,
 		Example: `  ` + string(constants.CLIExtensionPrefix) + ` init                                # Initialize repository with defaults
   ` + string(constants.CLIExtensionPrefix) + ` init -v                             # Initialize with verbose output
@@ -74,7 +74,8 @@ After running this command, you can:
   ` + string(constants.CLIExtensionPrefix) + ` init --codespaces=repo1,repo2       # Codespaces with additional repos
   ` + string(constants.CLIExtensionPrefix) + ` init --completions                  # Install shell completions
   ` + string(constants.CLIExtensionPrefix) + ` init --create-pull-request          # Initialize and create a pull request
-  ` + string(constants.CLIExtensionPrefix) + ` init --create-pull-request --auto-merge  # Initialize and enable pull request auto-merge`,
+  ` + string(constants.CLIExtensionPrefix) + ` init --create-pull-request --auto-merge  # Initialize and enable pull request auto-merge
+  ` + string(constants.CLIExtensionPrefix) + ` add githubnext/agentics/ci-doctor  # Add a workflow from the catalog`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			verbose, _ := cmd.Flags().GetBool("verbose")
 			mcpFlag, _ := cmd.Flags().GetBool("mcp")

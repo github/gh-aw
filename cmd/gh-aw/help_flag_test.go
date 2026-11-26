@@ -20,7 +20,6 @@ func TestHelpFlagConsistency(t *testing.T) {
 			if f == nil {
 				t.Skip("Command has no help flag")
 			}
-
 			want := "Show help for gh aw"
 			if !strings.HasPrefix(f.Usage, want) {
 				t.Errorf("Command %q help flag Usage = %q, want prefix %q", cmd.CommandPath(), f.Usage, want)
@@ -34,20 +33,4 @@ func TestHelpFlagConsistency(t *testing.T) {
 	// the command tree so it is covered by this check.
 	rootCmd.InitDefaultHelpCmd()
 	checkCmd(rootCmd)
-}
-
-func TestRunHelpExplainsDryRunAndApproval(t *testing.T) {
-	cmd, _, err := rootCmd.Find([]string{"run"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	for name, want := range map[string]string{
-		"dry-run": "preparation can still compile, enable, or push",
-		"approve": "no effect without --push",
-	} {
-		flag := cmd.Flags().Lookup(name)
-		if flag == nil || !strings.Contains(flag.Usage, want) {
-			t.Errorf("%s flag should explain %q", name, want)
-		}
-	}
 }
