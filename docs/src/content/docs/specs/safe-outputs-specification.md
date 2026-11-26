@@ -5829,7 +5829,8 @@ same-repository duplicate target. Common safe-output provenance fields apply.
    agent-selected target restrictions, and required labels/title prefix before
    mutation. Temporary IDs MUST NOT bypass these controls.
 2. The handler MUST resolve the requested status using the destination
-   repository's available planning statuses. Names match case-insensitively;
+   repository's available planning statuses. Names match case-insensitively
+   after trimming surrounding whitespace;
    numeric IDs MUST belong to that repository. `allowed`, when configured,
    restricts the resolved status by name or ID. Clearing is unsupported.
 3. Missing preview support, unavailable statuses, ambiguous names, unknown

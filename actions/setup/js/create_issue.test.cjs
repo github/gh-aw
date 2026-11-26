@@ -145,6 +145,12 @@ describe("create_issue", () => {
       expect(mockGithub.rest.issues.create.mock.calls[0][0].status).toBe("Todo");
     });
 
+    it("matches the configured default and allowlist regardless of case and surrounding whitespace", async () => {
+      const handler = await main({ planning_status: " tOdO ", allowed_statuses: [1, " TODO "] });
+      expect((await handler(message)).success).toBe(true);
+      expect(mockGithub.rest.issues.create.mock.calls[0][0].status).toBe("Todo");
+    });
+
     it("permits an allowed tool override of the configured default", async () => {
       const handler = await main({ planning_status: "Backlog", allowed_statuses: [2] });
       expect((await handler({ ...message, planning_status: 2 })).success).toBe(true);

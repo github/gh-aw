@@ -82,8 +82,13 @@ describe("native planning status resolution", () => {
     expect(client.request).not.toHaveBeenCalled();
   });
 
-  it.each([["todo"], [2], ["Backlog", 2]].map(allowed => [allowed]))("accepts allowed aliases %j", async allowed => {
+  it.each([["todo"], [" ToDo "], [2], ["Backlog", 2]].map(allowed => [allowed]))("accepts allowed aliases %j", async allowed => {
     expect(await resolvePlanningStatus(client, "owner", "repo", 2, allowed)).toEqual(statuses[1]);
+  });
+
+  it("normalizes names from both discovery and the allowlist without changing the canonical name", async () => {
+    available = [{ id: 2, name: " Todo ", category: "planned" }];
+    expect(await resolvePlanningStatus(client, "owner", "repo", " tOdO ", ["TODO"])).toEqual(available[0]);
   });
 
   it.each([["Backlog"], [3], ["2"]].map(allowed => [allowed]))("denies mismatched allowed selector %j", async allowed => {
@@ -98,6 +103,9 @@ describe("native planning status resolution", () => {
     await expect(resolvePlanningStatus(client, "owner", "repo", "New")).rejects.toThrow("Unknown");
     available = [...statuses, { id: 8, name: "todo", category: "planned" }];
     await expect(resolvePlanningStatus(client, "owner", "repo", "Todo")).rejects.toThrow("Ambiguous");
+    await expect(resolvePlanningStatus(client, "owner", "repo", 2)).rejects.toThrow("Ambiguous");
+    available = [...statuses, { id: 8, name: " TODO ", category: "planned" }];
+    await expect(resolvePlanningStatus(client, "owner", "repo", "todo")).rejects.toThrow("Ambiguous");
     await expect(resolvePlanningStatus(client, "owner", "repo", 2)).rejects.toThrow("Ambiguous");
   });
 

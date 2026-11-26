@@ -321,7 +321,8 @@ See [Cross-Repository Operations](/gh-aw/reference/cross-repository/) for compre
 `planning-status` selects the initial native issue status by name or numeric ID.
 `allowed-statuses` restricts the statuses that the agent may request through
 `create_issue.planning_status`. The configured default is subject to the same
-allowlist. Only open categories (`backlog`, `planned`, and `started`) are accepted
+allowlist. Status names are matched case-insensitively with surrounding whitespace
+ignored. Only open categories (`backlog`, `planned`, and `started`) are accepted
 at creation; closing requires a separately authorized operation.
 
 ```yaml wrap
@@ -873,7 +874,7 @@ safe-outputs:
 
 The `set_issue_status` tool requires `status` (a status name or positive numeric
 ID), and accepts `issue_number` and `repo` subject to the configured target and
-repository restrictions. Names resolve case-insensitively against the target
+repository restrictions. Names resolve case-insensitively, ignoring surrounding whitespace, against the target
 repository's available planning statuses; numeric IDs must also be present in
 that repository. Statuses cannot be cleared.
 

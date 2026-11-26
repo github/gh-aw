@@ -11,7 +11,7 @@ function isPlanningStatusSelector(value) {
 
 /** @param {any} status @param {unknown} selector */
 function matchesPlanningStatus(status, selector) {
-  return typeof selector === "number" ? status.id === selector : typeof selector === "string" && status.name.toLowerCase() === selector.trim().toLowerCase();
+  return typeof selector === "number" ? status.id === selector : typeof selector === "string" && status.name.trim().toLowerCase() === selector.trim().toLowerCase();
 }
 
 /** Resolve native statuses before any write: unsupported previews must never fall back to issue state. */
