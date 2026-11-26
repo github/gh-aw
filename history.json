@@ -298,8 +298,44 @@
       "avg_comments": 0.18,
       "success_rate": 0.4545,
       "note": "true UTC calendar-day window (2026-11-18T00:00:00Z..2026-11-19T00:00:00Z); cohort author.login in {app/copilot-swe-agent, gh-aw-bot} (0 app/copilot-swe-agent activity this day, all 11 are gh-aw-bot); creation cohort from 30-day pre-fetched dataset; agent_prs_total=11, all resolved (0 open) at collection time; agent_prs_merged_from_created=5, closed_prs=6 (#79056 doc fix, #79039 spec refresh, #78959 investigation closed with no repo changes, #78958 mapcopyloop linter closed despite ADR-gated substantial work, #78952 investigation confirming existing safeguards with no code changes, #78951 dependency bump - all had substantive bodies, no bare WIP placeholders); agent_success_rate=agent_prs_merged_from_created/agent_prs_total=45.5%, down sharply vs 11-17 (76.5%->45.5%, -31.0pp, -40.5% relative, significant); avg_duration created->merged over 5 merged PRs=885.0min (14h45m), up sharply vs 11-17 (173.78->885.0min, +409%, significant) - driven by PRs created overnight (05:xx-09:xx UTC) that were not merged until the evening triage batch (~21:xx-22:xx UTC); volume down vs 11-17 (17->11, -35.3%, significant); agent_prs_merged (event-scoped, mergedAt in window)=7, independently verified via live paginated GitHub search (is:merged, author:gh-aw-bot, merged:2026-11-18T00:00:00Z..2026-11-18T23:59:59Z, total_count=7, includes 2 PRs created 11-17 but merged 11-18: #78840, #78839; author:app/copilot-swe-agent same range=0), cross-checked against 51 all-author merged PRs in window (7<=51, consistent); avg_comments=0.18 is human (non-bot, non-automation) comments only via get_comments+get_review_comments across all 11 cohort PRs - only 2 human comments found, both from @pelikhan ('resolve the merge conflicts on this branch' on #78960 and #78951), all other comments were from github-actions[bot] review workflows, the 'gh-aw-bot' PR-Sous-Chef automation account, or the agent's own 'Copilot' reply account (all excluded as non-human); 3 review comment items on #78958 were withheld by integrity policy and excluded from the human-comment count"
+    },
+    {
+      "date": "2026-11-23",
+      "agent_prs_total": 10,
+      "agent_prs_merged": 8,
+      "agent_prs_merged_from_created": 9,
+      "closed_prs": 1,
+      "open_prs": 0,
+      "avg_agent_duration_minutes": 181.63,
+      "avg_comments": null,
+      "success_rate": 0.9,
+      "note": "cold-start rebuild day 1/3 (5-day gap 11-19..11-24 after last entry 11-18); window 2026-11-23T00:00Z..11-24T00:00Z; cohort=gh-aw-bot only; total=10, merged=9, closed=1 (#80467, substantive); success_rate=90.0%; avg_duration(created->merged)=181.63min; agent_prs_merged(event-scoped, live search)=8, cross-checked vs 89 all-author merges (consistent); avg_comments not collected (backfill)"
+    },
+    {
+      "date": "2026-11-24",
+      "agent_prs_total": 11,
+      "agent_prs_merged": 9,
+      "agent_prs_merged_from_created": 8,
+      "closed_prs": 2,
+      "open_prs": 1,
+      "avg_agent_duration_minutes": 151.91,
+      "avg_comments": null,
+      "success_rate": 0.7273,
+      "note": "cold-start rebuild day 2/3; window 2026-11-24T00:00Z..11-25T00:00Z; cohort=gh-aw-bot only; total=11, merged=8, closed=2 (#80759, #80753, both investigations, substantive), open=1 (#80684, >24h old); success_rate=72.7%, down vs 11-23 (-17.3pp, significant); avg_duration=151.91min (-16.4% vs 11-23); agent_prs_merged(event-scoped)=9, cross-checked vs 37 all-author merges (consistent); avg_comments not collected (backfill)"
+    },
+    {
+      "date": "2026-11-25",
+      "agent_prs_total": 11,
+      "agent_prs_merged": 7,
+      "agent_prs_merged_from_created": 8,
+      "closed_prs": 2,
+      "open_prs": 1,
+      "avg_agent_duration_minutes": 325.08,
+      "avg_comments": 0.09,
+      "success_rate": 0.7273,
+      "note": "primary window, cold-start rebuild day 3/3; window 2026-11-25T00:00Z..11-26T00:00Z; cohort=gh-aw-bot only (verified 0 app/copilot-swe-agent); total=11, merged=8, closed=2 (#81117 investigation substantive, #81035 bare [WIP] placeholder), open=1 (#81094, ~27h old); success_rate=72.7% flat vs 11-24; avg_duration=325.08min, up +114% vs 11-24 (driven by #81034/#81033 merged ~9h47m after creation in evening batch); agent_prs_merged(event-scoped)=7, cross-checked vs 27 all-author merges (consistent); avg_comments=0.09 human-only (get_comments+get_review_comments, bots/automation/agent-reply excluded) - only 1 human comment across 11 PRs (@pelikhan on #81034)"
     }
   ],
-  "last_updated": "2026-11-19",
+  "last_updated": "2026-11-26",
   "note": "root-level history.json is the live file (nested copilot-agent-metrics/history.json is not matched by the configured flat *.json file-glob and is no longer updated); 2026-11-19 run added 2026-11-18 with no gap (continuing directly from 11-17); success_rate dropped sharply this run (76.5%->45.5%) driven by three investigation/chore PRs closed without code changes plus one substantial linter PR closed despite passing CI, see per-day note for 11-18"
 }
