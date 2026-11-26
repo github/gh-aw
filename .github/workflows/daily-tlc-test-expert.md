@@ -133,7 +133,13 @@ Do not assume matching `.tla`/`.cfg` basenames: some models share configurations
 use generated configurations, or deliberately expect violations.
 
 Follow the imported formal-methods guidance. Use `JAVA_BIN` and `TLA2TOOLS_JAR`
-from the shared setup; do not download another runtime. Prefer the repository's
+from the shared setup; do not download another runtime. Shell tools may not
+inherit the job environment: in each shell invocation that needs the runtime,
+set `JAVA_BIN=/tmp/gh-aw/agent/tla-tools/jre/bin/java` and
+`TLA2TOOLS_JAR=/tmp/gh-aw/agent/tla-tools/tla2tools.jar` and export both.
+Check that Java is executable and the jar exists before reporting a runtime
+blocker. On non-default refs the shared setup is intentionally skipped; do not
+replace it with an untrusted installer. Prefer the repository's
 checker **only if it can restrict execution to the selected module**. Otherwise
 run SANY and TLC directly using that checker's documented module/config mapping
 and expected-result semantics. Preserve checker-specific version/checksum
@@ -195,8 +201,12 @@ blocker, not a reason to alter unrelated code.
 
 Write a concise report and sanitized logs under
 `/tmp/gh-aw/agent/tlc-test-expert/evidence/`, excluding TLC state directories,
-credentials, and large generated data. Upload this directory as one artifact
-through the safe output even when checking is inconclusive or no PR is needed.
+credentials, and large generated data. Copy the sanitized evidence to
+`$RUNNER_TEMP/gh-aw/safeoutputs/upload-artifacts/tlc-test-expert-evidence/`,
+then call `upload_artifact` with the staging-relative path
+`tlc-test-expert-evidence`. Leave the staged files for the safe-outputs job;
+never include them in a PR. Upload one artifact even when checking is
+inconclusive or no PR is needed.
 Use `###` or lower headings. Structure the report as a concise overview and
 verdict → key configuration results and coverage gaps → collapsible per-config
 evidence and logs → next actions or limitations. Keep the selected module,

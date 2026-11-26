@@ -203,7 +203,7 @@ is_linter_summary_line() {
     [[ "$line" =~ ^[0-9]+[[:space:]]issues?:$ ]] ||
         [[ "$line" =~ ^\*[[:space:]][^:]+:[[:space:]][0-9]+$ ]] ||
         [[ "$line" = "Building custom linters..." ]] ||
-        [[ "$line" = "Running custom linters (largefunc max-lines=60)..." ]] ||
+        [[ "$line" =~ ^Running\ custom\ linters\ \((tier=[^,]+,\ )?largefunc\ max-lines=[0-9]+\)\.\.\.$ ]] ||
         [[ "$line" =~ ^make\[[0-9]+\]:[[:space:]]\*\*\*[[:space:]]\[Makefile:[0-9]+:[[:space:]]golint-custom\][[:space:]]Error[[:space:]][0-9]+$ ]]
 }
 

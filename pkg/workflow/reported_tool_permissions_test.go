@@ -3,9 +3,13 @@
 package workflow
 
 import (
+	"encoding/json"
+	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
+	"unicode/utf8"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -26,6 +30,7 @@ func TestReportedWorkflowToolPermissions(t *testing.T) {
 		{"smoke-workflow-call", []string{"Bash(git status:*)", "Bash(git branch:*)", "Bash(git remote:*)", "Bash(git log:*)"}},
 		{"sighthound-security-scan", nil},
 	}
+
 	for _, tt := range tests {
 		t.Run(tt.workflow, func(t *testing.T) {
 			path := filepath.Join("..", "..", ".github", "workflows", tt.workflow+".md")
@@ -90,11 +95,71 @@ func TestReportedWorkflowToolPermissions(t *testing.T) {
 				assert.NotContains(t, getMCPCLIExcludeFromAgentConfig(data), "mcpscripts")
 				require.Contains(t, data.MCPScripts.Tools, "read-sighthound-findings")
 				require.Contains(t, data.MCPScripts.Tools, "read-sighthound-summary")
-				assert.Equal(t, "cat /tmp/gh-aw/agent/sighthound/actionable.json", data.MCPScripts.Tools["read-sighthound-findings"].Run)
 				assert.Equal(t, "cat /tmp/gh-aw/agent/sighthound/summary.md", data.MCPScripts.Tools["read-sighthound-summary"].Run)
 			default:
 				t.Fatalf("unexpected engine: %s", ResolveEngineID(data))
 			}
 		})
 	}
+}
+
+func TestSighthoundFindingsReader(t *testing.T) {
+	if _, err := exec.LookPath("jq"); err != nil {
+		t.Skip("jq is required to exercise the Sighthound findings reader")
+	}
+	compiler := NewCompiler()
+	compiler.SetWorkflowIdentifier("sighthound-security-scan")
+	data, err := compiler.ParseWorkflowFile(filepath.Join("..", "..", ".github", "workflows", "sighthound-security-scan.md"))
+	require.NoError(t, err)
+	command := data.MCPScripts.Tools["read-sighthound-findings"].Run
+	const inputPath = "/tmp/gh-aw/agent/sighthound/actionable.json"
+	require.Contains(t, command, inputPath)
+	command = strings.ReplaceAll(command, inputPath, `"$1"`)
+
+	run := func(t *testing.T, input any) ([]byte, error) {
+		t.Helper()
+		file := filepath.Join(t.TempDir(), "findings.json")
+		content, err := json.Marshal(input)
+		require.NoError(t, err)
+		require.NoError(t, os.WriteFile(file, content, 0600))
+		return exec.Command("bash", "-c", command, "reader", file).Output()
+	}
+
+	t.Run("large input is ranked and bounded", func(t *testing.T) {
+		findings := []map[string]any{
+			{"file": "low.go", "severity": "Low", "snippet": strings.Repeat("x", 11*1024*1024)},
+			{"file": "high.go", "severity": "High"},
+			{"file": "medium.go", "severity": "Medium"},
+			{"file": "critical1.go", "severity": "Critical", "description": strings.Repeat("🧪", 3000)},
+			{"file": "info.go", "severity": "Info"},
+			{"file": "critical2.go", "severity": "critical", "snippet": strings.Repeat("🧪", 3000)},
+			{"file": "high2.go", "severity": "HIGH"},
+		}
+		output, err := run(t, findings)
+		require.NoError(t, err)
+		require.Less(t, len(output), 100*1024)
+		var result []map[string]any
+		require.NoError(t, json.Unmarshal(output, &result))
+		require.Len(t, result, 5)
+		for i, file := range []string{"critical1.go", "critical2.go", "high.go", "high2.go", "medium.go"} {
+			assert.Equal(t, file, result[i]["file"])
+		}
+		description, ok := result[0]["description"].(string)
+		require.True(t, ok)
+		assert.Len(t, description, 4096)
+		assert.True(t, utf8.ValidString(description))
+		snippet, ok := result[1]["snippet"].(string)
+		require.True(t, ok)
+		assert.Len(t, snippet, 2048)
+		assert.True(t, utf8.ValidString(snippet))
+	})
+	t.Run("empty", func(t *testing.T) {
+		output, err := run(t, []any{})
+		require.NoError(t, err)
+		assert.JSONEq(t, "[]", string(output))
+	})
+	t.Run("unknown severity fails", func(t *testing.T) {
+		_, err := run(t, []map[string]any{{"severity": "unexpected"}})
+		require.Error(t, err)
+	})
 }

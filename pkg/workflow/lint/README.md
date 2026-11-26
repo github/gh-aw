@@ -29,16 +29,21 @@ constructors:
 |-------------|-------------------|
 | Expressions and disclosure | `TemplateInjectionRule`, `PromptExpressionRule`, `PromptConditionSyntaxRule`, `SecretLeakRule`, `OTLPSecretLeakRule`, `OverprovisionedSecretsRule` |
 | Actions and workflow integrity | `ActionPinRule`, `VersionCheckRule`, `JobTimeoutRule`, `NeedsConsistencyRule`, `StepReferenceRule`, `WorkflowRunScopeRule`, `ConditionalImportRule`, `PrivateToPublicRule`, `InstallScriptsRule`, `GatewayDispatchLiteralsRule`, `BashCasePatternRule`, `UnquotedCommandAssignmentRule`, `ObfuscationRule`, `UnsoundContainsRule`, `RemoteScriptExecutionRule` |
-| Permissions, jobs, and checkout | `PermissionScopeRule`, `ExcessivePermissionsRule`, `CustomJobDetectionRule`, `PrivilegedCheckoutRule`, `CheckoutModeRule`, `ForkAssociationRule`, `PullRequestTargetRolesRule`, `UntrustedRolesDetectionRule`, `PullRequestTargetCheckoutRule`, `BotConditionsRule` |
+| Permissions, jobs, and checkout | `PermissionScopeRule`, `ExcessivePermissionsRule`, `CustomJobDetectionRule`, `PrivilegedCheckoutRule`, `CheckoutModeRule`, `ForkAssociationRule`, `PullRequestTargetRolesRule`, `UntrustedRolesDetectionRule`, `PullRequestTargetCheckoutRule`, `BotConditionsRule`, `DangerousTriggersRule` |
 | Network, tools, images, and sandbox | `NetworkScopeRule`, `PushTargetRule`, `AllowedLabelsRule`, `ToolScopeRule`, `ImageArgumentRule`, `UnpinnedImagesRule`, `SandboxConfigRule`, `FirewallSSLBumpRule` |
 | Outputs, artifacts, and cache | `SafeOutputShellExpansionRule`, `SafeOutputCredentialsRule`, `ArtifactExecutionRule`, `ArtipackedRule`, `CachePoisoningRule` |
 | Environment-file integrity | `EnvironmentFileInjectionRule`, `InsecureCommandsRule` |
 | Grader I/O | `GraderFileIORule` |
+| Prompt file access | `FileAccessRule` (specified in [`specs/file-access-lint-spec.md`](../../../specs/file-access-lint-spec.md)) |
 
 `ASTTargets` selects the authored AW AST (`AWAST`), native Actions AST
 (`ActionsAST`), or both for a rule. `Severity` uses `Error` and `Warning` values
 and provides `String` for the diagnostic label. `CheckGatewayDispatchLiterals`
 is the direct check used by the corresponding built-in rule.
+
+`DangerousTriggersRule` reports privileged `pull_request_target` triggers and
+comment triggers when actor admission and GitHub integrity filtering permit
+untrusted input; findings map to CTR-008 or CTR-039.
 
 `unquoted-command-assignment` warns about bare assignments to a conservative
 set of common command names in POSIX shell steps and MCP shell scripts. Quote

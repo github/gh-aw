@@ -38,6 +38,7 @@ imports:
   - shared/copilot-pr-data-fetch.md
   - shared/python-nlp.md
 
+  - shared/reporting.md
   - shared/otlp.md
 cache:
   - key: prompt-clustering-cache-${{ github.run_id }}

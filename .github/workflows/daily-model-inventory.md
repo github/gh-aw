@@ -412,6 +412,7 @@ safe-outputs:
     close-older-pull-requests: true
 
 imports:
+  - shared/reporting.md
   - shared/lock-safe-pull-request.md
   - shared/otlp.md
 features:

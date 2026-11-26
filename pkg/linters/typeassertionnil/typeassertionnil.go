@@ -13,10 +13,11 @@ import (
 	"github.com/github/gh-aw/pkg/linters/internal/astutil"
 	"github.com/github/gh-aw/pkg/linters/internal/filecheck"
 	"github.com/github/gh-aw/pkg/linters/internal/nolint"
+	"github.com/github/gh-aw/pkg/linters/internal/parentmap"
 )
 
 // Analyzer is the type-assertion-nil analysis pass.
-var Analyzer = analyzerutil.New("typeassertionnil", "reports type assertions to pointer types without ok-check before dereferencing", run)
+var Analyzer = analyzerutil.New("typeassertionnil", "reports type assertions to pointer types without ok-check before dereferencing", run, parentmap.Analyzer)
 
 func run(pass *analysis.Pass) (any, error) {
 	noLintIndex, generatedFiles, err := analyzerutil.Indexes(pass)
@@ -24,10 +25,10 @@ func run(pass *analysis.Pass) (any, error) {
 		return nil, err
 	}
 
-	// Build a parent map for each file to detect context (assignments, returns, etc.)
-	fileParents := make(map[*ast.File]map[ast.Node]ast.Node)
-	for _, f := range pass.Files {
-		fileParents[f] = astutil.BuildParentMap(f)
+	// Reuse the per-package parent maps shared by all parent-aware analyzers.
+	fileParents, err := parentmap.Of(pass)
+	if err != nil {
+		return nil, err
 	}
 
 	nodeFilter := []ast.Node{

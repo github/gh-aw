@@ -27,7 +27,7 @@ func TestRuleRegistrationAndSelection(t *testing.T) {
 		"pull-request-target-roles", "untrusted-roles-detection", "safe-output-shell-expansion", "safe-output-credentials", "firewall-ssl-bump",
 		"custom-job-detection",
 		"grader-file-io",
-		"pull-request-target-checkout", "prompt-expression", "prompt-condition-syntax",
+		"pull-request-target-checkout", "prompt-expression", "prompt-condition-syntax", "file-access",
 		"gateway-dispatch-literals",
 		"artipacked", "cache-poisoning", "excessive-permissions", "obfuscation",
 		"bash-case-pattern", "unquoted-command-assignment", "unsound-contains",

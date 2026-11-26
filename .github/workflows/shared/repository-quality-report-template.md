@@ -50,13 +50,11 @@ When generating the quality improvement report, use the structure below. **Use h
 
 ---
 
-## 🤖 Tasks for Copilot Agent
+### 🤖 Tasks for Copilot Agent
 
-**NOTE TO PLANNER AGENT**: Split the following tasks into individual work items.
+#### Improvement Tasks
 
-### Improvement Tasks
-
-#### Task 1: [Short Description]
+##### Task 1: [Short Description]
 
 **Priority**: High/Medium/Low
 **Estimated Effort**: Small/Medium/Large
@@ -76,11 +74,11 @@ When generating the quality improvement report, use the structure below. **Use h
 
 ---
 
-[Repeat Task pattern for 3–5 total tasks]
+[Repeat Task pattern for up to 5 evidenced tasks; cite existing issues or pull requests for already-tracked tasks and explain when no issue qualifies.]
 
 ---
 
-## 📊 Historical Context
+### 📊 Historical Context
 
 <details>
 <summary>Previous Focus Areas</summary>
@@ -93,30 +91,30 @@ When generating the quality improvement report, use the structure below. **Use h
 
 ---
 
-## 🎯 Recommendations
+### 🎯 Recommendations
 
-### Immediate Actions (This Week)
+#### Immediate Actions (This Week)
 1. [Action 1] — Priority: High
 
-### Short-term Actions (This Month)
+#### Short-term Actions (This Month)
 1. [Action 1] — Priority: Medium
 
-### Long-term Actions (This Quarter)
+#### Long-term Actions (This Quarter)
 1. [Action 1] — Priority: Low
 
 ---
 
-## 📈 Success Metrics
+### 📈 Success Metrics
 
 - **Metric 1**: [Current] → [Target]
 - **Metric 2**: [Current] → [Target]
 
 ---
 
-## Next Steps
+### Next Steps
 
 1. Review and prioritise the tasks above
-2. Assign tasks to Copilot coding agent via planner agent
+2. Review the separate issues created for novel, verified tasks
 3. Track progress on improvement items
 4. Re-evaluate this focus area in [timeframe]
 
