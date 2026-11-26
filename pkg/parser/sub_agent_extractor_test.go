@@ -4,6 +4,8 @@ package parser
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -53,6 +55,34 @@ func TestExtractInlineSubAgents_SingleAgent(t *testing.T) {
 	require.Len(t, agents, 1, "should extract one sub-agent")
 	assert.Equal(t, "planner", agents[0].Name, "agent name should be 'planner'")
 	assert.Equal(t, "---\nengine: copilot\n---\nYou are a planning assistant.", agents[0].Content, "agent content should be trimmed")
+}
+
+func TestExtractInlineSubAgents_DeadCodeRemover(t *testing.T) {
+	content, err := os.ReadFile(filepath.Join("..", "..", ".github", "workflows", "dead-code-remover.md"))
+	require.NoError(t, err)
+	workflow, err := ExtractFrontmatterFromContent(string(content))
+	require.NoError(t, err)
+
+	mainMarkdown, agents, err := ExtractInlineSubAgents(workflow.Markdown)
+	require.NoError(t, err)
+	require.Len(t, agents, 1)
+	assert.Equal(t, "discover-candidates", agents[0].Name)
+	agent, err := ExtractFrontmatterFromContent(agents[0].Content)
+	require.NoError(t, err)
+	assert.Equal(t, "copilot/gpt-6-luna", agent.Frontmatter["model"])
+	for _, expected := range []string{
+		"containsInNonCommentLines", "indexInNonCommentLines", "extractJobSection",
+		`{"skip":false,"candidates":[{"function":"Name","file":"pkg/workflow/compiler.go","reason":"no callers"}]}`,
+		`{"skip":true,"candidates":[]}`, "./internal/tools/...",
+	} {
+		assert.Contains(t, agent.Markdown, expected)
+	}
+	assert.Contains(t, mainMarkdown, "Run the `discover-candidates` sub-agent first.")
+	assert.Contains(t, mainMarkdown, "## Phase 3: Select a Batch")
+	assert.Contains(t, mainMarkdown, "## Phase 8: Create Pull Request")
+	assert.Contains(t, mainMarkdown, "Read at most 60 lines per call.")
+	assert.Contains(t, mainMarkdown, "`safeoutputs create_pull_request '<json>'` via bash")
+	assert.NotContains(t, agents[0].Content, "## Phase 3")
 }
 
 func TestExtractInlineSubAgents_MultipleAgents(t *testing.T) {
