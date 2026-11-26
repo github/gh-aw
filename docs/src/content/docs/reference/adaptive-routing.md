@@ -79,6 +79,8 @@ Commits to the history are signed, so they satisfy rulesets on `memory/**` that 
 
 ## Retention
 
+`last_run` is the highest recorded run number, not proof that every preceding result was saved. For example, if run 12 saves while run 11 is still active, coverage can reach 12 with 11 listed in `unresolved_runs`. A missing entry in an Actions listing is not proof that 11 saved. Only the writer settles that obligation. Older histories without `reconciled_through` do not yet report verified coverage.
+
 The history keeps the model and effort, the verdict, the credits and the token counts of each run, and never prompts or agent output. In `state.json`, each model and effort keeps its newest 50 outcomes within 60 days; `runs.jsonl` keeps the last 500 runs. Every earlier version of both files remains in the branch's Git history. To remove the history entirely, delete the branch by hand; the next run starts a new one.
 
 ## Status and reset
