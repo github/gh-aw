@@ -98,6 +98,7 @@ describe("convert_gateway_config_gemini", () => {
         GITHUB_WORKSPACE: process.env.GITHUB_WORKSPACE,
         GH_AW_MCP_CLI_SERVERS: process.env.GH_AW_MCP_CLI_SERVERS,
         GH_AW_WEB_FETCH_MCP: process.env.GH_AW_WEB_FETCH_MCP,
+        GH_AW_WEB_FETCH_MCP_NVX: process.env.GH_AW_WEB_FETCH_MCP_NVX,
         RUNNER_TEMP: process.env.RUNNER_TEMP,
       };
 
@@ -108,6 +109,7 @@ describe("convert_gateway_config_gemini", () => {
       process.env.GH_AW_MCP_CLI_SERVERS = "[]";
       process.env.RUNNER_TEMP = tempDir;
       delete process.env.GH_AW_WEB_FETCH_MCP;
+      delete process.env.GH_AW_WEB_FETCH_MCP_NVX;
     });
 
     afterEach(() => {
@@ -137,6 +139,8 @@ describe("convert_gateway_config_gemini", () => {
         command: "node",
         args: [join(tempDir, "gh-aw/actions/web_fetch_mcp_server.cjs")],
       });
+      process.env.GH_AW_WEB_FETCH_MCP_NVX = "1";
+      expect(JSON.parse(main()).mcpServers["web-fetch"].args).toEqual(["/workspace/.gh-aw-nvx/gh-aw/actions/web_fetch_mcp_server.cjs"]);
     });
 
     /**

@@ -41,6 +41,10 @@ func NewGeminiEngine() *GeminiEngine {
 	}
 }
 
+func (e *GeminiEngine) UsesWebFetchFallback(data *WorkflowData) bool {
+	return isFirewallEnabled(data)
+}
+
 // GetModelEnvVarName returns the native environment variable name that the Gemini CLI uses
 // for model selection. Setting GEMINI_MODEL is equivalent to passing --model to the CLI.
 func (e *GeminiEngine) GetModelEnvVarName() string {

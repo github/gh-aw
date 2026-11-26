@@ -77,7 +77,7 @@ Engine behavior differs:
 - **Copilot**: Both CLI and SDK always run in offline BYOK mode. `web-fetch:` enables the built-in MCP server, not a native tool. Compilation still rejects `web-search:`.
 - **Gemini** and **Pi**: No built-in web search. `web-search:` has no effect and `gh aw compile` prints a warning.
 
-For built-in engines and the Goose and OpenCode samples, `web-fetch:` exposes the `web_fetch` MCP tool alongside any available native fetch tool. Custom engines can opt in using a compatible MCP adapter. The agent launches the stateless server inside AWF, which is required when the fallback is enabled. It sends only HTTP(S) GET requests, checks redirects through the firewall, and does not add destinations to `network.allowed`. The tool returns bounded, paginated text and does not perform web search.
+For built-in engines and the Goose and OpenCode samples, `web-fetch:` exposes the `web_fetch` MCP tool alongside any available native fetch tool. Custom engines can opt in using a compatible MCP adapter. The agent launches the stateless server inside AWF. Claude on Anthropic inference, Codex, and Gemini use native fetch alone when AWF is disabled; the other fallback-enabled engines require AWF. The fallback sends only HTTP(S) GET requests, checks redirects through the firewall, and does not add destinations to `network.allowed`. The tool returns bounded, paginated text and does not perform web search.
 
 Copilot, Gemini, and Pi need a separate MCP server for search. See [Using Web Search](/gh-aw/reference/web-search/).
 

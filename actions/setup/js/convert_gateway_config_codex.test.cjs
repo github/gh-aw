@@ -100,6 +100,7 @@ describe("convert_gateway_config_codex", () => {
       const output = main();
       expect(output).toContain("[mcp_servers.web-fetch]");
       expect(output).toContain('command = "node"');
+      expect(output).toContain('env_vars = ["HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy", "SSL_CERT_FILE", "SSL_CERT_DIR", "CURL_CA_BUNDLE"]');
       expect(output).toContain(join(tempDir, "gh-aw/actions/web_fetch_mcp_server.cjs"));
       expect(output).not.toContain("/mcp/web-fetch");
     });

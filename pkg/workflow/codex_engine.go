@@ -69,6 +69,10 @@ func NewCodexEngine() *CodexEngine {
 	}
 }
 
+func (e *CodexEngine) UsesWebFetchFallback(data *WorkflowData) bool {
+	return isFirewallEnabled(data)
+}
+
 // GetModelEnvVarName returns an empty string because the Codex CLI does not support
 // selecting the model via a native environment variable. Model selection for Codex
 // is done via the --model flag in the shell command.

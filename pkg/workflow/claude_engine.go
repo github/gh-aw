@@ -61,8 +61,8 @@ func (e *ClaudeEngine) ResolveLLMProvider(workflowData *WorkflowData) LLMProvide
 	return resolveEngineLLMProviderFromModel(workflowData, LLMProviderAnthropic)
 }
 
-func (e *ClaudeEngine) UsesWebFetchFallback(_ *WorkflowData) bool {
-	return true
+func (e *ClaudeEngine) UsesWebFetchFallback(data *WorkflowData) bool {
+	return e.ResolveLLMProvider(data) == LLMProviderGitHub || isFirewallEnabled(data)
 }
 
 func (e *ClaudeEngine) GetHostedWebCapabilities(_ *WorkflowData) HostedWebCapabilities {

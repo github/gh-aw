@@ -12,7 +12,7 @@ import (
 )
 
 func TestWebFetchMCPRequiresAWF(t *testing.T) {
-	for _, engine := range []string{"copilot", "claude", "codex", "gemini", "pi", "agy"} {
+	for _, engine := range []string{"copilot", "pi", "agy", "\n  id: claude\n  model-provider: github"} {
 		t.Run(engine, func(t *testing.T) {
 			_, err := NewCompiler().ParseWorkflowString(fmt.Sprintf(`---
 on: workflow_dispatch
@@ -30,12 +30,46 @@ Fetch a page.
 	}
 }
 
+func TestNativeWebFetchWithoutAWF(t *testing.T) {
+	for _, engine := range []string{"claude", "codex", "gemini"} {
+		t.Run(engine, func(t *testing.T) {
+			data, err := NewCompiler().ParseWorkflowString(fmt.Sprintf(`---
+on: workflow_dispatch
+strict: false
+engine: %s
+sandbox:
+  agent: false
+tools:
+  web-fetch:
+---
+Fetch a page.
+`, engine), "native-web-fetch.md")
+			require.NoError(t, err)
+			require.False(t, usesWebFetchMCP(data))
+		})
+	}
+}
+
 func TestWebFetchMCPDisabled(t *testing.T) {
 	for _, engine := range []CapabilityProvider{NewCopilotEngine(), NewClaudeEngine(), NewCodexEngine(), NewGeminiEngine(), NewPiEngine(), NewAgyEngine()} {
 		for _, tools := range []map[string]any{nil, {"web-fetch": false}} {
 			require.False(t, usesWebFetchMCPForEngine(engine, &WorkflowData{Tools: tools}))
 		}
 	}
+}
+
+func TestGeminiWebFetchProxyEnvironment(t *testing.T) {
+	data := &WorkflowData{
+		Tools:         map[string]any{"web-fetch": nil},
+		SandboxConfig: &SandboxConfig{Agent: &AgentSandboxConfig{ID: "awf"}},
+		ExcludedEnv:   []string{"http_proxy"},
+	}
+	allowed := NewGeminiEngine().geminiShellEnvironment(data)
+	require.NotContains(t, allowed, "HTTP_PROXY")
+	require.Contains(t, allowed, "HTTPS_PROXY")
+	require.Contains(t, allowed, "SSL_CERT_FILE")
+	data.Tools = nil
+	require.Empty(t, NewGeminiEngine().geminiShellEnvironment(data))
 }
 
 func TestWebFetchMCPCompilation(t *testing.T) {
@@ -86,6 +120,10 @@ Fetch a page.
 			if tc.name == "claude-anthropic" {
 				assert.Contains(t, string(lock), "mcp__web-fetch__web_fetch")
 				assert.Contains(t, string(lock), "WebFetch")
+			}
+			if tc.name == "gemini" {
+				assert.Contains(t, string(lock), `HTTP_PROXY`)
+				assert.Contains(t, string(lock), `HTTPS_PROXY`)
 			}
 		})
 	}

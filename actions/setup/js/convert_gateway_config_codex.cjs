@@ -160,7 +160,18 @@ function main() {
     transformServer: (_name, entry) => entry,
     serialize: (servers, _context, urlPrefix) => {
       const config = buildConfig(servers, urlPrefix);
-      addWebFetchMCPServer(config.mcp_servers, entry => entry);
+      if (!isTable(config.mcp_servers)) throw new Error("Invalid Codex MCP servers");
+      /** @type {Record<string, Record<string, unknown>>} */
+      const mcpServers = {};
+      for (const [name, value] of Object.entries(config.mcp_servers)) {
+        if (!isTable(value)) throw new Error("Invalid Codex MCP server");
+        mcpServers[name] = value;
+      }
+      addWebFetchMCPServer(mcpServers, entry => ({
+        ...entry,
+        env_vars: ["HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy", "SSL_CERT_FILE", "SSL_CERT_DIR", "CURL_CA_BUNDLE"],
+      }));
+      config.mcp_servers = mcpServers;
       return serializeConfig(config);
     },
   });
