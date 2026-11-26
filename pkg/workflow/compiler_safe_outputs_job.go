@@ -542,6 +542,7 @@ func hasHandlerManagerTypes(data *WorkflowData) bool {
 		data.SafeOutputs.MarkPullRequestAsReadyForReview != nil ||
 		data.SafeOutputs.ApproveWorkflowRun != nil ||
 		data.SafeOutputs.HideComment != nil ||
+		data.SafeOutputs.SetIssueStatus != nil ||
 		data.SafeOutputs.SetIssueType != nil ||
 		data.SafeOutputs.SetIssueField != nil ||
 		data.SafeOutputs.DispatchWorkflow != nil ||

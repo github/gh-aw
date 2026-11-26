@@ -1377,6 +1377,7 @@ func TestComputePermissionsForSafeOutputs_StagedReads(t *testing.T) {
 		{key: "dismiss-pull-request-review", filterScope: PermissionIssues},
 		{key: "submit-pull-request-review", unfiltered: map[PermissionScope]PermissionLevel{PermissionPullRequests: PermissionRead}, filterScope: PermissionIssues},
 		{key: "set-issue-type", filterScope: PermissionIssues},
+		{key: "set-issue-status", unfiltered: map[PermissionScope]PermissionLevel{PermissionIssues: PermissionRead}},
 		{key: "set-issue-field", filterScope: PermissionIssues},
 		{key: "close-issue", unfiltered: map[PermissionScope]PermissionLevel{PermissionIssues: PermissionRead}},
 		{key: "link-sub-issue", unfiltered: map[PermissionScope]PermissionLevel{PermissionIssues: PermissionRead}},
@@ -1493,6 +1494,8 @@ func TestCompileStagedHandlerReadPermissions(t *testing.T) {
 	}{
 		{key: "remove-labels", config: "    allowed: [needs-triage]\n    required-labels: [needs-triage]\n", scopes: []PermissionScope{PermissionIssues}},
 		{key: "set-issue-type", config: "    required-labels: [needs-triage]\n    required-title-prefix: '[triage]'\n", scopes: []PermissionScope{PermissionIssues}},
+		{key: "set-issue-status", config: "    required-labels: [needs-triage]\n    required-title-prefix: '[triage]'\n", scopes: []PermissionScope{PermissionIssues}},
+		{key: "set-issue-status", scopes: []PermissionScope{PermissionIssues}},
 		{key: "add-comment", config: "    required-labels: [needs-triage]\n", scopes: []PermissionScope{PermissionIssues}},
 		{key: "create-discussion", config: "    category: General\n", scopes: []PermissionScope{PermissionDiscussions}},
 		{key: "create-project-status-update", config: "    project: https://github.com/orgs/test-org/projects/1\n", scopes: []PermissionScope{PermissionOrganizationProj}},

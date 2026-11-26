@@ -2,6 +2,7 @@
 /// <reference types="@actions/github-script" />
 
 const { createReportIssue, renderIssueParameters } = require("./issue_report.cjs");
+const { PLANNING_STATUS_HEADERS, resolvePlanningStatus, verifyPlanningStatus, planningStatusSnapshot } = require("./planning_status.cjs");
 const { normalizeReportText, normalizeReportTitle } = require("./report_ast.cjs");
 const { parseReportMarkdown } = require("./report_markdown.cjs");
 const { renderSizedReport } = require("./report_size.cjs");
@@ -914,6 +915,15 @@ async function main(config = {}) {
       };
     }
     const { repo: qualifiedItemRepo, repoParts } = repoResult;
+    let planningStatus;
+    const planningStatusSelector = message.planning_status !== undefined ? message.planning_status : config.planning_status;
+    if (planningStatusSelector !== undefined) {
+      try {
+        planningStatus = await resolvePlanningStatus(githubClient, repoParts.owner, repoParts.repo, planningStatusSelector, config.allowed_statuses || [], true);
+      } catch (error) {
+        return { success: false, error: getErrorMessage(error) };
+      }
+    }
 
     // In staged mode no issues are created, so temporary IDs never resolve; validate the
     // references without deferring so dependent issues still get a staged preview.
@@ -1180,7 +1190,7 @@ async function main(config = {}) {
       closeOlderKey,
       allowedMentions: expandAllowedAliases(allowedMentionAliases),
     });
-    const request = renderIssueParameters({ owner: repoParts.owner, repo: repoParts.repo, title, labels, assignees }, report);
+    const request = renderIssueParameters({ owner: repoParts.owner, repo: repoParts.repo, title, labels, assignees, ...(planningStatus ? { status: planningStatus.name, headers: PLANNING_STATUS_HEADERS } : {}) }, report);
     const { body } = request;
 
     // Reserve a max-count slot synchronously before any async pre-creation work.
@@ -1271,6 +1281,7 @@ async function main(config = {}) {
           labels,
           assignees,
           fields: issueFields,
+          ...(planningStatus ? { planning_status: planningStatus } : {}),
           ...(artifacts.length > 0 ? { artifacts } : {}),
           bodyLength: body.length,
           temporaryId,
@@ -1282,6 +1293,20 @@ async function main(config = {}) {
     let artifactFailure;
     try {
       const { data: issue } = await withRetry(() => createReportIssue(githubClient, request), RATE_LIMIT_RETRY_CONFIG, `create_issue in ${qualifiedItemRepo}`);
+      if (planningStatus) {
+        try {
+          verifyPlanningStatus(issue, planningStatus);
+        } catch (error) {
+          return {
+            success: false,
+            error: `Issue ${qualifiedItemRepo}#${issue.number} was created, but its planning status was not applied: ${getErrorMessage(error)}`,
+            repo: qualifiedItemRepo,
+            number: issue.number,
+            url: issue.html_url,
+            id: issue.id,
+          };
+        }
+      }
 
       core.info(`Created issue ${qualifiedItemRepo}#${issue.number}: ${issue.html_url}`);
       createdIssues.push({ ...issue, _repo: qualifiedItemRepo });
@@ -1514,7 +1539,8 @@ async function main(config = {}) {
         url: issue.html_url,
         body,
         id: issue.id,
-        metadata: { node_id: issue.node_id },
+        metadata: { node_id: issue.node_id, ...(planningStatus ? { planning_status: planningStatus } : {}) },
+        ...(planningStatus ? { after_state: planningStatusSnapshot(issue) } : {}),
         temporaryId: temporaryId,
         ...(createdArtifacts.length > 0 ? { artifacts: createdArtifacts } : {}),
         ...(blockedByFailures.length > 0 ? { blocked_by_errors: blockedByFailures } : {}),

@@ -177,6 +177,7 @@ type WorkflowData struct {
 	MCPScripts                     *MCPScriptsConfig               // mcp-scripts configuration for custom MCP tools
 	Enclaves                       EnclavesConfig                  // AWF-owned private repository enclave executors
 	LabelNames                     []string                        // label names that must match for pull_request_target labeled events (on.labels)
+	IssueStatusFilter              *IssueStatusFilterConfig        // captured issues.status_changed transition filters
 	Roles                          []string                        // permission levels required to trigger workflow
 	Bots                           []string                        // allow list of bot identifiers that can trigger workflow
 	RateLimit                      *RateLimitConfig                // rate limiting configuration for workflow triggers

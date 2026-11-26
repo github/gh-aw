@@ -11,6 +11,11 @@
 {{#if ${{ github.event.issue.number || (github.aw.context.item_type == 'issue' && github.aw.context.item_number) }} }}
 - **issue-number**: #${{ github.event.issue.number || (github.aw.context.item_type == 'issue' && github.aw.context.item_number) }}
 {{/if}}
+{{#if ${{ github.aw.context.issue_status }} }}
+- **issue-status** (event = captured change, previous = prior status, snapshot = issue status when delivery was built; none guarantees latest state): ${{ toJSON(github.aw.context.issue_status) }}
+- Status events may be repeated, stale, or out of order. Fetch the issue before acting on its latest status; do not infer deduplication from this context.
+- Issue search supports status qualifiers but may omit status details. Hydrate matches with `issue_read` (`get`) when status details are needed; never infer returned status from the search qualifier.
+{{/if}}
 {{#if ${{ github.event.discussion.number || (github.aw.context.item_type == 'discussion' && github.aw.context.item_number) }} }}
 - **discussion-number**: #${{ github.event.discussion.number || (github.aw.context.item_type == 'discussion' && github.aw.context.item_number) }}
 {{/if}}

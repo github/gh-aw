@@ -596,6 +596,18 @@ var safeOutputHandlers = []safeOutputHandlerDescriptor{
 		Builtin:     true,
 	},
 	{
+		Key:         "set-issue-status",
+		StructField: "SetIssueStatus",
+		ToolName:    "set_issue_status",
+		NewConfig:   func() any { return &SetIssueStatusConfig{} },
+		PermissionBuilder: func(safeOutputs *SafeOutputsConfig) *Permissions {
+			if !isSafeOutputHandlerEnabledAndUnstaged(safeOutputs, "SetIssueStatus") {
+				return nil
+			}
+			return NewPermissionsIssuesWrite()
+		},
+	},
+	{
 		Key:         "set-issue-type",
 		StructField: "SetIssueType",
 		ToolName:    "set_issue_type",

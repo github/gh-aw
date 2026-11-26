@@ -62,6 +62,8 @@ type onSectionCleanupState struct {
 	inDeploymentStatus           bool
 	inWorkflowRun                bool
 	inWorkflowRunConclusionArray bool
+	inIssueStatusFilterArray     bool
+	issueStatusFilterIndent      int
 	inForksArray                 bool
 	forksIndent                  int
 	inSkipIfMatch                bool
@@ -550,7 +552,16 @@ func (s *onSectionCleanupState) determineEventSectionComment(info onSectionLine,
 }
 
 func (s *onSectionCleanupState) commentPullRequestAndTriggerField(info onSectionLine) (bool, string) {
+	if s.inIssueStatusFilterArray && info.indent <= s.issueStatusFilterIndent && !strings.HasPrefix(info.trimmed, "-") {
+		s.inIssueStatusFilterArray = false
+	}
 	switch {
+	case s.inIssues && hasAnyPrefixInLine(info.trimmed, "status-ids:", "status-categories:"):
+		s.inIssueStatusFilterArray = true
+		s.issueStatusFilterIndent = info.indent
+		return true, " # Status filtering applied before activation"
+	case s.inIssueStatusFilterArray && strings.HasPrefix(info.trimmed, "-"):
+		return true, " # Status filtering applied before activation"
 	case s.inAllowedCheckouts && info.indent > s.allowedCheckoutsIndent:
 		return true, ""
 	case s.inPullRequestTarget && info.indent == 4 && strings.HasPrefix(info.trimmed, "acknowledge-risk:"):

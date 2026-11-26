@@ -34,6 +34,12 @@ var issueHandlerRegistry = map[string]handlerBuilder{
 			AddTemplatableBool("staged", templatableBoolPtrToStringPtr(c.Staged)).
 			AddTemplatableBoolOrInt("deduplicate_by_title", c.DeduplicateByTitle).
 			AddStringSlice("deduplicate_by_labels", c.DeduplicateByLabels)
+		if c.PlanningStatus != nil {
+			builder.AddDefault("planning_status", c.PlanningStatus)
+		}
+		if c.AllowedStatuses != nil {
+			builder.AddDefault("allowed_statuses", c.AllowedStatuses)
+		}
 		return builder.Build()
 	},
 	"close_issue": func(cfg *SafeOutputsConfig) map[string]any {
@@ -104,6 +110,27 @@ var issueHandlerRegistry = map[string]handlerBuilder{
 			AddIfNotEmpty("github-token", resolveHandlerGitHubToken(c.GitHubApp, "link-sub-issue", c.GitHubToken)).
 			AddTemplatableBool("staged", templatableBoolPtrToStringPtr(c.Staged)).
 			Build()
+	},
+	"set_issue_status": func(cfg *SafeOutputsConfig) map[string]any {
+		if cfg.SetIssueStatus == nil {
+			return nil
+		}
+		c := cfg.SetIssueStatus
+		builder := newHandlerConfigBuilder().
+			AddTemplatableInt("max", c.Max).
+			AddDefault("allow_close", c.AllowClose).
+			AddDefault("allow_reopen", c.AllowReopen).
+			AddIfNotEmpty("target", c.Target).
+			AddStringSlice("required_labels", c.RequiredLabels).
+			AddIfNotEmpty("required_title_prefix", c.RequiredTitlePrefix).
+			AddIfNotEmpty("target-repo", c.TargetRepoSlug).
+			AddStringSlice("allowed_repos", c.AllowedRepos).
+			AddIfNotEmpty("github-token", resolveHandlerGitHubToken(c.GitHubApp, "set-issue-status", c.GitHubToken)).
+			AddTemplatableBool("staged", templatableBoolPtrToStringPtr(c.Staged))
+		if c.Allowed != nil {
+			builder.AddDefault("allowed", c.Allowed)
+		}
+		return builder.Build()
 	},
 	"set_issue_type": func(cfg *SafeOutputsConfig) map[string]any {
 		if cfg.SetIssueType == nil {

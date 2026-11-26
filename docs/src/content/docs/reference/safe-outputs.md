@@ -159,6 +159,7 @@ The tables below summarize the built-in safe output handlers. `noop`, `report-mi
 | [Assign to User](#assign-to-user-assign-to-user) | `assign-to-user` | Assign users to issues (max: 1) |
 | [Unassign from User](#unassign-from-user-unassign-from-user) | `unassign-from-user` | Remove user assignments from issues or PRs (max: 1) |
 | [Set Issue Type](#set-issue-type-set-issue-type) | `set-issue-type` | Set or clear the type of GitHub issues (max: 5) |
+| [Set Issue Status](#set-issue-status-set-issue-status) | `set-issue-status` | Set a native issue planning status with explicit state-transition authorization (max: 5) |
 | [Set Issue Field](#set-issue-field-set-issue-field) | `set-issue-field` | Set one issue field value by name/value (max: 5) |
 
 ### External Integrations
@@ -314,6 +315,32 @@ safe-outputs:
 ```
 
 See [Cross-Repository Operations](/gh-aw/reference/cross-repository/) for comprehensive documentation on `target-repo`, `allowed-repos`, and cross-repository authentication.
+
+#### Initial planning status
+
+`planning-status` selects the initial native issue status by name or numeric ID.
+`allowed-statuses` restricts the statuses that the agent may request through
+`create_issue.planning_status`. The configured default is subject to the same
+allowlist. Only open categories (`backlog`, `planned`, and `started`) are accepted
+at creation; closing requires a separately authorized operation.
+
+```yaml wrap
+safe-outputs:
+  create-issue:
+    planning-status: Todo
+    allowed-statuses: [Backlog, Todo]
+```
+
+The handler resolves the status in the target repository before creating the
+issue, then includes it in the creation request. Unavailable preview support,
+unknown statuses, and disallowed statuses fail without creating an issue.
+Omitting both options preserves existing creation behavior.
+
+GitHub can silently ignore an initial status if the token cannot set it. The
+handler verifies the response and reports failure with the created issue's
+identity if the requested status was not applied. The issue can therefore exist
+despite that failure; do not retry creation blindly. It is not automatically
+deleted or reported as a verified status effect.
 
 > [!TIP]
 > Use `footer: false` to omit the visible AI-generated footer while preserving workflow grouping markers and machine-readable execution provenance. See [Footer Control](/gh-aw/reference/footers/) for details.
@@ -829,6 +856,62 @@ safe-outputs:
 ```
 
 Agent calls `set_issue_type` with `issue_type` (the type name) and optionally `issue_number`. Omitting `issue_number` targets the triggering issue.
+
+### Set Issue Status (`set-issue-status:`)
+
+Sets a [native issue planning status](https://docs.github.com/en/issues/tracking-your-work-with-issues/learning-about-issues/about-issue-statuses),
+not a Projects Status field or an issue's open/closed state. Issue statuses are
+in public preview and must be available in the target repository.
+
+```yaml wrap
+safe-outputs:
+  set-issue-status:
+    allowed: [Todo, "In progress"]
+    target: triggering
+    max: 5
+```
+
+The `set_issue_status` tool requires `status` (a status name or positive numeric
+ID), and accepts `issue_number` and `repo` subject to the configured target and
+repository restrictions. Names resolve case-insensitively against the target
+repository's available planning statuses; numeric IDs must also be present in
+that repository. Statuses cannot be cleared.
+
+| Configuration | Default | Meaning |
+|---|---|---|
+| `allowed` | Unrestricted | Allowed status names or numeric IDs, checked after resolution |
+| `allow-close` | `false` | Authorize transitions from open to closed |
+| `allow-reopen` | `false` | Authorize transitions from closed to open |
+| `target` | `triggering` | Triggering issue, fixed number, or `"*"` for agent selection |
+| `required-labels` | None | Require every configured label |
+| `required-title-prefix` | None | Require the configured title prefix |
+| `target-repo`, `allowed-repos` | Current repository | Standard cross-repository restrictions |
+| `max` | `5` | Per-run operation limit |
+
+Standard `staged`, `github-token`, and `github-app` options also apply.
+The handler fetches current state immediately before mutation. Selecting the
+existing status is a no-op. `completed`, `not_planned`, and `duplicate` close an
+issue; selecting an open category reopens a closed issue. Changing the close
+reason of a closed issue requires **both** `allow-close` and `allow-reopen`.
+Duplicate status additionally requires `duplicate_of`, identifying the
+same-repository issue being duplicated. Changing an existing canonical duplicate
+target also requires both permissions. Duplicate relationships are verified
+through GraphQL; unavailable relationship evidence fails closed. These
+permissions are independent of
+the allowlist and of other safe outputs: enabling `close-issue` or
+`update-issue.status` does not authorize transitions through this tool.
+
+Unknown categories, missing statuses, unavailable preview endpoints, and denied
+API permissions fail closed; there is no fallback to a state-only mutation.
+Staged execution previews but never mutates. Successful writes are verified
+against the returned status before being reported as applied effects.
+Current-state checks are not atomic compare-and-set: concurrent changes remain
+possible between a read and write. Work Queue and Repo Factory integration are
+not included.
+
+`update-issue.status` remains backward compatible: it still means `open` or
+`closed`, not a planning status. GitHub may update the planning status as a side
+effect of those state changes.
 
 ### Set Issue Field (`set-issue-field:`)
 

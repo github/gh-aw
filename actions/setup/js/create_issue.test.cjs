@@ -112,6 +112,88 @@ describe("create_issue", () => {
     vi.clearAllMocks();
   });
 
+  describe("initial native planning status", () => {
+    const statuses = [
+      { id: 1, name: "Backlog", category: "backlog" },
+      { id: 2, name: "Todo", category: "planned" },
+      { id: 3, name: "In progress", category: "started" },
+      { id: 4, name: "In review", category: "started" },
+      { id: 5, name: "Done", category: "completed" },
+      { id: 6, name: "Not planned", category: "not_planned" },
+      { id: 7, name: "Duplicate", category: "duplicate" },
+    ];
+    const message = { title: "Native planning", body: "A new issue with an initial native planning status." };
+
+    beforeEach(() => {
+      mockGithub.request.mockResolvedValue({ data: statuses });
+      mockGithub.rest.issues.create.mockImplementation(async request => ({
+        data: { id: 100, number: 42, node_id: "I_test", html_url: "https://github.com/test-owner/test-repo/issues/42", state: "open", state_reason: null, status: statuses.find(status => status.name === request.status) },
+      }));
+    });
+
+    it.each(["Todo", "todo", 2])("resolves initial tool status %j and preserves verified outcome metadata", async planning_status => {
+      const handler = await main({});
+      const result = await handler({ ...message, planning_status });
+      expect(result).toMatchObject({ success: true, number: 42, metadata: { planning_status: statuses[1] }, after_state: { planning_status: statuses[1] } });
+      expect(mockGithub.rest.issues.create).toHaveBeenCalledWith(expect.objectContaining({ status: "Todo", headers: { "X-GitHub-Api-Version": "2026-03-10" } }));
+      expect(mockGithub.request).toHaveBeenCalledWith("GET /repos/{owner}/{repo}/planning-statuses", expect.objectContaining({ owner: "test-owner", repo: "test-repo" }));
+    });
+
+    it("uses configured default and accepts mixed name/ID allowlists", async () => {
+      const handler = await main({ planning_status: 2, allowed_statuses: [1, "Todo"] });
+      expect((await handler(message)).success).toBe(true);
+      expect(mockGithub.rest.issues.create.mock.calls[0][0].status).toBe("Todo");
+    });
+
+    it("permits an allowed tool override of the configured default", async () => {
+      const handler = await main({ planning_status: "Backlog", allowed_statuses: [2] });
+      expect((await handler({ ...message, planning_status: 2 })).success).toBe(true);
+    });
+
+    it.each(["Done", "Not planned", "Duplicate", "Unknown", "", null, 0, true])("rejects initial status %j before creating anything", async planning_status => {
+      const handler = await main({});
+      expect((await handler({ ...message, planning_status })).success).toBe(false);
+      expect(mockGithub.rest.issues.create).not.toHaveBeenCalled();
+      expect(mockGithub.rest.issues.createComment).not.toHaveBeenCalled();
+    });
+
+    it("enforces allowed-statuses before create", async () => {
+      const handler = await main({ allowed_statuses: ["Backlog"] });
+      expect((await handler({ ...message, planning_status: "Todo" })).error).toContain("allowed list");
+      expect(mockGithub.rest.issues.create).not.toHaveBeenCalled();
+    });
+
+    it("fails closed without preview support and never retries creation", async () => {
+      mockGithub.request.mockRejectedValue(Object.assign(new Error("Not Found"), { status: 404 }));
+      const handler = await main({ planning_status: "Todo" });
+      expect((await handler(message)).error).toContain("unavailable");
+      expect(mockGithub.rest.issues.create).not.toHaveBeenCalled();
+    });
+
+    it("previews validated initial status without writing", async () => {
+      const handler = await main({ planning_status: "Todo", staged: true });
+      expect(await handler(message)).toMatchObject({ success: true, staged: true, previewInfo: { planning_status: statuses[1] } });
+      expect(mockGithub.rest.issues.create).not.toHaveBeenCalled();
+    });
+
+    it.each([undefined, null, statuses[0], { ...statuses[1], category: "future" }])("reports truthful partial failure when status is ignored (%j)", async status => {
+      mockGithub.rest.issues.create.mockResolvedValue({ data: { id: 100, number: 42, html_url: "https://github.com/test-owner/test-repo/issues/42", state: "open", status } });
+      const handler = await main({ planning_status: "Todo" });
+      const result = await handler(message);
+      expect(result).toMatchObject({ success: false, number: 42, url: "https://github.com/test-owner/test-repo/issues/42", id: 100 });
+      expect(result.error).toContain("was created");
+      expect(mockGithub.rest.issues.create).toHaveBeenCalledTimes(1);
+      expect(mockGithub.rest.issues.createComment).not.toHaveBeenCalled();
+    });
+
+    it("does not discover or send planning status when unconfigured", async () => {
+      const handler = await main({});
+      expect((await handler(message)).success).toBe(true);
+      expect(mockGithub.request).not.toHaveBeenCalled();
+      expect(mockGithub.rest.issues.create.mock.calls[0][0]).not.toHaveProperty("status");
+    });
+  });
+
   describe("basic issue creation", () => {
     it.each([{ allowedBotMentions: [] }, { allowedBotMentions: ["copilot"] }])("normalizes complete source fragments before URL policy with allowed mentions $allowedBotMentions", async ({ allowedBotMentions }) => {
       vi.stubEnv("GH_AW_ALLOWED_DOMAINS", "github.com");
