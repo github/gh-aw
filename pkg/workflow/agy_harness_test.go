@@ -318,7 +318,7 @@ func TestAgyMCPConfigurationAdapter(t *testing.T) {
 	}}`
 	for _, tt := range []struct {
 		name, config, cliServers, expected string
-		valid, symlink                     bool
+		valid, symlink, webFetch           bool
 	}{
 		{name: "gateway", config: `{"mcpServers":{"native":{"url":"http://gateway:8080/mcp/native","headers":{"Authorization":"test-gateway-token"}},"safeoutputs":{"command":"ignored"}}}`, cliServers: `["safeoutputs"]`, valid: true,
 			expected: `{"mcpServers":{"native":{"serverUrl":"http://host.docker.internal:80/mcp/native","headers":{"Authorization":"test-gateway-token"}}}}`},
@@ -332,6 +332,8 @@ func TestAgyMCPConfigurationAdapter(t *testing.T) {
 		{name: "explicit cli exclusion", config: nativeServers, cliServers: `["native","safeoutputs","mcpscripts","awf-enclave"]`, valid: true, expected: `{"mcpServers":{}}`},
 		{name: "invalid root", config: `{"mcpServers":[]}`},
 		{name: "stdio", config: `{"mcpServers":{"native":{"command":"node"}}}`},
+		{name: "web-fetch", config: `{"mcpServers":{}}`, valid: true, webFetch: true},
+		{name: "reserved web-fetch", config: `{"mcpServers":{"web-fetch":{"url":"http://gateway:8080/mcp/web-fetch"}}}`, webFetch: true},
 		{name: "nonstring header", config: `{"mcpServers":{"native":{"url":"http://gateway:8080/mcp/native","headers":{"Authorization":123}}}}`},
 		{name: "external endpoint", config: `{"mcpServers":{"native":{"url":"https://outside.example/mcp/native"}}}`},
 		{name: "dangling symlink", config: `{"mcpServers":{}}`, symlink: true},
@@ -355,6 +357,9 @@ func TestAgyMCPConfigurationAdapter(t *testing.T) {
 			if tt.cliServers != "" {
 				cmd.Env = append(cmd.Env, "GH_AW_MCP_CLI_SERVERS="+tt.cliServers)
 			}
+			if tt.webFetch {
+				cmd.Env = append(cmd.Env, "GH_AW_WEB_FETCH_MCP=1", "RUNNER_TEMP="+dir)
+			}
 			out, err := cmd.CombinedOutput()
 			if !tt.valid {
 				require.Error(t, err)
@@ -364,7 +369,15 @@ func TestAgyMCPConfigurationAdapter(t *testing.T) {
 			file := filepath.Join(dir, ".agents", "mcp_config.json")
 			data, err := os.ReadFile(file)
 			require.NoError(t, err)
-			assert.JSONEq(t, tt.expected, string(data))
+			if tt.webFetch {
+				expected, err := json.Marshal(map[string]any{"mcpServers": map[string]any{
+					"web-fetch": map[string]any{"command": "node", "args": []string{filepath.Join(dir, "gh-aw/actions/web_fetch_mcp_server.cjs")}},
+				}})
+				require.NoError(t, err)
+				assert.JSONEq(t, string(expected), string(data))
+			} else {
+				assert.JSONEq(t, tt.expected, string(data))
+			}
 			stat, err := os.Stat(file)
 			require.NoError(t, err)
 			assert.Equal(t, os.FileMode(0o600), stat.Mode().Perm())

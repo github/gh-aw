@@ -93,7 +93,7 @@ func addEpisodeRetrievalFlags(cmd *cobra.Command, opts *EpisodeRetrievalOptions,
 	flags.StringVar(&opts.EndDate, "end-date", "", "Latest candidate creation date (defaults to now)")
 	flags.IntVar(&opts.MaxRuns, "max-runs", opts.MaxRuns, "Maximum distinct candidate runs examined, including the seed and nonmembers")
 	flags.IntVar(&opts.MaxAPIRequests, "max-api-requests", opts.MaxAPIRequests, "Maximum GitHub REST requests for the entire retrieval")
-	flags.DurationVar(&opts.Timeout, "timeout", opts.Timeout, "Wall-clock retrieval deadline")
+	flags.DurationVar(&opts.Timeout, "timeout", opts.Timeout, "Wall-clock retrieval deadline as a duration (e.g., 30s or 5m)")
 	flags.StringVarP(&opts.OutputDir, "output", "o", opts.OutputDir, "Directory for compact artifacts")
 	flags.BoolVarP(jsonOutput, "json", "j", false, "Output the standard logs report with retrieval bounds and gaps as JSON")
 }

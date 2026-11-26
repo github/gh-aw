@@ -52,6 +52,7 @@ import (
 	"github.com/github/gh-aw/pkg/linters/ignoredlocalerror"
 	"github.com/github/gh-aw/pkg/linters/ioutildeprecated"
 	"github.com/github/gh-aw/pkg/linters/jsondecodertrailingdataunchecked"
+	"github.com/github/gh-aw/pkg/linters/jsondecoderunknownfields"
 	"github.com/github/gh-aw/pkg/linters/jsonmarshalignoredeerror"
 	"github.com/github/gh-aw/pkg/linters/jsonunmarshalbytesconversion"
 	"github.com/github/gh-aw/pkg/linters/largefunc"
@@ -138,7 +139,7 @@ type docAnalyzer struct {
 //
 //	appendbytestring, appendoneelement, blankassigncomma, blankassignedcleanuperror, bufferresetbeforereuse, bufioscannererunchecked, bytesbufferstring, bytescomparestring, closeerrorunchecked, contextcancelnotdeferred, ctxbackground, deferinloop, deferrerrorunchecked, errorfwrapv, excessivefuncparams, errormessage, errorsnewerrorstring,
 //	errortypeassertion, errstringmatch, execcommandoutputerrdiscard, execcommandwithoutcontext, fileclosenotdeferred, filepathwalkpreferwalkdir, fmterrorfnoverbs, formatintitoa, fprintferrorunchecked, fprintlnsprintf,
-//	generatedyamlheredoc, globwalkignorederror, goroutinemissingrecover, goroutineresourceleak, hardcodedfilepath, hasprefixdotdotpathescape, httpclientnotimeout, httpnoctx, httprespbodyclose, httpstatuscode, ignoredlocalerror, ioutildeprecated, jsondecodertrailingdataunchecked, jsonmarshalignoredeerror, jsonunmarshalbytesconversion, largefunc, lenstringsplit, lenstringzero,
+//	generatedyamlheredoc, globwalkignorederror, goroutinemissingrecover, goroutineresourceleak, hardcodedfilepath, hasprefixdotdotpathescape, httpclientnotimeout, httpnoctx, httprespbodyclose, httpstatuscode, ignoredlocalerror, ioutildeprecated, jsondecodertrailingdataunchecked, jsondecoderunknownfields, jsonmarshalignoredeerror, jsonunmarshalbytesconversion, largefunc, lenstringsplit, lenstringzero,
 //	logfatallibrary, manualmutexunlock, manualpathconcat, mapclearloop, mapdeletecheck, nilctxpassed, osexitinlibrary, osgetenvlibrary, osisnotexist, osopenreadallpreferreadfile, osremoveuncheckedcleanup, osstatignoredeerrorderef, ossetenvlibrary, packagelevelmutableslicemap, panic-in-library-code, prefercutprefix, rawloginlib,
 //	readerstringconv, reflectdeepequalusage, regexpcompileinfunction, regexpdynamicpattern, seenmapbool, slicemakezerolength, sortbasicslices, sortslice, splitindexzero, splitlines-on-newline, sprintferrdot, sprintferrorsnew, sprintfbool, sprintfint, ssljson,
 //	strconvparseignorederror, stringbytesroundtrip, stringreplaceminusone, stringsconcatloop, stringscountcontains, stringsindexcontains, stringsindexhasprefix, stringsjoinone, stringssplitfirst,
@@ -187,6 +188,7 @@ func documentedAnalyzers() []docAnalyzer {
 		{"ignoredlocalerror", ignoredlocalerror.Analyzer},
 		{"ioutildeprecated", ioutildeprecated.Analyzer},
 		{"jsondecodertrailingdataunchecked", jsondecodertrailingdataunchecked.Analyzer},
+		{"jsondecoderunknownfields", jsondecoderunknownfields.Analyzer},
 		{"jsonmarshalignoredeerror", jsonmarshalignoredeerror.Analyzer},
 		{"jsonunmarshalbytesconversion", jsonunmarshalbytesconversion.Analyzer},
 		{"largefunc", largefunc.Analyzer},

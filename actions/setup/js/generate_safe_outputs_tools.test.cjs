@@ -9,6 +9,7 @@ import { loadTools, attachHandlers, registerPredefinedTools, registerDynamicTool
 import { createServer, registerTool } from "./mcp_server_core.cjs";
 import { validateValueAgainstSchema } from "./schema-validation.cjs";
 import generateSafeOutputsTools from "./generate_safe_outputs_tools.cjs";
+import { summarizeHelpText } from "./mcp_cli_schema_docs.cjs";
 
 const scriptPath = path.join(__dirname, "generate_safe_outputs_tools.cjs");
 const { main: generateTools } = generateSafeOutputsTools;
@@ -288,6 +289,16 @@ describe("generate_safe_outputs_tools", () => {
     expect(mixed.map((/** @type {{name: string}} */ tool) => tool.name)).toEqual(["ledger_append", builtin.name]);
     expect(mixed[0].inputSchema.properties.ledger.enum).toEqual(["events"]);
     expect(mixed[0].inputSchema.required).toContain("ledger");
+  });
+
+  it("keeps the ledger_append object-vs-string warning visible in the truncated CLI help description", () => {
+    const readLedgerAppend = (/** @type {string} */ file) => JSON.parse(fs.readFileSync(file, "utf8")).find((/** @type {{name: string}} */ tool) => tool.name === "ledger_append");
+    const tool = readLedgerAppend(path.join(__dirname, "safe_outputs_tools.json"));
+    // `safeoutputs <tool> --help` shows only the first 90 characters of "[safeoutputs] <description>",
+    // so agents never see later guidance; they sent `value` as a JSON-encoded string and had to retry.
+    const helpDescription = summarizeHelpText(`[safeoutputs] ${tool.description}`, 90);
+    expect(helpDescription).toContain("never as JSON-encoded strings");
+    expect(readLedgerAppend(path.join(__dirname, "..", "..", "..", "pkg", "workflow", "js", "safe_outputs_tools.json"))).toEqual(tool);
   });
 
   it.each(["", undefined])("advertises the required custom record envelope for ledger type %s", type => {
