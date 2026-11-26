@@ -4840,6 +4840,22 @@ describe("handle_agent_failure", () => {
       expect(result).toContain("terminated before producing output");
     });
 
+    it("surfaces only validated harness failure classes in metadata-only diagnostics", () => {
+      fs.writeFileSync(path.join(tmpDir, "agent_execution_exit_code.txt"), "80");
+      fs.writeFileSync(path.join(tmpDir, "harness_retry.json"), JSON.stringify({ attempts: 1, exit_code: 80, attempt_results: [{ attempt: 1, exit_code: 80, failure_classes: ["unknown_error"] }] }));
+      const result = buildEngineFailureContext({ metadataOnly: true });
+      expect(result).toContain("Harness failure class: unknown_error (exit code: 80)");
+      expect(result).toContain("**Failure boundary:** Engine driver process.");
+    });
+
+    it("does not render unrecognized harness failure text", () => {
+      fs.writeFileSync(path.join(tmpDir, "agent_execution_exit_code.txt"), "80");
+      fs.writeFileSync(path.join(tmpDir, "harness_retry.json"), JSON.stringify({ attempts: 1, exit_code: 80, attempt_results: [{ attempt: 1, exit_code: 80, failure_classes: ["private diagnostic"] }] }));
+      const result = buildEngineFailureContext({ metadataOnly: true });
+      expect(result).not.toContain("private diagnostic");
+      expect(result).toContain("**Driver exit code:** `80`");
+    });
+
     it.each(["1", "127", "255"])("uses only validated driver metadata in generic failures (exit %s)", exitCode => {
       fs.writeFileSync(path.join(tmpDir, "agent_execution_exit_code.txt"), exitCode);
       fs.writeFileSync(stdioLogPath, "Error: agent-generated diagnostic\n");

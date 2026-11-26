@@ -12,6 +12,7 @@ const { parseCopilotRetryAfterMs } = require("./copilot_retry_after.cjs");
 const {
   captureExecutionEvidenceConfiguration,
   recordStartupAttempt,
+  recordProcessExit,
   resolveHarnessRetryTelemetryPath,
   runHarnessRetryLoop,
   selectedHarnessStrategy,
@@ -420,6 +421,72 @@ describe("harness_retry_runner.cjs", () => {
       { attempt: 1, attempt_id: "startup:1", started_at: 100, finished_at: 100, strategy: "restart", backoff_ms: 0, outcome: "failure", exit_code: 1, failure_classes: ["startup_error"] },
       { attempt: 2, attempt_id: "startup:2", started_at: 100, finished_at: 100, strategy: "restart", backoff_ms: 5000, outcome: "success", exit_code: 0, failure_classes: [] },
     ]);
+  });
+
+  it.each([
+    [1, "unknown_error"],
+    [78, "unknown_error"],
+    [80, "unknown_error"],
+    [130, "cancelled"],
+    [143, "cancelled"],
+  ])("records a fallback process attempt for exit code %i", (exitCode, failureClass) => {
+    telemetryOptions();
+    vi.stubEnv("GH_AW_HARNESS_TELEMETRY_DIR", directory);
+    expect(recordProcessExit(exitCode)).toBe(true);
+    expect(JSON.parse(fs.readFileSync(path.join(directory, "harness_retry.json"), "utf8"))).toMatchObject({
+      attempts: 1,
+      exit_code: exitCode,
+      attempt_results: [{ attempt: 1, exit_code: exitCode, outcome: failureClass === "cancelled" ? "cancelled" : "failure", failure_classes: [failureClass] }],
+    });
+  });
+
+  it("records successful engines without a retry harness", () => {
+    telemetryOptions();
+    vi.stubEnv("GH_AW_HARNESS_TELEMETRY_DIR", directory);
+    expect(recordProcessExit(0)).toBe(true);
+    expect(JSON.parse(fs.readFileSync(path.join(directory, "harness_retry.json"), "utf8"))).toMatchObject({
+      attempts: 1,
+      exit_code: 0,
+      attempt_results: [{ outcome: "success", failure_classes: [] }],
+    });
+  });
+
+  it("completes zero-attempt failures without discarding startup telemetry", () => {
+    telemetryOptions();
+    vi.stubEnv("GH_AW_HARNESS_TELEMETRY_DIR", directory);
+    const startupAttemptResults = [{ attempt: 1, attempt_id: "startup:1", exit_code: 1, failure_classes: ["startup_error"] }];
+    fs.writeFileSync(path.join(directory, "harness_retry.json"), JSON.stringify({ attempts: 0, exit_code: 1, attempt_results: [], startup_attempt_results: startupAttemptResults }));
+    expect(recordProcessExit(80)).toBe(true);
+    expect(JSON.parse(fs.readFileSync(path.join(directory, "harness_retry.json"), "utf8"))).toMatchObject({
+      attempts: 1,
+      exit_code: 80,
+      startup_attempt_results: startupAttemptResults,
+      attempt_results: [{ exit_code: 80, failure_classes: ["unknown_error"] }],
+    });
+  });
+
+  it("classifies every failed startup attempt", () => {
+    telemetryOptions();
+    vi.stubEnv("GH_AW_HARNESS_TELEMETRY_DIR", directory);
+    recordStartupAttempt("start", 1, 0);
+    recordStartupAttempt("finish", 1, 78);
+    expect(JSON.parse(fs.readFileSync(path.join(directory, "harness_retry.json"), "utf8")).startup_attempt_results[0]).toMatchObject({
+      exit_code: 78,
+      outcome: "failure",
+      failure_classes: ["startup_error"],
+    });
+  });
+
+  it("fills missing classes on an existing failed attempt and preserves classified telemetry", () => {
+    telemetryOptions();
+    vi.stubEnv("GH_AW_HARNESS_TELEMETRY_DIR", directory);
+    const file = path.join(directory, "harness_retry.json");
+    fs.writeFileSync(file, JSON.stringify({ attempts: 1, exit_code: 78, attempt_results: [{ attempt: 1, exit_code: 78, failure_classes: [] }] }));
+    expect(recordProcessExit(78)).toBe(true);
+    expect(JSON.parse(fs.readFileSync(file, "utf8")).attempt_results[0].failure_classes).toEqual(["unknown_error"]);
+    fs.writeFileSync(file, JSON.stringify({ attempts: 1, exit_code: 78, attempt_results: [{ attempt: 1, exit_code: 78, failure_classes: ["authentication_failed"] }] }));
+    expect(recordProcessExit(78)).toBe(false);
+    expect(JSON.parse(fs.readFileSync(file, "utf8")).attempt_results[0].failure_classes).toEqual(["authentication_failed"]);
   });
 
   it("emits bounded stdout boundaries that agree with the startup-scoped manifest", async () => {

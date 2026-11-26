@@ -167,7 +167,7 @@ function recordStartupAttempt(event, attempt, value, startupFailure = false) {
       current.finished_at = Date.now();
       current.exit_code = value;
       current.outcome = value === 0 ? "success" : [130, 143].includes(value) ? "cancelled" : "failure";
-      current.failure_classes = startupFailure ? ["startup_error"] : [];
+      current.failure_classes = value === 0 && !startupFailure ? [] : ["startup_error"];
     }
     fs.mkdirSync(path.dirname(telemetryPath), { recursive: true });
     fs.writeFileSync(`${telemetryPath}.tmp`, JSON.stringify(telemetry) + "\n");
@@ -177,8 +177,105 @@ function recordStartupAttempt(event, attempt, value, startupFailure = false) {
   }
 }
 
+/**
+ * Record a bounded fallback when an engine does not have a retry harness, or
+ * complete an interrupted zero-attempt record with the observed process status.
+ * @param {number} exitCode
+ * @param {NodeJS.ProcessEnv} [env]
+ * @returns {boolean}
+ */
+function recordProcessExit(exitCode, env = process.env) {
+  try {
+    if (!Number.isSafeInteger(exitCode) || exitCode < 0 || exitCode > 255) return false;
+    const telemetryPath = resolveHarnessRetryTelemetryPath(env);
+    let existing;
+    try {
+      existing = require("./harness_retry_record.cjs").normalizeHarnessRetryRecord(JSON.parse(fs.readFileSync(telemetryPath, "utf8")));
+    } catch {
+      existing = undefined;
+    }
+
+    if (existing?.attempts && existing.attemptResults.length) {
+      const lastAttempt = existing.attemptResults.at(-1);
+      if (exitCode === 0 || lastAttempt.exitCode === 0 || lastAttempt.failureClasses.length) return false;
+      lastAttempt.exitCode ??= exitCode;
+      lastAttempt.finishedAt ??= Date.now();
+      lastAttempt.outcome = [130, 143].includes(exitCode) ? "cancelled" : "failure";
+      lastAttempt.failureClasses = [lastAttempt.outcome === "cancelled" ? "cancelled" : "unknown_error"];
+      existing.exitCode = exitCode;
+      return writeProcessExitTelemetry(telemetryPath, existing);
+    }
+
+    if (existing && exitCode === 0) return false;
+    const timestamp = Date.now();
+    const failureClasses = exitCode === 0 ? [] : [exitCode === 130 || exitCode === 143 ? "cancelled" : "unknown_error"];
+    /** @type {import("./types/unified_session").HarnessRetryData} */
+    const record = {
+      attempts: 1,
+      exitCode,
+      attemptResults: [
+        {
+          attempt: 1,
+          exitCode,
+          failureClasses,
+          attemptId: "harness:1",
+          startedAt: timestamp,
+          finishedAt: timestamp,
+          strategy: "restart",
+          backoffMs: 0,
+          outcome: exitCode === 0 ? "success" : failureClasses[0] === "cancelled" ? "cancelled" : "failure",
+        },
+      ],
+      ...(existing?.startupAttemptResults ? { startupAttemptResults: existing.startupAttemptResults } : {}),
+      ...(existing?.decisionResults ? { decisionResults: existing.decisionResults } : {}),
+    };
+    return writeProcessExitTelemetry(telemetryPath, record);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * @param {string} telemetryPath
+ * @param {import("./types/unified_session").HarnessRetryData} record
+ */
+function writeProcessExitTelemetry(telemetryPath, record) {
+  try {
+    fs.mkdirSync(path.dirname(telemetryPath), { recursive: true });
+    const serializeAttempt = attempt => ({
+      attempt: attempt.attempt,
+      exit_code: attempt.exitCode,
+      failure_classes: attempt.failureClasses,
+      ...(attempt.attemptId !== undefined ? { attempt_id: attempt.attemptId } : {}),
+      ...(attempt.startupAttemptId !== undefined ? { startup_attempt_id: attempt.startupAttemptId } : {}),
+      ...(attempt.startedAt !== undefined ? { started_at: attempt.startedAt } : {}),
+      ...(attempt.finishedAt !== undefined ? { finished_at: attempt.finishedAt } : {}),
+      ...(attempt.backoffMs !== undefined ? { backoff_ms: attempt.backoffMs } : {}),
+      ...(attempt.strategy !== undefined ? { strategy: attempt.strategy } : {}),
+      ...(attempt.outcome !== undefined ? { outcome: attempt.outcome } : {}),
+      ...(attempt.reason !== undefined ? { reason: attempt.reason } : {}),
+    });
+    const rawRecord = {
+      attempts: record.attempts,
+      exit_code: record.exitCode,
+      attempt_results: record.attemptResults.map(serializeAttempt),
+      ...(record.startupAttemptResults ? { startup_attempt_results: record.startupAttemptResults.map(serializeAttempt) } : {}),
+      ...(record.decisionResults ? { decision_results: record.decisionResults } : {}),
+    };
+    fs.writeFileSync(`${telemetryPath}.tmp`, JSON.stringify(rawRecord) + "\n");
+    fs.renameSync(`${telemetryPath}.tmp`, telemetryPath);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 if (require.main === module && process.argv[2] === "--startup-attempt") {
   recordStartupAttempt(process.argv[3], Number(process.argv[4]), Number(process.argv[5]), process.argv[6] === "startup_error");
+}
+
+if (require.main === module && process.argv[2] === "--record-process-exit") {
+  recordProcessExit(Number(process.argv[3]));
 }
 
 /**
@@ -425,6 +522,7 @@ if (typeof module !== "undefined" && module.exports) {
     captureExecutionEvidenceConfiguration,
     resolveHarnessRetryTelemetryPath,
     recordStartupAttempt,
+    recordProcessExit,
     runHarnessRetryLoop,
     runPreflightNoopCheck,
     shouldSkipForNoopSafeOutputs,

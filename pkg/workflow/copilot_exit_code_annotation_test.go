@@ -48,6 +48,8 @@ func TestAgentExecutionExitCodeTrap_EmitsErrorAnnotation(t *testing.T) {
 		"trap must emit an error annotation with the exit code:\n%s", got)
 	assert.Contains(t, got, `> `+agentExecutionExitCodePath,
 		"trap must still persist the exit code for the OTLP conclusion span:\n%s", got)
+	assert.Contains(t, got, `--record-process-exit "$gh_aw_exit_code"`,
+		"trap must record fallback retry telemetry for engines without a harness:\n%s", got)
 	assert.Contains(t, got, `rm -f "`+copilotSettingsPath+`"`,
 		"trap must still clean up the Copilot settings file:\n%s", got)
 }

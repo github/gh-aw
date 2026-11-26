@@ -46,6 +46,7 @@ const { GITHUB_API_VERSION, STEP_NAME_START_MCP_GATEWAY, TMP_GH_AW_PATH } = requ
 const { buildEmptyOutputOutcome, buildCompletionEvidence, EMPTY_OUTPUT_CAUSES, EMPTY_OUTPUT_FAILURE_CAUSES } = require("./empty_output_outcome.cjs");
 const { isAgentExecutionEvent } = require("./agent_execution.cjs");
 const { collectUnifiedSession, isModelEndpointMismatchData } = require("./unified_session.cjs");
+const { normalizeHarnessRetryRecord } = require("./harness_retry_record.cjs");
 const { validateSessionFileHeader } = require("./unified_session_render.cjs");
 const { isTaskCompleteRegistrationIssue, hasAgentTerminalReasonCompleted, shouldIgnoreTaskCompleteRegistrationReports } = require("./load_agent_output.cjs");
 const fs = require("fs");
@@ -3466,6 +3467,7 @@ function buildEngineFailureContext(options = {}) {
   const agentOutputFile = process.env.GH_AW_AGENT_OUTPUT;
   const stdioLogPath = agentOutputFile ? path.join(path.dirname(agentOutputFile), "agent-stdio.log") : "/tmp/gh-aw/agent-stdio.log";
   const exitCodePath = path.join(path.dirname(stdioLogPath), "agent_execution_exit_code.txt");
+  const harnessRetryPath = path.join(path.dirname(stdioLogPath), "harness_retry.json");
 
   // Include engine ID in failure messages when available (e.g. "copilot", "claude", "codex")
   const engineId = process.env.GH_AW_ENGINE_ID || "";
@@ -3476,9 +3478,22 @@ function buildEngineFailureContext(options = {}) {
 
   try {
     const exitCodeText = fs.existsSync(exitCodePath) ? fs.readFileSync(exitCodePath, "utf8").trim() : "";
-    const exitDetails = /^[1-9]\d{0,2}$/.test(exitCodeText) && Number(exitCodeText) <= 255 ? renderErrorDetails(`Driver exit code: ${exitCodeText}`) : [];
+    const exitCodeDetails = /^[1-9]\d{0,2}$/.test(exitCodeText) && Number(exitCodeText) <= 255 ? renderErrorDetails(`Driver exit code: ${exitCodeText}`) : [];
+    let harnessFailureDetails = [];
+    try {
+      const retryRecord = normalizeHarnessRetryRecord(JSON.parse(fs.readFileSync(harnessRetryPath, "utf8")));
+      const failedAttempt = [...(retryRecord?.startupAttemptResults || []), ...(retryRecord?.attemptResults || [])].reverse().find(attempt => attempt.exitCode !== 0 && attempt.failureClasses.length > 0);
+      if (failedAttempt) {
+        const exit = failedAttempt.exitCode === null ? "" : ` (exit code: ${failedAttempt.exitCode})`;
+        harnessFailureDetails = renderErrorDetails(`Harness failure class: ${failedAttempt.failureClasses.join(", ")}${exit}`);
+      }
+    } catch {
+      // The retry record is advisory; malformed or missing telemetry must not block failure reporting.
+      core.debug("Harness retry telemetry is unavailable or invalid; omitting failure-class details");
+    }
+    const exitDetails = [...exitCodeDetails, ...harnessFailureDetails];
     if (options.metadataOnly === true) {
-      return exitDetails.length ? renderPromptTemplate("engine_driver_failure.md", { driver_exit_code: exitCodeText }) : [];
+      return exitDetails.length ? [...renderPromptTemplate("engine_driver_failure.md", { driver_exit_code: exitCodeText }), ...harnessFailureDetails] : [];
     }
     if (!fs.existsSync(stdioLogPath)) {
       if (shellExpansionGuardRejectedFromDetection) {
