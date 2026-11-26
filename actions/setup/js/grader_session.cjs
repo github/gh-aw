@@ -187,23 +187,31 @@ function createSessionLookups(session) {
   }
   const gatewayCalls = new Map();
   const gatewayCallIds = new Map();
+  const otherRequests = new Map();
   /** @type {Map<string, {keys: string[], next: number}>} */
   const anonymousRequests = new Map();
   for (const event of agentEvents) {
     if (!["mcp.tool_call", "mcp.rpc.request", "mcp.rpc.response"].includes(event.type)) continue;
     const data = event.data;
-    if (data.method && data.method !== "tools/call") continue;
     const id = data.toolCallId ?? data.rpcId ?? data.requestId;
     const pendingKey = JSON.stringify([data.serverName, ...attemptScope(event)]);
     let key = JSON.stringify([data.serverName, id ?? { eventIndex: eventIndices.get(event) }, ...attemptScope(event), ...(event.provenance.attemptId ? [data.sessionId ?? "", data.agentId ?? ""] : [])]);
+    if (data.method && data.method !== "tools/call") {
+      if (event.type === "mcp.rpc.request" && id != null) otherRequests.set(key, (otherRequests.get(key) ?? 0) + 1);
+      continue;
+    }
     let call = gatewayCalls.get(key);
+    if (event.type === "mcp.rpc.response" && !call && (otherRequests.get(key) ?? 0) > 0) {
+      otherRequests.set(key, otherRequests.get(key) - 1);
+      continue;
+    }
     if (event.type === "mcp.rpc.response" && (!call || call.completed)) {
       const pending = anonymousRequests.get(pendingKey);
       while (pending && pending.next < pending.keys.length && gatewayCalls.get(pending.keys[pending.next])?.completed) pending.next++;
       if (pending && pending.next < pending.keys.length) {
         key = pending.keys[pending.next++];
         call = gatewayCalls.get(key);
-      } else {
+      } else if (!data.toolName) {
         continue;
       }
     }
@@ -233,7 +241,8 @@ function createSessionLookups(session) {
       const id = gatewayCallIds.get(call);
       const byId = id == null ? [] : (nativeCallIds.get(JSON.stringify([String(id), ...callAttemptScope(call)])) ?? []);
       const byName = nativeCallsByName.get(JSON.stringify([call.serverName, `${call.serverName}-${call.name}`, ...callAttemptScope(call)])) ?? [];
-      const native = [...byId, ...byName].find(candidate => !matchedNativeCalls.has(candidate));
+      const byUnprefixedName = nativeCallsByName.get(JSON.stringify([call.serverName, call.name, ...callAttemptScope(call)])) ?? [];
+      const native = [...byId, ...byName, ...byUnprefixedName].find(candidate => !matchedNativeCalls.has(candidate));
       if (!native) return true;
       matchedNativeCalls.add(native);
       return false;

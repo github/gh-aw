@@ -70,6 +70,31 @@ describe("gateway tool calls", () => {
     const session = [native("tool.execution_start", "1", "bash"), native("tool.execution_complete", "1", "bash", { success: true }), gateway("mcp.rpc.request", { toolName: "search_cards" }), gateway("mcp.rpc.response", { rpcId: 1 })];
     expect(createSessionLookups(session).stats).toMatchObject({ toolCallCount: 2, failedToolCalls: 0 });
   });
+
+  it("matches an unprefixed native MCP tool and retains standalone named responses", () => {
+    const session = [
+      native("tool.execution_start", "native", "search_cards", { mcpServerName: "field-guide" }),
+      native("tool.execution_complete", "native", "search_cards", { success: true }),
+      gateway("mcp.rpc.request", { toolName: "search_cards" }),
+      gateway("mcp.rpc.response", { rpcId: 1 }),
+      gateway("mcp.rpc.response", { rpcId: 2, toolName: "other", error: { code: -1 } }),
+    ];
+    const lookups = createSessionLookups(session);
+    expect(lookups.toolCalls.map(call => call.name)).toEqual(["search_cards", "other"]);
+    expect(lookups.stats).toMatchObject({ toolCallCount: 2, failedToolCalls: 1 });
+  });
+
+  it("does not pair a known non-tool response with an anonymous tool request", () => {
+    const session = [
+      gateway("mcp.rpc.request", { method: "tools/list", rpcId: 2 }),
+      gateway("mcp.rpc.request", { method: "tools/call", toolName: "search_cards" }),
+      gateway("mcp.rpc.response", { rpcId: 2 }),
+      gateway("mcp.rpc.response", { rpcId: 1, error: { code: -1 } }),
+    ];
+    const lookups = createSessionLookups(session);
+    expect(lookups.stats).toMatchObject({ toolCallCount: 1, failedToolCalls: 1 });
+    expect(lookups.toolCalls[0]).toMatchObject({ name: "search_cards", completed: true, error: { code: -1 } });
+  });
 });
 
 describe("retry session consumers", () => {
