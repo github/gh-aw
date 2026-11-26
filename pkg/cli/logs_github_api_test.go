@@ -21,6 +21,7 @@ import (
 // The "path" field was previously requested but is not a valid gh run list --json
 // field and caused failures on strict gh CLI versions.
 func TestWorkflowRunUnmarshal(t *testing.T) {
+	t.Parallel()
 	rawJSON := `[
 {
 "databaseId": 42,
@@ -89,6 +90,7 @@ func TestLogsCachedWorkflowRunMetadataIsCurrent(t *testing.T) {
 }
 
 func TestFilterIgnoredWorkflowRuns(t *testing.T) {
+	t.Parallel()
 	runs := []WorkflowRun{{DatabaseID: 100}, {DatabaseID: 200}, {DatabaseID: 300}}
 
 	filtered := filterIgnoredWorkflowRuns(runs, []int64{100, 300})
@@ -99,6 +101,7 @@ func TestFilterIgnoredWorkflowRuns(t *testing.T) {
 }
 
 func TestApplyWorkflowRunListRepository(t *testing.T) {
+	t.Parallel()
 	runs := []WorkflowRun{
 		{DatabaseID: 1, Repository: ""},
 		{DatabaseID: 2, Repository: "cached/repo"},
@@ -246,6 +249,7 @@ func TestFetchAndCacheWorkflowRunMetadata(t *testing.T) {
 // outside the requested window were returned (multiple --created flags were used but gh
 // CLI only honours the last one).
 func TestBuildCreatedFilter(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name       string
 		startDate  string
@@ -311,6 +315,7 @@ func TestBuildCreatedFilter(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			got := buildCreatedFilter(tt.startDate, tt.endDate, tt.beforeDate)
 			assert.Equal(t, tt.want, got)
 		})
@@ -321,6 +326,7 @@ func TestBuildCreatedFilter(t *testing.T) {
 // beforeDate are set, the returned filter contains the startDate so that the lower bound
 // is always honoured. This is the regression test for the original bug.
 func TestBuildCreatedFilterStartDateAlwaysEnforced(t *testing.T) {
+	t.Parallel()
 	startDate := "2026-04-17"
 	beforeDate := "2026-04-17T23:59:59Z"
 
@@ -338,6 +344,7 @@ func TestBuildCreatedFilterStartDateAlwaysEnforced(t *testing.T) {
 //   - Exit code 1 alone does NOT trigger the auth-failure path because gh exits
 //     with code 1 for many non-auth errors (e.g. unsupported JSON fields).
 func TestListWorkflowRunsErrorHandling(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name             string
 		errMsg           string
@@ -394,6 +401,7 @@ func TestListWorkflowRunsErrorHandling(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			combinedMsg := tt.errMsg + " " + tt.outputMsg
 			combinedMsgLower := strings.ToLower(combinedMsg)
 
@@ -558,6 +566,7 @@ func TestFetchJobDetailsWithCountsNullConclusion(t *testing.T) {
 }
 
 func TestWorkflowRunsSpinnerMessage(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name string
 		opts ListWorkflowRunsOptions
@@ -603,6 +612,7 @@ func TestWorkflowRunsSpinnerMessage(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			msg := workflowRunsSpinnerMessage(tt.opts)
 			assert.Equal(t, tt.want, msg)
 		})

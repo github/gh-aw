@@ -62,6 +62,26 @@ func TestEnvOTELProtoWireFields(t *testing.T) {
 	}
 }
 
+func FuzzEnvOTELProtoResponse(f *testing.F) {
+	for _, data := range [][]byte{
+		{},
+		{0x0a, 0x00},
+		{0x0a, 0x07, 0x08, 0x00, 0x12, 0x03, 'm', 's', 'g'},
+		{0x0a, 0x02, 0x08, 0x01},
+		{0x0a, 0x03, 0x12, 0x01, 0xff},
+		{0x1b, 0x08, 0x01, 0x1c},
+		{0x1b, 0x24},
+		{0x80},
+		{0x0a, 0x02, 0x08},
+		{0x1e},
+	} {
+		f.Add(data)
+	}
+	f.Fuzz(func(t *testing.T, data []byte) {
+		_ = envOTELProtoResponse(data)
+	})
+}
+
 func TestEnvOTELProbePreservesEndpointEscapes(t *testing.T) {
 	for _, path := range []string{"/tenant%2Fname", "/tenant%2Fname/", "/tenant%2Fname/v1/traces"} {
 		t.Run(path, func(t *testing.T) {

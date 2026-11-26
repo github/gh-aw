@@ -15165,16 +15165,6 @@
       "uniqueItems": true,
       "items": { "$ref": "#/$defs/connectorName" }
     },
-    "webhookProviderIssueTypes": {
-      "type": "array",
-      "minItems": 1,
-      "uniqueItems": true,
-      "items": { "type": "string", "enum": ["opened", "edited", "closed", "reopened", "labeled", "unlabeled", "deleted"] },
-      "description": "Experimental. GitHub-style normalized activities, not provider-native action names. Missing transition evidence never matches lifecycle or label activities."
-    },
-    "webhookProviderSelectorValues": {
-      "oneOf": [{ "type": "string" }, { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string" } }]
-    },
     "webhookSecurityAlert": {
       "type": "object",
       "additionalProperties": false,
@@ -17184,12 +17174,6 @@
       "pattern": "^\\$\\{\\{\\s*(secrets\\.[A-Za-z_][A-Za-z0-9_]*(\\s*\\|\\|\\s*secrets\\.[A-Za-z_][A-Za-z0-9_]*)*|needs\\.[A-Za-z_][A-Za-z0-9_]*\\.outputs\\.[A-Za-z_][A-Za-z0-9_]*)\\s*\\}\\}$",
       "description": "GitHub token expression for cross-job or activation-time contexts. Accepts a secrets expression (e.g., `${{ secrets.NAME }}` or `${{ secrets.NAME1 || secrets.NAME2 }}`) or a cross-job output expression (e.g., `${{ needs.auth.outputs.token }}`). Pattern details: secret names, job IDs, and output names in dot notation match `[A-Za-z_][A-Za-z0-9_]*` (identifiers without hyphens).",
       "examples": ["${{ secrets.GITHUB_TOKEN }}", "${{ secrets.CUSTOM_PAT }}", "${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}", "${{ needs.auth.outputs.token }}"]
-    },
-    "ci_secret_expression": {
-      "type": "string",
-      "pattern": "^\\$\\{\\{\\s*secrets\\.[A-Z_][A-Z0-9_]*\\s*\\}\\}$",
-      "description": "A single GitHub Actions secret expression for a non-interactive CI credential.",
-      "examples": ["${{ secrets.ATLASSIAN_API_TOKEN }}"]
     },
     "github_token_same_job": {
       "type": "string",
