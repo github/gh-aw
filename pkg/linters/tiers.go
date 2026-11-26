@@ -2,8 +2,6 @@ package linters
 
 import (
 	"fmt"
-	"maps"
-	"slices"
 	"strings"
 
 	"golang.org/x/tools/go/analysis"
@@ -54,22 +52,6 @@ var slowAnalyzers = map[string]string{
 func IsSlow(name string) bool {
 	_, ok := slowAnalyzers[name]
 	return ok
-}
-
-// Fast returns registered analyzers in the fast tier.
-func Fast() []*analysis.Analyzer {
-	return slices.DeleteFunc(All(), func(a *analysis.Analyzer) bool { return IsSlow(a.Name) })
-}
-
-// SlowAnalyzerReasons returns a copy of the slow-tier analyzer names mapped to
-// the reason each one is classified as slow.
-func SlowAnalyzerReasons() map[string]string {
-	return maps.Clone(slowAnalyzers)
-}
-
-// Slow returns registered analyzers in the slow tier.
-func Slow() []*analysis.Analyzer {
-	return slices.DeleteFunc(All(), func(a *analysis.Analyzer) bool { return !IsSlow(a.Name) })
 }
 
 // SelectTier returns the analyzers to hand to multichecker for tier.
