@@ -71,7 +71,7 @@ If Actions is unavailable, run 12 can still save its own result without advancin
 
 An edit can also separate two early missing saves. If runs 10 and 12 use the same definition but run 11 is verified to have used a different one, run 10's loss is not charged to run 12's generation. If run 11 has not been checked yet, the writer waits before charging run 10.
 
-The writer also bounds the work it spends on early runs. For example, 33 failed saves at the same revision can share one definition lookup. With 33 distinct revisions, checking the jobs and definitions can exceed the 64-request budget on every attempt. The current observation still saves, but those losses can remain unverified.
+The writer also bounds the work it spends on early runs. For example, 33 failed saves at the same revision can share one definition lookup. With 33 distinct revisions, checking the jobs and definitions can exceed the 64-request budget on every attempt. While coverage is stuck, successful writers still save themselves, but later missing saves beyond the gap are not recorded as `unsaved` either. To start measuring again without resolving that gap, use `gh aw routing reset <workflow>`. This deliberately discards learned evidence through the reset point; it does not recover the missing observations.
 
 ## The branch
 

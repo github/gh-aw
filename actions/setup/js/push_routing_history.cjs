@@ -1098,8 +1098,11 @@ async function listRuns({ githubClient, owner, repo, workflowFile, workflowPath 
     const retained = new Map(runs.map(row => [row.number, row.generation]));
     const listed = new Map(listing.map(run => [run.number, run]));
     let lastEdit = 0;
-    let complete = runNumber >= firstWrite && reconciliationCeiling >= runNumber - 1;
-    for (let n = pending.number + 1; complete && n < runNumber; n++) {
+    let complete = runNumber >= Math.max(firstWrite, effectiveSinceRun) && reconciliationCeiling >= runNumber - 1;
+    // A late writer's listing ends at its own run, but later saved rows can already prove an edit.
+    const through = Math.max(runNumber - 1, state.last_run);
+    for (let n = pending.number + 1; complete && n <= through; n++) {
+      if (n === runNumber) continue;
       if (ineligibleNumbers.has(n) && !eligibleByNumber.has(n)) continue;
       const item = listed.get(n);
       let hash = retained.get(n) || item?.generation;
