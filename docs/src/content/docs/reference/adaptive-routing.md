@@ -95,7 +95,9 @@ gh aw routing status issue-triage
 
 For an unreleased build, record the full gh-aw commit SHA. Build the compiler from that commit, pass the same SHA to `compile --gh-aw-ref`, and check that the workflow lock uses `github/gh-aw/actions/setup@<SHA>` before running it. The flag pins the runtime actions; it does not change the compiler you invoked. For example, the [reviewed observe baseline](https://github.com/github/gh-aw/commit/7154b590ec1dda07344713fccefc8e2a4e2a3866) includes `model-routing.learning` and the writer fixes for pagination, deleted runs and active re-runs.
 
-Record the first opted-in Actions run ID, not the first successful save. Check that its attempt-1 `push_routing_history` job succeeded and that its `run` ID appears once in `runs.jsonl`. For the whole pilot, compare [eligible first attempts](#which-workflows-take-part) from Actions with the history by run ID, using earlier [branch revisions](#retention) if the pilot exceeds 500 rows. Use the writer result from attempt 1 even if the run was later re-run.
+Record the first opted-in Actions run ID, not the first successful save. If the opening attempt is [eligible](#which-workflows-take-part), check that its `push_routing_history` job succeeded and its `run` ID appears once in `runs.jsonl`. Otherwise record why it owed no save and check the first eligible attempt without moving the pilot boundary.
+
+Record the history branch head when the last pilot writer finishes. Compare the eligible first attempts from Actions with the rows at that revision by run ID, checking for missing or duplicate rows. Use the writer result from attempt 1 even if the run was later re-run. If the snapshot does not cover the entire pilot, use [earlier branch revisions](#retention) to recover rows that rolled off, counting each appended row only once.
 
 A row with `note: "unsaved"` accounts for a failed save; it does not recover the observation. If two eligible writers failed before the first successful save and history shows neither ID, report both missing IDs. Zero `unsaved` rows in history does not prove that every observation was saved.
 
