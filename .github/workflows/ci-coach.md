@@ -155,7 +155,7 @@ Otherwise: analyze CI workflows (`.github/workflows/ci.yml`, `cgo.yml`, `cjs.yml
 - Keep under 600 words.
 - Use `<details>` for long diffs or evidence.
 - Include top 1-3 optimizations with impact, risk, and rationale.
-{{else}}
+{{#else}}
 ## Analysis Framework
 
 Follow the optimization strategies defined in the `ci-optimization-strategies` shared module:
