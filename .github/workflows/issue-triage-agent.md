@@ -39,6 +39,10 @@ safe-outputs:
         name: { type: string }
         rationale: { type: string }
         confidence: { type: string, enum: [HIGH, MEDIUM, LOW] }
+  set-issue-status:
+    target: "*"
+    allowed: [Backlog]
+    max: 5
   add-comment:
     target: "*"
     max: 5
@@ -57,7 +61,7 @@ evals:
 
 # Issue Triage Agent
 
-List open issues in ${{ github.repository }} that have no labels. Triage at most 5 eligible issues per run. For each unlabeled issue, analyze the title and body, then add one of the allowed labels: `bug`, `feature`, `enhancement`, `documentation`, `question`, `help-wanted`, or `good-first-issue`.
+List open issues in ${{ github.repository }} that have no labels. Triage at most 5 eligible issues per run. For each unlabeled issue, analyze the title and body, then add one of the allowed labels: `bug`, `feature`, `enhancement`, `documentation`, `question`, `help-wanted`, or `good-first-issue`. If a labeled issue has no native planning status, set it to `Backlog`; preserve any existing status.
 
 Skip issues that:
 - Already have any of these labels
@@ -65,7 +69,7 @@ Skip issues that:
 
 If an issue's title or body is unavailable or withheld by the integrity policy, leave it untouched and report the missing data separately. Do not retry through alternate tools to bypass that policy.
 
-This workflow runs on a schedule or manual dispatch, not an issue event. For both `add_labels` and `add_comment`, explicitly pass the selected issue's numeric `item_number`. Only target eligible issues in ${{ github.repository }}; do not supply a different repository or a `target` tool argument.
+This workflow runs on a schedule or manual dispatch, not an issue event. For `add_labels` and `add_comment`, explicitly pass the selected issue's numeric `item_number`. For `set_issue_status`, pass its numeric `issue_number` and only set `Backlog` when `issue_read` confirms the issue has no current planning status. Only target eligible issues in ${{ github.repository }}; do not supply a different repository or a `target` tool argument.
 
 After submitting the label action for an issue, submit a comment mentioning the issue author using this format (follow shared/reporting.md guidelines). Safe-output acceptance queues an action; it does not confirm that GitHub has applied it.
 

@@ -12,7 +12,7 @@
 
 ### Next step
 
-Review the failure details below for a targeted fix, or **assign this issue to a coding agent** to investigate.
+Review the failure details below for a targeted fix, or **assign this issue to a coding agent** to investigate. If an agentic threat is detected, complete manual review before assigning or using any follow-up automation.
 
 ### Failure details
 
@@ -25,7 +25,7 @@ Review the failure details below for a targeted fix, or **assign this issue to a
 <details>
 <summary>Copy a debugging prompt</summary>
 
-Paste this into your coding agent:
+After any required manual threat review, paste this into your coding agent:
 
 ```text
 Debug the agentic workflow "{workflow_id}" failure.

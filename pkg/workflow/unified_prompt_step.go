@@ -677,6 +677,9 @@ func buildSafeOutputsSections(safeOutputs *SafeOutputsConfig, commentMemory *Com
 	if safeOutputs.HideComment != nil {
 		tools = append(tools, toolWithMaxBudget("hide_comment", safeOutputs.HideComment.Max))
 	}
+	if safeOutputs.SetIssueStatus != nil {
+		tools = append(tools, toolWithMaxBudget("set_issue_status", safeOutputs.SetIssueStatus.Max))
+	}
 	if safeOutputs.SetIssueType != nil {
 		tools = append(tools, toolWithMaxBudget("set_issue_type", safeOutputs.SetIssueType.Max))
 	}

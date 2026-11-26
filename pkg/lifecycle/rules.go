@@ -40,7 +40,7 @@ var rules = func() map[string]Rule {
 		"dismiss_pull_request_review", "hide_comment", "link_sub_issue",
 		"mark_pull_request_as_ready_for_review", "merge_pull_request", "push_to_pull_request_branch",
 		"remove_labels", "replace_label", "resolve_pull_request_review_thread", "set_issue_field",
-		"set_issue_type", "unassign_from_user", "update_discussion", "update_issue",
+		"set_issue_type", "set_issue_status", "unassign_from_user", "update_discussion", "update_issue",
 		"update_project", "update_pull_request")
 	add("delegation", true, true,
 		"approve_workflow_run", "assign_to_agent", "call_workflow", "create_agent_session",
@@ -82,6 +82,7 @@ func setRuleSignals(result map[string]Rule) {
 		[]string{"SUGGESTION_DISMISSED"}, []string{"ISS_REOPENED"})
 	set([]string{"set_issue_type"}, "issue", []string{"SUGGESTION_APPROVED_SET_TYPE"},
 		[]string{"SUGGESTION_DISMISSED"}, []string{"ISSUE_TYPE_CHANGED"})
+	set([]string{"set_issue_status"}, "issue", nil, nil, nil)
 	set([]string{"set_issue_field"}, "issue", []string{"SUGGESTION_APPROVED_SET_FIELD"},
 		[]string{"SUGGESTION_DISMISSED"}, []string{"ISSUE_FIELD_CHANGED"})
 	set([]string{"add_comment"}, "issue_pull_request_or_discussion",

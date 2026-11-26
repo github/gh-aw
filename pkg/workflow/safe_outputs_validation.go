@@ -143,6 +143,9 @@ func collectIssueTargetConfigs(config *SafeOutputsConfig) []safeOutputTargetConf
 	if config.UnassignFromUser != nil {
 		configs = append(configs, safeOutputTargetConfig{"unassign-from-user", config.UnassignFromUser.Target})
 	}
+	if config.SetIssueStatus != nil {
+		configs = append(configs, safeOutputTargetConfig{"set-issue-status", config.SetIssueStatus.Target})
+	}
 	if config.SetIssueType != nil {
 		configs = append(configs, safeOutputTargetConfig{"set-issue-type", config.SetIssueType.Target})
 	}
