@@ -36,8 +36,20 @@ func TestGitHubContextPrompt_CompilesConditionalValues(t *testing.T) {
 			}
 		}
 	}
-	if conditions != 8 {
-		t.Errorf("expected 8 context conditions, got %d", conditions)
+	if conditions != 9 {
+		t.Errorf("expected 9 context conditions, got %d", conditions)
+	}
+}
+
+func TestGitHubContextPromptIncludesNativeIssueStatusContextWithoutStatusFields(t *testing.T) {
+	if !strings.Contains(githubContextPromptText, "github.event.action == 'status_changed'") {
+		t.Fatal("expected native status_changed event condition")
+	}
+	if strings.Contains(githubContextPromptText, "toJSON(github.aw.context.issue_status)") {
+		t.Fatal("status fields must not be interpolated into the prompt")
+	}
+	if !strings.Contains(githubContextPromptText, "Fetch the issue before acting on its latest status") {
+		t.Fatal("expected guidance to fetch the issue before acting")
 	}
 }
 

@@ -32,6 +32,13 @@ func TestDetectTaskDomain(t *testing.T) {
 	assert.Equal(t, "Research", domain.Label)
 }
 
+func TestDetectTaskDomainIssuePlanningStatus(t *testing.T) {
+	t.Parallel()
+	domain := detectTaskDomain(ProcessedRun{}, []CreatedItemReport{{Type: "set_issue_status"}}, nil, nil)
+	require.NotNil(t, domain)
+	assert.Equal(t, "triage", domain.Name)
+}
+
 func TestBuildAgenticAssessmentsFlagsPotentialDeterministicAlternative(t *testing.T) {
 	t.Parallel()
 	processedRun := ProcessedRun{

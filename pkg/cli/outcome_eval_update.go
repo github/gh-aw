@@ -119,6 +119,8 @@ func compareRetainedUpdateState(beforeState map[string]any, afterState map[strin
 
 func mutableTrackedFields(itemType string) []string {
 	switch itemType {
+	case "set_issue_status":
+		return []string{"planning_status_id", "planning_status_category", "state", "state_reason", "duplicate_issue_id"}
 	case "update_issue":
 		return []string{"title", "body_hash", "state", "labels", "assignees"}
 	case "update_pull_request":
@@ -241,7 +243,10 @@ func mutableBodyHash(raw any) string {
 
 func normalizeMutableBody(raw any) string {
 	body := strings.ReplaceAll(mutableString(raw), "\r\n", "\n")
-	lines := strings.Split(body, "\n")
+	var lines []string
+	for line := range strings.Lines(body) {
+		lines = append(lines, strings.TrimSuffix(line, "\n"))
+	}
 	for i := range lines {
 		lines[i] = strings.TrimRight(lines[i], " \t")
 	}

@@ -131,7 +131,8 @@ function validateStringMinLengths(args, inputSchema) {
   const violations = [];
 
   for (const [field, schema] of Object.entries(properties)) {
-    if (schema && schema.type === "string" && typeof schema.minLength === "number") {
+    const allowsString = schema && (schema.type === "string" || (Array.isArray(schema.type) && schema.type.includes("string")));
+    if (allowsString && typeof schema.minLength === "number") {
       const value = args[field];
       if (typeof value === "string") {
         const trimmedLength = value.trim().length;

@@ -148,6 +148,8 @@ steps:
 safe-outputs:
   create-issue:
     labels: [cookie]
+    planning-status: Todo
+    allowed-statuses: [Todo]
     max: 1
 timeout-minutes: 20
 model: router/economy
