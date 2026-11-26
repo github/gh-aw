@@ -1,17 +1,17 @@
 {
   "last_run_window": {
-    "start": "2026-11-24T07:53:02Z",
-    "end": "2026-11-25T07:53:02Z",
-    "coverage": "partial; count-limited cached records begin 2026-11-24T21:03:55Z; collector start 07:56:06Z"
+    "start": "2026-11-25T07:53:07Z",
+    "end": "2026-11-26T07:53:07Z",
+    "coverage": "partial; 299 in-window cached records from 2026-11-25T21:55:34Z through 2026-11-26T07:51:02Z; count-limited"
   },
   "key_themes": [
-    "Work queue control and acceptance outcomes mixed after v4 merge",
-    "Three shared-context smoke sets and recurring Agy failures",
-    "Simulator memory validation and publication failures recurred"
+    "Automated spec PR merged as review fan-out began; review publication failed",
+    "Trusted work queue controls failed in two dispatchers while smoke dispatches succeeded",
+    "Auditor collection was intermittent; a successful agent run was observed"
   ],
   "carry_forward_questions": [
-    "Why did trusted controls fail across dispatchers and why did smoke dispatch acceptance fail after an earlier success?",
-    "Do smoke retries and review follow-up yield a validated fix?",
-    "Why did simulator memory validation and push fail again?"
+    "Why did three safe-output processing steps fail and were review findings delivered?",
+    "Why do trusted controls fail while separate smoke dispatches succeed?",
+    "Will Auditor collection and agent execution remain reliable?"
   ]
 }
