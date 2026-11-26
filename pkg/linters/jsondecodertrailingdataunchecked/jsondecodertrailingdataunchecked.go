@@ -46,8 +46,14 @@ func analyzeFunction(pass *analysis.Pass, body *ast.BlockStmt, generatedFiles fi
 		return
 	}
 
-	parents := parentNodes(body)
 	decodeCalls, tokenCalls := collectDecoderCalls(pass, body)
+	if len(decodeCalls) == 0 {
+		return
+	}
+	// Build the parent map only for bodies that decode in-memory JSON; most
+	// functions have none and building it for every (nested) body dominated
+	// this analyzer's cost.
+	parents := parentNodes(body)
 	var firstDecodes []*ast.CallExpr
 	for decoder, calls := range decodeCalls {
 		slices.SortFunc(calls, func(a, b *ast.CallExpr) int {

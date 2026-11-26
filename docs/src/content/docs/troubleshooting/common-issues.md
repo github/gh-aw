@@ -240,14 +240,16 @@ If the Copilot CLI is missing, first verify compilation succeeded because compil
 
 ### Copilot License or Inference Access Issues
 
-If a workflow fails at the Copilot inference step despite a correctly configured `COPILOT_GITHUB_TOKEN` (authentication or quota errors), the PAT owner may lack a valid Copilot license or inference access. Test locally with the [Copilot CLI](https://docs.github.com/en/copilot/how-tos/use-copilot-agents/use-copilot-cli):
+For `403 Resource not accessible by personal access token` at the Copilot inference step, replace `COPILOT_GITHUB_TOKEN` with a fine-grained PAT owned by a personal account, not an organization, and grant it **Account permissions → Copilot Requests: Read**. See [Troubleshooting auth errors](/gh-aw/reference/auth/#troubleshooting-auth-errors) for details.
+
+For `403 "unauthorized: not licensed to use Copilot"`, the PAT owner may lack a valid Copilot license or inference access. Test locally with the [Copilot CLI](https://docs.github.com/en/copilot/how-tos/use-copilot-agents/use-copilot-cli):
 
 ```bash
 export COPILOT_GITHUB_TOKEN="<your-github-pat>"
 copilot -p "write a haiku"
 ```
 
-If this fails, contact your organization administrator to enable Copilot for the token owner.
+If the not-licensed error persists, contact your organization administrator to enable Copilot for the token owner.
 
 > [!NOTE]
 > `COPILOT_GITHUB_TOKEN` must belong to a user account with an active Copilot subscription. Org-managed licenses may impose additional restrictions on programmatic API access.

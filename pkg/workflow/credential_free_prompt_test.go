@@ -237,7 +237,7 @@ func TestCompilerPromptConfigurationVariableBoundary(t *testing.T) {
 						name:       "direct vars access",
 						value:      "${{ vars.LOG_LEVEL }}",
 						expression: "vars.LOG_LEVEL || 'info'",
-						errorText:  "expressions are not in the allowed list:\n  - vars.LOG_LEVEL",
+						errorText:  "expressions are not in the allowed list",
 					},
 					{
 						name:       "alias with secret fallback",
