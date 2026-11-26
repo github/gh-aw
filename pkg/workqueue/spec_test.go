@@ -99,9 +99,9 @@ func TestSpec_PublicAPI_InvalidJSON(t *testing.T) {
 	for _, data := range []string{`{"version":`, `not-json`, `{"operations":[}`} {
 		t.Run(data, func(t *testing.T) {
 			t.Parallel()
-			_, err := workqueue.Parse([]byte(data))
+			_, err := workqueue.Parse([]byte(data + "\n"))
 			require.Error(t, err, "Parse must reject malformed JSON ledger data")
-			_, err = workqueue.ReplayLog([]byte(data))
+			_, err = workqueue.ReplayLog([]byte(data + "\n"))
 			require.Error(t, err, "ReplayLog must reject malformed JSON ledger data")
 			_, err = workqueue.ReplayRaw([]json.RawMessage{json.RawMessage(data)})
 			require.Error(t, err, "ReplayRaw must reject malformed JSON records")

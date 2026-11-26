@@ -141,7 +141,7 @@ func TestSpec_PublicAPI_ResolveActionPin_DocumentedExample(t *testing.T) {
 	if reference == "" {
 		t.Skip("SPEC_MISMATCH: documented strict checkout@v5 example returns an empty reference")
 	}
-	assert.Regexp(t, `^actions/checkout@[^ ]+ # v5$`, reference,
+	assert.Regexp(t, `^actions/checkout@[0-9a-fA-F]{40} # v5$`, reference,
 		"the documented example must return checkout pinned to a SHA and labeled v5")
 }
 
