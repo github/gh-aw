@@ -150,7 +150,7 @@ func packageFunctionAlias(pass *analysis.Pass, obj types.Object, seen map[types.
 	// taken inside its declaring scope, so inspect only that region of the
 	// declaring file instead of every file in the package. Scanning the whole
 	// package for every aliased call made this helper quadratic in package size.
-	file := fileContaining(pass, variable.Pos())
+	file := FileForPos(pass.Files, variable.Pos())
 	scope := variable.Parent()
 	if file == nil || scope == nil || !scope.Pos().IsValid() || !scope.End().IsValid() {
 		return "", "", false
@@ -192,16 +192,6 @@ func packageFunctionAlias(pass *analysis.Pass, obj types.Object, seen map[types.
 		return "", "", false
 	}
 	return packageFunction(pass, initializer, seen)
-}
-
-// fileContaining returns the file in pass that contains pos, or nil.
-func fileContaining(pass *analysis.Pass, pos token.Pos) *ast.File {
-	for _, file := range pass.Files {
-		if file.FileStart <= pos && pos <= file.FileEnd {
-			return file
-		}
-	}
-	return nil
 }
 
 func packageFunctionAliasInitializer(pass *analysis.Pass, node ast.Node, obj types.Object) ast.Expr {
