@@ -475,6 +475,23 @@ describe("push_routing_history saves", () => {
     expect(github.calls.jobs).toEqual([]);
   });
 
+  it("does not mistake a post-commit job failure for a missing save after journal eviction", async () => {
+    const remote = bareRemote();
+    // #12 first saved while #11 was still running. Both #12 and #13 have now aged out.
+    const retained = Array.from({ length: 500 }, (_, i) => ({ run: String(9014 + i), number: 14 + i }));
+    seedHistory(remote, { ...emptyState("triage"), generation: { hash: GENERATION, since_run: 12 }, last_run: 513, reconciled_through: 10 }, retained);
+    const runs = Array.from({ length: 514 }, (_, i) => paginationRun(514 - i, { conclusion: [12, 13].includes(514 - i) ? "failure" : "success" }));
+    const jobs = [
+      { name: "agent", started_at: runCreatedAt(12), conclusion: "success" },
+      { name: "push_routing_history", conclusion: "failure" },
+    ];
+    const github = fakeGitHub(remote, { runs, jobs: { 9012: jobs, 9013: jobs } });
+    await save(remote, 514, "success", { github });
+    expect(remoteState(remote)).toMatchObject({ last_run: 514, reconciled_through: 10, unexplained: 0 });
+    expect(remoteRuns(remote).filter(row => row.note === "unsaved")).toEqual([]);
+    expect(github.calls.jobs).toEqual([]);
+  });
+
   it("lands two saves that read the same state, re-applying the later one to the newer file", async () => {
     const remote = bareRemote();
     vi.useFakeTimers({ toFake: ["Date"] });

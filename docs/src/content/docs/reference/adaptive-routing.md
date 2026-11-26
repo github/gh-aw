@@ -65,7 +65,7 @@ A run counts as a success or a failure only when the verdict says its result was
 
 `last_run` is the highest recorded run number, not proof that every preceding result was saved. For example, in an established history, if run 12 saves while run 11 is still active, coverage can reach 12 with 11 listed in `unresolved_runs`. A missing entry in an Actions listing is not proof that 11 saved. Only the writer settles that obligation. Older histories without `reconciled_through` do not yet report verified coverage.
 
-The first save checks earlier runs too. If runs 10 and 11 ran the agent under the same definition but failed to save, run 12 records both as `unsaved`. Run 13 does not count them again, and neither missing save counts as a model failure. If Actions is unavailable, run 12 can still save its own result without advancing `reconciled_through`. A later writer retries from that point. An old backlog, a missing run number, or a workflow revision that Actions cannot verify can leave early history unverified indefinitely.
+The first save checks earlier runs too. If runs 10 and 11 ran the agent under the same definition but failed to save, run 12 records both as `unsaved`. Run 13 does not count them again, and neither missing save counts as a model failure. If Actions is unavailable, run 12 can still save its own result without advancing `reconciled_through`. A later writer retries from that point. An old backlog, a missing run number, or a workflow revision that Actions cannot verify can leave early history unverified indefinitely. If run 12's row ages out before catch-up reaches it, a later writer leaves that range unverified: a job may have failed after its save landed.
 
 ## The branch
 
