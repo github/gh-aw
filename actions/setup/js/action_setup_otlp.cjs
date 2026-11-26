@@ -223,7 +223,10 @@ async function run() {
   }
 
   const brokeredOTLP = getActionInput("TOKEN_BROKER_OTLP") === "true";
-  if (brokeredOTLP) await configureBrokeredOTLP();
+  if (brokeredOTLP) {
+    // Fail closed until sandbox filtering, collector policy, and exporter deadlines are enforced.
+    throw new Error("Brokered OTLP is not available until its security controls are enforced.");
+  }
 
   const inputOTLPOIDCToken = getActionInput("OTLP_OIDC_TOKEN");
   if (brokeredOTLP) {

@@ -23,6 +23,7 @@ describe("shared-runner cleanup boundary", () => {
           if (name === "path") return path;
           if (name === "fs") return { existsSync: () => present, rmSync: (...args) => mutations.push(args) };
           if (name === "child_process") return { spawnSync: (...args) => mutations.push(args) };
+          if (name === "./js/action_input_utils.cjs") return { getActionInput: () => "" };
           if (name.endsWith("action_conclusion_otlp.cjs"))
             return {
               run: async () => {
@@ -51,6 +52,7 @@ describe("shared-runner cleanup boundary", () => {
       require(name) {
         if (name === "path") return path;
         if (name === "fs") return { existsSync: () => false };
+        if (name === "./js/action_input_utils.cjs") return { getActionInput: () => "" };
         if (name === "child_process") {
           return {
             spawnSync: (...args) => {

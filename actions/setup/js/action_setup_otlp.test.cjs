@@ -28,7 +28,7 @@ const originalIsValidTraceId = sendOtlpModule.isValidTraceId;
 const originalIsValidSpanId = sendOtlpModule.isValidSpanId;
 
 // Load the module under test after patching is possible
-const { run, writeEnvLine } = req("./action_setup_otlp.cjs");
+const { run, writeEnvLine, configureBrokeredOTLP } = req("./action_setup_otlp.cjs");
 
 const mockSendJobSetupSpan = vi.fn();
 
@@ -130,7 +130,17 @@ describe("action_setup_otlp.cjs", () => {
     expect(typeof run).toBe("function");
   });
 
-  it("uses a fresh brokered OTLP pair and replaces all configured destinations", async () => {
+  it("fails closed before requesting or exporting credentials when brokered OTLP is enabled", async () => {
+    process.env.INPUT_TOKEN_BROKER_OTLP = "true";
+    const fetchSpy = vi.spyOn(global, "fetch");
+
+    await expect(run()).rejects.toThrow("Brokered OTLP is not available until its security controls are enforced.");
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(mockSendJobSetupSpan).not.toHaveBeenCalled();
+    expect(readFileSync(envFile, "utf8")).toBe("");
+  });
+
+  it("configures a fresh brokered OTLP pair and replaces all configured destinations", async () => {
     const oidc = [JSON.stringify({ alg: "synthetic" }), JSON.stringify({ exp: Math.floor(Date.now() / 1000) + 600 }), "signature"].map(value => Buffer.from(value).toString("base64url")).join(".");
     const token = "broker+/token==";
     const expiresAt = new Date(Date.now() + 300_000).toISOString();
@@ -152,7 +162,7 @@ describe("action_setup_otlp.cjs", () => {
       return Promise.resolve(new Response(JSON.stringify({ value: oidc }), { status: 200 }));
     });
 
-    await run();
+    await configureBrokeredOTLP();
 
     const expectedHeaders = `Authorization=${encodeURIComponent("Bearer " + token)}`;
     expect(fetchSpy).toHaveBeenCalledTimes(2);
