@@ -790,6 +790,9 @@ jobs:
                   "parent": {
                     "issueOrPRNumber": true
                   },
+                  "planning_status": {
+                    "stringOrInteger": true
+                  },
                   "repo": {
                     "type": "string",
                     "maxLength": 256
@@ -1576,6 +1579,7 @@ jobs:
     permissions:
       actions: read # Read workflow runs and artifacts for workflow context.
       id-token: write # Request an OIDC token for authenticated services.
+      issues: read # Read issues and comments for workflow context.
     concurrency:
       group: "gh-aw-conclusion-smoke-agy-${{ github.run_id }}"
       cancel-in-progress: false
@@ -2239,7 +2243,8 @@ jobs:
     if: (!cancelled()) && needs.agent.result != 'skipped'
     runs-on: ubuntu-slim
     # Permissions for the safe_outputs job (workflow permissions default to none).
-    permissions: {}
+    permissions:
+      issues: read # Read issues and comments for workflow context.
     timeout-minutes: 2
     env:
       GH_AW_AGENT_AIC: ${{ needs.agent.outputs.aic }}

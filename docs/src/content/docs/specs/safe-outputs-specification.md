@@ -8,9 +8,9 @@ sidebar:
 
 # Safe Outputs MCP Gateway Specification
 
-**Version**: 1.33.0<br>
+**Version**: 1.34.0<br>
 **Status**: Working Draft<br>
-**Publication Date**: 2026-11-25<br>
+**Publication Date**: 2026-11-26<br>
 **Editor**: GitHub Agentic Workflows Team<br>
 **This Version**: [safe-outputs-specification](/gh-aw/specs/safe-outputs-specification/)<br>
 **Latest Published Version**: This document
@@ -5804,6 +5804,95 @@ or review bodies to returned or persisted decision evidence.
 
 ---
 
+#### Type: set_issue_status
+
+**Purpose**: Set a native GitHub issue planning status, distinct from open/closed
+state and Projects fields.
+
+GitHub's native issue planning status API is in public preview and is subject to
+change. Availability varies by target repository.
+
+**Default Max**: 5
+
+**Cross-Repository Support**: Yes
+
+**Mandatory**: No
+
+The tool requires `status` (a nonempty status name or positive integer ID).
+Optional `issue_number` and `repo` follow the same runtime target authorization
+and repository restrictions as `set_issue_type`. `duplicate_of` identifies a
+same-repository duplicate target. Common safe-output provenance fields apply.
+
+**Operational Semantics**:
+
+1. The handler MUST enforce `max`, repository authorization, triggering/fixed/
+   agent-selected target restrictions, and required labels/title prefix before
+   mutation. Temporary IDs MUST NOT bypass these controls.
+2. The handler MUST resolve the requested status using the destination
+   repository's available planning statuses. Names match case-insensitively
+   after trimming surrounding whitespace;
+   numeric IDs MUST belong to that repository. `allowed`, when configured,
+   restricts the resolved status by name or ID. Clearing is unsupported.
+3. Missing preview support, unavailable statuses, ambiguous names, unknown
+   categories, and API errors MUST fail closed, without a state-only fallback.
+   The implementation MUST NOT assume that status IDs are universal.
+4. The handler MUST read current issue state, not trust event snapshots.
+   An already-selected status is a no-op, not an applied mutation.
+5. Categories `backlog`, `planned`, and `started` describe open issues;
+   `completed`, `not_planned`, and `duplicate` describe closed issues.
+   Open-to-closed changes require `allow-close: true`; closed-to-open changes
+   require `allow-reopen: true`. Changing a closed issue's close reason requires
+   both. These permissions default to false and MUST NOT be inferred from other
+   enabled outputs. Duplicate requires an explicit valid duplicate target.
+   The canonical duplicate relationship MUST be verified from service evidence
+   before skipping or reporting success; changing the canonical target requires
+   both lifecycle permissions. Relationship identity MUST be retained in
+   execution snapshots and checked during outcome evaluation.
+6. Staged mode MUST NOT mutate. Runtime authorization and status validation
+   MUST still apply to the preview.
+7. Applied effects MUST be backed by service-returned status evidence.
+   Missing or mismatched status evidence MUST NOT be reported as a verified
+   successful status mutation. Verification, manifests, audit, and outcome
+   evaluation MUST distinguish requested, skipped, staged, failed, and applied
+   effects.
+
+Outcome retention compares stable status IDs/categories, issue state, and close
+reason against the recorded before/after snapshots. Renaming a status alone
+MUST NOT count as reversal. Missing execution evidence or unavailable current
+status MUST NOT establish retention or rejection. Retention and delivery-rule
+fallbacks MUST NOT be described as verified human adoption.
+
+**Creation**: `create-issue.planning-status` supplies the default initial status;
+`allowed-statuses` restricts both the default and `create_issue.planning_status`.
+Resolution and validation MUST precede issue creation. Only open categories are
+accepted. The selected status MUST be included in the creation request, rather
+than creating first and attempting a separate transition. Existing behavior is
+unchanged when no initial planning status is requested.
+
+**Compatibility**: `update-issue.status` continues to mean `open` or `closed`.
+Status writes require `issues: write`; discovery and current-state reads require
+`issues: read`. Repository preview enrollment, archived/locked restrictions,
+and actual token permissions remain enforced by GitHub.
+
+**Trigger and Context Contract**: `on.issues.status-ids` and
+`status-categories` require explicit `types` containing `status_changed`.
+Filters MUST run before agent activation and use captured `event.status`,
+never `issue.status` or mutable display names. Values within a dimension are
+alternatives and dimensions combine conjunctively. Missing/malformed captured
+status MUST fail a configured filter; other selected activity types remain
+unaffected. Agent context MUST preserve status ID/name/category, including
+captured/previous/snapshot distinctions and null status.
+
+Delivery is not exactly once or ordered. Filters MUST NOT imply deduplication
+or freshness. Current-state reads reduce stale-event effects but do not provide
+atomic compare-and-set. Unrestricted `issues` listeners also receive automatic
+`status_changed` events; authors SHOULD select explicit activity types to avoid
+extra activations. MCP reads/searches MUST preserve native status information
+when supplied by the server, without requiring the preview for legacy reads.
+Work Queue and Repo Factory integration are outside this contract.
+
+---
+
 #### Type: set_issue_field
 
 **Purpose**: Set one custom issue field value.
@@ -8501,6 +8590,12 @@ This specification revision aligns with directly relevant `CHANGELOG.md` entries
 - **v0.40.1**: append-only status comment behavior was documented for smoke workflow execution.
 - **Earlier changelog entry**: status comments were decoupled from default AI reaction behavior; explicit `on.status-comment` configuration is required when status comments are desired.
 - **Earlier changelog entry**: `command` trigger was renamed to `slash_command` with deprecation compatibility.
+
+**Version 1.34.0** (2026-11-26):
+
+- **Specified**: `set_issue_status` target authorization, allowed planning statuses, current-state evidence, lifecycle permissions, duplicate relationship verification, and read-only staged previews.
+- **Specified**: Initial native planning status validation and verification for `create_issue`.
+- **Updated**: Publication metadata to 1.34.0.
 
 **Version 1.33.0** (2026-11-25):
 

@@ -310,6 +310,7 @@ function normalizeLegacyWorkQueueContext(awContext, rawClaim) {
  *   item_number: string,
  *   comment_id: string,
  *   comment_node_id: string,
+ *   issue_status?: {snapshot: any, event?: any, previous?: any},
  *   pr_head_sha: string,
  *   comment_updated_at: string,
  *   deployment_state: string,
@@ -452,6 +453,22 @@ function buildAwContext() {
     item_number,
     comment_id,
     comment_node_id,
+    // Both are delivery-time evidence, never a claim about the latest API state.
+    ...(context.payload?.issue && !context.payload.issue.pull_request
+      ? {
+          issue_status: {
+            snapshot: context.payload.issue.status ?? null,
+            ...(context.eventName === "issues" && context.payload.action === "status_changed" ? { event: context.payload.status ?? null, previous: context.payload.changes?.status?.from ?? null } : {}),
+          },
+        }
+      : isRecord(inheritedContext?.issue_status)
+        ? {
+            issue_status: {
+              snapshot: inheritedContext.issue_status.snapshot ?? null,
+              ...(Object.hasOwn(inheritedContext.issue_status, "event") ? { event: inheritedContext.issue_status.event ?? null, previous: inheritedContext.issue_status.previous ?? null } : {}),
+            },
+          }
+        : {}),
     // Only event-recorded revisions are propagated; an API read of today's head
     // cannot reconstruct the revision when an earlier issue comment was posted.
     pr_head_sha:
