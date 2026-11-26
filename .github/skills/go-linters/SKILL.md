@@ -27,6 +27,14 @@ For PR-driven linter generation (derive a rule from a specific pull request patt
 
 `make golint-custom` builds `cmd/linters` and runs it against `./cmd/...` and `./pkg/...`.
 
+## Performance tiers
+
+- Analyzers are fast by default. Add a new analyzer to `slowAnalyzers` in `pkg/linters/tiers.go` (with a reason) when profiling shows ≥ ~0.3s per full run, or when it requires `internal/parentmap`.
+- Profile: `/tmp/gh-aw-linters -cpuprofile=/tmp/lint.prof ./cmd/... ./pkg/...` then `go tool pprof -top -cum /tmp/lint.prof`.
+- Run one tier: `make golint-custom-fast`, `make golint-custom-slow`, or `make golint-custom LINTER_TIER=fast LINTER_FLAGS="..."`.
+- When enforcing an analyzer in CI, add its flag to the `lint-go-custom` step matching its tier, in both native and wasm steps.
+- Reuse shared prerequisites (`parentmap.Analyzer` via `analyzerutil.New(..., parentmap.Analyzer)`) instead of rebuilding whole-file maps; avoid per-call walks over every file in the package.
+
 ## Common AST pitfalls
 
 ### Unwrap parenthesized expressions

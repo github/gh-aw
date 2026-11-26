@@ -16,6 +16,21 @@ network:
     - node
 skills:
   - cathrynlavery/diagram-design/skills/diagram-design@648c2a597839301e06df1e7434a08bde9f42eed3
+runtimes:
+  node:
+    version: "24"
+pre-agent-steps:
+  - name: Checkout agentics workflows
+    uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+    with:
+      repository: githubnext/agentics
+      ref: main
+      path: .agentics
+      persist-credentials: false
+      sparse-checkout: workflows
+  - name: Install docs dependencies
+    working-directory: ./docs
+    run: npm ci --legacy-peer-deps
 tools:
   cache-memory:
     retention-days: 30
@@ -91,6 +106,6 @@ action or limitation. Keep the page, concept, and build result visible.
 ## Validate and publish
 
 1. Confirm the patch contains only the selected MDX page and the new SVG. Confirm the SVG has a `viewBox`, accessibility metadata, no `<script>` element, and no external URL.
-2. Run `npm run build` from `docs/`. Revert the diagram and page change if the build fails.
+2. Run `AGENTICS_WORKFLOWS_DIR="$PWD/../.agentics/workflows" npm run build` from `docs/`. Revert the diagram and page change if the build fails.
 3. If validation succeeds, use the pre-created `create_pull_request` safe output. Title it `[docs-diagram] Add <short concept> diagram` and summarize the selected page, concept, and validation result.
 4. If no suitable page exists or validation fails, use `noop` with the number of candidates considered and a short reason. Do not create a placeholder diagram.
