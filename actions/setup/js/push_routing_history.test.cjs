@@ -649,6 +649,89 @@ describe("push_routing_history saves", () => {
     expect(github.calls.jobs).toEqual([9002]);
   });
 
+  it.each([10000, 15000])("continues past an early gap with %i run numbers without losing a later failed save", async size => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(runCreatedAt(size + 2)));
+    const remote = bareRemote();
+    const runs = Array.from({ length: size }, (_, i) => paginationRun(size - i, { conclusion: size - i === 3 ? "failure" : "success" })).filter(run => run.run_number !== 2);
+    const failed = [
+      { name: "agent", started_at: runCreatedAt(1), conclusion: "success" },
+      { name: "push_routing_history", conclusion: "failure" },
+    ];
+    const github = fakeGitHub(remote, { runs, jobs: { 9002: failed, 9003: failed } });
+    const list = github.rest.actions.listWorkflowRuns;
+    github.rest.actions.listWorkflowRuns = async params => {
+      const result = await list(params);
+      if (size === 10000) result.data.total_count = Math.min(2500, result.data.total_count);
+      return result;
+    };
+    await save(remote, size, "success", { github });
+    const first = remoteState(remote);
+    expect(first.reconciled_through).toBeGreaterThan(3);
+    expect(first.unexplained).toBe(1);
+    expect(first.unresolved_runs).toEqual(size === 10000 ? [] : [2]);
+    await save(remote, size + 1, "success", { github });
+    expect(remoteState(remote).reconciled_through).toBeGreaterThan(first.reconciled_through);
+    if (size === 15000) {
+      expect(remoteState(remote).unresolved_runs).toEqual([2]);
+      runs.unshift(paginationRun(2, { created_at: runCreatedAt(size + 2), conclusion: "failure" }));
+      await save(remote, size + 2, "success", { github });
+      expect(remoteState(remote)).toMatchObject({ unresolved_runs: [], unexplained: 2 });
+    }
+  });
+
+  it("does not replenish the inspection budget when a concurrent save forces a replay", async () => {
+    const remote = bareRemote();
+    await save(remote, 1, "success");
+    const runs = Array.from({ length: 70 }, (_, i) => paginationRun(70 - i, { conclusion: "failure" }));
+    const github = fakeGitHub(remote, { runs });
+    const push = signedPush(remote);
+    let interrupted = false;
+    await save(remote, 70, "success", {
+      github,
+      push: async args => {
+        if (!interrupted) {
+          interrupted = true;
+          await save(remote, 71, "success", {
+            github: fakeGitHub(remote, {
+              listWorkflowRuns: async () => {
+                throw new Error("listing unavailable");
+              },
+            }),
+          });
+        }
+        return push(args);
+      },
+    });
+    expect(github.calls.jobs).toHaveLength(64);
+    expect(remoteRuns(remote).map(row => row.number)).toEqual([1, 71, 70]);
+    expect(remoteState(remote).reconciled_through).toBe(1);
+  });
+
+  it("keeps a failed first-write generation lookup unresolved until the old definition is verified", async () => {
+    const remote = bareRemote();
+    const previous = `${"c".repeat(64)}:${"d".repeat(64)}`;
+    const contents = {};
+    const runs = [paginationRun(2), paginationRun(1, { head_sha: "old", conclusion: "failure" })];
+    const github = fakeGitHub(remote, {
+      runs,
+      contents,
+      jobs: {
+        9001: [
+          { name: "agent", conclusion: "success", started_at: runCreatedAt(1) },
+          { name: "push_routing_history", conclusion: "failure" },
+        ],
+      },
+    });
+    await save(remote, 2, "success", { github });
+    expect(remoteState(remote)).toMatchObject({ unexplained: 0, unresolved_runs: [1], unresolved_run_ids: { "1": "9001" } });
+    expect(remoteRuns(remote).map(row => row.number)).toEqual([2]);
+    contents.old = `GH_AW_ROUTING_GENERATION: "${previous}"`;
+    await save(remote, 3, "success", { github });
+    expect(remoteState(remote)).toMatchObject({ unexplained: 0, unresolved_runs: [] });
+    expect(remoteRuns(remote).filter(row => row.number === 1)).toMatchObject([{ note: "older_definition", generation: previous }]);
+  });
+
   it("checkpoints a failure-heavy bootstrap and budgets every job page before requesting the next", async () => {
     const runs = Array.from({ length: 901 }, (_, i) => paginationRun(901 - i, { conclusion: "failure" }));
     const github = fakeGitHub(null, { runs });
