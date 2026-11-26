@@ -91,6 +91,16 @@ gh aw routing status issue-triage
 
 `gh aw routing reset <workflow>` starts a history afresh. It reads the workflow's latest run number and, in one commit that lands only if no run saved in the meantime, stops every run up to it from counting, empties the recorded evidence, and clears reconciliation obligations at or below the reset point while preserving any obligations above it. It keeps `runs.jsonl` and never deletes the branch. It needs write access to the repository.
 
+## Verify an observe pilot
+
+For an unreleased build, record the full gh-aw commit SHA. Build the compiler from that commit, pass the same SHA to `compile --gh-aw-ref`, and check that the workflow lock uses `github/gh-aw/actions/setup@<SHA>` before running it. The flag pins the runtime actions; it does not change the compiler you invoked. For example, the [reviewed observe baseline](https://github.com/github/gh-aw/commit/7154b590ec1dda07344713fccefc8e2a4e2a3866) includes `model-routing.learning` and the writer fixes for pagination, deleted runs and active re-runs.
+
+Record the first opted-in Actions run ID, not the first successful save. For an [eligible workflow](#which-workflows-take-part), an observation is due when the first attempt uses the default-branch workflow definition, runs the agent and is not a dry run. Check that its `push_routing_history` job succeeded and its `run` ID appears once in `runs.jsonl`. If the opening run owed no save (for example, a `pull_request` run using a PR ref), record why and check the first eligible attempt without moving the pilot boundary.
+
+Record the history branch head when the last pilot writer finishes. Compare the eligible first attempts from Actions with the rows at that revision by run ID, checking for missing or duplicate rows. Use the writer result from attempt 1 even if the run was later re-run. If the snapshot does not cover the entire pilot, use [earlier branch revisions](#retention) to recover rows that rolled off, counting each appended row only once.
+
+A row with `note: "unsaved"` accounts for a failed save; it does not recover the observation. If two eligible writers failed before the first successful save and history shows neither ID, report both missing IDs. Zero `unsaved` rows in history does not prove that every observation was saved.
+
 ## Limits
 
 - Observe mode only records evidence; it never changes which model runs and makes no recommendation.
