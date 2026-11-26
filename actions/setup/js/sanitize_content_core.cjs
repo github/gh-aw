@@ -437,7 +437,10 @@ function sanitizeUrlDomains(s, allowed) {
   allowed = allowed
     .filter(domain => typeof domain === "string")
     .map(domain => domain.trim().toLowerCase())
-    .filter(Boolean);
+    .filter(domain => {
+      const base = domain.startsWith("*.") ? domain.slice(2) : domain;
+      return base && !base.startsWith(".") && !base.endsWith(".");
+    });
 
   // Strip userinfo (user:password@) from HTTPS URLs before any domain filtering
   // so that credentials are never passed to the allowlist check or preserved
