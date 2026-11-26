@@ -32,7 +32,7 @@ namespace TokenBroker {
     token_type: "copilot-task" | "github-app";
   }
 
-  @doc("Proposed independent OTLP exchange; provider, endpoint, and caller headers are forbidden.")
+  @doc("Proposed independent OTLP exchange selected by observability.otlp.token-broker; provider, endpoint, and caller headers are forbidden.")
   model OtlpRequest {
     ...RequestIdentity;
     token_type: "otlp";

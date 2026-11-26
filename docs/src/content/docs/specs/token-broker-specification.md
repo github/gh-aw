@@ -81,7 +81,7 @@ Workflow source MUST explicitly select Copilot capabilities using `token-broker.
 
 GitHub API authentication MUST be selected independently using `tools.github.token-broker: true` and/or `safe-outputs.token-broker: true`. Each selects the `github-app` capability for that section; neither requires a top-level Copilot capability. An enabled section-level broker selection MUST NOT be combined with that section's `github-app` or `github-token`, and MUST suppress top-level GitHub App fallback for that section. Omission or `false` MUST preserve existing authentication. Installation selection, repository scope, permissions, and lifetime MUST come from enrolled server policy bound to verified identity, never from caller-selected scope fields.
 
-In these two sections, a present `token-broker:` key with an empty value MUST be equivalent to `token-broker: true`. This shorthand does not select top-level Copilot or OTLP capabilities.
+In these two sections, a present `token-broker:` key with an empty value MUST be equivalent to `token-broker: true`. This shorthand does not select Copilot or OTLP capabilities.
 
 For GitHub tool consumers, broker policy MUST restrict installation token permissions to read-only. Safe-output consumers MUST receive only the permissions required by their approved effects. Sharing the `github-app` capability name MUST NOT authorize credential reuse between these job contexts.
 
@@ -105,7 +105,15 @@ Admission success, admission absence, and admission's `ignore` outage policy MUS
 
 ### 3.1. Independent OTLP opt-in and action setup
 
-Workflow source MUST select brokered OTLP export independently using the explicit boolean `token-broker.otlp: true`. Omission or `false` MUST preserve existing telemetry authentication; other values MUST be rejected. No Copilot, GitHub tools, safe-output, or admission capability is required. An inherited broker URL or existing exporter configuration MUST NOT enable this capability.
+Workflow source MUST select brokered OTLP export independently using the explicit boolean `observability.otlp.token-broker: true`:
+
+```yaml
+observability:
+  otlp:
+    token-broker: true
+```
+
+Omission or `false` MUST preserve existing telemetry authentication; other values, including an empty value, MUST be rejected. `token-broker.otlp` MUST NOT select this capability and MUST be rejected. The existing main-workflow `observability.otlp: false` opt-out takes precedence over an imported broker selection. No Copilot, GitHub tools, safe-output, or admission capability is required. An inherited broker URL or existing exporter configuration MUST NOT enable this capability.
 
 For each consuming job, the compiler MUST pass the explicit action input `token-broker-otlp: true` to trusted action setup and grant only that job the required OIDC permission. The action MUST enable this path only for that explicit input. Before any remote OTLP export, including action-setup telemetry, the action MUST acquire a fresh OIDC identity and exchange it for `token_type: "otlp"` using the same broker URL, audience, and protocol as other capabilities, without `provider`. It MUST NOT reuse an inherited credential or another job's exchange. Acquisition, validation, or configuration failure after opt-in MUST fail setup and the job without exporting or falling back to static credentials. A generic best-effort telemetry error handler MUST NOT swallow these failures.
 
@@ -422,7 +430,7 @@ The server author MUST run the server scenarios below with a controlled issuer/J
 | T-TBR-017 | Client | GitHub tools and safe-output broker selections work independently and together. Conflicting section credentials fail compilation; top-level App fallback does not override broker selection. Only consuming jobs exchange credentials and receive broker-related OIDC permission. Tokens remain masked and job-local, and failures never select legacy credentials. |
 | T-TBR-018 | Deployment | After job-end invalidation, the downstream service rejects the job's credentials before their original expiry, the broker denies further exchanges for that job, and a sibling job's credential still works. In a separate run without cleanup, verify that the downstream service rejects the credential at `expires_at`. |
 | T-TBR-019 | Both | Exchange and invalidation carry unchanged JSON `job_id`, header-safe percent-encoded job baggage, and valid current trace context. Missing job/context is omitted, arbitrary inherited metadata is not forwarded, OIDC-issuer requests receive no correlation headers, and unsigned job/trace values never replace verified job-execution evidence. |
-| T-TBR-020 | Client | Only explicit boolean `token-broker.otlp: true` selects the proposed action input; omitted/false preserves existing behavior and other values reject. OTLP works without another capability. Each consuming job obtains fresh OIDC and performs its own exchange before any remote export; inherited URL, token, or cached sibling exchange cannot enable or satisfy setup. Failures fail the job, including through best-effort telemetry handlers. |
+| T-TBR-020 | Client | Only explicit boolean `observability.otlp.token-broker: true` selects the proposed action input; omitted/false preserves existing behavior, other values and top-level `token-broker.otlp` reject, and main-workflow `observability.otlp: false` overrides an imported selection. OTLP works without another capability. Each consuming job obtains fresh OIDC and performs its own exchange before any remote export; inherited URL, token, or cached sibling exchange cannot enable or satisfy setup. Failures fail the job, including through best-effort telemetry handlers. |
 | T-TBR-021 | Both | `otlp` requests omit `provider` and reject endpoint/header selection. Responses require exactly `endpoint`, `token`, and `expires_at`; missing, duplicate, non-string, or extra fields reject. An `endpoint` in any existing capability response still rejects (SV-29); existing two-field responses remain valid. |
 | T-TBR-022 | Both | Reject unsafe URL syntax, unapproved destinations, DNS/address-policy bypasses, and redirects without forwarding credentials. Missing preprovisioned egress permission for any intended exporter fails setup; opt-in and broker responses never widen or bypass workflow/AWF firewall policy. Replace multiple `GH_AW_OTLP_ENDPOINTS` destinations and stale global/signal-specific/input overrides with the single validated pair. Verify correctly decoded bearer authorization for tokens containing percent, comma, and equals characters, no generic token merge/fan-out, masking before use, and no agent, bootstrap, output, or artifact leakage. |
 | T-TBR-023 | Both, Deployment | Client tests with a deterministic clock enforce the static deadline at expiry minus 30 seconds across all exporters, queued batches, and in-flight requests. No renewal is claimed, no stale export occurs, and an overlong job fails without fallback. Deployment tests additionally verify finite collector expiry independently when cleanup is lost. |
@@ -469,7 +477,7 @@ For a client clock of `2026-10-30T17:55:00Z`, expiration `2026-10-30T18:00:00Z` 
 }
 ```
 
-For the proposed independent opt-in `token-broker.otlp: true`, an action setup request and response can instead be:
+For the proposed independent opt-in `observability.otlp.token-broker: true`, an action setup request and response can instead be:
 
 ```json
 {
@@ -575,7 +583,7 @@ These choices do not permit extra wire fields, weakened identity verification, o
 
 ### Version 2.1.0 (Draft, 2026-11-26)
 
-- Added the independent optional `token-broker.otlp: true` capability and provider-free `otlp` request, with a collector `endpoint` only in its strict success response (Sections 3–4, SV-29).
+- Added the independent optional `observability.otlp.token-broker: true` selection and provider-free `otlp` request, with a collector `endpoint` only in its strict success response (Sections 3–4, SV-29).
 - Specified fresh per-job action-setup exchange, approved destinations, isolated single-destination exporter configuration, masked handoff, and fail-closed behavior.
 - Defined the bounded static OTLP lifecycle, flush-before-invalidation cleanup, and T-TBR-020–024 conformance cases. OTLP support remains proposed, not implemented.
 
