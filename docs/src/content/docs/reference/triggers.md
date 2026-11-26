@@ -157,6 +157,48 @@ on:
 
 Compilation accepts this activity type; event delivery depends on GitHub's availability of the preview.
 
+Use `status-ids` to select particular statuses and `status-categories` to select
+categories before agent activation:
+
+```yaml wrap
+on:
+  issues:
+    types: [status_changed]
+    status-ids: [4, 8]
+    status-categories: [started]
+```
+
+Both filters require explicit `types` containing `status_changed`. Entries
+within a filter are alternatives; when both filters are present, both must
+match. Categories are `backlog`, `planned`, `started`, `completed`,
+`not_planned`, and `duplicate`. Matching uses the captured
+`github.event.status`, not the display name or `github.event.issue.status`.
+The latter is a delivery-time snapshot and can already describe a later
+transition. Missing or malformed captured status cannot pass a configured
+filter. Other explicitly selected activity types are unaffected by these
+filters.
+
+> [!WARNING]
+> An unrestricted `issues` trigger also receives `status_changed`, including
+> automatic changes after creation, assignment, closing, reopening, or linked
+> pull request changes. Select explicit `types` to avoid extra agent runs.
+
+Deliveries can repeat or arrive out of order. Status filters select captured
+transitions; they do not deduplicate deliveries or establish the latest state.
+The agent context preserves captured, previous, and issue-snapshot statuses.
+Fetch the current issue before deciding on a mutation; do not infer current
+state from arrival order. Status mutations re-read current state and treat an
+already-applied status as a no-op, but this is not exactly-once processing.
+
+GitHub MCP issue reads and searches support native statuses when available.
+Use `status:` search qualifiers (the category spelling is `not-planned` in
+search); retain returned status IDs, names, and categories when summarizing
+issues. A null or absent status is not Backlog and does not prove that the
+repository supports status mutations.
+Search results can omit the status object even when `status:` filtering works.
+Read individual issues with `issue_read` when status details are needed; do not
+reconstruct a status ID or name from the search qualifier.
+
 #### Issue Locking (`lock-for-agent:`)
 
 Prevent concurrent modifications to an issue during workflow execution by setting `lock-for-agent: true`:

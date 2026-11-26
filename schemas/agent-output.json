@@ -30,6 +30,7 @@
         { "$ref": "#/$defs/AddSecurityAdvisoryCommentOutput" },
         { "$ref": "#/$defs/CreateSecurityAdvisoryOutput" },
         { "$ref": "#/$defs/CreateIssueOutput" },
+        { "$ref": "#/$defs/SetIssueStatusOutput" },
         { "$ref": "#/$defs/AddCommentOutput" },
         { "$ref": "#/$defs/CreatePullRequestOutput" },
         { "$ref": "#/$defs/AddLabelsOutput" },
@@ -121,6 +122,40 @@
       },
       "additionalProperties": false
     },
+    "IssuePlanningStatus": {
+      "description": "Native planning status name or positive safe integer ID",
+      "oneOf": [
+        { "type": "string", "minLength": 1, "maxLength": 256, "pattern": ".*\\S.*" },
+        { "type": "integer", "minimum": 1, "maximum": 9007199254740991 }
+      ]
+    },
+    "SetIssueStatusOutput": {
+      "title": "Set Issue Status Output",
+      "description": "Change a native issue planning status independently of legacy open/closed state",
+      "type": "object",
+      "required": ["type", "status"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "const": "set_issue_status" },
+        "status": { "$ref": "#/$defs/IssuePlanningStatus" },
+        "issue_number": {
+          "type": ["integer", "string"],
+          "minimum": 1,
+          "maximum": 9007199254740991,
+          "minLength": 1,
+          "description": "Issue number or temporary issue ID; defaults to the triggering issue"
+        },
+        "duplicate_of": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991,
+          "description": "Canonical issue number in the target repository for duplicate-category status"
+        },
+        "repo": { "type": "string", "maxLength": 256 },
+        "secrecy": { "type": "string" },
+        "integrity": { "type": "string" }
+      }
+    },
     "CreateIssueOutput": {
       "title": "Create Issue Output",
       "description": "Output for creating a GitHub issue",
@@ -145,6 +180,10 @@
           "items": {
             "type": "string"
           }
+        },
+        "planning_status": {
+          "$ref": "#/$defs/IssuePlanningStatus",
+          "description": "Initial native planning status; only open categories backlog, planned, and started are allowed at runtime"
         },
         "fields": {
           "type": "array",

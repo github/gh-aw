@@ -1,8 +1,8 @@
 [
   "action-container-substitutions.md",
   "agent-runtime-instructions.md",
-  "agentic-engine.md",
   "agentic-chat.md",
+  "agentic-engine.md",
   "agentic-workflows-mcp.md",
   "analyzing-runs.md",
   "asciicharts.md",

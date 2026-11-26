@@ -2,6 +2,7 @@
 /// <reference types="@actions/github-script" />
 
 const { createReportIssue, renderIssueParameters } = require("./issue_report.cjs");
+const { PLANNING_STATUS_HEADERS, resolvePlanningStatus, verifyPlanningStatus, planningStatusSnapshot } = require("./planning_status.cjs");
 const { normalizeReportText, normalizeReportTitle } = require("./report_ast.cjs");
 const { parseReportMarkdown } = require("./report_markdown.cjs");
 const { renderSizedReport } = require("./report_size.cjs");
@@ -895,7 +896,8 @@ async function main(config = {}) {
    * @param {Object} resolvedTemporaryIds - Map of temporary IDs to {repo, number}
    * @returns {Promise<Object>} Result with success/error status and issue details
    */
-  return async function handleCreateIssue(message, resolvedTemporaryIds) {
+  const handleCreateIssue = async function (message, resolvedTemporaryIds, _temporaryIdMap, forcePreview = false) {
+    const stagedForInvocation = isStaged || forcePreview;
     // Merge external resolved temp IDs with our local map
     if (resolvedTemporaryIds) {
       // The current invocation's resolutions replace cached entries from earlier invocations.
@@ -914,10 +916,19 @@ async function main(config = {}) {
       };
     }
     const { repo: qualifiedItemRepo, repoParts } = repoResult;
+    let planningStatus;
+    const planningStatusSelector = message.planning_status !== undefined ? message.planning_status : config.planning_status;
+    if (planningStatusSelector !== undefined) {
+      try {
+        planningStatus = await resolvePlanningStatus(githubClient, repoParts.owner, repoParts.repo, planningStatusSelector, config.allowed_statuses || [], true);
+      } catch (error) {
+        return { success: false, error: getErrorMessage(error) };
+      }
+    }
 
     // In staged mode no issues are created, so temporary IDs never resolve; validate the
     // references without deferring so dependent issues still get a staged preview.
-    const blockedBy = resolveBlockedByReferences(message.blocked_by, temporaryIdMap, qualifiedItemRepo, isStaged);
+    const blockedBy = resolveBlockedByReferences(message.blocked_by, temporaryIdMap, qualifiedItemRepo, stagedForInvocation);
     if (blockedBy.deferred) {
       core.info(`Deferring create_issue: ${blockedBy.error}`);
       return { success: false, deferred: true, error: blockedBy.error };
@@ -1180,7 +1191,7 @@ async function main(config = {}) {
       closeOlderKey,
       allowedMentions: expandAllowedAliases(allowedMentionAliases),
     });
-    const request = renderIssueParameters({ owner: repoParts.owner, repo: repoParts.repo, title, labels, assignees }, report);
+    const request = renderIssueParameters({ owner: repoParts.owner, repo: repoParts.repo, title, labels, assignees, ...(planningStatus ? { status: planningStatus.name, headers: PLANNING_STATUS_HEADERS } : {}) }, report);
     const { body } = request;
 
     // Reserve a max-count slot synchronously before any async pre-creation work.
@@ -1199,7 +1210,7 @@ async function main(config = {}) {
     // When found, post the new content as a comment on the existing issue instead of
     // creating a duplicate. This groups multiple same-day runs into a single issue.
     // The reserved max-count slot is released when posting as a comment.
-    if (!isStaged && artifacts.length === 0 && groupByDayEnabled && (closeOlderKey || workflowId)) {
+    if (!stagedForInvocation && artifacts.length === 0 && groupByDayEnabled && (closeOlderKey || workflowId)) {
       const today = new Date().toISOString().split("T")[0]; // YYYY-MM-DD (UTC)
       try {
         const existingIssues = await searchOlderIssues(
@@ -1252,7 +1263,7 @@ async function main(config = {}) {
     core.info(`Body length: ${body.length}`);
 
     // If in staged mode, preview the issue without creating it
-    if (isStaged) {
+    if (stagedForInvocation) {
       logStagedPreviewInfo(`Would create issue in ${qualifiedItemRepo} with title: ${title}`);
       const stagedBlockedBy = blockedBy.references;
       if (stagedBlockedBy.length > 0) {
@@ -1271,6 +1282,7 @@ async function main(config = {}) {
           labels,
           assignees,
           fields: issueFields,
+          ...(planningStatus ? { planning_status: planningStatus } : {}),
           ...(artifacts.length > 0 ? { artifacts } : {}),
           bodyLength: body.length,
           temporaryId,
@@ -1282,11 +1294,28 @@ async function main(config = {}) {
     let artifactFailure;
     try {
       const { data: issue } = await withRetry(() => createReportIssue(githubClient, request), RATE_LIMIT_RETRY_CONFIG, `create_issue in ${qualifiedItemRepo}`);
-
       core.info(`Created issue ${qualifiedItemRepo}#${issue.number}: ${issue.html_url}`);
       createdIssues.push({ ...issue, _repo: qualifiedItemRepo });
       if (deduplicationEnabled && hasDeduplicationLabels(labels, deduplicateByLabels)) {
         recordSeenTitle(qualifiedItemRepo, title, normalizedTitle);
+      }
+      const normalizedTempId = normalizeTemporaryId(String(temporaryId));
+      temporaryIdMap.set(normalizedTempId, { repo: qualifiedItemRepo, number: issue.number });
+      core.info(`Stored temporary ID mapping: ${temporaryId} -> ${qualifiedItemRepo}#${issue.number}`);
+
+      if (planningStatus) {
+        try {
+          verifyPlanningStatus(issue, planningStatus);
+        } catch (error) {
+          return {
+            success: false,
+            error: `Issue ${qualifiedItemRepo}#${issue.number} was created, but its planning status was not applied: ${getErrorMessage(error)}`,
+            repo: qualifiedItemRepo,
+            number: issue.number,
+            url: issue.html_url,
+            id: issue.id,
+          };
+        }
       }
 
       if (issueFields.length > 0) {
@@ -1337,12 +1366,6 @@ async function main(config = {}) {
           core.warning(`Issue ${qualifiedItemRepo}#${issue.number} was created, but blocked-by dependency ${blockedIssue.repo}#${blockedIssue.number} could not be added: ${dependencyError}`);
         }
       }
-
-      // Store the mapping of temporary_id -> {repo, number}
-      // temporaryId is guaranteed to be non-null because we checked tempIdResult.error above
-      const normalizedTempId = normalizeTemporaryId(String(temporaryId));
-      temporaryIdMap.set(normalizedTempId, { repo: qualifiedItemRepo, number: issue.number });
-      core.info(`Stored temporary ID mapping: ${temporaryId} -> ${qualifiedItemRepo}#${issue.number}`);
 
       /** @type {CreatedIssueArtifact[]} */
       let createdArtifacts = [];
@@ -1514,7 +1537,8 @@ async function main(config = {}) {
         url: issue.html_url,
         body,
         id: issue.id,
-        metadata: { node_id: issue.node_id },
+        metadata: { node_id: issue.node_id, ...(planningStatus ? { planning_status: planningStatus } : {}) },
+        ...(planningStatus ? { after_state: planningStatusSnapshot(issue) } : {}),
         temporaryId: temporaryId,
         ...(createdArtifacts.length > 0 ? { artifacts: createdArtifacts } : {}),
         ...(blockedByFailures.length > 0 ? { blocked_by_errors: blockedByFailures } : {}),
@@ -1541,6 +1565,8 @@ async function main(config = {}) {
       };
     }
   };
+  handleCreateIssue.validatePreview = (message, resolvedTemporaryIds, temporaryIdMap) => handleCreateIssue(message, resolvedTemporaryIds, temporaryIdMap, true);
+  return handleCreateIssue;
 }
 
 module.exports = { main, createIssue, createParentIssueTemplate, searchForExistingParent, getSubIssueCount, ISSUE_FIELDS_QUERY };
