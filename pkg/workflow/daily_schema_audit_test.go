@@ -15,6 +15,9 @@ import (
 
 func TestDailySchemaAuditChecks(t *testing.T) {
 	if _, err := exec.LookPath("jq"); err != nil {
+		if os.Getenv("CI") != "" {
+			t.Fatal("jq is required to exercise the schema audit in CI")
+		}
 		t.Skip("jq is required to exercise the schema audit")
 	}
 	content, err := os.ReadFile("../../.github/workflows/daily-schema-audit-cursor.md")
@@ -41,6 +44,7 @@ func TestDailySchemaAuditChecks(t *testing.T) {
 		return cmd.CombinedOutput()
 	}
 	require.NoError(t, os.WriteFile(schemaPath, []byte(`{
+	  "type": "object",
 	  "properties": {
 	    "direct": {"$ref": "#/$defs/direct"},
 	    "nested": {"$ref": "#/$defs/a~1b/properties/field"}
@@ -48,16 +52,20 @@ func TestDailySchemaAuditChecks(t *testing.T) {
 	  "$defs": {
 	    "direct": {"$ref": "#/$defs/transitive"},
 	    "transitive": {"$ref": "#/$defs/direct"},
-	    "a/b": {"properties": {"field": {"type": "string"}}},
+	    "a/b": {"type": "object", "properties": {"field": {"type": "string"}}},
 	    "isolated1": {"$ref": "#/$defs/isolated2"},
 	    "isolated2": {"$ref": "#/$defs/isolated1"},
-	    "unused": {"description": "#/$defs/unused"}
+	    "unused": {"description": "#/$defs/unused"},
+	    "line\n\"break": {},
+	    "named-properties": {"type": "object", "properties": {
+	      "properties": {"type": "string"}, "name": {"type": "string"}
+	    }, "required": ["name"]}
 	  }
 	}`), 0o600))
 
 	output, err := run(references)
 	require.NoError(t, err, "%s", output)
-	require.Equal(t, "isolated1\nisolated2\nunused\n", string(output))
+	require.Equal(t, "\"isolated1\"\n\"isolated2\"\n\"line\\n\\\"break\"\n\"named-properties\"\n\"unused\"\n", string(output))
 
 	output, err = run(required)
 	require.NoError(t, err, "%s", output)
@@ -65,10 +73,17 @@ func TestDailySchemaAuditChecks(t *testing.T) {
 	require.NoError(t, json.Unmarshal(output, &paths))
 	require.Equal(t, [][]any{{}, {"$defs", "a/b"}}, paths)
 
-	require.NoError(t, os.WriteFile(schemaPath, []byte("{"), 0o600))
-	for _, command := range []string{references, required} {
-		output, err = run(command)
-		require.Error(t, err, "%s", output)
+	require.NoError(t, os.WriteFile(schemaPath, []byte(`{"$defs":{}}`), 0o600))
+	output, err = run(references)
+	require.NoError(t, err, "%s", output)
+	require.Empty(t, output)
+
+	for _, invalid := range []string{"", " \n", "{", "{}\n{}", "null", "[]"} {
+		require.NoError(t, os.WriteFile(schemaPath, []byte(invalid), 0o600))
+		for _, command := range []string{references, required} {
+			output, err = run(command)
+			require.Error(t, err, "input %q: %s", invalid, output)
+		}
 	}
 	require.NoError(t, os.Remove(schemaPath))
 	for _, command := range []string{references, required} {
