@@ -221,7 +221,7 @@ func TestRoutingResetPreservesReconciliationCoverage(t *testing.T) {
 	})
 
 	t.Run("preserves reconciliation obligations above reset_after_run", func(t *testing.T) {
-		stateJSON := `{"v":2,"workflow":"triage","seq":5,"generation":{"hash":"9f2c41d0","since_run":1},"reset_after_run":0,"last_run":105,"reconciled_through":105,"unresolved_runs":[104,98,100,102,102],"unresolved_run_ids":{"98":"9098","100":"9100","102":"9102","104":"9104"},"unresolved_lookup_cursor":102,"unexplained":1,"scopes":{},"updated":{"run":"9105","at":"2026-11-24T09:00:00Z"}}`
+		stateJSON := `{"v":2,"workflow":"triage","seq":5,"generation":{"hash":"9f2c41d0","since_run":105},"reset_after_run":0,"last_run":105,"first_write_run":103,"reconciled_through":105,"unresolved_runs":[104,98,100,102,102],"unresolved_run_ids":{"98":"9098","100":"9100","102":"9102","104":"9104"},"unresolved_lookup_cursor":102,"unexplained":1,"scopes":{},"updated":{"run":"9105","at":"2026-11-24T09:00:00Z"}}`
 		api := &fakeRoutingAPI{
 			heads:  map[string]string{"memory/adaptive-routing/triage": "head2"},
 			files:  map[string]string{"head2:state.json": stateJSON},
@@ -234,6 +234,7 @@ func TestRoutingResetPreservesReconciliationCoverage(t *testing.T) {
 		raw := decodeRaw(t, api.commits[0].content)
 		assert.Equal(t, json.Number("100"), raw["reset_after_run"])
 		assert.Equal(t, json.Number("105"), raw["reconciled_through"])
+		assert.Equal(t, json.Number("103"), raw["first_write_run"])
 		assert.Equal(t, []any{json.Number("102"), json.Number("104")}, raw["unresolved_runs"])
 		assert.Equal(t, map[string]any{"102": "9102", "104": "9104"}, raw["unresolved_run_ids"])
 		assert.Equal(t, json.Number("102"), raw["unresolved_lookup_cursor"])

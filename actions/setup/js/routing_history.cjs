@@ -36,7 +36,7 @@ const LIVE_ROLES = new Set(["serve", "test", "probe", "ordinary"]);
  * @typedef {{ since_seq: number, pending: number }} Suspension
  * @typedef {{ history: HistoryEntry[], credits: number | null, model_credits: number | null, bills: number, streak: number, tests: number, suspended: Suspension | null, seen: string, summary: { runs: number, rate: number, hopeful: number } | null }} PairRecord
  * @typedef {{ incumbent: string | null, last_role: string | null, last_success_seq: number, pairs: Record<string, PairRecord> }} ScopeRecord
- * @typedef {{ v: number, workflow: string, seq: number, generation: { hash: string, since_run: number } | null, reset_after_run: number, last_run: number, reconciled_through?: number, unresolved_runs?: number[], unresolved_run_ids?: Record<string, string>, unresolved_lookup_cursor?: number, unexplained: number, scopes: Record<string, ScopeRecord>, updated: { run: string | null, at: string } | null }} HistoryState
+ * @typedef {{ v: number, workflow: string, seq: number, generation: { hash: string, since_run: number } | null, reset_after_run: number, last_run: number, first_write_run?: number, reconciled_through?: number, unresolved_runs?: number[], unresolved_run_ids?: Record<string, string>, unresolved_lookup_cursor?: number, unexplained: number, scopes: Record<string, ScopeRecord>, updated: { run: string | null, at: string } | null }} HistoryState
  * @typedef {{ run: string, number: number, attempt: number | null, at: string, generation: string | null, scope: string | null, mode: string | null, role: string | null, pair: string | null, outcome: string | null, credits: number | null, counted: boolean, note: string | null }} RunLine
  * @typedef {{ credits?: number | null, model_credits?: number | null, tokens?: (number | null)[] | null }} RunCost
  * @typedef {{ id: string, number: number, conclusion: string, agent_ran?: boolean | null, generation?: string | null }} ListedRun
@@ -489,6 +489,7 @@ function applyRun(input, runs, run, options = {}) {
     return finish();
   }
   if (state.generation === null) {
+    if (hasReconciliation && number > state.reset_after_run + 1) state.first_write_run = number;
     state.generation = { hash: run.generation, since_run: number };
   } else if (run.generation !== state.generation.hash) {
     if (number <= state.generation.since_run) {

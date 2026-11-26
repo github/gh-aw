@@ -87,7 +87,7 @@ function matchesCreatedFilter(createdAt, created) {
 const runCreatedAt = number => new Date(Date.parse("2026-11-01T00:00:00Z") + number * 60_000).toISOString().replace(/\.\d{3}Z$/, "Z");
 
 function paginationRun(number, overrides = {}) {
-  return { id: 9000 + number, run_number: number, created_at: runCreatedAt(number), status: "completed", conclusion: "success", head_branch: "main", event: "schedule", run_attempt: 1, ...overrides };
+  return { id: 9000 + number, run_number: number, created_at: runCreatedAt(number), status: "completed", conclusion: "success", head_branch: "main", head_sha: "compiled-default", event: "schedule", run_attempt: 1, ...overrides };
 }
 
 function reconcilePagination(githubClient, floor, runNumber) {
@@ -114,7 +114,7 @@ function fakeGitHub(remote, { runs = [], jobs = {}, attempts = {}, contents = {}
         get: async () => ({ data: { default_branch: "main" } }),
         getContent: async ({ path: filePath, ref }) => {
           calls.contents.push({ path: filePath, ref });
-          const text = contents[`${ref}:${filePath}`] ?? contents[ref];
+          const text = contents[`${ref}:${filePath}`] ?? contents[ref] ?? (ref === "compiled-default" ? `GH_AW_ROUTING_GENERATION: "${GENERATION}"` : undefined);
           if (text === undefined) throw Object.assign(new Error("Not Found"), { status: 404 });
           return { data: { content: Buffer.from(text, "utf8").toString("base64"), encoding: "base64" } };
         },
@@ -730,6 +730,45 @@ describe("push_routing_history saves", () => {
     await save(remote, 3, "success", { github });
     expect(remoteState(remote)).toMatchObject({ unexplained: 0, unresolved_runs: [] });
     expect(remoteRuns(remote).filter(row => row.number === 1)).toMatchObject([{ note: "older_definition", generation: previous }]);
+  });
+
+  it("does not attribute a pre-first-write pull_request_target failure to a guessed definition on a later save", async () => {
+    const remote = bareRemote();
+    const runs = [paginationRun(2), paginationRun(1, { event: "pull_request_target", head_branch: "feature", head_sha: "pr-head", conclusion: "failure" })];
+    const github = fakeGitHub(remote, {
+      runs,
+      jobs: {
+        9001: [
+          { name: "agent", started_at: runCreatedAt(1), conclusion: "success" },
+          { name: "push_routing_history", conclusion: "failure" },
+        ],
+      },
+    });
+    await save(remote, 2, "success", { github });
+    await save(remote, 3, "success", { github });
+    expect(remoteState(remote)).toMatchObject({ unexplained: 0, unresolved_runs: [1], unresolved_run_ids: { "1": "9001" } });
+    expect(remoteRuns(remote).map(row => row.number)).toEqual([2, 3]);
+    expect(github.calls.contents).toEqual([]);
+  });
+
+  it("can expire a post-opt-in gap after the definition changes on a long-lived workflow", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(runCreatedAt(20100)));
+    const remote = bareRemote();
+    seedHistory(remote, { ...emptyState("triage"), generation: { hash: GENERATION, since_run: 1 }, last_run: 19999, reconciled_through: 19999, unresolved_runs: [19500] }, []);
+    const generation = `${"c".repeat(64)}:${"d".repeat(64)}`;
+    await save(remote, 20000, "success", {
+      generation,
+      github: fakeGitHub(remote, {
+        listWorkflowRuns: async () => {
+          throw new Error("unavailable");
+        },
+      }),
+    });
+    expect(remoteState(remote).unresolved_runs).toEqual([19500]);
+    const runs = Array.from({ length: 20000 }, (_, i) => paginationRun(20000 - i)).filter(row => row.run_number !== 19500);
+    await save(remote, 20001, "success", { generation, github: fakeGitHub(remote, { runs }) });
+    expect(remoteState(remote)).toMatchObject({ reconciled_through: 20001, unresolved_runs: [] });
   });
 
   it("checkpoints a failure-heavy bootstrap and budgets every job page before requesting the next", async () => {

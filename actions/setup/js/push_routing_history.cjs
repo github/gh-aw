@@ -790,7 +790,7 @@ async function findBootstrapChunk(probe, floor, nowMs) {
  * @param {{githubClient: any, owner: string, repo: string, workflowFile: string, workflowPath?: string, defaultBranch: string, runId: string, runNumber: number, state: HistoryState, runs: any[], generation: string, inspectionBudget?: {remaining: number}}} options
  * @returns {Promise<{listing: any[], reconciliation: import("./routing_history.cjs").ReconciliationCoverage}>}
  */
-async function listRuns({ githubClient, owner, repo, workflowFile, workflowPath = "", defaultBranch, runId, runNumber, state, runs, generation, inspectionBudget = { remaining: MAX_NEW_INSPECTION_CALLS } }) {
+async function listRuns({ githubClient, owner, repo, workflowFile, workflowPath = `.github/workflows/${workflowFile}`, defaultBranch, runId, runNumber, state, runs, generation, inspectionBudget = { remaining: MAX_NEW_INSPECTION_CALLS } }) {
   // At or immediately after the reset fence there are no earlier obligations to inspect.
   if (runNumber <= state.reset_after_run + 1 || (state.generation && state.generation.hash !== generation && runNumber <= state.generation.since_run)) {
     return { listing: [], reconciliation: { verified: true, unresolved: [], resolved: [] } };
@@ -800,6 +800,9 @@ async function listRuns({ githubClient, owner, repo, workflowFile, workflowPath 
   const legacyFloor = legacyReconciliationFloor(state, runs);
   const baseReconciled = typeof state.reconciled_through === "number" ? state.reconciled_through : legacyFloor;
   const floor = Math.max(baseReconciled, state.reset_after_run || 0);
+  // Older histories predate first-write reconciliation. A later definition edit does not
+  // retroactively make their established gaps part of bootstrap.
+  const firstWrite = state.first_write_run ?? (state.generation === null ? runNumber : 0);
   // Leave tracked unresolved runs at or above this writer's number for a later writer to handle.
   const prevUnresolved = new Set((Array.isArray(state.unresolved_runs) ? state.unresolved_runs : []).filter(n => Number.isInteger(n) && n > state.reset_after_run && n < runNumber));
   const storedUnresolvedIds = state.unresolved_run_ids && typeof state.unresolved_run_ids === "object" ? state.unresolved_run_ids : {};
@@ -814,10 +817,10 @@ async function listRuns({ githubClient, owner, repo, workflowFile, workflowPath 
   const probe = created => githubClient.rest.actions.listWorkflowRuns({ owner, repo, workflow_id: workflowFile, created, page: 1, per_page: 1 });
   // A long-lived workflow may already have thousands of runs when learning is first enabled.
   // Start near the unverified floor rather than spending every save's budget searching back to it.
-  if (floor < (state.generation?.since_run ?? runNumber) && upperNeeded - floor > MAX_LIST_PAGE * LIST_RUNS_PER_PAGE) {
+  if (floor < firstWrite && upperNeeded - floor > MAX_LIST_PAGE * LIST_RUNS_PER_PAGE) {
     const chunk = await findBootstrapChunk(probe, floor, nowMs);
     if (chunk) {
-      upperNeeded = Math.min(upperNeeded, chunk.number);
+      upperNeeded = Math.min(upperNeeded, chunk.number, firstWrite);
       until = chunk.second;
     }
   }
@@ -1026,8 +1029,7 @@ async function listRuns({ githubClient, owner, repo, workflowFile, workflowPath 
   // covered by the interval-gap unfiltered scan. Isolate failures locally so an API error on a deep
   // page does not discard completed direct-ID lookups, cursor rotation, or verified interval coverage.
   const unindexedMissing = stillMissingUnresolved.filter(num => !eligibleByNumber.has(num) && !ineligibleNumbers.has(num) && !resolved.has(num) && !storedUnresolvedIds[String(num)]);
-  const generationStart = state.generation?.since_run ?? runNumber;
-  if (!bootstrapProof && unindexedMissing.some(num => num < generationStart)) {
+  if (!bootstrapProof && unindexedMissing.some(num => num < firstWrite)) {
     try {
       bootstrapProof = await fetchStreamWindow(listPages({}), 0, upperNeeded, null, true);
       recordUnfilteredStream(bootstrapProof);
@@ -1036,7 +1038,7 @@ async function listRuns({ githubClient, owner, repo, workflowFile, workflowPath 
     }
   }
   /** @param {number} num */
-  const mayExpireGap = num => num >= generationStart || bootstrapProof?.reachedFloor === true;
+  const mayExpireGap = num => num >= firstWrite || bootstrapProof?.reachedFloor === true;
   const uncoveredUnindexed = unindexedMissing.filter(num => !scanCoversNumber(intervalUnfilteredScan, num));
   if (uncoveredUnindexed.length > 0) {
     try {
@@ -1159,6 +1161,9 @@ async function listRuns({ githubClient, owner, repo, workflowFile, workflowPath 
         if (jobs.length > 0 && (!writer || writer.conclusion === "success")) include = false;
         // Only trust head_sha for non-pull_request_target runs on the default branch; pull_request_target's
         // REST head_sha is the PR head rather than the base commit that supplied the workflow definition.
+        if (include && listed.agent_ran && num < firstWrite && (run.event === "pull_request_target" || typeof run.head_sha !== "string" || !run.head_sha)) {
+          throw new Error("First-write reconciliation has no trusted workflow definition revision for this run");
+        }
         if (include && listed.agent_ran && num <= effectiveSinceRun && run.event !== "pull_request_target" && run.head_branch === defaultBranch && typeof run.head_sha === "string" && run.head_sha) {
           takeInspection();
           listed.generation = await readRunGeneration({ githubClient, owner, repo, workflowPath, ref: run.head_sha });
