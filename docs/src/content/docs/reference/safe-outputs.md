@@ -860,8 +860,8 @@ Agent calls `set_issue_type` with `issue_type` (the type name) and optionally `i
 ### Set Issue Status (`set-issue-status:`)
 
 Sets a [native issue planning status](https://docs.github.com/en/issues/tracking-your-work-with-issues/learning-about-issues/about-issue-statuses),
-not a Projects Status field or an issue's open/closed state. Issue statuses are
-in public preview and must be available in the target repository.
+not a Projects Status field or an issue's open/closed state. Issue statuses are in public preview and subject to change; they must be
+available in the target repository.
 
 ```yaml wrap
 safe-outputs:

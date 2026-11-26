@@ -5809,6 +5809,9 @@ or review bodies to returned or persisted decision evidence.
 **Purpose**: Set a native GitHub issue planning status, distinct from open/closed
 state and Projects fields.
 
+GitHub's native issue planning status API is in public preview and is subject to
+change. Availability varies by target repository.
+
 **Default Max**: 5
 
 **Cross-Repository Support**: Yes
