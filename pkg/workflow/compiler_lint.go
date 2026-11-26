@@ -113,10 +113,16 @@ func (c *Compiler) compilerLintInput(data *WorkflowData, graph *actions.Workflow
 			}
 		}
 	}
+	var resolvedAgentSandbox *bool
+	if data.SandboxConfig != nil {
+		enabled := isSandboxEnabled(data.SandboxConfig, data.NetworkPermissions)
+		resolvedAgentSandbox = &enabled
+	}
 	return workflowlint.Input{
 		Workflow: graph, Document: c.lintPolicyDocument(data), AuthoredJobs: data.Jobs, SourcePath: sourcePath,
 		ResolvedTools: resolvedTools, ResolvedRoles: c.dryRunWorkflowData(data).Roles, ResolvedMCPScripts: resolvedScripts,
-		AllowActionRefs: c.allowActionRefs, SafeOutputJobs: safeOutputLintJobs(data), GeneratedActionRefs: generatedActionRefs,
+		ResolvedAgentSandbox: resolvedAgentSandbox,
+		AllowActionRefs:      c.allowActionRefs, SafeOutputJobs: safeOutputLintJobs(data), GeneratedActionRefs: generatedActionRefs,
 	}
 }
 
