@@ -38,10 +38,12 @@ const WRITER_JOB = "push_routing_history";
 const LIST_RUNS_PER_PAGE = 100;
 // GitHub Actions lists only the newest 1,000 runs that match a query, so page 10 is the last readable page.
 const MAX_LIST_PAGE = 10;
-// Listing calls one stream may make in a save. New windows open only within the first MAX_SEARCH_CALLS,
-// which leaves calls to finish the search and walk back up.
+// Per-stream limits, separate from bootstrap timestamp probes and exhaustive gap corroboration.
+// New windows open only within the first MAX_SEARCH_CALLS, leaving calls for the return walk.
 const MAX_SEARCH_CALLS = 16;
 const MAX_LIST_CALLS = 24;
+const MAX_BOOTSTRAP_CORROBORATION_CALLS = 128;
+const MAX_NEW_INSPECTION_CALLS = 64;
 const MAX_DIRECT_UNRESOLVED_LOOKUPS = 10;
 const MAX_BOUNDARY_CHECKS = 4;
 // Gaps whose higher listed neighbour is within 5 minutes of the scan can still reflect GitHub
@@ -386,20 +388,22 @@ function uniqueRuns(runs) {
  * @param {number} targetRunNumber lowest run_number we must reach (inclusive)
  * @param {number} maxRunNumber highest run_number we need to verify (inclusive)
  * @param {number | null} [until] last creation second of a bootstrap chunk
+ * @param {boolean} [exhaustive] require coverage of the entire unfiltered listing to corroborate a bootstrap gap
  * @returns {Promise<{items: any[], reachedFloor: boolean, maxVerified: number, reachedStart: boolean, reachedTop: boolean, contiguousPages: Array<{page: number, created: string | undefined, batch: any[], minNum: number, maxNum: number, reachedStart: boolean, timed: boolean, oldest: number, newest: number, settled: number}>}>}
  */
-async function fetchStreamWindow(fetchPage, targetRunNumber, maxRunNumber, until = null) {
+async function fetchStreamWindow(fetchPage, targetRunNumber, maxRunNumber, until = null, exhaustive = false) {
   /** @typedef {ReturnType<typeof pageSummary>} Page */
   /** @typedef {{created: string | undefined, total: number | null, pages: Map<number, Page>, bottom: number}} RunWindow */
   /** @type {RunWindow[]} */
   const windows = [];
   let calls = 0;
+  const callLimit = exhaustive ? MAX_BOOTSTRAP_CORROBORATION_CALLS : MAX_LIST_CALLS;
 
   /** @param {RunWindow} win @param {number} page @returns {Promise<Page | null>} */
   const load = async (win, page) => {
     const cached = win.pages.get(page);
     if (cached) return cached;
-    if (calls >= MAX_LIST_CALLS) return null;
+    if (calls >= callLimit) return null;
     calls += 1;
     const data = (await fetchPage(page, win.created))?.data;
     const runs = data?.workflow_runs;
@@ -413,8 +417,8 @@ async function fetchStreamWindow(fetchPage, targetRunNumber, maxRunNumber, until
     win.pages.set(page, entry);
     return entry;
   };
-  /** @param {Page} entry */
-  const holdsFloor = entry => entry.last || (entry.full && entry.timed && entry.settled <= targetRunNumber);
+  /** @param {Page} entry @param {RunWindow} win */
+  const holdsFloor = (entry, win) => (exhaustive ? entry.last && win.total !== MAX_LIST_PAGE * LIST_RUNS_PER_PAGE : entry.last || (entry.full && entry.timed && entry.settled <= targetRunNumber));
   const fail = () => ({
     items: uniqueRuns(windows.flatMap(win => [...win.pages.values()].flatMap(entry => entry.runs))),
     reachedFloor: false,
@@ -428,7 +432,7 @@ async function fetchStreamWindow(fetchPage, targetRunNumber, maxRunNumber, until
   let cutoff = until;
   let floorPage = 1;
   for (;;) {
-    if (calls >= MAX_SEARCH_CALLS) return fail();
+    if (calls >= (exhaustive ? callLimit : MAX_SEARCH_CALLS)) return fail();
     /** @type {RunWindow} */
     const win = { created: cutoff === null ? undefined : `<=${new Date(cutoff * 1000).toISOString().replace(/\.\d{3}Z$/, "Z")}`, total: null, pages: new Map(), bottom: 0 };
     windows.push(win);
@@ -441,20 +445,20 @@ async function fetchStreamWindow(fetchPage, targetRunNumber, maxRunNumber, until
     let jump = first.minNum - targetRunNumber > (lastPage - 1) * LIST_RUNS_PER_PAGE;
     let page = 1;
     let entry = first;
-    while (!holdsFloor(entry) && entry.full && page < lastPage) {
+    while (!holdsFloor(entry, win) && entry.full && page < lastPage) {
       page = jump ? lastPage : page + 1;
       const next = await load(win, page);
       if (!next) return fail();
       entry = next;
       if (jump && entry.maxNum < targetRunNumber) {
         // Look for a nearer floor, unless we already have one and cannot afford all the skipped pages.
-        if (holdsFloor(entry) && calls + lastPage - 2 > MAX_LIST_CALLS) break;
+        if (holdsFloor(entry, win) && calls + lastPage - 2 > callLimit) break;
         jump = false;
         page = 1;
         entry = first;
       }
     }
-    if (holdsFloor(entry)) {
+    if (holdsFloor(entry, win)) {
       floorPage = page;
       break;
     }
@@ -486,7 +490,7 @@ async function fetchStreamWindow(fetchPage, targetRunNumber, maxRunNumber, until
   let page = floorPage;
   for (;;) {
     const win = windows[w];
-    if (!win.pages.has(page) && calls >= MAX_LIST_CALLS) break;
+    if (!win.pages.has(page) && calls >= callLimit) break;
     const entry = await load(win, page);
     // Every page above the floor is full unless the listing lost runs between calls.
     if (!entry || (walked.length > 0 && !entry.full)) return fail();
@@ -497,8 +501,10 @@ async function fetchStreamWindow(fetchPage, targetRunNumber, maxRunNumber, until
       w -= 1;
       page = windows[w].bottom;
     } else {
+      const items = uniqueRuns(walked.flatMap(e => e.entry.runs));
+      if (exhaustive && (items.some(run => run?.id == null || !Number.isSafeInteger(run.run_number)) || items.length !== windows[0].total)) return fail();
       return {
-        items: uniqueRuns(walked.flatMap(e => e.entry.runs)),
+        items,
         reachedFloor: true,
         maxVerified: maxRunNumber,
         reachedStart: walked[0]?.entry.last === true,
@@ -508,6 +514,7 @@ async function fetchStreamWindow(fetchPage, targetRunNumber, maxRunNumber, until
     }
   }
 
+  if (exhaustive) return fail();
   // The unread page above can still hold runs created in the newest second read, so only runs
   // created before it are verified.
   const newest = walked[walked.length - 1].entry.newest;
@@ -716,17 +723,17 @@ function isEligibleRun(run, defaultBranch) {
  * @param {(created: string) => Promise<any>} probe newest unfiltered run at or before a timestamp
  * @param {number} floor
  * @param {number} nowMs
- * @param {number} [low] earliest creation second to probe
  */
-async function findBootstrapChunk(probe, floor, nowMs, low = 0) {
+async function findBootstrapChunk(probe, floor, nowMs) {
   const span = MAX_LIST_PAGE * LIST_RUNS_PER_PAGE;
+  let low = 0;
   let high = Math.ceil(nowMs / 1000);
   /** @type {{second: number, number: number} | null} */
   let firstAbove = null;
   // Bisect whole seconds (at most 32 probes through 2106), not pages past the API's result cap.
   while (low <= high) {
     const second = Math.floor((low + high) / 2);
-    const { data } = await probe(`<=${new Date(second * 1000).toISOString()}`);
+    const { data } = await probe(`<=${new Date(second * 1000).toISOString().replace(/\.\d{3}Z$/, "Z")}`);
     const items = data?.workflow_runs;
     if (!Array.isArray(items) || !Number.isSafeInteger(data.total_count) || data.total_count < 0 || items.length !== Math.min(data.total_count, 1)) return null;
     const number = items[0]?.run_number;
@@ -787,10 +794,15 @@ async function listRuns({ githubClient, owner, repo, workflowFile, workflowPath 
   /** @param {Record<string, string>} filter */
   const listPages = filter => (/** @type {number} */ page, /** @type {string | undefined} */ created) =>
     githubClient.rest.actions.listWorkflowRuns({ owner, repo, workflow_id: workflowFile, ...filter, per_page: LIST_RUNS_PER_PAGE, page, ...(created ? { created } : {}) });
-  const [defaultStream, prtStream] = await Promise.all([fetchStreamWindow(listPages({ branch: defaultBranch }), floor + 1, upperNeeded, until), fetchStreamWindow(listPages({ event: "pull_request_target" }), floor + 1, upperNeeded, until)]);
+  // In a bootstrap window, list all event types once so a non-default-branch run is
+  // positive evidence of ineligibility, not a gap requiring exhaustive corroboration.
+  const streams =
+    until !== null
+      ? [await fetchStreamWindow(listPages({}), floor + 1, upperNeeded, until)]
+      : await Promise.all([fetchStreamWindow(listPages({ branch: defaultBranch }), floor + 1, upperNeeded), fetchStreamWindow(listPages({ event: "pull_request_target" }), floor + 1, upperNeeded)]);
 
-  let verified = defaultStream.reachedFloor && prtStream.reachedFloor;
-  let verifiedUpper = verified ? Math.min(upperNeeded, defaultStream.maxVerified, prtStream.maxVerified) : floor;
+  let verified = streams.every(stream => stream.reachedFloor);
+  let verifiedUpper = verified ? streams.reduce((upper, stream) => Math.min(upper, stream.maxVerified), upperNeeded) : floor;
   if (verified && runNumber > floor + 1 && verifiedUpper <= floor) verified = false;
 
   /** @type {Map<number, any>} */
@@ -809,7 +821,7 @@ async function listRuns({ githubClient, owner, repo, workflowFile, workflowPath 
       if (!eligibleByNumber.has(num)) eligibleByNumber.set(num, run);
     }
   };
-  ingestRuns([...defaultStream.items, ...prtStream.items]);
+  for (const stream of streams) ingestRuns(stream.items);
 
   const missingUnresolved = [...prevUnresolved].filter(num => !writtenNumbers.has(num) && !eligibleByNumber.has(num) && !ineligibleNumbers.has(num));
   const expectedIntervalCount = verified ? Math.max(0, verifiedUpper - floor) : 0;
@@ -918,13 +930,17 @@ async function listRuns({ githubClient, owner, repo, workflowFile, workflowPath 
       if (num > earliestGap) break;
       earliestGap = num + 1;
     }
-    // The first survivor after a deletion may itself be the chunk's last run. Let the
-    // unfiltered page bracket it without extending the coverage we are trying to verify.
-    const lookahead = until === null ? null : await findBootstrapChunk(probe, upperNeeded, nowMs, until + 1);
-    const unfilteredStream = await fetchStreamWindow(listPages({}), earliestGap, verifiedUpper, lookahead?.second ?? null);
+    // A run's timestamp may be newer than both its numbered neighbours. A bootstrap
+    // cutoff can find positive evidence, but cannot prove a missing run was deleted.
+    const unfilteredStream = await fetchStreamWindow(listPages({}), until === null ? earliestGap : 0, verifiedUpper, null, until !== null);
     intervalUnfilteredScan = recordUnfilteredStream(unfilteredStream);
     if (!unfilteredStream.reachedFloor) {
-      verified = false;
+      if (until === null) verified = false;
+      else {
+        while (earliestGap <= verifiedUpper && (writtenNumbers.has(earliestGap) || eligibleByNumber.has(earliestGap) || ineligibleNumbers.has(earliestGap))) earliestGap++;
+        verifiedUpper = earliestGap - 1;
+        verified = verifiedUpper > floor;
+      }
     } else {
       verifiedUpper = Math.min(verifiedUpper, unfilteredStream.maxVerified);
       if (runNumber > floor + 1 && verifiedUpper <= floor) {
@@ -1037,12 +1053,14 @@ async function listRuns({ githubClient, owner, repo, workflowFile, workflowPath 
 
   const effectiveSinceRun = state.generation?.hash === generation ? state.generation.since_run : runNumber;
   const fullCatchUp = verified && (runNumber <= floor + 1 || verifiedUpper >= runNumber - 1);
-  const reconciliationCeiling = verified ? (fullCatchUp ? runNumber : verifiedUpper) : floor;
+  let reconciliationCeiling = verified ? (fullCatchUp ? runNumber : verifiedUpper) : floor;
   const listing = [];
   /** @type {Set<number>} */
   const unresolved = new Set(verified ? unresolvedGaps : []);
   /** @type {Record<string, string>} */
   const unresolvedIds = {};
+  let remainingInspections = MAX_NEW_INSPECTION_CALLS;
+  const budgetExhausted = new Error("New routing-history inspection budget exhausted");
 
   for (const num of [...eligibleByNumber.keys()].sort((a, b) => a - b)) {
     const isTrackedUnresolved = prevUnresolved.has(num);
@@ -1054,10 +1072,16 @@ async function listRuns({ githubClient, owner, repo, workflowFile, workflowPath 
       if (isTrackedUnresolved) resolved.add(num);
       continue;
     }
+    // Previously tracked obligations have their own bounded state and must not be
+    // starved by new work. Checkpoint new work before the first unfinished inspection.
+    const takeInspection = () => {
+      if (!isTrackedUnresolved && remainingInspections-- <= 0) throw budgetExhausted;
+    };
     try {
       let { status, conclusion } = run;
       // The listing describes the latest attempt. Only the first attempt can owe a save.
       if ((run.run_attempt || 1) > 1) {
+        takeInspection();
         const { data: firstAttempt } = await githubClient.rest.actions.getWorkflowRunAttempt({ owner, repo, run_id: run.id, attempt_number: 1 });
         conclusion = firstAttempt.conclusion;
         status = firstAttempt.status ?? (conclusion ? "completed" : null);
@@ -1071,7 +1095,11 @@ async function listRuns({ githubClient, owner, repo, workflowFile, workflowPath 
       const listed = { id, number: num, conclusion: conclusion || "unknown" };
       let include = true;
       if (!SAVED_CONCLUSIONS.has(listed.conclusion)) {
-        const jobs = await githubClient.paginate(githubClient.rest.actions.listJobsForWorkflowRunAttempt, { owner, repo, run_id: run.id, attempt_number: 1, per_page: 100 });
+        takeInspection();
+        const jobs = await githubClient.paginate(githubClient.rest.actions.listJobsForWorkflowRunAttempt, { owner, repo, run_id: run.id, attempt_number: 1, per_page: 100 }, (/** @type {any} */ response) => {
+          if (/<[^>]+>;\s*rel="next"/.test(response.headers.link || "")) takeInspection();
+          return response.data;
+        });
         listed.agent_ran = jobs.some((/** @type {any} */ job) => job?.name === "agent" && job.conclusion !== "skipped" && Boolean(job.started_at));
         const writer = jobs.find((/** @type {any} */ job) => job?.name === WRITER_JOB);
         // A run that failed before any job was created (jobs.length === 0) is recorded as no_agent.
@@ -1082,6 +1110,7 @@ async function listRuns({ githubClient, owner, repo, workflowFile, workflowPath 
         // Only trust head_sha for non-pull_request_target runs on the default branch; pull_request_target's
         // REST head_sha is the PR head rather than the base commit that supplied the workflow definition.
         if (include && listed.agent_ran && num <= effectiveSinceRun && run.event !== "pull_request_target" && run.head_branch === defaultBranch && typeof run.head_sha === "string" && run.head_sha) {
+          takeInspection();
           const runGeneration = await readRunGeneration({ githubClient, owner, repo, workflowPath, ref: run.head_sha });
           if (runGeneration) listed.generation = runGeneration;
         }
@@ -1089,6 +1118,10 @@ async function listRuns({ githubClient, owner, repo, workflowFile, workflowPath 
       if (include) listing.push(listed);
       if (isTrackedUnresolved) resolved.add(num);
     } catch (error) {
+      if (error === budgetExhausted) {
+        reconciliationCeiling = num - 1;
+        break;
+      }
       // Keep this run unresolved with its ID so a per-run API failure does not discard other
       // resolved runs, verified interval coverage, or direct-lookup cursor progress.
       core.warning(`Could not inspect earlier run ${num} (${id}): ${getErrorMessage(error)}`);
@@ -1116,7 +1149,7 @@ async function listRuns({ githubClient, owner, repo, workflowFile, workflowPath 
     listing,
     reconciliation: {
       verified,
-      ...(verified && !fullCatchUp ? { ceiling: reconciliationCeiling } : {}),
+      ...(verified && reconciliationCeiling < runNumber ? { ceiling: reconciliationCeiling } : {}),
       unresolved: [...unresolved].sort((a, b) => a - b),
       ...(Object.keys(unresolvedIds).length > 0 ? { unresolved_ids: unresolvedIds } : {}),
       ...(nextLookupCursor !== undefined ? { unresolved_lookup_cursor: nextLookupCursor } : {}),

@@ -155,10 +155,11 @@ function fakeGitHub(remote, { runs = [], jobs = {}, attempts = {}, contents = {}
         listJobsForWorkflowRunAttempt: async ({ run_id }) => ({ data: { jobs: jobs[run_id] || [] } }),
       },
     },
-    paginate: async (method, params) => {
+    paginate: async (method, params, mapPage) => {
       calls.jobs.push(params.run_id);
       calls.jobParams.push(params);
-      return (await method(params)).data.jobs;
+      const data = (await method(params)).data.jobs;
+      return mapPage ? mapPage({ data, headers: {} }) : data;
     },
   };
   return client;
@@ -606,6 +607,72 @@ describe("push_routing_history saves", () => {
     expect(rows.filter(row => row.note === "unsaved").map(row => row.number)).toEqual([first + 1, afterGap, 10001]);
     expect(github.calls.jobs).toEqual([9001 + first, 9000 + afterGap, 19001]);
     expect(github.calls.lists.every(call => call.page <= 10)).toBe(true);
+  });
+
+  it("recovers a failure outside the bootstrap cutoff instead of certifying its run number as deleted", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(runCreatedAt(10001)));
+    const runs = Array.from({ length: 10000 }, (_, i) => paginationRun(10000 - i));
+    const skewed = runs.splice(-2, 1)[0];
+    runs.unshift({ ...skewed, conclusion: "failure", created_at: runCreatedAt(10001) });
+    const github = fakeGitHub(null, {
+      runs,
+      jobs: {
+        9002: [
+          { name: "agent", started_at: runCreatedAt(2), conclusion: "success" },
+          { name: "push_routing_history", conclusion: "failure" },
+        ],
+      },
+    });
+    const options = {
+      githubClient: github,
+      owner: "octo",
+      repo: "demo",
+      workflowFile: "triage.lock.yml",
+      defaultBranch: "main",
+      runId: "19000",
+      runNumber: 10000,
+      state: emptyState("triage"),
+      runs: [],
+      generation: GENERATION,
+    };
+    const list = github.rest.actions.listWorkflowRuns;
+    github.rest.actions.listWorkflowRuns = params => (!params.created && !params.branch && !params.event ? Promise.resolve({ data: { total_count: 10000, workflow_runs: [] } }) : list(params));
+    const incomplete = await listRuns(options);
+    expect(incomplete.reconciliation).toMatchObject({ verified: true, ceiling: 1 });
+    expect(github.calls.jobs).toEqual([]);
+
+    github.rest.actions.listWorkflowRuns = list;
+    const result = await listRuns(options);
+    expect(result.reconciliation.verified).toBe(true);
+    expect(result.listing).toContainEqual(expect.objectContaining({ id: "9002", number: 2, agent_ran: true }));
+    expect(github.calls.jobs).toEqual([9002]);
+  });
+
+  it("checkpoints a failure-heavy bootstrap and budgets every job page before requesting the next", async () => {
+    const runs = Array.from({ length: 901 }, (_, i) => paginationRun(901 - i, { conclusion: "failure" }));
+    const github = fakeGitHub(null, { runs });
+    const inspected = [];
+    let pages = 0;
+    github.paginate = async (_method, { run_id }, mapPage) => {
+      inspected.push(run_id);
+      for (let page = 0; page < 3; page++) {
+        pages++;
+        mapPage?.({ data: [], headers: page === 2 ? {} : { link: '<https://api.github.com/next>; rel="next"' } });
+      }
+      return [{ name: "agent", started_at: runCreatedAt(1), conclusion: "success" }];
+    };
+    const options = { githubClient: github, owner: "octo", repo: "demo", workflowFile: "triage.lock.yml", defaultBranch: "main", generation: GENERATION, runs: [] };
+    const first = await listRuns({ ...options, runId: "9901", runNumber: 901, state: emptyState("triage") });
+    expect(pages).toBe(64);
+    expect(first.reconciliation).toMatchObject({ verified: true, ceiling: 21 });
+    expect(first.listing).toEqual([]);
+    inspected.length = 0;
+    pages = 0;
+    const next = await listRuns({ ...options, runId: "9902", runNumber: 902, state: { ...emptyState("triage"), generation: { hash: GENERATION, since_run: 901 }, last_run: 901, reconciled_through: first.reconciliation.ceiling } });
+    expect(inspected[0]).toBe(9022);
+    expect(pages).toBe(64);
+    expect(next.reconciliation.ceiling).toBe(42);
   });
 
   it("does not charge failed or cancelled runs compiled without the history job, such as dry runs", async () => {
