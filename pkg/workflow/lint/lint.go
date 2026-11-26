@@ -306,6 +306,7 @@ func Default() *Runner {
 		PullRequestTargetCheckoutRule(),
 		PromptExpressionRule(),
 		PromptConditionSyntaxRule(),
+		FileAccessRule(),
 		GatewayDispatchLiteralsRule(),
 		ArtipackedRule(),
 		CachePoisoningRule(),
