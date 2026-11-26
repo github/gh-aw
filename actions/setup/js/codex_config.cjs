@@ -126,8 +126,8 @@ function loadCompiledConfig() {
   return { defaults: payload.defaults, overrides: payload.overrides, disablePlugins: payload.disablePlugins, envExpanded: payload.envExpanded === true };
 }
 
-/** @param {Record<string, Record<string, unknown>>} servers @param {string} urlPrefix */
-function buildConfig(servers, urlPrefix) {
+/** @param {Record<string, Record<string, unknown>>} servers @param {string} urlPrefix @param {Record<string, Record<string, unknown>>} [localServers] */
+function buildConfig(servers, urlPrefix, localServers = {}) {
   const compiled = loadCompiledConfig();
   const defaultServers = isTable(compiled.defaults.mcp_servers) ? compiled.defaults.mcp_servers : {};
   const defaults = {
@@ -148,7 +148,8 @@ function buildConfig(servers, urlPrefix) {
   };
   const merged = mergeConfig(defaults, compiled.overrides);
   const configuredServers = isTable(merged.mcp_servers) ? merged.mcp_servers : {};
-  merged.mcp_servers = Object.fromEntries(
+  /** @type {Record<string, Record<string, unknown>>} */
+  const mcpServers = Object.fromEntries(
     Object.entries(servers).map(([name, value]) => {
       const configured = configuredServers[name];
       const options = isTable(configured) ? configured : {};
@@ -163,6 +164,12 @@ function buildConfig(servers, urlPrefix) {
       ];
     })
   );
+  for (const [name, entry] of Object.entries(localServers)) {
+    if (Object.hasOwn(servers, name)) throw new Error(`Duplicate Codex MCP server ${name}`);
+    const options = configuredServers[name];
+    mcpServers[name] = { ...(isTable(options) ? options : {}), ...entry };
+  }
+  merged.mcp_servers = mcpServers;
   if (compiled.disablePlugins) {
     merged.features = { ...(isTable(merged.features) ? merged.features : {}), plugins: false };
   }
