@@ -720,6 +720,7 @@ function isEligibleRun(run, defaultBranch) {
 async function findBootstrapChunk(probe, floor, nowMs) {
   let low = 0;
   let high = Math.ceil(nowMs / 1000);
+  /** @type {{second: number, number: number} | null} */
   let firstAbove = null;
   // Bisect whole seconds (at most 32 probes through 2106), not pages past the API's result cap.
   while (low <= high) {
@@ -770,6 +771,7 @@ async function listRuns({ githubClient, owner, repo, workflowFile, workflowPath 
   writtenNumbers.add(runNumber);
 
   let upperNeeded = Math.max(floor, runNumber - 1);
+  /** @type {number | null} */
   let until = null;
   // A long-lived workflow may already have thousands of runs when learning is first enabled.
   // Start near the unverified floor rather than spending every save's budget searching back to it.
