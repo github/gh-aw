@@ -52,18 +52,16 @@ func newSecretsSetSubcommand() *cobra.Command {
 The secret value can be provided in three ways:
   1. Via the --value flag
   2. Via the --value-from-env flag (reads from environment variable)
-  3. From stdin (if neither flag is provided)`,
+  3. From the terminal or stdin (if neither flag is provided)
+
+Avoid --value for secrets: command-line arguments can be exposed in shell history and process listings.`,
 		Example: `  # From stdin (uses current repository)
   gh aw secrets set MY_SECRET
 
   # Specify target repository
   gh aw secrets set MY_SECRET --repo myorg/myrepo
 
-  # From flag
-  gh aw secrets set MY_SECRET --value "secret123" --repo myorg/myrepo
-
-  # From environment variable
-  export MY_TOKEN="secret123"
+  # From an existing environment variable
   gh aw secrets set MY_SECRET --value-from-env MY_TOKEN --repo myorg/myrepo`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -116,7 +114,7 @@ The secret value can be provided in three ways:
 	}
 
 	addRepoFlag(cmd)
-	cmd.Flags().StringVar(&flagValue, "value", "", "Secret value (if not provided, prompts interactively in a terminal or reads from stdin)")
+	cmd.Flags().StringVar(&flagValue, "value", "", "Secret value (avoid: visible in shell history and process listings; omit to prompt or read stdin)")
 	cmd.Flags().StringVar(&flagValueEnv, "value-from-env", "", "Environment variable to read secret value from")
 	cmd.Flags().StringVar(&flagAPIBase, "api-url", "", "GitHub API base URL (default: https://api.github.com or $GITHUB_API_URL)")
 

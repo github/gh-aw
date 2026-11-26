@@ -281,6 +281,13 @@ func TestInitCommandHelp(t *testing.T) {
 		t.Error("Expected help text to mention non-interactive setup")
 	}
 
+	exampleStart := strings.Index(cmd.Example, "gh aw add ")
+	require.NotEqual(t, -1, exampleStart)
+	fields := strings.Fields(cmd.Example[exampleStart:])
+	require.GreaterOrEqual(t, len(fields), 4)
+	_, err := parseWorkflowSpec(fields[3])
+	require.NoError(t, err)
+
 	if strings.Contains(helpText, "Usage:") {
 		t.Error("Expected init long help text to not embed a Usage section")
 	}

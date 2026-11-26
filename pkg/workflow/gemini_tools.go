@@ -191,22 +191,29 @@ fi`
 // explicit literal engine settings after agent overrides, never credentials or
 // runtime expressions.
 func (e *GeminiEngine) geminiShellEnvironment(data *WorkflowData) []string {
-	if data.EngineConfig == nil {
-		return nil
-	}
 	excluded := ComputeAWFExcludeEnvVarNames(data, e.GetRequiredSecretNames(data))
 	agentConfig := getAgentConfig(data)
 	var allowed []string
-	for name, value := range data.EngineConfig.Env {
-		if agentConfig != nil {
-			if override, ok := agentConfig.Env[name]; ok {
-				value = override
+	if data.EngineConfig != nil {
+		for name, value := range data.EngineConfig.Env {
+			if agentConfig != nil {
+				if override, ok := agentConfig.Env[name]; ok {
+					value = override
+				}
+			}
+			if !slices.Contains(excluded, name) && !geminiSensitiveEnvName.MatchString(name) && !strings.Contains(value, "${{") {
+				allowed = append(allowed, name)
 			}
 		}
-		if !slices.Contains(excluded, name) && !geminiSensitiveEnvName.MatchString(name) && !strings.Contains(value, "${{") {
-			allowed = append(allowed, name)
+	}
+	if usesWebFetchMCPForEngine(e, data) {
+		for _, name := range []string{"HTTP_PROXY", "HTTPS_PROXY", "SSL_CERT_FILE", "SSL_CERT_DIR", "CURL_CA_BUNDLE"} {
+			if !slices.ContainsFunc(excluded, func(value string) bool { return strings.EqualFold(value, name) }) &&
+				!slices.ContainsFunc(allowed, func(value string) bool { return strings.EqualFold(value, name) }) {
+				allowed = append(allowed, name)
+			}
 		}
 	}
-	sort.Strings(allowed)
+	slices.Sort(allowed)
 	return allowed
 }

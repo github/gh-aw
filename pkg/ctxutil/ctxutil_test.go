@@ -3,6 +3,9 @@ package ctxutil
 import (
 	"context"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestOrBackground(t *testing.T) {
@@ -28,20 +31,12 @@ func TestOrBackground(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			got := OrBackground(tt.ctx)
-			if got == nil {
-				t.Fatal("OrBackground returned nil")
-			}
+			require.NotNil(t, got, "OrBackground should never return a nil context")
 			if tt.ctx == nil {
-				if got != context.Background() {
-					t.Errorf("expected context.Background() for nil input, got %v", got)
-				}
+				assert.Equal(t, context.Background(), got, "OrBackground should fall back to context.Background() for a nil input")
 			} else {
-				if got != tt.ctx {
-					t.Errorf("expected original context to be returned unchanged, got %v", got)
-				}
-				if got.Value(testKey) != "value" {
-					t.Errorf("expected value to be preserved, got %v", got.Value(testKey))
-				}
+				assert.Same(t, tt.ctx, got, "OrBackground should return the original non-nil context unchanged")
+				assert.Equal(t, "value", got.Value(testKey), "OrBackground should preserve values carried by the input context")
 			}
 		})
 	}

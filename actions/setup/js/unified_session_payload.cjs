@@ -99,6 +99,7 @@ function normalizeSteeringDelivery(value) {
 /** @type {Fields} */
 const MCP_FIELDS = {
   serverName: ["serverName", "server_name", "server_id"],
+  sessionId: ["sessionId", "session_id"],
   direction: ["direction"],
   rpcId: ["rpcId"],
   method: ["method"],

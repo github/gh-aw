@@ -62,7 +62,7 @@ func (e *ClaudeEngine) ResolveLLMProvider(workflowData *WorkflowData) LLMProvide
 }
 
 func (e *ClaudeEngine) UsesWebFetchFallback(data *WorkflowData) bool {
-	return e.ResolveLLMProvider(data) == LLMProviderGitHub
+	return e.ResolveLLMProvider(data) == LLMProviderGitHub || isFirewallEnabled(data)
 }
 
 func (e *ClaudeEngine) GetHostedWebCapabilities(_ *WorkflowData) HostedWebCapabilities {
@@ -267,13 +267,17 @@ func (e *ClaudeEngine) buildClaudeCliArgs(workflowData *WorkflowData, toolsWithM
 	// fine-grained control: Bash(git:*), MCP tool prefixes, path-specific tools, etc.
 	allowedTools = e.computeAllowedClaudeToolsStringWithDynamicWorkflows(toolsWithMountedCLIs, workflowData.SafeOutputs, workflowData.CacheMemoryConfig, workflowData.DriveMemoryConfig, workflowData.MCPScripts, workflowData.SandboxConfig, dynamicWorkflowsEnabled(e, workflowData.EngineConfig))
 	if usesWebFetchMCPForEngine(e, workflowData) {
-		tools := strings.Split(allowedTools, ",")
-		for i, tool := range tools {
-			if tool == "WebFetch" {
-				tools[i] = "mcp__web-fetch__web_fetch"
+		if e.ResolveLLMProvider(workflowData) == LLMProviderGitHub {
+			tools := strings.Split(allowedTools, ",")
+			for i, tool := range tools {
+				if tool == "WebFetch" {
+					tools[i] = "mcp__web-fetch__web_fetch"
+				}
 			}
+			allowedTools = strings.Join(tools, ",")
+		} else {
+			allowedTools += ",mcp__web-fetch__web_fetch"
 		}
-		allowedTools = strings.Join(tools, ",")
 	}
 	if allowedTools != "" {
 		claudeArgs = append(claudeArgs, "--allowed-tools", allowedTools)

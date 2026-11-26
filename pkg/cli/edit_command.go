@@ -54,7 +54,7 @@ Inspect the declaration with gh aw connector <id> setup before editing.`,
 	cmd.Flags().StringArray("add-skill", nil, "Append a workflow skill")
 	cmd.Flags().StringArray("remove-skill", nil, "Remove a workflow skill")
 	cmd.Flags().String("schedule", "", "Set a schedule using a fuzzy schedule or cron expression; use off to remove it")
-	cmd.Flags().Bool("dry-run", false, "Validate changes without writing or compiling")
+	cmd.Flags().Bool("dry-run", false, "Validate and print changed workflow content without writing or compiling")
 	cmd.Flags().StringP("dir", "d", "", "Workflow directory (default: $GH_AW_WORKFLOWS_DIR or .github/workflows)")
 	cmd.ValidArgsFunction = CompleteWorkflowNames
 	RegisterDirFlagCompletion(cmd, "dir")
