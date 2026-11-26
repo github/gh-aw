@@ -40,6 +40,10 @@ function increment(current, key, amount = 1) {
   current.attributes[name] = Number(current.attributes[name] || 0) + amount;
 }
 
+function setAttribute(current, key, value) {
+  current.attributes[`${PREFIX}${key}`] = value;
+}
+
 function publicationAttempt() {
   const current = activeOperation.getStore();
   if (current) increment(current, "publication.attempts");
@@ -60,18 +64,15 @@ function captureResult(current, result) {
     }
   }
   if (result?.recovered === true) increment(current, "publication.recovered");
-  if (REQUESTS.has(result?.commit?.request?.kind)) current.attributes[`${PREFIX}request.kind`] = result.commit.request.kind;
-  if (REASONS.has(result?.reason)) current.attributes[`${PREFIX}reason`] = result.reason;
+  if (REQUESTS.has(result?.commit?.request?.kind)) setAttribute(current, "request.kind", result.commit.request.kind);
+  if (REASONS.has(result?.reason)) setAttribute(current, "reason", result.reason);
 }
 
 function captureOutcome(current, result) {
-  let isError = false;
   const outcome = result?.state;
-  if (OUTCOMES.has(outcome)) {
-    current.attributes[`${PREFIX}outcome`] = outcome;
-    isError = outcome === "blocked";
-  }
-  return isError;
+  if (!OUTCOMES.has(outcome)) return false;
+  setAttribute(current, "outcome", outcome);
+  return outcome === "blocked";
 }
 
 /** @param {unknown} error */
@@ -119,7 +120,7 @@ async function observeQueueOperation(operation, options, execute) {
       return result;
     } catch (error) {
       isError = true;
-      current.attributes[`${PREFIX}error.type`] = telemetryErrorType(error);
+      setAttribute(current, "error.type", telemetryErrorType(error));
       throw error;
     } finally {
       const endMs = Date.now();

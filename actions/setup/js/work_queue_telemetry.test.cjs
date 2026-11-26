@@ -91,6 +91,31 @@ describe("work queue OpenTelemetry", () => {
     expect(warn.mock.calls.flat().join(" ")).not.toContain("secret");
   });
 
+  it("records known queue error codes and marks the span as an error", async () => {
+    await expect(
+      telemetry.observeQueueOperation("read", { owner: "o", repo: "r" }, async () => {
+        throw Object.assign(new Error("boom"), { code: "ledger_invalid" });
+      })
+    ).rejects.toThrow("boom");
+    expect(attributes(mirrors[0])[`${PREFIX}error.type`]).toBe("ledger_invalid");
+    expect(span(mirrors[0]).status.code).toBe(2);
+  });
+
+  it("records outcome and marks blocked results as errors", async () => {
+    await telemetry.observeQueueOperation("launch", { owner: "o", repo: "r" }, async () => ({ state: "blocked", reason: "no_work" }));
+    expect(attributes(mirrors[0])).toMatchObject({ [`${PREFIX}outcome`]: "blocked", [`${PREFIX}reason`]: "no_work" });
+    expect(span(mirrors[0]).status.code).toBe(2);
+  });
+
+  it("ignores unknown outcome, reason, and request kind values", async () => {
+    await telemetry.observeQueueOperation("launch", {}, async () => ({ state: "weird", reason: "other", commit: { request: { kind: "nope" } } }));
+    const attrs = attributes(mirrors[0]);
+    expect(attrs).not.toHaveProperty(`${PREFIX}outcome`);
+    expect(attrs).not.toHaveProperty(`${PREFIX}reason`);
+    expect(attrs).not.toHaveProperty(`${PREFIX}request.kind`);
+    expect(span(mirrors[0]).status.code).toBe(1);
+  });
+
   it("summarizes projection counts only", () => {
     const planned = h.dispatchNext(h.submit([], [h.work("a"), h.work("b")]), { concurrency: 1 });
     expect(telemetry.snapshotAttributes(replayTransactions(planned.log))).toEqual({
