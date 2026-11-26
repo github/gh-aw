@@ -53,7 +53,7 @@ namespace TokenBroker {
   @pattern("^https://[^\\s\\\\#]+$")
   scalar CollectorEndpoint extends string;
 
-  @doc("Only an otlp exchange returns this exact three-member body; endpoint/token/expiry are one job-local pair.")
+  @doc("Only an otlp exchange returns this exact three-member body; endpoint/token/expiry are one job-local pair. Expiration must cover the trusted job completion bound plus the safety margin in Section 6.4.")
   model IssuedOtlpCredential {
     endpoint: CollectorEndpoint;
     token: Credential;
