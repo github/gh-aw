@@ -734,7 +734,10 @@ describe("push_routing_history saves", () => {
 
   it("records zero-job startup failures as no_agent without charging unexplained, while ignoring pre-opt-in runs", async () => {
     const remote = bareRemote();
-    await save(remote, 50, "success");
+    const initialRuns = Array.from({ length: 50 }, (_, i) => paginationRun(50 - i, { conclusion: i === 1 ? "startup_failure" : "success" }));
+    await save(remote, 50, "success", { github: fakeGitHub(remote, { runs: initialRuns }) });
+    expect(remoteState(remote)).toMatchObject({ reconciled_through: 50, unexplained: 0 });
+    expect(remoteRuns(remote).map(row => row.number)).toEqual([50]);
     const run = (number, conclusion = "failure") => ({ id: 9000 + number, run_number: number, status: "completed", conclusion, head_branch: "main", event: "schedule", run_attempt: 1 });
     const agent = { name: "agent", conclusion: "failure", started_at: "2026-11-24T09:00:00Z" };
     const runs = [run(53, "startup_failure"), run(52, "failure"), run(51, "failure")];

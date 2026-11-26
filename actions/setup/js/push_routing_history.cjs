@@ -1040,7 +1040,8 @@ async function listRuns({ githubClient, owner, repo, workflowFile, workflowPath 
         });
         listed.agent_ran = jobs.some((/** @type {any} */ job) => job?.name === "agent" && job.conclusion !== "skipped" && Boolean(job.started_at));
         const writer = jobs.find((/** @type {any} */ job) => job?.name === WRITER_JOB);
-        // A run that failed before any job was created (jobs.length === 0) is recorded as no_agent.
+        // An established history records a zero-job startup failure as no_agent. Before its first
+        // writer, an empty job list cannot establish opt-in and proves no agent ran or owed a save.
         // When jobs exist, nothing is owed by a run compiled while adaptive routing was off or for a
         // dry run (both omit the history job), or by a run whose history job succeeded: it saved the
         // run, or declined it, as for a pull request into another branch.
