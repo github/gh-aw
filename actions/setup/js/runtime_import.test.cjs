@@ -139,6 +139,27 @@ describe("runtime_import", () => {
     }),
     describe("isSafeExpression", () => {
       it.each([
+        ["leading LF", "\ngithub.actor"],
+        ["trailing LF", "github.actor\n"],
+        ["internal LF", "github.\nactor"],
+        ["leading CR", "\rgithub.actor"],
+        ["trailing CR", "github.actor\r"],
+        ["internal CR", "github.\ractor"],
+        ["leading LS", "\u2028github.actor"],
+        ["trailing LS", "github.actor\u2028"],
+        ["internal LS", "github.\u2028actor"],
+        ["leading PS", "\u2029github.actor"],
+        ["trailing PS", "github.actor\u2029"],
+        ["internal PS", "github.\u2029actor"],
+      ])("should reject line terminators before trimming: %s", (_name, expression) => {
+        expect(isSafeExpression(expression)).toBe(false);
+        const escaped = JSON.stringify(expression)
+          .replace(/\u2028/g, "\\u2028")
+          .replace(/\u2029/g, "\\u2029");
+        expect(() => processExpressions(`\${{${expression}}}`, "remote.md")).toThrow(escaped);
+      });
+
+      it.each([
         "env.INPUT_GITHUB-TOKEN",
         "env.GITHUB_TOKEN",
         "env.NODE_VERSION",
