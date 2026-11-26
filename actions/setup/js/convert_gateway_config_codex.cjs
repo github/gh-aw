@@ -24,7 +24,7 @@ require("./shim.cjs");
 
 const path = require("path");
 const fs = require("fs");
-const { runGatewayConversion, writeSecureOutput } = require("./convert_gateway_config_shared.cjs");
+const { runGatewayConversion, writeSecureOutput, addWebFetchMCPServer } = require("./convert_gateway_config_shared.cjs");
 const { buildConfig, serializeConfig, tomlValue, loadCompiledConfig, mergeConfig, expandConfigEnv, isTable, directToolCatalog } = require("./codex_config.cjs");
 const { TMP_GH_AW_PATH } = require("./constants.cjs");
 
@@ -159,7 +159,17 @@ function main() {
     },
     transformServer: (_name, entry) => entry,
     serialize: (servers, _context, urlPrefix) => {
-      return serializeConfig(buildConfig(servers, urlPrefix));
+      /** @type {Record<string, Record<string, unknown>>} */
+      const localServers = {};
+      if (process.env.GH_AW_WEB_FETCH_MCP === "1" && Object.hasOwn(servers, "web-fetch")) {
+        throw new Error("The web-fetch MCP server name is reserved when tools.web-fetch is enabled");
+      }
+      addWebFetchMCPServer(localServers, entry => ({
+        ...entry,
+        env_vars: ["HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy", "SSL_CERT_FILE", "SSL_CERT_DIR", "CURL_CA_BUNDLE"],
+      }));
+      const config = buildConfig(servers, urlPrefix, localServers);
+      return serializeConfig(config);
     },
   });
 }

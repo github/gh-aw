@@ -56,6 +56,7 @@ func TestLogsHarborOptions(t *testing.T) {
 }
 
 func TestLogsHarborArtifactNormalization(t *testing.T) {
+	t.Parallel()
 	for _, sets := range [][]string{nil, {}, {"all"}, {"usage"}, {"detection", "usage", "experiment"}} {
 		original := append([]string(nil), sets...)
 		opts := normalizeLogsDownloadOptions(LogsDownloadOptions{Harbor: true, ArtifactSets: sets})

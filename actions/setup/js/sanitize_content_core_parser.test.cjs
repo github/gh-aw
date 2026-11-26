@@ -16,6 +16,7 @@ describe("sanitize_content_core.cjs – parser internals", () => {
   let applyFnOutsideInlineCode;
   let applyToNonCodeRegions;
   let createRenderSafeCodeSpanWrapper;
+  let neutralizeGitHubReferences;
 
   beforeEach(async () => {
     // Set up a minimal stub so code that calls core.* doesn't throw.
@@ -36,10 +37,27 @@ describe("sanitize_content_core.cjs – parser internals", () => {
     applyFnOutsideInlineCode = mod.applyFnOutsideInlineCode ?? null;
     applyToNonCodeRegions = mod.applyToNonCodeRegions;
     createRenderSafeCodeSpanWrapper = mod.createRenderSafeCodeSpanWrapper;
+    neutralizeGitHubReferences = mod.neutralizeGitHubReferences;
   });
 
   afterEach(() => {
     delete global.core;
+  });
+
+  describe("neutralizeGitHubReferences input validation", () => {
+    it("preserves the null allowlist sentinel", () => {
+      expect(neutralizeGitHubReferences("owner/repo#1", null)).toBe("owner/repo#1");
+    });
+
+    it("fails closed for malformed allowlists and non-string content", () => {
+      expect(neutralizeGitHubReferences("owner/repo#1", undefined)).toBe("`owner/repo#1`");
+      expect(neutralizeGitHubReferences("owner/repo#1", [null, " "])).toBe("`owner/repo#1`");
+      expect(neutralizeGitHubReferences(42, null)).toBe("");
+    });
+
+    it("normalizes valid allowlist entries", () => {
+      expect(neutralizeGitHubReferences("owner/repo#1", [" OWNER/REPO "])).toBe("owner/repo#1");
+    });
   });
 
   it("uses bounded HTML code elements when all short delimiters are present", () => {

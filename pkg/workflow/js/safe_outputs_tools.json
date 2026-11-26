@@ -85,7 +85,7 @@
   },
   {
     "name": "ledger_append",
-    "description": "Submit a custom record or a typed operation to a configured Git-backed ledger. Supported built-in types: counter, log, set, table. For map ledgers, use ledger_map_put or ledger_map_delete instead. Use `record` only for custom ledgers; it must be a JSON object. For built-in ledgers send `operation` plus `value` (or `key`/`patch`/`name`/`amount`) and no `record`. Match `value` to the configured ledger type/schema; pass an object when required (including table `insert`/`upsert`), not a JSON-encoded string. Persistence follows trusted validation.",
+    "description": "Append to a ledger. Pass objects as objects, never as JSON-encoded strings. Submit a custom record or a typed operation to a configured Git-backed ledger. Supported built-in types: counter, log, set, table. For map ledgers, use ledger_map_put or ledger_map_delete instead. Use `record` only for custom ledgers; it must be a JSON object. For built-in ledgers send `operation` plus `value` (or `key`/`patch`/`name`/`amount`) and no `record`. Match `value` to the configured ledger type/schema; pass an object when required (including table `insert`/`upsert`), not a JSON-encoded string. Persistence follows trusted validation.",
     "inputSchema": {
       "type": "object",
       "properties": {

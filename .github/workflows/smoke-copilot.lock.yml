@@ -2473,6 +2473,7 @@ jobs:
           export GH_AW_TARGET_REPO_SLUG="${GH_AW_TARGET_REPO_SLUG:-}"
           export GH_AW_ENGINE="copilot"
           export GH_AW_WEB_FETCH_MCP=1
+          export GH_AW_WEB_FETCH_MCP_NVX=0
           MCP_GATEWAY_UID=$(id -u 2>/dev/null || echo '0')
           MCP_GATEWAY_GID=$(id -g 2>/dev/null || echo '0')
           source "${RUNNER_TEMP}/gh-aw/actions/resolve_docker_socket_gid.sh"
