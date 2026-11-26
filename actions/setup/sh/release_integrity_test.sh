@@ -67,6 +67,9 @@ if [ "${AWF_TEST_FAIL_ASSET:-}" = "${url##*/}" ]; then
   exit "${AWF_TEST_CURL_EXIT:-22}"
 fi
 case "$url" in
+  https://api.github.com/repos/github/copilot-cli/releases/*)
+    if [ "${COPILOT_TEST_METADATA_FAIL:-}" = true ]; then exit 22; fi
+    cp "$TEST_ROOT/release-metadata.json" "$out" ;;
   */compat.json) cp "$TEST_ROOT/compat.json" "$out" ;;
   */checksums.txt) cp "$TEST_ROOT/checksums.txt" "$out" ;;
   */SHA256SUMS.txt) cp "$TEST_ROOT/SHA256SUMS.txt" "$out" ;;
@@ -182,6 +185,36 @@ run_copilot 1.0.98 --rootless
 test -x "$COPILOT_INSTALL_DIR/copilot"
 rm -f "$COPILOT_INSTALL_DIR/copilot"
 echo "PASS: authenticated Copilot archive installs and executes"
+
+printf '%s\n' '{"draft":false,"tag_name":"v1.0.98","published_at":"2020-01-01T00:00:00Z"}' >"$TEMP_DIR/release-metadata.json"
+for server in https://github.com https://example.ghe.com ''; do
+  rm -f "$TEMP_DIR/curl.log"
+  GITHUB_SERVER_URL="$server" GITHUB_TOKEN=workflow-test-token run_copilot 1.0.98 --rootless --cooldown-days 7
+  metadata_request="$(grep 'api.github.com/repos/github/copilot-cli/releases/' "$TEMP_DIR/curl.log")"
+  if [ "$server" = https://github.com ]; then
+    [[ "$metadata_request" = *'Authorization:'* ]]
+    [[ "$metadata_request" = *'workflow-test-token'* ]]
+  else
+    [[ "$metadata_request" != *'Authorization:'* ]]
+    [[ "$metadata_request" != *'workflow-test-token'* ]]
+  fi
+done
+rm -f "$TEMP_DIR/curl.log"
+GITHUB_SERVER_URL=https://github.com GITHUB_TOKEN= run_copilot 1.0.98 --rootless --cooldown-days 7
+! grep 'api.github.com/repos/github/copilot-cli/releases/' "$TEMP_DIR/curl.log" | grep -q 'Authorization:'
+echo "PASS: Copilot release-age checks authenticate only with github.com workflow tokens"
+
+printf '%s\n' '{"draft":false,"tag_name":"v1.0.98","published_at":"2999-01-01T00:00:00Z"}' >"$TEMP_DIR/release-metadata.json"
+if GITHUB_SERVER_URL=https://example.ghe.com GITHUB_TOKEN=workflow-test-token run_copilot 1.0.98 --rootless --cooldown-days 7; then
+  echo "FAIL: Copilot release-age check accepted a recent release" >&2; exit 1
+fi
+grep -q 'release metadata is invalid or the release is too recent' "$TEMP_DIR/output"
+if GITHUB_SERVER_URL=https://example.ghe.com GITHUB_TOKEN=workflow-test-token COPILOT_TEST_METADATA_FAIL=true \
+  run_copilot 1.0.98 --rootless --cooldown-days 7; then
+  echo "FAIL: Copilot release-age check accepted unavailable metadata" >&2; exit 1
+fi
+grep -q 'GitHub release metadata is unavailable' "$TEMP_DIR/output"
+echo "PASS: Copilot release-age checks fail closed for recent releases and unavailable metadata"
 
 cat >"$TEMP_DIR/bin/id" <<'EOF'
 #!/usr/bin/env bash

@@ -754,12 +754,12 @@ check_copilot_release_age() {
     echo "ERROR: Install jq from https://jqlang.github.io/jq/download/ before installing Copilot CLI." >&2
     return 1
   fi
-  if [ -z "${GITHUB_TOKEN:-}" ]; then
-    echo "ERROR: GITHUB_TOKEN is required to authenticate Copilot release-age metadata requests." >&2
-    return 1
-  fi
   local endpoint metadata resolved authorization_header
-  printf -v authorization_header '%s: %s %s' 'Authorization' 'Bearer' "$GITHUB_TOKEN"
+  local -a auth_args=()
+  if [ "${GITHUB_SERVER_URL:-}" = "https://github.com" ] && [ -n "${GITHUB_TOKEN:-}" ]; then
+    printf -v authorization_header '%s: %s %s' 'Authorization' 'Bearer' "$GITHUB_TOKEN"
+    auth_args=(-H "$authorization_header")
+  fi
   metadata="${TEMP_DIR}/release-age.json"
   if [ -z "$version" ] || [ "$version" = latest ]; then
     endpoint="https://api.github.com/repos/${COPILOT_REPO}/releases/latest"
@@ -770,7 +770,7 @@ check_copilot_release_age() {
     fi
     endpoint="https://api.github.com/repos/${COPILOT_REPO}/releases/tags/v${version#v}"
   fi
-  if ! curl --proto '=https' --proto-redir '=https' -H "$authorization_header" \
+  if ! curl --proto '=https' --proto-redir '=https' "${auth_args[@]}" \
     -H "Accept: application/vnd.github+json" -fsSL --connect-timeout 10 --max-time 30 \
     --retry 5 --retry-delay 2 --retry-max-time 60 --retry-all-errors -o "$metadata" "$endpoint"; then
     echo "ERROR: Cannot verify Copilot release age: GitHub release metadata is unavailable" >&2
