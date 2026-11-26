@@ -146,11 +146,11 @@ func TestSighthoundFindingsReader(t *testing.T) {
 		}
 		description, ok := result[0]["description"].(string)
 		require.True(t, ok)
-		assert.Equal(t, 4096, len(description))
+		assert.Len(t, description, 4096)
 		assert.True(t, utf8.ValidString(description))
 		snippet, ok := result[1]["snippet"].(string)
 		require.True(t, ok)
-		assert.Equal(t, 2048, len(snippet))
+		assert.Len(t, snippet, 2048)
 		assert.True(t, utf8.ValidString(snippet))
 	})
 	t.Run("empty", func(t *testing.T) {
