@@ -943,6 +943,37 @@ describe("generate_aw_info.cjs", () => {
     expect(mockCore.warning).not.toHaveBeenCalledWith(expect.stringContaining("aw_context"));
   });
 
+  it("accepts and preserves validated inherited issue_status context", async () => {
+    const validContext = {
+      repo: "org/repo",
+      run_id: "12345",
+      workflow_id: "org/repo/.github/workflows/dispatcher.yml@refs/heads/main",
+      item_type: "issue",
+      item_number: "42",
+      issue_status: {
+        snapshot: { id: 2, name: "Todo", category: "planned" },
+        event: { id: 2, name: "Todo", category: "planned" },
+        previous: { id: 1, name: "Backlog", category: "backlog" },
+      },
+    };
+    await main(mockCore, { ...mockContext, payload: { inputs: { aw_context: JSON.stringify(validContext) } } });
+    expect(JSON.parse(fs.readFileSync(awInfoPath, "utf8")).context).toEqual(validContext);
+    expect(mockCore.setOutput).toHaveBeenCalledWith("aw_context", JSON.stringify(validContext));
+    expect(mockCore.warning).not.toHaveBeenCalledWith(expect.stringContaining("aw_context"));
+  });
+
+  it("rejects malformed inherited issue_status without accepting arbitrary nested data", async () => {
+    const contextWithInvalidStatus = {
+      repo: "org/repo",
+      run_id: "12345",
+      workflow_id: "org/repo/.github/workflows/dispatcher.yml@refs/heads/main",
+      issue_status: { snapshot: { id: 2, name: "Todo", category: "planned", injected: "untrusted" } },
+    };
+    await main(mockCore, { ...mockContext, payload: { inputs: { aw_context: JSON.stringify(contextWithInvalidStatus) } } });
+    expect(JSON.parse(fs.readFileSync(awInfoPath, "utf8")).context).toBeUndefined();
+    expect(mockCore.warning).toHaveBeenCalledWith(expect.stringContaining("invalid issue_status"));
+  });
+
   it("should accept aw_context object from repository_dispatch client_payload", async () => {
     const validContext = {
       repo: "org/repo",

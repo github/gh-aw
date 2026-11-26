@@ -270,6 +270,11 @@ func validateSafeOutputsMax(config *SafeOutputsConfig) error {
 			return err
 		}
 	}
+	if config.SetIssueStatus != nil {
+		if err := checkMaxField("set_issue_status", config.SetIssueStatus.Max); err != nil {
+			return err
+		}
+	}
 	if config.SetIssueType != nil {
 		if err := checkMaxField("set_issue_type", config.SetIssueType.Max); err != nil {
 			return err

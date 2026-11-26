@@ -104,7 +104,7 @@ func registerDeployFlags(cmd *cobra.Command) {
 	cmd.Flags().StringP("name", "n", "", "Specify name for the added workflow (without .md extension)")
 	addEngineFlag(cmd)
 	cmd.Flags().BoolP("force", "f", false, "Overwrite existing workflow files without confirmation")
-	cmd.Flags().Bool("create-pull-request", false, "Create a pull request (always enabled for deploy)")
+	cmd.Flags().Bool("create-pull-request", false, "Required with --auto-merge; deploy always creates a pull request")
 	addPRMessageFlag(cmd)
 	cmd.Flags().Bool("pr", false, "Alias for --create-pull-request")
 	_ = cmd.Flags().MarkHidden("pr")

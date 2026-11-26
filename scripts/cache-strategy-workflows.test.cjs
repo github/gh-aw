@@ -57,7 +57,7 @@ test("flagged stateful workflows read and verify stable cache paths", () => {
     "repository-quality-improver": {
       state: "/tmp/gh-aw/cache-memory-focus-areas/history.json",
       read: "### 0.1 Load Pre-computed Context",
-      write: "## Phase 3: Update Cache Memory",
+      write: "## Phase 4: Update Cache Memory",
     },
     "constraint-solving-potd": {
       state: "/tmp/gh-aw/cache-memory/covered-topics.json",

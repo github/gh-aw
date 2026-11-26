@@ -22,6 +22,7 @@ type FieldValidation struct {
 	MinLength                int      `json:"minLength,omitempty"`
 	PositiveInteger          bool     `json:"positiveInteger,omitempty"`
 	OptionalPositiveInteger  bool     `json:"optionalPositiveInteger,omitempty"`
+	StringOrInteger          bool     `json:"stringOrInteger,omitempty"`
 	AllowAuto                bool     `json:"allowAuto,omitempty"`
 	AllowNull                bool     `json:"allowNull,omitempty"`
 	AllowEmpty               bool     `json:"allowEmpty,omitempty"`
@@ -89,12 +90,13 @@ var ValidationConfig = map[string]TypeValidationConfig{
 		DefaultMax:   1,
 		CollapseData: true,
 		Fields: map[string]FieldValidation{
-			"title":     {Required: true, Type: "string", Sanitize: true, MaxLength: 128},
-			"body":      {Required: true, Type: "string", Sanitize: true, MaxLength: MaxBodyLength, MinLength: MinIssueBodyLength},
-			"labels":    {Type: "array", ItemType: "string", ItemSanitize: true, ItemMaxLength: 128},
-			"fields":    {Type: "array"},
-			"artifacts": {Type: "array"},
-			"parent":    {IssueOrPRNumber: true},
+			"title":           {Required: true, Type: "string", Sanitize: true, MaxLength: 128},
+			"body":            {Required: true, Type: "string", Sanitize: true, MaxLength: MaxBodyLength, MinLength: MinIssueBodyLength},
+			"labels":          {Type: "array", ItemType: "string", ItemSanitize: true, ItemMaxLength: 128},
+			"fields":          {Type: "array"},
+			"planning_status": {StringOrInteger: true},
+			"artifacts":       {Type: "array"},
+			"parent":          {IssueOrPRNumber: true},
 			// blocked_by accepts an issue number, temporary ID, owner/repo#number, issue URL,
 			// or an array of these; reference parsing is handled by the create_issue handler.
 			"blocked_by":   {},
@@ -180,6 +182,15 @@ var ValidationConfig = map[string]TypeValidationConfig{
 			"milestone_number": {OptionalPositiveInteger: true},
 			"milestone_title":  {Type: "string", Sanitize: true, MaxLength: 128},
 			"repo":             {Type: "string", MaxLength: 256}, // Optional: target repository in format "owner/repo"
+		},
+	},
+	"set_issue_status": {
+		DefaultMax: 5,
+		Fields: map[string]FieldValidation{
+			"issue_number": {IssueOrPRNumber: true},
+			"status":       {Required: true, StringOrInteger: true},
+			"duplicate_of": {OptionalPositiveInteger: true},
+			"repo":         {Type: "string", MaxLength: 256},
 		},
 	},
 	"set_issue_type": {

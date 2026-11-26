@@ -1244,31 +1244,51 @@ func TestComputePermissionsForSafeOutputs_Staged(t *testing.T) {
 		expected    map[PermissionScope]PermissionLevel
 	}{
 		{
-			name: "global staged=true - only discussion lookup permissions",
+			name: "global staged=true - issue status and discussion lookup permissions",
 			safeOutputs: &SafeOutputsConfig{
 				Staged:            templatableBoolPtr("true"),
 				CreateIssues:      &CreateIssuesConfig{},
 				CreateDiscussions: &CreateDiscussionsConfig{},
 				AddLabels:         &AddLabelsConfig{},
 			},
-			expected: map[PermissionScope]PermissionLevel{PermissionDiscussions: PermissionRead},
+			expected: map[PermissionScope]PermissionLevel{
+				PermissionIssues:      PermissionRead,
+				PermissionDiscussions: PermissionRead,
+			},
 		},
 		{
-			name: "per-handler staged=true - staged handler contributes no permissions",
+			name: "global staged create-issue grants status discovery read permission",
+			safeOutputs: &SafeOutputsConfig{
+				Staged:       templatableBoolPtr("true"),
+				CreateIssues: &CreateIssuesConfig{},
+			},
+			expected: map[PermissionScope]PermissionLevel{PermissionIssues: PermissionRead},
+		},
+		{
+			name: "per-handler staged create-issue grants status discovery read permission",
+			safeOutputs: &SafeOutputsConfig{
+				CreateIssues: &CreateIssuesConfig{
+					BaseSafeOutputConfig: BaseSafeOutputConfig{Staged: templatableBoolPtr("true")},
+				},
+			},
+			expected: map[PermissionScope]PermissionLevel{PermissionIssues: PermissionRead},
+		},
+		{
+			name: "per-handler staged=true - create-issue status discovery read is preserved",
 			safeOutputs: &SafeOutputsConfig{
 				CreateIssues: &CreateIssuesConfig{
 					BaseSafeOutputConfig: BaseSafeOutputConfig{Staged: templatableBoolPtr("true")},
 				},
 				AddLabels: &AddLabelsConfig{},
 			},
-			// create-issue is staged so it contributes nothing; add-labels is not staged
+			// Staged create-issue needs read access for agent-supplied planning status discovery; add-labels supplies write access.
 			expected: map[PermissionScope]PermissionLevel{
 				PermissionIssues:       PermissionWrite,
 				PermissionPullRequests: PermissionWrite,
 			},
 		},
 		{
-			name: "all handlers per-handler staged - only discussion lookup permissions",
+			name: "all handlers per-handler staged - issue status and discussion lookup permissions",
 			safeOutputs: &SafeOutputsConfig{
 				CreateIssues: &CreateIssuesConfig{
 					BaseSafeOutputConfig: BaseSafeOutputConfig{Staged: templatableBoolPtr("true")},
@@ -1277,7 +1297,10 @@ func TestComputePermissionsForSafeOutputs_Staged(t *testing.T) {
 					BaseSafeOutputConfig: BaseSafeOutputConfig{Staged: templatableBoolPtr("true")},
 				},
 			},
-			expected: map[PermissionScope]PermissionLevel{PermissionDiscussions: PermissionRead},
+			expected: map[PermissionScope]PermissionLevel{
+				PermissionIssues:      PermissionRead,
+				PermissionDiscussions: PermissionRead,
+			},
 		},
 		{
 			name: "global staged=true overrides per-handler staged=false",
@@ -1377,6 +1400,7 @@ func TestComputePermissionsForSafeOutputs_StagedReads(t *testing.T) {
 		{key: "dismiss-pull-request-review", filterScope: PermissionIssues},
 		{key: "submit-pull-request-review", unfiltered: map[PermissionScope]PermissionLevel{PermissionPullRequests: PermissionRead}, filterScope: PermissionIssues},
 		{key: "set-issue-type", filterScope: PermissionIssues},
+		{key: "set-issue-status", unfiltered: map[PermissionScope]PermissionLevel{PermissionIssues: PermissionRead}},
 		{key: "set-issue-field", filterScope: PermissionIssues},
 		{key: "close-issue", unfiltered: map[PermissionScope]PermissionLevel{PermissionIssues: PermissionRead}},
 		{key: "link-sub-issue", unfiltered: map[PermissionScope]PermissionLevel{PermissionIssues: PermissionRead}},
@@ -1493,6 +1517,8 @@ func TestCompileStagedHandlerReadPermissions(t *testing.T) {
 	}{
 		{key: "remove-labels", config: "    allowed: [needs-triage]\n    required-labels: [needs-triage]\n", scopes: []PermissionScope{PermissionIssues}},
 		{key: "set-issue-type", config: "    required-labels: [needs-triage]\n    required-title-prefix: '[triage]'\n", scopes: []PermissionScope{PermissionIssues}},
+		{key: "set-issue-status", config: "    required-labels: [needs-triage]\n    required-title-prefix: '[triage]'\n", scopes: []PermissionScope{PermissionIssues}},
+		{key: "set-issue-status", scopes: []PermissionScope{PermissionIssues}},
 		{key: "add-comment", config: "    required-labels: [needs-triage]\n", scopes: []PermissionScope{PermissionIssues}},
 		{key: "create-discussion", config: "    category: General\n", scopes: []PermissionScope{PermissionDiscussions}},
 		{key: "create-project-status-update", config: "    project: https://github.com/orgs/test-org/projects/1\n", scopes: []PermissionScope{PermissionOrganizationProj}},
@@ -1596,7 +1622,7 @@ func TestComputePermissionsForSafeOutputs_StagedYAMLRendering(t *testing.T) {
 				CreateIssues: &CreateIssuesConfig{},
 				AddLabels:    &AddLabelsConfig{},
 			},
-			expectedRendered: "permissions: {}",
+			expectedRendered: "permissions:\n      issues: read",
 		},
 		{
 			name: "all per-handler staged - renders permissions: {}",
@@ -1604,7 +1630,7 @@ func TestComputePermissionsForSafeOutputs_StagedYAMLRendering(t *testing.T) {
 				CreateIssues: &CreateIssuesConfig{BaseSafeOutputConfig: BaseSafeOutputConfig{Staged: templatableBoolPtr("true")}},
 				AddLabels:    &AddLabelsConfig{BaseSafeOutputConfig: BaseSafeOutputConfig{Staged: templatableBoolPtr("true")}},
 			},
-			expectedRendered: "permissions: {}",
+			expectedRendered: "permissions:\n      issues: read",
 		},
 		{
 			name: "staged PR handlers - renders permissions: {}",

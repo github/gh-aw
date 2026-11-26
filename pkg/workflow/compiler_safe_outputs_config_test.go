@@ -749,6 +749,21 @@ func TestAddHandlerManagerConfigEnvVar(t *testing.T) {
 			expectedKeys: []string{"set_issue_type"},
 		},
 		{
+			name: "set_issue_status config",
+			safeOutputs: &SafeOutputsConfig{
+				SetIssueStatus: &SetIssueStatusConfig{
+					BaseSafeOutputConfig: BaseSafeOutputConfig{
+						Max: strPtr("5"),
+					},
+				},
+			},
+			checkContains: []string{
+				"GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG",
+			},
+			checkJSON:    true,
+			expectedKeys: []string{"set_issue_status"},
+		},
+		{
 			name: "set_issue_field config",
 			safeOutputs: &SafeOutputsConfig{
 				SetIssueField: &SetIssueFieldConfig{

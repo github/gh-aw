@@ -1949,7 +1949,9 @@ function buildReportIncompleteParts(items, { collectorEmptyOutputCause, rootDir,
   }
   evidence.push(
     nodes.paragraph([
-      nodes.text("A successful agent job only confirms a clean process exit, not that the requested work was completed. Treat any agent-declared reason as a lead, not a confirmed root cause; agent diagnostic details are excluded."),
+      nodes.text(
+        "A successful agent job only confirms a clean process exit, not that the requested work was completed. A successful memory save confirms persistence only, not task completion or data completeness. Treat any agent-declared reason as a lead, not a confirmed root cause; agent diagnostic details are excluded."
+      ),
     ])
   );
   if (typeof runId === "number" && Number.isSafeInteger(runId) && runId > 0) {

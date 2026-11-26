@@ -15,6 +15,29 @@ const { buildWorkflowCallId, normalizeLegacyWorkQueueContext, normalizeWorkQueue
 const { normalizeWebhookContext } = require("./webhook_context.cjs");
 const { isRouterModelValue, normalizeEngineHarness, parseCompiledModelConfig, ROUTER_MODEL_VALUES } = require("./routing_analytics.cjs");
 
+function isIssueStatusRecord(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const entries = Object.entries(value);
+  if (entries.length === 0) return false;
+  const allowedKeys = new Set(["id", "name", "category"]);
+  const categories = new Set(["backlog", "planned", "started", "completed", "not_planned", "duplicate"]);
+  return entries.every(([key, field]) => {
+    if (!allowedKeys.has(key)) return false;
+    if (key === "id") return (typeof field === "number" && Number.isSafeInteger(field) && field > 0) || (typeof field === "string" && /^[1-9]\d*$/.test(field) && Number.isSafeInteger(Number(field)));
+    if (key === "name") return typeof field === "string";
+    return typeof field === "string" && categories.has(field);
+  });
+}
+
+function isIssueStatusContext(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value) || !Object.hasOwn(value, "snapshot")) return false;
+  const allowedKeys = new Set(["snapshot", "event", "previous"]);
+  return Object.entries(value).every(([key, status]) => {
+    if (!allowedKeys.has(key)) return false;
+    return status === null || typeof status === "string" || isIssueStatusRecord(status);
+  });
+}
+
 /**
  * Generate aw_info.json with workflow run metadata.
  * Reads compile-time values from environment variables (GH_AW_INFO_*) and
@@ -253,11 +276,15 @@ async function main(core, ctx, githubClient) {
       if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
         core.warning(`aw_context must be a JSON object, got: ${typeof parsed}`);
       } else {
+        if (Object.hasOwn(parsed, "issue_status") && !isIssueStatusContext(parsed.issue_status)) {
+          core.warning("aw_context contains an invalid issue_status value. Ignoring aw_context.");
+          parsed = null;
+        }
         try {
-          if (queueRuntime) {
+          if (parsed !== null && queueRuntime) {
             parsed = normalizeWorkQueueContext(parsed);
             if (queueRuntime.assignment && !Object.hasOwn(parsed, "work_queue_assignment")) parsed = { ...parsed, work_queue_assignment: queueRuntime.assignment };
-          } else {
+          } else if (parsed !== null) {
             parsed = normalizeLegacyWorkQueueContext(parsed, ctx.payload?.inputs?.work_queue_claim ?? ctx.payload?.client_payload?.work_queue_claim);
           }
         } catch (error) {
@@ -267,7 +294,7 @@ async function main(core, ctx, githubClient) {
         if (parsed !== null) {
           // Only validated batch context and queue assignments may contain nested data.
           const nestedKeys = Object.entries(parsed)
-            .filter(([k, v]) => k !== (queueRuntime ? "work_queue_assignment" : "work_queue") && !(webhookContext && ["webhook", "items"].includes(k)) && v !== null && typeof v === "object")
+            .filter(([k, v]) => k !== (queueRuntime ? "work_queue_assignment" : "work_queue") && !["issue_status"].includes(k) && !(webhookContext && ["webhook", "items"].includes(k)) && v !== null && typeof v === "object")
             .map(([k]) => k);
           if (nestedKeys.length > 0) {
             core.warning(`aw_context contains nested objects for keys: ${nestedKeys.join(", ")}. Ignoring aw_context.`);

@@ -69,6 +69,8 @@ safe-outputs:
   create-issue:
     expires: 2d
     title-prefix: "[Parent] "
+    planning-status: Backlog
+    allowed-statuses: [Backlog]
     max: 5
     group: true
   link-sub-issue:

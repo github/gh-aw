@@ -45,6 +45,8 @@ safe-outputs:
     expires: 7d
     title-prefix: "[agent-job-health] "
     labels: [agentic-workflows, automation, cookie]
+    planning-status: Backlog
+    allowed-statuses: [Backlog]
     max: 1
     group: true
   noop:

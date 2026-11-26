@@ -980,12 +980,12 @@ describe("essential unified session payloads", () => {
 
   it("flattens RPC metadata but excludes arguments, response bodies, and error context", () => {
     const events = [
-      { type: "mcp.rpc.request", data: { server_id: "github", payload: { id: 0, method: "tools/call", params: { name: "list_issues", arguments: { token: "PRIVATE_RPC_ARGUMENT" } } } } },
+      { type: "mcp.rpc.request", data: { server_id: "github", session_id: "resumed-session", payload: { id: 0, method: "tools/call", params: { name: "list_issues", arguments: { token: "PRIVATE_RPC_ARGUMENT" } } } } },
       { type: "mcp.rpc.response", data: { server_name: "github", payload: { id: 0, result: { content: "PRIVATE_RPC_BODY" }, error: { code: 0, message: "rejected", data: "PRIVATE_ERROR_CONTEXT" } } } },
     ];
     const compact = events.map(normalizeUnifiedSessionEvent);
     expect(compact.map(event => event.data)).toEqual([
-      { serverName: "github", rpcId: 0, method: "tools/call", toolName: "list_issues" },
+      { serverName: "github", sessionId: "resumed-session", rpcId: 0, method: "tools/call", toolName: "list_issues" },
       { serverName: "github", rpcId: 0, error: { code: 0, message: "rejected" } },
     ]);
     expect(JSON.stringify(compact)).not.toContain("PRIVATE_");
