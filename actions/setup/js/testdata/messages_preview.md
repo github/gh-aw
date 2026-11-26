@@ -336,7 +336,7 @@ Synthetic agent_report_context.
 
 ### Next step
 
-Review the failure details below for a targeted fix. If a threat warning is present, complete manual review before assigning this issue to a coding agent or using any follow-up automation.
+Review the failure details below for a targeted fix, or **assign this issue to a coding agent** to investigate. If an agentic threat is detected, complete manual review before assigning or using any follow-up automation.
 
 ### Failure details
 
