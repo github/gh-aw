@@ -4,6 +4,7 @@
 const routes = require("./request_continuation_routes.cjs");
 const { currentClaimAssignment, currentClaimHandle, readClaimScopeContext } = require("./work_queue_claim_scope.cjs");
 const { isStagedMode } = require("./safe_output_helpers.cjs");
+const { ERR_CONFIG } = require("./error_codes.cjs");
 
 /** @type {import('./types/handler-factory').HandlerFactoryFunction} */
 async function main(config = {}, githubClient = null) {
@@ -12,7 +13,7 @@ async function main(config = {}, githubClient = null) {
   const { max: maxCount = 1 } = config;
   const normalizedMax = typeof maxCount === "string" && /^\d+$/.test(maxCount) ? Number(maxCount) : maxCount;
   if (!Number.isSafeInteger(normalizedMax) || normalizedMax < 1) {
-    throw new Error("request_continuation max must be a positive integer");
+    throw new Error(`${ERR_CONFIG}: request_continuation max must be a positive integer`);
   }
   let processedCount = 0;
 
