@@ -28,7 +28,8 @@ describe("DIFC proxy Docker startup", () => {
         path.join(root, "docker"),
         `#!/bin/bash
 case "$1" in
-  rm|tag) exit 0 ;;
+  rm) exit 0 ;;
+  tag) printf '%s\\n' "$*" >> "$TEST_EVENTS"; exit 0 ;;
   pull)
     count=0
     if [[ -f "$TEST_PULL_COUNT" ]]; then read -r count < "$TEST_PULL_COUNT"; fi
@@ -66,7 +67,11 @@ esac
         expectedEvents.push(`pull --quiet ${image}`);
         if (attempt < Math.min(failures, 2)) expectedEvents.push(`sleep ${5 * 2 ** attempt}`);
       }
-      if (failures < 3) expectedEvents.push("run");
+      if (failures < 3) {
+        expectedEvents.push(`tag ${image} ghcr.io/github/gh-aw-mcpg:v0.0.0`);
+        expectedEvents.push("tag ghcr.io/github/gh-aw-mcpg:v0.0.0 ghcr.io/github/gh-aw-mcpg:latest");
+        expectedEvents.push("run");
+      }
       expect(fs.readFileSync(events, "utf8").trim().split("\n")).toEqual(expectedEvents);
       if (failures === 3) {
         expect(result.status).not.toBe(0);

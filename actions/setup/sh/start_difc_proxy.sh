@@ -54,6 +54,8 @@ echo "Starting DIFC proxy container: $CONTAINER_IMAGE"
 echo "Using DIFC proxy upstream host: ${GH_HOST} (API: ${GITHUB_API_URL})"
 
 # Pull explicitly so transient registry errors use the shared retry/backoff logic.
+# The shared downloader also aliases versioned ghcr.io/github/gh-aw-* images
+# to :latest; docker run below still uses the original image reference.
 bash "${SCRIPT_DIR}/download_docker_images.sh" "$CONTAINER_IMAGE"
 
 # Remove any existing container to avoid name conflicts on cancelled/retried jobs.
