@@ -139,9 +139,13 @@ func (b *handlerConfigBuilder) AddTemplatableStringSlice(key string, value []str
 	}
 	// A single-element expression slice is the canonical representation produced by
 	// preprocessing – store as a string so GitHub Actions evaluates it at runtime.
-	if len(value) == 1 && isExpression(value[0]) {
-		b.config[key] = value[0]
-		return b
+	if len(value) == 1 {
+		for _, expression := range value {
+			if isExpression(expression) {
+				b.config[key] = expression
+				return b
+			}
+		}
 	}
 	b.config[key] = value
 	return b
@@ -157,9 +161,13 @@ func (b *handlerConfigBuilder) AddTemplatableJSONSlice(key string, value []strin
 	if len(value) == 0 {
 		return b
 	}
-	if len(value) == 1 && isExpression(value[0]) {
-		b.config[key] = newTemplatableJSONExpression(wrapExpressionWithToJSON(value[0]))
-		return b
+	if len(value) == 1 {
+		for _, expression := range value {
+			if isExpression(expression) {
+				b.config[key] = newTemplatableJSONExpression(wrapExpressionWithToJSON(expression))
+				return b
+			}
+		}
 	}
 	b.config[key] = value
 	return b
@@ -194,7 +202,22 @@ func sanitizeAgentSafeOutputsConfig(config map[string]any, unresolvableJobs []st
 	}
 	referencesUnresolvableJob := func(expr string) bool {
 		for _, path := range interpolationReferences(expr) {
-			if len(path) >= 3 && strings.EqualFold(path[0], "needs") && slices.Contains(unresolvableJobs, path[1]) {
+			if len(path) < 3 {
+				continue
+			}
+			first, second := "", ""
+			for index, segment := range path {
+				switch index {
+				case 0:
+					first = segment
+				case 1:
+					second = segment
+				}
+				if index == 1 {
+					break
+				}
+			}
+			if strings.EqualFold(first, "needs") && slices.Contains(unresolvableJobs, second) {
 				return true
 			}
 		}

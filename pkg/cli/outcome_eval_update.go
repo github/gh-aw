@@ -243,7 +243,10 @@ func mutableBodyHash(raw any) string {
 
 func normalizeMutableBody(raw any) string {
 	body := strings.ReplaceAll(mutableString(raw), "\r\n", "\n")
-	lines := strings.Split(body, "\n")
+	var lines []string
+	for line := range strings.Lines(body) {
+		lines = append(lines, strings.TrimSuffix(line, "\n"))
+	}
 	for i := range lines {
 		lines[i] = strings.TrimRight(lines[i], " \t")
 	}

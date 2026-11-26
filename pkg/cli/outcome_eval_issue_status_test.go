@@ -10,6 +10,7 @@ import (
 
 	"github.com/github/gh-aw/pkg/lifecycle"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestEvalSetIssueStatus(t *testing.T) {
@@ -111,7 +112,7 @@ func TestRetainedLifecycleIssueStatusSnapshots(t *testing.T) {
 
 func TestNativeStatusIDJSONRoundTripLargeInteger(t *testing.T) {
 	var raw any
-	assert.NoError(t, json.Unmarshal([]byte("1234567890"), &raw))
+	require.NoError(t, json.Unmarshal([]byte("1234567890"), &raw))
 	id, ok := nativeStatusID(raw)
 	assert.True(t, ok)
 	assert.Equal(t, "1234567890", id)

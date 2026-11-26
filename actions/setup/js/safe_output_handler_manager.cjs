@@ -67,6 +67,14 @@ const {
 const { appendClaimEffects, withClaimEffectClients } = require("./work_queue_effect_client.cjs");
 const { normalizeSafeOutputName } = require("./safe_output_names.cjs");
 const { createClaimAdapterHandler, preparedAdapterPath } = require("./work_queue_claim_adapters.cjs");
+
+/**
+ * @typedef {Function & {
+ *   getReviewTarget?: (message: any) => any,
+ *   validatePreview?: (...args: any[]) => Promise<any>
+ * }} SafeOutputHandler
+ */
+
 // Output types that never write resources; allowed for a Work whose effect_contract sets no_writes.
 const NO_WRITE_TYPES = new Set(["noop", "report_missing_tool", "report_missing_data", "missing_tool", "missing_data", "report_incomplete"]);
 const GITHUB_TOKEN_CONFIG_KEY = "github-token";
@@ -663,7 +671,7 @@ async function loadHandlers(config, prReviewBufferRegistry, resolvedAllowedMenti
   for (const type of new Set([...Object.keys(HANDLER_MAP).filter(type => config[type]), ...scripts.keys(), ...actions.keys(), ...Object.keys(config.claim_adapters || {})])) {
     if (type === "upload_asset" && !currentClaimHandle()) continue;
     let executable;
-    /** @type {((...args: any[]) => Promise<any>) & {getReviewTarget?: (message: any) => any}} */
+    /** @type {SafeOutputHandler} */
     const handler = async (...args) => {
       const requirement = effectiveAuthorization(config, type, args[0]);
       if (requirement) {
@@ -1746,7 +1754,9 @@ async function processMessages(messageHandlers, messages, onItemCreated = null, 
     if (stagedFor(messageType, message) && previewOnly(messageType, message)) {
       authorizations.set(i, { state: "skipped_staged", reason_code: "skipped_staged" });
       core.info(`Staged safe-output invocation preview: ${messageType}`);
+      /** @type {SafeOutputHandler|undefined} */
       const handler = messageHandlers.get(messageType);
+      /** @type {{success: boolean, staged?: boolean, preview?: boolean, error?: string}} */
       let previewResult = { success: true, staged: true, preview: true };
       try {
         if (typeof handler?.validatePreview === "function") {
