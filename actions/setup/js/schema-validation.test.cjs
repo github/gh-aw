@@ -630,6 +630,18 @@ describe("schema-validation.cjs", () => {
       expect(violations[0].actualLength).toBe(0);
     });
 
+    it("should enforce minLength for string members of a union type", async () => {
+      const { validateStringMinLengths } = await import("./schema-validation.cjs");
+
+      const args = { planning_status: " \t\n" };
+      const schema = {
+        type: "object",
+        properties: { planning_status: { type: ["string", "integer"], minLength: 1 } },
+      };
+
+      expect(validateStringMinLengths(args, schema)).toEqual([{ field: "planning_status", minLength: 1, actualLength: 0 }]);
+    });
+
     it("should accept a value at exactly minLength", async () => {
       const { validateStringMinLengths } = await import("./schema-validation.cjs");
 

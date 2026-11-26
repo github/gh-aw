@@ -10,6 +10,7 @@
 #         expires: "2d"      # optional, default: 2d
 #         labels: [automation, cookie]
 #         assignees: [copilot]  # optional, default: []
+# New issues start in the native Backlog planning status.
 
 import-schema:
   title-prefix:
@@ -39,6 +40,8 @@ safe-outputs:
     title-prefix: "${{ github.aw.import-inputs.title-prefix }}"
     labels: ${{ github.aw.import-inputs.labels }}
     assignees: ${{ github.aw.import-inputs.assignees }}
+    planning-status: Backlog
+    allowed-statuses: [Backlog]
     max: 1
   noop:
 ---

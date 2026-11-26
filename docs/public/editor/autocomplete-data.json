@@ -3164,6 +3164,11 @@
           "desc": "Enable AI agents to minimize (hide) comments on issues or pull requests based on relevance, spam detection, or modera...",
           "leaf": true
         },
+        "set-issue-status": {
+          "type": "null|object",
+          "desc": "Change native issue planning status, separately from legacy update-issue.status open/closed state.",
+          "leaf": true
+        },
         "set-issue-type": {
           "type": "null|object",
           "desc": "Enable AI agents to set or clear the type of GitHub issues.",
