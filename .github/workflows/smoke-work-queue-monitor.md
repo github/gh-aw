@@ -56,12 +56,13 @@ steps:
         fs.mkdirSync("/tmp/gh-aw/agent", { recursive: true });
         fs.writeFileSync("/tmp/gh-aw/agent/smoke-cycle.json", JSON.stringify(report, null, 2));
         const completed = report.queue.claims.filter(claim => claim.state === "completed").length;
+        const planned = report.queue.claims.filter(claim => claim.planned_failure).length;
         const succeeded = report.workers.filter(worker => worker.status === "completed" && worker.conclusion === "success").length;
         const errorSummary = report.errors.map(error => `${error.operation}: ${error.category}${error.status == null ? "" : ` ${error.status}`}`).join("; ");
         const dispatcher = report.dispatcher ? `§${report.dispatcher.id} attempt ${report.dispatcher.run_attempt} ${report.dispatcher.conclusion}` : "not found";
         await core.summary
           .addHeading("Smoke work queue cycle", 2)
-          .addRaw(`Dispatcher ${dispatcher}. Queue snapshot ${report.queue.available ? "available" : "unavailable"}; dispatcher Claims ${completed}/${report.queue.claims.length} completed; bound worker attempts ${succeeded}/${report.workers.length} succeeded; ${report.healthy ? "healthy" : "unhealthy"}.${errorSummary ? ` Read failures: ${errorSummary}.` : ""}`, true)
+          .addRaw(`Dispatcher ${dispatcher}. Queue snapshot ${report.queue.available ? "available" : "unavailable"}; dispatcher Claims ${completed}/${report.queue.claims.length} completed, ${planned} planned fail-once failures; bound worker attempts ${succeeded}/${report.workers.length} succeeded; ${report.healthy ? "healthy" : "unhealthy"}.${errorSummary ? ` Read failures: ${errorSummary}.` : ""}`, true)
           .write();
 timeout-minutes: 15
 strict: true
@@ -91,8 +92,10 @@ Work graph IDs or current Work state.
 1. Dispatcher run. Expected: `dispatcher` present with conclusion `success`.
    Record `dispatcher.id` as DISPATCH_RUN.
 2. Dispatcher Claims. From `queue.claims`: expected exactly three distinct
-   Claims, each `state: completed` with a bound `run_id`. Any other state is a
-   failure; report its `cancellation_reason`.
+   Claims with a bound `run_id`, each `state: completed`, or `state: cancelled`
+   with `planned_failure: true` (the fail-once smoke Work's first attempt,
+   reason `worker_failed`). Any other state is a failure; report its
+   `cancellation_reason`.
 3. Bound worker runs. From `workers`: expected three distinct runs whose bound
    attempt has status `completed` and conclusion `success`. A later rerun of the
    same run does not count. A missing run or API read error is a failure.
@@ -106,7 +109,7 @@ Work graph IDs or current Work state.
    run, `healthy: false`, or queue read tool error is a failure in its own
    right; never treat unreadable evidence as a healthy queue.
    - No failures: call `noop` with one line:
-     `smoke-work-queue healthy: dispatcher §<DISPATCH_RUN> ok, 3/3 Claims completed, 3/3 workers succeeded`.
+     `smoke-work-queue healthy: dispatcher §<DISPATCH_RUN> ok, <completed>/3 Claims completed, <planned> planned failures, 3/3 workers succeeded`.
    - Otherwise create one issue titled
      `Smoke Work Queue Failures - dispatcher §<DISPATCH_RUN or "none">` (the safe
      output prefixes it with `[WorkQueue Health] `) using the `reporting` skill.
