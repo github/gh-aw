@@ -198,24 +198,37 @@ function createSessionLookups(session) {
     let key = JSON.stringify([data.serverName, id ?? { eventIndex: eventIndices.get(event) }, ...attemptScope(event), ...(event.provenance.attemptId ? [data.sessionId ?? "", data.agentId ?? ""] : [])]);
     if (data.method && data.method !== "tools/call") {
       if (event.type === "mcp.rpc.request" && id != null) otherRequests.set(key, (otherRequests.get(key) ?? 0) + 1);
+      if (event.type === "mcp.rpc.response" && id != null && (otherRequests.get(key) ?? 0) > 0) otherRequests.set(key, otherRequests.get(key) - 1);
       continue;
     }
     let call = gatewayCalls.get(key);
-    if (event.type === "mcp.rpc.response" && !call && (otherRequests.get(key) ?? 0) > 0) {
+    if (event.type === "mcp.rpc.response" && (otherRequests.get(key) ?? 0) > 0) {
       otherRequests.set(key, otherRequests.get(key) - 1);
       continue;
     }
     if (event.type === "mcp.rpc.response" && (!call || call.completed)) {
       const pending = anonymousRequests.get(pendingKey);
-      while (pending && pending.next < pending.keys.length && gatewayCalls.get(pending.keys[pending.next])?.completed) pending.next++;
-      if (pending && pending.next < pending.keys.length) {
-        key = pending.keys[pending.next++];
+      let pendingIndex = -1;
+      for (let index = pending?.next ?? 0; pending && index < pending.keys.length; index++) {
+        const candidate = gatewayCalls.get(pending.keys[index]);
+        if (!candidate || candidate.completed) continue;
+        if (!data.toolName || candidate.name === data.toolName) {
+          pendingIndex = index;
+          break;
+        }
+      }
+      if (pending && pendingIndex >= 0) {
+        key = pending.keys[pendingIndex];
         call = gatewayCalls.get(key);
+        if (pendingIndex === pending.next) pending.next++;
       } else if (!data.toolName) {
         continue;
+      } else {
+        call = undefined;
       }
     }
     if (!call && !data.toolName) continue;
+    const created = !call;
     call ??= {
       name: data.toolName ?? "",
       serverName: data.serverName,
@@ -226,6 +239,8 @@ function createSessionLookups(session) {
       sessionId: data.sessionId,
     };
     if (event.type !== "mcp.rpc.response" && id != null) gatewayCallIds.set(call, id);
+    if (event.type === "mcp.rpc.response" && data.toolCallId != null) gatewayCallIds.set(call, data.toolCallId);
+    else if (event.type === "mcp.rpc.response" && created && id != null) gatewayCallIds.set(call, id);
     if (data.toolName) call.name = data.toolName;
     if (event.type !== "mcp.rpc.request") Object.assign(call, data, { completed: true });
     gatewayCalls.set(key, call);
@@ -239,7 +254,13 @@ function createSessionLookups(session) {
   toolCalls.push(
     ...[...gatewayCalls.values()].filter(call => {
       const id = gatewayCallIds.get(call);
-      const byId = id == null ? [] : (nativeCallIds.get(JSON.stringify([String(id), ...callAttemptScope(call)])) ?? []);
+      const byId =
+        id == null
+          ? []
+          : (nativeCallIds.get(JSON.stringify([String(id), ...callAttemptScope(call)])) ?? []).filter(candidate => {
+              const nameMatches = candidate.name === call.name || candidate.name === `${call.serverName}-${call.name}`;
+              return nameMatches && (!candidate.mcpServerName || candidate.mcpServerName === call.serverName);
+            });
       const byName = nativeCallsByName.get(JSON.stringify([call.serverName, `${call.serverName}-${call.name}`, ...callAttemptScope(call)])) ?? [];
       const byUnprefixedName = nativeCallsByName.get(JSON.stringify([call.serverName, call.name, ...callAttemptScope(call)])) ?? [];
       const native = [...byId, ...byName, ...byUnprefixedName].find(candidate => !matchedNativeCalls.has(candidate));
