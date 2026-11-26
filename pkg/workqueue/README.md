@@ -76,7 +76,6 @@ For the full queue behavior and operator configuration, see the [work-queue refe
 | `ReplayRaw` | `func ReplayRaw(records []json.RawMessage) (Projection, error)` | Replays raw commit records. |
 | `NewProjection` | `func NewProjection() Projection` | Returns an empty projection. |
 | `AppendCommit` | `func AppendCommit(state Projection, commit QueueCommit) (Projection, error)` | Applies one commit to a cloned projection. |
-| `ValidateCommit` | `func ValidateCommit(commit QueueCommit) error` | Validates commit shape and identity. |
 | `LedgerProtocol` | `func LedgerProtocol(data []byte) int` | Reports the head line's protocol version. |
 | `SerializeProjection` | `func SerializeProjection(state Projection) ([]byte, error)` | Serializes a projection in the Checkpoint `state` format, unpruned. |
 | `CheckpointCommit` | `func CheckpointCommit(state Projection, actor Actor, at int64) (QueueCommit, error)` | Builds a root Checkpoint commit that carries only records a later commit can read: live Work, its predecessors, terminal Work awaiting its Issue comment, their Claims, Dispatches, creators and gate Observations, and the newest `RetainedRequests` request IDs of the folded log. |
@@ -91,9 +90,7 @@ For the full queue behavior and operator configuration, see the [work-queue refe
 | Function | Signature | Description |
 |----------|-----------|-------------|
 | `NewRequest` | `func NewRequest(kind string, actor Actor, parameters any) (Request, error)` | Builds a request with its canonical id. |
-| `RequestID` | `func RequestID(actor Actor, kind string, parameters any) (string, error)` | Computes `request:<sha256>`. |
 | `CommitID` | `func CommitID(previous *string, requestID string) string` | Computes `q_<sha256>`. |
-| `ProposedCommitID` | `func ProposedCommitID(state Projection, request Request) string` | Commit id for a request at the current tip. |
 | `BuildCommit` | `func BuildCommit(state Projection, actor Actor, request Request, operations []Operation, at int64) QueueCommit` | Builds the next commit. |
 | `Op` | `func Op(value any) (Operation, error)` | Canonically encodes an operation. |
 | `ValidateActor` | `func ValidateActor(actor Actor) error` | Validates actor fields. |
@@ -124,7 +121,6 @@ For the full queue behavior and operator configuration, see the [work-queue refe
 | `Branch.Publish` | `func (b Branch) Publish(ctx context.Context, actor Actor, kind string, parameters any, operationsFor OperationsFor) (Publication, error)` | Publishes one request with compare-and-swap retries. |
 | `Branch.Checkpoint` | `func (b Branch) Checkpoint(ctx context.Context, actor Actor, minimumLines int) (CheckpointResult, error)` | Replaces the log with one Checkpoint commit. |
 | `ParseSettings` | `func ParseSettings(data []byte) (Settings, error)` | Parses a `work_queue` settings object. |
-| `ParseRepositorySettings` | `func ParseRepositorySettings(data []byte) (Settings, error)` | Parses `work_queue` from an `aw.json` document. |
 | `BuildPolicyEnv` | `func BuildPolicyEnv(settings Settings, repository string, workflows []string) (PolicyEnv, error)` | Compiles settings and worker workflows into the policy environment. |
 | `ParsePolicyEnv` | `func ParsePolicyEnv(data []byte) (PolicyEnv, error)` | Parses a policy environment. |
 | `ValidatePolicyEnv` | `func ValidatePolicyEnv(env PolicyEnv) error` | Validates a policy environment. |

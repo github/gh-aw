@@ -263,7 +263,7 @@ function formatDate(date) {
  * @returns {Promise<Function>} Message handler function
  */
 async function main(config = {}, githubClient = null) {
-  const maxCount = config.max || 10;
+  const maxCount = config.max || 1;
 
   // Check if we're in staged mode
   const isStaged = isStagedMode(config);

@@ -305,15 +305,14 @@ model: router/economy
 
 To narrow the main agent's choices without restricting sub-agents, add a [shortlist](/gh-aw/reference/model-routing/#a-shortlist-of-models) alongside a literal router value. To opt out of [default routing](/gh-aw/reference/model-routing/#default-routing-for-workflows-without-a-model) without pinning a model, omit `model` and set top-level `model-routing: false`.
 
-### Adaptive Routing (`adaptive-routing:`)
-
-Set `adaptive-routing: observe` on a routed workflow that enables `tools.repo-memory` to record each run's model and effort, whether it completed its task, and what it cost, on the `memory/adaptive-routing/<workflow>` branch. The workflow keeps running the router's ordinary pick. `false` turns it off, including a repository default from `aw.json`. See [Adaptive Routing](/gh-aw/reference/adaptive-routing/).
+To record the selected model and effort, outcome, and cost without changing the router's pick, set `learning: observe` under `model-routing` and enable `tools.repo-memory`. Set `learning: false` to override an import or repository default without disabling routing. See [Adaptive Routing](/gh-aw/reference/adaptive-routing/).
 
 ```aw wrap
 model: router
+model-routing:
+  learning: observe
 tools:
   repo-memory: true
-adaptive-routing: observe
 ```
 
 ### Engine Driver (`engine.driver:`)

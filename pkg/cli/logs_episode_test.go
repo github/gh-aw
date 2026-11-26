@@ -464,6 +464,7 @@ func TestMCPToolCallToEpisodeToolCall(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			got := mcpToolCallToEpisodeToolCall(tt.input)
 			assert.Equal(t, tt.expectedTool, got.Tool, "Tool should match")
 			assert.Equal(t, tt.expectedServer, got.Server, "Server should match")
@@ -625,6 +626,7 @@ func TestClassifyEpisodeEscalationThresholds(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			ok, reason := classifyEpisodeEscalation(tt.episode)
 			assert.Equal(t, tt.expectedOK, ok, "escalation eligibility should match threshold behavior")
 			assert.Equal(t, tt.expectedReason, reason, "escalation reason should match threshold behavior")
@@ -659,6 +661,7 @@ func TestBuildSuggestedRoutePreferenceOrder(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			assert.Equal(t, tt.expected, buildSuggestedRoute(tt.episode), "suggested route should follow the documented preference order")
 		})
 	}

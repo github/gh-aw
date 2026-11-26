@@ -37,7 +37,7 @@ Container digests come from registry metadata only (`docker buildx imagetools in
 |-------|------|---------|-------------|
 | `lock_file_logo` | boolean | `true` | Include the ASCII logo in generated workflow headers, including companion workflows. Set to `false` to omit only the logo. |
 | `issue_label` | string | `"agentic-workflows"` | Label used to create and find gh-aw's own issues, including detection trackers, failure issues, and maintenance reports. |
-| `adaptive_routing` | `"observe"` or `false` | `false` | Record every eligible routed workflow's runs in its [adaptive routing](/gh-aw/reference/adaptive-routing/) history. Workflows that cannot take part are skipped; a workflow's own `adaptive-routing` value, or one from an import, wins. |
+| `model_routing.learning` | `"observe"` or `false` | `false` | Record eligible routed runs in the workflow's [routing history](/gh-aw/reference/adaptive-routing/). Ineligible workflows are skipped; `model-routing.learning` in the workflow or an import takes precedence. |
 
 ```json title=".github/workflows/aw.json"
 {
