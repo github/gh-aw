@@ -10,6 +10,7 @@ permissions:
   pull-requests: read
   copilot-requests: write
 imports:
+- shared/reporting.md
 - uses: shared/skip-if-issue-open.md
   with:
     title-prefix: "[file-diet]"
@@ -187,22 +188,6 @@ Calculate:
 ### 5. Generate Issue Description
 
 If refactoring is needed (file ≥ 800 lines), create an issue with this structure:
-
-#### Markdown Formatting Guidelines
-
-**IMPORTANT**: Follow these formatting rules to ensure consistent, readable issue reports:
-
-1. **Header Levels**: Use h3 (###) or lower for all headers in your issue report to maintain proper document hierarchy. The issue title serves as h1, so start section headers at h3.
-
-2. **Progressive Disclosure**: Wrap detailed file analysis, code snippets, and lengthy explanations in `<details><summary>Section Name</summary>` tags to improve readability and reduce overwhelm. This keeps the most important information immediately visible while allowing readers to expand sections as needed.
-
-3. **Issue Structure**: Follow this pattern for optimal clarity:
-   - **Brief summary** of the file size issue (always visible)
-   - **Key metrics** (LOC, complexity, test coverage) (always visible)
-   - **Detailed file structure analysis** (in `<details>` tags)
-   - **Refactoring suggestions** (always visible)
-
-These guidelines build trust through clarity, exceed expectations with helpful context, create delight through progressive disclosure, and maintain consistency with other reporting workflows.
 
 #### Issue Template
 
