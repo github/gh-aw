@@ -23933,9 +23933,9 @@ safe-outputs:
     # Format 3: string
     max-ai-credits: "example-value"
 
-    # Runner specification for the detection job. Overrides agent.runs-on for the
-    # detection job only. Supports string, array, or runner-group object forms.
-    # Defaults to agent.runs-on.
+    # Runner specification for the detection job. Applies only to the detection job
+    # and does not inherit `agent.runs-on`. Supports string, array, or runner-group
+    # object forms. Defaults to GitHub-hosted `ubuntu-latest`.
     # (optional)
     # Accepted formats:
 
