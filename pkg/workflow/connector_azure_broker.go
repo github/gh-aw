@@ -108,6 +108,9 @@ func (c *Compiler) validateConnectorAzureBoundary(data *WorkflowData) error {
 			for _, secret := range config.Agent.Secrets() {
 				if azure := config.azureRoute(secret); azure != nil {
 					readers[azureClientKey(azure.ClientID)] = struct{}{}
+					if !isFirewallEnabled(data) {
+						return errors.New("connector Azure OIDC brokers require an enabled sandbox.agent")
+					}
 					if c.dryRun {
 						return errors.New("--dry-run cannot safely execute connector readers using Azure OIDC")
 					}
@@ -122,6 +125,9 @@ func (c *Compiler) validateConnectorAzureBoundary(data *WorkflowData) error {
 				if azure := config.azureRoute(secret); azure != nil {
 					if _, _, live := connectorCredentialMintCondition(c, data, config, secret, "safe-output"); !live {
 						continue
+					}
+					if !isFirewallEnabled(data) {
+						return errors.New("connector Azure OIDC brokers require an enabled sandbox.agent")
 					}
 					writers[azureClientKey(azure.ClientID)] = struct{}{}
 				}

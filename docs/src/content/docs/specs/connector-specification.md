@@ -231,6 +231,9 @@ token. The host MUST NOT forward assertions or token-request credentials to
 the agent or provider, persist access tokens in plans or outputs, or use a
 failed exchange or authorization denial to select another route. Renewal
 uses a fresh exchange, not a stored refresh token or replay of a denied call.
+The compiler MUST reject an active connector Azure OIDC broker when the agent
+sandbox is disabled or not enabled. Import-only and staged-only credentials do
+not start a broker.
 
 For federated readers, the agent MUST NOT receive the OIDC request credentials,
 assertion, access token, or broker socket capability. The broker supplies a
@@ -982,8 +985,12 @@ The current broker creates its socket under `RUNNER_TEMP` without checking all
 agent-visible host mounts. On a local-Docker self-hosted runner, a temp
 directory beneath an exposed mount such as `/tmp/gh-aw` can let the agent
 connect directly and obtain the token. Read-only bind mounts do not prevent
-socket connections. C-FED-002 therefore requires runtime mount-isolation
-enforcement; the model and existing unit tests do not establish it.
+socket connections. The [AWF mount policy](https://github.com/github/gh-aw-firewall/blob/7e4883fa737d51b4c43fa11a5b86268841c607be/docs/mount-policy.md)
+likewise warns against placing host IPC in shared paths and does not guarantee
+that an arbitrary `RUNNER_TEMP` is outside every share. Requiring an enabled
+agent sandbox is necessary but does not close this gap. C-FED-002 therefore
+requires runtime mount-isolation enforcement; the model and existing unit tests
+do not establish it.
 
 To reproduce, replace the `cd` above with `cd "$repo/specs/connectors/agent-boundary"`
 and use `AgentBoundary.tla` and `AgentBoundary.cfg` in place of

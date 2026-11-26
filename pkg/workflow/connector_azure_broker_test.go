@@ -147,6 +147,34 @@ func TestConnectorAzureBrokerRejectsUnsafeRoutes(t *testing.T) {
 	}
 }
 
+func TestConnectorAzureBrokerRequiresAgentSandbox(t *testing.T) {
+	for _, tc := range []struct {
+		name, sandbox, selection string
+		wantError                bool
+	}{
+		{"reader-disabled", "sandbox:\n  agent: false\n", "tools:\n  tracker: [get-issue]\n", true},
+		{"remote-disabled", "sandbox:\n  agent: false\n", "tools:\n  tracker: {remote: [native_read]}\n", true},
+		{"writer-disabled", "sandbox:\n  agent: false\n", "safe-outputs:\n  environment: publish\n  tracker-add-comment:\n", true},
+		{"conditional-disabled", "sandbox:\n  agent: false\n", "safe-outputs:\n  environment: publish\n  tracker-add-comment:\n    staged: ${{ inputs.stage }}\n", true},
+		{"staged-disabled", "sandbox:\n  agent: false\n", "safe-outputs:\n  threat-detection: false\n  tracker-add-comment:\n    staged: true\n", false},
+		{"import-disabled", "sandbox:\n  agent: false\n", "", false},
+		{"writer-default", "", "safe-outputs:\n  environment: publish\n  tracker-add-comment:\n", false},
+		{"writer-enabled", "sandbox:\n  agent: awf\n", "safe-outputs:\n  environment: publish\n  tracker-add-comment:\n", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			c, root := awConnectorCompiler(t)
+			data, err := c.ParseWorkflowString(awConnectorHeader+"strict: false\nfeatures:\n  dangerously-disable-sandbox-agent: true\n"+connectorAzureSource(t)+tc.sandbox+tc.selection+"---\nReview.\n", root+"/proof.md")
+			if tc.wantError {
+				require.ErrorContains(t, err, "connector Azure OIDC brokers require an enabled sandbox.agent")
+				return
+			}
+			require.NoError(t, err)
+			_, err = c.CompileToYAML(data, root+"/proof.md")
+			require.NoError(t, err)
+		})
+	}
+}
+
 func TestConnectorAzureWriterRequiresExclusiveEnvironment(t *testing.T) {
 	const write = "safe-outputs:\n  tracker-add-comment:\n"
 	for _, tc := range []struct{ name, selection, message string }{
