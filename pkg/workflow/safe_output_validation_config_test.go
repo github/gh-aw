@@ -130,6 +130,29 @@ func TestApproveWorkflowRunValidationConfig(t *testing.T) {
 	}
 }
 
+func TestCreateProjectStatusUpdateValidationConfigDefaultsMaxToOne(t *testing.T) {
+	config, ok := ValidationConfig["create_project_status_update"]
+	if !ok {
+		t.Fatal("create_project_status_update not found in ValidationConfig")
+	}
+	if config.DefaultMax != 1 {
+		t.Errorf("create_project_status_update DefaultMax = %d, want 1", config.DefaultMax)
+	}
+
+	jsonStr, err := GetValidationConfigJSONWithDataSchema([]string{"create_project_status_update"}, nil, false, nil)
+	if err != nil {
+		t.Fatalf("GetValidationConfigJSONWithDataSchema() error = %v", err)
+	}
+	var parsed map[string]TypeValidationConfig
+	if err := json.Unmarshal([]byte(jsonStr), &parsed); err != nil {
+		t.Fatalf("Failed to parse validation config JSON: %v", err)
+	}
+	parsedConfig, ok := parsed["create_project_status_update"]
+	if len(parsed) != 1 || !ok || parsedConfig.DefaultMax != 1 {
+		t.Errorf("create_project_status_update validation config = %#v, want defaultMax 1", parsedConfig)
+	}
+}
+
 // TestCallWorkflowValidationConfigPreservesWorkflowName is a regression test for
 // samples-mode call-workflow replay dropping the workflow name (github/gh-aw#55176):
 // without a "call_workflow" entry in ValidationConfig, collect_ndjson_output.cjs

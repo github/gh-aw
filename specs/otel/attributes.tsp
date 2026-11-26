@@ -82,6 +82,7 @@ model AttributeNames {
   genAiTokenModality: "gen_ai.token.modality";
   // Removed upstream; compatibility only. Use gen_ai.agent.name (spec section 6.7.1).
   genAiWorkflowName: "gen_ai.workflow.name";
+  serverAddress: "server.address";
   vcsProviderName: "vcs.provider.name";
   vcsRefHeadName: "vcs.ref.head.name";
   vcsRefHeadRevision: "vcs.ref.head.revision";

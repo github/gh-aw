@@ -45,7 +45,7 @@ The `--timeout` flag uses different formats depending on the command:
 | Command | Description | When to use |
 |---------|-------------|-------------|
 | [`gh aw skill`](#skill) | Print the bundled agentic-workflows skill | Loading instructions into an agent without adding repository files |
-| [`gh aw work-queue`](#work-queue) | Experimental Git-backed DAG work queue | Inspecting queue state and operator recovery |
+| [`gh aw work-queue`](#work-queue) | Experimental Git-backed priority-FIFO work queue with dependencies | Inspecting queue state and operator recovery |
 
 ## Installation
 
@@ -1076,6 +1076,8 @@ Read native delivery, adoption, recorded grades and independently measured outco
 gh aw value weekly-research --repo owner/repo --json
 ```
 
+**Options:** `--start`, `--end` (snapshot dates at 12:00 UTC), `--daily` (daily measurements), `--ref` (local history ref), `--timeout` (collection deadline), `--recipe` (report recipe), `--evidence` (typed observations), `--value-function` (value evaluator definition), `--logs-dir` (native lifecycle records), `--repo/-r`, `--json/-j`.
+
 See [Value report](/gh-aw/reference/value/) for collection, options and attribution limits.
 
 #### `graders`
@@ -1299,7 +1301,7 @@ gh aw experiments analyze my-workflow --json  # Analyze one experiment workflow 
 gh aw experiments analyze my-workflow --repo owner/repo  # Analyze experiments in another repository
 ```
 
-**Options:** all `experiments` commands accept `--repo/-r`, `--json/-j`
+**Options:** all `experiments` commands accept `--repo/-r`, `--json/-j`. `experiments analyze` also accepts `--adoption` to evaluate live adoption-backed metrics using additional GitHub API requests.
 
 #### `routing`
 
@@ -1598,11 +1600,11 @@ gh aw mcp-server --validate-actor     # Enable actor validation
 
 **Options:** `--port/-p` (HTTP server port), `--cmd` (custom subprocess command), `--allow-write-tools` (enable workflow-writing tools for trusted clients), `--validate-actor` (enforce actor validation for logs, audit, audit-diff, and enabled workflow-writing tools)
 
-**Available Tools:** status, compile, logs, audit, checks, work-queue (read-only), mcp-inspect, add, update, fix
+**Available Tools:** status, health, compile, logs, audit, audit-diff, checks, work-queue (read-only), mcp-inspect, add, update, fix
 
 The `compile` tool uses a dedicated read-only mode with `--no-emit` by default; remote imports and nested body-level includes must already be cached, and container validation never pulls Docker images. Ordinary CLI `compile --no-emit` and `validate` retain import-cache population. Workflow-writing tools (`add`, `update`, and `fix`), emitted compilation, dry-run compilation, and external scanners require `--allow-write-tools`. Enable writes only for trusted MCP clients and workflow sources.
 
-When `--validate-actor` is enabled, logs and audit tools require write+ repository access via GitHub API (permissions cached for 1 hour). See [MCP Server Guide](/gh-aw/reference/gh-aw-as-mcp-server/).
+When `--validate-actor` is enabled, logs, audit, and audit-diff tools require write+ repository access via GitHub API (permissions cached for 1 hour). See [MCP Server Guide](/gh-aw/reference/gh-aw-as-mcp-server/).
 
 #### `domains`
 

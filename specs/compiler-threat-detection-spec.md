@@ -7,7 +7,7 @@ sidebar:
 
 # GitHub Actions Compiler Threat Detection Specification
 
-**Version**: 1.0.112
+**Version**: 1.0.114
 **Status**: Candidate Recommendation  
 **Latest Version**: https://github.com/github/gh-aw/blob/main/specs/compiler-threat-detection-spec.md  
 **Editors**: GitHub Next (GitHub, Inc.)
@@ -32,7 +32,7 @@ Each version maps to the minimum compatible binary. A version change MUST update
 
 | Versions | Minimum gh-aw |
 |---|---:|
-| `1.0.60`–`1.0.112` | Unreleased |
+| `1.0.60`–`1.0.114` | Unreleased |
 | `1.0.44`–`1.0.59` | Unreleased |
 | `1.0.40`–`1.0.43` | `v0.87.9` |
 | `1.0.39` | `v0.87.9` |
@@ -237,7 +237,7 @@ Each rule has a stable `CTR-*` ID, threat class, trigger, compiler action, diagn
 - **CTR-007 Markdown Content Security**: Detect unsafe external markdown, including obfuscation, scripts, and social engineering.
 - **CTR-008 Pull Request Target Safety**: For `pull_request_target`, strict mode MUST warn about elevated permissions and secret access unless `on.pull_request_target.acknowledge-risk` is `true`. This acknowledgment suppresses only that warning; it MUST NOT authorize a checkout or suppress checkout diagnostics. If `on.roles` is `all` or `read`, or a role list contains either value, the compiler MUST reject the workflow in strict mode regardless of checkout configuration, trigger-risk acknowledgment, or feature flags. In non-strict mode, this role combination MUST produce a security warning unless `features.dangerously-allow-roles-read-and-pull-request-target` is explicitly set to boolean `true`. This feature flag suppresses only the role-combination warning; it MUST NOT affect strict-mode rejection or other `pull_request_target` trigger and checkout diagnostics. An explicit `checkout: false` is accepted. Otherwise, every configured checkout MUST independently use either the supported base-repository/base-ref form or an exact, case-sensitive literal repository/ref pair in `on.pull_request_target.allowed-checkouts`. The allowlist path MUST reject expressions, wildcard refs, `refs/pull/...` refs, wiki checkouts, and omitted external refs. Neither the base-checkout nor allowlist path may accept any non-empty `fetch` value. An omitted checkout configuration is not equivalent to explicit `checkout: false`. In strict mode an unsafe checkout MUST be rejected; in non-strict mode it MUST produce a warning.
 - **CTR-009 Shell Expansion in Safe-Outputs**: Reject dangerous shell expansion in safe-output scripts.
-- **CTR-010 Expression Safety Allowlist**: Reject unauthorized or multiline GitHub Actions expressions.
+- **CTR-010 Expression Safety Allowlist**: Reject unauthorized GitHub Actions expressions and expressions containing any JavaScript line terminator (LF, CR, U+2028, or U+2029), including before or after expression content. At compile time, report line-break violations separately and render rejected expressions on one line.
 - **CTR-011 Network Firewall Configuration**: Reject missing firewall prerequisites and strict-mode wildcard domains.
 - **CTR-012 Safe-Outputs Wildcard Push Scope**: Warn for unconstrained wildcard PR-branch pushes.
 - **CTR-013 Argument Injection via Package/Image Names**: Reject hyphen-prefixed package and image names before subprocess use.
@@ -507,7 +507,7 @@ Every active rule MUST map to implementation and test coverage. References are p
 | CTR-007 Markdown Content Security | `markdown_security_scanner.go`, `pull_request_target_validation.go` | corresponding workflow and sanitizer tests |
 | CTR-008 Pull Request Target Safety | `pkg/workflow/pull_request_target_validation.go`, shared `pkg/workflow/checkoutpolicy/target.go`; AST subsets: `pkg/workflow/lint/pull_request_target_roles.go`, `pull_request_target_checkout.go` | `pkg/workflow/pull_request_target_validation_test.go`, `ast_threat_policy_test.go`, `pkg/workflow/checkoutpolicy/target_test.go`, `pkg/workflow/lint/threat_policy_test.go`, `pull_request_target_checkout_test.go`; `specs/workflow-security/PullRequestTargetCheckout.tla` |
 | CTR-009 Shell Expansion in Safe-Outputs | `pkg/workflow/safe_outputs_steps_shell_expansion_validation.go`, shared `pkg/workflow/shellpattern/expansion.go`; AST adapter: `pkg/workflow/lint/safe_output_shell_expansion.go` | `pkg/workflow/safe_outputs_steps_shell_expansion_validation_test.go`, `pkg/workflow/shellpattern/expansion_test.go`, `pkg/workflow/lint/threat_policy_test.go` |
-| CTR-010 Expression Safety Allowlist | safe-output shell/push validation, expression validation, firewall validation; AST prompt-form subset: `pkg/workflow/lint/prompt_expression.go` | corresponding workflow tests; `pkg/workflow/lint/prompt_expression_test.go`, `pkg/workflow/ast_threat_policy_test.go` |
+| CTR-010 Expression Safety Allowlist | `pkg/workflow/expression_safety_validation.go`, `actions/setup/js/runtime_import.cjs`; safe-output shell/push validation, firewall validation; AST prompt-form subset: `pkg/workflow/lint/prompt_expression.go` | `pkg/workflow/expression_safety_test.go`, `pkg/workflow/runtime_import_validation_test.go`, `actions/setup/js/runtime_import.test.cjs`; `pkg/workflow/lint/prompt_expression_test.go`, `pkg/workflow/ast_threat_policy_test.go` |
 | CTR-011 Network Firewall Configuration | safe-output shell/push validation, expression validation, firewall validation; AST subsets: `pkg/workflow/lint/runtime_policy.go`, `firewall_ssl_bump.go` | corresponding workflow tests; `pkg/workflow/lint/source_policy_test.go`, `threat_policy_test.go` |
 | CTR-012 Safe-Outputs Wildcard Push Scope | safe-output shell/push validation, expression validation, firewall validation | corresponding workflow tests |
 | CTR-013 Argument Injection via Package/Image Names | name, install-script, and allowed-label validation | `argument_injection_test.go`, corresponding validation tests |
@@ -950,21 +950,21 @@ This is an existing-behavior supply-chain mapping. No new `CTR-*` rule or compli
 
 ### 7.18 Adaptive Routing History Writer
 
-`adaptive-routing: observe` adds a post-conclusion `push_routing_history` job that records routed-run evidence on `memory/adaptive-routing/<workflow>` without changing the model that runs. The compiler MUST keep that history outside agent control:
+Setting `model-routing.learning` to `observe` adds a post-conclusion `push_routing_history` job that records routed-run evidence on `memory/adaptive-routing/<workflow>` without changing the model that runs. The compiler MUST keep that history outside agent control:
 
 - Reject any `tools.repo-memory` branch equal to or inside `memory/adaptive-routing`, so the agent can never edit its own record.
 - Grant `contents: write` and `actions: read` only to the writer job, never to the agent or other jobs; the job MUST depend on `activation`, `agent`, and `conclusion` and MUST NOT run when the agent was skipped.
 - Emit the routing identity fields (workflow ID, definition hash, mode, engine, and goal) only as fixed, quoted compiler-derived values. Other runtime bindings, including a dynamically selected routing level, token/session-file bindings, and sub-agent declarations, are outside this requirement. The verdict MUST come from the unified session artifact, not from agent-written files.
 - Reject explicit use for the tested ineligible cases: a fixed or non-routed primary model, `workflow_call`, and missing `tools.repo-memory`. A repository default silently skips the fixed/non-routed model and `workflow_call` cases covered by regression tests. Workflows that do not opt in compile unchanged.
-- `gh aw compile --dry-run` is an explicit compiler preview mode. It MUST perform adaptive-routing eligibility and configuration validation, including validation of explicit configuration, without mutating the parsed `WorkflowData`. The emitted dry-run workflow MUST omit the compiler-managed `push_routing_history` job and its associated `contents: write` and `actions: read` permissions. A dry-run compilation MUST NOT charge the run as unsaved.
+- `gh aw compile --dry-run` is an explicit compiler preview mode. It MUST validate `model-routing.learning` and check workflow eligibility without mutating the parsed `WorkflowData`. The emitted dry-run workflow MUST omit the compiler-managed `push_routing_history` job and its associated `contents: write` and `actions: read` permissions. A dry-run compilation MUST NOT charge the run as unsaved.
 - For a real run, when the agent has started and an existing `push_routing_history` writer concludes with anything other than success, including skipped or cancelled conclusions, the run MUST remain unsaved. The dry-run omission does not weaken this real-run accounting requirement.
 
 | Boundary | Implementation | Regression Evidence |
 |---|---|---|
-| Reserved history namespace | `pkg/workflow/adaptive_routing.go`: `validateRepoMemoryBranchesNotReserved` | `TestRepoMemoryCannotWriteTheRoutingHistories` |
-| Writer job permissions, ordering, and environment | `addPushRoutingHistoryJob`, `buildPushRoutingHistorySteps` | `TestAdaptiveRoutingObserveAddsOnlyTheWriterJob` |
-| Eligibility and opt-in precedence | `resolveAdaptiveRoutingSetting`, `adaptiveRoutingIneligibility`, `applyAdaptiveRouting` | `TestAdaptiveRoutingSettingPrecedence`, `TestAdaptiveRoutingFromAnImport`, `TestAdaptiveRoutingIneligibleWorkflows` (fixed/non-routed models, `workflow_call`, and missing repo-memory; default skips for fixed/non-routed models and `workflow_call`) |
-| Dry-run validation, omission, and compiler-data isolation | `pkg/workflow/compiler_development.go`, `pkg/workflow/adaptive_routing.go` | PR #80804 tests for explicit and `aw.json`-default dry-run omission, compiler reuse without parsed-data mutation, and retained validation |
+| Reserved history namespace | `pkg/workflow/routing_learning.go`: `validateRepoMemoryBranchesNotReserved` | `TestRepoMemoryCannotWriteTheRoutingHistories` |
+| Writer job permissions, ordering, and environment | `addPushRoutingHistoryJob`, `buildPushRoutingHistorySteps` | `TestRoutingLearningObserveAddsOnlyTheWriterJob` |
+| Eligibility and opt-in precedence | `resolveRoutingLearningSetting`, `routingLearningIneligibility`, `applyRoutingLearning` | `TestRoutingLearningSettingPrecedence`, `TestRoutingLearningFromAnImport`, `TestRoutingLearningIneligibleWorkflows` (fixed/non-routed models, `workflow_call`, and missing repo-memory; default skips for fixed/non-routed models and `workflow_call`) |
+| Dry-run validation, omission, and compiler-data isolation | `pkg/workflow/compiler_development.go`, `pkg/workflow/routing_learning.go` | `TestRoutingLearningDryRunOmitsWriterJob` (explicit and repository-default opt-in, compiler reuse without parsed-data mutation, and retained validation) |
 | Real-run unsaved accounting | `actions/setup/js/push_routing_history.cjs` | PR #80804 tests for failed/cancelled runs with an agent started and non-successful writer conclusions, including skipped/cancelled writers |
 
 This is an existing-behavior mapping. The writer's `contents: write` is a deliberate, job-scoped grant; the history records routing evidence only and does not authorize model selection changes. No new `CTR-*` rule or compliance-test identifier is introduced.
@@ -986,7 +986,7 @@ Each active rule MUST have at least one deterministic test that covers its prima
 | **T-CTR-007** | CTR-007 Markdown Content Security | Detect unsafe external markdown, including obfuscation, scripts, and social engineering | Detect unsafe external markdown, including obfuscation, scripts, and social engineering. | `CTR-007` |
 | **T-CTR-008** | CTR-008 Pull Request Target Safety | A `pull_request_target` workflow acknowledges trigger risk, configures base or external checkouts, sets `fetch`, or combines the trigger with `on.roles` containing `read` or `all` | Reject the unsafe role combination in strict mode regardless of acknowledgment, checkout, or feature flag; in non-strict mode warn unless `features.dangerously-allow-roles-read-and-pull-request-target: true`, which suppresses only that warning. Suppress only the strict trigger warning when acknowledged; accept only explicit disablement, trusted base checkouts, or exact allowlisted literal repository/ref pairs without `fetch`; otherwise reject in strict mode and warn in non-strict mode. | `CTR-008` |
 | **T-CTR-009** | CTR-009 Shell Expansion in Safe-Outputs | Reject dangerous shell expansion in safe-output scripts | Reject dangerous shell expansion in safe-output scripts. | `CTR-009` |
-| **T-CTR-010** | CTR-010 Expression Safety Allowlist | Reject unauthorized or multiline GitHub Actions expressions | Reject unauthorized or multiline GitHub Actions expressions. | `CTR-010` |
+| **T-CTR-010** | CTR-010 Expression Safety Allowlist | Reject unauthorized or line-terminator-containing GitHub Actions expressions | Reject unauthorized or line-terminator-containing GitHub Actions expressions. | `CTR-010` |
 | **T-CTR-011** | CTR-011 Network Firewall Configuration | Reject missing firewall prerequisites and strict-mode wildcard domains | Reject missing firewall prerequisites and strict-mode wildcard domains. | `CTR-011` |
 | **T-CTR-012** | CTR-012 Safe-Outputs Wildcard Push Scope | Warn for unconstrained wildcard PR-branch pushes | Warn for unconstrained wildcard PR-branch pushes. | `CTR-012` |
 | **T-CTR-013** | CTR-013 Argument Injection via Package/Image Names | Reject hyphen-prefixed package and image names before subprocess use | Reject hyphen-prefixed package and image names before subprocess use. | `CTR-013` |

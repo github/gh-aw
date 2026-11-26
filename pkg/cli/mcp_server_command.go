@@ -32,6 +32,7 @@ The server provides the following tools:
   - compile     - Compile Markdown workflows to GitHub Actions YAML
   - logs        - Download and analyze workflow logs (requires write access or higher)
   - audit       - Investigate a workflow run, job, or step and generate a report (requires write access or higher)
+  - audit-diff  - Compare workflow runs (requires write access or higher)
   - checks      - Classify CI check state for a pull request
   - work-queue  - Read Git-backed work queue state or inspect Work/Claim metadata (read-only)
   - mcp-inspect - List MCP server configurations without starting or connecting to servers
@@ -53,7 +54,7 @@ Access Control:
 
   The GITHUB_ACTOR environment variable specifies the GitHub username for role-based
   access control. The actor's repository role (admin, maintain, write, etc.) determines
-  which tools are available. Tools requiring elevated permissions (logs, audit) are always
+  which tools are available. Tools requiring elevated permissions (logs, audit, audit-diff) are always
   mounted but will return permission denied errors if the actor lacks write access or higher.
 
   Use the --validate-actor flag to enforce actor validation for logs, audit, audit-diff,
@@ -77,7 +78,7 @@ an HTTP server with SSE (Server-Sent Events) transport instead.`,
 
 	cmd.Flags().IntVarP(&port, "port", "p", 0, "Port to run HTTP server on (uses stdio if not specified)")
 	cmd.Flags().StringVar(&cmdPath, "cmd", "", "Path to gh aw command to use (defaults to 'gh aw')")
-	cmd.Flags().BoolVar(&validateActor, "validate-actor", false, "Enforce actor validation for logs/audit and enabled workflow-writing tools")
+	cmd.Flags().BoolVar(&validateActor, "validate-actor", false, "Enforce actor validation for logs, audit, audit-diff, and enabled workflow-writing tools")
 	cmd.Flags().BoolVar(&allowWriteTools, "allow-write-tools", false, "Allow add/update/fix/compile to modify workflows (trusted clients and sources only)")
 
 	return cmd

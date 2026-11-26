@@ -56,7 +56,7 @@
     { "id": "lint-go-govulncheck", "description": "Run govulncheck for vulnerable Go dependencies and reachable vulnerable functions in the Go application.", "historical_duration_seconds": null, "mandatory": false },
     {
       "id": "lint-go-custom",
-      "description": "Run custom Go linters for native and WASM builds, console stderr checks, unchecked printf diagnostics, and action shell script linting.",
+      "description": "Run custom Go linters (fast and slow tiers) for native and WASM builds, console stderr checks, unchecked printf diagnostics, and action shell script linting.",
       "historical_duration_seconds": null,
       "mandatory": false
     },

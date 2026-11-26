@@ -65,7 +65,7 @@ Returns `true` if and only if `s` is a decimal integer that is strictly greater 
 
 ### `NormalizeWhitespace(content string) string`
 
-Normalizes trailing whitespace in multi-line content. Trims trailing spaces and tabs from every line, then ensures the content ends with exactly one newline (or is empty). This reduces spurious diffs caused by trailing-whitespace differences.
+Normalizes trailing whitespace in multi-line content. Trims trailing spaces, tabs, and carriage returns from every line, then ensures the content ends with exactly one newline (or is empty). This reduces spurious diffs caused by trailing-whitespace differences.
 
 ### `NormalizeLeadingWhitespace(content string) string`
 

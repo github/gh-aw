@@ -544,7 +544,7 @@ var ValidationConfig = map[string]TypeValidationConfig{
 		},
 	},
 	"create_project_status_update": {
-		DefaultMax: 10,
+		DefaultMax: 1,
 		Fields: map[string]FieldValidation{
 			"project":     {Required: true, Type: "string", Sanitize: true, MaxLength: 512, Pattern: "^https://[^/]+/(orgs|users)/[^/]+/projects/\\d+", PatternError: "must be a full GitHub project URL (e.g., https://github.com/orgs/myorg/projects/42)"},
 			"body":        {Required: true, Type: "string", Sanitize: true, MaxLength: 65536},

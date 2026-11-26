@@ -6,6 +6,8 @@ const READ_BUFFER_SIZE = 64 * 1024;
 const FILE_OPEN_FLAGS = fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW | fs.constants.O_NONBLOCK;
 const DIRECTORY_OPEN_FLAGS = fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW | fs.constants.O_DIRECTORY;
 
+class FileChangedError extends Error {}
+
 function sameMetadata(first, second) {
   return first.dev === second.dev && first.ino === second.ino && first.size === second.size && first.mtimeMs === second.mtimeMs && first.ctimeMs === second.ctimeMs;
 }
@@ -14,7 +16,7 @@ function assertStableFile(directory, name, fd, expectedStat) {
   const openedStat = fs.fstatSync(fd);
   const currentStat = fs.lstatSync(path.join(directory, name));
   if (!openedStat.isFile() || !sameMetadata(expectedStat, openedStat) || !sameMetadata(openedStat, currentStat)) {
-    throw new Error(`File changed while comparing ${path.join(directory, name)}`);
+    throw new FileChangedError(`File changed while comparing ${path.join(directory, name)}`);
   }
 }
 
@@ -212,12 +214,40 @@ function copyDirectoryExclusive(sourceDir, destDir, copyContents) {
 }
 
 function copyFileExclusive(sourcePath, destPath) {
+  let tempDir;
   try {
-    fs.copyFileSync(sourcePath, destPath, fs.constants.COPYFILE_EXCL);
-    return "copied";
+    tempDir = fs.mkdtempSync(path.join(path.dirname(destPath), `.${path.basename(destPath)}.stage-`));
   } catch (error) {
-    if (!(error instanceof Error) || Reflect.get(error, "code") !== "EEXIST") throw error;
-    return filesHaveSameContents(sourcePath, destPath) ? "identical" : "conflict";
+    throw new Error(`Failed to create temporary staging directory for ${destPath}`, { cause: error });
+  }
+  const tempPath = path.join(tempDir, "file");
+  try {
+    try {
+      fs.copyFileSync(sourcePath, tempPath, fs.constants.COPYFILE_EXCL);
+      fs.chmodSync(tempPath, 0o600);
+    } catch (error) {
+      throw new Error(error instanceof Error ? error.message : String(error), { cause: error });
+    }
+    try {
+      fs.linkSync(tempPath, destPath);
+      return "copied";
+    } catch (error) {
+      if (!(error instanceof Error) || Reflect.get(error, "code") !== "EEXIST") throw error;
+      return withGuardedDirectory(path.dirname(sourcePath), false, () => {
+        try {
+          return filesHaveSameContents(tempPath, destPath) ? "identical" : "conflict";
+        } catch (comparisonError) {
+          if (!(comparisonError instanceof FileChangedError)) throw comparisonError;
+          return filesHaveSameContents(tempPath, destPath) ? "identical" : "conflict";
+        }
+      });
+    }
+  } finally {
+    try {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    } catch (error) {
+      throw new Error(`Failed to clean up temporary staging directory ${tempDir}`, { cause: error });
+    }
   }
 }
 

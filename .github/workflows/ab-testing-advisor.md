@@ -256,7 +256,7 @@ evals:
 
 ### Workflow Changes Required
 
-List the exact changes needed in the workflow markdown body to implement the experiment using handlebars conditional blocks. **Always compare against a specific variant value** — the correct syntax is `{{#if experiments.<name> == "<variant>" }}...{{else}}...{{/if}}`. The compiler automatically expands `experiments.<name>` references at compile time; never write the internal env-var form (`__GH_AW_EXPERIMENTS__<NAME>___<variant>`) directly.
+List the exact changes needed in the workflow markdown body to implement the experiment using handlebars conditional blocks. **Always compare against a specific variant value** — the correct syntax is `{{#if experiments.<name> == "<variant>" }}...{{#else}}...{{/if}}`. The compiler automatically expands `experiments.<name>` references at compile time; never write the internal env-var form (`__GH_AW_EXPERIMENTS__<NAME>___<variant>`) directly.
 
 Show the concrete before/after diff.
 

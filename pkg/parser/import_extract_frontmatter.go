@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"errors"
 	"fmt"
 	"maps"
 	"strings"
@@ -15,11 +16,8 @@ func (acc *importAccumulator) extractImportFields(content []byte, item importQue
 		return err
 	}
 
-	if routing, hasRouting := fm["model-routing"]; hasRouting {
-		routingFrontmatter := map[string]any{"model-routing": routing}
-		if err := ValidateIncludedFileFrontmatterWithSchemaAndLocation(routingFrontmatter, item.fullPath); err != nil {
-			return fmt.Errorf("import %q: %w", item.importPath, err)
-		}
+	if err := validateImportedRouting(fm, item.fullPath); err != nil {
+		return fmt.Errorf("import %q: %w", item.importPath, err)
 	}
 
 	// Phase 2: Validate 'with'/'inputs' values against the imported workflow's 'import-schema'.
@@ -64,6 +62,18 @@ func (acc *importAccumulator) extractImportFields(content []byte, item importQue
 		acc.extractOrderedStepFields(fm)
 	}
 
+	return nil
+}
+
+func validateImportedRouting(fm map[string]any, fullPath string) error {
+	// Markdown outside the workflows directory permits unknown fields. Dropping a
+	// removed learning opt-out could inadvertently enable a repository default.
+	if _, removed := fm["adaptive-routing"]; removed {
+		return errors.New("adaptive-routing is no longer supported; set learning under model-routing instead")
+	}
+	if routing, ok := fm["model-routing"]; ok {
+		return ValidateIncludedFileFrontmatterWithSchemaAndLocation(map[string]any{"model-routing": routing}, fullPath)
+	}
 	return nil
 }
 

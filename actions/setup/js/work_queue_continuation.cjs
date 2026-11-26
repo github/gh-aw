@@ -1,4 +1,5 @@
 // @ts-check
+// @safe-outputs-exempt USE-001 — errors are raised via queueError(code, message) from work_queue_codec.cjs and carry stable work-queue protocol codes (for example policy_missing), not the E/ERR_ catalog codes.
 "use strict";
 
 // Finalizer side of routed `request_continuation` for queue workers: match the

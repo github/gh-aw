@@ -1792,6 +1792,18 @@ describe("collect_ndjson_output.cjs", () => {
             parsedOutput = JSON.parse(outputCall[1]);
           expect(parsedOutput.items[0].body).toBe("This fixes #123 and closes #456, also resolves #789");
         }),
+        it.each(["invalid", 0])("neutralizes bot triggers when max-bot-mentions is %s", async maxBotMentions => {
+          const testFile = "/tmp/gh-aw/test-ndjson-output.txt";
+          fs.writeFileSync(testFile, JSON.stringify({ type: "noop", message: "fixes #123" }));
+          process.env.GH_AW_SAFE_OUTPUTS = testFile;
+          fs.writeFileSync("/tmp/gh-aw/safeoutputs/config.json", JSON.stringify({ "max-bot-mentions": maxBotMentions, noop: true }));
+
+          await eval(`(async () => { ${collectScript}; await main(); })()`);
+
+          const outputCall = mockCore.setOutput.mock.calls.find(call => call[0] === "output");
+          const parsedOutput = JSON.parse(outputCall[1]);
+          expect(parsedOutput.items[0].message).toBe("`fixes #123`");
+        }),
         it("should remove ANSI escape sequences", async () => {
           const testFile = "/tmp/gh-aw/test-ndjson-output.txt",
             bodyWithAnsi = "[31mRed text[0m and [1mBold text[m",

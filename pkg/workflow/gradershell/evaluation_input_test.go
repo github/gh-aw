@@ -20,6 +20,8 @@ func TestHasShellCodeEvaluationInputRedirections(t *testing.T) {
 		{"<<'EOF'\ndata\nEOF", false},
 		{`bash < input`, true},
 		{`printf data | bash`, true},
+		{`bash < input; echo done`, true},
+		{`printf data | bash; echo done`, true},
 	} {
 		t.Run(test.source, func(t *testing.T) {
 			tree, err := syntax.NewParser().Parse(strings.NewReader(test.source), "")

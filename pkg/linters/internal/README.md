@@ -10,4 +10,5 @@ The packages in this directory are implementation helpers for `pkg/linters`. The
 | `coverage` | Coverage-profile-aware gating for performance-sensitive linter findings. |
 | `filecheck` | Indexes generated and test files and determines which files analyzers should skip. |
 | `nolint` | Indexes `nolint` directives and checks whether a directive applies at a source position. |
+| `parentmap` | Builds AST node-to-parent maps once per package and shares them across parent-aware analyzers. |
 | `resourcetracker` | Shared state machine for resource acquisitions that require deferred cleanup. |

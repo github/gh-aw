@@ -44,7 +44,7 @@ func NewWorkCommand() *cobra.Command {
 		},
 		RunE: func(cmd *cobra.Command, _ []string) error { return cmd.Help() },
 	}
-	root.PersistentFlags().StringP("repo", "r", "", "Target repository (owner/repo format). Defaults to current repository")
+	root.PersistentFlags().StringP("repo", "r", "", repoNoHostUsage+". Defaults to current repository")
 	root.PersistentFlags().String("branch", workqueue.DefaultBranch, workQueueBranchDescription)
 	root.PersistentFlags().BoolP("json", "j", false, "Output results in JSON format")
 	root.AddCommand(workReplayCommand(), workStatsCommand(), workStateCommand(), workInspectCommand(), workTUICommand(),
@@ -216,7 +216,7 @@ func workStatsCommand() *cobra.Command {
 
 func workCompactCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use: "compact", Short: "Replace the ledger with one Checkpoint commit (Git history keeps the prior log)",
+		Use: "compact", Short: "Replace the ledger with one checkpoint commit (Git history keeps the prior log)",
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			minimum, _ := cmd.Flags().GetInt("min-lines")

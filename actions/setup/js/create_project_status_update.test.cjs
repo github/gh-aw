@@ -35,6 +35,33 @@ describe("create_project_status_update", () => {
     vi.clearAllMocks();
   });
 
+  it("defaults to creating at most one status update", async () => {
+    mockGithub.graphql.mockResolvedValueOnce({
+      organization: {
+        projectV2: {
+          id: "PVT_test123",
+          number: 42,
+          title: "Test Project",
+          url: "https://github.com/orgs/test-org/projects/42",
+        },
+      },
+    });
+
+    const handler = await main({ staged: true });
+    const message = {
+      project: "https://github.com/orgs/test-org/projects/42",
+      body: "Test status update",
+    };
+
+    const firstResult = await handler(message, {});
+    const secondResult = await handler(message, {});
+
+    expect(firstResult.success).toBe(true);
+    expect(secondResult.success).toBe(false);
+    expect(secondResult.error).toBe("Max count of 1 reached");
+    expect(mockGithub.graphql).toHaveBeenCalledTimes(1);
+  });
+
   it("should create a project status update with all fields", async () => {
     // Mock GraphQL responses
     mockGithub.graphql
