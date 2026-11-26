@@ -8,9 +8,9 @@ The `intent` package resolves the intent behind a pull request or issue by inspe
 
 Resolution is performed by a `Resolver`, which holds a label matcher function and a version string. The resolver applies a priority chain:
 
-1. Explicit intent metadata (`PullRequestData.ExplicitIntent`) — used as-is.
-2. A single closing issue — resolved from the issue's labels.
-3. PR labels — used as an artifact fallback when no closing issues are present.
+1. Explicit intent metadata (`PullRequestData.ExplicitIntent`) — returned as provided, with `ResolverVersion` filled from the resolver when absent.
+2. Closing issues — one issue is resolved from its labels; multiple closing issues produce an ambiguous attribution and do not fall through to PR labels.
+3. PR labels — used as an artifact fallback only when no closing issues are present.
 4. No supported sources — returns an `AttributionUnlinked` record.
 
 ## Public API

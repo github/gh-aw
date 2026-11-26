@@ -100,6 +100,7 @@ The method names mentioned in analyzer descriptions (such as `Err`, `Flush`, `Re
 - `timenowsub` — reports `time.Now().Sub(t)` calls that should be simplified to `time.Since(t)`.
 - `tolowerequalfold` — reports case-insensitive string comparisons using `strings.ToLower`/`ToUpper` that should use `strings.EqualFold`.
 - `trimleftright` — reports `strings.TrimLeft`/`TrimRight` calls with a multi-character literal cutset where `TrimPrefix`/`TrimSuffix` was likely intended.
+- `trimspacestringbytes` — reports `strings.TrimSpace(string(b))` for byte slices and recommends considering `bytes.TrimSpace(b)`. Convert the result to `string` if needed; the returned slice aliases the input.
 - `typeassertionnil` — reports single-value type assertions to pointer types and recommends the two-value form.
 - `typeassertionokdiscarded` — reports two-value type assertions whose `ok` result is discarded.
 - `unchecked-deferred-close` (Go package `unchecked_deferredclose`) — reports deferred `Close()` calls that discard the returned error.
@@ -107,6 +108,7 @@ The method names mentioned in analyzer descriptions (such as `Err`, `Flush`, `Re
 - `uncheckedtypeassertion` — reports single-value type assertions where unchecked panics are possible.
 - `uncheckedflushreturn` — reports `Flush()` method calls where the error return is discarded, which silently drops buffered data on failure.
 - `walkdirignoredeerror` — reports `filepath.Walk` and `filepath.WalkDir` calls where the error return is discarded, hiding traversal failures. The analyzer lives in `walk-dir-ignored-error`.
+- `walkfuncerrshadow` — reports `filepath.Walk` and `filepath.WalkDir` callbacks whose `err` parameter shadows an outer error assigned from the walk call.
 - `wgdonenotdeferred` — reports non-deferred `sync.WaitGroup.Done()` calls that can deadlock on panics or early returns.
 - `writebytestring` — reports `w.Write([]byte(s))` calls where `s` is a string, which can be replaced with `io.WriteString` to avoid an unnecessary `[]byte` allocation.
 - `writefilepublicpermsensitive` — reports `os.WriteFile`, creating `os.OpenFile`, and `os.MkdirAll` calls using a world-accessible `constants.FilePermPublic` mode when a path or written content contains a sensitive word such as `token`, `secret`, `key`, `credential`, `password`, `auth`, or `env`. Words are matched as identifier/string segments, including camelCase and punctuation boundaries; package and function identifiers are ignored. Non-creating `os.OpenFile` calls and constant modes without world permissions are ignored. This is a heuristic, not data-flow analysis; review findings and use a restricted file or directory mode where appropriate. Existing files are not made private by changing their creation mode.
@@ -167,12 +169,41 @@ Built-in `len` and `cap` calls, comparisons, receives, and type conversions are
 not themselves handoffs. A launched goroutine's return values are discarded, so
 returning a channel does not transfer ownership.
 
+## Performance tiers and profiling
+
+Analyzers are split into a **fast** and a **slow** tier (`tiers.go`) so CI can
+run each tier in its own step with its own timeout. `slowAnalyzers` maps each
+slow analyzer to the reason it is slow; every other registered analyzer is fast,
+and `tiers_test.go` checks that the two tiers partition `All()`.
+
+- `GH_AW_LINT_TIER=fast|slow|all` selects the tier for `cmd/linters`
+  (`make golint-custom LINTER_TIER=fast`, or `make golint-custom-fast` /
+  `make golint-custom-slow`). The default is `all`.
+- Analyzers outside the selected tier become inert stubs that keep their flags,
+  so shared flags still parse. Explicitly enabling an analyzer from the other
+  tier (for example `-rawloginlib` with `LINTER_TIER=fast`) is an error.
+- CI steps that set `LINTER_TIER` may only list analyzers from that tier
+  (`TestCITierStepsMatchTiers`).
+
+Profile with the multichecker's built-in flag:
+
+```bash
+go build -o /tmp/gh-aw-linters ./cmd/linters
+/tmp/gh-aw-linters -cpuprofile=/tmp/lint.prof ./cmd/... ./pkg/...
+go tool pprof -top -cum /tmp/lint.prof | grep 'pkg/linters/'
+```
+
+Classify an analyzer as slow when its cumulative run time is at least ~0.3s per
+full-repository run, or when it requires `internal/parentmap`. Analyzers that
+need child-to-parent links should require `parentmap.Analyzer` (passed to
+`analyzerutil.New`) instead of building their own per-file parent map.
+
 ## Coverage-aware perf gating
 
 Micro-optimizations flagged by allocation/perf linters (e.g. `stringsconcatloop`, `appendoneelement`,
 `appendbytestring`, `bytesbufferstring`, `bytescomparestring`, `lenstringsplit`, `mapclearloop`,
 `readerstringconv`, `reflectdeepequalusage`, `seenmapbool`, `slicemakezerolength`, `sortslice`, `splitindexzero`, `stringssplitfirst`,
-`stringbytesroundtrip`, `stringsjoinone`, `tolowerequalfold`, and `writebytestring`) only matter on hot paths: applying them to code that tests never execute adds
+`stringbytesroundtrip`, `stringsjoinone`, `tolowerequalfold`, `trimspacestringbytes`, and `writebytestring`) only matter on hot paths: applying them to code that tests never execute adds
 churn without a measurable benefit. These linters consult the shared
 `pkg/linters/internal/coverage` package, which loads a Go coverage profile (produced by
 `go test -covermode=count -coverprofile=<path>`) referenced by the `GH_AW_LINT_COVERAGE_PROFILE`
@@ -251,7 +282,7 @@ environment variable and gates findings on the recorded execution hit count for 
 | `osopenreadallpreferreadfile` | Custom `go/analysis` analyzer that recommends `os.ReadFile` for an `os.Open` file used only by deferred `Close` and one `ReadAll` |
 | `osexitinlibrary` | Custom `go/analysis` analyzer that flags `os.Exit` usage in library packages |
 | `osremoveuncheckedcleanup` | Custom `go/analysis` analyzer that flags discarded errors from `os.Remove` and `os.RemoveAll` expression and `go` statements |
-| `osstatignoredeerrorderef` | Custom `go/analysis` analyzer that flags dereferences of `os.Stat` and `os.Lstat` results after their errors are discarded without a nil check |
+| `os-stat-ignored-error-deref` (`osstatignoredeerrorderef`) | Custom `go/analysis` analyzer that flags dereferences of `os.Stat` and `os.Lstat` results after their errors are discarded without a nil check |
 | `ossetenvlibrary` | Custom `go/analysis` analyzer that flags `os.Setenv` usage in library packages |
 | `packagelevelmutableslicemap` | Custom `go/analysis` analyzer that flags package-level slice/map `var` declarations mutated from inside a function body via `append()` re-assignment, index assignment, or `delete()` |
 | `panic-in-library-code` | Custom `go/analysis` analyzer that flags `panic()` usage in library packages |
@@ -286,6 +317,7 @@ environment variable and gates findings on the recorded execution hit count for 
 | `timenowsub` | Custom `go/analysis` analyzer that flags `time.Now().Sub(t)` calls that should use `time.Since(t)` |
 | `tolowerequalfold` | Custom `go/analysis` analyzer that flags case-insensitive comparisons via `strings.ToLower`/`ToUpper` that should use `strings.EqualFold` |
 | `trimleftright` | Custom `go/analysis` analyzer that flags `strings.TrimLeft`/`TrimRight` calls with a multi-character literal cutset where `TrimPrefix`/`TrimSuffix` was likely intended |
+| `trimspacestringbytes` | Custom `go/analysis` analyzer that reports `strings.TrimSpace(string(b))` for byte slices and recommends considering `bytes.TrimSpace(b)` |
 | `typeassertionnil` | Custom `go/analysis` analyzer that flags single-value type assertions to pointer types and recommends the two-value form |
 | `typeassertionokdiscarded` | Custom `go/analysis` analyzer that flags two-value type assertions whose `ok` result is discarded |
 | `unchecked-slice-index` (`uncheckedsliceindex`) | Custom `go/analysis` analyzer that reports slice and string indexes without proven bounds checks |
@@ -305,6 +337,16 @@ environment variable and gates findings on the recorded execution hit count for 
 |---|---|
 | `All` | Returns the canonical registry of all custom analyzers as `[]*analysis.Analyzer` for multichecker wiring, test assertions, and documentation consistency checks |
 | `ErrorMessageAnalyzer` | Compatibility alias to `pkg/linters/errormessage.Analyzer` |
+
+### Analyzer tiers
+
+| Symbol | Description |
+|---|---|
+| `TierAll`, `TierFast`, `TierSlow` | Accepted tier names for `SelectTier` and the `GH_AW_LINT_TIER` environment variable. |
+| `Fast`, `Slow` | Return registered analyzers in the fast or slow tier. |
+| `IsSlow` | Reports whether an analyzer name belongs to the slow tier. |
+| `SlowAnalyzerReasons` | Returns a copy of the slow-tier analyzer names and their classification reasons. |
+| `SelectTier` | Selects analyzers for a tier while preserving command-line flags for excluded analyzers; rejects flags that explicitly enable an analyzer outside the selected tier. |
 
 ## Usage Examples
 
@@ -460,6 +502,7 @@ _ = typeassertionnil.Analyzer
 - `github.com/github/gh-aw/pkg/linters/timesleepnocontext` — time-sleep-no-context analyzer subpackage
 - `github.com/github/gh-aw/pkg/linters/tolowerequalfold` — to-lower-equal-fold analyzer subpackage
 - `github.com/github/gh-aw/pkg/linters/trimleftright` — trim-left-right analyzer subpackage
+- `github.com/github/gh-aw/pkg/linters/trimspacestringbytes` — trim-space-string-bytes analyzer subpackage
 - `github.com/github/gh-aw/pkg/linters/typeassertionnil` — type-assertion-nil analyzer subpackage
 - `github.com/github/gh-aw/pkg/linters/typeassertionokdiscarded` — type-assertion-ok-discarded analyzer subpackage
 - `github.com/github/gh-aw/pkg/linters/unchecked-slice-index` — unchecked-slice-index analyzer subpackage

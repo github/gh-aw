@@ -33,6 +33,22 @@ describe("workflow file exclusions", () => {
     expect(getWorkflowCompilationNotice({ message: WORKFLOW_COMPILATION_NOTICE }, {})).toBe("");
   });
 
+  it("does not duplicate the lock pattern and ignores non-array excluded_files", () => {
+    expect(getExcludedFiles({ exclude_lock_yml: true, excluded_files: [".github/workflows/**.lock.yml"] })).toEqual([".github/workflows/**.lock.yml"]);
+    expect(getExcludedFiles({ excluded_files: "dist/**" })).toEqual([]);
+    expect(getExcludedFiles({ exclude_lock_yml: "true" })).toEqual([]);
+  });
+
+  it("handles non-array and non-string inputs for omitted workflow files", () => {
+    expect(getExcludedWorkflowFiles(undefined, [])).toEqual([]);
+    expect(getExcludedWorkflowFiles([42, null, ".github/workflows/a.yml"], [])).toEqual([".github/workflows/a.yml"]);
+  });
+
+  it("ignores notices with non-string messages", () => {
+    expect(getWorkflowCompilationNotice({}, { exclude_lock_yml: true })).toBe("");
+    expect(getWorkflowCompilationNotice({ message: 5 }, { exclude_lock_yml: true })).toBe("");
+  });
+
   it("does not require workflow-write scope for retained Markdown sources", () => {
     expect(isWorkflowYamlFile(".github/workflows/source.md")).toBe(false);
     expect(isWorkflowYamlFile(".github/workflows/ci.yml")).toBe(true);

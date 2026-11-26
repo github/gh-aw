@@ -253,6 +253,7 @@ func envOTELJSONAlias(fields map[string]json.RawMessage, camel, snake string) (j
 	return second, nil
 }
 
+// Decode the two OTLP fields with protowire to avoid the generated OTLP dependency tree.
 func envOTELProtoResponse(data []byte) error {
 	return envOTELProtoFields(data, false)
 }

@@ -353,8 +353,8 @@ ${{ github.event.issue.body }}
 	yamlOut, err := compiler.CompileToYAML(wd, "workflow.md")
 	require.Error(t, err, "T-CS-002: unauthorized expressions must fail compilation")
 	assert.Empty(t, yamlOut, "T-CS-002: expression safety failure must block lock-file emission")
-	require.ErrorContains(t, err, "unauthorized expressions found",
-		"T-CS-002: error must report unauthorized expression detection")
+	require.ErrorContains(t, err, "invalid expressions found",
+		"T-CS-002: error must report invalid expression detection")
 }
 
 // TestFormalBasicConformance_AllFourControls (BasicConformance)

@@ -105,9 +105,17 @@ func (c *Compiler) compilerLintInput(data *WorkflowData, graph *actions.Workflow
 	if c.actionTag != "" {
 		generatedActionRefs = nil
 	}
+	resolvedScripts := make(map[string]string)
+	if data.MCPScripts != nil {
+		for name, tool := range data.MCPScripts.Tools {
+			if tool != nil && tool.Run != "" {
+				resolvedScripts[name] = tool.Run
+			}
+		}
+	}
 	return workflowlint.Input{
 		Workflow: graph, Document: c.lintPolicyDocument(data), AuthoredJobs: data.Jobs, SourcePath: sourcePath,
-		ResolvedTools: resolvedTools, ResolvedRoles: c.dryRunWorkflowData(data).Roles,
+		ResolvedTools: resolvedTools, ResolvedRoles: c.dryRunWorkflowData(data).Roles, ResolvedMCPScripts: resolvedScripts,
 		AllowActionRefs: c.allowActionRefs, SafeOutputJobs: safeOutputLintJobs(data), GeneratedActionRefs: generatedActionRefs,
 	}
 }

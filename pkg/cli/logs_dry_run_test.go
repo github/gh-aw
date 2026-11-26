@@ -25,6 +25,7 @@ func TestDryRunMetadataAndFilters(t *testing.T) {
 		{"missing", "", false, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			dir := t.TempDir()
 			if tc.metadata != "" {
 				require.NoError(t, os.WriteFile(filepath.Join(dir, "aw_info.json"), []byte(tc.metadata), 0600))
@@ -49,6 +50,7 @@ func TestLogsDryRunFlags(t *testing.T) {
 	t.Parallel()
 	for _, flag := range []string{"dry-run", "no-dry-run"} {
 		t.Run(flag, func(t *testing.T) {
+			t.Parallel()
 			cmd := NewLogsCommand()
 			require.NoError(t, cmd.Flags().Set(flag, "true"))
 			opts, err := loadCommonLogsOptions(cmd)

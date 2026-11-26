@@ -1,6 +1,6 @@
 ---
 emoji: "🛡️"
-description: Daily deep-dive security audit of actions/setup/* files using cache-memory to rotate focus across security aspects
+description: Daily deep-dive security audit of a rotating batch of actions/setup/* files
 features:
   gh-aw-detection: true
 on:
@@ -38,14 +38,14 @@ imports:
   - shared/reporting.md
 evals:
   - id: security_aspect_rotated
-    question: Did the agent load and update the cache-memory state to rotate the security focus aspect using the 60/40 rule?
+    question: Did the agent retain the selected security aspects through the file sweep and rotate them using the 60/40 rule only after completing the sweep?
   - id: issue_or_noop
-    question: Was at least one security issue created with actionable recommendations, or was noop called when no new findings were found?
+    question: Was at least one security issue created with actionable recommendations, or was noop called when the selected batch was reviewed and no new findings were found?
 ---
 
 # Daily action/setup/* Security Audit
 
-You are a deep-dive security analyst specializing in GitHub Actions setup action code. Your job is to audit the files under `actions/setup/` in this repository for security vulnerabilities and provide actionable issue recommendations.
+You are a deep-dive security analyst specializing in GitHub Actions setup action code. Your job is to audit a bounded batch of files under `actions/setup/` for security vulnerabilities and provide actionable issue recommendations. Success means completing the selected batch, not reviewing the entire directory in one run.
 
 ## Execution Constraints
 
@@ -72,11 +72,15 @@ If the file is missing (first run), initialize it:
   "last_run": null,
   "completed_aspects": [],
   "aspect_rotation_index": 0,
+  "sweep_aspects": [],
+  "last_completed_file": null,
   "known_findings": []
 }
 ```
 
-The state tracks which security aspects have been covered so you can rotate focus.
+Existing state files may lack `sweep_aspects` and `last_completed_file`; treat
+them as an empty list and null respectively. The state tracks aspect rotation
+and progress through a file sweep.
 
 ## Step 2: Determine Focus Aspects for This Run
 
@@ -98,93 +102,60 @@ All security aspects to cycle through:
 
 Select exactly **2 reuse aspects** (or fewer if history is short) and **2 new aspects** (or enough to total 4 aspects per run). Clearly state which aspects you selected and why.
 
-## Step 3: Enumerate Target Files
+If `sweep_aspects` is nonempty, use those same aspects for this batch instead of
+selecting again. Otherwise select aspects using the rule above and start a new
+sweep, including a rotation reset if needed. Do not mark the selected aspects
+completed until the sweep is finished.
+
+## Step 3: Select a File Batch
 
 ```bash
-# List all actionable files under actions/setup/ (exclude node_modules and test fixtures)
-find actions/setup -type f \( -name "*.js" -o -name "*.ts" -o -name "*.cjs" -o -name "*.mjs" -o -name "*.sh" -o -name "*.yml" -o -name "*.yaml" -o -name "*.json" \) \
-  | grep -v node_modules \
-  | grep -v ".test." \
+export LC_ALL=C
+find actions/setup \( -type d \( -name node_modules -o -name fixtures -o -name test-fixtures \) -prune \) -o \
+  \( -type f \( -name "*.js" -o -name "*.ts" -o -name "*.cjs" -o -name "*.mjs" -o -name "*.sh" -o -name "*.yml" -o -name "*.yaml" -o -name "*.json" \) ! -name "*.test.*" -print \) \
   | sort > /tmp/gh-aw/agent/setup-files.txt
-
-echo "Files to audit:"
-cat /tmp/gh-aw/agent/setup-files.txt
 ```
+
+Select the first 20 paths strictly after `last_completed_file` in this sorted
+list, or the first 20 paths if the cursor is null. Save the selected paths in
+`/tmp/gh-aw/agent/setup-batch.txt` and report both the batch and total inventory
+counts. If no paths remain after a non-null cursor, finish the sweep as described
+in Step 7 and call `noop` stating that no new files were reviewed. Files added
+before the cursor are picked up in a later sweep; this is not a single-snapshot
+full audit.
 
 ## Step 4: Deep-Dive Analysis per Selected Aspect
 
-For each selected aspect, perform a thorough analysis of the relevant files.
+Review **every file in the selected batch** for each selected aspect, including
+`.cjs`, `.mjs`, YAML, and JSON files. Use the batch file as the source of truth
+for searches; do not search only a subset of extensions. Search results are
+leads, not proof of coverage: inspect relevant code and its callers or data
+flows as needed. Do not truncate results or infer that a file is safe merely
+because a search returned no matches. If the batch cannot be reviewed, report
+the incomplete work and do not advance its checkpoint.
 
 ### secret-handling
-```bash
-# Find secret/token access patterns
-grep -rn "process\.env\|os\.environ\|getInput\|getSecret\|GITHUB_TOKEN\|secrets\." \
-  --include="*.js" --include="*.ts" --include="*.sh" actions/setup/ \
-  | grep -v node_modules | grep -v ".test."
-```
 Look for: tokens logged to stdout/stderr, tokens interpolated into strings without masking, tokens stored in world-readable temp files, masking calls (`core.setSecret`) missing for derived values.
 
 ### command-injection
-```bash
-grep -rn "exec\|spawn\|execSync\|child_process\|eval\|\$(" \
-  --include="*.js" --include="*.ts" --include="*.sh" actions/setup/ \
-  | grep -v node_modules | grep -v ".test."
-```
 Look for: shell=true with user-supplied strings, unquoted variable interpolation in shell scripts, `$()` or backtick expansion from action inputs.
 
 ### network-requests
-```bash
-grep -rn "fetch\|axios\|http\.\|https\.\|request(" \
-  --include="*.js" --include="*.ts" actions/setup/ \
-  | grep -v node_modules | grep -v ".test."
-```
 Look for: URLs built from action inputs without validation, no TLS hostname verification, response data written to env/outputs without sanitization.
 
 ### supply-chain
-```bash
-# Check for unpinned or missing integrity entries
-cat actions/setup/js/package.json 2>/dev/null || echo "No package.json"
-cat actions/setup/js/package-lock.json 2>/dev/null | python3 -c "
-import json,sys
-d=json.load(sys.stdin)
-pkgs=d.get('packages',d.get('dependencies',{}))
-for name,info in pkgs.items():
-    if isinstance(info,dict) and not info.get('integrity') and name:
-        print('Missing integrity:', name)
-" 2>/dev/null | head -20 || echo "No lockfile or integrity check failed"
-```
-Look for: missing `integrity` hashes in lockfile, packages without exact pinning, postinstall scripts in dependencies.
+Look for: missing `integrity` hashes in selected lockfiles, packages without exact pinning, postinstall scripts in dependencies, and unpinned actions or downloads in selected files. Inspect related manifests as context when needed; do not limit the check to one package directory.
 
 ### file-permissions
-```bash
-grep -rn "chmod\|writeFileSync\|createWriteStream\|mktemp\|RUNNER_TEMP\|/tmp" \
-  --include="*.js" --include="*.ts" --include="*.sh" actions/setup/ \
-  | grep -v node_modules | grep -v ".test."
-```
 Look for: credential files written to predictable paths, missing `chmod 600` on token files, temp files not cleaned up on failure paths.
 
 ### github-token-scope
-```bash
-grep -rn "GITHUB_TOKEN\|github\.token\|GH_TOKEN\|getInput.*token\|core\.getInput" \
-  --include="*.js" --include="*.ts" --include="*.sh" --include="*.yml" actions/setup/ \
-  | grep -v node_modules
-```
 Look for: tokens passed to child processes via env, token appearing in action outputs, broader token scope than needed.
 
 ### sandbox-escape
-```bash
-grep -rn "iptables\|sysctl\|nsenter\|unshare\|chroot\|cgroup\|/proc\|/sys\|mount\b" \
-  --include="*.js" --include="*.ts" --include="*.sh" actions/setup/ \
-  | grep -v node_modules
-```
 Look for: namespace operations, firewall rule modifications, proc filesystem access, privileged container operations.
 
 ### output-injection
-```bash
-grep -rn "GITHUB_OUTPUT\|GITHUB_ENV\|GITHUB_STEP_SUMMARY\|setOutput\|exportVariable\|addPath" \
-  --include="*.js" --include="*.ts" --include="*.sh" actions/setup/ \
-  | grep -v node_modules
-```
 Look for: user-controlled input written directly to `GITHUB_OUTPUT`/`GITHUB_ENV` without sanitization (newline injection risk), missing `EOF` delimiter randomization in heredoc patterns.
 
 ## Step 5: Cross-Reference Against Known Findings
@@ -237,17 +208,19 @@ For each significant new finding (severity: high or critical), use the `create-i
 
 **Flood guard**: open at most 3 issues per run (`max: 3` is already set). Prioritize by severity: critical first, then high, then medium.
 
-If no new findings are discovered, call `noop` with a brief explanation: which aspects were checked, how many files were scanned, and that no actionable issues were found.
+If the entire selected batch was reviewed and no new findings were discovered, call `noop` with the aspects, batch and inventory counts, and the batch's first and last paths. State that the result applies only to this batch, not the whole directory. If the batch was not fully reviewed, report it as incomplete instead of calling `noop`.
 
 ## Step 7: Update Cache-Memory State
 
-After analysis, write updated state back to `/tmp/gh-aw/cache-memory/setup-security-state.json`:
+After the entire batch has been reviewed for every selected aspect, write updated state back to `/tmp/gh-aw/cache-memory/setup-security-state.json`:
 
 ```json
 {
   "last_run": "YYYY-MM-DD-HH-MM-SS",
   "completed_aspects": ["<all aspects covered so far in current cycle>"],
   "aspect_rotation_index": <current index>,
+  "sweep_aspects": ["<selected aspects for the current sweep>"],
+  "last_completed_file": "<last path in the completed batch>",
   "known_findings": [
     {
       "file": "actions/setup/js/src/example.js",
@@ -260,13 +233,22 @@ After analysis, write updated state back to `/tmp/gh-aw/cache-memory/setup-secur
 }
 ```
 
+For an unfinished sweep, keep `sweep_aspects` unchanged and advance
+`last_completed_file` only to the last file of the fully reviewed batch. When
+there are no inventory paths after that file, add the sweep's aspects to
+`completed_aspects`, clear `sweep_aspects`, and set `last_completed_file` to
+null so the next run starts a new sweep. Also finish a sweep when a non-null
+cursor has no remaining paths, for example after files were deleted. Apply the
+rotation reset from Step 2 when selecting the next sweep. Do not advance the
+cursor or mark aspects complete for a partially reviewed batch.
+
 Use filesystem-safe timestamp format `YYYY-MM-DD-HH-MM-SS` (no colons, no `T`, no `Z`).
 
 Keep `known_findings` trimmed to the 50 most recent entries to avoid unbounded growth.
 
 ## Output Requirements
 
-- Always produce either a `create-issue` (when findings exist) or a `noop` (when clean).
+- For a completed batch, produce either a `create-issue` (when findings exist) or a batch-scoped `noop` (when clean). Report incomplete work if the batch was not completed.
 - Issue body must be 20–65000 characters and contain actionable recommendations.
 - Use `###` or lower headings inside issue bodies — never `#` or `##`.
 - Wrap large evidence blocks in `<details>` to keep issues readable.

@@ -232,9 +232,9 @@ async function main() {
         core.info(`[INGESTION] Expected output types after normalization: ${JSON.stringify(Object.keys(expectedOutputTypes))}`);
         core.info(`[INGESTION] Expected output types full config: ${JSON.stringify(expectedOutputTypes)}`);
         // Extract max-bot-mentions from config (defaults to undefined, using neutralizeBotTriggers default)
-        const rawMaxBotMentions = parseIntTemplatable(expectedOutputTypes.max_bot_mentions, 0);
-        if (rawMaxBotMentions > 0) {
-          maxBotMentions = rawMaxBotMentions;
+        const configuredMaxBotMentions = expectedOutputTypes.max_bot_mentions;
+        if (configuredMaxBotMentions !== undefined && configuredMaxBotMentions !== null) {
+          maxBotMentions = parseIntTemplatable(configuredMaxBotMentions, 0);
         }
         // Remove global config keys so they are not treated as valid output types
         delete expectedOutputTypes.max_bot_mentions;

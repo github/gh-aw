@@ -26,6 +26,8 @@ The unreleased 1.0.81 merge-policy mapping also covers ambiguous check producers
 
 | Version | Change |
 |---|---|
+| 1.0.114 | Clarifies CTR-010 compile-time and runtime-import rejection of all JavaScript line terminators (LF, CR, U+2028, U+2029) before expression trimming, with separate compile-time diagnostics rendered on one line. No new threat ID or lock-file schema change. |
+| 1.0.113 | Section 7.18 moves the unreleased `adaptive-routing` opt-in to `model-routing.learning` (#81142). `observe` records the ordinary router pick; `false` disables recording without disabling routing. The reserved history namespace, writer permissions, unified-session evidence, and dry-run guarantees are unchanged. No new threat rule or lock-file format change. |
 | 1.0.112 | Mapping-only clarification for Section 7.18 and PR #80804: `gh aw compile --dry-run` is an explicit compiler preview mode that validates adaptive-routing eligibility and configuration, preserves parsed `WorkflowData`, omits the compiler-managed `push_routing_history` job and its `contents: write`/`actions: read` permissions from emitted dry-run output, and does not charge dry-run runs as unsaved. Real failed/cancelled runs with an agent started and an existing writer whose conclusion is not success, including skipped/cancelled writers, remain unsaved. No new `CTR-*` rule or `T-CTR-*` test ID. |
 | 1.0.111 | Mapping-only: adds Section 7.18 for the `adaptive-routing: observe` history writer (#80583): reserved `memory/adaptive-routing/` namespace, job-scoped `contents: write`/`actions: read`, fixed compiler-derived routing identity fields, unified-session verdict sourcing, and test-mapped eligibility behavior. No new `CTR-*` rule or `T-CTR-*` test ID. |
 | 1.0.110 | Clarifies CTR-017 whole-context secrets exposure and maps `overprovisioned-secrets` diagnostics to it. Literal and dynamic single-secret selection remain distinct from serializing or projecting all secrets; selector expressions are still inspected for nested whole-context exposure. Preserves strict/non-strict severity, local inheritance warnings, the compiler-generated call-workflow fallback exception, and independent credential-placement and disclosure controls. Regression evidence covers the repository-to-secret-name mapping in both Actions and AW ASTs. No new threat identifier, permission, runtime behavior, or lock-file compatibility change. |
@@ -120,13 +122,28 @@ The unreleased 1.0.81 merge-policy mapping also covers ambiguous check producers
 
 ## Mapping Audits
 
+### Mapping Audit (2026-11-26)
+
+Reviewed 11 commits from the last two days (most recent: #81182, #81171, #81162, #81144, #81142, #81116, #81034, #81033, #80999, #80766, #80582) touching compiler, linter, and runtime security boundaries. Commits #81108, #81167, and #81151 below are context-only references and are not part of that reviewed set.
+
+Findings and disposition:
+
+- Shell AST finding preservation (#81033): already implemented. The CTR-038 visitor in `pkg/workflow/lint/safe_output_credentials.go` latches `found = true`, and the remote-script walker in `remote_script_execution.go` appends diagnostics without overwriting earlier findings as it continues traversing sibling statements and redirects. Existing CTR-038 cases in `safe_output_credentials_test.go` cover protected redirects combined with stderr redirection in both orders; Section 7 already maps CTR-038 to those files. No spec change and no new `CTR-*` rule.
+- Routing-history reconciliation (#81171, #81162, #81144) and `model-routing.learning` configuration (#81142): runtime reconciliation and configuration changes within the Section 7.18 history writer; the reserved namespace, writer permissions, and dry-run guarantees are unchanged. No new `CTR-*` rule.
+- Sandboxed threat detection port to JavaScript (#80582): runtime detector shipped by the setup action; it does not alter the compiler-emitted detection gate or CTR-detection-gate rules. No new `CTR-*` rule.
+- Sensitive public file permission linter (#80766), TrimSpace byte-conversion analyzer (#81116), and coverage staging conflict rejection (#81034): repository development tooling, not checks on compiler-generated workflows. No new `CTR-*` rule.
+- Project status update safe-output defaults (#80999), CLI help (#81108), and documentation/context changes (#81182, #81167, #81151): no compiler-generated security construct changed.
+- The `schema-demos/schema-demo-threat-detection-suppress.md` workflow contains a coverage-only demo annotation; no production `threat-detection-suppress` annotation requires suppression SLA action.
+- Steering issue #81199 had no comments.
+- Go tests could not be executed (the required Go 1.27.4 toolchain download failed offline). Only changelog text changed; no implementation or specification was modified. The GitHub integrity filter withheld pull-request file lists, so dispositions rely on commit messages and local source inspection. Code-scanning alerts were not retrieved separately.
+
 ### Mapping Audit (2026-11-24)
 
 Reviewed the only compiler-relevant commit in the last two days: #80583 (adaptive-routing observe mode).
 
 Findings and disposition:
 
-- Adaptive routing history writer (#80583): already implemented in `pkg/workflow/adaptive_routing.go` (reserved `memory/adaptive-routing/` branch validation, job-scoped `contents: write` + `actions: read`, quoted compiler-derived routing identity fields, and unified-session verdict sourcing) with tests in `adaptive_routing_test.go`. Section 7.18 maps only the eligibility cases asserted by regression tests: fixed/non-routed models, `workflow_call`, and missing repo-memory; the repository-default skip is tested for fixed/non-routed models and `workflow_call`. Added the mapping and bumped to 1.0.111. No new `CTR-*` rule; the agent job and all other jobs are asserted unchanged by `TestAdaptiveRoutingObserveAddsOnlyTheWriterJob`.
+- Adaptive routing history writer ([#80583](https://github.com/github/gh-aw/pull/80583)): the compiler already enforced the reserved `memory/adaptive-routing/` branch, job-scoped `contents: write` + `actions: read`, quoted compiler-derived routing identity fields, and unified-session verdict sourcing. Section 7.18 maps only the eligibility cases asserted by regression tests: fixed/non-routed models, `workflow_call`, and missing repo-memory; the repository-default skip is tested for fixed/non-routed models and `workflow_call`. Added the mapping and bumped to 1.0.111. No new `CTR-*` rule; the observe-mode regression test asserts that the agent job and all other jobs are unchanged.
 - No `threat-detection-suppress` annotations were reviewed beyond the prior audit's finding, so no suppression SLA action applies.
 - Steering issue #80597 had no comments.
 - Go tests could not be executed (the Go 1.27.4 toolchain download failed offline). Only specification and changelog text changed; no implementation was modified. Code-scanning alerts were not retrieved separately.

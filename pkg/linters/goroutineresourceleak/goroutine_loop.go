@@ -10,31 +10,6 @@ import (
 	"github.com/github/gh-aw/pkg/linters/internal/astutil"
 )
 
-func buildParentMap(files []*ast.File) map[ast.Node]ast.Node {
-	type frame struct {
-		node   ast.Node
-		parent *frame
-	}
-	parents := make(map[ast.Node]ast.Node)
-	for _, file := range files {
-		var stack *frame
-		ast.Inspect(file, func(node ast.Node) bool {
-			if node == nil {
-				if stack != nil {
-					stack = stack.parent
-				}
-				return true
-			}
-			if stack != nil {
-				parents[node] = stack.node
-			}
-			stack = &frame{node: node, parent: stack}
-			return true
-		})
-	}
-	return parents
-}
-
 func checkLoopWaitGroupLeak(pass *analysis.Pass, goStmt *ast.GoStmt, parents map[ast.Node]ast.Node) bool {
 	loop := enclosingLoop(goStmt, parents)
 	if loop == nil {

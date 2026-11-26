@@ -23601,9 +23601,9 @@ safe-outputs:
     # Format 3: string
     max-ai-credits: "example-value"
 
-    # Runner specification for the detection job. Overrides agent.runs-on for the
-    # detection job only. Supports string, array, or runner-group object forms.
-    # Defaults to agent.runs-on.
+    # Runner specification for the detection job. Applies only to the detection job
+    # and does not inherit `agent.runs-on`. Supports string, array, or runner-group
+    # object forms. Defaults to GitHub-hosted `ubuntu-latest`.
     # (optional)
     # Accepted formats:
 
@@ -26008,8 +26008,8 @@ import-schema:
 model: "example-value"
 
 # Set false to disable implicit main-agent routing without pinning a model, or
-# give a shortlist for an explicit router model value. The shortlist changes no
-# other model requests.
+# configure the main agent's router shortlist and learning. Learning does not
+# enable model routing.
 # (optional)
 # Accepted formats:
 
@@ -26019,27 +26019,19 @@ model-routing: false
 
 # Format 2: object
 model-routing:
-  # Specify at least one exact model name or gh-aw alias. Declare one list across
-  # the workflow and its imports. The engine's capabilities and
-  # models.allowed/blocked still apply.
+  # For a literal router model value, specify at least one exact model name or gh-aw
+  # alias. Declare one list across the workflow and its imports. The engine's
+  # capabilities and models.allowed/blocked still apply.
+  # (optional)
   allowed-models: []
     # Array of strings
 
-# Record each run of a routed workflow in its adaptive routing history on the
-# memory/adaptive-routing/<workflow> branch. observe keeps the ordinary router
-# pick and records the selected model and effort, whether the run completed its
-# task, and what it cost; false turns it off, including a repository default from
-# aw.json. Requires model routing on a Copilot, Claude, or Codex engine and
-# tools.repo-memory.
-# (optional)
-# Accepted formats:
-
-# Format 1: Record every eligible run without changing which model runs.
-adaptive-routing: "observe"
-
-# Format 2: false turns adaptive routing off. true is reserved for live adaptive
-# routing, which is not available yet.
-adaptive-routing: false
+  # Use observe to record each eligible run's model, effort, outcome and cost
+  # without changing the router's pick. Requires a routed main agent on Copilot,
+  # Claude or Codex and tools.repo-memory. Set false to override an import or
+  # repository default without disabling routing.
+  # (optional)
+  learning: "observe"
 
 # Graders over the unified session, including reserved operational-value
 # JavaScript. Fast built-ins run in conclusion; executable custom graders run only

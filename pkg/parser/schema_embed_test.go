@@ -4,6 +4,7 @@ package parser
 
 import (
 	"encoding/json"
+	"fmt"
 	"testing"
 )
 
@@ -65,5 +66,37 @@ func TestEmbeddedSchemasAreValid(t *testing.T) {
 				t.Fatalf("embedded schema %q failed to compile: %v\nRun `make build` after editing files under pkg/parser/schemas/", tc.name, err)
 			}
 		})
+	}
+}
+
+func TestProjectSafeOutputExamplesValidateAgainstMainWorkflowSchema(t *testing.T) {
+	t.Parallel()
+
+	var schema map[string]any
+	if err := json.Unmarshal([]byte(mainWorkflowSchema), &schema); err != nil {
+		t.Fatalf("failed to decode main workflow schema: %v", err)
+	}
+
+	rootProperties := schema["properties"].(map[string]any)
+	safeOutputProperties := rootProperties["safe-outputs"].(map[string]any)["properties"].(map[string]any)
+	for _, key := range []string{"update-project", "create-project-status-update"} {
+		definition := safeOutputProperties[key].(map[string]any)
+		objectSchema := definition["oneOf"].([]any)[0].(map[string]any)
+		examples := objectSchema["examples"].([]any)
+		for i, example := range examples {
+			t.Run(fmt.Sprintf("%s/example-%d", key, i+1), func(t *testing.T) {
+				t.Parallel()
+				frontmatter := map[string]any{
+					"on":     "workflow_dispatch",
+					"engine": "copilot",
+					"safe-outputs": map[string]any{
+						key: example,
+					},
+				}
+				if err := ValidateMainWorkflowFrontmatterWithSchemaAndLocation(frontmatter, "schema-example.md"); err != nil {
+					t.Fatalf("%s example %d does not validate: %v", key, i+1, err)
+				}
+			})
+		}
 	}
 }

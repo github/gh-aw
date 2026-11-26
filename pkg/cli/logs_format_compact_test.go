@@ -112,6 +112,7 @@ func TestRenderLogsCompactPropagatesEveryWriterFailure(t *testing.T) {
 		"compact": renderLogsCompactToWriter, "verbose": renderLogsCompactVerboseToWriter,
 	} {
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
 			success := &failingCompactLogsWriter{}
 			require.NoError(t, render(success, data))
 			for failAt := 1; failAt <= success.calls; failAt++ {

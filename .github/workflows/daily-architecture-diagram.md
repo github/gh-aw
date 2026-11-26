@@ -225,7 +225,7 @@ A compact table of all packages with their layer and one-line description, wrapp
 | cli | Core | Command implementations |
 | workflow | Core | Workflow compilation engine |
 | ... | ... | ... |
-{{else}}
+{{#else}}
 ### Changes (incremental only)
 
 If this was an incremental update, list changed packages in a brief bullet list (max 5 items).

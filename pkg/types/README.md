@@ -78,6 +78,11 @@ auth := &types.MCPAuthConfig{
 |-------|------|-------------|
 | `Type` | `string` | Auth type; currently only `"github-oidc"` is supported |
 | `Audience` | `string` | OIDC token audience (`aud` claim); defaults to the server URL if omitted |
+| `Provider` | `string` | Selects the federation provider for the token exchange. |
+| `AzureTenantID` | `string` | Azure tenant ID used for Azure federation (`azure-tenant-id`). |
+| `AzureClientID` | `string` | Azure application/client ID used for Azure federation (`azure-client-id`). |
+| `AzureScope` | `string` | Scope requested from Azure during token exchange (`azure-scope`). |
+| `AzureCloud` | `string` | Azure cloud environment used for federation (`azure-cloud`). |
 
 ### `TokenWeights`
 

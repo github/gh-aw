@@ -115,6 +115,12 @@ The `cli` package is intentionally large and command-oriented. The tables below 
 | `Metadata` | struct | Pagination metadata for MCP registry list responses. |
 | `OutdatedDependency` | struct | A Go module dependency with a newer version available, including current/latest versions and age. |
 | `SecurityAdvisory` | struct | A security vulnerability (GHSA/CVE) affecting a dependency, with severity and patched versions. |
+| `RoutingHistoryListEntry` | struct | Summary of one workflow's adaptive-routing history in an unfiltered routing-status response. |
+| `RoutingObservation` | struct | Unified-session verdict and optional reason indicating whether a routed run counts as evidence. |
+| `RoutingPairStatus` | struct | Evidence and evaluation metrics for one model/effort pair within a routing scope. |
+| `RoutingRecentRuns` | struct | Summary of recent routing-history entries, including counted and excluded runs. |
+| `RoutingScopeStatus` | struct | Incumbent, last role, and pair evidence for one routing scope. |
+| `RoutingStatus` | struct | JSON response for `gh aw routing status`, containing workflow, history, scope, and recent-run state. |
 | `SetupAuthOptions` | struct | Options for checking `gh` authentication status during repository setup. |
 | `SetupRepositoryCheckOptions` | struct | Options for validating repository access and ownership during setup. |
 | `TrialOptions` | struct | Configuration for running workflow trials, including repo context, timeout, and repeat count. |
@@ -192,6 +198,7 @@ The `cli` package is intentionally large and command-oriented. The tables below 
 | `NewConnectorsCommand` | `func() *cobra.Command` | Constructs commands for validating and inspecting connector definitions and hosting frozen plans. |
 | `NewConnectorCommand` | `func() *cobra.Command` | Constructs the id-first setup and local-test interface for AW Markdown connectors. |
 | `NewValueCommand` | `func() *cobra.Command` | Constructs the longitudinal value report command. |
+| `NewRoutingCommand` | `func() *cobra.Command` | Constructs the adaptive-routing status and reset commands. |
 | `RetrieveEpisodeLogs` | `func(ctx context.Context, opts EpisodeRetrievalOptions) (LogsData, error)` | Collects canonical workflow-run members using compact artifacts and the standard log report builder. |
 | `ValidateDevelopmentCompileFlags` | `func(dev bool, flags map[string]bool) error` | Rejects explicit development-compile opt-outs while allowing omitted defaults. |
 

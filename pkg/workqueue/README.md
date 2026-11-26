@@ -23,6 +23,7 @@ For the full queue behavior and operator configuration, see the [work-queue refe
 | `Resource` | struct | GitHub Issue or pull request reference used by dependencies, Observations, and Issue links. |
 | `Dependency` | struct | Work predecessor or external Issue/pull-request edge. |
 | `Replacement` | struct | Optional `replacement_of` reference on a Work definition. |
+| `WorkContinuation` | struct | Follow-up route, remaining-work message, and hop budget carried beside the inherited payload. |
 | `WorkDefinition` | struct | Work operation: identity, pool, priority, fairness key, worker profile, payload, and dependencies. |
 | `ObservationOperation`, `ClaimOperation`, `DispatchOperation`, `BoundOperation`, `CompletionOperation`, `ClaimCancellationOperation`, `WorkCancellationOperation`, `ReleaseOperation`, `CheckpointOperation`, `IssueLinkOperation`, `IssueCommentOperation` | struct | Remaining closed operation variants. |
 | `WorkIDsParameters`, `DispatchParameters`, `DispatchProfile`, `DispatchIDParameters`, `ReleaseParameters`, `CancelWorkParameters`, `CheckpointParameters`, `IssueLinkParameters` | struct | Closed request parameters per request kind. |
@@ -30,7 +31,8 @@ For the full queue behavior and operator configuration, see the [work-queue refe
 | `Projection` | struct | State derived by replaying the ledger: Work, Claims, Dispatches, Observations, committed requests, and `Stats`. |
 | `WorkState` | struct | Work definition plus state, position, attempts, Completion effects, and cancellation data. |
 | `ClaimState` | struct | One Claim: ids, handle, state, terminal commit, cancellation reason, and effects. |
-| `DispatchState` | struct | One dispatch: pool, profile, workflow, reserving dispatcher attempt (`ReservedBy`), state, launch, run binding, and its sole Claim. |
+| `DispatchState` | struct | One dispatch: pool, profile, workflow, reserving dispatcher attempt (`ReservedBy`), state, launch (`LaunchRecord`), run binding, and its sole Claim. |
+| `LaunchRecord` | struct | Run ID and head revision recorded by the dispatcher when it launches a Dispatch. |
 | `RunBinding` | struct | Run id and attempt: the run bound to a dispatch, or the dispatcher attempt that reserved it. |
 | `Stats` | struct | Aggregate counts of Work by state, Claims, Dispatches, transactions, and graph nodes. |
 | `Decision` | struct | Planned `dispatch_next` Claims, dispatch ids, and plan reason. |
@@ -60,6 +62,8 @@ For the full queue behavior and operator configuration, see the [work-queue refe
 | `LedgerBytes` | 64 MiB | Maximum ledger size. |
 | `CheckpointAfterLines` | 512 | Maintenance checkpoint threshold. |
 | `MaxPendingWork` | 4096 | Maximum available plus claimed Work per pool. |
+| `ContinuationMessageBytes` | 16384 | Maximum bytes in a continuation's remaining-work message. |
+| `ContinuationRemainingMax` | 15 | Maximum remaining automatic continuation hops. |
 | `RetainedRequests` | 4096 | Request IDs a Checkpoint keeps for `request_reused` deduplication. |
 | `CASAttempts` | 8 | Maximum compare-and-swap publication attempts. |
 | `Roles` | variable | Closed actor roles. |
@@ -76,7 +80,6 @@ For the full queue behavior and operator configuration, see the [work-queue refe
 | `ReplayRaw` | `func ReplayRaw(records []json.RawMessage) (Projection, error)` | Replays raw commit records. |
 | `NewProjection` | `func NewProjection() Projection` | Returns an empty projection. |
 | `AppendCommit` | `func AppendCommit(state Projection, commit QueueCommit) (Projection, error)` | Applies one commit to a cloned projection. |
-| `ValidateCommit` | `func ValidateCommit(commit QueueCommit) error` | Validates commit shape and identity. |
 | `LedgerProtocol` | `func LedgerProtocol(data []byte) int` | Reports the head line's protocol version. |
 | `SerializeProjection` | `func SerializeProjection(state Projection) ([]byte, error)` | Serializes a projection in the Checkpoint `state` format, unpruned. |
 | `CheckpointCommit` | `func CheckpointCommit(state Projection, actor Actor, at int64) (QueueCommit, error)` | Builds a root Checkpoint commit that carries only records a later commit can read: live Work, its predecessors, terminal Work awaiting its Issue comment, their Claims, Dispatches, creators and gate Observations, and the newest `RetainedRequests` request IDs of the folded log. |
@@ -91,9 +94,7 @@ For the full queue behavior and operator configuration, see the [work-queue refe
 | Function | Signature | Description |
 |----------|-----------|-------------|
 | `NewRequest` | `func NewRequest(kind string, actor Actor, parameters any) (Request, error)` | Builds a request with its canonical id. |
-| `RequestID` | `func RequestID(actor Actor, kind string, parameters any) (string, error)` | Computes `request:<sha256>`. |
 | `CommitID` | `func CommitID(previous *string, requestID string) string` | Computes `q_<sha256>`. |
-| `ProposedCommitID` | `func ProposedCommitID(state Projection, request Request) string` | Commit id for a request at the current tip. |
 | `BuildCommit` | `func BuildCommit(state Projection, actor Actor, request Request, operations []Operation, at int64) QueueCommit` | Builds the next commit. |
 | `Op` | `func Op(value any) (Operation, error)` | Canonically encodes an operation. |
 | `ValidateActor` | `func ValidateActor(actor Actor) error` | Validates actor fields. |
@@ -105,6 +106,7 @@ For the full queue behavior and operator configuration, see the [work-queue refe
 | Function | Signature | Description |
 |----------|-----------|-------------|
 | `NewWork` | `func NewWork(graphID, nodeKey, pool, profile, fairnessKey string, priority int, payload []byte, dependsOn []Dependency) (WorkDefinition, error)` | Builds and validates a Work definition. |
+| `ContinuationChild` | `func ContinuationChild(parent WorkDefinition, continuation WorkContinuation, approval *Resource) (WorkDefinition, error)` | Builds and validates a successor Work item with inherited scheduling context and a parent dependency; an issue-routed continuation also gets an approval gate. |
 | `ValidateWork` | `func ValidateWork(work WorkDefinition) error` | Validates a Work definition. |
 | `NodeID` | `func NodeID(graphID, nodeKey string) string` | Computes a Work id. |
 | `IndependentGraphID` | `func IndependentGraphID(payload []byte) (string, error)` | Default graph id from the canonical payload. |
@@ -124,7 +126,6 @@ For the full queue behavior and operator configuration, see the [work-queue refe
 | `Branch.Publish` | `func (b Branch) Publish(ctx context.Context, actor Actor, kind string, parameters any, operationsFor OperationsFor) (Publication, error)` | Publishes one request with compare-and-swap retries. |
 | `Branch.Checkpoint` | `func (b Branch) Checkpoint(ctx context.Context, actor Actor, minimumLines int) (CheckpointResult, error)` | Replaces the log with one Checkpoint commit. |
 | `ParseSettings` | `func ParseSettings(data []byte) (Settings, error)` | Parses a `work_queue` settings object. |
-| `ParseRepositorySettings` | `func ParseRepositorySettings(data []byte) (Settings, error)` | Parses `work_queue` from an `aw.json` document. |
 | `BuildPolicyEnv` | `func BuildPolicyEnv(settings Settings, repository string, workflows []string) (PolicyEnv, error)` | Compiles settings and worker workflows into the policy environment. |
 | `ParsePolicyEnv` | `func ParsePolicyEnv(data []byte) (PolicyEnv, error)` | Parses a policy environment. |
 | `ValidatePolicyEnv` | `func ValidatePolicyEnv(env PolicyEnv) error` | Validates a policy environment. |
