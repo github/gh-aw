@@ -720,7 +720,7 @@ async function listRuns({ githubClient, owner, repo, workflowFile, workflowPath 
   const legacyFloor = legacyReconciliationFloor(state, runs);
   const baseReconciled = typeof state.reconciled_through === "number" ? state.reconciled_through : legacyFloor;
   const floor = Math.max(baseReconciled, state.reset_after_run || 0);
-  const since = state.generation?.since_run ?? runNumber;
+  const firstWrite = state.generation ? (state.first_write_run ?? 0) : runNumber;
   // Leave tracked unresolved runs at or above this writer's number for a later writer to handle.
   const prevUnresolved = new Set((Array.isArray(state.unresolved_runs) ? state.unresolved_runs : []).filter(n => Number.isInteger(n) && n > state.reset_after_run && n < runNumber));
   const storedUnresolvedIds = state.unresolved_run_ids && typeof state.unresolved_run_ids === "object" ? state.unresolved_run_ids : {};
@@ -981,9 +981,9 @@ async function listRuns({ githubClient, owner, repo, workflowFile, workflowPath 
   const fullCatchUp = verified && (runNumber <= floor + 1 || verifiedUpper >= runNumber - 1);
   let reconciliationCeiling = verified ? (fullCatchUp ? runNumber : verifiedUpper) : floor;
   // If catch-up outlives the first writer's row, a failed job may already have committed an evicted row.
-  if (state.generation && floor < since && !writtenNumbers.has(since)) reconciliationCeiling = floor;
+  if (state.generation && floor < firstWrite && !writtenNumbers.has(firstWrite)) reconciliationCeiling = floor;
   // Before the first known definition, require positive evidence, not a guessed deletion.
-  for (let n = floor + 1; n < since && n <= reconciliationCeiling; n++) {
+  for (let n = floor + 1; n < firstWrite && n <= reconciliationCeiling; n++) {
     if (!writtenNumbers.has(n) && !eligibleByNumber.has(n) && !ineligibleNumbers.has(n)) {
       reconciliationCeiling = n - 1;
       break;
@@ -1005,7 +1005,7 @@ async function listRuns({ githubClient, owner, repo, workflowFile, workflowPath 
       if (isTrackedUnresolved) resolved.add(num);
       continue;
     }
-    const early = num > floor && num < since;
+    const early = num > floor && num < firstWrite;
     const reserve = () => {
       if (!early) return;
       if (inspectionBudget.remaining === 0) throw new Error("Earlier run inspection budget exhausted");

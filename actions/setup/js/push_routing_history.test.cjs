@@ -413,8 +413,10 @@ describe("push_routing_history saves", () => {
         : github,
     });
     expect(remoteState(remote)).toMatchObject({ last_run: 12, reconciled_through: unavailable ? 0 : 12, unexplained: unavailable ? 0 : 2 });
+    expect(remoteState(remote).first_write_run).toBe(unavailable ? 12 : undefined);
     await save(remote, 13, "success", { github });
     expect(remoteState(remote)).toMatchObject({ last_run: 13, reconciled_through: 13, unexplained: 2 });
+    expect(remoteState(remote)).not.toHaveProperty("first_write_run");
     expect(remoteRuns(remote).filter(row => row.note === "unsaved")).toMatchObject([
       { number: 10, attempt: 1, counted: false, outcome: null },
       { number: 11, attempt: 1, counted: false, outcome: null },
@@ -479,17 +481,46 @@ describe("push_routing_history saves", () => {
     const remote = bareRemote();
     // #12 first saved while #11 was still running. Both #12 and #13 have now aged out.
     const retained = Array.from({ length: 500 }, (_, i) => ({ run: String(9014 + i), number: 14 + i }));
-    seedHistory(remote, { ...emptyState("triage"), generation: { hash: GENERATION, since_run: 12 }, last_run: 513, reconciled_through: 10 }, retained);
-    const runs = Array.from({ length: 514 }, (_, i) => paginationRun(514 - i, { conclusion: [12, 13].includes(514 - i) ? "failure" : "success" }));
+    seedHistory(remote, { ...emptyState("triage"), generation: { hash: GENERATION, since_run: 12 }, first_write_run: 12, last_run: 513, reconciled_through: 10 }, retained);
+    const runs = Array.from({ length: 515 }, (_, i) => paginationRun(515 - i, { head_sha: "original", conclusion: [12, 13].includes(515 - i) ? "failure" : "success" }));
     const jobs = [
       { name: "agent", started_at: runCreatedAt(12), conclusion: "success" },
       { name: "push_routing_history", conclusion: "failure" },
     ];
-    const github = fakeGitHub(remote, { runs, jobs: { 9012: jobs, 9013: jobs } });
-    await save(remote, 514, "success", { github });
+    const github = fakeGitHub(remote, { runs, jobs: { 9012: jobs, 9013: jobs }, contents: { original: `GH_AW_ROUTING_GENERATION: "${GENERATION}"` } });
+    await save(remote, 514, "success", { github, generation: `${"c".repeat(64)}:${"d".repeat(64)}` });
     expect(remoteState(remote)).toMatchObject({ last_run: 514, reconciled_through: 10, unexplained: 0 });
+    await save(remote, 515, "success", { github, generation: GENERATION });
+    expect(remoteState(remote)).toMatchObject({ last_run: 515, reconciled_through: 10, unexplained: 0 });
     expect(remoteRuns(remote).filter(row => row.note === "unsaved")).toEqual([]);
     expect(github.calls.jobs).toEqual([]);
+  });
+
+  it("resumes established reconciliation after a listing outage during a workflow edit", async () => {
+    const remote = bareRemote();
+    await save(remote, 1, "success");
+    const generation = `${"c".repeat(64)}:${"d".repeat(64)}`;
+    await save(remote, 3, "success", {
+      generation,
+      github: fakeGitHub(remote, {
+        listWorkflowRuns: async () => {
+          throw new Error("Actions unavailable");
+        },
+      }),
+    });
+    const runs = [paginationRun(3), paginationRun(2, { event: "pull_request_target", head_branch: "feature", conclusion: "failure" }), paginationRun(1)];
+    const jobs = [
+      { name: "agent", started_at: runCreatedAt(2), conclusion: "success" },
+      { name: "push_routing_history", conclusion: "failure" },
+    ];
+    const github = fakeGitHub(remote, { runs, jobs: { 9002: jobs } });
+    await save(remote, 4, "success", { github, generation });
+    expect(remoteState(remote)).toMatchObject({ reconciled_through: 4, unexplained: 1 });
+    expect(
+      remoteRuns(remote)
+        .filter(row => row.note === "unsaved")
+        .map(row => row.number)
+    ).toEqual([2]);
   });
 
   it("lands two saves that read the same state, re-applying the later one to the newer file", async () => {

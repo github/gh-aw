@@ -220,6 +220,21 @@ func TestRoutingResetPreservesReconciliationCoverage(t *testing.T) {
 		assert.Equal(t, json.Number("0"), raw["unexplained"])
 	})
 
+	t.Run("keeps an unfinished first write until the reset covers it", func(t *testing.T) {
+		var state routingHistoryState
+		require.NoError(t, json.Unmarshal([]byte(`{"first_write_run":12,"reconciled_through":9}`), &state))
+		for _, fence := range []int64{10, 12} {
+			content, err := encodeRoutingState(resetRoutingState(state, fence, "2026-11-24T10:00:00Z"))
+			require.NoError(t, err)
+			raw := decodeRaw(t, content)
+			if fence < 12 {
+				assert.Equal(t, json.Number("12"), raw["first_write_run"])
+			} else {
+				assert.NotContains(t, raw, "first_write_run")
+			}
+		}
+	})
+
 	t.Run("preserves reconciliation obligations above reset_after_run", func(t *testing.T) {
 		stateJSON := `{"v":2,"workflow":"triage","seq":5,"generation":{"hash":"9f2c41d0","since_run":1},"reset_after_run":0,"last_run":105,"reconciled_through":105,"unresolved_runs":[104,98,100,102,102],"unresolved_run_ids":{"98":"9098","100":"9100","102":"9102","104":"9104"},"unresolved_lookup_cursor":102,"unexplained":1,"scopes":{},"updated":{"run":"9105","at":"2026-11-24T09:00:00Z"}}`
 		api := &fakeRoutingAPI{

@@ -49,6 +49,7 @@ type routingHistoryState struct {
 	Generation             *routingGeneration              `json:"generation"`
 	ResetAfterRun          int64                           `json:"reset_after_run"`
 	LastRun                int64                           `json:"last_run"`
+	FirstWriteRun          int64                           `json:"first_write_run,omitempty"`
 	ReconciledThrough      *int64                          `json:"reconciled_through,omitempty"`
 	UnresolvedRuns         *[]int64                        `json:"unresolved_runs,omitempty"`
 	UnresolvedRunIDs       map[string]string               `json:"unresolved_run_ids,omitempty"`
@@ -536,6 +537,9 @@ func runRoutingList(ctx context.Context, api routingAPI, out io.Writer, jsonOutp
 // fields are preserved, clearing only obligations at or below latestRun.
 func resetRoutingState(state routingHistoryState, latestRun int64, at string) routingHistoryState {
 	state.ResetAfterRun = latestRun
+	if state.FirstWriteRun <= latestRun {
+		state.FirstWriteRun = 0
+	}
 	if state.ReconciledThrough != nil {
 		reconciled := max(*state.ReconciledThrough, latestRun)
 		state.ReconciledThrough = &reconciled
