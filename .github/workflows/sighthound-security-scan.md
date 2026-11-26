@@ -147,8 +147,31 @@ tools:
   cli-proxy: false
 mcp-scripts:
   read-sighthound-findings:
-    description: Read the pre-filtered actionable Sighthound findings.
-    run: cat /tmp/gh-aw/agent/sighthound/actionable.json
+    description: Read the five highest-severity pre-filtered Sighthound findings.
+    run: |
+      jq -c '
+        def rank:
+          if type != "string" then error("Missing finding severity")
+          else ascii_downcase |
+            if . == "critical" then 5
+            elif . == "high" then 4
+            elif . == "medium" then 3
+            elif . == "low" then 2
+            elif . == "info" or . == "informational" then 1
+            else error("Unknown finding severity")
+            end
+          end;
+        def text($limit): if type == "string" then .[:$limit] else null end;
+        sort_by(-(.severity | rank))[:5] | map({
+          file: ((.file // .path) | text(4096)),
+          line: (if (.line | type) == "number" then .line else null end),
+          severity: (.severity | text(64)),
+          finding_type: (.finding_type | text(512)),
+          cwe_id: (.cwe_id | text(128)),
+          description: (.description | text(4096)),
+          snippet: (.snippet | text(2048))
+        })
+      ' /tmp/gh-aw/agent/sighthound/actionable.json
   read-sighthound-summary:
     description: Read the Sighthound scan summary.
     run: cat /tmp/gh-aw/agent/sighthound/summary.md
@@ -166,16 +189,16 @@ imports:
 
 # Sighthound Security Scan Triage
 
-The `sighthound_scan` job ran Sighthound and pre-filtered findings. Read the files:
-- `/tmp/gh-aw/agent/sighthound/actionable.json` — findings outside test/testdata paths (primary input)
+The `sighthound_scan` job ran Sighthound and pre-filtered findings. Read the inputs:
+- `read-sighthound-findings` — compact details for the five highest-severity findings outside test/testdata paths; long fields are truncated
 - `/tmp/gh-aw/agent/sighthound/summary.md` — scan summary
 
 ## Task
 
 1. Call `mcp__mcpscripts__read-sighthound-findings` and `mcp__mcpscripts__read-sighthound-summary` to read the scan inputs. GitHub-backed Codex has no shell tool; use these file-specific MCP tools instead.
-2. Select up to 5 findings with the highest severity from `actionable.json`. If there are no findings, call `noop`.
+2. Use the returned highest-severity findings. If there are no findings, call `noop`.
 3. Call `create_issue` with:
    - title: `Security findings in ${{ github.repository }}`
    - body: concise summary listing the selected findings with file path, severity, and remediation guidance for each.
 
-Keep the issue body concise. Only report findings from `actionable.json`.
+Keep the issue body concise. Only report findings returned by `read-sighthound-findings`.
