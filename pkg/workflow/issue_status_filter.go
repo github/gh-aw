@@ -14,8 +14,14 @@ type IssueStatusFilterConfig struct {
 }
 
 func extractIssueStatusFilter(frontmatter map[string]any) (*IssueStatusFilterConfig, error) {
-	on, _ := frontmatter["on"].(map[string]any)
-	issues, _ := on["issues"].(map[string]any)
+	on, ok := frontmatter["on"].(map[string]any)
+	if !ok {
+		return nil, nil
+	}
+	issues, ok := on["issues"].(map[string]any)
+	if !ok {
+		return nil, nil
+	}
 	ids, hasIDs := issues["status-ids"]
 	categories, hasCategories := issues["status-categories"]
 	if !hasIDs && !hasCategories {

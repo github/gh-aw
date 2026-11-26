@@ -48,6 +48,22 @@ func TestIssueStatusFilterValidation(t *testing.T) {
 	}
 }
 
+func TestIssueStatusFilterAbsentSettings(t *testing.T) {
+	for _, frontmatter := range []map[string]any{
+		nil,
+		{},
+		{"on": "workflow_dispatch"},
+		{"on": map[string]any{}},
+		{"on": map[string]any{"issues": nil}},
+		{"on": map[string]any{"issues": map[string]any{"types": []any{"opened"}}}},
+	} {
+		filter, err := extractIssueStatusFilter(frontmatter)
+		if err != nil || filter != nil {
+			t.Fatalf("extractIssueStatusFilter(%v) = %v, %v; want nil, nil", frontmatter, filter, err)
+		}
+	}
+}
+
 func TestIssueStatusFilterCompilation(t *testing.T) {
 	dir := testutil.TempDir(t, "issue-status-filter")
 	path := filepath.Join(dir, "status.md")
