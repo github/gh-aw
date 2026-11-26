@@ -30,70 +30,23 @@ type decoderMethodCall struct {
 	call   *ast.CallExpr
 }
 
+type decoderIndex struct {
+	constructions       []decoderConstruction
+	strictCalls         []decoderMethodCall
+	decodeCalls         []decoderMethodCall
+	writes              map[types.Object][]token.Pos
+	constructionObjects map[*ast.CallExpr]types.Object
+}
+
 func run(pass *analysis.Pass) (any, error) {
 	noLintIndex, generatedFiles, err := analyzerutil.Indexes(pass)
 	if err != nil {
 		return nil, err
 	}
 
-	var constructions []decoderConstruction
-	var strictCalls, decodeCalls []decoderMethodCall
-	writes := make(map[types.Object][]token.Pos)
-	constructionObjects := make(map[*ast.CallExpr]types.Object)
-
-	for _, file := range pass.Files {
-		ast.Inspect(file, func(node ast.Node) bool {
-			switch node := node.(type) {
-			case *ast.CallExpr:
-				if isJSONNewDecoder(pass, node) {
-					constructions = append(constructions, decoderConstruction{call: node})
-				}
-				selector, ok := astutil.UnwrapParenExpr(node.Fun).(*ast.SelectorExpr)
-				if !ok || !isJSONDecoder(pass, selector.X) {
-					return true
-				}
-				switch selector.Sel.Name {
-				case "DisallowUnknownFields":
-					strictCalls = append(strictCalls, decoderMethodCall{
-						object: decoderObject(pass, selector.X),
-						call:   node,
-					})
-				case "Decode":
-					decodeCalls = append(decodeCalls, decoderMethodCall{
-						object: decoderObject(pass, selector.X),
-						call:   node,
-					})
-				}
-			case *ast.AssignStmt:
-				for i, lhs := range node.Lhs {
-					object := decoderObject(pass, lhs)
-					if object != nil {
-						writes[object] = append(writes[object], node.Pos())
-					}
-					rhs, ok := astutil.RhsExprForIndex(node.Rhs, i)
-					if ok {
-						recordConstructionObject(pass, astutil.UnwrapParenExpr(rhs), lhs, constructionObjects)
-					}
-				}
-			case *ast.ValueSpec:
-				for i, name := range node.Names {
-					object := pass.TypesInfo.ObjectOf(name)
-					if object != nil {
-						writes[object] = append(writes[object], node.Pos())
-					}
-					rhs, ok := astutil.RhsExprForIndex(node.Values, i)
-					if ok {
-						recordConstructionObject(pass, astutil.UnwrapParenExpr(rhs), name, constructionObjects)
-					}
-				}
-			}
-			return true
-		})
-	}
-
-	for _, construction := range constructions {
-		construction.object = constructionObjects[construction.call]
-		if isStrictBeforeDecode(construction, strictCalls, decodeCalls, writes) {
+	index := collectDecoderCalls(pass)
+	for _, construction := range index.constructions {
+		if isStrictBeforeDecode(construction, index.strictCalls, index.decodeCalls, index.writes) {
 			continue
 		}
 		position := pass.Fset.PositionFor(construction.call.Pos(), false)
@@ -105,6 +58,73 @@ func run(pass *analysis.Pass) (any, error) {
 	}
 
 	return nil, nil
+}
+
+func collectDecoderCalls(pass *analysis.Pass) decoderIndex {
+	index := decoderIndex{
+		writes:              make(map[types.Object][]token.Pos),
+		constructionObjects: make(map[*ast.CallExpr]types.Object),
+	}
+	for _, file := range pass.Files {
+		collectFileCalls(pass, file, &index)
+	}
+	for i := range index.constructions {
+		index.constructions[i].object = index.constructionObjects[index.constructions[i].call]
+	}
+	return index
+}
+
+func collectFileCalls(pass *analysis.Pass, file *ast.File, index *decoderIndex) {
+	ast.Inspect(file, func(node ast.Node) bool {
+		switch node := node.(type) {
+		case *ast.CallExpr:
+			collectDecoderCall(pass, node, index)
+		case *ast.AssignStmt:
+			for i, lhs := range node.Lhs {
+				recordWrite(pass, lhs, node.Pos(), index)
+				rhs, ok := astutil.RhsExprForIndex(node.Rhs, i)
+				if ok {
+					recordConstructionObject(pass, astutil.UnwrapParenExpr(rhs), lhs, index.constructionObjects)
+				}
+			}
+		case *ast.ValueSpec:
+			for i, name := range node.Names {
+				object := pass.TypesInfo.ObjectOf(name)
+				if object != nil {
+					index.writes[object] = append(index.writes[object], node.Pos())
+				}
+				rhs, ok := astutil.RhsExprForIndex(node.Values, i)
+				if ok {
+					recordConstructionObject(pass, astutil.UnwrapParenExpr(rhs), name, index.constructionObjects)
+				}
+			}
+		}
+		return true
+	})
+}
+
+func collectDecoderCall(pass *analysis.Pass, call *ast.CallExpr, index *decoderIndex) {
+	if isJSONNewDecoder(pass, call) {
+		index.constructions = append(index.constructions, decoderConstruction{call: call})
+	}
+	selector, ok := astutil.UnwrapParenExpr(call.Fun).(*ast.SelectorExpr)
+	if !ok || !isJSONDecoder(pass, selector.X) {
+		return
+	}
+	methodCall := decoderMethodCall{object: decoderObject(pass, selector.X), call: call}
+	switch selector.Sel.Name {
+	case "DisallowUnknownFields":
+		index.strictCalls = append(index.strictCalls, methodCall)
+	case "Decode":
+		index.decodeCalls = append(index.decodeCalls, methodCall)
+	}
+}
+
+func recordWrite(pass *analysis.Pass, lhs ast.Expr, pos token.Pos, index *decoderIndex) {
+	object := decoderObject(pass, lhs)
+	if object != nil {
+		index.writes[object] = append(index.writes[object], pos)
+	}
 }
 
 func recordConstructionObject(pass *analysis.Pass, rhs ast.Expr, lhs ast.Expr, constructionObjects map[*ast.CallExpr]types.Object) {
