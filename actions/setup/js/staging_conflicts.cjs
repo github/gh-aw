@@ -100,6 +100,14 @@ function assertStableDirectory(directory) {
   }
 }
 
+function assertPinnedDirectoryIdentity(directory) {
+  const openedStat = fs.fstatSync(directory.fd);
+  const currentStat = fs.lstatSync(path.join(directory.parentDirectory, directory.name));
+  if (!openedStat.isDirectory() || !currentStat.isDirectory() || openedStat.dev !== directory.expectedStat.dev || openedStat.ino !== directory.expectedStat.ino || currentStat.dev !== openedStat.dev || currentStat.ino !== openedStat.ino) {
+    throw new Error(`Directory changed while publishing ${path.join(directory.parentDirectory, directory.name)}`);
+  }
+}
+
 function statDirectory(directory) {
   try {
     return fs.statSync(directory);
@@ -160,6 +168,49 @@ function directoriesHaveSameContents(sourceDir, destDir) {
   return withGuardedDirectory(sourceDir, false, sourceRoot => withGuardedDirectory(destDir, false, destRoot => directoriesAtHaveSameContents(sourceRoot, destRoot)));
 }
 
+function copyStagedDirectoryContents(sourceDir, destDir) {
+  for (const entry of readDirectoryEntries(sourceDir)) {
+    const sourcePath = path.join(sourceDir, entry.name);
+    const destPath = path.join(destDir, entry.name);
+    if (entry.isDirectory()) {
+      const sourceStat = fs.lstatSync(sourcePath);
+      if (!sourceStat.isDirectory()) return false;
+      try {
+        fs.mkdirSync(destPath, { mode: sourceStat.mode & 0o777 });
+      } catch (error) {
+        const code = error && typeof error === "object" ? Reflect.get(error, "code") : undefined;
+        if (code === "EEXIST") return false;
+        throw error;
+      }
+      const createdStat = fs.lstatSync(destPath);
+      const destChild = openPinnedDirectory(destDir, entry.name);
+      try {
+        if (createdStat.dev !== destChild.expectedStat.dev || createdStat.ino !== destChild.expectedStat.ino) {
+          throw new Error(`Directory changed while publishing ${destPath}`);
+        }
+        if (!copyStagedDirectoryContents(sourcePath, destChild.path)) return false;
+        try {
+          fs.fchmodSync(destChild.fd, sourceStat.mode & 0o777);
+        } catch (error) {
+          throw new Error(`Failed to set staging directory permissions ${destPath}`, { cause: error });
+        }
+        assertPinnedDirectoryIdentity(destChild);
+      } finally {
+        fs.closeSync(destChild.fd);
+      }
+    } else if (entry.isFile()) {
+      try {
+        fs.linkSync(sourcePath, destPath);
+      } catch (error) {
+        const code = error && typeof error === "object" ? Reflect.get(error, "code") : undefined;
+        if (code === "EEXIST") return false;
+        throw error;
+      }
+    }
+  }
+  return true;
+}
+
 function existingDirectoryStageState(sourceDir, destDir) {
   let destinationStat;
   try {
@@ -191,17 +242,40 @@ function copyDirectoryExclusive(sourceDir, destDir, copyContents) {
   }
   try {
     copyContents(tempDir);
-    const currentState = existingDirectoryStageState(sourceDir, destDir);
-    if (currentState !== null) return currentState;
+    let stagedStat;
     try {
-      fs.renameSync(tempDir, destDir);
-      return "copied";
+      stagedStat = fs.statSync(tempDir);
+    } catch (error) {
+      throw new Error(`Failed to inspect temporary staging directory ${tempDir}`, { cause: error });
+    }
+    try {
+      fs.mkdirSync(destDir, { mode: stagedStat.mode & 0o777 });
     } catch (error) {
       const code = error && typeof error === "object" ? Reflect.get(error, "code") : undefined;
-      if (code === "EEXIST" || code === "ENOTEMPTY") {
-        const currentState = existingDirectoryStageState(sourceDir, destDir);
-        if (currentState !== null) return currentState;
+      if (code === "EEXIST") {
+        return existingDirectoryStageState(sourceDir, destDir) || "conflict";
       }
+      throw new Error(`Failed to create staging directory ${destDir}`, { cause: error });
+    }
+    const createdStat = fs.lstatSync(destDir);
+    try {
+      const destRoot = openPinnedDirectory(path.dirname(destDir), path.basename(destDir));
+      try {
+        if (createdStat.dev !== destRoot.expectedStat.dev || createdStat.ino !== destRoot.expectedStat.ino) {
+          throw new Error(`Directory changed while publishing ${destDir}`);
+        }
+        if (!copyStagedDirectoryContents(tempDir, destRoot.path)) return "conflict";
+        try {
+          fs.fchmodSync(destRoot.fd, stagedStat.mode & 0o777);
+        } catch (error) {
+          throw new Error(`Failed to set staging directory permissions ${destDir}`, { cause: error });
+        }
+        assertPinnedDirectoryIdentity(destRoot);
+        return "copied";
+      } finally {
+        fs.closeSync(destRoot.fd);
+      }
+    } catch (error) {
       throw new Error(`Failed to publish staging directory ${destDir}`, { cause: error });
     }
   } finally {
