@@ -20,8 +20,8 @@ Forces:
 
 Add a custom `go/analysis` analyzer, `jsondecoderunknownfields`, that reports each `json.NewDecoder` call whose decoder does not have `DisallowUnknownFields()` called on it before its first `Decode`. The change:
 
-1. Identifies `NewDecoder` calls by package path, so import aliases are covered (`jsonalias` in the testdata). It tracks decoders bound to local identifiers and decoders used inline.
-2. Accepts a `DisallowUnknownFields` call only when it appears before the first `Decode` and before any reassignment of the same identifier. The check is based on source position (`isStrictBeforeDecode` in `jsondecoderunknownfields.go`).
+1. Identifies `NewDecoder` calls by package path, so import aliases are covered (`jsonalias` in the testdata). It tracks local aliases and field paths as well as decoders used inline.
+2. Accepts a synchronous `DisallowUnknownFields` call in the construction's statement block only when the tracked decoder is definitely the same instance and no possible `Decode` precedes it. Conditional writes are treated conservatively; blocks containing `goto` are not credited.
 3. Skips generated files and honors `//nolint:jsondecoderunknownfields`.
 4. Is registered in `pkg/linters/registry.go`, and documented in `pkg/linters/README.md`, `pkg/linters/doc.go` (now "All 105 active analyzers"), and `spec_test.go`.
 5. Is recorded in the `notYetEnforced` map in `pkg/linters/doc_sync_test.go` with the reason "new JSON decoder schema-drift analyzer needs an enforcement-readiness audit before CI enables it". The analyzer is therefore not yet enforced in CI.
@@ -29,7 +29,7 @@ Add a custom `go/analysis` analyzer, `jsondecoderunknownfields`, that reports ea
 ## Alternatives Considered
 
 1. **Enforce the analyzer in CI immediately.** Not chosen in this PR. The `notYetEnforced` entry records that enforcement readiness has not been audited. Enforcing before the audit would make CI fail on existing decoders that have not been reviewed.
-2. **Use control-flow-aware or interprocedural analysis.** Not chosen in this PR. The implementation uses source-position ordering and identifier matching instead of a control-flow graph. The PR gives no explicit rationale for this choice. The trade-off is simpler code and fewer false negatives on straight-line code, at the cost of the limitations listed under Consequences.
+2. **Use full control-flow or interprocedural analysis.** Not chosen in this PR. The implementation uses conservative statement-block and local alias tracking instead of a control-flow graph. This is simpler but may report safe code whose strictness cannot be proven locally.
 
 ## Consequences
 
@@ -40,5 +40,5 @@ Positive:
 
 Negative:
 
-- The check is position-based, not control-flow-aware. A `DisallowUnknownFields()` call inside a conditional branch that precedes `Decode` satisfies the check. A decoder not bound to a local identifier (for example, a struct field or a chained call) is always reported, even when it is strict.
+- The check does not prove strictness across branches, helper functions, or unsupported storage expressions. It conservatively reports decoder escapes and copies that may hide decoding or mutation, so some safe decoders may be reported.
 - Because the analyzer is listed in `notYetEnforced`, CI does not enforce it. This PR does not remediate existing decoders that accept unknown fields, so the schema-drift risk remains until the enforcement audit is complete.
