@@ -71,6 +71,8 @@ If Actions is unavailable, run 12 can still save its own result without advancin
 
 An edit can also separate two early missing saves. If runs 10 and 12 use the same definition but run 11 is verified to have used a different one, run 10's loss is not charged to run 12's generation. If run 11 has not been checked yet, the writer waits before charging run 10.
 
+The writer also bounds the work it spends on early runs. For example, 33 failed saves at the same revision can share one definition lookup. With 33 distinct revisions, checking the jobs and definitions can exceed the 64-request budget on every attempt. The current observation still saves, but those losses can remain unverified.
+
 ## The branch
 
 Each workflow's history lives on its own branch, `memory/adaptive-routing/<workflow>`, named after the lock file without `.lock.yml`, so renaming the workflow file starts a new history. The first save creates the branch from its own root commit, and every commit is made through the GitHub API, which signs it. gh-aw never force-pushes or deletes the branch.

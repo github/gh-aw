@@ -994,6 +994,21 @@ async function listRuns({ githubClient, owner, repo, workflowFile, workflowPath 
   const unresolved = new Set(verified ? unresolvedGaps : []);
   /** @type {Record<string, string>} */
   const unresolvedIds = {};
+  const reserve = () => {
+    if (inspectionBudget.remaining === 0) throw new Error("Earlier run inspection budget exhausted");
+    inspectionBudget.remaining--;
+  };
+  /** @type {Map<string, string | null>} */
+  const definitions = new Map();
+  // A pull_request_target head SHA belongs to the PR, not the base commit that supplied the workflow.
+  const definitionOf = async (/** @type {any} */ run, /** @type {boolean} */ bounded) => {
+    if (run.event === "pull_request_target" || run.head_branch !== defaultBranch || typeof run.head_sha !== "string" || !run.head_sha) return null;
+    if (!definitions.has(run.head_sha)) {
+      if (bounded) reserve();
+      definitions.set(run.head_sha, await readRunGeneration({ githubClient, owner, repo, workflowPath, ref: run.head_sha }));
+    }
+    return definitions.get(run.head_sha);
+  };
 
   for (const num of [...eligibleByNumber.keys()].sort((a, b) => a - b)) {
     const isTrackedUnresolved = prevUnresolved.has(num);
@@ -1006,16 +1021,11 @@ async function listRuns({ githubClient, owner, repo, workflowFile, workflowPath 
       continue;
     }
     const early = num > floor && num < firstWrite;
-    const reserve = () => {
-      if (!early) return;
-      if (inspectionBudget.remaining === 0) throw new Error("Earlier run inspection budget exhausted");
-      inspectionBudget.remaining--;
-    };
     try {
       let { status, conclusion } = run;
       // The listing describes the latest attempt. Only the first attempt can owe a save.
       if ((run.run_attempt || 1) > 1) {
-        reserve();
+        if (early) reserve();
         const { data: firstAttempt } = await githubClient.rest.actions.getWorkflowRunAttempt({ owner, repo, run_id: run.id, attempt_number: 1 });
         conclusion = firstAttempt.conclusion;
         status = firstAttempt.status ?? (conclusion ? "completed" : null);
@@ -1029,13 +1039,13 @@ async function listRuns({ githubClient, owner, repo, workflowFile, workflowPath 
         unresolvedIds[String(num)] = id;
         continue;
       }
-      /** @type {{id: string, number: number, conclusion: string, agent_ran?: boolean, generation?: string}} */
+      /** @type {import("./routing_history.cjs").ListedRun} */
       const listed = { id, number: num, conclusion: conclusion || "unknown" };
       let include = true;
       if (!isSavedConclusion(listed.conclusion)) {
-        reserve();
+        if (early) reserve();
         const jobs = await githubClient.paginate(githubClient.rest.actions.listJobsForWorkflowRunAttempt, { owner, repo, run_id: run.id, attempt_number: 1, per_page: 100 }, (/** @type {any} */ page) => {
-          if (/<[^>]+>;\s*rel="next"/.test(page.headers.link || "")) reserve();
+          if (early && /<[^>]+>;\s*rel="next"/.test(page.headers.link || "")) reserve();
           return page.data;
         });
         listed.agent_ran = jobs.some((/** @type {any} */ job) => job?.name === "agent" && job.conclusion !== "skipped" && Boolean(job.started_at));
@@ -1046,11 +1056,8 @@ async function listRuns({ githubClient, owner, repo, workflowFile, workflowPath 
         // dry run (both omit the history job), or by a run whose history job succeeded: it saved the
         // run, or declined it, as for a pull request into another branch.
         if ((early || jobs.length > 0) && (!writer || writer.conclusion === "success")) include = false;
-        // Only trust head_sha for non-pull_request_target runs on the default branch; pull_request_target's
-        // REST head_sha is the PR head rather than the base commit that supplied the workflow definition.
-        if (include && listed.agent_ran && num <= effectiveSinceRun && run.event !== "pull_request_target" && run.head_branch === defaultBranch && typeof run.head_sha === "string" && run.head_sha) {
-          reserve();
-          const runGeneration = await readRunGeneration({ githubClient, owner, repo, workflowPath, ref: run.head_sha });
+        if (include && listed.agent_ran && num <= effectiveSinceRun) {
+          const runGeneration = await definitionOf(run, early);
           if (runGeneration) listed.generation = runGeneration;
         }
         if (early && include && listed.agent_ran && !listed.generation) throw new Error("Cannot verify the earlier workflow definition");
@@ -1085,10 +1092,32 @@ async function listRuns({ githubClient, owner, repo, workflowFile, workflowPath 
     }
   }
 
-  // A later unchecked early run may reveal an intervening edit that forgives this loss.
-  if (reconciliationCeiling < firstWrite - 1) {
-    const pending = listing.find(run => run.number > floor && run.number < firstWrite && run.agent_ran && run.generation === generation);
-    if (pending) reconciliationCeiling = Math.min(reconciliationCeiling, pending.number - 1);
+  // Before charging a pre-history loss, rule out a later edit and rollback using this same listing.
+  const pending = listing.find(run => run.number > floor && run.number < firstWrite && run.agent_ran && run.generation === generation);
+  if (pending) {
+    const retained = new Map(runs.map(row => [row.number, row.generation]));
+    const listed = new Map(listing.map(run => [run.number, run]));
+    let lastEdit = 0;
+    let complete = runNumber >= firstWrite && reconciliationCeiling >= runNumber - 1;
+    for (let n = pending.number + 1; complete && n < runNumber; n++) {
+      if (ineligibleNumbers.has(n) && !eligibleByNumber.has(n)) continue;
+      const item = listed.get(n);
+      let hash = retained.get(n) || item?.generation;
+      if (!hash && eligibleByNumber.has(n)) {
+        try {
+          hash = await definitionOf(eligibleByNumber.get(n), true);
+        } catch (error) {
+          core.warning(`Could not verify the workflow definition at run ${n}: ${getErrorMessage(error)}`);
+        }
+      }
+      if (!hash) complete = false;
+      else {
+        if (item) item.generation = hash;
+        if (hash !== generation) lastEdit = n;
+      }
+    }
+    if (!complete) reconciliationCeiling = Math.min(reconciliationCeiling, pending.number - 1);
+    else for (const item of listing) if (item.agent_ran && item.number <= lastEdit) item.older_definition = true;
   }
   return {
     listing,

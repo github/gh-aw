@@ -477,6 +477,27 @@ describe("push_routing_history saves", () => {
     expect(github.calls.jobs).toEqual([]);
   });
 
+  it.each([true, false])("checks a failure-heavy start within one budget (shared revision: %s)", async shared => {
+    const remote = bareRemote();
+    const runs = Array.from({ length: 33 }, (_, i) => paginationRun(33 - i, { conclusion: "failure", head_sha: shared ? "same" : `rev-${i}` }));
+    const jobs = Object.fromEntries(
+      runs.map(run => [
+        run.id,
+        [
+          { name: "agent", started_at: run.created_at, conclusion: "success" },
+          { name: "push_routing_history", conclusion: "failure" },
+        ],
+      ])
+    );
+    const contents = Object.fromEntries(runs.map(run => [run.head_sha, `GH_AW_ROUTING_GENERATION: "${GENERATION}"`]));
+    const github = fakeGitHub(remote, { runs, jobs, contents });
+    await save(remote, 34, "success", { github });
+    expect(remoteState(remote)).toMatchObject({ last_run: 34, reconciled_through: shared ? 34 : 0, unexplained: shared ? 33 : 0 });
+    expect(github.calls.jobs.length + github.calls.contents.length).toBe(shared ? 34 : 64);
+    await save(remote, 35, "success", { github });
+    expect(remoteState(remote)).toMatchObject({ last_run: 35, reconciled_through: shared ? 35 : 0, unexplained: shared ? 33 : 0 });
+  });
+
   it("does not mistake a post-commit job failure for a missing save after journal eviction", async () => {
     const remote = bareRemote();
     // #12 first saved while #11 was still running. Both #12 and #13 have now aged out.
@@ -587,6 +608,27 @@ describe("push_routing_history saves", () => {
         .filter(row => row.note === "older_definition")
         .map(row => row.number)
     ).toEqual([1, 2]);
+  });
+
+  it.each(["skipped agent", "late saved row", "after first write"])("uses intervening edit evidence from a %s", async source => {
+    const remote = bareRemote();
+    const edited = `${"c".repeat(64)}:${"d".repeat(64)}`;
+    const changed = source === "after first write" ? 3 : 2;
+    const runs = [3, 2, 1].map(n => paginationRun(n, { head_sha: n === changed ? "edited" : "original", conclusion: [1, changed].includes(n) ? "failure" : "success" }));
+    const failed = [
+      { name: "agent", started_at: runCreatedAt(1), conclusion: "success" },
+      { name: "push_routing_history", conclusion: "failure" },
+    ];
+    const github = fakeGitHub(remote, {
+      runs,
+      jobs: { 9001: failed, [9000 + changed]: source === "skipped agent" ? failed.map(job => ({ ...job, conclusion: "skipped" })) : failed },
+      contents: { original: `GH_AW_ROUTING_GENERATION: "${GENERATION}"`, edited: `GH_AW_ROUTING_GENERATION: "${edited}"` },
+    });
+    if (source !== "skipped agent") await save(remote, source === "late saved row" ? 3 : 2, "success", { github: fakeGitHub(remote) });
+    if (source === "late saved row") await save(remote, 2, "success", { github, generation: edited });
+    await save(remote, source === "skipped agent" ? 3 : 4, "success", { github });
+    expect(remoteRuns(remote).filter(row => row.number === 1)).toMatchObject([{ note: "older_definition", counted: false }]);
+    expect(remoteState(remote).unexplained).toBe(0);
   });
 
   it("lands two saves that read the same state, re-applying the later one to the newer file", async () => {

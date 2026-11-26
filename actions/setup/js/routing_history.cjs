@@ -39,7 +39,7 @@ const LIVE_ROLES = new Set(["serve", "test", "probe", "ordinary"]);
  * @typedef {{ v: number, workflow: string, seq: number, generation: { hash: string, since_run: number } | null, reset_after_run: number, last_run: number, first_write_run?: number, reconciled_through?: number, unresolved_runs?: number[], unresolved_run_ids?: Record<string, string>, unresolved_lookup_cursor?: number, unexplained: number, scopes: Record<string, ScopeRecord>, updated: { run: string | null, at: string } | null }} HistoryState
  * @typedef {{ run: string, number: number, attempt: number | null, at: string, generation: string | null, scope: string | null, mode: string | null, role: string | null, pair: string | null, outcome: string | null, credits: number | null, counted: boolean, note: string | null }} RunLine
  * @typedef {{ credits?: number | null, model_credits?: number | null, tokens?: (number | null)[] | null }} RunCost
- * @typedef {{ id: string, number: number, conclusion: string, agent_ran?: boolean | null, generation?: string | null }} ListedRun
+ * @typedef {{ id: string, number: number, conclusion: string, agent_ran?: boolean | null, generation?: string | null, older_definition?: boolean }} ListedRun
  * @typedef {{ verified: boolean, ceiling?: number, unresolved?: number[], unresolved_ids?: Record<string, string>, unresolved_lookup_cursor?: number, resolved?: number[] }} ReconciliationCoverage
  * @typedef {{ workflow: string, run: { id: string, number: number, attempt: number }, at: string, generation: string, mode: string, scope: string, observation: { outcome: string, reason?: string } | null, pair: string | null, cost?: RunCost | null, receipt?: Record<string, any> | null, prepare?: { explore_allowed?: boolean } | null, listing?: ListedRun[], reconciliation?: ReconciliationCoverage | null }} RunEvidence
  */
@@ -541,11 +541,6 @@ function applyRun(input, runs, run, options = {}) {
   // Completed runs that wrote no line are charged after the fences, in the right generation.
   const written = new Set(runs.map(entry => entry.run));
   const sinceRun = state.generation.since_run;
-  const firstWrite = input.first_write_run ?? (input.generation === null ? number : 0);
-  let lastEarlyEdit = sinceRun > firstWrite ? firstWrite : 0;
-  for (const other of run.listing || []) {
-    if (other.number < firstWrite && other.generation && other.generation !== state.generation.hash) lastEarlyEdit = Math.max(lastEarlyEdit, other.number);
-  }
   for (const other of [...(run.listing || [])].sort((left, right) => left.number - right.number)) {
     if (written.has(other.id) || other.id === id || other.number <= state.reset_after_run) continue;
     if (hasReconciliation) {
@@ -558,8 +553,7 @@ function applyRun(input, runs, run, options = {}) {
       continue;
     }
     if (["success", "skipped", "neutral"].includes(other.conclusion)) continue;
-    // A rollback can restore the same hash without undoing the intervening edit's forgiveness.
-    if (hasReconciliation && other.generation && other.number <= sinceRun && (other.generation !== state.generation.hash || other.number < lastEarlyEdit)) {
+    if (hasReconciliation && other.generation && (other.older_definition || (other.number <= sinceRun && other.generation !== state.generation.hash))) {
       lines.push(line("older_definition", { run: other.id, number: other.number, attempt: 1, generation: other.generation }));
       written.add(other.id);
       continue;
