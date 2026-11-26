@@ -108,6 +108,7 @@ The method names mentioned in analyzer descriptions (such as `Err`, `Flush`, `Re
 - `uncheckedtypeassertion` — reports single-value type assertions where unchecked panics are possible.
 - `uncheckedflushreturn` — reports `Flush()` method calls where the error return is discarded, which silently drops buffered data on failure.
 - `walkdirignoredeerror` — reports `filepath.Walk` and `filepath.WalkDir` calls where the error return is discarded, hiding traversal failures. The analyzer lives in `walk-dir-ignored-error`.
+- `walkfuncerrshadow` — reports `filepath.Walk` and `filepath.WalkDir` callbacks whose `err` parameter shadows an outer error assigned from the walk call.
 - `wgdonenotdeferred` — reports non-deferred `sync.WaitGroup.Done()` calls that can deadlock on panics or early returns.
 - `writebytestring` — reports `w.Write([]byte(s))` calls where `s` is a string, which can be replaced with `io.WriteString` to avoid an unnecessary `[]byte` allocation.
 - `writefilepublicpermsensitive` — reports `os.WriteFile`, creating `os.OpenFile`, and `os.MkdirAll` calls using a world-accessible `constants.FilePermPublic` mode when a path or written content contains a sensitive word such as `token`, `secret`, `key`, `credential`, `password`, `auth`, or `env`. Words are matched as identifier/string segments, including camelCase and punctuation boundaries; package and function identifiers are ignored. Non-creating `os.OpenFile` calls and constant modes without world permissions are ignored. This is a heuristic, not data-flow analysis; review findings and use a restricted file or directory mode where appropriate. Existing files are not made private by changing their creation mode.
@@ -281,7 +282,7 @@ environment variable and gates findings on the recorded execution hit count for 
 | `osopenreadallpreferreadfile` | Custom `go/analysis` analyzer that recommends `os.ReadFile` for an `os.Open` file used only by deferred `Close` and one `ReadAll` |
 | `osexitinlibrary` | Custom `go/analysis` analyzer that flags `os.Exit` usage in library packages |
 | `osremoveuncheckedcleanup` | Custom `go/analysis` analyzer that flags discarded errors from `os.Remove` and `os.RemoveAll` expression and `go` statements |
-| `osstatignoredeerrorderef` | Custom `go/analysis` analyzer that flags dereferences of `os.Stat` and `os.Lstat` results after their errors are discarded without a nil check |
+| `os-stat-ignored-error-deref` (`osstatignoredeerrorderef`) | Custom `go/analysis` analyzer that flags dereferences of `os.Stat` and `os.Lstat` results after their errors are discarded without a nil check |
 | `ossetenvlibrary` | Custom `go/analysis` analyzer that flags `os.Setenv` usage in library packages |
 | `packagelevelmutableslicemap` | Custom `go/analysis` analyzer that flags package-level slice/map `var` declarations mutated from inside a function body via `append()` re-assignment, index assignment, or `delete()` |
 | `panic-in-library-code` | Custom `go/analysis` analyzer that flags `panic()` usage in library packages |
@@ -336,6 +337,16 @@ environment variable and gates findings on the recorded execution hit count for 
 |---|---|
 | `All` | Returns the canonical registry of all custom analyzers as `[]*analysis.Analyzer` for multichecker wiring, test assertions, and documentation consistency checks |
 | `ErrorMessageAnalyzer` | Compatibility alias to `pkg/linters/errormessage.Analyzer` |
+
+### Analyzer tiers
+
+| Symbol | Description |
+|---|---|
+| `TierAll`, `TierFast`, `TierSlow` | Accepted tier names for `SelectTier` and the `GH_AW_LINT_TIER` environment variable. |
+| `Fast`, `Slow` | Return registered analyzers in the fast or slow tier. |
+| `IsSlow` | Reports whether an analyzer name belongs to the slow tier. |
+| `SlowAnalyzerReasons` | Returns a copy of the slow-tier analyzer names and their classification reasons. |
+| `SelectTier` | Selects analyzers for a tier while preserving command-line flags for excluded analyzers; rejects flags that explicitly enable an analyzer outside the selected tier. |
 
 ## Usage Examples
 
