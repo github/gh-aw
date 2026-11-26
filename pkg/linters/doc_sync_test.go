@@ -44,6 +44,7 @@ var notYetEnforced = map[string]string{
 	"httpclientnotimeout":              "the new HTTP client timeout analyzer needs an enforcement-readiness audit",
 	"ignoredlocalerror":                "existing ignored local errors need review before CI enforcement",
 	"jsondecodertrailingdataunchecked": "new JSON decoder correctness analyzer needs an enforcement-readiness audit before CI enables it",
+	"jsondecoderunknownfields":         "new JSON decoder correctness analyzer needs an enforcement-readiness audit before CI enables it",
 	"jsonunmarshalbytesconversion":     "existing production conversions need review before CI enforcement",
 	"largefunc":                        "existing production violations need remediation before enforcement; nolint suppression already works",
 	"lenstringzero":                    "requires an enforcement audit after the diagnostic-message fix (#54717)",

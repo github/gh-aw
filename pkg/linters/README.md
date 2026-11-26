@@ -49,6 +49,7 @@ The method names mentioned in analyzer descriptions (such as `Err`, `Flush`, `Re
 - `ignoredlocalerror` — reports ignored error results from functions in the `github.com/github/gh-aw` module.
 - `ioutildeprecated` — reports uses of deprecated `io/ioutil` functions (deprecated since Go 1.16) and suggests their replacements in the `io` and `os` packages.
 - `jsondecodertrailingdataunchecked` — reports in-memory JSON decoders whose first `Decode` is not followed by a `Decode` that checks for `io.EOF`, allowing trailing JSON data to go unnoticed.
+- `jsondecoderunknownfields` — reports `json.Decoder` values used to `Decode` JSON without calling `DisallowUnknownFields` on that decoder, so unexpected object fields are not rejected.
 - `jsonmarshalignoredeerror` — reports `json.Marshal` and `json.Unmarshal` calls where the error return is discarded.
 - `jsonunmarshalbytesconversion` — reports `json.Unmarshal([]byte(s), ...)` calls where `s` is a string; use a decoder for streams, or require a second `Decode` to return `io.EOF` to preserve whole-document validation.
 - `largefunc` — reports function bodies that exceed a configurable line-count threshold.
@@ -266,6 +267,7 @@ environment variable and gates findings on the recorded execution hit count for 
 | `ignoredlocalerror` | Custom `go/analysis` analyzer that flags discarded errors from functions in the `github.com/github/gh-aw` module |
 | `ioutildeprecated` | Custom `go/analysis` analyzer that flags deprecated `io/ioutil` function calls (deprecated since Go 1.16) and suggests replacements in the `io` and `os` packages |
 | `jsondecodertrailingdataunchecked` | Custom `go/analysis` analyzer that flags in-memory JSON decoders whose first `Decode` is not followed by a `Decode` that checks for `io.EOF` |
+| `jsondecoderunknownfields` | Custom `go/analysis` analyzer that flags `json.Decoder` values that `Decode` without calling `DisallowUnknownFields` on the same decoder |
 | `jsonmarshalignoredeerror` | Custom `go/analysis` analyzer that flags `json.Marshal`/`json.Unmarshal` calls where the error return is discarded |
 | `jsonunmarshalbytesconversion` | Custom `go/analysis` analyzer that flags `json.Unmarshal([]byte(s), ...)` calls where `s` is a string and recommends `strings.NewReader(s)` for streams or requiring a second `Decode` to return `io.EOF` for whole-document validation |
 | `largefunc` | Custom `go/analysis` analyzer that flags large functions with actionable diagnostics |
