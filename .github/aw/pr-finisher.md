@@ -23,6 +23,8 @@ comment, review, reply, or Copilot request. Skip active coding-agent or finisher
 runs and short-running pending CI. Suppress previously requested work using
 persisted head/work fingerprints; elapsed time alone is insufficient. Do not
 repeatedly nudge if this automation wrote the latest conversation comment.
+If fingerprint state cannot be read or recorded, skip automatic repair and skip
+trigger handoffs; report the limitation.
 Revalidate eligibility immediately before handoff; never sleep, poll, or loop
 inside the agent to wait out cooldowns.
 
@@ -51,39 +53,51 @@ that PR; keep write credentials in safe-output jobs. Use a narrow, task-specific
 `safe-outputs.push-to-pull-request-branch.exclude-lock-yml: true` and
 `excluded-files: [".github/workflows/*.yml", ".github/workflows/*.yaml"]` so
 generated locks do not prevent pushes without a workflow-capable App or token.
+Set `fallback-as-pull-request: false` to prevent replacement PRs on push failure.
 Never publish workflow YAML through this finisher. Route protected-file changes
 to human review; never add credentials or broaden permissions to bypass protection.
 
 ## Make one bounded repair pass
 
 Read PR state, review threads, and latest checks once; reuse the snapshot. Stop
-if the PR is ineligible, no actionable work remains, feedback is already
-addressed, or a human decision or external fix is required. Apply the smallest
-correct changes for unanswered, unresolved, in-scope feedback. Inspect failed
-checks and fix causes; never weaken tests or disable checks.
+if the PR is ineligible or no action remains. If feedback is already addressed,
+skip repair but still verify and handle unresolved threads as described below.
+Hand off decisions and external fixes. Apply the smallest correct changes for
+unanswered, unresolved, in-scope feedback. Inspect failed checks and fix causes;
+never weaken tests or disable checks.
 
 If the branch needs its base, merge only a locally available base ref and
 preserve PR changes. Without git credentials, do not fetch, pull, rebase,
 force-push, or push directly. Hand off missing history or credentials.
 
-Run focused tests, formatting, and other repository-required validations.
+Run focused tests, formatting, and other repository-required validations in an
+isolated, unprivileged environment without credentials accessible to PR code;
+if unavailable, hand off rather than execute PR code with credentials.
 Recompile changed workflow Markdown and inspect the output, but never publish
-generated workflow YAML through a finisher safe output. Local validation does
-not prove CI passed.
+generated workflow YAML through a finisher safe output. If the repair needs a
+generated workflow YAML change, hand off the entire dependent change instead of
+publishing only its Markdown. Local validation does not prove CI passed.
 
 ## Publish and report accurately
 
-Use the declared PR-branch safe output once, identifying the validated PR and
-branch. Never create another PR, merge, approve, dispatch a workflow, retry CI,
-or call assignment tools. Published changes make CI stale; report that a
-maintainer may need to retrigger it.
+For validated changes, use the declared PR-branch safe output once, identifying
+the validated PR and branch. Enforce the validated head SHA with an atomic
+conditional update at publication; if the head changed or this cannot be
+enforced, do not push and hand off.
+Do not treat a queued safe output as confirmed publication. Never create another
+PR, merge, approve, dispatch a workflow, retry CI, or call assignment tools.
+Published changes make CI stale; report that a maintainer may need to retrigger it.
 
 Instead of local repair, if the repository supports Copilot coding agent and an
 `assign-to-agent` token is configured, hand off via the declared `add-comment`
 safe output authenticated with that token. Set
 `safe-outputs.mentions.allowed: ["@copilot"]`; start the comment with literal
 `@copilot`, not a Markdown link or prefixed marker. Request only concrete
-outstanding work on the existing PR branch.
+outstanding work on the existing PR branch. Before posting, require an
+independent deterministic gate in trusted workflow code: manual dispatch with
+an explicitly selected PR, or a maintainer-controlled approval label or
+allowlist. If the gate is absent, fails, or cannot be verified, never post the
+trigger mention; use bounded local repair or a human handoff instead.
 Apply the same cooldown and fingerprint deduplication; record the request without
 claiming the agent started. Never repair locally and request the same work.
 Keep the token out of the agent job. Without support or credentials, use bounded
